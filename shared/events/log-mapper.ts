@@ -868,7 +868,7 @@ export const buildLogPresentationPlan = (
           playerId: event.playerId ?? event.actorPlayerId ?? event.targetPlayerId,
           params: {
             player: playerName(ctx, event.playerId ?? event.actorPlayerId ?? event.targetPlayerId),
-            actionId: event.actionId,
+            action: actionName(ctx, event.actionId),
             cardId: event.cardId,
           },
         }])

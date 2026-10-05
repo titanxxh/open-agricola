@@ -3,6 +3,7 @@ import type { EventSink } from '../contract/events'
 import { getMajorCard } from '../cards/major'
 import { getRegisteredMinorImprovement, getRegisteredOccupation } from '../cards/registry-display'
 import { positionKey } from '../domain/farm'
+import { moorSpecialActionBaseResources } from '../domain/moor-special-action-values'
 import { improvementAction } from '../actions/effects/improvement'
 import {
   hasVisibleTerrain,
@@ -58,9 +59,6 @@ const hasAdjacentField = (fields: readonly Field[], tile: FarmTilePosition): boo
     { row: tile.row, col: tile.col + 1 },
   ].some((neighbor) => fieldKeys.has(positionKey(neighbor)))
 }
-
-const horseMarketFoodCost = (state: GameState): number =>
-  [2, 5, 6].includes(state.players.length) ? 1 : 0
 
 const improvementFlow = (types: readonly ('major' | 'minor')[]): ActionFlow => ({
   type: 'leaf',
@@ -167,15 +165,12 @@ export const validateMoorSpecialAction = (
   if (!isMoorSpecialActionCardUsableByPlayer(card, player.id)) {
     return { ok: false, error: 'special action unavailable' }
   }
-  const requiredFood =
-    (card.location.kind === 'playerFaceUp' ? 2 : 0) +
-    (actionId === 'horse-market' ? horseMarketFoodCost(state) : 0) +
-    (actionId === 'illicit-work' ? 1 : 0)
+  const { cost } = moorSpecialActionBaseResources(actionId, state.players.length)
+  const requiredFood = (card.location.kind === 'playerFaceUp' ? 2 : 0) + (cost.food ?? 0)
   if (player.resources.food < requiredFood) {
     return { ok: false, error: 'not enough food' }
   }
-  const requiredFuel =
-    actionId === 'black-market' || actionId === 'illicit-work' ? 1 : 0
+  const requiredFuel = cost.fuel ?? 0
   if ((player.resources.fuel ?? 0) < requiredFuel) {
     return { ok: false, error: 'not enough fuel' }
   }
@@ -256,6 +251,7 @@ const executeMoorSpecialActionEffect = (
   eventSink?: EventSink,
 ): MoorSpecialActionResult => {
   const player = state.players[playerIndex]!
+  const { cost, gain } = moorSpecialActionBaseResources(actionId, state.players.length)
   let followUpFlow: ActionFlow | undefined
   let terrainCleared: boolean | undefined
 
@@ -265,7 +261,7 @@ const executeMoorSpecialActionEffect = (
       const removed = removeVisibleTerrain(player, payload.tile, 'moor')
       if (!removed.ok) return { ok: false, error: 'terrain unavailable' }
       terrainCleared = removed.cleared
-      player.resources.fuel = (player.resources.fuel ?? 0) + 3
+      player.resources.fuel = (player.resources.fuel ?? 0) + (gain.fuel ?? 0)
       applyMoorSpecialActionBonuses(state, player, actionId)
       emitGain(eventSink, player, actionId, resourceDelta(before, player.resources))
       break
@@ -275,7 +271,7 @@ const executeMoorSpecialActionEffect = (
       const removed = removeVisibleTerrain(player, payload.tile, 'forest')
       if (!removed.ok) return { ok: false, error: 'terrain unavailable' }
       terrainCleared = removed.cleared
-      player.resources.wood += 2
+      player.resources.wood += gain.wood ?? 0
       applyMoorSpecialActionBonuses(state, player, actionId)
       emitGain(eventSink, player, actionId, resourceDelta(before, player.resources))
       break
@@ -294,27 +290,27 @@ const executeMoorSpecialActionEffect = (
     }
     case 'hiring-fair': {
       const before = { ...player.resources }
-      player.resources.food += state.players.length === 3 ? 2 : 1
+      player.resources.food += gain.food ?? 0
       emitGain(eventSink, player, actionId, resourceDelta(before, player.resources))
       break
     }
     case 'horse-market': {
-      const foodCost = horseMarketFoodCost(state)
+      const foodCost = cost.food ?? 0
       player.resources.food -= foodCost
-      player.resources.horse = (player.resources.horse ?? 0) + 1
+      player.resources.horse = (player.resources.horse ?? 0) + (gain.horse ?? 0)
       emitPayment(eventSink, player, actionId, { food: foodCost })
-      emitGain(eventSink, player, actionId, { horse: 1 })
+      emitGain(eventSink, player, actionId, gain)
       break
     }
     case 'black-market':
-      player.resources.fuel = (player.resources.fuel ?? 0) - 1
-      emitPayment(eventSink, player, actionId, { fuel: 1 })
+      player.resources.fuel = (player.resources.fuel ?? 0) - (cost.fuel ?? 0)
+      emitPayment(eventSink, player, actionId, cost)
       followUpFlow = improvementFlow(['minor'])
       break
     case 'illicit-work':
-      player.resources.food -= 1
-      player.resources.fuel = (player.resources.fuel ?? 0) - 1
-      emitPayment(eventSink, player, actionId, { food: 1, fuel: 1 })
+      player.resources.food -= cost.food ?? 0
+      player.resources.fuel = (player.resources.fuel ?? 0) - (cost.fuel ?? 0)
+      emitPayment(eventSink, player, actionId, cost)
       followUpFlow = improvementFlow(['major'])
       break
     default:

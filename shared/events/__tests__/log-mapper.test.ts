@@ -1230,7 +1230,7 @@ describe('eventsToLogEntries', () => {
         key: 'log.cardGrantedAction', playerId: 'p1',
         params: {
           player: 'Alice',
-          actionId: 'construct',
+          action: 'actions.construct.name',
           cardId: 'A150_Stagehand',
         },
       },

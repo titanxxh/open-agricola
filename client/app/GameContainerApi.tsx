@@ -1895,6 +1895,7 @@ export const GameContainerApi = () => {
         <section className="board-panel board-special-actions">
           <SpecialActionsPanel
             locale={locale}
+            playerCount={state.players.length}
             cards={state.farmersOfTheMoor.specialActionCards}
             currentPlayerId={currentPlayer.id}
             availability={currentPlayer.moorSpecialActionAvailability}
