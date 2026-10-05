@@ -30,7 +30,7 @@ export function buildEnvelope(args: Args): StateUpdateEnvelope {
     requestId: args.requestId,
     payload: args.mode === 'debug'
       ? buildSessionSyncPayload(args.room.session, args.resp, args.viewerPlayerId, args.mode, true)
-      : projectRoomHistoryNames(args.room, buildSessionSyncPayload(args.room.session, args.resp, args.viewerPlayerId, args.mode, true)),
+      : projectRoomHistoryNames(args.room, buildSessionSyncPayload(args.room.session, args.resp, args.viewerPlayerId, args.mode, true, 'deferred')),
     emittedAt: args.emittedAt,
   }
 }

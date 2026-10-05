@@ -21,6 +21,8 @@ import type { GameCore, SessionResponse } from './session-core.ts'
  * `debug` is the full authoritative state.
  */
 export type SyncPayloadMode = 'viewer' | 'dev-viewer' | 'debug'
+/** Room envelopes apply their connection names after windowing; other callers use Session names. */
+export type HistoryNameProjection = 'session' | 'deferred'
 
 export function buildSyncPayload(
   core: GameCore,
@@ -29,6 +31,7 @@ export function buildSyncPayload(
   mode: SyncPayloadMode = 'viewer',
   serializedState?: SerializedGameState,
   windowed = false,
+  historyNameProjection: HistoryNameProjection = 'session',
 ): GameSyncPayload {
   const ctx = { engineStack: core.getEngineStack() }
   const defs = core.getCustomCardDefs()
@@ -81,5 +84,7 @@ export function buildSyncPayload(
     base.cardWarnings = [...core.cardWarnings]
   }
   const payload = windowed && mode !== 'debug' ? applyHistoryWindow(canonicalState, base, viewerPlayerId) : base
-  return mode !== 'debug' ? { ...payload, state: projectHistoryStateNames(payload.state) } : payload
+  return mode !== 'debug' && (!windowed || historyNameProjection === 'session')
+    ? { ...payload, state: projectHistoryStateNames(payload.state) }
+    : payload
 }
