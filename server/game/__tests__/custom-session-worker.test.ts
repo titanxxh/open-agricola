@@ -1,4 +1,5 @@
 import { buildRoomHistoryPage } from '../../../shared/session/history-window'
+import { buildEnvelope } from '../../connection/envelope-builder'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { CustomCardData } from '../../../shared/cards/session-card-context.ts'
 import { validateAndCompileCustomCode } from '../../custom-code/engine.ts'
@@ -67,6 +68,32 @@ afterEach(() => {
 })
 
 describe('custom session executor', () => {
+  it('keeps cached Worker payloads authoritative while projecting current Room names', async () => {
+    const { session, executor } = setup(card('CUSTOM_HistoryNames'))
+    session.state.players.forEach(player => { player.name = 'Recorded name' })
+    session.loadState({ ...session.state, log: [{ key: 'transfer',
+      playerRefs: { fromPlayer: 'p1', toPlayer: 'p2' },
+      params: { fromPlayer: 'Recorded name', toPlayer: 'Recorded name' } }] })
+    await executor.updatePlayerNames([[0, 'Worker actor'], [1, 'Worker recipient']])
+    const response = await executor.execute('getState', [])
+    const cached = buildSessionSyncPayload(session, response, 'p1', 'viewer', true)
+    const cachedText = JSON.stringify(cached)
+    expect(cached.state.log[0]!.params).toEqual({ fromPlayer: 'Worker actor', toPlayer: 'Worker recipient' })
+    const nativeBuild = vi.spyOn(session, 'buildSyncPayload').mockImplementation(() => { throw new Error('Cached Worker payload must not be rebuilt') })
+    const room = { id: 'worker-names', session,
+      players: [{ playerIndex: 0, name: 'Room actor' }, { playerIndex: 1, name: 'Room recipient' }] as never }
+    const first = buildEnvelope({ room, resp: response, viewerPlayerId: 'p1', version: 1, cause: 'reconnect', emittedAt: 0 })
+    expect(first.payload.state.log[0]!.params).toEqual({ fromPlayer: 'Room actor', toPlayer: 'Room recipient' })
+    expect(first.payload.historyWindow).toEqual(cached.historyWindow)
+    expect(first.payload.state.players[0]!.minorHand).toEqual(cached.state.players[0]!.minorHand)
+    expect(first.payload.state.players[1]!.minorHand).toEqual(cached.state.players[1]!.minorHand)
+    expect(JSON.stringify(cached)).toBe(cachedText)
+    expect(buildSessionSyncPayload(session, response, 'p1', 'viewer', true)).toBe(cached)
+    expect(nativeBuild).not.toHaveBeenCalled()
+    expect(executor.serializedStateForPersistence()!.frame.log[0]!.params)
+      .toEqual({ fromPlayer: 'Recorded name', toPlayer: 'Recorded name' })
+  })
+
   it('shares the worker budget between room reservations and HTTP sessions', async () => {
     const customCard = card('CUSTOM_Capacity')
     const rooms = Array.from({ length: 14 }, () => setup(customCard))

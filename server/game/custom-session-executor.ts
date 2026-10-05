@@ -17,6 +17,7 @@ import {
   type SyncPayloadMode,
 } from './authoritative-session.ts'
 import type { StateWithCursor } from '../../shared/session/session-core.ts'
+import type { HistoryNameProjection } from '../../shared/session/sync-payload.ts'
 
 const WORKER_SCRIPT = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -99,11 +100,13 @@ export const buildSessionSyncPayload = (
   viewerPlayerId: string | null,
   mode: SyncPayloadMode = 'viewer',
   windowed = false,
+  historyNameProjection: HistoryNameProjection = 'session',
 ): GameSyncPayload => {
   const payloads = payloadsByResponse.get(response)
   if (!payloads) {
-    return session.buildSyncPayload(response, viewerPlayerId, mode, undefined, windowed)
+    return session.buildSyncPayload(response, viewerPlayerId, mode, undefined, windowed, historyNameProjection)
   }
+  // Worker payloads already contain Session names; keep their prepared privacy projections.
   if (mode === 'debug') return payloads.debug
   const source = windowed ? payloads.windows : payloads
   const viewer = viewerPlayerId ? source.viewers[viewerPlayerId] ?? source.spectator : source.spectator

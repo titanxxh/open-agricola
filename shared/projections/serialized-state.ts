@@ -312,6 +312,25 @@ const filterHiddenHandEvents = (
     .filter((event) => !isHiddenCurrentEvent(event, hiddenRefs))
     .map((event) => remapEventSeq(event, seqView))
 
+const hasUnchangedArchiveFields = (packet: PublicEventArchivePacket): boolean => {
+  if (packet.type === 'publicEvents.committed') {
+    const length = packet.eventIds.length
+    if (length === 0 || packet.eventSeqs.length !== length ||
+      packet.firstEventSeq !== packet.eventSeqs[0] || packet.lastEventSeq !== packet.eventSeqs[length - 1]) return false
+    for (let index = 0; index < length; index += 1) {
+      if (!Object.hasOwn(packet.eventIds, index) || !Object.hasOwn(packet.eventSeqs, index)) return false
+    }
+    return true
+  }
+  const length = packet.canceledEvents.length
+  if (length === 0 || packet.canceledEventIds.length !== length || packet.canceledSeqs.length !== length) return false
+  for (let index = 0; index < length; index += 1) {
+    const event = packet.canceledEvents[index]
+    if (!event || packet.canceledEventIds[index] !== event.id || packet.canceledSeqs[index] !== event.seq) return false
+  }
+  return true
+}
+
 const filterHiddenHandArchive = (
   archive: readonly PublicEventArchivePacket[],
   hiddenRefs: HiddenHandEventRefs,
@@ -320,6 +339,14 @@ const filterHiddenHandArchive = (
   const filtered: PublicEventArchivePacket[] = []
   let packetSeq = 1
   for (const packet of archive) {
+    // A null seq view means no current or canceled event is hidden. Reuse only
+    // packets whose derived fields already match; malformed/empty packets still
+    // follow the original normalization path. The output array stays independent.
+    if (!seqView && hasUnchangedArchiveFields(packet)) {
+      filtered.push(packet)
+      packetSeq += 1
+      continue
+    }
     if (packet.type === 'publicEvents.committed') {
       const visible = packet.eventIds
         .map((id, index) => ({
