@@ -1,18 +1,17 @@
+import { buildAnimalReorgRequest } from '../../domain/animal-reorg'
 import type {
   ActionDefinition,
   ActionExecutionResult,
   ActionFlow,
   GameState,
   HarvestBreedSummary,
-  InteractionAnimalReorgZone,
   PlayerState,
 } from '../../contract/types'
 import type { EventSink } from '../../contract/events'
 import { animalKeysForState, type AnimalKey } from '../../contract/animals'
-import { playerBoard, getTotalAnimalCapacity } from '../../domain'
+import { getTotalAnimalCapacity } from '../../domain'
 import {
   computeAnimalZones,
-  getAllowedAnimalTypesForZone,
   readAnimalCountsForZoneAssignment,
 } from '../../domain/animal-zones'
 import { getBreedableAnimalCount, getBreedThreshold, shouldEnforceReorganizeOnLastHarvest } from '../../cards/card-effects'
@@ -133,33 +132,11 @@ export const breedAction: ActionDefinition = {
         }
       }
     }
-    const buildReorgRequest = (): ActionExecutionResult => {
-      const idx = state.players.indexOf(player)
-      const zones: InteractionAnimalReorgZone[] = playerBoard(state, idx).animals.zones().map((zone) => ({
-        id: zone.id,
-        zoneType: zone.zoneType,
-        cardId: zone.cardId,
-        ...(zone.ownerPlayerId ? { ownerPlayerId: zone.ownerPlayerId } : {}),
-        ...(zone.animalOwnerPlayerId ? { animalOwnerPlayerId: zone.animalOwnerPlayerId } : {}),
-        ...(zone.displayOwnerName ? { displayOwnerName: zone.displayOwnerName } : {}),
-        animalType: zone.animalType ?? null,
-        animalCount: zone.animalCount ?? 0,
-        ...(zone.animalCounts ? { animalCounts: zone.animalCounts } : {}),
-        ...(zone.allowedAnimalType !== undefined ? { allowedAnimalType: zone.allowedAnimalType } : {}),
-        ...(zone.zoneType === 'card' ? { allowedAnimalTypes: getAllowedAnimalTypesForZone(state, player, zone) } : {}),
-        ...(zone.farmPosition ? { farmPosition: zone.farmPosition } : {}),
-        ...(zone.countsFarmyardSpaceAsUnused !== undefined ? { countsFarmyardSpaceAsUnused: zone.countsFarmyardSpaceAsUnused } : {}),
-        ...(zone.displaySource ? { displaySource: zone.displaySource } : {}),
-        ...(zone.exclusiveCardZoneLimit !== undefined ? { exclusiveCardZoneLimit: zone.exclusiveCardZoneLimit } : {}),
-        ...(zone.requiredEmptyZoneGroupIds ? { requiredEmptyZoneGroupIds: zone.requiredEmptyZoneGroupIds } : {}),
-        capacity: zone.capacity,
-      }))
-      return {
-        type: 'request',
-        request: { kind: 'animal-reorg', zones },
-        sourceCard,
-      }
-    }
+    const buildReorgRequest = (): ActionExecutionResult => ({
+      type: 'request',
+      request: buildAnimalReorgRequest(state, player),
+      sourceCard,
+    })
     // Animals bred: return 'ok' so the engine's after/immediatelyAfter hooks
     // still run on the post-mutate state (D60 LargePottery, B104 SheepWalker,
     // ...). GameCore's `getAnimalCount > before` heuristic then auto-launches

@@ -461,6 +461,9 @@ describe('use-animal-reorg-flow helpers', () => {
 
     expect(wouldExceedExclusiveCardZoneLimit(reorg.zones, 'card:M035_HorseTrough@0,1')).toBe(true)
     expect(wouldExceedExclusiveCardZoneLimit(reorg.zones, 'card:M035_HorseTrough@0,0')).toBe(false)
+    reorg.zones.find((zone) => zone.id === 'card:M035_HorseTrough@0,0')!.ownerPlayerId = 'p1'
+    reorg.zones.find((zone) => zone.id === 'card:M035_HorseTrough@0,1')!.ownerPlayerId = 'p2'
+    expect(wouldExceedExclusiveCardZoneLimit(reorg.zones, 'card:M035_HorseTrough@0,1')).toBe(false)
   })
 
   it('builds pending choice with farm-redevelopment fence bonus', () => {

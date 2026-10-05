@@ -990,7 +990,7 @@ export type SelectionKind = 'farm-position' | 'occupation-hand'
 
 export type InteractionRequest =
   | { kind: 'choice'; options: ActionChoiceOption[]; structuredChoicePrefixes?: string[]; requiresExplicitChoice?: boolean }
-  | { kind: 'animal-reorg'; zones: InteractionAnimalReorgZone[] }
+  | { kind: 'animal-reorg'; zones: InteractionAnimalReorgZone[]; prefill?: boolean }
   | { kind: 'confirm-next-player'; nextPlayerIndex: number }
   | { kind: 'confirm-player-switch'; fromPlayerIndex: number; toPlayerIndex: number }
   | {

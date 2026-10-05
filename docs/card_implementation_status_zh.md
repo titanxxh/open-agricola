@@ -169,6 +169,7 @@
 | Animal-holder per-zone storage consumers | `animalCountsByZone`、`getAssignedAnimalsByType()`、`subtractAnimalsFromBoard()`、`InteractionAnimalReorgZone.exclusiveCardZoneLimit`、`InteractionAnimalReorgZone.allowedAnimalTypes`、`wouldExceedExclusiveCardZoneLimit()` | farm-position backed card zones 存动物后，所有动物消费 / 统计 helper 必须读写 `animalCountsByZone`，不能只读 legacy `animalCounts` / `held`；pending animal 检测按当前 active `AnimalZone` 统计 assigned，不把 stale keyed storage 算作已安置，也不把 visible keyed storage 加两次；exclusive card zone limit 和可接受动物类型必须由后端 pending payload 透传给前端统一 reorg helper，且 `canAccommodateAnimalTotals()` 搜索期同样执行 limit，避免前端或候选生成允许后端会裁剪或过滤的分配。非 active reorg 展示从 `SerializedPlayerState.farmCardAnimalZones` 显示空/非空候选；旧的已占用 keyed storage 仍可从 `animalCountsByZone[zoneId]` 的持久化 `capacity` / `allowedAnimalType` / `allowedAnimalTypes` / `farmPosition` 还原。 |
 | 动物重整权威拒绝 | `shared/actions/effects/reorganize.ts`、`InteractionAnimalReorgZone.allowedAnimalTypes` | 所有提交区域在变更前校验身份/类型、已启用物种、整数及数量一致性、混放、容量、库存、互斥与必空组；非法输入返回可恢复的 `log.reorganizeFail`，不改变状态、历史、交互。保留数组和 `{ zones }` 格式；省略区域为空，少分配表示主动弃养。 |
 | 已安置新生动物与仅限农场动物的交换 | `harvestBreedSummary`、`harvestBreedPlacement`、`getPlacedAnimalsByType()`、`CardExchange.fromFarmyard` / `Trade.fromFarmyard` | 共享繁殖摘要在安置后结算，排除弃掉的新生动物，覆盖修改后的父母阈值与寄养归属；C071/D115/E090/E133 及 Harvest outcome 消费者共用结算结果。繁殖等待期间跟踪支付、获得及嵌套弃养，不恢复已失去的新生动物。仅限农场动物的交换在 exchange 与有序喂食路径中校验当前安置数量；feed request 发布已安置余额供草稿按选择顺序推演，同批喂食刚获得的动物仍未安置。 |
+| 动物重整自动补位 | `prefillAnimalZones()`、`buildAnimalReorgRequest()`、`InteractionRequest.prefill` | 被动重整固定已有有效布局，尽量补入最多动物；不移动已有动物。容量、卡牌物种与混养限制、互斥区域和必空组由后端统一约束。草稿不写入真实安置、不扣弃养库存，确认后才结算；明确的手动流程保留原布局。固定种子的两人 Session 与浏览器验证覆盖安置、部分溢出、卡牌存储、收获续行和手动编辑。 |
 | Required-empty AnimalZone 分组 | `AnimalZone.requiredEmptyZoneGroupIds`、`areRequiredEmptyZoneGroupsSatisfied()`、`canAccommodateAnimalTotals()`、`InteractionAnimalReorgZone`、`reorganize` | 最终分配中，每个 group id 至少要有一个 tagged zone 为空；重叠分组全部生效且不改变 capacity。可容纳搜索检查终态，协议保留分组 metadata，后端在 mutation 前拒绝非法提交，前端只使用同一套通用确认门禁。 |
 | Scheduled future offers | `scheduled-offer` internal action、`scheduledOffersRoundStartFlow()`、`player.cardStates[cardId].extraData.scheduledOffers` | 用于未来回合的一次性 optional offer，而不是自动发放 future resource token；offer state 记录 `dueRound`、`kind`、cost、目标 special action 或 animal、`consumed` / `consumedRound`。到期时 internal action 先消费 token，再按当前可执行性决定是否弹 choice；拒绝、资源不足或目标不可执行都不会保留 token。M056 用它复用 Cut Peat special action card 校验/翻面/费用；M131 用它表达 1 food 购买预约动物并显式进入 animal reorg。 |
 | Future meeple FoM 资源覆盖 | `extendedResourceKeyList`、`receive` internal action、`buildFutureMeepleActionFlow()` | future resource token 结算复用同一个 `receive` path，并覆盖 base resource 之外的 `fuel` / `horse`；M075/M076/M078/M079 这类预约 FoM 资源的牌不需要卡内 round-start 状态机。 |
@@ -185,6 +186,8 @@
 通用行动替换在原行动的可选提示前显示统一来源菜单，唯一替代也必须明确选择。选中子树保留内部选择及可选步骤，必需续行在 before、pending、重连和撤销过程中保持承诺。每个 leaf 保存替换决定，producer 守卫以行动机会为边界，既保留行动身份，也允许新授予的行动格重新计算替换。共同契约覆盖 #850–#852 的 11 张牌迁移及普通自定义替代，以架构文档和可执行 Session 测试为准。B026 次数、E151 容量、C168 来源的独立后续保留在 §2。
 
 ## 6. 基础设施待办
+
+动物重整自动补位已在共享动物区与请求边界实现，详见 §5 基础设施表；核心路径不增加卡号分支。
 
 当前选项可用性由原生纯查询 `CardEffect.projectInteractionRequest` 实现：活动 pending 的选项及数量上限在展示与权威校验前刷新，覆盖嵌套 anytime、撤销和恢复。卡牌局部条件保留 pending 归属、随机观察、资源承诺和原有选项展示策略；未来必需流程继续沿用 ADR 0015 语义。
 

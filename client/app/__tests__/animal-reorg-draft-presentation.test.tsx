@@ -81,6 +81,21 @@ const animalReorgInteraction = (): ClientInteractionState => ({
 })
 
 describe('useAnimalReorgDraftPresentation', () => {
+  it('preserves manual changes on repeated snapshots and resets when inventory changes', () => {
+    const snapshot = state()
+    const { result } = renderHook(() => useAnimalReorgDraftPresentation({
+      state: snapshot, pendingAnimalReorg: { playerIndex: 0, spaceId: 'animal-reorg' },
+    }))
+    act(() => result.current.syncFromInteraction(animalReorgInteraction(), snapshot))
+    act(() => result.current.controls.adjustAnimal('pasture-1', 'sheep', 1))
+    act(() => result.current.syncFromInteraction(structuredClone(animalReorgInteraction()), snapshot))
+    expect(result.current.reorgTotals.sheep).toBe(1)
+    const changed = structuredClone(snapshot)
+    changed.players[0]!.resources.sheep = 1
+    act(() => result.current.syncFromInteraction(animalReorgInteraction(), changed))
+    expect(result.current.reorgTotals.sheep).toBe(0)
+  })
+
   it('owns animal reorg draft lifecycle and submit payload', () => {
     const confirm = vi.fn()
     const { result } = renderHook(() =>
@@ -90,7 +105,7 @@ describe('useAnimalReorgDraftPresentation', () => {
       }),
     )
 
-    act(() => result.current.syncFromInteraction(animalReorgInteraction()))
+    act(() => result.current.syncFromInteraction(animalReorgInteraction(), state()))
     expect(result.current.isActive).toBe(true)
     expect(result.current.animalReorg?.confirmDiscard).toBe(false)
 

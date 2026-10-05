@@ -1158,7 +1158,7 @@ export const GameContainerApi = () => {
     if (roomId) setRoomInUrl(roomId)
     applySnapshot(payload)
     applySnapshotPublicEventCancellations(payload)
-    syncAnimalReorgFromInteraction(payload.interaction)
+    syncAnimalReorgFromInteraction(payload.interaction, payload.state)
     if (payload.ok) {
       setSelectedSpecialAction(null)
       resetFarmSelectionDraft()

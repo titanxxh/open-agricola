@@ -1,3 +1,4 @@
+import { buildAnimalReorgRequest } from '../domain/animal-reorg'
 import { beginHistoryOperation, captureStateWithHistory, historyBranch, materializeHistoryBranch, recoveryRecordId, registerRecoveryRecordId } from './history-streams'
 import { cloneStateWithHistory } from './state-bootstrap'
 import { canStartBefore, evaluateFlowDoable, isActionDoableInFlowContext, isFlowDerivedDoable } from '../actions/flow'
@@ -26,7 +27,6 @@ import type {
   ProtectedObservation,
   Resource,
   ResourceKey,
-  InteractionAnimalReorgZone,
   ExactCost,
 } from '../contract/types.ts'
 import type { ActionDetailParts, PublicEventCancellation } from '../contract/protocol/game.ts'
@@ -130,7 +130,7 @@ import { recordReturnHomePlacements, resetRoundPlacements } from '../cards/helpe
 import { familySize, findPlayerById, findPlayerIndexById, hasPlayer, smallestAvailableWorker } from '../domain/player.ts'
 import { animalKeysForState, type AnimalKey } from '../contract/animals.ts'
 import { applyAnimalPayment, isAnimalResourceKey } from '../domain/animal-payment.ts'
-import { getAllowedAnimalTypesForZone, getPlacedAnimalsByType, readAnimalCountsForZoneAssignment } from '../domain/animal-zones.ts'
+import { getPlacedAnimalsByType, readAnimalCountsForZoneAssignment } from '../domain/animal-zones.ts'
 import {
   canAffordTrade,
   getMaxTradeTimes,
@@ -2354,31 +2354,6 @@ export class GameCore {
     }))
   }
 
-  private buildAnimalReorgZones(
-    player: PlayerState,
-  ): InteractionAnimalReorgZone[] {
-    const idx = this.state.players.indexOf(player)
-    return playerBoard(this.state, idx).animals.zones().map((zone) => ({
-      id: zone.id,
-      zoneType: zone.zoneType,
-      cardId: zone.cardId,
-      ...(zone.ownerPlayerId ? { ownerPlayerId: zone.ownerPlayerId } : {}),
-      ...(zone.animalOwnerPlayerId ? { animalOwnerPlayerId: zone.animalOwnerPlayerId } : {}),
-      ...(zone.displayOwnerName ? { displayOwnerName: zone.displayOwnerName } : {}),
-      animalType: zone.animalType ?? null,
-      animalCount: zone.animalCount ?? 0,
-      ...(zone.animalCounts ? { animalCounts: zone.animalCounts } : {}),
-      ...(zone.allowedAnimalType !== undefined ? { allowedAnimalType: zone.allowedAnimalType } : {}),
-      ...(zone.zoneType === 'card' ? { allowedAnimalTypes: getAllowedAnimalTypesForZone(this.state, player, zone) } : {}),
-      ...(zone.farmPosition ? { farmPosition: zone.farmPosition } : {}),
-      ...(zone.countsFarmyardSpaceAsUnused !== undefined ? { countsFarmyardSpaceAsUnused: zone.countsFarmyardSpaceAsUnused } : {}),
-      ...(zone.displaySource ? { displaySource: zone.displaySource } : {}),
-      ...(zone.exclusiveCardZoneLimit !== undefined ? { exclusiveCardZoneLimit: zone.exclusiveCardZoneLimit } : {}),
-      ...(zone.requiredEmptyZoneGroupIds ? { requiredEmptyZoneGroupIds: zone.requiredEmptyZoneGroupIds } : {}),
-      capacity: zone.capacity,
-    }))
-  }
-
   private projectPendingInteractionRequest({
     request,
     player,
@@ -2396,7 +2371,7 @@ export class GameCore {
     if (request.kind === 'animal-reorg') {
       return {
         ...request,
-        zones: player ? this.buildAnimalReorgZones(player) : request.zones,
+        ...(player ? buildAnimalReorgRequest(this.state, player, request.prefill !== false) : {}),
       }
     }
     if (request.kind !== 'choice' || !hasPendingHost || !player) return request
