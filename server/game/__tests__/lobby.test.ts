@@ -149,16 +149,16 @@ describe('lobby.getRooms', () => {
 })
 
 describe('lobby.dissolveRoomById', () => {
-  it('rejects when room is missing', () => {
+  it('rejects when room is missing', async () => {
     const lobby = createLobby({
       registry: new RoomRegistry(),
       checkpoint: checkpoint(),
       broadcaster: fakeBroadcaster(),
     })
-    expect(lobby.dissolveRoomById('nope', 'u1')).toEqual({ ok: false, error: 'room not found' })
+    expect((await lobby.dissolveRoomById('nope', 'u1'))).toEqual({ ok: false, error: 'room not found' })
   })
 
-  it('rejects when caller is not the creator', () => {
+  it('rejects when caller is not the creator', async () => {
     const registry = new RoomRegistry()
     registry.set(fakeRoom({ id: 'r1', createdBy: 'u1' }))
     const lobby = createLobby({
@@ -166,13 +166,13 @@ describe('lobby.dissolveRoomById', () => {
       checkpoint: checkpoint(),
       broadcaster: fakeBroadcaster(),
     })
-    expect(lobby.dissolveRoomById('r1', 'u2')).toEqual({
+    expect((await lobby.dissolveRoomById('r1', 'u2'))).toEqual({
       ok: false,
       error: 'only the room creator can dissolve',
     })
   })
 
-  it('rejects fixed and rotated dev rooms', () => {
+  it('rejects fixed and rotated dev rooms', async () => {
     const registry = new RoomRegistry()
     registry.set(fakeRoom({ id: 'dev2', createdBy: 'u1' }))
     const rotatedId = 'dev2-12345678-1234-1234-1234-123456789abc'
@@ -182,11 +182,11 @@ describe('lobby.dissolveRoomById', () => {
       checkpoint: checkpoint(),
       broadcaster: fakeBroadcaster(),
     })
-    expect(lobby.dissolveRoomById('dev2', 'u1').ok).toBe(false)
-    expect(lobby.dissolveRoomById(rotatedId, undefined).ok).toBe(false)
+    expect((await lobby.dissolveRoomById('dev2', 'u1')).ok).toBe(false)
+    expect((await lobby.dissolveRoomById(rotatedId, undefined)).ok).toBe(false)
   })
 
-  it('happy path: broadcasts roomDissolved + closes sockets + cleans state', () => {
+  it('happy path: broadcasts roomDissolved + closes sockets + cleans state', async () => {
     const closeCalls: number[] = []
     const fakeWs = (id: number) => ({ readyState: 1, OPEN: 1, close: () => closeCalls.push(id), send: vi.fn() })
     const registry = new RoomRegistry()
@@ -212,7 +212,7 @@ describe('lobby.dissolveRoomById', () => {
       onRoomRetired,
     })
 
-    expect(lobby.dissolveRoomById('r1', 'u1')).toEqual({ ok: true })
+    expect((await lobby.dissolveRoomById('r1', 'u1'))).toEqual({ ok: true })
     expect(broadcaster.calls.find((e) => e.type === 'roomDissolved')).toBeTruthy()
     expect(closeCalls.sort()).toEqual([0, 1])
     expect(registry.has('r1')).toBe(false)
@@ -223,7 +223,7 @@ describe('lobby.dissolveRoomById', () => {
 })
 
 describe('lobby.endRoomsForUser', () => {
-  it('does not end rotated dev rooms for a deleted participant', () => {
+  it('does not end rotated dev rooms for a deleted participant', async () => {
     const id = 'dev2-12345678-1234-1234-1234-123456789abc'
     const registry = new RoomRegistry()
     registry.set(fakeRoom({
@@ -236,11 +236,11 @@ describe('lobby.endRoomsForUser', () => {
       broadcaster: fakeBroadcaster(),
     })
 
-    expect(lobby.endRoomsForUser('u1')).toEqual({ endedRoomIds: [] })
+    expect((await lobby.endRoomsForUser('u1'))).toEqual({ endedRoomIds: [] })
     expect(registry.has(id)).toBe(true)
   })
 
-  it('ends rooms created by or joined by the deleted user', () => {
+  it('ends rooms created by or joined by the deleted user', async () => {
     const closeCalls: string[] = []
     const fakeWs = (id: string) => ({ readyState: 1, OPEN: 1, close: () => closeCalls.push(id), send: vi.fn() })
     const registry = new RoomRegistry()
@@ -294,7 +294,7 @@ describe('lobby.endRoomsForUser', () => {
       onRoomRetired,
     })
 
-    expect(lobby.endRoomsForUser('u1')).toEqual({ endedRoomIds: ['owned-room', 'joined-room'] })
+    expect((await lobby.endRoomsForUser('u1'))).toEqual({ endedRoomIds: ['owned-room', 'joined-room'] })
     expect(closeCalls.sort()).toEqual(['joined-u1', 'joined-u2', 'owned-u1', 'owned-u2'])
     expect(broadcaster.calls.filter((event) => event.type === 'roomDissolved').map(event => event.roomId).sort())
       .toEqual(['joined-room', 'owned-room'])
@@ -305,8 +305,6 @@ describe('lobby.endRoomsForUser', () => {
     expect(registry.lastActivityOf('joined-room')).toBeUndefined()
     expect(persistence.load('owned-room')).toBeNull()
     expect(persistence.load('joined-room')).toBeNull()
-    expect(persistence.__getResultForTest('owned-room')).toBeUndefined()
-    expect(persistence.__getResultForTest('joined-room')).toBeUndefined()
     expect(persistence.load('unrelated-room')?.meta.status).toBe('playing')
     expect(onRoomRetired.mock.calls).toEqual([
       ['owned-room'],
@@ -314,7 +312,7 @@ describe('lobby.endRoomsForUser', () => {
     ])
   })
 
-  it('ends rooms by persisted affected ids when the deleted user is disconnected', () => {
+  it('ends rooms by persisted affected ids when the deleted user is disconnected', async () => {
     const closeCalls: string[] = []
     const fakeWs = (id: string) => ({ readyState: 1, OPEN: 1, close: () => closeCalls.push(id), send: vi.fn() })
     const registry = new RoomRegistry()
@@ -350,7 +348,7 @@ describe('lobby.endRoomsForUser', () => {
     const broadcaster = fakeBroadcaster()
     const lobby = createLobby({ registry, checkpoint: checkpoint(persistence), broadcaster })
 
-    expect(lobby.endRoomsForUser('u1', ['disconnected-joined-room'])).toEqual({ endedRoomIds: ['disconnected-joined-room'] })
+    expect((await lobby.endRoomsForUser('u1', ['disconnected-joined-room']))).toEqual({ endedRoomIds: ['disconnected-joined-room'] })
     expect(closeCalls).toEqual(['u2'])
     expect(broadcaster.calls.filter((event) => event.type === 'roomDissolved').map(event => event.roomId))
       .toEqual(['disconnected-joined-room'])
@@ -358,13 +356,12 @@ describe('lobby.endRoomsForUser', () => {
     expect(registry.has('unrelated-room')).toBe(true)
     expect(registry.lastActivityOf('disconnected-joined-room')).toBeUndefined()
     expect(persistence.load('disconnected-joined-room')).toBeNull()
-    expect(persistence.__getResultForTest('disconnected-joined-room')).toBeUndefined()
     expect(persistence.load('unrelated-room')?.meta.status).toBe('playing')
   })
 })
 
 describe('lobby.endRoomsUsingCard', () => {
-  it('terminates every room embedding the card and leaves others alone', () => {
+  it('terminates every room embedding the card and leaves others alone', async () => {
     const registry = new RoomRegistry()
     const closeA = vi.fn()
     const closeB = vi.fn()
@@ -389,7 +386,7 @@ describe('lobby.endRoomsUsingCard', () => {
       onRoomRetired: (roomId) => retired.push(roomId),
     })
 
-    const { endedRoomIds } = lobby.endRoomsUsingCard('card-db-1')
+    const { endedRoomIds } = (await lobby.endRoomsUsingCard('card-db-1'))
 
     expect(endedRoomIds.sort()).toEqual(['using-a', 'using-b'])
     expect(registry.has('using-a')).toBe(false)
@@ -405,7 +402,7 @@ describe('lobby.endRoomsUsingCard', () => {
     ]))
   })
 
-  it('ends finished rooms too — their completed archives are protected at the cleanup layer', () => {
+  it('ends finished rooms too — their completed archives are protected at the cleanup layer', async () => {
     const registry = new RoomRegistry()
     registry.set(fakeRoom({
       id: 'finished',
@@ -417,11 +414,11 @@ describe('lobby.endRoomsUsingCard', () => {
       checkpoint: checkpoint(),
       broadcaster: fakeBroadcaster(),
     })
-    expect(lobby.endRoomsUsingCard('card-db-1')).toEqual({ endedRoomIds: ['finished'] })
+    expect((await lobby.endRoomsUsingCard('card-db-1'))).toEqual({ endedRoomIds: ['finished'] })
     expect(registry.has('finished')).toBe(false)
   })
 
-  it('is a safe no-op when no room uses the card', () => {
+  it('is a safe no-op when no room uses the card', async () => {
     const registry = new RoomRegistry()
     registry.set(fakeRoom({ id: 'r1', customCardDbIds: ['other'] }))
     const lobby = createLobby({
@@ -429,7 +426,7 @@ describe('lobby.endRoomsUsingCard', () => {
       checkpoint: checkpoint(),
       broadcaster: fakeBroadcaster(),
     })
-    expect(lobby.endRoomsUsingCard('card-db-1')).toEqual({ endedRoomIds: [] })
+    expect((await lobby.endRoomsUsingCard('card-db-1'))).toEqual({ endedRoomIds: [] })
     expect(registry.has('r1')).toBe(true)
   })
 })

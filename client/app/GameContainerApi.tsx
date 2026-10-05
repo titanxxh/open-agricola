@@ -149,6 +149,7 @@ const useTransportSetup = (
   const [localReady, setLocalReady] = useState(false)
 
   const initRef = useRef(false)
+  const [recoveryNotice, setRecoveryNotice] = useState(false)
   const playerIndexRef = useRef(0)
 
   useEffect(() => {
@@ -212,249 +213,111 @@ const useTransportSetup = (
   useEffect(() => {
     if (isLocalMode || !isWsMode || initRef.current) return
     initRef.current = true
-
+    const params = new URLSearchParams(window.location.search)
+    const contextRoomId = params.get('context')
+    const roomId = contextRoomId ?? params.get('room')
+    const ws = new WsGameTransport(undefined, roomId ?? undefined)
+    const hadPendingCommands = ws.recoveringCommands
+    let hotseat = false
+    let receivedRoom = false
+    let snapshotRoomId: string | undefined
+    let waiting: Extract<WsStatus, { phase: 'waiting' }> | undefined
+    let disposed = false
+    const ready = () => {
+      if (disposed) return
+      if (waiting) { setWsReady(false); setWsStatus(waiting); return }
+      setWsReady(true)
+      setWsStatus({ phase: 'ready', roomId: ws.roomId, playerIndex: ws.playerIndex, ...(hotseat ? { hotseat: true } : {}) })
+    }
+    setWsTransport(ws)
+    const offStatus = ws.onConnectionStatus(status => {
+      if (disposed) return
+      if (status.phase === 'connecting' || status.phase === 'reconnecting' || status.phase === 'recovering') {
+        snapshotRoomId = undefined
+        setWsReady(false)
+        setWsStatus({ phase: status.phase === 'connecting' ? 'connecting' : 'reconnecting' })
+      } else if (status.phase === 'stopped') {
+        setWsReady(false)
+        setWsStatus({ phase: 'error', message: status.message, code: status.code as WsErrorCode | undefined })
+      } else if (status.phase === 'ready') ready()
+    })
+    const offRecovery = ws.onRecoveryNotice(() => setRecoveryNotice(true))
+    const offEvent = ws.onEvent(msg => {
+      if (disposed) return
+      if (msg.type === 'roomCreated' || msg.type === 'roomJoined') {
+        receivedRoom = true
+        setRoomInUrl(msg.roomId)
+        playerIndexRef.current = msg.playerIndex
+        hotseat = msg.hotseat === true
+        if (msg.type === 'roomCreated' || msg.status === 'waiting') {
+          waiting = { phase: 'waiting', roomId: msg.roomId, players: msg.type === 'roomCreated' ? [{ playerIndex: msg.playerIndex, name: displayName ?? '' }] : msg.players, maxPlayers: msg.maxPlayers }
+          setWsReady(false)
+          setWsStatus(waiting)
+        } else {
+          waiting = undefined
+          setWsStatus({ phase: 'joining', roomId: msg.roomId })
+        }
+      } else if (msg.type === 'roomWaiting') {
+        setRoomInUrl(msg.roomId)
+        waiting = { phase: 'waiting', roomId: msg.roomId, players: msg.players, maxPlayers: msg.maxPlayers }
+        setWsReady(false)
+        setWsStatus(waiting)
+      } else if (msg.type === 'playerJoined' && waiting) {
+        waiting = { ...waiting, players: [...waiting.players.filter(player => player.playerIndex !== msg.playerIndex), { playerIndex: msg.playerIndex, name: msg.name }].sort((a, b) => a.playerIndex - b.playerIndex), maxPlayers: msg.maxPlayers }
+        setWsStatus(waiting)
+      } else if (msg.type === 'gameStarted') {
+        waiting = undefined
+        if (snapshotRoomId === ws.roomId && ws.connected) ready()
+        else setWsStatus({ phase: 'joining', roomId: ws.roomId })
+      } else if (msg.type === 'stateUpdate' && msg.sync === 'snapshot') {
+        waiting = undefined
+        snapshotRoomId = msg.roomId
+        setRoomInUrl(msg.roomId)
+        if (ws.connected) ready()
+      } else if (msg.type === 'error' && !ws.connected) {
+        if (contextRoomId && (msg.code === 'context_changed' || msg.code === 'not_participant')) window.dispatchEvent(new Event(GAME_CONTEXT_CHANGED_EVENT))
+        if (msg.code !== 'command_pending') setWsStatus({ phase: 'error', message: msg.error, code: msg.code })
+      } else if (msg.type === 'error' && !receivedRoom) {
+        setWsStatus({ phase: 'error', message: msg.error, code: msg.code })
+      }
+    })
     const init = async () => {
-      setWsStatus({ phase: 'connecting' })
-      const ws = new WsGameTransport()
-
       try {
         await ws.connect()
-      } catch {
-        setWsStatus({ phase: 'error', message: 'WebSocket connection failed' })
-        return
-      }
-
-      const rawWs = (ws as unknown as { ws: WebSocket }).ws
-      if (!rawWs) {
-        setWsStatus({ phase: 'error', message: 'no WebSocket instance' })
-        return
-      }
-      setWsTransport(ws)
-
-      const waitForPlayers = (
-        roomId: string,
-        playerIndex: number,
-        players: Array<{ playerIndex: number; name: string }>,
-        maxPlayers: number,
-        hotseat = false,
-      ) => {
-        setWsStatus({ phase: 'waiting', roomId, players, maxPlayers })
-        const handler = (event: MessageEvent) => {
-          try {
-            const msg = JSON.parse(event.data as string)
-            if (msg.type === 'gameStarted') {
-              rawWs.removeEventListener('message', handler)
-              setWsReady(true)
-              setWsStatus({ phase: 'ready', roomId, playerIndex, ...(hotseat ? { hotseat: true } : {}) })
-            } else if (msg.type === 'playerJoined') {
-              setWsStatus(prev => {
-                if (prev.phase !== 'waiting') return prev
-                const existing = prev.players.filter(p => p.playerIndex !== msg.playerIndex)
-                return {
-                  ...prev,
-                  players: [...existing, { playerIndex: msg.playerIndex, name: msg.name }].sort((a, b) => a.playerIndex - b.playerIndex),
-                  maxPlayers: msg.maxPlayers,
-                }
-              })
-            }
-          } catch { /* skip */ }
-        }
-        rawWs.addEventListener('message', handler)
-      }
-
-      // Stays attached for the whole WebSocket session: a takedown can
-      // dissolve the room mid-game, long after the waiting-room handler
-      // removed itself on gameStarted.
-      rawWs.addEventListener('message', (event) => {
-        try {
-          const msg = JSON.parse(event.data as string)
-          if (msg.type !== 'roomDissolved') return
-          setWsReady(false)
-          setWsStatus({
-            phase: 'error',
-            message: msg.reason === 'card_takedown' ? 'roomTerminatedCardTakedown' : 'roomDissolved',
-          })
-        } catch { /* skip */ }
-      })
-
-      rawWs.addEventListener('message', (event) => {
-        try {
-          const msg = JSON.parse(event.data as string)
-          if (msg.type !== 'roomWaiting') return
-          setRoomInUrl(msg.roomId)
-          setWsReady(false)
-          waitForPlayers(
-            msg.roomId,
-            playerIndexRef.current,
-            msg.players,
-            msg.maxPlayers,
-          )
-        } catch { /* skip */ }
-      })
-
-      const searchParams = new URLSearchParams(window.location.search)
-      const contextRoomId = searchParams.get('context')
-      const roomParam = contextRoomId ?? searchParams.get('room')
-      const isCreator = !roomParam && (!playerParam || playerParam === 'p1')
-
-      if (isCreator) {
-        setWsStatus({ phase: 'creating' })
-        const resp = await new Promise<{ roomId: string; playerIndex: number; maxPlayers: number; hotseat: boolean } | { error: string }>((resolve) => {
-          const searchParams = new URLSearchParams(window.location.search)
-          const customCardsParam = searchParams.get('customCards')
-          const customCardIds = customCardsParam ? customCardsParam.split(',').filter(Boolean) : undefined
-          const maxPlayers = maxPlayersFromQuery(window.location.search)
-          const draftParams = parseDraftParamsFromQuery(window.location.search)
-          const enableCommunityDeck = searchParams.get('enableCommunityDeck') === 'true' || undefined
-          const enableParentCards = searchParams.get('enableParentCards') === 'true' || undefined
-          const draftParents = searchParams.get('draftParents') === 'false' ? false : undefined
-          const enableThroughTheSeasons = enableThroughTheSeasonsFromQuery(window.location.search) || undefined
-          const enableFarmersOfTheMoor = enableFarmersOfTheMoorFromQuery(window.location.search) || undefined
-          const allowIncompleteFarmersOfTheMoorMinorDeal =
-            allowIncompleteFarmersOfTheMoorMinorDealFromQuery(window.location.search) || undefined
-          const enableSnakeOpening = enableSnakeOpeningFromQuery(window.location.search) || undefined
-          const hotseat = isHotseatSetupQuery(window.location.search) || undefined
-          const sendCreateRoom = () => {
-            ws.sendRoomCommand('createRoom', {
-              maxPlayers,
-              hotseat,
-              name: displayName ?? '',
-              customCardIds,
-              enableCommunityDeck,
-              enableParentCards,
-              draftParents,
-              enableThroughTheSeasons,
-              enableFarmersOfTheMoor,
-              allowIncompleteFarmersOfTheMoorMinorDeal,
-              enableSnakeOpening,
-              ...(draftParams ?? {}),
-            })
-          }
-          const handler = (event: MessageEvent) => {
-            try {
-              const msg = JSON.parse(event.data as string)
-              if (msg.type === 'roomCreated') {
-                rawWs.removeEventListener('message', handler)
-                resolve({
-                  roomId: msg.roomId,
-                  playerIndex: msg.playerIndex,
-                  maxPlayers: msg.maxPlayers ?? 2,
-                  hotseat: msg.hotseat === true,
-                })
-              } else if (msg.type === 'error') {
-                rawWs.removeEventListener('message', handler)
-                resolve({ error: msg.error })
-              }
-            } catch { /* skip */ }
-          }
-          rawWs.addEventListener('message', handler)
-          sendCreateRoom()
-        })
-
-        if ('error' in resp) {
-          setWsStatus({ phase: 'error', message: resp.error })
-          return
-        }
-        setRoomInUrl(resp.roomId)
-        playerIndexRef.current = resp.playerIndex
-        const creatorName = displayName ?? ''
-        waitForPlayers(
-          resp.roomId,
-          resp.playerIndex,
-          [{ playerIndex: resp.playerIndex, name: creatorName }],
-          resp.maxPlayers,
-          resp.hotseat,
-        )
-      } else {
-        const roomId = roomParam
-        const requestedPlayerIndex = contextRoomId
-          ? undefined
-          : toRequestedPlayerIndex(playerParam)
-        if (!roomId) {
-          setWsStatus({
-            phase: 'error',
-            message: 'No room in URL. Use the link shared by Player 1 (URL must contain room=...) to join the same game.',
-          })
-          return
-        }
-
-        setWsStatus({ phase: 'joining', roomId })
-        const resp = await new Promise<{
-          roomId: string
-          playerIndex: number
-          status: 'waiting' | 'playing'
-          players: Array<{ playerIndex: number; name: string }>
-          maxPlayers: number
-          hotseat: boolean
-        } | { error: string; code?: WsErrorCode }>((resolve) => {
-          const handler = (event: MessageEvent) => {
-            try {
-              const msg = JSON.parse(event.data as string)
-              if (msg.type === 'roomJoined') {
-                rawWs.removeEventListener('message', handler)
-                resolve({
-                  roomId: msg.roomId,
-                  playerIndex: msg.playerIndex,
-                  status: msg.status,
-                  players: msg.players,
-                  maxPlayers: msg.maxPlayers,
-                  hotseat: msg.hotseat === true,
-                })
-              } else if (msg.type === 'error') {
-                rawWs.removeEventListener('message', handler)
-                if (
-                  contextRoomId &&
-                  (msg.code === 'context_changed' || msg.code === 'not_participant')
-                ) {
-                  window.dispatchEvent(new Event(GAME_CONTEXT_CHANGED_EVENT))
-                }
-                resolve({ error: msg.error, code: msg.code })
-              }
-            } catch { /* skip */ }
-          }
-          rawWs.addEventListener('message', handler)
-          ws.sendRoomCommand('joinRoom', {
-            roomId: roomId!,
-            intent: contextRoomId ? 'resume' : 'join',
+        if (disposed || hadPendingCommands) return
+        if (roomId) {
+          setWsStatus({ phase: 'joining', roomId })
+          ws.sendRoomCommand('joinRoom', { roomId, intent: contextRoomId ? 'resume' : 'join', name: displayName ?? '', requestedPlayerIndex: contextRoomId ? undefined : toRequestedPlayerIndex(playerParam) })
+        } else if (!playerParam || playerParam === 'p1') {
+          setWsStatus({ phase: 'creating' })
+          ws.sendRoomCommand('createRoom', {
+            maxPlayers: maxPlayersFromQuery(window.location.search),
             name: displayName ?? '',
-            requestedPlayerIndex,
+            customCardIds: params.get('customCards')?.split(',').filter(Boolean),
+            hotseat: isHotseatSetupQuery(window.location.search) || undefined,
+            enableCommunityDeck: params.get('enableCommunityDeck') === 'true' || undefined,
+            enableParentCards: params.get('enableParentCards') === 'true' || undefined,
+            draftParents: params.get('draftParents') === 'false' ? false : undefined,
+            enableThroughTheSeasons: enableThroughTheSeasonsFromQuery(window.location.search) || undefined,
+            enableFarmersOfTheMoor: enableFarmersOfTheMoorFromQuery(window.location.search) || undefined,
+            allowIncompleteFarmersOfTheMoorMinorDeal: allowIncompleteFarmersOfTheMoorMinorDealFromQuery(window.location.search) || undefined,
+            enableSnakeOpening: enableSnakeOpeningFromQuery(window.location.search) || undefined,
+            ...parseDraftParamsFromQuery(window.location.search),
           })
-        })
-
-        if ('error' in resp) {
-          setWsStatus({ phase: 'error', message: resp.error, code: resp.code })
-          return
-        }
-        setRoomInUrl(resp.roomId)
-        playerIndexRef.current = resp.playerIndex
-        if (resp.status === 'waiting') {
-          waitForPlayers(
-            resp.roomId,
-            resp.playerIndex,
-            resp.players,
-            resp.maxPlayers,
-            resp.hotseat,
-          )
-          return
-        }
-        setWsReady(true)
-        setWsStatus({
-          phase: 'ready',
-          roomId: resp.roomId,
-          playerIndex: resp.playerIndex,
-          ...(resp.hotseat ? { hotseat: true } : {}),
-        })
+        } else setWsStatus({ phase: 'error', message: 'No room in URL. Use the link shared by Player 1.' })
+      } catch (error) {
+        if (!disposed) setWsStatus({ phase: 'error', message: error instanceof Error ? error.message : 'WebSocket connection failed' })
       }
     }
-
-    init()
-  }, [displayName, isWsMode, locale, playerParam])
+    void init()
+    return () => { disposed = true; offStatus(); offEvent(); offRecovery(); ws.destroy(); initRef.current = false }
+  }, [displayName, isLocalMode, isWsMode, playerParam])
 
   const transport: GameTransport = isLocalMode
     ? (localTransport ?? httpTransportSingleton)
-    : isWsMode && wsReady && wsTransport ? wsTransport : httpTransportSingleton
+    : isWsMode && wsTransport ? wsTransport : httpTransportSingleton
   const isReady = isLocalMode ? localReady : (!isWsMode || wsReady)
-  return { transport, wsStatus, isWs: isWsMode, isReady, wsTransport }
+  return { transport, wsStatus, isWs: isWsMode, isReady, wsTransport, recoveryNotice, clearRecoveryNotice: () => setRecoveryNotice(false) }
 }
 
 const getIsMobileViewport = () =>
@@ -488,7 +351,7 @@ export const GameContainerApi = () => {
   }, [])
   const { locale } = useLocale()
   const { user } = useAuth()
-  const { transport, wsStatus, isWs, isReady, wsTransport } = useTransportSetup(
+  const { transport, wsStatus, isWs, isReady, wsTransport, recoveryNotice, clearRecoveryNotice } = useTransportSetup(
     lockedViewPlayerId,
     user?.displayName,
     isWsMode,
@@ -598,9 +461,9 @@ export const GameContainerApi = () => {
   const isMyTurn = !!(activePlayer && selfPlayer && activePlayer.id === selfPlayer.id)
   // In HTTP (non-WS) mode, one human controls all players — always interactive
   const isInteractive = isHotseat
-    ? !persistencePaused && !!(activePlayer && displayPlayer)
+    ? !persistencePaused && (!isWs || wsStatus.phase === 'ready') && !!(activePlayer && displayPlayer)
     : isWs
-      ? !persistencePaused && !!(activePlayer && selfPlayer && displayPlayer &&
+      ? !persistencePaused && (!isWs || wsStatus.phase === 'ready') && !!(activePlayer && selfPlayer && displayPlayer &&
            activePlayer.id === selfPlayer.id && displayPlayer.id === selfPlayer.id)
       : !!(activePlayer && displayPlayer)
   const hasGameView = !!(state && currentPlayer && displayPlayer)
@@ -1419,7 +1282,7 @@ export const GameContainerApi = () => {
     reader.readAsText(file)
   }, [transport])
 
-  if (isWs && wsStatus.phase !== 'ready' && (!state || wsStatus.phase === 'waiting' || wsStatus.phase === 'error')) {
+  if (isWs && wsStatus.phase !== 'ready') {
     const wsProgressPhase =
       resolveGameLoadPhase({ wsStatus, hasGameView: false }) ??
       (wsStatus.phase === 'idle' ? 'wsConnecting' : null)
@@ -1439,7 +1302,9 @@ export const GameContainerApi = () => {
 
     const isNetworkError = wsStatus.phase === 'error' &&
       (wsStatus.message === 'WebSocket connection failed' || wsStatus.message === 'no WebSocket instance')
-    const statusText = wsStatus.phase === 'waiting'
+    const statusText = wsStatus.phase === 'reconnecting'
+      ? t(locale, 'platform.roomReconnecting')
+      : wsStatus.phase === 'waiting'
       ? t(locale, 'platform.waitingForPlayers', { roomId: wsStatus.roomId, current: String(wsStatus.players.length), max: String(wsStatus.maxPlayers) })
       : wsStatus.phase === 'error'
         ? wsStatus.message === 'roomDissolved'
@@ -1558,8 +1423,14 @@ export const GameContainerApi = () => {
     return <GameLoadScreen percent={percent} label={t(locale, labelKey)} />
   }
 
-  const notificationStack = persistencePaused || privateEventNotifications.length > 0 || displayPublicEventNotifications.length > 0 ? (
+  const notificationStack = recoveryNotice || persistencePaused || privateEventNotifications.length > 0 || displayPublicEventNotifications.length > 0 ? (
     <div className="event-notifications" role="status" aria-live="polite">
+      {recoveryNotice ? (
+        <div role="alert" className="event-notification">
+          {t(locale, 'platform.roomInputChanged')}
+          <button type="button" onClick={clearRecoveryNotice}>{t(locale, 'ui.close')}</button>
+        </div>
+      ) : null}
       {persistencePaused ? (
         <div className="public-event-notification" data-kind="future" role="alert">
           {t(locale, 'ui.roomPersistencePaused')}

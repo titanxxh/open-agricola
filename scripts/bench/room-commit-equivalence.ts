@@ -1,6 +1,6 @@
 import { appendFileSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { SqliteRoomPersistence } from '../../server/game/persistence/sqlite-adapter.ts'
+import { PostgresRoomPersistence } from '../../server/game/persistence/postgres-adapter.ts'
 import { canonicalJson, decodeReplayFrame, type JsonValue } from '../../server/game/replay-codec.ts'
 import { runRoomWorkload, type RoomWorkload } from './room-performance.ts'
 
@@ -11,9 +11,9 @@ if (!fixtures || !output) throw new Error('usage: room-commit-equivalence.ts <fi
 writeFileSync(output, '')
 let players = 0
 let previous: JsonValue | null = null
-const commitReplay = SqliteRoomPersistence.prototype.commitReplay
-SqliteRoomPersistence.prototype.commitReplay = function (commit) {
-  const result = commitReplay.call(this, commit)
+const commitReplay = PostgresRoomPersistence.prototype.commitReplay
+PostgresRoomPersistence.prototype.commitReplay = async function (commit) {
+  const result = await commitReplay.call(this, commit)
   if (result.kind === 'conflict') throw new Error(result.error)
   previous = decodeReplayFrame(previous, commit.step)
   appendFileSync(output, `${JSON.stringify({
@@ -32,7 +32,7 @@ SqliteRoomPersistence.prototype.commitReplay = function (commit) {
 for (players of [2, 4]) {
   previous = null
   const workload = JSON.parse(readFileSync(join(fixtures, `${players}p.json`), 'utf8')) as RoomWorkload
-  const result = runRoomWorkload(workload)
+  const result = await runRoomWorkload(workload)
   appendFileSync(output, `${JSON.stringify({ players, commands: result.commands, classifications: result.classifications })}\n`)
 }
 process.stdout.write(`Saved exact Frame/cursor/Step trace: ${output}\n`)

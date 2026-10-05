@@ -1,74 +1,18 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import Database from 'better-sqlite3'
+import { createTestDatabase } from '../../__tests__/_helpers/postgres'
+import type { PostgresDatabase } from '../../database/postgres'
 import { afterEach, describe, expect, it } from 'vitest'
 import { handleGameContextRoute } from '../../game-context-routes.ts'
 import { GameContextStore } from '../game-context-store.ts'
 
-const createDb = () => {
-  const db = new Database(':memory:')
-  db.exec(`
-    CREATE TABLE rooms (
-      id TEXT PRIMARY KEY,
-      version INTEGER NOT NULL
-    );
-    CREATE TABLE room_players (
-      room_id TEXT NOT NULL,
-      user_id TEXT NOT NULL,
-      player_index INTEGER NOT NULL
-    );
-    CREATE TABLE game_contexts (
-      room_id TEXT PRIMARY KEY,
-      lifecycle TEXT NOT NULL,
-      phase TEXT,
-      replay_status TEXT,
-      expires_at INTEGER,
-      removal_reason TEXT,
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL
-    );
-    CREATE TABLE game_results (
-      room_id TEXT PRIMARY KEY,
-      started_at INTEGER NOT NULL,
-      finished_at INTEGER NOT NULL,
-      rounds_played INTEGER NOT NULL,
-      player_count INTEGER NOT NULL,
-      enable_community_deck INTEGER NOT NULL,
-      enable_parent_cards INTEGER NOT NULL,
-      enable_through_the_seasons INTEGER NOT NULL,
-      enable_farmers_of_the_moor INTEGER NOT NULL,
-      enable_snake_opening INTEGER NOT NULL DEFAULT 0
-    );
-    CREATE TABLE game_result_players (
-      room_id TEXT NOT NULL,
-      player_index INTEGER NOT NULL,
-      game_player_id TEXT NOT NULL,
-      user_id TEXT,
-      name_is_default INTEGER NOT NULL DEFAULT 0,
-      display_name TEXT NOT NULL,
-      score INTEGER NOT NULL
-    );
-    CREATE TABLE game_replays (
-      room_id TEXT PRIMARY KEY,
-      schema_version INTEGER NOT NULL,
-      viewer_build_id TEXT NOT NULL,
-      game_build_id TEXT NOT NULL,
-      status TEXT NOT NULL,
-      latest_step_no INTEGER NOT NULL,
-      missing_prefix INTEGER NOT NULL,
-      custom_cards_json TEXT NOT NULL,
-      created_at INTEGER NOT NULL,
-      completed_at INTEGER
-    );
-    CREATE TABLE game_replay_steps (
-      room_id TEXT NOT NULL,
-      step_no INTEGER NOT NULL
-    );
-  `)
+const createDb = async () => {
+  const db = await createTestDatabase()
+  for (const id of ['u1', 'u2']) await db.prepare('INSERT INTO users (id, username, display_name, password_hash, created_at) VALUES (?, ?, ?, ?, 1)').run(id, id, id, '')
   return db
 }
 
-const insertContext = (
-  db: Database.Database,
+const insertContext = async (
+  db: PostgresDatabase,
   roomId: string,
   lifecycle: string,
   values: {
@@ -78,7 +22,7 @@ const insertContext = (
     removalReason?: string | null
   } = {},
 ) => {
-  db.prepare(`
+  ;(await db.prepare(`
     INSERT INTO game_contexts (
       room_id, lifecycle, phase, replay_status, expires_at,
       removal_reason, created_at, updated_at
@@ -90,32 +34,32 @@ const insertContext = (
     values.replayStatus ?? null,
     values.expiresAt ?? null,
     values.removalReason ?? null,
-  )
+  ))
 }
 
-const insertCompleted = (
-  db: Database.Database,
+const insertCompleted = async (
+  db: PostgresDatabase,
   roomId: string,
   replayStatus: 'available' | 'legacy_no_replay',
   options: { snakeOpening?: boolean } = {},
 ) => {
-  insertContext(db, roomId, 'completed', { replayStatus })
-  db.prepare(`
+  ;(await insertContext(db, roomId, 'completed', { replayStatus }))
+  ;(await db.prepare(`
     INSERT INTO game_results VALUES (?, 10, 20, 14, 2, 1, 0, 1, 0, ?)
-  `).run(roomId, options.snakeOpening ? 1 : 0)
-  db.prepare(`
+  `).run(roomId, options.snakeOpening ? 1 : 0))
+  ;(await db.prepare(`
     INSERT INTO game_result_players (room_id, player_index, game_player_id, user_id, display_name, score) VALUES (?, 0, 'p1', 'u1', 'Alice', 42)
-  `).run(roomId)
-  db.prepare(`
+  `).run(roomId))
+  ;(await db.prepare(`
     INSERT INTO game_result_players (room_id, player_index, game_player_id, user_id, display_name, score) VALUES (?, 1, 'p2', 'u2', 'Bob', 35)
-  `).run(roomId)
+  `).run(roomId))
   if (replayStatus === 'available') {
-    db.prepare(`
+    ;(await db.prepare(`
       INSERT INTO game_replays
       VALUES (?, 1, 'viewer-1', 'game-1', 'completed', 4, 0, '[]', 10, 20)
-    `).run(roomId)
-    db.prepare('INSERT INTO game_replay_steps VALUES (?, 0)').run(roomId)
-    db.prepare('INSERT INTO game_replay_steps VALUES (?, 4)').run(roomId)
+    `).run(roomId))
+    await db.prepare(`INSERT INTO game_replay_steps (room_id, step_no, room_version, checkpoint_step_no, command_type, intent_json, payload_kind, payload_gzip, frame_hash, created_at) VALUES (?, 0, 0, 0, 'test', '{}', 'checkpoint', decode('00', 'hex'), repeat('a', 64), 1)`).run(roomId)
+    await db.prepare(`INSERT INTO game_replay_steps (room_id, step_no, room_version, checkpoint_step_no, command_type, intent_json, payload_kind, payload_gzip, frame_hash, created_at) VALUES (?, 4, 4, 0, 'test', '{}', 'checkpoint', decode('00', 'hex'), repeat('a', 64), 1)`).run(roomId)
   }
 }
 
@@ -125,12 +69,12 @@ type CapturedResponse = {
   body: string
 }
 
-const requestRoute = (
+const requestRoute = async (
   store: GameContextStore,
   path: string,
   userId?: string,
   headers: Record<string, string> = {},
-): CapturedResponse => {
+): Promise<Awaited<CapturedResponse>> => {
   const captured: CapturedResponse = { status: 0, headers: {}, body: '' }
   const req = {
     method: 'GET',
@@ -146,14 +90,14 @@ const requestRoute = (
       captured.body = body ?? ''
     },
   } as unknown as ServerResponse
-  expect(handleGameContextRoute(
+  expect((await handleGameContextRoute(
     req,
     res,
     store,
     userId
       ? { id: userId, username: userId, displayName: userId }
       : null,
-  )).toBe(true)
+  ))).toBe(true)
   return captured
 }
 
@@ -162,46 +106,46 @@ afterEach(() => {
 })
 
 describe('GameContextStore', () => {
-  it('retains generated-name provenance in public completed results', () => {
-    const db = createDb()
-    insertCompleted(db, 'default-names', 'available')
-    db.prepare("UPDATE game_result_players SET display_name = 'Player 2', name_is_default = player_index").run()
-    expect(new GameContextStore(db).resolve('default-names')).toMatchObject({
+  it('retains generated-name provenance in public completed results', async () => {
+    const db = (await createDb())
+    ;(await insertCompleted(db, 'default-names', 'available'))
+    ;(await db.prepare("UPDATE game_result_players SET display_name = 'Player 2', name_is_default = player_index").run())
+    expect((await new GameContextStore(db).resolve('default-names'))).toMatchObject({
       ok: true,
       result: { players: [
         { playerIndex: 0, displayName: 'Player 2' },
         { playerIndex: 1, displayName: 'Player 2', nameIsDefault: true },
       ] },
     })
-    db.close()
+    ;(await db.close())
   })
-  it('resolves every lifecycle without exposing internal user ids', () => {
-    const db = createDb()
-    insertContext(db, 'active-room', 'active', {
+  it('resolves every lifecycle without exposing internal user ids', async () => {
+    const db = (await createDb())
+    ;(await insertContext(db, 'active-room', 'active', {
       phase: 'playing',
       expiresAt: 20_000,
-    })
-    db.prepare('INSERT INTO rooms VALUES (?, ?)').run('active-room', 7)
-    db.prepare('INSERT INTO room_players VALUES (?, ?, ?)').run('active-room', 'u1', 0)
-    db.prepare('INSERT INTO game_replays VALUES (?, 1, ?, ?, ?, 4, 0, ?, 1, NULL)')
-      .run('active-room', 'viewer-1', 'game-1', 'recording', '[]')
-    insertCompleted(db, 'completed-room', 'available')
-    insertCompleted(db, 'legacy-room', 'legacy_no_replay', { snakeOpening: true })
-    insertContext(db, 'expired-room', 'expired')
-    insertContext(db, 'removed-room', 'removed', { removalReason: 'private detail' })
+    }))
+    ;(await db.prepare('INSERT INTO rooms (id, version, created_at, updated_at) VALUES (?, ?, 1, 1)').run('active-room', 7))
+    ;(await db.prepare('INSERT INTO room_players (room_id, user_id, player_index, joined_at) VALUES (?, ?, ?, 1)').run('active-room', 'u1', 0))
+    ;(await db.prepare('INSERT INTO game_replays VALUES (?, 1, ?, ?, ?, 4, 0, ?, 1, NULL)')
+      .run('active-room', 'viewer-1', 'game-1', 'recording', '[]'))
+    ;(await insertCompleted(db, 'completed-room', 'available'))
+    ;(await insertCompleted(db, 'legacy-room', 'legacy_no_replay', { snakeOpening: true }))
+    ;(await insertContext(db, 'expired-room', 'expired'))
+    ;(await insertContext(db, 'removed-room', 'removed', { removalReason: 'private detail' }))
     const store = new GameContextStore(db, () => 1_000)
 
-    expect(store.resolve('active-room')).toMatchObject({
+    expect((await store.resolve('active-room'))).toMatchObject({
       ok: false,
       code: 'login_required',
       lifecycle: 'active',
     })
-    expect(store.resolve('active-room', 'u9')).toMatchObject({
+    expect((await store.resolve('active-room', 'u9'))).toMatchObject({
       ok: false,
       code: 'not_participant',
       lifecycle: 'active',
     })
-    expect(store.resolve('active-room', 'u1')).toEqual({
+    expect((await store.resolve('active-room', 'u1'))).toEqual({
       ok: true,
       roomId: 'active-room',
       lifecycle: 'active',
@@ -211,7 +155,7 @@ describe('GameContextStore', () => {
       stepNo: 4,
       expiresAt: 20_000,
     })
-    expect(store.resolve('completed-room')).toEqual({
+    expect((await store.resolve('completed-room'))).toEqual({
       ok: true,
       roomId: 'completed-room',
       lifecycle: 'completed',
@@ -239,59 +183,59 @@ describe('GameContextStore', () => {
         viewerBuildId: 'viewer-1',
       },
     })
-    expect(JSON.stringify(store.resolve('completed-room'))).not.toContain('u1')
-    expect(store.resolve('legacy-room')).toMatchObject({
+    expect(JSON.stringify((await store.resolve('completed-room')))).not.toContain('u1')
+    expect((await store.resolve('legacy-room'))).toMatchObject({
       ok: true,
       lifecycle: 'completed',
       replayStatus: 'legacy_no_replay',
       result: { enableSnakeOpening: true },
     })
-    expect(store.resolve('expired-room')).toEqual({
+    expect((await store.resolve('expired-room'))).toEqual({
       ok: true,
       roomId: 'expired-room',
       lifecycle: 'expired',
     })
-    expect(store.resolve('removed-room')).toEqual({
+    expect((await store.resolve('removed-room'))).toEqual({
       ok: true,
       roomId: 'removed-room',
       lifecycle: 'removed',
       reason: 'removed',
     })
-    expect(store.resolve('missing-room')).toMatchObject({
+    expect((await store.resolve('missing-room'))).toMatchObject({
       ok: false,
       code: 'unknown_context',
     })
-    db.close()
+    ;(await db.close())
   })
 
-  it('expires an active room at its persisted deadline', () => {
-    const db = createDb()
-    insertContext(db, 'due-room', 'active', {
+  it('expires an active room at its persisted deadline', async () => {
+    const db = (await createDb())
+    ;(await insertContext(db, 'due-room', 'active', {
       phase: 'playing',
       expiresAt: 999,
-    })
-    db.prepare('INSERT INTO rooms VALUES (?, 1)').run('due-room')
+    }))
+    ;(await db.prepare('INSERT INTO rooms (id, version, created_at, updated_at) VALUES (?, 1, 1, 1)').run('due-room'))
     const store = new GameContextStore(db, () => 1_000)
 
-    expect(store.resolve('due-room')).toEqual({
+    expect((await store.resolve('due-room'))).toEqual({
       ok: true,
       roomId: 'due-room',
       lifecycle: 'expired',
     })
-    expect(db.prepare('SELECT 1 FROM rooms WHERE id = ?').get('due-room')).toBeUndefined()
-    db.close()
+    expect((await db.prepare('SELECT 1 FROM rooms WHERE id = ?').get('due-room'))).toBeUndefined()
+    ;(await db.close())
   })
 
-  it('serves active auth errors and cache-revalidated public descriptors', () => {
-    const db = createDb()
-    insertContext(db, 'active-room', 'active', { phase: 'waiting' })
-    db.prepare('INSERT INTO rooms VALUES (?, 2)').run('active-room')
-    db.prepare('INSERT INTO room_players VALUES (?, ?, ?)').run('active-room', 'u1', 0)
-    insertCompleted(db, 'completed-room', 'legacy_no_replay')
+  it('serves active auth errors and cache-revalidated public descriptors', async () => {
+    const db = (await createDb())
+    ;(await insertContext(db, 'active-room', 'active', { phase: 'waiting' }))
+    ;(await db.prepare('INSERT INTO rooms (id, version, created_at, updated_at) VALUES (?, 2, 1, 1)').run('active-room'))
+    ;(await db.prepare('INSERT INTO room_players (room_id, user_id, player_index, joined_at) VALUES (?, ?, ?, 1)').run('active-room', 'u1', 0))
+    ;(await insertCompleted(db, 'completed-room', 'legacy_no_replay'))
     const store = new GameContextStore(db, () => 1_000)
     process.env.PUBLIC_APP_ORIGIN = 'https://example.test/open-agricola/'
 
-    const loginRequired = requestRoute(store, '/api/v1/game-contexts/active-room')
+    const loginRequired = (await requestRoute(store, '/api/v1/game-contexts/active-room'))
     expect(loginRequired.status).toBe(401)
     expect(JSON.parse(loginRequired.body)).toMatchObject({
       code: 'login_required',
@@ -299,22 +243,22 @@ describe('GameContextStore', () => {
     })
     expect(loginRequired.headers['Cache-Control']).toBe('no-store')
 
-    const publicResult = requestRoute(store, '/api/v1/game-contexts/completed-room')
+    const publicResult = (await requestRoute(store, '/api/v1/game-contexts/completed-room'))
     expect(publicResult.status).toBe(200)
     expect(publicResult.headers['Cache-Control']).toBe('no-cache')
     expect(publicResult.headers.ETag).toMatch(/^"[a-f0-9]{64}"$/)
 
-    const revalidated = requestRoute(
+    const revalidated = (await requestRoute(
       store,
       '/api/v1/game-contexts/completed-room',
       undefined,
       { 'if-none-match': publicResult.headers.ETag! },
-    )
+    ))
     expect(revalidated.status).toBe(304)
     expect(revalidated.body).toBe('')
 
-    expect(requestRoute(store, '/api/v1/game-contexts/%2Fbad').status).toBe(400)
-    expect(requestRoute(store, '/api/v1/game-contexts/missing-room').status).toBe(404)
-    db.close()
+    expect((await requestRoute(store, '/api/v1/game-contexts/%2Fbad')).status).toBe(400)
+    expect((await requestRoute(store, '/api/v1/game-contexts/missing-room')).status).toBe(404)
+    ;(await db.close())
   })
 })

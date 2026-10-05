@@ -1,5 +1,5 @@
-import type Database from 'better-sqlite3'
-import { isDevRoom, isFixedDevRoom } from './room.ts'
+import type { PostgresDatabase as Database } from '../database/postgres'
+import { isDevRoom } from './room.ts'
 import type {
   CompletedGameContextDescriptor,
   GameContextLifecycle,
@@ -7,7 +7,7 @@ import type {
   RemovedGameContextDescriptor,
 } from '../../shared/contract/protocol/game-context.ts'
 
-type SqliteDb = Pick<Database.Database, 'prepare' | 'transaction'>
+type StoreDatabase = Pick<Database, 'prepare' | 'transaction'>
 
 type ContextRow = {
   room_id: string
@@ -57,103 +57,84 @@ const removedReason = (
   value === 'moderation' || value === 'legal' ? value : 'removed'
 
 export class GameContextStore {
-  private readonly db: SqliteDb
+  private readonly db: StoreDatabase
   private readonly now: () => number
 
   constructor(
-    db: SqliteDb,
+    db: StoreDatabase,
     now: () => number = Date.now,
   ) {
     this.db = db
     this.now = now
   }
 
-  private loadContext(roomId: string): ContextRow | null {
-    return (this.db.prepare(`
+  private async loadContext(roomId: string): Promise<Awaited<ContextRow | null>> {
+    return ((await this.db.prepare(`
       SELECT room_id, lifecycle, phase, replay_status, expires_at, removal_reason
       FROM game_contexts
       WHERE room_id = ?
-    `).get(roomId) as ContextRow | undefined) ?? null
+    `).get(roomId)) as ContextRow | undefined) ?? null
   }
 
-  private expireActive(roomId: string, now: number): void {
-    this.db.transaction(() => {
-      this.db.prepare('DELETE FROM rooms WHERE id = ?').run(roomId)
-      this.db.prepare(`
+  private async expireActive(roomId: string, now: number): Promise<Awaited<void>> {
+    ;(await this.db.transaction(async () => {
+      await this.db.prepare('SELECT room_id FROM room_ownership WHERE room_id=? FOR UPDATE').get(roomId)
+      const context = await this.db.prepare('SELECT lifecycle, expires_at FROM game_contexts WHERE room_id = ? FOR UPDATE').get<{ lifecycle: string; expires_at: number | null }>(roomId)
+      if (!context || context.lifecycle !== 'active') return
+      const exists = await this.db.prepare('SELECT 1 FROM rooms WHERE id = ?').get(roomId)
+      if (exists && (context.expires_at === null || context.expires_at > now)) return
+      await this.db.prepare("UPDATE room_ownership SET status='retired', lease_until=0 WHERE room_id=?").run(roomId)
+      ;(await this.db.prepare('DELETE FROM rooms WHERE id = ?').run(roomId))
+      ;(await this.db.prepare(`
         UPDATE game_contexts
         SET lifecycle = 'expired',
             phase = NULL,
             expires_at = ?,
             updated_at = ?
         WHERE room_id = ? AND lifecycle = 'active'
-      `).run(now, now, roomId)
-    })()
+      `).run(now, now, roomId))
+    })())
   }
 
-  private currentContext(roomId: string): ContextRow | null {
-    const context = this.loadContext(roomId)
+  private async currentContext(roomId: string): Promise<Awaited<ContextRow | null>> {
+    const context = (await this.loadContext(roomId))
     if (!context || context.lifecycle !== 'active') return context
     const now = this.now()
-    const roomExists = this.db.prepare('SELECT 1 FROM rooms WHERE id = ?').get(roomId)
+    const roomExists = (await this.db.prepare('SELECT 1 FROM rooms WHERE id = ?').get(roomId))
     if (!roomExists || (context.expires_at !== null && context.expires_at <= now)) {
-      this.expireActive(roomId, now)
-      return this.loadContext(roomId)
+      ;(await this.expireActive(roomId, now))
+      return (await this.loadContext(roomId))
     }
     return context
   }
 
-  lifecycle(roomId: string): GameContextLifecycle | null {
-    return this.currentContext(roomId)?.lifecycle ?? null
+  async lifecycle(roomId: string): Promise<Awaited<GameContextLifecycle | null>> {
+    return (await this.currentContext(roomId))?.lifecycle ?? null
   }
 
-  activeExpiresAt(roomId: string): number | null {
-    const context = this.currentContext(roomId)
+  async activeExpiresAt(roomId: string): Promise<Awaited<number | null>> {
+    const context = (await this.currentContext(roomId))
     return context?.lifecycle === 'active' ? context.expires_at : null
   }
 
-  restoreDevelopmentRooms(): void {
-    const rooms = this.db.prepare(`
-      SELECT room_id, lifecycle
-      FROM game_contexts
-      JOIN rooms ON rooms.id = game_contexts.room_id
-      WHERE lifecycle IN ('active', 'expired')
-    `).all() as Array<Pick<ContextRow, 'room_id' | 'lifecycle'>>
-    const restore = this.db.prepare(`
-      UPDATE game_contexts
-      SET lifecycle = 'active',
-          phase = (SELECT CASE WHEN status = 'waiting' THEN 'waiting' ELSE 'playing' END
-                   FROM rooms WHERE id = game_contexts.room_id),
-          expires_at = NULL,
-          updated_at = ?
-      WHERE room_id = ?
-    `)
-    this.db.transaction(() => {
-      for (const room of rooms) {
-        if (!isDevRoom(room.room_id)) continue
-        if (room.lifecycle === 'expired' && !isFixedDevRoom(room.room_id)) continue
-        restore.run(this.now(), room.room_id)
-      }
-    })()
-  }
-
-  setActiveExpiry(roomId: string, expiresAt: number): void {
-    this.db.prepare(`
+  async setActiveExpiry(roomId: string, expiresAt: number): Promise<Awaited<void>> {
+    ;(await this.db.prepare(`
       UPDATE game_contexts
       SET expires_at = ?, updated_at = ?
       WHERE room_id = ? AND lifecycle = 'active'
-    `).run(isDevRoom(roomId) ? null : expiresAt, this.now(), roomId)
+    `).run(isDevRoom(roomId) ? null : expiresAt, this.now(), roomId))
   }
 
-  clearActiveExpiry(roomId: string): void {
-    this.db.prepare(`
+  async clearActiveExpiry(roomId: string): Promise<Awaited<void>> {
+    ;(await this.db.prepare(`
       UPDATE game_contexts
       SET expires_at = NULL, updated_at = ?
       WHERE room_id = ? AND lifecycle = 'active'
-    `).run(this.now(), roomId)
+    `).run(this.now(), roomId))
   }
 
-  resolve(roomId: string, userId?: string): GameContextResponse {
-    const context = this.currentContext(roomId)
+  async resolve(roomId: string, userId?: string): Promise<Awaited<GameContextResponse>> {
+    const context = (await this.currentContext(roomId))
     if (!context) {
       return {
         ok: false,
@@ -182,7 +163,7 @@ export class GameContextStore {
           message: 'Login required',
         }
       }
-      const active = this.db.prepare(`
+      const active = (await this.db.prepare(`
         SELECT rooms.version,
                game_replays.latest_step_no,
                room_players.player_index
@@ -192,7 +173,7 @@ export class GameContextStore {
          AND room_players.user_id = ?
         LEFT JOIN game_replays ON game_replays.room_id = rooms.id
         WHERE rooms.id = ?
-      `).get(userId, roomId) as ActiveRow | undefined
+      `).get(userId, roomId)) as ActiveRow | undefined
       if (!active) {
         return {
           ok: false,
@@ -213,14 +194,14 @@ export class GameContextStore {
       }
     }
 
-    const result = this.db.prepare(`
+    const result = (await this.db.prepare(`
       SELECT started_at, finished_at, rounds_played, player_count,
              enable_community_deck, enable_parent_cards,
              enable_through_the_seasons, enable_farmers_of_the_moor,
              enable_snake_opening
       FROM game_results
       WHERE room_id = ?
-    `).get(roomId) as ResultRow | undefined
+    `).get(roomId)) as ResultRow | undefined
     if (!result) {
       return {
         ok: false,
@@ -229,12 +210,12 @@ export class GameContextStore {
         message: 'Completed game summary is unavailable',
       }
     }
-    const players = this.db.prepare(`
+    const players = (await this.db.prepare(`
       SELECT player_index, display_name, score, name_is_default
       FROM game_result_players
       WHERE room_id = ?
       ORDER BY player_index
-    `).all(roomId) as ResultPlayerRow[]
+    `).all(roomId)) as ResultPlayerRow[]
     const descriptor: CompletedGameContextDescriptor = {
       ok: true,
       roomId,
@@ -261,7 +242,7 @@ export class GameContextStore {
       },
     }
     if (descriptor.replayStatus === 'available') {
-      const replay = this.db.prepare(`
+      const replay = (await this.db.prepare(`
         SELECT replay.schema_version,
                replay.viewer_build_id,
                replay.latest_step_no,
@@ -271,7 +252,7 @@ export class GameContextStore {
         JOIN game_replay_steps AS step ON step.room_id = replay.room_id
         WHERE replay.room_id = ?
         GROUP BY replay.room_id
-      `).get(roomId) as ReplayRow | undefined
+      `).get(roomId)) as ReplayRow | undefined
       if (replay) {
         descriptor.replay = {
           firstStepNo: replay.first_step_no,

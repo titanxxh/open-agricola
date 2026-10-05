@@ -17,7 +17,7 @@ const script = readFileSync('restart-local.sh', 'utf8')
 
 const RESOLVER = script.slice(
   script.indexOf('MAIN_REPO_DIR='),
-  script.indexOf('# Anchor persistent dev state'),
+  script.indexOf('# Worktrees share locally hosted dependency data'),
 )
 const TOOL_RESOLVER = script.slice(
   script.indexOf('LOCAL_NODE_BIN='),

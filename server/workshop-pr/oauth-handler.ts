@@ -9,14 +9,14 @@ import { tokenCache } from './token-cache.ts'
  * the browser to GitHub's authorization URL. GitHub will redirect back to
  * /api/workshop/github/oauth/callback?code=...&state=<hs>.
  */
-export function handleOAuthStart(req: IncomingMessage, res: ServerResponse, url: URL): void {
+export async function handleOAuthStart(req: IncomingMessage, res: ServerResponse, url: URL): Promise<Awaited<void>> {
   if (!workshopPrEnabled()) {
     res.writeHead(503, { 'Content-Type': 'application/json' })
     res.end(JSON.stringify({ ok: false, error: 'workshop PR integration disabled' }))
     return
   }
   const hs = url.searchParams.get('hs')
-  if (!hs || !tokenCache.hasPending(hs)) {
+  if (!hs || !(await tokenCache.hasPending(hs))) {
     res.writeHead(400, { 'Content-Type': 'application/json' })
     res.end(JSON.stringify({ ok: false, error: 'invalid or expired handshakeId' }))
     return
@@ -52,13 +52,14 @@ export async function handleOAuthCallback(
   const code = url.searchParams.get('code')
   const error = url.searchParams.get('error')
 
-  if (!state || !tokenCache.hasPending(state)) {
+  if (!state || !(await tokenCache.hasPending(state))) {
     res.writeHead(400, { 'Content-Type': 'text/plain' })
     res.end('invalid state')
     return
   }
 
   if (error) {
+    await tokenCache.delete(state)
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
     res.end(closePopupHtml({ ok: false, error, hs: state }))
     return
@@ -67,6 +68,12 @@ export async function handleOAuthCallback(
   if (!code) {
     res.writeHead(400, { 'Content-Type': 'text/plain' })
     res.end('missing code')
+    return
+  }
+
+  if (!(await tokenCache.claimCallback(state))) {
+    res.writeHead(400, { 'Content-Type': 'text/plain' })
+    res.end('invalid state')
     return
   }
 
@@ -95,7 +102,11 @@ export async function handleOAuthCallback(
     return
   }
 
-  tokenCache.bind(state, accessToken)
+  if (!(await tokenCache.bind(state, accessToken))) {
+    res.writeHead(400, { 'Content-Type': 'text/plain' })
+    res.end('expired state')
+    return
+  }
   res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
   res.end(closePopupHtml({ ok: true, hs: state }))
 }

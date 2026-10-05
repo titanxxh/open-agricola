@@ -1,29 +1,28 @@
+# Run scripts/local-services.mjs before starting this single-host stack.
 services:
   app:
     build: .
+    image: open-agricola:${GAME_BUILD_ID:-local}
+    env_file:
+      - ${DEPENDENCIES_ENV_FILE:-./data/dependencies.compose.env}
     ports:
-      - "${BACKEND_PORT:-5175}:5175"
+      - "127.0.0.1:${BACKEND_PORT:-5175}:5175"
     environment:
-      - NODE_ENV=production
-      - BACKEND_PORT=5175
-      - BACKEND_HOST=0.0.0.0
-      - PERSIST_ROOMS=sqlite
-      - ALLOW_ANONYMOUS_WS=false
-      - REPLAY_NEW_ROOMS_ENABLED=${REPLAY_NEW_ROOMS_ENABLED:-false}
-      - REPLAY_VIEWER_BUILD_ID=${REPLAY_VIEWER_BUILD_ID:-}
-      - REPLAY_VIEWER_ROOT=${REPLAY_VIEWER_ROOT:-./data/replay-viewers}
-      - REPLAY_ASSET_ROOT=${REPLAY_ASSET_ROOT:-./data/replay-assets}
-      - REPLAY_REMOVAL_LEDGER_PATH=${REPLAY_REMOVAL_LEDGER_PATH:-./data/replay-removals.jsonl}
-      - REPLAY_TRUST_PROXY=${REPLAY_TRUST_PROXY:-false}
-      - GAME_BUILD_ID=${GAME_BUILD_ID:-}
-      - DB_PATH=./data/open-agricola.db
-      - CARD_ART_DIR=./data/card-art
-      - CORS_ORIGIN=${CORS_ORIGIN:-*}
-    volumes:
-      - app-data:/app/data
-      - app-output:/app/output
+      - VALIDATION_DATABASE_URL=${VALIDATION_DATABASE_URL:-}
+      NODE_ENV: production
+      BACKEND_PORT: 5175
+      BACKEND_HOST: 0.0.0.0
+      APP_INSTANCES: ${APP_INSTANCES:-1}
+      ALLOW_ANONYMOUS_WS: "false"
+      GAME_BUILD_ID: ${GAME_BUILD_ID:-local}
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
+      PUBLIC_API_BASE: ${PUBLIC_API_BASE:-http://127.0.0.1:5175}
+      ACCOUNT_REGISTRATION_POLICY: ${ACCOUNT_REGISTRATION_POLICY:-open}
+      ADMIN_USERS: ${ADMIN_USERS:-}
+    networks: [dependencies]
+    stop_grace_period: 90s
     restart: unless-stopped
-
-volumes:
-  app-data:
-  app-output:
+networks:
+  dependencies:
+    external: true
+    name: open-agricola-local_default

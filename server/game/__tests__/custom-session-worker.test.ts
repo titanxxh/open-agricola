@@ -1,5 +1,6 @@
 import { buildRoomHistoryPage } from '../../../shared/session/history-window'
 import { buildEnvelope } from '../../connection/envelope-builder'
+import { snapshotToRoom } from '../room'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { CustomCardData } from '../../../shared/cards/session-card-context.ts'
 import { validateAndCompileCustomCode } from '../../custom-code/engine.ts'
@@ -104,6 +105,15 @@ describe('custom session executor', () => {
 
     const nextRoom = setup(customCard)
     expect(nextRoom.executor.reserveWorkerSlot()).toBe(false)
+    const snapshot = { id: 'recorded-custom-room', updatedAt: 1, version: 0, serialized: null,
+      meta: { createdBy: null, customCardDbIds: [], maxPlayers: 2, status: 'waiting' as const, players: [], customCards: [customCard] } }
+    expect(() => snapshotToRoom(snapshot)).toThrow('No executable Room worker slot')
+    // Capacity rejection leaves the same persisted snapshot recoverable later.
+    rooms[1]!.executor.dispose()
+    const restored = snapshotToRoom(snapshot)
+    expect(restored.customCards).toEqual([customCard])
+    restored.customSessionExecutor!.dispose()
+    restored.session.dispose()
     expect((await rooms[0]!.executor.execute('getState', [])).ok).toBe(true)
   }, 20_000)
 

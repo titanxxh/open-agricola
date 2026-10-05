@@ -1,7 +1,6 @@
-import { EventEmitter } from 'node:events'
+import { Readable } from 'node:stream'
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import Database from 'better-sqlite3'
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 let routeHandler: ((req: IncomingMessage, res: ServerResponse) => void | Promise<void>) | null = null
 const originalNodeEnv = process.env.NODE_ENV
@@ -23,6 +22,13 @@ vi.mock('node:http', async () => {
 
 vi.mock('../connection/ws-server.ts', () => ({
   createWsServer: () => ({
+    authority: { instanceId: 'auth-routes-test' },
+    applyInvalidation: async (operation: { kind: string; subjectId: string; roomIds: string[] }) => {
+      if (operation.kind === 'user') {
+        wsServerMocks.endRoomsForUser(operation.subjectId, operation.roomIds)
+        wsServerMocks.closeUserConnections(operation.subjectId)
+      }
+    },
     lobby: {
       getRooms: () => [],
       dissolveRoomById: () => ({ ok: true }),
@@ -42,279 +48,12 @@ vi.mock('../oauth/providers.ts', () => ({
 }))
 
 vi.mock('../db.ts', async () => {
-  const db = new Database(':memory:')
-  db.pragma('foreign_keys = ON')
-  db.exec(`
-    CREATE TABLE users (
-      id TEXT PRIMARY KEY,
-      username TEXT UNIQUE NOT NULL COLLATE NOCASE,
-      email TEXT UNIQUE COLLATE NOCASE,
-      email_verified_at INTEGER,
-      email_verification_sent_at INTEGER,
-      display_name TEXT NOT NULL,
-      password_hash TEXT NOT NULL,
-      password_updated_at INTEGER,
-      created_at INTEGER NOT NULL,
-      last_login_at INTEGER
-    );
-    CREATE TABLE sessions (
-      token TEXT PRIMARY KEY,
-      user_id TEXT NOT NULL REFERENCES users(id),
-      expires_at INTEGER NOT NULL,
-      created_at INTEGER NOT NULL
-    );
-    CREATE TABLE account_deletion_requests (
-      user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-      requested_at INTEGER NOT NULL,
-      next_attempt_at INTEGER NOT NULL,
-      last_error_code TEXT
-    );
-    CREATE TABLE email_verification_tokens (
-      token_hash TEXT PRIMARY KEY,
-      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      expires_at INTEGER NOT NULL,
-      created_at INTEGER NOT NULL,
-      used_at INTEGER
-    );
-    CREATE TABLE auth_identities (
-      id TEXT PRIMARY KEY,
-      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      provider TEXT NOT NULL,
-      provider_user_id TEXT NOT NULL,
-      provider_login TEXT,
-      provider_email TEXT,
-      provider_email_verified INTEGER NOT NULL DEFAULT 0,
-      display_name TEXT,
-      avatar_url TEXT,
-      linked_at INTEGER NOT NULL,
-      last_login_at INTEGER,
-      UNIQUE(provider, provider_user_id),
-      UNIQUE(user_id, provider)
-    );
-    CREATE TABLE oauth_states (
-      state_hash TEXT PRIMARY KEY,
-      provider TEXT NOT NULL,
-      intent TEXT NOT NULL,
-      user_id TEXT,
-      return_to TEXT,
-      invite_code_hash TEXT,
-      expires_at INTEGER NOT NULL,
-      created_at INTEGER NOT NULL,
-      used_at INTEGER
-    );
-    CREATE TABLE oauth_onboarding_tickets (
-      ticket_hash TEXT PRIMARY KEY,
-      provider TEXT NOT NULL,
-      provider_user_id TEXT NOT NULL,
-      provider_login TEXT,
-      provider_email TEXT,
-      provider_email_verified INTEGER NOT NULL DEFAULT 0,
-      display_name TEXT,
-      avatar_url TEXT,
-      return_to TEXT,
-      invite_code_hash TEXT,
-      expires_at INTEGER NOT NULL,
-      created_at INTEGER NOT NULL,
-      used_at INTEGER
-    );
-    CREATE TABLE account_invites (
-      id TEXT PRIMARY KEY,
-      code_hash TEXT NOT NULL UNIQUE,
-      created_by TEXT REFERENCES users(id) ON DELETE SET NULL,
-      created_at INTEGER NOT NULL,
-      expires_at INTEGER,
-      max_uses INTEGER NOT NULL DEFAULT 1,
-      use_count INTEGER NOT NULL DEFAULT 0,
-      used_by TEXT REFERENCES users(id) ON DELETE SET NULL,
-      used_at INTEGER,
-      revoked_at INTEGER
-    );
-    CREATE TABLE reserved_usernames (
-      username TEXT PRIMARY KEY COLLATE NOCASE,
-      reason TEXT NOT NULL,
-      created_at INTEGER NOT NULL
-    );
-    CREATE TABLE rooms (
-      id TEXT PRIMARY KEY,
-      created_by TEXT REFERENCES users(id),
-      state_json TEXT,
-      max_players INTEGER NOT NULL DEFAULT 2,
-      status TEXT NOT NULL DEFAULT 'waiting',
-      version INTEGER NOT NULL DEFAULT 0,
-      custom_card_ids TEXT NOT NULL DEFAULT '[]',
-      custom_cards_runtime_json TEXT,
-      enable_parent_cards INTEGER NOT NULL DEFAULT 0,
-      draft_parents INTEGER,
-      enable_through_the_seasons INTEGER NOT NULL DEFAULT 0,
-      enable_farmers_of_the_moor INTEGER NOT NULL DEFAULT 0,
-      allow_incomplete_farmers_of_the_moor_minor_deal INTEGER NOT NULL DEFAULT 0,
-      enable_snake_opening INTEGER NOT NULL DEFAULT 0,
-      hotseat INTEGER NOT NULL DEFAULT 0,
-      started_at INTEGER,
-      replay_recording INTEGER,
-      replay_viewer_build_id TEXT,
-      replay_game_build_id TEXT,
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL
-    );
-    CREATE TABLE room_players (
-      room_id TEXT NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
-      user_id TEXT NOT NULL REFERENCES users(id),
-      player_index INTEGER NOT NULL,
-      joined_at INTEGER NOT NULL,
-      PRIMARY KEY (room_id, user_id)
-    );
-    CREATE TABLE game_results (
-      room_id TEXT PRIMARY KEY,
-      started_at INTEGER NOT NULL,
-      finished_at INTEGER NOT NULL,
-      rounds_played INTEGER NOT NULL,
-      player_count INTEGER NOT NULL,
-      enable_community_deck INTEGER NOT NULL,
-      enable_parent_cards INTEGER NOT NULL,
-      enable_through_the_seasons INTEGER NOT NULL,
-      enable_farmers_of_the_moor INTEGER NOT NULL,
-      enable_snake_opening INTEGER NOT NULL DEFAULT 0
-    );
-    CREATE TABLE game_result_players (
-      room_id TEXT NOT NULL REFERENCES game_results(room_id) ON DELETE CASCADE,
-      player_index INTEGER NOT NULL,
-      game_player_id TEXT NOT NULL,
-      user_id TEXT,
-      name_is_default INTEGER NOT NULL DEFAULT 0,
-      display_name TEXT NOT NULL,
-      score INTEGER NOT NULL,
-      PRIMARY KEY (room_id, player_index)
-    );
-    CREATE TABLE game_contexts (
-      room_id TEXT PRIMARY KEY,
-      lifecycle TEXT NOT NULL,
-      phase TEXT,
-      replay_status TEXT,
-      expires_at INTEGER,
-      removal_reason TEXT,
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL
-    );
-    CREATE TABLE bug_reports (
-      submission_id TEXT PRIMARY KEY,
-      reporter_user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
-      room_id TEXT NOT NULL REFERENCES game_contexts(room_id),
-      github_issue_number INTEGER,
-      submitted_at INTEGER,
-      phenomenon TEXT,
-      author_identity TEXT,
-      confirmed_github_user_id TEXT,
-      status TEXT NOT NULL DEFAULT 'draft',
-      discarded_at INTEGER,
-      claim_token TEXT,
-      claimed_at INTEGER,
-      next_attempt_at INTEGER,
-      last_error_code TEXT,
-      updated_at INTEGER
-    );
-    CREATE TABLE issue_submission_connections (
-      user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-      revoked_at INTEGER,
-      updated_at INTEGER NOT NULL DEFAULT 0
-    );
-    CREATE TABLE game_replays (
-      room_id TEXT PRIMARY KEY REFERENCES game_contexts(room_id),
-      schema_version INTEGER NOT NULL,
-      viewer_build_id TEXT NOT NULL,
-      game_build_id TEXT NOT NULL,
-      status TEXT NOT NULL,
-      latest_step_no INTEGER NOT NULL,
-      missing_prefix INTEGER NOT NULL DEFAULT 0,
-      custom_cards_json TEXT NOT NULL DEFAULT '[]',
-      created_at INTEGER NOT NULL,
-      completed_at INTEGER
-    );
-    CREATE TABLE game_replay_steps (
-      room_id TEXT NOT NULL REFERENCES game_replays(room_id) ON DELETE CASCADE,
-      step_no INTEGER NOT NULL,
-      room_version INTEGER NOT NULL,
-      checkpoint_step_no INTEGER NOT NULL,
-      player_index INTEGER,
-      command_type TEXT NOT NULL,
-      intent_json TEXT NOT NULL,
-      payload_kind TEXT NOT NULL,
-      payload_gzip BLOB NOT NULL,
-      frame_hash TEXT NOT NULL,
-      created_at INTEGER NOT NULL,
-      PRIMARY KEY (room_id, step_no)
-    );
-    CREATE TABLE workshop_cards (
-      id TEXT PRIMARY KEY,
-      author_id TEXT NOT NULL REFERENCES users(id),
-      card_id TEXT NOT NULL,
-      card_type TEXT NOT NULL,
-      name TEXT NOT NULL,
-      description TEXT NOT NULL DEFAULT '',
-      card_json TEXT NOT NULL,
-      code_manifest TEXT,
-      art_url TEXT,
-      art_prompt TEXT,
-      status TEXT NOT NULL DEFAULT 'draft',
-      featured INTEGER NOT NULL DEFAULT 0,
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL
-    );
-    CREATE TABLE card_likes (
-      user_id TEXT NOT NULL REFERENCES users(id),
-      card_id TEXT NOT NULL REFERENCES workshop_cards(id) ON DELETE CASCADE,
-      created_at INTEGER NOT NULL,
-      PRIMARY KEY (user_id, card_id)
-    );
-    CREATE TABLE card_comments (
-      id TEXT PRIMARY KEY,
-      card_id TEXT NOT NULL REFERENCES workshop_cards(id) ON DELETE CASCADE,
-      author_id TEXT NOT NULL REFERENCES users(id),
-      body TEXT NOT NULL,
-      created_at INTEGER NOT NULL
-    );
-    CREATE TABLE sandbox_cards (
-      user_id TEXT NOT NULL REFERENCES users(id),
-      workshop_card_id TEXT NOT NULL REFERENCES workshop_cards(id) ON DELETE CASCADE,
-      added_at INTEGER NOT NULL,
-      PRIMARY KEY (user_id, workshop_card_id)
-    );
-    CREATE TABLE sandbox_settings (
-      user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-      player_count INTEGER NOT NULL DEFAULT 2,
-      deck_ids_json TEXT NOT NULL DEFAULT '["A","B","C","D","E"]',
-      updated_at INTEGER NOT NULL
-    );
-    CREATE TABLE workshop_card_versions (
-      id TEXT PRIMARY KEY,
-      card_id TEXT NOT NULL REFERENCES workshop_cards(id) ON DELETE CASCADE,
-      card_json TEXT NOT NULL,
-      code_manifest TEXT,
-      art_url TEXT,
-      version_number INTEGER NOT NULL,
-      created_by TEXT NOT NULL REFERENCES users(id),
-      created_at INTEGER NOT NULL
-    );
-    CREATE TABLE github_propose_rate_limit (
-      user_id TEXT PRIMARY KEY REFERENCES users(id),
-      last_propose_at INTEGER NOT NULL
-    );
-    CREATE TABLE github_propose_audit (
-      id TEXT PRIMARY KEY,
-      user_id TEXT NOT NULL REFERENCES users(id),
-      workshop_card_id TEXT NOT NULL,
-      action TEXT NOT NULL,
-      pr_url TEXT,
-      error_code TEXT,
-      error_message TEXT,
-      created_at INTEGER NOT NULL
-    );
-  `)
-  const { ROOM_HISTORY_SCHEMA, ROOM_RECOVERY_SCHEMA } = await import('../game/persistence/room-history-store')
-  db.exec(ROOM_HISTORY_SCHEMA)
-  db.exec(ROOM_RECOVERY_SCHEMA)
-  return { getDb: () => db, cleanExpiredSessions: () => {} }
+  const { createTestDatabase } = await import('./_helpers/postgres')
+  const db = await createTestDatabase()
+  return { getDb: () => db, initializeDatabase: async () => {}, cleanExpiredSessions: async () => {} }
 })
+afterAll(async () => { await (await import('../db.ts')).getDb().close() })
+
 
 const {
   createEmailVerificationToken,
@@ -340,7 +79,8 @@ type JsonResponse = {
   json: Record<string, unknown>
 }
 
-class MockReq extends EventEmitter {
+class MockReq extends Readable {
+  override _read(): void {}
   method: string
   url: string
   headers: Record<string, string | undefined>
@@ -352,10 +92,8 @@ class MockReq extends EventEmitter {
     this.url = url
     this.headers = { host: 'localhost' }
     for (const [key, value] of Object.entries(headers)) this.headers[key.toLowerCase()] = value
-    queueMicrotask(() => {
-      if (body !== undefined) this.emit('data', Buffer.from(JSON.stringify(body)))
-      this.emit('end')
-    })
+    if (body !== undefined) this.push(Buffer.from(JSON.stringify(body)))
+    this.push(null)
   }
 }
 
@@ -422,12 +160,19 @@ function startOAuthCookie(res: JsonResponse): string {
 }
 
 describe('auth routes', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     wsServerMocks.endRoomsForUser.mockClear()
     wsServerMocks.closeUserConnections.mockClear()
+    vi.stubEnv('REPLAY_TRUST_PROXY', 'true')
     process.env.DISABLE_RATE_LIMIT = '1'
     process.env.ACCOUNT_REGISTRATION_POLICY = 'open'
-    getDb().exec(`
+    const { RoomDirectory } = await import('../game/room-directory')
+    const directory = new RoomDirectory(getDb())
+    if (!await getDb().prepare('SELECT 1 FROM app_instances WHERE instance_id=?').get('auth-routes-test')) {
+      await directory.register('auth-routes-test', 'http://test', 'test')
+      await directory.activate('auth-routes-test')
+    } else await directory.heartbeat('auth-routes-test')
+    ;(await getDb().exec(`
       DELETE FROM github_propose_audit;
       DELETE FROM github_propose_rate_limit;
       DELETE FROM workshop_card_versions;
@@ -452,11 +197,12 @@ describe('auth routes', () => {
       DELETE FROM email_verification_tokens;
       DELETE FROM sessions;
       DELETE FROM users;
-    `)
+    `))
   })
 
   afterEach(() => {
     vi.restoreAllMocks()
+    vi.unstubAllEnvs()
     if (originalNodeEnv === undefined) delete process.env.NODE_ENV
     else process.env.NODE_ENV = originalNodeEnv
     delete process.env.ENABLE_AUTH_TEST_HELPERS
@@ -482,7 +228,7 @@ describe('auth routes', () => {
 
   it('authenticates with a valid duplicate session cookie when a stale one is present', async () => {
     const user = await createLocalUserForTests('duplicatecookie', 'password123', 'Duplicate Cookie')
-    const validToken = createSession(user.id)
+    const validToken = (await createSession(user.id))
 
     for (const cookie of [
       `${SESSION_COOKIE}=stale; ${SESSION_COOKIE}=${validToken}`,
@@ -505,43 +251,43 @@ describe('auth routes', () => {
 
   it('delete account removes the current user and clears the session cookie', async () => {
     const user = await createLocalUserForTests('delete_route', 'password123', 'Delete Route')
-    const token = createSession(user.id)
+    const token = (await createSession(user.id))
     const now = Date.now()
-    getDb().prepare(`
+    ;(await getDb().prepare(`
       INSERT INTO rooms (id, created_by, state_json, max_players, status, version, custom_card_ids, created_at, updated_at)
       VALUES (?, ?, ?, 2, 'playing', 1, '[]', ?, ?)
-    `).run('route-room', user.id, '{"private":"name"}', now, now)
-    getDb().prepare('INSERT INTO room_players (room_id, user_id, player_index, joined_at) VALUES (?, ?, ?, ?)')
-      .run('route-room', user.id, 0, now)
+    `).run('route-room', user.id, '{"private":"name"}', now, now))
+    ;(await getDb().prepare('INSERT INTO room_players (room_id, user_id, player_index, joined_at) VALUES (?, ?, ?, ?)')
+      .run('route-room', user.id, 0, now))
 
     const res = await requestJson('DELETE', '/api/auth/account', undefined, {
       Cookie: `${SESSION_COOKIE}=${token}`,
     })
 
     expect(res.status).toBe(200)
-    expect(res.json).toEqual({ ok: true })
+    expect(res.json).toMatchObject({ ok: true })
     expect(res.headers['Set-Cookie']).toContain(`${SESSION_COOKIE}=;`)
-    expect(validateSession(token)).toBeNull()
-    expect((getDb().prepare('SELECT COUNT(*) AS n FROM users WHERE id = ?').get(user.id) as { n: number }).n).toBe(0)
-    expect((getDb().prepare('SELECT COUNT(*) AS n FROM rooms WHERE id = ?').get('route-room') as { n: number }).n).toBe(0)
+    expect((await validateSession(token))).toBeNull()
+    expect(((await getDb().prepare('SELECT COUNT(*) AS n FROM users WHERE id = ?').get(user.id)) as { n: number }).n).toBe(0)
+    expect(((await getDb().prepare('SELECT COUNT(*) AS n FROM rooms WHERE id = ?').get('route-room')) as { n: number }).n).toBe(0)
     expect(wsServerMocks.endRoomsForUser).toHaveBeenCalledWith(user.id, ['route-room'])
     expect(wsServerMocks.closeUserConnections).toHaveBeenCalledWith(user.id)
   })
 
   it('deletes an unsubmitted local bug report draft without GitHub delivery', async () => {
     const user = await createLocalUserForTests('delete_draft', 'password123', 'Delete Draft')
-    const token = createSession(user.id)
+    const token = (await createSession(user.id))
     const now = Date.now()
-    getDb().prepare(`
+    ;(await getDb().prepare(`
       INSERT INTO game_contexts (
         room_id, lifecycle, phase, replay_status, created_at, updated_at
       ) VALUES (?, 'completed', NULL, 'available', ?, ?)
-    `).run('draft-room', now, now)
-    getDb().prepare(`
+    `).run('draft-room', now, now))
+    ;(await getDb().prepare(`
       INSERT INTO bug_reports (
-        submission_id, reporter_user_id, room_id, phenomenon
-      ) VALUES (?, ?, ?, ?)
-    `).run('draft-submission', user.id, 'draft-room', 'The game froze')
+        submission_id, reporter_user_id, room_id, phenomenon, player_index, lifecycle, room_version, step_no, frame_hash, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, 0, 'completed', 1, 1, 'test-hash', 1, 1)
+    `).run('draft-submission', user.id, 'draft-room', 'The game froze'))
 
     const res = await requestJson('DELETE', '/api/auth/account', undefined, {
       Cookie: `${SESSION_COOKIE}=${token}`,
@@ -549,32 +295,32 @@ describe('auth routes', () => {
 
     expect(res.status).toBe(200)
     expect(
-      (getDb().prepare('SELECT COUNT(*) AS n FROM bug_reports').get() as { n: number }).n,
+      ((await getDb().prepare('SELECT COUNT(*) AS n FROM bug_reports').get()) as { n: number }).n,
     ).toBe(0)
     expect(
-      (getDb().prepare('SELECT COUNT(*) AS n FROM users WHERE id = ?').get(user.id) as { n: number }).n,
+      ((await getDb().prepare('SELECT COUNT(*) AS n FROM users WHERE id = ?').get(user.id)) as { n: number }).n,
     ).toBe(0)
   })
 
   it('persists and disables account deletion while GitHub cleanup is unavailable', async () => {
     const user = await createLocalUserForTests('delete_pending', 'password123', 'Delete Pending')
-    linkIdentity(user.id, {
+    ;(await linkIdentity(user.id, {
       provider: 'github',
       providerUserId: 'gh-delete-pending',
       emailVerified: true,
-    })
-    const token = createSession(user.id)
+    }))
+    const token = (await createSession(user.id))
     const now = Date.now()
-    getDb().prepare(`
+    ;(await getDb().prepare(`
       INSERT INTO game_contexts (
         room_id, lifecycle, phase, replay_status, created_at, updated_at
       ) VALUES (?, 'completed', NULL, 'available', ?, ?)
-    `).run('pending-room', now, now)
-    getDb().prepare(`
+    `).run('pending-room', now, now))
+    ;(await getDb().prepare(`
       INSERT INTO bug_reports (
         submission_id, reporter_user_id, room_id, github_issue_number,
-        submitted_at, phenomenon, status, updated_at
-      ) VALUES (?, ?, ?, 7, ?, ?, 'submitted', ?)
+        submitted_at, phenomenon, status, updated_at, player_index, lifecycle, room_version, step_no, frame_hash, created_at
+      ) VALUES (?, ?, ?, 7, ?, ?, 'submitted', ?, 0, 'completed', 1, 1, 'test-hash', 1)
     `).run(
       'pending-submission',
       user.id,
@@ -582,32 +328,32 @@ describe('auth routes', () => {
       now,
       'The game froze',
       now,
-    )
-    getDb().prepare(`
-      INSERT INTO issue_submission_connections (user_id, updated_at)
-      VALUES (?, ?)
-    `).run(user.id, now)
+    ))
+    ;(await getDb().prepare(`
+      INSERT INTO issue_submission_connections (user_id, updated_at, github_user_id, access_token_ciphertext, access_token_nonce, access_token_tag, key_id, access_token_expires_at, created_at)
+      VALUES (?, ?, 'gh-delete-pending', 'ciphertext', 'nonce', 'tag', 'test', 9999999999999, 1)
+    `).run(user.id, now))
 
     const res = await requestJson('DELETE', '/api/auth/account', undefined, {
       Cookie: `${SESSION_COOKIE}=${token}`,
     })
 
     expect(res.status).toBe(202)
-    expect(res.json).toEqual({ ok: true, pending: true })
+    expect(res.json).toMatchObject({ ok: true, pending: true, operationId: expect.any(String) })
     expect(res.headers['Set-Cookie']).toContain(`${SESSION_COOKIE}=;`)
-    expect(validateSession(token)).toBeNull()
-    expect(createSession(user.id)).toBeNull()
-    expect(findIdentity('github', 'gh-delete-pending')).toBeNull()
-    expect(getDb().prepare(`
+    expect((await validateSession(token))).toBeNull()
+    expect((await createSession(user.id))).toBeNull()
+    expect((await findIdentity('github', 'gh-delete-pending'))).toBeNull()
+    expect((await getDb().prepare(`
       SELECT last_error_code FROM account_deletion_requests WHERE user_id = ?
-    `).get(user.id)).toEqual({ last_error_code: null })
-    expect(getDb().prepare(`
+    `).get(user.id))).toEqual({ last_error_code: 'bug_report_deletion_failed' })
+    expect((await getDb().prepare(`
       SELECT revoked_at FROM issue_submission_connections WHERE user_id = ?
-    `).get(user.id)).toMatchObject({ revoked_at: expect.any(Number) })
-    expect(getDb().prepare(`
+    `).get(user.id))).toMatchObject({ revoked_at: expect.any(Number) })
+    expect((await getDb().prepare(`
       SELECT reporter_user_id, phenomenon
       FROM bug_reports WHERE submission_id = 'pending-submission'
-    `).get()).toEqual({
+    `).get())).toEqual({
       reporter_user_id: user.id,
       phenomenon: null,
     })
@@ -699,12 +445,12 @@ describe('auth routes', () => {
     expect(res.json).toMatchObject({ ok: true, status: 'verification_required' })
     expect(res.headers['Set-Cookie']).toBeUndefined()
 
-    const user = getDb().prepare('SELECT id, email_verified_at FROM users WHERE username = ?').get('routeuser') as {
+    const user = (await getDb().prepare('SELECT id, email_verified_at FROM users WHERE username = ?').get('routeuser')) as {
       id: string
       email_verified_at: number | null
     }
     expect(user.email_verified_at).toBeNull()
-    const tokenRow = getDb().prepare('SELECT user_id FROM email_verification_tokens').get() as { user_id: string }
+    const tokenRow = (await getDb().prepare('SELECT user_id FROM email_verification_tokens').get()) as { user_id: string }
     expect(tokenRow.user_id).toBe(user.id)
   })
 
@@ -735,14 +481,14 @@ describe('auth routes', () => {
     })
     expect(created.ok).toBe(true)
     if (!created.ok) return
-    const token = createEmailVerificationToken(created.userId)
+    const token = (await createEmailVerificationToken(created.userId))
 
     const res = await requestJson('GET', `/api/auth/verify-email?token=${encodeURIComponent(token)}`)
 
     expect(res.status).toBe(302)
     expect(res.headers.Location).toBe('https://frontend.example/open-agricola/')
     expect(res.headers['Set-Cookie']).toContain('oa_session=')
-    const verified = getDb().prepare('SELECT email_verified_at FROM users WHERE id = ?').get(created.userId) as {
+    const verified = (await getDb().prepare('SELECT email_verified_at FROM users WHERE id = ?').get(created.userId)) as {
       email_verified_at: number | null
     }
     expect(verified.email_verified_at).toBeTypeOf('number')
@@ -764,7 +510,7 @@ describe('auth routes', () => {
     process.env.ACCOUNT_REGISTRATION_POLICY = 'invite_only'
     process.env.EMAIL_DELIVERY = 'log'
     const admin = await createLocalUserForTests('invite_password_admin', 'password123', 'Invite Admin')
-    const invite = createInvite(admin.id, { expiresAt: Date.now() + 7 * 86_400_000, maxUses: 1 })
+    const invite = (await createInvite(admin.id, { expiresAt: Date.now() + 7 * 86_400_000, maxUses: 1 }))
 
     const missing = await requestJson('POST', '/api/auth/register', {
       username: 'missinginvite',
@@ -784,8 +530,8 @@ describe('auth routes', () => {
     })
     expect(created.status).toBe(200)
 
-    const user = getDb().prepare('SELECT id FROM users WHERE username = ?').get('invitedpassword') as { id: string }
-    const row = getDb().prepare('SELECT used_by, used_at FROM account_invites WHERE id = ?').get(invite.id) as {
+    const user = (await getDb().prepare('SELECT id FROM users WHERE username = ?').get('invitedpassword')) as { id: string }
+    const row = (await getDb().prepare('SELECT used_by, used_at FROM account_invites WHERE id = ?').get(invite.id)) as {
       used_by: string
       used_at: number
     }
@@ -797,7 +543,7 @@ describe('auth routes', () => {
     process.env.ACCOUNT_REGISTRATION_POLICY = 'invite_only'
     process.env.PUBLIC_API_BASE = 'https://api.example'
     const admin = await createLocalUserForTests('rollback_admin', 'password123', 'Rollback Admin')
-    const invite = createInvite(admin.id, { expiresAt: Date.now() + 7 * 86_400_000, maxUses: 1 })
+    const invite = (await createInvite(admin.id, { expiresAt: Date.now() + 7 * 86_400_000, maxUses: 1 }))
     const sendEmailSpy = vi.spyOn(emailModule, 'sendEmail')
       .mockRejectedValueOnce(new Error('resend down'))
       .mockResolvedValueOnce()
@@ -811,10 +557,10 @@ describe('auth routes', () => {
     })
     expect(failed.status).toBe(500)
     expect(failed.json).toMatchObject({ ok: false, code: 'email_delivery_failed' })
-    expect(getDb().prepare('SELECT id FROM users WHERE username = ?').get('retryregister')).toBeUndefined()
-    expect(getDb().prepare('SELECT id FROM users WHERE email = ?').get('retryregister@example.com')).toBeUndefined()
-    expect((getDb().prepare('SELECT COUNT(*) AS count FROM email_verification_tokens').get() as { count: number }).count).toBe(0)
-    const releasedInvite = getDb().prepare('SELECT used_by, used_at, use_count FROM account_invites WHERE id = ?').get(invite.id) as {
+    expect((await getDb().prepare('SELECT id FROM users WHERE username = ?').get('retryregister'))).toBeUndefined()
+    expect((await getDb().prepare('SELECT id FROM users WHERE email = ?').get('retryregister@example.com'))).toBeUndefined()
+    expect(((await getDb().prepare('SELECT COUNT(*) AS count FROM email_verification_tokens').get()) as { count: number }).count).toBe(0)
+    const releasedInvite = (await getDb().prepare('SELECT used_by, used_at, use_count FROM account_invites WHERE id = ?').get(invite.id)) as {
       used_by: string | null
       used_at: number | null
       use_count: number
@@ -832,8 +578,8 @@ describe('auth routes', () => {
     })
     expect(retried.status).toBe(200)
     expect(sendEmailSpy).toHaveBeenCalledTimes(2)
-    const user = getDb().prepare('SELECT id FROM users WHERE username = ?').get('retryregister') as { id: string }
-    const usedInvite = getDb().prepare('SELECT used_by, used_at FROM account_invites WHERE id = ?').get(invite.id) as {
+    const user = (await getDb().prepare('SELECT id FROM users WHERE username = ?').get('retryregister')) as { id: string }
+    const usedInvite = (await getDb().prepare('SELECT used_by, used_at FROM account_invites WHERE id = ?').get(invite.id)) as {
       used_by: string | null
       used_at: number | null
     }
@@ -845,9 +591,9 @@ describe('auth routes', () => {
     process.env.ACCOUNT_REGISTRATION_POLICY = 'invite_only'
     process.env.PUBLIC_API_BASE = 'https://api.example'
     const admin = await createLocalUserForTests('interleaved_admin', 'password123', 'Admin')
-    const invite = createInvite(admin.id, {
+    const invite = (await createInvite(admin.id, {
       code: 'INTERLEAVED-TWO', expiresAt: Date.now() + 86_400_000, maxUses: 2,
-    })
+    }))
     let markFirstEmailStarted!: () => void
     const firstEmailStarted = new Promise<void>(resolve => { markFirstEmailStarted = resolve })
     let rejectFirstEmail!: (error: Error) => void
@@ -876,16 +622,16 @@ describe('auth routes', () => {
       inviteCode: invite.code,
     })
     expect(secondRegistration.status).toBe(200)
-    const secondUser = getDb().prepare('SELECT id FROM users WHERE username = ?').get('interleavedb') as { id: string }
+    const secondUser = (await getDb().prepare('SELECT id FROM users WHERE username = ?').get('interleavedb')) as { id: string }
 
     rejectFirstEmail(new Error('first delivery failed'))
     const failedFirstRegistration = await firstRegistration
     expect(failedFirstRegistration.status).toBe(500)
-    expect(getDb().prepare('SELECT id FROM users WHERE username = ?').get('interleaveda')).toBeUndefined()
-    expect(getDb().prepare('SELECT id FROM users WHERE username = ?').get('interleavedb')).toEqual(secondUser)
-    const row = getDb().prepare(`
+    expect((await getDb().prepare('SELECT id FROM users WHERE username = ?').get('interleaveda'))).toBeUndefined()
+    expect((await getDb().prepare('SELECT id FROM users WHERE username = ?').get('interleavedb'))).toEqual(secondUser)
+    const row = (await getDb().prepare(`
       SELECT use_count, used_by, used_at FROM account_invites WHERE id = ?
-    `).get(invite.id) as { use_count: number; used_by: string | null; used_at: number | null }
+    `).get(invite.id)) as { use_count: number; used_by: string | null; used_at: number | null }
     expect(row.use_count).toBe(1)
     expect(row.used_by).toBe(secondUser.id)
     expect(row.used_at).toBeGreaterThan(0)
@@ -902,9 +648,9 @@ describe('auth routes', () => {
     })
     expect(created.ok).toBe(true)
 
-    const firstSentAt = (getDb()
+    const firstSentAt = ((await getDb()
       .prepare('SELECT email_verification_sent_at FROM users WHERE username = ?')
-      .get('resendroute') as { email_verification_sent_at: number | null }).email_verification_sent_at
+      .get('resendroute')) as { email_verification_sent_at: number | null }).email_verification_sent_at
 
     const resend = await requestJson('POST', '/api/auth/resend-verification', {
       email: 'resendroute@example.com',
@@ -912,11 +658,11 @@ describe('auth routes', () => {
     expect(resend.status).toBe(200)
     expect(resend.json).toMatchObject({ ok: true })
 
-    const afterResend = getDb().prepare(`
+    const afterResend = (await getDb().prepare(`
       SELECT email_verified_at, email_verification_sent_at
       FROM users
       WHERE username = ?
-    `).get('resendroute') as {
+    `).get('resendroute')) as {
       email_verified_at: number | null
       email_verification_sent_at: number | null
     }
@@ -942,7 +688,7 @@ describe('auth routes', () => {
     expect(created.ok).toBe(true)
     if (!created.ok) return
 
-    const token = createEmailVerificationToken(created.userId)
+    const token = (await createEmailVerificationToken(created.userId))
     const verified = await requestJson('GET', `/api/auth/verify-email?token=${encodeURIComponent(token)}`)
     expect(verified.status).toBe(302)
 
@@ -1012,7 +758,7 @@ describe('auth routes', () => {
 
   it('me reads oa_session cookie', async () => {
     const user = await createLocalUserForTests('meuser', 'password123', 'Me User')
-    const token = createSession(user.id)
+    const token = (await createSession(user.id))
     const res = await requestJson('GET', '/api/auth/me', undefined, { Cookie: `oa_session=${token}` })
     expect(res.status).toBe(200)
     expect((res.json.user as { username: string }).username).toBe('meuser')
@@ -1020,7 +766,7 @@ describe('auth routes', () => {
 
   it.each(['raw', 'compressed'] as const)('my-rooms flags rooms waiting on the caller and sorts them first (%s)', async encoding => {
     const user = await createLocalUserForTests('lobbyuser', 'password123', 'Lobby User')
-    const token = createSession(user.id)
+    const token = (await createSession(user.id))
     const db = getDb()
     const insertRoom = db.prepare(`
       INSERT INTO rooms (id, created_by, state_json, max_players, status, created_at, updated_at)
@@ -1070,27 +816,27 @@ describe('auth routes', () => {
       expect(JSON.parse(packed.json)).toMatchObject({ roomBodyEncoding: 'gzip-base64-v1' })
       return packed.json
     }
-    insertRoom.run('room-their-turn', user.id, persisted({ phase: 'playing', currentPlayerIndex: 0 }), 'playing', 1, 600)
-    insertPlayer.run('room-their-turn', user.id, 1, 1)
-    insertRoom.run('room-my-turn', user.id, persisted({ phase: 'playing', currentPlayerIndex: 1 }), 'playing', 1, 100)
-    insertPlayer.run('room-my-turn', user.id, 1, 1)
-    insertRoom.run('room-waiting', user.id, null, 'waiting', 1, 500)
-    insertPlayer.run('room-waiting', user.id, 0, 1)
-    insertRoom.run('room-draft', user.id, persisted({ phase: 'draft', currentPlayerIndex: 0 }), 'playing', 1, 400)
-    insertPlayer.run('room-draft', user.id, 0, 1)
-    insertRoom.run('room-broken', user.id, '{not-json', 'playing', 1, 300)
-    insertPlayer.run('room-broken', user.id, 0, 1)
-    insertRoom.run('room-harvest', user.id, persisted({
+    ;(await insertRoom.run('room-their-turn', user.id, persisted({ phase: 'playing', currentPlayerIndex: 0 }), 'playing', 1, 600))
+    ;(await insertPlayer.run('room-their-turn', user.id, 1, 1))
+    ;(await insertRoom.run('room-my-turn', user.id, persisted({ phase: 'playing', currentPlayerIndex: 1 }), 'playing', 1, 100))
+    ;(await insertPlayer.run('room-my-turn', user.id, 1, 1))
+    ;(await insertRoom.run('room-waiting', user.id, null, 'waiting', 1, 500))
+    ;(await insertPlayer.run('room-waiting', user.id, 0, 1))
+    ;(await insertRoom.run('room-draft', user.id, persisted({ phase: 'draft', currentPlayerIndex: 0 }), 'playing', 1, 400))
+    ;(await insertPlayer.run('room-draft', user.id, 0, 1))
+    ;(await insertRoom.run('room-broken', user.id, '{not-json', 'playing', 1, 300))
+    ;(await insertPlayer.run('room-broken', user.id, 0, 1))
+    ;(await insertRoom.run('room-harvest', user.id, persisted({
       phase: 'playing',
       currentPlayerIndex: 0,
-    }, [{ ownerPlayerIndex: 1 }]), 'playing', 1, 200)
-    insertPlayer.run('room-harvest', user.id, 1, 1)
-    insertRoom.run('room-gameover', user.id, persisted({
+    }, [{ ownerPlayerIndex: 1 }]), 'playing', 1, 200))
+    ;(await insertPlayer.run('room-harvest', user.id, 1, 1))
+    ;(await insertRoom.run('room-gameover', user.id, persisted({
       phase: 'playing',
       currentPlayerIndex: 0,
       gameOver: true,
-    }), 'playing', 1, 150)
-    insertPlayer.run('room-gameover', user.id, 0, 1)
+    }), 'playing', 1, 150))
+    ;(await insertPlayer.run('room-gameover', user.id, 0, 1))
 
     const res = await requestJson('GET', '/api/lobby/my-rooms', undefined, { Cookie: `oa_session=${token}` })
     expect(res.status).toBe(200)
@@ -1105,7 +851,7 @@ describe('auth routes', () => {
   it('uses the same admin config for me and admin invite routes', async () => {
     process.env.ADMIN_USERS = 'admin'
     const admin = await createLocalUserForTests('admin', 'password123', 'Admin')
-    const token = createSession(admin.id)
+    const token = (await createSession(admin.id))
 
     const login = await requestJson('POST', '/api/auth/login', { username: 'admin', password: 'password123' })
     expect(login.status).toBe(200)
@@ -1127,20 +873,20 @@ describe('auth routes', () => {
 
   it('logout-all clears every session and clears the browser cookie', async () => {
     const user = await createLocalUserForTests('allout', 'password123', 'All Out')
-    const one = createSession(user.id)
-    const two = createSession(user.id)
+    const one = (await createSession(user.id))
+    const two = (await createSession(user.id))
     const res = await requestJson('POST', '/api/auth/logout-all', {}, { Cookie: `oa_session=${one}` })
     expect(res.status).toBe(200)
-    expect(validateSession(one)).toBeNull()
-    expect(validateSession(two)).toBeNull()
+    expect((await validateSession(one))).toBeNull()
+    expect((await validateSession(two))).toBeNull()
     expect(res.headers['Set-Cookie']).toContain('oa_session=;')
   })
 
   it('rejects cross-site cookie-backed mutation requests', async () => {
     process.env.PUBLIC_APP_ORIGIN = 'https://frontend.example'
     const user = await createLocalUserForTests('csrfuser', 'password123', 'CSRF User')
-    const one = createSession(user.id)
-    const two = createSession(user.id)
+    const one = (await createSession(user.id))
+    const two = (await createSession(user.id))
 
     const rejected = await requestJson(
       'POST',
@@ -1151,8 +897,8 @@ describe('auth routes', () => {
 
     expect(rejected.status).toBe(403)
     expect(rejected.json).toMatchObject({ ok: false, code: 'csrf_rejected' })
-    expect(validateSession(one)?.username).toBe('csrfuser')
-    expect(validateSession(two)?.username).toBe('csrfuser')
+    expect((await validateSession(one))?.username).toBe('csrfuser')
+    expect((await validateSession(two))?.username).toBe('csrfuser')
 
     const allowed = await requestJson(
       'POST',
@@ -1162,19 +908,19 @@ describe('auth routes', () => {
     )
 
     expect(allowed.status).toBe(200)
-    expect(validateSession(one)).toBeNull()
-    expect(validateSession(two)).toBeNull()
+    expect((await validateSession(one))).toBeNull()
+    expect((await validateSession(two))).toBeNull()
   })
 
   it('completes onboarding from an oauth ticket and sets a session cookie', async () => {
-    const ticket = createOnboardingTicket({
+    const ticket = (await createOnboardingTicket({
       provider: 'github',
       providerUserId: 'gh-new',
       providerLogin: 'new-gh',
       email: 'new@example.com',
       emailVerified: true,
       displayName: 'New GH',
-    })
+    }))
     const res = await requestJson(
       'POST',
       '/api/auth/onboarding/complete',
@@ -1184,11 +930,24 @@ describe('auth routes', () => {
     expect(res.status).toBe(200)
     expect((res.json.user as { username: string }).username).toBe('newuser')
     expect(res.headers['Set-Cookie']).toContain('oa_session=')
-    expect(findIdentity('github', 'gh-new')?.userId).toBe((res.json.user as { id: string }).id)
+    expect((await findIdentity('github', 'gh-new'))?.userId).toBe((res.json.user as { id: string }).id)
+  })
+
+  it('consumes one onboarding ticket and creates one identity under concurrent submissions', async () => {
+    const ticket = await createOnboardingTicket({ provider: 'github', providerUserId: 'gh-race', emailVerified: true })
+    const responses = await Promise.all(['firstuser', 'seconduser'].map(username => requestJson(
+      'POST', '/api/auth/onboarding/complete',
+      { username, password: 'password123', confirmPassword: 'password123' },
+      { Cookie: `oa_onboarding=${ticket}` },
+    )))
+    expect(responses.filter(response => response.status === 200)).toHaveLength(1)
+    expect(responses.find(response => response.status !== 200)?.json).toMatchObject({ code: 'oauth_onboarding_expired' })
+    expect(await getDb().prepare('SELECT COUNT(*) AS n FROM users').get()).toEqual({ n: 1 })
+    expect(await getDb().prepare('SELECT COUNT(*) AS n FROM auth_identities').get()).toEqual({ n: 1 })
   })
 
   it('rejects onboarding when passwords do not match', async () => {
-    const ticket = createOnboardingTicket({ provider: 'google', providerUserId: 'g-new', emailVerified: false })
+    const ticket = (await createOnboardingTicket({ provider: 'google', providerUserId: 'g-new', emailVerified: false }))
     const res = await requestJson(
       'POST',
       '/api/auth/onboarding/complete',
@@ -1200,7 +959,7 @@ describe('auth routes', () => {
   })
 
   it('preserves onboarding ticket after password mismatch and allows retry', async () => {
-    const ticket = createOnboardingTicket({ provider: 'google', providerUserId: 'g-retry', emailVerified: false })
+    const ticket = (await createOnboardingTicket({ provider: 'google', providerUserId: 'g-retry', emailVerified: false }))
     const mismatch = await requestJson(
       'POST',
       '/api/auth/onboarding/complete',
@@ -1218,12 +977,12 @@ describe('auth routes', () => {
     )
     expect(retry.status).toBe(200)
     expect((retry.json.user as { username: string }).username).toBe('retryuser')
-    expect(findIdentity('google', 'g-retry')?.userId).toBe((retry.json.user as { id: string }).id)
+    expect((await findIdentity('google', 'g-retry'))?.userId).toBe((retry.json.user as { id: string }).id)
   })
 
   it('preserves onboarding ticket after duplicate username and allows retry', async () => {
     await createLocalUserForTests('takenname', 'password123', 'Taken Name')
-    const ticket = createOnboardingTicket({ provider: 'github', providerUserId: 'gh-retry', emailVerified: true })
+    const ticket = (await createOnboardingTicket({ provider: 'github', providerUserId: 'gh-retry', emailVerified: true }))
     const duplicate = await requestJson(
       'POST',
       '/api/auth/onboarding/complete',
@@ -1241,15 +1000,15 @@ describe('auth routes', () => {
     )
     expect(retry.status).toBe(200)
     expect((retry.json.user as { username: string }).username).toBe('uniquename')
-    expect(findIdentity('github', 'gh-retry')?.userId).toBe((retry.json.user as { id: string }).id)
+    expect((await findIdentity('github', 'gh-retry'))?.userId).toBe((retry.json.user as { id: string }).id)
   })
 
   it('prevents reusing a deleted admin username during onboarding', async () => {
     process.env.ADMIN_USERS = 'deleted_admin'
     process.env.ACCOUNT_REGISTRATION_POLICY = 'open'
     const admin = await createLocalUserForTests('deleted_admin', 'password123', 'Deleted Admin')
-    expect(deleteAccount(admin.id)).toEqual({ ok: true })
-    const ticket = createOnboardingTicket({ provider: 'github', providerUserId: 'gh-deleted-admin', emailVerified: true })
+    expect((await deleteAccount(admin.id))).toEqual({ ok: true })
+    const ticket = (await createOnboardingTicket({ provider: 'github', providerUserId: 'gh-deleted-admin', emailVerified: true }))
 
     const res = await requestJson(
       'POST',
@@ -1260,7 +1019,7 @@ describe('auth routes', () => {
 
     expect(res.status).toBe(400)
     expect(res.json).toMatchObject({ ok: false, code: 'username_taken' })
-    expect(findIdentity('github', 'gh-deleted-admin')).toBeNull()
+    expect((await findIdentity('github', 'gh-deleted-admin'))).toBeNull()
   })
 
   it('reports the current registration policy', async () => {
@@ -1274,7 +1033,7 @@ describe('auth routes', () => {
 
   it('requires an invite code for invite-only onboarding', async () => {
     process.env.ACCOUNT_REGISTRATION_POLICY = 'invite_only'
-    const ticket = createOnboardingTicket({ provider: 'github', providerUserId: 'gh-no-invite', emailVerified: true })
+    const ticket = (await createOnboardingTicket({ provider: 'github', providerUserId: 'gh-no-invite', emailVerified: true }))
 
     const res = await requestJson(
       'POST',
@@ -1285,7 +1044,7 @@ describe('auth routes', () => {
 
     expect(res.status).toBe(400)
     expect(res.json).toMatchObject({ ok: false, code: 'invalid_invite' })
-    expect(findIdentity('github', 'gh-no-invite')).toBeNull()
+    expect((await findIdentity('github', 'gh-no-invite'))).toBeNull()
   })
 
   it('rejects invite-only oauth register start without an invite code', async () => {
@@ -1324,8 +1083,8 @@ describe('auth routes', () => {
   it('rejects inviteCode body during invite-only onboarding without a pre-authorized invite', async () => {
     process.env.ACCOUNT_REGISTRATION_POLICY = 'invite_only'
     const admin = await createLocalUserForTests('admin_inviter', 'password123', 'Admin Inviter')
-    const invite = createInvite(admin.id, { expiresAt: Date.now() + 7 * 86_400_000, maxUses: 1 })
-    const ticket = createOnboardingTicket({ provider: 'github', providerUserId: 'gh-invited', emailVerified: true })
+    const invite = (await createInvite(admin.id, { expiresAt: Date.now() + 7 * 86_400_000, maxUses: 1 }))
+    const ticket = (await createOnboardingTicket({ provider: 'github', providerUserId: 'gh-invited', emailVerified: true }))
 
     const res = await requestJson(
       'POST',
@@ -1336,8 +1095,8 @@ describe('auth routes', () => {
 
     expect(res.status).toBe(400)
     expect(res.json).toMatchObject({ ok: false, code: 'invalid_invite' })
-    expect(findIdentity('github', 'gh-invited')).toBeNull()
-    const row = getDb().prepare('SELECT used_by, used_at FROM account_invites WHERE id = ?').get(invite.id) as {
+    expect((await findIdentity('github', 'gh-invited'))).toBeNull()
+    const row = (await getDb().prepare('SELECT used_by, used_at FROM account_invites WHERE id = ?').get(invite.id)) as {
       used_by: string | null
       used_at: number | null
     }
@@ -1348,8 +1107,8 @@ describe('auth routes', () => {
   it('keeps onboarding retryable after inviteCode body is rejected without pre-authorization', async () => {
     process.env.ACCOUNT_REGISTRATION_POLICY = 'invite_only'
     const admin = await createLocalUserForTests('reuse_admin', 'password123', 'Reuse Admin')
-    const ticket = createOnboardingTicket({ provider: 'github', providerUserId: 'gh-second', emailVerified: true })
-    const invite = createInvite(admin.id, { expiresAt: Date.now() + 7 * 86_400_000, maxUses: 1 })
+    const ticket = (await createOnboardingTicket({ provider: 'github', providerUserId: 'gh-second', emailVerified: true }))
+    const invite = (await createInvite(admin.id, { expiresAt: Date.now() + 7 * 86_400_000, maxUses: 1 }))
 
     const first = await requestJson(
       'POST',
@@ -1369,13 +1128,13 @@ describe('auth routes', () => {
 
     expect(retry.status).toBe(400)
     expect(retry.json).toMatchObject({ ok: false, code: 'invalid_invite' })
-    expect(findIdentity('github', 'gh-second')).toBeNull()
+    expect((await findIdentity('github', 'gh-second'))).toBeNull()
   })
 
   it('consumes the pre-authorized invite from onboarding ticket', async () => {
     process.env.ACCOUNT_REGISTRATION_POLICY = 'invite_only'
     const admin = await createLocalUserForTests('preauth_admin', 'password123', 'Preauth Admin')
-    const invite = createInvite(admin.id, { expiresAt: Date.now() + 7 * 86_400_000, maxUses: 1 })
+    const invite = (await createInvite(admin.id, { expiresAt: Date.now() + 7 * 86_400_000, maxUses: 1 }))
     vi.mocked(exchangeOAuthCode).mockResolvedValueOnce({
       provider: 'github',
       providerUserId: 'gh-preauth',
@@ -1405,7 +1164,7 @@ describe('auth routes', () => {
 
     expect(complete.status).toBe(200)
     const userId = (complete.json.user as { id: string }).id
-    const row = getDb().prepare('SELECT used_by, used_at FROM account_invites WHERE id = ?').get(invite.id) as {
+    const row = (await getDb().prepare('SELECT used_by, used_at FROM account_invites WHERE id = ?').get(invite.id)) as {
       used_by: string
       used_at: number
     }
@@ -1416,9 +1175,9 @@ describe('auth routes', () => {
   it('allows OAuth onboarding exactly up to a reusable invite limit', async () => {
     process.env.ACCOUNT_REGISTRATION_POLICY = 'invite_only'
     const admin = await createLocalUserForTests('oauth_multi_admin', 'password123', 'Admin')
-    const invite = createInvite(admin.id, {
+    const invite = (await createInvite(admin.id, {
       code: 'OAUTH-TWO', expiresAt: Date.now() + 86_400_000, maxUses: 2,
-    })
+    }))
 
     for (const suffix of ['one', 'two']) {
       const start = await requestJson(
@@ -1455,14 +1214,14 @@ describe('auth routes', () => {
     )
     expect(rejected.status).toBe(302)
     expect(rejected.headers.Location).toContain('authError=invalid_invite')
-    expect(getDb().prepare('SELECT use_count FROM account_invites WHERE id = ?').get(invite.id))
+    expect((await getDb().prepare('SELECT use_count FROM account_invites WHERE id = ?').get(invite.id)))
       .toEqual({ use_count: 2 })
   })
 
   it('requires admin access to create invites', async () => {
     process.env.ADMIN_USERS = 'admin'
     const nonAdmin = await createLocalUserForTests('regular_user', 'password123', 'Regular User')
-    const token = createSession(nonAdmin.id)
+    const token = (await createSession(nonAdmin.id))
 
     const unauthenticated = await requestJson('POST', '/api/admin/invites', { expiresInDays: 7 })
     expect(unauthenticated.status).toBe(401)
@@ -1481,7 +1240,7 @@ describe('auth routes', () => {
   it('lets admins create and list invites without exposing plaintext codes in the list', async () => {
     process.env.ADMIN_USERS = 'admin'
     const admin = await createLocalUserForTests('admin', 'password123', 'Admin')
-    const token = createSession(admin.id)
+    const token = (await createSession(admin.id))
 
     const created = await requestJson(
       'POST',
@@ -1504,7 +1263,7 @@ describe('auth routes', () => {
   it('lets admins create a custom reusable expiring invite', async () => {
     process.env.ADMIN_USERS = 'admin'
     const admin = await createLocalUserForTests('admin', 'password123', 'Admin')
-    const token = createSession(admin.id)
+    const token = (await createSession(admin.id))
     const expiresAt = Date.now() + 2 * 24 * 60 * 60 * 1000
 
     const created = await requestJson('POST', '/api/admin/invites', {
@@ -1529,7 +1288,7 @@ describe('auth routes', () => {
   it('rejects a duplicate custom invite code', async () => {
     process.env.ADMIN_USERS = 'admin'
     const admin = await createLocalUserForTests('admin', 'password123', 'Admin')
-    const token = createSession(admin.id)
+    const token = (await createSession(admin.id))
     const headers = { Cookie: `oa_session=${token}` }
     const body = { code: '  DUPLICATE  ', expiresInDays: 7, maxUses: 2 }
     expect((await requestJson('POST', '/api/admin/invites', body, headers)).status).toBe(200)
@@ -1551,7 +1310,7 @@ describe('auth routes', () => {
   ])('rejects invalid invite creation input %#', async (body, code) => {
     process.env.ADMIN_USERS = 'admin'
     const admin = await createLocalUserForTests('admin', 'password123', 'Admin')
-    const token = createSession(admin.id)
+    const token = (await createSession(admin.id))
     const response = await requestJson('POST', '/api/admin/invites', body, {
       Cookie: `oa_session=${token}`,
     })
@@ -1562,8 +1321,8 @@ describe('auth routes', () => {
   it('lets admins revoke unused invites', async () => {
     process.env.ADMIN_USERS = 'admin'
     const admin = await createLocalUserForTests('admin', 'password123', 'Admin')
-    const token = createSession(admin.id)
-    const invite = createInvite(admin.id, { expiresAt: Date.now() + 7 * 86_400_000, maxUses: 1 })
+    const token = (await createSession(admin.id))
+    const invite = (await createInvite(admin.id, { expiresAt: Date.now() + 7 * 86_400_000, maxUses: 1 }))
 
     const revoked = await requestJson(
       'POST',
@@ -1581,7 +1340,7 @@ describe('auth routes', () => {
 
   it('blocks new onboarding when registration is disabled', async () => {
     process.env.ACCOUNT_REGISTRATION_POLICY = 'disabled'
-    const ticket = createOnboardingTicket({ provider: 'google', providerUserId: 'g-disabled', emailVerified: true })
+    const ticket = (await createOnboardingTicket({ provider: 'google', providerUserId: 'g-disabled', emailVerified: true }))
 
     const res = await requestJson(
       'POST',
@@ -1592,18 +1351,18 @@ describe('auth routes', () => {
 
     expect(res.status).toBe(400)
     expect(res.json).toMatchObject({ ok: false, code: 'registration_disabled' })
-    expect(findIdentity('google', 'g-disabled')).toBeNull()
+    expect((await findIdentity('google', 'g-disabled'))).toBeNull()
   })
 
   it('allows existing OAuth users to log in when registration is disabled', async () => {
     process.env.ACCOUNT_REGISTRATION_POLICY = 'disabled'
     const existing = await createLocalUserForTests('existing_oauth', 'password123', 'Existing OAuth')
-    linkIdentity(existing.id, {
+    ;(await linkIdentity(existing.id, {
       provider: 'github',
       providerUserId: 'gh-existing-disabled',
       providerLogin: 'existing-gh',
       emailVerified: true,
-    })
+    }))
     vi.mocked(exchangeOAuthCode).mockResolvedValueOnce({
       provider: 'github',
       providerUserId: 'gh-existing-disabled',
@@ -1628,7 +1387,7 @@ describe('auth routes', () => {
   it('rejects inviteCode body after intent=login onboarding for an unlinked identity', async () => {
     process.env.ACCOUNT_REGISTRATION_POLICY = 'invite_only'
     const admin = await createLocalUserForTests('login_invite_admin', 'password123', 'Login Invite Admin')
-    const invite = createInvite(admin.id, { expiresAt: Date.now() + 7 * 86_400_000, maxUses: 1 })
+    const invite = (await createInvite(admin.id, { expiresAt: Date.now() + 7 * 86_400_000, maxUses: 1 }))
     vi.mocked(exchangeOAuthCode).mockResolvedValueOnce({
       provider: 'github',
       providerUserId: 'gh-login-unlinked',
@@ -1660,8 +1419,8 @@ describe('auth routes', () => {
 
     expect(complete.status).toBe(400)
     expect(complete.json).toMatchObject({ ok: false, code: 'invalid_invite' })
-    expect(findIdentity('github', 'gh-login-unlinked')).toBeNull()
-    const row = getDb().prepare('SELECT used_by, used_at FROM account_invites WHERE id = ?').get(invite.id) as {
+    expect((await findIdentity('github', 'gh-login-unlinked'))).toBeNull()
+    const row = (await getDb().prepare('SELECT used_by, used_at FROM account_invites WHERE id = ?').get(invite.id)) as {
       used_by: string | null
       used_at: number | null
     }
@@ -1693,14 +1452,14 @@ describe('auth routes', () => {
     process.env.NODE_ENV = 'test'
     process.env.ENABLE_AUTH_TEST_HELPERS = '1'
     const user = await createLocalUserForTests('oauthlogin', 'password123', 'OAuth Login')
-    linkIdentity(user.id, {
+    ;(await linkIdentity(user.id, {
       provider: 'google',
       providerUserId: 'google-existing',
       providerLogin: 'google-existing',
       email: 'existing@example.com',
       emailVerified: true,
       displayName: 'Existing Google',
-    })
+    }))
 
     const res = await requestJson('POST', '/api/test/oauth/google/callback', {
       providerUserId: 'google-existing',
@@ -1712,7 +1471,7 @@ describe('auth routes', () => {
     expect(res.status).toBe(200)
     expect(res.json).toMatchObject({ ok: true, provider: 'google', mode: 'login' })
     expect(res.headers['Set-Cookie']).toContain('oa_session=')
-    expect(validateSession(String(res.headers['Set-Cookie']).match(/oa_session=([^;]+)/)?.[1] ?? '')).toMatchObject({
+    expect((await validateSession(String(res.headers['Set-Cookie']).match(/oa_session=([^;]+)/)?.[1] ?? ''))).toMatchObject({
       username: 'oauthlogin',
     })
   })
@@ -1733,11 +1492,11 @@ describe('auth routes', () => {
       providerLogin: 'linked-gh',
       emailVerified: true,
     }
-    linkIdentity(linkedUser.id, profile)
+    ;(await linkIdentity(linkedUser.id, profile))
     vi.mocked(exchangeOAuthCode).mockResolvedValueOnce(profile)
 
-    const state = createOAuthState({ provider: 'github', intent: 'link', userId: currentUser.id })
-    const currentToken = createSession(currentUser.id)
+    const state = (await createOAuthState({ provider: 'github', intent: 'link', userId: currentUser.id }))
+    const currentToken = (await createSession(currentUser.id))
     const res = await requestJson(
       'GET',
       `/api/auth/oauth/github/callback?code=ok&state=${state}`,
@@ -1750,7 +1509,7 @@ describe('auth routes', () => {
     expect(res.headers.Location).toContain('authError=oauth_identity_taken')
     expect(res.headers['Set-Cookie']).toContain(`${OAUTH_STATE_COOKIE}=;`)
     expect(res.headers['Set-Cookie']).not.toContain('oa_session=')
-    expect(getDb().prepare('SELECT COUNT(*) AS count FROM sessions').get()).toMatchObject({ count: 1 })
+    expect((await getDb().prepare('SELECT COUNT(*) AS count FROM sessions').get())).toMatchObject({ count: 1 })
   })
 
   it('rejects link callback without a matching current session cookie', async () => {
@@ -1762,7 +1521,7 @@ describe('auth routes', () => {
       providerLogin: 'session-required-gh',
       emailVerified: true,
     }
-    const state = createOAuthState({ provider: 'github', intent: 'link', userId: stateUser.id })
+    const state = (await createOAuthState({ provider: 'github', intent: 'link', userId: stateUser.id }))
 
     const noCookie = await requestJson(
       'GET',
@@ -1773,10 +1532,10 @@ describe('auth routes', () => {
     expect(noCookie.status).toBe(302)
     expect(noCookie.headers.Location).toContain('page=settings')
     expect(noCookie.headers.Location).toContain('authError=not_authenticated')
-    expect(findIdentity('github', 'gh-session-required')).toBeNull()
+    expect((await findIdentity('github', 'gh-session-required'))).toBeNull()
 
-    const secondState = createOAuthState({ provider: 'github', intent: 'link', userId: stateUser.id })
-    const otherToken = createSession(otherUser.id)
+    const secondState = (await createOAuthState({ provider: 'github', intent: 'link', userId: stateUser.id }))
+    const otherToken = (await createSession(otherUser.id))
     const mismatch = await requestJson(
       'GET',
       `/api/auth/oauth/github/callback?code=ok&state=${secondState}`,
@@ -1785,7 +1544,7 @@ describe('auth routes', () => {
     )
     expect(mismatch.status).toBe(302)
     expect(mismatch.headers.Location).toContain('authError=not_authenticated')
-    expect(findIdentity('github', 'gh-session-required')).toBeNull()
+    expect((await findIdentity('github', 'gh-session-required'))).toBeNull()
   })
 
   it('binds OAuth callback state to the initiating browser cookie', async () => {
@@ -1796,7 +1555,7 @@ describe('auth routes', () => {
       providerLogin: 'statebound-gh',
       emailVerified: true,
     }
-    linkIdentity(user.id, profile)
+    ;(await linkIdentity(user.id, profile))
     vi.mocked(exchangeOAuthCode).mockResolvedValueOnce(profile)
 
     const start = await requestJson('GET', '/api/auth/oauth/github/start')
@@ -1822,7 +1581,7 @@ describe('auth routes', () => {
   it('carries invite hash from oauth start into onboarding ticket', async () => {
     process.env.ACCOUNT_REGISTRATION_POLICY = 'invite_only'
     const admin = await createLocalUserForTests('hash_admin', 'password123', 'Hash Admin')
-    const invite = createInvite(admin.id, { expiresAt: Date.now() + 7 * 86_400_000, maxUses: 1 })
+    const invite = (await createInvite(admin.id, { expiresAt: Date.now() + 7 * 86_400_000, maxUses: 1 }))
     vi.mocked(exchangeOAuthCode).mockResolvedValueOnce({
       provider: 'github',
       providerUserId: 'gh-hashed-invite',
@@ -1847,7 +1606,7 @@ describe('auth routes', () => {
 
     const onboardingCookie = cookiePairFromSetCookie(callback.headers['Set-Cookie'], 'oa_onboarding')
     const ticket = decodeURIComponent(onboardingCookie.replace(/^oa_onboarding=/, ''))
-    const profile = getOnboardingTicket(ticket)
+    const profile = (await getOnboardingTicket(ticket))
     expect(profile?.inviteCodeHash).toBe(hashInviteCode(invite.code))
   })
 
@@ -1900,7 +1659,7 @@ describe('auth routes', () => {
       providerLogin: 'frontredir-gh',
       emailVerified: true,
     }
-    linkIdentity(user.id, profile)
+    ;(await linkIdentity(user.id, profile))
     vi.mocked(exchangeOAuthCode).mockResolvedValueOnce(profile)
 
     const start = await requestJson('GET', '/api/auth/oauth/github/start?returnTo=%2F%3Fpage%3Dsettings')
@@ -1927,7 +1686,7 @@ describe('auth routes', () => {
       providerLogin: 'baseredir-gh',
       emailVerified: true,
     }
-    linkIdentity(user.id, profile)
+    ;(await linkIdentity(user.id, profile))
     vi.mocked(exchangeOAuthCode).mockResolvedValueOnce(profile)
 
     const start = await requestJson('GET', '/api/auth/oauth/github/start?returnTo=%2Fopen-agricola%2F%3Fpage%3Dworkshop')
@@ -1952,7 +1711,7 @@ describe('auth routes', () => {
       providerLogin: 'querybase-gh',
       emailVerified: true,
     }
-    linkIdentity(user.id, profile)
+    ;(await linkIdentity(user.id, profile))
     vi.mocked(exchangeOAuthCode).mockResolvedValueOnce(profile)
 
     const start = await requestJson('GET', '/api/auth/oauth/github/start?returnTo=%2Fopen-agricola%3Fpage%3Dworkshop')
@@ -1982,7 +1741,7 @@ describe('auth routes', () => {
     expect(unauthProfile.json).toMatchObject({ ok: false, code: 'not_authenticated' })
 
     const user = await createLocalUserForTests('pwuser', 'password123', 'Pw User')
-    const token = createSession(user.id)
+    const token = (await createSession(user.id))
     const missingPasswordFields = await requestJson(
       'POST',
       '/api/auth/change-password',
@@ -2001,7 +1760,7 @@ describe('auth routes', () => {
       providerLogin: 'oauth-gh',
       emailVerified: true,
     }
-    linkIdentity(user.id, profile)
+    ;(await linkIdentity(user.id, profile))
 
     for (const returnTo of ['https://evil.test', '//evil.test', '\\\\evil']) {
       vi.mocked(exchangeOAuthCode).mockResolvedValueOnce(profile)

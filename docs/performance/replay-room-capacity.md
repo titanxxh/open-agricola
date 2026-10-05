@@ -1,5 +1,8 @@
 # Replay Room Capacity
 
+> Historical SQLite measurements: the results below apply to the recorded commits and harness versions, not the PostgreSQL/S3 deployment. The non-recording capacity and scalar terminal-room probes were retired with mandatory recording; their source remains in Git history at `54c2cb8a`. The current recorded workload harness uses PostgreSQL. This migration does not claim new capacity, RTO, or fault-test acceptance.
+
+
 ## Result
 
 The 2 CPU / 2 GiB launch limit remains 30 ordinary in-memory Rooms. The original #941 optimization group passed its frozen latency/CPU/write gates and the 30-Room capacity checks below. The additional history projection change is assessed separately under the later owner-authorized policy described below. The original production Durable Room Commit probe passed at 30 Rooms and exceeded the action-latency threshold at 35 Rooms; the current optimization probe revalidates 30 Rooms. This probe used built-in cards and did not include the two-Worker topology of executable Workshop Rooms; those Rooms are separately capped at 15 until that topology is measured.

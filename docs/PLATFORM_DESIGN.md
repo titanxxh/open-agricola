@@ -12,138 +12,15 @@ Sections A through G record the original choices and later evolution. SQL and ro
 
 ## A. Architecture choices
 
-### A1. Database: SQLite with `better-sqlite3`
+### A1. Database: asynchronous PostgreSQL with private S3 resources
 
-Why SQLite instead of PostgreSQL or MongoDB:
+`server/database/schema.sql` and numbered migrations define the runtime schema. `server/db.ts` uses an asynchronous `pg` pool. Transactions retain one connection across awaits; nested transactions use serialized savepoints. Startup applies migrations under a shared advisory lock.
 
-- This is a single-server independent project, and SQLite requires no daemon, connection pool, or separate container.
-- Existing persistence already uses synchronous `readFileSync` and `writeFileSync`; the synchronous `better-sqlite3` API fits naturally.
-- Game state is deeply nested JSON, and SQLite supports stored JSON plus queries through `json_extract`.
-- Social features such as likes and comments are relational and easily fit this scale.
-- A backup is a copy of one `.db` file.
+Accounts, OAuth, Workshop, Bug Reports, Rooms, Game Contexts, Replays, results, placement, command receipts, invalidation barriers, and task claims use PostgreSQL. Case-insensitive unique identities use `citext`. Recovery encodings stay exact TEXT and compressed Replay payloads stay BYTEA; JSONB must not re-encode bytes used by integrity checks.
 
-Database path: `./data/open-agricola.db`.
+Artwork, content-addressed Replay assets, and immutable Viewers live in private S3. PostgreSQL owns staging, references, and GC claims. The independent S3 erasure ledger is merged with current external copies before restoration. Application-container files are not authoritative resource storage.
 
-Schema design:
-
-```sql
--- Users
-CREATE TABLE users (
-  id TEXT PRIMARY KEY,            -- nanoid
-  username TEXT UNIQUE NOT NULL,
-  display_name TEXT NOT NULL,
-  password_hash TEXT NOT NULL,    -- crypto.scrypt
-  created_at INTEGER NOT NULL,
-  last_login_at INTEGER
-);
-
--- Sessions
-CREATE TABLE sessions (
-  token TEXT PRIMARY KEY,         -- crypto.randomUUID
-  user_id TEXT NOT NULL REFERENCES users(id),
-  expires_at INTEGER NOT NULL,
-  created_at INTEGER NOT NULL
-);
-
--- Game rooms, replacing JSON-file persistence
-CREATE TABLE rooms (
-  id TEXT PRIMARY KEY,
-  created_by TEXT REFERENCES users(id),
-  state_json TEXT,                -- SerializedGameState JSON
-  max_players INTEGER DEFAULT 2,
-  status TEXT DEFAULT 'waiting',  -- waiting | playing | finished
-  version INTEGER DEFAULT 0,
-  started_at INTEGER,
-  created_at INTEGER NOT NULL,
-  updated_at INTEGER NOT NULL
-);
-
--- Room players
-CREATE TABLE room_players (
-  room_id TEXT NOT NULL REFERENCES rooms(id),
-  user_id TEXT NOT NULL REFERENCES users(id),
-  player_index INTEGER NOT NULL,
-  joined_at INTEGER NOT NULL,
-  PRIMARY KEY (room_id, user_id)
-);
-
--- Scalar summary for a normally completed game; room_id is never reused
-CREATE TABLE game_results (
-  room_id TEXT PRIMARY KEY,
-  started_at INTEGER NOT NULL,
-  finished_at INTEGER NOT NULL,
-  rounds_played INTEGER NOT NULL,
-  player_count INTEGER NOT NULL,
-  enable_community_deck INTEGER NOT NULL,
-  enable_parent_cards INTEGER NOT NULL,
-  enable_through_the_seasons INTEGER NOT NULL,
-  enable_farmers_of_the_moor INTEGER NOT NULL
-);
-
-CREATE TABLE game_result_players (
-  room_id TEXT NOT NULL REFERENCES game_results(room_id) ON DELETE CASCADE,
-  player_index INTEGER NOT NULL,
-  game_player_id TEXT NOT NULL,
-  user_id TEXT,
-  display_name TEXT NOT NULL,
-  score INTEGER NOT NULL,
-  PRIMARY KEY (room_id, player_index)
-);
-
--- Workshop cards
-CREATE TABLE workshop_cards (
-  id TEXT PRIMARY KEY,            -- nanoid
-  author_id TEXT NOT NULL REFERENCES users(id),
-  card_id TEXT NOT NULL,          -- e.g. CUSTOM_FireDragon
-  card_type TEXT NOT NULL,        -- minor | occupation
-  name TEXT NOT NULL,
-  description TEXT NOT NULL,
-  card_json TEXT NOT NULL,        -- CardDefinition JSON plus CARD_DEF and CARD_IMPL TypeScript
-  -- Historical effect_dsl/effect_code/compiled_code columns were dropped in migration v7
-  art_url TEXT,
-  art_prompt TEXT,
-  review_status TEXT DEFAULT 'unsubmitted', -- unsubmitted | in_review | approved | stale | merged, PRD #634
-  live INTEGER DEFAULT 0,         -- only approved cards can be live; Rooms load approved_version_id snapshots
-  created_at INTEGER NOT NULL,
-  updated_at INTEGER NOT NULL
-);
-
--- Likes
-CREATE TABLE card_likes (
-  user_id TEXT NOT NULL REFERENCES users(id),
-  card_id TEXT NOT NULL REFERENCES workshop_cards(id),
-  created_at INTEGER NOT NULL,
-  PRIMARY KEY (user_id, card_id)
-);
-
--- Comments
-CREATE TABLE card_comments (
-  id TEXT PRIMARY KEY,
-  card_id TEXT NOT NULL REFERENCES workshop_cards(id),
-  author_id TEXT NOT NULL REFERENCES users(id),
-  body TEXT NOT NULL,
-  created_at INTEGER NOT NULL
-);
-
--- Custom cards saved to a user's sandbox
-CREATE TABLE sandbox_cards (
-  user_id TEXT NOT NULL REFERENCES users(id),
-  workshop_card_id TEXT NOT NULL REFERENCES workshop_cards(id),
-  added_at INTEGER NOT NULL,
-  PRIMARY KEY (user_id, workshop_card_id)
-);
-
--- Sandbox player, deck, and variant settings
-CREATE TABLE sandbox_settings (
-  user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-  player_count INTEGER NOT NULL DEFAULT 2,
-  deck_ids_json TEXT NOT NULL DEFAULT '["A","B","C","D","E"]',
-  enable_through_the_seasons INTEGER NOT NULL DEFAULT 0,
-  enable_farmers_of_the_moor INTEGER NOT NULL DEFAULT 0,
-  allow_incomplete_farmers_of_the_moor_minor_deal INTEGER NOT NULL DEFAULT 0,
-  updated_at INTEGER NOT NULL
-);
-```
+Docker Compose provides PostgreSQL 18 and RustFS on one host without an external service account. SQLite is only a read-only, one-time input to `scripts/import-sqlite.ts`. Import preserves recorded games and unrelated data and discards only proven unrecorded active games. Failed import or target-build validation blocks application startup. See [deployment instructions](HOW_TO_DEPLOY.md) for migration and backup commands.
 
 ### A2. Authentication: server-side session tokens
 
@@ -185,45 +62,21 @@ Do not add Redux or Zustand:
 
 ## B. Deployment model
 
-### B1. Extend the single-process server
+### B1. One public entry, one application by default
 
-Keep the raw Node.js HTTP server in `server/index.ts` and extend its routes:
-
-```text
-/api/auth/register       POST   register
-/api/auth/login          POST   log in
-/api/auth/logout         POST   log out
-/api/auth/me             GET    current user
-
-/api/lobby/rooms         GET    room list
-/api/lobby/create        POST   create a room
-
-/api/workshop/cards      GET    paginated, searchable, sortable card list
-/api/workshop/cards/:id  GET    card detail
-/api/workshop/cards      POST   create or update a card
-/api/workshop/cards/:id/like     POST  toggle like
-/api/workshop/cards/:id/comments GET   comment list
-/api/workshop/cards/:id/comments POST  add a comment
-/api/workshop/sandbox    GET/POST/DELETE  sandbox management
-
-/api/game/*              existing routes
-/ws                      existing WebSocket plus authentication handshake
-```
+`server/ingress.ts` preserves the backend origin and OAuth callbacks, routes `/nodes/<instanceId>/ws` to the current Room owner, and provides HTTP Workshop sandbox affinity. `scripts/local-backend.ts` starts one application process by default; `APP_INSTANCES=2` exercises two processes on one host. PostgreSQL owns the directory, leases, owner epochs, write/publication fences, and command receipts. GameSession remains the sole rule-state writer.
 
 ### B2. Development
 
-- `restart-local.sh` needs no change; server startup initializes the database with `CREATE TABLE IF NOT EXISTS`.
-- `./data/open-agricola.db` is ignored by Git.
-- At startup, check the schema version and run pending migrations.
+`./restart-local.sh` prepares or reuses local PostgreSQL, private S3, schema, and an immutable Viewer. Worktrees share their main checkout's dependency data by default. Restart preserves that data. Use `./restart-local.sh --instances 2` for two local applications. `pnpm run verify` uses the same launcher with a separate test schema, S3 prefix, ports, and logs.
 
-### B3. Production
+All hosted Rooms record, including ordinary, Workshop, hotseat, and development Rooms. A development slot points at a fresh permanent Room ID after rematch/reset; the launcher prints current links. Earlier Game Context identities are never reused. Standalone HTTP/browser Workshop Sandboxes remain available.
 
-One host is enough:
+### B3. Single-host deployment and later service migration
 
-- a Node.js process for backend and WebSocket plus Vite-built static files;
-- SQLite persisted to disk;
-- optional Nginx reverse proxy for static files and WebSocket;
-- a clear future migration path from SQLite to PostgreSQL because their SQL is broadly compatible.
+The production image includes native PostgreSQL backup tools and an immutable Viewer, published to S3 at startup. Caddy retains the existing HTTPS origin. Application processes and dependency ports stay private. PostgreSQL and S3 have independent persistent volumes; cloud accounts are optional.
+
+External `DATABASE_URL` and complete `S3_*` settings can be supplied later. Move data during maintenance, preserve encryption keys, merge current erasure facts, and validate recovery with the target build before activation. Configuration changes alone never migrate data. Normal one-host/two-instance checks are not fault-recovery, 30-second recovery, or capacity certification.
 
 ---
 
@@ -549,11 +402,13 @@ A Draft Version serializes only final card content and provenance for adopted ca
 
 | Dependency | Purpose | Notes |
 |---|---|---|
-| `better-sqlite3` | SQLite | Synchronous API matching existing style |
+| `pg` | PostgreSQL | Asynchronous queries and connection-scoped transactions |
+| `@aws-sdk/client-s3` | Private resources | S3 protocol for local and external services |
+| `better-sqlite3` | Legacy import | Read-only migration input only |
 | `@types/better-sqlite3` | Types | Development dependency |
 | `nanoid` | Short IDs | User, card, and Room IDs |
 
-No other dependency is needed. `crypto.scrypt` and `crypto.randomUUID` are built into Node.js.
+`crypto.scrypt` and `crypto.randomUUID` are built into Node.js.
 
 ---
 
@@ -561,11 +416,11 @@ No other dependency is needed. `crypto.scrypt` and `crypto.randomUUID` are built
 
 ### Phase 1: Database and authentication
 
-- Add `better-sqlite3` and initialize schema in `server/db.ts`.
+- Initialize PostgreSQL migrations and asynchronous transactions in `server/db.ts`.
 - Create `server/auth.ts` for registration, login, and sessions.
 - Add authentication middleware to `server/index.ts`.
 - Create `client/app/LoginPage.tsx` and `AuthContext`.
-- Migrate Room persistence from JSON files to SQLite.
+- Import retained legacy data into PostgreSQL and private S3.
 - Add the WebSocket authentication handshake.
 
 ### Phase 2: Lobby
@@ -623,20 +478,20 @@ No other dependency is needed. `crypto.scrypt` and `crypto.randomUUID` are built
 
 ## J. Implementation status on `main`
 
-Last updated 2026-07-29.
+Last updated 2026-10-06.
 
 ### Complete
 
 | Feature | Files |
 |---|---|
 | Registration, login, logout, session validation, email verification, and OAuth | `server/auth.ts`, `server/auth-cookies.ts`, `server/oauth/`, `client/app/LoginPage.tsx`, `client/contexts/AuthContext.tsx` |
-| SQLite and migrations | `server/db.ts` |
+| PostgreSQL and migrations | `server/db.ts` |
 | WebSocket authentication | `server/connection/ws-server.ts`, `server/connection/room-router.ts`, `shared/contract/protocol/ws.ts` |
-| WebSocket Room writes to SQLite | `server/game/room-persistence-checkpoint.ts`, `server/game/room-committer.ts`, `server/game/persistence/sqlite-adapter.ts` |
-| Room recovery after server restart | `server/connection/ws-server.ts`, `server/game/persistence/sqlite-adapter.ts` |
-| JSON or SQLite game-state persistence | `server/game/persistence/`, selected by `PERSIST_ROOMS` |
-| Completed-result archive and full-state removal | `server/game/room-persistence-checkpoint.ts`, `server/game/persistence/sqlite-adapter.ts` |
-| Room TTL expiry | `server/connection/ws-server.ts`, `server/game/persistence/sqlite-adapter.ts` |
+| Durable recorded Room commits to PostgreSQL | `server/game/room-persistence-checkpoint.ts`, `server/game/room-committer.ts`, `server/game/persistence/postgres-adapter.ts` |
+| Room recovery after server restart | `server/connection/ws-server.ts`, `server/game/persistence/postgres-adapter.ts` |
+| PostgreSQL-only game-state persistence | `server/game/persistence/postgres-adapter.ts` |
+| Completed-result archive and full-state removal | `server/game/room-persistence-checkpoint.ts`, `server/game/persistence/postgres-adapter.ts` |
+| Room TTL expiry | `server/connection/ws-server.ts`, `server/game/persistence/postgres-adapter.ts` |
 | Lobby | `client/app/LobbyPage.tsx`, `/api/lobby/my-rooms` |
 | Page routing through `?page=` | `client/app/PageRouter.tsx` |
 | Live URL-parameter reads | `client/app/GameContainerApi.tsx`, moved out of module scope |

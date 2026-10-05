@@ -1,3 +1,4 @@
+import { isUniqueViolation } from '../database/errors'
 import { randomBytes, scrypt } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { nanoid } from 'nanoid'
@@ -158,6 +159,7 @@ async function parseBody<T>(req: IncomingMessage): Promise<T | null> {
 }
 
 async function createLocalUserForOnboarding(input: {
+  ticket: string
   username: string
   password: string
   displayName?: string
@@ -181,8 +183,8 @@ async function createLocalUserForOnboarding(input: {
   }
 
   const db = getDb()
-  const existing = db.prepare('SELECT id FROM users WHERE username = ?').get(name)
-  if (existing || isUsernameReserved(name)) {
+  const existing = (await db.prepare('SELECT id FROM users WHERE username = ?').get(name))
+  if (existing || (await isUsernameReserved(name))) {
     return { ok: false as const, code: 'username_taken', error: 'Username already taken' }
   }
 
@@ -192,20 +194,27 @@ async function createLocalUserForOnboarding(input: {
   const localDisplayName = input.displayName?.trim() || input.profile.displayName?.trim() || name
 
   try {
-    db.transaction(() => {
-      db.prepare(
+    ;(await db.transaction(async () => {
+      if (!(await consumeOnboardingTicket(input.ticket))) throw new Error('onboarding expired')
+      ;(await db.prepare(
         'INSERT INTO users (id, username, display_name, password_hash, password_updated_at, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-      ).run(id, name, localDisplayName, passwordHash, now, now)
-      linkIdentity(id, input.profile)
-      if (policy === 'invite_only' && !consumeInviteCodeHash(db, inviteCodeHash, id, now)) {
+      ).run(id, name, localDisplayName, passwordHash, now, now))
+      ;(await linkIdentity(id, input.profile))
+      if (policy === 'invite_only' && !(await consumeInviteCodeHash(db, inviteCodeHash, id, now))) {
         throw new Error('invalid invite')
       }
-    })()
+    })())
   } catch (err) {
+    if (err instanceof Error && err.message === 'onboarding expired') {
+      return { ok: false as const, code: 'oauth_onboarding_expired', error: 'Onboarding ticket is missing or expired' }
+    }
+    if (isUniqueViolation(err, 'users_username_key')) {
+      return { ok: false as const, code: 'username_taken', error: 'Username already taken' }
+    }
     if (err instanceof Error && /invalid invite/.test(err.message)) {
       return { ok: false as const, code: 'invalid_invite', error: 'Invite code is invalid, expired, or already used' }
     }
-    if (err instanceof Error && /linked/.test(err.message)) {
+    if (isUniqueViolation(err, 'auth_identities_provider_provider_user_id_key', 'auth_identities_user_id_provider_key') || (err instanceof Error && /linked/.test(err.message))) {
       return { ok: false as const, code: 'oauth_identity_taken', error: 'OAuth identity is already linked' }
     }
     throw err
@@ -214,7 +223,7 @@ async function createLocalUserForOnboarding(input: {
   return { ok: true as const, user: { id, username: name, displayName: localDisplayName } }
 }
 
-export function handleOAuthStart(req: IncomingMessage, res: ServerResponse, url: URL): void {
+export async function handleOAuthStart(req: IncomingMessage, res: ServerResponse, url: URL): Promise<Awaited<void>> {
   let provider: OAuthProvider
   try {
     provider = parseProvider(url)
@@ -225,7 +234,7 @@ export function handleOAuthStart(req: IncomingMessage, res: ServerResponse, url:
 
   const intent = parseIntent(url)
   const token = readCookie(req.headers.cookie, SESSION_COOKIE)
-  const user = token ? validateSession(token) : null
+  const user = token ? (await validateSession(token)) : null
   if (intent === 'link' && !user) {
     redirect(res, appLocation('/?page=login&authError=not_authenticated'))
     return
@@ -241,20 +250,20 @@ export function handleOAuthStart(req: IncomingMessage, res: ServerResponse, url:
       return
     }
     if (policy === 'invite_only') {
-      if (!inviteCode || !isInviteCodeAvailable(inviteCode)) {
+      if (!inviteCode || !(await isInviteCodeAvailable(inviteCode))) {
         redirect(res, appLocation('/?page=login&authError=invalid_invite'))
         return
       }
       inviteCodeHash = hashInviteCode(inviteCode)
     }
   }
-  const state = createOAuthState({
+  const state = (await createOAuthState({
     provider,
     intent,
     ...(user ? { userId: user.id } : {}),
     ...(returnTo ? { returnTo } : {}),
     ...(inviteCodeHash ? { inviteCodeHash } : {}),
-  })
+  }))
   redirect(res, buildOAuthAuthorizationUrl(provider, state, req), {
     'Set-Cookie': serializeOAuthStateCookie(state, { backendOrigin: getRequestOrigin(req) }),
   })
@@ -273,7 +282,7 @@ export async function handleOAuthCallback(req: IncomingMessage, res: ServerRespo
     return
   }
 
-  const state = consumeOAuthState(rawState)
+  const state = (await consumeOAuthState(rawState))
   if (!state) {
     redirect(res, appLocation('/?page=login&authError=oauth_state_invalid'), oauthStateClearHeaders(req))
     return
@@ -290,7 +299,7 @@ export async function handleOAuthCallback(req: IncomingMessage, res: ServerRespo
 
   if (state.intent === 'link') {
     const token = readCookie(req.headers.cookie, SESSION_COOKIE)
-    const currentUser = token ? validateSession(token) : null
+    const currentUser = token ? (await validateSession(token)) : null
     if (!state.userId || !currentUser || currentUser.id !== state.userId) {
       redirect(res, appLocation('/?page=settings&authError=not_authenticated'), oauthStateClearHeaders(req))
       return
@@ -310,12 +319,12 @@ export async function handleOAuthCallback(req: IncomingMessage, res: ServerRespo
       redirect(res, appLocation('/?page=settings&authError=not_authenticated'), oauthStateClearHeaders(req))
       return
     }
-    if (findIdentity(profile.provider, profile.providerUserId)) {
+    if ((await findIdentity(profile.provider, profile.providerUserId))) {
       redirect(res, appLocation('/?page=settings&authError=oauth_identity_taken'), oauthStateClearHeaders(req))
       return
     }
     try {
-      linkIdentity(state.userId, profile)
+      ;(await linkIdentity(state.userId, profile))
       redirect(res, appLocation(`/?page=settings&linked=${provider}`), oauthStateClearHeaders(req))
     } catch {
       redirect(res, appLocation('/?page=settings&authError=oauth_identity_taken'), oauthStateClearHeaders(req))
@@ -323,9 +332,9 @@ export async function handleOAuthCallback(req: IncomingMessage, res: ServerRespo
     return
   }
 
-  const existing = findIdentity(profile.provider, profile.providerUserId)
+  const existing = (await findIdentity(profile.provider, profile.providerUserId))
   if (existing) {
-    const token = createSession(existing.userId)
+    const token = (await createSession(existing.userId))
     if (!token) {
       redirect(res, appLocation('/?page=login&authError=not_authenticated'), oauthStateClearHeaders(req))
       return
@@ -336,7 +345,7 @@ export async function handleOAuthCallback(req: IncomingMessage, res: ServerRespo
     return
   }
 
-  const ticket = createOnboardingTicket(profile, appRelativeReturnTo(state.returnTo), state.inviteCodeHash)
+  const ticket = (await createOnboardingTicket(profile, appRelativeReturnTo(state.returnTo), state.inviteCodeHash))
   redirect(res, appLocation('/?page=onboarding'), oauthStateClearHeaders(req, {
     'Set-Cookie': serializeOnboardingCookie(ticket, { backendOrigin: getRequestOrigin(req) }),
   }))
@@ -344,7 +353,7 @@ export async function handleOAuthCallback(req: IncomingMessage, res: ServerRespo
 
 export async function handleOnboardingComplete(req: IncomingMessage, res: ServerResponse): Promise<void> {
   const ticket = readCookie(req.headers.cookie, ONBOARDING_COOKIE)
-  const profile = ticket ? getOnboardingTicket(ticket) : null
+  const profile = ticket ? (await getOnboardingTicket(ticket)) : null
   if (!profile) {
     sendJson(res, 400, { ok: false, code: 'oauth_onboarding_expired', error: 'Onboarding ticket is missing or expired' })
     return
@@ -361,6 +370,7 @@ export async function handleOnboardingComplete(req: IncomingMessage, res: Server
   }
 
   const result = await createLocalUserForOnboarding({
+    ticket,
     username: body.username,
     password: body.password,
     displayName: body.displayName,
@@ -372,15 +382,13 @@ export async function handleOnboardingComplete(req: IncomingMessage, res: Server
     return
   }
 
-  const token = createSession(result.user.id)
+  const token = (await createSession(result.user.id))
   if (!token) {
-    consumeOnboardingTicket(ticket)
     sendJson(res, 401, { ok: false, code: 'not_authenticated', error: 'Not authenticated' }, {
       'Set-Cookie': clearOnboardingCookie({ backendOrigin: getRequestOrigin(req) }),
     })
     return
   }
-  consumeOnboardingTicket(ticket)
   sendJson(res, 200, {
     ok: true,
     user: result.user,
@@ -393,14 +401,14 @@ export async function handleOnboardingComplete(req: IncomingMessage, res: Server
   })
 }
 
-export function handleLinkedIdentities(req: IncomingMessage, res: ServerResponse): void {
+export async function handleLinkedIdentities(req: IncomingMessage, res: ServerResponse): Promise<Awaited<void>> {
   const token = readCookie(req.headers.cookie, SESSION_COOKIE)
-  const user = token ? validateSession(token) : null
+  const user = token ? (await validateSession(token)) : null
   if (!user) {
     sendJson(res, 401, { ok: false, code: 'not_authenticated', error: 'Not authenticated' })
     return
   }
-  sendJson(res, 200, { ok: true, identities: getLinkedIdentities(user.id) })
+  sendJson(res, 200, { ok: true, identities: (await getLinkedIdentities(user.id)) })
 }
 
 export function handleRegistrationPolicy(_req: IncomingMessage, res: ServerResponse): void {

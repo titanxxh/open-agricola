@@ -1,16 +1,5 @@
-import {
-  closeSync,
-  existsSync,
-  ftruncateSync,
-  fsyncSync,
-  mkdirSync,
-  openSync,
-  readFileSync,
-  unlinkSync,
-  writeFileSync,
-} from 'node:fs'
-import { dirname, join } from 'node:path'
-import type Database from 'better-sqlite3'
+import type { ResourceStore } from '../storage/resource-store'
+import type { PostgresDatabase as Database } from '../database/postgres'
 
 export type ReplayRemovalReason = 'removed' | 'moderation' | 'legal'
 
@@ -50,8 +39,7 @@ type ReplayRow = {
 export type ReplayRemovalOptions = {
   roomId: string
   reason: ReplayRemovalReason
-  assetRoot: string
-  ledgerPath: string
+  resources: ResourceStore
   assetHash?: string
   eraseResult?: boolean
   dryRun?: boolean
@@ -105,11 +93,11 @@ const safeReplayAssetHashes = (raw: string | null): string[] | null => {
   }
 }
 
-const loadReplay = (
-  db: Database.Database,
+const loadReplay = async (
+  db: Database,
   roomId: string,
-): ReplayRow | null =>
-  (db.prepare(`
+): Promise<Awaited<ReplayRow | null>> =>
+  ((await db.prepare(`
     SELECT context.room_id,
            context.lifecycle,
            context.replay_status,
@@ -117,10 +105,10 @@ const loadReplay = (
     FROM game_contexts AS context
     LEFT JOIN game_replays AS replay ON replay.room_id = context.room_id
     WHERE context.room_id = ?
-  `).get(roomId) as ReplayRow | undefined) ?? null
+  `).get(roomId)) as ReplayRow | undefined) ?? null
 
-const replayRows = (db: Database.Database): ReplayRow[] =>
-  db.prepare(`
+const replayRows = async (db: Database): Promise<Awaited<ReplayRow[]>> =>
+  (await db.prepare(`
     SELECT context.room_id,
            context.lifecycle,
            context.replay_status,
@@ -129,14 +117,14 @@ const replayRows = (db: Database.Database): ReplayRow[] =>
     JOIN game_replays AS replay ON replay.room_id = context.room_id
     WHERE context.lifecycle != 'removed'
     ORDER BY context.room_id
-  `).all() as ReplayRow[]
+  `).all()) as ReplayRow[]
 
-const referencedAssetHashes = (
-  db: Database.Database,
+const referencedAssetHashes = async (
+  db: Database,
   excludedRoomIds: ReadonlySet<string> = new Set(),
-): Set<string> | null => {
+): Promise<Awaited<Set<string> | null>> => {
   const hashes = new Set<string>()
-  for (const row of replayRows(db)) {
+  for (const row of (await replayRows(db))) {
     if (excludedRoomIds.has(row.room_id)) continue
     const rowHashes = safeReplayAssetHashes(row.custom_cards_json)
     if (rowHashes === null) return null
@@ -145,7 +133,7 @@ const referencedAssetHashes = (
   return hashes
 }
 
-const validateEntry = (value: unknown): ReplayRemovalLedgerEntry => {
+export const validateEntry = (value: unknown): ReplayRemovalLedgerEntry => {
   if (!value || typeof value !== 'object') {
     throw new Error('invalid replay removal ledger entry')
   }
@@ -199,7 +187,7 @@ const validateAssetTakedown = (value: unknown): ReplayAssetTakedown => {
   }
 }
 
-const validateBatch = (value: unknown): ReplayRemovalLedgerBatch => {
+export const validateBatch = (value: unknown): ReplayRemovalLedgerBatch => {
   if (!value || typeof value !== 'object') {
     throw new Error('invalid replay removal ledger batch')
   }
@@ -219,71 +207,32 @@ const validateBatch = (value: unknown): ReplayRemovalLedgerBatch => {
   }
 }
 
-const readLedger = (path: string): ReplayRemovalLedger => {
-  if (!existsSync(path)) return { entries: [], assetTakedowns: [] }
-  const raw = readFileSync(path)
-  if (raw.length === 0) return { entries: [], assetTakedowns: [] }
-  let committedLength = raw.length
-  if (raw[raw.length - 1] !== 0x0a) {
-    committedLength = raw.lastIndexOf(0x0a) + 1
-    const fd = openSync(path, 'r+')
-    try {
-      ftruncateSync(fd, committedLength)
-      fsyncSync(fd)
-    } finally {
-      closeSync(fd)
-    }
-  }
-  if (committedLength === 0) return { entries: [], assetTakedowns: [] }
-  const lines = raw.subarray(0, committedLength).toString('utf8').split('\n')
-  lines.pop()
-  const batches = lines.map((line) => {
-    try {
-      return validateBatch(JSON.parse(line) as unknown)
-    } catch {
-      throw new Error('invalid replay removal ledger')
-    }
-  })
-  return {
-    entries: batches.flatMap((batch) => batch.entries),
-    assetTakedowns: batches.flatMap((batch) => batch.assetTakedowns),
-  }
+const readLedger = async (resources: ResourceStore): Promise<ReplayRemovalLedger> => {
+  const batches = (await resources.ledger.read()).map(validateBatch)
+  return { entries: batches.flatMap(batch => batch.entries), assetTakedowns: batches.flatMap(batch => batch.assetTakedowns) }
 }
 
-const appendLedger = (
-  path: string,
-  batch: ReplayRemovalLedgerBatch,
-): void => {
-  if (batch.entries.length === 0 && batch.assetTakedowns.length === 0) return
-  mkdirSync(dirname(path), { recursive: true })
-  const fd = openSync(path, 'a')
-  try {
-    writeFileSync(fd, `${JSON.stringify(batch)}\n`)
-    fsyncSync(fd)
-  } finally {
-    closeSync(fd)
-  }
-  const directoryFd = openSync(dirname(path), 'r')
-  try {
-    fsyncSync(directoryFd)
-  } finally {
-    closeSync(directoryFd)
-  }
+const appendLedger = async (resources: ResourceStore, batch: ReplayRemovalLedgerBatch): Promise<void> => {
+  await resources.ledger.append(validateBatch(batch))
+  // Public resource reads already consult the independent ledger. Persist the
+  // catalog barrier before cleanup so no DB reference can publish the content.
+  for (const rule of batch.assetTakedowns) await resources.blockHash(rule.hash)
 }
 
-const applyEntries = (
-  db: Database.Database,
+const applyEntries = async (
+  db: Database,
   entries: ReplayRemovalLedgerEntry[],
-): string[] => db.transaction(() => {
+): Promise<Awaited<string[]>> => (await db.transaction(async () => {
   const removedRoomIds: string[] = []
   for (const entry of entries) {
-    const current = loadReplay(db, entry.roomId)
+    await db.prepare("DELETE FROM object_references WHERE owner_kind = 'room-preparation' AND owner_id = ?").run(entry.roomId)
+    const current = (await loadReplay(db, entry.roomId))
     if (!current) continue
     if (current.lifecycle !== 'removed') {
-      db.prepare('DELETE FROM rooms WHERE id = ?').run(entry.roomId)
-      db.prepare('DELETE FROM game_replay_steps WHERE room_id = ?').run(entry.roomId)
-      db.prepare('DELETE FROM game_replays WHERE room_id = ?').run(entry.roomId)
-      db.prepare(`
+      ;(await db.prepare('DELETE FROM rooms WHERE id = ?').run(entry.roomId))
+      ;(await db.prepare('DELETE FROM game_replay_steps WHERE room_id = ?').run(entry.roomId))
+      ;(await db.prepare('DELETE FROM game_replays WHERE room_id = ?').run(entry.roomId))
+      ;(await db.prepare(`
         UPDATE game_contexts
         SET lifecycle = 'removed',
             phase = NULL,
@@ -292,72 +241,58 @@ const applyEntries = (
             removal_reason = ?,
             updated_at = ?
         WHERE room_id = ?
-      `).run(entry.reason, entry.removedAt, entry.roomId)
+      `).run(entry.reason, entry.removedAt, entry.roomId))
       removedRoomIds.push(entry.roomId)
     } else if (entry.eraseResult) {
-      db.prepare(`
+      ;(await db.prepare(`
         UPDATE game_contexts
         SET removal_reason = ?,
             updated_at = ?
         WHERE room_id = ?
-      `).run(entry.reason, entry.removedAt, entry.roomId)
+      `).run(entry.reason, entry.removedAt, entry.roomId))
     }
     if (entry.eraseResult) {
-      db.prepare('DELETE FROM game_results WHERE room_id = ?').run(entry.roomId)
+      ;(await db.prepare('DELETE FROM game_results WHERE room_id = ?').run(entry.roomId))
     } else {
-      db.prepare(`
+      ;(await db.prepare(`
         UPDATE game_result_players
         SET user_id = NULL,
             display_name = 'Deleted player (seat ' || (player_index + 1) || ')',
             name_is_default = 0
         WHERE room_id = ?
-      `).run(entry.roomId)
+      `).run(entry.roomId))
     }
-    db.prepare(`
+    ;(await db.prepare(`
       DELETE FROM game_context_participants
       WHERE room_id = ?
-    `).run(entry.roomId)
+    `).run(entry.roomId))
   }
   return removedRoomIds
-})()
+})())
 
-const deleteUnreferencedAssets = (
-  db: Database.Database,
-  assetRoot: string,
-  candidates: Iterable<string>,
-): string[] => {
-  const referenced = referencedAssetHashes(db)
+const deleteUnreferencedAssets = async (db: Database, resources: ResourceStore, candidates: Iterable<string>): Promise<string[]> => {
+  const referenced = await referencedAssetHashes(db)
   if (referenced === null) return []
+  const keys = [...new Set(candidates)].filter(hash => !referenced.has(hash)).sort().map(hash => `replay-assets/${hash}`)
+  return (await resources.removeUnreferenced(keys)).map(key => key.slice('replay-assets/'.length))
+}
+
+const deleteAssets = async (resources: ResourceStore, candidates: Iterable<string>): Promise<string[]> => {
   const deleted: string[] = []
   for (const hash of [...new Set(candidates)].sort()) {
-    if (referenced.has(hash)) continue
-    const path = join(assetRoot, hash)
-    if (!existsSync(path)) continue
-    unlinkSync(path)
-    deleted.push(hash)
+    await resources.blockHash(hash)
+    const rows = await resources.db.prepare('SELECT object_key FROM stored_objects WHERE content_hash = ?').all(hash) as { object_key: string }[]
+    const keys = await resources.removeUnreferenced(rows.map(row => row.object_key))
+    if (keys.length) deleted.push(hash)
   }
   return deleted
 }
 
-const deleteAssets = (
-  assetRoot: string,
-  candidates: Iterable<string>,
-): string[] => {
-  const deleted: string[] = []
-  for (const hash of [...new Set(candidates)].sort()) {
-    const path = join(assetRoot, hash)
-    if (!existsSync(path)) continue
-    unlinkSync(path)
-    deleted.push(hash)
-  }
-  return deleted
-}
-
-const planRows = (
-  db: Database.Database,
+const planRows = async (
+  db: Database,
   target: ReplayRow,
   assetHash?: string,
-): ReplayRow[] => {
+): Promise<Awaited<ReplayRow[]>> => {
   if (!assetHash) {
     if (
       target.lifecycle !== 'completed'
@@ -372,7 +307,7 @@ const planRows = (
   if (!replayAssetHashes(target.custom_cards_json).includes(assetHash)) {
     throw new Error('replay does not reference asset')
   }
-  return replayRows(db).filter((row) =>
+  return (await replayRows(db)).filter((row) =>
     safeReplayAssetHashes(row.custom_cards_json)?.includes(assetHash) === true)
 }
 
@@ -390,16 +325,16 @@ const entryForRow = (
   eraseResult,
 })
 
-const cleanupAssets = (
-  db: Database.Database,
-  assetRoot: string,
+const cleanupAssets = async (
+  db: Database,
+  resources: ResourceStore,
   candidates: Iterable<string>,
   assetTakedowns: Iterable<string>,
-): string[] => {
-  const forced = deleteAssets(assetRoot, assetTakedowns)
+): Promise<Awaited<string[]>> => {
+  const forced = await deleteAssets(resources, assetTakedowns)
   return [...new Set([
     ...forced,
-    ...deleteUnreferencedAssets(db, assetRoot, candidates),
+    ...(await deleteUnreferencedAssets(db, resources, candidates)),
   ])].sort()
 }
 
@@ -417,14 +352,14 @@ const validateRemovedAt = (value: number): number => {
   return value
 }
 
-const previewDeletedAssets = (
-  db: Database.Database,
+const previewDeletedAssets = async (
+  db: Database,
   candidates: Iterable<string>,
   removedRoomIds: ReadonlySet<string>,
   assetTakedowns: Iterable<string>,
-): string[] => {
+): Promise<Awaited<string[]>> => {
   const forced = new Set(assetTakedowns)
-  const referenced = referencedAssetHashes(db, removedRoomIds)
+  const referenced = (await referencedAssetHashes(db, removedRoomIds))
   if (referenced === null) return [...forced].sort()
   for (const hash of candidates) {
     if (!referenced.has(hash)) forced.add(hash)
@@ -432,10 +367,10 @@ const previewDeletedAssets = (
   return [...forced].sort()
 }
 
-export function removeReplay(
-  db: Database.Database,
+export async function removeReplay(
+  db: Database,
   options: ReplayRemovalOptions,
-): ReplayRemovalResult {
+): Promise<Awaited<ReplayRemovalResult>> {
   if (
     options.roomId.length > 128
     || !ROOM_ID.test(options.roomId)
@@ -451,9 +386,9 @@ export function removeReplay(
   if (options.eraseResult && options.assetHash) {
     throw new Error('result erasure cannot be combined with asset removal')
   }
-  const target = loadReplay(db, options.roomId)
+  const target = (await loadReplay(db, options.roomId))
   if (!target) throw new Error('replay not found')
-  const ledger = readLedger(options.ledgerPath)
+  const ledger = await readLedger(options.resources)
   if (target.lifecycle === 'removed') {
     if (options.assetHash) {
       if (!ASSET_HASH.test(options.assetHash)) {
@@ -462,7 +397,7 @@ export function removeReplay(
       if (!priorRoomAssetHashes(ledger, options.roomId).includes(options.assetHash)) {
         throw new Error('replay does not reference asset')
       }
-      const rows = replayRows(db).filter((row) =>
+      const rows = (await replayRows(db)).filter((row) =>
         safeReplayAssetHashes(row.custom_cards_json)?.includes(options.assetHash!) === true)
       const alreadyTakenDown = ledger.assetTakedowns.some(
         (rule) => rule.hash === options.assetHash,
@@ -475,7 +410,7 @@ export function removeReplay(
           assetHashes: [options.assetHash],
           deletedAssetHashes: options.dryRun
             ? [options.assetHash]
-            : deleteAssets(options.assetRoot, [options.assetHash]),
+            : await deleteAssets(options.resources, [options.assetHash]),
         }
       }
       const removedAt = validateRemovedAt((options.now ?? Date.now)())
@@ -501,31 +436,31 @@ export function removeReplay(
           alreadyRemoved: false,
           roomIds,
           assetHashes,
-          deletedAssetHashes: previewDeletedAssets(
+          deletedAssetHashes: (await previewDeletedAssets(
             db,
             assetHashes,
             new Set(entries.map((entry) => entry.roomId)),
             [options.assetHash],
-          ),
+          )),
         }
       }
-      appendLedger(options.ledgerPath, {
+      await appendLedger(options.resources, {
         version: 1,
         entries,
         assetTakedowns,
       })
-      applyEntries(db, entries)
+      ;(await applyEntries(db, entries))
       return {
         dryRun: false,
         alreadyRemoved: false,
         roomIds,
         assetHashes,
-        deletedAssetHashes: cleanupAssets(
+        deletedAssetHashes: (await cleanupAssets(
           db,
-          options.assetRoot,
+          options.resources,
           assetHashes,
           [options.assetHash],
-        ),
+        )),
       }
     }
     if (options.eraseResult) {
@@ -533,7 +468,7 @@ export function removeReplay(
         (entry) => entry.roomId === options.roomId && entry.eraseResult,
       )
       if (durableEntry) {
-        if (!options.dryRun) applyEntries(db, [durableEntry])
+        if (!options.dryRun) (await applyEntries(db, [durableEntry]))
         return {
           dryRun: options.dryRun === true,
           alreadyRemoved: true,
@@ -541,12 +476,12 @@ export function removeReplay(
           assetHashes: durableEntry.assetHashes,
           deletedAssetHashes: options.dryRun
             ? []
-            : cleanupAssets(
+            : (await cleanupAssets(
                 db,
-                options.assetRoot,
+                options.resources,
                 durableEntry.assetHashes,
                 [],
-              ),
+              )),
         }
       }
       const removedAt = validateRemovedAt((options.now ?? Date.now)())
@@ -560,12 +495,12 @@ export function removeReplay(
         eraseResult: true,
       }
       if (!options.dryRun) {
-        appendLedger(options.ledgerPath, {
+        await appendLedger(options.resources, {
           version: 1,
           entries: [entry],
           assetTakedowns: [],
         })
-        applyEntries(db, [entry])
+        ;(await applyEntries(db, [entry]))
       }
       return {
         dryRun: options.dryRun === true,
@@ -573,8 +508,8 @@ export function removeReplay(
         roomIds: [options.roomId],
         assetHashes,
         deletedAssetHashes: options.dryRun
-          ? previewDeletedAssets(db, assetHashes, new Set(), [])
-          : cleanupAssets(db, options.assetRoot, assetHashes, []),
+          ? (await previewDeletedAssets(db, assetHashes, new Set(), []))
+          : (await cleanupAssets(db, options.resources, assetHashes, [])),
       }
     }
     return {
@@ -585,7 +520,7 @@ export function removeReplay(
       deletedAssetHashes: [],
     }
   }
-  const rows = planRows(db, target, options.assetHash)
+  const rows = (await planRows(db, target, options.assetHash))
   const removedAt = validateRemovedAt((options.now ?? Date.now)())
   const entries = rows.map((row) => entryForRow(
     row,
@@ -607,42 +542,41 @@ export function removeReplay(
       alreadyRemoved: false,
       roomIds,
       assetHashes,
-      deletedAssetHashes: previewDeletedAssets(
+      deletedAssetHashes: (await previewDeletedAssets(
         db,
         assetHashes,
         new Set(roomIds),
         options.assetHash ? [options.assetHash] : [],
-      ),
+      )),
     }
   }
-  appendLedger(options.ledgerPath, {
+  await appendLedger(options.resources, {
     version: 1,
     entries,
     assetTakedowns,
   })
-  applyEntries(db, entries)
+  ;(await applyEntries(db, entries))
   return {
     dryRun: false,
     alreadyRemoved: false,
     roomIds,
     assetHashes,
-    deletedAssetHashes: cleanupAssets(
+    deletedAssetHashes: (await cleanupAssets(
       db,
-      options.assetRoot,
+      options.resources,
       assetHashes,
       options.assetHash ? [options.assetHash] : [],
-    ),
+    )),
   }
 }
 
-export function applyReplayRemovalLedger(
-  db: Database.Database,
+export async function applyReplayRemovalLedger(
+  db: Database,
   options: {
-    assetRoot: string
-    ledgerPath: string
+    resources: ResourceStore
   },
-): ReplayRemovalLedgerResult {
-  const ledger = readLedger(options.ledgerPath)
+): Promise<Awaited<ReplayRemovalLedgerResult>> {
+  const ledger = await readLedger(options.resources)
   const assetTakedownHashes = [...new Set(
     ledger.assetTakedowns.map((rule) => rule.hash),
   )].sort()
@@ -654,10 +588,11 @@ export function applyReplayRemovalLedger(
       assetTakedownHashes: [],
     }
   }
+  for (const hash of assetTakedownHashes) await options.resources.blockHash(hash)
   const entries = [...ledger.entries]
-  const removedRoomIds = applyEntries(db, entries)
+  const removedRoomIds = (await applyEntries(db, entries))
   const recordedRoomIds = new Set(entries.map((entry) => entry.roomId))
-  const discoveredEntries = replayRows(db).flatMap((row) => {
+  const discoveredEntries = (await replayRows(db)).flatMap((row) => {
     if (recordedRoomIds.has(row.room_id)) return []
     const hashes = safeReplayAssetHashes(row.custom_cards_json)
     if (hashes === null) return []
@@ -665,23 +600,23 @@ export function applyReplayRemovalLedger(
     return rule ? [entryForRow(row, rule.reason, rule.removedAt)] : []
   })
   if (discoveredEntries.length > 0) {
-    appendLedger(options.ledgerPath, {
+    await appendLedger(options.resources, {
       version: 1,
       entries: discoveredEntries,
       assetTakedowns: [],
     })
     entries.push(...discoveredEntries)
-    removedRoomIds.push(...applyEntries(db, discoveredEntries))
+    removedRoomIds.push(...(await applyEntries(db, discoveredEntries)))
   }
   return {
     entries: entries.length,
     removedRoomIds,
-    deletedAssetHashes: cleanupAssets(
+    deletedAssetHashes: (await cleanupAssets(
       db,
-      options.assetRoot,
+      options.resources,
       entries.flatMap((entry) => entry.assetHashes),
       assetTakedownHashes,
-    ),
+    )),
     assetTakedownHashes,
   }
 }

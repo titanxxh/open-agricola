@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
+const scanner = readFileSync('scripts/local-rooms.ts', 'utf8')
 const script = readFileSync('restart-local.sh', 'utf8')
 
 describe('restart-local preview mode', () => {
@@ -52,13 +53,13 @@ describe('restart-local preview mode', () => {
     expect(script).toContain('DEV_ENABLE_SNAKE_OPENING="$([ "$SNAKE_ENABLED" -eq 1 ] && echo true || echo false)"')
     expect(script).toContain('&enableSnakeOpening=true')
     expect(script).toContain('dev_rooms_without_variant snake')
-    const resetScanner = script.match(/dev_rooms_without_variant\(\) \{[\s\S]*?^\}/m)?.[0] ?? ''
-    expect(resetScanner).toContain('state.enableSnakeOpening !== true')
+    const resetScanner = scanner
+    expect(resetScanner).toContain('state?.enableSnakeOpening')
   })
 
   it('does not require incomplete-minor startup options from serialized Moor game state', () => {
-    const resetScanner = script.match(/dev_rooms_without_variant\(\) \{[\s\S]*?^\}/m)?.[0] ?? ''
-    expect(resetScanner).toContain('state.enableFarmersOfTheMoor !== true')
+    const resetScanner = scanner
+    expect(resetScanner).toContain('state?.enableFarmersOfTheMoor')
     expect(resetScanner).not.toContain('state.allowIncompleteFarmersOfTheMoorMinorDeal')
     expect(script).toContain('dev_rooms_without_variant moor')
   })

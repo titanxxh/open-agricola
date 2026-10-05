@@ -38,23 +38,23 @@ function hashSecret(raw: string): string {
   return createHash('sha256').update(raw).digest('hex')
 }
 
-export function pruneExpiredOAuthRows(now: number = Date.now()): void {
+export async function pruneExpiredOAuthRows(now: number = Date.now()): Promise<Awaited<void>> {
   const db = getDb()
-  db.prepare('DELETE FROM oauth_states WHERE used_at IS NOT NULL OR expires_at <= ?').run(now)
-  db.prepare('DELETE FROM oauth_onboarding_tickets WHERE used_at IS NOT NULL OR expires_at <= ?').run(now)
+  ;(await db.prepare('DELETE FROM oauth_states WHERE used_at IS NOT NULL OR expires_at <= ?').run(now))
+  ;(await db.prepare('DELETE FROM oauth_onboarding_tickets WHERE used_at IS NOT NULL OR expires_at <= ?').run(now))
 }
 
-export function createOAuthState(input: {
+export async function createOAuthState(input: {
   provider: OAuthProvider
   intent: OAuthIntent
   userId?: string
   returnTo?: string
   inviteCodeHash?: string
-}): string {
+}): Promise<Awaited<string>> {
   const raw = createRawSecret()
   const now = Date.now()
-  pruneExpiredOAuthRows(now)
-  getDb().prepare(`
+  ;(await pruneExpiredOAuthRows(now))
+  ;(await getDb().prepare(`
     INSERT INTO oauth_states (state_hash, provider, intent, user_id, return_to, invite_code_hash, expires_at, created_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
@@ -66,28 +66,27 @@ export function createOAuthState(input: {
     input.inviteCodeHash ?? null,
     now + STATE_TTL_MS,
     now,
-  )
+  ))
   return raw
 }
 
-export function consumeOAuthState(rawState: string): {
+export async function consumeOAuthState(rawState: string): Promise<Awaited<{
   provider: OAuthProvider
   intent: OAuthIntent
   userId?: string
   returnTo?: string
   inviteCodeHash?: string
-} | null {
+} | null>> {
   const db = getDb()
   const stateHash = hashSecret(rawState)
   const now = Date.now()
-  const row = db.prepare(`
-    SELECT provider, intent, user_id, return_to, invite_code_hash
-    FROM oauth_states
+  const row = (await db.prepare(`
+    UPDATE oauth_states SET used_at = ?
     WHERE state_hash = ? AND used_at IS NULL AND expires_at > ?
-  `).get(stateHash, now) as OAuthStateRow | undefined
+    RETURNING provider, intent, user_id, return_to, invite_code_hash
+  `).get(now, stateHash, now)) as OAuthStateRow | undefined
 
   if (!row) return null
-  db.prepare('UPDATE oauth_states SET used_at = ? WHERE state_hash = ? AND used_at IS NULL').run(now, stateHash)
   return {
     provider: row.provider,
     intent: row.intent,
@@ -97,32 +96,32 @@ export function consumeOAuthState(rawState: string): {
   }
 }
 
-export function findIdentity(provider: OAuthProvider, providerUserId: string): { userId: string } | null {
-  const row = getDb().prepare(`
+export async function findIdentity(provider: OAuthProvider, providerUserId: string): Promise<Awaited<{ userId: string } | null>> {
+  const row = (await getDb().prepare(`
     SELECT user_id
     FROM auth_identities
     WHERE provider = ? AND provider_user_id = ?
-  `).get(provider, providerUserId) as { user_id: string } | undefined
+  `).get(provider, providerUserId)) as { user_id: string } | undefined
   return row ? { userId: row.user_id } : null
 }
 
-export function linkIdentity(userId: string, profile: OAuthProfile): void {
+export async function linkIdentity(userId: string, profile: OAuthProfile): Promise<Awaited<void>> {
   const db = getDb()
-  const existingIdentity = db.prepare(`
+  const existingIdentity = (await db.prepare(`
     SELECT user_id
     FROM auth_identities
     WHERE provider = ? AND provider_user_id = ?
-  `).get(profile.provider, profile.providerUserId)
+  `).get(profile.provider, profile.providerUserId))
   if (existingIdentity) throw new Error('provider identity already linked')
 
-  const existingProvider = db.prepare(`
+  const existingProvider = (await db.prepare(`
     SELECT id
     FROM auth_identities
     WHERE user_id = ? AND provider = ?
-  `).get(userId, profile.provider)
+  `).get(userId, profile.provider))
   if (existingProvider) throw new Error('user already linked provider')
 
-  db.prepare(`
+  ;(await db.prepare(`
     INSERT INTO auth_identities (
       id, user_id, provider, provider_user_id, provider_login, provider_email,
       provider_email_verified, display_name, avatar_url, linked_at
@@ -139,14 +138,14 @@ export function linkIdentity(userId: string, profile: OAuthProfile): void {
     profile.displayName ?? null,
     profile.avatarUrl ?? null,
     Date.now(),
-  )
+  ))
 }
 
-export function createOnboardingTicket(profile: OAuthProfile, returnTo?: string, inviteCodeHash?: string): string {
+export async function createOnboardingTicket(profile: OAuthProfile, returnTo?: string, inviteCodeHash?: string): Promise<Awaited<string>> {
   const raw = createRawSecret()
   const now = Date.now()
-  pruneExpiredOAuthRows(now)
-  getDb().prepare(`
+  ;(await pruneExpiredOAuthRows(now))
+  ;(await getDb().prepare(`
     INSERT INTO oauth_onboarding_tickets (
       ticket_hash, provider, provider_user_id, provider_login, provider_email,
       provider_email_verified, display_name, avatar_url, return_to, invite_code_hash, expires_at, created_at
@@ -165,7 +164,7 @@ export function createOnboardingTicket(profile: OAuthProfile, returnTo?: string,
     inviteCodeHash ?? null,
     now + ONBOARDING_TICKET_TTL_MS,
     now,
-  )
+  ))
   return raw
 }
 
@@ -183,46 +182,45 @@ function profileFromTicketRow(row: OnboardingTicketRow): OAuthOnboardingProfile 
   }
 }
 
-export function getOnboardingTicket(rawTicket: string): OAuthOnboardingProfile | null {
+export async function getOnboardingTicket(rawTicket: string): Promise<Awaited<OAuthOnboardingProfile | null>> {
   const ticketHash = hashSecret(rawTicket)
-  const row = getDb().prepare(`
+  const row = (await getDb().prepare(`
     SELECT provider, provider_user_id, provider_login, provider_email,
       provider_email_verified, display_name, avatar_url, return_to, invite_code_hash
     FROM oauth_onboarding_tickets
     WHERE ticket_hash = ? AND used_at IS NULL AND expires_at > ?
-  `).get(ticketHash, Date.now()) as OnboardingTicketRow | undefined
+  `).get(ticketHash, Date.now())) as OnboardingTicketRow | undefined
 
   return row ? profileFromTicketRow(row) : null
 }
 
-export function consumeOnboardingTicket(rawTicket: string): OAuthOnboardingProfile | null {
+export async function consumeOnboardingTicket(rawTicket: string): Promise<Awaited<OAuthOnboardingProfile | null>> {
   const db = getDb()
   const ticketHash = hashSecret(rawTicket)
   const now = Date.now()
-  const row = db.prepare(`
-    SELECT provider, provider_user_id, provider_login, provider_email,
-      provider_email_verified, display_name, avatar_url, return_to, invite_code_hash
-    FROM oauth_onboarding_tickets
+  const row = (await db.prepare(`
+    UPDATE oauth_onboarding_tickets SET used_at = ?
     WHERE ticket_hash = ? AND used_at IS NULL AND expires_at > ?
-  `).get(ticketHash, now) as OnboardingTicketRow | undefined
+    RETURNING provider, provider_user_id, provider_login, provider_email,
+      provider_email_verified, display_name, avatar_url, return_to, invite_code_hash
+  `).get(now, ticketHash, now)) as OnboardingTicketRow | undefined
 
   if (!row) return null
-  db.prepare('UPDATE oauth_onboarding_tickets SET used_at = ? WHERE ticket_hash = ? AND used_at IS NULL').run(now, ticketHash)
   return profileFromTicketRow(row)
 }
 
-export function getLinkedIdentities(userId: string): Array<{
+export async function getLinkedIdentities(userId: string): Promise<Awaited<Array<{
   provider: OAuthProvider
   providerLogin?: string
   providerEmail?: string
   linkedAt: number
-}> {
-  const rows = getDb().prepare(`
+}>>> {
+  const rows = (await getDb().prepare(`
     SELECT provider, provider_login, provider_email, linked_at
     FROM auth_identities
     WHERE user_id = ?
     ORDER BY linked_at ASC
-  `).all(userId) as Array<{
+  `).all(userId)) as Array<{
     provider: OAuthProvider
     provider_login: string | null
     provider_email: string | null

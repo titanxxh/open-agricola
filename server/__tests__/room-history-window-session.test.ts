@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { join } from 'node:path'
-import { tmpdir } from 'node:os'
-import { JsonRoomPersistence } from '../game/persistence/json-adapter'
+import { PostgresRoomPersistence } from '../game/persistence/postgres-adapter'
+import { createTestDatabase } from './_helpers/postgres'
 import { InMemoryRoomPersistence } from '../game/persistence/memory-adapter'
 import { eventsToLogEntries } from '../../shared/events/log-mapper'
 import type { GameEvent } from '../../shared/contract/events'
@@ -164,10 +162,10 @@ describe('complete operation-group Room history pages', () => {
     expect(new Set(ids).size).toBe(ids.length)
   })
 
-  it.each(['json', 'memory'])('retains groups, exact raw values and renamed participant roles through %s recovery', (adapter) => {
-    const dir = mkdtempSync(join(tmpdir(), 'oa-history-page-'))
+  it.each(['postgres', 'memory'])('retains groups, exact raw values and renamed participant roles through %s recovery', async (adapter) => {
+    const db = adapter === 'postgres' ? await createTestDatabase() : undefined
     try {
-      const persistence = adapter === 'json' ? new JsonRoomPersistence(dir) : new InMemoryRoomPersistence()
+      const persistence = db ? new PostgresRoomPersistence(db) : new InMemoryRoomPersistence()
       const session = setup()
       addActions(session, 28)
       const [left, right] = session.state.players
@@ -177,8 +175,8 @@ describe('complete operation-group Room history pages', () => {
       session.updatePlayerName(1, 'Renamed right')
       const saved = serializeSessionSnapshot(session.state, session)
       const before = buildRoomHistoryPage(saved.frame, 'p1')
-      persistence.save('page-room', saved, { createdBy: null, maxPlayers: 2, status: 'playing', players: [], customCardDbIds: [] })
-      const loaded = persistence.load('page-room')!.serialized!
+      await persistence.save('page-room', saved, { createdBy: null, maxPlayers: 2, status: 'playing', players: [], customCardDbIds: [] })
+      const loaded = (await persistence.load('page-room'))!.serialized!
       expect(frameHash(loaded.frame as unknown as JsonValue)).toBe(frameHash(saved.frame as unknown as JsonValue))
       const restarted = new GameSession(rehydrateState(loaded))
       const raw = restarted.withCtx(() => serializeState(restarted.state, {}))
@@ -190,7 +188,7 @@ describe('complete operation-group Room history pages', () => {
       expect(restarted.state.log[0]).toEqual(saved.state.log[0])
       const older = buildRoomHistoryPage(raw, 'p1', page.window.nextCursor!)
       expect(page.log.length + older.log.length).toBe(raw.log.length)
-    } finally { rmSync(dir, { recursive: true, force: true }) }
+    } finally { await db?.close() }
   })
 
 })

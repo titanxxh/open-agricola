@@ -1,20 +1,18 @@
+import { recordingResources } from '../../server/__tests__/_helpers/recording'
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { performance } from 'node:perf_hooks'
-import Database from 'better-sqlite3'
+import { createTestDatabase } from '../../server/__tests__/_helpers/postgres'
 import type { WebSocket } from 'ws'
 import '../../shared/cards/register-all.ts'
 import { rehydrateState, serializeSessionSnapshot, type PersistedSessionSnapshot } from '../../shared/session/serialization.ts'
 import { GameSession, type SessionResponse } from '../../server/game/authoritative-session.ts'
-import { SqliteRoomPersistence } from '../../server/game/persistence/sqlite-adapter.ts'
+import { PostgresRoomPersistence } from '../../server/game/persistence/postgres-adapter.ts'
 import { RoomCommitter } from '../../server/game/room-committer.ts'
 import { Broadcaster } from '../../server/connection/broadcaster.ts'
-import { createRoomPersistenceCheckpoint } from '../../server/game/room-persistence-checkpoint.ts'
 import type { Room } from '../../server/game/room.ts'
-import { runMigrations } from '../../server/db.ts'
-import { readCgroupLimits, assertResourceLimits } from './room-capacity.ts'
+import { readCgroupLimits, assertResourceLimits } from './resource-limits.ts'
 
 type Command =
   | { type: 'action'; actor: number; actionId: string }
@@ -142,24 +140,18 @@ const percentile = (values: number[], quantile: number): number => {
   return sorted[Math.min(sorted.length - 1, Math.ceil(sorted.length * quantile) - 1)] ?? 0
 }
 
-export const runRoomWorkload = (workload: RoomWorkload, options: {
+export const runRoomWorkload = async (workload: RoomWorkload, options: {
   onPacket?: (packet: { commandIndex: number; playerIndex: number; data: string }) => void
   nameMode?: 'matched' | 'override'
 } = {}) => {
-  const dir = mkdtempSync(join(tmpdir(), 'oa-room-performance-'))
-  const dbPath = join(dir, 'probe.db')
-  const db = new Database(dbPath)
-  db.pragma('journal_mode = WAL')
-  db.pragma('synchronous = NORMAL')
-  db.pragma('foreign_keys = ON')
-  runMigrations(db)
-  const persistence = new SqliteRoomPersistence(db)
-  const makeCommitter = () => new RoomCommitter({ persistence, enabled: true, viewerBuildId: 'probe', gameBuildId: 'probe', viewerBuildExists: () => true })
+  const db = await createTestDatabase()
+  const recording = await recordingResources(db)
+  const persistence = new PostgresRoomPersistence(db)
+  const makeCommitter = () => new RoomCommitter({ persistence, ...recording.replay, resources: recording.resources, viewerBuildExists: async id => !!await recording.resources.viewer(id) })
   let committer = makeCommitter()
-  const checkpoint = createRoomPersistenceCheckpoint({ persistence })
-  const broadcaster = new Broadcaster({ checkpoint })
+  const broadcaster = new Broadcaster()
   const insertUser = db.prepare("INSERT INTO users (id,username,display_name,password_hash,created_at) VALUES (?,?,?,'probe',1)")
-  for (let index = 0; index < workload.players; index++) insertUser.run(`u${index}`, `u${index}`, `P${index}`)
+  for (let index = 0; index < workload.players; index++) await insertUser.run(`u${index}`, `u${index}`, `P${index}`)
   let commandIndex = -1
   let sentPackets = 0
   const room: Room = {
@@ -175,8 +167,7 @@ export const runRoomWorkload = (workload: RoomWorkload, options: {
     })),
     maxPlayers: workload.players, status: 'playing', version: 0, startedAt: 1, createdBy: 'u0',
   }
-  const start = committer.prepareRoom(room, { missingPrefix: false })
-  if (start.kind === 'blocked') throw new Error(start.error)
+  committer.lockNewRoom(room)
   const latencies: number[] = []
   const ruleSamples: number[] = []
   const classifications: string[] = []
@@ -188,16 +179,18 @@ export const runRoomWorkload = (workload: RoomWorkload, options: {
   if (process.env.ROOM_PERFORMANCE_TRACE === '1') process.stderr.write(`OA_TRACE_BEGIN ${workload.players}\n`)
   const begin = performance.now()
   try {
+    const start = await committer.prepareRoom(room, { missingPrefix: false })
+    if (start.kind === 'blocked') throw new Error(start.error)
     for (const [index, command] of workload.commands.entries()) {
       commandIndex = index
       if (command.type === 'restart') {
         committer.shutdown()
-        const saved = persistence.load(room.id)?.serialized
+        const saved = (await persistence.load(room.id))?.serialized
         if (!saved) throw new Error('benchmark restart lost snapshot')
         room.session.dispose()
         room.session = new GameSession(rehydrateState(saved))
         committer = makeCommitter()
-        const restored = committer.prepareRoom(room, { missingPrefix: false })
+        const restored = await committer.prepareRoom(room, { missingPrefix: false })
         if (restored.kind === 'blocked') throw new Error(restored.error)
         continue
       }
@@ -207,16 +200,12 @@ export const runRoomWorkload = (workload: RoomWorkload, options: {
       const response = executeWorkloadCommand(room.session, command)
       ruleSamples.push(performance.now() - started)
       if (!response.ok) throw new Error(`fixed transcript rejected ${JSON.stringify(command)}: ${response.error}`)
-      const result = committer.commit(room, response, { commandType: command.type, intentJson: JSON.stringify(command) }, command.actor)
+      const result = await committer.commit(room, response, { commandType: command.type, intentJson: JSON.stringify(command) }, command.actor)
       classifications.push(result.kind)
       if (result.kind === 'blocked') throw new Error(result.error)
       if (result.kind === 'committed') {
         hashes.push(result.frameHash)
-        // The same harness runs old and new implementations. Old committed
-        // results have no prepared state; newer ones publish that exact value.
-        if ('serializedState' in result) {
-          Reflect.apply(broadcaster.broadcastCommitted, broadcaster, [room, response, 'action', undefined, undefined, result.serializedState])
-        } else broadcaster.broadcastCommitted(room, response, 'action')
+        await broadcaster.broadcastCommitted(room, response, 'action')
       }
       const elapsedMs = performance.now() - started
       latencies.push(elapsedMs)
@@ -240,10 +229,9 @@ export const runRoomWorkload = (workload: RoomWorkload, options: {
     }
   } finally {
     committer.shutdown()
-    checkpoint.shutdown()
     room.session.dispose()
-    db.close()
-    if (!process.env.ROOM_PERFORMANCE_KEEP_DB) rmSync(dir, { recursive: true, force: true })
+    await recording.close()
+    await db.close()
   }
 }
 
@@ -260,8 +248,9 @@ if (process.argv[1]?.endsWith('room-performance.ts')) {
   } else if (mode === 'run') {
     const limits = readCgroupLimits()
     assertResourceLimits(limits, process.argv.includes('--allow-unconstrained'))
-    const results = [2, 4].map(players => runRoomWorkload(JSON.parse(readFileSync(join(path, `${players}p.json`), 'utf8')) as RoomWorkload))
-    const report = JSON.stringify({ node: process.version, ...limits, commit: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), results }) + '\n'
+    const results = []
+    for (const players of [2, 4]) results.push(await runRoomWorkload(JSON.parse(readFileSync(join(path, `${players}p.json`), 'utf8')) as RoomWorkload))
+    const report = JSON.stringify({ node: process.version, storage: 'postgresql', measurement: 'App process CPU and writes exclude the PostgreSQL service; no capacity acceptance.', ...limits, commit: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), results }) + '\n'
     const output = process.argv[4]
     if (output && !output.startsWith('--')) {
       writeFileSync(output, report)

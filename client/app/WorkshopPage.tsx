@@ -1,3 +1,4 @@
+import { CardTakedownButton } from './workshop/CardTakedownButton'
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useLocale } from '../contexts/LocaleContext'
@@ -743,6 +744,7 @@ function CardDetail({ card, isLoggedIn, apiFetch, onBack, onEdit, onAddSandbox, 
                 {isFeatured ? t('platform.unfeature') : t('platform.setFeatured')}
               </button>
             )}
+            {isUserAdmin && <CardTakedownButton key={card.id} cardId={card.id} apiFetch={apiFetch} t={t} onComplete={onRefresh} />}
           </div>
 
           <CardDetailPrSection

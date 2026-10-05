@@ -1,4 +1,4 @@
-import type Database from 'better-sqlite3'
+import type { PostgresDatabase as Database } from '../database/postgres'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { markBuiltInMergedCards, markCardMerged } from '../workshop-drafts.ts'
 import { ALL_CARD_IMPLS } from '../../shared/cards/register-all.ts'
@@ -79,25 +79,25 @@ type ReviewBinding = {
   reviewVersionId: string | null
 }
 
-const getReviewBinding = (
-  db: Database.Database,
+const getReviewBinding = async (
+  db: Database,
   prUrl: string,
-): ReviewBinding | null => {
-  const matches = db.prepare(`
+): Promise<Awaited<ReviewBinding | null>> => {
+  const matches = (await db.prepare(`
     SELECT id,
            draft_revision AS revision,
-           review_status AS reviewStatus,
+           review_status AS "reviewStatus",
            live,
-           updated_at AS updatedAt,
-           approved_commit_sha AS approvedCommitSha,
-           approved_version_id AS approvedVersionId,
-           review_commit_sha AS reviewCommitSha,
-           review_version_id AS reviewVersionId
+           updated_at AS "updatedAt",
+           approved_commit_sha AS "approvedCommitSha",
+           approved_version_id AS "approvedVersionId",
+           review_commit_sha AS "reviewCommitSha",
+           review_version_id AS "reviewVersionId"
     FROM workshop_cards
     WHERE github_pr_url = ?
       AND review_status IN ('in_review', 'stale', 'approved')
     LIMIT 2
-  `).all(prUrl) as ReviewBinding[]
+  `).all(prUrl)) as ReviewBinding[]
   return matches.length === 1 ? matches[0]! : null
 }
 
@@ -148,7 +148,7 @@ const expectedPrUrl = (
 export async function handleWorkshopReviewWebhook(
   req: IncomingMessage,
   res: ServerResponse,
-  db: Database.Database,
+  db: Database,
   runtime: WorkshopReviewRuntime,
 ): Promise<boolean> {
   if (req.url !== '/api/github/webhook') return false
@@ -198,9 +198,9 @@ export async function handleWorkshopReviewWebhook(
     sendJson(res, 200, { ok: true, ignored: true })
     return true
   }
-  if (db.prepare(`
+  if ((await db.prepare(`
     SELECT 1 FROM github_webhook_events WHERE delivery_id = ?
-  `).get(deliveryId)) {
+  `).get(deliveryId))) {
     sendJson(res, 200, { ok: true, duplicate: true })
     return true
   }
@@ -218,31 +218,31 @@ export async function handleWorkshopReviewWebhook(
   // Graduation (#642): the PR merged — terminal transition, no binding or
   // SHA verification needed (GitHub's merge is the fact to reflect).
   if (mergedIntoMain) {
-    const result = db.transaction(() => {
-      const inserted = db.prepare(`
-        INSERT OR IGNORE INTO github_webhook_events (
+    const result = (await db.transaction(async () => {
+      const inserted = (await db.prepare(`
+        INSERT INTO github_webhook_events (
           delivery_id, event_name, received_at
-        ) VALUES (?, ?, ?)
-      `).run(deliveryId, eventName, Date.now()).changes > 0
+        ) VALUES (?, ?, ?) ON CONFLICT (delivery_id) DO NOTHING
+      `).run(deliveryId, eventName, Date.now())).changes > 0
       if (!inserted) return { duplicate: true as const }
-      const merged = markCardMerged(db, { prUrl })
+      const merged = (await markCardMerged(db, { prUrl }))
       if (merged === 0) {
         // Out-of-order delivery: the approval binding has not landed yet.
         // GitHub does not redeliver acknowledged hooks, so persist the merge
         // fact — reconcilePendingMerges graduates the card once the approval
         // arrives (approval webhook, refresh, or startup).
-        db.prepare(`
+        ;(await db.prepare(`
           UPDATE workshop_cards
           SET github_pr_status = 'merged', github_pr_last_synced_at = ?
           WHERE github_pr_url = ? AND review_status != 'merged'
-        `).run(Date.now(), prUrl)
+        `).run(Date.now(), prUrl))
         return { pendingMerge: true as const }
       }
       // A late merge delivery may arrive after the release already shipped:
       // reconcile the built-in takeover immediately instead of waiting for
       // the next restart.
-      return { merged, builtIn: markBuiltInMergedCards(db, Object.keys(ALL_CARD_IMPLS)).flagged }
-    })()
+      return { merged, builtIn: (await markBuiltInMergedCards(db, Object.keys(ALL_CARD_IMPLS))).flagged }
+    })())
     sendJson(res, 200, { ok: true, ...result })
     return true
   }
@@ -260,30 +260,30 @@ export async function handleWorkshopReviewWebhook(
     sendJson(res, 200, { ok: true, ignored: true })
     return true
   }
-  const binding = getReviewBinding(db, prUrl)
+  const binding = (await getReviewBinding(db, prUrl))
   if (!binding) {
     sendJson(res, 200, { ok: true, ignored: true })
     return true
   }
-  const recordDelivery = (): boolean => db.prepare(`
-    INSERT OR IGNORE INTO github_webhook_events (
+  const recordDelivery = async (): Promise<Awaited<boolean>> => (await db.prepare(`
+    INSERT INTO github_webhook_events (
       delivery_id, event_name, received_at
-    ) VALUES (?, ?, ?)
-  `).run(deliveryId, eventName, Date.now()).changes > 0
-  const failClosed = (): true => {
-    const result = db.transaction(() => {
-      if (!recordDelivery()) return { duplicate: true as const }
-      if (!sameReviewBinding(getReviewBinding(db, prUrl), binding)) {
+    ) VALUES (?, ?, ?) ON CONFLICT (delivery_id) DO NOTHING
+  `).run(deliveryId, eventName, Date.now())).changes > 0
+  const failClosed = async (): Promise<Awaited<true>> => {
+    const result = (await db.transaction(async () => {
+      if (!(await recordDelivery())) return { duplicate: true as const }
+      if (!sameReviewBinding((await getReviewBinding(db, prUrl)), binding)) {
         return { ignored: true as const }
       }
       return {
-        invalidated: invalidateReviewedCard(db, {
+        invalidated: (await invalidateReviewedCard(db, {
           prUrl,
           ...(payload.action === 'closed' ? { prStatus: 'closed' } : {}),
           expectedBinding: binding,
-        }),
+        })),
       }
-    })()
+    })())
     sendJson(res, 200, { ok: true, conservative: true, ...result })
     return true
   }
@@ -309,11 +309,11 @@ export async function handleWorkshopReviewWebhook(
           : isReviewTargetEligible(snapshot))
       if (remainsValid) preserveCommitSha = snapshot.headRefOid
     } catch {
-      return failClosed()
+      return (await failClosed())
     }
-    const result = db.transaction(() => {
-      if (!recordDelivery()) return { duplicate: true as const }
-      if (!sameReviewBinding(getReviewBinding(db, prUrl), binding)) {
+    const result = (await db.transaction(async () => {
+      if (!(await recordDelivery())) return { duplicate: true as const }
+      if (!sameReviewBinding((await getReviewBinding(db, prUrl)), binding)) {
         return { ignored: true as const }
       }
       const approvedReview = payload.action === 'dismissed'
@@ -322,23 +322,23 @@ export async function handleWorkshopReviewWebhook(
         : undefined
       if (approvedReview) {
         return {
-          approved: approveReviewedVersion(db, {
+          approved: (await approveReviewedVersion(db, {
             prUrl,
             commitSha: snapshot.headRefOid,
             reviewId: approvedReview.id,
             expectedBinding: binding,
-          }),
+          })),
           invalidated: 0,
         }
       }
-      const invalidated = invalidateReviewedCard(db, {
+      const invalidated = (await invalidateReviewedCard(db, {
         prUrl,
         prStatus: githubPrStatus(snapshot),
         ...(preserveCommitSha ? { preserveCommitSha } : {}),
         expectedBinding: binding,
-      })
+      }))
       return { invalidated }
-    })()
+    })())
     sendJson(res, 200, { ok: true, ...result })
     return true
   }
@@ -348,58 +348,58 @@ export async function handleWorkshopReviewWebhook(
     try {
       snapshot = await runtime.provider.getPullRequestSnapshot(prNumber as number)
     } catch {
-      return failClosed()
+      return (await failClosed())
     }
     // A merged PR can still receive its (delayed) approval delivery: the
     // head is frozen after merge, so the #629 SHA binding stays verifiable —
     // without this the pending graduation (#642) could never complete.
     const approvedReview = findApprovedHeadReview(snapshot)
       ?? findApprovedMergedHeadReview(snapshot)
-    const result = db.transaction(() => {
-      if (!recordDelivery()) return { duplicate: true as const }
-      if (!sameReviewBinding(getReviewBinding(db, prUrl), binding)) {
+    const result = (await db.transaction(async () => {
+      if (!(await recordDelivery())) return { duplicate: true as const }
+      if (!sameReviewBinding((await getReviewBinding(db, prUrl)), binding)) {
         return { ignored: true as const }
       }
       // Capture the pending-merge fact BEFORE the approval overwrites
       // github_pr_status with 'open' — otherwise the reconciliation below
       // would read zero pending rows and the card would stay 'approved'.
       const wasPendingMerge = snapshot.state === 'MERGED'
-        || (db.prepare(
+        || ((await db.prepare(
           'SELECT github_pr_status FROM workshop_cards WHERE github_pr_url = ?',
-        ).get(prUrl) as { github_pr_status: string | null } | undefined)
+        ).get(prUrl)) as { github_pr_status: string | null } | undefined)
           ?.github_pr_status === 'merged'
       const approved = approvedReview
-        ? approveReviewedVersion(db, {
+        ? (await approveReviewedVersion(db, {
             prUrl,
             commitSha: snapshot.headRefOid,
             reviewId: approvedReview.id,
             expectedBinding: binding,
-          })
+          }))
         : 0
       if (approvedReview) {
         // The merge event may have arrived first: graduate immediately now
         // that the approval binding exists.
         const graduated = approved > 0 && wasPendingMerge
-          ? markCardMerged(db, { prUrl })
+          ? (await markCardMerged(db, { prUrl }))
           : 0
         if (graduated > 0) {
           // The release containing the card may already be running (it
           // shipped between the merge delivery and this delayed approval):
           // reconcile the built-in takeover now instead of at next restart.
-          const builtIn = markBuiltInMergedCards(db, Object.keys(ALL_CARD_IMPLS)).flagged
+          const builtIn = (await markBuiltInMergedCards(db, Object.keys(ALL_CARD_IMPLS))).flagged
           return { approved, graduated, builtIn }
         }
         return { approved }
       }
       const breaksReview = breaksReviewGateWithoutApproval(snapshot)
-      const invalidated = invalidateReviewedCard(db, {
+      const invalidated = (await invalidateReviewedCard(db, {
         prUrl,
         prStatus: githubPrStatus(snapshot),
         ...(!breaksReview ? { preserveCommitSha: snapshot.headRefOid } : {}),
         expectedBinding: binding,
-      })
+      }))
       return { approved, invalidated }
-    })()
+    })())
     sendJson(res, 200, { ok: true, ...result })
     return true
   }

@@ -48,6 +48,8 @@ sudo apt-get install -y build-essential pkg-config python3 \
 brew install pkg-config cairo pango libpng jpeg giflib librsvg pixman
 ```
 
+还需安装 Docker Engine 和 Compose。启动器自动准备持久化的本机 PostgreSQL 和私有 S3，无需申请外部服务；`./restart-local.sh --instances 2` 在同机启动两个应用进程。`pnpm run verify` 为浏览器测试分配独立数据库 / 资源命名空间与端口。以后切换外部连接仍需迁移并验证数据，见[部署说明](docs/HOW_TO_DEPLOY.md)。
+
 ```bash
 pnpm install
 ./restart-local.sh    # 在 127.0.0.1 上启动后端 (5175) + 前端 (5173)
@@ -99,7 +101,7 @@ docs/      架构、部署、平台设计、卡牌进度
 ![Vite](https://img.shields.io/badge/Vite-8-646cff)
 ![pnpm](https://img.shields.io/badge/pnpm-10-f69220)
 
-后端 Node.js + WebSocket + SQLite（better-sqlite3）；前端 React 19 + Vite 8 + TypeScript。
+后端 Node.js + WebSocket + PostgreSQL（pg）及私有 S3 兼容存储；前端 React 19 + Vite 8 + TypeScript。
 
 ## Documentation
 

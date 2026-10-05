@@ -1,7 +1,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { Pool, types, type PoolClient, type PoolConfig, type QueryResultRow } from 'pg'
 
-type Transaction = { client: PoolClient; active: boolean; savepoint: number }
+type Transaction = { client: PoolClient; active: boolean; sequence: { value: number }; nested: Promise<void> }
 export type WriteResult = { changes: number }
 
 /** Bind values only. Quoted SQL and comments are never interpreted as parameters. */
@@ -54,7 +54,11 @@ export class PostgresDatabase {
 
   async query<Row extends QueryResultRow = QueryResultRow>(sql: string, values: unknown[] = []) {
     const transaction = this.current.getStore()
-    if (transaction && !transaction.active) throw new Error('Query escaped its transaction')
+    if (transaction) {
+      if (!transaction.active) throw new Error('Query escaped its transaction')
+      await transaction.nested
+      if (!transaction.active) throw new Error('Query escaped its transaction')
+    }
     return (transaction?.client ?? this.pool).query<Row>(sql, values)
   }
 
@@ -82,26 +86,43 @@ export class PostgresDatabase {
       const parent = this.current.getStore()
       if (parent) {
         if (!parent.active) throw new Error('Transaction already completed')
-        const savepoint = `nested_${++parent.savepoint}`
-        await parent.client.query(`SAVEPOINT ${savepoint}`)
-        try {
-          const result = await work(...args)
-          await parent.client.query(`RELEASE SAVEPOINT ${savepoint}`)
-          return result
-        } catch (error) {
-          await parent.client.query(`ROLLBACK TO SAVEPOINT ${savepoint}`)
-          await parent.client.query(`RELEASE SAVEPOINT ${savepoint}`)
-          throw error
-        }
+        // SAVEPOINTs are connection-wide. Sibling asynchronous transactions
+        // must not release or roll back one another's scope. Child ALS scopes
+        // have their own queue, so genuinely nested work remains reentrant.
+        const pending = parent.nested.then(async () => {
+          if (!parent.active) throw new Error('Transaction already completed')
+          const savepoint = `nested_${++parent.sequence.value}`
+          const child: Transaction = { client: parent.client, active: true, sequence: parent.sequence, nested: Promise.resolve() }
+          await parent.client.query(`SAVEPOINT ${savepoint}`)
+          try {
+            const result = await this.current.run(child, () => work(...args))
+            await child.nested
+            child.active = false
+            await parent.client.query(`RELEASE SAVEPOINT ${savepoint}`)
+            return result
+          } catch (error) {
+            await child.nested
+            child.active = false
+            await parent.client.query(`ROLLBACK TO SAVEPOINT ${savepoint}`)
+            await parent.client.query(`RELEASE SAVEPOINT ${savepoint}`)
+            throw error
+          }
+        })
+        parent.nested = pending.then(() => {}, () => {})
+        return await pending
       }
       const client = await this.pool.connect()
-      const transaction = { client, active: true, savepoint: 0 }
+      const transaction: Transaction = { client, active: true, sequence: { value: 0 }, nested: Promise.resolve() }
       try {
         await client.query('BEGIN')
         const result = await this.current.run(transaction, () => work(...args))
+        await transaction.nested
+        transaction.active = false
         await client.query('COMMIT')
         return result
       } catch (error) {
+        await transaction.nested
+        transaction.active = false
         await client.query('ROLLBACK')
         throw error
       } finally {
@@ -109,6 +130,10 @@ export class PostgresDatabase {
         client.release()
       }
     }
+  }
+
+  assertInTransaction(): void {
+    if (!this.current.getStore()?.active) throw new Error('This write requires an enclosing transaction')
   }
 
   async close(): Promise<void> {

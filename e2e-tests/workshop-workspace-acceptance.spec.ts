@@ -1,5 +1,5 @@
 import AxeBuilder from '@axe-core/playwright'
-import Database from 'better-sqlite3'
+import { PostgresDatabase } from '../server/database/postgres'
 import {
   expect,
   test,
@@ -201,7 +201,7 @@ const createDraft = async (
       },
     },
   ))
-  return loadWorkspace(request, account, created.id)
+  return (await loadWorkspace(request, account, created.id))
 }
 
 const loadWorkspace = async (
@@ -236,7 +236,7 @@ const adoptArt = async (
   workspace: Workspace,
   subject: string,
   resultUrl = imageData,
-) => responseJson<{ workspace: Workspace; versionId: string }>(await api(
+) => (await responseJson<{ workspace: Workspace; versionId: string }>(await api(
   request,
   account,
   `/api/workshop/cards/${workspace.id}/adopt`,
@@ -257,7 +257,7 @@ const adoptArt = async (
       artInputs: { subject },
     },
   },
-))
+)))
 
 const adoptAbility = async (
   request: APIRequestContext,
@@ -265,7 +265,7 @@ const adoptAbility = async (
   workspace: Workspace,
   prompt: string,
   sourceCode = sourceFor(workspace.draft.cardId, workspace.draft.name),
-) => responseJson<{ workspace: Workspace; versionId: string }>(await api(
+) => (await responseJson<{ workspace: Workspace; versionId: string }>(await api(
   request,
   account,
   `/api/workshop/cards/${workspace.id}/adopt`,
@@ -285,7 +285,7 @@ const adoptAbility = async (
       },
     },
   },
-))
+)))
 
 const setupPage = async (
   page: Page,
@@ -364,23 +364,17 @@ const versions = async (
   request: APIRequestContext,
   account: Account,
   cardId: string,
-) => responseJson<{ versions: Array<{
+) => (await responseJson<{ versions: Array<{
   id: string
   version_number: number
   card_json: Record<string, unknown>
-}> }>(await api(request, account, `/api/workshop/cards/${cardId}/versions`))
+}> }>(await api(request, account, `/api/workshop/cards/${cardId}/versions`)))
 
-const withDatabase = <T>(
-  run: (database: Database.Database) => T,
-  readonly = true,
-): T => {
-  const path = process.env.DB_PATH ?? 'data/open-agricola.db'
-  const database = new Database(path, { readonly })
-  try {
-    return run(database)
-  } finally {
-    database.close()
-  }
+const withDatabase = async <T>(run: (database: PostgresDatabase) => T | Promise<T>): Promise<T> => {
+  const schema = process.env.DATABASE_SCHEMA
+  if (!schema?.startsWith('test_')) throw new Error('Workshop acceptance requires an isolated test schema; use scripts/verify.sh')
+  const database = new PostgresDatabase({ connectionString: process.env.DATABASE_URL!, schema })
+  try { return await run(database) } finally { await database.close() }
 }
 
 const fakeImageService = async (page: Page): Promise<string[]> => {
@@ -468,9 +462,9 @@ const scenarioNewDraft = async ({
     await api(request, account, '/api/workshop/cards?scope=mine'),
   )
   expect(mine.cards.map(card => card.card_id)).toEqual([uniqueId])
-  expect(withDatabase(database => database.prepare(
+  expect((await withDatabase(async database => (await database.prepare(
     'SELECT COUNT(*) AS count FROM workshop_cards WHERE card_id = ?',
-  ).get(uniqueId) as { count: number }).count).toBe(1)
+  ).get(uniqueId)) as { count: number })).count).toBe(1)
   await expectAccessibleWorkspace(page)
 }
 
@@ -805,15 +799,15 @@ const scenarioReopen = async ({
   await expect(page.locator('.aicw-current-code')).toContainText('CARD_IMPL')
   await expect(page.locator('.ai-chat-hint')).toBeVisible()
   expect((await loadWorkspace(request, account, workspace.id)).revision).toBe(savedRevision)
-  expect(withDatabase(database => {
-    const row = database.prepare(
+  expect((await withDatabase(async database => {
+    const row = (await database.prepare(
       'SELECT draft_revision, draft_generation_json FROM workshop_cards WHERE id = ?',
-    ).get(workspace.id) as { draft_revision: number; draft_generation_json: string }
+    ).get(workspace.id)) as { draft_revision: number; draft_generation_json: string }
     return {
       revision: row.draft_revision,
       generation: row.draft_generation_json,
     }
-  })).toEqual(expect.objectContaining({
+  }))).toEqual(expect.objectContaining({
     revision: savedRevision,
     generation: expect.stringContaining(abilityPrompt),
   }))
@@ -1031,9 +1025,9 @@ const scenarioVersionRestore = async ({
     .toHaveValue(currentSubject)
   const undone = await loadWorkspace(request, account, workspace.id)
   expect(undone.revision).toBe(revisionBeforeRestore + 2)
-  expect(withDatabase(database => (database.prepare(
+  expect((await withDatabase(async database => ((await database.prepare(
     'SELECT COUNT(*) AS count FROM workshop_card_versions WHERE card_id = ?',
-  ).get(workspace.id) as { count: number }).count)).toBe(1)
+  ).get(workspace.id)) as { count: number }).count))).toBe(1)
   await expectAccessibleWorkspace(page)
 }
 
@@ -1290,17 +1284,17 @@ const scenarioPrivacy = async ({
     privateAbilityPrompt,
   )
   workspace = adopted.workspace
-  withDatabase(database => {
-    approveCurrentDraft(database, {
+  ;(await withDatabase(async database => {
+    ;(await approveCurrentDraft(database, {
       cardId: workspace.id,
       authorId: workspace.authorId,
-    })
-    publish(database, {
+    }))
+    ;(await publish(database, {
       cardId: workspace.id,
       authorId: workspace.authorId,
       baseRevision: workspace.revision,
-    })
-  }, false)
+    }))
+  }))
 
   const ownerPayload = await responseJson<{ workspace: Workspace }>(
     await api(request, account, `/api/workshop/cards/${workspace.id}/workspace`),
@@ -1334,17 +1328,17 @@ const scenarioPrivacy = async ({
     await api(request, null, `/api/workshop/cards?search=${encodeURIComponent(workspace.draft.cardId)}`),
   )
   expect(JSON.stringify(publicList)).not.toContain(privatePrompt)
-  expect(withDatabase(database => {
-    const generation = (database.prepare(
+  expect((await withDatabase(async database => {
+    const generation = ((await database.prepare(
       'SELECT draft_generation_json FROM workshop_cards WHERE id = ?',
-    ).get(workspace.id) as { draft_generation_json: string }).draft_generation_json
+    ).get(workspace.id)) as { draft_generation_json: string }).draft_generation_json
     return {
       hasSubject: generation.includes(privateSubject),
       hasPrompt: generation.includes(privatePrompt),
       hasModel: generation.includes(privateModel),
       hasKey: generation.includes('e2e-fake-key'),
     }
-  })).toEqual({ hasSubject: true, hasPrompt: false, hasModel: true, hasKey: false })
+  }))).toEqual({ hasSubject: true, hasPrompt: false, hasModel: true, hasKey: false })
 
   await openEditor(page, workspace.id)
   await stage(page, variant.locale, '卡面图', 'Card art')
@@ -1479,14 +1473,14 @@ const scenarioLiveEditBlocked = async ({
   variant,
 }: ScenarioContext) => {
   const workspace = await createDraft(request, account)
-  withDatabase(database => {
-    approveCurrentDraft(database, { cardId: workspace.id, authorId: workspace.authorId })
-    publish(database, {
+  ;(await withDatabase(async database => {
+    ;(await approveCurrentDraft(database, { cardId: workspace.id, authorId: workspace.authorId }))
+    ;(await publish(database, {
       cardId: workspace.id,
       authorId: workspace.authorId,
       baseRevision: workspace.revision,
-    })
-  }, false)
+    }))
+  }))
   await openEditor(page, workspace.id)
   const nameInput = page.getByLabel(text(variant.locale, '英文卡牌名', 'Card name'))
   const localName = unique('Edited live card')

@@ -1,11 +1,12 @@
+import { seedResourceCatalog } from './_helpers/objects'
 /**
  * Workshop API integration tests.
  * Tests card CRUD, like toggle, and comment operations
  * by calling the handler functions with mock req/res objects.
  */
-import { describe, it, expect, vi, beforeAll } from 'vitest'
+import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest'
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import Database from 'better-sqlite3'
+import { createTestDatabase } from './_helpers/postgres'
 import {
   approveCurrentDraft,
   checkpointDraft,
@@ -19,109 +20,25 @@ import type { WorkshopReviewSnapshot } from '../workshop-review/github-review-pr
 
 // ── Mock DB ──────────────────────────────────────────────────────────────────
 
-const db = new Database(':memory:')
-db.pragma('foreign_keys = ON')
-db.exec(`
-  CREATE TABLE users (
-    id TEXT PRIMARY KEY, username TEXT UNIQUE NOT NULL COLLATE NOCASE,
-    display_name TEXT NOT NULL, password_hash TEXT NOT NULL,
-    created_at INTEGER NOT NULL, last_login_at INTEGER
-  );
-  CREATE TABLE sessions (
-    token TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id),
-    expires_at INTEGER NOT NULL, created_at INTEGER NOT NULL
-  );
-  CREATE TABLE workshop_cards (
-    id TEXT PRIMARY KEY, author_id TEXT NOT NULL REFERENCES users(id),
-    card_id TEXT NOT NULL, card_type TEXT NOT NULL, name TEXT NOT NULL,
-    description TEXT NOT NULL DEFAULT '', card_json TEXT NOT NULL,
-    effect_dsl TEXT, effect_code TEXT, compiled_code TEXT, code_manifest TEXT,
-    art_url TEXT, art_prompt TEXT,
-    review_status TEXT NOT NULL DEFAULT 'unsubmitted',
-    live INTEGER NOT NULL DEFAULT 0,
-    featured INTEGER NOT NULL DEFAULT 0,
-    github_pr_url TEXT,
-    github_pr_status TEXT,
-    github_pr_last_synced_at INTEGER,
-    review_commit_sha TEXT,
-    review_version_id TEXT,
-    draft_revision INTEGER NOT NULL DEFAULT 1,
-    draft_generation_json TEXT NOT NULL DEFAULT '{}',
-    approved_commit_sha TEXT,
-    approved_review_id TEXT,
-    approved_at INTEGER,
-    approved_version_id TEXT,
-    built_in INTEGER NOT NULL DEFAULT 0,
-    sandbox_pass_version_id TEXT,
-    sandbox_passed_at INTEGER,
-    created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
-  );
-  CREATE UNIQUE INDEX idx_workshop_card_id_gated
-    ON workshop_cards(card_id) WHERE review_status IN ('approved', 'merged');
-  CREATE TABLE card_likes (
-    user_id TEXT NOT NULL REFERENCES users(id),
-    card_id TEXT NOT NULL REFERENCES workshop_cards(id) ON DELETE CASCADE,
-    created_at INTEGER NOT NULL, PRIMARY KEY (user_id, card_id)
-  );
-  CREATE TABLE card_comments (
-    id TEXT PRIMARY KEY,
-    card_id TEXT NOT NULL REFERENCES workshop_cards(id) ON DELETE CASCADE,
-    author_id TEXT NOT NULL REFERENCES users(id),
-    body TEXT NOT NULL, created_at INTEGER NOT NULL
-  );
-  CREATE TABLE sandbox_cards (
-    user_id TEXT NOT NULL REFERENCES users(id),
-    workshop_card_id TEXT NOT NULL REFERENCES workshop_cards(id) ON DELETE CASCADE,
-    added_at INTEGER NOT NULL, PRIMARY KEY (user_id, workshop_card_id)
-  );
-  CREATE TABLE sandbox_settings (
-    user_id TEXT PRIMARY KEY REFERENCES users(id),
-    player_count INTEGER NOT NULL DEFAULT 2,
-    deck_ids_json TEXT NOT NULL DEFAULT '["A","B","C","D","E"]',
-    enable_through_the_seasons INTEGER NOT NULL DEFAULT 0,
-    enable_farmers_of_the_moor INTEGER NOT NULL DEFAULT 0,
-    allow_incomplete_farmers_of_the_moor_minor_deal INTEGER NOT NULL DEFAULT 0,
-    enable_snake_opening INTEGER NOT NULL DEFAULT 0,
-      hotseat INTEGER NOT NULL DEFAULT 0,
-    updated_at INTEGER NOT NULL
-  );
-  CREATE TABLE workshop_card_versions (
-    id TEXT PRIMARY KEY,
-    card_id TEXT NOT NULL REFERENCES workshop_cards(id) ON DELETE CASCADE,
-    card_json TEXT NOT NULL,
-    effect_dsl TEXT,
-    effect_code TEXT,
-    compiled_code TEXT,
-    code_manifest TEXT,
-    art_url TEXT,
-    version_number INTEGER NOT NULL,
-    created_by TEXT NOT NULL REFERENCES users(id),
-    created_at INTEGER NOT NULL,
-    content_hash TEXT,
-    provenance_json TEXT NOT NULL DEFAULT '{}'
-  );
-  CREATE TABLE github_webhook_events (
-    delivery_id TEXT PRIMARY KEY,
-    event_name TEXT NOT NULL,
-    received_at INTEGER NOT NULL
-  );
-`)
+const db = await createTestDatabase()
+await seedResourceCatalog(db, ['private.png', 'published.png', 'unpublished.png'])
+afterAll(async () => { await db.close() })
 
 vi.mock('../db.ts', () => ({ getDb: () => db, cleanExpiredSessions: () => {} }))
 
 // Seed user and session
 const NOW = Date.now()
-db.prepare('INSERT INTO users VALUES (?,?,?,?,?,?)').run('u1', 'alice', 'Alice', 'hash', NOW, null)
-db.prepare('INSERT INTO sessions VALUES (?,?,?,?)').run('tok-alice', 'u1', NOW + 86400000, NOW)
-db.prepare('INSERT INTO users VALUES (?,?,?,?,?,?)').run('u2', 'bob', 'Bob', 'hash', NOW, null)
-db.prepare('INSERT INTO sessions VALUES (?,?,?,?)').run('tok-bob', 'u2', NOW + 86400000, NOW)
+;(await db.prepare('INSERT INTO users (id, username, display_name, password_hash, created_at, last_login_at) VALUES (?,?,?,?,?,?)').run('u1', 'alice', 'Alice', 'hash', NOW, null))
+;(await db.prepare('INSERT INTO sessions VALUES (?,?,?,?)').run('tok-alice', 'u1', NOW + 86400000, NOW))
+;(await db.prepare('INSERT INTO users (id, username, display_name, password_hash, created_at, last_login_at) VALUES (?,?,?,?,?,?)').run('u2', 'bob', 'Bob', 'hash', NOW, null))
+;(await db.prepare('INSERT INTO sessions VALUES (?,?,?,?)').run('tok-bob', 'u2', NOW + 86400000, NOW))
 
 vi.mock('../auth.ts', async () => {
   const actual = await vi.importActual('../auth.ts') as Record<string, unknown>
   return {
     ...actual,
-    validateSession: (token: string) => {
-      const row = db.prepare('SELECT u.id, u.username, u.display_name FROM sessions s JOIN users u ON s.user_id = u.id WHERE s.token = ? AND s.expires_at > ?').get(token, Date.now()) as { id: string; username: string; display_name: string } | undefined
+    validateSession: async (token: string) => {
+      const row = (await db.prepare('SELECT u.id, u.username, u.display_name FROM sessions s JOIN users u ON s.user_id = u.id WHERE s.token = ? AND s.expires_at > ?').get(token, Date.now())) as { id: string; username: string; display_name: string } | undefined
       if (!row) return null
       return { id: row.id, username: row.username, displayName: row.display_name }
     },
@@ -201,24 +118,24 @@ beforeAll(async () => {
   handleWorkshopRoute = (req, res) => mod.handleWorkshopRoute(req, res, reviewRuntime)
 })
 
-const approveForPublish = (
+const approveForPublish = async (
   cardId: string,
   authorId: string,
   revision: number,
-): void => {
-  enterReview(db, {
+): Promise<Awaited<void>> => {
+  ;(await enterReview(db, {
     cardId,
     authorId,
     prUrl: `https://github.com/titanxxh/open-agricola/pull/${nextReviewPrNumber++}`,
     expectedRevision: revision,
     commitSha: 'approved-head',
-  })
-  approveCurrentDraft(db, {
+  }))
+  ;(await approveCurrentDraft(db, {
     cardId,
     authorId,
     commitSha: 'approved-head',
     reviewId: 'approved-review',
-  })
+  }))
 }
 
 const createPublishedCard = async (
@@ -242,9 +159,9 @@ const createPublishedCard = async (
     createRes,
   )
   const cardDbId = JSON.parse(createRes.body).id as string
-  const authorId = (db.prepare('SELECT user_id FROM sessions WHERE token = ?')
-    .get(token) as { user_id: string }).user_id
-  approveForPublish(cardDbId, authorId, 1)
+  const authorId = ((await db.prepare('SELECT user_id FROM sessions WHERE token = ?')
+    .get(token)) as { user_id: string }).user_id
+  await approveForPublish(cardDbId, authorId, 1)
   const publishRes = mockRes()
   await handleWorkshopRoute(
     mockReq('POST', `/api/workshop/cards/${cardDbId}/publish`, {
@@ -404,8 +321,8 @@ const CARD_IMPL = {
         name: 'Room Merged Window Card',
         card_json: { id: 'CUSTOM_RoomMergedWindowCard', name: 'Room Merged Window Card', deck: 'CUSTOM', number: 0, desc: [] },
       }, 'tok-alice')
-      db.prepare("UPDATE workshop_cards SET review_status = 'merged', built_in = 1 WHERE id = ?").run(builtInId)
-      db.prepare("UPDATE workshop_cards SET review_status = 'merged' WHERE id = ?").run(mergedWindowId)
+      ;(await db.prepare("UPDATE workshop_cards SET review_status = 'merged', built_in = 1 WHERE id = ?").run(builtInId))
+      ;(await db.prepare("UPDATE workshop_cards SET review_status = 'merged' WHERE id = ?").run(mergedWindowId))
 
       const res = mockRes()
       await handleWorkshopRoute(mockReq('GET', '/api/workshop/cards?scope=room'), res)
@@ -465,7 +382,7 @@ const CARD_IMPL = {
       await handleWorkshopRoute(createReq, createRes)
       const cardDbId = JSON.parse(createRes.body).id
 
-      approveForPublish(cardDbId, 'u1', 1)
+      await approveForPublish(cardDbId, 'u1', 1)
       const publishRes = mockRes()
       await handleWorkshopRoute(mockReq(
         'POST',
@@ -590,7 +507,7 @@ const CARD_IMPL = {
         },
       }, 'tok-alice'), createRes)
       const cardDbId = JSON.parse(createRes.body).id as string
-      approveForPublish(cardDbId, 'u1', 1)
+      await approveForPublish(cardDbId, 'u1', 1)
       reviewProvider.mockResolvedValueOnce(snapshot)
       const publishRes = mockRes()
 
@@ -637,7 +554,7 @@ const CARD_IMPL = {
         },
       }, 'tok-alice'), createRes)
       const cardDbId = JSON.parse(createRes.body).id as string
-      approveForPublish(cardDbId, 'u1', 1)
+      await approveForPublish(cardDbId, 'u1', 1)
       let resolveSnapshot!: (snapshot: WorkshopReviewSnapshot) => void
       reviewProvider.mockReturnValueOnce(new Promise(resolve => {
         resolveSnapshot = resolve
@@ -652,8 +569,8 @@ const CARD_IMPL = {
       ), publishRes)
       await vi.waitFor(() => expect(reviewProvider).toHaveBeenCalledTimes(callsBefore + 1))
 
-      const current = loadWorkspace(db, cardDbId, 'u1')
-      const edited = checkpointDraft(db, {
+      const current = (await loadWorkspace(db, cardDbId, 'u1'))
+      const edited = (await checkpointDraft(db, {
         cardId: cardDbId,
         authorId: 'u1',
         baseRevision: 1,
@@ -666,16 +583,16 @@ const CARD_IMPL = {
             desc: ['new review text'],
           },
         },
-      })
-      enterReview(db, {
+      }))
+      ;(await enterReview(db, {
         cardId: cardDbId,
         authorId: 'u1',
-        prUrl: (db.prepare(`
+        prUrl: ((await db.prepare(`
           SELECT github_pr_url FROM workshop_cards WHERE id = ?
-        `).get(cardDbId) as { github_pr_url: string }).github_pr_url,
+        `).get(cardDbId)) as { github_pr_url: string }).github_pr_url,
         expectedRevision: edited.revision,
         commitSha: 'new-head',
-      })
+      }))
       resolveSnapshot({
         reviewDecision: 'APPROVED',
         headRefOid: 'superseded-head',
@@ -701,7 +618,7 @@ const CARD_IMPL = {
           live: false,
         },
       })
-      expect(loadWorkspace(db, cardDbId, 'u1')).toMatchObject({
+      expect((await loadWorkspace(db, cardDbId, 'u1'))).toMatchObject({
         revision: 2,
         reviewStatus: 'in_review',
         live: false,
@@ -722,7 +639,7 @@ const CARD_IMPL = {
           desc: ['reviewed text'],
         },
       }, 'tok-alice')
-      unpublish(db, { cardId: cardDbId, authorId: 'u1', baseRevision: 1 })
+      ;(await unpublish(db, { cardId: cardDbId, authorId: 'u1', baseRevision: 1 }))
       let resolveSnapshot!: (snapshot: WorkshopReviewSnapshot) => void
       reviewProvider.mockReturnValueOnce(new Promise(resolve => {
         resolveSnapshot = resolve
@@ -737,8 +654,8 @@ const CARD_IMPL = {
       ), publishRes)
       await vi.waitFor(() => expect(reviewProvider).toHaveBeenCalledTimes(callsBefore + 1))
 
-      publish(db, { cardId: cardDbId, authorId: 'u1', baseRevision: 1 })
-      unpublish(db, { cardId: cardDbId, authorId: 'u1', baseRevision: 1 })
+      ;(await publish(db, { cardId: cardDbId, authorId: 'u1', baseRevision: 1 }))
+      ;(await unpublish(db, { cardId: cardDbId, authorId: 'u1', baseRevision: 1 }))
       resolveSnapshot({
         reviewDecision: 'APPROVED',
         headRefOid: 'approved-head',
@@ -759,7 +676,7 @@ const CARD_IMPL = {
         ok: false,
         current: { live: false },
       })
-      expect(loadWorkspace(db, cardDbId, 'u1').live).toBe(false)
+      expect((await loadWorkspace(db, cardDbId, 'u1')).live).toBe(false)
     })
   })
 
@@ -1078,7 +995,7 @@ const CARD_IMPL = {}
         },
       })
 
-      approveForPublish(cardDbId, 'u1', 2)
+      await approveForPublish(cardDbId, 'u1', 2)
       const publishRes = mockRes()
       await handleWorkshopRoute(mockReq('POST', `/api/workshop/cards/${cardDbId}/publish`, {
         baseRevision: 2,
@@ -1159,9 +1076,9 @@ const CARD_IMPL = {}
         versionId,
       }, 'tok-alice'), restoreRes)
       expect(JSON.parse(restoreRes.body).workspace.revision).toBe(4)
-      expect(db.prepare(`
+      expect((await db.prepare(`
         SELECT COUNT(*) AS count FROM workshop_card_versions WHERE card_id = ?
-      `).get(cardDbId)).toEqual({ count: 1 })
+      `).get(cardDbId))).toEqual({ count: 1 })
 
       const sandboxPassRes = mockRes()
       await handleWorkshopRoute(mockReq('POST', `/api/workshop/cards/${cardDbId}/sandbox-pass`, {

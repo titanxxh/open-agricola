@@ -1,4 +1,4 @@
-import type Database from 'better-sqlite3'
+import type { PostgresDatabase as Database } from './database/postgres'
 import { createHash, randomBytes } from 'node:crypto'
 import { nanoid } from 'nanoid'
 import { getDb } from './db.ts'
@@ -60,16 +60,16 @@ function statusFor(row: InviteRow, now: number): InviteStatus {
   return 'active'
 }
 
-export function createInvite(createdBy: string, input: CreateInviteInput): CreatedInvite {
+export async function createInvite(createdBy: string, input: CreateInviteInput): Promise<Awaited<CreatedInvite>> {
   const db = getDb()
   const id = nanoid()
   const code = input.code?.trim() || `oa_${randomBytes(18).toString('base64url')}`
   const createdAt = Date.now()
-  db.prepare(`
+  ;(await db.prepare(`
     INSERT INTO account_invites (
       id, code_hash, created_by, created_at, expires_at, max_uses, use_count
     ) VALUES (?, ?, ?, ?, ?, ?, 0)
-  `).run(id, hashInviteCode(code), createdBy, createdAt, input.expiresAt, input.maxUses)
+  `).run(id, hashInviteCode(code), createdBy, createdAt, input.expiresAt, input.maxUses))
   return {
     id,
     code,
@@ -80,12 +80,12 @@ export function createInvite(createdBy: string, input: CreateInviteInput): Creat
   }
 }
 
-export function listInvites(now: number = Date.now()): ListedInvite[] {
-  const rows = getDb().prepare(`
+export async function listInvites(now: number = Date.now()): Promise<Awaited<ListedInvite[]>> {
+  const rows = (await getDb().prepare(`
     SELECT id, created_at, expires_at, used_at, used_by, revoked_at, max_uses, use_count
     FROM account_invites
     ORDER BY created_at DESC
-  `).all() as InviteRow[]
+  `).all()) as InviteRow[]
   return rows.map(row => ({
     id: row.id,
     createdAt: row.created_at,
@@ -99,71 +99,71 @@ export function listInvites(now: number = Date.now()): ListedInvite[] {
   }))
 }
 
-function isInviteHashAvailable(codeHash: string, now: number): boolean {
-  const row = getDb().prepare(`
+async function isInviteHashAvailable(codeHash: string, now: number): Promise<Awaited<boolean>> {
+  const row = (await getDb().prepare(`
     SELECT id
     FROM account_invites
     WHERE code_hash = ?
       AND use_count < max_uses
       AND revoked_at IS NULL
       AND (expires_at IS NULL OR expires_at > ?)
-  `).get(codeHash, now)
+  `).get(codeHash, now))
   return Boolean(row)
 }
 
-export function isInviteCodeAvailable(code: string, now: number = Date.now()): boolean {
+export async function isInviteCodeAvailable(code: string, now: number = Date.now()): Promise<Awaited<boolean>> {
   const normalized = code.trim()
   if (!normalized) return false
-  return isInviteHashAvailable(hashInviteCode(normalized), now)
+  return (await isInviteHashAvailable(hashInviteCode(normalized), now))
 }
 
-export function revokeInvite(inviteId: string, now: number = Date.now()): boolean {
-  const result = getDb().prepare(`
+export async function revokeInvite(inviteId: string, now: number = Date.now()): Promise<Awaited<boolean>> {
+  const result = (await getDb().prepare(`
     UPDATE account_invites
     SET revoked_at = ?
     WHERE id = ?
       AND use_count < max_uses
       AND revoked_at IS NULL
       AND (expires_at IS NULL OR expires_at > ?)
-  `).run(now, inviteId, now)
+  `).run(now, inviteId, now))
   return result.changes === 1
 }
 
-function consumeInviteHash(
-  db: Database.Database,
+async function consumeInviteHash(
+  db: Database,
   codeHash: string,
   userId: string,
   now: number,
-): boolean {
-  const result = db.prepare(`
+): Promise<Awaited<boolean>> {
+  const result = (await db.prepare(`
     UPDATE account_invites
     SET use_count = use_count + 1, used_by = ?, used_at = ?
     WHERE code_hash = ?
       AND use_count < max_uses
       AND revoked_at IS NULL
       AND (expires_at IS NULL OR expires_at > ?)
-  `).run(userId, now, codeHash, now)
+  `).run(userId, now, codeHash, now))
   return result.changes === 1
 }
 
-export function consumeInviteCode(
-  db: Database.Database,
+export async function consumeInviteCode(
+  db: Database,
   code: string,
   userId: string,
   now: number = Date.now(),
-): boolean {
+): Promise<Awaited<boolean>> {
   const normalized = code.trim()
   if (!normalized) return false
-  return consumeInviteHash(db, hashInviteCode(normalized), userId, now)
+  return (await consumeInviteHash(db, hashInviteCode(normalized), userId, now))
 }
 
-export function consumeInviteCodeHash(
-  db: Database.Database,
+export async function consumeInviteCodeHash(
+  db: Database,
   codeHash: string,
   userId: string,
   now: number = Date.now(),
-): boolean {
+): Promise<Awaited<boolean>> {
   const normalizedHash = codeHash.trim()
   if (!normalizedHash) return false
-  return consumeInviteHash(db, normalizedHash, userId, now)
+  return (await consumeInviteHash(db, normalizedHash, userId, now))
 }

@@ -1,17 +1,11 @@
-const buckets = new Map<string, { count: number; resetAt: number }>()
+import { getDb } from './db'
+import { consumeRateLimit } from './database/rate-limit'
 
-export function checkRateLimit(key: string, opts: { windowMs: number; max: number }): boolean {
+export async function checkRateLimit(key: string, opts: { windowMs: number; max: number }): Promise<boolean> {
   if (process.env.DISABLE_RATE_LIMIT === '1') return true
-  const now = Date.now()
-  const entry = buckets.get(key)
-  if (!entry || now > entry.resetAt) {
-    buckets.set(key, { count: 1, resetAt: now + opts.windowMs })
-    return true
-  }
-  entry.count++
-  return entry.count <= opts.max
+  return (await consumeRateLimit(getDb(), 'api', key, opts.max, opts.windowMs)).allowed
 }
 
-export function resetRateLimitsForTests(): void {
-  buckets.clear()
+export async function resetRateLimitsForTests(): Promise<void> {
+  await getDb().prepare("DELETE FROM request_rate_limits WHERE scope = 'api'").run()
 }

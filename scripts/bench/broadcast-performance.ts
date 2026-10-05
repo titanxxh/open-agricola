@@ -6,9 +6,9 @@ import { resolve } from 'node:path'
 import { Broadcaster } from '../../server/connection/broadcaster.ts'
 import { GameSession } from '../../server/game/authoritative-session.ts'
 import { RoomCommitter } from '../../server/game/room-committer.ts'
-import { SqliteRoomPersistence } from '../../server/game/persistence/sqlite-adapter.ts'
+import { PostgresRoomPersistence } from '../../server/game/persistence/postgres-adapter.ts'
 import { canonicalJson, decodeReplayFrame, type JsonValue } from '../../server/game/replay-codec.ts'
-import { assertResourceLimits, readCgroupLimits } from './room-capacity.ts'
+import { assertResourceLimits, readCgroupLimits } from './resource-limits.ts'
 import { runRoomWorkload, type RoomWorkload } from './room-performance.ts'
 
 const [fixturePath, outputPath] = process.argv.slice(2)
@@ -42,12 +42,17 @@ if (attributed) {
       if (depth) return original.apply(this, args)
       depth += 1
       const before = process.cpuUsage()
-      try { return original.apply(this, args) } finally {
+      const finish = () => {
         const cpu = process.cpuUsage(before)
         phaseCpuMs[phase] += (cpu.user + cpu.system) / 1000
         phaseCalls[phase] += 1
         depth -= 1
       }
+      try {
+        const result = original.apply(this, args)
+        if (result instanceof Promise) return result.finally(finish) as Result
+        finish(); return result
+      } catch (error) { finish(); throw error }
     }
   GameSession.prototype.takeAction = measure(GameSession.prototype.takeAction, 'rules')
   GameSession.prototype.resolveChoice = measure(GameSession.prototype.resolveChoice, 'rules')
@@ -67,10 +72,10 @@ if (tracePath) {
   Object.defineProperty(globalThis.crypto, 'randomUUID', { configurable: true, value: () =>
     `00000000-0000-4000-8000-${(++uuid).toString(16).padStart(12, '0')}` })
   writeFileSync(tracePath, '')
-  const commitReplay = SqliteRoomPersistence.prototype.commitReplay
+  const commitReplay = PostgresRoomPersistence.prototype.commitReplay
   let previous: JsonValue | null = null
-  SqliteRoomPersistence.prototype.commitReplay = function (commit) {
-    const result = commitReplay.call(this, commit)
+  PostgresRoomPersistence.prototype.commitReplay = async function (commit) {
+    const result = await commitReplay.call(this, commit)
     if (result.kind === 'conflict') throw new Error(result.error)
     if (commit.step.stepNo === 0) previous = null
     previous = decodeReplayFrame(previous, commit.step)
@@ -84,11 +89,11 @@ if (tracePath) {
   }
 }
 
-for (let index = 0; index < warmups; index += 1) runRoomWorkload(workload, { nameMode })
+for (let index = 0; index < warmups; index += 1) await runRoomWorkload(workload, { nameMode })
 for (const phase of ['rules', 'commit', 'broadcast'] as const) { phaseCpuMs[phase] = 0; phaseCalls[phase] = 0 }
 const runs = []
 for (iteration = 0; iteration < repeats; iteration += 1) {
-  const run = runRoomWorkload(workload, { nameMode, ...(tracePath ? { onPacket: packet => {
+  const run = await runRoomWorkload(workload, { nameMode, ...(tracePath ? { onPacket: packet => {
     appendFileSync(tracePath, JSON.stringify({ kind: 'packet', iteration, commandIndex: packet.commandIndex,
       viewer: packet.playerIndex, envelope: canonicalJson(JSON.parse(packet.data)),
     }) + '\n')
@@ -127,7 +132,7 @@ writeFileSync(outputPath, JSON.stringify({
   fixture: resolve(fixturePath), fixtureSha256: sha256(fixtureText), preparation: workload.preparation,
   sourceSha256: Object.fromEntries(sourceFiles.map(path => [path, sha256(readFileSync(path, 'utf8'))])),
   mode: tracePath ? 'exact' : attributed ? 'attribution' : 'timing', nameMode, warmups, repeats,
-  measurement: 'Server command entry through SQLite durable commit and last synchronous four-seat socket sink send; excludes routing, queueing, network and client rendering. Per-round p99 near max with small n.',
+  measurement: 'Server command entry through PostgreSQL durable commit (database service CPU excluded) and last synchronous four-seat socket sink send; excludes routing, queueing, network and client rendering. Per-round p99 near max with small n.',
   aggregate: { ...summary(samples), cpuMs: runs.reduce((total, run) => total + run.cpuMs, 0),
     rssBytes: Math.max(...runs.map(run => run.rssBytes)), processPeakRssBytes: process.resourceUsage().maxRSS * 1024,
     byRound: Object.fromEntries([...new Set(samples.map(sample => sample.roundBefore))].map(round => [round, summary(samples.filter(sample => sample.roundBefore === round))])),

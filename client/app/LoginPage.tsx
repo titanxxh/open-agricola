@@ -200,6 +200,8 @@ export function LoginPage() {
   return (
     <div className="login-page">
       <div className="login-card">
+        {new URLSearchParams(window.location.search).get('accountDeletion') === 'pending' && <p role="status">{t('platform.accountDeletionPending')}</p>}
+        {new URLSearchParams(window.location.search).get('accountDeletion') === 'complete' && <p role="status">{t('platform.accountDeleted')}</p>}
         <div className="login-top-bar">
           <LocaleSwitcher />
         </div>

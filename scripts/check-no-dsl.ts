@@ -30,8 +30,6 @@ const DSL_EXCEPTIONS = new Map([
   ['scripts/check-no-dsl.ts', 'The guard defines forbidden tokens'],
   ['scripts/__tests__/check-no-dsl.test.ts', 'Regression tests exercise forbidden tokens'],
   ['scripts/__tests__/fixtures/dsl-samples/dirty.ts', 'Intentional failing fixture'],
-  ['server/db.ts', 'Historical migration SQL drops the legacy column'],
-  ['server/__tests__/workshop-api.test.ts', 'Tests migrate historical database schemas'],
 ])
 
 const SCAN_DIRS = ['shared', 'server', 'client', 'replay-viewer', 'scripts', 'tests', 'e2e-tests']

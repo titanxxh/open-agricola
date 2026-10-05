@@ -23,7 +23,12 @@ class FakeWebSocket {
   }
 
   send(raw: string) {
-    this.sent.push(JSON.parse(raw) as Record<string, unknown>)
+    const command = JSON.parse(raw) as Record<string, unknown>
+    if (command.type === 'getCommandScope') {
+      queueMicrotask(() => this.emit({ type: 'commandScope', scope: { scopeId: '01800000-0000-4000-8000-000000000001', expiresAt: Date.now() + 86400000 } }))
+      return
+    }
+    this.sent.push(command)
   }
 
   close() {
@@ -74,7 +79,7 @@ describe('WsGameTransport request correlation', () => {
 
   it('sends request ids and only resolves the matching pending command', async () => {
     const { WsGameTransport } = await import('../gameTransport')
-    const transport = new WsGameTransport('ws://test')
+    const transport = new WsGameTransport('ws://test', undefined, undefined, { route: false })
     await transport.connect()
 
     const socket = FakeWebSocket.instances[0]!
@@ -98,14 +103,14 @@ describe('WsGameTransport request correlation', () => {
     await expect(secondPromise).resolves.toMatchObject({ historyLength: 2 })
 
     socket.emit(buildEnvelope(String(socket.sent[0]?.requestId), 1))
-    await expect(firstPromise).resolves.toMatchObject({ historyLength: 1 })
+    await expect(firstPromise).resolves.toMatchObject({ historyLength: 2 })
 
     transport.destroy()
   })
 
   it('requests an unredacted snapshot for developer state saves', async () => {
     const { WsGameTransport } = await import('../gameTransport')
-    const transport = new WsGameTransport('ws://test')
+    const transport = new WsGameTransport('ws://test', undefined, undefined, { route: false })
     await transport.connect()
 
     const socket = FakeWebSocket.instances[0]!
@@ -119,7 +124,7 @@ describe('WsGameTransport request correlation', () => {
 
   it('switches its room reference from each authoritative state envelope', async () => {
     const { WsGameTransport } = await import('../gameTransport')
-    const transport = new WsGameTransport('ws://test', 'old-room')
+    const transport = new WsGameTransport('ws://test', 'old-room', undefined, { route: false })
     const listener = vi.fn()
     transport.onSnapshot(listener)
     await transport.connect()
@@ -134,7 +139,7 @@ describe('WsGameTransport request correlation', () => {
 
   it('reports room persistence pause and resume events', async () => {
     const { WsGameTransport } = await import('../gameTransport')
-    const transport = new WsGameTransport('ws://test', 'room-1')
+    const transport = new WsGameTransport('ws://test', 'room-1', undefined, { route: false })
     await transport.connect()
 
     const socket = FakeWebSocket.instances[0]!
@@ -149,7 +154,7 @@ describe('WsGameTransport request correlation', () => {
 
   it('sends dedicated dev commands for setResources and setRound', async () => {
     const { WsGameTransport } = await import('../gameTransport')
-    const transport = new WsGameTransport('ws://test')
+    const transport = new WsGameTransport('ws://test', undefined, undefined, { route: false })
     await transport.connect()
 
     const socket = FakeWebSocket.instances[0]!
@@ -177,7 +182,7 @@ describe('WsGameTransport request correlation', () => {
 
   it('threads optional payload into choice msg', async () => {
     const { WsGameTransport } = await import('../gameTransport')
-    const transport = new WsGameTransport('ws://test')
+    const transport = new WsGameTransport('ws://test', undefined, undefined, { route: false })
     await transport.connect()
 
     const socket = FakeWebSocket.instances[0]!
@@ -198,7 +203,7 @@ describe('WsGameTransport request correlation', () => {
 
   it('omits payload field when not provided in choice msg', async () => {
     const { WsGameTransport } = await import('../gameTransport')
-    const transport = new WsGameTransport('ws://test')
+    const transport = new WsGameTransport('ws://test', undefined, undefined, { route: false })
     await transport.connect()
 
     const socket = FakeWebSocket.instances[0]!
@@ -218,7 +223,7 @@ describe('WsGameTransport request correlation', () => {
 
   it('sends draftSubmit with playerId and pick payload', async () => {
     const { WsGameTransport } = await import('../gameTransport')
-    const transport = new WsGameTransport('ws://test')
+    const transport = new WsGameTransport('ws://test', undefined, undefined, { route: false })
     await transport.connect()
 
     const socket = FakeWebSocket.instances[0]!
@@ -240,7 +245,7 @@ describe('WsGameTransport request correlation', () => {
 
   it('sends parentSubmit with playerIndex and selection payload', async () => {
     const { WsGameTransport } = await import('../gameTransport')
-    const transport = new WsGameTransport('ws://test')
+    const transport = new WsGameTransport('ws://test', undefined, undefined, { route: false })
     await transport.connect()
 
     const socket = FakeWebSocket.instances[0]!
@@ -262,7 +267,7 @@ describe('WsGameTransport request correlation', () => {
 
   it('sends ordinaryDrawKeep with playerIndex, choiceId, and keepCardId', async () => {
     const { WsGameTransport } = await import('../gameTransport')
-    const transport = new WsGameTransport('ws://test')
+    const transport = new WsGameTransport('ws://test', undefined, undefined, { route: false })
     await transport.connect()
 
     const socket = FakeWebSocket.instances[0]!
@@ -284,7 +289,7 @@ describe('WsGameTransport request correlation', () => {
 
   it('sends Farmers of the Moor special actions as dedicated specialAction commands', async () => {
     const { WsGameTransport } = await import('../gameTransport')
-    const transport = new WsGameTransport('ws://test')
+    const transport = new WsGameTransport('ws://test', undefined, undefined, { route: false })
     await transport.connect()
 
     const socket = FakeWebSocket.instances[0]!

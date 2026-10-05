@@ -6,7 +6,7 @@ import { InMemoryRoomPersistence } from '../persistence/memory-adapter.ts'
 import { buildGameResult, createRoomPersistenceCheckpoint } from '../room-persistence-checkpoint.ts'
 
 const room = (id = 'r1'): Room => {
-  const session = new GameSession()
+  const session = new GameSession(961, undefined, { playerCount: 2 })
   return {
     id,
     session,
@@ -20,31 +20,6 @@ const room = (id = 'r1'): Room => {
     version: 0,
     status: 'waiting',
     createdBy: 'u1',
-  }
-}
-
-const schedulerHarness = () => {
-  type Timer = { callback: () => void; delay: number }
-  const timers = new Set<Timer>()
-  const scheduler = {
-    setTimeout: vi.fn((callback: () => void, delay: number) => {
-      const timer = { callback, delay }
-      timers.add(timer)
-      return timer
-    }),
-    clearTimeout: vi.fn((handle: unknown) => {
-      timers.delete(handle as Timer)
-    }),
-  }
-  return {
-    scheduler,
-    pending: () => timers.size,
-    tick: () => {
-      const timer = timers.values().next().value
-      if (!timer) return
-      timers.delete(timer)
-      timer.callback()
-    },
   }
 }
 
@@ -62,269 +37,55 @@ describe('Room Persistence Checkpoint', () => {
     expect(result.players[0]!.nameIsDefault).not.toBe(true)
     expect(result.players[1]).toMatchObject({ displayName: 'Player 2', nameIsDefault: true })
   })
-  it('persists creation state immediately while delaying later state serialization', () => {
+  it('waits for durable creation and propagates a failed write', async () => {
     const persistence = new InMemoryRoomPersistence()
-    const save = vi.spyOn(persistence, 'save')
-    const clock = schedulerHarness()
-    const checkpoint = createRoomPersistenceCheckpoint({
-      persistence,
-      scheduler: clock.scheduler,
-    })
+    const save = persistence.save.bind(persistence)
+    let release!: () => void
+    const gate = new Promise<void>(resolve => { release = resolve })
+    vi.spyOn(persistence, 'save').mockImplementationOnce(async (...args) => { await gate; save(...args) })
+    const checkpoint = createRoomPersistenceCheckpoint({ persistence })
     const r = room()
-    r.session = new GameSession(undefined, undefined, {
-      playerCount: 2,
-      enableCommunityDeck: true,
-      draftMode: 'simultaneous',
-      draftPoolSize: 8,
-    })
-    r.draftParents = false
-
-    checkpoint.recordCreated(r)
-    expect(save).toHaveBeenCalledOnce()
-    expect(save).toHaveBeenLastCalledWith('r1', expect.any(Object), expect.objectContaining({ status: 'waiting' }))
-    expect(persistence.load('r1')?.serialized).not.toBeNull()
-    expect(snapshotToRoom(persistence.load('r1')!).session.state).toMatchObject({
-      enableCommunityDeck: true,
-      draftMode: 'simultaneous',
-      draftPoolSize: 8,
-    })
-    expect(clock.pending()).toBe(0)
-
-    r.status = 'playing'
-    checkpoint.recordMeta(r)
-    expect(save).toHaveBeenCalledTimes(2)
-    expect(save).toHaveBeenLastCalledWith('r1', null, expect.objectContaining({ status: 'playing' }))
-
-    checkpoint.recordState(r)
-    expect(clock.pending()).toBe(1)
-    clock.tick()
-    expect(save).toHaveBeenCalledTimes(3)
-    expect(persistence.load('r1')?.serialized).not.toBeNull()
-    expect(snapshotToRoom(persistence.load('r1')!).draftParents).toBe(false)
+    let complete = false
+    const pending = checkpoint.recordCreated(r).then(() => { complete = true })
+    await Promise.resolve()
+    expect(complete).toBe(false)
+    expect(persistence.load(r.id)).toBeNull()
+    release()
+    await pending
+    expect(snapshotToRoom(persistence.load(r.id)!).session.state.players).toHaveLength(2)
+    vi.spyOn(persistence, 'save').mockImplementationOnce(() => { throw new Error('database unavailable') })
+    await expect(checkpoint.recordMeta(r)).rejects.toThrow('database unavailable')
   })
 
-  it('coalesces rapid updates and saves the latest authoritative state once', () => {
+  it('durably saves waiting-room names without changing the authoritative version', async () => {
     const persistence = new InMemoryRoomPersistence()
-    const save = vi.spyOn(persistence, 'save')
-    const clock = schedulerHarness()
-    const checkpoint = createRoomPersistenceCheckpoint({
-      persistence,
-      scheduler: clock.scheduler,
-    })
+    const checkpoint = createRoomPersistenceCheckpoint({ persistence })
     const r = room()
-
-    checkpoint.recordState(r)
-    r.session.state.rngTick = 1
-    checkpoint.recordState(r)
-    r.session.state.rngTick = 2
-    checkpoint.recordState(r)
-
-    expect(save).not.toHaveBeenCalled()
-    expect(clock.scheduler.setTimeout).toHaveBeenCalledOnce()
-    expect(clock.scheduler.setTimeout).toHaveBeenCalledWith(expect.any(Function), 1000)
-    clock.tick()
-    expect(save).toHaveBeenCalledOnce()
-    expect(save.mock.calls[0]?.[1]?.state).toMatchObject({ rngTick: 2 })
+    await checkpoint.recordCreated(r)
+    r.session.updatePlayerName(0, 'Renamed')
+    await checkpoint.recordMeta(r)
+    expect(persistence.load(r.id)?.serialized?.state.players[0]?.name).toBe('Renamed')
+    expect(r.version).toBe(0)
   })
 
-  it('flushes multiple dirty rooms from one scheduler tick', () => {
+  it('prevents retired rooms or stopped checkpoints from saving again', async () => {
     const persistence = new InMemoryRoomPersistence()
-    const save = vi.spyOn(persistence, 'save')
-    const clock = schedulerHarness()
-    const checkpoint = createRoomPersistenceCheckpoint({
-      persistence,
-      scheduler: clock.scheduler,
-    })
-
-    checkpoint.recordState(room('r1'))
-    checkpoint.recordState(room('r2'))
-
-    expect(clock.scheduler.setTimeout).toHaveBeenCalledOnce()
-    clock.tick()
-    expect(save).toHaveBeenCalledTimes(2)
-    expect(save.mock.calls.map(([id]) => id).sort()).toEqual(['r1', 'r2'])
-  })
-
-  it('keeps an update that arrives during a flush dirty for the next tick', () => {
-    const persistence = new InMemoryRoomPersistence()
-    const originalSave = persistence.save.bind(persistence)
-    const clock = schedulerHarness()
-    const checkpoint = createRoomPersistenceCheckpoint({
-      persistence,
-      scheduler: clock.scheduler,
-    })
+    const checkpoint = createRoomPersistenceCheckpoint({ persistence })
     const r = room()
-    let saves = 0
-    vi.spyOn(persistence, 'save').mockImplementation((...args) => {
-      originalSave(...args)
-      saves += 1
-      if (saves === 1) {
-        r.session.state.rngTick = 2
-        checkpoint.recordState(r)
-      }
-    })
-
-    checkpoint.recordState(r)
-    clock.tick()
-    expect(saves).toBe(1)
-    expect(clock.pending()).toBe(1)
-
-    clock.tick()
-    expect(saves).toBe(2)
-    expect(persistence.load(r.id)?.serialized?.state).toMatchObject({ rngTick: 2 })
-  })
-
-  it('cancels stale writes for deleted and terminal rooms', () => {
-    const persistence = new InMemoryRoomPersistence()
-    const save = vi.spyOn(persistence, 'save')
-    const complete = vi.spyOn(persistence, 'complete')
-    const clock = schedulerHarness()
-    const checkpoint = createRoomPersistenceCheckpoint({
-      persistence,
-      scheduler: clock.scheduler,
-      now: () => 123,
-    })
-    const deleted = room('deleted')
-    const finished = room('finished')
-    finished.startedAt = 1
-    finished.session.state.gameOver = true
-
-    checkpoint.recordState(deleted)
-    checkpoint.discardRoom(deleted.id)
-    checkpoint.flushRoom(deleted)
-    checkpoint.recordState(deleted)
-    checkpoint.recordState(finished)
-    checkpoint.completeGame(finished)
-    checkpoint.flushRoom(finished)
-    checkpoint.recordState(finished)
-    clock.tick()
-
-    expect(save).toHaveBeenCalledOnce()
-    expect(complete).toHaveBeenCalledWith(expect.objectContaining({
-      roomId: 'finished',
-      startedAt: 1,
-      finishedAt: 123,
-      playerCount: 2,
-    }))
-    expect(clock.pending()).toBe(0)
+    await checkpoint.recordCreated(r)
+    await checkpoint.discardRoom(r.id)
+    expect(persistence.load(r.id)).toBeNull()
+    await expect(checkpoint.recordMeta(r)).rejects.toThrow('no longer writable')
+    checkpoint.shutdown()
+    await expect(checkpoint.recordCreated(room('new'))).rejects.toThrow('no longer writable')
   })
 
   it('archives final scores produced by the custom session worker', () => {
-    const persistence = new InMemoryRoomPersistence()
-    const checkpoint = createRoomPersistenceCheckpoint({ persistence })
     const finished = room('finished')
     finished.startedAt = 10
     finished.session.state.gameOver = true
-    const workerScores = finished.session.getState().scores!.map((score, index) => ({
-      ...score,
-      total: 100 + index,
-    }))
-    finished.customSessionExecutor = {
-      scoresForPersistence: () => workerScores,
-    } as never
-
-    expect(checkpoint.completeGame(finished, 20).ok).toBe(true)
-    expect(persistence.__getResultForTest('finished')?.players.map((player) => player.score))
-      .toEqual([100, 101])
-  })
-
-  it('flushes all dirty rooms and disposes the timer on shutdown', () => {
-    const persistence = new InMemoryRoomPersistence()
-    const save = vi.spyOn(persistence, 'save')
-    const clock = schedulerHarness()
-    const checkpoint = createRoomPersistenceCheckpoint({
-      persistence,
-      scheduler: clock.scheduler,
-    })
-
-    checkpoint.recordState(room('r1'))
-    checkpoint.recordState(room('r2'))
-    checkpoint.shutdown()
-
-    expect(save).toHaveBeenCalledTimes(2)
-    expect(clock.pending()).toBe(0)
-    checkpoint.recordState(room('r3'))
-    checkpoint.flushAll()
-    expect(save).toHaveBeenCalledTimes(2)
-  })
-
-  it('filters dirty saves without filtering discard checkpoints', () => {
-    const persistence = new InMemoryRoomPersistence()
-    const save = vi.spyOn(persistence, 'save')
-    const discard = vi.spyOn(persistence, 'discard')
-    const checkpoint = createRoomPersistenceCheckpoint({
-      persistence,
-      shouldPersist: (r) => r.id === 'dev2',
-    })
-
-    checkpoint.recordCreated(room('r1'))
-    checkpoint.flushAll()
-    expect(save).not.toHaveBeenCalled()
-
-    checkpoint.discardRoom('r1')
-    expect(discard).toHaveBeenCalledWith('r1')
-    checkpoint.shutdown()
-  })
-
-  it('retries a failed completion without another state update', () => {
-    const persistence = new InMemoryRoomPersistence()
-    const complete = vi.spyOn(persistence, 'complete')
-      .mockReturnValueOnce({ ok: false, error: 'write failed' })
-    const save = vi.spyOn(persistence, 'save')
-    const clock = schedulerHarness()
-    const checkpoint = createRoomPersistenceCheckpoint({
-      persistence,
-      scheduler: clock.scheduler,
-    })
-    const finished = room('finished')
-    finished.startedAt = 10
-    finished.session.state.gameOver = true
-
-    expect(checkpoint.completeGame(finished, 20)).toEqual({ ok: false, error: 'write failed' })
-    expect(persistence.load('finished')?.serialized?.state.gameOver).toBe(true)
-    expect(clock.pending()).toBe(1)
-    clock.tick()
-
-    expect(save).toHaveBeenCalledTimes(2)
-    expect(complete).toHaveBeenCalledTimes(2)
-    expect(persistence.__getResultForTest('finished')).toBeDefined()
-    expect(clock.pending()).toBe(0)
-    checkpoint.shutdown()
-  })
-
-  it('does not write when no room is dirty', () => {
-    const persistence = new InMemoryRoomPersistence()
-    const save = vi.spyOn(persistence, 'save')
-    const checkpoint = createRoomPersistenceCheckpoint({ persistence })
-
-    checkpoint.flushAll()
-
-    expect(save).not.toHaveBeenCalled()
-    checkpoint.shutdown()
-  })
-
-  it('contains immediate save failures and retries them later', () => {
-    const persistence = new InMemoryRoomPersistence()
-    const originalSave = persistence.save.bind(persistence)
-    const save = vi.spyOn(persistence, 'save')
-      .mockImplementationOnce(() => { throw new Error('write failed') })
-      .mockImplementationOnce(() => { throw new Error('write failed') })
-      .mockImplementationOnce(() => { throw new Error('write failed') })
-      .mockImplementation(originalSave)
-    const clock = schedulerHarness()
-    const checkpoint = createRoomPersistenceCheckpoint({
-      persistence,
-      scheduler: clock.scheduler,
-    })
-    const r = room()
-
-    expect(() => checkpoint.recordCreated(r)).not.toThrow()
-    expect(() => checkpoint.recordMeta(r)).not.toThrow()
-    expect(() => checkpoint.flushRoom(r)).not.toThrow()
-    expect(clock.pending()).toBe(1)
-    clock.tick()
-
-    expect(save).toHaveBeenCalledTimes(4)
-    expect(persistence.load(r.id)?.serialized).not.toBeNull()
+    const workerScores = finished.session.getState().scores!.map((score, index) => ({ ...score, total: 100 + index }))
+    finished.customSessionExecutor = { scoresForPersistence: () => workerScores } as never
+    expect(buildGameResult(finished, 20).players.map(player => player.score)).toEqual([100, 101])
   })
 })

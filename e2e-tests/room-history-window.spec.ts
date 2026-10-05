@@ -11,9 +11,30 @@ const snapshot = (page: Page) => page.evaluate(() => (window as AuditWindow).aud
 let sequence = 0
 const command = async (page: Page, body: Record<string, unknown>) => {
   const requestId = `history-e2e-${++sequence}`
-  await page.evaluate(({ body, requestId }) => (window as AuditWindow).auditSocket.send(JSON.stringify({ ...body, requestId })), { body, requestId })
-  await expect.poll(() => page.evaluate(id => (window as AuditWindow).auditMessages.some(message => 'requestId' in message && message.requestId === id), requestId)).toBe(true)
-  const result = await page.evaluate(id => (window as AuditWindow).auditMessages.find(message => 'requestId' in message && message.requestId === id), requestId)
+  await page.evaluate(async ({ body, requestId }) => {
+    const audit = window as AuditWindow
+    const scopeRequest = `${requestId}-scope`
+    const scoped = new Promise<Extract<ServerEvent, { type: 'commandScope' }>>((resolve, reject) => {
+      const timeout = setTimeout(() => { audit.auditSocket.removeEventListener('message', receive); reject(new Error('Scope timeout')) }, 5000)
+      const receive = (event: MessageEvent) => {
+        const message = JSON.parse(event.data) as ServerEvent
+        if (!('requestId' in message) || message.requestId !== scopeRequest) return
+        clearTimeout(timeout); audit.auditSocket.removeEventListener('message', receive)
+        if (message.type === 'commandScope') resolve(message)
+        else reject(new Error(JSON.stringify(message)))
+      }
+      audit.auditSocket.addEventListener('message', receive)
+    })
+    audit.auditSocket.send(JSON.stringify({ type: 'getCommandScope', requestId: scopeRequest }))
+    const { scope } = await scoped
+    const state = audit.auditMessages.findLast(message => message.type === 'stateUpdate')
+    audit.auditSocket.send(JSON.stringify({ ...body, requestId, commandContext: {
+      scopeId: scope.scopeId, commandId: crypto.randomUUID(), roomId: state?.roomId,
+      expectedVersion: state?.version, inputWindowId: state?.inputWindow?.id,
+    } }))
+  }, { body, requestId })
+  await expect.poll(() => page.evaluate(id => (window as AuditWindow).auditMessages.some(message => (message.type === 'stateUpdate' || message.type === 'error') && message.requestId === id), requestId)).toBe(true)
+  const result = await page.evaluate(id => (window as AuditWindow).auditMessages.find(message => (message.type === 'stateUpdate' || message.type === 'error') && message.requestId === id), requestId)
   expect(result?.type, JSON.stringify(result)).toBe('stateUpdate')
   if (result?.type === 'stateUpdate') expect(result.payload.ok, result.payload.error).toBe(true)
 }

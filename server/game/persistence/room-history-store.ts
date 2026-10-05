@@ -1,6 +1,6 @@
 import { applyReplayDelta, createReplayDelta, frameHash, type JsonValue, type ReplayDeltaOperation } from '../replay-codec'
 import { createHash } from 'node:crypto'
-import type Database from 'better-sqlite3'
+import type { PostgresDatabase as Database } from '../../database/postgres'
 import { historyBranch, materializeHistoryBranch, recoveryRecordId, registerRecoveryRecordId, registerRestoredHistoryNode, historyStreamKeys, type HistoryNode, type HistoryRecordIdentity, type HistoryStreamKind } from '../../../shared/session/history-streams'
 import type { PersistedSessionSnapshot } from '../../../shared/session/serialization'
 import type { HistoryEntry, SessionPrivateCursor, SessionCommandCheckpoint } from '../../../shared/session/session-core'
@@ -38,14 +38,18 @@ export class RoomHistoryStore {
   private readonly select
   private readonly insertRecovery
   private readonly selectRecovery
+  private readonly selectMany
+  private readonly selectRecoveryMany
   private readonly durable = new Map<string, Set<string>>()
-  constructor(db: Pick<Database.Database, 'prepare'>) {
+  constructor(db: Pick<Database, 'prepare'>) {
     this.insert = db.prepare(`INSERT INTO room_history_nodes (room_id, node_id, kind, previous_id, length, record_json, identity_json, checksum)
       VALUES (@roomId, @node_id, @kind, @previous_id, @length, @record_json, @identity_json, @checksum) ON CONFLICT(room_id, node_id) DO NOTHING`)
-    this.select = db.prepare('SELECT node_id, kind, previous_id, length, record_json, identity_json, checksum FROM room_history_nodes WHERE room_id = ? AND node_id = ?')
+    this.select = db.prepare('SELECT node_id, kind, previous_id, length, record_json, identity_json, checksum FROM room_history_nodes WHERE room_id = ?')
     this.insertRecovery = db.prepare(`INSERT INTO room_recovery_nodes (room_id, node_id, kind, body_json, checksum)
       VALUES (@roomId, @node_id, @kind, @body_json, @checksum) ON CONFLICT(room_id, node_id) DO NOTHING`)
-    this.selectRecovery = db.prepare('SELECT kind, body_json, checksum FROM room_recovery_nodes WHERE room_id = ? AND node_id = ?')
+    this.selectRecovery = db.prepare('SELECT node_id, kind, body_json, checksum FROM room_recovery_nodes WHERE room_id = ?')
+    this.selectMany = db.prepare('SELECT room_id, node_id, kind, previous_id, length, record_json, identity_json, checksum FROM room_history_nodes WHERE room_id = ANY(?::text[])')
+    this.selectRecoveryMany = db.prepare('SELECT room_id, node_id, kind, body_json, checksum FROM room_recovery_nodes WHERE room_id = ANY(?::text[])')
   }
   prepare(roomId: string, snapshot: PersistedSessionSnapshot, expectedFrameHash?: string): PackedRoomSnapshot {
     if (!('state' in snapshot)) return { json: JSON.stringify(snapshot), nodes: [], recoveryNodes: [] }
@@ -100,7 +104,7 @@ export class RoomHistoryStore {
     } }
 
     const lastFrame = snapshot.sessionCursor.engineStackCursor?.frames.at(-1)
-    // The lobby reads only these turn fields directly with SQLite json_extract.
+    // The lobby reads only these turn fields directly with PostgreSQL JSON operators.
     // Recovery always uses the complete encoded body, never this query projection.
     const queryFields = {
       state: {
@@ -116,14 +120,14 @@ export class RoomHistoryStore {
     }
     return { json: encodeRoomBody(JSON.stringify(stored), queryFields), nodes, recoveryNodes }
   }
-  write(roomId: string, nodes: HistoryNode[], recoveryNodes: RecoveryNode[] = []): void {
+  async write(roomId: string, nodes: HistoryNode[], recoveryNodes: RecoveryNode[] = []): Promise<Awaited<void>> {
     for (const node of nodes) {
       const row = { node_id: node.id, kind: node.kind, previous_id: node.previous?.id ?? null, length: node.length, record_json: JSON.stringify(node.value), identity_json: JSON.stringify(node.identity) }
-      this.insert.run({ roomId, ...row, checksum: checksum(row) })
+      ;(await this.insert.run({ roomId, ...row, checksum: checksum(row) }))
     }
     for (const node of recoveryNodes) {
       const row = { node_id: node.id, kind: node.kind, body_json: node.json }
-      this.insertRecovery.run({ roomId, ...row, checksum: checksum(row) })
+      ;(await this.insertRecovery.run({ roomId, ...row, checksum: checksum(row) }))
     }
   }
   accept(roomId: string, nodes: HistoryNode[], recoveryNodes: RecoveryNode[] = []): void {
@@ -133,13 +137,41 @@ export class RoomHistoryStore {
     this.durable.set(roomId, known)
   }
   forget(roomId: string): void { this.durable.delete(roomId) }
-  restore(roomId: string, json: string): PersistedSessionSnapshot {
-    try { return this.restoreRecords(roomId, json) } catch (error) {
+  async restore(roomId: string, json: string): Promise<PersistedSessionSnapshot> {
+    try {
+      const [nodes, recovery] = await Promise.all([
+        this.select.all<NodeRow>(roomId),
+        this.selectRecovery.all<{ node_id: string; kind: string; body_json: string; checksum: string }>(roomId),
+      ])
+      return this.restoreRecords(roomId, json, new Map(nodes.map(row => [row.node_id, row])), new Map(recovery.map(row => [row.node_id, row])))
+    } catch (error) {
       if (error instanceof RoomHistoryCorruptionError) throw error
       throw new RoomHistoryCorruptionError(`Invalid Room recovery for ${roomId}`, { cause: error })
     }
   }
-  private restoreRecords(roomId: string, json: string): PersistedSessionSnapshot {
+  /** Read all owned recovery records in two queries, without per-room round trips. */
+  async restoreMany(roomIds: string[]): Promise<(roomId: string, json: string) => PersistedSessionSnapshot> {
+    const nodes = new Map<string, Map<string, NodeRow>>()
+    const recovery = new Map<string, Map<string, { node_id: string; kind: string; body_json: string; checksum: string }>>()
+    if (roomIds.length) {
+      const [historyRows, recoveryRows] = await Promise.all([
+        this.selectMany.all<NodeRow & { room_id: string }>(roomIds),
+        this.selectRecoveryMany.all<{ room_id: string; node_id: string; kind: string; body_json: string; checksum: string }>(roomIds),
+      ])
+      for (const { room_id, ...row } of historyRows) {
+        const group = nodes.get(room_id) ?? new Map()
+        group.set(row.node_id, row)
+        nodes.set(room_id, group)
+      }
+      for (const { room_id, ...row } of recoveryRows) {
+        const group = recovery.get(room_id) ?? new Map()
+        group.set(row.node_id, row)
+        recovery.set(room_id, group)
+      }
+    }
+    return (roomId, json) => this.restoreRecords(roomId, json, nodes.get(roomId) ?? new Map(), recovery.get(roomId) ?? new Map())
+  }
+  private restoreRecords(roomId: string, json: string, nodes: Map<string, NodeRow>, recovery: Map<string, { kind: string; body_json: string; checksum: string }>): PersistedSessionSnapshot {
     const stored = parseRoomBody(json) as StoredSnapshot | PersistedSessionSnapshot
     if (!('roomHistoryVersion' in stored)) return stored
     if (stored.roomHistoryVersion !== 1 && stored.roomHistoryVersion !== 2) throw new RoomHistoryCorruptionError(`Unsupported Room history for ${roomId}`)
@@ -161,7 +193,7 @@ export class RoomHistoryStore {
           while (id && !cache.has(id)) {
             if (seen.has(id)) throw new RoomHistoryCorruptionError(`Cyclic Room history for ${roomId}`)
             seen.add(id)
-            const row = this.select.get(roomId, id) as NodeRow | undefined
+            const row = nodes.get(id)
             if (!row) throw new RoomHistoryCorruptionError(`Missing Room history ${roomId}/${id}`)
             const { checksum: saved, ...raw } = row
             if (row.kind !== reference.kind || checksum(raw) !== saved) throw new RoomHistoryCorruptionError(`Corrupt Room history ${roomId}/${id}`)
@@ -188,7 +220,7 @@ export class RoomHistoryStore {
     const restoreUndo = (id: string): HistoryEntry => {
       const cached = undoCache.get(id)
       if (cached) return cached
-      const row = this.selectRecovery.get(roomId, id) as { kind: string; body_json: string; checksum: string } | undefined
+      const row = recovery.get(id)
       if (!row || row.kind !== 'undo' || row.checksum !== checksum({ node_id: id, kind: row.kind, body_json: row.body_json })) throw new RoomHistoryCorruptionError(`Missing or corrupt Room undo ${roomId}/${id}`)
       const body = parseRoomBody(row.body_json) as Omit<HistoryEntry, 'state'> & { state: StoredState }
       const entry = { ...body, state: restoreState(body.state) } as HistoryEntry
@@ -201,7 +233,7 @@ export class RoomHistoryStore {
     const restoreCheckpoint = (id: string): SessionCommandCheckpoint => {
       const cached = checkpointCache.get(id)
       if (cached) return cached
-      const row = this.selectRecovery.get(roomId, id) as { kind: string; body_json: string; checksum: string } | undefined
+      const row = recovery.get(id)
       if (!row || row.kind !== 'checkpoint' || row.checksum !== checksum({ node_id: id, kind: row.kind, body_json: row.body_json })) throw new RoomHistoryCorruptionError(`Missing or corrupt Room checkpoint ${roomId}/${id}`)
       const { state, undoHistory, ...body } = parseRoomBody(row.body_json) as Omit<SessionCommandCheckpoint, 'state' | 'history'> & { state: StoredState; undoHistory: string[] }
       const checkpoint = { ...body, state: restoreState(state), history: undoHistory.map(restoreUndo) } as SessionCommandCheckpoint

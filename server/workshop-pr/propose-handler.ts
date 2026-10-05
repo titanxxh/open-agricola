@@ -1,7 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { createHash } from 'node:crypto'
-import { readFileSync, existsSync } from 'node:fs'
-import { join } from 'node:path'
+import { getResources } from '../storage/runtime'
 import { nanoid } from 'nanoid'
 import { getDb } from '../db.ts'
 import { ALL_CARD_IMPLS } from '../../shared/cards/register-all.ts'
@@ -90,60 +89,60 @@ type ReviewBinding = {
   updatedAt: number
 }
 
-const loadReviewBinding = (
+const loadReviewBinding = async (
   db: ReturnType<typeof getDb>,
   cardId: string,
   prUrl: string,
-): ReviewBinding | undefined => db.prepare(`
+): Promise<Awaited<ReviewBinding | undefined>> => (await db.prepare(`
   SELECT id,
          draft_revision AS revision,
-         approved_commit_sha AS approvedCommitSha,
-         approved_version_id AS approvedVersionId,
-         review_commit_sha AS reviewCommitSha,
-         review_version_id AS reviewVersionId,
-         updated_at AS updatedAt
+         approved_commit_sha AS "approvedCommitSha",
+         approved_version_id AS "approvedVersionId",
+         review_commit_sha AS "reviewCommitSha",
+         review_version_id AS "reviewVersionId",
+         updated_at AS "updatedAt"
   FROM workshop_cards
   WHERE id = ? AND github_pr_url = ?
-`).get(cardId, prUrl) as ReviewBinding | undefined
+`).get(cardId, prUrl)) as ReviewBinding | undefined
 
-const reconcileReviewSnapshot = (
+const reconcileReviewSnapshot = async (
   db: ReturnType<typeof getDb>,
   prUrl: string,
   snapshot: WorkshopReviewSnapshot,
   expectedBinding: ReviewBinding,
-): number => {
+): Promise<Awaited<number>> => {
   if (snapshot.headRefOid !== expectedBinding.reviewCommitSha) {
-    return invalidateReviewedCard(db, {
+    return (await invalidateReviewedCard(db, {
       prUrl,
       prStatus: githubPrStatus(snapshot),
       expectedBinding,
-    })
+    }))
   }
   const approvedReview = findApprovedHeadReview(snapshot)
     ?? findApprovedMergedHeadReview(snapshot)
   if (approvedReview) {
-    const approved = approveReviewedVersion(db, {
+    const approved = (await approveReviewedVersion(db, {
       prUrl,
       commitSha: snapshot.headRefOid,
       reviewId: approvedReview.id,
       expectedBinding,
-    })
+    }))
     // Both the approval and merge webhooks may have been missed: the snapshot
     // already reads MERGED. Graduate right here — approveReviewedVersion just
     // reset github_pr_status to 'open', so reconcilePendingMerges would never
     // see this row as pending.
     if (approved > 0 && snapshot.state === 'MERGED') {
-      markCardMerged(db, { prUrl })
+      ;(await markCardMerged(db, { prUrl }))
     }
     return approved
   }
   return expectedBinding.approvedVersionId !== null
     || breaksReviewGateWithoutApproval(snapshot)
-    ? invalidateReviewedCard(db, {
+    ? (await invalidateReviewedCard(db, {
         prUrl,
         prStatus: githubPrStatus(snapshot),
         expectedBinding,
-      })
+      }))
     : 0
 }
 
@@ -185,19 +184,19 @@ export async function handleSubmitReviewRequest(
     return
   }
 
-  const user = validateSession(extractToken(req.headers.authorization))
+  const user = (await validateSession(extractToken(req.headers.authorization)))
   if (!user) {
     sendJson(res, 401, { ok: false, error: 'unauthenticated' })
     return
   }
 
   const db = getDb()
-  const wcard = db.prepare(
+  const wcard = (await db.prepare(
     `SELECT c.*, u.username AS author_name
      FROM workshop_cards c
      LEFT JOIN users u ON u.id = c.author_id
      WHERE c.id = ?`,
-  ).get(cardDbId) as WorkshopCardRow | undefined
+  ).get(cardDbId)) as WorkshopCardRow | undefined
 
   if (!wcard) {
     sendJson(res, 404, { ok: false, error: 'card not found' })
@@ -218,7 +217,7 @@ export async function handleSubmitReviewRequest(
     })
     return
   }
-  const readiness = getHandoffReadiness(db, cardDbId, user.id)
+  const readiness = (await getHandoffReadiness(db, cardDbId, user.id))
   if (!readiness.ready) {
     sendJson(res, 400, {
       ok: false,
@@ -228,7 +227,7 @@ export async function handleSubmitReviewRequest(
     })
     return
   }
-  if (!hasCompleteZhLocale(loadWorkspace(db, cardDbId, user.id).draft.cardJson)) {
+  if (!hasCompleteZhLocale((await loadWorkspace(db, cardDbId, user.id)).draft.cardJson)) {
     sendJson(res, 400, {
       ok: false,
       code: 'localization_not_ready',
@@ -236,7 +235,7 @@ export async function handleSubmitReviewRequest(
     })
     return
   }
-  if (hasReservedCardId(db, wcard.card_id, cardDbId)) {
+  if ((await hasReservedCardId(db, wcard.card_id, cardDbId))) {
     sendJson(res, 409, {
       ok: false,
       code: 'card_id_taken',
@@ -263,13 +262,13 @@ export async function handleSubmitReviewRequest(
       return
     }
     const prUrl = '/mock-workshop-pr/1'
-    enterReview(db, {
+    ;(await enterReview(db, {
       cardId: cardDbId,
       authorId: user.id,
       prUrl,
       expectedRevision: wcard.draft_revision,
       commitSha: 'mock-workshop-head',
-    })
+    }))
     sendJson(res, 200, { ok: true, prUrl, prNumber: 1 })
     return
   }
@@ -280,9 +279,9 @@ export async function handleSubmitReviewRequest(
   }
 
   const now = Date.now()
-  const rate = db.prepare(
+  const rate = (await db.prepare(
     `SELECT last_propose_at FROM github_propose_rate_limit WHERE user_id = ?`,
-  ).get(user.id) as { last_propose_at: number } | undefined
+  ).get(user.id)) as { last_propose_at: number } | undefined
   if (rate && now - rate.last_propose_at < RATE_LIMIT_MS) {
     const retryAfter = Math.ceil((RATE_LIMIT_MS - (now - rate.last_propose_at)) / 1000)
     sendJson(res, 429, { ok: false, code: 'rate_limited', retryAfter })
@@ -293,26 +292,36 @@ export async function handleSubmitReviewRequest(
 
   // ── Phase 1: allocate handshake, return needsAuth ──
   if (!body.handshakeId) {
-    const hs = tokenCache.allocateHandshakeId(user.id)
+    const hs = (await tokenCache.allocateHandshakeId(user.id))
     const authUrl = `/api/workshop/github/oauth/start?hs=${encodeURIComponent(hs)}`
     sendJson(res, 200, { ok: false, needsAuth: true, authUrl, handshakeId: hs })
     return
   }
 
   // ── Phase 2: consume token, do the work ──
-  const creds = tokenCache.get(body.handshakeId)
+  const creds = await tokenCache.consume(body.handshakeId, user.id)
   if (!creds || creds.userId !== user.id) {
     sendJson(res, 200, { ok: false, code: 'handshake_expired' })
     return
   }
-  tokenCache.delete(body.handshakeId)
+
+  const reserved = await db.prepare(`
+    INSERT INTO github_propose_rate_limit (user_id, last_propose_at) VALUES (?, ?)
+    ON CONFLICT (user_id) DO UPDATE SET last_propose_at = excluded.last_propose_at
+    WHERE github_propose_rate_limit.last_propose_at <= ?
+    RETURNING user_id
+  `).get(user.id, now, now - RATE_LIMIT_MS)
+  if (!reserved) {
+    sendJson(res, 429, { ok: false, code: 'rate_limited', retryAfter: Math.ceil(RATE_LIMIT_MS / 1000) })
+    return
+  }
 
   const auditStartId = nanoid()
-  db.prepare(
+  ;(await db.prepare(
     `INSERT INTO github_propose_audit
       (id, user_id, workshop_card_id, action, created_at)
      VALUES (?, ?, ?, 'start', ?)`,
-  ).run(auditStartId, user.id, cardDbId, now)
+  ).run(auditStartId, user.id, cardDbId, now))
 
   try {
     const client = new GitHubClient({
@@ -329,7 +338,7 @@ export async function handleSubmitReviewRequest(
     const upstreamCatalogGenerated = await client.getUpstreamFile('shared/cards/catalog.generated.ts', upstreamBaseSha)
     const upstreamCommunityMd = await client.getUpstreamFile('docs/community_cards.md', upstreamBaseSha)
 
-    const artData = loadArtIfAny(wcard.art_url)
+    const artData = await loadArtIfAny(wcard.art_url)
 
     // v7 schema: TS source lives inside card_json under `_code`.
     let effectCode = ''
@@ -452,36 +461,36 @@ export async function handleSubmitReviewRequest(
       commitSha: commit2.commitSha,
     })
 
-    enterReview(db, {
+    ;(await enterReview(db, {
       cardId: cardDbId,
       authorId: user.id,
       prUrl: pr.url,
       expectedRevision: wcard.draft_revision,
       commitSha: commit2.commitSha,
-    })
-    const expectedBinding = loadReviewBinding(db, cardDbId, pr.url)!
+    }))
+    const expectedBinding = (await loadReviewBinding(db, cardDbId, pr.url))!
     let reconciliationPending = false
     try {
       const snapshot = await reviewProvider.getPullRequestSnapshot(pr.number)
-      reconcileReviewSnapshot(db, pr.url, snapshot, expectedBinding)
+      ;(await reconcileReviewSnapshot(db, pr.url, snapshot, expectedBinding))
     } catch {
       reconciliationPending = true
-      db.prepare(`
+      ;(await db.prepare(`
         UPDATE workshop_cards
         SET github_pr_last_synced_at = NULL
         WHERE id = ? AND github_pr_url = ? AND updated_at = ?
-      `).run(expectedBinding.id, pr.url, expectedBinding.updatedAt)
+      `).run(expectedBinding.id, pr.url, expectedBinding.updatedAt))
     }
-    db.prepare(
-      `INSERT OR REPLACE INTO github_propose_rate_limit
+    ;(await db.prepare(
+      `INSERT INTO github_propose_rate_limit
         (user_id, last_propose_at)
-       VALUES (?, ?)`,
-    ).run(user.id, now)
-    db.prepare(
+       VALUES (?, ?) ON CONFLICT (user_id) DO UPDATE SET last_propose_at = excluded.last_propose_at`,
+    ).run(user.id, now))
+    ;(await db.prepare(
       `INSERT INTO github_propose_audit
         (id, user_id, workshop_card_id, action, pr_url, created_at)
        VALUES (?, ?, ?, 'success', ?, ?)`,
-    ).run(nanoid(), user.id, cardDbId, pr.url, now)
+    ).run(nanoid(), user.id, cardDbId, pr.url, now))
 
     sendJson(res, 200, {
       ok: true,
@@ -493,7 +502,7 @@ export async function handleSubmitReviewRequest(
     const code = err instanceof GitHubApiError ? err.code : 'unknown'
     const status = err instanceof GitHubApiError ? err.status : undefined
     const message = err instanceof Error ? err.message : String(err)
-    db.prepare(
+    ;(await db.prepare(
       `INSERT INTO github_propose_audit
         (id, user_id, workshop_card_id, action, error_code, error_message, created_at)
        VALUES (?, ?, ?, 'fail', ?, ?, ?)`,
@@ -504,7 +513,7 @@ export async function handleSubmitReviewRequest(
       code,
       status ? `${message} (HTTP ${status})` : message,
       Date.now(),
-    )
+    ))
     sendJson(res, 200, { ok: false, code, message, ...(status ? { status } : {}) })
   }
 }
@@ -515,17 +524,17 @@ export async function handleRefreshPrStatus(
   cardDbId: string,
   reviewProvider?: ReviewProvider,
 ): Promise<void> {
-  const user = validateSession(extractToken(req.headers.authorization))
+  const user = (await validateSession(extractToken(req.headers.authorization)))
   if (!user) {
     sendJson(res, 401, { ok: false, error: 'unauthenticated' })
     return
   }
 
   const db = getDb()
-  const wcard = db.prepare(
+  const wcard = (await db.prepare(
     `SELECT github_pr_url, github_pr_last_synced_at, author_id
      FROM workshop_cards WHERE id = ?`,
-  ).get(cardDbId) as
+  ).get(cardDbId)) as
     | { github_pr_url: string | null; github_pr_last_synced_at: number | null; author_id: string }
     | undefined
   if (!wcard) {
@@ -563,30 +572,30 @@ export async function handleRefreshPrStatus(
     return
   }
   const prNum = Number(match[1])
-  const expectedBinding = loadReviewBinding(db, cardDbId, wcard.github_pr_url)!
+  const expectedBinding = (await loadReviewBinding(db, cardDbId, wcard.github_pr_url))!
 
   try {
     const snapshot = await reviewProvider.getPullRequestSnapshot(prNum)
     const status = githubPrStatus(snapshot)
-    const reconciled = reconcileReviewSnapshot(
+    const reconciled = (await reconcileReviewSnapshot(
       db,
       wcard.github_pr_url,
       snapshot,
       expectedBinding,
-    )
-    if (reconciled === 0) db.prepare(
+    ))
+    if (reconciled === 0) (await db.prepare(
       `UPDATE workshop_cards
        SET github_pr_status = ?, github_pr_last_synced_at = ?
        WHERE id = ? AND github_pr_url = ? AND updated_at = ?`,
-    ).run(status, now, cardDbId, wcard.github_pr_url, expectedBinding.updatedAt)
+    ).run(status, now, cardDbId, wcard.github_pr_url, expectedBinding.updatedAt))
     // A missed merge webhook is repaired here: once the PR reads as merged
     // and the approval binding exists, the pending graduation completes —
     // including the built-in takeover if the running release has the card.
     // The graduation may have happened inside reconcileReviewSnapshot (both
     // webhooks missed), so the takeover reconcile runs unconditionally.
     if (status === 'merged') {
-      reconcilePendingMerges(db)
-      markBuiltInMergedCards(db, Object.keys(ALL_CARD_IMPLS))
+      ;(await reconcilePendingMerges(db))
+      ;(await markBuiltInMergedCards(db, Object.keys(ALL_CARD_IMPLS)))
     }
 
     sendJson(res, 200, { ok: true, status })
@@ -598,17 +607,13 @@ export async function handleRefreshPrStatus(
   }
 }
 
-function loadArtIfAny(artUrl: string | null): { ext: string; buffer: Buffer } | null {
+async function loadArtIfAny(artUrl: string | null): Promise<{ ext: string; buffer: Buffer } | null> {
   if (!artUrl) return null
-  // art_url expected format: /card-art/{uuid}.{ext} → read from CARD_ART_DIR
-  const match = /\/card-art\/([^/]+\.([a-z0-9]+))$/i.exec(artUrl)
+  const match = /^\/card-art\/[A-Za-z0-9._-]+\.([a-z0-9]+)$/i.exec(artUrl)
   if (!match) return null
-  const filename = match[1]!
-  const ext = match[2]!.toLowerCase()
-  const dir = process.env.CARD_ART_DIR ?? join(process.cwd(), 'data', 'card-art')
-  const path = join(dir, filename)
-  if (!existsSync(path)) return null
-  return { ext, buffer: readFileSync(path) }
+  const object = await getResources().read(artUrl.slice(1))
+  if (!object) throw new Error('Card art is unavailable')
+  return { ext: match[1]!.toLowerCase(), buffer: object.body }
 }
 
 function buildCommitMessage(

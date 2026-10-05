@@ -1,15 +1,20 @@
+import { clientIp as getClientIp } from './client-ip'
+import { InvalidationStore } from './invalidation'
+import { SandboxAuthority } from './game/sandbox-authority'
+import { RoomDirectory } from './game/room-directory'
+import { CommandStore } from './game/command-store'
+import { discoverRoom } from './game/room-discovery'
+import type { RoomDiscoveryRequest } from '../shared/contract/protocol/routing'
+import { isUniqueViolation } from './database/errors'
+import { consumeRateLimit } from './database/rate-limit'
 import { createServer } from 'node:http'
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { writeFileSync, mkdirSync, existsSync, readFileSync } from 'node:fs'
-import { join, extname } from 'node:path'
 import { randomUUID } from 'node:crypto'
-import { handleGameRoute, disposeSandboxSessionsUsingCard } from './game-router.ts'
+import { handleGameRoute, disposeSandboxSessionsUsingCard, configureSandboxAuthority, disposeSandboxSessionsForUser, shutdownSandboxSessions } from './game-router.ts'
 import { handleWorkshopRoute } from './workshop.ts'
 import { createWsServer } from './connection/ws-server.ts'
-import { isDevRoom, type Room } from './game/room.ts'
-import { getDb, cleanExpiredSessions } from './db.ts'
-import { SqliteRoomPersistence } from './game/persistence/sqlite-adapter.ts'
-import { JsonRoomPersistence } from './game/persistence/json-adapter.ts'
+import { initializeDatabase, getDb, cleanExpiredSessions } from './db.ts'
+import { PostgresRoomPersistence } from './game/persistence/postgres-adapter.ts'
 import {
   login,
   logout,
@@ -21,10 +26,10 @@ import {
   cleanupPendingPasswordUser,
   isAdmin,
   createSession,
-  deleteAccount,
   deferAccountDeletion,
-  getAccountDeletionRoomIds,
-  nextPendingAccountDeletion,
+  claimPendingAccountDeletion,
+  renewAccountDeletion,
+  finishAccountDeletion,
   registerPasswordUser,
   requestAccountDeletion,
   resendVerificationEmail,
@@ -52,7 +57,9 @@ import { ReplayStore } from './game/replay-store.ts'
 import { handleReplayRoute, ReplayReadLimiter } from './replay-routes.ts'
 import { GameSession } from './game/authoritative-session.ts'
 import { encodeReplayFrame, type JsonValue } from './game/replay-codec.ts'
-import { viewerBuildExists } from './game/replay-viewer-build.ts'
+import { getResources, closeResources } from './storage/runtime'
+import { ReplayResources } from './storage/replay-resources'
+import { objectHash } from './storage/s3-store'
 import { REPLAY_SCHEMA_VERSION } from './game/room-committer.ts'
 import {
   bugReportsEnabled,
@@ -70,11 +77,6 @@ import { applyReplayRemovalLedger } from './game/replay-removal.ts'
 import { adminTakedownCard, markBuiltInMergedCards, reconcilePendingMerges } from './workshop-drafts.ts'
 import { ALL_CARD_IMPLS } from '../shared/cards/register-all.ts'
 
-const CARD_ART_DIR = process.env.CARD_ART_DIR ?? join(process.cwd(), 'data', 'card-art')
-const REPLAY_VIEWER_ROOT = process.env.REPLAY_VIEWER_ROOT ?? join(process.cwd(), 'data', 'replay-viewers')
-const REPLAY_ASSET_ROOT = process.env.REPLAY_ASSET_ROOT ?? join(process.cwd(), 'data', 'replay-assets')
-const REPLAY_REMOVAL_LEDGER_PATH = process.env.REPLAY_REMOVAL_LEDGER_PATH
-  ?? join(process.cwd(), 'data', 'replay-removals.jsonl')
 
 const serverCorsHeaders = () => corsHeaders({
   methods: 'GET,POST,PUT,PATCH,DELETE,OPTIONS',
@@ -108,41 +110,30 @@ const parseBody = async <T = Record<string, unknown>>(req: IncomingMessage): Pro
   }
 }
 
-// Rate limiting for login attempts (simple in-memory)
-const loginAttempts = new Map<string, { count: number; resetAt: number }>()
 const RATE_LIMIT_WINDOW = 60_000
 const RATE_LIMIT_MAX = 10
 const DAY_MS = 24 * 60 * 60 * 1000
 const MAX_INVITE_AGE_MS = 365 * DAY_MS
 
-function checkRateLimit(ip: string): boolean {
+async function checkRateLimit(ip: string): Promise<boolean> {
   if (process.env.DISABLE_RATE_LIMIT === '1') return true
-  const now = Date.now()
-  const entry = loginAttempts.get(ip)
-  if (!entry || now > entry.resetAt) {
-    loginAttempts.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW })
-    return true
-  }
-  entry.count++
-  return entry.count <= RATE_LIMIT_MAX
+  return (await consumeRateLimit(getDb(), 'authentication', ip, RATE_LIMIT_MAX, RATE_LIMIT_WINDOW)).allowed
 }
 
-function getClientIp(req: IncomingMessage): string {
-  const forwarded = req.headers['x-forwarded-for']
-  if (typeof forwarded === 'string') return forwarded.split(',')[0]!.trim()
-  return req.socket.remoteAddress ?? 'unknown'
-}
 
-function getAuthToken(req: IncomingMessage): string {
+async function getAuthToken(req: IncomingMessage): Promise<string> {
   const cookieTokens = readCookies(req.headers.cookie, SESSION_COOKIE)
-  const validCookie = cookieTokens.find(token => validateSession(token))
+  let validCookie: string | undefined
+  for (const candidate of cookieTokens) {
+    if (await validateSession(candidate)) { validCookie = candidate; break }
+  }
   const bearer = extractToken(req.headers.authorization)
   return validCookie || bearer || cookieTokens[0] || ''
 }
 
-function requireAdmin(req: IncomingMessage, res: ServerResponse): AuthUser | null {
-  const token = getAuthToken(req)
-  const user = validateSession(token)
+async function requireAdmin(req: IncomingMessage, res: ServerResponse): Promise<Awaited<AuthUser | null>> {
+  const token = (await getAuthToken(req))
+  const user = (await validateSession(token))
   if (!user) {
     sendJson(res, 401, authError('not_authenticated', 'Not authenticated'))
     return null
@@ -154,10 +145,13 @@ function requireAdmin(req: IncomingMessage, res: ServerResponse): AuthUser | nul
   return user
 }
 
-function forwardCookieSessionAsBearer(req: IncomingMessage): void {
+async function forwardCookieSessionAsBearer(req: IncomingMessage): Promise<void> {
   if (req.headers.authorization) return
   const cookieTokens = readCookies(req.headers.cookie, SESSION_COOKIE)
-  const token = cookieTokens.find(candidate => validateSession(candidate)) ?? cookieTokens[0] ?? ''
+  let token = cookieTokens[0] ?? ''
+  for (const candidate of cookieTokens) {
+    if (await validateSession(candidate)) { token = candidate; break }
+  }
   if (token) req.headers.authorization = `Bearer ${token}`
 }
 
@@ -174,33 +168,25 @@ function rejectUntrustedOrigin(req: IncomingMessage, res: ServerResponse): boole
   return true
 }
 
-// Initialize database on import
-getDb()
+// Initialize shared schema before accepting requests.
+await initializeDatabase()
 // Release-window takeover (#642): merged workshop cards now present in the
 // built-in registry switch to the built-in definition.
 {
-  const graduated = reconcilePendingMerges(getDb())
+  const graduated = (await reconcilePendingMerges(getDb()))
   if (graduated > 0) console.log(`[workshop] ${graduated} pending merge(s) graduated`)
-  const { flagged, unflagged } = markBuiltInMergedCards(getDb(), Object.keys(ALL_CARD_IMPLS))
+  const { flagged, unflagged } = (await markBuiltInMergedCards(getDb(), Object.keys(ALL_CARD_IMPLS)))
   if (flagged > 0) console.log(`[workshop] ${flagged} merged card(s) now served by the built-in registry`)
   if (unflagged > 0) console.log(`[workshop] ${unflagged} merged card(s) fell back to their workshop snapshot (registry rollback)`)
 }
-const replayRemovalState = process.env.NODE_ENV !== 'test'
-  ? applyReplayRemovalLedger(getDb(), {
-    assetRoot: REPLAY_ASSET_ROOT,
-    ledgerPath: REPLAY_REMOVAL_LEDGER_PATH,
-  })
-  : { assetTakedownHashes: [] }
+if (process.env.NODE_ENV !== 'test') {
+  await applyReplayRemovalLedger(getDb(), { resources: getResources() })
+}
 
 // Wire up room persistence adapter before creating the WS server
-const PERSIST_ROOMS = (process.env.PERSIST_ROOMS ?? 'sqlite') as 'json' | 'sqlite'
-const PERSISTED_ROOMS_DIR = process.env.PERSISTED_ROOMS_DIR ?? join(process.cwd(), 'output')
-const persistence =
-  PERSIST_ROOMS === 'sqlite'
-    ? new SqliteRoomPersistence(getDb())
-    : new JsonRoomPersistence(PERSISTED_ROOMS_DIR)
-const shouldPersist: (room: Room) => boolean =
-  PERSIST_ROOMS === 'sqlite' ? () => true : (room) => isDevRoom(room.id)
+const directory = new RoomDirectory(getDb())
+const invalidations = new InvalidationStore(getDb())
+const persistence = new PostgresRoomPersistence(getDb(), directory)
 const gameContextStore = new GameContextStore(getDb())
 const replayStore = new ReplayStore(getDb())
 const replayReadLimiter = new ReplayReadLimiter()
@@ -225,9 +211,9 @@ const bugReportRuntime = bugReportStore
     }
   : null
 
-const createCompletedReplayFixture = (defaultNames = false, recordReplay = true) => {
+const createCompletedReplayFixture = async (defaultNames = false, recordReplay = true) => {
   const viewerBuildId = process.env.REPLAY_VIEWER_BUILD_ID ?? ''
-  if (recordReplay && !viewerBuildExists(REPLAY_VIEWER_ROOT, viewerBuildId)) {
+  if (recordReplay && !await new ReplayResources(getResources()).viewer(viewerBuildId)) {
     throw new Error('Replay viewer build is unavailable')
   }
   const roomId = `replay-${randomUUID()}`
@@ -263,15 +249,15 @@ const createCompletedReplayFixture = (defaultNames = false, recordReplay = true)
   })
   const now = Date.now()
   const db = getDb()
-  db.transaction(() => {
-    db.prepare(`
+  ;(await db.transaction(async () => {
+    ;(await db.prepare(`
       INSERT INTO game_contexts (
         room_id, lifecycle, phase, replay_status, expires_at,
         removal_reason, created_at, updated_at
       ) VALUES (?, 'completed', NULL, ?, NULL, NULL, ?, ?)
-    `).run(roomId, recordReplay ? 'available' : 'legacy_no_replay', now, now)
+    `).run(roomId, recordReplay ? 'available' : 'legacy_no_replay', now, now))
     if (recordReplay) {
-      db.prepare(`
+      ;(await db.prepare(`
         INSERT INTO game_replays (
           room_id, schema_version, viewer_build_id, game_build_id, status,
           latest_step_no, missing_prefix, custom_cards_json, created_at, completed_at
@@ -284,7 +270,7 @@ const createCompletedReplayFixture = (defaultNames = false, recordReplay = true)
         frames.length - 1,
         now,
         now,
-      )
+      ))
       const insertStep = db.prepare(`
         INSERT INTO game_replay_steps (
           room_id, step_no, room_version, checkpoint_step_no, player_index,
@@ -292,7 +278,8 @@ const createCompletedReplayFixture = (defaultNames = false, recordReplay = true)
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `)
       const commandTypes = ['initial', 'takeAction', 'resolveChoice']
-      encoded.forEach((step, stepNo) => insertStep.run(
+      for (const [stepNo, step] of encoded.entries()) {
+      await insertStep.run(
         roomId,
         stepNo,
         stepNo,
@@ -304,30 +291,33 @@ const createCompletedReplayFixture = (defaultNames = false, recordReplay = true)
         step.payloadGzip,
         step.frameHash,
         now + stepNo,
-      ))
+      )
+      }
     }
-    db.prepare(`
+    ;(await db.prepare(`
       INSERT INTO game_results (
         room_id, started_at, finished_at, rounds_played, player_count,
         enable_community_deck, enable_parent_cards, enable_through_the_seasons,
         enable_farmers_of_the_moor, enable_snake_opening
       ) VALUES (?, ?, ?, 1, 2, 0, 0, 0, 0, 0)
-    `).run(roomId, now - 1000, now)
+    `).run(roomId, now - 1000, now))
     const scores = session.getState().scores ?? []
     const insertPlayer = db.prepare(`
       INSERT INTO game_result_players (
         room_id, player_index, game_player_id, user_id, display_name, score, name_is_default
       ) VALUES (?, ?, ?, NULL, ?, ?, ?)
     `)
-    session.state.players.forEach((player, playerIndex) => insertPlayer.run(
+    for (const [playerIndex, player] of session.state.players.entries()) {
+    await insertPlayer.run(
       roomId,
       playerIndex,
       player.id,
       player.name,
       scores.find((score) => score.playerId === player.id)?.total ?? 0,
       player.nameIsDefault === true ? 1 : 0,
-    ))
-  })()
+    )
+    }
+  })())
   return {
     ok: true,
     roomId,
@@ -335,35 +325,57 @@ const createCompletedReplayFixture = (defaultNames = false, recordReplay = true)
   }
 }
 
-let wssCtx: ReturnType<typeof createWsServer> | null = null
+let wssCtx: Awaited<ReturnType<typeof createWsServer>> | null = null
 
-const retireAccountRooms = (userId: string): void => {
-  wssCtx?.lobby.endRoomsForUser(userId, getAccountDeletionRoomIds(userId))
-  wssCtx?.closeUserConnections(userId)
-}
-
-const retryPendingAccountDeletion = async (): Promise<void> => {
-  const userId = nextPendingAccountDeletion()
-  if (!userId || !bugReportDelivery) return
-  retireAccountRooms(userId)
+let invalidationRunning = false
+const processInvalidations = async (): Promise<void> => {
+  const instanceId = wssCtx?.authority?.instanceId
+  if (!instanceId || invalidationRunning) return
+  invalidationRunning = true
   try {
-    await bugReportDelivery.deleteReporter(userId)
-    deleteAccount(userId)
-  } catch (error) {
-    if (error instanceof BugReportError && error.code === 'bug_report_delivery_busy') {
-      return
-    }
-    const failure = error instanceof BugReportError
-      ? error
-      : new BugReportError('bug_report_deletion_failed', 503)
-    deferAccountDeletion(userId, failure.code, failure.retryAt)
-  }
+    await invalidations.drain(instanceId, async operation => {
+      for (const cardId of operation.cardIds) disposeSandboxSessionsUsingCard(cardId)
+      if (operation.kind === 'user') disposeSandboxSessionsForUser(operation.subjectId)
+      await wssCtx!.applyInvalidation(operation)
+    })
+  } finally { invalidationRunning = false }
 }
+
+const retryPendingAccountDeletion = async (userId?: string): Promise<void> => {
+  const claim = await claimPendingAccountDeletion(userId)
+  if (!claim) return
+  let lostClaim = false
+  const renew = setInterval(() => {
+    void renewAccountDeletion(claim).then(ok => { if (!ok) lostClaim = true }, () => { lostClaim = true })
+  }, 10000)
+  try {
+    const operation = await invalidations.latest('user', claim.userId)
+    if (operation?.pending) { await deferAccountDeletion(claim, 'instances_retiring', Date.now() + 1000); return }
+    const external = await getDb().prepare(`SELECT 1 WHERE EXISTS(SELECT 1 FROM bug_reports WHERE reporter_user_id=? AND (submitted_at IS NOT NULL OR github_issue_number IS NOT NULL))
+      OR EXISTS(SELECT 1 FROM issue_submission_connections WHERE user_id=?)`).get(claim.userId, claim.userId)
+    if (external) {
+      if (!bugReportDelivery) throw new BugReportError('bug_report_deletion_failed', 503)
+      await bugReportDelivery.deleteReporter(claim.userId)
+    }
+    if (!lostClaim) await finishAccountDeletion(claim)
+  } catch (error) {
+    const failure = error instanceof BugReportError ? error : new BugReportError('bug_report_deletion_failed', 503)
+    if (!lostClaim) await deferAccountDeletion(claim, failure.code, failure.retryAt)
+  } finally { clearInterval(renew) }
+}
+
+const invalidationTimer = setInterval(() => {
+  void processInvalidations().catch(error => console.error('[invalidation] cleanup pending', error))
+}, 1000)
 
 // Periodically clean expired sessions and replay evidence (every hour)
-const sessionCleanupTimer = setInterval(() => {
-  cleanExpiredSessions()
-  wssCtx?.committer?.cleanupReplayAssets()
+const sessionCleanupTimer = setInterval(async () => {
+  try {
+    await cleanExpiredSessions()
+    await directory.cleanup()
+    await new CommandStore(getDb()).cleanup()
+    await wssCtx?.committer?.cleanupReplayAssets()
+  } catch (error) { console.error('[storage] periodic cleanup pending', error) }
 }, 60 * 60 * 1000)
 const bugReportDeliveryTimer = setInterval(() => {
   void retryPendingAccountDeletion().then(
@@ -377,7 +389,15 @@ const bugReportDeliveryTimer = setInterval(() => {
   })
 }, 5_000)
 
-const server = createServer(async (req, res) => {
+const server = createServer((req, res) => {
+  return handleRequest(req, res).catch(error => {
+    console.error('[http] request failed', error)
+    if (!res.headersSent) sendJson(res, 503, { error: 'Service temporarily unavailable' })
+    else res.destroy()
+  })
+})
+
+async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
   if (!req.url) {
     sendJson(res, 404, { error: 'Not found' })
     return
@@ -398,7 +418,7 @@ const server = createServer(async (req, res) => {
       sendJson(res, 503, { ok: false, error: 'bug report delivery is unavailable' })
       return
     }
-    const readiness = wssCtx?.committer?.canCreateRoom()
+    const readiness = await wssCtx?.committer?.canCreateRoom()
     if (readiness && !readiness.ok) {
       sendJson(res, 503, { ok: false, error: readiness.error })
       return
@@ -412,24 +432,37 @@ const server = createServer(async (req, res) => {
     || req.url.startsWith('/replay-viewers/')
     || req.url.startsWith('/replay-assets/')
   ) {
-    if (handleReplayRoute(req, res, replayStore, {
-      viewerRoot: REPLAY_VIEWER_ROOT,
-      assetRoot: REPLAY_ASSET_ROOT,
+    if ((await handleReplayRoute(req, res, replayStore, {
+      resources: new ReplayResources(getResources()),
       limiter: replayReadLimiter,
-    })) return
+    }))) return
   }
 
-  const requestUser = validateSession(getAuthToken(req))
+  const requestUser = (await validateSession((await getAuthToken(req))))
+
+  if (req.method === 'POST' && req.url === '/api/rooms/locate') {
+    const anonymous = process.env.NODE_ENV !== 'production' && process.env.ALLOW_ANONYMOUS_WS !== 'false'
+    if (!requestUser && !anonymous) { sendJson(res, 401, { error: 'Login required', code: 'login_required' }); return }
+    try {
+      const input = JSON.parse(await readBody(req)) as RoomDiscoveryRequest
+      const route = await discoverRoom(directory, requestUser ? `user:${requestUser.id}` : 'development-anonymous', input)
+      sendJson(res, 200, route)
+    } catch (error) {
+      const code = error && typeof error === 'object' && 'code' in error ? error.code : 'room_unavailable'
+      sendJson(res, 409, { code, error: error instanceof Error ? error.message : String(error) })
+    }
+    return
+  }
 
   if (req.url.startsWith('/api/v1/game-contexts/')) {
-    if (handleGameContextRoute(req, res, gameContextStore, requestUser)) return
+    if ((await handleGameContextRoute(req, res, gameContextStore, requestUser))) return
   }
 
   // ── Auth routes ────────────────────────────────────────
   if (req.url?.startsWith('/api/auth/oauth/')) {
     const url = new URL(req.url, `http://${req.headers.host ?? 'localhost'}`)
     if (req.method === 'GET' && url.pathname.endsWith('/start')) {
-      handleOAuthStart(req, res, url)
+      ;(await handleOAuthStart(req, res, url))
       return
     }
     if (req.method === 'GET' && url.pathname.endsWith('/callback')) {
@@ -449,13 +482,13 @@ const server = createServer(async (req, res) => {
   }
 
   if (req.url === '/api/auth/identities' && req.method === 'GET') {
-    handleLinkedIdentities(req, res)
+    ;(await handleLinkedIdentities(req, res))
     return
   }
 
   if (req.url === '/api/auth/register' && req.method === 'POST') {
     const ip = getClientIp(req)
-    if (!checkRateLimit(ip)) {
+    if (!(await checkRateLimit(ip))) {
       sendJson(res, 429, authError('rate_limited', 'Too many requests'))
       return
     }
@@ -486,7 +519,7 @@ const server = createServer(async (req, res) => {
     try {
       await sendVerificationEmail(result.userId, body.email)
     } catch {
-      cleanupPendingPasswordUser(result.userId, result.consumedInviteCodeHash)
+      ;(await cleanupPendingPasswordUser(result.userId, result.consumedInviteCodeHash))
       sendJson(res, 500, authError('email_delivery_failed', 'Failed to send verification email'))
       return
     }
@@ -496,7 +529,7 @@ const server = createServer(async (req, res) => {
 
   if (req.url === '/api/auth/login' && req.method === 'POST') {
     const ip = getClientIp(req)
-    if (!checkRateLimit(ip)) {
+    if (!(await checkRateLimit(ip))) {
       sendJson(res, 429, authError('rate_limited', 'Too many requests'))
       return
     }
@@ -515,17 +548,17 @@ const server = createServer(async (req, res) => {
   }
 
   if (req.url === '/api/auth/logout' && req.method === 'POST') {
-    const token = getAuthToken(req)
-    if (token) logout(token)
+    const token = (await getAuthToken(req))
+    if (token) (await logout(token))
     sendJson(res, 200, { ok: true }, { 'Set-Cookie': clearSessionCookie({ backendOrigin: getRequestOrigin(req), requestOrigin: req.headers.origin }) })
     return
   }
 
   if (req.url === '/api/auth/logout-all' && req.method === 'POST') {
-    const token = getAuthToken(req)
-    const user = validateSession(token)
+    const token = (await getAuthToken(req))
+    const user = (await validateSession(token))
     if (user) {
-      logoutAll(user.id)
+      ;(await logoutAll(user.id))
       wssCtx?.closeUserConnections(user.id)
     }
     sendJson(res, 200, { ok: true }, { 'Set-Cookie': clearSessionCookie({ backendOrigin: getRequestOrigin(req), requestOrigin: req.headers.origin }) })
@@ -533,103 +566,33 @@ const server = createServer(async (req, res) => {
   }
 
   if (req.url === '/api/auth/account' && req.method === 'DELETE') {
-    const token = getAuthToken(req)
-    const user = validateSession(token)
+    const token = (await getAuthToken(req))
+    const user = (await validateSession(token))
     if (!user) { sendJson(res, 401, authError('not_authenticated', 'Not authenticated')); return }
-    const database = getDb()
-    const bugReportTables = new Set((database.prepare(`
-      SELECT name
-      FROM sqlite_master
-      WHERE type = 'table'
-        AND name IN ('bug_reports', 'issue_submission_connections')
-    `).all() as Array<{ name: string }>).map(({ name }) => name))
-    const hasExternalBugReportData = (
-      bugReportTables.has('bug_reports')
-      && Boolean(database.prepare(`
-        SELECT 1
-        FROM bug_reports
-        WHERE reporter_user_id = ?
-          AND (
-            submitted_at IS NOT NULL
-            OR github_issue_number IS NOT NULL
-          )
-        LIMIT 1
-      `).get(user.id))
-    ) || (
-      bugReportTables.has('issue_submission_connections')
-      && Boolean(database.prepare(`
-        SELECT 1
-        FROM issue_submission_connections
-        WHERE user_id = ?
-        LIMIT 1
-      `).get(user.id))
-    )
-    if (hasExternalBugReportData) {
-      requestAccountDeletion(user.id)
-      retireAccountRooms(user.id)
-      if (!bugReportDelivery) {
-        sendJson(res, 202, { ok: true, pending: true }, {
-          'Set-Cookie': clearSessionCookie({
-            backendOrigin: getRequestOrigin(req),
-            requestOrigin: req.headers.origin,
-          }),
-        })
-        return
-      }
-      try {
-        await bugReportDelivery.deleteReporter(user.id)
-      } catch (error) {
-        const failure = error instanceof BugReportError
-          ? error
-          : new BugReportError('bug_report_deletion_failed', 503)
-        if (failure.code !== 'bug_report_delivery_busy') {
-          deferAccountDeletion(user.id, failure.code, failure.retryAt)
-        }
-        sendJson(res, 202, { ok: true, pending: true }, {
-          'Set-Cookie': clearSessionCookie({
-            backendOrigin: getRequestOrigin(req),
-            requestOrigin: req.headers.origin,
-          }),
-        })
-        return
-      }
-      const result = deleteAccount(user.id)
-      sendJson(res, 200, result, {
-        'Set-Cookie': clearSessionCookie({
-          backendOrigin: getRequestOrigin(req),
-          requestOrigin: req.headers.origin,
-        }),
-      })
-      return
-    }
-    if (bugReportTables.has('bug_reports')) {
-      database.prepare(`
-        DELETE FROM bug_reports
-        WHERE reporter_user_id = ?
-          AND submitted_at IS NULL
-          AND github_issue_number IS NULL
-      `).run(user.id)
-    }
-    retireAccountRooms(user.id)
-    const result = deleteAccount(user.id)
-    sendJson(res, 200, result, { 'Set-Cookie': clearSessionCookie({ backendOrigin: getRequestOrigin(req), requestOrigin: req.headers.origin }) })
+    const operation = await invalidations.begin('user', user.id, () => requestAccountDeletion(user.id))
+    await processInvalidations()
+    await retryPendingAccountDeletion(user.id)
+    const pending = !!await getDb().prepare('SELECT 1 FROM users WHERE id=?').get(user.id)
+    sendJson(res, pending ? 202 : 200, { ok: true, pending, operationId: operation.id }, {
+      'Set-Cookie': clearSessionCookie({ backendOrigin: getRequestOrigin(req), requestOrigin: req.headers.origin }),
+    })
     return
   }
 
   if (req.url === '/api/auth/profile' && req.method === 'PATCH') {
-    const token = getAuthToken(req)
-    const user = validateSession(token)
+    const token = (await getAuthToken(req))
+    const user = (await validateSession(token))
     if (!user) { sendJson(res, 401, authError('not_authenticated', 'Not authenticated')); return }
     const body = await parseBody<{ displayName?: string }>(req)
-    const err = updateDisplayName(user.id, body?.displayName ?? '')
+    const err = (await updateDisplayName(user.id, body?.displayName ?? ''))
     if (err) { sendJson(res, 400, authError('invalid_display_name', err)); return }
     sendJson(res, 200, { ok: true })
     return
   }
 
   if (req.url === '/api/auth/change-password' && req.method === 'POST') {
-    const token = getAuthToken(req)
-    const user = validateSession(token)
+    const token = (await getAuthToken(req))
+    const user = (await validateSession(token))
     if (!user) { sendJson(res, 401, authError('not_authenticated', 'Not authenticated')); return }
     const body = await parseBody<{ oldPassword?: string; newPassword?: string }>(req)
     if (!body?.oldPassword || !body.newPassword) {
@@ -644,7 +607,7 @@ const server = createServer(async (req, res) => {
   if (req.url?.startsWith('/api/auth/verify-email') && req.method === 'GET') {
     const parsed = new URL(req.url, getRequestOrigin(req) || 'http://localhost')
     const token = parsed.searchParams.get('token') ?? ''
-    const result = verifyEmailToken(token)
+    const result = (await verifyEmailToken(token))
     const appOrigin = process.env.PUBLIC_APP_ORIGIN || '/'
     if (!result.ok) {
       res.statusCode = 302
@@ -661,7 +624,7 @@ const server = createServer(async (req, res) => {
 
   if (req.url === '/api/auth/resend-verification' && req.method === 'POST') {
     const ip = getClientIp(req)
-    if (!checkRateLimit(ip)) {
+    if (!(await checkRateLimit(ip))) {
       sendJson(res, 429, authError('rate_limited', 'Too many requests'))
       return
     }
@@ -676,8 +639,8 @@ const server = createServer(async (req, res) => {
   }
 
   if (req.url === '/api/auth/me' && req.method === 'GET') {
-    const token = getAuthToken(req)
-    const user = validateSession(token)
+    const token = (await getAuthToken(req))
+    const user = (await validateSession(token))
     if (!user) {
       sendJson(res, 401, authError('not_authenticated', 'Not authenticated'))
       return
@@ -729,9 +692,9 @@ const server = createServer(async (req, res) => {
       ...(body.displayName ? { displayName: body.displayName } : {}),
       ...(body.avatarUrl ? { avatarUrl: body.avatarUrl } : {}),
     }
-    const existing = findIdentity(provider, body.providerUserId)
+    const existing = (await findIdentity(provider, body.providerUserId))
     if (existing) {
-      const token = createSession(existing.userId)
+      const token = (await createSession(existing.userId))
       if (!token) {
         sendJson(res, 401, authError('not_authenticated', 'Not authenticated'))
         return
@@ -740,7 +703,7 @@ const server = createServer(async (req, res) => {
       return
     }
 
-    const ticket = createOnboardingTicket(profile)
+    const ticket = (await createOnboardingTicket(profile))
     sendJson(res, 200, { ok: true, provider, mode: 'onboarding' }, { 'Set-Cookie': serializeOnboardingCookie(ticket, { backendOrigin: getRequestOrigin(req) }) })
     return
   }
@@ -752,7 +715,7 @@ const server = createServer(async (req, res) => {
     }
     try {
       const params = new URLSearchParams(req.url.split('?')[1])
-      sendJson(res, 201, createCompletedReplayFixture(params.get('defaultNames') === '1', params.get('recordReplay') !== '0'))
+      sendJson(res, 201, (await createCompletedReplayFixture(params.get('defaultNames') === '1', params.get('recordReplay') !== '0')))
     } catch (error) {
       sendJson(res, 503, {
         ok: false,
@@ -762,11 +725,18 @@ const server = createServer(async (req, res) => {
     return
   }
 
+  if (req.method === 'GET' && req.url?.startsWith('/api/admin/operations/')) {
+    if (!await requireAdmin(req, res)) return
+    const operation = await invalidations.status(req.url.slice('/api/admin/operations/'.length))
+    sendJson(res, operation ? 200 : 404, operation ? { ok: true, operationId: operation.id, pending: operation.pending } : { ok: false, error: 'Operation not found' })
+    return
+  }
+
   // Admin kill switch (#641): force a card offline, void its approval and
   // terminate every running game that embeds it. Games end without scores,
   // game_results or a completed replay (their recording rows are removed).
   if (req.method === 'POST' && req.url?.startsWith('/api/admin/cards/') && req.url.endsWith('/takedown')) {
-    const adminUser = requireAdmin(req, res)
+    const adminUser = (await requireAdmin(req, res))
     if (!adminUser) return
     try {
       let cardDbId: string
@@ -778,39 +748,11 @@ const server = createServer(async (req, res) => {
         sendJson(res, 400, { ok: false, error: 'Malformed card id' })
         return
       }
-      const db = getDb()
-      // Fail closed AND atomic: the card invalidation and the deletion of
-      // every persisted room row embedding it commit in one transaction —
-      // a crash can never leave the card taken down but a restorable
-      // snapshot alive (restoreRooms trusts the embedded card snapshot).
-      const card = adminTakedownCard(db, cardDbId)
-      const { endedRoomIds } = wssCtx?.lobby.endRoomsUsingCard(cardDbId) ?? { endedRoomIds: [] }
-      // HTTP sandbox sessions embed the same executable snapshot and refresh
-      // their TTL on every access — dispose them too.
-      const disposedSandboxSessions = disposeSandboxSessionsUsingCard(cardDbId)
-      const affectedRoomIds = [...new Set([
-        ...endedRoomIds,
-        ...card.removedRoomIds,
-      ])]
-      for (const roomId of affectedRoomIds) {
-        db.prepare('DELETE FROM rooms WHERE id = ?').run(roomId)
-        // Drop half-recorded replays so no 'recording' orphans survive —
-        // but keep rooms referenced by a bug report: their retained
-        // evidence segment (ADR-0011) must stay reconstructible.
-        const hasReport = db.prepare(
-          'SELECT 1 FROM bug_reports WHERE room_id = ? LIMIT 1',
-        ).get(roomId)
-        if (hasReport) continue
-        // Only half-recorded replays are dropped; a completed archive
-        // (lifecycle 'completed', replay_status 'available') stays intact.
-        const replay = db.prepare(
-          'SELECT status FROM game_replays WHERE room_id = ?',
-        ).get(roomId) as { status: string } | undefined
-        if (!replay || replay.status !== 'recording') continue
-        db.prepare('DELETE FROM game_replay_steps WHERE room_id = ?').run(roomId)
-        db.prepare('DELETE FROM game_replays WHERE room_id = ?').run(roomId)
-      }
-      sendJson(res, 200, { ok: true, card, endedRoomIds: affectedRoomIds, disposedSandboxSessions })
+      let card: Awaited<ReturnType<typeof adminTakedownCard>> | undefined
+      const operation = await invalidations.begin('card', cardDbId, async () => { card = await adminTakedownCard(getDb(), cardDbId) })
+      await processInvalidations()
+      const status = (await invalidations.status(operation.id))!
+      sendJson(res, status.pending ? 202 : 200, { ok: true, card, endedRoomIds: operation.roomIds, operationId: operation.id, pending: status.pending })
     } catch (error) {
       const notFound = error instanceof Error && error.message === 'Card not found'
       sendJson(res, notFound ? 404 : 500, {
@@ -823,11 +765,11 @@ const server = createServer(async (req, res) => {
 
   if (req.url?.startsWith('/api/admin/invites')) {
     const url = new URL(req.url, `http://${req.headers.host ?? 'localhost'}`)
-    const adminUser = requireAdmin(req, res)
+    const adminUser = (await requireAdmin(req, res))
     if (!adminUser) return
 
     if (req.method === 'GET' && url.pathname === '/api/admin/invites') {
-      sendJson(res, 200, { ok: true, invites: listInvites() })
+      sendJson(res, 200, { ok: true, invites: (await listInvites()) })
       return
     }
 
@@ -889,10 +831,10 @@ const server = createServer(async (req, res) => {
       }
 
       try {
-        const invite = createInvite(adminUser.id, { code, expiresAt, maxUses })
+        const invite = (await createInvite(adminUser.id, { code, expiresAt, maxUses }))
         sendJson(res, 200, { ok: true, invite })
       } catch (error) {
-        if (error instanceof Error && error.message.includes('account_invites.code_hash')) {
+        if (isUniqueViolation(error, 'account_invites_code_hash_key')) {
           sendJson(res, 400, {
             ok: false,
             code: 'invite_code_taken',
@@ -907,7 +849,7 @@ const server = createServer(async (req, res) => {
 
     const revokeMatch = /^\/api\/admin\/invites\/([^/]+)\/revoke$/.exec(url.pathname)
     if (req.method === 'POST' && revokeMatch) {
-      const ok = revokeInvite(decodeURIComponent(revokeMatch[1]!))
+      const ok = (await revokeInvite(decodeURIComponent(revokeMatch[1]!)))
       sendJson(res, ok ? 200 : 404, ok ? { ok: true } : { ok: false, error: 'Invite not found' })
       return
     }
@@ -920,35 +862,36 @@ const server = createServer(async (req, res) => {
     const limit = Number.isFinite(rawLimit) && rawLimit > 0
       ? Math.min(Math.floor(rawLimit), 200)
       : 50
-    sendJson(res, 200, { ok: true, rooms: wssCtx!.lobby.getRooms(limit) })
+    sendJson(res, 200, { ok: true, rooms: await directory.lobby(limit) })
     return
   }
 
   // Dissolve a room (HTTP, for lobby use)
   if (req.method === 'POST' && req.url?.startsWith('/api/rooms/') && req.url.endsWith('/dissolve')) {
-    const token = getAuthToken(req)
-    const user = validateSession(token)
+    const token = (await getAuthToken(req))
+    const user = (await validateSession(token))
     if (!user) { sendJson(res, 401, { ok: false, error: 'Not authenticated' }); return }
     const roomId = req.url.slice('/api/rooms/'.length, req.url.length - '/dissolve'.length)
-    const result = wssCtx!.lobby.dissolveRoomById(roomId, user.id)
+    await wssCtx!.authority?.load(roomId)
+    const result = (await wssCtx!.lobby.dissolveRoomById(roomId, user.id))
     sendJson(res, result.ok ? 200 : 400, result)
     return
   }
 
-  // Rooms the current user has participated in (SQLite mode only)
+  // Rooms the current user has participated in (shared PostgreSQL)
   if (req.method === 'GET' && req.url === '/api/lobby/my-rooms') {
-    const token = getAuthToken(req)
-    const user = validateSession(token)
+    const token = (await getAuthToken(req))
+    const user = (await validateSession(token))
     if (!user) { sendJson(res, 401, { ok: false, error: 'Not authenticated' }); return }
     try {
-      const rows = getDb().prepare(`
+      const rows = (await getDb().prepare(`
         SELECT r.id, r.status, r.max_players, r.updated_at, rp.player_index,
-               CASE WHEN r.status = 'playing' AND json_valid(r.state_json) THEN
-                 CASE WHEN json_extract(r.state_json, '$.state.phase') = 'playing'
-                        AND json_extract(r.state_json, '$.state.gameOver') IS NOT 1
+               CASE WHEN r.status = 'playing' AND r.state_json IS JSON THEN
+                 CASE WHEN r.state_json::jsonb #>> '{state,phase}' = 'playing'
+                        AND (r.state_json::jsonb #>> '{state,gameOver}') IS DISTINCT FROM 'true'
                         AND COALESCE(
-                              json_extract(r.state_json, '$.sessionCursor.engineStackCursor.frames[#-1].ownerPlayerIndex'),
-                              json_extract(r.state_json, '$.state.currentPlayerIndex')
+                              (r.state_json::jsonb #>> '{sessionCursor,engineStackCursor,frames,-1,ownerPlayerIndex}')::integer,
+                              (r.state_json::jsonb #>> '{state,currentPlayerIndex}')::integer
                             ) = rp.player_index
                       THEN 1 ELSE 0 END
                ELSE 0 END AS my_turn
@@ -957,7 +900,7 @@ const server = createServer(async (req, res) => {
         WHERE rp.user_id = ? AND r.status != 'finished'
         ORDER BY my_turn DESC, r.updated_at DESC
         LIMIT 20
-      `).all(user.id) as Array<{ id: string; status: string; max_players: number; updated_at: number; player_index: number; my_turn: number }>
+      `).all(user.id)) as Array<{ id: string; status: string; max_players: number; updated_at: number; player_index: number; my_turn: number }>
       sendJson(res, 200, { ok: true, rooms: rows })
     } catch {
       sendJson(res, 200, { ok: true, rooms: [] })
@@ -965,43 +908,46 @@ const server = createServer(async (req, res) => {
     return
   }
 
-  // ── Card art static files ──────────────────────────────
+  // Private object storage remains behind product routes and shared barriers.
   if (req.method === 'GET' && req.url?.startsWith('/card-art/')) {
-    const filename = req.url.slice('/card-art/'.length).replace(/[^a-zA-Z0-9._-]/g, '')
-    const filePath = join(CARD_ART_DIR, filename)
-    if (filename && existsSync(filePath)) {
-      const ext = extname(filename).toLowerCase()
-      const mime = ext === '.png' ? 'image/png' : ext === '.jpg' ? 'image/jpeg' : 'application/octet-stream'
-      res.writeHead(200, { 'Content-Type': mime, 'Cache-Control': 'public, max-age=86400', ...serverCorsHeaders() })
-      res.end(readFileSync(filePath))
-    } else {
-      sendJson(res, 404, { error: 'Not found' })
-    }
+    const pathname = new URL(req.url, 'http://localhost').pathname
+    if (!/^\/card-art\/[A-Za-z0-9._-]+$/.test(pathname)) { sendJson(res, 404, { error: 'Not found' }); return }
+    const object = await getResources().read(pathname.slice(1))
+    if (!object) { sendJson(res, 404, { error: 'Not found' }); return }
+    const etag = `"${objectHash(object.body)}"`
+    res.writeHead(req.headers['if-none-match'] === etag ? 304 : 200, {
+      'Content-Type': object.contentType, 'Cache-Control': 'public, max-age=0, must-revalidate',
+      'X-Content-Type-Options': 'nosniff', ETag: etag, ...serverCorsHeaders(),
+    })
+    res.end(req.headers['if-none-match'] === etag ? undefined : object.body)
     return
   }
 
-  // ── Art upload ─────────────────────────────────────────
   if (req.method === 'POST' && req.url === '/api/workshop/art') {
-    const token = getAuthToken(req)
-    const user = validateSession(token)
+    const user = await validateSession(await getAuthToken(req))
     if (!user) { sendJson(res, 401, { ok: false, error: 'Not authenticated' }); return }
-    const contentLength = parseInt(req.headers['content-length'] ?? '0', 10)
-    if (contentLength > 5 * 1024 * 1024) { sendJson(res, 413, { ok: false, error: 'Image too large (max 5MB)' }); return }
-    const body = await parseBody<{ dataUrl?: string }>(req)
-    const dataUrl = body?.dataUrl ?? ''
-    const match = /^data:(image\/(?:png|jpeg|webp));base64,(.+)$/.exec(dataUrl)
+    const chunks: Buffer[] = []
+    let bytes = 0
+    for await (const chunk of req.iterator({ destroyOnReturn: false })) {
+      bytes += chunk.length
+      if (bytes > 7 * 1024 * 1024) { req.resume(); sendJson(res, 413, { ok: false, error: 'Image too large (max 5MB)' }); return }
+      chunks.push(Buffer.from(chunk))
+    }
+    let dataUrl = ''
+    try { dataUrl = JSON.parse(Buffer.concat(chunks).toString('utf8')).dataUrl ?? '' } catch { /* invalid input */ }
+    const match = typeof dataUrl === 'string' && /^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/]+={0,2})$/.exec(dataUrl)
     if (!match) { sendJson(res, 400, { ok: false, error: 'Invalid data URL' }); return }
     const [, mime, b64] = match
-    const ext = mime === 'image/jpeg' ? '.jpg' : mime === 'image/webp' ? '.webp' : '.png'
-    try {
-      mkdirSync(CARD_ART_DIR, { recursive: true })
-      const filename = `${randomUUID()}${ext}`
-      writeFileSync(join(CARD_ART_DIR, filename), Buffer.from(b64!, 'base64'))
-      sendJson(res, 200, { ok: true, url: `/card-art/${filename}` })
-    } catch (err) {
-      console.error('[art-upload] failed:', err)
-      sendJson(res, 500, { ok: false, error: 'Upload failed' })
-    }
+    const body = Buffer.from(b64!, 'base64')
+    if (body.length > 5 * 1024 * 1024) { sendJson(res, 413, { ok: false, error: 'Image too large (max 5MB)' }); return }
+    const actual = body.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])) ? 'image/png'
+      : body[0] === 0xff && body[1] === 0xd8 ? 'image/jpeg'
+        : body.subarray(0, 4).toString() === 'RIFF' && body.subarray(8, 12).toString() === 'WEBP' ? 'image/webp' : null
+    if (actual !== mime) { sendJson(res, 400, { ok: false, error: 'Image content does not match its type' }); return }
+    const ext = mime === 'image/jpeg' ? 'jpg' : mime === 'image/webp' ? 'webp' : 'png'
+    const key = `card-art/${randomUUID()}.${ext}`
+    await getResources().stage(key, body, mime!)
+    sendJson(res, 200, { ok: true, url: `/${key}` })
     return
   }
 
@@ -1011,14 +957,14 @@ const server = createServer(async (req, res) => {
     || req.url?.startsWith('/api/workshop/')
     || req.url?.startsWith('/api/admin/')
   ) {
-    forwardCookieSessionAsBearer(req)
+    ;(await forwardCookieSessionAsBearer(req))
     const handled = await handleWorkshopRoute(req, res)
     if (handled) return
   }
 
   // ── Game routes (existing) ─────────────────────────────
   if (req.url?.startsWith('/api/game/')) {
-    forwardCookieSessionAsBearer(req)
+    ;(await forwardCookieSessionAsBearer(req))
     const handled = await handleGameRoute(req, res)
     if (handled) return
   }
@@ -1032,14 +978,17 @@ const server = createServer(async (req, res) => {
   )) return
 
   sendJson(res, 404, { error: 'Not found' })
-})
+}
 
-wssCtx = createWsServer(server, {
+wssCtx = (await createWsServer(server, {
   persistence,
-  shouldPersist,
-  gameContextStore: PERSIST_ROOMS === 'sqlite' ? gameContextStore : undefined,
-  removedReplayAssetHashes: new Set(replayRemovalState.assetTakedownHashes),
-})
+  gameContextStore,
+  directory,
+  internalUrl: process.env.INSTANCE_INTERNAL_URL,
+}))
+
+configureSandboxAuthority(new SandboxAuthority(directory, wssCtx.authority!.instanceId))
+await processInvalidations()
 
 const PORT = Number(process.env.BACKEND_PORT) || 5175
 const HOST = process.env.BACKEND_HOST || undefined
@@ -1049,9 +998,14 @@ server.listen(PORT, HOST, () => {
   console.log(`WebSocket available at ws://${HOST || 'localhost'}:${PORT}/ws`)
 })
 
-installShutdownHandlers(() => {
-  server.close()
+installShutdownHandlers(async () => {
+  const closed = new Promise<void>(resolve => server.close(() => resolve()))
   clearInterval(sessionCleanupTimer)
+  clearInterval(invalidationTimer)
+  shutdownSandboxSessions()
   clearInterval(bugReportDeliveryTimer)
-  wssCtx?.shutdown()
+  await wssCtx?.shutdown()
+  await closed
+  closeResources()
+  await getDb().close()
 })

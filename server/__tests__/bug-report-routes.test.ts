@@ -1,4 +1,6 @@
-import Database from 'better-sqlite3'
+import * as database from '../db'
+import { createTestDatabase } from './_helpers/postgres'
+import type { PostgresDatabase } from '../database/postgres'
 import { createHmac } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -10,7 +12,6 @@ import {
   type IssueDeliveryAdapter,
 } from '../bug-report/bug-report-store.ts'
 import { handleBugReportRoute } from '../bug-report-routes.ts'
-import { runMigrations } from '../db.ts'
 import { encodeReplayFrame } from '../game/replay-codec.ts'
 import { resetRateLimitsForTests } from '../rate-limit.ts'
 
@@ -24,7 +25,7 @@ type MockResponse = ServerResponse & {
   headers: Record<string, string>
 }
 
-let db: Database.Database
+let db: PostgresDatabase
 let store: BugReportStore
 let createIssue: ReturnType<typeof vi.fn>
 let revokeUserGrant: ReturnType<typeof vi.fn>
@@ -101,53 +102,54 @@ const invoke = async (
 
 const json = (res: MockResponse) => JSON.parse(res.body) as Record<string, unknown>
 
-beforeEach(() => {
-  resetRateLimitsForTests()
+beforeEach(async () => {
   vi.stubEnv('BUG_REPORTS_ENABLED', 'true')
   vi.stubEnv('PUBLIC_APP_ORIGIN', 'https://game.example/')
   vi.stubEnv('PUBLIC_API_BASE', 'https://api.example')
   vi.stubEnv('BUG_REPORT_GITHUB_WEBHOOK_SECRET', 'webhook-secret')
-  db = new Database(':memory:')
-  db.pragma('foreign_keys = ON')
-  runMigrations(db)
+  db = await createTestDatabase()
+  vi.spyOn(database, 'getDb').mockReturnValue(db)
+  await resetRateLimitsForTests()
+
+
   const now = 1_700_000_000_000
   for (const user of [USER, OTHER]) {
-    db.prepare(`
+    ;(await db.prepare(`
       INSERT INTO users (id, username, display_name, password_hash, created_at)
       VALUES (?, ?, ?, 'hash', ?)
-    `).run(user.id, user.username, user.displayName, now)
+    `).run(user.id, user.username, user.displayName, now))
   }
-  db.prepare(`
+  ;(await db.prepare(`
     INSERT INTO rooms (
       id, created_by, state_json, status, version, created_at, updated_at
     )
     VALUES ('active-room', 'u1', '{}', 'playing', 8, ?, ?)
-  `).run(now, now)
-  db.prepare(`
+  `).run(now, now))
+  ;(await db.prepare(`
     INSERT INTO room_players (room_id, user_id, player_index, joined_at)
     VALUES ('active-room', 'u1', 0, ?)
-  `).run(now)
-  db.prepare(`
+  `).run(now))
+  ;(await db.prepare(`
     INSERT INTO game_contexts (
       room_id, lifecycle, phase, created_at, updated_at
     )
     VALUES ('active-room', 'active', 'playing', ?, ?)
-  `).run(now, now)
-  db.prepare(`
+  `).run(now, now))
+  ;(await db.prepare(`
     INSERT INTO game_replays (
       room_id, schema_version, viewer_build_id, game_build_id, status,
       latest_step_no, created_at
     )
     VALUES ('active-room', 1, 'viewer', 'game', 'recording', 5, ?)
-  `).run(now)
-  db.prepare(`
+  `).run(now))
+  ;(await db.prepare(`
     INSERT INTO game_replay_steps (
       room_id, step_no, room_version, checkpoint_step_no, player_index,
       command_type, intent_json, payload_kind, payload_gzip, frame_hash,
       created_at
     )
     VALUES ('active-room', 5, 8, 5, 0, 'test', '{}', 'checkpoint', ?, ?, ?)
-  `).run(Buffer.from('frame'), FRAME_HASH, now)
+  `).run(Buffer.from('frame'), FRAME_HASH, now))
   store = new BugReportStore(
     db,
     new TokenCipher('k1', new Map([['k1', Buffer.alloc(32, 7)]])),
@@ -185,8 +187,9 @@ beforeEach(() => {
   } as never
 })
 
-afterEach(() => {
-  db.close()
+afterEach(async () => {
+  ;(await db.close())
+  vi.restoreAllMocks()
   vi.unstubAllEnvs()
 })
 
@@ -242,9 +245,9 @@ describe('bug report routes', () => {
       '/api/v1/issue-submission-connection?roomId=active-room',
     ))).toMatchObject({ enabled: true })
 
-    db.prepare(`
+    ;(await db.prepare(`
       DELETE FROM game_replay_steps WHERE room_id = 'active-room'
-    `).run()
+    `).run())
 
     expect(json(await invoke(
       'GET',
@@ -436,10 +439,10 @@ describe('bug report routes', () => {
   })
 
   it('removes the local connection even when GitHub revocation fails', async () => {
-    store.saveConnection('u1', '99', {
+    ;(await store.saveConnection('u1', '99', {
       accessToken: 'token',
       accessTokenExpiresAt: 1_700_003_600_000,
-    })
+    }))
     revokeUserGrant.mockResolvedValueOnce({
       ok: false,
       kind: 'uncertain',
@@ -451,7 +454,7 @@ describe('bug report routes', () => {
       '/api/v1/issue-submission-connection',
     )
     expect(failed.statusCode).toBe(503)
-    expect(store.connectionStatus('u1').connected).toBe(false)
+    expect((await store.connectionStatus('u1')).connected).toBe(false)
 
     const removed = await invoke(
       'DELETE',
@@ -460,14 +463,14 @@ describe('bug report routes', () => {
     expect(removed.statusCode).toBe(200)
     expect(revokeUserGrant).toHaveBeenCalledTimes(1)
     expect(revokeUserGrant).toHaveBeenCalledWith('token')
-    expect(store.connectionStatus('u1')).toEqual({ connected: false })
+    expect((await store.connectionStatus('u1'))).toEqual({ connected: false })
   })
 
   it('queues revocation and disconnects locally when delivery is unavailable', async () => {
-    store.saveConnection('u1', '99', {
+    ;(await store.saveConnection('u1', '99', {
       accessToken: 'token',
       accessTokenExpiresAt: 1_700_003_600_000,
-    })
+    }))
     runtime = { ...runtime!, delivery: null, github: null }
 
     const removed = await invoke(
@@ -476,8 +479,8 @@ describe('bug report routes', () => {
     )
 
     expect(removed.statusCode).toBe(200)
-    expect(store.connectionStatus('u1')).toEqual({ connected: false })
-    expect(store.nextGrantRevocation()).toMatchObject({ accessToken: 'token' })
+    expect((await store.connectionStatus('u1'))).toEqual({ connected: false })
+    expect((await store.nextGrantRevocation())).toMatchObject({ accessToken: 'token' })
     expect(revokeUserGrant).not.toHaveBeenCalled()
   })
 
@@ -540,7 +543,7 @@ describe('bug report routes', () => {
       expect.any(String),
       'https://api.example/api/v1/issue-submission-connection/github/callback',
     )
-    expect(store.connectionStatus('u1')).toMatchObject({
+    expect((await store.connectionStatus('u1'))).toMatchObject({
       connected: true,
       githubUserId: '99',
     })
@@ -555,10 +558,10 @@ describe('bug report routes', () => {
   })
 
   it('revokes a replacement grant instead of overwriting another GitHub identity', async () => {
-    store.saveConnection(USER.id, '99', {
+    ;(await store.saveConnection(USER.id, '99', {
       accessToken: 'existing-token',
       accessTokenExpiresAt: 1_700_003_600_000,
-    })
+    }))
     const created = await invoke(
       'POST',
       '/api/v1/game-contexts/active-room/bug-reports',
@@ -589,7 +592,7 @@ describe('bug report routes', () => {
     expect(completed.statusCode).toBe(502)
     expect(json(completed)).toMatchObject({ code: 'github_connection_failed' })
     expect(revokeUserGrant).toHaveBeenCalledWith('replacement-token')
-    expect(store.connectionTokens(USER.id)).toMatchObject({
+    expect((await store.connectionTokens(USER.id))).toMatchObject({
       githubUserId: '99',
       accessToken: 'existing-token',
     })
@@ -622,7 +625,7 @@ describe('bug report routes', () => {
     expect(new URL(cancelled.headers.Location).searchParams.get(
       'bugReportConnection',
     )).toBe('cancelled')
-    expect(store.getOwned(submissionId, 'u1').status).toBe('draft')
+    expect((await store.getOwned(submissionId, 'u1')).status).toBe('draft')
   })
 
   it('revokes a GitHub grant when account deletion wins OAuth completion', async () => {
@@ -642,11 +645,11 @@ describe('bug report routes', () => {
     ).searchParams.get('state')
     exchangeCode.mockImplementationOnce(async () => {
       const now = Date.now()
-      db.prepare(`
+      ;(await db.prepare(`
         INSERT INTO account_deletion_requests (
           user_id, requested_at, next_attempt_at, last_error_code
         ) VALUES (?, ?, ?, NULL)
-      `).run(USER.id, now, now)
+      `).run(USER.id, now, now))
       return {
         accessToken: 'late-token',
         accessTokenExpiresAt: now + 3_600_000,
@@ -667,27 +670,27 @@ describe('bug report routes', () => {
     expect(completed.statusCode).toBe(502)
     expect(json(completed)).toMatchObject({ code: 'github_connection_failed' })
     expect(revokeUserGrant).toHaveBeenCalledWith('late-token')
-    expect(store.connectionStatus(USER.id)).toEqual({ connected: false })
-    expect(db.prepare(`
+    expect((await store.connectionStatus(USER.id))).toEqual({ connected: false })
+    expect((await db.prepare(`
       SELECT COUNT(*) AS count FROM github_grant_revocations
-    `).get()).toEqual({ count: 1 })
+    `).get())).toEqual({ count: 1 })
 
-    db.prepare(`
+    ;(await db.prepare(`
       UPDATE github_grant_revocations SET next_attempt_at = 0
-    `).run()
+    `).run())
     revokeUserGrant.mockResolvedValueOnce({ ok: true })
     await runtime?.delivery?.retryGrantRevocation()
 
-    expect(db.prepare(`
+    expect((await db.prepare(`
       SELECT COUNT(*) AS count FROM github_grant_revocations
-    `).get()).toEqual({ count: 0 })
+    `).get())).toEqual({ count: 0 })
   })
 
   it('validates signed webhooks and revokes the matching connection', async () => {
-    store.saveConnection('u1', '99', {
+    ;(await store.saveConnection('u1', '99', {
       accessToken: 'token',
       accessTokenExpiresAt: 1_700_003_600_000,
-    })
+    }))
     const payload = JSON.stringify({
       action: 'revoked',
       sender: { id: 99 },
@@ -702,7 +705,7 @@ describe('bug report routes', () => {
         'x-hub-signature-256': 'sha256=00',
       },
     )).statusCode).toBe(401)
-    expect(store.connectionStatus('u1').connected).toBe(true)
+    expect((await store.connectionStatus('u1')).connected).toBe(true)
 
     const signature = `sha256=${createHmac('sha256', 'webhook-secret')
       .update(payload)
@@ -718,7 +721,7 @@ describe('bug report routes', () => {
       },
     )
     expect(revoked.statusCode).toBe(202)
-    expect(store.connectionStatus('u1')).toEqual({ connected: false })
+    expect((await store.connectionStatus('u1'))).toEqual({ connected: false })
 
     const invalidPayload = '{'
     const invalidPayloadSignature = `sha256=${createHmac('sha256', 'webhook-secret')
@@ -746,18 +749,18 @@ describe('bug report routes', () => {
     )
     const submissionId = (json(created).report as { submissionId: string })
       .submissionId
-    db.prepare(`
+    ;(await db.prepare(`
       UPDATE bug_reports
       SET github_issue_number = 7, github_issue_state = 'open'
       WHERE submission_id = ?
-    `).run(submissionId)
+    `).run(submissionId))
     const webhook = async (action: string, repository: string) => {
       const payload = JSON.stringify({
         action,
         issue: { number: 7 },
         repository: { full_name: repository },
       })
-      return invoke(
+      return (await invoke(
         'POST',
         '/api/v1/github-app/webhook',
         payload,
@@ -769,39 +772,39 @@ describe('bug report routes', () => {
             'webhook-secret',
           ).update(payload).digest('hex')}`,
         },
-      )
+      ))
     }
 
     await webhook('closed', 'attacker/repository')
-    expect((db.prepare(`
+    expect(((await db.prepare(`
       SELECT github_issue_state AS state
       FROM bug_reports WHERE submission_id = ?
-    `).get(submissionId) as { state: string }).state).toBe('open')
+    `).get(submissionId)) as { state: string }).state).toBe('open')
 
     await webhook('closed', 'titanxxh/open-agricola-issues')
-    expect((db.prepare(`
+    expect(((await db.prepare(`
       SELECT github_issue_state AS state
       FROM bug_reports WHERE submission_id = ?
-    `).get(submissionId) as { state: string }).state).toBe('closed')
+    `).get(submissionId)) as { state: string }).state).toBe('closed')
 
     await webhook('reopened', 'titanxxh/open-agricola-issues')
-    expect((db.prepare(`
+    expect(((await db.prepare(`
       SELECT github_issue_state AS state
       FROM bug_reports WHERE submission_id = ?
-    `).get(submissionId) as { state: string }).state).toBe('open')
+    `).get(submissionId)) as { state: string }).state).toBe('open')
 
     await webhook('deleted', 'titanxxh/open-agricola-issues')
-    expect((db.prepare(`
+    expect(((await db.prepare(`
       SELECT github_issue_state AS state
       FROM bug_reports WHERE submission_id = ?
-    `).get(submissionId) as { state: string }).state).toBe('deleted')
+    `).get(submissionId)) as { state: string }).state).toBe('deleted')
 
     await webhook('reopened', 'titanxxh/open-agricola-issues')
-    expect((db.prepare(`
+    expect(((await db.prepare(`
       SELECT github_issue_state AS state
       FROM bug_reports WHERE submission_id = ?
-    `).get(submissionId) as { state: string }).state).toBe('deleted')
-    expect(store.reporterDeletionPlan('u1').issueNumbers).toEqual([])
+    `).get(submissionId)) as { state: string }).state).toBe('deleted')
+    expect((await store.reporterDeletionPlan('u1')).issueNumbers).toEqual([])
   })
 
   it('applies participant tombstones and retains the evidence auditor identity', async () => {
@@ -871,15 +874,15 @@ describe('bug report routes', () => {
       stepNo: 5,
       previousCheckpointStepNo: 5,
     })
-    db.prepare(`
+    ;(await db.prepare(`
       INSERT INTO room_players (room_id, user_id, player_index, joined_at)
       VALUES ('active-room', ?, 1, ?)
-    `).run(OTHER.id, Date.now())
-    db.prepare(`
+    `).run(OTHER.id, Date.now()))
+    ;(await db.prepare(`
       UPDATE game_replay_steps
       SET payload_kind = ?, payload_gzip = ?, frame_hash = ?
       WHERE room_id = 'active-room' AND step_no = 5
-    `).run(encoded.payloadKind, encoded.payloadGzip, encoded.frameHash)
+    `).run(encoded.payloadKind, encoded.payloadGzip, encoded.frameHash))
     const customCards = [{
       cardType: 'minor',
       cardJson: {
@@ -890,22 +893,22 @@ describe('bug report routes', () => {
       },
       artUrl: `/replay-assets/${'f'.repeat(64)}`,
     }]
-    db.prepare(`
+    ;(await db.prepare(`
       UPDATE game_replays
       SET custom_cards_json = ?
       WHERE room_id = 'active-room'
-    `).run(JSON.stringify(customCards))
-    db.prepare(`
+    `).run(JSON.stringify(customCards)))
+    ;(await db.prepare(`
       UPDATE bug_reports
       SET frame_hash = ?, evidence_expires_at = ?
       WHERE submission_id = ?
-    `).run(encoded.frameHash, Date.now() + 60_000, submissionId)
-    db.prepare("DELETE FROM rooms WHERE id = 'active-room'").run()
-    db.prepare(`
+    `).run(encoded.frameHash, Date.now() + 60_000, submissionId))
+    ;(await db.prepare("DELETE FROM rooms WHERE id = 'active-room'").run())
+    ;(await db.prepare(`
       UPDATE game_context_participants
       SET user_id = NULL
       WHERE room_id = 'active-room' AND player_index = 0
-    `).run()
+    `).run())
 
     const reporterInspected = await invoke(
       'POST',
@@ -978,9 +981,9 @@ describe('bug report routes', () => {
       players: Array<{ cardStates: Record<string, { extraData?: unknown }> }>
     }).players[1]!.cardStates.B003_Moonshine!.extraData)
       .toEqual({ occ: 'SECRET_OCC' })
-    db.prepare(`
+    ;(await db.prepare(`
       DELETE FROM game_context_participants WHERE room_id = 'active-room'
-    `).run()
+    `).run())
     const legacyInspected = await invoke(
       'POST',
       `/api/v1/bug-reports/${submissionId}/evidence/inspect`,
@@ -995,12 +998,12 @@ describe('bug report routes', () => {
         { name: 'Deleted player (seat 2)' },
       ],
     })
-    db.prepare('DELETE FROM users WHERE id = ?').run(USER.id)
-    expect(db.prepare(`
+    ;(await db.prepare('DELETE FROM users WHERE id = ?').run(USER.id))
+    expect((await db.prepare(`
       SELECT maintainer_user_id, maintainer_identity
       FROM bug_report_evidence_audit
       WHERE submission_id = ?
-    `).get(submissionId)).toEqual({
+    `).get(submissionId))).toEqual({
       maintainer_user_id: null,
       maintainer_identity: USER.id,
     })
@@ -1026,7 +1029,7 @@ describe('bug report routes', () => {
       ) VALUES (?, ?, ?, 'active-room', 5, ?, 'reporter', 'test', ?)
     `)
     for (let index = 0; index < 30; index += 1) {
-      insertAudit.run(submissionId, USER.id, USER.id, FRAME_HASH, Date.now())
+      ;(await insertAudit.run(submissionId, USER.id, USER.id, FRAME_HASH, Date.now()))
     }
 
     const inspected = await invoke(
@@ -1040,10 +1043,10 @@ describe('bug report routes', () => {
 
     expect(inspected.statusCode).toBe(429)
     expect(json(inspected)).toMatchObject({ code: 'rate_limited' })
-    expect((db.prepare(`
+    expect(((await db.prepare(`
       SELECT COUNT(*) AS count FROM bug_report_evidence_audit
       WHERE maintainer_user_id = ?
-    `).get(USER.id) as { count: number }).count).toBe(30)
+    `).get(USER.id)) as { count: number }).count).toBe(30)
   })
 
   it('expires evidence only while the game context remains active', async () => {
@@ -1059,9 +1062,9 @@ describe('bug report routes', () => {
       { authorIdentity: 'hosted', confirmHosted: true },
     )
     await invoke('POST', `/api/v1/bug-reports/${submissionId}/submit`, {})
-    db.prepare(`
+    ;(await db.prepare(`
       UPDATE bug_reports SET evidence_expires_at = 0 WHERE submission_id = ?
-    `).run(submissionId)
+    `).run(submissionId))
 
     const inspected = await invoke(
       'POST',
@@ -1075,12 +1078,12 @@ describe('bug report routes', () => {
     expect(inspected.statusCode).toBe(503)
     expect(json(inspected)).toMatchObject({ code: 'replay_segment_unavailable' })
 
-    db.prepare(`
+    ;(await db.prepare(`
       UPDATE game_contexts SET lifecycle = 'completed' WHERE room_id = 'active-room'
-    `).run()
-    db.prepare(`
+    `).run())
+    ;(await db.prepare(`
       DELETE FROM game_replay_steps WHERE room_id = 'active-room'
-    `).run()
+    `).run())
     const completed = await invoke(
       'POST',
       `/api/v1/bug-reports/${submissionId}/evidence/inspect`,

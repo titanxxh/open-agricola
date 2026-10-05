@@ -1,4 +1,4 @@
-import type Database from 'better-sqlite3'
+import type { PostgresDatabase as Database } from '../database/postgres'
 import type { CustomCardDef } from '../../shared/contract/protocol/game.ts'
 import type { GameContextLifecycle } from '../../shared/contract/protocol/game-context.ts'
 import type {
@@ -15,7 +15,7 @@ import type {
 } from '../../shared/contract/protocol/replay.ts'
 import { decodeReplayFrame, type JsonValue } from './replay-codec.ts'
 
-type SqliteDb = Pick<Database.Database, 'prepare'>
+type StoreDatabase = Pick<Database, 'prepare'>
 
 type ReplayHeaderRow = {
   lifecycle: GameContextLifecycle
@@ -182,14 +182,14 @@ export const projectReplayParticipantNames = (
 }
 
 export class ReplayStore {
-  private readonly db: SqliteDb
+  private readonly db: StoreDatabase
 
-  constructor(db: SqliteDb) {
+  constructor(db: StoreDatabase) {
     this.db = db
   }
 
-  private header(roomId: string): AvailableHeader | ReplayUnavailableError {
-    const row = this.db.prepare(`
+  private async header(roomId: string): Promise<Awaited<AvailableHeader | ReplayUnavailableError>> {
+    const row = (await this.db.prepare(`
       SELECT context.lifecycle,
              context.replay_status,
              replay.status,
@@ -202,7 +202,7 @@ export class ReplayStore {
       FROM game_contexts AS context
       LEFT JOIN game_replays AS replay ON replay.room_id = context.room_id
       WHERE context.room_id = ?
-    `).get(roomId) as ReplayHeaderRow | undefined
+    `).get(roomId)) as ReplayHeaderRow | undefined
     if (!row) return replayError('unknown_context', 'Game context not found')
     if (row.lifecycle === 'removed') {
       return replayError('context_removed', 'Replay has been removed', 'removed')
@@ -247,8 +247,8 @@ export class ReplayStore {
     }
   }
 
-  private segmentDescriptors(roomId: string): ReplaySegmentDescriptor[] {
-    return (this.db.prepare(`
+  private async segmentDescriptors(roomId: string): Promise<Awaited<ReplaySegmentDescriptor[]>> {
+    return ((await this.db.prepare(`
       SELECT checkpoint_step_no,
              MIN(step_no) AS first_step_no,
              MAX(step_no) AS last_step_no
@@ -256,26 +256,26 @@ export class ReplayStore {
       WHERE room_id = ?
       GROUP BY checkpoint_step_no
       ORDER BY checkpoint_step_no
-    `).all(roomId) as ReplaySegmentRow[]).map((row) => ({
+    `).all(roomId)) as ReplaySegmentRow[]).map((row) => ({
       checkpointStepNo: row.checkpoint_step_no,
       firstStepNo: Math.min(row.checkpoint_step_no, row.first_step_no),
       lastStepNo: row.last_step_no,
     }))
   }
 
-  private participants(roomId: string): ReplayParticipantRow[] {
-    return this.db.prepare(`
+  private async participants(roomId: string): Promise<Awaited<ReplayParticipantRow[]>> {
+    return (await this.db.prepare(`
       SELECT player_index, display_name, name_is_default
       FROM game_result_players
       WHERE room_id = ?
       ORDER BY player_index
-    `).all(roomId) as ReplayParticipantRow[]
+    `).all(roomId)) as ReplayParticipantRow[]
   }
 
-  manifest(roomId: string): ReplayManifestResponse {
-    const header = this.header(roomId)
+  async manifest(roomId: string): Promise<Awaited<ReplayManifestResponse>> {
+    const header = (await this.header(roomId))
     if ('ok' in header) return header
-    const segments = this.segmentDescriptors(roomId)
+    const segments = (await this.segmentDescriptors(roomId))
     if (segments.length === 0) {
       return replayError(
         'replay_segment_unavailable',
@@ -283,10 +283,10 @@ export class ReplayStore {
         'completed',
       )
     }
-    const participants = this.participants(roomId)
+    const participants = (await this.participants(roomId))
     let steps: ReplayStepSummary[]
     try {
-      steps = (this.db.prepare(`
+      steps = ((await this.db.prepare(`
         SELECT step_no,
                room_version,
                checkpoint_step_no,
@@ -298,7 +298,7 @@ export class ReplayStore {
         FROM game_replay_steps
         WHERE room_id = ?
         ORDER BY step_no
-      `).all(roomId) as ReplayStepSummaryRow[]).map((step) => ({
+      `).all(roomId)) as ReplayStepSummaryRow[]).map((step) => ({
         stepNo: step.step_no,
         roomVersion: step.room_version,
         checkpointStepNo: step.checkpoint_step_no,
@@ -360,10 +360,10 @@ export class ReplayStore {
     }
   }
 
-  segment(roomId: string, checkpointStepNo: number): ReplaySegmentResponse {
-    const header = this.header(roomId)
+  async segment(roomId: string, checkpointStepNo: number): Promise<Awaited<ReplaySegmentResponse>> {
+    const header = (await this.header(roomId))
     if ('ok' in header) return header
-    const descriptor = this.segmentDescriptors(roomId)
+    const descriptor = (await this.segmentDescriptors(roomId))
       .find((segment) => segment.checkpointStepNo === checkpointStepNo)
     if (!descriptor) {
       return replayError(
@@ -372,7 +372,7 @@ export class ReplayStore {
         'completed',
       )
     }
-    const rows = this.db.prepare(`
+    const rows = (await this.db.prepare(`
       SELECT step_no,
              room_version,
              checkpoint_step_no,
@@ -386,9 +386,9 @@ export class ReplayStore {
       FROM game_replay_steps
       WHERE room_id = ? AND checkpoint_step_no = ?
       ORDER BY step_no
-    `).all(roomId, checkpointStepNo) as ReplayStepRow[]
+    `).all(roomId, checkpointStepNo)) as ReplayStepRow[]
     const participantNames = new Map(
-      this.participants(roomId).map((participant) => [
+      (await this.participants(roomId)).map((participant) => [
         participant.player_index,
         participant.display_name,
       ]),
@@ -425,7 +425,7 @@ export class ReplayStore {
         })
       }
     } catch {
-      const nextCheckpointStepNo = this.segmentDescriptors(roomId)
+      const nextCheckpointStepNo = (await this.segmentDescriptors(roomId))
         .find((segment) => segment.checkpointStepNo > checkpointStepNo)
         ?.checkpointStepNo
       return {
@@ -453,14 +453,14 @@ export class ReplayStore {
     }
   }
 
-  anchor(roomId: string, stepNo: number, expectedHash: string): ReplayAnchorResponse {
-    const header = this.header(roomId)
+  async anchor(roomId: string, stepNo: number, expectedHash: string): Promise<Awaited<ReplayAnchorResponse>> {
+    const header = (await this.header(roomId))
     if ('ok' in header) return header
-    const row = this.db.prepare(`
+    const row = (await this.db.prepare(`
       SELECT checkpoint_step_no, frame_hash
       FROM game_replay_steps
       WHERE room_id = ? AND step_no = ?
-    `).get(roomId, stepNo) as ReplayAnchorRow | undefined
+    `).get(roomId, stepNo)) as ReplayAnchorRow | undefined
     if (!row || row.frame_hash !== expectedHash) {
       return replayError(
         'anchor_mismatch',
@@ -468,7 +468,7 @@ export class ReplayStore {
         'completed',
       )
     }
-    const segment = this.segment(roomId, row.checkpoint_step_no)
+    const segment = (await this.segment(roomId, row.checkpoint_step_no))
     if (!segment.ok) {
       return {
         ...segment,

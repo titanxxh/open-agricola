@@ -20,7 +20,7 @@ MAIN_REPO_DIR="$(cd "$(dirname "$(git -C "$SCRIPT_DIR" rev-parse --path-format=a
 # repo's, the same way persistent dev state is anchored there — otherwise every
 # new worktree silently starts with no GH_TOKEN, no OAuth config and no API
 # bases, leaving platform integrations and endpoint configuration incomplete.
-ENV_FILE="$SCRIPT_DIR/.env"
+ENV_FILE="${LOCAL_ENV_FILE:-$SCRIPT_DIR/.env}"
 if [ ! -f "$ENV_FILE" ]; then
   ENV_FILE="$MAIN_REPO_DIR/.env"
 fi
@@ -32,25 +32,11 @@ if [ -f "$ENV_FILE" ]; then
   set +a
 fi
 
-# Anchor persistent dev state (sqlite DB, JSON room snapshots, custom cards,
-# card art) to the MAIN repo even when we're running from
-# a worktree. Without this, each worktree gets its own ./data and ./output,
-# so fixed dev room game state diverges across worktrees.
-#
-# Override: pass the env var explicitly to escape this anchor (e.g.
-#   DB_DIR=/tmp/foo PERSISTED_ROOMS_DIR=/tmp/bar ./restart-local.sh
-# ).
+# Worktrees share locally hosted dependency data with their main checkout.
+# DATABASE_URL / S3_* select explicit external services; changing endpoints does
+# not migrate data. The Viewer directory is only an offline packaging cache.
 SHARED_DATA_DIR="${SHARED_DATA_DIR:-$MAIN_REPO_DIR/data}"
-SHARED_OUTPUT_DIR="${SHARED_OUTPUT_DIR:-$MAIN_REPO_DIR/output}"
-
-DB_DIR="${DB_DIR:-$SHARED_DATA_DIR}"
-DB_PATH="${DB_PATH:-$DB_DIR/open-agricola.db}"
-PERSISTED_ROOMS_DIR="${PERSISTED_ROOMS_DIR:-$SHARED_OUTPUT_DIR}"
-CUSTOM_CARD_DIR="${CUSTOM_CARD_DIR:-$SHARED_DATA_DIR/custom-cards}"
-CARD_ART_DIR="${CARD_ART_DIR:-$SHARED_DATA_DIR/card-art}"
 REPLAY_VIEWER_ROOT="${REPLAY_VIEWER_ROOT:-$SHARED_DATA_DIR/replay-viewers}"
-REPLAY_ASSET_ROOT="${REPLAY_ASSET_ROOT:-$SHARED_DATA_DIR/replay-assets}"
-REPLAY_REMOVAL_LEDGER_PATH="${REPLAY_REMOVAL_LEDGER_PATH:-$SHARED_DATA_DIR/replay-removals.jsonl}"
 
 # Linked worktrees may share the main checkout's installed dependencies.
 # Materialize missing top-level entries as symlinks so Node/Vite can resolve
@@ -91,7 +77,7 @@ usage() {
 Usage: ./restart-local.sh [--kill-only|--kill_only|-k]
                           [--players N | -p N | --players=N | -p=N]
                           [--parents] [--seasons] [--moor] [--draft] [--preview]
-                          [--snake] [--intranet] [-h|--help]
+                          [--snake] [--intranet] [--instances 1|2] [-h|--help]
 
 Without flags: stop any process on the frontend/backend ports, then start
 fresh backend (tsx) and frontend (vite) bound to 127.0.0.1, reachable only
@@ -118,11 +104,14 @@ are created automatically; each survives backend restarts independently.
                                  Linux eth0) so other machines on the network
                                  can reach the dev server. Fails if that
                                  address cannot be determined.
+  --instances N                  Start 1 (default) or 2 local app instances behind
+                                 the same public entry. PostgreSQL/S3 stay shared.
   -h, --help                     Show this help.
 EOF
 }
 
 KILL_ONLY=0
+APP_INSTANCES="${APP_INSTANCES:-1}"
 PLAYERS="4"
 PARENTS_ENABLED=0
 SEASONS_ENABLED=0
@@ -147,6 +136,15 @@ while [ $# -gt 0 ]; do
       ;;
     --players=*|-p=*)
       PLAYERS="${1#*=}"
+      shift
+      ;;
+    --instances)
+      [ "$#" -ge 2 ] || { echo "--instances requires 1 or 2"; exit 1; }
+      APP_INSTANCES="$2"
+      shift 2
+      ;;
+    --instances=*)
+      APP_INSTANCES="${1#*=}"
       shift
       ;;
     --parents)
@@ -188,6 +186,8 @@ while [ $# -gt 0 ]; do
       ;;
   esac
 done
+
+case "$APP_INSTANCES" in 1|2) ;; *) echo "--instances must be 1 or 2"; exit 1 ;; esac
 
 case "$PLAYERS" in
   2|3|4|5|6) ;;
@@ -337,50 +337,7 @@ EOF
 }
 
 dev_rooms_without_variant() {
-  local variant="$1"
-  DB_PATH="$DB_PATH" VARIANT="$variant" node <<'EOF'
-const fs = require('node:fs')
-const Database = require('better-sqlite3')
-const { parseRoomBody } = require('./server/game/persistence/room-body-codec.ts')
-
-const dbPath = process.env.DB_PATH
-if (!dbPath || !fs.existsSync(dbPath)) process.exit(0)
-const variant = process.env.VARIANT
-
-const db = new Database(dbPath, { readonly: true, fileMustExist: true })
-try {
-  const table = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'rooms'").get()
-  if (!table) process.exit(0)
-  const rows = db.prepare("SELECT id, state_json FROM rooms WHERE id IN ('dev2', 'dev3', 'dev4', 'dev5', 'dev6')").all()
-  const missing = rows.filter((row) => {
-    if (!row.state_json) return true
-    try {
-      const state = parseRoomBody(row.state_json).state
-      switch (variant) {
-        case 'parents':
-          return state.enableParentCards !== true
-        case 'direct-parents':
-          return state.enableParentCards !== true || !Array.isArray(state.players) || !state.players.every((player) =>
-            player.parentCards && player.parentCards.mother && player.parentCards.father
-          )
-        case 'seasons':
-          return state.enableThroughTheSeasons !== true
-        case 'moor':
-          return state.enableFarmersOfTheMoor !== true
-        case 'snake':
-          return state.enableSnakeOpening !== true
-        default:
-          return true
-      }
-    } catch {
-      return true
-    }
-  })
-  if (missing.length > 0) console.log(missing.map((row) => row.id).join(', '))
-} finally {
-  db.close()
-}
-EOF
+  "$BACKEND_BIN" "$SCRIPT_DIR/scripts/local-rooms.ts" missing-variant "$1"
 }
 
 confirm_dev_room_reset() {
@@ -402,33 +359,7 @@ confirm_dev_room_reset() {
 }
 
 reset_persisted_dev_rooms() {
-  DB_PATH="$DB_PATH" node <<'EOF'
-const fs = require('node:fs')
-const Database = require('better-sqlite3')
-
-const dbPath = process.env.DB_PATH
-if (!dbPath || !fs.existsSync(dbPath)) {
-  console.log('  No SQLite room DB found.')
-  process.exit(0)
-}
-
-const db = new Database(dbPath)
-try {
-  const table = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'rooms'").get()
-  if (!table) {
-    console.log('  No rooms table found.')
-    process.exit(0)
-  }
-  const result = db.prepare("DELETE FROM rooms WHERE id IN ('dev2', 'dev3', 'dev4', 'dev5', 'dev6')").run()
-  console.log(`  Removed ${result.changes} SQLite dev room row(s).`)
-} finally {
-  db.close()
-}
-EOF
-
-  for room_id in dev2 dev3 dev4 dev5 dev6; do
-    rm -f "$PERSISTED_ROOMS_DIR/${room_id}.json"
-  done
+  "$BACKEND_BIN" "$SCRIPT_DIR/scripts/local-rooms.ts" reset
 }
 
 STARTED_PROCESS_TARGETS=()
@@ -466,9 +397,17 @@ start_and_wait() {
   fi
   echo "  PID: $pid"
 
-  for ((i = 0; i < 30; i += 1)); do
+  for ((i = 0; i < 180; i += 1)); do
     if wait_for_port_state "$port" "yes" 1 0; then
-      return 0
+      local listener listener_pgid
+      while IFS= read -r listener; do
+        listener_pgid="$(ps -o pgid= -p "$listener" 2>/dev/null | tr -d ' ')"
+        if [ "$listener" = "$pid" ] || { [ "$detached" -eq 1 ] && [ "$listener_pgid" = "$pid" ]; }; then
+          return 0
+        fi
+      done < <(list_listening_pids "$port")
+      echo "Error: another process acquired $label port $port during startup."
+      return 1
     fi
     if ! kill -0 "$pid" 2>/dev/null; then
       echo "Error: $label exited before binding port $port."
@@ -508,6 +447,7 @@ REPLAY_VIEWER_BUILD_ID="${REPLAY_VIEWER_BUILD_ID:-$(
     "$PNPM_BIN" run build:replay-viewer | tail -n 1
 )}"
 GAME_BUILD_ID="${GAME_BUILD_ID:-$(git -C "$SCRIPT_DIR" rev-parse HEAD)}"
+env REPLAY_VIEWER_ROOT="$REPLAY_VIEWER_ROOT" REPLAY_VIEWER_BUILD_ID="$REPLAY_VIEWER_BUILD_ID" "$PNPM_BIN" exec tsx scripts/upload-replay-viewer.ts
 
 if [ "$INTRANET_ENABLED" -eq 1 ]; then
   BIND_IP=$(get_lan_ip)
@@ -583,10 +523,11 @@ if [ "$PREVIEW_ENABLED" -eq 1 ]; then
     "$PNPM_BIN" run build
 fi
 
-echo "Starting backend (port $BACKEND_PORT on $BIND_IP, dev2/dev3/dev4/dev5/dev6 persisted via SQLite)..."
+echo "Starting backend (port $BACKEND_PORT on $BIND_IP, dev2/dev3/dev4/dev5/dev6 recorded in PostgreSQL/S3)..."
 start_and_wait "backend" "$BACKEND_PORT" "$BACKEND_LOG" env \
   NODE_ENV=development \
-  PERSIST_ROOMS=sqlite \
+  APP_INSTANCES="$APP_INSTANCES" \
+  BACKEND_PORT="$BACKEND_PORT" \
   ALLOW_ANONYMOUS_WS=true \
   ENABLE_AUTH_TEST_HELPERS=1 \
   BACKEND_HOST="$BIND_IP" \
@@ -601,18 +542,10 @@ start_and_wait "backend" "$BACKEND_PORT" "$BACKEND_LOG" env \
   DEV_ENABLE_SNAKE_OPENING="$([ "$SNAKE_ENABLED" -eq 1 ] && echo true || echo false)" \
   DEV_DRAFT_MODE="$([ "$DRAFT_ENABLED" -eq 1 ] && echo simultaneous || echo none)" \
   DEV_DRAFT_POOL_SIZE=7 \
-  DB_DIR="$DB_DIR" \
-  DB_PATH="$DB_PATH" \
-  PERSISTED_ROOMS_DIR="$PERSISTED_ROOMS_DIR" \
-  CUSTOM_CARD_DIR="$CUSTOM_CARD_DIR" \
-  CARD_ART_DIR="$CARD_ART_DIR" \
-  REPLAY_NEW_ROOMS_ENABLED="${REPLAY_NEW_ROOMS_ENABLED:-true}" \
   REPLAY_VIEWER_BUILD_ID="$REPLAY_VIEWER_BUILD_ID" \
   REPLAY_VIEWER_ROOT="$REPLAY_VIEWER_ROOT" \
-  REPLAY_ASSET_ROOT="$REPLAY_ASSET_ROOT" \
-  REPLAY_REMOVAL_LEDGER_PATH="$REPLAY_REMOVAL_LEDGER_PATH" \
   GAME_BUILD_ID="$GAME_BUILD_ID" \
-  "$BACKEND_BIN" "$SCRIPT_DIR/server/index.ts"
+  "$BACKEND_BIN" "$SCRIPT_DIR/scripts/local-backend.ts"
 
 if [ "$PREVIEW_ENABLED" -eq 1 ]; then
   echo "Starting frontend preview (port $FRONTEND_PORT on $BIND_IP)..."
@@ -632,15 +565,10 @@ else
 fi
 
 echo ""
-echo "Persistent dev state:"
-echo "  DB_DIR             = $DB_DIR"
-echo "  DB_PATH            = $DB_PATH"
-echo "  PERSISTED_ROOMS_DIR= $PERSISTED_ROOMS_DIR"
-echo "  CARD_ART_DIR       = $CARD_ART_DIR"
-echo "  REPLAY_VIEWER_ROOT = $REPLAY_VIEWER_ROOT"
+echo "Persistent dev state: PostgreSQL + private S3"
+echo "  SHARED_DATA_DIR    = $SHARED_DATA_DIR"
+echo "  VIEWER_BUILD_CACHE = $REPLAY_VIEWER_ROOT"
 echo "  REPLAY_VIEWER_ID   = $REPLAY_VIEWER_BUILD_ID"
-echo "  REPLAY_ASSET_ROOT  = $REPLAY_ASSET_ROOT"
-echo "  REPLAY_REMOVAL_LEDGER_PATH = $REPLAY_REMOVAL_LEDGER_PATH"
 echo "  FRONTEND_MODE      = $([ "$PREVIEW_ENABLED" -eq 1 ] && echo preview || echo dev)"
 [ "$SCRIPT_DIR" != "$MAIN_REPO_DIR" ] && echo "  (running from worktree; anchored to main repo: $MAIN_REPO_DIR)"
 echo ""
@@ -666,14 +594,17 @@ fi
 if [ "$DRAFT_ENABLED" -eq 1 ]; then
   DEV_ROOM_QUERY_SUFFIX="${DEV_ROOM_QUERY_SUFFIX}&draftMode=simultaneous&draftPoolSize=7"
 fi
+DEV_ROOM_ASSIGNMENTS="$("$PNPM_BIN" exec tsx scripts/local-rooms.ts current)"
 for n in 2 3 4 5 6; do
+  room_id="$(printf '%s\n' "$DEV_ROOM_ASSIGNMENTS" | sed -n "s/^dev${n}=//p")"
+  [ -n "$room_id" ] || room_id="dev$n"
   marker=""
   if [ "$PLAYERS" = "$n" ]; then
     marker="    <-- selected (--players $n)"
   fi
-  echo "  ${n}-player room (room=dev${n})${marker}"
+  echo "  ${n}-player room (room=${room_id})${marker}"
   for ((i = 1; i <= n; i += 1)); do
-    echo "    P${i}: http://${BIND_IP}:${FRONTEND_PORT}/?player=p${i}&transport=ws&room=dev${n}&devMode=1${DEV_ROOM_QUERY_SUFFIX}"
+    echo "    P${i}: http://${BIND_IP}:${FRONTEND_PORT}/?player=p${i}&transport=ws&room=${room_id}&devMode=1${DEV_ROOM_QUERY_SUFFIX}"
   done
 done
 echo ""

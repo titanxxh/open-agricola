@@ -1,71 +1,92 @@
 import { nanoid } from 'nanoid'
+import { getDb } from '../db'
+import type { PostgresDatabase } from '../database/postgres'
+import { TokenCipher } from '../bug-report/bug-report-store'
 
-type Entry = { token: string; userId: string; expiresAt: number }
-type Pending = { userId: string; expiresAt: number }
+type TokenRow = {
+  user_id: string
+  token_ciphertext: Buffer
+  token_nonce: Buffer
+  token_tag: Buffer
+  token_key_id: string
+}
 
-/**
- * In-memory transient store for the GitHub OAuth handshake token flow.
- *
- * Two phases for a given handshakeId:
- *   1. "pending" — allocated by /oauth/start; waiting for GitHub callback.
- *   2. "bound"   — token exchanged by /oauth/callback; waiting for /propose
- *                  to consume it.
- *
- * Tokens never touch disk. Entries auto-expire after ttlMs (default 60s).
- */
+/** Shared, expiring OAuth handshake. Callback and token consumption each happen once. */
 export class TokenCache {
-  private readonly tokens = new Map<string, Entry>()
-  private readonly pending = new Map<string, Pending>()
   private readonly ttlMs: number
-
-  constructor(ttlMs = 60_000) {
+  private readonly database: () => PostgresDatabase
+  private readonly encryption: () => TokenCipher
+  constructor(
+    ttlMs = 60_000,
+    database: () => PostgresDatabase = getDb,
+    encryption: () => TokenCipher = () => {
+      const key = process.env.WORKSHOP_TOKEN_ENCRYPTION_KEY
+      if (!key) throw new Error('WORKSHOP_TOKEN_ENCRYPTION_KEY is required for Workshop OAuth')
+      return new TokenCipher('workshop-v1', new Map([['workshop-v1', Buffer.from(key, 'base64')]]))
+    },
+  ) {
     this.ttlMs = ttlMs
+    this.database = database
+    this.encryption = encryption
   }
 
-  /** Start a handshake: allocate a handshakeId tied to userId; token bound later via callback. */
-  allocateHandshakeId(userId: string): string {
-    const hs = nanoid(32)
-    this.pending.set(hs, { userId, expiresAt: Date.now() + this.ttlMs })
-    return hs
+  async allocateHandshakeId(userId: string): Promise<string> {
+    const id = nanoid(32)
+    await this.database().prepare('INSERT INTO workshop_oauth_handshakes (id, user_id, expires_at) VALUES (?, ?, ?)')
+      .run(id, userId, Date.now() + this.ttlMs)
+    return id
   }
 
-  /** Callback handler: bind the GitHub access token to an existing handshake. */
-  bind(hs: string, token: string): void {
-    const p = this.pending.get(hs)
-    if (!p || p.expiresAt < Date.now()) {
-      this.pending.delete(hs)
-      return
-    }
-    this.tokens.set(hs, { token, userId: p.userId, expiresAt: p.expiresAt })
-    this.pending.delete(hs)
+  async hasPending(id: string): Promise<boolean> {
+    return Boolean(await this.database().prepare(`
+      SELECT 1 FROM workshop_oauth_handshakes
+      WHERE id = ? AND expires_at > ? AND callback_claimed = 0 AND token_ciphertext IS NULL
+    `).get(id, Date.now()))
   }
 
-  /** Consumer: retrieve the bound token; returns undefined if unbound or expired. */
-  get(hs: string): { token: string; userId: string } | undefined {
-    const e = this.tokens.get(hs)
-    if (!e) return undefined
-    if (e.expiresAt < Date.now()) {
-      this.tokens.delete(hs)
-      return undefined
-    }
-    return { token: e.token, userId: e.userId }
+  async claimCallback(id: string): Promise<boolean> {
+    return (await this.database().prepare(`
+      UPDATE workshop_oauth_handshakes SET callback_claimed = 1
+      WHERE id = ? AND expires_at > ? AND callback_claimed = 0 AND token_ciphertext IS NULL
+    `).run(id, Date.now())).changes === 1
   }
 
-  /** True if a pending (not-yet-bound, not-yet-expired) handshakeId exists. */
-  hasPending(hs: string): boolean {
-    const p = this.pending.get(hs)
-    if (!p) return false
-    if (p.expiresAt < Date.now()) {
-      this.pending.delete(hs)
-      return false
-    }
-    return true
+  async bind(id: string, token: string): Promise<boolean> {
+    const value = this.encryption().encrypt(token)
+    return (await this.database().prepare(`
+      UPDATE workshop_oauth_handshakes
+      SET token_ciphertext = ?, token_nonce = ?, token_tag = ?, token_key_id = ?, callback_claimed = 1
+      WHERE id = ? AND expires_at > ? AND token_ciphertext IS NULL
+    `).run(value.ciphertext, value.nonce, value.tag, value.keyId, id, Date.now())).changes === 1
   }
 
-  /** Clear all state for a handshakeId (used after successful consumption or error). */
-  delete(hs: string): void {
-    this.tokens.delete(hs)
-    this.pending.delete(hs)
+  /** Atomic consumption also verifies the authenticated user before deleting. */
+  async consume(id: string, userId: string): Promise<{ token: string; userId: string } | undefined> {
+    const row = await this.database().prepare(`
+      DELETE FROM workshop_oauth_handshakes
+      WHERE id = ? AND user_id = ? AND expires_at > ? AND token_ciphertext IS NOT NULL
+      RETURNING user_id, token_ciphertext, token_nonce, token_tag, token_key_id
+    `).get<TokenRow>(id, userId, Date.now())
+    return row && this.decode(row)
+  }
+
+  /** Read-only introspection; production proposal paths use consume. */
+  async get(id: string): Promise<{ token: string; userId: string } | undefined> {
+    const row = await this.database().prepare(`
+      SELECT user_id, token_ciphertext, token_nonce, token_tag, token_key_id
+      FROM workshop_oauth_handshakes WHERE id = ? AND expires_at > ? AND token_ciphertext IS NOT NULL
+    `).get<TokenRow>(id, Date.now())
+    return row && this.decode(row)
+  }
+
+  private decode(row: TokenRow) {
+    return { userId: row.user_id, token: this.encryption().decrypt({
+      ciphertext: row.token_ciphertext, nonce: row.token_nonce, tag: row.token_tag, keyId: row.token_key_id,
+    }) }
+  }
+
+  async delete(id: string): Promise<void> {
+    await this.database().prepare('DELETE FROM workshop_oauth_handshakes WHERE id = ?').run(id)
   }
 }
 

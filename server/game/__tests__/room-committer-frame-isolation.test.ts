@@ -1,4 +1,5 @@
-import Database from 'better-sqlite3'
+import { createTestDatabase } from '../../__tests__/_helpers/postgres'
+import type { PostgresDatabase } from '../../database/postgres'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { prependDerivedLogEntries } from '../../../shared/events/log-cache.ts'
 import {
@@ -6,9 +7,8 @@ import {
   type PersistedSessionSnapshot,
 } from '../../../shared/session/serialization.ts'
 import { stabilizeRandomHands } from '../../__tests__/_helpers/stabilize-random-hands.ts'
-import { runMigrations } from '../../db.ts'
 import { GameSession } from '../authoritative-session.ts'
-import { SqliteRoomPersistence } from '../persistence/sqlite-adapter.ts'
+import { PostgresRoomPersistence } from '../persistence/postgres-adapter.ts'
 import { decodeReplayFrame, type JsonValue } from '../replay-codec.ts'
 import { RoomCommitter, replayIntentFromCommand } from '../room-committer.ts'
 import type { Room } from '../room.ts'
@@ -17,17 +17,17 @@ const jsonValue = (value: unknown): JsonValue => JSON.parse(JSON.stringify(value
 const actionIntent = replayIntentFromCommand({ type: 'devSetResources', playerIndex: 0, resources: { food: 5 } })!
 
 describe('RoomCommitter Frame isolation', () => {
-  let db: Database.Database
-  let persistence: SqliteRoomPersistence
+  let db: PostgresDatabase
+  let persistence: PostgresRoomPersistence
   let room: Room
   let committer: RoomCommitter
   let retries: Array<() => void>
 
-  beforeEach(() => {
-    db = new Database(':memory:')
-    db.pragma('foreign_keys = ON')
-    runMigrations(db, () => {})
-    persistence = new SqliteRoomPersistence(db)
+  beforeEach(async () => {
+    db = await createTestDatabase()
+
+
+    persistence = new PostgresRoomPersistence(db)
     const session = new GameSession(587, undefined, { playerCount: 2 })
     stabilizeRandomHands(session.state.players)
     session.updatePlayerName(0, 'Before')
@@ -38,12 +38,11 @@ describe('RoomCommitter Frame isolation', () => {
     }])
     room = {
       id: 'frame-isolation', session, players: [], seatOwners: [],
-      maxPlayers: 2, version: 0, status: 'playing', startedAt: 100,
+      maxPlayers: 2, version: 0, status: 'playing', replayRecording: true, replayViewerBuildId: 'viewer-1', replayGameBuildId: 'game-1', startedAt: 100,
     }
     retries = []
     committer = new RoomCommitter({
       persistence,
-      enabled: true,
       viewerBuildId: 'viewer-1',
       gameBuildId: 'game-1',
       viewerBuildExists: () => true,
@@ -55,10 +54,10 @@ describe('RoomCommitter Frame isolation', () => {
     })
   })
 
-  afterEach(() => {
+  afterEach(async () => {
     committer.shutdown()
     room.session.dispose()
-    db.close()
+    ;(await db.close())
   })
 
   const frameSource = (source: 'native' | 'worker') => {
@@ -82,16 +81,15 @@ describe('RoomCommitter Frame isolation', () => {
     return capture
   }
 
-  const rejectStepOne = () => db.exec(`
-    CREATE TRIGGER reject_step BEFORE INSERT ON game_replay_steps
-    WHEN NEW.step_no = 1 BEGIN SELECT RAISE(ABORT, 'disk unavailable'); END;
-  `)
+  const rejectStepOne = async () => (await db.exec(`
+    CREATE FUNCTION reject_step_fn() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.step_no = 1 THEN RAISE EXCEPTION 'disk unavailable'; END IF; RETURN NEW; END $$; CREATE TRIGGER reject_step BEFORE INSERT ON game_replay_steps FOR EACH ROW EXECUTE FUNCTION reject_step_fn();
+  `))
 
-  const rawFrames = (): JsonValue[] => {
-    const rows = db.prepare(`
+  const rawFrames = async (): Promise<Awaited<JsonValue[]>> => {
+    const rows = (await db.prepare(`
       SELECT payload_kind, payload_gzip, checkpoint_step_no, frame_hash
       FROM game_replay_steps WHERE room_id = ? ORDER BY step_no
-    `).all(room.id) as Array<{
+    `).all(room.id)) as Array<{
       payload_kind: 'checkpoint' | 'delta'
       payload_gzip: Buffer
       checkpoint_step_no: number
@@ -111,16 +109,16 @@ describe('RoomCommitter Frame isolation', () => {
 
   it.each(['native', 'worker'] as const)(
     'preserves the frozen %s Frame and the next delta across live changes and retry',
-    source => {
+    async source => {
       const capture = frameSource(source)
       const initial = jsonValue(capture().frame)
-      expect(committer.prepareRoom(room, { missingPrefix: false })).toMatchObject({ kind: 'committed', stepNo: 0 })
+      expect((await committer.prepareRoom(room, { missingPrefix: false }))).toMatchObject({ kind: 'committed', stepNo: 0 })
 
       const response = room.session.devSetResources(0, { food: 5 })
       const firstSnapshot = capture()
       const firstFrame = jsonValue(firstSnapshot.frame)
-      rejectStepOne()
-      expect(committer.commit(room, response, actionIntent, 0))
+      ;(await rejectStepOne())
+      expect((await committer.commit(room, response, actionIntent, 0)))
         .toEqual({ kind: 'blocked', error: 'disk unavailable' })
 
       // The live state can change independently; captured histories are never mutated.
@@ -131,11 +129,11 @@ describe('RoomCommitter Frame isolation', () => {
         playerId: room.session.state.players[0]!.id,
         params: { player: 'After', action: 'reed-bank' },
       }])
-      db.exec('DROP TRIGGER reject_step')
-      retries.shift()!()
+      ;(await db.exec('DROP TRIGGER reject_step ON game_replay_steps'))
+      await retries.shift()!()
       expect(committer.isBlocked(room.id)).toBe(false)
-      expect(persistence.loadReplayFrame(room.id)).toEqual(firstFrame)
-      expect(rawFrames()).toEqual([initial, firstFrame])
+      expect((await persistence.loadReplayFrame(room.id))).toEqual(firstFrame)
+      expect((await rawFrames())).toEqual([initial, firstFrame])
 
       // Worker snapshots are cached externally; their mutable bodies must not own the head.
       if (source === 'worker') {
@@ -144,36 +142,36 @@ describe('RoomCommitter Frame isolation', () => {
       }
       const nextResponse = room.session.getState()
       const nextFrame = jsonValue(capture().frame)
-      expect(committer.commit(room, nextResponse, actionIntent, 0))
+      expect((await committer.commit(room, nextResponse, actionIntent, 0)))
         .toMatchObject({ kind: 'committed', stepNo: 2 })
-      expect(persistence.loadReplayFrame(room.id)).toEqual(nextFrame)
-      expect(rawFrames()).toEqual([initial, firstFrame, nextFrame])
+      expect((await persistence.loadReplayFrame(room.id))).toEqual(nextFrame)
+      expect((await rawFrames())).toEqual([initial, firstFrame, nextFrame])
     },
   )
 
   it.each(['native', 'worker'] as const)(
     'freezes %s final scores before a failed commit is retried',
-    source => {
+    async source => {
       const capture = frameSource(source)
       const initial = jsonValue(capture().frame)
-      expect(committer.prepareRoom(room, { missingPrefix: false })).toMatchObject({ kind: 'committed', stepNo: 0 })
+      expect((await committer.prepareRoom(room, { missingPrefix: false }))).toMatchObject({ kind: 'committed', stepNo: 0 })
       room.session.state.gameOver = true
       const response = room.session.getState()
       expect(response.scores).toBeDefined()
       const finalFrame = jsonValue({ ...capture().frame, scores: response.scores })
-      rejectStepOne()
-      expect(committer.commit(room, response, actionIntent, 0))
+      ;(await rejectStepOne())
+      expect((await committer.commit(room, response, actionIntent, 0)))
         .toEqual({ kind: 'blocked', error: 'disk unavailable' })
 
       response.scores![0]!.total = 999
       response.scores![0]!.playerName = 'Changed score'
       room.session.updatePlayerName(0, 'After')
-      db.exec('DROP TRIGGER reject_step')
-      retries.shift()!()
+      ;(await db.exec('DROP TRIGGER reject_step ON game_replay_steps'))
+      await retries.shift()!()
 
       expect(committer.isBlocked(room.id)).toBe(false)
-      expect(persistence.loadReplayHead(room.id)).toMatchObject({ status: 'completed', latestStepNo: 1 })
-      expect(rawFrames()).toEqual([initial, finalFrame])
+      expect((await persistence.loadReplayHead(room.id))).toMatchObject({ status: 'completed', latestStepNo: 1 })
+      expect((await rawFrames())).toEqual([initial, finalFrame])
     },
   )
 })

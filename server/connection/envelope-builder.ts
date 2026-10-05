@@ -9,7 +9,7 @@ import { buildSessionSyncPayload } from '../game/custom-session-executor.ts'
 import type { SyncPayloadMode } from '../../shared/session/sync-payload.ts'
 
 type Args = {
-  room: { id: string; session: GameSession } & Partial<Pick<Room, 'players'>>
+  room: { id: string; session: GameSession } & Partial<Pick<Room, 'players' | 'inputWindow'>>
   resp: SessionResponse
   viewerPlayerId: string | null
   version: number
@@ -23,6 +23,7 @@ type Args = {
 export function buildEnvelope(args: Args): StateUpdateEnvelope {
   return {
     type: 'stateUpdate',
+    ...(args.room.inputWindow ? { inputWindow: { id: args.room.inputWindow.id, kind: args.room.inputWindow.kind } } : {}),
     roomId: args.room.id,
     version: args.version,
     sync: args.sync ?? 'snapshot',

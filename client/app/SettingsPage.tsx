@@ -245,9 +245,9 @@ export function SettingsPage() {
       const resp = await apiFetch('/api/auth/account', { method: 'DELETE' })
       const d = await resp.json()
       if (d.ok) {
-        setDeleteMsg({ ok: true, text: t('platform.accountDeleted') })
+        setDeleteMsg({ ok: true, text: t(d.pending ? 'platform.accountDeletionPending' : 'platform.accountDeleted') })
         await logout()
-        setPage('lobby')
+        setPage('login', { accountDeletion: d.pending ? 'pending' : 'complete' })
       } else {
         setDeleteMsg({ ok: false, text: authErrorMessage(d.code, d.error, t) })
       }
