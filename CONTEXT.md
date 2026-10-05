@@ -109,7 +109,7 @@ _Avoid_: 可复用房间号、GameState、Room Invite
 _Avoid_: Room Invite Link、登录回调、恢复令牌
 
 **Active Game Recovery**:
-已认证且已拥有座位的玩家返回仍处于活动状态的 Room，并从当前权威状态继续游戏。恢复身份来自玩家与座位的既有绑定，不来自链接参数。
+已认证且已拥有座位的玩家返回仍处于活动状态的 Room，并从当前权威状态继续游戏；暂时的连接中断本身不改变该 Game Context 的身份或既有座位归属。恢复身份来自玩家与座位的既有绑定，不来自链接参数。
 _Avoid_: 加入空座位、活动局观战、回到历史步骤继续操作
 
 **Expired Game Context**:
@@ -834,7 +834,7 @@ _Avoid_: 实时 Design Draft、生成记录、Generation Provenance
 _Avoid_: Published Card、Draft Version、可执行卡牌实现
 
 **Workshop Sandbox（工坊沙盒）**:
-Workshop 中组合自定义卡、配置测试局并启动浏览器内热座游戏的界面与流程。中文界面统一使用“沙盒”；重新选择卡牌和配置称“重新配置沙盒”；启动动作称“开始沙盒测试”。
+Workshop 中组合自定义卡、配置测试局并运行独立试卡会话的界面与流程，不属于正式 Room 或其 Game Replay Archive。中文界面统一使用“沙盒”；重新选择卡牌和配置称“重新配置沙盒”；启动动作称“开始沙盒测试”。
 _Avoid_: 中文界面中的 Sandbox、Reset Sandbox、Custom Code Sandbox
 
 **Custom Code Sandbox**:
