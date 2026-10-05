@@ -2,6 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-10-04
+- Amended: 2026-10-05 (#941 follow-up)
 - Issues: #938–#942; #937 is completed by PR #945
 
 ## Context
@@ -24,7 +25,7 @@ Players retain access to the complete history. Real-time presentation uses a bou
 
 Store the latest committed raw Frame as a structural `frameDelta` against the same snapshot's packed authoritative `state`, including exact references to the original versions of `log`, `events` and `publicEventArchive`. Internal Room history version 2 writes this overlay; version 1 `frameWithoutStreams` records remain readable. The overlay retains every difference, including derived display values, constant keys, removed execution fields, scores, future fields and history references that differ from state. It is self-contained within the Room snapshot, independent of prior Replay Steps, and uses no field allowlist or general object-graph cache.
 
-Issue #941 uses one in-memory capture of the authoritative core, shared by the snapshot's `state` and `frame` views as owned immutable values. Capture display projections separately from the live session context; copy the core again when rehydrating writable rules state, including after Worker IPC. The committer owns its smaller Frame body and final scores while retaining shared immutable histories for encoding, its accepted baseline and frozen retry. Shared core identity also stops unnecessary overlay traversal; the two logical views remain separate.
+Issue #941 uses one in-memory capture of the authoritative core, shared by the snapshot's `state` and `frame` views as owned immutable values. Capture display projections separately from the live session context; copy the core again when rehydrating writable rules state, including after Worker IPC. The committer takes ownership of the freshly captured native Frame; externally cached Worker Frames still require a smaller-body copy, and final scores are copied separately. It retains these owned values and shared immutable histories for encoding, its accepted baseline and frozen retry. Shared core identity also stops unnecessary overlay traversal; the two logical views remain separate.
 
 Restore by applying the overlay to an independent copy of the smaller saved state body, joining Room-owned history values and checking the existing canonical Frame Hash. Restored state and Frame core bodies must not share mutable values. Do not call current rules or `serializeState` to recalculate old derived values, and do not read historical Replay payload. Original per-entry log parameters and name values must remain reproducible; a single current-name map cannot reconstruct the mixed name history in existing raw logs. Room record/group identities and History Branch references stay outside the raw Replay Frame. Existing log participant identity fields remain part of the exact raw Frame.
 
@@ -32,21 +33,27 @@ Keep the complete logical Frame for Replay encoding, Worker IPC and the existing
 
 ## Alternatives and consequences
 
-An inverse-state journal would need to capture every rule mutation, observation boundary and nested rollback. A general persistent object tree would require broad changes to the current mutable GameState model. Both enlarge the correctness boundary compared with sharing the large history data while retaining core snapshots. Merely compressing existing SQLite snapshots leaves the costly capture and cloning paths intact. The Frame overlay trades a structural comparison on save and a smaller-body copy on restore for fewer duplicated JSON fields and SQLite bytes; small-body compression adds synchronous encoding and decoding work to reduce those bytes further. Acceptance still requires the fixed-workload performance measurements below.
+An inverse-state journal would need to capture every rule mutation, observation boundary and nested rollback. A general persistent object tree would require broad changes to the current mutable GameState model. Both enlarge the correctness boundary compared with sharing the large history data while retaining core snapshots. Merely compressing existing SQLite snapshots leaves the costly capture and cloning paths intact. The Frame overlay trades a structural comparison on save and a smaller-body copy on restore for fewer duplicated JSON fields and SQLite bytes; small-body compression adds synchronous encoding and decoding work to reduce those bytes further. The accepted measurements and continuing validation requirements are recorded below.
 
 The internal history identity is distinct from a reusable event sequence. Undo followed by a different action, same-length state replacement, player rename, cancellation and nested scope recovery must remain distinguishable. Missing recovery records or inconsistent references are errors; the implementation must not silently substitute another branch.
 
-Issues #947–#955 implement this representation and its completed-group acceptance. Raw measurements and unchanged performance gates are maintained in [Replay Room Capacity](../performance/replay-room-capacity.md).
+Issues #947–#955 implemented the initial history/recovery representation. The completed #941 follow-up adds the shared core, exact Frame overlay and conditional small-body compression described above. It also replaces private-cursor hashing with owned content comparison and reuses canonical encodings only for proven immutable history records. Session-wide dirty tracking and caching every complete history-array prefix were rejected: the former adds mutation/invalidation obligations, while the latter can retain quadratic string storage.
 
-## Implementation sequence and validation
+The #941 follow-up passed its own frozen two-player and four-player CPU, latency, write-volume and memory gates, exact Frame/cursor/Step equivalence, and both 30-Room capacity probes. Its acceptance uses a fresh post-#957 baseline, not the initial group's gains. Raw evidence and both groups' unchanged gates remain in [Replay Room Capacity](../performance/replay-room-capacity.md#issue-941-evaluation).
+
+## Original implementation sequence (completed)
+
+The following sequence records the initial staged rollout. Its first #941 slice was delivered by #948 in PR #957; that slice's hash-reuse limit is historical, superseded by the follow-up decision and acceptance above.
 
 1. Establish a fresh-Room baseline after PR #945 using fixed complete command transcripts. Include the existing two-player capacity workload and a four-player late-game workload with costs, payments, farm choices, undo and process recovery. Freeze improvement thresholds from repeated baseline measurements before implementing the optimizations.
-2. Limit the first #941 slice to reusing the existing private cursor hash through commit, frozen retry and acceptance. Preserve canonical encoding and the `committed` / `unchanged` decisions. Revisit the remaining serialization and change-detection costs after the shared representation stabilizes.
+2. Limit the first #941 slice to reusing the existing private cursor hash through commit, frozen retry and acceptance. Preserve canonical encoding and the `committed` / `unchanged` decisions. Defer remaining serialization and change-detection work until the shared representation stabilizes.
 3. Implement #942 under the existing query-purity contract: remove the whole-state preview clone, extend test protection to generic `computeCosts` hooks, and validate repeated previews, real costs and payment outcomes in the relevant Session and Workshop paths.
 4. Implement #939/#940 as one common capture, history-reference and recovery model. Introduce stable record identity, actor and other participant-role references, complete operation-group membership, and exact raw-Frame parameter versions at this stage. Cover ordinary history and all nested checkpoints; retain complete logical output while the new storage is introduced.
 5. Implement #938 using the small Frame body and shared history versions. Verify exact raw-Frame reconstruction and Hash equality, including after rename and restart. Restore without Replay payload or current-rule recalculation.
 6. Switch the history window, authenticated on-demand reads and client consumption together. Keep viewer filtering and identity stable across window movement, paging, cancellation and undo branches. Apply current-name projection only to presentation. Earlier backend slices retain the full payload until this stage.
 7. Repeat the same workloads and accept the completed group only when both latency/CPU cost and cumulative persistence write volume improve beyond the frozen thresholds, while capacity and recovery requirements remain satisfied. A slice may improve one objective if the others remain within permitted variation.
+
+## Continuing validation requirements
 
 Recovery validation must include undoStep, undoAction, undo followed by a different action with a reused event sequence, same-length state replacement, rename, nested cross-player scope abort, Protected Observation boundaries and continuation after restart. Test SQLite atomic failure and retry for every new record/reference write, and round-trip the equivalent logical snapshot through JSON and memory adapters. Session fixtures use two players and explicit hands by default; the four-player fixtures are for the performance workload.
 

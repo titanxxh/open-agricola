@@ -700,7 +700,7 @@ trigger frame 必须随 trailing `activate-card` node 持久化：`ActivateCardA
 
 当前事件覆盖已包括资源主干（collect/gain/pay/exchange）、农场主干（sow/plow/construct/stables/fencing/reap/breed/reorganize）、worker 放置/返家/新生儿、round/work/return-home/harvest phase、action reveal/accumulate、future meeple、legacy action detail 以及 `special-effect` mutation 分支。`state.log` 作为 UI 缓存保留，由事件 mapper 和 session cache writer 派生；业务代码不再通过旧日志字段记录规则事实。
 
-**Issue #942 的费用预览优化计划：**基于现有查询纯度契约，移除 `previewComputeCosts` 的全量状态克隆。把仅测试启用的纯度保护扩展到通用 `computeCosts` hook，并验证重复预览不改变权威状态、事件、RNG 或私有 cursor，费用、可用性和真实支付行为保持一致。允许状态变更的执行阶段沿用现有语义。纯度门禁只证明已执行分支，不宣称整程序变更安全。
+**费用预览查询（Issues #942/#949）：**基于现有查询纯度契约，`previewComputeCosts` 直接在当前上下文调用 `computeCosts`，不再克隆全量状态。仅测试启用的纯度保护覆盖通用 `computeCosts` hook；重复预览测试检查权威状态、事件、RNG 和私有 cursor 不变，同时核对费用、可用性和真实支付行为。Stage activation 预览仍按 [ADR-0008](adr/0008-node-parallel-reaction-dispatch.md) 使用 clone 检测可触发的直接变更；允许状态变更的执行阶段沿用现有语义。纯度门禁只证明已执行分支，不代表生产运行时具备全局变更保护。
 
 `sourceCard` 兜底：`ActionHookResult.flow` 顶层 `sourceCard` 递归补到缺失 child leaf；组合 pending / leaf request 写入 `PendingEnvelope.sourceCard`，`GameCore` 透传到 `interaction`。
 

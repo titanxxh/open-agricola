@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-07-27
-- Amended: 2026-10-04
+- Amended: 2026-10-05
 
 ## Context
 
@@ -16,10 +16,10 @@ ADR-0010 至 ADR-0013 已固定公开回放、delta 链、GitHub 身份和 Game 
 
 1. `room-router` 继续同步调用服务端唯一游戏命令入口和 `GameState` owner `GameSession`；具体状态修改发生在它驱动的 `GameCore` 和 action leaf 中，而不是只允许 `authoritative-session.ts` 赋值。这个 ownership 是 review invariant；机械门禁只覆盖可精确定义的邻接命令入口和依赖边界，不宣称证明全部 mutation path。成功且改变公开 Frame 或 Private Session Cursor 的响应，以及带 `durableTransition` 的推进，随后只经过一个具体的 `RoomCommitter` 模块；它在同一 SQLite 事务内更新 Room 快照并追加 Replay Step，成功后才允许 `Broadcaster` 为 Room 内在线座位生成各自遮蔽后的 envelope。
 2. `RoomCommitter` 的小接口返回 committed、unchanged 或 blocked 结果，内部隐藏序列化、delta、gzip、Hash、事务、完成归档、幂等和重试。它不增加单实现 interface 或 factory；现有生产、JSON 和内存持久化 adapter seam 继续用于真实的多 adapter 差异。
-3. 普通失败（`resp.ok=false` 且没有 `durableTransition` 标记）只回发起连接，不增加 `roomVersion` 或 `stepNo`。带 `durableTransition` 的拒绝仍持久化并推进版本；其错误只回发起连接，其他座位收到同一已提交版本的无错快照，详见 [ADR-0015](0015-provisional-cross-player-continuation-resolution.md)。成功响应只有在公开 Frame Hash 与私有游标均未变化且没有 `durableTransition` 标记时才返回 unchanged，只向发起者确认当前状态；仅私有游标变化时仍创建 Replay Step，即使公开 Frame 重复。重连、补拉和心跳不经过 Durable Room Commit。
+3. 普通失败（`resp.ok=false` 且没有 `durableTransition` 标记）只回发起连接，不增加 `roomVersion` 或 `stepNo`。带 `durableTransition` 的拒绝仍持久化并推进版本；其错误只回发起连接，其他座位收到同一已提交版本的无错快照，详见 [ADR-0015](0015-provisional-cross-player-continuation-resolution.md)。成功响应只有在公开 Frame Hash 与私有游标均未变化且没有 `durableTransition` 标记时才返回 unchanged，只向发起者确认当前状态；仅私有游标变化时仍创建 Replay Step，即使公开 Frame 重复。#941 以已捕获的私有游标为基准进行与 canonical JSON 等价的内容比较，仅共享已证明不可变的历史，替代私有游标 hash；公开 Frame 已变化或 `durableTransition` 已强制提交时跳过该比较。恢复后重建基准，改动后又还原的游标仍按内容判定 unchanged，公开 Frame Hash 算法不变。重连、补拉和心跳不经过 Durable Room Commit。
 4. `roomVersion` 和 `stepNo` 独立递增。`roomVersion` 标识成功提交后对玩家可见的状态版本；`stepNo` 标识已持久化权威推进的全局 Room 顺序，包括仅私有游标变化和 `durableTransition` 推进。多个玩家同时提交时仍按 Room 串行占用连续 Step；最后一份输入触发的自动结算属于该输入的 Step，而且结算结果不得依赖到达顺序。
 5. Step 0 在权威初始状态能够接收第一个互动命令前建立。互动 draft、Parent Selection 和其他多人提交发生在 Step 0 之后，各自按服务端接受顺序记录；classic deal 已包含在 Step 0。
-6. 写失败时冻结同一份待提交 Frame 和 Replay Intent，Room 拒绝所有新游戏命令并向在线玩家显示保存暂停。系统按 1、2、5、10、30 秒退避，之后每 30 秒重试；成功后广播并恢复。暂停期间的新连接等待成功后再接收快照。进程在成功前退出时，重启恢复最后已提交 Step，玩家重做从未看到成功的操作。
+6. 写失败时保留同一份已捕获的 Room 快照、Frame（含终局 scores）、私有游标比较值、编码 payload 和 Replay Intent，重试不从后来变化的 Session 或 Worker 缓存重新捕获；快照所有权见 [ADR-0021](0021-room-owned-history-branches-and-recovery-snapshots.md)。Room 拒绝所有新游戏命令并向在线玩家显示保存暂停。系统按 1、2、5、10、30 秒退避，之后每 30 秒重试；成功后广播并恢复。暂停期间的新连接等待成功后再接收快照。进程在成功前退出时，重启恢复最后已提交 Step，玩家重做从未看到成功的操作。
 7. 相同 `roomId + stepNo + frameHash` 的重试是幂等成功；相同 `roomId + stepNo` 出现不同 Hash 时永久阻断该 Room 并报警，绝不覆盖。持久化整体异常时拒绝新建 Room，但已存在 Room 保留并继续重试。
 
 ### Capacity and process shape
