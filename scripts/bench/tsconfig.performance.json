@@ -1,0 +1,6 @@
+{
+  "extends": "../../tsconfig.server.json",
+  "compilerOptions": { "erasableSyntaxOnly": false },
+  "include": ["./room-performance.ts", "./broadcast-performance.ts", "./late-game-workload.ts", "./late-game-capacity.ts"],
+  "exclude": []
+}

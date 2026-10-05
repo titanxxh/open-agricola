@@ -1,0 +1,273 @@
+{
+  "preparation": "Explicit late-game pressure preparation, NOT a naturally played 5-worker game: replay stock seed563 4p trace to round12 preserving real histories, then set each player to 5 ordinary active workers, 5 connected wooden rooms, 2 fields, 1 fenced stable, 10 distinct played cards (5 occupations/5 minors), explicit placeholder hands and abundant resources. Reset pre-preparation undo cursor. All recorded rounds12-14 commands and final harvest/end-game pending (engine round15) use normal public session APIs, including undo, pending restart, farming, card payments and harvest.",
+  "prefixCommands": 226,
+  "rounds": {
+    "12": 75,
+    "13": 79,
+    "14": 73,
+    "15": 7
+  },
+  "commandTypes": {
+    "action": 63,
+    "undoAction": 2,
+    "selection": 26,
+    "choice": 141,
+    "undoStep": 1,
+    "restart": 1
+  },
+  "pendingKinds": {
+    "farm-select:plow": 10,
+    "confirm-next-player": 60,
+    "farm-select:fence": 6,
+    "choice": 53,
+    "farm-select:room": 6,
+    "farm-select:sow": 3,
+    "select-trigger": 16,
+    "animal-reorg": 2,
+    "farm-select:stable": 5,
+    "confirm-player-switch": 7,
+    "feed": 3
+  },
+  "commands": 234,
+  "gameOver": true,
+  "paymentChoices": 1,
+  "eventTypes": {
+    "worker.placed": 60,
+    "farm.fieldPlowed": 6,
+    "action.detailLogged": 9,
+    "farm.fenceBuilt": 6,
+    "resource.paid": 42,
+    "farm.roomBuilt": 6,
+    "farm.renovated": 4,
+    "card.played": 3,
+    "farm.sown": 3,
+    "card.triggered": 51,
+    "resource.moved": 102,
+    "card.stateChanged": 17,
+    "card.infoboxChanged": 4,
+    "farm.animalDiscarded": 2,
+    "action.granted": 5,
+    "farm.stableBuilt": 5,
+    "returnHome.started": 3,
+    "worker.returned": 3,
+    "round.started": 2,
+    "action.revealed": 2,
+    "action.accumulated": 26,
+    "work.started": 2,
+    "harvest.started": 2,
+    "harvest.phaseStarted": 6,
+    "farm.cropRemoved": 22,
+    "game.ended": 1
+  },
+  "finalCanonicalHash": "1760f769251ad7daae31449f856cc3e924c2aa4d84033da9313f8fbcffd6ba3e",
+  "familySizes": [
+    5,
+    5,
+    5,
+    5
+  ],
+  "cards": [
+    {
+      "occupations": [
+        "B126_Carpenter",
+        "C122_Bricklayer",
+        "D154_ChimneySweep",
+        "E118_KindlingGatherer",
+        "D105_Sculptor"
+      ],
+      "minors": [
+        "B012_Stockyard",
+        "B068_Beanfield",
+        "A012_DrinkingTrough",
+        "A056_Basket",
+        "A015_CarpentersAxe"
+      ]
+    },
+    {
+      "occupations": [
+        "A143_Stonecutter",
+        "D121_ClayPlasterer",
+        "C128_WoodenHutExtender",
+        "B162_ForestClearer",
+        "D125_ForestTrader"
+      ],
+      "minors": [
+        "C011_WildlifeReserve",
+        "C070_LettucePatch",
+        "B013_CarpentersParlor",
+        "E075_StoneAxe",
+        "C051_FishingNet"
+      ]
+    },
+    {
+      "occupations": [
+        "C088_CarpentersApprentice",
+        "B128_Plumber",
+        "A128_RiparianBuilder",
+        "D143_TreeCutter",
+        "D146_Porter"
+      ],
+      "minors": [
+        "C012_CattleFarm",
+        "E068_CherryOrchard",
+        "C076_WoodCart",
+        "B048_ForestStone",
+        "A075_LumberMill"
+      ]
+    },
+    {
+      "occupations": [
+        "B095_MasterBricklayer",
+        "C094_StableCleaner",
+        "E150_RockBeater",
+        "D144_WaterWorker",
+        "B147_Huntsman"
+      ],
+      "minors": [
+        "A011_MudPatch",
+        "E069_MelonPatch",
+        "E015_NailBasket",
+        "C036_ClayDeposit",
+        "B079_Corf"
+      ]
+    }
+  ],
+  "finalPlayedCards": [
+    {
+      "occupations": [
+        "B126_Carpenter",
+        "C122_Bricklayer",
+        "D154_ChimneySweep",
+        "E118_KindlingGatherer",
+        "D105_Sculptor"
+      ],
+      "minors": [
+        "B012_Stockyard",
+        "B068_Beanfield",
+        "A012_DrinkingTrough",
+        "A056_Basket",
+        "A015_CarpentersAxe"
+      ],
+      "majors": [
+        "Major_Fireplace2"
+      ],
+      "count": 11
+    },
+    {
+      "occupations": [
+        "A143_Stonecutter",
+        "D121_ClayPlasterer",
+        "C128_WoodenHutExtender",
+        "B162_ForestClearer",
+        "D125_ForestTrader"
+      ],
+      "minors": [
+        "C011_WildlifeReserve",
+        "C070_LettucePatch",
+        "B013_CarpentersParlor",
+        "E075_StoneAxe",
+        "C051_FishingNet"
+      ],
+      "majors": [],
+      "count": 10
+    },
+    {
+      "occupations": [
+        "C088_CarpentersApprentice",
+        "B128_Plumber",
+        "A128_RiparianBuilder",
+        "D143_TreeCutter",
+        "D146_Porter"
+      ],
+      "minors": [
+        "C012_CattleFarm",
+        "E068_CherryOrchard",
+        "C076_WoodCart",
+        "B048_ForestStone",
+        "A075_LumberMill"
+      ],
+      "majors": [],
+      "count": 10
+    },
+    {
+      "occupations": [
+        "B095_MasterBricklayer",
+        "C094_StableCleaner",
+        "E150_RockBeater",
+        "D144_WaterWorker",
+        "B147_Huntsman"
+      ],
+      "minors": [
+        "A011_MudPatch",
+        "E069_MelonPatch",
+        "E015_NailBasket",
+        "C036_ClayDeposit",
+        "B079_Corf"
+      ],
+      "majors": [
+        "Major_CookingHearth2"
+      ],
+      "count": 11
+    }
+  ],
+  "initialSnapshotBytes": 437282,
+  "peakSnapshotBytes": 6121350,
+  "peakUndoDepth": 13,
+  "history": {
+    "initial": {
+      "log": 413,
+      "events": 413,
+      "archive": 302
+    },
+    "final": {
+      "log": 772,
+      "events": 807,
+      "archive": 499
+    }
+  },
+  "hookCalls": {
+    "B012_Stockyard:onComputeAnimalZones": 591,
+    "C011_WildlifeReserve:onComputeAnimalZones": 588,
+    "C012_CattleFarm:onComputeAnimalZones": 588,
+    "A011_MudPatch:onComputeAnimalZones": 604,
+    "C51-fishing-net-isDoable:isDoable": 1087,
+    "B068_Beanfield-cardfield-isdoable-sow:isDoable": 23,
+    "D154-chimney-sweep-compute-costs-renovation:computeCosts": 27,
+    "B126-carpenter-costs-construct:computeCosts": 13,
+    "E118-kindling-gatherer-after-action-space-food:after": 42,
+    "A128-riparian-builder-after-opponent-reed-bank:after": 45,
+    "C070_LettucePatch-cardfield-isdoable-sow:isDoable": 16,
+    "D121-clay-plasterer-compute-costs-renovation:computeCosts": 15,
+    "B13-carpenters-parlor-costs-construct:computeCosts": 6,
+    "C128-wooden-hut-extender-costs-construct:computeCosts": 6,
+    "D121-clay-plasterer-compute-costs-construct:computeCosts": 6,
+    "E068_CherryOrchard-cardfield-isdoable-sow:isDoable": 14,
+    "B128-plumber-compute-costs-renovation:computeCosts": 8,
+    "A128-riparian-builder-costs-construct:computeCosts": 39,
+    "C88-carpenters-apprentice-costs-construct:computeCosts": 39,
+    "C88-carpenters-apprentice-costs-stables:computeCosts": 24,
+    "B128-plumber-after-place-farmer-major-improvement:after": 15,
+    "C94-stable-cleaner-anytime:anytime": 82,
+    "E069_MelonPatch-cardfield-isdoable-sow:isDoable": 14,
+    "E150-rock-beater-compute-args-place-farmer:computeArgs": 30,
+    "D144-water-worker-after-place-farmer:after": 15,
+    "C76-wood-cart-before-collect:before": 8,
+    "C51-fishing-net-opponent-fishing:before": 22,
+    "D143-tree-cutter-after-collect:after": 18,
+    "D146-porter-after-collect:after": 22,
+    "B48-forest-stone-after-collect-stone:after": 22,
+    "B48-forest-stone-after-collect-wood:after": 22,
+    "B79-corf-after-collect:after": 38,
+    "C36-clay-deposit-after-collect:immediatelyAfter": 6,
+    "D144-water-worker-after-collect:after": 14,
+    "B147-huntsman-after-collect:after": 10,
+    "E15-nail-basket-after-collect:after": 14,
+    "D105-sculptor-before-collect:before": 8,
+    "A56-basket-immediately-after-collect:immediatelyAfter": 8,
+    "A15-carpenters-axe-after-collect:after": 17,
+    "D125-forest-trader-before-collect:before": 8,
+    "E75-stone-axe-after-collect:immediatelyAfter": 8,
+    "B162-forest-clearer-after-collect:after": 8
+  },
+  "hookCallsScope": "Recorder-only observation, including snapshot/display checks; not benchmark operation counts."
+}

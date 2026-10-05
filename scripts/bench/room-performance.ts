@@ -142,7 +142,9 @@ const percentile = (values: number[], quantile: number): number => {
   return sorted[Math.min(sorted.length - 1, Math.ceil(sorted.length * quantile) - 1)] ?? 0
 }
 
-export const runRoomWorkload = (workload: RoomWorkload) => {
+export const runRoomWorkload = (workload: RoomWorkload, options: {
+  onPacket?: (packet: { commandIndex: number; playerIndex: number; data: string }) => void
+} = {}) => {
   const dir = mkdtempSync(join(tmpdir(), 'oa-room-performance-'))
   const dbPath = join(dir, 'probe.db')
   const db = new Database(dbPath)
@@ -157,11 +159,16 @@ export const runRoomWorkload = (workload: RoomWorkload) => {
   const broadcaster = new Broadcaster({ checkpoint })
   const insertUser = db.prepare("INSERT INTO users (id,username,display_name,password_hash,created_at) VALUES (?,?,?,'probe',1)")
   for (let index = 0; index < workload.players; index++) insertUser.run(`u${index}`, `u${index}`, `P${index}`)
+  let commandIndex = -1
+  let sentPackets = 0
   const room: Room = {
     id: 'probe', session: new GameSession(rehydrateState(structuredClone(workload.initial))),
     players: Array.from({ length: workload.players }, (_, playerIndex) => ({
       playerIndex, name: `P${playerIndex}`, userId: `u${playerIndex}`,
-      ws: { OPEN: 1, readyState: 1, send: () => undefined } as unknown as WebSocket,
+      ws: { OPEN: 1, readyState: 1, send: (data: string) => {
+        sentPackets += 1
+        options.onPacket?.({ commandIndex, playerIndex, data })
+      } } as unknown as WebSocket,
     })),
     maxPlayers: workload.players, status: 'playing', version: 0, startedAt: 1, createdBy: 'u0',
   }
@@ -171,23 +178,28 @@ export const runRoomWorkload = (workload: RoomWorkload) => {
   const ruleSamples: number[] = []
   const classifications: string[] = []
   const hashes: string[] = []
+  const commandSamples: Array<{ commandIndex: number; roundBefore: number; roundAfter: number; type: Command['type']; classification: string; sentPackets: number; elapsedMs: number }> = []
   let snapshotBytes = 0
   const ioBefore = readFileSync('/proc/self/io', 'utf8')
   const cpuBefore = process.cpuUsage()
   if (process.env.ROOM_PERFORMANCE_TRACE === '1') process.stderr.write(`OA_TRACE_BEGIN ${workload.players}\n`)
   const begin = performance.now()
   try {
-    for (const command of workload.commands) {
+    for (const [index, command] of workload.commands.entries()) {
+      commandIndex = index
       if (command.type === 'restart') {
         committer.shutdown()
         const saved = persistence.load(room.id)?.serialized
         if (!saved) throw new Error('benchmark restart lost snapshot')
+        room.session.dispose()
         room.session = new GameSession(rehydrateState(saved))
         committer = makeCommitter()
         const restored = committer.prepareRoom(room, { missingPrefix: false })
         if (restored.kind === 'blocked') throw new Error(restored.error)
         continue
       }
+      const roundBefore = room.session.state.round
+      const packetsBefore = sentPackets
       const started = performance.now()
       const response = executeWorkloadCommand(room.session, command)
       ruleSamples.push(performance.now() - started)
@@ -197,9 +209,15 @@ export const runRoomWorkload = (workload: RoomWorkload) => {
       if (result.kind === 'blocked') throw new Error(result.error)
       if (result.kind === 'committed') {
         hashes.push(result.frameHash)
-        broadcaster.broadcastCommitted(room, response, 'action')
+        // The same harness runs old and new implementations. Old committed
+        // results have no prepared state; newer ones publish that exact value.
+        if ('serializedState' in result) {
+          Reflect.apply(broadcaster.broadcastCommitted, broadcaster, [room, response, 'action', undefined, undefined, result.serializedState])
+        } else broadcaster.broadcastCommitted(room, response, 'action')
       }
-      latencies.push(performance.now() - started)
+      const elapsedMs = performance.now() - started
+      latencies.push(elapsedMs)
+      commandSamples.push({ commandIndex, roundBefore, roundAfter: room.session.state.round, type: command.type, classification: result.kind, sentPackets: sentPackets - packetsBefore, elapsedMs })
       if (process.env.ROOM_PERFORMANCE_MEASURE_BYTES === '1') {
         snapshotBytes += Buffer.byteLength(JSON.stringify(serializeSessionSnapshot(room.session.state, room.session)))
       }
@@ -215,11 +233,12 @@ export const runRoomWorkload = (workload: RoomWorkload) => {
       latencyP50Ms: percentile(latencies, 0.5), latencyP95Ms: percentile(latencies, 0.95), latencyP99Ms: percentile(latencies, 0.99),
       logicalSnapshotBytes: process.env.ROOM_PERFORMANCE_MEASURE_BYTES === '1' ? snapshotBytes : null,
       processWrittenBytes: wchar(ioAfter) - wchar(ioBefore),
-      rssBytes: process.memoryUsage().rss, hashes, classifications,
+      rssBytes: process.memoryUsage().rss, hashes, classifications, commandSamples,
     }
   } finally {
     committer.shutdown()
     checkpoint.shutdown()
+    room.session.dispose()
     db.close()
     if (!process.env.ROOM_PERFORMANCE_KEEP_DB) rmSync(dir, { recursive: true, force: true })
   }
