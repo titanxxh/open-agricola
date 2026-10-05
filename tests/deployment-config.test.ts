@@ -1,5 +1,51 @@
-import { readFileSync, readdirSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
+
+// Execute the CLI and its remote command, replacing SSH/sudo/bash with capture tools.
+// The deployment body is never executed and no network connection is opened.
+function captureBackendDeployment(args: string[], policy?: string) {
+  const directory = mkdtempSync(join(tmpdir(), 'open-agricola-deploy-'))
+  const captures = {
+    ssh: join(directory, 'ssh-args'),
+    sudo: join(directory, 'sudo-args'),
+    bash: join(directory, 'bash-args'),
+    policy: join(directory, 'registration-policy'),
+  }
+  try {
+    writeFileSync(join(directory, 'ssh'), `#!/bin/bash
+printf '%s\\0' "$@" > "$OA_DEPLOY_CAPTURE/ssh-args"
+exec /bin/bash -c "$2"
+`, { mode: 0o700 })
+    writeFileSync(join(directory, 'sudo'), `#!/bin/bash
+printf '%s\\0' "$@" > "$OA_DEPLOY_CAPTURE/sudo-args"
+exit 99
+`, { mode: 0o700 })
+    writeFileSync(join(directory, 'bash'), `#!/bin/bash
+printf '%s\\0' "$@" > "$OA_DEPLOY_CAPTURE/bash-args"
+printf '%s' "\${ACCOUNT_REGISTRATION_POLICY:-}" > "$OA_DEPLOY_CAPTURE/registration-policy"
+`, { mode: 0o700 })
+    const env: NodeJS.ProcessEnv = { ...process.env, PATH: `${directory}:${process.env.PATH}`, OA_DEPLOY_CAPTURE: directory }
+    delete env.ACCOUNT_REGISTRATION_POLICY
+    if (policy !== undefined) env.ACCOUNT_REGISTRATION_POLICY = policy
+    const result = spawnSync('/bin/bash', ['deploy-backend.sh', ...args], { env, encoding: 'utf8' })
+    if (result.error) throw result.error
+    if (result.status !== 0) throw new Error(`deployment capture failed: ${result.stderr}`)
+    const capturedArgs = (file: string) => existsSync(file)
+      ? readFileSync(file, 'utf8').split('\0').slice(0, -1)
+      : []
+    return {
+      host: capturedArgs(captures.ssh)[0],
+      sudo: capturedArgs(captures.sudo),
+      args: capturedArgs(captures.bash),
+      policy: readFileSync(captures.policy, 'utf8'),
+    }
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
+}
 
 describe('production deployment config', () => {
   it('requires an explicit registration policy so fresh deployments do not silently lock themselves', () => {
@@ -9,11 +55,31 @@ describe('production deployment config', () => {
   })
 
   it('passes the explicit registration policy through local backend deployment', () => {
-    const script = readFileSync('deploy-backend.sh', 'utf8')
-    expect(script).toContain(
-      'REMOTE_ENV+=(ACCOUNT_REGISTRATION_POLICY="$ACCOUNT_REGISTRATION_POLICY")',
-    )
-    expect(script).toContain('ssh "$HOST" "${REMOTE_ENV[@]}" bash -s')
+    const deployment = captureBackendDeployment([], 'invite_only')
+    expect(deployment.host).toBe('ubuntu@ten-kr')
+    expect(deployment.sudo).toEqual([])
+    expect(deployment.args).toEqual(['-s', '/home/ubuntu/open-agricola', 'main'])
+    expect(deployment.policy).toBe('invite_only')
+  })
+
+  it('supports an explicit SSH user, version and directory without privilege escalation', () => {
+    const deployment = captureBackendDeployment(['operator@example.com', 'v0.7.9', '/srv/game'], 'open')
+    expect(deployment.host).toBe('operator@example.com')
+    expect(deployment.sudo).toEqual([])
+    expect(deployment.args).toEqual(['-s', '/srv/game', 'v0.7.9'])
+    expect(deployment.policy).toBe('open')
+  })
+
+  it('treats remote paths, refs and registration policy as literal arguments', () => {
+    // Shell evaluation would exit early or alter the captured arguments.
+    const remoteDir = '/srv/game folder; exit 71'
+    const ref = 'topic/$(exit 72)'
+    const policy = 'invite_only; exit 73'
+    const deployment = captureBackendDeployment(['ten-kr', ref, remoteDir], policy)
+    expect(deployment.host).toBe('ubuntu@ten-kr')
+    expect(deployment.sudo).toEqual([])
+    expect(deployment.args).toEqual(['-s', remoteDir, ref])
+    expect(deployment.policy).toBe(policy)
   })
 
   it('records the deployed remote commit as the game build ID', () => {
@@ -52,7 +118,8 @@ describe('production deployment config', () => {
   it('validates each backup with the target image and writes a version manifest', () => {
     const dockerfile = readFileSync('Dockerfile', 'utf8')
     const script = readFileSync('deploy-backend.sh', 'utf8')
-    expect(dockerfile).toContain('COPY scripts/validate-backup.ts ./scripts/')
+    expect(dockerfile).toContain('COPY --chown=node:node scripts/validate-backup.ts ./scripts/')
+    expect(dockerfile).toContain('USER node')
     expect(script).toContain('SOURCE_BUILD_ID=')
     expect(script).toContain('BACKUP_SHA256=')
     expect(script).toContain('BACKUP_SIZE_BYTES=')
@@ -240,8 +307,10 @@ describe('production deployment config', () => {
     const cron = readFileSync('deploy/open-agricola-backup.cron', 'utf8')
     const logrotate = readFileSync('deploy/open-agricola-backup.logrotate', 'utf8')
     expect(cron).toContain('CRON_TZ=UTC')
-    expect(cron).toContain('/root/open-agricola/backup-offsite.sh')
-    expect(cron).toContain('/var/log/open-agricola-backup.log')
-    expect(logrotate).toContain('/var/log/open-agricola-backup.log')
+    expect(cron).toContain('0 20 * * * ubuntu /home/ubuntu/open-agricola/backup-offsite.sh')
+    expect(cron).toContain('/home/ubuntu/open-agricola/logs/backup.log')
+    expect(logrotate).toContain('/home/ubuntu/open-agricola/logs/backup.log')
+    expect(logrotate).toContain('su ubuntu ubuntu')
+    expect(logrotate).toContain('create 600 ubuntu ubuntu')
   })
 })

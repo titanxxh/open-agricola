@@ -20,18 +20,18 @@ RUN apk add --no-cache \
 
 WORKDIR /app
 
-COPY package.json pnpm-lock.yaml .npmrc ./
-COPY --from=deps /app/node_modules ./node_modules
+COPY --chown=node:node package.json pnpm-lock.yaml .npmrc ./
+COPY --from=deps --chown=node:node /app/node_modules ./node_modules
 
 # Copy server + shared source (tsx runs TS directly)
-COPY shared/ ./shared/
-COPY server/ ./server/
-COPY scripts/replay-removal.ts ./scripts/
-COPY scripts/validate-backup.ts ./scripts/
-COPY tsconfig*.json ./
+COPY --chown=node:node shared/ ./shared/
+COPY --chown=node:node server/ ./server/
+COPY --chown=node:node scripts/replay-removal.ts ./scripts/
+COPY --chown=node:node scripts/validate-backup.ts ./scripts/
+COPY --chown=node:node tsconfig*.json ./
 
 # Data directories
-RUN mkdir -p data output
+RUN mkdir -p data output && chown node:node data output
 
 ENV NODE_ENV=production
 ENV BACKEND_PORT=5175
@@ -44,4 +44,5 @@ EXPOSE 5175
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD wget -qO- http://127.0.0.1:5175/api/health || exit 1
 
+USER node
 CMD ["node", "--import", "tsx", "server/index.ts"]

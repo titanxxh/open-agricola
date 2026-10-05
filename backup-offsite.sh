@@ -20,6 +20,7 @@
 
 set -e
 cd "$(dirname "$0")"
+export APP_UID="$(id -u)" APP_GID="$(id -g)"
 
 env_value() {
   grep -E "^$1=" .env 2>/dev/null | tail -n 1 | cut -d '=' -f 2-
@@ -153,6 +154,7 @@ do_backup() {
   RESTART_ON_EXIT=1
   docker compose -f docker-compose.prod.yml stop app || true
   docker compose -f docker-compose.prod.yml run --rm --no-deps \
+    --user "$APP_UID:$APP_GID" \
     -v "$PWD/backups:/backup" app sh -c \
     "tar -C /app/data -czf /backup/$BACKUP_STEM.tgz . && \
      if [ -f $CONTAINER_LEDGER ]; then \
@@ -177,6 +179,7 @@ do_backup() {
     || { discard_backup "mktemp"; return 1; }
   tar -C "$VALIDATION_DIR" -xzf "backups/$BACKUP_STEM.tgz" || { discard_backup "解包"; return 1; }
   docker compose -f docker-compose.prod.yml run --rm --no-deps \
+    --user "$APP_UID:$APP_GID" \
     -v "$VALIDATION_DIR:/validation-data" \
     -e DB_PATH=/validation-data/open-agricola.db \
     -e BACKUP_STEM="$BACKUP_STEM" \

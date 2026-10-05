@@ -1,8 +1,9 @@
 # 安装到生产机：
 #   cp deploy/open-agricola-backup.cron /etc/cron.d/open-agricola-backup
 #   chmod 644 /etc/cron.d/open-agricola-backup
+# 先由 ubuntu 创建 /home/ubuntu/open-agricola/logs，并确保仓库与备份归 ubuntu 所有
 # 每日 UTC 20:00（北京时间 04:00）运行定时备份 + 异机同步；日志轮转见 deploy/open-agricola-backup.logrotate
 # CRON_TZ 显式固定 UTC，避免宿主机时区不是 UTC 时在错误时刻停 app
 CRON_TZ=UTC
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-0 20 * * * root /root/open-agricola/backup-offsite.sh >> /var/log/open-agricola-backup.log 2>&1
+0 20 * * * ubuntu /home/ubuntu/open-agricola/backup-offsite.sh >> /home/ubuntu/open-agricola/logs/backup.log 2>&1

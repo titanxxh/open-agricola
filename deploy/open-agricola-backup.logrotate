@@ -1,9 +1,11 @@
 # 安装到生产机：
 #   cp deploy/open-agricola-backup.logrotate /etc/logrotate.d/open-agricola-backup
-/var/log/open-agricola-backup.log {
+/home/ubuntu/open-agricola/logs/backup.log {
   monthly
   rotate 3
   compress
   missingok
   notifempty
+  su ubuntu ubuntu
+  create 600 ubuntu ubuntu
 }
