@@ -144,6 +144,7 @@ const percentile = (values: number[], quantile: number): number => {
 
 export const runRoomWorkload = (workload: RoomWorkload, options: {
   onPacket?: (packet: { commandIndex: number; playerIndex: number; data: string }) => void
+  nameMode?: 'matched' | 'override'
 } = {}) => {
   const dir = mkdtempSync(join(tmpdir(), 'oa-room-performance-'))
   const dbPath = join(dir, 'probe.db')
@@ -164,7 +165,9 @@ export const runRoomWorkload = (workload: RoomWorkload, options: {
   const room: Room = {
     id: 'probe', session: new GameSession(rehydrateState(structuredClone(workload.initial))),
     players: Array.from({ length: workload.players }, (_, playerIndex) => ({
-      playerIndex, name: `P${playerIndex}`, userId: `u${playerIndex}`,
+      playerIndex,
+      name: options.nameMode === 'matched' ? workload.initial.state.players[playerIndex]!.name : `P${playerIndex}`,
+      userId: `u${playerIndex}`,
       ws: { OPEN: 1, readyState: 1, send: (data: string) => {
         sentPackets += 1
         options.onPacket?.({ commandIndex, playerIndex, data })

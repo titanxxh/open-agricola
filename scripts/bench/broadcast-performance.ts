@@ -12,12 +12,14 @@ import { assertResourceLimits, readCgroupLimits } from './room-capacity.ts'
 import { runRoomWorkload, type RoomWorkload } from './room-performance.ts'
 
 const [fixturePath, outputPath] = process.argv.slice(2)
-if (!fixturePath || !outputPath) throw new Error('usage: broadcast-performance.ts <fixture.json> <output.json> [--exact trace.jsonl | --attribution] [--repeats 3]')
+if (!fixturePath || !outputPath) throw new Error('usage: broadcast-performance.ts <fixture.json> <output.json> [--exact trace.jsonl | --attribution] [--repeats 3] [--names matched|override]')
 const flagValue = (flag: string, fallback: string) => {
   const index = process.argv.indexOf(flag)
   return index < 0 ? fallback : process.argv[index + 1]!
 }
 const tracePath = flagValue('--exact', '')
+const nameMode = flagValue('--names', 'override')
+assert.ok(nameMode === 'matched' || nameMode === 'override', '--names must be matched or override')
 const attributed = process.argv.includes('--attribution')
 const diagnostic = !!tracePath || attributed
 const repeats = Number(flagValue('--repeats', diagnostic ? '1' : '3'))
@@ -82,15 +84,15 @@ if (tracePath) {
   }
 }
 
-for (let index = 0; index < warmups; index += 1) runRoomWorkload(workload)
+for (let index = 0; index < warmups; index += 1) runRoomWorkload(workload, { nameMode })
 for (const phase of ['rules', 'commit', 'broadcast'] as const) { phaseCpuMs[phase] = 0; phaseCalls[phase] = 0 }
 const runs = []
 for (iteration = 0; iteration < repeats; iteration += 1) {
-  const run = runRoomWorkload(workload, tracePath ? { onPacket: packet => {
+  const run = runRoomWorkload(workload, { nameMode, ...(tracePath ? { onPacket: packet => {
     appendFileSync(tracePath, JSON.stringify({ kind: 'packet', iteration, commandIndex: packet.commandIndex,
       viewer: packet.playerIndex, envelope: canonicalJson(JSON.parse(packet.data)),
     }) + '\n')
-  } } : {})
+  } } : {}) })
   assert.equal(run.commandSamples.length, workload.commands.filter(command => command.type !== 'restart').length)
   for (const sample of run.commandSamples) {
     assert.equal(sample.sentPackets, sample.classification === 'committed' ? workload.players : 0,
@@ -115,12 +117,16 @@ const summary = (selected: typeof samples) => {
 }
 const sourceFiles = ['scripts/bench/room-performance.ts', 'scripts/bench/broadcast-performance.ts',
   'server/connection/broadcaster.ts', 'server/connection/envelope-builder.ts', 'server/connection/room-router.ts',
-  'server/game/custom-session-executor.ts', 'server/game/room-committer.ts', 'shared/session/sync-payload.ts']
+  'server/game/custom-session-executor.ts', 'server/game/custom-session-worker.ts', 'server/game/room-committer.ts',
+  'server/game/authoritative-session.ts', 'server/connection/history-presentation.ts',
+  'shared/session/sync-payload.ts', 'shared/session/session-core.ts', 'shared/session/history-window.ts',
+  'shared/projections/serialized-state.ts', 'shared/projections/history-names.ts',
+  'shared/projections/history-record-identity.ts']
 writeFileSync(outputPath, JSON.stringify({
   node: process.version, ...limits, commit: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(),
   fixture: resolve(fixturePath), fixtureSha256: sha256(fixtureText), preparation: workload.preparation,
   sourceSha256: Object.fromEntries(sourceFiles.map(path => [path, sha256(readFileSync(path, 'utf8'))])),
-  mode: tracePath ? 'exact' : attributed ? 'attribution' : 'timing', warmups, repeats,
+  mode: tracePath ? 'exact' : attributed ? 'attribution' : 'timing', nameMode, warmups, repeats,
   measurement: 'Server command entry through SQLite durable commit and last synchronous four-seat socket sink send; excludes routing, queueing, network and client rendering. Per-round p99 near max with small n.',
   aggregate: { ...summary(samples), cpuMs: runs.reduce((total, run) => total + run.cpuMs, 0),
     rssBytes: Math.max(...runs.map(run => run.rssBytes)), processPeakRssBytes: process.resourceUsage().maxRSS * 1024,
