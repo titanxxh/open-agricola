@@ -12,6 +12,7 @@ import { serializeSessionSnapshot } from '../../../shared/session/serialization'
 import { getDb } from '../../db'
 import { recordingResources } from '../../__tests__/_helpers/recording'
 import { PostgresRoomPersistence } from '../../game/persistence/postgres-adapter'
+import { RoomDirectory } from '../../game/room-directory'
 import type { ClientCommand } from '../../../shared/contract/protocol/ws'
 import { afterAll } from 'vitest'
 import { InMemoryRoomPersistence } from '../../game/persistence/memory-adapter.ts'
@@ -27,7 +28,7 @@ let recording: Awaited<ReturnType<typeof recordingResources>>
 beforeEach(async () => { vi.stubEnv('ALLOW_ANONYMOUS_WS', 'true'); recording = await recordingResources(getDb()) })
 afterEach(async () => {
   await recording.close()
-  await getDb().exec('TRUNCATE users, rooms, game_contexts, game_results, stored_objects, command_scopes CASCADE')
+  await getDb().exec('TRUNCATE users, rooms, game_contexts, game_results, stored_objects, command_scopes, development_room_slots, app_instances CASCADE')
   vi.restoreAllMocks(); vi.unstubAllEnvs()
 })
 afterAll(async () => { await getDb().close() })
@@ -218,6 +219,53 @@ const waitForEvent = async <T extends ServerEvent>(
     ws.on('error', onError)
   })
 }
+
+it('completes an owned two-seat game and durably deduplicates its WebSocket rematch', async () => {
+  const db = getDb()
+  const directory = new RoomDirectory(db)
+  const persistence = new PostgresRoomPersistence(db, directory)
+  const http = createServer()
+  await new Promise<void>(done => { http.listen(0, '127.0.0.1', done) })
+  const port = (http.address() as AddressInfo).port
+  const backend = await createWsServer(http, { persistence, directory, internalUrl: `http://127.0.0.1:${port}`, ...recording })
+  const peers: TestSocket[] = []
+  try {
+    const room = backend.registry.get('dev2')!
+    for (const player of room.session.state.players) { player.minorHand = ['__test_placeholder__']; player.occupationHand = ['__test_placeholder__'] }
+    for (let index = 0; index < 2; index++) {
+      const ws = Object.assign(new WebSocket(`ws://127.0.0.1:${port}/ws`), { received: [] as ServerEvent[] })
+      peers.push(ws); attachCollector(ws); await waitForOpen(ws)
+      await sendCommand(ws, { type: 'joinRoom', roomId: room.id, requestedPlayerIndex: index, name: `Seat ${index + 1}` })
+      await waitForEvent(ws, (event): event is StateUpdateEnvelope => event.type === 'stateUpdate')
+    }
+    const host = peers[0]!
+    await sendCommand(host, { type: 'loadGame', state: { ...room.session.getState().state, gameOver: true }, requestId: 'finish' })
+    const finished = await waitForEvent(host, (event): event is StateUpdateEnvelope => event.type === 'stateUpdate' && event.requestId === 'finish')
+    expect(finished.payload.state.gameOver).toBe(true)
+    expect(await persistence.load('dev2')).toBeNull()
+    const finalStep = await db.prepare('SELECT payload_gzip, frame_hash FROM game_replay_steps WHERE room_id=? AND step_no=?').get('dev2', 1)
+    host.send(JSON.stringify({ type: 'getCommandScope', requestId: 'rematch-scope' }))
+    const { scope } = await waitForEvent(host, (event): event is Extract<ServerEvent, { type: 'commandScope' }> => event.type === 'commandScope' && event.requestId === 'rematch-scope')
+    const rematch = { type: 'newGame' as const, commandContext: { scopeId: scope.scopeId, commandId: randomUUID(), roomId: 'dev2', expectedVersion: finished.version } }
+    host.send(JSON.stringify({ ...rematch, requestId: 'rematch' }))
+    const receipt = await waitForEvent(host, (event): event is Extract<ServerEvent, { type: 'commandReceipt' }> => event.type === 'commandReceipt' && event.requestId === 'rematch')
+    expect(receipt).toMatchObject({ status: 'completed', receipt: { outcome: { ok: true, roomVersion: 0 } } })
+    if (receipt.status !== 'completed') throw new Error('Expected committed rematch receipt')
+    const nextId = receipt.receipt.outcome.roomId!
+    expect(nextId).not.toBe('dev2')
+    await waitForEvent(peers[1]!, (event): event is StateUpdateEnvelope => event.type === 'stateUpdate' && event.roomId === nextId)
+    host.send(JSON.stringify({ ...rematch, requestId: 'duplicate-rematch' }))
+    const duplicate = await waitForEvent(host, (event): event is Extract<ServerEvent, { type: 'commandReceipt' }> => event.type === 'commandReceipt' && event.requestId === 'duplicate-rematch')
+    expect(duplicate).toMatchObject({ status: 'completed', receipt: receipt.receipt })
+    expect((await persistence.load(nextId))?.meta.status).toBe('playing')
+    expect(await recording.gameContextStore.lifecycle('dev2')).toBe('completed')
+    expect(await db.prepare('SELECT payload_gzip, frame_hash FROM game_replay_steps WHERE room_id=? AND step_no=?').get('dev2', 1)).toEqual(finalStep)
+  } finally {
+    for (const peer of peers) peer.close()
+    await backend.shutdown()
+    await new Promise<void>(done => http.close(() => done()))
+  }
+})
 
 describe('room-manager ws sync', () => {
   let server: ReturnType<typeof createServer>

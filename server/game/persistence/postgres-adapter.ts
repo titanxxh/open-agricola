@@ -507,8 +507,7 @@ export class PostgresRoomPersistence implements RoomPersistence {
       if (options?.retireRoomId && options.retireRoomId !== values.id) {
         if (directory) {
           if (!options.retiredOwner) throw new RoomOwnershipError('Previous room owner token is required')
-          await directory.assertOwner(options.retireRoomId, options.retiredOwner, options.retiredVersion)
-          await directory.retire(options.retireRoomId, options.retiredOwner)
+          await directory.retire(options.retireRoomId, options.retiredOwner, options.retiredVersion)
         }
         await replaceDevelopmentRoom(db, options.retireRoomId, String(values.id))
         await this.deleteRoom.run(options.retireRoomId)
@@ -626,8 +625,7 @@ export class PostgresRoomPersistence implements RoomPersistence {
       if (commit.retireRoomId && commit.retireRoomId !== commit.roomId) {
         if (directory) {
           if (!commit.retiredOwner) throw new RoomOwnershipError('Previous room owner token is required')
-          await directory.assertOwner(commit.retireRoomId, commit.retiredOwner, commit.retiredVersion)
-          await directory.retire(commit.retireRoomId, commit.retiredOwner)
+          await directory.retire(commit.retireRoomId, commit.retiredOwner, commit.retiredVersion)
         }
         await replaceDevelopmentRoom(db, commit.retireRoomId, commit.roomId)
         await this.deleteRoom.run(commit.retireRoomId)
@@ -722,8 +720,7 @@ export class PostgresRoomPersistence implements RoomPersistence {
     await this.dbForCleanup.transaction(async () => {
       if (this.directory) {
         if (!options?.owner) throw new RoomOwnershipError('Room owner token is required')
-        await this.directory.assertOwner(id, options.owner, options.expectedVersion)
-        await this.directory.retire(id, options.owner)
+        await this.directory.retire(id, options.owner, options.expectedVersion)
       }
       if (options?.receipt) await new CommandStore(this.dbForCleanup).complete(options.receipt.request, options.receipt.outcome)
       await this.deleteRoom.run(id)

@@ -1,6 +1,6 @@
 # 22. Distributed Rooms require recording and may reconnect players
 
-- Status: Accepted design; implementation tracked in GitHub issues #961–#976
+- Status: Implemented on the integration branch for GitHub issues #961–#976; production cutover and fault acceptance are separate
 - Date: 2026-10-05
 
 ## Confirmed constraints
@@ -72,12 +72,12 @@ Real functional verification covers account access, creation/join/resume, record
 
 ## Existing contracts and scope conflict
 
-[ADR-0014](0014-durable-room-commit-is-the-publish-seam.md) chooses one process, synchronous SQLite commits and no Room sharding. This accepted target design supersedes those process and storage decisions and its first-rollout recording opt-out. Implementation is still pending; its durable-publish, frozen-retry and per-viewer privacy contracts remain the starting constraints.
+[ADR-0014](0014-durable-room-commit-is-the-publish-seam.md) chose one process, synchronous SQLite commits and no Room sharding. This implementation supersedes those process and storage decisions and its first-rollout recording opt-out. Its durable-publish, frozen-retry and per-viewer privacy contracts remain in force.
 
 [ADR-0011](0011-bounded-authoritative-state-delta-replays.md) and [ADR-0021](0021-room-owned-history-branches-and-recovery-snapshots.md) require Room-owned active recovery, including ordinary undo, private continuation state and the commit baseline, without decoding historical Replay payload. Reconnection is not permission to discard those capabilities.
 
-Current durable publishing is conditional: non-recording Rooms can still use broadcast followed by a persistence checkpoint. That runtime branch is now rejected and must be removed during implementation. `REPLAY_NEW_ROOMS_ENABLED`, optional-committer fallbacks and the legacy non-recording custom-card restoration path must be reviewed together; changing the default of the recording flag alone does not implement this decision. The first-rollout opt-out in ADR-0014 is part of the scope being replaced. Current `requestId` correlation and Replay Step retry identity also do not establish durable client-command deduplication.
+The previous conditional durable-publishing path, `REPLAY_NEW_ROOMS_ENABLED`, optional-committer fallbacks and legacy non-recording custom-card restoration have been removed. PostgreSQL Room commits and command receipts now precede publication. Transport `requestId` remains response correlation; durable client-command identity and deduplication are separate persisted contracts. Existing historical result-only games remain readable, and the stopped-app importer discards only proven unrecorded active games.
 
 ## Design review state
 
-The user accepted the scope and execution details above, then approved a 16-ticket breakdown after reviewing main at `d03a54e4` (including PR #960). The tickets are published as [#961](https://github.com/titanxxh/open-agricola/issues/961)–[#976](https://github.com/titanxxh/open-agricola/issues/976), with native blocking relationships and the `ready-for-agent` label. The initial unblocked tickets are mandatory Room recording (#961) and the asynchronous persistence seam with local PostgreSQL ([#962](https://github.com/titanxxh/open-agricola/issues/962)); #976 integrates normal single-host acceptance. Completed #941 optimizations are inherited constraints, not new implementation work. Acceptance and ticket publication are not claims that implementation, deletion, database migration or deployment has occurred. Actual external-service adoption, fault/capacity certification and physical multi-host rollout remain future work.
+The user accepted the scope and execution details above, then approved a 16-ticket breakdown after reviewing main at `d03a54e4` (including PR #960). The tickets are [#961](https://github.com/titanxxh/open-agricola/issues/961)–[#976](https://github.com/titanxxh/open-agricola/issues/976); the implementation was subsequently rebased onto `54c2cb8a`. Completed #941 optimizations are inherited constraints, not new implementation work. Native PostgreSQL/S3 tests, normal one- and two-instance checks, browser reconnection, recorded workload Frame equivalence, and isolated backup restoration validate the integration branch. Standards and specification review found publication-waiter cleanup and completed-game rematch defects; both have regression coverage and were corrected before submission. These results do not perform or certify a production migration. Actual external-service adoption, fault/capacity certification and physical multi-host rollout remain future work.

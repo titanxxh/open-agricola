@@ -17,7 +17,9 @@ export async function validateArchiveInIsolation(root: string, env: NodeJS.Proce
   const manifest = JSON.parse(await readFile(join(root, 'archive.json'), 'utf8')) as StorageArchive
   const sourceObjects = S3ObjectStore.fromEnv(env)
   const targetObjects = S3ObjectStore.fromEnv(env, `test/backup-${randomUUID()}/`)
-  const admin = new PostgresDatabase({ connectionString: env.DATABASE_URL })
+  // CREATE/DROP DATABASE can wait for a cluster checkpoint under normal load.
+  // Keep the longer bound on this maintenance connection, not runtime queries.
+  const admin = new PostgresDatabase({ connectionString: env.DATABASE_URL, max: 1, statement_timeout: 120_000 })
   const name = `backup_${randomUUID().replaceAll('-', '')}`
   const url = new URL(env.VALIDATION_DATABASE_URL ?? env.DATABASE_URL)
   if (!env.VALIDATION_DATABASE_URL) url.pathname = `/${name}`

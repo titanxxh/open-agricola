@@ -194,8 +194,24 @@ export class RoomDirectory {
     await this.db.prepare("UPDATE room_ownership SET status='active' WHERE room_id=?").run(roomId)
   }
 
-  async retire(roomId: string, owner: OwnerToken): Promise<void> {
+  async retire(roomId: string, owner: OwnerToken, expectedVersion?: number | null): Promise<void> {
     await this.assertOwner(roomId, owner)
+    if (expectedVersion !== undefined) {
+      const active = await this.db.prepare('SELECT version FROM rooms WHERE id=? FOR UPDATE').get<{ version: number }>(roomId)
+      // Completion removes active recovery data. Only lifecycle retirement may
+      // use the final Step's version; ordinary writes still require a live row.
+      const completed = !active && expectedVersion !== null
+        ? await this.db.prepare(`SELECT s.room_version AS version FROM game_contexts c
+            JOIN game_replays r ON r.room_id=c.room_id
+            JOIN game_replay_steps s ON s.room_id=r.room_id AND s.step_no=r.latest_step_no
+            WHERE c.room_id=? AND c.lifecycle='completed' AND r.status='completed'
+            FOR SHARE OF c, r, s`).get<{ version: number }>(roomId)
+        : undefined
+      const current = active ?? completed
+      if (expectedVersion === null ? !!active : !current || current.version !== expectedVersion) {
+        throw new RoomOwnershipError('Committed room version changed')
+      }
+    }
     await this.db.prepare("UPDATE room_ownership SET status='retired', lease_until=0 WHERE room_id=?").run(roomId)
   }
 

@@ -619,8 +619,6 @@ export class RoomCommitter {
         this.blockPermanently(pending.room.id, persisted.error)
         return
       }
-      this.pending.delete(pending.room.id)
-      this.updateStorageFailed()
       const result = this.acceptCommit(
         pending.room,
         pending.commit,
@@ -628,8 +626,11 @@ export class RoomCommitter {
         pending.encoded,
         pending.privateCursor,
       )
-      await pending.onCommitted?.(result)
-      pending.waiters.forEach((waiter) => waiter())
+      const error = await this.publishRecovered(pending.room, () => pending.onCommitted?.(result))
+      if (this.pending.get(pending.room.id) !== pending) return
+      this.pending.delete(pending.room.id)
+      this.updateStorageFailed()
+      pending.waiters.splice(0).forEach((waiter) => waiter(error))
     } catch (error) {
       if ((error instanceof RoomOwnershipError || error instanceof ExecutionRevokedError)) { this.blockPermanently(pending.room.id, error.message); return }
       pending.error = errorMessage(error)
@@ -684,6 +685,10 @@ export class RoomCommitter {
       const persisted = (await this.persistence.loadReplayHead(pending.room.id))
       result = (await this.prepareLoadedRoom(pending.room, pending.options, persisted))
     } catch (error) {
+      if (error instanceof RoomOwnershipError || error instanceof ExecutionRevokedError || error instanceof RoomHistoryCorruptionError) {
+        this.blockPermanently(pending.room.id, errorMessage(error))
+        return
+      }
       if (error instanceof ReplayAssetValidationError) {
         this.blockPermanently(
           pending.room.id,
@@ -709,14 +714,33 @@ export class RoomCommitter {
       this.updateStorageFailed()
       return
     }
+    const error = result.kind === 'blocked'
+      ? result.error
+      : await this.publishRecovered(pending.room, () => pending.options.onReady?.(result))
+    if (this.pendingReplayLoads.get(pending.room.id) !== pending) return
     this.pendingReplayLoads.delete(pending.room.id)
     this.updateStorageFailed()
-    if (result.kind === 'blocked') {
-      pending.waiters.forEach((waiter) => waiter(result.error))
-      return
+    pending.waiters.splice(0).forEach((waiter) => waiter(error))
+  }
+
+  /** The durable outcome is known. Never replay adoption callbacks after a partial publication. */
+  private async publishRecovered(room: Room, publish: () => void | Promise<void>): Promise<string | undefined> {
+    try {
+      await publish()
+      return undefined
+    } catch (error) {
+      const message = errorMessage(error)
+      if (error instanceof RoomOwnershipError || error instanceof ExecutionRevokedError) {
+        this.permanentErrors.set(room.id, message)
+      }
+      console.warn(JSON.stringify({ event: 'durable_room_publication_failed', roomId: room.id, error: message }))
+      // Release the command queue even if publication failed; reconnect recovers
+      // the committed receipt and snapshot without executing the command twice.
+      for (const player of room.players) {
+        try { player.ws.close(1012, 'Reload committed room state') } catch { /* Already disconnected. */ }
+      }
+      return message
     }
-    await pending.options.onReady?.(result)
-    pending.waiters.forEach((waiter) => waiter())
   }
 
   private updateStorageFailed(): void {
