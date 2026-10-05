@@ -665,6 +665,7 @@ const canPlaceAnimalInWorkZone = (
       index !== zoneIndex &&
       entry.zoneType === 'card' &&
       entry.cardId === zone.cardId &&
+      entry.ownerPlayerId === zone.ownerPlayerId &&
       entry.animalCount > 0
     ).length
     if (occupied >= limit) return null
@@ -726,6 +727,113 @@ export const canAccommodateAllAnimals = (
     targetCounts[type] ??= player.resources[type] ?? 0
   }
   return canAccommodateAnimalTotals(state, player, targetCounts)
+}
+
+/**
+ * Propose additions to the current layout, without moving or removing animals.
+ * Unlike accommodation queries, this maximizes a partial fixed-layout result.
+ * Invalid existing layouts remain the player's responsibility.
+ */
+export const prefillAnimalZones = (
+  state: GameState,
+  player: PlayerState,
+  zones: AnimalZone[] = computeAnimalZones(player, state),
+): AnimalZone[] => {
+  const keys = animalKeysForState(state)
+  const workZones: AnimalAccommodationWorkZone[] = zones.map((zone) => {
+    const animalCounts = readAnimalCountsForZoneAssignment(zone)
+    return { ...zone, animalCounts, animalCount: sumAnimalCounts(animalCounts), animalType: singleAnimalType(animalCounts) }
+  })
+  const placed = createAnimalCounts(state.enableFarmersOfTheMoor === true)
+  const groupKey = (zone: AnimalZone) => JSON.stringify([zone.cardId, zone.ownerPlayerId])
+  const exclusiveCounts = new Map<string, number>()
+  for (const zone of workZones) {
+    for (const type of ALL_ANIMAL_KEYS) placed[type] = (placed[type] ?? 0) + (zone.animalCounts[type] ?? 0)
+    const occupied = ALL_ANIMAL_KEYS.filter((type) => (zone.animalCounts[type] ?? 0) > 0)
+    if (zone.animalCount > zone.capacity
+      || (zone.blocked && zone.animalCount > 0)
+      || occupied.some((type) => !keys.includes(type))
+      || (!allowsMixedAnimalTypes(zone) && occupied.length > 1)
+      || (zone.allowedAnimalType != null && occupied.some((type) => type !== zone.allowedAnimalType))
+      || computeInvalidAnimalsForZone(state, player, zone).length > 0) return zones
+    if (zone.zoneType === 'card' && zone.cardId && zone.animalCount > 0) {
+      exclusiveCounts.set(groupKey(zone), (exclusiveCounts.get(groupKey(zone)) ?? 0) + 1)
+    }
+  }
+  if (!areRequiredEmptyZoneGroupsSatisfied(workZones)
+    || keys.some((type) => (placed[type] ?? 0) > (player.resources[type] ?? 0))
+    || workZones.some((zone) => zone.cardId && zone.exclusiveCardZoneLimit !== undefined
+      && (exclusiveCounts.get(groupKey(zone)) ?? 0) > zone.exclusiveCardZoneLimit)) return zones
+
+  const freeCapacity = workZones.reduce((sum, zone) => sum + Math.max(0, zone.capacity - zone.animalCount), 0)
+  const animals = keys.flatMap((type) => Array.from({
+    length: Math.min(freeCapacity, Math.max(0, Math.floor(player.resources[type] ?? 0) - (placed[type] ?? 0))),
+  }, () => type))
+  let best = workZones
+  let bestAdded = 0
+  const seen = new Set<string>()
+  const emptyGroups = [...new Set(workZones.flatMap((zone) => zone.requiredEmptyZoneGroupIds ?? []))]
+  const exclusiveLimits = new Map<string, number>()
+  for (const zone of workZones) {
+    if (zone.cardId && zone.exclusiveCardZoneLimit !== undefined) {
+      exclusiveLimits.set(groupKey(zone), Math.min(
+        exclusiveLimits.get(groupKey(zone)) ?? Infinity,
+        Math.max(0, Math.floor(zone.exclusiveCardZoneLimit)),
+      ))
+    }
+  }
+  const search = (index: number, current: AnimalAccommodationWorkZone[], added: number): void => {
+    if (added > bestAdded) {
+      best = current
+      bestAdded = added
+    }
+    if (index === animals.length) return
+    const free = freeCapacity - added
+    let capacityBound = free
+    for (const group of emptyGroups) {
+      const reserved = Math.min(...current.filter((zone) =>
+        zone.animalCount === 0 && zone.requiredEmptyZoneGroupIds?.includes(group),
+      ).map((zone) => zone.capacity))
+      // Use each group's bound separately: overlapping groups may share an empty zone.
+      capacityBound = Math.min(capacityBound, free - reserved)
+    }
+    let exclusiveBound = free
+    for (const [group, limit] of exclusiveLimits) {
+      const members = current.filter((zone) => groupKey(zone) === group)
+      const occupied = members.filter((zone) => zone.animalCount > 0).length
+      const emptyCapacities = members.filter((zone) => zone.animalCount === 0)
+        .map((zone) => zone.capacity).sort((a, b) => b - a)
+      exclusiveBound -= emptyCapacities.slice(Math.max(0, limit - occupied)).reduce((sum, capacity) => sum + capacity, 0)
+    }
+    capacityBound = Math.min(capacityBound, exclusiveBound)
+    if (added + Math.min(animals.length - index, capacityBound) <= bestAdded) return
+    const key = index + '|' + current.map((zone) => keys.map((type) => zone.animalCounts[type] ?? 0).join(',')).join('|')
+    if (seen.has(key)) return
+    seen.add(key)
+    const type = animals[index]!
+    const indices = current.map((_, i) => i).sort((a, b) =>
+      Number((current[b]!.animalCounts[type] ?? 0) > 0) - Number((current[a]!.animalCounts[type] ?? 0) > 0) || a - b,
+    )
+    for (const i of indices) {
+      const candidate = canPlaceAnimalInWorkZone(state, player, current, i, current[i]!, type)
+      if (!candidate) continue
+      const next = [...current]
+      next[i] = candidate
+      const limit = candidate.cardId ? exclusiveLimits.get(groupKey(candidate)) : undefined
+      if (limit !== undefined && next.filter((zone) => groupKey(zone) === groupKey(candidate) && zone.animalCount > 0).length > limit) continue
+      if (areRequiredEmptyZoneGroupsSatisfied(next)) search(index + 1, next, added + 1)
+    }
+    search(index + 1, current, added)
+  }
+  search(0, workZones, 0)
+  if (bestAdded === 0) return zones
+  return best.map((zone, index) => ({
+    ...zones[index]!,
+    animalType: zone.animalType,
+    animalCount: zone.animalCount,
+    ...(allowsMixedAnimalTypes(zone) || zones[index]!.animalCounts
+      ? { animalCounts: compactAnimalCounts(zone.animalCounts) } : {}),
+  }))
 }
 
 /**

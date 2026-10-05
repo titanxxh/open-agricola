@@ -1,3 +1,5 @@
+import { buildAnimalReorgRequest } from '../../domain/animal-reorg'
+import { playerBoard } from '../../domain'
 import { copyHistoryRecordIdentity } from '../../session/history-streams'
 import { syncHarvestBreedPlacement } from '../../domain/harvest-breed-placement'
 import type {
@@ -9,7 +11,6 @@ import type {
   Resource,
 } from '../../contract/types'
 import { animalKeysForState, type AnimalKey } from '../../contract/animals'
-import { playerBoard } from '../../domain'
 import {
   areRequiredEmptyZoneGroupsSatisfied,
   buildCardAnimalZoneId,
@@ -395,34 +396,9 @@ export const reorganizeAction: ActionDefinition = {
   execute: (ctx): ActionExecutionResult => {
     const trigger = (ctx.actionContext?.trigger as ReorganizeTrigger) ?? 'anytime'
     syncCardAnimalStorage(ctx.state, ctx.player)
-    // NOTE: zones are computed here at emit-time and travel inside `request`.
-    // However, GameCore.buildInteraction() in shared/session/session-core.ts still
-    // recomputes zones via buildAnimalReorgZones() during the transitional
-    // period. Task 6/7 will rewire GameCore to consume zones from the
-    // engineStack.peekInteraction()?.request, eliminating the duplicate compute.
-    const idx = ctx.state.players.indexOf(ctx.player)
-    const zones: InteractionAnimalReorgZone[] = playerBoard(ctx.state, idx).animals.zones().map((zone) => ({
-      id: zone.id,
-      zoneType: zone.zoneType,
-      cardId: zone.cardId,
-      ...(zone.ownerPlayerId ? { ownerPlayerId: zone.ownerPlayerId } : {}),
-      ...(zone.animalOwnerPlayerId ? { animalOwnerPlayerId: zone.animalOwnerPlayerId } : {}),
-      ...(zone.displayOwnerName ? { displayOwnerName: zone.displayOwnerName } : {}),
-      animalType: zone.animalType ?? null,
-      animalCount: zone.animalCount ?? 0,
-      ...(zone.animalCounts ? { animalCounts: zone.animalCounts } : {}),
-      ...(zone.allowedAnimalType !== undefined ? { allowedAnimalType: zone.allowedAnimalType } : {}),
-      ...(zone.zoneType === 'card' ? { allowedAnimalTypes: getAllowedAnimalTypesForZone(ctx.state, ctx.player, zone) } : {}),
-      ...(zone.farmPosition ? { farmPosition: zone.farmPosition } : {}),
-      ...(zone.countsFarmyardSpaceAsUnused !== undefined ? { countsFarmyardSpaceAsUnused: zone.countsFarmyardSpaceAsUnused } : {}),
-      ...(zone.displaySource ? { displaySource: zone.displaySource } : {}),
-      ...(zone.exclusiveCardZoneLimit !== undefined ? { exclusiveCardZoneLimit: zone.exclusiveCardZoneLimit } : {}),
-      ...(zone.requiredEmptyZoneGroupIds ? { requiredEmptyZoneGroupIds: zone.requiredEmptyZoneGroupIds } : {}),
-      capacity: zone.capacity,
-    }))
     return {
       type: 'request',
-      request: { kind: 'animal-reorg', zones },
+      request: buildAnimalReorgRequest(ctx.state, ctx.player, ctx.actionContext?.prefill !== false),
       promptKey: 'ui.interactionAnimalReorg',
       promptParams: { trigger },
     }

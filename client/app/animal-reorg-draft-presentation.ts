@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { ALL_ANIMAL_KEYS, type AnimalKey } from '../../shared/contract/animals'
 import type { GameState, InteractionAnimalReorgZone } from '../../shared/contract/types'
 import type { ClientInteractionState } from '../../shared/contract/protocol/game'
@@ -11,6 +11,7 @@ import {
 } from './hooks/use-animal-reorg-flow'
 
 type ReorgAnimalType = AnimalKey
+type ReorgSourceState = { players: ReadonlyArray<Pick<GameState['players'][number], 'resources'>> }
 
 export type AnimalReorgSubmitDraft = {
   animalReorgZones?: readonly InteractionAnimalReorgZone[]
@@ -68,22 +69,32 @@ export const useAnimalReorgDraftPresentation = ({
   pendingAnimalReorg,
 }: AnimalReorgDraftPresentationInput) => {
   const [animalReorg, setAnimalReorg] = useState<AnimalReorgState | null>(null)
+  const sourceKey = useRef<string | null>(null)
 
-  const syncFromInteraction = useCallback((interaction: ClientInteractionState) => {
+  const syncFromInteraction = useCallback((interaction: ClientInteractionState, snapshotState: ReorgSourceState | null | undefined) => {
     if (
       interaction.stateId === 'wait' &&
       interaction.request.kind === 'animal-reorg'
     ) {
+      const player = snapshotState?.players[interaction.playerIndex]
+      const key = JSON.stringify([
+        interaction.playerIndex, interaction.spaceId, interaction.request,
+        REORG_ANIMAL_TYPES.map((type) => player?.resources[type] ?? 0),
+      ])
+      if (sourceKey.current === key) return
+      sourceKey.current = key
       setAnimalReorg({
         zones: interaction.request.zones,
         confirmDiscard: false,
       })
       return
     }
+    sourceKey.current = null
     setAnimalReorg(null)
   }, [])
 
   const reset = useCallback(() => {
+    sourceKey.current = null
     setAnimalReorg(null)
   }, [])
 

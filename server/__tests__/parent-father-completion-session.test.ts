@@ -837,8 +837,11 @@ describe('Parents batch 2 father interaction boundaries', () => {
     } else {
       const zones = prompt.interaction.request.zones.map((zone) => ({
         id: zone.id, zoneType: zone.zoneType, animalType: zone.animalType,
-        animalCount: zone.animalCount + (mode === 'house' && zone.id === 'pen-0' ? tier : 0),
+        animalCount: zone.animalCount,
       }))
+      if (mode === 'house') {
+        expect(zones.find((zone) => zone.id === 'pen-0')).toMatchObject({ animalType: animal, animalCount: 2 + tier })
+      }
       const invalid = zones.map((zone, index) => index === 0 ? { ...zone, animalType: animal, animalCount: 999 } : zone)
       expect(session.resolveChoice(0, 'confirm', { zones: invalid }).ok).toBe(false)
       expect(auditClone(session.state)).toEqual(waiting)

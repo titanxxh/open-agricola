@@ -65,6 +65,7 @@ export const wouldExceedExclusiveCardZoneLimit = (
     zone.id !== target.id &&
     zone.zoneType === 'card' &&
     zone.cardId === target.cardId &&
+    zone.ownerPlayerId === target.ownerPlayerId &&
     interactionZoneAnimalTotal(zone) > 0
   ).length
   return occupied >= limit
