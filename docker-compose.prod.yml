@@ -9,6 +9,8 @@
 
 services:
   app:
+    # Match the deployment account so persistent data stays writable by that account.
+    user: "${APP_UID:-1000}:${APP_GID:-1000}"
     build:
       context: .
       target: production
@@ -68,6 +70,9 @@ services:
 
   caddy:
     image: caddy:alpine
+    user: "${APP_UID:-1000}:${APP_GID:-1000}"
+    environment:
+      - XDG_CONFIG_HOME=/data/config
     ports:
       - "80:80"
       - "443:443"

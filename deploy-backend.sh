@@ -4,31 +4,24 @@
 # 一键更新并重新部署后端 Docker
 # 部署前自动做完整备份、目标镜像恢复验证和版本清单，
 # 备份失败则拉回旧版本并中止部署；pre-deploy 备份保留最近 5 份、最多 30 天（ADR-0010）。
-# 用法: ./deploy-backend.sh <ssh-host> [ref] [remote-dir]
+# 用法: ./deploy-backend.sh [ssh-host] [ref] [remote-dir]
+# 默认后端: ubuntu@ten-kr:/home/ubuntu/open-agricola，以 SSH 登录用户执行部署
 # ref 可以是分支名或 release tag
-# 示例: ./deploy-backend.sh 1.2.3.4
-#       ./deploy-backend.sh 1.2.3.4 v0.3.0
-#       ./deploy-backend.sh root@1.2.3.4 main /home/user/open-agricola
+# 示例: ./deploy-backend.sh
+#       ./deploy-backend.sh ubuntu@ten-kr v0.7.9
+#       ./deploy-backend.sh ubuntu@1.2.3.4 main /srv/open-agricola
 
 set -e
 
-# 如果没有 @ 则默认用 root 用户
-_HOST="${1:-}"
+# 未指定用户名时使用 ubuntu
+_HOST="${1:-ubuntu@ten-kr}"
 if [[ "$_HOST" != *@* ]]; then
-  HOST="root@$_HOST"
+  HOST="ubuntu@$_HOST"
 else
   HOST="$_HOST"
 fi
 REF="${2:-main}"
-REMOTE_DIR="${3:-/root/open-agricola}"
-
-if [ -z "$HOST" ]; then
-  echo "用法: ./deploy-backend.sh <ssh-host> [ref] [remote-dir]"
-  echo "示例: ./deploy-backend.sh 1.2.3.4              # 部署 main"
-  echo "      ./deploy-backend.sh 1.2.3.4 v0.3.0       # 部署 release tag"
-  echo "      ./deploy-backend.sh root@1.2.3.4 main /home/user/open-agricola"
-  exit 1
-fi
+REMOTE_DIR="${3:-/home/ubuntu/open-agricola}"
 
 echo ">>> 部署后端到 $HOST:$REMOTE_DIR (ref: $REF)"
 
@@ -37,11 +30,16 @@ if [ -n "${ACCOUNT_REGISTRATION_POLICY:-}" ]; then
   REMOTE_ENV+=(ACCOUNT_REGISTRATION_POLICY="$ACCOUNT_REGISTRATION_POLICY")
 fi
 
-ssh "$HOST" "${REMOTE_ENV[@]}" bash -s "$REMOTE_DIR" "$REF" << 'REMOTE_SCRIPT'
+# 显式传递配置并逐个引用参数，避免 SSH 拼接命令时解释路径或 ref。
+REMOTE_ARGS=(env "${REMOTE_ENV[@]}" bash -s "$REMOTE_DIR" "$REF")
+printf -v REMOTE_COMMAND '%q ' "${REMOTE_ARGS[@]}"
+
+ssh "$HOST" "$REMOTE_COMMAND" << 'REMOTE_SCRIPT'
   set -e
   REMOTE_DIR="$1"
   REF="$2"
   cd "$REMOTE_DIR"
+  export APP_UID="$(id -u)" APP_GID="$(id -g)"
 
   # 与 backup-offsite.sh 共享维护锁：等待进行中的定时备份结束，部署期间备份不会启动
   mkdir -p backups
@@ -98,6 +96,7 @@ ssh "$HOST" "${REMOTE_ENV[@]}" bash -s "$REMOTE_DIR" "$REF" << 'REMOTE_SCRIPT'
   RESTART_ON_EXIT=1
   docker compose -f docker-compose.prod.yml stop app
   docker compose -f docker-compose.prod.yml run --rm --no-deps \
+    --user "$APP_UID:$APP_GID" \
     -v "$PWD/backups:/backup" app sh -c \
     "tar -C /app/data -czf /backup/$BACKUP_STEM.tgz . && \
      if [ -f /app/data/replay-removals.jsonl ]; then \
@@ -114,6 +113,7 @@ ssh "$HOST" "${REMOTE_ENV[@]}" bash -s "$REMOTE_DIR" "$REF" << 'REMOTE_SCRIPT'
     || backup_failed
   tar -C "$VALIDATION_DIR" -xzf "backups/$BACKUP_STEM.tgz" || backup_failed
   docker compose -f docker-compose.prod.yml run --rm --no-deps \
+    --user "$APP_UID:$APP_GID" \
     -v "$VALIDATION_DIR:/validation-data" \
     -e DB_PATH=/validation-data/open-agricola.db \
     -e BACKUP_STEM="$BACKUP_STEM" \
