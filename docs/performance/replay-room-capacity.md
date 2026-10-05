@@ -150,6 +150,36 @@ Both separate 30-Room probes pass the unchanged 250ms scheduled-to-send p99, 100
 
 The retained benchmark/documentation change passes isolated local restart, backend health/frontend HTTP checks, both late-name CLI modes, 778 fast-suite files / 8,338 tests (2 skipped, 1 todo), benchmark types and lint with zero errors. A transient remote asset-metadata timeout required a restart retry. The prototype separately passes its focused tests, server/app types, changed-file lint and the real Room browser test; it was not promoted to the full fast-suite acceptance stage. No production implementation, architecture contract, ADR, push or deployment changes are adopted. The artifact retains all 72 threshold, diagnostic and paired timing reports, exact-trace fingerprints, original prototype patch, diagnostics, verification logs and analysis sources; its JSON references are a reversible storage encoding.
 
+### Late-game tail diagnosis (no additional production change)
+
+The next investigation retains the same four-player, five-worker fixture and all history-projection follow-up gates above. Its source is `d8753380`; the production files and timing harness still match that experiment's control. It does not implement another candidate or claim another accepted improvement. Evidence and diagnostic sources are retained in [`room-tail-diagnosis-results.json`](room-tail-diagnosis-results.json).
+
+The initial targets are fixture command 26 (`activate-after-collect-10`, round 12) and command 233 (the final stable selection, engine round 15). Indices are zero-based and are not Replay Step numbers: command 78 restores the process without generating a Step. Each name mode has a separate uninstrumented replay and a phase diagnostic, each with one warmup and three measured complete transcripts. A sampled profile and a syscall trace run separately, with the same repetition count. All use Node 24.19.0 and the unchanged 2 CPU / 2 GiB and SQLite settings. No apps or tests from this investigation run alongside these probes.
+
+Wrappers record every command's rule, commit and broadcast intervals, plus nested snapshot preparation, history writes and the complete SQLite transaction. The matched-name diagnostic medians are below. Nested transaction time is part of commit, not additional time; phase medians need not sum to the median command latency. CPU measures the whole process during each interval, including runtime workers.
+
+| Command | Rules wall | Commit wall | Transaction wall / CPU, within commit | Broadcast wall |
+| :--- | ---: | ---: | ---: | ---: |
+| 26, after-collect choice | 15.15ms | 28.81ms | 20.28 / 3.25ms | 8.85ms |
+| 233, final stable selection | 6.03ms | 35.41ms | 21.79 / 6.19ms | 7.64ms |
+
+These are diagnostic costs, not acceptance timings. Instrumentation, GC, JIT activity and checkpoint placement affect them. For example, command 26 has an uninstrumented matched-name median of 32.11ms but an instrumented median of 52.85ms; in the overridden-name runs the corresponding medians are 54.02ms and 34.12ms. Comparing those values as an optimization would be invalid. All twelve measured instrumented transcripts, including profile and trace runs, preserve the corresponding uninstrumented Frame Hash chain and commit classifications. This is narrower than the complete Frame/cursor/envelope equivalence required for adopting production changes.
+
+The syscall trace identifies the waiting mechanism: WAL append, `fsync(WAL)`, WAL reads and 4096-byte database-page backfill, `ftruncate(DB)`, then `fsync(DB)`. Combined with the unchanged synchronous commit path and absence of an explicit checkpoint call there, this identifies automatic WAL checkpoints. Two measured command-26 windows backfill 414 pages and spend approximately 19–20ms in the two sync calls. The third has no backfill; its next checkpoint falls in command 27 instead. All three final command-233 windows backfill 455–456 pages before the command-end marker, with approximately 10–20ms in the two sync calls. Thus the final wait is not a database-close artifact, and moving the checkpoint to a neighboring command would not establish a tail improvement. Syscall tracing adds overhead; these times and bytes are not performance or write-volume acceptance results.
+
+The final command also saves the result and deletes the active Room with its dependent rows in the existing transaction. Skipping recovery data that would immediately be deleted is a possible future local investigation, but it must preserve final Replay/result/delete atomicity, rollback and frozen retry. It does not provide enough measured direct cost to justify a candidate under this investigation's complete-workload gates.
+
+| Name mode | Transaction CPU / complete-run CPU | Diagnostic p50 reduction if all transaction wall time is deleted | Required CPU / p50 reduction |
+| :--- | ---: | ---: | ---: |
+| Matched | 1.83% | 3.18% | 11% / 11% |
+| Overridden | 1.75% | 2.61% | 5% / 8% |
+
+This deliberately optimistic subtraction includes indispensable SQL and transaction work; it is a ceiling on the recorded direct costs only, not a prediction of an implementation or a universal bound on indirect allocation/GC effects. Removing waiting alone would recover less CPU. The corresponding p99 subtraction is much larger, about 23%/20%, which explains why a transaction-only change could improve the tail while failing the CPU and usual-latency requirements.
+
+The separate sampled profile finds remaining commit work in canonical encoding, delta construction, pointer escaping and snapshot capture. Source-map inspection attributes 1,844.522ms of codec self samples to canonical encoding (including its array callback), 667.781ms to delta construction and 298.319ms to pointer escaping across four transcripts, including warmup. These are sampled intervals, not exact function CPU or removable savings; recursive ancestors are not summed. GC without a target-command ancestor remains unassigned, and the profile parser explicitly records its single negative 2-microsecond interval adjustment. The investigation does not establish a redundant computation whose removal would satisfy both gates.
+
+Stop this follow-up without changing production code, durability/checkpoint settings, the frozen thresholds, ADRs or Room limits. No candidate exists for a new paired acceptance population, write comparison or capacity claim; the previously accepted #941 implementation and its validation above remain the reviewable delivery. This documentation-only follow-up validates report identities, complete command coverage, diagnostic parser checks and reversible artifact reconstruction; it does not claim a new application test-suite, restart, capacity or deployment run.
+
 ### Frozen optimization baseline (Issue #947)
 
 The fixed workloads contain 136 two-player and 277 four-player commands, including farm choices, payments, undo and process recovery. Their explicit stress preparation (hands, cost occupations and resources) is recorded with each fixture; these are reproducible cost workloads, not a claim about optimal play or ordinary starting resources. Five fresh-process runs on Node 24.19.0 under a 2 CPU / 2 GiB cgroup produced identical raw Frame Hash chains and commit classifications. SQLite uses WAL and `synchronous=NORMAL`.
