@@ -14,138 +14,15 @@
 
 ## A. 架构选型
 
-### A1. 数据库：SQLite (better-sqlite3)
+### A1. 数据库：异步 PostgreSQL，资源使用私有 S3
 
-**为什么选 SQLite 而非 Postgres/MongoDB：**
+`server/database/schema.sql` 和编号 migration 是运行时 schema 的唯一实现。`server/db.ts` 使用异步 `pg` 连接池，事务在所有 await 之间保留同一连接，嵌套事务使用串行 savepoint。启动时通过共享 advisory lock 应用 migration。
 
-- 单服务器 indie 项目，SQLite 零运维（无守护进程、无连接池、无 Docker 服务）
-- 当前代码已用同步 `readFileSync`/`writeFileSync` 持久化，`better-sqlite3` 同步 API 天然适配
-- 游戏状态是复杂嵌套 JSON — SQLite 的 `json_extract` 支持 JSON 列存储+查询
-- 社交功能（点赞/评论）是关系型数据，SQLite 在这个规模完全胜任
-- 备份 = 复制单个 `.db` 文件
+账号、OAuth、Workshop、Bug Report、Room、Game Context、Replay、结果、目录、命令回执、失效屏障和任务 claim 共用 PostgreSQL。需要大小写无关唯一性的字段使用 `citext`；恢复校验依赖的原始编码保持 TEXT，Replay 压缩数据保持 BYTEA，不以 JSONB 重编码。
 
-**数据库文件位置：** `./data/open-agricola.db`
+卡图、内容寻址的 Replay 资源和不可变 Viewer 放入私有 S3。PostgreSQL 保存暂存、引用和 GC claim；删除 ledger 独立保存在 S3，并在恢复前与最新独立副本合并。普通应用容器没有资源真源目录。
 
-**Schema 设计：**
-
-```sql
--- 用户
-CREATE TABLE users (
-  id TEXT PRIMARY KEY,            -- nanoid
-  username TEXT UNIQUE NOT NULL,
-  display_name TEXT NOT NULL,
-  password_hash TEXT NOT NULL,    -- crypto.scrypt
-  created_at INTEGER NOT NULL,
-  last_login_at INTEGER
-);
-
--- 会话
-CREATE TABLE sessions (
-  token TEXT PRIMARY KEY,         -- crypto.randomUUID
-  user_id TEXT NOT NULL REFERENCES users(id),
-  expires_at INTEGER NOT NULL,
-  created_at INTEGER NOT NULL
-);
-
--- 游戏房间（替代当前 JSON 文件持久化）
-CREATE TABLE rooms (
-  id TEXT PRIMARY KEY,
-  created_by TEXT REFERENCES users(id),
-  state_json TEXT,                -- SerializedGameState JSON
-  max_players INTEGER DEFAULT 2,
-  status TEXT DEFAULT 'waiting',  -- waiting | playing | finished
-  version INTEGER DEFAULT 0,
-  started_at INTEGER,
-  created_at INTEGER NOT NULL,
-  updated_at INTEGER NOT NULL
-);
-
--- 房间玩家
-CREATE TABLE room_players (
-  room_id TEXT NOT NULL REFERENCES rooms(id),
-  user_id TEXT NOT NULL REFERENCES users(id),
-  player_index INTEGER NOT NULL,
-  joined_at INTEGER NOT NULL,
-  PRIMARY KEY (room_id, user_id)
-);
-
--- 正常完赛标量摘要；room_id 永不复用
-CREATE TABLE game_results (
-  room_id TEXT PRIMARY KEY,
-  started_at INTEGER NOT NULL,
-  finished_at INTEGER NOT NULL,
-  rounds_played INTEGER NOT NULL,
-  player_count INTEGER NOT NULL,
-  enable_community_deck INTEGER NOT NULL,
-  enable_parent_cards INTEGER NOT NULL,
-  enable_through_the_seasons INTEGER NOT NULL,
-  enable_farmers_of_the_moor INTEGER NOT NULL
-);
-
-CREATE TABLE game_result_players (
-  room_id TEXT NOT NULL REFERENCES game_results(room_id) ON DELETE CASCADE,
-  player_index INTEGER NOT NULL,
-  game_player_id TEXT NOT NULL,
-  user_id TEXT,
-  display_name TEXT NOT NULL,
-  score INTEGER NOT NULL,
-  PRIMARY KEY (room_id, player_index)
-);
-
--- 工坊卡牌
-CREATE TABLE workshop_cards (
-  id TEXT PRIMARY KEY,            -- nanoid
-  author_id TEXT NOT NULL REFERENCES users(id),
-  card_id TEXT NOT NULL,          -- e.g. "CUSTOM_FireDragon"
-  card_type TEXT NOT NULL,        -- 'minor' | 'occupation'
-  name TEXT NOT NULL,
-  description TEXT NOT NULL,
-  card_json TEXT NOT NULL,        -- CardDefinition JSON（含 CARD_DEF + CARD_IMPL TypeScript 源码）
-  -- effect_dsl / effect_code / compiled_code 历史字段，migration v7 已 DROP
-  art_url TEXT,
-  art_prompt TEXT,
-  review_status TEXT DEFAULT 'unsubmitted',  -- unsubmitted | in_review | approved | stale | merged（PRD #634）
-  live INTEGER DEFAULT 0,         -- 仅 approved 卡可置 1；房间只装载 live 卡的 approved_version_id 快照
-  created_at INTEGER NOT NULL,
-  updated_at INTEGER NOT NULL
-);
-
--- 点赞
-CREATE TABLE card_likes (
-  user_id TEXT NOT NULL REFERENCES users(id),
-  card_id TEXT NOT NULL REFERENCES workshop_cards(id),
-  created_at INTEGER NOT NULL,
-  PRIMARY KEY (user_id, card_id)
-);
-
--- 评论
-CREATE TABLE card_comments (
-  id TEXT PRIMARY KEY,
-  card_id TEXT NOT NULL REFERENCES workshop_cards(id),
-  author_id TEXT NOT NULL REFERENCES users(id),
-  body TEXT NOT NULL,
-  created_at INTEGER NOT NULL
-);
-
--- 沙盒（用户收藏的自定义卡牌）
-CREATE TABLE sandbox_cards (
-  user_id TEXT NOT NULL REFERENCES users(id),
-  workshop_card_id TEXT NOT NULL REFERENCES workshop_cards(id),
-  added_at INTEGER NOT NULL,
-  PRIMARY KEY (user_id, workshop_card_id)
-);
-
--- 沙盒配置（人数、牌组、变体）
-CREATE TABLE sandbox_settings (
-  user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-  player_count INTEGER NOT NULL DEFAULT 2,
-  deck_ids_json TEXT NOT NULL DEFAULT '["A","B","C","D","E"]',
-  enable_through_the_seasons INTEGER NOT NULL DEFAULT 0,
-  enable_farmers_of_the_moor INTEGER NOT NULL DEFAULT 0,
-  allow_incomplete_farmers_of_the_moor_minor_deal INTEGER NOT NULL DEFAULT 0,
-  updated_at INTEGER NOT NULL
-);
-```
+本机通过 Docker Compose 启动 PostgreSQL 18 和 RustFS，无需申请外部服务。SQLite 仅由 `scripts/import-sqlite.ts` 作为只读、一次性迁移输入。它保留录制局和无关数据，仅丢弃已证实未录制的活动局；导入或目标版本校验失败会阻止应用启动。迁移与备份步骤见 [部署文档](HOW_TO_DEPLOY.md)。
 
 ### A2. 认证：服务端 Session Token
 
@@ -189,45 +66,21 @@ App.tsx
 
 ## B. 部署模式设计
 
-### B1. 单进程服务器扩展
+### B1. 一个公开入口，默认一个应用实例
 
-保持 `server/index.ts` 的 raw Node.js HTTP 服务器，扩展路由：
-
-```
-/api/auth/register       POST   注册
-/api/auth/login          POST   登录
-/api/auth/logout         POST   登出
-/api/auth/me             GET    获取当前用户
-
-/api/lobby/rooms         GET    房间列表
-/api/lobby/create        POST   创建房间
-
-/api/workshop/cards      GET    卡牌列表（分页/搜索/排序）
-/api/workshop/cards/:id  GET    卡牌详情
-/api/workshop/cards      POST   创建/更新卡牌
-/api/workshop/cards/:id/like     POST  点赞/取消
-/api/workshop/cards/:id/comments GET   评论列表
-/api/workshop/cards/:id/comments POST  添加评论
-/api/workshop/sandbox    GET/POST/DELETE  沙盒管理
-
-/api/game/*              (现有路由)
-/ws                      (现有 WebSocket，加认证握手)
-```
+`server/ingress.ts` 保留同一 backend origin 和 OAuth callback，将 `/nodes/<instanceId>/ws` 转发给 Room 的当前 owner；HTTP 工坊沙盒使用节点亲和 cookie。`scripts/local-backend.ts` 默认启动一个应用进程，可显式配置 `APP_INSTANCES=2` 在同一台机器验证路由。共享目录、lease、owner epoch、写入/发布屏障和命令回执由 PostgreSQL 保存；GameSession 仍是规则状态唯一写入者。
 
 ### B2. 开发环境
 
-- `restart-local.sh` 无需修改 — 数据库初始化在服务器启动时自动完成（`CREATE TABLE IF NOT EXISTS`）
-- SQLite 文件位于 `./data/open-agricola.db`，加入 `.gitignore`
-- 迁移策略：服务器启动时检查 schema 版本，自动执行 pending migrations
+统一入口 `./restart-local.sh` 准备或复用本机 PostgreSQL、私有 S3、schema 和不可变 Viewer。worktree 的默认依赖数据归属于主仓；应用重启保留数据。`./restart-local.sh --instances 2` 启动本机双实例。`pnpm run verify` 同样使用统一入口，另建测试 schema、S3 prefix、端口和日志。
 
-### B3. 生产部署
+所有正式 Room 都录制，包括普通、Workshop、热座与开发 Room。开发入口 slot 在重开后指向新的永久 Room ID，启动器输出当前链接；旧 Game Context 不复用。独立 HTTP/browser Workshop Sandbox 仍保留。
 
-单机部署即可：
+### B3. 单机部署与后续切换
 
-- Node.js 进程 (backend + WebSocket) + Vite build 的静态文件
-- SQLite 文件持久化到磁盘
-- 可选 Nginx 反代前端静态文件 + WebSocket 代理
-- 如果未来需要扩展，SQLite → PostgreSQL 迁移路径清晰（SQL 语法兼容度高）
+生产镜像包含原生 PostgreSQL 备份工具和一个不可变 Viewer；启动时把 Viewer 发布到 S3。Caddy 继续提供原有 HTTPS origin，私有应用进程和依赖端口不向公网暴露。PostgreSQL 与 S3 使用独立持久卷，默认无云服务前提。
+
+后续可配置外部 `DATABASE_URL` 和完整 `S3_*` 参数。需要在维护窗口搬迁数据、保留加密密钥、合并当前删除 ledger，并通过目标版本恢复检查后启用。只改环境变量不会迁移数据。正常单机/双实例功能检查不构成故障恢复、30 秒恢复或容量认证。
 
 ---
 
@@ -664,11 +517,11 @@ Draft Version 只序列化最终卡牌内容和各分区已采用候选的 prove
 | 注册/登录/登出/会话验证、邮箱验证与 OAuth       | `server/auth.ts`, `server/auth-cookies.ts`, `server/oauth/`, `client/app/LoginPage.tsx`, `client/contexts/AuthContext.tsx`            |
 | SQLite 数据库 + migration          | `server/db.ts`                                                                                                               |
 | WebSocket 认证握手                 | `server/connection/ws-server.ts`, `server/connection/room-router.ts`, `shared/contract/protocol/ws.ts`                         |
-| WS 房间 → SQLite 写入              | `server/game/room-persistence-checkpoint.ts`, `server/game/room-committer.ts`, `server/game/persistence/sqlite-adapter.ts`      |
-| 服务器重启恢复房间                      | `server/connection/ws-server.ts`, `server/game/persistence/sqlite-adapter.ts`                                                  |
+| WS 房间 → SQLite 写入              | `server/game/room-persistence-checkpoint.ts`, `server/game/room-committer.ts`, `server/game/persistence/postgres-adapter.ts`      |
+| 服务器重启恢复房间                      | `server/connection/ws-server.ts`, `server/game/persistence/postgres-adapter.ts`                                                  |
 | 游戏状态持久化（JSON/SQLite）           | `server/game/persistence/` (`PERSIST_ROOMS` 环境变量)                                                                            |
-| 完赛结果归档 + 删除完整状态                 | `server/game/room-persistence-checkpoint.ts`, `server/game/persistence/sqlite-adapter.ts`                                     |
-| 房间 TTL 丢弃                      | `server/connection/ws-server.ts`, `server/game/persistence/sqlite-adapter.ts`                                                 |
+| 完赛结果归档 + 删除完整状态                 | `server/game/room-persistence-checkpoint.ts`, `server/game/persistence/postgres-adapter.ts`                                     |
+| 房间 TTL 丢弃                      | `server/connection/ws-server.ts`, `server/game/persistence/postgres-adapter.ts`                                                 |
 | 大厅页面                           | `client/app/LobbyPage.tsx`, `/api/lobby/my-rooms`                                                                               |
 | 页面路由 (?page=)                  | `client/app/PageRouter.tsx`                                                                                                     |
 | URL params 实时读取                | `client/app/GameContainerApi.tsx` (移出模块级)                                                                                       |

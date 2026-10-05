@@ -1,11 +1,6 @@
+import { recordedRouterFixture } from '../../__tests__/_helpers/room-router'
 import { describe, expect, it, vi } from 'vitest'
-import { dispatch } from '../room-router.ts'
 import { createConnectionCtx } from '../connection-ctx.ts'
-import { Broadcaster } from '../broadcaster.ts'
-import { RoomRegistry } from '../../game/room-registry.ts'
-import { InMemoryRoomPersistence } from '../../game/persistence/memory-adapter.ts'
-import { createLobby } from '../../game/lobby.ts'
-import { createRoomPersistenceCheckpoint } from '../../game/room-persistence-checkpoint.ts'
 import { snapshotToRoom, summarizeRoomsForLobby, toRoomMeta } from '../../game/room.ts'
 import { GameSession } from '../../game/authoritative-session.ts'
 import type { StateUpdateEnvelope } from '../../../shared/contract/protocol/game.ts'
@@ -21,23 +16,12 @@ const fakeWs = () => ({ OPEN: 1, readyState: 1, send: vi.fn(), close: vi.fn() })
 const GameSessionPrototype = GameSession.prototype as unknown as { getState: () => unknown }
 const GameSessionGetState = GameSessionPrototype.getState
 
-const newDeps = (persistence = new InMemoryRoomPersistence()) => {
-  const registry = new RoomRegistry()
-  const checkpoint = createRoomPersistenceCheckpoint({ persistence })
-  const broadcaster = new Broadcaster({ checkpoint })
-  const lobby = createLobby({ registry, checkpoint, broadcaster })
-  return { persistence, registry, checkpoint, broadcaster, lobby }
-}
+const { newDeps, dispatch } = recordedRouterFixture()
 
 const newCtx = (deps = newDeps()) => {
   const ws = fakeWs() as never
   return Object.assign(
-    createConnectionCtx(ws, {
-      registry: deps.registry,
-      checkpoint: deps.checkpoint,
-      broadcaster: deps.broadcaster,
-      lobby: deps.lobby,
-    }, true),
+    createConnectionCtx(ws, deps, true),
     { deps },
   )
 }
@@ -50,9 +34,9 @@ const sentMessagesOf = (ctx: ReturnType<typeof newCtx>): Array<Record<string, un
 const errorsOf = (ctx: ReturnType<typeof newCtx>): string[] =>
   sentMessagesOf(ctx).filter((msg) => msg.type === 'error').map((msg) => String(msg.error))
 
-const createHotseatRoom = async (ctx: ReturnType<typeof newCtx>, maxPlayers = 3) => {
+const createHotseatRoom = async (ctx: ReturnType<typeof newCtx>, maxPlayers = 2, enableParentCards = false) => {
   ctx.currentUserId = 'owner'
-  await dispatch(ctx, { type: 'createRoom', maxPlayers, name: 'Owner', hotseat: true })
+  await dispatch(ctx, { type: 'createRoom', maxPlayers, name: 'Owner', hotseat: true, enableParentCards })
   return ctx.currentRoom!
 }
 
@@ -118,7 +102,7 @@ describe('hotseat seat ownership', () => {
 
   it('lets a seat-naming command act for any seat in the room', async () => {
     const ctx = newCtx()
-    const room = await createHotseatRoom(ctx, 3)
+    const room = await createHotseatRoom(ctx, 3, true)
     const submit = vi.spyOn(room.session, 'submitParentSelection')
 
     ctx.currentPlayerIndex = 0
@@ -134,7 +118,7 @@ describe('hotseat seat ownership', () => {
 
   it('still rejects a seat that does not exist in the game', async () => {
     const ctx = newCtx()
-    await createHotseatRoom(ctx, 2)
+    await createHotseatRoom(ctx, 2, true)
 
     await dispatch(ctx, {
       type: 'parentSubmit',
@@ -148,10 +132,11 @@ describe('hotseat seat ownership', () => {
   it('keeps the strict one-seat rule for ordinary rooms', async () => {
     const ctx = newCtx()
     ctx.currentUserId = 'u1'
-    await dispatch(ctx, { type: 'createRoom', maxPlayers: 2, name: 'host' })
+    await dispatch(ctx, { type: 'createRoom', maxPlayers: 2, name: 'host', enableParentCards: true })
     const room = ctx.currentRoom!
     room.status = 'playing'
     room.startedAt ??= 1
+    await ctx.committer!.prepareRoom(room, { missingPrefix: false })
 
     await dispatch(ctx, {
       type: 'parentSubmit',
@@ -169,6 +154,7 @@ describe('hotseat seat ownership', () => {
     const room = ctx.currentRoom!
     room.status = 'playing'
     room.startedAt ??= 1
+    await ctx.committer!.prepareRoom(room, { missingPrefix: false })
     room.session.getState().state.currentPlayerIndex = 1
     const takeAction = vi.spyOn(room.session, 'takeAction')
 
@@ -203,7 +189,8 @@ describe('hotseat snapshot projection', () => {
     const room = ctx.currentRoom!
     room.status = 'playing'
     room.startedAt ??= 1
-    ctx.broadcaster.broadcastState(room, room.session.getState(), 'reconnect')
+    await ctx.committer!.prepareRoom(room, { missingPrefix: false })
+    await dispatch(ctx, { type: 'getState' })
 
     const payload = stateUpdateOf(ctx).at(-1)!.payload
     const others = payload.state.players.filter((_, index) => index !== 0)
@@ -216,27 +203,14 @@ describe('hotseat replay attribution', () => {
     const deps = newDeps()
     const ctx = newCtx(deps)
     const room = await createHotseatRoom(ctx, 3)
-    const commits: number[] = []
-    ctx.committer = {
-      isRecording: () => true,
-      commit: (_room, _resp, _intent, playerIndex) => {
-        commits.push(playerIndex)
-        return { kind: 'committed' as const }
-      },
-      isRetrying: () => false,
-      blockedError: () => undefined,
-      canCreateRoom: () => undefined,
-      lockNewRoom: () => {},
-      hasReplay: () => false,
-      waitUntilReady: () => false,
-    } as unknown as typeof ctx.committer
+    const commit = vi.spyOn(ctx.committer!, 'commit')
 
     // Seat 1 acts while the connection is still seated at 0.
     room.session.getState().state.currentPlayerIndex = 1
     ctx.currentPlayerIndex = 0
     await dispatch(ctx, { type: 'action', spaceId: 'forest' })
 
-    expect(commits).toEqual([1])
+    expect(commit).toHaveBeenCalledWith(room, expect.anything(), expect.anything(), 1, expect.any(Function), expect.anything())
   })
 })
 

@@ -1,3 +1,4 @@
+import type { CommandIdentity, CommandInput, CommandScope, CommandReceipt, CommandErrorCode } from './commands'
 import type { RoomHistoryPage } from './history'
 import type { StateUpdateEnvelope } from './game'
 import type { GameContextErrorCode, GameContextLifecycle } from './game-context'
@@ -28,6 +29,8 @@ type MoorSpecialActionPayload = {
 
 type ClientCommandBody =
   | { type: 'auth'; token: string }
+  | { type: 'getCommandScope'; scopeId?: string }
+  | { type: 'getCommandReceipt'; identity: CommandIdentity }
   | { type: 'action'; spaceId: string }
   | { type: 'specialAction'; cardId: string; actionId: MoorSpecialActionId; payload?: MoorSpecialActionPayload }
   | { type: 'choice'; value: string; payload?: Record<string, unknown> }
@@ -89,15 +92,18 @@ type ClientCommandBody =
   | { type: 'dissolveRoom' }
   | { type: 'draftSubmit'; playerId: string; pick: DraftPickPayload }
 
-export type ClientCommand = ClientCommandBody & { requestId?: string }
+export type ClientCommand = ClientCommandBody & { requestId?: string; commandContext?: CommandIdentity & Partial<CommandInput> & { roomId?: string; allocationId?: string } }
 
 export type ServerEvent =
+  | { type: 'commandScope'; scope: CommandScope; requestId?: string }
+  | { type: 'commandReceipt'; status: 'completed'; receipt: CommandReceipt; requestId?: string }
+  | { type: 'commandReceipt'; status: 'pending' | 'unknown'; identity: CommandIdentity; requestId?: string }
   | { type: 'historyPage'; roomId: string; page: RoomHistoryPage; requestId?: string }
   | StateUpdateEnvelope
   | {
       type: 'error'
       error: string
-      code?: GameContextErrorCode | 'seat_replaced' | 'history_branch_changed'
+      code?: GameContextErrorCode | CommandErrorCode | 'seat_replaced' | 'history_branch_changed'
       lifecycle?: GameContextLifecycle
       requestId?: string
     }

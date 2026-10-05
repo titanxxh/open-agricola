@@ -1,15 +1,16 @@
+import { clientIp } from './client-ip'
 import { createHash } from 'node:crypto'
-import { createReadStream, lstatSync } from 'node:fs'
-import { readFile } from 'node:fs/promises'
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { extname, join } from 'node:path'
+import { extname } from 'node:path'
 import type { GameContextErrorCode } from '../shared/contract/protocol/game-context.ts'
 import type {
   ReplayAnchorResponse,
   ReplayManifestResponse,
   ReplaySegmentResponse,
 } from '../shared/contract/protocol/replay.ts'
-import { loadReplayViewerBuild } from './game/replay-viewer-build.ts'
+import { ReplayResources, validViewerPath } from './storage/replay-resources'
+import { ResourceIntegrityError } from './storage/resource-store'
+import { objectHash } from './storage/s3-store'
 import { ReplayStore } from './game/replay-store.ts'
 
 const MANIFEST_ROUTE = /^\/api\/v1\/replays\/([^/]+)\/manifest$/
@@ -20,14 +21,6 @@ const ASSET_ROUTE = /^\/replay-assets\/([a-f0-9]{64})$/
 const CONTEXT_ID = /^[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*$/
 const MAX_RESPONSE_BYTES = 8 * 1024 * 1024
 const READ_LIMIT_PER_MINUTE = 240
-type VerifiedReplayAsset = {
-  size: number
-  mtimeMs: number
-  contentType: string
-}
-const verifiedReplayAssets = new Map<string, VerifiedReplayAsset>()
-const replayAssetVerifications = new Map<string, Promise<VerifiedReplayAsset | null>>()
-
 type ReplayResponse = ReplayManifestResponse | ReplaySegmentResponse | ReplayAnchorResponse
 
 const statusForCode = (code: GameContextErrorCode): number => {
@@ -116,19 +109,6 @@ const parseStepNo = (raw: string): number | null => {
   return Number.isSafeInteger(value) && value >= 0 ? value : null
 }
 
-const clientIp = (req: IncomingMessage): string => {
-  if (
-    process.env.REPLAY_TRUST_PROXY === '1'
-    || process.env.REPLAY_TRUST_PROXY === 'true'
-  ) {
-    const forwarded = req.headers['x-forwarded-for']
-    if (typeof forwarded === 'string') {
-      return forwarded.split(',').at(-1)?.trim() || req.socket.remoteAddress || 'unknown'
-    }
-  }
-  return req.socket.remoteAddress ?? 'unknown'
-}
-
 export class ReplayReadLimiter {
   private readonly reads = new Map<string, { count: number; resetAt: number }>()
   private readonly max: number
@@ -188,187 +168,59 @@ const mimeType = (path: string): string => {
   }
 }
 
-const safeViewerPath = (raw: string): string | null => {
-  try {
-    const path = decodeURIComponent(raw)
-    const parts = path.split('/')
-    if (
-      !path
-      || path.startsWith('/')
-      || path.includes('\\')
-      || parts.some((part) => !part || part === '.' || part === '..')
-    ) return null
-    return path
-  } catch {
-    return null
-  }
+const viewerUnavailable = (res: ServerResponse, status: number): void => {
+  res.writeHead(status, publicHeaders('application/json; charset=utf-8', 'no-cache'))
+  res.end(JSON.stringify({ ok: false, code: 'viewer_unavailable', message: 'Replay viewer not found' }))
 }
 
-const fileMetadata = (path: string): {
-  size: number
-  mtimeMs: number
-} | null => {
-  try {
-    const stat = lstatSync(path)
-    return stat.isFile()
-      ? { size: stat.size, mtimeMs: stat.mtimeMs }
-      : null
-  } catch {
-    return null
-  }
-}
-
-const metadataMatches = (
-  actual: { size: number; mtimeMs: number },
-  expected: { size: number; mtimeMs: number },
-): boolean =>
-  actual.size === expected.size && actual.mtimeMs === expected.mtimeMs
-
-const streamFile = (
-  res: ServerResponse,
-  path: string,
-  headers: Record<string, string>,
-): void => {
-  res.writeHead(200, headers)
-  const stream = createReadStream(path)
-  stream.on('error', () => res.destroy())
-  stream.pipe(res)
-}
-
-const serveViewerFile = (
-  res: ServerResponse,
-  root: string,
-  buildId: string,
-  rawPath: string,
-): void => {
-  const path = safeViewerPath(rawPath)
-  if (!path) {
-    res.writeHead(404, publicHeaders('application/json; charset=utf-8', 'no-cache'))
-    res.end(JSON.stringify({ ok: false, code: 'viewer_unavailable', message: 'Replay viewer not found' }))
-    return
-  }
-  const build = loadReplayViewerBuild(root, buildId)
-  if (!build) {
-    res.writeHead(503, publicHeaders('application/json; charset=utf-8', 'no-cache'))
-    res.end(JSON.stringify({ ok: false, code: 'viewer_unavailable', message: 'Replay viewer not found' }))
-    return
-  }
-  if (path !== 'manifest.json' && !(path in build.files)) {
-    res.writeHead(404, publicHeaders('application/json; charset=utf-8', 'no-cache'))
-    res.end(JSON.stringify({ ok: false, code: 'viewer_unavailable', message: 'Replay viewer not found' }))
-    return
-  }
-  const filePath = join(build.directory, path)
-  const metadata = fileMetadata(filePath)
-  const expectedMetadata = build.fileMetadata[path]
-  if (
-    !metadata
-    || !expectedMetadata
-    || !metadataMatches(metadata, expectedMetadata)
-  ) {
-    res.writeHead(503, publicHeaders('application/json; charset=utf-8', 'no-cache'))
-    res.end(JSON.stringify({ ok: false, code: 'viewer_unavailable', message: 'Replay viewer not found' }))
-    return
-  }
+const serveViewerFile = async (res: ServerResponse, resources: ReplayResources, buildId: string, rawPath: string): Promise<void> => {
+  let path: string
+  try { path = decodeURIComponent(rawPath) } catch { viewerUnavailable(res, 404); return }
+  if (!validViewerPath(path)) { viewerUnavailable(res, 404); return }
+  const build = await resources.viewer(buildId)
+  if (!build) { viewerUnavailable(res, 503); return }
+  if (path !== 'manifest.json' && !Object.hasOwn(build.files, path)) { viewerUnavailable(res, 404); return }
+  const object = await resources.storage.read(`replay-viewers/${buildId}/${path}`)
   const hash = path === 'manifest.json' ? buildId : build.files[path]!
+  if (!object || objectHash(object.body) !== hash) { viewerUnavailable(res, 503); return }
   const headers = publicHeaders(mimeType(path), 'public, max-age=31536000, immutable')
   headers.ETag = `"${hash}"`
   if (path === 'index.html') {
     headers['Content-Security-Policy'] = [
-      "default-src 'none'",
-      "script-src 'self'",
-      "style-src 'self' 'unsafe-inline'",
-      // Existing rooms keep their immutable Viewer, including its asset source.
+      "default-src 'none'", "script-src 'self'", "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: https://titanxxh.github.io/open-agricola-assets/ https://raw.githubusercontent.com/titanxxh/open-agricola-assets/",
       "font-src 'self' https://titanxxh.github.io/open-agricola-assets/ https://raw.githubusercontent.com/titanxxh/open-agricola-assets/",
-      "connect-src 'self'",
-      "frame-ancestors *",
-      "base-uri 'none'",
-      "form-action 'none'",
+      "connect-src 'self'", "frame-ancestors *", "base-uri 'none'", "form-action 'none'",
     ].join('; ')
   }
-  streamFile(res, filePath, headers)
+  res.writeHead(200, headers)
+  res.end(object.body)
 }
 
-const assetMimeType = (body: Buffer): string => {
-  if (body.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) {
-    return 'image/png'
-  }
-  if (body[0] === 0xff && body[1] === 0xd8) return 'image/jpeg'
-  if (body.subarray(0, 4).toString('ascii') === 'RIFF' && body.subarray(8, 12).toString('ascii') === 'WEBP') {
-    return 'image/webp'
-  }
-  return 'application/octet-stream'
-}
-
-const serveReplayAsset = (
-  req: IncomingMessage,
-  res: ServerResponse,
-  root: string,
-  hash: string,
-): void => {
-  const path = join(root, hash)
-  const metadata = fileMetadata(path)
-  if (!metadata) {
-    verifiedReplayAssets.delete(path)
+const serveReplayAsset = async (req: IncomingMessage, res: ServerResponse, resources: ReplayResources, hash: string): Promise<void> => {
+  const object = await resources.storage.read(`replay-assets/${hash}`)
+  if (!object) {
     res.writeHead(404, publicHeaders('application/json; charset=utf-8', 'no-cache'))
     res.end(JSON.stringify({ ok: false, code: 'replay_segment_unavailable', message: 'Replay asset not found' }))
     return
   }
-  const sendVerified = (contentType: string): void => {
-    const headers = {
-      ...publicHeaders(contentType, 'public, max-age=0, must-revalidate'),
-      ETag: `"${hash}"`,
-    }
-    if (req.headers['if-none-match'] === headers.ETag) {
-      res.writeHead(304, headers)
-      res.end()
-      return
-    }
-    streamFile(res, path, headers)
-  }
-  const cached = verifiedReplayAssets.get(path)
-  if (cached && metadataMatches(metadata, cached)) {
-    sendVerified(cached.contentType)
-    return
-  }
-  verifiedReplayAssets.delete(path)
-  let verification = replayAssetVerifications.get(path)
-  if (!verification) {
-    verification = readFile(path).then((body): VerifiedReplayAsset | null => {
-      const current = fileMetadata(path)
-      if (
-        !current
-        || !metadataMatches(current, metadata)
-        || createHash('sha256').update(body).digest('hex') !== hash
-      ) return null
-      const verified = { ...current, contentType: assetMimeType(body) }
-      verifiedReplayAssets.set(path, verified)
-      return verified
-    }).catch(() => null)
-    replayAssetVerifications.set(path, verification)
-    void verification.then(() => replayAssetVerifications.delete(path))
-  }
-  void verification.then((verified) => {
-    if (!verified) {
-      res.writeHead(503, publicHeaders('application/json; charset=utf-8', 'no-cache'))
-      res.end(JSON.stringify({ ok: false, code: 'replay_segment_unavailable', message: 'Replay asset failed its integrity check' }))
-      return
-    }
-    sendVerified(verified.contentType)
-  })
+  if (objectHash(object.body) !== hash) throw new Error('Replay asset integrity failure')
+  const headers = { ...publicHeaders(object.contentType, 'public, max-age=0, must-revalidate'), ETag: `"${hash}"` }
+  // The shared barrier is checked even for conditional browser requests.
+  if (req.headers['if-none-match'] === headers.ETag) { res.writeHead(304, headers); res.end(); return }
+  res.writeHead(200, headers)
+  res.end(object.body)
 }
 
-export function handleReplayRoute(
+export async function handleReplayRoute(
   req: IncomingMessage,
   res: ServerResponse,
   store: ReplayStore,
   options: {
-    viewerRoot: string
-    assetRoot: string
+    resources: ReplayResources
     limiter: ReplayReadLimiter
   },
-): boolean {
+): Promise<Awaited<boolean>> {
   if (req.method !== 'GET' || !req.url) return false
   const url = new URL(req.url, `http://${req.headers.host ?? 'localhost'}`)
   const viewerMatch = VIEWER_ROUTE.exec(url.pathname)
@@ -392,16 +244,22 @@ export function handleReplayRoute(
     return true
   }
   if (viewerMatch) {
-    serveViewerFile(
+    try { await serveViewerFile(
       res,
-      options.viewerRoot,
+      options.resources,
       viewerMatch[1]!,
       viewerMatch[2]!,
-    )
+    ) } catch (error) {
+      if (!(error instanceof ResourceIntegrityError)) throw error
+      viewerUnavailable(res, 503)
+    }
     return true
   }
   if (assetMatch) {
-    serveReplayAsset(req, res, options.assetRoot, assetMatch[1]!)
+    try { await serveReplayAsset(req, res, options.resources, assetMatch[1]!) } catch (error) {
+      if (!(error instanceof ResourceIntegrityError)) throw error
+      sendJson(req, res, { ok: false, code: 'replay_segment_unavailable', message: 'Replay asset failed its integrity check' })
+    }
     return true
   }
   const match = manifestMatch ?? segmentMatch ?? anchorMatch
@@ -411,10 +269,10 @@ export function handleReplayRoute(
     return true
   }
   if (manifestMatch) {
-    const response = store.manifest(roomId)
+    const response = (await store.manifest(roomId))
     if (
       response.ok
-      && !loadReplayViewerBuild(options.viewerRoot, response.viewerBuildId)
+      && !await options.resources.viewer(response.viewerBuildId)
     ) {
       sendJson(req, res, {
         ok: false,
@@ -433,7 +291,7 @@ export function handleReplayRoute(
       sendInvalidLink(req, res)
       return true
     }
-    sendJson(req, res, store.segment(roomId, checkpointStepNo))
+    sendJson(req, res, (await store.segment(roomId, checkpointStepNo)))
     return true
   }
   const stepNo = parseStepNo(anchorMatch![2]!)
@@ -442,6 +300,6 @@ export function handleReplayRoute(
     sendInvalidLink(req, res)
     return true
   }
-  sendJson(req, res, store.anchor(roomId, stepNo, frameHash))
+  sendJson(req, res, (await store.anchor(roomId, stepNo, frameHash)))
   return true
 }

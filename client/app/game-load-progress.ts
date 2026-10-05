@@ -59,6 +59,7 @@ export function resolveGameLoadPhase(input: GameLoadResolveInput): GameLoadPhase
         return 'wsJoining'
       case 'ready':
         return 'fetchingState'
+      case 'reconnecting':
       case 'waiting':
       case 'error':
       case 'idle':

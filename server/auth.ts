@@ -1,3 +1,4 @@
+import { isUniqueViolation } from './database/errors'
 import { scrypt, randomBytes, randomUUID, timingSafeEqual, createHash } from 'node:crypto'
 import { getDb } from './db.ts'
 import { nanoid } from 'nanoid'
@@ -113,28 +114,28 @@ function newEmailVerificationToken(): { token: string; tokenHash: string } {
   return { token, tokenHash: hashToken(token) }
 }
 
-function storeEmailVerificationToken(userId: string, tokenHash: string, now: number): void {
+async function storeEmailVerificationToken(userId: string, tokenHash: string, now: number): Promise<Awaited<void>> {
   const db = getDb()
-  db.transaction(() => {
-    db.prepare(`
+  ;(await db.transaction(async () => {
+    ;(await db.prepare(`
       UPDATE email_verification_tokens
       SET used_at = ?
       WHERE user_id = ? AND used_at IS NULL
-    `).run(now, userId)
-    db.prepare(`
+    `).run(now, userId))
+    ;(await db.prepare(`
       INSERT INTO email_verification_tokens (token_hash, user_id, expires_at, created_at, used_at)
       VALUES (?, ?, ?, ?, NULL)
-    `).run(tokenHash, userId, now + EMAIL_VERIFICATION_TTL_MS, now)
-    db.prepare('UPDATE users SET email_verification_sent_at = ? WHERE id = ?').run(now, userId)
-  })()
+    `).run(tokenHash, userId, now + EMAIL_VERIFICATION_TTL_MS, now))
+    ;(await db.prepare('UPDATE users SET email_verification_sent_at = ? WHERE id = ?').run(now, userId))
+  })())
 }
 
 function mapRegistrationConstraintError(err: unknown): RegisterPasswordResult | null {
   if (!(err instanceof Error)) return null
-  if (/users\.username/.test(err.message)) {
+  if (isUniqueViolation(err, 'users_username_key')) {
     return { ok: false, code: 'username_taken', error: 'Username already taken' }
   }
-  if (/users\.email/.test(err.message)) {
+  if (isUniqueViolation(err, 'idx_users_email')) {
     return { ok: false, code: 'email_taken', error: 'Email already taken' }
   }
   return null
@@ -172,13 +173,13 @@ export async function registerPasswordUser(input: RegisterPasswordInput): Promis
   }
 
   const db = getDb()
-  if (policy === 'invite_only' && !isInviteCodeAvailable(inviteCode)) {
+  if (policy === 'invite_only' && !(await isInviteCodeAvailable(inviteCode))) {
     return { ok: false, code: 'invalid_invite', error: 'Invalid invite code' }
   }
-  if (db.prepare('SELECT id FROM users WHERE username = ?').get(username) || isUsernameReserved(username)) {
+  if ((await db.prepare('SELECT id FROM users WHERE username = ?').get(username)) || (await isUsernameReserved(username))) {
     return { ok: false, code: 'username_taken', error: 'Username already taken' }
   }
-  if (db.prepare('SELECT id FROM users WHERE email = ?').get(email)) {
+  if ((await db.prepare('SELECT id FROM users WHERE email = ?').get(email))) {
     return { ok: false, code: 'email_taken', error: 'Email already taken' }
   }
 
@@ -187,19 +188,19 @@ export async function registerPasswordUser(input: RegisterPasswordInput): Promis
   const now = Date.now()
   const name = input.displayName?.trim() || username
   try {
-    const result = db.transaction(() => {
-      db.prepare(`
+    const result = (await db.transaction(async () => {
+      ;(await db.prepare(`
         INSERT INTO users (
           id, username, email, email_verified_at, email_verification_sent_at,
           display_name, password_hash, password_updated_at, created_at
         )
         VALUES (?, ?, ?, NULL, NULL, ?, ?, ?, ?)
-      `).run(id, username, email, name, passwordHash, now, now)
-      if (policy === 'invite_only' && !consumeInviteCode(db, inviteCode, id, now)) {
+      `).run(id, username, email, name, passwordHash, now, now))
+      if (policy === 'invite_only' && !(await consumeInviteCode(db, inviteCode, id, now))) {
         throw new Error('invalid_invite')
       }
       return { ok: true as const, status: 'verification_required' as const, userId: id, consumedInviteCodeHash }
-    })()
+    })())
     return result
   } catch (err) {
     if (err instanceof Error && err.message === 'invalid_invite') {
@@ -211,28 +212,28 @@ export async function registerPasswordUser(input: RegisterPasswordInput): Promis
   }
 }
 
-export function createEmailVerificationToken(userId: string): string {
+export async function createEmailVerificationToken(userId: string): Promise<Awaited<string>> {
   const now = Date.now()
   const { token, tokenHash } = newEmailVerificationToken()
-  storeEmailVerificationToken(userId, tokenHash, now)
+  ;(await storeEmailVerificationToken(userId, tokenHash, now))
   return token
 }
 
-export function verifyEmailToken(rawToken: string): LoginResult {
+export async function verifyEmailToken(rawToken: string): Promise<Awaited<LoginResult>> {
   const token = rawToken.trim()
   if (!token) {
     return { ok: false, code: 'invalid_or_expired_token', error: 'Invalid or expired token' }
   }
   const db = getDb()
   const now = Date.now()
-  const row = db.prepare(`
+  const row = (await db.prepare(`
     SELECT t.token_hash, t.user_id, u.username, u.display_name, u.email
     FROM email_verification_tokens t
     JOIN users u ON u.id = t.user_id
     WHERE t.token_hash = ?
       AND t.used_at IS NULL
       AND t.expires_at > ?
-  `).get(hashToken(token), now) as
+  `).get(hashToken(token), now)) as
     | { token_hash: string; user_id: string; username: string; display_name: string; email: string | null }
     | undefined
 
@@ -240,11 +241,13 @@ export function verifyEmailToken(rawToken: string): LoginResult {
     return { ok: false, code: 'invalid_or_expired_token', error: 'Invalid or expired token' }
   }
 
-  const session = db.transaction(() => {
-    db.prepare('UPDATE email_verification_tokens SET used_at = ? WHERE token_hash = ?').run(now, row.token_hash)
-    db.prepare('UPDATE users SET email_verified_at = ?, last_login_at = ? WHERE id = ?').run(now, now, row.user_id)
-    return createSession(row.user_id)
-  })()
+  const session = (await db.transaction(async () => {
+    await db.prepare('SELECT id FROM users WHERE id = ? FOR UPDATE').get(row.user_id)
+    const consumed = await db.prepare('UPDATE email_verification_tokens SET used_at = ? WHERE token_hash = ? AND used_at IS NULL AND expires_at > ?').run(now, row.token_hash, now)
+    if (consumed.changes !== 1) return null
+    ;(await db.prepare('UPDATE users SET email_verified_at = ?, last_login_at = ? WHERE id = ?').run(now, now, row.user_id))
+    return (await createSession(row.user_id))
+  })())
   if (!session) {
     return { ok: false, code: 'invalid_or_expired_token', error: 'Invalid or expired token' }
   }
@@ -280,13 +283,13 @@ export async function sendVerificationEmail(userId: string, email: string): Prom
     text: `Verify your Open Agricola email: ${link}`,
     html: `<p>Verify your Open Agricola email:</p><p><a href="${link}">Verify email</a></p>`,
   })
-  storeEmailVerificationToken(userId, tokenHash, Date.now())
+  ;(await storeEmailVerificationToken(userId, tokenHash, Date.now()))
 }
 
-export function cleanupPendingPasswordUser(userId: string, consumedInviteCodeHash: string | null): boolean {
+export async function cleanupPendingPasswordUser(userId: string, consumedInviteCodeHash: string | null): Promise<Awaited<boolean>> {
   const db = getDb()
-  return db.transaction(() => {
-    const row = db.prepare(`
+  return (await db.transaction(async () => {
+    const row = (await db.prepare(`
       SELECT u.id
       FROM users u
       WHERE u.id = ?
@@ -294,21 +297,21 @@ export function cleanupPendingPasswordUser(userId: string, consumedInviteCodeHas
         AND u.email_verified_at IS NULL
         AND NOT EXISTS (SELECT 1 FROM sessions s WHERE s.user_id = u.id)
         AND NOT EXISTS (SELECT 1 FROM auth_identities i WHERE i.user_id = u.id)
-    `).get(userId)
+    `).get(userId))
     if (!row) return false
     if (consumedInviteCodeHash) {
-      db.prepare(`
+      ;(await db.prepare(`
         UPDATE account_invites
         SET use_count = use_count - 1,
             used_by = CASE WHEN used_by = ? THEN NULL ELSE used_by END,
             used_at = CASE WHEN used_by = ? THEN NULL ELSE used_at END
         WHERE code_hash = ? AND use_count > 0
-      `).run(userId, userId, consumedInviteCodeHash)
+      `).run(userId, userId, consumedInviteCodeHash))
     }
-    db.prepare('DELETE FROM email_verification_tokens WHERE user_id = ?').run(userId)
-    db.prepare('DELETE FROM users WHERE id = ?').run(userId)
+    ;(await db.prepare('DELETE FROM email_verification_tokens WHERE user_id = ?').run(userId))
+    ;(await db.prepare('DELETE FROM users WHERE id = ?').run(userId))
     return true
-  })()
+  })())
 }
 
 export async function resendVerificationEmail(
@@ -317,11 +320,11 @@ export async function resendVerificationEmail(
   const normalized = normalizeEmail(email)
   const db = getDb()
   const now = Date.now()
-  const row = db.prepare(`
+  const row = (await db.prepare(`
     SELECT id, email, email_verified_at, email_verification_sent_at
     FROM users
     WHERE email = ?
-  `).get(normalized) as
+  `).get(normalized)) as
     | { id: string; email: string; email_verified_at: number | null; email_verification_sent_at: number | null }
     | undefined
 
@@ -358,7 +361,7 @@ export async function createLocalUserForTests(
   if (!password || password.length < 8) throw new Error('Password must be at least 8 characters')
 
   const db = getDb()
-  const existing = db.prepare('SELECT id FROM users WHERE username = ?').get(username)
+  const existing = (await db.prepare('SELECT id FROM users WHERE username = ?').get(username))
   if (existing) throw new Error('Username already taken')
 
   const id = nanoid()
@@ -366,37 +369,41 @@ export async function createLocalUserForTests(
   const now = Date.now()
   const name = displayName?.trim() || username
 
-  db.prepare(
+  ;(await db.prepare(
     `INSERT INTO users (
       id, username, email, email_verified_at, email_verification_sent_at,
       display_name, password_hash, password_updated_at, created_at
     ) VALUES (?, ?, NULL, ?, NULL, ?, ?, ?, ?)`,
-  ).run(id, username, now, name, passwordHash, now, now)
+  ).run(id, username, now, name, passwordHash, now, now))
 
   return { id, username, displayName: name }
 }
 
-export function createSession(userId: string): string | null {
+export async function createSession(userId: string): Promise<Awaited<string | null>> {
   const now = Date.now()
   const token = randomUUID()
   const db = getDb()
-  const result = db.prepare(`
+  return (await db.transaction(async () => {
+  const user = await db.prepare('SELECT id FROM users WHERE id = ? FOR UPDATE').get(userId)
+  if (!user) return null
+  const result = (await db.prepare(`
     INSERT INTO sessions (token, user_id, expires_at, created_at)
     SELECT ?, ?, ?, ?
     WHERE NOT EXISTS (
       SELECT 1 FROM account_deletion_requests WHERE user_id = ?
     )
-  `).run(token, userId, now + SESSION_TTL_MS, now, userId)
+  `).run(token, userId, now + SESSION_TTL_MS, now, userId))
   return result.changes === 1 ? token : null
+  })())
 }
 
 export async function login(username: string, password: string): Promise<LoginResult> {
   if (!password) return { ok: false, code: 'invalid_login', error: 'Invalid username or password' }
 
   const db = getDb()
-  const row = db.prepare(
+  const row = (await db.prepare(
     'SELECT id, username, display_name, password_hash, email, email_verified_at FROM users WHERE username = ?',
-  ).get(username) as
+  ).get(username)) as
     | {
       id: string
       username: string
@@ -420,11 +427,11 @@ export async function login(username: string, password: string): Promise<LoginRe
   }
 
   const now = Date.now()
-  const token = createSession(row.id)
+  const token = (await createSession(row.id))
   if (!token) {
     return { ok: false, code: 'invalid_login', error: 'Invalid username or password' }
   }
-  db.prepare('UPDATE users SET last_login_at = ? WHERE id = ?').run(now, row.id)
+  ;(await db.prepare('UPDATE users SET last_login_at = ? WHERE id = ?').run(now, row.id))
 
   return {
     ok: true,
@@ -440,53 +447,54 @@ export async function login(username: string, password: string): Promise<LoginRe
   }
 }
 
-export function logout(token: string): void {
+export async function logout(token: string): Promise<Awaited<void>> {
   const db = getDb()
-  db.prepare('DELETE FROM sessions WHERE token = ?').run(token)
+  ;(await db.prepare('DELETE FROM sessions WHERE token = ?').run(token))
 }
 
-export function logoutAll(userId: string): void {
+export async function logoutAll(userId: string): Promise<Awaited<void>> {
   const db = getDb()
-  db.prepare('DELETE FROM sessions WHERE user_id = ?').run(userId)
+  ;(await db.prepare('DELETE FROM sessions WHERE user_id = ?').run(userId))
 }
 
-export function requestAccountDeletion(userId: string): void {
+export async function requestAccountDeletion(userId: string): Promise<Awaited<void>> {
   const db = getDb()
   const now = Date.now()
   const disabledPasswordHash = `${randomBytes(16).toString('hex')}:${randomBytes(SCRYPT_KEYLEN).toString('hex')}`
-  db.transaction(() => {
-    db.prepare(`
+  ;(await db.transaction(async () => {
+    await db.prepare('SELECT id FROM users WHERE id = ? FOR UPDATE').get(userId)
+    ;(await db.prepare(`
       INSERT INTO account_deletion_requests (
         user_id, requested_at, next_attempt_at, last_error_code
       ) VALUES (?, ?, ?, NULL)
       ON CONFLICT(user_id) DO UPDATE SET
-        next_attempt_at = MIN(
+        next_attempt_at = LEAST(
           account_deletion_requests.next_attempt_at,
           excluded.next_attempt_at
         ),
         last_error_code = NULL
-    `).run(userId, now, now)
-    db.prepare('DELETE FROM sessions WHERE user_id = ?').run(userId)
-    db.prepare('DELETE FROM email_verification_tokens WHERE user_id = ?').run(userId)
-    db.prepare('DELETE FROM oauth_states WHERE user_id = ?').run(userId)
-    db.prepare('DELETE FROM auth_identities WHERE user_id = ?').run(userId)
-    db.prepare(`
+    `).run(userId, now, now))
+    ;(await db.prepare('DELETE FROM sessions WHERE user_id = ?').run(userId))
+    ;(await db.prepare('DELETE FROM email_verification_tokens WHERE user_id = ?').run(userId))
+    ;(await db.prepare('DELETE FROM oauth_states WHERE user_id = ?').run(userId))
+    ;(await db.prepare('DELETE FROM auth_identities WHERE user_id = ?').run(userId))
+    ;(await db.prepare(`
       UPDATE users
       SET password_hash = ?, password_updated_at = ?
       WHERE id = ?
-    `).run(disabledPasswordHash, now, userId)
-    db.prepare(`
+    `).run(disabledPasswordHash, now, userId))
+    ;(await db.prepare(`
       UPDATE issue_submission_connections
       SET revoked_at = COALESCE(revoked_at, ?), updated_at = ?
       WHERE user_id = ?
-    `).run(now, now, userId)
-    db.prepare(`
+    `).run(now, now, userId))
+    ;(await db.prepare(`
       DELETE FROM bug_reports
       WHERE reporter_user_id = ?
         AND submitted_at IS NULL
         AND github_issue_number IS NULL
-    `).run(userId)
-    db.prepare(`
+    `).run(userId))
+    ;(await db.prepare(`
       UPDATE bug_reports
       SET phenomenon = NULL,
           author_identity = NULL,
@@ -508,107 +516,122 @@ export function requestAccountDeletion(userId: string): void {
           END,
           updated_at = ?
       WHERE reporter_user_id = ?
-    `).run(now, now, userId)
+    `).run(now, now, userId))
+  })())
+}
+
+export type AccountDeletionClaim = { userId: string; token: string }
+export async function claimPendingAccountDeletion(userId?: string): Promise<AccountDeletionClaim | null> {
+  const db = getDb()
+  return db.transaction(async () => {
+    const now = (await db.prepare('SELECT (extract(epoch FROM clock_timestamp())*1000)::bigint AS now').get<{ now: number }>())!.now
+    const row = await db.prepare(`SELECT user_id FROM account_deletion_requests
+      WHERE next_attempt_at<=? AND (claim_until IS NULL OR claim_until<=?) AND (?::text IS NULL OR user_id=?)
+      ORDER BY requested_at, user_id FOR UPDATE SKIP LOCKED LIMIT 1`).get<{ user_id: string }>(now, now, userId ?? null, userId ?? null)
+    if (!row) return null
+    const token = randomUUID()
+    await db.prepare('UPDATE account_deletion_requests SET claim_token=?, claim_until=? WHERE user_id=?').run(token, now + 60000, row.user_id)
+    return { userId: row.user_id, token }
   })()
 }
 
-export function nextPendingAccountDeletion(): string | null {
-  const row = getDb().prepare(`
-    SELECT user_id
-    FROM account_deletion_requests
-    WHERE next_attempt_at <= ?
-    ORDER BY requested_at, user_id
-    LIMIT 1
-  `).get(Date.now()) as { user_id: string } | undefined
-  return row?.user_id ?? null
+export async function renewAccountDeletion(claim: AccountDeletionClaim): Promise<boolean> {
+  const result = await getDb().prepare(`UPDATE account_deletion_requests
+    SET claim_until=(extract(epoch FROM clock_timestamp())*1000)::bigint+60000
+    WHERE user_id=? AND claim_token=? AND claim_until>(extract(epoch FROM clock_timestamp())*1000)::bigint`).run(claim.userId, claim.token)
+  return result.changes === 1
 }
 
-export function deferAccountDeletion(
-  userId: string,
-  errorCode: string,
-  retryAt = Date.now() + ACCOUNT_DELETION_RETRY_MS,
-): void {
-  getDb().prepare(`
-    UPDATE account_deletion_requests
-    SET next_attempt_at = ?, last_error_code = ?
-    WHERE user_id = ?
-  `).run(Math.max(retryAt, Date.now() + 1_000), errorCode, userId)
+export async function deferAccountDeletion(claim: AccountDeletionClaim, errorCode: string, retryAt = Date.now() + ACCOUNT_DELETION_RETRY_MS): Promise<void> {
+  await getDb().prepare(`UPDATE account_deletion_requests SET next_attempt_at=?, last_error_code=?, claim_token=NULL, claim_until=NULL
+    WHERE user_id=? AND claim_token=?`).run(Math.max(retryAt, Date.now() + 1000), errorCode, claim.userId, claim.token)
+}
+
+export async function finishAccountDeletion(claim: AccountDeletionClaim): Promise<boolean> {
+  const db = getDb()
+  return db.transaction(async () => {
+    const valid = await db.prepare(`SELECT user_id FROM account_deletion_requests WHERE user_id=? AND claim_token=?
+      AND claim_until>(extract(epoch FROM clock_timestamp())*1000)::bigint FOR UPDATE`).get(claim.userId, claim.token)
+    if (!valid) return false
+    await deleteAccount(claim.userId)
+    return true
+  })()
 }
 
 const idPlaceholders = (ids: string[]): string => ids.map(() => '?').join(', ')
 
-export function deleteAccount(userId: string): { ok: true } {
+export async function deleteAccount(userId: string): Promise<Awaited<{ ok: true }>> {
   const db = getDb()
   const now = Date.now()
-  const userRow = db.prepare('SELECT username FROM users WHERE id = ?').get(userId) as { username: string } | undefined
-  const authoredCardIds = (db.prepare('SELECT id FROM workshop_cards WHERE author_id = ?').all(userId) as Array<{ id: string }>)
+  const userRow = (await db.prepare('SELECT username FROM users WHERE id = ?').get(userId)) as { username: string } | undefined
+  const authoredCardIds = ((await db.prepare('SELECT id FROM workshop_cards WHERE author_id = ?').all(userId)) as Array<{ id: string }>)
     .map(row => row.id)
-  const affectedRoomIds = getAccountDeletionRoomIds(userId)
+  const affectedRoomIds = (await getAccountDeletionRoomIds(userId))
 
-  db.transaction(() => {
+  ;(await db.transaction(async () => {
     if (userRow && isAdmin(userRow.username)) {
-      db.prepare(`
-        INSERT OR IGNORE INTO reserved_usernames (username, reason, created_at)
-        VALUES (?, 'deleted_admin', ?)
-      `).run(userRow.username, now)
+      ;(await db.prepare(`
+        INSERT INTO reserved_usernames (username, reason, created_at)
+        VALUES (?, 'deleted_admin', ?) ON CONFLICT (username) DO NOTHING
+      `).run(userRow.username, now))
     }
 
     if (affectedRoomIds.length > 0) {
-      db.prepare(`DELETE FROM rooms WHERE id IN (${idPlaceholders(affectedRoomIds)})`)
-        .run(...affectedRoomIds)
+      ;(await db.prepare(`DELETE FROM rooms WHERE id IN (${idPlaceholders(affectedRoomIds)})`)
+        .run(...affectedRoomIds))
     }
-    db.prepare(`
+    ;(await db.prepare(`
       UPDATE game_result_players
       SET user_id = NULL,
           display_name = 'Deleted player (seat ' || (player_index + 1) || ')',
           name_is_default = 0
       WHERE user_id = ?
-    `).run(userId)
+    `).run(userId))
 
-    db.prepare('DELETE FROM github_propose_audit WHERE user_id = ?').run(userId)
-    db.prepare('DELETE FROM github_propose_rate_limit WHERE user_id = ?').run(userId)
-    db.prepare('DELETE FROM workshop_card_versions WHERE created_by = ?').run(userId)
-    db.prepare('DELETE FROM card_likes WHERE user_id = ?').run(userId)
-    db.prepare('DELETE FROM card_comments WHERE author_id = ?').run(userId)
-    db.prepare('DELETE FROM sandbox_cards WHERE user_id = ?').run(userId)
-    db.prepare('DELETE FROM sandbox_settings WHERE user_id = ?').run(userId)
+    ;(await db.prepare('DELETE FROM github_propose_audit WHERE user_id = ?').run(userId))
+    ;(await db.prepare('DELETE FROM github_propose_rate_limit WHERE user_id = ?').run(userId))
+    ;(await db.prepare('DELETE FROM workshop_card_versions WHERE created_by = ?').run(userId))
+    ;(await db.prepare('DELETE FROM card_likes WHERE user_id = ?').run(userId))
+    ;(await db.prepare('DELETE FROM card_comments WHERE author_id = ?').run(userId))
+    ;(await db.prepare('DELETE FROM sandbox_cards WHERE user_id = ?').run(userId))
+    ;(await db.prepare('DELETE FROM sandbox_settings WHERE user_id = ?').run(userId))
 
     if (authoredCardIds.length > 0) {
       const placeholders = idPlaceholders(authoredCardIds)
-      db.prepare(`DELETE FROM github_propose_audit WHERE workshop_card_id IN (${placeholders})`).run(...authoredCardIds)
-      db.prepare(`DELETE FROM workshop_card_versions WHERE card_id IN (${placeholders})`).run(...authoredCardIds)
-      db.prepare(`DELETE FROM card_likes WHERE card_id IN (${placeholders})`).run(...authoredCardIds)
-      db.prepare(`DELETE FROM card_comments WHERE card_id IN (${placeholders})`).run(...authoredCardIds)
-      db.prepare(`DELETE FROM sandbox_cards WHERE workshop_card_id IN (${placeholders})`).run(...authoredCardIds)
-      db.prepare(`DELETE FROM workshop_cards WHERE id IN (${placeholders})`).run(...authoredCardIds)
+      ;(await db.prepare(`DELETE FROM github_propose_audit WHERE workshop_card_id IN (${placeholders})`).run(...authoredCardIds))
+      ;(await db.prepare(`DELETE FROM workshop_card_versions WHERE card_id IN (${placeholders})`).run(...authoredCardIds))
+      ;(await db.prepare(`DELETE FROM card_likes WHERE card_id IN (${placeholders})`).run(...authoredCardIds))
+      ;(await db.prepare(`DELETE FROM card_comments WHERE card_id IN (${placeholders})`).run(...authoredCardIds))
+      ;(await db.prepare(`DELETE FROM sandbox_cards WHERE workshop_card_id IN (${placeholders})`).run(...authoredCardIds))
+      ;(await db.prepare(`DELETE FROM workshop_cards WHERE id IN (${placeholders})`).run(...authoredCardIds))
     }
 
-    db.prepare('DELETE FROM room_players WHERE user_id = ?').run(userId)
-    db.prepare('DELETE FROM oauth_states WHERE user_id = ?').run(userId)
-    db.prepare('DELETE FROM auth_identities WHERE user_id = ?').run(userId)
-    db.prepare('DELETE FROM sessions WHERE user_id = ?').run(userId)
-    db.prepare('DELETE FROM users WHERE id = ?').run(userId)
-  })()
+    ;(await db.prepare('DELETE FROM room_players WHERE user_id = ?').run(userId))
+    ;(await db.prepare('DELETE FROM oauth_states WHERE user_id = ?').run(userId))
+    ;(await db.prepare('DELETE FROM auth_identities WHERE user_id = ?').run(userId))
+    ;(await db.prepare('DELETE FROM sessions WHERE user_id = ?').run(userId))
+    ;(await db.prepare('DELETE FROM users WHERE id = ?').run(userId))
+  })())
 
   return { ok: true }
 }
 
-export function getAccountDeletionRoomIds(userId: string): string[] {
-  return (getDb().prepare(`
+export async function getAccountDeletionRoomIds(userId: string): Promise<Awaited<string[]>> {
+  return ((await getDb().prepare(`
     SELECT id FROM rooms WHERE created_by = ?
     UNION
     SELECT room_id AS id FROM room_players WHERE user_id = ?
-  `).all(userId, userId) as Array<{ id: string }>).map(row => row.id)
+  `).all(userId, userId)) as Array<{ id: string }>).map(row => row.id)
 }
 
-export function validateSession(token: string): AuthUser | null {
+export async function validateSession(token: string): Promise<Awaited<AuthUser | null>> {
   if (!token) return null
   const db = getDb()
-  const row = db.prepare(`
+  const row = (await db.prepare(`
     SELECT u.id, u.username, u.display_name
     FROM sessions s JOIN users u ON s.user_id = u.id
     WHERE s.token = ? AND s.expires_at > ?
-  `).get(token, Date.now()) as { id: string; username: string; display_name: string } | undefined
+  `).get(token, Date.now())) as { id: string; username: string; display_name: string } | undefined
 
   if (!row) return null
   return { id: row.id, username: row.username, displayName: row.display_name }
@@ -622,11 +645,11 @@ export function extractToken(authHeader: string | undefined): string {
 }
 
 /** Update a user's display name. Returns error string or null on success. */
-export function updateDisplayName(userId: string, displayName: string): string | null {
+export async function updateDisplayName(userId: string, displayName: string): Promise<Awaited<string | null>> {
   const name = displayName.trim()
   if (!name || name.length > 60) return 'Display name must be 1-60 characters'
   const db = getDb()
-  db.prepare('UPDATE users SET display_name = ? WHERE id = ?').run(name, userId)
+  ;(await db.prepare('UPDATE users SET display_name = ? WHERE id = ?').run(name, userId))
   return null
 }
 
@@ -638,10 +661,10 @@ export function isAdmin(username: string): boolean {
     .includes(username)
 }
 
-export function isUsernameReserved(username: string): boolean {
+export async function isUsernameReserved(username: string): Promise<Awaited<boolean>> {
   const name = username.trim()
   if (!name) return false
-  const row = getDb().prepare('SELECT 1 FROM reserved_usernames WHERE username = ?').get(name)
+  const row = (await getDb().prepare('SELECT 1 FROM reserved_usernames WHERE username = ?').get(name))
   return Boolean(row)
 }
 
@@ -653,12 +676,12 @@ export async function changePassword(
 ): Promise<string | null> {
   if (!newPassword || newPassword.length < 8) return 'Password must be at least 8 characters'
   const db = getDb()
-  const row = db.prepare('SELECT password_hash FROM users WHERE id = ?').get(userId) as
+  const row = (await db.prepare('SELECT password_hash FROM users WHERE id = ?').get(userId)) as
     | { password_hash: string } | undefined
   if (!row) return 'User not found'
   const valid = await verifyPassword(oldPassword, row.password_hash)
   if (!valid) return 'Current password is incorrect'
   const newHash = await hashPassword(newPassword)
-  db.prepare('UPDATE users SET password_hash = ?, password_updated_at = ? WHERE id = ?').run(newHash, Date.now(), userId)
+  ;(await db.prepare('UPDATE users SET password_hash = ?, password_updated_at = ? WHERE id = ?').run(newHash, Date.now(), userId))
   return null
 }

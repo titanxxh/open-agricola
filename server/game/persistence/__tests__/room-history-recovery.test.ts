@@ -1,9 +1,9 @@
-import Database from 'better-sqlite3'
+import { createTestDatabase } from '../../../__tests__/_helpers/postgres'
+import type { PostgresDatabase } from '../../../database/postgres'
 import { describe, expect, it } from 'vitest'
-import { runMigrations } from '../../../db'
 import { GameSession } from '../../authoritative-session'
 import { rehydrateState, serializeSessionSnapshot } from '../../../../shared/session/serialization'
-import { SqliteRoomPersistence } from '../sqlite-adapter'
+import { PostgresRoomPersistence } from '../postgres-adapter'
 import { RoomHistoryCorruptionError } from '../room-history-store'
 import { parseRoomBody } from '../room-body-codec'
 import type { RoomMeta } from '../room-persistence'
@@ -19,10 +19,10 @@ const session = () => {
   game.loadState(game.state)
   return game
 }
-const database = () => {
-  const db = new Database(':memory:')
-  db.pragma('foreign_keys = ON')
-  runMigrations(db, () => {})
+const database = async () => {
+  const db = await createTestDatabase()
+
+
   return db
 }
 
@@ -46,10 +46,10 @@ describe('Room-owned history recovery', () => {
     expect(Object.getPrototypeOf(restored)).toBe(Object.prototype)
   })
 
-  it('rolls back new history and the Room when a history record write fails, then retries the frozen snapshot', () => {
-    const db = database()
+  it('rolls back new history and the Room when a history record write fails, then retries the frozen snapshot', async () => {
+    const db = await database()
     let fail = false
-    const persistence = new SqliteRoomPersistence({
+    const persistence = new PostgresRoomPersistence({
       transaction: db.transaction.bind(db),
       prepare: (sql: string) => {
         const statement = db.prepare(sql)
@@ -66,43 +66,43 @@ describe('Room-owned history recovery', () => {
     })
     const game = session()
     const before = serializeSessionSnapshot(game.state, game)
-    persistence.save('r', before, meta)
+    ;(await persistence.save('r', before, meta))
     expect(game.takeAction(0, 'forest').ok).toBe(true)
     const frozen = serializeSessionSnapshot(game.state, game)
     fail = true
-    expect(() => persistence.save('r', frozen, meta)).toThrow('history write failed')
-    expect(persistence.load('r')!.serialized).toEqual(JSON.parse(JSON.stringify(before)))
+    ;(await expect(persistence.save('r', frozen, meta)).rejects.toThrow('history write failed'))
+    expect((await persistence.load('r'))!.serialized).toEqual(JSON.parse(JSON.stringify(before)))
     fail = false
-    persistence.save('r', frozen, meta)
-    const restored = new GameSession(rehydrateState(persistence.load('r')!.serialized!))
+    ;(await persistence.save('r', frozen, meta))
+    const restored = new GameSession(rehydrateState((await persistence.load('r'))!.serialized!))
     expect(restored.getState()).toEqual(game.getState())
     expect(restored.resolveChoice(1, 'confirm').ok).toBe(true)
     expect(restored.takeAction(1, 'clay-pit').ok).toBe(true)
-    db.close()
+    ;(await db.close())
   })
-  it('preserves frozen raw names and same-length replacement branches and rejects missing records', () => {
-    const db = database()
-    const persistence = new SqliteRoomPersistence(db)
+  it('preserves frozen raw names and same-length replacement branches and rejects missing records', async () => {
+    const db = await database()
+    const persistence = new PostgresRoomPersistence(db)
     const game = session()
     game.loadState({ ...game.state, log: [{ key: 'log.placeFarmer', playerId: 'p1', params: { player: 'Before', action: 'forest' } }] })
     const first = serializeSessionSnapshot(game.state, game)
-    persistence.save('r', first, meta)
+    ;(await persistence.save('r', first, meta))
     game.updatePlayerName(0, 'After')
     game.loadState({ ...game.state, log: [{ key: 'log.placeFarmer', playerId: 'p1', params: { player: 'After', action: 'reed-bank' } }] })
     const second = serializeSessionSnapshot(game.state, game)
-    persistence.save('r', second, meta)
-    expect(persistence.load('r')!.serialized!.state.log).toEqual([{ key: 'log.placeFarmer', playerId: 'p1', params: { player: 'After', action: 'reed-bank' } }])
-    persistence.save('r', first, meta)
-    expect(persistence.loadReplayFrame('r')!.log).toEqual([{ key: 'log.placeFarmer', playerId: 'p1', params: { player: 'Before', action: 'forest' } }])
-    db.exec("DELETE FROM room_history_nodes WHERE room_id = 'r'")
-    expect(() => persistence.load('r')).toThrow(RoomHistoryCorruptionError)
-    db.close()
+    ;(await persistence.save('r', second, meta))
+    expect((await persistence.load('r'))!.serialized!.state.log).toEqual([{ key: 'log.placeFarmer', playerId: 'p1', params: { player: 'After', action: 'reed-bank' } }])
+    ;(await persistence.save('r', first, meta))
+    expect((await persistence.loadReplayFrame('r'))!.log).toEqual([{ key: 'log.placeFarmer', playerId: 'p1', params: { player: 'Before', action: 'forest' } }])
+    ;(await db.exec("DELETE FROM room_history_nodes WHERE room_id = 'r'"))
+    ;(await expect(persistence.load('r')).rejects.toThrow(RoomHistoryCorruptionError))
+    ;(await db.close())
   })
 
-  it('makes ordinary undo reference writes atomic and preserves restart undo', () => {
-    const db = database()
+  it('makes ordinary undo reference writes atomic and preserves restart undo', async () => {
+    const db = await database()
     let fail = true
-    const persistence = new SqliteRoomPersistence({
+    const persistence = new PostgresRoomPersistence({
       transaction: db.transaction.bind(db),
       prepare: (sql: string) => {
         const statement = db.prepare(sql)
@@ -121,23 +121,23 @@ describe('Room-owned history recovery', () => {
     const before = JSON.parse(JSON.stringify(game.getState()))
     expect(game.takeAction(0, 'farm-expansion').ok).toBe(true)
     const captured = serializeSessionSnapshot(game.state, game)
-    expect(() => persistence.save('r', captured, meta)).toThrow('undo write failed')
-    expect(persistence.load('r')).toBeNull()
+    ;(await expect(persistence.save('r', captured, meta)).rejects.toThrow('undo write failed'))
+    expect((await persistence.load('r'))).toBeNull()
     fail = false
-    persistence.save('r', captured, meta)
-    const restored = new GameSession(rehydrateState(persistence.load('r')!.serialized!))
+    ;(await persistence.save('r', captured, meta))
+    const restored = new GameSession(rehydrateState((await persistence.load('r'))!.serialized!))
     expect(restored.undoAction().ok).toBe(true)
     expect(restored.getState().state.players).toEqual(before.state.players)
     expect(serializeSessionSnapshot(restored.state, restored).state.actionSpaces).toEqual(before.state.actionSpaces)
     expect(restored.getState().interaction).toEqual(before.interaction)
     expect(JSON.parse(JSON.stringify(restored.getState().scores))).toEqual(before.scores)
-    db.close()
+    ;(await db.close())
   })
 
-  it('atomically stores provisional checkpoints and resumes a protected cross-player payment flow', () => {
-    const db = database()
+  it('atomically stores provisional checkpoints and resumes a protected cross-player payment flow', async () => {
+    const db = await database()
     let fail = true
-    const persistence = new SqliteRoomPersistence({
+    const persistence = new PostgresRoomPersistence({
       transaction: db.transaction.bind(db),
       prepare: (sql: string) => {
         const statement = db.prepare(sql)
@@ -169,13 +169,13 @@ describe('Room-owned history recovery', () => {
     }
     expect(response.interaction).toMatchObject({ stateId: 'wait', playerIndex: 1, sourceCard: 'D128_BuildingTycoon' })
     const snapshot = serializeSessionSnapshot(game.state, game)
-    expect(() => persistence.save('r', snapshot, meta)).toThrow('checkpoint write failed')
-    expect(persistence.load('r')).toBeNull()
+    ;(await expect(persistence.save('r', snapshot, meta)).rejects.toThrow('checkpoint write failed'))
+    expect((await persistence.load('r'))).toBeNull()
     fail = false
-    persistence.save('r', snapshot, meta)
-    const saved = persistence.load('r')!.serialized!
+    ;(await persistence.save('r', snapshot, meta))
+    const saved = (await persistence.load('r'))!.serialized!
     expect(saved).toEqual(JSON.parse(JSON.stringify(snapshot)))
-    const checkpoints = db.prepare("SELECT body_json FROM room_recovery_nodes WHERE room_id = 'r' AND kind = 'checkpoint'").all() as { body_json: string }[]
+    const checkpoints = (await db.prepare("SELECT body_json FROM room_recovery_nodes WHERE room_id = 'r' AND kind = 'checkpoint'").all()) as { body_json: string }[]
     expect(checkpoints.length).toBeGreaterThan(0)
     for (const checkpoint of checkpoints) {
       expect(JSON.parse(checkpoint.body_json)).toMatchObject({ roomBodyEncoding: 'gzip-base64-v1' })
@@ -193,12 +193,12 @@ describe('Room-owned history recovery', () => {
     expect(response.ok).toBe(true)
     expect(response.state.players[0]).toMatchObject({ rooms: 2, resources: { clay: 7, reed: 3, stone: 2 } })
     expect(response.state.log.filter(entry => entry.key === 'log.provisionalContinuationRollback')).toHaveLength(1)
-    db.close()
+    ;(await db.close())
   })
-  it('atomically stores exact Frame-only history versions and future derived fields', () => {
-    const db = database()
+  it('atomically stores exact Frame-only history versions and future derived fields', async () => {
+    const db = await database()
     let fail = true
-    const persistence = new SqliteRoomPersistence({
+    const persistence = new PostgresRoomPersistence({
       transaction: db.transaction.bind(db),
       prepare: (sql: string) => {
         const statement = db.prepare(sql)
@@ -217,14 +217,14 @@ describe('Room-owned history recovery', () => {
     const snapshot = serializeSessionSnapshot(game.state, game)
     snapshot.frame.log = [{ key: 'frameOnlyCapture', playerId: 'p1', params: { player: 'Original mixed name' } }]
     Object.assign(snapshot.frame, { futureProjection: { exactValue: 1234 }, scores: [{ playerId: 'p1', total: -7 }] })
-    expect(() => persistence.save('r', snapshot, meta)).toThrow('Frame history write failed')
-    expect(persistence.load('r')).toBeNull()
+    ;(await expect(persistence.save('r', snapshot, meta)).rejects.toThrow('Frame history write failed'))
+    expect((await persistence.load('r'))).toBeNull()
     fail = false
-    persistence.save('r', snapshot, meta)
+    ;(await persistence.save('r', snapshot, meta))
     game.updatePlayerName(0, 'Current display name')
-    expect(persistence.loadReplayFrame('r')).toEqual(snapshot.frame)
-    expect(persistence.load('r')!.serialized!.frame).toEqual(snapshot.frame)
-    db.close()
+    expect((await persistence.loadReplayFrame('r'))).toEqual(snapshot.frame)
+    expect((await persistence.load('r'))!.serialized!.frame).toEqual(snapshot.frame)
+    ;(await db.close())
   })
 
 })

@@ -1,6 +1,6 @@
 import { describe, expect, it, beforeEach } from 'vitest'
 import { InMemoryRoomPersistence } from '../memory-adapter.ts'
-import type { GameResult, RoomMeta } from '../room-persistence.ts'
+import type { RoomMeta } from '../room-persistence.ts'
 import type { PersistedSessionSnapshot } from '../../../../shared/session/serialization.ts'
 
 const META: RoomMeta = {
@@ -15,19 +15,6 @@ const STATE = {
   frame: { _stub: true },
   sessionCursor: {},
 } as unknown as PersistedSessionSnapshot
-const RESULT: GameResult = {
-  roomId: 'r1',
-  startedAt: 1,
-  finishedAt: 2,
-  roundsPlayed: 14,
-  playerCount: 1,
-  communityDeck: false,
-  parentCards: false,
-  throughTheSeasons: false,
-  farmersOfTheMoor: false,
-  snakeOpening: false,
-  players: [{ playerIndex: 0, gamePlayerId: 'p1', userId: null, displayName: 'P1', score: 10 }],
-}
 
 describe('InMemoryRoomPersistence', () => {
   let p: InMemoryRoomPersistence
@@ -53,15 +40,7 @@ describe('InMemoryRoomPersistence', () => {
     p.save('r1', STATE, META)
     p.discard('r1')
     expect(p.load('r1')).toBeNull()
-    expect(p.__getResultForTest('r1')).toBeUndefined()
-  })
-
-  it('complete archives persisted identity and removes full state', () => {
-    p.save('r1', STATE, META)
-    expect(p.complete(RESULT)).toEqual({ ok: true, archived: true })
-    expect(p.load('r1')).toBeNull()
-    expect(p.__getResultForTest('r1')?.players[0]).toMatchObject({ userId: 'u', score: 10 })
-    expect(p.hasRoomId('r1')).toBe(true)
+    expect(p.hasRoomId('r1')).toBe(false)
   })
 
   it('listRestorable filters finished + excluded + stale', () => {
@@ -93,7 +72,7 @@ describe('InMemoryRoomPersistence', () => {
     })
 
     expect(p.load('stale')).toBeNull()
-    expect(p.__getResultForTest('stale')).toBeUndefined()
+    expect(p.hasRoomId('stale')).toBe(false)
   })
 
   it('save with null serialized creates placeholder row; load returns snap with null serialized but meta present', () => {

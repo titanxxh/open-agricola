@@ -1,6 +1,4 @@
 import type {
-  GameResult,
-  RoomCompletionResult,
   RoomMeta,
   RoomPersistence,
   RoomSnapshot,
@@ -19,7 +17,6 @@ const copyMeta = (meta: RoomMeta): RoomMeta => ({
 
 export class InMemoryRoomPersistence implements RoomPersistence {
   private rooms = new Map<string, Row>()
-  private results = new Map<string, GameResult>()
 
   load(id: string): RoomSnapshot | null {
     const row = this.rooms.get(id)
@@ -48,24 +45,8 @@ export class InMemoryRoomPersistence implements RoomPersistence {
     this.rooms.delete(id)
   }
 
-  complete(result: GameResult): RoomCompletionResult {
-    if (!this.results.has(result.roomId)) {
-      const persistedPlayers = this.rooms.get(result.roomId)?.meta.players ?? []
-      const userIds = new Map(persistedPlayers.map((player) => [player.playerIndex, player.userId]))
-      this.results.set(result.roomId, {
-        ...result,
-        players: result.players.map((player) => ({
-          ...player,
-          userId: userIds.get(player.playerIndex) ?? player.userId,
-        })),
-      })
-    }
-    this.rooms.delete(result.roomId)
-    return { ok: true, archived: true }
-  }
-
   hasRoomId(id: string): boolean {
-    return this.rooms.has(id) || this.results.has(id)
+    return this.rooms.has(id)
   }
 
   listRestorable(opts: RestoreOptions): RoomSnapshot[] {
@@ -88,9 +69,5 @@ export class InMemoryRoomPersistence implements RoomPersistence {
   __setUpdatedAtForTest(id: string, updatedAt: number): void {
     const row = this.rooms.get(id)
     if (row) row.updatedAt = updatedAt
-  }
-
-  __getResultForTest(id: string): GameResult | undefined {
-    return this.results.get(id)
   }
 }

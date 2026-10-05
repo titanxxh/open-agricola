@@ -1,13 +1,16 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, describe, expect, it, vi } from 'vitest'
 
 type MockRes = ServerResponse & { statusCode: number; body: string }
 
-const originalDbPath = process.env.DB_PATH
-let tempDir = ''
+import { getDb } from '../db'
+import { seedResourceCatalog } from './_helpers/objects'
+vi.mock('../db', async () => {
+  const { createTestDatabase } = await import('./_helpers/postgres')
+  const db = await createTestDatabase()
+  return { getDb: () => db }
+})
+afterAll(async () => { await getDb().close() })
 
 const mockReq = (
   method: string,
@@ -41,18 +44,8 @@ const mockRes = (): MockRes => {
   } as unknown as MockRes
 }
 
-afterEach(() => {
-  if (originalDbPath === undefined) delete process.env.DB_PATH
-  else process.env.DB_PATH = originalDbPath
-  if (tempDir) rmSync(tempDir, { recursive: true, force: true })
-  vi.resetModules()
-})
-
 describe('sandbox version binding', () => {
   it('loads the requested immutable workshop version instead of the mutable draft', async () => {
-    tempDir = mkdtempSync(join(tmpdir(), 'open-agricola-sandbox-version-'))
-    process.env.DB_PATH = join(tempDir, 'sandbox.db')
-    vi.resetModules()
     const { getDb } = await import('../db.ts')
     const {
       adoptCandidate,
@@ -62,15 +55,15 @@ describe('sandbox version binding', () => {
     } = await import('../workshop-drafts.ts')
     const db = getDb()
     const now = Date.now()
-    db.prepare(`
+    ;(await db.prepare(`
       INSERT INTO users (id, username, display_name, password_hash, created_at)
       VALUES ('author', 'sandbox_author', 'Sandbox Author', 'x', ?)
-    `).run(now)
-    db.prepare(`
+    `).run(now))
+    ;(await db.prepare(`
       INSERT INTO sessions (token, user_id, expires_at, created_at)
       VALUES ('sandbox-token', 'author', ?, ?)
-    `).run(now + 3_600_000, now)
-    const original = createCard(db, {
+    `).run(now + 3_600_000, now))
+    const original = (await createCard(db, {
       authorId: 'author',
       draft: {
         cardId: 'CUSTOM_PinnedVersion',
@@ -94,8 +87,9 @@ describe('sandbox version binding', () => {
         artUrl: null,
         generation: {},
       },
-    })
-    const pinned = adoptCandidate(db, {
+    }))
+    await seedResourceCatalog(db, ['pinned.png'])
+    const pinned = (await adoptCandidate(db, {
       cardId: original.id,
       authorId: 'author',
       baseRevision: 1,
@@ -107,12 +101,12 @@ describe('sandbox version binding', () => {
         resultUrl: '/card-art/pinned.png',
         createdAt: now,
       },
-    })
-    const approved = approveCurrentDraft(db, { cardId: original.id, authorId: 'author' })
+    }))
+    const approved = (await approveCurrentDraft(db, { cardId: original.id, authorId: 'author' }))
     expect(approved.versionId).toBe(pinned.versionId)
     // author keeps editing offline; the approval goes stale but the pinned
     // immutable version stays loadable for the author sandbox
-    checkpointDraft(db, {
+    ;(await checkpointDraft(db, {
       cardId: original.id,
       authorId: 'author',
       baseRevision: 2,
@@ -126,7 +120,7 @@ describe('sandbox version binding', () => {
           name: 'Mutable Draft',
         },
       },
-    })
+    }))
     const { handleGameRoute } = await import('../game-router.ts')
     const startRes = mockRes()
     await handleGameRoute(mockReq('POST', '/api/game/new-sandbox', {
@@ -173,6 +167,6 @@ describe('sandbox version binding', () => {
       cardId: 'CUSTOM_PinnedVersion',
     }, 'sandbox-token'), defaultDrawRes)
     expect(defaultDrawRes.statusCode).toBe(200)
-    db.close()
+
   })
 })

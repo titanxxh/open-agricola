@@ -1,3 +1,4 @@
+import type { InputWindow } from './commands'
 import type { HistoryWindow } from './history'
 import type { InteractionState, PlayerState, Resource } from '../../contract/types'
 import type { SerializedGameState } from '../../session/serialization'
@@ -101,6 +102,7 @@ export type StateUpdateCause =
 
 export type StateUpdateEnvelope = {
   type: 'stateUpdate'
+  inputWindow?: InputWindow
   roomId: string
   version: number
   sync: 'snapshot'

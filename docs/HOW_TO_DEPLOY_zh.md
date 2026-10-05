@@ -8,18 +8,19 @@
 
 ## 架构概览
 
+```mermaid
+flowchart LR
+  Browser --> Pages[Static frontend]
+  Browser --> Ingress[HTTPS public origin / Caddy]
+  Ingress --> Router[HTTP / WS routing]
+  Router --> A[Application 1]
+  Router --> B[Application 2 - optional]
+  A --> PG[(PostgreSQL)]
+  B --> PG
+  A --> S3[(Private S3 / RustFS)]
+  B --> S3
 ```
-┌──────────────────────────────┐      ┌───────────────────────────────┐
-│  GitHub Pages（主站）          │      │  VPS（你的服务器）              │
-│  index.html + JS/CSS         │─────▶│  Node.js 后端                  │
-└──────────────┬───────────────┘      │    ├── HTTP API  /api/*       │
-               │                      │    ├── WebSocket /ws          │
-               ▼                      │    ├── Card art  /card-art/*  │
-┌──────────────────────────────┐      │    └── SQLite    ./data/*.db  │
-│  GitHub Pages（图片资源站）    │      └───────────────────────────────┘
-│  open-agricola-assets        │
-└──────────────────────────────┘
-```
+
 
 前端和后端完全分离——前端是纯静态文件（GitHub Pages），后端是一个 Docker 容器（VPS）。
 
@@ -35,129 +36,58 @@
 
 ### 1. 基础步骤（两种情况通用）
 
-#### 容量基准规格
+准备 Node.js 24.15+（不支持 Node 25）、pnpm、Docker Compose、Git。默认一台机器运行 PostgreSQL 18、RustFS 和一个应用进程，无需申请外部服务。配置 `APP_INSTANCES=2` 可在同机运行两个应用进程。
 
-单实例容量统一以 **2 vCPU / 2 GiB 内存**为测量锚点，真实命令与 Replay 写入复测见
-[`docs/performance/replay-room-capacity.md`](performance/replay-room-capacity.md)。
-该规格最多保留 **30 个普通 `waiting + playing` Room**；只有相同探针的新报告可以上调。
-
-#### 安装 Docker
-
-```bash
-# 一键安装 Docker（Ubuntu/Debian/CentOS）
-curl -fsSL https://get.docker.com | sh
-sudo usermod -aG docker $USER
-# 重新登录 SSH 让 docker 组生效
-```
-
-#### 拉取代码
+旧 SQLite 单实例的性能报告仅是历史基线；继续保留应用的既有容量上限，不把这些数字当作 PostgreSQL、双实例或高可用认证。本次只验正常功能和重启，不做故障注入或恢复计时。
 
 ```bash
 git clone https://github.com/YOUR_USER/open-agricola.git
 cd open-agricola
-git checkout main
-```
-
-#### 配置环境变量
-
-```bash
+pnpm install --frozen-lockfile
 cp .env.example .env
 ```
 
-编辑 `.env`（后续步骤会覆盖部分值，先填通用的）：
-
-```env
-BACKEND_PORT=5175
-NODE_ENV=production
-PERSIST_ROOMS=sqlite
-ALLOW_ANONYMOUS_WS=false
-REPLAY_NEW_ROOMS_ENABLED=false
-REPLAY_VIEWER_BUILD_ID=
-REPLAY_VIEWER_ROOT=./data/replay-viewers
-REPLAY_ASSET_ROOT=./data/replay-assets
-REPLAY_REMOVAL_LEDGER_PATH=./data/replay-removals.jsonl
-REPLAY_TRUST_PROXY=false
-GAME_BUILD_ID=
-# CORS_ORIGIN 等后续根据情况设置
-```
-
-后端直接暴露端口时保持 `REPLAY_TRUST_PROXY=false`。只有后端仅能经可信 Caddy/Nginx 到达，且代理会覆盖 `X-Forwarded-For` 时才设为 `true`。
-仓库的 `docker-compose.prod.yml` 使用隔离的 Caddy 作为唯一入口，因此已固定为 `REPLAY_TRUST_PROXY=true`。
-
-首次启用 Replay 时必须使用 `PERSIST_ROOMS=sqlite`。先生成并追加发布 Viewer Build：
+设置 `.env` 中原有 `PUBLIC_API_BASE`、`PUBLIC_APP_ORIGIN`、`CORS_ORIGIN` 和账号/OAuth 参数；已有 callback 不改。把 `DATABASE_URL` 与 `S3_*` 连接组留空即使用本机服务。配置外部 S3 时需要完整 endpoint、region、bucket、access key 和 secret，桶必须私有。
 
 ```bash
-REPLAY_VIEWER_ROOT="$PWD/data/replay-viewers" \
-pnpm run build:replay-viewer
-# stdout 最后一行是 REPLAY_VIEWER_BUILD_ID
+node --env-file=.env scripts/local-services.mjs
+GAME_BUILD_ID="$(git rev-parse HEAD)" docker compose -f docker-compose.prod.yml build app
 ```
 
-命令只把 Viewer 代码、样式和卡牌 manifest 写入独立只读 Build，棋盘图、卡图和字体从固定的素材仓 commit 读取，不进入持久卷。发布仍生成逐文件 SHA-256 清单，以清单本身的 SHA-256 作为目录名，并在发布后重新校验完整目录；已存在的同 ID 目录不会覆盖。
+依赖使用独立持久卷，生成凭据和 Workshop 加密密钥保存在 mode-600 的 `data/local-services.env`；主机工具使用 `data/dependencies.local`，容器使用 `data/dependencies.compose.env`。应用重建不清空数据库或资源。镜像包含 PostgreSQL 18 原生客户端和一个不可变 Viewer，启动时校验并上传到 S3。所有正式 Room 强制录制，资源不齐时拒绝开局。
 
-`docker-compose.prod.yml` 使用 `app-data:/app/data` named volume。保持 `REPLAY_NEW_ROOMS_ENABLED=false` 启动一次后，把 Build 追加进去，再启用录制：
+#### 首次 SQLite 迁移
 
-运行下方命令前，把上一步 stdout 最后一行填入 `.env` 的 `REPLAY_VIEWER_BUILD_ID`，并把 `git rev-parse HEAD` 的输出填入 `GAME_BUILD_ID`。
+导入器只接受当前发布的 SQLite 结构（版本 33）。旧结构的逐级升级链已退役；切换存储前应先用当前 `main` 版本导出。源数据以只读方式打开，并保留到目标验证成功。
+
+先停止旧应用，再复制它的数据目录。源目录挂载为只读，导入目标必须为空；禁止把旧卷覆盖为空数据库。下面的 `legacy-data` 必须包含原数据库、卡图、Replay 资源、Viewer 和 JSONL 删除 ledger。
 
 ```bash
-set -a
-source .env
-set +a
-test -n "$REPLAY_VIEWER_BUILD_ID"
-test -n "$GAME_BUILD_ID"
-docker compose -f docker-compose.prod.yml up -d --build
-docker compose -f docker-compose.prod.yml exec app \
-  mkdir -p "/app/data/replay-viewers/$REPLAY_VIEWER_BUILD_ID"
-docker compose -f docker-compose.prod.yml cp \
-  "data/replay-viewers/$REPLAY_VIEWER_BUILD_ID/." \
-  "app:/app/data/replay-viewers/$REPLAY_VIEWER_BUILD_ID"
-# 复制完成后，在 .env 改为 REPLAY_NEW_ROOMS_ENABLED=true
-docker compose -f docker-compose.prod.yml up -d --force-recreate app
+docker compose -f docker-compose.prod.yml stop app
+mkdir -p legacy-data backups
+chmod 700 legacy-data backups
+docker cp "$(docker compose -f docker-compose.prod.yml ps -aq app):/app/data/." legacy-data/
+docker compose -f docker-compose.prod.yml run --rm --no-deps \
+  -v "$PWD/legacy-data:/legacy:ro" -v "$PWD/backups:/backup" app \
+  node --import tsx scripts/import-sqlite.ts /legacy /backup/sqlite-import.json --applications-stopped
 ```
 
-清单、内容 Hash 或入口校验失败时拒绝创建新 Room。开关、Build ID 和自定义卡运行时版本在 Room 创建时锁定；自定义卡图复制到 `REPLAY_ASSET_ROOT` 的内容寻址文件。已有 Replay Room 会继续按锁定值记录，开关关闭期间不会迁移旧进行局。
-
-Bug Report 使用独立 GitHub App，只安装到 `titanxxh/open-agricola-issues`：
-
-1. Repository permissions 只开启 `Issues: Read and write`，安装范围只选 issues-only 仓库。
-2. Callback URL 设为 `<PUBLIC_API_BASE>/api/v1/issue-submission-connection/github/callback`。
-3. Webhook URL 设为 `<PUBLIC_API_BASE>/api/v1/github-app/webhook`，配置独立 webhook secret，并订阅 GitHub App authorization 和 Issues 事件。
-4. 在 `.env` 填写 App ID、Client ID/secret、单行 `\n` 转义的 private key、webhook secret、installation ID 和 issues-only repository ID。
-5. 生成 32 字节随机加密密钥，使用 JSON key ring 配置 `BUG_REPORT_TOKEN_ENCRYPTION_KEYS`，并让 `BUG_REPORT_TOKEN_ACTIVE_KEY_ID` 指向其中一个 key。
-6. 保持 `BUG_REPORTS_ENABLED=false` 启动并完成迁移；验证 Hosted 与本人 GitHub 两条链路后再改为 `true`。关闭开关只隐藏新入口，不会丢弃既有草稿或交付队列。
-
-启用后，`PUBLIC_APP_ORIGIN` 缺失或不是有效的 HTTP(S) 前端地址会让健康检查返回 `503`，并暂停 OAuth、新草稿和交付，避免创建缺少对局链接的 Issue。
-
-```env
-BUG_REPORTS_ENABLED=false
-BUG_REPORT_GITHUB_APP_ID=
-BUG_REPORT_GITHUB_CLIENT_ID=
-BUG_REPORT_GITHUB_CLIENT_SECRET=
-BUG_REPORT_GITHUB_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----"
-BUG_REPORT_GITHUB_WEBHOOK_SECRET=
-BUG_REPORT_GITHUB_INSTALLATION_ID=
-BUG_REPORT_GITHUB_REPOSITORY_ID=
-BUG_REPORT_TOKEN_ENCRYPTION_KEYS={"v1":"<32-byte-base64-key>"}
-BUG_REPORT_TOKEN_ACTIVE_KEY_ID=v1
-```
-
-#### 构建并启动
+导入校验原始行值、恢复文本、Replay 字节/hash、Room-owned 恢复及资源引用。只丢弃已证实未录制的活动局，不补造历史；账号、工坊、录制局、结果和被引用资源保留。失败会留下启动屏障，继续处理该导入，不删除无关数据。全新安装无需旧库复制和导入，只执行下面的目标库校验。
 
 ```bash
-docker compose up -d --build
+docker compose -f docker-compose.prod.yml run --rm --no-deps app \
+  node --import tsx scripts/storage-archive-cli.ts check-live "$(git rev-parse HEAD)" --applications-stopped
+mkdir -p data
+touch data/postgres-cutover.validated
+# Configure deploy/Caddyfile using the existing public backend domain first.
+docker compose -f docker-compose.prod.yml up -d --no-build --wait app caddy
 ```
 
-#### 验证
+开发环境同样使用 `scripts/import-sqlite.ts`，加载 `data/dependencies.local` 后指向只读旧目录，再运行 `./restart-local.sh`。历史源数据应保留到目标版本验证完成。
 
-```bash
-curl http://localhost:5175/api/health
-# 应返回: {"ok":true}
-```
+公开 origin 保持不变。浏览器先查询 Room 目录，再通过同源 `/nodes/<instanceId>/ws` 连接 owner；私有实例端口不开放到公网。默认 Compose 本地入口只绑定 loopback。Caddy 生产入口继续支持现有 443/8443，OAuth callback、cookie 和跨域配置沿用现有值。
 
-查看日志：
-
-```bash
-docker compose logs -f app
-```
+Bug Report GitHub App、Workshop PR 和账号 OAuth 都仍是可选集成；配置表和独立 OAuth 文档保留它们的权限与回调要求。迁移 PostgreSQL/S3 不要求重新授权第三方账号。
 
 ---
 
@@ -220,51 +150,7 @@ docker compose logs -f app
    }
    ```
 
-3. 创建 `docker-compose.prod.yml`（不覆盖原文件）：
-
-   ```yaml
-   services:
-     app:
-       build: .
-       expose:
-         - "5175"
-       environment:
-         - NODE_ENV=production
-         - BACKEND_PORT=5175
-         - BACKEND_HOST=0.0.0.0
-         - PERSIST_ROOMS=sqlite
-         - ALLOW_ANONYMOUS_WS=false
-         - DB_PATH=./data/open-agricola.db
-         - CARD_ART_DIR=./data/card-art
-         - REPLAY_NEW_ROOMS_ENABLED=${REPLAY_NEW_ROOMS_ENABLED:-false}
-         - REPLAY_VIEWER_BUILD_ID=${REPLAY_VIEWER_BUILD_ID:-}
-         - REPLAY_VIEWER_ROOT=${REPLAY_VIEWER_ROOT:-./data/replay-viewers}
-         - REPLAY_ASSET_ROOT=${REPLAY_ASSET_ROOT:-./data/replay-assets}
-         - REPLAY_TRUST_PROXY=true
-         - GAME_BUILD_ID=${GAME_BUILD_ID:-}
-         - CORS_ORIGIN=https://YOUR_USER.github.io
-       volumes:
-         - app-data:/app/data
-         - app-output:/app/output
-       restart: unless-stopped
-
-     caddy:
-       image: caddy:alpine
-       ports:
-         - "80:80"
-         - "443:443"
-       volumes:
-         - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
-         - caddy-data:/data
-       depends_on:
-         - app
-       restart: unless-stopped
-
-   volumes:
-     app-data:
-     app-output:
-     caddy-data:
-   ```
+3. 使用仓库中的 `docker-compose.prod.yml`，保留完整 PostgreSQL/S3、OAuth 和入口配置。
 
 4. 启动：
 
@@ -456,15 +342,9 @@ PUBLIC_ASSET_LOCAL_DIR=../open-agricola-assets pnpm dev
 
 ### 后端
 
-后端只在 owner 控制的本机部署。SSH 私钥保留在本机，`ACCOUNT_REGISTRATION_POLICY` 由服务器 `.env` 提供；两者都不写入 GitHub Actions：
+从 owner 控制的本机运行 `./deploy-backend.sh <ssh-host> [ref] [remote-dir]`。脚本拒绝覆盖远端已跟踪文件的本地修改，以安全 checkout 切换目标版本。目标镜像构建时旧应用继续运行；之后停止整组应用，在维护锁内导出 PostgreSQL 和 S3，先在隔离数据库/对象 prefix 中使用目标镜像恢复与校验，再迁移并验证实际目标库，最后启动同一部署代际的全部应用。
 
-```bash
-./deploy-backend.sh root@your-game.duckdns.org v0.3.0 /root/open-agricola
-```
-
-`deploy-backend.sh` 在切换新版本前自动做完整备份：先 build 新镜像（旧版本继续服务），然后停止 app，把 `app-data` volume 全量打包为 `backups/pre-<ref>-<timestamp>.tgz`（含 SQLite、card art、Replay Viewer、Replay assets、删除 ledger），同时刷新 `backups/replay-removals.latest.jsonl` 并保存 `.env` 快照 `backups/env-pre-<ref>-<timestamp>`（600 权限）。归档生成后，目标镜像会在一次性可写副本上执行目标数据库迁移、删除 ledger 重放、SQLite `integrity_check`、所有活动 Room 反序列化、Replay metadata/Head/Segment、内容寻址 assets 和 Viewer 构建校验；配置在 `/app/data` 下的自定义 Replay 路径会映射到解包副本，原归档保持不变。通过后写入同名 `.manifest.json`，记录归档 SHA-256/大小、源/目标 Build、目标 ref、迁移前后数据库 schema、Replay schema 及校验计数。备份或语义校验失败会拉回旧版本 app 并使本地部署命令失败；app 停止后到新版本启动成功之间本地 SSH 被中断时同样自动拉回旧容器。脚本自动清理旧的 pre-deploy 备份及配对 manifest：保留最近 5 份，且按 ADR-0010 的备份副本上限删除超过 30 天的归档；手动备份（非 `pre-` 前缀）不受影响。备份归档、manifest 与 ledger 快照为 600 权限、`backups/` 目录为 700。停机窗口只覆盖打包、语义校验和启动新容器，不包含镜像构建。恢复流程见[数据备份](#数据备份)。
-
-数据（SQLite 数据库、card art）存储在 Docker volume 中，重建容器不会丢失。
+预检失败可重启未修改数据的旧容器。实际迁移开始后若校验失败，保持维护状态，不自动把旧程序连到可能已变更的 schema。`data_imports` 持久屏障阻止失败目标启动。脚本等待容器健康检查；这不是生产部署授权，也不是故障恢复认证。
 
 ### 前端
 
@@ -526,10 +406,15 @@ https://<backend-origin>/api/auth/oauth/google/callback
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
+| `DATABASE_URL` | 本机自动生成 | PostgreSQL URL；外部切换前先搬迁、校验数据 |
+| `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET` | 本机自动生成 | 私有 S3 地址和桶 |
+| `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | 本机自动生成 | S3 凭据，不写入 Git |
+| `S3_PREFIX` | 空 | 当前环境对象 namespace |
+| `WORKSHOP_TOKEN_ENCRYPTION_KEY` | 本机自动生成 | 搬迁时保留的共享令牌加密密钥 |
+| `APP_INSTANCES` | `1` | 当前单机支持 `1` 或 `2` 个应用进程 |
 | `BACKEND_PORT` | `5175` | HTTP/WS 监听端口 |
 | `BACKEND_HOST` | `0.0.0.0` | 绑定地址 |
 | `NODE_ENV` | — | 设为 `production` 启用生产模式 |
-| `PERSIST_ROOMS` | `sqlite` | 房间持久化方式 (`sqlite` / `json`) |
 | `ALLOW_ANONYMOUS_WS` | `true`(dev) / `false`(prod) | 是否允许匿名 WebSocket |
 | `CORS_ORIGIN` | `*` | 允许的前端域名，生产环境必须设置 |
 | `PUBLIC_APP_ORIGIN` | — | 前端公开地址；Pages 子路径部署要包含 `/open-agricola/` |
@@ -553,13 +438,7 @@ https://<backend-origin>/api/auth/oauth/google/callback
 | `BUG_REPORT_TOKEN_ENCRYPTION_KEYS` | — | AES-256-GCM key ring JSON；每个值为 32 字节 base64 |
 | `BUG_REPORT_TOKEN_ACTIVE_KEY_ID` | — | 新令牌使用的 key ring key ID |
 | `ENABLE_AUTH_TEST_HELPERS` | — | 仅本地/E2E 可设 `1`，生产禁止设置 |
-| `DB_PATH` | `./data/open-agricola.db` | SQLite 文件路径 |
-| `CARD_ART_DIR` | `./data/card-art` | 上传的卡牌图片存储路径 |
-| `REPLAY_VIEWER_ROOT` | `./data/replay-viewers` | 不可变 Replay Viewer Build 目录 |
 | `REPLAY_VIEWER_BUILD_ID` | — | 新 Room 锁定的不可变 Viewer Build ID |
-| `REPLAY_ASSET_ROOT` | `./data/replay-assets` | 内容寻址的 Replay 自定义卡资源目录 |
-| `REPLAY_REMOVAL_LEDGER_PATH` | `./data/replay-removals.jsonl` | SQLite 外、只追加的 Replay 删除 ledger；恢复旧备份时必须使用最新副本 |
-| `REPLAY_NEW_ROOMS_ENABLED` | `false` | 是否为新 Room 启用 Replay 录制；启用前必须准备 Viewer Build |
 | `REPLAY_TRUST_PROXY` | `false` | 仅当后端只能经会覆盖 `X-Forwarded-For` 的可信反向代理访问时设为 `true` |
 | `GAME_BUILD_ID` | — | 当前后端 Git commit；自动部署脚本会填入 |
 | `ADMIN_USERS` | — | 管理员用户名，逗号分隔 |
@@ -625,129 +504,36 @@ https://<backend-origin>/api/auth/oauth/google/callback
 
 ### 数据备份
 
-备份必须同时包含 SQLite、Viewer、Replay assets、card art 和 deletion ledger。`deploy-backend.sh` 会在每次切换新版本前生成同等内容的 `backups/pre-<ref>-<timestamp>.tgz`，并配对 `pre-<ref>-<timestamp>.manifest.json` 证明目标镜像已在一次性副本上完成迁移和恢复验证（见「三、更新部署」）。manifest 中的 `targetBuildId` 只证明该构建兼容，`archiveSha256` 和 `archiveSizeBytes` 绑定实际归档；换用其他构建恢复时必须重新运行 `scripts/validate-backup.ts`。下述手动命令用于部署之外的场景。以下命令假定 ledger 保持默认的 `/app/data/replay-removals.jsonl`；先停后端，避免备份跨越一次 Room Commit：
+普通归档包含 PostgreSQL 原生 custom-format dump、S3 不可变对象及 SHA-256/长度清单。最新删除 ledger 独立保存，绝不从旧归档恢复覆盖。`env-<stem>` 是 mode-600 的配置 tar，包含 `.env`、容器连接配置和本机凭据/加密密钥；不要当作明文 `.env` 直接复制。
 
 ```bash
-mkdir -p backups
-OA_BACKUP_NAME="open-agricola-$(date -u +%Y%m%dT%H%M%SZ).tgz"
-docker compose -f docker-compose.prod.yml stop app
+bash scripts/backup-storage.sh "manual-$(date -u +%Y%m%dT%H%M%SZ)"
+./backup-offsite.sh                 # Optional configured offsite copy
+./backup-offsite.sh ledger-only     # Refresh deletion facts without stopping applications
+```
+
+备份脚本停止应用并导出数据，恢复服务后在隔离 PostgreSQL 数据库和 S3 prefix 中做目标版本校验。manifest 记录源/目标构建和归档 hash/长度。默认验证账号需要 `CREATEDB`；外部托管服务可提供单独的空 `VALIDATION_DATABASE_URL`，该目标仅用于此次验证。旧 SQLite 的写入/容量数字不能用于这些备份或恢复能力的声明。
+
+每日备份与部署共用 `backups/.maintenance.lock`。保留策略仍是本地 daily 7 份、pre 5 份，异机 daily 30 份、pre 10 份，所有普通归档及其配置快照最多 30 天。保留 `deploy/offsite-retention.sh` 的异机独立 cron，删除 ledger 不受归档清理影响。配置 `OFFSITE_BACKUP_TARGET` 和 `OFFSITE_BACKUP_REMOTE_DIR` 后安装仓库 `deploy/open-agricola-backup.cron` 与 logrotate 配置；无异机时仍可执行本机手动备份。
+
+异机 ledger 同步先读远端副本，合并到当前 S3 的 CAS ledger，再导出其并集。旧普通备份、旧本地副本都不能抹掉较新的删除事实。立即删除后的异机同步仍使用 `ledger-only`。
+
+#### 恢复或切换外部服务
+
+停止全部应用。准备目标版本镜像、原始归档、配对 manifest、最新独立 ledger、保留的加密密钥，以及一个空目标数据库和隔离的目标对象 namespace。先核对 tar 的 SHA-256/长度与 manifest，然后解包到私有目录；恢复工具还会核对内层数据库和每个对象的 hash/长度。配置目标连接组后运行：
+
+```bash
+# /restore/archive contains archive.json, database.dump, and objects/.
+# The current ledger was obtained independently, not extracted from the archive.
 docker compose -f docker-compose.prod.yml run --rm --no-deps \
-  -v "$PWD/backups:/backup" app sh -c \
-  "tar -C /app/data -czf /backup/$OA_BACKUP_NAME . && \
-   if [ -f /app/data/replay-removals.jsonl ]; then \
-     cp /app/data/replay-removals.jsonl /backup/replay-removals.latest.jsonl; \
-   else \
-     : > /backup/replay-removals.latest.jsonl; \
-   fi"
-docker compose -f docker-compose.prod.yml up -d app
+  -v "$PWD/restore:/restore"   -e CURRENT_ERASURE_LEDGER=/restore/replay-removals.latest.json app \
+  node --import tsx scripts/storage-archive-cli.ts restore /restore/archive --applications-stopped
+docker compose -f docker-compose.prod.yml run --rm --no-deps app \
+  node --import tsx scripts/storage-archive-cli.ts check-live "$(git rev-parse HEAD)" --applications-stopped
+docker compose -f docker-compose.prod.yml up -d --no-build --wait app caddy
 ```
 
-手动归档只有通过当前目标镜像的只读恢复验证后才能作为已验证恢复点，并须保留配对 manifest：
-
-```bash
-OA_BACKUP_STEM="${OA_BACKUP_NAME%.tgz}"
-OA_VALIDATE_DIR="$(mktemp -d)"
-OA_BUILD_ID="$(git rev-parse HEAD)"
-OA_BACKUP_SHA256="$(sha256sum "backups/$OA_BACKUP_NAME" | cut -d ' ' -f 1)"
-OA_BACKUP_SIZE_BYTES="$(stat -c '%s' "backups/$OA_BACKUP_NAME")"
-tar -C "$OA_VALIDATE_DIR" -xzf "backups/$OA_BACKUP_NAME"
-docker compose -f docker-compose.prod.yml run --rm --no-deps \
-  -v "$OA_VALIDATE_DIR:/validation-data" \
-  -e DB_PATH=/validation-data/open-agricola.db \
-  -e BACKUP_STEM="$OA_BACKUP_STEM" \
-  -e BACKUP_CREATED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-  -e SOURCE_BUILD_ID="$OA_BUILD_ID" \
-  -e TARGET_BUILD_ID="$OA_BUILD_ID" \
-  -e TARGET_REF=manual \
-  -e BACKUP_SHA256="$OA_BACKUP_SHA256" \
-  -e BACKUP_SIZE_BYTES="$OA_BACKUP_SIZE_BYTES" \
-  app node --import tsx scripts/validate-backup.ts \
-  > "backups/$OA_BACKUP_STEM.manifest.json"
-rm -rf -- "$OA_VALIDATE_DIR"
-chmod 600 "backups/$OA_BACKUP_STEM.manifest.json"
-```
-
-`replay-removals.latest.jsonl` 是只追加的最新删除事实，必须与普通备份分开保留；每次 Replay 下架后立即执行 `./backup-offsite.sh ledger-only` 更新其异机副本（不停 app），不能随旧数据备份回滚。
-
-#### 定时备份与异机副本
-
-`backup-offsite.sh` 由生产机 cron 每日调用（UTC 20:00，北京时间 04:00），补齐两次 release 之间的数据保护并把备份同步到生产机之外：
-
-1. 停 app 把 `app-data` volume 打包为 `backups/daily-<timestamp>.tgz` 并刷新 `backups/replay-removals.latest.jsonl`，随即重启 app——停机窗口只覆盖打包。备份与部署共享 `backups/.maintenance.lock`：部署进行中 cron 备份直接跳过，部署会等待进行中的备份结束。
-2. app 恢复服务后，用当前运行镜像在一次性副本上执行与 pre-deploy 备份相同的恢复验证（`scripts/validate-backup.ts`），写入同名 `.manifest.json` 并保存 `.env` 快照（存在 `.env` 文件时）；验证失败删除本次产物并以非零退出（cron 日志可见），不影响线上服务，后续保留清理与异机同步照常执行。
-3. 本地 `daily-*` 保留最近 7 份；本地所有归档（含 `pre-*` 与手动备份）一律最多 30 天（ADR-0010 上限，按分钟计算避免整天舍入），份数层面 `pre-*` 仍由 `deploy-backend.sh` 管理、手动备份留人工处理。
-4. 把 `backups/`（含 `pre-*`、`daily-*`、手动备份、manifest、env 快照）rsync 到 `OFFSITE_BACKUP_TARGET` 的 `OFFSITE_BACKUP_REMOTE_DIR`；超过 30 天的本地归档不再推送。rsync 不带 `--delete`：远端保留策略独立于本地，本地误删不会传播到异机。
-5. `replay-removals.latest.jsonl` 不走目录同步：只有本地副本是远端副本的超集（前缀关系成立）时才覆盖远端，防止回滚的 ledger 冲掉异机删除事实；前缀不成立时脚本以非零退出并保留远端副本。
-6. 远端清理：`daily-*` 保留最近 30 份、`pre-*` 保留最近 10 份，且所有归档（含手动备份）一律最多 30 天（ADR-0010 备份副本上限）；`replay-removals.latest.jsonl` 永不自动清理。异机自身另装 `deploy/offsite-retention.sh` 的自治 cron 兜底 30 天上限——生产机丢失或失联时合规仍然成立。
-
-首次在生产机启用：
-
-```bash
-# 1. host 依赖：生产机需要 rsync + cron + logrotate（Docker 不自带），异机需要 rsync
-apt-get update && apt-get install -y rsync cron logrotate
-systemctl is-active cron   # 必须输出 active
-ssh root@<异机IP> 'command -v rsync || (apt-get update && apt-get install -y rsync)'
-
-# 2. 生产机 → 异机的 ssh 信任（生产机上执行；已有 key 时跳过 ssh-keygen）
-test -f ~/.ssh/id_ed25519 || ssh-keygen -t ed25519 -N '' -f ~/.ssh/id_ed25519
-ssh-copy-id root@<异机IP>
-
-# 3. .env 配置备份目标
-echo 'OFFSITE_BACKUP_TARGET=root@<异机IP>' >> /root/open-agricola/.env
-
-# 4. 手动跑一次验证全链路
-/root/open-agricola/backup-offsite.sh
-
-# 5. 安装 cron 与日志轮转
-cd /root/open-agricola
-cp deploy/open-agricola-backup.cron /etc/cron.d/open-agricola-backup
-chmod 644 /etc/cron.d/open-agricola-backup
-cp deploy/open-agricola-backup.logrotate /etc/logrotate.d/open-agricola-backup
-
-# 6. 异机安装自治 30 天清理（生产机失联时 ADR-0010 上限仍成立）
-scp deploy/offsite-retention.sh root@<异机IP>:/root/offsite-retention.sh
-ssh root@<异机IP> 'chmod +x /root/offsite-retention.sh'
-scp deploy/open-agricola-offsite-retention.cron root@<异机IP>:/etc/cron.d/open-agricola-offsite-retention
-ssh root@<异机IP> 'chmod 644 /etc/cron.d/open-agricola-offsite-retention && systemctl is-active cron'
-```
-
-脚本随 git 部署自动更新；cron 定义改动后需重新执行第 5 步。从异机恢复时，先把目标归档、配对 manifest、`env-<stem>` 快照和 `replay-removals.latest.jsonl` 拉回生产机 `backups/`：
-
-```bash
-rsync "root@<异机IP>:/root/open-agricola-backups/{<stem>.tgz,<stem>.manifest.json,env-<stem>,replay-removals.latest.jsonl}" backups/
-cp "backups/env-<stem>" .env && chmod 600 .env   # 新机器缺 .env 时恢复运行配置
-```
-
-再按下述恢复流程执行。
-
-恢复前准备目标归档、配对 manifest 和最新 ledger，并确认 manifest 的 `targetBuildId` 与准备启动的构建相同；否则先在归档副本上用目标镜像重新运行验证器。然后在后端停止期间替换数据。恢复命令会显式重放 ledger；服务启动也会再次幂等重放：
-
-```bash
-OA_RESTORE_ARCHIVE=open-agricola-YYYYMMDDTHHMMSSZ.tgz
-OA_RESTORE_STEM="${OA_RESTORE_ARCHIVE%.tgz}"
-OA_TARGET_BUILD_ID="$(git rev-parse HEAD)"
-test -f "backups/$OA_RESTORE_ARCHIVE"
-test -f "backups/$OA_RESTORE_STEM.manifest.json"
-test -f backups/replay-removals.latest.jsonl
-test "$(sha256sum "backups/$OA_RESTORE_ARCHIVE" | cut -d ' ' -f 1)" = \
-  "$(jq -r .archiveSha256 "backups/$OA_RESTORE_STEM.manifest.json")"
-test "$(stat -c '%s' "backups/$OA_RESTORE_ARCHIVE")" -eq \
-  "$(jq -r .archiveSizeBytes "backups/$OA_RESTORE_STEM.manifest.json")"
-test "$OA_TARGET_BUILD_ID" = \
-  "$(jq -r .targetBuildId "backups/$OA_RESTORE_STEM.manifest.json")"
-docker compose -f docker-compose.prod.yml stop app
-docker compose -f docker-compose.prod.yml run --rm --no-deps \
-  -e OA_RESTORE_ARCHIVE="$OA_RESTORE_ARCHIVE" \
-  -v "$PWD/backups:/backup:ro" app sh -c \
-  'tar -tzf "/backup/$OA_RESTORE_ARCHIVE" >/dev/null &&
-   find /app/data -mindepth 1 -maxdepth 1 -exec rm -rf -- {} \; &&
-   tar -C /app/data -xzf "/backup/$OA_RESTORE_ARCHIVE" &&
-   cp /backup/replay-removals.latest.jsonl /app/data/replay-removals.jsonl &&
-   node --import tsx scripts/replay-removal.ts apply-ledger'
-docker compose -f docker-compose.prod.yml up -d app
-```
-
-恢复后逐个抽查 ledger 中的 Room ID：Game Context 只能返回 `removed` Tombstone，manifest/segment 不可读取；无其他 Replay 引用的资源 Hash 必须返回 404。
+恢复先合并当前删除事实，再放置允许保留的对象、恢复 PostgreSQL、应用目标 migration，并验证 Room-owned 恢复、Replay 全链及资源。失败不能启用目标库；保留原数据端点并处理报错。切换配置不是迁移数据，不能省略导出/恢复/校验。当前单机功能不承诺故障时间或物理主机高可用。
 
 ### Replay 下架
 
@@ -763,8 +549,9 @@ docker compose -f docker-compose.prod.yml run --rm --no-deps app \
   node --import tsx scripts/replay-removal.ts remove \
   --room-id "$OA_ROOM_ID" --reason moderation
 mkdir -p backups
-docker compose -f docker-compose.prod.yml cp \
-  app:/app/data/replay-removals.jsonl backups/replay-removals.latest.jsonl
+docker compose -f docker-compose.prod.yml run --rm --no-deps \
+  -v "$PWD/backups:/backup" app node --import tsx scripts/storage-archive-cli.ts \
+  ledger-export /backup/replay-removals.latest.json
 docker compose -f docker-compose.prod.yml up -d app
 ```
 
@@ -780,8 +567,9 @@ docker compose -f docker-compose.prod.yml run --rm --no-deps app \
   node --import tsx scripts/replay-removal.ts remove \
   --room-id "$OA_ROOM_ID" --reason legal --erase-result
 mkdir -p backups
-docker compose -f docker-compose.prod.yml cp \
-  app:/app/data/replay-removals.jsonl backups/replay-removals.latest.jsonl
+docker compose -f docker-compose.prod.yml run --rm --no-deps \
+  -v "$PWD/backups:/backup" app node --import tsx scripts/storage-archive-cli.ts \
+  ledger-export /backup/replay-removals.latest.json
 docker compose -f docker-compose.prod.yml up -d app
 ```
 
@@ -799,8 +587,9 @@ docker compose -f docker-compose.prod.yml run --rm --no-deps app \
   --room-id "$OA_ROOM_ID" --reason legal \
   --asset-hash "$OA_ASSET_HASH"
 mkdir -p backups
-docker compose -f docker-compose.prod.yml cp \
-  app:/app/data/replay-removals.jsonl backups/replay-removals.latest.jsonl
+docker compose -f docker-compose.prod.yml run --rm --no-deps \
+  -v "$PWD/backups:/backup" app node --import tsx scripts/storage-archive-cli.ts \
+  ledger-export /backup/replay-removals.latest.json
 docker compose -f docker-compose.prod.yml up -d app
 ```
 
@@ -813,7 +602,7 @@ docker compose -f docker-compose.prod.yml up -d app
 3. 旧 key 仍用于解密尚未刷新连接，不能提前删除。检查 `issue_submission_connections.key_id`，并等待旧 key 行数归零；仍有效的旧 `oauth_states.pkce_verifier_key_id` 也必须归零或过期。
 4. 确认 Hosted 与本人 GitHub 提交都成功后，才从 key ring 删除旧 key 并再次重启。轮换期间不要修改已有 key id 对应的 key 内容。
 
-### 本地开发（不需要 Docker）
+### 本地开发与自包含依赖
 
 ```bash
 pnpm install

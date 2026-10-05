@@ -1,3 +1,6 @@
+import type { ExecutionStamp } from './execution-access'
+import { RoomCapacityError, type OwnerToken } from './room-directory'
+import { nextInputWindow, type RoomInputWindow } from './command-input'
 import type { WebSocket } from 'ws'
 import { GameSession } from './authoritative-session.ts'
 import type { RoomMeta, RoomSnapshot, RoomStatus } from './persistence/room-persistence.ts'
@@ -23,6 +26,9 @@ export type RoomSeatOwner = {
 }
 
 export type Room = {
+  executionStamp?: ExecutionStamp
+  owner?: OwnerToken
+  inputWindow?: RoomInputWindow | null
   id: string
   session: GameSession
   customSessionExecutor?: CustomSessionExecutor
@@ -178,6 +184,9 @@ export const roomOccupiedSeatCount = (
     ]).size
 
 export const toRoomMeta = (room: Room): RoomMeta => ({
+  ...(room.executionStamp ? { executionStamp: room.executionStamp } : {}),
+  ...(room.owner ? { owner: room.owner } : {}),
+  ...(room.inputWindow ? { inputWindow: room.inputWindow } : {}),
   createdBy: room.createdBy ?? null,
   startedAt: room.startedAt ?? null,
   maxPlayers: room.maxPlayers,
@@ -344,16 +353,21 @@ export const snapshotToRoom = (
   const created = createSessionFromSnapshot(snapshot, customCards, () => {
     snapshotRehydrationFailed = true
   })
-  created.executor?.reserveWorkerSlot()
+  if (created.executor && !created.executor.reserveWorkerSlot()) {
+    created.executor.dispose()
+    created.session.dispose()
+    throw new RoomCapacityError('No executable Room worker slot is available')
+  }
   const session = created.session
   return {
     id: snapshot.id,
+    inputWindow: snapshot.meta.inputWindow ?? nextInputWindow(null, session.state, 'initial'),
     session,
     ...(created.executor ? { customSessionExecutor: created.executor } : {}),
     players: [],
     seatOwners: snapshot.meta.players.map((owner) => ({ ...owner })),
     maxPlayers: snapshot.meta.maxPlayers,
-    version: 0,
+    version: snapshot.version ?? 0,
     status: snapshot.meta.status,
     startedAt: snapshot.meta.startedAt ?? undefined,
     createdBy: snapshot.meta.createdBy ?? undefined,

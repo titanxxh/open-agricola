@@ -1,0 +1,27 @@
+{
+  "extends": "./tsconfig.server.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.storage-tools.tsbuildinfo"
+  },
+  "include": [
+    "scripts/import-sqlite.ts",
+    "scripts/validate-backup.ts",
+    "scripts/upload-replay-viewer.ts",
+    "scripts/replay-removal.ts",
+    "scripts/local-rooms.ts",
+    "scripts/local-backend.ts",
+    "scripts/storage-archive.ts",
+    "scripts/storage-archive-cli.ts",
+    "scripts/container-entry.ts",
+    "scripts/bench/room-performance.ts",
+    "scripts/bench/room-commit-equivalence.ts",
+    "scripts/bench/room-cpu-attribution.ts",
+    "scripts/bench/broadcast-performance.ts",
+    "scripts/bench/late-game-capacity.ts"
+  ],
+  "exclude": [
+    "**/__tests__/**",
+    "tests",
+    "e2e-tests"
+  ]
+}

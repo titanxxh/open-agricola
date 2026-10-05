@@ -1,132 +1,86 @@
-import { once } from 'node:events'
+import { randomUUID } from 'node:crypto'
 import { createServer } from 'node:http'
-import Database from 'better-sqlite3'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import WebSocket from 'ws'
-import * as database from '../../db.ts'
-import { GameContextStore } from '../../game/game-context-store.ts'
-import { SqliteRoomPersistence } from '../../game/persistence/sqlite-adapter.ts'
-import { createConnectionCtx } from '../connection-ctx.ts'
-import { dispatch } from '../room-router.ts'
-import { createWsServer } from '../ws-server.ts'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import * as database from '../../db'
+import { createTestDatabase } from '../../__tests__/_helpers/postgres'
+import { recordingResources } from '../../__tests__/_helpers/recording'
+import { PostgresRoomPersistence } from '../../game/persistence/postgres-adapter'
+import { createConnectionCtx } from '../connection-ctx'
+import { dispatch } from '../room-router'
+import { createWsServer } from '../ws-server'
+import { CommandStore } from '../../game/command-store'
+let db: Awaited<ReturnType<typeof createTestDatabase>>
+let recording: Awaited<ReturnType<typeof recordingResources>>
+let persistence: PostgresRoomPersistence
+const servers: Array<Awaited<ReturnType<typeof createWsServer>>> = []
+const start = async () => {
+  const server = await createWsServer(createServer(), { persistence, ...recording }); servers.push(server); return server
+}
+beforeEach(async () => {
+  vi.stubEnv('ALLOW_ANONYMOUS_WS', 'true')
+  db = await createTestDatabase(); recording = await recordingResources(db)
+  vi.spyOn(database, 'getDb').mockReturnValue(db)
+  persistence = new PostgresRoomPersistence(db)
+})
+afterEach(async () => {
+  for (const server of servers.splice(0)) await server.shutdown()
+  await recording.close(); await db.close(); vi.restoreAllMocks(); vi.unstubAllEnvs()
+})
+const join = async (server: Awaited<ReturnType<typeof createWsServer>>, roomId: string) => {
+  const ws = { OPEN: 1, readyState: 1, send: vi.fn(), close: vi.fn() }
+  const ctx = createConnectionCtx(ws as never, { ...server, commands: new CommandStore(db), gameContextStore: recording.gameContextStore }, true)
+  await dispatch(ctx, { type: 'joinRoom', roomId, requestedPlayerIndex: 0 })
+  expect(ws.send.mock.calls.map(([raw]) => JSON.parse(raw))).toContainEqual(expect.objectContaining({ type: 'roomJoined', roomId, playerIndex: 0 }))
+  return ctx
+}
 
-describe('development room expiry', () => {
-  let db: Database.Database
-  let persistence: SqliteRoomPersistence
-  let gameContextStore: GameContextStore
-  const servers: Array<ReturnType<typeof createWsServer>> = []
+it('keeps a recorded development game joinable after a normal restart beyond seven days', async () => {
+  const first = await start(), ctx = await join(first, 'dev2')
+  const scope = await ctx.commands!.issueScope('development-anonymous')
+  await dispatch(ctx, { type: 'devSetResources', playerIndex: 0, resources: { wood: 17 }, commandContext: {
+    scopeId: scope.scopeId, commandId: randomUUID(), roomId: 'dev2', expectedVersion: ctx.currentRoom!.version,
+  } })
+  expect(ctx.currentRoom!.session.state.players[0]!.resources.wood).toBe(17)
+  const before = await persistence.load('dev2')
+  await first.shutdown(); servers.pop()
+  vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 8 * 86400000)
+  const next = await start(), restored = await join(next, 'dev2')
+  expect(restored.currentRoom!.session.state.players[0]!.resources.wood).toBe(17)
+  expect((await persistence.load('dev2'))?.serialized).toEqual(before?.serialized)
+  expect(await recording.gameContextStore.activeExpiresAt('dev2')).toBeNull()
+})
 
-  const start = (server = createServer()) => {
-    const result = createWsServer(server, { persistence, gameContextStore })
-    servers.push(result)
-    result.checkpoint.flushAll()
-    return result
-  }
+it('exempts development rematches from empty-room expiry and retires ordinary games normally', async () => {
+  const server = await start(), ctx = await join(server, 'dev2')
+  const scope = await ctx.commands!.issueScope('development-anonymous')
+  await dispatch(ctx, { type: 'newGame', commandContext: { scopeId: scope.scopeId, commandId: randomUUID(), roomId: 'dev2', expectedVersion: ctx.currentRoom!.version } })
+  const nextId = ctx.currentRoom!.id
+  expect(nextId).toMatch(/^dev2-/)
+  expect(await recording.gameContextStore.lifecycle('dev2')).toBe('expired')
+  await recording.gameContextStore.setActiveExpiry(nextId, 1)
+  expect(await recording.gameContextStore.activeExpiresAt(nextId)).toBeNull()
+  await dispatch(ctx, { type: 'createRoom', maxPlayers: 2, commandContext: { scopeId: scope.scopeId, commandId: randomUUID() } })
+  const ordinary = ctx.currentRoom!.id
+  await recording.gameContextStore.setActiveExpiry(ordinary, 1)
+  expect(await recording.gameContextStore.lifecycle(ordinary)).toBe('expired')
+  expect(await persistence.load(ordinary)).toBeNull()
+  await server.shutdown(); servers.pop()
+  const restored = await start()
+  expect(restored.registry.has(nextId)).toBe(true)
+  expect(restored.registry.has('dev2')).toBe(false)
+})
 
-  const join = (result: ReturnType<typeof createWsServer>, roomId: string) => {
-    const ws = { OPEN: 1, readyState: 1, send: vi.fn(), close: vi.fn() }
-    const ctx = createConnectionCtx(ws as never, { ...result, gameContextStore }, true)
-    dispatch(ctx, { type: 'joinRoom', roomId, requestedPlayerIndex: 0 })
-    expect(ws.send.mock.calls.map(([raw]) => JSON.parse(raw))).toContainEqual(
-      expect.objectContaining({ type: 'roomJoined', roomId, playerIndex: 0 }),
-    )
-    expect(ctx.currentRoom?.session.state.players[0]?.resources.wood).toBe(17)
-  }
-
-  beforeEach(() => {
-    db = new Database(':memory:')
-    db.pragma('foreign_keys = ON')
-    database.runMigrations(db, () => {})
-    vi.spyOn(database, 'getDb').mockReturnValue(db)
-    persistence = new SqliteRoomPersistence(db)
-    gameContextStore = new GameContextStore(db)
-    const initial = start()
-    const room = initial.registry.get('dev2')!
-    for (const player of room.session.state.players) {
-      player.minorHand = ['__test_placeholder__']
-      player.occupationHand = ['__test_placeholder__']
-    }
-    room.session.state.players[0]!.resources.wood = 17
-    initial.checkpoint.flushRoom(room)
-    initial.shutdown()
-    servers.pop()
-  })
-
-  afterEach(() => {
-    for (const server of servers.splice(0)) server.shutdown()
-    vi.restoreAllMocks()
-    db.close()
-  })
-
-  it('keeps a fixed room joinable after disconnecting and restarting beyond seven days', async () => {
-    const server = createServer()
-    const result = start(server)
-    server.listen(0, '127.0.0.1')
-    await once(server, 'listening')
-    const address = server.address()
-    if (!address || typeof address === 'string') throw new Error('missing server address')
-    const ws = new WebSocket(`ws://127.0.0.1:${address.port}/ws`)
-    try {
-      await once(ws, 'open')
-      ws.send(JSON.stringify({ type: 'joinRoom', roomId: 'dev2', requestedPlayerIndex: 0 }))
-      await vi.waitFor(() => expect(result.registry.get('dev2')?.players).toHaveLength(1))
-      ws.close()
-      await once(ws, 'close')
-      await vi.waitFor(() => expect(result.registry.get('dev2')?.players).toHaveLength(0))
-      expect(db.prepare("SELECT expires_at FROM game_contexts WHERE room_id = 'dev2'").get())
-        .toEqual({ expires_at: null })
-      result.shutdown()
-      servers.pop()
-      vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 8 * 24 * 60 * 60 * 1000)
-      gameContextStore = new GameContextStore(db)
-      join(start(), 'dev2')
-    } finally {
-      ws.terminate()
-      server.close()
-    }
-  })
-
-  it('repairs expired fixed contexts and stale development deadlines without changing saved state', () => {
-    const snapshot = persistence.load('dev2')!
-    const derivedId = 'dev2-00000000-0000-4000-8000-000000000000'
-    persistence.save(derivedId, snapshot.serialized, snapshot.meta)
-    persistence.save('ordinary-room', snapshot.serialized, snapshot.meta)
-    db.prepare("UPDATE game_contexts SET lifecycle = 'expired', phase = NULL WHERE room_id = 'dev2'").run()
-    db.prepare("UPDATE game_contexts SET expires_at = 1 WHERE lifecycle = 'active'").run()
-    gameContextStore.setActiveExpiry('ordinary-room', 1)
-    expect(db.prepare("SELECT expires_at FROM game_contexts WHERE room_id = 'ordinary-room'").get())
-      .toEqual({ expires_at: 1 })
-
-    const result = start()
-
-    expect(persistence.load('dev2')?.serialized).toEqual(snapshot.serialized)
-    expect(persistence.load(derivedId)?.serialized).toEqual(snapshot.serialized)
-    expect(persistence.load('ordinary-room')).toBeNull()
-    for (const roomId of ['dev2', 'dev6', derivedId]) {
-      expect(gameContextStore.lifecycle(roomId)).toBe('active')
-      expect(gameContextStore.activeExpiresAt(roomId)).toBeNull()
-    }
-    join(result, 'dev2')
-    join(result, derivedId)
-  })
-
-  it('keeps terminal contexts retired and restores a fixed room after an explicit reset', () => {
-    const snapshot = persistence.load('dev2')!
-    const derivedId = 'dev2-00000000-0000-4000-8000-000000000000'
-    persistence.save(derivedId, snapshot.serialized, snapshot.meta)
-    persistence.save('ordinary-room', snapshot.serialized, snapshot.meta)
-    db.prepare("UPDATE game_contexts SET lifecycle = 'expired' WHERE room_id IN (?, ?)")
-      .run(derivedId, 'ordinary-room')
-    db.prepare("UPDATE game_contexts SET lifecycle = 'completed' WHERE room_id = 'dev3'").run()
-    db.prepare("UPDATE game_contexts SET lifecycle = 'removed' WHERE room_id = 'dev4'").run()
-    persistence.discard('dev2')
-
-    start()
-
-    expect(gameContextStore.lifecycle('dev2')).toBe('active')
-    expect(gameContextStore.lifecycle('dev3')).toBe('completed')
-    expect(gameContextStore.lifecycle('dev4')).toBe('removed')
-    expect(gameContextStore.lifecycle(derivedId)).toBe('expired')
-    expect(gameContextStore.lifecycle('ordinary-room')).toBe('expired')
-  })
+it('allocates a fresh permanent game after an explicit development reset without reviving a terminal context', async () => {
+  const server = await start()
+  expect(await persistence.loadReplayHead('dev2')).not.toBeNull()
+  await server.shutdown(); servers.pop()
+  await persistence.discard('dev2')
+  expect(await recording.gameContextStore.lifecycle('dev2')).toBe('expired')
+  const next = await start()
+  const replacement = [...next.registry.iter()].find(room => room.id.startsWith('dev2-'))!
+  expect(replacement).toBeDefined()
+  expect(next.registry.has('dev2')).toBe(false)
+  expect((await persistence.loadReplayHead(replacement.id))?.latestStepNo).toBe(0)
+  expect(await persistence.loadReplayHead('dev2')).toBeNull()
+  expect(await recording.gameContextStore.lifecycle('dev2')).toBe('expired')
 })

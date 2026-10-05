@@ -1,4 +1,5 @@
-import Database from 'better-sqlite3'
+import type { PostgresDatabase } from '../database/postgres'
+import { createTestDatabase } from './_helpers/postgres'
 import { createHmac } from 'node:crypto'
 import { Readable } from 'node:stream'
 import type { IncomingMessage, ServerResponse } from 'node:http'
@@ -11,7 +12,7 @@ import type { WorkshopReviewSnapshot } from '../workshop-review/github-review-pr
 import { enterReview, invalidateReviewedCard, loadWorkspace, reconcilePendingMerges } from '../workshop-drafts.ts'
 import { ALL_CARD_IMPLS } from '../../shared/cards/register-all.ts'
 
-let db: Database.Database
+let db: PostgresDatabase
 
 const runtime = (): WorkshopReviewRuntime => ({
   webhookSecret: 'webhook-secret',
@@ -54,15 +55,15 @@ const mockRes = (): ServerResponse & { statusCode: number; body: string } => {
   } as unknown as ServerResponse & { statusCode: number; body: string }
 }
 
-const insertReviewedCard = (input: {
+const insertReviewedCard = async (input: {
   id: string
   prNumber: number
   reviewStatus?: string
   live?: boolean
   reviewCommitSha?: string
-}): void => {
+}): Promise<Awaited<void>> => {
   const now = Date.now()
-  db.prepare(`
+  ;(await db.prepare(`
     INSERT INTO workshop_cards (
       id, author_id, card_id, card_type, name, card_json,
       review_status, live, github_pr_url, review_commit_sha,
@@ -78,7 +79,7 @@ const insertReviewedCard = (input: {
     input.reviewCommitSha ?? null,
     now,
     now,
-  )
+  ))
 }
 
 const deliver = async (
@@ -104,60 +105,13 @@ const deliver = async (
   return res
 }
 
-beforeEach(() => {
-  db = new Database(':memory:')
-  db.exec(`
-    CREATE TABLE workshop_cards (
-      id TEXT PRIMARY KEY,
-      author_id TEXT NOT NULL,
-      card_id TEXT NOT NULL,
-      card_type TEXT NOT NULL,
-      name TEXT NOT NULL,
-      description TEXT NOT NULL DEFAULT '',
-      card_json TEXT NOT NULL,
-      code_manifest TEXT,
-      art_url TEXT,
-      review_status TEXT NOT NULL DEFAULT 'unsubmitted',
-      live INTEGER NOT NULL DEFAULT 0,
-      github_pr_url TEXT,
-      github_pr_status TEXT,
-      github_pr_last_synced_at INTEGER,
-      review_commit_sha TEXT,
-      review_version_id TEXT,
-      draft_revision INTEGER NOT NULL DEFAULT 1,
-      draft_generation_json TEXT NOT NULL DEFAULT '{}',
-      approved_commit_sha TEXT,
-      approved_review_id TEXT,
-      approved_at INTEGER,
-      approved_version_id TEXT,
-      built_in INTEGER NOT NULL DEFAULT 0,
-      sandbox_pass_version_id TEXT,
-      sandbox_passed_at INTEGER,
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL
-    );
-    CREATE TABLE workshop_card_versions (
-      id TEXT PRIMARY KEY,
-      card_id TEXT NOT NULL,
-      card_json TEXT NOT NULL,
-      code_manifest TEXT,
-      art_url TEXT,
-      version_number INTEGER NOT NULL,
-      created_by TEXT NOT NULL,
-      created_at INTEGER NOT NULL,
-      content_hash TEXT,
-      provenance_json TEXT NOT NULL DEFAULT '{}'
-    );
-    CREATE TABLE github_webhook_events (
-      delivery_id TEXT PRIMARY KEY,
-      event_name TEXT NOT NULL,
-      received_at INTEGER NOT NULL
-    );
-  `)
+beforeEach(async () => {
+  db = await createTestDatabase()
+  await db.exec("INSERT INTO users (id, username, display_name, password_hash, created_at) VALUES ('author', 'author', 'Author', 'hash', 1)")
 })
 
-afterEach(() => {
-  db.close()
+afterEach(async () => {
+  ;(await db.close())
 })
 
 describe('workshop review webhook', () => {
@@ -200,12 +154,12 @@ describe('workshop review webhook', () => {
 
     expect(JSON.parse(res.body)).toEqual({ ok: true, ignored: true })
     expect(reviewRuntime.provider.getPullRequestSnapshot).not.toHaveBeenCalled()
-    expect(db.prepare('SELECT COUNT(*) AS count FROM github_webhook_events').get())
+    expect((await db.prepare('SELECT COUNT(*) AS count FROM github_webhook_events').get()))
       .toEqual({ count: 0 })
   })
 
   it('fails closed and records the delivery when GitHub is unavailable', async () => {
-    insertReviewedCard({
+    await insertReviewedCard({
       id: 'card-provider-unavailable',
       prNumber: 55,
       reviewCommitSha: 'head-55',
@@ -229,17 +183,17 @@ describe('workshop review webhook', () => {
       conservative: true,
       invalidated: 1,
     })
-    expect(loadWorkspace(db, 'card-provider-unavailable', 'author')).toMatchObject({
+    expect((await loadWorkspace(db, 'card-provider-unavailable', 'author'))).toMatchObject({
       reviewStatus: 'stale',
       live: false,
     })
-    expect(db.prepare('SELECT COUNT(*) AS count FROM github_webhook_events').get())
+    expect((await db.prepare('SELECT COUNT(*) AS count FROM github_webhook_events').get()))
       .toEqual({ count: 1 })
   })
 
   it('invalidates a synchronized live card once per delivery', async () => {
     const now = Date.now()
-    db.prepare(`
+    ;(await db.prepare(`
       INSERT INTO workshop_cards (
         id, author_id, card_id, card_type, name, card_json,
         review_status, live, github_pr_url, created_at, updated_at
@@ -254,7 +208,7 @@ describe('workshop review webhook', () => {
       'https://github.com/titanxxh/open-agricola/pull/42',
       now,
       now,
-    )
+    ))
     const body = Buffer.from(JSON.stringify({
       action: 'synchronize',
       after: 'new-head-42',
@@ -281,20 +235,20 @@ describe('workshop review webhook', () => {
 
     expect(firstRes.statusCode).toBe(200)
     expect(JSON.parse(firstRes.body)).toEqual({ ok: true, invalidated: 1 })
-    expect(loadWorkspace(db, 'card-1', 'author')).toMatchObject({
+    expect((await loadWorkspace(db, 'card-1', 'author'))).toMatchObject({
       reviewStatus: 'stale',
       live: false,
     })
 
-    db.prepare(`
+    ;(await db.prepare(`
       UPDATE workshop_cards SET review_status = 'approved', live = 1 WHERE id = 'card-1'
-    `).run()
+    `).run())
     const duplicateRes = mockRes()
 
     await handleWorkshopReviewWebhook(mockReq(body, headers), duplicateRes, db, reviewRuntime)
 
     expect(JSON.parse(duplicateRes.body)).toEqual({ ok: true, duplicate: true })
-    expect(loadWorkspace(db, 'card-1', 'author')).toMatchObject({
+    expect((await loadWorkspace(db, 'card-1', 'author'))).toMatchObject({
       reviewStatus: 'approved',
       live: true,
     })
@@ -302,7 +256,7 @@ describe('workshop review webhook', () => {
   })
 
   it('keeps the freshly submitted head in review when its synchronize event arrives late', async () => {
-    insertReviewedCard({
+    await insertReviewedCard({
       id: 'card-current-head',
       prNumber: 45,
       reviewStatus: 'in_review',
@@ -324,14 +278,14 @@ describe('workshop review webhook', () => {
     }, 'pull_request', 'delivery-current-head', reviewRuntime)
 
     expect(JSON.parse(res.body)).toEqual({ ok: true, invalidated: 0 })
-    expect(loadWorkspace(db, 'card-current-head', 'author')).toMatchObject({
+    expect((await loadWorkspace(db, 'card-current-head', 'author'))).toMatchObject({
       reviewStatus: 'in_review',
       live: false,
     })
   })
 
   it('keeps a newer submitted head when an older synchronize event arrives late', async () => {
-    insertReviewedCard({
+    await insertReviewedCard({
       id: 'card-newer-head',
       prNumber: 48,
       reviewStatus: 'in_review',
@@ -353,7 +307,7 @@ describe('workshop review webhook', () => {
     }, 'pull_request', 'delivery-older-head', reviewRuntime)
 
     expect(JSON.parse(res.body)).toEqual({ ok: true, invalidated: 0 })
-    expect(loadWorkspace(db, 'card-newer-head', 'author')).toMatchObject({
+    expect((await loadWorkspace(db, 'card-newer-head', 'author'))).toMatchObject({
       reviewStatus: 'in_review',
       live: false,
     })
@@ -361,7 +315,7 @@ describe('workshop review webhook', () => {
 
   it('invalidates a card when its approval is dismissed', async () => {
     const now = Date.now()
-    db.prepare(`
+    ;(await db.prepare(`
       INSERT INTO workshop_cards (
         id, author_id, card_id, card_type, name, card_json,
         review_status, live, github_pr_url, created_at, updated_at
@@ -376,7 +330,7 @@ describe('workshop review webhook', () => {
       'https://github.com/titanxxh/open-agricola/pull/43',
       now,
       now,
-    )
+    ))
     const body = Buffer.from(JSON.stringify({
       action: 'dismissed',
       review: { commit_id: 'head-43' },
@@ -406,14 +360,14 @@ describe('workshop review webhook', () => {
     )
 
     expect(JSON.parse(res.body)).toEqual({ ok: true, invalidated: 1 })
-    expect(loadWorkspace(db, 'card-2', 'author')).toMatchObject({
+    expect((await loadWorkspace(db, 'card-2', 'author'))).toMatchObject({
       reviewStatus: 'stale',
       live: false,
     })
   })
 
   it('keeps an unapproved newer head when an older dismissal arrives late', async () => {
-    insertReviewedCard({
+    await insertReviewedCard({
       id: 'card-unapproved-after-dismissal',
       prNumber: 52,
       reviewStatus: 'in_review',
@@ -435,14 +389,14 @@ describe('workshop review webhook', () => {
     }, 'pull_request_review', 'delivery-old-dismissal', reviewRuntime)
 
     expect(JSON.parse(res.body)).toEqual({ ok: true, invalidated: 0 })
-    expect(loadWorkspace(db, 'card-unapproved-after-dismissal', 'author')).toMatchObject({
+    expect((await loadWorkspace(db, 'card-unapproved-after-dismissal', 'author'))).toMatchObject({
       reviewStatus: 'in_review',
       live: false,
     })
   })
 
   it('keeps a current in-review head when one nonfinal approval is dismissed', async () => {
-    insertReviewedCard({
+    await insertReviewedCard({
       id: 'card-nonfinal-dismissal',
       prNumber: 56,
       reviewStatus: 'in_review',
@@ -466,14 +420,14 @@ describe('workshop review webhook', () => {
     }, 'pull_request_review', 'delivery-nonfinal-dismissal', reviewRuntime)
 
     expect(JSON.parse(res.body)).toEqual({ ok: true, invalidated: 0 })
-    expect(loadWorkspace(db, 'card-nonfinal-dismissal', 'author')).toMatchObject({
+    expect((await loadWorkspace(db, 'card-nonfinal-dismissal', 'author'))).toMatchObject({
       reviewStatus: 'in_review',
       live: false,
     })
   })
 
   it('keeps a newer valid approval when an older dismissal arrives late', async () => {
-    insertReviewedCard({
+    await insertReviewedCard({
       id: 'card-delayed-dismissal',
       prNumber: 50,
       reviewCommitSha: 'head-50',
@@ -500,7 +454,7 @@ describe('workshop review webhook', () => {
     }, 'pull_request_review', 'delivery-delayed-dismissal', reviewRuntime)
 
     expect(JSON.parse(res.body)).toEqual({ ok: true, invalidated: 0 })
-    expect(loadWorkspace(db, 'card-delayed-dismissal', 'author')).toMatchObject({
+    expect((await loadWorkspace(db, 'card-delayed-dismissal', 'author'))).toMatchObject({
       reviewStatus: 'approved',
       live: true,
     })
@@ -509,21 +463,21 @@ describe('workshop review webhook', () => {
   it('restores a stale card when dismissal reveals a valid head approval', async () => {
     const now = Date.now()
     const prUrl = 'https://github.com/titanxxh/open-agricola/pull/62'
-    db.prepare(`
+    ;(await db.prepare(`
       INSERT INTO workshop_cards (
         id, author_id, card_id, card_type, name, card_json,
         review_status, live, created_at, updated_at
       ) VALUES ('card-restored-dismissal', 'author', 'CUSTOM_RestoredDismissal',
                 'occupation', 'Restored Dismissal', '{}', 'unsubmitted', 0, ?, ?)
-    `).run(now, now)
-    enterReview(db, {
+    `).run(now, now))
+    ;(await enterReview(db, {
       cardId: 'card-restored-dismissal',
       authorId: 'author',
       prUrl,
       expectedRevision: 1,
       commitSha: 'head-62',
-    })
-    invalidateReviewedCard(db, { prUrl })
+    }))
+    ;(await invalidateReviewedCard(db, { prUrl }))
     const reviewRuntime = runtime()
     vi.mocked(reviewRuntime.provider.getPullRequestSnapshot).mockResolvedValue({
       ...openSnapshot('head-62'),
@@ -547,7 +501,7 @@ describe('workshop review webhook', () => {
     }, 'pull_request_review', 'delivery-restored-dismissal', reviewRuntime)
 
     expect(JSON.parse(res.body)).toEqual({ ok: true, approved: 1, invalidated: 0 })
-    expect(loadWorkspace(db, 'card-restored-dismissal', 'author')).toMatchObject({
+    expect((await loadWorkspace(db, 'card-restored-dismissal', 'author'))).toMatchObject({
       reviewStatus: 'approved',
       live: false,
     })
@@ -559,7 +513,7 @@ describe('workshop review webhook', () => {
   ])('preserves an approved live card when a delayed %s review arrives after merge', async (action, prNumber) => {
     const id = `card-merged-${action}`
     const head = `head-${prNumber}`
-    insertReviewedCard({ id, prNumber, reviewCommitSha: head })
+    await insertReviewedCard({ id, prNumber, reviewCommitSha: head })
     const reviewRuntime = runtime()
     vi.mocked(reviewRuntime.provider.getPullRequestSnapshot).mockResolvedValue({
       ...openSnapshot(head),
@@ -577,21 +531,21 @@ describe('workshop review webhook', () => {
     }, 'pull_request_review', `delivery-merged-${action}`, reviewRuntime)
 
     expect(JSON.parse(res.body)).toMatchObject({ ok: true, invalidated: 0 })
-    expect(loadWorkspace(db, id, 'author')).toMatchObject({
+    expect((await loadWorkspace(db, id, 'author'))).toMatchObject({
       reviewStatus: 'approved',
       live: true,
     })
   })
 
   it('ignores an ambiguous legacy PR binding instead of selecting a row', async () => {
-    insertReviewedCard({
+    await insertReviewedCard({
       id: 'card-duplicate-a',
       prNumber: 60,
       reviewStatus: 'in_review',
       live: false,
       reviewCommitSha: 'head-60',
     })
-    insertReviewedCard({
+    await insertReviewedCard({
       id: 'card-duplicate-b',
       prNumber: 60,
       reviewStatus: 'in_review',
@@ -616,10 +570,10 @@ describe('workshop review webhook', () => {
   })
 
   it('graduates a live card to merged when its PR merges', async () => {
-    insertReviewedCard({ id: 'card-merged-pr', prNumber: 47 })
-    db.prepare(`
+    await insertReviewedCard({ id: 'card-merged-pr', prNumber: 47 })
+    ;(await db.prepare(`
       UPDATE workshop_cards SET approved_version_id = 'ver-47' WHERE id = 'card-merged-pr'
-    `).run()
+    `).run())
     const reviewRuntime = runtime()
 
     const res = await deliver({
@@ -634,7 +588,7 @@ describe('workshop review webhook', () => {
     }, 'pull_request', 'delivery-merged-pr', reviewRuntime)
 
     expect(JSON.parse(res.body)).toEqual({ ok: true, merged: 1, builtIn: 0 })
-    expect(loadWorkspace(db, 'card-merged-pr', 'author')).toMatchObject({
+    expect((await loadWorkspace(db, 'card-merged-pr', 'author'))).toMatchObject({
       reviewStatus: 'merged',
       live: true,
     })
@@ -659,7 +613,7 @@ describe('workshop review webhook', () => {
     // approved_version_id is still null: the merge arrived before the
     // approval landed. GitHub does not redeliver acknowledged hooks, so the
     // merge fact is persisted and reconciled later.
-    insertReviewedCard({ id: 'card-early-merge', prNumber: 48, reviewStatus: 'in_review', live: false })
+    await insertReviewedCard({ id: 'card-early-merge', prNumber: 48, reviewStatus: 'in_review', live: false })
     const payload = {
       action: 'closed',
       repository: { full_name: 'titanxxh/open-agricola' },
@@ -672,20 +626,20 @@ describe('workshop review webhook', () => {
     }
     const res = await deliver(payload, 'pull_request', 'delivery-early-merge', runtime())
     expect(JSON.parse(res.body)).toEqual({ ok: true, pendingMerge: true })
-    const pending = loadWorkspace(db, 'card-early-merge', 'author')
+    const pending = (await loadWorkspace(db, 'card-early-merge', 'author'))
     expect(pending.reviewStatus).toBe('in_review')
-    expect(db.prepare(`
+    expect((await db.prepare(`
       SELECT github_pr_status FROM workshop_cards WHERE id = 'card-early-merge'
-    `).get()).toEqual({ github_pr_status: 'merged' })
+    `).get())).toEqual({ github_pr_status: 'merged' })
 
     // the approval lands: the next reconciliation point graduates the card
-    db.prepare(`
+    ;(await db.prepare(`
       UPDATE workshop_cards
       SET review_status = 'approved', approved_version_id = 'ver-48'
       WHERE id = 'card-early-merge'
-    `).run()
-    expect(reconcilePendingMerges(db)).toBe(1)
-    expect(loadWorkspace(db, 'card-early-merge', 'author').reviewStatus).toBe('merged')
+    `).run())
+    expect((await reconcilePendingMerges(db))).toBe(1)
+    expect((await loadWorkspace(db, 'card-early-merge', 'author')).reviewStatus).toBe('merged')
 
     // duplicate delivery of the original hook is idempotent
     const dup = await deliver(payload, 'pull_request', 'delivery-early-merge', runtime())
@@ -693,10 +647,10 @@ describe('workshop review webhook', () => {
   })
 
   it('demotes a live card when its PR merges into a branch other than main', async () => {
-    insertReviewedCard({ id: 'card-retargeted-merge', prNumber: 49, reviewCommitSha: 'head-49' })
-    db.prepare(`
+    await insertReviewedCard({ id: 'card-retargeted-merge', prNumber: 49, reviewCommitSha: 'head-49' })
+    ;(await db.prepare(`
       UPDATE workshop_cards SET approved_version_id = 'ver-49' WHERE id = 'card-retargeted-merge'
-    `).run()
+    `).run())
     const reviewRuntime = runtime()
     vi.mocked(reviewRuntime.provider.getPullRequestSnapshot).mockResolvedValue({
       ...openSnapshot('head-49'),
@@ -718,19 +672,19 @@ describe('workshop review webhook', () => {
     // merged outside main never reaches the built-in registry: the card must
     // not terminalize, and no false pending-merge fact may be left behind
     expect(JSON.parse(res.body)).toEqual({ ok: true, invalidated: 1 })
-    expect(loadWorkspace(db, 'card-retargeted-merge', 'author')).toMatchObject({
+    expect((await loadWorkspace(db, 'card-retargeted-merge', 'author'))).toMatchObject({
       reviewStatus: 'stale',
       live: false,
     })
-    expect(db.prepare(`
+    expect((await db.prepare(`
       SELECT github_pr_status FROM workshop_cards WHERE id = 'card-retargeted-merge'
-    `).get()).toEqual({ github_pr_status: 'closed' })
+    `).get())).toEqual({ github_pr_status: 'closed' })
   })
 
   it('records closure when a non-main merge closes an already-stale card', async () => {
     // The earlier `edited` webhook already demoted the retargeted PR's card:
     // the subsequent close must still land github_pr_status = 'closed'.
-    insertReviewedCard({
+    await insertReviewedCard({
       id: 'card-stale-retarget',
       prNumber: 51,
       reviewStatus: 'stale',
@@ -756,22 +710,22 @@ describe('workshop review webhook', () => {
     }, 'pull_request', 'delivery-stale-retarget-close', reviewRuntime)
 
     expect(JSON.parse(res.body)).toEqual({ ok: true, invalidated: 1 })
-    expect(db.prepare(`
+    expect((await db.prepare(`
       SELECT review_status, github_pr_status FROM workshop_cards WHERE id = 'card-stale-retarget'
-    `).get()).toEqual({ review_status: 'stale', github_pr_status: 'closed' })
+    `).get())).toEqual({ review_status: 'stale', github_pr_status: 'closed' })
   })
 
   it('preserves the recorded closure when out-of-order deliveries revisit a stale binding', async () => {
-    insertReviewedCard({
+    await insertReviewedCard({
       id: 'card-closed-stale',
       prNumber: 52,
       reviewStatus: 'stale',
       live: false,
       reviewCommitSha: 'head-52',
     })
-    db.prepare(`
+    ;(await db.prepare(`
       UPDATE workshop_cards SET github_pr_status = 'closed' WHERE id = 'card-closed-stale'
-    `).run()
+    `).run())
 
     // snapshot available: the status is re-derived, never defaulted to 'open'
     const reviewRuntime = runtime()
@@ -789,9 +743,9 @@ describe('workshop review webhook', () => {
       },
     }, 'pull_request', 'delivery-stale-edited', reviewRuntime)
     expect(JSON.parse(edited.body)).toMatchObject({ ok: true })
-    expect(db.prepare(`
+    expect((await db.prepare(`
       SELECT github_pr_status FROM workshop_cards WHERE id = 'card-closed-stale'
-    `).get()).toEqual({ github_pr_status: 'closed' })
+    `).get())).toEqual({ github_pr_status: 'closed' })
 
     // GitHub unavailable: fail-closed has no snapshot and must not overwrite
     const failingRuntime = runtime()
@@ -806,27 +760,27 @@ describe('workshop review webhook', () => {
       },
     }, 'pull_request', 'delivery-stale-failclosed', failingRuntime)
     expect(JSON.parse(failed.body)).toMatchObject({ ok: true, conservative: true })
-    expect(db.prepare(`
+    expect((await db.prepare(`
       SELECT github_pr_status FROM workshop_cards WHERE id = 'card-closed-stale'
-    `).get()).toEqual({ github_pr_status: 'closed' })
+    `).get())).toEqual({ github_pr_status: 'closed' })
   })
 
   it('reconciles the built-in takeover when a delayed approval graduates the card', async () => {
     const builtInCardId = Object.keys(ALL_CARD_IMPLS)[0]!
     const now = Date.now()
-    db.prepare(`
+    ;(await db.prepare(`
       INSERT INTO workshop_cards (
         id, author_id, card_id, card_type, name, card_json,
         review_status, live, created_at, updated_at
       ) VALUES ('card-late-approval', 'author', ?, 'occupation', 'Late Approval', '{}', 'unsubmitted', 0, ?, ?)
-    `).run(builtInCardId, now, now)
-    enterReview(db, {
+    `).run(builtInCardId, now, now))
+    ;(await enterReview(db, {
       cardId: 'card-late-approval',
       authorId: 'author',
       prUrl: 'https://github.com/titanxxh/open-agricola/pull/50',
       expectedRevision: 1,
       commitSha: 'head-50',
-    })
+    }))
 
     // merge delivery arrives first: only the merge fact is persisted
     const mergeRes = await deliver({
@@ -865,14 +819,14 @@ describe('workshop review webhook', () => {
     }, 'pull_request_review', 'delivery-late-approval-review', reviewRuntime)
 
     expect(JSON.parse(res.body)).toEqual({ ok: true, approved: 1, graduated: 1, builtIn: 1 })
-    expect(loadWorkspace(db, 'card-late-approval', 'author').reviewStatus).toBe('merged')
-    expect(db.prepare(`
+    expect((await loadWorkspace(db, 'card-late-approval', 'author')).reviewStatus).toBe('merged')
+    expect((await db.prepare(`
       SELECT built_in FROM workshop_cards WHERE id = 'card-late-approval'
-    `).get()).toEqual({ built_in: 1 })
+    `).get())).toEqual({ built_in: 1 })
   })
 
   it('invalidates a live card when its PR closes without merging', async () => {
-    insertReviewedCard({ id: 'card-closed-pr', prNumber: 46 })
+    await insertReviewedCard({ id: 'card-closed-pr', prNumber: 46 })
     const reviewRuntime = runtime()
     vi.mocked(reviewRuntime.provider.getPullRequestSnapshot).mockResolvedValue({
       ...openSnapshot('head-46'),
@@ -890,14 +844,14 @@ describe('workshop review webhook', () => {
     }, 'pull_request', 'delivery-closed-pr', reviewRuntime)
 
     expect(JSON.parse(res.body)).toEqual({ ok: true, invalidated: 1 })
-    expect(loadWorkspace(db, 'card-closed-pr', 'author')).toMatchObject({
+    expect((await loadWorkspace(db, 'card-closed-pr', 'author'))).toMatchObject({
       reviewStatus: 'stale',
       live: false,
     })
   })
 
   it('keeps a reopened PR when its older close delivery arrives late', async () => {
-    insertReviewedCard({
+    await insertReviewedCard({
       id: 'card-reopened-pr',
       prNumber: 53,
       reviewStatus: 'in_review',
@@ -919,7 +873,7 @@ describe('workshop review webhook', () => {
     }, 'pull_request', 'delivery-old-close', reviewRuntime)
 
     expect(JSON.parse(res.body)).toEqual({ ok: true, invalidated: 0 })
-    expect(loadWorkspace(db, 'card-reopened-pr', 'author')).toMatchObject({
+    expect((await loadWorkspace(db, 'card-reopened-pr', 'author'))).toMatchObject({
       reviewStatus: 'in_review',
       live: false,
     })
@@ -929,7 +883,7 @@ describe('workshop review webhook', () => {
     ['edited', { ...openSnapshot('head-51'), baseRefName: 'release' }],
     ['converted_to_draft', { ...openSnapshot('head-51'), isDraft: true }],
   ])('invalidates a live card when %s makes its PR ineligible', async (action, snapshot) => {
-    insertReviewedCard({
+    await insertReviewedCard({
       id: `card-ineligible-${action}`,
       prNumber: 51,
       reviewCommitSha: 'head-51',
@@ -947,14 +901,14 @@ describe('workshop review webhook', () => {
     }, 'pull_request', `delivery-ineligible-${action}`, reviewRuntime)
 
     expect(JSON.parse(res.body)).toEqual({ ok: true, invalidated: 1 })
-    expect(loadWorkspace(db, `card-ineligible-${action}`, 'author')).toMatchObject({
+    expect((await loadWorkspace(db, `card-ineligible-${action}`, 'author'))).toMatchObject({
       reviewStatus: 'stale',
       live: false,
     })
   })
 
   it('invalidates a live card when the atomic snapshot requests changes', async () => {
-    insertReviewedCard({
+    await insertReviewedCard({
       id: 'card-changes-requested',
       prNumber: 47,
       reviewCommitSha: 'head-47',
@@ -984,14 +938,14 @@ describe('workshop review webhook', () => {
     }, 'pull_request_review', 'delivery-changes-requested', reviewRuntime)
 
     expect(JSON.parse(res.body)).toEqual({ ok: true, approved: 0, invalidated: 1 })
-    expect(loadWorkspace(db, 'card-changes-requested', 'author')).toMatchObject({
+    expect((await loadWorkspace(db, 'card-changes-requested', 'author'))).toMatchObject({
       reviewStatus: 'stale',
       live: false,
     })
   })
 
   it('keeps an unchanged PR in review after a comment-only review', async () => {
-    insertReviewedCard({
+    await insertReviewedCard({
       id: 'card-comment-review',
       prNumber: 49,
       reviewStatus: 'in_review',
@@ -1019,7 +973,7 @@ describe('workshop review webhook', () => {
     }, 'pull_request_review', 'delivery-comment-review', reviewRuntime)
 
     expect(JSON.parse(res.body)).toEqual({ ok: true, approved: 0, invalidated: 0 })
-    expect(loadWorkspace(db, 'card-comment-review', 'author')).toMatchObject({
+    expect((await loadWorkspace(db, 'card-comment-review', 'author'))).toMatchObject({
       reviewStatus: 'in_review',
       live: false,
     })
@@ -1027,7 +981,7 @@ describe('workshop review webhook', () => {
 
   it('approves the exact submitted version from an atomic GitHub snapshot', async () => {
     const now = Date.now()
-    db.prepare(`
+    ;(await db.prepare(`
       INSERT INTO workshop_cards (
         id, author_id, card_id, card_type, name, card_json,
         review_status, live, created_at, updated_at
@@ -1041,14 +995,14 @@ describe('workshop review webhook', () => {
       '{}',
       now,
       now,
-    )
-    enterReview(db, {
+    ))
+    ;(await enterReview(db, {
       cardId: 'card-3',
       authorId: 'author',
       prUrl: 'https://github.com/titanxxh/open-agricola/pull/44',
       expectedRevision: 1,
       commitSha: 'head-44',
-    })
+    }))
     const body = Buffer.from(JSON.stringify({
       action: 'submitted',
       repository: { full_name: 'titanxxh/open-agricola' },
@@ -1088,7 +1042,7 @@ describe('workshop review webhook', () => {
 
     expect(JSON.parse(res.body)).toEqual({ ok: true, approved: 1 })
     expect(reviewRuntime.provider.getPullRequestSnapshot).toHaveBeenCalledWith(44)
-    expect(loadWorkspace(db, 'card-3', 'author')).toMatchObject({
+    expect((await loadWorkspace(db, 'card-3', 'author'))).toMatchObject({
       reviewStatus: 'approved',
       approvedVersionId: expect.any(String),
       live: false,
@@ -1096,7 +1050,7 @@ describe('workshop review webhook', () => {
   })
 
   it('ignores an approval snapshot captured before a concurrent resubmission', async () => {
-    insertReviewedCard({
+    await insertReviewedCard({
       id: 'card-concurrent-approval',
       prNumber: 54,
       reviewStatus: 'in_review',
@@ -1119,9 +1073,9 @@ describe('workshop review webhook', () => {
     await vi.waitFor(() => {
       expect(reviewRuntime.provider.getPullRequestSnapshot).toHaveBeenCalledWith(54)
     })
-    db.prepare(`
+    ;(await db.prepare(`
       UPDATE workshop_cards SET review_commit_sha = 'head-54-b' WHERE id = ?
-    `).run('card-concurrent-approval')
+    `).run('card-concurrent-approval'))
     resolveSnapshot({
       ...openSnapshot('head-54-a'),
       reviewDecision: 'APPROVED',
@@ -1135,14 +1089,14 @@ describe('workshop review webhook', () => {
 
     const res = await delivering
     expect(JSON.parse(res.body)).toEqual({ ok: true, ignored: true })
-    expect(loadWorkspace(db, 'card-concurrent-approval', 'author')).toMatchObject({
+    expect((await loadWorkspace(db, 'card-concurrent-approval', 'author'))).toMatchObject({
       reviewStatus: 'in_review',
       live: false,
     })
   })
 
   it('does not restore an older approval after a newer invalidation', async () => {
-    insertReviewedCard({
+    await insertReviewedCard({
       id: 'card-overlapping-webhooks',
       prNumber: 57,
       reviewStatus: 'in_review',
@@ -1200,7 +1154,7 @@ describe('workshop review webhook', () => {
     const olderRes = await olderDelivery
 
     expect(JSON.parse(olderRes.body)).toEqual({ ok: true, ignored: true })
-    expect(loadWorkspace(db, 'card-overlapping-webhooks', 'author')).toMatchObject({
+    expect((await loadWorkspace(db, 'card-overlapping-webhooks', 'author'))).toMatchObject({
       reviewStatus: 'stale',
       live: false,
     })

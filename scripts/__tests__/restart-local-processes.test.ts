@@ -13,8 +13,13 @@ import {
 } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
-import Database from 'better-sqlite3'
+import { vi, afterEach, describe, expect, it } from 'vitest'
+
+// Native database/S3 and child-process operations also run under full-suite load.
+vi.setConfig({ testTimeout: 30000, hookTimeout: 30000 })
+import { parseEnv } from 'node:util'
+import { createTestDatabase, getTestDatabaseUrl } from '../../server/__tests__/_helpers/postgres'
+import { sendCommand } from '../../server/__tests__/_helpers/command-socket'
 import WebSocket from 'ws'
 import { GameSession } from '../../server/game/authoritative-session'
 import { serializeSessionSnapshot } from '../../shared/session/serialization'
@@ -54,7 +59,7 @@ const sendWsCommand = <T>(ws: WebSocket, command: ClientCommand): Promise<T> =>
       else resolvePromise(event.payload as T)
     }
     ws.on('message', onMessage)
-    ws.send(JSON.stringify({ ...command, requestId }))
+    void sendCommand(ws as WebSocket & { received: ServerEvent[] }, { ...command, requestId }).catch(error => { clearTimeout(timer); ws.off('message', onMessage); reject(error) })
   })
 
 const writeExecutable = (path: string, contents: string): void => {
@@ -106,68 +111,35 @@ afterEach(async () => {
 
 describe.each(['raw', 'compressed'] as const)('restart-local saved variant preflight (%s)', (format) => {
   it.each(['parents', 'parents-seasons-moor', 'disabled', 'missing-father'] as const)(
-    'preserves current snapshots and correctly checks %s without resetting data', (mode) => {
-      const root = mkdtempSync(join(tmpdir(), 'oa-restart-snapshot-'))
-      tempDirs.push(root)
-      const bin = join(root, 'bin')
-      const nodeBin = join(root, 'node_modules/.bin')
-      mkdirSync(bin, { recursive: true })
-      mkdirSync(nodeBin, { recursive: true })
-      mkdirSync(join(root, 'server/game/persistence'), { recursive: true })
-      execFileSync('git', ['init', '-q'], { cwd: root })
-      writeFileSync(join(root, 'restart-local.sh'), readFileSync(scriptPath))
-      writeServicesStub(root)
-      writeFileSync(join(root, 'server/game/persistence/room-body-codec.ts'), readFileSync(resolve('server/game/persistence/room-body-codec.ts')))
-      symlinkSync(resolve('node_modules/better-sqlite3'), join(root, 'node_modules/better-sqlite3'))
-      writeExecutable(join(nodeBin, 'tsx'), '#!/bin/bash\nexit 0\n')
-      writeExecutable(join(nodeBin, 'vite'), '#!/bin/bash\nexit 0\n')
-      writeExecutable(join(bin, 'pnpm'), '#!/bin/bash\nexit 0\n')
-      writeExecutable(join(bin, 'lsof'), '#!/bin/bash\nexit 0\n')
-      const dbPath = join(root, 'rooms.db')
-      const db = new Database(dbPath)
+    'reads current %s snapshots without resetting PostgreSQL data', async (mode) => {
+      const db = await createTestDatabase()
       try {
-        db.exec('CREATE TABLE rooms (id TEXT PRIMARY KEY, state_json TEXT)')
+        const schema = (await db.prepare('SELECT current_schema() AS schema').get<{ schema: string }>())!.schema
         for (const playerCount of [2, 3, 4, 5, 6]) {
           const session = new GameSession(56125, undefined, {
             playerCount, enableParentCards: mode !== 'disabled', draftParents: false,
             parentSelectionSeed: 9002, enableThroughTheSeasons: mode === 'parents-seasons-moor',
             enableFarmersOfTheMoor: mode === 'parents-seasons-moor', allowIncompleteFarmersOfTheMoorMinorDeal: true,
           })
-          for (const player of session.state.players) {
-            player.minorHand = player.occupationHand = ['__test_placeholder__']
-          }
+          for (const player of session.state.players) player.minorHand = player.occupationHand = ['__test_placeholder__']
           if (mode === 'missing-father') session.state.players[0]!.parentCards.father = null
           const json = JSON.stringify(serializeSessionSnapshot(session.state, session))
           const body = format === 'compressed' ? encodeRoomBody(json) : json
           if (format === 'compressed') expect(JSON.parse(body).roomBodyEncoding).toBe('gzip-base64-v1')
-          db.prepare('INSERT INTO rooms VALUES (?, ?)').run(`dev${playerCount}`, body)
+          await db.prepare("INSERT INTO rooms(id,state_json,max_players,status,version,custom_card_ids,created_at,updated_at) VALUES(?,?,?,'playing',0,'[]',1,1)").run(`dev${playerCount}`, body, playerCount)
+          session.dispose()
         }
-        const before = db.prepare('SELECT * FROM rooms ORDER BY id').all()
+        const before = await db.prepare('SELECT * FROM rooms ORDER BY id').all()
         for (let attempt = 0; attempt < 2; attempt++) {
-          const result = spawnSync('bash', [join(root, 'restart-local.sh'), '--players', '2', '--parents', ...(mode === 'parents-seasons-moor' ? ['--seasons', '--moor'] : [])], {
-            cwd: root, input: '', encoding: 'utf8', timeout: 15_000,
-            env: {
-              ...process.env, PATH: `${bin}:${process.env.PATH}`, PNPM_BIN: join(bin, 'pnpm'),
-              DB_PATH: dbPath, SHARED_DATA_DIR: root, SHARED_OUTPUT_DIR: root,
-              REPLAY_VIEWER_BUILD_ID: 'test-viewer', GAME_BUILD_ID: 'test-game',
-            },
+          const result = spawnSync(process.execPath, ['--import', 'tsx', 'scripts/local-rooms.ts', 'missing-variant', 'direct-parents'], {
+            cwd: resolve(import.meta.dirname, '../..'), encoding: 'utf8', timeout: 15000,
+            env: { ...process.env, DATABASE_URL: getTestDatabaseUrl(), DATABASE_SCHEMA: schema },
           })
-          expect(result.error).toBeUndefined()
-          if (mode === 'disabled' || mode === 'missing-father') {
-            expect(result.status).toBe(1)
-            expect(result.stdout).toContain('not Parent Cards games: dev2, dev3, dev4, dev5, dev6')
-            expect(result.stdout).toContain('Aborted.')
-            expect(result.stdout).not.toContain('Starting backend')
-          } else {
-            expect(result.stdout).not.toContain('Reset required')
-            expect(result.stdout).toContain('Starting backend')
-            expect(result.stdout).toContain('backend exited before binding')
-          }
-          expect(db.prepare('SELECT * FROM rooms ORDER BY id').all()).toEqual(before)
+          expect(result.status, result.stderr).toBe(0)
+          expect(result.stdout.trim()).toBe(mode === 'disabled' || mode === 'missing-father' ? 'dev2, dev3, dev4, dev5, dev6' : '')
+          expect(await db.prepare('SELECT * FROM rooms ORDER BY id').all()).toEqual(before)
         }
-      } finally {
-        db.close()
-      }
+      } finally { await db.close() }
     },
   )
 })
@@ -176,23 +148,11 @@ describe.skipIf(process.platform !== 'linux')('restart-local saved interaction r
   it('preserves a current Parents choice through two real restarts and resumes by public command', async () => {
     const root = mkdtempSync(join(tmpdir(), 'oa-restart-live-'))
     tempDirs.push(root)
-    const backendPort = await reservePort()
-    const frontendPort = await reservePort()
-    const env = {
-      ...process.env,
-      BACKEND_PORT: String(backendPort),
-      FRONTEND_PORT: String(frontendPort),
-      DB_DIR: root,
-      DB_PATH: join(root, 'rooms.db'),
-      SHARED_DATA_DIR: root,
-      SHARED_OUTPUT_DIR: root,
-      PERSISTED_ROOMS_DIR: join(root, 'rooms'),
-      BACKEND_LOG: join(root, 'backend.log'),
-      FRONTEND_LOG: join(root, 'frontend.log'),
-      REPLAY_VIEWER_BUILD_ID: 'test-viewer',
-      GAME_BUILD_ID: 'test-game',
-      REPLAY_NEW_ROOMS_ENABLED: 'false',
-    }
+    const repository = resolve(import.meta.dirname, '../..')
+    execFileSync(process.execPath, ['--import', 'tsx', 'scripts/test-environment.ts', 'create', root], { cwd: repository })
+    const isolated = parseEnv(readFileSync(join(root, 'test.env'), 'utf8'))
+    const backendPort = Number(isolated.BACKEND_PORT), frontendPort = Number(isolated.FRONTEND_PORT)
+    const env = { ...process.env, ...isolated, GAME_BUILD_ID: 'test-game', SHARED_OUTPUT_DIR: root }
     const restart = (...args: string[]) => spawnSync('bash', [scriptPath, ...args], {
       cwd: resolve(import.meta.dirname, '../..'),
       encoding: 'utf8',
@@ -201,9 +161,13 @@ describe.skipIf(process.platform !== 'linux')('restart-local saved interaction r
       env,
     })
     const connect = async () => {
-      const ws = new WebSocket(`ws://127.0.0.1:${backendPort}/ws`, {
+      const located = await fetch(`http://127.0.0.1:${backendPort}/api/rooms/locate`, { method: 'POST', headers: { 'content-type': 'application/json', origin: `http://127.0.0.1:${frontendPort}` }, body: JSON.stringify({ roomId: 'dev2' }) })
+      const route = await located.json() as { wsPath: string }
+      const ws = new WebSocket(`ws://127.0.0.1:${backendPort}${route.wsPath}`, {
         origin: `http://127.0.0.1:${frontendPort}`,
       })
+      Object.assign(ws, { received: [] })
+      ws.on('message', raw => (ws as WebSocket & { received: ServerEvent[] }).received.push(JSON.parse(raw.toString())))
       await once(ws, 'open')
       await sendWsCommand(ws, { type: 'joinRoom', roomId: 'dev2', requestedPlayerIndex: 0 })
       return ws
@@ -279,6 +243,7 @@ describe.skipIf(process.platform !== 'linux')('restart-local saved interaction r
       await close(ws!)
     } finally {
       restart('--kill-only')
+      execFileSync(process.execPath, ['--import', 'tsx', 'scripts/test-environment.ts', 'cleanup', root], { cwd: repository })
     }
   }, 180_000)
 })
@@ -325,6 +290,7 @@ TEST_STUBBORN=1 node "$TEST_SERVER" &
 wait
 `)
     writeExecutable(join(nodeBin, 'tsx'), `#!/bin/bash
+case "$*" in *local-rooms.ts*) exit 0 ;; esac
 echo "$$" > "$TEST_NEW_GROUP_FILE"
 node "$TEST_SERVER" &
 wait

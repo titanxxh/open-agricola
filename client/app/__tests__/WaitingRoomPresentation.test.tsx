@@ -66,6 +66,15 @@ class WaitingRoomWebSocket {
 
   send(raw: string) {
     const message = JSON.parse(raw) as Record<string, unknown>
+    if (message.type === 'getCommandScope') {
+      queueMicrotask(() => {
+        const event = new MessageEvent('message', { data: JSON.stringify({ type: 'commandScope',
+          scope: { scopeId: '01800000-0000-4000-8000-000000000001', expiresAt: Date.now() + 86400000 } }) })
+        this.onmessage?.(event)
+        this.messageListeners.forEach(listener => listener(event))
+      })
+      return
+    }
     WaitingRoomWebSocket.sent.push(message)
     if (message.type === 'joinRoom') {
       queueMicrotask(() => {
@@ -73,13 +82,14 @@ class WaitingRoomWebSocket {
         WaitingRoomWebSocket.emit({
           type: 'roomJoined',
           roomId: 'room-1',
-          playerIndex: 0,
+          playerIndex: typeof message.requestedPlayerIndex === 'number' ? message.requestedPlayerIndex : 0,
           status: WaitingRoomWebSocket.joinStatus,
           players: playing
             ? [{ playerIndex: 0, name: 'Host' }, { playerIndex: 1, name: 'Guest' }]
             : [{ playerIndex: 0, name: 'Host' }],
           maxPlayers: playing ? 2 : 4,
         })
+        if (playing) WaitingRoomWebSocket.emit({ type: 'stateUpdate', roomId: 'room-1', version: 1, sync: 'snapshot', cause: 'reconnect', payload: WaitingRoomWebSocket.statePayload, emittedAt: Date.now() })
       })
       return
     }
@@ -138,6 +148,15 @@ class JoinErrorWebSocket {
 
   send(raw: string) {
     const message = JSON.parse(raw) as Record<string, unknown>
+    if (message.type === 'getCommandScope') {
+      queueMicrotask(() => {
+        const event = new MessageEvent('message', { data: JSON.stringify({ type: 'commandScope',
+          scope: { scopeId: '01800000-0000-4000-8000-000000000001', expiresAt: Date.now() + 86400000 } }) })
+        this.onmessage?.(event)
+        this.messageListeners.forEach(listener => listener(event))
+      })
+      return
+    }
     if (message.type !== 'joinRoom') return
     queueMicrotask(() => {
       const event = new MessageEvent('message', {
@@ -179,6 +198,7 @@ function AuthenticatedGame() {
 afterEach(() => {
   cleanup()
   window.localStorage.clear()
+  window.sessionStorage.clear()
   window.history.replaceState(null, '', '/')
   WaitingRoomWebSocket.sent = []
   WaitingRoomWebSocket.joinStatus = 'waiting'
@@ -204,6 +224,7 @@ describe('waiting room presentation', () => {
     vi.stubGlobal('fetch', vi.fn(async () =>
       new Response(JSON.stringify({
         ok: true,
+        wsPath: '/nodes/presentation-test/ws',
         user: { id: 'u1', username: 'host', displayName: 'Host' },
       })),
     ))
@@ -230,6 +251,7 @@ describe('waiting room presentation', () => {
     vi.stubGlobal('fetch', vi.fn(async () =>
       new Response(JSON.stringify({
         ok: true,
+        wsPath: '/nodes/presentation-test/ws',
         user: { id: 'u1', username: 'host', displayName: 'Host' },
       })),
     ))
@@ -261,6 +283,7 @@ describe('waiting room presentation', () => {
     vi.stubGlobal('fetch', vi.fn(async () =>
       new Response(JSON.stringify({
         ok: true,
+        wsPath: '/nodes/presentation-test/ws',
         user: { id: 'u1', username: 'host', displayName: 'Host' },
       })),
     ))
@@ -333,6 +356,7 @@ describe('waiting room presentation', () => {
     vi.stubGlobal('fetch', vi.fn(async () =>
       new Response(JSON.stringify({
         ok: true,
+        wsPath: '/nodes/presentation-test/ws',
         user: { id: 'u1', username: 'host', displayName: 'Host' },
       })),
     ))
@@ -364,6 +388,7 @@ describe('waiting room presentation', () => {
     vi.stubGlobal('fetch', vi.fn(async () =>
       new Response(JSON.stringify({
         ok: true,
+        wsPath: '/nodes/presentation-test/ws',
         user: { id: 'u1', username: 'host', displayName: 'Host' },
       })),
     ))
@@ -392,6 +417,7 @@ describe('waiting room presentation', () => {
     vi.stubGlobal('fetch', vi.fn(async () =>
       new Response(JSON.stringify({
         ok: true,
+        wsPath: '/nodes/presentation-test/ws',
         user: { id: 'u1', username: 'host', displayName: 'Host' },
       })),
     ))
@@ -425,6 +451,7 @@ describe('waiting room presentation', () => {
     vi.stubGlobal('fetch', vi.fn(async () =>
       new Response(JSON.stringify({
         ok: true,
+        wsPath: '/nodes/presentation-test/ws',
         user: { id: 'u1', username: 'host', displayName: 'Host' },
       })),
     ))
@@ -454,6 +481,7 @@ describe('waiting room presentation', () => {
     vi.stubGlobal('fetch', vi.fn(async () =>
       new Response(JSON.stringify({
         ok: true,
+        wsPath: '/nodes/presentation-test/ws',
         user: { id: 'u1', username: 'host', displayName: 'Host' },
       })),
     ))
@@ -481,6 +509,7 @@ describe('waiting room presentation', () => {
     vi.stubGlobal('fetch', vi.fn(async () =>
       new Response(JSON.stringify({
         ok: true,
+        wsPath: '/nodes/presentation-test/ws',
         user: { id: 'u1', username: 'host', displayName: 'Host' },
       })),
     ))

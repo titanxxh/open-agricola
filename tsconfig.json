@@ -1,10 +1,23 @@
 {
   "files": [],
   "references": [
-    { "path": "./tsconfig.app.json" },
-    { "path": "./replay-viewer/tsconfig.json" },
-    { "path": "./tsconfig.node.json" },
-    { "path": "./tsconfig.server.json" },
-    { "path": "./tsconfig.tests.json" }
+    {
+      "path": "./tsconfig.app.json"
+    },
+    {
+      "path": "./replay-viewer/tsconfig.json"
+    },
+    {
+      "path": "./tsconfig.node.json"
+    },
+    {
+      "path": "./tsconfig.server.json"
+    },
+    {
+      "path": "./tsconfig.tests.json"
+    },
+    {
+      "path": "./tsconfig.storage-tools.json"
+    }
   ]
 }

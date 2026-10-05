@@ -121,7 +121,7 @@ describe('Room history name presentation', () => {
     const players = seats(['Room actor', 'Room recipient'])
     const room: Room = { id: 'names', session, players, maxPlayers: 2, version: 1, status: 'playing', hotseat: true }
     const project = vi.spyOn(historyNames, 'projectHistoryLogNames')
-    const broadcaster = new Broadcaster({ checkpoint: {} as never })
+    const broadcaster = new Broadcaster()
     broadcaster.broadcastCommitted(room, session.getState(), 'action')
     const sent = vi.mocked(players[0]!.ws.send).mock.calls[0]![0]
     const payload = JSON.parse(String(sent)).payload

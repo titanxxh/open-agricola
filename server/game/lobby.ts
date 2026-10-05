@@ -1,3 +1,5 @@
+import type { RoomWriteOptions } from './persistence/room-persistence'
+import { enqueueRoomTask } from './room-queue.ts'
 import type { RoomSummary, ServerEvent } from '../../shared/contract/protocol/ws.ts'
 import type { RoomPersistenceCheckpoint } from './room-persistence-checkpoint.ts'
 import { RoomRegistry } from './room-registry.ts'
@@ -8,72 +10,65 @@ import {
 } from './room.ts'
 
 export type RoomBroadcaster = {
-  broadcastEvent(room: Room, event: ServerEvent): void
+  broadcastEvent(room: Room, event: ServerEvent): void | Promise<void>
 }
 
 export type Lobby = {
   getRooms(limit?: number): RoomSummary[]
-  dissolveRoomById(roomId: string, userId: string | undefined): { ok: boolean; error?: string }
-  endRoomsForUser(userId: string, affectedRoomIds?: readonly string[]): { endedRoomIds: string[] }
-  endRoomsUsingCard(cardDbId: string): { endedRoomIds: string[] }
+  dissolveRoomById(roomId: string, userId: string | undefined, options?: RoomWriteOptions): Promise<{ ok: boolean; error?: string }>
+  endRoomsForUser(userId: string, affectedRoomIds?: readonly string[]): Promise<{ endedRoomIds: string[] }>
+  endRoomsUsingCard(cardDbId: string): Promise<{ endedRoomIds: string[] }>
 }
 
 export function createLobby(deps: {
   registry: RoomRegistry
   checkpoint: RoomPersistenceCheckpoint
   broadcaster: RoomBroadcaster
-  onRoomRetired?: (roomId: string) => void
+  onRoomRetired?: (roomId: string) => void | Promise<void>
 }): Lobby {
   const { registry, checkpoint, broadcaster, onRoomRetired } = deps
+  const retire = async (room: Room, reason?: 'card_takedown', options?: RoomWriteOptions): Promise<void> => {
+    await checkpoint.discardRoom(room.id, { owner: room.owner, expectedVersion: room.version, ...options })
+    await onRoomRetired?.(room.id)
+    const players = room.players
+    await broadcaster.broadcastEvent(room, { type: 'roomDissolved', roomId: room.id, ...(reason ? { reason } : {}) })
+    room.players = []
+    registry.delete(room.id)
+    registry.clearActivity(room.id)
+    for (const player of players) {
+      try { player.ws.close() } catch { /* transport already closed */ }
+    }
+  }
   return {
     getRooms(limit?: number) {
       return summarizeRoomsForLobby(registry.iter(), limit)
     },
-    dissolveRoomById(roomId, userId) {
+    async dissolveRoomById(roomId, userId, options) {
       const room = registry.get(roomId)
       if (!room) return { ok: false, error: 'room not found' }
-      if (isDevRoom(room.id)) return { ok: false, error: 'cannot dissolve dev room' }
-      if (room.createdBy !== userId) return { ok: false, error: 'only the room creator can dissolve' }
-      broadcaster.broadcastEvent(room, { type: 'roomDissolved', roomId: room.id })
-      for (const p of room.players) {
-        try { p.ws.close() } catch { }
-      }
-      registry.delete(roomId)
-      registry.clearActivity(roomId)
-      checkpoint.discardRoom(roomId)
-      onRoomRetired?.(roomId)
-      return { ok: true }
+      return enqueueRoomTask(room, async () => {
+        if (!registry.has(roomId)) return { ok: false, error: 'room not found' }
+        if (isDevRoom(room.id)) return { ok: false, error: 'cannot dissolve dev room' }
+        if (room.createdBy !== userId) return { ok: false, error: 'only the room creator can dissolve' }
+        await retire(room, undefined, options)
+        return { ok: true }
+      })
     },
-    endRoomsUsingCard(cardDbId) {
+    async endRoomsUsingCard(cardDbId) {
       // Admin kill switch (#641): terminate every running game that embeds
       // the card. Dev rooms are not spared — the whole point is that the
       // card's code must stop executing.
       const endedRoomIds: string[] = []
       for (const room of [...registry.iter()]) {
         if (!room.customCardDbIds?.includes(cardDbId)) continue
-        broadcaster.broadcastEvent(room, {
-          type: 'roomDissolved',
-          roomId: room.id,
-          reason: 'card_takedown',
+        await enqueueRoomTask(room, async () => {
+          if (registry.has(room.id)) await retire(room, 'card_takedown')
         })
-        // Retire the seats synchronously BEFORE closing: a client command
-        // already buffered on the socket could otherwise dispatch against
-        // this room (requireRoom checks room.players) and execute the
-        // taken-down card code one more time.
-        const players = [...room.players]
-        room.players = []
-        for (const p of players) {
-          try { p.ws.close() } catch { /* ignore close errors */ }
-        }
-        registry.delete(room.id)
-        registry.clearActivity(room.id)
-        checkpoint.discardRoom(room.id)
-        onRoomRetired?.(room.id)
         endedRoomIds.push(room.id)
       }
       return { endedRoomIds }
     },
-    endRoomsForUser(userId, affectedRoomIds = []) {
+    async endRoomsForUser(userId, affectedRoomIds = []) {
       const endedRoomIds: string[] = []
       const affected = new Set(affectedRoomIds)
       for (const room of [...registry.iter()]) {
@@ -83,14 +78,9 @@ export function createLobby(deps: {
           room.players.some((player) => player.userId === userId) ||
           room.seatOwners?.some((owner) => owner.userId === userId)
         if (!belongsToUser) continue
-        broadcaster.broadcastEvent(room, { type: 'roomDissolved', roomId: room.id })
-        for (const p of room.players) {
-          try { p.ws.close() } catch { /* ignore close errors */ }
-        }
-        registry.delete(room.id)
-        registry.clearActivity(room.id)
-        checkpoint.discardRoom(room.id)
-        onRoomRetired?.(room.id)
+        await enqueueRoomTask(room, async () => {
+          if (registry.has(room.id)) await retire(room)
+        })
         endedRoomIds.push(room.id)
       }
       return { endedRoomIds }

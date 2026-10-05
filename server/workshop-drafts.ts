@@ -1,4 +1,4 @@
-import type Database from 'better-sqlite3'
+import type { PostgresDatabase as Database } from './database/postgres'
 import { createHash } from 'node:crypto'
 import { nanoid } from 'nanoid'
 import type {
@@ -116,20 +116,20 @@ const parseRecord = (raw: string | null): Record<string, unknown> => {
     : {}
 }
 
-export const hasReservedCardId = (
-  db: Database.Database,
+export const hasReservedCardId = async (
+  db: Database,
   cardId: string,
   excludedCardId = '',
-): boolean => {
-  if (db.prepare(
+): Promise<Awaited<boolean>> => {
+  if ((await db.prepare(
     'SELECT 1 FROM workshop_cards WHERE card_id = ? AND id != ?',
-  ).get(cardId, excludedCardId)) return true
-  const approvedVersions = db.prepare(`
+  ).get(cardId, excludedCardId))) return true
+  const approvedVersions = (await db.prepare(`
     SELECT version.card_json
     FROM workshop_cards card
     JOIN workshop_card_versions version ON version.id = card.approved_version_id
     WHERE card.review_status IN ('approved', 'merged') AND card.id != ?
-  `).all(excludedCardId) as Array<{ card_json: string }>
+  `).all(excludedCardId)) as Array<{ card_json: string }>
   return approvedVersions.some(
     version => parseRecord(version.card_json).id === cardId,
   )
@@ -335,31 +335,32 @@ const normaliseDraftNames = (draft: WorkshopDraft): WorkshopDraft => ({
   },
 })
 
-export function loadWorkspace(
-  db: Database.Database,
+export async function loadWorkspace(
+  db: Database,
   cardId: string,
   authorId: string,
-): WorkshopWorkspace {
-  const row = db.prepare('SELECT * FROM workshop_cards WHERE id = ?').get(cardId) as WorkshopCardRow | undefined
+): Promise<Awaited<WorkshopWorkspace>> {
+  const row = (await db.prepare('SELECT * FROM workshop_cards WHERE id = ? FOR UPDATE').get(cardId)) as WorkshopCardRow | undefined
   if (!row) throw new WorkshopDraftError('not_found', 'Card not found')
   if (row.author_id !== authorId) throw new WorkshopDraftError('forbidden', 'Forbidden')
   return rowToWorkspace(row)
 }
 
-export function createCard(
-  db: Database.Database,
+export async function createCard(
+  db: Database,
   input: { authorId: string; draft: WorkshopDraft },
-): WorkshopWorkspace {
+): Promise<Awaited<WorkshopWorkspace>> {
   const draft = normaliseDraftNames(input.draft)
   validateDraft(draft)
-  return db.transaction(() => {
-    if (hasReservedCardId(db, draft.cardId)) {
+  return (await db.transaction(async () => {
+    await db.prepare('SELECT pg_advisory_xact_lock(hashtextextended(?, 964))').get(draft.cardId)
+    if ((await hasReservedCardId(db, draft.cardId))) {
       throw new WorkshopDraftError('conflict', 'Card id already exists')
     }
     const id = nanoid()
     const now = Date.now()
     const serialised = serialiseDraft(draft)
-    db.prepare(`
+    ;(await db.prepare(`
       INSERT INTO workshop_cards (
         id, author_id, card_id, card_type, name, description,
         card_json, code_manifest, art_url, art_prompt,
@@ -379,24 +380,24 @@ export function createCard(
       serialised.generation,
       now,
       now,
-    )
-    return loadWorkspace(db, id, input.authorId)
-  })()
+    ))
+    return (await loadWorkspace(db, id, input.authorId))
+  })())
 }
 
-export function checkpointDraft(
-  db: Database.Database,
+export async function checkpointDraft(
+  db: Database,
   input: {
     cardId: string
     authorId: string
     baseRevision: number
     draft: WorkshopDraft
   },
-): WorkshopWorkspace {
+): Promise<Awaited<WorkshopWorkspace>> {
   const draft = normaliseDraftNames(input.draft)
   validateDraft(draft)
-  return db.transaction(() => {
-    const current = loadWorkspace(db, input.cardId, input.authorId)
+  return (await db.transaction(async () => {
+    const current = (await loadWorkspace(db, input.cardId, input.authorId))
     if (current.reviewStatus === 'merged') {
       throw new WorkshopDraftError(
         'conflict',
@@ -414,13 +415,14 @@ export function checkpointDraft(
     if (current.revision !== input.baseRevision) {
       throw new WorkshopDraftError('conflict', 'Draft revision conflict', current)
     }
-    if (hasReservedCardId(db, draft.cardId, input.cardId)) {
+    await db.prepare('SELECT pg_advisory_xact_lock(hashtextextended(?, 964))').get(draft.cardId)
+    if ((await hasReservedCardId(db, draft.cardId, input.cardId))) {
       throw new WorkshopDraftError('conflict', 'Card id already exists', current)
     }
 
     const serialised = serialiseDraft(draft)
     const keepSandboxPass = contentHash(current.draft) === contentHash(draft)
-    db.prepare(`
+    ;(await db.prepare(`
       UPDATE workshop_cards SET
         card_id = ?,
         card_type = ?,
@@ -448,11 +450,11 @@ export function checkpointDraft(
       keepSandboxPass ? current.sandboxPassedAt : null,
       Date.now(),
       input.cardId,
-    )
+    ))
     // Editing the content of an approved card voids the approval (#628):
     // the pinned snapshot no longer matches what the author intends to ship.
     if (current.reviewStatus === 'approved' && !keepSandboxPass) {
-      db.prepare(`
+      ;(await db.prepare(`
         UPDATE workshop_cards
         SET review_status = 'stale',
             approved_commit_sha = NULL,
@@ -460,33 +462,33 @@ export function checkpointDraft(
             approved_at = NULL,
             approved_version_id = NULL
         WHERE id = ?
-      `).run(input.cardId)
+      `).run(input.cardId))
     }
-    return loadWorkspace(db, input.cardId, input.authorId)
-  })()
+    return (await loadWorkspace(db, input.cardId, input.authorId))
+  })())
 }
 
-const ensureVersion = (
-  db: Database.Database,
+const ensureVersion = async (
+  db: Database,
   workspace: WorkshopWorkspace,
-): string => {
+): Promise<Awaited<string>> => {
   const hash = contentHash(workspace.draft)
-  const existing = db.prepare(`
+  const existing = (await db.prepare(`
     SELECT id FROM workshop_card_versions WHERE card_id = ? AND content_hash = ?
-  `).get(workspace.id, hash) as { id: string } | undefined
+  `).get(workspace.id, hash)) as { id: string } | undefined
   if (existing) return existing.id
 
-  const versionNumber = (db.prepare(`
+  const versionNumber = ((await db.prepare(`
     SELECT COALESCE(MAX(version_number), 0) + 1 AS value
     FROM workshop_card_versions WHERE card_id = ?
-  `).get(workspace.id) as { value: number }).value
+  `).get(workspace.id)) as { value: number }).value
   const id = nanoid()
   const cardJson = JSON.stringify(versionCardJson(workspace.draft))
   const codeManifest = workspace.draft.codeManifest
     ? JSON.stringify(workspace.draft.codeManifest)
     : null
   const provenance = JSON.stringify(versionProvenance(workspace.draft.generation))
-  db.prepare(`
+  ;(await db.prepare(`
     INSERT INTO workshop_card_versions (
       id, card_id, card_json, code_manifest, art_url, version_number,
       created_by, created_at, content_hash, provenance_json
@@ -502,8 +504,8 @@ const ensureVersion = (
     Date.now(),
     hash,
     provenance,
-  )
-  db.prepare(`
+  ))
+  ;(await db.prepare(`
     DELETE FROM workshop_card_versions
     WHERE card_id = @cardId
       AND id NOT IN (
@@ -521,12 +523,12 @@ const ensureVersion = (
             sandbox_pass_version_id
           )
       )
-  `).run({ cardId: workspace.id })
+  `).run({ cardId: workspace.id }))
   return id
 }
 
-export function adoptCandidate(
-  db: Database.Database,
+export async function adoptCandidate(
+  db: Database,
   input: {
     cardId: string
     authorId: string
@@ -534,9 +536,9 @@ export function adoptCandidate(
     candidate: WorkshopCandidate
     artInputs?: { subject: string }
   },
-): { workspace: WorkshopWorkspace; versionId: string } {
-  return db.transaction(() => {
-    const current = loadWorkspace(db, input.cardId, input.authorId)
+): Promise<Awaited<{ workspace: WorkshopWorkspace; versionId: string }>> {
+  return (await db.transaction(async () => {
+    const current = (await loadWorkspace(db, input.cardId, input.authorId))
     if (current.revision !== input.baseRevision) {
       throw new WorkshopDraftError('conflict', 'Draft revision conflict', current)
     }
@@ -611,14 +613,14 @@ export function adoptCandidate(
         generation,
       }
     }
-    const workspace = checkpointDraft(db, {
+    const workspace = (await checkpointDraft(db, {
       cardId: input.cardId,
       authorId: input.authorId,
       baseRevision: input.baseRevision,
       draft,
-    })
-    return { workspace, versionId: ensureVersion(db, workspace) }
-  })()
+    }))
+    return { workspace, versionId: (await ensureVersion(db, workspace)) }
+  })())
 }
 
 const staticValidation = (
@@ -667,16 +669,16 @@ const handoffValidation = (
   return { valid: errors.length === 0, errors }
 }
 
-const loadVersion = (
-  db: Database.Database,
+const loadVersion = async (
+  db: Database,
   cardId: string,
   versionId: string,
-): WorkshopVersionRow => {
-  const version = db.prepare(`
+): Promise<Awaited<WorkshopVersionRow>> => {
+  const version = (await db.prepare(`
     SELECT id, card_id, card_json, code_manifest, art_url, content_hash, provenance_json
     FROM workshop_card_versions
     WHERE id = ? AND card_id = ?
-  `).get(versionId, cardId) as WorkshopVersionRow | undefined
+  `).get(versionId, cardId)) as WorkshopVersionRow | undefined
   if (!version) throw new WorkshopDraftError('not_found', 'Version not found')
   return version
 }
@@ -716,57 +718,57 @@ const draftFromVersion = (
   }
 }
 
-export function loadSandboxVersion(
-  db: Database.Database,
+export async function loadSandboxVersion(
+  db: Database,
   input: {
     cardId: string
     authorId: string
     versionId: string
   },
-): WorkshopDraft {
-  const current = loadWorkspace(db, input.cardId, input.authorId)
-  return draftFromVersion(current, loadVersion(db, input.cardId, input.versionId))
+): Promise<Awaited<WorkshopDraft>> {
+  const current = (await loadWorkspace(db, input.cardId, input.authorId))
+  return draftFromVersion(current, (await loadVersion(db, input.cardId, input.versionId)))
 }
 
-export function loadLiveDraft(
-  db: Database.Database,
+export async function loadLiveDraft(
+  db: Database,
   cardId: string,
-): WorkshopDraft {
-  const row = db.prepare(`
+): Promise<Awaited<WorkshopDraft>> {
+  const row = (await db.prepare(`
     SELECT * FROM workshop_cards
     WHERE id = ? AND live = 1 AND approved_version_id IS NOT NULL
       AND (review_status = 'approved' OR (review_status = 'merged' AND built_in = 0))
-  `).get(cardId) as WorkshopCardRow | undefined
+  `).get(cardId)) as WorkshopCardRow | undefined
   if (!row) throw new WorkshopDraftError('not_found', 'Card not found')
   const current = rowToWorkspace(row)
   return draftFromVersion(
     current,
-    loadVersion(db, cardId, current.approvedVersionId!),
+    (await loadVersion(db, cardId, current.approvedVersionId!)),
   )
 }
 
-export function restoreVersion(
-  db: Database.Database,
+export async function restoreVersion(
+  db: Database,
   input: {
     cardId: string
     authorId: string
     baseRevision: number
     versionId: string
   },
-): WorkshopWorkspace {
-  return db.transaction(() => {
-    const current = loadWorkspace(db, input.cardId, input.authorId)
+): Promise<Awaited<WorkshopWorkspace>> {
+  return (await db.transaction(async () => {
+    const current = (await loadWorkspace(db, input.cardId, input.authorId))
     if (current.revision !== input.baseRevision) {
       throw new WorkshopDraftError('conflict', 'Draft revision conflict', current)
     }
-    const version = loadVersion(db, input.cardId, input.versionId)
-    return checkpointDraft(db, {
+    const version = (await loadVersion(db, input.cardId, input.versionId))
+    return (await checkpointDraft(db, {
       cardId: input.cardId,
       authorId: input.authorId,
       baseRevision: input.baseRevision,
       draft: draftFromVersion(current, version),
-    })
-  })()
+    }))
+  })())
 }
 
 /**
@@ -775,8 +777,8 @@ export function restoreVersion(
  * submit-review handler after the PR is created or its branch updated.
  * Re-submitting while already in_review is the "update the PR" path.
  */
-export function enterReview(
-  db: Database.Database,
+export async function enterReview(
+  db: Database,
   input: {
     cardId: string
     authorId: string
@@ -790,9 +792,10 @@ export function enterReview(
      */
     expectedRevision: number
   },
-): WorkshopWorkspace {
-  return db.transaction(() => {
-    const current = loadWorkspace(db, input.cardId, input.authorId)
+): Promise<Awaited<WorkshopWorkspace>> {
+  return (await db.transaction(async () => {
+    await db.prepare('SELECT pg_advisory_xact_lock(hashtextextended(?, 965))').get(input.prUrl)
+    const current = (await loadWorkspace(db, input.cardId, input.authorId))
     if (current.revision !== input.expectedRevision) {
       throw new WorkshopDraftError(
         'conflict',
@@ -807,21 +810,21 @@ export function enterReview(
         current,
       )
     }
-    if (db.prepare(`
+    if ((await db.prepare(`
       SELECT 1 FROM workshop_cards
       WHERE github_pr_url = ?
         AND id != ?
         AND review_status IN ('approved', 'merged')
-    `).get(input.prUrl, current.id)) {
+    `).get(input.prUrl, current.id))) {
       throw new WorkshopDraftError(
         'conflict',
         'PR is already bound to an approved card',
         current,
       )
     }
-    const reviewVersionId = input.commitSha ? ensureVersion(db, current) : null
+    const reviewVersionId = input.commitSha ? (await ensureVersion(db, current)) : null
     const now = Date.now()
-    db.prepare(`
+    ;(await db.prepare(`
       UPDATE workshop_cards
       SET review_status = CASE
             WHEN review_status = 'in_review' THEN 'stale'
@@ -833,10 +836,10 @@ export function enterReview(
           github_pr_last_synced_at = NULL,
           review_commit_sha = NULL,
           review_version_id = NULL,
-          updated_at = MAX(updated_at + 1, ?)
+          updated_at = GREATEST(updated_at + 1, ?)
       WHERE github_pr_url = ? AND id != ?
-    `).run(now, input.prUrl, current.id)
-    db.prepare(`
+    `).run(now, input.prUrl, current.id))
+    ;(await db.prepare(`
       UPDATE workshop_cards
       SET review_status = 'in_review',
           github_pr_url = ?,
@@ -844,7 +847,7 @@ export function enterReview(
           github_pr_last_synced_at = ?,
           review_commit_sha = ?,
           review_version_id = ?,
-          updated_at = MAX(updated_at + 1, ?)
+          updated_at = GREATEST(updated_at + 1, ?)
       WHERE id = ?
     `).run(
       input.prUrl,
@@ -853,32 +856,32 @@ export function enterReview(
       reviewVersionId,
       now,
       current.id,
-    )
-    return loadWorkspace(db, current.id, input.authorId)
-  })()
+    ))
+    return (await loadWorkspace(db, current.id, input.authorId))
+  })())
 }
 
-export function approveCurrentDraft(
-  db: Database.Database,
+export async function approveCurrentDraft(
+  db: Database,
   input: {
     cardId: string
     authorId: string
     commitSha?: string
     reviewId?: string
   },
-): { workspace: WorkshopWorkspace; versionId: string } {
-  return db.transaction(() => {
-    const current = loadWorkspace(db, input.cardId, input.authorId)
+): Promise<Awaited<{ workspace: WorkshopWorkspace; versionId: string }>> {
+  return (await db.transaction(async () => {
+    const current = (await loadWorkspace(db, input.cardId, input.authorId))
     const validation = staticValidation(current.draft)
     if (!validation.valid) {
       throw new WorkshopDraftError('not_ready', validation.errors.join('; '), current)
     }
-    if (hasReservedCardId(db, current.draft.cardId, current.id)) {
+    if ((await hasReservedCardId(db, current.draft.cardId, current.id))) {
       throw new WorkshopDraftError('conflict', 'Approved card id already exists', current)
     }
-    const versionId = ensureVersion(db, current)
+    const versionId = (await ensureVersion(db, current))
     const now = Date.now()
-    db.prepare(`
+    ;(await db.prepare(`
       UPDATE workshop_cards
       SET review_status = 'approved',
           approved_version_id = ?,
@@ -887,16 +890,16 @@ export function approveCurrentDraft(
           approved_at = ?,
           updated_at = ?
       WHERE id = ?
-    `).run(versionId, input.commitSha ?? null, input.reviewId ?? null, now, now, current.id)
+    `).run(versionId, input.commitSha ?? null, input.reviewId ?? null, now, now, current.id))
     return {
-      workspace: loadWorkspace(db, current.id, input.authorId),
+      workspace: (await loadWorkspace(db, current.id, input.authorId)),
       versionId,
     }
-  })()
+  })())
 }
 
-export function invalidateReviewedCard(
-  db: Database.Database,
+export async function invalidateReviewedCard(
+  db: Database,
   input: {
     prUrl: string
     prStatus?: string
@@ -911,31 +914,31 @@ export function invalidateReviewedCard(
       updatedAt: number
     }
   },
-): number {
+): Promise<Awaited<number>> {
   const now = Date.now()
   // 'stale' rows are included so a later PR-status change (e.g. the close of
   // an already-demoted retargeted PR) is still recorded on the binding.
   // Without an explicit prStatus the recorded status is preserved: callers
   // that lack a snapshot (fail-closed, approve-validation failures) must not
   // overwrite a persisted 'closed'/'merged' fact with a default.
-  return db.prepare(`
+  return (await db.prepare(`
     UPDATE workshop_cards
     SET review_status = 'stale',
         live = 0,
         github_pr_status = COALESCE(?, github_pr_status),
         github_pr_last_synced_at = ?,
-        updated_at = MAX(updated_at + 1, ?)
+        updated_at = GREATEST(updated_at + 1, ?)
     WHERE github_pr_url = ?
       AND review_status IN ('in_review', 'approved', 'stale')
-      AND (? IS NULL OR review_commit_sha IS NULL OR review_commit_sha <> ?)
+      AND (CAST(? AS text) IS NULL OR review_commit_sha IS NULL OR review_commit_sha <> ?)
       AND (
-        ? IS NULL OR (
+        CAST(? AS text) IS NULL OR (
           id = ?
           AND draft_revision = ?
-          AND approved_commit_sha IS ?
-          AND approved_version_id IS ?
-          AND review_commit_sha IS ?
-          AND review_version_id IS ?
+          AND approved_commit_sha IS NOT DISTINCT FROM ?
+          AND approved_version_id IS NOT DISTINCT FROM ?
+          AND review_commit_sha IS NOT DISTINCT FROM ?
+          AND review_version_id IS NOT DISTINCT FROM ?
           AND updated_at = ?
         )
       )
@@ -954,11 +957,11 @@ export function invalidateReviewedCard(
     input.expectedBinding?.reviewCommitSha ?? null,
     input.expectedBinding?.reviewVersionId ?? null,
     input.expectedBinding?.updatedAt ?? null,
-  ).changes
+  )).changes
 }
 
-export function approveReviewedVersion(
-  db: Database.Database,
+export async function approveReviewedVersion(
+  db: Database,
   input: {
     prUrl: string
     commitSha: string
@@ -970,18 +973,18 @@ export function approveReviewedVersion(
       updatedAt: number
     }
   },
-): number {
-  return db.transaction(() => {
-    const matches = db.prepare(`
+): Promise<Awaited<number>> {
+  return (await db.transaction(async () => {
+    const matches = (await db.prepare(`
       SELECT * FROM workshop_cards
       WHERE github_pr_url = ?
-        AND (? IS NULL OR id = ?)
-      LIMIT 2
+        AND (CAST(? AS text) IS NULL OR id = ?)
+      LIMIT 2 FOR UPDATE
     `).all(
       input.prUrl,
       input.expectedBinding?.id ?? null,
       input.expectedBinding?.id ?? null,
-    ) as WorkshopCardRow[]
+    )) as WorkshopCardRow[]
     if (
       matches.length !== 1
       || !['in_review', 'stale', 'approved'].includes(matches[0]!.review_status)
@@ -996,20 +999,20 @@ export function approveReviewedVersion(
       row.review_commit_sha !== input.commitSha
       || !row.review_version_id
     ) {
-      invalidateReviewedCard(db, { prUrl: input.prUrl })
+      ;(await invalidateReviewedCard(db, { prUrl: input.prUrl }))
       return 0
     }
     const current = rowToWorkspace(row)
-    const reviewedVersion = loadVersion(db, current.id, row.review_version_id)
+    const reviewedVersion = (await loadVersion(db, current.id, row.review_version_id))
     if (
       contentHash(current.draft) !== versionContentHash(reviewedVersion)
-      || hasReservedCardId(db, current.draft.cardId, current.id)
+      || (await hasReservedCardId(db, current.draft.cardId, current.id))
     ) {
-      invalidateReviewedCard(db, { prUrl: input.prUrl })
+      ;(await invalidateReviewedCard(db, { prUrl: input.prUrl }))
       return 0
     }
     const now = Date.now()
-    return db.prepare(`
+    return (await db.prepare(`
       UPDATE workshop_cards
       SET review_status = 'approved',
           approved_version_id = ?,
@@ -1018,7 +1021,7 @@ export function approveReviewedVersion(
           approved_at = ?,
           github_pr_status = 'open',
           github_pr_last_synced_at = ?,
-          updated_at = MAX(updated_at + 1, ?)
+          updated_at = GREATEST(updated_at + 1, ?)
       WHERE id = ?
     `).run(
       row.review_version_id,
@@ -1028,24 +1031,23 @@ export function approveReviewedVersion(
       now,
       now,
       current.id,
-    ).changes
-  })()
+    )).changes
+  })())
 }
 
-export function publish(
-  db: Database.Database,
+export async function publish(
+  db: Database,
   input: {
     cardId: string
     authorId: string
     baseRevision: number
     expectedUpdatedAt?: number
   },
-): { workspace: WorkshopWorkspace; versionId: string } {
-  // Deliberately not wrapped in one transaction: the stale downgrade below
-  // must survive the thrown error (a transaction would roll it back), and the
-  // synchronous better-sqlite3 driver leaves no interleaving window between
-  // the checks and the final live flip.
-  const current = loadWorkspace(db, input.cardId, input.authorId)
+): Promise<Awaited<{ workspace: WorkshopWorkspace; versionId: string }>> {
+  // Hold the card row through validation and publication. Commit a stale
+  // downgrade before reporting its error to preserve the fail-closed state.
+  const outcome = await db.transaction(async () => {
+  const current = (await loadWorkspace(db, input.cardId, input.authorId))
   if (current.revision !== input.baseRevision) {
     throw new WorkshopDraftError('conflict', 'Draft revision conflict', current)
   }
@@ -1056,10 +1058,10 @@ export function publish(
       current,
     )
   }
-  const row = db.prepare(`
+  const row = (await db.prepare(`
     SELECT approved_commit_sha, github_pr_url, updated_at
     FROM workshop_cards WHERE id = ?
-  `).get(current.id) as {
+  `).get(current.id)) as {
     approved_commit_sha: string | null
     github_pr_url: string | null
     updated_at: number
@@ -1076,7 +1078,7 @@ export function publish(
   }
   // Atomic snapshot rule (#629, #638): at the moment the card goes live the
   // approving review's commit, the PR head and the platform-pinned commit
-  // must agree. Direct aggregate callers use the synchronous provider seam;
+  // must agree. Direct aggregate callers use the provider seam;
   // the production HTTP route performs the asynchronous GitHub check first.
   const provider = getReviewDecisionProvider()
   if (provider) {
@@ -1095,7 +1097,7 @@ export function publish(
       && snapshot.approvedCommitSha === snapshot.headCommitSha
       && snapshot.approvedCommitSha === row.approved_commit_sha
     if (!consistent) {
-      db.prepare(`
+      ;(await db.prepare(`
         UPDATE workshop_cards
         SET review_status = 'stale',
             live = 0,
@@ -1103,37 +1105,40 @@ export function publish(
             approved_review_id = NULL,
             approved_at = NULL,
             approved_version_id = NULL,
-            updated_at = MAX(updated_at + 1, ?)
+            updated_at = GREATEST(updated_at + 1, ?)
         WHERE id = ?
-      `).run(Date.now(), current.id)
-      throw new WorkshopDraftError(
+      `).run(Date.now(), current.id))
+      return new WorkshopDraftError(
         'not_ready',
         'Review approval no longer matches the reviewed commit; re-submit for review',
-        loadWorkspace(db, current.id, input.authorId),
+        (await loadWorkspace(db, current.id, input.authorId)),
       )
     }
   }
-  const updated = db.prepare(`
+  const updated = (await db.prepare(`
     UPDATE workshop_cards
-    SET live = 1, updated_at = MAX(updated_at + 1, ?)
-    WHERE id = ? AND (? IS NULL OR updated_at = ?)
+    SET live = 1, updated_at = GREATEST(updated_at + 1, ?)
+    WHERE id = ? AND (CAST(? AS text) IS NULL OR updated_at = ?)
   `).run(
     Date.now(),
     current.id,
     input.expectedUpdatedAt ?? null,
     input.expectedUpdatedAt ?? null,
-  )
+  ))
   if (updated.changes === 0) {
     throw new WorkshopDraftError(
       'conflict',
       'Card state changed while publish validation was in flight',
-      loadWorkspace(db, current.id, input.authorId),
+      (await loadWorkspace(db, current.id, input.authorId)),
     )
   }
   return {
-    workspace: loadWorkspace(db, current.id, input.authorId),
+    workspace: (await loadWorkspace(db, current.id, input.authorId)),
     versionId: current.approvedVersionId,
   }
+  })()
+  if (outcome instanceof WorkshopDraftError) throw outcome
+  return outcome
 }
 
 /**
@@ -1143,16 +1148,16 @@ export function publish(
  * markSandboxPass later verifies the same content hash. (The old self-publish
  * used to play this role before the PR review gate.)
  */
-export function pinCurrentDraftVersion(
-  db: Database.Database,
+export async function pinCurrentDraftVersion(
+  db: Database,
   input: {
     cardId: string
     authorId: string
     baseRevision: number
   },
-): { workspace: WorkshopWorkspace; versionId: string } {
-  return db.transaction(() => {
-    const current = loadWorkspace(db, input.cardId, input.authorId)
+): Promise<Awaited<{ workspace: WorkshopWorkspace; versionId: string }>> {
+  return (await db.transaction(async () => {
+    const current = (await loadWorkspace(db, input.cardId, input.authorId))
     if (current.revision !== input.baseRevision) {
       throw new WorkshopDraftError('conflict', 'Draft revision conflict', current)
     }
@@ -1162,9 +1167,9 @@ export function pinCurrentDraftVersion(
     }
     return {
       workspace: current,
-      versionId: ensureVersion(db, current),
+      versionId: (await ensureVersion(db, current)),
     }
-  })()
+  })())
 }
 
 /**
@@ -1173,16 +1178,16 @@ export function pinCurrentDraftVersion(
  * another review round. Running games keep their embedded snapshot; only new
  * rooms stop offering the card.
  */
-export function unpublish(
-  db: Database.Database,
+export async function unpublish(
+  db: Database,
   input: {
     cardId: string
     authorId: string
     baseRevision: number
   },
-): WorkshopWorkspace {
-  return db.transaction(() => {
-    const current = loadWorkspace(db, input.cardId, input.authorId)
+): Promise<Awaited<WorkshopWorkspace>> {
+  return (await db.transaction(async () => {
+    const current = (await loadWorkspace(db, input.cardId, input.authorId))
     if (current.reviewStatus === 'merged') {
       throw new WorkshopDraftError(
         'conflict',
@@ -1193,13 +1198,13 @@ export function unpublish(
     if (current.revision !== input.baseRevision) {
       throw new WorkshopDraftError('conflict', 'Draft revision conflict', current)
     }
-    db.prepare(`
+    ;(await db.prepare(`
       UPDATE workshop_cards
-      SET live = 0, updated_at = MAX(updated_at + 1, ?)
+      SET live = 0, updated_at = GREATEST(updated_at + 1, ?)
       WHERE id = ?
-    `).run(Date.now(), current.id)
-    return loadWorkspace(db, current.id, input.authorId)
-  })()
+    `).run(Date.now(), current.id))
+    return (await loadWorkspace(db, current.id, input.authorId))
+  })())
 }
 
 /**
@@ -1207,21 +1212,21 @@ export function unpublish(
  * The card enters the read-only 'merged' terminal state; a live card keeps
  * its live flag so the approved snapshot serves through the release window.
  */
-export function markCardMerged(
-  db: Database.Database,
+export async function markCardMerged(
+  db: Database,
   input: { prUrl: string },
-): number {
+): Promise<Awaited<number>> {
   const now = Date.now()
-  return db.prepare(`
+  return (await db.prepare(`
     UPDATE workshop_cards
     SET review_status = 'merged',
         github_pr_status = 'merged',
         github_pr_last_synced_at = ?,
-        updated_at = MAX(updated_at + 1, ?)
+        updated_at = GREATEST(updated_at + 1, ?)
     WHERE github_pr_url = ?
       AND review_status = 'approved'
       AND approved_version_id IS NOT NULL
-  `).run(now, now, input.prUrl).changes
+  `).run(now, now, input.prUrl)).changes
 }
 
 /**
@@ -1229,19 +1234,17 @@ export function markCardMerged(
  * (#642): the merge fact is persisted as github_pr_status='merged'; once the
  * approval lands, the next reconciliation point graduates the card.
  */
-export function reconcilePendingMerges(db: Database.Database): number {
-  const columns = db.pragma('table_info(workshop_cards)') as Array<{ name: string }>
-  if (!columns.some(({ name }) => name === 'review_status')) return 0
-  const rows = db.prepare(`
+export async function reconcilePendingMerges(db: Database): Promise<Awaited<number>> {
+  const rows = (await db.prepare(`
     SELECT github_pr_url FROM workshop_cards
     WHERE github_pr_status = 'merged'
       AND review_status != 'merged'
       AND approved_version_id IS NOT NULL
       AND github_pr_url IS NOT NULL
-  `).all() as Array<{ github_pr_url: string }>
+  `).all()) as Array<{ github_pr_url: string }>
   let graduated = 0
   for (const row of rows) {
-    graduated += markCardMerged(db, { prUrl: row.github_pr_url })
+    graduated += (await markCardMerged(db, { prUrl: row.github_pr_url }))
   }
   return graduated
 }
@@ -1251,18 +1254,14 @@ export function reconcilePendingMerges(db: Database.Database): number {
  * is now present in the built-in registry. From then on rooms use the
  * built-in definition and the workshop snapshot retires (isLoadableLive).
  */
-export function markBuiltInMergedCards(
-  db: Database.Database,
+export async function markBuiltInMergedCards(
+  db: Database,
   builtInCardIds: readonly string[],
-): { flagged: number; unflagged: number } {
-  // Guard in the v25/v26 pragma style: partially-seeded test fixtures may
-  // lack the two-axis columns; real databases always have them post-v26.
-  const columns = db.pragma('table_info(workshop_cards)') as Array<{ name: string }>
-  if (!columns.some(({ name }) => name === 'review_status')) return { flagged: 0, unflagged: 0 }
-  const rows = db.prepare(`
+): Promise<Awaited<{ flagged: number; unflagged: number }>> {
+  const rows = (await db.prepare(`
     SELECT id, card_id, built_in FROM workshop_cards
     WHERE review_status = 'merged'
-  `).all() as Array<{ id: string; card_id: string; built_in: number }>
+  `).all()) as Array<{ id: string; card_id: string; built_in: number }>
   let flagged = 0
   let unflagged = 0
   const now = Date.now()
@@ -1273,9 +1272,9 @@ export function markBuiltInMergedCards(
     // otherwise the card would vanish for the whole rollback window.
     const next = inRegistry ? 1 : 0
     if (row.built_in === next) continue
-    db.prepare(`
-      UPDATE workshop_cards SET built_in = ?, updated_at = MAX(updated_at + 1, ?) WHERE id = ?
-    `).run(next, now, row.id)
+    ;(await db.prepare(`
+      UPDATE workshop_cards SET built_in = ?, updated_at = GREATEST(updated_at + 1, ?) WHERE id = ?
+    `).run(next, now, row.id))
     if (next === 1) flagged += 1
     else unflagged += 1
   }
@@ -1289,32 +1288,32 @@ export function markBuiltInMergedCards(
  * Safe no-op for cards that are neither live nor approved; merged cards only
  * lose the live flag (their review axis belongs to the main repository).
  */
-export function adminTakedownCard(
-  db: Database.Database,
+export async function adminTakedownCard(
+  db: Database,
   cardDbId: string,
-): { reviewStatus: string; live: boolean; removedRoomIds: string[] } {
-  return db.transaction(() => {
-    const row = db.prepare(
-      'SELECT review_status FROM workshop_cards WHERE id = ?',
-    ).get(cardDbId) as { review_status: string } | undefined
+): Promise<Awaited<{ reviewStatus: string; live: boolean; removedRoomIds: string[] }>> {
+  return (await db.transaction(async () => {
+    const row = (await db.prepare(
+      'SELECT review_status FROM workshop_cards WHERE id = ? FOR UPDATE',
+    ).get(cardDbId)) as { review_status: string } | undefined
     if (!row) throw new WorkshopDraftError('not_found', 'Card not found')
     // Atomic with the card invalidation: delete every persisted room row
     // that embeds the card (exact JSON element match — LIKE would treat _
     // in nanoid ids as a wildcard). A crash can then never leave the card
     // taken down but a restorable snapshot alive, or vice versa.
-    const persistedRows = db.prepare(`
+    const persistedRows = (await db.prepare(`
       SELECT id FROM rooms
       WHERE EXISTS (
-        SELECT 1 FROM json_each(rooms.custom_card_ids)
-        WHERE json_each.value = ?
+        SELECT 1 FROM json_array_elements_text(rooms.custom_card_ids::json) AS card(value)
+        WHERE card.value = ?
       )
-    `).all(cardDbId) as Array<{ id: string }>
+    `).all(cardDbId)) as Array<{ id: string }>
     const removedRoomIds = persistedRows.map((r) => r.id)
     for (const roomId of removedRoomIds) {
-      db.prepare('DELETE FROM rooms WHERE id = ?').run(roomId)
+      ;(await db.prepare('DELETE FROM rooms WHERE id = ?').run(roomId))
     }
     if (row.review_status === 'approved') {
-      db.prepare(`
+      ;(await db.prepare(`
         UPDATE workshop_cards
         SET review_status = 'stale',
             live = 0,
@@ -1326,29 +1325,29 @@ export function adminTakedownCard(
             review_version_id = NULL,
             updated_at = ?
         WHERE id = ?
-      `).run(Date.now(), cardDbId)
+      `).run(Date.now(), cardDbId))
     } else {
       // Also sever any surviving review binding: reconcileReviewSnapshot
       // accepts stale rows, so a stale GitHub approval snapshot could
       // otherwise re-approve the card without a fresh review round.
-      db.prepare(`
+      ;(await db.prepare(`
         UPDATE workshop_cards
         SET live = 0,
             review_commit_sha = NULL,
             review_version_id = NULL,
             updated_at = ?
         WHERE id = ?
-      `).run(Date.now(), cardDbId)
+      `).run(Date.now(), cardDbId))
     }
-    const after = db.prepare(
+    const after = (await db.prepare(
       'SELECT review_status, live FROM workshop_cards WHERE id = ?',
-    ).get(cardDbId) as { review_status: string; live: number }
+    ).get(cardDbId)) as { review_status: string; live: number }
     return { reviewStatus: after.review_status, live: after.live === 1, removedRoomIds }
-  })()
+  })())
 }
 
-export function markSandboxPass(
-  db: Database.Database,
+export async function markSandboxPass(
+  db: Database,
   input: {
     cardId: string
     authorId: string
@@ -1356,10 +1355,10 @@ export function markSandboxPass(
     authorConfirmed: boolean
     runtimeErrors: string[]
   },
-): WorkshopWorkspace {
-  return db.transaction(() => {
-    const current = loadWorkspace(db, input.cardId, input.authorId)
-    const version = loadVersion(db, current.id, input.versionId)
+): Promise<Awaited<WorkshopWorkspace>> {
+  return (await db.transaction(async () => {
+    const current = (await loadWorkspace(db, input.cardId, input.authorId))
+    const version = (await loadVersion(db, current.id, input.versionId))
     if (
       !input.authorConfirmed
       || input.runtimeErrors.length > 0
@@ -1367,28 +1366,28 @@ export function markSandboxPass(
     ) {
       throw new WorkshopDraftError('not_ready', 'Sandbox pass must confirm the exact error-free draft version', current)
     }
-    db.prepare(`
+    ;(await db.prepare(`
       UPDATE workshop_cards
       SET sandbox_pass_version_id = ?, sandbox_passed_at = ?, updated_at = ?
       WHERE id = ?
-    `).run(input.versionId, Date.now(), Date.now(), current.id)
-    return loadWorkspace(db, current.id, input.authorId)
-  })()
+    `).run(input.versionId, Date.now(), Date.now(), current.id))
+    return (await loadWorkspace(db, current.id, input.authorId))
+  })())
 }
 
-export function getHandoffReadiness(
-  db: Database.Database,
+export async function getHandoffReadiness(
+  db: Database,
   cardId: string,
   authorId: string,
-): {
+): Promise<Awaited<{
   ready: boolean
   staticValidation: { valid: boolean; errors: string[] }
   sandboxPassedForDraft: boolean
-} {
-  const current = loadWorkspace(db, cardId, authorId)
+}>> {
+  const current = (await loadWorkspace(db, cardId, authorId))
   const validation = handoffValidation(current.draft)
   const sandboxPassedForDraft = current.sandboxPassVersionId !== null
-    && versionContentHash(loadVersion(db, current.id, current.sandboxPassVersionId))
+    && versionContentHash((await loadVersion(db, current.id, current.sandboxPassVersionId)))
       === contentHash(current.draft)
   return {
     ready: validation.valid && sandboxPassedForDraft,
@@ -1397,12 +1396,12 @@ export function getHandoffReadiness(
   }
 }
 
-export function loadPublishedCard(
-  db: Database.Database,
+export async function loadPublishedCard(
+  db: Database,
   cardId: string,
   viewerId?: string,
-): PublishedWorkshopCard {
-  const row = db.prepare(`
+): Promise<Awaited<PublishedWorkshopCard>> {
+  const row = (await db.prepare(`
     SELECT
       card.id,
       card.author_id,
@@ -1431,8 +1430,8 @@ export function loadPublishedCard(
       (card.review_status = 'approved' AND card.live = 1)
       OR card.review_status = 'merged'
     )
-    GROUP BY card.id
-  `).get(cardId) as {
+    GROUP BY card.id, version.id, author.id
+  `).get(cardId)) as {
     id: string
     author_id: string
     author_name: string | null
@@ -1480,7 +1479,7 @@ export function loadPublishedCard(
     live: row.live === 1,
     likeCount: row.like_count,
     likedByMe: viewerId
-      ? Boolean(db.prepare('SELECT 1 FROM card_likes WHERE user_id = ? AND card_id = ?').get(viewerId, row.id))
+      ? Boolean((await db.prepare('SELECT 1 FROM card_likes WHERE user_id = ? AND card_id = ?').get(viewerId, row.id)))
       : false,
     featured: row.featured,
     createdAt: row.created_at,

@@ -1,9 +1,13 @@
+import * as database from '../db'
+import { sendCommand } from './_helpers/command-socket'
+import { createTestDatabase } from './_helpers/postgres'
+import { recordingResources } from './_helpers/recording'
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import WebSocket, { WebSocketServer } from 'ws'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import WebSocket from 'ws'
 import { createWsServer } from '../connection/ws-server.ts'
-import { InMemoryRoomPersistence } from '../game/persistence/memory-adapter.ts'
+import { PostgresRoomPersistence } from '../game/persistence/postgres-adapter.ts'
 import type { ServerEvent } from '../../shared/contract/protocol/ws.ts'
 import type { StateUpdateEnvelope } from '../../shared/contract/protocol/game.ts'
 
@@ -56,14 +60,20 @@ const isReconnectState = (event: ServerEvent): event is StateUpdateEnvelope =>
 
 describe('WS broadcast per-viewer filter', () => {
   let server: ReturnType<typeof createServer>
-  let wsServer: WebSocketServer
+  let wsServerResult: Awaited<ReturnType<typeof createWsServer>>
   let baseUrl: string
   const sockets: TestSocket[] = []
+  let db: Awaited<ReturnType<typeof createTestDatabase>>
+  let recording: Awaited<ReturnType<typeof recordingResources>>
 
   beforeEach(async () => {
-    const persistence = new InMemoryRoomPersistence()
+    db = await createTestDatabase()
+    vi.spyOn(database, 'getDb').mockReturnValue(db)
+    vi.stubEnv('ALLOW_ANONYMOUS_WS', 'true')
+    recording = await recordingResources(db)
+    const persistence = new PostgresRoomPersistence(db)
     server = createServer()
-    wsServer = createWsServer(server, { persistence }).wss
+    wsServerResult = await createWsServer(server, { persistence, ...recording })
     await new Promise<void>((resolve) => {
       server.listen(0, '127.0.0.1', () => resolve())
     })
@@ -94,12 +104,10 @@ describe('WS broadcast per-viewer filter', () => {
       ),
     )
     sockets.length = 0
-    await new Promise<void>((resolve, reject) => {
-      wsServer.close((err) => {
-        if (err) reject(err)
-        else resolve()
-      })
-    })
+    await wsServerResult?.shutdown()
+    await recording?.close()
+    await db?.close()
+    vi.restoreAllMocks(); vi.unstubAllEnvs()
     await new Promise<void>((resolve, reject) => {
       server.close((err) => {
         if (err) reject(err)
@@ -126,14 +134,12 @@ describe('WS broadcast per-viewer filter', () => {
     initialP2: StateUpdateEnvelope
   }> => {
     const p1 = await connectSocket()
-    p1.send(
-      JSON.stringify({
+    await sendCommand(p1, {
         type: 'createRoom',
         name: 'P1',
         maxPlayers: 2,
         ...extraCreate,
-      }),
-    )
+      })
     const roomCreated = await waitForEvent(
       p1,
       (event): event is Extract<ServerEvent, { type: 'roomCreated' }> =>
@@ -141,14 +147,12 @@ describe('WS broadcast per-viewer filter', () => {
     )
 
     const p2 = await connectSocket()
-    p2.send(
-      JSON.stringify({
+    await sendCommand(p2, {
         type: 'joinRoom',
         roomId: roomCreated.roomId,
         requestedPlayerIndex: 1,
         name: 'P2',
-      }),
-    )
+      })
 
     const initialP1 = await waitForEvent(p1, isReconnectState)
     const initialP2 = await waitForEvent(p2, isReconnectState)
@@ -170,14 +174,12 @@ describe('WS broadcast per-viewer filter', () => {
     requestId: string,
   ) => {
     const pick = pickFirst(state, playerId)
-    ws.send(
-      JSON.stringify({
+    await sendCommand(ws, {
         type: 'draftSubmit',
         playerId,
         pick,
         requestId,
-      }),
-    )
+      })
     return pick
   }
 
@@ -188,14 +190,12 @@ describe('WS broadcast per-viewer filter', () => {
     initialP2: StateUpdateEnvelope
   }> => {
     const p1 = await connectSocket()
-    p1.send(
-      JSON.stringify({
+    await sendCommand(p1, {
         type: 'joinRoom',
         roomId: 'dev2',
         requestedPlayerIndex: 0,
         name: 'P1',
-      }),
-    )
+      })
     await waitForEvent(
       p1,
       (event): event is Extract<ServerEvent, { type: 'roomJoined' }> =>
@@ -203,14 +203,12 @@ describe('WS broadcast per-viewer filter', () => {
     )
 
     const p2 = await connectSocket()
-    p2.send(
-      JSON.stringify({
+    await sendCommand(p2, {
         type: 'joinRoom',
         roomId: 'dev2',
         requestedPlayerIndex: 1,
         name: 'P2',
-      }),
-    )
+      })
     await waitForEvent(
       p2,
       (event): event is Extract<ServerEvent, { type: 'roomJoined' }> =>
@@ -294,18 +292,14 @@ describe('WS broadcast per-viewer filter', () => {
   it('action broadcast keeps per-viewer filtering', async () => {
     const { p1, p2, initialP1 } = await openTwoPlayerRoom()
 
-    const freeSpace = initialP1.payload.state.actionSpaces.find(
-      (s) => s.takenBy.length === 0,
-    )?.id
+    const freeSpace = 'forest'
     expect(freeSpace).toBeTruthy()
 
-    p1.send(
-      JSON.stringify({
+    await sendCommand(p1, {
         type: 'action',
         spaceId: freeSpace,
         requestId: 'action-1',
-      }),
-    )
+      })
 
     const actionP1 = await waitForEvent(
       p1,
@@ -315,7 +309,7 @@ describe('WS broadcast per-viewer filter', () => {
     const actionP2 = await waitForEvent(
       p2,
       (event): event is StateUpdateEnvelope =>
-        isStateUpdate(event) && event.requestId === 'action-1',
+        isStateUpdate(event) && event.version === actionP1.version,
     )
 
     // p1 sees own hand, p2 masked
@@ -403,7 +397,7 @@ describe('WS broadcast per-viewer filter', () => {
     const p2Update = await waitForEvent(
       p2,
       (event): event is StateUpdateEnvelope =>
-        isStateUpdate(event) && event.requestId === 'draft-p1-r1',
+        isStateUpdate(event) && event.version === p1Update.version,
     )
 
     expect(p1Update.payload.privateEvents).toEqual([
@@ -444,14 +438,14 @@ describe('WS broadcast per-viewer filter', () => {
       const p2AfterP1 = await waitForEvent(
         p2,
         (event): event is StateUpdateEnvelope =>
-          isStateUpdate(event) && event.requestId === p1RequestId,
+          isStateUpdate(event) && event.version === p1AfterP1.version,
       )
 
       await submitDraftWs(p2, 'p2', p2AfterP1.payload.state, p2RequestId)
       const p1AfterP2 = await waitForEvent(
         p1,
         (event): event is StateUpdateEnvelope =>
-          isStateUpdate(event) && event.requestId === p2RequestId,
+          isStateUpdate(event) && event.version === p1AfterP1.version + 1,
       )
       const p2AfterP2 = await waitForEvent(
         p2,
@@ -465,8 +459,8 @@ describe('WS broadcast per-viewer filter', () => {
 
     const p1FinalEvent = p1State.players[0]!.occupationHand.concat(p1State.players[0]!.minorHand)
     const p2FinalEvent = p2State.players[1]!.occupationHand.concat(p2State.players[1]!.minorHand)
-    const p1FinalUpdate = p1.received.filter(isStateUpdate).findLast((event) => event.requestId === 'draft-p2-r6')!
     const p2FinalUpdate = p2.received.filter(isStateUpdate).findLast((event) => event.requestId === 'draft-p2-r6')!
+    const p1FinalUpdate = p1.received.filter(isStateUpdate).findLast((event) => event.version === p2FinalUpdate.version)!
 
     expect(p1FinalUpdate.payload.privateEvents).toEqual([
       expect.objectContaining({
@@ -497,14 +491,14 @@ describe('WS broadcast per-viewer filter', () => {
   it('reconnect getState returns the viewer-specific filter for that ws', async () => {
     const { p1, p2 } = await openTwoPlayerRoom()
 
-    p1.send(JSON.stringify({ type: 'getState', requestId: 'state-p1' }))
+    await sendCommand(p1, { type: 'getState', requestId: 'state-p1' })
     const stateP1 = await waitForEvent(
       p1,
       (event): event is StateUpdateEnvelope =>
         isStateUpdate(event) && event.requestId === 'state-p1',
     )
 
-    p2.send(JSON.stringify({ type: 'getState', requestId: 'state-p2' }))
+    await sendCommand(p2, { type: 'getState', requestId: 'state-p2' })
     const stateP2 = await waitForEvent(
       p2,
       (event): event is StateUpdateEnvelope =>
@@ -531,14 +525,12 @@ describe('WS broadcast per-viewer filter', () => {
   it('devDrawCard broadcasts private handChanged only to the target player', async () => {
     const { p1, p2 } = await joinTwoPlayerDevRoom()
 
-    p1.send(
-      JSON.stringify({
+    await sendCommand(p1, {
         type: 'devDrawCard',
         playerIndex: 0,
         cardId: 'A116_WoodCutter',
         requestId: 'draw-private-1',
-      }),
-    )
+      })
 
     const drawP1 = await waitForEvent(
       p1,
@@ -548,7 +540,7 @@ describe('WS broadcast per-viewer filter', () => {
     const drawP2 = await waitForEvent(
       p2,
       (event): event is StateUpdateEnvelope =>
-        isStateUpdate(event) && event.requestId === 'draw-private-1',
+        isStateUpdate(event) && event.version === drawP1.version,
     )
 
     expect(drawP1.payload.privateEvents).toEqual([

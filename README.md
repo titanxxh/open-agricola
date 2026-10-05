@@ -48,6 +48,8 @@ sudo apt-get install -y build-essential pkg-config python3 \
 brew install pkg-config cairo pango libpng jpeg giflib librsvg pixman
 ```
 
+Docker Engine with Compose is also required. The launcher prepares persistent local PostgreSQL and private S3 storage automatically; no external service account is needed. Use `./restart-local.sh --instances 2` for two application processes on the same host. `pnpm run verify` gives browser tests isolated database/resource namespaces and ports. External endpoints require a data migration and validation; see [deployment](docs/HOW_TO_DEPLOY.md).
+
 ```bash
 pnpm install
 ./restart-local.sh    # Start the backend (5175) and frontend (5173) on 127.0.0.1
@@ -99,7 +101,7 @@ docs/      Architecture, deployment, platform design, and card progress
 ![Vite](https://img.shields.io/badge/Vite-8-646cff)
 ![pnpm](https://img.shields.io/badge/pnpm-10-f69220)
 
-The backend uses Node.js, WebSocket, and SQLite (`better-sqlite3`); the frontend uses React 19, Vite 8, and TypeScript.
+The backend uses Node.js, WebSocket, PostgreSQL (`pg`), and private S3-compatible storage; the frontend uses React 19, Vite 8, and TypeScript.
 
 ## Documentation
 

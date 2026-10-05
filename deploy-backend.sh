@@ -1,165 +1,83 @@
-#!/bin/bash
-# MAINTAINER-ONLY — 仅项目维护者在自己控制的机器上运行，贡献者无需使用本脚本。
-# Maintainer-only: deploys the owner's production backend. Contributors never need this.
-# 一键更新并重新部署后端 Docker
-# 部署前自动做完整备份、目标镜像恢复验证和版本清单，
-# 备份失败则拉回旧版本并中止部署；pre-deploy 备份保留最近 5 份、最多 30 天（ADR-0010）。
-# 用法: ./deploy-backend.sh [ssh-host] [ref] [remote-dir]
-# 默认后端: ubuntu@ten-kr:/home/ubuntu/open-agricola，以 SSH 登录用户执行部署
-# ref 可以是分支名或 release tag
-# 示例: ./deploy-backend.sh
-#       ./deploy-backend.sh ubuntu@ten-kr v0.7.9
-#       ./deploy-backend.sh ubuntu@1.2.3.4 main /srv/open-agricola
-
-set -e
-
-# 未指定用户名时使用 ubuntu
-_HOST="${1:-ubuntu@ten-kr}"
-if [[ "$_HOST" != *@* ]]; then
-  HOST="ubuntu@$_HOST"
-else
-  HOST="$_HOST"
-fi
+#!/usr/bin/env bash
+# Maintainer-only: a planned single-host maintenance deployment. Never run in CI.
+set -euo pipefail
+# Defaults follow the owner-controlled Seoul deployment; no privilege escalation.
+HOST="${1:-ubuntu@ten-kr}"
+[[ "$HOST" == *@* ]] || HOST="ubuntu@$HOST"
 REF="${2:-main}"
 REMOTE_DIR="${3:-/home/ubuntu/open-agricola}"
-
-echo ">>> 部署后端到 $HOST:$REMOTE_DIR (ref: $REF)"
-
 REMOTE_ENV=()
-if [ -n "${ACCOUNT_REGISTRATION_POLICY:-}" ]; then
+if [[ -n "${ACCOUNT_REGISTRATION_POLICY:-}" ]]; then
   REMOTE_ENV+=(ACCOUNT_REGISTRATION_POLICY="$ACCOUNT_REGISTRATION_POLICY")
 fi
-
-# 显式传递配置并逐个引用参数，避免 SSH 拼接命令时解释路径或 ref。
 REMOTE_ARGS=(env "${REMOTE_ENV[@]}" bash -s "$REMOTE_DIR" "$REF")
 printf -v REMOTE_COMMAND '%q ' "${REMOTE_ARGS[@]}"
-
-ssh "$HOST" "$REMOTE_COMMAND" << 'REMOTE_SCRIPT'
-  set -e
-  REMOTE_DIR="$1"
-  REF="$2"
-  cd "$REMOTE_DIR"
-  export APP_UID="$(id -u)" APP_GID="$(id -g)"
-
-  # 与 backup-offsite.sh 共享维护锁：等待进行中的定时备份结束，部署期间备份不会启动
-  mkdir -p backups
-  chmod 700 backups
-  exec 9> backups/.maintenance.lock
-  flock -w 1800 9 || { echo ">>> ✗ 等待维护锁超时（定时备份未结束？）"; exit 1; }
-
-  SOURCE_BUILD_ID="$(
-    docker compose -f docker-compose.prod.yml exec -T app \
-      sh -c 'printf "%s" "$GAME_BUILD_ID"' < /dev/null 2>/dev/null \
-      || git rev-parse HEAD
-  )"
-  if [ -z "$SOURCE_BUILD_ID" ]; then
-    SOURCE_BUILD_ID="$(git rev-parse HEAD)"
+ssh "$HOST" "$REMOTE_COMMAND" <<'REMOTE'
+set -euo pipefail
+# Parse the complete function before detaching stdin from the SSH script.
+deploy_backend() {
+cd "$1"
+REF="$2"
+export APP_UID="$(id -u)" APP_GID="$(id -g)"
+umask 077
+mkdir -p backups
+exec 9>backups/.maintenance.lock
+flock -w 1800 9
+# Keep local operator configuration and refuse to overwrite tracked edits.
+[[ -z "$(git status --porcelain --untracked-files=no)" ]] || { echo 'Tracked local edits must be resolved before deployment'; exit 1; }
+PREVIOUS_REF="$(git rev-parse HEAD)"
+git fetch origin "$REF"
+TARGET_REF="$(git rev-parse FETCH_HEAD)"
+git checkout --detach "$TARGET_REF"
+# Bootstrap host dependencies without requiring any external service account.
+# Node 24.15+ and pnpm are deployment-host prerequisites, as in local development.
+pnpm install --frozen-lockfile
+node --env-file=.env scripts/local-services.mjs
+export GAME_BUILD_ID="$TARGET_REF"
+COMPOSE=(docker compose -f docker-compose.prod.yml)
+"${COMPOSE[@]}" build app
+OLD_CONTAINER="$("${COMPOSE[@]}" ps -q app)"
+SOURCE_BUILD_ID="$PREVIOUS_REF"
+if [[ -n "$OLD_CONTAINER" ]]; then
+  SOURCE_BUILD_ID="$(docker exec "$OLD_CONTAINER" node -p 'process.env.GAME_BUILD_ID' 2>/dev/null || printf '%s' "$PREVIOUS_REF")"
+fi
+export SOURCE_BUILD_ID
+RESTART_OLD=0
+cleanup() {
+  if [[ "$RESTART_OLD" == 1 && -n "$OLD_CONTAINER" ]]; then
+    echo 'Preflight failed; restarting the unchanged source application'
+    docker start "$OLD_CONTAINER" || true
   fi
-
-  echo ">>> git fetch + checkout $REF..."
-  git fetch origin "$REF"
-  git reset --hard FETCH_HEAD
-  GAME_BUILD_ID="$(git rev-parse HEAD)"
-
-  echo ">>> docker compose build..."
-  GAME_BUILD_ID="$GAME_BUILD_ID" docker compose -f docker-compose.prod.yml build
-
-  echo ">>> pre-deploy 备份..."
-  mkdir -p backups
-  chmod 700 backups
-  SAFE_REF="${REF//\//-}"
-  BACKUP_STEM="pre-${SAFE_REF}-$(date -u +%Y%m%dT%H%M%SZ)"
-  BACKUP_CREATED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-  VALIDATION_DIR=""
-  # app 停止后到新版本 up 成功之间，任何退出（含 CI cancel 杀掉 SSH）都拉回旧容器
-  RESTART_ON_EXIT=0
-  on_exit() {
-    if [ -n "$VALIDATION_DIR" ]; then
-      rm -rf -- "$VALIDATION_DIR"
-    fi
-    if [ "$RESTART_ON_EXIT" = "1" ]; then
-      echo ">>> 部署未完成，恢复旧版本 app"
-      docker compose -f docker-compose.prod.yml start app || true
-      exit 1
-    fi
-  }
-  trap on_exit EXIT
-  trap 'exit 129' HUP INT TERM
-  backup_failed() {
-    echo ">>> ✗ 备份失败，部署中止"
-    rm -f \
-      "backups/$BACKUP_STEM.tgz" \
-      "backups/$BACKUP_STEM.manifest.json" \
-      "backups/env-$BACKUP_STEM"
-    exit 1
-  }
-  RESTART_ON_EXIT=1
-  docker compose -f docker-compose.prod.yml stop app
-  docker compose -f docker-compose.prod.yml run --rm --no-deps \
-    --user "$APP_UID:$APP_GID" \
-    -v "$PWD/backups:/backup" app sh -c \
-    "tar -C /app/data -czf /backup/$BACKUP_STEM.tgz . && \
-     if [ -f /app/data/replay-removals.jsonl ]; then \
-       cp /app/data/replay-removals.jsonl /backup/replay-removals.latest.jsonl; \
-     elif [ ! -f /backup/replay-removals.latest.jsonl ]; then \
-       : > /backup/replay-removals.latest.jsonl; \
-     fi" < /dev/null || backup_failed
-  tar -tzf "backups/$BACKUP_STEM.tgz" > /dev/null || backup_failed
-  BACKUP_SHA256="$(sha256sum "backups/$BACKUP_STEM.tgz" | cut -d ' ' -f 1)" \
-    || backup_failed
-  BACKUP_SIZE_BYTES="$(stat -c '%s' "backups/$BACKUP_STEM.tgz")" \
-    || backup_failed
-  VALIDATION_DIR="$(mktemp -d "$PWD/backups/.validate-$BACKUP_STEM.XXXXXX")" \
-    || backup_failed
-  tar -C "$VALIDATION_DIR" -xzf "backups/$BACKUP_STEM.tgz" || backup_failed
-  docker compose -f docker-compose.prod.yml run --rm --no-deps \
-    --user "$APP_UID:$APP_GID" \
-    -v "$VALIDATION_DIR:/validation-data" \
-    -e DB_PATH=/validation-data/open-agricola.db \
-    -e BACKUP_STEM="$BACKUP_STEM" \
-    -e BACKUP_CREATED_AT="$BACKUP_CREATED_AT" \
-    -e SOURCE_BUILD_ID="$SOURCE_BUILD_ID" \
-    -e TARGET_BUILD_ID="$GAME_BUILD_ID" \
-    -e TARGET_REF="$REF" \
-    -e BACKUP_SHA256="$BACKUP_SHA256" \
-    -e BACKUP_SIZE_BYTES="$BACKUP_SIZE_BYTES" \
-    app node --import tsx scripts/validate-backup.ts \
-    < /dev/null \
-    > "backups/$BACKUP_STEM.manifest.json" || backup_failed
-  rm -rf -- "$VALIDATION_DIR"
-  VALIDATION_DIR=""
-  chmod 600 \
-    "backups/$BACKUP_STEM.tgz" \
-    "backups/$BACKUP_STEM.manifest.json" \
-    backups/replay-removals.latest.jsonl || backup_failed
-  { cp .env "backups/env-$BACKUP_STEM" && chmod 600 "backups/env-$BACKUP_STEM"; } || backup_failed
-  echo ">>> ✓ 备份完成: backups/$BACKUP_STEM.tgz"
-
-  echo ">>> 清理旧 pre-deploy 备份（保留最近 5 份、最多 30 天）..."
-  {
-    ls -1t backups/pre-*.tgz 2>/dev/null | tail -n +6
-    find backups -maxdepth 1 -name 'pre-*.tgz' -mtime +30 2>/dev/null
-  } | sort -u | while read -r OLD; do
-    STEM="$(basename "$OLD" .tgz)"
-    rm -f "$OLD" "backups/$STEM.manifest.json" "backups/env-$STEM"
-    echo ">>> 已删除旧备份 $STEM"
-  done
-
-  echo ">>> docker compose up..."
-  GAME_BUILD_ID="$GAME_BUILD_ID" docker compose -f docker-compose.prod.yml up -d --remove-orphans
-  RESTART_ON_EXIT=0
-
-  echo ">>> 等待健康检查..."
-  for i in $(seq 1 15); do
-    sleep 3
-    STATUS=$(docker inspect --format='{{.State.Health.Status}}' open-agricola-app-1 2>/dev/null || echo "unknown")
-    if [ "$STATUS" = "healthy" ]; then
-      echo ">>> ✓ 部署成功！"
-      exit 0
-    fi
-    echo ">>> 等待中... ($i/15) [$STATUS]"
-  done
-  echo ">>> ✗ 健康检查超时，查看日志："
-  docker compose -f docker-compose.prod.yml logs --tail 20 app
+}
+trap cleanup EXIT
+trap 'exit 130' HUP INT TERM
+# The first SQLite -> PostgreSQL cutover is a separately documented controlled
+# import, not an automatic empty-database launch over existing recorded games.
+if [[ ! -f data/postgres-cutover.validated ]]; then
+  echo 'Complete the controlled SQLite import (or explicitly validate a new empty installation) and create data/postgres-cutover.validated first.'
   exit 1
-REMOTE_SCRIPT
+fi
+if [[ -n "$OLD_CONTAINER" ]]; then RESTART_OLD=1; "${COMPOSE[@]}" stop app; fi
+STEM="pre-${TARGET_REF:0:12}-$(date -u +%Y%m%dT%H%M%SZ)"
+MAINTENANCE_LOCK_HELD=1 bash scripts/backup-storage.sh "$STEM" --already-stopped
+# Only after the target image restored and checked a copy may it touch live data.
+# Once live migration begins, a failure leaves maintenance active; never resume
+# the old executable blindly against a possibly changed schema.
+RESTART_OLD=0
+"${COMPOSE[@]}" run --rm --no-deps app node --import tsx scripts/storage-archive-cli.ts \
+  check-live "$TARGET_REF" --applications-stopped
+"${COMPOSE[@]}" up -d --remove-orphans --no-build --wait --wait-timeout 120 app caddy
+printf '%s\n' "$TARGET_REF" > data/deployed-build-id
+printf 'Previous build: %s\nCurrent build: %s\n' "$PREVIOUS_REF" "$TARGET_REF"
+# Pre-deploy archives: newest 5, and never beyond the 30-day retention bound.
+{
+  find backups -maxdepth 1 -name 'pre-*.tgz' -printf '%T@ %p\n' | sort -nr | tail -n +6 | cut -d ' ' -f 2-
+  find backups -maxdepth 1 -name 'pre-*.tgz' -mmin +43200
+} | sort -u | while IFS= read -r old; do
+  stem="$(basename "$old" .tgz)"
+  rm -f -- "$old" "backups/$stem.manifest.json" "backups/env-$stem"
+done
+echo 'Backend maintenance deployment and target-build validation completed.'
+}
+deploy_backend "$@" < /dev/null
+REMOTE

@@ -28,6 +28,7 @@ const PAGE_SCOPED_QUERY_KEYS = [
   'perspective',
   'layout',
   'bugReportConnection',
+  'accountDeletion',
 ]
 
 export function buildPlatformPageUrl(

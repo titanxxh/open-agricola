@@ -1,6 +1,7 @@
-import { join, resolve } from 'node:path'
+import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { getDb } from '../server/db.ts'
+import { getResources, closeResources } from '../server/storage/runtime'
+import { getDb, initializeDatabase } from '../server/db.ts'
 import {
   applyReplayRemovalLedger,
   removeReplay,
@@ -97,23 +98,19 @@ export function parseReplayRemovalArgs(args: string[]): ReplayRemovalCliArgs {
   }
 }
 
-export function runReplayRemovalCli(
+export async function runReplayRemovalCli(
   args: string[],
-  env: NodeJS.ProcessEnv = process.env,
-): unknown {
+): Promise<unknown> {
   const parsed = parseReplayRemovalArgs(args)
-  const assetRoot = env.REPLAY_ASSET_ROOT
-    ?? join(process.cwd(), 'data', 'replay-assets')
-  const ledgerPath = env.REPLAY_REMOVAL_LEDGER_PATH
-    ?? join(process.cwd(), 'data', 'replay-removals.jsonl')
+  await initializeDatabase()
+  const resources = getResources()
   if (parsed.command === 'apply-ledger') {
-    return applyReplayRemovalLedger(getDb(), { assetRoot, ledgerPath })
+    return applyReplayRemovalLedger(getDb(), { resources })
   }
   return removeReplay(getDb(), {
     roomId: parsed.roomId,
     reason: parsed.reason,
-    assetRoot,
-    ledgerPath,
+    resources,
     ...(parsed.assetHash === undefined ? {} : { assetHash: parsed.assetHash }),
     ...(parsed.eraseResult ? { eraseResult: true } : {}),
     dryRun: parsed.dryRun,
@@ -125,9 +122,9 @@ if (
   && resolve(process.argv[1]) === fileURLToPath(import.meta.url)
 ) {
   try {
-    console.log(JSON.stringify(runReplayRemovalCli(process.argv.slice(2))))
+    console.log(JSON.stringify(await runReplayRemovalCli(process.argv.slice(2))))
   } catch (error) {
     console.error(error instanceof Error ? error.message : 'replay removal failed')
     process.exitCode = 1
-  }
+  } finally { closeResources(); await getDb().close() }
 }

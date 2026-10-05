@@ -1,3 +1,7 @@
+import * as database from '../../db'
+import { sendCommand } from '../../__tests__/_helpers/command-socket'
+import { createTestDatabase } from '../../__tests__/_helpers/postgres'
+import { recordingResources } from '../../__tests__/_helpers/recording'
 /**
  * PR-6 Task 4 — WS seat binding tests.
  *
@@ -16,10 +20,10 @@
  */
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import WebSocket from 'ws'
 import { createWsServer } from '../ws-server.ts'
-import { InMemoryRoomPersistence } from '../../game/persistence/memory-adapter.ts'
+import { PostgresRoomPersistence } from '../../game/persistence/postgres-adapter.ts'
 import type { ServerEvent } from '../../../shared/contract/protocol/ws.ts'
 import type { StateUpdateEnvelope } from '../../../shared/contract/protocol/game.ts'
 
@@ -82,28 +86,24 @@ const setupTwoPlayerRoom = async (
   opts?: { draftMode?: 'simultaneous'; draftPoolSize?: number },
 ) => {
   const p1 = await openWs(baseUrl, sockets)
-  p1.send(
-    JSON.stringify({
+  await sendCommand(p1, {
       type: 'createRoom',
       name: 'P1',
       maxPlayers: 2,
       ...(opts ?? {}),
-    }),
-  )
+    })
   const roomCreated = await waitForEvent(
     p1,
     (event): event is Extract<ServerEvent, { type: 'roomCreated' }> =>
       event.type === 'roomCreated',
   )
   const p2 = await openWs(baseUrl, sockets)
-  p2.send(
-    JSON.stringify({
+  await sendCommand(p2, {
       type: 'joinRoom',
       roomId: roomCreated.roomId,
       requestedPlayerIndex: 1,
       name: 'P2',
-    }),
-  )
+    })
   const initialP1 = await waitForEvent(
     p1,
     (event): event is StateUpdateEnvelope =>
@@ -122,12 +122,12 @@ const setupFixedDevRoom = async (
   sockets: TestSocket[],
 ) => {
   const p1 = await openWs(baseUrl, sockets)
-  p1.send(JSON.stringify({
+  await sendCommand(p1, {
     type: 'joinRoom',
     roomId: 'dev2',
     requestedPlayerIndex: 0,
     name: 'P1',
-  }))
+  })
   await waitForEvent(
     p1,
     (event): event is Extract<ServerEvent, { type: 'roomJoined' }> =>
@@ -135,12 +135,12 @@ const setupFixedDevRoom = async (
   )
 
   const p2 = await openWs(baseUrl, sockets)
-  p2.send(JSON.stringify({
+  await sendCommand(p2, {
     type: 'joinRoom',
     roomId: 'dev2',
     requestedPlayerIndex: 1,
     name: 'P2',
-  }))
+  })
   await waitForEvent(
     p2,
     (event): event is Extract<ServerEvent, { type: 'roomJoined' }> =>
@@ -162,14 +162,20 @@ const setupFixedDevRoom = async (
 
 describe('WS seat binding', () => {
   let server: ReturnType<typeof createServer>
-  let wsServerResult: ReturnType<typeof createWsServer>
+  let wsServerResult: Awaited<ReturnType<typeof createWsServer>>
   let baseUrl: string
   const sockets: TestSocket[] = []
+  let db: Awaited<ReturnType<typeof createTestDatabase>>
+  let recording: Awaited<ReturnType<typeof recordingResources>>
 
   beforeEach(async () => {
-    const persistence = new InMemoryRoomPersistence()
+    db = await createTestDatabase()
+    vi.spyOn(database, 'getDb').mockReturnValue(db)
+    vi.stubEnv('ALLOW_ANONYMOUS_WS', 'true')
+    recording = await recordingResources(db)
+    const persistence = new PostgresRoomPersistence(db)
     server = createServer()
-    wsServerResult = createWsServer(server, { persistence })
+    wsServerResult = await createWsServer(server, { persistence, ...recording })
     await new Promise<void>((resolve) => {
       server.listen(0, '127.0.0.1', () => resolve())
     })
@@ -200,13 +206,10 @@ describe('WS seat binding', () => {
       ),
     )
     sockets.length = 0
-    clearInterval(wsServerResult.cleanupTimer)
-    await new Promise<void>((resolve, reject) => {
-      wsServerResult.wss.close((err) => {
-        if (err) reject(err)
-        else resolve()
-      })
-    })
+    await wsServerResult?.shutdown()
+    await recording?.close()
+    await db?.close()
+    vi.restoreAllMocks(); vi.unstubAllEnvs()
     await new Promise<void>((resolve, reject) => {
       server.close((err) => {
         if (err) reject(err)
@@ -220,14 +223,12 @@ describe('WS seat binding', () => {
     const initialWood = initialP1.payload.state.players[0]!.resources.wood
 
     // p1 is seat 0, tries to mutate seat 1 — must be blocked.
-    p1.send(
-      JSON.stringify({
+    await sendCommand(p1, {
         type: 'devSetResources',
         playerIndex: 1,
         resources: { wood: 999 },
         requestId: 'spoof-dev-set-1',
-      }),
-    )
+      })
     const err = await waitForEvent(
       p1,
       (event): event is Extract<ServerEvent, { type: 'error' }> =>
@@ -236,7 +237,7 @@ describe('WS seat binding', () => {
     expect(err.error).toMatch(/seat mismatch/i)
 
     // Confirm state on seat 0 was not touched: getState round-trip.
-    p1.send(JSON.stringify({ type: 'getState', requestId: 'check-unchanged-1' }))
+    await sendCommand(p1, { type: 'getState', requestId: 'check-unchanged-1' })
     const check = await waitForEvent(
       p1,
       (event): event is StateUpdateEnvelope =>
@@ -248,14 +249,12 @@ describe('WS seat binding', () => {
 
   it('rejects devSetResources in a normal room even when the seat matches the sender', async () => {
     const { p1 } = await setupTwoPlayerRoom(baseUrl, sockets)
-    p1.send(
-      JSON.stringify({
+    await sendCommand(p1, {
         type: 'devSetResources',
         playerIndex: 0,
         resources: { wood: 999 },
         requestId: 'own-dev-set-1',
-      }),
-    )
+      })
     const result = await waitForEvent(
       p1,
       (event): event is Extract<ServerEvent, { type: 'error' }> | StateUpdateEnvelope =>
@@ -270,14 +269,12 @@ describe('WS seat binding', () => {
 
   it('rejects commitSelection with a playerIndex that is not the sender seat', async () => {
     const { p1 } = await setupTwoPlayerRoom(baseUrl, sockets)
-    p1.send(
-      JSON.stringify({
+    await sendCommand(p1, {
         type: 'commitSelection',
         playerIndex: 1,
         payload: { positions: [] },
         requestId: 'spoof-commitSel-1',
-      }),
-    )
+      })
     const err = await waitForEvent(
       p1,
       (event): event is Extract<ServerEvent, { type: 'error' }> =>
@@ -289,14 +286,12 @@ describe('WS seat binding', () => {
   it('rejects devDrawCard when seat does not match', async () => {
     const { p1 } = await setupTwoPlayerRoom(baseUrl, sockets)
 
-    p1.send(
-      JSON.stringify({
+    await sendCommand(p1, {
         type: 'devDrawCard',
         playerIndex: 1,
         cardId: 'A3',
         requestId: 'spoof-draw-1',
-      }),
-    )
+      })
     const err1 = await waitForEvent(
       p1,
       (event): event is Extract<ServerEvent, { type: 'error' }> =>
@@ -308,14 +303,12 @@ describe('WS seat binding', () => {
   it('accepts devPlayCard for a different seat in fixed dev rooms', async () => {
     const { p2 } = await setupFixedDevRoom(baseUrl, sockets)
 
-    p2.send(
-      JSON.stringify({
+    await sendCommand(p2, {
         type: 'devPlayCard',
         playerIndex: 0,
         cardId: 'D025_WitchesDanceFloor',
         requestId: 'spoof-play-1',
-      }),
-    )
+      })
     const afterPlay = await waitForEvent(
       p2,
       (event): event is StateUpdateEnvelope =>
@@ -333,14 +326,12 @@ describe('WS seat binding', () => {
     expect(initialP1.payload.state.phase).toBe('draft')
     const otherId = initialP1.payload.state.players[1]!.id
 
-    p1.send(
-      JSON.stringify({
+    await sendCommand(p1, {
         type: 'draftSubmit',
         playerId: otherId,
         pick: { occCardId: null, minorCardId: null },
         requestId: 'spoof-draft-1',
-      }),
-    )
+      })
     const err = await waitForEvent(
       p1,
       (event): event is Extract<ServerEvent, { type: 'error' }> =>
@@ -355,13 +346,11 @@ describe('WS seat binding', () => {
       (s) => s.takenBy.length === 0,
     )
     expect(openSpace).toBeTruthy()
-    p1.send(
-      JSON.stringify({
+    await sendCommand(p1, {
         type: 'action',
         spaceId: openSpace!.id,
         requestId: 'own-action-1',
-      }),
-    )
+      })
     const afterAction = await waitForEvent(
       p1,
       (event): event is StateUpdateEnvelope =>

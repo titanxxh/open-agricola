@@ -5,7 +5,8 @@
 #   2. Replace domain name in Caddyfile
 #   3. Set CORS_ORIGIN in .env to your GitHub Pages URL
 #   4. Public HTTPS traffic is exposed on host port 443 (8443 retained for existing clients)
-#   5. docker compose -f docker-compose.prod.yml up -d --build
+#   5. pnpm install --frozen-lockfile && node --env-file=.env scripts/local-services.mjs
+#   6. docker compose -f docker-compose.prod.yml up -d --build
 
 services:
   app:
@@ -14,23 +15,23 @@ services:
     build:
       context: .
       target: production
+      args:
+        GAME_BUILD_ID: ${GAME_BUILD_ID:-development}
+    image: open-agricola:backend
+    env_file:
+      - ${DEPENDENCIES_ENV_FILE:-./data/dependencies.compose.env}
+    networks: [default, dependencies]
+    stop_grace_period: 90s
     expose:
       - "5175"
     environment:
+      - VALIDATION_DATABASE_URL=${VALIDATION_DATABASE_URL:-}
       - NODE_ENV=production
       - BACKEND_PORT=5175
       - BACKEND_HOST=0.0.0.0
-      - PERSIST_ROOMS=sqlite
+      - APP_INSTANCES=${APP_INSTANCES:-1}
       - ALLOW_ANONYMOUS_WS=false
-      - DB_PATH=./data/open-agricola.db
-      - CARD_ART_DIR=./data/card-art
-      - REPLAY_NEW_ROOMS_ENABLED=${REPLAY_NEW_ROOMS_ENABLED:-false}
-      - REPLAY_VIEWER_BUILD_ID=${REPLAY_VIEWER_BUILD_ID:-}
-      - REPLAY_VIEWER_ROOT=${REPLAY_VIEWER_ROOT:-./data/replay-viewers}
-      - REPLAY_ASSET_ROOT=${REPLAY_ASSET_ROOT:-./data/replay-assets}
-      - REPLAY_REMOVAL_LEDGER_PATH=${REPLAY_REMOVAL_LEDGER_PATH:-./data/replay-removals.jsonl}
       - REPLAY_TRUST_PROXY=true
-      - GAME_BUILD_ID=${GAME_BUILD_ID:-}
       - BUG_REPORTS_ENABLED=${BUG_REPORTS_ENABLED:-false}
       - BUG_REPORT_GITHUB_APP_ID=${BUG_REPORT_GITHUB_APP_ID:-}
       - BUG_REPORT_GITHUB_CLIENT_ID=${BUG_REPORT_GITHUB_CLIENT_ID:-}
@@ -64,7 +65,6 @@ services:
       - ACCOUNT_GOOGLE_OAUTH_CLIENT_ID=${ACCOUNT_GOOGLE_OAUTH_CLIENT_ID:-}
       - ACCOUNT_GOOGLE_OAUTH_CLIENT_SECRET=${ACCOUNT_GOOGLE_OAUTH_CLIENT_SECRET:-}
     volumes:
-      - app-data:/app/data
       - app-output:/app/output
     restart: unless-stopped
 
@@ -85,6 +85,10 @@ services:
     restart: unless-stopped
 
 volumes:
-  app-data:
   app-output:
   caddy-data:
+
+networks:
+  dependencies:
+    external: true
+    name: open-agricola-local_default

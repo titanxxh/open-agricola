@@ -6,18 +6,19 @@ This guide is for developers who want to self-host the Open Agricola platform.
 
 ## Architecture Overview
 
-```text
-┌──────────────────────────────┐      ┌───────────────────────────────┐
-│ GitHub Pages: main site      │      │ VPS                           │
-│ index.html + JS/CSS          │─────▶│ Node.js backend               │
-└──────────────┬───────────────┘      │   ├── HTTP API  /api/*        │
-               │                      │   ├── WebSocket /ws            │
-               ▼                      │   ├── Card art  /card-art/*    │
-┌──────────────────────────────┐      │   └── SQLite    ./data/*.db   │
-│ GitHub Pages: asset site     │      └───────────────────────────────┘
-│ open-agricola-assets         │
-└──────────────────────────────┘
+```mermaid
+flowchart LR
+  Browser --> Pages[Static frontend]
+  Browser --> Ingress[HTTPS public origin / Caddy]
+  Ingress --> Router[HTTP / WS routing]
+  Router --> A[Application 1]
+  Router --> B[Application 2 - optional]
+  A --> PG[(PostgreSQL)]
+  B --> PG
+  A --> S3[(Private S3 / RustFS)]
+  B --> S3
 ```
+
 
 The frontend and backend are fully separated. The frontend is a static GitHub Pages site; the backend runs in a Docker container on a VPS.
 
@@ -34,124 +35,58 @@ Both cases start with the common steps below.
 
 ### 1.1 Common Setup
 
-#### Capacity Baseline
+Install Node.js 24.15+ (excluding Node 25), pnpm, Docker Compose, and Git. One host runs PostgreSQL 18, RustFS, and one application process by default. No external service account is required. Set `APP_INSTANCES=2` to exercise two application processes on that host.
 
-Use **2 vCPU and 2 GiB RAM** as the single-instance capacity baseline. The exact probe and Replay-write rerun are recorded in [`docs/performance/replay-room-capacity.md`](performance/replay-room-capacity.md). This specification supports at most **30 ordinary `waiting + playing` rooms**. Increase that limit only after a new run of the same probe.
-
-#### Install Docker
-
-```bash
-# One-command Docker installation on Ubuntu, Debian, or CentOS
-curl -fsSL https://get.docker.com | sh
-sudo usermod -aG docker $USER
-# Log in through SSH again for the docker group change to take effect
-```
-
-#### Clone the Repository
+Earlier SQLite single-instance performance reports are historical baselines only. Keep existing admission limits; those measurements do not certify PostgreSQL, two-instance capacity, or high availability. This delivery verifies normal behavior and restarts, without fault injection or recovery-time acceptance.
 
 ```bash
 git clone https://github.com/YOUR_USER/open-agricola.git
 cd open-agricola
-git checkout main
-```
-
-#### Configure Environment Variables
-
-```bash
+pnpm install --frozen-lockfile
 cp .env.example .env
 ```
 
-Edit `.env`. Later steps override some values; start with the common settings:
-
-```env
-BACKEND_PORT=5175
-NODE_ENV=production
-PERSIST_ROOMS=sqlite
-ALLOW_ANONYMOUS_WS=false
-REPLAY_NEW_ROOMS_ENABLED=false
-REPLAY_VIEWER_BUILD_ID=
-REPLAY_VIEWER_ROOT=./data/replay-viewers
-REPLAY_ASSET_ROOT=./data/replay-assets
-REPLAY_REMOVAL_LEDGER_PATH=./data/replay-removals.jsonl
-REPLAY_TRUST_PROXY=false
-GAME_BUILD_ID=
-# Set CORS_ORIGIN and other environment-specific values later
-```
-
-Keep `REPLAY_TRUST_PROXY=false` when the backend port is exposed directly. Set it to `true` only when the backend is reachable exclusively through a trusted Caddy or Nginx proxy that overwrites `X-Forwarded-For`. The repository's `docker-compose.prod.yml` uses an isolated Caddy container as the only ingress and therefore pins `REPLAY_TRUST_PROXY=true`.
-
-The first Replay rollout requires `PERSIST_ROOMS=sqlite`. Build and append a Viewer Build before enabling recording:
+Set the existing `PUBLIC_API_BASE`, `PUBLIC_APP_ORIGIN`, `CORS_ORIGIN`, and account/OAuth settings in `.env`; preserve registered callbacks. Leave `DATABASE_URL` and the S3 connection group blank to use local services. External S3 requires a complete endpoint, region, private bucket, access key, and secret.
 
 ```bash
-REPLAY_VIEWER_ROOT="$PWD/data/replay-viewers" \
-pnpm run build:replay-viewer
-# The final stdout line is REPLAY_VIEWER_BUILD_ID
+node --env-file=.env scripts/local-services.mjs
+GAME_BUILD_ID="$(git rev-parse HEAD)" docker compose -f docker-compose.prod.yml build app
 ```
 
-The command writes Viewer code, styles, and the card manifest into a separate read-only Build. It reads board art, card art, and fonts from the pinned asset repository instead of storing them in the persistent volume. Publishing creates a per-file SHA-256 manifest, uses the manifest's own SHA-256 as the directory name, and revalidates the complete directory. It never overwrites an existing directory with the same ID.
+Dependencies use independent persistent volumes. Generated credentials and the Workshop encryption key live in mode-600 `data/local-services.env`; host tools use `data/dependencies.local` and containers use `data/dependencies.compose.env`. Rebuilding applications never clears dependency data. The image contains PostgreSQL 18 native clients and an immutable Viewer, verified and uploaded to S3 at startup. Every hosted Room records; unavailable resources block game creation.
 
-`docker-compose.prod.yml` stores data in the `app-data:/app/data` named volume. Start once with `REPLAY_NEW_ROOMS_ENABLED=false`, append the Build, and only then enable recording. Put the previous command's final output in `.env` as `REPLAY_VIEWER_BUILD_ID`, and put the output of `git rev-parse HEAD` in `GAME_BUILD_ID`:
+#### First SQLite migration
+
+The importer accepts the current released SQLite schema (version 33). Older schema upgrade chains are retired; export from the current `main` build before switching storage. The source is opened read-only and retained until validation succeeds.
+
+Stop the old application before copying its data directory. Mount the source read-only and use an empty target. Never replace the old volume with an empty database. `legacy-data` below must contain the original database, card art, Replay assets, Viewers, and JSONL removal ledger.
 
 ```bash
-set -a
-source .env
-set +a
-test -n "$REPLAY_VIEWER_BUILD_ID"
-test -n "$GAME_BUILD_ID"
-docker compose -f docker-compose.prod.yml up -d --build
-docker compose -f docker-compose.prod.yml exec app \
-  mkdir -p "/app/data/replay-viewers/$REPLAY_VIEWER_BUILD_ID"
-docker compose -f docker-compose.prod.yml cp \
-  "data/replay-viewers/$REPLAY_VIEWER_BUILD_ID/." \
-  "app:/app/data/replay-viewers/$REPLAY_VIEWER_BUILD_ID"
-# After the copy succeeds, set REPLAY_NEW_ROOMS_ENABLED=true in .env
-docker compose -f docker-compose.prod.yml up -d --force-recreate app
+docker compose -f docker-compose.prod.yml stop app
+mkdir -p legacy-data backups
+chmod 700 legacy-data backups
+docker cp "$(docker compose -f docker-compose.prod.yml ps -aq app):/app/data/." legacy-data/
+docker compose -f docker-compose.prod.yml run --rm --no-deps \
+  -v "$PWD/legacy-data:/legacy:ro" -v "$PWD/backups:/backup" app \
+  node --import tsx scripts/import-sqlite.ts /legacy /backup/sqlite-import.json --applications-stopped
 ```
 
-New room creation is rejected if the manifest, content hash, or entry-point validation fails. The feature flag, Build ID, and custom-card runtime version are locked when the room is created. Custom-card art is copied into `REPLAY_ASSET_ROOT` under a content-addressed filename. Existing Replay rooms continue using their locked settings, and disabling the feature does not migrate games already in progress.
-
-Bug Reports use a separate GitHub App installed only on `titanxxh/open-agricola-issues`:
-
-1. Grant only `Issues: Read and write`, and install it only on the issues repository.
-2. Set the callback URL to `<PUBLIC_API_BASE>/api/v1/issue-submission-connection/github/callback`.
-3. Set the webhook URL to `<PUBLIC_API_BASE>/api/v1/github-app/webhook`, configure a dedicated webhook secret, and subscribe to GitHub App authorization and Issues events.
-4. Add the App ID, Client ID and secret, private key escaped as single-line `\n`, webhook secret, installation ID, and issues-only repository ID to `.env`.
-5. Generate a random 32-byte encryption key, configure `BUG_REPORT_TOKEN_ENCRYPTION_KEYS` as a JSON key ring, and point `BUG_REPORT_TOKEN_ACTIVE_KEY_ID` at one key.
-6. Start with `BUG_REPORTS_ENABLED=false` and complete migrations. Set it to `true` only after validating both Hosted and personal-GitHub delivery paths. Disabling the flag hides only the new entry point; it does not discard existing drafts or delivery queues.
-
-After the feature is enabled, a missing or invalid HTTP(S) frontend URL in `PUBLIC_APP_ORIGIN` makes the health check return `503` and pauses OAuth, new drafts, and delivery. This prevents issues without game links.
-
-```env
-BUG_REPORTS_ENABLED=false
-BUG_REPORT_GITHUB_APP_ID=
-BUG_REPORT_GITHUB_CLIENT_ID=
-BUG_REPORT_GITHUB_CLIENT_SECRET=
-BUG_REPORT_GITHUB_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----"
-BUG_REPORT_GITHUB_WEBHOOK_SECRET=
-BUG_REPORT_GITHUB_INSTALLATION_ID=
-BUG_REPORT_GITHUB_REPOSITORY_ID=
-BUG_REPORT_TOKEN_ENCRYPTION_KEYS={"v1":"<32-byte-base64-key>"}
-BUG_REPORT_TOKEN_ACTIVE_KEY_ID=v1
-```
-
-#### Build and Start
+Import verifies exact row values, recovery text, Replay bytes/hashes, Room-owned recovery, and resource references. It discards only proven unrecorded active games and never fabricates history. Accounts, Workshop data, recorded games, results, and referenced objects survive. A failure leaves a startup barrier: resolve the import instead of clearing unrelated data. A new empty installation skips the legacy copy/import and performs the target check below.
 
 ```bash
-docker compose up -d --build
+docker compose -f docker-compose.prod.yml run --rm --no-deps app \
+  node --import tsx scripts/storage-archive-cli.ts check-live "$(git rev-parse HEAD)" --applications-stopped
+mkdir -p data
+touch data/postgres-cutover.validated
+# Configure deploy/Caddyfile using the existing public backend domain first.
+docker compose -f docker-compose.prod.yml up -d --no-build --wait app caddy
 ```
 
-#### Verify
+Development uses the same `scripts/import-sqlite.ts`: load `data/dependencies.local`, point the importer at the read-only legacy directory, and then run `./restart-local.sh`. Keep the source until target-build validation finishes.
 
-```bash
-curl http://localhost:5175/api/health
-# Expected: {"ok":true}
-```
+The public origin stays unchanged. Browsers discover the Room before opening same-origin `/nodes/<instanceId>/ws`; private application ports are not public endpoints. The default local Compose entry binds loopback. Caddy retains existing 443/8443 bindings and OAuth callback, cookie, and CORS configuration.
 
-View logs:
-
-```bash
-docker compose logs -f app
-```
+Bug Report GitHub App, Workshop PR, and account OAuth remain optional integrations. Their environment reference and dedicated OAuth documentation retain permission/callback requirements. Migrating PostgreSQL/S3 does not require users to reconnect third-party accounts.
 
 ---
 
@@ -204,51 +139,7 @@ Optional free-domain providers:
    }
    ```
 
-3. Create `docker-compose.prod.yml` without replacing the repository's original Compose file:
-
-   ```yaml
-   services:
-     app:
-       build: .
-       expose:
-         - "5175"
-       environment:
-         - NODE_ENV=production
-         - BACKEND_PORT=5175
-         - BACKEND_HOST=0.0.0.0
-         - PERSIST_ROOMS=sqlite
-         - ALLOW_ANONYMOUS_WS=false
-         - DB_PATH=./data/open-agricola.db
-         - CARD_ART_DIR=./data/card-art
-         - REPLAY_NEW_ROOMS_ENABLED=${REPLAY_NEW_ROOMS_ENABLED:-false}
-         - REPLAY_VIEWER_BUILD_ID=${REPLAY_VIEWER_BUILD_ID:-}
-         - REPLAY_VIEWER_ROOT=${REPLAY_VIEWER_ROOT:-./data/replay-viewers}
-         - REPLAY_ASSET_ROOT=${REPLAY_ASSET_ROOT:-./data/replay-assets}
-         - REPLAY_TRUST_PROXY=true
-         - GAME_BUILD_ID=${GAME_BUILD_ID:-}
-         - CORS_ORIGIN=https://YOUR_USER.github.io
-       volumes:
-         - app-data:/app/data
-         - app-output:/app/output
-       restart: unless-stopped
-
-     caddy:
-       image: caddy:alpine
-       ports:
-         - "80:80"
-         - "443:443"
-       volumes:
-         - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
-         - caddy-data:/data
-       depends_on:
-         - app
-       restart: unless-stopped
-
-   volumes:
-     app-data:
-     app-output:
-     caddy-data:
-   ```
+3. Use the checked-in `docker-compose.prod.yml` so PostgreSQL/S3, OAuth, and ingress settings remain complete.
 
 4. Start the stack:
 
@@ -435,21 +326,9 @@ To update public assets, first publish `open-agricola-assets` to its Pages site 
 
 ### Backend
 
-Deploy the backend only from an owner-controlled machine. Keep the SSH private key on that machine and provide `ACCOUNT_REGISTRATION_POLICY` through the server's `.env`; neither belongs in GitHub Actions.
+Run `./deploy-backend.sh <ssh-host> [ref] [remote-dir]` from an owner-controlled machine. It refuses to overwrite tracked local edits and checks out the target safely. The old application stays online during image build. Under the maintenance lock, it then stops the application group, exports PostgreSQL and S3, restores a copy into an isolated database/object prefix using the target image, migrates and validates the actual target, and starts the whole application generation together.
 
-```bash
-./deploy-backend.sh root@your-game.duckdns.org v0.3.0 /root/open-agricola
-```
-
-Before switching versions, `deploy-backend.sh` builds the new image while the old version remains online, stops the app, and archives the complete `app-data` volume as `backups/pre-<ref>-<timestamp>.tgz`. The archive includes SQLite, card art, Replay Viewer builds, Replay assets, and the removal ledger. It also refreshes `backups/replay-removals.latest.jsonl` and stores a mode-600 `.env` snapshot at `backups/env-pre-<ref>-<timestamp>`.
-
-After creating the archive, the target image operates on a disposable writable copy. It runs target database migrations, replays the removal ledger, runs SQLite `integrity_check`, deserializes every active room, and validates Replay metadata, Head and Segment records, content-addressed assets, and Viewer builds. Custom Replay paths under `/app/data` are mapped to the extracted copy while the original archive remains unchanged.
-
-On success, the script writes a matching `.manifest.json` containing the archive SHA-256 and size, source and target Builds, target ref, database schemas before and after migration, Replay schema, and validation counts. A backup or semantic-validation failure restores the previous app and fails the local deployment command. Losing the local SSH session after the app stops but before the new version starts also restores the old container.
-
-The script retains the five newest pre-deploy backups and matching manifests, and removes archives older than 30 days under ADR-0010's backup-copy ceiling. Manual archives without the `pre-` prefix are unaffected. Backup archives, manifests, and ledger snapshots use mode 600; `backups/` uses mode 700. Downtime covers only archive creation, semantic validation, and new-container startup, not image building. See [Data Backup](#data-backup) for recovery.
-
-SQLite and card art live in the Docker volume, so rebuilding the container does not delete them.
+A preflight failure can restart the unchanged source container. After live migration starts, failure leaves maintenance active instead of starting an old executable against a possibly changed schema. The durable `data_imports` barrier blocks failed targets. Deployment waits for container health; this procedure does not itself authorize a deployment or certify failover.
 
 ### Frontend
 
@@ -509,10 +388,15 @@ Never set these in production:
 
 | Variable | Default | Description |
 |---|---|---|
+| `DATABASE_URL` | Generated locally | PostgreSQL URL; migrate and validate before endpoint changes |
+| `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET` | Generated locally | Private S3 endpoint and bucket |
+| `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | Generated locally | S3 credentials; never commit them |
+| `S3_PREFIX` | Empty | Object namespace for this environment |
+| `WORKSHOP_TOKEN_ENCRYPTION_KEY` | Generated locally | Shared token encryption key; preserve it during migration |
+| `APP_INSTANCES` | `1` | `1` or `2` application processes on the current host |
 | `BACKEND_PORT` | `5175` | HTTP and WebSocket listen port |
 | `BACKEND_HOST` | `0.0.0.0` | Bind address |
 | `NODE_ENV` | — | Set to `production` for production mode |
-| `PERSIST_ROOMS` | `sqlite` | Room persistence: `sqlite` or `json` |
 | `ALLOW_ANONYMOUS_WS` | `true` in development, `false` in production | Whether anonymous WebSocket connections are allowed |
 | `CORS_ORIGIN` | `*` | Allowed frontend origin; required in production |
 | `PUBLIC_APP_ORIGIN` | — | Public frontend URL; include `/open-agricola/` for a Pages subpath |
@@ -536,13 +420,7 @@ Never set these in production:
 | `BUG_REPORT_TOKEN_ENCRYPTION_KEYS` | — | AES-256-GCM key-ring JSON; every value is 32-byte base64 |
 | `BUG_REPORT_TOKEN_ACTIVE_KEY_ID` | — | Key-ring ID used for new tokens |
 | `ENABLE_AUTH_TEST_HELPERS` | — | May be `1` only locally or in E2E; forbidden in production |
-| `DB_PATH` | `./data/open-agricola.db` | SQLite file path |
-| `CARD_ART_DIR` | `./data/card-art` | Uploaded card-art directory |
-| `REPLAY_VIEWER_ROOT` | `./data/replay-viewers` | Immutable Replay Viewer Build directory |
 | `REPLAY_VIEWER_BUILD_ID` | — | Immutable Viewer Build ID locked by new rooms |
-| `REPLAY_ASSET_ROOT` | `./data/replay-assets` | Content-addressed custom-card assets for Replay |
-| `REPLAY_REMOVAL_LEDGER_PATH` | `./data/replay-removals.jsonl` | Append-only Replay removal ledger outside SQLite; restore with the latest copy |
-| `REPLAY_NEW_ROOMS_ENABLED` | `false` | Whether new rooms record Replay; requires a Viewer Build first |
 | `REPLAY_TRUST_PROXY` | `false` | Set only when the backend is reachable exclusively through a trusted proxy that overwrites `X-Forwarded-For` |
 | `GAME_BUILD_ID` | — | Current backend Git commit; deployment scripts set it automatically |
 | `ADMIN_USERS` | — | Comma-separated administrator usernames |
@@ -608,129 +486,36 @@ Never set these in production:
 
 ### Data Backup
 
-A backup must contain SQLite, Viewer builds, Replay assets, card art, and the deletion ledger. Before every version switch, `deploy-backend.sh` creates an equivalent `backups/pre-<ref>-<timestamp>.tgz` and pairs it with `pre-<ref>-<timestamp>.manifest.json`, proving that the target image migrated and restored a disposable copy successfully. The manifest's `targetBuildId` proves only build compatibility; `archiveSha256` and `archiveSizeBytes` bind the actual archive. Before restoring with another build, rerun `scripts/validate-backup.ts` against that build.
-
-The following manual procedure is for backups outside deployment. It assumes the default ledger path `/app/data/replay-removals.jsonl`. Stop the backend first so the archive does not cross a Room Commit:
+An ordinary archive contains a native PostgreSQL custom-format dump, immutable S3 objects, and SHA-256/length metadata. The current erasure ledger is retained separately and never replaced by an older archive. `env-<stem>` is a mode-600 configuration tar containing `.env`, container connection configuration, and local credentials/encryption keys; it is not a plain `.env` file.
 
 ```bash
-mkdir -p backups
-OA_BACKUP_NAME="open-agricola-$(date -u +%Y%m%dT%H%M%SZ).tgz"
-docker compose -f docker-compose.prod.yml stop app
+bash scripts/backup-storage.sh "manual-$(date -u +%Y%m%dT%H%M%SZ)"
+./backup-offsite.sh                 # Optional configured offsite copy
+./backup-offsite.sh ledger-only     # Refresh deletion facts without stopping applications
+```
+
+The backup helper stops applications for export, resumes service, and validates the archive using the target build in an isolated PostgreSQL database and S3 prefix. Its report identifies source/target builds and binds the archive hash/length. By default validation needs `CREATEDB`; a managed service can instead supply a separate empty `VALIDATION_DATABASE_URL` dedicated to that validation. Historical SQLite write/capacity numbers do not establish these storage capabilities.
+
+Daily backup and deployment share `backups/.maintenance.lock`. Retention remains 7 local daily archives and 5 local pre-deploy archives; offsite retains 30 daily and 10 pre-deploy archives. All ordinary archives and corresponding configuration snapshots expire within 30 days. Keep the autonomous offsite cron for `deploy/offsite-retention.sh`; ledger copies are never ordinary archive-retention targets. Configure `OFFSITE_BACKUP_TARGET` and `OFFSITE_BACKUP_REMOTE_DIR`, then install `deploy/open-agricola-backup.cron` and its logrotate file. Manual local backups do not require an offsite host.
+
+Offsite ledger synchronization reads the remote copy, merges it into the current S3 CAS ledger, and exports the union. Old backups or local copies cannot erase newer deletion facts. Use `ledger-only` immediately after a removal.
+
+#### Restore or switch to external services
+
+Stop every application. Prepare the target image, archive and matching report, latest independent ledger, retained encryption keys, an empty target database, and a separate target object namespace. Verify the tar SHA-256/length against the report before extracting into a private directory. Restore also verifies the inner database and object hashes/lengths. Configure the destination connection group, then run:
+
+```bash
+# /restore/archive contains archive.json, database.dump, and objects/.
+# The current ledger was obtained independently, not extracted from the archive.
 docker compose -f docker-compose.prod.yml run --rm --no-deps \
-  -v "$PWD/backups:/backup" app sh -c \
-  "tar -C /app/data -czf /backup/$OA_BACKUP_NAME . && \
-   if [ -f /app/data/replay-removals.jsonl ]; then \
-     cp /app/data/replay-removals.jsonl /backup/replay-removals.latest.jsonl; \
-   else \
-     : > /backup/replay-removals.latest.jsonl; \
-   fi"
-docker compose -f docker-compose.prod.yml up -d app
+  -v "$PWD/restore:/restore"   -e CURRENT_ERASURE_LEDGER=/restore/replay-removals.latest.json app \
+  node --import tsx scripts/storage-archive-cli.ts restore /restore/archive --applications-stopped
+docker compose -f docker-compose.prod.yml run --rm --no-deps app \
+  node --import tsx scripts/storage-archive-cli.ts check-live "$(git rev-parse HEAD)" --applications-stopped
+docker compose -f docker-compose.prod.yml up -d --no-build --wait app caddy
 ```
 
-A manual archive is a verified restore point only after read-only validation with the target image. Keep the matching manifest:
-
-```bash
-OA_BACKUP_STEM="${OA_BACKUP_NAME%.tgz}"
-OA_VALIDATE_DIR="$(mktemp -d)"
-OA_BUILD_ID="$(git rev-parse HEAD)"
-OA_BACKUP_SHA256="$(sha256sum "backups/$OA_BACKUP_NAME" | cut -d ' ' -f 1)"
-OA_BACKUP_SIZE_BYTES="$(stat -c '%s' "backups/$OA_BACKUP_NAME")"
-tar -C "$OA_VALIDATE_DIR" -xzf "backups/$OA_BACKUP_NAME"
-docker compose -f docker-compose.prod.yml run --rm --no-deps \
-  -v "$OA_VALIDATE_DIR:/validation-data" \
-  -e DB_PATH=/validation-data/open-agricola.db \
-  -e BACKUP_STEM="$OA_BACKUP_STEM" \
-  -e BACKUP_CREATED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-  -e SOURCE_BUILD_ID="$OA_BUILD_ID" \
-  -e TARGET_BUILD_ID="$OA_BUILD_ID" \
-  -e TARGET_REF=manual \
-  -e BACKUP_SHA256="$OA_BACKUP_SHA256" \
-  -e BACKUP_SIZE_BYTES="$OA_BACKUP_SIZE_BYTES" \
-  app node --import tsx scripts/validate-backup.ts \
-  > "backups/$OA_BACKUP_STEM.manifest.json"
-rm -rf -- "$OA_VALIDATE_DIR"
-chmod 600 "backups/$OA_BACKUP_STEM.manifest.json"
-```
-
-`replay-removals.latest.jsonl` is the newest append-only deletion fact. Store it separately from ordinary backups. Immediately after every Replay removal, run `./backup-offsite.sh ledger-only` to update its offsite copy without stopping the app. Never roll it back with an older data archive.
-
-#### Scheduled Backups and Offsite Copies
-
-Production cron runs `backup-offsite.sh` daily at 20:00 UTC, or 04:00 Beijing time. It protects data between releases and copies backups off the production host:
-
-1. Stop the app, archive `app-data` as `backups/daily-<timestamp>.tgz`, refresh `backups/replay-removals.latest.jsonl`, and restart the app. Downtime covers only archive creation. Backups and deployments share `backups/.maintenance.lock`: cron skips a backup during deployment, and deployment waits for a backup already in progress.
-2. After service returns, use the current image to run the same restore validation as a pre-deploy backup against a disposable copy. Write the matching `.manifest.json` and an `.env` snapshot when `.env` exists. On validation failure, delete this run's artifacts and exit nonzero without affecting production; retention cleanup and offsite synchronization still run.
-3. Retain the seven newest local `daily-*` archives. Every local archive, including `pre-*` and manual backups, has a 30-day maximum age under ADR-0010, calculated by minute to avoid day rounding. `deploy-backend.sh` still owns the count limit for `pre-*`; manual archives remain operator-managed.
-4. Use rsync to copy `backups/`, including pre-deploy, daily, manual, manifest, and environment snapshots, to `OFFSITE_BACKUP_REMOTE_DIR` on `OFFSITE_BACKUP_TARGET`. Do not upload local archives older than 30 days. Do not use `--delete`; remote retention is independent, so an accidental local deletion does not propagate.
-5. Synchronize `replay-removals.latest.jsonl` separately. Replace the remote ledger only when the local copy is a prefix-compatible superset of it. A divergent prefix fails the script and preserves the remote copy, preventing a rolled-back ledger from overwriting offsite deletion facts.
-6. Remotely retain the newest 30 `daily-*` archives and 10 `pre-*` archives, while enforcing the 30-day maximum on every archive, including manual ones. Never automatically delete `replay-removals.latest.jsonl`. Install the autonomous `deploy/offsite-retention.sh` cron on the offsite host so the 30-day ceiling still applies if production is lost or unreachable.
-
-Initial production-host setup:
-
-```bash
-# 1. Host dependencies: production needs rsync, cron, and logrotate; offsite needs rsync
-apt-get update && apt-get install -y rsync cron logrotate
-systemctl is-active cron
-ssh root@<OFFSITE_IP> 'command -v rsync || (apt-get update && apt-get install -y rsync)'
-
-# 2. SSH trust from production to offsite; skip ssh-keygen when the key exists
-test -f ~/.ssh/id_ed25519 || ssh-keygen -t ed25519 -N '' -f ~/.ssh/id_ed25519
-ssh-copy-id root@<OFFSITE_IP>
-
-# 3. Configure the destination in .env
-echo 'OFFSITE_BACKUP_TARGET=root@<OFFSITE_IP>' >> /root/open-agricola/.env
-
-# 4. Verify the complete path manually
-/root/open-agricola/backup-offsite.sh
-
-# 5. Install cron and log rotation
-cd /root/open-agricola
-cp deploy/open-agricola-backup.cron /etc/cron.d/open-agricola-backup
-chmod 644 /etc/cron.d/open-agricola-backup
-cp deploy/open-agricola-backup.logrotate /etc/logrotate.d/open-agricola-backup
-
-# 6. Install autonomous 30-day retention on the offsite host
-scp deploy/offsite-retention.sh root@<OFFSITE_IP>:/root/offsite-retention.sh
-ssh root@<OFFSITE_IP> 'chmod +x /root/offsite-retention.sh'
-scp deploy/open-agricola-offsite-retention.cron root@<OFFSITE_IP>:/etc/cron.d/open-agricola-offsite-retention
-ssh root@<OFFSITE_IP> 'chmod 644 /etc/cron.d/open-agricola-offsite-retention && systemctl is-active cron'
-```
-
-The scripts update with normal Git deployment. Reinstall the cron file after changing its definition. To restore from the offsite host, first pull the archive, matching manifest, `env-<stem>` snapshot, and latest ledger into production `backups/`:
-
-```bash
-rsync "root@<OFFSITE_IP>:/root/open-agricola-backups/{<stem>.tgz,<stem>.manifest.json,env-<stem>,replay-removals.latest.jsonl}" backups/
-cp "backups/env-<stem>" .env && chmod 600 .env
-```
-
-Before restoring, prepare the archive, matching manifest, and latest ledger. Confirm that the manifest `targetBuildId` equals the build to be started; otherwise rerun the validator with the target image against a copy of the archive. Replace data while the backend is stopped. The command explicitly replays the ledger, and service startup replays it idempotently again:
-
-```bash
-OA_RESTORE_ARCHIVE=open-agricola-YYYYMMDDTHHMMSSZ.tgz
-OA_RESTORE_STEM="${OA_RESTORE_ARCHIVE%.tgz}"
-OA_TARGET_BUILD_ID="$(git rev-parse HEAD)"
-test -f "backups/$OA_RESTORE_ARCHIVE"
-test -f "backups/$OA_RESTORE_STEM.manifest.json"
-test -f backups/replay-removals.latest.jsonl
-test "$(sha256sum "backups/$OA_RESTORE_ARCHIVE" | cut -d ' ' -f 1)" = \
-  "$(jq -r .archiveSha256 "backups/$OA_RESTORE_STEM.manifest.json")"
-test "$(stat -c '%s' "backups/$OA_RESTORE_ARCHIVE")" -eq \
-  "$(jq -r .archiveSizeBytes "backups/$OA_RESTORE_STEM.manifest.json")"
-test "$OA_TARGET_BUILD_ID" = \
-  "$(jq -r .targetBuildId "backups/$OA_RESTORE_STEM.manifest.json")"
-docker compose -f docker-compose.prod.yml stop app
-docker compose -f docker-compose.prod.yml run --rm --no-deps \
-  -e OA_RESTORE_ARCHIVE="$OA_RESTORE_ARCHIVE" \
-  -v "$PWD/backups:/backup:ro" app sh -c \
-  'tar -tzf "/backup/$OA_RESTORE_ARCHIVE" >/dev/null &&
-   find /app/data -mindepth 1 -maxdepth 1 -exec rm -rf -- {} \; &&
-   tar -C /app/data -xzf "/backup/$OA_RESTORE_ARCHIVE" &&
-   cp /backup/replay-removals.latest.jsonl /app/data/replay-removals.jsonl &&
-   node --import tsx scripts/replay-removal.ts apply-ledger'
-docker compose -f docker-compose.prod.yml up -d app
-```
-
-After restoration, sample every Room ID in the ledger. Game Context may return only a `removed` Tombstone; manifests and segments must be unreadable, and asset hashes with no remaining Replay reference must return 404.
+Restore merges current deletion facts before placing allowed historical objects, restores PostgreSQL, applies target migrations, and verifies Room-owned recovery, complete Replay chains, and resources. A failed target must stay detached; preserve the source and resolve the error. Changing endpoints is not data migration and cannot replace export/restore/validation. Current single-host functionality makes no fault-timing or physical-host availability claim.
 
 ### Remove a Replay
 
@@ -746,8 +531,9 @@ docker compose -f docker-compose.prod.yml run --rm --no-deps app \
   node --import tsx scripts/replay-removal.ts remove \
   --room-id "$OA_ROOM_ID" --reason moderation
 mkdir -p backups
-docker compose -f docker-compose.prod.yml cp \
-  app:/app/data/replay-removals.jsonl backups/replay-removals.latest.jsonl
+docker compose -f docker-compose.prod.yml run --rm --no-deps \
+  -v "$PWD/backups:/backup" app node --import tsx scripts/storage-archive-cli.ts \
+  ledger-export /backup/replay-removals.latest.json
 docker compose -f docker-compose.prod.yml up -d app
 ```
 
@@ -763,8 +549,9 @@ docker compose -f docker-compose.prod.yml run --rm --no-deps app \
   node --import tsx scripts/replay-removal.ts remove \
   --room-id "$OA_ROOM_ID" --reason legal --erase-result
 mkdir -p backups
-docker compose -f docker-compose.prod.yml cp \
-  app:/app/data/replay-removals.jsonl backups/replay-removals.latest.jsonl
+docker compose -f docker-compose.prod.yml run --rm --no-deps \
+  -v "$PWD/backups:/backup" app node --import tsx scripts/storage-archive-cli.ts \
+  ledger-export /backup/replay-removals.latest.json
 docker compose -f docker-compose.prod.yml up -d app
 ```
 
@@ -782,12 +569,13 @@ docker compose -f docker-compose.prod.yml run --rm --no-deps app \
   --room-id "$OA_ROOM_ID" --reason legal \
   --asset-hash "$OA_ASSET_HASH"
 mkdir -p backups
-docker compose -f docker-compose.prod.yml cp \
-  app:/app/data/replay-removals.jsonl backups/replay-removals.latest.jsonl
+docker compose -f docker-compose.prod.yml run --rm --no-deps \
+  -v "$PWD/backups:/backup" app node --import tsx scripts/storage-archive-cli.ts \
+  ledger-export /backup/replay-removals.latest.json
 docker compose -f docker-compose.prod.yml up -d app
 ```
 
-An asset removal may use an existing Tombstone Room whose ledger proves the reference. The violating hash becomes a permanent ledger rule: restoring an old backup automatically removes new references, and later rooms cannot archive the same content. The operation is idempotent. Ordinary whole-Replay removal deletes only assets no longer referenced by another Replay. On success, immediately run `./backup-offsite.sh ledger-only` to back up the latest `replay-removals.jsonl` offsite.
+An asset removal may use an existing Tombstone Room whose ledger proves the reference. The violating hash becomes a permanent ledger rule: restoring an old backup automatically removes new references, and later rooms cannot archive the same content. The operation is idempotent. Ordinary whole-Replay removal deletes only assets no longer referenced by another Replay. On success, immediately run `./backup-offsite.sh ledger-only` to back up the latest independent ledger offsite.
 
 ### Rotate Bug Report Token Keys
 
@@ -796,7 +584,7 @@ An asset removal may use an existing Tombstone Room whose ledger proves the refe
 3. Keep the old key while any connection still requires it. Wait until rows using the old key disappear from `issue_submission_connections.key_id`, and until old `oauth_states.pkce_verifier_key_id` rows disappear or expire.
 4. After confirming both Hosted and personal-GitHub submissions, remove the old key from the key ring and restart again. Never change the key material associated with an existing key ID during rotation.
 
-### Local Development without Docker
+### Local Development with Self-hosted Dependencies
 
 ```bash
 pnpm install

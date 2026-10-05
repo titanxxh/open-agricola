@@ -1,3 +1,4 @@
+import { consumeRateLimit } from '../database/rate-limit'
 import {
   createCipheriv,
   createDecipheriv,
@@ -5,7 +6,7 @@ import {
   randomBytes,
   randomUUID,
 } from 'node:crypto'
-import type Database from 'better-sqlite3'
+import type { PostgresDatabase as Database } from '../database/postgres'
 import {
   createCodeChallenge,
   type GitHubFailure,
@@ -22,7 +23,7 @@ const CLAIM_TTL_MS = 5 * 60 * 1000
 const RETRY_DELAYS = [30_000, 120_000, 600_000] as const
 const MAX_UNFINISHED_DRAFTS = 5
 
-type SqliteDb = Pick<Database.Database, 'prepare' | 'transaction'>
+type ReportDatabase = Pick<Database, 'prepare' | 'transaction'>
 
 type EncryptedValue = {
   ciphertext: Buffer
@@ -46,6 +47,7 @@ type ConnectionRow = {
 }
 
 type GrantRevocationRow = {
+  claim_token: string
   token_hash: string
   access_token_ciphertext: Buffer
   access_token_nonce: Buffer
@@ -260,12 +262,12 @@ const reportColumns = `
 `
 
 export class BugReportStore {
-  private readonly db: SqliteDb
+  private readonly db: ReportDatabase
   private readonly cipher: TokenCipher
   private readonly now: () => number
 
   constructor(
-    db: SqliteDb,
+    db: ReportDatabase,
     cipher: TokenCipher,
     now: () => number = Date.now,
   ) {
@@ -274,16 +276,16 @@ export class BugReportStore {
     this.now = now
   }
 
-  connectionStatus(userId: string): {
+  async connectionStatus(userId: string): Promise<Awaited<{
     connected: boolean
     githubUserId?: string
     expiresAt?: number
-  } {
-    const row = this.db.prepare(`
+  }>> {
+    const row = (await this.db.prepare(`
       SELECT github_user_id, access_token_expires_at
       FROM issue_submission_connections
       WHERE user_id = ? AND revoked_at IS NULL
-    `).get(userId) as {
+    `).get(userId)) as {
       github_user_id: string
       access_token_expires_at: number
     } | undefined
@@ -296,40 +298,43 @@ export class BugReportStore {
       : { connected: false }
   }
 
-  saveConnection(
+  async saveConnection(
     userId: string,
     githubUserId: string,
     tokens: GitHubUserTokens,
-  ): void {
-    const linked = this.db.prepare(`
+  ): Promise<Awaited<void>> {
+    const result = await this.db.transaction(async () => {
+await this.db.prepare('SELECT id FROM users WHERE id = ? FOR UPDATE').get(userId)
+
+    const linked = (await this.db.prepare(`
       SELECT provider_user_id
       FROM auth_identities
       WHERE user_id = ? AND provider = 'github'
-    `).get(userId) as { provider_user_id: string } | undefined
+    `).get(userId)) as { provider_user_id: string } | undefined
     if (linked && linked.provider_user_id !== githubUserId) {
       throw new BugReportError('github_identity_mismatch', 409)
     }
-    const identityOwner = this.db.prepare(`
+    const identityOwner = (await this.db.prepare(`
       SELECT user_id
       FROM auth_identities
       WHERE provider = 'github' AND provider_user_id = ?
-    `).get(githubUserId) as { user_id: string } | undefined
+    `).get(githubUserId)) as { user_id: string } | undefined
     if (identityOwner && identityOwner.user_id !== userId) {
       throw new BugReportError('github_identity_already_connected', 409)
     }
-    const owner = this.db.prepare(`
+    const owner = (await this.db.prepare(`
       SELECT user_id
       FROM issue_submission_connections
       WHERE github_user_id = ?
-    `).get(githubUserId) as { user_id: string } | undefined
+    `).get(githubUserId)) as { user_id: string } | undefined
     if (owner && owner.user_id !== userId) {
       throw new BugReportError('github_identity_already_connected', 409)
     }
-    const existing = this.db.prepare(`
+    const existing = (await this.db.prepare(`
       SELECT github_user_id
       FROM issue_submission_connections
       WHERE user_id = ?
-    `).get(userId) as { github_user_id: string } | undefined
+    `).get(userId)) as { github_user_id: string } | undefined
     if (existing && existing.github_user_id !== githubUserId) {
       throw new BugReportError('github_identity_mismatch', 409)
     }
@@ -338,7 +343,7 @@ export class BugReportStore {
       ? this.cipher.encrypt(tokens.refreshToken)
       : null
     const now = this.now()
-    const saved = this.db.prepare(`
+    const saved = (await this.db.prepare(`
       INSERT INTO issue_submission_connections (
         user_id, github_user_id,
         access_token_ciphertext, access_token_nonce, access_token_tag,
@@ -385,17 +390,20 @@ export class BugReportStore {
       now,
       now,
       userId,
-    )
+    ))
     if (saved.changes !== 1) {
       throw new BugReportError('account_deletion_pending', 409)
     }
+
+    })()
+    return result
   }
 
-  connectionTokens(
+  async connectionTokens(
     userId: string,
     includeRevoked = false,
-  ): (GitHubUserTokens & { githubUserId: string }) | null {
-    const row = this.db.prepare(`
+  ): Promise<Awaited<(GitHubUserTokens & { githubUserId: string }) | null>> {
+    const row = (await this.db.prepare(`
       SELECT user_id, github_user_id,
              access_token_ciphertext, access_token_nonce, access_token_tag,
              refresh_token_ciphertext, refresh_token_nonce, refresh_token_tag,
@@ -403,7 +411,7 @@ export class BugReportStore {
       FROM issue_submission_connections
       WHERE user_id = ?
         AND (? = 1 OR revoked_at IS NULL)
-    `).get(userId, includeRevoked ? 1 : 0) as ConnectionRow | undefined
+    `).get(userId, includeRevoked ? 1 : 0)) as ConnectionRow | undefined
     if (!row) return null
     const accessToken = this.cipher.decrypt({
       ciphertext: row.access_token_ciphertext,
@@ -432,11 +440,11 @@ export class BugReportStore {
     }
   }
 
-  queueGrantRevocation(accessToken: string): string {
+  async queueGrantRevocation(accessToken: string): Promise<Awaited<string>> {
     const tokenHash = hashState(accessToken)
     const encrypted = this.cipher.encrypt(accessToken)
     const now = this.now()
-    this.db.prepare(`
+    ;(await this.db.prepare(`
       INSERT INTO github_grant_revocations (
         token_hash, access_token_ciphertext, access_token_nonce,
         access_token_tag, key_id, next_attempt_at, last_error_code,
@@ -456,90 +464,74 @@ export class BugReportStore {
       now,
       now,
       now,
-    )
+    ))
     return tokenHash
   }
 
-  nextGrantRevocation(): {
-    tokenHash: string
-    accessToken: string
-  } | null {
-    const row = this.db.prepare(`
-      SELECT token_hash, access_token_ciphertext, access_token_nonce,
-             access_token_tag, key_id
-      FROM github_grant_revocations
-      WHERE next_attempt_at <= ?
-      ORDER BY next_attempt_at, created_at
-      LIMIT 1
-    `).get(this.now()) as GrantRevocationRow | undefined
+  async nextGrantRevocation(tokenHash?: string): Promise<{ tokenHash: string; claimToken: string; accessToken: string } | null> {
+    const now = this.now()
+    const row = await this.db.prepare(`
+      UPDATE github_grant_revocations SET claim_token = ?, claim_until = ?
+      WHERE token_hash = (
+        SELECT token_hash FROM github_grant_revocations
+        WHERE next_attempt_at <= ? AND (claim_until IS NULL OR claim_until <= ?)
+          AND (?::text IS NULL OR token_hash = ?)
+        ORDER BY next_attempt_at, created_at LIMIT 1 FOR UPDATE SKIP LOCKED
+      ) RETURNING token_hash, claim_token, access_token_ciphertext, access_token_nonce, access_token_tag, key_id
+    `).get<GrantRevocationRow>(randomUUID(), now + CLAIM_TTL_MS, now, now, tokenHash ?? null, tokenHash ?? null)
     if (!row) return null
     return {
-      tokenHash: row.token_hash,
-      accessToken: this.cipher.decrypt({
-        ciphertext: row.access_token_ciphertext,
-        nonce: row.access_token_nonce,
-        tag: row.access_token_tag,
-        keyId: row.key_id,
-      }),
+      tokenHash: row.token_hash, claimToken: row.claim_token,
+      accessToken: this.cipher.decrypt({ ciphertext: row.access_token_ciphertext, nonce: row.access_token_nonce, tag: row.access_token_tag, keyId: row.key_id }),
     }
   }
 
-  finishGrantRevocation(tokenHash: string): void {
-    this.db.prepare(`
-      DELETE FROM github_grant_revocations WHERE token_hash = ?
-    `).run(tokenHash)
+  async finishGrantRevocation(tokenHash: string, claimToken: string): Promise<void> {
+    await this.db.prepare('DELETE FROM github_grant_revocations WHERE token_hash = ? AND claim_token = ?').run(tokenHash, claimToken)
   }
 
-  deferGrantRevocation(
-    tokenHash: string,
-    code: string,
-    retryAt?: number,
-  ): void {
+  async deferGrantRevocation(tokenHash: string, claimToken: string, code: string, retryAt?: number): Promise<void> {
     const now = this.now()
-    this.db.prepare(`
-      UPDATE github_grant_revocations
-      SET next_attempt_at = ?,
-          last_error_code = ?,
-          updated_at = ?
-      WHERE token_hash = ?
-    `).run(retryAt ?? now + RETRY_DELAYS[0], code, now, tokenHash)
+    await this.db.prepare(`UPDATE github_grant_revocations
+      SET next_attempt_at = ?, last_error_code = ?, updated_at = ?, claim_token = NULL, claim_until = NULL
+      WHERE token_hash = ? AND claim_token = ?`).run(retryAt ?? now + RETRY_DELAYS[0], code, now, tokenHash, claimToken)
   }
 
-  disconnect(userId: string): void {
-    this.db.prepare(`
+  async disconnect(userId: string): Promise<Awaited<void>> {
+    ;(await this.db.prepare(`
       DELETE FROM issue_submission_connections WHERE user_id = ?
-    `).run(userId)
+    `).run(userId))
   }
 
-  disconnectGithubUser(githubUserId: string): void {
-    this.db.prepare(`
+  async disconnectGithubUser(githubUserId: string): Promise<Awaited<void>> {
+    ;(await this.db.prepare(`
       DELETE FROM issue_submission_connections WHERE github_user_id = ?
-    `).run(githubUserId)
+    `).run(githubUserId))
   }
 
-  createConnectionState(
+  async createConnectionState(
     userId: string,
     returnTo: string,
-  ): {
+  ): Promise<Awaited<{
     state: string
     codeChallenge: string
-  } {
+  }>> {
     const state = randomBytes(32).toString('base64url')
     const verifier = randomBytes(48).toString('base64url')
     const encrypted = this.cipher.encrypt(verifier)
     const now = this.now()
-    this.db.transaction(() => {
-      this.db.prepare(`
+    ;(await this.db.transaction(async () => {
+      ;(await this.db.prepare(`
         DELETE FROM oauth_states
         WHERE used_at IS NOT NULL OR expires_at <= ?
-      `).run(now)
-      this.db.prepare(`
+      `).run(now))
+      ;(await this.db.prepare(`
         DELETE FROM oauth_states
         WHERE provider = 'github'
           AND intent = 'bug_report'
           AND user_id = ?
-      `).run(userId)
-      this.db.prepare(`
+      `).run(userId))
+      ;(await this.db.prepare(`
         INSERT INTO oauth_states (
           state_hash, provider, intent, user_id, return_to, expires_at, created_at,
           pkce_verifier_ciphertext, pkce_verifier_nonce, pkce_verifier_tag,
@@ -556,13 +548,13 @@ export class BugReportStore {
         encrypted.nonce,
         encrypted.tag,
         encrypted.keyId,
-      )
-    })()
+      ))
+    })())
     return { state, codeChallenge: createCodeChallenge(verifier) }
   }
 
-  connectionStateReturnTo(state: string): string | null {
-    const row = this.db.prepare(`
+  async connectionStateReturnTo(state: string): Promise<Awaited<string | null>> {
+    const row = (await this.db.prepare(`
       SELECT return_to
       FROM oauth_states
       WHERE state_hash = ?
@@ -570,19 +562,19 @@ export class BugReportStore {
         AND intent = 'bug_report'
         AND used_at IS NULL
         AND expires_at > ?
-    `).get(hashState(state), this.now()) as { return_to: string | null } | undefined
+    `).get(hashState(state), this.now())) as { return_to: string | null } | undefined
     return row?.return_to ?? null
   }
 
-  consumeConnectionState(state: string, expectedUserId?: string): {
+  async consumeConnectionState(state: string, expectedUserId?: string): Promise<Awaited<{
     userId: string
     returnTo: string
     verifier: string
-  } | null {
+  } | null>> {
     const now = this.now()
     const stateHash = hashState(state)
-    const row = this.db.transaction(() => {
-      const found = this.db.prepare(`
+    const row = (await this.db.transaction(async () => {
+      const found = (await this.db.prepare(`
         SELECT user_id, return_to,
                pkce_verifier_ciphertext, pkce_verifier_nonce,
                pkce_verifier_tag, pkce_verifier_key_id
@@ -592,20 +584,20 @@ export class BugReportStore {
           AND intent = 'bug_report'
           AND used_at IS NULL
           AND expires_at > ?
-      `).get(stateHash, now) as OAuthStateRow | undefined
+      `).get(stateHash, now)) as OAuthStateRow | undefined
       if (
         !found
         || (expectedUserId !== undefined && found.user_id !== expectedUserId)
       ) {
         return null
       }
-      const changed = this.db.prepare(`
+      const changed = (await this.db.prepare(`
         UPDATE oauth_states
         SET used_at = ?
         WHERE state_hash = ? AND used_at IS NULL
-      `).run(now, stateHash)
+      `).run(now, stateHash))
       return changed.changes === 1 ? found : null
-    })()
+    })())
     if (!row) return null
     return {
       userId: row.user_id,
@@ -619,42 +611,46 @@ export class BugReportStore {
     }
   }
 
-  createDraft(input: {
+  async createDraft(input: {
     userId: string
     roomId: string
     phenomenon: unknown
     stepNo?: unknown
     frameHash?: unknown
-  }): BugReportView {
+  }): Promise<Awaited<BugReportView>> {
+    const result = await this.db.transaction(async () => {
+await this.db.prepare('SELECT id FROM users WHERE id = ? FOR UPDATE').get(input.userId)
+await this.db.prepare('SELECT room_id FROM game_contexts WHERE room_id = ? FOR UPDATE').get(input.roomId)
+
     const phenomenon = cleanPhenomenon(input.phenomenon)
-    const unfinished = this.db.prepare(`
+    const unfinished = (await this.db.prepare(`
       SELECT COUNT(*) AS count
       FROM bug_reports
       WHERE reporter_user_id = ?
         AND discarded_at IS NULL
         AND github_issue_number IS NULL
-    `).get(input.userId) as { count: number }
+    `).get(input.userId)) as { count: number }
     if (unfinished.count >= MAX_UNFINISHED_DRAFTS) {
       throw new BugReportError('bug_report_draft_limit', 429)
     }
-    const context = this.db.prepare(`
+    const context = (await this.db.prepare(`
       SELECT lifecycle FROM game_contexts WHERE room_id = ?
-    `).get(input.roomId) as ContextRow | undefined
+    `).get(input.roomId)) as ContextRow | undefined
     if (!context) throw new BugReportError('unknown_context', 404)
     if (context.lifecycle !== 'active' && context.lifecycle !== 'completed') {
       throw new BugReportError(`context_${context.lifecycle}`, 410)
     }
     const participant = context.lifecycle === 'active'
-      ? this.db.prepare(`
+      ? (await this.db.prepare(`
           SELECT 1 FROM room_players
           WHERE room_id = ? AND user_id = ?
-        `).get(input.roomId, input.userId)
-      : this.db.prepare(`
+        `).get(input.roomId, input.userId))
+      : (await this.db.prepare(`
           SELECT 1 FROM game_result_players
           WHERE room_id = ? AND user_id = ?
-        `).get(input.roomId, input.userId)
+        `).get(input.roomId, input.userId))
     if (!participant) throw new BugReportError('not_participant', 403)
-    if (!this.hasReplayAnchor(input.userId, input.roomId)) {
+    if (!(await this.hasReplayAnchor(input.userId, input.roomId))) {
       throw new BugReportError('bug_report_anchor_unavailable', 503)
     }
     let anchor: AnchorRow | undefined
@@ -662,7 +658,7 @@ export class BugReportStore {
       if (input.stepNo !== undefined || input.frameHash !== undefined) {
         throw new BugReportError('anchor_mismatch', 409)
       }
-      anchor = this.db.prepare(`
+      anchor = (await this.db.prepare(`
         SELECT room_players.player_index,
                step.room_version,
                step.step_no,
@@ -679,7 +675,7 @@ export class BugReportStore {
            WHERE latest.room_id = rooms.id
          )
         WHERE rooms.id = ?
-      `).get(input.userId, input.roomId) as AnchorRow | undefined
+      `).get(input.userId, input.roomId)) as AnchorRow | undefined
     } else if (context.lifecycle === 'completed') {
       if (
         !Number.isSafeInteger(input.stepNo)
@@ -688,7 +684,7 @@ export class BugReportStore {
       ) {
         throw new BugReportError('anchor_mismatch', 409)
       }
-      anchor = this.db.prepare(`
+      anchor = (await this.db.prepare(`
         SELECT result_player.player_index,
                step.room_version,
                step.step_no,
@@ -705,12 +701,12 @@ export class BugReportStore {
         input.frameHash,
         input.roomId,
         input.userId,
-      ) as AnchorRow | undefined
+      )) as AnchorRow | undefined
     }
     if (!anchor) throw new BugReportError('anchor_mismatch', 409)
     const submissionId = randomUUID()
     const now = this.now()
-    this.db.prepare(`
+    ;(await this.db.prepare(`
       INSERT INTO bug_reports (
         submission_id, reporter_user_id, room_id, player_index, lifecycle,
         room_version, step_no, frame_hash, phenomenon, status,
@@ -730,12 +726,15 @@ export class BugReportStore {
       null,
       now,
       now,
-    )
-    return this.getOwned(submissionId, input.userId)
+    ))
+    return (await this.getOwned(submissionId, input.userId))
+
+    })()
+    return result
   }
 
-  hasReplayAnchor(userId: string, roomId: string): boolean {
-    return Boolean(this.db.prepare(`
+  async hasReplayAnchor(userId: string, roomId: string): Promise<Awaited<boolean>> {
+    return Boolean((await this.db.prepare(`
       SELECT 1
       FROM game_contexts AS context
       WHERE context.room_id = ?
@@ -760,19 +759,19 @@ export class BugReportStore {
           )
         )
       LIMIT 1
-    `).get(roomId, userId, userId))
+    `).get(roomId, userId, userId)))
   }
 
-  getOwned(submissionId: string, userId: string): BugReportView {
-    return toView(this.ownedRow(submissionId, userId))
+  async getOwned(submissionId: string, userId: string): Promise<Awaited<BugReportView>> {
+    return toView((await this.ownedRow(submissionId, userId)))
   }
 
-  openIssuesFor(submissionId: string, userId: string): ExistingBugIssue[] {
-    return this.matchingOpenIssues(this.ownedRow(submissionId, userId))
+  async openIssuesFor(submissionId: string, userId: string): Promise<Awaited<ExistingBugIssue[]>> {
+    return (await this.matchingOpenIssues((await this.ownedRow(submissionId, userId))))
       .map(({ number, url }) => ({ number, url }))
   }
 
-  updateDraft(
+  async updateDraft(
     submissionId: string,
     userId: string,
     input: {
@@ -782,8 +781,12 @@ export class BugReportStore {
       confirmHosted?: unknown
       confirmExisting?: unknown
     },
-  ): BugReportView {
-    const row = this.ownedRow(submissionId, userId)
+  ): Promise<Awaited<BugReportView>> {
+    const result = await this.db.transaction(async () => {
+await this.db.prepare('SELECT id FROM users WHERE id = ? FOR UPDATE').get(userId)
+await this.db.prepare('SELECT room_id FROM game_contexts WHERE room_id = (SELECT room_id FROM bug_reports WHERE submission_id = ?) FOR UPDATE').get(submissionId)
+
+    const row = (await this.ownedRow(submissionId, userId))
     if (row.status === 'submitted') {
       throw new BugReportError('bug_report_already_submitted', 409)
     }
@@ -813,7 +816,7 @@ export class BugReportStore {
     let author = row.author_identity
     let confirmedGitHubUserId = row.confirmed_github_user_id
     if (githubReconfirmation) {
-      const connection = this.connectionStatus(userId)
+      const connection = (await this.connectionStatus(userId))
       if (!connection.connected || !connection.githubUserId) {
         throw new BugReportError('github_connection_required', 409)
       }
@@ -841,7 +844,7 @@ export class BugReportStore {
       if (
         input.authorIdentity === 'github_user'
       ) {
-        const connection = this.connectionStatus(userId)
+        const connection = (await this.connectionStatus(userId))
         if (!connection.connected || !connection.githubUserId) {
           throw new BugReportError('github_connection_required', 409)
         }
@@ -858,7 +861,7 @@ export class BugReportStore {
       throw new BugReportError('invalid_existing_issue_confirmation', 400)
     }
     const now = this.now()
-    this.db.prepare(`
+    ;(await this.db.prepare(`
       UPDATE bug_reports
       SET phenomenon = ?,
           author_identity = ?,
@@ -875,12 +878,19 @@ export class BugReportStore {
       now,
       submissionId,
       userId,
-    )
-    return this.getOwned(submissionId, userId)
+    ))
+    return (await this.getOwned(submissionId, userId))
+
+    })()
+    return result
   }
 
-  queue(submissionId: string, userId: string): BugReportView {
-    const row = this.ownedRow(submissionId, userId)
+  async queue(submissionId: string, userId: string): Promise<Awaited<BugReportView>> {
+    const result = await this.db.transaction(async () => {
+await this.db.prepare('SELECT id FROM users WHERE id = ? FOR UPDATE').get(userId)
+await this.db.prepare('SELECT room_id FROM game_contexts WHERE room_id = (SELECT room_id FROM bug_reports WHERE submission_id = ?) FOR UPDATE').get(submissionId)
+try {
+    const row = (await this.ownedRow(submissionId, userId))
     if (row.status === 'submitted') return toView(row)
     if (['queued', 'submitting', 'reconcile', 'retry'].includes(row.status)) {
       return toView(row)
@@ -890,25 +900,25 @@ export class BugReportStore {
       throw new BugReportError('author_identity_required', 400)
     }
     if (row.author_identity === 'github_user') {
-      const connection = this.connectionStatus(userId)
+      const connection = (await this.connectionStatus(userId))
       if (!connection.connected || !connection.githubUserId) {
         throw new BugReportError('github_connection_required', 409)
       }
       if (connection.githubUserId !== row.confirmed_github_user_id) {
         if (row.status !== 'draft') {
-          this.db.prepare(`
+          ;(await this.db.prepare(`
             UPDATE bug_reports
             SET status = 'needs_reconnect',
                 last_error_code = 'github_identity_confirmation_required',
                 updated_at = ?
             WHERE submission_id = ? AND reporter_user_id = ?
-          `).run(this.now(), submissionId, userId)
+          `).run(this.now(), submissionId, userId))
         }
         throw new BugReportError('github_identity_confirmation_required', 409)
       }
     }
     if (row.submitted_at === null) {
-      const latestExisting = this.matchingOpenIssues(row)[0]
+      const latestExisting = (await this.matchingOpenIssues(row))[0]
       if (
         latestExisting
         && (
@@ -918,11 +928,11 @@ export class BugReportStore {
       ) {
         throw new BugReportError('existing_issue_confirmation_required', 409)
       }
-      this.assertQuota(row)
+      ;(await this.assertQuota(row))
     }
     const now = this.now()
     const status = row.status === 'draft' ? 'queued' : 'reconcile'
-    const queued = this.db.prepare(`
+    const queued = (await this.db.prepare(`
       UPDATE bug_reports
       SET status = ?,
           submitted_at = COALESCE(submitted_at, ?),
@@ -970,21 +980,29 @@ export class BugReportStore {
       now,
       submissionId,
       userId,
-    )
+    ))
     if (queued.changes !== 1) {
       throw new BugReportError('replay_segment_unavailable', 503)
     }
-    return this.getOwned(submissionId, userId)
+    return (await this.getOwned(submissionId, userId))
+  } catch (error) { if (error instanceof BugReportError && error.code === 'github_identity_confirmation_required') return error; throw error }
+    })()
+    if (result instanceof BugReportError) throw result
+    return result
   }
 
-  deleteDraft(submissionId: string, userId: string): void {
-    const row = this.ownedRow(submissionId, userId)
+  async deleteDraft(submissionId: string, userId: string): Promise<Awaited<void>> {
+    const result = await this.db.transaction(async () => {
+await this.db.prepare('SELECT id FROM users WHERE id = ? FOR UPDATE').get(userId)
+await this.db.prepare('SELECT room_id FROM game_contexts WHERE room_id = (SELECT room_id FROM bug_reports WHERE submission_id = ?) FOR UPDATE').get(submissionId)
+
+    const row = (await this.ownedRow(submissionId, userId))
     if (!['draft', 'needs_reconnect', 'failed'].includes(row.status)) {
       throw new BugReportError('bug_report_delete_conflict', 409)
     }
     if (row.submitted_at !== null) {
       const now = this.now()
-      this.db.prepare(`
+      ;(await this.db.prepare(`
         UPDATE bug_reports
         SET phenomenon = NULL,
             author_identity = NULL,
@@ -997,19 +1015,22 @@ export class BugReportStore {
             last_error_code = 'bug_report_discarded',
             updated_at = ?
         WHERE submission_id = ? AND reporter_user_id = ?
-      `).run(now, now, submissionId, userId)
+      `).run(now, now, submissionId, userId))
       return
     }
-    this.db.prepare(`
+    ;(await this.db.prepare(`
       DELETE FROM bug_reports
       WHERE submission_id = ? AND reporter_user_id = ?
-    `).run(submissionId, userId)
+    `).run(submissionId, userId))
+
+    })()
+    return result
   }
 
-  claim(submissionId?: string): Claim | null {
+  async claim(submissionId?: string): Promise<Awaited<Claim | null>> {
     const now = this.now()
-    return this.db.transaction(() => {
-      this.db.prepare(`
+    return (await this.db.transaction(async () => {
+      ;(await this.db.prepare(`
         UPDATE bug_reports
         SET status = 'reconcile',
             claim_token = NULL,
@@ -1020,8 +1041,8 @@ export class BugReportStore {
         WHERE status = 'submitting'
           AND discarded_at IS NULL
           AND claimed_at < ?
-      `).run(now, now, now - CLAIM_TTL_MS)
-      const row = this.db.prepare(`
+      `).run(now, now, now - CLAIM_TTL_MS))
+      const row = (await this.db.prepare(`
         SELECT ${reportColumns}
         FROM bug_reports
         WHERE status IN ('queued', 'retry', 'reconcile')
@@ -1030,11 +1051,11 @@ export class BugReportStore {
           AND COALESCE(next_attempt_at, 0) <= ?
           ${submissionId ? 'AND submission_id = ?' : ''}
         ORDER BY COALESCE(next_attempt_at, created_at), created_at
-        LIMIT 1
-      `).get(...(submissionId ? [now, submissionId] : [now])) as ReportRow | undefined
+        LIMIT 1 FOR UPDATE SKIP LOCKED
+      `).get(...(submissionId ? [now, submissionId] : [now]))) as ReportRow | undefined
       if (!row) return null
       const token = randomUUID()
-      const changed = this.db.prepare(`
+      const changed = (await this.db.prepare(`
         UPDATE bug_reports
         SET status = 'submitting',
             claim_token = ?,
@@ -1043,7 +1064,7 @@ export class BugReportStore {
         WHERE submission_id = ?
           AND status = ?
           AND claim_token IS NULL
-      `).run(token, now, now, row.submission_id, row.status)
+      `).run(token, now, now, row.submission_id, row.status))
       return changed.changes === 1
         ? {
             report: { ...row, status: 'submitting' as const },
@@ -1053,18 +1074,18 @@ export class BugReportStore {
               : 'create' as const,
           }
         : null
-    })()
+    })())
   }
 
-  recordAttempt(
+  async recordAttempt(
     submissionId: string,
     kind: 'create' | 'reconcile',
     outcome: string,
     startedAt: number,
     failure?: GitHubFailure,
-  ): void {
+  ): Promise<Awaited<void>> {
     const now = this.now()
-    this.db.prepare(`
+    ;(await this.db.prepare(`
       INSERT INTO bug_report_attempts (
         submission_id, kind, outcome, http_status, github_request_id,
         started_at, finished_at, retry_at, expires_at
@@ -1080,23 +1101,16 @@ export class BugReportStore {
       now,
       failure?.retryAt ?? null,
       now + ATTEMPT_TTL_MS,
-    )
+    ))
   }
 
-  canSendGithubRequest(): { ok: true } | { ok: false; retryAt: number } {
-    const now = this.now()
-    const row = this.db.prepare(`
-      SELECT COUNT(*) AS count, MIN(started_at) AS oldest
-      FROM bug_report_attempts
-      WHERE kind = 'create' AND started_at > ?
-    `).get(now - 60_000) as { count: number; oldest: number | null }
-    return row.count < 20
-      ? { ok: true }
-      : { ok: false, retryAt: (row.oldest ?? now) + 60_000 }
+  async canSendGithubRequest(): Promise<{ ok: true } | { ok: false; retryAt: number }> {
+    const slot = await consumeRateLimit(this.db, 'bug-report-github', 'repository', 20, 60_000, this.now())
+    return slot.allowed ? { ok: true } : { ok: false, retryAt: slot.resetAt }
   }
 
-  retryCount(submissionId: string): number {
-    const row = this.db.prepare(`
+  async retryCount(submissionId: string): Promise<Awaited<number>> {
+    const row = (await this.db.prepare(`
       SELECT
         SUM(CASE WHEN kind = 'create' AND outcome = 'uncertain' THEN 1 ELSE 0 END)
           AS create_count,
@@ -1104,20 +1118,20 @@ export class BugReportStore {
           AS reconcile_count
       FROM bug_report_attempts
       WHERE submission_id = ?
-    `).get(submissionId) as {
+    `).get(submissionId)) as {
       create_count: number
       reconcile_count: number
     }
     return Math.max(row.create_count, row.reconcile_count)
   }
 
-  finish(
+  async finish(
     claim: Claim,
     result: GitHubIssueResult,
-  ): void {
+  ): Promise<Awaited<void>> {
     const now = this.now()
     if (!result.ok) throw new Error('successful GitHub issue result required')
-    this.db.prepare(`
+    ;(await this.db.prepare(`
       UPDATE bug_reports
       SET status = 'submitted',
           phenomenon = NULL,
@@ -1137,15 +1151,15 @@ export class BugReportStore {
       now,
       claim.report.submission_id,
       claim.token,
-    )
+    ))
   }
 
-  finishDiscardedReconciliation(
+  async finishDiscardedReconciliation(
     submissionId: string,
     result: GitHubIssueResult,
-  ): void {
+  ): Promise<Awaited<void>> {
     if (!result.ok) throw new Error('successful GitHub issue result required')
-    this.db.prepare(`
+    ;(await this.db.prepare(`
       UPDATE bug_reports
       SET status = 'submitted',
           phenomenon = NULL,
@@ -1159,17 +1173,17 @@ export class BugReportStore {
           last_error_code = NULL,
           updated_at = ?
       WHERE submission_id = ? AND submitted_at IS NOT NULL
-    `).run(result.number, result.url, this.now(), submissionId)
+    `).run(result.number, result.url, this.now(), submissionId))
   }
 
-  defer(
+  async defer(
     claim: Claim,
     status: 'reconcile' | 'retry' | 'needs_reconnect' | 'failed',
     code: string,
     nextAttemptAt?: number,
-  ): void {
+  ): Promise<Awaited<void>> {
     const now = this.now()
-    this.db.prepare(`
+    ;(await this.db.prepare(`
       UPDATE bug_reports
       SET status = ?,
           claim_token = NULL,
@@ -1185,18 +1199,18 @@ export class BugReportStore {
       now,
       claim.report.submission_id,
       claim.token,
-    )
+    ))
   }
 
-  reportForEvidence(submissionId: string): ReportRow | null {
-    return this.report(submissionId)
+  async reportForEvidence(submissionId: string): Promise<Awaited<ReportRow | null>> {
+    return (await this.report(submissionId))
   }
 
-  setIssueState(
+  async setIssueState(
     issueNumber: number,
     state: 'open' | 'closed' | 'deleted',
-  ): void {
-    this.db.prepare(`
+  ): Promise<Awaited<void>> {
+    ;(await this.db.prepare(`
       UPDATE bug_reports
       SET github_issue_state = ?, updated_at = ?
       WHERE github_issue_number = ?
@@ -1204,18 +1218,18 @@ export class BugReportStore {
           ? = 'deleted'
           OR COALESCE(github_issue_state, 'open') != 'deleted'
         )
-    `).run(state, this.now(), issueNumber, state)
+    `).run(state, this.now(), issueNumber, state))
   }
 
-  reporterDeletionPlan(userId: string): {
+  async reporterDeletionPlan(userId: string): Promise<Awaited<{
     issueNumbers: number[]
     discardedReports: Array<{
       submissionId: string
       submittedAt: number
     }>
     tokens: GitHubUserTokens | null
-  } {
-    const unresolved = this.db.prepare(`
+  }>> {
+    const unresolved = (await this.db.prepare(`
       SELECT 1
       FROM bug_reports
       WHERE reporter_user_id = ?
@@ -1223,19 +1237,19 @@ export class BugReportStore {
         AND github_issue_number IS NULL
         AND discarded_at IS NULL
       LIMIT 1
-    `).get(userId)
+    `).get(userId))
     if (unresolved) {
       throw new BugReportError('bug_report_deletion_pending', 409)
     }
-    const issues = this.db.prepare(`
+    const issues = (await this.db.prepare(`
       SELECT DISTINCT github_issue_number AS issue_number
       FROM bug_reports
       WHERE reporter_user_id = ?
         AND github_issue_number IS NOT NULL
         AND COALESCE(github_issue_state, 'open') != 'deleted'
       ORDER BY github_issue_number
-    `).all(userId) as Array<{ issue_number: number }>
-    const discarded = this.db.prepare(`
+    `).all(userId)) as Array<{ issue_number: number }>
+    const discarded = (await this.db.prepare(`
       SELECT submission_id, submitted_at
       FROM bug_reports
       WHERE reporter_user_id = ?
@@ -1243,7 +1257,7 @@ export class BugReportStore {
         AND github_issue_number IS NULL
         AND discarded_at IS NOT NULL
       ORDER BY submitted_at, submission_id
-    `).all(userId) as Array<{
+    `).all(userId)) as Array<{
       submission_id: string
       submitted_at: number
     }>
@@ -1253,14 +1267,14 @@ export class BugReportStore {
         submissionId: report.submission_id,
         submittedAt: report.submitted_at,
       })),
-      tokens: this.connectionTokens(userId, true),
+      tokens: (await this.connectionTokens(userId, true)),
     }
   }
 
-  anonymizeReporter(userId: string): void {
+  async anonymizeReporter(userId: string): Promise<Awaited<void>> {
     const now = this.now()
-    this.db.transaction(() => {
-      this.db.prepare(`
+    ;(await this.db.transaction(async () => {
+      ;(await this.db.prepare(`
         UPDATE bug_reports
         SET reporter_user_id = NULL,
             phenomenon = NULL,
@@ -1277,21 +1291,22 @@ export class BugReportStore {
             END,
             updated_at = ?
         WHERE reporter_user_id = ?
-      `).run(now, now, userId)
-      this.disconnect(userId)
-    })()
+      `).run(now, now, userId))
+      ;(await this.disconnect(userId))
+    })())
   }
 
-  private report(submissionId: string): ReportRow | null {
-    return (this.db.prepare(`
+  private async report(submissionId: string, lock = false): Promise<Awaited<ReportRow | null>> {
+    return ((await this.db.prepare(`
       SELECT ${reportColumns}
       FROM bug_reports
       WHERE submission_id = ?
-    `).get(submissionId) as ReportRow | undefined) ?? null
+      ${lock ? 'FOR UPDATE' : ''}
+    `).get(submissionId)) as ReportRow | undefined) ?? null
   }
 
-  private ownedRow(submissionId: string, userId: string): ReportRow {
-    const row = this.report(submissionId)
+  private async ownedRow(submissionId: string, userId: string): Promise<Awaited<ReportRow>> {
+    const row = (await this.report(submissionId, true))
     if (!row || row.discarded_at !== null) {
       throw new BugReportError('bug_report_not_found', 404)
     }
@@ -1301,13 +1316,13 @@ export class BugReportStore {
     return row
   }
 
-  private matchingOpenIssues(report: ReportRow): Array<
+  private async matchingOpenIssues(report: ReportRow): Promise<Awaited<Array<
     ExistingBugIssue & { updatedAt: number }
-  > {
-    return this.db.prepare(`
+  >>> {
+    return (await this.db.prepare(`
       SELECT github_issue_number AS number,
              github_issue_url AS url,
-             updated_at AS updatedAt
+             updated_at AS "updatedAt"
       FROM bug_reports
       WHERE submission_id != ?
         AND room_id = ?
@@ -1322,17 +1337,17 @@ export class BugReportStore {
       report.room_id,
       report.step_no,
       report.frame_hash,
-    ) as Array<ExistingBugIssue & { updatedAt: number }>
+    )) as Array<ExistingBugIssue & { updatedAt: number }>
   }
 
-  private assertQuota(report: ReportRow): void {
+  private async assertQuota(report: ReportRow): Promise<Awaited<void>> {
     const now = this.now()
-    const tenMinutes = this.db.prepare(`
+    const tenMinutes = (await this.db.prepare(`
       SELECT COUNT(*) AS count, MIN(submitted_at) AS oldest
       FROM bug_reports
       WHERE reporter_user_id = ?
         AND submitted_at > ?
-    `).get(report.reporter_user_id, now - 10 * 60_000) as {
+    `).get(report.reporter_user_id, now - 10 * 60_000)) as {
       count: number
       oldest: number | null
     }
@@ -1343,12 +1358,12 @@ export class BugReportStore {
         (tenMinutes.oldest ?? now) + 10 * 60_000,
       )
     }
-    const daily = this.db.prepare(`
+    const daily = (await this.db.prepare(`
       SELECT COUNT(*) AS count, MIN(submitted_at) AS oldest
       FROM bug_reports
       WHERE reporter_user_id = ?
         AND submitted_at > ?
-    `).get(report.reporter_user_id, now - DAY_MS) as {
+    `).get(report.reporter_user_id, now - DAY_MS)) as {
       count: number
       oldest: number | null
     }
@@ -1359,21 +1374,21 @@ export class BugReportStore {
         (daily.oldest ?? now) + DAY_MS,
       )
     }
-    const userRoom = this.db.prepare(`
+    const userRoom = (await this.db.prepare(`
       SELECT COUNT(*) AS count
       FROM bug_reports
       WHERE reporter_user_id = ?
         AND room_id = ?
         AND submitted_at IS NOT NULL
-    `).get(report.reporter_user_id, report.room_id) as { count: number }
+    `).get(report.reporter_user_id, report.room_id)) as { count: number }
     if (userRoom.count >= 5) {
       throw new BugReportError('bug_report_room_limit', 429)
     }
-    const room = this.db.prepare(`
+    const room = (await this.db.prepare(`
       SELECT COUNT(*) AS count
       FROM bug_reports
       WHERE room_id = ? AND submitted_at IS NOT NULL
-    `).get(report.room_id) as { count: number }
+    `).get(report.room_id)) as { count: number }
     if (room.count >= 30) {
       throw new BugReportError('bug_report_room_limit', 429)
     }
@@ -1472,7 +1487,7 @@ export class BugReportDelivery {
     if (this.running) return
     this.running = true
     try {
-      const claim = this.store.claim(submissionId)
+      const claim = (await this.store.claim(submissionId))
       if (claim) await this.deliverClaim(claim)
     } finally {
       this.running = false
@@ -1484,7 +1499,7 @@ export class BugReportDelivery {
     this.running = true
     try {
       for (let count = 0; count < limit; count += 1) {
-        const claim = this.store.claim()
+        const claim = (await this.store.claim())
         if (!claim) return
         await this.deliverClaim(claim)
       }
@@ -1499,9 +1514,9 @@ export class BugReportDelivery {
     }
     this.running = true
     try {
-      const tokens = this.store.connectionTokens(userId)
-      if (tokens) this.store.queueGrantRevocation(tokens.accessToken)
-      this.store.disconnect(userId)
+      const tokens = (await this.store.connectionTokens(userId))
+      if (tokens) (await this.store.queueGrantRevocation(tokens.accessToken))
+      ;(await this.store.disconnect(userId))
       if (tokens) await this.revokeGrant(tokens.accessToken)
     } finally {
       this.running = false
@@ -1509,29 +1524,32 @@ export class BugReportDelivery {
   }
 
   async revokeGrant(accessToken: string): Promise<void> {
-    const tokenHash = this.store.queueGrantRevocation(accessToken)
+    const tokenHash = (await this.store.queueGrantRevocation(accessToken))
+    const pending = await this.store.nextGrantRevocation(tokenHash)
+    if (!pending) throw new BugReportError('github_revocation_pending', 503)
     const result = await this.client.revokeUserGrant(accessToken)
     if (result.ok) {
-      this.store.finishGrantRevocation(tokenHash)
+      ;(await this.store.finishGrantRevocation(tokenHash, pending.claimToken))
       return
     }
-    this.store.deferGrantRevocation(tokenHash, result.code, result.retryAt)
+    ;(await this.store.deferGrantRevocation(tokenHash, pending.claimToken, result.code, result.retryAt))
     throw new BugReportError(result.code, 503, result.retryAt)
   }
 
   async retryGrantRevocation(): Promise<void> {
-    const pending = this.store.nextGrantRevocation()
+    const pending = (await this.store.nextGrantRevocation())
     if (!pending) return
     const result = await this.client.revokeUserGrant(pending.accessToken)
     if (result.ok) {
-      this.store.finishGrantRevocation(pending.tokenHash)
+      ;(await this.store.finishGrantRevocation(pending.tokenHash, pending.claimToken))
       return
     }
-    this.store.deferGrantRevocation(
+    ;(await this.store.deferGrantRevocation(
       pending.tokenHash,
+      pending.claimToken,
       result.code,
       result.retryAt,
-    )
+    ))
   }
 
   async deleteReporter(userId: string): Promise<void> {
@@ -1540,7 +1558,7 @@ export class BugReportDelivery {
     }
     this.running = true
     try {
-      const plan = this.store.reporterDeletionPlan(userId)
+      const plan = (await this.store.reporterDeletionPlan(userId))
       const issueNumbers = new Set(plan.issueNumbers)
       for (const report of plan.discardedReports) {
         const startedAt = this.now()
@@ -1549,7 +1567,7 @@ export class BugReportDelivery {
           `<!-- open-agricola-report:${report.submissionId} -->`,
           report.submittedAt,
         )
-        this.store.recordAttempt(
+        ;(await this.store.recordAttempt(
           report.submissionId,
           'reconcile',
           result.ok
@@ -1559,12 +1577,12 @@ export class BugReportDelivery {
             : result.kind,
           startedAt,
           result.ok ? undefined : result,
-        )
+        ))
         if (!result.ok) {
           throw new BugReportError(result.code, 503, result.retryAt)
         }
         if (!('found' in result)) {
-          this.store.finishDiscardedReconciliation(report.submissionId, result)
+          ;(await this.store.finishDiscardedReconciliation(report.submissionId, result))
           issueNumbers.add(result.number)
         }
       }
@@ -1577,7 +1595,7 @@ export class BugReportDelivery {
       if (plan.tokens) {
         await this.revokeGrant(plan.tokens.accessToken)
       }
-      this.store.anonymizeReporter(userId)
+      ;(await this.store.anonymizeReporter(userId))
     } finally {
       this.running = false
     }
@@ -1586,23 +1604,23 @@ export class BugReportDelivery {
   private async deliverClaim(claim: Claim): Promise<void> {
     const report = claim.report
     if (!report.reporter_user_id || !report.author_identity) {
-      this.store.defer(claim, 'failed', 'bug_report_invalid')
+      ;(await this.store.defer(claim, 'failed', 'bug_report_invalid'))
       return
     }
     const issue = buildIssue(report, this.appOrigin)
     let userToken: string | undefined
     if (report.author_identity === 'github_user') {
-      const tokens = this.store.connectionTokens(report.reporter_user_id)
+      const tokens = (await this.store.connectionTokens(report.reporter_user_id))
       if (!tokens) {
-        this.store.defer(claim, 'needs_reconnect', 'github_connection_required')
+        ;(await this.store.defer(claim, 'needs_reconnect', 'github_connection_required'))
         return
       }
       if (tokens.githubUserId !== report.confirmed_github_user_id) {
-        this.store.defer(
+        ;(await this.store.defer(
           claim,
           'needs_reconnect',
           'github_identity_confirmation_required',
-        )
+        ))
         return
       }
       if (tokens.accessTokenExpiresAt <= this.now() + 60_000) {
@@ -1610,38 +1628,38 @@ export class BugReportDelivery {
           !tokens.refreshToken
           || (tokens.refreshTokenExpiresAt ?? 0) <= this.now()
         ) {
-          this.store.disconnect(report.reporter_user_id)
-          this.store.defer(claim, 'needs_reconnect', 'github_connection_required')
+          ;(await this.store.disconnect(report.reporter_user_id))
+          ;(await this.store.defer(claim, 'needs_reconnect', 'github_connection_required'))
           return
         }
         try {
           const refreshed = await this.client.refreshUserToken(tokens.refreshToken)
           if (
-            this.store.connectionStatus(report.reporter_user_id).githubUserId
+            (await this.store.connectionStatus(report.reporter_user_id)).githubUserId
             !== tokens.githubUserId
           ) {
-            this.store.queueGrantRevocation(refreshed.accessToken)
-            this.store.defer(
+            ;(await this.store.queueGrantRevocation(refreshed.accessToken))
+            ;(await this.store.defer(
               claim,
               'needs_reconnect',
               'github_identity_confirmation_required',
-            )
+            ))
             return
           }
           try {
-            this.store.saveConnection(
+            ;(await this.store.saveConnection(
               report.reporter_user_id,
               tokens.githubUserId,
               refreshed,
-            )
+            ))
           } catch {
-            this.store.queueGrantRevocation(refreshed.accessToken)
+            ;(await this.store.queueGrantRevocation(refreshed.accessToken))
             throw new BugReportError('github_connection_required', 409)
           }
           userToken = refreshed.accessToken
         } catch {
-          this.store.disconnect(report.reporter_user_id)
-          this.store.defer(claim, 'needs_reconnect', 'github_connection_required')
+          ;(await this.store.disconnect(report.reporter_user_id))
+          ;(await this.store.defer(claim, 'needs_reconnect', 'github_connection_required'))
           return
         }
       } else {
@@ -1654,9 +1672,9 @@ export class BugReportDelivery {
       if (reconciled !== 'not_found') return
     }
 
-    const slot = this.store.canSendGithubRequest()
+    const slot = (await this.store.canSendGithubRequest())
     if (!slot.ok) {
-      this.store.defer(claim, 'retry', 'github_queue_limited', slot.retryAt)
+      ;(await this.store.defer(claim, 'retry', 'github_queue_limited', slot.retryAt))
       return
     }
     const startedAt = this.now()
@@ -1665,24 +1683,24 @@ export class BugReportDelivery {
       { title: issue.title, body: issue.body },
       userToken,
     )
-    this.store.recordAttempt(
+    ;(await this.store.recordAttempt(
       report.submission_id,
       'create',
       result.ok ? 'success' : result.kind,
       startedAt,
       result.ok ? undefined : result,
-    )
+    ))
     if (result.ok) {
-      this.store.finish(claim, result)
+      ;(await this.store.finish(claim, result))
       return
     }
     if (result.kind === 'uncertain') {
       const reconciled = await this.reconcile(claim, issue.marker, userToken)
       if (reconciled !== 'not_found') return
-      this.deferUncertain(claim)
+      ;(await this.deferUncertain(claim))
       return
     }
-    this.deferFailure(claim, result)
+    ;(await this.deferFailure(claim, result))
   }
 
   private async reconcile(
@@ -1698,7 +1716,7 @@ export class BugReportDelivery {
       report.submitted_at ?? report.created_at,
       userToken,
     )
-    this.store.recordAttempt(
+    ;(await this.store.recordAttempt(
       report.submission_id,
       'reconcile',
       result.ok
@@ -1706,72 +1724,72 @@ export class BugReportDelivery {
         : result.kind,
       startedAt,
       result.ok ? undefined : result,
-    )
+    ))
     if (result.ok && !('found' in result)) {
-      this.store.finish(claim, result)
+      ;(await this.store.finish(claim, result))
       return 'done'
     }
     if (result.ok) return 'not_found'
     if (result.kind === 'auth') {
-      this.deferAuthFailure(claim, result.code)
+      ;(await this.deferAuthFailure(claim, result.code))
       return 'done'
     }
     if (result.kind === 'rate_limit') {
-      this.store.defer(
+      ;(await this.store.defer(
         claim,
         'reconcile',
         result.code,
         result.retryAt ?? this.now() + 60_000,
-      )
+      ))
       return 'done'
     }
     if (result.kind === 'permission' || result.kind === 'terminal') {
-      this.store.defer(claim, 'failed', result.code)
+      ;(await this.store.defer(claim, 'failed', result.code))
       return 'done'
     }
-    this.deferUncertain(claim)
+    ;(await this.deferUncertain(claim))
     return 'done'
   }
 
-  private deferUncertain(claim: Claim): void {
-    const attempts = this.store.retryCount(claim.report.submission_id)
+  private async deferUncertain(claim: Claim): Promise<Awaited<void>> {
+    const attempts = (await this.store.retryCount(claim.report.submission_id))
     if (attempts > RETRY_DELAYS.length) {
-      this.store.defer(claim, 'failed', 'github_result_uncertain')
+      ;(await this.store.defer(claim, 'failed', 'github_result_uncertain'))
       return
     }
-    this.store.defer(
+    ;(await this.store.defer(
       claim,
       'reconcile',
       'github_result_uncertain',
       this.now() + RETRY_DELAYS[Math.max(0, attempts - 1)]!,
-    )
+    ))
   }
 
-  private deferFailure(claim: Claim, failure: GitHubFailure): void {
+  private async deferFailure(claim: Claim, failure: GitHubFailure): Promise<Awaited<void>> {
     if (failure.kind === 'auth') {
-      this.deferAuthFailure(claim, failure.code)
+      ;(await this.deferAuthFailure(claim, failure.code))
       return
     }
     if (failure.kind === 'rate_limit') {
-      this.store.defer(
+      ;(await this.store.defer(
         claim,
         'retry',
         failure.code,
         failure.retryAt ?? this.now() + 60_000,
-      )
+      ))
       return
     }
-    this.store.defer(claim, 'failed', failure.code)
+    ;(await this.store.defer(claim, 'failed', failure.code))
   }
 
-  private deferAuthFailure(claim: Claim, code: string): void {
+  private async deferAuthFailure(claim: Claim, code: string): Promise<Awaited<void>> {
     if (claim.report.author_identity === 'github_user') {
       if (claim.report.reporter_user_id) {
-        this.store.disconnect(claim.report.reporter_user_id)
+        ;(await this.store.disconnect(claim.report.reporter_user_id))
       }
-      this.store.defer(claim, 'needs_reconnect', code)
+      ;(await this.store.defer(claim, 'needs_reconnect', code))
       return
     }
-    this.store.defer(claim, 'failed', code)
+    ;(await this.store.defer(claim, 'failed', code))
   }
 }

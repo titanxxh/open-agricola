@@ -1,5 +1,6 @@
 import { gzipSync } from 'node:zlib'
-import Database from 'better-sqlite3'
+import { createTestDatabase } from '../../__tests__/_helpers/postgres'
+import type { PostgresDatabase } from '../../database/postgres'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
   canonicalJson,
@@ -93,59 +94,23 @@ const frames = [
 ] satisfies JsonValue[]
 
 describe('ReplayStore', () => {
-  let db: Database.Database
+  let db: PostgresDatabase
   let store: ReplayStore
 
-  beforeEach(() => {
-    db = new Database(':memory:')
-    db.exec(`
-      CREATE TABLE game_contexts (
-        room_id TEXT PRIMARY KEY,
-        lifecycle TEXT NOT NULL,
-        replay_status TEXT
-      );
-      CREATE TABLE game_replays (
-        room_id TEXT PRIMARY KEY,
-        schema_version INTEGER NOT NULL,
-        viewer_build_id TEXT NOT NULL,
-        game_build_id TEXT NOT NULL,
-        status TEXT NOT NULL,
-        latest_step_no INTEGER NOT NULL,
-        missing_prefix INTEGER NOT NULL,
-        custom_cards_json TEXT NOT NULL
-      );
-      CREATE TABLE game_replay_steps (
-        room_id TEXT NOT NULL,
-        step_no INTEGER NOT NULL,
-        room_version INTEGER NOT NULL,
-        checkpoint_step_no INTEGER NOT NULL,
-        player_index INTEGER,
-        command_type TEXT NOT NULL,
-        intent_json TEXT NOT NULL,
-        payload_kind TEXT NOT NULL,
-        payload_gzip BLOB NOT NULL,
-        frame_hash TEXT NOT NULL,
-        created_at INTEGER NOT NULL,
-        PRIMARY KEY (room_id, step_no)
-      );
-      CREATE TABLE game_result_players (
-        room_id TEXT NOT NULL,
-        player_index INTEGER NOT NULL,
-        name_is_default INTEGER NOT NULL DEFAULT 0,
-        display_name TEXT NOT NULL
-      );
-    `)
-    db.prepare('INSERT INTO game_contexts VALUES (?, ?, ?)')
-      .run('room-1', 'completed', 'available')
-    db.prepare("INSERT INTO game_replays VALUES (?, 1, ?, ?, 'completed', 3, 0, ?)")
+  beforeEach(async () => {
+    db = await createTestDatabase()
+    await db.prepare("INSERT INTO game_results (room_id, started_at, finished_at, rounds_played, player_count, enable_community_deck, enable_parent_cards, enable_through_the_seasons, enable_farmers_of_the_moor) VALUES ('room-1', 1, 2, 14, 2, 0, 0, 0, 0)").run()
+    ;(await db.prepare('INSERT INTO game_contexts (room_id, lifecycle, replay_status, created_at, updated_at) VALUES (?, ?, ?, 1, 1)')
+      .run('room-1', 'completed', 'available'))
+    ;(await db.prepare("INSERT INTO game_replays (room_id, schema_version, viewer_build_id, game_build_id, status, latest_step_no, missing_prefix, custom_cards_json, created_at) VALUES (?, 1, ?, ?, 'completed', 3, 0, ?, 1)")
       .run('room-1', 'a'.repeat(64), 'game-1', JSON.stringify([{
         cardType: 'minor',
         cardJson: { id: 'CUSTOM_1', name: 'Custom', deck: 'X', number: 1 },
-      }]))
-    db.prepare('INSERT INTO game_result_players (room_id, player_index, display_name) VALUES (?, 0, ?)')
-      .run('room-1', 'wood')
-    db.prepare('INSERT INTO game_result_players (room_id, player_index, display_name) VALUES (?, 1, ?)')
-      .run('room-1', 'Bob')
+      }])))
+    ;(await db.prepare(`INSERT INTO game_result_players (room_id, player_index, display_name, game_player_id, score) VALUES (?, 0, ?, 'p1', 0)`)
+      .run('room-1', 'wood'))
+    ;(await db.prepare(`INSERT INTO game_result_players (room_id, player_index, display_name, game_player_id, score) VALUES (?, 1, ?, 'p2', 0)`)
+      .run('room-1', 'Bob'))
 
     const encoded0 = encodeReplayFrame({
       frame: frames[0],
@@ -177,24 +142,24 @@ describe('ReplayStore', () => {
         @commandType, @intentJson, @payloadKind, @payloadGzip, @frameHash, @createdAt
       )
     `)
-    ;[
+    await Promise.all([
       { stepNo: 0, playerIndex: null, commandType: 'initial', intentJson: '{}', ...encoded0 },
       { stepNo: 1, playerIndex: 0, commandType: 'action', intentJson: '{"spaceId":"forest"}', ...encoded1 },
       { stepNo: 2, playerIndex: 1, commandType: 'action', intentJson: '{"spaceId":"fishing"}', ...encoded2 },
       { stepNo: 3, playerIndex: 0, commandType: 'choice', intentJson: '{"value":"confirm"}', ...encoded3 },
-    ].forEach((step) => insert.run({
+    ].map(async (step) => (await insert.run({
       roomId: 'room-1',
       roomVersion: step.stepNo,
       createdAt: 1_000 + step.stepNo,
       ...step,
-    }))
+    }))))
     store = new ReplayStore(db)
   })
 
-  afterEach(() => db.close())
+  afterEach(async () => (await db.close()))
 
-  it('returns a public manifest and reconstructs bounded segments', () => {
-    expect(store.manifest('room-1')).toEqual({
+  it('returns a public manifest and reconstructs bounded segments', async () => {
+    expect((await store.manifest('room-1'))).toEqual({
       ok: true,
       kind: 'replayManifest',
       apiVersion: 1,
@@ -262,7 +227,7 @@ describe('ReplayStore', () => {
       }],
     })
 
-    const first = store.segment('room-1', 0)
+    const first = (await store.segment('room-1', 0))
     expect(first.ok).toBe(true)
     if (!first.ok) return
     expect(first.steps.map((step) => step.frame)).toEqual(frames.slice(0, 2))
@@ -274,34 +239,34 @@ describe('ReplayStore', () => {
     })
   })
 
-  it('retains generated-name provenance in replay participants', () => {
-    db.prepare("UPDATE game_result_players SET display_name = 'Player 2', name_is_default = player_index").run()
-    expect(store.manifest('room-1')).toMatchObject({ participants: [
+  it('retains generated-name provenance in replay participants', async () => {
+    ;(await db.prepare("UPDATE game_result_players SET display_name = 'Player 2', name_is_default = player_index").run())
+    expect((await store.manifest('room-1'))).toMatchObject({ participants: [
       { playerIndex: 0, displayName: 'Player 2' },
       { playerIndex: 1, displayName: 'Player 2', nameIsDefault: true },
     ] })
   })
 
-  it('requires an exact step and frame hash for anchor evidence', () => {
-    const exact = store.anchor('room-1', 3, frameHash(frames[3]))
+  it('requires an exact step and frame hash for anchor evidence', async () => {
+    const exact = (await store.anchor('room-1', 3, frameHash(frames[3])))
     expect(exact.ok).toBe(true)
     if (exact.ok) expect(exact.step.frame).toEqual(frames[3])
 
-    expect(store.anchor('room-1', 3, 'f'.repeat(64))).toMatchObject({
+    expect((await store.anchor('room-1', 3, 'f'.repeat(64)))).toMatchObject({
       ok: false,
       code: 'anchor_mismatch',
     })
-    expect(store.anchor('room-1', 2, frameHash(frames[1]))).toMatchObject({
+    expect((await store.anchor('room-1', 2, frameHash(frames[1])))).toMatchObject({
       ok: false,
       code: 'anchor_mismatch',
     })
   })
 
-  it('reports a corrupt range and the next checkpoint without guessing a frame', () => {
-    db.prepare('UPDATE game_replay_steps SET payload_gzip = ? WHERE room_id = ? AND step_no = 1')
-      .run(Buffer.from('broken'), 'room-1')
+  it('reports a corrupt range and the next checkpoint without guessing a frame', async () => {
+    ;(await db.prepare('UPDATE game_replay_steps SET payload_gzip = ? WHERE room_id = ? AND step_no = 1')
+      .run(Buffer.from('broken'), 'room-1'))
 
-    expect(store.segment('room-1', 0)).toEqual({
+    expect((await store.segment('room-1', 0))).toEqual({
       ok: false,
       code: 'replay_segment_unavailable',
       lifecycle: 'completed',
@@ -312,7 +277,7 @@ describe('ReplayStore', () => {
         nextCheckpointStepNo: 2,
       },
     })
-    expect(store.anchor('room-1', 1, frameHash(frames[1]))).toMatchObject({
+    expect((await store.anchor('room-1', 1, frameHash(frames[1])))).toMatchObject({
       ok: false,
       code: 'replay_segment_unavailable',
       verifiedAnchor: {
@@ -320,15 +285,15 @@ describe('ReplayStore', () => {
         frameHash: frameHash(frames[1]),
       },
     })
-    const next = store.segment('room-1', 2)
+    const next = (await store.segment('room-1', 2))
     expect(next.ok).toBe(true)
   })
 
-  it('reports missing final rows instead of silently truncating the timeline', () => {
-    db.prepare('DELETE FROM game_replay_steps WHERE room_id = ? AND step_no = ?')
-      .run('room-1', 3)
+  it('reports missing final rows instead of silently truncating the timeline', async () => {
+    ;(await db.prepare('DELETE FROM game_replay_steps WHERE room_id = ? AND step_no = ?')
+      .run('room-1', 3))
 
-    const manifest = store.manifest('room-1')
+    const manifest = (await store.manifest('room-1'))
     expect(manifest.ok).toBe(true)
     if (!manifest.ok) return
     expect(manifest.lastStepNo).toBe(3)
@@ -339,11 +304,11 @@ describe('ReplayStore', () => {
     }])
   })
 
-  it('reports a missing initial segment and its recovery checkpoint', () => {
-    db.prepare('DELETE FROM game_replay_steps WHERE room_id = ? AND step_no < ?')
-      .run('room-1', 2)
+  it('reports a missing initial segment and its recovery checkpoint', async () => {
+    ;(await db.prepare('DELETE FROM game_replay_steps WHERE room_id = ? AND step_no < ?')
+      .run('room-1', 2))
 
-    const manifest = store.manifest('room-1')
+    const manifest = (await store.manifest('room-1'))
     expect(manifest.ok).toBe(true)
     if (!manifest.ok) return
     expect(manifest.firstStepNo).toBe(0)
@@ -354,13 +319,13 @@ describe('ReplayStore', () => {
     }])
   })
 
-  it('uses current participant names in archived frames', () => {
-    db.prepare('UPDATE game_result_players SET display_name = ? WHERE room_id = ? AND player_index = 0')
-      .run('Deleted player (seat 1)', 'room-1')
-    db.prepare('UPDATE game_result_players SET display_name = ? WHERE room_id = ? AND player_index = 1')
-      .run('wood', 'room-1')
+  it('uses current participant names in archived frames', async () => {
+    ;(await db.prepare('UPDATE game_result_players SET display_name = ? WHERE room_id = ? AND player_index = 0')
+      .run('Deleted player (seat 1)', 'room-1'))
+    ;(await db.prepare('UPDATE game_result_players SET display_name = ? WHERE room_id = ? AND player_index = 1')
+      .run('wood', 'room-1'))
 
-    const segment = store.segment('room-1', 0)
+    const segment = (await store.segment('room-1', 0))
     expect(segment.ok).toBe(true)
     if (!segment.ok) return
     expect(segment.steps[0]?.frame.players[0]?.name).toBe('Deleted player (seat 1)')
@@ -379,7 +344,7 @@ describe('ReplayStore', () => {
     })
   })
 
-  it('redacts ambiguous name-only log fields when participant names collide', () => {
+  it('redacts ambiguous name-only log fields when participant names collide', async () => {
     const collisionFrame = {
       ...frames[0],
       players: [
@@ -394,46 +359,46 @@ describe('ReplayStore', () => {
       stepNo: 0,
       previousCheckpointStepNo: 0,
     })
-    db.prepare('DELETE FROM game_replay_steps WHERE room_id = ? AND step_no > 0')
-      .run('room-1')
-    db.prepare(`
+    ;(await db.prepare('DELETE FROM game_replay_steps WHERE room_id = ? AND step_no > 0')
+      .run('room-1'))
+    ;(await db.prepare(`
       UPDATE game_replay_steps
       SET payload_kind = ?, payload_gzip = ?, frame_hash = ?
       WHERE room_id = ? AND step_no = 0
-    `).run(encoded.payloadKind, encoded.payloadGzip, encoded.frameHash, 'room-1')
-    db.prepare('UPDATE game_replays SET latest_step_no = 0 WHERE room_id = ?')
-      .run('room-1')
-    db.prepare('UPDATE game_result_players SET display_name = ? WHERE room_id = ? AND player_index = 0')
-      .run('Deleted player (seat 1)', 'room-1')
-    db.prepare('UPDATE game_result_players SET display_name = ? WHERE room_id = ? AND player_index = 1')
-      .run('Alice', 'room-1')
+    `).run(encoded.payloadKind, encoded.payloadGzip, encoded.frameHash, 'room-1'))
+    ;(await db.prepare('UPDATE game_replays SET latest_step_no = 0 WHERE room_id = ?')
+      .run('room-1'))
+    ;(await db.prepare('UPDATE game_result_players SET display_name = ? WHERE room_id = ? AND player_index = 0')
+      .run('Deleted player (seat 1)', 'room-1'))
+    ;(await db.prepare('UPDATE game_result_players SET display_name = ? WHERE room_id = ? AND player_index = 1')
+      .run('Alice', 'room-1'))
 
-    const segment = store.segment('room-1', 0)
+    const segment = (await store.segment('room-1', 0))
     expect(segment.ok).toBe(true)
     if (!segment.ok) return
     expect(segment.steps[0]?.frame.log[0]?.params?.player).toBe('Deleted player')
   })
 
-  it('never exposes active or legacy replay payloads', () => {
-    db.prepare('INSERT INTO game_contexts VALUES (?, ?, NULL)').run('active-room', 'active')
-    db.prepare('INSERT INTO game_contexts VALUES (?, ?, ?)').run(
+  it('never exposes active or legacy replay payloads', async () => {
+    ;(await db.prepare('INSERT INTO game_contexts (room_id, lifecycle, replay_status, created_at, updated_at) VALUES (?, ?, NULL, 1, 1)').run('active-room', 'active'))
+    ;(await db.prepare('INSERT INTO game_contexts (room_id, lifecycle, replay_status, created_at, updated_at) VALUES (?, ?, ?, 1, 1)').run(
       'legacy-room',
       'completed',
       'legacy_no_replay',
-    )
+    ))
 
-    expect(store.manifest('active-room')).toMatchObject({
+    expect((await store.manifest('active-room'))).toMatchObject({
       ok: false,
       code: 'context_changed',
       lifecycle: 'active',
     })
-    expect(store.manifest('legacy-room')).toMatchObject({
+    expect((await store.manifest('legacy-room'))).toMatchObject({
       ok: false,
       code: 'replay_segment_unavailable',
       lifecycle: 'completed',
     })
-    db.prepare("UPDATE game_replays SET status = 'recording' WHERE room_id = 'room-1'").run()
-    expect(store.manifest('room-1')).toMatchObject({
+    ;(await db.prepare("UPDATE game_replays SET status = 'recording' WHERE room_id = 'room-1'").run())
+    expect((await store.manifest('room-1'))).toMatchObject({
       ok: false,
       code: 'replay_segment_unavailable',
       lifecycle: 'completed',

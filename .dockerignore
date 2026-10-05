@@ -10,3 +10,8 @@ docs
 .github
 .env
 .env.*
+.scratch
+.orca
+backups
+playwright-report
+test-results

@@ -82,25 +82,19 @@ describe('production deployment config', () => {
     expect(deployment.policy).toBe(policy)
   })
 
-  it('records the deployed remote commit as the game build ID', () => {
+  it('records the target commit in the image before validating live storage', () => {
     const script = readFileSync('deploy-backend.sh', 'utf8')
-    expect(script).toContain('GAME_BUILD_ID="$(git rev-parse HEAD)"')
-    expect(script).toContain('GAME_BUILD_ID="$GAME_BUILD_ID" docker compose')
+    expect(script).toContain('TARGET_REF="$(git rev-parse FETCH_HEAD)"')
+    expect(script).toContain('export GAME_BUILD_ID="$TARGET_REF"')
+    expect(script).toContain('check-live "$TARGET_REF" --applications-stopped')
+    expect(script.indexOf('bash scripts/backup-storage.sh')).toBeLessThan(script.indexOf('check-live "$TARGET_REF"'))
+    expect(script).not.toContain('reset --hard')
   })
 
-  it('prevents container commands from consuming the remote deployment script', () => {
+  it('detaches deployment commands from the SSH script input', () => {
     const script = readFileSync('deploy-backend.sh', 'utf8')
-    const sourceBuildRead = script.slice(
-      script.indexOf('SOURCE_BUILD_ID="$('),
-      script.indexOf('if [ -z "$SOURCE_BUILD_ID" ]'),
-    )
-    const backupValidationStart = script.indexOf('DB_PATH=/validation-data/open-agricola.db')
-    const backupValidation = script.slice(
-      backupValidationStart,
-      script.indexOf('rm -rf -- "$VALIDATION_DIR"', backupValidationStart),
-    )
-    expect(sourceBuildRead).toContain('< /dev/null')
-    expect(backupValidation).toContain('< /dev/null')
+    expect(script).toContain('deploy_backend() {')
+    expect(script).toContain('deploy_backend "$@" < /dev/null')
   })
 
   it('keeps Actions off self-hosted runners and long-lived repository secrets', () => {
@@ -115,42 +109,28 @@ describe('production deployment config', () => {
     }
   })
 
-  it('validates each backup with the target image and writes a version manifest', () => {
+  it('packages native backup tools and runs the application as the deployment user', () => {
     const dockerfile = readFileSync('Dockerfile', 'utf8')
-    const script = readFileSync('deploy-backend.sh', 'utf8')
-    expect(dockerfile).toContain('COPY --chown=node:node scripts/validate-backup.ts ./scripts/')
+    expect(dockerfile).toContain('COPY --chown=node:node scripts/ ./scripts/')
     expect(dockerfile).toContain('USER node')
-    expect(script).toContain('SOURCE_BUILD_ID=')
-    expect(script).toContain('BACKUP_SHA256=')
-    expect(script).toContain('BACKUP_SIZE_BYTES=')
-    expect(script).toContain('DB_PATH=/validation-data/open-agricola.db')
-    expect(script).toContain('scripts/validate-backup.ts')
-    expect(script).toContain('$BACKUP_STEM.manifest.json')
-    expect(script).not.toContain('$VALIDATION_DIR:/validation-data:ro')
+    const compose = readFileSync('docker-compose.prod.yml', 'utf8')
+    expect(compose.match(/user: "\$\{APP_UID:-1000\}:\$\{APP_GID:-1000\}"/g)).toHaveLength(2)
+    for (const file of ['deploy-backend.sh', 'backup-offsite.sh', 'scripts/backup-storage.sh']) {
+      expect(readFileSync(file, 'utf8')).toContain('export APP_UID="$(id -u)" APP_GID="$(id -g)"')
+    }
   })
 
-  it('forwards replay recording settings into production', () => {
+  it('uses mandatory recording and shared dependencies in both container entry points', () => {
     for (const composePath of ['docker-compose.yml', 'docker-compose.prod.yml']) {
       const compose = readFileSync(composePath, 'utf8')
-      for (const name of [
-        'REPLAY_NEW_ROOMS_ENABLED',
-        'REPLAY_VIEWER_BUILD_ID',
-        'REPLAY_VIEWER_ROOT',
-        'REPLAY_ASSET_ROOT',
-        'GAME_BUILD_ID',
-      ]) {
-        expect(compose).toContain(`${name}=\${${name}`)
+      expect(compose).toContain('dependencies.compose.env')
+      expect(compose).toContain('APP_INSTANCES')
+      for (const obsolete of ['REPLAY_NEW_ROOMS_ENABLED', 'PERSIST_ROOMS', 'DB_PATH', 'app-data:/app/data', 'BGA_CDN_BASE_URL']) {
+        expect(compose).not.toContain(obsolete)
       }
     }
-    expect(readFileSync('docker-compose.yml', 'utf8')).toContain(
-      'REPLAY_TRUST_PROXY=${REPLAY_TRUST_PROXY:-false}',
-    )
-    const compose = readFileSync('docker-compose.prod.yml', 'utf8')
-    expect(compose).toContain('REPLAY_TRUST_PROXY=true')
-    expect(compose).toContain('app-data:/app/data')
-    for (const composePath of ['docker-compose.yml', 'docker-compose.prod.yml']) {
-      expect(readFileSync(composePath, 'utf8')).not.toContain('BGA_CDN_BASE_URL')
-    }
+    expect(readFileSync('docker-compose.prod.yml', 'utf8')).toContain('REPLAY_TRUST_PROXY=true')
+    expect(readFileSync('Dockerfile', 'utf8')).toContain('scripts/container-entry.ts')
   })
 
   it('builds both frontends from the pinned public asset repository only', () => {
@@ -198,17 +178,7 @@ describe('production deployment config', () => {
     expect(script).toContain('up -d --remove-orphans')
   })
 
-  it('restarts the app right after archiving so scheduled backup downtime only covers the tar step', () => {
-    const script = readFileSync('backup-offsite.sh', 'utf8')
-    const stopAt = script.indexOf('stop app')
-    const tarAt = script.indexOf('tar -C /app/data -czf')
-    const startAt = script.indexOf('restart_app || return 1')
-    const validateAt = script.indexOf('scripts/validate-backup.ts')
-    expect(stopAt).toBeGreaterThan(-1)
-    expect(tarAt).toBeGreaterThan(stopAt)
-    expect(startAt).toBeGreaterThan(tarAt)
-    expect(validateAt).toBeGreaterThan(startAt)
-  })
+
 
   it('shares one maintenance lock between deployment and scheduled backup', () => {
     const backup = readFileSync('backup-offsite.sh', 'utf8')
@@ -221,8 +191,8 @@ describe('production deployment config', () => {
 
   it('runs retention and offsite sync even when the daily backup fails', () => {
     const script = readFileSync('backup-offsite.sh', 'utf8')
-    expect(script).toContain('if ! do_backup; then')
-    const failureHandledAt = script.indexOf('if ! do_backup; then')
+    expect(script).toContain('if ! MAINTENANCE_LOCK_HELD=1 bash scripts/backup-storage.sh')
+    const failureHandledAt = script.indexOf('if ! MAINTENANCE_LOCK_HELD=1 bash scripts/backup-storage.sh')
     const localPruneAt = script.indexOf('清理本地旧备份')
     const remotePruneAt = script.indexOf('清理远端旧备份')
     expect(localPruneAt).toBeGreaterThan(failureHandledAt)
@@ -232,26 +202,25 @@ describe('production deployment config', () => {
     expect(remotePruneAt).toBeGreaterThan(rsyncFailureAt)
   })
 
-  it('restarts the app immediately when archiving fails instead of waiting for the exit trap', () => {
+
+
+  it('propagates shared-ledger sync failures to the cron exit status', () => {
     const script = readFileSync('backup-offsite.sh', 'utf8')
-    expect(script).toContain('discard_backup "打包"\n       restart_app || true\n       return 1')
-    const restartFn = script.slice(script.indexOf('restart_app() {'), script.indexOf('do_backup() {'))
-    expect(restartFn).toContain('RESTART_ON_EXIT=0')
-    expect(restartFn).toContain('return 1')
+    expect(script).toContain('sync_ledger || LEDGER_OK=0')
+    expect(script).toContain('[ "$LEDGER_OK" != 1 ]')
+    const sync = script.slice(script.indexOf('sync_ledger() {'), script.indexOf('if [ "$MODE" = "ledger-only" ]; then', script.indexOf('sync_ledger() {')))
+    expect(sync.match(/\|\| return 1/g)).toHaveLength(4)
   })
 
-  it('propagates every ledger sync failure so cron reports it', () => {
+  it('unions independent S3 erasure facts before copying them offsite', () => {
     const script = readFileSync('backup-offsite.sh', 'utf8')
-    expect(script).toContain('|| { echo ">>> ✗ 读取远端 ledger 大小失败"; return 1; }')
-    expect(script).toContain('|| { echo ">>> ✗ ledger 推送失败"; return 1; }')
-  })
-
-  it('honors the configured removal ledger path in both backup modes', () => {
-    const script = readFileSync('backup-offsite.sh', 'utf8')
-    expect(script).toContain('REPLAY_REMOVAL_LEDGER_PATH')
-    expect(script).toContain('cp app:"$CONTAINER_LEDGER" "$LEDGER"')
-    expect(script).toContain('cp $CONTAINER_LEDGER /backup/replay-removals.latest.jsonl')
-    expect(script).not.toContain('app:/app/data/replay-removals.jsonl')
+    const mergeAt = script.indexOf('storage-archive-cli.ts ledger-merge')
+    const exportAt = script.indexOf('storage-archive-cli.ts ledger-export')
+    const uploadAt = script.indexOf('rsync -a -e')
+    expect(mergeAt).toBeGreaterThan(-1)
+    expect(exportAt).toBeGreaterThan(mergeAt)
+    expect(uploadAt).toBeGreaterThan(exportAt)
+    expect(script).not.toContain('REPLAY_REMOVAL_LEDGER_PATH')
   })
 
   it('enforces the offsite 30-day cap autonomously on the replica host', () => {
@@ -264,21 +233,16 @@ describe('production deployment config', () => {
     expect(cron).toContain('/root/offsite-retention.sh')
   })
 
-  it('protects the offsite removal ledger from rollback and syncs it on takedown', () => {
+  it('keeps the independent erasure ledger outside ordinary archive synchronization', () => {
     const script = readFileSync('backup-offsite.sh', 'utf8')
-    expect(script).toContain('cmp -s -n')
-    expect(script).toContain("--exclude 'replay-removals.latest.jsonl'")
+    expect(script).toContain("--exclude 'replay-removals.latest.json'")
     expect(script).toContain('ledger-only')
+    expect(readFileSync('scripts/backup-storage.sh', 'utf8')).toContain('ledger-export /backup/replay-removals.latest.json')
   })
 
-  it('validates each scheduled backup with the running image and writes a manifest', () => {
-    const script = readFileSync('backup-offsite.sh', 'utf8')
-    expect(script).toContain('BACKUP_SHA256=')
-    expect(script).toContain('BACKUP_SIZE_BYTES=')
-    expect(script).toContain('DB_PATH=/validation-data/open-agricola.db')
-    expect(script).toContain('scripts/validate-backup.ts')
-    expect(script).toContain('$BACKUP_STEM.manifest.json')
-    expect(script).toContain('replay-removals.latest.jsonl')
+  it('shares the native archive helper between scheduled and pre-deploy backups', () => {
+    expect(readFileSync('backup-offsite.sh', 'utf8')).toContain('bash scripts/backup-storage.sh "$BACKUP_STEM"')
+    expect(readFileSync('deploy-backend.sh', 'utf8')).toContain('bash scripts/backup-storage.sh "$STEM" --already-stopped')
   })
 
   it('keeps the offsite retention independent from local pruning and within the 30-day cap', () => {

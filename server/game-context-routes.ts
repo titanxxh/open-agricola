@@ -75,12 +75,12 @@ const send = (
   res.end(body)
 }
 
-export function handleGameContextRoute(
+export async function handleGameContextRoute(
   req: IncomingMessage,
   res: ServerResponse,
   store: GameContextStore,
   user: AuthUser | null,
-): boolean {
+): Promise<Awaited<boolean>> {
   if (req.method !== 'GET' || !req.url) return false
   const url = new URL(req.url, `http://${req.headers.host ?? 'localhost'}`)
   const match = CONTEXT_ROUTE.exec(url.pathname)
@@ -104,7 +104,7 @@ export function handleGameContextRoute(
     })
     return true
   }
-  const response = store.resolve(roomId, user?.id)
+  const response = (await store.resolve(roomId, user?.id))
   if (!response.ok && response.code === 'login_required') {
     response.returnTo = contextReturnTo(roomId)
   }

@@ -1,6 +1,5 @@
-import Database from 'better-sqlite3'
-import { runMigrations } from '../db'
-import { SqliteRoomPersistence } from '../game/persistence/sqlite-adapter'
+import { createTestDatabase } from './_helpers/postgres'
+import { PostgresRoomPersistence } from '../game/persistence/postgres-adapter'
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
@@ -308,7 +307,7 @@ describe('D014 Hammer Crusher provisional continuation', () => {
     })
   })
 
-  it('records explicit ancestry and aborts only the nested Construct scope', () => {
+  it('records explicit ancestry and aborts only the nested Construct scope', async () => {
     let session = setup({ buildingTycoon: false, clay: 0, reed: 0 })
     const helperPlayerIndex = registerNestedConstructHelper(session, { clay: 3, reed: 1 })
 
@@ -347,12 +346,11 @@ describe('D014 Hammer Crusher provisional continuation', () => {
 
     const snapshot = serializeSessionSnapshot(session.state, session)
     expect(snapshot.frame.engineStack.frames).toEqual([])
-    const db = new Database(':memory:')
-    runMigrations(db, () => {})
-    const persistence = new SqliteRoomPersistence(db)
-    persistence.save('nested', snapshot, { createdBy: null, maxPlayers: 2, customCardDbIds: [], status: 'playing', players: [] })
-    const restoredState = rehydrateState(persistence.load('nested')!.serialized!)
-    db.close()
+    const db = await createTestDatabase()
+    const persistence = new PostgresRoomPersistence(db)
+    await persistence.save('nested', snapshot, { createdBy: null, maxPlayers: 2, customCardDbIds: [], status: 'playing', players: [] })
+    const restoredState = rehydrateState((await persistence.load('nested'))!.serialized!)
+    ;(await db.close())
     const restored = setup({ buildingTycoon: false, clay: 0, reed: 0 })
     registerNestedConstructHelper(restored, { clay: 3, reed: 1 })
     restored.loadState(restoredState.state)

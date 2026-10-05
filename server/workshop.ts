@@ -1,3 +1,4 @@
+import { InvalidationStore } from './invalidation'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { getDb } from './db.ts'
 import { validateSession, extractToken, isAdmin } from './auth.ts'
@@ -71,6 +72,11 @@ const parseBody = async <T>(req: IncomingMessage): Promise<T | null> => {
 }
 
 const sendWorkshopDraftError = (res: ServerResponse, error: unknown): boolean => {
+  if (error instanceof Error && 'code' in error && error.code === '23514'
+    && 'constraint' in error && error.constraint === 'object_reference_ready') {
+    sendJson(res, 400, { ok: false, code: 'invalid', error: 'Card art is unavailable; upload the image again' })
+    return true
+  }
   if (!(error instanceof WorkshopDraftError)) return false
   const status = {
     conflict: 409,
@@ -172,7 +178,7 @@ const serialiseCardForApi = (
 }
 
 const serialisePublishedCardForApi = (
-  card: ReturnType<typeof loadPublishedCard>,
+  card: Awaited<ReturnType<typeof loadPublishedCard>>,
 ): Record<string, unknown> => ({
   id: card.id,
   author_id: card.authorId,
@@ -247,13 +253,13 @@ const sanitizeSandboxSettings = (settings?: SandboxSettingsInput): SandboxSettin
   }
 }
 
-const getSandboxSettings = (userId: string): SandboxSettings => {
+const getSandboxSettings = async (userId: string): Promise<Awaited<SandboxSettings>> => {
   const db = getDb()
-  const row = db.prepare(`
+  const row = (await db.prepare(`
     SELECT player_count, deck_ids_json, enable_through_the_seasons, enable_farmers_of_the_moor, allow_incomplete_farmers_of_the_moor_minor_deal, enable_snake_opening, updated_at
     FROM sandbox_settings
     WHERE user_id = ?
-  `).get(userId) as {
+  `).get(userId)) as {
     player_count: number
     deck_ids_json: string
     enable_through_the_seasons: number
@@ -290,13 +296,13 @@ const getSandboxSettings = (userId: string): SandboxSettings => {
   }
 }
 
-const saveSandboxSettings = (userId: string, settings?: SandboxSettingsInput): SandboxSettings => {
+const saveSandboxSettings = async (userId: string, settings?: SandboxSettingsInput): Promise<Awaited<SandboxSettings>> => {
   const next: SandboxSettings = {
     ...sanitizeSandboxSettings(settings),
     updated_at: Date.now(),
   }
   const db = getDb()
-  db.prepare(`
+  ;(await db.prepare(`
     INSERT INTO sandbox_settings (
       user_id,
       player_count,
@@ -325,7 +331,7 @@ const saveSandboxSettings = (userId: string, settings?: SandboxSettingsInput): S
     next.allow_incomplete_farmers_of_the_moor_minor_deal ? 1 : 0,
     next.enable_snake_opening ? 1 : 0,
     next.updated_at,
-  )
+  ))
   return next
 }
 
@@ -351,13 +357,13 @@ export async function handleWorkshopRoute(
   const routeUrl = new URL(url, 'http://localhost')
 
   const token = extractToken(req.headers.authorization)
-  const user = validateSession(token)
+  const user = (await validateSession(token))
   const db = getDb()
 
   // ── GET /api/workshop/github/oauth/start ────────────────────────────────
   // Redirects to GitHub's authorize URL. Handshake must already be pending.
   if (req.method === 'GET' && url.startsWith('/api/workshop/github/oauth/start')) {
-    handleOAuthStart(req, res, new URL(url, 'http://localhost'))
+    ;(await handleOAuthStart(req, res, new URL(url, 'http://localhost')))
     return true
   }
 
@@ -424,30 +430,30 @@ export async function handleWorkshopRoute(
       const orderBy = sort === 'popular'
         ? 'w.featured DESC, like_count DESC, w.updated_at DESC'
         : 'w.updated_at DESC'
-      const rows = db.prepare(`
+      const rows = (await db.prepare(`
         SELECT w.*, u.display_name AS author_name,
                COUNT(DISTINCT l.user_id) AS like_count
         FROM workshop_cards w
         LEFT JOIN users u ON w.author_id = u.id
         LEFT JOIN card_likes l ON l.card_id = w.id
         WHERE ${where}
-        GROUP BY w.id
+        GROUP BY w.id, u.id
         ORDER BY ${orderBy}
         LIMIT ? OFFSET ?
-      `).all(...params, limit, offset) as WorkshopCard[]
+      `).all(...params, limit, offset)) as WorkshopCard[]
       const ids = rows.map(r => r.id)
       const likedIds = ids.length > 0
-        ? new Set((db.prepare(
+        ? new Set(((await db.prepare(
             `SELECT card_id FROM card_likes WHERE user_id = ? AND card_id IN (${ids.map(() => '?').join(',')})`,
-          ).all(user.id, ...ids) as { card_id: string }[]).map(row => row.card_id))
+          ).all(user.id, ...ids)) as { card_id: string }[]).map(row => row.card_id))
         : new Set<string>()
       const cards = rows.map(row => serialiseCardForApi(
         row,
         { liked_by_me: likedIds.has(row.id) },
         true,
       ))
-      const total = (db.prepare(`SELECT COUNT(*) AS n FROM workshop_cards w WHERE ${where}`)
-        .get(...params) as { n: number }).n
+      const total = ((await db.prepare(`SELECT COUNT(*) AS n FROM workshop_cards w WHERE ${where}`)
+        .get(...params)) as { n: number }).n
       sendJson(res, 200, { ok: true, cards, page, total, hasMore: offset + rows.length < total })
       return true
     }
@@ -464,25 +470,25 @@ export async function handleWorkshopRoute(
     const orderBy = sort === 'popular'
       ? 'w.featured DESC, like_count DESC, version.created_at DESC'
       : 'version.created_at DESC'
-    const rows = db.prepare(`
+    const rows = (await db.prepare(`
       SELECT w.id, COUNT(DISTINCT likes.user_id) AS like_count
       FROM workshop_cards w
       JOIN workshop_card_versions version ON version.id = w.approved_version_id
       LEFT JOIN card_likes likes ON likes.card_id = w.id
       WHERE ${where}
-      GROUP BY w.id
+      GROUP BY w.id, version.id
       ORDER BY ${orderBy}
       LIMIT ? OFFSET ?
-    `).all(...params, limit, offset) as { id: string }[]
-    const cards = rows.map(row => serialisePublishedCardForApi(
-      loadPublishedCard(db, row.id, user?.id),
-    ))
-    const total = (db.prepare(`
+    `).all(...params, limit, offset)) as { id: string }[]
+    const cards = await Promise.all(rows.map(async row => serialisePublishedCardForApi(
+      await loadPublishedCard(db, row.id, user?.id),
+    )))
+    const total = ((await db.prepare(`
       SELECT COUNT(*) AS n
       FROM workshop_cards w
       JOIN workshop_card_versions version ON version.id = w.approved_version_id
       WHERE ${where}
-    `).get(...params) as { n: number }).n
+    `).get(...params)) as { n: number }).n
     sendJson(res, 200, { ok: true, cards, page, total, hasMore: offset + rows.length < total })
     return true
   }
@@ -491,11 +497,11 @@ export async function handleWorkshopRoute(
   if (req.method === 'GET' && workspaceMatch) {
     if (!user) { sendJson(res, 401, { ok: false, error: 'Not authenticated' }); return true }
     try {
-      const workspace = loadWorkspace(db, workspaceMatch[1]!, user.id)
+      const workspace = (await loadWorkspace(db, workspaceMatch[1]!, user.id))
       sendJson(res, 200, {
         ok: true,
         workspace,
-        readiness: getHandoffReadiness(db, workspace.id, user.id),
+        readiness: (await getHandoffReadiness(db, workspace.id, user.id)),
       })
     } catch (error) {
       if (!sendWorkshopDraftError(res, error)) throw error
@@ -521,12 +527,12 @@ export async function handleWorkshopRoute(
       return true
     }
     try {
-      const workspace = checkpointDraft(db, {
+      const workspace = (await checkpointDraft(db, {
         cardId: draftMatch[1]!,
         authorId: user.id,
         baseRevision: body!.baseRevision as number,
         draft: prepared.draft,
-      })
+      }))
       sendJson(res, 200, { ok: true, workspace })
     } catch (error) {
       if (!sendWorkshopDraftError(res, error)) throw error
@@ -598,7 +604,7 @@ export async function handleWorkshopRoute(
       }
       let currentCardDefinitionId: string
       try {
-        currentCardDefinitionId = loadWorkspace(db, adoptMatch[1]!, user.id).draft.cardId
+        currentCardDefinitionId = (await loadWorkspace(db, adoptMatch[1]!, user.id)).draft.cardId
       } catch (error) {
         if (sendWorkshopDraftError(res, error)) return true
         throw error
@@ -643,13 +649,13 @@ export async function handleWorkshopRoute(
       return true
     }
     try {
-      const result = adoptCandidate(db, {
+      const result = (await adoptCandidate(db, {
         cardId: adoptMatch[1]!,
         authorId: user.id,
         baseRevision: body.baseRevision as number,
         candidate,
         ...(artInputs ? { artInputs } : {}),
-      })
+      }))
       sendJson(res, 200, { ok: true, ...result })
     } catch (error) {
       if (!sendWorkshopDraftError(res, error)) throw error
@@ -666,12 +672,12 @@ export async function handleWorkshopRoute(
       return true
     }
     try {
-      const workspace = restoreVersion(db, {
+      const workspace = (await restoreVersion(db, {
         cardId: restoreMatch[1]!,
         authorId: user.id,
         baseRevision: body.baseRevision as number,
         versionId: body.versionId,
-      })
+      }))
       sendJson(res, 200, { ok: true, workspace })
     } catch (error) {
       if (!sendWorkshopDraftError(res, error)) throw error
@@ -689,7 +695,7 @@ export async function handleWorkshopRoute(
       return true
     }
     try {
-      const workspace = loadWorkspace(db, publishMatch[1]!, user.id)
+      const workspace = (await loadWorkspace(db, publishMatch[1]!, user.id))
       if (workspace.revision !== baseRevision) {
         throw new WorkshopDraftError('conflict', 'Draft revision conflict', workspace)
       }
@@ -704,11 +710,11 @@ export async function handleWorkshopRoute(
         sendJson(res, 503, { ok: false, code: 'github_review_unavailable' })
         return true
       }
-      const binding = db.prepare(`
+      const binding = (await db.prepare(`
         SELECT github_pr_url, approved_commit_sha, approved_version_id,
                review_commit_sha, review_version_id, updated_at
         FROM workshop_cards WHERE id = ?
-      `).get(publishMatch[1]!) as {
+      `).get(publishMatch[1]!)) as {
         github_pr_url: string | null
         approved_commit_sha: string | null
         approved_version_id: string | null
@@ -750,7 +756,7 @@ export async function handleWorkshopRoute(
         || snapshot.headRefOid !== binding.review_commit_sha
         || binding.approved_version_id !== binding.review_version_id
       ) {
-        invalidateReviewedCard(db, {
+        ;(await invalidateReviewedCard(db, {
           prUrl,
           expectedBinding: {
             id: workspace.id,
@@ -761,17 +767,17 @@ export async function handleWorkshopRoute(
             reviewVersionId: binding.review_version_id,
             updatedAt: binding.updated_at,
           },
-        })
-        const current = loadWorkspace(db, publishMatch[1]!, user.id)
+        }))
+        const current = (await loadWorkspace(db, publishMatch[1]!, user.id))
         sendJson(res, 409, { ok: false, code: 'review_stale', current })
         return true
       }
-      const result = publish(db, {
+      const result = (await publish(db, {
         cardId: publishMatch[1]!,
         authorId: user.id,
         baseRevision: baseRevision as number,
         expectedUpdatedAt: binding.updated_at,
-      })
+      }))
       sendJson(res, 200, { ok: true, ...result })
     } catch (error) {
       if (!sendWorkshopDraftError(res, error)) throw error
@@ -788,11 +794,11 @@ export async function handleWorkshopRoute(
       return true
     }
     try {
-      const result = pinCurrentDraftVersion(db, {
+      const result = (await pinCurrentDraftVersion(db, {
         cardId: pinVersionMatch[1]!,
         authorId: user.id,
         baseRevision: body!.baseRevision as number,
-      })
+      }))
       sendJson(res, 200, { ok: true, ...result })
     } catch (error) {
       if (!sendWorkshopDraftError(res, error)) throw error
@@ -809,11 +815,11 @@ export async function handleWorkshopRoute(
       return true
     }
     try {
-      const workspace = unpublish(db, {
+      const workspace = (await unpublish(db, {
         cardId: unpublishMatch[1]!,
         authorId: user.id,
         baseRevision: body!.baseRevision as number,
-      })
+      }))
       sendJson(res, 200, { ok: true, workspace })
     } catch (error) {
       if (!sendWorkshopDraftError(res, error)) throw error
@@ -834,13 +840,13 @@ export async function handleWorkshopRoute(
       return true
     }
     try {
-      const workspace = markSandboxPass(db, {
+      const workspace = (await markSandboxPass(db, {
         cardId: sandboxPassMatch[1]!,
         authorId: user.id,
         versionId: body.versionId,
         authorConfirmed: body.authorConfirmed,
         runtimeErrors: body.runtimeErrors.filter((value): value is string => typeof value === 'string'),
-      })
+      }))
       sendJson(res, 200, { ok: true, workspace })
     } catch (error) {
       if (!sendWorkshopDraftError(res, error)) throw error
@@ -855,27 +861,27 @@ export async function handleWorkshopRoute(
     try {
       sendJson(res, 200, {
         ok: true,
-        card: serialisePublishedCardForApi(loadPublishedCard(db, cardDbId, user?.id)),
+        card: serialisePublishedCardForApi((await loadPublishedCard(db, cardDbId, user?.id))),
       })
     } catch (error) {
       const ownerCard = user
-        ? db.prepare(`
+        ? (await db.prepare(`
             SELECT w.*, u.display_name AS author_name,
                    COUNT(DISTINCT likes.user_id) AS like_count
             FROM workshop_cards w
             LEFT JOIN users u ON u.id = w.author_id
             LEFT JOIN card_likes likes ON likes.card_id = w.id
             WHERE w.id = ? AND w.author_id = ?
-            GROUP BY w.id
-          `).get(cardDbId, user.id) as WorkshopCard | undefined
+            GROUP BY w.id, u.id
+          `).get(cardDbId, user.id)) as WorkshopCard | undefined
         : undefined
       if (ownerCard) {
         sendJson(res, 200, {
           ok: true,
           card: serialiseCardForApi(ownerCard, {
-            liked_by_me: Boolean(db.prepare(
+            liked_by_me: Boolean((await db.prepare(
               'SELECT 1 FROM card_likes WHERE user_id = ? AND card_id = ?',
-            ).get(user!.id, cardDbId)),
+            ).get(user!.id, cardDbId))),
           }),
         })
         return true
@@ -978,7 +984,7 @@ export async function handleWorkshopRoute(
         artUrl: body.art_url ?? null,
         generation: {},
       }
-      const workspace = createCard(db, { authorId: user.id, draft })
+      const workspace = (await createCard(db, { authorId: user.id, draft }))
       sendJson(res, 200, { ok: true, id: workspace.id })
     } catch (error) {
       if (!sendWorkshopDraftError(res, error)) throw error
@@ -991,7 +997,7 @@ export async function handleWorkshopRoute(
   if (req.method === 'DELETE' && cardDeleteMatch) {
     if (!user) { sendJson(res, 401, { ok: false, error: 'Not authenticated' }); return true }
     const cardDbId = cardDeleteMatch[1]!
-    const row = db.prepare('SELECT author_id, review_status FROM workshop_cards WHERE id = ?').get(cardDbId) as
+    const row = (await db.prepare('SELECT author_id, review_status FROM workshop_cards WHERE id = ?').get(cardDbId)) as
       | { author_id: string; review_status: string } | undefined
     if (!row) { sendJson(res, 404, { ok: false, error: 'Card not found' }); return true }
     if (row.author_id !== user.id && !isAdmin(user.username)) { sendJson(res, 403, { ok: false, error: 'Forbidden' }); return true }
@@ -999,8 +1005,10 @@ export async function handleWorkshopRoute(
       sendJson(res, 403, { ok: false, error: 'Merged cards are permanent memorials; contact an admin' })
       return true
     }
-    db.prepare('DELETE FROM workshop_cards WHERE id = ?').run(cardDbId)
-    sendJson(res, 200, { ok: true })
+    const invalidations = new InvalidationStore(db)
+    const operation = await invalidations.begin('card', cardDbId, async () => { await db.prepare('DELETE FROM workshop_cards WHERE id = ?').run(cardDbId) })
+    const status = (await invalidations.status(operation.id))!
+    sendJson(res, status.pending ? 202 : 200, { ok: true, operationId: operation.id, pending: status.pending })
     return true
   }
 
@@ -1009,18 +1017,18 @@ export async function handleWorkshopRoute(
   if (req.method === 'POST' && likeMatch) {
     if (!user) { sendJson(res, 401, { ok: false, error: 'Not authenticated' }); return true }
     const cardDbId = likeMatch[1]!
-    const cardRow = db.prepare('SELECT review_status, live, built_in, author_id FROM workshop_cards WHERE id = ?').get(cardDbId) as { review_status: string; live: number; built_in: number; author_id: string } | undefined
+    const cardRow = (await db.prepare('SELECT review_status, live, built_in, author_id FROM workshop_cards WHERE id = ?').get(cardDbId)) as { review_status: string; live: number; built_in: number; author_id: string } | undefined
     const publiclyVisible = cardRow
       && (isLoadableLive(cardRow) || cardRow.review_status === 'merged')
     if (!cardRow || (!publiclyVisible && cardRow.author_id !== user.id)) {
       sendJson(res, 404, { ok: false, error: 'Card not found' }); return true
     }
-    const existing = db.prepare('SELECT 1 FROM card_likes WHERE user_id = ? AND card_id = ?').get(user.id, cardDbId)
+    const existing = (await db.prepare('SELECT 1 FROM card_likes WHERE user_id = ? AND card_id = ?').get(user.id, cardDbId))
     if (existing) {
-      db.prepare('DELETE FROM card_likes WHERE user_id = ? AND card_id = ?').run(user.id, cardDbId)
+      ;(await db.prepare('DELETE FROM card_likes WHERE user_id = ? AND card_id = ?').run(user.id, cardDbId))
       sendJson(res, 200, { ok: true, liked: false })
     } else {
-      db.prepare('INSERT INTO card_likes (user_id, card_id, created_at) VALUES (?, ?, ?)').run(user.id, cardDbId, Date.now())
+      ;(await db.prepare('INSERT INTO card_likes (user_id, card_id, created_at) VALUES (?, ?, ?)').run(user.id, cardDbId, Date.now()))
       sendJson(res, 200, { ok: true, liked: true })
     }
     return true
@@ -1030,13 +1038,13 @@ export async function handleWorkshopRoute(
   const commentsGetMatch = /^\/api\/workshop\/cards\/([^/]+)\/comments$/.exec(url)
   if (req.method === 'GET' && commentsGetMatch) {
     const cardDbId = commentsGetMatch[1]!
-    const rows = db.prepare(`
+    const rows = (await db.prepare(`
       SELECT c.*, u.display_name AS author_name
       FROM card_comments c
       LEFT JOIN users u ON c.author_id = u.id
       WHERE c.card_id = ?
       ORDER BY c.created_at ASC
-    `).all(cardDbId)
+    `).all(cardDbId))
     sendJson(res, 200, { ok: true, comments: rows })
     return true
   }
@@ -1052,8 +1060,8 @@ export async function handleWorkshopRoute(
       sendJson(res, 400, { ok: false, error: 'Comment body required (max 2000 chars)' }); return true
     }
     const id = nanoid()
-    db.prepare('INSERT INTO card_comments (id, card_id, author_id, body, created_at) VALUES (?, ?, ?, ?, ?)')
-      .run(id, cardDbId, user.id, text, Date.now())
+    ;(await db.prepare('INSERT INTO card_comments (id, card_id, author_id, body, created_at) VALUES (?, ?, ?, ?, ?)')
+      .run(id, cardDbId, user.id, text, Date.now()))
     sendJson(res, 200, { ok: true, id })
     return true
   }
@@ -1061,25 +1069,25 @@ export async function handleWorkshopRoute(
   // ── GET /api/workshop/sandbox ─────────────────────────────────────────────
   if (req.method === 'GET' && url === '/api/workshop/sandbox') {
     if (!user) { sendJson(res, 401, { ok: false, error: 'Not authenticated' }); return true }
-    const rows = db.prepare(`
+    const rows = (await db.prepare(`
       SELECT w.*, u.display_name AS author_name
       FROM sandbox_cards s
       JOIN workshop_cards w ON s.workshop_card_id = w.id
       LEFT JOIN users u ON w.author_id = u.id
       WHERE s.user_id = ?
       ORDER BY s.added_at DESC
-    `).all(user.id) as WorkshopCard[]
-    const cards = rows.flatMap(row => {
+    `).all(user.id)) as WorkshopCard[]
+    const cards = (await Promise.all(rows.map(async row => {
       if (isLoadableLive(row)) {
         try {
-          return [serialisePublishedCardForApi(loadPublishedCard(db, row.id, user.id))]
+          return [serialisePublishedCardForApi((await loadPublishedCard(db, row.id, user.id)))]
         } catch {
           return []
         }
       }
       return row.author_id === user.id ? [serialiseCardForApi(row)] : []
-    })
-    sendJson(res, 200, { ok: true, cards, settings: getSandboxSettings(user.id) })
+    }))).flat()
+    sendJson(res, 200, { ok: true, cards, settings: (await getSandboxSettings(user.id)) })
     return true
   }
 
@@ -1093,19 +1101,19 @@ export async function handleWorkshopRoute(
     }>(req)
     const MAX_SANDBOX_CARDS = 20
     if (body?.workshop_card_id) {
-      const count = (db.prepare('SELECT COUNT(*) as c FROM sandbox_cards WHERE user_id = ?')
-        .get(user.id) as { c: number }).c
+      const count = ((await db.prepare('SELECT COUNT(*) as c FROM sandbox_cards WHERE user_id = ?')
+        .get(user.id)) as { c: number }).c
       if (count >= MAX_SANDBOX_CARDS) {
         sendJson(res, 400, { ok: false, error: `Maximum ${MAX_SANDBOX_CARDS} sandbox cards allowed` })
         return true
       }
-      const existing = db.prepare('SELECT 1 FROM sandbox_cards WHERE user_id = ? AND workshop_card_id = ?')
-        .get(user.id, body.workshop_card_id)
+      const existing = (await db.prepare('SELECT 1 FROM sandbox_cards WHERE user_id = ? AND workshop_card_id = ?')
+        .get(user.id, body.workshop_card_id))
       if (!existing) {
-        db.prepare('INSERT INTO sandbox_cards (user_id, workshop_card_id, added_at) VALUES (?, ?, ?)')
-          .run(user.id, body.workshop_card_id, Date.now())
+        ;(await db.prepare('INSERT INTO sandbox_cards (user_id, workshop_card_id, added_at) VALUES (?, ?, ?)')
+          .run(user.id, body.workshop_card_id, Date.now()))
       }
-      sendJson(res, 200, { ok: true, settings: getSandboxSettings(user.id) })
+      sendJson(res, 200, { ok: true, settings: (await getSandboxSettings(user.id)) })
       return true
     }
     if (!Array.isArray(body?.workshop_card_ids)) {
@@ -1117,13 +1125,13 @@ export async function handleWorkshopRoute(
       .slice(0, MAX_SANDBOX_CARDS)
     const now = Date.now()
     const insertSandboxCard = db.prepare('INSERT INTO sandbox_cards (user_id, workshop_card_id, added_at) VALUES (?, ?, ?)')
-    db.transaction(() => {
-      db.prepare('DELETE FROM sandbox_cards WHERE user_id = ?').run(user.id)
+    ;(await db.transaction(async () => {
+      ;(await db.prepare('DELETE FROM sandbox_cards WHERE user_id = ?').run(user.id))
       for (const cardId of nextIds) {
-        insertSandboxCard.run(user.id, cardId, now)
+        ;(await insertSandboxCard.run(user.id, cardId, now))
       }
-    })()
-    const settings = saveSandboxSettings(user.id, body.settings)
+    })())
+    const settings = (await saveSandboxSettings(user.id, body.settings))
     sendJson(res, 200, { ok: true, settings })
     return true
   }
@@ -1133,7 +1141,7 @@ export async function handleWorkshopRoute(
   if (req.method === 'DELETE' && sandboxDeleteMatch) {
     if (!user) { sendJson(res, 401, { ok: false, error: 'Not authenticated' }); return true }
     const workshopCardId = sandboxDeleteMatch[1]!
-    db.prepare('DELETE FROM sandbox_cards WHERE user_id = ? AND workshop_card_id = ?').run(user.id, workshopCardId)
+    ;(await db.prepare('DELETE FROM sandbox_cards WHERE user_id = ? AND workshop_card_id = ?').run(user.id, workshopCardId))
     sendJson(res, 200, { ok: true })
     return true
   }
@@ -1144,16 +1152,16 @@ export async function handleWorkshopRoute(
     if (!user) { sendJson(res, 401, { ok: false, error: 'Not authenticated' }); return true }
     const cardDbId = versionsGetMatch[1]!
     // Only owner can see version history (drafts or published)
-    const cardRow = db.prepare('SELECT author_id FROM workshop_cards WHERE id = ?').get(cardDbId) as { author_id: string } | undefined
+    const cardRow = (await db.prepare('SELECT author_id FROM workshop_cards WHERE id = ?').get(cardDbId)) as { author_id: string } | undefined
     if (!cardRow) { sendJson(res, 404, { ok: false, error: 'Card not found' }); return true }
     if (cardRow.author_id !== user.id && !isAdmin(user.username)) { sendJson(res, 403, { ok: false, error: 'Forbidden' }); return true }
-    const rows = db.prepare(`
+    const rows = (await db.prepare(`
       SELECT id, version_number, card_json, art_url, created_at
       FROM workshop_card_versions
       WHERE card_id = ?
       ORDER BY version_number DESC
       LIMIT 5
-    `).all(cardDbId) as { id: string; version_number: number; card_json: string; art_url: string | null; created_at: number }[]
+    `).all(cardDbId)) as { id: string; version_number: number; card_json: string; art_url: string | null; created_at: number }[]
 
     const versions = rows.map(r => ({
       ...r,
@@ -1169,11 +1177,11 @@ export async function handleWorkshopRoute(
     if (!user) { sendJson(res, 401, { ok: false, error: 'Not authenticated' }); return true }
     if (!isAdmin(user.username)) { sendJson(res, 403, { ok: false, error: 'Admin only' }); return true }
     const cardDbId = featureMatch[1]!
-    const current = db.prepare('SELECT featured FROM workshop_cards WHERE id = ?').get(cardDbId) as
+    const current = (await db.prepare('SELECT featured FROM workshop_cards WHERE id = ?').get(cardDbId)) as
       | { featured: number } | undefined
     if (!current) { sendJson(res, 404, { ok: false, error: 'Card not found' }); return true }
     const newVal = current.featured ? 0 : 1
-    db.prepare('UPDATE workshop_cards SET featured = ? WHERE id = ?').run(newVal, cardDbId)
+    ;(await db.prepare('UPDATE workshop_cards SET featured = ? WHERE id = ?').run(newVal, cardDbId))
     sendJson(res, 200, { ok: true, featured: !!newVal })
     return true
   }
@@ -1198,14 +1206,14 @@ export async function handleWorkshopRoute(
     else if (status && isReviewStatus(status)) { where += ' AND w.review_status = ?'; params.push(status) }
     if (author) { where += ' AND u.username = ?'; params.push(author) }
 
-    const rows = db.prepare(`
+    const rows = (await db.prepare(`
       SELECT w.*, u.username AS author_name
       FROM workshop_cards w LEFT JOIN users u ON w.author_id = u.id
       WHERE ${where}
       ORDER BY w.updated_at DESC
       LIMIT ? OFFSET ?
-    `).all(...params, limit, offset) as Record<string, unknown>[]
-    const total = (db.prepare(`SELECT COUNT(*) as cnt FROM workshop_cards w LEFT JOIN users u ON w.author_id = u.id WHERE ${where}`).get(...params) as { cnt: number }).cnt
+    `).all(...params, limit, offset)) as Record<string, unknown>[]
+    const total = ((await db.prepare(`SELECT COUNT(*) as cnt FROM workshop_cards w LEFT JOIN users u ON w.author_id = u.id WHERE ${where}`).get(...params)) as { cnt: number }).cnt
 
     sendJson(res, 200, {
       ok: true,
@@ -1221,11 +1229,11 @@ export async function handleWorkshopRoute(
   if (req.method === 'GET' && adminExportMatch) {
     if (!user || !isAdmin(user.username)) { sendJson(res, 403, { ok: false, error: 'Admin only' }); return true }
     const cardDbId = adminExportMatch[1]!
-    const row = db.prepare(`
+    const row = (await db.prepare(`
       SELECT w.*, u.username AS author_name
       FROM workshop_cards w LEFT JOIN users u ON w.author_id = u.id
       WHERE w.id = ?
-    `).get(cardDbId) as Record<string, unknown> | undefined
+    `).get(cardDbId)) as Record<string, unknown> | undefined
     if (!row) { sendJson(res, 404, { ok: false, error: 'Card not found' }); return true }
 
     const card = serialiseCardForApi(row as unknown as WorkshopCard)
@@ -1238,26 +1246,24 @@ export async function handleWorkshopRoute(
   if (req.method === 'DELETE' && adminDeleteMatch) {
     if (!user || !isAdmin(user.username)) { sendJson(res, 403, { ok: false, error: 'Admin only' }); return true }
     const cardDbId = adminDeleteMatch[1]!
-    const row = db.prepare('SELECT card_id, name FROM workshop_cards WHERE id = ?').get(cardDbId) as
+    const row = (await db.prepare('SELECT card_id, name FROM workshop_cards WHERE id = ?').get(cardDbId)) as
       | { card_id: string; name: string } | undefined
     if (!row) { sendJson(res, 404, { ok: false, error: 'Card not found' }); return true }
-    db.prepare('DELETE FROM workshop_card_versions WHERE card_id = ?').run(cardDbId)
-    db.prepare('DELETE FROM card_likes WHERE card_id = ?').run(cardDbId)
-    db.prepare('DELETE FROM card_comments WHERE card_id = ?').run(cardDbId)
-    db.prepare('DELETE FROM sandbox_cards WHERE workshop_card_id = ?').run(cardDbId)
-    db.prepare('DELETE FROM workshop_cards WHERE id = ?').run(cardDbId)
-    sendJson(res, 200, { ok: true, deleted: { id: cardDbId, card_id: row.card_id, name: row.name } })
+    const invalidations = new InvalidationStore(db)
+    const operation = await invalidations.begin('card', cardDbId, async () => { await db.prepare('DELETE FROM workshop_cards WHERE id = ?').run(cardDbId) })
+    const status = (await invalidations.status(operation.id))!
+    sendJson(res, status.pending ? 202 : 200, { ok: true, pending: status.pending, operationId: operation.id, deleted: { id: cardDbId, card_id: row.card_id, name: row.name } })
     return true
   }
 
   // ── GET /api/admin/users — list all users ─────────────────────────────
   if (req.method === 'GET' && url.startsWith('/api/admin/users')) {
     if (!user || !isAdmin(user.username)) { sendJson(res, 403, { ok: false, error: 'Admin only' }); return true }
-    const rows = db.prepare(`
+    const rows = (await db.prepare(`
       SELECT u.id, u.username, u.display_name, u.created_at, u.last_login_at,
         (SELECT COUNT(*) FROM workshop_cards WHERE author_id = u.id) AS card_count
       FROM users u ORDER BY u.created_at DESC
-    `).all() as Record<string, unknown>[]
+    `).all()) as Record<string, unknown>[]
     sendJson(res, 200, { ok: true, users: rows })
     return true
   }

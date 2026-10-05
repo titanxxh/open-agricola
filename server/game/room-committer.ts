@@ -1,8 +1,10 @@
+import { ExecutionRevokedError } from './execution-access'
+import type { OwnerToken } from './room-directory'
+import { RoomOwnershipError } from './room-directory'
+import { nextInputWindow } from './command-input'
+import type { CommandReceiptWrite } from './command-store'
 import { RoomHistoryCorruptionError } from './persistence/room-history-store'
-import { createHash } from 'node:crypto'
-import { mkdirSync, readFileSync, readdirSync, unlinkSync, writeFileSync } from 'node:fs'
-import { basename, join } from 'node:path'
-import type { CustomCardDef } from '../../shared/contract/protocol/game.ts'
+import { ReplayResources, ReplayAssetValidationError } from '../storage/replay-resources'
 import type { ClientCommand } from '../../shared/contract/protocol/ws.ts'
 import { captureStateWithHistory } from '../../shared/session/history-streams.ts'
 import {
@@ -21,16 +23,13 @@ import { buildGameResult } from './room-persistence-checkpoint.ts'
 import { capturePrivateCursor, privateCursorEquals, type PrivateCursorComparison } from './private-cursor-comparison.ts'
 import { toRoomMeta, type Room } from './room.ts'
 import {
-  SqliteRoomPersistence,
+  PostgresRoomPersistence,
   type ReplayCommit,
   type ReplayHead,
-} from './persistence/sqlite-adapter.ts'
+} from './persistence/postgres-adapter.ts'
 
 const RETRY_DELAYS_MS = [1_000, 2_000, 5_000, 10_000, 30_000] as const
 export const REPLAY_SCHEMA_VERSION = 1
-const REPLAY_ASSET_URL_PATTERN = /^\/replay-assets\/([a-f0-9]{64})$/
-
-class ReplayAssetValidationError extends Error {}
 
 export type ReplayIntent = {
   commandType: string
@@ -59,8 +58,12 @@ type RoomHead = {
 type PrepareRoomReadyResult = Exclude<RoomCommitResult, { kind: 'blocked' }>
 
 type PrepareRoomOptions = {
+  receipt?: CommandReceiptWrite
+  retireRoomId?: string
+  retiredOwner?: OwnerToken
+  retiredVersion?: number
   missingPrefix: boolean
-  onReady?: (result: PrepareRoomReadyResult) => void
+  onReady?: (result: PrepareRoomReadyResult) => void | Promise<void>
 }
 
 type PendingCommit = {
@@ -72,7 +75,7 @@ type PendingCommit = {
   retryIndex: number
   error: string
   timer: unknown | null
-  onCommitted?: (result: Extract<RoomCommitResult, { kind: 'committed' }>) => void
+  onCommitted?: (result: Extract<RoomCommitResult, { kind: 'committed' }>) => void | Promise<void>
   waiters: Array<(error?: string) => void>
 }
 
@@ -104,6 +107,8 @@ const intent = (commandType: string, params: JsonValue = {}): ReplayIntent => ({
 export const replayIntentFromCommand = (command: ClientCommand): ReplayIntent | null => {
   switch (command.type) {
     case 'auth':
+    case 'getCommandScope':
+    case 'getCommandReceipt':
     case 'createRoom':
     case 'joinRoom':
     case 'dissolveRoom':
@@ -188,91 +193,12 @@ const replayFrame = (
 const errorMessage = (error: unknown): string =>
   error instanceof Error ? error.message : String(error)
 
-const sha256 = (value: Buffer): string =>
-  createHash('sha256').update(value).digest('hex')
-
-const archiveReplayAsset = (
-  artUrl: string,
-  assetRoot: string,
-  cardArtRoot: string,
-  removedAssetHashes: ReadonlySet<string>,
-): string => {
-  const archived = REPLAY_ASSET_URL_PATTERN.exec(artUrl)
-  if (archived) {
-    if (removedAssetHashes.has(archived[1]!)) {
-      throw new ReplayAssetValidationError('replay asset has been removed')
-    }
-    const content = readFileSync(join(assetRoot, archived[1]!))
-    if (sha256(content) !== archived[1]) {
-      throw new ReplayAssetValidationError('archived custom card art is corrupt')
-    }
-    return artUrl
-  }
-  if (!artUrl.startsWith('/card-art/')) {
-    throw new ReplayAssetValidationError('unsupported custom card art URL')
-  }
-  const filename = artUrl.slice('/card-art/'.length)
-  if (!filename || basename(filename) !== filename || !/^[A-Za-z0-9._-]+$/.test(filename)) {
-    throw new ReplayAssetValidationError('invalid custom card art URL')
-  }
-  const content = readFileSync(join(cardArtRoot, filename))
-  const hash = sha256(content)
-  if (removedAssetHashes.has(hash)) {
-    throw new ReplayAssetValidationError('replay asset has been removed')
-  }
-  mkdirSync(assetRoot, { recursive: true })
-  const target = join(assetRoot, hash)
-  try {
-    writeFileSync(target, content, { flag: 'wx' })
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error
-    if (sha256(readFileSync(target)) !== hash) {
-      throw new ReplayAssetValidationError('replay asset hash conflict')
-    }
-  }
-  return `/replay-assets/${hash}`
-}
-
-const archiveCustomCardDefs = (
-  definitions: CustomCardDef[],
-  assetRoot: string,
-  cardArtRoot: string,
-  removedAssetHashes: ReadonlySet<string>,
-): CustomCardDef[] => definitions.map((definition) => ({
-  ...definition,
-  ...(definition.artUrl
-    ? {
-        artUrl: archiveReplayAsset(
-          definition.artUrl,
-          assetRoot,
-          cardArtRoot,
-          removedAssetHashes,
-        ),
-      }
-    : {}),
-}))
-
-const replayAssetHashes = (customCardsJson: string): string[] => {
-  const definitions = JSON.parse(customCardsJson) as unknown
-  if (!Array.isArray(definitions)) throw new Error('invalid replay custom card archive')
-  return definitions.flatMap((definition) => {
-    if (!definition || typeof definition !== 'object') return []
-    const artUrl = (definition as { artUrl?: unknown }).artUrl
-    if (typeof artUrl !== 'string') return []
-    const match = REPLAY_ASSET_URL_PATTERN.exec(artUrl)
-    return match ? [match[1]!] : []
-  })
-}
-
 export class RoomCommitter {
-  private readonly persistence: SqliteRoomPersistence
-  private readonly enabled: boolean
+  private readonly persistence: PostgresRoomPersistence
   private readonly viewerBuildId: string
   private readonly gameBuildId: string
-  private readonly viewerBuildExists: (viewerBuildId: string) => boolean
-  private readonly assetRoot: string
-  private readonly cardArtRoot: string
-  private readonly removedAssetHashes: ReadonlySet<string>
+  private readonly viewerBuildExists: (viewerBuildId: string) => boolean | Promise<boolean>
+  private readonly resources?: ReplayResources
   private readonly scheduler: RoomCommitScheduler
   private readonly now: () => number
   private readonly heads = new Map<string, RoomHead>()
@@ -283,34 +209,27 @@ export class RoomCommitter {
   private storageFailed = false
 
   constructor(deps: {
-    persistence: SqliteRoomPersistence
-    enabled: boolean
+    persistence: PostgresRoomPersistence
     viewerBuildId: string
     gameBuildId: string
-    viewerBuildExists: (viewerBuildId: string) => boolean
-    assetRoot?: string
-    cardArtRoot?: string
-    removedAssetHashes?: ReadonlySet<string>
+    viewerBuildExists: (viewerBuildId: string) => boolean | Promise<boolean>
+    resources?: ReplayResources
     scheduler?: RoomCommitScheduler
     now?: () => number
   }) {
     this.persistence = deps.persistence
-    this.enabled = deps.enabled
     this.viewerBuildId = deps.viewerBuildId.trim()
     this.gameBuildId = deps.gameBuildId.trim()
     this.viewerBuildExists = deps.viewerBuildExists
-    this.assetRoot = deps.assetRoot ?? join(process.cwd(), 'data', 'replay-assets')
-    this.cardArtRoot = deps.cardArtRoot ?? join(process.cwd(), 'data', 'card-art')
-    this.removedAssetHashes = deps.removedAssetHashes ?? new Set()
+    this.resources = deps.resources
     this.scheduler = deps.scheduler ?? defaultScheduler
     this.now = deps.now ?? Date.now
   }
 
-  canCreateRoom(): { ok: true } | { ok: false; error: string } {
+  async canCreateRoom(): Promise<{ ok: true } | { ok: false; error: string }> {
     if (this.storageFailed) return { ok: false, error: 'replay storage unavailable' }
-    if (!this.enabled) return { ok: true }
     if (!this.viewerBuildId) return { ok: false, error: 'replay viewer build is missing' }
-    if (!this.viewerBuildExists(this.viewerBuildId)) {
+    if (!await this.viewerBuildExists(this.viewerBuildId)) {
       return { ok: false, error: 'replay viewer build not found' }
     }
     if (!this.gameBuildId) return { ok: false, error: 'game build id is missing' }
@@ -318,9 +237,9 @@ export class RoomCommitter {
   }
 
   lockNewRoom(room: Room): void {
-    room.replayRecording = this.enabled
-    room.replayViewerBuildId = this.enabled ? this.viewerBuildId : undefined
-    room.replayGameBuildId = this.enabled ? this.gameBuildId : undefined
+    room.replayRecording = true
+    room.replayViewerBuildId = this.viewerBuildId
+    room.replayGameBuildId = this.gameBuildId
   }
 
   hasReplay(roomId: string): boolean {
@@ -357,7 +276,7 @@ export class RoomCommitter {
     return true
   }
 
-  retireRoom(roomId: string): void {
+  async retireRoom(roomId: string): Promise<Awaited<void>> {
     const pending = this.pending.get(roomId)
     const pendingLoad = this.pendingReplayLoads.get(roomId)
     if (pending?.timer !== null && pending?.timer !== undefined) {
@@ -374,24 +293,25 @@ export class RoomCommitter {
     this.heads.delete(roomId)
     this.knownReplayIds.delete(roomId)
     this.updateStorageFailed()
-    this.cleanupReplayAssets()
+    await this.resources?.releasePreparation(roomId)
   }
 
-  prepareRoom(
+  async prepareRoom(
     room: Room,
     options: PrepareRoomOptions,
-  ): RoomCommitResult {
+  ): Promise<Awaited<RoomCommitResult>> {
     const blocked = this.blockedError(room.id)
     if (blocked) return { kind: 'blocked', error: blocked }
     let persisted: ReplayHead | null
     try {
-      persisted = this.persistence.loadReplayHead(room.id)
+      persisted = (await this.persistence.loadReplayHead(room.id))
     } catch (error) {
       return this.deferReplayLoad(room, options, errorMessage(error))
     }
     try {
-      return this.prepareLoadedRoom(room, options, persisted)
+      return (await this.prepareLoadedRoom(room, options, persisted))
     } catch (error) {
+      if ((error instanceof RoomOwnershipError || error instanceof ExecutionRevokedError)) return this.blockPermanently(room.id, errorMessage(error))
       if (error instanceof RoomHistoryCorruptionError) return this.blockPermanently(room.id, errorMessage(error))
       if (error instanceof ReplayAssetValidationError) {
         return this.blockPermanently(
@@ -403,36 +323,23 @@ export class RoomCommitter {
     }
   }
 
-  private prepareLoadedRoom(
+  private async prepareLoadedRoom(
     room: Room,
     options: PrepareRoomOptions,
     persisted: ReplayHead | null,
-  ): RoomCommitResult {
+  ): Promise<Awaited<RoomCommitResult>> {
     if (!persisted && room.status === 'waiting') return { kind: 'unchanged' }
-    if (
-      !persisted
-      && room.replayRecording === undefined
-      && room.session.getCustomCardDefs().length > 0
-    ) {
-      return { kind: 'unchanged' }
+    if (persisted) return (await this.restoreHead(room, persisted))
+    if (options.missingPrefix || room.replayRecording !== true) {
+      return this.blockPermanently(room.id, 'recorded room replay header is missing')
     }
-    if (persisted) return this.restoreHead(room, persisted)
     const { serialized, frame } = replayFrame(room)
-    const legacyRoom = room.replayRecording === undefined
-    const shouldRecord = legacyRoom
-      ? this.enabled
-      : room.replayRecording
-    if (!shouldRecord) return { kind: 'unchanged' }
-    const viewerBuildId = legacyRoom
-      ? this.viewerBuildId
-      : room.replayViewerBuildId?.trim() ?? ''
-    const gameBuildId = legacyRoom
-      ? this.gameBuildId
-      : room.replayGameBuildId?.trim() ?? ''
+    const viewerBuildId = room.replayViewerBuildId?.trim() ?? ''
+    const gameBuildId = room.replayGameBuildId?.trim() ?? ''
     if (!viewerBuildId) {
       return this.blockPermanently(room.id, 'replay viewer build is missing')
     }
-    if (!this.viewerBuildExists(viewerBuildId)) {
+    if (!await this.viewerBuildExists(viewerBuildId)) {
       return this.blockPermanently(room.id, 'replay viewer build not found')
     }
     if (!gameBuildId) {
@@ -446,21 +353,24 @@ export class RoomCommitter {
       previousCheckpointStepNo: 0,
     })
     const createdAt = this.now()
-    const customCardsJson = canonicalJson(archiveCustomCardDefs(
-      room.session.getCustomCardDefs(),
-      this.assetRoot,
-      this.cardArtRoot,
-      this.removedAssetHashes,
-    ))
+    const definitions = room.session.getCustomCardDefs()
+    if (!this.resources && definitions.some(definition => definition.artUrl)) throw new ReplayAssetValidationError('Shared resource store is required')
+    const customCardsJson = canonicalJson(this.resources
+      ? await this.resources.archiveCards(room.id, definitions)
+      : definitions)
     const commit: ReplayCommit = {
       roomId: room.id,
+      retireRoomId: options.retireRoomId,
+      retiredOwner: options.retiredOwner,
+      retiredVersion: options.retiredVersion,
       serialized,
-      meta: toRoomMeta(room),
+      meta: { ...toRoomMeta(room), inputWindow: nextInputWindow(room.inputWindow, serialized.state, 'initial') },
+      ...(options.receipt ? { receipt: { request: { ...options.receipt.request }, outcome: { ...options.receipt.outcome, roomId: room.id, roomVersion: 0, stepNo: 0, frameHash: encoded.frameHash } } } : {}),
       header: {
         schemaVersion: REPLAY_SCHEMA_VERSION,
         viewerBuildId,
         gameBuildId,
-        missingPrefix: legacyRoom && options.missingPrefix,
+        missingPrefix: false,
         customCardsJson,
       },
       step: {
@@ -476,16 +386,17 @@ export class RoomCommitter {
         createdAt,
       },
     }
-    return this.persist(room, commit, frame, encoded, options.onReady)
+    return (await this.persist(room, commit, frame, encoded, options.onReady))
   }
 
-  commit(
+  async commit(
     room: Room,
     response: SessionResponse,
     replayIntent: ReplayIntent,
     playerIndex: number,
-    onCommitted?: (result: Extract<RoomCommitResult, { kind: 'committed' }>) => void,
-  ): RoomCommitResult {
+    onCommitted?: (result: Extract<RoomCommitResult, { kind: 'committed' }>) => void | Promise<void>,
+    receipt?: CommandReceiptWrite,
+  ): Promise<Awaited<RoomCommitResult>> {
     const blocked = this.blockedError(room.id)
     if (blocked) return { kind: 'blocked', error: blocked }
     if (!response.ok && response.durableTransition !== true) return { kind: 'unchanged' }
@@ -519,7 +430,8 @@ export class RoomCommitter {
     const commit: ReplayCommit = {
       roomId: room.id,
       serialized,
-      meta: toRoomMeta(room),
+      meta: { ...toRoomMeta(room), inputWindow: nextInputWindow(room.inputWindow, serialized.state, replayIntent.commandType) },
+      ...(receipt ? { receipt: { request: { ...receipt.request }, outcome: { ...receipt.outcome, roomId: room.id, roomVersion, stepNo, frameHash: encoded.frameHash } } } : {}),
       step: {
         stepNo,
         roomVersion,
@@ -536,16 +448,19 @@ export class RoomCommitter {
         ? { result: buildGameResult(room, createdAt) }
         : {}),
     }
-    return this.persist(room, commit, frame, encoded, onCommitted)
+    return (await this.persist(room, commit, frame, encoded, onCommitted))
   }
 
   shutdown(): void {
+    this.stopped = true
     for (const pending of this.pending.values()) {
       if (pending.timer !== null) this.scheduler.clearTimeout(pending.timer)
+      pending.waiters.forEach(waiter => waiter('server shutdown'))
     }
     for (const pending of this.pendingReplayLoads.values()) {
       if (pending.timer !== null) this.scheduler.clearTimeout(pending.timer)
     }
+    for (const pending of this.pendingReplayLoads.values()) pending.waiters.forEach(waiter => waiter('server shutdown'))
     this.pending.clear()
     this.pendingReplayLoads.clear()
     this.heads.clear()
@@ -554,10 +469,10 @@ export class RoomCommitter {
     this.storageFailed = false
   }
 
-  private restoreHead(
+  private async restoreHead(
     room: Room,
     persisted: ReplayHead,
-  ): RoomCommitResult {
+  ): Promise<Awaited<RoomCommitResult>> {
     this.knownReplayIds.add(room.id)
     if (persisted.schemaVersion !== REPLAY_SCHEMA_VERSION) {
       return this.blockPermanently(
@@ -571,7 +486,7 @@ export class RoomCommitter {
         `room snapshot rehydration failed for ${room.id} step ${persisted.latestStepNo}`,
       )
     }
-    const serialized = this.persistence.loadReplayFrame(room.id)
+    const serialized = (await this.persistence.loadReplayFrame(room.id))
     if (!serialized) {
       return this.blockPermanently(
         room.id,
@@ -610,22 +525,26 @@ export class RoomCommitter {
         }
   }
 
-  private persist(
+  private stopped = false
+
+  private async persist(
     room: Room,
     commit: ReplayCommit,
     frame: JsonValue,
     encoded: EncodedReplayFrame,
-    onCommitted?: (result: Extract<RoomCommitResult, { kind: 'committed' }>) => void,
-  ): RoomCommitResult {
+    onCommitted?: (result: Extract<RoomCommitResult, { kind: 'committed' }>) => void | Promise<void>,
+  ): Promise<Awaited<RoomCommitResult>> {
     const privateCursor = capturePrivateCursor(commit.serialized.sessionCursor)
     try {
-      const persisted = this.persistence.commitReplay(commit)
+      const persisted = (await this.persistence.commitReplay(commit))
       if (persisted.kind === 'conflict') {
         return this.blockPermanently(room.id, persisted.error)
       }
       return this.acceptCommit(room, commit, frame, encoded, privateCursor)
     } catch (error) {
       const message = errorMessage(error)
+      if ((error instanceof RoomOwnershipError || error instanceof ExecutionRevokedError)) return this.blockPermanently(room.id, message)
+      if (this.stopped) return { kind: 'blocked', error: message }
       const pending: PendingCommit = {
         room,
         commit,
@@ -659,6 +578,7 @@ export class RoomCommitter {
     privateCursor: PrivateCursorComparison,
   ): Extract<RoomCommitResult, { kind: 'committed' }> {
     room.version = commit.step.roomVersion
+    room.inputWindow = commit.meta.inputWindow ?? null
     this.knownReplayIds.add(room.id)
     if (commit.result) {
       this.heads.delete(room.id)
@@ -681,17 +601,20 @@ export class RoomCommitter {
   }
 
   private scheduleRetry(pending: PendingCommit): void {
+    if (this.stopped) return
     const delay = RETRY_DELAYS_MS[Math.min(pending.retryIndex, RETRY_DELAYS_MS.length - 1)]!
     pending.retryIndex += 1
-    pending.timer = this.scheduler.setTimeout(() => {
+    pending.timer = this.scheduler.setTimeout(async () => {
       pending.timer = null
-      this.retry(pending)
+      ;(await this.retry(pending))
     }, delay)
   }
 
-  private retry(pending: PendingCommit): void {
+  private async retry(pending: PendingCommit): Promise<Awaited<void>> {
+    if (this.stopped || !this.pending.has(pending.room.id)) return
     try {
-      const persisted = this.persistence.commitReplay(pending.commit)
+      const persisted = (await this.persistence.commitReplay(pending.commit))
+      if (this.stopped) return
       if (persisted.kind === 'conflict') {
         this.blockPermanently(pending.room.id, persisted.error)
         return
@@ -705,9 +628,10 @@ export class RoomCommitter {
         pending.encoded,
         pending.privateCursor,
       )
-      pending.onCommitted?.(result)
+      await pending.onCommitted?.(result)
       pending.waiters.forEach((waiter) => waiter())
     } catch (error) {
+      if ((error instanceof RoomOwnershipError || error instanceof ExecutionRevokedError)) { this.blockPermanently(pending.room.id, error.message); return }
       pending.error = errorMessage(error)
       console.warn(JSON.stringify({
         event: 'durable_room_commit_retry_failed',
@@ -744,19 +668,21 @@ export class RoomCommitter {
   }
 
   private scheduleReplayLoadRetry(pending: PendingReplayLoad): void {
+    if (this.stopped) return
     const delay = RETRY_DELAYS_MS[Math.min(pending.retryIndex, RETRY_DELAYS_MS.length - 1)]!
     pending.retryIndex += 1
-    pending.timer = this.scheduler.setTimeout(() => {
+    pending.timer = this.scheduler.setTimeout(async () => {
       pending.timer = null
-      this.retryReplayLoad(pending)
+      ;(await this.retryReplayLoad(pending))
     }, delay)
   }
 
-  private retryReplayLoad(pending: PendingReplayLoad): void {
+  private async retryReplayLoad(pending: PendingReplayLoad): Promise<Awaited<void>> {
+    if (this.stopped || !this.pendingReplayLoads.has(pending.room.id)) return
     let result: RoomCommitResult
     try {
-      const persisted = this.persistence.loadReplayHead(pending.room.id)
-      result = this.prepareLoadedRoom(pending.room, pending.options, persisted)
+      const persisted = (await this.persistence.loadReplayHead(pending.room.id))
+      result = (await this.prepareLoadedRoom(pending.room, pending.options, persisted))
     } catch (error) {
       if (error instanceof ReplayAssetValidationError) {
         this.blockPermanently(
@@ -789,7 +715,7 @@ export class RoomCommitter {
       pending.waiters.forEach((waiter) => waiter(result.error))
       return
     }
-    pending.options.onReady?.(result)
+    await pending.options.onReady?.(result)
     pending.waiters.forEach((waiter) => waiter())
   }
 
@@ -797,24 +723,9 @@ export class RoomCommitter {
     this.storageFailed = this.pending.size > 0 || this.pendingReplayLoads.size > 0
   }
 
-  cleanupReplayAssets(): void {
-    try {
-      const referenced = this.persistence.referencedReplayAssetHashes()
-      for (const pending of this.pending.values()) {
-        const customCardsJson = pending.commit.header?.customCardsJson
-        if (!customCardsJson) continue
-        replayAssetHashes(customCardsJson).forEach((hash) => referenced.add(hash))
-      }
-      for (const entry of readdirSync(this.assetRoot, { withFileTypes: true })) {
-        if (!entry.isFile() || !/^[a-f0-9]{64}$/.test(entry.name)) continue
-        if (!referenced.has(entry.name)) unlinkSync(join(this.assetRoot, entry.name))
-      }
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return
-      console.warn(JSON.stringify({
-        event: 'replay_asset_cleanup_failed',
-        error: errorMessage(error),
-      }))
+  async cleanupReplayAssets(): Promise<void> {
+    try { await this.resources?.collect() } catch (error) {
+      console.warn(JSON.stringify({ event: 'replay_asset_cleanup_failed', error: errorMessage(error) }))
     }
   }
 

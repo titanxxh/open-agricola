@@ -4,97 +4,29 @@
  * These tests exercise the full `/api/workshop/cards/:id/submit-review` flow end to
  * end through the real propose-handler / github-client / code-gen composition,
  * with the GitHub API stubbed via `vi.stubGlobal('fetch', ...)`. The database
- * is an in-memory SQLite instance.
+ * uses an isolated PostgreSQL schema.
  *
  * Covers:
  *   - happy path: first-time propose creates PR, updates DB, audit=success
  *   - upsert: second propose reuses the existing open PR (no new openPr)
  *   - rate limit: second propose within 10 minutes returns 429
  */
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from 'vitest'
 import { IncomingMessage, ServerResponse } from 'node:http'
 import { createHash } from 'node:crypto'
 import { Socket } from 'node:net'
-import Database from 'better-sqlite3'
+import { createTestDatabase } from './_helpers/postgres'
 import { nanoid } from 'nanoid'
 
 // ── Mock DB (in-memory) ─────────────────────────────────────────────────────
 
-const db = new Database(':memory:')
-db.pragma('foreign_keys = ON')
-db.exec(`
-  CREATE TABLE users (
-    id TEXT PRIMARY KEY,
-    username TEXT UNIQUE NOT NULL COLLATE NOCASE,
-    display_name TEXT NOT NULL,
-    password_hash TEXT NOT NULL,
-    created_at INTEGER NOT NULL,
-    last_login_at INTEGER
-  );
-  CREATE TABLE sessions (
-    token TEXT PRIMARY KEY,
-    user_id TEXT NOT NULL REFERENCES users(id),
-    expires_at INTEGER NOT NULL,
-    created_at INTEGER NOT NULL
-  );
-  CREATE TABLE workshop_cards (
-    id TEXT PRIMARY KEY,
-    author_id TEXT NOT NULL REFERENCES users(id),
-    card_id TEXT NOT NULL,
-    card_type TEXT NOT NULL,
-    name TEXT NOT NULL,
-    description TEXT NOT NULL DEFAULT '',
-    card_json TEXT NOT NULL,
-    code_manifest TEXT,
-    art_url TEXT,
-    art_prompt TEXT,
-    review_status TEXT NOT NULL DEFAULT 'unsubmitted',
-    live INTEGER NOT NULL DEFAULT 0,
-    featured INTEGER NOT NULL DEFAULT 0,
-    github_pr_url TEXT,
-    github_pr_status TEXT,
-    github_pr_last_synced_at INTEGER,
-    review_commit_sha TEXT,
-    review_version_id TEXT,
-    draft_revision INTEGER NOT NULL DEFAULT 1,
-    draft_generation_json TEXT NOT NULL DEFAULT '{}',
-    approved_commit_sha TEXT,
-    approved_review_id TEXT,
-    approved_at INTEGER,
-    approved_version_id TEXT,
-    built_in INTEGER NOT NULL DEFAULT 0,
-    sandbox_pass_version_id TEXT,
-    sandbox_passed_at INTEGER,
-    created_at INTEGER NOT NULL,
-    updated_at INTEGER NOT NULL
-  );
-  CREATE TABLE workshop_card_versions (
-    id TEXT PRIMARY KEY,
-    card_id TEXT NOT NULL REFERENCES workshop_cards(id) ON DELETE CASCADE,
-    card_json TEXT NOT NULL,
-    code_manifest TEXT,
-    art_url TEXT,
-    version_number INTEGER NOT NULL,
-    created_by TEXT NOT NULL REFERENCES users(id),
-    created_at INTEGER NOT NULL,
-    content_hash TEXT,
-    provenance_json TEXT NOT NULL DEFAULT '{}'
-  );
-  CREATE TABLE github_propose_rate_limit (
-    user_id TEXT PRIMARY KEY REFERENCES users(id),
-    last_propose_at INTEGER NOT NULL
-  );
-  CREATE TABLE github_propose_audit (
-    id TEXT PRIMARY KEY,
-    user_id TEXT NOT NULL REFERENCES users(id),
-    workshop_card_id TEXT NOT NULL,
-    action TEXT NOT NULL,
-    pr_url TEXT,
-    error_code TEXT,
-    error_message TEXT,
-    created_at INTEGER NOT NULL
-  );
-`)
+const originalWorkshopKey = process.env.WORKSHOP_TOKEN_ENCRYPTION_KEY
+const db = await createTestDatabase()
+afterAll(async () => {
+  await db.close()
+  if (originalWorkshopKey === undefined) delete process.env.WORKSHOP_TOKEN_ENCRYPTION_KEY
+  else process.env.WORKSHOP_TOKEN_ENCRYPTION_KEY = originalWorkshopKey
+})
 
 vi.mock('../db.ts', () => ({ getDb: () => db, cleanExpiredSessions: () => {} }))
 
@@ -551,7 +483,8 @@ describe('workshop PR propose — session', () => {
   let cardDbId: string
   let versionId: string
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    process.env.WORKSHOP_TOKEN_ENCRYPTION_KEY = Buffer.alloc(32, 5).toString('base64')
     ;(workshopPrConfig as unknown as { clientId: string }).clientId = 'test_cid'
     ;(workshopPrConfig as unknown as { clientSecret: string }).clientSecret = 'test_secret'
     ;(workshopPrConfig as unknown as { enabled: boolean }).enabled = true
@@ -560,14 +493,14 @@ describe('workshop PR propose — session', () => {
     const now = Date.now()
     userId = nanoid()
     userToken = nanoid()
-    db.prepare(
+    ;(await db.prepare(
       `INSERT INTO users (id, username, display_name, password_hash, created_at)
        VALUES (?, ?, ?, ?, ?)`,
-    ).run(userId, `user_${userId.slice(0, 8)}`, 'Test User', 'x', now)
-    db.prepare(
+    ).run(userId, `user_${userId.slice(0, 8)}`, 'Test User', 'x', now))
+    ;(await db.prepare(
       `INSERT INTO sessions (token, user_id, expires_at, created_at)
        VALUES (?, ?, ?, ?)`,
-    ).run(userToken, userId, now + 3_600_000, now)
+    ).run(userToken, userId, now + 3_600_000, now))
 
     cardDbId = nanoid()
     const sourceCode = `const CARD_DEF = { cardType: 'minor', meta: { id: 'CUSTOM_TestCard', deck: 'CUSTOM', number: 0, name: 'Test Card', desc: [], cost: {}, vp: 0 } }\nconst CARD_IMPL = {}`
@@ -606,7 +539,7 @@ describe('workshop PR propose — session', () => {
       _code: sourceCode,
       _compiled: '"use strict";',
     })
-    db.prepare(
+    ;(await db.prepare(
       `INSERT INTO workshop_cards
          (id, author_id, card_id, card_type, name, description, card_json,
           code_manifest, art_url, review_status, live, created_at, updated_at)
@@ -623,30 +556,30 @@ describe('workshop PR propose — session', () => {
       null,
       now,
       now,
-    )
+    ))
     versionId = nanoid()
-    db.prepare(`
+    ;(await db.prepare(`
       INSERT INTO workshop_card_versions (
         id, card_id, card_json, code_manifest, art_url, version_number,
         created_by, created_at, content_hash, provenance_json
       ) VALUES (?, ?, ?, ?, NULL, 1, ?, ?, NULL, '{}')
-    `).run(versionId, cardDbId, cardJson, codeManifest, userId, now)
-    db.prepare(`
+    `).run(versionId, cardDbId, cardJson, codeManifest, userId, now))
+    ;(await db.prepare(`
       UPDATE workshop_cards
       SET sandbox_pass_version_id = ?, sandbox_passed_at = ?
       WHERE id = ?
-    `).run(versionId, now, cardDbId)
+    `).run(versionId, now, cardDbId))
 
-    db.prepare(`DELETE FROM github_propose_rate_limit WHERE user_id = ?`).run(userId)
-    db.prepare(`DELETE FROM github_propose_audit WHERE user_id = ?`).run(userId)
+    ;(await db.prepare(`DELETE FROM github_propose_rate_limit WHERE user_id = ?`).run(userId))
+    ;(await db.prepare(`DELETE FROM github_propose_audit WHERE user_id = ?`).run(userId))
   })
 
-  afterEach(() => {
-    db.prepare(`DELETE FROM github_propose_audit WHERE user_id = ?`).run(userId)
-    db.prepare(`DELETE FROM github_propose_rate_limit WHERE user_id = ?`).run(userId)
-    db.prepare(`DELETE FROM workshop_cards WHERE id = ?`).run(cardDbId)
-    db.prepare(`DELETE FROM sessions WHERE token = ?`).run(userToken)
-    db.prepare(`DELETE FROM users WHERE id = ?`).run(userId)
+  afterEach(async () => {
+    ;(await db.prepare(`DELETE FROM github_propose_audit WHERE user_id = ?`).run(userId))
+    ;(await db.prepare(`DELETE FROM github_propose_rate_limit WHERE user_id = ?`).run(userId))
+    ;(await db.prepare(`DELETE FROM workshop_cards WHERE id = ?`).run(cardDbId))
+    ;(await db.prepare(`DELETE FROM sessions WHERE token = ?`).run(userToken))
+    ;(await db.prepare(`DELETE FROM users WHERE id = ?`).run(userId))
 
     ;(workshopPrConfig as unknown as { clientId: string }).clientId = origClientId
     ;(workshopPrConfig as unknown as { clientSecret: string }).clientSecret = origSecret
@@ -656,15 +589,16 @@ describe('workshop PR propose — session', () => {
     else process.env.CORS_ORIGIN = origCorsOrigin
 
     vi.unstubAllGlobals()
+    vi.unstubAllEnvs()
   })
 
   // ── C-24: happy path ─────────────────────────────────────────────────────
 
   it('rejects before OAuth when the published version has no matching sandbox pass', async () => {
-    db.prepare(`
+    ;(await db.prepare(`
       UPDATE workshop_cards SET sandbox_pass_version_id = NULL, sandbox_passed_at = NULL
       WHERE id = ?
-    `).run(cardDbId)
+    `).run(cardDbId))
     const req = fakeReq({
       method: 'POST',
       url: `/api/workshop/cards/${cardDbId}/submit-review`,
@@ -704,10 +638,10 @@ describe('workshop PR propose — session', () => {
       prUrl: '/mock-workshop-pr/1',
       prNumber: 1,
     })
-    expect(db.prepare(`
+    expect((await db.prepare(`
       SELECT github_pr_url, github_pr_status, review_status, live
       FROM workshop_cards WHERE id = ?
-    `).get(cardDbId)).toEqual({
+    `).get(cardDbId))).toEqual({
       github_pr_url: '/mock-workshop-pr/1',
       github_pr_status: 'open',
       review_status: 'in_review',
@@ -717,7 +651,7 @@ describe('workshop PR propose — session', () => {
 
   it('rejects submission for approved and merged cards until the draft is edited', async () => {
     ;(workshopPrConfig as unknown as { mockMode: boolean }).mockMode = true
-    db.prepare(`UPDATE workshop_cards SET review_status = 'approved' WHERE id = ?`).run(cardDbId)
+    ;(await db.prepare(`UPDATE workshop_cards SET review_status = 'approved' WHERE id = ?`).run(cardDbId))
     const res = fakeRes()
     await handleSubmitReviewRequest(fakeReq({
       method: 'POST',
@@ -732,13 +666,13 @@ describe('workshop PR propose — session', () => {
   it('rejects submission when the card id is reserved by an approved card', async () => {
     ;(workshopPrConfig as unknown as { mockMode: boolean }).mockMode = true
     const now = Date.now()
-    db.prepare(`
+    ;(await db.prepare(`
       INSERT INTO workshop_cards
         (id, author_id, card_id, card_type, name, description, card_json,
          review_status, live, created_at, updated_at)
       VALUES ('rival-card', ?, 'CUSTOM_TestCard', 'minor', 'Rival', '', '{"id":"CUSTOM_TestCard"}',
               'approved', 0, ?, ?)
-    `).run(userId, now, now)
+    `).run(userId, now, now))
     try {
       const res = fakeRes()
       await handleSubmitReviewRequest(fakeReq({
@@ -750,22 +684,22 @@ describe('workshop PR propose — session', () => {
       expect(res.statusCode).toBe(409)
       expect(JSON.parse(res.body)).toMatchObject({ ok: false, code: 'card_id_taken' })
     } finally {
-      db.prepare(`DELETE FROM workshop_cards WHERE id = 'rival-card'`).run()
+      ;(await db.prepare(`DELETE FROM workshop_cards WHERE id = 'rival-card'`).run())
     }
   })
 
   it('rejects proposals without complete Chinese localization before mock handoff', async () => {
     ;(workshopPrConfig as unknown as { mockMode: boolean }).mockMode = true
-    const current = db.prepare(
+    const current = (await db.prepare(
       'SELECT card_json FROM workshop_cards WHERE id = ?',
-    ).get(cardDbId) as { card_json: string }
+    ).get(cardDbId)) as { card_json: string }
     const cardJson = JSON.parse(current.card_json) as Record<string, unknown>
     delete cardJson.locales
     const serialised = JSON.stringify(cardJson)
-    db.prepare('UPDATE workshop_cards SET card_json = ? WHERE id = ?')
-      .run(serialised, cardDbId)
-    db.prepare('UPDATE workshop_card_versions SET card_json = ? WHERE id = ?')
-      .run(serialised, versionId)
+    ;(await db.prepare('UPDATE workshop_cards SET card_json = ? WHERE id = ?')
+      .run(serialised, cardDbId))
+    ;(await db.prepare('UPDATE workshop_card_versions SET card_json = ? WHERE id = ?')
+      .run(serialised, versionId))
 
     const req = fakeReq({
       method: 'POST',
@@ -802,9 +736,9 @@ describe('workshop PR propose — session', () => {
 
     expect(res.statusCode).toBe(status)
     expect(JSON.parse(res.body)).toMatchObject({ ok: false, code })
-    expect(db.prepare(
+    expect((await db.prepare(
       'SELECT github_pr_url FROM workshop_cards WHERE id = ?',
-    ).get(cardDbId)).toEqual({ github_pr_url: null })
+    ).get(cardDbId))).toEqual({ github_pr_url: null })
   })
 
   it('happy path: first-time propose creates PR and reconciles an early approval', async () => {
@@ -848,13 +782,14 @@ describe('workshop PR propose — session', () => {
     const reqCb = fakeReq({ method: 'GET', url: cbUrl })
     const resCb = fakeRes()
     await handleOAuthCallback(reqCb, resCb, new URL(`http://host${cbUrl}`))
-    expect(tokenCache.get(j1.handshakeId)).toEqual({
+    expect((await tokenCache.get(j1.handshakeId))).toEqual({
       token: 'ghp_mock',
       userId,
     })
 
     // Phase 2 — full GitHub API stubbed.
     vi.unstubAllGlobals()
+    vi.unstubAllEnvs()
     const { fn: gh, counts } = createGitHubApiStub({
       githubLogin: 'workshopuser',
       openedPr: {
@@ -912,12 +847,12 @@ describe('workshop PR propose — session', () => {
     expect(counts.commitCalls).toBe(2)
 
     // DB state: PR URL + status set.
-    const row = db
+    const row = (await db
       .prepare(
         `SELECT github_pr_url, github_pr_status, review_status
          FROM workshop_cards WHERE id = ?`,
       )
-      .get(cardDbId) as {
+      .get(cardDbId)) as {
         github_pr_url: string
         github_pr_status: string
         review_status: string
@@ -928,20 +863,20 @@ describe('workshop PR propose — session', () => {
     expect(reviewProvider.getPullRequestSnapshot).toHaveBeenCalledWith(42)
 
     // Audit log: start + success.
-    const audits = db
+    const audits = (await db
       .prepare(
         `SELECT action FROM github_propose_audit
-         WHERE workshop_card_id = ? ORDER BY created_at ASC, rowid ASC`,
+         WHERE workshop_card_id = ? ORDER BY created_at ASC, action ASC`,
       )
-      .all(cardDbId) as Array<{ action: string }>
+      .all(cardDbId)) as Array<{ action: string }>
     expect(audits.map((a) => a.action)).toEqual(['start', 'success'])
 
     // Rate-limit row inserted.
-    const rate = db
+    const rate = (await db
       .prepare(
         `SELECT last_propose_at FROM github_propose_rate_limit WHERE user_id = ?`,
       )
-      .get(userId) as { last_propose_at: number } | undefined
+      .get(userId)) as { last_propose_at: number } | undefined
     expect(rate?.last_propose_at).toBeGreaterThan(0)
   })
 
@@ -962,8 +897,8 @@ describe('workshop PR propose — session', () => {
   })
 
   it('keeps the PR submission successful when post-bind reconciliation fails', async () => {
-    const hs = tokenCache.allocateHandshakeId(userId)
-    tokenCache.bind(hs, 'ghp_mock')
+    const hs = (await tokenCache.allocateHandshakeId(userId))
+    ;(await tokenCache.bind(hs, 'ghp_mock'))
     const { fn: gh } = createGitHubApiStub({
       githubLogin: 'workshopuser',
       openedPr: {
@@ -988,13 +923,13 @@ describe('workshop PR propose — session', () => {
       prNumber: 42,
       reconciliationPending: true,
     })
-    expect(db.prepare(
+    expect((await db.prepare(
       'SELECT review_status FROM workshop_cards WHERE id = ?',
-    ).get(cardDbId)).toEqual({ review_status: 'in_review' })
-    expect(db.prepare(
+    ).get(cardDbId))).toEqual({ review_status: 'in_review' })
+    expect((await db.prepare(
       `SELECT action FROM github_propose_audit
-       WHERE workshop_card_id = ? ORDER BY rowid`,
-    ).all(cardDbId)).toEqual([{ action: 'start' }, { action: 'success' }])
+       WHERE workshop_card_id = ? ORDER BY created_at, action ASC`,
+    ).all(cardDbId))).toEqual([{ action: 'start' }, { action: 'success' }])
   })
 
   // ── C-25: upsert path ────────────────────────────────────────────────────
@@ -1040,16 +975,16 @@ describe('workshop PR propose — session', () => {
     testSha,
   ) => {
     // Pretend this card already has an open PR from a previous propose.
-    db.prepare(
+    ;(await db.prepare(
       `UPDATE workshop_cards
        SET github_pr_url = ?, github_pr_status = 'open'
        WHERE id = ?`,
-    ).run('https://github.com/titanxxh/open-agricola/pull/99', cardDbId)
-    db.prepare(`DELETE FROM github_propose_rate_limit WHERE user_id = ?`).run(userId)
+    ).run('https://github.com/titanxxh/open-agricola/pull/99', cardDbId))
+    ;(await db.prepare(`DELETE FROM github_propose_rate_limit WHERE user_id = ?`).run(userId))
 
     // Bind a token directly — skip the OAuth round-trip.
-    const hs = tokenCache.allocateHandshakeId(userId)
-    tokenCache.bind(hs, 'ghp_mock')
+    const hs = (await tokenCache.allocateHandshakeId(userId))
+    ;(await tokenCache.bind(hs, 'ghp_mock'))
 
     const { fn: gh, counts } = createGitHubApiStub({
       githubLogin: 'workshopuser',
@@ -1113,28 +1048,28 @@ describe('workshop PR propose — session', () => {
     )))).toBe(true)
 
     // github_pr_url sticks to pull/99.
-    const row = db
+    const row = (await db
       .prepare(`SELECT github_pr_url FROM workshop_cards WHERE id = ?`)
-      .get(cardDbId) as { github_pr_url: string }
+      .get(cardDbId)) as { github_pr_url: string }
     expect(row.github_pr_url).toContain('/pull/99')
 
-    const audits = db
+    const audits = (await db
       .prepare(
         `SELECT action FROM github_propose_audit
-         WHERE workshop_card_id = ? ORDER BY created_at ASC, rowid ASC`,
+         WHERE workshop_card_id = ? ORDER BY created_at ASC, action ASC`,
       )
-      .all(cardDbId) as Array<{ action: string }>
+      .all(cardDbId)) as Array<{ action: string }>
     expect(audits.map((a) => a.action)).toEqual(['start', 'success'])
   })
 
   it('creates a new PR instead of reopening a closed one', async () => {
-    db.prepare(
+    ;(await db.prepare(
       `UPDATE workshop_cards
        SET github_pr_url = ?, github_pr_status = 'closed'
        WHERE id = ?`,
-    ).run('https://github.com/titanxxh/open-agricola/pull/99', cardDbId)
-    const hs = tokenCache.allocateHandshakeId(userId)
-    tokenCache.bind(hs, 'ghp_mock')
+    ).run('https://github.com/titanxxh/open-agricola/pull/99', cardDbId))
+    const hs = (await tokenCache.allocateHandshakeId(userId))
+    ;(await tokenCache.bind(hs, 'ghp_mock'))
     const { fn: gh, counts } = createGitHubApiStub({
       githubLogin: 'workshopuser',
       existingPr: {
@@ -1167,8 +1102,8 @@ describe('workshop PR propose — session', () => {
     ['draft', { isDraft: true }],
     ['non-main', { baseRefName: 'release' }],
   ])('replaces an existing %s PR before rebinding', async (_case, existingPrState) => {
-    const hs = tokenCache.allocateHandshakeId(userId)
-    tokenCache.bind(hs, 'ghp_mock')
+    const hs = (await tokenCache.allocateHandshakeId(userId))
+    ;(await tokenCache.bind(hs, 'ghp_mock'))
     const { fn: gh, counts } = createGitHubApiStub({
       githubLogin: 'workshopuser',
       existingPr: {
@@ -1206,8 +1141,8 @@ describe('workshop PR propose — session', () => {
   })
 
   it('reports the GitHub HTTP status when the fork cannot be created', async () => {
-    const hs = tokenCache.allocateHandshakeId(userId)
-    tokenCache.bind(hs, 'ghp_mock')
+    const hs = (await tokenCache.allocateHandshakeId(userId))
+    ;(await tokenCache.bind(hs, 'ghp_mock'))
     const { fn: gh } = createGitHubApiStub({
       githubLogin: 'workshopuser',
       forkCreateStatus: 404,
@@ -1229,17 +1164,17 @@ describe('workshop PR propose — session', () => {
       code: 'fork_create_failed',
       status: 404,
     })
-    const audit = db.prepare(
+    const audit = (await db.prepare(
       `SELECT error_message FROM github_propose_audit
        WHERE workshop_card_id = ? AND action = 'fail'
        ORDER BY created_at DESC LIMIT 1`,
-    ).get(cardDbId) as { error_message: string }
+    ).get(cardDbId)) as { error_message: string }
     expect(audit.error_message).toContain('HTTP 404')
   })
 
   it('restores and reopens a non-main source PR when opening its replacement fails', async () => {
-    const hs = tokenCache.allocateHandshakeId(userId)
-    tokenCache.bind(hs, 'ghp_mock')
+    const hs = (await tokenCache.allocateHandshakeId(userId))
+    ;(await tokenCache.bind(hs, 'ghp_mock'))
     const { fn: gh, counts } = createGitHubApiStub({
       githubLogin: 'workshopuser',
       existingPr: {
@@ -1277,8 +1212,8 @@ describe('workshop PR propose — session', () => {
   })
 
   it('replays preserved test edits onto the current main file', async () => {
-    const hs = tokenCache.allocateHandshakeId(userId)
-    tokenCache.bind(hs, 'ghp_mock')
+    const hs = (await tokenCache.allocateHandshakeId(userId))
+    ;(await tokenCache.bind(hs, 'ghp_mock'))
     const testPath = 'server/__tests__/CUSTOM_TestCard-session.test.ts'
     const { fn: gh, counts } = createGitHubApiStub({
       githubLogin: 'workshopuser',
@@ -1315,8 +1250,8 @@ describe('workshop PR propose — session', () => {
   })
 
   it('keeps a replacement PR open when its preserved patch cannot be rebased', async () => {
-    const hs = tokenCache.allocateHandshakeId(userId)
-    tokenCache.bind(hs, 'ghp_mock')
+    const hs = (await tokenCache.allocateHandshakeId(userId))
+    ;(await tokenCache.bind(hs, 'ghp_mock'))
     const { fn: gh, counts } = createGitHubApiStub({
       githubLogin: 'workshopuser',
       existingPr: {
@@ -1347,16 +1282,16 @@ describe('workshop PR propose — session', () => {
 
   it('reconciles a missed approval through the existing refresh endpoint', async () => {
     const prUrl = 'https://github.com/titanxxh/open-agricola/pull/42'
-    enterReview(db, {
+    ;(await enterReview(db, {
       cardId: cardDbId,
       authorId: userId,
       prUrl,
       expectedRevision: 1,
       commitSha: 'review-head',
-    })
-    db.prepare(
+    }))
+    ;(await db.prepare(
       'UPDATE workshop_cards SET github_pr_last_synced_at = NULL WHERE id = ?',
-    ).run(cardDbId)
+    ).run(cardDbId))
     const res = fakeRes()
 
     await handleRefreshPrStatus(fakeReq({
@@ -1380,21 +1315,21 @@ describe('workshop PR propose — session', () => {
     })
 
     expect(JSON.parse(res.body)).toEqual({ ok: true, status: 'open' })
-    expect(db.prepare(
+    expect((await db.prepare(
       'SELECT review_status FROM workshop_cards WHERE id = ?',
-    ).get(cardDbId)).toEqual({ review_status: 'approved' })
+    ).get(cardDbId))).toEqual({ review_status: 'approved' })
   })
 
   it('invalidates an approved card when no authorized head approval remains', async () => {
     const prUrl = 'https://github.com/titanxxh/open-agricola/pull/42'
-    enterReview(db, {
+    ;(await enterReview(db, {
       cardId: cardDbId,
       authorId: userId,
       prUrl,
       expectedRevision: 1,
       commitSha: 'review-head',
-    })
-    db.prepare(`
+    }))
+    ;(await db.prepare(`
       UPDATE workshop_cards
       SET review_status = 'approved',
           live = 1,
@@ -1402,7 +1337,7 @@ describe('workshop PR propose — session', () => {
           approved_version_id = review_version_id,
           github_pr_last_synced_at = NULL
       WHERE id = ?
-    `).run(cardDbId)
+    `).run(cardDbId))
     const res = fakeRes()
 
     await handleRefreshPrStatus(fakeReq({
@@ -1426,9 +1361,9 @@ describe('workshop PR propose — session', () => {
     })
 
     expect(JSON.parse(res.body)).toEqual({ ok: true, status: 'open' })
-    expect(db.prepare(
+    expect((await db.prepare(
       'SELECT review_status, live FROM workshop_cards WHERE id = ?',
-    ).get(cardDbId)).toEqual({ review_status: 'stale', live: 0 })
+    ).get(cardDbId))).toEqual({ review_status: 'stale', live: 0 })
   })
 
   it('graduates a merged approved snapshot through the refresh endpoint', async () => {
@@ -1436,16 +1371,16 @@ describe('workshop PR propose — session', () => {
     // approved MERGED snapshot. The head is frozen after merge, so the #629
     // SHA binding stays verifiable and the card graduates in one pass.
     const prUrl = 'https://github.com/titanxxh/open-agricola/pull/42'
-    enterReview(db, {
+    ;(await enterReview(db, {
       cardId: cardDbId,
       authorId: userId,
       prUrl,
       expectedRevision: 1,
       commitSha: 'review-head',
-    })
-    db.prepare(
+    }))
+    ;(await db.prepare(
       'UPDATE workshop_cards SET github_pr_last_synced_at = NULL WHERE id = ?',
-    ).run(cardDbId)
+    ).run(cardDbId))
     const res = fakeRes()
 
     await handleRefreshPrStatus(fakeReq({
@@ -1469,23 +1404,23 @@ describe('workshop PR propose — session', () => {
     })
 
     expect(JSON.parse(res.body)).toEqual({ ok: true, status: 'merged' })
-    expect(db.prepare(
+    expect((await db.prepare(
       'SELECT review_status, github_pr_status FROM workshop_cards WHERE id = ?',
-    ).get(cardDbId)).toEqual({ review_status: 'merged', github_pr_status: 'merged' })
+    ).get(cardDbId))).toEqual({ review_status: 'merged', github_pr_status: 'merged' })
   })
 
   it('demotes a card whose PR merged outside main through the refresh endpoint', async () => {
     const prUrl = 'https://github.com/titanxxh/open-agricola/pull/42'
-    enterReview(db, {
+    ;(await enterReview(db, {
       cardId: cardDbId,
       authorId: userId,
       prUrl,
       expectedRevision: 1,
       commitSha: 'review-head',
-    })
-    db.prepare(
+    }))
+    ;(await db.prepare(
       'UPDATE workshop_cards SET github_pr_last_synced_at = NULL WHERE id = ?',
-    ).run(cardDbId)
+    ).run(cardDbId))
     const res = fakeRes()
 
     await handleRefreshPrStatus(fakeReq({
@@ -1511,23 +1446,23 @@ describe('workshop PR propose — session', () => {
     // merged outside main is no graduation: the card demotes and the status
     // reads 'closed' so no false pending-merge fact is persisted
     expect(JSON.parse(res.body)).toEqual({ ok: true, status: 'closed' })
-    expect(db.prepare(
+    expect((await db.prepare(
       'SELECT review_status, github_pr_status FROM workshop_cards WHERE id = ?',
-    ).get(cardDbId)).toEqual({ review_status: 'stale', github_pr_status: 'closed' })
+    ).get(cardDbId))).toEqual({ review_status: 'stale', github_pr_status: 'closed' })
   })
 
   it('invalidates a moved review head through the existing refresh endpoint', async () => {
     const prUrl = 'https://github.com/titanxxh/open-agricola/pull/42'
-    enterReview(db, {
+    ;(await enterReview(db, {
       cardId: cardDbId,
       authorId: userId,
       prUrl,
       expectedRevision: 1,
       commitSha: 'review-head',
-    })
-    db.prepare(
+    }))
+    ;(await db.prepare(
       'UPDATE workshop_cards SET github_pr_last_synced_at = NULL WHERE id = ?',
-    ).run(cardDbId)
+    ).run(cardDbId))
     const res = fakeRes()
 
     await handleRefreshPrStatus(fakeReq({
@@ -1537,19 +1472,19 @@ describe('workshop PR propose — session', () => {
     }), res, cardDbId, reviewRequiredProvider('moved-head'))
 
     expect(JSON.parse(res.body)).toEqual({ ok: true, status: 'open' })
-    expect(db.prepare(
+    expect((await db.prepare(
       'SELECT review_status FROM workshop_cards WHERE id = ?',
-    ).get(cardDbId)).toEqual({ review_status: 'stale' })
+    ).get(cardDbId))).toEqual({ review_status: 'stale' })
   })
 
   // ── C-26: rate limit ─────────────────────────────────────────────────────
 
   it('rate limit: second propose within 10 minutes returns 429', async () => {
     const now = Date.now()
-    db.prepare(
-      `INSERT OR REPLACE INTO github_propose_rate_limit (user_id, last_propose_at)
-       VALUES (?, ?)`,
-    ).run(userId, now)
+    ;(await db.prepare(
+      `INSERT INTO github_propose_rate_limit (user_id, last_propose_at)
+       VALUES (?, ?) ON CONFLICT (user_id) DO UPDATE SET last_propose_at = excluded.last_propose_at`,
+    ).run(userId, now))
 
     const req = fakeReq({
       method: 'POST',

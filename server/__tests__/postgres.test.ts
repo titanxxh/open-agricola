@@ -1,13 +1,12 @@
+import { getTestDatabaseUrl } from './_helpers/postgres'
 import { randomUUID } from 'node:crypto'
-import { readFileSync } from 'node:fs'
-import { parseEnv } from 'node:util'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { PostgresDatabase } from '../database/postgres'
 import { migratePostgres } from '../database/migrations'
 
 // A test-owned schema in the explicitly configured test service, never the app schema.
 const schema = `test_${randomUUID().replaceAll('-', '')}`
-const connectionString = process.env.TEST_DATABASE_URL ?? parseEnv(readFileSync('data/dependencies.local', 'utf8')).TEST_DATABASE_URL
+const connectionString = getTestDatabaseUrl()
 if (!connectionString) throw new Error('TEST_DATABASE_URL is required for PostgreSQL integration tests')
 const admin = new PostgresDatabase({ connectionString })
 const db = new PostgresDatabase({ connectionString, schema })
@@ -78,4 +77,26 @@ it('retains participant identity and expires a discarded active Game Context', a
   expect(await db.prepare('SELECT lifecycle FROM game_contexts WHERE room_id = ?').get('discarded')).toEqual({ lifecycle: 'expired' })
   expect(await db.prepare('SELECT user_id, player_index FROM game_context_participants WHERE room_id = ?').get('discarded'))
     .toEqual({ user_id: 'identity-one', player_index: 0 })
+})
+
+it('isolates concurrent nested rollback scopes while keeping successful siblings', async () => {
+  await db.transaction(async () => {
+    const results = await Promise.allSettled([
+      db.transaction(async () => {
+        await Promise.resolve()
+        await db.prepare('INSERT INTO balances(id, amount) VALUES (?, ?)').run('nested-kept', 11)
+        await db.transaction(async () => {
+          await db.prepare('UPDATE balances SET amount = 12 WHERE id = ?').run('nested-kept')
+        })()
+      })(),
+      db.transaction(async () => {
+        await db.prepare('INSERT INTO balances(id, amount) VALUES (?, ?)').run('nested-rejected', 99)
+        throw new Error('rejected child')
+      })(),
+    ])
+    expect(results.map(result => result.status)).toEqual(['fulfilled', 'rejected'])
+    expect(await db.prepare('SELECT amount FROM balances WHERE id = ?').get('nested-kept')).toEqual({ amount: 12 })
+    expect(await db.prepare('SELECT amount FROM balances WHERE id = ?').get('nested-rejected')).toBeUndefined()
+  })()
+  expect(await db.prepare('SELECT amount FROM balances WHERE id = ?').get('nested-kept')).toEqual({ amount: 12 })
 })
