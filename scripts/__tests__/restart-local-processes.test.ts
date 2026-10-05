@@ -62,6 +62,17 @@ const writeExecutable = (path: string, contents: string): void => {
   chmodSync(path, 0o755)
 }
 
+// Launcher process tests replace the external dependency boundary alongside pnpm.
+const writeServicesStub = (root: string): void => {
+  mkdirSync(join(root, 'scripts'), { recursive: true })
+  writeFileSync(join(root, 'scripts/local-services.mjs'), `
+    import { mkdirSync, writeFileSync } from 'node:fs'
+    import { join } from 'node:path'
+    mkdirSync(process.env.SHARED_DATA_DIR, { recursive: true })
+    writeFileSync(join(process.env.SHARED_DATA_DIR, 'dependencies.local'), '')
+  `)
+}
+
 const waitForFile = async (path: string): Promise<void> => {
   for (let attempt = 0; attempt < 100; attempt += 1) {
     if (existsSync(path)) return
@@ -105,6 +116,7 @@ describe.each(['raw', 'compressed'] as const)('restart-local saved variant prefl
       mkdirSync(join(root, 'server/game/persistence'), { recursive: true })
       execFileSync('git', ['init', '-q'], { cwd: root })
       writeFileSync(join(root, 'restart-local.sh'), readFileSync(scriptPath))
+      writeServicesStub(root)
       writeFileSync(join(root, 'server/game/persistence/room-body-codec.ts'), readFileSync(resolve('server/game/persistence/room-body-codec.ts')))
       symlinkSync(resolve('node_modules/better-sqlite3'), join(root, 'node_modules/better-sqlite3'))
       writeExecutable(join(nodeBin, 'tsx'), '#!/bin/bash\nexit 0\n')
@@ -283,6 +295,7 @@ describe.skipIf(process.platform !== 'linux')('restart-local process cleanup', (
     mkdirSync(nodeBin, { recursive: true })
     execFileSync('git', ['init', '-q'], { cwd: root })
     writeFileSync(join(root, 'restart-local.sh'), readFileSync(scriptPath))
+    writeServicesStub(root)
     chmodSync(join(root, 'restart-local.sh'), 0o755)
 
     const marker = join(root, 'backend-listening')
