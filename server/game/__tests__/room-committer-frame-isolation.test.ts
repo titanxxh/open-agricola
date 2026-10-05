@@ -1,5 +1,6 @@
 import Database from 'better-sqlite3'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { prependDerivedLogEntries } from '../../../shared/events/log-cache.ts'
 import {
   serializeSessionSnapshot,
   type PersistedSessionSnapshot,
@@ -30,11 +31,11 @@ describe('RoomCommitter Frame isolation', () => {
     const session = new GameSession(587, undefined, { playerCount: 2 })
     stabilizeRandomHands(session.state.players)
     session.updatePlayerName(0, 'Before')
-    session.state.log = [{
+    prependDerivedLogEntries(session.state, [{
       key: 'log.placeFarmer',
       playerId: session.state.players[0]!.id,
       params: { player: 'Before', action: 'forest' },
-    }]
+    }])
     room = {
       id: 'frame-isolation', session, players: [], seatOwners: [],
       maxPlayers: 2, version: 0, status: 'playing', startedAt: 100,
@@ -125,11 +126,11 @@ describe('RoomCommitter Frame isolation', () => {
       // The live state can change independently; captured histories are never mutated.
       room.session.updatePlayerName(0, 'After')
       room.session.state.players[0]!.resources.food = 9
-      room.session.state.log = [{
+      prependDerivedLogEntries(room.session.state, [{
         key: 'log.placeFarmer',
         playerId: room.session.state.players[0]!.id,
         params: { player: 'After', action: 'reed-bank' },
-      }, ...room.session.state.log]
+      }])
       db.exec('DROP TRIGGER reject_step')
       retries.shift()!()
       expect(committer.isBlocked(room.id)).toBe(false)

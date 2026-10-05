@@ -36,7 +36,8 @@ describe('private cursor comparison', () => {
   })
 
   it('owns mutable engine, undo and nested checkpoint values even under shallow freezing', () => {
-    const history = [{ state: { players: [{ resources: { food: 2 } }], log: [{ params: { food: 2 } }] } }]
+    const producerLogParams = { food: 2 }
+    const history = [{ state: { players: [{ resources: { food: 2 } }], log: [{ params: producerLogParams }] } }]
     const cursor = {
       engineStackCursor: { frames: [{ pending: { value: 'before' } }] },
       history,
@@ -48,7 +49,7 @@ describe('private cursor comparison', () => {
 
     cursor.engineStackCursor.frames[0]!.pending.value = 'after'
     cursor.history[0]!.state.players[0]!.resources.food = 4
-    cursor.history[0]!.state.log[0]!.params.food = 4
+    producerLogParams.food = 4
     cursor.provisionalContinuationScopes[0]!.checkpoint.state.players[0]!.resources.food = 4
     cursor.shallow.nested.value = 2
 
