@@ -26,6 +26,7 @@ import {
 } from '../room-committer.ts'
 import { snapshotToRoom, type Room } from '../room.ts'
 import { PostgresRoomPersistence } from '../persistence/postgres-adapter.ts'
+import { RoomOwnershipError } from '../room-directory.ts'
 
 const makeRoom = (id = 'room-1'): Room => ({
   id,
@@ -900,6 +901,49 @@ describe('RoomCommitter', () => {
     expect(retried).toEqual([1])
     expect(committer.isBlocked(room.id)).toBe(false)
     expect((await persistence.loadReplayHead(room.id))?.latestStepNo).toBe(1)
+  })
+
+  it.each(['commit', 'load'] as const)('settles %s retry waiters and reconnects after asynchronous publication rejection', async (path) => {
+    const room = makeRoom()
+    const { scheduler, tasks } = fakeScheduler()
+    const committer = createCommitter({ scheduler })
+    await committer.prepareRoom(room, { missingPrefix: false })
+    const close = vi.fn()
+    room.players = [{ ws: { close } as never, playerIndex: 0, name: 'Alice' }]
+    const publication = vi.fn(async () => { throw new Error('publication unavailable') })
+    if (path === 'commit') {
+      vi.spyOn(persistence, 'commitReplay').mockRejectedValueOnce(new Error('write unavailable'))
+      await committer.commit(room, room.session.devSetResources(0, { food: 1 }), actionIntent!, 0, publication)
+    } else {
+      vi.spyOn(persistence, 'loadReplayHead').mockRejectedValueOnce(new Error('read unavailable'))
+      await committer.prepareRoom(room, { missingPrefix: true, onReady: publication })
+    }
+    const waiter = vi.fn()
+    expect(committer.waitUntilReady(room.id, waiter)).toBe(true)
+    await tasks.shift()!.callback()
+    expect(waiter).toHaveBeenCalledExactlyOnceWith('publication unavailable')
+    expect(close).toHaveBeenCalledExactlyOnceWith(1012, 'Reload committed room state')
+    expect(publication).toHaveBeenCalledOnce()
+    expect(tasks).toHaveLength(0)
+    expect(committer.isBlocked(room.id)).toBe(false)
+    expect((await persistence.loadReplayHead(room.id))!.latestStepNo).toBe(path === 'commit' ? 1 : 0)
+  })
+
+  it('settles retry waiters when the publication fence rejects the previous owner', async () => {
+    const room = makeRoom()
+    const { scheduler, tasks } = fakeScheduler()
+    const committer = createCommitter({ scheduler })
+    await committer.prepareRoom(room, { missingPrefix: false })
+    vi.spyOn(persistence, 'commitReplay').mockRejectedValueOnce(new Error('write unavailable'))
+    await committer.commit(room, room.session.devSetResources(0, { food: 1 }), actionIntent!, 0,
+      async () => { throw new RoomOwnershipError('ownership changed') })
+    const waiter = vi.fn()
+    expect(committer.waitUntilReady(room.id, waiter)).toBe(true)
+    await tasks.shift()!.callback()
+    expect(waiter).toHaveBeenCalledExactlyOnceWith('ownership changed')
+    expect(committer.isRetrying(room.id)).toBe(false)
+    expect(committer.blockedError(room.id)).toBe('ownership changed')
+    expect(tasks).toHaveLength(0)
   })
 
   it('keeps a failed Step 0 on the durable path while it retries', async () => {

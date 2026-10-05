@@ -4,7 +4,7 @@ import { readFile, writeFile } from 'node:fs/promises'
 import { vi, afterEach, expect, it } from 'vitest'
 
 // Native database/S3 and child-process operations also run under full-suite load.
-vi.setConfig({ testTimeout: 30000, hookTimeout: 60000 })
+vi.setConfig({ testTimeout: 30000, hookTimeout: 180000 })
 import { importFixture } from './_helpers/import-fixture'
 import { importSqlite } from '../sqlite-import/import'
 import { exportStorageArchive, restoreStorageArchive } from '../storage-archive'
@@ -22,7 +22,7 @@ it('round-trips native PostgreSQL recovery bytes and private S3 objects, then ap
   await importSqlite(fixture.paths, fixture.db, fixture.resources)
   const archive = join(fixture.paths.cardArt, '..', 'archive')
   const manifest = await exportStorageArchive(getTestDatabaseUrl(), fixture.db, fixture.resources.objects, archive, 'test-build')
-  const admin = new PostgresDatabase({ connectionString: getTestDatabaseUrl() })
+  const admin = new PostgresDatabase({ connectionString: getTestDatabaseUrl(), max: 1, statement_timeout: 120_000 })
   cleanups.push(() => admin.close())
   const makeTarget = async (schema = manifest.schema) => {
     const name = `backup_${randomUUID().replaceAll('-', '')}`
