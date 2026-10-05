@@ -16,6 +16,23 @@ Before implementation, measure repeated runs of that baseline and freeze the min
 
 The completed group is assessed below against these unchanged objectives. The original capacity measurements are retained separately for context.
 
+### Review map: accepted implementation and rejected follow-ups
+
+Issue #941's combined production change passes the original contract; subsequent attempts to obtain **additional** four-player late-game gains do not. This review includes the accepted implementation, benchmark tools, ADR updates and the evidence for rejected experiments. Rejected prototype implementations are retained as evidence, not installed in production. The earlier #957 cursor-hash fix is already in the baseline.
+
+| Evaluation | Decision | Evidence |
+| :--- | :--- | :--- |
+| Private cursor comparison, shared capture/Frame overlay, canonical encoding and supporting query/fence/display work | Adopt: all 12 original checks and both capacity probes pass | [`room-commit-results.json`](room-commit-results.json) |
+| Generic reference encoding | Reject cost diagnostic: packed bytes and encode CPU increase; no end-to-end acceptance gate was set | [`room-reference-codec-results.json`](room-reference-codec-results.json) |
+| Broadcast serialization / native Frame reuse | Reject: all four late-game timing gates fail | [`room-broadcast-late-results.json`](room-broadcast-late-results.json) |
+| Archive packet reuse / one final name projection | Reject: matched CPU/p50/p99 and overridden-name p99 fail paired gates | [`room-history-projection-results.json`](room-history-projection-results.json) |
+| Incremental history-window index | Reject: matched p95/p99, overridden-name p99 and frozen stock4 RSS fail | [`room-incremental-history-results.json`](room-incremental-history-results.json) |
+| Late-tail attribution | Diagnostic only: recurring WAL checkpoint waits identified; no durability or checkpoint-setting change adopted | [`room-tail-diagnosis-results.json`](room-tail-diagnosis-results.json) |
+
+State and Frame remain distinct logical views: State supplies authoritative rule data and Frame adds its exact public presentation. Shared immutable capture and a persisted Frame overlay remove duplicate storage while preserving both contracts. A generic reference codec is a different proposal and is not required for this reuse.
+
+The PR was rebased onto `450b72ce` and freshly verified on 2026-10-05; [`room-commit-pr-verification.json`](room-commit-pr-verification.json) records source hashes, the exact trace, live HTTP/WS checks and full local CI. All 15 original optimization production files and their patch are byte-identical to the measured implementation. Upstream Moor/localization changes do not overlap those files. The regenerated 94,476,226-byte stock trace still matches the frozen baseline exactly. Full tests pass 1,468 files / 13,760 tests (3 skipped, 1 todo); the architecture, lint, i18n, LLM golden, app/Viewer builds, bundle and community checks pass. Three test-fixture log writes were adjusted to comply with the existing architecture guard. These are fresh correctness/CI results; the timing tables below retain their original populations and are not new performance measurements after rebase.
+
 ### Issue #941 evaluation
 
 The final candidate covers all three agreed directions: private session-cursor change detection, serialization reuse and canonical Replay Frame hashing. Five alternating fresh-process control/candidate pairs and five independent write traces pass all twelve timing, RSS and persistence-write checks; both 30-Room capacity probes also pass. Functional verification also passes; the implementation is ready for review against the unchanged Issue #941 acceptance criteria. The duplicate cursor-hash calculation was already fixed by Issue #948 in PR #957 and is not counted as a new improvement.
@@ -23,6 +40,8 @@ The final candidate covers all three agreed directions: private session-cursor c
 The source baseline is `bd43a15bde1ee177dc5820924929bc69810569b3`. Before implementation, five runs of the unchanged 136-command two-player and 277-command four-player fixtures froze the thresholds in [`room-commit-baseline.json`](room-commit-baseline.json). Both versions use Node 24.19.0, a 2 CPU / 2 GiB cgroup and unchanged SQLite WAL, `synchronous=NORMAL` and checkpoint settings. Whole-workload CPU includes recovery; action-to-broadcast latency ends at the in-process committed socket sink and excludes network transport. CPU profiles, syscall tracing and extra logical-byte measurement are separate from acceptance timing.
 
 For each timing metric, the required reduction is the greater of 5% or twice the largest five-run deviation from the baseline median, rounded up to a whole percentage point. RSS and DB/WAL regression allowances are the baseline variation rounded up. These requirements were frozen before candidate measurements and remain unchanged:
+
+Precisely, for five unchanged-baseline observations `x_i`, define `m = median(x_i)` and `v = 100 * max_i(abs(x_i - m) / m)`. The required timing reduction is `max(5, ceil(2 * v))%`. For example, the original two-player p99 has `v = 20.0619367%`, producing a **41%** minimum reduction. The rule is an engineering acceptance margin intended to exceed observed noise, not a confidence interval or a user-facing latency SLO. Five process samples give a limited estimate of variation; tail variance can therefore produce a much higher gate than CPU variance. Gates are frozen before candidate results and each metric must pass independently: CPU savings cannot compensate for a failed p99 requirement.
 
 | Players | CPU reduction | p50 reduction | p95 reduction | p99 reduction | Maximum RSS regression | Maximum DB/WAL write regression |
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -76,6 +95,33 @@ After the required local restart, the real Room browser test passed history pagi
 
 [`room-commit-results.json`](room-commit-results.json) retains the raw runs, source and harness hashes, diagnostic slices, three failed paired attempts, exact-trace identity, physical writes, capacity reports and final verdict. The 94 MB raw trace and syscall/profile logs remain local artifacts identified by SHA-256; timing and write reports are embedded in the JSON, with repeated hash/classification arrays represented by lossless `workloadTranscripts` references. Every measured sample is retained. The completed optimization group below remains historical evidence.
 
+### Generic reference serialization follow-up (rejected cost diagnostic)
+
+A separate prototype at baseline `8b62adb8` tested a generic JSON node table that preserves shared object and array references. It is not adopted. Its raw reports, exact prototype sources and correctness evidence are retained in [`room-reference-codec-results.json`](room-reference-codec-results.json). This was an exploratory codec-cost comparison, with no frozen numeric acceptance threshold; it was not a production commit/broadcast or persistence-write acceptance run.
+
+The strict encoder validates plain JSON data and rejects accessors, proxies, custom serialization, exotic objects and cycles. A trusted encoder skips those inspections for already detached internal JSON graphs and produces identical wire bytes. Decode preserves aliases without freezing them; existing recovery import and rehydration provide writable rule-state isolation. The experiment replaces neither the production SQLite adapter nor Worker IPC.
+
+Seven samples retain real snapshot aliases: midgame boundary, late largest-undo and terminal snapshots for each stock two-/four-player fixture, plus a nested provisional checkpoint. Each is tested as a raw snapshot, a JSON-adapter snapshot with recovery catalog, and the actual latest Room body captured before `RoomHistoryStore.prepare` stringifies it. Packed preparation is outside timing and executes no SQL. JSON uses a catalog for every serialized alias path; reference encoding uses identity-deduplicated paths, preserving the same restored logical values.
+
+Five fresh processes use Node 24.19.0, ARM64/Linux and the same 2 CPU / 2 GiB limits. Each operation receives eight warmups and explicit pre-loop GC, then at least 20 measured iterations over at least 120ms. Timed CPU includes GC occurring inside the loop; dataset and operation order vary across processes. The table gives equal-weight bundles of the three regular snapshots per player count. CPU changes are medians of each process's relative change in summed per-operation CPU; they are not complete-transcript CPU or action latency. The seventh nested sample remains individually reported.
+
+| Representation | Players | Raw bytes change | gzip bytes change | Trusted encode CPU change | Roundtrip CPU change |
+| :--- | ---: | ---: | ---: | ---: | ---: |
+| Raw snapshot | 2 | −46.35% | −24.68% | +79.21% | +53.59% |
+| Raw snapshot | 4 | −50.60% | −26.03% | +75.49% | +47.72% |
+| JSON adapter | 2 | −26.37% | −6.03% | +132.25% | +49.50% |
+| JSON adapter | 4 | −30.58% | −6.69% | +131.90% | +33.88% |
+| SQLite packed body | 2 | +14.45% | +22.79% | +278.08% | +218.77% |
+| SQLite packed body | 4 | +15.98% | +29.22% | +301.15% | +236.45% |
+
+References reduce raw-snapshot bytes, but encoding and roundtrip CPU increase even with the trusted path. Existing Room history references and the Frame overlay already remove most duplication at the SQLite boundary: regular packed samples contain only zero or one repeated reference, and the nested provisional sample contains ten. The generic node-table overhead then increases both raw and gzip-compressed packed bytes. Some raw gzip-decode measurements improve, but this does not establish a useful production tradeoff. These are codec bytes and costs, not measured DB/WAL writes; the benchmark excludes filesystem I/O, transactions, Worker IPC, broadcast and Room capacity. Its mixed-case process RSS is also not a per-codec memory comparison.
+
+Packed-body byte comparisons exclude the final storage envelope/base64 and independent history/recovery-node rows. The reported encode CPU is the trusted path; neither these bytes nor its gzip result can be substituted for the complete production write measurement.
+
+Strict and trusted correctness checks pass all seven snapshots, continuation/isolation checks, three successful undo cases, seven packed-value roundtrips, 20 supported JSON edge values, 19 strict domain rejections and 18 malformed envelopes. The complete 413-command stock fixtures preserve canonical Frame/cursor values and semantic commit classification when both JSON and reference variants restore after every command. That fair comparison records the same restoration canonicalization on both sides; it is not the uninterrupted production trace or validation of actual SQLite Replay Step storage.
+
+Retain this as a rejected cost diagnostic, without attributing the original #941 gains to it or applying later late-game thresholds retrospectively. The artifact keeps all five raw benchmark reports, correctness details, summary, resource configuration, six source files and verification logs as individually checksummed, reversible gzip/base64 byte records. Assembly independently recomputes the bundle CPU/wall statistics and verifies exact recovery of every archived file; no new benchmark is run while assembling it.
+
 ### Late-game broadcast reuse follow-up (rejected)
 
 The follow-up experiment did **not** meet its frozen performance gates and is **not integrated into production**. Slice A shares one serialized base per broadcast (`a09c7b2e`); slice B additionally reuses the native committed Frame (`78ef395f`), retaining per-viewer filtering. The control source is `8b62adb8a43aca2038161598b1a30ccc3b085672`, after the completed #941 changes above. Those earlier gains remain separate; they are not counted again in this comparison. The benchmark harness, fixed input and rejected measurements are retained in [`room-broadcast-late-results.json`](room-broadcast-late-results.json).
@@ -123,6 +169,8 @@ Two independent prototypes were tested: archive packet reuse (`e91f94a3`) and on
 The unchanged four-player, five-worker late fixture above is tested in two separate modes: `--names matched` initializes Room seats with the snapshot's player names; `--names override` retains the prior `P0`–`P3` connection names. Neither mode rewrites fixture state or Replay. Names matter because identity-based history presentation visits name fields even when names match, and copies entries when names change. This experiment removes redundant work without changing which name is displayed. It does not model every possible sequence of real renames.
 
 All populations use Node 24.19.0, a 2 CPU / 2 GiB cgroup, unchanged SQLite settings, one full warmup and three measured transcripts per fresh process. Five baseline processes per case freeze the following gates before implementation. Late-case timing reductions use the greater of 5% or twice the largest baseline median-relative deviation, rounded up; stock cases and RSS use the deviation rounded up, with a 1% floor. Final comparisons must pass against both the frozen population and five contemporaneous control/candidate pairs. Diagnostics, profiles, tracing, capacity, apps and tests are separate from timing.
+
+The later incremental history-window experiment reuses this same frozen threshold artifact (SHA-256 `e84d61337c7d7d2e9cae5a5d7761c152be1d4b2ebe66f45b7f4f238f0de5a9a1`); thresholds are not recomputed after a rejection. Late matched-name p99 has frozen median 48.774532ms and largest relative deviation 4.626184829%, giving `ceil(2 * 4.626184829) = 10%`. Overridden-name p99 has median 51.215381ms and deviation 5.990161432%, giving **12%**. Stock cases are non-regression guards because the additional optimization targets the late workload. The original #941 timing/RSS decision uses contemporaneous pairs and its writes use frozen traces; this later contract additionally requires timing/RSS to pass against both populations. The service-capacity limits (250ms action p99, 100ms event-loop p99, 1.8 GiB RSS) are separate fixed limits, not outputs of the noise formula.
 
 | Case | Timing gate | CPU | p50 | p95 | p99 | Maximum peak-RSS regression |
 | :--- | :--- | ---: | ---: | ---: | ---: | ---: |

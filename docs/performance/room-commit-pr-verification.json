@@ -1,0 +1,1477 @@
+{
+  "schemaVersion": 1,
+  "kind": "issue-941-pr-rebase-verification",
+  "verifiedAt": "2026-10-05T09:24:55.791333+00:00",
+  "scope": "Fresh correctness and full local CI on the rebased PR; historical performance populations were not rerun or relabeled.",
+  "sourceComparison": {
+    "schemaVersion": 1,
+    "kind": "accepted-941-rebase-source-comparison",
+    "generatedAt": "2026-10-05T09:22:40.533261+00:00",
+    "repository": "/tmp/open-agricola-pr941.lj2a1ypz/worktree",
+    "revisions": {
+      "acceptedOriginal": "c415955c3342693c86249b3b4daec69da5f54bb4",
+      "acceptedOriginalParent": "c714b74163f7b437016adfc82c71b3f490186b8f",
+      "originalBranchHead": "8a476ba1e51ea01a5d755f81058fcd9ce47c04bc",
+      "upstreamMain": "450b72ce9e3246e8e1e328cb15da15f2bd358d9d",
+      "upstreamParent": "d90f50eccee2773549bfaa74c6608ec820feea86",
+      "rebasedHead": "3acc23858faaef067d2bcfea5887c7e7a94efe03"
+    },
+    "summary": {
+      "acceptedProductionFiles": 15,
+      "all15MatchOriginalMeasuredHashesAndBothOriginalCommits": true,
+      "prProductionFileSetExactlyMatchesOriginal941": true,
+      "originalAndRebasedProductionPatchBytesEqual": true,
+      "upstreamChangesExactlyExplainWholeCommittedTreeDifference": true,
+      "upstreamChangedFiles": 15,
+      "upstreamChangedProductionFiles": 9,
+      "upstreamOverlapsOriginal941ProductionFiles": false,
+      "benchmarkFilesCompared": 15,
+      "allBenchmarkFilesUnchangedByRebase": true,
+      "originalMeasuredHarnessFilesNoLongerMatchingCurrent": [
+        "scripts/bench/room-performance.ts"
+      ],
+      "testsOrBenchmarksRun": false
+    },
+    "originalMeasuredSourceLabel": "c714b74163f7b437016adfc82c71b3f490186b8f",
+    "originalMeasuredSourceLabelMeaning": "Working-tree production file hashes identify the measured candidate; the HEAD label alone does not include these edits.",
+    "equivalentParents": {
+      "originalAcceptedParent": "c714b74163f7b437016adfc82c71b3f490186b8f",
+      "upstreamBeforeMoorCommit": "d90f50eccee2773549bfaa74c6608ec820feea86",
+      "treeSha": "9d93ba35d66b88a00f593b24c5bece912296be0a",
+      "treesByteIdentical": true,
+      "note": "The original asynchronous-error test-fix parent was replayed upstream under a different commit ID, with the same tree."
+    },
+    "productionFiles": [
+      {
+        "path": "restart-local.sh",
+        "measuredSourceManifest": {
+          "sha256": "67d5797480363857485ed6392d86e7e0ff730a53f07b93bd91b4e5bb963592dd",
+          "bytes": 22399,
+          "source": "docs/performance/room-commit-results.json#/source/files"
+        },
+        "acceptedOriginal": {
+          "bytes": 22399,
+          "sha256": "67d5797480363857485ed6392d86e7e0ff730a53f07b93bd91b4e5bb963592dd"
+        },
+        "originalBranchHead": {
+          "bytes": 22399,
+          "sha256": "67d5797480363857485ed6392d86e7e0ff730a53f07b93bd91b4e5bb963592dd"
+        },
+        "upstreamMain": {
+          "bytes": 22314,
+          "sha256": "2e1c2231352368c81a519521818c56a831a0ea9d772ff9db4fd7c3d69e927808"
+        },
+        "rebasedHead": {
+          "bytes": 22399,
+          "sha256": "67d5797480363857485ed6392d86e7e0ff730a53f07b93bd91b4e5bb963592dd"
+        },
+        "workingTree": {
+          "bytes": 22399,
+          "sha256": "67d5797480363857485ed6392d86e7e0ff730a53f07b93bd91b4e5bb963592dd"
+        },
+        "allAcceptedAndCurrentHashesMatchMeasuredSource": true
+      },
+      {
+        "path": "server/game/persistence/room-body-codec.ts",
+        "measuredSourceManifest": {
+          "sha256": "d7ee604373fa469c8bc089f9d0119bf35d810247af2721a9fa891e17f696718e",
+          "bytes": 1141,
+          "source": "docs/performance/room-commit-results.json#/source/files"
+        },
+        "acceptedOriginal": {
+          "bytes": 1141,
+          "sha256": "d7ee604373fa469c8bc089f9d0119bf35d810247af2721a9fa891e17f696718e"
+        },
+        "originalBranchHead": {
+          "bytes": 1141,
+          "sha256": "d7ee604373fa469c8bc089f9d0119bf35d810247af2721a9fa891e17f696718e"
+        },
+        "upstreamMain": null,
+        "rebasedHead": {
+          "bytes": 1141,
+          "sha256": "d7ee604373fa469c8bc089f9d0119bf35d810247af2721a9fa891e17f696718e"
+        },
+        "workingTree": {
+          "bytes": 1141,
+          "sha256": "d7ee604373fa469c8bc089f9d0119bf35d810247af2721a9fa891e17f696718e"
+        },
+        "allAcceptedAndCurrentHashesMatchMeasuredSource": true
+      },
+      {
+        "path": "server/game/persistence/room-history-store.ts",
+        "measuredSourceManifest": {
+          "sha256": "5ec3a396a7f9a44a192d12b12fae80f3cf3bbb3d577db8f5059dedfa3d24557f",
+          "bytes": 15135,
+          "source": "docs/performance/room-commit-results.json#/source/files"
+        },
+        "acceptedOriginal": {
+          "bytes": 15135,
+          "sha256": "5ec3a396a7f9a44a192d12b12fae80f3cf3bbb3d577db8f5059dedfa3d24557f"
+        },
+        "originalBranchHead": {
+          "bytes": 15135,
+          "sha256": "5ec3a396a7f9a44a192d12b12fae80f3cf3bbb3d577db8f5059dedfa3d24557f"
+        },
+        "upstreamMain": {
+          "bytes": 13786,
+          "sha256": "6c0c221f3994d4677fc26db5dad476e65ed906aabafb3cadb78d8f5ffd9f87ef"
+        },
+        "rebasedHead": {
+          "bytes": 15135,
+          "sha256": "5ec3a396a7f9a44a192d12b12fae80f3cf3bbb3d577db8f5059dedfa3d24557f"
+        },
+        "workingTree": {
+          "bytes": 15135,
+          "sha256": "5ec3a396a7f9a44a192d12b12fae80f3cf3bbb3d577db8f5059dedfa3d24557f"
+        },
+        "allAcceptedAndCurrentHashesMatchMeasuredSource": true
+      },
+      {
+        "path": "server/game/persistence/sqlite-adapter.ts",
+        "measuredSourceManifest": {
+          "sha256": "e8aaf24a0a74bd784a38183484a9278776eb1d8bcaa4835e524ed392fe7d2d17",
+          "bytes": 27461,
+          "source": "docs/performance/room-commit-results.json#/source/files"
+        },
+        "acceptedOriginal": {
+          "bytes": 27461,
+          "sha256": "e8aaf24a0a74bd784a38183484a9278776eb1d8bcaa4835e524ed392fe7d2d17"
+        },
+        "originalBranchHead": {
+          "bytes": 27461,
+          "sha256": "e8aaf24a0a74bd784a38183484a9278776eb1d8bcaa4835e524ed392fe7d2d17"
+        },
+        "upstreamMain": {
+          "bytes": 27394,
+          "sha256": "940d4c99cdb5c61e6eb2707effdcf1b041b465a979ae8be23a84d3d5792ec4a4"
+        },
+        "rebasedHead": {
+          "bytes": 27461,
+          "sha256": "e8aaf24a0a74bd784a38183484a9278776eb1d8bcaa4835e524ed392fe7d2d17"
+        },
+        "workingTree": {
+          "bytes": 27461,
+          "sha256": "e8aaf24a0a74bd784a38183484a9278776eb1d8bcaa4835e524ed392fe7d2d17"
+        },
+        "allAcceptedAndCurrentHashesMatchMeasuredSource": true
+      },
+      {
+        "path": "server/game/private-cursor-comparison.ts",
+        "measuredSourceManifest": {
+          "sha256": "c565265ad8222ad3b07c89d42777a2f6b84ccea7042e69414a0cc576ed8a32dc",
+          "bytes": 4036,
+          "source": "docs/performance/room-commit-results.json#/source/files"
+        },
+        "acceptedOriginal": {
+          "bytes": 4036,
+          "sha256": "c565265ad8222ad3b07c89d42777a2f6b84ccea7042e69414a0cc576ed8a32dc"
+        },
+        "originalBranchHead": {
+          "bytes": 4036,
+          "sha256": "c565265ad8222ad3b07c89d42777a2f6b84ccea7042e69414a0cc576ed8a32dc"
+        },
+        "upstreamMain": null,
+        "rebasedHead": {
+          "bytes": 4036,
+          "sha256": "c565265ad8222ad3b07c89d42777a2f6b84ccea7042e69414a0cc576ed8a32dc"
+        },
+        "workingTree": {
+          "bytes": 4036,
+          "sha256": "c565265ad8222ad3b07c89d42777a2f6b84ccea7042e69414a0cc576ed8a32dc"
+        },
+        "allAcceptedAndCurrentHashesMatchMeasuredSource": true
+      },
+      {
+        "path": "server/game/replay-codec.ts",
+        "measuredSourceManifest": {
+          "sha256": "9433a03d9f1ad90c190b6f1100f705d78134c92987c268a203ff91fca82178ba",
+          "bytes": 8826,
+          "source": "docs/performance/room-commit-results.json#/source/files"
+        },
+        "acceptedOriginal": {
+          "bytes": 8826,
+          "sha256": "9433a03d9f1ad90c190b6f1100f705d78134c92987c268a203ff91fca82178ba"
+        },
+        "originalBranchHead": {
+          "bytes": 8826,
+          "sha256": "9433a03d9f1ad90c190b6f1100f705d78134c92987c268a203ff91fca82178ba"
+        },
+        "upstreamMain": {
+          "bytes": 8026,
+          "sha256": "7788e6b27957b15085155da8dc65c10eb378d4c4075690a9a3f4ae0065a5e590"
+        },
+        "rebasedHead": {
+          "bytes": 8826,
+          "sha256": "9433a03d9f1ad90c190b6f1100f705d78134c92987c268a203ff91fca82178ba"
+        },
+        "workingTree": {
+          "bytes": 8826,
+          "sha256": "9433a03d9f1ad90c190b6f1100f705d78134c92987c268a203ff91fca82178ba"
+        },
+        "allAcceptedAndCurrentHashesMatchMeasuredSource": true
+      },
+      {
+        "path": "server/game/room-committer.ts",
+        "measuredSourceManifest": {
+          "sha256": "18da2f4756d7464f29c2fb36ef0e24936012e3f5a50520ff327aa91063ac6885",
+          "bytes": 27731,
+          "source": "docs/performance/room-commit-results.json#/source/files"
+        },
+        "acceptedOriginal": {
+          "bytes": 27731,
+          "sha256": "18da2f4756d7464f29c2fb36ef0e24936012e3f5a50520ff327aa91063ac6885"
+        },
+        "originalBranchHead": {
+          "bytes": 27731,
+          "sha256": "18da2f4756d7464f29c2fb36ef0e24936012e3f5a50520ff327aa91063ac6885"
+        },
+        "upstreamMain": {
+          "bytes": 27082,
+          "sha256": "c2dae3500e182a8c9ed29ba956438ac7c20726422d6a6c0894034daaf81938de"
+        },
+        "rebasedHead": {
+          "bytes": 27731,
+          "sha256": "18da2f4756d7464f29c2fb36ef0e24936012e3f5a50520ff327aa91063ac6885"
+        },
+        "workingTree": {
+          "bytes": 27731,
+          "sha256": "18da2f4756d7464f29c2fb36ef0e24936012e3f5a50520ff327aa91063ac6885"
+        },
+        "allAcceptedAndCurrentHashesMatchMeasuredSource": true
+      },
+      {
+        "path": "shared/actions/effects/fencing.ts",
+        "measuredSourceManifest": {
+          "sha256": "bc5ea9caac86fc00fdc740b8ee736eb6b5f5e466cfd160d29d8bf89ad38918ff",
+          "bytes": 39281,
+          "source": "docs/performance/room-commit-results.json#/source/files"
+        },
+        "acceptedOriginal": {
+          "bytes": 39281,
+          "sha256": "bc5ea9caac86fc00fdc740b8ee736eb6b5f5e466cfd160d29d8bf89ad38918ff"
+        },
+        "originalBranchHead": {
+          "bytes": 39281,
+          "sha256": "bc5ea9caac86fc00fdc740b8ee736eb6b5f5e466cfd160d29d8bf89ad38918ff"
+        },
+        "upstreamMain": {
+          "bytes": 37862,
+          "sha256": "6870eaf9a09c46958ab48b737c37716152f1861c1836dce08f345c96eb82c7de"
+        },
+        "rebasedHead": {
+          "bytes": 39281,
+          "sha256": "bc5ea9caac86fc00fdc740b8ee736eb6b5f5e466cfd160d29d8bf89ad38918ff"
+        },
+        "workingTree": {
+          "bytes": 39281,
+          "sha256": "bc5ea9caac86fc00fdc740b8ee736eb6b5f5e466cfd160d29d8bf89ad38918ff"
+        },
+        "allAcceptedAndCurrentHashesMatchMeasuredSource": true
+      },
+      {
+        "path": "shared/actions/flow.ts",
+        "measuredSourceManifest": {
+          "sha256": "a2011ee823c0f67449af660252f6a25b273f8e67a7f4f26721dfb28b56bcc526",
+          "bytes": 8995,
+          "source": "docs/performance/room-commit-results.json#/source/files"
+        },
+        "acceptedOriginal": {
+          "bytes": 8995,
+          "sha256": "a2011ee823c0f67449af660252f6a25b273f8e67a7f4f26721dfb28b56bcc526"
+        },
+        "originalBranchHead": {
+          "bytes": 8995,
+          "sha256": "a2011ee823c0f67449af660252f6a25b273f8e67a7f4f26721dfb28b56bcc526"
+        },
+        "upstreamMain": {
+          "bytes": 8726,
+          "sha256": "3e48fc8a3cb1912a8c66d4fd4b45c5eccb9cbbea924e20a54bdcc1bd05ecc0da"
+        },
+        "rebasedHead": {
+          "bytes": 8995,
+          "sha256": "a2011ee823c0f67449af660252f6a25b273f8e67a7f4f26721dfb28b56bcc526"
+        },
+        "workingTree": {
+          "bytes": 8995,
+          "sha256": "a2011ee823c0f67449af660252f6a25b273f8e67a7f4f26721dfb28b56bcc526"
+        },
+        "allAcceptedAndCurrentHashesMatchMeasuredSource": true
+      },
+      {
+        "path": "shared/actions/helpers/placement-availability.ts",
+        "measuredSourceManifest": {
+          "sha256": "e8c08d4230525a8948e68cef04076b5642a62467e6a27da98be980942bfad9da",
+          "bytes": 5989,
+          "source": "docs/performance/room-commit-results.json#/source/files"
+        },
+        "acceptedOriginal": {
+          "bytes": 5989,
+          "sha256": "e8c08d4230525a8948e68cef04076b5642a62467e6a27da98be980942bfad9da"
+        },
+        "originalBranchHead": {
+          "bytes": 5989,
+          "sha256": "e8c08d4230525a8948e68cef04076b5642a62467e6a27da98be980942bfad9da"
+        },
+        "upstreamMain": {
+          "bytes": 5977,
+          "sha256": "a20e16ae11ee97146d3f0ddc89d3ea8b44d92cc5059fa267f5e2d3dd5051f517"
+        },
+        "rebasedHead": {
+          "bytes": 5989,
+          "sha256": "e8c08d4230525a8948e68cef04076b5642a62467e6a27da98be980942bfad9da"
+        },
+        "workingTree": {
+          "bytes": 5989,
+          "sha256": "e8c08d4230525a8948e68cef04076b5642a62467e6a27da98be980942bfad9da"
+        },
+        "allAcceptedAndCurrentHashesMatchMeasuredSource": true
+      },
+      {
+        "path": "shared/engine/dispatcher.ts",
+        "measuredSourceManifest": {
+          "sha256": "0a12f3dd2a899e0260ce5edc283ae57b0d196534c26a5a7e99b7e38cb4658592",
+          "bytes": 8803,
+          "source": "docs/performance/room-commit-results.json#/source/files"
+        },
+        "acceptedOriginal": {
+          "bytes": 8803,
+          "sha256": "0a12f3dd2a899e0260ce5edc283ae57b0d196534c26a5a7e99b7e38cb4658592"
+        },
+        "originalBranchHead": {
+          "bytes": 8803,
+          "sha256": "0a12f3dd2a899e0260ce5edc283ae57b0d196534c26a5a7e99b7e38cb4658592"
+        },
+        "upstreamMain": {
+          "bytes": 8711,
+          "sha256": "ef26e19e593026b999ad95b29cfd7b5e21ed2b2efe3e8d3eec39951f3b3349cd"
+        },
+        "rebasedHead": {
+          "bytes": 8803,
+          "sha256": "0a12f3dd2a899e0260ce5edc283ae57b0d196534c26a5a7e99b7e38cb4658592"
+        },
+        "workingTree": {
+          "bytes": 8803,
+          "sha256": "0a12f3dd2a899e0260ce5edc283ae57b0d196534c26a5a7e99b7e38cb4658592"
+        },
+        "allAcceptedAndCurrentHashesMatchMeasuredSource": true
+      },
+      {
+        "path": "shared/session/action-entry-query.ts",
+        "measuredSourceManifest": {
+          "sha256": "51adb427261b0f45dba984dcdfe4c4652a561e66b27dceaed98f6058ac4255ee",
+          "bytes": 3640,
+          "source": "docs/performance/room-commit-results.json#/source/files"
+        },
+        "acceptedOriginal": {
+          "bytes": 3640,
+          "sha256": "51adb427261b0f45dba984dcdfe4c4652a561e66b27dceaed98f6058ac4255ee"
+        },
+        "originalBranchHead": {
+          "bytes": 3640,
+          "sha256": "51adb427261b0f45dba984dcdfe4c4652a561e66b27dceaed98f6058ac4255ee"
+        },
+        "upstreamMain": {
+          "bytes": 3614,
+          "sha256": "aa199e8c4e9e8da2ba1e407bfd50c14b74cd4b717b6c98fb1d503f943edd589c"
+        },
+        "rebasedHead": {
+          "bytes": 3640,
+          "sha256": "51adb427261b0f45dba984dcdfe4c4652a561e66b27dceaed98f6058ac4255ee"
+        },
+        "workingTree": {
+          "bytes": 3640,
+          "sha256": "51adb427261b0f45dba984dcdfe4c4652a561e66b27dceaed98f6058ac4255ee"
+        },
+        "allAcceptedAndCurrentHashesMatchMeasuredSource": true
+      },
+      {
+        "path": "shared/session/history-streams.ts",
+        "measuredSourceManifest": {
+          "sha256": "a9d825eefad51ba38d256d8e6677a31b2465afe5e5201f8f48768fcf4803b0f5",
+          "bytes": 9922,
+          "source": "docs/performance/room-commit-results.json#/source/files"
+        },
+        "acceptedOriginal": {
+          "bytes": 9922,
+          "sha256": "a9d825eefad51ba38d256d8e6677a31b2465afe5e5201f8f48768fcf4803b0f5"
+        },
+        "originalBranchHead": {
+          "bytes": 9922,
+          "sha256": "a9d825eefad51ba38d256d8e6677a31b2465afe5e5201f8f48768fcf4803b0f5"
+        },
+        "upstreamMain": {
+          "bytes": 7798,
+          "sha256": "2b251b708fc04af1941dccac3a2451ac9dc8887edff9c93128ffd5ae7b34b71f"
+        },
+        "rebasedHead": {
+          "bytes": 9922,
+          "sha256": "a9d825eefad51ba38d256d8e6677a31b2465afe5e5201f8f48768fcf4803b0f5"
+        },
+        "workingTree": {
+          "bytes": 9922,
+          "sha256": "a9d825eefad51ba38d256d8e6677a31b2465afe5e5201f8f48768fcf4803b0f5"
+        },
+        "allAcceptedAndCurrentHashesMatchMeasuredSource": true
+      },
+      {
+        "path": "shared/session/serialization.ts",
+        "measuredSourceManifest": {
+          "sha256": "62af80d250d238f65a89c51e6179c861065b847913ec9e8502d25a547fdb3a13",
+          "bytes": 12728,
+          "source": "docs/performance/room-commit-results.json#/source/files"
+        },
+        "acceptedOriginal": {
+          "bytes": 12728,
+          "sha256": "62af80d250d238f65a89c51e6179c861065b847913ec9e8502d25a547fdb3a13"
+        },
+        "originalBranchHead": {
+          "bytes": 12728,
+          "sha256": "62af80d250d238f65a89c51e6179c861065b847913ec9e8502d25a547fdb3a13"
+        },
+        "upstreamMain": {
+          "bytes": 11579,
+          "sha256": "58d8b112e28dd187b692a9d891347fe33d32b7e956e13e80a3aad690b5d28ce8"
+        },
+        "rebasedHead": {
+          "bytes": 12728,
+          "sha256": "62af80d250d238f65a89c51e6179c861065b847913ec9e8502d25a547fdb3a13"
+        },
+        "workingTree": {
+          "bytes": 12728,
+          "sha256": "62af80d250d238f65a89c51e6179c861065b847913ec9e8502d25a547fdb3a13"
+        },
+        "allAcceptedAndCurrentHashesMatchMeasuredSource": true
+      },
+      {
+        "path": "shared/session/session-core.ts",
+        "measuredSourceManifest": {
+          "sha256": "2c442ba0927289ba4ba8e93f7e58f611d950f1e991cd94829e117c0a144e7585",
+          "bytes": 240055,
+          "source": "docs/performance/room-commit-results.json#/source/files"
+        },
+        "acceptedOriginal": {
+          "bytes": 240055,
+          "sha256": "2c442ba0927289ba4ba8e93f7e58f611d950f1e991cd94829e117c0a144e7585"
+        },
+        "originalBranchHead": {
+          "bytes": 240055,
+          "sha256": "2c442ba0927289ba4ba8e93f7e58f611d950f1e991cd94829e117c0a144e7585"
+        },
+        "upstreamMain": {
+          "bytes": 239892,
+          "sha256": "9193cbb71b82e815f748499d8c76bb8e04a28a5a46ab1a7b303091ddc711b0a5"
+        },
+        "rebasedHead": {
+          "bytes": 240055,
+          "sha256": "2c442ba0927289ba4ba8e93f7e58f611d950f1e991cd94829e117c0a144e7585"
+        },
+        "workingTree": {
+          "bytes": 240055,
+          "sha256": "2c442ba0927289ba4ba8e93f7e58f611d950f1e991cd94829e117c0a144e7585"
+        },
+        "allAcceptedAndCurrentHashesMatchMeasuredSource": true
+      }
+    ],
+    "productionPatch": {
+      "bytes": 47666,
+      "originalSha256": "0193fe5723954f6efaed3a2c370827c5a0f6c167b882b851a71722b2202e108c",
+      "rebasedSha256": "0193fe5723954f6efaed3a2c370827c5a0f6c167b882b851a71722b2202e108c",
+      "byteIdentical": true
+    },
+    "upstreamMoorLocalizationFiles": [
+      {
+        "path": "client/app/GameContainerApi.tsx",
+        "production": true,
+        "originalBranchHead": {
+          "bytes": 87281,
+          "sha256": "3cd9d0eba452ad8f44ca82f7802ba89e78a61c4177126df2f0792577e3df8b21"
+        },
+        "upstreamParent": {
+          "bytes": 87281,
+          "sha256": "3cd9d0eba452ad8f44ca82f7802ba89e78a61c4177126df2f0792577e3df8b21"
+        },
+        "upstreamMain": {
+          "bytes": 87328,
+          "sha256": "175df5c4d56534ffce6de78887834d4eb176516717bfba59d9226e2b93567380"
+        },
+        "rebasedHead": {
+          "bytes": 87328,
+          "sha256": "175df5c4d56534ffce6de78887834d4eb176516717bfba59d9226e2b93567380"
+        },
+        "workingTree": {
+          "bytes": 87328,
+          "sha256": "175df5c4d56534ffce6de78887834d4eb176516717bfba59d9226e2b93567380"
+        },
+        "beforeMatchesUpstreamParent": true,
+        "afterExactlyMatchesUpstreamMain": true
+      },
+      {
+        "path": "client/components/board/SpecialActionsPanel.tsx",
+        "production": true,
+        "originalBranchHead": {
+          "bytes": 3742,
+          "sha256": "b3673cad5b17168d6389ed5b98d30114464723abf96b4c01b1480af4675ea6f9"
+        },
+        "upstreamParent": {
+          "bytes": 3742,
+          "sha256": "b3673cad5b17168d6389ed5b98d30114464723abf96b4c01b1480af4675ea6f9"
+        },
+        "upstreamMain": {
+          "bytes": 5958,
+          "sha256": "053ebf7f24dcbdf682fe87d5f920f1184ea5ca0aca7a6c631846a404a449e2d6"
+        },
+        "rebasedHead": {
+          "bytes": 5958,
+          "sha256": "053ebf7f24dcbdf682fe87d5f920f1184ea5ca0aca7a6c631846a404a449e2d6"
+        },
+        "workingTree": {
+          "bytes": 5958,
+          "sha256": "053ebf7f24dcbdf682fe87d5f920f1184ea5ca0aca7a6c631846a404a449e2d6"
+        },
+        "beforeMatchesUpstreamParent": true,
+        "afterExactlyMatchesUpstreamMain": true
+      },
+      {
+        "path": "client/components/board/__tests__/ActionLog.test.tsx",
+        "production": false,
+        "originalBranchHead": {
+          "bytes": 18165,
+          "sha256": "71304bcfc72816d4c07cf2a2490ff5ed57db3085ba59d2b9af7674878094e79d"
+        },
+        "upstreamParent": {
+          "bytes": 18165,
+          "sha256": "71304bcfc72816d4c07cf2a2490ff5ed57db3085ba59d2b9af7674878094e79d"
+        },
+        "upstreamMain": {
+          "bytes": 20038,
+          "sha256": "ff1a10df2e2342b8c0c939d8b49393382ee5dff7b1f2debdfac44f8b29c24f3e"
+        },
+        "rebasedHead": {
+          "bytes": 20038,
+          "sha256": "ff1a10df2e2342b8c0c939d8b49393382ee5dff7b1f2debdfac44f8b29c24f3e"
+        },
+        "workingTree": {
+          "bytes": 20038,
+          "sha256": "ff1a10df2e2342b8c0c939d8b49393382ee5dff7b1f2debdfac44f8b29c24f3e"
+        },
+        "beforeMatchesUpstreamParent": true,
+        "afterExactlyMatchesUpstreamMain": true
+      },
+      {
+        "path": "client/components/board/__tests__/SpecialActionsPanel.test.tsx",
+        "production": false,
+        "originalBranchHead": {
+          "bytes": 2799,
+          "sha256": "fac38a8bf2b00ad9e358db8cf96f5d266fd4922661b7efa5c57865be7cd707c1"
+        },
+        "upstreamParent": {
+          "bytes": 2799,
+          "sha256": "fac38a8bf2b00ad9e358db8cf96f5d266fd4922661b7efa5c57865be7cd707c1"
+        },
+        "upstreamMain": {
+          "bytes": 6261,
+          "sha256": "83fedf8add0414d0b598f4bc5b2507b9bc4e3306b8f0c946c2b02af1a8c1a02d"
+        },
+        "rebasedHead": {
+          "bytes": 6261,
+          "sha256": "83fedf8add0414d0b598f4bc5b2507b9bc4e3306b8f0c946c2b02af1a8c1a02d"
+        },
+        "workingTree": {
+          "bytes": 6261,
+          "sha256": "83fedf8add0414d0b598f4bc5b2507b9bc4e3306b8f0c946c2b02af1a8c1a02d"
+        },
+        "beforeMatchesUpstreamParent": true,
+        "afterExactlyMatchesUpstreamMain": true
+      },
+      {
+        "path": "client/styles/pages/game.css",
+        "production": true,
+        "originalBranchHead": {
+          "bytes": 139786,
+          "sha256": "db41a0951ad97b659f6f105e7d9525d6488575b1a36e12517ca29b9b705f5209"
+        },
+        "upstreamParent": {
+          "bytes": 139786,
+          "sha256": "db41a0951ad97b659f6f105e7d9525d6488575b1a36e12517ca29b9b705f5209"
+        },
+        "upstreamMain": {
+          "bytes": 140134,
+          "sha256": "7696ec4668196eddb29dc1e6fad15d6ec1465b06e96c10f65e80029fde98ef9f"
+        },
+        "rebasedHead": {
+          "bytes": 140134,
+          "sha256": "7696ec4668196eddb29dc1e6fad15d6ec1465b06e96c10f65e80029fde98ef9f"
+        },
+        "workingTree": {
+          "bytes": 140134,
+          "sha256": "7696ec4668196eddb29dc1e6fad15d6ec1465b06e96c10f65e80029fde98ef9f"
+        },
+        "beforeMatchesUpstreamParent": true,
+        "afterExactlyMatchesUpstreamMain": true
+      },
+      {
+        "path": "e2e-tests/mobile-graphical-actions.spec.ts",
+        "production": false,
+        "originalBranchHead": {
+          "bytes": 7807,
+          "sha256": "1999d207cfe5d9825f31d856824c8ecc1efc59ded12573b51115e9b7c8df3ef7"
+        },
+        "upstreamParent": {
+          "bytes": 7807,
+          "sha256": "1999d207cfe5d9825f31d856824c8ecc1efc59ded12573b51115e9b7c8df3ef7"
+        },
+        "upstreamMain": {
+          "bytes": 7866,
+          "sha256": "a9cc545b1d8a032749ef5b3d3150ad7a3caaac31c2da8761bb7d7b6a3b39d4d1"
+        },
+        "rebasedHead": {
+          "bytes": 7866,
+          "sha256": "a9cc545b1d8a032749ef5b3d3150ad7a3caaac31c2da8761bb7d7b6a3b39d4d1"
+        },
+        "workingTree": {
+          "bytes": 7866,
+          "sha256": "a9cc545b1d8a032749ef5b3d3150ad7a3caaac31c2da8761bb7d7b6a3b39d4d1"
+        },
+        "beforeMatchesUpstreamParent": true,
+        "afterExactlyMatchesUpstreamMain": true
+      },
+      {
+        "path": "e2e-tests/special-actions-localization.spec.ts",
+        "production": false,
+        "originalBranchHead": null,
+        "upstreamParent": null,
+        "upstreamMain": {
+          "bytes": 5183,
+          "sha256": "51691adc1c2ae1f45b31ea37ce338833d8af6fb8e2657c2cf2f414aa339c4881"
+        },
+        "rebasedHead": {
+          "bytes": 5183,
+          "sha256": "51691adc1c2ae1f45b31ea37ce338833d8af6fb8e2657c2cf2f414aa339c4881"
+        },
+        "workingTree": {
+          "bytes": 5183,
+          "sha256": "51691adc1c2ae1f45b31ea37ce338833d8af6fb8e2657c2cf2f414aa339c4881"
+        },
+        "beforeMatchesUpstreamParent": true,
+        "afterExactlyMatchesUpstreamMain": true
+      },
+      {
+        "path": "replay-viewer/src/ReplayBoard.tsx",
+        "production": true,
+        "originalBranchHead": {
+          "bytes": 13276,
+          "sha256": "bb16ffe6c63757ee2cb482f46e2b3f6b55ea39517a1e922ed67395a162725b64"
+        },
+        "upstreamParent": {
+          "bytes": 13276,
+          "sha256": "bb16ffe6c63757ee2cb482f46e2b3f6b55ea39517a1e922ed67395a162725b64"
+        },
+        "upstreamMain": {
+          "bytes": 13323,
+          "sha256": "abb59f8f90d12b38503a7418691af3703f34619568f1e4d98e45d0ced5d75d68"
+        },
+        "rebasedHead": {
+          "bytes": 13323,
+          "sha256": "abb59f8f90d12b38503a7418691af3703f34619568f1e4d98e45d0ced5d75d68"
+        },
+        "workingTree": {
+          "bytes": 13323,
+          "sha256": "abb59f8f90d12b38503a7418691af3703f34619568f1e4d98e45d0ced5d75d68"
+        },
+        "beforeMatchesUpstreamParent": true,
+        "afterExactlyMatchesUpstreamMain": true
+      },
+      {
+        "path": "server/__tests__/farmers-of-the-moor-special-actions-session.test.ts",
+        "production": false,
+        "originalBranchHead": {
+          "bytes": 13160,
+          "sha256": "3763157e2d45466ea6855d82415341bcc7834c7d0828dd50681f047a524e763f"
+        },
+        "upstreamParent": {
+          "bytes": 13160,
+          "sha256": "3763157e2d45466ea6855d82415341bcc7834c7d0828dd50681f047a524e763f"
+        },
+        "upstreamMain": {
+          "bytes": 14331,
+          "sha256": "8ce870e814d832c79bade7aae009dd11666faad49d489d39b3bbadd92ce396a7"
+        },
+        "rebasedHead": {
+          "bytes": 14331,
+          "sha256": "8ce870e814d832c79bade7aae009dd11666faad49d489d39b3bbadd92ce396a7"
+        },
+        "workingTree": {
+          "bytes": 14331,
+          "sha256": "8ce870e814d832c79bade7aae009dd11666faad49d489d39b3bbadd92ce396a7"
+        },
+        "beforeMatchesUpstreamParent": true,
+        "afterExactlyMatchesUpstreamMain": true
+      },
+      {
+        "path": "shared/domain/moor-special-action-values.ts",
+        "production": true,
+        "originalBranchHead": null,
+        "upstreamParent": null,
+        "upstreamMain": {
+          "bytes": 949,
+          "sha256": "b29cdcd07c4b1895724afd3b8b321aab383289c17985e06fa4815d5a3e2f7af5"
+        },
+        "rebasedHead": {
+          "bytes": 949,
+          "sha256": "b29cdcd07c4b1895724afd3b8b321aab383289c17985e06fa4815d5a3e2f7af5"
+        },
+        "workingTree": {
+          "bytes": 949,
+          "sha256": "b29cdcd07c4b1895724afd3b8b321aab383289c17985e06fa4815d5a3e2f7af5"
+        },
+        "beforeMatchesUpstreamParent": true,
+        "afterExactlyMatchesUpstreamMain": true
+      },
+      {
+        "path": "shared/events/__tests__/log-mapper.test.ts",
+        "production": false,
+        "originalBranchHead": {
+          "bytes": 43504,
+          "sha256": "a398005516014badcc98c9ebb6a8e46d26177d891fafe8c4f6a03b83ab35920a"
+        },
+        "upstreamParent": {
+          "bytes": 43504,
+          "sha256": "a398005516014badcc98c9ebb6a8e46d26177d891fafe8c4f6a03b83ab35920a"
+        },
+        "upstreamMain": {
+          "bytes": 43515,
+          "sha256": "de470f4efa23b4a9cb8891d780b0fa06aaf99b33b485200d16d9c7e0109c7cb5"
+        },
+        "rebasedHead": {
+          "bytes": 43515,
+          "sha256": "de470f4efa23b4a9cb8891d780b0fa06aaf99b33b485200d16d9c7e0109c7cb5"
+        },
+        "workingTree": {
+          "bytes": 43515,
+          "sha256": "de470f4efa23b4a9cb8891d780b0fa06aaf99b33b485200d16d9c7e0109c7cb5"
+        },
+        "beforeMatchesUpstreamParent": true,
+        "afterExactlyMatchesUpstreamMain": true
+      },
+      {
+        "path": "shared/events/log-mapper.ts",
+        "production": true,
+        "originalBranchHead": {
+          "bytes": 38010,
+          "sha256": "22275bdc0f5b70b25f7c652e0caa1726af8865b23ea50f027b6f022fe7b47f30"
+        },
+        "upstreamParent": {
+          "bytes": 38010,
+          "sha256": "22275bdc0f5b70b25f7c652e0caa1726af8865b23ea50f027b6f022fe7b47f30"
+        },
+        "upstreamMain": {
+          "bytes": 38025,
+          "sha256": "e233241fd86f16481d532a617a525a1a2dcf25b432febd7bd9dded0c3d3b3711"
+        },
+        "rebasedHead": {
+          "bytes": 38025,
+          "sha256": "e233241fd86f16481d532a617a525a1a2dcf25b432febd7bd9dded0c3d3b3711"
+        },
+        "workingTree": {
+          "bytes": 38025,
+          "sha256": "e233241fd86f16481d532a617a525a1a2dcf25b432febd7bd9dded0c3d3b3711"
+        },
+        "beforeMatchesUpstreamParent": true,
+        "afterExactlyMatchesUpstreamMain": true
+      },
+      {
+        "path": "shared/i18n/en.ts",
+        "production": true,
+        "originalBranchHead": {
+          "bytes": 138699,
+          "sha256": "3c95aeb00655faffacde35de59a99fc405a9d0712be6c859371cb3c343a6dbb8"
+        },
+        "upstreamParent": {
+          "bytes": 138699,
+          "sha256": "3c95aeb00655faffacde35de59a99fc405a9d0712be6c859371cb3c343a6dbb8"
+        },
+        "upstreamMain": {
+          "bytes": 139272,
+          "sha256": "83cccbaec1107ad277f699f63c670d0fb238e8511c211f0485069b86db6bafa8"
+        },
+        "rebasedHead": {
+          "bytes": 139272,
+          "sha256": "83cccbaec1107ad277f699f63c670d0fb238e8511c211f0485069b86db6bafa8"
+        },
+        "workingTree": {
+          "bytes": 139272,
+          "sha256": "83cccbaec1107ad277f699f63c670d0fb238e8511c211f0485069b86db6bafa8"
+        },
+        "beforeMatchesUpstreamParent": true,
+        "afterExactlyMatchesUpstreamMain": true
+      },
+      {
+        "path": "shared/i18n/zh.ts",
+        "production": true,
+        "originalBranchHead": {
+          "bytes": 297552,
+          "sha256": "d1b102fa2e26304a35b2ca5d926766dc1853fcede3c173e6033f205274fb12b8"
+        },
+        "upstreamParent": {
+          "bytes": 297552,
+          "sha256": "d1b102fa2e26304a35b2ca5d926766dc1853fcede3c173e6033f205274fb12b8"
+        },
+        "upstreamMain": {
+          "bytes": 298145,
+          "sha256": "adf988d89617d34859a37d4f65d2c6c9193ba1aaef10d3e5fa9b1774201e9e66"
+        },
+        "rebasedHead": {
+          "bytes": 298145,
+          "sha256": "adf988d89617d34859a37d4f65d2c6c9193ba1aaef10d3e5fa9b1774201e9e66"
+        },
+        "workingTree": {
+          "bytes": 298145,
+          "sha256": "adf988d89617d34859a37d4f65d2c6c9193ba1aaef10d3e5fa9b1774201e9e66"
+        },
+        "beforeMatchesUpstreamParent": true,
+        "afterExactlyMatchesUpstreamMain": true
+      },
+      {
+        "path": "shared/moor/special-actions.ts",
+        "production": true,
+        "originalBranchHead": {
+          "bytes": 13304,
+          "sha256": "e6fc7f8b58c19ee4c76fd00787c22e7b32ebbeff148325caf4f4691f56df4652"
+        },
+        "upstreamParent": {
+          "bytes": 13304,
+          "sha256": "e6fc7f8b58c19ee4c76fd00787c22e7b32ebbeff148325caf4f4691f56df4652"
+        },
+        "upstreamMain": {
+          "bytes": 13320,
+          "sha256": "ee426b74516d477c2f4bf5292330afd150ee59a126e9a1ca54bdd90b1bb8de4f"
+        },
+        "rebasedHead": {
+          "bytes": 13320,
+          "sha256": "ee426b74516d477c2f4bf5292330afd150ee59a126e9a1ca54bdd90b1bb8de4f"
+        },
+        "workingTree": {
+          "bytes": 13320,
+          "sha256": "ee426b74516d477c2f4bf5292330afd150ee59a126e9a1ca54bdd90b1bb8de4f"
+        },
+        "beforeMatchesUpstreamParent": true,
+        "afterExactlyMatchesUpstreamMain": true
+      }
+    ],
+    "benchmarkAndFixtureFiles": [
+      {
+        "path": "scripts/bench/broadcast-performance.ts",
+        "acceptedOriginal": null,
+        "originalBranchHead": {
+          "bytes": 8587,
+          "sha256": "5a6ddf9b655bf022e0f915698aa03d757effc954dfdfbf8e2441428a2935006b"
+        },
+        "rebasedHead": {
+          "bytes": 8587,
+          "sha256": "5a6ddf9b655bf022e0f915698aa03d757effc954dfdfbf8e2441428a2935006b"
+        },
+        "workingTree": {
+          "bytes": 8587,
+          "sha256": "5a6ddf9b655bf022e0f915698aa03d757effc954dfdfbf8e2441428a2935006b"
+        },
+        "unchangedByRebase": true,
+        "changedAfterOriginalAcceptance": true,
+        "explanation": "Added by later retained experiment tooling; not part of the original accepted #941 timing harness."
+      },
+      {
+        "path": "scripts/bench/fixtures/room-performance/2p.json",
+        "acceptedOriginal": {
+          "bytes": 59116,
+          "sha256": "bd848b37600e4741b1a9f9293cecd216a0bdadcaaa6e1e0b749ebd07b223c43d"
+        },
+        "originalBranchHead": {
+          "bytes": 59116,
+          "sha256": "bd848b37600e4741b1a9f9293cecd216a0bdadcaaa6e1e0b749ebd07b223c43d"
+        },
+        "rebasedHead": {
+          "bytes": 59116,
+          "sha256": "bd848b37600e4741b1a9f9293cecd216a0bdadcaaa6e1e0b749ebd07b223c43d"
+        },
+        "workingTree": {
+          "bytes": 59116,
+          "sha256": "bd848b37600e4741b1a9f9293cecd216a0bdadcaaa6e1e0b749ebd07b223c43d"
+        },
+        "unchangedByRebase": true,
+        "originalMeasuredSha256": "bd848b37600e4741b1a9f9293cecd216a0bdadcaaa6e1e0b749ebd07b223c43d",
+        "acceptedCommitMatchesOriginalMeasurement": true,
+        "currentMatchesOriginalMeasurement": true,
+        "changedAfterOriginalAcceptance": false
+      },
+      {
+        "path": "scripts/bench/fixtures/room-performance/4p-late.json",
+        "acceptedOriginal": null,
+        "originalBranchHead": {
+          "bytes": 451263,
+          "sha256": "dac17354c5fe8ddeb1970a9b77c410a03409d7210df31dd7aa83513d042fe947"
+        },
+        "rebasedHead": {
+          "bytes": 451263,
+          "sha256": "dac17354c5fe8ddeb1970a9b77c410a03409d7210df31dd7aa83513d042fe947"
+        },
+        "workingTree": {
+          "bytes": 451263,
+          "sha256": "dac17354c5fe8ddeb1970a9b77c410a03409d7210df31dd7aa83513d042fe947"
+        },
+        "unchangedByRebase": true,
+        "changedAfterOriginalAcceptance": true,
+        "explanation": "Added by later retained experiment tooling; not part of the original accepted #941 timing harness."
+      },
+      {
+        "path": "scripts/bench/fixtures/room-performance/4p-late.shape.json",
+        "acceptedOriginal": null,
+        "originalBranchHead": {
+          "bytes": 7872,
+          "sha256": "641179817ff2f38a7f070ce6e955601a353c5b7ef314c77a4c17c8f2df7064aa"
+        },
+        "rebasedHead": {
+          "bytes": 7872,
+          "sha256": "641179817ff2f38a7f070ce6e955601a353c5b7ef314c77a4c17c8f2df7064aa"
+        },
+        "workingTree": {
+          "bytes": 7872,
+          "sha256": "641179817ff2f38a7f070ce6e955601a353c5b7ef314c77a4c17c8f2df7064aa"
+        },
+        "unchangedByRebase": true,
+        "changedAfterOriginalAcceptance": true,
+        "explanation": "Added by later retained experiment tooling; not part of the original accepted #941 timing harness."
+      },
+      {
+        "path": "scripts/bench/fixtures/room-performance/4p.json",
+        "acceptedOriginal": {
+          "bytes": 84760,
+          "sha256": "92cac80740db8e00ab253c99249776aeb444f2a9e0ca2672ad06d9e81a1bc18c"
+        },
+        "originalBranchHead": {
+          "bytes": 84760,
+          "sha256": "92cac80740db8e00ab253c99249776aeb444f2a9e0ca2672ad06d9e81a1bc18c"
+        },
+        "rebasedHead": {
+          "bytes": 84760,
+          "sha256": "92cac80740db8e00ab253c99249776aeb444f2a9e0ca2672ad06d9e81a1bc18c"
+        },
+        "workingTree": {
+          "bytes": 84760,
+          "sha256": "92cac80740db8e00ab253c99249776aeb444f2a9e0ca2672ad06d9e81a1bc18c"
+        },
+        "unchangedByRebase": true,
+        "originalMeasuredSha256": "92cac80740db8e00ab253c99249776aeb444f2a9e0ca2672ad06d9e81a1bc18c",
+        "acceptedCommitMatchesOriginalMeasurement": true,
+        "currentMatchesOriginalMeasurement": true,
+        "changedAfterOriginalAcceptance": false
+      },
+      {
+        "path": "scripts/bench/late-game-capacity.ts",
+        "acceptedOriginal": null,
+        "originalBranchHead": {
+          "bytes": 12837,
+          "sha256": "edcd8b8b250ccebebc97fe452500757d07dd653e77cd8ab978f231aee7e19c21"
+        },
+        "rebasedHead": {
+          "bytes": 12837,
+          "sha256": "edcd8b8b250ccebebc97fe452500757d07dd653e77cd8ab978f231aee7e19c21"
+        },
+        "workingTree": {
+          "bytes": 12837,
+          "sha256": "edcd8b8b250ccebebc97fe452500757d07dd653e77cd8ab978f231aee7e19c21"
+        },
+        "unchangedByRebase": true,
+        "changedAfterOriginalAcceptance": true,
+        "explanation": "Added by later retained experiment tooling; not part of the original accepted #941 timing harness."
+      },
+      {
+        "path": "scripts/bench/late-game-workload.ts",
+        "acceptedOriginal": null,
+        "originalBranchHead": {
+          "bytes": 17586,
+          "sha256": "62840fd4d5267d40f1a1ebdbe06c67d79cb14a52a351cf2db90e276309315af6"
+        },
+        "rebasedHead": {
+          "bytes": 17586,
+          "sha256": "62840fd4d5267d40f1a1ebdbe06c67d79cb14a52a351cf2db90e276309315af6"
+        },
+        "workingTree": {
+          "bytes": 17586,
+          "sha256": "62840fd4d5267d40f1a1ebdbe06c67d79cb14a52a351cf2db90e276309315af6"
+        },
+        "unchangedByRebase": true,
+        "changedAfterOriginalAcceptance": true,
+        "explanation": "Added by later retained experiment tooling; not part of the original accepted #941 timing harness."
+      },
+      {
+        "path": "scripts/bench/room-capacity.ts",
+        "acceptedOriginal": {
+          "bytes": 35088,
+          "sha256": "2a6e883f70e7729d19b4086b21be541eb2cdfa61c4265893f34d4bbc948645a5"
+        },
+        "originalBranchHead": {
+          "bytes": 35088,
+          "sha256": "2a6e883f70e7729d19b4086b21be541eb2cdfa61c4265893f34d4bbc948645a5"
+        },
+        "rebasedHead": {
+          "bytes": 35088,
+          "sha256": "2a6e883f70e7729d19b4086b21be541eb2cdfa61c4265893f34d4bbc948645a5"
+        },
+        "workingTree": {
+          "bytes": 35088,
+          "sha256": "2a6e883f70e7729d19b4086b21be541eb2cdfa61c4265893f34d4bbc948645a5"
+        },
+        "unchangedByRebase": true,
+        "originalMeasuredSha256": "2a6e883f70e7729d19b4086b21be541eb2cdfa61c4265893f34d4bbc948645a5",
+        "acceptedCommitMatchesOriginalMeasurement": true,
+        "currentMatchesOriginalMeasurement": true,
+        "changedAfterOriginalAcceptance": false
+      },
+      {
+        "path": "scripts/bench/room-commit-acceptance.ts",
+        "acceptedOriginal": {
+          "bytes": 5998,
+          "sha256": "b2c6270c4d48cfde69d7259d678a9349043b48ae150af63d8ea05d2226a0a981"
+        },
+        "originalBranchHead": {
+          "bytes": 5998,
+          "sha256": "b2c6270c4d48cfde69d7259d678a9349043b48ae150af63d8ea05d2226a0a981"
+        },
+        "rebasedHead": {
+          "bytes": 5998,
+          "sha256": "b2c6270c4d48cfde69d7259d678a9349043b48ae150af63d8ea05d2226a0a981"
+        },
+        "workingTree": {
+          "bytes": 5998,
+          "sha256": "b2c6270c4d48cfde69d7259d678a9349043b48ae150af63d8ea05d2226a0a981"
+        },
+        "unchangedByRebase": true,
+        "originalMeasuredSha256": "b2c6270c4d48cfde69d7259d678a9349043b48ae150af63d8ea05d2226a0a981",
+        "acceptedCommitMatchesOriginalMeasurement": true,
+        "currentMatchesOriginalMeasurement": true,
+        "changedAfterOriginalAcceptance": false
+      },
+      {
+        "path": "scripts/bench/room-commit-equivalence.ts",
+        "acceptedOriginal": {
+          "bytes": 1785,
+          "sha256": "b3ddeedb539bb3195faedca03c6552456709d7f7ae4da9856c4ace6c7e399d1b"
+        },
+        "originalBranchHead": {
+          "bytes": 1785,
+          "sha256": "b3ddeedb539bb3195faedca03c6552456709d7f7ae4da9856c4ace6c7e399d1b"
+        },
+        "rebasedHead": {
+          "bytes": 1785,
+          "sha256": "b3ddeedb539bb3195faedca03c6552456709d7f7ae4da9856c4ace6c7e399d1b"
+        },
+        "workingTree": {
+          "bytes": 1785,
+          "sha256": "b3ddeedb539bb3195faedca03c6552456709d7f7ae4da9856c4ace6c7e399d1b"
+        },
+        "unchangedByRebase": true,
+        "originalMeasuredSha256": "b3ddeedb539bb3195faedca03c6552456709d7f7ae4da9856c4ace6c7e399d1b",
+        "acceptedCommitMatchesOriginalMeasurement": true,
+        "currentMatchesOriginalMeasurement": true,
+        "changedAfterOriginalAcceptance": false
+      },
+      {
+        "path": "scripts/bench/room-cpu-attribution.ts",
+        "acceptedOriginal": {
+          "bytes": 3256,
+          "sha256": "11bcdb91ebe4c1d5f577d1d72badabcd90f96657d3ca69f5b34d11cbd46e33e7"
+        },
+        "originalBranchHead": {
+          "bytes": 3256,
+          "sha256": "11bcdb91ebe4c1d5f577d1d72badabcd90f96657d3ca69f5b34d11cbd46e33e7"
+        },
+        "rebasedHead": {
+          "bytes": 3256,
+          "sha256": "11bcdb91ebe4c1d5f577d1d72badabcd90f96657d3ca69f5b34d11cbd46e33e7"
+        },
+        "workingTree": {
+          "bytes": 3256,
+          "sha256": "11bcdb91ebe4c1d5f577d1d72badabcd90f96657d3ca69f5b34d11cbd46e33e7"
+        },
+        "unchangedByRebase": true,
+        "originalMeasuredSha256": "11bcdb91ebe4c1d5f577d1d72badabcd90f96657d3ca69f5b34d11cbd46e33e7",
+        "acceptedCommitMatchesOriginalMeasurement": true,
+        "currentMatchesOriginalMeasurement": true,
+        "changedAfterOriginalAcceptance": false
+      },
+      {
+        "path": "scripts/bench/room-performance.ts",
+        "acceptedOriginal": {
+          "bytes": 13610,
+          "sha256": "e93e59b8fcabd21ff3fc1631128e741864d6d1bf7db236b9fedc7ffce58581a0"
+        },
+        "originalBranchHead": {
+          "bytes": 14980,
+          "sha256": "d6b5e9136990a68cc7bb0fa8e92b9f953357f577255ce98a48c7d832c8d0eaa5"
+        },
+        "rebasedHead": {
+          "bytes": 14980,
+          "sha256": "d6b5e9136990a68cc7bb0fa8e92b9f953357f577255ce98a48c7d832c8d0eaa5"
+        },
+        "workingTree": {
+          "bytes": 14980,
+          "sha256": "d6b5e9136990a68cc7bb0fa8e92b9f953357f577255ce98a48c7d832c8d0eaa5"
+        },
+        "unchangedByRebase": true,
+        "originalMeasuredSha256": "e93e59b8fcabd21ff3fc1631128e741864d6d1bf7db236b9fedc7ffce58581a0",
+        "acceptedCommitMatchesOriginalMeasurement": true,
+        "currentMatchesOriginalMeasurement": false,
+        "changedAfterOriginalAcceptance": true,
+        "explanation": "Later retained benchmark support adds packet/seat accounting, command samples, matched/override name mode, Session disposal, and compatibility with a prototype committed serializedState. It predates rebase and is byte-identical to original branch HEAD; do not use its current hash as the original #941 timing harness hash."
+      },
+      {
+        "path": "scripts/bench/room-write-trace.ts",
+        "acceptedOriginal": {
+          "bytes": 2632,
+          "sha256": "2a5456103d2717011bbc552a1aa04bae9e213575fa620bcf18b89786b7b5b369"
+        },
+        "originalBranchHead": {
+          "bytes": 2632,
+          "sha256": "2a5456103d2717011bbc552a1aa04bae9e213575fa620bcf18b89786b7b5b369"
+        },
+        "rebasedHead": {
+          "bytes": 2632,
+          "sha256": "2a5456103d2717011bbc552a1aa04bae9e213575fa620bcf18b89786b7b5b369"
+        },
+        "workingTree": {
+          "bytes": 2632,
+          "sha256": "2a5456103d2717011bbc552a1aa04bae9e213575fa620bcf18b89786b7b5b369"
+        },
+        "unchangedByRebase": true,
+        "originalMeasuredSha256": "2a5456103d2717011bbc552a1aa04bae9e213575fa620bcf18b89786b7b5b369",
+        "acceptedCommitMatchesOriginalMeasurement": true,
+        "currentMatchesOriginalMeasurement": true,
+        "changedAfterOriginalAcceptance": false
+      },
+      {
+        "path": "scripts/bench/terminal-room-stress.ts",
+        "acceptedOriginal": {
+          "bytes": 4662,
+          "sha256": "f48b0067540c639e9e8413c031e749ed213aa186a02552a65073aee130ff2b6d"
+        },
+        "originalBranchHead": {
+          "bytes": 4662,
+          "sha256": "f48b0067540c639e9e8413c031e749ed213aa186a02552a65073aee130ff2b6d"
+        },
+        "rebasedHead": {
+          "bytes": 4662,
+          "sha256": "f48b0067540c639e9e8413c031e749ed213aa186a02552a65073aee130ff2b6d"
+        },
+        "workingTree": {
+          "bytes": 4662,
+          "sha256": "f48b0067540c639e9e8413c031e749ed213aa186a02552a65073aee130ff2b6d"
+        },
+        "unchangedByRebase": true,
+        "changedAfterOriginalAcceptance": false
+      },
+      {
+        "path": "scripts/bench/tsconfig.performance.json",
+        "acceptedOriginal": null,
+        "originalBranchHead": {
+          "bytes": 241,
+          "sha256": "e1c9ff3f65c4f2d6c26e6a9ff1b76632ce7d515b1544ceaf4cf03b22dea7f623"
+        },
+        "rebasedHead": {
+          "bytes": 241,
+          "sha256": "e1c9ff3f65c4f2d6c26e6a9ff1b76632ce7d515b1544ceaf4cf03b22dea7f623"
+        },
+        "workingTree": {
+          "bytes": 241,
+          "sha256": "e1c9ff3f65c4f2d6c26e6a9ff1b76632ce7d515b1544ceaf4cf03b22dea7f623"
+        },
+        "unchangedByRebase": true,
+        "changedAfterOriginalAcceptance": true,
+        "explanation": "Added by later retained experiment tooling; not part of the original accepted #941 timing harness."
+      }
+    ],
+    "workingTreeStatusAtStart": [
+      " M docs/performance/replay-room-capacity.md",
+      " M server/game/__tests__/private-cursor-comparison.test.ts",
+      " M server/game/__tests__/room-committer-frame-isolation.test.ts",
+      "?? docs/performance/room-reference-codec-results.json"
+    ],
+    "scope": [
+      "Read-only source identity comparison, not a new performance/correctness acceptance run.",
+      "Production selection is shared/server/client/replay-viewer plus restart-local.sh, excluding test/spec paths.",
+      "The 15 original optimization files are compared to the historical measured per-file manifest, accepted original commit, original branch HEAD, rebased HEAD and current working files.",
+      "All 15 whole-tree differences between original branch HEAD and rebased HEAD exactly equal the Moor/localization upstream commit, including its tests; those upstream changes are not claimed performance-neutral.",
+      "Uncommitted documentation and test changes are recorded, not silently called a clean worktree or part of timing evidence.",
+      "Historical benchmark results retain their original source/harness/fixture identities; source equality does not turn a later rebase runtime into a newly measured performance population."
+    ],
+    "reproduction": {
+      "script": "/tmp/open-agricola-pr941.lj2a1ypz/compare-rebase-sources.py",
+      "sha256": "850029fe4ac45bfea4d2aa6b1199081091393bc7d2afea7d776791e4edbab6b9",
+      "command": "python3 /tmp/open-agricola-pr941.lj2a1ypz/compare-rebase-sources.py",
+      "method": "Read git show REV:PATH bytes and working files; SHA-256 exact bytes. Derive original production set from c415955c^..c415955c and compare it to the recorded manifest and origin/main..HEAD. Compare original/rebased git diff --binary bytes. No Git mutation."
+    }
+  },
+  "validatedTestFixtureAdjustments": [
+    {
+      "path": "server/game/__tests__/private-cursor-comparison.test.ts",
+      "sha256": "e4b205d80e3446ca9a034b8de2f4e4e9495a8f2378574ddb9620f4ec55e784d2"
+    },
+    {
+      "path": "server/game/__tests__/room-committer-frame-isolation.test.ts",
+      "sha256": "f31e1482634f126438ccfe5437aa9e724921067a97eea2e5e22b296dd8fe6b54"
+    }
+  ],
+  "fixtureAdjustmentReason": "The first full architecture run rejected three direct test-log writes. Use prependDerivedLogEntries for Session logs and a separate producer-owned params reference for the synthetic ownership test. No production or benchmark input changed; all full CI steps subsequently passed.",
+  "runtime": {
+    "node": "v24.19.0",
+    "pnpm": "10.33.0"
+  },
+  "installation": {
+    "command": "pnpm install --frozen-lockfile",
+    "exitCode": 0,
+    "logIdentity": {
+      "path": "/tmp/open-agricola-pr941.lj2a1ypz/install.log",
+      "bytes": 1074,
+      "sha256": "1070e2528def3dbc2b743b3e4de89c2014af3afd25528a9bdbad540b162f566b"
+    }
+  },
+  "liveVerification": {
+    "restartCommand": "BACKEND_PORT=5475 FRONTEND_PORT=5473 SHARED_DATA_DIR=<isolated>/dev-data SHARED_OUTPUT_DIR=<isolated>/dev-output REPLAY_VIEWER_BUILD_ID=d5a5cbfbae135f8e50399bde0b032dbe86a6a4273bd9f00a74cd65be74936ee5 ./restart-local.sh",
+    "exitCode": 0,
+    "restartLog": {
+      "path": "/tmp/open-agricola-pr941.lj2a1ypz/restart-fixture-fix-isolated.log",
+      "bytes": 4285,
+      "sha256": "a48392bdedccd81c7e093a3406a9c26bab527c24a9cb317be40f7afced786d7b"
+    },
+    "smokeScript": {
+      "path": "/tmp/open-agricola-pr941.lj2a1ypz/live-smoke.mjs",
+      "bytes": 2436,
+      "sha256": "45b924d0a239673b2a620ac5bcad6d9210c0466b6fa9cb8e5c55360727e937d1"
+    },
+    "smokeResult": {
+      "health": 200,
+      "frontend": 200,
+      "players": 4,
+      "version": 1,
+      "historyBranch": "a7bfd7f5-bea0-4f9e-93a8-de3d0e1adde4.22641899-329b-44f5-8d99-ba4733998f2e.5ec76d51-6a1b-4364-8ff7-b76d4359247a.p1",
+      "privateHandsMasked": true,
+      "packets": 5
+    },
+    "assertions": [
+      "backend health HTTP 200",
+      "frontend HTTP 200",
+      "real WebSocket dev4 join",
+      "devSetResources command succeeds and broadcasts food=21",
+      "other seats private hands masked and seed absent",
+      "history page branch matches committed history window"
+    ],
+    "limits": "CLI HTTP/WS checks; no new browser E2E run. Earlier browser undo/rename/reconnect evidence stays in the historical accepted report."
+  },
+  "exactEquivalence": {
+    "command": "node --import tsx scripts/bench/room-commit-equivalence.ts scripts/bench/fixtures/room-performance <output>.jsonl",
+    "exitCode": 0,
+    "trace": {
+      "path": "/tmp/open-agricola-pr941.lj2a1ypz/rebased-equivalence.jsonl",
+      "bytes": 94476226,
+      "sha256": "d6aed42bf888b215b9b032bf53add04ed61a329c529b1e4cde269e44750df9df"
+    },
+    "comparison": "Byte-identical to the frozen baseline and accepted original final trace",
+    "originalAcceptedTrace": {
+      "path": "/tmp/open-agricola-941.LSAN63/runs/final-equivalence.jsonl",
+      "bytes": 94476226,
+      "sha256": "d6aed42bf888b215b9b032bf53add04ed61a329c529b1e4cde269e44750df9df"
+    },
+    "log": {
+      "path": "/tmp/open-agricola-pr941.lj2a1ypz/equivalence.log",
+      "bytes": 1861,
+      "sha256": "62cdbaec7dc4d66df7d5cfd978cb3ceed80377c0f1a9398a1b047ff126f36907"
+    },
+    "scope": "Complete two-/four-player fixed stock command traces: raw Frame, canonical hash, private cursor, Replay Step and commit classification."
+  },
+  "localCI": {
+    "allFinalStepsPassed": true,
+    "attempts": [
+      {
+        "step": "architecture",
+        "command": [
+          "pnpm",
+          "run",
+          "check:architecture"
+        ],
+        "exitCode": 1,
+        "seconds": 32.23951552808285,
+        "log": "/tmp/open-agricola-pr941.lj2a1ypz/ci/architecture-1.log",
+        "logIdentity": {
+          "path": "/tmp/open-agricola-pr941.lj2a1ypz/ci/architecture-1.log",
+          "bytes": 124051,
+          "sha256": "70d51956df2a82093b3c2cbdc9856d8d8499cc454a31622010675dcbacfff718"
+        }
+      },
+      {
+        "step": "architecture",
+        "command": [
+          "pnpm",
+          "run",
+          "check:architecture"
+        ],
+        "exitCode": 0,
+        "seconds": 51.15192533005029,
+        "log": "/tmp/open-agricola-pr941.lj2a1ypz/ci/architecture-2.log",
+        "logIdentity": {
+          "path": "/tmp/open-agricola-pr941.lj2a1ypz/ci/architecture-2.log",
+          "bytes": 140441,
+          "sha256": "e99ca0cac75e6d667e34bfab28e43117acac79fe08d92b42952d30d79852f5d5"
+        }
+      },
+      {
+        "step": "i18n",
+        "command": [
+          "pnpm",
+          "run",
+          "lint:i18n"
+        ],
+        "exitCode": 0,
+        "seconds": 1.2668729810975492,
+        "log": "/tmp/open-agricola-pr941.lj2a1ypz/ci/i18n-1.log",
+        "logIdentity": {
+          "path": "/tmp/open-agricola-pr941.lj2a1ypz/ci/i18n-1.log",
+          "bytes": 201,
+          "sha256": "53cf77000a786de7b742d925d163cf5208b0167e31d82e4f225a89e96e162a45"
+        }
+      },
+      {
+        "step": "tests",
+        "command": [
+          "pnpm",
+          "test"
+        ],
+        "exitCode": 0,
+        "seconds": 60.08705119928345,
+        "log": "/tmp/open-agricola-pr941.lj2a1ypz/ci/tests-1.log",
+        "logIdentity": {
+          "path": "/tmp/open-agricola-pr941.lj2a1ypz/ci/tests-1.log",
+          "bytes": 5686,
+          "sha256": "a3438f336870b3214be646a95c5a74cde8610524ac1b884ca377b0a186e48b76"
+        }
+      },
+      {
+        "step": "llm",
+        "command": [
+          "pnpm",
+          "test:llm"
+        ],
+        "exitCode": 0,
+        "seconds": 5.968539881985635,
+        "log": "/tmp/open-agricola-pr941.lj2a1ypz/ci/llm-1.log",
+        "logIdentity": {
+          "path": "/tmp/open-agricola-pr941.lj2a1ypz/ci/llm-1.log",
+          "bytes": 317,
+          "sha256": "aa3cb283b310585f61b16d61790414066d077d7ba60e2f3aa7f05e0a90f19420"
+        }
+      },
+      {
+        "step": "build",
+        "command": [
+          "pnpm",
+          "run",
+          "build"
+        ],
+        "exitCode": 0,
+        "seconds": 22.681016772054136,
+        "log": "/tmp/open-agricola-pr941.lj2a1ypz/ci/build-1.log",
+        "logIdentity": {
+          "path": "/tmp/open-agricola-pr941.lj2a1ypz/ci/build-1.log",
+          "bytes": 7874,
+          "sha256": "a9bf43d716c62fa8f523a9817edf8dfad3ca773a8509559b2fe8184e3f5aca09"
+        }
+      },
+      {
+        "step": "replay-viewer",
+        "command": [
+          "pnpm",
+          "run",
+          "build:replay-viewer"
+        ],
+        "exitCode": 0,
+        "seconds": 2.0266303080134094,
+        "log": "/tmp/open-agricola-pr941.lj2a1ypz/ci/replay-viewer-1.log",
+        "logIdentity": {
+          "path": "/tmp/open-agricola-pr941.lj2a1ypz/ci/replay-viewer-1.log",
+          "bytes": 7533,
+          "sha256": "5d03aa63ede06b710ef9008b51b4cc025323c20f6bb4562dd21ee7b87c926080"
+        }
+      },
+      {
+        "step": "bundle-size",
+        "command": [
+          "pnpm",
+          "run",
+          "check:bundle-size"
+        ],
+        "exitCode": 0,
+        "seconds": 0.37774722883477807,
+        "log": "/tmp/open-agricola-pr941.lj2a1ypz/ci/bundle-size-1.log",
+        "logIdentity": {
+          "path": "/tmp/open-agricola-pr941.lj2a1ypz/ci/bundle-size-1.log",
+          "bytes": 995,
+          "sha256": "74d527eba42965bbdcdfcc38e59c1f0599fea72c87023fb42e632aaef673561f"
+        }
+      },
+      {
+        "step": "community-deck",
+        "command": [
+          "pnpm",
+          "run",
+          "check:community-deck"
+        ],
+        "exitCode": 0,
+        "seconds": 8.508897283114493,
+        "log": "/tmp/open-agricola-pr941.lj2a1ypz/ci/community-deck-1.log",
+        "logIdentity": {
+          "path": "/tmp/open-agricola-pr941.lj2a1ypz/ci/community-deck-1.log",
+          "bytes": 422,
+          "sha256": "d56fc87dd5ba457140ff62e0b6c31a8a5400f279b38e31ab0851a840c946d180"
+        }
+      }
+    ],
+    "unitSessionTests": {
+      "filesPassed": 1468,
+      "testsPassed": 13760,
+      "skipped": 3,
+      "todo": 1,
+      "includesFastAndSlow": true
+    },
+    "llmGoldenTests": {
+      "filesPassed": 7,
+      "testsPassed": 64
+    },
+    "lint": {
+      "errors": 0,
+      "warnings": 456
+    },
+    "dependencyChecks": {
+      "files": 1649,
+      "runtimeCycles": 0,
+      "boundaryErrors": 0
+    },
+    "communityDeck": {
+      "filesPassed": 16,
+      "testsPassed": 95
+    }
+  },
+  "review": {
+    "fixedPoint": "450b72ce9e3246e8e1e328cb15da15f2bd358d9d",
+    "standardsFindings": 0,
+    "specFindings": 0,
+    "note": "Independent reviews before fixture conformance cleanup; gate arithmetic and final PR narrative separately audited."
+  },
+  "githubActions": {
+    "configuration": "ci.yml, ci-full.yml and e2e.yml are workflow_dispatch-only",
+    "policySource": "docs/operations/ci-checks.md",
+    "localCIIsMergeEvidence": true,
+    "note": "Do not report cloud checks as passing when no run exists; check the final pushed head separately."
+  },
+  "reproducibilityLimits": [
+    "Performance tables retain their original source/fixture manifests; this report is correctness/CI evidence after rebase, not a new timing population.",
+    "Log files and the 94 MB trace are local artifacts identified by byte count and SHA-256; raw timing/write reports remain in the separately committed result JSONs.",
+    "No merge, release or deployment was performed."
+  ]
+}
