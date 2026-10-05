@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { markAllWorkersUsed } from '../../shared/domain/player'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 const findCardFor = (
   session: GameSession,
@@ -23,6 +24,27 @@ const actionDetailFor = (session: GameSession, action: string) =>
   )
 
 describe('Farmers of the Moor special actions', () => {
+  // Shared base values also feed the localized card diagrams. Exercise actual
+  // payments and gains through GameSession, including the solo/3-player variants.
+  it.each([
+    [1, 1, 0], [2, 1, 1], [3, 2, 0], [4, 1, 0], [5, 1, 1], [6, 1, 1],
+  ])('applies the printed base resources for %i players', (playerCount, hiringFood, horseCost) => {
+    for (const actionId of ['hiring-fair', 'horse-market'] as const) {
+      const session = new GameSession(958, undefined, {
+        playerCount, enableFarmersOfTheMoor: true, allowIncompleteFarmersOfTheMoorMinorDeal: true,
+      })
+      stabilizeRandomHands(session.state.players)
+      const player = session.state.players[0]!
+      player.resources.food = 5
+      const card = findCardFor(session, actionId)
+      const response = session.takeSpecialAction(0, card.id, actionId)
+
+      expect(response.ok).toBe(true)
+      expect(response.state.players[0]!.resources.food).toBe(5 + (actionId === 'hiring-fair' ? hiringFood : -horseCost))
+      if (actionId === 'horse-market') expect(response.state.players[0]!.resources.horse).toBe(1)
+    }
+  })
+
   it('sets up public special action cards for the two-player scanned cards', () => {
     const session = new GameSession(41, undefined, {
       playerCount: 2,

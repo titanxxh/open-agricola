@@ -2,7 +2,8 @@ import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
 import type { SerializedPlayerState } from '../../../shared/session/serialization'
 import type { MoorSpecialActionCardState, MoorSpecialActionId } from '../../../shared/moor/types'
-import { publicAssetUrl } from '../../utils/public-asset-url'
+import { moorSpecialActionBaseResources } from '../../../shared/domain/moor-special-action-values'
+import { ResourceLine } from '../common/ResourceLine'
 
 type SelectedSpecialAction = {
   cardId: string
@@ -11,6 +12,7 @@ type SelectedSpecialAction = {
 
 type SpecialActionsPanelProps = {
   locale: Locale
+  playerCount: number
   cards: MoorSpecialActionCardState[]
   currentPlayerId: string
   availability: SerializedPlayerState['moorSpecialActionAvailability']
@@ -21,6 +23,35 @@ type SpecialActionsPanelProps = {
 
 const specialActionLabel = (locale: Locale, actionId: MoorSpecialActionId) =>
   t(locale, `moor.specialActions.${actionId}`)
+
+function SpecialActionEffect({ locale, actionId, playerCount, id }: {
+  locale: Locale
+  actionId: MoorSpecialActionId
+  playerCount: number
+  id: string
+}) {
+  const { cost, gain } = moorSpecialActionBaseResources(actionId, playerCount)
+  const terrain = actionId === 'cut-peat' ? 'moor'
+    : actionId === 'fell-trees' || actionId === 'slash-and-burn' ? 'forest' : null
+  const improvement = actionId === 'black-market' ? 'minor' : actionId === 'illicit-work' ? 'major' : null
+  const resultIcon = improvement ?? (actionId === 'slash-and-burn' ? 'field' : null)
+  const hasInput = terrain !== null || Object.values(cost).some((amount) => amount > 0)
+  const description = t(locale, `moor.specialActions.effects.${actionId}`, {
+    ...gain, foodCost: cost.food ?? 0, fuelCost: cost.fuel ?? 0,
+  })
+
+  return (
+    <span id={id} className="special-action-card__effect" role="img" aria-label={description}>
+      <span className="special-action-card__diagram" aria-hidden="true">
+        {terrain && <span className="special-action-card__token"><span className={`res-icon res-icon-${terrain}`} />1</span>}
+        <ResourceLine locale={locale} resources={cost} mode="payment" />
+        {hasInput ? <span className="res-icon res-icon-arrow" /> : <span>+</span>}
+        {resultIcon && <span className="special-action-card__token"><span className={`res-icon res-icon-${resultIcon}`} />1</span>}
+        <ResourceLine locale={locale} resources={gain} mode="payment" />
+      </span>
+    </span>
+  )
+}
 
 const locationLabel = (
   locale: Locale,
@@ -37,6 +68,7 @@ const locationLabel = (
 
 export function SpecialActionsPanel({
   locale,
+  playerCount,
   cards,
   currentPlayerId,
   availability,
@@ -56,29 +88,40 @@ export function SpecialActionsPanel({
           return (
             <div
               key={card.id}
+              data-card-id={card.id}
+              role="group"
+              aria-label={cardLabel}
               className={`special-action-card${cardUsable ? '' : ' special-action-card--disabled'}`}
             >
-              <div className="special-action-card__image-wrap">
-                <img className="special-action-card__image" src={publicAssetUrl(card.image)} alt={cardLabel} />
-                <div className={`special-action-card__image-actions action-count-${card.actions.length}`}>
-                  {card.actions.map((actionId) => {
-                    const label = specialActionLabel(locale, actionId)
-                    const available = cardUsable && canTakeSpecialAction(card, actionId)
-                    const isSelected = selected?.cardId === card.id && selected.actionId === actionId
-                    return (
-                      <button
-                        key={`${card.id}:${actionId}`}
-                        type="button"
-                        className={`special-action-card__image-action${isSelected ? ' selected' : ''}`}
-                        disabled={!available}
-                        aria-label={label}
-                        aria-pressed={isSelected}
-                        title={label}
-                        onClick={() => onTakeAction(card.id, actionId)}
-                      />
-                    )
-                  })}
-                </div>
+              <div className="special-action-card__players">
+                {t(locale, 'moor.specialActions.players', { count: card.players.join('/') })}
+              </div>
+              <div className="special-action-card__actions">
+                {card.actions.map((actionId) => {
+                  const label = specialActionLabel(locale, actionId)
+                  const available = cardUsable && canTakeSpecialAction(card, actionId)
+                  const isSelected = selected?.cardId === card.id && selected.actionId === actionId
+                  const effectId = `${card.id}-${actionId}-effect`
+                  return (
+                    <button
+                      key={`${card.id}:${actionId}`}
+                      type="button"
+                      className={`special-action-card__action${isSelected ? ' selected' : ''}`}
+                      disabled={!available}
+                      aria-label={label}
+                      aria-pressed={isSelected}
+                      aria-describedby={effectId}
+                      title={label}
+                      onClick={() => onTakeAction(card.id, actionId)}
+                    >
+                      <span className="special-action-card__action-label">{label}</span>
+                      <SpecialActionEffect locale={locale} actionId={actionId} playerCount={playerCount} id={effectId} />
+                      {(actionId === 'black-market' || actionId === 'illicit-work') && (
+                        <span className="special-action-card__note">{t(locale, 'moor.specialActions.improvementCost')}</span>
+                      )}
+                    </button>
+                  )
+                })}
               </div>
               <div className="special-action-card__status">
                 {locationLabel(locale, card, currentPlayerId)}

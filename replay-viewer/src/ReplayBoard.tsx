@@ -342,6 +342,7 @@ export function ReplayBoard({
         <section className="replay-board__action">
           <SpecialActionsPanel
             locale={locale}
+            playerCount={state.players.length}
             cards={state.farmersOfTheMoor.specialActionCards}
             currentPlayerId={currentPlayer.id}
             availability={currentPlayer.moorSpecialActionAvailability}

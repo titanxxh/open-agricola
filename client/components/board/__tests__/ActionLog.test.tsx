@@ -7,6 +7,39 @@ import { eventsToLogEntries } from '../../../../shared/events/log-mapper'
 import { buildActionLogTimelineRows } from '../../../app/action-log-timeline'
 import { ActionLog } from '../ActionLog'
 
+it.each([
+  ['zh', 'sow', 'D175_Countryman', '播种'],
+  ['en', 'sow', 'D175_Countryman', 'Sow'],
+  ['zh', 'construct', 'D128_BuildingTycoon', '扩建房屋'],
+  ['en', 'construct', 'D128_BuildingTycoon', 'Build Rooms'],
+  ['zh', 'fence', 'A150_Stagehand', '围栏'],
+  ['en', 'fence', 'A150_Stagehand', 'Fencing'],
+] as const)('localizes granted %s action %s in the rendered log', (locale, actionId, cardId, actionName) => {
+  const event: GameEvent = {
+    schemaVersion: 1, id: 'granted', seq: 1, round: 1, phase: 'work', visibility: 'public',
+    type: 'action.granted', actorPlayerId: 'p2', playerId: 'p2', actionId, cardId,
+  }
+  const log = eventsToLogEntries([event], { playerNames: { p2: 'Alice' } })
+  const originalLog = structuredClone(log)
+  const playerNames = { p2: 'Alice' }
+  const timelineBuckets = buildActionLogTimelineRows({
+    entries: [{ key: 'granted', kind: 'event', packetSeq: 1, packetLocalIndex: 0, event,
+      status: 'active', payloadSource: 'currentEvents', replayable: true }],
+    stateLog: log, currentRound: 1, locale, playerNames,
+  })
+  const { container, rerender } = render(<ActionLog locale={locale} log={log} currentRound={1}
+    playerNames={playerNames} timelineBuckets={timelineBuckets} />)
+
+  expect(container.querySelectorAll('li')).toHaveLength(1)
+  expect(container).toHaveTextContent(locale === 'zh' ? `的 ${actionName} 行动` : `gains ${actionName} action`)
+  expect(container).not.toHaveTextContent(new RegExp(`\\b${actionId}\\b`))
+  expect(log[0]!.params!.action).toBe(`actions.${actionId === 'fence' ? 'fencing' : actionId}.name`)
+  rerender(<ActionLog locale={locale === 'zh' ? 'en' : 'zh'} log={log} currentRound={1} />)
+  expect(container).not.toHaveTextContent(new RegExp(`\\b${actionId}\\b`))
+  expect(container).not.toHaveTextContent(/actions\.[\w-]+\.name|\{action\}/)
+  expect(log).toEqual(originalLog)
+})
+
 it('localizes both ends of a pass by identity and deduplicates the snapshot against its event', () => {
   const event: GameEvent = {
     schemaVersion: 1, id: 'pass', seq: 1, round: 1, phase: 'work', visibility: 'public',

@@ -109,8 +109,8 @@ test('workshop variants expose every action family as graphical boards', async (
 
   const moorSandbox = await configureAndStartSandbox(page, { seasons: false, moor: true })
   const specialActions = moorSandbox.locator('[aria-label="Special Actions"]')
-  const specialImages = specialActions.locator('.special-action-card__image')
-  await expect(specialImages).toHaveCount(2)
+  await expect(specialActions.locator('.special-action-card')).toHaveCount(2)
+  await expect(specialActions.getByRole('img', { name: 'Remove 1 moor to gain 3 fuel' })).toBeVisible()
   const cutPeat = specialActions.getByRole('button', { name: 'Cut Peat' })
   await expect(cutPeat).toBeEnabled()
   await cutPeat.click()
