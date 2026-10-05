@@ -22,6 +22,8 @@ import { executeWorkloadCommand, type RoomWorkload } from './room-performance.ts
 
 const flag = (key: string, fallback = '') => process.argv.includes(key) ? process.argv[process.argv.indexOf(key) + 1]! : fallback
 const fixture = flag('--fixture'), output = flag('--output')
+const nameMode = flag('--names', 'override')
+assert.ok(nameMode === 'matched' || nameMode === 'override', '--names must be matched or override')
 if (!fixture || !output) throw new Error('usage: late-game-capacity.ts --fixture <4p-late.json> --output <report.json> [--rooms 30] [--warmup-seconds 1] [--duration-seconds 5] [--action-rate 0.45125] [--keep-db]')
 const roomCount = Number(flag('--rooms', '30')), warmupSeconds = Number(flag('--warmup-seconds', '1'))
 const durationSeconds = Number(flag('--duration-seconds', '5')), rate = Number(flag('--action-rate', '0.45125'))
@@ -122,7 +124,8 @@ try {
   for (let index = 0; index < roomCount; index += 1) {
     const entry: Entry = { room: {} as Room, index: prefixCommands, due: 0, sent: 0, lastSend: 0 }
     const players = Array.from({ length: 4 }, (_, playerIndex) => {
-      const userId = `late-${index}-u${playerIndex}`, name = `P${playerIndex}`
+      const userId = `late-${index}-u${playerIndex}`
+      const name = nameMode === 'matched' ? selected.state.players[playerIndex]!.name : `P${playerIndex}`
       insertUser.run(userId, userId, name)
       const ws = { OPEN: 1, readyState: 1, send: () => { entry.sent += 1; entry.lastSend = performance.now() } } as unknown as WebSocket
       return { playerIndex, name, userId, ws }
@@ -149,7 +152,7 @@ try {
   const report = { schemaVersion: 1, node: process.version, ...limits,
     sourceCommit: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), harnessSha256: digest(readFileSync(new URL(import.meta.url))),
     fixture, fixtureSha256: digest(fixtureText), preparation: workload.preparation,
-    config: { roomCount, playersPerRoom: 4, warmupSeconds, durationSeconds, commandsPerRoomSecond: rate },
+    config: { roomCount, playersPerRoom: 4, nameMode, warmupSeconds, durationSeconds, commandsPerRoomSecond: rate },
     selection: { round: selected.state.round, prefixCommands, remainingCommandsPerRoom: workload.commands.length - prefixCommands,
       players: selected.state.players.map(player => ({ id: player.id, workers: familySize(player), played: new Set([...player.improvements, ...player.minorPlayed, ...player.occupationPlayed]).size })) },
     warmup, measurement: { ...measurement, elapsedMs, cpuUserMs: cpu.user / 1000, cpuSystemMs: cpu.system / 1000, cpuMs,
