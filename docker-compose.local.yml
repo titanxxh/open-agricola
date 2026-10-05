@@ -1,0 +1,20 @@
+name: open-agricola-local
+services:
+  postgres:
+    image: postgres:18-bookworm@sha256:3725f4e2499eef5134592b3b4ab79a543ed7f8e533b05b5b637af926630f6650
+    environment:
+      POSTGRES_USER: agricola
+      POSTGRES_PASSWORD: ${LOCAL_POSTGRES_PASSWORD:?Initialize local dependencies first}
+      POSTGRES_DB: agricola
+    ports:
+      - "127.0.0.1:${LOCAL_POSTGRES_PORT:-55432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agricola -d agricola"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+volumes:
+  postgres-data:

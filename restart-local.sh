@@ -493,6 +493,13 @@ if [ "$KILL_ONLY" -eq 1 ]; then
   exit 0
 fi
 
+echo "Preparing local dependencies..."
+SHARED_DATA_DIR="$SHARED_DATA_DIR" node "$SCRIPT_DIR/scripts/local-services.mjs"
+set -a
+# shellcheck disable=SC1090
+. "$SHARED_DATA_DIR/dependencies.local"
+set +a
+
 echo "Ensuring immutable replay viewer..."
 "$PNPM_BIN" run build:cards-manifest
 REPLAY_VIEWER_BUILD_ID="${REPLAY_VIEWER_BUILD_ID:-$(
