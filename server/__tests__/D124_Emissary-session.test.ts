@@ -4,6 +4,7 @@ import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { getCardStack } from '../../shared/cards/helpers/card-state'
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
 import type { Resource } from '../../shared/contract/types'
+import { expectPublicCardGoods } from './_helpers/card-public-presentation'
 
 import '../../shared/cards/D/D124_Emissary'
 
@@ -79,6 +80,7 @@ describe('D124_Emissary session', () => {
     expect(resp.state.events.filter((event) => event.type === 'resource.moved' && event.sourceCardId === 'D124_Emissary'))
       .toEqual([expect.objectContaining({ resources: { stone: 1 } })])
     expect(resp.interaction).toEqual(parent.interaction)
+    expectPublicCardGoods(session, 'D124_Emissary', { stack: ['wood'] })
   })
 
   it('excludes previously placed goods from the next activation', () => {

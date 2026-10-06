@@ -55,6 +55,7 @@ export const E052_Cubbyhole = defineMinorCard({
     altCosts: [{ wood: 1 }, { clay: 1 }],
     vp: 1,
   },
+  presentation: { counters: ['food'] },
   impl: cardImpl,
 })
 

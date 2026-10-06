@@ -51,6 +51,7 @@ export const B019_MoldboardPlow = defineMinorCard({
     prerequisite: '1 Occupation',
     occupationPrerequisites: { min: 1 },
   },
+  presentation: { stack: true },
   impl: cardImpl,
 })
 

@@ -64,6 +64,7 @@ export const E085_MasterTanner = defineOccupationCard({
     players: '1+',
     category: 'FARMYARD_-_PLACE_FOR_PERSON',
   },
+  presentation: { stack: true },
   impl: cardImpl,
 })
 

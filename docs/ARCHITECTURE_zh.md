@@ -922,7 +922,7 @@ C1 Overhaul 只计数、回收、重建 own ordinary fences：onBuy 先用 `cons
 
 当前 pending 交互中的卡牌 anytime 可用项，由 `shared/session/anytime-policy.ts` 的 `computeAnytimePolicy()` 在每次 `buildInteraction()` 中计算；前端不导入该规则查询。
 
-`GameCore.getAnytimePolicyInput()` 提供活动上下文、`stageResume`、当前 `InteractionRequest.kind` 和该 request 的 `anytimeWindow`。Flow / request 可显式声明 `{ allowed: true, blockedIds?: string[] }` 或 `{ allowed: false }`。权限只属于当前等待节点，不从父 optional、兄弟或 continuation 继承，并随 Engine cursor 保存和恢复。提示键仅负责文案，不授予权限；普通 exchange / bake flow 自己声明允许且禁用 `exchange`。
+`GameCore.getAnytimePolicyInput()` 提供活动上下文、`stageResume`、当前 `InteractionRequest.kind` 和该 request 的 `anytimeWindow`。Flow / request 可显式声明 `{ allowed: true, blockedIds?: string[] }` 或 `{ allowed: false }`。权限只属于当前等待节点，不从父 optional、兄弟或 continuation 继承。Optional leaf 的窗口仅覆盖接受 / 跳过提示，即使后续付款选择复用同一个 engine node，后续 request 仍须自己声明窗口。窗口随 Engine cursor 保存和恢复。提示键仅负责文案，不授予权限；普通 exchange / bake flow 自己声明允许且禁用 `exchange`。
 
 优先级依次为：没有活动上下文、heating、engine-blocked、next-player confirmation（允许但禁用 exchange）、player-switch confirmation、animal reorganization、当前显式窗口、默认 stage-hook-chain 禁止、普通窗口允许。显式元数据不能放宽前面的硬性禁止；非法窗口按关闭处理。D132 在来源 optional 节点声明开放；其数量选择声明关闭，避免冻结的支付数量受随时兑换影响。
 
@@ -956,7 +956,7 @@ OA-vs-the reference design notes:
 - 官方 Card Effect 可声明只读 `computeResourceCommitments(state, owner)`，从卡内状态派生参与者必须保有的资源。Session 聚合并发承诺，若命令破坏承诺则在发布前恢复命令检查点。这不预扣款、不在 PaymentSolver 锁资，也不放宽 Continuation Guard；卡牌在一次原子成交中解除承诺并交换双方资源，见 ADR-0019。
 - 同步兑换反应支持立即执行的 `special-effect` 和 `gain` leaf，不执行 optional、选择或 pending flow。Listener 保持只读，资源和日志通过正常 event sink 产生。
 - Idle work-phase turns and `confirm-next-player` are acting-player anytime windows: legal anytime actions remain available before a worker is placed and before control passes to the next player. In `confirm-next-player`, `exchange` stays blocked to avoid recursive generic exchange prompts. `confirm-player-switch` remains blocked because it is a system-controlled cross-player transition inside another flow.
-- 阶段 hook chain 默认禁止 anytime；系统交互类型和当前节点显式 `anytimeWindow` 声明提供例外。权限不依赖卡名或提示键。
+- 带 `stageResume` 的阶段 hook chain 默认禁止 anytime，保持系统 hook 链不让出控制权的约束。动物重整和当前等待节点显式声明的 `anytimeWindow` 可以开放窗口。Exchange / bake flow 和 D132 终局前的 optional 选择各自声明窗口，权限不依赖提示键。D132 内层 `resource-quantity-select` 仍禁止 anytime，因为它的上限由当前食物和空格状态冻结，无法在任意 anytime 改动后安全恢复。
 
 ---
 

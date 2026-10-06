@@ -43,6 +43,7 @@ export const E110_Dentist = defineOccupationCard({
     cost: {},
     players: '1+',
   },
+  presentation: { stack: true },
   impl: cardImpl,
 })
 

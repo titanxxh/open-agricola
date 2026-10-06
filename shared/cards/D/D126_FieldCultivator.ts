@@ -70,6 +70,7 @@ export const D126_FieldCultivator = defineOccupationCard({
     cost: {},
     players: '1+',
   },
+  presentation: { stack: true },
   impl: cardImpl,
 })
 

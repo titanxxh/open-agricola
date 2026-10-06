@@ -87,6 +87,7 @@ export const C120_AgriculturalLabourer = defineOccupationCard({
     cost: {},
     players: "1+",
   },
+  presentation: { counters: ['clay'] },
   impl: cardImpl,
 })
 

@@ -3,6 +3,7 @@ import { GameSession, type SessionResponse } from '../game/authoritative-session
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
+import { expectPublicCardGoods } from './_helpers/card-public-presentation'
 
 import '../../shared/cards/C/C103_GreenGrocer'
 import '../../shared/cards/C/C120_AgriculturalLabourer'
@@ -77,11 +78,13 @@ describe('C120 Agricultural Labourer parity', () => {
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.occupationPlayed).toContain(CARD_ID)
     expect(storedClay(response)).toBe(8)
+    expectPublicCardGoods(session, CARD_ID, { counters: { clay: 8 } })
     if (response.interaction.request.kind === 'confirm-next-player') session.resolveChoice(0, 'confirm')
     response = session.takeAction(0, 'grain-seeds')
     expect(response.ok, response.error).toBe(true)
     expect(storedClay(response)).toBe(7)
     expect(response.state.players[0]!.resources).toMatchObject({ grain: 1, clay: 1 })
+    expectPublicCardGoods(session, CARD_ID, { counters: { clay: 7 } })
   })
 
   it('C120 S2: the owner gains one clay when obtaining grain from Grain Seeds', () => {
@@ -125,6 +128,7 @@ describe('C120 Agricultural Labourer parity', () => {
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources).toMatchObject({ grain: 2, clay: 1 })
     expect(storedClay(response)).toBe(0)
+    expectPublicCardGoods(session, CARD_ID, { counters: {} })
   })
 
   it('C120 S6: grain obtained through an exchange also moves one clay from the card', () => {

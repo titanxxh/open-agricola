@@ -41,10 +41,13 @@ afterEach(() => {
 })
 
 describe('custom code executor', () => {
-  it.each(['native', 'sandbox'])('uses a source-owned quantity and current-step window through %s, including restoration', (mode) => {
-    const flow: ActionFlow = { type: 'leaf', actionId: 'selection', sourceCard: 'CUSTOM_ExecutorCard', optional: true,
-      optionalPromptKey: 'ui.interactionOptionalAction', anytimeWindow: { allowed: true },
-      actionContext: { selectionKind: 'farm-position', selectableTiles: [{ row: 0, col: 1 }], minSelections: 1, maxSelections: 1 } }
+  it.each(['native', 'sandbox'].flatMap(mode => ['selection', 'pay'].map(kind => ({ mode, kind }))))(
+    'uses a source-owned quantity and current-step window through $mode / $kind, including restoration', ({ mode, kind }) => {
+    const flow: ActionFlow = { type: 'leaf', actionId: kind, sourceCard: 'CUSTOM_ExecutorCard', optional: true,
+      promptKey: 'ui.interactionOptionalAction', anytimeWindow: { allowed: true },
+      ...(kind === 'pay'
+        ? { params: { cost: { fees: [{ food: 1 }, { wood: 1 }] } } }
+        : { actionContext: { selectionKind: 'farm-position', selectableTiles: [{ row: 0, col: 1 }], minSelections: 1, maxSelections: 1 } }) }
     const compiled = validateAndCompileCustomCode(`
 const CARD_ID = 'CUSTOM_ExecutorCard'
 const CARD_DEF = MinorImprovement({ id: CARD_ID, name: 'Executor Card' })
@@ -72,7 +75,14 @@ const CARD_IMPL = { effect: { id: CARD_ID,
     const player = session.state.players[0]!
     player.minorPlayed = ['CUSTOM_ExecutorCard']
     player.improvements = ['Major_Fireplace1']; player.resources.sheep = 1
+    player.resources.wood = 1; player.resources.grain = 1
     player.houseAnimalType = 'sheep'; player.houseAnimalCount = 1
+    if (kind === 'pay') {
+      player.resources.sheep = 2
+      player.houseAnimalType = null; player.houseAnimalCount = 0
+      player.pastures = [{ id: 'payment-sheep', size: 1, tiles: [{ row: 0, col: 2 }],
+        stables: 0, animalType: 'sheep', animalCount: 2 }]
+    }
     player.cardStates.CUSTOM_ExecutorCard = { extraData: { quantity: 1.9 } }
     session.loadState(session.state)
     let response = session.invokeAfterRoundEnd()
@@ -89,16 +99,33 @@ const CARD_IMPL = { effect: { id: CARD_ID,
       expect(response.state.players[0]!.resources.food).toBe(2)
       expect(response.interaction.promptKey).toBe('ui.interactionOptionalAction')
       response = target.resolveChoice(0, response.interaction.request!.options!.find((option) => option.value !== '__skip__')!.value)
-      expect(response.interaction.request?.kind).toBe('selection')
+      expect(response.interaction.request?.kind).toBe(kind === 'pay' ? 'choice' : 'selection')
+      expect(response.interaction.request?.anytimeWindow?.allowed).not.toBe(true)
       expect(response.interaction.anytimeActions).toEqual([])
+      const closedSnapshot = target.withCtx(() => serializeSessionSnapshot(target.state, target))
+      const closedRestored = new GameSession(rehydrateState(closedSnapshot), cards)
+      installNative(closedRestored)
+      expect(closedRestored.getState().interaction.anytimeActions).toEqual([])
+      expect(closedRestored.getState().interaction.request?.anytimeWindow?.allowed).not.toBe(true)
       const before = JSON.stringify(target.state)
       expect(target.takeAnytimeAction(0, 'exchange').ok).toBe(false)
       expect(JSON.stringify(target.state)).toBe(before)
-      response = target.commitSelectionChoice(0, { positions: ['0-1'] })
+      if (kind === 'pay') {
+        expect(response.interaction.promptKey).toBe('prompt.selectPayment')
+        expect(response.interaction.request!.options!.length).toBe(2)
+        const food = response.interaction.request!.options!.find(option =>
+          (option.labelParams?.resourcesPaid as Record<string, number> | undefined)?.food === 1)
+        expect(food).toBeDefined()
+        response = target.resolveChoice(0, food!.value)
+        expect(response.state.players[0]!.resources).toMatchObject({ food: 1, wood: 1, grain: 1 })
+        expect(response.state.events).toContainEqual(expect.objectContaining({
+          type: 'resource.paid', sourceCardId: 'CUSTOM_ExecutorCard', resources: { food: 1 },
+        }))
+      } else response = target.commitSelectionChoice(0, { positions: ['0-1'] })
       expect(response.ok, response.error).toBe(true)
       expect(response.state.gameOver).toBe(true)
       expect(target.withCtx(() => Scoring.breakdown(response.state, 0)).categories.find((category) => category.key === 'empty'))
-        .toMatchObject({ quantity: 12, total: -12 })
+        .toMatchObject({ quantity: kind === 'pay' ? 11 : 12, total: kind === 'pay' ? -11 : -12 })
     }
   })
   it.each(['native', 'sandbox'])('records detached, explicitly public presentation through the %s query', (mode) => {

@@ -61,6 +61,7 @@ export const A039_Chapel = definePlayerActionCard({
     extraVp: true,
     vp: 3,
   },
+  presentation: { counters: ['bonusVp'] },
   impl: cardImpl,
 })
 

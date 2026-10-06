@@ -57,6 +57,7 @@ export const D124_Emissary = defineOccupationCard({
     players: '1+',
     implemented: true,
   },
+  presentation: { stack: true },
   impl: cardImpl,
 })
 

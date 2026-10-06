@@ -15,6 +15,11 @@ const expectPublicCards = async (view: Page | FrameLocator) => {
   await expect(view.locator('.played-card-slot').filter({ has: view.locator('[data-card-anchor="D075_WoodField"]') }).locator('.field-crop-segment')).toHaveCount(2)
   await expect(view.getByTestId('played-card-held-worker-C022_BasketChair')).toBeVisible()
   await expect(view.locator('.lazybones-stable-marker')).toHaveAttribute('title', /Lazybones/)
+  const labourer = view.locator('.played-card-slot').filter({ has: view.locator('[data-card-anchor="C120_AgriculturalLabourer"]') })
+  await expect(labourer.locator('.resource-clay .resource-chip-count')).toHaveText('8')
+  const grocer = view.locator('.played-card-slot').filter({ has: view.locator('[data-card-anchor="A102_Grocer"]') })
+  await expect(grocer.locator('.card-stack .res-icon')).toHaveCount(3)
+  await expect(grocer.locator('.card-stack .res-icon').first()).toHaveClass(/res-icon-wood/)
 }
 
 test('public Card State facts render in live seat views and a newly pinned Replay Viewer', async ({ page, request }) => {
@@ -29,7 +34,7 @@ test('public Card State facts render in live seat views and a newly pinned Repla
     player.occupationHand = ['__test_placeholder__']
   }
   const owner = state.players[0]!
-  owner.occupationPlayed = ['C146_WorkshopAssistant', 'E148_Lazybones']
+  owner.occupationPlayed = ['C146_WorkshopAssistant', 'E148_Lazybones', 'C120_AgriculturalLabourer', 'A102_Grocer']
   owner.minorPlayed = ['M084_BogPony', 'D075_WoodField', 'C022_BasketChair']
   owner.cardStates = {
     C146_WorkshopAssistant: { extraData: { pairs: ['WC', 'CS', 'RS'], internal: 'INTERNAL_BROWSER_SENTINEL' },
@@ -38,6 +43,8 @@ test('public Card State facts render in live seat views and a newly pinned Repla
     D075_WoodField: { extraData: { cardFieldStacks: [{ crop: 'wood', remaining: 2 }, { crop: 'wood', remaining: 1 }] } },
     C022_BasketChair: { extraData: { heldWorkerId: '1' } },
     E148_Lazybones: { extraData: { reservedActionSpaces: ['forest'] } },
+    C120_AgriculturalLabourer: { counters: { clay: 8 } },
+    A102_Grocer: { stack: ['reed', 'grain', 'wood'] },
   }
   expect((await postJson(request, `${BACKEND_URL}/api/game/load`, { state })).ok).toBe(true)
   for (const viewer of ['p1', 'p2']) {

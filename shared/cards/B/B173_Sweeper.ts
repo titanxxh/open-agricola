@@ -39,6 +39,7 @@ export const B173_Sweeper = defineOccupationCard({
     cost: {},
     players: '5+',
   },
+  presentation: { counters: ['food'] },
   impl: cardImpl,
 })
 

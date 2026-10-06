@@ -66,7 +66,7 @@ export const E031_Upholstery = defineMinorCard({
     cost: {},
     extraVp: true,
   },
-  presentation: { counters: ['bonusVp'] },
+  presentation: { counters: ['bonusVp', 'reed'] },
   impl: cardImpl,
 })
 

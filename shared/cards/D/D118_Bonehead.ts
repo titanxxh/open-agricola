@@ -63,6 +63,7 @@ export const D118_Bonehead = defineOccupationCard({
     cost: {},
     players: '1+',
   },
+  presentation: { stack: true },
   impl: cardImpl,
 })
 
