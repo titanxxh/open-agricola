@@ -38,16 +38,12 @@ import { PostgresRoomPersistence } from '../game/persistence/postgres-adapter.ts
 import type { GameContextStore } from '../game/game-context-store.ts'
 import { getResources } from '../storage/runtime'
 import { ReplayResources } from '../storage/replay-resources'
+import { allowAnonymousAccess } from '../anonymous-access.ts'
 
 const WS_AUTH_TIMEOUT_MS = 5000
 const ROOM_CLEANUP_INTERVAL_MS = 5 * 60 * 1000
 
-const allowAnonymousWs = (): boolean => {
-  if (process.env.ALLOW_ANONYMOUS_WS !== undefined) {
-    return process.env.ALLOW_ANONYMOUS_WS === 'true'
-  }
-  return process.env.NODE_ENV !== 'production'
-}
+const allowAnonymousWs = (): boolean => allowAnonymousAccess()
 
 // ── Startup helpers ──────────────────────────────────────────────────────────
 

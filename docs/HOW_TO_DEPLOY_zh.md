@@ -417,7 +417,7 @@ https://<backend-origin>/api/auth/oauth/google/callback
 | `BACKEND_PORT` | `5175` | HTTP/WS 监听端口 |
 | `BACKEND_HOST` | `0.0.0.0` | 绑定地址 |
 | `NODE_ENV` | — | 设为 `production` 启用生产模式 |
-| `ALLOW_ANONYMOUS_WS` | `true`(dev) / `false`(prod) | 是否允许匿名 WebSocket |
+| `ALLOW_ANONYMOUS_WS` | `true`(dev) / `false`(prod) | 是否允许未登录调用者使用匿名 WebSocket 房间和 HTTP 调试沙箱（`/api/game/*`） |
 | `CORS_ORIGIN` | `*` | 允许的前端域名，生产环境必须设置 |
 | `PUBLIC_APP_ORIGIN` | — | 前端公开地址；Pages 子路径部署要包含 `/open-agricola/` |
 | `PUBLIC_API_BASE` | — | 后端公开 origin，用于 OAuth provider callback URL 和邮箱验证链接；生产环境必填 |

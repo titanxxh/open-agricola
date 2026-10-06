@@ -399,7 +399,7 @@ Never set these in production:
 | `BACKEND_PORT` | `5175` | HTTP and WebSocket listen port |
 | `BACKEND_HOST` | `0.0.0.0` | Bind address |
 | `NODE_ENV` | — | Set to `production` for production mode |
-| `ALLOW_ANONYMOUS_WS` | `true` in development, `false` in production | Whether anonymous WebSocket connections are allowed |
+| `ALLOW_ANONYMOUS_WS` | `true` in development, `false` in production | Whether session-less callers may use anonymous WebSocket rooms and the HTTP debug sandbox (`/api/game/*`) |
 | `CORS_ORIGIN` | `*` | Allowed frontend origin; required in production |
 | `PUBLIC_APP_ORIGIN` | — | Public frontend URL; include `/open-agricola/` for a Pages subpath |
 | `PUBLIC_API_BASE` | — | Public backend origin for OAuth callbacks and email verification; required in production |
