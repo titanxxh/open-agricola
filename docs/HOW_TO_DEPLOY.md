@@ -12,7 +12,7 @@ flowchart LR
   Browser --> Ingress[HTTPS public origin / Caddy]
   Ingress --> Router[HTTP / WS routing]
   Router --> A[Application 1]
-  Router --> B[Application 2 - optional]
+  Router --> B[Application 2]
   A --> PG[(PostgreSQL)]
   B --> PG
   A --> S3[(Private S3 / RustFS)]
@@ -35,7 +35,7 @@ Both cases start with the common steps below.
 
 ### 1.1 Common Setup
 
-Install Node.js 24.15+ (excluding Node 25), pnpm, Docker Compose, and Git. One host runs PostgreSQL 18, RustFS, and one application process by default. No external service account is required. Set `APP_INSTANCES=2` to exercise two application processes on that host.
+Install Node.js 24.15+ (excluding Node 25), pnpm, Docker Compose, and Git. Production Compose runs two independent application processes inside the app container on one host, sharing PostgreSQL 18 and RustFS through the public HTTP/WS routing process. It fixes `APP_INSTANCES=2`, including when `.env` contains the local-development value `1`. No external service account is required. Local development still defaults to one application process; use `./restart-local.sh --instances 2` to exercise the same two-process routing locally.
 
 Earlier SQLite single-instance performance reports are historical baselines only. Keep existing admission limits; those measurements do not certify PostgreSQL, two-instance capacity, or high availability. This delivery verifies normal behavior and restarts, without fault injection or recovery-time acceptance.
 
@@ -393,7 +393,7 @@ Never set these in production:
 | `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | Generated locally | S3 credentials; never commit them |
 | `S3_PREFIX` | Empty | Object namespace for this environment |
 | `WORKSHOP_TOKEN_ENCRYPTION_KEY` | Generated locally | Shared token encryption key; preserve it during migration |
-| `APP_INSTANCES` | `1` | `1` or `2` application processes on the current host |
+| `APP_INSTANCES` | Local: `1`; production: `2` | Local launch accepts `1` or `2`; production Compose fixes two application processes on one host |
 | `BACKEND_PORT` | `5175` | HTTP and WebSocket listen port |
 | `BACKEND_HOST` | `0.0.0.0` | Bind address |
 | `NODE_ENV` | — | Set to `production` for production mode |

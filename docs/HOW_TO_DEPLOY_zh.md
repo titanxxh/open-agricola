@@ -14,7 +14,7 @@ flowchart LR
   Browser --> Ingress[HTTPS public origin / Caddy]
   Ingress --> Router[HTTP / WS routing]
   Router --> A[Application 1]
-  Router --> B[Application 2 - optional]
+  Router --> B[Application 2]
   A --> PG[(PostgreSQL)]
   B --> PG
   A --> S3[(Private S3 / RustFS)]
@@ -36,7 +36,7 @@ flowchart LR
 
 ### 1. 基础步骤（两种情况通用）
 
-准备 Node.js 24.15+（不支持 Node 25）、pnpm、Docker Compose、Git。默认一台机器运行 PostgreSQL 18、RustFS 和一个应用进程，无需申请外部服务。配置 `APP_INSTANCES=2` 可在同机运行两个应用进程。
+准备 Node.js 24.15+（不支持 Node 25）、pnpm、Docker Compose、Git。生产 Compose 在同一台机器的 app 容器内启动两个独立应用进程，通过公开 HTTP/WS 路由进程接入，共享 PostgreSQL 18 和 RustFS。生产配置固定 `APP_INSTANCES=2`，即使 `.env` 中保留本地开发的 `1` 也会启动两个。无需申请外部服务。本地开发仍默认一个应用进程，使用 `./restart-local.sh --instances 2` 即可在本机验证相同的双进程路由。
 
 旧 SQLite 单实例的性能报告仅是历史基线；继续保留应用的既有容量上限，不把这些数字当作 PostgreSQL、双实例或高可用认证。本次只验正常功能和重启，不做故障注入或恢复计时。
 
@@ -411,7 +411,7 @@ https://<backend-origin>/api/auth/oauth/google/callback
 | `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | 本机自动生成 | S3 凭据，不写入 Git |
 | `S3_PREFIX` | 空 | 当前环境对象 namespace |
 | `WORKSHOP_TOKEN_ENCRYPTION_KEY` | 本机自动生成 | 搬迁时保留的共享令牌加密密钥 |
-| `APP_INSTANCES` | `1` | 当前单机支持 `1` 或 `2` 个应用进程 |
+| `APP_INSTANCES` | 本地：`1`；生产：`2` | 本地启动可选 `1` 或 `2`；生产 Compose 固定同机两个应用进程 |
 | `BACKEND_PORT` | `5175` | HTTP/WS 监听端口 |
 | `BACKEND_HOST` | `0.0.0.0` | 绑定地址 |
 | `NODE_ENV` | — | 设为 `production` 启用生产模式 |
