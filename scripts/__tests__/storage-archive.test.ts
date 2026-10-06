@@ -8,6 +8,7 @@ vi.setConfig({ testTimeout: 30000, hookTimeout: 180000 })
 import { importFixture } from './_helpers/import-fixture'
 import { importSqlite } from '../sqlite-import/import'
 import { exportStorageArchive, restoreStorageArchive } from '../storage-archive'
+import { validateArchiveInIsolation } from '../storage-archive-cli'
 import { getTestDatabaseUrl } from '../../server/__tests__/_helpers/postgres'
 import { testStorageEnvironment } from '../../server/__tests__/_helpers/objects'
 import { PostgresDatabase } from '../../server/database/postgres'
@@ -56,6 +57,10 @@ it('round-trips native PostgreSQL recovery bytes and private S3 objects, then ap
   await exportStorageArchive(target.url, publicDb, target.objects, publicArchive, 'test-public-build')
   const publicTarget = await makeTarget('public')
   expect((await restoreStorageArchive(publicTarget.url, publicTarget.db, publicTarget.objects, publicArchive, [])).validation.replayStepCount).toBe(4)
+  // Compose supplies an empty optional URL for self-hosted deployments.
+  expect(await validateArchiveInIsolation(publicArchive, {
+    ...testStorageEnvironment(), DATABASE_URL: target.url, VALIDATION_DATABASE_URL: '', GAME_BUILD_ID: 'blank-url-check',
+  })).toMatchObject({ targetBuildId: 'blank-url-check', roomCount: 1, replayStepCount: 4 })
   // A valid native dump with incomplete resources is refused by target-build validation.
   const incomplete = await makeTarget()
   const index = JSON.parse(await readFile(join(archive, 'archive.json'), 'utf8'))

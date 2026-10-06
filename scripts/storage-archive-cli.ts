@@ -21,7 +21,7 @@ export async function validateArchiveInIsolation(root: string, env: NodeJS.Proce
   // Keep the longer bound on this maintenance connection, not runtime queries.
   const admin = new PostgresDatabase({ connectionString: env.DATABASE_URL, max: 1, statement_timeout: 120_000 })
   const name = `backup_${randomUUID().replaceAll('-', '')}`
-  const url = new URL(env.VALIDATION_DATABASE_URL ?? env.DATABASE_URL)
+  const url = new URL(env.VALIDATION_DATABASE_URL || env.DATABASE_URL)
   if (!env.VALIDATION_DATABASE_URL) url.pathname = `/${name}`
   if (url.toString() === new URL(env.DATABASE_URL).toString()) throw new Error('Validation must use a separate empty database')
   const target = new PostgresDatabase({ connectionString: url.toString(), schema: manifest.schema })
