@@ -6,6 +6,7 @@ import {
 } from '../../../domain/farm-position-selection'
 import { runSelectionEffect, validateSelectionEffect } from '../../helpers/selection-effect-registry'
 import { buildFarmPositionSelectionInteraction } from '../../../domain/farmyard-interaction'
+import { validateOccupationHandSelection } from '../../../domain/occupation-hand-selection'
 
 const validateFarmPositions = (
   positions: string[],
@@ -15,23 +16,6 @@ const validateFarmPositions = (
   const request = buildFarmPositionSelectionRequest(player, actionContext)
   if (!request.hasConstraints) return { ok: true as const, positionStrings: positions }
   return validateFarmPositionSelection({ request, positions })
-}
-
-const validateOccupationCards = (
-  cards: string[],
-  playerHand: string[],
-  actionContext: Record<string, unknown> | undefined,
-) => {
-  const minSelections = (actionContext?.minSelections as number | undefined) ?? 1
-  const maxSelections = actionContext?.maxSelections as number | undefined
-  if (cards.length < minSelections) return 'not enough card selections'
-  if (maxSelections !== undefined && cards.length > maxSelections) {
-    return 'too many card selections'
-  }
-  for (const card of cards) {
-    if (!playerHand.includes(card)) return `card ${card} not in occupation hand`
-  }
-  return null
 }
 
 export const selectionAction: ActionDefinition = {
@@ -85,8 +69,10 @@ export const selectionAction: ActionDefinition = {
       positions = validation.positionStrings
     }
     if (kind === 'occupation-hand') {
-      const validationError = validateOccupationCards(cards, player.occupationHand, actionContext)
-      if (validationError) return { type: 'fail', errorKey: validationError, recoverable: true }
+      const validation = validateOccupationHandSelection({ cards, hand: player.occupationHand,
+        minSelections: (actionContext?.minSelections as number | undefined) ?? 1,
+        maxSelections: actionContext?.maxSelections as number | undefined })
+      if (!validation.ok) return { type: 'fail', errorKey: validation.error, recoverable: true }
     }
     const effect = actionContext?.selectionEffect as string | undefined
     if (effect) {
@@ -103,8 +89,7 @@ export const selectionAction: ActionDefinition = {
     }
 
     if (sourceCard) {
-      // selectedPositions keeps the existing extra-data key:
-      // positions for board selections, card ids for card selections.
+      // Board coordinates are internal; occupation subsets belong to the selecting player.
       const stored = cards.length > 0 ? cards : positions
       if (kind === 'occupation-hand') writePrivateCardData(player, sourceCard, 'selectedPositions', stored)
       else writeCardExtraData(player, sourceCard, 'selectedPositions', stored)

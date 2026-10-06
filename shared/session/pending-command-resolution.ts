@@ -18,6 +18,7 @@ import {
   validateFarmPositionSelection,
 } from '../domain/farm-position-selection'
 import { interactionSubmitChannel } from './interaction-command-policy'
+import { validateOccupationHandSelection } from '../domain/occupation-hand-selection'
 
 export type FeedSelection = {
   count: number
@@ -292,18 +293,8 @@ export const validateOccupationHandCommit = (input: {
   minSelections: number
   maxSelections: number
 }): Failure | { ok: true } => {
-  if (input.cardIds.length < input.minSelections) {
-    return { ok: false, error: 'not enough card selections' }
-  }
-  if (input.cardIds.length > input.maxSelections) {
-    return { ok: false, error: 'too many card selections' }
-  }
-  for (const id of input.cardIds) {
-    if (!input.player.occupationHand.includes(id)) {
-      return { ok: false, error: `card ${id} not in occupation hand` }
-    }
-  }
-  return { ok: true }
+  return validateOccupationHandSelection({ cards: input.cardIds, hand: input.player.occupationHand,
+    minSelections: input.minSelections, maxSelections: input.maxSelections })
 }
 
 export const validateFarmPositionCommit = (input: {
