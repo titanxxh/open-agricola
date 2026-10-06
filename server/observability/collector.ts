@@ -27,6 +27,7 @@ export function createCollector(db: PostgresDatabase, role: 'app' | 'ingress', r
         const id = instanceId?.()
         if (id && observation) {
           await observationDb.transaction(async () => {
+            await observationDb.prepare('INSERT INTO observability_instances(instance_id,observed_at) VALUES(?,?) ON CONFLICT(instance_id) DO UPDATE SET observed_at=excluded.observed_at').run(id, now)
             await observationDb.prepare('DELETE FROM observability_presence WHERE instance_id=? OR expires_at<=?').run(id, now)
             await observationDb.query(`INSERT INTO observability_presence(instance_id,user_id,expires_at)
               SELECT $1, id, $3 FROM users WHERE id=ANY($2::text[])`, [id, observation.users, now + 120_000])
@@ -44,11 +45,13 @@ export function createCollector(db: PostgresDatabase, role: 'app' | 'ingress', r
               : field === 'throttled_usec' ? Number(/throttled_usec (\d+)/.exec(text)?.[1]) / 1e6
               : [...text.matchAll(new RegExp(`${field}=(\\d+)`, 'g'))].reduce((sum, match) => sum + Number(match[1]), 0)
             if (Number.isFinite(value)) metrics.data.set({ kind }, value)
-          } catch { /* Not all deployments expose cgroups; absence remains unknown. */ }
+            else metrics.data.remove({ kind })
+          } catch { metrics.data.remove({ kind }) /* Missing cgroups remain unknown. */ }
         }
       } else {
         const rows = await observationDb.query<{ kind: string; value: string }>(`
           SELECT 'online_users' AS kind, count(DISTINCT p.user_id)::text AS value FROM observability_presence p JOIN app_instances i USING(instance_id) WHERE p.expires_at>$1 AND i.lease_until>$1 AND i.status='ready'
+            HAVING NOT EXISTS (SELECT 1 FROM app_instances a LEFT JOIN observability_instances o USING(instance_id) WHERE a.status='ready' AND a.lease_until>$1 AND (o.observed_at IS NULL OR o.observed_at<=$1-120000))
           UNION ALL SELECT 'instances_ready',count(*)::text FROM app_instances WHERE status='ready' AND lease_until>$1
           UNION ALL SELECT 'versions_ready',count(DISTINCT generation)::text FROM app_instances WHERE status='ready' AND lease_until>$1
           UNION ALL SELECT 'room_capacity',coalesce(sum(room_capacity),0)::text FROM app_instances WHERE status='ready' AND lease_until>$1
@@ -71,6 +74,7 @@ export function createCollector(db: PostgresDatabase, role: 'app' | 'ingress', r
           UNION ALL SELECT 'pg_wal_bytes',wal_bytes::text FROM pg_stat_wal
           UNION ALL SELECT 'pg_deadlocks',deadlocks::text FROM pg_stat_database WHERE datname=current_database()
         `, [now])
+        metrics.data.remove({ kind: 'online_users' })
         // Explicit zeroes only for a successful query with an empty known category.
         for (const kind of ['rooms_waiting', 'rooms_playing']) metrics.data.set({ kind }, 0)
         for (const row of rows.rows) if (Number.isFinite(Number(row.value))) metrics.data.set({ kind: row.kind }, Number(row.value))
@@ -83,10 +87,15 @@ export function createCollector(db: PostgresDatabase, role: 'app' | 'ingress', r
           if (!Number.isFinite(validated)) throw new Error('Invalid backup time')
           metrics.data.set({ kind: 'backup_validated_unixtime' }, validated)
           metrics.collectorSuccess.set({ source: 'backup' }, now / 1000)
-        } catch { metrics.data.remove({ kind: 'backup_validated_unixtime' }); metrics.collectorErrors.inc({ source: 'backup' }) }
+          metrics.collectorStatus.set({ source: 'backup' }, 1)
+        } catch { metrics.data.remove({ kind: 'backup_validated_unixtime' }); metrics.collectorErrors.inc({ source: 'backup' }); metrics.collectorStatus.set({ source: 'backup' }, 0) }
       }
+      metrics.collectorStatus.set({ source: role === 'ingress' ? 'global' : 'runtime' }, 1)
       metrics.collectorSuccess.set({ source: role === 'ingress' ? 'global' : 'runtime' }, now / 1000)
-    })().catch(() => metrics.collectorErrors.inc({ source: role === 'ingress' ? 'global' : 'runtime' })).finally(() => { inflight = undefined })
+    })().catch(() => {
+      metrics.collectorErrors.inc({ source: role === 'ingress' ? 'global' : 'runtime' })
+      metrics.collectorStatus.set({ source: role === 'ingress' ? 'global' : 'runtime' }, 0)
+    }).finally(() => { inflight = undefined })
     return inflight
   }
 }

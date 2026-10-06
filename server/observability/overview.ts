@@ -1,10 +1,14 @@
 type PromResponse = { status: string; data?: { result?: { value: [number, string] }[] } }
 export type HealthLevel = 'normal' | 'degraded' | 'unavailable' | 'unknown'
+const RUNTIME = '(agricola_collector_status{source="runtime"} == 1) and on(job,instance,source) (time()-agricola_collector_last_success_unixtime{source="runtime"}<120)'
 const queries = {
+  runtimeFresh: `count(${RUNTIME})`,
+  directoryInstances: 'agricola_platform{role="ingress",kind="instances_ready"}',
+
   versions: 'agricola_platform{role="ingress",kind="versions_ready"}',
   s3Fresh: 'max(agricola_collector_last_success_unixtime{source="s3"})',
   blockedRooms: 'sum(agricola_platform{role="app",kind="blocked_rooms"})',
-  gameReady: 'sum(agricola_platform{role="app",kind="game_ready"})',
+  gameReady: `sum(agricola_platform{role="app",kind="game_ready"} and on(job,instance) (${RUNTIME}))`,
   dbErrors: 'sum(increase(agricola_db_errors_total{reason=~"timeout|deadlock|unavailable|connection_limit"}[5m]))',
   s3Errors: 'sum(increase(agricola_operation_duration_seconds_count{stage=~"s3_.*",outcome="error"}[5m]))',
   backupAge: 'time()-agricola_platform{role="ingress",kind="backup_validated_unixtime"}',
@@ -40,31 +44,37 @@ export async function overview() {
   let fresh = false
   if (url && !failed) {
     try {
-      const response = await fetch(new URL('/api/v1/query?query=agricola_collector_last_success_unixtime%7Bsource%3D%22global%22%7D', url), { signal: AbortSignal.timeout(2000) })
+      const response = await fetch(new URL('/api/v1/query?query=' + encodeURIComponent('agricola_collector_last_success_unixtime{source="global"} and on(job,instance,source) (agricola_collector_status{source="global"}==1)'), url), { signal: AbortSignal.timeout(2000) })
       const body = await response.json() as PromResponse
       const sample = body.data?.result?.[0]?.value
       lastSample = sample && Number.isFinite(Number(sample[1])) ? Number(sample[1]) * 1000 : null
       fresh = lastSample !== null && now - lastSample < 120_000
     } catch { failed = true }
   }
-  const level: HealthLevel = failed || !fresh || values.instances === null || values.gameReady === null ? 'unknown' : values.instances === 0 ? 'unavailable'
-    : (values.instances !== null && values.instances! < Number(process.env.APP_INSTANCES ?? 1)) || (values.errorRate ?? 0) > 0.02 || (values.commandP95 ?? 0) > 1 || (values.blockedRooms ?? 0) > 0 || (values.gameReady !== null && values.gameReady! < Number(process.env.APP_INSTANCES ?? 1)) || (values.dbErrors ?? 0) > 0 || (values.s3Errors ?? 0) > 0 || (values.backupAge ?? 0) > 172800 || (values.taskAge ?? 0) > 900 || (values.versions ?? 0) > 1 ? 'degraded' : 'normal'
-  const reasons: string[] = []
-  if (level === 'unknown') reasons.push('freshness')
-  if (fresh) {
-    if (values.instances !== null && values.instances! < Number(process.env.APP_INSTANCES ?? 1)) reasons.push('instances')
-    if (values.gameReady !== null && values.gameReady! < Number(process.env.APP_INSTANCES ?? 1)) reasons.push('readiness')
-    if ((values.blockedRooms ?? 0) > 0) reasons.push('blocked')
-    if ((values.commandP95 ?? 0) > 1) reasons.push('latency')
-    if ((values.errorRate ?? 0) > .02) reasons.push('errors')
-    if ((values.dbErrors ?? 0) > 0) reasons.push('database')
-    if ((values.s3Errors ?? 0) > 0) reasons.push('storage')
-    if ((values.backupAge ?? 0) > 172800) reasons.push('backup')
-    if ((values.taskAge ?? 0) > 900) reasons.push('tasks')
-    if ((values.versions ?? 0) > 1) reasons.push('versions')
+  const expected = Number(process.env.APP_INSTANCES ?? 1)
+  const unavailable = fresh && (values.instances === 0 || values.directoryInstances === 0)
+  const complete = fresh && values.instances !== null && values.gameReady !== null && values.onlineUsers !== null
+    && values.runtimeFresh !== null && values.runtimeFresh >= (values.directoryInstances ?? expected)
+  const anomalies = {
+    instances: values.instances !== null && values.instances < expected,
+    readiness: values.gameReady !== null && values.gameReady < expected,
+    blocked: (values.blockedRooms ?? 0) > 0,
+    latency: (values.commandP95 ?? 0) > 1,
+    errors: (values.errorRate ?? 0) > .02,
+    database: (values.dbErrors ?? 0) > 0,
+    storage: (values.s3Errors ?? 0) > 0,
+    backup: (values.backupAge ?? 0) > 172800,
+    tasks: (values.taskAge ?? 0) > 900,
+    versions: (values.versions ?? 0) > 1,
   }
-  const components = { database: fresh ? (values.dbErrors ?? 0) > 0 ? 'degraded' : 'normal' : 'unknown',
-    storage: fresh && (values.s3Errors ?? 0) > 0 ? 'degraded' : values.s3Fresh !== null && now / 1000 - values.s3Fresh! < 120 ? 'normal' : 'unknown',
-    backup: fresh && values.backupAge !== null ? values.backupAge! > 172800 ? 'degraded' : 'normal' : 'unknown' }
-  return { level, reasons, components, values: fresh ? values : Object.fromEntries(Object.keys(values).map(key => [key, null])), lastSample, retentionDays: 7, refreshSeconds: 15 }
+  const reasons = fresh ? Object.entries(anomalies).filter(([, active]) => active).map(([reason]) => reason) : []
+  const level: HealthLevel = failed || !fresh ? 'unknown' : unavailable ? 'unavailable'
+    : !complete ? 'unknown' : reasons.length ? 'degraded' : 'normal'
+  if (level === 'unknown') reasons.unshift('freshness')
+  const components = {
+    database: fresh ? anomalies.database ? 'degraded' : 'normal' : 'unknown',
+    storage: fresh && anomalies.storage ? 'degraded' : values.s3Fresh !== null && now / 1000 - values.s3Fresh < 120 ? 'normal' : 'unknown',
+    backup: fresh && values.backupAge !== null ? anomalies.backup ? 'degraded' : 'normal' : 'unknown',
+  }
+  return { level, reasons, components, values: complete || unavailable ? values : Object.fromEntries(Object.keys(values).map(key => [key, null])), lastSample, retentionDays: 7, refreshSeconds: 15 }
 }

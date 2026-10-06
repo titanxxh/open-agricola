@@ -198,7 +198,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "agricola_platform{role=\"ingress\",kind=~\"online_users|rooms_.*|players_connected|games_completed_.*\"} and on(job,instance) (time()-agricola_collector_last_success_unixtime{source=\"global\"}<120)",
+          "expr": "agricola_platform{role=\"ingress\",kind=~\"online_users|rooms_.*|players_connected|games_completed_.*\"} and on(job,instance) ((time()-agricola_collector_last_success_unixtime{source=\"global\"}<120) and on(job,instance,source) (agricola_collector_status{source=\"global\"}==1))",
           "legendFormat": "{{kind}}",
           "format": "time_series"
         }
@@ -588,7 +588,7 @@
       "id": 11,
       "title": "Returned WS envelope p50 / p95 / p99",
       "type": "timeseries",
-      "description": "Actual complete UTF-8 JSON per recipient before WS compression/framing. Round comes from that returned state. Histogram cannot reconstruct exact maximum.",
+      "description": "Actual complete UTF-8 JSON per recipient before WS compression/framing. Round comes from that returned state. Histogram cannot reconstruct exact maximum. Quantiles require at least 20 samples/5m; count and mean are shown separately.",
       "datasource": {
         "type": "prometheus",
         "uid": "agricola-prometheus"
@@ -630,19 +630,19 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "histogram_quantile(0.5,sum by(le)(rate(agricola_ws_outgoing_message_size_bytes_bucket{round=~\"$round\",message_type=\"state\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.5,sum by(le)(rate(agricola_ws_outgoing_message_size_bytes_bucket{round=~\"$round\",message_type=\"state\"}[$__rate_interval]))) and (sum(increase(agricola_ws_outgoing_message_size_bytes_count{round=~\"$round\",message_type=\"state\"}[5m]))>=20)",
           "legendFormat": "p50",
           "format": "time_series"
         },
         {
           "refId": "B",
-          "expr": "histogram_quantile(0.95,sum by(le)(rate(agricola_ws_outgoing_message_size_bytes_bucket{round=~\"$round\",message_type=\"state\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.95,sum by(le)(rate(agricola_ws_outgoing_message_size_bytes_bucket{round=~\"$round\",message_type=\"state\"}[$__rate_interval]))) and (sum(increase(agricola_ws_outgoing_message_size_bytes_count{round=~\"$round\",message_type=\"state\"}[5m]))>=20)",
           "legendFormat": "p95",
           "format": "time_series"
         },
         {
           "refId": "C",
-          "expr": "histogram_quantile(0.99,sum by(le)(rate(agricola_ws_outgoing_message_size_bytes_bucket{round=~\"$round\",message_type=\"state\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.99,sum by(le)(rate(agricola_ws_outgoing_message_size_bytes_bucket{round=~\"$round\",message_type=\"state\"}[$__rate_interval]))) and (sum(increase(agricola_ws_outgoing_message_size_bytes_count{round=~\"$round\",message_type=\"state\"}[5m]))>=20)",
           "legendFormat": "p99",
           "format": "time_series"
         }
@@ -751,7 +751,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "histogram_quantile(0.95,sum by(le,round)(rate(agricola_ws_outgoing_message_size_bytes_bucket{message_type=\"state\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.95,sum by(le,round)(rate(agricola_ws_outgoing_message_size_bytes_bucket{message_type=\"state\"}[$__rate_interval]))) and on(round) (sum by(round)(increase(agricola_ws_outgoing_message_size_bytes_count{message_type=\"state\"}[5m]))>=20)",
           "legendFormat": "round {{round}}",
           "format": "time_series"
         }
@@ -1409,7 +1409,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "agricola_platform{role=\"app\",kind=~\"container_.*\"}",
+          "expr": "agricola_platform{role=\"app\",kind=~\"container_.*\"} and on(job,instance) ((time()-agricola_collector_last_success_unixtime{source=\"runtime\"}<120) and on(job,instance,source) (agricola_collector_status{source=\"runtime\"}==1))",
           "legendFormat": "{{instance}} {{kind}}",
           "format": "time_series"
         }
@@ -1461,7 +1461,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "agricola_platform{role=\"ingress\",kind=~\"pg_connections|pg_long_transactions|pg_waiting_locks|pg_deadlocks|.*backlog|reports_oldest_age_seconds|objects_staging\"} and on(job,instance) (time()-agricola_collector_last_success_unixtime{source=\"global\"}<120)",
+          "expr": "agricola_platform{role=\"ingress\",kind=~\"pg_connections|pg_long_transactions|pg_waiting_locks|pg_deadlocks|.*backlog|reports_oldest_age_seconds|objects_staging\"} and on(job,instance) ((time()-agricola_collector_last_success_unixtime{source=\"global\"}<120) and on(job,instance,source) (agricola_collector_status{source=\"global\"}==1))",
           "legendFormat": "{{kind}}",
           "format": "time_series"
         }
@@ -1513,13 +1513,13 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "rate(agricola_platform{kind=\"pg_wal_bytes\"}[$__rate_interval])",
+          "expr": "(rate(agricola_platform{kind=\"pg_wal_bytes\"}[$__rate_interval])) and on(job,instance) ((time()-agricola_collector_last_success_unixtime{source=\"global\"}<120) and on(job,instance,source) (agricola_collector_status{source=\"global\"}==1))",
           "legendFormat": "WAL bytes/s",
           "format": "time_series"
         },
         {
           "refId": "B",
-          "expr": "agricola_platform{kind=\"pg_database_bytes\"}",
+          "expr": "(agricola_platform{kind=\"pg_database_bytes\"}) and on(job,instance) ((time()-agricola_collector_last_success_unixtime{source=\"global\"}<120) and on(job,instance,source) (agricola_collector_status{source=\"global\"}==1))",
           "legendFormat": "database bytes",
           "format": "time_series"
         }
@@ -1937,6 +1937,83 @@
           "refId": "C",
           "expr": "scrape_samples_scraped{job=~\"agricola-.*\"}",
           "legendFormat": "{{job}} sample count",
+          "format": "time_series"
+        },
+        {
+          "refId": "D",
+          "expr": "agricola_collector_status",
+          "legendFormat": "{{source}} last collection success",
+          "format": "time_series"
+        }
+      ]
+    },
+    {
+      "id": 35,
+      "title": "Returned WS sample count / mean by round",
+      "type": "timeseries",
+      "description": "Selected range sample count and mean per displayed round. Empty windows remain empty; no exact maximum is inferred.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agricola-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 136,
+        "w": 24,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "Unknown / no samples",
+          "custom": {
+            "spanNulls": false
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".* mean bytes"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "bytes"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by(round)(increase(agricola_ws_outgoing_message_size_bytes_count{round=~\"$round\",message_type=\"state\"}[$__range]))",
+          "legendFormat": "{{round}} samples",
+          "format": "time_series"
+        },
+        {
+          "refId": "B",
+          "expr": "sum by(round)(increase(agricola_ws_outgoing_message_size_bytes_sum{round=~\"$round\",message_type=\"state\"}[$__range]))/sum by(round)(increase(agricola_ws_outgoing_message_size_bytes_count{round=~\"$round\",message_type=\"state\"}[$__range]))",
+          "legendFormat": "{{round}} mean bytes",
           "format": "time_series"
         }
       ]

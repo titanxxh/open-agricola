@@ -28,6 +28,7 @@ export function createOperationsHandler({ db, collect }: { db: PostgresDatabase;
     const path = url.pathname
     if (!path.startsWith('/ops/') && !path.startsWith('/api/admin/observability') && path !== '/internal/metrics' && path !== '/api/observability/telemetry') return false
     operationsMetrics.http(req, res)
+    if (!req.url?.startsWith('/') || req.url.startsWith('//')) { json(res, 400, { ok: false, code: 'invalid_request_target' }); return true }
     if (path === '/internal/metrics') {
       if (!metricsAuthorized(req)) { json(res, 401, { ok: false, code: 'metrics_token_required' }); return true }
       await collect?.()
@@ -76,7 +77,7 @@ export function createOperationsHandler({ db, collect }: { db: PostgresDatabase;
           if (!event || typeof event !== 'object') continue
           const { kind, seconds, round, outcome } = event
           if (!['command_rtt', 'snapshot_commit', 'connect_ready'].includes(kind) || !Number.isFinite(seconds) || seconds < 0 || seconds > 120) continue
-          if (!/^(?:[1-9]|1[0-4]|pregame|postgame|none|unknown)$/.test(round) || !['ok', 'timeout', 'reconnect'].includes(outcome)) continue
+          if (!/^(?:[1-9]|1[0-4]|pregame|postgame|none|unknown)$/.test(round) || !['ok', 'timeout', 'reconnect', 'rejected', 'stale', 'error'].includes(outcome)) continue
           operationsMetrics.clientDuration.observe({ kind, round, outcome }, seconds)
           operationsMetrics.clientEvents.inc({ kind: outcome })
         }
@@ -103,7 +104,7 @@ export function createOperationsHandler({ db, collect }: { db: PostgresDatabase;
       if (!target) { json(res, 503, { ok: false, code: 'observability_unavailable' }); return true }
       // Build an allowlist; neither credentials nor client-supplied auth/proxy headers reach Grafana.
       const headers = { 'x-webauth-user': user.username, 'x-webauth-role': 'Viewer', 'content-type': req.headers['content-type'] ?? 'application/json', accept: req.headers.accept ?? '*/*' }
-      const upstream = httpRequest(new URL(req.url!, target), { method: req.method, headers, timeout: 10_000 }, response => {
+      const upstream = httpRequest(new URL(path + url.search, target), { method: req.method, headers, timeout: 10_000 }, response => {
         const responseHeaders = { ...response.headers, 'cache-control': 'no-store', 'referrer-policy': 'no-referrer' }
         delete responseHeaders['set-cookie']
         res.writeHead(response.statusCode ?? 502, responseHeaders)

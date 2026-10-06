@@ -3,20 +3,14 @@ import { performance } from 'node:perf_hooks'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { Counter, Gauge, Histogram, Registry, collectDefaultMetrics } from '@prometheus-io/client'
 import type { WebSocket } from 'ws'
-import type { GameState } from '../../shared/contract/types'
+import { observationRound } from '../../shared/contract/observation-round'
 import type { ServerEvent } from '../../shared/contract/protocol/ws'
 
 const SECONDS = [0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 15, 60]
 const BYTES = [1024, 4096, 16384, 32768, 65536, 131072, 262144, 524288, 1048576, 4194304]
 const COMMANDS = new Set(['action', 'specialAction', 'choice', 'anytime', 'roundEnd', 'commitSelection', 'parentSubmit', 'undoStep', 'undoAction', 'newGame', 'createRoom', 'joinRoom', 'getState', 'getHistory', 'draftSubmit', 'loadGame', 'ordinaryDrawKeep'])
 export const commandTag = (value: string): string => COMMANDS.has(value) ? value : 'other'
-export type RoundState = Pick<GameState, 'round' | 'phase' | 'gameOver'>
-export function roundTag(state?: RoundState): string {
-  if (!state) return 'none'
-  if (state.gameOver || (state.phase === 'playing' && state.round === 15)) return 'postgame'
-  if (state.phase === 'draft' || state.phase === 'parent-selection') return 'pregame'
-  return Number.isInteger(state.round) && state.round >= 1 && state.round <= 14 ? String(state.round) : 'unknown'
-}
+export const roundTag = observationRound
 export type Operation = 'queue' | 'preflight' | 'rule' | 'commit' | 'snapshot' | 'encode' | 'persist' | 'publication' | 'projection' | 'send' | 'json' | 'db_query' | 'db_pool_wait' | 'db_transaction' | 's3_get' | 's3_put' | 's3_delete'
 type CommandObservation = { command: string; requestId?: string; socket: WebSocket; start: number; round: string; outcome: string; responded: boolean }
 const commands = new AsyncLocalStorage<CommandObservation>()
@@ -48,6 +42,7 @@ export class OperationsMetrics {
   readonly commitResults = new Counter({ name: 'agricola_commit_attempts_total', help: 'Durable commit attempts by bounded result; retries are separate attempts.', labelNames: ['outcome'], registers: [this.registry] })
   readonly logicalBytes = new Counter({ name: 'agricola_persistence_payload_bytes_total', help: 'Confirmed logical payload bytes by representation, not physical disk writes.', labelNames: ['kind'], registers: [this.registry] })
   readonly data = new Gauge({ name: 'agricola_platform', help: 'Bounded current platform gauges; use collector freshness before interpreting a value.', labelNames: ['kind'], registers: [this.registry] })
+  readonly collectorStatus = new Gauge({ name: 'agricola_collector_status', help: 'Last attempted source collection: 1 success, 0 failure; absent before first attempt.', labelNames: ['source'], registers: [this.registry] })
   readonly collectorSuccess = new Gauge({ name: 'agricola_collector_last_success_unixtime', help: 'Last successful complete observation by source; absent before first success.', labelNames: ['source'], registers: [this.registry] })
   readonly collectorErrors = new Counter({ name: 'agricola_collector_errors_total', help: 'Collection failures by bounded source.', labelNames: ['source'], registers: [this.registry] })
   readonly clientDuration = new Histogram({ name: 'agricola_client_duration_seconds', help: 'Sampled, untrusted browser observations using one browser monotonic clock.', labelNames: ['kind', 'round', 'outcome'], buckets: SECONDS, registers: [this.registry] })
@@ -107,7 +102,7 @@ export function measure<T>(stage: Operation, work: () => T): T {
   } catch (error) { finish('error'); throw error }
 }
 
-export function commandOutcome(outcome: 'ok' | 'rule_rejected' | 'duplicate' | 'stale' | 'blocked' | 'error' | 'canceled'): void {
+export function commandOutcome(outcome: 'ok' | 'committed' | 'unchanged' | 'rule_rejected' | 'duplicate' | 'stale' | 'blocked' | 'error' | 'canceled'): void {
   const observation = commands.getStore()
   if (observation) observation.outcome = outcome
 }
@@ -171,4 +166,15 @@ export function observeDatabaseError(error: unknown): void {
   const reason = code === '40P01' ? 'deadlock' : code === '57014' ? 'timeout' : code === '53300' ? 'connection_limit'
     : /^(08|ECONN|ETIMEDOUT|EPIPE)/.test(code) ? 'unavailable' : 'query'
   safe(() => operationsMetrics.dbErrors.inc({ reason }))
+}
+
+export function rejectObservedCommand(outcome: 'rule_rejected' | 'stale' | 'canceled' = 'rule_rejected'): void {
+  const observation = commands.getStore()
+  if (observation && ['ok', 'committed', 'unchanged'].includes(observation.outcome)) observation.outcome = outcome
+}
+
+/** Deferred persistence callbacks can run in another command's async context. */
+export function captureCommandOutcome(): (outcome: Parameters<typeof commandOutcome>[0]) => void {
+  const observation = commands.getStore()
+  return outcome => { if (observation) observation.outcome = outcome }
 }

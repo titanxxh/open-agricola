@@ -12,3 +12,8 @@ CREATE TABLE observability_presence (
   expires_at BIGINT NOT NULL,
   PRIMARY KEY(instance_id,user_id)
 );
+
+CREATE TABLE observability_instances (
+  instance_id TEXT PRIMARY KEY REFERENCES app_instances(instance_id) ON DELETE CASCADE,
+  observed_at BIGINT NOT NULL
+);

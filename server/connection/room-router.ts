@@ -1,4 +1,4 @@
-import { measure, measureRule, observeCommand, commandOutcome, roundTag, startObservation } from '../observability/metrics'
+import { measure, measureRule, observeCommand, commandOutcome, roundTag, startObservation, rejectObservedCommand, captureCommandOutcome } from '../observability/metrics'
 import { ExecutionAccess, ExecutionRevokedError } from '../game/execution-access'
 import { RoomOwnershipError } from '../game/room-directory'
 import type { OwnerToken } from '../game/room-directory'
@@ -183,6 +183,7 @@ const sendCommandError = (
   code?: GameContextErrorCode | CommandErrorCode | 'seat_replaced' | 'history_branch_changed',
   lifecycle?: GameContextLifecycle,
 ) => {
+  rejectObservedCommand(code === 'command_input_stale' ? 'stale' : code === 'login_required' || code === 'seat_replaced' ? 'canceled' : 'rule_rejected')
   if (ctx.activeCommand) {
     ctx.activeCommand.outcome = { ok: false, error, ...(code ? { code } : {}), ...(ctx.currentRoom ? { roomId: ctx.currentRoom.id } : {}) }
     return
@@ -216,11 +217,13 @@ const requireWritableRoom = (ctx: ConnectionCtx, requestId?: string): Room | nul
     return null
   }
   if (!ctx.committer || !ctx.committer.hasReplay(room.id)) {
+    commandOutcome('blocked')
     sendCommandError(ctx, 'room recording is unavailable', requestId)
     return null
   }
   const blocked = ctx.committer.blockedError(room.id)
   if (!blocked) return room
+  commandOutcome('blocked')
   sendCommandError(ctx, `room saving is paused: ${blocked}`, requestId)
   return null
 }
@@ -251,6 +254,7 @@ const publishCommandResponse = async (
    */
   seat: number = ctx.currentPlayerIndex,
 ): Promise<Awaited<void | Promise<void>>> => {
+  const finishObservation = captureCommandOutcome()
   if (!response.ok) commandOutcome('rule_rejected')
   if (!response.ok && response.durableTransition !== true) {
     await persistResponseReceipt(ctx, room, response)
@@ -294,18 +298,24 @@ const publishCommandResponse = async (
     ctx.activeCommand ? { request: ctx.activeCommand.request, outcome: { ok: response.ok, ...(response.error ? { error: response.error } : {}) } } : undefined,
   )))
   if (result.kind === 'committed') {
+    if (response.ok) commandOutcome('committed')
     await publishCommitted()
   } else if (result.kind === 'unchanged') {
+    if (response.ok) commandOutcome('unchanged')
     await persistResponseReceipt(ctx, room, response)
     await ctx.broadcaster.sendStateTo(ctx.ws, room, response, command.requestId, cause)
   } else {
+    commandOutcome('blocked')
     await notifyPersistencePaused(ctx, room)
     if (!ctx.committer.isRetrying(room.id)) {
       sendCommandError(ctx, result.error, command.requestId)
       return
     }
     return new Promise((resolve) => {
-      if (!ctx.committer?.waitUntilReady(room.id, () => resolve())) resolve()
+      if (!ctx.committer?.waitUntilReady(room.id, error => { finishObservation(error ? 'blocked' : response.ok ? 'committed' : 'rule_rejected'); resolve() })) {
+        finishObservation(ctx.committer?.isBlocked(room.id) || !ctx.committer?.hasReplay(room.id) ? 'blocked' : response.ok ? 'committed' : 'rule_rejected')
+        resolve()
+      }
     })
   }
 }
@@ -321,6 +331,7 @@ const publishInitialState = async (
   retiredOwner?: OwnerToken,
   retiredVersion?: number,
 ): Promise<Awaited<void | Promise<void>>> => {
+  const finishObservation = captureCommandOutcome()
   const publishReady = async (): Promise<Awaited<void>> => {
     await beforePublish()
     await ctx.broadcaster.broadcastCommitted(room, response, 'reconnect', requestId)
@@ -329,6 +340,7 @@ const publishInitialState = async (
       roomId: room.id,
     })
     await onReady()
+    finishObservation('committed')
   }
   if (!ctx.committer) throw new Error('Room recording is required')
   const result = (await ctx.committer.prepareRoom(room, {
@@ -340,18 +352,23 @@ const publishInitialState = async (
     onReady: publishReady,
   }))
   if (result.kind === 'blocked') {
+    commandOutcome('blocked')
     await notifyPersistencePaused(ctx, room)
     if (!ctx.committer.isRetrying(room.id)) {
       sendCommandError(ctx, result.error, requestId)
       return
     }
     return new Promise((resolve) => {
-      if (!ctx.committer?.waitUntilReady(room.id, () => resolve())) resolve()
+      if (!ctx.committer?.waitUntilReady(room.id, error => { finishObservation(error ? 'blocked' : 'committed'); resolve() })) {
+        finishObservation(ctx.committer?.isBlocked(room.id) || !ctx.committer?.hasReplay(room.id) ? 'blocked' : 'committed')
+        resolve()
+      }
     })
   }
   await beforePublish()
   await ctx.broadcaster.broadcastCommitted(room, response, 'reconnect', requestId)
   await onReady()
+  finishObservation(result.kind === 'unchanged' ? 'unchanged' : 'committed')
 }
 
 /**
@@ -511,6 +528,7 @@ async function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, 
   }
   const persistence = (await ctx.committer?.canCreateRoom()) ?? { ok: false, error: 'room recording is unavailable' }
   if (!persistence.ok) {
+    commandOutcome('blocked')
     sendCommandError(ctx, persistence.error, msg.requestId)
     return
   }
@@ -537,6 +555,7 @@ async function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, 
       buildInitialStateOptions(setup),
     )
   } catch (err) {
+    commandOutcome('error')
     sendCommandError(ctx, err instanceof Error ? err.message : String(err), msg.requestId)
     return
   }
@@ -672,6 +691,7 @@ async function handleJoinRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { 
   }
   const blocked = ctx.committer?.blockedError(room.id)
   if (blocked) {
+    commandOutcome('blocked')
     const waiting = ctx.committer?.waitUntilReady(room.id, (error) => {
       if (ctx.ws.readyState !== ctx.ws.OPEN) return
       if (ctx.currentRoom) return
@@ -1065,6 +1085,7 @@ async function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { t
   const room = requireWritableRoom(ctx, msg.requestId); if (!room) return
   const persistence = (await ctx.committer?.canCreateRoom()) ?? { ok: false, error: 'room recording is unavailable' }
   if (!persistence.ok) {
+    commandOutcome('blocked')
     sendCommandError(ctx, persistence.error, msg.requestId)
     return
   }
@@ -1111,6 +1132,7 @@ async function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { t
       },
     )
   } catch (err) {
+    commandOutcome('error')
     sendCommandError(ctx, err instanceof Error ? err.message : String(err), msg.requestId)
     return
   }
@@ -1390,7 +1412,7 @@ async function dispatchCommand(ctx: ConnectionCtx, msg: ClientCommand): Promise<
       endPreflight('error')
       if (error instanceof ExecutionRevokedError) { commandOutcome('canceled'); ctx.ws.close(1008, error.message); return }
       if (error instanceof RoomOwnershipError) { commandOutcome('stale'); ctx.ws.close(1012, 'room owner changed'); return }
-      commandOutcome(error instanceof CommandError && error.code === 'command_input_stale' ? 'stale' : 'error')
+      commandOutcome(error instanceof CommandError ? error.code === 'command_input_stale' ? 'stale' : 'rule_rejected' : 'error')
       if (!(error instanceof CommandError)) throw error
       sendCommandError(ctx, error.message, msg.requestId, error.code)
     } finally {

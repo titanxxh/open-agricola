@@ -1,3 +1,4 @@
+import type { ServerEvent } from '../../../shared/contract/protocol/ws'
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { afterAll, beforeAll, expect, it, vi } from 'vitest'
@@ -79,8 +80,8 @@ it('measures real returned UTF-8 envelopes using the round displayed by each mes
 
 it('counts per-viewer fanout once and follows new rounds, duplicate receipts and undo snapshots', async () => {
   const second = new WebSocket(base.replace('http:', 'ws:') + '/ws')
-  const replies: { socket: WebSocket; event: any; bytes: number }[] = []
-  const wait = (socket: WebSocket, match: (event: any) => boolean) => new Promise<any>((resolve, reject) => {
+  const replies: { socket: WebSocket; event: ServerEvent; bytes: number }[] = []
+  const wait = (socket: WebSocket, match: (event: ServerEvent) => boolean) => new Promise<ServerEvent>((resolve, reject) => {
     const timeout = setTimeout(() => { socket.off('message', receive); reject(new Error('WS observation timed out')) }, 5000)
     const receive = (raw: Buffer) => { const event = JSON.parse(raw.toString()); if (match(event)) { clearTimeout(timeout); socket.off('message', receive); resolve(event) } }
     socket.on('message', receive)
@@ -95,10 +96,13 @@ it('counts per-viewer fanout once and follows new rounds, duplicate receipts and
     await joined
     const scopePromise = wait(peer!, e => e.type === 'commandScope')
     peer!.send(JSON.stringify({ type: 'getCommandScope', requestId: 'metrics-scope' }))
-    const { scope } = await scopePromise
+    const scopeResponse = await scopePromise
+    if (scopeResponse.type !== 'commandScope') throw new Error('Missing command scope')
+    const { scope } = scopeResponse
     const statePromise = wait(peer!, e => e.type === 'stateUpdate' && e.requestId === 'baseline')
     peer!.send(JSON.stringify({ type: 'getState', requestId: 'baseline' }))
     let state = await statePromise
+    if (state.type !== 'stateUpdate') throw new Error('Missing initial state')
     const scrape = async () => (await fetch(base + '/internal/metrics', { headers: { Authorization: 'Bearer ws-scrape-token' } })).text()
     const value = (text: string, family: string, labels: string[]) => text.split('\n').filter(line => line.startsWith(family + '{') && labels.every(label => line.includes(label)))
       .reduce((sum, line) => sum + Number(line.slice(line.lastIndexOf(' ') + 1)), 0)
@@ -109,7 +113,8 @@ it('counts per-viewer fanout once and follows new rounds, duplicate receipts and
     const other = wait(second, e => e.type === 'stateUpdate' && e.payload.state.round === 9)
     peer!.send(JSON.stringify(command))
     state = await first; await other
-    const states = replies.filter(reply => reply.event.type === 'stateUpdate' && reply.event.payload.state.round === 9)
+    if (state.type !== 'stateUpdate') throw new Error('Missing advanced state')
+    const states = replies.filter((reply): reply is typeof reply & { event: Extract<ServerEvent, { type: 'stateUpdate' }> } => reply.event.type === 'stateUpdate' && reply.event.payload.state.round === 9)
     expect(states).toHaveLength(2)
     expect(states[0]!.event.payload.state.players).not.toEqual(states[1]!.event.payload.state.players)
     const after = await scrape()
@@ -119,12 +124,16 @@ it('counts per-viewer fanout once and follows new rounds, duplicate receipts and
     expect(value(after, 'agricola_ws_broadcast_recipients_sum', ['round="9"']) - value(before, 'agricola_ws_broadcast_recipients_sum', ['round="9"'])).toBe(2)
     const duplicate = wait(peer!, e => e.type === 'commandReceipt' && e.requestId === 'duplicate')
     peer!.send(JSON.stringify({ ...command, requestId: 'duplicate' }))
-    expect((await duplicate).status).toBe('completed')
+    const receipt = await duplicate
+    expect(receipt.type).toBe('commandReceipt')
+    if (receipt.type !== 'commandReceipt') throw new Error('Missing duplicate receipt')
+    expect(receipt.status).toBe('completed')
     const duplicateMetrics = await scrape()
     expect(value(duplicateMetrics, 'agricola_commit_attempts_total', ['outcome="committed"'])).toBe(value(after, 'agricola_commit_attempts_total', ['outcome="committed"']))
     const undo = wait(peer!, e => e.type === 'stateUpdate' && e.requestId === 'undo-round')
     peer!.send(JSON.stringify({ type: 'undoStep', requestId: 'undo-round', commandContext: { scopeId: scope.scopeId, commandId: crypto.randomUUID(), roomId: 'dev2', expectedVersion: state.version, inputWindowId: state.inputWindow?.id } }))
     const result = await undo
+    if (result.type !== 'stateUpdate') throw new Error('Missing undo state')
     expect(result.payload.state.round).toBeGreaterThanOrEqual(1)
     expect(await scrape()).toContain(`round="${result.payload.state.round}"`)
   } finally { peer!.off('message', recordFirst); second.terminate() }
@@ -167,4 +176,32 @@ it('keeps draft/parent selection distinct from playing rounds and classifies end
       expect(count(await scrape(), fixture.tag)).toBe(before + 1)
     }
   } finally { room.session = previous; for (const fixture of cases) fixture.session.dispose() }
+})
+
+it('records an unavailable recording as blocked instead of a successful join', async () => {
+  const { GameSession } = await import('../../game/authoritative-session')
+  const session = new GameSession(961, undefined, { playerCount: 2 })
+  for (const player of session.state.players) player.minorHand = player.occupationHand = ['__test_placeholder__']
+  const room = { id: 'missing-recording-fixture', session, players: [], maxPlayers: 2, version: 0, status: 'playing' as const }
+  backend.registry.set(room)
+  await backend.committer!.prepareRoom(room, { missingPrefix: true })
+  const scrape = async () => (await fetch(base + '/internal/metrics', { headers: { Authorization: 'Bearer ws-scrape-token' } })).text()
+  const count = (text: string) => text.split('\n').filter(line => line.startsWith('agricola_commands_total{') && line.includes('command="joinRoom"') && line.includes('outcome="blocked"'))
+    .reduce((sum, line) => sum + Number(line.slice(line.lastIndexOf(' ') + 1)), 0)
+  const before = count(await scrape())
+  const rejected = new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(() => { peer!.off('message', receive); reject(new Error('Missing blocked response')) }, 5000)
+    const receive = (raw: Buffer) => {
+      const event = JSON.parse(raw.toString())
+      if (event.type !== 'error' || event.requestId !== 'blocked-recording') return
+      clearTimeout(timer); peer!.off('message', receive)
+      expect(event.error).toContain('room saving is paused')
+      resolve()
+    }
+    peer!.on('message', receive)
+  })
+  peer!.send(JSON.stringify({ type: 'joinRoom', roomId: room.id, requestedPlayerIndex: 0, requestId: 'blocked-recording' }))
+  await rejected
+  expect(count(await scrape())).toBe(before + 1)
+  backend.registry.delete(room.id)
 })

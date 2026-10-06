@@ -485,9 +485,11 @@ export class WsGameTransport implements GameTransport {
 
   private receive(msg: ServerEvent): void {
     if (msg.type === 'stateUpdate') {
-      responseReceived(msg.requestId, msg.payload.state); snapshotReceived(msg.payload.state)
+      responseReceived(msg.requestId, msg.payload.state, msg.payload.ok ? 'ok' : 'rejected'); snapshotReceived(msg.payload.state)
       if (this.connectStarted !== undefined) { observeBrowser('connect_ready', this.connectStarted, msg.payload.state); this.connectStarted = undefined }
     }
+    if (msg.type === 'error') responseReceived(msg.requestId, undefined, msg.code === 'command_input_stale' ? 'stale' : 'error')
+    if (msg.type === 'commandReceipt' && msg.status === 'completed') responseReceived(msg.requestId, undefined, msg.receipt.outcome.ok ? 'ok' : 'rejected')
     if (msg.type === 'seat_replaced') this.stop('seat was replaced', 'seat_replaced')
     if (msg.type === 'roomDissolved') this.stop(msg.reason === 'card_takedown' ? 'roomTerminatedCardTakedown' : 'roomDissolved')
     if (msg.type === 'error' && terminalCode(msg.code)) this.stop(msg.error, msg.code)

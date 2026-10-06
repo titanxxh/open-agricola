@@ -86,6 +86,42 @@ it('shows unknown values when trend storage has no recent samples', async () => 
   expect(response.status).toBe(200)
   const overview = await response.json()
   expect(overview.level).toBe('unknown')
-  expect(overview.values).toEqual({ versions: null, s3Fresh: null, blockedRooms: null, gameReady: null, dbErrors: null, s3Errors: null, backupAge: null, taskAge: null, instances: null, onlineUsers: null, playingRooms: null, commandP95: null, errorRate: null })
+  expect(overview.values).toEqual({ runtimeFresh: null, directoryInstances: null, versions: null, s3Fresh: null, blockedRooms: null, gameReady: null, dbErrors: null, s3Errors: null, backupAge: null, taskAge: null, instances: null, onlineUsers: null, playingRooms: null, commandP95: null, errorRate: null })
   expect(overview.lastSample).toBeNull()
+})
+
+it('rejects absolute-form upstream overrides before forwarding administrator headers', async () => {
+  const { request } = await import('node:http')
+  const status = await new Promise<number>(resolve => {
+    const req = request({ hostname: '127.0.0.1', port: (server.address() as AddressInfo).port,
+      path: 'http://127.0.0.1:1/ops/api/search', headers: { Authorization: 'Bearer ops-admin-token' } }, res => { res.resume(); resolve(res.statusCode!) })
+    req.end()
+  })
+  expect(status).toBe(400)
+})
+
+it('suppresses current values when the global sample is stale or application source coverage is incomplete', async () => {
+  let stale = true
+  const trend = createServer((req, res) => {
+    const query = new URL(req.url!, 'http://localhost').searchParams.get('query') ?? ''
+    const value = query.includes('source="global"') ? Date.now() / 1000 - (stale ? 180 : 0)
+      : query.startsWith('count(') ? 1 : query.includes('instances_ready') || query.includes('up{') || query.startsWith('sum(agricola_platform{role="app",kind="game_ready"}') ? 2 : 0
+    res.writeHead(200, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify({ status: 'success', data: { result: [{ value: [Date.now() / 1000, String(value)] }] } }))
+  })
+  await new Promise<void>(done => trend.listen(0, '127.0.0.1', done))
+  vi.stubEnv('APP_INSTANCES', '2')
+  vi.stubEnv('PROMETHEUS_URL', `http://127.0.0.1:${(trend.address() as AddressInfo).port}`)
+  try {
+    for (const globalStale of [true, false]) {
+      stale = globalStale
+      const response = await fetch(base + '/api/admin/observability', { headers: { Authorization: 'Bearer ops-admin-token' } })
+      expect(response.status).toBe(200)
+      const result = await response.json()
+      expect(result.level).toBe('unknown')
+      expect(result.values.onlineUsers).toBeNull()
+      expect(result.values.gameReady).toBeNull()
+      expect(result.reasons).toContain('freshness')
+    }
+  } finally { await new Promise<void>(done => trend.close(() => done())); vi.stubEnv('PROMETHEUS_URL', ''); vi.stubEnv('APP_INSTANCES', '1') }
 })
