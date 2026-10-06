@@ -103,6 +103,10 @@ describe('B104 Sheep Walker parity', () => {
     expect(reorg.ok, reorg.error).toBe(true)
     expect(reorg.interaction.stateId === 'wait' && reorg.interaction.request.kind).toBe('animal-reorg')
     expect(reorg.state.players[0]!.resources).toMatchObject({ sheep: 1, boar: 1, food: 0 })
+    expect(reorg.state.players[0]!).toMatchObject({ houseAnimalType: null, houseAnimalCount: 0 })
+    if (reorg.interaction.stateId !== 'wait' || reorg.interaction.request.kind !== 'animal-reorg') throw new Error('expected reorganization')
+    expect(reorg.interaction.request.zones.find((zone) => zone.id === 'house'))
+      .toMatchObject({ animalType: 'boar', animalCount: 1 })
     expect(reorg.interaction.anytimeActions.map((action) => action.id)).toContain('exchange')
 
     let nested = session.takeAnytimeAction(0, 'exchange')
@@ -126,13 +130,18 @@ describe('B104 Sheep Walker parity', () => {
     const cooked = session.resolveChoice(0, cooking!.value)
     expect(cooked.ok, cooked.error).toBe(true)
     expect(cooked.state.players[0]!.resources).toMatchObject({ sheep: 1, boar: 0, food: 2 })
-    if (cooked.interaction.stateId !== 'wait' || reorg.interaction.stateId !== 'wait') throw new Error('expected reorganization')
-    expect(cooked.interaction.request).toEqual(reorg.interaction.request)
+    if (cooked.interaction.stateId !== 'wait' || cooked.interaction.request.kind !== 'animal-reorg') throw new Error('expected reorganization')
+    // Cooking changes inventory, so the same pending host refreshes its draft.
+    expect(cooked.interaction.request).toEqual({
+      ...reorg.interaction.request,
+      zones: reorg.interaction.request.zones.map((zone) => zone.id === 'house'
+        ? { ...zone, animalType: null, animalCount: 0 }
+        : zone),
+    })
+    expect(cooked.state.players[0]!).toMatchObject({ houseAnimalType: null, houseAnimalCount: 0 })
     expect(cooked.interaction.playerIndex).toBe(0)
     expect(session.peekEnginePendingEnvelope()?.hostNodeId).toBe(reorgHost)
-    const resumed = session.resolveChoice(0, 'confirm', { zones: [
-      { id: 'sheep-pasture', zoneType: 'pasture', animalType: 'sheep', animalCount: 1 },
-    ] })
+    const resumed = session.resolveChoice(0, 'confirm', { zones: cooked.interaction.request.zones })
     expect(resumed.ok, resumed.error).toBe(true)
     if (resumed.interaction.stateId !== 'wait' || parent.interaction.stateId !== 'wait') throw new Error('expected plow')
     expect(resumed.interaction.request).toEqual(parent.interaction.request)
