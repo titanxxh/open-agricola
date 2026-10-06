@@ -549,3 +549,9 @@ Draft Version 只序列化最终卡牌内容和各分区已采用候选的 prove
 | 管理员角色                          | `server/auth.ts` isAdmin(), `ADMIN_USERS` 环境变量                                                                               |
 | 管理员 API                        | `GET/DELETE /api/admin/cards`, `GET /api/admin/cards/:id/export`, `GET /api/admin/users`（自证发布的 status 切换端点已随 PRD #634 移除） |
 | 卡牌发布/取消发布                      | PR-gated（PRD #634）：GitHub App GraphQL 定论 pin 被审版本 → 作者 publish 再校验后置 live；非作者只能看到 live 卡                                                             |
+
+## 管理员运行看板
+
+管理员从设置进入 `?page=operations`。总览每 15 秒刷新，展示应用就绪、去重在线用户、活动普通多人房间、5 分钟命令 p95 和系统错误率、组件状态、采集时间及异常原因。Grafana 通过一次性认证交接打开，提供当前/24 小时/7 天趋势、WS 回合筛选和大小分布。页面只读，不发送站外通知，也不授予活动对局隐藏状态访问权限。
+
+普通进行中/等待房间总数排除开发和 hotseat 房间，后两类独立显示。独立 HTTP/浏览器 sandbox 不计入 Room。在线用户为有存活 WS 的认证用户，跨实例去重；仅有 HTTP session 不构成在线 presence。匿名开发 socket 计入连接，不计入认证用户。完成局使用权威 game results，不能用命令尝试数替代。Room presence 校验当前 ownership epoch 和有效租约。未知/过期来源和不足的分位数样本保留为空，不当作健康的零值。运行默认值和阈值见 [HOW_TO_DEPLOY](HOW_TO_DEPLOY.md#operations-monitoring)，行为以源码为准。

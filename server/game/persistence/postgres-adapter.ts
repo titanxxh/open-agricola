@@ -1,3 +1,4 @@
+import { operationsMetrics, safe } from '../../observability/metrics'
 import { replaceDevelopmentRoom } from '../development-room-slots'
 import { ExecutionAccess } from '../execution-access'
 import { RoomDirectory, RoomOwnershipError, type OwnerToken } from '../room-directory'
@@ -596,7 +597,7 @@ export class PostgresRoomPersistence implements RoomPersistence {
       )
       values.stateJson = packed.json
       ;(await this.upsertRoom.run(values))
-      ;(await this.history.write(commit.roomId, packed.nodes, packed.recoveryNodes))
+      packed.writtenBytes = await this.history.write(commit.roomId, packed.nodes, packed.recoveryNodes)
       ;(await savePlayers(commit.roomId, commit.step.createdAt, commit.meta.players))
       ;(await this.insertReplayStep.run({ roomId: commit.roomId, ...commit.step }))
       const advanced = (await this.advanceReplay.run({
@@ -670,12 +671,20 @@ export class PostgresRoomPersistence implements RoomPersistence {
     try {
       const packed = this.history.prepare(commit.roomId, commit.serialized, commit.step.frameHash)
       const result = (await this.commitReplayTransaction(commit, packed))
+      safe(() => operationsMetrics.commitResults.inc({ outcome: result.kind }))
       if (result.kind === 'committed') {
+        safe(() => {
+          for (const [kind, bytes] of Object.entries({ snapshot_reference: Buffer.byteLength(packed.json ?? ''), replay_gzip: commit.step.payloadGzip.length, ...packed.writtenBytes })) {
+            operationsMetrics.payloadSize.observe({ kind }, bytes)
+            operationsMetrics.logicalBytes.inc({ kind }, bytes)
+          }
+        })
         if (commit.result) this.history.forget(commit.roomId)
         else this.history.accept(commit.roomId, packed.nodes, packed.recoveryNodes)
       }
       return result
     } catch (error) {
+      safe(() => operationsMetrics.commitResults.inc({ outcome: 'error' }))
       if (error instanceof ReplayConflictError || error instanceof CommandError) {
         return { kind: 'conflict', error: error.message }
       }

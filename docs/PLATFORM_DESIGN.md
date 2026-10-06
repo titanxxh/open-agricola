@@ -519,3 +519,9 @@ Last updated 2026-10-06.
 | Administrator role | `server/auth.ts` `isAdmin()`, `ADMIN_USERS` |
 | Administrator APIs | `GET/DELETE /api/admin/cards`, `GET /api/admin/cards/:id/export`, `GET /api/admin/users`; PRD #634 removed the self-certified status toggle |
 | Card publish and unpublish | PR-gated under PRD #634: a GitHub App GraphQL decision pins the reviewed version; author publish revalidates before setting live; nonauthors see only live cards |
+
+## Administrator operations dashboard
+
+Administrators enter `?page=operations` from Settings. The overview refreshes every 15 seconds and shows application readiness, distinct online users, live ordinary multiplayer Rooms, five-minute command p95 and system error ratio, component status, collection time and anomaly reasons. Grafana opens through a one-use authenticated handoff and provides current/24-hour/seven-day trends, WS round filtering and size distributions. It is read only and sends no external notifications. It grants no access to hidden active-game state.
+
+Usage counts exclude development and hotseat Rooms from ordinary playing/waiting totals and show those categories separately. Standalone HTTP/browser sandboxes are not Rooms. Online users are authenticated live WS users deduplicated across instances; HTTP-only sessions are not presence. Anonymous development sockets contribute to connections but not authenticated-user totals. Completed usage comes from authoritative game results, not command attempts. Room presence counts use the current ownership epoch and live lease. Unknown/expired sources and insufficient percentile samples remain empty rather than healthy zeroes. Operational defaults and thresholds are documented in [HOW_TO_DEPLOY](HOW_TO_DEPLOY.md#operations-monitoring); source code defines the implementation.

@@ -438,6 +438,9 @@ set -a
 # shellcheck disable=SC1090
 . "$SHARED_DATA_DIR/dependencies.local"
 set +a
+if [[ "${OBSERVABILITY_ENABLED:-true}" == "true" && -n "${OBSERVABILITY_METRICS_TOKEN:-}" ]]; then
+  node "$SCRIPT_DIR/scripts/observability.mjs"
+fi
 
 echo "Ensuring immutable replay viewer..."
 "$PNPM_BIN" run build:cards-manifest

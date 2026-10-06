@@ -1,3 +1,5 @@
+import { performance } from 'node:perf_hooks'
+import { measure, operationsMetrics, safe, observeDatabaseError } from '../observability/metrics'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { Pool, types, type PoolClient, type PoolConfig, type QueryResultRow } from 'pg'
 
@@ -59,7 +61,8 @@ export class PostgresDatabase {
       await transaction.nested
       if (!transaction.active) throw new Error('Query escaped its transaction')
     }
-    return (transaction?.client ?? this.pool).query<Row>(sql, values)
+    try { return await measure('db_query', () => (transaction?.client ?? this.pool).query<Row>(sql, values)) }
+    catch (error) { observeDatabaseError(error); throw error }
   }
 
   async exec(sql: string): Promise<void> {
@@ -111,7 +114,9 @@ export class PostgresDatabase {
         parent.nested = pending.then(() => {}, () => {})
         return await pending
       }
-      const client = await this.pool.connect()
+      const client = await measure('db_pool_wait', () => this.pool.connect())
+      const started = performance.now()
+      let outcome = 'error'
       const transaction: Transaction = { client, active: true, sequence: { value: 0 }, nested: Promise.resolve() }
       try {
         await client.query('BEGIN')
@@ -119,6 +124,7 @@ export class PostgresDatabase {
         await transaction.nested
         transaction.active = false
         await client.query('COMMIT')
+        outcome = 'ok'
         return result
       } catch (error) {
         await transaction.nested
@@ -128,8 +134,13 @@ export class PostgresDatabase {
       } finally {
         transaction.active = false
         client.release()
+        safe(() => operationsMetrics.operationDuration.observe({ stage: 'db_transaction', outcome }, (performance.now() - started) / 1000))
       }
     }
+  }
+
+  observation(): Record<string, number> {
+    return { db_pool_total: this.pool.totalCount, db_pool_idle: this.pool.idleCount, db_pool_busy: this.pool.totalCount - this.pool.idleCount, db_pool_waiting: this.pool.waitingCount }
   }
 
   assertInTransaction(): void {

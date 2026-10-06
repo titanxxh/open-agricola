@@ -592,3 +592,41 @@ pnpm install
 ```
 
 When `VITE_API_BASE` is unset, it defaults to the empty string for same-origin use. In development, the frontend automatically connects to `localhost:5175`.
+
+## Operations monitoring
+
+`./restart-local.sh` prepares and starts local Prometheus, Grafana and Node Exporter alongside the ordinary application. Use `--instances 2` for both application slots. Local monitoring listeners bind **127.0.0.1 only**: Prometheus 19090, Grafana 13000 and Node Exporter 19100. `OBSERVABILITY_ENABLED=false ./restart-local.sh` skips their startup; it does not delete observations. Runtime secrets/configuration and persistent TSDB/Grafana data live in the main checkout's ignored `data/observability/`. The metrics bearer secret is generated in `data/local-services.env`, copied mode 0600, and never sent to browsers.
+
+Production `scripts/local-services.mjs` prepares monitoring configuration automatically; `deploy-backend.sh` starts the three monitoring services with app/Caddy. Neither Grafana nor Prometheus nor Node Exporter publishes a production host port. Their private dependency network is a trusted server boundary; do not add a Caddy route directly to them. Only `/ops/` through the application gateway is public. The services run without a Docker socket; Node Exporter mounts the host root read only and uses host PID visibility for host observations. Configure `OBSERVABILITY_UID/GID` when the deployment account differs from 1000 and ensure `data/observability/{prometheus,grafana}` and the token file are readable/writable by that account. The application still runs as `APP_UID/GID`.
+
+Prometheus scrapes every 15s (5s timeout), discovers current application leases every 15s, and stores a seven-day TSDB. Global DB queries, authenticated-user presence and cgroup/backup checks run at most every 60s and share in-flight work. Stable per-slot targets avoid process UUID series churn. Prometheus `rate`/`increase` handle restart counter resets; merge buckets with `sum by(le,...)` **before** `histogram_quantile`. The dashboard offers 24h/7d ranges and 15s refresh. Seven-day retention is TSDB block retention, not an exact per-sample erasure timer; no pre-installation history is fabricated. Gaps remain gaps, and quantiles cannot recover exact maxima.
+
+| Metric family / seam | Meaning and aggregation |
+|---|---|
+| `agricola_http_*`, app and ingress HTTP | Bounded route/method/status, response finish or aborted; keep ingress/app roles separate |
+| `agricola_commands_total`, command/response histograms | Attempts and ok/rule rejection/duplicate/stale/canceled/system failure; parsed dispatch to final local work vs first correlated response |
+| `agricola_operation_duration_seconds`, queue/preflight/commit/snapshot/encode/persist/publication/projection/json/send | Monotonic wall time; overlapping stages are not additive; send is enqueue, not delivery |
+| `agricola_rule_duration_seconds` | Command and native/Worker mode; includes Worker wait, not Worker CPU |
+| `agricola_ws_outgoing_message_size_bytes` | Every complete UTF-8 JSON per actual recipient, with finite round/message type; histogram count/sum provide rates and bytes |
+| `agricola_ws_broadcast_payload_bytes`, recipients | One committed publication's sum of recipient envelopes and actual fanout; no second serialization |
+| WS errors, incoming bytes, buffered bytes | Parse/send/socket errors and current application backpressure; host counters cover transport overhead |
+| Persistence payload histogram/total and commit attempts | Confirmed snapshot-reference/body JSON, newly inserted history/recovery JSON and Replay gzip; conflicts/errors/retries are attempts, not confirmed writes |
+| DB operation histograms, pool gauges, `agricola_db_errors_total` | Query (including pool wait), transaction acquisition wait, BEGIN-to-COMMIT/ROLLBACK wall time; timeout/deadlock/connection-limit/unavailable/query errors without SQL text |
+| Platform global gauges | Deduplicated authenticated WS users, live lease/epoch Room counts, development/hotseat categories, capacity, connections and completed games in 24h/7d |
+| Runtime platform gauges and Node defaults | Queue depth/age, blocked/retrying/permanent Rooms, Workers active/reserved/busy/pending/capacity/timeouts, CPU/RSS/heap/ELU/lag/GC |
+| Container cgroup + Node Exporter | App cgroup limits, usage, throttling and IO; host CPU/memory/filesystem/disk/network. Two app slots share a cgroup: never sum duplicate cgroup values |
+| PostgreSQL / object / task gauges | Connections, locks, long transactions (>30s), deadlocks, database size, cluster WAL; object inventory/staging; report/deletion/revocation backlog and report oldest age |
+| S3 operation histograms / bytes | Public store-operation wall time including SDK retries and full body read; successful payload bytes. SDK attempts and missing-object outcomes are not distinct series |
+| Browser duration/events | 10% session samples of command RTT, connect-to-first-snapshot readiness, snapshot-to-React-layout-commit; bounded upload, no account/Room/payload identifiers |
+| Collector success/errors + Prometheus scrape metrics | Actual last successful source observation, errors, scrape duration/sample count, exporter availability and observability cost |
+| Backup freshness | Optional validated manifest time; absent/invalid is unknown. No claim of a running backup's progress or a recovery test |
+
+`backup-storage.sh` atomically updates `backups/observability.latest.json` after successful archive validation. Production mounts backups read only and sets `OBSERVABILITY_BACKUP_MANIFEST` to this file. For local monitoring, set that environment variable explicitly to a validated manifest. Backup presence alone does not prove restoration.
+
+Health defaults are operational starting points, not capacity certification: missing global collection or age ≥120s is **unknown**; no scraped application up is **unavailable**; fewer ready slots than `APP_INSTANCES`, any blocked Room or recent DB infrastructure/S3 failures, command p95 >1s (at least 20 samples/5m), system error ratio >2%/5m, oldest report >15m or validated backup >48h is **degraded**. Otherwise the application/DB overview is normal. S3 with no successful call in 120s and absent backup remain individually unknown, even while core readiness is normal. A refreshed source/rolling window clears the condition; no external alerts or operational writes are exposed. Failed refresh clears displayed values and preserves the last collection timestamp. Thresholds use PostgreSQL/runtime evidence, not old SQLite benchmarks.
+
+Round labels have 18 possible values; with five message types, 13 size bucket/count/sum series and two app targets, outgoing WS histograms have at most 2340 series. Publication families add at most 792. Expect fewer than 15,000 application series in ordinary operation; 15s/7d at that budget is about 605 million samples. Provision at least 5GB TSDB space initially and monitor actual disk/series/scrape cost rather than promising a fixed compression ratio. Collector queries use a separate one-connection pool with 1s acquisition/2s statement bounds and are off the game command path; metrics counters do not traverse game snapshots. Initial observation budget: under 0.5ms additional CPU per returned message and under 100ms global scrape collection on the local normal workload. These budgets are not production latency or capacity acceptance.
+
+To disable visualization reversibly, stop `prometheus grafana node-exporter` with the matching Compose file; keep their data directories for later restart. Never remove volumes as a rollback step. The application reports unknown when trend storage is unavailable; gameplay durability and routing remain authoritative. This implementation does not deploy production, inject failures or certify capacity.
+
+Configuration follows the official [Grafana auth proxy documentation](https://grafana.com/docs/grafana/latest/setup-grafana/configure-access/configure-authentication/auth-proxy/) and [Prometheus discovery/configuration documentation](https://prometheus.io/docs/prometheus/latest/configuration/configuration/).

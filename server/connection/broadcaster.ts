@@ -1,4 +1,5 @@
 import { ExecutionAccess } from '../game/execution-access'
+import { measure, operationsMetrics, roundTag, sendObserved, safe } from '../observability/metrics'
 import { RoomDirectory, RoomOwnershipError } from '../game/room-directory'
 import type { WebSocket } from 'ws'
 import { isDevRoom, roomOccupiedSeatCount, type Room } from '../game/room.ts'
@@ -57,7 +58,7 @@ export class Broadcaster {
   }
 
   sendRoomEvent(ws: WebSocket, room: Room, event: ServerEvent): void | Promise<void> {
-    return this.publish(room, () => this.sendTo(ws, event))
+    return this.publish(room, () => { sendObserved(ws, event, roundTag(room.session.state)) })
   }
 
   broadcastCommitted(
@@ -67,23 +68,30 @@ export class Broadcaster {
     requestId?: string,
     requesterResponse?: RequesterResponse,
   ): void | Promise<void> {
-    return this.publish(room, () => {
-    const emittedAt = Date.now()
-    for (const seat of room.players) {
-      if (seat.ws.readyState !== seat.ws.OPEN) continue
-      const env = buildEnvelope({
-        room,
-        resp: requesterResponse?.ws === seat.ws ? requesterResponse.response : resp,
-        viewerPlayerId: viewerIdForSeat(resp, seat.playerIndex),
-        version: room.version,
-        cause,
-        requestId: requesterResponse && requesterResponse.ws !== seat.ws ? undefined : requestId,
-        emittedAt,
-        mode: projectionModeFor(room),
-      })
-      seat.ws.send(JSON.stringify(env))
+    return measure('publication', () => this.publish(room, () => {
+      const emittedAt = Date.now()
+      let bytes = 0
+      let recipients = 0
+      for (const seat of room.players) {
+        if (seat.ws.readyState !== seat.ws.OPEN) continue
+        const env = measure('projection', () => buildEnvelope({
+          room,
+          resp: requesterResponse?.ws === seat.ws ? requesterResponse.response : resp,
+          viewerPlayerId: viewerIdForSeat(resp, seat.playerIndex),
+          version: room.version,
+          cause,
+          requestId: requesterResponse && requesterResponse.ws !== seat.ws ? undefined : requestId,
+          emittedAt,
+          mode: projectionModeFor(room),
+      }))
+      bytes += sendObserved(seat.ws, env)
+      recipients++
     }
+    safe(() => {
+      operationsMetrics.broadcastSize.observe({ round: roundTag(resp.state) }, bytes)
+      operationsMetrics.broadcastRecipients.observe({ round: roundTag(resp.state) }, recipients)
     })
+    }))
   }
 
   sendStateTo(
@@ -94,32 +102,33 @@ export class Broadcaster {
     cause: StateUpdateCause = 'reconnect',
     mode?: SyncPayloadMode,
   ): void | Promise<void> {
-    return this.publish(room, () => {
-    const seat = room.players.find((p) => p.ws === ws)
-    const env = buildEnvelope({
-      room,
-      resp,
-      viewerPlayerId: viewerIdForSeat(resp, seat?.playerIndex),
-      version: room.version,
-      cause,
-      requestId,
-      emittedAt: Date.now(),
-      mode: mode ?? projectionModeFor(room),
-    })
-    if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(env))
-    })
+    return measure('publication', () => this.publish(room, () => {
+      const seat = room.players.find((p) => p.ws === ws)
+      const env = measure('projection', () => buildEnvelope({
+        room,
+        resp,
+        viewerPlayerId: viewerIdForSeat(resp, seat?.playerIndex),
+        version: room.version,
+        cause,
+        requestId,
+        emittedAt: Date.now(),
+        mode: mode ?? projectionModeFor(room),
+    }))
+    sendObserved(ws, env)
+    }))
   }
 
   broadcastEvent(room: Room, event: ServerEvent): void | Promise<void> {
     return this.publish(room, () => {
     const data = JSON.stringify(event)
+    const round = roundTag(room.session.state)
     for (const seat of room.players) {
-      if (seat.ws.readyState === seat.ws.OPEN) seat.ws.send(data)
+      sendObserved(seat.ws, event, round, data)
     }
     }, event.type === 'roomDissolved')
   }
 
   sendTo(ws: WebSocket, event: ServerEvent): void {
-    if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(event))
+    sendObserved(ws, event)
   }
 }

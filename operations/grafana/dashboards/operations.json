@@ -1,0 +1,1945 @@
+{
+  "uid": "open-agricola",
+  "title": "Open Agricola Operations",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": false,
+  "refresh": "15s",
+  "timezone": "browser",
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": [
+      "15s",
+      "30s",
+      "1m"
+    ],
+    "time_options": [
+      "1h",
+      "6h",
+      "24h",
+      "7d"
+    ]
+  },
+  "tags": [
+    "operations"
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "round",
+        "label": "Returned game round",
+        "type": "custom",
+        "query": "pregame,1,2,3,4,5,6,7,8,9,10,11,12,13,14,postgame,none,unknown",
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Scrape availability",
+      "type": "stat",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agricola-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "Unknown / no samples",
+          "custom": {
+            "spanNulls": false
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "up{job=~\"agricola-.*|host\"}",
+          "legendFormat": "{{job}} {{instance}}",
+          "format": "time_series"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Global collection age",
+      "type": "stat",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agricola-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "noValue": "Unknown / no samples",
+          "custom": {
+            "spanNulls": false
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 120
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "time()-agricola_collector_last_success_unixtime{source=\"global\"}",
+          "legendFormat": "seconds since successful collection",
+          "format": "time_series"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Users, Rooms and usage",
+      "type": "timeseries",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agricola-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "Unknown / no samples",
+          "custom": {
+            "spanNulls": false
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "agricola_platform{role=\"ingress\",kind=~\"online_users|rooms_.*|players_connected|games_completed_.*\"} and on(job,instance) (time()-agricola_collector_last_success_unixtime{source=\"global\"}<120)",
+          "legendFormat": "{{kind}}",
+          "format": "time_series"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Command attempts and outcomes",
+      "type": "timeseries",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agricola-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "noValue": "Unknown / no samples",
+          "custom": {
+            "spanNulls": false
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by(command,outcome)(rate(agricola_commands_total[$__rate_interval]))",
+          "legendFormat": "{{command}} {{outcome}}",
+          "format": "time_series"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Command p95 / p99",
+      "type": "timeseries",
+      "description": "Parsed reception through local publication/receipt. Includes queue and durable retries. At least 20 samples/5m; does not measure client delivery.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agricola-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "noValue": "Unknown / no samples",
+          "custom": {
+            "spanNulls": false
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95,sum by(le,command)(rate(agricola_command_duration_seconds_bucket[$__rate_interval]))) and on(command) (sum by(command)(increase(agricola_command_duration_seconds_count[5m]))>=20)",
+          "legendFormat": "p95 {{command}}",
+          "format": "time_series"
+        },
+        {
+          "refId": "B",
+          "expr": "histogram_quantile(0.99,sum by(le,command)(rate(agricola_command_duration_seconds_bucket[$__rate_interval]))) and on(command) (sum by(command)(increase(agricola_command_duration_seconds_count[5m]))>=20)",
+          "legendFormat": "p99 {{command}}",
+          "format": "time_series"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "First response p95",
+      "type": "timeseries",
+      "description": "First correlated response enqueue can be pending. It is not final completion.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agricola-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "noValue": "Unknown / no samples",
+          "custom": {
+            "spanNulls": false
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95,sum by(le,command)(rate(agricola_command_response_duration_seconds_bucket[$__rate_interval])))",
+          "legendFormat": "{{command}}",
+          "format": "time_series"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "HTTP p95 by route and role",
+      "type": "timeseries",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agricola-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 24,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "noValue": "Unknown / no samples",
+          "custom": {
+            "spanNulls": false
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95,sum by(le,route,role)(rate(agricola_http_request_duration_seconds_bucket[$__rate_interval])))",
+          "legendFormat": "{{role}} {{route}}",
+          "format": "time_series"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "Stage p95 and errors",
+      "type": "timeseries",
+      "description": "Monotonic wall time. Nested stages overlap; do not add them.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agricola-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 24,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "noValue": "Unknown / no samples",
+          "custom": {
+            "spanNulls": false
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95,sum by(le,stage,outcome)(rate(agricola_operation_duration_seconds_bucket[$__rate_interval])))",
+          "legendFormat": "{{stage}} {{outcome}}",
+          "format": "time_series"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "title": "Rule execution p95",
+      "type": "timeseries",
+      "description": "Worker includes messaging/wait; separate from CPU.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agricola-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 32,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "noValue": "Unknown / no samples",
+          "custom": {
+            "spanNulls": false
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95,sum by(le,command,mode)(rate(agricola_rule_duration_seconds_bucket[$__rate_interval])))",
+          "legendFormat": "{{command}} {{mode}}",
+          "format": "time_series"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "title": "Queue depth and oldest wait",
+      "type": "timeseries",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agricola-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 32,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "Unknown / no samples",
+          "custom": {
+            "spanNulls": false
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "agricola_queue_pending",
+          "legendFormat": "{{instance}} depth",
+          "format": "time_series"
+        },
+        {
+          "refId": "B",
+          "expr": "clamp_min(time()-agricola_queue_oldest_enqueued_unixtime,0) and (agricola_queue_oldest_enqueued_unixtime>0)",
+          "legendFormat": "{{instance}} oldest seconds",
+          "format": "time_series"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "title": "Returned WS envelope p50 / p95 / p99",
+      "type": "timeseries",
+      "description": "Actual complete UTF-8 JSON per recipient before WS compression/framing. Round comes from that returned state. Histogram cannot reconstruct exact maximum.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agricola-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 40,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "noValue": "Unknown / no samples",
+          "custom": {
+            "spanNulls": false
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.5,sum by(le)(rate(agricola_ws_outgoing_message_size_bytes_bucket{round=~\"$round\",message_type=\"state\"}[$__rate_interval])))",
+          "legendFormat": "p50",
+          "format": "time_series"
+        },
+        {
+          "refId": "B",
+          "expr": "histogram_quantile(0.95,sum by(le)(rate(agricola_ws_outgoing_message_size_bytes_bucket{round=~\"$round\",message_type=\"state\"}[$__rate_interval])))",
+          "legendFormat": "p95",
+          "format": "time_series"
+        },
+        {
+          "refId": "C",
+          "expr": "histogram_quantile(0.99,sum by(le)(rate(agricola_ws_outgoing_message_size_bytes_bucket{round=~\"$round\",message_type=\"state\"}[$__rate_interval])))",
+          "legendFormat": "p99",
+          "format": "time_series"
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "title": "Returned WS size distribution",
+      "type": "heatmap",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agricola-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 40,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "noValue": "Unknown / no samples",
+          "custom": {
+            "spanNulls": false
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        },
+        "calculate": false,
+        "yAxis": {
+          "unit": "bytes"
+        },
+        "cellGap": 1
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by(le)(rate(agricola_ws_outgoing_message_size_bytes_bucket{round=~\"$round\",message_type=\"state\"}[$__rate_interval]))",
+          "legendFormat": "{{le}}",
+          "format": "heatmap"
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "title": "WS size p95 by round",
+      "type": "timeseries",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agricola-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 48,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "noValue": "Unknown / no samples",
+          "custom": {
+            "spanNulls": false
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95,sum by(le,round)(rate(agricola_ws_outgoing_message_size_bytes_bucket{message_type=\"state\"}[$__rate_interval])))",
+          "legendFormat": "round {{round}}",
+          "format": "time_series"
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "title": "WS message rate / payload traffic",
+      "type": "timeseries",
+      "description": "Payload rates use histogram count/sum; network framing, TLS and TCP bytes are host metrics.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agricola-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 48,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "Unknown / no samples",
+          "custom": {
+            "spanNulls": false
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by(round)(rate(agricola_ws_outgoing_message_size_bytes_count{round=~\"$round\"}[$__rate_interval]))",
+          "legendFormat": "{{round}} messages/s",
+          "format": "time_series"
+        },
+        {
+          "refId": "B",
+          "expr": "sum by(round)(rate(agricola_ws_outgoing_message_size_bytes_sum{round=~\"$round\"}[$__rate_interval]))",
+          "legendFormat": "{{round}} bytes/s",
+          "format": "time_series"
+        }
+      ]
+    },
+    {
+      "id": 15,
+      "title": "Publication payload and fanout",
+      "type": "timeseries",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agricola-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 56,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "Unknown / no samples",
+          "custom": {
+            "spanNulls": false
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95,sum by(le)(rate(agricola_ws_broadcast_payload_bytes_bucket{round=~\"$round\"}[$__rate_interval])))",
+          "legendFormat": "p95 total bytes",
+          "format": "time_series"
+        },
+        {
+          "refId": "B",
+          "expr": "sum(rate(agricola_ws_broadcast_recipients_sum{round=~\"$round\"}[$__rate_interval]))/sum(rate(agricola_ws_broadcast_recipients_count{round=~\"$round\"}[$__rate_interval]))",
+          "legendFormat": "mean recipients",
+          "format": "time_series"
+        }
+      ]
+    },
+    {
+      "id": 16,
+      "title": "WS errors / backpressure",
+      "type": "timeseries",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agricola-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 56,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "Unknown / no samples",
+          "custom": {
+            "spanNulls": false
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by(kind)(rate(agricola_ws_errors_total[$__rate_interval]))",
+          "legendFormat": "{{kind}} errors/s",
+          "format": "time_series"
+        },
+        {
+          "refId": "B",
+          "expr": "agricola_platform{role=\"app\",kind=\"ws_buffered_bytes\"}",
+          "legendFormat": "{{instance}} buffered bytes",
+          "format": "time_series"
+        }
+      ]
+    },
+    {
+      "id": 17,
+      "title": "Confirmed persistence bytes",
+      "type": "timeseries",
+      "description": "Confirmed logical snapshot reference/body, appended history/recovery records and Replay gzip. Not WAL or physical disk IO.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agricola-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 64,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "noValue": "Unknown / no samples",
+          "custom": {
+            "spanNulls": false
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by(kind)(increase(agricola_persistence_payload_bytes_total[$__range]))",
+          "legendFormat": "{{kind}} bytes in selected range",
+          "format": "time_series"
+        }
+      ]
+    },
+    {
+      "id": 18,
+      "title": "Durable writes and retries",
+      "type": "timeseries",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agricola-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 64,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "noValue": "Unknown / no samples",
+          "custom": {
+            "spanNulls": false
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by(outcome)(rate(agricola_commit_attempts_total[$__rate_interval]))",
+          "legendFormat": "{{outcome}} attempts/s",
+          "format": "time_series"
+        }
+      ]
+    },
+    {
+      "id": 19,
+      "title": "Database pool and workers",
+      "type": "timeseries",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agricola-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 72,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "Unknown / no samples",
+          "custom": {
+            "spanNulls": false
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "agricola_platform{role=\"app\",kind=~\"db_pool_.*|workers_.*\"}",
+          "legendFormat": "{{instance}} {{kind}}",
+          "format": "time_series"
+        }
+      ]
+    },
+    {
+      "id": 20,
+      "title": "Blocked and retrying Rooms",
+      "type": "timeseries",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agricola-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 72,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "Unknown / no samples",
+          "custom": {
+            "spanNulls": false
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "agricola_platform{role=\"app\",kind=~\"blocked_.*|retrying_rooms|permanent_rooms\"}",
+          "legendFormat": "{{instance}} {{kind}}",
+          "format": "time_series"
+        }
+      ]
+    },
+    {
+      "id": 21,
+      "title": "Node CPU",
+      "type": "timeseries",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agricola-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 80,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "Unknown / no samples",
+          "custom": {
+            "spanNulls": false
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(agricola_process_cpu_user_seconds_total[$__rate_interval])+rate(agricola_process_cpu_system_seconds_total[$__rate_interval])",
+          "legendFormat": "{{role}} {{instance}} CPU cores",
+          "format": "time_series"
+        }
+      ]
+    },
+    {
+      "id": 22,
+      "title": "RSS / heap",
+      "type": "timeseries",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agricola-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 80,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "noValue": "Unknown / no samples",
+          "custom": {
+            "spanNulls": false
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "agricola_process_resident_memory_bytes",
+          "legendFormat": "{{instance}} RSS",
+          "format": "time_series"
+        },
+        {
+          "refId": "B",
+          "expr": "agricola_nodejs_heap_size_used_bytes",
+          "legendFormat": "{{instance}} heap used",
+          "format": "time_series"
+        }
+      ]
+    },
+    {
+      "id": 23,
+      "title": "Event loop lag / utilization",
+      "type": "timeseries",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agricola-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 88,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "noValue": "Unknown / no samples",
+          "custom": {
+            "spanNulls": false
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "agricola_nodejs_eventloop_lag_p99_seconds",
+          "legendFormat": "{{instance}} p99 lag",
+          "format": "time_series"
+        },
+        {
+          "refId": "B",
+          "expr": "agricola_platform{kind=\"event_loop_utilization\"}",
+          "legendFormat": "{{instance}} utilization",
+          "format": "time_series"
+        }
+      ]
+    },
+    {
+      "id": 24,
+      "title": "GC p95",
+      "type": "timeseries",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agricola-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 88,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "noValue": "Unknown / no samples",
+          "custom": {
+            "spanNulls": false
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95,sum by(le,kind)(rate(agricola_nodejs_gc_duration_seconds_bucket[$__rate_interval])))",
+          "legendFormat": "{{kind}}",
+          "format": "time_series"
+        }
+      ]
+    },
+    {
+      "id": 25,
+      "title": "Container limits and memory",
+      "type": "timeseries",
+      "description": "App processes share a cgroup: do not sum identical container values across slots. Local host execution may expose host cgroup rather than a dedicated app container.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agricola-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 96,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "Unknown / no samples",
+          "custom": {
+            "spanNulls": false
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "agricola_platform{role=\"app\",kind=~\"container_.*\"}",
+          "legendFormat": "{{instance}} {{kind}}",
+          "format": "time_series"
+        }
+      ]
+    },
+    {
+      "id": 26,
+      "title": "PostgreSQL health / tasks / object inventory",
+      "type": "timeseries",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agricola-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 96,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "Unknown / no samples",
+          "custom": {
+            "spanNulls": false
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "agricola_platform{role=\"ingress\",kind=~\"pg_connections|pg_long_transactions|pg_waiting_locks|pg_deadlocks|.*backlog|reports_oldest_age_seconds|objects_staging\"} and on(job,instance) (time()-agricola_collector_last_success_unixtime{source=\"global\"}<120)",
+          "legendFormat": "{{kind}}",
+          "format": "time_series"
+        }
+      ]
+    },
+    {
+      "id": 27,
+      "title": "PostgreSQL WAL and database size",
+      "type": "timeseries",
+      "description": "Cluster WAL counter is separate from logical app bytes and host disk writes; counters can reset.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agricola-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 104,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "noValue": "Unknown / no samples",
+          "custom": {
+            "spanNulls": false
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(agricola_platform{kind=\"pg_wal_bytes\"}[$__rate_interval])",
+          "legendFormat": "WAL bytes/s",
+          "format": "time_series"
+        },
+        {
+          "refId": "B",
+          "expr": "agricola_platform{kind=\"pg_database_bytes\"}",
+          "legendFormat": "database bytes",
+          "format": "time_series"
+        }
+      ]
+    },
+    {
+      "id": 28,
+      "title": "S3 requests and bytes",
+      "type": "timeseries",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agricola-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 104,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "Unknown / no samples",
+          "custom": {
+            "spanNulls": false
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by(stage,outcome)(rate(agricola_operation_duration_seconds_count{stage=~\"s3_.*\"}[$__rate_interval]))",
+          "legendFormat": "{{stage}} {{outcome}} requests/s",
+          "format": "time_series"
+        },
+        {
+          "refId": "B",
+          "expr": "sum by(kind)(rate(agricola_s3_payload_bytes_total[$__rate_interval]))",
+          "legendFormat": "{{kind}} bytes/s",
+          "format": "time_series"
+        }
+      ]
+    },
+    {
+      "id": 29,
+      "title": "Browser command RTT / snapshot UI commit / readiness",
+      "type": "timeseries",
+      "description": "10% browser sampling. Browser monotonic clock only. UI commit is React layout commit, not paint; untrusted observational input. RTT includes network, server and scheduling.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agricola-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 112,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "noValue": "Unknown / no samples",
+          "custom": {
+            "spanNulls": false
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95,sum by(le,kind,outcome)(rate(agricola_client_duration_seconds_bucket{round=~\"$round\"}[$__rate_interval])))",
+          "legendFormat": "{{kind}} {{outcome}}",
+          "format": "time_series"
+        }
+      ]
+    },
+    {
+      "id": 30,
+      "title": "Browser reconnects and timeouts",
+      "type": "timeseries",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agricola-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 112,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "noValue": "Unknown / no samples",
+          "custom": {
+            "spanNulls": false
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by(kind)(rate(agricola_client_events_total[$__rate_interval]))",
+          "legendFormat": "{{kind}}",
+          "format": "time_series"
+        }
+      ]
+    },
+    {
+      "id": 31,
+      "title": "Host CPU / memory pressure",
+      "type": "timeseries",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agricola-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 120,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "noValue": "Unknown / no samples",
+          "custom": {
+            "spanNulls": false
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 0.9
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "1-avg(rate(node_cpu_seconds_total{mode=\"idle\"}[$__rate_interval]))",
+          "legendFormat": "CPU fraction",
+          "format": "time_series"
+        },
+        {
+          "refId": "B",
+          "expr": "1-node_memory_MemAvailable_bytes/node_memory_MemTotal_bytes",
+          "legendFormat": "memory fraction",
+          "format": "time_series"
+        }
+      ]
+    },
+    {
+      "id": 32,
+      "title": "Host disk / network IO",
+      "type": "timeseries",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agricola-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 120,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps",
+          "noValue": "Unknown / no samples",
+          "custom": {
+            "spanNulls": false
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(node_disk_written_bytes_total[$__rate_interval]))",
+          "legendFormat": "disk written bytes/s",
+          "format": "time_series"
+        },
+        {
+          "refId": "B",
+          "expr": "sum(rate(node_disk_read_bytes_total[$__rate_interval]))",
+          "legendFormat": "disk read bytes/s",
+          "format": "time_series"
+        },
+        {
+          "refId": "C",
+          "expr": "sum(rate(node_network_receive_bytes_total{device!=\"lo\"}[$__rate_interval]))",
+          "legendFormat": "network received bytes/s",
+          "format": "time_series"
+        },
+        {
+          "refId": "D",
+          "expr": "sum(rate(node_network_transmit_bytes_total{device!=\"lo\"}[$__rate_interval]))",
+          "legendFormat": "network sent bytes/s",
+          "format": "time_series"
+        }
+      ]
+    },
+    {
+      "id": 33,
+      "title": "Disk free / backup freshness",
+      "type": "timeseries",
+      "description": "No backup manifest or invalid manifest means unknown. Backups remain owner-operated.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agricola-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 128,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "Unknown / no samples",
+          "custom": {
+            "spanNulls": false
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "node_filesystem_avail_bytes{fstype!~\"tmpfs|overlay|squashfs\"}/node_filesystem_size_bytes",
+          "legendFormat": "{{mountpoint}} free fraction",
+          "format": "time_series"
+        },
+        {
+          "refId": "B",
+          "expr": "time()-agricola_platform{kind=\"backup_validated_unixtime\"}",
+          "legendFormat": "backup age seconds",
+          "format": "time_series"
+        }
+      ]
+    },
+    {
+      "id": 34,
+      "title": "Observability cost / failures",
+      "type": "timeseries",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agricola-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 128,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "Unknown / no samples",
+          "custom": {
+            "spanNulls": false
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by(source)(rate(agricola_collector_errors_total[$__rate_interval]))",
+          "legendFormat": "{{source}} collection errors/s",
+          "format": "time_series"
+        },
+        {
+          "refId": "B",
+          "expr": "scrape_duration_seconds{job=~\"agricola-.*\"}",
+          "legendFormat": "{{job}} scrape seconds",
+          "format": "time_series"
+        },
+        {
+          "refId": "C",
+          "expr": "scrape_samples_scraped{job=~\"agricola-.*\"}",
+          "legendFormat": "{{job}} sample count",
+          "format": "time_series"
+        }
+      ]
+    }
+  ]
+}

@@ -14,6 +14,8 @@ import { SandboxAppLazy } from '../sandbox'
 import { setPage, type PlatformPage } from '../utils/platform-page-url'
 import '../App.css'
 
+const OperationsPageLazy = lazy(() => import('./OperationsPage').then(m => ({ default: m.OperationsPage })))
+
 const GameContainerApiLazy = lazy(() =>
   import('./GameContainerApi').then((m) => ({ default: m.GameContainerApi })),
 )
@@ -21,7 +23,7 @@ const GameContainerApiLazy = lazy(() =>
 function getPage(): PlatformPage {
   const params = new URLSearchParams(window.location.search)
   const page = params.get('page')
-  if (page === 'game' || page === 'workshop' || page === 'lobby' || page === 'settings' || page === 'login' || page === 'onboarding') return page
+  if (page === 'game' || page === 'workshop' || page === 'lobby' || page === 'settings' || page === 'login' || page === 'onboarding' || page === 'operations') return page
   if (params.get('context')) return 'game'
   if (params.get('room') || params.get('transport') === 'ws') return 'game'
   if (isHotseatSetupQuery(window.location.search)) return 'game'
@@ -87,6 +89,9 @@ export function PageRouter() {
           <SandboxAppLazy />
         </Suspense>
       )
+      break
+    case 'operations':
+      pageNode = <Suspense fallback={<AppShellLoadScreen />}><OperationsPageLazy /></Suspense>
       break
     case 'settings':
       pageNode = <SettingsPage />

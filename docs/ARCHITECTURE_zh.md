@@ -1705,3 +1705,15 @@ pnpm run build              # tsc + vite build
 | CI 检查 | `docs/operations/ci-checks.md` |
 | GitHub OAuth | `docs/operations/github-oauth-app-setup.md` |
 | 已知卡牌架构债务 | `docs/card_implementation_status.md` |
+
+## 平台运行观测
+
+`server/observability/` 管理有界数值指标、采集、管理员网关和总览健康，不写规则状态。`Broadcaster` 在已有编码发送处按收件人计量一次；`stateUpdate` 回合取该包实际返回的状态，undo 和恢复也遵循此口径。回合为 `1`–`14`、`pregame`（draft/parent selection）、`postgame`（gameOver/playing 第 15 回合）、`none`、`unknown`。其他事件使用捕获的 Room/命令上下文。禁止把房间、账号、命令/请求身份、卡牌、payload 或异常文本作为标签。
+
+命令单调时钟耗时覆盖解析后的 dispatch、队列等待、receipt/ownership 校验、Session 执行、持久化提交及本地发布。首次相关响应另行统计，pending receipt 不等于完成。提交仍然先持久化再发布，冻结重试语义不变。投影、JSON 编码和 `ws.send` 入队分别统计，嵌套阶段有重叠；入队不代表网络送达或前端渲染。指标失败不得改变游戏结果。默认进程指标覆盖 CPU、RSS/heap、事件循环延迟和 GC；Worker 墙钟耗时不等于 Worker CPU。
+
+应用端口绑定 app 容器内 loopback，私有 Prometheus 通过 bearer 保护的入口发现和逐实例转发采集。稳定端口/slot 标签跨进程身份变化，PromQL 处理 counter reset，合并 histogram bucket 后再计算分位数。入口拥有全站基于租约/epoch 的房间汇总，并通过带过期时间的私有 presence 行对在线用户去重；应用进程提供本地连接、队列、Worker、持久化健康。采集仅更新运行 presence，不写游戏状态，不遍历快照/history 采集平台 gauge。
+
+Grafana 仅访问 Prometheus 汇总。每个 `/ops/` 资源和查询重新校验当前站点 session 与 `ADMIN_USERS`。30 秒原子一次性交接安装 HttpOnly 看板 cookie，关联原始 session；删除、过期和权限变化在下一次请求生效。代理丢弃客户端凭据/身份头，强制 Viewer，仅允许 GET/HEAD 和只读数据源查询 POST。禁用 Grafana login token、匿名/basic 登录、公开看板、编辑和 Live；生产不发布私有服务端口。指标清单和新鲜度边界见[部署文档](HOW_TO_DEPLOY.md#operations-monitoring)。
+
+浏览器按 10% 会话抽样上传有界、限速的命令 RTT、首快照就绪、快照到 React layout commit 耗时。每项起止使用同一浏览器单调时钟，不跨时钟相减，也不宣称测到浏览器 paint。样本仅含数值耗时、有界 kind/outcome 和回合，属于不可信观测输入。

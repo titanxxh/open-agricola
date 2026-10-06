@@ -32,7 +32,7 @@ if (operation === 'create') {
     LOCAL_ENV_FILE: envPath, SHARED_DATA_DIR: root, REPLAY_VIEWER_ROOT: join(root, 'replay-viewers'),
     BACKEND_PORT: backend, FRONTEND_PORT: frontend, APP_BASE_PORT: String(await freePort()),
     BACKEND_LOG: join(root, 'backend.log'), FRONTEND_LOG: join(root, 'frontend.log'),
-    NODE_ENV: 'test', ACCOUNT_REGISTRATION_POLICY: 'open', ALLOW_ANONYMOUS_WS: 'true',
+    OBSERVABILITY_ENABLED: 'false', NODE_ENV: 'test', ACCOUNT_REGISTRATION_POLICY: 'open', ALLOW_ANONYMOUS_WS: 'true',
     ENABLE_AUTH_TEST_HELPERS: '1', DISABLE_RATE_LIMIT: '1', WORKSHOP_PR_MOCK_MODE: 'true',
     WORKSHOP_TOKEN_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64'),
     PUBLIC_API_BASE: base, PUBLIC_APP_ORIGIN: client, CORS_ORIGIN: client,

@@ -1,3 +1,8 @@
+import { createObservationDatabase } from './observability/database'
+import type { PostgresDatabase } from './database/postgres'
+import { createCollector } from './observability/collector'
+import { metricsAuthorized } from './observability/http'
+import { operationsMetrics } from './observability/metrics'
 import { createServer, request as httpRequest, type IncomingMessage, type ServerResponse } from 'node:http'
 import type { Duplex } from 'node:stream'
 import { RoomDirectory } from './game/room-directory'
@@ -15,7 +20,8 @@ const jsonError = (res: ServerResponse, status: number, message: string) => {
 const nodePath = /^\/nodes\/([A-Za-z0-9-]+)\/ws(?:\?(.*))?$/
 
 /** One public origin. Routing cookies convey affinity only, never authentication. */
-export function createPublicIngress(directory: RoomDirectory, secureCookies: boolean, trustProxy = process.env.REPLAY_TRUST_PROXY === 'true' || process.env.REPLAY_TRUST_PROXY === '1') {
+export function createPublicIngress(directory: RoomDirectory, secureCookies: boolean, trustProxy = process.env.REPLAY_TRUST_PROXY === 'true' || process.env.REPLAY_TRUST_PROXY === '1', observationDb?: PostgresDatabase) {
+  const collect = createCollector(directory.db, 'ingress', undefined, undefined, undefined, observationDb)
   let next = 0
   const sockets = new Set<Duplex>()
   const forwarded = (req: IncomingMessage, upgrade = false) => ({
@@ -26,10 +32,31 @@ export function createPublicIngress(directory: RoomDirectory, secureCookies: boo
     connection: upgrade ? 'Upgrade' : 'close',
   })
   const server = createServer((req, res) => {
+    operationsMetrics.http(req, res)
     void (async () => {
+      const path = new URL(req.url ?? '/', 'http://localhost').pathname
+      if (path.startsWith('/internal/metrics')) {
+        if (!metricsAuthorized(req)) { res.writeHead(401); res.end(); return }
+        if (path === '/internal/metrics') {
+          await collect()
+          res.writeHead(200, { 'Content-Type': operationsMetrics.registry.contentType })
+          res.end(await operationsMetrics.registry.metrics()); return
+        }
+        if (path === '/internal/metrics/targets') {
+          const instances = await directory.instances()
+          const targets = instances.map(instance => ({ targets: [req.headers.host ?? 'localhost:5175'], labels: {
+            __metrics_path__: `/internal/metrics/app/${instance.instance_id}`, instance: `app-${new URL(instance.internal_url).port}`,
+          } }))
+          res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(targets)); return
+        }
+      }
       const instances = await directory.instances()
       const affinity = req.headers.cookie?.split(';').map(value => value.trim()).find(value => value.startsWith(`${AFFINITY_COOKIE}=`))?.slice(AFFINITY_COOKIE.length + 1)
       let selected: typeof instances[number] | undefined = instances.find(instance => instance.instance_id === affinity) ?? instances[next++ % instances.length]
+      if (path.startsWith('/internal/metrics/app/')) {
+        selected = instances.find(instance => instance.instance_id === path.slice('/internal/metrics/app/'.length))
+        req.url = '/internal/metrics'
+      } else if (path.startsWith('/internal/metrics/')) { res.writeHead(404); res.end(); return }
       const dissolve = /^\/api\/rooms\/([A-Za-z0-9-]+)\/dissolve$/.exec(req.url ?? '')
       if (req.method === 'POST' && dissolve && await directory.db.prepare('SELECT 1 FROM rooms WHERE id=?').get(dissolve[1])) {
         const owner = await directory.claim(dissolve[1]!)
@@ -80,13 +107,14 @@ export function createPublicIngress(directory: RoomDirectory, secureCookies: boo
       const closed = new Promise<void>(done => server.close(() => done()))
       for (const socket of sockets) socket.end()
       await closed
+      await observationDb?.close()
     },
   }
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   await initializeDatabase()
-  const ingress = createPublicIngress(new RoomDirectory(getDb()), process.env.PUBLIC_API_BASE?.startsWith('https:') === true)
+  const ingress = createPublicIngress(new RoomDirectory(getDb()), process.env.PUBLIC_API_BASE?.startsWith('https:') === true, undefined, createObservationDatabase())
   const port = Number(process.env.BACKEND_PORT) || 5175
   ingress.server.listen(port, process.env.BACKEND_HOST ?? '127.0.0.1', () => console.log(`[ingress] Public backend listening on ${port}`))
   installShutdownHandlers(async () => { await ingress.shutdown(); await getDb().close() })

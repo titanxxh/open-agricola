@@ -1,4 +1,4 @@
-export type PlatformPage = 'login' | 'lobby' | 'workshop' | 'game' | 'settings' | 'onboarding'
+export type PlatformPage = 'login' | 'lobby' | 'workshop' | 'game' | 'settings' | 'onboarding' | 'operations'
 
 const PAGE_SCOPED_QUERY_KEYS = [
   'card',

@@ -66,7 +66,7 @@ MAINTENANCE_LOCK_HELD=1 bash scripts/backup-storage.sh "$STEM" --already-stopped
 RESTART_OLD=0
 "${COMPOSE[@]}" run --rm --no-deps app node --import tsx scripts/storage-archive-cli.ts \
   check-live "$TARGET_REF" --applications-stopped
-"${COMPOSE[@]}" up -d --remove-orphans --no-build --wait --wait-timeout 120 app caddy
+"${COMPOSE[@]}" up -d --remove-orphans --no-build --wait --wait-timeout 120 app caddy prometheus grafana node-exporter
 printf '%s\n' "$TARGET_REF" > data/deployed-build-id
 printf 'Previous build: %s\nCurrent build: %s\n' "$PREVIOUS_REF" "$TARGET_REF"
 # Pre-deploy archives: newest 5, and never beyond the 30-day retention bound.

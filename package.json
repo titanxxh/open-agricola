@@ -68,6 +68,7 @@
     "isolated-vm": "^7.0.1",
     "nanoid": "^6.0.1",
     "pg": "^8.23.1",
+    "@prometheus-io/client": "0.16.1",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "tsx": "^4.23.15",

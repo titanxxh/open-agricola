@@ -74,7 +74,7 @@ const writeServicesStub = (root: string): void => {
     import { mkdirSync, writeFileSync } from 'node:fs'
     import { join } from 'node:path'
     mkdirSync(process.env.SHARED_DATA_DIR, { recursive: true })
-    writeFileSync(join(process.env.SHARED_DATA_DIR, 'dependencies.local'), '')
+    writeFileSync(join(process.env.SHARED_DATA_DIR, 'dependencies.local'), 'OBSERVABILITY_ENABLED=false\\n')
   `)
 }
 

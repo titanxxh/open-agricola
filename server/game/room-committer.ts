@@ -1,3 +1,4 @@
+import { measure } from '../observability/metrics'
 import { ExecutionRevokedError } from './execution-access'
 import type { OwnerToken } from './room-directory'
 import { RoomOwnershipError } from './room-directory'
@@ -226,6 +227,12 @@ export class RoomCommitter {
     this.now = deps.now ?? Date.now
   }
 
+  observation(): Record<string, number> {
+    return { blocked_rooms: this.pending.size + this.pendingReplayLoads.size + this.permanentErrors.size,
+      retrying_rooms: this.pending.size + this.pendingReplayLoads.size, permanent_rooms: this.permanentErrors.size,
+      blocked_oldest_age_seconds: this.pending.size ? Math.max(0, (this.now() - Math.min(...[...this.pending.values()].map(p => p.commit.step.createdAt))) / 1000) : 0 }
+  }
+
   async canCreateRoom(): Promise<{ ok: true } | { ok: false; error: string }> {
     if (this.storageFailed) return { ok: false, error: 'replay storage unavailable' }
     if (!this.viewerBuildId) return { ok: false, error: 'replay viewer build is missing' }
@@ -346,12 +353,12 @@ export class RoomCommitter {
       return this.blockPermanently(room.id, 'game build id is missing')
     }
 
-    const encoded = encodeReplayFrame({
+    const encoded = measure('encode', () => encodeReplayFrame({
       frame,
       previousFrame: null,
       stepNo: 0,
       previousCheckpointStepNo: 0,
-    })
+    }))
     const createdAt = this.now()
     const definitions = room.session.getCustomCardDefs()
     if (!this.resources && definitions.some(definition => definition.artUrl)) throw new ReplayAssetValidationError('Shared resource store is required')
@@ -404,18 +411,18 @@ export class RoomCommitter {
     if (!head) {
       return { kind: 'blocked', error: `replay is not recording for ${room.id}` }
     }
-    const { serialized, frame } = replayFrame(
+    const { serialized, frame } = measure('snapshot', () => replayFrame(
       room,
       response.state.gameOver ? response.scores ?? [] : undefined,
-    )
+    ))
     const stepNo = head.stepNo + 1
     const roomVersion = head.roomVersion + 1
-    const encoded = encodeReplayFrame({
+    const encoded = measure('encode', () => encodeReplayFrame({
       frame,
       previousFrame: head.frame,
       stepNo,
       previousCheckpointStepNo: head.checkpointStepNo,
-    })
+    }))
     if (
       response.durableTransition !== true &&
       encoded.frameHash === head.frameHash &&
@@ -536,7 +543,7 @@ export class RoomCommitter {
   ): Promise<Awaited<RoomCommitResult>> {
     const privateCursor = capturePrivateCursor(commit.serialized.sessionCursor)
     try {
-      const persisted = (await this.persistence.commitReplay(commit))
+      const persisted = (await measure('persist', () => this.persistence.commitReplay(commit)))
       if (persisted.kind === 'conflict') {
         return this.blockPermanently(room.id, persisted.error)
       }
@@ -613,7 +620,7 @@ export class RoomCommitter {
   private async retry(pending: PendingCommit): Promise<Awaited<void>> {
     if (this.stopped || !this.pending.has(pending.room.id)) return
     try {
-      const persisted = (await this.persistence.commitReplay(pending.commit))
+      const persisted = (await measure('persist', () => this.persistence.commitReplay(pending.commit)))
       if (this.stopped) return
       if (persisted.kind === 'conflict') {
         this.blockPermanently(pending.room.id, persisted.error)

@@ -53,4 +53,7 @@ writeFileSync(reportPath, JSON.stringify(report, null, 2) + '\n', { mode: 0o600 
 NODE
 chmod 600 "backups/$STEM.tgz" "backups/$STEM.manifest.json" "backups/env-$STEM" backups/replay-removals.latest.json
 SUCCESS=1
+cp "backups/$STEM.manifest.json" backups/.observability-manifest.tmp
+mv backups/.observability-manifest.tmp backups/observability.latest.json
+chmod 600 backups/observability.latest.json
 echo "Validated native backup: backups/$STEM.tgz"

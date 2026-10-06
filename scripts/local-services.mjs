@@ -19,6 +19,7 @@ if (!existsSync(credentialsFile)) {
 }
 const config = parseEnv(readFileSync(credentialsFile, 'utf8'))
 const generated = {
+  OBSERVABILITY_METRICS_TOKEN: () => randomBytes(32).toString('hex'),
   WORKSHOP_TOKEN_ENCRYPTION_KEY: () => randomBytes(32).toString('base64'),
   LOCAL_S3_ACCESS_KEY: () => randomBytes(16).toString('hex'),
   LOCAL_S3_SECRET_KEY: () => randomBytes(32).toString('hex'),
@@ -77,6 +78,9 @@ if (!process.env.S3_ENDPOINT || testOnly) {
   } finally { client.destroy() }
 }
 const values = {
+  OBSERVABILITY_METRICS_TOKEN: config.OBSERVABILITY_METRICS_TOKEN,
+  PROMETHEUS_URL: 'http://127.0.0.1:19090',
+  GRAFANA_URL: 'http://127.0.0.1:13000',
   S3_ENDPOINT: process.env.S3_ENDPOINT || localS3Endpoint,
   S3_BUCKET: process.env.S3_BUCKET || 'agricola',
   S3_PREFIX: process.env.S3_PREFIX ?? '',
@@ -98,7 +102,7 @@ const text = Object.entries(values).map(([key, value]) => `${key}='${value.repla
 writeFileSync(join(dataDir, 'dependencies.local'), text, { mode: 0o600 })
 // Explicit external endpoints pass through unchanged. Host loopback endpoints
 // become dependency-network addresses when used by application containers.
-const containerValues = { ...values }
+const containerValues = { ...values, PROMETHEUS_URL: 'http://prometheus:9090', GRAFANA_URL: 'http://grafana:3000' }
 if (!process.env.DATABASE_URL) {
   const url = new URL(localUrl); url.hostname = 'postgres'; url.port = '5432'
   containerValues.DATABASE_URL = url.toString()
@@ -111,3 +115,5 @@ console.log('[services] PostgreSQL and S3 configuration ready; application and t
 
 try { execFileSync('docker', ['network', 'inspect', 'open-agricola-local_default'], { stdio: 'ignore' }) }
 catch { execFileSync('docker', ['network', 'create', 'open-agricola-local_default'], { stdio: 'ignore' }) }
+
+execFileSync(process.execPath, ['scripts/observability.mjs', '--prepare-only'], { stdio: 'inherit', env: { ...process.env, SHARED_DATA_DIR: dataDir } })

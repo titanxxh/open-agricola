@@ -44,6 +44,7 @@ services:
       - BUG_REPORT_TOKEN_ENCRYPTION_KEYS=${BUG_REPORT_TOKEN_ENCRYPTION_KEYS:-}
       - BUG_REPORT_TOKEN_ACTIVE_KEY_ID=${BUG_REPORT_TOKEN_ACTIVE_KEY_ID:-}
       - CORS_ORIGIN=${CORS_ORIGIN:-*}
+      - OBSERVABILITY_BACKUP_MANIFEST=/app/backups/observability.latest.json
       - ADMIN_USERS=${ADMIN_USERS:-}
       - ACCOUNT_REGISTRATION_POLICY=${ACCOUNT_REGISTRATION_POLICY:?Set ACCOUNT_REGISTRATION_POLICY explicitly. Use open for first-user bootstrap, then invite_only.}
       - GITHUB_OAUTH_CLIENT_ID=${GITHUB_OAUTH_CLIENT_ID:-}
@@ -67,7 +68,15 @@ services:
       - ACCOUNT_GOOGLE_OAUTH_CLIENT_SECRET=${ACCOUNT_GOOGLE_OAUTH_CLIENT_SECRET:-}
     volumes:
       - app-output:/app/output
+      - ./backups:/app/backups:ro
     restart: unless-stopped
+
+  prometheus:
+    extends: { file: docker-compose.yml, service: prometheus }
+  grafana:
+    extends: { file: docker-compose.yml, service: grafana }
+  node-exporter:
+    extends: { file: docker-compose.yml, service: node-exporter }
 
   caddy:
     image: caddy:alpine
