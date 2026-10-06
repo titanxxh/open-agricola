@@ -2,7 +2,7 @@ apiVersion: 1
 providers:
   - name: Operations
     orgId: 1
-    folder: Operations
+    folder: 平台运行
     type: file
     disableDeletion: true
     allowUiUpdates: false

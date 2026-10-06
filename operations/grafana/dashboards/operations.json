@@ -1,8 +1,8 @@
 {
   "uid": "open-agricola",
-  "title": "Open Agricola Operations",
+  "title": "Open Agricola 平台运行看板",
   "schemaVersion": 39,
-  "version": 1,
+  "version": 2,
   "editable": false,
   "refresh": "15s",
   "timezone": "browser",
@@ -24,20 +24,20 @@
     ]
   },
   "tags": [
-    "operations"
+    "运行监控"
   ],
   "templating": {
     "list": [
       {
         "name": "round",
-        "label": "Returned game round",
+        "label": "返回状态所属游戏回合",
         "type": "custom",
-        "query": "pregame,1,2,3,4,5,6,7,8,9,10,11,12,13,14,postgame,none,unknown",
+        "query": "游戏前 : pregame,第 1 回合 : 1,第 2 回合 : 2,第 3 回合 : 3,第 4 回合 : 4,第 5 回合 : 5,第 6 回合 : 6,第 7 回合 : 7,第 8 回合 : 8,第 9 回合 : 9,第 10 回合 : 10,第 11 回合 : 11,第 12 回合 : 12,第 13 回合 : 13,第 14 回合 : 14,游戏结束 : postgame,无对局 : none,未知 : unknown",
         "multi": true,
         "includeAll": true,
         "allValue": ".*",
         "current": {
-          "text": "All",
+          "text": "全部",
           "value": "$__all"
         }
       }
@@ -46,9 +46,9 @@
   "panels": [
     {
       "id": 1,
-      "title": "Scrape availability",
+      "title": "采集目标可用性",
       "type": "stat",
-      "description": "",
+      "description": "1 表示本次采集成功，0 表示失败；没有样本时显示未知。按服务与实例区分采集目标。",
       "datasource": {
         "type": "prometheus",
         "uid": "agricola-prometheus"
@@ -62,7 +62,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "short",
-          "noValue": "Unknown / no samples",
+          "noValue": "未知 / 暂无样本",
           "custom": {
             "spanNulls": false
           },
@@ -91,16 +91,39 @@
         {
           "refId": "A",
           "expr": "up{job=~\"agricola-.*|host\"}",
-          "legendFormat": "{{job}} {{instance}}",
+          "legendFormat": "服务 {{job}} · 实例 {{instance}}",
           "format": "time_series"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)agricola-ingress(?=\\s|$)",
+            "renamePattern": "$1统一入口"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)agricola-app(?=\\s|$)",
+            "renamePattern": "$1应用实例"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)host(?=\\s|$)",
+            "renamePattern": "$1主机"
+          }
         }
       ]
     },
     {
       "id": 2,
-      "title": "Global collection age",
+      "title": "全局数据距上次采集的时间",
       "type": "stat",
-      "description": "",
+      "description": "距离最近一次成功采集的秒数；超过 120 秒视为过期，避免把旧数据误判为当前状态。",
       "datasource": {
         "type": "prometheus",
         "uid": "agricola-prometheus"
@@ -114,7 +137,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "s",
-          "noValue": "Unknown / no samples",
+          "noValue": "未知 / 暂无样本",
           "custom": {
             "spanNulls": false
           },
@@ -147,16 +170,16 @@
         {
           "refId": "A",
           "expr": "time()-agricola_collector_last_success_unixtime{source=\"global\"}",
-          "legendFormat": "seconds since successful collection",
+          "legendFormat": "距上次成功采集（秒）",
           "format": "time_series"
         }
       ]
     },
     {
       "id": 3,
-      "title": "Users, Rooms and usage",
+      "title": "在线用户、房间与对局数量",
       "type": "timeseries",
-      "description": "",
+      "description": "在线用户跨实例去重；房间按状态区分，另列开发房间和同屏房间。全局采集失败或过期时不展示当前值。",
       "datasource": {
         "type": "prometheus",
         "uid": "agricola-prometheus"
@@ -170,7 +193,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "short",
-          "noValue": "Unknown / no samples",
+          "noValue": "未知 / 暂无样本",
           "custom": {
             "spanNulls": false
           },
@@ -202,13 +225,78 @@
           "legendFormat": "{{kind}}",
           "format": "time_series"
         }
+      ],
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)online_users(?=\\s|$)",
+            "renamePattern": "$1在线用户"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)rooms_waiting(?=\\s|$)",
+            "renamePattern": "$1等待中的房间"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)rooms_playing(?=\\s|$)",
+            "renamePattern": "$1进行中的房间"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)rooms_finished(?=\\s|$)",
+            "renamePattern": "$1已结束房间"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)rooms_hotseat(?=\\s|$)",
+            "renamePattern": "$1同屏房间"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)rooms_development(?=\\s|$)",
+            "renamePattern": "$1开发房间"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)players_connected(?=\\s|$)",
+            "renamePattern": "$1已连接座位"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)games_completed_7d(?=\\s|$)",
+            "renamePattern": "$1近七天完成对局"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)games_completed_24h(?=\\s|$)",
+            "renamePattern": "$1近一天完成对局"
+          }
+        }
       ]
     },
     {
       "id": 4,
-      "title": "Command attempts and outcomes",
+      "title": "命令请求与处理结果",
       "type": "timeseries",
-      "description": "",
+      "description": "每秒命令尝试数，按命令及最终结果区分；规则拒绝、重复请求、阻塞与系统错误分别统计。",
       "datasource": {
         "type": "prometheus",
         "uid": "agricola-prometheus"
@@ -222,7 +310,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "ops",
-          "noValue": "Unknown / no samples",
+          "noValue": "未知 / 暂无样本",
           "custom": {
             "spanNulls": false
           },
@@ -254,13 +342,253 @@
           "legendFormat": "{{command}} {{outcome}}",
           "format": "time_series"
         }
+      ],
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)action(?=\\s|$)",
+            "renamePattern": "$1行动"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)specialAction(?=\\s|$)",
+            "renamePattern": "$1特殊行动"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)choice(?=\\s|$)",
+            "renamePattern": "$1选择"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)anytime(?=\\s|$)",
+            "renamePattern": "$1任意时行动"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)roundEnd(?=\\s|$)",
+            "renamePattern": "$1结束回合"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)commitSelection(?=\\s|$)",
+            "renamePattern": "$1确认选择"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)parentSubmit(?=\\s|$)",
+            "renamePattern": "$1提交家长牌"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)undoStep(?=\\s|$)",
+            "renamePattern": "$1撤销一步"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)undoAction(?=\\s|$)",
+            "renamePattern": "$1撤销行动"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)newGame(?=\\s|$)",
+            "renamePattern": "$1新建对局"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)createRoom(?=\\s|$)",
+            "renamePattern": "$1创建房间"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)joinRoom(?=\\s|$)",
+            "renamePattern": "$1加入房间"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)getState(?=\\s|$)",
+            "renamePattern": "$1获取状态"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)getHistory(?=\\s|$)",
+            "renamePattern": "$1获取历史"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)draftSubmit(?=\\s|$)",
+            "renamePattern": "$1提交选牌"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)loadGame(?=\\s|$)",
+            "renamePattern": "$1加载对局"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)ordinaryDrawKeep(?=\\s|$)",
+            "renamePattern": "$1保留抽取卡牌"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)other(?=\\s|$)",
+            "renamePattern": "$1其他"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)ok(?=\\s|$)",
+            "renamePattern": "$1成功"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)committed(?=\\s|$)",
+            "renamePattern": "$1已提交"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)idempotent(?=\\s|$)",
+            "renamePattern": "$1幂等"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)conflict(?=\\s|$)",
+            "renamePattern": "$1冲突"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)unchanged(?=\\s|$)",
+            "renamePattern": "$1状态未变"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)rule_rejected(?=\\s|$)",
+            "renamePattern": "$1规则拒绝"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)duplicate(?=\\s|$)",
+            "renamePattern": "$1重复请求"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)stale(?=\\s|$)",
+            "renamePattern": "$1状态过期"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)blocked(?=\\s|$)",
+            "renamePattern": "$1阻塞"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)error(?=\\s|$)",
+            "renamePattern": "$1错误"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)canceled(?=\\s|$)",
+            "renamePattern": "$1已取消"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)retry(?=\\s|$)",
+            "renamePattern": "$1重试"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)permanent(?=\\s|$)",
+            "renamePattern": "$1永久失败"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)timeout(?=\\s|$)",
+            "renamePattern": "$1超时"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)reconnect(?=\\s|$)",
+            "renamePattern": "$1重连"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)rejected(?=\\s|$)",
+            "renamePattern": "$1被拒绝"
+          }
+        }
       ]
     },
     {
       "id": 5,
-      "title": "Command p95 / p99",
+      "title": "命令完成耗时 p95 / p99",
       "type": "timeseries",
-      "description": "Parsed reception through local publication/receipt. Includes queue and durable retries. At least 20 samples/5m; does not measure client delivery.",
+      "description": "从解析命令到本地最终发布或回执，包含排队及持久化重试。最近 5 分钟至少 20 个样本才展示分位数；不包含客户端收到数据的时间。",
       "datasource": {
         "type": "prometheus",
         "uid": "agricola-prometheus"
@@ -274,7 +602,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "s",
-          "noValue": "Unknown / no samples",
+          "noValue": "未知 / 暂无样本",
           "custom": {
             "spanNulls": false
           },
@@ -316,13 +644,141 @@
           "legendFormat": "p99 {{command}}",
           "format": "time_series"
         }
+      ],
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)action(?=\\s|$)",
+            "renamePattern": "$1行动"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)specialAction(?=\\s|$)",
+            "renamePattern": "$1特殊行动"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)choice(?=\\s|$)",
+            "renamePattern": "$1选择"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)anytime(?=\\s|$)",
+            "renamePattern": "$1任意时行动"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)roundEnd(?=\\s|$)",
+            "renamePattern": "$1结束回合"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)commitSelection(?=\\s|$)",
+            "renamePattern": "$1确认选择"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)parentSubmit(?=\\s|$)",
+            "renamePattern": "$1提交家长牌"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)undoStep(?=\\s|$)",
+            "renamePattern": "$1撤销一步"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)undoAction(?=\\s|$)",
+            "renamePattern": "$1撤销行动"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)newGame(?=\\s|$)",
+            "renamePattern": "$1新建对局"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)createRoom(?=\\s|$)",
+            "renamePattern": "$1创建房间"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)joinRoom(?=\\s|$)",
+            "renamePattern": "$1加入房间"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)getState(?=\\s|$)",
+            "renamePattern": "$1获取状态"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)getHistory(?=\\s|$)",
+            "renamePattern": "$1获取历史"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)draftSubmit(?=\\s|$)",
+            "renamePattern": "$1提交选牌"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)loadGame(?=\\s|$)",
+            "renamePattern": "$1加载对局"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)ordinaryDrawKeep(?=\\s|$)",
+            "renamePattern": "$1保留抽取卡牌"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)other(?=\\s|$)",
+            "renamePattern": "$1其他"
+          }
+        }
       ]
     },
     {
       "id": 6,
-      "title": "First response p95",
+      "title": "首次响应耗时 p95",
       "type": "timeseries",
-      "description": "First correlated response enqueue can be pending. It is not final completion.",
+      "description": "从解析命令到首次关联响应进入发送队列。首次响应可能仍处于等待状态，不代表命令最终完成。",
       "datasource": {
         "type": "prometheus",
         "uid": "agricola-prometheus"
@@ -336,7 +792,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "s",
-          "noValue": "Unknown / no samples",
+          "noValue": "未知 / 暂无样本",
           "custom": {
             "spanNulls": false
           },
@@ -368,13 +824,141 @@
           "legendFormat": "{{command}}",
           "format": "time_series"
         }
+      ],
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)action(?=\\s|$)",
+            "renamePattern": "$1行动"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)specialAction(?=\\s|$)",
+            "renamePattern": "$1特殊行动"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)choice(?=\\s|$)",
+            "renamePattern": "$1选择"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)anytime(?=\\s|$)",
+            "renamePattern": "$1任意时行动"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)roundEnd(?=\\s|$)",
+            "renamePattern": "$1结束回合"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)commitSelection(?=\\s|$)",
+            "renamePattern": "$1确认选择"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)parentSubmit(?=\\s|$)",
+            "renamePattern": "$1提交家长牌"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)undoStep(?=\\s|$)",
+            "renamePattern": "$1撤销一步"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)undoAction(?=\\s|$)",
+            "renamePattern": "$1撤销行动"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)newGame(?=\\s|$)",
+            "renamePattern": "$1新建对局"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)createRoom(?=\\s|$)",
+            "renamePattern": "$1创建房间"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)joinRoom(?=\\s|$)",
+            "renamePattern": "$1加入房间"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)getState(?=\\s|$)",
+            "renamePattern": "$1获取状态"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)getHistory(?=\\s|$)",
+            "renamePattern": "$1获取历史"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)draftSubmit(?=\\s|$)",
+            "renamePattern": "$1提交选牌"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)loadGame(?=\\s|$)",
+            "renamePattern": "$1加载对局"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)ordinaryDrawKeep(?=\\s|$)",
+            "renamePattern": "$1保留抽取卡牌"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)other(?=\\s|$)",
+            "renamePattern": "$1其他"
+          }
+        }
       ]
     },
     {
       "id": 7,
-      "title": "HTTP p95 by route and role",
+      "title": "HTTP 请求耗时 p95",
       "type": "timeseries",
-      "description": "",
+      "description": "按服务角色和接口类别统计从接收请求到响应结束的耗时，不包含网络送达时间。",
       "datasource": {
         "type": "prometheus",
         "uid": "agricola-prometheus"
@@ -388,7 +972,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "s",
-          "noValue": "Unknown / no samples",
+          "noValue": "未知 / 暂无样本",
           "custom": {
             "spanNulls": false
           },
@@ -420,13 +1004,92 @@
           "legendFormat": "{{role}} {{route}}",
           "format": "time_series"
         }
+      ],
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)app(?=\\s|$)",
+            "renamePattern": "$1应用实例"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)ingress(?=\\s|$)",
+            "renamePattern": "$1统一入口"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)operations(?=\\s|$)",
+            "renamePattern": "$1运行看板"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)metrics(?=\\s|$)",
+            "renamePattern": "$1指标采集"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)health(?=\\s|$)",
+            "renamePattern": "$1健康检查"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)auth(?=\\s|$)",
+            "renamePattern": "$1账号认证"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)rooms(?=\\s|$)",
+            "renamePattern": "$1房间"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)contexts(?=\\s|$)",
+            "renamePattern": "$1对局上下文"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)workshop(?=\\s|$)",
+            "renamePattern": "$1工坊"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)replay(?=\\s|$)",
+            "renamePattern": "$1回放"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)other(?=\\s|$)",
+            "renamePattern": "$1其他"
+          }
+        }
       ]
     },
     {
       "id": 8,
-      "title": "Stage p95 and errors",
+      "title": "处理阶段耗时 p95（按结果区分）",
       "type": "timeseries",
-      "description": "Monotonic wall time. Nested stages overlap; do not add them.",
+      "description": "使用单调时钟测量排队、规则执行、持久化、编码及发送等阶段。嵌套阶段会重叠，不能相加作为总耗时。",
       "datasource": {
         "type": "prometheus",
         "uid": "agricola-prometheus"
@@ -440,7 +1103,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "s",
-          "noValue": "Unknown / no samples",
+          "noValue": "未知 / 暂无样本",
           "custom": {
             "spanNulls": false
           },
@@ -472,13 +1135,246 @@
           "legendFormat": "{{stage}} {{outcome}}",
           "format": "time_series"
         }
+      ],
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)queue(?=\\s|$)",
+            "renamePattern": "$1排队"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)preflight(?=\\s|$)",
+            "renamePattern": "$1前置检查"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)rule(?=\\s|$)",
+            "renamePattern": "$1规则执行"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)commit(?=\\s|$)",
+            "renamePattern": "$1提交"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)snapshot(?=\\s|$)",
+            "renamePattern": "$1生成快照"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)encode(?=\\s|$)",
+            "renamePattern": "$1编码"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)persist(?=\\s|$)",
+            "renamePattern": "$1持久化"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)publication(?=\\s|$)",
+            "renamePattern": "$1发布"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)projection(?=\\s|$)",
+            "renamePattern": "$1视角投影"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)send(?=\\s|$)",
+            "renamePattern": "$1发送"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)json(?=\\s|$)",
+            "renamePattern": "$1JSON 序列化"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)db_query(?=\\s|$)",
+            "renamePattern": "$1数据库查询"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)db_pool_wait(?=\\s|$)",
+            "renamePattern": "$1等待数据库连接"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)db_transaction(?=\\s|$)",
+            "renamePattern": "$1数据库事务"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)s3_get(?=\\s|$)",
+            "renamePattern": "$1S3 读取"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)s3_put(?=\\s|$)",
+            "renamePattern": "$1S3 写入"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)s3_delete(?=\\s|$)",
+            "renamePattern": "$1S3 删除"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)ok(?=\\s|$)",
+            "renamePattern": "$1成功"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)committed(?=\\s|$)",
+            "renamePattern": "$1已提交"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)idempotent(?=\\s|$)",
+            "renamePattern": "$1幂等"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)conflict(?=\\s|$)",
+            "renamePattern": "$1冲突"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)unchanged(?=\\s|$)",
+            "renamePattern": "$1状态未变"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)rule_rejected(?=\\s|$)",
+            "renamePattern": "$1规则拒绝"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)duplicate(?=\\s|$)",
+            "renamePattern": "$1重复请求"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)stale(?=\\s|$)",
+            "renamePattern": "$1状态过期"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)blocked(?=\\s|$)",
+            "renamePattern": "$1阻塞"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)error(?=\\s|$)",
+            "renamePattern": "$1错误"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)canceled(?=\\s|$)",
+            "renamePattern": "$1已取消"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)retry(?=\\s|$)",
+            "renamePattern": "$1重试"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)permanent(?=\\s|$)",
+            "renamePattern": "$1永久失败"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)timeout(?=\\s|$)",
+            "renamePattern": "$1超时"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)reconnect(?=\\s|$)",
+            "renamePattern": "$1重连"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)rejected(?=\\s|$)",
+            "renamePattern": "$1被拒绝"
+          }
+        }
       ]
     },
     {
       "id": 9,
-      "title": "Rule execution p95",
+      "title": "规则执行耗时 p95",
       "type": "timeseries",
-      "description": "Worker includes messaging/wait; separate from CPU.",
+      "description": "按命令与执行方式区分。Worker 耗时包含消息传递和等待，应与进程 CPU 用量分别解读。",
       "datasource": {
         "type": "prometheus",
         "uid": "agricola-prometheus"
@@ -492,7 +1388,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "s",
-          "noValue": "Unknown / no samples",
+          "noValue": "未知 / 暂无样本",
           "custom": {
             "spanNulls": false
           },
@@ -524,13 +1420,155 @@
           "legendFormat": "{{command}} {{mode}}",
           "format": "time_series"
         }
+      ],
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)action(?=\\s|$)",
+            "renamePattern": "$1行动"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)specialAction(?=\\s|$)",
+            "renamePattern": "$1特殊行动"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)choice(?=\\s|$)",
+            "renamePattern": "$1选择"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)anytime(?=\\s|$)",
+            "renamePattern": "$1任意时行动"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)roundEnd(?=\\s|$)",
+            "renamePattern": "$1结束回合"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)commitSelection(?=\\s|$)",
+            "renamePattern": "$1确认选择"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)parentSubmit(?=\\s|$)",
+            "renamePattern": "$1提交家长牌"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)undoStep(?=\\s|$)",
+            "renamePattern": "$1撤销一步"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)undoAction(?=\\s|$)",
+            "renamePattern": "$1撤销行动"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)newGame(?=\\s|$)",
+            "renamePattern": "$1新建对局"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)createRoom(?=\\s|$)",
+            "renamePattern": "$1创建房间"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)joinRoom(?=\\s|$)",
+            "renamePattern": "$1加入房间"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)getState(?=\\s|$)",
+            "renamePattern": "$1获取状态"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)getHistory(?=\\s|$)",
+            "renamePattern": "$1获取历史"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)draftSubmit(?=\\s|$)",
+            "renamePattern": "$1提交选牌"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)loadGame(?=\\s|$)",
+            "renamePattern": "$1加载对局"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)ordinaryDrawKeep(?=\\s|$)",
+            "renamePattern": "$1保留抽取卡牌"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)other(?=\\s|$)",
+            "renamePattern": "$1其他"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)native(?=\\s|$)",
+            "renamePattern": "$1原生执行"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)worker(?=\\s|$)",
+            "renamePattern": "$1Worker 执行"
+          }
+        }
       ]
     },
     {
       "id": 10,
-      "title": "Queue depth and oldest wait",
+      "title": "等待队列长度与最长等待时间",
       "type": "timeseries",
-      "description": "",
+      "description": "展示每个实例排队的工作项数量，以及最早入队工作项已等待的秒数；空队列不展示等待时间。",
       "datasource": {
         "type": "prometheus",
         "uid": "agricola-prometheus"
@@ -544,7 +1582,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "short",
-          "noValue": "Unknown / no samples",
+          "noValue": "未知 / 暂无样本",
           "custom": {
             "spanNulls": false
           },
@@ -573,22 +1611,22 @@
         {
           "refId": "A",
           "expr": "agricola_queue_pending",
-          "legendFormat": "{{instance}} depth",
+          "legendFormat": "{{instance}} 队列长度",
           "format": "time_series"
         },
         {
           "refId": "B",
           "expr": "clamp_min(time()-agricola_queue_oldest_enqueued_unixtime,0) and (agricola_queue_oldest_enqueued_unixtime>0)",
-          "legendFormat": "{{instance}} oldest seconds",
+          "legendFormat": "{{instance}} 最长等待（秒）",
           "format": "time_series"
         }
       ]
     },
     {
       "id": 11,
-      "title": "Returned WS envelope p50 / p95 / p99",
+      "title": "WS 返回包大小 p50 / p95 / p99",
       "type": "timeseries",
-      "description": "Actual complete UTF-8 JSON per recipient before WS compression/framing. Round comes from that returned state. Histogram cannot reconstruct exact maximum. Quantiles require at least 20 samples/5m; count and mean are shown separately.",
+      "description": "每个接收方实际完整 JSON 包的 UTF-8 字节数，位于 WS 压缩与封装之前。回合取自该返回状态。最近 5 分钟至少 20 个样本才展示分位数；直方图无法还原精确最大值。",
       "datasource": {
         "type": "prometheus",
         "uid": "agricola-prometheus"
@@ -602,7 +1640,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "bytes",
-          "noValue": "Unknown / no samples",
+          "noValue": "未知 / 暂无样本",
           "custom": {
             "spanNulls": false
           },
@@ -650,9 +1688,9 @@
     },
     {
       "id": 12,
-      "title": "Returned WS size distribution",
+      "title": "WS 返回包大小分布",
       "type": "heatmap",
-      "description": "",
+      "description": "所选回合的状态返回包大小直方图，用于识别大包集中在哪个字节范围；不包含传输层封装。",
       "datasource": {
         "type": "prometheus",
         "uid": "agricola-prometheus"
@@ -666,7 +1704,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "bytes",
-          "noValue": "Unknown / no samples",
+          "noValue": "未知 / 暂无样本",
           "custom": {
             "spanNulls": false
           },
@@ -707,9 +1745,9 @@
     },
     {
       "id": 13,
-      "title": "WS size p95 by round",
+      "title": "各游戏回合的 WS 包大小 p95",
       "type": "timeseries",
-      "description": "",
+      "description": "按返回状态所属回合对比状态包大小。每个回合最近 5 分钟至少 20 个样本才展示 p95。",
       "datasource": {
         "type": "prometheus",
         "uid": "agricola-prometheus"
@@ -723,7 +1761,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "bytes",
-          "noValue": "Unknown / no samples",
+          "noValue": "未知 / 暂无样本",
           "custom": {
             "spanNulls": false
           },
@@ -752,16 +1790,53 @@
         {
           "refId": "A",
           "expr": "histogram_quantile(0.95,sum by(le,round)(rate(agricola_ws_outgoing_message_size_bytes_bucket{message_type=\"state\"}[$__rate_interval]))) and on(round) (sum by(round)(increase(agricola_ws_outgoing_message_size_bytes_count{message_type=\"state\"}[5m]))>=20)",
-          "legendFormat": "round {{round}}",
+          "legendFormat": "{{round}}",
           "format": "time_series"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)pregame(?=\\s|$)",
+            "renamePattern": "$1游戏前"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)postgame(?=\\s|$)",
+            "renamePattern": "$1游戏结束"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)none(?=\\s|$)",
+            "renamePattern": "$1无对局"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)unknown(?=\\s|$)",
+            "renamePattern": "$1未知"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^(1[0-4]|[1-9])(?=\\s|$)",
+            "renamePattern": "第 $1 回合"
+          }
         }
       ]
     },
     {
       "id": 14,
-      "title": "WS message rate / payload traffic",
+      "title": "WS 消息速率与数据流量",
       "type": "timeseries",
-      "description": "Payload rates use histogram count/sum; network framing, TLS and TCP bytes are host metrics.",
+      "description": "按回合展示每秒发送消息数和有效载荷字节数。WS 封装、TLS 与 TCP 开销由主机网络指标反映。",
       "datasource": {
         "type": "prometheus",
         "uid": "agricola-prometheus"
@@ -775,7 +1850,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "short",
-          "noValue": "Unknown / no samples",
+          "noValue": "未知 / 暂无样本",
           "custom": {
             "spanNulls": false
           },
@@ -804,22 +1879,59 @@
         {
           "refId": "A",
           "expr": "sum by(round)(rate(agricola_ws_outgoing_message_size_bytes_count{round=~\"$round\"}[$__rate_interval]))",
-          "legendFormat": "{{round}} messages/s",
+          "legendFormat": "{{round}} 消息/秒",
           "format": "time_series"
         },
         {
           "refId": "B",
           "expr": "sum by(round)(rate(agricola_ws_outgoing_message_size_bytes_sum{round=~\"$round\"}[$__rate_interval]))",
-          "legendFormat": "{{round}} bytes/s",
+          "legendFormat": "{{round}} 字节/秒",
           "format": "time_series"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)pregame(?=\\s|$)",
+            "renamePattern": "$1游戏前"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)postgame(?=\\s|$)",
+            "renamePattern": "$1游戏结束"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)none(?=\\s|$)",
+            "renamePattern": "$1无对局"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)unknown(?=\\s|$)",
+            "renamePattern": "$1未知"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^(1[0-4]|[1-9])(?=\\s|$)",
+            "renamePattern": "第 $1 回合"
+          }
         }
       ]
     },
     {
       "id": 15,
-      "title": "Publication payload and fanout",
+      "title": "单次发布的数据量与接收方数量",
       "type": "timeseries",
-      "description": "",
+      "description": "展示一次发布向所有实际接收方发送的数据量 p95，以及平均接收方数量；可与单个返回包大小对照。",
       "datasource": {
         "type": "prometheus",
         "uid": "agricola-prometheus"
@@ -833,7 +1945,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "short",
-          "noValue": "Unknown / no samples",
+          "noValue": "未知 / 暂无样本",
           "custom": {
             "spanNulls": false
           },
@@ -862,22 +1974,22 @@
         {
           "refId": "A",
           "expr": "histogram_quantile(0.95,sum by(le)(rate(agricola_ws_broadcast_payload_bytes_bucket{round=~\"$round\"}[$__rate_interval])))",
-          "legendFormat": "p95 total bytes",
+          "legendFormat": "单次发布总字节数 p95",
           "format": "time_series"
         },
         {
           "refId": "B",
           "expr": "sum(rate(agricola_ws_broadcast_recipients_sum{round=~\"$round\"}[$__rate_interval]))/sum(rate(agricola_ws_broadcast_recipients_count{round=~\"$round\"}[$__rate_interval]))",
-          "legendFormat": "mean recipients",
+          "legendFormat": "平均接收方数量",
           "format": "time_series"
         }
       ]
     },
     {
       "id": 16,
-      "title": "WS errors / backpressure",
+      "title": "WS 错误与发送积压",
       "type": "timeseries",
-      "description": "",
+      "description": "按类别展示每秒错误数，并展示各实例尚未发出的缓冲字节数，用于识别发送积压。",
       "datasource": {
         "type": "prometheus",
         "uid": "agricola-prometheus"
@@ -891,7 +2003,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "short",
-          "noValue": "Unknown / no samples",
+          "noValue": "未知 / 暂无样本",
           "custom": {
             "spanNulls": false
           },
@@ -920,22 +2032,38 @@
         {
           "refId": "A",
           "expr": "sum by(kind)(rate(agricola_ws_errors_total[$__rate_interval]))",
-          "legendFormat": "{{kind}} errors/s",
+          "legendFormat": "{{kind}} 错误/秒",
           "format": "time_series"
         },
         {
           "refId": "B",
           "expr": "agricola_platform{role=\"app\",kind=\"ws_buffered_bytes\"}",
-          "legendFormat": "{{instance}} buffered bytes",
+          "legendFormat": "{{instance}} 发送缓冲字节数",
           "format": "time_series"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)send(?=\\s|$)",
+            "renamePattern": "$1发送"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)parse(?=\\s|$)",
+            "renamePattern": "$1解析"
+          }
         }
       ]
     },
     {
       "id": 17,
-      "title": "Confirmed persistence bytes",
+      "title": "已确认持久化的数据量",
       "type": "timeseries",
-      "description": "Confirmed logical snapshot reference/body, appended history/recovery records and Replay gzip. Not WAL or physical disk IO.",
+      "description": "所选时间范围内已确认提交的快照引用或正文、追加历史、恢复记录及回放 gzip 的逻辑字节数；不等于 WAL 或物理磁盘写入量。",
       "datasource": {
         "type": "prometheus",
         "uid": "agricola-prometheus"
@@ -949,7 +2077,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "bytes",
-          "noValue": "Unknown / no samples",
+          "noValue": "未知 / 暂无样本",
           "custom": {
             "spanNulls": false
           },
@@ -978,16 +2106,46 @@
         {
           "refId": "A",
           "expr": "sum by(kind)(increase(agricola_persistence_payload_bytes_total[$__range]))",
-          "legendFormat": "{{kind}} bytes in selected range",
+          "legendFormat": "{{kind}} 所选范围累计字节数",
           "format": "time_series"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)snapshot_reference(?=\\s|$)",
+            "renamePattern": "$1快照引用或正文"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)history_nodes(?=\\s|$)",
+            "renamePattern": "$1追加历史"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)recovery_nodes(?=\\s|$)",
+            "renamePattern": "$1恢复记录"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)replay_gzip(?=\\s|$)",
+            "renamePattern": "$1回放 gzip 归档"
+          }
         }
       ]
     },
     {
       "id": 18,
-      "title": "Durable writes and retries",
+      "title": "持久化提交与重试",
       "type": "timeseries",
-      "description": "",
+      "description": "每次数据库持久化提交尝试均计数，包含重试；按已提交、幂等、冲突和错误分类。",
       "datasource": {
         "type": "prometheus",
         "uid": "agricola-prometheus"
@@ -1001,7 +2159,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "ops",
-          "noValue": "Unknown / no samples",
+          "noValue": "未知 / 暂无样本",
           "custom": {
             "spanNulls": false
           },
@@ -1030,16 +2188,130 @@
         {
           "refId": "A",
           "expr": "sum by(outcome)(rate(agricola_commit_attempts_total[$__rate_interval]))",
-          "legendFormat": "{{outcome}} attempts/s",
+          "legendFormat": "{{outcome}} 提交尝试/秒",
           "format": "time_series"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)ok(?=\\s|$)",
+            "renamePattern": "$1成功"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)committed(?=\\s|$)",
+            "renamePattern": "$1已提交"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)idempotent(?=\\s|$)",
+            "renamePattern": "$1幂等"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)conflict(?=\\s|$)",
+            "renamePattern": "$1冲突"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)unchanged(?=\\s|$)",
+            "renamePattern": "$1状态未变"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)rule_rejected(?=\\s|$)",
+            "renamePattern": "$1规则拒绝"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)duplicate(?=\\s|$)",
+            "renamePattern": "$1重复请求"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)stale(?=\\s|$)",
+            "renamePattern": "$1状态过期"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)blocked(?=\\s|$)",
+            "renamePattern": "$1阻塞"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)error(?=\\s|$)",
+            "renamePattern": "$1错误"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)canceled(?=\\s|$)",
+            "renamePattern": "$1已取消"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)retry(?=\\s|$)",
+            "renamePattern": "$1重试"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)permanent(?=\\s|$)",
+            "renamePattern": "$1永久失败"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)timeout(?=\\s|$)",
+            "renamePattern": "$1超时"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)reconnect(?=\\s|$)",
+            "renamePattern": "$1重连"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)rejected(?=\\s|$)",
+            "renamePattern": "$1被拒绝"
+          }
         }
       ]
     },
     {
       "id": 19,
-      "title": "Database pool and workers",
+      "title": "数据库连接池与规则 Worker",
       "type": "timeseries",
-      "description": "",
+      "description": "按实例展示连接池总量、空闲、占用、等待，以及 Worker 的活动、忙碌、预约、等待与容量。",
       "datasource": {
         "type": "prometheus",
         "uid": "agricola-prometheus"
@@ -1053,7 +2325,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "short",
-          "noValue": "Unknown / no samples",
+          "noValue": "未知 / 暂无样本",
           "custom": {
             "spanNulls": false
           },
@@ -1085,13 +2357,78 @@
           "legendFormat": "{{instance}} {{kind}}",
           "format": "time_series"
         }
+      ],
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)db_pool_total(?=\\s|$)",
+            "renamePattern": "$1连接池总连接数"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)db_pool_idle(?=\\s|$)",
+            "renamePattern": "$1空闲连接"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)db_pool_busy(?=\\s|$)",
+            "renamePattern": "$1占用连接"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)db_pool_waiting(?=\\s|$)",
+            "renamePattern": "$1等待连接"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)workers_pending(?=\\s|$)",
+            "renamePattern": "$1等待 Worker"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)workers_busy(?=\\s|$)",
+            "renamePattern": "$1忙碌 Worker"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)workers_active(?=\\s|$)",
+            "renamePattern": "$1活动 Worker"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)workers_reserved(?=\\s|$)",
+            "renamePattern": "$1预约 Worker"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)workers_capacity(?=\\s|$)",
+            "renamePattern": "$1Worker 容量"
+          }
+        }
       ]
     },
     {
       "id": 20,
-      "title": "Blocked and retrying Rooms",
+      "title": "阻塞、重试与永久失败的房间",
       "type": "timeseries",
-      "description": "",
+      "description": "展示各实例受阻房间数、重试房间数、永久失败房间数，以及最早受阻工作的等待时间。",
       "datasource": {
         "type": "prometheus",
         "uid": "agricola-prometheus"
@@ -1105,7 +2442,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "short",
-          "noValue": "Unknown / no samples",
+          "noValue": "未知 / 暂无样本",
           "custom": {
             "spanNulls": false
           },
@@ -1141,13 +2478,43 @@
           "legendFormat": "{{instance}} {{kind}}",
           "format": "time_series"
         }
+      ],
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)blocked_rooms(?=\\s|$)",
+            "renamePattern": "$1受阻房间"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)retrying_rooms(?=\\s|$)",
+            "renamePattern": "$1重试房间"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)permanent_rooms(?=\\s|$)",
+            "renamePattern": "$1永久失败房间"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)blocked_oldest_age_seconds(?=\\s|$)",
+            "renamePattern": "$1最早阻塞距现在（秒）"
+          }
+        }
       ]
     },
     {
       "id": 21,
-      "title": "Node CPU",
+      "title": "Node.js 进程 CPU 用量",
       "type": "timeseries",
-      "description": "",
+      "description": "按角色和实例展示每秒消耗的 CPU 秒数；1 表示约占用一个 CPU 核心。",
       "datasource": {
         "type": "prometheus",
         "uid": "agricola-prometheus"
@@ -1161,7 +2528,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "short",
-          "noValue": "Unknown / no samples",
+          "noValue": "未知 / 暂无样本",
           "custom": {
             "spanNulls": false
           },
@@ -1190,16 +2557,32 @@
         {
           "refId": "A",
           "expr": "rate(agricola_process_cpu_user_seconds_total[$__rate_interval])+rate(agricola_process_cpu_system_seconds_total[$__rate_interval])",
-          "legendFormat": "{{role}} {{instance}} CPU cores",
+          "legendFormat": "{{role}} {{instance}} CPU 核心用量",
           "format": "time_series"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)app(?=\\s|$)",
+            "renamePattern": "$1应用实例"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)ingress(?=\\s|$)",
+            "renamePattern": "$1统一入口"
+          }
         }
       ]
     },
     {
       "id": 22,
-      "title": "RSS / heap",
+      "title": "进程驻留内存与已用堆内存",
       "type": "timeseries",
-      "description": "",
+      "description": "分别展示进程 RSS 和 Node.js 已用堆内存字节数，用于区分整体内存与 JavaScript 堆增长。",
       "datasource": {
         "type": "prometheus",
         "uid": "agricola-prometheus"
@@ -1213,7 +2596,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "bytes",
-          "noValue": "Unknown / no samples",
+          "noValue": "未知 / 暂无样本",
           "custom": {
             "spanNulls": false
           },
@@ -1242,22 +2625,22 @@
         {
           "refId": "A",
           "expr": "agricola_process_resident_memory_bytes",
-          "legendFormat": "{{instance}} RSS",
+          "legendFormat": "{{instance}} 驻留内存",
           "format": "time_series"
         },
         {
           "refId": "B",
           "expr": "agricola_nodejs_heap_size_used_bytes",
-          "legendFormat": "{{instance}} heap used",
+          "legendFormat": "{{instance}} 已用堆内存",
           "format": "time_series"
         }
       ]
     },
     {
       "id": 23,
-      "title": "Event loop lag / utilization",
+      "title": "事件循环延迟与利用率",
       "type": "timeseries",
-      "description": "",
+      "description": "展示各实例事件循环延迟 p99 和利用率；利用率为 0～1，延迟单位为秒。",
       "datasource": {
         "type": "prometheus",
         "uid": "agricola-prometheus"
@@ -1271,7 +2654,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "s",
-          "noValue": "Unknown / no samples",
+          "noValue": "未知 / 暂无样本",
           "custom": {
             "spanNulls": false
           },
@@ -1300,22 +2683,22 @@
         {
           "refId": "A",
           "expr": "agricola_nodejs_eventloop_lag_p99_seconds",
-          "legendFormat": "{{instance}} p99 lag",
+          "legendFormat": "{{instance}} 延迟 p99",
           "format": "time_series"
         },
         {
           "refId": "B",
           "expr": "agricola_platform{kind=\"event_loop_utilization\"}",
-          "legendFormat": "{{instance}} utilization",
+          "legendFormat": "{{instance}} 利用率",
           "format": "time_series"
         }
       ]
     },
     {
       "id": 24,
-      "title": "GC p95",
+      "title": "垃圾回收耗时 p95",
       "type": "timeseries",
-      "description": "",
+      "description": "按垃圾回收类型展示单次耗时 p95，用于观察 GC 暂停是否影响响应。",
       "datasource": {
         "type": "prometheus",
         "uid": "agricola-prometheus"
@@ -1329,7 +2712,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "s",
-          "noValue": "Unknown / no samples",
+          "noValue": "未知 / 暂无样本",
           "custom": {
             "spanNulls": false
           },
@@ -1361,13 +2744,43 @@
           "legendFormat": "{{kind}}",
           "format": "time_series"
         }
+      ],
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)major(?=\\s|$)",
+            "renamePattern": "$1主要回收"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)minor(?=\\s|$)",
+            "renamePattern": "$1次要回收"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)incremental(?=\\s|$)",
+            "renamePattern": "$1增量回收"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)weakcb(?=\\s|$)",
+            "renamePattern": "$1弱引用回调"
+          }
+        }
       ]
     },
     {
       "id": 25,
-      "title": "Container limits and memory",
+      "title": "容器资源限制与使用量",
       "type": "timeseries",
-      "description": "App processes share a cgroup: do not sum identical container values across slots. Local host execution may expose host cgroup rather than a dedicated app container.",
+      "description": "应用进程可能共享同一 cgroup，各实例的相同容器值不能相加。本地运行可能暴露主机 cgroup；采集失败或过期时不展示当前值。",
       "datasource": {
         "type": "prometheus",
         "uid": "agricola-prometheus"
@@ -1381,7 +2794,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "short",
-          "noValue": "Unknown / no samples",
+          "noValue": "未知 / 暂无样本",
           "custom": {
             "spanNulls": false
           },
@@ -1413,13 +2826,57 @@
           "legendFormat": "{{instance}} {{kind}}",
           "format": "time_series"
         }
+      ],
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)container_cpu_limit_cores(?=\\s|$)",
+            "renamePattern": "$1CPU 核心限制"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)container_memory_limit_bytes(?=\\s|$)",
+            "renamePattern": "$1内存字节限制"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)container_memory_bytes(?=\\s|$)",
+            "renamePattern": "$1已用内存字节数"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)container_cpu_throttled_seconds(?=\\s|$)",
+            "renamePattern": "$1CPU 累计限流秒数"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)container_io_read_bytes(?=\\s|$)",
+            "renamePattern": "$1累计读取字节数"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)container_io_write_bytes(?=\\s|$)",
+            "renamePattern": "$1累计写入字节数"
+          }
+        }
       ]
     },
     {
       "id": 26,
-      "title": "PostgreSQL health / tasks / object inventory",
+      "title": "PostgreSQL 状态、后台任务与对象积压",
       "type": "timeseries",
-      "description": "",
+      "description": "展示连接、超过 30 秒的事务、锁等待、累计死锁，以及报告、账号删除、授权撤销和对象处理积压。全局采集过期时不展示当前值。",
       "datasource": {
         "type": "prometheus",
         "uid": "agricola-prometheus"
@@ -1433,7 +2890,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "short",
-          "noValue": "Unknown / no samples",
+          "noValue": "未知 / 暂无样本",
           "custom": {
             "spanNulls": false
           },
@@ -1465,13 +2922,78 @@
           "legendFormat": "{{kind}}",
           "format": "time_series"
         }
+      ],
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)pg_connections(?=\\s|$)",
+            "renamePattern": "$1数据库连接数"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)pg_long_transactions(?=\\s|$)",
+            "renamePattern": "$1长事务数"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)pg_waiting_locks(?=\\s|$)",
+            "renamePattern": "$1锁等待数"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)pg_deadlocks(?=\\s|$)",
+            "renamePattern": "$1累计死锁数"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)reports_backlog(?=\\s|$)",
+            "renamePattern": "$1报告积压"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)reports_oldest_age_seconds(?=\\s|$)",
+            "renamePattern": "$1最早报告距现在（秒）"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)deletions_backlog(?=\\s|$)",
+            "renamePattern": "$1账号删除积压"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)revocations_backlog(?=\\s|$)",
+            "renamePattern": "$1授权撤销积压"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)objects_staging(?=\\s|$)",
+            "renamePattern": "$1待处理对象"
+          }
+        }
       ]
     },
     {
       "id": 27,
-      "title": "PostgreSQL WAL and database size",
+      "title": "PostgreSQL WAL 速率与数据库大小",
       "type": "timeseries",
-      "description": "Cluster WAL counter is separate from logical app bytes and host disk writes; counters can reset.",
+      "description": "WAL 字节速率来自数据库集群计数器，与应用逻辑写入、主机磁盘写入分别统计；计数器可能重置。",
       "datasource": {
         "type": "prometheus",
         "uid": "agricola-prometheus"
@@ -1485,7 +3007,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "bytes",
-          "noValue": "Unknown / no samples",
+          "noValue": "未知 / 暂无样本",
           "custom": {
             "spanNulls": false
           },
@@ -1514,22 +3036,22 @@
         {
           "refId": "A",
           "expr": "(rate(agricola_platform{kind=\"pg_wal_bytes\"}[$__rate_interval])) and on(job,instance) ((time()-agricola_collector_last_success_unixtime{source=\"global\"}<120) and on(job,instance,source) (agricola_collector_status{source=\"global\"}==1))",
-          "legendFormat": "WAL bytes/s",
+          "legendFormat": "WAL 字节/秒",
           "format": "time_series"
         },
         {
           "refId": "B",
           "expr": "(agricola_platform{kind=\"pg_database_bytes\"}) and on(job,instance) ((time()-agricola_collector_last_success_unixtime{source=\"global\"}<120) and on(job,instance,source) (agricola_collector_status{source=\"global\"}==1))",
-          "legendFormat": "database bytes",
+          "legendFormat": "数据库字节数",
           "format": "time_series"
         }
       ]
     },
     {
       "id": 28,
-      "title": "S3 requests and bytes",
+      "title": "S3 请求与数据流量",
       "type": "timeseries",
-      "description": "",
+      "description": "按操作及结果展示每秒请求数，并展示成功读写的有效载荷字节速率；不包含协议封装开销。",
       "datasource": {
         "type": "prometheus",
         "uid": "agricola-prometheus"
@@ -1543,7 +3065,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "short",
-          "noValue": "Unknown / no samples",
+          "noValue": "未知 / 暂无样本",
           "custom": {
             "spanNulls": false
           },
@@ -1572,22 +3094,269 @@
         {
           "refId": "A",
           "expr": "sum by(stage,outcome)(rate(agricola_operation_duration_seconds_count{stage=~\"s3_.*\"}[$__rate_interval]))",
-          "legendFormat": "{{stage}} {{outcome}} requests/s",
+          "legendFormat": "{{stage}} {{outcome}} 请求/秒",
           "format": "time_series"
         },
         {
           "refId": "B",
           "expr": "sum by(kind)(rate(agricola_s3_payload_bytes_total[$__rate_interval]))",
-          "legendFormat": "{{kind}} bytes/s",
+          "legendFormat": "{{kind}} 字节/秒",
           "format": "time_series"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)queue(?=\\s|$)",
+            "renamePattern": "$1排队"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)preflight(?=\\s|$)",
+            "renamePattern": "$1前置检查"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)rule(?=\\s|$)",
+            "renamePattern": "$1规则执行"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)commit(?=\\s|$)",
+            "renamePattern": "$1提交"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)snapshot(?=\\s|$)",
+            "renamePattern": "$1生成快照"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)encode(?=\\s|$)",
+            "renamePattern": "$1编码"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)persist(?=\\s|$)",
+            "renamePattern": "$1持久化"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)publication(?=\\s|$)",
+            "renamePattern": "$1发布"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)projection(?=\\s|$)",
+            "renamePattern": "$1视角投影"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)send(?=\\s|$)",
+            "renamePattern": "$1发送"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)json(?=\\s|$)",
+            "renamePattern": "$1JSON 序列化"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)db_query(?=\\s|$)",
+            "renamePattern": "$1数据库查询"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)db_pool_wait(?=\\s|$)",
+            "renamePattern": "$1等待数据库连接"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)db_transaction(?=\\s|$)",
+            "renamePattern": "$1数据库事务"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)s3_get(?=\\s|$)",
+            "renamePattern": "$1S3 读取"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)s3_put(?=\\s|$)",
+            "renamePattern": "$1S3 写入"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)s3_delete(?=\\s|$)",
+            "renamePattern": "$1S3 删除"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)ok(?=\\s|$)",
+            "renamePattern": "$1成功"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)committed(?=\\s|$)",
+            "renamePattern": "$1已提交"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)idempotent(?=\\s|$)",
+            "renamePattern": "$1幂等"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)conflict(?=\\s|$)",
+            "renamePattern": "$1冲突"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)unchanged(?=\\s|$)",
+            "renamePattern": "$1状态未变"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)rule_rejected(?=\\s|$)",
+            "renamePattern": "$1规则拒绝"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)duplicate(?=\\s|$)",
+            "renamePattern": "$1重复请求"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)stale(?=\\s|$)",
+            "renamePattern": "$1状态过期"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)blocked(?=\\s|$)",
+            "renamePattern": "$1阻塞"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)error(?=\\s|$)",
+            "renamePattern": "$1错误"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)canceled(?=\\s|$)",
+            "renamePattern": "$1已取消"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)retry(?=\\s|$)",
+            "renamePattern": "$1重试"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)permanent(?=\\s|$)",
+            "renamePattern": "$1永久失败"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)timeout(?=\\s|$)",
+            "renamePattern": "$1超时"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)reconnect(?=\\s|$)",
+            "renamePattern": "$1重连"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)rejected(?=\\s|$)",
+            "renamePattern": "$1被拒绝"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)get(?=\\s|$)",
+            "renamePattern": "$1读取"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)put(?=\\s|$)",
+            "renamePattern": "$1写入"
+          }
         }
       ]
     },
     {
       "id": 29,
-      "title": "Browser command RTT / snapshot UI commit / readiness",
+      "title": "浏览器命令往返、界面提交与就绪耗时",
       "type": "timeseries",
-      "description": "10% browser sampling. Browser monotonic clock only. UI commit is React layout commit, not paint; untrusted observational input. RTT includes network, server and scheduling.",
+      "description": "抽样 10% 的浏览器会话，使用浏览器单调时钟。往返耗时包含网络、服务端与调度；界面提交指 React 布局提交，不是屏幕绘制。客户端数据仅供观察。",
       "datasource": {
         "type": "prometheus",
         "uid": "agricola-prometheus"
@@ -1601,7 +3370,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "s",
-          "noValue": "Unknown / no samples",
+          "noValue": "未知 / 暂无样本",
           "custom": {
             "spanNulls": false
           },
@@ -1633,13 +3402,148 @@
           "legendFormat": "{{kind}} {{outcome}}",
           "format": "time_series"
         }
+      ],
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)ok(?=\\s|$)",
+            "renamePattern": "$1成功"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)committed(?=\\s|$)",
+            "renamePattern": "$1已提交"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)idempotent(?=\\s|$)",
+            "renamePattern": "$1幂等"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)conflict(?=\\s|$)",
+            "renamePattern": "$1冲突"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)unchanged(?=\\s|$)",
+            "renamePattern": "$1状态未变"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)rule_rejected(?=\\s|$)",
+            "renamePattern": "$1规则拒绝"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)duplicate(?=\\s|$)",
+            "renamePattern": "$1重复请求"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)stale(?=\\s|$)",
+            "renamePattern": "$1状态过期"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)blocked(?=\\s|$)",
+            "renamePattern": "$1阻塞"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)error(?=\\s|$)",
+            "renamePattern": "$1错误"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)canceled(?=\\s|$)",
+            "renamePattern": "$1已取消"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)retry(?=\\s|$)",
+            "renamePattern": "$1重试"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)permanent(?=\\s|$)",
+            "renamePattern": "$1永久失败"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)timeout(?=\\s|$)",
+            "renamePattern": "$1超时"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)reconnect(?=\\s|$)",
+            "renamePattern": "$1重连"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)rejected(?=\\s|$)",
+            "renamePattern": "$1被拒绝"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)command_rtt(?=\\s|$)",
+            "renamePattern": "$1命令往返"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)snapshot_commit(?=\\s|$)",
+            "renamePattern": "$1状态至界面提交"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)connect_ready(?=\\s|$)",
+            "renamePattern": "$1连接至首个状态"
+          }
+        }
       ]
     },
     {
       "id": 30,
-      "title": "Browser reconnects and timeouts",
+      "title": "浏览器重连、超时与响应结果",
       "type": "timeseries",
-      "description": "",
+      "description": "按类型展示抽样浏览器事件速率，包括重连、超时、成功、拒绝、过期状态和错误；不是全量事件计数。",
       "datasource": {
         "type": "prometheus",
         "uid": "agricola-prometheus"
@@ -1653,7 +3557,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "ops",
-          "noValue": "Unknown / no samples",
+          "noValue": "未知 / 暂无样本",
           "custom": {
             "spanNulls": false
           },
@@ -1685,13 +3589,127 @@
           "legendFormat": "{{kind}}",
           "format": "time_series"
         }
+      ],
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)ok(?=\\s|$)",
+            "renamePattern": "$1成功"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)committed(?=\\s|$)",
+            "renamePattern": "$1已提交"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)idempotent(?=\\s|$)",
+            "renamePattern": "$1幂等"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)conflict(?=\\s|$)",
+            "renamePattern": "$1冲突"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)unchanged(?=\\s|$)",
+            "renamePattern": "$1状态未变"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)rule_rejected(?=\\s|$)",
+            "renamePattern": "$1规则拒绝"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)duplicate(?=\\s|$)",
+            "renamePattern": "$1重复请求"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)stale(?=\\s|$)",
+            "renamePattern": "$1状态过期"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)blocked(?=\\s|$)",
+            "renamePattern": "$1阻塞"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)error(?=\\s|$)",
+            "renamePattern": "$1错误"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)canceled(?=\\s|$)",
+            "renamePattern": "$1已取消"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)retry(?=\\s|$)",
+            "renamePattern": "$1重试"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)permanent(?=\\s|$)",
+            "renamePattern": "$1永久失败"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)timeout(?=\\s|$)",
+            "renamePattern": "$1超时"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)reconnect(?=\\s|$)",
+            "renamePattern": "$1重连"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)rejected(?=\\s|$)",
+            "renamePattern": "$1被拒绝"
+          }
+        }
       ]
     },
     {
       "id": 31,
-      "title": "Host CPU / memory pressure",
+      "title": "主机 CPU 与内存使用率",
       "type": "timeseries",
-      "description": "",
+      "description": "CPU 使用率由非空闲时间估算，内存使用率由可用内存估算；数值范围为 0～1。",
       "datasource": {
         "type": "prometheus",
         "uid": "agricola-prometheus"
@@ -1705,7 +3723,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "percentunit",
-          "noValue": "Unknown / no samples",
+          "noValue": "未知 / 暂无样本",
           "custom": {
             "spanNulls": false
           },
@@ -1738,22 +3756,22 @@
         {
           "refId": "A",
           "expr": "1-avg(rate(node_cpu_seconds_total{mode=\"idle\"}[$__rate_interval]))",
-          "legendFormat": "CPU fraction",
+          "legendFormat": "CPU 使用率",
           "format": "time_series"
         },
         {
           "refId": "B",
           "expr": "1-node_memory_MemAvailable_bytes/node_memory_MemTotal_bytes",
-          "legendFormat": "memory fraction",
+          "legendFormat": "内存使用率",
           "format": "time_series"
         }
       ]
     },
     {
       "id": 32,
-      "title": "Host disk / network IO",
+      "title": "主机磁盘与网络吞吐",
       "type": "timeseries",
-      "description": "",
+      "description": "展示磁盘读写及非 loopback 网络收发的字节速率，反映主机物理 IO，与应用有效载荷分别解读。",
       "datasource": {
         "type": "prometheus",
         "uid": "agricola-prometheus"
@@ -1767,7 +3785,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "Bps",
-          "noValue": "Unknown / no samples",
+          "noValue": "未知 / 暂无样本",
           "custom": {
             "spanNulls": false
           },
@@ -1796,34 +3814,34 @@
         {
           "refId": "A",
           "expr": "sum(rate(node_disk_written_bytes_total[$__rate_interval]))",
-          "legendFormat": "disk written bytes/s",
+          "legendFormat": "磁盘写入 字节/秒",
           "format": "time_series"
         },
         {
           "refId": "B",
           "expr": "sum(rate(node_disk_read_bytes_total[$__rate_interval]))",
-          "legendFormat": "disk read bytes/s",
+          "legendFormat": "磁盘读取 字节/秒",
           "format": "time_series"
         },
         {
           "refId": "C",
           "expr": "sum(rate(node_network_receive_bytes_total{device!=\"lo\"}[$__rate_interval]))",
-          "legendFormat": "network received bytes/s",
+          "legendFormat": "网络接收 字节/秒",
           "format": "time_series"
         },
         {
           "refId": "D",
           "expr": "sum(rate(node_network_transmit_bytes_total{device!=\"lo\"}[$__rate_interval]))",
-          "legendFormat": "network sent bytes/s",
+          "legendFormat": "网络发送 字节/秒",
           "format": "time_series"
         }
       ]
     },
     {
       "id": 33,
-      "title": "Disk free / backup freshness",
+      "title": "磁盘可用空间与备份新鲜度",
       "type": "timeseries",
-      "description": "No backup manifest or invalid manifest means unknown. Backups remain owner-operated.",
+      "description": "展示各挂载点剩余空间比例，以及距最近一次已验证备份的秒数。没有有效备份清单时显示未知；备份仍由 owner 操作。",
       "datasource": {
         "type": "prometheus",
         "uid": "agricola-prometheus"
@@ -1837,7 +3855,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "short",
-          "noValue": "Unknown / no samples",
+          "noValue": "未知 / 暂无样本",
           "custom": {
             "spanNulls": false
           },
@@ -1866,22 +3884,22 @@
         {
           "refId": "A",
           "expr": "node_filesystem_avail_bytes{fstype!~\"tmpfs|overlay|squashfs\"}/node_filesystem_size_bytes",
-          "legendFormat": "{{mountpoint}} free fraction",
+          "legendFormat": "{{mountpoint}} 可用空间比例",
           "format": "time_series"
         },
         {
           "refId": "B",
           "expr": "time()-agricola_platform{kind=\"backup_validated_unixtime\"}",
-          "legendFormat": "backup age seconds",
+          "legendFormat": "备份距现在（秒）",
           "format": "time_series"
         }
       ]
     },
     {
       "id": 34,
-      "title": "Observability cost / failures",
+      "title": "监控采集开销与失败",
       "type": "timeseries",
-      "description": "",
+      "description": "按来源展示采集失败速率、最后一次采集是否成功，并展示各服务采集耗时与样本数量。",
       "datasource": {
         "type": "prometheus",
         "uid": "agricola-prometheus"
@@ -1895,7 +3913,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "short",
-          "noValue": "Unknown / no samples",
+          "noValue": "未知 / 暂无样本",
           "custom": {
             "spanNulls": false
           },
@@ -1924,34 +3942,78 @@
         {
           "refId": "A",
           "expr": "sum by(source)(rate(agricola_collector_errors_total[$__rate_interval]))",
-          "legendFormat": "{{source}} collection errors/s",
+          "legendFormat": "{{source}} 采集错误/秒",
           "format": "time_series"
         },
         {
           "refId": "B",
           "expr": "scrape_duration_seconds{job=~\"agricola-.*\"}",
-          "legendFormat": "{{job}} scrape seconds",
+          "legendFormat": "{{job}} 采集耗时（秒）",
           "format": "time_series"
         },
         {
           "refId": "C",
           "expr": "scrape_samples_scraped{job=~\"agricola-.*\"}",
-          "legendFormat": "{{job}} sample count",
+          "legendFormat": "{{job}} 采集样本数",
           "format": "time_series"
         },
         {
           "refId": "D",
           "expr": "agricola_collector_status",
-          "legendFormat": "{{source}} last collection success",
+          "legendFormat": "{{source}} 最近一次采集成功",
           "format": "time_series"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)global(?=\\s|$)",
+            "renamePattern": "$1全局数据"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)runtime(?=\\s|$)",
+            "renamePattern": "$1实例运行状态"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)s3(?=\\s|$)",
+            "renamePattern": "$1S3"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)backup(?=\\s|$)",
+            "renamePattern": "$1备份"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)agricola-ingress(?=\\s|$)",
+            "renamePattern": "$1统一入口"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)agricola-app(?=\\s|$)",
+            "renamePattern": "$1应用实例"
+          }
         }
       ]
     },
     {
       "id": 35,
-      "title": "Returned WS sample count / mean by round",
+      "title": "各回合的 WS 样本数与平均包大小",
       "type": "timeseries",
-      "description": "Selected range sample count and mean per displayed round. Empty windows remain empty; no exact maximum is inferred.",
+      "description": "所选时间范围内，按返回状态回合展示状态包样本数与平均字节数。没有样本的时间段保持为空，不推断精确最大值。",
       "datasource": {
         "type": "prometheus",
         "uid": "agricola-prometheus"
@@ -1965,7 +4027,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "short",
-          "noValue": "Unknown / no samples",
+          "noValue": "未知 / 暂无样本",
           "custom": {
             "spanNulls": false
           },
@@ -1983,7 +4045,7 @@
           {
             "matcher": {
               "id": "byRegexp",
-              "options": ".* mean bytes"
+              "options": ".* 平均包大小"
             },
             "properties": [
               {
@@ -2007,16 +4069,54 @@
         {
           "refId": "A",
           "expr": "sum by(round)(increase(agricola_ws_outgoing_message_size_bytes_count{round=~\"$round\",message_type=\"state\"}[$__range]))",
-          "legendFormat": "{{round}} samples",
+          "legendFormat": "{{round}} 样本数",
           "format": "time_series"
         },
         {
           "refId": "B",
           "expr": "sum by(round)(increase(agricola_ws_outgoing_message_size_bytes_sum{round=~\"$round\",message_type=\"state\"}[$__range]))/sum by(round)(increase(agricola_ws_outgoing_message_size_bytes_count{round=~\"$round\",message_type=\"state\"}[$__range]))",
-          "legendFormat": "{{round}} mean bytes",
+          "legendFormat": "{{round}} 平均包大小",
           "format": "time_series"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)pregame(?=\\s|$)",
+            "renamePattern": "$1游戏前"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)postgame(?=\\s|$)",
+            "renamePattern": "$1游戏结束"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)none(?=\\s|$)",
+            "renamePattern": "$1无对局"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)unknown(?=\\s|$)",
+            "renamePattern": "$1未知"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^(1[0-4]|[1-9])(?=\\s|$)",
+            "renamePattern": "第 $1 回合"
+          }
         }
       ]
     }
-  ]
+  ],
+  "description": "展示当前运行情况与近七天趋势，每 15 秒刷新。p95 表示约 95% 的样本不超过该值。缺失或过期数据保持未知；WS 包大小按实际返回状态的游戏回合统计。"
 }
