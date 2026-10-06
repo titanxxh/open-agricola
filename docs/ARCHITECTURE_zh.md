@@ -1246,7 +1246,7 @@ server/game/
 
 停机导入器只清理能够确认未录制的活动局，线上启动不执行旧数据清理。等待局及任何带录制意图、构建身份、Replay 或结果记录的局都保留。录制数据缺失会阻止恢复，不会新建替代局或补造历史。独立 HTTP/browser 工坊沙盒继续可用。参见 [ADR-0022](adr/0022-distributed-room-recovery.md)。
 
-`RoomDirectory` 通过 PostgreSQL 租约和单调递增的 owner epoch 分配应用进程。提交和发布都验证 owner 与预期 Room 版本。`POST /api/rooms/locate` 返回同源 `/nodes/<instanceId>/ws` 路由，`ingress.ts` 转发到私有实例。本机默认一个进程，可在同一物理机启动两个；共享大厅 presence 和 HTTP 亲和路由维持房间接入与不承诺恢复的 Sandbox 访问。
+`RoomDirectory` 通过 PostgreSQL 租约和单调递增的 owner epoch 分配应用进程。提交和发布都验证 owner 与预期 Room 版本。`POST /api/rooms/locate` 返回同源 `/nodes/<instanceId>/ws` 路由，`ingress.ts` 转发到私有实例。生产 Compose 在同一物理机的一个 app 容器内启动两个独立应用进程；本地开发默认一个，也支持两个。共享大厅 presence 和 HTTP 亲和路由维持房间接入与不承诺恢复的 Sandbox 访问。
 
 写命令携带服务端签发的 scope、稳定命令身份、Room 身份和预期版本或同时输入窗口。`CommandStore` 登记内容指纹，并在 Room 转换的同一事务内提交结果；重复命令返回原 receipt。客户端记录待定命令，正常重连时重新定位 owner、查询 receipt、恢复原座位，并等待权威快照后开放新输入。重开只迁入在线座位，旧局离线玩家的预留不能使新局自动开始。
 

@@ -29,7 +29,8 @@ services:
       - NODE_ENV=production
       - BACKEND_PORT=5175
       - BACKEND_HOST=0.0.0.0
-      - APP_INSTANCES=${APP_INSTANCES:-1}
+      # Production always exercises both application processes, even if .env selects one for local development.
+      - APP_INSTANCES=2
       - ALLOW_ANONYMOUS_WS=false
       - REPLAY_TRUST_PROXY=true
       - BUG_REPORTS_ENABLED=${BUG_REPORTS_ENABLED:-false}
