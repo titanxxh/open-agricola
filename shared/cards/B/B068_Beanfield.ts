@@ -23,6 +23,7 @@ export const B068_Beanfield = defineMinorCard({
     isField: true,
     cardField: { allowedCrops: ['vegetable'], capacity: 1 },
   },
+  presentation: { cardFields: true },
   impl: cardImpl,
 })
 

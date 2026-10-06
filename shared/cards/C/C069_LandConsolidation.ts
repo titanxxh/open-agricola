@@ -81,6 +81,7 @@ const cardImpl = {
 } satisfies CardImpl
 
 export const C069_LandConsolidation = defineMinorCard({
+  presentation: { stack: true },
   meta: {
     id: CARD_ID,
     name: 'Land Consolidation',

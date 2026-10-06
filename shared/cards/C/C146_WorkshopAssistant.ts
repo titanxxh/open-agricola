@@ -240,7 +240,10 @@ const opponentRenovationListener: CardListenerRegistration = {
 
 const cardImpl = {
   effect: {
-    id: CARD_ID,
+  id: CARD_ID,
+  getStatePresentation: (player) => ({
+    resourceGroups: readStoredPairs(player).flatMap((pair) => PAIR_RESOURCES[pair] ? [{ ...PAIR_RESOURCES[pair] }] : []),
+  }),
     onBuy: (_state, player) => {
       const n = Math.min(6, countAllImprovements(player))
       if (n <= 0) return

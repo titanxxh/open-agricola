@@ -1,15 +1,9 @@
 import type { PlayerState } from '../../contract/types'
+import type { PublicCardMarker } from '../../contract/card-state'
+export type { PublicCardMarker } from '../../contract/card-state'
 import { readCardExtraData, writeCardExtraData } from './card-state'
 
 export const PUBLIC_CARD_MARKERS_KEY = 'publicCardMarkers'
-
-export type PublicCardMarker = {
-  id: string
-  label: string
-  sourceCardId: string
-  score?: number
-  sourcePlayerId?: string
-}
 
 export type PublicCardMarkerEntry = PublicCardMarker & {
   cardId: string

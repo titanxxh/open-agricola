@@ -76,6 +76,7 @@ const cardImpl = {
 } satisfies CardImpl
 
 export const D070_StrawManure = defineMinorCard({
+  presentation: { stack: true },
   meta: {
     id: CARD_ID,
     name: "Straw Manure",

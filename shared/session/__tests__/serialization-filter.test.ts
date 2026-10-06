@@ -11,6 +11,12 @@ import {
 } from '../serialization'
 import { EngineStack } from '../../engine'
 
+const withoutInternalValue = (event: GameEvent): GameEvent => {
+  const copy = { ...event }
+  if (copy.type === 'card.stateChanged') delete copy.value
+  return copy
+}
+
 const emptyCtx = () => ({ engineStack: new EngineStack() })
 
 // ---------- helpers ----------
@@ -478,7 +484,7 @@ describe('serializeStateForPlayer', () => {
     ])
     expect(ownerP2.stats.draftHistory).toEqual(p2.stats.draftHistory)
     expect(filteredP2.cardStates.D036_BreedRegistry).toBeUndefined()
-    expect(filteredP2.cardStates.B021_HayloftBarn).toEqual(p2.cardStates.B021_HayloftBarn)
+    expect(filteredP2.cardStates.B021_HayloftBarn).toBeUndefined()
     expect(opponentView.events.map((event) => event.id)).toEqual(['102'])
     expect(opponentView.events.map((event) => event.seq)).toEqual([1])
     expect(opponentView.log).toEqual([
@@ -508,10 +514,10 @@ describe('serializeStateForPlayer', () => {
         nextMaxSeq: 0,
         canceledEventIds: ['102'],
         canceledSeqs: [1],
-        canceledEvents: [{ ...visibleEvent, seq: 1 }],
+        canceledEvents: [{ ...withoutInternalValue(visibleEvent), seq: 1 }],
       },
     ])
-    expect(ownerP2.cardStates.D036_BreedRegistry).toEqual(p2.cardStates.D036_BreedRegistry)
+    expect(ownerP2.cardStates.D036_BreedRegistry).toBeUndefined()
     expect(ownerView.events.map((event) => event.id)).toEqual(['100', '102'])
     expect(ownerView.events.map((event) => event.seq)).toEqual([100, 102])
     expect(ownerView.log).toEqual(stateWithLog.log)
@@ -596,7 +602,8 @@ describe('serializeStateForPlayer', () => {
 
     const opponentView = serializeStateForPlayer(state, 'p1', emptyCtx())
 
-    expect(opponentView.events).toEqual([visibleEvent])
+    expect(opponentView.events).toEqual([withoutInternalValue(visibleEvent)])
+    expect(opponentView.events[0]).not.toHaveProperty('value')
     expect(opponentView.nextEventSeq).toBe(2)
     expect(opponentView.publicEventArchive).toEqual([
       {
@@ -722,7 +729,7 @@ describe('serializeStateForPlayer', () => {
         nextMaxSeq: 0,
         canceledEventIds: ['old-visible'],
         canceledSeqs: [2],
-        canceledEvents: [{ ...oldVisibleEvent, seq: 2 }],
+        canceledEvents: [{ ...withoutInternalValue(oldVisibleEvent), seq: 2 }],
       },
       {
         schemaVersion: 1,

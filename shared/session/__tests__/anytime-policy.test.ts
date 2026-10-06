@@ -6,11 +6,18 @@ const base = (over: Partial<AnytimePolicyInput> = {}): AnytimePolicyInput => ({
   hasActiveContext: true,
   stageResume: null,
   interactionKind: undefined,
-  promptKey: undefined,
+  anytimeWindow: undefined,
   ...over,
 })
 
 describe('computeAnytimePolicy', () => {
+  it('uses an explicit window at a stage wait without recognizing its prompt', () => {
+    expect(computeAnytimePolicy(base({
+      stageResume: { hook: 'onBeforeEndGame', playerIndex: 0, cardIndex: 0 },
+      interactionKind: 'choice',
+      anytimeWindow: { allowed: true, blockedIds: [] },
+    }))).toEqual({ allowed: true, blockedIds: [] })
+  })
   it('rule 1 — no active context → blocked', () => {
     expect(computeAnytimePolicy(base({ hasActiveContext: false })))
       .toEqual({ allowed: false, reason: 'no-active-interaction' })
@@ -38,13 +45,13 @@ describe('computeAnytimePolicy', () => {
       .toEqual({ allowed: true, blockedIds: [] })
   })
 
-  it('rule 5 — exchange promptKey → allowed, blocks exchange', () => {
-    expect(computeAnytimePolicy(base({ promptKey: 'ui.interactionExchange' })))
+  it('rule 5 — exchange window → allowed, blocks exchange', () => {
+    expect(computeAnytimePolicy(base({ anytimeWindow: { allowed: true, blockedIds: ['exchange'] } })))
       .toEqual({ allowed: true, blockedIds: ['exchange'] })
   })
 
-  it('rule 5 — bake-bread promptKey → allowed, blocks exchange', () => {
-    expect(computeAnytimePolicy(base({ promptKey: 'ui.interactionBakeBread' })))
+  it('rule 5 — bake-bread window → allowed, blocks exchange', () => {
+    expect(computeAnytimePolicy(base({ anytimeWindow: { allowed: true, blockedIds: ['exchange'] } })))
       .toEqual({ allowed: true, blockedIds: ['exchange'] })
   })
 
@@ -59,11 +66,11 @@ describe('computeAnytimePolicy', () => {
     ).toEqual({ allowed: true, blockedIds: [] })
   })
 
-  it('rule 5 overrides rule 6 — exchange promptKey + stageResume non-null still allowed', () => {
+  it('rule 5 overrides rule 6 — exchange window + stageResume non-null still allowed', () => {
     expect(
       computeAnytimePolicy(
         base({
-          promptKey: 'ui.interactionExchange',
+          anytimeWindow: { allowed: true, blockedIds: ['exchange'] },
           stageResume: { hook: 'beforeHarvest', playerIndex: 0, cardIndex: 0 },
         }),
       ),

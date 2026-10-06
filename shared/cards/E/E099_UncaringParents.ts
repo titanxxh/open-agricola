@@ -31,6 +31,7 @@ export const E099_UncaringParents = defineOccupationCard({
     players: "1+",
     extraVp: true,
   },
+  presentation: { counters: ['bonusVp'] },
   impl: cardImpl,
 })
 

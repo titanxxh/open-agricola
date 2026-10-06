@@ -25,6 +25,7 @@ describe('E043_BarnCats prerequisite', () => {
     const state = session.getState().state
     const player = state.players[0]!
     player.stableTiles = []
+    player.occupationPlayed.push('B085_FarmHand')
     player.cardStates = {
       B085_FarmHand: { extraData: { position: { row: 0, col: 0 } } },
     }

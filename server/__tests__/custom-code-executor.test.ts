@@ -16,6 +16,12 @@ import { workshopCardJsonFromDefinition } from '../workshop-draft-validation.ts'
 import { compileCardCode } from '../../shared/custom-code/compiler.ts'
 import { serializeSessionSnapshot } from '../../shared/session/serialization.ts'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands.ts'
+import { getOwnOrdinaryFenceReserveCount, getAvailableStableSupplyCount } from '../../shared/domain/supply-tokens'
+import { getActiveCardRegistry } from '../../shared/cards/active-registry'
+import { rehydrateState } from '../../shared/session/serialization'
+import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
+import { Scoring } from '../../shared/domain'
+import type { ActionFlow } from '../../shared/contract/types'
 
 const makeCardData = (compiledCode: string, codeManifest: CustomCardData['codeManifest']): CustomCardData => ({
   cardType: 'minor',
@@ -35,6 +41,124 @@ afterEach(() => {
 })
 
 describe('custom code executor', () => {
+  it.each(['native', 'sandbox'])('uses a source-owned quantity and current-step window through %s, including restoration', (mode) => {
+    const flow: ActionFlow = { type: 'leaf', actionId: 'selection', sourceCard: 'CUSTOM_ExecutorCard', optional: true,
+      optionalPromptKey: 'ui.interactionOptionalAction', anytimeWindow: { allowed: true },
+      actionContext: { selectionKind: 'farm-position', selectableTiles: [{ row: 0, col: 1 }], minSelections: 1, maxSelections: 1 } }
+    const compiled = validateAndCompileCustomCode(`
+const CARD_ID = 'CUSTOM_ExecutorCard'
+const CARD_DEF = MinorImprovement({ id: CARD_ID, name: 'Executor Card' })
+const CARD_IMPL = { effect: { id: CARD_ID,
+  getRuleContributions: (player) => ({ unusedSpaceReduction: player.cardStates[CARD_ID].extraData.quantity }),
+  onBeforeEndGame: () => (${JSON.stringify(flow)})
+} }
+    `, 'CUSTOM_ExecutorCard')
+    if (!compiled.valid) throw new Error(compiled.errors.join('\n'))
+    const cards = mode === 'sandbox' ? [makeCardData(compiled.compiledCode, compiled.manifest)] : undefined
+    const session = new GameSession(42, cards, { playerCount: 2 })
+    const installNative = (target: GameSession) => {
+      if (mode === 'native') target.withCtx(() => getActiveCardRegistry()!.loadImpl('CUSTOM_ExecutorCard', { effect: {
+        id: 'CUSTOM_ExecutorCard', getRuleContributions: (player) => ({ unusedSpaceReduction: player.cardStates.CUSTOM_ExecutorCard!.extraData!.quantity as number }),
+        onBeforeEndGame: () => structuredClone(flow),
+      } }))
+    }
+    installNative(session)
+    session.state.round = 14
+    for (const player of session.state.players) {
+      player.minorHand = ['__test_placeholder__']; player.occupationHand = ['__test_placeholder__']
+      markAllWorkersUsed(session.state, player); setActiveWorkerCount(player, 0)
+      player.resources.food = 0
+    }
+    const player = session.state.players[0]!
+    player.minorPlayed = ['CUSTOM_ExecutorCard']
+    player.improvements = ['Major_Fireplace1']; player.resources.sheep = 1
+    player.houseAnimalType = 'sheep'; player.houseAnimalCount = 1
+    player.cardStates.CUSTOM_ExecutorCard = { extraData: { quantity: 1.9 } }
+    session.loadState(session.state)
+    let response = session.invokeAfterRoundEnd()
+    expect(response.interaction.request?.kind).toBe('choice')
+    expect(response.interaction.anytimeActions.map((action) => action.id)).toContain('exchange')
+    const saved = session.withCtx(() => serializeSessionSnapshot(session.state, session))
+    const restored = new GameSession(rehydrateState(saved), cards)
+    installNative(restored)
+    expect(restored.getState().interaction.anytimeActions.map((action) => action.id)).toContain('exchange')
+    for (const target of [session, restored]) {
+      response = target.takeAnytimeAction(0, 'exchange')
+      expect(response.ok).toBe(true)
+      response = target.resolveChoice(0, 'bulk:0=1')
+      expect(response.state.players[0]!.resources.food).toBe(2)
+      expect(response.interaction.promptKey).toBe('ui.interactionOptionalAction')
+      response = target.resolveChoice(0, response.interaction.request!.options!.find((option) => option.value !== '__skip__')!.value)
+      expect(response.interaction.request?.kind).toBe('selection')
+      expect(response.interaction.anytimeActions).toEqual([])
+      const before = JSON.stringify(target.state)
+      expect(target.takeAnytimeAction(0, 'exchange').ok).toBe(false)
+      expect(JSON.stringify(target.state)).toBe(before)
+      response = target.commitSelectionChoice(0, { positions: ['0-1'] })
+      expect(response.ok, response.error).toBe(true)
+      expect(response.state.gameOver).toBe(true)
+      expect(target.withCtx(() => Scoring.breakdown(response.state, 0)).categories.find((category) => category.key === 'empty'))
+        .toMatchObject({ quantity: 12, total: -12 })
+    }
+  })
+  it.each(['native', 'sandbox'])('records detached, explicitly public presentation through the %s query', (mode) => {
+    const compiled = validateAndCompileCustomCode(`
+const CARD_ID = 'CUSTOM_ExecutorCard'
+const CARD_DEF = MinorImprovement({ id: CARD_ID, name: 'Executor Card' })
+const CARD_IMPL = { effect: { id: CARD_ID, getStatePresentation: (player) => {
+  const data = player.cardStates[CARD_ID].extraData
+  data.internal = 'QUERY_WRITE'
+  return { counters: { publicCount: data.publicCount }, resourceGroups: data.groups,
+    animalMarkers: [{ animal: 'horse', count: 1.9, pose: 'lying' }, { animal: 'horse', count: -1 }],
+    extraData: data }
+} } }
+    `, 'CUSTOM_ExecutorCard')
+    if (!compiled.valid) throw new Error(compiled.errors.join('\n'))
+    const session = new GameSession(42, mode === 'sandbox' ? [makeCardData(compiled.compiledCode, compiled.manifest)] : undefined, { playerCount: 2 })
+    stabilizeRandomHands(session.state.players)
+    if (mode === 'native') session.withCtx(() => getActiveCardRegistry()!.loadImpl('CUSTOM_ExecutorCard', { effect: {
+      id: 'CUSTOM_ExecutorCard',
+      getStatePresentation: (player) => {
+        const data = player.cardStates.CUSTOM_ExecutorCard!.extraData!
+        data.internal = 'QUERY_WRITE'
+        return { counters: { publicCount: data.publicCount as number }, resourceGroups: data.groups as { wood: number }[],
+          animalMarkers: [{ animal: 'horse', count: 1.9, pose: 'lying' }, { animal: 'horse', count: -1 }], extraData: data }
+      },
+    } }))
+    const player = session.state.players[0]!
+    player.minorPlayed = ['CUSTOM_ExecutorCard']
+    player.cardStates.CUSTOM_ExecutorCard = { extraData: { publicCount: 2, internal: 'AUTH_INTERNAL', groups: [{ wood: 1, clay: 1 }] } }
+    const before = JSON.stringify(session.state)
+    for (const viewer of [player.id, session.state.players[1]!.id, null]) {
+      const facts = session.buildSyncPayload(session.getState(), viewer).state.players[0]!.cardStatePresentation.CUSTOM_ExecutorCard!
+      expect(facts).toEqual({ counters: { publicCount: 2 }, resourceGroups: [{ wood: 1, clay: 1 }],
+        animalMarkers: [{ animal: 'horse', count: 1, pose: 'lying' }] })
+      facts.resourceGroups![0]!.wood = 99
+    }
+    expect(JSON.stringify(session.state)).toBe(before)
+  })
+  it('aggregates sandbox source component reservations through the same rule queries', () => {
+    const compiled = validateAndCompileCustomCode(`
+const CARD_ID = 'CUSTOM_ExecutorCard'
+const CARD_DEF = MinorImprovement({ id: CARD_ID, name: 'Executor Card' })
+const CARD_IMPL = { effect: { id: CARD_ID, getRuleContributions: (player) => ({
+  reservedSupply: { fence: player.cardStates[CARD_ID].extraData.pieces, stable: 2 },
+}) } }
+    `, 'CUSTOM_ExecutorCard')
+    expect(compiled.valid).toBe(true)
+    if (!compiled.valid) throw new Error(compiled.errors.join('\n'))
+    const session = new GameSession(42, [makeCardData(compiled.compiledCode, compiled.manifest)], { playerCount: 2 })
+    stabilizeRandomHands(session.state.players)
+    const player = session.state.players[0]!
+    player.minorPlayed = ['CUSTOM_ExecutorCard']
+    player.cardStates.CUSTOM_ExecutorCard = { extraData: { pieces: 3 } }
+    const before = JSON.stringify(session.state)
+    session.withCtx(() => {
+      expect(getOwnOrdinaryFenceReserveCount(player)).toBe(12)
+      expect(getAvailableStableSupplyCount(session.state, player)).toBe(2)
+    })
+    expect(JSON.stringify(session.state)).toBe(before)
+  })
   it('extracts the validated CARD_DEF metadata', () => {
     const result = validateAndCompileCustomCode(`
 const CARD_ID = 'CUSTOM_MetadataCard'

@@ -11,6 +11,11 @@ import {
   loadCardsManifest,
   type CardsManifestPayload,
 } from '../../../services/card-meta'
+import { CardRegistry } from '../../../../shared/cards/registry'
+import { ALL_CARD_IMPLS } from '../../../../shared/cards/register-all'
+import { withActiveRegistry } from '../../../../shared/cards/active-registry'
+import { collectCardStatePresentation } from '../../../../shared/cards/card-state-presentation'
+import { projectParentCardState } from '../../../../shared/parents/father-completion'
 import { buildFarmBoardProjection } from '../../../app/farm-board-projection'
 import { publicAssetUrl } from '../../../utils/public-asset-url'
 
@@ -106,13 +111,21 @@ const createPlayer = (id: string, name: string, color: PlayerState['color']): Pl
   cardStates: {},
 })
 
+const registry = new CardRegistry()
+for (const [id, impl] of Object.entries(ALL_CARD_IMPLS)) registry.loadImpl(id, impl)
+const recordedPresentation = (player: PlayerState) => withActiveRegistry(registry, () => ({
+  ...collectCardStatePresentation(player),
+  ...(player.parentCards ? projectParentCardState(player) : {}),
+}))
+
 const createFarmBoardProps = (
   player: PlayerState,
   viewOverrides: Partial<FarmBoardProps['view']> = {},
   actionOverrides: Partial<FarmBoardProps['actions']> = {},
 ): FarmBoardProps => {
+  const displayPlayer = { ...player, cardStatePresentation: recordedPresentation(player) }
   const projected = buildFarmBoardProjection({
-    displayPlayer: player,
+    displayPlayer,
     interaction: { stateId: 'idle', allowedCommands: [], anytimeActions: [] },
     selectionInteraction: null,
     players: [player],
@@ -1384,7 +1397,7 @@ describe('FarmBoard', () => {
     expect(html).not.toContain('extra-sow-tray')
   })
 
-  it('renders held-worker overlay when cardStates.heldWorkerId is set', () => {
+  it('renders a recorded held-worker overlay', () => {
     const player: PlayerState = {
       ...createPlayer('p1', 'Player A', 'red'),
       minorPlayed: ['C022_BasketChair'],
@@ -1533,7 +1546,7 @@ describe('FarmBoard', () => {
       anytimeActions: [],
     }
     const projection = buildFarmBoardProjection({
-      displayPlayer: player,
+      displayPlayer: { ...player, cardStatePresentation: recordedPresentation(player) },
       interaction,
       selectionInteraction: interaction.request.selection,
       players: [player],
@@ -1555,7 +1568,7 @@ describe('FarmBoard', () => {
     expect(togglePositionSelection).toHaveBeenCalledWith(expect.objectContaining({ row: -1, col: 4075 }))
   })
 
-  it('renders C146 stored pairs from extraData as resource-pair stack on the played card', () => {
+  it('renders recorded C146 resource groups on the played card', () => {
     const player = createPlayer('p1', 'Player A', 'red')
     player.occupationPlayed = ['C146_WorkshopAssistant']
     player.cardStates = {

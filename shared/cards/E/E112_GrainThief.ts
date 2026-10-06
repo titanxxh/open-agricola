@@ -116,6 +116,7 @@ const cardImpl = {
 } satisfies CardImpl
 
 export const E112_GrainThief = defineOccupationCard({
+  presentation: { stack: true },
   meta: {
     id: "E112_GrainThief",
     name: "Grain Thief",

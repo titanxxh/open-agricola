@@ -282,6 +282,7 @@ describe('D072_StableManure session', () => {
     const { session } = setupHarvest(0)
     const state = session.getState().state
     const p = state.players[0]!
+    p.occupationPlayed.push('B085_FarmHand')
     p.cardStates = {
       ...p.cardStates,
       B085_FarmHand: { extraData: { position: { row: 0, col: 0 } } },

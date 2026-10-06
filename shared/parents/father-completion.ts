@@ -11,12 +11,25 @@ import { countOccupations } from '../cards/helpers/prerequisites'
 import { collectCardsAs } from '../cards/helpers/card-type'
 import { getLogicalFields } from '../cards/helpers/card-field'
 import type { FatherParentCardId, FatherRequirement, FatherReward, FatherRewardEffect } from './types'
+import type { CardStatePresentation } from '../contract/card-state'
 
 export const COMPLETE_PARENT_FATHER_ACTION_ID = 'complete-parent-father'
 const COMPLETED_INFOBOX = 'Completed'
 const COMPLETED_TIER_KEY = 'fatherCompletedTier'
 const BUILDING_RESOURCES = ['wood', 'clay', 'reed', 'stone'] as const
 type BuildingResource = typeof BUILDING_RESOURCES[number]
+
+/** Parent completion owns these fields; consumers receive only recorded display facts. */
+export const projectParentCardState = (player: Readonly<PlayerState>): Record<string, CardStatePresentation> =>
+  Object.fromEntries([player.parentCards.mother, player.parentCards.father].flatMap((id) => {
+    if (!id) return []
+    const state = player.cardStates?.[id]
+    const tier = state?.extraData?.[COMPLETED_TIER_KEY]
+    const facts: CardStatePresentation = {}
+    if (typeof state?.infobox === 'string') facts.infobox = state.infobox
+    if (tier === 1 || tier === 2 || tier === 3) facts.completedTier = tier
+    return [[id, facts]]
+  }))
 
 const positiveResources = (resources: Partial<Resource>): Partial<Resource> => {
   const out: Partial<Resource> = {}

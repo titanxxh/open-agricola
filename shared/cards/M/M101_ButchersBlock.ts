@@ -43,6 +43,7 @@ const conversionFlow = (
     type: 'xor',
     optional,
     promptKey: 'ui.interactionExchangeChoice',
+    anytimeWindow: { allowed: true, blockedIds: ['exchange'] },
     sourceCard: CARD_ID,
     children,
   }

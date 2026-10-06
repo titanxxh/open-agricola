@@ -941,16 +941,11 @@ C1 Overhaul counts, returns, and rebuilds only the player's own ordinary fences.
 
 ## Anytime Window Policy
 
-The set of card-listener anytime actions available in a given pending interaction is computed once per `buildInteraction()` by `computeAnytimePolicy()` in `shared/session/anytime-policy.ts`. The helper is **server-only**; `client/` never imports it.
+`computeAnytimePolicy()` in `shared/session/anytime-policy.ts` computes card-listener anytime availability once per `buildInteraction()`. Clients never import this rule query.
 
-Inputs come from `GameCore.getAnytimePolicyInput()` using the same node-plus-composite fallback as `buildInteraction`:
+`GameCore.getAnytimePolicyInput()` supplies active context, `stageResume`, the current `InteractionRequest.kind`, and that request's `anytimeWindow`. A flow/request may declare `{ allowed: true, blockedIds?: string[] }` or `{ allowed: false }`. The declaration belongs only to the current waiting node: parent optional nodes, siblings and continuations do not confer permission. Engine cursor serialization preserves it. Prompt keys select copy only; ordinary exchange/bake flows explicitly allow the window while blocking `exchange`.
 
-- `hasActiveContext`: whether `getActiveInteractionContext()` is nonnull;
-- `stageResume`: the current frame's `stageResume`;
-- `interactionKind`: `node?.request?.kind ?? composite?.request?.kind`;
-- `promptKey`: `node?.promptKey ?? composite?.promptKey`.
-
-Output is `{ allowed: false, reason }` or `{ allowed: true, blockedIds }`. Rules are priority ordered and first match wins: no context; heating locked; `confirm-next-player` allowed with `exchange` blocked; `confirm-player-switch` blocked; animal reorganization; exchange or bake-bread prompt key; default stage-hook-chain block; otherwise allowed without blocked IDs.
+Priority is: no context; heating; engine-blocked; next-player confirmation (allowed with exchange blocked); player-switch confirmation; animal reorganization; the explicit current window; default stage-hook-chain block; ordinary allowance. Metadata cannot override preceding hard blocks, and malformed windows close. D132 declares an open source optional and a closed quantity selection so frozen payment limits cannot be changed by a nested exchange.
 
 Three consumers share the snapshot:
 
@@ -1042,6 +1037,12 @@ Production paths access cards only through `catalog.generated.ts` and `CardRegis
 - A card may hold a worker in `cardStates[cardId].extraData.heldWorkerId`, where the worker is neither in `takenBy` nor at home. `shared/cards/helpers/card-held-workers.ts` supplies `holdWorkerOnCard`, `getWorkerHeldOnCard`, `releaseWorkerFromCard`, and `getCardHeldWorkerIds`; return-home releases all held workers. `family-growth` can use `actionContext.holdNewbornOnCard` to place a newborn directly on the card, avoiding action-space occupancy before return-home and preventing reuse as a capacity source.
 - A card may write read-only UI markers to `cardStates[cardId].extraData.farmTerrainMarkers`. FarmBoard renders a marker inside its terrain tile, while backend card state remains authoritative for rules.
 - A card may write cross-player public markers into the target's `cardStates[sourceCard].extraData.publicCardMarkers`. A helper aggregates them and scoring writes them to `cardBonusVp`. FarmBoard displays them in the source player's summary area, not outside the farm board.
+
+Card Sources own both storage and interpretation. Native `presentation` declarations opt specific counter keys, stacks, Card Fields, held workers, reservations, attachments and markers into common display adapters; `getStatePresentation(player)` supplies source-specific facts such as resource pairs or lying animals. `infobox` and resource statistics are explicitly public adapter channels. Authoritative serialization records normalized `cardStatePresentation`; frontend and seat-view Replay render these facts and authoritative animal/stable projections without decoding raw fields. Derived facts are stripped on rehydration and are never a second writable source of truth.
+
+Card state has three audiences: internal (default), public presentation, and player-private `privateData`. Ordinary snapshots, patches, dev WS snapshots, events, histories and seat-view Bug Reports/Replay expose only public facts and the viewer's declared private data, including when the viewer owns the card. Private data follows the storage player rather than the current card holder. Authoritative state, recovery, undo, debug full state and all-open Replay retain raw state. New `card.stateChanged` events carry source/key metadata without values; projection also removes values from historical events without rewriting immutable Frames or their Viewer references. New Frames record the additive presentation facts and use a newly built content-addressed Viewer. The existing JSON Frame/delta container schema is unchanged; the Room header locks its Viewer build at creation (ADR 0011).
+
+`getRuleContributions(player)` provides read-only component reservations and unused-space reductions. Shared consumers combine unique played sources, floor finite values, reject negatives/non-numbers and cap deductions at the category's size. Generic stable discovery and return dispatch by `sourceCardId`; the source alone changes its construction state. Farmyard geometry receives actual non-pasture animal counts from AnimalZones instead of inspecting a card or subtracting capacity. Query inputs/results are detached from authoritative storage, and native/Workshop read-only queries use the same contract.
 
 ### 8.4 Convenience helpers under `shared/cards/helpers/`
 

@@ -62,6 +62,7 @@ export const M074_Administration = defineMinorCard({
     implemented: true,
     requiresFarmersOfTheMoor: true,
   },
+  presentation: { counters: ['bonusVp'] },
   impl: cardImpl,
 })
 

@@ -57,6 +57,7 @@ const cardImpl = {
 } satisfies CardImpl
 
 export const D158_BeanCounter = defineOccupationCard({
+  presentation: { counters: ['food'] },
   meta: {
     id: "D158_BeanCounter",
     name: "Bean Counter",

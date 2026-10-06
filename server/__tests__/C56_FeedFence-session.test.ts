@@ -64,6 +64,7 @@ describe('C056_FeedFence session', () => {
     // on top of 1 built = 3 food.
     const result = runAfterStables((player) => {
       player.stableTiles = [{ row: 2, col: 2 }, { row: 2, col: 3 }, { row: 2, col: 4 }]
+      player.occupationPlayed.push('B085_FarmHand')
       player.cardStates = {
         __actionSnapshot__: { extraData: { stableTiles: 3 } },
         B085_FarmHand: { extraData: { position: { row: 0, col: 0 } } },

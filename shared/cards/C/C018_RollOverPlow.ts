@@ -80,6 +80,7 @@ const cardImpl = {
 } satisfies CardImpl
 
 export const C018_RollOverPlow = defineMinorCard({
+  presentation: { stack: true },
   meta: {
     id: CARD_ID,
     name: 'Roll-Over Plow',

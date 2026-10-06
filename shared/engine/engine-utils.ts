@@ -192,6 +192,7 @@ function copySharedNodeMetadata(source: EngineNode, target: EngineNode): EngineN
   target.optional = source.optional
   target.optionalActive = source.optionalActive
   target.optionalPromptKey = source.optionalPromptKey
+  target.anytimeWindow = source.anytimeWindow
   target.mandatory = source.mandatory
   target.beforeAnytimeAvailable = source.beforeAnytimeAvailable
   const pending = source.getPending()
@@ -729,6 +730,18 @@ export function buildFlowNode(
   inheritedOptionId?: string,
   idStyle: 'flow' | 'session' = 'flow',
 ): EngineNode {
+  const node = buildFlowNodeContent(int, flow, ownerPlayerId, inheritedOptionId, idStyle)
+  node.anytimeWindow = flow.anytimeWindow
+  return node
+}
+
+function buildFlowNodeContent(
+  int: EngineInternals,
+  flow: ActionFlow,
+  ownerPlayerId: string | undefined,
+  inheritedOptionId: string | undefined,
+  idStyle: 'flow' | 'session',
+): EngineNode {
   const optionId = flow.optionId ?? inheritedOptionId
   const nextId = () => `flow-${int.counterRef.value++}`
   const nextActionId = (actionId: string) =>
@@ -779,6 +792,9 @@ export function buildFlowNode(
       optionId ? { ...(flow.actionContext ?? {}), optionId } : flow.actionContext,
       flow.effectPreview,
     )
+    // A nonoptional leaf owns its initial request. Optional metadata belongs
+    // to the optional prompt, not the action's later selection or continuation.
+    if (flow.optional !== true) actionNode.anytimeWindow = flow.anytimeWindow
     const definition = int.registry.get(flow.actionId)
     if (definition?.resolveChoice && !definition.skipChoiceWrap) {
       const sequence = new SequenceNode(nextSequenceId(flow.actionId), [actionNode])

@@ -35,6 +35,7 @@ export const E100_MuseumCaretaker = defineOccupationCard({
     players: '1+',
     extraVp: true,
   },
+  presentation: { counters: ['bonusVp'] },
   impl: cardImpl,
 })
 

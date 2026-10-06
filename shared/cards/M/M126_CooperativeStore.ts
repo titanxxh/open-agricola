@@ -68,6 +68,7 @@ export const M126_CooperativeStore = defineMinorCard({
     implemented: true,
     requiresFarmersOfTheMoor: true,
   },
+  presentation: { counters: ['usage'] },
   impl: cardImpl,
 })
 

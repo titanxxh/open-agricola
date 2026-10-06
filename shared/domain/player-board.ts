@@ -28,9 +28,9 @@ export class PlayerBoard {
   constructor(player: PlayerState, state: GameState) {
     this.player = player
     this.state = state
-    this.farmyard = new Farmyard(player, state)
-    this.farmInteraction = new FarmInteraction(player)
     this.animals = new AnimalZones(player, state)
+    this.farmyard = new Farmyard(player, state, () => this.animals.nonPastureAnimalCounts())
+    this.farmInteraction = new FarmInteraction(player)
   }
 
   /** Underlying state (escape hatch for PR2+ migrations). */

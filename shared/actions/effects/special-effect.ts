@@ -15,6 +15,7 @@ import {
   writeCardInfobox,
   readCardExtraData,
   writeCardExtraData,
+  writePrivateCardData,
   popFromCardStack,
 } from '../../cards/helpers/card-state'
 import { incCounter, initCardState } from '../../cards/__stubs__/helpers'
@@ -62,6 +63,7 @@ type ResourceAccumulationTarget =
 export type SpecialEffectParams =
   | { kind: 'increment-extra-data'; key: string; amount: number }
   | { kind: 'set-extra-data'; key: string; value: unknown }
+  | { kind: 'set-private-data'; key: string; value: unknown }
   | {
       kind: 'record-scoring-reserve-bonus'
       reserved: Partial<Resource>
@@ -141,15 +143,6 @@ const readGrowableStack = <S extends { remaining: number }>(
   return stack
 }
 
-const isPublicCardStateEventValue = (value: unknown): boolean => {
-  if (value === null) return true
-  const valueType = typeof value
-  if (valueType === 'string' || valueType === 'boolean') return true
-  if (valueType === 'number') return Number.isFinite(value)
-  if (Array.isArray(value)) return value.every(isPublicCardStateEventValue)
-  return false
-}
-
 const RESOURCE_KEYS = new Set<keyof Resource>([
   'wood',
   'clay',
@@ -184,15 +177,12 @@ const emitCardStateChanged = (
   sourceCard: string,
   target: PlayerState,
   key: string,
-  value: unknown,
 ): void => {
-  if (!isPublicCardStateEventValue(value)) return
   eventSink?.emit<'card.stateChanged'>({
     type: 'card.stateChanged',
     sourceCardId: sourceCard,
     cardId: sourceCard,
     key,
-    value,
     targetPlayerId: target.id,
   })
 }
@@ -225,14 +215,16 @@ export const specialEffectAction: ActionDefinition = {
         const current = readCardExtraData<number>(target, sourceCard, p.key) ?? 0
         const next = current + p.amount
         writeCardExtraData(target, sourceCard, p.key, next)
-        emitCardStateChanged(eventSink, sourceCard, target, p.key, next)
+        emitCardStateChanged(eventSink, sourceCard, target, p.key)
         return { type: 'ok' }
       }
       case 'set-extra-data':
         writeCardExtraData(target, sourceCard, p.key, p.value)
-        if (p.value !== undefined && isPublicCardStateEventValue(p.value)) {
-          emitCardStateChanged(eventSink, sourceCard, target, p.key, p.value)
-        }
+        emitCardStateChanged(eventSink, sourceCard, target, p.key)
+        return { type: 'ok' }
+      case 'set-private-data':
+        writePrivateCardData(target, sourceCard, p.key, p.value)
+        emitCardStateChanged(eventSink, sourceCard, target, p.key)
         return { type: 'ok' }
       case 'record-scoring-reserve-bonus':
         if (typeof p.score !== 'number' || !Number.isFinite(p.score)) {
@@ -272,15 +264,14 @@ export const specialEffectAction: ActionDefinition = {
         return { type: 'ok' }
       case 'increment-counter': {
         incCounter(target, sourceCard, p.key, p.amount)
-        const next = target.cardStates?.[sourceCard]?.counters?.[p.key] ?? 0
-        emitCardStateChanged(eventSink, sourceCard, target, p.key, next)
+        emitCardStateChanged(eventSink, sourceCard, target, p.key)
         return { type: 'ok' }
       }
       case 'set-counter': {
         const counters = initCardState(target, sourceCard)
         const next = Math.max(0, p.value)
         counters[p.key] = next
-        emitCardStateChanged(eventSink, sourceCard, target, p.key, next)
+        emitCardStateChanged(eventSink, sourceCard, target, p.key)
         return { type: 'ok' }
       }
       case 'pop-card-stack-top': {
@@ -329,7 +320,7 @@ export const specialEffectAction: ActionDefinition = {
         return { type: 'ok' }
       case 'set-flag':
         setCardFlag(target, sourceCard, p.flag)
-        emitCardStateChanged(eventSink, sourceCard, target, 'flagged', p.flag)
+        emitCardStateChanged(eventSink, sourceCard, target, 'flagged')
         return { type: 'ok' }
       case 'set-infobox':
         writeCardInfobox(target, sourceCard, p.text)
@@ -419,7 +410,7 @@ export const specialEffectAction: ActionDefinition = {
       }
       case 'clear-pending-fence-bonus':
         clearPendingFenceBonus(target)
-        emitCardStateChanged(eventSink, sourceCard, target, 'pendingFenceBonus', null)
+        emitCardStateChanged(eventSink, sourceCard, target, 'pendingFenceBonus')
         return { type: 'ok' }
       case 'consume-pending-extra-turns': {
         if (!state) return { type: 'fail', errorKey: 'log.specialEffectFail' }

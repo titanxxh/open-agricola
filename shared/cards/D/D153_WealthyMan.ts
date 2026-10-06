@@ -47,6 +47,7 @@ export const D153_WealthyMan = defineOccupationCard({
     players: "4+",
     extraVp: true,
   },
+  presentation: { counters: ['bonusVp'] },
   impl: cardImpl,
 })
 

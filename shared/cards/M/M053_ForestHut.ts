@@ -143,6 +143,7 @@ const cardImpl = {
 } satisfies CardImpl
 
 export const M053_ForestHut = defineMinorCard({
+  presentation: { farmTerrainMarkers: true },
   meta: {
     id: CARD_ID,
     name: "Forest Hut",

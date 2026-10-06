@@ -38,6 +38,7 @@ export const C029_BeerTable = defineMinorCard({
     prerequisite: "No Grain in Your Supply",
     extraVp: true,
   },
+  presentation: { counters: ['bonusVp'] },
   impl: cardImpl,
 })
 

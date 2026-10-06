@@ -58,6 +58,7 @@ const cardImpl = {
 } satisfies CardImpl
 
 export const E086_PenBuilder = defineOccupationCard({
+  presentation: { counters: ['discards'] },
   meta: {
     id: CARD_ID,
     name: 'Pen Builder',

@@ -60,6 +60,7 @@ const cardImpl = {
 } satisfies CardImpl
 
 export const C132_TimberShingleMaker = defineOccupationCard({
+  presentation: { counters: ['woodPlaced'] },
   meta: {
     id: CARD_ID,
     name: 'Timber Shingle Maker',

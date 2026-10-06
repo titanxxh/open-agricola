@@ -136,6 +136,7 @@ const cardImpl = {
 } satisfies CardImpl
 
 export const E027_PiggyBank = defineMinorCard({
+  presentation: { counters: ['food'] },
   meta: {
     id: CARD_ID,
     name: 'Piggy Bank',

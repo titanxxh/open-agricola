@@ -48,6 +48,7 @@ export const D107_Bellfounder = defineOccupationCard({
     extraVp: true,
     waresSalesmanGains: [{ clay: 1, reed: 1 }],
   },
+  presentation: { counters: ['bonusVp'] },
   impl: cardImpl,
 })
 

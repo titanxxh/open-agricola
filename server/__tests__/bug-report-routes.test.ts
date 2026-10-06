@@ -828,7 +828,7 @@ describe('bug report routes', () => {
         minorHand: ['A'],
         occupationHand: ['B'],
         cardStates: {
-          B003_Moonshine: { extraData: { occ: 'OWN_SECRET_OCC' } },
+          B003_Moonshine: { privateData: { occ: 'OWN_SECRET_OCC' }, extraData: { internal: 'BUG_INTERNAL_SENTINEL' } },
         },
         stats: {
           draftHistory: [{ cardId: 'A', draftTurn: 1 }],
@@ -839,13 +839,14 @@ describe('bug report routes', () => {
         minorHand: ['C'],
         occupationHand: ['D'],
         cardStates: {
-          B003_Moonshine: { extraData: { occ: 'SECRET_OCC' } },
+          B003_Moonshine: { privateData: { occ: 'SECRET_OCC' }, extraData: { internal: 'BUG_INTERNAL_SENTINEL' } },
           B068_Beanfield: {
             extraData: {
               cardFieldStacks: [{ crop: 'vegetable', remaining: 2 }],
             },
           },
         },
+        cardStatePresentation: { B068_Beanfield: { cropLayers: [{ stack: { kind: 'vegetable', remaining: 2 }, slotIndex: 0, top: true }] } },
         stats: {
           draftHistory: [{ cardId: 'C', draftTurn: 1 }],
         },
@@ -920,16 +921,17 @@ describe('bug report routes', () => {
     )
     expect(reporterInspected.statusCode).toBe(200)
     const reporterFrame = json(reporterInspected).frame as {
-      players: Array<{ cardStates: Record<string, { extraData?: unknown }> }>
+      players: Array<{ cardStates: Record<string, { extraData?: unknown; privateData?: unknown }> }>
     }
-    expect(reporterFrame.players[0]!.cardStates.B003_Moonshine!.extraData)
+    expect(reporterFrame.players[0]!.cardStates.B003_Moonshine?.privateData)
       .toEqual({ occ: 'OWN_SECRET_OCC' })
-    expect(reporterFrame.players[1]!.cardStates.B003_Moonshine!.extraData)
+    expect(reporterFrame.players[1]!.cardStates.B003_Moonshine?.privateData)
       .toBeUndefined()
-    expect(reporterFrame.players[1]!.cardStates.B068_Beanfield!.extraData)
-      .toEqual({
-        cardFieldStacks: [{ crop: 'vegetable', remaining: 2 }],
-      })
+    expect(reporterFrame.players[1]!.cardStates.B068_Beanfield).toBeUndefined()
+    expect(JSON.stringify(reporterFrame).includes('BUG_INTERNAL_SENTINEL')).toBe(false)
+    expect(json(reporterInspected).frame).toMatchObject({ players: [ {}, { cardStatePresentation: {
+      B068_Beanfield: { cropLayers: [{ stack: { kind: 'vegetable', remaining: 2 }, slotIndex: 0, top: true }] },
+    } } ] })
 
     const participantRead = await invoke(
       'GET',
@@ -948,13 +950,13 @@ describe('bug report routes', () => {
     })
     const participantFrame = json(participantRead).frame as {
       players: Array<{
-        cardStates: Record<string, { extraData?: unknown }>
+        cardStates: Record<string, { extraData?: unknown; privateData?: unknown }>
         stats: { draftHistory: Array<{ cardId: string }> }
       }>
     }
-    expect(participantFrame.players[0]!.cardStates.B003_Moonshine!.extraData)
+    expect(participantFrame.players[0]!.cardStates.B003_Moonshine?.privateData)
       .toBeUndefined()
-    expect(participantFrame.players[1]!.cardStates.B003_Moonshine!.extraData)
+    expect(participantFrame.players[1]!.cardStates.B003_Moonshine?.privateData)
       .toEqual({ occ: 'SECRET_OCC' })
     expect(participantFrame.players[0]!.stats.draftHistory[0]!.cardId).toBe('?')
     expect(participantFrame.players[1]!.stats.draftHistory[0]!.cardId).toBe('C')
@@ -978,8 +980,8 @@ describe('bug report routes', () => {
       scores: [{ playerName: 'Deleted player (seat 1)' }],
     })
     expect((json(inspected).frame as {
-      players: Array<{ cardStates: Record<string, { extraData?: unknown }> }>
-    }).players[1]!.cardStates.B003_Moonshine!.extraData)
+      players: Array<{ cardStates: Record<string, { extraData?: unknown; privateData?: unknown }> }>
+    }).players[1]!.cardStates.B003_Moonshine?.privateData)
       .toEqual({ occ: 'SECRET_OCC' })
     ;(await db.prepare(`
       DELETE FROM game_context_participants WHERE room_id = 'active-room'

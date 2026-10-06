@@ -50,6 +50,7 @@ export const E039_Paintbrush = defineMinorCard({
     extraVp: true,
     waresSalesmanGains: [{ clay: 1, reed: 1 }],
   },
+  presentation: { counters: ['bonusVp'] },
   impl: cardImpl,
 })
 

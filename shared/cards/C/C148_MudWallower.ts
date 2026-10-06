@@ -187,6 +187,7 @@ const cardImpl = {
 } satisfies CardImpl
 
 export const C148_MudWallower = defineOccupationCard({
+  presentation: { counters: ['counter', 'held'] },
   meta: {
     id: CARD_ID,
     name: 'Mud Wallower',

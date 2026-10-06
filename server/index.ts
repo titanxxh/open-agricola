@@ -215,7 +215,7 @@ const bugReportRuntime = bugReportStore
     }
   : null
 
-const createCompletedReplayFixture = async (defaultNames = false, recordReplay = true) => {
+const createCompletedReplayFixture = async (defaultNames = false, recordReplay = true, initialState?: unknown) => {
   const viewerBuildId = process.env.REPLAY_VIEWER_BUILD_ID ?? ''
   if (recordReplay && !await new ReplayResources(getResources()).viewer(viewerBuildId)) {
     throw new Error('Replay viewer build is unavailable')
@@ -225,6 +225,9 @@ const createCompletedReplayFixture = async (defaultNames = false, recordReplay =
     playerCount: 2,
     playerNames: defaultNames ? ['Player 2'] : ['Alice', 'Bob'],
   })
+  if (initialState !== undefined && !session.loadState(initialState).ok) {
+    throw new Error('Invalid initial Replay fixture state')
+  }
   const capture = (): JsonValue => {
     const payload = session.buildSyncPayload(session.getState(), null, 'debug')
     return JSON.parse(JSON.stringify({
@@ -724,7 +727,9 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
     }
     try {
       const params = new URLSearchParams(req.url.split('?')[1])
-      sendJson(res, 201, (await createCompletedReplayFixture(params.get('defaultNames') === '1', params.get('recordReplay') !== '0')))
+      const raw = await readBody(req)
+      const body = raw ? JSON.parse(raw) as { state?: unknown } : {}
+      sendJson(res, 201, (await createCompletedReplayFixture(params.get('defaultNames') === '1', params.get('recordReplay') !== '0', body.state)))
     } catch (error) {
       sendJson(res, 503, {
         ok: false,

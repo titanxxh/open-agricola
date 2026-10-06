@@ -1,8 +1,20 @@
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import type { GameState, PlayerState, Resource, Worker } from '../../contract/types'
 import { computeAnimalZones } from '../animal-zones'
 import { getPlayerPanelSupplySummary } from '../player-panel-summary'
 import { getStableCountForCards } from '../stables'
+
+import { CardRegistry } from '../../cards/registry'
+import { setActiveCardRegistry } from '../../cards/active-registry'
+import { B085_FarmHand } from '../../cards/B/B085_FarmHand'
+import { E148_Lazybones } from '../../cards/E/E148_Lazybones'
+
+beforeEach(() => {
+  const registry = new CardRegistry()
+  registry.loadImpl(B085_FarmHand.id, B085_FarmHand.impl)
+  registry.loadImpl(E148_Lazybones.id, E148_Lazybones.impl)
+  setActiveCardRegistry(registry)
+})
 
 const resources = (): Resource => ({
   wood: 0,
@@ -122,6 +134,7 @@ describe('player panel stable supply summary', () => {
 
   it('counts special stables that consume supply without adding animal capacity', () => {
     const p = player({
+      occupationPlayed: ['B085_FarmHand'],
       cardStates: {
         B085_FarmHand: { extraData: { position: { row: 1, col: 1 } } },
       },
@@ -179,6 +192,7 @@ describe('player panel stable supply summary', () => {
 
   it('counts action-space stable reservations in the numerator', () => {
     const p = player({
+      occupationPlayed: ['E148_Lazybones'],
       cardStates: {
         E148_Lazybones: {
           extraData: { reservedActionSpaces: ['grain-seeds', 'farm-expansion'] },

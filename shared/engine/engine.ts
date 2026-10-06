@@ -144,6 +144,9 @@ const restoreSharedCursorData = (node: EngineNode, data: Record<string, unknown>
   if (typeof data.optionalPromptKey === 'string') {
     node.optionalPromptKey = data.optionalPromptKey as PromptKey
   }
+  if (data.anytimeWindow && typeof data.anytimeWindow === 'object') {
+    node.anytimeWindow = data.anytimeWindow as EngineNode['anytimeWindow']
+  }
   if (typeof data.beforeAnytimeAvailable === 'boolean') node.beforeAnytimeAvailable = data.beforeAnytimeAvailable
   if (typeof data.mandatory === 'boolean') node.mandatory = data.mandatory
   if (data.pending && typeof data.pending === 'object') {

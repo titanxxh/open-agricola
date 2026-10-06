@@ -28,6 +28,7 @@ const cardImpl = {
 } satisfies CardImpl
 
 export const M052_WeddingCoach = defineMinorCard({
+  presentation: { heldWorker: true },
   meta: {
     id: CARD_ID,
     name: "Wedding Coach",

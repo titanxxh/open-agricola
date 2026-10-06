@@ -92,6 +92,7 @@ const cardImpl = {
 } satisfies CardImpl
 
 export const A084_Silage = defineMinorCard({
+  presentation: { stack: true },
   meta: {
     id: CARD_ID,
     name: "Silage",

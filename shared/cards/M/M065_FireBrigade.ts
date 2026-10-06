@@ -50,6 +50,7 @@ export const M065_FireBrigade = defineMinorCard({
     implemented: true,
     requiresFarmersOfTheMoor: true,
   },
+  presentation: { counters: ['bonusVp'] },
   impl: cardImpl,
 })
 

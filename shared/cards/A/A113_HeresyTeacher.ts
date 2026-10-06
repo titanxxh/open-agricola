@@ -75,6 +75,7 @@ const cardImpl = {
 } satisfies CardImpl
 
 export const A113_HeresyTeacher = defineOccupationCard({
+  presentation: { stack: true },
   meta: {
     id: CARD_ID,
     name: 'Heresy Teacher',

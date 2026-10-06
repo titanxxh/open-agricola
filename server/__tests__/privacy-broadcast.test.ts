@@ -10,6 +10,7 @@ import { createWsServer } from '../connection/ws-server.ts'
 import { PostgresRoomPersistence } from '../game/persistence/postgres-adapter.ts'
 import type { ServerEvent } from '../../shared/contract/protocol/ws.ts'
 import type { StateUpdateEnvelope } from '../../shared/contract/protocol/game.ts'
+import { CARD_ID, prepareVisibilitySession } from './_helpers/card-visibility'
 
 /**
  * WebSocket broadcast privacy: every `stateUpdate` envelope must be filtered
@@ -486,6 +487,40 @@ describe('WS broadcast per-viewer filter', () => {
         reason: 'draft-finalized',
       }),
     ])
+  })
+
+  it('keeps internal values out of initial, committed and reconnect WS payloads for both seats and a spectator', async () => {
+    const room = wsServerResult.registry.get('dev2')!
+    prepareVisibilitySession(room.session)
+    room.session.loadState(room.session.state)
+    const { p1, p2, initialP1, initialP2 } = await joinTwoPlayerDevRoom()
+    const spectator = await connectSocket()
+    // The broadcast audience can contain an unseated reader. No playing-seat
+    // permission is granted to that connection by this fixture.
+    const seatedSockets = new Set(room.players.map((seat) => seat.ws))
+    const spectatorPeer = [...wsServerResult.wss.clients].find((socket) => !seatedSockets.has(socket))!
+    room.players.push({ ws: spectatorPeer, playerIndex: -1, name: 'Observer' })
+    await wsServerResult.broadcaster.sendStateTo(spectatorPeer, room, room.session.getState(), 'spectator-initial')
+    const initialSpectator = await waitForEvent(spectator, isReconnectState)
+    const check = (event: StateUpdateEnvelope, owner: boolean) => {
+      const text = JSON.stringify(event.payload)
+      for (const sentinel of ['INTERNAL_CARD_SENTINEL', 'INTERNAL_STACK_SENTINEL', '8675912']) expect(text.includes(sentinel), sentinel).toBe(false)
+      expect(text.includes('OWNER_CARD_SECRET')).toBe(owner)
+      expect(event.payload.state.players[0]!.cardStatePresentation[CARD_ID]?.counters).toEqual({ visibleCount: 2 })
+    }
+    check(initialP1, true); check(initialP2, false); check(initialSpectator, false)
+    await sendCommand(p1, { type: 'action', spaceId: 'forest', requestId: 'visibility-action' })
+    const committed = await waitForEvent(p1, (event): event is StateUpdateEnvelope => isStateUpdate(event) && event.requestId === 'visibility-action')
+    check(committed, true)
+    for (const socket of [p2, spectator]) check(await waitForEvent(socket,
+      (event): event is StateUpdateEnvelope => isStateUpdate(event) && event.version === committed.version), false)
+    const reconnected = await connectSocket()
+    await sendCommand(reconnected, { type: 'joinRoom', roomId: 'dev2', requestedPlayerIndex: 0, name: 'P1' })
+    check(await waitForEvent(reconnected, isReconnectState), true)
+    await sendCommand(p2, { type: 'getState', requestId: 'visibility-refresh' })
+    check(await waitForEvent(p2, (event): event is StateUpdateEnvelope => isStateUpdate(event) && event.requestId === 'visibility-refresh'), false)
+    await wsServerResult.broadcaster.sendStateTo(spectatorPeer, room, room.session.getState(), 'spectator-refresh')
+    check(await waitForEvent(spectator, (event): event is StateUpdateEnvelope => isStateUpdate(event) && event.requestId === 'spectator-refresh'), false)
   })
 
   it('reconnect getState returns the viewer-specific filter for that ws', async () => {

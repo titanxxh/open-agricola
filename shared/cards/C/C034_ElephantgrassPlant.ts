@@ -36,6 +36,7 @@ export const C034_ElephantgrassPlant = defineMinorCard({
     occupationPrerequisites: { min: 2 },
     extraVp: true,
   },
+  presentation: { counters: ['bonusVp'] },
   impl: cardImpl,
 })
 

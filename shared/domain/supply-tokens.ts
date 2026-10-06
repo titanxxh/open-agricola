@@ -1,6 +1,7 @@
 import type { GameState, PlayerState, SupplyTokenKey } from '../contract/types'
 import { getOwnOrdinaryFenceCount, MAX_ORDINARY_FENCE_PIECES } from './fence-segments'
-import { getFarmHandStableInUseCount, getOrdinaryStableCount } from './stables'
+import { getStandingSpecialStableCount, getOrdinaryStableCount } from './stables'
+import { getCardReservedSupplyCount } from '../cards/card-rule-contributions'
 
 export const MAX_STABLE_PIECES = 4
 
@@ -20,10 +21,8 @@ export const addConsumedSupplyTokenCount = (
 export const getOwnOrdinaryFenceBuildLimit = (player: PlayerState): number =>
   Math.max(0, MAX_ORDINARY_FENCE_PIECES - readConsumedSupplyTokenCount(player, 'fence'))
 
-export const getOwnOrdinaryFenceHeldOnCardsCount = (player: PlayerState): number => {
-  const ashTrees = player.cardStates?.E074_AshTrees?.counters?.fences ?? 0
-  return Math.max(0, ashTrees)
-}
+export const getOwnOrdinaryFenceHeldOnCardsCount = (player: PlayerState): number =>
+  getCardReservedSupplyCount(player, 'fence')
 
 export const getOwnOrdinaryFenceReserveCount = (player: PlayerState): number =>
   Math.max(
@@ -32,9 +31,6 @@ export const getOwnOrdinaryFenceReserveCount = (player: PlayerState): number =>
       - getOwnOrdinaryFenceCount(player)
       - getOwnOrdinaryFenceHeldOnCardsCount(player),
   )
-
-const readStringArray = (value: unknown): string[] =>
-  Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === 'string') : []
 
 const getQueuedFutureStableCount = (
   state: GameState,
@@ -48,7 +44,7 @@ export const getReservedFutureStableCount = (state: GameState, player: PlayerSta
   getQueuedFutureStableCount(state, player)
 
 export const getReservedActionSpaceStableCount = (player: PlayerState): number =>
-  readStringArray(player.cardStates?.E148_Lazybones?.extraData?.reservedActionSpaces).length
+  getCardReservedSupplyCount(player, 'stable')
 
 export const getStableSupplyLimit = (player: PlayerState): number =>
   Math.max(0, MAX_STABLE_PIECES - readConsumedSupplyTokenCount(player, 'stable'))
@@ -60,5 +56,5 @@ export const getAvailableStableSupplyCount = (state: GameState, player: PlayerSt
       - getOrdinaryStableCount(player)
       - getReservedFutureStableCount(state, player)
       - getReservedActionSpaceStableCount(player)
-      - getFarmHandStableInUseCount(player),
+      - getStandingSpecialStableCount(player),
   )

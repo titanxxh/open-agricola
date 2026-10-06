@@ -57,6 +57,7 @@ export const M123_StoneQuarry = defineMinorCard({
     implemented: true,
     requiresFarmersOfTheMoor: true,
   },
+  presentation: { counters: ['usage'] },
   impl: cardImpl,
 })
 

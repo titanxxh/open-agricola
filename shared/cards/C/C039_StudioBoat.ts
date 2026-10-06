@@ -87,6 +87,7 @@ const cardImpl = {
 } satisfies CardImpl
 
 export const C039_StudioBoat = definePlayerActionCard({
+  presentation: { counters: ['bonusVp'] },
   meta: {
     id: CARD_ID,
     name: 'Studio Boat',

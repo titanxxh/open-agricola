@@ -98,6 +98,7 @@ export const D134_OysterEater = defineOccupationCard({
     players: '3+',
     extraVp: true,
   },
+  presentation: { counters: ['bonusVp'] },
   impl: cardImpl,
 })
 

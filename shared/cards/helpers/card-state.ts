@@ -109,6 +109,23 @@ export const writeCardExtraData = (
   cardState.extraData[key] = value
 }
 
+export const readPrivateCardData = <T>(
+  player: PlayerState,
+  cardId: string,
+  key: string,
+): T | undefined => player.cardStates?.[cardId]?.privateData?.[key] as T | undefined
+
+export const writePrivateCardData = (
+  player: PlayerState,
+  cardId: string,
+  key: string,
+  value: unknown,
+): void => {
+  const cardState = ensureCardState(player, cardId)
+  cardState.privateData ??= {}
+  cardState.privateData[key] = value
+}
+
 // Accepts both real-resource Partial<Resource> and pseudo-resource maps used
 // by CardResourceStats.gained. Drops zero / negative / non-number values;
 // preserves keys passed through (real or pseudo) without filtering — callers

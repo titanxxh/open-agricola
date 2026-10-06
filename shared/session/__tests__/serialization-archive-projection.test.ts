@@ -149,7 +149,10 @@ describe('viewer archive projection', () => {
     owner.minorHand = ['__test_placeholder__']
     owner.minorPlayed = ['D036_BreedRegistry']
     const publicView = filterSerializedStateForPlayer(base, 'p1')
-    expect(publicView.events).toEqual([hidden, visible])
+    const metadata = { ...hidden }
+    delete metadata.value
+    expect(publicView.events).toEqual([metadata, visible])
+    expect(publicView.events[0]).not.toHaveProperty('value')
     expect(publicView.publicEventArchive).toEqual([packet])
     expect(publicView.nextEventSeq).toBe(12)
     expect(publicView.nextPublicEventArchivePacketSeq).toBe(28)

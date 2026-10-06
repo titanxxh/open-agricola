@@ -174,6 +174,7 @@ export const B029_CookeryLesson = defineMinorCard({
     evenMoreSet: true,
     implemented: true,
   },
+  presentation: { counters: ['bonusVp'] },
   impl: cardImpl,
 })
 

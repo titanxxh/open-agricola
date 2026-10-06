@@ -48,6 +48,7 @@ export const E070_CropRotationField = defineMinorCard({
     isField: true,
     cardField: { allowedCrops: ['grain', 'vegetable'], capacity: 1 },
   },
+  presentation: { cardFields: true },
   impl: cardImpl,
 })
 

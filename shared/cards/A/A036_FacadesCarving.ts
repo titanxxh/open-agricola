@@ -64,6 +64,7 @@ export const A036_FacadesCarving = defineMinorCard({
     prerequisite: 'Wood in Your Supply >= Current Round',
     extraVp: true,
   },
+  presentation: { counters: ['bonusVp'] },
   impl: cardImpl,
 })
 

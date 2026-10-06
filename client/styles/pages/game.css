@@ -3693,6 +3693,10 @@
 .played-cards-by-others-title {
   font-weight: 700;
 }
+.played-card-readonly-animals[data-animal-pose="lying"] .res-icon {
+  transform: rotate(90deg);
+}
+
 .played-card-readonly-animals {
   display: inline-flex;
   align-items: center;

@@ -59,6 +59,7 @@ export const B134_HousebookMaster = defineOccupationCard({
     players: '3+',
     extraVp: true,
   },
+  presentation: { counters: ['bonusVp'] },
   impl: cardImpl,
 })
 

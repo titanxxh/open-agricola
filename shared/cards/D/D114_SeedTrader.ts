@@ -88,6 +88,7 @@ const cardImpl = {
 } satisfies CardImpl
 
 export const D114_SeedTrader = defineOccupationCard({
+  presentation: { counters: ['grain', 'vegetable'] },
   meta: {
     id: CARD_ID,
     name: 'Seed Trader',

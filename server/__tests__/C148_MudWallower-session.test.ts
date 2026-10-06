@@ -16,6 +16,42 @@ import '../../shared/cards/C/C148_MudWallower'
 
 const CARD_ID = 'C148_MudWallower'
 
+describe('C148 fencing with existing card animals', () => {
+  it.each([1, 2])('preserves one actually held pig with %i total pigs', (total) => {
+    const session = new GameSession(148, undefined, { playerCount: 2 })
+    const state = session.state
+    stabilizeRandomHands(state.players)
+    state.round = 3
+    const owner = state.players[0]!
+    owner.occupationPlayed = [CARD_ID]
+    owner.cardStates[CARD_ID] = { counters: { held: total, counter: 0 } }
+    owner.resources.wood = 20
+    owner.resources.boar = total
+    if (total === 2) {
+      owner.fenceSegments = ['H-1-2', 'H-2-2', 'V-1-2', 'V-1-3'].map((edge) => ({
+        edge, type: 'fence', source: { kind: 'own', ownerPlayerId: owner.id },
+      }))
+      owner.pastures = [{ id: 'old', size: 1, tiles: [{ row: 1, col: 2 }], stables: 0, animalType: 'boar', animalCount: 1 }]
+    }
+    session.loadState(state)
+    let response = session.takeAction(0, 'fencing')
+    expect(response.ok, response.error).toBe(true)
+    response = session.commitSelectionChoice(0, {
+      edges: ['H-1-1', 'H-2-1', 'V-1-1', 'V-1-2'], extraWood: 0,
+    })
+    expect(response.ok, response.error).toBe(true)
+    const after = response.state.players[0]!
+    expect(after.resources.wood).toBe(total === 1 ? 16 : 17)
+    expect(after.resources.boar).toBe(total)
+    expect(after.cardStates[CARD_ID]?.counters).toEqual({ held: total, counter: 0 })
+    expect(after.pastures.reduce((sum, pasture) => sum + pasture.animalCount, 0)).toBe(total - 1)
+    expect(computeAnimalZones(after, response.state).find((zone) => zone.cardId === CARD_ID)?.animalCount).toBe(1)
+    expect(response.interaction.stateId === 'wait' && response.interaction.request.kind).toBe('confirm-next-player')
+    expect(response.state.events.some((event) => event.type === 'farm.fenceBuilt')).toBe(true)
+    expect(response.state.events.some((event) => event.type === 'resource.paid' && event.resources.wood === (total === 1 ? 4 : 3))).toBe(true)
+  })
+})
+
 const setupSession = (actorIndex: number, counter = 0, held = 0) => {
   const session = new GameSession(148, undefined, { playerCount: 4 })
   stabilizeRandomHands(session.state.players)

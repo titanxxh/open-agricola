@@ -91,6 +91,7 @@ export const C022_BasketChair = defineMinorCard({
     vp: 1,
     evenMoreSet: true,
   },
+  presentation: { heldWorker: true },
   impl: cardImpl,
 })
 

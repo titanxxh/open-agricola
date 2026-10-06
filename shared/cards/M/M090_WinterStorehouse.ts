@@ -59,6 +59,7 @@ export const M090_WinterStorehouse = defineMinorCard({
     implemented: true,
     requiresFarmersOfTheMoor: true,
   },
+  presentation: { counters: ['usage'] },
   impl: cardImpl,
 })
 

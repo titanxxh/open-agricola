@@ -58,6 +58,7 @@ export const A062_BeerKeg = defineMinorCard({
     prerequisite: "2 Grain in Your Supply",
     extraVp: true,
   },
+  presentation: { counters: ['bonusVp'] },
   impl: cardImpl,
 })
 

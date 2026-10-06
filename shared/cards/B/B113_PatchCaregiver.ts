@@ -50,6 +50,7 @@ export const B113_PatchCaregiver = defineOccupationCard({
     isField: true,
     cardField: { allowedCrops: ['grain', 'vegetable', 'wood', 'stone'], capacity: 1 },
   },
+  presentation: { cardFields: true },
   impl: cardImpl,
 })
 

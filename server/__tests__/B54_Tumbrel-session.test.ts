@@ -99,6 +99,7 @@ describe('B054_Tumbrel session', () => {
     const player = state.players[0]!
     player.minorPlayed.push(CARD_ID)
     player.stableTiles = [{ row: 2, col: 0 }]
+    player.occupationPlayed.push('B085_FarmHand')
     player.cardStates = {
       B085_FarmHand: { extraData: { position: { row: 0, col: 0 } } },
     }

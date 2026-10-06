@@ -572,7 +572,7 @@ const buildOptionalPrompt = (
     { value: '__skip__', labelKey: 'ui.interactionOptionalSkip' },
   ]
   const optionalPromptKey = node.optionalPromptKey ?? 'ui.interactionOptionalAction'
-  const request: InteractionRequest = { kind: 'choice', options: optionalOptions }
+  const request: InteractionRequest = { kind: 'choice', options: optionalOptions, anytimeWindow: node.anytimeWindow }
   node.setPending({
     hostNodeId: node.id,
     request,
@@ -1012,7 +1012,7 @@ export function engineProceed(
       : (node.promptKey ?? 'ui.interactionFlowSelect')
     node.setPending({
       hostNodeId: node.id,
-      request: { kind: 'choice', options, ...(replacementOriginalNodeId ? { requiresExplicitChoice: true } : {}) },
+      request: { kind: 'choice', options, anytimeWindow: node.anytimeWindow, ...(replacementOriginalNodeId ? { requiresExplicitChoice: true } : {}) },
       choices: options,
       promptKey: compositePromptKey,
       promptParams: undefined,
@@ -1391,6 +1391,9 @@ export function engineProceed(
         const _exhaustive: never = result.request
         void _exhaustive
         choiceOptions = []
+      }
+      if (node.anytimeWindow !== undefined) {
+        updatedRequest = { ...updatedRequest, anytimeWindow: node.anytimeWindow }
       }
       applyInteractionRequest(int, {
         targetNode: node,

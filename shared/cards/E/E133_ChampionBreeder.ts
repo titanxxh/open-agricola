@@ -40,6 +40,7 @@ export const E133_ChampionBreeder = defineOccupationCard({
     extraVp: true,
     category: 'BONUS_POINTS',
   },
+  presentation: { counters: ['bonusVp'] },
   impl: cardImpl,
 })
 

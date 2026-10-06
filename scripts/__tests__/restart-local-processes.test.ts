@@ -233,9 +233,9 @@ describe.skipIf(process.platform !== 'linux')('restart-local saved interaction r
         payload: { crops: [] },
       })
       expect(completed.interaction.stateId).toBe('idle')
-      expect(completed.state.players[0]!.cardStates.PS07).toMatchObject({
+      expect(completed.state.players[0]!.cardStatePresentation.PS07).toMatchObject({
         infobox: 'Completed',
-        extraData: { fatherCompletedTier: 2 },
+        completedTier: 2,
       })
       expect(completed.state.players[0]!.resources).toEqual(loaded.state.players[0]!.resources)
       expect(completed.state.events.filter((event) =>

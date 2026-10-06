@@ -1,5 +1,6 @@
 import type { ActionFlow, FarmTilePosition, GameState, InteractionRequest, Pasture, PaymentResourceMap, PlayerState, ProtectedObservation, Resource, ResourceKey } from '../contract/types'
 import type { PrivateGameEvent } from '../contract/private-events'
+import type { CardRuleContributions, CardStatePresentation } from '../contract/card-state'
 import type { AnimalZone, PlayerScoreSummary, ScoreCategoryResult } from '../domain'
 import { getCurrentSessionContext } from './session-card-context'
 import { getActiveCardRegistry } from './active-registry'
@@ -168,6 +169,9 @@ export type CardEffectField = CardEffectHook
   | 'computeLockedFarmTiles'
   | 'getInvalidAnimals'
   | 'getSpecialStablePositions' | 'applySpecialStable' | 'getBuiltSpecialStables'
+  | 'getRuleContributions'
+  | 'returnSpecialStable'
+  | 'getStatePresentation'
 
 export { cardEffectHooks } from '../projections/card-effect-hooks'
 type FlowEffectHandler = (
@@ -294,6 +298,9 @@ export type CardEffect = {
   computeCostedBonus?: CostedBonusHandler
   computeSharedPostScore?: SharedPostScoreHandler
   computeExtraRoomCapacity?: (player: PlayerState) => number
+  /** Deterministic read-only facts, aggregated by generic rule queries. */
+  getRuleContributions?: (player: Readonly<PlayerState>) => CardRuleContributions | void
+  getStatePresentation?: (player: Readonly<PlayerState>) => CardStatePresentation | void
   computeHarvestBreedOrderPriority?: (state: GameState, player: PlayerState) => number | void
   computePastureCapacityModifiers?: (
     player: PlayerState,
@@ -354,6 +361,8 @@ export type CardEffect = {
    * single card's `cardStates`.
    */
   getBuiltSpecialStables?: (player: PlayerState) => FarmTilePosition[]
+  /** Return this source's standing tile, preserving any one-use marker. */
+  returnSpecialStable?: (player: PlayerState, position: FarmTilePosition) => boolean
   /**
    * The reference `enforceReorganizeOnLastHarvest`: cards like B104 SheepWalker, B35
    * HookKnife, A153 PigOwner force an animal reorg on the round-14 harvest
@@ -1013,18 +1022,23 @@ export type BuiltSpecialStable = {
 export const collectBuiltSpecialStables = (
   player: PlayerState,
 ): BuiltSpecialStable[] => {
-  const allCards = [
-    ...player.improvements,
-    ...player.minorPlayed,
-    ...player.occupationPlayed,
-  ]
+  const allCards = new Set([
+    ...(player.improvements ?? []),
+    ...(player.minorPlayed ?? []),
+    ...(player.occupationPlayed ?? []),
+  ])
   const built: BuiltSpecialStable[] = []
   for (const cardId of allCards) {
     const effect = getCardEffect(cardId)
     if (!effect?.getBuiltSpecialStables) continue
     try {
-      for (const position of effect.getBuiltSpecialStables(player)) {
-        built.push({ position, sourceCardId: cardId })
+      const seen = new Set<string>()
+      for (const position of effect.getBuiltSpecialStables(JSON.parse(JSON.stringify(player)) as PlayerState)) {
+        if (!Number.isInteger(position?.row) || !Number.isInteger(position?.col)) continue
+        const key = positionKey(position)
+        if (seen.has(key)) continue
+        seen.add(key)
+        built.push({ position: { row: position.row, col: position.col }, sourceCardId: cardId })
       }
     } catch (err) {
       if (isCustomCard(cardId)) {

@@ -52,9 +52,11 @@ describe('shared/session/serialization', () => {
           farmCardAnimalZones,
           borrowedPlayedCardAnimalZones,
           pastureCapacities,
+          cardStatePresentation,
           ...domainPlayer
         } = serializedPlayer
         expect(domainPlayer).toEqual(state.players[index])
+        expect(cardStatePresentation).toEqual({})
         expect(lockedFarmTileKeys).toEqual([])
         expect(playerPanelSummary.housingCapacity.value).toBe(state.players[index]!.rooms)
         expect(moorSpecialActionAvailability).toEqual({})

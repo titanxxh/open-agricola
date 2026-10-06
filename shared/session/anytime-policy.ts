@@ -1,5 +1,4 @@
-import type { InteractionRequest } from '../contract/types'
-import type { PromptKey } from '../contract/prompt-keys'
+import type { InteractionRequest, AnytimeWindow } from '../contract/types'
 import type { StageResumeState } from '../engine/engine-stack'
 
 export type AnytimeInteractionKind = InteractionRequest['kind']
@@ -10,6 +9,7 @@ export type AnytimeBlockReason =
   | 'confirm-window'
   | 'engine-blocked'
   | 'stage-hook-chain'
+  | 'closed-window'
 
 export type AnytimePolicy =
   | { allowed: false; reason: AnytimeBlockReason }
@@ -19,12 +19,8 @@ export type AnytimePolicyInput = {
   hasActiveContext: boolean
   stageResume: StageResumeState | null
   interactionKind: AnytimeInteractionKind | undefined
-  promptKey: PromptKey | undefined
+  anytimeWindow?: AnytimeWindow
 }
-
-const EXCHANGE_PROMPT_PREFIX = 'ui.interactionExchange'
-const BAKE_BREAD_PROMPT_PREFIX = 'ui.interactionBakeBread'
-const D132_HIDE_FARMER_OPTIONAL_PROMPT = 'ui.cards.D132_HideFarmer.optional'
 
 export function computeAnytimePolicy(input: AnytimePolicyInput): AnytimePolicy {
   if (!input.hasActiveContext) {
@@ -45,20 +41,13 @@ export function computeAnytimePolicy(input: AnytimePolicyInput): AnytimePolicy {
   if (input.interactionKind === 'animal-reorg') {
     return { allowed: true, blockedIds: [] }
   }
-  const promptKey = input.promptKey
-  if (
-    promptKey &&
-    (promptKey.startsWith(BAKE_BREAD_PROMPT_PREFIX) ||
-      promptKey.startsWith(EXCHANGE_PROMPT_PREFIX))
-  ) {
-    return { allowed: true, blockedIds: ['exchange'] }
-  }
-  if (
-    input.stageResume?.hook === 'onBeforeEndGame' &&
-    input.interactionKind === 'choice' &&
-    input.promptKey === D132_HIDE_FARMER_OPTIONAL_PROMPT
-  ) {
-    return { allowed: true, blockedIds: [] }
+  if (input.anytimeWindow) {
+    const window = input.anytimeWindow
+    if (window.allowed !== true) return { allowed: false, reason: 'closed-window' }
+    if (window.blockedIds !== undefined && (!Array.isArray(window.blockedIds) || window.blockedIds.some((id) => typeof id !== 'string'))) {
+      return { allowed: false, reason: 'closed-window' }
+    }
+    return { allowed: true, blockedIds: [...(window.blockedIds ?? [])] }
   }
   if (input.stageResume !== null) {
     return { allowed: false, reason: 'stage-hook-chain' }

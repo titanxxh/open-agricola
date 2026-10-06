@@ -21,6 +21,7 @@ export const E080_RockGarden = defineMinorCard({
     isField: true,
     cardField: { allowedCrops: ['stone'], capacity: 3 },
   },
+  presentation: { cardFields: true },
   impl: cardImpl,
 })
 

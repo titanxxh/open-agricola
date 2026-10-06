@@ -1,3 +1,4 @@
+import { getCardUnusedSpaceReduction } from '../cards/card-rule-contributions'
 import type { GameState, PlayerState, Resource } from '../contract/types.ts'
 import { getFarmyardTileCount } from '../domain/farm.ts'
 import { fieldHasCrop } from '../domain/field.ts'
@@ -438,12 +439,7 @@ export const computeScores = (state: GameState): PlayerScoreSummary[] => {
 
     const usedTiles = getUsedFarmyardTileKeys(player)
     const rawEmptyCount = Math.max(0, getFarmyardTileCount(player) - usedTiles.size)
-    const hiddenRaw =
-      player.cardStates?.D132_HideFarmer?.extraData?.hiddenSpaces
-    const hiddenSpaces =
-      typeof hiddenRaw === 'number' && Number.isFinite(hiddenRaw)
-        ? Math.max(0, Math.min(rawEmptyCount, Math.floor(hiddenRaw)))
-        : 0
+    const hiddenSpaces = getCardUnusedSpaceReduction(player, rawEmptyCount)
     const emptyCount = Math.max(0, rawEmptyCount - hiddenSpaces)
     const emptyScore = emptyCount === 0 ? 0 : emptyCount * -1
     categories.push({

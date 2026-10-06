@@ -14,6 +14,7 @@ const filesUnder = (dir: string): string[] =>
 describe('board import boundary', () => {
   it('keeps board components from importing shared card implementations', () => {
     const offenders = filesUnder(boardDir)
+      .filter((path) => !path.includes('/__tests__/'))
       .filter((path) => readFileSync(path, 'utf8').includes(`shared/${'cards'}/`))
       .map((path) => relative(boardDir, path))
 

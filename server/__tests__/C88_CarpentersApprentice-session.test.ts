@@ -231,6 +231,7 @@ describe('C88 Carpenter\'s Apprentice — session w/ palisades', () => {
       p.occupationPlayed.push('C088_CarpentersApprentice')
       p.stableTiles = Array.from({ length: stables }, (_, i) => ({ row: 0, col: i }))
       if (farmHand) {
+        p.occupationPlayed.push('B085_FarmHand')
         p.cardStates = {
           ...p.cardStates,
           B085_FarmHand: { extraData: { position: { row: 2, col: 2 } } },

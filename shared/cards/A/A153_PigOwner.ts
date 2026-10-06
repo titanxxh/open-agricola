@@ -57,6 +57,7 @@ export const A153_PigOwner = defineOccupationCard({
     players: '4+',
     extraVp: true,
   },
+  presentation: { counters: ['bonusVp'] },
   impl: cardImpl,
 })
 

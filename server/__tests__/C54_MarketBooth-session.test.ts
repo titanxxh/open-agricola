@@ -38,6 +38,7 @@ const setupForHarvestField = (options?: {
     player.supplyTokensConsumed = { fence: options.consumedFences }
   }
   if (options?.e74HeldFences) {
+    player.minorPlayed.push('E074_AshTrees')
     player.cardStates = {
       ...player.cardStates,
       E074_AshTrees: { counters: { fences: options.e74HeldFences } },
@@ -89,6 +90,7 @@ const setupForPurchase = (options?: { noStableReserve?: boolean }) => {
   if (options?.noStableReserve) {
     player.stableTiles = [{ row: 0, col: 1 }]
     player.supplyTokensConsumed = { stable: 1 }
+    player.occupationPlayed.push('B085_FarmHand')
     player.cardStates = {
       ...player.cardStates,
       B085_FarmHand: { extraData: { position: { row: 1, col: 1 } } },

@@ -920,18 +920,13 @@ C1 Overhaul 只计数、回收、重建 own ordinary fences：onBuy 先用 `cons
 
 ## Anytime Window Policy
 
-The set of card-listener anytime actions available in a given pending is computed once per `buildInteraction()` via `computeAnytimePolicy()` (`shared/session/anytime-policy.ts`). The helper is **server-only** — `client/` never imports it.
+当前 pending 交互中的卡牌 anytime 可用项，由 `shared/session/anytime-policy.ts` 的 `computeAnytimePolicy()` 在每次 `buildInteraction()` 中计算；前端不导入该规则查询。
 
-Inputs (derived by `GameCore.getAnytimePolicyInput()` using the same node + composite fallback as `buildInteraction`):
+`GameCore.getAnytimePolicyInput()` 提供活动上下文、`stageResume`、当前 `InteractionRequest.kind` 和该 request 的 `anytimeWindow`。Flow / request 可显式声明 `{ allowed: true, blockedIds?: string[] }` 或 `{ allowed: false }`。权限只属于当前等待节点，不从父 optional、兄弟或 continuation 继承，并随 Engine cursor 保存和恢复。提示键仅负责文案，不授予权限；普通 exchange / bake flow 自己声明允许且禁用 `exchange`。
 
-- `hasActiveContext` — `getActiveInteractionContext()` non-null
-- `stageResume` — current frame's `stageResume`
-- `interactionKind` — `node?.request?.kind ?? composite?.request?.kind`
-- `promptKey` — `node?.promptKey ?? composite?.promptKey`
+优先级依次为：没有活动上下文、heating、engine-blocked、next-player confirmation（允许但禁用 exchange）、player-switch confirmation、animal reorganization、当前显式窗口、默认 stage-hook-chain 禁止、普通窗口允许。显式元数据不能放宽前面的硬性禁止；非法窗口按关闭处理。D132 在来源 optional 节点声明开放；其数量选择声明关闭，避免冻结的支付数量受随时兑换影响。
 
-Output: `{ allowed: false, reason }` or `{ allowed: true, blockedIds }`. The rules are priority-ordered (first match wins): no-context → heating-locked → `confirm-next-player` allowed with `exchange` blocked → `confirm-player-switch` blocked → animal-reorg → exchange/bake-bread promptKey → stage-hook-chain default block → everything else allowed with no blocks.
-
-Three consumers share this snapshot:
+三个消费点共享该策略结果：
 
 1. `buildAnytimeEntries()` — filters the auto-discovered registry + card-listener entries; returns `[]` if `!allowed`, otherwise removes any entry whose id is in `blockedIds`.
 2. `buildInteraction()` — derives `'takeAnytimeAction'` inclusion in `allowedCommands` strictly from `allowed && entries.length > 0`, keeping the UI and server views synchronised.
@@ -961,7 +956,7 @@ OA-vs-the reference design notes:
 - 官方 Card Effect 可声明只读 `computeResourceCommitments(state, owner)`，从卡内状态派生参与者必须保有的资源。Session 聚合并发承诺，若命令破坏承诺则在发布前恢复命令检查点。这不预扣款、不在 PaymentSolver 锁资，也不放宽 Continuation Guard；卡牌在一次原子成交中解除承诺并交换双方资源，见 ADR-0019。
 - 同步兑换反应支持立即执行的 `special-effect` 和 `gain` leaf，不执行 optional、选择或 pending flow。Listener 保持只读，资源和日志通过正常 event sink 产生。
 - Idle work-phase turns and `confirm-next-player` are acting-player anytime windows: legal anytime actions remain available before a worker is placed and before control passes to the next player. In `confirm-next-player`, `exchange` stays blocked to avoid recursive generic exchange prompts. `confirm-player-switch` remains blocked because it is a system-controlled cross-player transition inside another flow.
-- `stageResume`-bearing stage hook chains default to blocked to preserve the "system-driven hook chains do not yield to player anytime" invariant; the explicit allow-list (`animal-reorg`, exchange/bake-bread promptKey, and D132's `ui.cards.D132_HideFarmer.optional` before-endgame choice prompt) overrides this. D132's nested `resource-quantity-select` prompt stays blocked, because its max is frozen from current food/empty-space state and must not be resumed after arbitrary anytime changes.
+- 阶段 hook chain 默认禁止 anytime；系统交互类型和当前节点显式 `anytimeWindow` 声明提供例外。权限不依赖卡名或提示键。
 
 ---
 
@@ -1019,8 +1014,14 @@ export const A123_FrameBuilder = defineOccupationCard({
 - 复杂"等待玩家下一步选择"的卡牌交互抽显式 continuation 走 `pending` / `EngineStack.push`，不偷塞共享槽位。
 - 推荐结构：`{ cardId, kind:'choice'|'delayedEffect', payload }`。
 - 卡牌可在 `cardStates[cardId].extraData.heldWorkerId` 持有 worker（既不在 takenBy 也不在家）；`shared/cards/helpers/card-held-workers.ts` 提供 `holdWorkerOnCard` / `getWorkerHeldOnCard` / `releaseWorkerFromCard` / `getCardHeldWorkerIds`；`returnHome` 阶段统一释放。`family-growth` 可通过 `actionContext.holdNewbornOnCard` 把 newborn 直接放到卡上，避免其在回家前占用行动格或被再次用作容量来源。
-- 卡牌可在 `cardStates[cardId].extraData.farmTerrainMarkers` 写入只读 UI marker；FarmBoard 只把 marker 渲染在对应 terrain tile 内，规则仍由后端卡牌状态裁定。
+- 卡牌可在 `cardStates[cardId].extraData.farmTerrainMarkers` 写入只读 UI marker；来源声明公开展示 marker，FarmBoard 只在对应 terrain tile 内渲染，规则仍由后端卡牌状态裁定。
 - 卡牌可在目标玩家 `cardStates[sourceCard].extraData.publicCardMarkers` 写入跨玩家公开 marker；helper 汇总后由 scoring 写入 `cardBonusVp`，FarmBoard 只在原玩家摘要区域展示，不把 marker 贴到农场板外侧。
+
+Card Source 拥有状态的存储和解释。原生 `presentation` 声明把指定 counter key、stack、Card Field、持有工人、预留、附件和 marker 接入通用展示适配器；`getStatePresentation(player)` 返回配对资源或躺下动物等来源专属的通用事实。`infobox` 和资源统计明确属于公开适配通道。权威序列化记录规范化的 `cardStatePresentation`；前端和座位视角 Replay 只渲染这些事实，以及后端动物区和特殊畜栏投影，不解析原始字段。恢复时剥离派生事实，它不是第二份可写真源。
+
+卡牌状态有三种可见范围：默认内部、公开展示、玩家私有 `privateData`。普通快照、patch、dev WS、事件、历史，以及座位视角 Bug Report / Replay，只提供公开事实和该观察者明确的私有数据；卡牌本人也不接收内部字段。私有数据随存储玩家归属，不随传牌归属转移。权威状态、恢复、undo、完整调试状态和全开 Replay 保留原始数据。新的 `card.stateChanged` 只记录来源和字段 metadata，不记录值；投影也抹除历史事件中的值，不改写不可变 Frame 或其 Viewer 引用。 新 Frame 记录新增的展示事实，并使用重新构建、内容寻址的 Viewer。JSON Frame / delta 容器格式不变；Room header 在创建时锁定 Viewer build（ADR 0011）。
+
+`getRuleContributions(player)` 只读贡献组件预留和空格数量调整。共享消费者聚合去重后的已打出来源，将有限数值向下取整，排除负数、非数值，并把扣除限制在该类别数量内。通用特殊畜栏发现与归还按 `sourceCardId` 分派，由来源自己修改建造状态。Farmyard 几何接收 AnimalZones 的实际非牧场动物数量，不识别单卡或扣除容量。查询输入、结果与权威存储隔离，原生和 Workshop 只读查询遵循相同契约。
 
 ### 8.4 helpers 糖衣层（`shared/cards/helpers/`）
 

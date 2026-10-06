@@ -43,6 +43,7 @@ export const D025_WitchesDanceFloor = defineMinorCard({
       ],
     cardField: { allowedCrops: ['grain', 'vegetable'], capacity: 1 },
   },
+  presentation: { cardFields: true },
   impl: cardImpl,
 })
 

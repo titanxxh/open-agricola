@@ -16,6 +16,8 @@ import {
   type FarmBoardProjectionInput,
 } from '../farm-board-projection'
 
+import type { CardStatePresentation } from '../../../shared/contract/card-state'
+
 const resources = (overrides: Partial<Resource> = {}): Resource => ({
   wood: 0,
   clay: 0,
@@ -31,8 +33,9 @@ const resources = (overrides: Partial<Resource> = {}): Resource => ({
   ...overrides,
 })
 
-const createPlayer = (overrides: Partial<PlayerState & { lockedFarmTileKeys: string[] }> = {}): PlayerState & { lockedFarmTileKeys: string[] } => ({
+const createPlayer = (overrides: Partial<PlayerState & { lockedFarmTileKeys: string[]; cardStatePresentation: Record<string, CardStatePresentation> }> = {}): PlayerState & { lockedFarmTileKeys: string[]; cardStatePresentation: Record<string, CardStatePresentation> } => ({
   lockedFarmTileKeys: [],
+  cardStatePresentation: {},
   id: 'p1',
   name: 'Player 1',
   color: 'red',
@@ -234,15 +237,14 @@ describe('buildFarmBoardProjection', () => {
   it.each([false, true])('projects card-field selection without expanding the farm, with buried crops: %s', (buried) => {
     const player = createPlayer({
       minorPlayed: ['D075_WoodField'],
-      cardStates: {
-        D075_WoodField: {
-          extraData: {
-            cardFieldStacks: [
-              buried ? null : { crop: 'wood', remaining: 2 },
-              { crop: 'wood', remaining: 2, ...(buried ? { below: [{ crop: 'vegetable', remaining: 1 }] } : {}) },
-            ],
-          },
-        },
+      cardStatePresentation: {
+        D075_WoodField: { cropLayers: buried ? [
+          { stack: { kind: 'vegetable', remaining: 1 }, slotIndex: 1, top: false },
+          { stack: { kind: 'wood', remaining: 2 }, slotIndex: 1, top: true },
+        ] : [
+          { stack: { kind: 'wood', remaining: 2 }, slotIndex: 0, top: true },
+          { stack: { kind: 'wood', remaining: 2 }, slotIndex: 1, top: true },
+        ] },
       },
     })
     const interaction: ClientInteractionState = {
@@ -384,12 +386,8 @@ describe('buildFarmBoardProjection', () => {
         kind: 'blocked-farmyard-space',
         blocksPlacement: true,
       }],
-      cardStates: {
-        MarkerCard: {
-          extraData: {
-            farmTerrainMarkers: [{ row: 1, col: 1, kind: 'person', workerId: 'worker-1' }],
-          },
-        },
+      cardStatePresentation: {
+        MarkerCard: { farmTerrainMarkers: [{ row: 1, col: 1, kind: 'person', workerId: 'worker-1' }] },
       },
     })
 
@@ -604,28 +602,22 @@ describe('buildFarmBoardProjection', () => {
       parentCards: { mother: 'PR01', father: 'PS01' },
       minorPlayed: ['M084_BogPony', 'C146_WorkshopAssistant'],
       occupationPlayed: ['C022_BasketChair'],
-      cardStates: {
+      cardStates: { C146_WorkshopAssistant: { extraData: { sentinel: 'INTERNAL_ONLY' } } },
+      cardStatePresentation: {
         PR01: { infobox: 'Mother ready' },
-        PS01: { infobox: 'Father tier 2', extraData: { fatherCompletedTier: 2 } },
-        M084_BogPony: { extraData: { lyingHorseCount: 2 } },
+        PS01: { infobox: 'Father tier 2', completedTier: 2 },
+        M084_BogPony: { animalMarkers: [{ animal: 'horse', count: 2, pose: 'lying' }] },
         C146_WorkshopAssistant: {
-          counters: { bonusVp: 1, usedRound: 2, wood: 2 },
+          counters: { bonusVp: 1, wood: 2 },
+          resourceGroups: [{ wood: 1, clay: 1 }],
           stack: ['reed'],
-          extraData: {
-            pairs: ['WC', 7],
-            resourceStats: { used: 1, saved: { wood: 2 } },
-            cardCrop: { crop: 'grain', remaining: 2 },
-          },
+          resourceStats: { used: 1, saved: { wood: 2 }, gained: {}, paid: {}, receivedPayment: {}, paidToOthers: {} },
+          cropLayers: [{ stack: { kind: 'grain', remaining: 2 } }],
         },
-        C022_BasketChair: {
-          stack: ['food'],
-          extraData: { heldWorkerId: 'worker-1' },
-        },
+        C022_BasketChair: { stack: ['food'], heldWorkerId: 'worker-1' },
         MarkerCard: {
-          extraData: {
-            farmTerrainMarkers: [{ row: 1, col: 2, kind: 'person', workerId: 'worker-2' }],
-            publicCardMarkers: [{ id: 'm1', label: '+1', sourceCardId: 'MarkerCard' }],
-          },
+          farmTerrainMarkers: [{ row: 1, col: 2, kind: 'person', workerId: 'worker-2' }],
+          publicCardMarkers: [{ id: 'm1', label: '+1', sourceCardId: 'MarkerCard' }],
         },
       },
     })
@@ -646,11 +638,12 @@ describe('buildFarmBoardProjection', () => {
       'C146_WorkshopAssistant',
       'C022_BasketChair',
     ])
-    expect(projection.playedCardDisplays.find((card) => card.rawId === 'M084_BogPony')?.m084LyingHorses).toBe(2)
+    expect(projection.playedCardDisplays.find((card) => card.rawId === 'M084_BogPony')?.animalMarkers).toEqual([{ animal: 'horse', count: 2, pose: 'lying' }])
     expect(projection.playedCardDisplays.find((card) => card.rawId === 'C146_WorkshopAssistant')).toMatchObject({
       displayCounters: { bonusVp: 1, wood: 2 },
       resourceStats: { used: 1, saved: { wood: 2 } },
-      stack: ['WC'],
+      stack: ['reed'],
+      resourceGroups: [{ wood: 1, clay: 1 }],
       cardStacks: [{ kind: 'grain', remaining: 2 }],
     })
     expect(projection.playedCardDisplays.find((card) => card.rawId === 'C022_BasketChair')?.heldWorkerId).toBe('worker-1')
@@ -667,16 +660,10 @@ describe('buildFarmBoardProjection', () => {
       id: 'p1',
       name: 'Alice',
       color: 'blue',
-      cardStates: {
-        E148_Lazybones: {
-          extraData: { reservedActionSpaces: ['forest'] },
-        },
+      cardStatePresentation: {
+        E148_Lazybones: { reservedActionSpaces: ['forest'] },
         A177_Middleman: {
-          extraData: {
-            actionSpaceAttachments: [
-              { spaceId: 'copse-56', resources: { stone: 1, food: 1 } },
-            ],
-          },
+          actionSpaceAttachments: [{ spaceId: 'copse-56', resources: { stone: 1, food: 1 } }],
         },
       },
     })
@@ -689,11 +676,12 @@ describe('buildFarmBoardProjection', () => {
       currentRound: 1,
     })
 
-    expect(projection.actionSpaceReservations.get('forest')).toEqual({
+    expect(projection.actionSpaceReservations.get('forest')).toEqual([{
       id: 'p1',
       name: 'Alice',
       color: 'blue',
-    })
+      sourceCardId: 'E148_Lazybones',
+    }])
     expect(projection.actionSpaceAttachments.get('copse-56')).toEqual([
       { id: 'p1', name: 'Alice', color: 'blue', resource: 'stone', amount: 1 },
       { id: 'p1', name: 'Alice', color: 'blue', resource: 'food', amount: 1 },

@@ -16,6 +16,11 @@ import {
 
 beforeAll(async () => {
   const manifest: CardsManifestPayload = {
+    CUSTOM_ReservedCorral: {
+      meta: { id: 'CUSTOM_ReservedCorral', name: 'Reserved Corral', deck: 'A', number: 1, type: 'occupation' },
+      module: '',
+      reaches: [],
+    },
     D023_PioneeringSpirit: {
       meta: { id: 'D023_PioneeringSpirit', name: 'Pioneering Spirit', deck: 'D', number: 23, type: 'minor' },
       module: '',
@@ -111,6 +116,21 @@ const expectActionStyle = (
 }
 
 describe('ActionBoard', () => {
+  it('labels each recorded stable reservation by its actual source', () => {
+    const owner = createPlayer('p1', 'Alice', 'red')
+    const html = renderToStaticMarkup(<ActionBoard locale="en"
+      baseActions={[createAction('forest', 'actions.forest.name')]} roundSlots={[]}
+      currentPlayer={owner} players={[owner]} futureMeeples={[]}
+      actionSpaceReservations={new Map([['forest', [
+        { ...owner, sourceCardId: 'CUSTOM_ReservedCorral' },
+        { ...owner, sourceCardId: 'D023_PioneeringSpirit' },
+      ]]])}
+      canTakeAction={() => true} takeAction={vi.fn()} currentRound={1} devMode={false} />)
+    expect(html.match(/class="lazybones-stable-marker"/g)).toHaveLength(2)
+    expect(html).toContain('title="Alice: Reserved Corral"')
+    expect(html).toContain('title="Alice: Pioneering Spirit"')
+  })
+
   it('localizes raw owner names in card actions, exclusive markers, and future resource labels', () => {
     const first = createPlayer('p1', 'Player 1', 'red')
     const second = createPlayer('p2', 'Player 2', 'blue')

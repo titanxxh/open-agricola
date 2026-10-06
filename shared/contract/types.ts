@@ -442,6 +442,8 @@ export type CardState = {
   infobox?: string
   counters?: Record<string, number>
   extraData?: Record<string, unknown>
+  /** Explicitly private to the player storing this state, including after passing a card. */
+  privateData?: Record<string, unknown>
   stack?: string[]
 }
 
@@ -823,7 +825,10 @@ export type ActionExecutionResult =
   | { type: 'request'; request: InteractionRequest; promptKey?: PromptKey; promptParams?: Record<string, unknown>; sourceCard?: string; extraData?: Record<string, unknown> }
   | { type: 'fail'; errorKey: string; recoverable?: boolean }
   | { type: 'flow'; flow: ActionFlow; extraData?: Record<string, unknown> }
-export type ActionFlow =
+/** Permissions for this waiting step; declarations do not flow into nested steps. */
+export type AnytimeWindow = { allowed: true; blockedIds?: string[] } | { allowed: false }
+
+export type ActionFlow = (
   | {
       type: 'leaf'
       actionId: string
@@ -870,6 +875,7 @@ export type ActionFlow =
        */
       targetPlayerId?: string
     }
+ ) & { anytimeWindow?: AnytimeWindow }
 
 export type ActionDefinition = {
   id: string
@@ -988,7 +994,7 @@ export type SubFlowKind =
 export type FarmSelectType = 'plow' | 'sow' | 'fence' | 'room' | 'stable'
 export type SelectionKind = 'farm-position' | 'occupation-hand'
 
-export type InteractionRequest =
+export type InteractionRequest = (
   | { kind: 'choice'; options: ActionChoiceOption[]; structuredChoicePrefixes?: string[]; requiresExplicitChoice?: boolean }
   | { kind: 'animal-reorg'; zones: InteractionAnimalReorgZone[]; prefill?: boolean }
   | { kind: 'confirm-next-player'; nextPlayerIndex: number }
@@ -1087,6 +1093,7 @@ export type InteractionRequest =
       promptKey?: string
       requireAtLeastOne?: boolean
     }
+) & { anytimeWindow?: AnytimeWindow }
 
 export type InteractionCommand =
   | 'takeAction'

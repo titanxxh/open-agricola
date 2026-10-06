@@ -56,6 +56,7 @@ export const D039_TruffleSlicer = defineMinorCard({
     prerequisite: 'Play in Round 8 or Later',
     extraVp: true,
   },
+  presentation: { counters: ['bonusVp'] },
   impl: cardImpl,
 })
 

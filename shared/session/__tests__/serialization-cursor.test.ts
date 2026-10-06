@@ -360,7 +360,7 @@ describe('serialization cursor round-trip', () => {
     const rejected = restored.resolveChoice(0, 'C1')
 
     expect(rejected.ok).toBe(false)
-    expect(rejected.error).toBe('invalid choice value')
+    expect(rejected.error).toBe('choice disabled')
     expect(restored.getEngineStack().peekPendingEnvelope()?.request.kind).toBe('select-trigger')
   })
 

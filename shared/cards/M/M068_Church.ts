@@ -46,6 +46,7 @@ export const M068_Church = defineMinorCard({
     implemented: true,
     requiresFarmersOfTheMoor: true,
   },
+  presentation: { counters: ['bonusVp'] },
   impl: cardImpl,
 })
 

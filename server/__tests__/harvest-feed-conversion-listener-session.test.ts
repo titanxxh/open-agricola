@@ -86,7 +86,7 @@ describe('harvest feed conversion card listener dispatch', () => {
         event.type === 'card.stateChanged'
         && event.sourceCardId === LISTENER_CARD
         && event.key === 'seenFeedConverted'
-        && event.value === true,
+        && !Object.hasOwn(event, 'value'),
       )).toBe(true)
     } finally {
       setActiveCardRegistry(outerRegistry)

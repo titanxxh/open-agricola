@@ -1,5 +1,7 @@
 import type { CardDefinition, PlayerActionCardType } from '../contract/cards'
 import type { CardImpl } from './registry'
+import type { CardPresentationDeclaration } from '../contract/card-state'
+import { projectDeclaredCardState } from './helpers/state-presentation'
 
 export type CardSourceKind = 'minor' | 'occupation' | 'playerAction' | 'major'
 
@@ -27,6 +29,7 @@ export type CardSource<K extends CardSourceKind = CardSourceKind> =
 type CardSourceWithImplInput = {
   meta: CardSourceMetaInput
   impl: CardImpl
+  presentation?: CardPresentationDeclaration
 }
 
 type CardSourceWithoutImplInput = {
@@ -40,6 +43,7 @@ type PlayerActionCardSourceMetaInput =
 type PlayerActionCardSourceWithImplInput = {
   meta: PlayerActionCardSourceMetaInput
   impl: CardImpl
+  presentation?: CardPresentationDeclaration
 }
 type PlayerActionCardSourceWithoutImplInput = {
   meta: PlayerActionCardSourceMetaInput
@@ -57,10 +61,22 @@ const defineCardSource = <K extends CardSourceKind>(
     ...input.meta,
     kind,
   }
+  const declared = 'presentation' in input ? input.presentation : undefined
+  const impl = input.impl ? {
+    ...input.impl,
+    effect: {
+      id: meta.id,
+      ...input.impl.effect,
+      getStatePresentation: (player: Parameters<typeof projectDeclaredCardState>[0]) => ({
+        ...projectDeclaredCardState(player, meta.id, declared),
+        ...input.impl?.effect?.getStatePresentation?.(player),
+      }),
+    },
+  } : input.impl
   return {
     ...meta,
     meta,
-    impl: input.impl,
+    impl,
   } as CardSource<K>
 }
 

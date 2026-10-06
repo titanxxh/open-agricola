@@ -1,6 +1,6 @@
 import { createSeededRng } from '../../utils/rng'
 import type { GameState, PlayerState, ProtectedObservation } from '../../contract/types'
-import { readCardExtraData, writeCardExtraData } from './card-state'
+import { readCardExtraData, writeCardExtraData, readPrivateCardData, writePrivateCardData } from './card-state'
 
 /**
  * Roll a seeded, cacheable random pick from `candidates`. The result is stored under
@@ -22,8 +22,11 @@ export const rollAndCacheCardPick = <T>(
   key: string,
   candidates: T[],
   reportProtectedObservation?: (observation: ProtectedObservation) => void,
+  visibility: 'internal' | 'player-private' = 'internal',
 ): T => {
-  const cached = readCardExtraData<T>(player, cardId, key)
+  const cached = visibility === 'player-private'
+    ? readPrivateCardData<T>(player, cardId, key)
+    : readCardExtraData<T>(player, cardId, key)
   if (cached !== undefined) return cached
   if (candidates.length === 0) {
     throw new Error(`rollAndCacheCardPick: empty candidates for ${cardId}/${key}`)
@@ -33,7 +36,8 @@ export const rollAndCacheCardPick = <T>(
   const rng = createSeededRng(state.gameSeed ?? 0, `card-random:${rngTick}`, (value) => value ^ rngTick)
   const idx = Math.floor(rng() * candidates.length)
   const pick = candidates[idx]!
-  writeCardExtraData(player, cardId, key, pick)
+  if (visibility === 'player-private') writePrivateCardData(player, cardId, key, pick)
+  else writeCardExtraData(player, cardId, key, pick)
   reportProtectedObservation?.({
     kind: 'random',
     recipientPlayerIds: [player.id],

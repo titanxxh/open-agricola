@@ -378,21 +378,14 @@ describe('use-animal-reorg-flow helpers', () => {
     ])
   })
 
-  it('builds farm-card display from persisted per-zone storage after reorg', () => {
+  it('builds farm-card display from recorded zones after reorg', () => {
     const target = player()
-    target.cardStates = {
-      M034_HomeWood: {
-        extraData: {
-          animalCountsByZone: {
-            'card:M034_HomeWood@0-0': {
-              animalCounts: { horse: 1 },
-              capacity: 1,
-              allowedAnimalTypes: ['boar', 'cattle', 'horse'],
-            },
-          },
-        },
-      },
-    }
+    ;(target as PlayerState & { farmCardAnimalZones: AnimalReorgState['zones'] }).farmCardAnimalZones = [{
+      id: 'card:M034_HomeWood@0-0', zoneType: 'card', cardId: 'M034_HomeWood',
+      displaySource: 'farm-position', farmPosition: { row: 0, col: 0 },
+      animalType: 'horse', animalCount: 1, animalCounts: { horse: 1 }, capacity: 1,
+      allowedAnimalTypes: ['boar', 'cattle', 'horse'],
+    }]
     const display = buildFarmCardDisplayMap(target, null)
     expect(display.get('0-0')).toEqual({
       animalType: 'horse',

@@ -91,6 +91,7 @@ export const A132_Publican = defineOccupationCard({
     players: '3+',
     extraVp: true,
   },
+  presentation: { counters: ['bonusVp'] },
   impl: cardImpl,
 })
 

@@ -414,7 +414,8 @@ ${renderActionIdList()}
 | \`increment-counter\` | \`key: string\`、\`amount: number\` | 把 \`cardStates[cardId].counters[key]\` 增加 amount（可为负） |
 | \`set-counter\` | \`key: string\`、\`value: number\` | 把 counters[key] 设为 value；值会被截断为 ≥ 0，不能用负数清零（清零用 \`value: 0\`） |
 | \`increment-extra-data\` | \`key: string\`、\`amount: number\` | 把 \`cardStates[cardId].extraData[key]\` 数值增加 amount |
-| \`set-extra-data\` | \`key: string\`、\`value: unknown\` | 把 extraData[key] 设为 value |
+| \`set-extra-data\` | \`key: string\`、\`value: unknown\` | 把内部 extraData[key] 设为 value |
+| \`set-private-data\` | \`key: string\`、\`value: unknown\` | 把 privateData[key] 设为 value，仅状态所属玩家可见 |
 | \`set-flag\` | \`flag: boolean\` | 设置 \`cardStates[cardId].flagged\` |
 | \`set-infobox\` | \`text: string\` | 设置 \`cardStates[cardId].infobox\`（卡面文字提示） |
 
@@ -484,7 +485,7 @@ player.houseType             // 'wood' | 'clay' | 'stone'
 player.minorPlayed           // 已打出小改良卡 ID 数组
 player.occupationPlayed      // 已打出职业卡 ID 数组
 player.improvements          // 已建主要改良 ID 数组
-player.cardStates            // { [cardId]: { counters?, flagged?, infobox?, stack?, extraData? } }
+player.cardStates            // { [cardId]: { counters?, flagged?, infobox?, stack?, extraData?, privateData? } }
 
 // 游戏状态
 state.round                  // 1-14
@@ -493,6 +494,8 @@ state.actionSpaces           // 行动位数组
 \`\`\`
 
 数家庭成员：\`(player.workers ?? []).filter(w => w.isActive).length\`
+
+内部字段默认不发送给普通客户端（包括本人）；公开计数或图标通过 \`getStatePresentation(player)\` 返回通用展示，规则计算贡献用 \`getRuleContributions(player)\`。\`infobox\` 和资源统计是明确的公共展示通道，不能存放私有信息。\`privateData\` 只发送给该状态所属玩家。
 
 读卡上资源：\`player.cardStates?.[CARD_ID]?.counters?.grain ?? 0\`
 

@@ -992,6 +992,17 @@ export class AnimalZones {
     return computeAnimalZones(this.player, this.state)
   }
 
+  /** Actual animals already assigned outside pastures; capacity is never an animal count. */
+  nonPastureAnimalCounts(): AnimalCounts {
+    const totals = createAnimalCounts(this.state.enableFarmersOfTheMoor === true)
+    for (const zone of this.zones()) {
+      if (zone.zoneType === 'pasture') continue
+      const counts = readAnimalCountsForZoneAssignment(zone)
+      for (const key of ALL_ANIMAL_KEYS) totals[key] = (totals[key] ?? 0) + (counts[key] ?? 0)
+    }
+    return totals
+  }
+
   /**
    * Count of a given animal type, or all assigned animals if no type given.
    */

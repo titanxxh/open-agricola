@@ -99,6 +99,9 @@ const cardImpl = {
   listeners: [anytimeListener],
   effect: {
     id: CARD_ID,
+    getStatePresentation: (player) => ({
+      animalMarkers: [{ animal: 'horse', count: getBogPonyLyingHorseCount(player), pose: 'lying' }],
+    }),
     computeBreedableAnimalCount: (_state, player, animalType, currentCount) => {
       if (animalType !== 'horse') return undefined
       return Math.max(0, currentCount - getBogPonyLyingHorseCount(player))

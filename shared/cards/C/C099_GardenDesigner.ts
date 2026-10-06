@@ -45,6 +45,7 @@ const cardImpl = {
       return {
         type: 'leaf',
         actionId: 'emit-choice',
+        anytimeWindow: { allowed: true, blockedIds: ['exchange'] },
         sourceCard: CARD_ID,
         targetPlayerId: player.id,
         params: { promptKey: 'ui.interactionExchangeChoice', options },

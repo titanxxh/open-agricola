@@ -2,12 +2,7 @@ import type { Pasture, PlayerState } from '../../../shared/contract/types'
 import type { ActionChoiceOption } from '../../../shared/contract/types'
 import type { GameState } from '../../../shared/contract/types'
 import { ALL_ANIMAL_KEYS, type AnimalKey } from '../../../shared/contract/animals'
-import { parsePositionKey, positionKey } from '../../../shared/domain/farm'
-import {
-  compactAnimalCounts,
-  readAnimalHolderCounts,
-  sumAnimalCounts,
-} from '../../../shared/domain/animal-holder-state'
+import { positionKey } from '../../../shared/domain/farm'
 import type { AnimalReorgState, PendingAnimalReorg, PendingChoice } from '../../types/ui'
 import type { EngineProgress } from './use-engine-flow'
 
@@ -289,63 +284,11 @@ export const buildBorrowedPlayedCardDisplays = (
   )
 }
 
-const animalTypeFromCounts = (counts: Partial<Record<AnimalType, number>>): AnimalType | null => {
-  const used = ALL_ANIMAL_KEYS.filter((animal) => (counts[animal] ?? 0) > 0)
-  return used.length === 1 ? used[0]! : null
-}
-
-const readAllowedAnimalType = (value: unknown): AnimalType | null | undefined => {
-  if (!value || typeof value !== 'object') return undefined
-  const type = (value as { allowedAnimalType?: unknown }).allowedAnimalType
-  if (type === null) return null
-  return ALL_ANIMAL_KEYS.includes(type as AnimalType) ? type as AnimalType : undefined
-}
-
-const readAllowedAnimalTypes = (value: unknown): AnimalType[] | undefined => {
-  if (!value || typeof value !== 'object') return undefined
-  const types = (value as { allowedAnimalTypes?: unknown }).allowedAnimalTypes
-  if (!Array.isArray(types)) return undefined
-  return types.filter((type): type is AnimalType => ALL_ANIMAL_KEYS.includes(type as AnimalType))
-}
-
-const readCapacity = (value: unknown, fallback: number) => {
-  if (!value || typeof value !== 'object') return fallback
-  const capacity = (value as { capacity?: unknown }).capacity
-  return typeof capacity === 'number' && Number.isFinite(capacity)
-    ? Math.max(0, Math.floor(capacity))
-    : fallback
-}
-
 export const buildFarmCardDisplayMap = (
   player: PlayerState | null | undefined,
   animalReorg: AnimalReorgState | null | undefined,
 ) => {
   const map = new Map<string, CardAnimalDisplay>()
-  Object.values(player?.cardStates ?? {}).forEach((state) => {
-    const countsByZone = state?.extraData?.animalCountsByZone
-    if (!countsByZone || typeof countsByZone !== 'object') return
-    Object.entries(countsByZone as Record<string, unknown>).forEach(([zoneId, stored]) => {
-      const position = parsePositionKey(zoneId.split('@')[1] ?? '')
-      if (!position) return
-      const animalCounts = readAnimalHolderCounts(stored)
-      const animalCount = sumAnimalCounts(animalCounts)
-      if (animalCount <= 0) return
-      const compact = compactAnimalCounts(animalCounts)
-      const display: CardAnimalDisplay = {
-        animalType: animalTypeFromCounts(compact),
-        animalCount,
-        animalCounts: compact,
-        capacity: readCapacity(stored, animalCount),
-        zoneId,
-        isReorgDraft: false,
-      }
-      const allowedAnimalType = readAllowedAnimalType(stored)
-      const allowedAnimalTypes = readAllowedAnimalTypes(stored)
-      if (allowedAnimalType !== undefined) display.allowedAnimalType = allowedAnimalType
-      if (allowedAnimalTypes) display.allowedAnimalTypes = allowedAnimalTypes
-      map.set(positionKey(position), display)
-    })
-  })
   ;((player as PlayerWithCardAnimalZones | null | undefined)?.farmCardAnimalZones ?? [])
     .forEach((zone) => {
       if (zone.zoneType !== 'card' || !zone.farmPosition) return

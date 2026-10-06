@@ -1,5 +1,5 @@
 import type { ActionDefinition, PlayerState } from '../../../contract/types'
-import { writeCardExtraData } from '../../../cards/helpers/card-state'
+import { writeCardExtraData, writePrivateCardData } from '../../../cards/helpers/card-state'
 import {
   buildFarmPositionSelectionRequest,
   validateFarmPositionSelection,
@@ -106,7 +106,8 @@ export const selectionAction: ActionDefinition = {
       // selectedPositions keeps the existing extra-data key:
       // positions for board selections, card ids for card selections.
       const stored = cards.length > 0 ? cards : positions
-      writeCardExtraData(player, sourceCard, 'selectedPositions', stored)
+      if (kind === 'occupation-hand') writePrivateCardData(player, sourceCard, 'selectedPositions', stored)
+      else writeCardExtraData(player, sourceCard, 'selectedPositions', stored)
     }
 
     const extraData: Record<string, unknown> = { selectedPositions: positions }

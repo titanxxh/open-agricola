@@ -290,7 +290,7 @@ type Props = {
   devMode: boolean
   highlightedActionIds?: ReadonlySet<string>
   actionSpaceSelectionActive?: boolean
-  actionSpaceReservations?: ReadonlyMap<string, ActionBoardPlayerDisplay>
+  actionSpaceReservations?: ReadonlyMap<string, ActionSpaceReservationDisplay[]>
   actionSpaceAttachments?: ReadonlyMap<string, ActionSpaceAttachmentDisplay[]>
   leftActionNames?: ReadonlyMap<string, string>
   enablePrecisionMode?: boolean
@@ -317,6 +317,7 @@ type SpaceFarmerMarker = {
 }
 
 type ActionBoardPlayerDisplay = Pick<PlayerState, 'id' | 'name' | 'color'>
+type ActionSpaceReservationDisplay = ActionBoardPlayerDisplay & { sourceCardId: string }
 
 type ActionSpaceAttachmentDisplay = ActionBoardPlayerDisplay & {
   resource: keyof FutureMeepleResourceMap
@@ -499,7 +500,7 @@ export const ActionBoard = ({
   futureMeeples, canTakeAction, takeAction, currentRound, devMode,
   highlightedActionIds = new Set<string>(),
   actionSpaceSelectionActive = false,
-  actionSpaceReservations = new Map<string, ActionBoardPlayerDisplay>(),
+  actionSpaceReservations = new Map<string, ActionSpaceReservationDisplay[]>(),
   actionSpaceAttachments = new Map<string, ActionSpaceAttachmentDisplay[]>(),
   leftActionNames = new Map<string, string>(),
   enablePrecisionMode = false,
@@ -647,14 +648,14 @@ export const ActionBoard = ({
   }
 
   const renderStableMarker = (space: ActionSpace) => {
-    const owner = actionSpaceReservations.get(space.id)
-    if (!owner) return null
-    return (
-      <div className="lazybones-stable-marker" data-player-color={owner.color}
-        title={`${playerDisplayName(owner)}: ${getAnyCardDisplayName(locale, 'E148_Lazybones')}`}>
+    const reservations = actionSpaceReservations.get(space.id)
+    if (!reservations?.length) return null
+    return reservations.map((owner) => (
+      <div key={`${owner.id}:${owner.sourceCardId}`} className="lazybones-stable-marker" data-player-color={owner.color}
+        title={`${playerDisplayName(owner)}: ${getAnyCardDisplayName(locale, owner.sourceCardId)}`}>
         <span className="res-icon res-icon-barn" />
       </div>
-    )
+    ))
   }
 
   const renderActionSpaceAttachments = (space: ActionSpace) => {

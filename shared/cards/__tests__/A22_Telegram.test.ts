@@ -1,4 +1,8 @@
-import { describe, expect, it } from 'vitest'
+import { E074_AshTrees } from '../E/E074_AshTrees'
+import { A022_Telegram } from '../A/A022_Telegram'
+import { CardRegistry } from '../registry'
+import { setActiveCardRegistry } from '../active-registry'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { getCardEffect } from '../card-effects'
 import type { GameState, PlayerState } from '../../contract/types'
 import { setFencesForTest, setPalisadesForTest } from './__fixtures__/fence'
@@ -33,11 +37,19 @@ const createState = (...players: PlayerState[]): GameState =>
     gameOver: false, workPhaseObtainedResources: {},
   }) as unknown as GameState
 
+beforeEach(() => {
+  const registry = new CardRegistry()
+  registry.loadImpl(E074_AshTrees.id, E074_AshTrees.impl)
+  registry.loadImpl(A022_Telegram.id, A022_Telegram.impl)
+  setActiveCardRegistry(registry)
+})
+
 describe('A022_Telegram', () => {
   it('computes target round from fence reserve, excluding palisades and E74-held fences', () => {
     const player = createPlayer()
     setFencesForTest(player, 4)
     setPalisadesForTest(player, 3)
+    player.minorPlayed = [...(player.minorPlayed ?? []), E074_AshTrees.id]
     player.cardStates = { E074_AshTrees: { counters: { fences: 5 } } }
     player.supplyTokensConsumed = { fence: 1 }
     const state = createState(player)

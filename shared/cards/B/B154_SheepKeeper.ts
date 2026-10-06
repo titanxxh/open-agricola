@@ -50,6 +50,7 @@ export const B154_SheepKeeper = defineOccupationCard({
     prerequisite: 'Less Than 7 Sheep',
     extraVp: true,
   },
+  presentation: { counters: ['bonusVp'] },
   impl: cardImpl,
 })
 

@@ -252,7 +252,7 @@ describe('specialEffectAction — mutation dispatcher', () => {
     })
   })
 
-  it('set-extra-data: emits public literal state changes only', () => {
+  it('set-extra-data: emits metadata without internal values', () => {
     const player = makePlayer()
     const events: DraftGameEvent[] = []
     specialEffectAction.execute({
@@ -270,9 +270,10 @@ describe('specialEffectAction — mutation dispatcher', () => {
         sourceCardId: CARD_ID,
         cardId: CARD_ID,
         key: 'foo',
-        value: 'hello',
       }),
+      expect.objectContaining({ type: 'card.stateChanged', cardId: CARD_ID, key: 'foo' }),
     ])
+    expect(events.every((event) => !Object.hasOwn(event, 'value'))).toBe(true)
     expect(readCardExtraData(player, CARD_ID, 'foo')).toEqual({ privateHand: ['E1'] })
   })
 
@@ -299,11 +300,13 @@ describe('specialEffectAction — mutation dispatcher', () => {
     })
 
     expect(events).toEqual([
-      expect.objectContaining({ type: 'card.stateChanged', key: 'foo', value: 5 }),
-      expect.objectContaining({ type: 'card.stateChanged', key: 'uses', value: 2 }),
-      expect.objectContaining({ type: 'card.stateChanged', key: 'uses', value: 4 }),
-      expect.objectContaining({ type: 'card.stateChanged', key: 'flagged', value: true }),
+      expect.objectContaining({ type: 'card.stateChanged', key: 'foo' }),
+      expect.objectContaining({ type: 'card.stateChanged', key: 'uses' }),
+      expect.objectContaining({ type: 'card.stateChanged', key: 'uses' }),
+      expect.objectContaining({ type: 'card.stateChanged', key: 'flagged' }),
     ])
+    expect(events.every((event) => !Object.hasOwn(event, 'value'))).toBe(true)
+    expect(player.cardStates[CARD_ID]).toMatchObject({ counters: { uses: 4 }, flagged: true, extraData: { foo: 5 } })
   })
 
   it('set-flag: toggles card flag both ways', () => {
@@ -366,7 +369,6 @@ describe('specialEffectAction — mutation dispatcher', () => {
       expect.objectContaining({
         type: 'card.stateChanged',
         key: 'pendingFenceBonus',
-        value: null,
       }),
     ])
   })
