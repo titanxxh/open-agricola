@@ -438,9 +438,6 @@ set -a
 # shellcheck disable=SC1090
 . "$SHARED_DATA_DIR/dependencies.local"
 set +a
-if [[ "${OBSERVABILITY_ENABLED:-true}" == "true" && -n "${OBSERVABILITY_METRICS_TOKEN:-}" ]]; then
-  node "$SCRIPT_DIR/scripts/observability.mjs"
-fi
 
 echo "Ensuring immutable replay viewer..."
 "$PNPM_BIN" run build:cards-manifest
@@ -508,6 +505,10 @@ fi
 
 echo "Binding to: $BIND_IP$([ "$INTRANET_ENABLED" -eq 1 ] && echo " (intranet)" || echo " (local only; pass --intranet for LAN access)")"
 PUBLIC_API_BASE="${PUBLIC_API_BASE:-http://$BIND_IP:$BACKEND_PORT}"
+if [[ "${OBSERVABILITY_ENABLED:-true}" == "true" && -n "${OBSERVABILITY_METRICS_TOKEN:-}" ]]; then
+  SHARED_DATA_DIR="$SHARED_DATA_DIR" BACKEND_HOST="$BIND_IP" BACKEND_PORT="$BACKEND_PORT" PUBLIC_API_BASE="http://$BIND_IP:$BACKEND_PORT" \
+    node "$SCRIPT_DIR/scripts/observability.mjs"
+fi
 echo "Stopping existing processes..."
 stop_port_listeners "$FRONTEND_PORT" "frontend"
 stop_port_listeners "$BACKEND_PORT" "backend"

@@ -65,6 +65,35 @@ it('requires the current site administrator for every dashboard and data route',
   }
 })
 
+it('lets a Chinese administrator use Grafana without invalid HTTP headers', async () => {
+  await db.prepare('INSERT INTO users(id,username,display_name,password_hash,created_at) VALUES(?,?,?,?,?)')
+    .run('unicode-admin', '管理员甲', '管理员甲', 'unused-test-password', Date.now())
+  await db.prepare('INSERT INTO sessions(token,user_id,created_at,expires_at) VALUES(?,?,?,?)')
+    .run('unicode-admin-token', 'unicode-admin', Date.now(), Date.now() + 60_000)
+  vi.stubEnv('ADMIN_USERS', 'ops-admin,管理员甲')
+  try {
+    const response = await fetch(base + '/ops/api/search', { headers: { Authorization: 'Bearer unicode-admin-token' } })
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ user: '%E7%AE%A1%E7%90%86%E5%91%98%E7%94%B2' })
+  } finally { vi.stubEnv('ADMIN_USERS', 'ops-admin') }
+})
+
+it('keeps local HTTP handoff cookies usable with a production API URL in .env', async () => {
+  const originalNodeEnv = process.env.NODE_ENV
+  const originalApiBase = process.env.PUBLIC_API_BASE
+  vi.stubEnv('PUBLIC_API_BASE', 'https://api.example.com')
+  try {
+    for (const environment of ['development', 'production']) {
+      vi.stubEnv('NODE_ENV', environment)
+      const bootstrap = await fetch(base + '/api/admin/observability/session', { method: 'POST', headers: { Authorization: 'Bearer ops-admin-token' } })
+      const { path } = await bootstrap.json()
+      const start = await fetch(base + path, { redirect: 'manual' })
+      expect(start.status).toBe(303)
+      expect(start.headers.get('set-cookie')!.includes('; Secure')).toBe(environment === 'production')
+    }
+  } finally { vi.stubEnv('NODE_ENV', originalNodeEnv); vi.stubEnv('PUBLIC_API_BASE', originalApiBase) }
+})
+
 it('protects the scrape endpoint and reports actual rejected HTTP requests', async () => {
   expect((await fetch(base + '/internal/metrics')).status).toBe(401)
   const scrape = async () => {

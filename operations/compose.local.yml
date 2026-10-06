@@ -17,7 +17,7 @@ services:
     environment:
       GF_SERVER_HTTP_ADDR: 127.0.0.1
       GF_SERVER_HTTP_PORT: 13000
-      GF_SERVER_ROOT_URL: http://127.0.0.1:${BACKEND_PORT:-5175}/ops/
+      GF_SERVER_ROOT_URL: ${PUBLIC_API_BASE:?Start through restart-local.sh or scripts/observability.mjs}/ops/
       PROMETHEUS_URL: http://127.0.0.1:19090
     volumes:
       - ${OBSERVABILITY_DATA_DIR:?}/grafana:/var/lib/grafana

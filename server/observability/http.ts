@@ -3,7 +3,7 @@ import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
 import type { PostgresDatabase } from '../database/postgres'
 import { extractToken, isAdmin } from '../auth'
 import { readCookies, SESSION_COOKIE } from '../auth-cookies'
-import { corsHeaders } from '../http-origin'
+import { corsHeaders, getRequestOrigin } from '../http-origin'
 import { operationsMetrics } from './metrics'
 
 const OPS_COOKIE = 'oa_ops_session'
@@ -42,8 +42,9 @@ export function createOperationsHandler({ db, collect }: { db: PostgresDatabase;
         .get<{ session_token: string }>(digest(ticket), Date.now())
       const user = row && await userFor(row.session_token)
       if (!user || !isAdmin(user.username)) { json(res, 401, { ok: false, code: 'invalid_handoff' }); return true }
+      const secure = process.env.NODE_ENV === 'production' && (process.env.PUBLIC_API_BASE ?? getRequestOrigin(req)).startsWith('https:')
       res.writeHead(303, { Location: '/ops/d/open-agricola/operations', 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer',
-        'Set-Cookie': `${OPS_COOKIE}=${encodeURIComponent(row!.session_token)}; Path=/ops; HttpOnly; SameSite=Lax${process.env.PUBLIC_API_BASE?.startsWith('https:') ? '; Secure' : ''}` })
+        'Set-Cookie': `${OPS_COOKIE}=${encodeURIComponent(row!.session_token)}; Path=/ops; HttpOnly; SameSite=Lax${secure ? '; Secure' : ''}` })
       res.end(); return true
     }
     const tokens = [...readCookies(req.headers.cookie, path.startsWith('/ops/') ? OPS_COOKIE : SESSION_COOKIE), extractToken(req.headers.authorization)]
@@ -103,7 +104,7 @@ export function createOperationsHandler({ db, collect }: { db: PostgresDatabase;
       const target = process.env.GRAFANA_URL
       if (!target) { json(res, 503, { ok: false, code: 'observability_unavailable' }); return true }
       // Build an allowlist; neither credentials nor client-supplied auth/proxy headers reach Grafana.
-      const headers = { 'x-webauth-user': user.username, 'x-webauth-role': 'Viewer', 'content-type': req.headers['content-type'] ?? 'application/json', accept: req.headers.accept ?? '*/*' }
+      const headers = { 'x-webauth-user': encodeURIComponent(user.username), 'x-webauth-role': 'Viewer', 'content-type': req.headers['content-type'] ?? 'application/json', accept: req.headers.accept ?? '*/*' }
       const upstream = httpRequest(new URL(path + url.search, target), { method: req.method, headers, timeout: 10_000 }, response => {
         const responseHeaders = { ...response.headers, 'cache-control': 'no-store', 'referrer-policy': 'no-referrer' }
         delete responseHeaders['set-cookie']
