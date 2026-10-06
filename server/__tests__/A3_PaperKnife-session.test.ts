@@ -336,6 +336,40 @@ describe('A003_PaperKnife session-tier: flow', () => {
     expect(playedFromSelection).toContain(pick)
   })
 
+  it.each([
+    { cardIds: [OCC_A, OCC_A, OCC_A] },
+    { cardIds: [OCC_A, OCC_B] },
+    { cardIds: [OCC_A, OCC_B, '__not_in_hand__'] },
+  ])('rejects an invalid occupation subset $cardIds atomically before randomness, then accepts a legal subset', ({ cardIds }) => {
+    const session = makeSession({ wood: 1, gameSeed: 42 })
+    const initial = playA3(session)
+    const before = JSON.stringify(session.state)
+    const beforeLogLength = session.state.log.length
+    const pending = structuredClone(initial.interaction)
+    const rejected = session.commitSelectionChoice(0, { cardIds })
+    expect(rejected.ok).toBe(false)
+    expect(JSON.stringify(session.state)).toBe(before)
+    expect(rejected.interaction).toEqual(pending)
+    expect(session.state.players[0]!.cardStates[SESSION_CARD_ID]?.privateData?.pick).toBeUndefined()
+
+    const control = makeSession({ wood: 1, gameSeed: 42 })
+    playA3(control)
+    const valid = [OCC_A, OCC_B, OCC_C]
+    const expected = control.commitSelectionChoice(0, { cardIds: valid })
+    const response = session.commitSelectionChoice(0, { cardIds: valid })
+    expect(response.ok, response.error).toBe(true)
+    const pick = response.state.players[0]!.cardStates[SESSION_CARD_ID]?.privateData?.pick
+    expect(pick).toBe(expected.state.players[0]!.cardStates[SESSION_CARD_ID]?.privateData?.pick)
+    expect(valid).toContain(pick)
+    expect(response.interaction.stateId).toBe('wait')
+    const accept = response.interaction.request!.options!.find(option => option.value !== '__skip__')!
+    const played = session.resolveChoice(0, accept.value)
+    expect(played.ok, played.error).toBe(true)
+    expect(played.state.players[0]!.occupationPlayed).toEqual([pick])
+    expect(played.state.players[0]!.resources.food).toBe(3)
+    expect(played.state.log.length).toBeGreaterThan(beforeLogLength)
+  })
+
   it('A003 S4: declining the revealed occupation leaves every occupation in hand', () => {
     const session = makeSession({ wood: 1, gameSeed: 42 })
     const a3Resp = playA3(session)

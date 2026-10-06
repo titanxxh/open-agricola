@@ -328,6 +328,13 @@ describe('selection action with occupation-hand kind', () => {
       recoverable: true,
     })
     expect(
+      selectionAction.resolveChoice!(context, 'confirm', { cards: ['id1', 'id1'] }),
+    ).toEqual({
+      type: 'fail',
+      errorKey: 'duplicate card selection',
+      recoverable: true,
+    })
+    expect(
       selectionAction.resolveChoice!(context, 'confirm', { cards: ['missing'] }),
     ).toEqual({
       type: 'fail',
