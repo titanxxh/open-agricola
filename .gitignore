@@ -27,7 +27,8 @@ open-agricola.code-workspace
 
 *.pdf
 data/
-.env
+.env*
+!.env.example
 .persisted-room.json
 output/
 artifacts/
