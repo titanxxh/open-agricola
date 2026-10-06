@@ -8,7 +8,7 @@ services:
     ports:
       - "127.0.0.1:${BACKEND_PORT:-5175}:5175"
     environment:
-      - VALIDATION_DATABASE_URL=${VALIDATION_DATABASE_URL:-}
+      VALIDATION_DATABASE_URL: ${VALIDATION_DATABASE_URL:-}
       NODE_ENV: production
       BACKEND_PORT: 5175
       BACKEND_HOST: 0.0.0.0
