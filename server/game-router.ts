@@ -9,6 +9,7 @@ import type { FarmTilePosition } from '../shared/contract/types.ts'
 import type { MoorSpecialActionId } from '../shared/moor/types.ts'
 import { getDb } from './db.ts'
 import { validateSession, extractToken } from './auth.ts'
+import { allowAnonymousAccess } from './anonymous-access.ts'
 import type { CustomCardData } from '../shared/cards/session-card-context.ts'
 import type { CustomCodeManifest } from '../shared/custom-code/types.ts'
 import { defaultSandboxDeckIds } from '../shared/session/state-bootstrap.ts'
@@ -1056,8 +1057,15 @@ return false
 }
 
 export const handleGameRoute = async (req: IncomingMessage, res: ServerResponse): Promise<boolean> => {
-  if (!authority) return handleAuthorizedGameRoute(req, res)
   if (!req.url?.startsWith('/api/game/')) return false
+  // The debug sandbox is a development surface (#993): without anonymous
+  // access every call needs a session, so unauthenticated callers cannot
+  // drive server-side GameSessions or custom-code executors.
+  if (!allowAnonymousAccess() && !(await validateSession(extractToken(req.headers.authorization)))) {
+    rawJson(res, 401, { ok: false, code: 'login_required', error: 'Login required' })
+    return true
+  }
+  if (!authority) return handleAuthorizedGameRoute(req, res)
   try {
     const key = await getSessionKey(req)
     const stamp = sessionStamps.get(key) ?? await authority.access.capture([], key === 'anonymous' ? [] : [key])
