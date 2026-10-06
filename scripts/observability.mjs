@@ -1,7 +1,8 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { execFileSync } from 'node:child_process'
-import { parseEnv } from 'node:util'
+import { execFile, execFileSync } from 'node:child_process'
+import { createServer } from 'node:http'
+import { parseEnv, promisify } from 'node:util'
 const dependencies = parseEnv(readFileSync(resolve(process.env.SHARED_DATA_DIR ?? 'data', 'dependencies.local'), 'utf8'))
 const backendHost = process.env.BACKEND_HOST ?? '127.0.0.1'
 const backendPort = process.env.BACKEND_PORT ?? '5175'
@@ -14,4 +15,23 @@ function config(target, exporter) {
 }
 writeFileSync(resolve(data, 'prometheus.local.yml'), config(`${backendHost}:${backendPort}`, '127.0.0.1:19100').replace('localhost:9090', '127.0.0.1:19090'), { mode: 0o600 })
 writeFileSync(resolve(data, 'prometheus.compose.yml'), config('app:5175', 'node-exporter:9100'), { mode: 0o600 })
-if (!process.argv.includes('--prepare-only')) execFileSync('docker', ['compose', '-f', 'operations/compose.local.yml', 'up', '-d', '--force-recreate'], { stdio: 'inherit', env: { ...process.env, PUBLIC_API_BASE: publicApiBase, OBSERVABILITY_DATA_DIR: data, OBSERVABILITY_UID: String(process.getuid()), OBSERVABILITY_GID: String(process.getgid()) } })
+async function hostNetworkingAvailable(env) {
+  const body = 'open-agricola-host-network-probe'
+  const probe = createServer((_req, res) => res.end(body))
+  try {
+    const compose = JSON.parse(execFileSync('docker', ['compose', '-f', 'operations/compose.local.yml', 'config', '--format', 'json'], { env, encoding: 'utf8' }))
+    await new Promise((resolve, reject) => { probe.once('error', reject); probe.listen(0, '127.0.0.1', resolve) })
+    const { stdout } = await promisify(execFile)('docker', ['run', '--rm', '--network', 'host', '--entrypoint', '/usr/bin/wget', compose.services.grafana.image,
+      '-q', '-T', '3', '-O', '-', `http://127.0.0.1:${probe.address().port}/`], { env, timeout: 30_000 })
+    return stdout.trim() === body
+  } catch { return false }
+  finally { await new Promise(resolve => probe.close(() => resolve())) }
+}
+if (!process.argv.includes('--prepare-only')) {
+  const env = { ...process.env, PUBLIC_API_BASE: publicApiBase, OBSERVABILITY_DATA_DIR: data, OBSERVABILITY_UID: String(process.getuid()), OBSERVABILITY_GID: String(process.getgid()) }
+  if (await hostNetworkingAvailable(env)) {
+    execFileSync('docker', ['compose', '-f', 'operations/compose.local.yml', 'up', '-d', '--force-recreate'], { stdio: 'inherit', env })
+  } else {
+    console.warn('Local monitoring skipped: Docker could not complete the host-network loopback probe. On Docker Desktop, enable host networking (4.34+); retry once images are available. The application will still start.')
+  }
+}

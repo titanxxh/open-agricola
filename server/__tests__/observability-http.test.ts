@@ -144,8 +144,8 @@ it('preserves the public API prefix through an actual reverse-proxy handoff, coo
 })
 
 it('reports pool-acquisition and deferred COMMIT failures once, without counting business rejections', async () => {
-  const errors = async () => (await (await fetch(base + '/internal/metrics', { headers: { Authorization: 'Bearer scrape-test-token' } })).text())
-    .split('\n').filter(line => line.startsWith('agricola_db_errors_total{')).reduce((sum, line) => sum + Number(line.slice(line.lastIndexOf(' ') + 1)), 0)
+  const errors = async (reason?: string) => (await (await fetch(base + '/internal/metrics', { headers: { Authorization: 'Bearer scrape-test-token' } })).text())
+    .split('\n').filter(line => line.startsWith('agricola_db_errors_total{') && (!reason || line.includes(`reason="${reason}"`))).reduce((sum, line) => sum + Number(line.slice(line.lastIndexOf(' ') + 1)), 0)
   const constrained = new PostgresDatabase({ connectionString: getTestDatabaseUrl(), max: 1, connectionTimeoutMillis: 50 })
   let release!: () => void
   let ready!: () => void
@@ -154,9 +154,13 @@ it('reports pool-acquisition and deferred COMMIT failures once, without counting
   const held = constrained.transaction(async () => { ready(); await gate })()
   await acquired
   try {
+    const initial = await (await fetch(base + '/internal/metrics', { headers: { Authorization: 'Bearer scrape-test-token' } })).text()
+    expect(initial.split('\n').find(line => line.startsWith('agricola_db_errors_total{') && line.includes('reason="timeout"'))).toMatch(/ 0$/)
     const before = await errors()
+    const beforeTimeout = await errors('timeout')
     await expect(constrained.transaction(() => 1)()).rejects.toThrow(/timeout/i)
     expect(await errors()).toBe(before + 1)
+    expect(await errors('timeout')).toBe(beforeTimeout + 1)
   } finally { release(); await held; await constrained.close() }
   await db.exec('CREATE TABLE observation_parent(id int PRIMARY KEY); CREATE TABLE observation_child(parent_id int REFERENCES observation_parent(id) DEFERRABLE INITIALLY DEFERRED)')
   const beforeCommit = await errors()

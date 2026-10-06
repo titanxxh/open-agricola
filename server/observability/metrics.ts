@@ -48,6 +48,11 @@ export class OperationsMetrics {
   readonly clientDuration = new Histogram({ name: 'agricola_client_duration_seconds', help: 'Sampled, untrusted browser observations using one browser monotonic clock.', labelNames: ['kind', 'round', 'outcome'], buckets: SECONDS, registers: [this.registry] })
   readonly clientEvents = new Counter({ name: 'agricola_client_events_total', help: 'Sampled browser timeout, reconnect and connection events.', labelNames: ['kind'], registers: [this.registry] })
 
+  constructor() {
+    // Establish a sampleable baseline so increase() can see the first failure.
+    for (const reason of ['deadlock', 'timeout', 'connection_limit', 'unavailable', 'query']) this.dbErrors.inc({ reason }, 0)
+  }
+
   initialize(role: 'app' | 'ingress'): void {
     if (this.initialized) return
     this.initialized = true
@@ -163,7 +168,8 @@ export function startObservation(stage: Operation): (outcome?: string) => void {
 
 export function observeDatabaseError(error: unknown): void {
   const code = error && typeof error === 'object' && 'code' in error ? String(error.code) : ''
-  const reason = code === '40P01' ? 'deadlock' : code === '57014' ? 'timeout' : code === '53300' ? 'connection_limit'
+  const poolTimeout = !code && error instanceof Error && /timeout exceeded when trying to connect|connection terminated due to connection timeout/i.test(error.message)
+  const reason = code === '40P01' ? 'deadlock' : code === '57014' || poolTimeout ? 'timeout' : code === '53300' ? 'connection_limit'
     : /^(08|ECONN|ETIMEDOUT|EPIPE)/.test(code) ? 'unavailable' : 'query'
   safe(() => operationsMetrics.dbErrors.inc({ reason }))
 }

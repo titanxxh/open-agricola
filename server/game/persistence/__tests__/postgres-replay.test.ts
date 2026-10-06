@@ -1,4 +1,7 @@
 import { randomUUID } from 'node:crypto'
+import { createServer, type Server } from 'node:http'
+import type { AddressInfo } from 'node:net'
+import { createOperationsHandler } from '../../../observability/http'
 import { CommandStore } from '../../command-store'
 import { createTestDatabase } from '../../../__tests__/_helpers/postgres'
 import type { PostgresDatabase } from '../../../database/postgres'
@@ -88,6 +91,10 @@ const nextStep = (): ReplayCommit => ({
 describe('PostgresRoomPersistence replay commit', () => {
   let db: PostgresDatabase
   let persistence: PostgresRoomPersistence
+  let monitoring: Server
+  let metricsBase: string
+  const attempts = async (outcome: string) => (await (await fetch(metricsBase + '/internal/metrics', { headers: { Authorization: 'Bearer replay-test-metrics' } })).text())
+    .split('\n').filter(line => line.startsWith('agricola_commit_attempts_total{') && line.includes(`outcome="${outcome}"`)).reduce((sum, line) => sum + Number(line.slice(line.lastIndexOf(' ') + 1)), 0)
   let cleanExpiredSessions: (db: PostgresDatabase) => Promise<void>
 
   beforeEach(async () => {
@@ -96,11 +103,18 @@ describe('PostgresRoomPersistence replay commit', () => {
     vi.spyOn(database, 'getDb').mockReturnValue(db)
     cleanExpiredSessions = database.cleanExpiredSessions
     persistence = new PostgresRoomPersistence(db)
+    vi.stubEnv('OBSERVABILITY_METRICS_TOKEN', 'replay-test-metrics')
+    const handle = createOperationsHandler({ db })
+    monitoring = createServer((req, res) => { void handle(req, res) })
+    await new Promise<void>(done => monitoring.listen(0, '127.0.0.1', done))
+    metricsBase = `http://127.0.0.1:${(monitoring.address() as AddressInfo).port}`
   })
 
   afterEach(async () => {
+    await new Promise<void>(done => monitoring.close(() => done()))
     ;(await db.close())
     vi.restoreAllMocks()
+    vi.unstubAllEnvs()
   })
 
   it('commits the command receipt atomically with the Replay step and refuses step collisions', async () => {
@@ -123,7 +137,11 @@ describe('PostgresRoomPersistence replay commit', () => {
     expect(await persistence.commitReplay(commit)).toEqual({ kind: 'idempotent' })
     const other = await commands.reserve('actor', { scopeId: scope.scopeId, commandId: randomUUID() }, 'room-1', { type: 'action', spaceId: 'forest', expectedVersion: 0 })
     if (other.kind !== 'pending') throw new Error('Expected reservation')
+    const beforeConflict = await attempts('conflict')
+    const beforeError = await attempts('error')
     expect(await persistence.commitReplay({ ...commit, receipt: { ...commit.receipt, request: other.request } })).toMatchObject({ kind: 'conflict' })
+    expect(await attempts('conflict')).toBe(beforeConflict + 1)
+    expect(await attempts('error')).toBe(beforeError)
   })
 
   it('atomically starts a replay with Step 0 and the recoverable snapshot', async () => {

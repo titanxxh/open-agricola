@@ -684,8 +684,9 @@ export class PostgresRoomPersistence implements RoomPersistence {
       }
       return result
     } catch (error) {
-      safe(() => operationsMetrics.commitResults.inc({ outcome: 'error' }))
-      if (error instanceof ReplayConflictError || error instanceof CommandError) {
+      const conflict = error instanceof ReplayConflictError || error instanceof CommandError
+      safe(() => operationsMetrics.commitResults.inc({ outcome: conflict ? 'conflict' : 'error' }))
+      if (conflict) {
         return { kind: 'conflict', error: error.message }
       }
       throw error
