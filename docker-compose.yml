@@ -22,6 +22,37 @@ services:
     networks: [dependencies]
     stop_grace_period: 90s
     restart: unless-stopped
+  prometheus:
+    image: prom/prometheus:v3.15.0
+    user: "${OBSERVABILITY_UID:-1000}:${OBSERVABILITY_GID:-1000}"
+    command: ["--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.path=/prometheus", "--storage.tsdb.retention.time=7d"]
+    volumes:
+      - ${OBSERVABILITY_DATA_DIR:-./data/observability}/prometheus:/prometheus
+      - ${OBSERVABILITY_DATA_DIR:-./data/observability}/prometheus.compose.yml:/etc/prometheus/prometheus.yml:ro
+      - ${OBSERVABILITY_DATA_DIR:-./data/observability}/metrics-token:/etc/prometheus/metrics-token:ro
+    networks: [dependencies]
+    restart: unless-stopped
+  grafana:
+    image: grafana/grafana:13.2.3
+    user: "${OBSERVABILITY_UID:-1000}:${OBSERVABILITY_GID:-1000}"
+    environment:
+      GF_SERVER_ROOT_URL: ${PUBLIC_API_BASE:-http://127.0.0.1:5175}/ops/
+      PROMETHEUS_URL: http://prometheus:9090
+    volumes:
+      - ${OBSERVABILITY_DATA_DIR:-./data/observability}/grafana:/var/lib/grafana
+      - ./operations/grafana/grafana.ini:/etc/grafana/grafana.ini:ro
+      - ./operations/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./operations/grafana/dashboards:/etc/grafana/dashboards:ro
+    networks: [dependencies]
+    restart: unless-stopped
+  node-exporter:
+    image: prom/node-exporter:v1.10.2
+    pid: host
+    command: ["--path.rootfs=/host", "--collector.disable-defaults", "--collector.cpu", "--collector.meminfo", "--collector.filesystem", "--collector.diskstats", "--collector.netdev", "--collector.loadavg"]
+    volumes: ["/:/host:ro,rslave"]
+    read_only: true
+    networks: [dependencies]
+    restart: unless-stopped
 networks:
   dependencies:
     external: true

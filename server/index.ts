@@ -1,4 +1,8 @@
+import { createObservationDatabase } from './observability/database'
+import { createCollector } from './observability/collector'
+import { operationsMetrics } from './observability/metrics'
 import { clientIp as getClientIp } from './client-ip'
+import { createOperationsHandler } from './observability/http'
 import { InvalidationStore } from './invalidation'
 import { SandboxAuthority } from './game/sandbox-authority'
 import { RoomDirectory } from './game/room-directory'
@@ -389,7 +393,10 @@ const bugReportDeliveryTimer = setInterval(() => {
   })
 }, 5_000)
 
+const observationDb = createObservationDatabase()
+const handleOperations = createOperationsHandler({ db: getDb(), collect: createCollector(getDb(), 'app', () => wssCtx?.observation(), () => wssCtx?.authority?.instanceId, async () => (await wssCtx?.committer?.canCreateRoom())?.ok === true, observationDb) })
 const server = createServer((req, res) => {
+  operationsMetrics.http(req, res)
   return handleRequest(req, res).catch(error => {
     console.error('[http] request failed', error)
     if (!res.headersSent) sendJson(res, 503, { error: 'Service temporarily unavailable' })
@@ -411,6 +418,8 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
   }
 
   if (rejectUntrustedOrigin(req, res)) return
+
+  if (await handleOperations(req, res)) return
 
   // ── Health ─────────────────────────────────────────────
   if (req.method === 'GET' && req.url === '/api/health') {
@@ -1005,6 +1014,7 @@ installShutdownHandlers(async () => {
   shutdownSandboxSessions()
   clearInterval(bugReportDeliveryTimer)
   await wssCtx?.shutdown()
+  await observationDb.close()
   await closed
   closeResources()
   await getDb().close()

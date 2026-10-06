@@ -1,3 +1,4 @@
+import { createObservationDatabase } from '../server/observability/database'
 import { spawn, type ChildProcess } from 'node:child_process'
 import { setTimeout as pause } from 'node:timers/promises'
 import { createPublicIngress } from '../server/ingress'
@@ -11,7 +12,7 @@ const privatePort = Number(process.env.APP_BASE_PORT ?? port + 100)
 if (!Number.isSafeInteger(count) || count < 1 || count > 2) throw new Error('Local APP_INSTANCES must be 1 or 2')
 await initializeDatabase()
 const directory = new RoomDirectory(getDb())
-const ingress = createPublicIngress(directory, process.env.PUBLIC_API_BASE?.startsWith('https:') === true)
+const ingress = createPublicIngress(directory, process.env.PUBLIC_API_BASE?.startsWith('https:') === true, undefined, createObservationDatabase())
 const children = new Set<ChildProcess>()
 let stopping = false
 const shutdown = async () => {
@@ -32,7 +33,7 @@ async function start(index: number): Promise<void> {
   const internalUrl = `http://127.0.0.1:${childPort}`
   const child = spawn(process.execPath, ['--import', 'tsx', 'server/index.ts'], {
     // Private children receive one normalized client IP from this ingress.
-    env: { ...process.env, REPLAY_TRUST_PROXY: 'true', BACKEND_HOST: '127.0.0.1', BACKEND_PORT: String(childPort), INSTANCE_INTERNAL_URL: internalUrl },
+    env: { ...process.env, REPLAY_TRUST_PROXY: 'true', INSTANCE_SLOT: String(index), BACKEND_HOST: '127.0.0.1', BACKEND_PORT: String(childPort), INSTANCE_INTERNAL_URL: internalUrl },
     stdio: 'inherit',
   })
   children.add(child)

@@ -196,6 +196,10 @@ _Avoid_: 活动 Room 快照、完整未完成局归档、永久 Replay
 房间里的连接席位，包含 `ws`、`playerIndex`、显示名和可选用户身份；不是规则层玩家状态。
 _Avoid_: PlayerState
 
+**Platform Operations Dashboard（平台运行看板）**:
+供管理员查看 Open Agricola 服务健康和使用概况的汇总界面。运行概况不授予活动对局的隐藏规则状态访问权限。
+_Avoid_: 公开状态页、活动局观战、Game Replay Archive
+
 **Connection**:
 WebSocket 连接和房间命令路由层，核心包括 `ws-server`、`room-router`、`broadcaster` 和 `envelope-builder`。
 _Avoid_: 规则执行、直接写 GameState

@@ -1,3 +1,4 @@
+import { markRequest, responseReceived, snapshotReceived, observeBrowser } from './observability'
 import type { RoomDiscoveryResponse } from '../../shared/contract/protocol/routing'
 import { RoomCommandJournal } from './room-command-journal'
 import type { CommandScope, InputWindow, CommandOutcome } from '../../shared/contract/protocol/commands'
@@ -311,7 +312,10 @@ export class WsGameTransport implements GameTransport {
   get connected() { return this._connected && !this.recovering && !this.stopped }
   get recoveringCommands() { return this.recovering || this.journal.commands.size > 0 }
 
+  private connectStarted: number | undefined
+
   async connect(): Promise<void> {
+    this.connectStarted = performance.now()
     this.stopped = false
     this.recovering = this.journal.commands.size > 0
     await this.openSocket()
@@ -332,7 +336,7 @@ export class WsGameTransport implements GameTransport {
       const scope = this.readScope()
       let authenticated = false
       let requestedFreshScope = false
-      const timer = setTimeout(() => { reject(new Error('Connection timed out')); socket.close() }, 10000)
+      const timer = setTimeout(() => { observeBrowser('connect_ready', this.connectStarted ?? performance.now(), undefined, 'timeout'); reject(new Error('Connection timed out')); socket.close() }, 10000)
       socket.onopen = () => {
         if (this.ws !== socket) return
         socket.send(JSON.stringify({ type: 'getCommandScope', ...(scope ? { scopeId: scope.scopeId } : {}) }))
@@ -410,6 +414,8 @@ export class WsGameTransport implements GameTransport {
   private scheduleReconnect(): void {
     if (this.retryTimer || this.stopped) return
     this.recovering = true
+    this.connectStarted = performance.now()
+    observeBrowser('connect_ready', this.connectStarted, undefined, 'reconnect')
     this.setStatus({ phase: 'reconnecting' })
     const delay = this.options.reconnectDelayMs ?? Math.min(10000, 500 * 2 ** Math.min(this.retryAttempt++, 5))
     this.retryTimer = setTimeout(() => {
@@ -478,6 +484,12 @@ export class WsGameTransport implements GameTransport {
   }
 
   private receive(msg: ServerEvent): void {
+    if (msg.type === 'stateUpdate') {
+      responseReceived(msg.requestId, msg.payload.state, msg.payload.ok ? 'ok' : 'rejected'); snapshotReceived(msg.payload.state)
+      if (this.connectStarted !== undefined) { observeBrowser('connect_ready', this.connectStarted, msg.payload.state); this.connectStarted = undefined }
+    }
+    if (msg.type === 'error') responseReceived(msg.requestId, undefined, msg.code === 'command_input_stale' ? 'stale' : 'error')
+    if (msg.type === 'commandReceipt' && msg.status === 'completed') responseReceived(msg.requestId, undefined, msg.receipt.outcome.ok ? 'ok' : 'rejected')
     if (msg.type === 'seat_replaced') this.stop('seat was replaced', 'seat_replaced')
     if (msg.type === 'roomDissolved') this.stop(msg.reason === 'card_takedown' ? 'roomTerminatedCardTakedown' : 'roomDissolved')
     if (msg.type === 'error' && terminalCode(msg.code)) this.stop(msg.error, msg.code)
@@ -598,6 +610,7 @@ export class WsGameTransport implements GameTransport {
   }
   private sendRaw(command: ClientCommand): void {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) throw new Error('WebSocket not connected')
+    if (command.requestId) markRequest(command.requestId)
     this.ws.send(JSON.stringify(command))
   }
   getHistory(cursor?: string): Promise<RoomHistoryPage> {

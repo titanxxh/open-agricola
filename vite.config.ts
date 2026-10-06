@@ -60,6 +60,10 @@ export default defineConfig({
       allow: ['..'],
     },
     proxy: {
+      '/ops': {
+        target: `http://${process.env.BACKEND_HOST || 'localhost'}:${process.env.BACKEND_PORT || '5175'}`,
+        changeOrigin: true,
+      },
       '/api': {
         target: `http://${process.env.BACKEND_HOST || 'localhost'}:${process.env.BACKEND_PORT || '5175'}`,
         changeOrigin: true,

@@ -424,6 +424,8 @@ export function SettingsPage() {
         </Section>
       ) : null}
 
+      {user?.isAdmin && <Section icon="📊" title={t('platform.operationsTitle')} variant="parchment"><button className="btn btn-primary" onClick={() => setPage('operations')}>{t('platform.operationsTitle')}</button></Section>}
+
       {user?.isAdmin && (
         <Section icon="🎟️" title={t('platform.adminInvites')} variant="parchment">
           <div className="settings-form">

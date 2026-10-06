@@ -1,5 +1,6 @@
+import { transferSnapshotObservation, snapshotCommitted } from '../services/observability'
 import type { HistoryWindow } from '../../shared/contract/protocol/history'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { PlayerScoreSummary } from '../../shared/domain'
 import type { ClientInteractionState, GameSyncPayload, PrivateGameEvent } from '../../shared/contract/protocol/game'
 import { rehydrateStateForClient, type ClientGameState } from '../services/rehydrate'
@@ -28,6 +29,8 @@ export const useGameSync = () => {
     return () => { mountedRef.current = false }
   }, [])
 
+  useLayoutEffect(() => { if (state) snapshotCommitted(state) }, [state])
+
   const applySnapshot = useCallback((payload: GameSyncPayload) => {
     if (!mountedRef.current) return
     // Register custom card metadata for frontend display.
@@ -37,6 +40,7 @@ export const useGameSync = () => {
       }
     }
     const hydrated = rehydrateStateForClient(payload.state)
+    transferSnapshotObservation(payload.state, hydrated)
     setState(hydrated)
     setInteraction(payload.interaction)
     setScores(payload.scores ?? null)

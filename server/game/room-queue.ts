@@ -1,3 +1,5 @@
+import { operationsMetrics, safe } from '../observability/metrics'
+import { performance } from 'node:perf_hooks'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import type { Room } from './room.ts'
 
@@ -5,6 +7,11 @@ import type { Room } from './room.ts'
 // Nested lifecycle operations may reuse locks already held by their command.
 const queues = new WeakMap<object, Promise<void>>()
 const active = new Set<Promise<void>>()
+const waiting = new Map<object, number>()
+const updateQueue = () => safe(() => {
+  operationsMetrics.queueDepth.set(waiting.size)
+  operationsMetrics.queuedAt.set(waiting.size ? Math.min(...waiting.values()) : 0)
+})
 const held = new AsyncLocalStorage<{ keys: ReadonlySet<object>; active: boolean }>()
 
 export function enqueueRoomWork<T>(keys: readonly object[], work: () => T | Promise<T>): Promise<T> {
@@ -14,7 +21,14 @@ export function enqueueRoomWork<T>(keys: readonly object[], work: () => T | Prom
   if (current && unique.every(key => current.has(key))) return Promise.resolve().then(work)
   if (current) throw new Error('Nested room work must not acquire additional locks')
   const predecessors = unique.map(key => queues.get(key)).filter(value => value !== undefined)
+  const observation = {}
+  const start = performance.now()
+  waiting.set(observation, Date.now() / 1000)
+  updateQueue()
   const result = Promise.all(predecessors).then(async () => {
+    waiting.delete(observation)
+    updateQueue()
+    safe(() => operationsMetrics.operationDuration.observe({ stage: 'queue', outcome: 'ok' }, (performance.now() - start) / 1000))
     const scope = { keys: new Set(unique), active: true }
     try { return await held.run(scope, work) } finally { scope.active = false }
   })

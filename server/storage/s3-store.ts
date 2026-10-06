@@ -1,3 +1,4 @@
+import { measure, operationsMetrics, safe } from '../observability/metrics'
 import { createHash } from 'node:crypto'
 import {
   DeleteObjectCommand, GetObjectCommand, ListObjectsV2Command, PutObjectCommand, S3Client,
@@ -37,6 +38,14 @@ export class S3ObjectStore {
   }
 
   async get(key: string): Promise<StoredObject | null> {
+    return measure('s3_get', async () => {
+      const result = await this.getBody(key)
+      if (result) safe(() => operationsMetrics.s3Bytes.inc({ kind: 'get' }, result.body.length))
+      return result
+    })
+  }
+
+  private async getBody(key: string): Promise<StoredObject | null> {
     try {
       const result = await this.client.send(new GetObjectCommand({ Bucket: this.bucket, Key: this.prefix + key }))
       if (!result.Body || !result.ETag) throw new Error('Object store returned incomplete content')
@@ -48,6 +57,14 @@ export class S3ObjectStore {
   }
 
   async putImmutable(key: string, body: Buffer, contentType: string): Promise<void> {
+    return measure('s3_put', async () => {
+      const result = await this.putImmutableBody(key, body, contentType)
+      safe(() => operationsMetrics.s3Bytes.inc({ kind: 'put' }, body.length))
+      return result
+    })
+  }
+
+  private async putImmutableBody(key: string, body: Buffer, contentType: string): Promise<void> {
     try {
       await this.client.send(new PutObjectCommand({ Bucket: this.bucket, Key: this.prefix + key, Body: body, ContentType: contentType, IfNoneMatch: '*' }))
     } catch (error) {
@@ -59,6 +76,14 @@ export class S3ObjectStore {
 
   /** CAS for the independent erasure ledger. null means create only. */
   async replace(key: string, body: Buffer, previousEtag: string | null): Promise<string> {
+    return measure('s3_put', async () => {
+      const result = await this.replaceBody(key, body, previousEtag)
+      safe(() => operationsMetrics.s3Bytes.inc({ kind: 'put' }, body.length))
+      return result
+    })
+  }
+
+  private async replaceBody(key: string, body: Buffer, previousEtag: string | null): Promise<string> {
     try {
       const result = await this.client.send(new PutObjectCommand({
         Bucket: this.bucket, Key: this.prefix + key, Body: body, ContentType: 'application/json',
@@ -73,6 +98,13 @@ export class S3ObjectStore {
   }
 
   async delete(key: string): Promise<void> {
+    return measure('s3_delete', async () => {
+      const result = await this.deleteBody(key)
+      return result
+    })
+  }
+
+  private async deleteBody(key: string): Promise<void> {
     await this.client.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: this.prefix + key }))
   }
 

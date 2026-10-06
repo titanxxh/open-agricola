@@ -16,7 +16,7 @@ type StoredSnapshot = { state: StoredState; rawFrameHash: string; sessionCursor:
 )
 type NodeRow = { node_id: string; kind: HistoryStreamKind; previous_id: string | null; length: number; record_json: string; identity_json: string; checksum: string }
 export type RecoveryNode = { id: string; kind: 'undo' | 'checkpoint'; json: string }
-export type PackedRoomSnapshot = { json: string; nodes: HistoryNode[]; recoveryNodes: RecoveryNode[] }
+export type PackedRoomSnapshot = { writtenBytes?: { history_nodes: number; recovery_nodes: number }; json: string; nodes: HistoryNode[]; recoveryNodes: RecoveryNode[] }
 export class RoomHistoryCorruptionError extends Error {}
 const checksum = (row: object): string => createHash('sha256').update(JSON.stringify(row)).digest('hex')
 
@@ -120,15 +120,19 @@ export class RoomHistoryStore {
     }
     return { json: encodeRoomBody(JSON.stringify(stored), queryFields), nodes, recoveryNodes }
   }
-  async write(roomId: string, nodes: HistoryNode[], recoveryNodes: RecoveryNode[] = []): Promise<Awaited<void>> {
+  async write(roomId: string, nodes: HistoryNode[], recoveryNodes: RecoveryNode[] = []): Promise<{ history_nodes: number; recovery_nodes: number }> {
+    const bytes = { history_nodes: 0, recovery_nodes: 0 }
     for (const node of nodes) {
       const row = { node_id: node.id, kind: node.kind, previous_id: node.previous?.id ?? null, length: node.length, record_json: JSON.stringify(node.value), identity_json: JSON.stringify(node.identity) }
-      ;(await this.insert.run({ roomId, ...row, checksum: checksum(row) }))
+      const result = await this.insert.run({ roomId, ...row, checksum: checksum(row) })
+      if (result.changes) bytes.history_nodes += Buffer.byteLength(row.record_json) + Buffer.byteLength(row.identity_json)
     }
     for (const node of recoveryNodes) {
       const row = { node_id: node.id, kind: node.kind, body_json: node.json }
-      ;(await this.insertRecovery.run({ roomId, ...row, checksum: checksum(row) }))
+      const result = await this.insertRecovery.run({ roomId, ...row, checksum: checksum(row) })
+      if (result.changes) bytes.recovery_nodes += Buffer.byteLength(row.body_json)
     }
+    return bytes
   }
   accept(roomId: string, nodes: HistoryNode[], recoveryNodes: RecoveryNode[] = []): void {
     const known = this.durable.get(roomId) ?? new Set<string>()

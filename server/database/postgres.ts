@@ -1,3 +1,5 @@
+import { performance } from 'node:perf_hooks'
+import { measure, operationsMetrics, safe, observeDatabaseError } from '../observability/metrics'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { Pool, types, type PoolClient, type PoolConfig, type QueryResultRow } from 'pg'
 
@@ -59,11 +61,17 @@ export class PostgresDatabase {
       await transaction.nested
       if (!transaction.active) throw new Error('Query escaped its transaction')
     }
-    return (transaction?.client ?? this.pool).query<Row>(sql, values)
+    try { return await measure('db_query', () => (transaction?.client ?? this.pool).query<Row>(sql, values)) }
+    catch (error) { observeDatabaseError(error); throw error }
   }
 
   async exec(sql: string): Promise<void> {
     await this.query(sql)
+  }
+
+  private async transactionControl(client: PoolClient, sql: string): Promise<void> {
+    try { await client.query(sql) }
+    catch (error) { observeDatabaseError(error); throw error }
   }
 
   prepare(sql: string) {
@@ -93,43 +101,51 @@ export class PostgresDatabase {
           if (!parent.active) throw new Error('Transaction already completed')
           const savepoint = `nested_${++parent.sequence.value}`
           const child: Transaction = { client: parent.client, active: true, sequence: parent.sequence, nested: Promise.resolve() }
-          await parent.client.query(`SAVEPOINT ${savepoint}`)
+          await this.transactionControl(parent.client, `SAVEPOINT ${savepoint}`)
           try {
             const result = await this.current.run(child, () => work(...args))
             await child.nested
             child.active = false
-            await parent.client.query(`RELEASE SAVEPOINT ${savepoint}`)
+            await this.transactionControl(parent.client, `RELEASE SAVEPOINT ${savepoint}`)
             return result
           } catch (error) {
             await child.nested
             child.active = false
-            await parent.client.query(`ROLLBACK TO SAVEPOINT ${savepoint}`)
-            await parent.client.query(`RELEASE SAVEPOINT ${savepoint}`)
+            await this.transactionControl(parent.client, `ROLLBACK TO SAVEPOINT ${savepoint}`)
+            await this.transactionControl(parent.client, `RELEASE SAVEPOINT ${savepoint}`)
             throw error
           }
         })
         parent.nested = pending.then(() => {}, () => {})
         return await pending
       }
-      const client = await this.pool.connect()
+      const client = await measure('db_pool_wait', () => this.pool.connect()).catch(error => { observeDatabaseError(error); throw error })
+      const started = performance.now()
+      let outcome = 'error'
       const transaction: Transaction = { client, active: true, sequence: { value: 0 }, nested: Promise.resolve() }
       try {
-        await client.query('BEGIN')
+        await this.transactionControl(client, 'BEGIN')
         const result = await this.current.run(transaction, () => work(...args))
         await transaction.nested
         transaction.active = false
-        await client.query('COMMIT')
+        await this.transactionControl(client, 'COMMIT')
+        outcome = 'ok'
         return result
       } catch (error) {
         await transaction.nested
         transaction.active = false
-        await client.query('ROLLBACK')
+        await this.transactionControl(client, 'ROLLBACK')
         throw error
       } finally {
         transaction.active = false
         client.release()
+        safe(() => operationsMetrics.operationDuration.observe({ stage: 'db_transaction', outcome }, (performance.now() - started) / 1000))
       }
     }
+  }
+
+  observation(): Record<string, number> {
+    return { db_pool_total: this.pool.totalCount, db_pool_idle: this.pool.idleCount, db_pool_busy: this.pool.totalCount - this.pool.idleCount, db_pool_waiting: this.pool.waitingCount }
   }
 
   assertInTransaction(): void {

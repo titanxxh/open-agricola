@@ -1,3 +1,4 @@
+import { operationsMetrics, safe } from '../observability/metrics'
 import { importRecoveryCatalog, snapshotForWorker } from '../../shared/session/recovery-catalog'
 import { Worker } from 'node:worker_threads'
 import path from 'node:path'
@@ -25,7 +26,10 @@ const WORKER_SCRIPT = path.resolve(
 )
 const COMMAND_TIMEOUT_MS = 10_000
 const MAX_CUSTOM_SESSION_WORKER_SLOTS = 15
+let pendingWorkers = 0
+let busyWorkers = 0
 const activeSessionWorkers = new Set<CustomSessionExecutor>()
+export const workerObservation = () => ({ workers_pending: pendingWorkers, workers_busy: busyWorkers, workers_active: activeSessionWorkers.size, workers_reserved: reservedSessionWorkers.size, workers_capacity: MAX_CUSTOM_SESSION_WORKER_SLOTS })
 const reservedSessionWorkers = new Set<CustomSessionExecutor>()
 
 const claimedSessionWorkers = (): Set<CustomSessionExecutor> =>
@@ -223,7 +227,11 @@ export class CustomSessionExecutor {
   }
 
   private enqueue<T>(run: () => Promise<T>): Promise<T> {
-    const result = this.queue.then(run)
+    pendingWorkers++
+    const result = this.queue.then(async () => {
+      pendingWorkers--; busyWorkers++
+      try { return await run() } finally { busyWorkers-- }
+    })
     this.queue = result.then(() => undefined, () => undefined)
     return result
   }
@@ -354,6 +362,7 @@ export class CustomSessionExecutor {
       const timer = setTimeout(() => {
         cleanup()
         reset()
+        safe(() => operationsMetrics.workerFailures.inc({ kind: 'timeout' }))
         const warning = 'custom session command timed out'
         if (!this.session.cardWarnings.includes(warning)) this.session.cardWarnings.push(warning)
         reject(new Error(warning))

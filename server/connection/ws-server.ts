@@ -1,3 +1,4 @@
+import { operationsMetrics, safe } from '../observability/metrics'
 import { selectDevelopmentRoom } from '../game/development-room-slots'
 import type { InvalidationOperation } from '../invalidation'
 import { randomUUID } from 'node:crypto'
@@ -267,8 +268,9 @@ const handleConnection = async (ws: WebSocket, req: IncomingMessage, deps: Conne
   }
 
   const onMessage = async (raw: Buffer): Promise<void> => {
+    safe(() => operationsMetrics.incomingBytes.inc(raw.byteLength))
     let msg: ClientCommand
-    try { msg = JSON.parse(raw.toString()) as ClientCommand } catch { return }
+    try { msg = JSON.parse(raw.toString()) as ClientCommand } catch { safe(() => operationsMetrics.socketErrors.inc({ kind: 'parse' })); return }
     if (!ctx.authenticated && msg.type !== 'auth') {
       deps.broadcaster.sendTo(ws, {
         type: 'error',
@@ -331,6 +333,7 @@ const handleConnection = async (ws: WebSocket, req: IncomingMessage, deps: Conne
 // ── Public entry ─────────────────────────────────────────────────────────────
 
 export type CreateWsServerResult = {
+  observation: () => { users: string[]; values: Record<string, number> }
   wss: WebSocketServer
   registry: RoomRegistry
   broadcaster: Broadcaster
@@ -501,6 +504,10 @@ export async function createWsServer(
 
   return {
     wss,
+    observation: () => {
+      const users = [...activeUserSockets].filter(([, sockets]) => [...sockets].some(socket => socket.readyState === socket.OPEN)).map(([user]) => user)
+      return { users, values: { connections: wss.clients.size, online_users_local: users.length, ws_buffered_bytes: [...wss.clients].reduce((sum, socket) => sum + socket.bufferedAmount, 0), ...committer?.observation() } }
+    },
     authority,
     registry,
     broadcaster,
