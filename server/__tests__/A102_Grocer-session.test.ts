@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { getCardStack } from '../../shared/cards/helpers/card-state'
+import { expectPublicCardGoods } from './_helpers/card-public-presentation'
 
 import '../../shared/cards/A/A102_Grocer'
 import type { AnytimeAction } from '../../shared/contract/types';
@@ -40,6 +41,7 @@ describe('A102_Grocer session', () => {
       'vegetable', 'reed', 'clay', 'vegetable', 'stone', 'reed', 'grain', 'wood',
     ])
     expect(stack.length).toBe(8)
+    expectPublicCardGoods(session, 'A102_Grocer', { stack })
   })
 
   it('anytime action appears during active interaction with food and non-empty stack', () => {
@@ -103,6 +105,7 @@ describe('A102_Grocer session', () => {
     const stack = getCardStack(updatedPlayer, 'A102_Grocer')
     expect(stack.length).toBe(7)
     expect(stack[stack.length - 1]).toBe('grain')
+    expectPublicCardGoods(session, 'A102_Grocer', { stack })
   })
 
   it('second take: gain grain (new top after first take)', () => {
@@ -154,6 +157,7 @@ describe('A102_Grocer session', () => {
     expect(updatedPlayer.resources.food).toBe(2) // 10 - 8
     const stack = getCardStack(updatedPlayer, 'A102_Grocer')
     expect(stack.length).toBe(0)
+    expectPublicCardGoods(session, 'A102_Grocer', { stack: [] })
 
     // Verify anytime is no longer available after stack is drained
     const anytimeIds = lastResp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)

@@ -57,6 +57,7 @@ export const A102_Grocer = defineOccupationCard({
     cost: {},
     players: '1+',
   },
+  presentation: { stack: true },
   impl: cardImpl,
 })
 

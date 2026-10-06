@@ -30,6 +30,9 @@ describe('generic Card State architecture boundaries', () => {
     "const read = readCardExtraData; read(player, 'M084_BogPony', 'lyingHorseCount')",
     "import { readCardExtraData as read } from '../cards/helpers/card-state'; read(player, 'C146_WorkshopAssistant', 'pairs')",
     "if (request.promptKey === 'ui.interactionMoonshineChoice') return disabledError",
+    "if (String(view.promptKey) === 'cards.B003_Moonshine.choice') return disabledError",
+    "const key = String(request['promptKey']); if (key.startsWith('ui.interactionHideFarmer')) allow()",
+    "switch (String(request.promptKey)) { case 'ui.interactionMoonshineChoice': return disabledError }",
     "const key = request.promptKey; const prefix = 'ui.interactionHideFarmer'; if (key.startsWith(prefix)) allow()",
     "switch (request.promptKey) { case 'ui.interactionMoonshineChoice': return disabledError }",
     "import { readPony } from '../cards/M/M084_BogPony-state'",
@@ -53,6 +56,7 @@ describe('generic Card State architecture boundaries', () => {
     "const metadata = getCard('B085_FarmHand').name; const art = 'B085_FarmHand.png'",
     "const options = { promptKey: 'ui.interactionMoonshineChoice' }",
     "if (request.promptKey === 'ui.interactionStableSelect') render()",
+    "if (String(request.promptKey) === 'ui.interactionStableSelect') render()",
     '// player.cardStates.B085_FarmHand.extraData.position\nconst valid = true',
     'for (const [source, facts] of Object.entries(player.cardStatePresentation)) render(facts.counters)',
   ])('accepts generic facts and static metadata: %s', (code) => expect(scan(code)).toEqual([]))

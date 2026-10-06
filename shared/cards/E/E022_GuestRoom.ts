@@ -88,6 +88,7 @@ export const E022_GuestRoom = defineMinorCard({
     cost: { wood: 4, reed: 1 },
     category: 'FARMYARD_-_PLACE_FOR_PERSON',
   },
+  presentation: { stack: true },
   impl: cardImpl,
 })
 

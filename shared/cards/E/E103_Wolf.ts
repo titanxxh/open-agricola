@@ -93,6 +93,7 @@ export const E103_Wolf = defineOccupationCard({
     players: '1+',
     category: 'GOODS_-_GET',
   },
+  presentation: { stack: true },
   impl: cardImpl,
 })
 

@@ -86,6 +86,7 @@ export const A144_Sequestrator = defineOccupationCard({
     cost: {},
     players: "3+",
   },
+  presentation: { counters: ['reed', 'clay'] },
   impl: cardImpl,
 })
 

@@ -49,6 +49,7 @@ export const E040_BeeStatue = defineMinorCard({
     cost: { clay: 2 },
     players: '1+',
   },
+  presentation: { stack: true },
   impl: cardImpl,
 })
 

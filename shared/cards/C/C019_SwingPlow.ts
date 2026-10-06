@@ -76,6 +76,7 @@ export const C019_SwingPlow = defineMinorCard({
     prerequisite: '3 Occupations',
     occupationPrerequisites: { min: 3 },
   },
+  presentation: { stack: true },
   impl: cardImpl,
 })
 

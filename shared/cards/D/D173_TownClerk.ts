@@ -48,6 +48,7 @@ export const D173_TownClerk = defineOccupationCard({
     cost: {},
     players: '5+',
   },
+  presentation: { counters: ['food'] },
   impl: cardImpl,
 })
 

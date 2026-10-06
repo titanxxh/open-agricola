@@ -1392,7 +1392,9 @@ export function engineProceed(
         void _exhaustive
         choiceOptions = []
       }
-      if (node.anytimeWindow !== undefined) {
+      // An optional leaf owns its accept/skip window. Its execution may reuse
+      // this node for a payment choice, which must declare its own window.
+      if (node.optional !== true && node.anytimeWindow !== undefined) {
         updatedRequest = { ...updatedRequest, anytimeWindow: node.anytimeWindow }
       }
       applyInteractionRequest(int, {

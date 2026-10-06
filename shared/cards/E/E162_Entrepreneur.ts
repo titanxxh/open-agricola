@@ -98,6 +98,7 @@ export const E162_Entrepreneur = defineOccupationCard({
     players: '4+',
     category: 'BUILDING_RESOURCES',
   },
+  presentation: { stack: true },
   impl: cardImpl,
 })
 

@@ -76,6 +76,7 @@ export const A081_InterimStorage = defineMinorCard({
     desc: ["Each time you use a <CLAY>/<REED>/<STONE> accumulation space, place 1 <WOOD>/<CLAY>/<REED> on this card. At the start of rounds 7, 11, and 14, move all the goods on this card to your supply."],
     cost: {"food":2},
   },
+  presentation: { counters: ['wood', 'clay', 'reed'] },
   impl: cardImpl,
 })
 

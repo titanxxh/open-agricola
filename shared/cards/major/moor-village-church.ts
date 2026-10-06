@@ -41,5 +41,6 @@ export const Major_Moor_VillageChurch = defineMajorCard({
       'Immediately gain 2<FOOD>.',
     ],
   } satisfies CardSourceMetaInput,
+  presentation: { counters: ['bonusVp'] },
   impl: cardImpl,
 })

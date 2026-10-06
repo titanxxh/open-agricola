@@ -54,6 +54,7 @@ export const C172_FieldCounter = defineOccupationCard({
     cost: {},
     players: '5+',
   },
+  presentation: { counters: ['food'] },
   impl: cardImpl,
 })
 

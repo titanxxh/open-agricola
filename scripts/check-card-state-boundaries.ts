@@ -100,6 +100,10 @@ export const scanCardStateSource = (source: ts.SourceFile, file: string, cardPro
   )
   const prompt = (value: ts.Expression): boolean => {
     const resolved = resolve(value)
+    if (ts.isCallExpression(resolved)) {
+      const callee = resolve(resolved.expression)
+      if (ts.isIdentifier(callee) && callee.text === 'String' && resolved.arguments.length === 1) return prompt(resolved.arguments[0]!)
+    }
     return member(resolved) === 'promptKey' || ts.isIdentifier(resolved) && resolved.text === 'promptKey'
   }
   const comparisons = new Set([ts.SyntaxKind.EqualsEqualsToken, ts.SyntaxKind.EqualsEqualsEqualsToken, ts.SyntaxKind.ExclamationEqualsToken, ts.SyntaxKind.ExclamationEqualsEqualsToken])

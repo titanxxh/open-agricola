@@ -78,6 +78,7 @@ export const D020_TurnwrestPlow = defineMinorCard({
     prerequisite: '2 Occupations',
     occupationPrerequisites: { min: 2 },
   },
+  presentation: { stack: true },
   impl: cardImpl,
 })
 

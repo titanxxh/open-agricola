@@ -56,6 +56,7 @@ export const B083_MuddyPuddles = defineMinorCard({
     cost: { clay: 2 },
     players: '1+',
   },
+  presentation: { stack: true },
   impl: cardImpl,
 })
 
