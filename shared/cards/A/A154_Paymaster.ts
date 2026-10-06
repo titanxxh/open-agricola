@@ -71,6 +71,7 @@ export const A154_Paymaster = defineOccupationCard({
     players: '4+',
     extraVp: true,
   },
+  presentation: { counters: ['bonusVp'] },
   impl: cardImpl,
 })
 

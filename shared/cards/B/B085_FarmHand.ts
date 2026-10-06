@@ -147,6 +147,12 @@ const cardImpl = {
       const position = readFarmHandPosition(player)
       return position ? [position] : []
     },
+    returnSpecialStable: (player, position) => {
+      const standing = readFarmHandPosition(player)
+      if (!standing || positionKey(standing) !== positionKey(position)) return false
+      writeCardExtraData(player, CARD_ID, POSITION_KEY, undefined)
+      return true
+    },
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl

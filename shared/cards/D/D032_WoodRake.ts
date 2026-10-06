@@ -40,6 +40,7 @@ export const D032_WoodRake = defineMinorCard({
     cost: { wood: 1 },
     extraVp: true,
   },
+  presentation: { counters: ['bonusVp'] },
   impl: cardImpl,
 })
 

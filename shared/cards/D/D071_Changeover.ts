@@ -87,6 +87,7 @@ const cardImpl = {
 } satisfies CardImpl
 
 export const D071_Changeover = defineMinorCard({
+  presentation: { stack: true },
   meta: {
     id: CARD_ID,
     name: 'Changeover',

@@ -41,6 +41,7 @@ describe('D168_Stockman session', () => {
     // is the 2nd stable -> gains 1 cattle.
     const result = runAfterStables((player) => {
       player.stableTiles = [{ row: 2, col: 2 }]
+      player.occupationPlayed.push('B085_FarmHand')
       player.cardStates = {
         __actionSnapshot__: { extraData: { stableTiles: 1 } },
         B085_FarmHand: { extraData: { position: { row: 0, col: 0 } } },

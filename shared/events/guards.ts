@@ -546,7 +546,7 @@ const assertKnownEventDetails = (type: string, event: Record<string, unknown>): 
       assertStringField(event.cardId, 'cardId')
       assertStringField(event.key, 'key')
       assertStringField(event.targetPlayerId, 'targetPlayerId')
-      assertPublicCardStateValue(event.value, 'card.stateChanged.value')
+      if (event.value !== undefined) assertPublicCardStateValue(event.value, 'card.stateChanged.value')
       return
     case 'card.infoboxChanged':
       assertStringField(event.cardId, 'cardId')

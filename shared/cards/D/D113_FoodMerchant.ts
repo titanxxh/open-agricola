@@ -47,6 +47,7 @@ const cardImpl = {
 } satisfies CardImpl
 
 export const D113_FoodMerchant = defineOccupationCard({
+  presentation: { stack: true },
   meta: {
     id: CARD_ID,
     name: 'Food Merchant',

@@ -128,6 +128,7 @@ describe('D102_SampleStableMaker card effect', () => {
   it('offers the B85 FarmHand tile as a selection candidate', () => {
     const player = createOwner()
     player.stableTiles = []
+    if (!player.occupationPlayed.includes('B085_FarmHand')) player.occupationPlayed.push('B085_FarmHand')
     player.cardStates = {
       B085_FarmHand: { extraData: { position: { row: 2, col: 1 } } },
     }
@@ -142,6 +143,7 @@ describe('D102_SampleStableMaker card effect', () => {
     const player = createOwner()
     player.occupationPlayed.push('B085_FarmHand')
     player.stableTiles = []
+    if (!player.occupationPlayed.includes('B085_FarmHand')) player.occupationPlayed.push('B085_FarmHand')
     player.cardStates = {
       B085_FarmHand: {
         flagged: true,
@@ -177,6 +179,7 @@ describe('D102_SampleStableMaker card effect', () => {
       { row: 1, col: 0 },
       { row: 2, col: 0 },
     ]
+    if (!player.occupationPlayed.includes('B085_FarmHand')) player.occupationPlayed.push('B085_FarmHand')
     player.cardStates = {
       B085_FarmHand: {
         flagged: true,

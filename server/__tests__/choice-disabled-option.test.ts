@@ -95,7 +95,7 @@ describe('disabled option in pending choice', () => {
     // Attempt to resolve with the disabled option → should be rejected before dispatch.
     resp = session.resolveChoice(0, firstOption.value)
     expect(resp.ok).toBe(false)
-    expect(resp.error).toBe('invalid choice value')
+    expect(resp.error).toBe('choice disabled')
   })
 
   it('still allows resolveChoice on a non-disabled option when another is disabled', () => {

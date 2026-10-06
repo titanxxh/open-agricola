@@ -161,7 +161,6 @@ describe('stage hook flows', () => {
         type: 'card.stateChanged',
         cardId: 'E100_MuseumCaretaker',
         key: 'bonusVp',
-        value: 1,
       }),
     ]))
     expect(resp.state.events.filter((event) => event.type === 'round.started')).toHaveLength(1)

@@ -36,6 +36,7 @@ export const A035_SwimmingClass = defineMinorCard({
     occupationPrerequisites: { min: 2 },
     extraVp: true,
   },
+  presentation: { counters: ['bonusVp'] },
   impl: cardImpl,
 })
 

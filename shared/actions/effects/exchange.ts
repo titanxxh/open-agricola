@@ -792,7 +792,7 @@ export const anytimeExchangeAction: ActionDefinition = {
 
     return {
       type: 'request' as const,
-      request: { kind: 'choice' as const, options: filtered, structuredChoicePrefixes: ['bulk:'] },
+      request: { kind: 'choice' as const, options: filtered, structuredChoicePrefixes: ['bulk:'], anytimeWindow: { allowed: true as const, blockedIds: ['exchange'] } },
       promptKey: 'ui.interactionExchangeChoice',
     }
   },

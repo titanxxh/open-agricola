@@ -1,4 +1,7 @@
 import { importRecoveryCatalog } from './recovery-catalog'
+import type { CardStatePresentation } from '../contract/card-state'
+import { collectCardStatePresentation } from '../cards/card-state-presentation'
+import { projectParentCardState } from '../parents/father-completion'
 import type { RecoveryHistoryCatalog } from './recovery-catalog'
 import { captureStateWithHistory } from './history-streams'
 import type {
@@ -38,6 +41,7 @@ export type SerializedActionSpace = Omit<
  * never enter `PlayerState`.
  */
 export type SerializedPlayerState = PlayerState & {
+  cardStatePresentation: Record<string, CardStatePresentation>
   moorSpecialActionAvailability: Record<string, Partial<Record<MoorSpecialActionId, boolean>> & { cardUsable: boolean }>
   lockedFarmTileKeys: string[]
   playerPanelSummary: PlayerPanelSupplySummary
@@ -178,6 +182,7 @@ const serializePlayerDisplayFields = (
   const zones = computeAnimalZones(player, state)
   return {
     moorSpecialActionAvailability,
+    cardStatePresentation: { ...collectCardStatePresentation(player), ...projectParentCardState(player) },
     lockedFarmTileKeys,
     playerPanelSummary,
     specialStables,
@@ -295,6 +300,7 @@ export const rehydrateState = (
       specialStables: _specialStables,
       playedCardAnimalZones: _playedCardAnimalZones,
       farmCardAnimalZones: _farmCardAnimalZones,
+      cardStatePresentation: _cardStatePresentation,
       borrowedPlayedCardAnimalZones: _borrowedPlayedCardAnimalZones,
       pastureCapacities: _pastureCapacities,
       ...player

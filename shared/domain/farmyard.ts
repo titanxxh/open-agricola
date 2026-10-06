@@ -17,7 +17,7 @@ import {
   parseEdgeId,
   positionKey,
 } from '../domain/farm.ts'
-import { ANIMAL_KEYS, readAnimalHolderCounts } from './animal-holder-state.ts'
+import { ANIMAL_KEYS } from './animal-holder-state.ts'
 import { ALL_ANIMAL_KEYS, type AnimalKey } from '../contract/animals.ts'
 import { computePasturesFromFences, type Pasture as PastureView } from './pasture.ts'
 import { isOwnOrdinaryFenceSegment } from './fence-segments.ts'
@@ -54,7 +54,6 @@ type PlayerFarmAnimalState = PlayerFarmState & {
   houseAnimalType?: FarmAnimalType | null
   houseAnimalCount?: number
   stableAnimals?: Record<string, FarmAnimalType | null>
-  cardStates?: PlayerState['cardStates']
 }
 
 export type PlayerFarmState = {
@@ -161,6 +160,8 @@ export type FenceValidationOptions = {
   ordinaryFenceBuildLimit?: number
   availableOrdinaryFenceTokens?: number
   fenceSources?: Record<string, string>
+  /** Authoritative zone aggregation supplied by PlayerBoard, independent of card storage. */
+  nonPastureAnimalCounts?: Partial<Record<AnimalKey, number>>
   pastureBounds?: {
     newPastures?: Bounds
     changedPastures?: Bounds
@@ -365,15 +366,6 @@ const animalTypesForPlayer = (player: PlayerFarmAnimalState): readonly AnimalKey
     ? ALL_ANIMAL_KEYS
     : ANIMAL_KEYS
 
-const countPastureAnimals = (player: PlayerFarmAnimalState) => {
-  const totals: Partial<Record<FarmAnimalType, number>> = { sheep: 0, boar: 0, cattle: 0 }
-  for (const pasture of player.pastures ?? []) {
-    if (!pasture.animalType || pasture.animalCount <= 0) continue
-    totals[pasture.animalType] = (totals[pasture.animalType] ?? 0) + pasture.animalCount
-  }
-  return totals
-}
-
 const countNonPastureAnimals = (player: PlayerFarmAnimalState) => {
   const totals: Partial<Record<FarmAnimalType, number>> = { sheep: 0, boar: 0, cattle: 0 }
   if (player.houseAnimalType && (player.houseAnimalCount ?? 0) > 0) {
@@ -382,33 +374,16 @@ const countNonPastureAnimals = (player: PlayerFarmAnimalState) => {
   Object.values(player.stableAnimals ?? {}).forEach((animal) => {
     if (animal) totals[animal] = (totals[animal] ?? 0) + 1
   })
-  Object.values(player.cardStates ?? {}).forEach((cardState) => {
-    const counts = readAnimalHolderCounts(cardState?.extraData)
-    for (const key of ALL_ANIMAL_KEYS) {
-      const amount = counts[key] ?? 0
-      if (amount > 0) totals[key] = (totals[key] ?? 0) + amount
-    }
-  })
-  const c148Held = player.cardStates?.C148_MudWallower?.counters?.held ?? 0
-  if (c148Held > 0) {
-    const pastureTotals = countPastureAnimals(player)
-    const availableBoars = Math.max(
-      0,
-      (player.resources?.boar ?? 0) -
-        (pastureTotals.boar ?? 0) -
-        (totals.boar ?? 0),
-    )
-    totals.boar = (totals.boar ?? 0) + Math.min(Math.floor(c148Held), availableBoars)
-  }
   return totals
 }
 
 const enforcePastureAnimalCapacity = (
   player: PlayerFarmState,
   sourcePlayer: PlayerFarmState = player,
+  assignedNonPastureAnimals?: Partial<Record<AnimalKey, number>>,
 ) => {
   const sourceAnimalPlayer = sourcePlayer as PlayerFarmAnimalState
-  const nonPastureTotals = countNonPastureAnimals(sourceAnimalPlayer)
+  const nonPastureTotals = assignedNonPastureAnimals ?? countNonPastureAnimals(sourceAnimalPlayer)
   const animalTypes = animalTypesForPlayer(sourceAnimalPlayer)
   const totals: Partial<Record<FarmAnimalType, number>> = {}
   for (const animalType of animalTypes) {
@@ -1330,7 +1305,7 @@ export const validateFenceSelection = <T extends PlayerFarmState>(
     fenceSegments: [...(normalized.fenceSegments ?? []), ...newSegments],
     pastures,
   }
-  enforcePastureAnimalCapacity(updated, normalized)
+  enforcePastureAnimalCapacity(updated, normalized, options.nonPastureAnimalCounts)
   if (options.preserveAnimalTotals) {
     const animalTotalsAfter = {
       sheep: updated.resources?.sheep ?? 0,
@@ -1412,10 +1387,16 @@ export type FenceSpec = {
 export class Farmyard {
   private readonly player: PlayerState
   private readonly state: Readonly<GameState>
+  private readonly nonPastureAnimalCounts?: () => Partial<Record<AnimalKey, number>>
 
-  constructor(player: PlayerState, state: Readonly<GameState>) {
+  constructor(
+    player: PlayerState,
+    state: Readonly<GameState>,
+    nonPastureAnimalCounts?: () => Partial<Record<AnimalKey, number>>,
+  ) {
     this.player = player
     this.state = state
+    this.nonPastureAnimalCounts = nonPastureAnimalCounts
   }
 
   /** Underlying state (escape hatch for downstream migrations). */
@@ -1446,15 +1427,18 @@ export class Farmyard {
 
   /** Validate a fence-build spec (edges + optional palisades). */
   canBuildFence(spec: FenceSpec): FenceValidationResult<PlayerState> {
+    const options = {
+      ...(spec.options ?? {}),
+      ...(spec.fenceSources === undefined ? {} : { fenceSources: spec.fenceSources }),
+      ...(this.nonPastureAnimalCounts ? { nonPastureAnimalCounts: this.nonPastureAnimalCounts() } : {}),
+    }
     return validateFenceSelection(
       this.player,
       spec.edges,
       spec.palisadeEdges ?? [],
       spec.extraWood ?? 0,
       spec.freeFences ?? 0,
-      spec.fenceSources === undefined
-        ? (spec.options ?? {})
-        : { ...(spec.options ?? {}), fenceSources: spec.fenceSources },
+      options,
       spec.lockedKeys,
     )
   }

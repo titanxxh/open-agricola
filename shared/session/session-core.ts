@@ -758,13 +758,12 @@ export class GameCore {
   /** @internal — derive policy input from the current pending envelope. */
   private getAnytimePolicyInput(): AnytimePolicyInput {
     const view = this.engineStack.peekPendingView()
-    const promptKey = view?.promptKey
     const request = view?.request
     return {
       hasActiveContext: !!this.getActiveInteractionContext(),
       stageResume: this.stageResume,
       interactionKind: request?.kind,
-      promptKey,
+      anytimeWindow: request?.anytimeWindow,
     }
   }
 

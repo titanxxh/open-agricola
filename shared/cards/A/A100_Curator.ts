@@ -43,6 +43,7 @@ export const A100_Curator = defineOccupationCard({
     evenMoreSet: true,
     extraVp: true,
   },
+  presentation: { counters: ['bonusVp'] },
   impl: cardImpl,
 })
 

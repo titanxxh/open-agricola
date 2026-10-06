@@ -40,6 +40,7 @@ export const E098_Prodigy = defineOccupationCard({
     players: '1+',
     extraVp: true,
   },
+  presentation: { counters: ['bonusVp'] },
   impl: cardImpl,
 })
 

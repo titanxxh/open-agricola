@@ -36,6 +36,7 @@ export const B033_Mantlepiece = defineMinorCard({
     extraVp: true,
     blocksRenovation: true,
   },
+  presentation: { counters: ['bonusVp'] },
   impl: cardImpl,
 })
 

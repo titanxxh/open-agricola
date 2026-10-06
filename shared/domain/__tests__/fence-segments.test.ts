@@ -1,4 +1,7 @@
-import { describe, expect, it } from 'vitest'
+import { E074_AshTrees } from '../../cards/E/E074_AshTrees'
+import { CardRegistry } from '../../cards/registry'
+import { setActiveCardRegistry } from '../../cards/active-registry'
+import { beforeEach, describe, expect, it } from 'vitest'
 import type { FenceSegment, PlayerState } from '../../contract/types'
 import {
   MAX_ORDINARY_FENCE_PIECES,
@@ -13,6 +16,12 @@ const makePlayer = (fenceSegments: FenceSegment[]): PlayerState =>
     id: 'p1',
     fenceSegments,
   }) as unknown as PlayerState
+
+beforeEach(() => {
+  const registry = new CardRegistry()
+  registry.loadImpl(E074_AshTrees.id, E074_AshTrees.impl)
+  setActiveCardRegistry(registry)
+})
 
 describe('fence segment helpers', () => {
   it('counts missing source ordinary fence as own ordinary', () => {
@@ -73,6 +82,7 @@ describe('fence segment helpers', () => {
       { edge: 'H-0-0', type: 'fence', source: { kind: 'own', ownerPlayerId: 'p1' } },
       { edge: 'H-0-1', type: 'fence', source: { kind: 'own', ownerPlayerId: 'p1' } },
     ])
+    player.minorPlayed = [...(player.minorPlayed ?? []), E074_AshTrees.id]
     player.cardStates = { E074_AshTrees: { counters: { fences: 5 } } }
     player.supplyTokensConsumed = { fence: 1 }
 

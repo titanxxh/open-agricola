@@ -45,6 +45,7 @@ export const A033_BigCountry = defineMinorCard({
     prerequisite: 'All Farmyard Spaces Used',
     extraVp: true,
   },
+  presentation: { counters: ['bonusVp'] },
   impl: cardImpl,
 })
 

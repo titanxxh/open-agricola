@@ -91,7 +91,7 @@ export const planResolveChoiceSubmission = (
   if (!protectedDirectCancel && !isPendingChoiceValueAllowed(envelope, value)) {
     const disabled = pendingEnvelopeChoices(envelope)
       .some((option) => option.value === value && option.disabled === true)
-    if (disabled && String(view.promptKey) === 'cards.B003_Moonshine.choice') {
+    if (disabled) {
       return { ok: false, error: 'choice disabled' }
     }
     return { ok: false, error: 'invalid choice value' }

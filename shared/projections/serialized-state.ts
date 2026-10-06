@@ -18,13 +18,14 @@ const hiddenHandCardIdsByPlayer = (
   return hidden
 }
 
-const filterHiddenHandCardStates = (
+const projectPrivateCardStates = (
   cardStates: CardStates,
-  hiddenCardIds: ReadonlySet<string> | undefined,
+  owner: boolean,
 ): CardStates => {
-  if (!hiddenCardIds || hiddenCardIds.size === 0) return cardStates
-  const entries = Object.entries(cardStates).filter(([cardId]) => !hiddenCardIds.has(cardId))
-  return Object.fromEntries(entries)
+  if (!owner) return {}
+  return Object.fromEntries(Object.entries(cardStates).flatMap(([cardId, state]) =>
+    state.privateData ? [[cardId, { privateData: structuredClone(state.privateData) }]] : [],
+  ))
 }
 
 const hiddenHandCardEventTarget = (event: GameEvent): { playerId: string; cardId: string } | null => {
@@ -300,8 +301,14 @@ const filterParentSelectionForPlayer = (
   }
 }
 
-const remapEventSeq = (event: GameEvent, seqView: VisibleEventSeqView | null): GameEvent =>
-  !seqView ? event : inheritHistoryRecordIdentity(event, { ...event, seq: seqView.eventSeqByKey.get(gameEventRefKey(event)) ?? event.seq } as GameEvent)
+const remapEventSeq = (event: GameEvent, seqView: VisibleEventSeqView | null): GameEvent => {
+  const seq = seqView?.eventSeqByKey.get(gameEventRefKey(event)) ?? event.seq
+  if (event.type === 'card.stateChanged' && Object.hasOwn(event, 'value')) {
+    const { value: _internalValue, ...metadata } = event
+    return inheritHistoryRecordIdentity(event, { ...metadata, seq }) as GameEvent
+  }
+  return seq === event.seq ? event : inheritHistoryRecordIdentity(event, { ...event, seq }) as GameEvent
+}
 
 const filterHiddenHandEvents = (
   events: readonly GameEvent[],
@@ -322,6 +329,7 @@ const hasUnchangedArchiveFields = (packet: PublicEventArchivePacket): boolean =>
     }
     return true
   }
+  if (packet.canceledEvents.some((event) => event.type === 'card.stateChanged' && Object.hasOwn(event, 'value'))) return false
   const length = packet.canceledEvents.length
   if (length === 0 || packet.canceledEventIds.length !== length || packet.canceledSeqs.length !== length) return false
   for (let index = 0; index < length; index += 1) {
@@ -538,13 +546,18 @@ export const filterSerializedStateForPlayer = (
   )
   const filteredPlayers = base.players.map((p) => {
     const { lastDraftSubmission: _lastDraftSubmission, ...visiblePlayer } = p
+    const cardStates = projectPrivateCardStates(p.cardStates, p.id === viewerPlayerId)
+    const cardStatePresentation = Object.fromEntries(Object.entries(p.cardStatePresentation ?? {}).filter(([id]) =>
+      !hiddenCardIds.get(p.id)?.has(id),
+    ))
     return p.id === viewerPlayerId
-      ? visiblePlayer
+      ? { ...visiblePlayer, cardStates, cardStatePresentation }
       : {
           ...visiblePlayer,
           occupationHand: Array(p.occupationHand.length).fill('?'),
           minorHand: Array(p.minorHand.length).fill('?'),
-          cardStates: filterHiddenHandCardStates(p.cardStates, hiddenCardIds.get(p.id)),
+          cardStates,
+          cardStatePresentation,
           stats: {
             ...p.stats,
             draftHistory: p.stats.draftHistory.map((entry) =>

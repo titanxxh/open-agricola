@@ -19,6 +19,8 @@ import type { GameEvent } from '../../shared/contract/events'
 import { runSelectionEffect } from '../../shared/actions/helpers/selection-effect-registry'
 import { serializeStateForPlayer } from '../../shared/session/serialization'
 import { EngineStack } from '../../shared/engine'
+import { setWorkersAtHome } from '../../shared/domain/player'
+import { confirmNextPlayer } from './_helpers/pending-confirms'
 
 import '../../shared/cards/B/B085_FarmHand'
 import '../../shared/cards/D/D102_SampleStableMaker'
@@ -38,7 +40,7 @@ const make2x2Fields = (): FarmTilePosition[] => [
 const FARM_HAND_TILE: FarmTilePosition = { row: 0, col: 2 }
 
 const setupBuildStables = (overrides: Partial<PlayerState> = {}) => {
-  const session = new GameSession()
+  const session = new GameSession(42, undefined, { playerCount: 2 })
   const state = session.getState().state
   state.currentPlayerIndex = 0
   for (const p of state.players) {
@@ -76,6 +78,39 @@ const findStableBuiltStables = (events: readonly GameEvent[]) =>
     .flatMap((event) => event.stables)
 
 describe('B85 FarmHand — build through Build Stables farm-select', () => {
+  it('returns a newly built source-owned stable through D102 before starting round two', () => {
+    const session = setupBuildStables()
+    const state = session.state
+    const owner = state.players[0]!
+    owner.occupationPlayed.push('D102_SampleStableMaker')
+    owner.resources.food = 20
+    setWorkersAtHome(state, owner, 1)
+    setWorkersAtHome(state, state.players[1]!, 0)
+    session.loadState(state)
+    enterStableSelect(session)
+    let response = session.commitSelectionChoice(0, { farmHand: FARM_HAND_TILE })
+    expect(response.ok).toBe(true)
+    expect(getExtraRoomCapacity(response.state.players[0]!)).toBe(1)
+    expect(response.state.players[0]!.stableTiles).toEqual([])
+    response = session.resolveChoice(0, '__done__')
+    expect(response.interaction.stateId === 'wait' && response.interaction.request.kind).toBe('confirm-next-player')
+    response = confirmNextPlayer(session)
+    expect(response.interaction.stateId).toBe('wait')
+    if (response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'choice') throw new Error('expected optional return')
+    const accept = response.interaction.request.options.find((option) => option.value !== '__skip__')!
+    response = session.resolveChoice(0, accept.value)
+    expect(response.interaction.stateId === 'wait' && response.interaction.request.kind).toBe('selection')
+    response = session.commitSelectionChoice(0, { positions: [positionKey(FARM_HAND_TILE)] })
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.round).toBe(2)
+    const after = response.state.players[0]!
+    expect(after.resources).toMatchObject({ wood: 9, grain: 1, food: 21 })
+    expect(readFarmHandPosition(after)).toBeUndefined()
+    expect(after.cardStates[CARD_ID]?.flagged).toBe(true)
+    expect(getExtraRoomCapacity(after)).toBe(0)
+    expect(getAvailableStableSupplyCount(response.state, after)).toBe(4)
+    expect(response.interaction.stateId).toBe('idle')
+  })
   it('B085 S1: playing Farm Hand through Lessons keeps the occupation in play', () => {
     const session = setupBuildStables({
       occupationHand: [CARD_ID],

@@ -28,6 +28,7 @@ export const E068_CherryOrchard = defineMinorCard({
     isField: true,
     cardField: { allowedCrops: ['wood'], capacity: 1 },
   },
+  presentation: { cardFields: true },
   impl: cardImpl,
 })
 

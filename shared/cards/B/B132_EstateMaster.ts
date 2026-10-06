@@ -84,6 +84,7 @@ const cardImpl = {
 } satisfies CardImpl
 
 export const B132_EstateMaster = defineOccupationCard({
+  presentation: { counters: ['bonusVp'] },
   meta: {
     id: CARD_ID,
     name: 'Estate Master',

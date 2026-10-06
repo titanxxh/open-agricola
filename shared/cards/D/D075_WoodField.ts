@@ -25,6 +25,7 @@ export const D075_WoodField = defineMinorCard({
     isField: true,
     cardField: { allowedCrops: ['wood'], capacity: 2 },
   },
+  presentation: { cardFields: true },
   impl: cardImpl,
 })
 

@@ -147,7 +147,8 @@ describe('D036_BreedRegistry session', () => {
       event.cardId === CARD_ID &&
       event.targetPlayerId === updated.id,
     )).toBe(false)
-    expect(ownerView.players[0]!.cardStates[CARD_ID]?.extraData?.boardSheep).toBe(1)
+    expect(ownerView.players[0]!.cardStates[CARD_ID]).toBeUndefined()
+    expect(updated.cardStates[CARD_ID]?.extraData?.boardSheep).toBe(1)
   })
 
   it('uses action-space resource.moved events to increment boardSheep', () => {

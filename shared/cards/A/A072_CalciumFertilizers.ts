@@ -85,6 +85,7 @@ const cardImpl = {
 } satisfies CardImpl
 
 export const A072_CalciumFertilizers = defineMinorCard({
+  presentation: { stack: true },
   meta: {
     id: CARD_ID,
     name: "Calcium Fertilizers",

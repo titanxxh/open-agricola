@@ -36,6 +36,7 @@ export const D133_BeerTentOperator = defineOccupationCard({
     extraVp: true,
     waresSalesmanGains: [{ wood: 1, reed: 1 }],
   },
+  presentation: { counters: ['bonusVp'] },
   impl: cardImpl,
 })
 

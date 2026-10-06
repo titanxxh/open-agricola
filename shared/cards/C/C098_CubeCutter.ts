@@ -36,6 +36,7 @@ export const C098_CubeCutter = defineOccupationCard({
     players: '1+',
     extraVp: true,
   },
+  presentation: { counters: ['bonusVp'] },
   impl: cardImpl,
 })
 

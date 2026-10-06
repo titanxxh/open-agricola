@@ -1,3 +1,4 @@
+import type { CardStatePresentation } from '../../../shared/contract/card-state'
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
@@ -28,7 +29,6 @@ import { sumAnimalCounts } from '../../../shared/domain/animal-holder-state'
 
 type AnimalType = AnimalKey
 const ANIMAL_CONTROL_TYPES: readonly AnimalType[] = ALL_ANIMAL_KEYS
-type BuildingResource = 'wood' | 'clay' | 'reed' | 'stone'
 type CardAnimalDisplay = {
   animalType: AnimalType | null
   animalCount: number
@@ -76,20 +76,12 @@ type PlayedCardDisplay = {
   cardStacks: CropStack[] | null
   cardStackSelectionTiles: (FarmTilePosition | null)[]
   heldWorkerId?: string
-  m084LyingHorses: number
+  resourceGroups: NonNullable<CardStatePresentation['resourceGroups']>
+  animalMarkers: NonNullable<CardStatePresentation['animalMarkers']>
 }
 
 const PARENT_CARD_PREVIEW_WIDTH = 320
 const PARENT_CARD_PREVIEW_HEIGHT = Math.round((PARENT_CARD_PREVIEW_WIDTH * 560) / 735)
-
-const C146_PAIR_STACK_RESOURCES: Record<string, readonly BuildingResource[]> = {
-  WC: ['wood', 'clay'],
-  WR: ['wood', 'reed'],
-  WS: ['wood', 'stone'],
-  CR: ['clay', 'reed'],
-  CS: ['clay', 'stone'],
-  RS: ['reed', 'stone'],
-}
 
 const AnimalCount = ({
   count,
@@ -209,16 +201,6 @@ const CardStackItem = ({
   index: number
   stackSize: number
 }) => {
-  const pairResources = C146_PAIR_STACK_RESOURCES[item]
-  if (pairResources) {
-    return (
-      <span className="card-stack-pair">
-        {pairResources.map((resource) => (
-          <span key={resource} className={`res-icon res-icon-${resource}`} />
-        ))}
-      </span>
-    )
-  }
   return (
     <span
       className={`res-icon res-icon-${item}`}
@@ -593,6 +575,7 @@ const PlayedCardStats = ({
   displayCounters,
   resourceStats,
   stack,
+  resourceGroups = [],
   cardStacks,
   cardStackSelectionTiles,
   selectedPositionKeys,
@@ -615,6 +598,7 @@ const PlayedCardStats = ({
   displayCounters: Record<string, number>
   resourceStats?: CardResourceStats
   stack: string[]
+  resourceGroups: NonNullable<CardStatePresentation['resourceGroups']>
   cardStacks?: CropStack[] | null
   cardStackSelectionTiles?: (FarmTilePosition | null)[]
   selectedPositionKeys?: ReadonlySet<string>
@@ -632,7 +616,7 @@ const PlayedCardStats = ({
     Object.entries(displayCounters).filter(([key]) => key !== 'bonusVp'),
   )
   const hasCardStacks = !!cardStacks && cardStacks.some((s) => s.remaining > 0)
-  const hasCounters = Object.keys(visibleCounters).length > 0 || bonusVp > 0 || stack.length > 0 || hasCardStacks
+  const hasCounters = Object.keys(visibleCounters).length > 0 || bonusVp > 0 || stack.length > 0 || resourceGroups.length > 0 || hasCardStacks
   const statsLines = formatCardStatsLines(resourceStats, rawId, locale)
   const hasResourceStats = statsLines.length > 0
   const statsTitle =
@@ -751,6 +735,20 @@ const PlayedCardStats = ({
                   index={i}
                   stackSize={stack.length}
                 />
+              ))}
+            </div>
+          )}
+          {resourceGroups.length > 0 && (
+            <div className="card-stack card-resource-groups">
+              {resourceGroups.map((resources, index) => (
+                <span className="card-stack-pair" key={`group-${index}`}>
+                  {Object.entries(resources).map(([resource, amount]) => (
+                    <span key={resource}>
+                      <span className={`res-icon res-icon-${resource}`} />
+                      {amount && amount > 1 ? <span>{amount}</span> : null}
+                    </span>
+                  ))}
+                </span>
               ))}
             </div>
           )}
@@ -1721,6 +1719,7 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false }: FarmBoardP
                 displayCounters={card.displayCounters}
                 resourceStats={card.resourceStats}
                 stack={card.stack}
+                resourceGroups={card.resourceGroups}
                 cardStacks={card.cardStacks}
                 cardStackSelectionTiles={card.cardStackSelectionTiles}
                 selectedPositionKeys={pendingPositionSelections}
@@ -1729,15 +1728,13 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false }: FarmBoardP
                 playerColor={displayPlayer.color}
                 inlineStats={inlineCardStats}
               />
-              {card.m084LyingHorses > 0 ? (
-                <div
-                  className="played-card-readonly-animals"
-                  aria-label={`Bog Pony lying horses: ${card.m084LyingHorses}`}
-                >
-                  <span className="res-icon res-icon-horse" aria-hidden="true" />
-                  <span>{card.m084LyingHorses}</span>
+              {(card.animalMarkers ?? []).filter((marker) => marker.count > 0).map((marker, index) => (
+                <div key={index} className="played-card-readonly-animals" data-animal-pose={marker.pose}
+                  aria-label={`${marker.animal}: ${marker.count}`}>
+                  <span className={`res-icon res-icon-${marker.animal}`} aria-hidden="true" />
+                  <span>{marker.count}</span>
                 </div>
-              ) : null}
+              ))}
               {cardDisplay
                 ? cardDisplay.isReorgDraft
                   ? renderPlayedCardReorg(cardDisplay)

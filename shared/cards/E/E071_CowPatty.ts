@@ -130,6 +130,7 @@ const cardImpl = {
 } satisfies CardImpl
 
 export const E071_CowPatty = defineMinorCard({
+  presentation: { stack: true },
   meta: {
     id: 'E071_CowPatty',
     name: 'Cow Patty',

@@ -22,7 +22,6 @@ export const bonusVpAction: ActionDefinition = {
       type: 'card.stateChanged',
       cardId: sourceCard,
       key: 'bonusVp',
-      value: target.cardStates?.[sourceCard]?.counters?.bonusVp ?? 0,
       targetPlayerId: target.id,
     })
     return { type: 'ok' }

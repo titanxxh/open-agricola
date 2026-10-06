@@ -112,6 +112,7 @@ describe('C049_BeerStall session', () => {
     player.stableTiles = []
     player.pastures = []
     player.stableAnimals = {}
+    player.occupationPlayed.push('B085_FarmHand')
     player.cardStates = {
       B085_FarmHand: { extraData: { position: { row: 0, col: 0 } } },
     }

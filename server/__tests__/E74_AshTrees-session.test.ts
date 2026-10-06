@@ -15,7 +15,7 @@ const edgesForTile = (row: number, col: number) => [
 
 describe('E074_AshTrees session flow', () => {
   it('lets fencing reach fence selection using stored free fences', () => {
-    const session = new GameSession()
+    const session = new GameSession(42, undefined, { playerCount: 2 })
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -76,7 +76,7 @@ describe('E074_AshTrees session flow', () => {
   })
 
   it('freeFences only discount fences, palisades still cost full wood (with B30)', () => {
-    const session = new GameSession()
+    const session = new GameSession(42, undefined, { playerCount: 2 })
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

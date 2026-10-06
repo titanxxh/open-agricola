@@ -23,18 +23,7 @@ import {
   positionKey,
 } from '../../shared/domain/farm'
 import { getPlayedCardKeys } from '../../shared/domain/player'
-import {
-  ACTION_SPACE_ATTACHMENTS_KEY,
-  RESERVED_ACTION_SPACES_KEY,
-  readCardResourceStats,
-  type ActionSpaceAttachment,
-} from '../../shared/cards/helpers/card-state'
-import { readAllPublicCardMarkers, type PublicCardMarkerEntry } from '../../shared/cards/helpers/public-card-markers'
-import { getWorkerHeldOnCard } from '../../shared/cards/helpers/card-held-workers'
-import {
-  M084_BOG_PONY_ID,
-  readBogPonyLyingHorseCountFromExtraData,
-} from '../../shared/projections/bog-pony-state'
+import type { CardStatePresentation, PublicCardMarker } from '../../shared/contract/card-state'
 import { getLeftBoardActionSpaceId } from '../../shared/cards/helpers/round-action-topology'
 import type { ParentCardId } from '../../shared/parents'
 import type { AnimalReorgState, ExtraSowTarget, PendingAnimalReorg, PendingSowCrop } from '../types/ui'
@@ -95,7 +84,8 @@ export type FarmBoardProjectionPlayedCardDisplay = {
   cardStacks: CropStack[] | null
   cardStackSelectionTiles: (FarmTilePosition | null)[]
   heldWorkerId?: string
-  m084LyingHorses: number
+  resourceGroups: NonNullable<CardStatePresentation['resourceGroups']>
+  animalMarkers: NonNullable<CardStatePresentation['animalMarkers']>
 }
 export type FarmBoardProjectionTerrainMarker = {
   row: number
@@ -105,12 +95,13 @@ export type FarmBoardProjectionTerrainMarker = {
   sourceCard?: string
 }
 export type ActionBoardPlayerDisplay = Pick<PlayerState, 'id' | 'name' | 'color'>
+export type ActionSpaceReservationDisplay = ActionBoardPlayerDisplay & { sourceCardId: string }
 export type ActionSpaceAttachmentDisplay = ActionBoardPlayerDisplay & {
   resource: keyof FutureMeepleResourceMap
   amount: number
 }
 export type ActionBoardProjection = {
-  actionSpaceReservations: Map<string, ActionBoardPlayerDisplay>
+  actionSpaceReservations: Map<string, ActionSpaceReservationDisplay[]>
   actionSpaceAttachments: Map<string, ActionSpaceAttachmentDisplay[]>
   leftActionNames: Map<string, string>
 }
@@ -150,7 +141,7 @@ export type FarmBoardProjection = {
   borrowedPlayedCardDisplays: BorrowedPlayedCardDisplay[]
   reorgRemaining: FarmBoardProjectionAnimalTotals | null
   lockedTileKeys: Set<string>
-  publicCardMarkers: PublicCardMarkerEntry[]
+  publicCardMarkers: (PublicCardMarker & { cardId: string })[]
   farmTerrainMarkerMap: Map<string, FarmBoardProjectionTerrainMarker[]>
   parentCardDisplays: FarmBoardProjectionParentCardDisplay[]
   playedCardDisplays: FarmBoardProjectionPlayedCardDisplay[]
@@ -185,25 +176,16 @@ const emptyAnimalTotals = (): FarmBoardProjectionAnimalTotals =>
 const animalCountsTotal = (counts: Partial<Record<AnimalKey, number>>) =>
   ALL_ANIMAL_KEYS.reduce((sum, animal) => sum + Math.max(0, counts[animal] ?? 0), 0)
 
-const parentFatherCompletedTier = (value: unknown): 1 | 2 | 3 | undefined =>
-  value === 1 || value === 2 || value === 3 ? value : undefined
-
-const isFarmTerrainMarker = (value: unknown): value is FarmBoardProjectionTerrainMarker => {
-  if (!value || typeof value !== 'object') return false
-  const marker = value as Partial<FarmBoardProjectionTerrainMarker>
-  return Number.isInteger(marker.row) && Number.isInteger(marker.col) && typeof marker.kind === 'string'
-}
+const cardPresentation = (player: PlayerState): Record<string, CardStatePresentation> =>
+  (player as PlayerState & { cardStatePresentation?: Record<string, CardStatePresentation> }).cardStatePresentation ?? {}
 
 const readFarmTerrainMarkers = (player: PlayerState): FarmBoardProjectionTerrainMarker[] =>
-  Object.entries(player.cardStates ?? {}).flatMap(([cardId, state]) => {
-    const raw = state.extraData?.farmTerrainMarkers
-    if (!Array.isArray(raw)) return []
-    return raw.filter(isFarmTerrainMarker).map((marker) => ({
+  Object.entries(cardPresentation(player)).flatMap(([cardId, facts]) =>
+    (facts.farmTerrainMarkers ?? []).map((marker) => ({
       ...marker,
-      sourceCard: typeof marker.sourceCard === 'string' ? marker.sourceCard : cardId,
-      workerId: typeof marker.workerId === 'string' ? marker.workerId : undefined,
-    }))
-  })
+      sourceCard: cardId,
+    })),
+  )
 
 const buildFarmTerrainMarkerMap = (
   displayPlayer: PlayerState | null | undefined,
@@ -215,53 +197,6 @@ const buildFarmTerrainMarkerMap = (
     map.set(key, [...(map.get(key) ?? []), marker])
   })
   return map
-}
-
-const C146_WORKSHOP_ASSISTANT_ID = 'C146_WorkshopAssistant'
-const PLAYED_CARD_INTERNAL_COUNTERS = new Set(['usedRound'])
-const CROP_KINDS = new Set(['grain', 'vegetable', 'wood', 'stone'])
-
-const isCropKind = (value: unknown): value is CropStack['kind'] =>
-  typeof value === 'string' && CROP_KINDS.has(value)
-
-const normalizeCropStack = (kind: unknown, remaining: unknown): CropStack | null =>
-  isCropKind(kind) && typeof remaining === 'number' && remaining > 0
-    ? { kind, remaining }
-    : null
-
-const readCardFieldLayers = (extraData: Record<string, unknown> | undefined) => {
-  const slots = extraData?.cardFieldStacks
-  if (!Array.isArray(slots)) return null
-  return slots.flatMap((entry, slotIndex) => {
-    if (!entry || typeof entry !== 'object') return []
-    const slot = entry as { crop?: unknown; remaining?: unknown; below?: unknown[] }
-    const layers = [...(Array.isArray(slot.below) ? slot.below : []), slot]
-    return layers.flatMap((layer, layerIndex) => {
-      if (!layer || typeof layer !== 'object') return []
-      const value = layer as { crop?: unknown; remaining?: unknown }
-      const stack = normalizeCropStack(value.crop, value.remaining)
-      return stack ? [{ stack, slotIndex, top: layerIndex === layers.length - 1 }] : []
-    })
-  })
-}
-
-const readCardStacksFromExtraData = (extraData: Record<string, unknown> | undefined): CropStack[] | null => {
-  const fieldLayers = readCardFieldLayers(extraData)
-  if (fieldLayers) return fieldLayers.map((layer) => layer.stack)
-
-  const rawStacks = extraData?.stacks
-  if (Array.isArray(rawStacks) && rawStacks.length > 0) {
-    return rawStacks
-      .map((entry) => {
-        const stack = entry as { kind?: unknown; remaining?: unknown }
-        return normalizeCropStack(stack.kind, stack.remaining)
-      })
-      .filter((entry): entry is CropStack => !!entry)
-  }
-
-  const rawCardCrop = extraData?.cardCrop as { crop?: unknown; remaining?: unknown } | undefined
-  const cropStack = normalizeCropStack(rawCardCrop?.crop, rawCardCrop?.remaining)
-  return cropStack ? [cropStack] : null
 }
 
 const splitPlayedCardKey = (cardId: string): { rawId: string; cardType: FarmBoardProjectionCardType } => {
@@ -279,8 +214,8 @@ const buildParentCardDisplays = (
     .filter((id): id is ParentCardId => !!id)
     .map((id) => ({
       id,
-      infobox: displayPlayer.cardStates?.[id]?.infobox,
-      completedTier: parentFatherCompletedTier(displayPlayer.cardStates?.[id]?.extraData?.fatherCompletedTier),
+      infobox: cardPresentation(displayPlayer)[id]?.infobox,
+      completedTier: cardPresentation(displayPlayer)[id]?.completedTier,
     }))
 }
 
@@ -291,17 +226,8 @@ const buildPlayedCardDisplays = (
   if (!displayPlayer) return []
   return getPlayedCardKeys(displayPlayer).map((cardId) => {
     const { rawId, cardType } = splitPlayedCardKey(cardId)
-    const cardState = displayPlayer.cardStates?.[rawId]
-    const rawExtraData = cardState?.extraData
-    const c146Pairs =
-      rawId === C146_WORKSHOP_ASSISTANT_ID && Array.isArray(rawExtraData?.pairs)
-        ? rawExtraData.pairs.filter((pair): pair is string => typeof pair === 'string')
-        : null
-    const displayCounters = Object.fromEntries(
-      Object.entries(cardState?.counters ?? {})
-        .filter(([key, count]) => !PLAYED_CARD_INTERNAL_COUNTERS.has(key) && count > 0),
-    )
-    const cardStacks = readCardStacksFromExtraData(rawExtraData)
+    const facts = cardPresentation(displayPlayer)[rawId]
+    const cardStacks = facts?.cropLayers?.map((layer) => layer.stack) ?? null
     const cardSelectionTargets = selectionInteraction?.kind === 'farm-position'
       ? selectionInteraction.selectablePositions.filter((position) => position.sourceCard === rawId)
       : []
@@ -309,18 +235,17 @@ const buildPlayedCardDisplays = (
       cardId,
       rawId,
       cardType,
-      infobox: cardState?.infobox,
-      displayCounters,
-      resourceStats: readCardResourceStats(displayPlayer, rawId),
-      stack: c146Pairs ?? cardState?.stack ?? [],
+      infobox: facts?.infobox,
+      displayCounters: facts?.counters ?? {},
+      resourceStats: facts?.resourceStats,
+      stack: facts?.stack ?? [],
+      resourceGroups: facts?.resourceGroups ?? [],
       cardStacks,
-      cardStackSelectionTiles: readCardFieldLayers(rawExtraData)?.map((layer) =>
+      cardStackSelectionTiles: facts?.cropLayers?.map((layer) =>
         layer.top ? cardSelectionTargets.find((position) => position.cardFieldSlot === layer.slotIndex) ?? null : null,
       ) ?? cardStacks?.map(() => null) ?? [],
-      heldWorkerId: getWorkerHeldOnCard(displayPlayer, rawId),
-      m084LyingHorses: rawId === M084_BOG_PONY_ID
-        ? readBogPonyLyingHorseCountFromExtraData(rawExtraData)
-        : 0,
+      heldWorkerId: facts?.heldWorkerId,
+      animalMarkers: facts?.animalMarkers ?? [],
     }
   })
 }
@@ -609,22 +534,25 @@ export const buildActionBoardProjection = ({
   roundSlots,
   currentRound,
 }: ActionBoardProjectionInput): ActionBoardProjection => {
-  const actionSpaceReservations = new Map<string, ActionBoardPlayerDisplay>()
+  const actionSpaceReservations = new Map<string, ActionSpaceReservationDisplay[]>()
   const actionSpaceAttachments = new Map<string, ActionSpaceAttachmentDisplay[]>()
 
   for (const player of players) {
     const owner = playerDisplay(locale, player, players.indexOf(player))
-    for (const cardState of Object.values(player.cardStates ?? {})) {
-      const reservedSpaces = cardState?.extraData?.[RESERVED_ACTION_SPACES_KEY]
-      if (Array.isArray(reservedSpaces)) {
+    for (const [sourceCardId, facts] of Object.entries(cardPresentation(player))) {
+      const reservedSpaces = facts.reservedActionSpaces
+      if (reservedSpaces) {
         for (const spaceId of reservedSpaces) {
-          if (typeof spaceId === 'string') actionSpaceReservations.set(spaceId, owner)
+          if (typeof spaceId === 'string') {
+            const reservations = actionSpaceReservations.get(spaceId) ?? []
+            reservations.push({ ...owner, sourceCardId })
+            actionSpaceReservations.set(spaceId, reservations)
+          }
         }
       }
 
-      const attachments = cardState?.extraData?.[ACTION_SPACE_ATTACHMENTS_KEY]
-      if (!Array.isArray(attachments)) continue
-      for (const attachment of attachments as ActionSpaceAttachment[]) {
+      const attachments = facts.actionSpaceAttachments ?? []
+      for (const attachment of attachments) {
         if (!attachment || typeof attachment.spaceId !== 'string') continue
         for (const [resource, amount] of Object.entries(attachment.resources ?? {})) {
           if (typeof amount !== 'number' || amount <= 0) continue
@@ -732,7 +660,9 @@ export const buildFarmBoardProjection = ({
   const borrowedPlayedCardDisplays = buildBorrowedPlayedCardDisplays(state, displayPlayer, animalReorg)
   const reorgRemaining = buildReorgRemaining(state, pendingAnimalReorg, animalReorg)
   const lockedTileKeys = new Set(displayPlayer?.lockedFarmTileKeys ?? [])
-  const publicCardMarkers = displayPlayer ? readAllPublicCardMarkers(displayPlayer) : []
+  const publicCardMarkers = displayPlayer ? Object.entries(cardPresentation(displayPlayer)).flatMap(([cardId, facts]) =>
+    (facts.publicCardMarkers ?? []).map((marker) => ({ ...marker, cardId })),
+  ) : []
   const farmTerrainMarkerMap = buildFarmTerrainMarkerMap(displayPlayer)
   const terrainMap = buildFarmTerrainMap(displayPlayer)
   const parentCardDisplays = buildParentCardDisplays(displayPlayer)

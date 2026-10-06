@@ -30,6 +30,7 @@ describe('A022_Telegram prerequisite', () => {
     const state = session.getState().state
     const player = state.players[0]!
     player.fenceSegments = []
+    player.minorPlayed.push('E074_AshTrees')
     player.cardStates = { E074_AshTrees: { counters: { fences: maxFences } } }
     expect(meetsCardPrerequisites(player, A022_Telegram, state.round, state)).toBe(false)
   })

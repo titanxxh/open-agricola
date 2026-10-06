@@ -64,6 +64,7 @@ const cardImpl = {
 } satisfies CardImpl
 
 export const B165_GameProvider = defineOccupationCard({
+  presentation: { stack: true },
   meta: {
     id: "B165_GameProvider",
     name: "Game Provider",

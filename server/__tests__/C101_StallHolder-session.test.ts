@@ -86,6 +86,7 @@ describe('C101_StallHolder session', () => {
     const session = setup({ stableCount: 0 })
     const state = session.getState().state
     const player = state.players[0]!
+    player.occupationPlayed.push('B085_FarmHand')
     player.cardStates = {
       ...player.cardStates,
       B085_FarmHand: { extraData: { position: { row: 0, col: 0 } } },

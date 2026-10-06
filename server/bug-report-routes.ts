@@ -61,36 +61,6 @@ type EvidenceAnchor = {
   evidence_expires_at: number | null
 }
 
-const redactOpponentPrivateCardState = (
-  state: SerializedGameState,
-  viewerPlayerId: string | null,
-): SerializedGameState => ({
-  ...state,
-  players: state.players.map((player) =>
-    player.id === viewerPlayerId
-      ? player
-      : {
-          ...player,
-          cardStates: Object.fromEntries(
-            Object.entries(player.cardStates ?? {}).map(([cardId, cardState]) => {
-              if (cardId !== 'B003_Moonshine' || !cardState.extraData) {
-                return [cardId, cardState]
-              }
-              const { occ: _hiddenOccupation, ...publicExtraData } = cardState.extraData
-              return [
-                cardId,
-                {
-                  ...cardState,
-                  extraData: Object.keys(publicExtraData).length > 0
-                    ? publicExtraData
-                    : undefined,
-                },
-              ]
-            }),
-          ),
-        }),
-})
-
 export const bugReportsEnabled = (): boolean =>
   process.env.BUG_REPORTS_ENABLED === '1'
   || process.env.BUG_REPORTS_ENABLED === 'true'
@@ -364,10 +334,7 @@ const loadEvidenceFrame = async (
   if (playerIndex === null) return projected
   const playerId = projected.players[playerIndex]?.id ?? null
   if (!playerId) throw new BugReportError('not_participant', 403)
-  return redactOpponentPrivateCardState(
-    filterSerializedStateForPlayer(projected, playerId),
-    playerId,
-  )
+  return filterSerializedStateForPlayer(projected, playerId)
 }
 
 const inspectEvidence = async (

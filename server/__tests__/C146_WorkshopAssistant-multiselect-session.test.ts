@@ -31,9 +31,8 @@ const setupRenovationWithStoredPairs = (
   pairs: string[],
   actionId: 'house-redevelopment' | 'farm-redevelopment' = 'house-redevelopment',
 ) => {
-  const session = new GameSession()
+  const session = new GameSession(42, undefined, { playerCount: 2 })
   const state = session.getState().state
-  state.players = state.players.slice(0, 2)
   state.round = actionId === 'farm-redevelopment' ? 10 : 6
   state.currentPlayerIndex = 1
   const space = state.actionSpaces.find((entry) => entry.id === actionId)
@@ -267,19 +266,22 @@ describe('C146 — multi-select pairs (onBuy)', () => {
   })
 
   it('session onBuy accepts comma-joined n=3 pair selection', () => {
-    const session = new GameSession(undefined, undefined, { playerCount: 3 })
+    const session = new GameSession(42, undefined, { playerCount: 2 })
     const state = session.getState().state
     state.currentPlayerIndex = 0
-    state.round = 1
+    state.round = 6
     for (const player of state.players) {
       player.minorHand = ['__test_placeholder__']
       player.occupationHand = ['__test_placeholder__']
+      Object.assign(player.resources, { wood: 10, clay: 10, reed: 10, stone: 10, food: 10 })
+      setWorkersAtHome(state, player, 2)
     }
     const player = state.players[0]!
     setWorkersAtHome(state, player, 2)
     player.occupationHand = [CARD_ID]
     player.minorPlayed = ['M1', 'M2', 'M3']
     player.resources.food = 10
+    state.actionSpaces.find((space) => space.id === 'house-redevelopment')!.roundAvailable = 1
     session.loadState(state)
 
     let resp = session.takeAction(0, 'lessons')
@@ -294,14 +296,25 @@ describe('C146 — multi-select pairs (onBuy)', () => {
     expect(resp.interaction.sourceCard).toBe(CARD_ID)
     expect(resp.interaction.promptKey).toBe('ui.interactionWorkshopAssistantSelect')
 
+    const beforeInvalid = JSON.stringify(session.getState().state.players[0])
+    resp = session.resolveChoice(0, 'WC')
+    expect(resp.interaction.stateId).toBe('wait')
+    expect(JSON.stringify(session.getState().state.players[0])).toBe(beforeInvalid)
+    resp = session.resolveChoice(0, 'WC,WC,CS')
+    expect(resp.interaction.stateId).toBe('wait')
+    expect(JSON.stringify(session.getState().state.players[0])).toBe(beforeInvalid)
     resp = session.resolveChoice(0, 'WC,CS,RS')
     expect(resp.ok).toBe(true)
     const livePlayer = resp.state.players[0]!
     expect(readCardExtraData<string[]>(livePlayer, CARD_ID, 'pairs')).toEqual(['WC', 'CS', 'RS'])
-    expect(livePlayer.resources.wood).toBe(0)
-    expect(livePlayer.resources.clay).toBe(0)
-    expect(livePlayer.resources.reed).toBe(0)
-    expect(livePlayer.resources.stone).toBe(0)
+    for (const viewer of [livePlayer.id, resp.state.players[1]!.id, null]) {
+      expect(session.buildSyncPayload(resp, viewer).state.players[0]!.cardStatePresentation[CARD_ID]?.resourceGroups)
+        .toEqual([{ wood: 1, clay: 1 }, { clay: 1, stone: 1 }, { reed: 1, stone: 1 }])
+    }
+    expect(livePlayer.resources.wood).toBe(10)
+    expect(livePlayer.resources.clay).toBe(10)
+    expect(livePlayer.resources.reed).toBe(10)
+    expect(livePlayer.resources.stone).toBe(10)
     expect(resp.state.log).toEqual(expect.arrayContaining([
       expect.objectContaining({
         key: 'log.cardResourcePairsStored',
@@ -312,6 +325,24 @@ describe('C146 — multi-select pairs (onBuy)', () => {
         }),
       }),
     ]))
+    resp = confirmPlayerSwitch(session)
+    expect(resp.state.currentPlayerIndex).toBe(1)
+    resp = driveOpponentRenovationToC146(session)
+    expect(resp.state.players[1]!.houseType).toBe('clay')
+    expect(resp.interaction.playerIndex).toBe(0)
+    resp = session.resolveChoice(0, resp.interaction.request.options!.find((option) => option.value !== '__skip__')!.value)
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.resources).toMatchObject({ wood: 11, clay: 11, reed: 10, stone: 10 })
+    expect(readCardExtraData(resp.state.players[0]!, CARD_ID, 'pairs')).toEqual(['CS', 'RS'])
+    for (const viewer of [livePlayer.id, resp.state.players[1]!.id, null]) {
+      expect(session.buildSyncPayload(resp, viewer).state.players[0]!.cardStatePresentation[CARD_ID]?.resourceGroups)
+        .toEqual([{ clay: 1, stone: 1 }, { reed: 1, stone: 1 }])
+    }
+    expect(resp.state.events).toContainEqual(expect.objectContaining({
+      type: 'resource.moved', sourceCardId: CARD_ID, resources: { wood: 1, clay: 1 },
+    }))
+    resp = confirmPlayerSwitch(session)
+    expect(resp.interaction.playerIndex).toBe(1)
   })
 
   it('opponent renovation lets owner take one stored pair', () => {

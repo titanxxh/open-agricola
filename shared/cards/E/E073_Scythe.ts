@@ -83,6 +83,7 @@ const cardImpl = {
 } satisfies CardImpl
 
 export const E073_Scythe = defineMinorCard({
+  presentation: { stack: true },
   meta: {
     id: "E073_Scythe",
     name: "Scythe",

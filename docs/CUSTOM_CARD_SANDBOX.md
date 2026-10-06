@@ -190,6 +190,8 @@ The marked blocks below are machine checked against `cardEffectHooks` in `shared
 - `computeLockedFarmTiles`
 - `getInvalidAnimals`
 - `getBuiltSpecialStables`
+- `getRuleContributions`
+- `getStatePresentation`
 <!-- prompt-sync:end id=card-effect-hooks -->
 
 `onBeforeWork` runs after round growth and future-meeple actions but before `onRoundStart`. Use it only when the card explicitly acts before the work phase.
@@ -217,6 +219,8 @@ Advanced-hook details:
 | `computeLockedFarmTiles` | `(player) => FarmTilePosition[]` | Locked farm tiles |
 | `getInvalidAnimals` | `(player, zone, meeples) => Meeple[]` | Card-zone animal restriction; sandbox supplies no `state` |
 | `getBuiltSpecialStables` | `(player) => FarmTilePosition[]` | Currently standing special stables for derived snapshot display |
+| `getRuleContributions` | `(player) => CardRuleContributions` | Read-only source-owned component reservations and unused-space quantity adjustments; finite, floored, nonnegative and capped by the consuming category |
+| `getStatePresentation` | `(player) => CardStatePresentation` | Explicit public counters, resource groups, crop layers and markers; ordinary clients do not read internal storage |
 | `handHooks` metadata | `HandCardEffectHook[]` | Stage hooks that also run while the card remains in hand |
 
 Extra sowing and special stables each require a paired candidate and settlement contract: `onComputeSowableFields` with `onSowExtraField`, and `getSpecialStablePositions` with `applySpecialStable`. Settlement relies on in-place host mutation that cannot return through sandbox JSON snapshots, so Workshop exposes neither pair. `handHooks` does not support `onBuy`, `onEndTurn`, `onBeforeEndGame`, or `onBeforePlayerTurn`. `CARD_IMPL.effect` must be a direct object literal with no variable reference, spread, computed key, or accessor, preventing static-validation bypass. Server and browser manifests also filter unsupported hand hooks on the host side.
@@ -357,8 +361,11 @@ type CardState = {
   infobox?: string                               // small card-face label
   stack?: unknown[]                              // complex state such as a LIFO queue
   extraData?: Record<string, unknown>            // free-form extension data
+  privateData?: Record<string, unknown>
 }
 ```
+Internal counters, flags, stacks and `extraData` remain authoritative storage and are absent from ordinary synchronization, including the owner. `privateData` is visible only to the player whose state stores it; passing a card does not transfer another player's private observations. `infobox` and resource statistics are reserved public channels. Other public facts require `getStatePresentation(player)` or a native Card Source `presentation` declaration. The host copies query input and normalizes a closed `CardStatePresentation` result; return public counters, resource groups, crop layers or markers, never raw state. Rule queries use `getRuleContributions(player)` and do not write state.
+
 
 Read grain stored on the card as:
 
@@ -572,7 +579,8 @@ Sprint 6b on 2026-04-30 removed five separate mutation IDs, `flag-card`, `unflag
 { kind: 'set-infobox', text: '' }
 
 // Write player.cardStates[sourceCard].extraData[key]
-{ kind: 'set-extra-data', key: 'foo', value: 1 }
+{ kind: 'set-extra-data', key: 'foo', value: 1 } // internal
+{ kind: 'set-private-data', key: 'secret', value: 'owner only' }
 
 // Add amount to player.cardStates[sourceCard].extraData[key]
 { kind: 'increment-extra-data', key: 'used', amount: 1 }

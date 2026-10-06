@@ -11,6 +11,7 @@ import { buildStableFarmInteraction } from '../../domain/farmyard-interaction'
 import { getAvailableStableSupplyCount } from '../../domain/supply-tokens'
 import type { CardImpl } from '../registry'
 import type { GameState, PlayerState } from '../../contract/types'
+import { getReservedActionSpaces } from '../helpers/card-state'
 
 const CARD_ID = 'E148_Lazybones'
 const TRIGGER_SPACES = ['grain-seeds', 'farmland', 'day-laborer', 'farm-expansion']
@@ -67,6 +68,7 @@ const cardImpl = {
   listeners: [listener],
   effect: {
     id: CARD_ID,
+    getRuleContributions: (player) => ({ reservedSupply: { stable: getReservedActionSpaces(player, CARD_ID).length } }),
     projectInteractionRequest: (state, player, request, actionId) => {
       if (actionId !== 'emit-choice' || request.kind !== 'choice') return request
       return { ...request, options: actionSpaceTokenChoiceOptions(choiceConfig(state, player)) }
@@ -80,6 +82,7 @@ const cardImpl = {
 } satisfies CardImpl
 
 export const E148_Lazybones = defineOccupationCard({
+  presentation: { reservedActionSpaces: true },
   meta: {
     id: CARD_ID,
     name: 'Lazybones',

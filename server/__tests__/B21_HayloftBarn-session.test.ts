@@ -84,7 +84,7 @@ describe('B021_HayloftBarn session', () => {
       && event.sourceCardId === CARD_ID
       && event.cardId === CARD_ID
       && event.key === 'foodCount'
-      && event.value === 3
+      && !Object.hasOwn(event, 'value')
     )
     const infoboxChangedIndex = resp.state.events.findIndex((event) =>
       event.type === 'card.infoboxChanged'
@@ -108,7 +108,6 @@ describe('B021_HayloftBarn session', () => {
         sourceCardId: CARD_ID,
         cardId: CARD_ID,
         key: 'foodCount',
-        value: 3,
         targetPlayerId: player.id,
       }),
       expect.objectContaining({

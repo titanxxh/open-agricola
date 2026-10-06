@@ -205,6 +205,8 @@ const jsonSafe = JSON.parse(JSON.stringify(value ?? null))
 - `computeLockedFarmTiles`
 - `getInvalidAnimals`
 - `getBuiltSpecialStables`
+- `getRuleContributions`
+- `getStatePresentation`
 <!-- prompt-sync:end id=card-effect-hooks -->
 
 
@@ -235,6 +237,8 @@ reaction-compatible hook（action listener 的 `before` / `during` / `immediatel
 | `computeLockedFarmTiles`                     | `(player) => FarmTilePosition[]`                                  | 田地锁定                                                |
 | `getInvalidAnimals`                          | `(player, zone, meeples) => Meeple[]`                             | 卡牌专属动物分区禁入校验；沙盒不传 `state`                           |
 | `getBuiltSpecialStables`                     | `(player) => FarmTilePosition[]`                                | 当前矗立的特殊 stable（驱动 snapshot `specialStables` 展示派生）    |
+| `getRuleContributions` | `(player) => CardRuleContributions` | 来源卡只读贡献组件预留或空格数量调整；有限、取整、非负并按类别上限约束 |
+| `getStatePresentation` | `(player) => CardStatePresentation` | 明确的公开计数、资源组、作物层和标记；普通客户端不读取内部状态 |
 | `handHooks`（meta）                            | `HandCardEffectHook[]`                                           | 声明哪些 stage hook 在卡牌还在手牌时也触发                          |
 
 额外播种与特殊 stable 都是“候选 + 结算”成对契约：`onComputeSowableFields` / `onSowExtraField`、`getSpecialStablePositions` / `applySpecialStable`。结算 hook 依赖原地修改宿主对象，沙盒的 JSON 快照无法回传，因此 Workshop 不暴露这两对 hook。`handHooks` 不支持 `onBuy`、`onEndTurn`、`onBeforeEndGame`、`onBeforePlayerTurn`；`CARD_IMPL.effect` 必须直接写对象字面量，禁止变量引用、spread、computed key 和 accessor，避免 hook 或 meta 字段绕过静态校验；server/browser manifest 还会在宿主侧过滤不支持的 hand hook。
@@ -390,8 +394,11 @@ type CardState = {
   infobox?: string                               // 显示在卡面的小标签
   stack?: unknown[]                              // 复杂状态（如 LIFO 队列）
   extraData?: Record<string, unknown>            // 自由扩展字段
+  privateData?: Record<string, unknown>
 }
 ```
+计数、flag、stack 和 `extraData` 默认属于权威内部状态，不进入普通同步，本人也不接收。`privateData` 仅对存储它的玩家可见；传牌不会转移其他玩家的私有观察。`infobox` 和资源统计是预留的公开通道。其他公开信息必须通过 `getStatePresentation(player)` 或原生 Card Source 的 `presentation` 声明提供。宿主复制查询输入，并按封闭的 `CardStatePresentation` 结构校验结果；返回公开计数、资源组、作物层或标记，不返回原始状态。规则贡献使用 `getRuleContributions(player)`，查询不写状态。
+
 
 读"卡上存了多少 grain"：
 
@@ -603,7 +610,7 @@ return {
 | `pay`                      | 同上，扣资源                                                                            |
 | `bake-bread`               | 启动一段烤面包子流程                                                                        |
 | `push-to-card-stack`       | 向 `player.cardStates[CARD_ID].stack` 推入一项                                         |
-| `special-effect`           | **沙盒 cardStates mutation 入口**（Sprint 6a/6b）。`params: { kind: 'set-flag' \| 'set-infobox' \| 'set-extra-data' \| 'increment-extra-data', ... }`。取代旧的 `flag-card` / `unflag-card` / `set-card-infobox` / `clear-card-infobox` / `write-card-extra-data` 5 个 leaf。详见 §6.1；未列出的仓库内部 kind 不属于 Workshop 合约。 |
+| `special-effect`           | **沙盒 cardStates mutation 入口**（Sprint 6a/6b）。`params: { kind: 'set-flag' \| 'set-infobox' \| 'set-extra-data' \| 'set-private-data' \| 'increment-extra-data', ... }`。取代旧的 `flag-card` / `unflag-card` / `set-card-infobox` / `clear-card-infobox` / `write-card-extra-data` 5 个 leaf。详见 §6.1；未列出的仓库内部 kind 不属于 Workshop 合约。 |
 | `future-meeples`           | 沙箱专用：用 `params.__futureMeepleRequest` 预放未来回合资源（见 §5.7）                            |
 
 > Sprint 6b（2026-04-30）已删除 5 个独立 mutation actionId（`flag-card` / `unflag-card` / `set-card-infobox` / `clear-card-infobox` / `write-card-extra-data`）+ 3 个 dead actionId（`hold-worker-on-card` / `release-worker-from-card` / `gain-other-players`）。统一使用 `special-effect` discriminated-union。`check-prompt-sync` 在 CI 校验 prompt 只暴露白名单内 actionId；白名单外的 actionId 不会出现在 prompt 中，沙盒卡牌不应使用——改用 `special-effect`。
@@ -620,7 +627,8 @@ return {
 { kind: 'set-infobox', text: '' }
 
 // 写 player.cardStates[sourceCard].extraData[key]
-{ kind: 'set-extra-data', key: 'foo', value: 1 }
+{ kind: 'set-extra-data', key: 'foo', value: 1 } // 内部状态
+{ kind: 'set-private-data', key: 'secret', value: '仅本人可见' }
 
 // player.cardStates[sourceCard].extraData[key] += amount
 { kind: 'increment-extra-data', key: 'used', amount: 1 }

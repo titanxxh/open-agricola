@@ -83,6 +83,7 @@ const cardImpl = {
 } satisfies CardImpl
 
 export const D072_StableManure = defineMinorCard({
+  presentation: { stack: true },
   meta: {
     id: CARD_ID,
     name: "Stable Manure",

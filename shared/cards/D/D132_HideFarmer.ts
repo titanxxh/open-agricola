@@ -7,6 +7,7 @@ import type {
 import { countUnusedFarmyardSpaces } from '../../domain/farmyard-usage'
 import { registerAdHocAction } from '../../actions/helpers/ad-hoc-action-registry'
 import type { CardImpl } from '../registry'
+import { readCardExtraData } from '../helpers/card-state'
 
 const CARD_ID = 'D132_HideFarmer'
 const MARK_SPACES_ACTION_ID = `card_${CARD_ID}_markSpaces`
@@ -51,6 +52,7 @@ const markSpacesAction: ActionDefinition = {
       type: 'request',
       request: {
         kind: 'resource-quantity-select',
+        anytimeWindow: { allowed: false },
         cardId: CARD_ID,
         availableByResource: { food: max },
         promptKey: 'ui.cards.D132_HideFarmer.markSpaces.prompt',
@@ -85,6 +87,7 @@ registerAdHocAction(markSpacesAction)
 const cardImpl = {
   effect: {
     id: CARD_ID,
+    getRuleContributions: (player) => ({ unusedSpaceReduction: readCardExtraData<number>(player, CARD_ID, 'hiddenSpaces') ?? 0 }),
     onBeforeEndGame: (_state, player) => {
       if (
         typeof player.cardStates?.[CARD_ID]?.extraData?.hiddenSpaces ===
@@ -99,6 +102,7 @@ const cardImpl = {
         actionId: MARK_SPACES_ACTION_ID,
         sourceCard: CARD_ID,
         optional: true,
+        anytimeWindow: { allowed: true },
         promptKey: 'ui.cards.D132_HideFarmer.optional',
       }
     },

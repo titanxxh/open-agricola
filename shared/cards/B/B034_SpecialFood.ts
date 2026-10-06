@@ -135,6 +135,7 @@ export const B034_SpecialFood = defineMinorCard({
     prerequisite: "No Animal",
     extraVp: true,
   },
+  presentation: { counters: ['bonusVp'] },
   impl: cardImpl,
 })
 

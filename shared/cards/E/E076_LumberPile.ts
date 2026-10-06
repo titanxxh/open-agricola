@@ -4,7 +4,7 @@ import { addResourcesFromCards } from '../../session/stats'
 import { registerSelectionEffect } from '../../actions/helpers/selection-effect-registry'
 import {
   listReturnableStableTiles,
-  removeStableOrFarmHandAtTile,
+  returnStableAtTile,
 } from '../helpers/stable-removal'
 import type { ActionFlow, FarmTilePosition } from '../../contract/types'
 import type { CardImpl } from '../registry'
@@ -32,7 +32,7 @@ registerSelectionEffect(FIELD_EFFECT, ({ player, positions, sourceCard }) => {
     const col = Number(colStr)
     if (!Number.isFinite(row) || !Number.isFinite(col)) continue
     const tile: FarmTilePosition = { row, col }
-    if (removeStableOrFarmHandAtTile(player, tile)) removed += 1
+    if (returnStableAtTile(player, tile)) removed += 1
     if (removed >= 3) break
   }
   if (removed > 0) {

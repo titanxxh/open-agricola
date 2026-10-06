@@ -59,6 +59,7 @@ export const C153_PatternMaker = defineOccupationCard({
     extraVp: true,
     waresSalesmanGains: [{ wood: 1, reed: 1 }],
   },
+  presentation: { counters: ['bonusVp'] },
   impl: cardImpl,
 })
 

@@ -33,6 +33,7 @@ const cardImpl = {
 } satisfies CardImpl
 
 export const M027_GardenPath = defineMinorCard({
+  presentation: { publicCardMarkers: true },
   meta: {
     id: CARD_ID,
     name: "Garden Path",

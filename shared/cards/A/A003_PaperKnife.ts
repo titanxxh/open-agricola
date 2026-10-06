@@ -21,7 +21,7 @@ const EFFECT_ID = 'paper-knife-random-play'
  * Flow:
  *   onBuy → emit 'selection' leaf (occupation-hand, min=max=3, selectionEffect=EFFECT_ID)
  *   resolveChoice(3 ids) → selectionEffect fires:
- *     rollAndCacheCardPick → stores pick in cardStates[CARD_ID].extraData.pick
+ *     rollAndCacheCardPick → stores the player's private pick
  *     state.pendingUndoBoundary = true
  *     returns occupation leaf { exactCost: {}, allowedCards: [pick] }
  *   occupation auto-resolves (single option) → occupation played for free + onBuy fires
@@ -48,6 +48,7 @@ registerSelectionEffect(EFFECT_ID, ({
     KEY_PICK,
     selected,
     reportProtectedObservation,
+    'player-private',
   )
   state.pendingUndoBoundary = true
   return {

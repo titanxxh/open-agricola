@@ -120,6 +120,7 @@ const cardImpl = {
 } satisfies CardImpl
 
 export const A177_Middleman = defineOccupationCard({
+  presentation: { actionSpaceAttachments: true },
   meta: {
     id: CARD_ID,
     name: 'Middleman',

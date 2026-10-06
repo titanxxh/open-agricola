@@ -13,6 +13,7 @@ const architectureChecks = [
   'pnpm run check:no-dsl -- --strict',
   'pnpm run check:catalog-types',
   'pnpm run check:card-impl-boundaries',
+  'pnpm run check:card-state-boundaries',
   'pnpm run check:architecture-types',
   'pnpm run check:architecture-tests',
   'pnpm run check:prompt-sync -- --strict',
@@ -37,6 +38,7 @@ describe('canonical architecture verification wiring', () => {
       'client/services/__tests__/llmPrompts.test.ts',
       'server/__tests__/workshop-prompt-runtime.test.ts',
       'scripts/__tests__/ci-card-impl-boundaries.test.ts',
+      'scripts/__tests__/check-card-state-boundaries.test.ts',
       'shared/cards/__tests__/listener-purity-guard.test.ts',
       'server/__tests__/listener-purity-gate-session.test.ts',
     ]

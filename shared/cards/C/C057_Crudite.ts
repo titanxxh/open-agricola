@@ -132,6 +132,7 @@ const cardImpl = {
 } satisfies CardImpl
 
 export const C057_Crudite = defineMinorCard({
+  presentation: { stack: true },
   meta: {
     id: CARD_ID,
     name: 'Crudite',

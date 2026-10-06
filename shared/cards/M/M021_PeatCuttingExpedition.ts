@@ -40,6 +40,7 @@ const cardImpl = {
 } satisfies CardImpl
 
 export const M021_PeatCuttingExpedition = defineMinorCard({
+  presentation: { counters: ['bonusVp'] },
   meta: {
     id: CARD_ID,
     name: "Peat-Cutting Expedition",

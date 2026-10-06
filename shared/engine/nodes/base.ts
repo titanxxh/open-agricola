@@ -1,4 +1,5 @@
 import type { PromptKey } from '../../contract/prompt-keys'
+import type { AnytimeWindow } from '../../contract/types'
 import type {
   EngineNode,
   EngineNodeType,
@@ -18,6 +19,7 @@ export abstract class BaseNode implements EngineNode {
   public optional?: boolean
   public optionalActive?: boolean
   public optionalPromptKey?: PromptKey
+  public anytimeWindow?: AnytimeWindow
   public mandatory?: boolean
   public beforeAnytimeAvailable?: boolean
   public pending?: PendingEnvelope | null
@@ -93,6 +95,7 @@ export abstract class BaseNode implements EngineNode {
     if (this.optional !== undefined) data.optional = this.optional
     if (this.optionalActive !== undefined) data.optionalActive = this.optionalActive
     if (this.optionalPromptKey !== undefined) data.optionalPromptKey = this.optionalPromptKey
+    if (this.anytimeWindow !== undefined) data.anytimeWindow = this.anytimeWindow
     if (this.beforeAnytimeAvailable !== undefined) data.beforeAnytimeAvailable = this.beforeAnytimeAvailable
     if (this.mandatory !== undefined) data.mandatory = this.mandatory
     if (this.pending !== undefined && this.pending !== null) data.pending = this.pending

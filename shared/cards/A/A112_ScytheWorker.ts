@@ -83,6 +83,7 @@ const cardImpl = {
 } satisfies CardImpl
 
 export const A112_ScytheWorker = defineOccupationCard({
+  presentation: { stack: true },
   meta: {
     id: CARD_ID,
     name: "Scythe Worker",

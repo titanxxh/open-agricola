@@ -106,6 +106,7 @@ const cardImpl = {
 } satisfies CardImpl
 
 export const A071_ClearingSpade = defineMinorCard({
+  presentation: { stack: true },
   meta: {
     id: CARD_ID,
     name: 'Clearing Spade',

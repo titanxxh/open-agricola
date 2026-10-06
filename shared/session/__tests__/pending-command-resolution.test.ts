@@ -13,6 +13,17 @@ const view = (envelope: PendingEnvelope): PendingView => ({
 })
 
 describe('pending command resolution', () => {
+  it('reports disabled options independently of the choice prompt', () => {
+    const envelope: PendingEnvelope = {
+      hostNodeId: 'choice-0', promptKey: 'ui.confirm',
+      request: { kind: 'choice', options: [{ value: 'buy', labelKey: 'ui.confirm', disabled: true }] },
+      choices: [{ value: 'buy', labelKey: 'ui.confirm', disabled: true }],
+    }
+    const input = { envelope, view: view(envelope), pendingActionId: undefined,
+      payload: undefined, isFarmPrompt: false, isSelectionPrompt: false }
+    expect(planResolveChoiceSubmission({ ...input, value: 'buy' })).toEqual({ ok: false, error: 'choice disabled' })
+    expect(planResolveChoiceSubmission({ ...input, value: 'unknown' })).toEqual({ ok: false, error: 'invalid choice value' })
+  })
   it('routes feed submissions after normalizing legacy payload forms', () => {
     const envelope: PendingEnvelope = {
       hostNodeId: 'feed-0',

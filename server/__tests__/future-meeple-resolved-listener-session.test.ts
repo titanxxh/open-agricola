@@ -77,7 +77,7 @@ describe('future meeple resolved card listener dispatch', () => {
         event.type === 'card.stateChanged'
         && event.sourceCardId === LISTENER_CARD
         && event.key === 'seenFutureMeeple'
-        && event.value === true,
+        && !Object.hasOwn(event, 'value'),
       )).toBe(true)
     } finally {
       setActiveCardRegistry(outerRegistry)

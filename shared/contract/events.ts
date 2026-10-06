@@ -241,7 +241,8 @@ export type CardTriggeredEvent = GameEventBase<'card.triggered'> & {
 export type CardStateChangedEvent = GameEventBase<'card.stateChanged'> & {
   cardId: string
   key: string
-  value: unknown
+  /** Retained only when reading historical full Frames. New audit events carry metadata. */
+  value?: unknown
   targetPlayerId: string
 }
 

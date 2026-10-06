@@ -93,6 +93,7 @@ const cardImpl = {
 } satisfies CardImpl
 
 export const B048_ForestStone = defineMinorCard({
+  presentation: { counters: ['foodCount'] },
   meta: {
     id: CARD_ID,
     name: 'Forest Stone',

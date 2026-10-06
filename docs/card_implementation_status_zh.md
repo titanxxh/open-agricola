@@ -187,6 +187,8 @@
 
 ## 6. 基础设施待办
 
+#994–#1002 建立 Card State 边界：来源卡只读规则贡献、按来源归还特殊畜栏、围栏使用真实 AnimalZone 数量、当前节点显式 Anytime Window，以及规范化的公开展示。普通视角只接收明确的公开／玩家私有信息，本人也不接收内部状态；恢复和全开 Replay 保留原始数据。默认架构入口现扫描领域层、行动层（包括 internal effect）、引擎、会话、投影、服务端、前端和 Replay Viewer，拒绝固定单卡状态／提示键依赖与前端原始状态读取。原生和沙盒 Session 验证结算、恢复、undo、视角隔离和通用多来源行为，前端验证记录后的展示。契约见 Architecture §8.3 和 ADR 0023。
+
 动物重整自动补位已在共享动物区与请求边界实现，详见 §5 基础设施表；核心路径不增加卡号分支。
 
 当前选项可用性由原生纯查询 `CardEffect.projectInteractionRequest` 实现：活动 pending 的选项及数量上限在展示与权威校验前刷新，覆盖嵌套 anytime、撤销和恢复。卡牌局部条件保留 pending 归属、随机观察、资源承诺和原有选项展示策略；未来必需流程继续沿用 ADR 0015 语义。
@@ -204,6 +206,8 @@ Issue #893 补充不改变固定槽身份的 Card Field 作物分层；播种提
 后续若发现需要跨多张卡的新机制，先在本节新增待办；实现完成并有测试或守卫后，从本节移除并同步 §5 / §12。
 
 ## 8. 参考实现坏味道：不要照抄
+
+通用消费者不得读取固定单卡的原始状态或提示键，不得枚举内部字段生成展示，也不得把完整内部状态发送给本人。应添加来源只读规则／展示查询或可复用的显式 flow 契约；默认 card-state 架构门禁检查这些边界。
 
 - 中心化 `SpecialEffect.js` cardId dispatch 和单卡 JS 方法。OA 应保留 typed pending/action flow。
 - 参考实现在 action/main path 中出现卡名或一次性逻辑，例如全局 Scythe-style flag 或 C88 stable/fence cost relocation。OA 应优先使用卡牌本地 hooks/helpers。

@@ -51,6 +51,7 @@ export const B111_Rustic = defineOccupationCard({
     players: '1+',
     extraVp: true,
   },
+  presentation: { counters: ['bonusVp'] },
   impl: cardImpl,
 })
 

@@ -68,6 +68,7 @@ const cardImpl = {
 } satisfies CardImpl
 
 export const C075_Firewood = defineMinorCard({
+  presentation: { counters: ['wood'] },
   meta: {
     id: CARD_ID,
     name: "Firewood",

@@ -56,6 +56,7 @@ export const C101_StallHolder = defineOccupationCard({
     players: '1+',
     extraVp: true,
   },
+  presentation: { counters: ['bonusVp'] },
   impl: cardImpl,
 })
 

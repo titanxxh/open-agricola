@@ -14,7 +14,7 @@
  *     { kind: 'occupation-hand', selectableCards: player.occupationHand, min=3, max=3,
  *       selectionEffect: 'paper-knife-random-play' }
  *   commitSelectionChoice({ cardIds }) → selection effect fires:
- *     • rollAndCacheCardPick → caches pick in cardStates[CARD_ID].extraData.pick
+ *     • rollAndCacheCardPick → caches pick in cardStates[CARD_ID].privateData.pick
  *     • state.pendingUndoBoundary = true
  *     • returns occupation leaf { exactCost: {}, allowedCards: [pick] }
  *   occupation prompt offers the revealed card or decline
@@ -302,7 +302,7 @@ describe('A003_PaperKnife session-tier: flow', () => {
     expect(commitResp.interaction.stateId).toBe('wait')
     if (commitResp.interaction.stateId !== 'wait') return
     const p0 = commitResp.state.players[0]!
-    const pick = p0.cardStates?.[SESSION_CARD_ID]?.extraData?.pick as string | undefined
+    const pick = p0.cardStates?.[SESSION_CARD_ID]?.privateData?.pick as string | undefined
     expect(pick).toBeDefined()
     const acceptOption = commitResp.interaction.request.options?.find((option) => option.value !== '__skip__')
     expect(acceptOption?.sourceCard).toBe(SESSION_CARD_ID)
@@ -345,7 +345,7 @@ describe('A003_PaperKnife session-tier: flow', () => {
 
     expect(resp.ok).toBe(true)
     const player = resp.state.players[0]!
-    const pick = player.cardStates?.[SESSION_CARD_ID]?.extraData?.pick as string | undefined
+    const pick = player.cardStates?.[SESSION_CARD_ID]?.privateData?.pick as string | undefined
     expect(pick).toBeDefined()
     expect(player.occupationPlayed).toEqual([])
     expect(player.occupationHand).toEqual([OCC_A, OCC_B, OCC_C, OCC_D])
@@ -360,6 +360,13 @@ describe('A003_PaperKnife session-tier: flow', () => {
     expect(declined.state.players[0]!.occupationPlayed).toEqual([])
     expect(declined.state.players[0]!.occupationHand).toEqual([OCC_A, OCC_B, OCC_C, OCC_D])
     expect(declined.state.players[0]!.resources.food).toBe(3)
+    for (const response of [resp, declined]) {
+      expect(JSON.stringify(session.buildSyncPayload(response, player.id))).toContain(pick)
+      for (const viewer of [response.state.players[1]!.id, null]) {
+        const payload = JSON.stringify(session.buildSyncPayload(response, viewer))
+        for (const cardId of [OCC_A, OCC_B, OCC_C, OCC_D]) expect(payload).not.toContain(cardId)
+      }
+    }
   })
 
   // ---------------------------------------------------------------------------
@@ -379,8 +386,8 @@ describe('A003_PaperKnife session-tier: flow', () => {
     expect(resp1.ok).toBe(true)
     expect(resp2.ok).toBe(true)
 
-    const pick1 = resp1.state.players[0]!.cardStates?.[SESSION_CARD_ID]?.extraData?.pick
-    const pick2 = resp2.state.players[0]!.cardStates?.[SESSION_CARD_ID]?.extraData?.pick
+    const pick1 = resp1.state.players[0]!.cardStates?.[SESSION_CARD_ID]?.privateData?.pick
+    const pick2 = resp2.state.players[0]!.cardStates?.[SESSION_CARD_ID]?.privateData?.pick
 
     expect(pick1).toBeDefined()
     expect(pick2).toBeDefined()
@@ -403,7 +410,7 @@ describe('A003_PaperKnife session-tier: flow', () => {
     expect(commitResp.ok).toBe(true)
 
     // The pick must be cached after commit
-    const pick = commitResp.state.players[0]!.cardStates?.[SESSION_CARD_ID]?.extraData?.pick
+    const pick = commitResp.state.players[0]!.cardStates?.[SESSION_CARD_ID]?.privateData?.pick
     expect(pick).toBeDefined()
 
     // undoStep must be blocked — the boundary was set during the roll
@@ -414,7 +421,7 @@ describe('A003_PaperKnife session-tier: flow', () => {
     // The revealed prompt and player state must survive the failed undo
     const afterUndo = session.getState()
     const stateAfterUndo = afterUndo.state
-    const pickAfter = stateAfterUndo.players[0]?.cardStates?.[SESSION_CARD_ID]?.extraData?.pick
+    const pickAfter = stateAfterUndo.players[0]?.cardStates?.[SESSION_CARD_ID]?.privateData?.pick
     expect(pickAfter).toBe(pick)
     expect(stateAfterUndo.players[0]!.occupationHand).toEqual([OCC_A, OCC_B, OCC_C, OCC_D])
     expect(stateAfterUndo.players[0]!.occupationPlayed).toEqual([])
@@ -483,7 +490,7 @@ describe('A003_PaperKnife session-tier: flow', () => {
 
     expect(commitResp.interaction.stateId).toBe('wait')
     if (commitResp.interaction.stateId !== 'wait') return
-    const pick = commitResp.state.players[0]!.cardStates?.[SESSION_CARD_ID]?.extraData?.pick as string | undefined
+    const pick = commitResp.state.players[0]!.cardStates?.[SESSION_CARD_ID]?.privateData?.pick as string | undefined
     expect(pick).toBeDefined()
     const acceptOption = commitResp.interaction.request.options?.find((option) => option.value !== '__skip__')
     expect(acceptOption).toBeDefined()

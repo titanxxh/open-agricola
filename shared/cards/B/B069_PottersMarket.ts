@@ -50,6 +50,7 @@ const cardImpl = {
 } satisfies CardImpl
 
 export const B069_PottersMarket = defineMinorCard({
+  presentation: { counters: ['pending'] },
   meta: {
     id: CARD_ID,
     name: "Potter's Market",

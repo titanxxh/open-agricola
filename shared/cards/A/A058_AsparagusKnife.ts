@@ -80,6 +80,7 @@ const cardImpl = {
 } satisfies CardImpl
 
 export const A058_AsparagusKnife = defineMinorCard({
+  presentation: { counters: ['bonusVp'], stack: true },
   meta: {
     id: 'A058_AsparagusKnife',
     name: 'Asparagus Knife',

@@ -135,6 +135,7 @@ const cardImpl = {
 } satisfies CardImpl
 
 export const E123_ResourceHoarder = defineOccupationCard({
+  presentation: { stack: true },
   meta: {
     id: CARD_ID,
     name: 'Resource Hoarder',

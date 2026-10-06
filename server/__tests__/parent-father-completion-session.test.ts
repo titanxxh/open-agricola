@@ -261,12 +261,15 @@ const auditAssertCompleted = (session: GameSession, father: FatherParentCardId, 
   expect(response.state.log.filter((entry) => entry.key === 'log.cardInfoboxChanged' && entry.params?.cardId === father))
     .toEqual([{ key: 'log.cardInfoboxChanged', params: { cardId: father, text: 'Completed' } }])
   expect(response.state.events.filter((event) => event.type === 'card.stateChanged' && event.cardId === father && event.key === 'fatherCompletedTier'))
-    .toEqual([expect.objectContaining({ actorPlayerId: 'p1', targetPlayerId: 'p1', value: tier })])
+    .toEqual([expect.objectContaining({ actorPlayerId: 'p1', targetPlayerId: 'p1' })])
+  expect(response.state.events.filter((event) => event.type === 'card.stateChanged' && event.cardId === father)
+    .every((event) => !Object.hasOwn(event, 'value'))).toBe(true)
   expect(response.state.events.filter((event) => event.type === 'card.infoboxChanged' && event.cardId === father))
     .toEqual([expect.objectContaining({ actorPlayerId: 'p1', targetPlayerId: 'p1', text: 'Completed' })])
   for (const viewer of ['p1', 'p2', null]) {
     const payload = session.buildSyncPayload(response, viewer)
-    expect(payload.state.players[0]!.cardStates[father]?.infobox).toBe('Completed')
+    expect(payload.state.players[0]!.cardStatePresentation[father]).toMatchObject({ infobox: 'Completed', completedTier: tier })
+    expect(payload.state.players[0]!.cardStates[father]).toBeUndefined()
     expect(payload.scores![0]!.categories.find((category) => category.key === 'parentCards')?.entries).toEqual([{ type: 'parentCard', cardId: 'PR10', score: 0.7 }])
   }
   const before = auditClone(response.state)

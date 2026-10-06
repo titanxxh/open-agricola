@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import type { FarmTilePosition, PlayerState } from '../../contract/types'
 import {
   getEmptyUnfencedStableCountForCards,
@@ -7,6 +7,37 @@ import {
   getUnfencedStableCountForCards,
 } from '../stables'
 import { makeBlankPlayer } from './helpers'
+import { CardRegistry } from '../../cards/registry'
+import { setActiveCardRegistry, withActiveRegistry } from '../../cards/active-registry'
+import { B085_FarmHand } from '../../cards/B/B085_FarmHand'
+import { listReturnableStableTiles, returnStableAtTile } from '../../cards/helpers/stable-removal'
+
+beforeEach(() => {
+  const registry = new CardRegistry()
+  registry.loadImpl(B085_FarmHand.id, B085_FarmHand.impl)
+  setActiveCardRegistry(registry)
+})
+
+it('counts and returns special stables through their owning sources', () => {
+  const registry = new CardRegistry()
+  for (const [cardId, position] of [
+    ['CUSTOM_FirstStable', { row: 0, col: 2 }],
+    ['CUSTOM_SecondStable', { row: 1, col: 3 }],
+  ] as const) registry.loadImpl(cardId, { effect: {
+    id: cardId,
+    getBuiltSpecialStables: (p) => p.cardStates[cardId]?.flagged ? [{ ...position }] : [],
+    returnSpecialStable: (p) => { p.cardStates[cardId]!.flagged = false; return true },
+  } })
+  const p = makeBlankPlayer({ occupationPlayed: ['CUSTOM_FirstStable', 'CUSTOM_SecondStable'] }) as unknown as PlayerState
+  p.cardStates = { CUSTOM_FirstStable: { flagged: true }, CUSTOM_SecondStable: { flagged: true } }
+  withActiveRegistry(registry, () => {
+    expect(getStableCountForCards(p)).toBe(2)
+    expect(listReturnableStableTiles(p)).toEqual([{ row: 0, col: 2 }, { row: 1, col: 3 }])
+    expect(returnStableAtTile(p, { row: 0, col: 2 })).toBe('special')
+    expect(getStableCountForCards(p)).toBe(1)
+    expect(p.cardStates.CUSTOM_SecondStable?.flagged).toBe(true)
+  })
+})
 
 const player = (overrides: {
   stableTiles?: FarmTilePosition[]
@@ -20,6 +51,7 @@ const player = (overrides: {
   }) as unknown as PlayerState
   base.stableAnimals = overrides.stableAnimals ?? {}
   if (overrides.farmHandPosition) {
+    base.occupationPlayed = [B085_FarmHand.id]
     base.cardStates = {
       B085_FarmHand: { extraData: { position: overrides.farmHandPosition } },
     }

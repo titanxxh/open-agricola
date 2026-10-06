@@ -3,6 +3,7 @@ import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
+import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/serialization'
 import { Scoring } from '../../shared/domain'
 import type { InteractionRequest, InteractionState, PlayerState } from '../../shared/contract/types'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
@@ -95,9 +96,8 @@ const setupEndGameSession = (opts: {
   p0FireplaceSheep?: number
   p1FireplaceSheep?: number
 } = {}) => {
-  const session = new GameSession()
+  const session = new GameSession(42, undefined, { playerCount: 2 })
   const state = session.getState().state
-  state.players = state.players.slice(0, 2)
   state.currentPlayerIndex = 0
   state.round = 14
   state.roundPhase = 'work'
@@ -281,6 +281,20 @@ describe('D132_HideFarmer session', () => {
     const quantity = expectD132Quantity(resp, 0)
     expect(quantity.request.availableByResource.food).toBe(2)
     expect(quantity.anytimeActions.map((a) => a.id)).not.toContain('exchange')
+    const beforeRejected = JSON.stringify(session.state)
+    expect(session.takeAnytimeAction(0, 'exchange').ok).toBe(false)
+    expect(JSON.stringify(session.state)).toBe(beforeRejected)
+    const saved = session.withCtx(() => serializeSessionSnapshot(session.state, session))
+    const restored = new GameSession(rehydrateState(saved))
+    expectD132Quantity(restored.getState(), 0)
+    expect(restored.getState().interaction.anytimeActions).toEqual([])
+    for (const target of [session, restored]) {
+      const finished = commitHiddenFood(target, 0, 2)
+      expect(finished.ok).toBe(true)
+      expect(finished.state.players[0]!.resources.food).toBe(0)
+      expect(finished.state.players[0]!.cardStates[CARD_ID]?.extraData?.hiddenSpaces).toBe(2)
+      expect(getCategory(finished, 0, 'empty')).toMatchObject({ quantity: 0, total: 0 })
+    }
   })
 
   it('does not skip D132 optional just because current food is zero', () => {

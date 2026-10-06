@@ -154,6 +154,7 @@ const resolveBakeBreadChoice = (
       request: {
         kind: 'choice',
         structuredChoicePrefixes: ['bulk:'],
+        anytimeWindow: { allowed: true, blockedIds: ['exchange'] },
         options: Array.from({ length: maxCount }, (_, index) => ({
           value: `count-${choice}-${index + 1}`,
           labelKey: 'ui.interactionBakeBreadCountLabel',
@@ -182,6 +183,7 @@ export const bakeBreadAction: ActionDefinition = {
         kind: 'choice',
         options,
         structuredChoicePrefixes: ['bulk:'],
+        anytimeWindow: { allowed: true, blockedIds: ['exchange'] },
         ...(actionContext?.requiresExplicitChoice === true ? { requiresExplicitChoice: true } : {}),
       },
       promptKey: 'ui.interactionBakeBreadChoice',

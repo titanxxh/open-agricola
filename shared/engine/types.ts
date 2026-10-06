@@ -2,6 +2,7 @@ import type {
   ActionChoiceOption,
   ActionExecutionContext,
   ActionExecutionResult,
+  AnytimeWindow,
   InteractionRequest,
 } from '../contract/types'
 import type { PromptKey } from '../contract/prompt-keys'
@@ -22,6 +23,7 @@ export type EngineNode = {
   optional?: boolean
   optionalActive?: boolean
   optionalPromptKey?: PromptKey
+  anytimeWindow?: AnytimeWindow
   mandatory?: boolean
   beforeAnytimeAvailable?: boolean
   pending?: PendingEnvelope | null

@@ -4,7 +4,7 @@ import type { PrivateGameEvent } from '../../shared/contract/protocol/game'
 import { getActionDefinition } from '../../shared/actions'
 import type { ActionExecutionContext, ActionSpace } from '../../shared/contract/types'
 import { setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
-import { writeCardExtraData } from '../../shared/cards/helpers/card-state'
+import { writePrivateCardData } from '../../shared/cards/helpers/card-state'
 import { B003_Moonshine_impl } from '../../shared/cards/B/B003_Moonshine'
 
 import '../../shared/cards/A/A016_RammedClay'
@@ -271,7 +271,7 @@ describe('card effect hand notification events', () => {
     state.players = state.players.slice(0, 1)
     const player = state.players[0]!
     player.occupationHand = [TEST_OCCUPATION_ID]
-    writeCardExtraData(player, B003_CARD_ID, 'occ', TEST_OCCUPATION_ID)
+    writePrivateCardData(player, B003_CARD_ID, 'occ', TEST_OCCUPATION_ID)
 
     const events: PrivateGameEvent[] = []
     B003_Moonshine_impl.effect.resolveChoice?.(state, player, 'pass', {

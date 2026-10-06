@@ -102,6 +102,7 @@ const cardImpl = {
   listeners: [isDoableListener, beforeFenceListener, afterFenceListener],
   effect: {
   id: CARD_ID,
+  getRuleContributions: (player) => ({ reservedSupply: { fence: player.cardStates?.[CARD_ID]?.counters?.fences ?? 0 } }),
   onBuy: (_state, player) => {
     const initial = Math.min(MAX_FREE_FENCES, getOwnOrdinaryFenceReserveCount(player))
     const counters = initCardState(player, CARD_ID)
@@ -113,6 +114,7 @@ const cardImpl = {
 } satisfies CardImpl
 
 export const E074_AshTrees = defineMinorCard({
+  presentation: { counters: ['fences'] },
   meta: {
     id: CARD_ID,
     name: "Ash Trees",

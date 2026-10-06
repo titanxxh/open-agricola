@@ -109,14 +109,12 @@ const expectWorkIdle = (
   expect(resp.interaction.allowedCommands).toEqual(['takeAction'])
 }
 
-const bonusCounterValues = (resp: ReturnType<GameSession['getState']>) =>
-  resp.state.events
-    .filter((event) =>
-      event.type === 'card.stateChanged' &&
-      event.sourceCardId === CARD_ID &&
-      event.key === 'bonusVp',
-    )
-    .map((event) => event.value)
+const bonusCounterEvents = (resp: ReturnType<GameSession['getState']>) => {
+  const events = resp.state.events.filter((event) =>
+    event.type === 'card.stateChanged' && event.sourceCardId === CARD_ID && event.key === 'bonusVp')
+  expect(events.every((event) => !Object.hasOwn(event, 'value'))).toBe(true)
+  return events
+}
 
 describe('B132_EstateMaster session', () => {
   it('scores no bonus while at least one farmyard space is unused', () => {
@@ -130,7 +128,7 @@ describe('B132_EstateMaster session', () => {
     expectWorkIdle(resp, 5)
     expect(resp.state.players[0]!.resources.vegetable).toBe(1)
     expect(resp.state.players[0]!.cardStates[CARD_ID]?.counters?.bonusVp).toBeUndefined()
-    expect(bonusCounterValues(resp)).toEqual([])
+    expect(bonusCounterEvents(resp)).toHaveLength(0)
     expect(resp.state.events.some((event) =>
       event.type === 'card.triggered' && event.sourceCardId === CARD_ID,
     )).toBe(false)
@@ -149,7 +147,7 @@ describe('B132_EstateMaster session', () => {
     expectWorkIdle(resp, 5)
     expect(resp.state.players[0]!.resources.vegetable).toBe(1)
     expect(resp.state.players[0]!.cardStates[CARD_ID]?.counters?.bonusVp).toBe(1)
-    expect(bonusCounterValues(resp)).toEqual([1])
+    expect(bonusCounterEvents(resp)).toHaveLength(1)
     expect(resp.state.events.filter((event) =>
       event.type === 'card.triggered' && event.sourceCardId === CARD_ID,
     )).toHaveLength(1)
@@ -169,7 +167,7 @@ describe('B132_EstateMaster session', () => {
     expectWorkIdle(resp, 5)
     expect(resp.state.players[0]!.resources.vegetable).toBe(2)
     expect(resp.state.players[0]!.cardStates[CARD_ID]?.counters?.bonusVp).toBe(2)
-    expect(bonusCounterValues(resp)).toEqual([2])
+    expect(bonusCounterEvents(resp)).toHaveLength(1)
     expect(resp.state.events.filter((event) =>
       event.type === 'card.triggered' && event.sourceCardId === CARD_ID,
     )).toHaveLength(1)
@@ -188,7 +186,7 @@ describe('B132_EstateMaster session', () => {
     expectWorkIdle(resp, 5)
     expect(resp.state.players[0]!.resources.grain).toBe(1)
     expect(resp.state.players[0]!.cardStates[CARD_ID]?.counters?.bonusVp).toBeUndefined()
-    expect(bonusCounterValues(resp)).toEqual([])
+    expect(bonusCounterEvents(resp)).toHaveLength(0)
     expect(resp.state.events.some((event) =>
       event.type === 'card.triggered' && event.sourceCardId === CARD_ID,
     )).toBe(false)
@@ -206,7 +204,7 @@ describe('B132_EstateMaster session', () => {
     let resp = session.performRoundEnd()
     expectWorkIdle(resp, 5)
     expect(resp.state.players[0]!.cardStates[CARD_ID]?.counters?.bonusVp).toBe(1)
-    expect(bonusCounterValues(resp)).toEqual([1])
+    expect(bonusCounterEvents(resp)).toHaveLength(1)
     expect(reaped(resp, 'vegetable')).toBe(1)
     expectEstateBonus(resp, 1)
 
@@ -223,7 +221,7 @@ describe('B132_EstateMaster session', () => {
     expectWorkIdle(resp, 8)
     expect(resp.state.players[0]!.resources.vegetable).toBe(2)
     expect(resp.state.players[0]!.cardStates[CARD_ID]?.counters?.bonusVp).toBe(2)
-    expect(bonusCounterValues(resp)).toEqual([1, 2])
+    expect(bonusCounterEvents(resp)).toHaveLength(2)
     expect(reaped(resp, 'vegetable')).toBe(2)
     expectEstateBonus(resp, 2)
   })
@@ -261,7 +259,6 @@ describe('B132_EstateMaster session', () => {
       type: 'card.stateChanged',
       sourceCardId: CARD_ID,
       key: 'saturated',
-      value: true,
       targetPlayerId: resp.state.players[0]!.id,
     }))
 
@@ -280,7 +277,7 @@ describe('B132_EstateMaster session', () => {
     expectWorkIdle(resp, 5)
     expect(resp.state.players[0]!.resources.vegetable).toBe(1)
     expect(resp.state.players[0]!.cardStates[CARD_ID]?.counters?.bonusVp).toBe(1)
-    expect(bonusCounterValues(resp)).toEqual([1])
+    expect(bonusCounterEvents(resp)).toHaveLength(1)
     expect(reaped(resp, 'vegetable')).toBe(1)
     expectEstateBonus(resp, 1)
 
@@ -301,7 +298,7 @@ describe('B132_EstateMaster session', () => {
     expectWorkIdle(resp, 8)
     expect(resp.state.players[0]!.resources.vegetable).toBe(2)
     expect(resp.state.players[0]!.cardStates[CARD_ID]?.counters?.bonusVp).toBe(2)
-    expect(bonusCounterValues(resp)).toEqual([1, 2])
+    expect(bonusCounterEvents(resp)).toHaveLength(2)
     expect(reaped(resp, 'vegetable')).toBe(2)
     expectEstateBonus(resp, 2)
   })

@@ -1,4 +1,7 @@
-import { describe, expect, it } from 'vitest'
+import { E074_AshTrees } from '../../../cards/E/E074_AshTrees'
+import { CardRegistry } from '../../../cards/registry'
+import { setActiveCardRegistry } from '../../../cards/active-registry'
+import { beforeEach, describe, expect, it } from 'vitest'
 import type { GameState, PlayerState } from '../../../contract/types'
 import { createInitialPlayerStats } from '../../../session/stats'
 import { payAction } from '../pay'
@@ -37,6 +40,12 @@ const makePlayer = (overrides: Partial<PlayerState> = {}): PlayerState => ({
 
 const makeState = (player: PlayerState): GameState => ({ players: [player] } as never)
 
+beforeEach(() => {
+  const registry = new CardRegistry()
+  registry.loadImpl(E074_AshTrees.id, E074_AshTrees.impl)
+  setActiveCardRegistry(registry)
+})
+
 describe('pay supply tokens', () => {
   it('pays fence from reserve without removing built fences', () => {
     const player = makePlayer()
@@ -51,6 +60,7 @@ describe('pay supply tokens', () => {
   it('does not pay fence from E74 card-held fences', () => {
     const player = makePlayer({
       fenceSegments: Array.from({ length: 10 }, (_, i) => ({ edge: `${i},0-H`, type: 'fence' as const, source: { kind: 'own' as const, ownerPlayerId: 'p1' } })),
+      minorPlayed: [E074_AshTrees.id],
       cardStates: { E074_AshTrees: { counters: { fences: 5 } } },
     })
     const state = makeState(player)

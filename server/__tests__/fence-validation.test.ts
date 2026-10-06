@@ -739,7 +739,7 @@ describe('validateFenceSelection — generic fence policy', () => {
       D148_DomesticianExpert: { extraData: { held: 1, animalType: 'cattle' } },
     }
 
-    const result = validateFenceSelection(player, edgesForTile(0, 1))
+    const result = validateFenceSelection(player, edgesForTile(0, 1), [], 0, 0, { nonPastureAnimalCounts: { cattle: 1 } })
 
     expect(result.ok).toBe(true)
     if (result.ok) {
@@ -760,7 +760,7 @@ describe('validateFenceSelection — generic fence policy', () => {
       C148_MudWallower: { counters: { counter: 0, held: 1 } },
     }
 
-    const result = validateFenceSelection(player, edgesForTile(0, 1))
+    const result = validateFenceSelection(player, edgesForTile(0, 1), [], 0, 0, { nonPastureAnimalCounts: { boar: 1 } })
 
     expect(result.ok).toBe(true)
     if (result.ok) {
@@ -784,7 +784,7 @@ describe('validateFenceSelection — generic fence policy', () => {
       C148_MudWallower: { counters: { counter: 0, held: 2 } },
     }
 
-    const result = validateFenceSelection(player, edgesForTile(0, 1))
+    const result = validateFenceSelection(player, edgesForTile(0, 1), [], 0, 0, { nonPastureAnimalCounts: { boar: 1 } })
 
     expect(result.ok).toBe(true)
     if (result.ok) {

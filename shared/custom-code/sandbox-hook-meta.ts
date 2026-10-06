@@ -72,6 +72,14 @@ export const cardEffectHookMeta: Record<CardEffectField, HookMeta> = {
     usage: '终局花资源换 VP（声明 levels；solver 枚举最优组合）',
   },
   computeExtraRoomCapacity: { table: 'advanced', signature: '(player) => number', usage: '额外容纳空间' },
+  getRuleContributions: {
+    table: 'advanced', signature: '(player) => { reservedSupply?, unusedSpaceReduction? }',
+    usage: '只读规则贡献；组件预留数量与空格扣分数量减免，不能写状态',
+  },
+  getStatePresentation: {
+    table: 'advanced', signature: '(player) => CardStatePresentation',
+    usage: '只读公开展示：计数、资源组、作物层、动物标记和来源；内部字段默认不发送',
+  },
   computeHarvestBreedOrderPriority: {
     table: 'advanced',
     signature: '(state, player) => number | void',
@@ -104,6 +112,10 @@ export const cardEffectHookMeta: Record<CardEffectField, HookMeta> = {
     table: 'advanced',
     signature: '(player) => FarmTilePosition[]',
     usage: '当前矗立的特殊 stable（驱动 snapshot specialStables 展示派生）',
+  },
+  returnSpecialStable: {
+    table: 'advanced', signature: '(player, position) => boolean',
+    usage: '所属来源返回特殊畜栏（native；沙盒写入尚未开放）',
   },
 
   // 联合成员但不在 cardEffectHooks 数组，不会被渲染进 prompt（仅为 Record 穷尽性）

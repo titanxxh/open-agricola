@@ -46,6 +46,7 @@ export const B035_HookKnife = defineMinorCard({
     cost: { wood: 1 },
     extraVp: true,
   },
+  presentation: { counters: ['bonusVp'] },
   impl: cardImpl,
 })
 

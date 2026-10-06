@@ -1,5 +1,5 @@
 import { defineMinorCard } from '../card-source'
-import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
+import { readPrivateCardData, writePrivateCardData } from '../helpers/card-state'
 import { rollAndCacheCardPick } from '../helpers/card-random'
 import { passOccupationToNextPlayer } from '../helpers/pass-occupation'
 import type { ActionFlow } from '../../contract/types'
@@ -26,7 +26,7 @@ const cardImpl = {
   onBuy: (state, player, _paymentInfo, ctx) => {
     if (player.occupationHand.length === 0) return
 
-    // Roll and cache via Task-1.1 helper (writes to extraData.occ).
+    // The revealed occupation belongs to this player's private state.
     const pick = rollAndCacheCardPick(
       state,
       player,
@@ -34,6 +34,7 @@ const cardImpl = {
       KEY_OCC,
       player.occupationHand,
       ctx?.reportProtectedObservation,
+      'player-private',
     )
 
     state.pendingUndoBoundary = true
@@ -67,11 +68,11 @@ const cardImpl = {
   },
 
   resolveChoice: (state, player, choice, ctx) => {
-    const pick = readCardExtraData<string>(player, CARD_ID, KEY_OCC)
+    const pick = readPrivateCardData<string>(player, CARD_ID, KEY_OCC)
     if (!pick) return
 
     if (choice === 'play') {
-      writeCardExtraData(player, CARD_ID, KEY_OCC, undefined)
+      writePrivateCardData(player, CARD_ID, KEY_OCC, undefined)
       return {
         type: 'leaf',
         actionId: 'occupation',
@@ -104,7 +105,7 @@ const cardImpl = {
           ))
         }
       }
-      writeCardExtraData(player, CARD_ID, KEY_OCC, undefined)
+      writePrivateCardData(player, CARD_ID, KEY_OCC, undefined)
     }
   },
 },

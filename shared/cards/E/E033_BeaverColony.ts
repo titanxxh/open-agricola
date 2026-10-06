@@ -87,6 +87,7 @@ export const E033_BeaverColony = defineMinorCard({
     prerequisite: "1 Fenced Stable",
     extraVp: true,
   },
+  presentation: { counters: ['bonusVp'] },
   impl: cardImpl,
 })
 

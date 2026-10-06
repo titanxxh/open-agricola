@@ -110,6 +110,7 @@ const cardImpl = {
 } satisfies CardImpl
 
 export const B115_TinsmithMaster = defineOccupationCard({
+  presentation: { stack: true },
   meta: {
     id: CARD_ID,
     name: 'Tinsmith Master',

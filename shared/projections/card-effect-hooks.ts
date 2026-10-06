@@ -37,4 +37,6 @@ export const cardEffectHooks: CardEffectField[] = [
   'computeLockedFarmTiles',
   'getInvalidAnimals',
   'getBuiltSpecialStables',
+  'getRuleContributions',
+  'getStatePresentation',
 ]

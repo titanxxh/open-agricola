@@ -61,6 +61,7 @@ const cardImpl = {
 } satisfies CardImpl
 
 export const C063_CraftBrewery = defineMinorCard({
+  presentation: { counters: ['bonusVp'], stack: true },
   meta: {
     id: CARD_ID,
     name: "Craft Brewery",
