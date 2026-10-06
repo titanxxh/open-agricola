@@ -34,7 +34,7 @@ export function OperationsPage() {
       const response = await apiFetch('/api/admin/observability/session', { method: 'POST' })
       if (!response.ok) throw new Error('unavailable')
       const { path } = await response.json() as { path: string }
-      const target = new URL(path, API_BASE || window.location.origin)
+      const target = new URL(API_BASE.replace(/\/+$/, '') + path, window.location.origin)
       if (tab) tab.location.href = target.href
       else window.location.assign(target.href)
     } catch { tab?.close(); setError(t('platform.operationsUnavailable')) }

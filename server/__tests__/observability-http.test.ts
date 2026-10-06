@@ -1,11 +1,14 @@
-import { createServer } from 'node:http'
+import { createServer, request } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { afterAll, beforeAll, expect, it, vi } from 'vitest'
-import { createTestDatabase } from './_helpers/postgres'
+import { createTestDatabase, getTestDatabaseUrl } from './_helpers/postgres'
+import { PostgresDatabase } from '../database/postgres'
 import { createOperationsHandler } from '../observability/http'
 
 const db = await createTestDatabase()
+const grafanaRequests: string[] = []
 const grafana = createServer((req, res) => {
+  grafanaRequests.push(req.url!)
   res.writeHead(200, { 'Content-Type': 'application/json' })
   res.end(JSON.stringify({ user: req.headers['x-webauth-user'], cookie: req.headers.cookie, authorization: req.headers.authorization }))
 })
@@ -107,6 +110,63 @@ it('protects the scrape endpoint and reports actual rejected HTTP requests', asy
   const before = rejected(await scrape())
   await fetch(base + '/api/admin/observability')
   expect(rejected(await scrape())).toBe(before + 1)
+})
+
+it('preserves the public API prefix through an actual reverse-proxy handoff, cookie and Grafana request', async () => {
+  const originalNodeEnv = process.env.NODE_ENV
+  const originalApiBase = process.env.PUBLIC_API_BASE
+  const proxy = createServer((req, res) => {
+    if (!req.url?.startsWith('/agricola-api/')) { res.writeHead(404); res.end(); return }
+    const upstream = request(base + req.url.slice('/agricola-api'.length), { method: req.method, headers: req.headers }, response => {
+      res.writeHead(response.statusCode!, response.headers); response.pipe(res)
+    })
+    req.pipe(upstream)
+  })
+  await new Promise<void>(done => proxy.listen(0, '127.0.0.1', done))
+  const publicBase = `http://127.0.0.1:${(proxy.address() as AddressInfo).port}/agricola-api`
+  vi.stubEnv('NODE_ENV', 'production')
+  vi.stubEnv('PUBLIC_API_BASE', publicBase)
+  try {
+    const bootstrap = await fetch(publicBase + '/api/admin/observability/session', { method: 'POST', headers: { Authorization: 'Bearer ops-admin-token' } })
+    const { path } = await bootstrap.json()
+    const start = await fetch(publicBase + path, { redirect: 'manual' })
+    expect(start.status).toBe(303)
+    expect(start.headers.get('location')).toBe('/agricola-api/ops/d/open-agricola/operations')
+    expect(start.headers.get('set-cookie')).toContain('Path=/agricola-api/ops;')
+    const cookie = start.headers.get('set-cookie')!.split(';')[0]!
+    const dashboard = await fetch(new URL(start.headers.get('location')!, publicBase), { headers: { Cookie: cookie } })
+    expect(dashboard.status).toBe(200)
+    expect(grafanaRequests.at(-1)).toBe('/agricola-api/ops/d/open-agricola/operations')
+  } finally {
+    vi.stubEnv('NODE_ENV', originalNodeEnv); vi.stubEnv('PUBLIC_API_BASE', originalApiBase)
+    await new Promise<void>(done => proxy.close(() => done()))
+  }
+})
+
+it('reports pool-acquisition and deferred COMMIT failures once, without counting business rejections', async () => {
+  const errors = async () => (await (await fetch(base + '/internal/metrics', { headers: { Authorization: 'Bearer scrape-test-token' } })).text())
+    .split('\n').filter(line => line.startsWith('agricola_db_errors_total{')).reduce((sum, line) => sum + Number(line.slice(line.lastIndexOf(' ') + 1)), 0)
+  const constrained = new PostgresDatabase({ connectionString: getTestDatabaseUrl(), max: 1, connectionTimeoutMillis: 50 })
+  let release!: () => void
+  let ready!: () => void
+  const gate = new Promise<void>(done => { release = done })
+  const acquired = new Promise<void>(done => { ready = done })
+  const held = constrained.transaction(async () => { ready(); await gate })()
+  await acquired
+  try {
+    const before = await errors()
+    await expect(constrained.transaction(() => 1)()).rejects.toThrow(/timeout/i)
+    expect(await errors()).toBe(before + 1)
+  } finally { release(); await held; await constrained.close() }
+  await db.exec('CREATE TABLE observation_parent(id int PRIMARY KEY); CREATE TABLE observation_child(parent_id int REFERENCES observation_parent(id) DEFERRABLE INITIALLY DEFERRED)')
+  const beforeCommit = await errors()
+  await expect(db.transaction(async () => { await db.exec('INSERT INTO observation_child(parent_id) VALUES(1)') })()).rejects.toMatchObject({ code: '23503' })
+  expect(await errors()).toBe(beforeCommit + 1)
+  const beforeBusiness = await errors()
+  await expect(db.transaction(() => { throw new Error('business rejection') })()).rejects.toThrow('business rejection')
+  expect(await errors()).toBe(beforeBusiness)
+  await expect(db.transaction(async () => { await db.exec('SELECT missing_observation_function()') })()).rejects.toMatchObject({ code: '42883' })
+  expect(await errors()).toBe(beforeBusiness + 1)
 })
 
 it('shows unknown values when trend storage has no recent samples', async () => {

@@ -264,6 +264,8 @@ Use this when the VPS already runs Nginx with a Certbot-managed certificate. Doc
 
 7. Set frontend `VITE_API_BASE` to `https://api.your-domain.com`, or `https://your-domain.com/agricola-api` for the subpath option.
 
+   For a backend subpath, set production `PUBLIC_API_BASE` to the same public API base (including `/agricola-api`, without a trailing slash). Nginx strips that prefix before forwarding; the operations handoff, dashboard cookie path and private Grafana proxy retain it for browser navigation. Grafana's root URL uses this same base plus `/ops/`.
+
 > Nginx must forward WebSocket traffic. Without the `Upgrade` and `Connection` headers, HTTP APIs work but multiplayer connections fail.
 
 ---

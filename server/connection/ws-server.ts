@@ -504,7 +504,10 @@ export async function createWsServer(
 
   return {
     wss,
-    observation: () => ({ users: [...activeUserSockets.keys()], values: { connections: wss.clients.size, online_users_local: activeUserSockets.size, ws_buffered_bytes: [...wss.clients].reduce((sum, socket) => sum + socket.bufferedAmount, 0), ...committer?.observation() } }),
+    observation: () => {
+      const users = [...activeUserSockets].filter(([, sockets]) => [...sockets].some(socket => socket.readyState === socket.OPEN)).map(([user]) => user)
+      return { users, values: { connections: wss.clients.size, online_users_local: users.length, ws_buffered_bytes: [...wss.clients].reduce((sum, socket) => sum + socket.bufferedAmount, 0), ...committer?.observation() } }
+    },
     authority,
     registry,
     broadcaster,

@@ -69,6 +69,11 @@ export class PostgresDatabase {
     await this.query(sql)
   }
 
+  private async transactionControl(client: PoolClient, sql: string): Promise<void> {
+    try { await client.query(sql) }
+    catch (error) { observeDatabaseError(error); throw error }
+  }
+
   prepare(sql: string) {
     const query = <Row extends QueryResultRow>(args: unknown[]) => {
       const bound = parameters(sql, args)
@@ -96,40 +101,40 @@ export class PostgresDatabase {
           if (!parent.active) throw new Error('Transaction already completed')
           const savepoint = `nested_${++parent.sequence.value}`
           const child: Transaction = { client: parent.client, active: true, sequence: parent.sequence, nested: Promise.resolve() }
-          await parent.client.query(`SAVEPOINT ${savepoint}`)
+          await this.transactionControl(parent.client, `SAVEPOINT ${savepoint}`)
           try {
             const result = await this.current.run(child, () => work(...args))
             await child.nested
             child.active = false
-            await parent.client.query(`RELEASE SAVEPOINT ${savepoint}`)
+            await this.transactionControl(parent.client, `RELEASE SAVEPOINT ${savepoint}`)
             return result
           } catch (error) {
             await child.nested
             child.active = false
-            await parent.client.query(`ROLLBACK TO SAVEPOINT ${savepoint}`)
-            await parent.client.query(`RELEASE SAVEPOINT ${savepoint}`)
+            await this.transactionControl(parent.client, `ROLLBACK TO SAVEPOINT ${savepoint}`)
+            await this.transactionControl(parent.client, `RELEASE SAVEPOINT ${savepoint}`)
             throw error
           }
         })
         parent.nested = pending.then(() => {}, () => {})
         return await pending
       }
-      const client = await measure('db_pool_wait', () => this.pool.connect())
+      const client = await measure('db_pool_wait', () => this.pool.connect()).catch(error => { observeDatabaseError(error); throw error })
       const started = performance.now()
       let outcome = 'error'
       const transaction: Transaction = { client, active: true, sequence: { value: 0 }, nested: Promise.resolve() }
       try {
-        await client.query('BEGIN')
+        await this.transactionControl(client, 'BEGIN')
         const result = await this.current.run(transaction, () => work(...args))
         await transaction.nested
         transaction.active = false
-        await client.query('COMMIT')
+        await this.transactionControl(client, 'COMMIT')
         outcome = 'ok'
         return result
       } catch (error) {
         await transaction.nested
         transaction.active = false
-        await client.query('ROLLBACK')
+        await this.transactionControl(client, 'ROLLBACK')
         throw error
       } finally {
         transaction.active = false

@@ -29,6 +29,7 @@ export function createOperationsHandler({ db, collect }: { db: PostgresDatabase;
     if (!path.startsWith('/ops/') && !path.startsWith('/api/admin/observability') && path !== '/internal/metrics' && path !== '/api/observability/telemetry') return false
     operationsMetrics.http(req, res)
     if (!req.url?.startsWith('/') || req.url.startsWith('//')) { json(res, 400, { ok: false, code: 'invalid_request_target' }); return true }
+    const prefix = process.env.NODE_ENV === 'production' ? new URL(process.env.PUBLIC_API_BASE || getRequestOrigin(req)).pathname.replace(/\/+$/, '') : ''
     if (path === '/internal/metrics') {
       if (!metricsAuthorized(req)) { json(res, 401, { ok: false, code: 'metrics_token_required' }); return true }
       await collect?.()
@@ -43,8 +44,8 @@ export function createOperationsHandler({ db, collect }: { db: PostgresDatabase;
       const user = row && await userFor(row.session_token)
       if (!user || !isAdmin(user.username)) { json(res, 401, { ok: false, code: 'invalid_handoff' }); return true }
       const secure = process.env.NODE_ENV === 'production' && (process.env.PUBLIC_API_BASE ?? getRequestOrigin(req)).startsWith('https:')
-      res.writeHead(303, { Location: '/ops/d/open-agricola/operations', 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer',
-        'Set-Cookie': `${OPS_COOKIE}=${encodeURIComponent(row!.session_token)}; Path=/ops; HttpOnly; SameSite=Lax${secure ? '; Secure' : ''}` })
+      res.writeHead(303, { Location: `${prefix}/ops/d/open-agricola/operations`, 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer',
+        'Set-Cookie': `${OPS_COOKIE}=${encodeURIComponent(row!.session_token)}; Path=${prefix}/ops; HttpOnly; SameSite=Lax${secure ? '; Secure' : ''}` })
       res.end(); return true
     }
     const tokens = [...readCookies(req.headers.cookie, path.startsWith('/ops/') ? OPS_COOKIE : SESSION_COOKIE), extractToken(req.headers.authorization)]
@@ -105,7 +106,7 @@ export function createOperationsHandler({ db, collect }: { db: PostgresDatabase;
       if (!target) { json(res, 503, { ok: false, code: 'observability_unavailable' }); return true }
       // Build an allowlist; neither credentials nor client-supplied auth/proxy headers reach Grafana.
       const headers = { 'x-webauth-user': encodeURIComponent(user.username), 'x-webauth-role': 'Viewer', 'content-type': req.headers['content-type'] ?? 'application/json', accept: req.headers.accept ?? '*/*' }
-      const upstream = httpRequest(new URL(path + url.search, target), { method: req.method, headers, timeout: 10_000 }, response => {
+      const upstream = httpRequest(new URL(prefix + path + url.search, target), { method: req.method, headers, timeout: 10_000 }, response => {
         const responseHeaders = { ...response.headers, 'cache-control': 'no-store', 'referrer-policy': 'no-referrer' }
         delete responseHeaders['set-cookie']
         res.writeHead(response.statusCode ?? 502, responseHeaders)

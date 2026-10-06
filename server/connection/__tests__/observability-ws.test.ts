@@ -5,6 +5,7 @@ import { afterAll, beforeAll, expect, it, vi } from 'vitest'
 import WebSocket from 'ws'
 import { getDb } from '../../db'
 import { createOperationsHandler } from '../../observability/http'
+import { createCollector } from '../../observability/collector'
 import { recordingResources } from '../../__tests__/_helpers/recording'
 import { PostgresRoomPersistence } from '../../game/persistence/postgres-adapter'
 import { createWsServer } from '../ws-server'
@@ -16,7 +17,7 @@ vi.mock('../../db', async () => {
 })
 
 const db = getDb()
-const handler = createOperationsHandler({ db })
+const handler = createOperationsHandler({ db, collect: createCollector(db, 'app', () => backend?.observation()) })
 const server = createServer((req, res) => { void handler(req, res) })
 let backend: Awaited<ReturnType<typeof createWsServer>>
 let recording: Awaited<ReturnType<typeof recordingResources>>
@@ -205,3 +206,49 @@ it('records an unavailable recording as blocked instead of a successful join', a
   expect(count(await scrape())).toBe(before + 1)
   backend.registry.delete(room.id)
 })
+
+it('excludes closed authenticated sockets while a real database lock delays their command cleanup', async () => {
+  const { createLocalUserForTests, createSession } = await import('../../auth')
+  const user = await createLocalUserForTests('online_observation', 'password123')
+  const token = await createSession(user.id)
+  const busy = new WebSocket(base.replace('http:', 'ws:') + '/ws', { headers: { Cookie: `oa_session=${token}` } })
+  const idle = new WebSocket(base.replace('http:', 'ws:') + '/ws', { headers: { Cookie: `oa_session=${token}` } })
+  const reply = (socket: WebSocket, requestId: string) => new Promise<ServerEvent>(resolve => {
+    const receive = (raw: Buffer) => { const event = JSON.parse(raw.toString()); if (event.requestId === requestId) { socket.off('message', receive); resolve(event) } }
+    socket.on('message', receive)
+  })
+  const online = async () => {
+    const text = await (await fetch(base + '/internal/metrics', { headers: { Authorization: 'Bearer ws-scrape-token' } })).text()
+    return text.split('\n').filter(line => line.startsWith('agricola_platform{') && line.includes('kind="online_users_local"')).reduce((sum, line) => sum + Number(line.slice(line.lastIndexOf(' ') + 1)), 0)
+  }
+  let release!: () => void
+  let locked!: () => void
+  let blocker: Promise<void> | undefined
+  try {
+    await Promise.all([busy, idle].map(socket => new Promise<void>(done => socket.once('open', done))))
+    const idleReady = reply(idle, 'idle-ready')
+    idle.send(JSON.stringify({ type: 'getState', requestId: 'idle-ready' }))
+    await idleReady
+    const joined = reply(busy, 'online-join')
+    busy.send(JSON.stringify({ type: 'joinRoom', roomId: 'dev2', requestedPlayerIndex: 1, requestId: 'online-join' }))
+    const state = await joined
+    if (state.type !== 'stateUpdate') throw new Error('Missing joined state')
+    const scoped = reply(busy, 'online-scope')
+    busy.send(JSON.stringify({ type: 'getCommandScope', requestId: 'online-scope' }))
+    const scope = await scoped
+    if (scope.type !== 'commandScope') throw new Error('Missing command scope')
+    expect(await online()).toBe(1)
+    const idleClosed = new Promise<void>(done => idle.once('close', () => done()))
+    idle.close(); await idleClosed
+    expect(await online()).toBe(1)
+    const gate = new Promise<void>(done => { release = done })
+    const acquired = new Promise<void>(done => { locked = done })
+    blocker = db.transaction(async () => { await db.exec('LOCK TABLE game_replays IN ACCESS EXCLUSIVE MODE'); locked(); await gate })()
+    await Promise.race([acquired, blocker])
+    busy.send(JSON.stringify({ type: 'devSetRound', round: 10, requestId: 'locked-round', commandContext: { scopeId: scope.scope.scopeId, commandId: crypto.randomUUID(), roomId: 'dev2', expectedVersion: state.version, inputWindowId: state.inputWindow?.id } }))
+    await expect.poll(async () => Number((await db.prepare("SELECT count(*) AS n FROM pg_stat_activity WHERE datname=current_database() AND wait_event_type='Lock' AND query LIKE '%game_replays%'").get<{ n: string }>())!.n), { timeout: 5000 }).toBeGreaterThan(0)
+    const closed = new Promise<void>(done => busy.once('close', () => done()))
+    busy.close(); await closed
+    await expect.poll(online, { timeout: 1500 }).toBe(0)
+  } finally { release?.(); await blocker; busy.terminate(); idle.terminate() }
+}, 15_000)
