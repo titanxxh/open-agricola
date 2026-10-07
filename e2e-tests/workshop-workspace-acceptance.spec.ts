@@ -1576,6 +1576,35 @@ test.describe('AI card workspace acceptance matrix', () => {
 })
 
 
+test('exhausted Workshop submission explains the pause and recovers only after the countdown', async ({page,request}) => {
+  const account = await createAccount(request,page)
+  const workspace = await createDraft(request,account)
+  const actions: string[] = []
+  await page.route(`**/api/workshop/cards/${workspace.id}/submit-review`,async route => {
+    if (route.request().method() === 'POST') {
+      actions.push(route.request().postDataJSON().action)
+      await route.fulfill({json:{ok:true,submissionId:'saved-submission',prNumber:1,prUrl:'https://github.com/titanxxh/open-agricola/pull/1'}})
+    } else {
+      await route.fulfill({json:{ok:false,submissionId:'saved-submission',state:'pending',code:'workshop_app_unavailable',needsAttention:true,retryAfter:3}})
+    }
+  })
+  try {
+    await page.goto(`${FRONTEND_URL}/?page=workshop&card=${workspace.id}`)
+    await page.getByRole('button',{name:'投稿记录与恢复'}).click()
+    const recover = page.getByRole('button',{name:'再次核实'})
+    await expect(page.getByRole('status')).toContainText('自动重试已暂停')
+    await expect(recover).toBeDisabled()
+    await expect(recover).toBeEnabled({timeout:5000})
+    await recover.click()
+    await expect(page.getByRole('link',{name:'查看审核 PR'})).toHaveAttribute('href','https://github.com/titanxxh/open-agricola/pull/1')
+    expect(actions).toEqual(['recover'])
+    await expect(page.getByText('投稿编号：saved-submission')).toBeVisible()
+  } finally {
+    await responseJson(await api(request,account,`/api/workshop/cards/${workspace.id}`,{method:'DELETE'}))
+    await responseJson(await api(request,account,'/api/auth/account',{method:'DELETE'}))
+  }
+})
+
 test('pending submission protects card and account deletion without invalidating the session', async ({request}) => {
   const account = await createAccount(request)
   const workspace = await createDraft(request,account)

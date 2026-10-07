@@ -10,6 +10,7 @@ import { verifyLegacySubmission } from './legacy-submission'
 import { WorkshopGitHubApp } from './github-app'
 import { SubmissionStore, type SubmissionPayload } from './submission-store'
 import { deliverSubmission, submissionResult } from './submission-service'
+import { recordSubmissionFailure, submissionFailureCode } from './submission-failure'
 import {
   enterReview,
   getHandoffReadiness,
@@ -171,7 +172,11 @@ export async function handleSubmitReviewRequest(
     sendJson(res,200,submissionResult(result))
   } catch (error) {
     const status = error instanceof GitHubApiError ? error.status ?? 500 : 500
-    sendJson(res,status,{ok:false,code:error instanceof GitHubApiError ? error.code : 'submission_failed',...(error instanceof GitHubApiError && error.retryAfter ? {retryAfter:error.retryAfter} : {})})
+    if (!(error instanceof GitHubApiError) || error.diagnostic) {
+      try { await recordSubmissionFailure(db,{cardId:cardDbId,authorId:user.id,phase:'preflight'},error) }
+      catch { /* Audit availability must not replace the original failure response. */ }
+    }
+    sendJson(res,status,{ok:false,code:submissionFailureCode(error),...(error instanceof GitHubApiError && error.retryAfter ? {retryAfter:error.retryAfter} : {})})
   }
 }
 

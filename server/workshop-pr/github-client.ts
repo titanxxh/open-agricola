@@ -1,29 +1,10 @@
+import { GitHubApiError, requestGitHub, type GitHubOperation } from './github-transport'
+export { GitHubApiError } from './github-transport'
+
 type ClientOpts = {
   token: string
   upstreamOwner: string
   upstreamRepo: string
-}
-
-export class GitHubApiError extends Error {
-  public code: string
-  public status?: number
-  public retryAfter?: number
-  constructor(message: string, code: string, status?: number, retryAfter?: number) {
-    super(message)
-    this.name = 'GitHubApiError'
-    this.code = code
-    this.status = status
-    this.retryAfter = retryAfter
-  }
-}
-
-export function checkGitHubRateLimit(response: Response, now = Date.now()): void {
-  if (response.status === 429 || response.status === 403 && (response.headers.has('retry-after') || response.headers.get('x-ratelimit-remaining') === '0')) {
-    const hint = response.headers.get('retry-after')
-    const delay = hint && /^\d+$/.test(hint) ? Number(hint) : hint ? Math.ceil((Date.parse(hint)-now)/1000) : 0
-    const reset = Number(response.headers.get('x-ratelimit-reset') ?? 0) - now/1000
-    throw new GitHubApiError('GitHub rate limited','github_rate_limited',429,Math.max(60,delay || 0,reset))
-  }
 }
 
 type CommitFile = { path: string; content: string; encoding: 'utf-8' | 'base64' }
@@ -135,15 +116,13 @@ export class GitHubClient {
     this.opts = opts
   }
 
-  private async fetch(path: string, init?: RequestInit): Promise<Response> {
+  private async fetch(operation: GitHubOperation, path: string, init?: RequestInit) {
     const url = path.startsWith('http') ? path : `https://api.github.com${path}`
     const headers = new Headers(init?.headers)
     headers.set('Authorization', `Bearer ${this.opts.token}`)
     headers.set('Accept', 'application/vnd.github+json')
     headers.set('X-GitHub-Api-Version', '2022-11-28')
-    const response = await fetch(url, { ...init, headers, signal: AbortSignal.timeout(15_000) })
-    checkGitHubRateLimit(response)
-    return response
+    return requestGitHub(operation, url, {...init, headers})
   }
 
   async createCommit(opts: {
@@ -159,12 +138,12 @@ export class GitHubClient {
     const upstreamBaseSha = opts.upstreamBaseSha ?? await this.getUpstreamMainSha()
 
     const createBlob = async (file: CommitFile): Promise<{ path: string; sha: string }> => {
-      const r = await this.fetch(`/repos/${owner}/${repo}/git/blobs`, {
+      const r = await this.fetch('blob_create',`/repos/${owner}/${repo}/git/blobs`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: file.content, encoding: file.encoding }),
       })
-      if (!r.ok) throw new GitHubApiError(`blob failed: ${file.path}`, 'blob_failed', r.status)
+      if (!r.ok) throw r.error(`blob failed: ${file.path}`, 'blob_failed')
       const { sha } = (await r.json()) as { sha: string }
       return { path: file.path, sha }
     }
@@ -250,11 +229,11 @@ export class GitHubClient {
       })
     }
 
-    const parentResponse = await this.fetch(`/repos/${owner}/${repo}/git/commits/${upstreamBaseSha}`)
-    if (!parentResponse.ok) throw new GitHubApiError('parent commit unavailable','parent_commit_failed',parentResponse.status)
+    const parentResponse = await this.fetch('commit_read',`/repos/${owner}/${repo}/git/commits/${upstreamBaseSha}`)
+    if (!parentResponse.ok) throw parentResponse.error('parent commit unavailable','parent_commit_failed')
     const parent = await parentResponse.json() as {tree?: {sha?: string}}
     if (!parent.tree?.sha) throw new GitHubApiError('parent tree unavailable','parent_tree_missing',503)
-    const treeResp = await this.fetch(`/repos/${owner}/${repo}/git/trees`, {
+    const treeResp = await this.fetch('tree_create',`/repos/${owner}/${repo}/git/trees`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -265,10 +244,10 @@ export class GitHubClient {
         ],
       }),
     })
-    if (!treeResp.ok) throw new GitHubApiError('tree failed', 'tree_failed', treeResp.status)
+    if (!treeResp.ok) throw treeResp.error('tree failed', 'tree_failed')
     const { sha: treeSha } = (await treeResp.json()) as { sha: string }
 
-    const commitResp = await this.fetch(`/repos/${owner}/${repo}/git/commits`, {
+    const commitResp = await this.fetch('commit_create',`/repos/${owner}/${repo}/git/commits`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -278,7 +257,7 @@ export class GitHubClient {
       }),
     })
     if (!commitResp.ok) {
-      throw new GitHubApiError('commit failed', 'commit_failed', commitResp.status)
+      throw commitResp.error('commit failed', 'commit_failed')
     }
     const { sha: commitSha } = (await commitResp.json()) as { sha: string }
 
@@ -287,11 +266,11 @@ export class GitHubClient {
 
   async getUpstreamMainSha(): Promise<string> {
     const repo = this.opts.upstreamRepo
-    const upstreamRef = await this.fetch(
+    const upstreamRef = await this.fetch('main_read',
       `/repos/${this.opts.upstreamOwner}/${repo}/git/ref/heads/main`,
     )
     if (!upstreamRef.ok) {
-      throw new GitHubApiError('upstream ref failed', 'upstream_ref_failed', upstreamRef.status)
+      throw upstreamRef.error('upstream ref failed', 'upstream_ref_failed')
     }
     return ((await upstreamRef.json()) as { object: { sha: string } }).object.sha
   }
@@ -301,10 +280,10 @@ export class GitHubClient {
     if (!/^workshop\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+$/.test(input.branchName)) {
       throw new GitHubApiError('invalid submission branch', 'invalid_branch', 400)
     }
-    const repository = await this.fetch(`/repos/${this.opts.upstreamOwner}/${this.opts.upstreamRepo}`)
-    if (!repository.ok) throw new GitHubApiError('repository unavailable', 'repository_unavailable', repository.status)
+    const repository = await this.fetch('repository_read',`/repos/${this.opts.upstreamOwner}/${this.opts.upstreamRepo}`)
+    if (!repository.ok) throw repository.error('repository unavailable', 'repository_unavailable')
     const { node_id: repositoryId } = await repository.json() as { node_id: string }
-    const response = await this.fetch('/graphql', {
+    const response = await this.fetch('branch_publish','/graphql', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -320,16 +299,17 @@ export class GitHubClient {
         } },
       }),
     })
+    if (!response.ok) throw response.error('branch publication failed', 'branch_publish_failed')
     const body = await response.json() as { data?: { updateRefs?: unknown }; errors?: unknown[] }
-    if (!response.ok || body.errors?.length || !body.data?.updateRefs) {
-      throw new GitHubApiError('submission branch changed or could not be published', 'branch_conflict', response.ok ? 409 : response.status)
+    if (body.errors?.length || !body.data?.updateRefs) {
+      throw response.error('submission branch changed or could not be published', 'branch_conflict', 409)
     }
   }
 
   async getBranchHead(branch: string): Promise<string | null> {
-    const response = await this.fetch(`/repos/${this.opts.upstreamOwner}/${this.opts.upstreamRepo}/git/ref/heads/${branch.split('/').map(encodeURIComponent).join('/')}`)
+    const response = await this.fetch('branch_read',`/repos/${this.opts.upstreamOwner}/${this.opts.upstreamRepo}/git/ref/heads/${branch.split('/').map(encodeURIComponent).join('/')}`)
     if (response.status === 404) return null
-    if (!response.ok) throw new GitHubApiError('branch lookup failed', 'branch_lookup_failed', response.status)
+    if (!response.ok) throw response.error('branch lookup failed', 'branch_lookup_failed')
     return ((await response.json()) as { object: { sha: string } }).object.sha
   }
 
@@ -343,17 +323,17 @@ export class GitHubClient {
   async getHeadRepositoryStatus(fullName: string): Promise<'upstream' | 'fork' | 'detached' | 'missing'> {
     if (fullName === `${this.opts.upstreamOwner}/${this.opts.upstreamRepo}`) return 'upstream'
     if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(fullName)) return 'missing'
-    const response = await this.fetch(`/repos/${fullName}`)
+    const response = await this.fetch('repository_read',`/repos/${fullName}`)
     if (response.status === 404) return 'missing'
-    if (!response.ok) throw new GitHubApiError('head repository unavailable','head_repository_unavailable',response.status)
+    if (!response.ok) throw response.error('head repository unavailable','head_repository_unavailable')
     const repo = await response.json() as {source?: {full_name:string};parent?: {full_name:string}}
     const upstream = `${this.opts.upstreamOwner}/${this.opts.upstreamRepo}`
     return repo.source?.full_name === upstream || repo.parent?.full_name === upstream ? 'fork' : 'detached'
   }
 
   async getPullRequest(number: number): Promise<SubmissionPr> {
-    const response = await this.fetch(`/repos/${this.opts.upstreamOwner}/${this.opts.upstreamRepo}/pulls/${number}`)
-    if (!response.ok) throw new GitHubApiError('PR lookup failed','pr_lookup_failed',response.status)
+    const response = await this.fetch('pr_read',`/repos/${this.opts.upstreamOwner}/${this.opts.upstreamRepo}/pulls/${number}`)
+    if (!response.ok) throw response.error('PR lookup failed','pr_lookup_failed')
     return this.parsePr(await response.json())
   }
 
@@ -362,8 +342,8 @@ export class GitHubClient {
     const result: SubmissionPr[] = []
     for (let page = 1; ; page++) {
       const head = encodeURIComponent(`${this.opts.upstreamOwner}:${branch}`)
-      const response = await this.fetch(`/repos/${this.opts.upstreamOwner}/${this.opts.upstreamRepo}/pulls?head=${head}&state=all&per_page=100&page=${page}`)
-      if (!response.ok) throw new GitHubApiError('PR lookup failed','pr_lookup_failed',response.status)
+      const response = await this.fetch('pr_list',`/repos/${this.opts.upstreamOwner}/${this.opts.upstreamRepo}/pulls?head=${head}&state=all&per_page=100&page=${page}`)
+      if (!response.ok) throw response.error('PR lookup failed','pr_lookup_failed')
       const values = await response.json() as unknown[]
       result.push(...values.map(value => this.parsePr(value)))
       if (values.length < 100) return result
@@ -384,18 +364,18 @@ export class GitHubClient {
       sha: string
       patch?: string
     }
-    const prResponse = await this.fetch(
+    const prResponse = await this.fetch('pr_read',
       `/repos/${this.opts.upstreamOwner}/${this.opts.upstreamRepo}/pulls/${prNumber}`,
     )
     if (!prResponse.ok) {
-      throw new GitHubApiError('pr lookup failed', 'pr_lookup_failed', prResponse.status)
+      throw prResponse.error('pr lookup failed', 'pr_lookup_failed')
     }
     const { head } = (await prResponse.json()) as { head: { sha: string } }
-    const treeResponse = await this.fetch(
+    const treeResponse = await this.fetch('tree_read',
       `/repos/${this.opts.upstreamOwner}/${this.opts.upstreamRepo}/git/trees/${head.sha}?recursive=1`,
     )
     if (!treeResponse.ok) {
-      throw new GitHubApiError('pr tree lookup failed', 'pr_tree_lookup_failed', treeResponse.status)
+      throw treeResponse.error('pr tree lookup failed', 'pr_tree_lookup_failed')
     }
     const tree = (await treeResponse.json()) as {
       truncated: boolean
@@ -409,10 +389,10 @@ export class GitHubClient {
       .map(entry => [entry.path, entry.mode]))
     const files: PullRequestFile[] = []
     for (let page = 1; ; page++) {
-      const r = await this.fetch(
+      const r = await this.fetch('pr_files',
         `/repos/${this.opts.upstreamOwner}/${this.opts.upstreamRepo}/pulls/${prNumber}/files?per_page=100&page=${page}`,
       )
-      if (!r.ok) throw new GitHubApiError('pr files lookup failed', 'pr_files_lookup_failed', r.status)
+      if (!r.ok) throw r.error('pr files lookup failed', 'pr_files_lookup_failed')
       const currentPage = (await r.json()) as PullRequestFile[]
       files.push(...currentPage)
       if (files.length >= 3000) throw new GitHubApiError('PR file list may be truncated','pr_tree_truncated',409)
@@ -444,7 +424,7 @@ export class GitHubClient {
     baseRefName: string
     isDraft: boolean
   }> {
-    const r = await this.fetch(
+    const r = await this.fetch('pr_create',
       `/repos/${this.opts.upstreamOwner}/${this.opts.upstreamRepo}/pulls`,
       {
         method: 'POST',
@@ -458,7 +438,7 @@ export class GitHubClient {
         }),
       },
     )
-    if (!r.ok) throw new GitHubApiError('pr create failed', 'pr_create_failed', r.status)
+    if (!r.ok) throw r.error('pr create failed', 'pr_create_failed')
     const pr = (await r.json()) as { number: number; html_url: string }
     return {
       number: pr.number,
@@ -473,10 +453,10 @@ export class GitHubClient {
     ref = 'main',
   ): Promise<{ content: string; sha: string }> {
     const encodedPath = path.split('/').map(segment => encodeURIComponent(segment)).join('/')
-    const r = await this.fetch(
+    const r = await this.fetch('contents_read',
       `/repos/${this.opts.upstreamOwner}/${this.opts.upstreamRepo}/contents/${encodedPath}?ref=${encodeURIComponent(ref)}`,
     )
-    if (!r.ok) throw new GitHubApiError(`contents failed: ${path}`, 'contents_failed', r.status)
+    if (!r.ok) throw r.error(`contents failed: ${path}`, 'contents_failed')
     const data = (await r.json()) as { content: string; encoding: string; sha: string }
     if (data.encoding !== 'base64') {
       throw new GitHubApiError('unexpected encoding', 'contents_encoding', 500)

@@ -6,6 +6,7 @@ import { GitHubApiError, GitHubClient } from './github-client'
 import { generatePrFiles, patchCommunityCardsMarkdown, type PrFile } from './code-gen'
 import { WorkshopGitHubApp } from './github-app'
 import { SubmissionStore, type SubmissionPayload, type SubmissionRow } from './submission-store'
+import { recordSubmissionFailure, submissionFailureCode } from './submission-failure'
 
 const publicText = (value: string) => value.replace(/[\r\n]/g, ' ').replaceAll('@', '@\u200b')
 const sourcePaths = ['shared/cards/register-all.ts', 'shared/cards/catalog.generated.ts', 'docs/community_cards.md'] as const
@@ -204,12 +205,19 @@ export async function deliverSubmission(store: SubmissionStore, source: Submissi
   } catch (error) {
     if (row.phase === 'done') { row.phase = 'bind'; row.state = 'pending' }
     const known = error instanceof GitHubApiError
-    row.error_code = known ? error.code : 'github_unavailable'
+    row.error_code = submissionFailureCode(error)
     if (known && error.status && error.status < 500 && error.status !== 429) row.state = 'blocked'
     else row.retry_at = Date.now() + Math.max((known ? error.retryAfter ?? 0 : 0)*1000,30_000 * 2 ** Math.min(row.attempts - 1,5))
     if (known && error.status === 401) app.invalidate()
     if (known && row.phase === 'open' && error.code === 'pr_create_failed' && [401,403,404,422].includes(error.status ?? 0)) data.createAttempted = false
-    try { await store.save(row,data) } catch { /* A newer execution owns the record; never replace it. */ }
+    try {
+      await store.db.transaction(async () => {
+        await store.save(row,data)
+        await recordSubmissionFailure(store.db, {
+          cardId:row.card_id, authorId:row.author_id, submissionId:row.id, attempt:row.attempts, phase:row.phase,
+        }, error)
+      })()
+    } catch { /* A newer execution owns the record; never replace it. */ }
   } finally {
     await store.release(row)
   }

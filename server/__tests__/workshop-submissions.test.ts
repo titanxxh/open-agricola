@@ -18,6 +18,7 @@ import { GitHubReviewProvider } from '../workshop-review/github-review-provider'
 import { SubmissionStore } from '../workshop-pr/submission-store'
 import { recoverPendingSubmissions } from '../workshop-pr/submission-service'
 import { WorkshopGitHubApp } from '../workshop-pr/github-app'
+import { GitHubClient } from '../workshop-pr/github-client'
 import { InvalidationStore } from '../invalidation'
 import { deleteAccount, requestAccountDeletion, validateSession } from '../auth'
 import { workshopPrConfig } from '../workshop-pr/config'
@@ -81,6 +82,80 @@ async function edit(id: string) {
 }
 
 describe('Workshop submissions over HTTP', () => {
+  it('audits all four token failures and recovers the same operation after automatic attempts stop', async () => {
+    const card = await readyCard()
+    const remote = github.fetch
+    vi.spyOn(github, 'fetch').mockImplementation(async (input, init) =>
+      String(input).endsWith('/access_tokens')
+        ? new Response('', {status:500,headers:{'X-GitHub-Request-Id':'ABCD:1234'}}) : remote(input,init))
+    const first = await submit(card.id)
+    expect(first).toMatchObject({ok:false,code:'workshop_app_unavailable',needsAttention:false})
+    const store = new SubmissionStore(db)
+    for (let attempt = 2; attempt <= 4; attempt++) {
+      await db.exec('UPDATE workshop_submissions SET retry_at=0')
+      await recoverPendingSubmissions(store,WorkshopGitHubApp.fromEnv()!)
+    }
+    await db.exec('UPDATE workshop_submissions SET retry_at=0')
+    await recoverPendingSubmissions(store,WorkshopGitHubApp.fromEnv()!)
+    const status = await (await nativeFetch(`${address}/${card.id}`,{headers:{Authorization:'Bearer test-session'}})).json()
+    expect(status).toMatchObject({ok:false,submissionId:first.submissionId,needsAttention:true})
+    expect((await store.latest(card.id))?.attempts).toBe(4)
+    const audit = await db.prepare("SELECT error_code,error_message FROM github_propose_audit WHERE workshop_card_id=? ORDER BY created_at").all<{error_code:string;error_message:string}>(card.id)
+    expect(audit).toHaveLength(4)
+    expect(audit.map(row => JSON.parse(row.error_message).attempt).sort()).toEqual([1,2,3,4])
+    for (const row of audit) expect(JSON.parse(row.error_message)).toMatchObject({
+      submissionId:first.submissionId,phase:'prepare',kind:'http',operation:'installation_token',httpStatus:500,requestId:'ABCD:1234',
+    })
+    expect(JSON.stringify(audit)).not.toMatch(/never publish me|PRIVATE KEY|Authorization|access_tokens/)
+    vi.mocked(github.fetch).mockImplementation(remote)
+    expect(await submit(card.id,'recover')).toMatchObject({ok:true,submissionId:first.submissionId,prNumber:1})
+    expect(github.prs).toHaveLength(1)
+  })
+
+  it('reconciles a malformed successful creation response without posting a second PR', async () => {
+    const card = await readyCard()
+    const remote = github.fetch
+    vi.spyOn(github,'fetch').mockImplementation(async (input,init) => {
+      const response = await remote(input,init)
+      return String(input).endsWith('/pulls') && init?.method === 'POST'
+        ? new Response('',{status:201,headers:{'X-GitHub-Request-Id':'ABCD:5678'}}) : response
+    })
+    const first = await submit(card.id)
+    expect(first).toMatchObject({ok:false,code:'github_invalid_response'})
+    const audit = await db.prepare('SELECT error_message FROM github_propose_audit WHERE workshop_card_id=?').get<{error_message:string}>(card.id)
+    expect(JSON.parse(audit!.error_message)).toMatchObject({phase:'open',kind:'invalid_response',operation:'pr_create',httpStatus:201,requestId:'ABCD:5678'})
+    await db.exec('UPDATE workshop_submissions SET retry_at=0')
+    expect(await submit(card.id,'recover')).toMatchObject({ok:true,submissionId:first.submissionId,prNumber:1})
+    expect(github.prs).toHaveLength(1)
+    expect(github.writes.filter(path => path.endsWith('/pulls'))).toHaveLength(1)
+  })
+
+  it('reports internal exceptions separately without persisting their sensitive message', async () => {
+    const card = await readyCard()
+    vi.spyOn(GitHubClient.prototype,'createCommit').mockRejectedValue(new Error('private draft or credential'))
+    expect(await submit(card.id)).toMatchObject({ok:false,code:'submission_internal_error'})
+    const audit = await db.prepare('SELECT error_code,error_message FROM github_propose_audit WHERE workshop_card_id=?').get<{error_code:string;error_message:string}>(card.id)
+    expect(audit?.error_code).toBe('submission_internal_error')
+    expect(JSON.parse(audit!.error_message)).toMatchObject({kind:'internal',phase:'prepare'})
+    expect(audit!.error_message).not.toContain('private draft or credential')
+  })
+
+  it('audits preflight token failure without replacing the completed submission', async () => {
+    const card = await readyCard()
+    const previous = await submit(card.id)
+    await edit(card.id)
+    const remote = github.fetch
+    vi.spyOn(github,'fetch').mockImplementation(async (input,init) => String(input).endsWith('/access_tokens')
+      ? new Response('<html>secret response</html>',{status:503,headers:{'X-GitHub-Request-Id':'credential-not-a-request-id'}})
+      : remote(input,init))
+    expect(await submit(card.id)).toMatchObject({ok:false,code:'workshop_app_unavailable'})
+    const audit = await db.prepare('SELECT error_message FROM github_propose_audit WHERE workshop_card_id=?').get<{error_message:string}>(card.id)
+    expect(JSON.parse(audit!.error_message)).toMatchObject({phase:'preflight',kind:'http',operation:'installation_token',httpStatus:503})
+    expect(audit!.error_message).not.toMatch(/secret|credential/)
+    expect(await new SubmissionStore(db).latest(card.id)).toMatchObject({id:previous.submissionId,state:'complete'})
+    expect(github.prs).toHaveLength(1)
+  })
+
   it.each(['https://api.example/card-art/../private.png', 'https://api.example/agricola/../card-art/image.png', 'https://api.example/card-art/image.png?redirect=1', 'https://user:password@api.example/card-art/image.png'])('rejects unsupported artwork without fetching the supplied URL: %s', async artUrl => {
     const card = await readyCard(artUrl)
     expect(await submit(card.id)).toMatchObject({ok:false,code:'invalid_art'})

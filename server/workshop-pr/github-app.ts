@@ -1,4 +1,4 @@
-import { checkGitHubRateLimit, GitHubApiError } from './github-client'
+import { requestGitHub } from './github-transport'
 import { createGitHubAppJwt } from '../bug-report/github-issue-client'
 
 export type WorkshopAppOptions = {
@@ -37,7 +37,8 @@ export class WorkshopGitHubApp {
     const cached = this.tokens.get(permission)
     if (cached && cached.expiresAt - 60_000 > now) return cached.token
     const jwt = createGitHubAppJwt(this.options.appId, this.options.privateKey, now)
-    const response = await (this.options.fetchImpl ?? fetch)(
+    const response = await requestGitHub(
+      'installation_token',
       `https://api.github.com/app/installations/${encodeURIComponent(this.options.installationId)}/access_tokens`,
       {
         method: 'POST',
@@ -49,15 +50,18 @@ export class WorkshopGitHubApp {
           repositories: [this.options.repositoryName],
           permissions: { contents: permission, pull_requests: permission },
         }),
-        signal: AbortSignal.timeout(15_000),
       },
+      this.options.fetchImpl, now,
     )
-    checkGitHubRateLimit(response, now)
+    if (!response.ok) {
+      this.invalidate()
+      throw response.error('Workshop App unavailable', 'workshop_app_unavailable')
+    }
     const body = await response.json() as { token?: string; expires_at?: string }
     const expiresAt = Date.parse(body.expires_at ?? '')
-    if (!response.ok || !body.token || !Number.isFinite(expiresAt)) {
+    if (typeof body.token !== 'string' || !body.token || !Number.isFinite(expiresAt)) {
       this.invalidate()
-      throw new GitHubApiError('Workshop App unavailable','workshop_app_unavailable',response.status === 200 ? 503 : response.status)
+      throw response.invalidResponse()
     }
     this.tokens.set(permission, { token: body.token, expiresAt })
     return body.token

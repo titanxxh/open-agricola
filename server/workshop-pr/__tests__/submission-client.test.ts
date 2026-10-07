@@ -4,6 +4,26 @@ import { GitHubClient } from '../github-client'
 afterEach(() => vi.unstubAllGlobals())
 
 describe('Workshop branch publication', () => {
+  it('preserves an empty GraphQL HTTP failure without treating it as a reviewer conflict', async () => {
+    vi.stubGlobal('fetch', async (url: string) => url.endsWith('/graphql')
+      ? new Response('',{status:502,headers:{'X-GitHub-Request-Id':'ABCD:5678'}})
+      : Response.json({node_id:'repo'}))
+    const client = new GitHubClient({token:'secret',upstreamOwner:'titanxxh',upstreamRepo:'open-agricola'})
+    await expect(client.publishBranch({branchName:'workshop/card/proposal',expectedHead:null,commitSha:'new'}))
+      .rejects.toMatchObject({code:'branch_publish_failed',status:502,diagnostic:{kind:'http',operation:'branch_publish',httpStatus:502,requestId:'ABCD:5678'}})
+  })
+
+  it.each([
+    {error:new DOMException('secret','TimeoutError'),code:'github_timeout',kind:'timeout'},
+    {error:new TypeError('secret',{cause:{code:'ECONNRESET'}}),code:'github_network_error',kind:'network'},
+  ])('classifies transport failure as $code without retaining its message', async ({error,code,kind}) => {
+    vi.stubGlobal('fetch',async () => {throw error})
+    const client = new GitHubClient({token:'secret',upstreamOwner:'titanxxh',upstreamRepo:'open-agricola'})
+    const caught = await client.getPullRequest(1).catch((error: unknown) => error)
+    expect(caught).toMatchObject({code,status:503,diagnostic:{kind,operation:'pr_read'}})
+    expect(JSON.stringify(caught)).not.toContain('secret')
+  })
+
   it('does not overwrite a reviewer push made after the submission was prepared', async () => {
     let head = 'reviewer-head'
     vi.stubGlobal('fetch', async (url: string, init?: RequestInit) => {
