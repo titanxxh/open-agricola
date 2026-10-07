@@ -20,7 +20,6 @@ if (!existsSync(credentialsFile)) {
 const config = parseEnv(readFileSync(credentialsFile, 'utf8'))
 const generated = {
   OBSERVABILITY_METRICS_TOKEN: () => randomBytes(32).toString('hex'),
-  WORKSHOP_TOKEN_ENCRYPTION_KEY: () => randomBytes(32).toString('base64'),
   LOCAL_S3_ACCESS_KEY: () => randomBytes(16).toString('hex'),
   LOCAL_S3_SECRET_KEY: () => randomBytes(32).toString('hex'),
   LOCAL_S3_PORT: () => process.env.LOCAL_S3_PORT ?? '59000',
@@ -93,7 +92,6 @@ const values = {
   TEST_S3_REGION: 'us-east-1',
   TEST_S3_ACCESS_KEY_ID: config.LOCAL_S3_ACCESS_KEY,
   TEST_S3_SECRET_ACCESS_KEY: config.LOCAL_S3_SECRET_KEY,
-  WORKSHOP_TOKEN_ENCRYPTION_KEY: process.env.WORKSHOP_TOKEN_ENCRYPTION_KEY || config.WORKSHOP_TOKEN_ENCRYPTION_KEY,
   DATABASE_URL: process.env.DATABASE_URL || localUrl,
   TEST_DATABASE_URL: process.env.TEST_DATABASE_URL ?? localUrl.replace(/\/agricola$/, '/agricola_test'),
 }

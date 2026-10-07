@@ -1202,6 +1202,15 @@ const scenarioHandoff = async ({
       headers: { 'x-workshop-pr-mock-result': 'remote-error' },
     },
   ), 503)
+  const proposalPage = await page.context().newPage()
+  await proposalPage.goto(`${FRONTEND_URL}/?page=workshop&card=${encodeURIComponent(workspace.id)}`)
+  await proposalPage.getByRole('button',{name:'投稿记录与恢复'}).click()
+  await expect(proposalPage.getByText('工坊机器人将把你采用的卡牌内容', {exact:false})).toBeVisible()
+  await proposalPage.getByRole('checkbox').check()
+  await proposalPage.getByRole('button',{name:'发起 PR',exact:true}).click()
+  await expect(proposalPage.getByRole('link',{name:'查看审核 PR'})).toHaveAttribute('href','/mock-workshop-pr/1')
+  await proposalPage.screenshot({path:test.info().outputPath('workshop-app-submission.png')})
+  await proposalPage.close()
   const proposed = await responseJson<{ prUrl: string; prNumber: number }>(
     await api(request, account, `/api/workshop/cards/${workspace.id}/submit-review`, {
       method: 'POST',

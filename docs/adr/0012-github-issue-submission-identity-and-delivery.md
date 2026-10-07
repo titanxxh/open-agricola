@@ -8,7 +8,7 @@
 
 Game Bug Reporter 必须能从对局内把现象和 Bug Report Anchor 提交到公开的 `titanxxh/open-agricola`。有 GitHub 账号的玩家希望成为 Issue 作者，没有 GitHub 账号的玩家需要托管代提；两条路径都必须限制权限、承受撤销与限流，并在 GitHub 返回不确定结果时保留玩家描述且尽量避免重复 Issue。
 
-现有站点 GitHub 登录 OAuth 只证明登录身份，不保存写权限令牌；Workshop GitHub OAuth 最初面向私有源码仓库提案，仍使用更宽的权限，其权限和生命周期也不适合公开 Bug Issue。GitHub Create Issue API 没有可依赖的幂等键，因此外部创建无法承诺严格 exactly-once。
+现有站点 GitHub 登录 OAuth 只证明登录身份，不保存写权限令牌；Workshop GitHub OAuth 最初面向私有源码仓库提案，当时使用更宽的权限，其权限和生命周期也不适合公开 Bug Issue。GitHub Create Issue API 没有可依赖的幂等键，因此外部创建无法承诺严格 exactly-once。
 
 ## Decision
 
@@ -37,7 +37,7 @@ Game Bug Reporter 必须能从对局内把现象和 Bug Report Anchor 提交到�
 ## Alternatives considered
 
 - **复用站点 GitHub 登录 OAuth**：拒绝。它当前只承担登录身份，增加 Issue 写权限会把认证和外部写入耦合。
-- **复用 Workshop GitHub OAuth**：拒绝。它最初为私有源码仓库设计，仍使用更宽权限，不符合 Bug Report 仅需 `Issues: write` 的最小权限边界。
+- **复用 Workshop GitHub OAuth**：拒绝。它最初为私有源码仓库设计，当时使用更宽权限，不符合 Bug Report 仅需 `Issues: write` 的最小权限边界。
 - **用维护者个人 PAT 托管代提**：拒绝。长期个人凭据会扩大泄露影响，Issue 作者也会错误显示为维护者本人。
 - **不保存刷新令牌，每次提交重新连接**：拒绝。违背首次连接后持续可用的产品语义，也不能改善托管路径。
 - **连接失效后自动改用 App `[bot]`**：拒绝。它会在玩家不知情时改变公开作者身份。
@@ -52,3 +52,5 @@ Game Bug Reporter 必须能从对局内把现象和 Bug Report Anchor 提交到�
 - [Best practices for creating a GitHub App](https://docs.github.com/en/apps/creating-github-apps/about-creating-github-apps/best-practices-for-creating-a-github-app)
 - [Rate limits for the REST API](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api)
 - [Webhook events and payloads](https://docs.github.com/en/webhooks/webhook-events-and-payloads)
+
+2026-10-07 后续：源码仓库现已公开，Workshop 投稿 OAuth 退役，投稿及审核改用单独的 Workshop GitHub App。此变更不改变本 ADR 的 Bug Report 独立授权、issues-only 安装范围及身份决定。

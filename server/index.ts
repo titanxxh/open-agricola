@@ -1,3 +1,6 @@
+import { recoverPendingSubmissions } from './workshop-pr/submission-service'
+import { SubmissionStore } from './workshop-pr/submission-store'
+import { WorkshopGitHubApp } from './workshop-pr/github-app'
 import { createObservationDatabase } from './observability/database'
 import { createCollector } from './observability/collector'
 import { operationsMetrics } from './observability/metrics'
@@ -398,6 +401,17 @@ const bugReportDeliveryTimer = setInterval(() => {
 
 const observationDb = createObservationDatabase()
 const handleOperations = createOperationsHandler({ db: getDb(), collect: createCollector(getDb(), 'app', () => wssCtx?.observation(), () => wssCtx?.authority?.instanceId, async () => (await wssCtx?.committer?.canCreateRoom())?.ok === true, observationDb) })
+let submissionRecoveryRunning = false
+const submissionApp = WorkshopGitHubApp.fromEnv()
+const submissionRecoveryTimer = setInterval(() => {
+  if (!submissionApp || process.env.WORKSHOP_PR_ENABLED !== 'true' || submissionRecoveryRunning) return
+  submissionRecoveryRunning = true
+  void recoverPendingSubmissions(new SubmissionStore(getDb()),submissionApp)
+    .catch(() => { console.warn('[workshop] submission reconciliation deferred') })
+    .finally(() => { submissionRecoveryRunning = false })
+},15_000)
+submissionRecoveryTimer.unref()
+
 const server = createServer((req, res) => {
   operationsMetrics.http(req, res)
   return handleRequest(req, res).catch(error => {
@@ -1018,6 +1032,7 @@ installShutdownHandlers(async () => {
   clearInterval(invalidationTimer)
   shutdownSandboxSessions()
   clearInterval(bugReportDeliveryTimer)
+  clearInterval(submissionRecoveryTimer)
   await wssCtx?.shutdown()
   await observationDb.close()
   await closed

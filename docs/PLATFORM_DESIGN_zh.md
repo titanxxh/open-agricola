@@ -325,29 +325,29 @@ WorkshopPage
 
 ### D5. Workshop → GitHub PR 流程
 
-提交审核（submit-review）是进入 `in_review` 的唯一入口（PRD #634 #637）：GitHub PR 是审核载体，审核发生在 approve **之前**。入口在卡牌详情页：
+`submit-review` 是进入 `in_review` 的唯一入口。公开源码仓库由一个 Workshop GitHub App 负责投稿、只读审核和签名 webhook；登录 OAuth 与 issues-only Bug Report App 仍独立。
 
-1. 用户必须登录，且是该工坊卡牌作者。
-2. 卡牌必须处于 `unsubmitted / stale / in_review`（`in_review` 再次提交 = 更新 PR 分支）；质量门：静态校验 + `sandbox_pass_version_id` 内容与草稿一致（`getHandoffReadiness`）+ 完整中文本地化 + `card_id` 未被 approved/merged 卡占用。
-3. 前端调用 `POST /api/workshop/cards/:id/submit-review`。
-4. 如果服务端没有当前会话对应的 GitHub token，会返回 OAuth start URL；前端用 popup 打开，并等待 callback 页面通过 `postMessage({ type: 'workshop-pr-oauth', ... }, '*')` 通知授权完成。
-5. 授权完成后前端重试请求，服务端创建/更新分支并打开或更新 PR，成功后卡牌转入 `in_review`（`enterReview`），同时固定 PR head SHA 与对应 Draft Version；一个 PR URL 只绑定一张卡，只复用同一分支上仍为 open、非 draft 且以 `main` 为 base 的 PR。已关闭或已合并的 PR 保留为历史，重新提交时创建新 PR；open 但 draft 或 base 非 `main` 的旧 PR 会先关闭，再创建合格 PR。绑定后补查一次当前 review 快照以覆盖先到的审批 webhook；补查暂时失败不回滚已建立的 PR/绑定，清空同步时间后由现有 `refresh-pr-status` 入口重试协调。
-6. Workshop Review GitHub App 接收 `pull_request_review` / `pull_request` webhook；验签和 delivery 幂等通过后，approved review 必须经 GraphQL 原子快照确认。`authorAssociation=OWNER` 且没有 `CHANGES_REQUESTED` 的 PR 由 provider 生成绑定当前 head 的 owner approval，以补足 GitHub 禁止作者 self-approve 的平台限制；普通作者仍必须取得有 push 权限的 reviewer approval。GitHub 当前 head 不同、PR 关闭/转 draft/改离 `main`、有效审批被 `dismissed` 或 `CHANGES_REQUESTED` 都把卡转为 `stale·offline`；未绑定或绑定歧义的 PR 不查询 GitHub，可能乱序的事件重读当前快照且只在含 lifecycle/更新时间的 review binding 未变时提交，已 merge 进 `main` 的 PR 的迟到 review 事件保留同 head 绑定（合入非 `main` 分支不享有此豁免，视同未 merge 关闭），GraphQL 不可用则记录 delivery 并保守下线且不覆盖已记录的 PR 关闭状态；comment-only review 不改变状态。
-7. 作者发布时服务端再次即时查询 GraphQL，只有 state=`OPEN`、非 draft、base=`main`、有效 reviewer/owner approval、review commit、PR head、平台 approved commit、固定版本和查询前后的 live-state token 全部一致才置 live。
+1. 检查已登录作者、非上线可编辑草稿、静态校验、精确版本沙盒确认、中文本地化和卡牌 ID 预留。
+2. `POST /api/workshop/cards/:id/submit-review` 在远端写入前将 Workshop Card、Draft Version、revision、App installation、仓库和 `workshop/<card database ID>/<proposal ID>` 分支持久化到 PostgreSQL。卡牌源码及 PR 正文保留设计者署名，GitHub 作者为 App。未采用候选、生成溯源和凭据不公开。
+3. 按最新 main 生成卡牌、图片及共享索引。GraphQL `updateRefs(beforeOid, afterOid, force:true)` 原子检查预期 head，禁止无条件强推。只允许生成文件及独立的 `server/shared/**/__tests__/*.test.ts` 修改；工作流及其他改动交由维护者处理。
+4. 只复用原来 open、非 draft、目标为 main 的 PR。每个旧生成文件都与持久化基线比较，人工修改、删除或重命名均暂停；独立测试按最新 main 保留，冲突则暂停。draft 或改 base 暂停；关闭后必须明确 `action:restart`，合并后走内置接管。不自动关闭、重开 PR 或改写旧 fork。
+5. `SubmissionStore` 保存检查点，同卡只有一个 pending 操作；租约过期可恢复，本地写入带 fencing。后台每 15 秒最多协调五条到期记录，每条最多四次自动尝试，从 30 秒开始指数退避，并遵守 GitHub 限流等待提示。新操作每作者十分钟一次、全站每分钟二十次；恢复不重复计入新投稿额度。
+6. 分支响应丢失时核对计划 commit 和原预期 head。PR 按全部状态分页查找，核对仓库、分支、marker 和 commit；POST 前保存创建意图，结果未知时即使查空也不再次盲目创建。这是可恢复交付，不承诺外部 exactly-once。`GET .../submit-review` 返回权威状态，POST `action:recover` 只恢复原操作；未知或歧义状态保留编号供维护者核实。
+7. 实际 head 和提交版本事务绑定；投稿途中编辑保留新草稿并返回 `draft_changed`，不会把新草稿冒充旧投稿或批准。新绑定清空旧批准。绑定后审核读取失败保留 PR，并清空同步时间供刷新重试。
+8. 签名和去重后的 webhook、上架时即时查询均要求有 push 权限的真实 reviewer 对精确 head 批准，不再合成 OWNER 批准。审核列表不完整时拒绝通过。GraphQL 读取不被当成事务快照；本地 binding 与生命周期条件保护协调。head 改变、draft、改 base、关闭、撤销和 changes-requested 使批准失效。作者仍可在批准后、合并前上架，发布包含卡牌的版本后完成内置接管。
 
-服务端核心模块：
+旧投稿迁移必须明确发起。由旧固定版本重建源码和图片，源码比较只忽略溯源头注释；缺基线或有人工修改时交维护者处理。保留独立测试、草稿、版本和旧 PR 链接。启用切换前运行只读盘点并处理合成批准，见[运维说明](operations/github-oauth-app-setup.md)。
 
-
-| 模块                                      | 职责                                                                         |
-| --------------------------------------- | -------------------------------------------------------------------------- |
-| `server/workshop-pr/propose-handler.ts` | 提交流程编排：权限检查、读取 upstream 文件、生成 PR 文件、创建 commit/branch/PR                    |
-| `server/workshop-pr/oauth-handler.ts`   | GitHub OAuth start/callback；请求 `repo` scope 以支持 private upstream           |
-| `server/workshop-pr/github-client.ts`   | GitHub REST API 封装；授权用户等于 upstream owner 时跳过 fork，直接推 upstream 分支          |
-| `server/workshop-pr/code-gen.ts`        | 纯生成器：把 workshop card 转成 community card 文件、注册表和文档                        |
-| `server/workshop-review/github-review-provider.ts` | GitHub App installation token 与 GraphQL review 原子快照 |
-| `server/workshop-review/webhook-handler.ts` | `/api/github/webhook` 验签、delivery 幂等及 review 失效/批准 |
-| `client/services/workshop-pr.ts`        | 前端 submit-review/OAuth popup helper；relative auth URL 会按 `VITE_API_BASE` 解析到后端域名 |
-
+| 模块 | 职责 |
+|---|---|
+| `server/workshop-pr/propose-handler.ts` | 作者与交接门检查、固定操作分配及状态 API |
+| `server/workshop-pr/submission-store.ts` | 持久化身份、检查点、租约、限流 |
+| `server/workshop-pr/submission-service.ts` | 条件交付、安全更新、有界对账 |
+| `server/workshop-pr/github-app.ts` | 单 App，仓库范围的写 token 与独立只读 token |
+| `server/workshop-pr/github-client.ts` | GitHub 传输、预期 head 写入及测试补丁保留 |
+| `server/workshop-pr/code-gen.ts` | 卡牌源码、注册表、图片及索引生成 |
+| `server/workshop-review/` | 精确 head 审核与签名 webhook 协调 |
+| `client/services/workshop-pr.ts` | 投稿、状态和明确恢复，无 OAuth 弹窗 |
 
 生成的 PR 文件固定包含：
 

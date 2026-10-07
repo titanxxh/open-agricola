@@ -826,7 +826,7 @@ export function generateCardSourceFile(
 
   return `// Generated from Open Agricola workshop. Do not hand-edit.
 // Workshop card: ${wcard.card_id}
-// Author: ${wcard.author_name ?? 'unknown'} (github: @${ctx.githubLogin})
+// Author: ${(wcard.author_name ?? 'unknown').replace(/[\r\n]/g, ' ')}${ctx.githubLogin ? ` (github: @${ctx.githubLogin})` : ''}
 // Submitted: ${ctx.iso}
 
 ${lintDirective}${cardSourceImport(wcard.card_type)}
@@ -1147,9 +1147,11 @@ export function patchCommunityCardsMarkdown(
     card_type: string
     github_login: string
     pr_number: number
+    designer_name?: string
   },
 ): string {
-  const row = `| ${args.card_id} | ${args.card_name} | ${args.card_type} | @${args.github_login} | #${args.pr_number} |`
+  const designer = args.designer_name?.replace(/[|\r\n]/g, ' ').replaceAll('@', '@\u200b') ?? `@${args.github_login}`
+  const row = `| ${args.card_id} | ${args.card_name} | ${args.card_type} | ${designer} | #${args.pr_number} |`
   if (source.includes(`| ${args.card_id} |`)) return source
   const endMarker = '<!-- community-card-entries:end -->'
   const idx = source.indexOf(endMarker)
@@ -1174,6 +1176,7 @@ export type GenArgs = {
   upstream_catalog_generated: string
   upstream_community_md: string
   pr_number: number
+  designer_name?: string
   art_data?: { ext: string; buffer: Buffer } | null
 }
 
@@ -1222,6 +1225,7 @@ export async function generatePrFiles(args: GenArgs): Promise<PrFile[]> {
     card_type: wcard.card_type,
     github_login,
     pr_number,
+    designer_name: args.designer_name,
   })
 
   const files: PrFile[] = [

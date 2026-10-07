@@ -1,4 +1,4 @@
-import { createGitHubAppJwt } from '../bug-report/github-issue-client.ts'
+import { WorkshopGitHubApp, type WorkshopAppOptions } from '../workshop-pr/github-app'
 
 const API = 'https://api.github.com'
 const REQUEST_TIMEOUT_MS = 15_000
@@ -84,32 +84,19 @@ export const findApprovedMergedHeadReview = (
       )
     : undefined
 
-type GitHubReviewProviderOptions = {
-  appId: string
-  privateKey: string
-  installationId: string
-  repositoryOwner: string
-  repositoryName: string
-  fetchImpl?: typeof fetch
-  now?: () => number
-}
-
-type InstallationTokenResponse = {
-  token?: string
-  expires_at?: string
-}
+type GitHubReviewProviderOptions = WorkshopAppOptions
 
 type ReviewQueryResponse = {
   data?: {
     repository?: {
       pullRequest?: {
-        authorAssociation?: string | null
         reviewDecision?: string | null
         headRefOid?: string
         baseRefName?: string
         state?: string
         isDraft?: boolean
         latestOpinionatedReviews?: {
+          pageInfo?: { hasNextPage: boolean }
           nodes?: Array<{
             id?: string
             state?: string
@@ -142,36 +129,24 @@ const parseJson = async <T>(response: Response): Promise<T> => {
 export class GitHubReviewProvider {
   private readonly options: GitHubReviewProviderOptions
   private readonly fetchImpl: typeof fetch
-  private readonly now: () => number
-  private tokenCache: { token: string; expiresAt: number } | null = null
+  private readonly app: WorkshopGitHubApp
 
   constructor(options: GitHubReviewProviderOptions) {
     this.options = options
     this.fetchImpl = options.fetchImpl ?? fetch
-    this.now = options.now ?? Date.now
+    this.app = new WorkshopGitHubApp(options)
   }
 
   static fromEnv(fetchImpl: typeof fetch = fetch): GitHubReviewProvider | null {
-    const options = {
-      appId: process.env.WORKSHOP_REVIEW_GITHUB_APP_ID?.trim() ?? '',
-      privateKey: process.env.WORKSHOP_REVIEW_GITHUB_PRIVATE_KEY
-        ?.replaceAll('\\n', '\n')
-        .trim() ?? '',
-      installationId: process.env.WORKSHOP_REVIEW_GITHUB_INSTALLATION_ID?.trim() ?? '',
-      repositoryOwner: process.env.GITHUB_UPSTREAM_OWNER?.trim() || 'titanxxh',
-      repositoryName: process.env.GITHUB_UPSTREAM_REPO?.trim() || 'open-agricola',
-      fetchImpl,
-    }
-    return options.appId && options.privateKey && options.installationId
-      ? new GitHubReviewProvider(options)
-      : null
+    const app = WorkshopGitHubApp.fromEnv(fetchImpl)
+    return app ? new GitHubReviewProvider(app.options) : null
   }
 
   async getPullRequestSnapshot(prNumber: number): Promise<WorkshopReviewSnapshot> {
     if (!Number.isSafeInteger(prNumber) || prNumber <= 0) {
       throw new Error('invalid_pull_request_number')
     }
-    const token = await this.installationToken()
+    const token = await this.app.token('read')
     const response = await this.request(`${API}/graphql`, {
       method: 'POST',
       headers: headers(token),
@@ -179,13 +154,13 @@ export class GitHubReviewProvider {
         query: `query WorkshopReviewSnapshot($owner: String!, $name: String!, $number: Int!) {
           repository(owner: $owner, name: $name) {
             pullRequest(number: $number) {
-              authorAssociation
               reviewDecision
               headRefOid
               baseRefName
               state
               isDraft
               latestOpinionatedReviews(first: 100) {
+                pageInfo { hasNextPage }
                 nodes {
                   id
                   state
@@ -213,6 +188,8 @@ export class GitHubReviewProvider {
       || typeof pullRequest.baseRefName !== 'string'
       || typeof pullRequest.state !== 'string'
       || typeof pullRequest.isDraft !== 'boolean'
+      || pullRequest.latestOpinionatedReviews?.pageInfo?.hasNextPage !== false
+      || !Array.isArray(pullRequest.latestOpinionatedReviews.nodes)
     ) {
       throw new Error('github_review_snapshot_failed')
     }
@@ -229,26 +206,13 @@ export class GitHubReviewProvider {
           }]
         : [],
     )
-    const ownerApproval = pullRequest.authorAssociation === 'OWNER'
-      && pullRequest.reviewDecision !== 'CHANGES_REQUESTED'
-      ? {
-          id: `owner:${pullRequest.headRefOid}`,
-          state: 'APPROVED',
-          commitOid: pullRequest.headRefOid,
-          authorCanPushToRepository: true,
-        }
-      : null
     return {
-      reviewDecision: ownerApproval
-        ? 'APPROVED'
-        : typeof pullRequest.reviewDecision === 'string'
-        ? pullRequest.reviewDecision
-        : null,
+      reviewDecision: typeof pullRequest.reviewDecision === 'string' ? pullRequest.reviewDecision : null,
       headRefOid: pullRequest.headRefOid,
       baseRefName: pullRequest.baseRefName,
       state: pullRequest.state,
       isDraft: pullRequest.isDraft,
-      reviews: ownerApproval ? [...reviews, ownerApproval] : reviews,
+      reviews,
     }
   }
 
@@ -259,32 +223,4 @@ export class GitHubReviewProvider {
     })
   }
 
-  private async installationToken(): Promise<string> {
-    const now = this.now()
-    if (this.tokenCache && this.tokenCache.expiresAt - 60_000 > now) {
-      return this.tokenCache.token
-    }
-    const jwt = createGitHubAppJwt(
-      this.options.appId,
-      this.options.privateKey,
-      now,
-    )
-    const response = await this.request(
-      `${API}/app/installations/${encodeURIComponent(this.options.installationId)}/access_tokens`,
-      {
-        method: 'POST',
-        headers: headers(jwt),
-        body: JSON.stringify({
-          permissions: { contents: 'read', pull_requests: 'read' },
-        }),
-      },
-    )
-    const body = await parseJson<InstallationTokenResponse>(response)
-    const expiresAt = Date.parse(body.expires_at ?? '')
-    if (!response.ok || !body.token || !Number.isFinite(expiresAt)) {
-      throw new Error('github_installation_token_failed')
-    }
-    this.tokenCache = { token: body.token, expiresAt }
-    return body.token
-  }
 }

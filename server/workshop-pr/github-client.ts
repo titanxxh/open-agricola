@@ -2,22 +2,26 @@ type ClientOpts = {
   token: string
   upstreamOwner: string
   upstreamRepo: string
-  forkPollIntervalMs?: number
-  forkPollMaxMs?: number
 }
 
 export class GitHubApiError extends Error {
   public code: string
   public status?: number
-  constructor(message: string, code: string, status?: number) {
+  public retryAfter?: number
+  constructor(message: string, code: string, status?: number, retryAfter?: number) {
     super(message)
     this.name = 'GitHubApiError'
     this.code = code
     this.status = status
+    this.retryAfter = retryAfter
   }
 }
 
 type CommitFile = { path: string; content: string; encoding: 'utf-8' | 'base64' }
+export type SubmissionPr = {
+  number: number; url: string; headSha: string; branch: string; headRepository: string
+  base: string; draft: boolean; state: 'open' | 'closed'; merged: boolean; body: string
+}
 type CommitTreeEntry = {
   path: string
   sha: string
@@ -128,64 +132,30 @@ export class GitHubClient {
     headers.set('Authorization', `Bearer ${this.opts.token}`)
     headers.set('Accept', 'application/vnd.github+json')
     headers.set('X-GitHub-Api-Version', '2022-11-28')
-    return fetch(url, { ...init, headers })
-  }
-
-  async getUserLogin(): Promise<string> {
-    const r = await this.fetch('/user')
-    if (!r.ok) throw new GitHubApiError('user lookup failed', 'user_lookup_failed', r.status)
-    const data = (await r.json()) as { login: string }
-    return data.login
-  }
-
-  async ensureFork(): Promise<{ owner: string; repo: string }> {
-    const login = await this.getUserLogin()
-    const repo = this.opts.upstreamRepo
-    if (login.toLowerCase() === this.opts.upstreamOwner.toLowerCase()) {
-      return { owner: this.opts.upstreamOwner, repo }
+    const response = await fetch(url, { ...init, headers, signal: AbortSignal.timeout(15_000) })
+    if (response.status === 429 || response.status === 403 && (response.headers.has('retry-after') || response.headers.get('x-ratelimit-remaining') === '0')) {
+      const hint = response.headers.get('retry-after')
+      const delay = hint && /^\d+$/.test(hint) ? Number(hint) : hint ? Math.ceil((Date.parse(hint)-Date.now())/1000) : 0
+      const reset = Number(response.headers.get('x-ratelimit-reset') ?? 0) - Date.now()/1000
+      throw new GitHubApiError('GitHub rate limited','github_rate_limited',429,Math.max(60,delay || 0,reset))
     }
-    const check = await this.fetch(`/repos/${login}/${repo}`)
-    if (check.ok) return { owner: login, repo }
-    if (check.status !== 404) {
-      throw new GitHubApiError('fork lookup failed', 'fork_lookup_failed', check.status)
-    }
-
-    const create = await this.fetch(
-      `/repos/${this.opts.upstreamOwner}/${repo}/forks`,
-      { method: 'POST' },
-    )
-    if (!create.ok && create.status !== 202) {
-      throw new GitHubApiError('fork create failed', 'fork_create_failed', create.status)
-    }
-
-    const interval = this.opts.forkPollIntervalMs ?? 2000
-    const maxMs = this.opts.forkPollMaxMs ?? 30_000
-    const started = Date.now()
-    // First check is immediate (no sleep), subsequent checks sleep between them
-    while (Date.now() - started < maxMs) {
-      const poll = await this.fetch(`/repos/${login}/${repo}`)
-      if (poll.ok) return { owner: login, repo }
-      if (Date.now() - started + interval >= maxMs) break
-      await new Promise((r) => setTimeout(r, interval))
-    }
-    throw new GitHubApiError('fork not ready within timeout', 'fork_pending')
+    return response
   }
 
   async createCommit(opts: {
-    forkOwner: string
     files: CommitFile[]
     message: string
-    author: { name: string; email: string }
     upstreamBaseSha?: string
     preservedTreeEntries?: CommitTreeEntry[]
   }): Promise<{ commitSha: string; upstreamBaseSha: string }> {
-    const { forkOwner, files, message, author } = opts
+    const { files, message } = opts
+    const owner = this.opts.upstreamOwner
     const repo = this.opts.upstreamRepo
 
     const upstreamBaseSha = opts.upstreamBaseSha ?? await this.getUpstreamMainSha()
 
     const createBlob = async (file: CommitFile): Promise<{ path: string; sha: string }> => {
-      const r = await this.fetch(`/repos/${forkOwner}/${repo}/git/blobs`, {
+      const r = await this.fetch(`/repos/${owner}/${repo}/git/blobs`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: file.content, encoding: file.encoding }),
@@ -276,11 +246,15 @@ export class GitHubClient {
       })
     }
 
-    const treeResp = await this.fetch(`/repos/${forkOwner}/${repo}/git/trees`, {
+    const parentResponse = await this.fetch(`/repos/${owner}/${repo}/git/commits/${upstreamBaseSha}`)
+    if (!parentResponse.ok) throw new GitHubApiError('parent commit unavailable','parent_commit_failed',parentResponse.status)
+    const parent = await parentResponse.json() as {tree?: {sha?: string}}
+    if (!parent.tree?.sha) throw new GitHubApiError('parent tree unavailable','parent_tree_missing',503)
+    const treeResp = await this.fetch(`/repos/${owner}/${repo}/git/trees`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        base_tree: upstreamBaseSha,
+        base_tree: parent.tree.sha,
         tree: [
           ...preservedTree.map(({ path, sha, mode }) => ({ path, sha, mode, type: 'blob' })),
           ...blobs.map((b) => ({ path: b.path, mode: b.mode, type: 'blob', sha: b.sha })),
@@ -290,14 +264,13 @@ export class GitHubClient {
     if (!treeResp.ok) throw new GitHubApiError('tree failed', 'tree_failed', treeResp.status)
     const { sha: treeSha } = (await treeResp.json()) as { sha: string }
 
-    const commitResp = await this.fetch(`/repos/${forkOwner}/${repo}/git/commits`, {
+    const commitResp = await this.fetch(`/repos/${owner}/${repo}/git/commits`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         message,
         tree: treeSha,
         parents: [upstreamBaseSha],
-        author: { ...author, date: new Date().toISOString() },
       }),
     })
     if (!commitResp.ok) {
@@ -319,71 +292,84 @@ export class GitHubClient {
     return ((await upstreamRef.json()) as { object: { sha: string } }).object.sha
   }
 
-  async upsertBranch(opts: {
-    forkOwner: string
-    branchName: string
-    commitSha: string
-  }): Promise<string | null> {
-    const { forkOwner, branchName, commitSha } = opts
-    const repo = this.opts.upstreamRepo
-    const check = await this.fetch(`/repos/${forkOwner}/${repo}/git/ref/heads/${branchName}`)
-    if (check.ok) {
-      const previousCommitSha = ((await check.json()) as { object: { sha: string } }).object.sha
-      const patch = await this.fetch(
-        `/repos/${forkOwner}/${repo}/git/refs/heads/${branchName}`,
-        {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sha: commitSha, force: true }),
-        },
-      )
-      if (!patch.ok) {
-        throw new GitHubApiError('ref update failed', 'ref_update_failed', patch.status)
-      }
-      return previousCommitSha
-    } else if (check.status === 404) {
-      const post = await this.fetch(`/repos/${forkOwner}/${repo}/git/refs`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ref: `refs/heads/${branchName}`, sha: commitSha }),
-      })
-      if (!post.ok) {
-        throw new GitHubApiError('ref create failed', 'ref_create_failed', post.status)
-      }
-      return null
-    } else {
-      throw new GitHubApiError('ref lookup failed', 'ref_lookup_failed', check.status)
+  /** Compare-and-swap, including non-fast-forward rebases. Never refresh the expected head on conflict. */
+  async publishBranch(input: { branchName: string; expectedHead: string | null; commitSha: string }): Promise<void> {
+    if (!/^workshop\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+$/.test(input.branchName)) {
+      throw new GitHubApiError('invalid submission branch', 'invalid_branch', 400)
+    }
+    const repository = await this.fetch(`/repos/${this.opts.upstreamOwner}/${this.opts.upstreamRepo}`)
+    if (!repository.ok) throw new GitHubApiError('repository unavailable', 'repository_unavailable', repository.status)
+    const { node_id: repositoryId } = await repository.json() as { node_id: string }
+    const response = await this.fetch('/graphql', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        query: 'mutation PublishWorkshopBranch($input: UpdateRefsInput!) { updateRefs(input: $input) { clientMutationId } }',
+        variables: { input: {
+          repositoryId,
+          refUpdates: [{
+            name: `refs/heads/${input.branchName}`,
+            beforeOid: input.expectedHead ?? '0'.repeat(40),
+            afterOid: input.commitSha,
+            force: true,
+          }],
+        } },
+      }),
+    })
+    const body = await response.json() as { data?: { updateRefs?: unknown }; errors?: unknown[] }
+    if (!response.ok || body.errors?.length || !body.data?.updateRefs) {
+      throw new GitHubApiError('submission branch changed or could not be published', 'branch_conflict', response.ok ? 409 : response.status)
     }
   }
 
-  async findOpenPr(opts: {
-    forkOwner: string
-    branchName: string
-  }): Promise<{
-    number: number
-    url: string
-    baseRefName: string
-    isDraft: boolean
-  } | null> {
-    const head = `${opts.forkOwner}:${opts.branchName}`
-    const r = await this.fetch(
-      `/repos/${this.opts.upstreamOwner}/${this.opts.upstreamRepo}/pulls?head=${encodeURIComponent(head)}&state=open`,
-    )
-    if (!r.ok) throw new GitHubApiError('pr lookup failed', 'pr_lookup_failed', r.status)
-    const list = (await r.json()) as Array<{
-      number: number
-      html_url: string
-      base: { ref: string }
-      draft: boolean
-    }>
-    const pr = list.find((item) => item.base.ref === 'main' && !item.draft) ?? list[0]
-    if (!pr) return null
-    return {
-      number: pr.number,
-      url: pr.html_url,
-      baseRefName: pr.base.ref,
-      isDraft: pr.draft,
+  async getBranchHead(branch: string): Promise<string | null> {
+    const response = await this.fetch(`/repos/${this.opts.upstreamOwner}/${this.opts.upstreamRepo}/git/ref/heads/${branch.split('/').map(encodeURIComponent).join('/')}`)
+    if (response.status === 404) return null
+    if (!response.ok) throw new GitHubApiError('branch lookup failed', 'branch_lookup_failed', response.status)
+    return ((await response.json()) as { object: { sha: string } }).object.sha
+  }
+
+  private parsePr(value: unknown): SubmissionPr {
+    const pr = value as { number: number; html_url: string; head: { sha: string; ref: string; repo: { full_name: string } | null }; base: { ref: string }; draft: boolean; state: 'open' | 'closed'; merged_at?: string | null; merged?: boolean; body: string | null }
+    if (!pr.head?.repo || !pr.head.sha || !pr.number || !pr.html_url) throw new GitHubApiError('PR identity is incomplete', 'pr_identity_invalid', 409)
+    return { number:pr.number,url:pr.html_url,headSha:pr.head.sha,branch:pr.head.ref,headRepository:pr.head.repo.full_name,
+      base:pr.base.ref,draft:pr.draft,state:pr.state,merged:!!(pr.merged_at || pr.merged),body:pr.body ?? '' }
+  }
+
+  async getHeadRepositoryStatus(fullName: string): Promise<'upstream' | 'fork' | 'detached' | 'missing'> {
+    if (fullName === `${this.opts.upstreamOwner}/${this.opts.upstreamRepo}`) return 'upstream'
+    if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(fullName)) return 'missing'
+    const response = await this.fetch(`/repos/${fullName}`)
+    if (response.status === 404) return 'missing'
+    if (!response.ok) throw new GitHubApiError('head repository unavailable','head_repository_unavailable',response.status)
+    const repo = await response.json() as {source?: {full_name:string};parent?: {full_name:string}}
+    const upstream = `${this.opts.upstreamOwner}/${this.opts.upstreamRepo}`
+    return repo.source?.full_name === upstream || repo.parent?.full_name === upstream ? 'fork' : 'detached'
+  }
+
+  async getPullRequest(number: number): Promise<SubmissionPr> {
+    const response = await this.fetch(`/repos/${this.opts.upstreamOwner}/${this.opts.upstreamRepo}/pulls/${number}`)
+    if (!response.ok) throw new GitHubApiError('PR lookup failed','pr_lookup_failed',response.status)
+    return this.parsePr(await response.json())
+  }
+
+  /** Include closed and merged proposals: a lost response is not permission to create a replacement. */
+  async findPullRequests(branch: string): Promise<SubmissionPr[]> {
+    const result: SubmissionPr[] = []
+    for (let page = 1; ; page++) {
+      const head = encodeURIComponent(`${this.opts.upstreamOwner}:${branch}`)
+      const response = await this.fetch(`/repos/${this.opts.upstreamOwner}/${this.opts.upstreamRepo}/pulls?head=${head}&state=all&per_page=100&page=${page}`)
+      if (!response.ok) throw new GitHubApiError('PR lookup failed','pr_lookup_failed',response.status)
+      const values = await response.json() as unknown[]
+      result.push(...values.map(value => this.parsePr(value)))
+      if (values.length < 100) return result
+      if (page >= 100) throw new GitHubApiError('PR list exceeds reconciliation limit','ambiguous_pr',409)
     }
+  }
+
+  async getFileSha(path: string, ref: string): Promise<string | null> {
+    try { return (await this.getUpstreamFileEntry(path,ref)).sha }
+    catch (error) { if (error instanceof GitHubApiError && error.status === 404) return null; throw error }
   }
 
   async getPullRequestTreeEntries(prNumber: number): Promise<CommitTreeEntry[]> {
@@ -425,6 +411,7 @@ export class GitHubClient {
       if (!r.ok) throw new GitHubApiError('pr files lookup failed', 'pr_files_lookup_failed', r.status)
       const currentPage = (await r.json()) as PullRequestFile[]
       files.push(...currentPage)
+      if (files.length >= 3000) throw new GitHubApiError('PR file list may be truncated','pr_tree_truncated',409)
       if (currentPage.length < 100) break
     }
     return files.map(file => {
@@ -444,7 +431,6 @@ export class GitHubClient {
   }
 
   async openPr(opts: {
-    forkOwner: string
     branchName: string
     title: string
     body: string
@@ -462,7 +448,7 @@ export class GitHubClient {
         body: JSON.stringify({
           title: opts.title,
           body: opts.body,
-          head: `${opts.forkOwner}:${opts.branchName}`,
+          head: `${this.opts.upstreamOwner}:${opts.branchName}`,
           base: 'main',
           maintainer_can_modify: true,
         }),
@@ -475,45 +461,6 @@ export class GitHubClient {
       url: pr.html_url,
       baseRefName: 'main',
       isDraft: false,
-    }
-  }
-
-  async closePr(prNumber: number): Promise<void> {
-    const r = await this.fetch(
-      `/repos/${this.opts.upstreamOwner}/${this.opts.upstreamRepo}/pulls/${prNumber}`,
-      {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ state: 'closed' }),
-      },
-    )
-    if (!r.ok) throw new GitHubApiError('pr state update failed', 'pr_state_update_failed', r.status)
-  }
-
-  async reopenPr(prNumber: number): Promise<void> {
-    const r = await this.fetch(
-      `/repos/${this.opts.upstreamOwner}/${this.opts.upstreamRepo}/pulls/${prNumber}`,
-      {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ state: 'open' }),
-      },
-    )
-    if (!r.ok) throw new GitHubApiError('pr state update failed', 'pr_state_update_failed', r.status)
-  }
-
-  async commentOnPr(opts: { prNumber: number; body: string }): Promise<void> {
-    try {
-      await this.fetch(
-        `/repos/${this.opts.upstreamOwner}/${this.opts.upstreamRepo}/issues/${opts.prNumber}/comments`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ body: opts.body }),
-        },
-      )
-    } catch {
-      // best-effort; swallow errors
     }
   }
 

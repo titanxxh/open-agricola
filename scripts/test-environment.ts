@@ -34,7 +34,6 @@ if (operation === 'create') {
     BACKEND_LOG: join(root, 'backend.log'), FRONTEND_LOG: join(root, 'frontend.log'),
     OBSERVABILITY_ENABLED: 'false', NODE_ENV: 'test', ACCOUNT_REGISTRATION_POLICY: 'open', ALLOW_ANONYMOUS_WS: 'true',
     ENABLE_AUTH_TEST_HELPERS: '1', DISABLE_RATE_LIMIT: '1', WORKSHOP_PR_MOCK_MODE: 'true',
-    WORKSHOP_TOKEN_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64'),
     PUBLIC_API_BASE: base, PUBLIC_APP_ORIGIN: client, CORS_ORIGIN: client,
     FRONTEND_URL: client, BACKEND_URL: base, VITE_API_BASE: base, VITE_WS_BASE: `ws://127.0.0.1:${backend}/ws`,
     VITE_SANDBOX_EXECUTOR: process.env.VITE_SANDBOX_EXECUTOR || 'server',

@@ -3,8 +3,9 @@ import { join } from 'node:path'
 import { readFile, writeFile } from 'node:fs/promises'
 import { vi, afterEach, expect, it } from 'vitest'
 
-// Native database/S3 and child-process operations also run under full-suite load.
-vi.setConfig({ testTimeout: 30000, hookTimeout: 180000 })
+// Multiple native dump/restore containers also run on ARM hosts under full-suite load.
+// Keep all byte-integrity assertions; allow the complete restore sequence to finish.
+vi.setConfig({ testTimeout: 120000, hookTimeout: 180000 })
 import { importFixture } from './_helpers/import-fixture'
 import { importSqlite } from '../sqlite-import/import'
 import { exportStorageArchive, restoreStorageArchive } from '../storage-archive'
@@ -68,4 +69,4 @@ it('round-trips native PostgreSQL recovery bytes and private S3 objects, then ap
   await writeFile(join(archive, 'archive.json'), JSON.stringify(index))
   await expect(restoreStorageArchive(incomplete.url, incomplete.db, incomplete.objects, archive, [])).rejects.toThrow(/resource|viewer/i)
   await expect(assertStorageReady(incomplete.db)).rejects.toThrow('has not passed validation')
-}, 30000)
+}, 120000)

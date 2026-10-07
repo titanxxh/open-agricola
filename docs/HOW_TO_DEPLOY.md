@@ -53,7 +53,7 @@ node --env-file=.env scripts/local-services.mjs
 GAME_BUILD_ID="$(git rev-parse HEAD)" docker compose -f docker-compose.prod.yml build app
 ```
 
-Dependencies use independent persistent volumes. Generated credentials and the Workshop encryption key live in mode-600 `data/local-services.env`; host tools use `data/dependencies.local` and containers use `data/dependencies.compose.env`. Rebuilding applications never clears dependency data. The image contains PostgreSQL 18 native clients and an immutable Viewer, verified and uploaded to S3 at startup. Every hosted Room records; unavailable resources block game creation.
+Dependencies use independent persistent volumes. Generated dependency credentials live in mode-600 `data/local-services.env`; host tools use `data/dependencies.local` and containers use `data/dependencies.compose.env`. Rebuilding applications never clears dependency data. The image contains PostgreSQL 18 native clients and an immutable Viewer, verified and uploaded to S3 at startup. Every hosted Room records; unavailable resources block game creation.
 
 #### First SQLite migration
 
@@ -394,7 +394,6 @@ Never set these in production:
 | `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET` | Generated locally | Private S3 endpoint and bucket |
 | `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | Generated locally | S3 credentials; never commit them |
 | `S3_PREFIX` | Empty | Object namespace for this environment |
-| `WORKSHOP_TOKEN_ENCRYPTION_KEY` | Generated locally | Shared token encryption key; preserve it during migration |
 | `APP_INSTANCES` | Local: `1`; production: `2` | Local launch accepts `1` or `2`; production Compose fixes two application processes on one host |
 | `BACKEND_PORT` | `5175` | HTTP and WebSocket listen port |
 | `BACKEND_HOST` | `0.0.0.0` | Bind address |
@@ -427,10 +426,9 @@ Never set these in production:
 | `GAME_BUILD_ID` | — | Current backend Git commit; deployment scripts set it automatically |
 | `ADMIN_USERS` | — | Comma-separated administrator usernames |
 | `ACCOUNT_REGISTRATION_POLICY` | required | Use `open` for the first administrator, then `invite_only`; `disabled` blocks new accounts |
-| `GITHUB_OAUTH_CLIENT_ID` / `GITHUB_OAUTH_CLIENT_SECRET` | — | GitHub OAuth App credentials for Workshop pull requests |
 | `GITHUB_UPSTREAM_OWNER` / `GITHUB_UPSTREAM_REPO` | `titanxxh` / `open-agricola` | Workshop pull-request target |
 | `WORKSHOP_PR_ENABLED` | `false` | Whether Workshop pull requests are enabled |
-| `WORKSHOP_REVIEW_GITHUB_APP_ID` | — | Workshop Review GitHub App ID |
+| `WORKSHOP_REVIEW_GITHUB_APP_ID` | — | Workshop submission and review GitHub App ID |
 | `WORKSHOP_REVIEW_GITHUB_PRIVATE_KEY` | — | App private key escaped with single-line `\n` |
 | `WORKSHOP_REVIEW_GITHUB_INSTALLATION_ID` | — | App installation ID for the main repository |
 | `WORKSHOP_REVIEW_GITHUB_WEBHOOK_SECRET` | — | HMAC secret for `/api/github/webhook` |
