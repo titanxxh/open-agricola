@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { afterAll, beforeAll, expect, it } from 'vitest'
+import { afterAll, beforeAll, expect, it, vi } from 'vitest'
 import { createTestDatabase } from './_helpers/postgres'
 import { RoomDirectory } from '../game/room-directory'
 import { CommandStore } from '../game/command-store'
@@ -10,6 +10,26 @@ beforeAll(async () => {
   await directory.register('a', 'http://127.0.0.1:9001', 'test'); await directory.activate('a')
 })
 afterAll(async () => { await directory.db.close() })
+
+it('resolves explicit development slots after rematches without retargeting permanent links', async () => {
+  const nextRoom = `dev2-${randomUUID()}`
+  await directory.db.prepare("INSERT INTO game_contexts(room_id,lifecycle,created_at,updated_at) VALUES ('dev2','expired',1,1), (?,'active',1,1)").run(nextRoom)
+  await directory.db.prepare('INSERT INTO development_room_slots(root_id,room_id) VALUES (?,?)').run('dev2', nextRoom)
+  await expect(discoverRoom(directory, 'alice', { roomId: 'dev2' })).rejects.toMatchObject({ code: 'context_changed' })
+  vi.stubEnv('NODE_ENV', 'development')
+  try {
+    expect(await discoverRoom(directory, 'alice', { roomId: 'dev2', developmentSlot: true })).toEqual({ roomId: nextRoom, wsPath: '/nodes/a/ws' })
+    const commands = new CommandStore(directory.db)
+    const scope = await commands.issueScope('alice')
+    const identity = { scopeId: scope.scopeId, commandId: randomUUID() }
+    const pending = await commands.reserve('alice', identity, 'dev2', { type: 'newGame' })
+    if (pending.kind !== 'pending') throw new Error('Expected pending command')
+    await directory.db.transaction(() => commands.complete(pending.request, { ok: false, error: 'Rejected rematch' }))()
+    expect(await discoverRoom(directory, 'alice', { roomId: 'dev2', developmentSlot: true, pendingIdentity: identity })).toEqual({ roomId: 'dev2', wsPath: '/nodes/a/ws' })
+    vi.stubEnv('NODE_ENV', 'production')
+    await expect(discoverRoom(directory, 'alice', { roomId: 'dev2', developmentSlot: true })).rejects.toMatchObject({ code: 'context_changed' })
+  } finally { vi.unstubAllEnvs() }
+})
 
 it('discovers an idempotent creation allocation without creating a Room', async () => {
   const input = { allocationId: randomUUID() }

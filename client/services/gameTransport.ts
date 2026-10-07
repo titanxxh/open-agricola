@@ -254,6 +254,7 @@ export type RoomConnectionStatus =
   | { phase: 'connecting' | 'connected' | 'reconnecting' | 'recovering' | 'ready' }
   | { phase: 'stopped'; message: string; code?: string }
 export type RoomConnectionOptions = {
+  developmentSlot?: boolean
   route?: false | ((roomId: string, pending: ClientCommand[]) => Promise<string>)
   reconnectDelayMs?: number
 }
@@ -397,11 +398,13 @@ export class WsGameTransport implements GameTransport {
     const operation = pending.find(command => command.type === 'createRoom' || command.type === 'newGame') ?? pending[0]
     const identity = operation?.commandContext
     this.allocationId = identity?.allocationId ?? this.allocationId
+    const developmentSlot = this.options.developmentSlot === true && !identity && /^dev[2-6]$/.test(this.roomId)
     const base = new URL(this.wsUrl)
     base.protocol = base.protocol === 'wss:' ? 'https:' : 'http:'
     const response = await fetch(new URL('/api/rooms/locate', base), {
       method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...(this.roomId ? { roomId: this.roomId } : { allocationId: this.allocationId }),
+        ...(developmentSlot ? { developmentSlot: true } : {}),
         ...(identity ? { pendingIdentity: { scopeId: identity.scopeId, commandId: identity.commandId } } : {}) }),
     })
     if (!response.ok) {
@@ -410,6 +413,7 @@ export class WsGameTransport implements GameTransport {
     }
     const route = await response.json() as RoomDiscoveryResponse
     if (!/^\/nodes\/[A-Za-z0-9-]+\/ws$/.test(route.wsPath)) throw new Error('Invalid room route')
+    if (developmentSlot && route.roomId) this.setRoom(route.roomId)
     const destination = new URL(route.wsPath, this.wsUrl)
     return destination.href
   }

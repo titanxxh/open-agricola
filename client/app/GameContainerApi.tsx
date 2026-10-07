@@ -217,7 +217,8 @@ const useTransportSetup = (
     const params = new URLSearchParams(window.location.search)
     const contextRoomId = params.get('context')
     const roomId = contextRoomId ?? params.get('room')
-    const ws = new WsGameTransport(undefined, roomId ?? undefined, toRequestedPlayerIndex(playerParam))
+    const developmentSlot = !contextRoomId && isDevModeAllowedFromQuery(window.location.search) && /^dev[2-6]$/.test(roomId ?? '')
+    const ws = new WsGameTransport(undefined, roomId ?? undefined, toRequestedPlayerIndex(playerParam), { developmentSlot })
     const hadPendingCommands = ws.recoveringCommands
     let hotseat = false
     let receivedRoom = false
@@ -288,7 +289,7 @@ const useTransportSetup = (
         if (disposed || hadPendingCommands) return
         if (roomId) {
           setWsStatus({ phase: 'joining', roomId })
-          ws.sendRoomCommand('joinRoom', { roomId, intent: contextRoomId ? 'resume' : 'join', name: displayName ?? '', requestedPlayerIndex: toRequestedPlayerIndex(playerParam) })
+          ws.sendRoomCommand('joinRoom', { roomId: developmentSlot ? ws.roomId : roomId, intent: contextRoomId ? 'resume' : 'join', name: displayName ?? '', requestedPlayerIndex: toRequestedPlayerIndex(playerParam) })
         } else if (!playerParam || playerParam === 'p1') {
           setWsStatus({ phase: 'creating' })
           ws.sendRoomCommand('createRoom', {
@@ -346,7 +347,7 @@ export const GameContainerApi = () => {
   const { user } = useAuth()
   const { transport, wsStatus, isWs, isReady, wsTransport, recoveryNotice, clearRecoveryNotice } = useTransportSetup(
     requestedPlayerId,
-    user?.displayName,
+    user?.displayNameIsDefault ? undefined : user?.displayName,
     isWsMode,
     locale,
     isLocalMode,

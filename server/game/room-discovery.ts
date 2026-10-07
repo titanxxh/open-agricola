@@ -22,6 +22,10 @@ export async function discoverRoom(directory: RoomDirectory, actorId: string, re
   }
   if (roomId) {
     if (typeof roomId !== 'string' || roomId.length > 128 || !/^[A-Za-z0-9-]+$/.test(roomId)) throw Object.assign(new Error('Invalid game context'), { code: 'invalid_context_link' })
+    if (request.developmentSlot === true && !request.pendingIdentity && process.env.NODE_ENV !== 'production' && /^dev[2-6]$/.test(roomId)) {
+      const slot = await directory.db.prepare('SELECT room_id FROM development_room_slots WHERE root_id=?').get<{ room_id: string }>(roomId)
+      roomId = slot?.room_id ?? roomId
+    }
     const context = await directory.db.prepare('SELECT lifecycle FROM game_contexts WHERE room_id=?').get<{ lifecycle: string }>(roomId)
     if (!context) throw Object.assign(new Error('Game context was not found'), { code: 'unknown_context' })
     if (context.lifecycle !== 'active') {

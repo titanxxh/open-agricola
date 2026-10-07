@@ -190,12 +190,13 @@ describe('AuthProvider', () => {
 
     function Probe() {
       const { user, loading } = useAuth()
-      return <div>{loading ? 'loading' : user?.username ?? 'anonymous'}</div>
+      return <div>{loading ? 'loading' : user?.username ?? 'anonymous'}<span>{user?.displayNameIsDefault ? 'generated name' : 'account name'}</span></div>
     }
 
     render(<AuthProvider><Probe /></AuthProvider>)
 
     expect(await screen.findByText('p1')).toBeInTheDocument()
+    expect(screen.getByText('generated name')).toBeInTheDocument()
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
