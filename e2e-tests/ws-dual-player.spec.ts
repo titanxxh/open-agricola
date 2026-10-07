@@ -184,4 +184,54 @@ test.describe('WS dual-player sync', () => {
     await ctx1.close()
     await ctx2.close()
   })
+
+  // This lifecycle case retires the fixed Room used by the join cases above.
+  test('development reset opens a new game from p1 during another seat turn', async ({ browser, request }) => {
+    const context = await browser.newContext()
+    await authenticate(context, request, `dev_reset_${Date.now().toString(36)}`)
+    const page = await context.newPage()
+    const outgoing: Array<{ type: string }> = []
+    const errors: Array<{ type: string; error?: string; code?: string }> = []
+    let currentPlayerIndex = -1
+    let stateUpdates = 0
+    page.on('websocket', socket => {
+      socket.on('framesent', ({ payload }) => {
+        if (typeof payload === 'string') outgoing.push({ type: JSON.parse(payload).type })
+      })
+      socket.on('framereceived', ({ payload }) => {
+        if (typeof payload !== 'string') return
+        const event = JSON.parse(payload)
+        if (event.type === 'error') errors.push(event)
+        if (event.type === 'stateUpdate') {
+          currentPlayerIndex = event.payload.state.currentPlayerIndex
+          stateUpdates += 1
+        }
+      })
+    })
+    try {
+      await page.goto(`${FRONTEND_URL}/?player=p1&transport=ws&room=dev2&devMode=1`)
+      await expect(page.locator('.game-layout')).toBeVisible()
+      const previousRoomId = new URL(page.url()).searchParams.get('room')
+      expect(previousRoomId).toBeTruthy()
+      await page.locator('[data-action-id="forest"] button').first().click()
+      const confirmSwitch = page.getByRole('button', { name: /Confirm switch|确认切换/i })
+      await expect(confirmSwitch).toBeVisible()
+      const beforeSwitch = stateUpdates
+      await confirmSwitch.click()
+      await expect.poll(() => stateUpdates, { timeout: 5000 }).toBeGreaterThan(beforeSwitch)
+      await expect.poll(() => currentPlayerIndex, { timeout: 5000 }).toBe(1)
+      const reset = page.getByRole('button', { name: /Reset|重开/ })
+      await expect(page.locator('[data-action-id="farmland"] button').first()).toBeDisabled()
+      await expect(reset, 'A development room reset must remain available during another seat turn').toBeEnabled({ timeout: 5000 })
+      await expect(page.locator('.seed-input input')).toBeEditable()
+      await reset.click()
+      try {
+        await expect.poll(() => new URL(page.url()).searchParams.get('room'), { timeout: 8000 }).not.toBe(previousRoomId)
+      } finally {
+        console.log('Development reset result:', { sentReset: outgoing.some(event => event.type === 'newGame'), errors })
+      }
+      await expect(page.locator('.game-layout')).toBeVisible()
+      await expect(page.locator('[data-action-id="forest"] button').first()).toBeEnabled()
+    } finally { await context.close() }
+  })
 })

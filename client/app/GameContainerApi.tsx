@@ -460,6 +460,8 @@ export const GameContainerApi = () => {
            activePlayer.id === selfPlayer.id && displayPlayer.id === selfPlayer.id)
       : !!(activePlayer && displayPlayer)
   const hasGameView = !!(state && currentPlayer && displayPlayer)
+  const canResetGame = hasGameView && !persistencePaused && (!isWs || wsStatus.phase === 'ready') &&
+    (!isWs || isHotseat || selfPlayer?.id === displayPlayer?.id)
   const bugReportRoomId = isWs && wsStatus.phase === 'ready'
     ? wsStatus.roomId
     : null
@@ -745,10 +747,10 @@ export const GameContainerApi = () => {
     void transport.confirmPlayerSwitch().catch((e) => console.error(e))
   }, [interaction, runInteractionSubmitCommand, transport, isInteractive])
   const resetGame = useCallback(() => {
-    if (!isInteractive) return
+    if (!canResetGame) return
     const seed = resetSeedInput ? Number(resetSeedInput) : undefined
     void transport.newGame(Number.isFinite(seed) ? seed : undefined).catch((e) => console.error(e))
-  }, [transport, isInteractive, resetSeedInput])
+  }, [transport, canResetGame, resetSeedInput])
 
   const pendingEngineBlocked =
     interactionPresentationPlan.kind === 'engine-blocked'
@@ -1826,7 +1828,7 @@ export const GameContainerApi = () => {
           playDevCard={playDevCard} drawDevCard={drawDevCard}
           createDevPasture={createDevPasture}
           saveDevState={saveDevState} loadDevState={loadDevState}
-          isInteractive={isInteractive}
+          canResetGame={canResetGame}
           seedValue={resetSeedInput} onSeedChange={setResetSeedInput} onResetGame={resetGame}
         />
       ) : null}

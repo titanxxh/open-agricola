@@ -26,7 +26,7 @@ type Props = {
   saveDevState: () => void
   loadDevState: (file: File) => void
   createDevPasture?: () => void
-  isInteractive: boolean
+  canResetGame: boolean
   seedValue: string
   onSeedChange: (value: string) => void
   onResetGame: () => void
@@ -53,7 +53,7 @@ export const DevPanel = ({
   saveDevState,
   loadDevState,
   createDevPasture,
-  isInteractive,
+  canResetGame,
   seedValue,
   onSeedChange,
   onResetGame,
@@ -147,10 +147,10 @@ export const DevPanel = ({
             value={seedValue}
             placeholder={t(locale, 'ui.resetSeedPlaceholder')}
             onChange={(event) => onSeedChange(event.target.value)}
-            disabled={!isInteractive}
+            disabled={!canResetGame}
           />
         </label>
-        <button className="dev-apply" onClick={onResetGame} disabled={!isInteractive}>
+        <button className="dev-apply" onClick={onResetGame} disabled={!canResetGame}>
           {t(locale, 'ui.resetGame')}
         </button>
       </div>
