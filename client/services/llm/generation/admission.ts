@@ -7,7 +7,13 @@ export type ModelAdmission = GenerationTarget & { evidence: string; batch: strin
 /** Added only after the exact browser protocol + complete behavior batch passes.
  * No URL, localStorage, custom-model or provider-level flag can enable a tuple.
  */
-export const ADMITTED_GENERATION_MODELS: readonly ModelAdmission[] = []
+export const ADMITTED_GENERATION_MODELS: readonly ModelAdmission[] = [{
+  provider: 'deepseek',
+  endpoint: 'https://api.deepseek.com/v1/chat/completions',
+  model: 'deepseek-v4-flash',
+  evidence: 'https://github.com/titanxxh/open-agricola/issues/1041#issuecomment-6048766116',
+  batch: 'live-2026-10-07T22-42-03-306Z-cd23e6ec',
+}]
 
 export function resolveGenerationTarget(config: LlmConfig): GenerationTarget {
   const base = config.baseUrl ?? getProvider(config.provider).baseUrl

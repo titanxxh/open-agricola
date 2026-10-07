@@ -18,12 +18,7 @@ for (const locale of ['zh', 'en'] as const) test(`editor candidate recovery and 
   const cookie = await createSession(user.id)
   if (!cookie) throw new Error('No local test session')
   await page.context().addCookies([{ name: 'oa_session', value: cookie, url: FRONTEND_URL }])
-  // Substitute only the test browser's module. The shipped admission registry has no bypass.
-  await page.route('**/client/services/llm/generation/admission.ts*', async route => {
-    const response = await route.fetch()
-    const body = (await response.text()).replace('ADMITTED_GENERATION_MODELS = []', `ADMITTED_GENERATION_MODELS = [{provider:'deepseek',endpoint:'${modelUrl}',model:'deepseek-v4-flash',evidence:'controlled browser test',batch:'fixture'}]`)
-    await route.fulfill({ response, body })
-  })
+  // Exercise the shipped admission entry; only provider/reference responses are controlled.
   await page.route('https://api.github.com/**', route => route.fulfill({ json: route.request().url().includes('/git/ref/') ? { object: { sha: referenceCommit } } : { truncated: false, tree: [] } }))
   await page.goto(FRONTEND_URL)
   const cardId = `CUSTOM_Editor_${locale}_${Date.now()}`

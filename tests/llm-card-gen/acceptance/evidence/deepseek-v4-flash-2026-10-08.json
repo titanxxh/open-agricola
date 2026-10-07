@@ -1,0 +1,787 @@
+{
+  "format": 1,
+  "measuredAt": "2026-10-07T23:08:15.644Z",
+  "batch": "live-2026-10-07T22-42-03-306Z-cd23e6ec",
+  "decision": "https://github.com/titanxxh/open-agricola/issues/1035#issuecomment-6040961284",
+  "tracking": "https://github.com/titanxxh/open-agricola/issues/1041",
+  "admittedTarget": {
+    "provider": "deepseek",
+    "endpoint": "https://api.deepseek.com/v1/chat/completions",
+    "model": "deepseek-v4-flash"
+  },
+  "returnedModels": {
+    "deepseek-flash": 320
+  },
+  "documentedService": "DeepSeek-V4.1-Flash",
+  "identityNote": "Only the exact approved request tuple is admitted. The provider returned deepseek-flash for every request; this does not admit that request alias or establish results for the retired V4 model.",
+  "implementation": {
+    "implementationCommit": "a9469137d158347563734585d0ef47bec58788b7",
+    "dirty": false,
+    "frozenDigest": "002427b91d70974d140fe4b1dbc5993f9b5ec93180160612536e08f6dfb7b1af",
+    "promptVersion": "workshop-browser-tools-v5",
+    "toolVersion": "github-text-v2",
+    "sandboxContractId": "sandbox-v1:2015789eec1d5a761bbd2916338a327771e7424f2b019ed9578c92e1bddbf4f3",
+    "settings": {
+      "max_tokens": 16384,
+      "stream": true,
+      "stream_options": {
+        "include_usage": true
+      },
+      "thinking": {
+        "type": "enabled"
+      }
+    },
+    "responseLimits": {
+      "wireBytes": 33554432,
+      "eventBytes": 2097152,
+      "messageBytes": 2097152
+    },
+    "allowance": {
+      "modelRequests": 8,
+      "referenceCalls": 24,
+      "activeMs": 300000
+    },
+    "contextBytes": 196608,
+    "referenceLimits": {
+      "fileBytes": 262144,
+      "readLines": 160,
+      "resultBytes": 16384,
+      "searchHits": 40,
+      "httpRetries": 2,
+      "concurrency": 3
+    }
+  },
+  "control": {
+    "label": "Old full prompt plus shared static repair",
+    "sha256": "a22e5450fb6c7f0d5c17f50d5588742f281a851fb9de0be8ebf9c14cbf022d6a",
+    "bytes": 35414,
+    "sourceCommit": "f036403558dc0e49a23c077b6c41bdde596237a5"
+  },
+  "method": "Three repetitions in declared scenario order, tools then control; no task reruns or Session-driven repairs. Old prompt plus shared repair is the control. Synthetic results cannot admit a model.",
+  "report": {
+    "batch": "live-2026-10-07T22-42-03-306Z-cd23e6ec",
+    "synthetic": false,
+    "diagnostic": false,
+    "admitted": true,
+    "finishedAt": "2026-10-07T23:08:15.644Z",
+    "complete": true,
+    "planned": 102,
+    "completed": 102,
+    "arms": {
+      "tools": {
+        "completed": 51,
+        "planned": 51,
+        "firstPassed": 51,
+        "finalPassed": 51,
+        "sourcePassed": 48,
+        "gapPassed": 3,
+        "usage": {
+          "knownInputTokens": 3897004,
+          "knownOutputTokens": 217895,
+          "unknownRequests": 0
+        },
+        "modelRequests": 262,
+        "medianMs": 16996,
+        "p95Ms": 52386,
+        "estimatedNanoUsd": 537417312,
+        "heldNanoUsd": 0
+      },
+      "control": {
+        "completed": 51,
+        "planned": 51,
+        "firstPassed": 47,
+        "finalPassed": 47,
+        "sourcePassed": 47,
+        "gapPassed": 0,
+        "usage": {
+          "knownInputTokens": 544155,
+          "knownOutputTokens": 92494,
+          "unknownRequests": 0
+        },
+        "modelRequests": 51,
+        "medianMs": 5681,
+        "p95Ms": 28501,
+        "estimatedNanoUsd": 117316506,
+        "heldNanoUsd": 0
+      }
+    },
+    "probePassed": true,
+    "totalEffortCommittedNanoUsd": 1785903270,
+    "totalEffortRemainingNanoUsd": 3214096730,
+    "failures": [
+      {
+        "task": "control-M1-immediate-gain-with-cost-prereq-1",
+        "reason": "Expected one complete TypeScript source or a structured clarification/capability gap."
+      },
+      {
+        "task": "control-M15-cropped-field-stable-gap-1",
+        "reason": "Error: Expected a capability gap without an adoptable replacement source"
+      },
+      {
+        "task": "control-M15-cropped-field-stable-gap-2",
+        "reason": "Error: Expected a capability gap without an adoptable replacement source"
+      },
+      {
+        "task": "control-M15-cropped-field-stable-gap-3",
+        "reason": "Error: Expected a capability gap without an adoptable replacement source"
+      }
+    ],
+    "unrun": [],
+    "note": "Costs use published peak rates and are estimates, not invoices. Unknown calls keep their full reservations. Passing synthetic output never admits a model; admission registry updates require the actual complete report."
+  },
+  "probe": {
+    "firstPassed": true,
+    "finalPassed": true,
+    "modelRequests": 7,
+    "referenceCalls": 13,
+    "staticRepairs": 0,
+    "activeMs": 43983,
+    "checks": [
+      "M2-per-action-bonus: state/interaction/log/scores",
+      "M2 rejects opponents, other actions and unplayed ownership; repeats next round"
+    ],
+    "cost": {
+      "requests": 7,
+      "knownEstimatedNanoUsd": 16364340,
+      "heldUnknownNanoUsd": 0
+    }
+  },
+  "matrix": [
+    {
+      "scenario": "M1-immediate-gain-with-cost-prereq",
+      "expected": "source",
+      "tools": {
+        "firstPassed": 3,
+        "finalPassed": 3,
+        "staticRepairs": 0
+      },
+      "control": {
+        "firstPassed": 2,
+        "finalPassed": 2,
+        "staticRepairs": 0
+      }
+    },
+    {
+      "scenario": "M2-per-action-bonus",
+      "expected": "source",
+      "tools": {
+        "firstPassed": 3,
+        "finalPassed": 3,
+        "staticRepairs": 0
+      },
+      "control": {
+        "firstPassed": 3,
+        "finalPassed": 3,
+        "staticRepairs": 0
+      }
+    },
+    {
+      "scenario": "M3-harvest-feed-modifier",
+      "expected": "source",
+      "tools": {
+        "firstPassed": 3,
+        "finalPassed": 3,
+        "staticRepairs": 0
+      },
+      "control": {
+        "firstPassed": 3,
+        "finalPassed": 3,
+        "staticRepairs": 0
+      }
+    },
+    {
+      "scenario": "M4-endgame-vp",
+      "expected": "source",
+      "tools": {
+        "firstPassed": 3,
+        "finalPassed": 3,
+        "staticRepairs": 0
+      },
+      "control": {
+        "firstPassed": 3,
+        "finalPassed": 3,
+        "staticRepairs": 0
+      }
+    },
+    {
+      "scenario": "M5-cost-reduction",
+      "expected": "source",
+      "tools": {
+        "firstPassed": 3,
+        "finalPassed": 3,
+        "staticRepairs": 0
+      },
+      "control": {
+        "firstPassed": 3,
+        "finalPassed": 3,
+        "staticRepairs": 0
+      }
+    },
+    {
+      "scenario": "M6-cardstate-counter",
+      "expected": "source",
+      "tools": {
+        "firstPassed": 3,
+        "finalPassed": 3,
+        "staticRepairs": 0
+      },
+      "control": {
+        "firstPassed": 3,
+        "finalPassed": 3,
+        "staticRepairs": 0
+      }
+    },
+    {
+      "scenario": "M7-anytime-ability",
+      "expected": "source",
+      "tools": {
+        "firstPassed": 3,
+        "finalPassed": 3,
+        "staticRepairs": 0
+      },
+      "control": {
+        "firstPassed": 3,
+        "finalPassed": 3,
+        "staticRepairs": 0
+      }
+    },
+    {
+      "scenario": "M8-cross-player-trigger",
+      "expected": "source",
+      "tools": {
+        "firstPassed": 3,
+        "finalPassed": 3,
+        "staticRepairs": 0
+      },
+      "control": {
+        "firstPassed": 3,
+        "finalPassed": 3,
+        "staticRepairs": 0
+      }
+    },
+    {
+      "scenario": "M9-future-meeple",
+      "expected": "source",
+      "tools": {
+        "firstPassed": 3,
+        "finalPassed": 3,
+        "staticRepairs": 0
+      },
+      "control": {
+        "firstPassed": 3,
+        "finalPassed": 3,
+        "staticRepairs": 0
+      }
+    },
+    {
+      "scenario": "M10-payment-resource-provider",
+      "expected": "source",
+      "tools": {
+        "firstPassed": 3,
+        "finalPassed": 3,
+        "staticRepairs": 0
+      },
+      "control": {
+        "firstPassed": 3,
+        "finalPassed": 3,
+        "staticRepairs": 0
+      }
+    },
+    {
+      "scenario": "M11-improvement-cost-reduction",
+      "expected": "source",
+      "tools": {
+        "firstPassed": 3,
+        "finalPassed": 3,
+        "staticRepairs": 0
+      },
+      "control": {
+        "firstPassed": 3,
+        "finalPassed": 3,
+        "staticRepairs": 0
+      }
+    },
+    {
+      "scenario": "M12-combined-forest-counter",
+      "expected": "source",
+      "tools": {
+        "firstPassed": 3,
+        "finalPassed": 3,
+        "staticRepairs": 0
+      },
+      "control": {
+        "firstPassed": 3,
+        "finalPassed": 3,
+        "staticRepairs": 0
+      }
+    },
+    {
+      "scenario": "M13-selected-candidate-followup",
+      "expected": "source",
+      "tools": {
+        "firstPassed": 3,
+        "finalPassed": 3,
+        "staticRepairs": 0
+      },
+      "control": {
+        "firstPassed": 3,
+        "finalPassed": 3,
+        "staticRepairs": 0
+      }
+    },
+    {
+      "scenario": "M14-tested-source-repair",
+      "expected": "source",
+      "tools": {
+        "firstPassed": 3,
+        "finalPassed": 3,
+        "staticRepairs": 0
+      },
+      "control": {
+        "firstPassed": 3,
+        "finalPassed": 3,
+        "staticRepairs": 0
+      }
+    },
+    {
+      "scenario": "M15-cropped-field-stable-gap",
+      "expected": "capability-gap",
+      "tools": {
+        "firstPassed": 3,
+        "finalPassed": 3,
+        "staticRepairs": 0
+      },
+      "control": {
+        "firstPassed": 0,
+        "finalPassed": 0,
+        "staticRepairs": 0
+      }
+    },
+    {
+      "scenario": "M16-forest-english",
+      "expected": "source",
+      "tools": {
+        "firstPassed": 3,
+        "finalPassed": 3,
+        "staticRepairs": 0
+      },
+      "control": {
+        "firstPassed": 3,
+        "finalPassed": 3,
+        "staticRepairs": 0
+      }
+    },
+    {
+      "scenario": "M17-discount-english",
+      "expected": "source",
+      "tools": {
+        "firstPassed": 3,
+        "finalPassed": 3,
+        "staticRepairs": 0
+      },
+      "control": {
+        "firstPassed": 3,
+        "finalPassed": 3,
+        "staticRepairs": 0
+      }
+    }
+  ],
+  "protocol": {
+    "allPreserved": true,
+    "assistantMessagesChecked": 651,
+    "toolGroupsChecked": 651,
+    "opaqueFieldNames": [
+      "reasoning_content"
+    ],
+    "note": "Browser compared original assistant messages and complete tool groups before subsequent POSTs. Only equality counts and field names leave page memory; raw reasoning/signatures were not persisted."
+  },
+  "references": {
+    "attemptCommitCounts": {
+      "759e83f5bc254762af862b20fdf050089aea2d24": 52
+    },
+    "successfulReadRanges": 341,
+    "operations": 427,
+    "note": "Each new tool attempt resolved current public main independently; reads were pinned to that attempt SHA and Git blob verified. Identical-commit caches were allowed."
+  },
+  "credentialDestinations": {
+    "GET https://titanxxh.github.io": {
+      "requests": 2,
+      "credential": false
+    },
+    "GET https://api.github.com": {
+      "requests": 54,
+      "credential": false
+    },
+    "GET http://127.0.0.1:5913/api/workshop/sandbox-contract": {
+      "requests": 103,
+      "credential": false
+    },
+    "POST https://api.deepseek.com": {
+      "requests": 320,
+      "credential": true
+    },
+    "GET https://raw.githubusercontent.com": {
+      "requests": 35,
+      "credential": false
+    },
+    "POST http://127.0.0.1:5913/api/workshop/cards/validate-code": {
+      "requests": 99,
+      "credential": false
+    }
+  },
+  "cost": {
+    "currency": "USD",
+    "priceBasis": {
+      "source": "https://api-docs.deepseek.com/quick_start/pricing/",
+      "verifiedAt": "2026-10-08",
+      "currency": "USD",
+      "documentedService": "DeepSeek-V4.1-Flash",
+      "inputNanoUsdPerToken": 300,
+      "cachedInputNanoUsdPerToken": 6,
+      "outputNanoUsdPerToken": 1200,
+      "basis": "Published peak rates; settled costs are conservative estimates, not invoices."
+    },
+    "batchIncludingProbe": {
+      "requests": 320,
+      "knownEstimatedNanoUsd": 671098158,
+      "heldUnknownNanoUsd": 0
+    },
+    "wholeEffort": {
+      "requests": 860,
+      "knownEstimatedNanoUsd": 1724674170,
+      "heldUnknownNanoUsd": 61229100,
+      "committedNanoUsd": 1785903270,
+      "remainingNanoUsd": 3214096730,
+      "limitNanoUsd": 5000000000
+    },
+    "note": "All probes, failures, diagnostics and comparison runs share the ledger. One earlier call retains its full unknown-usage reservation. Conservative peak-rate estimates, not invoices; reasoning tokens are already included in output tokens."
+  },
+  "earlierPaidOrPreflightBatches": [
+    {
+      "batch": "live-2026-10-07T19-27-36-400Z-37507547",
+      "implementationCommit": "be4d84c133e15716dcf79025fe4ae9bb1236ca1f",
+      "promptVersion": "workshop-browser-tools-v1",
+      "diagnostic": false,
+      "complete": false,
+      "completed": 0,
+      "admitted": false,
+      "cost": {
+        "requests": 8,
+        "knownEstimatedNanoUsd": 10573476,
+        "heldUnknownNanoUsd": 0
+      },
+      "reportSha256": "6a1a67a2e9915b652e316f8fc001ca784bf4de09418e0f2be6c53b39b8e4948c",
+      "stoppedBecause": "The real browser tool roundtrip probe did not pass; the complete batch was not started."
+    },
+    {
+      "batch": "live-2026-10-07T19-38-12-615Z-e21f7f7d",
+      "implementationCommit": "9952387a857c69fff59cfe9892b82624d2f0a3c6",
+      "promptVersion": "workshop-browser-tools-v2",
+      "diagnostic": false,
+      "complete": false,
+      "completed": 0,
+      "admitted": false,
+      "cost": {
+        "requests": 0,
+        "knownEstimatedNanoUsd": 0,
+        "heldUnknownNanoUsd": 0
+      },
+      "reportSha256": "58cf17ff4de0b59c2bcf43e72e7850d51b363f15322992b373de3fd6fd97bb5b",
+      "stoppedBecause": "Anonymous GitHub quota is 49; at least 56 requests are required before starting the paid batch. Reset: 2026-10-07T19:41:51.000Z"
+    },
+    {
+      "batch": "live-2026-10-07T19-42-20-551Z-8993775d",
+      "implementationCommit": "9952387a857c69fff59cfe9892b82624d2f0a3c6",
+      "promptVersion": "workshop-browser-tools-v2",
+      "diagnostic": false,
+      "complete": false,
+      "completed": 0,
+      "admitted": false,
+      "cost": {
+        "requests": 8,
+        "knownEstimatedNanoUsd": 13078344,
+        "heldUnknownNanoUsd": 0
+      },
+      "reportSha256": "6c332d0544027f5b9919a5aaae3fe6469f702219a65e6561c6672218d5f1d836",
+      "stoppedBecause": "The real browser tool roundtrip probe did not pass; the complete batch was not started."
+    },
+    {
+      "batch": "live-2026-10-07T19-53-22-077Z-9f85153a",
+      "implementationCommit": "44717dbdbb3516e70824158485a73a1e09755ec3",
+      "promptVersion": "workshop-browser-tools-v3",
+      "diagnostic": false,
+      "complete": false,
+      "completed": 0,
+      "admitted": false,
+      "cost": {
+        "requests": 0,
+        "knownEstimatedNanoUsd": 0,
+        "heldUnknownNanoUsd": 0
+      },
+      "reportSha256": "d9f1064992cca4c21a3c6793b9880dde6191cc0bdbba4d2b1c859026f451f511",
+      "stoppedBecause": "Anonymous GitHub quota is 55; at least 56 requests are required before starting the paid batch. Reset: 2026-10-07T20:41:52.000Z"
+    },
+    {
+      "batch": "live-2026-10-07T20-00-09-661Z-1f635568",
+      "implementationCommit": "b4e019b618b65f8e2e56f20febaaa0e34445e23a",
+      "promptVersion": "workshop-browser-tools-v3",
+      "diagnostic": false,
+      "complete": false,
+      "completed": 11,
+      "admitted": false,
+      "cost": {
+        "requests": 49,
+        "knownEstimatedNanoUsd": 80356464,
+        "heldUnknownNanoUsd": 61229100
+      },
+      "reportSha256": "60340a0d7d76cfd6dcd4325f8a49531ff8c54b00c41dda27bb41f48faa6c0a70",
+      "stoppedBecause": "Provider response exceeds the stream limit.",
+      "failures": [
+        {
+          "task": "tools-M6-cardstate-counter-1",
+          "reason": "Provider response exceeds the stream limit."
+        }
+      ]
+    },
+    {
+      "batch": "diagnostic-live-2026-10-07T20-20-18-741Z-a0b68a75",
+      "implementationCommit": "b6c8579c4c2d5f79af3e4234151226bdcb7ed955",
+      "promptVersion": "workshop-browser-tools-v3",
+      "diagnostic": true,
+      "complete": true,
+      "completed": 1,
+      "admitted": false,
+      "cost": {
+        "requests": 6,
+        "knownEstimatedNanoUsd": 14812392,
+        "heldUnknownNanoUsd": 0
+      },
+      "reportSha256": "2e70a45e666fc92d8e5f545ee8a79eb7d3c69410071fbcc616d1e81e908671e9"
+    },
+    {
+      "batch": "live-2026-10-07T20-42-03-008Z-d7b240dc",
+      "implementationCommit": "b6c8579c4c2d5f79af3e4234151226bdcb7ed955",
+      "promptVersion": "workshop-browser-tools-v3",
+      "diagnostic": false,
+      "complete": false,
+      "completed": 37,
+      "admitted": false,
+      "cost": {
+        "requests": 130,
+        "knownEstimatedNanoUsd": 261898920,
+        "heldUnknownNanoUsd": 0
+      },
+      "reportSha256": "22329ccf11deca0aad59d82fc0dac0ac414a67468c373dbd704e5cbccf0f7291",
+      "stoppedBecause": "The model-request allowance was reached.",
+      "failures": [
+        {
+          "task": "tools-M5-cost-reduction-1",
+          "reason": "expected reed=1 (discount waived the 1-reed cost), got 0"
+        },
+        {
+          "task": "control-M15-cropped-field-stable-gap-1",
+          "reason": "Error: Expected a capability gap without an adoptable replacement source"
+        },
+        {
+          "task": "tools-M2-per-action-bonus-2",
+          "reason": "The model-request allowance was reached."
+        }
+      ]
+    },
+    {
+      "batch": "diagnostic-live-2026-10-07T21-28-44-137Z-2025e913",
+      "implementationCommit": "00a6163e90f3e3f47937c0d87ce01e36e265bb43",
+      "promptVersion": "workshop-browser-tools-v4",
+      "diagnostic": true,
+      "complete": true,
+      "completed": 1,
+      "admitted": false,
+      "cost": {
+        "requests": 4,
+        "knownEstimatedNanoUsd": 8016852,
+        "heldUnknownNanoUsd": 0
+      },
+      "reportSha256": "640cb9f328bf8c4f12ef0f4cec0079270e89e47d7eb55123be99e54af81d3982"
+    },
+    {
+      "batch": "diagnostic-live-2026-10-07T21-29-09-863Z-69dd94f9",
+      "implementationCommit": "00a6163e90f3e3f47937c0d87ce01e36e265bb43",
+      "promptVersion": "workshop-browser-tools-v4",
+      "diagnostic": true,
+      "complete": true,
+      "completed": 1,
+      "admitted": false,
+      "cost": {
+        "requests": 8,
+        "knownEstimatedNanoUsd": 25509732,
+        "heldUnknownNanoUsd": 0
+      },
+      "reportSha256": "e2982a6d54899060dcfa91abc037d721f7ce692e254efc34f5a5192e33ee9f89"
+    },
+    {
+      "batch": "live-2026-10-07T21-42-00-421Z-a6b24986",
+      "implementationCommit": "00a6163e90f3e3f47937c0d87ce01e36e265bb43",
+      "promptVersion": "workshop-browser-tools-v4",
+      "diagnostic": false,
+      "complete": true,
+      "completed": 102,
+      "admitted": false,
+      "cost": {
+        "requests": 323,
+        "knownEstimatedNanoUsd": 633352740,
+        "heldUnknownNanoUsd": 0
+      },
+      "reportSha256": "2c60c1ef23bccac55749c8f84574bf113b31fed2dd2b24c0a31399a85e42167f",
+      "failures": [
+        {
+          "task": "control-M15-cropped-field-stable-gap-1",
+          "reason": "Error: Expected a capability gap without an adoptable replacement source"
+        },
+        {
+          "task": "tools-M9-future-meeple-2",
+          "reason": "Cannot read properties of undefined (reading 'map')"
+        },
+        {
+          "task": "control-M15-cropped-field-stable-gap-2",
+          "reason": "Error: Expected a capability gap without an adoptable replacement source"
+        },
+        {
+          "task": "control-M15-cropped-field-stable-gap-3",
+          "reason": "Error: Expected a capability gap without an adoptable replacement source"
+        }
+      ]
+    },
+    {
+      "batch": "diagnostic-live-2026-10-07T22-18-20-466Z-4874a046",
+      "implementationCommit": "a9469137d158347563734585d0ef47bec58788b7",
+      "promptVersion": "workshop-browser-tools-v5",
+      "diagnostic": true,
+      "complete": true,
+      "completed": 1,
+      "admitted": false,
+      "cost": {
+        "requests": 4,
+        "knownEstimatedNanoUsd": 5977092,
+        "heldUnknownNanoUsd": 0
+      },
+      "reportSha256": "9b037113c25c5fc67bb020ead97532a126a571a4e2099ebdaf3f34a3c99a3d4c"
+    }
+  ],
+  "limits": [
+    "Finite, open-book 17-scenario acceptance; not a universal generation success rate.",
+    "The new arm cost more and took longer than the frozen control in this batch.",
+    "Only metadata admission, evidence and related regression/documentation changes follow this frozen implementation; changing generation behavior requires new acceptance.",
+    "Original test sources, validations, behavior results and accounting remain in local private artifacts. This summary excludes credentials, raw reasoning/signatures and provider message bodies."
+  ],
+  "artifactDirectory": "output/tmp/llm-acceptance/live-2026-10-07T22-42-03-306Z-cd23e6ec",
+  "artifactSha256": {
+    "budget-snapshot.json": "a1c6ab17976aa69cc67976cd27e3e7cf132aba44bdfdda63dcda3690928f5a16",
+    "control-M1-immediate-gain-with-cost-prereq-1.json": "50069b4ebeb44d0841ae643a08a68a90894221e6a086c39097938d2e9eb094f3",
+    "control-M1-immediate-gain-with-cost-prereq-2.json": "af0830cd369464e5e710a4ce6025f7b93d90da7f8c5432a194e80833380388ff",
+    "control-M1-immediate-gain-with-cost-prereq-3.json": "335b3c2e193773ace3ba79ec3481bc00060e9fa0e12a0fbe28b733032b71210e",
+    "control-M10-payment-resource-provider-1.json": "5d7a960a29904de5b5df4f0bccb1033ffecd682f40804f0744906fb5a9700f17",
+    "control-M10-payment-resource-provider-2.json": "f43b07eddacb2944edbc5deb88d6ed01d9b83704d8e5a4304ec5433097b04f30",
+    "control-M10-payment-resource-provider-3.json": "b1f37d24790ac2b599fcd556393bd4b283093d9874d7d0fde89a61d6bdf64228",
+    "control-M11-improvement-cost-reduction-1.json": "fa7dcd6144314e4f4a4c1a6dad53456c8fe3354a8917d65b9a78c9425ff74644",
+    "control-M11-improvement-cost-reduction-2.json": "8e567e904855ec55369244bc55e59d8e1bfb36ddd5dd3aa53a97c24c7b70ae8b",
+    "control-M11-improvement-cost-reduction-3.json": "df0ae2f889a25f0e302ec11a79f80f4d3c0cc49759964b9aa3283ec1388c7e6f",
+    "control-M12-combined-forest-counter-1.json": "55bdf5ce6d398549e09740371d26846555a3eca5d61dd7537c0c9704c0a91cdd",
+    "control-M12-combined-forest-counter-2.json": "6f9bb04e397983f26041158ab125bbca0e240297c52b7a2d3144ba9385e69835",
+    "control-M12-combined-forest-counter-3.json": "ce7974c0afb5594cb7e2c2d4304e028c5882c740bd15c80ed8ce7058861321a7",
+    "control-M13-selected-candidate-followup-1.json": "034d9e057be6ec860015d58a0cd84e6584be09b6c9ac03365f6f5fee3dbc540a",
+    "control-M13-selected-candidate-followup-2.json": "80e89a77aa08b3c78002f809f1467d9b4ba900eeb624ea214f66b2d1792af117",
+    "control-M13-selected-candidate-followup-3.json": "02a54ba3cbdf913ff6491685f16cfb87e62ebdff146a6d6be07d762dbe82b633",
+    "control-M14-tested-source-repair-1.json": "4cd5292d218fb3c488dcb2983e02c5f5787089ecd0a65dfc808dcb346ca09a50",
+    "control-M14-tested-source-repair-2.json": "0aee25330f33178c4e0ae3afe5dae37358898239bee5aef1a8800a500b2653f4",
+    "control-M14-tested-source-repair-3.json": "aca7477069fae059c099a47d6d1884b7f78cd773435496ea6091f56accefeef5",
+    "control-M15-cropped-field-stable-gap-1.json": "afc475ef6e75df625050e902075e58a6066d1ed2bcb656d2299654ed5fb0b926",
+    "control-M15-cropped-field-stable-gap-2.json": "e50fb96a28667b137ec753d4fa14d8ccb623194ff4237a9e58768176890560b3",
+    "control-M15-cropped-field-stable-gap-3.json": "d74a5643cbd100d5a6e7bb748f2e22ec70ef93a752a1a916977c2619a00de0f2",
+    "control-M16-forest-english-1.json": "a5efa86305b95dc8ab6338be437b564eb39b3736f0e89ca530d9d3e7105c7a49",
+    "control-M16-forest-english-2.json": "fad4987eb03ace6ae30e644641df86b3d3411cfa0772a5ab762afb07a552cec7",
+    "control-M16-forest-english-3.json": "cad6f0df55a5e37eb9817861115885ea8d52d5d46b1f4d7943687b72dc4e613f",
+    "control-M17-discount-english-1.json": "af6f766b63be170eb3fe3533402353657d2f4b0d29215b301a06f8a7b8dabfa6",
+    "control-M17-discount-english-2.json": "fa1365e5f89ed5c181c8d0f36e9929f54e8b76c52bde9c5b5d5d8ce990611355",
+    "control-M17-discount-english-3.json": "620cdc8e840d6a3166067ad88eb5e7764eda47d03a6154d56bccf7dcb097170d",
+    "control-M2-per-action-bonus-1.json": "f8260b17ea52b93c31981580d0ca5720036e257a1d561b36957ab76469c72681",
+    "control-M2-per-action-bonus-2.json": "391aa114609f859d84b391c74eac7ff5653c08c6e6829e8c89e33016ac37d29a",
+    "control-M2-per-action-bonus-3.json": "de944ffb7465434b71e3e75d70ce6abc45b1fcaf53f006805a0d8410f5607d37",
+    "control-M3-harvest-feed-modifier-1.json": "b0b7587b598aa078669ec061ffd2b949e48731b7ee84c10eff287eb2ee6fd54b",
+    "control-M3-harvest-feed-modifier-2.json": "c8510415c25706739017c11896dc66f9fca71a5ff063c8f47527622da1f32790",
+    "control-M3-harvest-feed-modifier-3.json": "fe46b80b07460aa777b9f9cd24c70f6cf6ec95da9bf828e5393a384ca503c466",
+    "control-M4-endgame-vp-1.json": "10cd1b00a149e992d470d3e05291c509421657f0aa5832023640100702b945e1",
+    "control-M4-endgame-vp-2.json": "273c125a466f9cce683a48df7e82ede096f0e911731090eb9bd67d43ee3b19ad",
+    "control-M4-endgame-vp-3.json": "dc1302848c79c958ad2474106c31da0e2cb2627dc8565fac49e6f49ff8339541",
+    "control-M5-cost-reduction-1.json": "ad89d002ea14a2a7174d91d00dd8fad984a22695f2aa1ad1678ae72a48a839af",
+    "control-M5-cost-reduction-2.json": "b0b7f0742e750af2f107f4099d09b465c7110e9d1612c666374d8d30835eacd5",
+    "control-M5-cost-reduction-3.json": "63673844b50d3e39809fac4d2f4f997e886723352f50e7f174d41c11d3b0c521",
+    "control-M6-cardstate-counter-1.json": "eaf5ff55365733af9cdecdff0c302bb7f3540626274e8ed6c6030f42bda5d1f4",
+    "control-M6-cardstate-counter-2.json": "a4880ecef37d1225df024086542224beb550c79ff186a184c6812102fb24fc5b",
+    "control-M6-cardstate-counter-3.json": "0d3c12040d419996e739e170cd9c516001cbf34b6015f641b49eb21aad9ac99a",
+    "control-M7-anytime-ability-1.json": "159e2c9f34ed079bda55a0158d84779ce70b8042595113d2d4ea8c0fce23ff22",
+    "control-M7-anytime-ability-2.json": "a699a73737757b0a1e8dc6fd7be221d5f86c0a3e4b4771e4d7bd9d22ad396895",
+    "control-M7-anytime-ability-3.json": "2310cc0fef692937b7a15f4fe31f9c0cdf0f9b8e0cb7325ecee9adcb2bd31ff3",
+    "control-M8-cross-player-trigger-1.json": "c404b076e925cb622d304ba0efbbba5cb9975ea9334325fb4072f116fb3a1a52",
+    "control-M8-cross-player-trigger-2.json": "c14f821e9cba2c59a794558531320a8175a600afef4a950300f14a18375bb288",
+    "control-M8-cross-player-trigger-3.json": "3fc3a97e249a2144c9423c117834913d6d7a800058267e8e3df75a4cc7f3882e",
+    "control-M9-future-meeple-1.json": "1f13d66bf42fb99696c4f3370817873641e2df4bd9ae7dc52c14317f574c7df5",
+    "control-M9-future-meeple-2.json": "8d415db50611986ada1ff4a15f01237823aa10d999fa28962dad1a48b52a6491",
+    "control-M9-future-meeple-3.json": "d044c02136370d95e5f139454b58a14d2f63208df8990c30114ad3b274b10f28",
+    "destinations.json": "a9de6c44682e9543713eabe8bf688be665741d20eefbe015b06cfd781d89d8be",
+    "github-preflight.json": "e9d0cb321f88bea2399fc43c967370cd68de3de51b7e13d39bfebc6233058b04",
+    "manifest.json": "f5a4666992cdec6afd8f941030805aff4175f6e37510be8f65680f419fe7587f",
+    "probe.json": "dd98cf6a918d2cd3aeed1a485950823a60e351e5e88e48f080b2ae7137e417c3",
+    "report.json": "64b4518880685b23f9a241da2cedf424ad9488ac08656c2c4ec981bcaf2dd8f2",
+    "tools-M1-immediate-gain-with-cost-prereq-1.json": "42afa80167e8336ea789a92233e5a600aeb0d883bb33f4457aeb9ba4c4e44c8a",
+    "tools-M1-immediate-gain-with-cost-prereq-2.json": "808107ad735d1497bf718f951a5461c799cf353b659c0be54ea3e13fbeab43bd",
+    "tools-M1-immediate-gain-with-cost-prereq-3.json": "ac0d6b54993e7ec8ff16708eec484adfc70768ffc124ba0cce249c38ef0df83f",
+    "tools-M10-payment-resource-provider-1.json": "df30fd4903416d647553ec98c841f95c84581d16c97f4a9563dfc7453c8a49db",
+    "tools-M10-payment-resource-provider-2.json": "bf28306ffd3186a4d39f8e8dfb3640e5bb9b866ff7ca996c9c1c510669ff31cb",
+    "tools-M10-payment-resource-provider-3.json": "e10320b64bcd86b7001e28b4593839ba76c1a488e63cbdd021a98e341c1d2462",
+    "tools-M11-improvement-cost-reduction-1.json": "53cfcb39633572bd92ca69bae8bed88a0a5a4a6b940d5bb0b62c719778bf73c4",
+    "tools-M11-improvement-cost-reduction-2.json": "4ac7be01052d4e3c4d4ec450ac1c66740b79a3d56334ab8875c5c15eb9025eeb",
+    "tools-M11-improvement-cost-reduction-3.json": "926df8a099797c0213f10279823efdfb3981d2d7d18ff5e07e1a0ba8656e0b84",
+    "tools-M12-combined-forest-counter-1.json": "46762582bc50ea5d08a83b69e06a1e88dc224658d6f6578693f7df0c310a2275",
+    "tools-M12-combined-forest-counter-2.json": "ddafacec34b8eb63653fbc6a5abebbd3d21d08d6f42132aabdce9c6e3a6d5a42",
+    "tools-M12-combined-forest-counter-3.json": "adfc732cd9e34075f7c2e65dee0973555a0358dd427eed3c034b3cea20d2a8fb",
+    "tools-M13-selected-candidate-followup-1.json": "e502765becb1523af3f179f4036b35384f226bbb4f093131ef1c13df8ccdedfe",
+    "tools-M13-selected-candidate-followup-2.json": "d6e710aaa9cd17aa8ac1ef64aea56cb262640e724d193289be8b8729ce5af6e3",
+    "tools-M13-selected-candidate-followup-3.json": "0d06fef3c1c72f0506724026030f46569e9d50f93cabf1047fd524e1b545d208",
+    "tools-M14-tested-source-repair-1.json": "55c1416759f220ad2728fe64981bca93aa221e85a8f24847a6587cbea8bb3ca0",
+    "tools-M14-tested-source-repair-2.json": "0c971f653aa64a91a8485e57eb72e1b3c8db44b3e4f6eaa07ed9b52951ca079a",
+    "tools-M14-tested-source-repair-3.json": "054de388de8f9c3d0ff720767c0ed209553256492cc36c30d5a124f6a0843b67",
+    "tools-M15-cropped-field-stable-gap-1.json": "d4cef75240f90d9977e16c65cce150f24f67c68d14917903f46d2b1d05b1a73e",
+    "tools-M15-cropped-field-stable-gap-2.json": "92538c0120de802b0dfc4c2ed603f380ee321f955c6adac8853b1ce0125dfc94",
+    "tools-M15-cropped-field-stable-gap-3.json": "5f32eb96e6e9586efacbc854c093c73025c9078698023b6435c310aa6b3add8c",
+    "tools-M16-forest-english-1.json": "852e5403e1db1c1c801e1ca3ce40f0d5670fe939f8884366c35983a90704c11e",
+    "tools-M16-forest-english-2.json": "443b4c6e7068d1e813e71e42b30e5cca5badc6e068f40c931456d921cdc3ff22",
+    "tools-M16-forest-english-3.json": "13fb1e32ed4ccc3cbf6aded4006f830d77198911b34cb536d702d85463efa5fe",
+    "tools-M17-discount-english-1.json": "a397a92900cb9228c2fff7a57d7995b6d30b0953adcaed03a44407e3be5029d8",
+    "tools-M17-discount-english-2.json": "c751a9524da7c31c5452a3e85634820ec45a7b2f7b782f33de4ae26699b3917f",
+    "tools-M17-discount-english-3.json": "30321807d736bd92c2fd3fae2702ae8d59c6fca6bfacc35fe6d78c839be36397",
+    "tools-M2-per-action-bonus-1.json": "031579232b4d2442c39d7d015716ac6865fe4d6116ca0fc00e8a7cf6fb813120",
+    "tools-M2-per-action-bonus-2.json": "067be57baac89d3207e06abf0204a1a5524e4d295726b37f0781a4468109e835",
+    "tools-M2-per-action-bonus-3.json": "f4c2127f584e27c3c308f84f017eea2565e7a27925535a68d50a9c0a629a264a",
+    "tools-M3-harvest-feed-modifier-1.json": "a60646d1878bed957c7222db27ad5cddfd4233300bdaa09d39bd575a236bc2c1",
+    "tools-M3-harvest-feed-modifier-2.json": "07ef0310886be41ae7447237b4f84cdee132a4bc47a4a3f1747929f6b9baee22",
+    "tools-M3-harvest-feed-modifier-3.json": "559f88ca431f4ba3a918b382c272bc136bb9b0c8f545fd411427c5aac01b6889",
+    "tools-M4-endgame-vp-1.json": "d88aef9aaa54d9134d0397224a95944ef129e3d66469aa1c6558b287f12ea500",
+    "tools-M4-endgame-vp-2.json": "da4a0656ebee80ed49c4fa9ea3f75f7aa6d5b0f1c83a0920633008de8a2d5b12",
+    "tools-M4-endgame-vp-3.json": "c91563c1e872470ee0e20a950ae06797008dad25f5e40d461c4a42837b0ab66d",
+    "tools-M5-cost-reduction-1.json": "46d1cdc94a08bd10a4acee20e751d1f3693799634063336a8a1605f34f8dcf40",
+    "tools-M5-cost-reduction-2.json": "e9b725710f28bd43d8d400da6e9b61992d8a11dc919e4cba96e6a33a681d4fc7",
+    "tools-M5-cost-reduction-3.json": "08e3d02b8380ef5ce5a4a323825bef4143d45a7af723e33a20f88b63f5e3e514",
+    "tools-M6-cardstate-counter-1.json": "08ed6ae372c81b1c3ee2f3da54b934e05c81c5c085376960f286142ede913b12",
+    "tools-M6-cardstate-counter-2.json": "7fa00ce2f92c218acd83035f3a7b746fc281b93320b24ff147afad5f7e4d00f9",
+    "tools-M6-cardstate-counter-3.json": "c8eafbb0a1b9d078f07ddf8a9f999d274ac321b5317dbf50b1e7eb5581c088c8",
+    "tools-M7-anytime-ability-1.json": "db56e28da8b3582164a7b09cba99ea77a7f91b665bd8e0ef2a41e6cc4f0cb9fc",
+    "tools-M7-anytime-ability-2.json": "4370d61de61483d8d2c0a7c1ec1c070917e2c74b8c2dea08e93300ef2a955365",
+    "tools-M7-anytime-ability-3.json": "4452299e5aac4218ee669f6d119e02dc6fa6f25df6e62f9aa62584b153216c9f",
+    "tools-M8-cross-player-trigger-1.json": "735b55857781f35bbf49acaa3f01a050706eff02d8f0cae34c2309b196a714cb",
+    "tools-M8-cross-player-trigger-2.json": "0062c274db55f60c5776aebbbf8286c87ddd168ba506bff391578c64a1d6e1aa",
+    "tools-M8-cross-player-trigger-3.json": "e08e4a569c842e2f8a8cfae5efc2d07ec754743db4974d578508b81f86edc175",
+    "tools-M9-future-meeple-1.json": "841afbde8f8fbf4a0ce4571552becc9a189e9638b2c5a186f1b28dc65fd688bf",
+    "tools-M9-future-meeple-2.json": "7b60d16369eeeacf133808ae190bdf2c9fa904f8401db4d56e3c35481bdd9276",
+    "tools-M9-future-meeple-3.json": "ebec965157ffa6189729a8c60f49f39e7662ce5ac9895faabc0091b69752af61"
+  }
+}

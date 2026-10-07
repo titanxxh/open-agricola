@@ -274,7 +274,10 @@ const setupPage = async (
   if (options.llm) {
     await page.route('**/client/services/llm/generation/admission.ts*', async route => {
       const response = await route.fetch()
-      await route.fulfill({ response, body: (await response.text()).replace('ADMITTED_GENERATION_MODELS = []', 'ADMITTED_GENERATION_MODELS = [{provider:"openrouter",endpoint:"https://openrouter.ai/api/v1/chat/completions",model:"qwen/qwen3.6-plus:free",batch:"fixture",evidence:"controlled browser test"}]') })
+      const body = await response.text()
+      const registry = /ADMITTED_GENERATION_MODELS\s*=\s*\[[\s\S]*?\]/
+      expect(body).toMatch(registry)
+      await route.fulfill({ response, body: body.replace(registry, 'ADMITTED_GENERATION_MODELS = [{provider:"openrouter",endpoint:"https://openrouter.ai/api/v1/chat/completions",model:"qwen/qwen3.6-plus:free",batch:"fixture",evidence:"controlled browser test"}]') })
     })
     await page.route('https://api.github.com/**', route => route.fulfill({ json: route.request().url().includes('/git/ref/') ? { object: { sha: 'e'.repeat(40) } } : { truncated: false, tree: [] } }))
   }
