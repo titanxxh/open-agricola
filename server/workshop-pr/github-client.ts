@@ -323,7 +323,7 @@ export class GitHubClient {
   async getHeadRepositoryStatus(fullName: string): Promise<'upstream' | 'fork' | 'detached' | 'missing'> {
     if (fullName === `${this.opts.upstreamOwner}/${this.opts.upstreamRepo}`) return 'upstream'
     if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(fullName)) return 'missing'
-    const response = await this.fetch('repository_read',`/repos/${fullName}`)
+    const response = await this.fetch('repository_lineage',`/repos/${fullName}`)
     if (response.status === 404) return 'missing'
     if (!response.ok) throw response.error('head repository unavailable','head_repository_unavailable')
     const repo = await response.json() as {source?: {full_name:string};parent?: {full_name:string}}
@@ -364,7 +364,7 @@ export class GitHubClient {
       sha: string
       patch?: string
     }
-    const prResponse = await this.fetch('pr_read',
+    const prResponse = await this.fetch('pr_head_read',
       `/repos/${this.opts.upstreamOwner}/${this.opts.upstreamRepo}/pulls/${prNumber}`,
     )
     if (!prResponse.ok) {

@@ -1,6 +1,5 @@
-export type GitHubOperation = 'installation_token' | 'blob_create' | 'commit_read' | 'tree_create'
-  | 'commit_create' | 'main_read' | 'repository_read' | 'branch_publish' | 'branch_read'
-  | 'pr_read' | 'pr_list' | 'tree_read' | 'pr_files' | 'pr_create' | 'contents_read'
+import { githubResponseShapes, type GitHubOperation } from './github-response-shapes'
+export type { GitHubOperation } from './github-response-shapes'
 
 /** Only allowlisted metadata may leave the transport; never response bodies or credentials. */
 export type GitHubDiagnostic = {
@@ -71,7 +70,7 @@ export class GitHubResponse {
       if (!(error instanceof SyntaxError)) throw transportError(error, this.diagnostic)
       throw this.invalidResponse()
     }
-    if (!body || typeof body !== 'object') throw this.invalidResponse()
+    if (!githubResponseShapes[this.diagnostic.operation](body)) throw this.invalidResponse()
     return body
   }
 

@@ -135,6 +135,7 @@ describe('GitHubClient', () => {
           return okJson({
             content: Buffer.from('changed\nfirst\nunrelated\nsecond\n').toString('base64'),
             encoding: 'base64',
+            sha: 'fixture-sha',
           })
         }
         if (url.includes('/git/blobs') && init?.method === 'POST') return okJson({ sha: 'blobsha' })
@@ -171,6 +172,7 @@ describe('GitHubClient', () => {
               'inserted\nfirst-target\nfiller\nsecond-target\nsecond-target\n',
             ).toString('base64'),
             encoding: 'base64',
+            sha: 'fixture-sha',
           })
         }
         if (url.includes('/git/blobs') && init?.method === 'POST') {
@@ -219,6 +221,7 @@ describe('GitHubClient', () => {
           return okJson({
             content: Buffer.from('const value = 1').toString('base64'),
             encoding: 'base64',
+            sha: 'fixture-sha',
           })
         }
         if (url.includes('/git/blobs') && init?.method === 'POST') {
@@ -258,6 +261,7 @@ describe('GitHubClient', () => {
           return okJson({
             content: Buffer.from('const value = 1\nconst upstream = 2\n').toString('base64'),
             encoding: 'base64',
+            sha: 'fixture-sha',
           })
         }
         if (url.includes('/git/blobs') && init?.method === 'POST') {
@@ -348,6 +352,7 @@ describe('GitHubClient', () => {
           return okJson({
             content: Buffer.from("it('source', () => {})\n").toString('base64'),
             encoding: 'base64',
+            sha: 'fixture-sha',
           })
         }
         if (url.includes('/git/blobs') && init?.method === 'POST') {
@@ -707,6 +712,7 @@ describe('GitHubClient', () => {
         if (url.includes('/contents/shared/cards/register-all.ts')) {
           return okJson({
             content: Buffer.from('file content here').toString('base64'),
+            sha: 'fixture-sha',
             encoding: 'base64',
           })
         }
@@ -726,6 +732,7 @@ describe('GitHubClient', () => {
         if (url.includes('ref=fixedsha')) {
           return okJson({
             content: Buffer.from('pinned content').toString('base64'),
+            sha: 'fixture-sha',
             encoding: 'base64',
           })
         }
@@ -746,6 +753,7 @@ describe('GitHubClient', () => {
         requestedUrl = url
         return okJson({
           content: Buffer.from('encoded path').toString('base64'),
+          sha: 'fixture-sha',
           encoding: 'base64',
         })
       }

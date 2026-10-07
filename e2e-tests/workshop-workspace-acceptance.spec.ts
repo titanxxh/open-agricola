@@ -1583,7 +1583,9 @@ test('exhausted Workshop submission explains the pause and recovers only after t
   await page.route(`**/api/workshop/cards/${workspace.id}/submit-review`,async route => {
     if (route.request().method() === 'POST') {
       actions.push(route.request().postDataJSON().action)
-      await route.fulfill({json:{ok:true,submissionId:'saved-submission',prNumber:1,prUrl:'https://github.com/titanxxh/open-agricola/pull/1'}})
+      await route.fulfill({json:actions.length === 1
+        ? {ok:false,code:'workshop_app_unavailable'}
+        : {ok:true,submissionId:'saved-submission',prNumber:1,prUrl:'https://github.com/titanxxh/open-agricola/pull/1'}})
     } else {
       await route.fulfill({json:{ok:false,submissionId:'saved-submission',state:'pending',code:'workshop_app_unavailable',needsAttention:true,retryAfter:3}})
     }
@@ -1595,9 +1597,13 @@ test('exhausted Workshop submission explains the pause and recovers only after t
     await expect(page.getByRole('status')).toContainText('自动重试已暂停')
     await expect(recover).toBeDisabled()
     await expect(recover).toBeEnabled({timeout:5000})
+    const failedRecovery = page.waitForResponse(response => response.url().endsWith('/submit-review') && response.request().method() === 'POST')
+    await recover.click()
+    await failedRecovery
+    await expect(recover).toBeEnabled({timeout:500})
     await recover.click()
     await expect(page.getByRole('link',{name:'查看审核 PR'})).toHaveAttribute('href','https://github.com/titanxxh/open-agricola/pull/1')
-    expect(actions).toEqual(['recover'])
+    expect(actions).toEqual(['recover','recover'])
     await expect(page.getByText('投稿编号：saved-submission')).toBeVisible()
   } finally {
     await responseJson(await api(request,account,`/api/workshop/cards/${workspace.id}`,{method:'DELETE'}))
