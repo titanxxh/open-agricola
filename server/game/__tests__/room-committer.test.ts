@@ -650,7 +650,7 @@ describe('RoomCommitter', () => {
     `).all(room.id))).toEqual([{ score: 100 }, { score: 101 }])
   })
 
-  it('copies custom card art into content-addressed replay storage', async () => {
+  it.each(['/card-art/custom.webp', 'https://old-api.example:8443/card-art/custom.webp'])('copies custom card art into content-addressed replay storage: %s', async artUrl => {
     await resources.storage.stage('card-art/custom.webp', Buffer.from('custom-art'), 'image/webp')
     const room = makeRoom()
     room.session = new GameSession(587, [{
@@ -662,7 +662,7 @@ describe('RoomCommitter', () => {
         number: 1,
         desc: [],
       },
-      artUrl: '/card-art/custom.webp',
+      artUrl,
     }], { playerCount: 2 })
     const committer = createCommitter()
     committer.lockNewRoom(room)

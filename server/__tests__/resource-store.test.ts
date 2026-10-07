@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { readFileSync } from 'node:fs'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { createTestDatabase } from './_helpers/postgres'
 import { testStorageEnvironment } from './_helpers/objects'
@@ -57,4 +58,45 @@ it('retains saved nested Workshop candidates until the draft releases them', asy
   await resources.db.prepare("UPDATE workshop_cards SET draft_generation_json = '{}' WHERE id = 'card'").run()
   expect(await peer.collect()).toBe(1)
   expect(await peer.read('card-art/candidate.png')).toBeNull()
+})
+
+it('retains absolute Workshop artwork URLs in drafts, candidates and pinned versions', async () => {
+  for (const name of ['absolute', 'candidate-absolute', 'version-absolute']) {
+    await resources.stage(`card-art/${name}.png`, Buffer.from(name), 'image/png')
+  }
+  await resources.db.prepare(`INSERT INTO workshop_cards(id, author_id, card_id, card_type, name, card_json, art_url, draft_generation_json, created_at, updated_at)
+    VALUES ('absolute-card', 'author', 'CUSTOM_absolute', 'minor', 'Absolute', '{}', ?, ?, 1, 1)`).run(
+    'https://api.example/card-art/absolute.png', JSON.stringify({art:{history:[{resultUrl:'https://old-api.example:8443/card-art/candidate-absolute.png'}]}}))
+  await resources.db.prepare(`INSERT INTO workshop_card_versions(id,card_id,version_number,created_by,card_json,art_url,created_at)
+    VALUES ('absolute-version','absolute-card',1,'author','{}',?,1)`).run('https://old-api.example:8443/card-art/version-absolute.png')
+  now += 2 * 24 * 60 * 60 * 1000
+  expect(await peer.collect()).toBe(0)
+  await resources.db.prepare("UPDATE workshop_cards SET art_url=NULL,draft_generation_json='{}' WHERE id='absolute-card'").run()
+  expect(await peer.collect()).toBe(2)
+  expect(await peer.read('card-art/version-absolute.png')).not.toBeNull()
+  await resources.db.prepare("DELETE FROM workshop_cards WHERE id='absolute-card'").run()
+  expect(await peer.collect()).toBe(1)
+})
+
+it('backfills surviving legacy references without resurrecting collected or removed artwork', async () => {
+  await resources.db.exec(readFileSync(new URL('../database/005-resource-reference-validation.sql',import.meta.url),'utf8'))
+  for (const name of ['surviving', 'collected', 'blocked']) {
+    await resources.stage(`card-art/${name}.png`, Buffer.from(name), 'image/png')
+  }
+  await resources.removeUnreferenced(['card-art/collected.png'])
+  await resources.blockHash((await resources.db.prepare("SELECT content_hash FROM stored_objects WHERE object_key='card-art/blocked.png'").get<{content_hash:string}>())!.content_hash)
+  await resources.db.prepare(`INSERT INTO workshop_cards(id,author_id,card_id,card_type,name,card_json,art_url,draft_generation_json,created_at,updated_at)
+    VALUES ('backfill-card','author','CUSTOM_backfill','minor','Backfill','{}',?,?,1,1)`).run(
+    'https://api.example/card-art/surviving.png',JSON.stringify({history:['https://old-api.example/card-art/collected.png','https://old-api.example/card-art/blocked.png']}))
+  const migration = readFileSync(new URL('../database/019-workshop-art-urls.sql',import.meta.url),'utf8')
+  await resources.db.transaction(() => resources.db.exec(migration))()
+  await resources.db.transaction(() => resources.db.exec(migration))()
+  expect(await resources.db.prepare("SELECT object_key FROM object_references WHERE owner_id='backfill-card'").all()).toEqual([{object_key:'card-art/surviving.png'}])
+  await resources.db.prepare("UPDATE workshop_cards SET draft_generation_json=draft_generation_json WHERE id='backfill-card'").run()
+  await expect(resources.db.prepare("UPDATE workshop_cards SET art_url='https://api.example/card-art/missing.png' WHERE id='backfill-card'").run()).rejects.toThrow('not ready')
+  expect(await resources.read('card-art/collected.png')).toBeNull()
+  expect(await resources.read('card-art/blocked.png')).toBeNull()
+  now += 2 * 24 * 60 * 60 * 1000
+  await peer.collect()
+  expect(await resources.read('card-art/surviving.png')).not.toBeNull()
 })
