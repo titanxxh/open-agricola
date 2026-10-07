@@ -225,7 +225,9 @@ The UI collects only an `Image subject`. At request time, it combines that with 
 
 The browser cover-crops the source into the art-window ratio, applies an occupation circle or minor-improvement hexagonal mask, and draws the gold border. Final canvases are 512 by 537 pixels for occupations and 512 by 534 for minor improvements, regardless of the model's output size.
 
-A generated image becomes a candidate rather than replacing current art. The browser session retains at most three candidates. Adoption atomically updates the Design Draft, creates a deduplicated Draft Version, and uploads the image to `/data/card-art/`. The server stores only the user's subject and the adopted candidate's provenance.
+A generated image becomes a candidate rather than replacing current art. The browser session retains at most three candidates. Adoption atomically updates the Design Draft, creates a deduplicated Draft Version, and uploads the image to private object storage through `/api/workshop/art`. The server stores only the user's subject and the adopted candidate's provenance.
+
+Managed artwork uses `/card-art/{filename}` identifiers. Historical absolute HTTP(S) URLs resolve to the same local object key for submission, Replay archival and durable references; their host is never fetched. Reads still require the local catalog, matching content hash and erasure checks. Drafts, saved candidates and pinned versions retain their images across API-origin changes. Migration backfills references only for surviving ready objects without rewriting snapshot contents. Already collected images require recovery of their exact recorded bytes and references; removed images remain blocked.
 
 ### C5. Security validation for LLM-generated code
 

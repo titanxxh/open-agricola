@@ -1,12 +1,17 @@
 import { readFileSync } from 'node:fs'
 import { createServer, type Server } from 'node:http'
-import { generateKeyPairSync } from 'node:crypto'
+import { generateKeyPairSync, randomUUID } from 'node:crypto'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createTestDatabase } from './_helpers/postgres'
 import { SubmissionGitHub } from './_helpers/submission-github'
+import { testStorageEnvironment } from './_helpers/objects'
+import { ResourceStore } from '../storage/resource-store'
+import { S3ObjectStore } from '../storage/s3-store'
 
 const db = await createTestDatabase()
+const resources = new ResourceStore(db, S3ObjectStore.fromEnv(testStorageEnvironment(), `test/${randomUUID()}/`))
 vi.mock('../db', () => ({ getDb: () => db }))
+vi.mock('../storage/runtime', () => ({ getResources: () => resources }))
 import { createCard, checkpointDraft, pinCurrentDraftVersion, markSandboxPass, loadWorkspace, type WorkshopDraft } from '../workshop-drafts'
 import { handleSubmitReviewRequest } from '../workshop-pr/propose-handler'
 import { GitHubReviewProvider } from '../workshop-review/github-review-provider'
@@ -45,16 +50,16 @@ beforeEach(async () => {
   vi.stubGlobal('fetch', (...args: Parameters<typeof fetch>) => github.fetch(...args))
 })
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.unstubAllEnvs() })
-afterAll(async () => { await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve())); await db.close() })
+afterAll(async () => { await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve())); await resources.objects.clearPrefix(); resources.objects.close(); await db.close() })
 
-async function readyCard() {
+async function readyCard(artUrl: string | null = null) {
   const meta = { id: 'CUSTOM_TestCard', name: 'Test Card', deck: 'CUSTOM', number: 0, desc: ['A test card'], cost: {}, vp: 0 }
   const draft: WorkshopDraft = {
     cardId: meta.id, cardType: 'minor', name: meta.name, description: 'A test card',
     cardJson: { ...meta, card_type: 'minor', implemented: true, locales: { zh: { name: '测试卡', desc: ['测试说明'] } } },
     effectCode: `const CARD_DEF = ${JSON.stringify({cardType: 'minor', meta})}; const CARD_IMPL = {}`,
     compiledCode: '"use strict";', codeManifest: { effectHooks: [], listeners: [], cardDefinition: { cardType: 'minor', meta } },
-    artUrl: null, generation: { secretPrompt: 'never publish me' },
+    artUrl, generation: { secretPrompt: 'never publish me' },
   }
   const card = await createCard(db,{authorId:'author',draft})
   const {versionId} = await pinCurrentDraftVersion(db,{cardId:card.id,authorId:'author',baseRevision:card.revision})
@@ -76,6 +81,31 @@ async function edit(id: string) {
 }
 
 describe('Workshop submissions over HTTP', () => {
+  it.each(['https://api.example/card-art/../private.png', 'https://api.example/card-art/image.png?redirect=1', 'https://user:password@api.example/card-art/image.png'])('rejects unsupported artwork without fetching the supplied URL: %s', async artUrl => {
+    const card = await readyCard(artUrl)
+    expect(await submit(card.id)).toMatchObject({ok:false,code:'invalid_art'})
+    expect(github.prs).toHaveLength(0)
+  })
+
+  it('resubmits legacy artwork stored as an absolute API URL without replacing the old PR', async () => {
+    await resources.stage('card-art/legacy.png', Buffer.from('original artwork'), 'image/png')
+    const card = await readyCard('/card-art/legacy.png')
+    expect(await submit(card.id)).toMatchObject({ok:true,prNumber:1})
+    const old = github.prs[0]!
+    const head = github.refs.get(old.branch)
+    old.state = 'closed'
+    await db.exec('DELETE FROM workshop_submissions; DELETE FROM request_rate_limits')
+    await db.prepare('UPDATE workshop_card_versions SET art_url=? WHERE card_id=?').run('https://old-api.example:8443/card-art/legacy.png',card.id)
+    const workspace = await loadWorkspace(db,card.id,'author')
+    const next = await checkpointDraft(db,{cardId:card.id,authorId:'author',baseRevision:workspace.revision,draft:{...workspace.draft,artUrl:'https://api.example/card-art/legacy.png'}})
+    const {versionId} = await pinCurrentDraftVersion(db,{cardId:card.id,authorId:'author',baseRevision:next.revision})
+    await markSandboxPass(db,{cardId:card.id,authorId:'author',versionId,authorConfirmed:true,runtimeErrors:[]})
+    expect(await submit(card.id,'restart')).toMatchObject({ok:true,prNumber:2})
+    expect(github.refs.get(old.branch)).toBe(head)
+    expect(old.state).toBe('closed')
+    expect(github.commits.get(github.refs.get(github.prs[1]!.branch)!)!['public/card-art/community/CUSTOM_TestCard.png']).toBe('original artwork')
+  })
+
   it.each(['card','user','cascade'] as const)('preserves an in-flight submission during %s deletion and permits deletion after recovery', async kind => {
     const card = await readyCard()
     github.loseCreateResponse = true

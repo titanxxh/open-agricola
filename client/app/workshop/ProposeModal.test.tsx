@@ -9,6 +9,24 @@ vi.mock('../../services/workshop-pr', () => ({ startPropose: vi.fn(), submission
 const card = {id:'card-db-id',card_id:'CUSTOM_TestCard',name:'测试卡',art_url:null}
 beforeEach(() => { vi.clearAllMocks(); vi.mocked(submissionStatus).mockResolvedValue({ok:false,code:'no_submission'}) })
 describe('ProposeModal', () => {
+  it('shows an artwork failure and keeps legacy resubmission and its PR link available', async () => {
+    vi.mocked(submissionStatus).mockResolvedValue({ok:false,code:'legacy_submission',prUrl:'https://github.com/titanxxh/open-agricola/pull/704'})
+    vi.mocked(startPropose).mockResolvedValue({ok:false,code:'art_unavailable'})
+    render(<ProposeModal card={card} onClose={vi.fn()}/>)
+    await screen.findByRole('button',{name:'重新投稿'})
+    await userEvent.click(screen.getByRole('checkbox'))
+    await userEvent.click(screen.getByRole('button',{name:'重新投稿'}))
+    await waitFor(() => expect(screen.getByRole('status').textContent).toContain('卡图文件暂不可用'))
+    expect(screen.getByRole('link',{name:'查看审核 PR'}).getAttribute('href')).toContain('/704')
+    await userEvent.click(screen.getByRole('button',{name:'重新投稿'}))
+    expect(startPropose).toHaveBeenNthCalledWith(2,card.id,'restart')
+    expect(screen.queryByRole('button',{name:'发起 PR'})).toBeNull()
+    vi.mocked(startPropose).mockRejectedValue(new TypeError('Response lost'))
+    vi.mocked(submissionStatus).mockResolvedValue({ok:false,submissionId:'saved-operation',state:'pending',code:'creation_unknown'})
+    await userEvent.click(screen.getByRole('button',{name:'重新投稿'}))
+    await screen.findByRole('button',{name:'再次核实'})
+    expect(screen.queryByRole('button',{name:'重新投稿'})).toBeNull()
+  })
   it('submits directly and displays the bot PR', async () => {
     vi.mocked(startPropose).mockResolvedValue({ok:true,prNumber:1,prUrl:'https://github.com/titanxxh/open-agricola/pull/1'})
     render(<ProposeModal card={card} onClose={vi.fn()}/>)

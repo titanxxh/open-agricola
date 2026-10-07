@@ -1,6 +1,7 @@
 import type { CustomCardDef } from '../../shared/contract/protocol/game'
 import type { ResourceStore } from './resource-store'
 import { objectHash } from './s3-store'
+import { cardArtKey } from './card-art-key'
 
 export class ReplayAssetValidationError extends Error {}
 export type ViewerManifest = { entrypoint: 'index.html'; files: Record<string, string> }
@@ -52,10 +53,11 @@ export class ReplayResources {
     const archived: CustomCardDef[] = []
     for (const definition of definitions) {
       if (!definition.artUrl) { archived.push({ ...definition }); continue }
-      if (!/^\/(?:card-art\/[A-Za-z0-9._-]+|replay-assets\/[a-f0-9]{64})$/.test(definition.artUrl)) throw new ReplayAssetValidationError('unsupported custom card art URL')
-      const object = await this.storage.read(definition.artUrl.slice(1))
+      const artKey = cardArtKey(definition.artUrl) ?? (/^\/replay-assets\/[a-f0-9]{64}$/.test(definition.artUrl) ? definition.artUrl.slice(1) : null)
+      if (!artKey) throw new ReplayAssetValidationError('unsupported custom card art URL')
+      const object = await this.storage.read(artKey)
       if (!object) {
-        const catalog = await this.storage.db.prepare('SELECT content_hash, blocked FROM stored_objects WHERE object_key = ?').get(definition.artUrl.slice(1)) as { content_hash: string; blocked: boolean } | undefined
+        const catalog = await this.storage.db.prepare('SELECT content_hash, blocked FROM stored_objects WHERE object_key = ?').get(artKey) as { content_hash: string; blocked: boolean } | undefined
         if (catalog && (catalog.blocked || await this.storage.ledger.isHashRemoved(catalog.content_hash))) throw new ReplayAssetValidationError('replay asset has been removed')
         throw new Error('custom card art is not available yet')
       }

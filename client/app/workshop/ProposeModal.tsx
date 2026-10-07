@@ -19,6 +19,8 @@ const hints: Record<string,string> = {
   pr_merged: 'PR 已合并，卡牌将随包含它的版本发布。',
   legacy_submission: '这是旧投稿。重新投稿会保留旧 PR 历史，并要求新 PR 重新审核。人工修改需先由维护者整合。',
   legacy_review_required: '旧 PR 缺少可验证的生成基线，请联系维护者核查源码、图片和测试后再迁移。',
+  invalid_art: '卡图地址不受支持，请在工坊重新上传并采用图片后再投稿。',
+  art_unavailable: '卡图文件暂不可用，请稍后重试；旧投稿图片缺失时，请联系维护者恢复原图。草稿和旧 PR 均已保留。',
   workshop_app_unavailable: '工坊 GitHub App 尚未就绪或授权不可用，请联系维护者。草稿和原投稿已保留。',
   rate_limited: '投稿过于频繁，请稍后再试。',
   github_rate_limited: 'GitHub 要求暂缓请求，请等待后再次核实。',
@@ -38,6 +40,7 @@ export function ProposeModal({card,onClose,onSuccess}: {
   const [result,setResult] = useState<ProposeResponse>()
   const [busy,setBusy] = useState(false)
   const [agreed,setAgreed] = useState(false)
+  const [retryRestart,setRetryRestart] = useState(false)
   useEffect(() => {
     let active = true
     void submissionStatus(card.id).then(value => { if (active) setResult(value) }).catch(() => {
@@ -60,16 +63,18 @@ export function ProposeModal({card,onClose,onSuccess}: {
     polls.current = 0
     try {
       const value = await startPropose(card.id,action)
-      setResult(value)
+      setResult(previous => !value.ok && !value.prUrl ? {...value,prUrl:previous?.prUrl} : value)
+      setRetryRestart(action === 'restart' && !value.ok && !value.submissionId)
       if (value.ok) onSuccess?.(value.prUrl)
     } catch {
+      setRetryRestart(false)
       try { setResult(await submissionStatus(card.id)) }
       catch { setResult({ok:false,code:'network_error'}) }
     } finally { setBusy(false) }
   }
   const code = result?.code
   const recover = result && !result.ok && (result.submissionId || code === 'network_error')
-  const restart = code === 'pr_closed' || code === 'legacy_submission'
+  const restart = code === 'pr_closed' || code === 'legacy_submission' || retryRestart
   return <ModalShell title="提交 PR 到主仓库" onClose={onClose}>
     <div style={{padding:16}}>
       <h3>{card.name}</h3>
