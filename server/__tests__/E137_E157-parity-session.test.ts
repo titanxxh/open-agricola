@@ -205,13 +205,17 @@ describe('E137-E145 parity', () => {
 
 describe('E148-E157 parity', () => {
   it('E148 S1: playing Lazybones may reserve Grain Seeds', () => {
-    const s = setup({ cardId: 'E148_Lazybones', played: false })
+    const s = setup({ cardId: 'E148_Lazybones', played: false, playerCount: 2 })
     let r = playOccupation(s, 'E148_Lazybones')
-    if (r.interaction.stateId === 'wait') r = choose(s, r, (o) => String(o.value).includes('grain-seeds'))
-    expect(r.state.players[0]!.cardStates.E148_Lazybones?.extraData?.reservedActionSpaces as string[]).toContain('grain-seeds')
+    expect(r.ok, r.error).toBe(true)
+    expect(r.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'choice', multiSelect: { maxSelections: 4 } } })
+    expect(opts(r).map((option) => option.value)).toEqual(['grain-seeds', 'farmland', 'day-laborer', 'farm-expansion'])
+    r = s.resolveChoice(0, 'lazybones:grain-seeds')
+    expect(r.ok, r.error).toBe(true)
+    expect(r.state.players[0]!.cardStates.E148_Lazybones?.extraData?.reservedActionSpaces).toEqual(['grain-seeds'])
   })
   it('E148 S2: opponent using a marked space builds a free stable for the owner', () => {
-    const s = setup({ cardId: 'E148_Lazybones', actor: 1 })
+    const s = setup({ cardId: 'E148_Lazybones', actor: 1, playerCount: 2 })
     s.state.players[0]!.cardStates.E148_Lazybones = { extraData: { reservedActionSpaces: ['grain-seeds'] } }
     s.loadState(s.state)
     let r = s.takeAction(1, 'grain-seeds')
@@ -228,18 +232,22 @@ describe('E148-E157 parity', () => {
     expect(r.state.players[0]!.cardStates.E148_Lazybones?.extraData?.reservedActionSpaces).toEqual([])
   })
   it('E148 S3: playing Lazybones may reserve all four action spaces', () => {
-    const s = setup({ cardId: 'E148_Lazybones', played: false })
+    const s = setup({ cardId: 'E148_Lazybones', played: false, playerCount: 2 })
     let r = playOccupation(s, 'E148_Lazybones')
-    if (r.interaction.stateId === 'wait') {
-      r = choose(s, r, (o) => ['grain-seeds', 'farmland', 'day-laborer', 'farm-expansion']
-        .every((space) => String(o.value).includes(space)))
-    }
-    expect(r.state.players[0]!.cardStates.E148_Lazybones?.extraData?.reservedActionSpaces).toHaveLength(4)
+    expect(r.ok, r.error).toBe(true)
+    expect(r.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'choice', multiSelect: { maxSelections: 4 } } })
+    r = s.resolveChoice(0, 'lazybones:grain-seeds,farmland,day-laborer,farm-expansion')
+    expect(r.ok, r.error).toBe(true)
+    expect(r.state.players[0]!.cardStates.E148_Lazybones?.extraData?.reservedActionSpaces)
+      .toEqual(['grain-seeds', 'farmland', 'day-laborer', 'farm-expansion'])
   })
   it('E148 S4: playing Lazybones may reserve no action space', () => {
-    const s = setup({ cardId: 'E148_Lazybones', played: false })
+    const s = setup({ cardId: 'E148_Lazybones', played: false, playerCount: 2 })
     let r = playOccupation(s, 'E148_Lazybones')
-    if (r.interaction.stateId === 'wait') r = s.resolveChoice(r.interaction.playerIndex, '__skip__')
+    expect(r.ok, r.error).toBe(true)
+    r = s.resolveChoice(0, 'lazybones:')
+    expect(r.ok, r.error).toBe(true)
+    expect(r.interaction.sourceCard).not.toBe('E148_Lazybones')
     expect(r.state.players[0]!.cardStates.E148_Lazybones?.extraData?.reservedActionSpaces ?? []).toEqual([])
     expect(r.state.players[0]!.stableTiles).toHaveLength(0)
   })
