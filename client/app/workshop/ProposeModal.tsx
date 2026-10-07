@@ -90,7 +90,7 @@ export function ProposeModal({card,onClose,onSuccess}: {
         if (value.ok) return value
         const saved = action === 'recover' && previous && !previous.ok && previous.submissionId
           && !value.submissionId && value.code !== 'no_submission' ? previous : undefined
-        return {...saved,...value,prUrl:value.prUrl ?? previous?.prUrl}
+        return {...saved,...value,retryAfter:value.retryAfter,prUrl:value.prUrl ?? previous?.prUrl}
       })
       setRetryRestart(action === 'restart' && !value.ok && !value.submissionId && !['pr_open','pr_merged'].includes(value.code ?? ''))
       if (value.ok) onSuccess?.(value.prUrl)

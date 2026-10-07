@@ -4,6 +4,21 @@ import { GitHubClient } from '../github-client'
 afterEach(() => vi.unstubAllGlobals())
 
 describe('Workshop branch publication', () => {
+  it.each(['main_read','pr_list','pr_read','contents_read','pr_create','blob_create'] as const)('retains diagnostics for incomplete %s JSON', async operation => {
+    vi.stubGlobal('fetch',async () => Response.json({}, {headers:{'X-GitHub-Request-Id':'ABCD:5678'}}))
+    const client = new GitHubClient({token:'secret',upstreamOwner:'titanxxh',upstreamRepo:'open-agricola'})
+    const call = {
+      main_read: () => client.getUpstreamMainSha(),
+      pr_list: () => client.findPullRequests('workshop/card/proposal'),
+      pr_read: () => client.getPullRequest(1),
+      contents_read: () => client.getUpstreamFile('test.ts'),
+      pr_create: () => client.openPr({branchName:'workshop/card/proposal',title:'Test',body:'Test'}),
+      blob_create: () => client.createCommit({upstreamBaseSha:'base',message:'Test',files:[{path:'test.ts',encoding:'utf-8',content:'test'}]}),
+    }[operation]
+    await expect(call())
+      .rejects.toMatchObject({code:'github_invalid_response',status:503,diagnostic:{kind:'invalid_response',operation,httpStatus:200,requestId:'ABCD:5678'}})
+  })
+
   it('preserves an empty GraphQL HTTP failure without treating it as a reviewer conflict', async () => {
     vi.stubGlobal('fetch', async (url: string) => url.endsWith('/graphql')
       ? new Response('',{status:502,headers:{'X-GitHub-Request-Id':'ABCD:5678'}})

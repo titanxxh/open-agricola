@@ -9,6 +9,22 @@ vi.mock('../../services/workshop-pr', () => ({ startPropose: vi.fn(), submission
 const card = {id:'card-db-id',card_id:'CUSTOM_TestCard',name:'测试卡',art_url:null}
 beforeEach(() => { vi.clearAllMocks(); vi.mocked(submissionStatus).mockResolvedValue({ok:false,code:'no_submission'}) })
 describe('ProposeModal', () => {
+  it('does not restart an expired delay when recovery returns no new waiting instruction', async () => {
+    vi.mocked(submissionStatus).mockResolvedValue({ok:false,submissionId:'saved-operation',state:'pending',code:'github_network_error',needsAttention:true,retryAfter:2})
+    vi.mocked(startPropose).mockResolvedValue({ok:false,code:'workshop_app_unavailable'})
+    vi.useFakeTimers()
+    const view = render(<ProposeModal card={card} onClose={vi.fn()}/>)
+    try {
+      await act(async () => {})
+      await act(() => vi.advanceTimersByTimeAsync(2000))
+      const recover = screen.getByRole('button',{name:'再次核实'})
+      await act(async () => { fireEvent.click(recover) })
+      expect(recover.hasAttribute('disabled')).toBe(false)
+      expect(screen.getByRole('status').textContent).not.toContain('秒后再试')
+      expect(screen.getByText('投稿编号：saved-operation')).toBeTruthy()
+    } finally { view.unmount(); vi.useRealTimers() }
+  })
+
   it('shows exhausted retries, counts down, and only resumes the saved submission', async () => {
     vi.mocked(submissionStatus).mockResolvedValue({ok:false,submissionId:'saved-operation',state:'pending',code:'workshop_app_unavailable',needsAttention:true,retryAfter:2})
     vi.mocked(startPropose).mockResolvedValue({ok:true,submissionId:'saved-operation',prNumber:1,prUrl:'https://github.com/titanxxh/open-agricola/pull/1'})

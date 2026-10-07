@@ -112,13 +112,13 @@ describe('Workshop submissions over HTTP', () => {
     expect(github.prs).toHaveLength(1)
   })
 
-  it('reconciles a malformed successful creation response without posting a second PR', async () => {
+  it.each(['', '{}', '[]'])('reconciles malformed successful creation JSON %j without posting a second PR', async responseBody => {
     const card = await readyCard()
     const remote = github.fetch
     vi.spyOn(github,'fetch').mockImplementation(async (input,init) => {
       const response = await remote(input,init)
       return String(input).endsWith('/pulls') && init?.method === 'POST'
-        ? new Response('',{status:201,headers:{'X-GitHub-Request-Id':'ABCD:5678'}}) : response
+        ? new Response(responseBody,{status:201,headers:{'X-GitHub-Request-Id':'ABCD:5678'}}) : response
     })
     const first = await submit(card.id)
     expect(first).toMatchObject({ok:false,code:'github_invalid_response'})
