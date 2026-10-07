@@ -1,4 +1,4 @@
--- Match storage/card-art-key.ts. Absolute URLs are historical managed object
+-- Match shared/utils/card-art-url.ts. Absolute URLs are historical managed object
 -- identities, never addresses to fetch. Preserve immutable snapshot contents.
 CREATE OR REPLACE FUNCTION workshop_art_keys(art_url TEXT, generation_json TEXT DEFAULT '{}') RETURNS SETOF TEXT
 LANGUAGE sql IMMUTABLE AS $$
@@ -7,7 +7,9 @@ LANGUAGE sql IMMUTABLE AS $$
   FROM (
     SELECT art_url AS url
     UNION ALL SELECT value #>> '{}' FROM jsonb_path_query(
-      generation_json::jsonb, 'strict $.** ? (@.type() == "string")') AS value
+      generation_json::jsonb, '$.art.**.resultUrl ? (@.type() == "string")') AS value
+    UNION ALL SELECT value #>> '{}' FROM jsonb_path_query(
+      generation_json::jsonb, '$.art.**.referenceImages[*] ? (@.type() == "string")') AS value
   ) urls
   WHERE url ~* '^(?:https?://[A-Za-z0-9.-]+(?::[0-9]+)?)?(?:/(?!\.{1,2}/)[A-Za-z0-9._~-]+)*/card-art/[A-Za-z0-9._-]+\.(?:png|jpg|jpeg|webp)$'
 $$;

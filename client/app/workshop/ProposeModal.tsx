@@ -16,6 +16,7 @@ const hints: Record<string,string> = {
   pr_rebase_conflict: '独立测试与最新主分支冲突，请先由维护者整合原 PR。',
   pr_paused: '维护者将 PR 设为草稿或修改了目标分支。请处理原 PR 后再次核实。',
   pr_closed: '原 PR 已关闭。只有明确选择重新投稿才会创建新的 PR，旧 PR 将保留。',
+  pr_open: '原 PR 已重新打开。再次发起 PR 会更新原投稿，不会创建新的 PR。',
   pr_merged: 'PR 已合并，卡牌将随包含它的版本发布。',
   legacy_submission: '这是旧投稿。重新投稿会保留旧 PR 历史，并要求新 PR 重新审核。人工修改需先由维护者整合。',
   legacy_review_required: '旧 PR 缺少可验证的生成基线，请联系维护者核查源码、图片和测试后再迁移。',
@@ -64,7 +65,7 @@ export function ProposeModal({card,onClose,onSuccess}: {
     try {
       const value = await startPropose(card.id,action)
       setResult(previous => !value.ok && !value.prUrl ? {...value,prUrl:previous?.prUrl} : value)
-      setRetryRestart(action === 'restart' && !value.ok && !value.submissionId)
+      setRetryRestart(action === 'restart' && !value.ok && !value.submissionId && !['pr_open','pr_merged'].includes(value.code ?? ''))
       if (value.ok) onSuccess?.(value.prUrl)
     } catch {
       setRetryRestart(false)
@@ -83,12 +84,12 @@ export function ProposeModal({card,onClose,onSuccess}: {
       {code && code !== 'no_submission' && <p role="status">{hints[code] ?? '投稿需要处理，请联系维护者。'}{!result?.ok && !!result?.retryAfter && ` 请等待 ${result.retryAfter} 秒。`}</p>}
       {result?.prUrl && <p><a href={result.prUrl} target="_blank" rel="noreferrer">查看审核 PR</a>{result.ok && !code && ' · 已提交，等待维护者审核'}</p>}
       {result?.submissionId && <p style={{fontSize:'0.85em'}}>投稿编号：{result.submissionId}</p>}
-      {(!recover || restart) && <label style={{display:'flex',gap:8}}><input type="checkbox" checked={agreed} onChange={event => setAgreed(event.target.checked)}/>我确认公开投稿，并保留设计者署名</label>}
+      {code !== 'pr_merged' && (!recover || restart) && <label style={{display:'flex',gap:8}}><input type="checkbox" checked={agreed} onChange={event => setAgreed(event.target.checked)}/>我确认公开投稿，并保留设计者署名</label>}
       <div style={{display:'flex',gap:8,justifyContent:'flex-end',marginTop:16}}>
         <button type="button" onClick={onClose}>关闭</button>
         {recover && <button type="button" disabled={busy} onClick={() => void run('recover')}>再次核实</button>}
         {restart && <button type="button" disabled={busy || !agreed} onClick={() => void run('restart')}>重新投稿</button>}
-        {!restart && !recover && <button type="button" disabled={busy || !agreed || !result} onClick={() => void run('submit')}>发起 PR</button>}
+        {!restart && !recover && code !== 'pr_merged' && <button type="button" disabled={busy || !agreed || !result} onClick={() => void run('submit')}>发起 PR</button>}
       </div>
     </div>
   </ModalShell>
