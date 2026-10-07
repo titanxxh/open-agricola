@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto'
-import { expect, test } from '@playwright/test'
+import { expect } from '@playwright/test'
+import { test } from './server-fixtures'
 import { FRONTEND_URL } from './fixtures'
 import { createLocalUserForTests, createSession } from '../server/auth'
-import { getDb } from '../server/db'
 
 const modelUrl = 'https://api.deepseek.com/v1/chat/completions'
 const referenceCommit = 'e'.repeat(40)
@@ -10,8 +10,6 @@ const referencePath = 'docs/CUSTOM_CARD_SANDBOX.md'
 const referenceBody = 'Sandbox example: use gainLeaf(CARD_ID, { food: 1 }).\n'
 const blob = createHash('sha1').update(`blob ${Buffer.byteLength(referenceBody)}\0`).update(referenceBody).digest('hex')
 const modelKey = 'browser-only-llm-credential-canary'
-
-test.afterAll(async () => { await getDb().close() })
 
 for (const locale of ['zh', 'en'] as const) test(`editor candidate recovery and explicit adoption (${locale})`, async ({ page, browser }) => {
   test.setTimeout(90_000)

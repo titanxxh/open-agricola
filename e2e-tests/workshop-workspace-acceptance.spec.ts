@@ -2,17 +2,14 @@ import AxeBuilder from '@axe-core/playwright'
 import { PostgresDatabase } from '../server/database/postgres'
 import {
   expect,
-  test,
   type APIRequestContext,
   type APIResponse,
   type Page,
 } from '@playwright/test'
 import { approveCurrentDraft, publish } from '../server/workshop-drafts.ts'
 import { BACKEND_URL, FRONTEND_URL } from './fixtures'
+import { test } from './server-fixtures'
 import { createLocalUserForTests, createSession } from '../server/auth'
-import { getDb } from '../server/db'
-
-test.afterAll(async () => { await getDb().close() })
 
 type Locale = 'zh' | 'en'
 type Viewport = 'desktop' | 'mobile'
