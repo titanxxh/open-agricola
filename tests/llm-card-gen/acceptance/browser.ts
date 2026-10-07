@@ -107,7 +107,7 @@ export async function runBrowserTask(options: {
     },
     model: {
       target: transport.target,
-      complete: async (messages, tools, signal, onText) => {
+      complete: async (messages, tools, signal, onText, turnOptions) => {
         for (const prior of previous) {
           const unchanged = JSON.stringify(messages[prior.index]) === JSON.stringify(prior.message)
           const replies = messages.slice(prior.index + 1, prior.index + 1 + prior.callIds.length)
@@ -119,7 +119,7 @@ export async function runBrowserTask(options: {
         }
         reservation = undefined
         let turn
-        try { turn = await transport.complete(messages, tools, signal, onText) } catch (error) {
+        try { turn = await transport.complete(messages, tools, signal, onText, turnOptions) } catch (error) {
           if (reservation) await window.acceptanceSettle({ id: reservation, usage: error instanceof ModelTurnError ? error.usage : UNKNOWN_USAGE, notPosted: error instanceof ModelTurnError && error.kind === 'preflight' })
           throw error
         }

@@ -49,6 +49,8 @@ describe('browser generation prompt and deployed sandbox contract', () => {
     expect(prompt).toContain('capDiscountAtCost: true, optional: false, sources: [CARD_ID]')
     expect(prompt).toContain('Any costs delta must include matching costAttribution')
     expect(prompt).toContain('costs is only for simple action fees')
+    expect(prompt).toContain('Return this card\'s applicable contribution on every invocation')
+    expect(sandbox).toContain('neither the base price nor proof that this listener has already contributed')
     expect(sandbox).toContain('costAttribution: [{ sourceCard: CARD_ID, costs: { wood: -1 } }]')
   })
 

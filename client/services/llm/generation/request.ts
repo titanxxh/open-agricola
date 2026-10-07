@@ -72,7 +72,7 @@ export function buildGenerationRequest(options: {
 }
 
 export type GenerationOutput = { kind: 'source'; source: string; message: string }
-  | { kind: 'clarification' | 'capability-gap'; message: string }
+  | { kind: 'clarification' | 'capability-gap' | 'reference-continuation'; message: string }
 
 export function extractGenerationOutput(text: string): GenerationOutput {
   const sourceBlocks = [...text.matchAll(/```(?:typescript|ts)\s*\r?\n([\s\S]*?)```/g)]
@@ -85,7 +85,7 @@ export function extractGenerationOutput(text: string): GenerationOutput {
   const json = /```json\s*\r?\n([\s\S]*?)```/.exec(text)?.[1] ?? text
   try {
     const value = JSON.parse(json) as Record<string, unknown>
-    if ((value.kind === 'clarification' || value.kind === 'capability-gap') && typeof value.message === 'string' && value.message.trim()) return { kind: value.kind, message: value.message }
+    if ((value.kind === 'clarification' || value.kind === 'capability-gap' || value.kind === 'reference-continuation') && typeof value.message === 'string' && value.message.trim()) return { kind: value.kind, message: value.message }
   } catch { /* A malformed final answer must not become a code candidate. */ }
   throw new Error('Expected one complete TypeScript source or a structured clarification/capability gap.')
 }

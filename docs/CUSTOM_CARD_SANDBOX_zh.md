@@ -295,6 +295,8 @@ reaction-compatible hook（action listener 的 `before` / `during` / `immediatel
 
 Workshop 自定义卡只能通过 `computeCosts` listener 的 handler 返回值影响支付：
 
+`computeCosts` 是纯查询，会在预览与支付执行时反复求值。每次调用都应返回本卡当前适用的贡献。`context.costs` 可能带有传入的已计算费用差值，它既不是基础价格，也不表示本 listener 已经贡献过折扣。尤其不能因为该字段已经为负值就跳过本次折扣；支付求解器负责合并贡献，并将应付费用下限限制为零。
+
 购买主要或次要改良的费用统一监听 `actions: ['improvement']`。
 
 - `costs`：简单行动费用 delta；负数表示折扣，正数表示额外费用。适合 `construct` 等普通 action cost。

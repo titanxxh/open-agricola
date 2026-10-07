@@ -210,7 +210,7 @@ export async function readModelTurn(response: Response, signal: AbortSignal, onT
 
 export type ToolTransport = {
   target: GenerationTarget
-  complete(messages: readonly WireMessage[], tools: readonly ToolDefinition[], signal: AbortSignal, onText?: (text: string) => void): Promise<ModelTurn>
+  complete(messages: readonly WireMessage[], tools: readonly ToolDefinition[], signal: AbortSignal, onText?: (text: string) => void, options?: { toolChoice: 'auto' | 'none' }): Promise<ModelTurn>
 }
 
 /** I/O and admission are seams for the browser acceptance harness. Production
@@ -230,13 +230,15 @@ export function createToolTransport(config: LlmConfig, options: {
   let active = false
   return {
     target,
-    async complete(messages, tools, signal, onText) {
+    async complete(messages, tools, signal, onText, turnOptions) {
       authorize(target) // check the resolved transport destination, not just UI selection
       if (!captured.apiKey) throw new Error('Configure your model API key in this browser.')
       if (active) throw new Error('Only one model request may run at a time.')
       const body = JSON.stringify({
         model: target.model, messages, ...GENERATION_MODEL_SETTINGS,
-        ...(tools.length ? { tools, tool_choice: 'auto' } : {}),
+        // Keep definitions even when closing research: DeepSeek uses the
+        // presence of tools to retain reasoning_content in the context.
+        ...(tools.length ? { tools, tool_choice: turnOptions?.toolChoice ?? 'auto' } : {}),
         ...(target.provider === 'deepseek' ? { thinking: { type: 'enabled' } } : { temperature: 0.2 }),
         ...(target.provider === 'openrouter' ? { provider: { require_parameters: true } } : {}),
       })

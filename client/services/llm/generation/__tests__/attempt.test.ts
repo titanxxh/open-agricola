@@ -99,7 +99,7 @@ describe('bounded browser generation attempt', () => {
     })
     const attempt = new GenerationAttempt(request(), io)
     const result = await attempt.start()
-    expect(history[1].slice(-4).map(message => message.role)).toEqual(['assistant', 'tool', 'tool', 'user'])
+    expect(history[1].slice(-4).map(message => message.role)).toEqual(['assistant', 'tool', 'tool', 'system'])
     expect(history[1].at(-4)).toMatchObject({ reasoning_content: 'opaque', tool_calls: [{ id: 'first' }, { id: 'second' }] })
     expect(history[1].slice(-3, -1).map(message => message.tool_call_id)).toEqual(['first', 'second'])
     expect(history[0].at(-1)?.content).toContain('model request 1 of 8; 7 model requests remain')
@@ -118,19 +118,47 @@ describe('bounded browser generation attempt', () => {
     expect(result).toMatchObject({ repairs: 2, result: { kind: 'failed-source', failedCandidate: { sourceCode: source, validation: { valid: false } } } })
   })
 
-  it('pauses after eight POST attempts and continues with the same reference snapshot and cumulative counts', async () => {
+  it('reserves the eighth response for source or an explicit research continuation, retaining the checkpoint', async () => {
     const io = ports()
     let requests = 0
     const notices: unknown[] = []
-    io.model.complete = vi.fn(async messages => { notices.push(messages.at(-1)?.content); return ++requests <= 8 ? turn([call(`call-${requests}`)], '') : turn() })
+    io.model.complete = vi.fn(async (messages, tools, _signal, _onText, options) => {
+      notices.push(messages.at(-1)?.content)
+      requests++
+      expect(tools.length).toBeGreaterThan(0)
+      expect(options?.toolChoice).toBe(requests === 8 ? 'none' : 'auto')
+      if (requests < 8) return turn([call(`call-${requests}`)], '')
+      if (requests === 8) return turn([], '{"kind":"reference-continuation","message":"Need the remaining payment interface fields"}')
+      return turn()
+    })
     const attempt = new GenerationAttempt(request(), io)
-    expect(await attempt.start()).toMatchObject({ status: 'paused', modelRequests: 8, needsAllowance: true })
+    expect(await attempt.start()).toMatchObject({ status: 'paused', modelRequests: 8, needsAllowance: true, reason: 'Need the remaining payment interface fields' })
+    expect(attempt.snapshot().result).toBeUndefined()
+    expect(io.validate).not.toHaveBeenCalled()
     expect(await attempt.resume()).toMatchObject({ modelRequests: 8 })
     const final = await attempt.resume({ extendAllowance: true })
-    expect(final).toMatchObject({ status: 'completed', modelRequests: 9, referenceCalls: 8, allowance: { modelRequests: 16, referenceCalls: 48 } })
+    expect(final).toMatchObject({ status: 'completed', modelRequests: 9, referenceCalls: 7, allowance: { modelRequests: 16, referenceCalls: 48 } })
     expect(notices.at(-1)).toContain('model request 9 of 16; 7 model requests remain')
-    expect(notices.at(-1)).toContain('Reference calls used: 8 of 48')
+    expect(notices.at(-1)).toContain('Reference calls used: 7 of 48')
     expect(io.openReferences).toHaveBeenCalledTimes(1)
+  })
+
+  it('validates complete source in the final response slot without requesting extra allowance', async () => {
+    const io = ports()
+    let requests = 0
+    io.model.complete = vi.fn(async (_messages, _tools, _signal, _onText, options) => {
+      if (++requests < 8) return turn([call(`read-${requests}`)], '')
+      expect(options?.toolChoice).toBe('none')
+      return turn()
+    })
+    expect(await new GenerationAttempt(request(), io).start()).toMatchObject({ status: 'completed', modelRequests: 8, referenceCalls: 7, candidate: { validation: { valid: true } } })
+  })
+
+  it('does not execute a provider tool call that violates the final response slot', async () => {
+    const io = ports()
+    let requests = 0
+    io.model.complete = vi.fn(async () => turn([call(`read-${++requests}`)], ''))
+    expect(await new GenerationAttempt(request(), io).start()).toMatchObject({ status: 'completed', modelRequests: 8, referenceCalls: 7, result: { kind: 'failure', message: expect.stringContaining('disabled') } })
   })
 
   it('starts no partial tool group across its budget and caps concurrent reads at three', async () => {

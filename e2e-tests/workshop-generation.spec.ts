@@ -113,7 +113,7 @@ for (const locale of ['zh', 'en'] as const) test(`editor candidate recovery and 
   await other.close()
 })
 
-test('browser tools round-trip into authoritative validation without forwarding model credentials', async ({ page }) => {
+test('browser tools preserve protocol through the final response slot and authoritative validation', async ({ page }) => {
   const username = `loop_${Date.now().toString(36)}`
   const user = await createLocalUserForTests(username, 'loop-test-password')
   const cookie = await createSession(user.id)
@@ -130,23 +130,26 @@ test('browser tools round-trip into authoritative validation without forwarding 
   const cardId = `CUSTOM_BrowserLoop_${Date.now()}`
   const source = `const CARD_ID = '${cardId}'; const CARD_DEF = { cardType: 'minor', meta: { id: CARD_ID, name: 'Browser Loop', cost: { wood: 2 }, desc: ['Gain 1 food.'] } }; const CARD_IMPL = { effect: { onBuy: () => gainLeaf(CARD_ID, { food: 1 }) } };`
   let posts = 0
-  let preservedProtocol = false
+  let preservedProtocol = true
   await page.route(modelUrl, async route => {
     const body = route.request().postDataJSON()
     posts += 1
-    if (posts === 2) {
+    expect(body.tool_choice).toBe(posts === 8 ? 'none' : 'auto')
+    expect(body.tools).toHaveLength(2)
+    if (posts > 1) {
       const assistant = body.messages.at(-3)
       const tool = body.messages.at(-2)
-      preservedProtocol = assistant.reasoning_content === 'private-reasoning-canary'
-        && assistant.tool_calls[0].id === 'reference-call'
-        && tool.role === 'tool' && tool.tool_call_id === 'reference-call'
+      preservedProtocol &&= assistant.reasoning_content === 'private-reasoning-canary'
+        && assistant.tool_calls[0].id === `reference-call-${posts - 1}`
+        && tool.role === 'tool' && tool.tool_call_id === `reference-call-${posts - 1}`
         && tool.content.includes(referenceCommit) && tool.content.includes('gainLeaf')
-        && body.messages.at(-1).content.includes('model request 2 of 8')
+        && body.messages.at(-1).role === 'system'
+        && body.messages.at(-1).content.includes(`model request ${posts} of 8`)
     }
-    const delta = posts === 1 ? { role: 'assistant', reasoning_content: 'private-reasoning-canary', tool_calls: [{ index: 0, id: 'reference-call', type: 'function', function: { name: 'read_reference', arguments: JSON.stringify({ path: referencePath, startLine: 1, lineCount: 10 }) } }] }
+    const delta = posts < 8 ? { role: 'assistant', reasoning_content: 'private-reasoning-canary', tool_calls: [{ index: 0, id: `reference-call-${posts}`, type: 'function', function: { name: 'read_reference', arguments: JSON.stringify({ path: referencePath, startLine: 1, lineCount: 10 }) } }] }
       : { role: 'assistant', content: `\`\`\`typescript\n${source}\n\`\`\`` }
     const frames = [
-      { id: `request-${posts}`, model: 'deepseek-v4-flash', choices: [{ index: 0, delta, finish_reason: posts === 1 ? 'tool_calls' : 'stop' }] },
+      { id: `request-${posts}`, model: 'deepseek-v4-flash', choices: [{ index: 0, delta, finish_reason: posts < 8 ? 'tool_calls' : 'stop' }] },
       { choices: [], usage: { prompt_tokens: 100, completion_tokens: 50 } },
     ]
     await route.fulfill({ contentType: 'text/event-stream', headers: { 'Access-Control-Allow-Origin': '*' }, body: frames.map(frame => `data: ${JSON.stringify(frame)}\n\n`).join('') + 'data: [DONE]\n\n' })
@@ -169,13 +172,13 @@ test('browser tools round-trip into authoritative validation without forwarding 
     })
     return await new GenerationAttempt(request, { model, ...createSandboxPorts((path: string, init?: RequestInit) => fetch(path, { ...init, credentials: 'include' })), openReferences: (signal: AbortSignal) => ReferenceSession.open(signal) }).start()
   }, { cardId, modelKey })
-  expect(posts).toBe(2)
+  expect(posts).toBe(8)
   expect(preservedProtocol).toBe(true)
-  expect(snapshot).toMatchObject({ status: 'completed', referenceCommit, modelRequests: 2, referenceCalls: 1,
+  expect(snapshot).toMatchObject({ status: 'completed', referenceCommit, modelRequests: 8, referenceCalls: 7,
     candidate: { sourceCode: source, cardJson: { id: cardId, cost: { wood: 2 } }, validation: { valid: true } }, result: { kind: 'candidate' },
   })
   expect(JSON.stringify(snapshot)).not.toContain('private-reasoning-canary')
-  expect(destinations.filter(item => item.containsModelKey).map(item => item.url)).toEqual([modelUrl, modelUrl])
+  expect(destinations.filter(item => item.containsModelKey).map(item => item.url)).toEqual(Array(8).fill(modelUrl))
   expect(destinations.some(item => item.url.includes('/api/workshop/cards/validate-code'))).toBe(true)
 })
 
