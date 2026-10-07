@@ -47,15 +47,30 @@ describe('canonical architecture verification wiring', () => {
     expect(pkg.scripts['check:reaches']).toBeUndefined()
   })
 
-  it.each(workflows)('%s is manual-only and calls the canonical check once', (name) => {
+  it.each(workflows)('%s calls the canonical check once', (name) => {
     const workflow = fs.readFileSync(path.join(repoRoot, '.github/workflows', name), 'utf8')
 
     expect(workflow).toMatch(/on:\s*\n\s+workflow_dispatch:/)
-    expect(workflow).not.toMatch(/^\s+(?:push|pull_request):/m)
     expect(workflow).toMatch(/permissions:\s*\n\s+contents: read/)
     expect(workflow.match(/pnpm run check:architecture/g)).toHaveLength(1)
     expect(workflow).not.toContain('pnpm run check:reaches')
     expect(workflow).not.toContain('pnpm run check:card-impl-boundaries')
     expect(workflow).not.toContain('pnpm run check:prompt-sync')
+  })
+
+  it.each([...workflows, 'e2e.yml'])('%s is ready for public PRs without running automatic private jobs', (name) => {
+    const workflow = fs.readFileSync(path.join(repoRoot, '.github/workflows', name), 'utf8')
+
+    expect(workflow).toMatch(/^ {2}pull_request:\n {4}branches: \[main\]$/m)
+    expect(workflow).toMatch(/^ {2}push:\n {4}branches: \[main\]$/m)
+    expect(workflow).toMatch(/^ {2}workflow_dispatch:$/m)
+    expect(workflow).toMatch(/permissions:\s*\n\s+contents: read/)
+    expect(workflow).not.toContain('pull_request_target:')
+    expect(workflow).not.toContain('secrets.')
+    expect(workflow).toContain('group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}')
+
+    const jobCount = name === 'ci.yml' ? 2 : 1
+    expect(workflow.match(/if: github.event_name == 'workflow_dispatch' \|\| github.event.repository.private == false/g))
+      .toHaveLength(jobCount)
   })
 })

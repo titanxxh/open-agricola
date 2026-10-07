@@ -364,6 +364,31 @@ Never set these in production:
 
 ---
 
+## Source Repository Publication
+
+Changing repository visibility is a separate operator decision, after the preparation changes have been reviewed. Read back each setting after applying it. A prepared workflow or a skipped run does not prove that a GitHub merge gate is active.
+
+Before changing visibility:
+
+- Inspect all Git branches/tags and the GitHub content that will become public: issue/PR descriptions and comments including their edit histories, review bodies and inline comments, Discussions, Wiki, releases/attachments, retained Actions logs, and artifacts. Scan for credentials and review operational endpoints and personal information separately. Record coverage, inaccessible or expired items, and findings using location links without copying sensitive values into another issue. Remove or redact confirmed sensitive operational details; rotate any real credential before relying on removal. Editing the current body is insufficient when a readable revision retains the value: remove the sensitive revisions through GitHub's comment history controls, or delete the identified comment when authorized, then verify that the original is no longer readable.
+- Confirm the third-party content rights and exclusions in [NOTICE](../NOTICE). Public distribution and a fan-project disclaimer do not grant permission. The maintainer must also decide whether the historical company email and current collaborator access are acceptable; preparation does not rewrite Git history or remove collaborators automatically.
+- Workshop submission modernization is tracked in [#1008](https://github.com/titanxxh/open-agricola/issues/1008). GitHub detaches existing private forks into standalone private repositories when upstream becomes public. Until the fork transition or App submission path is implemented and verified, disable Workshop PR submission with `WORKSHOP_PR_ENABLED=false` for the visibility transition and restart the backend. Card editing and sandbox testing can remain available. Do not assume that changing OAuth to `public_repo` repairs old forks, and do not publish or delete another user's private fork.
+- Merge the CI preparation and keep existing main review/linear-history protections. Automatic jobs start when the repository becomes public; follow [CI Checks Operations](operations/ci-checks.md) to obtain real PR/main results and enable required checks.
+
+Immediately after the visibility change:
+
+1. Read back repository visibility and enable private vulnerability reporting. Verify that the Security tab offers "Report a vulnerability"; [SECURITY.md](../SECURITY.md) retains email as a fallback.
+2. Read back secret scanning and repository push protection, enable them if needed, and review any detected history alerts. Do not assume defaults for a converted repository.
+3. Require Actions approval for all external fork contributors and read back `approval_policy=all_external_contributors`.
+4. Run the real PR/main checks and add their verified GitHub Actions check names to the existing main ruleset without removing other rules. Wait for all related runs to finish.
+5. Verify the site's authentication, rooms/WebSocket, public assets, and whichever Workshop submission path is enabled. Keep submission disabled if the transition is still pending.
+
+The read-only backend deploy key can remain during this work. Public repositories still require authentication through an SSH remote. Before removing the key, change the deployment checkout's fetch URL to anonymous HTTPS, verify an unauthenticated fetch on that host, and then revoke the obsolete key. `deploy-backend.sh` performs `git fetch origin` on the deployment host, so revocation alone can break the next deployment.
+
+GitHub references: [visibility consequences](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/managing-repository-settings/setting-repository-visibility), [comment edit histories](https://docs.github.com/en/communities/moderating-comments-and-conversations/tracking-changes-in-a-comment), [fork workflow approval](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/approve-runs-from-forks), and [Git remotes](https://docs.github.com/en/get-started/git-basics/about-remote-repositories).
+
+---
+
 ## 4. Verification Checklist
 
 - [ ] `curl https://your-backend/api/health` returns `{"ok":true}`.

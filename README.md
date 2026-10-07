@@ -95,7 +95,7 @@ docs/      Architecture, deployment, platform design, and card progress
 
 ## Tech Stack
 
-![Node](https://img.shields.io/badge/node-22-brightgreen)
+![Node](https://img.shields.io/badge/node-24.15%2B-brightgreen)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)
 ![React](https://img.shields.io/badge/React-19-61dafb)
 ![Vite](https://img.shields.io/badge/Vite-8-646cff)
@@ -130,4 +130,4 @@ Open Agricola is free to play and nothing in it is paywalled. **Sponsorship goes
 
 ## License
 
-[Apache 2.0](LICENSE). See [NOTICE](NOTICE) for the fan project disclaimer and artwork attribution.
+[Apache 2.0](LICENSE) applies to the original software. Third-party card text, artwork, and trademarks are excluded; see [NOTICE](NOTICE) for rights attribution and removal requests.

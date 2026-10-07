@@ -8,11 +8,17 @@ their respective copyright holders. This project is not affiliated
 with, endorsed by, or sponsored by Lookout Spiele, Z-Man Games, or
 Asmodee.
 
+The Apache License below applies to the project's original software.
+It does not grant rights to third-party Agricola card text, names,
+trademarks, or artwork. Their distribution here does not imply permission
+from the respective rights holders.
+
 Board, card, icon, and font artwork is served from the companion asset
-repository titanxxh/open-agricola-assets. That artwork is NOT covered by
-the Apache License below; it remains the property of its respective
-copyright holders and is used here only for a non-commercial fan
-project. Rights holders may contact the maintainer to request removal.
+repository titanxxh/open-agricola-assets. Third-party artwork is NOT
+covered by the Apache License below; it remains the property of its
+respective copyright holders and is included for this non-commercial
+fan project. Rights holders may request removal by emailing
+titanxxh@gmail.com with the affected content and its location.
 
 The Carlito font shipped under assets/fonts in that repository is
 licensed under the SIL Open Font License 1.1; the license text
