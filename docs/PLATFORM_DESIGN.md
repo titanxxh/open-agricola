@@ -156,6 +156,18 @@ The latest result and candidate may reference the same source without retaining 
 
 The [acceptance decision](https://github.com/titanxxh/open-agricola/issues/1035) admits models individually after browser protocol and card-behavior verification, starting with the configured DeepSeek Flash combination. The approved batch compares 17 scenarios, repeated three times in each arm, within a US$5 total paid-call budget. Every new-architecture run must pass its behavior or capability-gap assertions; first-output quality, repairs, tokens and elapsed time remain visible. The [LLM test guide](test/llm-card-gen.md#planned-browser-tool-acceptance) specifies the matrix and evidence requirements. This acceptance harness and the production tool loop are still pending implementation.
 
+#### C1.5 Accepted interaction prototype; production integration pending
+
+The author accepted the [interaction prototype](https://github.com/titanxxh/open-agricola/issues/1036) on 2026-10-08. Its ten guided scenarios establish the following presentation requirements for the production workshop:
+
+- Show the target of the next ordinary request separately from the source fixed when the current attempt began. An adoption action names its candidate and version. Code-validation status and actual playtest results have distinct labels.
+- Show the current generation stage, cumulative model requests, reference queries and repair counts. When paused, explain the reason, preserve the last complete progress, and state the additional allowance before the author continues the same attempt. Continuing and starting a new attempt remain distinct actions.
+- Keep the latest valid candidate and a later failed source separately inspectable; the failed source has no enabled adoption action. Clearly label partial, interrupted and stale results so they cannot be mistaken for a newly usable candidate.
+- Present a capability gap or clarification separately from a connection or reference-query failure. Model availability distinguishes admitted combinations from those awaiting verification. Reference sources and useful diagnostics are available on demand; provider reasoning and signatures are not ordinary chat content.
+- A playtest error identifies the source actually tested and offers an explicit **AI repair** action. Restored unfinished work says it was interrupted, with no automatic request or protocol continuation after reload.
+
+The original single-file artifact remains on the separate `prototype/llm-tool-loop-interaction` branch; its commit, path and browser observations are recorded in the decision issue. It uses simulated responses and source summaries, and does not prove model admission, rule behavior or production persistence. The guided scenario controls and reducer are disposable prototype assets. Production integration must implement these accepted interactions using the request/result contracts above; it is not a direct promotion of the HTML into the product.
+
 ### C2. System prompt design
 
 The source is `CARD_DESIGNER_SYSTEM_PROMPT` in `client/services/llmPrompts.ts`. This section summarizes its shape; source code is authoritative. Tables for advanced effect hooks, listener phases, listener scopes, and action IDs render at runtime from truth sources: `cardEffectHooks` in `shared/cards/card-effects.ts`, plus `shared/custom-code/sandbox-hook-meta.ts`, `sandbox-listener-phases.ts`, `sandbox-listener-scopes.ts`, and `sandbox-action-ids.ts`. They cannot drift from the engine and need no manual mirror.
