@@ -39,8 +39,9 @@ const fixture: CardFixture = {
     '- 效果: 打出后，建造房间和购买改良时各少支付 2 木材。',
   ].join('\n'),
 
-  setup(llmCode) {
+  setup(llmCode, options) {
     const built = buildSessionWithLLMCard(llmCode, {
+      historicalRecording: options?.historicalRecording,
       cardId: CARD_ID,
       cardType: 'occupation',
       cardName: '中世纪木槌',

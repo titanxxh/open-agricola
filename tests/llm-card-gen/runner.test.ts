@@ -23,7 +23,7 @@ const suiteSkip = MODE === 'live' && !apiKeyAvailable
 
 afterEach(() => resetCards())
 
-describe.skipIf(suiteSkip)(`LLM card-gen [${MODE}${MODE === 'live' ? ` ${PROVIDER}/${MODEL}` : ''}]`, () => {
+describe.skipIf(suiteSkip)(`Historical LLM card-gen [${MODE}${MODE === 'live' ? ` ${PROVIDER}/${MODEL}` : ''}]`, () => {
   for (const fixture of fixtures) {
     it(fixture.id, async () => {
       let llmResponse: string
@@ -57,8 +57,8 @@ describe.skipIf(suiteSkip)(`LLM card-gen [${MODE}${MODE === 'live' ? ` ${PROVIDE
         throw new Error(`[${fixture.id}] extract failed: ${reason} (see ${DUMP_DIR}/${fixture.id}.txt)`, { cause: err })
       }
 
-      const { session, ctx } = fixture.setup(code)
-      const driver = new Driver(session, ctx)
+      const { session, ctx } = fixture.setup(code, { historicalRecording: MODE === 'record' })
+      const driver = new Driver(session, ctx, { historicalRecording: MODE === 'record' })
       try {
         fixture.scenario(driver, ctx)
       } catch (err) {

@@ -20,8 +20,9 @@ const fixture: CardFixture = {
     '- 效果: 每次收获的喂养阶段开始时，你额外获得 1 食物（用于本次喂养）。',
   ].join('\n'),
 
-  setup(llmCode) {
+  setup(llmCode, options) {
     const built = buildSessionWithLLMCard(llmCode, {
+      historicalRecording: options?.historicalRecording,
       cardId: CARD_ID,
       cardType: 'occupation',
       cardName: '收获助手',

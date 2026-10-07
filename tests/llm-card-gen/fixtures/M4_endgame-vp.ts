@@ -50,19 +50,21 @@ const fixture: CardFixture = {
     '- 效果: 局末计分时，你每 2 头牛获得 1 额外分（向下取整）。',
   ].join('\n'),
 
-  setup(llmCode) {
+  setup(llmCode, options) {
     const built = buildSessionWithLLMCard(llmCode, {
+      historicalRecording: options?.historicalRecording,
       cardId: CARD_ID,
       cardType: 'occupation',
       cardName: '牛倌',
     })
+    const cattle = options?.cattle ?? 4
     const state = built.session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 14 // final round — next performRoundEnd triggers game-over
     state.players.forEach((p, i) => {
       markAllWorkersUsed(state, p)
       setActiveWorkerCount(p, 1)
-      p.resources = { ...ALL_ZERO_RESOURCES, food: 5, cattle: i === 0 ? 4 : 0 }
+      p.resources = { ...ALL_ZERO_RESOURCES, food: 5, cattle: i === 0 ? cattle : 0 }
       p.fields = []
       // p0 needs a pasture holding all 4 cattle so hasPendingAnimals === false.
       // p1 has 0 cattle so an empty pastures array is fine.
@@ -73,7 +75,7 @@ const fixture: CardFixture = {
             tiles: [{ row: 0, col: 0 }, { row: 0, col: 1 }, { row: 1, col: 0 }, { row: 1, col: 1 }],
             stables: 0,
             animalType: 'cattle',
-            animalCount: 4,
+            animalCount: cattle,
           }]
         : []
       p.houseAnimalType = null
@@ -103,9 +105,17 @@ const fixture: CardFixture = {
     const p0Entries = getBonusBreakdownForSession(session, 0)
     const p1Entries = getBonusBreakdownForSession(session, 1)
     const p0Card = p0Entries.find((e) => e.cardId === CARD_ID)
+    if (!p0Card && final.players[0].resources.cattle < 2) return { ok: true }
     if (!p0Card) return { ok: false, reason: `expected p0 bonus entry for ${CARD_ID}, got ${JSON.stringify(p0Entries)}` }
-    if (p0Card.score !== 2) {
-      return { ok: false, reason: `expected p0 score=2 (4 cattle → 5 after breeding → floor(5/2)=2), got ${p0Card.score}` }
+    const expected = Math.floor(final.players[0].resources.cattle / 2)
+    const scores = session.getState().scores
+    const scored = scores?.[0]?.categories.flatMap(category => category.entries)
+      .find(entry => entry.type === 'bonus' && entry.cardId === CARD_ID)
+    if (expected > 0 && (!scored || scored.score !== expected)) {
+      return { ok: false, reason: `authoritative final score missing expected ${expected} for ${CARD_ID}` }
+    }
+    if (p0Card.score !== expected) {
+      return { ok: false, reason: `expected p0 score=${expected}, got ${p0Card.score}` }
     }
     const p1Card = p1Entries.find((e) => e.cardId === CARD_ID)
     if (p1Card !== undefined) {

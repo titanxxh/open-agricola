@@ -1,0 +1,17 @@
+{
+  "format": 1,
+  "sourceCommit": "f036403558dc0e49a23c077b6c41bdde596237a5",
+  "sha256": "a22e5450fb6c7f0d5c17f50d5588742f281a851fb9de0be8ebf9c14cbf022d6a",
+  "bytes": 35414,
+  "characters": 27234,
+  "dependencies": {
+    "client/services/llmPrompts.ts": "cf0eb6a0664498e320344d132cae2ab45abc9247309403f9c420ee4753367eae",
+    "docs/community-card-examples.md": "cb6757e660b72d9c73214723020d483958caa5887518a7993ec9cdb8b5f9000e",
+    "shared/projections/card-effect-hooks.ts": "7789abe228f2140e1f6c86e39a8e6bfca1e1edde95c1577afb74b543c736e955",
+    "shared/custom-code/sandbox-hook-meta.ts": "b3183ba5c74b6c1b1f882081ffcb5e5b3b746a51cd0b6c9c7487b1cd0729ef84",
+    "shared/custom-code/sandbox-listener-actions.ts": "bf66c834927bb00718f3fa46f6b00eac9e3dac99c068b33da4c2a37b0e18b6a2",
+    "shared/custom-code/sandbox-listener-phases.ts": "3614bbc48fa90a49f81c8bc9d2ee7244b082f790fd6eb03f8695a62179adb7c8",
+    "shared/custom-code/sandbox-listener-scopes.ts": "c1262a495b7c65475f74bf3c8efeb05f5d8aba135055ad1162387ddc695d26d2",
+    "shared/custom-code/sandbox-action-ids.ts": "5b8f31cb2ba9027220872ad6afc90c17f7323955617a07fa8e49892c158ca9e7"
+  }
+}
