@@ -15,7 +15,7 @@ export const submissionResult = (row: SubmissionRow) => {
   const data = JSON.parse(row.payload) as SubmissionPayload
   return row.state === 'complete' && data.pr
     ? { ok: true as const, submissionId: row.id, prNumber: data.pr.number, prUrl: data.pr.url, ...(row.error_code ? { code: row.error_code } : {}) }
-    : { ok: false as const, submissionId: row.id, state: row.state, code: row.error_code ?? 'submission_pending', ...(data.pr ? { prUrl: data.pr.url } : {}), needsAttention: row.state === 'blocked' || row.attempts >= 4, retryAfter: Math.max(0,Math.ceil((row.retry_at-Date.now())/1000)) }
+    : { ok: false as const, submissionId: row.id, state: row.state, code: row.error_code ?? 'submission_pending', ...(data.pr ? { prUrl: data.pr.url } : {}), needsAttention: row.state === 'blocked' || row.attempts >= 4 && row.lease_until <= Date.now(), retryAfter: Math.max(0,Math.ceil((row.retry_at-Date.now())/1000)) }
 }
 
 function proposalBody(data: SubmissionPayload): string {

@@ -130,6 +130,20 @@ describe('Workshop submissions over HTTP', () => {
     expect(github.writes.filter(path => path.endsWith('/pulls'))).toHaveLength(1)
   })
 
+  it('keeps polling while the fourth attempt still owns an execution lease', async () => {
+    const card = await readyCard()
+    vi.spyOn(github,'fetch').mockResolvedValue(new Response('',{status:500}))
+    const first = await submit(card.id)
+    await db.exec('UPDATE workshop_submissions SET attempts=3,retry_at=0')
+    const store = new SubmissionStore(db)
+    const claimed = await store.claim(first.submissionId)
+    expect(claimed?.attempts).toBe(4)
+    const status = async () => (await nativeFetch(`${address}/${card.id}`,{headers:{Authorization:'Bearer test-session'}})).json()
+    expect(await status()).toMatchObject({needsAttention:false,state:'pending'})
+    await store.release(claimed!)
+    expect(await status()).toMatchObject({needsAttention:true,state:'pending'})
+  })
+
   it('reports internal exceptions separately without persisting their sensitive message', async () => {
     const card = await readyCard()
     vi.spyOn(GitHubClient.prototype,'createCommit').mockRejectedValue(new Error('private draft or credential'))
