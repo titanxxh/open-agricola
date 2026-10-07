@@ -1574,3 +1574,19 @@ test.describe('AI card workspace acceptance matrix', () => {
     }
   }
 })
+
+
+test('pending submission protects card and account deletion without invalidating the session', async ({request}) => {
+  const account = await createAccount(request)
+  const workspace = await createDraft(request,account)
+  await withDatabase(db => db.prepare(`INSERT INTO workshop_submissions
+    (id,card_id,author_id,version_id,revision,payload,attempts,retry_at,created_at,updated_at)
+    VALUES (?,?,?,?,?,'{}',4,?,1,1)`).run(unique('submission'),workspace.id,workspace.authorId,'fixture-version',workspace.revision,Date.now()+3600_000))
+  for (const route of [`/api/workshop/cards/${workspace.id}`,'/api/auth/account']) {
+    expect(await responseJson(await api(request,account,route,{method:'DELETE'}),409)).toMatchObject({code:'submission_in_progress'})
+  }
+  expect((await loadWorkspace(request,account,workspace.id)).id).toBe(workspace.id)
+  await withDatabase(db => db.prepare("UPDATE workshop_submissions SET state='complete' WHERE card_id=?").run(workspace.id))
+  await responseJson(await api(request,account,`/api/workshop/cards/${workspace.id}`,{method:'DELETE'}))
+  await responseJson(await api(request,account,'/api/auth/account',{method:'DELETE'}))
+})

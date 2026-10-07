@@ -22,6 +22,8 @@ const hints: Record<string,string> = {
   workshop_app_unavailable: '工坊 GitHub App 尚未就绪或授权不可用，请联系维护者。草稿和原投稿已保留。',
   rate_limited: '投稿过于频繁，请稍后再试。',
   github_rate_limited: 'GitHub 要求暂缓请求，请等待后再次核实。',
+  submission_busy: '投稿状态已变化，请重新核实原投稿后再试。',
+  draft_changed_before_submit: '草稿在核查时发生变化。请校验并确认当前版本后重新投稿。',
   draft_changed: '已提交当时的版本。你后续编辑的草稿已保留，需要另行提交审核。',
   handoff_not_ready: '请先完成当前版本的校验和沙盒确认。',
   localization_not_ready: '请先完成中文卡名和说明。',

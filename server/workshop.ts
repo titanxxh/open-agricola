@@ -1,3 +1,4 @@
+import { isWorkshopSubmissionInProgress } from './database/errors'
 import { InvalidationStore } from './invalidation'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { getDb } from './db.ts'
@@ -988,7 +989,14 @@ export async function handleWorkshopRoute(
       return true
     }
     const invalidations = new InvalidationStore(db)
-    const operation = await invalidations.begin('card', cardDbId, async () => { await db.prepare('DELETE FROM workshop_cards WHERE id = ?').run(cardDbId) })
+    let operation
+    try {
+      operation = await invalidations.begin('card', cardDbId, async () => { await db.prepare('DELETE FROM workshop_cards WHERE id = ?').run(cardDbId) })
+    } catch (error) {
+      if (!isWorkshopSubmissionInProgress(error)) throw error
+      sendJson(res,409,{ok:false,code:'submission_in_progress',error:'Recover the pending Workshop submission before deleting'})
+      return true
+    }
     const status = (await invalidations.status(operation.id))!
     sendJson(res, status.pending ? 202 : 200, { ok: true, operationId: operation.id, pending: status.pending })
     return true
@@ -1232,7 +1240,14 @@ export async function handleWorkshopRoute(
       | { card_id: string; name: string } | undefined
     if (!row) { sendJson(res, 404, { ok: false, error: 'Card not found' }); return true }
     const invalidations = new InvalidationStore(db)
-    const operation = await invalidations.begin('card', cardDbId, async () => { await db.prepare('DELETE FROM workshop_cards WHERE id = ?').run(cardDbId) })
+    let operation
+    try {
+      operation = await invalidations.begin('card', cardDbId, async () => { await db.prepare('DELETE FROM workshop_cards WHERE id = ?').run(cardDbId) })
+    } catch (error) {
+      if (!isWorkshopSubmissionInProgress(error)) throw error
+      sendJson(res,409,{ok:false,code:'submission_in_progress',error:'Recover the pending Workshop submission before deleting'})
+      return true
+    }
     const status = (await invalidations.status(operation.id))!
     sendJson(res, status.pending ? 202 : 200, { ok: true, pending: status.pending, operationId: operation.id, deleted: { id: cardDbId, card_id: row.card_id, name: row.name } })
     return true

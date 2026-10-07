@@ -12,7 +12,7 @@ import { RoomDirectory } from './game/room-directory'
 import { CommandStore } from './game/command-store'
 import { discoverRoom } from './game/room-discovery'
 import type { RoomDiscoveryRequest } from '../shared/contract/protocol/routing'
-import { isUniqueViolation } from './database/errors'
+import { isUniqueViolation, isWorkshopSubmissionInProgress } from './database/errors'
 import { consumeRateLimit } from './database/rate-limit'
 import { createServer } from 'node:http'
 import type { IncomingMessage, ServerResponse } from 'node:http'
@@ -595,7 +595,14 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
     const token = (await getAuthToken(req))
     const user = (await validateSession(token))
     if (!user) { sendJson(res, 401, authError('not_authenticated', 'Not authenticated')); return }
-    const operation = await invalidations.begin('user', user.id, () => requestAccountDeletion(user.id))
+    let operation
+    try {
+      operation = await invalidations.begin('user', user.id, () => requestAccountDeletion(user.id))
+    } catch (error) {
+      if (!isWorkshopSubmissionInProgress(error)) throw error
+      sendJson(res,409,{ok:false,code:'submission_in_progress',error:'Recover the pending Workshop submission before deleting'})
+      return
+    }
     await processInvalidations()
     await retryPendingAccountDeletion(user.id)
     const pending = !!await getDb().prepare('SELECT 1 FROM users WHERE id=?').get(user.id)

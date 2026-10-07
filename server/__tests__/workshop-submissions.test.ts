@@ -13,6 +13,8 @@ import { GitHubReviewProvider } from '../workshop-review/github-review-provider'
 import { SubmissionStore } from '../workshop-pr/submission-store'
 import { recoverPendingSubmissions } from '../workshop-pr/submission-service'
 import { WorkshopGitHubApp } from '../workshop-pr/github-app'
+import { InvalidationStore } from '../invalidation'
+import { deleteAccount, requestAccountDeletion, validateSession } from '../auth'
 import { workshopPrConfig } from '../workshop-pr/config'
 
 const nativeFetch = globalThis.fetch
@@ -34,7 +36,7 @@ beforeAll(async () => {
   address = `http://127.0.0.1:${bound.port}`
 })
 beforeEach(async () => {
-  await db.exec('DELETE FROM github_propose_audit; DELETE FROM workshop_cards; DELETE FROM request_rate_limits')
+  await db.exec("UPDATE workshop_submissions SET state='failed',lease_owner=NULL; DELETE FROM github_propose_audit; DELETE FROM workshop_cards; DELETE FROM request_rate_limits")
   github = new SubmissionGitHub()
   workshopPrConfig.enabled = true
   vi.stubEnv('WORKSHOP_REVIEW_GITHUB_APP_ID','1')
@@ -74,6 +76,119 @@ async function edit(id: string) {
 }
 
 describe('Workshop submissions over HTTP', () => {
+  it.each(['card','user','cascade'] as const)('preserves an in-flight submission during %s deletion and permits deletion after recovery', async kind => {
+    const card = await readyCard()
+    github.loseCreateResponse = true
+    github.afterCreate = async () => {
+      github.afterCreate = undefined
+      const remove = () => kind === 'card'
+        ? new InvalidationStore(db).begin('card',card.id,async () => { await db.prepare('DELETE FROM workshop_cards WHERE id=?').run(card.id) })
+        : kind === 'user'
+          ? new InvalidationStore(db).begin('user','author',() => requestAccountDeletion('author'))
+          : deleteAccount('author')
+      await expect(remove()).rejects.toThrow('Recover the pending Workshop submission before deleting')
+      expect(await validateSession('test-session')).toMatchObject({id:'author'})
+    }
+    expect(await submit(card.id)).toMatchObject({ok:false,state:'pending'})
+    expect(github.prs).toHaveLength(1)
+    await expect(db.prepare('DELETE FROM workshop_cards WHERE id=?').run(card.id)).rejects.toThrow('Recover the pending Workshop submission before deleting')
+    await db.exec('UPDATE workshop_submissions SET retry_at=0')
+    expect(await submit(card.id,'recover')).toMatchObject({ok:true,prNumber:1})
+    expect(github.prs).toHaveLength(1)
+    await db.prepare('DELETE FROM workshop_cards WHERE id=?').run(card.id)
+    expect(await new SubmissionStore(db).latest(card.id)).toBeUndefined()
+  })
+
+  it('allows deletion after completion even if the executor never releases its lease', async () => {
+    const card = await readyCard()
+    vi.spyOn(SubmissionStore.prototype,'release').mockResolvedValue(undefined)
+    expect(await submit(card.id)).toMatchObject({ok:true})
+    await new InvalidationStore(db).begin('card',card.id,async () => { await db.prepare('DELETE FROM workshop_cards WHERE id=?').run(card.id) })
+    expect(await new SubmissionStore(db).latest(card.id)).toBeUndefined()
+  })
+
+  it('returns an unchanged completed submission without contacting GitHub again', async () => {
+    const card = await readyCard()
+    const original = await submit(card.id)
+    const fetch = vi.spyOn(github,'fetch')
+    expect(await submit(card.id)).toEqual(original)
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it('bounds failed legacy preflight without rolling back remote admission', async () => {
+    const card = await readyCard()
+    await submit(card.id)
+    github.changeHead({'docs/community_cards.md':'Maintainer changes\n'})
+    await db.exec('DELETE FROM workshop_submissions; DELETE FROM request_rate_limits')
+    for (let attempt=0; attempt<5; attempt++) {
+      expect(await submit(card.id,'restart')).toMatchObject({ok:false,code:'generated_file_changed'})
+    }
+    const fetch = vi.spyOn(github,'fetch')
+    expect(await submit(card.id,'restart')).toMatchObject({ok:false,code:'rate_limited'})
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it('rejects a draft edited during preflight without holding its database lock', async () => {
+    const card = await readyCard()
+    await submit(card.id)
+    await edit(card.id)
+    const fetch = github.fetch
+    let edited = false
+    vi.spyOn(github,'fetch').mockImplementation(async (...args) => {
+      if (!edited && String(args[0]).endsWith('/pulls/1')) {
+        edited = true
+        const workspace = await loadWorkspace(db,card.id,'author')
+        await checkpointDraft(db,{cardId:card.id,authorId:'author',baseRevision:workspace.revision,draft:{...workspace.draft,description:'Edited during remote preflight'}})
+      }
+      return fetch(...args)
+    })
+    expect(await submit(card.id)).toMatchObject({ok:false,code:'draft_changed_before_submit'})
+    expect(edited).toBe(true)
+    expect(github.prs).toHaveLength(1)
+    expect((await loadWorkspace(db,card.id,'author')).draft.description).toBe('Edited during remote preflight')
+  })
+
+  it('returns the existing PR when recovery completes during restart preflight', async () => {
+    const card = await readyCard()
+    await submit(card.id)
+    const originalHead = github.refs.get(github.prs[0]!.branch)!
+    github.changeHead({'shared/cards/community/CUSTOM_TestCard.ts':'Reviewer edit'})
+    await edit(card.id)
+    expect(await submit(card.id)).toMatchObject({code:'generated_file_changed'})
+    github.refs.set(github.prs[0]!.branch,originalHead)
+    github.prs[0]!.state = 'closed'
+    await db.exec('DELETE FROM request_rate_limits')
+    const fetch = github.fetch
+    let recovered = false
+    vi.spyOn(github,'fetch').mockImplementation(async (...args) => {
+      const response = await fetch(...args)
+      if (!recovered && String(args[0]).endsWith('/pulls/1')) {
+        recovered = true
+        github.prs[0]!.state = 'open'
+        expect(await submit(card.id,'recover')).toMatchObject({ok:true,prNumber:1})
+      }
+      return response
+    })
+    expect(await submit(card.id,'restart')).toMatchObject({ok:true,prNumber:1})
+    expect(recovered).toBe(true)
+    expect(github.prs).toHaveLength(1)
+  })
+
+  it('keeps an unidentified created PR recoverable even after its lease was released', async () => {
+    const card = await readyCard()
+    github.loseCreateResponse = true
+    await submit(card.id)
+    const body = github.prs[0]!.body
+    github.prs[0]!.body = 'Marker removed'
+    await db.exec('UPDATE workshop_submissions SET retry_at=0')
+    expect(await submit(card.id,'recover')).toMatchObject({ok:false,state:'blocked',code:'pr_identity_invalid'})
+    await expect(new InvalidationStore(db).begin('card',card.id,async () => { await db.prepare('DELETE FROM workshop_cards WHERE id=?').run(card.id) })).rejects.toThrow('Recover the pending Workshop submission before deleting')
+    await expect(db.prepare('DELETE FROM workshop_cards WHERE id=?').run(card.id)).rejects.toThrow('Recover the pending Workshop submission before deleting')
+    github.prs[0]!.body = body
+    expect(await submit(card.id,'recover')).toMatchObject({ok:true,prNumber:1})
+    expect(github.prs).toHaveLength(1)
+  })
+
   it('does not allocate a submission when recovery has no saved operation', async () => {
     const card = await readyCard()
     expect(await submit(card.id,'recover')).toMatchObject({ok:false,code:'no_submission'})
