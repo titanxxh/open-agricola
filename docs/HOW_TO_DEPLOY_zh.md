@@ -380,31 +380,6 @@ https://<backend-origin>/api/auth/oauth/google/callback
 
 ---
 
-## 源码仓库公开
-
-仓库可见性切换是准备变更经过审核后的独立运维决定。每项配置修改后都要读回验证；准备好的 workflow 或 skipped run 不能证明 GitHub 合入门禁已启用。
-
-切换前：
-
-- 检查全部 Git 分支/标签，以及即将公开的 GitHub 内容：issue/PR 正文和评论（包括编辑历史）、review 正文及行内评论、Discussions、Wiki、Release 与附件、保留的 Actions 日志和产物。扫描凭据，另行审查运维地址和个人信息。覆盖范围、不可访问或已过期项目及发现只记录位置链接，不把敏感值复制到另一个 issue。清理或脱敏已确认的敏感运维信息；真实凭据要先撤销或轮换，不能只靠删除。旧版本仍可读时，仅修改当前正文不够：用 GitHub 编辑历史界面删除含敏感值的修订，或在授权范围内删除已确认的评论，再验证原值不可读。
-- 确认 [NOTICE](../NOTICE) 中的第三方内容权利和授权排除范围。已有公开分发和 fan project 声明不构成许可。维护者还需决定历史公司邮箱和现有协作者权限是否可以保留；准备工作不会自动改写 Git 历史或移除协作者。
-- 工坊投稿改造记录在 [#1008](https://github.com/titanxxh/open-agricola/issues/1008)。上游转 public 后，GitHub 会把已有私有 fork 拆为独立私有仓库。fork 过渡或 App 代投稿尚未实现并验证时，切换期间用 `WORKSHOP_PR_ENABLED=false` 关闭工坊 PR 投稿并重启后端；卡牌编辑和沙盒测试仍可保留。修改 OAuth 为 `public_repo` 不会修复旧 fork，也不应公开或删除其他用户的私有 fork。
-- 合入 CI 准备，保留 main 现有审核及线性历史规则。仓库公开后自动 job 才会开始执行；按 [CI Checks Operations](operations/ci-checks.md) 取得真实 PR/main 成功证据并启用 required checks。
-
-切换后立即执行：
-
-1. 读回仓库可见性，启用私密漏洞报告，验证 Security 页面能打开“Report a vulnerability”；[SECURITY.md](../SECURITY.md) 仍保留邮件后备渠道。
-2. 读回 secret scanning 和仓库级 push protection，必要时启用并审查历史告警；不要假设转换已有仓库时的默认状态。
-3. 要求全部外部 fork 贡献者经审批运行 Actions，读回 `approval_policy=all_external_contributors`。
-4. 跑真实 PR/main 检查，将核实过的 GitHub Actions check 名加入原 main ruleset，保留其他规则，并等待所有相关 run 结束。
-5. 验证站点登录、房间/WebSocket、公开资源，以及当前启用的工坊投稿路径；过渡仍未完成时继续关闭投稿。
-
-这期间可以保留后端只读 deploy key。公开仓库通过 SSH remote 拉取仍需要认证；撤掉 key 前，先把部署 checkout 的 fetch URL 改为匿名 HTTPS，在那台机器验证无认证 fetch，再撤销旧 key。`deploy-backend.sh` 在部署机执行 `git fetch origin`，仅撤销 key 会破坏下一次部署。
-
-GitHub 参考：[可见性转换后果](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/managing-repository-settings/setting-repository-visibility)、[评论编辑历史](https://docs.github.com/en/communities/moderating-comments-and-conversations/tracking-changes-in-a-comment)、[fork workflow 审批](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/approve-runs-from-forks)、[Git remotes](https://docs.github.com/en/get-started/git-basics/about-remote-repositories)。
-
----
-
 ## 四、验证清单
 
 部署完成后逐项验证：
