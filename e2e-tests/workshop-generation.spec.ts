@@ -135,12 +135,13 @@ test('browser tools round-trip into authoritative validation without forwarding 
     const body = route.request().postDataJSON()
     posts += 1
     if (posts === 2) {
-      const assistant = body.messages.at(-2)
-      const tool = body.messages.at(-1)
+      const assistant = body.messages.at(-3)
+      const tool = body.messages.at(-2)
       preservedProtocol = assistant.reasoning_content === 'private-reasoning-canary'
         && assistant.tool_calls[0].id === 'reference-call'
         && tool.role === 'tool' && tool.tool_call_id === 'reference-call'
         && tool.content.includes(referenceCommit) && tool.content.includes('gainLeaf')
+        && body.messages.at(-1).content.includes('model request 2 of 8')
     }
     const delta = posts === 1 ? { role: 'assistant', reasoning_content: 'private-reasoning-canary', tool_calls: [{ index: 0, id: 'reference-call', type: 'function', function: { name: 'read_reference', arguments: JSON.stringify({ path: referencePath, startLine: 1, lineCount: 10 }) } }] }
       : { role: 'assistant', content: `\`\`\`typescript\n${source}\n\`\`\`` }

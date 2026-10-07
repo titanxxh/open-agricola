@@ -99,9 +99,12 @@ describe('bounded browser generation attempt', () => {
     })
     const attempt = new GenerationAttempt(request(), io)
     const result = await attempt.start()
-    expect(history[1].slice(-3).map(message => message.role)).toEqual(['assistant', 'tool', 'tool'])
-    expect(history[1].at(-3)).toMatchObject({ reasoning_content: 'opaque', tool_calls: [{ id: 'first' }, { id: 'second' }] })
-    expect(history[1].slice(-2).map(message => message.tool_call_id)).toEqual(['first', 'second'])
+    expect(history[1].slice(-4).map(message => message.role)).toEqual(['assistant', 'tool', 'tool', 'user'])
+    expect(history[1].at(-4)).toMatchObject({ reasoning_content: 'opaque', tool_calls: [{ id: 'first' }, { id: 'second' }] })
+    expect(history[1].slice(-3, -1).map(message => message.tool_call_id)).toEqual(['first', 'second'])
+    expect(history[0].at(-1)?.content).toContain('model request 1 of 8; 7 model requests remain')
+    expect(history[1].at(-1)?.content).toContain('model request 2 of 8; 6 model requests remain')
+    expect(history[1].at(-1)?.content).toContain('Reference calls used: 2 of 24')
     expect(result).toMatchObject({ status: 'completed', modelRequests: 2, referenceCalls: 2, candidate: { sourceCode: source, validation: { valid: true } }, result: { kind: 'candidate' }, usage: { inputTokens: 4, outputTokens: 6 } })
     expect(JSON.stringify(result)).not.toContain('opaque')
   })
@@ -118,12 +121,15 @@ describe('bounded browser generation attempt', () => {
   it('pauses after eight POST attempts and continues with the same reference snapshot and cumulative counts', async () => {
     const io = ports()
     let requests = 0
-    io.model.complete = vi.fn(async () => ++requests <= 8 ? turn([call(`call-${requests}`)], '') : turn())
+    const notices: unknown[] = []
+    io.model.complete = vi.fn(async messages => { notices.push(messages.at(-1)?.content); return ++requests <= 8 ? turn([call(`call-${requests}`)], '') : turn() })
     const attempt = new GenerationAttempt(request(), io)
     expect(await attempt.start()).toMatchObject({ status: 'paused', modelRequests: 8, needsAllowance: true })
     expect(await attempt.resume()).toMatchObject({ modelRequests: 8 })
     const final = await attempt.resume({ extendAllowance: true })
     expect(final).toMatchObject({ status: 'completed', modelRequests: 9, referenceCalls: 8, allowance: { modelRequests: 16, referenceCalls: 48 } })
+    expect(notices.at(-1)).toContain('model request 9 of 16; 7 model requests remain')
+    expect(notices.at(-1)).toContain('Reference calls used: 8 of 48')
     expect(io.openReferences).toHaveBeenCalledTimes(1)
   })
 
