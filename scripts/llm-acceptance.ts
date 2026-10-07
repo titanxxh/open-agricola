@@ -252,7 +252,7 @@ try {
   budget.close()
   process.removeListener('exit', releaseBudget)
   console.log(JSON.stringify({ batch, admitted, complete: report.complete, completed: completed.length, directory, arms }))
-  if (fatal || completed.some(row => !row.final.ok) || completed.length !== 102) process.exitCode = 1
+  if (fatal || completed.length !== 102 || (live ? !admitted : completed.some(row => !row.final.ok))) process.exitCode = 1
   // GameSession's process-owned executor worker stays alive for reuse. This
   // one-shot owner CLI has finished all writes and closed its browser/DB.
   process.stdout.write('', () => process.exit(process.exitCode ?? 0))

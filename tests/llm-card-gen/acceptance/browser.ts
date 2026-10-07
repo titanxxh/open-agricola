@@ -7,7 +7,7 @@ import { createSandboxPorts } from '../../../client/services/llm/generation/brow
 import { buildGenerationRequest } from '../../../client/services/llm/generation/request'
 import { createToolTransport, ModelTurnError, UNKNOWN_USAGE, type WireMessage } from '../../../client/services/llm/generation/protocol'
 import { ReferenceSession } from '../../../client/services/llm/generation/references'
-import type { GenerationUsage } from '../../../shared/contract/workshop-generation'
+import type { GenerationReference, GenerationUsage } from '../../../shared/contract/workshop-generation'
 import type { LlmConfig } from '../../../client/services/llm/types'
 import type { AcceptanceInput } from './inputs'
 
@@ -25,6 +25,9 @@ export type BrowserTaskResult = {
   snapshot: AttemptSnapshot
   requests: RequestAccounting[]
   sources: Array<{ source: string; validation?: CodeValidation }>
+  referenceReads: GenerationReference[]
+  referenceOperations: Array<{ tool: string; query?: string; path?: string; startLine?: number; lineCount?: number; elapsedMs: number; resultBytes?: number; ok: boolean; error?: string }>
+  referenceHttp: Array<{ url: string; elapsedMs: number; status?: number; failed?: boolean }>
   protocol: { assistantMessagesChecked: number; toolGroupsChecked: number; opaqueFieldsPresent: string[]; preserved: boolean }
 }
 
@@ -35,6 +38,9 @@ export async function runBrowserTask(options: {
 }): Promise<BrowserTaskResult> {
   const request = buildGenerationRequest(options.input)
   const sources: BrowserTaskResult['sources'] = []
+  const referenceReads: GenerationReference[] = []
+  const referenceOperations: BrowserTaskResult['referenceOperations'] = []
+  const referenceHttp: BrowserTaskResult['referenceHttp'] = []
   const protocol: BrowserTaskResult['protocol'] = { assistantMessagesChecked: 0, toolGroupsChecked: 0, opaqueFieldsPresent: [], preserved: true }
   // The following opaque objects live only in this page and never cross the
   // Playwright boundary. Evidence records equality and field names, not values.
@@ -58,7 +64,39 @@ export async function runBrowserTask(options: {
       if (contract.id !== options.sandboxContractId) throw new GenerationStopError('The frozen sandbox deployment changed during this batch.')
       return contract
     },
-    openReferences: options.arm === 'tools' ? signal => ReferenceSession.open(signal)
+    openReferences: options.arm === 'tools' ? async signal => {
+      const references = await ReferenceSession.open(signal, async (url, init) => {
+        const entry: BrowserTaskResult['referenceHttp'][number] = { url: String(url), elapsedMs: 0 }
+        const started = Date.now()
+        referenceHttp.push(entry)
+        try {
+          const response = await fetch(url, init)
+          entry.status = response.status
+          return response
+        } catch (error) { entry.failed = true; throw error } finally { entry.elapsedMs = Date.now() - started }
+      })
+      return { commit: references.commit, reads: references.reads, execute: async (call, signal) => {
+        const entry: BrowserTaskResult['referenceOperations'][number] = { tool: call.function.name, elapsedMs: 0, ok: false }
+        const started = Date.now()
+        referenceOperations.push(entry)
+        try {
+          const args = JSON.parse(call.function.arguments) as Record<string, unknown>
+          if (typeof args.query === 'string') entry.query = args.query.slice(0, 200)
+          if (typeof args.path === 'string') entry.path = args.path.slice(0, 500)
+          if (typeof args.startLine === 'number') entry.startLine = args.startLine
+          if (typeof args.lineCount === 'number') entry.lineCount = args.lineCount
+        } catch { /* Malformed arguments are still handled by the real tool. */ }
+        try {
+          const result = await references.execute(call, signal)
+          entry.resultBytes = new TextEncoder().encode(result).length
+          const data = JSON.parse(result) as { error?: string }
+          entry.ok = !data.error
+          entry.error = data.error
+          return result
+        } catch (error) { entry.error = error instanceof Error ? error.message : 'Reference failed'; throw error }
+        finally { entry.elapsedMs = Date.now() - started; referenceReads.splice(0, referenceReads.length, ...references.reads) }
+      } }
+    }
       : async () => ({ commit: options.control.sourceCommit, reads: [], execute: async () => { throw new Error('The frozen control has no reference tools') } }),
     validate: async (source, cardId, contractId, signal) => {
       const entry: BrowserTaskResult['sources'][number] = { source }
@@ -96,5 +134,5 @@ export async function runBrowserTask(options: {
     systemPrompt: () => options.control.text, tools: [], modelRequests: 3,
   } } : {})
   const snapshot = await attempt.start()
-  return { inputFingerprint: request.inputFingerprint, snapshot, requests: attempt.requestAccounting(), sources, protocol }
+  return { inputFingerprint: request.inputFingerprint, snapshot, requests: attempt.requestAccounting(), sources, referenceReads, referenceOperations, referenceHttp, protocol }
 }
