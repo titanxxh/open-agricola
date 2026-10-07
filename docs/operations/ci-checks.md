@@ -1,6 +1,8 @@
 # CI Checks Operations
 
-当前 GitHub Actions 月度额度已耗尽，`ci.yml` 和 `ci-full.yml` 仅保留 `workflow_dispatch`，不作为合入证据。提交和 rebase merge 前必须在 owner 控制的本机跑完下列 CI 并把结果写入 PR；push 后不触发或等待 Actions。仓库 ruleset 暂不配置 required `verify` check，避免形成无法满足的门禁。
+`ci.yml`、`ci-full.yml` 和 `e2e.yml` 均声明 `pull_request`（目标 `main`）、`push: main` 和 `workflow_dispatch`，使用只读 `contents` 权限，并按 workflow + PR/ref 隔离 concurrency。自动 job 只在仓库为 public 时执行；私有期仅允许手动执行，避免公开准备阶段消耗私有仓库额度。私有期自动 run 的 skipped job 不是通过验证的证据。
+
+私有期提交和 rebase merge 前仍必须在 owner 控制的本机跑完下列 CI 并把结果写入 PR。push 后等待相关 Actions run 结束，同时明确区分 skipped 和实际执行成功。公开后恢复自动执行，并按下文取得真实成功证据再启用 main 的 required status checks；准备 YAML 不等于 GitHub 门禁已启用。
 
 ## 本机全量 CI
 
@@ -30,16 +32,19 @@ LLM prompt 的行为契约直接提取当前 prompt 中的喂食与建房示例�
 
 测试发现独立于 project glob；Card Source 声明独立于已注册实现枚举。缺少扫描根目录、语法错误、无法解析的依赖，以及 bundle 检查缺少 `dist/assets` 或 JS 产物，都不能产生成功证据。`check:bundle-size` 仍负责体积预算，隔离证明由 `check:browser-boundaries` 承担。
 
-## 恢复 GitHub 门禁
+## 启用公开仓库 GitHub 门禁
 
-额度恢复后再按顺序启用：
+准备代码合入后，保持现有 main 审核、禁止删除、禁止 force push 和线性历史规则。公开切换后按顺序启用：
 
-1. 为 `ci.yml` 恢复 `pull_request` 和 `push: main` 触发。
-2. 让一次 PR run 和一次 main run 的 `verify` job 成功完成。
-3. 确认 check 名稳定为 `CI / verify` 后，再把它加入 main ruleset required status checks。
-4. 更新本节并恢复 push 后等待 Actions 的要求。
+1. 读回 repository visibility，确认三个 workflow 的自动 job 已实际运行；私有期 skipped 的 run 不计入本步。
+2. 让一次真实 PR run 和一次 main run 的 `verify`、`llm-cards-record` job 成功完成。PR head 变化后必须等待对应新 head 的检查。
+3. 从这些提交的 check-runs 核实实际 check 名与 GitHub Actions provider，再把两项检查加入现有 main ruleset。不要只凭界面显示的 `CI / verify` 推测 API context，也不要覆盖已有审核与分支保护规则。
+4. Full 和 E2E 也会自动运行；将它们纳入 required checks 前，同样先取得 PR/main 的成功证据。所有相关 run 都必须结束，失败立即定位，不能忽略未被设为 required 的失败。
+5. 设置外部贡献者 fork PR 的 Actions 审批为 `all_external_contributors`。当前 GitHub API 不允许为私有仓库配置这项 public fork 设置，因此留到切换后执行并读回验证。
 
-在上述四步完成前，不把手动 workflow 的 check 配成 required。
+在真实检查尚不可满足时不提前配置 required，以免锁死 main。标准 GitHub-hosted runner 的公开仓库运行时间免费，较大 runner 及超额存储仍可能收费；保持当前 `ubuntu-latest`、timeout 和取消同一 PR 旧 run 的设置。
+
+公开前后的运维、内容审查及安全功能切换见 [HOW_TO_DEPLOY.md](../HOW_TO_DEPLOY.md#source-repository-publication)。CI 用 `pull_request` 检查投稿代码，不用 `pull_request_target` 带写权限或秘密执行投稿；后端 App 私钥及生产 `.env` 不进入 CI。
 
 ## 加载 GH_TOKEN
 

@@ -14,8 +14,8 @@
 
 请使用以下任一私密渠道：
 
-- **GitHub 私密漏洞报告**（推荐）：进入本仓库的
-  [Security 页面](https://github.com/titanxxh/open-agricola/security)，点击“Report a vulnerability”。
+- **GitHub 私密漏洞报告**（启用后推荐）：进入本仓库的
+  [Security 页面](https://github.com/titanxxh/open-agricola/security)，点击“Report a vulnerability”；如果该入口不可用，请使用下面的邮件渠道。
 - **电子邮件**：<titanxxh@gmail.com>
 
 请包含：

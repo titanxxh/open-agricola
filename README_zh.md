@@ -95,7 +95,7 @@ docs/      架构、部署、平台设计、卡牌进度
 
 ## Tech Stack
 
-![Node](https://img.shields.io/badge/node-22-brightgreen)
+![Node](https://img.shields.io/badge/node-24.15%2B-brightgreen)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)
 ![React](https://img.shields.io/badge/React-19-61dafb)
 ![Vite](https://img.shields.io/badge/Vite-8-646cff)
@@ -130,4 +130,4 @@ Open Agricola 免费游玩，没有任何付费内容。**赞助收入全部用�
 
 ## License
 
-[Apache 2.0](LICENSE)。fan project disclaimer + 美术素材归属声明见 [NOTICE](NOTICE)。
+项目原创软件采用 [Apache 2.0](LICENSE)。第三方卡面文字、美术与商标不在授权范围内；权利归属和下架联系方式见 [NOTICE](NOTICE)。

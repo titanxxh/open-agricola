@@ -13,9 +13,10 @@ There are no maintained release branches.
 
 Instead, use one of these private channels:
 
-- **GitHub private vulnerability reporting** (preferred): go to the
+- **GitHub private vulnerability reporting** (preferred when enabled): go to the
   [Security tab](https://github.com/titanxxh/open-agricola/security) of this
-  repository and click "Report a vulnerability".
+  repository and click "Report a vulnerability". If that entry is unavailable,
+  use the email channel below.
 - **Email**: <titanxxh@gmail.com>
 
 Please include:
