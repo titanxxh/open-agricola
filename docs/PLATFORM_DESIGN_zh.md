@@ -162,6 +162,18 @@ OpenRouter 不在 provider 级别声明 `chat` / `image` 兜底能力；每个�
 
 [验收决议](https://github.com/titanxxh/open-agricola/issues/1035)规定模型逐个通过浏览器协议与卡牌行为验证后开放，首先验收当前配置的 DeepSeek Flash 组合。已确认的批次覆盖 17 个场景，两组各重复 3 次，全部付费调用共用 5 美元预算。新架构每次运行都必须通过相应行为或能力缺口断言；首次输出质量、修复、token 和耗时分别记录。[LLM 测试指南](test/llm-card-gen.md#planned-browser-tool-acceptance)说明样本与证据要求。该验收程序和生产工具循环仍待实现。
 
+#### C1.5 已认可的交互原型，待接入生产
+
+用户于 2026-10-08 认可[交互原型](https://github.com/titanxxh/open-agricola/issues/1036)。其中十个引导场景确定了生产工坊应遵守的展示要求：
+
+- 分别显示下一次普通需求的修改对象，以及本次尝试开始时固定的源码。采用操作写明候选及版本；代码校验状态与实际试玩结果使用不同标签。
+- 显示当前生成阶段、累计模型请求、资料查询和修复次数。暂停时说明原因，保留最近的完整进度，并在作者继续本次尝试前写明追加额度。继续本次与开始新尝试是不同操作。
+- 最近有效候选与后续失败源码可分别查看；失败源码的采用操作不可用。半截内容、已中断及过期结果均有明确标记，不能被误认为新的可用候选。
+- 能力缺口或澄清与连接故障、资料查询故障分开展示。模型状态区分已验收组合与待验组合。资料来源和有用的诊断信息按需展开；provider 推理与签名不作为普通聊天内容。
+- 试玩报错写明实际测试的源码，并提供明确的 **AI 修复**操作。恢复后的未完成工作标为已中断，刷新后不自动发请求或续接协议。
+
+原始单文件资产保留在独立的 `prototype/llm-tool-loop-interaction` 分支；提交、路径和浏览器观察记录在决策票中。它使用模拟响应和源码摘要，不能证明模型准入、规则行为或生产持久化已经完成。场景引导控件与状态转换代码属于可丢弃原型。生产接入应按上述请求/结果契约实现已认可的交互，不能直接把该 HTML 当作产品实现。
+
 ### C2. 系统提示词设计
 
 **源文件**：`client/services/llmPrompts.ts`（`CARD_DESIGNER_SYSTEM_PROMPT`）。以下是其结构摘要；以源文件为准。effect / 进阶 hook 表、listener phase 表、listener scope 表、actionId 表**运行时从真相源渲染**（`shared/cards/card-effects.ts` 的 `cardEffectHooks` + `shared/custom-code/sandbox-hook-meta.ts` / `sandbox-listener-phases.ts` / `sandbox-listener-scopes.ts` / `sandbox-action-ids.ts`），因此这四张表不会与引擎漂移，无需手工镜像。
