@@ -2,16 +2,17 @@
 
 - Status: Accepted
 - Date: 2026-07-27
+- Updated: 2026-10-07 — 主仓库公开后，Game Bug Reports 与开发 Issues 统一交付到 `titanxxh/open-agricola`。
 
 ## Context
 
-Game Bug Reporter 必须能从对局内把现象和 Bug Report Anchor 提交到公开的 `titanxxh/open-agricola-issues`。有 GitHub 账号的玩家希望成为 Issue 作者，没有 GitHub 账号的玩家需要托管代提；两条路径都必须限制权限、承受撤销与限流，并在 GitHub 返回不确定结果时保留玩家描述且尽量避免重复 Issue。
+Game Bug Reporter 必须能从对局内把现象和 Bug Report Anchor 提交到公开的 `titanxxh/open-agricola`。有 GitHub 账号的玩家希望成为 Issue 作者，没有 GitHub 账号的玩家需要托管代提；两条路径都必须限制权限、承受撤销与限流，并在 GitHub 返回不确定结果时保留玩家描述且尽量避免重复 Issue。
 
 现有站点 GitHub 登录 OAuth 只证明登录身份，不保存写权限令牌；Workshop GitHub OAuth 最初面向私有源码仓库提案，仍使用更宽的权限，其权限和生命周期也不适合公开 Bug Issue。GitHub Create Issue API 没有可依赖的幂等键，因此外部创建无法承诺严格 exactly-once。
 
 ## Decision
 
-1. 单独注册一个公开 GitHub App，只安装到 `titanxxh/open-agricola-issues`，唯一可写仓库权限是 `Issues: write`。目标 owner、repository id 和 installation id 是服务端固定配置，不接受客户端传入；不使用现有登录 OAuth、Workshop OAuth 或个人 PAT。
+1. 单独注册一个公开 GitHub App，只安装到 `titanxxh/open-agricola`，唯一可写仓库权限是 `Issues: write`。目标 owner、repository id 和 installation id 是服务端固定配置，不接受客户端传入；不使用现有登录 OAuth、Workshop OAuth 或个人 PAT。
 2. 玩家本人提交使用 GitHub App user access token，因此 Issue 作者是玩家并同时归因于 App；提交前必须明确确认 GitHub 会公开该账号为作者，且站点删号无法匿名化这项 GitHub 作者身份。没有可用 Issue Submission Connection 时，玩家可以明确选择 Hosted Issue Identity，由同一 App 的 installation access token 代提，Issue 作者显示为 App `[bot]`；连接失效时不得自动切换作者身份。
 3. Issue Submission Connection 独立于站点登录身份，绑定当前站点用户和 GitHub 返回的不可变数字用户 id。一个 GitHub 用户 id 只能连接一个站点用户；若站点账号已有 GitHub 登录身份，两者 id 必须一致。首次连接不自动增加 GitHub 登录方式。
 4. GitHub 授权使用随机 `state` 和 PKCE `S256`。每个站点用户只保留一个未过期的 Bug Report state，创建时清理已用和过期 state。前端先在站点顶层上下文用当前 session 发起 start；GitHub 回调只校验 state 并把短期 code 和 state 放进返回前端的 URL fragment，不换取令牌。前端随后在原顶层上下文调用 complete，服务端必须用当前站点用户消费同一 state 后才可换取令牌。这样跨站 GitHub Pages 部署仍使用原分区 session 完成用户绑定，而 code 受服务端保存的 PKCE verifier 保护且 fragment 不进入前端站点请求。访问令牌和刷新令牌只在后端 SQLite 中用独立部署密钥加密保存，不进入浏览器、URL、日志、Issue 或仓库。启用过期令牌：user access token 默认 8 小时，refresh token 默认 6 个月并按需原子轮换。
@@ -36,7 +37,7 @@ Game Bug Reporter 必须能从对局内把现象和 Bug Report Anchor 提交到�
 ## Alternatives considered
 
 - **复用站点 GitHub 登录 OAuth**：拒绝。它当前只承担登录身份，增加 Issue 写权限会把认证和外部写入耦合。
-- **复用 Workshop GitHub OAuth**：拒绝。它最初为私有源码仓库设计，仍使用更宽权限，不符合公开 issues-only 仓库的最小权限边界。
+- **复用 Workshop GitHub OAuth**：拒绝。它最初为私有源码仓库设计，仍使用更宽权限，不符合 Bug Report 仅需 `Issues: write` 的最小权限边界。
 - **用维护者个人 PAT 托管代提**：拒绝。长期个人凭据会扩大泄露影响，Issue 作者也会错误显示为维护者本人。
 - **不保存刷新令牌，每次提交重新连接**：拒绝。违背首次连接后持续可用的产品语义，也不能改善托管路径。
 - **连接失效后自动改用 App `[bot]`**：拒绝。它会在玩家不知情时改变公开作者身份。

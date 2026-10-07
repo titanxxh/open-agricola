@@ -80,7 +80,7 @@ describe('BugReportBar', () => {
             authorIdentity: 'hosted',
             status: 'submitted',
             issueNumber: 7,
-            issueUrl: 'https://github.com/titanxxh/open-agricola-issues/issues/7',
+            issueUrl: 'https://github.com/titanxxh/open-agricola/issues/7',
           }),
         })
       }
@@ -108,7 +108,7 @@ describe('BugReportBar', () => {
     expect(await screen.findByRole('link', { name: 'Open Issue #7' }))
       .toHaveAttribute(
         'href',
-        'https://github.com/titanxxh/open-agricola-issues/issues/7',
+        'https://github.com/titanxxh/open-agricola/issues/7',
       )
     const create = calls.find(({ url }) =>
       url.endsWith('/api/v1/game-contexts/room-1/bug-reports'))
@@ -352,7 +352,7 @@ describe('BugReportBar', () => {
             authorIdentity: 'hosted',
             status: 'submitted',
             issueNumber: 8,
-            issueUrl: 'https://github.com/titanxxh/open-agricola-issues/issues/8',
+            issueUrl: 'https://github.com/titanxxh/open-agricola/issues/8',
           }),
         })
       }
@@ -421,7 +421,7 @@ describe('BugReportBar', () => {
             authorIdentity: 'github_user',
             status: 'submitted',
             issueNumber: 7,
-            issueUrl: 'https://github.com/titanxxh/open-agricola-issues/issues/7',
+            issueUrl: 'https://github.com/titanxxh/open-agricola/issues/7',
           }),
         })
       }
@@ -463,7 +463,7 @@ describe('BugReportBar', () => {
           report: report({ phenomenon: 'The game froze' }),
           existingIssues: [{
             number: 7,
-            url: 'https://github.com/titanxxh/open-agricola-issues/issues/7',
+            url: 'https://github.com/titanxxh/open-agricola/issues/7',
           }],
         }, 201)
       }
@@ -476,7 +476,7 @@ describe('BugReportBar', () => {
           report: report({ phenomenon: 'The game froze' }),
           existingIssues: [{
             number: 7,
-            url: 'https://github.com/titanxxh/open-agricola-issues/issues/7',
+            url: 'https://github.com/titanxxh/open-agricola/issues/7',
           }],
         })
       }
@@ -494,7 +494,7 @@ describe('BugReportBar', () => {
     expect(await screen.findByRole('link', { name: 'Open Issue #7' }))
       .toHaveAttribute(
         'href',
-        'https://github.com/titanxxh/open-agricola-issues/issues/7',
+        'https://github.com/titanxxh/open-agricola/issues/7',
       )
     await user.click(screen.getByRole('button', {
       name: 'Continue with a new Issue',
@@ -543,7 +543,7 @@ describe('BugReportBar', () => {
             authorIdentity: 'hosted',
             status: 'submitted',
             issueNumber: 8,
-            issueUrl: 'https://github.com/titanxxh/open-agricola-issues/issues/8',
+            issueUrl: 'https://github.com/titanxxh/open-agricola/issues/8',
           }),
         })
       }

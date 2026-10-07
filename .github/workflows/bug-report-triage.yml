@@ -1,0 +1,24 @@
+name: Triage game bug reports
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  issues: write
+
+jobs:
+  label:
+    if: >-
+      startsWith(github.event.issue.title, 'Game bug: ')
+      && contains(github.event.issue.body, '<!-- open-agricola-report:')
+      && !contains(github.event.issue.labels.*.name, 'needs-triage')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Add triage label
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: gh issue edit "$ISSUE_NUMBER" --repo "$GH_REPO" --add-label needs-triage

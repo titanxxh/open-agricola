@@ -158,7 +158,7 @@ beforeEach(async () => {
   createIssue = vi.fn(async () => ({
     ok: true as const,
     number: 7,
-    url: 'https://github.com/titanxxh/open-agricola-issues/issues/7',
+    url: 'https://github.com/titanxxh/open-agricola/issues/7',
   }))
   revokeUserGrant = vi.fn(async () => ({ ok: true as const }))
   exchangeCode = vi.fn(async () => ({
@@ -406,7 +406,7 @@ describe('bug report routes', () => {
     )
     expect(json(second).existingIssues).toEqual([{
       number: 7,
-      url: 'https://github.com/titanxxh/open-agricola-issues/issues/7',
+      url: 'https://github.com/titanxxh/open-agricola/issues/7',
     }])
     const secondId = (json(second).report as { submissionId: string }).submissionId
     await invoke(
@@ -741,7 +741,7 @@ describe('bug report routes', () => {
     expect(json(malformed)).toMatchObject({ code: 'invalid_webhook_payload' })
   })
 
-  it('tracks open and closed Issues only for the fixed issues repository', async () => {
+  it('tracks open and closed Issues only for the fixed public project repository', async () => {
     const created = await invoke(
       'POST',
       '/api/v1/game-contexts/active-room/bug-reports',
@@ -781,25 +781,25 @@ describe('bug report routes', () => {
       FROM bug_reports WHERE submission_id = ?
     `).get(submissionId)) as { state: string }).state).toBe('open')
 
-    await webhook('closed', 'titanxxh/open-agricola-issues')
+    await webhook('closed', 'titanxxh/open-agricola')
     expect(((await db.prepare(`
       SELECT github_issue_state AS state
       FROM bug_reports WHERE submission_id = ?
     `).get(submissionId)) as { state: string }).state).toBe('closed')
 
-    await webhook('reopened', 'titanxxh/open-agricola-issues')
+    await webhook('reopened', 'titanxxh/open-agricola')
     expect(((await db.prepare(`
       SELECT github_issue_state AS state
       FROM bug_reports WHERE submission_id = ?
     `).get(submissionId)) as { state: string }).state).toBe('open')
 
-    await webhook('deleted', 'titanxxh/open-agricola-issues')
+    await webhook('deleted', 'titanxxh/open-agricola')
     expect(((await db.prepare(`
       SELECT github_issue_state AS state
       FROM bug_reports WHERE submission_id = ?
     `).get(submissionId)) as { state: string }).state).toBe('deleted')
 
-    await webhook('reopened', 'titanxxh/open-agricola-issues')
+    await webhook('reopened', 'titanxxh/open-agricola')
     expect(((await db.prepare(`
       SELECT github_issue_state AS state
       FROM bug_reports WHERE submission_id = ?

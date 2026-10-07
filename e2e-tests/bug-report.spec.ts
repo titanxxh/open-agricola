@@ -194,7 +194,7 @@ test('completed replay submits one hosted bug report with the current anchor', a
           },
           existingIssues: [{
             number: 98,
-            url: 'https://github.com/titanxxh/open-agricola-issues/issues/98',
+            url: 'https://github.com/titanxxh/open-agricola/issues/98',
           }],
         },
       })
@@ -227,7 +227,7 @@ test('completed replay submits one hosted bug report with the current anchor', a
           },
           existingIssues: [{
             number: 98,
-            url: 'https://github.com/titanxxh/open-agricola-issues/issues/98',
+            url: 'https://github.com/titanxxh/open-agricola/issues/98',
           }],
         },
       })
@@ -251,7 +251,7 @@ test('completed replay submits one hosted bug report with the current anchor', a
             authorIdentity: 'hosted',
             status: 'submitted',
             issueNumber: 99,
-            issueUrl: 'https://github.com/titanxxh/open-agricola-issues/issues/99',
+            issueUrl: 'https://github.com/titanxxh/open-agricola/issues/99',
             lastErrorCode: null,
           },
         },

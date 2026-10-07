@@ -55,10 +55,10 @@ afterEach(() => {
 })
 
 describe('GitHubIssueClient', () => {
-  it('creates a labeled issue only in the fixed issues-only repository', async () => {
+  it('creates a labeled issue only in the fixed public project repository', async () => {
     const fetchImpl = vi.fn(async () => response({
       number: 17,
-      html_url: 'https://github.com/titanxxh/open-agricola-issues/issues/17',
+      html_url: 'https://github.com/titanxxh/open-agricola/issues/17',
     })) as unknown as typeof fetch
 
     const result = await client(fetchImpl).createIssue(
@@ -70,7 +70,7 @@ describe('GitHubIssueClient', () => {
     expect(result).toMatchObject({ ok: true, number: 17 })
     expect(fetchImpl).toHaveBeenCalledTimes(1)
     const [url, init] = vi.mocked(fetchImpl).mock.calls[0]!
-    expect(url).toBe('https://api.github.com/repos/titanxxh/open-agricola-issues/issues')
+    expect(url).toBe('https://api.github.com/repos/titanxxh/open-agricola/issues')
     expect(init?.headers).toMatchObject({ Authorization: 'Bearer user-token' })
     expect(init?.signal).toBeInstanceOf(AbortSignal)
     expect(JSON.parse(String(init?.body))).toEqual({
@@ -142,7 +142,7 @@ describe('GitHubIssueClient', () => {
   it('reconciles a marker against the fixed repository', async () => {
     const fetchImpl = vi.fn(async () => response([{
       number: 17,
-      html_url: 'https://github.com/titanxxh/open-agricola-issues/issues/17',
+      html_url: 'https://github.com/titanxxh/open-agricola/issues/17',
       body: 'details\n\n<!-- open-agricola-report:id -->',
       created_at: new Date(NOW).toISOString(),
       performed_via_github_app: { id: 1 },
@@ -157,7 +157,7 @@ describe('GitHubIssueClient', () => {
 
     expect(result).toMatchObject({ ok: true, number: 17 })
     expect(String(vi.mocked(fetchImpl).mock.calls[0]![0])).toContain(
-      '/repos/titanxxh/open-agricola-issues/issues?',
+      '/repos/titanxxh/open-agricola/issues?',
     )
   })
 
@@ -165,7 +165,7 @@ describe('GitHubIssueClient', () => {
     const marker = '<!-- open-agricola-report:id -->'
     const fetchImpl = vi.fn(async () => response([{
       number: 17,
-      html_url: 'https://github.com/titanxxh/open-agricola-issues/issues/17',
+      html_url: 'https://github.com/titanxxh/open-agricola/issues/17',
       body: `details\n\n${marker}`,
       created_at: new Date(NOW - 60_000).toISOString(),
       performed_via_github_app: { id: 1 },
@@ -184,28 +184,28 @@ describe('GitHubIssueClient', () => {
     const fetchImpl = vi.fn(async () => response([
       {
         number: 20,
-        html_url: 'https://github.com/titanxxh/open-agricola-issues/issues/20',
+        html_url: 'https://github.com/titanxxh/open-agricola/issues/20',
         body: `copied ${marker}\n\n<!-- open-agricola-report:attacker -->`,
         created_at: new Date(NOW).toISOString(),
         performed_via_github_app: { id: 1 },
       },
       {
         number: 19,
-        html_url: 'https://github.com/titanxxh/open-agricola-issues/issues/19',
+        html_url: 'https://github.com/titanxxh/open-agricola/issues/19',
         body: `${marker}\n\n${marker}`,
         created_at: new Date(NOW).toISOString(),
         performed_via_github_app: { id: 1 },
       },
       {
         number: 18,
-        html_url: 'https://github.com/titanxxh/open-agricola-issues/issues/18',
+        html_url: 'https://github.com/titanxxh/open-agricola/issues/18',
         body: marker,
         created_at: new Date(NOW).toISOString(),
         performed_via_github_app: null,
       },
       {
         number: 17,
-        html_url: 'https://github.com/titanxxh/open-agricola-issues/issues/17',
+        html_url: 'https://github.com/titanxxh/open-agricola/issues/17',
         body: marker,
         created_at: new Date(NOW - 2_000).toISOString(),
         performed_via_github_app: { id: 1 },
@@ -224,7 +224,7 @@ describe('GitHubIssueClient', () => {
     const marker = '<!-- open-agricola-report:id -->'
     const newerIssues = Array.from({ length: 100 }, (_, index) => ({
       number: 20_000 - index,
-      html_url: `https://github.com/titanxxh/open-agricola-issues/issues/${20_000 - index}`,
+      html_url: `https://github.com/titanxxh/open-agricola/issues/${20_000 - index}`,
       body: 'newer issue',
       created_at: new Date(NOW + 1_000).toISOString(),
       performed_via_github_app: { id: 1 },
@@ -234,7 +234,7 @@ describe('GitHubIssueClient', () => {
       return response(page === 101
         ? [{
             number: 17,
-            html_url: 'https://github.com/titanxxh/open-agricola-issues/issues/17',
+            html_url: 'https://github.com/titanxxh/open-agricola/issues/17',
             body: `details\n\n${marker}`,
             created_at: new Date(NOW).toISOString(),
             performed_via_github_app: { id: 1 },
@@ -259,7 +259,7 @@ describe('GitHubIssueClient', () => {
       }))
       .mockResolvedValueOnce(response({
         number: 17,
-        html_url: 'https://github.com/titanxxh/open-agricola-issues/issues/17',
+        html_url: 'https://github.com/titanxxh/open-agricola/issues/17',
       })) as unknown as typeof fetch
 
     await expect(hostedClient(fetchImpl).createIssue(
@@ -334,7 +334,7 @@ describe('GitHubIssueClient', () => {
 
     const [url, init] = vi.mocked(fetchImpl).mock.calls[2]!
     expect(url).toBe(
-      'https://api.github.com/repos/titanxxh/open-agricola-issues/issues/17',
+      'https://api.github.com/repos/titanxxh/open-agricola/issues/17',
     )
     expect(init).toMatchObject({ method: 'PATCH' })
     expect(JSON.parse(String(init?.body)).body).toBe(
