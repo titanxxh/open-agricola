@@ -136,7 +136,21 @@ The browser tool-loop design has been approved for implementation; the current p
 
 A **Generation Attempt** encompasses reference queries, model responses, and bounded repairs. Pausing and continuing preserves its model configuration, reference commit, and cumulative accounting; cancelling does not produce a completed candidate from partial output. Each new attempt resolves the latest GitHub `main` and pins that commit for its reference reads. Reference content is independent of site releases, while executable code must still obey the actual Custom Code Sandbox capabilities. LLM credentials remain browser-to-provider only.
 
-The decisions live in [the reference contract](https://github.com/titanxxh/open-agricola/issues/1032) and [model admission, loop boundaries, and recovery](https://github.com/titanxxh/open-agricola/issues/1033). These records define the initial budgets, explicit continuation, limited retries and repairs, and browser tool-roundtrip evidence required before enabling a model. Draft recovery and provenance persistence remain subject to [the request/result contract](https://github.com/titanxxh/open-agricola/issues/1034); this planned design does not add server-side conversation storage.
+The decisions live in [the reference contract](https://github.com/titanxxh/open-agricola/issues/1032) and [model admission, loop boundaries, and recovery](https://github.com/titanxxh/open-agricola/issues/1033). These records define the initial budgets, explicit continuation, limited retries and repairs, and browser tool-roundtrip evidence required before enabling a model.
+
+#### C1.3 Planned request/result and draft recovery
+
+The approved [request/result contract](https://github.com/titanxxh/open-agricola/issues/1034) makes follow-up requests use the selected ability candidate, or the adopted draft when none is selected. Error repair binds to the source that actually failed. Shared request construction captures card identity, the user's goal, source and input fingerprints, and the relevant visible conversation. New requests resolve the latest reference commit; automatic validation repairs and explicit continuation stay within the same attempt. Sandbox playtest errors start a new attempt only when the author clicks **AI repair**.
+
+A **Generation Result** can contain a complete source candidate, failed source retained for repair, a clarification, a capability gap, or a failure/interruption summary. Failed source cannot be adopted and does not replace the latest candidate that passed code validation. Partial output is not a completed source candidate. Source and input fingerprints bind asynchronous results and validation responses to the content they describe; old responses cannot silently replace newer work.
+
+| Storage boundary | Planned recovery |
+|---|---|
+| Current browser page | Complete tool protocol, reference bodies, and provider reasoning/signatures; no continuation across a page reload |
+| Same-browser local recovery | Visible conversation and existing editing state; unfinished work is marked interrupted and never resumes automatically |
+| Author-private server draft | Adopted draft content, latest ability candidate that passed code validation, latest Generation Result, and compact Generation Provenance; no complete conversation or raw tool protocol |
+
+The latest result and candidate may reference the same source without retaining duplicate completed copies. Adoption remains explicit and server-validated. Draft Versions retain only adopted content and its allowlisted provenance; identical content continues to reuse an immutable version without rewriting its original provenance. Public card, submission, and Replay projections exclude private generation records. The detailed field contract lives in the decision record; these recovery changes are not implemented yet.
 
 ### C2. System prompt design
 
