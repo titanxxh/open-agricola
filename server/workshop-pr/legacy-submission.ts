@@ -1,9 +1,8 @@
-import { createHash } from 'node:crypto'
 import type { PostgresDatabase } from '../database/postgres'
 import { generatePrFiles } from './code-gen'
 import { GitHubApiError, GitHubClient } from './github-client'
 import type { SubmissionPayload } from './submission-store'
-import { getResources } from '../storage/runtime'
+import { generatedBlobSha, readSubmissionArtwork } from './generated-files'
 
 /** Reconstruct only a verifiable legacy baseline; never write to or alter the old fork. */
 export async function verifyLegacySubmission(db: PostgresDatabase, client: GitHubClient, data: SubmissionPayload, url: string) {
@@ -20,13 +19,7 @@ export async function verifyLegacySubmission(db: PostgresDatabase, client: GitHu
   const cardId = String(meta.id)
   if (!/^CUSTOM_[A-Za-z][A-Za-z0-9_]*$/.test(cardId)) throw new GitHubApiError('legacy card identity invalid','legacy_review_required',409)
   const mainSha = await client.getUpstreamMainSha()
-  let artData: {ext:string;buffer:Buffer} | null = null
-  if (version.art_url) {
-    const artMatch = /^\/card-art\/[A-Za-z0-9._-]+\.(png|jpg|jpeg|webp)$/i.exec(version.art_url)
-    const stored = artMatch ? await getResources().read(version.art_url.slice(1)) : undefined
-    if (!artMatch || !stored) throw new GitHubApiError('legacy artwork baseline missing','legacy_review_required',409)
-    artData = {ext:artMatch[1]!.toLowerCase(),buffer:stored.body}
-  }
+  const artData = await readSubmissionArtwork(version.art_url)
   const [register,catalog,index] = await Promise.all(['shared/cards/register-all.ts','shared/cards/catalog.generated.ts','docs/community_cards.md'].map(path => client.getUpstreamFile(path,mainSha)))
   const files = await generatePrFiles({wcard:{...data.wcard,card_id:cardId,card_type:meta.card_type === 'occupation' ? 'occupation' : 'minor',card_json:version.card_json,effect_code:String(meta._code ?? ''),art_url:version.art_url},
     github_login:'',designer_name:data.wcard.author_name,pr_number:number,art_data:artData,
@@ -42,8 +35,7 @@ export async function verifyLegacySubmission(db: PostgresDatabase, client: GitHu
     if (baseline !== current) throw new GitHubApiError('legacy index changed','generated_file_changed',409)
   }
   for (const file of files.filter(file => file.encoding === 'base64')) {
-    const bytes = Buffer.from(file.content,'base64')
-    const expected = createHash('sha1').update(`blob ${bytes.length}\0`).update(bytes).digest('hex')
+    const expected = generatedBlobSha(file)
     if (await client.getFileSha(file.path,pr.headSha) !== expected) throw new GitHubApiError('legacy artwork changed','generated_file_changed',409)
   }
   return {number,url,headSha:pr.headSha,generatedPaths:files.map(file => file.path)}

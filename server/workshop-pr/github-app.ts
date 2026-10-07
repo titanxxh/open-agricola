@@ -1,4 +1,4 @@
-import { GitHubApiError } from './github-client'
+import { checkGitHubRateLimit, GitHubApiError } from './github-client'
 import { createGitHubAppJwt } from '../bug-report/github-issue-client'
 
 export type WorkshopAppOptions = {
@@ -52,6 +52,7 @@ export class WorkshopGitHubApp {
         signal: AbortSignal.timeout(15_000),
       },
     )
+    checkGitHubRateLimit(response, now)
     const body = await response.json() as { token?: string; expires_at?: string }
     const expiresAt = Date.parse(body.expires_at ?? '')
     if (!response.ok || !body.token || !Number.isFinite(expiresAt)) {

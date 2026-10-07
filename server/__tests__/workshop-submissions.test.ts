@@ -238,6 +238,19 @@ describe('Workshop submissions over HTTP', () => {
     expect(github.writes.filter(write => write.endsWith('/pulls'))).toHaveLength(1)
   })
 
+  it.each(['head','marker'])('does not bypass uncertain creation through restart after a reviewer changes its %s', async changed => {
+    const card = await readyCard()
+    github.loseCreateResponse = true
+    await submit(card.id)
+    if (changed === 'head') github.changeHead({'server/__tests__/reviewer.test.ts':'reviewer test'})
+    else github.prs[0]!.body = 'Marker removed by maintainer'
+    await db.exec('UPDATE workshop_submissions SET retry_at = 0; DELETE FROM request_rate_limits')
+    expect(await submit(card.id,'recover')).toMatchObject({ok:false,state:'blocked'})
+    expect(await submit(card.id,'restart')).toMatchObject({ok:false})
+    expect(github.prs).toHaveLength(1)
+    expect(await db.prepare('SELECT COUNT(*) AS count FROM workshop_submissions').get()).toEqual({count:1})
+  })
+
   it('migrates a verified legacy PR only on explicit resubmission', async () => {
     const card = await readyCard()
     await submit(card.id)
@@ -298,6 +311,17 @@ describe('Workshop submissions over HTTP', () => {
     github.laggedHead = undefined
     await db.exec('UPDATE workshop_submissions SET retry_at = 0')
     expect(await submit(card.id,'recover')).toMatchObject({ok:true,prNumber:1})
+  })
+
+  it.each(['manual','background'])('reconciles approval received before a %s recovery binds the PR', async mode => {
+    const card = await readyCard()
+    github.loseCreateResponse = true
+    expect(await submit(card.id)).toMatchObject({ok:false,state:'pending'})
+    github.approved = true
+    await db.exec('UPDATE workshop_submissions SET retry_at = 0')
+    if (mode === 'manual') expect(await submit(card.id,'recover')).toMatchObject({ok:true})
+    else await recoverPendingSubmissions(new SubmissionStore(db),WorkshopGitHubApp.fromEnv()!)
+    expect((await loadWorkspace(db,card.id,'author')).reviewStatus).toBe('approved')
   })
 
 })

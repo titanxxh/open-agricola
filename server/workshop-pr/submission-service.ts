@@ -1,5 +1,6 @@
-import { createHash } from 'node:crypto'
-import { getResources } from '../storage/runtime'
+import { GitHubReviewProvider } from '../workshop-review/github-review-provider'
+import { loadReviewBinding, reconcileReviewSnapshot, type ReviewProvider } from '../workshop-review/reconcile-snapshot'
+import { generatedBlobSha, readSubmissionArtwork } from './generated-files'
 import { enterReview, loadWorkspace } from '../workshop-drafts'
 import { GitHubApiError, GitHubClient } from './github-client'
 import { generatePrFiles, patchCommunityCardsMarkdown, type PrFile } from './code-gen'
@@ -14,15 +15,6 @@ export const submissionResult = (row: SubmissionRow) => {
   return row.state === 'complete' && data.pr
     ? { ok: true as const, submissionId: row.id, prNumber: data.pr.number, prUrl: data.pr.url, ...(row.error_code ? { code: row.error_code } : {}) }
     : { ok: false as const, submissionId: row.id, state: row.state, code: row.error_code ?? 'submission_pending', ...(data.pr ? { prUrl: data.pr.url } : {}), needsAttention: row.state === 'blocked' || row.attempts >= 4, retryAfter: Math.max(0,Math.ceil((row.retry_at-Date.now())/1000)) }
-}
-
-async function art(artUrl: string | null | undefined) {
-  if (!artUrl) return null
-  const match = /^\/card-art\/[A-Za-z0-9._-]+\.(png|jpg|jpeg|webp)$/i.exec(artUrl)
-  if (!match) throw new GitHubApiError('unsupported card artwork', 'invalid_art', 400)
-  const object = await getResources().read(artUrl.slice(1))
-  if (!object) throw new GitHubApiError('card artwork unavailable', 'art_unavailable', 503)
-  return { ext: match[1]!.toLowerCase(), buffer: object.body }
 }
 
 function proposalBody(data: SubmissionPayload): string {
@@ -65,7 +57,7 @@ export async function recoverPendingSubmissions(store: SubmissionStore, app: Wor
 }
 
 /** Resumes one fixed-version delivery. Each remotely visible step has a committed checkpoint first. */
-export async function deliverSubmission(store: SubmissionStore, source: SubmissionRow, app: WorkshopGitHubApp): Promise<SubmissionRow> {
+export async function deliverSubmission(store: SubmissionStore, source: SubmissionRow, app: WorkshopGitHubApp, reviewProvider: ReviewProvider = new GitHubReviewProvider(app.options)): Promise<SubmissionRow> {
   const row = await store.claim(source.id)
   if (!row) return (await store.latest(source.card_id))!
   const data = JSON.parse(row.payload) as SubmissionPayload
@@ -83,8 +75,7 @@ export async function deliverSubmission(store: SubmissionStore, source: Submissi
         validatePr(data,pr)
         data.expectedHead = pr.headSha
         for (const file of data.previousFiles ?? []) {
-          const bytes = Buffer.from(file.content,file.encoding === 'base64' ? 'base64' : 'utf8')
-          const expected = createHash('sha1').update(`blob ${bytes.length}\0`).update(bytes).digest('hex')
+          const expected = generatedBlobSha(file)
           if (await client.getFileSha(file.path,pr.headSha) !== expected) {
             throw new GitHubApiError('generated file was edited by a reviewer','generated_file_changed',409)
           }
@@ -119,7 +110,7 @@ export async function deliverSubmission(store: SubmissionStore, source: Submissi
       data.files = await generatePrFiles({
         wcard: data.wcard, github_login: '', designer_name: data.wcard.author_name ?? 'Workshop author',
         upstream_register_all: sources[0]!, upstream_catalog_generated: sources[1]!, upstream_community_md: sources[2]!,
-        pr_number: data.pr?.number ?? 0, art_data: await art(data.wcard.art_url),
+        pr_number: data.pr?.number ?? 0, art_data: await readSubmissionArtwork(data.wcard.art_url),
       })
       const allowed = new Set([...sourcePaths,`shared/cards/community/${data.wcard.card_id}.ts`,...['png','jpg','jpeg','webp'].map(ext => `public/card-art/community/${data.wcard.card_id}.${ext}`)])
       if (data.files.some(file => !allowed.has(file.path))) throw new GitHubApiError('generated file outside submission scope','invalid_path',400)
@@ -152,11 +143,12 @@ export async function deliverSubmission(store: SubmissionStore, source: Submissi
       const match = matches[0]
       if (match) {
         if (match.headRepository !== `${data.owner}/${data.repository}` || match.branch !== data.branch
-          || !match.body.includes(`<!-- workshop-proposal:${data.proposalId} -->`) || match.headSha !== data.commitSha) {
+          || !match.body.includes(`<!-- workshop-proposal:${data.proposalId} -->`)) {
           throw new GitHubApiError('PR identity does not match submission','pr_identity_invalid',409)
         }
         data.pr = {number:match.number,url:match.url}
         validatePr(data,match)
+        if (match.headSha !== data.commitSha) throw new GitHubApiError('PR changed before creation reconciliation','branch_conflict',409)
       } else {
         if (data.createAttempted) throw new GitHubApiError('PR creation result needs reconciliation', 'creation_unknown', 503)
         await store.save(row,data)
@@ -221,5 +213,13 @@ export async function deliverSubmission(store: SubmissionStore, source: Submissi
   } finally {
     await store.release(row)
   }
-  return (await store.latest(source.card_id))!
+  const result = (await store.latest(source.card_id))!
+  if (result.state === 'complete' && !result.error_code) {
+    const binding = await loadReviewBinding(store.db,result.card_id,data.pr!.url)
+    if (binding) {
+      try { await reconcileReviewSnapshot(store.db,data.pr!.url,await reviewProvider.getPullRequestSnapshot(data.pr!.number),binding) }
+      catch { await store.db.prepare('UPDATE workshop_cards SET github_pr_last_synced_at = NULL WHERE id = ? AND review_commit_sha = ?').run(result.card_id,binding.reviewCommitSha) }
+    }
+  }
+  return result
 }
