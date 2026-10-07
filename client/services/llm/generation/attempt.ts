@@ -4,7 +4,7 @@ import { sourceFingerprint } from '../../../../shared/projections/workshop-gener
 import { GENERATION_PROMPT_VERSION, generationSystemPrompt } from './prompt'
 import { extractGenerationOutput, type GenerationOutput, type GenerationRequest } from './request'
 import { REFERENCE_LIMITS, REFERENCE_TOOLS, REFERENCE_TOOL_VERSION, type ReferenceSession } from './references'
-import { ModelTurnError, UNKNOWN_USAGE, type ToolCall, type ToolTransport, type WireMessage } from './protocol'
+import { ModelTurnError, UNKNOWN_USAGE, type ToolCall, type ToolDefinition, type ToolTransport, type WireMessage } from './protocol'
 
 export const ATTEMPT_ALLOWANCE = Object.freeze({ modelRequests: 8, referenceCalls: 24, activeMs: 5 * 60 * 1000 })
 export const GENERATION_CONTEXT_BYTES = 192 * 1024
@@ -42,6 +42,20 @@ export type RequestAccounting = {
 
 export class GenerationStopError extends Error {}
 
+/** Dependency-injection seam for controlled comparisons. Product callers use
+ * the default recipe; configuration and persisted drafts cannot select one. */
+export type GenerationRecipe = {
+  promptVersion: string
+  toolVersion: string
+  systemPrompt(contract: WorkshopSandboxContract, commit: string): string
+  tools: readonly ToolDefinition[]
+  modelRequests: number
+}
+const DEFAULT_RECIPE: GenerationRecipe = {
+  promptVersion: GENERATION_PROMPT_VERSION, toolVersion: REFERENCE_TOOL_VERSION,
+  systemPrompt: generationSystemPrompt, tools: REFERENCE_TOOLS, modelRequests: ATTEMPT_ALLOWANCE.modelRequests,
+}
+
 /** Owns the page-memory checkpoint, protocol, budgets and complete source. UI
  * only observes snapshots; a refresh deliberately cannot reconstruct this class.
  */
@@ -51,7 +65,7 @@ export class GenerationAttempt {
   private readonly observe: (snapshot: AttemptSnapshot) => void
   private readonly onText: (text: string) => void
   private readonly clock: () => number
-  private readonly allowance = { ...ATTEMPT_ALLOWANCE }
+  private readonly allowance: AttemptSnapshot['allowance'] = { ...ATTEMPT_ALLOWANCE }
   private readonly messages: WireMessage[] = []
   private readonly accounting: RequestAccounting[] = []
   private status: AttemptSnapshot['status'] = 'ready'
@@ -71,16 +85,20 @@ export class GenerationAttempt {
   private startedAt?: number
   private controller?: AbortController
   private running?: Promise<AttemptSnapshot>
+  private readonly recipe: GenerationRecipe
 
   constructor(request: GenerationRequest, ports: AttemptPorts, options: {
     onProgress?: (snapshot: AttemptSnapshot) => void
     onText?: (text: string) => void
+    recipe?: GenerationRecipe
   } = {}) {
     this.request = request
     this.ports = ports
     this.clock = ports.now ?? Date.now
     this.observe = options.onProgress ?? (() => {})
     this.onText = options.onText ?? (() => {})
+    this.recipe = options.recipe ?? DEFAULT_RECIPE
+    this.allowance.modelRequests = this.recipe.modelRequests
   }
 
   snapshot(): AttemptSnapshot {
@@ -134,7 +152,7 @@ export class GenerationAttempt {
       attemptId: this.request.attemptId, inputFingerprint: this.request.inputFingerprint,
       ...(this.lastCandidate ? { sourceFingerprint: sourceFingerprint(this.lastCandidate.sourceCode) } : {}),
       referenceCommit: this.references?.commit, sandboxContractId: this.contract?.id,
-      promptVersion: GENERATION_PROMPT_VERSION, toolVersion: REFERENCE_TOOL_VERSION,
+      promptVersion: this.recipe.promptVersion, toolVersion: this.recipe.toolVersion,
       ...this.ports.model.target, returnedModel: this.accounting.at(-1)?.returnedModel,
       modelRequests: snapshot.modelRequests, referenceCalls: snapshot.referenceCalls, repairs: snapshot.repairs,
       elapsedMs: snapshot.activeMs, usage: snapshot.usage, references: this.references?.reads ?? [],
@@ -187,7 +205,7 @@ export class GenerationAttempt {
     if (!this.references) this.references = await this.ports.openReferences(signal)
     signal.throwIfAborted()
     if (!this.messages.length) this.messages.push(
-      { role: 'system', content: generationSystemPrompt(this.contract, this.references.commit) },
+      { role: 'system', content: this.recipe.systemPrompt(this.contract, this.references.commit) },
       { role: 'user', content: JSON.stringify(this.request.input) },
     )
     while (this.status === 'running') {
@@ -239,18 +257,19 @@ export class GenerationAttempt {
         this.messages.push({ role: 'user', content: `Static validation of source ${fingerprint} failed:\n${validation.errors.join('\n')}\nReturn the entire corrected source. Preserve all requested rules and identity. Do not invent missing capabilities.` })
       }
       if (this.accounting.length >= this.allowance.modelRequests) { this.pause('The model-request allowance was reached.', undefined, true); return }
-      const inputBytes = new TextEncoder().encode(JSON.stringify({ messages: this.messages, tools: REFERENCE_TOOLS })).length
+      const inputBytes = new TextEncoder().encode(JSON.stringify({ messages: this.messages, tools: this.recipe.tools })).length
       if (inputBytes > GENERATION_CONTEXT_BYTES) throw new GenerationStopError('The reference and protocol context reached its fixed size limit. Start a new attempt with a narrower request; protocol fields were not truncated.')
       this.stage = 'model'
       const record: RequestAccounting = { sequence: this.accounting.length + 1, inputBytes, startedAt: this.clock(), elapsedMs: 0, usage: { ...UNKNOWN_USAGE }, finishReason: 'unknown' }
       this.accounting.push(record); this.publish()
       try {
-        const turn = await this.ports.model.complete(this.messages, REFERENCE_TOOLS, signal, text => {
+        const turn = await this.ports.model.complete(this.messages, this.recipe.tools, signal, text => {
           if (!signal.aborted && this.status === 'running') this.onText(text)
         })
         record.usage = turn.usage; record.finishReason = turn.finishReason
         record.returnedModel = turn.returnedModel; record.requestId = turn.requestId
         signal.throwIfAborted()
+        if (!this.recipe.tools.length && turn.calls.length) throw new GenerationStopError('The model returned tool calls when no tools were offered.')
         this.messages.push(turn.message)
         if (turn.calls.length) this.pendingCalls = { calls: turn.calls, results: new Map(), started: new Set() }
         else {

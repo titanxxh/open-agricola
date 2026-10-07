@@ -158,9 +158,9 @@ The latest result and candidate may reference the same source without retaining 
 
 `GET /api/workshop/sandbox-contract` exposes the actual deployed helper source, hook/listener metadata, supported action shapes, isolation limits and semantic restrictions. Its identifier hashes deployed shared/executor source and runtime versions, independently of the GitHub reference commit. `POST /api/workshop/cards/validate-code` binds success and failure to that identifier and the submitted source fingerprint; an obsolete contract returns `sandbox_changed` so a new attempt is required. The main browser receives data only, never imports the rule runtime.
 
-#### C1.4 Planned quality and cost acceptance
+#### C1.4 Quality and cost acceptance
 
-The [acceptance decision](https://github.com/titanxxh/open-agricola/issues/1035) admits models individually after browser protocol and card-behavior verification, starting with the configured DeepSeek Flash combination. The approved batch compares 17 scenarios, repeated three times in each arm, within a US$5 total paid-call budget. Every new-architecture run must pass its behavior or capability-gap assertions; first-output quality, repairs, tokens and elapsed time remain visible. The [LLM test guide](test/llm-card-gen.md#planned-browser-tool-acceptance) specifies the matrix and evidence requirements. The formal paid acceptance harness is still pending; deterministic browser tests do not admit a model.
+The [acceptance decision](https://github.com/titanxxh/open-agricola/issues/1035) admits models individually after browser protocol and card-behavior verification, starting with the configured DeepSeek Flash combination. The approved batch compares 17 scenarios, repeated three times in each arm, within a US$5 total paid-call budget. Every new-architecture run must pass its behavior or capability-gap assertions; first-output quality, repairs, tokens and elapsed time remain visible. The [LLM test guide](test/llm-card-gen.md#browser-tool-acceptance) specifies the matrix and evidence requirements. `scripts/llm-acceptance.ts` implements the browser probe, fixed 102-task batch, original-source behavior checks and persistent US$5 budget shared across batches. Paid results remain pending; synthetic browser runs do not admit a model.
 
 #### C1.5 Editor interactions
 
