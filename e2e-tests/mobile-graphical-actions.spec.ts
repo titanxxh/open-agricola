@@ -30,6 +30,8 @@ const configureAndStartSandbox = async (
   await expect(page.getByTestId('workshop-root')).toBeVisible({ timeout: 30_000 })
   await page.getByRole('button', { name: 'Enter Sandbox' }).click()
   await page.locator('.ws-sandbox-btns').getByRole('button', { name: 'Start Sandbox' }).click()
+  const iframe = page.locator('iframe[title="Sandbox"]')
+  await expect(iframe).toBeVisible({ timeout: 30_000 })
 
   const configured = await page.evaluate(async ({ seasons, moor, playerCount }) => {
     const response = await fetch('/api/game/new-sandbox', {
@@ -49,7 +51,6 @@ const configureAndStartSandbox = async (
   }, variants)
   expect(configured).toBe(true)
 
-  const iframe = page.locator('iframe[title="Sandbox"]')
   await iframe.evaluate(async (element: HTMLIFrameElement, runId) => {
     await new Promise<void>((resolve) => {
       element.addEventListener('load', () => resolve(), { once: true })
