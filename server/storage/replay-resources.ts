@@ -1,7 +1,7 @@
 import type { CustomCardDef } from '../../shared/contract/protocol/game'
 import type { ResourceStore } from './resource-store'
 import { objectHash } from './s3-store'
-import { cardArtKey } from './card-art-key'
+import { cardArtKey } from '../../shared/utils/card-art-url'
 
 export class ReplayAssetValidationError extends Error {}
 export type ViewerManifest = { entrypoint: 'index.html'; files: Record<string, string> }

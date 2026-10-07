@@ -27,6 +27,7 @@ import { useLocale } from '../../contexts/LocaleContext'
 import { PlayerCard } from '../../components/common/PlayerCard'
 import { Section } from '../../components/common/Section'
 import type { CardMeta } from '../../services/card-meta'
+import { resolveCardArtUrl } from '../../../shared/utils/card-art-url'
 import { API_BASE } from '../../config'
 import { publicAssetUrl } from '../../utils/public-asset-url'
 import { useWorkshopDraft } from './useWorkshopDraft'
@@ -800,7 +801,7 @@ function ArtPanel({
             <strong>{locale === 'zh' ? '当前已采用' : 'Currently adopted'}</strong>
             <small>{locale === 'zh' ? '新候选不会自动覆盖' : 'New candidates do not overwrite this'}</small>
           </div>
-          <img src={artUrl} alt={cardName || (locale === 'zh' ? '当前卡牌图片' : 'Current card art')} />
+          <img src={resolveCardArtUrl(artUrl, API_BASE)} alt={cardName || (locale === 'zh' ? '当前卡牌图片' : 'Current card art')} />
         </section>
       )}
 
@@ -874,14 +875,14 @@ function ArtPanel({
                 onClick={() => onCandidateSelected(candidate.id)}
                 aria-label={`${locale === 'zh' ? '查看图片候选' : 'View art candidate'} ${candidate.id}`}
               >
-                <img src={candidate.resultUrl} alt="" />
+                <img src={resolveCardArtUrl(candidate.resultUrl, API_BASE)} alt="" />
                 <span>{candidate.model ?? candidate.provider ?? (locale === 'zh' ? '未知模型' : 'Unknown model')}</span>
               </button>
             ))}
           </div>
           {selectedCandidate && (
             <div className="aicw-art-review">
-              <img src={selectedCandidate.resultUrl} alt={locale === 'zh' ? '待采用图片候选' : 'Art candidate awaiting adoption'} />
+              <img src={resolveCardArtUrl(selectedCandidate.resultUrl, API_BASE)} alt={locale === 'zh' ? '待采用图片候选' : 'Art candidate awaiting adoption'} />
               <div>
                 <span className={`aicw-candidate-state${selectedCandidate.stale ? ' is-stale' : ''}`}>
                   {selectedCandidate.stale

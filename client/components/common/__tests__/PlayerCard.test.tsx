@@ -341,13 +341,13 @@ describe('PlayerCard dual-type rendering (alsoCountsAs)', () => {
     expect(html).toContain('background-size:contain')
   })
 
-  it('fits workshop draft art inside the icon box instead of cropping it', () => {
+  it.each(['/card-art/e1a2b3.png','https://old-api.example/old-api/card-art/e1a2b3.png'])('fits workshop draft art from %s inside the icon box on the current API', artUrl => {
     const html = renderToStaticMarkup(
       <PlayerCard
         locale="en"
         cardId="CUSTOM_DraftArt"
         cardType="occupation"
-        artUrl="/card-art/e1a2b3.png"
+        artUrl={artUrl}
         cardMeta={{
           id: 'CUSTOM_DraftArt',
           name: 'Draft Art',
@@ -359,6 +359,7 @@ describe('PlayerCard dual-type rendering (alsoCountsAs)', () => {
     )
 
     expect(html).toContain('/card-art/e1a2b3.png')
+    expect(html).not.toContain('old-api.example')
     expect(html).toContain('background-size:contain')
     expect(html).not.toContain('background-size:cover')
   })

@@ -501,7 +501,7 @@ describe('AiCardDesigner AI config header', () => {
       id: 'art-adopted',
       kind: 'art',
       prompt: 'exact private art prompt',
-      resultUrl: '/card-art/current.png',
+      resultUrl: 'https://old-api.example/old-api/card-art/current.png',
       provider: 'gemini',
       model: 'gemini-3.1-pro-preview',
       createdAt: 10,
@@ -529,12 +529,12 @@ describe('AiCardDesigner AI config header', () => {
             effectCode: sourceCode,
             compiledCode: null,
             codeManifest: null,
-            artUrl: '/card-art/current.png',
+            artUrl: 'https://old-api.example/old-api/card-art/current.png',
             generation: {
               art: {
                 subject: 'exact private art subject',
                 prompt: 'exact private art prompt',
-                lastCompleted: artGeneration,
+                lastCompleted: {...artGeneration,id:'pending-art',resultUrl:'https://old-api.example/old-api/card-art/candidate.png'},
                 adopted: artGeneration,
               },
             },
@@ -560,6 +560,9 @@ describe('AiCardDesigner AI config header', () => {
     await userEvent.click(screen.getByRole('button', { name: /卡面图\s*主题、参考图与候选/ }))
     expect(screen.getByLabelText('画面主题')).toHaveValue('exact private art subject')
     expect(screen.queryByDisplayValue('exact private art prompt')).not.toBeInTheDocument()
+    expect(container.querySelector('.aicw-current-asset img')?.getAttribute('src')).toBe('/card-art/current.png')
+    expect(screen.getByAltText('待采用图片候选').getAttribute('src')).toBe('/card-art/candidate.png')
+    expect(container.querySelector('img[src*="old-api.example"]')).toBeNull()
 
     await userEvent.click(screen.getByRole('button', { name: /卡牌能力\s*对话、源码与验证/ }))
     expect(container.querySelector('.aicw-current-code code')?.textContent).toBe(sourceCode)

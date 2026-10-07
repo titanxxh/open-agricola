@@ -1,3 +1,4 @@
+import { resolveCardArtUrl } from '../../../shared/utils/card-art-url'
 import { useMemo } from 'react'
 import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
@@ -266,7 +267,7 @@ export const PlayerCard = ({
     if (runtimeArt) {
       // artUrl is a relative path like /card-art/xxx.png — resolve against API_BASE (lazy import to avoid window access in tests)
       const apiBase = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_BASE) || ''
-      const fullUrl = runtimeArt.startsWith('http') ? runtimeArt : `${apiBase}${runtimeArt}`
+      const fullUrl = resolveCardArtUrl(runtimeArt, apiBase)
       return {
         backgroundImage: `url(${fullUrl})`,
         backgroundSize: 'contain',

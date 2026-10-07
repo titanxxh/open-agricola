@@ -244,6 +244,8 @@ const CARD_IMPL = {
 
 托管图片使用 `/card-art/{filename}` 标识。历史绝对 HTTP(S) URL 及 `/agricola-api` 等 API 路径前缀在投稿、Replay 归档和持久引用中解析为相同的本地对象键，不访问 URL 中的主机。读取仍须通过本地目录、内容哈希和删除屏障检查。草稿、保存的候选和固定版本的图片引用在 API 域名变更后仍然有效。迁移只为尚存且 ready 的对象补齐引用，不改写版本快照。已清理图片必须恢复与原记录完全一致的字节及引用；已下架删除的图片继续受屏障保护。
 
+工坊缩略图、已采用图片、候选预览及自定义卡面在渲染时按当前 API base 解析托管图片，保留存储的 URL 和快照哈希。生成记录仅从图片的 `resultUrl`、`referenceImages` 字段提取资源引用；主题、提示词和能力文本即使含有图片网址也仍是普通文字。
+
 ### C5. LLM 生成代码的安全验证
 
 LLM 输出 **TypeScript 源码**（包含 `CARD_DEF` 定义、`CARD_IMPL.effect` hook 回调、`CARD_IMPL.listeners` 监听器）。后端三步走：验证 → 编译 → 沙盒执行。

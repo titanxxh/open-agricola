@@ -9,6 +9,7 @@ import { LocaleSwitcher } from '../components/common/LocaleSwitcher'
 import { ResourceText } from '../components/common/ResourceText'
 import { Section } from '../components/common/Section'
 import { EmptyState } from '../components/common/EmptyState'
+import { resolveCardArtUrl } from '../../shared/utils/card-art-url'
 import { API_BASE } from '../config'
 import { refreshPrStatus, extractPrNumber } from '../services/workshop-pr'
 import { buildLocalGameConfig, isBrowserSandbox, stashLocalSandboxConfig } from '../local-sandbox/workshop-launch'
@@ -342,7 +343,7 @@ function CardTile({ card, onSelect, onLike, mine, t }: {
         </a>
       )}
       {card.art_url && (
-        <img className="ws-card-art-thumb" src={card.art_url} alt={card.name} />
+        <img className="ws-card-art-thumb" src={resolveCardArtUrl(card.art_url, API_BASE)} alt={card.name} />
       )}
       <div className="ws-card-tile-body">
         <div className="ws-card-tile-name">{card.name}</div>
@@ -706,7 +707,7 @@ function CardDetail({ card, isLoggedIn, apiFetch, onBack, onEdit, onAddSandbox, 
       <button type="button" className="ws-back-btn" onClick={onBack}>{t('platform.back')}</button>
 
       <div className="ws-detail-header">
-        {card.art_url && <img className="ws-detail-art" src={card.art_url} alt={card.name} />}
+        {card.art_url && <img className="ws-detail-art" src={resolveCardArtUrl(card.art_url, API_BASE)} alt={card.name} />}
         <div className="ws-detail-meta">
           <h2>{card.name}</h2>
           <div className="ws-badges-row">

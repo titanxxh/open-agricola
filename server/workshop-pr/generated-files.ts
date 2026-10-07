@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { getResources } from '../storage/runtime'
-import { cardArtKey } from '../storage/card-art-key'
+import { cardArtKey } from '../../shared/utils/card-art-url'
 import { GitHubApiError } from './github-client'
 import type { PrFile } from './code-gen'
 

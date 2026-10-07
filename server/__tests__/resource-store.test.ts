@@ -100,3 +100,16 @@ it('backfills surviving legacy references without resurrecting collected or remo
   await peer.collect()
   expect(await resources.read('card-art/surviving.png')).not.toBeNull()
 })
+
+it('keeps prose URLs out of resource admission while retaining actual candidate image fields', async () => {
+  await resources.stage('card-art/actual-candidate.png', Buffer.from('actual'), 'image/png')
+  await resources.stage('card-art/actual-reference.png', Buffer.from('reference'), 'image/png')
+  const art = {
+    subject:'https://example.com/card-art/inspiration.png',
+    lastCompleted:{prompt:'https://example.com/card-art/prompt.png',resultUrl:'https://old.example/api/card-art/actual-candidate.png',referenceImages:['https://old.example/api/card-art/actual-reference.png']},
+  }
+  await resources.db.prepare(`INSERT INTO workshop_cards(id,author_id,card_id,card_type,name,card_json,draft_generation_json,created_at,updated_at)
+    VALUES ('prose-card','author','CUSTOM_prose','minor','Prose','{}',?,1,1)`).run(JSON.stringify({art,ability:{sourceCode:'https://example.com/card-art/source.png'}}))
+  expect(await resources.db.prepare("SELECT object_key FROM object_references WHERE owner_id='prose-card' ORDER BY object_key").all()).toEqual([{object_key:'card-art/actual-candidate.png'},{object_key:'card-art/actual-reference.png'}])
+  await expect(resources.db.prepare("UPDATE workshop_cards SET draft_generation_json=? WHERE id='prose-card'").run(JSON.stringify({art:{...art,lastCompleted:{...art.lastCompleted,resultUrl:'https://api.example/card-art/missing.png'}}}))).rejects.toThrow('not ready')
+})

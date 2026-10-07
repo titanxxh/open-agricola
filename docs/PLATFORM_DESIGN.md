@@ -229,6 +229,8 @@ A generated image becomes a candidate rather than replacing current art. The bro
 
 Managed artwork uses `/card-art/{filename}` identifiers. Historical absolute HTTP(S) URLs and API base-path prefixes (such as `/agricola-api`) resolve to the same local object key for submission, Replay archival and durable references; their host is never fetched. Reads still require the local catalog, matching content hash and erasure checks. Drafts, saved candidates and pinned versions retain their images across API-origin changes. Migration backfills references only for surviving ready objects without rewriting snapshot contents. Already collected images require recovery of their exact recorded bytes and references; removed images remain blocked.
 
+Workshop thumbnails, adopted/candidate previews and custom card faces resolve managed images against the current API base at render time, preserving saved URL values and snapshot hashes. Generation references come only from artwork `resultUrl` and `referenceImages` fields; subject, prompt and ability text remain prose even when they contain image URLs.
+
 ### C5. Security validation for LLM-generated code
 
 The model emits TypeScript containing `CARD_DEF`, `CARD_IMPL.effect` callbacks, and `CARD_IMPL.listeners`. The backend validates, compiles, and executes it in a sandbox.
