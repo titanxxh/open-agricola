@@ -81,13 +81,13 @@ async function edit(id: string) {
 }
 
 describe('Workshop submissions over HTTP', () => {
-  it.each(['https://api.example/card-art/../private.png', 'https://api.example/card-art/image.png?redirect=1', 'https://user:password@api.example/card-art/image.png'])('rejects unsupported artwork without fetching the supplied URL: %s', async artUrl => {
+  it.each(['https://api.example/card-art/../private.png', 'https://api.example/agricola/../card-art/image.png', 'https://api.example/card-art/image.png?redirect=1', 'https://user:password@api.example/card-art/image.png'])('rejects unsupported artwork without fetching the supplied URL: %s', async artUrl => {
     const card = await readyCard(artUrl)
     expect(await submit(card.id)).toMatchObject({ok:false,code:'invalid_art'})
     expect(github.prs).toHaveLength(0)
   })
 
-  it('resubmits legacy artwork stored as an absolute API URL without replacing the old PR', async () => {
+  it.each(['', '/agricola-api', '/services/agricola.v1'])('resubmits legacy artwork under API path %s without replacing the old PR', async prefix => {
     await resources.stage('card-art/legacy.png', Buffer.from('original artwork'), 'image/png')
     const card = await readyCard('/card-art/legacy.png')
     expect(await submit(card.id)).toMatchObject({ok:true,prNumber:1})
@@ -95,9 +95,9 @@ describe('Workshop submissions over HTTP', () => {
     const head = github.refs.get(old.branch)
     old.state = 'closed'
     await db.exec('DELETE FROM workshop_submissions; DELETE FROM request_rate_limits')
-    await db.prepare('UPDATE workshop_card_versions SET art_url=? WHERE card_id=?').run('https://old-api.example:8443/card-art/legacy.png',card.id)
+    await db.prepare('UPDATE workshop_card_versions SET art_url=? WHERE card_id=?').run(`https://old-api.example:8443${prefix}/card-art/legacy.png`,card.id)
     const workspace = await loadWorkspace(db,card.id,'author')
-    const next = await checkpointDraft(db,{cardId:card.id,authorId:'author',baseRevision:workspace.revision,draft:{...workspace.draft,artUrl:'https://api.example/card-art/legacy.png'}})
+    const next = await checkpointDraft(db,{cardId:card.id,authorId:'author',baseRevision:workspace.revision,draft:{...workspace.draft,artUrl:`https://api.example${prefix}/card-art/legacy.png`}})
     const {versionId} = await pinCurrentDraftVersion(db,{cardId:card.id,authorId:'author',baseRevision:next.revision})
     await markSandboxPass(db,{cardId:card.id,authorId:'author',versionId,authorConfirmed:true,runtimeErrors:[]})
     expect(await submit(card.id,'restart')).toMatchObject({ok:true,prNumber:2})
