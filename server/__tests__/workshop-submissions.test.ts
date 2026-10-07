@@ -126,6 +126,10 @@ describe('Workshop submissions over HTTP', () => {
     const fetch = vi.spyOn(github,'fetch')
     expect(await submit(card.id,'restart')).toMatchObject({ok:false,code:'rate_limited'})
     expect(fetch).not.toHaveBeenCalled()
+    for (let attempt=0; attempt<100; attempt++) {
+      expect(await submit(card.id,'restart')).toMatchObject({ok:false,code:'rate_limited'})
+    }
+    await expect(new SubmissionStore(db).admitRemoteAttempt('another-author')).resolves.toBeUndefined()
   })
 
   it('rejects a draft edited during preflight without holding its database lock', async () => {
@@ -254,6 +258,31 @@ describe('Workshop submissions over HTTP', () => {
     const files = github.commits.get(github.refs.get(github.prs[0]!.branch)!)!
     expect(files['server/__tests__/community-card.test.ts']).toBe('reviewer test\n')
     expect(files['docs/community_cards.md']).toContain('#1')
+  })
+
+  it('keeps PR text untouched while its description link follows updated attribution and content', async () => {
+    const card = await readyCard()
+    await submit(card.id)
+    const pr = github.prs[0]!
+    const link = `https://github.com/titanxxh/open-agricola/blob/${pr.branch}/shared/cards/community/CUSTOM_TestCard.ts#L1`
+    expect(pr.body).toContain(link)
+    expect(pr.body).toContain('**Designer at first submission**: Designer')
+    expect(pr.body).not.toContain('A test card')
+    await edit(card.id)
+    await db.prepare("UPDATE users SET display_name='Updated Designer' WHERE id='author'").run()
+    github.beforeRefUpdate = () => {
+      github.beforeRefUpdate = undefined
+      pr.body = pr.body.replace('- [ ] Card behavior','- [x] Card behavior') + '\nConcurrent maintainer notes\n'
+    }
+    expect(await submit(card.id)).toMatchObject({ok:true,prNumber:1})
+    const source = github.commits.get(github.refs.get(pr.branch)!)!['shared/cards/community/CUSTOM_TestCard.ts']!
+    expect(source).toContain('// Description: Revised description')
+    expect(source).toContain('// Author: Updated Designer')
+    expect(pr.body).toContain(link)
+    expect(pr.body).toContain('- [x] Card behavior')
+    expect(pr.body).toContain('Concurrent maintainer notes')
+    expect(github.writes.filter(write => write.startsWith('PATCH '))).toEqual([])
+    await db.prepare("UPDATE users SET display_name='Designer' WHERE id='author'").run()
   })
 
   it('pauses on any reviewer edit to generated card source', async () => {
