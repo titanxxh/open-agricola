@@ -306,7 +306,7 @@ export class WsGameTransport implements GameTransport {
     this.wsUrl = wsUrl
     this.journal = new RoomCommandJournal(`agricola.pending-commands:${wsUrl}`, roomId ?? '')
     this.roomId = this.journal.roomId
-    this.playerIndex = playerIndex ?? 0
+    this.playerIndex = playerIndex ?? this.journal.playerIndex ?? 0
   }
 
   get connected() { return this._connected && !this.recovering && !this.stopped }
@@ -497,8 +497,11 @@ export class WsGameTransport implements GameTransport {
       this.completed.set(msg.receipt.commandId, msg.receipt.outcome)
       if (!this.recovering) this.finishCommand(msg.receipt.commandId, msg.receipt.outcome)
     } else if (msg.type === 'roomCreated' || msg.type === 'roomJoined' || msg.type === 'roomWaiting') {
+      if ('playerIndex' in msg) {
+        this.playerIndex = msg.playerIndex
+        this.journal.playerIndex = msg.playerIndex
+      }
       this.setRoom(msg.roomId)
-      if ('playerIndex' in msg) this.playerIndex = msg.playerIndex
     } else if (msg.type === 'historyPage') {
       if (msg.requestId) { this.pendingHistoryResolvers.get(msg.requestId)?.resolve(msg.page); this.pendingHistoryResolvers.delete(msg.requestId) }
     } else if (msg.type === 'stateUpdate') {

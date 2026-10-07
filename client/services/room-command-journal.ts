@@ -5,6 +5,7 @@ export class RoomCommandJournal {
   readonly commands = new Map<string, ClientCommand>()
   private readonly key: string
   roomId: string
+  playerIndex?: number
   constructor(key: string, roomId: string) {
     this.key = key
     this.roomId = roomId
@@ -15,6 +16,7 @@ export class RoomCommandJournal {
         command.commandContext?.roomId === roomId || (!roomId && command.type === 'createRoom'))
       if (!relevant) return
       this.roomId = typeof value.roomId === 'string' ? value.roomId : roomId
+      if (Number.isInteger(value.playerIndex) && value.playerIndex >= 0) this.playerIndex = value.playerIndex
       for (const command of value.commands.slice(0, 32) as ClientCommand[]) {
         if (command.commandContext?.commandId && command.commandContext.scopeId) this.commands.set(command.commandContext.commandId, command)
       }
@@ -23,7 +25,7 @@ export class RoomCommandJournal {
   save(): void {
     try {
       if (!this.commands.size) sessionStorage.removeItem(this.key)
-      else sessionStorage.setItem(this.key, JSON.stringify({ roomId: this.roomId, commands: [...this.commands.values()] }))
+      else sessionStorage.setItem(this.key, JSON.stringify({ roomId: this.roomId, playerIndex: this.playerIndex, commands: [...this.commands.values()] }))
     } catch { /* In-memory recovery remains available. */ }
   }
 }
