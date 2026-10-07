@@ -303,6 +303,23 @@ describe('Workshop submissions over HTTP', () => {
     expect((await replacement.latest(card.id))?.lease_owner).toBe(current.lease_owner)
   })
 
+  it('returns the completed replacement result when an old executor loses its lease during preparation', async () => {
+    const card = await readyCard()
+    const save = SubmissionStore.prototype.save
+    let replaced = false
+    vi.spyOn(SubmissionStore.prototype,'save').mockImplementation(async function (row,payload) {
+      if (row.phase === 'publish' && !replaced) {
+        replaced = true
+        await db.prepare('UPDATE workshop_submissions SET lease_until = 0 WHERE id = ?').run(row.id)
+        await recoverPendingSubmissions(new SubmissionStore(db),WorkshopGitHubApp.fromEnv()!)
+      }
+      return save.call(this,row,payload)
+    })
+    expect(await submit(card.id)).toMatchObject({ok:true,prNumber:1})
+    expect(github.prs).toHaveLength(1)
+    expect((await loadWorkspace(db,card.id,'author')).reviewStatus).toBe('in_review')
+  })
+
   it('waits for a lagging GitHub PR head after the planned branch write succeeds', async () => {
     const card = await readyCard()
     github.lagHeadAfterFinalPublish = true

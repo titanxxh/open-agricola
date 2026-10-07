@@ -215,9 +215,10 @@ export async function deliverSubmission(store: SubmissionStore, source: Submissi
   }
   const result = (await store.latest(source.card_id))!
   if (result.state === 'complete' && !result.error_code) {
-    const binding = await loadReviewBinding(store.db,result.card_id,data.pr!.url)
+    const completed = JSON.parse(result.payload) as SubmissionPayload
+    const binding = await loadReviewBinding(store.db,result.card_id,completed.pr!.url)
     if (binding) {
-      try { await reconcileReviewSnapshot(store.db,data.pr!.url,await reviewProvider.getPullRequestSnapshot(data.pr!.number),binding) }
+      try { await reconcileReviewSnapshot(store.db,completed.pr!.url,await reviewProvider.getPullRequestSnapshot(completed.pr!.number),binding) }
       catch { await store.db.prepare('UPDATE workshop_cards SET github_pr_last_synced_at = NULL WHERE id = ? AND review_commit_sha = ?').run(result.card_id,binding.reviewCommitSha) }
     }
   }
