@@ -430,13 +430,13 @@ https://<backend-origin>/api/auth/oauth/google/callback
 | `ACCOUNT_GOOGLE_OAUTH_CLIENT_ID` | — | 账号 Google OAuth client id |
 | `ACCOUNT_GOOGLE_OAUTH_CLIENT_SECRET` | — | 账号 Google OAuth client secret |
 | `BUG_REPORTS_ENABLED` | `false` | 是否允许创建新的 Bug Report 草稿 |
-| `BUG_REPORT_GITHUB_APP_ID` | — | issues-only GitHub App ID |
+| `BUG_REPORT_GITHUB_APP_ID` | — | 独立 Bug Report GitHub App ID；唯一可写权限为 `Issues: write` |
 | `BUG_REPORT_GITHUB_CLIENT_ID` | — | GitHub App Client ID |
 | `BUG_REPORT_GITHUB_CLIENT_SECRET` | — | GitHub App Client secret |
 | `BUG_REPORT_GITHUB_PRIVATE_KEY` | — | GitHub App private key，使用单行 `\n` 转义 |
 | `BUG_REPORT_GITHUB_WEBHOOK_SECRET` | — | GitHub App webhook secret |
-| `BUG_REPORT_GITHUB_INSTALLATION_ID` | — | issues-only 仓库的 App installation ID |
-| `BUG_REPORT_GITHUB_REPOSITORY_ID` | — | `titanxxh/open-agricola-issues` 数字 repository ID |
+| `BUG_REPORT_GITHUB_INSTALLATION_ID` | — | 可访问 `titanxxh/open-agricola` 的 App installation ID |
+| `BUG_REPORT_GITHUB_REPOSITORY_ID` | — | `titanxxh/open-agricola` 数字 repository ID：`1164782262` |
 | `BUG_REPORT_TOKEN_ENCRYPTION_KEYS` | — | AES-256-GCM key ring JSON；每个值为 32 字节 base64 |
 | `BUG_REPORT_TOKEN_ACTIVE_KEY_ID` | — | 新令牌使用的 key ring key ID |
 | `ENABLE_AUTH_TEST_HELPERS` | — | 仅本地/E2E 可设 `1`，生产禁止设置 |
@@ -454,6 +454,12 @@ https://<backend-origin>/api/auth/oauth/google/callback
 | `WORKSHOP_REVIEW_GITHUB_WEBHOOK_SECRET` | — | `/api/github/webhook` HMAC secret |
 | `OFFSITE_BACKUP_TARGET` | — | 定时异机备份的 ssh 目标（如 `root@1.2.3.4`）；仅 `backup-offsite.sh` 读取，不进应用容器 |
 | `OFFSITE_BACKUP_REMOTE_DIR` | `/root/open-agricola-backups` | 异机上的备份存放目录；仅 `backup-offsite.sh` 读取 |
+
+### Bug Report 仓库
+
+Game Bug Reports 交付到公开的 `titanxxh/open-agricola` 仓库。将独立 Bug Report GitHub App 安装到该仓库，仅授予 `Issues: write` 可写权限，并在部署后端前配置对应 installation ID 和 repository ID（`1164782262`）。沿用现有 callback、webhook 和令牌加密配置。当提交身份无法设置标签时，`bug-report-triage.yml` workflow 为游戏内报告补上 `needs-triage`。
+
+修改目标不会转移已有 GitHub Issue，也不会重写已保存的报告引用。切换已有部署前，先对账未完成的提交，再转移需要保留的报告，并将已保存的 Issue 编号和 URL 更新为目标仓库中的引用；完成后再废弃原仓库。
 
 ### Resend 邮箱验证
 

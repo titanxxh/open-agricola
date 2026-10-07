@@ -2,7 +2,7 @@
 
 Issues and PRDs for this repo live as GitHub issues in `titanxxh/open-agricola`. Use the `gh` CLI for all operations.
 
-This convention covers agent work and PRDs. Player-submitted Game Bug Reports are product data delivered to the public `titanxxh/open-agricola-issues` repository under ADR-0012.
+This convention covers agent work and PRDs. Player-submitted Game Bug Reports are product data delivered to the public `titanxxh/open-agricola` repository under ADR-0012.
 
 ## Conventions
 

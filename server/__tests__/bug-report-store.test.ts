@@ -11,7 +11,7 @@ import {
 
 const ACTIVE_HASH = 'a'.repeat(64)
 const COMPLETED_HASH = 'b'.repeat(64)
-const ISSUE_URL = 'https://github.com/titanxxh/open-agricola-issues/issues/7'
+const ISSUE_URL = 'https://github.com/titanxxh/open-agricola/issues/7'
 
 let db: PostgresDatabase
 let now: number
@@ -1125,7 +1125,7 @@ describe('BugReportStore', () => {
       .mockResolvedValueOnce({
         ok: true,
         number: 9,
-        url: 'https://github.com/titanxxh/open-agricola-issues/issues/9',
+        url: 'https://github.com/titanxxh/open-agricola/issues/9',
       })
     const delivery = new BugReportDelivery(
       store,
@@ -1149,7 +1149,7 @@ describe('BugReportStore', () => {
       reporter_user_id: 'u1',
       status: 'submitted',
       github_issue_number: 9,
-      github_issue_url: 'https://github.com/titanxxh/open-agricola-issues/issues/9',
+      github_issue_url: 'https://github.com/titanxxh/open-agricola/issues/9',
     })
 
     await delivery.deleteReporter('u1')

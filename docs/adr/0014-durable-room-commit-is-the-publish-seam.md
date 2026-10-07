@@ -38,7 +38,7 @@ ADR-0010 至 ADR-0013 已固定公开回放、delta 链、GitHub 身份和 Game 
 ### GitHub and operations
 
 15. GitHub 提交使用 SQLite 持久化草稿、稳定 `submissionId`、attempt 记录和单进程 claim 执行器，不增加外部队列。Issue Submission Connection 令牌使用 Node `crypto` 的 AES-256-GCM、每行独立 nonce 和 `keyId` 加密；PKCE state 复用扩展后的 `oauth_states`。
-16. Issue 只包含清洗后的现象和已批准定位键；首版不上传截图、日志或状态附件。issues-only 仓库的自动化添加 `needs-triage`，通知依赖 GitHub 原生 watching。
+16. Issue 只包含清洗后的现象和已批准定位键；首版不上传截图、日志或状态附件。公开主仓库 `titanxxh/open-agricola` 的自动化为游戏内报告添加 `needs-triage`，通知依赖 GitHub 原生 watching。
 17. 维护者全开取证复用现有管理员判定并永久审计。Replay 下架首版使用运维 CLI，删除 payload、保留 Tombstone，并追加数据库外删除 ledger；内容资源只有在没有其他未下架 Replay 引用时才删除，资源自身违规时先 Tombstone 所有引用局。旧备份恢复上线前重放该 ledger。
 18. 上线使用 `REPLAY_NEW_ROOMS_ENABLED` 与 `BUG_REPORTS_ENABLED` 两个开关。Viewer Build 先发布，随后部署数据库与后端，再启用新 Room 录制、公开回放和 GitHub 报告。已有 Replay header 的 Room 不受关闭新录制开关影响，必须继续写完。
 19. 首次启用前，恢复出的旧活动 Room 在接受命令前建立 `missingPrefix=true` 的 Step 0。启用录制后不得回滚到不认识该 Replay schema 的后端，只能回滚到兼容构建或向前修复。

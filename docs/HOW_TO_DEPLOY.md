@@ -412,13 +412,13 @@ Never set these in production:
 | `ACCOUNT_GOOGLE_OAUTH_CLIENT_ID` | — | Account Google OAuth client ID |
 | `ACCOUNT_GOOGLE_OAUTH_CLIENT_SECRET` | — | Account Google OAuth client secret |
 | `BUG_REPORTS_ENABLED` | `false` | Whether new Bug Report drafts can be created |
-| `BUG_REPORT_GITHUB_APP_ID` | — | Issues-only GitHub App ID |
+| `BUG_REPORT_GITHUB_APP_ID` | — | Dedicated Bug Report GitHub App ID; only `Issues: write` is writable |
 | `BUG_REPORT_GITHUB_CLIENT_ID` | — | GitHub App Client ID |
 | `BUG_REPORT_GITHUB_CLIENT_SECRET` | — | GitHub App Client secret |
 | `BUG_REPORT_GITHUB_PRIVATE_KEY` | — | GitHub App private key escaped with single-line `\n` |
 | `BUG_REPORT_GITHUB_WEBHOOK_SECRET` | — | GitHub App webhook secret |
-| `BUG_REPORT_GITHUB_INSTALLATION_ID` | — | App installation ID for the issues-only repository |
-| `BUG_REPORT_GITHUB_REPOSITORY_ID` | — | Numeric repository ID of `titanxxh/open-agricola-issues` |
+| `BUG_REPORT_GITHUB_INSTALLATION_ID` | — | App installation ID with access to `titanxxh/open-agricola` |
+| `BUG_REPORT_GITHUB_REPOSITORY_ID` | — | Numeric repository ID of `titanxxh/open-agricola`: `1164782262` |
 | `BUG_REPORT_TOKEN_ENCRYPTION_KEYS` | — | AES-256-GCM key-ring JSON; every value is 32-byte base64 |
 | `BUG_REPORT_TOKEN_ACTIVE_KEY_ID` | — | Key-ring ID used for new tokens |
 | `ENABLE_AUTH_TEST_HELPERS` | — | May be `1` only locally or in E2E; forbidden in production |
@@ -436,6 +436,12 @@ Never set these in production:
 | `WORKSHOP_REVIEW_GITHUB_WEBHOOK_SECRET` | — | HMAC secret for `/api/github/webhook` |
 | `OFFSITE_BACKUP_TARGET` | — | SSH destination for scheduled offsite backups, such as `root@1.2.3.4`; read only by `backup-offsite.sh` |
 | `OFFSITE_BACKUP_REMOTE_DIR` | `/root/open-agricola-backups` | Remote backup directory; read only by `backup-offsite.sh` |
+
+### Bug Report Repository
+
+Game Bug Reports go to the public `titanxxh/open-agricola` repository. Install the dedicated Bug Report GitHub App on that repository with `Issues: write`, and configure its installation ID and repository ID (`1164782262`) before deploying the backend. Keep the existing callback, webhook, and token-encryption settings. The `bug-report-triage.yml` workflow adds `needs-triage` to in-game reports when the submitting identity cannot set labels.
+
+Changing the target does not transfer existing GitHub Issues or rewrite stored report references. Before switching an existing deployment, reconcile pending submissions and transfer any retained reports, updating their stored Issue numbers and URLs to match the destination; do this before retiring the former repository.
 
 ### Resend Email Verification
 

@@ -8,6 +8,7 @@ import {
   BugReportStore,
 } from './bug-report/bug-report-store.ts'
 import {
+  BUG_REPORT_GITHUB_REPOSITORY,
   GitHubIssueClient,
   verifyGitHubWebhook,
 } from './bug-report/github-issue-client.ts'
@@ -517,7 +518,7 @@ export async function handleBugReportRoute(
       }
       if (
         req.headers['x-github-event'] === 'issues'
-        && payload.repository?.full_name === 'titanxxh/open-agricola-issues'
+        && payload.repository?.full_name === BUG_REPORT_GITHUB_REPOSITORY
         && typeof payload.issue?.number === 'number'
         && Number.isSafeInteger(payload.issue.number)
       ) {

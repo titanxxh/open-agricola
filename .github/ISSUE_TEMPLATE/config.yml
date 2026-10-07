@@ -3,6 +3,6 @@ contact_links:
   - name: 在线试玩
     url: https://titanxxh.github.io/open-agricola/
     about: 先在线上环境确认问题是否仍存在
-  - name: 玩家 Bug Report 数据仓库
-    url: https://github.com/titanxxh/open-agricola-issues
-    about: 游戏内 Bug Report 按钮提交的对局 bug（含 replay）交付到这里
+  - name: 玩家 Bug Reports
+    url: https://github.com/titanxxh/open-agricola/issues
+    about: 游戏内 Bug Report 按钮提交的对局 bug（含 replay）交付到当前仓库

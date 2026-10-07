@@ -6,8 +6,7 @@ import {
 } from 'node:crypto'
 
 const API = 'https://api.github.com'
-const OWNER = 'titanxxh'
-const REPOSITORY = 'open-agricola-issues'
+export const BUG_REPORT_GITHUB_REPOSITORY = 'titanxxh/open-agricola'
 const GITHUB_REQUEST_TIMEOUT_MS = 15_000
 const GITHUB_CREATED_AT_SKEW_MS = 5 * 60_000
 
@@ -273,7 +272,7 @@ export class GitHubIssueClient {
     let response: Response
     try {
       response = await this.request(
-        `${API}/repos/${OWNER}/${REPOSITORY}/issues`,
+        `${API}/repos/${BUG_REPORT_GITHUB_REPOSITORY}/issues`,
         {
           method: 'POST',
           headers: {
@@ -325,7 +324,7 @@ export class GitHubIssueClient {
     for (let page = 1; ; page += 1) {
       let response: Response
       try {
-        const url = new URL(`${API}/repos/${OWNER}/${REPOSITORY}/issues`)
+        const url = new URL(`${API}/repos/${BUG_REPORT_GITHUB_REPOSITORY}/issues`)
         url.searchParams.set('state', 'all')
         url.searchParams.set('sort', 'created')
         url.searchParams.set('direction', 'desc')
@@ -429,7 +428,7 @@ export class GitHubIssueClient {
     }
     const authorization = await this.installationToken()
     if (!authorization.ok) return authorization
-    const issueUrl = `${API}/repos/${OWNER}/${REPOSITORY}/issues/${issueNumber}`
+    const issueUrl = `${API}/repos/${BUG_REPORT_GITHUB_REPOSITORY}/issues/${issueNumber}`
     let response: Response
     try {
       response = await this.request(issueUrl, {
