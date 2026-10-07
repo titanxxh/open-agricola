@@ -845,6 +845,10 @@ _Avoid_: Draft Version、Published Card、临时表单状态
 基于 Design Draft 某一目标分区生成、尚未采用的作者私有提案；图片和能力候选共享生命周期，但内容类型不同。同一分区可在当前会话比较最多三个候选，重新打开只恢复最近一次完成生成的候选；采用或丢弃后不作为第二份内容长期保留。
 _Avoid_: Design Draft、Draft Version、已采用内容副本
 
+**Generation Attempt（生成尝试）**:
+为 Design Draft 的能力分区执行的一次完整生成过程，包含资料查询、模型回答和有界修复；它可以产生 Generation Candidate，也可以在没有候选时结束。暂停后继续仍属同一次尝试，沿用已确定的模型配置和资料版本；一次尝试不等于单次模型请求，也不表示采用候选。
+_Avoid_: 单次 LLM 请求、Generation Candidate、Draft Version
+
 **Generation Provenance（生成溯源）**:
 描述候选生成来源的作者私有不可变事实，包括最终请求、provider、model、参考图标识和可用的 seed 或 request ID；它是来源证据，不承诺确定性复现。
 _Avoid_: 可复现信息、API Key、模型凭据

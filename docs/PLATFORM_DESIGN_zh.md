@@ -136,6 +136,14 @@ App.tsx
 
 OpenRouter 不在 provider 级别声明 `chat` / `image` 兜底能力；每个模型必须显式声明自己的能力，避免图片面板展示聊天模型或聊天面板展示图片模型。
 
+#### C1.2 已定案、待实现的浏览器工具循环
+
+浏览器工具循环设计已获确认，等待实现；当前产品仍使用下文描述的纯文字流和完整 prompt。上方模型表列出的是现有 UI 注册项，不代表已经通过工具调用验收的组合。
+
+**Generation Attempt（生成尝试）**包含资料查询、模型回答和有界修复。暂停后继续沿用其模型配置、资料 commit 和累计统计；取消时不能把半截输出当作完成候选。每次新尝试解析 GitHub 最新 `main`，并将该次资料读取固定到这个 commit。参考资料独立于站点发布，生成的可执行代码仍须遵守实际 Custom Code Sandbox 的能力限制。LLM 凭据仍只由浏览器发送给模型服务。
+
+决议保存在[资料契约](https://github.com/titanxxh/open-agricola/issues/1032)与[模型准入、循环边界及恢复](https://github.com/titanxxh/open-agricola/issues/1033)中，明确初始预算、显式继续、有限重试与修复，以及模型开放前所需的浏览器工具往返证据。草稿恢复和溯源持久化仍由[请求/结果契约](https://github.com/titanxxh/open-agricola/issues/1034)决定；这份待实现设计不新增服务端对话存储。
+
 ### C2. 系统提示词设计
 
 **源文件**：`client/services/llmPrompts.ts`（`CARD_DESIGNER_SYSTEM_PROMPT`）。以下是其结构摘要；以源文件为准。effect / 进阶 hook 表、listener phase 表、listener scope 表、actionId 表**运行时从真相源渲染**（`shared/cards/card-effects.ts` 的 `cardEffectHooks` + `shared/custom-code/sandbox-hook-meta.ts` / `sandbox-listener-phases.ts` / `sandbox-listener-scopes.ts` / `sandbox-action-ids.ts`），因此这四张表不会与引擎漂移，无需手工镜像。

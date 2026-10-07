@@ -130,6 +130,14 @@ External `DATABASE_URL` and complete `S3_*` settings can be supplied later. Move
 
 OpenRouter has no provider-level fallback `chat` or `image` capability. Every model declares its own capabilities so image UI never shows chat-only models and chat UI never shows image-only models.
 
+#### C1.2 Planned browser tool loop
+
+The browser tool-loop design has been approved for implementation; the current product still uses the text-only stream and full prompt described below. The model table above lists existing UI registrations, not verified tool-calling combinations.
+
+A **Generation Attempt** encompasses reference queries, model responses, and bounded repairs. Pausing and continuing preserves its model configuration, reference commit, and cumulative accounting; cancelling does not produce a completed candidate from partial output. Each new attempt resolves the latest GitHub `main` and pins that commit for its reference reads. Reference content is independent of site releases, while executable code must still obey the actual Custom Code Sandbox capabilities. LLM credentials remain browser-to-provider only.
+
+The decisions live in [the reference contract](https://github.com/titanxxh/open-agricola/issues/1032) and [model admission, loop boundaries, and recovery](https://github.com/titanxxh/open-agricola/issues/1033). These records define the initial budgets, explicit continuation, limited retries and repairs, and browser tool-roundtrip evidence required before enabling a model. Draft recovery and provenance persistence remain subject to [the request/result contract](https://github.com/titanxxh/open-agricola/issues/1034); this planned design does not add server-side conversation storage.
+
 ### C2. System prompt design
 
 The source is `CARD_DESIGNER_SYSTEM_PROMPT` in `client/services/llmPrompts.ts`. This section summarizes its shape; source code is authoritative. Tables for advanced effect hooks, listener phases, listener scopes, and action IDs render at runtime from truth sources: `cardEffectHooks` in `shared/cards/card-effects.ts`, plus `shared/custom-code/sandbox-hook-meta.ts`, `sandbox-listener-phases.ts`, `sandbox-listener-scopes.ts`, and `sandbox-action-ids.ts`. They cannot drift from the engine and need no manual mirror.
