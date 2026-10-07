@@ -10,6 +10,7 @@
 
 ```bash
 pnpm install --frozen-lockfile
+node scripts/local-services.mjs --test
 pnpm run check:architecture
 pnpm run lint:i18n
 pnpm test
