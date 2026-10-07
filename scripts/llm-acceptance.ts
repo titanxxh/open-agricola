@@ -163,7 +163,12 @@ try {
       return { remaining: data.resources.core.remaining as number, reset: data.resources.core.reset as number }
     })
     save('github-preflight.json', quota)
-    if (quota.remaining < 56) throw new Error(`Anonymous GitHub quota is ${quota.remaining}; at least 56 requests are required before starting the paid batch. Reset: ${new Date(quota.reset * 1000).toISOString()}`)
+    // One main resolution per tools task, one for the probe and one cached
+    // tree for a stable main: 53 requests in the declared 102-task matrix.
+    // Moving main or transient HTTP failures can need more; those still pause
+    // at the normal reference boundary, never substitute stale code.
+    const requiredQuota = tasks.filter(task => task.arm === 'tools').length + 2
+    if (quota.remaining < requiredQuota) throw new Error(`Anonymous GitHub quota is ${quota.remaining}; at least ${requiredQuota} requests are required for the stable-main batch. Reset: ${new Date(quota.reset * 1000).toISOString()}`)
   }
   const assess = (input: AcceptanceInput, result: BrowserTaskResult, first: boolean): BehaviorEvidence => {
     if (input.expected === 'capability-gap') {
