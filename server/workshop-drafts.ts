@@ -842,6 +842,7 @@ export async function enterReview(
     ;(await db.prepare(`
       UPDATE workshop_cards
       SET review_status = 'in_review',
+          approved_commit_sha = NULL, approved_version_id = NULL, approved_review_id = NULL, approved_at = NULL,
           github_pr_url = ?,
           github_pr_status = 'open',
           github_pr_last_synced_at = ?,

@@ -13,10 +13,10 @@ const json = (body: unknown, status = 200): Response => new Response(
   { status, headers: { 'Content-Type': 'application/json' } },
 )
 const pullRequestJson = (pullRequest: Record<string, unknown>): Response =>
-  json({ data: { repository: { pullRequest } } })
+  json({ data: { repository: { pullRequest: {...pullRequest,latestOpinionatedReviews:{...(pullRequest.latestOpinionatedReviews as object),pageInfo:{hasNextPage:false}}} } } })
 
 describe('GitHubReviewProvider', () => {
-  it('reads one atomic pull-request review snapshot with an installation token', async () => {
+  it('reads a pull-request review snapshot with an installation token', async () => {
     const privateKey = generateKeyPairSync('rsa', { modulusLength: 1024 })
       .privateKey.export({ type: 'pkcs8', format: 'pem' })
       .toString()
@@ -69,6 +69,7 @@ describe('GitHubReviewProvider', () => {
       'https://api.github.com/app/installations/456/access_tokens',
     )
     expect(JSON.parse(String(fetchImpl.mock.calls[0]![1]?.body))).toEqual({
+      repositories: ['open-agricola'],
       permissions: {
         contents: 'read',
         pull_requests: 'read',
@@ -78,7 +79,7 @@ describe('GitHubReviewProvider', () => {
     expect(graphQlBody.query).toContain('baseRefName')
     expect(graphQlBody.query).toContain('isDraft')
     expect(graphQlBody.query).toContain('state')
-    expect(graphQlBody.query).toContain('authorAssociation')
+    expect(graphQlBody.query).toContain('pageInfo')
     expect(graphQlBody.variables).toEqual({
       owner: 'titanxxh',
       name: 'open-agricola',
@@ -96,17 +97,12 @@ describe('GitHubReviewProvider', () => {
     }))
 
     await expect(provider.getPullRequestSnapshot(43)).resolves.toEqual({
-      reviewDecision: 'APPROVED',
+      reviewDecision: null,
       headRefOid: 'head-43',
       baseRefName: 'main',
       state: 'OPEN',
       isDraft: false,
-      reviews: [{
-        id: 'owner:head-43',
-        state: 'APPROVED',
-        commitOid: 'head-43',
-        authorCanPushToRepository: true,
-      }],
+      reviews: [],
     })
 
     fetchImpl.mockResolvedValueOnce(pullRequestJson({

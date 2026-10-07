@@ -302,27 +302,29 @@ WorkshopPage
 
 ### D5. Workshop-to-GitHub pull-request flow
 
-`submit-review` is the only entry into `in_review`, under PRDs #634 and #637. The GitHub pull request carries review, and review occurs before approval. Entry is on the card detail page:
+`submit-review` is the only entry into `in_review`. The public source repository uses one Workshop GitHub App for submission, review reads and signed webhooks. Login OAuth and the issues-only Bug Report App remain independent.
 
-1. The user must be authenticated and be the Workshop card's author.
-2. The card must be `unsubmitted`, `stale`, or `in_review`; submitting again while in review updates the pull-request branch. Quality gates are static validation, `sandbox_pass_version_id` content matching the draft through `getHandoffReadiness`, complete Chinese localization, and a `card_id` not already owned by an approved or merged card.
-3. The frontend calls `POST /api/workshop/cards/:id/submit-review`.
-4. If the server lacks a GitHub token for the current session, it returns an OAuth start URL. The frontend opens a popup and waits for the callback page to send `postMessage({ type: 'workshop-pr-oauth', ... }, '*')`.
-5. After authorization, the frontend retries. The server creates or updates a branch and opens or updates a pull request, then `enterReview` changes the card to `in_review` and freezes the head SHA and Draft Version. One pull-request URL binds to one card. Reuse is limited to an open, nondraft PR on the same branch with `main` as base. Closed or merged PRs remain history; resubmission creates a new PR. An old open PR that is draft or targets another base is closed before creating an eligible PR. After binding, the server rereads current review state to cover an earlier approval webhook. A temporary read failure does not roll back the established PR or binding; it clears synchronization time and the existing `refresh-pr-status` entry retries reconciliation.
-6. The Workshop Review GitHub App receives `pull_request_review` and `pull_request` webhooks. After signature verification and delivery deduplication, an approved review requires an atomic GraphQL snapshot. If `authorAssociation=OWNER` and there is no `CHANGES_REQUESTED`, the provider synthesizes a head-bound owner approval to accommodate GitHub's ban on self-approval. An ordinary author still needs approval from a reviewer with push access. A changed head, closed or draft PR, base changed away from `main`, dismissed valid approval, or `CHANGES_REQUESTED` makes the card `stale·offline`. Unbound or ambiguous PRs do not query GitHub. Potentially out-of-order events reread current state and commit only if the review binding, lifecycle, and timestamp remain unchanged. A late review event for a PR merged into `main` retains its same-head binding; a PR merged elsewhere receives no exception and counts as closed without merge. If GraphQL is unavailable, record delivery and conservatively take the card offline without overwriting an already recorded close. Comment-only review changes nothing.
-7. On author publish, the server queries GraphQL again. It sets live only if the PR is open, nondraft, based on `main`, has valid reviewer or owner approval, and the review commit, PR head, platform-approved commit, pinned version, and before-and-after live-state token all agree.
+1. Require the signed-in card author, a non-live editable draft, static validation, exact-version sandbox confirmation, Chinese localization, and an available card ID.
+2. `POST /api/workshop/cards/:id/submit-review` freezes the Workshop Card, Draft Version, revision, App installation, repository and `workshop/<card database ID>/<proposal ID>` branch in PostgreSQL before any remote write. Card Source and PR text retain the designer's name; GitHub authorship belongs to the App. Unadopted candidates, generation provenance and credentials are excluded.
+3. Generate the card, art and shared indexes against current main. Publish with GraphQL `updateRefs(beforeOid, afterOid, force:true)`: the expected head is an atomic condition. Never use an unconditional force update. Only generated paths and independent `server/shared/**/__tests__/*.test.ts` edits are admitted; workflows and unrelated changes require maintainer integration.
+4. Reuse only the same open, non-draft, main-targeted PR. Compare every previously generated file with the saved baseline before regenerating; any reviewer edit, deletion or rename pauses the operation. Preserve independent test patches against latest main; conflicts pause. Draft or retargeted PRs pause. A closed PR requires explicit `action:restart`; a merged PR follows built-in takeover. Never close, reopen or rewrite an old fork automatically.
+5. `SubmissionStore` owns durable checkpoints, one pending operation per card, expiring execution leases and fenced local writes. The worker reconciles up to five due operations every 15 seconds, with at most four automatic attempts and exponential backoff starting at 30 seconds. GitHub rate-limit hints extend this delay. New operations cost one per author per ten minutes and at most twenty globally per minute; recovery does not spend a new-submission allowance.
+6. A lost branch response is reconciled against the planned commit and expected head. PR recovery queries all states with pagination and verifies repository, branch, marker and commit. A creation intent is persisted before POST; an unknown result is never blindly POSTed again, even after an empty query. This is recoverable delivery, not an external exactly-once guarantee. `GET .../submit-review` reads authoritative status; `POST` with `action:recover` continues that operation only. Unknown or ambiguous results retain the operation and expose its ID for maintainer investigation.
+7. Bind the actual head and submitted version transactionally. A concurrently edited draft is retained and reported as `draft_changed`; it is not approved or silently bound to the old submission. New bindings clear old approvals. Temporary post-bind review-read failure retains the PR and clears freshness so refresh can retry.
+8. Signed, deduplicated webhooks and publish-time review reads require a real push-authorized review on the exact head. No OWNER approval is synthesized. Incomplete review connections fail closed. GraphQL reads are not claimed to be transactional snapshots; local binding and lifecycle checks fence reconciliation. Head changes, draft, retarget, close, dismissal and changes-requested invalidate approval. Approved authors may publish before merge; release inclusion completes built-in takeover.
 
-Core server modules are:
+Legacy migration is explicit. Reconstruct the old pinned version's generated source/art; ignore only its provenance header when comparing source. Missing baselines or manual changes require maintainer handling. Preserve independent tests, drafts, versions and old PR links. Run the read-only inventory and resolve synthetic approvals before enabling the App cutover; see [the runbook](operations/github-oauth-app-setup.md).
 
 | Module | Responsibility |
 |---|---|
-| `server/workshop-pr/propose-handler.ts` | Orchestrates permissions, upstream file reads, generated files, and commit, branch, and pull-request creation |
-| `server/workshop-pr/oauth-handler.ts` | GitHub OAuth start and callback, requesting `repo` for private upstream support |
-| `server/workshop-pr/github-client.ts` | GitHub REST adapter; when the authorized user owns upstream, pushes a branch directly without a fork |
-| `server/workshop-pr/code-gen.ts` | Pure generator from Workshop card to community Card Source, registries, and documentation |
-| `server/workshop-review/github-review-provider.ts` | GitHub App installation token and atomic GraphQL review snapshot |
-| `server/workshop-review/webhook-handler.ts` | `/api/github/webhook` signature verification, delivery deduplication, and review approval or invalidation |
-| `client/services/workshop-pr.ts` | Frontend submit-review and OAuth popup helper; resolves a relative auth URL against backend `VITE_API_BASE` |
+| `server/workshop-pr/propose-handler.ts` | Author/gate checks, fixed-operation allocation and API status |
+| `server/workshop-pr/submission-store.ts` | Durable identity, checkpoints, leases, rate limits |
+| `server/workshop-pr/submission-service.ts` | Conditional delivery, safe updates and bounded reconciliation |
+| `server/workshop-pr/github-app.ts` | One App, repository-scoped write and separate read tokens |
+| `server/workshop-pr/github-client.ts` | GitHub transport, expected-head ref updates and preserved test patches |
+| `server/workshop-pr/code-gen.ts` | Community Card Source, registries, artwork and index generation |
+| `server/workshop-review/` | Exact-head review reads and signed webhook reconciliation |
+| `client/services/workshop-pr.ts` | Submit, status and explicit recovery; no OAuth popup |
 
 Every generated pull request contains:
 

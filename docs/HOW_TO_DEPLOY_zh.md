@@ -412,7 +412,6 @@ https://<backend-origin>/api/auth/oauth/google/callback
 | `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET` | 本机自动生成 | 私有 S3 地址和桶 |
 | `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | 本机自动生成 | S3 凭据，不写入 Git |
 | `S3_PREFIX` | 空 | 当前环境对象 namespace |
-| `WORKSHOP_TOKEN_ENCRYPTION_KEY` | 本机自动生成 | 搬迁时保留的共享令牌加密密钥 |
 | `APP_INSTANCES` | 本地：`1`；生产：`2` | 本地启动可选 `1` 或 `2`；生产 Compose 固定同机两个应用进程 |
 | `BACKEND_PORT` | `5175` | HTTP/WS 监听端口 |
 | `BACKEND_HOST` | `0.0.0.0` | 绑定地址 |
@@ -445,10 +444,9 @@ https://<backend-origin>/api/auth/oauth/google/callback
 | `GAME_BUILD_ID` | — | 当前后端 Git commit；自动部署脚本会填入 |
 | `ADMIN_USERS` | — | 管理员用户名，逗号分隔 |
 | `ACCOUNT_REGISTRATION_POLICY` | 必填 | 账号注册策略：首次部署用 `open` 创建第一个管理员，之后改为 `invite_only`；`disabled` 禁止新账号注册 |
-| `GITHUB_OAUTH_CLIENT_ID` / `GITHUB_OAUTH_CLIENT_SECRET` | — | Workshop → PR 使用的 GitHub OAuth App 凭据 |
 | `GITHUB_UPSTREAM_OWNER` / `GITHUB_UPSTREAM_REPO` | `titanxxh` / `open-agricola` | Workshop PR 目标仓库 |
 | `WORKSHOP_PR_ENABLED` | `false` | 是否开放 Workshop → PR |
-| `WORKSHOP_REVIEW_GITHUB_APP_ID` | — | Workshop Review GitHub App ID |
+| `WORKSHOP_REVIEW_GITHUB_APP_ID` | — | Workshop submission and review GitHub App ID |
 | `WORKSHOP_REVIEW_GITHUB_PRIVATE_KEY` | — | App private key，使用单行 `\n` 转义 |
 | `WORKSHOP_REVIEW_GITHUB_INSTALLATION_ID` | — | App 在主仓库的 installation ID |
 | `WORKSHOP_REVIEW_GITHUB_WEBHOOK_SECRET` | — | `/api/github/webhook` HMAC secret |

@@ -1,127 +1,45 @@
 // @vitest-environment jsdom
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ProposeModal } from './ProposeModal'
-import {
-  completePropose,
-  openOAuthPopupAndWait,
-  startPropose,
-} from '../../services/workshop-pr'
+import { startPropose, submissionStatus } from '../../services/workshop-pr'
 
-vi.mock('../../services/workshop-pr', () => ({
-  startPropose: vi.fn(),
-  completePropose: vi.fn(),
-  openOAuthPopupAndWait: vi.fn(),
-}))
-
+vi.mock('../../services/workshop-pr', () => ({ startPropose: vi.fn(), submissionStatus: vi.fn() }))
+const card = {id:'card-db-id',card_id:'CUSTOM_TestCard',name:'测试卡',art_url:null}
+beforeEach(() => { vi.clearAllMocks(); vi.mocked(submissionStatus).mockResolvedValue({ok:false,code:'no_submission'}) })
 describe('ProposeModal', () => {
-  it('shows backend error message when propose fails with an unknown code', async () => {
-    vi.mocked(startPropose).mockResolvedValue({
-      ok: false,
-      needsAuth: true,
-      authUrl: '/api/workshop/github/oauth/start?hs=abc',
-      handshakeId: 'abc',
-    })
-    vi.mocked(openOAuthPopupAndWait).mockResolvedValue({ ok: true })
-    vi.mocked(completePropose).mockResolvedValue({
-      ok: false,
-      code: 'unknown',
-      message: 'community_cards.md markers not found',
-    })
-
-    render(
-      <ProposeModal
-        card={{
-          id: 'card-db-id',
-          card_id: 'CUSTOM_MedievalMallet',
-          name: '中世纪木槌',
-          art_url: null,
-        }}
-        onClose={vi.fn()}
-      />,
-    )
-
+  it('submits directly and displays the bot PR', async () => {
+    vi.mocked(startPropose).mockResolvedValue({ok:true,prNumber:1,prUrl:'https://github.com/titanxxh/open-agricola/pull/1'})
+    render(<ProposeModal card={card} onClose={vi.fn()}/>)
     await userEvent.click(screen.getByRole('checkbox'))
-    await userEvent.click(screen.getByRole('button', { name: '发起 PR' }))
-
-    await waitFor(() => {
-      expect(screen.getByRole('alert').textContent).toContain('community_cards.md markers not found')
-    })
+    await userEvent.click(screen.getByRole('button',{name:'发起 PR'}))
+    expect((await screen.findByRole('link',{name:'查看审核 PR'})).getAttribute('href')).toBe('https://github.com/titanxxh/open-agricola/pull/1')
+    expect(startPropose).toHaveBeenCalledWith(card.id,'submit')
   })
-
-  it('surfaces the GitHub HTTP status and explains a 404 fork failure', async () => {
-    vi.mocked(startPropose).mockResolvedValue({
-      ok: false,
-      needsAuth: true,
-      authUrl: '/api/workshop/github/oauth/start?hs=abc',
-      handshakeId: 'abc',
-    })
-    vi.mocked(openOAuthPopupAndWait).mockResolvedValue({ ok: true })
-    vi.mocked(completePropose).mockResolvedValue({
-      ok: false,
-      code: 'fork_create_failed',
-      message: 'fork create failed',
-      status: 404,
-    })
-
-    render(
-      <ProposeModal
-        card={{
-          id: 'card-db-id',
-          card_id: 'CUSTOM_MedievalMallet',
-          name: '中世纪木槌',
-          art_url: null,
-        }}
-        onClose={vi.fn()}
-      />,
-    )
-
-    await userEvent.click(screen.getByRole('checkbox'))
-    await userEvent.click(screen.getByRole('button', { name: '发起 PR' }))
-
-    await waitFor(() => {
-      const alert = screen.getByRole('alert').textContent ?? ''
-      expect(alert).toContain('fork_create_failed (HTTP 404)')
-      expect(alert).toContain('private')
-      expect(alert).toContain('协作者')
-    })
+  it('reopens an unknown operation and only offers recovery', async () => {
+    vi.mocked(submissionStatus).mockResolvedValue({ok:false,submissionId:'saved-operation',state:'pending',code:'creation_unknown'})
+    vi.mocked(startPropose).mockResolvedValue({ok:false,submissionId:'saved-operation',state:'pending',code:'creation_unknown'})
+    render(<ProposeModal card={card} onClose={vi.fn()}/>)
+    await userEvent.click(await screen.findByRole('button',{name:'再次核实'}))
+    expect(startPropose).toHaveBeenCalledWith(card.id,'recover')
+    expect(screen.queryByRole('button',{name:'发起 PR'})).toBeNull()
+    expect(screen.queryByRole('button',{name:'重新投稿'})).toBeNull()
   })
-
-  it('falls back to a generic explanation for an unmapped code with a status', async () => {
-    vi.mocked(startPropose).mockResolvedValue({
-      ok: false,
-      needsAuth: true,
-      authUrl: '/api/workshop/github/oauth/start?hs=abc',
-      handshakeId: 'abc',
-    })
-    vi.mocked(openOAuthPopupAndWait).mockResolvedValue({ ok: true })
-    vi.mocked(completePropose).mockResolvedValue({
-      ok: false,
-      code: 'commit_failed',
-      message: 'commit failed',
-      status: 401,
-    })
-
-    render(
-      <ProposeModal
-        card={{
-          id: 'card-db-id',
-          card_id: 'CUSTOM_MedievalMallet',
-          name: '中世纪木槌',
-          art_url: null,
-        }}
-        onClose={vi.fn()}
-      />,
-    )
-
+  it('keeps the original PR link visible during a source conflict', async () => {
+    vi.mocked(submissionStatus).mockResolvedValue({ok:false,submissionId:'saved-operation',state:'blocked',code:'generated_file_changed',prUrl:'https://github.com/titanxxh/open-agricola/pull/1'})
+    render(<ProposeModal card={card} onClose={vi.fn()}/>)
+    await waitFor(() => expect(screen.getByRole('status').textContent).toContain('人工修改均已保留'))
+    expect(screen.getByRole('link',{name:'查看审核 PR'})).toBeTruthy()
+  })
+  it('recovers status after a lost HTTP response', async () => {
+    vi.mocked(startPropose).mockRejectedValue(new TypeError('Network unavailable'))
+    vi.mocked(submissionStatus).mockResolvedValueOnce({ok:false,code:'no_submission'})
+      .mockResolvedValue({ok:true,prNumber:1,prUrl:'https://github.com/titanxxh/open-agricola/pull/1'})
+    render(<ProposeModal card={card} onClose={vi.fn()}/>)
     await userEvent.click(screen.getByRole('checkbox'))
-    await userEvent.click(screen.getByRole('button', { name: '发起 PR' }))
-
-    await waitFor(() => {
-      const alert = screen.getByRole('alert').textContent ?? ''
-      expect(alert).toContain('commit_failed (HTTP 401)')
-      expect(alert).toContain('GitHub 授权已失效')
-    })
+    await userEvent.click(screen.getByRole('button',{name:'发起 PR'}))
+    expect(await screen.findByRole('link',{name:'查看审核 PR'})).toBeTruthy()
+    expect(startPropose).toHaveBeenCalledTimes(1)
   })
 })

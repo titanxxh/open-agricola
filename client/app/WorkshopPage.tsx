@@ -552,6 +552,9 @@ export function CardDetailPrSection({
       >
         {action.buttonLabel}
       </button>
+      <button type="button" className="btn-secondary ws-btn-sm" onClick={() => setModalOpen(true)}>
+        投稿记录与恢复
+      </button>
       {canPublish && (
         <button
           type="button"

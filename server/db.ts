@@ -27,7 +27,6 @@ export async function cleanExpiredSessions(db = getDb()): Promise<void> {
   const now = Date.now()
   ;(await db.transaction(async () => {
     await db.prepare('DELETE FROM request_rate_limits WHERE reset_at < ?').run(now)
-    await db.prepare('DELETE FROM workshop_oauth_handshakes WHERE expires_at < ?').run(now)
     ;(await db.prepare('DELETE FROM sessions WHERE expires_at < ?').run(now))
     ;(await db.prepare('DELETE FROM bug_report_attempts WHERE expires_at < ?').run(now))
     ;(await db.prepare(`

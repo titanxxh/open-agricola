@@ -3,7 +3,6 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { getDb } from './db.ts'
 import { validateSession, extractToken, isAdmin } from './auth.ts'
 import { nanoid } from 'nanoid'
-import { handleOAuthStart, handleOAuthCallback } from './workshop-pr/oauth-handler.ts'
 import { handleSubmitReviewRequest, handleRefreshPrStatus } from './workshop-pr/propose-handler.ts'
 import { corsHeaders } from './http-origin.ts'
 import {
@@ -360,25 +359,8 @@ export async function handleWorkshopRoute(
   const user = (await validateSession(token))
   const db = getDb()
 
-  // ── GET /api/workshop/github/oauth/start ────────────────────────────────
-  // Redirects to GitHub's authorize URL. Handshake must already be pending.
-  if (req.method === 'GET' && url.startsWith('/api/workshop/github/oauth/start')) {
-    ;(await handleOAuthStart(req, res, new URL(url, 'http://localhost')))
-    return true
-  }
-
-  // ── GET /api/workshop/github/oauth/callback ─────────────────────────────
-  // GitHub redirects here with ?code=&state=. Exchanges code for access token.
-  if (req.method === 'GET' && url.startsWith('/api/workshop/github/oauth/callback')) {
-    await handleOAuthCallback(req, res, new URL(url, 'http://localhost'))
-    return true
-  }
-
-  // ── POST /api/workshop/cards/:id/submit-review ──────────────────────────
-  // Entry to in_review (#637): opens or updates the review PR against
-  // upstream from the author's fork, after the quality gate passes.
   const submitReviewMatch = /^\/api\/workshop\/cards\/([^/]+)\/submit-review$/.exec(url)
-  if (req.method === 'POST' && submitReviewMatch) {
+  if ((req.method === 'POST' || req.method === 'GET') && submitReviewMatch) {
     await handleSubmitReviewRequest(
       req,
       res,
