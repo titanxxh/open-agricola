@@ -6,7 +6,7 @@ import { dirname, join, resolve } from 'node:path'
 import { parseArgs } from 'node:util'
 import { chromium } from '@playwright/test'
 import { ATTEMPT_ALLOWANCE, GENERATION_CONTEXT_BYTES } from '../client/services/llm/generation/attempt'
-import { GENERATION_MODEL_SETTINGS } from '../client/services/llm/generation/protocol'
+import { GENERATION_MODEL_SETTINGS, MODEL_STREAM_LIMITS } from '../client/services/llm/generation/protocol'
 import { GENERATION_PROMPT_VERSION } from '../client/services/llm/generation/prompt'
 import { REFERENCE_LIMITS, REFERENCE_TOOL_VERSION } from '../client/services/llm/generation/references'
 import { BudgetFile } from '../tests/llm-card-gen/acceptance/budget-file'
@@ -17,7 +17,7 @@ import type { BehaviorEvidence } from '../tests/llm-card-gen/acceptance/behavior
 
 const { values } = parseArgs({ options: {
   live: { type: 'boolean', default: false }, 'dry-run': { type: 'boolean', default: false },
-  model: { type: 'string' }, 'base-url': { type: 'string', default: 'http://127.0.0.1:5913' },
+  model: { type: 'string' }, diagnose: { type: 'string' }, 'base-url': { type: 'string', default: 'http://127.0.0.1:5913' },
   'runtime-env': { type: 'string', default: 'output/tmp/llm-runtime/local.env' },
 } })
 if (values.live === values['dry-run']) throw new Error('Choose exactly one of --dry-run or --live. Live requires an explicitly approved --model.')
@@ -50,6 +50,8 @@ function privateProviderKey(): string {
 const apiKey = live ? privateProviderKey() : 'synthetic-acceptance-browser-credential'
 const sha256 = (value: string | Buffer) => createHash('sha256').update(value).digest('hex')
 const { acceptanceInputs, assertCapabilityGap } = await import('../tests/llm-card-gen/acceptance/inputs')
+const diagnostic = values.diagnose ? acceptanceInputs.find(input => input.id === values.diagnose) : undefined
+if (values.diagnose && !diagnostic) throw new Error('Unknown diagnostic scenario; use a declared acceptance scenario ID.')
 const { evaluateBehavior } = await import('../tests/llm-card-gen/acceptance/behavior')
 const { resetCards } = await import('../tests/llm-card-gen/session-helpers')
 const { acceptanceSeed, GAP_SEED } = await import('../tests/llm-card-gen/acceptance/seeds')
@@ -59,7 +61,7 @@ const { getDb } = await import('../server/db')
 const controlManifest = JSON.parse(readFileSync('tests/llm-card-gen/control/manifest.json', 'utf8')) as { sourceCommit: string; sha256: string }
 const control = { ...controlManifest, text: readFileSync('tests/llm-card-gen/control/full-prompt.txt', 'utf8') }
 if (sha256(control.text) !== control.sha256) throw new Error('The frozen control prompt does not match its recorded hash.')
-const batch = `${live ? 'live' : 'synthetic'}-${new Date().toISOString().replace(/[:.]/g, '-')}-${randomUUID().slice(0, 8)}`
+const batch = `${diagnostic ? 'diagnostic-' : ''}${live ? 'live' : 'synthetic'}-${new Date().toISOString().replace(/[:.]/g, '-')}-${randomUUID().slice(0, 8)}`
 const directory = join(root, 'output/tmp/llm-acceptance', batch)
 mkdirSync(directory, { recursive: true })
 const save = (name: string, data: unknown) => {
@@ -81,16 +83,18 @@ const sandboxContractId = getWorkshopSandboxContract().id
 type Task = { id: string; scenario: string; repetition: number; arm: Arm }
 const tasks: Task[] = []
 for (let repetition = 1; repetition <= 3; repetition++) for (const input of acceptanceInputs) for (const arm of ['tools', 'control'] as const) tasks.push({ id: `${arm}-${input.id}-${repetition}`, scenario: input.id, repetition, arm })
+if (diagnostic) tasks.splice(0, tasks.length, { id: `tools-${diagnostic.id}-diagnostic`, scenario: diagnostic.id, repetition: 0, arm: 'tools' })
 save('manifest.json', {
-  format: 1, batch, synthetic: !live, startedAt: new Date().toISOString(), implementationCommit: git('rev-parse', 'HEAD'),
+  format: 1, batch, synthetic: !live, diagnostic: Boolean(diagnostic), startedAt: new Date().toISOString(), implementationCommit: git('rev-parse', 'HEAD'),
   dirty: Boolean(git('status', '--porcelain')), frozenDigest, files: frozenFiles,
   provider: 'deepseek', endpoint, requestedModel: model, documentedService: PRICE_BASIS.documentedService,
   priceBasis: PRICE_BASIS, totalEffortBudgetNanoUsd: TOTAL_BUDGET_NANO_USD,
   settings: { ...GENERATION_MODEL_SETTINGS, thinking: { type: 'enabled' } },
+  responseLimits: MODEL_STREAM_LIMITS,
   promptVersion: GENERATION_PROMPT_VERSION, toolVersion: REFERENCE_TOOL_VERSION, sandboxContractId,
   allowance: ATTEMPT_ALLOWANCE, contextBytes: GENERATION_CONTEXT_BYTES, referenceLimits: REFERENCE_LIMITS,
   control: controlManifest, tasks, inputs: acceptanceInputs,
-  method: 'Three repetitions in declared scenario order, tools then control; no task reruns or Session-driven repairs. Old prompt plus shared repair is the control. Synthetic results cannot admit a model.',
+  method: diagnostic ? 'One labelled diagnostic run; shares the entire effort budget and cannot admit a model or replace a failed formal sample.' : 'Three repetitions in declared scenario order, tools then control; no task reruns or Session-driven repairs. Old prompt plus shared repair is the control. Synthetic results cannot admit a model.',
 })
 
 type TaskEvidence = { task: Task; startedAt: string; finishedAt: string; result: BrowserTaskResult; first: BehaviorEvidence; final: BehaviorEvidence }
@@ -167,7 +171,7 @@ try {
     // tree for a stable main: 53 requests in the declared 102-task matrix.
     // Moving main or transient HTTP failures can need more; those still pause
     // at the normal reference boundary, never substitute stale code.
-    const requiredQuota = tasks.filter(task => task.arm === 'tools').length + 2
+    const requiredQuota = tasks.filter(task => task.arm === 'tools').length + (diagnostic ? 1 : 2)
     if (quota.remaining < requiredQuota) throw new Error(`Anonymous GitHub quota is ${quota.remaining}; at least ${requiredQuota} requests are required for the stable-main batch. Reset: ${new Date(quota.reset * 1000).toISOString()}`)
   }
   const assess = (input: AcceptanceInput, result: BrowserTaskResult, first: boolean): BehaviorEvidence => {
@@ -207,10 +211,12 @@ try {
     console.log(`${task.id}: ${evidence.final.ok ? 'PASS' : 'FAIL'}; first=${evidence.first.ok}; POSTs=${result.snapshot.modelRequests}; repairs=${result.snapshot.repairs}; ${result.snapshot.reason ?? evidence.final.reason ?? ''}`)
     return evidence
   }
-  const probeInput = structuredClone(acceptanceInputs[1])
-  probeInput.intent.message += '\nBefore producing source, call read_reference for docs/CUSTOM_CARD_SANDBOX.md lines 1–80, then use the tool response to complete the source.'
-  probe = await run({ id: 'probe', scenario: probeInput.id, repetition: 0, arm: 'tools' }, probeInput)
-  if (!probe.final.ok || !probe.result.protocol.preserved || probe.result.protocol.toolGroupsChecked < 1 || !probe.result.snapshot.result?.provenance?.references.length) throw new Error('The real browser tool roundtrip probe did not pass; the complete batch was not started.')
+  if (!diagnostic) {
+    const probeInput = structuredClone(acceptanceInputs[1])
+    probeInput.intent.message += '\nBefore producing source, call read_reference for docs/CUSTOM_CARD_SANDBOX.md lines 1–80, then use the tool response to complete the source.'
+    probe = await run({ id: 'probe', scenario: probeInput.id, repetition: 0, arm: 'tools' }, probeInput)
+    if (!probe.final.ok || !probe.result.protocol.preserved || probe.result.protocol.toolGroupsChecked < 1 || !probe.result.snapshot.result?.provenance?.references.length) throw new Error('The real browser tool roundtrip probe did not pass; the complete batch was not started.')
+  }
   for (const task of tasks) {
     if (fatal || interrupted) throw new Error(fatal ?? 'Interrupted by owner')
     const input = acceptanceInputs.find(item => item.id === task.scenario)!
@@ -236,7 +242,7 @@ try {
     }), { knownInputTokens: 0, knownOutputTokens: 0, unknownRequests: 0 })
     const elapsed = rows.map(row => row.result.snapshot.activeMs).sort((a, b) => a - b)
     const reservations = budget.ledger.state.reservations.filter(row => row.task.startsWith(`${batch}/${arm}-`))
-    return [arm, { completed: rows.length, planned: 51, firstPassed: rows.filter(row => row.first.ok).length, finalPassed: rows.filter(row => row.final.ok).length,
+    return [arm, { completed: rows.length, planned: tasks.filter(task => task.arm === arm).length, firstPassed: rows.filter(row => row.first.ok).length, finalPassed: rows.filter(row => row.final.ok).length,
       sourcePassed: rows.filter(row => row.final.ok && !row.task.scenario.startsWith('M15-')).length, gapPassed: rows.filter(row => row.final.ok && row.task.scenario.startsWith('M15-')).length,
       usage, modelRequests: rows.reduce((sum, row) => sum + row.result.snapshot.modelRequests, 0),
       medianMs: elapsed.length ? elapsed[Math.floor(elapsed.length / 2)] : null, p95Ms: elapsed.length ? elapsed[Math.min(elapsed.length - 1, Math.ceil(elapsed.length * 0.95) - 1)] : null,
@@ -244,9 +250,9 @@ try {
     }]
   }))
   const toolRows = completed.filter(row => row.task.arm === 'tools')
-  const admitted = live && !fatal && completed.length === 102 && probe?.final.ok === true && toolRows.length === 51 && toolRows.every(row => row.final.ok && row.result.protocol.preserved)
-  const report = { batch, synthetic: !live, admitted, finishedAt: new Date().toISOString(), fatal, complete: completed.length === 102,
-    planned: 102, completed: completed.length, arms, probePassed: probe?.final.ok ?? false,
+  const admitted = live && !diagnostic && !fatal && completed.length === 102 && probe?.final.ok === true && toolRows.length === 51 && toolRows.every(row => row.final.ok && row.result.protocol.preserved)
+  const report = { batch, synthetic: !live, diagnostic: Boolean(diagnostic), admitted, finishedAt: new Date().toISOString(), fatal, complete: completed.length === tasks.length,
+    planned: tasks.length, completed: completed.length, arms, probePassed: probe?.final.ok ?? null,
     totalEffortCommittedNanoUsd: budget.ledger.committedNanoUsd(), totalEffortRemainingNanoUsd: TOTAL_BUDGET_NANO_USD - budget.ledger.committedNanoUsd(),
     failures: completed.filter(row => !row.final.ok).map(row => ({ task: row.task.id, reason: row.final.reason })),
     unrun: tasks.filter(task => !completed.some(row => row.task.id === task.id)).map(task => task.id),
@@ -257,7 +263,7 @@ try {
   budget.close()
   process.removeListener('exit', releaseBudget)
   console.log(JSON.stringify({ batch, admitted, complete: report.complete, completed: completed.length, directory, arms }))
-  if (fatal || completed.length !== 102 || (live ? !admitted : completed.some(row => !row.final.ok))) process.exitCode = 1
+  if (fatal || !report.complete || (live && !diagnostic ? !admitted : completed.some(row => !row.final.ok))) process.exitCode = 1
   // GameSession's process-owned executor worker stays alive for reuse. This
   // one-shot owner CLI has finished all writes and closed its browser/DB.
   process.stdout.write('', () => process.exit(process.exitCode ?? 0))

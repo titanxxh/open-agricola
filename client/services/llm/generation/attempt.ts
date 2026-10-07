@@ -37,7 +37,7 @@ export type AttemptSnapshot = {
 }
 export type RequestAccounting = {
   sequence: number; inputBytes: number; startedAt: number; elapsedMs: number
-  usage: GenerationUsage; finishReason: string; returnedModel?: string; requestId?: string
+  usage: GenerationUsage; finishReason: string; returnedModel?: string; requestId?: string; responseWireBytes?: number
 }
 
 export class GenerationStopError extends Error {}
@@ -272,6 +272,7 @@ export class GenerationAttempt {
         })
         record.usage = turn.usage; record.finishReason = turn.finishReason
         record.returnedModel = turn.returnedModel; record.requestId = turn.requestId
+        record.responseWireBytes = turn.responseWireBytes
         signal.throwIfAborted()
         if (!this.recipe.tools.length && turn.calls.length) throw new GenerationStopError('The model returned tool calls when no tools were offered.')
         this.messages.push(turn.message)
@@ -291,7 +292,10 @@ export class GenerationAttempt {
         }
       } catch (error) {
         if (error instanceof ModelTurnError && error.kind === 'preflight') this.accounting.pop()
-        if (error instanceof ModelTurnError) { record.usage = error.usage; record.finishReason = error.kind }
+        if (error instanceof ModelTurnError) {
+          record.usage = error.usage; record.finishReason = error.kind
+          record.returnedModel = error.returnedModel; record.requestId = error.requestId; record.responseWireBytes = error.responseWireBytes
+        }
         throw error
       } finally { record.elapsedMs = Math.max(0, this.clock() - record.startedAt) }
     }

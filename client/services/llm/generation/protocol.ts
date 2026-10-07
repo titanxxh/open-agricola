@@ -17,19 +17,29 @@ export type ModelTurn = {
   finishReason: string
   returnedModel?: string
   requestId?: string
+  responseWireBytes?: number
   usage: GenerationUsage
 }
 
 export const UNKNOWN_USAGE: GenerationUsage = { inputTokens: null, outputTokens: null, cachedInputTokens: null, reasoningTokens: null }
 export const GENERATION_MODEL_SETTINGS = Object.freeze({ max_tokens: 16384, stream: true, stream_options: { include_usage: true } })
+// SSE repeats IDs/metadata per token. Bound that wire overhead separately from
+// the assembled opaque message, without truncating reasoning or signatures.
+export const MODEL_STREAM_LIMITS = Object.freeze({ wireBytes: 32 * 1024 * 1024, eventBytes: 2 * 1024 * 1024, messageBytes: 2 * 1024 * 1024 })
 
 export class ModelTurnError extends Error {
   readonly kind: 'preflight' | 'network' | 'http' | 'protocol' | 'incomplete' | 'cancelled'
   readonly usage: GenerationUsage
-  constructor(kind: ModelTurnError['kind'], message: string, usage = UNKNOWN_USAGE) {
-    super(message)
+  readonly returnedModel?: string
+  readonly requestId?: string
+  readonly responseWireBytes?: number
+  constructor(kind: ModelTurnError['kind'], message: string, usage = UNKNOWN_USAGE, facts: { returnedModel?: string; requestId?: string; responseWireBytes?: number } = {}, options?: ErrorOptions) {
+    super(message, options)
     this.kind = kind
     this.usage = { ...usage }
+    this.returnedModel = facts.returnedModel
+    this.requestId = facts.requestId
+    this.responseWireBytes = facts.responseWireBytes
   }
 }
 
@@ -95,10 +105,19 @@ export async function readModelTurn(response: Response, signal: AbortSignal, onT
   let requestId: string | undefined
   let usage = { ...UNKNOWN_USAGE }
   let bytes = 0
+  let eventBytes = 0
+  let bytesSinceMessageCheck = 0
+  const encoder = new TextEncoder()
+  const checkMessageSize = () => {
+    if (encoder.encode(JSON.stringify(message)).byteLength > MODEL_STREAM_LIMITS.messageBytes) throw new ModelTurnError('protocol', 'Provider decoded message exceeds the payload limit.', usage)
+    bytesSinceMessageCheck = 0
+  }
   const event = () => {
     if (!data.length) return
     const raw = data.join('\n')
     data = []
+    bytesSinceMessageCheck += eventBytes
+    eventBytes = 0
     if (raw === '[DONE]') { done = true; return }
     let frame: Record<string, unknown>
     try { frame = object(JSON.parse(raw)) } catch { throw new ModelTurnError('protocol', 'Malformed provider stream event.', usage) }
@@ -118,6 +137,10 @@ export async function readModelTurn(response: Response, signal: AbortSignal, onT
         finishReason = choice.finish_reason
       }
     }
+    // Checking after each 64 KiB of frames avoids quadratic serialization of
+    // a growing message for every tiny token fragment. Final output is checked
+    // again before it can become a complete turn.
+    if (bytesSinceMessageCheck >= 64 * 1024) checkMessageSize()
   }
   const lines = (eof = false) => {
     while (buffer) {
@@ -127,7 +150,12 @@ export async function readModelTurn(response: Response, signal: AbortSignal, onT
       const line = buffer.slice(0, match.index)
       buffer = buffer.slice(match.index + match[0].length)
       if (!line) event()
-      else if (line === 'data' || line.startsWith('data:')) data.push(line.slice(5).replace(/^ /, ''))
+      else if (line === 'data' || line.startsWith('data:')) {
+        const part = line.slice(5).replace(/^ /, '')
+        eventBytes += encoder.encode(part).byteLength + 1
+        if (eventBytes > MODEL_STREAM_LIMITS.eventBytes) throw new ModelTurnError('protocol', 'Provider SSE event exceeds the event limit.', usage)
+        data.push(part)
+      }
       if (done) break
     }
   }
@@ -144,11 +172,13 @@ export async function readModelTurn(response: Response, signal: AbortSignal, onT
         break
       }
       bytes += chunk.value.byteLength
-      if (bytes > 2 * 1024 * 1024) throw new ModelTurnError('protocol', 'Provider response exceeds the stream limit.', usage)
+      if (bytes > MODEL_STREAM_LIMITS.wireBytes) throw new ModelTurnError('protocol', 'Provider response exceeds the wire limit.', usage)
       buffer += decoder.decode(chunk.value, { stream: true })
       lines()
+      if (encoder.encode(buffer).byteLength > MODEL_STREAM_LIMITS.eventBytes) throw new ModelTurnError('protocol', 'Provider unterminated SSE line exceeds the event limit.', usage)
     }
     if (!done || !finishReason) throw new ModelTurnError('incomplete', 'The model stream ended without a complete terminal response.', usage)
+    checkMessageSize()
     if (!['stop', 'tool_calls'].includes(finishReason)) throw new ModelTurnError('incomplete', `Model output did not complete (${finishReason}).`, usage)
     const calls = (Array.isArray(message.tool_calls) ? message.tool_calls : []).sort((a, b) => Number(object(a).index) - Number(object(b).index)).map(value => {
       const call = object(value)
@@ -165,11 +195,12 @@ export async function readModelTurn(response: Response, signal: AbortSignal, onT
     const text = typeof message.content === 'string' ? message.content : ''
     if (!calls.length && !text.trim()) throw new ModelTurnError('protocol', 'The provider returned no final content.', usage)
     if (message.content === undefined) message.content = null
-    return { message, calls, text, finishReason, returnedModel, requestId, usage }
+    return { message, calls, text, finishReason, returnedModel, requestId, usage, responseWireBytes: bytes }
   } catch (error) {
-    if (signal.aborted) throw new ModelTurnError('cancelled', 'Model request interrupted; usage may be unknown.', usage)
-    if (error instanceof ModelTurnError) throw error
-    throw new ModelTurnError('network', 'The model response stream was interrupted; retry explicitly.', usage)
+    const facts = { returnedModel, requestId, responseWireBytes: bytes }
+    if (signal.aborted) throw new ModelTurnError('cancelled', 'Model request interrupted; usage may be unknown.', usage, facts, { cause: error })
+    if (error instanceof ModelTurnError) throw new ModelTurnError(error.kind, error.message, error.usage, facts, { cause: error })
+    throw new ModelTurnError('network', 'The model response stream was interrupted; retry explicitly.', usage, facts, { cause: error })
   } finally {
     signal.removeEventListener('abort', abort)
     await reader.cancel().catch(() => {})
