@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useLocale } from '../../contexts/LocaleContext'
 import type { LlmConfig } from '../../services/llm'
 import { ADMITTED_GENERATION_MODELS, generationAdmission, resolveGenerationTarget } from '../../services/llm/generation/admission'
@@ -6,8 +6,8 @@ import { GenerationAttempt, ATTEMPT_ALLOWANCE, type AttemptSnapshot } from '../.
 import { createBrowserGenerationPorts, createSandboxPorts } from '../../services/llm/generation/browser'
 import { buildGenerationRequest, type GenerationIntent, type GenerationRequest, type PlaytestFailure } from '../../services/llm/generation/request'
 import type { WorkshopVisibleMessage } from '../../../shared/contract/workshop-generation'
-import { abilityDraftFingerprint, sourceFingerprint } from '../../../shared/projections/workshop-generation'
-import type { AbilityCandidate, WorkshopDraftAction, WorkshopDraftState } from './workshop-draft-model'
+import { sourceFingerprint } from '../../../shared/projections/workshop-generation'
+import { isCurrentAbilityAttempt, type AbilityCandidate, type WorkshopDraftAction, type WorkshopDraftState } from './workshop-draft-model'
 import { MessageContent } from './WorkshopMessageContent'
 
 type Props = {
@@ -22,6 +22,9 @@ type Props = {
   onValidationErrorsConsumed?: () => void
 }
 type ActiveRun = { attempt: GenerationAttempt; request: GenerationRequest; config: LlmConfig; applied: boolean }
+const sameConfig = (current: LlmConfig | null, captured: LlmConfig): boolean => Boolean(current
+  && current.provider === captured.provider && current.model === captured.model
+  && current.apiKey === captured.apiKey && current.baseUrl === captured.baseUrl)
 
 export function WorkshopAbilityPanel({ state, config, apiFetch, dispatch, checkpoint, onAdopt, sandboxFailure, validationErrors, onValidationErrorsConsumed }: Props) {
   const { locale, t } = useLocale()
@@ -35,14 +38,23 @@ export function WorkshopAbilityPanel({ state, config, apiFetch, dispatch, checkp
   const [activeRequest, setActiveRequest] = useState<GenerationRequest | null>(null)
   const [validating, setValidating] = useState<string | null>(null)
   const runRef = useRef<ActiveRun | null>(null)
+  const validationRef = useRef<{ validationId: string; controller: AbortController } | null>(null)
   const messagesRef = useRef(messages)
   const stateRef = useRef(state)
+  const configRef = useRef(config)
   const mounted = useRef(true)
   const bottom = useRef<HTMLDivElement>(null)
   const errorElement = useRef<HTMLDivElement>(null)
   const progressElement = useRef<HTMLElement>(null)
-  useEffect(() => { stateRef.current = state }, [state])
-  useEffect(() => { messagesRef.current = messages }, [messages])
+  const stopValidation = useCallback(() => {
+    const validation = validationRef.current
+    if (!validation) return
+    validationRef.current = null
+    validation.controller.abort()
+    dispatch({ type: 'abilityValidationEnded', validationId: validation.validationId })
+    if (mounted.current) setValidating(null)
+  }, [dispatch])
+  useLayoutEffect(() => { stateRef.current = state; configRef.current = config; messagesRef.current = messages }, [state, config, messages])
   useEffect(() => { bottom.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
   useEffect(() => { if (error) errorElement.current?.focus() }, [error])
   useEffect(() => { if (progress?.status === 'paused') progressElement.current?.focus() }, [progress?.status])
@@ -57,15 +69,14 @@ export function WorkshopAbilityPanel({ state, config, apiFetch, dispatch, checkp
     if (run.applied || !snapshot.result || runRef.current !== run) return
     run.applied = true
     const current = stateRef.current
-    const applicable = current.session.activeAbilityAttemptId === run.request.attemptId
-      && abilityDraftFingerprint(current.draft) === run.request.draftFingerprint
-      && (!run.request.sourceCandidate || current.session.abilityCandidates.some(candidate => candidate.id === run.request.sourceCandidate!.id && sourceFingerprint(candidate.sourceCode) === run.request.sourceCandidate!.fingerprint))
-    dispatch({ type: 'generationFinished', attemptId: run.request.attemptId, draftFingerprint: run.request.draftFingerprint,
+    const applicable = sameConfig(configRef.current, run.config) && isCurrentAbilityAttempt(current, run.request)
+    if (applicable) dispatch({ type: 'generationFinished', attemptId: run.request.attemptId, draftFingerprint: run.request.draftFingerprint,
       sourceCandidate: run.request.sourceCandidate, result: snapshot.result,
       ...(snapshot.candidate ? { candidate: { ...snapshot.candidate, baseRevision: run.request.baseRevision, stale: false, validation: { ...snapshot.candidate.validation, errors: snapshot.candidate.validation.errors ?? [] } } } : {}),
     })
+    else dispatch({ type: 'generationInvalidated', attemptId: run.request.attemptId })
     const content = !applicable
-      ? (zh ? '生成期间输入或源码已改变，此结果未替换当前候选。请按当前内容开始新尝试。' : 'The input or source changed during generation. This result did not replace the current candidate; start a new attempt.')
+      ? (zh ? '生成期间输入、源码或模型配置已改变，此结果未替换当前候选。请按当前内容开始新尝试。' : 'The input, source or model configuration changed during generation. This result did not replace the current candidate; start a new attempt.')
       : snapshot.result.message || (snapshot.result.kind === 'candidate'
         ? (zh ? '完整源码已通过代码校验。请检查并采用候选，再试玩确认规则。' : 'Complete source passed code validation. Review and adopt the candidate, then playtest its behavior.')
         : (zh ? '本次尝试已结束。' : 'This attempt has ended.'))
@@ -75,19 +86,29 @@ export function WorkshopAbilityPanel({ state, config, apiFetch, dispatch, checkp
     await checkpoint()
   }, [checkpoint, commitMessages, dispatch, zh])
   const acceptResultRef = useRef(acceptResult)
-  useEffect(() => { acceptResultRef.current = acceptResult }, [acceptResult])
+  useLayoutEffect(() => { acceptResultRef.current = acceptResult }, [acceptResult])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    const run = runRef.current
+    if (run && !run.applied && (!sameConfig(config, run.config) || !isCurrentAbilityAttempt(state, run.request))) {
+      run.attempt.cancel()
+      void acceptResult(run, run.attempt.snapshot())
+    }
+    if (validationRef.current && state.session.activeAbilityValidationId !== validationRef.current.validationId) stopValidation()
+  }, [state, config, acceptResult, stopValidation])
+
+  useLayoutEffect(() => {
     mounted.current = true
     return () => {
       mounted.current = false
+      stopValidation()
       const run = runRef.current
       if (run && !run.applied) {
         run.attempt.cancel()
         void acceptResultRef.current(run, run.attempt.snapshot())
       }
     }
-  }, [])
+  }, [stopValidation])
 
   let admitted = false
   try { admitted = Boolean(config && generationAdmission(resolveGenerationTarget(config))) } catch { /* Invalid saved config stays closed. */ }
@@ -105,7 +126,7 @@ export function WorkshopAbilityPanel({ state, config, apiFetch, dispatch, checkp
       const attempt = new GenerationAttempt(request, ports, {
         onProgress: snapshot => { if (mounted.current && runRef.current === run) setProgress(snapshot) },
         onText: delta => {
-          if (!mounted.current || runRef.current !== run) return
+          if (!mounted.current || runRef.current !== run || run.applied) return
           commitMessages(items => items.map(message => message.role === 'assistant' && message.attemptId === request.attemptId
             ? { ...message, content: (message.content + delta).slice(-64000), streaming: true } : message))
         },
@@ -125,12 +146,11 @@ export function WorkshopAbilityPanel({ state, config, apiFetch, dispatch, checkp
   const resume = async () => {
     const run = runRef.current
     if (!run) return
-    if (JSON.stringify(config) !== JSON.stringify(run.config)) {
+    if (!sameConfig(config, run.config)) {
       setError(zh ? '模型配置已改变，请开始新尝试。' : 'The model configuration changed. Start a new attempt.')
       return
     }
-    if (abilityDraftFingerprint(stateRef.current.draft) !== run.request.draftFingerprint
-      || (run.request.sourceCandidate && !stateRef.current.session.abilityCandidates.some(candidate => candidate.id === run.request.sourceCandidate!.id && sourceFingerprint(candidate.sourceCode) === run.request.sourceCandidate!.fingerprint))) {
+    if (!isCurrentAbilityAttempt(stateRef.current, run.request)) {
       setError(zh ? '输入或源码已改变，请开始新尝试。' : 'The input or source changed. Start a new attempt.')
       return
     }
@@ -143,17 +163,31 @@ export function WorkshopAbilityPanel({ state, config, apiFetch, dispatch, checkp
   }
 
   const validate = async (candidate: AbilityCandidate) => {
+    stopValidation()
     setValidating(candidate.id); setError('')
+    const validationId = crypto.randomUUID()
+    const controller = new AbortController()
+    const validation = { validationId, controller }
+    validationRef.current = validation
+    const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(30_000)])
+    dispatch({ type: 'abilityValidationStarted', validationId })
+    stateRef.current = { ...stateRef.current, session: { ...stateRef.current.session, activeAbilityValidationId: validationId } }
     try {
       const ports = createSandboxPorts(apiFetch)
-      const signal = AbortSignal.timeout(30_000)
       const contract = await ports.loadContract(signal)
+      signal.throwIfAborted()
       const result = await ports.validate(candidate.sourceCode, draft.cardId, contract.id, signal)
+      signal.throwIfAborted()
+      if (!mounted.current || stateRef.current.session.activeAbilityValidationId !== validationId) return
       if (result.sourceFingerprint !== sourceFingerprint(candidate.sourceCode) || result.sandboxContractId !== contract.id) throw new Error('Validation belongs to different source or sandbox.')
-      dispatch({ type: 'abilityCandidateValidated', candidateId: candidate.id, sourceFingerprint: result.sourceFingerprint, validation: result, cardJson: result.cardJson })
+      dispatch({ type: 'abilityCandidateValidated', validationId, candidateId: candidate.id, sourceFingerprint: result.sourceFingerprint, validation: result, cardJson: result.cardJson })
       await checkpoint()
-    } catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)) }
-    finally { if (mounted.current) setValidating(null) }
+    } catch (reason) {
+      if (mounted.current && !controller.signal.aborted) setError(reason instanceof Error ? reason.message : String(reason))
+    }
+    finally {
+      if (validationRef.current === validation) stopValidation()
+    }
   }
 
   const importSource = async () => {

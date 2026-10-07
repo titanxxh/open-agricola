@@ -97,7 +97,7 @@ client/        浏览器 React UI（双 bundle）
 ├── components/          board/、interaction/、common/、header/
 ├── contexts/            AuthContext、LocaleContext
 ├── hooks/               useGameSync、useFarmSelection 等
-├── services/            gameTransport、card-meta、rehydrate、llmPrompts
+├── services/            gameTransport、card-meta、rehydrate、llm/generation
 ├── sandbox/             Hot-seat 离线 client（独立 bundle）
 └── types/、utils/、styles/、assets/、config.ts、main.tsx
 
@@ -1503,7 +1503,9 @@ Durable Room Commit 要求 PostgreSQL、共享资源、`REPLAY_VIEWER_BUILD_ID` 
 - `gameTransport.ts` —— `WsGameTransport` 类管理 WebSocket 连接（不在 React Context；在 service 层）；URL 切换 `?transport=ws` / `?player=p1|p2` / `?room=devN`。
 - `card-meta.ts` —— 启动时 `GET /cards-manifest.json` 运行时拉取卡牌元数据；`CUSTOM_*` overlay 只读 `shared/cards/custom-card-metadata.ts`。
 - `rehydrate.ts` —— 轻量 rehydrator，跳过 `ActionSpace.onTaken` 回调，切断对 `shared/actions` / `shared/cards/catalog` 的依赖链。
-- `llmPrompts.ts` —— Workshop 卡牌设计师 system prompt；hook / phase / scope / actionId 表运行时从 shared 真相源 + 描述元数据（`sandbox-hook-meta.ts` 等）渲染，不再手工镜像。
+- `llm/generation/` —— 浏览器拥有 `GenerationAttempt`、不可变请求构造、provider 工具协议、有界 GitHub 读取和完整源码结果。LLM 凭据只发往配置的 provider，游戏后端与 GitHub 均不接收。每次尝试解析 GitHub 当前 main，后续读取固定该 SHA；文件缺失返回工具错误，模型可改查同 SHA 的其他资料；网络或限流失败暂停，等待显式重试。
+- `GET /api/workshop/sandbox-contract` 通过 `server/workshop-sandbox-contract.ts` 提供实际部署运行时的 hooks、actions、helper 正文、语义与内容标识，不提供参考资料包。简短生成 prompt 包含该契约；按需读取的 GitHub 文档与内置卡样例不能扩大它。`POST /api/workshop/cards/validate-code` 将校验绑定源码及沙盒标识。仅逐一通过验收的 provider/endpoint/model 组合可用。
+- `WorkshopAbilityPanel` 通过草稿 reducer 应用结果：追加需求使用选中候选，试玩修复使用实际报错源码，原始费用与前置条件保留在固定输入中。编辑能力输入或切换模型配置会取消旧尝试，阻止迟到结果采用或继续修复。失败与手动编辑保留上一份有效候选。恢复只投影可见聊天和精简溯源，原始工具、reasoning、signature 记录仅留页面内存。完整请求、恢复及验收契约见 `docs/PLATFORM_DESIGN.md` 与 `docs/test/llm-card-gen.md`。
 
 ### 12.3 同步状态层
 

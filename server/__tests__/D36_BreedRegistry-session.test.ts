@@ -408,7 +408,7 @@ describe('D036 Breed Registry parity', () => {
     response = session.resolveChoice(0, 'confirm', [
       { id: 'sheep-pasture', zoneType: 'pasture', animalType: 'sheep', animalCount: 3 },
     ])
-    response = autoAdvanceRoundEnd(session)
+    response = autoAdvanceRoundEnd(session, { initialResponse: response })
 
     expect(response.state.players[0]!.resources.sheep).toBe(3)
     expect(response.state.players[0]!.cardStates[CARD_ID]?.extraData?.boardSheep ?? 0).toBe(0)

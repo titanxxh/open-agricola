@@ -1,9 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { sha1 } from '@noble/hashes/legacy.js'
+import { bytesToHex, concatBytes, utf8ToBytes } from '@noble/hashes/utils.js'
 import type { WorkshopSandboxContract } from '../../../../../shared/contract/workshop-generation'
 import { sourceFingerprint } from '../../../../../shared/projections/workshop-generation'
 import { GenerationAttempt, type AttemptPorts } from '../attempt'
 import { buildGenerationRequest, extractGenerationOutput } from '../request'
 import { ModelTurnError, type ModelTurn, type ToolCall, type WireMessage } from '../protocol'
+import { ReferenceSession } from '../references'
 
 afterEach(() => vi.useRealTimers())
 
@@ -33,6 +36,38 @@ function ports(): AttemptPorts {
 }
 
 describe('immutable generation input', () => {
+  it('preserves raw cost alternatives for the model and distinguishes them from combined costs', () => {
+    const capture = (costInput: string) => buildGenerationRequest({ workspaceId: 'w', baseRevision: 1,
+      draft: { ...draft, cardJson: { ...draft.cardJson, cost: { wood: 1, clay: 1 },
+        _draft: { costInput, prerequisite: 'At least 2 occupations', unrelated: 'private-internal-field' } } },
+      intent: { kind: 'generate', message: 'Use the edited card requirements' },
+    })
+    const alternative = capture('1 wood or 1 clay')
+    const combined = capture('1 wood and 1 clay')
+    expect(alternative.input.card).toMatchObject({ requirements: { cost: '1 wood or 1 clay', prerequisite: 'At least 2 occupations' } })
+    expect(combined.input.card).toMatchObject({ requirements: { cost: '1 wood and 1 clay' } })
+    expect(alternative.inputFingerprint).not.toBe(combined.inputFingerprint)
+    expect(alternative.draftFingerprint).not.toBe(combined.draftFingerprint)
+    expect(JSON.stringify(alternative)).not.toContain('private-internal-field')
+    expect(alternative.input.card.definition).not.toHaveProperty('_draft')
+  })
+  it('does not apply the adopted draft raw costs to a different selected or tested source', () => {
+    const current = { ...draft, description: 'Draft A: gain clay immediately', cardJson: { ...draft.cardJson, cost: { clay: 2 }, _draft: { costInput: '2 clay', prerequisite: '4 occupations' } } }
+    const selected = { id: 'B', kind: 'ability' as const, sourceCode: 'selected B', cardJson: { cost: { wood: 1 }, desc: ['Selected B: gain wood next round'] }, validation: { valid: true }, prompt: 'B', createdAt: 1 }
+    const base = { workspaceId: 'w', baseRevision: 1, draft: current, selectedCandidate: selected }
+    const followup = buildGenerationRequest({ ...base, intent: { kind: 'follow-up', message: 'Only change the reward; preserve the cost' } })
+    expect(followup.input.card.definition.cost).toEqual({ wood: 1 })
+    expect(followup.input.card.requirements).toEqual({})
+    expect(followup.input.card.description).toBe('Selected B: gain wood next round')
+    expect(buildGenerationRequest({ ...base, selectedCandidate: { ...selected, cardJson: { ...selected.cardJson, _draft: { costInput: '1 wood or 1 reed' } } },
+      intent: { kind: 'follow-up', message: 'Only change the reward' } }).input.card.requirements).toEqual({ cost: '1 wood or 1 reed' })
+    const repair = buildGenerationRequest({ ...base, intent: { kind: 'repair', message: 'Fix the tested code; preserve its cost',
+      failure: { workspaceId: 'w', versionId: 'tested', source: 'tested B', sourceFingerprint: sourceFingerprint('tested B'), errors: ['unsupported helper'] } } })
+    expect(repair.input.card.requirements).toEqual({})
+    expect(repair.input.card.definition).toEqual({})
+    expect(repair.input.card.description).toBe('')
+    expect(repair.input.source).toBe('tested B')
+  })
   it('uses selected B for follow-ups and the adopted draft when selection is absent', () => {
     const selected = { id: 'B', kind: 'ability' as const, sourceCode: 'selected B', cardJson: draft.cardJson, validation: { valid: true }, prompt: 'old', createdAt: 1 }
     const options = { workspaceId: 'w', baseRevision: 1, draft, intent: { kind: 'follow-up' as const, message: 'make it 2 wood' } }
@@ -61,6 +96,44 @@ describe('immutable generation input', () => {
 })
 
 describe('bounded browser generation attempt', () => {
+  it.each([404, 410])('lets the model choose another file at the same commit after a file returns HTTP %i', async status => {
+    const commit = (status === 404 ? '8' : '9').repeat(40)
+    const unavailable = 'docs/CUSTOM_CARD_SANDBOX.md'
+    const alternative = 'docs/community-card-examples.md'
+    const body = utf8ToBytes('A usable reference at the same commit.\n')
+    const sha = bytesToHex(sha1(concatBytes(utf8ToBytes(`blob ${body.length}\0`), body)))
+    const fetchReference = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(Response.json({ object: { sha: commit } }))
+      .mockResolvedValueOnce(Response.json({ tree: [unavailable, alternative].map(path => ({ path, sha, type: 'blob', size: body.length })) }))
+      .mockResolvedValueOnce(new Response('', { status }))
+      .mockResolvedValueOnce(new Response(body))
+    const io = ports()
+    io.openReferences = signal => ReferenceSession.open(signal, fetchReference)
+    const read = (id: string, path: string): ToolCall => ({ id, type: 'function', function: {
+      name: 'read_reference', arguments: JSON.stringify({ path, startLine: 1, lineCount: 2 }),
+    } })
+    let step = 0
+    io.model.complete = vi.fn(async messages => {
+      if (++step === 1) return turn([read('missing', unavailable)], '')
+      const result = messages.findLast(message => message.role === 'tool')!
+      if (step === 2) {
+        expect(result.tool_call_id).toBe('missing')
+        expect(JSON.parse(String(result.content))).toMatchObject({ commit, path: unavailable, error: expect.stringContaining(String(status)) })
+        return turn([read('alternative', alternative)], '')
+      }
+      expect(result.tool_call_id).toBe('alternative')
+      expect(JSON.parse(String(result.content))).toMatchObject({ commit, text: expect.stringContaining('A usable reference') })
+      return turn()
+    })
+    const final = await new GenerationAttempt(request(), io).start()
+    expect(final).toMatchObject({ status: 'completed', modelRequests: 3, referenceCalls: 2, result: { kind: 'candidate' } })
+    expect(final.result?.provenance?.references).toEqual([expect.objectContaining({ path: alternative })])
+    expect(fetchReference).toHaveBeenCalledTimes(4)
+    expect(fetchReference.mock.calls.slice(2).map(([url]) => String(url))).toEqual([
+      `https://raw.githubusercontent.com/titanxxh/open-agricola/${commit}/${unavailable}`,
+      `https://raw.githubusercontent.com/titanxxh/open-agricola/${commit}/${alternative}`,
+    ])
+  })
   it('runs the frozen control with the same validator and exactly two repairs, without offering tools', async () => {
     const io = ports()
     io.validate = vi.fn(async code => ({ valid: false, errors: ['invalid hook'], sourceFingerprint: sourceFingerprint(code), sandboxContractId: contract.id }))
