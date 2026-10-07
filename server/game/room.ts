@@ -255,10 +255,13 @@ export const resolveJoinPlayerIndex = (
 }
 
 export const resolveJoinRequestPlayerIndex = (
-  room: Pick<Room, 'players' | 'seatOwners'>,
+  room: Pick<Room, 'id' | 'players' | 'seatOwners'>,
   requestedPlayerIndex: number | undefined,
   userId: string | undefined,
 ): { ok: true; requestedPlayerIndex: number | undefined } | { ok: false; error: string } => {
+  if (isDevRoom(room.id) && requestedPlayerIndex !== undefined) {
+    return { ok: true, requestedPlayerIndex }
+  }
   if (!userId) return { ok: true, requestedPlayerIndex }
   const existingSeat = roomSeatOwners(room).find((owner) => owner.userId === userId)
   if (!existingSeat) return { ok: true, requestedPlayerIndex }

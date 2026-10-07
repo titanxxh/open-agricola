@@ -23,6 +23,8 @@ import type { AddressInfo } from 'node:net'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import WebSocket from 'ws'
 import { createWsServer } from '../ws-server.ts'
+import { createLocalUserForTests, createSession } from '../../auth.ts'
+import { SESSION_COOKIE } from '../../auth-cookies.ts'
 import { PostgresRoomPersistence } from '../../game/persistence/postgres-adapter.ts'
 import type { ServerEvent } from '../../../shared/contract/protocol/ws.ts'
 import type { StateUpdateEnvelope } from '../../../shared/contract/protocol/game.ts'
@@ -71,8 +73,11 @@ const waitForEvent = async <T extends ServerEvent>(
 const openWs = async (
   baseUrl: string,
   sockets: TestSocket[],
+  sessionToken?: string,
 ): Promise<TestSocket> => {
-  const ws = new WebSocket(baseUrl) as TestSocket
+  const ws = new WebSocket(baseUrl, sessionToken
+    ? { headers: { Cookie: `${SESSION_COOKIE}=${sessionToken}` } }
+    : undefined) as TestSocket
   ws.received = []
   attachCollector(ws)
   sockets.push(ws)
@@ -216,6 +221,55 @@ describe('WS seat binding', () => {
         else resolve()
       })
     })
+  })
+
+  it('lets one logged-in developer join p1 and p2 and resume only p2', async () => {
+    for (const player of wsServerResult.registry.get('dev2')!.session.state.players) {
+      player.minorHand = ['__test_placeholder__']
+      player.occupationHand = ['__test_placeholder__']
+    }
+    const user = await createLocalUserForTests('developer', 'test-password')
+    const token = await createSession(user.id)
+    expect(token).toBeTruthy()
+    const p1 = await openWs(baseUrl, sockets, token!)
+    await sendCommand(p1, { type: 'joinRoom', roomId: 'dev2', requestedPlayerIndex: 0 })
+    expect(await waitForEvent(p1, (event): event is Extract<ServerEvent, { type: 'roomJoined' | 'error' }> =>
+      event.type === 'roomJoined' || event.type === 'error',
+    )).toMatchObject({ type: 'roomJoined', playerIndex: 0 })
+
+    const p2 = await openWs(baseUrl, sockets, token!)
+    await sendCommand(p2, { type: 'joinRoom', roomId: 'dev2', requestedPlayerIndex: 1 })
+    expect(await waitForEvent(p2, (event): event is Extract<ServerEvent, { type: 'roomJoined' | 'error' }> =>
+      event.type === 'roomJoined' || event.type === 'error',
+    )).toMatchObject({ type: 'roomJoined', playerIndex: 1 })
+
+    const resumed = await openWs(baseUrl, sockets, token!)
+    await sendCommand(resumed, { type: 'joinRoom', roomId: 'dev2', intent: 'resume', requestedPlayerIndex: 1 })
+    expect(await waitForEvent(resumed, (event): event is Extract<ServerEvent, { type: 'roomJoined' | 'error' }> =>
+      event.type === 'roomJoined' || event.type === 'error',
+    )).toMatchObject({ type: 'roomJoined', playerIndex: 1 })
+    const state = await waitForEvent(resumed, (event): event is StateUpdateEnvelope => event.type === 'stateUpdate')
+    expect(state.payload.state.players[1]!.minorHand).not.toContain('?')
+    expect(state.payload.state.players[0]!.minorHand).toContain('?')
+    await waitForEvent(p2, (event): event is Extract<ServerEvent, { type: 'seat_replaced' }> => event.type === 'seat_replaced')
+    expect(p1.readyState).toBe(WebSocket.OPEN)
+    expect(p1.received.some(event => event.type === 'seat_replaced')).toBe(false)
+    expect(wsServerResult.registry.get('dev2')!.seatOwners).toEqual([
+      { playerIndex: 0, userId: user.id },
+      { playerIndex: 1, userId: user.id },
+    ])
+  })
+
+  it('allows an anonymous local developer to resume the requested dev seat', async () => {
+    const original = await openWs(baseUrl, sockets)
+    await sendCommand(original, { type: 'joinRoom', roomId: 'dev2', requestedPlayerIndex: 1 })
+    await waitForEvent(original, (event): event is Extract<ServerEvent, { type: 'roomJoined' }> => event.type === 'roomJoined')
+
+    const resumed = await openWs(baseUrl, sockets)
+    await sendCommand(resumed, { type: 'joinRoom', roomId: 'dev2', intent: 'resume', requestedPlayerIndex: 1 })
+    expect(await waitForEvent(resumed, (event): event is Extract<ServerEvent, { type: 'roomJoined' | 'error' }> =>
+      event.type === 'roomJoined' || event.type === 'error',
+    )).toMatchObject({ type: 'roomJoined', playerIndex: 1 })
   })
 
   it('rejects devSetResources when the seat argument does not match the sender', async () => {

@@ -717,7 +717,7 @@ async function handleJoinRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { 
   }
   const wasPlaying = room.status === 'playing'
   let requestedPlayerIndex: number | undefined
-  if (msg.intent === 'resume') {
+  if (msg.intent === 'resume' && !isDevRoom(room.id)) {
     if (!ctx.currentUserId) {
       sendCommandError(ctx, 'login required', msg.requestId, 'login_required', 'active')
       return

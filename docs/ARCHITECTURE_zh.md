@@ -1237,6 +1237,8 @@ server/game/
 
 开发槽位 `dev2` 至 `dev6` 通过 `development_room_slots` 指向永久对局身份。活动录制局在重启后保留身份；重开或显式重置退出旧局并分配带新 UUID 后缀的身份，已完成、过期和下架上下文不复活。开发局不因空闲过期。所有正式 Room 使用 PostgreSQL 并强制录制。普通房间全部玩家离线后，`waiting` 保留 30 分钟、`playing` 保留 7 天；恢复包含 `custom_card_ids` 和预留座位。重连可替换同一座位的旧连接。
 
+开发 Room 允许同一账号用不同连接打开所请求的不同座位。加入和恢复都保留显式请求的座位，同样适用于本地匿名连接和带 UUID 后缀的开发局。传输层重连时发送最近一次服务端确认的座位；普通 Room 恢复仍按登录账号的座位归属绑定，忽略客户端提供的座位提示。前端 `devMode` 标记不授予开发 Room 权限。
+
 `roomId` 唯一标识一局游戏：`newGame` 先创建新 `GameSession` 和 UUID，再把在线座位、人数、custom cards、已持久化变体开关及所有连接引用切到新 Room 记录；旧 id 永不复用。首个 `waiting → playing` 转换写入不可变 `started_at`。只有权威 `gameOver` 会在单个 PostgreSQL 事务内写入 `game_results` / `game_result_players` 标量摘要并删除 `rooms.state_json`；TTL、解散、删号和未完成重开只删除可恢复快照，把永久 Game Context 置为 `expired`，不产生结果。归档写失败会回滚，最终全量状态继续保留用于恢复或重试。
 
 `RoomPersistenceCheckpoint` 在创建、等待态和座位元数据写入成功后才确认。所有正式对局，包括 Workshop、热座和固定开发局，均强制录制。初始 Frame 与后续转换在同一 PostgreSQL 事务中提交 Room 状态、增量恢复记录、Replay Step 和终局结果，然后才发布。读取和元数据变化不推进权威版本。`newGame` 在同一事务中创建后继局并退出旧活动局，成功后才切换连接引用。

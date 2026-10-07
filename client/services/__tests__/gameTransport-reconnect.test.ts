@@ -40,6 +40,34 @@ describe('Room reconnect and durable commands', () => {
   })
   afterEach(() => { vi.unstubAllGlobals(); vi.resetModules() })
 
+  it('sends the acknowledged player seat when resuming a development room', async () => {
+    const { WsGameTransport } = await import('../gameTransport')
+    const transport = new WsGameTransport('ws://test', 'dev2', undefined, { route: false, reconnectDelayMs: 1 })
+    try {
+      await transport.connect()
+      const old = Socket.all[0]!
+      old.emit(joined('dev2'))
+      old.emit(snapshot(1, 'dev2'))
+      old.close()
+      await tick()
+      const next = Socket.all[1]!
+      await vi.waitFor(() => expect(next.sent.at(-1)?.type).toBe('joinRoom'))
+      expect(next.sent.at(-1)).toMatchObject({
+        type: 'joinRoom',
+        roomId: 'dev2',
+        intent: 'resume',
+        requestedPlayerIndex: 1,
+      })
+      next.emit(joined('dev2'))
+      expect(transport.connected).toBe(false)
+      next.emit(snapshot(1, 'dev2'))
+      await vi.waitFor(() => expect(transport.connected).toBe(true))
+      expect(transport.playerIndex).toBe(1)
+    } finally {
+      transport.destroy()
+    }
+  })
+
   it('looks up a lost action receipt before resuming and waits for a full snapshot', async () => {
     const { WsGameTransport } = await import('../gameTransport')
     const route = vi.fn(async () => 'ws://test/owner')

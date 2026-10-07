@@ -95,6 +95,32 @@ describe('room-manager seat assignment', () => {
     })
   })
 
+  it.each([...FIXED_DEV_ROOM_IDS, 'dev2-00000000-0000-4000-8000-000000000000'])(
+    'allows the same developer to request another seat in %s', (roomId) => {
+      const room = createRoom(roomId, [0], 2, { 0: 'user-1' })
+
+      expect(resolveJoinRequestPlayerIndex(room, 1, 'user-1')).toEqual({
+        ok: true,
+        requestedPlayerIndex: 1,
+      })
+    },
+  )
+
+  it('keeps the requested dev seat when the account owns several persisted seats', () => {
+    const room = {
+      ...createRoom(PRIMARY_DEV_ROOM_ID, []),
+      seatOwners: [
+        { playerIndex: 0, userId: 'user-1' },
+        { playerIndex: 1, userId: 'user-1' },
+      ],
+    }
+
+    expect(resolveJoinRequestPlayerIndex(room, 1, 'user-1')).toEqual({
+      ok: true,
+      requestedPlayerIndex: 1,
+    })
+  })
+
   it('rejects invalid requested seat indices', () => {
     const room = createRoom(PRIMARY_DEV_ROOM_ID, [])
 
