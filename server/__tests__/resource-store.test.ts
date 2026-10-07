@@ -87,7 +87,7 @@ it('backfills surviving legacy references without resurrecting collected or remo
   await resources.blockHash((await resources.db.prepare("SELECT content_hash FROM stored_objects WHERE object_key='card-art/blocked.png'").get<{content_hash:string}>())!.content_hash)
   await resources.db.prepare(`INSERT INTO workshop_cards(id,author_id,card_id,card_type,name,card_json,art_url,draft_generation_json,created_at,updated_at)
     VALUES ('backfill-card','author','CUSTOM_backfill','minor','Backfill','{}',?,?,1,1)`).run(
-    'https://api.example/card-art/surviving.png',JSON.stringify({history:['https://old-api.example/card-art/collected.png','https://old-api.example/card-art/blocked.png']}))
+    'https://api.example/agricola-api/card-art/surviving.png',JSON.stringify({history:['https://old-api.example/old-api/card-art/collected.png','https://old-api.example/old-api/card-art/blocked.png']}))
   const migration = readFileSync(new URL('../database/019-workshop-art-urls.sql',import.meta.url),'utf8')
   await resources.db.transaction(() => resources.db.exec(migration))()
   await resources.db.transaction(() => resources.db.exec(migration))()

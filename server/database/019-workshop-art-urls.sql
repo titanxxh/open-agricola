@@ -3,13 +3,13 @@
 CREATE OR REPLACE FUNCTION workshop_art_keys(art_url TEXT, generation_json TEXT DEFAULT '{}') RETURNS SETOF TEXT
 LANGUAGE sql IMMUTABLE AS $$
   SELECT DISTINCT (regexp_match(url,
-    '^(?:https?://[A-Za-z0-9.-]+(?::[0-9]+)?)?/(card-art/[A-Za-z0-9._-]+\.(?:png|jpg|jpeg|webp))$', 'i'))[1]
+    '^(?:https?://[A-Za-z0-9.-]+(?::[0-9]+)?)?(?:/(?!\.{1,2}/)[A-Za-z0-9._~-]+)*/(card-art/[A-Za-z0-9._-]+\.(?:png|jpg|jpeg|webp))$', 'i'))[1]
   FROM (
     SELECT art_url AS url
     UNION ALL SELECT value #>> '{}' FROM jsonb_path_query(
       generation_json::jsonb, 'strict $.** ? (@.type() == "string")') AS value
   ) urls
-  WHERE url ~* '^(?:https?://[A-Za-z0-9.-]+(?::[0-9]+)?)?/card-art/[A-Za-z0-9._-]+\.(?:png|jpg|jpeg|webp)$'
+  WHERE url ~* '^(?:https?://[A-Za-z0-9.-]+(?::[0-9]+)?)?(?:/(?!\.{1,2}/)[A-Za-z0-9._~-]+)*/card-art/[A-Za-z0-9._-]+\.(?:png|jpg|jpeg|webp)$'
 $$;
 
 CREATE OR REPLACE FUNCTION maintain_workshop_art_reference() RETURNS trigger AS $$
