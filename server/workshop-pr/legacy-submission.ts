@@ -27,7 +27,7 @@ export async function verifyLegacySubmission(db: PostgresDatabase, client: GitHu
   const source = files.find(file => file.path === `shared/cards/community/${cardId}.ts`)!
   const actual = await client.getUpstreamFile(source.path,pr.headSha)
   // Only provenance header lines differed between the OAuth and App generators.
-  const stripHeader = (text:string) => text.replace(/^\/\/ Generated from Open Agricola workshop[^\n]*\n\/\/ Workshop card:[^\n]*\n\/\/ (?:Author|Designer):[^\n]*\n\/\/ Submitted:[^\n]*\n/,'')
+  const stripHeader = (text:string) => text.replace(/^\/\/ Generated from Open Agricola workshop[^\n]*\n\/\/ Workshop card:[^\n]*\n\/\/ (?:Author|Designer):[^\n]*\n\/\/ Submitted:[^\n]*\n(?:\/\/ Description:[^\n]*\n)?/,'')
   if (stripHeader(source.content) !== stripHeader(actual)) throw new GitHubApiError('legacy source changed','generated_file_changed',409)
   for (const path of ['shared/cards/register-all.ts','shared/cards/catalog.generated.ts','docs/community_cards.md']) {
     const [baseline,current] = await Promise.all([client.getFileSha(path,version.review_commit_sha),client.getFileSha(path,pr.headSha)])

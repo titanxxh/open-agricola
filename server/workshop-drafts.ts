@@ -523,6 +523,10 @@ const ensureVersion = async (
             sandbox_pass_version_id
           )
       )
+      AND NOT EXISTS (
+        SELECT 1 FROM workshop_submissions
+        WHERE version_id = workshop_card_versions.id AND state IN ('pending','blocked')
+      )
   `).run({ cardId: workspace.id }))
   return id
 }

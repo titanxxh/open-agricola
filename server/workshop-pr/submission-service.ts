@@ -21,9 +21,9 @@ function proposalBody(data: SubmissionPayload): string {
   return `## Community Card Submission
 
 **Card ID**: ${data.wcard.card_id}
-**Designer**: ${publicText(data.wcard.author_name ?? 'Workshop author')}
+**Designer at first submission**: ${publicText(data.wcard.author_name ?? 'Workshop author')}
 
-${data.previousPrUrl ? `Previous proposal: ${data.previousPrUrl}\n\n` : ''}${(data.wcard.description ?? '').replaceAll('@', '@\u200b')}
+${data.previousPrUrl ? `Previous proposal: ${data.previousPrUrl}\n\n` : ''}Read the [current description and designer attribution](https://github.com/${data.owner}/${data.repository}/blob/${data.branch}/shared/cards/community/${data.wcard.card_id}.ts#L1) in the submitted card. This link follows updates to this proposal; earlier versions remain in its commits.
 
 Submitted by the Workshop App on behalf of the card designer.
 

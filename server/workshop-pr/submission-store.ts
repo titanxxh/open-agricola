@@ -45,8 +45,9 @@ export class SubmissionStore {
   async admitRemoteAttempt(authorId: string): Promise<void> {
     const now = Date.now()
     const user = await consumeRateLimit(this.db,'workshop-remote-attempt',authorId,5,60_000,now)
+    if (!user.allowed) throw new GitHubApiError('remote attempt rate limited','rate_limited',429,Math.ceil((user.resetAt-now)/1000))
     const global = await consumeRateLimit(this.db,'workshop-remote-attempt-global','all',100,60_000,now)
-    if (!user.allowed || !global.allowed) throw new GitHubApiError('remote attempt rate limited','rate_limited',429,Math.ceil((Math.max(user.resetAt,global.resetAt)-now)/1000))
+    if (!global.allowed) throw new GitHubApiError('remote attempt rate limited','rate_limited',429,Math.ceil((global.resetAt-now)/1000))
   }
 
   async begin(input: { cardId: string; authorId: string; versionId: string; revision: number; payload: SubmissionPayload; previous: SubmissionRow | undefined; restart?: boolean }): Promise<SubmissionRow> {

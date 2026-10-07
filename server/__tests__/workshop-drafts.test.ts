@@ -20,6 +20,7 @@ import {
   loadSandboxVersion,
   loadWorkspace,
   markSandboxPass,
+  pinCurrentDraftVersion,
   publish,
   restoreVersion,
   type WorkshopDraft,
@@ -370,6 +371,24 @@ describe('workshop draft aggregate', () => {
       { version_number: 5 },
       { version_number: 6 },
     ])
+  })
+
+  it.each(['pending','blocked'])('retains the frozen version and artwork reference of a %s submission', async state => {
+    let workspace = await createCard(db,{authorId:'author',draft:baseDraft({artUrl:'/card-art/original.png'})})
+    const {versionId} = await pinCurrentDraftVersion(db,{cardId:workspace.id,authorId:'author',baseRevision:workspace.revision})
+    await db.prepare(`INSERT INTO workshop_submissions(id,card_id,author_id,version_id,revision,state,payload,created_at,updated_at)
+      VALUES ('submission',?,'author',?,?,?,'{}',1,1)`).run(workspace.id,versionId,workspace.revision,state)
+    for (let index=1; index<=7; index++) {
+      workspace = await checkpointDraft(db,{cardId:workspace.id,authorId:'author',baseRevision:workspace.revision,draft:{...workspace.draft,artUrl:`/card-art/${index}.png`}})
+      await pinCurrentDraftVersion(db,{cardId:workspace.id,authorId:'author',baseRevision:workspace.revision})
+    }
+    expect((await loadSandboxVersion(db,{cardId:workspace.id,authorId:'author',versionId})).artUrl).toBe('/card-art/original.png')
+    expect(await db.prepare("SELECT object_key FROM object_references WHERE owner_kind='workshop_card_versions' AND owner_id=?").get(versionId)).toEqual({object_key:'card-art/original.png'})
+    await db.prepare("UPDATE workshop_submissions SET state='complete' WHERE id='submission'").run()
+    workspace = await checkpointDraft(db,{cardId:workspace.id,authorId:'author',baseRevision:workspace.revision,draft:{...workspace.draft,artUrl:'/card-art/8.png'}})
+    await pinCurrentDraftVersion(db,{cardId:workspace.id,authorId:'author',baseRevision:workspace.revision})
+    await expect(loadSandboxVersion(db,{cardId:workspace.id,authorId:'author',versionId})).rejects.toThrow('Version not found')
+    expect(await db.prepare("SELECT 1 FROM object_references WHERE owner_kind='workshop_card_versions' AND owner_id=?").get(versionId)).toBeUndefined()
   })
 
   it('keeps transient form state and unadopted generations out of versions', async () => {

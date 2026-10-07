@@ -837,9 +837,9 @@ export function generateCardSourceFile(
 
   return `// Generated from Open Agricola workshop. Do not hand-edit.
 // Workshop card: ${wcard.card_id}
-// Author: ${(wcard.author_name ?? 'unknown').replace(/[\r\n]/g, ' ')}${ctx.githubLogin ? ` (github: @${ctx.githubLogin})` : ''}
+// Author: ${(wcard.author_name ?? 'unknown').replace(/[\r\n\u2028\u2029]/g, ' ')}${ctx.githubLogin ? ` (github: @${ctx.githubLogin})` : ''}
 // Submitted: ${ctx.iso}
-
+${wcard.description ? `// Description: ${wcard.description.replace(/[\r\n\u2028\u2029]/g, ' ')}\n` : ''}
 ${lintDirective}${cardSourceImport(wcard.card_type)}
 import type { CardImpl } from '../registry'
 ${helperImports ? '\n' + helperImports : ''}

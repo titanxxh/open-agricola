@@ -9,7 +9,7 @@ const cookie = (response: APIResponse, name: string) => response.headersArray()
 type AuditWindow = Window & { auditSocket: WebSocket; auditState: GameSyncPayload; auditMessages: ServerEvent[] }
 const snapshot = (page: Page) => page.evaluate(() => (window as AuditWindow).auditState)
 let sequence = 0
-const command = async (page: Page, body: Record<string, unknown>) => {
+const command = async (page: Page, body: Record<string, unknown>, observer?: Page) => {
   const requestId = `history-e2e-${++sequence}`
   await page.evaluate(async ({ body, requestId }) => {
     const audit = window as AuditWindow
@@ -36,7 +36,13 @@ const command = async (page: Page, body: Record<string, unknown>) => {
   await expect.poll(() => page.evaluate(id => (window as AuditWindow).auditMessages.some(message => (message.type === 'stateUpdate' || message.type === 'error') && message.requestId === id), requestId)).toBe(true)
   const result = await page.evaluate(id => (window as AuditWindow).auditMessages.find(message => (message.type === 'stateUpdate' || message.type === 'error') && message.requestId === id), requestId)
   expect(result?.type, JSON.stringify(result)).toBe('stateUpdate')
-  if (result?.type === 'stateUpdate') expect(result.payload.ok, result.payload.error).toBe(true)
+  if (result?.type === 'stateUpdate') {
+    expect(result.payload.ok, result.payload.error).toBe(true)
+    // The actor's acknowledgement can arrive before the other page's broadcast.
+    if (observer) await expect.poll(() => observer.evaluate(() =>
+      (window as AuditWindow).auditMessages.findLast(message => message.type === 'stateUpdate')?.version ?? 0,
+    )).toBeGreaterThanOrEqual(result.version)
+  }
 }
 
 test('real Room history loads earlier groups, preserves cancellation markers and refreshes names after reconnect', async ({ browser, request }) => {
@@ -93,14 +99,14 @@ test('real Room history loads earlier groups, preserves cancellation markers and
       const pending = current.interaction.request
       if (pending.kind !== 'confirm-next-player' && pending.kind !== 'confirm-player-switch') throw new Error(pending.kind)
       const actor = pending.kind === 'confirm-next-player' ? pending.nextPlayerIndex : pending.fromPlayerIndex
-      await command(pages[actor]!, { type: 'choice', value: 'confirm' })
+      await command(pages[actor]!, { type: 'choice', value: 'confirm' }, p1)
       current = await snapshot(p1)
     }
     const actor = current.state.currentPlayerIndex
     const actorState = await snapshot(pages[actor]!)
     const spaceId = ['forest', 'reed-bank', 'fishing', 'day-laborer'].find(id => actorState.actionAvailability?.[id])
     expect(spaceId).toBeTruthy()
-    await command(pages[actor]!, { type: 'action', spaceId })
+    await command(pages[actor]!, { type: 'action', spaceId }, p1)
   }
   const live = await snapshot(p1)
   expect(live.historyWindow!.operationGroupIds).toHaveLength(20)
