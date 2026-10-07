@@ -95,6 +95,30 @@ pnpm test:llm:live
 
 `.github/workflows/ci.yml` 只运行确定性的 `pnpm test:llm` golden 回放。真实调用外部 LLM 的健康检查仅在 owner 控制的本机运行 `pnpm test:llm:live`，API key 从已忽略的本地 `.env` 读取，不进入 GitHub Actions。
 
+## Planned browser-tool acceptance
+
+The [approved quality and cost decision](https://github.com/titanxxh/open-agricola/issues/1035) defines a future acceptance harness. It is not implemented by the commands above: the current live runner uses an independent non-streaming client, and its helpers rewrite card identity and replace generated metadata. Existing golden replay proves regression behavior only.
+
+Admission is per exact provider, endpoint and model, after a real browser tool roundtrip and the complete acceptance batch. The first model is `deepseek` / `https://api.deepseek.com/v1/chat/completions` / `deepseek-v4-flash`. Other models remain pending until separately verified. All paid probes, comparisons, failures and repairs share a **US$5 total budget** for this initial acceptance effort. Pause before a request whose conservative charge cannot fit the remaining budget; unresolved usage is not zero and remains reserved. Do not top up accounts or silently substitute another model.
+
+The fixed matrix has **17 scenarios, three independent runs per scenario in each of two arms: 102 task runs per model**. It extends the 11 current mechanisms with:
+
+| Scenario | Required evidence |
+|---|---|
+| Combined reward and persistent counter | Own forest collection grants one food; every third trigger grants one point. Check each delta, cross-round counting, source events/logs, and non-triggering opponents/actions. |
+| Follow-up on the selected candidate | Adopted A, selected B and chat C differ. Change B's improvement discount from one wood to two, preserving its on-play reward and metadata; verify real payment and discount bounds. |
+| Repair of the actually tested source | Repair B's unavailable `futureMeeplesNode` call while C is selected. Keep the reward delayed until next round, grant exactly one wood once, and preserve unrelated work. |
+| Actual sandbox capability gap | Building a special stable on a grain-bearing field while retaining crops and normal payment/supply use requires an unavailable candidate/settlement pair. Explain the gap without an adoptable substitute. |
+| Two English paraphrases | Restate M2 and M11 without API hints; use the same behavior assertions as their Chinese versions. |
+
+New-architecture admission requires **48/48 implementable runs passing behavior checks and 3/3 correct capability-gap results**. Report first-output and final pass rates separately; final output may include at most two production static-validation repairs. A partial batch does not qualify. Preserve every failure; a changed prompt or implementation starts a separately identified batch instead of replacing failed samples with lucky retries. A finite passing batch does not establish a universal success rate.
+
+Both arms use the same browser transport, model settings, request inputs, extraction and authoritative validation. The control uses the frozen old full prompt with the same two static repairs, explicitly labelled **old prompt plus shared repair**, not the behavior of the current UI. Session assertion failures never become repair hints. Keep source and metadata unchanged by test helpers; human-edited results are reported separately. Each fresh two-player Session has explicit hands, successful commands, intentional pending choices and state/interaction/log/scores assertions. Strengthen M4 scoring, M6 intermediate counters, M7 reuse after replenishing wood, and M9 actual delayed delivery and cleanup before live evaluation.
+
+Each new-arm run retains the eight-model-request, 24-tool-call and five-minute limits; the control permits at most three model requests. The formal batch therefore permits at most **561 model requests**, with any preliminary probes counted separately against the same monetary budget. Record requested/returned model identity, prompt/tool/sandbox versions, actual reference SHAs and ranges, configured response/context limits, every request and retry, token usage including reasoning/cache fields when available, elapsed time and cost basis. Missing usage remains unknown. Freeze these settings and the assertions before a batch; reference reads still obey each attempt's latest-main contract.
+
+Deterministic protocol replay and browser E2E cover reference versions and failures, complete tool groups/signatures, exact budget boundaries, cancellation/late responses, candidate/source binding, recovery/adoption/privacy, manual playtest repair and translation regressions. Check real browser request destinations: only the configured LLM provider receives its credential. Test artifacts use synthetic or test-owned inputs, exclude credentials, and do not broaden production's page-memory-only raw protocol contract. Detailed scenarios and reporting requirements live in the decision record. No browser-tool model has passed this planned acceptance yet.
+
 ## Fixture 三段式
 
 ```ts

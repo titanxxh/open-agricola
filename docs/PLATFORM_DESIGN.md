@@ -152,6 +152,10 @@ A **Generation Result** can contain a complete source candidate, failed source r
 
 The latest result and candidate may reference the same source without retaining duplicate completed copies. Adoption remains explicit and server-validated. Draft Versions retain only adopted content and its allowlisted provenance; identical content continues to reuse an immutable version without rewriting its original provenance. Public card, submission, and Replay projections exclude private generation records. The detailed field contract lives in the decision record; these recovery changes are not implemented yet.
 
+#### C1.4 Planned quality and cost acceptance
+
+The [acceptance decision](https://github.com/titanxxh/open-agricola/issues/1035) admits models individually after browser protocol and card-behavior verification, starting with the configured DeepSeek Flash combination. The approved batch compares 17 scenarios, repeated three times in each arm, within a US$5 total paid-call budget. Every new-architecture run must pass its behavior or capability-gap assertions; first-output quality, repairs, tokens and elapsed time remain visible. The [LLM test guide](test/llm-card-gen.md#planned-browser-tool-acceptance) specifies the matrix and evidence requirements. This acceptance harness and the production tool loop are still pending implementation.
+
 ### C2. System prompt design
 
 The source is `CARD_DESIGNER_SYSTEM_PROMPT` in `client/services/llmPrompts.ts`. This section summarizes its shape; source code is authoritative. Tables for advanced effect hooks, listener phases, listener scopes, and action IDs render at runtime from truth sources: `cardEffectHooks` in `shared/cards/card-effects.ts`, plus `shared/custom-code/sandbox-hook-meta.ts`, `sandbox-listener-phases.ts`, `sandbox-listener-scopes.ts`, and `sandbox-action-ids.ts`. They cannot drift from the engine and need no manual mirror.

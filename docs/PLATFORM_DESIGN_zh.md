@@ -158,6 +158,10 @@ OpenRouter 不在 provider 级别声明 `chat` / `image` 兜底能力；每个�
 
 最近结果与候选可关联同一份源码，不保留重复的完成内容副本。采用仍需作者明确操作并通过服务端校验。Draft Version 只保留已采用内容与白名单内的溯源；相同内容继续复用不可变版本，不改写其原始溯源。公开卡牌、投稿和 Replay 投影不包含私有生成记录。详细字段契约保存在决策票中；上述恢复变更尚未实现。
 
+#### C1.4 已定案、待实现的质量与成本验收
+
+[验收决议](https://github.com/titanxxh/open-agricola/issues/1035)规定模型逐个通过浏览器协议与卡牌行为验证后开放，首先验收当前配置的 DeepSeek Flash 组合。已确认的批次覆盖 17 个场景，两组各重复 3 次，全部付费调用共用 5 美元预算。新架构每次运行都必须通过相应行为或能力缺口断言；首次输出质量、修复、token 和耗时分别记录。[LLM 测试指南](test/llm-card-gen.md#planned-browser-tool-acceptance)说明样本与证据要求。该验收程序和生产工具循环仍待实现。
+
 ### C2. 系统提示词设计
 
 **源文件**：`client/services/llmPrompts.ts`（`CARD_DESIGNER_SYSTEM_PROMPT`）。以下是其结构摘要；以源文件为准。effect / 进阶 hook 表、listener phase 表、listener scope 表、actionId 表**运行时从真相源渲染**（`shared/cards/card-effects.ts` 的 `cardEffectHooks` + `shared/custom-code/sandbox-hook-meta.ts` / `sandbox-listener-phases.ts` / `sandbox-listener-scopes.ts` / `sandbox-action-ids.ts`），因此这四张表不会与引擎漂移，无需手工镜像。
