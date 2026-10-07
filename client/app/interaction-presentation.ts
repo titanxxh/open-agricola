@@ -250,6 +250,7 @@ const pendingChoiceFromInteraction = (interaction: WaitInteraction): PendingChoi
     promptKey: interaction.promptKey,
     promptParams: interaction.promptParams,
     options: interactionChoiceOptions(interaction),
+    multiSelect: interaction.request.kind === 'choice' ? interaction.request.multiSelect : undefined,
     playerIndex: interaction.playerIndex,
     spaceId: interaction.spaceId ?? '',
     sourceCard: interaction.sourceCard,

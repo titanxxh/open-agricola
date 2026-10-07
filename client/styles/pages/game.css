@@ -376,6 +376,52 @@
 .borrowed-fence-source-count {
   color: rgba(253, 246, 227, 0.75);
 }
+.choice-multi-select {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.choice-multi-select-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  width: min(100%, 640px);
+}
+.choice-multi-select-tile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 52px;
+  padding: 8px 12px;
+  border: 1px solid rgba(255, 247, 230, 0.3);
+  border-radius: 8px;
+  background: rgba(255, 247, 230, 0.1);
+  color: #fdf6e3;
+  font-weight: 600;
+  cursor: pointer;
+}
+.choice-multi-select-tile.selected {
+  border-color: #d4a017;
+  background: rgba(212, 160, 23, 0.28);
+}
+.choice-multi-select-tile:has(input:disabled):not(.selected) {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.choice-multi-select-tile:focus-within {
+  outline: 2px solid #d4a017;
+  outline-offset: 2px;
+}
+.choice-multi-select-tile input {
+  accent-color: #d4a017;
+}
+@media (max-width: 600px) {
+  .choice-multi-select-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 .collector-multi-select {
   display: flex;
   flex-direction: column;

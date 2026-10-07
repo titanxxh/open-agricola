@@ -2,6 +2,7 @@ import type { AnimalKey } from '../../shared/contract/animals'
 import type {
   ActionChoiceOption,
   AnytimeAction,
+  ChoiceMultiSelect,
   PlayerState,
   Resource,
 } from '../../shared/contract/types'
@@ -165,6 +166,7 @@ export type InteractionBarChoiceModel = {
   showOptions: boolean
   useCollector: boolean
   collectorNeeded: number
+  multiSelect?: ChoiceMultiSelect
   isOptionalActionPrompt: boolean
   optionalActionName: string | null
   triggerCardName: string | null
@@ -442,6 +444,7 @@ const buildChoiceModel = (
     showOptions,
     useCollector: showOptions && needed > 1,
     collectorNeeded: (choice.promptParams?.needed as number | undefined) ?? 6,
+    multiSelect: choice.multiSelect,
     isOptionalActionPrompt,
     optionalActionName,
     triggerCardName,

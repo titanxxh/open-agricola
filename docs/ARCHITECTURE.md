@@ -301,7 +301,7 @@ type InteractionState =
 
 | kind | Payload shape |
 |---|---|
-| `choice` | `{ options: ActionChoiceOption[] }` |
+| `choice` | `{ options: ActionChoiceOption[], multiSelect?: { valuePrefix, minSelections, maxSelections } }` |
 | `farm-select` | `{ farm: { farmType: 'plow'\|'sow'\|'fence'\|'room'\|'stable', selectable*..., maxSelections? }, options? }` |
 | `selection` | `{ selection: { selectionType: 'farm-position'\|'occupation-hand', ... } }` |
 | `animal-reorg` | `{ zones: InteractionAnimalReorgZone[] }` |
@@ -323,6 +323,8 @@ WebSocket `ClientCommand.type` names do not exactly match `InteractionCommand`. 
 When a private choice concerns one card already visible in the recipient's hand, the producer may set `promptParams.cardId`. Interaction Presentation localizes that card name for the prompt and highlights the matching hand card; non-recipients receive `private-prompt` without `promptParams`.
 
 Native card effects may implement `CardEffect.projectInteractionRequest(state, player, request, actionId)` to derive current choice availability or resource quantity limits. The callback is a pure query scoped to its own pending action; it must preserve prompt metadata, accepted decisions, cached random observations, and execution progress. Session refreshes the active pending request and its choices before presentation, authoritative commands, and single-choice advancement, using the effective pending owner (including cross-player responses). The same refreshed envelope drives submission validation, nested-anytime resumption, undo, and restored sessions. Projection never reruns action execution, payment, drawing, logging, or future mandatory continuations; cards retain their existing hidden/disabled-option and automatic-advance policies.
+
+`emit-choice` can declare `multiSelect: { valuePrefix, minSelections, maxSelections }`. Its options are individual candidates with nonempty, comma-free values, rather than all candidate combinations. The client collects a local subset and submits `valuePrefix + values.join(',')` through the ordinary `choice` command. Generic pending validation rejects unknown or disabled candidates, duplicates, and counts outside the current bounds before invoking any card hook; structured-prefix admission cannot bypass this validation. `minSelections: 0` permits an empty subset. Multi-select requests require an explicit confirmation even with one candidate. Cards derive dynamic limits through `projectInteractionRequest`; exhausted optional choices may become a single skip option. Card-local hooks own all resulting rule state, while the generic frontend renders candidate tiles, a count, confirmation, and optional skip controls.
 
 ### 4.7 ActionChoiceOption and Previews
 

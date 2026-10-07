@@ -1,10 +1,11 @@
-import type { ActionChoiceOption } from '../../shared/contract/types'
+import type { ActionChoiceOption, ChoiceMultiSelect } from '../../shared/contract/types'
 import type { FarmTilePosition, GameState, InteractionAnimalReorgZone } from '../../shared/contract/types'
 
 export type PendingChoice = {
   promptKey?: string
   promptParams?: Record<string, unknown>
   options: ActionChoiceOption[]
+  multiSelect?: ChoiceMultiSelect
   playerIndex: number
   spaceId: string
   fenceExtraWood?: number

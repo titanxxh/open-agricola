@@ -24,6 +24,18 @@ export const isPendingChoiceValueAllowed = (
   envelope: PendingEnvelope,
   value: string,
 ): boolean => {
+  const request = envelope.request
+  if (request.kind === 'choice' && request.multiSelect) {
+    const { valuePrefix, minSelections, maxSelections } = request.multiSelect
+    if (!value.startsWith(valuePrefix)) return false
+    const suffix = value.slice(valuePrefix.length)
+    const selected = suffix === '' ? [] : suffix.split(',')
+    return selected.length >= minSelections && selected.length <= maxSelections
+      && new Set(selected).size === selected.length
+      && selected.every((entry) => entry !== '' && request.options.some(
+        (option) => option.value === entry && option.disabled !== true,
+      ))
+  }
   const choices = pendingEnvelopeChoices(envelope)
   if (choices.length === 0) return true
   return choices.some((option) => option.value === value && option.disabled !== true)

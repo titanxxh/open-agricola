@@ -130,6 +130,63 @@ const renderBarHtml = (
 ) => renderToStaticMarkup(buildBar(configure, actionOverrides))
 
 describe('InteractionBar', () => {
+  const configureMultiSelect = (input: InteractionBarPresentationInput, maxSelections = 2) => {
+    input.pending.choice = {
+      ...pendingChoice,
+      sourceCard: 'E148_Lazybones',
+      multiSelect: { valuePrefix: 'lazybones:', minSelections: 0, maxSelections },
+      options: ['grain-seeds', 'farmland', 'day-laborer', 'farm-expansion'].map((value) => ({
+        value, labelKey: `actions.${value}.name`,
+      })),
+    }
+  }
+
+  it('renders four bounded choice tiles, allows deselection, and submits one subset', () => {
+    const resolveChoice = vi.fn()
+    renderBar((input) => configureMultiSelect(input), { resolveChoice })
+    const choices = screen.getAllByRole('checkbox')
+    expect(choices).toHaveLength(4)
+    fireEvent.click(choices[0]!)
+    fireEvent.click(choices[1]!)
+    expect(choices[2]).toBeDisabled()
+    expect(choices[3]).toBeDisabled()
+    expect(choices[0]).toBeEnabled()
+    fireEvent.click(choices[0]!)
+    expect(choices[2]).toBeEnabled()
+    fireEvent.click(choices[2]!)
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm (2/2)' }))
+    expect(resolveChoice).toHaveBeenCalledExactlyOnceWith('lazybones:farmland,day-laborer')
+  })
+
+  it('permits an empty subset and keeps spectators read-only', () => {
+    const resolveChoice = vi.fn()
+    const bar = renderBar((input) => configureMultiSelect(input), { resolveChoice })
+    fireEvent.click(screen.getByRole('button', { name: 'Skip', exact: true }))
+    expect(resolveChoice).toHaveBeenCalledExactlyOnceWith('lazybones:')
+    bar.unmount()
+    renderBar((input) => {
+      configureMultiSelect(input)
+      input.isInteractive = false
+    })
+    expect(screen.queryAllByRole('checkbox')).toHaveLength(0)
+    expect(screen.queryByRole('button', { name: 'Confirm (0/2)' })).not.toBeInTheDocument()
+    expect(screen.getByText('Waiting')).toBeInTheDocument()
+  })
+
+  it('clears the local subset when the authoritative maximum changes', () => {
+    const resolveChoice = vi.fn()
+    const bar = renderBar((input) => configureMultiSelect(input, 4), { resolveChoice })
+    fireEvent.click(screen.getAllByRole('checkbox')[0]!)
+    fireEvent.click(screen.getAllByRole('checkbox')[1]!)
+    bar.rerender(buildBar((input) => configureMultiSelect(input, 1), { resolveChoice }))
+    expect(screen.getByRole('button', { name: 'Confirm (0/1)' })).toBeEnabled()
+    for (const choice of screen.getAllByRole('checkbox')) expect(choice).not.toBeChecked()
+    fireEvent.click(screen.getAllByRole('checkbox')[2]!)
+    expect(screen.getAllByRole('checkbox')[0]).toBeDisabled()
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm (1/1)' }))
+    expect(resolveChoice).toHaveBeenCalledExactlyOnceWith('lazybones:day-laborer')
+  })
+
   it.each(['zh', 'en'] as const)('resolves card references in the %s trigger prompt and anytime button', (locale) => {
     const html = renderBarHtml((input) => {
       input.locale = locale
