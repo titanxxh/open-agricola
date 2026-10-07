@@ -8167,6 +8167,26 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "kind": "minor"
   },
   {
+    "id": "CUSTOM_WorkshopAcceptance_muxxsx1b",
+    "name": "Workshop delivery acceptance",
+    "deck": "community",
+    "number": 0,
+    "desc": [
+      "Temporary acceptance fixture. No card effect."
+    ],
+    "cost": {},
+    "vp": 0,
+    "locales": {
+      "zh": {
+        "name": "工坊投稿验收",
+        "desc": [
+          "验收修订 1791368131565，无卡牌效果。"
+        ]
+      }
+    },
+    "kind": "minor"
+  },
+  {
     "id": "D001_ZigzagHarrow",
     "name": "Zigzag Harrow",
     "deck": "D",

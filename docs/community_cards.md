@@ -12,6 +12,7 @@
 <!-- community-card-entries:begin -->
 | Card ID | Name | Type | Author | PR  |
 | ------- | ---- | ---- | ------ | --- |
+| CUSTOM_WorkshopAcceptance_muxxsx1b | Workshop delivery acceptance | minor | Workshop App acceptance | #1022 |
 <!-- community-card-entries:end -->
 
 
