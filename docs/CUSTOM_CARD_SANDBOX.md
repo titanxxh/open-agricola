@@ -270,6 +270,8 @@ Fence discounts such as E16 Briar Hedge and C16 Field Fences use a `computeCosts
 
 A Workshop card may affect payment only through the value returned by a `computeCosts` listener. Major- and minor-improvement purchase costs both listen on `actions: ['improvement']`.
 
+`computeCosts` is a pure query evaluated repeatedly during previews and payment execution. Return the card's applicable contribution on every invocation. `context.costs` may contain an incoming computed delta: it is neither the base price nor proof that this listener has already contributed. In particular, do not skip a discount because that field already contains a negative value. The payment solver combines contributions and bounds payable costs at zero.
+
 - `costs`: a simple action-cost delta. Negative values discount and positive values add cost. Use it for ordinary action costs such as construct.
 - `trades`: payment substitutions such as using one resource instead of another.
 - `bonuses`: discounts or discount choices. Use `choices` for player selection and `optional` for whether the discount may be skipped.

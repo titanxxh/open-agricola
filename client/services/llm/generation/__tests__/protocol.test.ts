@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createToolTransport, MODEL_STREAM_LIMITS, readModelTurn } from '../protocol'
+import { REFERENCE_TOOLS } from '../references'
 
 const signal = () => new AbortController().signal
 const frame = (delta: unknown, finish: string | null = null) => ({ id: 'response-1', model: 'returned-model', choices: [{ index: 0, delta, finish_reason: finish }] })
@@ -39,17 +40,18 @@ describe('browser model protocol', () => {
     const authorize = vi.fn()
     const transport = createToolTransport({ provider: 'deepseek', model: 'deepseek-v4-flash', apiKey: 'token-canary' }, { fetch: fetchModel, authorize })
     const visible: string[] = []
-    const turn = await transport.complete([{ role: 'user', content: 'request' }], [], signal(), text => visible.push(text))
+    const turn = await transport.complete([{ role: 'user', content: 'request' }], REFERENCE_TOOLS, signal(), text => visible.push(text))
     expect(visible.join('')).toBe('查资料')
     expect(turn.calls.map(call => call.id)).toEqual(['first', 'second'])
     expect(turn.calls[1]).toMatchObject({ function: { arguments: '{"path":"docs/CUSTOM_CARD_SANDBOX.md"}' }, extra_content: { google: { thought_signature: 'opaque-signature' } } })
     expect(turn.message).toMatchObject({ reasoning_content: 'think more', reasoning_details: [{ text: 'reason continued', signature: 'signed' }, { data: 'encrypted' }] })
     expect(turn.usage).toEqual({ inputTokens: 5, outputTokens: 7, cachedInputTokens: 2, reasoningTokens: 3 })
-    await transport.complete([turn.message, ...turn.calls.map(call => ({ role: 'tool' as const, tool_call_id: call.id, content: 'result' }))], [], signal())
+    await transport.complete([turn.message, ...turn.calls.map(call => ({ role: 'tool' as const, tool_call_id: call.id, content: 'result' }))], REFERENCE_TOOLS, signal(), undefined, { toolChoice: 'none' })
     const [url, init] = fetchModel.mock.calls[1]
     expect(url).toBe('https://api.deepseek.com/v1/chat/completions')
     expect(init?.credentials).toBe('omit')
     expect(init?.redirect).toBe('error')
+    expect(JSON.parse(String(init?.body))).toMatchObject({ tools: REFERENCE_TOOLS, tool_choice: 'none', thinking: { type: 'enabled' } })
     expect(JSON.parse(String(init?.body)).messages[0]).toEqual(turn.message)
     expect(JSON.parse(String(init?.body)).messages.slice(1).map((message: { tool_call_id: string }) => message.tool_call_id)).toEqual(['first', 'second'])
     expect(String(init?.body)).not.toContain('token-canary')

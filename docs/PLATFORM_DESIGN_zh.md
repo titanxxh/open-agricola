@@ -146,6 +146,8 @@ OpenRouter 不在 provider 级别声明 `chat` / `image` 兜底能力；每个�
 
 资料工具搜索允许的路径与已获取文件的正文（不是 GitHub 全库全文搜索），每次最多返回 160 行，序列化结果最多 16 KiB，单文件最多 256 KiB，并核对 Git blob 哈希。缓存文本命中与 Markdown 章节标题附带行号，供模型直接跳到相关段落；分页标记不要求读完整个文件。提示词说明请求额度；浏览器每轮在完整工具组之后另加执行状态消息，告知剩余请求数和修复次数，要求确认所需契约后结束资料收集。每次尝试重新解析 main，同 commit 的 tree 与正文可缓存。请求上下文达到 192 KiB 后终止，不悄悄丢弃协议字段。传输层按精确 provider/endpoint/model 执行准入；真实验收批次通过前，所有组合仍为待验。
 
+每段额度的最后一次模型请求保留工具定义，但使用 `tool_choice: none`，留出交付结果的一次响应。模型可以返回完整源码或有依据的澄清/能力缺口；若仍缺少关键资料事实，可返回 `reference-continuation`，保留当前检查点并等待用户显式追加额度，它不属于 Generation Result，也不能成为候选。浏览器执行状态使用宿主的 `system` 消息，不伪装成用户的新需求。保留工具定义是 DeepSeek 将先前推理纳入上下文的条件，见官方[思考模式契约](https://api-docs.deepseek.com/guides/thinking_mode/)；[Chat Completions 契约](https://api-docs.deepseek.com/api/create-chat-completion/)支持在思考模式中使用 `none`。
+
 决议保存在[资料契约](https://github.com/titanxxh/open-agricola/issues/1032)与[模型准入、循环边界及恢复](https://github.com/titanxxh/open-agricola/issues/1033)中，明确初始预算、显式继续、有限重试与修复，以及模型开放前所需的浏览器工具往返证据。
 
 #### C1.3 请求、结果与草稿恢复

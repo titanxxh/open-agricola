@@ -37,6 +37,7 @@ export type AttemptSnapshot = {
 }
 export type RequestAccounting = {
   sequence: number; inputBytes: number; startedAt: number; elapsedMs: number
+  toolChoice?: 'auto' | 'none'
   usage: GenerationUsage; finishReason: string; returnedModel?: string; requestId?: string; responseWireBytes?: number
 }
 
@@ -260,26 +261,32 @@ export class GenerationAttempt {
       // Host execution context is separate from the immutable card request and
       // follows any complete tool group. Preserve every provider field and ID.
       // Both product and frozen-control recipes use this same status message.
-      this.messages.push({ role: 'user', content: `[Browser execution status, not a change to the card requirements]\nThis is model request ${this.accounting.length + 1} of ${this.allowance.modelRequests}; ${this.allowance.modelRequests - this.accounting.length - 1} model requests remain after this response. Reference calls used: ${this.referenceCalls} of ${this.allowance.referenceCalls}. Static repairs still available: ${2 - this.repairs}, within the same request allowance. If the required semantics and parameter shapes are established, return the complete final source now, leaving requests for validation repairs. Query further only for a specific unresolved fact; an exhausted allowance is not a sandbox capability gap.` })
+      const finalResponseSlot = this.accounting.length + 1 === this.allowance.modelRequests
+      this.messages.push({ role: 'system', content: `[Browser execution status, not a change to the card requirements]\nThis is model request ${this.accounting.length + 1} of ${this.allowance.modelRequests}; ${this.allowance.modelRequests - this.accounting.length - 1} model requests remain after this response. Reference calls used: ${this.referenceCalls} of ${this.allowance.referenceCalls}. Static repairs still available: ${2 - this.repairs}, within the same request allowance. If the required semantics and parameter shapes are established, return the complete final source now, leaving requests for validation repairs. Query further only for a specific unresolved fact; an exhausted allowance is not a sandbox capability gap.${finalResponseSlot && this.recipe.tools.length ? '\nThis is the final response slot of the current allowance. Reference calls are disabled for this response. Produce the complete source using established facts, or the supported clarification/capability-gap response if justified by the requirements and actual contract. If an essential reference fact is still unresolved, do not guess: return {"kind":"reference-continuation","message":"Describe the exact missing fact and reference to inspect"}. The browser will pause for explicit continuation with the same inputs and references.' : ''}` })
       const inputBytes = new TextEncoder().encode(JSON.stringify({ messages: this.messages, tools: this.recipe.tools })).length
       if (inputBytes > GENERATION_CONTEXT_BYTES) throw new GenerationStopError('The reference and protocol context reached its fixed size limit. Start a new attempt with a narrower request; protocol fields were not truncated.')
       this.stage = 'model'
-      const record: RequestAccounting = { sequence: this.accounting.length + 1, inputBytes, startedAt: this.clock(), elapsedMs: 0, usage: { ...UNKNOWN_USAGE }, finishReason: 'unknown' }
+      const record: RequestAccounting = { sequence: this.accounting.length + 1, inputBytes, startedAt: this.clock(), elapsedMs: 0, usage: { ...UNKNOWN_USAGE }, finishReason: 'unknown', ...(this.recipe.tools.length ? { toolChoice: finalResponseSlot ? 'none' as const : 'auto' as const } : {}) }
       this.accounting.push(record); this.publish()
       try {
         const turn = await this.ports.model.complete(this.messages, this.recipe.tools, signal, text => {
           if (!signal.aborted && this.status === 'running') this.onText(text)
-        })
+        }, { toolChoice: finalResponseSlot ? 'none' : 'auto' })
         record.usage = turn.usage; record.finishReason = turn.finishReason
         record.returnedModel = turn.returnedModel; record.requestId = turn.requestId
         record.responseWireBytes = turn.responseWireBytes
         signal.throwIfAborted()
-        if (!this.recipe.tools.length && turn.calls.length) throw new GenerationStopError('The model returned tool calls when no tools were offered.')
+        if ((!this.recipe.tools.length || finalResponseSlot) && turn.calls.length) throw new GenerationStopError('The model returned tool calls when reference calls were disabled.')
         this.messages.push(turn.message)
         if (turn.calls.length) this.pendingCalls = { calls: turn.calls, results: new Map(), started: new Set() }
         else {
           let output: GenerationOutput
           try { output = extractGenerationOutput(turn.text) } catch (error) { throw new GenerationStopError(error instanceof Error ? error.message : 'Invalid final response.') }
+          if (output.kind === 'reference-continuation') {
+            if (!finalResponseSlot || !this.recipe.tools.length) throw new GenerationStopError('The model requested a reference continuation outside the final response slot.')
+            this.pause(output.message, undefined, true)
+            return
+          }
           if (output.kind !== 'source') { this.finish(output.kind, output.message); return }
           const fingerprint = sourceFingerprint(output.source)
           this.lastCandidate = {
