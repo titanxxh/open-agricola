@@ -45,7 +45,7 @@ const resolveInstalledNodeModules = (): string => {
 // has no scanner equivalent in generate-register-all.ts, so it's not asserted
 // here — diff would be vacuous.
 describe('PR files self-consistency (S9-B2)', () => {
-  it.each(['effect','empty'])(
+  it.each(['effect','empty','companion helper'])(
     'generated %s card compiles under tsc + generated card files match generate-register-all rerun',
     { timeout: 120_000 },
     async mode => {
@@ -59,10 +59,10 @@ const CARD_DEF = new MinorImprovement({ id: CARD_ID, name: 'Snapshot Card', deck
 const CARD_IMPL = { effect: { id: CARD_ID, onHarvest: () => gainLeaf(CARD_ID, { food: 1 }) } }`,
         card_json: JSON.stringify({ name: 'Snapshot Card' }),
       }
-      if (mode === 'empty') {
-        wcard.effect_code = `const CARD_ID = 'CUSTOM_SnapshotCard'
+      if (mode !== 'effect') {
+        wcard.effect_code = `const CARD_ID = 'CUSTOM_SnapshotCard'${mode === 'companion helper' ? ', FOOD = 1' : ''}
 const CARD_DEF = { cardType: 'minor', meta: { id: 'CUSTOM_SnapshotCard', name: 'Snapshot Card', deck: 'community', number: 0, desc: [], cost: {}, vp: 0 } }
-const CARD_IMPL = {}`
+const CARD_IMPL = ${mode === 'companion helper' ? "{ effect: { id: 'CUSTOM_SnapshotCard', onHarvest: () => gainLeaf('CUSTOM_SnapshotCard', {food: FOOD}) } }" : '{}'}`
       }
 
       const upstream_register_all = readFileSync(
