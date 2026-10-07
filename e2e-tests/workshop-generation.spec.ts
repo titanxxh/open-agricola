@@ -36,7 +36,7 @@ for (const locale of ['zh', 'en'] as const) test(`editor candidate recovery and 
     if (!response.ok || !data.id) throw new Error(JSON.stringify(data))
     return data.id as string
   }, { cardId, name, modelKey, locale })
-  const source = (amount: number, bad = false) => `const CARD_ID = '${cardId}'; const CARD_DEF = { cardType: 'minor', meta: { id: CARD_ID, name: '${name}', cost: { wood: 2 }, desc: ['Gain ${amount} food.'] } }; const CARD_IMPL = { effect: { onBuy: () => ${bad ? 'eval("invalid")' : `gainLeaf(CARD_ID, { food: ${amount} })`} } };`
+  const source = (amount: number, bad = false) => `const CARD_ID = '${cardId}'; const CARD_DEF = { cardType: 'minor', meta: { id: CARD_ID, name: '${name}', cost: { wood: 2 }, desc: ['Gain ${amount} food.'] } }; const CARD_IMPL = { effect: { onBuy: () => ${bad ? `({ type: 'seq', items: [gainLeaf(CARD_ID, { food: ${amount} })] })` : `gainLeaf(CARD_ID, { food: ${amount} })`} } };`
   const bodies: Array<{ messages: Array<{ role: string; content: string }> }> = []
   let fail = false
   await page.route(modelUrl, async route => {

@@ -180,6 +180,8 @@ The original single-file artifact remains on the separate `prototype/llm-tool-lo
 
 The compact prompt lives in `client/services/llm/generation/prompt.ts`. It defines the task, immutable input, reference tools, trust boundary and output formats, then includes the actual deployed sandbox contract. The contract derives hook/listener/action metadata from their shared truth sources and supplies exact injected helpers. Runtime identity and reference commit remain separate.
 
+The descriptor includes the ActionFlow node grammar and the distinction between engine-scheduled future rewards and resources stored on a card. Inspectable malformed composite flows fail static validation before play, using the same bounded repair path as other compilation errors; this is not a full type or behavior proof.
+
 Examples and detailed reference documents are fetched from GitHub on model request, at the attempt's fixed commit. No repository corpus is bundled into the site prompt. The frozen previous prompt is retained only in `tests/llm-card-gen/control/full-prompt.txt` for acceptance comparisons; product code cannot select it.
 
 #### Output format

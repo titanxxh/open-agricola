@@ -537,6 +537,20 @@ return {
 
 `futureMeeplesAction.execute()` recognizes `params.__futureMeepleRequest`, queues each entry in `state.pendingFutureMeeples`, and places it on the round action card at the start of its round. `FutureMeepleRequest` also supports `{ startRound, count, resources }` for consecutive rounds; see `shared/contract/types.ts`.
 
+Preplaced rewards on future rounds must use this scheduling path so their visible entries, delivery and cleanup belong to the engine. Storing counters on the card and paying them from a flagged `onRoundStart` hook does not create future round placements.
+
+### 5.8 ActionFlow structure
+
+A leaf uses `{ type: 'leaf', actionId, params, sourceCard: CARD_ID }`. Composite nodes use `children`, with type `seq`, `or`, `xor`, or `parallel`:
+
+```ts
+{ type: 'seq', children: [gainLeaf(CARD_ID, { food: 1 }), gainLeaf(CARD_ID, { wood: 1 })] }
+```
+
+`optional` is a boolean on a node, not another node type. Flow effect hooks return the flow directly; listeners return `{ flow, sourceCard: CARD_ID }` (or their documented query result).
+
+Before execution, the AST validator rejects inspectable composite literals that omit `children` or provide a statically non-array value. This includes direct flow-hook returns, nested literal children, and listeners' `flow` / `alternativeFlow` results. It does not mistake arbitrary leaf parameters or private card data for flows, and does not infer dynamic helper results or spread-provided children. Static success still requires behavioral playtesting.
+
 ---
 
 ## 6. `actionId` behavior

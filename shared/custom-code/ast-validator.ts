@@ -9,7 +9,7 @@
  * (separate V8 heap, no prototype chain escapes possible).
  */
 import ts from 'typescript'
-import { cardEffectHooks, isHandCardEffectHook } from '../cards/card-effects'
+import { cardEffectHooks, flowCardEffectHooks, isHandCardEffectHook } from '../cards/card-effects'
 import { REAL_RESOURCE_KEYS } from '../contract/resource-keys'
 import { isSandboxListenerAction } from './sandbox-listener-actions'
 import { sandboxListenerPhases } from './sandbox-listener-phases'
@@ -57,6 +57,68 @@ const ALLOWED_EFFECT_KEYS = new Set<string>([
 /** Allowed values inside listener.phases arrays. */
 const ALLOWED_LISTENER_PHASES = new Set<string>(sandboxListenerPhases)
 const RESOURCE_KEYS = new Set<string>(REAL_RESOURCE_KEYS)
+const FLOW_EFFECT_KEYS = new Set<string>([...flowCardEffectHooks, 'resolveChoice'])
+
+/** Check known literal flow results without treating arbitrary card data as flow
+ * or claiming to type-check dynamic helper calls/children. */
+function validateLiteralFlow(
+  expression: ts.Expression,
+  errors: string[],
+  getLine: (node: ts.Node) => number,
+  constants: Map<string, string>,
+): void {
+  while (ts.isParenthesizedExpression(expression) || ts.isAsExpression(expression)
+    || ts.isTypeAssertionExpression(expression) || ts.isNonNullExpression(expression)
+    || ts.isSatisfiesExpression(expression)) expression = expression.expression
+  if (ts.isConditionalExpression(expression)) {
+    validateLiteralFlow(expression.whenTrue, errors, getLine, constants)
+    validateLiteralFlow(expression.whenFalse, errors, getLine, constants)
+    return
+  }
+  if (!ts.isObjectLiteralExpression(expression)) return
+  if (expression.properties.some(property => !hasInspectablePropertyName(property, constants))) return
+  const properties = [...expression.properties].reverse()
+  const type = properties.find(property => getStaticPropertyName(property, constants) === 'type')
+  const kind = type && ts.isPropertyAssignment(type) ? getStaticStringValue(type.initializer, constants) : undefined
+  if (!kind || !['seq', 'or', 'xor', 'parallel'].includes(kind)) return
+  const children = properties.find(property => getStaticPropertyName(property, constants) === 'children')
+  const report = () => errors.push(`line ${getLine(expression)}: ActionFlow '${kind}' requires a children array, not items or steps`)
+  if (!children) {
+    report()
+    return
+  }
+  if (!ts.isPropertyAssignment(children)) return
+  let value = children.initializer
+  while (ts.isParenthesizedExpression(value) || ts.isAsExpression(value)
+    || ts.isTypeAssertionExpression(value) || ts.isNonNullExpression(value)
+    || ts.isSatisfiesExpression(value)) value = value.expression
+  if (ts.isArrayLiteralExpression(value)) {
+    for (const child of value.elements) validateLiteralFlow(child, errors, getLine, constants)
+  } else if (ts.isObjectLiteralExpression(value) || ts.isStringLiteralLike(value) || ts.isNumericLiteral(value)
+    || [ts.SyntaxKind.NullKeyword, ts.SyntaxKind.TrueKeyword, ts.SyntaxKind.FalseKeyword].includes(value.kind)) report()
+}
+
+function validateFlowHookReturns(
+  hook: ts.ArrowFunction | ts.FunctionExpression | ts.MethodDeclaration,
+  errors: string[],
+  getLine: (node: ts.Node) => number,
+  constants: Map<string, string>,
+): void {
+  if (!hook.body) return
+  if (!ts.isBlock(hook.body)) {
+    validateLiteralFlow(hook.body, errors, getLine, constants)
+    return
+  }
+  const visit = (node: ts.Node): void => {
+    if (ts.isReturnStatement(node)) {
+      if (node.expression) validateLiteralFlow(node.expression, errors, getLine, constants)
+      return
+    }
+    if (ts.isFunctionLike(node)) return
+    ts.forEachChild(node, visit)
+  }
+  ts.forEachChild(hook.body, visit)
+}
 
 function getStaticStringValue(
   input: ts.Expression,
@@ -489,6 +551,14 @@ export function validateCardCode(source: string, expectedCardId?: string): Valid
 
   // Validate CARD_IMPL hook/listener whitelists
   validateCardImplHooksAndPhases(sourceFile, errors)
+  const constants = collectStringConstants(sourceFile)
+  forEachListenerResultObject(sourceFile, constants, result => {
+    for (const property of result.properties) {
+      if (ts.isPropertyAssignment(property) && ['flow', 'alternativeFlow'].includes(getStaticPropertyName(property, constants) ?? '')) {
+        validateLiteralFlow(property.initializer, errors, getLine, constants)
+      }
+    }
+  })
   validateCostAttributionShapes(sourceFile, errors, expectedCardId)
   for (const line of findMissingCostAttributionLines(sourceFile)) {
     errors.push(`line ${line}: listener results with costs must include costAttribution`)
@@ -574,7 +644,7 @@ function validateCardImplObject(
       if (!ts.isPropertyAssignment(prop) || !ts.isObjectLiteralExpression(prop.initializer)) {
         errors.push(`line ${getLine(prop)}: CARD_IMPL.effect must be an object literal`)
       } else {
-        validateEffectKeys(prop.initializer, errors, getLine)
+        validateEffectKeys(prop.initializer, errors, getLine, constants)
       }
       continue
     }
@@ -599,6 +669,7 @@ function validateEffectKeys(
   effectObj: ts.ObjectLiteralExpression,
   errors: string[],
   getLine: (node: ts.Node) => number,
+  constants: Map<string, string>,
 ): void {
   for (const prop of effectObj.properties) {
     if (ts.isSpreadAssignment(prop)) {
@@ -620,6 +691,12 @@ function validateEffectKeys(
     if (!name) continue
     if (!ALLOWED_EFFECT_KEYS.has(name)) {
       errors.push(`line ${getLine(prop)}: unknown effect hook '${name}' in CARD_IMPL.effect`)
+    }
+    if (FLOW_EFFECT_KEYS.has(name)) {
+      if (ts.isMethodDeclaration(prop)) validateFlowHookReturns(prop, errors, getLine, constants)
+      else if (ts.isPropertyAssignment(prop) && (ts.isArrowFunction(prop.initializer) || ts.isFunctionExpression(prop.initializer))) {
+        validateFlowHookReturns(prop.initializer, errors, getLine, constants)
+      }
     }
     if (name !== 'handHooks') continue
     if (!ts.isPropertyAssignment(prop) || !ts.isArrayLiteralExpression(prop.initializer)) {
