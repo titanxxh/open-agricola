@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createToolTransport, readModelTurn } from '../protocol'
+import { createToolTransport, MODEL_STREAM_LIMITS, readModelTurn } from '../protocol'
 
 const signal = () => new AbortController().signal
 const frame = (delta: unknown, finish: string | null = null) => ({ id: 'response-1', model: 'returned-model', choices: [{ index: 0, delta, finish_reason: finish }] })
@@ -11,6 +11,24 @@ function stream(frames: unknown[], done = true): Response {
 }
 
 describe('browser model protocol', () => {
+  it('accepts bounded long output whose repeated SSE metadata exceeds 2 MiB on the wire', async () => {
+    const count = 16300
+    const token = `data: ${JSON.stringify({ ...frame({ reasoning_content: 'x' }), created: 1791400000, object: 'chat.completion.chunk', system_fingerprint: 'provider-metadata-repeated-per-token' })}\n\n`
+    const body = token.repeat(count) + `data: ${JSON.stringify(frame({ content: 'complete source' }, 'stop'))}\n\ndata: [DONE]\n\n`
+    expect(new TextEncoder().encode(body).byteLength).toBeGreaterThan(2 * 1024 * 1024)
+    const result = await readModelTurn(new Response(body), signal())
+    expect(result.message.reasoning_content).toHaveLength(count)
+    expect(result.text).toBe('complete source')
+    expect(result.responseWireBytes).toBe(new TextEncoder().encode(body).byteLength)
+  })
+
+  it('still rejects an oversized assembled payload and an unterminated oversized event', async () => {
+    const part = `data: ${JSON.stringify(frame({ reasoning_content: 'x'.repeat(MODEL_STREAM_LIMITS.messageBytes / 2 + 1) }))}\n\n`
+    await expect(readModelTurn(new Response(part + part + 'data: [DONE]\n\n'), signal())).rejects.toMatchObject({
+      kind: 'protocol', message: expect.stringContaining('payload limit'), requestId: 'response-1', returnedModel: 'returned-model', responseWireBytes: expect.any(Number),
+    })
+    await expect(readModelTurn(new Response('data: ' + 'x'.repeat(MODEL_STREAM_LIMITS.eventBytes)), signal())).rejects.toThrow('event limit')
+  })
   it('retains interleaved calls, Unicode, reasoning and late signatures in the next POST', async () => {
     const fetchModel = vi.fn<typeof fetch>().mockResolvedValueOnce(stream([
       frame({ role: 'assistant', content: '查', reasoning_content: 'think ', tool_calls: [{ index: 1, id: 'second', type: 'function', function: { name: 'read_reference', arguments: '{"path":' } }, { index: 0, id: 'first', type: 'function', function: { name: 'search_references', arguments: '{"que' } }] }),

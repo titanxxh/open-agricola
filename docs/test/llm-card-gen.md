@@ -46,6 +46,9 @@ pnpm test:llm:dry
 # 正式验收：先确认模型身份和整个验收工作的付费预算；工作区必须已提交
 pnpm test:llm:live --model <confirmed-model-id>
 
+# 单场景付费诊断：单独标记、共用总预算，永远不能作为模型准入或替换正式失败样本
+pnpm test:llm:live --model <confirmed-model-id> --diagnose M6-cardstate-counter
+
 # 自定义本机入口；仍须是 localhost 或 127.0.0.1
 pnpm test:llm:dry --base-url http://127.0.0.1:5913 --runtime-env output/tmp/llm-runtime/local.env
 
@@ -69,7 +72,7 @@ The [approved quality and cost decision](https://github.com/titanxxh/open-agrico
 
 All paid probes, comparisons, failures, repairs and subsequent batches share a **US$5 total budget**. The persistent ledger is `<git-common-dir>/llm-acceptance-usd5.json`, shared by every worktree. An exclusive `.lock` prevents concurrent writers. Each conservative reservation is atomically saved before the browser can issue its POST; interrupted or unreported usage keeps the full reservation. A new batch does not reset the ledger. There is no budget override or account top-up. If a process crashes, inspect the PID in its lock and the preserved reservations before removing a stale lock; do not delete or zero the ledger. Synthetic runs use a separate, explicitly labelled budget file in their own output directory.
 
-Each run creates `output/tmp/llm-acceptance/<batch>/` containing the frozen manifest, per-task source/validation/behavior records, request accounting, reference SHAs/ranges, credential-destination checks, budget snapshot and final report. Compact tool operations, HTTP outcomes/retries and successful read ranges remain available even when an attempt pauses; raw response bodies, reasoning and signatures remain page-memory-only. Files are local private test artifacts and are not committed automatically. The manifest freezes implementation hashes, prompt/control hashes, settings, limits and actual deployed sandbox ID. It rejects edits during a run and requires a clean committed implementation for paid runs. Only the GitHub main reference may advance between new attempts, as required by the product contract.
+Each run creates `output/tmp/llm-acceptance/<batch>/` containing the frozen manifest, per-task source/validation/behavior records, request accounting, reference SHAs/ranges, credential-destination checks, budget snapshot and final report. Compact tool operations, HTTP outcomes/retries and successful read ranges remain available even when an attempt pauses; raw response bodies, reasoning and signatures remain page-memory-only. Files are local private test artifacts and are not committed automatically. The manifest freezes implementation hashes, prompt/control hashes, model and streaming limits, and actual deployed sandbox ID. It rejects edits during a run and requires a clean committed implementation for paid runs. Only the GitHub main reference may advance between new attempts, as required by the product contract.
 
 The runner first checks anonymous GitHub quota, then performs one real browser tool roundtrip probe. If the probe passes, it executes all declared scenarios in order, tools then control, for each repetition. Quality failures remain in the batch and do not trigger Session-driven repair or a lucky retry. A lost transport, paused attempt, budget stop or source change yields an incomplete, non-admissible batch. No model POST is retried automatically. Changing the implementation or prompt requires a separately identified complete batch while retaining earlier failures and their costs.
 
