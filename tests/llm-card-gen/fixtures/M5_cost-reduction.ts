@@ -21,8 +21,9 @@ const fixture: CardFixture = {
     '- 效果: 你翻修房屋时，所需芦苇 (reed) -1（最少 0）。',
   ].join('\n'),
 
-  setup(llmCode) {
+  setup(llmCode, options) {
     const built = buildSessionWithLLMCard(llmCode, {
+      historicalRecording: options?.historicalRecording,
       cardId: CARD_ID,
       cardType: 'occupation',
       cardName: '节俭翻修家',

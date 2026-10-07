@@ -119,6 +119,14 @@ Each new-arm run retains the eight-model-request, 24-tool-call and five-minute l
 
 Deterministic protocol replay and browser E2E cover reference versions and failures, complete tool groups/signatures, exact budget boundaries, cancellation/late responses, candidate/source binding, recovery/adoption/privacy, manual playtest repair and translation regressions. Check real browser request destinations: only the configured LLM provider receives its credential. Test artifacts use synthetic or test-owned inputs, exclude credentials, and do not broaden production's page-memory-only raw protocol contract. Detailed scenarios and reporting requirements live in the decision record. No browser-tool model has passed this planned acceptance yet.
 
+### Implementation progress: control and behavior checks
+
+The complete old prompt is frozen in `tests/llm-card-gen/control/full-prompt.txt`; its manifest records rendered bytes, SHA-256, source commit and dependency hashes. This is a test-only control, not a product fallback. New fixture setup preserves generated source and authoritative CARD_DEF metadata. The explicitly named `historicalRecording` option retains identity/metadata adaptation only for historical golden regression; those results are not model-admission evidence.
+
+The driver rejects failed commands and requires explicit nontrivial choices. Fixtures use placeholder hands. M4 checks authoritative final scoring across multiple cattle counts; M6 checks intermediate counts including the fishing negative; M7 replenishes wood before checking the once-only gate; M9 checks exact delayed delivery, cleanup and no repeat. M10 uses a two-player session with an explicitly prepared Traveling Players resource source for its payment-provider test. Known-bad recording mutations exercise these oracles independently of live generation.
+
+The browser generation path, remaining matrix additions and paid admission are still pending; passing these offline tests does not open a model.
+
 ## Fixture 三段式
 
 ```ts
@@ -155,11 +163,11 @@ interface CardFixture {
 
 ### 不要调 `loadState`
 
-`session.loadState(state)` 会走 `normalizeState` → 任意 hand 为空就**重新发牌**，把 `clearAllHands` 效果抹掉。`buildSessionWithLLMCard` 返回后直接 mutate `session.getState().state`（live reference）即可。
+`clearAllHands` 现在将所有 hand 设为 `__test_placeholder__`，避免 `normalizeState` 对空 hand 重新发牌。`buildSessionWithLLMCard` 返回后可准备 `session.getState().state` 的测试初始状态。
 
 ### 多步骤行动
 
-连续 `takeAction` 之间可能进入 `interaction.request.kind === 'confirm-next-player'`（比如轮到对手但对手没工人）。优先使用 `Driver.takeAction()` 自动 drain；只有必须观察中间 pending 时才用 `takeActionRaw()` / `resolveChoiceRaw()`。
+连续 `takeAction` 之间可能进入 `interaction.request.kind === 'confirm-next-player'`（比如轮到对手但对手没工人）。新验收只自动处理确认及明确的本卡选择；支付等关键 pending 必须使用 `takeActionRaw()` / `resolveChoiceRaw()` 检查选项后明确选择。历史录音保留显式标记的旧 drain 行为。
 
 单回合内同一玩家多次 action 还需要：
 

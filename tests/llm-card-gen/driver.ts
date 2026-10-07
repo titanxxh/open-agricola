@@ -35,10 +35,12 @@ export class Driver {
   constructor(
     private readonly session: GameSession,
     private readonly ctx: FixtureContext,
+    private readonly options: { historicalRecording?: boolean } = {},
   ) {}
 
   private record(label: string, resp: SessionResp): SessionResp {
     this.steps.push({ label, ok: resp.ok, error: resp.error, stateId: resp.interaction.stateId })
+    if (!resp.ok) throw new Error(`${label} failed: ${resp.error ?? 'unknown error'}`)
     return resp
   }
 
@@ -66,13 +68,12 @@ export class Driver {
       const opts = it.request?.options ?? []
       const pick =
         opts.find((o) => o.value === this.ctx.cardId) ??
-        opts.find((o) => o.value !== '__skip__') ??
-        opts[0]
-      if (!pick) throw new Error(`driver: choice with no options at ${label}`)
+        (this.options.historicalRecording ? opts.find((o) => o.value !== '__skip__') ?? opts[0] : undefined)
+      if (!pick) throw new Error(`driver: fixture must explicitly resolve choice at ${label}`)
       const pi = it.playerIndex ?? 0
       return this.resolveChoiceRaw(pi, pick.value)
     }
-    if (kind === 'farm-select' && it.request?.farm?.farmType === 'room') {
+    if (this.options.historicalRecording && kind === 'farm-select' && it.request?.farm?.farmType === 'room') {
       const room = it.request.farm.selectableTiles?.[0]
       if (!room) throw new Error(`driver: room selection with no selectable tiles at ${label}`)
       const pi = it.playerIndex ?? 0

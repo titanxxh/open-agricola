@@ -21,8 +21,9 @@ const fixture: CardFixture = {
     '  本卡牌的所有者额外获得 1 木材（奖励始终归卡主，无论谁触发）。',
   ].join('\n'),
 
-  setup(llmCode) {
+  setup(llmCode, options) {
     const built = buildSessionWithLLMCard(llmCode, {
+      historicalRecording: options?.historicalRecording,
       cardId: CARD_ID,
       cardType: 'occupation',
       cardName: '邻居互助',

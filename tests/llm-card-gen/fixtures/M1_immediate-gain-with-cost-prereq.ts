@@ -24,8 +24,9 @@ const fixture: CardFixture = {
     '- 效果: 打出本牌时立即获得 3 木材和 1 食物。',
   ].join('\n'),
 
-  setup(llmCode) {
+  setup(llmCode, options) {
     const built = buildSessionWithLLMCard(llmCode, {
+      historicalRecording: options?.historicalRecording,
       cardId: CARD_ID,
       cardType: 'minor',
       cardName: '速运',

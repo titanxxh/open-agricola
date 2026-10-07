@@ -20,8 +20,9 @@ const fixture: CardFixture = {
     '- 效果: 你每次使用「伐木」(forest) 行动空间时，额外获得 1 木材。',
   ].join('\n'),
 
-  setup(llmCode) {
+  setup(llmCode, options) {
     const built = buildSessionWithLLMCard(llmCode, {
+      historicalRecording: options?.historicalRecording,
       cardId: CARD_ID,
       cardType: 'occupation',
       cardName: '伐木靴',
