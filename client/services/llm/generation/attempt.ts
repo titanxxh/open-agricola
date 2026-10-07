@@ -257,6 +257,10 @@ export class GenerationAttempt {
         this.messages.push({ role: 'user', content: `Static validation of source ${fingerprint} failed:\n${validation.errors.join('\n')}\nReturn the entire corrected source. Preserve all requested rules and identity. Do not invent missing capabilities.` })
       }
       if (this.accounting.length >= this.allowance.modelRequests) { this.pause('The model-request allowance was reached.', undefined, true); return }
+      // Host execution context is separate from the immutable card request and
+      // follows any complete tool group. Preserve every provider field and ID.
+      // Both product and frozen-control recipes use this same status message.
+      this.messages.push({ role: 'user', content: `[Browser execution status, not a change to the card requirements]\nThis is model request ${this.accounting.length + 1} of ${this.allowance.modelRequests}; ${this.allowance.modelRequests - this.accounting.length - 1} model requests remain after this response. Reference calls used: ${this.referenceCalls} of ${this.allowance.referenceCalls}. Static repairs still available: ${2 - this.repairs}, within the same request allowance. If the required semantics and parameter shapes are established, return the complete final source now, leaving requests for validation repairs. Query further only for a specific unresolved fact; an exhausted allowance is not a sandbox capability gap.` })
       const inputBytes = new TextEncoder().encode(JSON.stringify({ messages: this.messages, tools: this.recipe.tools })).length
       if (inputBytes > GENERATION_CONTEXT_BYTES) throw new GenerationStopError('The reference and protocol context reached its fixed size limit. Start a new attempt with a narrower request; protocol fields were not truncated.')
       this.stage = 'model'
