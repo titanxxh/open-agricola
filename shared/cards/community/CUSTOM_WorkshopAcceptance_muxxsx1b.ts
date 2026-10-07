@@ -7,7 +7,6 @@ import { defineMinorCard } from '../card-source'
 import type { CardImpl } from '../registry'
 
 
-const CARD_ID = 'CUSTOM_WorkshopAcceptance_muxxsx1b'
 const CARD_IMPL: CardImpl = {}
 
 const cardImpl = CARD_IMPL satisfies CardImpl
