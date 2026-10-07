@@ -35,7 +35,7 @@ describe('canonical architecture verification wiring', () => {
       'shared/session/__tests__/interaction-command-policy.test.ts',
       'shared/cards/__tests__/card-source.test.ts',
       'shared/contract/__tests__/prompt-keys.test.ts',
-      'client/services/__tests__/llmPrompts.test.ts',
+      'client/services/__tests__/generation-prompt.test.ts',
       'server/__tests__/workshop-prompt-runtime.test.ts',
       'scripts/__tests__/ci-card-impl-boundaries.test.ts',
       'scripts/__tests__/check-card-state-boundaries.test.ts',

@@ -9,6 +9,10 @@ import {
 } from '@playwright/test'
 import { approveCurrentDraft, publish } from '../server/workshop-drafts.ts'
 import { BACKEND_URL, FRONTEND_URL } from './fixtures'
+import { createLocalUserForTests, createSession } from '../server/auth'
+import { getDb } from '../server/db'
+
+test.afterAll(async () => { await getDb().close() })
 
 type Locale = 'zh' | 'en'
 type Viewport = 'desktop' | 'mobile'
@@ -80,38 +84,16 @@ const CARD_DEF = {
 const CARD_IMPL = ${invalid ? "{ onPlay() { eval('invalid') } }" : '{}'}
 `.trim()
 
-const cookieValue = (response: APIResponse, cookieName: string) => {
-  const header = response.headersArray().find(({ name, value }) =>
-    name.toLowerCase() === 'set-cookie' && value.startsWith(`${cookieName}=`),
-  )
-  if (!header) throw new Error(`missing ${cookieName} cookie`)
-  return header.value.split(';')[0]!.slice(cookieName.length + 1)
-}
-
 const createAccount = async (
-  request: APIRequestContext,
+  _request: APIRequestContext,
   page?: Page,
 ): Promise<Account> => {
   const suffix = unique('workspace')
   const username = `ws_${suffix}`.slice(0, 30)
   const password = 'workspace-pass-562'
-  const oauth = await request.post(`${BACKEND_URL}/api/test/oauth/github/callback`, {
-    data: {
-      providerUserId: `github-${suffix}`,
-      providerLogin: username,
-      email: `${username}@example.com`,
-      displayName: username,
-    },
-  })
-  expect(oauth.ok(), await oauth.text()).toBe(true)
-  const onboarding = cookieValue(oauth, 'oa_onboarding')
-  const complete = await request.post(`${BACKEND_URL}/api/auth/onboarding/complete`, {
-    data: { username, displayName: username, password, confirmPassword: password },
-    headers: { Cookie: `oa_onboarding=${onboarding}` },
-  })
-  const completeText = await complete.text()
-  expect(complete.ok(), completeText).toBe(true)
-  const cookie = cookieValue(complete, 'oa_session')
+  const user = await createLocalUserForTests(username, password)
+  const cookie = await createSession(user.id)
+  if (!cookie) throw new Error('Could not create the local test session')
   if (page) {
     await page.context().addCookies([{
       name: 'oa_session',
@@ -292,6 +274,13 @@ const setupPage = async (
   variant: Variant,
   options: { llm?: boolean } = {},
 ) => {
+  if (options.llm) {
+    await page.route('**/client/services/llm/generation/admission.ts*', async route => {
+      const response = await route.fetch()
+      await route.fulfill({ response, body: (await response.text()).replace('ADMITTED_GENERATION_MODELS = []', 'ADMITTED_GENERATION_MODELS = [{provider:"openrouter",endpoint:"https://openrouter.ai/api/v1/chat/completions",model:"qwen/qwen3.6-plus:free",batch:"fixture",evidence:"controlled browser test"}]') })
+    })
+    await page.route('https://api.github.com/**', route => route.fulfill({ json: route.request().url().includes('/git/ref/') ? { object: { sha: 'e'.repeat(40) } } : { truncated: false, tree: [] } }))
+  }
   await page.setViewportSize(variant.size)
   await page.addInitScript(({ locale, llm }) => {
     localStorage.setItem('open-agricola-locale-v2', locale)
@@ -407,7 +396,7 @@ const fakeChatService = async (
   await page.route('https://openrouter.ai/**/chat/completions', route => {
     const content = response(calls++)
     const body = content
-      ? `data: ${JSON.stringify({ choices: [{ delta: { content } }] })}\n\ndata: [DONE]\n\n`
+      ? `data: ${JSON.stringify({ choices: [{ index: 0, delta: { content }, finish_reason: 'stop' }] })}\n\ndata: [DONE]\n\n`
       : 'data: [DONE]\n\n'
     return route.fulfill({
       status: 200,
@@ -611,7 +600,7 @@ const CARD_IMPL = {}
 `.trim()
   const invalidSource = sourceFor(workspace.draft.cardId, workspace.draft.name, true)
   await fakeChatService(page, call =>
-    `\`\`\`typescript\n${call === 0 ? invalidSource : validSource}\n\`\`\``,
+    `\`\`\`typescript\n${call < 3 ? invalidSource : validSource}\n\`\`\``,
   )
   await openEditor(page, workspace.id)
   await stage(page, variant.locale, '卡牌能力', 'Card ability')
@@ -1393,8 +1382,8 @@ const scenarioErrors = async ({
   await page.getByRole('button', {
     name: text(variant.locale, '生成能力候选', 'Generate ability candidate'),
   }).click()
-  await expect(page.locator('.aicw-panel-error')).toBeVisible()
-  await expect(page.locator('.aicw-panel-error')).toBeFocused()
+  await expect(page.locator('.aicw-generation-progress')).toContainText(text(variant.locale, '已暂停', 'Paused'))
+  await expect(page.locator('.aicw-generation-progress')).toBeFocused()
 
   let validationFailed = true
   await page.route('**/api/workshop/cards/validate-code', route => {
@@ -1408,14 +1397,10 @@ const scenarioErrors = async ({
     return route.continue()
   })
   await page.getByRole('button', { name: text(variant.locale, '重发', 'Resend') }).click()
-  await expect(page.locator('.aicw-candidate-section')).toBeVisible({ timeout: 30_000 })
-  await expect(page.locator('.aicw-validation-errors')).toContainText(
-    'deterministic validator failure',
-  )
+  await expect(page.locator('.aicw-generation-progress')).toContainText('Code validation is unavailable')
+  await expect(page.locator('.aicw-candidate-section')).toBeHidden()
   validationFailed = false
-  await page.getByRole('button', {
-    name: text(variant.locale, '运行静态验证', 'Run static validation'),
-  }).click()
+  await page.getByRole('button', { name: text(variant.locale, '重试当前步骤', 'Retry this step') }).click()
   await expect(page.getByRole('button', {
     name: text(variant.locale, '采用为当前源码', 'Adopt as current source'),
   })).toBeEnabled({ timeout: 30_000 })

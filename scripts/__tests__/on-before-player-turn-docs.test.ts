@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { CARD_DESIGNER_SYSTEM_PROMPT } from '../../client/services/llmPrompts'
+import { getWorkshopSandboxContract } from '../../server/workshop-sandbox-contract'
+import { generationSystemPrompt } from '../../client/services/llm/generation/prompt'
 
 const read = (path: string) => readFileSync(path, 'utf8')
 
@@ -15,6 +16,6 @@ describe('onBeforePlayerTurn documentation contract', () => {
     expect(status).toMatch(/onBeforePlayerTurn[\s\S]{0,160}non-flow/)
     expect(sandbox).toMatch(/onBeforePlayerTurn[\s\S]{0,200}skipTurn/)
     expect(sandbox).toMatch(/onBeforePlayerTurn[\s\S]{0,240}ActionFlow/)
-    expect(CARD_DESIGNER_SYSTEM_PROMPT).toMatch(/onBeforePlayerTurn[\s\S]{0,200}skip-control/)
+    expect(generationSystemPrompt(getWorkshopSandboxContract(), 'a'.repeat(40))).toMatch(/onBeforePlayerTurn[\s\S]{0,200}skip-control/)
   })
 })

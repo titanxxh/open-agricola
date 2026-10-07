@@ -46,11 +46,11 @@ describe('immutable generation input', () => {
   it('binds repair to tested version B while C is selected', () => {
     const snapshot = buildGenerationRequest({ workspaceId: 'w', baseRevision: 1, draft,
       selectedCandidate: { id: 'C', kind: 'ability', sourceCode: 'selected C', cardJson: {}, validation: { valid: true }, createdAt: 1, prompt: 'other' },
-      intent: { kind: 'repair', message: 'fix it', failure: { versionId: 'version-B', source: 'tested B', sourceFingerprint: sourceFingerprint('tested B'), errors: ['runtime error'] } },
+      intent: { kind: 'repair', message: 'fix it', failure: { workspaceId: 'w', versionId: 'version-B', source: 'tested B', sourceFingerprint: sourceFingerprint('tested B'), errors: ['runtime error'] } },
     })
     expect(snapshot.input.source).toBe('tested B')
     expect(snapshot.sourceCandidate).toBeUndefined()
-    expect(() => buildGenerationRequest({ workspaceId: 'w', baseRevision: 1, draft, intent: { kind: 'repair', message: 'fix', failure: { versionId: 'B', source: 'B', sourceFingerprint: 'mismatch', errors: [] } } })).toThrow('does not match')
+    expect(() => buildGenerationRequest({ workspaceId: 'w', baseRevision: 1, draft, intent: { kind: 'repair', message: 'fix', failure: { workspaceId: 'w', versionId: 'B', source: 'B', sourceFingerprint: 'mismatch', errors: [] } } })).toThrow('does not match')
   })
 
   it('does not extract a partial or ambiguous source as a completed result', () => {
@@ -61,6 +61,13 @@ describe('immutable generation input', () => {
 })
 
 describe('bounded browser generation attempt', () => {
+  it('does not count an unissued model POST when reservation fails', async () => {
+    const io = ports()
+    io.model.complete = vi.fn(async () => { throw new ModelTurnError('preflight', 'Budget exhausted') })
+    const attempt = new GenerationAttempt(request(), io)
+    expect(await attempt.start()).toMatchObject({ status: 'paused', modelRequests: 0, retry: 'model' })
+    expect(attempt.requestAccounting()).toEqual([])
+  })
   it('preserves the assistant tool group and original IDs before asking for source', async () => {
     const io = ports()
     const history: WireMessage[][] = []

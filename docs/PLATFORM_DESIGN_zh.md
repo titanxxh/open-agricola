@@ -138,7 +138,7 @@ OpenRouter 不在 provider 级别声明 `chat` / `image` 兜底能力；每个�
 
 #### C1.2 浏览器工具循环
 
-浏览器执行循环已实现于 `client/services/llm/generation/`；生产编辑器切换前仍使用下文的纯文字流。上方模型表列出的是现有 UI 注册项，不代表已经通过工具调用验收的组合。
+生产编辑器使用 `client/services/llm/generation/` 中的浏览器循环；原有纯文本能力生成路径已移除。上方模型表列出的是现有 UI 注册项，不代表已经通过工具调用验收的组合。
 
 **Generation Attempt（生成尝试）**包含资料查询、模型回答和有界修复。暂停后继续沿用其模型配置、资料 commit 和累计统计；取消时不能把半截输出当作完成候选。每次新尝试解析 GitHub 最新 `main`，并将该次资料读取固定到这个 commit。参考资料独立于站点发布，生成的可执行代码仍须遵守实际 Custom Code Sandbox 的能力限制。LLM 凭据仍只由浏览器发送给模型服务。
 
@@ -154,21 +154,21 @@ OpenRouter 不在 provider 级别声明 `chat` / `image` 兜底能力；每个�
 
 **Generation Result（生成结果）**可以包含完整源码候选、保留供修复的失败源码、澄清、能力缺口，或故障/中断说明。失败源码不能采用，也不替换最近通过代码校验的候选；半截输出不属于完整源码候选。源码与输入指纹将异步结果和校验回传绑定到对应内容，旧响应不能悄悄替换新编辑。
 
-| 存储边界 | 待实现的恢复范围 |
+| 存储边界 | 恢复范围 |
 |---|---|
 | 当前浏览器页面 | 完整工具协议、资料正文与 provider 推理/签名；刷新后不续接该协议 |
 | 同一浏览器的本地恢复 | 可见对话及已有编辑状态；未完成工作标为已中断，绝不自动续跑 |
 | 作者私有的服务端草稿 | 已采用内容、最近通过代码校验的能力候选、最近 Generation Result 和精简 Generation Provenance；不保存完整对话或原始工具协议 |
 
-最近结果与候选可关联同一份源码，不保留重复的完成内容副本。采用仍需作者明确操作并通过服务端校验。Draft Version 只保留已采用内容与白名单内的溯源；相同内容继续复用不可变版本，不改写其原始溯源。公开卡牌、投稿和 Replay 投影不包含私有生成记录。共享白名单 `shared/projections/workshop-generation.ts` 已贯通检查点、采用、版本溯源与本地恢复。能力分区分别保存 `lastValid` 与 `latestResult`；成功结果按候选 ID 与源码指纹引用源码，失败结果保留不可采用的完整源码。本地聊天仅投影可见字段，进行中的工作恢复为已中断。生产 UI 切换仍待实现。
+最近结果与候选可关联同一份源码，不保留重复的完成内容副本。采用仍需作者明确操作并通过服务端校验。Draft Version 只保留已采用内容与白名单内的溯源；相同内容继续复用不可变版本，不改写其原始溯源。公开卡牌、投稿和 Replay 投影不包含私有生成记录。共享白名单 `shared/projections/workshop-generation.ts` 已贯通检查点、采用、版本溯源与本地恢复。能力分区分别保存 `lastValid` 与 `latestResult`；成功结果按候选 ID 与源码指纹引用源码，失败结果保留不可采用的完整源码。本地聊天仅投影可见字段，进行中的工作恢复为已中断。编辑器已使用这些投影完成生成、明确采用和恢复。
 
 `GET /api/workshop/sandbox-contract` 提供实际部署的 helper 源码、hook/listener 元数据、支持的行动参数、隔离限制与语义约束。其标识来自部署中的 shared/executor 源码及运行时版本，与 GitHub 资料 commit 分开记录。`POST /api/workshop/cards/validate-code` 将成功和失败都绑定到该标识及提交源码指纹；过期契约返回 `sandbox_changed`，要求开始新尝试。主浏览器只接收数据，不导入规则运行时。
 
 #### C1.4 已定案、待实现的质量与成本验收
 
-[验收决议](https://github.com/titanxxh/open-agricola/issues/1035)规定模型逐个通过浏览器协议与卡牌行为验证后开放，首先验收当前配置的 DeepSeek Flash 组合。已确认的批次覆盖 17 个场景，两组各重复 3 次，全部付费调用共用 5 美元预算。新架构每次运行都必须通过相应行为或能力缺口断言；首次输出质量、修复、token 和耗时分别记录。[LLM 测试指南](test/llm-card-gen.md#planned-browser-tool-acceptance)说明样本与证据要求。该验收程序和生产工具循环仍待实现。
+[验收决议](https://github.com/titanxxh/open-agricola/issues/1035)规定模型逐个通过浏览器协议与卡牌行为验证后开放，首先验收当前配置的 DeepSeek Flash 组合。已确认的批次覆盖 17 个场景，两组各重复 3 次，全部付费调用共用 5 美元预算。新架构每次运行都必须通过相应行为或能力缺口断言；首次输出质量、修复、token 和耗时分别记录。[LLM 测试指南](test/llm-card-gen.md#planned-browser-tool-acceptance)说明样本与证据要求。正式付费验收程序仍待实现；确定性浏览器测试不构成模型准入。
 
-#### C1.5 已认可的交互原型，待接入生产
+#### C1.5 编辑器交互
 
 用户于 2026-10-08 认可[交互原型](https://github.com/titanxxh/open-agricola/issues/1036)。其中十个引导场景确定了生产工坊应遵守的展示要求：
 
@@ -178,19 +178,17 @@ OpenRouter 不在 provider 级别声明 `chat` / `image` 兜底能力；每个�
 - 能力缺口或澄清与连接故障、资料查询故障分开展示。模型状态区分已验收组合与待验组合。资料来源和有用的诊断信息按需展开；provider 推理与签名不作为普通聊天内容。
 - 试玩报错写明实际测试的源码，并提供明确的 **AI 修复**操作。恢复后的未完成工作标为已中断，刷新后不自动发请求或续接协议。
 
-原始单文件资产保留在独立的 `prototype/llm-tool-loop-interaction` 分支；提交、路径和浏览器观察记录在决策票中。它使用模拟响应和源码摘要，不能证明模型准入、规则行为或生产持久化已经完成。场景引导控件与状态转换代码属于可丢弃原型。生产接入应按上述请求/结果契约实现已认可的交互，不能直接把该 HTML 当作产品实现。
+原始单文件资产保留在独立的 `prototype/llm-tool-loop-interaction` 分支；提交、路径和浏览器观察记录在决策票中。它使用模拟响应和源码摘要，不能证明模型准入、规则行为或生产持久化已经完成。场景引导控件与状态转换代码属于可丢弃原型。`WorkshopAbilityPanel` 通过生产请求/结果契约实现这些交互。试玩修复读取实际固定版本的源码，并检查当前沙盒绑定，不会替换成另一个选中候选。
 
 ### C2. 系统提示词设计
 
-**源文件**：`client/services/llmPrompts.ts`（`CARD_DESIGNER_SYSTEM_PROMPT`）。以下是其结构摘要；以源文件为准。effect / 进阶 hook 表、listener phase 表、listener scope 表、actionId 表**运行时从真相源渲染**（`shared/cards/card-effects.ts` 的 `cardEffectHooks` + `shared/custom-code/sandbox-hook-meta.ts` / `sandbox-listener-phases.ts` / `sandbox-listener-scopes.ts` / `sandbox-action-ids.ts`），因此这四张表不会与引擎漂移，无需手工镜像。
+精简提示词位于 `client/services/llm/generation/prompt.ts`，定义任务、不可变输入、资料工具、信任边界和输出格式，并附上实际部署的沙盒契约。契约从共享真源派生 hook/listener/action 元数据，提供准确的注入 helper。运行时标识与资料 commit 分别记录。
 
-**结构：角色定义 + 输出格式 + 关键规则 + CARD_IMPL 结构详解 + effect hook 表 + listener 机制 + ActionFlow 类型 + 可用 helper + 可读 state/player 字段 + 沙盒限制 + 设计平衡参考 + 游戏规则速览 + few-shot 示例**
-
----
+模型按需从 GitHub 读取本次尝试固定 commit 的样例和详细文档，资料集不打包进站点提示词。旧提示词仅冻结在 `tests/llm-card-gen/control/full-prompt.txt` 中用于验收对照，产品代码不能切换到它。
 
 #### 输出格式
 
-LLM 每次回复**必须**包含一个 `` ```typescript `` 代码块，使用 `CARD_DEF` + `CARD_IMPL` 双常量结构（不使用 import / export）。`CARD_DEF` 只接受对象格式，不兼容 `new MinorImprovement(...)` / `new Occupation(...)`：
+源码回复**必须**包含且只包含一个完整 `` ```typescript `` 代码块，使用 `CARD_DEF` + `CARD_IMPL` 双常量结构（不使用 import / export）。`CARD_DEF` 只接受对象格式，不兼容 `new MinorImprovement(...)` / `new Occupation(...)`：
 
 ```typescript
 const CARD_ID = 'CUSTOM_英文驼峰名'
@@ -228,13 +226,15 @@ const CARD_IMPL = {
 }
 ```
 
+澄清和能力缺口改为返回含 `kind` 与 `message` 的结构化 JSON，不附源码。
+
 #### 关键规则（prompt 硬性约束）
 
 - `CARD_ID` 必须以 `"CUSTOM_"` 开头，英文驼峰
 - `deck` 固定 `'CUSTOM'`，`number` 固定 `0`，`implemented` 固定 `true`
 - 禁止 `import` / `export` / `require` / `registerCardEffect` / `registerCardListener`
 - 禁止 `class`、generator、`with`、`eval`、`Function`、`fetch` 等
-- `name` / `desc` / `prerequisite` 顶层字段必须英文；`locales.zh` 必须填全
+- 保持传入的卡牌身份与名称；规则说明和前置条件使用英文并提供完整 `locales.zh`，编辑时除明确要求修改外保留原有双语信息
 - 即使只做小修改，也要重新输出完整代码
 
 #### effect hook（`CARD_IMPL.effect`）
@@ -265,18 +265,13 @@ const CARD_IMPL = {
 
 #### few-shot 示例来源
 
-系统提示词末尾附加 `docs/community-card-examples.md`（原始 Markdown 通过 Vite `?raw` 导入），作为 few-shot 示例库随提示词一起发送给 LLM。
+模型从 GitHub 按需读取 `docs/community-card-examples.md` 的相关行。可执行样例继续由 `server/__tests__/workshop-prompt-runtime.test.ts` 中的 Session 测试保护。
 
 ### C3. 多轮对话设计
 
-- 对话历史和未发送输入只存在当前浏览器会话，并随本地恢复副本写入 localStorage
-- 每轮追加用户反馈 + LLM 响应
-- LLM 看到完整对话历史，支持迭代：
-  - "把费用降低一点"
-  - "加一个收获时的效果"
-  - "参考官方的 Ale Benches 风格"
-- 前端从每条响应中提取最后一个完整源码块作为能力候选，不直接覆盖当前已采用源码
-- 服务端只保存能力最近一次完成请求/结果；完整对话、未发送输入和 API Key 不上传
+浏览器捕获最近最多 12 条相关可见消息，以及选中候选或已采用草稿的准确源码。历史代码块从对话上下文省略，以明确传入的当前源码为准。重发保留当前卡牌上下文，开始新的尝试并重新解析资料 commit。工具消息、推理和签名仅留当前页面，刷新后不恢复。
+
+完整且通过校验的输出成为可审阅候选，静态代码最多自动修复两次；服务故障暂停在当前步骤。失败的完整源码保留供编辑，同时保住最近有效候选。服务端只保存 C1.3 所列的私有精简恢复投影，不接收完整对话或 LLM Key。
 
 ### C4. 卡牌美术生成
 

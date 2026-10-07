@@ -294,10 +294,12 @@ export const workshopDraftReducer = (
     case 'generationStarted':
       return { ...state, session: { ...state.session, activeAbilityAttemptId: action.attemptId } }
     case 'generationFinished': {
-      if (state.session.activeAbilityAttemptId !== action.attemptId
-        || abilityDraftFingerprint(state.draft) !== action.draftFingerprint
+      if (state.session.activeAbilityAttemptId !== action.attemptId) return state
+      if (abilityDraftFingerprint(state.draft) !== action.draftFingerprint
         || (action.sourceCandidate && !state.session.abilityCandidates.some(candidate =>
-          candidate.id === action.sourceCandidate!.id && sourceFingerprint(candidate.sourceCode) === action.sourceCandidate!.fingerprint))) return state
+          candidate.id === action.sourceCandidate!.id && sourceFingerprint(candidate.sourceCode) === action.sourceCandidate!.fingerprint))) {
+        return { ...state, session: { ...state.session, activeAbilityAttemptId: undefined } }
+      }
       const next = action.candidate ? workshopDraftReducer(state, { type: 'candidateCompleted', candidate: action.candidate }) : state
       return {
         ...next,

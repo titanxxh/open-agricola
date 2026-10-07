@@ -2,7 +2,8 @@ import type { WorkshopAbilityCandidateContract, WorkshopDraftContract } from '..
 import type { WorkshopVisibleMessage } from '../../../../shared/contract/workshop-generation'
 import { abilityDraftFingerprint, canonicalGenerationJson, projectVisibleMessages, sourceFingerprint } from '../../../../shared/projections/workshop-generation'
 
-export type PlaytestFailure = { versionId: string; source: string; sourceFingerprint: string; errors: string[] }
+export type PlaytestSource = { workspaceId: string; versionId: string; source: string; sourceFingerprint: string; gameSeed?: number | string }
+export type PlaytestFailure = PlaytestSource & { errors: string[] }
 export type GenerationIntent = { kind: 'generate' | 'follow-up' | 'resend'; message: string }
   | { kind: 'repair'; message: string; failure: PlaytestFailure }
 export type GenerationRequest = {
@@ -43,6 +44,7 @@ export function buildGenerationRequest(options: {
 }): GenerationRequest {
   const { draft, intent } = options
   if (!intent.message.trim()) throw new Error('Describe the requested card behavior first.')
+  if (intent.kind === 'repair' && intent.failure.workspaceId !== options.workspaceId) throw new Error('The playtest belongs to a different card workspace.')
   if (intent.kind === 'repair' && sourceFingerprint(intent.failure.source) !== intent.failure.sourceFingerprint) throw new Error('The playtest error does not match its recorded source.')
   const selected = intent.kind === 'repair' ? undefined : options.selectedCandidate
   const source = intent.kind === 'repair' ? intent.failure.source : selected?.sourceCode ?? draft.effectCode

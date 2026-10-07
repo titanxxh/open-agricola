@@ -357,7 +357,10 @@ describe('generation result ownership and recovery', () => {
       result: { kind: 'clarification' as const, attemptId: 'old', createdAt: 1, message: 'which round?' } }
     expect(workshopDraftReducer(state, action)).toBe(state)
     state = workshopDraftReducer(state, { type: 'draftChanged', draft: { ...state.draft, description: 'changed' } })
-    expect(workshopDraftReducer(state, { ...action, attemptId: 'new' })).toBe(state)
+    const completed = workshopDraftReducer(state, { ...action, attemptId: 'new' })
+    expect(completed.draft).toBe(state.draft)
+    expect(completed.session.latestAbilityResult).toBe(state.session.latestAbilityResult)
+    expect(completed.session.activeAbilityAttemptId).toBeUndefined()
   })
   it('persists an interrupted visible session, not a resumable attempt', () => {
     let state = createWorkshopDraftState(workspace())

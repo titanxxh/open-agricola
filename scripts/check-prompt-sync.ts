@@ -16,15 +16,9 @@
  * Targets it cross-checks against:
  *   - docs/CUSTOM_CARD_SANDBOX.md         → <!-- prompt-sync:begin id=... --> blocks
  *
- * NOTE: client/services/llmPrompts.ts is no longer cross-checked here — it
- * renders the hook / listener action / phase / scope / actionId tables at runtime from the source-of-truth
- * arrays + description metadata (shared/custom-code/*-meta, sandbox-*.ts), so
- * those five tables cannot drift by construction. The runtime render is guarded
- * by client/services/__tests__/llmPrompts.test.ts (set-equality assertions).
- *
- * If a hook / phase / denylist entry exists in the source but is missing from
- * a target — drift detected. By default this prints a warning; pass --strict
- * (in CI) to fail the build.
+ * NOTE: the compact browser prompt receives exact names from the deployed
+ * server/workshop-sandbox-contract.ts descriptor. Its complete allowlists are
+ * checked by client/services/__tests__/generation-prompt.test.ts.
  */
 
 import * as fs from 'node:fs'
@@ -278,7 +272,7 @@ function main() {
   const verb = strict ? 'FAIL' : 'WARN'
   console.log(`${verb}: ${driftCount} drift(s) detected.`)
   console.log(`Update docs/CUSTOM_CARD_SANDBOX.md (machine-checkable blocks)`)
-  console.log(`and client/services/llmPrompts.ts to match the source files above.`)
+  console.log(`and the deployed sandbox contract to match the source files above.`)
   if (strict) process.exit(1)
 }
 

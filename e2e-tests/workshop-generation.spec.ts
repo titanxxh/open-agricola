@@ -13,6 +13,106 @@ const modelKey = 'browser-only-llm-credential-canary'
 
 test.afterAll(async () => { await getDb().close() })
 
+for (const locale of ['zh', 'en'] as const) test(`editor candidate recovery and explicit adoption (${locale})`, async ({ page, browser }) => {
+  test.setTimeout(90_000)
+  if (locale === 'en') await page.setViewportSize({ width: 390, height: 844 })
+  const user = await createLocalUserForTests(`editor_${locale}_${Date.now().toString(36)}`, 'editor-test-password')
+  const cookie = await createSession(user.id)
+  if (!cookie) throw new Error('No local test session')
+  await page.context().addCookies([{ name: 'oa_session', value: cookie, url: FRONTEND_URL }])
+  // Substitute only the test browser's module. The shipped admission registry has no bypass.
+  await page.route('**/client/services/llm/generation/admission.ts*', async route => {
+    const response = await route.fetch()
+    const body = (await response.text()).replace('ADMITTED_GENERATION_MODELS = []', `ADMITTED_GENERATION_MODELS = [{provider:'deepseek',endpoint:'${modelUrl}',model:'deepseek-v4-flash',evidence:'controlled browser test',batch:'fixture'}]`)
+    await route.fulfill({ response, body })
+  })
+  await page.route('https://api.github.com/**', route => route.fulfill({ json: route.request().url().includes('/git/ref/') ? { object: { sha: referenceCommit } } : { truncated: false, tree: [] } }))
+  await page.goto(FRONTEND_URL)
+  const cardId = `CUSTOM_Editor_${locale}_${Date.now()}`
+  const name = 'Editor Tool Test'
+  const id = await page.evaluate(async ({ cardId, name, modelKey, locale }) => {
+    localStorage.setItem('open-agricola-locale-v2', locale)
+    localStorage.setItem('open-agricola-llm-config', JSON.stringify({ provider: 'deepseek', apiKey: modelKey, model: 'deepseek-v4-flash' }))
+    const response = await fetch('/api/workshop/cards', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ card_id: cardId, card_type: 'minor', name, description: '', card_json: { id: cardId, card_type: 'minor', name, cost: { wood: 2 }, desc: [] }, status: 'draft' }) })
+    const data = await response.json()
+    if (!response.ok || !data.id) throw new Error(JSON.stringify(data))
+    return data.id as string
+  }, { cardId, name, modelKey, locale })
+  const source = (amount: number, bad = false) => `const CARD_ID = '${cardId}'; const CARD_DEF = { cardType: 'minor', meta: { id: CARD_ID, name: '${name}', cost: { wood: 2 }, desc: ['Gain ${amount} food.'] } }; const CARD_IMPL = { effect: { onBuy: () => ${bad ? 'eval("invalid")' : `gainLeaf(CARD_ID, { food: ${amount} })`} } };`
+  const bodies: Array<{ messages: Array<{ role: string; content: string }> }> = []
+  let fail = false
+  await page.route(modelUrl, async route => {
+    bodies.push(route.request().postDataJSON())
+    const content = `\`\`\`typescript\n${source(fail ? 9 : bodies.length, fail)}\n\`\`\``
+    await route.fulfill({ contentType: 'text/event-stream', body: `data: ${JSON.stringify({ model: 'deepseek-v4-flash', choices: [{ index: 0, delta: { role: 'assistant', content }, finish_reason: 'stop' }], usage: { prompt_tokens: 20, completion_tokens: 40 } })}\n\ndata: [DONE]\n\n` })
+  })
+  const zh = locale === 'zh'
+  const enter = async () => {
+    await page.goto(`${FRONTEND_URL}/?page=workshop&view=editor&card=${id}`)
+    await page.getByRole('button', { name: zh ? /卡牌能力\s*对话、源码与验证/ : /Card ability\s*Conversation/ }).click()
+  }
+  await enter()
+  const input = page.getByPlaceholder(zh ? '描述你想要的卡牌效果…' : 'Describe the card effect…')
+  const generate = page.getByRole('button', { name: zh ? '生成能力候选' : 'Generate ability candidate' })
+  const editor = page.getByLabel(zh ? '能力候选源码' : 'Ability candidate source')
+  const adopt = page.getByRole('button', { name: zh ? '采用为当前源码' : 'Adopt as current source' })
+  await input.fill('Gain 1 food when played')
+  await generate.click()
+  await expect(adopt).toBeEnabled()
+  await expect(editor).toHaveValue(source(1))
+  await expect(page.locator('.aicw-current-code')).toHaveCount(0)
+  await input.fill('Change the food reward to 2')
+  await generate.click()
+  await expect(editor).toHaveValue(source(2))
+  const secondInput = JSON.parse(bodies[1].messages[1].content)
+  expect(secondInput.source).toBe(source(1))
+  expect(secondInput.card).toMatchObject({ id: cardId, name, type: 'minor', definition: { cost: { wood: 2 } } })
+  fail = true
+  await input.fill('A failed complete source')
+  await generate.click()
+  await expect(page.locator('.aicw-generation-progress')).toContainText(zh ? '本次尝试已结束' : 'Attempt finished')
+  await expect(editor).toHaveValue(source(9, true))
+  await expect(adopt).toBeDisabled()
+  expect(bodies).toHaveLength(5) // Original + exactly two static repairs.
+  await page.reload()
+  await page.getByRole('button', { name: zh ? /卡牌能力\s*对话、源码与验证/ : /Card ability\s*Conversation/ }).click()
+  await expect(editor).toHaveValue(source(9, true))
+  await expect(adopt).toBeDisabled()
+  expect(bodies).toHaveLength(5)
+  await page.locator('.aicw-ability-tabs button').filter({ hasText: zh ? '代码校验通过' : 'Code validated' }).last().click()
+  await expect(editor).toHaveValue(source(2))
+  await adopt.click()
+  await expect(page.locator('.aicw-current-code code')).toHaveText(source(2))
+  const persisted = await page.evaluate(async id => (await (await fetch(`/api/workshop/cards/${id}/workspace`)).json()).workspace, id)
+  expect(persisted.draft.effectCode).toBe(source(2))
+  expect(JSON.stringify(persisted.draft.generation)).not.toContain(modelKey)
+  expect(JSON.stringify(persisted.draft.generation)).not.toContain('"messages"')
+  await expect(page.locator('body')).toHaveJSProperty('scrollWidth', await page.locator('body').evaluate(element => element.clientWidth))
+  await page.unroute(modelUrl)
+  let interruptedCalls = 0
+  await page.route(modelUrl, async route => {
+    interruptedCalls += 1
+    await route.fulfill({ contentType: 'text/event-stream', body: `data: ${JSON.stringify({ choices: [{ index: 0, delta: { content: '```typescript\nconst CARD_IMPL = {' } }] })}\n\n` })
+  })
+  await input.fill('An interrupted response')
+  await generate.click()
+  await expect(page.locator('.aicw-generation-progress')).toContainText(zh ? '已暂停' : 'Paused')
+  await page.reload()
+  await page.getByRole('button', { name: zh ? /卡牌能力\s*对话、源码与验证/ : /Card ability\s*Conversation/ }).click()
+  await expect(page.locator('.aicw-generation-result')).toContainText(zh ? '上次尝试已中断' : 'Previous attempt interrupted')
+  await expect(page.locator('.aicw-current-code code')).toHaveText(source(2))
+  expect(interruptedCalls).toBe(1)
+  await expect(page.getByRole('button', { name: zh ? '重试当前步骤' : 'Retry this step' })).toHaveCount(0)
+  const other = await browser.newContext()
+  await other.addCookies([{ name: 'oa_session', value: cookie, url: FRONTEND_URL }])
+  const otherPage = await other.newPage()
+  await otherPage.goto(`${FRONTEND_URL}/?page=workshop&view=editor&card=${id}`)
+  await otherPage.getByRole('button', { name: /卡牌能力|Card ability/ }).click()
+  await expect(otherPage.locator('.aicw-current-code code')).toHaveText(source(2))
+  await expect(otherPage.locator('.ai-message')).toHaveCount(0)
+  await other.close()
+})
+
 test('browser tools round-trip into authoritative validation without forwarding model credentials', async ({ page }) => {
   const username = `loop_${Date.now().toString(36)}`
   const user = await createLocalUserForTests(username, 'loop-test-password')

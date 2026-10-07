@@ -9,6 +9,7 @@ import { sandboxListenerPhaseMeta } from '../shared/custom-code/sandbox-listener
 import { sandboxListenerScopes } from '../shared/custom-code/sandbox-listener-scopes.ts'
 import { HELPERS_INJECTION_SOURCE } from '../shared/custom-code/injected-helpers.ts'
 import { EXECUTION_TIMEOUT_MS, ISOLATE_MEMORY_LIMIT_MB } from '../shared/custom-code/runtime-limits.ts'
+import { createActionSpaces } from '../shared/actions/index.ts'
 
 let cached: WorkshopSandboxContract | undefined
 
@@ -51,8 +52,12 @@ export function getWorkshopSandboxContract(): WorkshopSandboxContract {
       'Source declares const CARD_ID, CARD_DEF = { cardType, meta }, and CARD_IMPL. Imports/exports, network, timers, eval, Node/browser globals and dynamic code are unavailable.',
       'Inputs are JSON copies. Mutating state/player in a hook cannot update the authoritative game. Return supported ActionFlow or the declared query result; use sourceCard: CARD_ID on leaves.',
       'CARD_DEF is declarative metadata: identity, cost, prerequisite, reward and modifiers. Keep the requested id, card type and name. A source must be validated and explicitly adopted before play.',
-      'effect.onBeforePlayerTurn returns { skipTurn: true } or void, not ActionFlow. computeBonusScore returns a number. resolveChoice receives state, player, choice (no ctx).',
-      'listeners use supported actions/phases and scope player/opponent/any. Handler ctx identifies owner, actor and source. Query phases must be pure; normal triggers return flow, computeCosts returns additive costs (negative discounts) plus optional costAttribution, not payment alternatives.',
+      'effect.onBeforePlayerTurn is a non-flow skip-control exception returning { skipTurn: true } or void, not ActionFlow. computeBonusScore returns a number. resolveChoice receives state, player, choice (no ctx).',
+      'listeners use supported actions/phases and scope player/opponent/any. Handler ctx identifies owner, actor and source. Query phases must be pure; normal triggers return flow. computeCosts returns costs, trades, bonuses or paymentResourceProviders. Any costs delta must include matching costAttribution. Discounting all improvement candidates requires bonuses with capDiscountAtCost: true, optional: false, sources: [CARD_ID]; costs is only for simple action fees. getBaseCosts, deriveCardCostCandidate and computeExchanges are official-card APIs unavailable in the sandbox.',
+      'Accumulators dispatch collect; check context.space.id and context.space.gainPerRound, not context.result.spaceId or a hand-maintained space whitelist. construct uses context.player.houseType; improvement purchase discounts listen to improvement.',
+      `Deployed two-player accumulating spaces: ${createActionSpaces(2).filter(space => Object.values(space.gainPerRound).some(amount => (amount ?? 0) > 0)).map(space => space.id).join(', ')}.`,
+      'For feeding-start gains return gainLeaf from onStartHarvestFeedingPhase. onComputeAnimalZones returns only additional zones, never the input zones concatenated again. positionKey({row,col}) returns "row-col".',
+      'handHooks only dispatches supported stage hooks from hand, excluding onBuy, onEndTurn, onBeforeEndGame and onBeforePlayerTurn. CARD_IMPL.effect must be a direct object literal without variable references, spreads, computed keys or accessors.',
       'special-effect is a discriminated union. For card-local state use increment-counter, set-counter, set-flag, increment-extra-data or set-extra-data with the documented key/value fields and sourceCard on the leaf. Read the matching interfaces before using other variants; it is not an arbitrary state mutation channel.',
       'future-meeples requires params.__futureMeepleRequest with cardId, playerId and either entries or startRound/count/resources. There is no futureMeeplesNode helper; do not import built-in factories.',
       'gainLeaf, payLeaf, spaceHasPlayer, positionKey, getCardStack and readCardExtraData are the injected helpers shown verbatim. getCardDefinition always returns null; the built-in catalog is not available inside the isolate.',
