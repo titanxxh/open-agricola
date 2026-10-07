@@ -6,7 +6,6 @@ const read = (path: string) => readFileSync(path, 'utf8')
 describe('workshop cost prompt contract', () => {
   it('documents supported cost paths and official-card-only cost APIs', () => {
     const files = [
-      read('client/services/llmPrompts.ts'),
       read('docs/CUSTOM_CARD_SANDBOX.md'),
     ]
 
@@ -22,7 +21,6 @@ describe('workshop cost prompt contract', () => {
 
   it('requires mandatory capped bonuses for improvement-wide discounts', () => {
     const guidance = [
-      read('client/services/llmPrompts.ts'),
       read('docs/CUSTOM_CARD_SANDBOX.md'),
     ]
 

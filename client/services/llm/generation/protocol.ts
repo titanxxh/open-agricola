@@ -24,7 +24,7 @@ export const UNKNOWN_USAGE: GenerationUsage = { inputTokens: null, outputTokens:
 export const GENERATION_MODEL_SETTINGS = Object.freeze({ max_tokens: 16384, stream: true, stream_options: { include_usage: true } })
 
 export class ModelTurnError extends Error {
-  readonly kind: 'network' | 'http' | 'protocol' | 'incomplete' | 'cancelled'
+  readonly kind: 'preflight' | 'network' | 'http' | 'protocol' | 'incomplete' | 'cancelled'
   readonly usage: GenerationUsage
   constructor(kind: ModelTurnError['kind'], message: string, usage = UNKNOWN_USAGE) {
     super(message)
@@ -211,9 +211,13 @@ export function createToolTransport(config: LlmConfig, options: {
       })
       active = true
       try {
-        signal.throwIfAborted()
-        await options.beforePost?.(body)
-        signal.throwIfAborted()
+        try {
+          signal.throwIfAborted()
+          await options.beforePost?.(body)
+          signal.throwIfAborted()
+        } catch (error) {
+          throw new ModelTurnError('preflight', error instanceof Error ? error.message : 'The request was stopped before contacting the provider.')
+        }
         let response: Response
         try {
           response = await fetchModel(target.endpoint, {

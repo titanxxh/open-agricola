@@ -2603,6 +2603,25 @@
   white-space: pre;
 }
 
+.aicw-generation-progress,
+.aicw-generation-result {
+  padding: 14px 16px;
+  border: 1px solid var(--aicw-border);
+  border-radius: 10px;
+  background: var(--aicw-paper);
+  overflow-wrap: anywhere;
+}
+
+.aicw-generation-progress p,
+.aicw-generation-result p {
+  margin: 8px 0;
+  white-space: pre-wrap;
+}
+
+.aicw-generation-progress button + button {
+  margin-left: 8px;
+}
+
 .aicw-generator-fields {
   display: grid;
   gap: 14px;

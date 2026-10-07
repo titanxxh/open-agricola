@@ -68,4 +68,13 @@ describe('browser model protocol', () => {
     expect(() => createToolTransport({ provider: 'deepseek', model: 'deepseek-v4-flash', apiKey: 'test', baseUrl: 'https://example.com/v1' })).toThrow('awaiting')
     expect(() => createToolTransport({ provider: 'deepseek', model: 'deepseek-flash', apiKey: 'test' })).toThrow('awaiting')
   })
+
+  it('does not send a request that fails its cost reservation', async () => {
+    const fetchModel = vi.fn<typeof fetch>()
+    const transport = createToolTransport({ provider: 'deepseek', model: 'deepseek-v4-flash', apiKey: 'test' }, {
+      fetch: fetchModel, authorize: () => {}, beforePost: async () => { throw new Error('Budget exhausted') },
+    })
+    await expect(transport.complete([], [], signal())).rejects.toMatchObject({ kind: 'preflight', message: 'Budget exhausted' })
+    expect(fetchModel).not.toHaveBeenCalled()
+  })
 })

@@ -2,7 +2,7 @@
  * Prompt 描述元数据（单一真相源）：CardEffect hook 的中文说明。
  *
  * 名字白名单由 `cardEffectHooks`（shared/cards/card-effects.ts）拥有；本文件
- * 只补「给 LLM 看的描述」。`CARD_DESIGNER_SYSTEM_PROMPT` 运行时 import 此 map
+ * 只补「给 LLM 看的描述」。`getWorkshopSandboxContract` 运行时 import 此 map
  * 渲染 effect / 进阶 hook 表，因此描述与名字不会漂移。
  *
  * `Record<CardEffectField, HookMeta>` 提供编译期穷尽性：往 `CardEffectField`

@@ -267,6 +267,7 @@ export class GenerationAttempt {
           this.pendingOutput = output
         }
       } catch (error) {
+        if (error instanceof ModelTurnError && error.kind === 'preflight') this.accounting.pop()
         if (error instanceof ModelTurnError) { record.usage = error.usage; record.finishReason = error.kind }
         throw error
       } finally { record.elapsedMs = Math.max(0, this.clock() - record.startedAt) }

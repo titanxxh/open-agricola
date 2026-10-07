@@ -472,3 +472,40 @@ const CARD_IMPL = {
 ```
 
 > `handHooks` 是 meta 字段，只声明会从手牌派发的 stage hook；不支持 `onBuy`、`onEndTurn`、`onBeforeEndGame`、`onBeforePlayerTurn`。`CARD_IMPL.effect` 必须直接写对象字面量，禁止变量引用、spread、computed key 和 accessor。一旦卡牌打出，只走正常 hook 路径。
+
+
+## 11. Food when feeding begins
+
+This flow runs after the feeding phase starts and before food is consumed. The host dispatches the hook only for the card owner. Use this CARD_IMPL with your own CARD_ID and CARD_DEF.
+
+```typescript
+const CARD_IMPL = {
+  effect: {
+    id: CARD_ID,
+    onStartHarvestFeedingPhase: () => gainLeaf(CARD_ID, { food: 1 }),
+  },
+}
+```
+
+
+## 12. Discount only clay rooms
+
+The construct action keeps the same action ID for every house material. Inspect the current house type and attribute the cost delta to this card. This partial implementation belongs beside your CARD_ID and CARD_DEF.
+
+```typescript
+const CARD_IMPL = {
+  listeners: [{
+    cardIds: [CARD_ID],
+    actions: ['construct'],
+    phases: ['computeCosts'],
+    handler: (context) => {
+      if (context.player.houseType !== 'clay') return
+      return {
+        costs: { clay: -1 },
+        costAttribution: [{ sourceCard: CARD_ID, costs: { clay: -1 } }],
+        sourceCard: CARD_ID,
+      }
+    },
+  }],
+}
+```

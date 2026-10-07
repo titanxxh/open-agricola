@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { CARD_DESIGNER_SYSTEM_PROMPT } from '../../client/services/llmPrompts'
+import { readFileSync } from 'node:fs'
+const REFERENCE_EXAMPLES = readFileSync(new URL('../../docs/community-card-examples.md', import.meta.url), 'utf8')
 import { readCardResourceStats } from '../../shared/cards/helpers/card-state'
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
 import { validateAndCompileCustomCode } from '../custom-code/engine'
@@ -10,10 +11,10 @@ const CARD_ID = 'CUSTOM_PromptContract'
 const sessions: GameSession[] = []
 
 const sessionFromPrompt = (marker: string) => {
-  const example = [...CARD_DESIGNER_SYSTEM_PROMPT.matchAll(/```typescript\s*([\s\S]*?)```/g)]
+  const example = [...REFERENCE_EXAMPLES.matchAll(/```typescript\s*([\s\S]*?)```/g)]
     .map((match) => match[1]!)
     .find((code) => code.includes(marker))
-  expect(example, `Missing executable prompt example: ${marker}`).toBeDefined()
+  expect(example, `Missing executable reference example: ${marker}`).toBeDefined()
   const result = validateAndCompileCustomCode(`
 const CARD_ID = '${CARD_ID}'
 const CARD_DEF = MinorImprovement({ id: CARD_ID, name: 'Prompt Contract' })
@@ -36,7 +37,7 @@ afterEach(() => {
   sessions.splice(0).forEach((session) => session.dispose())
 })
 
-describe('executable Workshop prompt contracts', () => {
+describe('executable Workshop reference contracts', () => {
   it('grants feeding-start food once, after feeding starts and before consumption', () => {
     const session = sessionFromPrompt('onStartHarvestFeedingPhase:')
     const state = session.state

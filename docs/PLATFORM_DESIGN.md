@@ -132,7 +132,7 @@ OpenRouter has no provider-level fallback `chat` or `image` capability. Every mo
 
 #### C1.2 Browser tool loop
 
-The browser runner is implemented under `client/services/llm/generation/`; the production editor still uses the text-only stream below until its cutover. The model table above lists existing UI registrations, not verified tool-calling combinations.
+The production editor uses the browser runner under `client/services/llm/generation/`; the text-only ability path has been removed. The model table above lists existing UI registrations, not verified tool-calling combinations.
 
 A **Generation Attempt** encompasses reference queries, model responses, and bounded repairs. Pausing and continuing preserves its model configuration, reference commit, and cumulative accounting; cancelling does not produce a completed candidate from partial output. Each new attempt resolves the latest GitHub `main` and pins that commit for its reference reads. Reference content is independent of site releases, while executable code must still obey the actual Custom Code Sandbox capabilities. LLM credentials remain browser-to-provider only.
 
@@ -148,21 +148,21 @@ The approved [request/result contract](https://github.com/titanxxh/open-agricola
 
 A **Generation Result** can contain a complete source candidate, failed source retained for repair, a clarification, a capability gap, or a failure/interruption summary. Failed source cannot be adopted and does not replace the latest candidate that passed code validation. Partial output is not a completed source candidate. Source and input fingerprints bind asynchronous results and validation responses to the content they describe; old responses cannot silently replace newer work.
 
-| Storage boundary | Planned recovery |
+| Storage boundary | Recovery |
 |---|---|
 | Current browser page | Complete tool protocol, reference bodies, and provider reasoning/signatures; no continuation across a page reload |
 | Same-browser local recovery | Visible conversation and existing editing state; unfinished work is marked interrupted and never resumes automatically |
 | Author-private server draft | Adopted draft content, latest ability candidate that passed code validation, latest Generation Result, and compact Generation Provenance; no complete conversation or raw tool protocol |
 
-The latest result and candidate may reference the same source without retaining duplicate completed copies. Adoption remains explicit and server-validated. Draft Versions retain only adopted content and its allowlisted provenance; identical content continues to reuse an immutable version without rewriting its original provenance. Public card, submission, and Replay projections exclude private generation records. The shared allowlist in `shared/projections/workshop-generation.ts` now protects checkpoint, adoption, version provenance and local recovery. The ability group stores `lastValid` and `latestResult` separately; successful results reference the candidate by ID and source fingerprint, while a failed result retains its complete non-adoptable source. Local chat recovery projects only visible fields and marks in-flight work interrupted. The production UI cutover is still pending.
+The latest result and candidate may reference the same source without retaining duplicate completed copies. Adoption remains explicit and server-validated. Draft Versions retain only adopted content and its allowlisted provenance; identical content continues to reuse an immutable version without rewriting its original provenance. Public card, submission, and Replay projections exclude private generation records. The shared allowlist in `shared/projections/workshop-generation.ts` now protects checkpoint, adoption, version provenance and local recovery. The ability group stores `lastValid` and `latestResult` separately; successful results reference the candidate by ID and source fingerprint, while a failed result retains its complete non-adoptable source. Local chat recovery projects only visible fields and marks in-flight work interrupted. The editor uses these projections for generation, explicit adoption and recovery.
 
 `GET /api/workshop/sandbox-contract` exposes the actual deployed helper source, hook/listener metadata, supported action shapes, isolation limits and semantic restrictions. Its identifier hashes deployed shared/executor source and runtime versions, independently of the GitHub reference commit. `POST /api/workshop/cards/validate-code` binds success and failure to that identifier and the submitted source fingerprint; an obsolete contract returns `sandbox_changed` so a new attempt is required. The main browser receives data only, never imports the rule runtime.
 
 #### C1.4 Planned quality and cost acceptance
 
-The [acceptance decision](https://github.com/titanxxh/open-agricola/issues/1035) admits models individually after browser protocol and card-behavior verification, starting with the configured DeepSeek Flash combination. The approved batch compares 17 scenarios, repeated three times in each arm, within a US$5 total paid-call budget. Every new-architecture run must pass its behavior or capability-gap assertions; first-output quality, repairs, tokens and elapsed time remain visible. The [LLM test guide](test/llm-card-gen.md#planned-browser-tool-acceptance) specifies the matrix and evidence requirements. The formal paid acceptance harness and editor cutover are still pending; deterministic browser tests do not admit a model.
+The [acceptance decision](https://github.com/titanxxh/open-agricola/issues/1035) admits models individually after browser protocol and card-behavior verification, starting with the configured DeepSeek Flash combination. The approved batch compares 17 scenarios, repeated three times in each arm, within a US$5 total paid-call budget. Every new-architecture run must pass its behavior or capability-gap assertions; first-output quality, repairs, tokens and elapsed time remain visible. The [LLM test guide](test/llm-card-gen.md#planned-browser-tool-acceptance) specifies the matrix and evidence requirements. The formal paid acceptance harness is still pending; deterministic browser tests do not admit a model.
 
-#### C1.5 Accepted interaction prototype; production integration pending
+#### C1.5 Editor interactions
 
 The author accepted the [interaction prototype](https://github.com/titanxxh/open-agricola/issues/1036) on 2026-10-08. Its ten guided scenarios establish the following presentation requirements for the production workshop:
 
@@ -172,17 +172,17 @@ The author accepted the [interaction prototype](https://github.com/titanxxh/open
 - Present a capability gap or clarification separately from a connection or reference-query failure. Model availability distinguishes admitted combinations from those awaiting verification. Reference sources and useful diagnostics are available on demand; provider reasoning and signatures are not ordinary chat content.
 - A playtest error identifies the source actually tested and offers an explicit **AI repair** action. Restored unfinished work says it was interrupted, with no automatic request or protocol continuation after reload.
 
-The original single-file artifact remains on the separate `prototype/llm-tool-loop-interaction` branch; its commit, path and browser observations are recorded in the decision issue. It uses simulated responses and source summaries, and does not prove model admission, rule behavior or production persistence. The guided scenario controls and reducer are disposable prototype assets. Production integration must implement these accepted interactions using the request/result contracts above; it is not a direct promotion of the HTML into the product.
+The original single-file artifact remains on the separate `prototype/llm-tool-loop-interaction` branch; its commit, path and browser observations are recorded in the decision issue. It uses simulated responses and source summaries, and does not prove model admission, rule behavior or production persistence. The guided scenario controls and reducer are disposable prototype assets. `WorkshopAbilityPanel` implements these interactions using the production request/result contracts. Playtest repair reads the exact pinned version source and checks the active sandbox binding; it never substitutes the selected candidate.
 
 ### C2. System prompt design
 
-The source is `CARD_DESIGNER_SYSTEM_PROMPT` in `client/services/llmPrompts.ts`. This section summarizes its shape; source code is authoritative. Tables for advanced effect hooks, listener phases, listener scopes, and action IDs render at runtime from truth sources: `cardEffectHooks` in `shared/cards/card-effects.ts`, plus `shared/custom-code/sandbox-hook-meta.ts`, `sandbox-listener-phases.ts`, `sandbox-listener-scopes.ts`, and `sandbox-action-ids.ts`. They cannot drift from the engine and need no manual mirror.
+The compact prompt lives in `client/services/llm/generation/prompt.ts`. It defines the task, immutable input, reference tools, trust boundary and output formats, then includes the actual deployed sandbox contract. The contract derives hook/listener/action metadata from their shared truth sources and supplies exact injected helpers. Runtime identity and reference commit remain separate.
 
-The prompt contains role definition, output format, hard rules, detailed `CARD_IMPL`, the effect-hook table, listeners, ActionFlow types, helpers, readable state and player fields, sandbox limits, balance guidance, a game-rules overview, and few-shot examples.
+Examples and detailed reference documents are fetched from GitHub on model request, at the attempt's fixed commit. No repository corpus is bundled into the site prompt. The frozen previous prompt is retained only in `tests/llm-card-gen/control/full-prompt.txt` for acceptance comparisons; product code cannot select it.
 
 #### Output format
 
-Every response must include one `typescript` code fence with `CARD_DEF` and `CARD_IMPL` constants and no imports or exports. `CARD_DEF` accepts only object form, never `new MinorImprovement(...)` or `new Occupation(...)`:
+A source response must include exactly one complete `typescript` code fence with `CARD_DEF` and `CARD_IMPL` constants and no imports or exports. `CARD_DEF` accepts only object form, never `new MinorImprovement(...)` or `new Occupation(...)`:
 
 ```typescript
 const CARD_ID = 'CUSTOM_EnglishPascalName'
@@ -220,13 +220,15 @@ const CARD_IMPL = {
 }
 ```
 
+Clarifications and capability gaps instead return a structured JSON object with `kind` and `message`, without source.
+
 #### Hard prompt rules
 
 - `CARD_ID` starts with `CUSTOM_` and uses English PascalCase.
 - `deck` is always `CUSTOM`, `number` is zero, and `implemented` is true.
 - `import`, `export`, `require`, `registerCardEffect`, and `registerCardListener` are forbidden.
 - Classes, generators, `with`, `eval`, `Function`, `fetch`, and related constructs are forbidden.
-- Top-level `name`, `desc`, and `prerequisite` fields are English; `locales.zh` must be complete.
+- Preserve supplied identity and names. Rule descriptions and prerequisites use English with complete `locales.zh`; editing retains existing bilingual metadata unless explicitly changed.
 - Even a small revision returns the complete source.
 
 #### Effect hooks in `CARD_IMPL.effect`
@@ -253,15 +255,13 @@ One food is approximately the weakest benefit. An `onRoundStart` effect repeats 
 
 #### Few-shot examples
 
-The system prompt appends raw Markdown from `docs/community-card-examples.md`, imported through Vite `?raw`, as its few-shot library.
+The model reads relevant numbered ranges from `docs/community-card-examples.md` on GitHub. Executable reference examples retain Session tests in `server/__tests__/workshop-prompt-runtime.test.ts`.
 
 ### C3. Multi-turn conversation
 
-- Conversation history and unsent input stay in the current browser session and its localStorage recovery copy.
-- Each turn appends user feedback and the LLM response.
-- The model sees complete history and can iterate on requests such as lowering a cost, adding a Harvest effect, or following the official Ale Benches style.
-- The frontend extracts the last complete source block from each response as an ability candidate; it does not overwrite the adopted source.
-- The server stores only the most recently completed ability request and result. It never receives full conversation history, unsent input, or the API key.
+The browser captures up to 12 relevant visible messages and the exact selected/adopted source. Earlier code blocks are omitted from conversational context because the explicit source is authoritative. Resend starts a new attempt with current card context and a newly resolved reference commit. Tool messages, reasoning and signatures stay only in the active page and are never restored after reload.
+
+Complete validated output becomes a reviewable candidate. Exactly two automatic static repairs are allowed; service failures pause their current step. Failed full source stays editable while the latest valid candidate remains available. The server stores the private compact recovery projection described in C1.3, never the conversation or LLM key.
 
 ### C4. Card artwork generation
 
