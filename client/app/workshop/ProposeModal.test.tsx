@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ProposeModal } from './ProposeModal'
@@ -9,6 +9,56 @@ vi.mock('../../services/workshop-pr', () => ({ startPropose: vi.fn(), submission
 const card = {id:'card-db-id',card_id:'CUSTOM_TestCard',name:'测试卡',art_url:null}
 beforeEach(() => { vi.clearAllMocks(); vi.mocked(submissionStatus).mockResolvedValue({ok:false,code:'no_submission'}) })
 describe('ProposeModal', () => {
+  it('shows exhausted retries, counts down, and only resumes the saved submission', async () => {
+    vi.mocked(submissionStatus).mockResolvedValue({ok:false,submissionId:'saved-operation',state:'pending',code:'workshop_app_unavailable',needsAttention:true,retryAfter:2})
+    vi.mocked(startPropose).mockResolvedValue({ok:true,submissionId:'saved-operation',prNumber:1,prUrl:'https://github.com/titanxxh/open-agricola/pull/1'})
+    vi.useFakeTimers()
+    const view = render(<ProposeModal card={card} onClose={vi.fn()}/>)
+    try {
+      await act(async () => {})
+      const recover = screen.getByRole('button',{name:'再次核实'})
+      expect(recover.hasAttribute('disabled')).toBe(true)
+      expect(screen.getByRole('status').textContent).toContain('自动重试已暂停')
+      expect(screen.getByRole('status').textContent).toContain('2 秒')
+      await act(() => vi.advanceTimersByTimeAsync(1000))
+      expect(screen.getByRole('status').textContent).toContain('1 秒')
+      await act(() => vi.advanceTimersByTimeAsync(1000))
+      expect(recover.hasAttribute('disabled')).toBe(false)
+      await act(async () => { fireEvent.click(recover) })
+      expect(startPropose).toHaveBeenCalledExactlyOnceWith(card.id,'recover')
+      expect(screen.getByRole('link',{name:'查看审核 PR'})).toBeTruthy()
+    } finally { view.unmount(); vi.useRealTimers() }
+  })
+
+  it('keeps polling past four reads until the worker reports exhausted retries', async () => {
+    vi.mocked(submissionStatus).mockImplementation(async () => ({ok:false,submissionId:'saved-operation',state:'pending',code:'github_network_error',needsAttention:false}))
+    vi.useFakeTimers()
+    const view = render(<ProposeModal card={card} onClose={vi.fn()}/>)
+    try {
+      await act(async () => {})
+      for (let read = 0; read < 4; read++) await act(() => vi.advanceTimersByTimeAsync(15_000))
+      vi.mocked(submissionStatus).mockRejectedValueOnce(new TypeError('Temporary browser network error'))
+      await act(() => vi.advanceTimersByTimeAsync(15_000))
+      vi.mocked(submissionStatus).mockResolvedValue({ok:false,submissionId:'saved-operation',state:'pending',code:'github_network_error',needsAttention:true})
+      await act(() => vi.advanceTimersByTimeAsync(15_000))
+      expect(screen.getByRole('status').textContent).toContain('自动重试已暂停')
+      const reads = vi.mocked(submissionStatus).mock.calls.length
+      await act(() => vi.advanceTimersByTimeAsync(60_000))
+      expect(submissionStatus).toHaveBeenCalledTimes(reads)
+    } finally { view.unmount(); vi.useRealTimers() }
+  })
+
+  it('retains the recovery action when a recovery request is rate limited', async () => {
+    vi.mocked(submissionStatus).mockResolvedValue({ok:false,submissionId:'saved-operation',state:'pending',code:'github_network_error',needsAttention:true})
+    vi.mocked(startPropose).mockResolvedValue({ok:false,code:'rate_limited',retryAfter:60})
+    render(<ProposeModal card={card} onClose={vi.fn()}/>)
+    await userEvent.click(await screen.findByRole('button',{name:'再次核实'}))
+    await waitFor(() => expect(screen.getByRole('status').textContent).toContain('投稿过于频繁'))
+    expect(screen.getByText('投稿编号：saved-operation')).toBeTruthy()
+    expect(screen.getByRole('button',{name:'再次核实'}).hasAttribute('disabled')).toBe(true)
+    expect(screen.queryByRole('button',{name:'发起 PR'})).toBeNull()
+  })
+
   it('switches back to updating the existing PR when a closed PR reopens during restart', async () => {
     vi.mocked(submissionStatus).mockResolvedValue({ok:false,code:'pr_closed',prUrl:'https://github.com/titanxxh/open-agricola/pull/1'})
     vi.mocked(startPropose).mockResolvedValueOnce({ok:false,code:'pr_open'})
