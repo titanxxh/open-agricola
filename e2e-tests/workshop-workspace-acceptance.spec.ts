@@ -657,6 +657,7 @@ const CARD_IMPL = {}
     name: text(variant.locale, '运行静态验证', 'Run static validation'),
   }).click()
   await expect(adopt).toBeEnabled({ timeout: 30_000 })
+  await expectSaved(page, variant.locale)
   const draftPattern = `**/api/workshop/cards/${workspace.id}/draft`
   let checkpointAttempts = 0
   await page.route(draftPattern, route => {
