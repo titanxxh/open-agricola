@@ -458,7 +458,7 @@ export class WsGameTransport implements GameTransport {
       // in the same event-loop turn. A playing Room never becomes ready on ack alone.
       const ready = this.waitEvent(event => event.type === 'stateUpdate' && event.roomId === this.roomId && event.sync === 'snapshot'
         || event.type === 'roomJoined' && event.roomId === this.roomId && event.status === 'waiting')
-      this.sendRaw({ type: 'joinRoom', roomId: this.roomId, intent: 'resume' })
+      this.sendRaw({ type: 'joinRoom', roomId: this.roomId, intent: 'resume', requestedPlayerIndex: this.playerIndex })
       await ready
     }
     for (const command of [...this.journal.commands.values()]) {
