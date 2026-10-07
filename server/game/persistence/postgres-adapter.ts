@@ -218,7 +218,7 @@ export class PostgresRoomPersistence implements RoomPersistence {
   private readonly loadPlayers
   private readonly upsertRoom
   private readonly upsertPlayer
-  private readonly clearReplacedSeat
+  private readonly clearObsoleteSeats
   private readonly deleteRoom
   private readonly findRoomId
   private readonly findResult
@@ -304,14 +304,24 @@ export class PostgresRoomPersistence implements RoomPersistence {
     `)
     this.upsertPlayer = db.prepare(`
       INSERT INTO room_players (room_id, user_id, player_index, joined_at)
-      VALUES (@roomId, @userId, @playerIndex, @now)
-      ON CONFLICT(room_id, user_id) DO UPDATE SET
-        player_index = excluded.player_index
-      WHERE room_players.player_index IS DISTINCT FROM excluded.player_index
+      VALUES (@roomId, @userId, @playerIndex, COALESCE((
+        SELECT joined_at FROM room_players
+        WHERE room_id = @roomId AND user_id = @userId
+        ORDER BY joined_at LIMIT 1
+      ), @now))
+      ON CONFLICT(room_id, player_index) DO UPDATE SET
+        user_id = excluded.user_id,
+        joined_at = excluded.joined_at
+      WHERE room_players.user_id IS DISTINCT FROM excluded.user_id
     `)
-    this.clearReplacedSeat = db.prepare(`
+    this.clearObsoleteSeats = db.prepare(`
       DELETE FROM room_players
-      WHERE room_id = @roomId AND player_index = @playerIndex AND user_id != @userId
+      WHERE room_id = @roomId AND NOT EXISTS (
+        SELECT 1 FROM jsonb_to_recordset(@players::jsonb)
+          AS owner("userId" text, "playerIndex" bigint)
+        WHERE owner."userId" = room_players.user_id
+          AND owner."playerIndex" = room_players.player_index
+      )
     `)
     this.deleteRoom = db.prepare('DELETE FROM rooms WHERE id = ?')
     this.findRoomId = db.prepare(`
@@ -456,9 +466,9 @@ export class PostgresRoomPersistence implements RoomPersistence {
           playerIndex: player.playerIndex,
           now,
         }
-        ;(await this.clearReplacedSeat.run(seat))
         ;(await this.upsertPlayer.run(seat))
       }
+      await this.clearObsoleteSeats.run({ roomId, players: JSON.stringify(players) })
     }
     const saveResult = async (result: GameResult): Promise<Awaited<void>> => {
       const persistedPlayers = (await this.loadPlayers.all(result.roomId)) as RoomMeta['players']

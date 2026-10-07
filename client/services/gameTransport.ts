@@ -264,6 +264,7 @@ const readOnlyCommand = (command: ClientCommand): boolean =>
 const terminalCode = (code?: string): boolean => !!code && [
   'seat_replaced', 'login_required', 'not_participant', 'unknown_context', 'context_changed',
   'context_expired', 'context_removed', 'command_scope_expired',
+  'player_slot_required',
 ].includes(code)
 
 export class WsGameTransport implements GameTransport {
@@ -288,6 +289,7 @@ export class WsGameTransport implements GameTransport {
   private readonly completed = new Map<string, CommandOutcome>()
   private readonly options: RoomConnectionOptions
   private readonly wsUrl: string
+  private seatHint?: number
   roomId: string
   playerIndex: number
   private _connected = false
@@ -306,7 +308,8 @@ export class WsGameTransport implements GameTransport {
     this.wsUrl = wsUrl
     this.journal = new RoomCommandJournal(`agricola.pending-commands:${wsUrl}`, roomId ?? '')
     this.roomId = this.journal.roomId
-    this.playerIndex = playerIndex ?? this.journal.playerIndex ?? 0
+    this.seatHint = playerIndex ?? this.journal.playerIndex
+    this.playerIndex = this.seatHint ?? 0
   }
 
   get connected() { return this._connected && !this.recovering && !this.stopped }
@@ -458,7 +461,7 @@ export class WsGameTransport implements GameTransport {
       // in the same event-loop turn. A playing Room never becomes ready on ack alone.
       const ready = this.waitEvent(event => event.type === 'stateUpdate' && event.roomId === this.roomId && event.sync === 'snapshot'
         || event.type === 'roomJoined' && event.roomId === this.roomId && event.status === 'waiting')
-      this.sendRaw({ type: 'joinRoom', roomId: this.roomId, intent: 'resume', requestedPlayerIndex: this.playerIndex })
+      this.sendRaw({ type: 'joinRoom', roomId: this.roomId, intent: 'resume', requestedPlayerIndex: this.seatHint })
       await ready
     }
     for (const command of [...this.journal.commands.values()]) {
@@ -499,6 +502,7 @@ export class WsGameTransport implements GameTransport {
     } else if (msg.type === 'roomCreated' || msg.type === 'roomJoined' || msg.type === 'roomWaiting') {
       if ('playerIndex' in msg) {
         this.playerIndex = msg.playerIndex
+        this.seatHint = msg.playerIndex
         this.journal.playerIndex = msg.playerIndex
       }
       this.setRoom(msg.roomId)

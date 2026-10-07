@@ -272,6 +272,27 @@ describe('WS seat binding', () => {
     )).toMatchObject({ type: 'roomJoined', playerIndex: 1 })
   })
 
+  it.each([false, true])('rejects an unknown dev resume seat without replacing p1 (logged in: %s)', async loggedIn => {
+    const token = loggedIn
+      ? await createSession((await createLocalUserForTests('developer', 'test-password')).id)
+      : undefined
+    const p1 = await openWs(baseUrl, sockets, token ?? undefined)
+    await sendCommand(p1, { type: 'joinRoom', roomId: 'dev2', requestedPlayerIndex: 0 })
+    await waitForEvent(p1, (event): event is Extract<ServerEvent, { type: 'roomJoined' }> => event.type === 'roomJoined')
+    if (loggedIn) {
+      const p2 = await openWs(baseUrl, sockets, token!)
+      await sendCommand(p2, { type: 'joinRoom', roomId: 'dev2', requestedPlayerIndex: 1 })
+      await waitForEvent(p2, (event): event is Extract<ServerEvent, { type: 'roomJoined' }> => event.type === 'roomJoined')
+    }
+    const resumed = await openWs(baseUrl, sockets, token ?? undefined)
+    await sendCommand(resumed, { type: 'joinRoom', roomId: 'dev2', intent: 'resume' })
+    expect(await waitForEvent(resumed, (event): event is Extract<ServerEvent, { type: 'roomJoined' | 'error' }> =>
+      event.type === 'roomJoined' || event.type === 'error',
+    )).toMatchObject({ type: 'error', code: 'player_slot_required' })
+    expect(p1.readyState).toBe(WebSocket.OPEN)
+    expect(p1.received.some(event => event.type === 'seat_replaced')).toBe(false)
+  })
+
   it('rejects devSetResources when the seat argument does not match the sender', async () => {
     const { p1, initialP1 } = await setupTwoPlayerRoom(baseUrl, sockets)
     const initialWood = initialP1.payload.state.players[0]!.resources.wood

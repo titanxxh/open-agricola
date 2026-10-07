@@ -68,6 +68,7 @@ import {
   hasPendingMoorSpecialActionChoice,
   isDevModeAllowedFromQuery,
   maxPlayersFromQuery,
+  requestedWsPlayerIdFromQuery,
   playerIdFromWsStatus,
   shouldShowDevPanel,
   splitBoardActionSpaces,
@@ -287,7 +288,7 @@ const useTransportSetup = (
         if (disposed || hadPendingCommands) return
         if (roomId) {
           setWsStatus({ phase: 'joining', roomId })
-          ws.sendRoomCommand('joinRoom', { roomId, intent: contextRoomId ? 'resume' : 'join', name: displayName ?? '', requestedPlayerIndex: contextRoomId ? undefined : toRequestedPlayerIndex(playerParam) })
+          ws.sendRoomCommand('joinRoom', { roomId, intent: contextRoomId ? 'resume' : 'join', name: displayName ?? '', requestedPlayerIndex: toRequestedPlayerIndex(playerParam) })
         } else if (!playerParam || playerParam === 'p1') {
           setWsStatus({ phase: 'creating' })
           ws.sendRoomCommand('createRoom', {
@@ -339,20 +340,12 @@ export const GameContainerApi = () => {
   // the draft / parent-selection phases (see `hotseat-seat.ts`).
   const [hotseatSeatConfirmed, setHotseatSeatConfirmed] = useState<string | null>(null)
 
-  const lockedViewPlayerId = useMemo(() => {
-    const p = new URLSearchParams(window.location.search)
-    if (p.has('context')) return null
-    const raw = p.get('player') ?? p.get('playerId')
-    if (!raw) return null
-    if (/^p[1-6]$/.test(raw)) return raw
-    const index = Number(raw)
-    if (Number.isFinite(index) && index >= 1 && index <= 6) return `p${index}`
-    return null
-  }, [])
+  const requestedPlayerId = useMemo(() => requestedWsPlayerIdFromQuery(window.location.search), [])
+  const lockedViewPlayerId = contextRoomId === null ? requestedPlayerId : null
   const { locale } = useLocale()
   const { user } = useAuth()
   const { transport, wsStatus, isWs, isReady, wsTransport, recoveryNotice, clearRecoveryNotice } = useTransportSetup(
-    lockedViewPlayerId,
+    requestedPlayerId,
     user?.displayName,
     isWsMode,
     locale,

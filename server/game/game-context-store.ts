@@ -173,6 +173,7 @@ export class GameContextStore {
          AND room_players.user_id = ?
         LEFT JOIN game_replays ON game_replays.room_id = rooms.id
         WHERE rooms.id = ?
+        ORDER BY room_players.player_index LIMIT 1
       `).get(userId, roomId)) as ActiveRow | undefined
       if (!active) {
         return {

@@ -419,11 +419,13 @@ const participantEvidence = async (
           SELECT player_index
           FROM room_players
           WHERE room_id = ? AND user_id = ?
+          ORDER BY player_index LIMIT 1
         `).get(roomId, participant.id))
       : (await runtime.db.prepare(`
           SELECT player_index
           FROM game_context_participants
           WHERE room_id = ? AND user_id = ?
+          ORDER BY player_index LIMIT 1
         `).get(roomId, participant.id))
   ) as { player_index: number } | undefined
   if (!seat) throw new BugReportError('not_participant', 403)

@@ -346,6 +346,16 @@ const isDevRoomId = (roomId: string): boolean => {
   return false
 }
 
+export const requestedWsPlayerIdFromQuery = (search: string): string | null => {
+  const params = new URLSearchParams(search)
+  if (params.has('context') && !isDevRoomId(params.get('context')!)) return null
+  const raw = params.get('player') ?? params.get('playerId')
+  if (!raw) return null
+  if (/^p[1-6]$/.test(raw)) return raw
+  const index = Number(raw)
+  return Number.isInteger(index) && index >= 1 && index <= 6 ? `p${index}` : null
+}
+
 export const maxPlayersFromQuery = (search: string): number => {
   const raw = Number(new URLSearchParams(search).get('maxPlayers'))
   if (!Number.isFinite(raw)) return 2
