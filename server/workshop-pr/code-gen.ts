@@ -679,7 +679,8 @@ function referencedNames(stmt: ts.Statement): Set<string> {
       const parent = node.parent
       const isPropertyName = (ts.isPropertyAccessExpression(parent) && parent.name === node)
         || (ts.isPropertyAssignment(parent) && parent.name === node)
-      if (!isPropertyName) names.add(node.text)
+      const isDeclarationName = ts.isVariableDeclaration(parent) && parent.name === node
+      if (!isPropertyName && !isDeclarationName) names.add(node.text)
     }
     ts.forEachChild(node, visit)
   }
@@ -807,9 +808,13 @@ export function generateCardSourceFile(
   })
   const cardMetaSource = extractCardMetaSource(normalised)
   const cardImplSource = extractCardImplSource(normalised)
-  const cardImplWithId = cardImplSource.includes('const CARD_ID')
-    ? cardImplSource
-    : `const CARD_ID = '${wcard.card_id}'\n${cardImplSource}`
+  const implFile = ts.createSourceFile('impl.ts',cardImplSource,ts.ScriptTarget.ES2022,true,ts.ScriptKind.TS)
+  const metaFile = ts.createSourceFile('meta.ts',`const meta = ${cardMetaSource}`,ts.ScriptTarget.ES2022,true,ts.ScriptKind.TS)
+  const needsCardId = [...implFile.statements,...metaFile.statements].some(stmt => referencedNames(stmt).has('CARD_ID'))
+  const declaration = findTopLevelConst(implFile,'CARD_ID')
+  const cardImplWithId = needsCardId
+    ? declaration ? cardImplSource : `const CARD_ID = '${wcard.card_id}'\n${cardImplSource}`
+    : printStatements(implFile,implFile.statements.filter(stmt => stmt !== declaration))
   const factory = cardSourceFactory(wcard.card_type)
 
   // Scan the emitted impl, not the raw sandbox source: helpers that were
