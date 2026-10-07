@@ -180,7 +180,7 @@ const sendCommandError = (
   ctx: ConnectionCtx,
   error: string,
   requestId?: string,
-  code?: GameContextErrorCode | CommandErrorCode | 'seat_replaced' | 'history_branch_changed',
+  code?: GameContextErrorCode | CommandErrorCode | 'seat_replaced' | 'history_branch_changed' | 'player_slot_required',
   lifecycle?: GameContextLifecycle,
 ) => {
   rejectObservedCommand(code === 'command_input_stale' ? 'stale' : code === 'login_required' || code === 'seat_replaced' ? 'canceled' : 'rule_rejected')
@@ -740,6 +740,14 @@ async function handleJoinRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { 
     requestedPlayerIndex = typeof msg.requestedPlayerIndex === 'number'
       ? msg.requestedPlayerIndex
       : undefined
+    if (msg.intent === 'resume' && requestedPlayerIndex === undefined) {
+      const ownedSeats = (room.seatOwners ?? []).filter(owner => owner.userId === ctx.currentUserId)
+      if (ownedSeats.length !== 1) {
+        sendCommandError(ctx, 'choose a player slot to resume this development room', msg.requestId, 'player_slot_required', 'active')
+        return
+      }
+      requestedPlayerIndex = ownedSeats[0]!.playerIndex
+    }
   }
   const requested = resolveJoinRequestPlayerIndex(
     room,

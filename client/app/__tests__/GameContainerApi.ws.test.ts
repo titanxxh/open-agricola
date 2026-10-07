@@ -20,6 +20,7 @@ import {
   getCurrentlySelectableRoomKeys,
   isDevModeAllowedFromQuery,
   maxPlayersFromQuery,
+  requestedWsPlayerIdFromQuery,
   getPendingMoorSpecialActionChoice,
   getPendingMoorSpecialActionTileChoice,
   getPendingMoorSpecialActionTileKeys,
@@ -70,6 +71,15 @@ const listAppSourceFiles = (dir: string): string[] =>
   })
 
 describe('GameContainerApi WS player identity', () => {
+  it.each([2, 3, 4, 5, 6])('preserves a requested seat in dev%s context links', count => {
+    expect(requestedWsPlayerIdFromQuery(`?context=dev${count}&player=p${count}`)).toBe(`p${count}`)
+    expect(requestedWsPlayerIdFromQuery(`?context=dev${count}-00000000-0000-4000-8000-000000000000&player=p${count}`)).toBe(`p${count}`)
+  })
+
+  it('ignores player hints for ordinary contexts regardless of secondary dev parameters', () => {
+    expect(requestedWsPlayerIdFromQuery('?context=ordinary&room=dev2&player=p2&devMode=1')).toBeNull()
+    expect(requestedWsPlayerIdFromQuery('?context=dev2-not-a-uuid&player=p2')).toBeNull()
+  })
   it('keeps option string prefix parsing inside interaction helpers', () => {
     const allowed = new Set([
       'game-container-helpers.ts',

@@ -40,6 +40,21 @@ describe('Room reconnect and durable commands', () => {
   })
   afterEach(() => { vi.unstubAllGlobals(); vi.resetModules() })
 
+  it.each([undefined, 1])('does not invent a seat before join acknowledgement (hint %s)', async (hint) => {
+    const { WsGameTransport } = await import('../gameTransport')
+    const transport = new WsGameTransport('ws://test', 'dev2', hint, { route: false, reconnectDelayMs: 1 })
+    try {
+      await transport.connect()
+      Socket.all[0]!.close()
+      await tick()
+      const next = Socket.all[1]!
+      await vi.waitFor(() => expect(next.sent.at(-1)?.type).toBe('joinRoom'))
+      expect(next.sent.at(-1)?.requestedPlayerIndex).toBe(hint)
+    } finally {
+      transport.destroy()
+    }
+  })
+
   it('sends the acknowledged player seat when resuming a development room', async () => {
     const { WsGameTransport } = await import('../gameTransport')
     const transport = new WsGameTransport('ws://test', 'dev2', undefined, { route: false, reconnectDelayMs: 1 })

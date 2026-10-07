@@ -103,7 +103,7 @@ export type ServerEvent =
   | {
       type: 'error'
       error: string
-      code?: GameContextErrorCode | CommandErrorCode | 'seat_replaced' | 'history_branch_changed'
+      code?: GameContextErrorCode | CommandErrorCode | 'seat_replaced' | 'history_branch_changed' | 'player_slot_required'
       lifecycle?: GameContextLifecycle
       requestId?: string
     }

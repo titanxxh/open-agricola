@@ -2,6 +2,11 @@ import { createTestDatabase } from '../../../__tests__/_helpers/postgres'
 import type { PostgresDatabase } from '../../../database/postgres'
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest'
 import { PostgresRoomPersistence } from '../postgres-adapter.ts'
+import { migratePostgres } from '../../../database/migrations'
+import { GameSession } from '../../authoritative-session.ts'
+import { snapshotToRoom } from '../../room.ts'
+import { buildGameResult } from '../../room-persistence-checkpoint.ts'
+import { serializeSessionSnapshot } from '../../../../shared/session/serialization.ts'
 import type { RoomMeta, RoomSnapshot } from '../room-persistence.ts'
 import type { PersistedSessionSnapshot } from '../../../../shared/session/serialization.ts'
 
@@ -59,6 +64,63 @@ describe('PostgresRoomPersistence', () => {
     expect((await p.load('nope'))).toBeNull()
   })
 
+  it('upgrades existing ownership rows without changing snapshots, timestamps or dev slots', async () => {
+    await p.save('r1', STATE, META)
+    await db.prepare("UPDATE room_players SET joined_at = ? WHERE room_id = 'r1'").run(NOW)
+    await db.prepare("INSERT INTO development_room_slots(root_id, room_id) VALUES ('dev2', 'r1')").run()
+    const before = await db.prepare("SELECT * FROM rooms WHERE id = 'r1'").get()
+    const owners = await db.prepare("SELECT * FROM room_players WHERE room_id = 'r1'").all()
+    await db.exec(`
+      ALTER TABLE room_players DROP CONSTRAINT room_players_pkey;
+      ALTER TABLE room_players ADD PRIMARY KEY (room_id, user_id);
+      DROP INDEX room_players_user_seats;
+      DELETE FROM postgres_schema_migrations WHERE version = 14;
+    `)
+
+    await migratePostgres(db)
+
+    expect(await db.prepare("SELECT * FROM rooms WHERE id = 'r1'").get()).toEqual(before)
+    expect(await db.prepare("SELECT * FROM room_players WHERE room_id = 'r1'").all()).toEqual(owners)
+    expect(await db.prepare("SELECT room_id FROM development_room_slots WHERE root_id = 'dev2'").get()).toEqual({ room_id: 'r1' })
+    await p.save('r1', STATE, { ...META, players: [
+      { userId: 'u1', playerIndex: 0 }, { userId: 'u1', playerIndex: 1 },
+    ] })
+    expect((await p.load('r1'))?.meta.players).toHaveLength(2)
+  })
+
+  it.each([2, 3, 4, 5, 6].flatMap(count => [
+    [`dev${count}`, count],
+    [`dev${count}-00000000-0000-4000-8000-000000000000`, count],
+  ] as const))('retains every seat owned by one developer in %s', async (roomId, count) => {
+    const players = Array.from({ length: count }, (_, playerIndex) => ({ userId: 'u1', playerIndex }))
+    await p.save(roomId, STATE, { ...META, maxPlayers: count, players })
+    expect((await new PostgresRoomPersistence(db).load(roomId))?.meta.players).toEqual(players)
+    expect((await p.listRestorable({ now: Date.now(), waitingTtlMs: WAITING_TTL, playingTtlMs: PLAYING_TTL }))
+      .find(room => room.id === roomId)?.meta.players).toEqual(players)
+  })
+
+  it('preserves both result associations and expired participants after offline recovery', async () => {
+    const session = new GameSession(42, undefined, { playerCount: 2 })
+    for (const player of session.state.players) {
+      player.minorHand = ['__test_placeholder__']
+      player.occupationHand = ['__test_placeholder__']
+    }
+    session.state.players[0]!.resources.wood = 42
+    const players = [{ userId: 'u1', playerIndex: 0 }, { userId: 'u1', playerIndex: 1 }]
+    try {
+      await p.save('dev2', serializeSessionSnapshot(session.state, session), { ...META, players })
+      const recovered = snapshotToRoom((await p.load('dev2'))!)
+      try {
+        expect(recovered.players).toEqual([])
+        expect(recovered.session.state.players[0]!.resources.wood).toBe(42)
+        expect(buildGameResult(recovered, NOW).players.map(player => player.userId)).toEqual(['u1', 'u1'])
+      } finally { recovered.session.dispose() }
+      await p.discard('dev2')
+      expect(await db.prepare('SELECT player_index, user_id FROM game_context_participants WHERE room_id = ? ORDER BY player_index').all('dev2'))
+        .toEqual([{ player_index: 0, user_id: 'u1' }, { player_index: 1, user_id: 'u1' }])
+    } finally { session.dispose() }
+  })
+
   describe('membership writes', () => {
     const players = [{ userId: 'u1', playerIndex: 0 }, { userId: 'u2', playerIndex: 1 }]
     const memberRows = async () => (await db.prepare(`
@@ -73,7 +135,7 @@ describe('PostgresRoomPersistence', () => {
         CREATE FUNCTION record_seat_update_fn() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN
           INSERT INTO seat_updates VALUES (NEW.user_id, OLD.player_index, NEW.player_index); RETURN NEW;
         END $$;
-        CREATE TRIGGER record_seat_update AFTER UPDATE OF player_index ON room_players FOR EACH ROW EXECUTE FUNCTION record_seat_update_fn();
+        CREATE TRIGGER record_seat_update AFTER UPDATE OF user_id, player_index ON room_players FOR EACH ROW EXECUTE FUNCTION record_seat_update_fn();
       `))
       ;(await p.save('r1', STATE, { ...META, players }))
       ;(await db.prepare("UPDATE room_players SET joined_at = ? WHERE room_id = 'r1'").run(NOW))
@@ -92,12 +154,12 @@ describe('PostgresRoomPersistence', () => {
       expect((await p.load('r1'))!.updatedAt).toBeGreaterThan(0)
     })
 
-    it('updates a moved member exactly once and preserves its joined_at', async () => {
+    it('reconciles a moved member and preserves its joined_at', async () => {
       const moved = [{ userId: 'u2', playerIndex: 1 }, { userId: 'u1', playerIndex: 2 }]
 
       ;(await p.save('r1', STATE, { ...META, maxPlayers: 3, players: moved }))
 
-      expect((await seatUpdates())).toEqual([{ user_id: 'u1', old_index: 0, new_index: 2 }])
+      expect((await seatUpdates())).toEqual([])
       expect((await memberRows())).toEqual([
         { user_id: 'u2', player_index: 1, joined_at: NOW },
         { user_id: 'u1', player_index: 2, joined_at: NOW },
@@ -115,9 +177,10 @@ describe('PostgresRoomPersistence', () => {
         { userId: 'u2', playerIndex: 0 },
         { userId: 'u1', playerIndex: 1 },
       ])
-      expect((await seatUpdates())).toEqual([{ user_id: 'u1', old_index: 0, new_index: 1 }])
-      // clearReplacedSeat deletes/reinserts the displaced member during swaps;
-      // the surviving moved member retains its original join timestamp.
+      expect((await seatUpdates())).toEqual([
+        { user_id: 'u1', old_index: 1, new_index: 1 },
+        { user_id: 'u2', old_index: 0, new_index: 0 },
+      ])
       expect((await memberRows())).toEqual([
         { user_id: 'u2', player_index: 0, joined_at: expect.any(Number) },
         { user_id: 'u1', player_index: 1, joined_at: NOW },
@@ -132,7 +195,11 @@ describe('PostgresRoomPersistence', () => {
         { userId: 'u3', playerIndex: 0 },
         { userId: 'u1', playerIndex: 1 },
       ])
-      expect((await seatUpdates())).toEqual([{ user_id: 'u1', old_index: 0, new_index: 1 }])
+      expect((await seatUpdates())).toEqual([
+        { user_id: 'u1', old_index: 1, new_index: 1 },
+        { user_id: 'u2', old_index: 0, new_index: 0 },
+        { user_id: 'u3', old_index: 0, new_index: 0 },
+      ])
     })
 
     it('rolls back actual moves, displaced members and update counters on a later failure', async () => {

@@ -1,7 +1,6 @@
-import type { CommandErrorCode } from '../../shared/contract/protocol/commands'
-import type { GameContextErrorCode } from '../../shared/contract/protocol/game-context'
+import type { ServerEvent } from '../../shared/contract/protocol/ws'
 
-export type WsErrorCode = GameContextErrorCode | CommandErrorCode | 'seat_replaced' | 'history_branch_changed'
+export type WsErrorCode = NonNullable<Extract<ServerEvent, { type: 'error' }>['code']>
 
 export type WsStatus =
   | { phase: 'idle' }

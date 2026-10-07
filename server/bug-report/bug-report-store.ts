@@ -675,6 +675,7 @@ await this.db.prepare('SELECT room_id FROM game_contexts WHERE room_id = ? FOR U
            WHERE latest.room_id = rooms.id
          )
         WHERE rooms.id = ?
+        ORDER BY room_players.player_index LIMIT 1
       `).get(input.userId, input.roomId)) as AnchorRow | undefined
     } else if (context.lifecycle === 'completed') {
       if (
@@ -696,6 +697,7 @@ await this.db.prepare('SELECT room_id FROM game_contexts WHERE room_id = ? FOR U
          AND step.frame_hash = ?
         WHERE result_player.room_id = ?
           AND result_player.user_id = ?
+        ORDER BY result_player.player_index LIMIT 1
       `).get(
         input.stepNo,
         input.frameHash,

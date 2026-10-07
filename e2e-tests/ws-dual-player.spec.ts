@@ -50,6 +50,47 @@ const authenticate = async (
 }
 
 test.describe('WS dual-player sync', () => {
+  test('one account keeps separate seats through every development context link', async ({ browser, request }) => {
+    const context = await browser.newContext()
+    await authenticate(context, request, `dev_seats_${Date.now().toString(36)}`)
+    try {
+      for (const count of [2, 3, 4, 5, 6]) {
+        const p1 = await context.newPage()
+        const other = await context.newPage()
+        const firstEvents: Array<{ type: string }> = []
+        const joins: Array<{ roomId: string; playerIndex: number }> = []
+        p1.on('websocket', socket => socket.on('framereceived', ({ payload }) => {
+          if (typeof payload === 'string') firstEvents.push(JSON.parse(payload))
+        }))
+        other.on('websocket', socket => socket.on('framereceived', ({ payload }) => {
+          if (typeof payload !== 'string') return
+          const message = JSON.parse(payload)
+          if (message.type === 'roomJoined') joins.push(message)
+        }))
+        try {
+          await p1.goto(`${FRONTEND_URL}/?transport=ws&room=dev${count}&player=p1&devMode=1`)
+          await expect(p1.locator('.game-layout')).toBeVisible()
+          await other.goto(`${FRONTEND_URL}/?transport=ws&room=dev${count}&player=p${count}&devMode=1`)
+          await expect(other.locator('.game-layout')).toBeVisible()
+          expect(joins.at(-1)?.playerIndex).toBe(count - 1)
+          const roomId = joins.at(-1)!.roomId
+          const beforeResume = joins.length
+          await other.goto(`${FRONTEND_URL}/?context=${roomId}&player=p${count}`)
+          await expect(other.locator('.game-layout')).toBeVisible()
+          await expect.poll(() => joins.length).toBeGreaterThan(beforeResume)
+          expect(joins.at(-1)?.playerIndex).toBe(count - 1)
+          const beforeReload = joins.length
+          await other.reload()
+          await expect(other.locator('.game-layout')).toBeVisible()
+          await expect.poll(() => joins.length).toBeGreaterThan(beforeReload)
+          expect(joins.at(-1)?.playerIndex).toBe(count - 1)
+          expect(firstEvents.some(event => event.type === 'seat_replaced')).toBe(false)
+          await expect(p1.locator('.game-layout')).toBeVisible()
+        } finally { await p1.close(); await other.close() }
+      }
+    } finally { await context.close() }
+  })
+
   const countTaken = (page: Page) =>
     page.locator('.action-card-holder.taken').count()
   const takenHolderByText = (page: Page, text: string) =>
