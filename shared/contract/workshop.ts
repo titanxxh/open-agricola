@@ -1,3 +1,5 @@
+import type { GenerationProvenance } from './workshop-generation'
+
 export type WorkshopCardType = 'minor' | 'occupation'
 
 export type WorkshopDraftErrorCode =
@@ -54,5 +56,8 @@ export type WorkshopAbilityCandidateContract = WorkshopGenerationCandidateBase &
   kind: 'ability'
   sourceCode: string
   cardJson: Record<string, unknown>
-  validation: { valid: boolean; errors?: string[] }
+  sourceFingerprint?: string
+  inputFingerprint?: string
+  provenance?: GenerationProvenance
+  validation: { valid: boolean; errors?: string[]; sourceFingerprint?: string; sandboxContractId?: string }
 }

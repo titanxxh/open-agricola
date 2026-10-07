@@ -12,6 +12,7 @@ import type {
 import { workshopCardJsonFromDefinition } from './workshop-draft-validation.ts'
 import { canGoLive, isReviewStatus, type ReviewStatus } from './workshop-status.ts'
 import { getReviewDecisionProvider } from './workshop-review-provider.ts'
+import { projectWorkshopGeneration, projectGenerationProvenance } from '../shared/projections/workshop-generation.ts'
 
 export type WorkshopDraft = WorkshopDraftContract & {
   compiledCode: string | null
@@ -140,7 +141,7 @@ const serialiseDraft = (draft: WorkshopDraft): {
   codeManifest: string | null
   generation: string
 } => {
-  const generation = structuredClone(draft.generation)
+  const generation = projectWorkshopGeneration(draft.generation)
   const art = generation.art
   if (art && typeof art === 'object' && !Array.isArray(art)) {
     const record = art as Record<string, unknown>
@@ -201,12 +202,14 @@ const provenanceCandidate = (value: unknown): Record<string, unknown> | null => 
     'requestId',
     'createdAt',
     'validation',
+    'sourceFingerprint',
+    'inputFingerprint',
   ]
-  return Object.fromEntries(
+  return { ...Object.fromEntries(
     keys
       .filter(key => candidate[key] !== undefined)
       .map(key => [key, candidate[key]]),
-  )
+  ), ...(projectGenerationProvenance(candidate.provenance) ? { provenance: projectGenerationProvenance(candidate.provenance) } : {}) }
 }
 
 const versionProvenance = (
@@ -301,7 +304,7 @@ const rowToWorkspace = (row: WorkshopCardRow): WorkshopWorkspace => {
       compiledCode,
       codeManifest: row.code_manifest ? parseRecord(row.code_manifest) : null,
       artUrl: row.art_url,
-      generation: parseRecord(row.draft_generation_json),
+      generation: projectWorkshopGeneration(parseRecord(row.draft_generation_json)),
     },
     approvedVersionId: row.approved_version_id,
     sandboxPassVersionId: row.sandbox_pass_version_id,
@@ -554,7 +557,7 @@ export async function adoptCandidate(
         ? previous as Record<string, unknown>
         : {}),
       ...(input.candidate.kind === 'art' && input.artInputs ? input.artInputs : {}),
-      lastCompleted: input.candidate,
+      ...(input.candidate.kind === 'ability' ? { lastValid: input.candidate } : { lastCompleted: input.candidate }),
       adopted: input.candidate,
     }
     let draft: WorkshopDraft

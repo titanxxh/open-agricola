@@ -6,6 +6,8 @@ import { validateSession, extractToken, isAdmin } from './auth.ts'
 import { nanoid } from 'nanoid'
 import { handleSubmitReviewRequest, handleRefreshPrStatus } from './workshop-pr/propose-handler.ts'
 import { corsHeaders } from './http-origin.ts'
+import { getWorkshopSandboxContract } from './workshop-sandbox-contract.ts'
+import { projectGenerationProvenance, sourceFingerprint } from '../shared/projections/workshop-generation.ts'
 import {
   WorkshopDraftError,
   adoptCandidate,
@@ -356,6 +358,11 @@ export async function handleWorkshopRoute(
   }
   const routeUrl = new URL(url, 'http://localhost')
 
+  if (req.method === 'GET' && url === '/api/workshop/sandbox-contract') {
+    sendJson(res, 200, { ok: true, contract: getWorkshopSandboxContract() })
+    return true
+  }
+
   const token = extractToken(req.headers.authorization)
   const user = (await validateSession(token))
   const db = getDb()
@@ -622,7 +629,10 @@ export async function handleWorkshopRoute(
         cardJson,
         compiledCode: prepared.compiledCode,
         codeManifest: prepared.codeManifest,
-        validation: { valid: true },
+        sourceFingerprint: sourceFingerprint(raw.sourceCode),
+        ...(typeof raw.inputFingerprint === 'string' ? { inputFingerprint: raw.inputFingerprint } : {}),
+        ...(projectGenerationProvenance(raw.provenance) ? { provenance: projectGenerationProvenance(raw.provenance) } : {}),
+        validation: { valid: true, sourceFingerprint: sourceFingerprint(raw.sourceCode), sandboxContractId: getWorkshopSandboxContract().id },
         ...(typeof raw.provider === 'string' ? { provider: raw.provider } : {}),
         ...(typeof raw.model === 'string' ? { model: raw.model } : {}),
         createdAt: typeof raw.createdAt === 'number' ? raw.createdAt : Date.now(),
@@ -877,27 +887,36 @@ export async function handleWorkshopRoute(
   // ── POST /api/workshop/cards/validate-code ──────────────────────────────
   if (req.method === 'POST' && url === '/api/workshop/cards/validate-code') {
     if (!user) { sendJson(res, 401, { ok: false, error: 'Not authenticated' }); return true }
-    const body = await parseBody<{ source?: string; card_id?: string }>(req)
+    const body = await parseBody<{ source?: string; card_id?: string; sandboxContractId?: string }>(req)
     if (!body?.source || typeof body.source !== 'string') {
       sendJson(res, 400, { ok: false, error: 'Missing source' }); return true
     }
     if (!body.card_id || typeof body.card_id !== 'string') {
       sendJson(res, 400, { ok: false, error: 'Missing card_id' }); return true
     }
+    const sandboxContractId = getWorkshopSandboxContract().id
+    const fingerprint = sourceFingerprint(body.source)
+    if (body.sandboxContractId && body.sandboxContractId !== sandboxContractId) {
+      sendJson(res, 409, { ok: false, code: 'sandbox_changed', error: 'Sandbox changed; start a new generation attempt.', sandboxContractId, sourceFingerprint: fingerprint })
+      return true
+    }
     const result = await prepareWorkshopAbilityCode(body.source, body.card_id)
     if (!result.ok) {
       if (result.status === 400) {
-        sendJson(res, 200, { ok: true, valid: false, errors: result.errors })
+        sendJson(res, 200, { ok: true, valid: false, errors: result.errors, sandboxContractId, sourceFingerprint: fingerprint })
       } else {
-        sendJson(res, result.status, result)
+        sendJson(res, result.status, { ...result, sandboxContractId, sourceFingerprint: fingerprint })
       }
       return true
     }
     sendJson(res, 200, {
       ok: true,
       valid: true,
+      sandboxContractId,
+      sourceFingerprint: fingerprint,
       compiled: result.compiledCode,
       manifest: result.codeManifest,
+      cardJson: workshopCardJsonFromDefinition(result.cardDefinition),
     })
     return true
   }

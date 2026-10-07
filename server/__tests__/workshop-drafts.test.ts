@@ -254,7 +254,8 @@ describe('workshop draft aggregate', () => {
 
     expect(saved.revision).toBe(2)
     expect(saved.draft.name).toBe('Field Keeper II')
-    expect(saved.draft.generation).toEqual({ ability: { prompt: 'gain grain' } })
+    // A bare request is local editing state, not a durable Generation Result.
+    expect(saved.draft.generation).toEqual({})
     expect(saved.sandboxPassVersionId).toBeNull()
     expect((await db.prepare('SELECT COUNT(*) AS count FROM workshop_card_versions').get())).toEqual({ count: 0 })
 
@@ -1192,4 +1193,39 @@ describe('workshop draft aggregate', () => {
     expect(checkpointed.sandboxPassVersionId).toBe(approved.versionId)
     expect((await getHandoffReadiness(db, created.id, 'author')).ready).toBe(true)
   })
+})
+
+
+it('persists A and failed B privately, strips protocol, and preserves immutable adopted provenance', async () => {
+  const makeCandidate = (id: string, valid: boolean) => ({
+    id, kind: 'ability' as const, prompt: `request ${id}`, createdAt: 1,
+    sourceCode: 'const CARD_IMPL = {}', cardJson: baseDraft().cardJson,
+    validation: { valid }, compiledCode: 'const CARD_IMPL = {};', codeManifest: { listeners: [] },
+    provenance: { attemptId: id, inputFingerprint: 'a'.repeat(64), promptVersion: 'v1', toolVersion: 'v1',
+      provider: 'deepseek', endpoint: 'https://api.deepseek.com/v1/chat/completions', model: 'deepseek-v4-flash',
+      modelRequests: 2, referenceCalls: 1, repairs: 0, elapsedMs: 10,
+      usage: { inputTokens: 10, outputTokens: 5, cachedInputTokens: null, reasoningTokens: null }, references: [],
+      raw: 'private-canary', apiKey: 'private-canary' },
+    tool_calls: ['private-canary'],
+  })
+  const a = makeCandidate('A', true)
+  const b = makeCandidate('B', false)
+  const initial = await createCard(db, { authorId: 'author', draft: baseDraft() })
+  const saved = await checkpointDraft(db, { cardId: initial.id, authorId: 'author', baseRevision: initial.revision,
+    draft: { ...initial.draft, generation: { apiKey: 'private-canary', ability: { lastValid: a,
+      latestResult: { kind: 'failed-source', attemptId: 'B', createdAt: 2, message: 'invalid', failedCandidate: b, reasoning: 'private-canary' } } } },
+  })
+  expect(saved.draft.generation).toMatchObject({ ability: { lastValid: { id: 'A' }, latestResult: { failedCandidate: { id: 'B', validation: { valid: false } } } } })
+  const row = await db.prepare('SELECT draft_generation_json FROM workshop_cards WHERE id = ?').get(initial.id)
+  expect(JSON.stringify(row)).not.toContain('private-canary')
+  await expect(adoptCandidate(db, { cardId: initial.id, authorId: 'author', baseRevision: saved.revision, candidate: b })).rejects.toMatchObject({ code: 'not_ready' })
+  const adopted = await adoptCandidate(db, { cardId: initial.id, authorId: 'author', baseRevision: saved.revision, candidate: a })
+  const first = await db.prepare('SELECT provenance_json FROM workshop_card_versions WHERE id = ?').get(adopted.versionId)
+  expect(JSON.stringify(first)).not.toContain('private-canary')
+  expect(JSON.stringify(first)).not.toContain('failedCandidate')
+  const same = await adoptCandidate(db, { cardId: initial.id, authorId: 'author', baseRevision: adopted.workspace.revision,
+    candidate: { ...a, id: 'new-attempt', provenance: { ...a.provenance, attemptId: 'new-attempt' } },
+  })
+  expect(same.versionId).toBe(adopted.versionId)
+  expect(await db.prepare('SELECT provenance_json FROM workshop_card_versions WHERE id = ?').get(same.versionId)).toEqual(first)
 })

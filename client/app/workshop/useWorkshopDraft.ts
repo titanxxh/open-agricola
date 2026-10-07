@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 import type { WorkshopDraftErrorCode } from '../../../shared/contract/workshop'
+import { projectAbilityCandidate, projectWorkshopGeneration } from '../../../shared/projections/workshop-generation'
 import {
   createWorkshopDraftState,
   resolveWorkshopRecovery,
@@ -51,7 +52,7 @@ const generationCandidate = (
   kind: WorkshopCandidate['kind'],
 ): Record<string, unknown> => {
   const record = generationGroup(draft, kind)
-  for (const key of ['lastCompleted', 'adopted']) {
+  for (const key of kind === 'ability' ? ['lastValid', 'adopted'] : ['lastCompleted', 'adopted']) {
     const candidate = record[key]
     if (candidate && typeof candidate === 'object' && !Array.isArray(candidate)) {
       return candidate as Record<string, unknown>
@@ -232,7 +233,7 @@ export const useWorkshopDraft = ({
         {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ baseRevision, draft }),
+          body: JSON.stringify({ baseRevision, draft: { ...draft, generation: projectWorkshopGeneration(draft.generation) } }),
         },
       )
       const payload = await response.json() as WorkspaceResponse
@@ -410,7 +411,7 @@ export const useWorkshopDraft = ({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             baseRevision: current.baseRevision,
-            candidate,
+            candidate: candidate.kind === 'ability' ? projectAbilityCandidate(candidate) : candidate,
             ...(artInputs ? { artInputs } : {}),
           }),
         },
