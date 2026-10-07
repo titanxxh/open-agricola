@@ -138,7 +138,7 @@ A **Generation Attempt** encompasses reference queries, model responses, and bou
 
 The decisions live in [the reference contract](https://github.com/titanxxh/open-agricola/issues/1032) and [model admission, loop boundaries, and recovery](https://github.com/titanxxh/open-agricola/issues/1033). These records define the initial budgets, explicit continuation, limited retries and repairs, and browser tool-roundtrip evidence required before enabling a model.
 
-#### C1.3 Planned request/result and draft recovery
+#### C1.3 Request/result and draft recovery
 
 The approved [request/result contract](https://github.com/titanxxh/open-agricola/issues/1034) makes follow-up requests use the selected ability candidate, or the adopted draft when none is selected. Error repair binds to the source that actually failed. Shared request construction captures card identity, the user's goal, source and input fingerprints, and the relevant visible conversation. New requests resolve the latest reference commit; automatic validation repairs and explicit continuation stay within the same attempt. Sandbox playtest errors start a new attempt only when the author clicks **AI repair**.
 
@@ -150,7 +150,9 @@ A **Generation Result** can contain a complete source candidate, failed source r
 | Same-browser local recovery | Visible conversation and existing editing state; unfinished work is marked interrupted and never resumes automatically |
 | Author-private server draft | Adopted draft content, latest ability candidate that passed code validation, latest Generation Result, and compact Generation Provenance; no complete conversation or raw tool protocol |
 
-The latest result and candidate may reference the same source without retaining duplicate completed copies. Adoption remains explicit and server-validated. Draft Versions retain only adopted content and its allowlisted provenance; identical content continues to reuse an immutable version without rewriting its original provenance. Public card, submission, and Replay projections exclude private generation records. The detailed field contract lives in the decision record; these recovery changes are not implemented yet.
+The latest result and candidate may reference the same source without retaining duplicate completed copies. Adoption remains explicit and server-validated. Draft Versions retain only adopted content and its allowlisted provenance; identical content continues to reuse an immutable version without rewriting its original provenance. Public card, submission, and Replay projections exclude private generation records. The shared allowlist in `shared/projections/workshop-generation.ts` now protects checkpoint, adoption, version provenance and local recovery. The ability group stores `lastValid` and `latestResult` separately; successful results reference the candidate by ID and source fingerprint, while a failed result retains its complete non-adoptable source. Local chat recovery projects only visible fields and marks in-flight work interrupted. The browser runner and production UI cutover are still pending.
+
+`GET /api/workshop/sandbox-contract` exposes the actual deployed helper source, hook/listener metadata, supported action shapes, isolation limits and semantic restrictions. Its identifier hashes deployed shared/executor source and runtime versions, independently of the GitHub reference commit. `POST /api/workshop/cards/validate-code` binds success and failure to that identifier and the submitted source fingerprint; an obsolete contract returns `sandbox_changed` so a new attempt is required. The main browser receives data only, never imports the rule runtime.
 
 #### C1.4 Planned quality and cost acceptance
 

@@ -5,14 +5,12 @@
  * importing any shared/ modules to keep the worker's dependency tree
  * minimal and avoid module resolution issues across thread boundaries.
  *
- * NOTE: HELPERS_INJECTION_SOURCE is the one exception — it's a pure
- * string constant with no transitive deps.
+ * Shared imports below are pure constants with no transitive runtime deps.
  */
 import ivm from 'isolated-vm'
 import { HELPERS_INJECTION_SOURCE } from '../../shared/custom-code/injected-helpers.ts'
 
-const EXECUTION_TIMEOUT_MS = 100
-const ISOLATE_MEMORY_LIMIT_MB = 8
+import { EXECUTION_TIMEOUT_MS, ISOLATE_MEMORY_LIMIT_MB } from '../../shared/custom-code/runtime-limits.ts'
 
 function runInIsolate(
   compiledCode: string,

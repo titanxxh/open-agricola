@@ -19,8 +19,7 @@ import type {
 } from '../../shared/custom-code/types.ts'
 import { HELPERS_INJECTION_SOURCE } from '../../shared/custom-code/injected-helpers.ts'
 
-const EXECUTION_TIMEOUT_MS = 100
-const ISOLATE_MEMORY_LIMIT_MB = 8
+import { EXECUTION_TIMEOUT_MS, ISOLATE_MEMORY_LIMIT_MB } from '../../shared/custom-code/runtime-limits.ts'
 
 /**
  * Run compiled card code in a true V8 isolate (via isolated-vm).

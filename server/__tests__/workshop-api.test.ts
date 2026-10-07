@@ -175,6 +175,26 @@ const createPublishedCard = async (
 
 describe('workshop API', () => {
   describe('POST /api/workshop/cards/validate-code', () => {
+    it('binds validation, including failures, to the deployed sandbox and exact source', async () => {
+      const descriptor = mockRes()
+      await handleWorkshopRoute(mockReq('GET', '/api/workshop/sandbox-contract'), descriptor)
+      const { contract } = JSON.parse(descriptor.body)
+      expect(contract.id).toMatch(/^sandbox-v1:[a-f0-9]{64}$/)
+      expect(contract.helpers).toContain('function getCardDefinition(_cardId)')
+      expect(contract.limits).toEqual({ executionTimeoutMs: 100, memoryLimitMb: 8 })
+      const invalid = mockRes()
+      await handleWorkshopRoute(mockReq('POST', '/api/workshop/cards/validate-code', {
+        source: 'import x from "node:fs"', card_id: 'CUSTOM_Test', sandboxContractId: contract.id,
+      }, 'tok-alice'), invalid)
+      expect(JSON.parse(invalid.body)).toMatchObject({ valid: false, sandboxContractId: contract.id, sourceFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/) })
+      const changed = mockRes()
+      await handleWorkshopRoute(mockReq('POST', '/api/workshop/cards/validate-code', {
+        source: 'const CARD_IMPL = {}', card_id: 'CUSTOM_Test', sandboxContractId: 'old-deployment',
+      }, 'tok-alice'), changed)
+      expect(changed.statusCode).toBe(409)
+      expect(JSON.parse(changed.body)).toMatchObject({ code: 'sandbox_changed', sandboxContractId: contract.id })
+    })
+
     it('validates cost attribution against the submitted card ID', async () => {
       const source = `
 const CARD_ID = 'CUSTOM_ValidatedCard'

@@ -1,6 +1,7 @@
 import type { CustomCodeValidateResult } from '../shared/custom-code/types.ts'
 import { validateAndCompileCustomCodeRemote } from './custom-code/client.ts'
 import type { WorkshopDraft } from './workshop-drafts.ts'
+import { projectWorkshopGeneration } from '../shared/projections/workshop-generation.ts'
 
 export type WorkshopDraftRequest = {
   cardId?: unknown
@@ -139,9 +140,7 @@ export const prepareWorkshopDraft = async (
       compiledCode,
       codeManifest,
       artUrl: typeof raw.artUrl === 'string' && raw.artUrl ? raw.artUrl : null,
-      generation: raw.generation && typeof raw.generation === 'object' && !Array.isArray(raw.generation)
-        ? raw.generation as Record<string, unknown>
-        : {},
+      generation: projectWorkshopGeneration(raw.generation),
     },
   }
 }

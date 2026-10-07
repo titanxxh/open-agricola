@@ -28,6 +28,7 @@ import { PlayerCard } from '../../components/common/PlayerCard'
 import { Section } from '../../components/common/Section'
 import type { CardMeta } from '../../services/card-meta'
 import { resolveCardArtUrl } from '../../../shared/utils/card-art-url'
+import { sourceFingerprint } from '../../../shared/projections/workshop-generation'
 import { API_BASE } from '../../config'
 import { publicAssetUrl } from '../../utils/public-asset-url'
 import { useWorkshopDraft } from './useWorkshopDraft'
@@ -987,6 +988,7 @@ function AbilityPanel({
   onCandidateValidated: (
     candidateId: string,
     validation: AbilityCandidate['validation'],
+    fingerprint: string,
   ) => Promise<void>
   onCandidateDiscarded: (candidateId: string) => Promise<void>
   onCandidateAdopted: (candidate: AbilityCandidate) => Promise<void>
@@ -1218,7 +1220,7 @@ function AbilityPanel({
   const handleValidate = async (candidate: AbilityCandidate) => {
     setValidatingCandidateId(candidate.id)
     const validation = await validateSource(candidate.sourceCode)
-    await onCandidateValidated(candidate.id, validation)
+    await onCandidateValidated(candidate.id, validation, sourceFingerprint(candidate.sourceCode))
     setValidatingCandidateId(null)
   }
 
@@ -1957,8 +1959,9 @@ export function AiCardDesigner({
   const validateAbilityCandidate = async (
     candidateId: string,
     validation: AbilityCandidate['validation'],
+    fingerprint: string,
   ) => {
-    dispatch({ type: 'abilityCandidateValidated', candidateId, validation })
+    dispatch({ type: 'abilityCandidateValidated', candidateId, validation, sourceFingerprint: fingerprint })
     await checkpoint()
   }
 

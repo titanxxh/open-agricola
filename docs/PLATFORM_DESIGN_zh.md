@@ -144,7 +144,7 @@ OpenRouter 不在 provider 级别声明 `chat` / `image` 兜底能力；每个�
 
 决议保存在[资料契约](https://github.com/titanxxh/open-agricola/issues/1032)与[模型准入、循环边界及恢复](https://github.com/titanxxh/open-agricola/issues/1033)中，明确初始预算、显式继续、有限重试与修复，以及模型开放前所需的浏览器工具往返证据。
 
-#### C1.3 已定案、待实现的请求、结果与草稿恢复
+#### C1.3 请求、结果与草稿恢复
 
 已确认的[请求/结果契约](https://github.com/titanxxh/open-agricola/issues/1034)规定：追加需求以当前选中的能力候选为基线，没有选中候选时使用已采用草稿；错误修复绑定实际报错的源码。各入口共用请求构造，明确卡牌身份、用户目标、源码与输入指纹，以及相关可见对话。新请求读取最新资料 commit；自动校验修复和显式继续仍在同一次尝试内。实际沙盒试玩报错后，只有作者点击 **AI 修复**才开始新尝试。
 
@@ -156,7 +156,9 @@ OpenRouter 不在 provider 级别声明 `chat` / `image` 兜底能力；每个�
 | 同一浏览器的本地恢复 | 可见对话及已有编辑状态；未完成工作标为已中断，绝不自动续跑 |
 | 作者私有的服务端草稿 | 已采用内容、最近通过代码校验的能力候选、最近 Generation Result 和精简 Generation Provenance；不保存完整对话或原始工具协议 |
 
-最近结果与候选可关联同一份源码，不保留重复的完成内容副本。采用仍需作者明确操作并通过服务端校验。Draft Version 只保留已采用内容与白名单内的溯源；相同内容继续复用不可变版本，不改写其原始溯源。公开卡牌、投稿和 Replay 投影不包含私有生成记录。详细字段契约保存在决策票中；上述恢复变更尚未实现。
+最近结果与候选可关联同一份源码，不保留重复的完成内容副本。采用仍需作者明确操作并通过服务端校验。Draft Version 只保留已采用内容与白名单内的溯源；相同内容继续复用不可变版本，不改写其原始溯源。公开卡牌、投稿和 Replay 投影不包含私有生成记录。共享白名单 `shared/projections/workshop-generation.ts` 已贯通检查点、采用、版本溯源与本地恢复。能力分区分别保存 `lastValid` 与 `latestResult`；成功结果按候选 ID 与源码指纹引用源码，失败结果保留不可采用的完整源码。本地聊天仅投影可见字段，进行中的工作恢复为已中断。浏览器执行循环与生产 UI 切换仍待实现。
+
+`GET /api/workshop/sandbox-contract` 提供实际部署的 helper 源码、hook/listener 元数据、支持的行动参数、隔离限制与语义约束。其标识来自部署中的 shared/executor 源码及运行时版本，与 GitHub 资料 commit 分开记录。`POST /api/workshop/cards/validate-code` 将成功和失败都绑定到该标识及提交源码指纹；过期契约返回 `sandbox_changed`，要求开始新尝试。主浏览器只接收数据，不导入规则运行时。
 
 #### C1.4 已定案、待实现的质量与成本验收
 
