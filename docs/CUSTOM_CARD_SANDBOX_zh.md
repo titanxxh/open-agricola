@@ -584,6 +584,20 @@ return {
 
 `futureMeeplesAction.execute()` 识别 `params.__futureMeepleRequest`，把 entry 入队到 `state.pendingFutureMeeples`，下一回合开始时落到当回合行动卡格上。`FutureMeepleRequest` 还有 `{ startRound, count, resources }` 形式（多个回合连续放），见 `shared/contract/types.ts` 的 `FutureMeepleRequest`。
 
+未来回合的预放奖励必须走该调度路径，由引擎管理可见的预放记录、到账与清理。把资源存在卡牌 counters，再通过带 flag 的 `onRoundStart` 发放，不会创建未来回合的预放记录。
+
+### 5.8 ActionFlow 结构
+
+单步使用 `{ type: 'leaf', actionId, params, sourceCard: CARD_ID }`。组合节点的数组字段是 `children`，类型可以是 `seq`、`or`、`xor` 或 `parallel`：
+
+```ts
+{ type: 'seq', children: [gainLeaf(CARD_ID, { food: 1 }), gainLeaf(CARD_ID, { wood: 1 })] }
+```
+
+`optional` 是节点上的布尔字段，不是另一种节点类型。返回流程的 effect hook 直接返回 flow；listener 返回 `{ flow, sourceCard: CARD_ID }`（或其文档规定的查询结果）。
+
+执行前，AST 校验会拒绝可静态识别的组合节点字面量：缺少 `children`，或其值明显不是数组。这覆盖 flow hook 的直接返回、嵌套的字面量 children，以及 listener 的 `flow` / `alternativeFlow` 结果。校验不会把 leaf 参数或卡牌私有数据当作 flow，也不推断动态 helper 结果或 spread 提供的 children。静态通过后仍需试玩验证行为。
+
 ---
 
 ## 6. `actionId` 行为校准
