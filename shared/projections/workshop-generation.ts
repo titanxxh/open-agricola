@@ -19,6 +19,15 @@ export function canonicalGenerationJson(value: unknown): string {
   return JSON.stringify(sort(value))
 }
 
+/** Preserve authored rules that the metadata editor's numeric cost parser cannot express. */
+export function projectAbilityRequirements(cardJson: Record<string, unknown>): { cost?: string; prerequisite?: string } {
+  const draft = record(cardJson._draft)
+  return {
+    ...(typeof draft.costInput === 'string' && draft.costInput.trim() ? { cost: draft.costInput } : {}),
+    ...(typeof draft.prerequisite === 'string' && draft.prerequisite.trim() ? { prerequisite: draft.prerequisite } : {}),
+  }
+}
+
 /** Art and generation bookkeeping do not change the ability input. */
 export function abilityDraftFingerprint(draft: WorkshopDraftContract): string {
   const cardJson = { ...draft.cardJson }
@@ -26,7 +35,7 @@ export function abilityDraftFingerprint(draft: WorkshopDraftContract): string {
   delete cardJson._compiled
   return sourceFingerprint(canonicalGenerationJson({
     cardId: draft.cardId, cardType: draft.cardType, name: draft.name,
-    description: draft.description, cardJson, effectCode: draft.effectCode,
+    description: draft.description, cardJson, requirements: projectAbilityRequirements(draft.cardJson), effectCode: draft.effectCode,
   }))
 }
 

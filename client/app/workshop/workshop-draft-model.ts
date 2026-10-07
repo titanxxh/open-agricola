@@ -35,6 +35,7 @@ export type WorkshopSessionState = {
   abilityMessages: unknown[]
   latestAbilityResult?: GenerationResult
   activeAbilityAttemptId?: string
+  activeAbilityValidationId?: string
   selectedArtCandidateId?: string
   selectedAbilityCandidateId?: string
   sandboxTestVersionId?: string
@@ -219,6 +220,9 @@ export type WorkshopDraftAction =
   | { type: 'draftChanged'; draft: WorkshopClientDraft }
   | { type: 'candidateCompleted'; candidate: WorkshopCandidate }
   | { type: 'generationStarted'; attemptId: string }
+  | { type: 'generationInvalidated'; attemptId: string }
+  | { type: 'abilityValidationStarted'; validationId: string }
+  | { type: 'abilityValidationEnded'; validationId: string }
   | { type: 'generationFinished'; attemptId: string; draftFingerprint: string; sourceCandidate?: { id: string; fingerprint: string }; result: GenerationResult; candidate?: AbilityCandidate }
   | { type: 'candidateDiscarded'; kind: WorkshopCandidate['kind']; candidateId: string }
   | {
@@ -229,6 +233,7 @@ export type WorkshopDraftAction =
     }
   | {
       type: 'abilityCandidateValidated'
+      validationId: string
       candidateId: string
       sourceFingerprint: string
       validation: AbilityCandidate['validation']
@@ -267,6 +272,15 @@ const applyWorkspace = (
   conflict: null,
 })
 
+export function isCurrentAbilityAttempt(state: WorkshopDraftState, attempt: {
+  attemptId: string; draftFingerprint: string; sourceCandidate?: { id: string; fingerprint: string }
+}): boolean {
+  return state.session.activeAbilityAttemptId === attempt.attemptId
+    && abilityDraftFingerprint(state.draft) === attempt.draftFingerprint
+    && (!attempt.sourceCandidate || state.session.abilityCandidates.some(candidate =>
+      candidate.id === attempt.sourceCandidate!.id && sourceFingerprint(candidate.sourceCode) === attempt.sourceCandidate!.fingerprint))
+}
+
 export const workshopDraftReducer = (
   state: WorkshopDraftState,
   action: WorkshopDraftAction,
@@ -281,6 +295,10 @@ export const workshopDraftReducer = (
         session: {
           ...state.session,
           artCandidates: staleCandidates(state.session.artCandidates),
+          activeAbilityAttemptId: abilityDraftFingerprint(state.draft) === abilityDraftFingerprint(action.draft)
+            ? state.session.activeAbilityAttemptId : undefined,
+          activeAbilityValidationId: abilityDraftFingerprint(state.draft) === abilityDraftFingerprint(action.draft)
+            ? state.session.activeAbilityValidationId : undefined,
           abilityCandidates: abilityDraftFingerprint(state.draft) === abilityDraftFingerprint(action.draft)
             ? state.session.abilityCandidates
             : staleCandidates(state.session.abilityCandidates),
@@ -292,12 +310,20 @@ export const workshopDraftReducer = (
         save: { status: 'dirty' },
       }
     case 'generationStarted':
-      return { ...state, session: { ...state.session, activeAbilityAttemptId: action.attemptId } }
+      return { ...state, session: { ...state.session, activeAbilityAttemptId: action.attemptId, activeAbilityValidationId: undefined } }
+    case 'abilityValidationStarted':
+      return { ...state, session: { ...state.session, activeAbilityValidationId: action.validationId } }
+    case 'abilityValidationEnded':
+      return state.session.activeAbilityValidationId === action.validationId
+        ? { ...state, session: { ...state.session, activeAbilityValidationId: undefined } }
+        : state
+    case 'generationInvalidated':
+      return state.session.activeAbilityAttemptId === action.attemptId
+        ? { ...state, session: { ...state.session, activeAbilityAttemptId: undefined } }
+        : state
     case 'generationFinished': {
       if (state.session.activeAbilityAttemptId !== action.attemptId) return state
-      if (abilityDraftFingerprint(state.draft) !== action.draftFingerprint
-        || (action.sourceCandidate && !state.session.abilityCandidates.some(candidate =>
-          candidate.id === action.sourceCandidate!.id && sourceFingerprint(candidate.sourceCode) === action.sourceCandidate!.fingerprint))) {
+      if (!isCurrentAbilityAttempt(state, action)) {
         return { ...state, session: { ...state.session, activeAbilityAttemptId: undefined } }
       }
       const next = action.candidate ? workshopDraftReducer(state, { type: 'candidateCompleted', candidate: action.candidate }) : state
@@ -326,6 +352,7 @@ export const workshopDraftReducer = (
             session: {
               ...state.session,
               abilityCandidates: keepAbilityCandidates([...state.session.abilityCandidates, action.candidate]),
+              activeAbilityValidationId: undefined,
               latestAbilityResult: resultFromCandidate(action.candidate),
               selectedAbilityCandidateId: action.candidate.id,
             },
@@ -364,6 +391,7 @@ export const workshopDraftReducer = (
         session: {
           ...state.session,
           abilityCandidates: remaining,
+          activeAbilityValidationId: undefined,
           selectedAbilityCandidateId: state.session.selectedAbilityCandidateId === action.candidateId
             ? remaining.at(-1)?.id
             : state.session.selectedAbilityCandidateId,
@@ -373,29 +401,28 @@ export const workshopDraftReducer = (
     }
     case 'abilityCandidateEdited': {
       const previous = state.session.abilityCandidates.find(candidate => candidate.id === action.candidateId)
+      if (!previous) return state
       const editedId = `${action.candidateId.split(':edit:')[0]}:edit:${sourceFingerprint(action.sourceCode).slice(0, 16)}`
-      const candidates = state.session.abilityCandidates.map(candidate =>
-        candidate.id === action.candidateId
-          ? {
-              ...candidate,
-              id: editedId,
-              sourceCode: action.sourceCode,
-              sourceFingerprint: sourceFingerprint(action.sourceCode),
-              ...(action.cardJson ? { cardJson: action.cardJson } : {}),
-              validation: { valid: false, errors: [] },
-            }
-          : candidate,
-      )
-      const edited = candidates.find(candidate => candidate.id === editedId) ?? null
-      if (previous?.validation.valid && previous.id !== editedId) candidates.unshift(previous)
+      const edited: AbilityCandidate = {
+        ...previous,
+        id: editedId,
+        sourceCode: action.sourceCode,
+        sourceFingerprint: sourceFingerprint(action.sourceCode),
+        ...(action.cardJson ? { cardJson: action.cardJson } : {}),
+        validation: { valid: false, errors: [] },
+      }
+      const candidates = state.session.abilityCandidates.filter(candidate =>
+        candidate.id !== editedId && (candidate.id !== previous.id || previous.validation.valid))
+      candidates.push(edited)
       return {
         ...state,
         draft: withLastCompleted(state.draft, 'ability', edited),
-        session: { ...state.session, abilityCandidates: keepAbilityCandidates(candidates), selectedAbilityCandidateId: editedId, latestAbilityResult: edited ? resultFromCandidate(edited) : undefined },
+        session: { ...state.session, activeAbilityAttemptId: undefined, activeAbilityValidationId: undefined, abilityCandidates: keepAbilityCandidates(candidates), selectedAbilityCandidateId: editedId, latestAbilityResult: resultFromCandidate(edited) },
         save: { status: 'dirty' },
       }
     }
     case 'abilityCandidateValidated': {
+      if (state.session.activeAbilityValidationId !== action.validationId) return state
       if (!state.session.abilityCandidates.some(candidate => candidate.id === action.candidateId && sourceFingerprint(candidate.sourceCode) === action.sourceFingerprint)) return state
       const candidates = state.session.abilityCandidates.map(candidate =>
         candidate.id === action.candidateId
@@ -406,7 +433,7 @@ export const workshopDraftReducer = (
       return {
         ...state,
         draft: withLastCompleted(state.draft, 'ability', validated),
-        session: { ...state.session, abilityCandidates: candidates, latestAbilityResult: validated ? resultFromCandidate(validated) : undefined },
+        session: { ...state.session, activeAbilityValidationId: undefined, abilityCandidates: candidates, latestAbilityResult: validated ? resultFromCandidate(validated) : undefined },
         save: { status: 'dirty' },
       }
     }
@@ -425,6 +452,7 @@ export const workshopDraftReducer = (
           : {
               ...next.session,
               abilityCandidates: [],
+              activeAbilityValidationId: undefined,
               selectedAbilityCandidateId: undefined,
               sandboxTestVersionId: undefined,
               restoreUndoDraft: undefined,

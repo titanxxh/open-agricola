@@ -9,6 +9,8 @@ import {
   freezeOtherPlayers,
   getBonusBreakdown,
   workersAvailable,
+  autoAdvanceRoundEnd,
+  markAllWorkersUsed,
 } from './session-helpers'
 
 const KNOWN_GOOD_GAIN_CARD = `
@@ -42,6 +44,21 @@ const CARD_IMPL = {
 afterEach(() => resetCards())
 
 describe('session-helpers', () => {
+  it('finishes an already completed round from its response without issuing another round-end command', () => {
+    const { session } = buildSessionWithLLMCard(KNOWN_GOOD_GAIN_CARD, {
+      cardId: 'CUSTOM_HELPER_SMOKE', cardType: 'minor', cardName: 'Helper Smoke',
+    })
+    const state = session.getState().state
+    expect(state.round).toBe(1)
+    state.players.forEach(player => markAllWorkersUsed(state, player))
+    const initialResponse = session.performRoundEnd()
+    expect(initialResponse.ok).toBe(true)
+    expect(initialResponse.state).toMatchObject({ round: 2, roundPhase: 'work' })
+    const completed = autoAdvanceRoundEnd(session, { initialResponse })
+    expect(completed.ok).toBe(true)
+    expect(completed.state).toMatchObject({ round: 2, roundPhase: 'work' })
+    expect(() => autoAdvanceRoundEnd(session)).toThrow('Round-end command failed: not all workers used')
+  })
   it('buildSessionWithLLMCard fixes round-action order and clears hands', () => {
     const { session, cardData } = buildSessionWithLLMCard(KNOWN_GOOD_GAIN_CARD, {
       cardId: 'CUSTOM_HELPER_SMOKE',

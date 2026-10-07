@@ -95,7 +95,7 @@ client/        Browser React UI with two bundles
 ├── components/          board/, interaction/, common/, header/
 ├── contexts/            AuthContext, LocaleContext
 ├── hooks/               useGameSync, useFarmSelection, ...
-├── services/            gameTransport, card-meta, rehydrate, llmPrompts
+├── services/            gameTransport, card-meta, rehydrate, llm/generation
 ├── sandbox/             Offline hot-seat client in a separate bundle
 └── types/, utils/, styles/, assets/, config.ts, main.tsx
 
@@ -1529,7 +1529,9 @@ Strict main-bundle budgets in `scripts/check-bundle-size.ts` are 550 KB raw and 
 - `gameTransport.ts`: `WsGameTransport` manages the WebSocket connection in the service layer, not React Context. URL switches include `?transport=ws`, `?player=p1|p2`, and `?room=devN`.
 - `card-meta.ts`: fetches card metadata from `GET /cards-manifest.json` at startup. The `CUSTOM_*` overlay reads only `shared/cards/custom-card-metadata.ts`.
 - `rehydrate.ts`: a lightweight rehydrator that skips `ActionSpace.onTaken` callbacks and breaks dependency chains into `shared/actions` and `shared/cards/catalog`.
-- `llmPrompts.ts`: Workshop card-designer system prompts. Hook, phase, scope, and action-ID tables render at runtime from shared truth sources and descriptive metadata such as `sandbox-hook-meta.ts`; no manual mirror remains.
+- `llm/generation/`: the browser owns `GenerationAttempt`, immutable request construction, provider tool protocol, bounded GitHub reads and complete-source results. The LLM credential goes only to the configured provider; neither the game backend nor GitHub receives it. Each attempt resolves current GitHub main and pins subsequent reads to that SHA; a missing file returns a tool error so the model can choose another reference at the same SHA. Network/rate-limit failures pause for explicit retry.
+- `GET /api/workshop/sandbox-contract` returns the deployed runtime's hooks, actions, helper bodies, semantics and content identity from `server/workshop-sandbox-contract.ts`. It serves no reference corpus. The short generation prompt includes that contract; on-demand GitHub documentation and built-in examples cannot expand it. `POST /api/workshop/cards/validate-code` binds validation to source and sandbox identities. Only separately verified provider/endpoint/model tuples are admitted.
+- `WorkshopAbilityPanel` applies results through the draft reducer: follow-ups use the selected candidate, playtest repair uses the tested source, and raw cost/prerequisite requirements remain part of the frozen input. Editing ability input or switching model configuration cancels the old attempt and prevents late adoption or repair. The last valid candidate survives failed/manual edits. Visible messages and compact provenance are projected for recovery; raw tool/reasoning/signature records stay in page memory. Full request, recovery and acceptance contracts are in `docs/PLATFORM_DESIGN.md` and `docs/test/llm-card-gen.md`.
 
 ### 12.3 Synchronized state layer
 

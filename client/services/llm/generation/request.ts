@@ -1,6 +1,6 @@
 import type { WorkshopAbilityCandidateContract, WorkshopDraftContract } from '../../../../shared/contract/workshop'
 import type { WorkshopVisibleMessage } from '../../../../shared/contract/workshop-generation'
-import { abilityDraftFingerprint, canonicalGenerationJson, projectVisibleMessages, sourceFingerprint } from '../../../../shared/projections/workshop-generation'
+import { abilityDraftFingerprint, canonicalGenerationJson, projectAbilityRequirements, projectVisibleMessages, sourceFingerprint } from '../../../../shared/projections/workshop-generation'
 
 export type PlaytestSource = { workspaceId: string; versionId: string; source: string; sourceFingerprint: string; gameSeed?: number | string }
 export type PlaytestFailure = PlaytestSource & { errors: string[] }
@@ -16,7 +16,7 @@ export type GenerationRequest = {
   sourceCandidate?: { id: string; fingerprint: string }
   input: {
     intent: GenerationIntent
-    card: { id: string; type: 'minor' | 'occupation'; name: string; description: string; definition: Record<string, unknown> }
+    card: { id: string; type: 'minor' | 'occupation'; name: string; description: string; definition: Record<string, unknown>; requirements: ReturnType<typeof projectAbilityRequirements> }
     source: string | null
     sourceFingerprint: string | null
     conversation: WorkshopVisibleMessage[]
@@ -49,13 +49,19 @@ export function buildGenerationRequest(options: {
   const selected = intent.kind === 'repair' ? undefined : options.selectedCandidate
   const source = intent.kind === 'repair' ? intent.failure.source : selected?.sourceCode ?? draft.effectCode
   const fingerprint = source === null ? null : sourceFingerprint(source)
-  const definition = { ...(selected?.cardJson ?? draft.cardJson) }
+  // A tested version owns its metadata in the recorded source. The current
+  // draft (or another selected candidate) may describe a different version.
+  const cardJson = intent.kind === 'repair' ? {} : selected?.cardJson ?? draft.cardJson
+  const definition = { ...cardJson }
+  const description = intent.kind === 'repair' ? '' : selected
+    ? (Array.isArray(cardJson.desc) ? cardJson.desc.filter((line): line is string => typeof line === 'string').join('\n') : '')
+    : draft.description
   delete definition._draft
   delete definition._code
   delete definition._compiled
   const input: GenerationRequest['input'] = structuredClone({
     intent,
-    card: { id: draft.cardId, type: draft.cardType, name: draft.name, description: draft.description, definition },
+    card: { id: draft.cardId, type: draft.cardType, name: draft.name, description, definition, requirements: projectAbilityRequirements(cardJson) },
     source,
     sourceFingerprint: fingerprint,
     conversation: projectVisibleMessages(options.messages).filter(message => !message.interrupted && !message.isError).slice(-12).map(message => ({

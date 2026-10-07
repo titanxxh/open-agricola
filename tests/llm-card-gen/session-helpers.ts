@@ -269,6 +269,8 @@ export function getBonusBreakdownForSession(
 }
 
 export interface AutoAdvanceOptions {
+  /** Continue the caller's latest round-end response, even if it already completed the round. */
+  initialResponse?: SessionResponse
   /** Defensive max iterations to avoid infinite loops on engine bugs. Default 50. */
   maxIterations?: number
   /**
@@ -356,14 +358,12 @@ export function autoAdvanceRoundEnd(
 ): SessionResponse {
   const max = opts.maxIterations ?? 50
   let iter = 0
-  // If the session already has a pending interaction (e.g. caller already
-  // started performRoundEnd and manually walked through some prompts),
-  // resume from the current state instead of re-invoking performRoundEnd —
-  // which would reject with ok=false ("pending action exists") and the loop
-  // would burn iterations before throwing.
-  let resp: SessionResponse = session.peekEnginePendingEnvelope()
+  // Callers that already issued a round-end command pass its latest response,
+  // so a completed harvest never starts another round. Otherwise resume a
+  // pending interaction or start round-end, rejecting unsuccessful commands.
+  let resp: SessionResponse = opts.initialResponse ?? (session.peekEnginePendingEnvelope()
     ? session.emitResponse()
-    : session.performRoundEnd()
+    : session.performRoundEnd())
   while (iter++ < max) {
     if (!resp.ok) throw new Error(`Round-end command failed: ${resp.error ?? "unknown error"}`)
     if (resp.interaction.stateId !== 'wait' && session.getState().state.gameOver) return resp

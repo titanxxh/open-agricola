@@ -4,7 +4,7 @@ import type { GenerationReference } from '../../../../shared/contract/workshop-g
 import type { ToolCall, ToolDefinition } from './protocol'
 
 export const REFERENCE_REPOSITORY = 'titanxxh/open-agricola'
-export const REFERENCE_TOOL_VERSION = 'github-text-v2'
+export const REFERENCE_TOOL_VERSION = 'github-text-v3'
 export const REFERENCE_LIMITS = Object.freeze({ fileBytes: 256 * 1024, readLines: 160, resultBytes: 16 * 1024, searchHits: 40, httpRetries: 2, concurrency: 3 })
 export const REFERENCE_TOOLS: readonly ToolDefinition[] = [
   { type: 'function', function: {
@@ -28,7 +28,8 @@ const blockedUntil = new Map<string, number>()
 
 export class ReferenceError extends Error {
   readonly retryable: boolean
-  constructor(message: string, retryable: boolean) { super(message); this.retryable = retryable }
+  readonly status?: number
+  constructor(message: string, retryable: boolean, status?: number) { super(message); this.retryable = retryable; this.status = status }
 }
 
 export function allowedReferencePath(path: string): boolean {
@@ -123,7 +124,7 @@ export class ReferenceSession {
             blockedUntil.set(host, Math.max(Date.now() + 60_000, Number.isFinite(retryAt) ? retryAt : 0, resetAt || 0))
             throw new ReferenceError(`GitHub rate limit or access denial (HTTP ${response.status}); retry after the cooldown.`, false)
           }
-          throw new ReferenceError(`GitHub reference request failed (HTTP ${response.status}).`, response.status >= 500)
+          throw new ReferenceError(`GitHub reference request failed (HTTP ${response.status}).`, response.status >= 500, response.status)
         }
         return await bodyBytes(response, limit, signal)
       } catch (error) {
@@ -170,7 +171,16 @@ export class ReferenceSession {
     const key = `${this.commit}/${path}`
     let file = cache.get(key)
     if (!file) {
-      const bytes = await ReferenceSession.get(this.fetchReference, `https://raw.githubusercontent.com/${REFERENCE_REPOSITORY}/${this.commit}/${path}`, REFERENCE_LIMITS.fileBytes, signal)
+      let bytes: Uint8Array
+      try {
+        bytes = await ReferenceSession.get(this.fetchReference, `https://raw.githubusercontent.com/${REFERENCE_REPOSITORY}/${this.commit}/${path}`, REFERENCE_LIMITS.fileBytes, signal)
+      } catch (error) {
+        signal.throwIfAborted()
+        if (error instanceof ReferenceError && (error.status === 404 || error.status === 410)) {
+          return JSON.stringify({ commit: this.commit, path, error: `File unavailable (HTTP ${error.status}). Search or read another allowed file at this same commit.` })
+        }
+        throw error
+      }
       const actual = bytesToHex(sha1(concatBytes(utf8ToBytes(`blob ${bytes.byteLength}\0`), bytes)))
       if (actual !== entry.sha) throw new ReferenceError('Reference blob checksum does not match the pinned GitHub tree.', false)
       file = { text: new TextDecoder('utf-8', { fatal: true }).decode(bytes), bytes: bytes.byteLength }
