@@ -17,6 +17,15 @@ export class GitHubApiError extends Error {
   }
 }
 
+export function checkGitHubRateLimit(response: Response, now = Date.now()): void {
+  if (response.status === 429 || response.status === 403 && (response.headers.has('retry-after') || response.headers.get('x-ratelimit-remaining') === '0')) {
+    const hint = response.headers.get('retry-after')
+    const delay = hint && /^\d+$/.test(hint) ? Number(hint) : hint ? Math.ceil((Date.parse(hint)-now)/1000) : 0
+    const reset = Number(response.headers.get('x-ratelimit-reset') ?? 0) - now/1000
+    throw new GitHubApiError('GitHub rate limited','github_rate_limited',429,Math.max(60,delay || 0,reset))
+  }
+}
+
 type CommitFile = { path: string; content: string; encoding: 'utf-8' | 'base64' }
 export type SubmissionPr = {
   number: number; url: string; headSha: string; branch: string; headRepository: string
@@ -133,12 +142,7 @@ export class GitHubClient {
     headers.set('Accept', 'application/vnd.github+json')
     headers.set('X-GitHub-Api-Version', '2022-11-28')
     const response = await fetch(url, { ...init, headers, signal: AbortSignal.timeout(15_000) })
-    if (response.status === 429 || response.status === 403 && (response.headers.has('retry-after') || response.headers.get('x-ratelimit-remaining') === '0')) {
-      const hint = response.headers.get('retry-after')
-      const delay = hint && /^\d+$/.test(hint) ? Number(hint) : hint ? Math.ceil((Date.parse(hint)-Date.now())/1000) : 0
-      const reset = Number(response.headers.get('x-ratelimit-reset') ?? 0) - Date.now()/1000
-      throw new GitHubApiError('GitHub rate limited','github_rate_limited',429,Math.max(60,delay || 0,reset))
-    }
+    checkGitHubRateLimit(response)
     return response
   }
 

@@ -16,6 +16,7 @@ export class SubmissionGitHub {
   readonly prs: Array<{ number: number; body: string; branch: string; base: string; draft: boolean; state: string; merged: boolean }> = []
   readonly writes: string[] = []
   loseCreateResponse = false
+  approved = false
   loseRefResponse = false
   lagHeadAfterFinalPublish = false
   laggedHead: string | undefined
@@ -61,7 +62,7 @@ export class SubmissionGitHub {
       const pr = this.pr(body.variables.number)
       return json({ data: { repository: { pullRequest: {
         authorAssociation: 'NONE', reviewDecision: null, headRefOid: pr.head.sha, baseRefName: pr.base.ref,
-        state: pr.state.toUpperCase(), isDraft: pr.draft, latestOpinionatedReviews: { nodes: [], pageInfo: { hasNextPage: false } },
+        state: pr.state.toUpperCase(), isDraft: pr.draft, latestOpinionatedReviews: { nodes: this.approved ? [{id:'review-1',state:'APPROVED',commit:{oid:pr.head.sha},authorCanPushToRepository:true}] : [], pageInfo: { hasNextPage: false } },
       } } } })
     }
     if (path.includes('/git/ref/heads/')) {

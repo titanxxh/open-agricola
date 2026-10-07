@@ -11,97 +11,18 @@ import { WorkshopGitHubApp } from './github-app'
 import { SubmissionStore, type SubmissionPayload } from './submission-store'
 import { deliverSubmission, submissionResult } from './submission-service'
 import {
-  approveReviewedVersion,
   enterReview,
   getHandoffReadiness,
   hasReservedCardId,
-  invalidateReviewedCard,
   loadWorkspace,
   pinCurrentDraftVersion,
   markBuiltInMergedCards,
-  markCardMerged,
   reconcilePendingMerges,
 } from '../workshop-drafts.ts'
-import {
-  breaksReviewGateWithoutApproval,
-  findApprovedHeadReview,
-  findApprovedMergedHeadReview,
-  githubPrStatus,
-  type WorkshopReviewSnapshot,
-} from '../workshop-review/github-review-provider.ts'
+import { githubPrStatus } from '../workshop-review/github-review-provider'
+import { loadReviewBinding, reconcileReviewSnapshot, type ReviewProvider } from '../workshop-review/reconcile-snapshot'
 
 const REFRESH_COOLDOWN_MS = 60_000
-
-type ReviewProvider = {
-  getPullRequestSnapshot(prNumber: number): Promise<WorkshopReviewSnapshot>
-}
-
-type ReviewBinding = {
-  id: string
-  revision: number
-  approvedCommitSha: string | null
-  approvedVersionId: string | null
-  reviewCommitSha: string | null
-  reviewVersionId: string | null
-  updatedAt: number
-}
-
-const loadReviewBinding = async (
-  db: ReturnType<typeof getDb>,
-  cardId: string,
-  prUrl: string,
-): Promise<Awaited<ReviewBinding | undefined>> => (await db.prepare(`
-  SELECT id,
-         draft_revision AS revision,
-         approved_commit_sha AS "approvedCommitSha",
-         approved_version_id AS "approvedVersionId",
-         review_commit_sha AS "reviewCommitSha",
-         review_version_id AS "reviewVersionId",
-         updated_at AS "updatedAt"
-  FROM workshop_cards
-  WHERE id = ? AND github_pr_url = ?
-`).get(cardId, prUrl)) as ReviewBinding | undefined
-
-const reconcileReviewSnapshot = async (
-  db: ReturnType<typeof getDb>,
-  prUrl: string,
-  snapshot: WorkshopReviewSnapshot,
-  expectedBinding: ReviewBinding,
-): Promise<Awaited<number>> => {
-  if (snapshot.headRefOid !== expectedBinding.reviewCommitSha) {
-    return (await invalidateReviewedCard(db, {
-      prUrl,
-      prStatus: githubPrStatus(snapshot),
-      expectedBinding,
-    }))
-  }
-  const approvedReview = findApprovedHeadReview(snapshot)
-    ?? findApprovedMergedHeadReview(snapshot)
-  if (approvedReview) {
-    const approved = (await approveReviewedVersion(db, {
-      prUrl,
-      commitSha: snapshot.headRefOid,
-      reviewId: approvedReview.id,
-      expectedBinding,
-    }))
-    // Both the approval and merge webhooks may have been missed: the snapshot
-    // already reads MERGED. Graduate right here — approveReviewedVersion just
-    // reset github_pr_status to 'open', so reconcilePendingMerges would never
-    // see this row as pending.
-    if (approved > 0 && snapshot.state === 'MERGED') {
-      ;(await markCardMerged(db, { prUrl }))
-    }
-    return approved
-  }
-  return expectedBinding.approvedVersionId !== null
-    || breaksReviewGateWithoutApproval(snapshot)
-    ? (await invalidateReviewedCard(db, {
-        prUrl,
-        prStatus: githubPrStatus(snapshot),
-        expectedBinding,
-      }))
-    : 0
-}
 
 const hasCompleteZhLocale = (cardJson: Record<string, unknown>): boolean => {
   const locales = cardJson.locales
@@ -160,11 +81,14 @@ export async function handleSubmitReviewRequest(
     if (action === 'recover' && !latest) { sendJson(res,200,{ok:false,code:'no_submission'}); return }
     if (action === 'recover' && latest && latest.state !== 'complete') await store.resume(latest.id)
     if (action === 'recover' && latest) {
-      const result = await deliverSubmission(store,(await store.latest(cardDbId))!,app!)
+      const result = await deliverSubmission(store,(await store.latest(cardDbId))!,app!,reviewProvider)
       sendJson(res,200,submissionResult(result))
       return
     }
     if (latest?.state === 'blocked' && action !== 'restart') {
+      sendJson(res,200,submissionResult(latest)); return
+    }
+    if (latest?.state === 'blocked' && action === 'restart' && !(JSON.parse(latest.payload) as SubmissionPayload).pr) {
       sendJson(res,200,submissionResult(latest)); return
     }
     let operation = latest?.state === 'pending' ? latest : undefined
@@ -229,15 +153,7 @@ export async function handleSubmitReviewRequest(
       })()
     }
     if (!operation) { sendJson(res,200,{ok:true,prUrl:'/mock-workshop-pr/1',prNumber:1}); return }
-    const result = await deliverSubmission(store,operation,app!)
-    if (result.state === 'complete' && !result.error_code && reviewProvider) {
-      const data = JSON.parse(result.payload) as SubmissionPayload
-      const binding = await loadReviewBinding(db,cardDbId,data.pr!.url)
-      if (binding) {
-        try { await reconcileReviewSnapshot(db,data.pr!.url,await reviewProvider.getPullRequestSnapshot(data.pr!.number),binding) }
-        catch { await db.prepare('UPDATE workshop_cards SET github_pr_last_synced_at = NULL WHERE id = ? AND review_commit_sha = ?').run(cardDbId,binding.reviewCommitSha) }
-      }
-    }
+    const result = await deliverSubmission(store,operation,app!,reviewProvider)
     sendJson(res,200,submissionResult(result))
   } catch (error) {
     const status = error instanceof GitHubApiError ? error.status ?? 500 : 500
