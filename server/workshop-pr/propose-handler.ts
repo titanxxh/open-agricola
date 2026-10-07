@@ -79,7 +79,10 @@ export async function handleSubmitReviewRequest(
     const action = body?.action ?? 'submit'
     if (!['submit','recover','restart'].includes(action)) throw new GitHubApiError('invalid action','invalid_action',400)
     if (action === 'recover' && !latest) { sendJson(res,200,{ok:false,code:'no_submission'}); return }
-    if (action === 'recover' && latest && latest.state !== 'complete') await store.resume(latest.id)
+    if (action === 'recover' && latest && latest.state !== 'complete') {
+      await store.admitRemoteAttempt(user.id)
+      await store.resume(latest.id)
+    }
     if (action === 'recover' && latest) {
       const result = await deliverSubmission(store,(await store.latest(cardDbId))!,app!,reviewProvider)
       sendJson(res,200,submissionResult(result))
@@ -93,10 +96,15 @@ export async function handleSubmitReviewRequest(
     }
     let operation = latest?.state === 'pending' ? latest : undefined
     if (!operation) {
-      operation = await db.transaction(async () => {
+      const current = await loadWorkspace(db,cardDbId,user.id)
+      if (action === 'submit' && latest?.state === 'complete' && latest.revision === current.revision) {
+        sendJson(res,200,submissionResult(latest)); return
+      }
+      if (!workshopPrConfig.mockMode) await store.admitRemoteAttempt(user.id)
+      const prepared = await db.transaction(async () => {
         const workspace = await loadWorkspace(db,cardDbId,user.id)
         latest = await store.latest(cardDbId)
-        if (latest?.state === 'pending') return latest
+        if (latest?.state === 'pending') return {operation:latest}
         if (workspace.live || workspace.reviewStatus === 'approved' || workspace.reviewStatus === 'merged') {
           throw new GitHubApiError('unpublish and edit the draft before submitting again','already_reviewed',409)
         }
@@ -112,6 +120,12 @@ export async function handleSubmitReviewRequest(
           await enterReview(db,{cardId:cardDbId,authorId:user.id,prUrl:'/mock-workshop-pr/1',expectedRevision:workspace.revision,commitSha:'mock-workshop-head'})
           return undefined
         }
+        return {workspace,versionId,latest}
+      })()
+      if (!prepared) { sendJson(res,200,{ok:true,prUrl:'/mock-workshop-pr/1',prNumber:1}); return }
+      if ('operation' in prepared) operation = prepared.operation
+      else {
+        const {workspace,versionId,latest} = prepared
         const author = await db.prepare('SELECT display_name FROM users WHERE id = ?').get<{display_name:string}>(user.id)
         const previous = latest ? JSON.parse(latest.payload) as SubmissionPayload : undefined
         const oldPrUrl = previous?.pr?.url ?? owner.github_pr_url
@@ -149,8 +163,8 @@ export async function handleSubmitReviewRequest(
           const client = new GitHubClient({token:await app!.token('read'),upstreamOwner:payload.owner,upstreamRepo:payload.repository})
           payload.legacyPr = await verifyLegacySubmission(db,client,payload,oldPrUrl)
         }
-        return store.begin({cardId:cardDbId,authorId:user.id,versionId,revision:workspace.revision,restart:action === 'restart',payload})
-      })()
+        operation = await store.begin({cardId:cardDbId,authorId:user.id,versionId,revision:workspace.revision,restart:action === 'restart',previous:latest,payload})
+      }
     }
     if (!operation) { sendJson(res,200,{ok:true,prUrl:'/mock-workshop-pr/1',prNumber:1}); return }
     const result = await deliverSubmission(store,operation,app!,reviewProvider)

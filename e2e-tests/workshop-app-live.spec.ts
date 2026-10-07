@@ -1,10 +1,11 @@
-import { readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { test, expect } from '@playwright/test'
 
 // Opt-in only: creates a real bot PR. Run with an isolated database and the Workshop App.
 test.skip(process.env.WORKSHOP_LIVE_ACCEPTANCE !== '1', 'requires explicit live GitHub acceptance environment')
 test('real bot submission survives a lost browser response', async ({page,request}) => {
   test.setTimeout(240_000)
+  await mkdir('/tmp/workshop-live-acceptance',{recursive:true,mode:0o700})
   const backend = process.env.BACKEND_URL!
   const frontend = process.env.FRONTEND_URL!
   const suffix = Date.now().toString(36)

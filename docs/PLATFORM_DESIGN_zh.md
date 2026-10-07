@@ -331,7 +331,7 @@ WorkshopPage
 2. `POST /api/workshop/cards/:id/submit-review` 在远端写入前将 Workshop Card、Draft Version、revision、App installation、仓库和 `workshop/<card database ID>/<proposal ID>` 分支持久化到 PostgreSQL。卡牌源码及 PR 正文保留设计者署名，GitHub 作者为 App。未采用候选、生成溯源和凭据不公开。
 3. 按最新 main 生成卡牌、图片及共享索引。GraphQL `updateRefs(beforeOid, afterOid, force:true)` 原子检查预期 head，禁止无条件强推。只允许生成文件及独立的 `server/shared/**/__tests__/*.test.ts` 修改；工作流及其他改动交由维护者处理。
 4. 只复用原来 open、非 draft、目标为 main 的 PR。每个旧生成文件都与持久化基线比较，人工修改、删除或重命名均暂停；独立测试按最新 main 保留，冲突则暂停。draft 或改 base 暂停；关闭后必须明确 `action:restart`，合并后走内置接管。不自动关闭、重开 PR 或改写旧 fork。
-5. `SubmissionStore` 保存检查点，同卡只有一个 pending 操作；租约过期可恢复，本地写入带 fencing。后台每 15 秒最多协调五条到期记录，每条最多四次自动尝试，从 30 秒开始指数退避，并遵守 GitHub 限流等待提示。新操作每作者十分钟一次、全站每分钟二十次；恢复不重复计入新投稿额度。
+5. `SubmissionStore` 保存检查点，同卡只有一个 pending 操作；租约过期可恢复，本地写入带 fencing。后台每 15 秒最多协调五条到期记录，每条最多四次自动尝试，从 30 秒开始指数退避，并遵守 GitHub 限流等待提示。新操作每作者十分钟一次、全站每分钟二十次；恢复不重复计入新投稿额度。 远程预检和手动恢复共用独立尝试额度（每作者每分钟五次、全站每分钟一百次），在事务外扣除，失败不回滚。未改动的已完成投稿直接返回本地结果。远程预检不持有数据库事务，最终创建操作时重新核对冻结版本的 revision 及预检时看到的投稿记录；若期间已有恢复操作改变记录，则返回其权威结果。投稿处于 pending 或仍持有执行租约时（包括远程结果未确认），作者、管理员和账号删除均返回冲突，须先恢复投稿；数据库触发器同时保护级联删除，包括创建响应丢失后尚未识别出的 PR。投稿完成时原子清除租约。
 6. 分支响应丢失时核对计划 commit 和原预期 head。PR 按全部状态分页查找，核对仓库、分支、marker 和 commit；POST 前保存创建意图，结果未知时即使查空也不再次盲目创建。这是可恢复交付，不承诺外部 exactly-once。`GET .../submit-review` 返回权威状态，POST `action:recover` 只恢复原操作；未知或歧义状态保留编号供维护者核实。
 7. 实际 head 和提交版本事务绑定；投稿途中编辑保留新草稿并返回 `draft_changed`，不会把新草稿冒充旧投稿或批准。新绑定清空旧批准。绑定后审核读取失败保留 PR，并清空同步时间供刷新重试。
 8. 签名和去重后的 webhook、上架时即时查询均要求有 push 权限的真实 reviewer 对精确 head 批准，不再合成 OWNER 批准。审核列表不完整时拒绝通过。GraphQL 读取不被当成事务快照；本地 binding 与生命周期条件保护协调。head 改变、draft、改 base、关闭、撤销和 changes-requested 使批准失效。作者仍可在批准后、合并前上架，发布包含卡牌的版本后完成内置接管。

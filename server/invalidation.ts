@@ -1,3 +1,4 @@
+import { WorkshopSubmissionInProgressError } from './database/errors'
 import { randomUUID } from 'node:crypto'
 import type { PostgresDatabase } from './database/postgres'
 import { ExecutionAccess } from './game/execution-access'
@@ -21,6 +22,12 @@ export class InvalidationStore {
       const previous = await this.db.prepare('SELECT * FROM invalidation_operations WHERE kind=? AND subject_id=? ORDER BY created_at DESC LIMIT 1').get<Row>(kind, subjectId)
       if (previous && (await this.status(previous.id))?.pending) return decode(previous)
       const cards = kind === 'card' ? [subjectId] : (await this.db.prepare('SELECT id FROM workshop_cards WHERE author_id=?').all<{ id: string }>(subjectId)).map(row => row.id)
+      if (await this.db.prepare(`SELECT 1 FROM workshop_submissions
+        WHERE card_id=ANY(?::text[]) AND (state='pending' OR lease_owner IS NOT NULL
+          OR (state='blocked' AND payload::jsonb @> '{"createAttempted":true}'
+            AND COALESCE(payload::jsonb->'pr','null'::jsonb) = 'null'::jsonb)) LIMIT 1`).get(cards)) {
+        throw new WorkshopSubmissionInProgressError()
+      }
       const rooms = await this.db.prepare(`SELECT r.id FROM rooms r WHERE
         (?!='card' AND (r.created_by=? OR EXISTS(SELECT 1 FROM room_players p WHERE p.room_id=r.id AND p.user_id=?)))
         OR EXISTS(SELECT 1 FROM json_array_elements_text(r.custom_card_ids::json) c(value) WHERE c.value=ANY(?::text[])) ORDER BY r.id`).all<{ id: string }>(kind, subjectId, subjectId, cards)
