@@ -1,4 +1,4 @@
-import type { ActionChoiceOption, ActionDefinition } from '../../../contract/types'
+import type { ActionChoiceOption, ActionDefinition, ChoiceMultiSelect } from '../../../contract/types'
 import type { PromptKey } from '../../../contract/prompt-keys'
 
 /**
@@ -26,12 +26,18 @@ export const emitChoiceAction: ActionDefinition = {
       options?: ActionChoiceOption[]
       promptKey?: PromptKey
       promptParams?: Record<string, unknown>
+      multiSelect?: ChoiceMultiSelect
+      requiresExplicitChoice?: boolean
     } | undefined
     const options = choice?.options
     if (Array.isArray(options) && options.length > 0) {
       return {
         type: 'request',
-        request: { kind: 'choice', options },
+        request: {
+          kind: 'choice', options,
+          ...(choice?.multiSelect ? { multiSelect: choice.multiSelect, requiresExplicitChoice: true } : {}),
+          ...(choice?.requiresExplicitChoice ? { requiresExplicitChoice: true } : {}),
+        },
         promptKey: choice?.promptKey,
         promptParams: choice?.promptParams,
       }

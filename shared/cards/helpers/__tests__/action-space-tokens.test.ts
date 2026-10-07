@@ -55,7 +55,6 @@ describe('action-space token helpers', () => {
       spaces: ['grain-seeds', 'farmland', 'day-laborer'],
       max: 2,
       choicePrefix: 'test:',
-      choiceLabelKey: 'cards.TestCard.choice',
       promptKey: 'cards.TestCard.name',
     }
 
@@ -65,9 +64,8 @@ describe('action-space token helpers', () => {
     const leaf = flow as Extract<ActionFlow, { type: 'leaf' }>
     expect(leaf.actionId).toBe('emit-choice')
     const options = leaf.params?.options as ActionChoiceOption[]
-    expect(options.find((option) => option.value === 'test:')?.labelKey).toBe('ui.interactionOptionalSkip')
-    expect(options.some((option) => option.value === 'test:grain-seeds,farmland')).toBe(true)
-    expect(options.some((option) => option.value === 'test:grain-seeds,farmland,day-laborer')).toBe(false)
+    expect(options.map((option) => option.value)).toEqual(config.spaces)
+    expect(leaf.params?.multiSelect).toEqual({ valuePrefix: 'test:', minSelections: 0, maxSelections: 2 })
     expect(leaf.params?.promptKey).toBe('cards.TestCard.name')
 
     const accepted = resolveActionSpaceTokenChoice(owner, 'test:grain-seeds,farmland', config)

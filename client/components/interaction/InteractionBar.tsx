@@ -7,6 +7,7 @@ import { ResourceText } from '../common/ResourceText'
 import { formatAnimalCounts } from '../../utils/format'
 import type {
   ActionChoiceOption,
+  ChoiceMultiSelect,
   ChoiceDescriptionPreview,
   ChoiceEffectPreview,
   PaymentResourceMap,
@@ -417,6 +418,63 @@ const renderChoiceOptionContent = ({
   return renderOptionContent(locale, option)
 }
 
+function ChoiceMultiSelectPanel({ locale, options, selection, resolveChoice, isInteractive }: {
+  locale: Locale
+  options: ActionChoiceOption[]
+  selection: ChoiceMultiSelect
+  resolveChoice: (value: string) => void
+  isInteractive: boolean
+}) {
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const { valuePrefix, minSelections, maxSelections } = selection
+  const toggle = (option: ActionChoiceOption) => {
+    if (!isInteractive || option.disabled) return
+    setSelected((previous) => {
+      const next = new Set(previous)
+      if (next.has(option.value)) next.delete(option.value)
+      else if (next.size < maxSelections) next.add(option.value)
+      return next
+    })
+  }
+  const confirm = () => resolveChoice(valuePrefix + options
+    .filter((option) => selected.has(option.value))
+    .map((option) => option.value).join(','))
+
+  return (
+    <div className="choice-multi-select">
+      <div className="interaction-subtitle" aria-live="polite">
+        {t(locale, 'ui.interactionSelectionSubtitle', { selected: selected.size, max: maxSelections })}
+      </div>
+      <div className="choice-multi-select-grid">
+        {options.map((option) => {
+          const checked = selected.has(option.value)
+          return (
+            <label key={option.value} className={`choice-multi-select-tile${checked ? ' selected' : ''}`}>
+              <input
+                type="checkbox"
+                checked={checked}
+                disabled={!isInteractive || !!option.disabled || (!checked && selected.size >= maxSelections)}
+                onChange={() => toggle(option)}
+              />
+              {renderOptionContent(locale, option)}
+            </label>
+          )
+        })}
+      </div>
+      <div className="interaction-actions">
+        <button onClick={confirm} disabled={!isInteractive || selected.size < minSelections}>
+          {t(locale, 'ui.interactionConfirmButton')} ({selected.size}/{maxSelections})
+        </button>
+        {minSelections === 0 ? (
+          <button onClick={() => resolveChoice(valuePrefix)} disabled={!isInteractive}>
+            {t(locale, 'ui.interactionOptionalSkip')}
+          </button>
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
 function CollectorMultiSelect({ locale, options, needed, resolveChoice, isInteractive }: {
   locale: Locale
   options: ActionChoiceOption[]
@@ -743,7 +801,16 @@ export const InteractionBar = ({
                   {renderInteractionText(locale, error)}
                 </div>
               ))}
-              {!choiceModel.showOptions ? null : choiceModel.useCollector ? (
+              {!choiceModel.showOptions ? null : choiceModel.multiSelect ? (
+                <ChoiceMultiSelectPanel
+                  key={`${choiceModel.multiSelect.valuePrefix}:${model.pending.choice?.playerIndex}:${model.pending.choice?.spaceId}:${choiceModel.multiSelect.minSelections}:${choiceModel.multiSelect.maxSelections}:${choiceModel.visibleOptions.map(({ option }) => `${option.value}:${!!option.disabled}`).join('|')}`}
+                  locale={locale}
+                  options={choiceModel.visibleOptions.map((entry) => entry.option)}
+                  selection={choiceModel.multiSelect}
+                  resolveChoice={resolveChoice}
+                  isInteractive={isInteractive}
+                />
+              ) : choiceModel.useCollector ? (
                 <CollectorMultiSelect
                   locale={locale}
                   options={choiceModel.visibleOptions.map((entry) => entry.option)}

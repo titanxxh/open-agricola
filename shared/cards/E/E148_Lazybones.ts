@@ -3,7 +3,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import {
   actionSpaceTokenChoiceFlow,
-  actionSpaceTokenChoiceOptions,
+  actionSpaceTokenChoiceRequest,
   consumeActionSpaceToken,
   resolveActionSpaceTokenChoice,
 } from '../helpers/action-space-tokens'
@@ -22,7 +22,6 @@ const choiceConfig = (state: GameState, player: PlayerState) => ({
   spaces: TRIGGER_SPACES,
   max: getAvailableStableSupplyCount(state, player),
   choicePrefix: CHOICE_PREFIX,
-  choiceLabelKey: 'cards.E148_Lazybones.choice',
   promptKey: 'cards.E148_Lazybones.name',
 })
 
@@ -71,7 +70,7 @@ const cardImpl = {
     getRuleContributions: (player) => ({ reservedSupply: { stable: getReservedActionSpaces(player, CARD_ID).length } }),
     projectInteractionRequest: (state, player, request, actionId) => {
       if (actionId !== 'emit-choice' || request.kind !== 'choice') return request
-      return { ...request, options: actionSpaceTokenChoiceOptions(choiceConfig(state, player)) }
+      return { ...request, ...actionSpaceTokenChoiceRequest(choiceConfig(state, player)) }
     },
     onBuy: (state, player) => actionSpaceTokenChoiceFlow(choiceConfig(state, player)),
     resolveChoice: (state, player, choice) => {

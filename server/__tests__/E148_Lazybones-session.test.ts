@@ -6,6 +6,7 @@ import { setWorkersAtHome } from '../../shared/domain/player'
 import { getAllTilePositions } from '../../shared/domain/farm'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import { getAvailableStableSupplyCount } from '../../shared/domain/supply-tokens'
+import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/serialization'
 import type { ActionChoiceOption, ActionFlow } from '../../shared/contract/types'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 import '../../shared/cards/E/E148_Lazybones'
@@ -14,10 +15,114 @@ const CARD_ID = 'E148_Lazybones'
 const TRIGGER_SPACES = ['grain-seeds', 'farmland', 'day-laborer', 'farm-expansion']
 const CHOICE_PREFIX = 'lazybones:'
 
-const selectedSpacesFromChoice = (value: string) =>
-  value.startsWith(CHOICE_PREFIX) ? value.slice(CHOICE_PREFIX.length).split(',').filter(Boolean) : []
+// Design: reuse a generic bounded choice multi-select; reservation stays card-local.
+// Session coverage is required for pending refresh, supply reservation, and rejection.
+const playLazybones = (remaining = 4) => {
+  const session = new GameSession(8148, undefined, { playerCount: 2 })
+  stabilizeRandomHands(session.state.players)
+  const owner = session.state.players[0]!
+  owner.occupationHand = [CARD_ID]
+  owner.resources.food = 5
+  owner.supplyTokensConsumed = { stable: 4 - remaining }
+  let response = session.takeAction(0, 'lessons')
+  if (!response.state.players[0]!.occupationPlayed.includes(CARD_ID)) response = session.resolveChoice(0, CARD_ID)
+  expect(response.ok, response.error).toBe(true)
+  return { session, response }
+}
 
 describe('E148_Lazybones session', () => {
+  it.each([1, 2, 3, 4])('offers four independent spaces with %i stable tokens remaining', (remaining) => {
+    const { session, response: offered } = playLazybones(remaining)
+    expect(offered.state.players).toHaveLength(2)
+    expect(offered.interaction).toMatchObject({
+      stateId: 'wait', playerIndex: 0, sourceCard: CARD_ID,
+      request: {
+        kind: 'choice',
+        options: TRIGGER_SPACES.map((value) => ({ value, labelKey: `actions.${value}.name` })),
+        multiSelect: { valuePrefix: CHOICE_PREFIX, minSelections: 0, maxSelections: remaining },
+        requiresExplicitChoice: true,
+      },
+    })
+    const selected = TRIGGER_SPACES.slice(0, remaining)
+    const response = session.resolveChoice(0, `${CHOICE_PREFIX}${selected.join(',')}`)
+    expect(response.ok, response.error).toBe(true)
+    expect(response.interaction.sourceCard).not.toBe(CARD_ID)
+    expect(response.state.players[0]!.cardStates[CARD_ID]?.extraData?.reservedActionSpaces).toEqual(selected)
+    expect(getAvailableStableSupplyCount(response.state, response.state.players[0]!)).toBe(0)
+    expect(response.state.players[0]!.stableTiles).toEqual([])
+    expect(response.state.players[0]!.resources).toEqual(offered.state.players[0]!.resources)
+    expect(response.scores).toEqual(offered.scores)
+    expect(response.state.log.some((entry) => entry.key === 'log.cardEffectGain' && entry.params?.cardId === CARD_ID)).toBe(false)
+  })
+
+  it('skips the reservation interaction when supply is empty', () => {
+    const { response } = playLazybones(0)
+    expect(response.state.players[0]!.occupationPlayed).toContain(CARD_ID)
+    expect(response.interaction.sourceCard).not.toBe(CARD_ID)
+    expect(response.state.players[0]!.cardStates[CARD_ID]?.extraData?.reservedActionSpaces).toBeUndefined()
+  })
+
+  it('allows confirming no spaces without reserving supply', () => {
+    const { session, response: offered } = playLazybones()
+    const response = session.resolveChoice(0, CHOICE_PREFIX)
+    expect(response.ok, response.error).toBe(true)
+    expect(response.interaction.sourceCard).not.toBe(CARD_ID)
+    expect(response.state.players[0]!.cardStates[CARD_ID]?.extraData?.reservedActionSpaces).toBeUndefined()
+    expect(getAvailableStableSupplyCount(response.state, response.state.players[0]!)).toBe(4)
+    expect(response.state.players[0]!.resources).toEqual(offered.state.players[0]!.resources)
+    expect(response.scores).toEqual(offered.scores)
+  })
+
+  it('preserves the bounded multi-select across session restoration', () => {
+    const { session } = playLazybones(2)
+    const saved = serializeSessionSnapshot(session.state, session)
+    const restored = new GameSession(rehydrateState(JSON.parse(JSON.stringify(saved))))
+    expect(restored.getState().interaction).toMatchObject({
+      stateId: 'wait', sourceCard: CARD_ID,
+      request: { kind: 'choice', multiSelect: { maxSelections: 2 } },
+    })
+    expect(restored.resolveChoice(0, 'lazybones:grain-seeds,farmland,day-laborer').ok).toBe(false)
+    const accepted = restored.resolveChoice(0, 'lazybones:grain-seeds,farmland')
+    expect(accepted.ok, accepted.error).toBe(true)
+    expect(accepted.state.players[0]!.cardStates[CARD_ID]?.extraData?.reservedActionSpaces).toEqual(TRIGGER_SPACES.slice(0, 2))
+  })
+
+  it('undoes a reservation back to the four-candidate choice and allows a new subset', () => {
+    const { session } = playLazybones(2)
+    expect(session.resolveChoice(0, 'lazybones:grain-seeds,farmland').ok).toBe(true)
+    const undone = session.undoStep()
+    expect(undone.ok, undone.error).toBe(true)
+    expect(undone.interaction).toMatchObject({
+      stateId: 'wait', sourceCard: CARD_ID,
+      request: { kind: 'choice', multiSelect: { maxSelections: 2 } },
+    })
+    expect(getAvailableStableSupplyCount(undone.state, undone.state.players[0]!)).toBe(2)
+    expect(undone.state.players[0]!.cardStates[CARD_ID]?.extraData?.reservedActionSpaces).toBeUndefined()
+    const accepted = session.resolveChoice(0, 'lazybones:day-laborer')
+    expect(accepted.ok, accepted.error).toBe(true)
+    expect(accepted.state.players[0]!.cardStates[CARD_ID]?.extraData?.reservedActionSpaces).toEqual(['day-laborer'])
+  })
+
+  it.each([
+    'lazybones:grain-seeds,farmland,day-laborer',
+    'lazybones:grain-seeds,grain-seeds',
+    'lazybones:forest',
+    'lazybones:grain-seeds,',
+    'grain-seeds',
+  ])('rejects invalid multi-selection %s atomically and permits retry', (choice) => {
+    const { session, response: offered } = playLazybones(2)
+    const before = structuredClone({ players: offered.state.players, log: offered.state.log })
+    const rejected = session.resolveChoice(0, choice)
+    expect(rejected.ok).toBe(false)
+    expect(rejected.state.players).toEqual(before.players)
+    expect(rejected.state.log).toEqual(before.log)
+    expect(rejected.scores).toEqual(offered.scores)
+    expect(rejected.interaction).toMatchObject({ stateId: 'wait', sourceCard: CARD_ID, request: offered.interaction.request })
+    const accepted = session.resolveChoice(0, 'lazybones:grain-seeds,farmland')
+    expect(accepted.ok, accepted.error).toBe(true)
+    expect(accepted.state.players[0]!.cardStates[CARD_ID]?.extraData?.reservedActionSpaces).toEqual(TRIGGER_SPACES.slice(0, 2))
+  })
+
   it.each([1, 4])('refreshes reservation choices after constructing %i stables', (built) => {
     const session = new GameSession(8148, undefined, { playerCount: 2 })
     for (const player of session.state.players) {
@@ -33,7 +138,8 @@ describe('E148_Lazybones session', () => {
     if (!response.state.players[0]!.occupationPlayed.includes(CARD_ID)) response = session.resolveChoice(0, CARD_ID)
     expect(response.ok, response.error).toBe(true)
     const fourSpaces = `${CHOICE_PREFIX}${TRIGGER_SPACES.join(',')}`
-    expect(response.interaction.request.options.some((option) => option.value === fourSpaces)).toBe(true)
+    expect(response.interaction.request).toMatchObject({ multiSelect: { maxSelections: 4 } })
+    expect(response.interaction.request.options.map((option) => option.value)).toEqual(TRIGGER_SPACES)
     response = session.takeAnytimeAction(0, 'C94-stable-cleaner-anytime')
     expect(response.ok, response.error).toBe(true)
     expect(response.interaction.request.kind).toBe('farm-select')
@@ -47,7 +153,8 @@ describe('E148_Lazybones session', () => {
       return
     }
     expect(getAvailableStableSupplyCount(response.state, response.state.players[0]!)).toBe(3)
-    expect(response.interaction.request.options.some((option) => option.value === fourSpaces)).toBe(false)
+    expect(response.interaction.request).toMatchObject({ multiSelect: { maxSelections: 3 } })
+    expect(response.interaction.request.options.map((option) => option.value)).toEqual(TRIGGER_SPACES)
     const before = structuredClone(response.state.players)
     response = session.resolveChoice(0, fourSpaces)
     expect(response.ok).toBe(false)
@@ -114,22 +221,8 @@ describe('E148_Lazybones session', () => {
     expect(leaf.actionId).toBe('emit-choice')
     const options = leaf.params?.options as ActionChoiceOption[]
     expect(options.length).toBeGreaterThan(0)
-    const skip = options.find((option) => option.value === CHOICE_PREFIX)
-    expect(skip?.labelKey).toBe('ui.interactionOptionalSkip')
-    expect(options.every((option) => selectedSpacesFromChoice(option.value).length <= 2)).toBe(true)
-    expect(options.some((option) => selectedSpacesFromChoice(option.value).length === 2)).toBe(true)
-    expect(options.some((option) => selectedSpacesFromChoice(option.value).length === 3)).toBe(false)
-    const reserveOptions = options.filter((option) => option.value !== CHOICE_PREFIX)
-    for (const option of reserveOptions) {
-      const spaces = selectedSpacesFromChoice(option.value)
-      expect(option.labelKey).toBe('cards.E148_Lazybones.choice')
-      expect(option.labelParams).toEqual({ spaces: spaces.join(', ') })
-    }
-    const optionLabels = new Set(reserveOptions.map((option) => JSON.stringify({
-      labelKey: option.labelKey,
-      labelParams: option.labelParams,
-    })))
-    expect(optionLabels.size).toBe(reserveOptions.length)
+    expect(options.map((option) => option.value)).toEqual(TRIGGER_SPACES)
+    expect(leaf.params?.multiSelect).toEqual({ valuePrefix: CHOICE_PREFIX, minSelections: 0, maxSelections: 2 })
 
     effect.resolveChoice!(state, owner, CHOICE_PREFIX)
 

@@ -994,8 +994,15 @@ export type SubFlowKind =
 export type FarmSelectType = 'plow' | 'sow' | 'fence' | 'room' | 'stable'
 export type SelectionKind = 'farm-position' | 'occupation-hand'
 
+/** Bounded subsets of choice options, submitted as prefix + comma-separated values. */
+export type ChoiceMultiSelect = {
+  valuePrefix: string
+  minSelections: number
+  maxSelections: number
+}
+
 export type InteractionRequest = (
-  | { kind: 'choice'; options: ActionChoiceOption[]; structuredChoicePrefixes?: string[]; requiresExplicitChoice?: boolean }
+  | { kind: 'choice'; options: ActionChoiceOption[]; multiSelect?: ChoiceMultiSelect; structuredChoicePrefixes?: string[]; requiresExplicitChoice?: boolean }
   | { kind: 'animal-reorg'; zones: InteractionAnimalReorgZone[]; prefill?: boolean }
   | { kind: 'confirm-next-player'; nextPlayerIndex: number }
   | { kind: 'confirm-player-switch'; fromPlayerIndex: number; toPlayerIndex: number }

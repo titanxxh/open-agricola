@@ -1,5 +1,5 @@
 import type { ActionHookResult } from '../../actions/hooks'
-import type { ActionChoiceOption, ActionFlow, PlayerState } from '../../contract/types'
+import type { ActionChoiceOption, ActionFlow, InteractionRequest, PlayerState } from '../../contract/types'
 import {
   getReservedActionSpaces,
   RESERVED_ACTION_SPACES_KEY,
@@ -11,44 +11,33 @@ type ActionSpaceTokenChoiceConfig = {
   spaces: readonly string[]
   max: number
   choicePrefix: string
-  choiceLabelKey: string
   promptKey?: string
-}
-
-const actionSpaceSubsets = (
-  spaces: readonly string[],
-  maxCount: number,
-): string[][] => {
-  const subsets: string[][] = []
-  const limit = Math.min(spaces.length, maxCount)
-  const visit = (index: number, selected: string[]) => {
-    if (selected.length > 0) subsets.push([...selected])
-    if (selected.length === limit) return
-    for (let next = index; next < spaces.length; next += 1) {
-      selected.push(spaces[next]!)
-      visit(next + 1, selected)
-      selected.pop()
-    }
-  }
-  visit(0, [])
-  return subsets
 }
 
 export const actionSpaceTokenChoiceOptions = (
   config: ActionSpaceTokenChoiceConfig,
-): ActionChoiceOption[] => [
-  {
+): ActionChoiceOption[] => config.max <= 0 ? [{
     value: config.choicePrefix,
     labelKey: 'ui.interactionOptionalSkip',
     sourceCard: config.cardId,
-  },
-  ...actionSpaceSubsets(config.spaces, config.max).map((spaces) => ({
-    value: `${config.choicePrefix}${spaces.join(',')}`,
-    labelKey: config.choiceLabelKey,
-    labelParams: { spaces: spaces.join(', ') },
+  }] : config.spaces.map((spaceId) => ({
+    value: spaceId,
+    labelKey: `actions.${spaceId}.name`,
     sourceCard: config.cardId,
-  })),
-]
+  }))
+
+export const actionSpaceTokenChoiceRequest = (
+  config: ActionSpaceTokenChoiceConfig,
+): Extract<InteractionRequest, { kind: 'choice' }> => ({
+  kind: 'choice',
+  options: actionSpaceTokenChoiceOptions(config),
+  multiSelect: config.max > 0 ? {
+    valuePrefix: config.choicePrefix,
+    minSelections: 0,
+    maxSelections: Math.min(config.spaces.length, config.max),
+  } : undefined,
+  requiresExplicitChoice: config.max > 0,
+})
 
 export const actionSpaceTokenChoiceFlow = (
   config: ActionSpaceTokenChoiceConfig,
@@ -59,7 +48,7 @@ export const actionSpaceTokenChoiceFlow = (
     actionId: 'emit-choice',
     sourceCard: config.cardId,
     params: {
-      options: actionSpaceTokenChoiceOptions(config),
+      ...actionSpaceTokenChoiceRequest(config),
       ...(config.promptKey ? { promptKey: config.promptKey } : {}),
     },
   }
