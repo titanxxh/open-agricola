@@ -44,7 +44,7 @@ LLM prompt 的行为契约直接提取当前 prompt 中的喂食与建房示例�
 
 在真实检查尚不可满足时不提前配置 required，以免锁死 main。标准 GitHub-hosted runner 的公开仓库运行时间免费，较大 runner 及超额存储仍可能收费；保持当前 `ubuntu-latest`、timeout 和取消同一 PR 旧 run 的设置。
 
-公开前后的运维、内容审查及安全功能切换见 [HOW_TO_DEPLOY.md](../HOW_TO_DEPLOY.md#source-repository-publication)。CI 用 `pull_request` 检查投稿代码，不用 `pull_request_target` 带写权限或秘密执行投稿；后端 App 私钥及生产 `.env` 不进入 CI。
+CI 用 `pull_request` 检查投稿代码，不用 `pull_request_target` 带写权限或秘密执行投稿；后端 App 私钥及生产 `.env` 不进入 CI。
 
 ## 加载 GH_TOKEN
 
