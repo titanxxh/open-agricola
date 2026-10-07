@@ -58,6 +58,17 @@ describe('canonical architecture verification wiring', () => {
     expect(workflow).not.toContain('pnpm run check:prompt-sync')
   })
 
+  it.each(workflows)('%s starts isolated dependencies before architecture and storage tests', (name) => {
+    const workflow = fs.readFileSync(path.join(repoRoot, '.github/workflows', name), 'utf8')
+    const dependencies = workflow.indexOf('run: node scripts/local-services.mjs --test')
+    const architecture = workflow.indexOf('run: pnpm run check:architecture')
+    const tests = workflow.indexOf(name === 'ci.yml' ? 'run: pnpm run test:fast' : 'run: pnpm test')
+
+    expect(dependencies).toBeGreaterThanOrEqual(0)
+    expect(dependencies).toBeLessThan(architecture)
+    expect(dependencies).toBeLessThan(tests)
+  })
+
   it.each([...workflows, 'e2e.yml'])('%s is ready for public PRs without running automatic private jobs', (name) => {
     const workflow = fs.readFileSync(path.join(repoRoot, '.github/workflows', name), 'utf8')
 
