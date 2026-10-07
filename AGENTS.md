@@ -37,14 +37,16 @@ pnpm install                # canvas 需要系统库：libcairo2-dev libpango1.0
 pnpm test                   # vitest 全量（fast + slow）
 pnpm test:fast              # 只跑 fast project（CI 默认）
 pnpm test:slow              # 只跑 slow project（单卡 session 测试）
-pnpm test:llm               # LLM card-gen：record 模式（回放 recordings/ 的 golden，不调 API，确定性，进 CI）
-pnpm test:llm:live          # live 模式：实时调 LLM API 做 prompt 健康检查（需 LLM provider key）
-pnpm test:llm:record        # 实时调 LLM 并把输出录制写回 recordings/ golden（改 prompt / fixture userMessage 后用）
+pnpm test:llm               # 历史 golden 与验收行为/账本回归，不调 API，进 CI
+pnpm test:llm:dry           # 专用本地环境的 102 任务合成浏览器演练，不调付费 API
+pnpm test:llm:live --model <id> # 已确认模型/预算后的完整浏览器验收，保存独立批次
 pnpm run test:e2e           # Playwright E2E（需要后端 + 前端在跑）
 pnpm exec vitest run <file> # 单文件
 pnpm run lint               # ESLint（error 必须清零）
 pnpm run build              # tsc + vite build
 ```
+
+修改工坊生成流程、prompt 或模型准入时，先读 `docs/test/llm-card-gen.md` 的批次、费用账本与证据要求。
 
 本地开发**统一使用 Node.js 24.15+**；`engines` 声明 `^24.15.0 || >=26.0.0`（`isolated-vm` 7 要求 `node >= 24`，`jsdom` 30 只接受 `^24.15.0 || >=26.0.0`，**不支持 Node 25**）；`better-sqlite3` 等原生依赖按 Node ABI 编译，用更低版本启动会出现 `NODE_MODULE_VERSION` 不匹配。
 

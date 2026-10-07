@@ -61,6 +61,28 @@ describe('immutable generation input', () => {
 })
 
 describe('bounded browser generation attempt', () => {
+  it('runs the frozen control with the same validator and exactly two repairs, without offering tools', async () => {
+    const io = ports()
+    io.validate = vi.fn(async code => ({ valid: false, errors: ['invalid hook'], sourceFingerprint: sourceFingerprint(code), sandboxContractId: contract.id }))
+    const result = await new GenerationAttempt(request(), io, { recipe: {
+      promptVersion: 'frozen-test', toolVersion: 'none', systemPrompt: () => 'unchanged full prompt', tools: [], modelRequests: 3,
+    } }).start()
+    expect(io.model.complete).toHaveBeenCalledTimes(3)
+    for (const [messages, tools] of vi.mocked(io.model.complete).mock.calls) {
+      expect(messages[0]).toEqual({ role: 'system', content: 'unchanged full prompt' })
+      expect(tools).toEqual([])
+    }
+    expect(result).toMatchObject({ modelRequests: 3, repairs: 2, result: { kind: 'failed-source', provenance: { promptVersion: 'frozen-test', toolVersion: 'none' } } })
+  })
+  it('rejects unsolicited tool calls in a recipe which offered no tools', async () => {
+    const io = ports()
+    io.model.complete = vi.fn(async () => turn([call('unoffered')], ''))
+    const result = await new GenerationAttempt(request(), io, { recipe: {
+      promptVersion: 'control', toolVersion: 'none', systemPrompt: () => 'frozen', tools: [], modelRequests: 3,
+    } }).start()
+    expect(result).toMatchObject({ modelRequests: 1, referenceCalls: 0, result: { kind: 'failure' } })
+    expect(io.validate).not.toHaveBeenCalled()
+  })
   it('does not count an unissued model POST when reservation fails', async () => {
     const io = ports()
     io.model.complete = vi.fn(async () => { throw new ModelTurnError('preflight', 'Budget exhausted') })

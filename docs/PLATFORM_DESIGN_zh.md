@@ -164,9 +164,9 @@ OpenRouter 不在 provider 级别声明 `chat` / `image` 兜底能力；每个�
 
 `GET /api/workshop/sandbox-contract` 提供实际部署的 helper 源码、hook/listener 元数据、支持的行动参数、隔离限制与语义约束。其标识来自部署中的 shared/executor 源码及运行时版本，与 GitHub 资料 commit 分开记录。`POST /api/workshop/cards/validate-code` 将成功和失败都绑定到该标识及提交源码指纹；过期契约返回 `sandbox_changed`，要求开始新尝试。主浏览器只接收数据，不导入规则运行时。
 
-#### C1.4 已定案、待实现的质量与成本验收
+#### C1.4 质量与成本验收
 
-[验收决议](https://github.com/titanxxh/open-agricola/issues/1035)规定模型逐个通过浏览器协议与卡牌行为验证后开放，首先验收当前配置的 DeepSeek Flash 组合。已确认的批次覆盖 17 个场景，两组各重复 3 次，全部付费调用共用 5 美元预算。新架构每次运行都必须通过相应行为或能力缺口断言；首次输出质量、修复、token 和耗时分别记录。[LLM 测试指南](test/llm-card-gen.md#planned-browser-tool-acceptance)说明样本与证据要求。正式付费验收程序仍待实现；确定性浏览器测试不构成模型准入。
+[验收决议](https://github.com/titanxxh/open-agricola/issues/1035)规定模型逐个通过浏览器协议与卡牌行为验证后开放，首先验收当前配置的 DeepSeek Flash 组合。已确认的批次覆盖 17 个场景，两组各重复 3 次，全部付费调用共用 5 美元预算。新架构每次运行都必须通过相应行为或能力缺口断言；首次输出质量、修复、token 和耗时分别记录。[LLM 测试指南](test/llm-card-gen.md#browser-tool-acceptance)说明样本与证据要求。`scripts/llm-acceptance.ts` 已实现浏览器探测、102 任务固定批次、原始源码行为检查和跨批次共用的 5 美元持久费用账本。正式付费结果仍待验收；合成浏览器演练不构成模型准入。
 
 #### C1.5 编辑器交互
 

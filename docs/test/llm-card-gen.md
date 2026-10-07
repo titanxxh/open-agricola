@@ -1,17 +1,19 @@
 # LLM Card-Gen 自动化测试套件
 
-验证**LLM 生成的自定义卡代码**能否在真实 `GameSession` 里跑通既定场景。默认 `record` 模式回放已提交的 golden，不调用 LLM；只有 `live` 或设置 `LLM_TEST_RECORD=1` 的刷新流程会调用外部模型。
+验证**LLM 生成的自定义卡代码**能否在真实 `GameSession` 里跑通既定场景。`pnpm test:llm` 只回放历史 golden 和确定性测试，不调用 LLM。正式模型准入通过 owner 本机的浏览器验收程序完成。
 
 ## 位置
 
 ```
 tests/llm-card-gen/
-├── runner.test.ts            # 读取 golden 或调用 LLM → 编译 → 跑 fixture.setup/scenario/assert
+├── runner.test.ts            # 只读历史 golden → 编译 → 跑 fixture.setup/scenario/assert
 ├── driver.ts                 # 驱动 GameSession action / choice / pending
 ├── session-helpers.ts        # buildSessionWithLLMCard / autoAdvanceRoundEnd / getBonusBreakdown 等
-├── session-helpers.test.ts   # helpers 自身的 smoke（不调 LLM）
-├── llm-client.ts             # Gemini / OpenAI / OpenRouter / DeepSeek / AiHubMix 兼容包装
+├── session-helpers.test.ts   # helpers 的行为回归（不调 LLM）
+├── llm-client.ts             # 其他脚本的旧客户端；不用于卡牌模型准入
 ├── extract.ts / extract.test.ts   # 从 LLM 响应里抽 TS 代码块
+├── acceptance/              # 固定题面、行为检查、浏览器入口、费用账本、合成演练数据
+├── control/                 # 冻结的旧完整 prompt 及 SHA-256 清单
 └── fixtures/
     ├── types.ts              # CardFixture = { setup, scenario, assert }
     ├── M1_immediate-gain-with-cost-prereq.ts  # minor + cost + prereq + onBuy gain
@@ -29,77 +31,47 @@ tests/llm-card-gen/
 
 ## 运行
 
-普通 `pnpm test:fast` 不包含该 project；CI 另行执行确定性的 golden 回放。
+历史 golden 回放和新验收检查均属于 `llm` project；普通 `pnpm test:fast` 不包含它们。CI 运行 `pnpm test:llm`，不会请求模型 API。
 
 ```bash
-# 1. 默认代码生成使用 DeepSeek；API key 可直接放在 .env 的 MY_TEST_DEEPSEEK_APIKEY
-export LLM_TEST_CODE_PROVIDER=deepseek
-export LLM_TEST_CODE_MODEL=deepseek-v4-flash
-
-# 2. 全量 11 fixture golden 回放（确定性，不调 API）
+# 历史回放、17 场景行为检查、已知错误反例、费用账本测试
 pnpm test:llm
 
-# 单跑一张 golden
+# 重启专用本地运行环境；必须使用 test_ 开头的数据库 schema
+LOCAL_ENV_FILE="$PWD/output/tmp/llm-runtime/local.env" ./restart-local.sh --players 2
+
+# 完整 102 任务合成演练：真实浏览器、后端校验及 GameSession；模型和 GitHub 响应受控
+pnpm test:llm:dry
+
+# 正式验收：先确认模型身份和整个验收工作的付费预算；工作区必须已提交
+pnpm test:llm:live --model <confirmed-model-id>
+
+# 自定义本机入口；仍须是 localhost 或 127.0.0.1
+pnpm test:llm:dry --base-url http://127.0.0.1:5913 --runtime-env output/tmp/llm-runtime/local.env
+
+# 单张历史回放，不是新模型准入证据
 pnpm exec vitest run --project llm tests/llm-card-gen/runner.test.ts -t 'M2-per-action-bonus'
-
-# 全量实时健康检查
-pnpm test:llm:live
-
-# 单张实时检查；不要把 -t 放到 pnpm script 的 -- 后面
-LLM_TEST_MODE=live pnpm exec vitest run --project llm tests/llm-card-gen/runner.test.ts -t 'M11-improvement-cost-reduction'
-
-# 单张确认通过后刷新 golden
-LLM_TEST_MODE=live LLM_TEST_RECORD=1 pnpm exec vitest run --project llm tests/llm-card-gen/runner.test.ts -t 'M11-improvement-cost-reduction'
-
-# 只跑 helper smoke（不调 LLM，~5s）
-pnpm exec vitest run --project llm tests/llm-card-gen/session-helpers.test.ts
-
-# 单独跑 Gemini 图片生成 smoke（2 个真实卡牌 case：1 张职业 + 1 张小改良）
-pnpm run smoke:gemini:image
-
-# 切换 provider / model（示例：AiHubMix 免费代码模型）
-LLM_TEST_CODE_PROVIDER=aihubmix \
-LLM_TEST_CODE_MODEL=coding-glm-5.1-free \
-AIHUBMIX_API_KEY=... \
-pnpm test:llm:live
 ```
 
-实时代码生成默认 provider=`deepseek`、model=`deepseek-v4-flash`。三种模式都会把本次使用的响应写到 `output/tmp/llm-card-gen/<fixture-id>.txt`，失败时优先看这个文件。
+`test:llm:record` 也是正式浏览器验收的别名，所有 live 批次都会保留原始完整源码；它不会覆盖 `recordings/` 的历史 golden。旧 runner 拒绝 `LLM_TEST_MODE=live` / `LLM_TEST_RECORD=1`，避免绕过浏览器传输与费用边界。图片 smoke 和翻译脚本继续使用各自独立入口，不属于卡牌能力验收。
 
-环境变量按用途拆分，避免代码模型和图片模型混用：
+专用 `--runtime-env` 只放本地服务与数据库配置，禁止写入 API key 或 GitHub token。真实模型 key 从当前 worktree 或主 checkout 的已忽略 `.env` 中读取 `MY_TEST_DEEPSEEK_APIKEY` / `DEEPSEEK_API_KEY`，也可由同名环境变量提供。key 仅传入私有浏览器传输闭包；后端、GitHub、localStorage、HAR、trace 与结果文件均不接收它。Node 只运行测试和费用登记，不代发模型请求。
 
-
-| 用途     | Provider env              | Model env              | 默认                                                 |
-| ------ | ------------------------- | ---------------------- | -------------------------------------------------- |
-| 卡牌代码生成 | `LLM_TEST_CODE_PROVIDER`  | `LLM_TEST_CODE_MODEL`  | `deepseek` / `deepseek-v4-flash`                   |
-| 卡牌图片生成 | `LLM_TEST_IMAGE_PROVIDER` | `LLM_TEST_IMAGE_MODEL` | `gemini` / `gemini-2.5-flash-image`                |
-
-
-当前 `tests/llm-card-gen/runner.test.ts` 只做代码生成，不调用图片模型。
-
-支持的代码生成 provider（用于 `LLM_TEST_CODE_PROVIDER`）：
-
-
-| Provider     | Chat completions endpoint                                                  | API key 环境变量                                       |
-| ------------ | -------------------------------------------------------------------------- | -------------------------------------------------- |
-| `gemini`     | `https://generativelanguage.googleapis.com/v1beta/openai/chat/completions` | `GEMINI_API_KEY` 或 `MY_TEST_GEMINI_APIKEY`         |
-| `openai`     | `https://api.openai.com/v1/chat/completions`                               | `OPENAI_API_KEY` 或 `MY_TEST_OPENAI_APIKEY`         |
-| `openrouter` | `https://openrouter.ai/api/v1/chat/completions`                            | `OPENROUTER_API_KEY` 或 `MY_TEST_OPENROUTER_APIKEY` |
-| `deepseek`   | `https://api.deepseek.com/v1/chat/completions`                             | `DEEPSEEK_API_KEY` 或 `MY_TEST_DEEPSEEK_APIKEY`     |
-| `aihubmix`   | `https://aihubmix.com/v1/chat/completions`                                 | `AIHUBMIX_API_KEY` 或 `MY_TEST_AIHUBMIX_APIKEY`     |
-
-
-`LLM_TEST_CODE_MODEL` / `LLM_TEST_IMAGE_MODEL` 不做白名单校验，直接透传给 provider，便于临时验证新模型。
+当前验收程序只支持已讨论的 DeepSeek HTTPS 端点。2026-10-08 核对[官方价格页](https://api-docs.deepseek.com/quick_start/pricing/)时，`deepseek-v4-flash` 已退役并转向 V4.1 Flash，正式请求名是 `deepseek-flash`。付费批次须明确选择请求名称，记录实际返回名称及官方服务说明，不能把旧别名当成旧模型的测量结果。价格按 V4.1 Flash 峰时价保守估算：每百万 token 的未缓存输入 $0.30、缓存输入 $0.006、输出 $1.20；报告明确标记估算而非账单，reasoning 用量不重复加到输出中。
 
 ## CI / Workflow
 
-`.github/workflows/ci.yml` 只运行确定性的 `pnpm test:llm` golden 回放。真实调用外部 LLM 的健康检查仅在 owner 控制的本机运行 `pnpm test:llm:live`，API key 从已忽略的本地 `.env` 读取，不进入 GitHub Actions。
+`.github/workflows/ci.yml` 只运行确定性的 `pnpm test:llm`。真实调用只允许在 owner 控制的本机运行，key 不进入 GitHub Actions。产品准入表位于 `client/services/llm/generation/admission.ts`，测试注入入口不提供任何产品设置或 URL 绕过方式。
 
-## Planned browser-tool acceptance
+## Browser-tool acceptance
 
-The [approved quality and cost decision](https://github.com/titanxxh/open-agricola/issues/1035) defines a future acceptance harness. It is not implemented by the commands above: the current live runner uses an independent non-streaming client, and its helpers rewrite card identity and replace generated metadata. Existing golden replay proves regression behavior only.
+The [approved quality and cost decision](https://github.com/titanxxh/open-agricola/issues/1035) is implemented by `scripts/llm-acceptance.ts` and `tests/llm-card-gen/acceptance/`. Admission is per exact provider, endpoint and model, after a real browser tool roundtrip and the complete acceptance batch. No model has been admitted yet; synthetic runs and historical golden replay do not qualify.
 
-Admission is per exact provider, endpoint and model, after a real browser tool roundtrip and the complete acceptance batch. The first model is `deepseek` / `https://api.deepseek.com/v1/chat/completions` / `deepseek-v4-flash`. Other models remain pending until separately verified. All paid probes, comparisons, failures and repairs share a **US$5 total budget** for this initial acceptance effort. Pause before a request whose conservative charge cannot fit the remaining budget; unresolved usage is not zero and remains reserved. Do not top up accounts or silently substitute another model.
+All paid probes, comparisons, failures, repairs and subsequent batches share a **US$5 total budget**. The persistent ledger is `<git-common-dir>/llm-acceptance-usd5.json`, shared by every worktree. An exclusive `.lock` prevents concurrent writers. Each conservative reservation is atomically saved before the browser can issue its POST; interrupted or unreported usage keeps the full reservation. A new batch does not reset the ledger. There is no budget override or account top-up. If a process crashes, inspect the PID in its lock and the preserved reservations before removing a stale lock; do not delete or zero the ledger. Synthetic runs use a separate, explicitly labelled budget file in their own output directory.
+
+Each run creates `output/tmp/llm-acceptance/<batch>/` containing the frozen manifest, per-task source/validation/behavior records, request accounting, reference SHAs/ranges, credential-destination checks, budget snapshot and final report. Raw tool bodies, reasoning and signatures remain page-memory-only. Files are local private test artifacts and are not committed automatically. The manifest freezes implementation hashes, prompt/control hashes, settings, limits and actual deployed sandbox ID. It rejects edits during a run and requires a clean committed implementation for paid runs. Only the GitHub main reference may advance between new attempts, as required by the product contract.
+
+The runner first checks anonymous GitHub quota, then performs one real browser tool roundtrip probe. If the probe passes, it executes all declared scenarios in order, tools then control, for each repetition. Quality failures remain in the batch and do not trigger Session-driven repair or a lucky retry. A lost transport, paused attempt, budget stop or source change yields an incomplete, non-admissible batch. No model POST is retried automatically. Changing the implementation or prompt requires a separately identified complete batch while retaining earlier failures and their costs.
 
 The fixed matrix has **17 scenarios, three independent runs per scenario in each of two arms: 102 task runs per model**. It extends the 11 current mechanisms with:
 
@@ -113,19 +85,19 @@ The fixed matrix has **17 scenarios, three independent runs per scenario in each
 
 New-architecture admission requires **48/48 implementable runs passing behavior checks and 3/3 correct capability-gap results**. Report first-output and final pass rates separately; final output may include at most two production static-validation repairs. A partial batch does not qualify. Preserve every failure; a changed prompt or implementation starts a separately identified batch instead of replacing failed samples with lucky retries. A finite passing batch does not establish a universal success rate.
 
-Both arms use the same browser transport, model settings, request inputs, extraction and authoritative validation. The control uses the frozen old full prompt with the same two static repairs, explicitly labelled **old prompt plus shared repair**, not the behavior of the current UI. Session assertion failures never become repair hints. Keep source and metadata unchanged by test helpers; human-edited results are reported separately. Each fresh two-player Session has explicit hands, successful commands, intentional pending choices and state/interaction/log/scores assertions. Strengthen M4 scoring, M6 intermediate counters, M7 reuse after replenishing wood, and M9 actual delayed delivery and cleanup before live evaluation.
+Both arms use the same browser transport, model settings, request inputs, extraction and authoritative validation. The control uses the frozen old full prompt with the same two static repairs, explicitly labelled **old prompt plus shared repair**, not the behavior of the current UI. Session assertion failures never become repair hints. Keep source and metadata unchanged by test helpers; human-edited results are reported separately. Each fresh two-player Session has explicit hands, successful commands, intentional pending choices and state/interaction/log/scores assertions. M4 checks final scoring, M6 intermediate counters, M7 reuse after replenishing wood, and M9 actual delayed delivery and cleanup.
 
 Each new-arm run retains the eight-model-request, 24-tool-call and five-minute limits; the control permits at most three model requests. The formal batch therefore permits at most **561 model requests**, with any preliminary probes counted separately against the same monetary budget. Record requested/returned model identity, prompt/tool/sandbox versions, actual reference SHAs and ranges, configured response/context limits, every request and retry, token usage including reasoning/cache fields when available, elapsed time and cost basis. Missing usage remains unknown. Freeze these settings and the assertions before a batch; reference reads still obey each attempt's latest-main contract.
 
-Deterministic protocol replay and browser E2E cover reference versions and failures, complete tool groups/signatures, exact budget boundaries, cancellation/late responses, candidate/source binding, recovery/adoption/privacy, manual playtest repair and translation regressions. Check real browser request destinations: only the configured LLM provider receives its credential. Test artifacts use synthetic or test-owned inputs, exclude credentials, and do not broaden production's page-memory-only raw protocol contract. Detailed scenarios and reporting requirements live in the decision record. No browser-tool model has passed this planned acceptance yet.
+Deterministic protocol replay and browser E2E cover reference versions and failures, complete tool groups/signatures, exact budget boundaries, cancellation/late responses, candidate/source binding, recovery/adoption/privacy, manual playtest repair and translation regressions. Check real browser request destinations: only the configured LLM provider receives its credential. Test artifacts use synthetic or test-owned inputs, exclude credentials, and do not broaden production's page-memory-only raw protocol contract. Detailed scenarios and reporting requirements live in the decision record. No browser-tool model has passed paid acceptance yet.
 
-### Implementation progress: control and behavior checks
+### Control and behavior checks
 
 The complete old prompt is frozen in `tests/llm-card-gen/control/full-prompt.txt`; its manifest records rendered bytes, SHA-256, source commit and dependency hashes. This is a test-only control, not a product fallback. New fixture setup preserves generated source and authoritative CARD_DEF metadata. The explicitly named `historicalRecording` option retains identity/metadata adaptation only for historical golden regression; those results are not model-admission evidence.
 
 The driver rejects failed commands and requires explicit nontrivial choices. Fixtures use placeholder hands. M4 checks authoritative final scoring across multiple cattle counts; M6 checks intermediate counts including the fishing negative; M7 replenishes wood before checking the once-only gate; M9 checks exact delayed delivery, cleanup and no repeat. M10 uses a two-player session with an explicitly prepared Traveling Players resource source for its payment-provider test. Known-bad recording mutations exercise these oracles independently of live generation.
 
-The browser generation path, remaining matrix additions and paid admission are still pending; passing these offline tests does not open a model.
+The production browser path and all 17 scenario oracles are implemented. A 102-task synthetic browser run exercises original-source validation, exact two-repair behavior, both prompts and all Session assertions. Its result is always labelled synthetic and cannot open a model; paid admission remains a separate gate.
 
 ## Fixture 三段式
 
@@ -161,7 +133,7 @@ interface CardFixture {
 
 所以 fixture 不用自己 `withCtx`、也不用担心 seed 影响初始局面。
 
-### 不要调 `loadState`
+### 初始状态准备
 
 `clearAllHands` 现在将所有 hand 设为 `__test_placeholder__`，避免 `normalizeState` 对空 hand 重新发牌。`buildSessionWithLLMCard` 返回后可准备 `session.getState().state` 的测试初始状态。
 
@@ -199,8 +171,8 @@ setActiveWorkerCount(p1, 0)          // 对手零工人，避免轮转
 2. 新建 `tests/llm-card-gen/fixtures/M<n>_<slug>.ts`，follow `M2_per-action-bonus.ts` 模板
 3. 在 `tests/llm-card-gen/fixtures/index.ts` 注册导出
 4. 先让旧 golden 或 known-bad 实现跑出预期红灯，确认断言能捕获机制漂移
-5. 用 `LLM_TEST_MODE=live` 单跑一次并 review `output/tmp/llm-card-gen/`
-6. live 通过后用 `LLM_TEST_RECORD=1` 刷新 golden，再用默认 `pnpm test:llm` 回放
+5. 在 `acceptance/inputs.ts` / `behavior.ts` 登记题面和行为断言，先用合成浏览器演练验证测试本身
+6. 如修改正式准入矩阵，先更新决议；重新冻结实现后开始完整付费批次，保留旧失败记录，不覆盖历史 golden
 
 ## 历史
 

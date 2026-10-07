@@ -387,7 +387,7 @@ export function autoAdvanceRoundEnd(
       const pi = resp.interaction.playerIndex
       const player = session.getState().state.players[pi]
       const zones = player ? buildPreservingZones(player) : []
-      resp = session.resolveChoice(pi, 'confirm', zones)
+      resp = session.resolveChoice(pi, 'confirm', { zones })
       continue
     }
     if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-next-player') {

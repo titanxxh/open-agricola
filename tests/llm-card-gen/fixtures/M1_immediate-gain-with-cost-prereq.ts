@@ -56,7 +56,7 @@ const fixture: CardFixture = {
   },
 
   scenario(driver) {
-    driver.playMinorViaMeetingPlace(0)
+    driver.playMinorViaMeetingPlace(0, { wood: 1 })
   },
 
   assert(session, _ctx): FixtureResult {
