@@ -31,7 +31,7 @@ function runtimeDigest(): string {
   }
   visit(new URL('../shared/', import.meta.url), 'shared/')
   visit(new URL('./custom-code/', import.meta.url), 'server/custom-code/')
-  hash.update(readFileSync(new URL('./workshop-sandbox-contract.ts', import.meta.url)))
+  hash.update(readFileSync(import.meta.filename))
   hash.update(readFileSync(new URL('../package.json', import.meta.url)))
   hash.update(process.versions.node).update(process.versions.v8)
   return hash.digest('hex')
