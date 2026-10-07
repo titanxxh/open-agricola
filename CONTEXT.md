@@ -838,19 +838,23 @@ Workshop 中由作者拥有、具有稳定身份的自定义卡设计聚合。�
 _Avoid_: Design Draft、游戏内卡牌定义
 
 **Design Draft**:
-Workshop Card 下作者私有、可变且可恢复的当前工作状态，包含已采用的卡牌内容，以及图片、能力各自最近一次完成生成的请求与结果；未发送输入和完整工作对话不属于服务端可恢复草稿。检查点只更新草稿，不代表创建版本或发布。
+Workshop Card 下作者私有、可变且可恢复的当前工作状态，包含已采用的卡牌内容、最近完成的图片候选、最近通过代码校验的能力候选及最近的 Generation Result；未发送输入和完整工作对话不属于服务端可恢复草稿。检查点只更新草稿，不代表创建版本或发布。
 _Avoid_: Draft Version、Published Card、临时表单状态
 
 **Generation Candidate**:
-基于 Design Draft 某一目标分区生成、尚未采用的作者私有提案；图片和能力候选共享生命周期，但内容类型不同。同一分区可在当前会话比较最多三个候选，重新打开只恢复最近一次完成生成的候选；采用或丢弃后不作为第二份内容长期保留。
+基于 Design Draft 某一目标分区生成、尚未采用的作者私有提案；图片和能力候选共享生命周期，但内容类型不同。同一分区可在当前会话比较最多三个候选，跨设备恢复最近完成的图片候选与最近通过代码校验的能力候选；采用或丢弃后不作为第二份内容长期保留。
 _Avoid_: Design Draft、Draft Version、已采用内容副本
 
 **Generation Attempt（生成尝试）**:
 为 Design Draft 的能力分区执行的一次完整生成过程，包含资料查询、模型回答和有界修复；它可以产生 Generation Candidate，也可以在没有候选时结束。暂停后继续仍属同一次尝试，沿用已确定的模型配置和资料版本；一次尝试不等于单次模型请求，也不表示采用候选。
 _Avoid_: 单次 LLM 请求、Generation Candidate、Draft Version
 
+**Generation Result（生成结果）**:
+Generation Attempt 产出的作者私有结果，包含完整源码候选、供继续修复的失败源码，或澄清、能力缺口、故障及终止说明。最近一次结果不会抹掉上一份通过代码校验的候选，也不代表卡牌规则已验证正确或内容已被采用。
+_Avoid_: Generation Candidate、完整工作对话、Draft Version
+
 **Generation Provenance（生成溯源）**:
-描述候选生成来源的作者私有不可变事实，包括最终请求、provider、model、参考图标识和可用的 seed 或 request ID；它是来源证据，不承诺确定性复现。
+描述生成来源的作者私有不可变事实，包括生成目标与输入基线、provider、model、参考资料与执行契约的版本及可用的调用统计；图片仍保留参考图标识和可用的 seed 或 request ID。它是来源证据，不承诺确定性复现，也不包含完整协议记录或模型凭据。
 _Avoid_: 可复现信息、API Key、模型凭据
 
 **Draft Version**:
