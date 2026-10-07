@@ -111,7 +111,7 @@ describe('invites', () => {
     const revoked = (await createInvite('admin', { expiresAt: future(), maxUses: 1 }))
     const now = Date.now()
 
-    insertUser('used-user', 'used-user')
+    await insertUser('used-user', 'used-user')
     expect((await consumeInviteCode(getDb(), used.code, 'used-user', now))).toBe(true)
     ;(await getDb().prepare('UPDATE account_invites SET expires_at = ? WHERE id = ?').run(now - 1, expired.id))
     expect((await revokeInvite(revoked.id, now))).toBe(true)
@@ -126,7 +126,7 @@ describe('invites', () => {
     const invite = (await createInvite('admin', { expiresAt: future(), maxUses: 1 }))
     const hash = hashInviteCode(invite.code)
 
-    insertUser('other-user', 'other-user')
+    await insertUser('other-user', 'other-user')
     expect((await consumeInviteCodeHash(getDb(), hash, 'new-user'))).toBe(true)
     expect((await consumeInviteCodeHash(getDb(), hash, 'other-user'))).toBe(false)
 
