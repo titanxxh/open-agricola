@@ -68,6 +68,43 @@ describe('Room reconnect and durable commands', () => {
     }
   })
 
+  it('preserves an automatically assigned dev seat across a pending-command reload', async () => {
+    const { WsGameTransport } = await import('../gameTransport')
+    const first = new WsGameTransport('ws://test', 'dev2', undefined, { route: false })
+    await first.connect()
+    const old = Socket.all[0]!
+    old.emit(joined('dev2'))
+    old.emit(snapshot(1, 'dev2'))
+    const action = first.takeAction(1, 'forest')
+    const rejected = expect(action).rejects.toThrow('Transport destroyed')
+    const command = old.sent.at(-1)!
+    first.destroy()
+    await rejected
+
+    const restored = new WsGameTransport('ws://test', 'dev2', undefined, { route: false })
+    const connection = restored.connect()
+    void connection.catch(() => {})
+    try {
+      await tick()
+      const next = Socket.all[1]!
+      await vi.waitFor(() => expect(next.sent.at(-1)?.type).toBe('getCommandReceipt'))
+      next.emit({ type: 'commandReceipt', status: 'completed', receipt: {
+        ...command.commandContext, outcome: { ok: true, roomId: 'dev2', roomVersion: 2 },
+      }, requestId: next.sent.at(-1)!.requestId })
+      await vi.waitFor(() => expect(next.sent.at(-1)?.type).toBe('joinRoom'))
+      expect(next.sent.at(-1)).toMatchObject({ intent: 'resume', requestedPlayerIndex: 1 })
+      next.emit(joined('dev2'))
+      expect(restored.connected).toBe(false)
+      next.emit(snapshot(2, 'dev2'))
+      await connection
+      expect(restored.playerIndex).toBe(1)
+      expect(next.sent.some(message => message.type === 'action')).toBe(false)
+    } finally {
+      restored.destroy()
+      await connection.catch(() => {})
+    }
+  })
+
   it('looks up a lost action receipt before resuming and waits for a full snapshot', async () => {
     const { WsGameTransport } = await import('../gameTransport')
     const route = vi.fn(async () => 'ws://test/owner')
