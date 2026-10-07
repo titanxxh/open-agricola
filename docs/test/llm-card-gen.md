@@ -68,7 +68,7 @@ pnpm exec vitest run --project llm tests/llm-card-gen/runner.test.ts -t 'M2-per-
 
 ## Browser-tool acceptance
 
-The [approved quality and cost decision](https://github.com/titanxxh/open-agricola/issues/1035) is implemented by `scripts/llm-acceptance.ts` and `tests/llm-card-gen/acceptance/`. Admission is per exact provider, endpoint and model, after a real browser tool roundtrip and the complete acceptance batch. No model has been admitted yet; synthetic runs and historical golden replay do not qualify.
+The [approved quality and cost decision](https://github.com/titanxxh/open-agricola/issues/1035) is implemented by `scripts/llm-acceptance.ts` and `tests/llm-card-gen/acceptance/`. Admission is per exact provider, endpoint and model, after a real browser tool roundtrip and the complete acceptance batch. The DeepSeek tuple in [completed paid acceptance](#completed-paid-acceptance) is admitted; all other combinations remain pending. Synthetic runs and historical golden replay do not qualify.
 
 All paid probes, comparisons, failures, repairs and subsequent batches share a **US$5 total budget**. The persistent ledger is `<git-common-dir>/llm-acceptance-usd5.json`, shared by every worktree. An exclusive `.lock` prevents concurrent writers. Each conservative reservation is atomically saved before the browser can issue its POST; interrupted or unreported usage keeps the full reservation. A new batch does not reset the ledger. There is no budget override or account top-up. If a process crashes, inspect the PID in its lock and the preserved reservations before removing a stale lock; do not delete or zero the ledger. Synthetic runs use a separate, explicitly labelled budget file in their own output directory.
 
@@ -94,7 +94,30 @@ Both arms use the same browser transport, model settings, request inputs, extrac
 
 Each new-arm run retains the eight-model-request, 24-tool-call and five-minute limits; the control permits at most three model requests. The formal batch therefore permits at most **561 model requests**, with any preliminary probes counted separately against the same monetary budget. Record requested/returned model identity, prompt/tool/sandbox versions, actual reference SHAs and ranges, configured response/context limits, every request and retry, token usage including reasoning/cache fields when available, elapsed time and cost basis. Missing usage remains unknown. Freeze these settings and the assertions before a batch; reference reads still obey each attempt's latest-main contract.
 
-Deterministic protocol replay and browser E2E cover reference versions and failures, complete tool groups/signatures, exact budget boundaries, cancellation/late responses, candidate/source binding, recovery/adoption/privacy, manual playtest repair and translation regressions. Check real browser request destinations: only the configured LLM provider receives its credential. Test artifacts use synthetic or test-owned inputs, exclude credentials, and do not broaden production's page-memory-only raw protocol contract. Detailed scenarios and reporting requirements live in the decision record. No browser-tool model has passed paid acceptance yet.
+Deterministic protocol replay and browser E2E cover reference versions and failures, complete tool groups/signatures, exact budget boundaries, cancellation/late responses, candidate/source binding, recovery/adoption/privacy, manual playtest repair and translation regressions. Check real browser request destinations: only the configured LLM provider receives its credential. Test artifacts use synthetic or test-owned inputs, exclude credentials, and do not broaden production's page-memory-only raw protocol contract. Detailed scenarios and reporting requirements live in the decision record. The Chinese and English editor E2Es exercise the shipped DeepSeek admission entry with controlled responses; other-provider fixtures remain test-only and cannot grant product admission.
+
+### Completed paid acceptance
+
+On 2026-10-08 (UTC+8), batch `live-2026-10-07T22-42-03-306Z-cd23e6ec` completed all 102 planned runs against clean implementation `a9469137d158347563734585d0ef47bec58788b7`, prompt `workshop-browser-tools-v5` and tools `github-text-v2`. The [resolution evidence](https://github.com/titanxxh/open-agricola/issues/1041#issuecomment-6048766116) and [compact evidence artifact](../../tests/llm-card-gen/acceptance/evidence/deepseek-v4-flash-2026-10-08.json) retain the exact settings, deployed sandbox identity, per-scenario counts, earlier failures, accounting and hashes of the original local artifacts.
+
+The admitted request is exactly **`deepseek` / `https://api.deepseek.com/v1/chat/completions` / `deepseek-v4-flash`**. The provider returned `deepseek-flash` for all 320 requests, including the probe. This measures the forwarded V4.1 Flash service using the approved request name; it does not establish quality for the retired V4 model or admit `deepseek-flash` as a request alias. Other models, providers and custom endpoints remain pending.
+
+| Formal-arm measurement | Browser tools | Old full prompt + shared static repair |
+|---|---:|---:|
+| First / final passes | 51/51 / 51/51 | 47/51 / 47/51 |
+| Source behavior passes | 48/48 | 47/48 |
+| Correct capability gaps | 3/3 | 0/3 |
+| Static repairs | 0 | 0 |
+| Model POSTs | 262 | 51 |
+| Input / output tokens | 3,897,004 / 217,895 | 544,155 / 92,494 |
+| Median / P95 active time | 16.996 s / 52.386 s | 5.681 s / 28.501 s |
+| Estimated cost | $0.537417312 | $0.117316506 |
+
+The control failed one M1 output-format check and all three capability-gap checks. The new arm passed the quality gate, with higher cost and latency in this finite, open-book matrix. No Session assertion failures were used as repair hints, no failed slots were replaced, and no attempt received extra allowance. Registering the evidence and exact admission tuple does not change the frozen generation behavior.
+
+The separate real-browser probe passed in seven POSTs with zero repairs, costing an estimated $0.016364340. All 320 requests had known usage. The browser verified 651 earlier assistant-message and complete-tool-group comparisons respectively, preserving the observed `reasoning_content` field without persisting its body. Each of the 52 new-arm attempts, including the probe, resolved current main independently; all saw `759e83f5bc254762af862b20fdf050089aea2d24`. Only the model endpoint received the LLM credential; GitHub and game API requests did not.
+
+The complete effort used 860 model requests across probes, failed batches, diagnostics and controls: **$1.724674170 estimated known cost + $0.061229100 still reserved for one earlier unknown-usage call = $1.785903270 of the $5 limit**. The remaining reservation budget is $3.214096730. These are conservative peak-rate estimates, not invoices. Earlier failures remain in the evidence history and local artifacts; the ledger was not reset.
 
 ### Control and behavior checks
 

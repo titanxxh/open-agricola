@@ -429,7 +429,7 @@ describe('AiCardDesigner AI config header', () => {
     await userEvent.click(screen.getByRole('button', { name: /卡牌能力\s*对话、源码与验证/ }))
     await userEvent.type(screen.getByPlaceholderText('描述你想要的卡牌效果…'), 'Gain food')
     expect(screen.getByRole('button', { name: '生成能力候选' })).toBeDisabled()
-    expect(screen.getByText(/模型正在等待工具与卡牌行为验收/)).toBeInTheDocument()
+    expect(screen.getByText('当前模型或接口尚未通过工具与卡牌行为验收，请换用已验收的组合。')).toBeInTheDocument()
     expect(provider.mock.calls.some(([url]) => String(url).includes('chat/completions'))).toBe(false)
   })
 

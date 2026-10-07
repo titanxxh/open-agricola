@@ -84,9 +84,24 @@ describe('browser model protocol', () => {
     await expect(pending).rejects.toMatchObject({ kind: 'cancelled', usage: { inputTokens: null, outputTokens: null } })
   })
 
-  it('checks admission against the actual custom endpoint and cannot use pending aliases', () => {
+  it('sends the admitted request identity even when the provider returns a different model name', async () => {
+    const fetchModel = vi.fn<typeof fetch>().mockResolvedValue(stream([
+      { model: 'deepseek-flash', choices: [{ index: 0, delta: { content: 'complete source' }, finish_reason: 'stop' }] },
+    ]))
+    const transport = createToolTransport({ provider: 'deepseek', model: 'deepseek-v4-flash', apiKey: 'browser-only-test-key' }, { fetch: fetchModel })
+    const result = await transport.complete([{ role: 'user', content: 'Generate a card' }], REFERENCE_TOOLS, signal())
+    expect(result.returnedModel).toBe('deepseek-flash')
+    expect(fetchModel).toHaveBeenCalledTimes(1)
+    const [url, init] = fetchModel.mock.calls[0]
+    expect(url).toBe('https://api.deepseek.com/v1/chat/completions')
+    expect(JSON.parse(String(init?.body)).model).toBe('deepseek-v4-flash')
+  })
+
+  it('checks admission against the actual custom endpoint, provider and exact model', () => {
     expect(() => createToolTransport({ provider: 'deepseek', model: 'deepseek-v4-flash', apiKey: 'test', baseUrl: 'https://example.com/v1' })).toThrow('awaiting')
     expect(() => createToolTransport({ provider: 'deepseek', model: 'deepseek-flash', apiKey: 'test' })).toThrow('awaiting')
+    expect(() => createToolTransport({ provider: 'deepseek', model: 'deepseek-v4-pro', apiKey: 'test' })).toThrow('awaiting')
+    expect(() => createToolTransport({ provider: 'openrouter', model: 'deepseek-v4-flash', apiKey: 'test', baseUrl: 'https://api.deepseek.com/v1' })).toThrow('awaiting')
   })
 
   it('does not send a request that fails its cost reservation', async () => {
