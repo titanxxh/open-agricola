@@ -812,9 +812,15 @@ export function generateCardSourceFile(
   const metaFile = ts.createSourceFile('meta.ts',`const meta = ${cardMetaSource}`,ts.ScriptTarget.ES2022,true,ts.ScriptKind.TS)
   const needsCardId = [...implFile.statements,...metaFile.statements].some(stmt => referencedNames(stmt).has('CARD_ID'))
   const declaration = findTopLevelConst(implFile,'CARD_ID')
+  const withoutCardId = implFile.statements.flatMap(stmt => {
+    if (stmt !== declaration) return [stmt]
+    const remaining = declaration.declarationList.declarations.filter(item => !ts.isIdentifier(item.name) || item.name.text !== 'CARD_ID')
+    return remaining.length ? [ts.factory.updateVariableStatement(declaration,declaration.modifiers,
+      ts.factory.updateVariableDeclarationList(declaration.declarationList,remaining))] : []
+  })
   const cardImplWithId = needsCardId
     ? declaration ? cardImplSource : `const CARD_ID = '${wcard.card_id}'\n${cardImplSource}`
-    : printStatements(implFile,implFile.statements.filter(stmt => stmt !== declaration))
+    : printStatements(implFile,withoutCardId)
   const factory = cardSourceFactory(wcard.card_type)
 
   // Scan the emitted impl, not the raw sandbox source: helpers that were
