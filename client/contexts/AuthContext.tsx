@@ -6,6 +6,7 @@ export type AuthUser = {
   id: string
   username: string
   displayName: string
+  displayNameIsDefault?: boolean
   isAdmin?: boolean
 }
 
@@ -50,7 +51,7 @@ function devShortcutUserFromLocation(): AuthUser | null {
   const devPlayer = params.get('player')
   if (!devAuthShortcutsEnabled() || !devPlayer || !isDevModeAllowedFromQuery(window.location.search)) return null
   const displayName = devPlayer === 'p1' ? 'Player 1' : devPlayer === 'p2' ? 'Player 2' : devPlayer
-  return { id: devPlayer, username: devPlayer, displayName }
+  return { id: devPlayer, username: devPlayer, displayName, displayNameIsDefault: true }
 }
 
 async function authFetch(path: string, body: Record<string, unknown>, retries = 2) {

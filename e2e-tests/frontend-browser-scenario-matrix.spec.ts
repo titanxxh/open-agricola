@@ -221,8 +221,10 @@ const openFixedRoom = async (
 }
 
 const resetFixedRoom = async (page: Page, seed: number) => {
+  const previousRoomId = new URL(page.url()).searchParams.get('room')
   await page.locator('.dev-panel .seed-input input').fill(String(seed))
   await page.getByRole('button', { name: /Reset|重开/ }).click()
+  await expect.poll(() => new URL(page.url()).searchParams.get('room')).not.toBe(previousRoomId)
   await expect(page.locator('[data-action-id="farmland"] button').first()).toBeEnabled()
 }
 
