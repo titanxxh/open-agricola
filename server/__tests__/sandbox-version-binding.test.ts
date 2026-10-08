@@ -142,6 +142,27 @@ describe('sandbox version binding', () => {
       }],
     })
 
+    const started = JSON.parse(startRes.body)
+    expect(started.gameInstanceId).toEqual(expect.any(String))
+    const readRes = mockRes()
+    await handleGameRoute(mockReq('GET', '/api/game/state', {}, 'sandbox-token'), readRes)
+    expect(JSON.parse(readRes.body).gameInstanceId).toBe(started.gameInstanceId)
+
+    const invalidLoadRes = mockRes()
+    await handleGameRoute(mockReq('POST', '/api/game/load', {}, 'sandbox-token'), invalidLoadRes)
+    expect(invalidLoadRes.statusCode).toBe(400)
+    const afterInvalidLoad = mockRes()
+    await handleGameRoute(mockReq('GET', '/api/game/state', {}, 'sandbox-token'), afterInvalidLoad)
+    expect(JSON.parse(afterInvalidLoad.body).gameInstanceId).toBe(started.gameInstanceId)
+
+    const loadRes = mockRes()
+    await handleGameRoute(mockReq('POST', '/api/game/load', { state: started.state }, 'sandbox-token'), loadRes)
+    const loaded = JSON.parse(loadRes.body)
+    expect(loaded.ok).toBe(true)
+    expect(loaded.gameInstanceId).toEqual(expect.any(String))
+    expect(loaded.gameInstanceId).not.toBe(started.gameInstanceId)
+    expect(loaded.state.gameSeed).toBe(started.state.gameSeed)
+
     const drawRes = mockRes()
     await handleGameRoute(mockReq('POST', '/api/game/dev/draw-card', {
       playerIndex: 0,
@@ -155,6 +176,13 @@ describe('sandbox version binding', () => {
       customCardIds: [original.id],
     }, 'sandbox-token'), defaultStartRes)
     expect(defaultStartRes.statusCode).toBe(200)
+    const restarted = JSON.parse(defaultStartRes.body)
+    expect(restarted.gameInstanceId).not.toBe(started.gameInstanceId)
+    expect(restarted.gameInstanceId).not.toBe(loaded.gameInstanceId)
+    expect(restarted.state.gameSeed).toBe(started.state.gameSeed)
+    const restartedReadRes = mockRes()
+    await handleGameRoute(mockReq('GET', '/api/game/state', {}, 'sandbox-token'), restartedReadRes)
+    expect(JSON.parse(restartedReadRes.body).gameInstanceId).toBe(restarted.gameInstanceId)
     expect(JSON.parse(defaultStartRes.body)).toMatchObject({
       ok: true,
       customCardsLoaded: 1,

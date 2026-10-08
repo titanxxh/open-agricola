@@ -278,7 +278,7 @@ type GameSyncPayload = {
 }
 ```
 
-**广播 vs 单播**：`stateUpdate` / `roomWaiting` / `gameStarted` / `playerJoined` / `playerDisconnected` / `roomDissolved` 广播；`roomCreated` / `roomJoined` / `authOk` / 请求级 `error` 单播。WS 广播会按连接对应的 `viewerPlayerId` 构造 per-viewer payload：目标玩家收到真实私有 prompt 和 `privateEvents`，其他玩家收到 `private-prompt` redaction。HTTP sandbox 默认无 `X-Viewer-Player` 时保持未过滤多座位开发流；带 `X-Viewer-Player` 时使用同一套 viewer 过滤和 seat guard。`cardWarnings` 只进入 HTTP debug/sandbox payload，用于把该局运行期自定义卡异常送回工坊确认门禁，不向 WS viewer 广播。
+**广播 vs 单播**：`stateUpdate` / `roomWaiting` / `gameStarted` / `playerJoined` / `playerDisconnected` / `roomDissolved` 广播；`roomCreated` / `roomJoined` / `authOk` / 请求级 `error` 单播。WS 广播会按连接对应的 `viewerPlayerId` 构造 per-viewer payload：目标玩家收到真实私有 prompt 和 `privateEvents`，其他玩家收到 `private-prompt` redaction。HTTP sandbox 默认无 `X-Viewer-Player` 时保持未过滤多座位开发流；带 `X-Viewer-Player` 时使用同一套 viewer 过滤和 seat guard。`cardWarnings` 只进入 HTTP debug/sandbox payload，用于把该局运行期自定义卡异常送回工坊确认门禁，不向 WS viewer 广播。 HTTP 游戏响应另带 `gameInstanceId`：它由服务端生成、绑定实际会话实例，并在成功载入状态后轮换。工坊试玩确认比较此标识，因为同一个游戏 seed 可以重用；该标识不承担鉴权，也不进入模型输入。
 
 托管写命令携带 `commandContext`：绑定已认证用户的服务端 scope、稳定 command ID、原 Room ID 与预期提交版本。draft / parent 同时提交还携带该阶段共享、不可 undo 的输入窗口 ID。`requestId` 仅关联单次传输。路由先查询持久回执，再检查输入是否过期；同一身份内容变化时拒绝，结果与 Room / 生命周期写入在同一事务提交。回执只保存结果身份与 Hash，不复制另一份 Frame，且仅对原用户可见。scope 过期或清理后不能当作新操作执行。
 

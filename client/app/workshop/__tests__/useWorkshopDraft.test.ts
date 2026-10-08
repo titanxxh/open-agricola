@@ -1072,6 +1072,41 @@ describe('useWorkshopDraft', () => {
       })
   })
 
+  it.each(['switch', 'unmount', 'edit'] as const)('keeps a delayed sandbox confirmation with its original workspace and draft (%s)', async change => {
+    let release: ((response: Response) => void) | undefined
+    const apiFetch = vi.fn(async (path: string, init?: RequestInit) => {
+      if (!init) return new Response(JSON.stringify({ ok: true, workspace: {
+        ...workspace(1, path.includes('card-2') ? 'Card B' : 'Card A'),
+        id: path.includes('card-2') ? 'card-2' : 'card-1',
+      } }))
+      return new Promise<Response>(resolve => { release = resolve })
+    })
+    const view = renderHook(({ cardId }) => useWorkshopDraft({ cardId, apiFetch }), { initialProps: { cardId: 'card-1' } })
+    await waitFor(() => expect(view.result.current.state?.workspaceId).toBe('card-1'))
+    let confirmation: Promise<boolean>
+    act(() => { confirmation = view.result.current.confirmSandboxPass('version-A') })
+    await waitFor(() => expect(release).toBeTypeOf('function'))
+    if (change === 'switch') {
+      view.rerender({ cardId: 'card-2' })
+      await waitFor(() => expect(view.result.current.state?.workspaceId).toBe('card-2'))
+    } else if (change === 'unmount') view.unmount()
+    else act(() => view.result.current.updateDraft({ ...view.result.current.state!.draft, name: 'Typed after confirmation' }))
+    const recoveryBefore = localStorage.getItem(workshopDraftStorageKey('card-1'))
+    await act(async () => {
+      release!(new Response(JSON.stringify({ ok: true, workspace: {
+        ...workspace(1, 'Card A'), sandboxPassVersionId: 'version-A', sandboxPassedAt: 100,
+      } })))
+      expect(await confirmation!).toBe(false)
+    })
+    if (change === 'switch') expect(view.result.current.state?.workspaceId).toBe('card-2')
+    else if (change === 'edit') {
+      expect(view.result.current.state?.draft.name).toBe('Typed after confirmation')
+      expect(view.result.current.state?.save.status).toBe('dirty')
+      expect(view.result.current.state?.sandboxPassVersionId).toBeNull()
+    }
+    if (change !== 'edit') expect(localStorage.getItem(workshopDraftStorageKey('card-1'))).toBe(recoveryBefore)
+  })
+
   it('preserves edits made while a publish request is in flight', async () => {
     let finishPublish: ((response: Response) => void) | undefined
     const apiFetch = vi.fn(async (_path: string, init?: RequestInit) => {

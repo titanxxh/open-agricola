@@ -136,6 +136,8 @@ export const useWorkshopDraft = ({
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const stateRef = useRef<WorkshopDraftState | null>(null)
+  const workspaceOwnerRef = useRef({ cardId, lifetime: 0 })
+  workspaceOwnerRef.current.cardId = cardId
   const saveRequestRef = useRef<{
     promise: Promise<boolean>
     baseRevision: number
@@ -195,6 +197,7 @@ export const useWorkshopDraft = ({
       })
     return () => {
       cancelled = true
+      workspaceOwnerRef.current.lifetime += 1
     }
   }, [apiFetch, cardId, dispatch, storageKey])
 
@@ -698,7 +701,11 @@ export const useWorkshopDraft = ({
     runtimeErrors: string[] = [],
   ): Promise<boolean> => {
     const current = stateRef.current
-    if (!current || current.save.status === 'conflict') return false
+    if (!current || current.workspaceId !== cardId || current.save.status === 'conflict') return false
+    const lifetime = workspaceOwnerRef.current.lifetime
+    const stillOwned = () => workspaceOwnerRef.current.cardId === cardId
+      && workspaceOwnerRef.current.lifetime === lifetime
+      && stateRef.current?.workspaceId === cardId
     dispatch({ type: 'saving' })
     try {
       const response = await apiFetch(
@@ -714,6 +721,7 @@ export const useWorkshopDraft = ({
         },
       )
       const payload = await response.json() as WorkspaceResponse
+      if (!stillOwned()) return false
       if (!response.ok || !payload.workspace) {
         dispatch({
           type: 'saveFailed',
@@ -722,14 +730,26 @@ export const useWorkshopDraft = ({
         })
         return false
       }
-      const confirmed = workshopDraftReducer(current, {
+      const latest = stateRef.current!
+      if (payload.workspace.id !== cardId) throw new Error('Sandbox confirmation belongs to a different workspace')
+      if (payload.workspace.revision < latest.baseRevision) return false
+      const applied = workshopDraftReducer(latest, {
         type: 'checkpointSaved',
         workspace: payload.workspace,
       })
+      const changed = current.save.status !== 'saved' || latest.draft !== current.draft
+      const confirmed = changed ? {
+        ...applied,
+        draft: latest.draft,
+        sandboxPassVersionId: latest.sandboxPassVersionId,
+        sandboxPassedAt: latest.sandboxPassedAt,
+        save: { status: 'dirty' as const },
+      } : applied
       dispatch({ type: 'serverLoaded', state: confirmed })
       persist(confirmed)
-      return true
+      return !changed
     } catch (reason) {
+      if (!stillOwned()) return false
       dispatch({
         type: 'saveFailed',
         status: 'offline',
