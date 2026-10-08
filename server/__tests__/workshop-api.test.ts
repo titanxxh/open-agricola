@@ -6,6 +6,7 @@ import { seedResourceCatalog } from './_helpers/objects'
  */
 import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest'
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import { EventEmitter } from 'node:events'
 import { createTestDatabase } from './_helpers/postgres'
 import {
   approveCurrentDraft,
@@ -75,6 +76,7 @@ function mockRes(): ServerResponse & { statusCode: number; body: string } {
   let statusCode = 200
   let body = ''
   const headers: Record<string, string> = {}
+  const events = new EventEmitter()
   return {
     get statusCode() { return statusCode },
     set statusCode(v) { statusCode = v },
@@ -85,6 +87,10 @@ function mockRes(): ServerResponse & { statusCode: number; body: string } {
     },
     end(data?: string) { body = data ?? '' },
     getHeader: (k: string) => headers[k],
+    setHeader: (k: string, value: string) => { headers[k] = value },
+    once: events.once.bind(events),
+    off: events.off.bind(events),
+    emit: events.emit.bind(events),
   } as unknown as ServerResponse & { statusCode: number; body: string }
 }
 
@@ -116,6 +122,151 @@ let nextReviewPrNumber = 1
 beforeAll(async () => {
   const mod = await import('../workshop.ts')
   handleWorkshopRoute = (req, res) => mod.handleWorkshopRoute(req, res, reviewRuntime)
+})
+
+it('serves fresh public reference metadata with the project credential, never the caller credential', async () => {
+  vi.stubEnv('WORKSHOP_REFERENCE_GITHUB_TOKEN', 'project-reference-secret')
+  const upstream = vi.fn<typeof fetch>()
+    .mockResolvedValueOnce(Response.json({ object: { sha: 'a'.repeat(40) }, token: 'must-not-leak' }))
+    .mockResolvedValueOnce(Response.json({ object: { sha: 'b'.repeat(40) } }))
+  vi.stubGlobal('fetch', upstream)
+  try {
+    const denied = mockRes()
+    await handleWorkshopRoute(mockReq('GET', '/api/workshop/references/main'), denied)
+    expect(denied.statusCode).toBe(401)
+    expect(upstream).not.toHaveBeenCalled()
+    for (const sha of ['a'.repeat(40), 'b'.repeat(40)]) {
+      const response = mockRes()
+      await handleWorkshopRoute(mockReq('GET', '/api/workshop/references/main', null, 'tok-alice'), response)
+      expect(response.statusCode).toBe(200)
+      expect(JSON.parse(response.body)).toEqual({ object: { sha } })
+      expect(response.getHeader('Cache-Control')).toBe('no-store')
+    }
+    expect(upstream).toHaveBeenCalledTimes(2)
+    for (const [url, init] of upstream.mock.calls) {
+      expect(url).toBe('https://api.github.com/repos/titanxxh/open-agricola/git/ref/heads/main')
+      expect(init).toMatchObject({ method: 'GET', redirect: 'error', cache: 'no-store' })
+      expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer project-reference-secret')
+      expect(JSON.stringify(init)).not.toContain('tok-alice')
+    }
+  } finally { vi.unstubAllEnvs(); vi.unstubAllGlobals() }
+})
+
+it('pins and caches complete tree metadata, rejects arbitrary targets and strips upstream fields', async () => {
+  vi.stubEnv('WORKSHOP_REFERENCE_GITHUB_TOKEN', 'project-reference-secret')
+  const sha = 'c'.repeat(40)
+  const blob = { path: 'docs/CUSTOM_CARD_SANDBOX.md', type: 'blob', sha: 'd'.repeat(40), size: 12 }
+  const upstream = vi.fn<typeof fetch>().mockResolvedValue(Response.json({ tree: [{ ...blob, url: 'https://untrusted.example', token: 'do-not-forward' }], truncated: false, secret: 'do-not-forward' }))
+  vi.stubGlobal('fetch', upstream)
+  try {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const response = mockRes()
+      await handleWorkshopRoute(mockReq('GET', `/api/workshop/references/tree/${sha}`, null, 'tok-alice'), response)
+      expect(response.statusCode).toBe(200)
+      expect(JSON.parse(response.body)).toEqual({ tree: [blob], truncated: false })
+    }
+    for (const target of ['tree/main', 'tree/../../private', 'https://example.com', 'main?repo=private/repo']) {
+      const response = mockRes()
+      await handleWorkshopRoute(mockReq('GET', `/api/workshop/references/${target}`, null, 'tok-alice'), response)
+      expect(response.statusCode).toBe(400)
+    }
+    expect(upstream).toHaveBeenCalledTimes(1)
+    expect(upstream.mock.calls[0][0]).toBe(`https://api.github.com/repos/titanxxh/open-agricola/git/trees/${sha}?recursive=1`)
+  } finally { vi.unstubAllEnvs(); vi.unstubAllGlobals() }
+})
+
+it('pauses reference reads for GitHub rate limits without exposing upstream errors or making repeated calls', async () => {
+  vi.stubEnv('WORKSHOP_REFERENCE_GITHUB_TOKEN', 'project-reference-secret')
+  const upstream = vi.fn<typeof fetch>().mockResolvedValue(new Response('project-reference-secret upstream body', { status: 429, headers: { 'Retry-After': '120' } }))
+  vi.stubGlobal('fetch', upstream)
+  const now = Date.now()
+  const clock = vi.spyOn(Date, 'now').mockReturnValue(now)
+  try {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const response = mockRes()
+      await handleWorkshopRoute(mockReq('GET', '/api/workshop/references/main', null, 'tok-alice'), response)
+      expect(response.statusCode).toBe(429)
+      expect(response.getHeader('Retry-After')).toBe('120')
+      expect(response.body).not.toMatch(/secret|upstream body/)
+    }
+    expect(upstream).toHaveBeenCalledTimes(1)
+    clock.mockReturnValue(now + 121_000)
+    upstream.mockResolvedValueOnce(Response.json({ object: { sha: 'f'.repeat(40) } }))
+    const recovered = mockRes()
+    await handleWorkshopRoute(mockReq('GET', '/api/workshop/references/main', null, 'tok-alice'), recovered)
+    expect(recovered.statusCode).toBe(200)
+    expect(upstream).toHaveBeenCalledTimes(2)
+  } finally { clock.mockRestore(); vi.unstubAllEnvs(); vi.unstubAllGlobals() }
+})
+
+it('bounds simultaneous reference requests across users before contacting GitHub', async () => {
+  vi.stubEnv('WORKSHOP_REFERENCE_GITHUB_TOKEN', 'project-reference-secret')
+  const gate = Promise.withResolvers<void>()
+  const upstream = vi.fn<typeof fetch>().mockImplementation(async () => { await gate.promise; return Response.json({ object: { sha: 'a'.repeat(40) } }) })
+  vi.stubGlobal('fetch', upstream)
+  const pending = Array.from({ length: 3 }, () => handleWorkshopRoute(mockReq('GET', '/api/workshop/references/main', null, 'tok-alice'), mockRes()))
+  try {
+    await vi.waitFor(() => expect(upstream).toHaveBeenCalledTimes(3))
+    const response = mockRes()
+    const fourth = handleWorkshopRoute(mockReq('GET', '/api/workshop/references/main', null, 'tok-bob'), response)
+    await vi.waitFor(() => expect(response.statusCode).toBe(429))
+    expect(response.getHeader('Retry-After')).toBe('1')
+    expect(upstream).toHaveBeenCalledTimes(3)
+    await fourth
+  } finally { gate.resolve(); await Promise.all(pending); vi.unstubAllEnvs(); vi.unstubAllGlobals() }
+})
+
+it('rejects incomplete, oversized and malformed reference responses without leaking upstream data', async () => {
+  vi.stubEnv('WORKSHOP_REFERENCE_GITHUB_TOKEN', 'project-reference-secret')
+  const upstream = vi.fn<typeof fetch>()
+    .mockResolvedValueOnce(Response.json({ tree: [], truncated: true }))
+    .mockResolvedValueOnce(new Response('project-reference-secret'.repeat(7000)))
+    .mockResolvedValueOnce(Response.json({ object: { sha: 'invalid' } }))
+    .mockRejectedValueOnce(new Error('project-reference-secret in transport error'))
+  vi.stubGlobal('fetch', upstream)
+  try {
+    for (const target of [`tree/${'9'.repeat(40)}`, 'main', 'main', 'main']) {
+      const response = mockRes()
+      await handleWorkshopRoute(mockReq('GET', `/api/workshop/references/${target}`, null, 'tok-alice'), response)
+      expect(response.statusCode).toBe(503)
+      expect(JSON.parse(response.body)).toEqual({ ok: false, error: 'GitHub reference metadata is unavailable.' })
+    }
+  } finally { vi.unstubAllEnvs(); vi.unstubAllGlobals() }
+})
+
+it('cancels an upstream reference read when the browser disconnects', async () => {
+  vi.stubEnv('WORKSHOP_REFERENCE_GITHUB_TOKEN', 'project-reference-secret')
+  let aborted = false
+  const upstream = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
+    const signal = init?.signal
+    if (!signal) throw new Error('Missing request signal')
+    await new Promise<void>((_resolve, reject) => signal.addEventListener('abort', () => { aborted = true; reject(new Error('cancelled')) }, { once: true }))
+    return Response.json({})
+  })
+  vi.stubGlobal('fetch', upstream)
+  try {
+    const response = mockRes()
+    const request = handleWorkshopRoute(mockReq('GET', '/api/workshop/references/main', null, 'tok-alice'), response)
+    await vi.waitFor(() => expect(upstream).toHaveBeenCalledTimes(1))
+    Object.defineProperty(response, 'destroyed', { value: true })
+    response.emit('close')
+    await request
+    expect(aborted).toBe(true)
+    expect(response.body).toBe('')
+  } finally { vi.unstubAllEnvs(); vi.unstubAllGlobals() }
+})
+
+it('requires a project GitHub identity instead of falling back to anonymous metadata', async () => {
+  vi.stubEnv('WORKSHOP_REFERENCE_GITHUB_TOKEN', '')
+  vi.stubEnv('WORKSHOP_REVIEW_GITHUB_PRIVATE_KEY', '')
+  const upstream = vi.fn<typeof fetch>()
+  vi.stubGlobal('fetch', upstream)
+  try {
+    const response = mockRes()
+    await handleWorkshopRoute(mockReq('GET', '/api/workshop/references/main', null, 'tok-alice'), response)
+    expect(response.statusCode).toBe(503)
+    expect(upstream).not.toHaveBeenCalled()
+  } finally { vi.unstubAllEnvs(); vi.unstubAllGlobals() }
 })
 
 const approveForPublish = async (

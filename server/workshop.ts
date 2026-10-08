@@ -7,6 +7,7 @@ import { nanoid } from 'nanoid'
 import { handleSubmitReviewRequest, handleRefreshPrStatus } from './workshop-pr/propose-handler.ts'
 import { corsHeaders } from './http-origin.ts'
 import { getWorkshopSandboxContract } from './workshop-sandbox-contract.ts'
+import { readWorkshopReference, WorkshopReferenceError } from './workshop-references.ts'
 import { projectGenerationProvenance, sourceFingerprint } from '../shared/projections/workshop-generation.ts'
 import {
   WorkshopDraftError,
@@ -366,6 +367,25 @@ export async function handleWorkshopRoute(
   const token = extractToken(req.headers.authorization)
   const user = (await validateSession(token))
   const db = getDb()
+
+  if (url.startsWith('/api/workshop/references/')) {
+    res.setHeader('Cache-Control', 'no-store')
+    res.setHeader('Access-Control-Expose-Headers', 'Retry-After')
+    if (!user) { sendJson(res, 401, { ok: false, error: 'Not authenticated' }); return true }
+    if (req.method !== 'GET' || url !== routeUrl.pathname) { sendJson(res, 400, { ok: false, error: 'Invalid reference request' }); return true }
+    const controller = new AbortController()
+    const disconnect = () => controller.abort()
+    res.once('close', disconnect)
+    try {
+      const data = await readWorkshopReference(routeUrl.pathname.slice('/api/workshop/references/'.length), controller.signal)
+      sendJson(res, 200, data)
+    } catch (error) {
+      const failure = error instanceof WorkshopReferenceError ? error : new WorkshopReferenceError(503, 'GitHub reference metadata is unavailable.')
+      if (failure.retryAfter) res.setHeader('Retry-After', String(failure.retryAfter))
+      if (!res.destroyed) sendJson(res, failure.status, { ok: false, error: failure.message })
+    } finally { res.off('close', disconnect) }
+    return true
+  }
 
   const submitReviewMatch = /^\/api\/workshop\/cards\/([^/]+)\/submit-review$/.exec(url)
   if ((req.method === 'POST' || req.method === 'GET') && submitReviewMatch) {

@@ -19,7 +19,7 @@ for (const locale of ['zh', 'en'] as const) test(`editor candidate recovery and 
   if (!cookie) throw new Error('No local test session')
   await page.context().addCookies([{ name: 'oa_session', value: cookie, url: FRONTEND_URL }])
   // Exercise the shipped admission entry; only provider/reference responses are controlled.
-  await page.route('https://api.github.com/**', route => route.fulfill({ json: route.request().url().includes('/git/ref/') ? { object: { sha: referenceCommit } } : { truncated: false, tree: [] } }))
+  await page.route('**/api/workshop/references/**', route => route.fulfill({ json: route.request().url().endsWith('/main') ? { object: { sha: referenceCommit } } : { truncated: false, tree: [] } }))
   await page.goto(FRONTEND_URL)
   const cardId = `CUSTOM_Editor_${locale}_${Date.now()}`
   const name = 'Editor Tool Test'
@@ -116,7 +116,7 @@ test('browser tools preserve protocol through the final response slot and author
   page.on('request', req => {
     destinations.push({ url: req.url(), containsModelKey: JSON.stringify(req.headers()).includes(modelKey) || (req.postData() ?? '').includes(modelKey) })
   })
-  await page.route('https://api.github.com/**', route => route.fulfill({ json: route.request().url().includes('/git/ref/')
+  await page.route('**/api/workshop/references/**', route => route.fulfill({ json: route.request().url().endsWith('/main')
     ? { object: { sha: referenceCommit } }
     : { truncated: false, tree: [{ path: referencePath, type: 'blob', sha: blob, size: Buffer.byteLength(referenceBody) }] }, headers: { 'Access-Control-Allow-Origin': '*' } }))
   await page.route('https://raw.githubusercontent.com/**', route => route.fulfill({ body: referenceBody, contentType: 'text/plain', headers: { 'Access-Control-Allow-Origin': '*' } }))
@@ -175,8 +175,14 @@ test('browser tools preserve protocol through the final response slot and author
   expect(destinations.some(item => item.url.includes('/api/workshop/cards/validate-code'))).toBe(true)
 })
 
-test('anonymous GitHub references work from the real browser origin', async ({ page }) => {
+test('project metadata and anonymous GitHub source work from the real browser origin', async ({ page }) => {
   test.skip(process.env.RUN_GITHUB_REFERENCE_PROBE !== '1', 'Explicit network probe; deterministic CI uses the controlled round-trip above.')
+  const user = await createLocalUserForTests(`reference_${Date.now().toString(36)}`, 'reference-test-password')
+  const cookie = await createSession(user.id)
+  if (!cookie) throw new Error('No reference test session')
+  await page.context().addCookies([{ name: 'oa_session', value: cookie, url: FRONTEND_URL }])
+  const destinations: Array<{ url: string; authorization?: string }> = []
+  page.on('request', request => { destinations.push({ url: request.url(), authorization: request.headers().authorization }) })
   await page.goto(FRONTEND_URL)
   const evidence = await page.evaluate(async () => {
     const modulePath = '/client/services/llm/generation/references.ts'
@@ -190,5 +196,10 @@ test('anonymous GitHub references work from the real browser origin', async ({ p
   expect(evidence.path).toBe('docs/CUSTOM_CARD_SANDBOX.md')
   expect(evidence.text.length).toBeGreaterThan(20)
   expect(evidence.url).toContain(`/blob/${evidence.commit}/`)
+  expect(destinations.some(item => item.url.endsWith('/api/workshop/references/main'))).toBe(true)
+  expect(destinations.filter(item => item.url.startsWith('https://api.github.com/'))).toHaveLength(0)
+  const rawRequests = destinations.filter(item => item.url.startsWith('https://raw.githubusercontent.com/'))
+  expect(rawRequests.length).toBeGreaterThan(0)
+  expect(rawRequests.every(item => !item.authorization)).toBe(true)
   console.log(JSON.stringify({ githubBrowserProbe: 'passed', commit: evidence.commit, path: evidence.path }))
 })

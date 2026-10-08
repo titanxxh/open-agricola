@@ -142,7 +142,7 @@ OpenRouter 不在 provider 级别声明 `chat` / `image` 兜底能力；每个�
 
 生产编辑器使用 `client/services/llm/generation/` 中的浏览器循环；原有纯文本能力生成路径已移除。上方模型表列出的是现有 UI 注册项，不代表已经通过工具调用验收的组合。
 
-**Generation Attempt（生成尝试）**包含资料查询、模型回答和有界修复。暂停后继续沿用其模型配置、资料 commit 和累计统计；取消时不能把半截输出当作完成候选。每次新尝试解析 GitHub 最新 `main`，并将该次资料读取固定到这个 commit。参考资料独立于站点发布，生成的可执行代码仍须遵守实际 Custom Code Sandbox 的能力限制。LLM 凭据仍只由浏览器发送给模型服务。
+**Generation Attempt（生成尝试）**包含资料查询、模型回答和有界修复。暂停后继续沿用其模型配置、资料 commit 和累计统计；取消时不能把半截输出当作完成候选。每次新尝试解析 GitHub 最新 `main`，并将该次资料读取固定到这个 commit。参考资料独立于站点发布，生成的可执行代码仍须遵守实际 Custom Code Sandbox 的能力限制。LLM 凭据仍只由浏览器发送给模型服务。已登录浏览器通过 `GET /api/workshop/references/main` 和 `GET /api/workshop/references/tree/:sha` 读取 main 与固定版本的目录。后端使用项目自己的 GitHub 只读凭据，固定仓库与操作、限制响应大小，并只返回 commit/目录字段；不接收模型凭据、不执行模型循环。源码正文仍由浏览器匿名请求 `raw.githubusercontent.com`，并按目录中的 blob 哈希验证，不随站点发布。main 不缓存，也不以旧版本兜底；项目凭据缺失、GitHub 元数据不可达或目录不完整时暂停生成。
 
 循环初始允许 8 次模型请求、24 次资料调用和 5 分钟活跃时间；显式继续增加同等额度，不重置计数或资料 commit。模型 POST 同时最多 1 个，资料读取并发最多 3 个，资料临时 HTTP 故障最多重试 2 次，静态代码修复最多 2 次。意外 EOF、截断、provider 错误和取消不会完成半截源码。模型 POST 失败后暂停等待显式重试；校验服务故障只重试校验，不调用模型修复。推理与签名只留在当前页面的协议历史中。流式限制分别计算累计 SSE 传输的 32 MiB、单个事件的 2 MiB 和解码后消息的 2 MiB，避免重复帧元数据提前截断允许的 16,384 token 响应。
 

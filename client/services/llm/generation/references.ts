@@ -4,7 +4,7 @@ import type { GenerationReference } from '../../../../shared/contract/workshop-g
 import type { ToolCall, ToolDefinition } from './protocol'
 
 export const REFERENCE_REPOSITORY = 'titanxxh/open-agricola'
-export const REFERENCE_TOOL_VERSION = 'github-text-v3'
+export const REFERENCE_TOOL_VERSION = 'github-text-v4'
 export const REFERENCE_LIMITS = Object.freeze({ fileBytes: 256 * 1024, readLines: 160, resultBytes: 16 * 1024, searchHits: 40, httpRetries: 2, concurrency: 3 })
 export const REFERENCE_TOOLS: readonly ToolDefinition[] = [
   { type: 'function', function: {
@@ -21,6 +21,7 @@ export const REFERENCE_TOOLS: readonly ToolDefinition[] = [
 
 type TreeEntry = { path: string; type: string; sha: string; size?: number }
 type CachedFile = { text: string; bytes: number }
+type ReferenceFetch = (url: string, init?: RequestInit) => Promise<Response>
 const cache = new Map<string, CachedFile>()
 let cacheBytes = 0
 const treeCache = new Map<string, TreeEntry[]>()
@@ -78,8 +79,8 @@ const pause = (ms: number, signal: AbortSignal) => new Promise<void>((resolve, r
   signal.addEventListener('abort', abort, { once: true })
 })
 
-/** Anonymous fetch is deliberately constructed from scratch. This port does not
- * accept LlmConfig, request headers, arbitrary URLs or a GitHub credential.
+/** Project-authenticated metadata comes from the Workshop API; pinned source
+ * bodies are anonymous. Neither port accepts LlmConfig or a GitHub credential.
  */
 export class ReferenceSession {
   readonly commit: string
@@ -93,14 +94,14 @@ export class ReferenceSession {
     this.fetchReference = fetchReference
   }
 
-  static async open(signal: AbortSignal, fetchReference: typeof fetch = fetch): Promise<ReferenceSession> {
+  static async open(signal: AbortSignal, fetchReference: typeof fetch = fetch, fetchMetadata: ReferenceFetch = fetchReference): Promise<ReferenceSession> {
     // Never cache branch resolution or silently substitute an older commit.
-    const main = JSON.parse(new TextDecoder().decode(await this.get(fetchReference, `https://api.github.com/repos/${REFERENCE_REPOSITORY}/git/ref/heads/main`, 128 * 1024, signal))) as { object?: { sha?: string } }
+    const main = JSON.parse(new TextDecoder().decode(await this.get(fetchMetadata, '/api/workshop/references/main', 128 * 1024, signal, 'include'))) as { object?: { sha?: string } }
     const commit = main.object?.sha
     if (!commit || !/^[a-f0-9]{40}$/.test(commit)) throw new ReferenceError('Cannot confirm the latest GitHub main commit.', true)
     const cachedTree = treeCache.get(commit)
     if (cachedTree) return new ReferenceSession(commit, cachedTree, fetchReference)
-    const tree = JSON.parse(new TextDecoder().decode(await this.get(fetchReference, `https://api.github.com/repos/${REFERENCE_REPOSITORY}/git/trees/${commit}?recursive=1`, 7 * 1024 * 1024, signal))) as { tree?: TreeEntry[]; truncated?: boolean }
+    const tree = JSON.parse(new TextDecoder().decode(await this.get(fetchMetadata, `/api/workshop/references/tree/${commit}`, 7 * 1024 * 1024, signal, 'include'))) as { tree?: TreeEntry[]; truncated?: boolean }
     if (tree.truncated || !Array.isArray(tree.tree)) throw new ReferenceError('GitHub returned an incomplete repository tree.', true)
     const entries = tree.tree.filter(entry => entry.type === 'blob' && typeof entry.path === 'string' && allowedReferencePath(entry.path) && /^[a-f0-9]{40}$/.test(entry.sha))
     if (treeCache.size >= 4) treeCache.clear()
@@ -108,20 +109,20 @@ export class ReferenceSession {
     return new ReferenceSession(commit, entries, fetchReference)
   }
 
-  private static async get(fetchReference: typeof fetch, url: string, limit: number, signal: AbortSignal): Promise<Uint8Array> {
+  private static async get(fetchReference: ReferenceFetch, url: string, limit: number, signal: AbortSignal, credentials: RequestCredentials = 'omit'): Promise<Uint8Array> {
     for (let attempt = 0; ; attempt += 1) {
       signal.throwIfAborted()
       try {
-        const host = new URL(url).host
+        const host = url.startsWith('/') ? 'workshop-references' : new URL(url).host
         if ((blockedUntil.get(host) ?? 0) > Date.now()) throw new ReferenceError('GitHub rate-limit cooldown is active; retry later.', false)
-        const response = await fetchReference(url, { method: 'GET', credentials: 'omit', redirect: 'error', cache: 'no-store', signal })
+        const response = await fetchReference(url, { method: 'GET', credentials, redirect: 'error', cache: 'no-store', signal })
         if (!response.ok) {
           if (response.status === 403 || response.status === 429) {
             const retryAfter = response.headers.get('retry-after')
             const seconds = retryAfter ? Number(retryAfter) : NaN
             const retryAt = Number.isFinite(seconds) ? Date.now() + seconds * 1000 : retryAfter ? Date.parse(retryAfter) : NaN
             const resetAt = Number(response.headers.get('x-ratelimit-reset')) * 1000
-            blockedUntil.set(host, Math.max(Date.now() + 60_000, Number.isFinite(retryAt) ? retryAt : 0, resetAt || 0))
+            blockedUntil.set(host, Math.max(Date.now() + (url.startsWith('/') ? 1000 : 60_000), Number.isFinite(retryAt) ? retryAt : 0, resetAt || 0))
             throw new ReferenceError(`GitHub rate limit or access denial (HTTP ${response.status}); retry after the cooldown.`, false)
           }
           throw new ReferenceError(`GitHub reference request failed (HTTP ${response.status}).`, response.status >= 500, response.status)
@@ -129,7 +130,7 @@ export class ReferenceSession {
         return await bodyBytes(response, limit, signal)
       } catch (error) {
         signal.throwIfAborted()
-        const failure = error instanceof ReferenceError ? error : new ReferenceError('GitHub is unreachable from this browser.', true)
+        const failure = error instanceof ReferenceError ? error : new ReferenceError('Reference data is unreachable from this browser.', true)
         if (!failure.retryable || attempt >= REFERENCE_LIMITS.httpRetries) throw failure
         await pause(250 * (2 ** attempt), signal)
       }

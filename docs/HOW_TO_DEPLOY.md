@@ -432,6 +432,7 @@ Never set these in production:
 | `WORKSHOP_REVIEW_GITHUB_PRIVATE_KEY` | — | App private key escaped with single-line `\n` |
 | `WORKSHOP_REVIEW_GITHUB_INSTALLATION_ID` | — | App installation ID for the main repository |
 | `WORKSHOP_REVIEW_GITHUB_WEBHOOK_SECRET` | — | HMAC secret for `/api/github/webhook` |
+| `WORKSHOP_REFERENCE_GITHUB_TOKEN` | — | Optional project-owned read credential for public Workshop reference metadata; otherwise use the Workshop App read token. Backend only; never prefix with `VITE_` or supply an LLM key. |
 | `OFFSITE_BACKUP_TARGET` | — | SSH destination for scheduled offsite backups, such as `root@1.2.3.4`; read only by `backup-offsite.sh` |
 | `OFFSITE_BACKUP_REMOTE_DIR` | `/root/open-agricola-backups` | Remote backup directory; read only by `backup-offsite.sh` |
 

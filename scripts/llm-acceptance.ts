@@ -123,7 +123,7 @@ try {
       await route.abort(); return
     }
     if (url.hostname.endsWith('github.com') || url.hostname === 'raw.githubusercontent.com') {
-      if (request.headers().authorization) { fatal = 'GitHub reference requests must be anonymous.'; await route.abort(); return }
+      if (request.headers().authorization) { fatal = 'Browser GitHub source requests must be anonymous.'; await route.abort(); return }
     }
     if (credential || url.hostname.includes('github') || url.pathname.startsWith('/api/workshop/')) {
       const key = `${request.method()} ${url.origin}${url.hostname === '127.0.0.1' || url.hostname === 'localhost' ? url.pathname : ''}`
@@ -154,25 +154,19 @@ try {
   const referencePath = 'docs/CUSTOM_CARD_SANDBOX.md'
   if (!live) {
     const blob = createHash('sha1').update(`blob ${Buffer.byteLength(referenceBody)}\0`).update(referenceBody).digest('hex')
-    await page.route('https://api.github.com/**', route => route.fulfill({ json: route.request().url().includes('/git/ref/') ? { object: { sha: referenceCommit } }
+    await page.route('**/api/workshop/references/**', route => route.fulfill({ json: route.request().url().endsWith('/main') ? { object: { sha: referenceCommit } }
       : { truncated: false, tree: [{ path: referencePath, type: 'blob', sha: blob, size: Buffer.byteLength(referenceBody) }] } }))
     await page.route('https://raw.githubusercontent.com/**', route => route.fulfill({ body: referenceBody, contentType: 'text/plain' }))
   }
   await page.goto(baseUrl.href)
   if (live) {
-    const quota = await page.evaluate(async () => {
-      const response = await fetch('https://api.github.com/rate_limit', { credentials: 'omit', cache: 'no-store', redirect: 'error' })
-      if (!response.ok) throw new Error('Anonymous GitHub quota could not be verified')
-      const data = await response.json()
-      return { remaining: data.resources.core.remaining as number, reset: data.resources.core.reset as number }
+    const reference = await page.evaluate(async () => {
+      const modulePath = '/client/services/llm/generation/references.ts'
+      const { ReferenceSession } = await import(modulePath)
+      const session = await ReferenceSession.open(AbortSignal.timeout(45_000))
+      return { transport: 'project-authenticated-metadata', commit: session.commit }
     })
-    save('github-preflight.json', quota)
-    // One main resolution per tools task, one for the probe and one cached
-    // tree for a stable main: 53 requests in the declared 102-task matrix.
-    // Moving main or transient HTTP failures can need more; those still pause
-    // at the normal reference boundary, never substitute stale code.
-    const requiredQuota = tasks.filter(task => task.arm === 'tools').length + (diagnostic ? 1 : 2)
-    if (quota.remaining < requiredQuota) throw new Error(`Anonymous GitHub quota is ${quota.remaining}; at least ${requiredQuota} requests are required for the stable-main batch. Reset: ${new Date(quota.reset * 1000).toISOString()}`)
+    save('github-preflight.json', reference)
   }
   const assess = (input: AcceptanceInput, result: BrowserTaskResult, first: boolean): BehaviorEvidence => {
     if (input.expected === 'capability-gap') {
