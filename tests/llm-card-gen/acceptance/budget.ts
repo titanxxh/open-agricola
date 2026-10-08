@@ -2,7 +2,7 @@ import type { GenerationUsage } from '../../../shared/contract/workshop-generati
 
 // Nanodollars keep every reservation integral. The approved budget is shared
 // by probes, both arms, failures and any subsequent complete batch.
-export const TOTAL_BUDGET_NANO_USD = 5_000_000_000
+export const TOTAL_BUDGET_NANO_USD = 20_000_000_000
 export const PRICE_BASIS = Object.freeze({
   source: 'https://api-docs.deepseek.com/quick_start/pricing/',
   verifiedAt: '2026-10-08',
@@ -48,7 +48,7 @@ export class AcceptanceBudget {
     // UTF-8 bytes bound ordinary text tokens; reserve an additional 16K tokens
     // for role/tool protocol templates. No cache discount is assumed up front.
     const reservedNanoUsd = (inputBytes + 16384) * PRICE_BASIS.inputNanoUsdPerToken + maxOutputTokens * PRICE_BASIS.outputNanoUsdPerToken
-    if (reservedNanoUsd + this.committedNanoUsd() > TOTAL_BUDGET_NANO_USD) throw new Error('US$5 acceptance budget cannot reserve this request. No provider request was sent.')
+    if (reservedNanoUsd + this.committedNanoUsd() > TOTAL_BUDGET_NANO_USD) throw new Error('US$20 acceptance budget cannot reserve this request. No provider request was sent.')
     const reservation: Reservation = { id: crypto.randomUUID(), task, sequence, at: new Date().toISOString(), inputBytes, maxOutputTokens, reservedNanoUsd, status: 'reserved' }
     this.state.reservations.push(reservation)
     return structuredClone(reservation)

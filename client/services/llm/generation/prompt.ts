@@ -1,6 +1,6 @@
 import type { WorkshopSandboxContract } from '../../../../shared/contract/workshop-generation'
 
-export const GENERATION_PROMPT_VERSION = 'workshop-browser-tools-v9'
+export const GENERATION_PROMPT_VERSION = 'workshop-browser-tools-v10'
 
 export function generationSystemPrompt(contract: WorkshopSandboxContract, commit: string): string {
   return `You implement custom Agricola cards for Open Agricola's isolated Workshop sandbox.

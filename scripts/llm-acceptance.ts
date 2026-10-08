@@ -21,6 +21,7 @@ const { values } = parseArgs({ options: {
   'runtime-env': { type: 'string', default: 'output/tmp/llm-runtime/local.env' },
 } })
 if (values.live === values['dry-run']) throw new Error('Choose exactly one of --dry-run or --live. Live requires an explicitly approved --model.')
+if (values.live && (process.env.CI || process.env.GITHUB_ACTIONS)) throw new Error('Paid LLM acceptance is owner-local only and cannot run in CI. No model credential was read or paid request issued.')
 if (values.live && !['deepseek-flash', 'deepseek-v4-flash'].includes(values.model ?? '')) throw new Error('Specify the approved DeepSeek request model with --model; no silent model substitution is allowed.')
 const live = values.live!
 const model = values.model ?? 'deepseek-flash'
