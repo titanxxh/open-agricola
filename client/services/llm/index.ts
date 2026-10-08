@@ -1,7 +1,6 @@
 // client/services/llm/index.ts
-// Public API for the LLM service. Re-exports types and provides the
-// dispatcher (streamChat, generateCardArt). Card-extraction helpers and the
-// localStorage-backed config helpers live in card-utils.ts.
+// Public API for provider configuration, browser translation and image generation.
+// Workshop ability generation uses the bounded generation/ module.
 import type { LlmConfig, ReferenceImage, ProviderId } from './types'
 import { getProvider, PROVIDERS, listModelsFor } from './registry'
 import { openaiCompatGenerateImage } from './openai-compat'
@@ -80,7 +79,6 @@ export const PROVIDER_KEY_HINTS = Object.fromEntries(
 
 // ── Re-export card-utils ────────────────────────────────────────────────────
 export {
-  extractCardFromResponse,
   translateCardContent,
   buildCardArtPrompt,
 } from './card-utils'
