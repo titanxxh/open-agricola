@@ -98,7 +98,9 @@ Deterministic protocol replay and browser E2E cover reference versions and failu
 
 Prompt v13 keeps repair source only in `input.source`; its error/version metadata is projected separately. It also retains candidate revision/staleness through checkpoints, clears model attribution after manual source edits, and applies the same card-identity check to generated and manually validated source. The completed v13 batch below verifies generation quality for the frozen implementation containing these fixes; editor/server regressions cover their state and recovery behavior. All earlier complete and failed batches remain historical evidence.
 
-The v14 review fixes add resolved dependencies to runtime identity, return the immutable snapshot directly when pinning, and reject retired model aliases before paid acceptance. A new complete frozen batch is required before updating admission evidence; the v13 result below remains historical evidence.
+The v14 review fixes add resolved dependencies to runtime identity, return the immutable snapshot directly when pinning, and reject retired model aliases before paid acceptance. The [complete v14 batch](https://github.com/titanxxh/open-agricola/issues/1041#issuecomment-6056695060) passed 48/48 source behaviors but only 2/3 capability gaps: one otherwise structured gap message contained bare line breaks inside its JSON string and was rejected. That failed slot and all original answer bytes remain unchanged.
+
+Prompt version v15 adds narrow parsing tolerance for non-source messages: after ordinary JSON parsing fails, only unescaped LF/CR inside quoted strings are escaped losslessly before parsing again. Invalid quotes, truncated objects, other illegal control characters and source output are not repaired. The existing kind/message checks, final-slot continuation restriction and both arms' behavior assertions remain unchanged. Browser evidence keeps the original answer and hash. A new complete frozen batch is required before updating admission evidence; the v13 result below remains historical evidence.
 
 ### Completed paid acceptance
 

@@ -264,13 +264,17 @@ test('project metadata and anonymous GitHub source work from the real browser or
   console.log(JSON.stringify({ githubBrowserProbe: 'passed', commit: evidence.commit, path: evidence.path }))
 })
 
-for (const large of [false, true]) test(`acceptance captures bounded visible answers without opaque fields (${large ? 'large' : 'malformed'})`, async ({ page }) => {
-  const user = await createLocalUserForTests(`answer_${large}_${Date.now().toString(36)}`, 'answer-test-password')
+for (const mode of ['malformed', 'large', 'multiline-gap']) test(`acceptance captures bounded visible answers without opaque fields (${mode})`, async ({ page }) => {
+  const large = mode === 'large'
+  const multiline = mode === 'multiline-gap'
+  const user = await createLocalUserForTests(`answer_${mode.replaceAll('-', '_')}_${Date.now().toString(36)}`, 'answer-test-password')
   const cookie = await createSession(user.id)
   if (!cookie) throw new Error('No answer evidence test session')
   await page.context().addCookies([{ name: 'oa_session', value: cookie, url: FRONTEND_URL }])
   await page.route('**/api/workshop/references/**', route => route.fulfill({ json: route.request().url().endsWith('/main') ? { object: { sha: referenceCommit } } : { truncated: false, tree: [] } }))
-  const answer = large ? '缺'.repeat(30_000) : '\uFEFF{"kind":"capability-gap","message":"Unavailable capability."}'
+  const message = 'Missing field placement.\nKeep the cost and crop.'
+  const answer = multiline ? `{"kind":"capability-gap","message":"${message}"}`
+    : large ? '缺'.repeat(30_000) : '\uFEFF{"kind":"capability-gap","message":"Unavailable capability."}'
   const reasoning = 'private-answer-reasoning-canary'
   const signature = 'private-answer-signature-canary'
   let posts = 0
@@ -302,7 +306,8 @@ for (const large of [false, true]) test(`acceptance captures bounded visible ans
   }, { modelKey, referenceCommit })
   expect(posts).toBe(1)
   expect(settlements).toBe(1)
-  expect(result.snapshot).toMatchObject({ status: 'completed', modelRequests: 1, result: { kind: 'failure' } })
+  expect(result.snapshot).toMatchObject({ status: 'completed', modelRequests: 1, repairs: 0, result: { kind: multiline ? 'capability-gap' : 'failure' } })
+  if (multiline) expect(result.snapshot.result?.message).toBe(message)
   expect(result.snapshot.candidate).toBeUndefined()
   expect(result.sources).toHaveLength(0)
   expect(result.answers).toHaveLength(1)
