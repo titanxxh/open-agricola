@@ -98,26 +98,26 @@ Deterministic protocol replay and browser E2E cover reference versions and failu
 
 ### Completed paid acceptance
 
-On 2026-10-08 (UTC+8), batch `live-2026-10-08T02-36-54-220Z-63fdc5e6` completed all 102 planned runs against clean implementation `82b84960f771861e6c6e69c7bb0aa81f775e3e95`, prompt `workshop-browser-tools-v8` and tools `github-text-v4`. The [resolution evidence](https://github.com/titanxxh/open-agricola/issues/1041#issuecomment-6051299853) and [compact evidence artifact](../../tests/llm-card-gen/acceptance/evidence/deepseek-flash-2026-10-08.json) retain exact settings, deployed sandbox identity, per-scenario counts, earlier failures, accounting and hashes of the original local artifacts.
+On 2026-10-08 (UTC+8), batch `live-2026-10-08T05-54-04-504Z-f7941f62` completed all 102 planned runs against clean implementation `328b6bc3fe7a3bc251327a42d7ae4b44c8bf042a`, prompt `workshop-browser-tools-v12` and tools `github-text-v5`. The [resolution evidence](https://github.com/titanxxh/open-agricola/issues/1041#issuecomment-6053908371) and [compact evidence artifact](../../tests/llm-card-gen/acceptance/evidence/deepseek-flash-v12-2026-10-08.json) retain exact settings, deployed sandbox identity, per-scenario counts, earlier failures, accounting and hashes of the original local artifacts.
 
-The admitted request is exactly **`deepseek` / `https://api.deepseek.com/v1/chat/completions` / `deepseek-flash`**. Observed returned model names were `deepseek-flash`. This batch measures the canonical V4.1 Flash request name. The old `deepseek-v4-flash` forwarding alias, Pro, OpenRouter and custom endpoints remain unadmitted. [Earlier v5 alias evidence](../../tests/llm-card-gen/acceptance/evidence/deepseek-v4-flash-2026-10-08.json) is retained as history and does not replace this final batch.
+The admitted request is exactly **`deepseek` / `https://api.deepseek.com/v1/chat/completions` / `deepseek-flash`**. Observed returned model names were `deepseek-flash`. This batch measures the canonical V4.1 Flash request name. The old `deepseek-v4-flash` forwarding alias, Pro, OpenRouter and custom endpoints remain unadmitted. [Earlier canonical v8 evidence](../../tests/llm-card-gen/acceptance/evidence/deepseek-flash-2026-10-08.json) and [v5 alias evidence](../../tests/llm-card-gen/acceptance/evidence/deepseek-v4-flash-2026-10-08.json) are retained as history and do not replace this final batch.
 
 | Formal-arm measurement | Browser tools | Old full prompt + shared static repair |
 |---|---:|---:|
-| First / final passes | 51/51 / 51/51 | 47/51 / 47/51 |
-| Source behavior passes | 48/48 | 47/48 |
+| First / final passes | 51/51 / 51/51 | 47/51 / 48/51 |
+| Source behavior passes | 48/48 | 48/48 |
 | Correct capability gaps | 3/3 | 0/3 |
 | Static repairs | 0 | 1 |
 | Model POSTs | 244 | 52 |
-| Input / output tokens | 3,606,089 / 185,063 | 556,320 / 96,234 |
-| Median / P95 active time | 14.260 s / 39.870 s | 5.921 s / 26.537 s |
-| Estimated cost | $0.472912476 | $0.122222064 |
+| Input / output tokens | 3,783,897 / 202,472 | 555,724 / 91,045 |
+| Median / P95 active time | 15.349 s / 60.535 s | 5.116 s / 30.119 s |
+| Estimated cost | $0.510228684 | $0.115741200 |
 
 The new arm passed the quality gate in this finite, open-book matrix. Every control failure remains in the linked report. No Session assertion failures were used as repair hints, no failed slots were replaced, and no attempt received extra allowance. Registering evidence and the exact admission tuple does not change the frozen generation behavior.
 
-The separate real-browser probe passed in 4 POSTs with 0 repairs, costing an estimated $0.006316392. The browser verified 556 earlier assistant-message comparisons and 555 complete-tool-group comparisons, preserving observed protocol fields without publishing raw reasoning or provider message bodies. Each of the 52 new-arm attempts, including the probe, resolved current main independently through the authenticated Workshop metadata interface using project GitHub credentials. Source bodies were read anonymously by the browser at the pinned SHA and checked against Git blob hashes. Only the model endpoint received the user's LLM credential.
+The separate real-browser probe passed in 8 POSTs with 0 repairs, costing an estimated $0.023907792. The browser verified 595 earlier assistant-message comparisons and 594 complete-tool-group comparisons, preserving observed protocol fields without publishing raw reasoning or provider message bodies. Each of the 52 new-arm attempts, including the probe, resolved current main independently through the authenticated Workshop metadata interface using project GitHub credentials. Source bodies were read anonymously by the browser at the pinned SHA and checked against Git blob hashes. Only the model endpoint received the user's LLM credential.
 
-At the close of that v8 batch, the complete effort used 1,893 request reservations across probes, failed batches, diagnostics and controls: **$3.819276504 estimated known cost + $0.105475800 still reserved for earlier unknown usage = $3.924752304 of the $5 limit**. Its frozen snapshot had $1.075247696 remaining; later batches and the authorized cumulative cap amendment preserve this historical record. These are conservative peak-rate estimates, not invoices. Earlier failures and interrupted batches remain in the evidence history and local artifacts; the ledger was not reset.
+The complete effort used 2,836 request reservations across probes, failed batches, diagnostics and controls: **$5.748669648 estimated known cost + $0.105475800 still reserved for earlier unknown usage = $5.854145448 against the cumulative $20 guard**. The remaining allowance is **$14.145854552**. The [user-authorized cap increase](https://github.com/titanxxh/open-agricola/issues/1035#issuecomment-6052008674) happened after the incomplete v9 batch and changed only the active ledger limit, leaving all earlier reservations, settlements and $5 snapshots intact. The original `llm-acceptance-usd5.json` filename is retained so every worktree continues to share the same history. These are conservative peak-rate estimates, not invoices. Earlier failures and interrupted batches remain in the evidence history and local artifacts; the ledger was not reset.
 
 ### Control and behavior checks
 

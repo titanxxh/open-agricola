@@ -172,7 +172,7 @@ OpenRouter 不在 provider 级别声明 `chat` / `image` 兜底能力；每个�
 
 #### C1.4 质量与成本验收
 
-[验收决议](https://github.com/titanxxh/open-agricola/issues/1035)规定模型逐个通过浏览器协议与卡牌行为验证后开放，首先验收当前配置的 DeepSeek Flash 组合。已确认的批次覆盖 17 个场景，两组各重复 3 次，[全部付费调用的累计预算已提高到 20 美元](https://github.com/titanxxh/open-agricola/issues/1035#issuecomment-6052008674)，此前冻结批次保留原预算快照。新架构每次运行都必须通过相应行为或能力缺口断言；首次输出质量、修复、token 和耗时分别记录。[LLM 测试指南](test/llm-card-gen.md#browser-tool-acceptance)说明样本与证据要求。`scripts/llm-acceptance.ts` 已实现浏览器探测、102 任务固定批次、原始源码行为检查和跨批次共用的 20 美元持久费用账本。[2026-10-08 付费验收](test/llm-card-gen.md#completed-paid-acceptance)在 prompt v8 与带项目凭据的元数据工具 v4 上完成全部 102 项：新架构通过 48/48 源码行为和 3/3 能力缺口判断，首次通过 51/51，静态修复 0 次；对照组通过 47/51。已开放正式请求名 `deepseek-flash`，旧转发别名及其他精确组合仍为待验。实测质量、用量、耗时，以及整个实施期间占用的 $3.924752304 预算均保留在证据中，包含历次失败和未知用量的预约。合成演练不构成模型准入。
+[验收决议](https://github.com/titanxxh/open-agricola/issues/1035)规定模型逐个通过浏览器协议与卡牌行为验证后开放，首先验收当前配置的 DeepSeek Flash 组合。已确认的批次覆盖 17 个场景，两组各重复 3 次，[全部付费调用的累计预算已提高到 20 美元](https://github.com/titanxxh/open-agricola/issues/1035#issuecomment-6052008674)；此前批次保留其原预算快照。新架构每次运行都必须通过相应行为或能力缺口断言；首次输出质量、修复、token 和耗时分别记录。[LLM 测试指南](test/llm-card-gen.md#browser-tool-acceptance)说明样本与证据要求。`scripts/llm-acceptance.ts` 已实现浏览器探测、102 任务固定批次、原始源码行为检查和跨批次共用的 20 美元持久费用账本，保留此前所有费用与未知用量预约。[2026-10-08 付费验收](test/llm-card-gen.md#completed-paid-acceptance)在 prompt v12 与带项目凭据的元数据工具 v5 上完成全部 102 项：新架构通过 48/48 源码行为和 3/3 能力缺口判断，首次通过 51/51，静态修复 0 次；对照组通过 48/51。已开放正式请求名 `deepseek-flash`，旧转发别名及其他精确组合仍为待验。实测质量、用量、耗时，以及整个实施期间占用的 $5.854145448 预算均保留在证据中，包含历次失败和未知用量的预约。合成演练不构成模型准入。
 
 #### C1.5 编辑器交互
 

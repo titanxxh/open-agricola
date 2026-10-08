@@ -1,0 +1,1221 @@
+{
+  "format": 1,
+  "measuredAt": "2026-10-08T06:21:42.445Z",
+  "batch": "live-2026-10-08T05-54-04-504Z-f7941f62",
+  "decision": "https://github.com/titanxxh/open-agricola/issues/1035#issuecomment-6040961284",
+  "tracking": "https://github.com/titanxxh/open-agricola/issues/1041",
+  "admittedTarget": {
+    "provider": "deepseek",
+    "endpoint": "https://api.deepseek.com/v1/chat/completions",
+    "model": "deepseek-flash"
+  },
+  "returnedModels": [
+    "deepseek-flash"
+  ],
+  "documentedService": "DeepSeek-V4.1-Flash",
+  "identityNote": "Only the exact approved request tuple is admitted. Returned model names do not admit request aliases or establish quality for a retired model.",
+  "implementation": {
+    "implementationCommit": "328b6bc3fe7a3bc251327a42d7ae4b44c8bf042a",
+    "dirty": false,
+    "frozenDigest": "80f50107f6d95ecfc4e095b551694fc50fc3c628f0987b6c33d761116d34503e",
+    "promptVersion": "workshop-browser-tools-v12",
+    "toolVersion": "github-text-v5",
+    "sandboxContractId": "sandbox-v1:753970c086365f2b5d8c3e35675e4687664ed44085c932d2efd9c08849ac52c7",
+    "settings": {
+      "max_tokens": 16384,
+      "stream": true,
+      "stream_options": {
+        "include_usage": true
+      },
+      "thinking": {
+        "type": "enabled"
+      }
+    },
+    "responseLimits": {
+      "wireBytes": 33554432,
+      "eventBytes": 2097152,
+      "messageBytes": 2097152
+    },
+    "allowance": {
+      "modelRequests": 8,
+      "referenceCalls": 24,
+      "activeMs": 300000
+    },
+    "contextBytes": 196608,
+    "referenceLimits": {
+      "fileBytes": 262144,
+      "readLines": 160,
+      "resultBytes": 16384,
+      "searchHits": 40,
+      "httpRetries": 2,
+      "concurrency": 3
+    }
+  },
+  "control": {
+    "label": "Old full prompt plus shared static repair",
+    "format": 1,
+    "sourceCommit": "f036403558dc0e49a23c077b6c41bdde596237a5",
+    "sha256": "a22e5450fb6c7f0d5c17f50d5588742f281a851fb9de0be8ebf9c14cbf022d6a",
+    "bytes": 35414,
+    "characters": 27234,
+    "dependencies": {
+      "client/services/llmPrompts.ts": "cf0eb6a0664498e320344d132cae2ab45abc9247309403f9c420ee4753367eae",
+      "docs/community-card-examples.md": "cb6757e660b72d9c73214723020d483958caa5887518a7993ec9cdb8b5f9000e",
+      "shared/projections/card-effect-hooks.ts": "7789abe228f2140e1f6c86e39a8e6bfca1e1edde95c1577afb74b543c736e955",
+      "shared/custom-code/sandbox-hook-meta.ts": "b3183ba5c74b6c1b1f882081ffcb5e5b3b746a51cd0b6c9c7487b1cd0729ef84",
+      "shared/custom-code/sandbox-listener-actions.ts": "bf66c834927bb00718f3fa46f6b00eac9e3dac99c068b33da4c2a37b0e18b6a2",
+      "shared/custom-code/sandbox-listener-phases.ts": "3614bbc48fa90a49f81c8bc9d2ee7244b082f790fd6eb03f8695a62179adb7c8",
+      "shared/custom-code/sandbox-listener-scopes.ts": "c1262a495b7c65475f74bf3c8efeb05f5d8aba135055ad1162387ddc695d26d2",
+      "shared/custom-code/sandbox-action-ids.ts": "5b8f31cb2ba9027220872ad6afc90c17f7323955617a07fa8e49892c158ca9e7"
+    }
+  },
+  "method": "Three repetitions in declared scenario order, tools then control; no task reruns or Session-driven repairs. Old prompt plus shared repair is the control. Synthetic results cannot admit a model.",
+  "report": {
+    "batch": "live-2026-10-08T05-54-04-504Z-f7941f62",
+    "synthetic": false,
+    "diagnostic": false,
+    "admitted": true,
+    "finishedAt": "2026-10-08T06:21:42.445Z",
+    "complete": true,
+    "planned": 102,
+    "completed": 102,
+    "arms": {
+      "tools": {
+        "completed": 51,
+        "planned": 51,
+        "firstPassed": 51,
+        "finalPassed": 51,
+        "sourcePassed": 48,
+        "gapPassed": 3,
+        "usage": {
+          "knownInputTokens": 3783897,
+          "knownOutputTokens": 202472,
+          "unknownRequests": 0
+        },
+        "modelRequests": 244,
+        "medianMs": 15349,
+        "p95Ms": 60535,
+        "estimatedNanoUsd": 510228684,
+        "heldNanoUsd": 0
+      },
+      "control": {
+        "completed": 51,
+        "planned": 51,
+        "firstPassed": 47,
+        "finalPassed": 48,
+        "sourcePassed": 48,
+        "gapPassed": 0,
+        "usage": {
+          "knownInputTokens": 555724,
+          "knownOutputTokens": 91045,
+          "unknownRequests": 0
+        },
+        "modelRequests": 52,
+        "medianMs": 5116,
+        "p95Ms": 30119,
+        "estimatedNanoUsd": 115741200,
+        "heldNanoUsd": 0
+      }
+    },
+    "probePassed": true,
+    "totalEffortCommittedNanoUsd": 5854145448,
+    "totalEffortRemainingNanoUsd": 14145854552,
+    "failures": [
+      {
+        "task": "control-M15-cropped-field-stable-gap-1",
+        "reason": "Error: Expected a capability gap without an adoptable replacement source"
+      },
+      {
+        "task": "control-M15-cropped-field-stable-gap-2",
+        "reason": "Error: Expected a capability gap without an adoptable replacement source"
+      },
+      {
+        "task": "control-M15-cropped-field-stable-gap-3",
+        "reason": "Error: Expected a capability gap without an adoptable replacement source"
+      }
+    ],
+    "unrun": [],
+    "note": "Costs use published peak rates and are estimates, not invoices. Unknown calls keep their full reservations. Passing synthetic output never admits a model; admission registry updates require the actual complete report."
+  },
+  "probe": {
+    "firstPassed": true,
+    "finalPassed": true,
+    "modelRequests": 8,
+    "referenceCalls": 15,
+    "staticRepairs": 0,
+    "activeMs": 53914,
+    "checks": [
+      "M2-per-action-bonus: state/interaction/log/scores",
+      "M2 rejects opponents, other actions and unplayed ownership; repeats next round"
+    ],
+    "cost": {
+      "requests": 8,
+      "knownEstimatedNanoUsd": 23907792,
+      "heldUnknownNanoUsd": 0
+    }
+  },
+  "matrix": [
+    {
+      "scenario": "M1-immediate-gain-with-cost-prereq",
+      "expected": "source",
+      "tools": {
+        "firstPassed": 3,
+        "finalPassed": 3,
+        "staticRepairs": 0
+      },
+      "control": {
+        "firstPassed": 3,
+        "finalPassed": 3,
+        "staticRepairs": 0
+      }
+    },
+    {
+      "scenario": "M2-per-action-bonus",
+      "expected": "source",
+      "tools": {
+        "firstPassed": 3,
+        "finalPassed": 3,
+        "staticRepairs": 0
+      },
+      "control": {
+        "firstPassed": 3,
+        "finalPassed": 3,
+        "staticRepairs": 0
+      }
+    },
+    {
+      "scenario": "M3-harvest-feed-modifier",
+      "expected": "source",
+      "tools": {
+        "firstPassed": 3,
+        "finalPassed": 3,
+        "staticRepairs": 0
+      },
+      "control": {
+        "firstPassed": 3,
+        "finalPassed": 3,
+        "staticRepairs": 0
+      }
+    },
+    {
+      "scenario": "M4-endgame-vp",
+      "expected": "source",
+      "tools": {
+        "firstPassed": 3,
+        "finalPassed": 3,
+        "staticRepairs": 0
+      },
+      "control": {
+        "firstPassed": 3,
+        "finalPassed": 3,
+        "staticRepairs": 0
+      }
+    },
+    {
+      "scenario": "M5-cost-reduction",
+      "expected": "source",
+      "tools": {
+        "firstPassed": 3,
+        "finalPassed": 3,
+        "staticRepairs": 0
+      },
+      "control": {
+        "firstPassed": 3,
+        "finalPassed": 3,
+        "staticRepairs": 0
+      }
+    },
+    {
+      "scenario": "M6-cardstate-counter",
+      "expected": "source",
+      "tools": {
+        "firstPassed": 3,
+        "finalPassed": 3,
+        "staticRepairs": 0
+      },
+      "control": {
+        "firstPassed": 3,
+        "finalPassed": 3,
+        "staticRepairs": 0
+      }
+    },
+    {
+      "scenario": "M7-anytime-ability",
+      "expected": "source",
+      "tools": {
+        "firstPassed": 3,
+        "finalPassed": 3,
+        "staticRepairs": 0
+      },
+      "control": {
+        "firstPassed": 3,
+        "finalPassed": 3,
+        "staticRepairs": 0
+      }
+    },
+    {
+      "scenario": "M8-cross-player-trigger",
+      "expected": "source",
+      "tools": {
+        "firstPassed": 3,
+        "finalPassed": 3,
+        "staticRepairs": 0
+      },
+      "control": {
+        "firstPassed": 3,
+        "finalPassed": 3,
+        "staticRepairs": 0
+      }
+    },
+    {
+      "scenario": "M9-future-meeple",
+      "expected": "source",
+      "tools": {
+        "firstPassed": 3,
+        "finalPassed": 3,
+        "staticRepairs": 0
+      },
+      "control": {
+        "firstPassed": 3,
+        "finalPassed": 3,
+        "staticRepairs": 0
+      }
+    },
+    {
+      "scenario": "M10-payment-resource-provider",
+      "expected": "source",
+      "tools": {
+        "firstPassed": 3,
+        "finalPassed": 3,
+        "staticRepairs": 0
+      },
+      "control": {
+        "firstPassed": 3,
+        "finalPassed": 3,
+        "staticRepairs": 0
+      }
+    },
+    {
+      "scenario": "M11-improvement-cost-reduction",
+      "expected": "source",
+      "tools": {
+        "firstPassed": 3,
+        "finalPassed": 3,
+        "staticRepairs": 0
+      },
+      "control": {
+        "firstPassed": 3,
+        "finalPassed": 3,
+        "staticRepairs": 0
+      }
+    },
+    {
+      "scenario": "M12-combined-forest-counter",
+      "expected": "source",
+      "tools": {
+        "firstPassed": 3,
+        "finalPassed": 3,
+        "staticRepairs": 0
+      },
+      "control": {
+        "firstPassed": 3,
+        "finalPassed": 3,
+        "staticRepairs": 0
+      }
+    },
+    {
+      "scenario": "M13-selected-candidate-followup",
+      "expected": "source",
+      "tools": {
+        "firstPassed": 3,
+        "finalPassed": 3,
+        "staticRepairs": 0
+      },
+      "control": {
+        "firstPassed": 3,
+        "finalPassed": 3,
+        "staticRepairs": 0
+      }
+    },
+    {
+      "scenario": "M14-tested-source-repair",
+      "expected": "source",
+      "tools": {
+        "firstPassed": 3,
+        "finalPassed": 3,
+        "staticRepairs": 0
+      },
+      "control": {
+        "firstPassed": 3,
+        "finalPassed": 3,
+        "staticRepairs": 0
+      }
+    },
+    {
+      "scenario": "M15-cropped-field-stable-gap",
+      "expected": "capability-gap",
+      "tools": {
+        "firstPassed": 3,
+        "finalPassed": 3,
+        "staticRepairs": 0
+      },
+      "control": {
+        "firstPassed": 0,
+        "finalPassed": 0,
+        "staticRepairs": 0
+      }
+    },
+    {
+      "scenario": "M16-forest-english",
+      "expected": "source",
+      "tools": {
+        "firstPassed": 3,
+        "finalPassed": 3,
+        "staticRepairs": 0
+      },
+      "control": {
+        "firstPassed": 3,
+        "finalPassed": 3,
+        "staticRepairs": 0
+      }
+    },
+    {
+      "scenario": "M17-discount-english",
+      "expected": "source",
+      "tools": {
+        "firstPassed": 3,
+        "finalPassed": 3,
+        "staticRepairs": 0
+      },
+      "control": {
+        "firstPassed": 2,
+        "finalPassed": 3,
+        "staticRepairs": 1
+      }
+    }
+  ],
+  "protocol": {
+    "allPreserved": true,
+    "assistantMessagesChecked": 595,
+    "toolGroupsChecked": 594,
+    "opaqueFieldNames": [
+      "reasoning_content"
+    ],
+    "note": "Only field names and comparison counts are retained; raw reasoning/signatures and provider bodies are excluded."
+  },
+  "references": {
+    "attemptCommitCounts": {
+      "759e83f5bc254762af862b20fdf050089aea2d24": 52
+    },
+    "successfulReadRanges": 313,
+    "operations": 405,
+    "note": "Each new tool attempt resolves current public main through the authenticated Workshop metadata interface using project GitHub credentials. Source bodies remain anonymous browser-to-raw-GitHub reads pinned to that SHA with Git blob verification. Identical-commit caches are allowed. User LLM credentials never reach the Workshop backend or GitHub."
+  },
+  "credentialDestinations": {
+    "GET https://titanxxh.github.io": {
+      "requests": 2,
+      "credential": false
+    },
+    "GET http://127.0.0.1:5913/api/workshop/references/main": {
+      "requests": 53,
+      "credential": false
+    },
+    "GET http://127.0.0.1:5913/api/workshop/references/tree/759e83f5bc254762af862b20fdf050089aea2d24": {
+      "requests": 1,
+      "credential": false
+    },
+    "GET http://127.0.0.1:5913/api/workshop/sandbox-contract": {
+      "requests": 103,
+      "credential": false
+    },
+    "POST https://api.deepseek.com": {
+      "requests": 304,
+      "credential": true
+    },
+    "GET https://raw.githubusercontent.com": {
+      "requests": 36,
+      "credential": false
+    },
+    "POST http://127.0.0.1:5913/api/workshop/cards/validate-code": {
+      "requests": 101,
+      "credential": false
+    }
+  },
+  "cost": {
+    "currency": "USD",
+    "priceBasis": {
+      "source": "https://api-docs.deepseek.com/quick_start/pricing/",
+      "verifiedAt": "2026-10-08",
+      "currency": "USD",
+      "documentedService": "DeepSeek-V4.1-Flash",
+      "inputNanoUsdPerToken": 300,
+      "cachedInputNanoUsdPerToken": 6,
+      "outputNanoUsdPerToken": 1200,
+      "basis": "Published peak rates; settled costs are conservative estimates, not invoices."
+    },
+    "batchIncludingProbe": {
+      "requests": 304,
+      "knownEstimatedNanoUsd": 649877676,
+      "heldUnknownNanoUsd": 0
+    },
+    "wholeEffort": {
+      "requests": 2836,
+      "knownEstimatedNanoUsd": 5748669648,
+      "heldUnknownNanoUsd": 105475800,
+      "committedNanoUsd": 5854145448,
+      "remainingNanoUsd": 14145854552,
+      "limitNanoUsd": 20000000000
+    },
+    "note": "Every probe, failure, diagnostic and control shares the cumulative ledger. Unknown usage keeps its full reservation. Peak-rate estimates, not invoices; reasoning tokens are included in output."
+  },
+  "earlierPaidOrPreflightBatches": [
+    {
+      "batch": "diagnostic-live-2026-10-07T20-20-18-741Z-a0b68a75",
+      "implementationCommit": "b6c8579c4c2d5f79af3e4234151226bdcb7ed955",
+      "promptVersion": "workshop-browser-tools-v3",
+      "diagnostic": true,
+      "provider": "deepseek",
+      "endpoint": "https://api.deepseek.com/v1/chat/completions",
+      "requestedModel": "deepseek-v4-flash",
+      "toolVersion": "github-text-v2",
+      "sandboxContractId": "sandbox-v1:6cb3e656d457796e9af5854d0b3d95040082bfd59f6b9e4567e864560ff526d7",
+      "complete": true,
+      "completed": 1,
+      "admitted": false,
+      "cost": {
+        "requests": 6,
+        "knownEstimatedNanoUsd": 14812392,
+        "heldUnknownNanoUsd": 0
+      },
+      "reportSha256": "2e70a45e666fc92d8e5f545ee8a79eb7d3c69410071fbcc616d1e81e908671e9"
+    },
+    {
+      "batch": "diagnostic-live-2026-10-07T21-28-44-137Z-2025e913",
+      "implementationCommit": "00a6163e90f3e3f47937c0d87ce01e36e265bb43",
+      "promptVersion": "workshop-browser-tools-v4",
+      "diagnostic": true,
+      "provider": "deepseek",
+      "endpoint": "https://api.deepseek.com/v1/chat/completions",
+      "requestedModel": "deepseek-v4-flash",
+      "toolVersion": "github-text-v2",
+      "sandboxContractId": "sandbox-v1:70321accf4ed39be920783edb5252929b965a028ff42fc64a03f2c7f228b38d0",
+      "complete": true,
+      "completed": 1,
+      "admitted": false,
+      "cost": {
+        "requests": 4,
+        "knownEstimatedNanoUsd": 8016852,
+        "heldUnknownNanoUsd": 0
+      },
+      "reportSha256": "640cb9f328bf8c4f12ef0f4cec0079270e89e47d7eb55123be99e54af81d3982"
+    },
+    {
+      "batch": "diagnostic-live-2026-10-07T21-29-09-863Z-69dd94f9",
+      "implementationCommit": "00a6163e90f3e3f47937c0d87ce01e36e265bb43",
+      "promptVersion": "workshop-browser-tools-v4",
+      "diagnostic": true,
+      "provider": "deepseek",
+      "endpoint": "https://api.deepseek.com/v1/chat/completions",
+      "requestedModel": "deepseek-v4-flash",
+      "toolVersion": "github-text-v2",
+      "sandboxContractId": "sandbox-v1:70321accf4ed39be920783edb5252929b965a028ff42fc64a03f2c7f228b38d0",
+      "complete": true,
+      "completed": 1,
+      "admitted": false,
+      "cost": {
+        "requests": 8,
+        "knownEstimatedNanoUsd": 25509732,
+        "heldUnknownNanoUsd": 0
+      },
+      "reportSha256": "e2982a6d54899060dcfa91abc037d721f7ce692e254efc34f5a5192e33ee9f89"
+    },
+    {
+      "batch": "diagnostic-live-2026-10-07T22-18-20-466Z-4874a046",
+      "implementationCommit": "a9469137d158347563734585d0ef47bec58788b7",
+      "promptVersion": "workshop-browser-tools-v5",
+      "diagnostic": true,
+      "provider": "deepseek",
+      "endpoint": "https://api.deepseek.com/v1/chat/completions",
+      "requestedModel": "deepseek-v4-flash",
+      "toolVersion": "github-text-v2",
+      "sandboxContractId": "sandbox-v1:2015789eec1d5a761bbd2916338a327771e7424f2b019ed9578c92e1bddbf4f3",
+      "complete": true,
+      "completed": 1,
+      "admitted": false,
+      "cost": {
+        "requests": 4,
+        "knownEstimatedNanoUsd": 5977092,
+        "heldUnknownNanoUsd": 0
+      },
+      "reportSha256": "9b037113c25c5fc67bb020ead97532a126a571a4e2099ebdaf3f34a3c99a3d4c"
+    },
+    {
+      "batch": "diagnostic-live-2026-10-08T04-55-44-161Z-f4eeac97",
+      "implementationCommit": "6c880d2aae3655166f55a46b32a627e018e251da",
+      "promptVersion": "workshop-browser-tools-v11",
+      "diagnostic": true,
+      "provider": "deepseek",
+      "endpoint": "https://api.deepseek.com/v1/chat/completions",
+      "requestedModel": "deepseek-flash",
+      "toolVersion": "github-text-v5",
+      "sandboxContractId": "sandbox-v1:753970c086365f2b5d8c3e35675e4687664ed44085c932d2efd9c08849ac52c7",
+      "complete": true,
+      "completed": 1,
+      "admitted": false,
+      "cost": {
+        "requests": 5,
+        "knownEstimatedNanoUsd": 10838268,
+        "heldUnknownNanoUsd": 0
+      },
+      "reportSha256": "14a1bde6a5ef041968d0709d20f78dd936bc38237188165d36b7667662f5ee94"
+    },
+    {
+      "batch": "diagnostic-live-2026-10-08T05-36-30-341Z-6e8f8918",
+      "implementationCommit": "02da243ead8e04e3b73f96a84d76e5082a94f248",
+      "promptVersion": "workshop-browser-tools-v11",
+      "diagnostic": true,
+      "provider": "deepseek",
+      "endpoint": "https://api.deepseek.com/v1/chat/completions",
+      "requestedModel": "deepseek-flash",
+      "toolVersion": "github-text-v5",
+      "sandboxContractId": "sandbox-v1:753970c086365f2b5d8c3e35675e4687664ed44085c932d2efd9c08849ac52c7",
+      "complete": true,
+      "completed": 1,
+      "admitted": false,
+      "cost": {
+        "requests": 6,
+        "knownEstimatedNanoUsd": 15629196,
+        "heldUnknownNanoUsd": 0
+      },
+      "reportSha256": "e583edb3a7bcf8bf3ffabf831cfff4328034eebb377b79a5b1a039a911cd67fd"
+    },
+    {
+      "batch": "diagnostic-live-2026-10-08T05-38-36-070Z-63f2aa49",
+      "implementationCommit": "02da243ead8e04e3b73f96a84d76e5082a94f248",
+      "promptVersion": "workshop-browser-tools-v11",
+      "diagnostic": true,
+      "provider": "deepseek",
+      "endpoint": "https://api.deepseek.com/v1/chat/completions",
+      "requestedModel": "deepseek-flash",
+      "toolVersion": "github-text-v5",
+      "sandboxContractId": "sandbox-v1:753970c086365f2b5d8c3e35675e4687664ed44085c932d2efd9c08849ac52c7",
+      "complete": true,
+      "completed": 1,
+      "admitted": false,
+      "cost": {
+        "requests": 8,
+        "knownEstimatedNanoUsd": 24311832,
+        "heldUnknownNanoUsd": 0
+      },
+      "reportSha256": "161d3b9852cf96204aa457b6381f7f0b5484baeabc38b8625497e93d551f67db"
+    },
+    {
+      "batch": "diagnostic-live-2026-10-08T05-39-43-691Z-ce1a6a1d",
+      "implementationCommit": "02da243ead8e04e3b73f96a84d76e5082a94f248",
+      "promptVersion": "workshop-browser-tools-v11",
+      "diagnostic": true,
+      "provider": "deepseek",
+      "endpoint": "https://api.deepseek.com/v1/chat/completions",
+      "requestedModel": "deepseek-flash",
+      "toolVersion": "github-text-v5",
+      "sandboxContractId": "sandbox-v1:753970c086365f2b5d8c3e35675e4687664ed44085c932d2efd9c08849ac52c7",
+      "complete": true,
+      "completed": 1,
+      "admitted": false,
+      "cost": {
+        "requests": 7,
+        "knownEstimatedNanoUsd": 10421292,
+        "heldUnknownNanoUsd": 0
+      },
+      "reportSha256": "0d3fd369178dd7a3d3ea155cf433580ce54b319ae3e0d437cdffca3980a0d3f3"
+    },
+    {
+      "batch": "live-2026-10-07T19-27-36-400Z-37507547",
+      "implementationCommit": "be4d84c133e15716dcf79025fe4ae9bb1236ca1f",
+      "promptVersion": "workshop-browser-tools-v1",
+      "diagnostic": false,
+      "provider": "deepseek",
+      "endpoint": "https://api.deepseek.com/v1/chat/completions",
+      "requestedModel": "deepseek-v4-flash",
+      "toolVersion": "github-text-v1",
+      "sandboxContractId": "sandbox-v1:6cb3e656d457796e9af5854d0b3d95040082bfd59f6b9e4567e864560ff526d7",
+      "complete": false,
+      "completed": 0,
+      "admitted": false,
+      "cost": {
+        "requests": 8,
+        "knownEstimatedNanoUsd": 10573476,
+        "heldUnknownNanoUsd": 0
+      },
+      "reportSha256": "6a1a67a2e9915b652e316f8fc001ca784bf4de09418e0f2be6c53b39b8e4948c",
+      "fatal": "The real browser tool roundtrip probe did not pass; the complete batch was not started."
+    },
+    {
+      "batch": "live-2026-10-07T19-38-12-615Z-e21f7f7d",
+      "implementationCommit": "9952387a857c69fff59cfe9892b82624d2f0a3c6",
+      "promptVersion": "workshop-browser-tools-v2",
+      "diagnostic": false,
+      "provider": "deepseek",
+      "endpoint": "https://api.deepseek.com/v1/chat/completions",
+      "requestedModel": "deepseek-v4-flash",
+      "toolVersion": "github-text-v2",
+      "sandboxContractId": "sandbox-v1:6cb3e656d457796e9af5854d0b3d95040082bfd59f6b9e4567e864560ff526d7",
+      "complete": false,
+      "completed": 0,
+      "admitted": false,
+      "cost": {
+        "requests": 0,
+        "knownEstimatedNanoUsd": 0,
+        "heldUnknownNanoUsd": 0
+      },
+      "reportSha256": "58cf17ff4de0b59c2bcf43e72e7850d51b363f15322992b373de3fd6fd97bb5b",
+      "fatal": "Anonymous GitHub quota is 49; at least 56 requests are required before starting the paid batch. Reset: 2026-10-07T19:41:51.000Z"
+    },
+    {
+      "batch": "live-2026-10-07T19-42-20-551Z-8993775d",
+      "implementationCommit": "9952387a857c69fff59cfe9892b82624d2f0a3c6",
+      "promptVersion": "workshop-browser-tools-v2",
+      "diagnostic": false,
+      "provider": "deepseek",
+      "endpoint": "https://api.deepseek.com/v1/chat/completions",
+      "requestedModel": "deepseek-v4-flash",
+      "toolVersion": "github-text-v2",
+      "sandboxContractId": "sandbox-v1:6cb3e656d457796e9af5854d0b3d95040082bfd59f6b9e4567e864560ff526d7",
+      "complete": false,
+      "completed": 0,
+      "admitted": false,
+      "cost": {
+        "requests": 8,
+        "knownEstimatedNanoUsd": 13078344,
+        "heldUnknownNanoUsd": 0
+      },
+      "reportSha256": "6c332d0544027f5b9919a5aaae3fe6469f702219a65e6561c6672218d5f1d836",
+      "fatal": "The real browser tool roundtrip probe did not pass; the complete batch was not started."
+    },
+    {
+      "batch": "live-2026-10-07T19-53-22-077Z-9f85153a",
+      "implementationCommit": "44717dbdbb3516e70824158485a73a1e09755ec3",
+      "promptVersion": "workshop-browser-tools-v3",
+      "diagnostic": false,
+      "provider": "deepseek",
+      "endpoint": "https://api.deepseek.com/v1/chat/completions",
+      "requestedModel": "deepseek-v4-flash",
+      "toolVersion": "github-text-v2",
+      "sandboxContractId": "sandbox-v1:6cb3e656d457796e9af5854d0b3d95040082bfd59f6b9e4567e864560ff526d7",
+      "complete": false,
+      "completed": 0,
+      "admitted": false,
+      "cost": {
+        "requests": 0,
+        "knownEstimatedNanoUsd": 0,
+        "heldUnknownNanoUsd": 0
+      },
+      "reportSha256": "d9f1064992cca4c21a3c6793b9880dde6191cc0bdbba4d2b1c859026f451f511",
+      "fatal": "Anonymous GitHub quota is 55; at least 56 requests are required before starting the paid batch. Reset: 2026-10-07T20:41:52.000Z"
+    },
+    {
+      "batch": "live-2026-10-07T20-00-09-661Z-1f635568",
+      "implementationCommit": "b4e019b618b65f8e2e56f20febaaa0e34445e23a",
+      "promptVersion": "workshop-browser-tools-v3",
+      "diagnostic": false,
+      "provider": "deepseek",
+      "endpoint": "https://api.deepseek.com/v1/chat/completions",
+      "requestedModel": "deepseek-v4-flash",
+      "toolVersion": "github-text-v2",
+      "sandboxContractId": "sandbox-v1:6cb3e656d457796e9af5854d0b3d95040082bfd59f6b9e4567e864560ff526d7",
+      "complete": false,
+      "completed": 11,
+      "admitted": false,
+      "cost": {
+        "requests": 49,
+        "knownEstimatedNanoUsd": 80356464,
+        "heldUnknownNanoUsd": 61229100
+      },
+      "reportSha256": "60340a0d7d76cfd6dcd4325f8a49531ff8c54b00c41dda27bb41f48faa6c0a70",
+      "fatal": "Provider response exceeds the stream limit.",
+      "failures": [
+        {
+          "task": "tools-M6-cardstate-counter-1",
+          "reason": "Provider response exceeds the stream limit."
+        }
+      ]
+    },
+    {
+      "batch": "live-2026-10-07T20-42-03-008Z-d7b240dc",
+      "implementationCommit": "b6c8579c4c2d5f79af3e4234151226bdcb7ed955",
+      "promptVersion": "workshop-browser-tools-v3",
+      "diagnostic": false,
+      "provider": "deepseek",
+      "endpoint": "https://api.deepseek.com/v1/chat/completions",
+      "requestedModel": "deepseek-v4-flash",
+      "toolVersion": "github-text-v2",
+      "sandboxContractId": "sandbox-v1:6cb3e656d457796e9af5854d0b3d95040082bfd59f6b9e4567e864560ff526d7",
+      "complete": false,
+      "completed": 37,
+      "admitted": false,
+      "cost": {
+        "requests": 130,
+        "knownEstimatedNanoUsd": 261898920,
+        "heldUnknownNanoUsd": 0
+      },
+      "reportSha256": "22329ccf11deca0aad59d82fc0dac0ac414a67468c373dbd704e5cbccf0f7291",
+      "fatal": "The model-request allowance was reached.",
+      "failures": [
+        {
+          "task": "tools-M5-cost-reduction-1",
+          "reason": "expected reed=1 (discount waived the 1-reed cost), got 0"
+        },
+        {
+          "task": "control-M15-cropped-field-stable-gap-1",
+          "reason": "Error: Expected a capability gap without an adoptable replacement source"
+        },
+        {
+          "task": "tools-M2-per-action-bonus-2",
+          "reason": "The model-request allowance was reached."
+        }
+      ]
+    },
+    {
+      "batch": "live-2026-10-07T21-42-00-421Z-a6b24986",
+      "implementationCommit": "00a6163e90f3e3f47937c0d87ce01e36e265bb43",
+      "promptVersion": "workshop-browser-tools-v4",
+      "diagnostic": false,
+      "provider": "deepseek",
+      "endpoint": "https://api.deepseek.com/v1/chat/completions",
+      "requestedModel": "deepseek-v4-flash",
+      "toolVersion": "github-text-v2",
+      "sandboxContractId": "sandbox-v1:70321accf4ed39be920783edb5252929b965a028ff42fc64a03f2c7f228b38d0",
+      "complete": true,
+      "completed": 102,
+      "admitted": false,
+      "cost": {
+        "requests": 323,
+        "knownEstimatedNanoUsd": 633352740,
+        "heldUnknownNanoUsd": 0
+      },
+      "reportSha256": "2c60c1ef23bccac55749c8f84574bf113b31fed2dd2b24c0a31399a85e42167f",
+      "failures": [
+        {
+          "task": "control-M15-cropped-field-stable-gap-1",
+          "reason": "Error: Expected a capability gap without an adoptable replacement source"
+        },
+        {
+          "task": "tools-M9-future-meeple-2",
+          "reason": "Cannot read properties of undefined (reading 'map')"
+        },
+        {
+          "task": "control-M15-cropped-field-stable-gap-2",
+          "reason": "Error: Expected a capability gap without an adoptable replacement source"
+        },
+        {
+          "task": "control-M15-cropped-field-stable-gap-3",
+          "reason": "Error: Expected a capability gap without an adoptable replacement source"
+        }
+      ]
+    },
+    {
+      "batch": "live-2026-10-07T22-42-03-306Z-cd23e6ec",
+      "implementationCommit": "a9469137d158347563734585d0ef47bec58788b7",
+      "promptVersion": "workshop-browser-tools-v5",
+      "diagnostic": false,
+      "provider": "deepseek",
+      "endpoint": "https://api.deepseek.com/v1/chat/completions",
+      "requestedModel": "deepseek-v4-flash",
+      "toolVersion": "github-text-v2",
+      "sandboxContractId": "sandbox-v1:2015789eec1d5a761bbd2916338a327771e7424f2b019ed9578c92e1bddbf4f3",
+      "complete": true,
+      "completed": 102,
+      "admitted": true,
+      "cost": {
+        "requests": 320,
+        "knownEstimatedNanoUsd": 671098158,
+        "heldUnknownNanoUsd": 0
+      },
+      "reportSha256": "64b4518880685b23f9a241da2cedf424ad9488ac08656c2c4ec981bcaf2dd8f2",
+      "failures": [
+        {
+          "task": "control-M1-immediate-gain-with-cost-prereq-1",
+          "reason": "Expected one complete TypeScript source or a structured clarification/capability gap."
+        },
+        {
+          "task": "control-M15-cropped-field-stable-gap-1",
+          "reason": "Error: Expected a capability gap without an adoptable replacement source"
+        },
+        {
+          "task": "control-M15-cropped-field-stable-gap-2",
+          "reason": "Error: Expected a capability gap without an adoptable replacement source"
+        },
+        {
+          "task": "control-M15-cropped-field-stable-gap-3",
+          "reason": "Error: Expected a capability gap without an adoptable replacement source"
+        }
+      ]
+    },
+    {
+      "batch": "live-2026-10-07T23-57-03-999Z-59d1d286",
+      "implementationCommit": "996387a0b7bd57317bc9ff0861f21a10959a84c5",
+      "promptVersion": "workshop-browser-tools-v6",
+      "diagnostic": false,
+      "provider": "deepseek",
+      "endpoint": "https://api.deepseek.com/v1/chat/completions",
+      "requestedModel": "deepseek-v4-flash",
+      "toolVersion": "github-text-v3",
+      "sandboxContractId": "sandbox-v1:80aa56652a8fd9c7d372712a1f820279257a5a43e98ea93539e1dad119318ccf",
+      "complete": true,
+      "completed": 102,
+      "admitted": false,
+      "cost": {
+        "requests": 328,
+        "knownEstimatedNanoUsd": 692464908,
+        "heldUnknownNanoUsd": 0
+      },
+      "reportSha256": "088604f28ac693566fd888491ad13a6fabd14e2438a353e21c4356e74fdb77db",
+      "failures": [
+        {
+          "task": "tools-M11-improvement-cost-reduction-1",
+          "reason": "The completed response contains multiple source candidates; request one complete source."
+        },
+        {
+          "task": "control-M15-cropped-field-stable-gap-1",
+          "reason": "Error: Expected a capability gap without an adoptable replacement source"
+        },
+        {
+          "task": "control-M15-cropped-field-stable-gap-2",
+          "reason": "Error: Expected a capability gap without an adoptable replacement source"
+        },
+        {
+          "task": "control-M15-cropped-field-stable-gap-3",
+          "reason": "Error: Expected a capability gap without an adoptable replacement source"
+        }
+      ]
+    },
+    {
+      "batch": "live-2026-10-08T00-42-02-286Z-c4a7baab",
+      "implementationCommit": "76018839fc775cb014a1ed68588b76615c057b50",
+      "promptVersion": "workshop-browser-tools-v7",
+      "diagnostic": false,
+      "provider": "deepseek",
+      "endpoint": "https://api.deepseek.com/v1/chat/completions",
+      "requestedModel": "deepseek-v4-flash",
+      "toolVersion": "github-text-v3",
+      "sandboxContractId": "sandbox-v1:80aa56652a8fd9c7d372712a1f820279257a5a43e98ea93539e1dad119318ccf",
+      "complete": false,
+      "completed": 22,
+      "admitted": false,
+      "cost": {
+        "requests": 78,
+        "knownEstimatedNanoUsd": 140966304,
+        "heldUnknownNanoUsd": 44246700
+      },
+      "reportSha256": "179873039dd27c68c1288169945532a167c099f35276975ab93397621cc7df99",
+      "fatal": "Interrupted by owner",
+      "failures": [
+        {
+          "task": "control-M9-future-meeple-1",
+          "reason": "Expected one complete TypeScript source or a structured clarification/capability gap."
+        }
+      ]
+    },
+    {
+      "batch": "live-2026-10-08T01-43-14-746Z-0ea5c902",
+      "implementationCommit": "7bf6df0711acf61fcf4ae443ff8c0e64ca3f4daa",
+      "promptVersion": "workshop-browser-tools-v7",
+      "diagnostic": false,
+      "provider": "deepseek",
+      "endpoint": "https://api.deepseek.com/v1/chat/completions",
+      "requestedModel": "deepseek-flash",
+      "toolVersion": "github-text-v4",
+      "sandboxContractId": "sandbox-v1:80aa56652a8fd9c7d372712a1f820279257a5a43e98ea93539e1dad119318ccf",
+      "complete": true,
+      "completed": 102,
+      "admitted": false,
+      "cost": {
+        "requests": 327,
+        "knownEstimatedNanoUsd": 659720190,
+        "heldUnknownNanoUsd": 0
+      },
+      "reportSha256": "ce013a382d5184b1f38fefa3978e3f2d3a69dc90571ea3ee629327bec68f9928",
+      "failures": [
+        {
+          "task": "control-M15-cropped-field-stable-gap-1",
+          "reason": "Error: Expected a capability gap without an adoptable replacement source"
+        },
+        {
+          "task": "control-M15-cropped-field-stable-gap-2",
+          "reason": "Error: Expected a capability gap without an adoptable replacement source"
+        },
+        {
+          "task": "control-M1-immediate-gain-with-cost-prereq-3",
+          "reason": "CARD_DEF id, card type and name must match the immutable request identity."
+        },
+        {
+          "task": "control-M15-cropped-field-stable-gap-3",
+          "reason": "Error: Expected a capability gap without an adoptable replacement source"
+        },
+        {
+          "task": "tools-M16-forest-english-3",
+          "reason": "expected wood=4 (3 from space + 1 bonus), got 3"
+        }
+      ]
+    },
+    {
+      "batch": "live-2026-10-08T02-36-54-220Z-63fdc5e6",
+      "implementationCommit": "82b84960f771861e6c6e69c7bb0aa81f775e3e95",
+      "promptVersion": "workshop-browser-tools-v8",
+      "diagnostic": false,
+      "provider": "deepseek",
+      "endpoint": "https://api.deepseek.com/v1/chat/completions",
+      "requestedModel": "deepseek-flash",
+      "toolVersion": "github-text-v4",
+      "sandboxContractId": "sandbox-v1:5ae24c59b506dd1728086d078fefbe750a0232ab2bcf7ca68de04ccee0632420",
+      "complete": true,
+      "completed": 102,
+      "admitted": true,
+      "cost": {
+        "requests": 300,
+        "knownEstimatedNanoUsd": 601450932,
+        "heldUnknownNanoUsd": 0
+      },
+      "reportSha256": "6dca5f6028ba5b93972863a80ca02e5a91b72f6b42cfe872670267f76e3e1750",
+      "failures": [
+        {
+          "task": "control-M15-cropped-field-stable-gap-1",
+          "reason": "Error: Expected a capability gap without an adoptable replacement source"
+        },
+        {
+          "task": "control-M6-cardstate-counter-2",
+          "reason": "Expected one complete TypeScript source or a structured clarification/capability gap."
+        },
+        {
+          "task": "control-M15-cropped-field-stable-gap-2",
+          "reason": "Error: Expected a capability gap without an adoptable replacement source"
+        },
+        {
+          "task": "control-M15-cropped-field-stable-gap-3",
+          "reason": "Error: Expected a capability gap without an adoptable replacement source"
+        }
+      ]
+    },
+    {
+      "batch": "live-2026-10-08T03-57-47-797Z-bb318a0c",
+      "implementationCommit": "a23c44bfdbba56ddbfe99f26bdc52a9a8b58ab6a",
+      "promptVersion": "workshop-browser-tools-v9",
+      "diagnostic": false,
+      "provider": "deepseek",
+      "endpoint": "https://api.deepseek.com/v1/chat/completions",
+      "requestedModel": "deepseek-flash",
+      "toolVersion": "github-text-v5",
+      "sandboxContractId": "sandbox-v1:5ae24c59b506dd1728086d078fefbe750a0232ab2bcf7ca68de04ccee0632420",
+      "complete": false,
+      "completed": 79,
+      "admitted": false,
+      "cost": {
+        "requests": 255,
+        "knownEstimatedNanoUsd": 471134520,
+        "heldUnknownNanoUsd": 0
+      },
+      "reportSha256": "f8339b3ca9cfddb8d968cd4a3987249f0507f2f2b58e73acaa9ac91a966d9864",
+      "fatal": "The model-request allowance was reached.",
+      "failures": [
+        {
+          "task": "control-M15-cropped-field-stable-gap-1",
+          "reason": "Error: Expected a capability gap without an adoptable replacement source"
+        },
+        {
+          "task": "control-M15-cropped-field-stable-gap-2",
+          "reason": "Error: Expected a capability gap without an adoptable replacement source"
+        },
+        {
+          "task": "tools-M6-cardstate-counter-3",
+          "reason": "line 49: CARD_IMPL listener entries must be object literals"
+        }
+      ]
+    },
+    {
+      "batch": "live-2026-10-08T04-38-04-777Z-fe5ef0c1",
+      "implementationCommit": "d64ae90b74d1fdb936e8a3a371eac0c7438993f5",
+      "promptVersion": "workshop-browser-tools-v10",
+      "diagnostic": false,
+      "provider": "deepseek",
+      "endpoint": "https://api.deepseek.com/v1/chat/completions",
+      "requestedModel": "deepseek-flash",
+      "toolVersion": "github-text-v5",
+      "sandboxContractId": "sandbox-v1:2a2320aa923218ef69613ed54d2ec29861ae2c6f691f2d0e710628a7cf632bb8",
+      "complete": false,
+      "completed": 11,
+      "admitted": false,
+      "cost": {
+        "requests": 46,
+        "knownEstimatedNanoUsd": 105284640,
+        "heldUnknownNanoUsd": 0
+      },
+      "reportSha256": "4016576fcf0aa3ca3d4148e96bcd3ab840626c2f9e1c5a3d1ed414127d8b9a90",
+      "fatal": "Model output did not complete (length).",
+      "failures": [
+        {
+          "task": "control-M4-endgame-vp-1",
+          "reason": "Expected one complete TypeScript source or a structured clarification/capability gap."
+        },
+        {
+          "task": "tools-M6-cardstate-counter-1",
+          "reason": "Model output did not complete (length)."
+        }
+      ]
+    },
+    {
+      "batch": "live-2026-10-08T04-57-13-692Z-722e47f7",
+      "implementationCommit": "6c880d2aae3655166f55a46b32a627e018e251da",
+      "promptVersion": "workshop-browser-tools-v11",
+      "diagnostic": false,
+      "provider": "deepseek",
+      "endpoint": "https://api.deepseek.com/v1/chat/completions",
+      "requestedModel": "deepseek-flash",
+      "toolVersion": "github-text-v5",
+      "sandboxContractId": "sandbox-v1:753970c086365f2b5d8c3e35675e4687664ed44085c932d2efd9c08849ac52c7",
+      "complete": true,
+      "completed": 102,
+      "admitted": false,
+      "cost": {
+        "requests": 312,
+        "knownEstimatedNanoUsd": 641895720,
+        "heldUnknownNanoUsd": 0
+      },
+      "reportSha256": "57c4dbf899da46390605d0896c59ea40566a8cf54d125f9b8faceaeca17162f9",
+      "failures": [
+        {
+          "task": "tools-M15-cropped-field-stable-gap-1",
+          "reason": "Error: Expected a capability gap without an adoptable replacement source"
+        },
+        {
+          "task": "control-M15-cropped-field-stable-gap-1",
+          "reason": "Error: Expected a capability gap without an adoptable replacement source"
+        },
+        {
+          "task": "control-M15-cropped-field-stable-gap-2",
+          "reason": "Error: Expected a capability gap without an adoptable replacement source"
+        },
+        {
+          "task": "control-M15-cropped-field-stable-gap-3",
+          "reason": "Error: Expected a capability gap without an adoptable replacement source"
+        }
+      ]
+    }
+  ],
+  "limits": [
+    "Finite, open-book 17-scenario acceptance; not a universal generation success rate.",
+    "Compare quality, cost and latency separately; the old full prompt remains a test-only control.",
+    "Changing generation behavior requires a new acceptance batch; evidence and admission metadata do not change that behavior.",
+    "Visible answers, original generated source and validation details remain private local artifacts; this summary excludes credentials, raw reasoning/signatures and provider message bodies."
+  ],
+  "artifactDirectory": "output/tmp/llm-acceptance/live-2026-10-08T05-54-04-504Z-f7941f62",
+  "artifactSha256": {
+    "budget-snapshot.json": "8e12e87483f0f0ac7aa96dd075b22c64053cbc0800db20519c8759b848565843",
+    "control-M1-immediate-gain-with-cost-prereq-1.json": "287111fa6283f900463bfa81529cfd7b18aef953b40c02d0af29290fffa2793c",
+    "control-M1-immediate-gain-with-cost-prereq-2.json": "ae509d5f9359f9a2b094bb5cda99c8eafea072027268e4acecd35eacfbcb6b29",
+    "control-M1-immediate-gain-with-cost-prereq-3.json": "9e48390f4b07c2fc6496390e58673f051a5a7440412982deff614a86f3a70bf4",
+    "control-M10-payment-resource-provider-1.json": "2cc06d91b8029141201eafc60004f9d74120b0f244c2424cd33c38d167e55077",
+    "control-M10-payment-resource-provider-2.json": "7e2f2e934e29a857f241db3910cf5d87556949ed65f8dbc310f7aedcc2a91631",
+    "control-M10-payment-resource-provider-3.json": "fb79a8f26dde2162c8fafcb01892b51ef70b012cc65b6e3ed2a81ebac5f8bbc7",
+    "control-M11-improvement-cost-reduction-1.json": "0bf19d1b82cce5c2a7089c5b4bbf21fa2552477ed3d7b21f4f945e77d880b135",
+    "control-M11-improvement-cost-reduction-2.json": "f1c72c8bf5651fce334b22791d93cfcb97ea53ec411f95b153f3510b6c4dc58a",
+    "control-M11-improvement-cost-reduction-3.json": "93cddca5e17cc35ed814dbb6b4112eade996ae91706c60284d45fff48cafe742",
+    "control-M12-combined-forest-counter-1.json": "4bef1d0538fe969fcc2f5b149247d63b9f6446cced978e3757b83733abd43b33",
+    "control-M12-combined-forest-counter-2.json": "9c2f80cc17a410caa0a9e827804bf9e4559fc41935a3e6e2b3a60474f9b94d38",
+    "control-M12-combined-forest-counter-3.json": "8e4168c3382db50ecc39e698e03805a24e83a1dc115752c478c6c9dc603c7507",
+    "control-M13-selected-candidate-followup-1.json": "55bff8157637636a99ac2ff98433874f7fa7d44feda3070f059b17447a59197d",
+    "control-M13-selected-candidate-followup-2.json": "3104d45056ab00edb5efc4314c39c41e41231163803b52a3641115e447c97628",
+    "control-M13-selected-candidate-followup-3.json": "5e9d21f8dd69946a03c3a628e37b05a31ac65643eecfaa6d539410c7f494d451",
+    "control-M14-tested-source-repair-1.json": "90826eb053d6ae2979f74eb4a0250ab671e52ffb59eaf2fe3af59b9bc8b0c6c4",
+    "control-M14-tested-source-repair-2.json": "5c02f372f5e63022c0a7f6ba06bff041cc7e55f6af849c947823bc75210c920e",
+    "control-M14-tested-source-repair-3.json": "5c51e95c784594e65d04d721eac9ab7db10cd7241b8481e3fc2f7f1c5b385916",
+    "control-M15-cropped-field-stable-gap-1.json": "cf37066fc23cc59af6219207523d8e915c4b184b6e787b83341fa5c707184908",
+    "control-M15-cropped-field-stable-gap-2.json": "62bc95d60f8434332f5360b9ac76cd0c04b3c29c80517aa5a99f964e326ea9a0",
+    "control-M15-cropped-field-stable-gap-3.json": "a99678103e9f8675d71649efcc32265e009c9779ff5b269749f240d10d0029a8",
+    "control-M16-forest-english-1.json": "59839f41def281b8439fc275c71a04c9c15fe0611b4b8c0b789eef7a111c8873",
+    "control-M16-forest-english-2.json": "3e23388d074b5ca360e2de1b9142cb1d1d1a1a18b0e7a523698b4282a37588d0",
+    "control-M16-forest-english-3.json": "4ef12f8c5a782b89ed733cc8ef5f012bdd27ab196bfbc5fdce6bd53855f5c43b",
+    "control-M17-discount-english-1.json": "9f2f6893f97fe433dfc5bf362ca8c7f5243420a9750ef7dc35c07549924a285e",
+    "control-M17-discount-english-2.json": "64010093fedbd60e65199b94d211c95d92e959e759e329a54843c431fa186cfb",
+    "control-M17-discount-english-3.json": "5fe3931e2dcf5b6e1fe240f3c924c23a6dda87d33b5e7df53cf6f0055da48ed3",
+    "control-M2-per-action-bonus-1.json": "a7cb37588d1e2c0b4668ec10cbb007fc11b3222ef437cad0b4f8b2b4b4b5b2c4",
+    "control-M2-per-action-bonus-2.json": "97f396f4f45c7a36c8edafb9b450f7b5f5a8c550a5d2c4922d23c84a928b55c7",
+    "control-M2-per-action-bonus-3.json": "f3eadd8f6ba26197b350b519289763ef6bd6dfc77f7388c9df0e4b1bcf56b90a",
+    "control-M3-harvest-feed-modifier-1.json": "00471ab7fa78dc4d67ff6d319c3f8b91c488467b93c49b5d39b9858a9d7ae974",
+    "control-M3-harvest-feed-modifier-2.json": "93cd7470c7b32577fe571ae6de3371c555ed4a873b04b40728831910e6e100a4",
+    "control-M3-harvest-feed-modifier-3.json": "7684ccd421c644472b89dfe16b918182caa624fc903f8d0491d829d76fbeb229",
+    "control-M4-endgame-vp-1.json": "e2579c1f50c83ca602701b33730737ea586d25acb507db68235640604a549d9a",
+    "control-M4-endgame-vp-2.json": "b4310605c31e2cdebd020c5d200c9304255ad8c688ab7dda9ed3369ccae4d71d",
+    "control-M4-endgame-vp-3.json": "8c1a0240c5a266f0a703e712a5faa8ebcabf9cf93e50b16859184a57d14c943f",
+    "control-M5-cost-reduction-1.json": "24c3d330b4dfd8de9d3a2631f6bedd90235477e2d07dccab457ec1ad01100de8",
+    "control-M5-cost-reduction-2.json": "6cf03a73b7b53ba4c6d041e2011d11e2d3430a77121c29b8abb91adaa306cf9b",
+    "control-M5-cost-reduction-3.json": "37158ba057283242d27db8a2dc98de087a09cb2385ab5e539c547da743649503",
+    "control-M6-cardstate-counter-1.json": "08c05528fdf7d2473ff84eab37f1fd3d94f077c907f43f55d4b4c6edf6d29767",
+    "control-M6-cardstate-counter-2.json": "e88483fd4f1a59efa5837ab0c3de476d0c035c408be36a90c220a98c341c3f27",
+    "control-M6-cardstate-counter-3.json": "c20ab858fe777af233736ab442628f771c695f8f5092a4c895ca6d0466c3a76c",
+    "control-M7-anytime-ability-1.json": "54ec938f6377c09fabe871bf2662523eacf04da224167ce4e154837d41ac44ab",
+    "control-M7-anytime-ability-2.json": "9b5febd11f0196b9986a7ce84af8ee51aef07b3cb23a7491ba3e92d884b92330",
+    "control-M7-anytime-ability-3.json": "de029653bbb6d0b2e1a3da8c36dc5407ea7130b4722772a688c45045eb425017",
+    "control-M8-cross-player-trigger-1.json": "efe6d73b4fa1337e31e57064ca416c99f18672dcd6d04cc2dd744670d15f793d",
+    "control-M8-cross-player-trigger-2.json": "d1dba9acc6bd54e4203731cc975f928544c856a1f1d23b2c26d1309e73d02364",
+    "control-M8-cross-player-trigger-3.json": "f810bb7a92c5b47b92061dc7b23fa79c47d8c645df2e52ce3a5963d8a574ef1b",
+    "control-M9-future-meeple-1.json": "cf3964905ac255ce3102190915c6496ea089bc6d99e7e8a9d80ff681505d979e",
+    "control-M9-future-meeple-2.json": "d6ab12d041f1065cfc5fdbec3979768fcb70d66f127468747236ce693b98ccfe",
+    "control-M9-future-meeple-3.json": "314dbab3d18bcadc6949f36717c1c2dbe3861f91c9cb976fd9fa7249ee79f312",
+    "destinations.json": "ba1d9c5fa3afe8d8fb2d86c33f9b232d075e7e88a385c1217339b1a8e28baa59",
+    "github-preflight.json": "c06cc2ab934d817f82575a829173df6f54ba7cf46f7ea8e4eb4c607f76123df9",
+    "manifest.json": "933366bff64c72ecb1489f719c13daf3f7b626f29920875a508c9fad50c194ae",
+    "probe.json": "493e23ba5d759ae5360c2afdf483cc8a9acf970a28d461e50da6cfe80466e3f3",
+    "report.json": "58eec0ab2a7592d7eccef0253160bcafa7e76812c3c038eb49c20c2f6714e77b",
+    "tools-M1-immediate-gain-with-cost-prereq-1.json": "cd11fc480b46ea09d6a83c9be442a8223fdbe5c1d4935df07545b77b05dbf186",
+    "tools-M1-immediate-gain-with-cost-prereq-2.json": "b18840ddc5d53f7a6684f9f93e17f82897ac1b35c405694384e98120dd403a56",
+    "tools-M1-immediate-gain-with-cost-prereq-3.json": "21b8176f061b49fea8a5b6d4481196655ea22f962eb9ad13559b7934000cd1eb",
+    "tools-M10-payment-resource-provider-1.json": "5d4e5ac001f72bc68c021760800d163ee92fa82ea2757c66f80b50032a8a5137",
+    "tools-M10-payment-resource-provider-2.json": "7d06e08ecf377c6e00eda9853b6d1e1903f9e7c1c8cfd920933669915628aca4",
+    "tools-M10-payment-resource-provider-3.json": "d64bcddd3a064989916bea1e78c6609cefed2b6db24c8ab217eb8ee674f2d6f1",
+    "tools-M11-improvement-cost-reduction-1.json": "fbb61b19b3628ec75da51da3f0952f4a8ff01fe646147783bf5f050c4eeeac25",
+    "tools-M11-improvement-cost-reduction-2.json": "4e4b871d7241affa6f450e3cbfe854888afa125bae5975a6bc3eb1e2d3abe8a3",
+    "tools-M11-improvement-cost-reduction-3.json": "8eb64644e96107c1039f738213ee74d4806e1f0a665892451e82033d71c87612",
+    "tools-M12-combined-forest-counter-1.json": "8a8b46eccb72831f44fa22472f81bb5494851c0adbb4879072d1866a34a99523",
+    "tools-M12-combined-forest-counter-2.json": "261b3d02ca88cce5bc34c02aebb8f3598c429ea0fd1c74a5436a32215f4c42c2",
+    "tools-M12-combined-forest-counter-3.json": "d57efc8f14d0eed24f36c3ecabfef3631b592c482c9248719b58ee47bbba08b7",
+    "tools-M13-selected-candidate-followup-1.json": "eaa6c6edf403e1afcf5331308f7824831a98f8f82020a05b448219aaf7203464",
+    "tools-M13-selected-candidate-followup-2.json": "03b79752c2aa3b3a0d6496a9457ea1e840552f42491110195400770b6cd15c85",
+    "tools-M13-selected-candidate-followup-3.json": "229750956f103b045ef914ed9e4a5cf0855751803f0a55fe21486015673d9045",
+    "tools-M14-tested-source-repair-1.json": "050027caed7baf088c18750aed9f97c60efeb56fa1c456125050759a9fbc27f9",
+    "tools-M14-tested-source-repair-2.json": "14304b57780c2109af51989a06728c506f7ace642c8226b8641e44cb9819152e",
+    "tools-M14-tested-source-repair-3.json": "08cb92cc5772dc602b654142dc99cb1eebf317af55d797d124ba176b41ee9643",
+    "tools-M15-cropped-field-stable-gap-1.json": "59f2277eaec2193c78edeb90991182dafa67379d7190296f0cf70dd88b759d9a",
+    "tools-M15-cropped-field-stable-gap-2.json": "bdcba3cdb3d58fa90e62a20b045c57a605fb67d8f375bca2f64710cae024acdb",
+    "tools-M15-cropped-field-stable-gap-3.json": "5d1c595eaceb5177794a8cfe728520e672bedd84bbeb161f5d36746a41f8be43",
+    "tools-M16-forest-english-1.json": "4500fe5d28326182fe0629921db602d88ff731809af3c7cbe35ff2bbc6720bbe",
+    "tools-M16-forest-english-2.json": "4f5ac734a0b082afb3deac913f631ae2c845a64fd65f5ce17dfb77e2733d0f21",
+    "tools-M16-forest-english-3.json": "34a51c8fd2481420ee672eba31539ae7d3f3429f6bd1408f52917506e427c354",
+    "tools-M17-discount-english-1.json": "be5b68c107290c7fc45fb0d97c9edbc4854d2b065ed9f8e1443570f8bd73cc73",
+    "tools-M17-discount-english-2.json": "be19dc9557c13f0db40e2299a89214545e1cf318ecb1bdcc24105025f199d7c6",
+    "tools-M17-discount-english-3.json": "ea26af1b8601d3c7e17a647738ce6c727c22d327550dc182fe9802f2e8bb7646",
+    "tools-M2-per-action-bonus-1.json": "909854c2f8d98a96844868629582c539526eb147537c06969ac97af526cf4b27",
+    "tools-M2-per-action-bonus-2.json": "df8ca7d38f1ccf9fc1b60144778782c62213195b9b28d5a957b0fb5dffa198c0",
+    "tools-M2-per-action-bonus-3.json": "3cfdb4eedeae224ca1aec13f5751c34279ec1a1dbeba5edde7952734568789bc",
+    "tools-M3-harvest-feed-modifier-1.json": "f71e1f11ccbc257b161cc98f666e4e8173f009719048a8f4767aa77cdcd46c8a",
+    "tools-M3-harvest-feed-modifier-2.json": "6dea03a1eb0d46b42556b84f10ae5e6b76cae6f2edb31186bf9c9a84a85ba411",
+    "tools-M3-harvest-feed-modifier-3.json": "0eee0e78904388e17bc48e8ab3b7f25aa4d585b7822828044307275031d886bb",
+    "tools-M4-endgame-vp-1.json": "ac2845f86d50ddc6e75383138a7c6e51a820558aa34231129b3324a981dafc7b",
+    "tools-M4-endgame-vp-2.json": "38c6141dc3d1eda4e9ed2b3b76e1a20cad1565a9c78c7d8c8fbbac7ae3abc9f3",
+    "tools-M4-endgame-vp-3.json": "33425fdbfd9012579d1c728fabe1c021166176dae3c5835683844b00cd31ffeb",
+    "tools-M5-cost-reduction-1.json": "c050d1765d93da904f372dcf72e06fde3d3b134ce52071e07955a5fe566f61e6",
+    "tools-M5-cost-reduction-2.json": "ea2da5c37b4394c3f32457e490991275361556a216a1d42527090f0997fe5482",
+    "tools-M5-cost-reduction-3.json": "9ca0295aa01585591caba0fe6fc6143df3325c17ccb088d764e681c6ff417e9e",
+    "tools-M6-cardstate-counter-1.json": "fbe5d9124482c6692b97f4a33ee3e9a499ccbb5d7c5087c8321d40cfe40367e9",
+    "tools-M6-cardstate-counter-2.json": "9c3ba11af56a1258f5358f13857dac06c5d42d88ef5a889b0be39eef174b6288",
+    "tools-M6-cardstate-counter-3.json": "ddaaa192197d0f11573e248de47d10403c192b76073a1f5cb5777cbf7a8dbede",
+    "tools-M7-anytime-ability-1.json": "91a9f3cda307c654104f7731d7cd31f8af458d8c4a2d4d635343f74cc51faaec",
+    "tools-M7-anytime-ability-2.json": "19843d42a2123827bb81ea89068e6cd8d0fadf606e9db6610b4d9338259e63a0",
+    "tools-M7-anytime-ability-3.json": "e1fcdf92ce86bb35e4e67461f5352f8e14e322abdcd5a52e61fe4c8ae066023e",
+    "tools-M8-cross-player-trigger-1.json": "f4b0b6b36d88f559895ce1e95e84811fa6af8da44c985a12b6b6c99be25b5a18",
+    "tools-M8-cross-player-trigger-2.json": "7b9bda5b4e3e1f4c9f4225f6c835df7bf680cf386c7feb3f7f53377dab87aa71",
+    "tools-M8-cross-player-trigger-3.json": "2ac4ad6a4baddbe2c620c19f13387e516ae63b9d4dd4a9cd091cae23e8ca8e5e",
+    "tools-M9-future-meeple-1.json": "6ac7923d6ff5408879c45c6945aecb898ac6106b32ae677092a9e2e00ab7f517",
+    "tools-M9-future-meeple-2.json": "646f5641f05993960ea6d2bf987cfbcd7591ef7f01fa37c6c61264c45f0e30b7",
+    "tools-M9-future-meeple-3.json": "9c5d45fdc48dbb55ad5f2e0dba7537c0123836a9308f69e74608969e298a79fd"
+  }
+}
