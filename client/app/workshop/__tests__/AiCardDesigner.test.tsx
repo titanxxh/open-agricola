@@ -421,7 +421,7 @@ describe('AiCardDesigner AI config header', () => {
   })
 
   it('keeps unverified model generation closed without falling back to the old prompt', async () => {
-    localStorage.setItem('open-agricola-llm-config', JSON.stringify({ provider: 'deepseek', apiKey: 'test', model: 'deepseek-v4-flash', baseUrl: 'https://unverified.example/v1' }))
+    localStorage.setItem('open-agricola-llm-config', JSON.stringify({ provider: 'deepseek', apiKey: 'test', model: 'deepseek-flash', baseUrl: 'https://unverified.example/v1' }))
     const provider = vi.fn()
     vi.stubGlobal('fetch', provider)
     render(<LocaleProvider><AiCardDesigner initialCard={existingCard} onClose={() => {}} apiFetch={apiFetchForExistingCard} /></LocaleProvider>)
@@ -836,7 +836,7 @@ describe('AiCardDesigner AI config header', () => {
     // DeepSeek selection on render, save a config first then test:
     localStorage.setItem(
       'open-agricola-llm-config-art',
-      JSON.stringify({ provider: 'deepseek', apiKey: 'test', model: 'deepseek-v4-flash' }),
+      JSON.stringify({ provider: 'deepseek', apiKey: 'test', model: 'deepseek-flash' }),
     )
     // The collapsed-bar test above already covers the summary rendering. Here we
     // just confirm the registry-derived label is "DeepSeek" so the mismatch path

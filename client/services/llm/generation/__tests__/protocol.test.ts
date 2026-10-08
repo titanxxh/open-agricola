@@ -38,7 +38,7 @@ describe('browser model protocol', () => {
       { choices: [], usage: { prompt_tokens: 5, completion_tokens: 7, prompt_cache_hit_tokens: 2, completion_tokens_details: { reasoning_tokens: 3 } } },
     ])).mockResolvedValueOnce(stream([frame({ content: 'finished' }, 'stop')]))
     const authorize = vi.fn()
-    const transport = createToolTransport({ provider: 'deepseek', model: 'deepseek-v4-flash', apiKey: 'token-canary' }, { fetch: fetchModel, authorize })
+    const transport = createToolTransport({ provider: 'deepseek', model: 'deepseek-flash', apiKey: 'token-canary' }, { fetch: fetchModel, authorize })
     const visible: string[] = []
     const turn = await transport.complete([{ role: 'user', content: 'request' }], REFERENCE_TOOLS, signal(), text => visible.push(text))
     expect(visible.join('')).toBe('查资料')
@@ -75,7 +75,7 @@ describe('browser model protocol', () => {
 
   it('cancels a stalled reader and never automatically repeats a failed POST', async () => {
     const fetchModel = vi.fn<typeof fetch>().mockRejectedValue(new Error('network down'))
-    const transport = createToolTransport({ provider: 'deepseek', model: 'deepseek-v4-flash', apiKey: 'test' }, { fetch: fetchModel, authorize: () => {} })
+    const transport = createToolTransport({ provider: 'deepseek', model: 'deepseek-flash', apiKey: 'test' }, { fetch: fetchModel, authorize: () => {} })
     await expect(transport.complete([], [], signal())).rejects.toThrow('not retried')
     expect(fetchModel).toHaveBeenCalledTimes(1)
     const abort = new AbortController()
@@ -86,27 +86,27 @@ describe('browser model protocol', () => {
 
   it('sends the admitted request identity even when the provider returns a different model name', async () => {
     const fetchModel = vi.fn<typeof fetch>().mockResolvedValue(stream([
-      { model: 'deepseek-flash', choices: [{ index: 0, delta: { content: 'complete source' }, finish_reason: 'stop' }] },
+      { model: 'synthetic-returned-revision', choices: [{ index: 0, delta: { content: 'complete source' }, finish_reason: 'stop' }] },
     ]))
-    const transport = createToolTransport({ provider: 'deepseek', model: 'deepseek-v4-flash', apiKey: 'browser-only-test-key' }, { fetch: fetchModel })
+    const transport = createToolTransport({ provider: 'deepseek', model: 'deepseek-flash', apiKey: 'browser-only-test-key' }, { fetch: fetchModel })
     const result = await transport.complete([{ role: 'user', content: 'Generate a card' }], REFERENCE_TOOLS, signal())
-    expect(result.returnedModel).toBe('deepseek-flash')
+    expect(result.returnedModel).toBe('synthetic-returned-revision')
     expect(fetchModel).toHaveBeenCalledTimes(1)
     const [url, init] = fetchModel.mock.calls[0]
     expect(url).toBe('https://api.deepseek.com/v1/chat/completions')
-    expect(JSON.parse(String(init?.body)).model).toBe('deepseek-v4-flash')
+    expect(JSON.parse(String(init?.body)).model).toBe('deepseek-flash')
   })
 
   it('checks admission against the actual custom endpoint, provider and exact model', () => {
-    expect(() => createToolTransport({ provider: 'deepseek', model: 'deepseek-v4-flash', apiKey: 'test', baseUrl: 'https://example.com/v1' })).toThrow('awaiting')
-    expect(() => createToolTransport({ provider: 'deepseek', model: 'deepseek-flash', apiKey: 'test' })).toThrow('awaiting')
+    expect(() => createToolTransport({ provider: 'deepseek', model: 'deepseek-flash', apiKey: 'test', baseUrl: 'https://example.com/v1' })).toThrow('awaiting')
+    expect(() => createToolTransport({ provider: 'deepseek', model: 'deepseek-v4-flash', apiKey: 'test' })).toThrow('awaiting')
     expect(() => createToolTransport({ provider: 'deepseek', model: 'deepseek-v4-pro', apiKey: 'test' })).toThrow('awaiting')
-    expect(() => createToolTransport({ provider: 'openrouter', model: 'deepseek-v4-flash', apiKey: 'test', baseUrl: 'https://api.deepseek.com/v1' })).toThrow('awaiting')
+    expect(() => createToolTransport({ provider: 'openrouter', model: 'deepseek-flash', apiKey: 'test', baseUrl: 'https://api.deepseek.com/v1' })).toThrow('awaiting')
   })
 
   it('does not send a request that fails its cost reservation', async () => {
     const fetchModel = vi.fn<typeof fetch>()
-    const transport = createToolTransport({ provider: 'deepseek', model: 'deepseek-v4-flash', apiKey: 'test' }, {
+    const transport = createToolTransport({ provider: 'deepseek', model: 'deepseek-flash', apiKey: 'test' }, {
       fetch: fetchModel, authorize: () => {}, beforePost: async () => { throw new Error('Budget exhausted') },
     })
     await expect(transport.complete([], [], signal())).rejects.toMatchObject({ kind: 'preflight', message: 'Budget exhausted' })
