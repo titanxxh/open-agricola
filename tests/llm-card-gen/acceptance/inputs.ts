@@ -64,7 +64,9 @@ export function assertCapabilityGap(kind: string | undefined, message: string, h
   if (kind !== 'capability-gap' || hasSource) throw new Error('Expected a capability gap without an adoptable replacement source')
   for (const [label, pattern] of [
     ['occupied crop field', /(?:谷物|作物|grain|crop)/i], ['retained crops', /(?:保留|保持|retain|preserv|keep)/i],
-    ['ordinary payment', /(?:支付|费用|payment|cost)/i], ['component supply', /(?:组件|库存|供应|supply|component|piece)/i],
+    // A lexical screen, not semantic proof. Qualify new fee synonyms so a
+    // waived fee or a paid API does not satisfy the ordinary-payment concept.
+    ['ordinary payment', /(?:支付|费用|payment|cost|(?:正常|照常|仍需|仍要)(?:付款|付费)|(?:付款|付费)[^。！？\n]{0,120}正常结算)/i], ['component supply', /(?:组件|库存|供应|supply|component|piece)/i],
     ['missing candidate/settlement contract', /(?:getSpecialStablePositions|applySpecialStable|候选|结算|candidate|settlement)/i],
   ] as const) if (!pattern.test(message)) throw new Error(`Capability gap did not explain ${label}`)
 }

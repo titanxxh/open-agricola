@@ -24,6 +24,7 @@ import {
 import { WorkshopAbilityPanel } from './WorkshopAbilityPanel'
 import { generationAdmission, resolveGenerationTarget } from '../../services/llm/generation/admission'
 import type { PlaytestFailure, PlaytestSource } from '../../services/llm/generation/request'
+import { sandboxFailureFor, type SandboxPlaytest } from './sandbox-playtest'
 import { LocalizationModal, isLocaleEntryComplete } from './LocalizationModal'
 import { useLocale } from '../../contexts/LocaleContext'
 import { PlayerCard } from '../../components/common/PlayerCard'
@@ -935,8 +936,7 @@ type AiCardDesignerProps = {
   onClose: () => void
   onAddToSandboxAndRestart?: (cardDbId: string, versionId: string, source: PlaytestSource) => Promise<boolean>
   sandboxErrors?: string[] | null
-  sandboxSource?: PlaytestSource | null
-  sandboxFailure?: PlaytestFailure | null
+  sandboxPlaytest?: SandboxPlaytest | null
   onCardLoaded?: (cardDbId: string) => void
   apiFetch?: ApiFetch
 }
@@ -947,8 +947,7 @@ export function AiCardDesigner({
   onClose,
   onAddToSandboxAndRestart,
   sandboxErrors,
-  sandboxSource,
-  sandboxFailure,
+  sandboxPlaytest,
   onCardLoaded,
   apiFetch,
 }: AiCardDesignerProps) {
@@ -976,9 +975,9 @@ export function AiCardDesigner({
   const [pendingStage, setPendingStage] = useState<WorkshopStage | null>(null)
   const [sandboxConfirmation, setSandboxConfirmation] = useState(false)
   const [runtimeSandboxErrors, setRuntimeSandboxErrors] = useState<string[] | null>(null)
-  const [localSandboxSource, setLocalSandboxSource] = useState<PlaytestSource | null>(null)
   const [runtimeSandboxFailure, setRuntimeSandboxFailure] = useState<PlaytestFailure | null>(null)
-  const testedSource = sandboxSource === undefined ? localSandboxSource : sandboxSource
+  const testedSource = sandboxPlaytest?.source
+  const sandboxFailure = sandboxFailureFor(sandboxPlaytest, sandboxErrors ?? [])
   const sandboxGateErrors = sandboxErrors?.length ? sandboxErrors : runtimeSandboxErrors
   const [versions, setVersions] = useState<WorkshopDraftVersion[]>([])
   const [versionsLoading, setVersionsLoading] = useState(false)
@@ -1018,10 +1017,20 @@ export function AiCardDesigner({
     ? controllerState
     : null
 
+  const sandboxOwner = { workspaceId: currentCardDbId, playtest: sandboxPlaytest, versionId: workspaceState?.session.sandboxTestVersionId }
+  const sandboxOwnerRef = useRef(sandboxOwner)
+  sandboxOwnerRef.current = sandboxOwner
+  const confirmingPlaytestRef = useRef(false)
+  const sandboxLifetimeRef = useRef(0)
+
+  useEffect(() => () => { sandboxLifetimeRef.current += 1 }, [])
+
   useEffect(() => {
     setRuntimeSandboxErrors(null)
     setRuntimeSandboxFailure(null)
-  }, [testedSource])
+    if (confirmingPlaytestRef.current) setSaving(false)
+    confirmingPlaytestRef.current = false
+  }, [sandboxPlaytest, currentCardDbId])
 
   useEffect(() => {
     if (error) errorRef.current?.focus()
@@ -1437,9 +1446,7 @@ export function AiCardDesigner({
       setSandboxConfirmation(false)
       setRuntimeSandboxErrors(null)
       setRuntimeSandboxFailure(null)
-      setLocalSandboxSource(null)
       if (await onAddToSandboxAndRestart(currentCardDbId, versionId, binding)) {
-        setLocalSandboxSource(binding)
         updateSession({ sandboxTestVersionId: versionId })
       }
     } catch (reason) {
@@ -1452,6 +1459,13 @@ export function AiCardDesigner({
   const handleConfirmSandboxPass = async () => {
     const versionId = workspaceState?.session.sandboxTestVersionId
     if (!versionId || !sandboxConfirmation) return
+    const owner = sandboxOwnerRef.current
+    const lifetime = sandboxLifetimeRef.current
+    const stillCurrent = () => sandboxLifetimeRef.current === lifetime
+      && sandboxOwnerRef.current.workspaceId === owner.workspaceId
+      && sandboxOwnerRef.current.playtest === owner.playtest
+      && sandboxOwnerRef.current.versionId === owner.versionId
+    confirmingPlaytestRef.current = true
     setSaving(true)
     setError('')
     try {
@@ -1459,8 +1473,9 @@ export function AiCardDesigner({
       const payload = await response.json() as {
         cardWarnings?: unknown
         error?: string
-        state?: { gameSeed?: number | string }
+        gameInstanceId?: string
       }
+      if (!stillCurrent()) return
       if (!response.ok) {
         throw new Error(payload.error ?? `Request failed (${response.status})`)
       }
@@ -1469,16 +1484,19 @@ export function AiCardDesigner({
         : []
       setRuntimeSandboxErrors(errors.length > 0 ? errors : null)
       const samePlaytest = testedSource?.workspaceId === currentCardDbId && testedSource?.versionId === versionId
-        && (testedSource.gameSeed === undefined || testedSource.gameSeed === payload.state?.gameSeed)
-      setRuntimeSandboxFailure(errors.length && samePlaytest ? { ...testedSource, errors } : null)
+        && sandboxPlaytest?.instanceId === payload.gameInstanceId
+      setRuntimeSandboxFailure(samePlaytest ? sandboxFailureFor(sandboxPlaytest, errors) : null)
       if (!samePlaytest) throw new Error(locale === 'zh' ? '试玩版本已改变，请重新固化并启动沙盒。' : 'The playtest version changed. Pin and start the sandbox again.')
       if (errors.length > 0) return
       await confirmSandboxPass(versionId, errors)
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : String(reason))
+      if (stillCurrent()) setError(reason instanceof Error ? reason.message : String(reason))
     } finally {
-      setSaving(false)
-      setSandboxConfirmation(false)
+      if (stillCurrent()) {
+        confirmingPlaytestRef.current = false
+        setSaving(false)
+        setSandboxConfirmation(false)
+      }
     }
   }
 
@@ -2024,6 +2042,14 @@ export function AiCardDesigner({
             )}
 
             {!controllerLoading && workspaceState && <div style={{ display: activeStage === 'ability' ? undefined : 'none' }}>
+              {sandboxGateErrors?.length && !sandboxFailure && !runtimeSandboxFailure && <section className="ai-validation-error-bar" role="status">
+                <div><strong>{locale === 'zh' ? '试玩报错' : 'Playtest failed'}</strong>
+                  <p>{sandboxGateErrors.join('\n')}</p>
+                  <p>{locale === 'zh'
+                    ? '无法确认这些错误属于当前固定源码。请在沙盒中只保留这张卡，再重新固化并试玩。'
+                    : 'These errors cannot be attributed to the pinned source. Keep only this card in the sandbox, then pin and playtest again.'}</p>
+                </div>
+              </section>}
               <WorkshopAbilityPanel key={workspaceState.workspaceId}
                 state={workspaceState}
                 config={abilityConfig}

@@ -58,4 +58,12 @@ describe('complete declared acceptance matrix', () => {
     expect(() => assertCapabilityGap('capability-gap', 'Not supported', false)).toThrow()
     expect(() => assertCapabilityGap('capability-gap', explanation.replace('payment', 'exchange'), false)).toThrow()
   })
+
+  it.each(['正常付款', '照常付费', '仍需付款', '付款（2 木/马厩，由建造行动正常结算）', '不能改成免费，仍要正常付费'])('recognizes a normal-payment description: %s', payment => {
+    expect(() => assertCapabilityGap('capability-gap', `沙盒缺少候选与结算写入能力，无法同时保留谷物、${payment}并消耗马厩组件。`, false)).not.toThrow()
+  })
+
+  it.each(['无需付费，直接免费建马厩', '接入付费 API'])('does not mistake an unrelated or waived fee for normal payment: %s', payment => {
+    expect(() => assertCapabilityGap('capability-gap', `沙盒缺少候选与结算能力，保留谷物和组件，但${payment}。`, false)).toThrow('ordinary payment')
+  })
 })

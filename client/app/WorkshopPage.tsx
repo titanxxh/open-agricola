@@ -3,7 +3,8 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useLocale } from '../contexts/LocaleContext'
 import { AiCardDesigner } from './workshop/AiCardDesigner'
-import type { PlaytestFailure, PlaytestSource } from '../services/llm/generation/request'
+import type { PlaytestSource } from '../services/llm/generation/request'
+import { bindSandboxPlaytest, type SandboxPlaytest, type SandboxStartResult } from './workshop/sandbox-playtest'
 import { ProposeModal } from './workshop/ProposeModal'
 import { BrandMark } from '../components/common/BrandMark'
 import { LocaleSwitcher } from '../components/common/LocaleSwitcher'
@@ -292,14 +293,6 @@ export function buildSandboxCardIds(
   const trimmed = typeof extraCardId === 'string' ? extraCardId.trim() : ''
   if (trimmed && !ids.includes(trimmed)) ids.push(trimmed)
   return ids
-}
-
-export type SandboxStartResult = {
-  ok: boolean
-  error?: string
-  cardWarnings?: string[]
-  state?: { gameSeed?: number | string }
-  customCardVersionsLoaded?: Array<{ cardId: string; versionId: string }>
 }
 
 export async function readSandboxStartResponse(
@@ -827,7 +820,7 @@ function CardDetail({ card, isLoggedIn, apiFetch, onBack, onEdit, onAddSandbox, 
 
 // ── Card Editor ──────────────────────────────────────────────────────────────
 
-function CardEditor({ initial, initialCardId, apiFetch, onCancel, onAddToSandboxAndRestart, sandboxErrors, sandboxSource, sandboxFailure, onCardLoaded }: {
+function CardEditor({ initial, initialCardId, apiFetch, onCancel, onAddToSandboxAndRestart, sandboxErrors, sandboxPlaytest, onCardLoaded }: {
   initial?: WorkshopCard
   initialCardId?: string
   apiFetch: (path: string, init?: RequestInit) => Promise<Response>
@@ -835,8 +828,7 @@ function CardEditor({ initial, initialCardId, apiFetch, onCancel, onAddToSandbox
   onAddToSandboxAndRestart?: (cardDbId: string, versionId: string, source: PlaytestSource) => Promise<boolean>
   t: (key: string, params?: Record<string, string | number>) => string
   sandboxErrors?: string[] | null
-  sandboxSource?: PlaytestSource | null
-  sandboxFailure?: PlaytestFailure | null
+  sandboxPlaytest?: SandboxPlaytest | null
   onCardLoaded?: (cardDbId: string) => void
 }) {
   return (
@@ -847,8 +839,7 @@ function CardEditor({ initial, initialCardId, apiFetch, onCancel, onAddToSandbox
         onClose={onCancel}
         onAddToSandboxAndRestart={onAddToSandboxAndRestart}
         sandboxErrors={sandboxErrors}
-        sandboxSource={sandboxSource}
-        sandboxFailure={sandboxFailure}
+        sandboxPlaytest={sandboxPlaytest}
         onCardLoaded={onCardLoaded}
         apiFetch={apiFetch}
       />
@@ -1323,14 +1314,20 @@ export function WorkshopPage() {
   const [myLoading, setMyLoading] = useState(false)
   const [resetSandboxOpen, setResetSandboxOpen] = useState(false)
   const [pendingSandboxErrors, setPendingSandboxErrors] = useState<string[] | null>(null)
-  const [sandboxSource, setSandboxSource] = useState<PlaytestSource | null>(null)
-  const [pendingSandboxFailure, setPendingSandboxFailure] = useState<PlaytestFailure | null>(null)
+  const [sandboxPlaytest, setSandboxPlaytest] = useState<SandboxPlaytest | null>(null)
+  const sandboxLaunchRef = useRef(0)
   const [sandboxActive, setSandboxActive] = useState(false)
   const [sandboxKey, setSandboxKey] = useState(0)
   const [sandboxLocalMode, setSandboxLocalMode] = useState(false)
   const [sandboxLocalFresh, setSandboxLocalFresh] = useState(false)
   const prevView = useRef<View>('home')
   const prevBrowseQuery = useRef({ search: '', sort: 'recent' as 'recent' | 'popular' })
+
+  useEffect(() => {
+    sandboxLaunchRef.current += 1
+    setSandboxPlaytest(null)
+    setPendingSandboxErrors(null)
+  }, [editCardId, user?.id])
 
   const communityDeckEnabled = import.meta.env.VITE_ENABLE_COMMUNITY_DECK === 'true'
 
@@ -1530,8 +1527,8 @@ export function WorkshopPage() {
     exactVersionId?: string,
     testedSource?: PlaytestSource,
   ): Promise<boolean> => {
-    setSandboxSource(null)
-    setPendingSandboxFailure(null)
+    const launch = ++sandboxLaunchRef.current
+    setSandboxPlaytest(null)
     // Browser-local executor: the playtest runs entirely in this browser.
     // Editor flows that pin an extra card / exact draft version still go
     // through the server sandbox (card data isn't in workshop state yet).
@@ -1584,12 +1581,10 @@ export function WorkshopPage() {
           error: `${response.status} ${response.statusText || 'HTTP error'}`,
         })
       const data = await readSandboxStartResponse(response, fallbackError)
+      if (launch !== sandboxLaunchRef.current) return false
       if (data.ok) {
         const warnings: string[] = data.cardWarnings ?? []
-        const binding = testedSource && data.customCardVersionsLoaded?.some(version => version.cardId === extraCardId && version.versionId === testedSource.versionId)
-          ? { ...testedSource, gameSeed: data.state?.gameSeed } : null
-        setSandboxSource(binding)
-        setPendingSandboxFailure(binding && warnings.length ? { ...binding, errors: warnings } : null)
+        setSandboxPlaytest(bindSandboxPlaytest(data, testedSource))
         setSandboxActive(true)
         setSandboxKey(k => k + 1)
         setPendingSandboxErrors(warnings.length > 0 ? warnings : null)
@@ -1601,6 +1596,7 @@ export function WorkshopPage() {
         return false
       }
     } catch (err) {
+      if (launch !== sandboxLaunchRef.current) return false
       const detail = err instanceof Error && err.message ? `: ${err.message}` : ''
       const error = `${t('platform.sandboxNetworkError')}${detail}`
       setPendingSandboxErrors([error])
@@ -1776,8 +1772,7 @@ export function WorkshopPage() {
           }}
           t={t}
           sandboxErrors={pendingSandboxErrors}
-          sandboxSource={sandboxSource}
-          sandboxFailure={pendingSandboxFailure}
+          sandboxPlaytest={sandboxPlaytest}
         />
         <div className="sandbox-embed">
           <div className="sandbox-embed-toolbar">
