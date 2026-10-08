@@ -7,11 +7,13 @@ import type {
   WorkshopCardType,
   WorkshopDraftContract,
   WorkshopDraftErrorCode,
+  WorkshopPinnedVersionContract,
   WorkshopWorkspaceContract,
 } from '../shared/contract/workshop'
 import { workshopCardJsonFromDefinition } from './workshop-draft-validation.ts'
 import { canGoLive, isReviewStatus, type ReviewStatus } from './workshop-status.ts'
 import { getReviewDecisionProvider } from './workshop-review-provider.ts'
+import { projectWorkshopGeneration, projectGenerationProvenance, projectGenerationResult } from '../shared/projections/workshop-generation.ts'
 
 export type WorkshopDraft = WorkshopDraftContract & {
   compiledCode: string | null
@@ -140,7 +142,7 @@ const serialiseDraft = (draft: WorkshopDraft): {
   codeManifest: string | null
   generation: string
 } => {
-  const generation = structuredClone(draft.generation)
+  const generation = projectWorkshopGeneration(draft.generation)
   const art = generation.art
   if (art && typeof art === 'object' && !Array.isArray(art)) {
     const record = art as Record<string, unknown>
@@ -201,12 +203,14 @@ const provenanceCandidate = (value: unknown): Record<string, unknown> | null => 
     'requestId',
     'createdAt',
     'validation',
+    'sourceFingerprint',
+    'inputFingerprint',
   ]
-  return Object.fromEntries(
+  return { ...Object.fromEntries(
     keys
       .filter(key => candidate[key] !== undefined)
       .map(key => [key, candidate[key]]),
-  )
+  ), ...(projectGenerationProvenance(candidate.provenance) ? { provenance: projectGenerationProvenance(candidate.provenance) } : {}) }
 }
 
 const versionProvenance = (
@@ -301,7 +305,7 @@ const rowToWorkspace = (row: WorkshopCardRow): WorkshopWorkspace => {
       compiledCode,
       codeManifest: row.code_manifest ? parseRecord(row.code_manifest) : null,
       artUrl: row.art_url,
-      generation: parseRecord(row.draft_generation_json),
+      generation: projectWorkshopGeneration(parseRecord(row.draft_generation_json)),
     },
     approvedVersionId: row.approved_version_id,
     sandboxPassVersionId: row.sandbox_pass_version_id,
@@ -549,14 +553,22 @@ export async function adoptCandidate(
 
     const generation = structuredClone(current.draft.generation)
     const previous = generation[input.candidate.kind]
-    generation[input.candidate.kind] = {
+    const adoptedGroup: Record<string, unknown> = {
       ...(previous && typeof previous === 'object' && !Array.isArray(previous)
         ? previous as Record<string, unknown>
         : {}),
       ...(input.candidate.kind === 'art' && input.artInputs ? input.artInputs : {}),
-      lastCompleted: input.candidate,
+      ...(input.candidate.kind === 'ability' ? { lastValid: input.candidate } : { lastCompleted: input.candidate }),
       adopted: input.candidate,
     }
+    if (input.candidate.kind === 'ability') {
+      const latestResult = projectGenerationResult(adoptedGroup.latestResult)
+      if (latestResult) {
+        delete latestResult.failedCandidate
+        adoptedGroup.latestResult = latestResult
+      }
+    }
+    generation[input.candidate.kind] = adoptedGroup
     let draft: WorkshopDraft
     if (input.candidate.kind === 'art') {
       if (!input.candidate.prompt.trim() || !input.candidate.resultUrl.trim()) {
@@ -1160,7 +1172,7 @@ export async function pinCurrentDraftVersion(
     authorId: string
     baseRevision: number
   },
-): Promise<Awaited<{ workspace: WorkshopWorkspace; versionId: string }>> {
+): Promise<{ workspace: WorkshopWorkspace } & WorkshopPinnedVersionContract> {
   return (await db.transaction(async () => {
     const current = (await loadWorkspace(db, input.cardId, input.authorId))
     if (current.revision !== input.baseRevision) {
@@ -1170,9 +1182,12 @@ export async function pinCurrentDraftVersion(
     if (!validation.valid) {
       throw new WorkshopDraftError('not_ready', validation.errors.join('; '), current)
     }
+    const versionId = await ensureVersion(db, current)
+    const version = await loadVersion(db, current.id, versionId)
     return {
       workspace: current,
-      versionId: (await ensureVersion(db, current)),
+      versionId,
+      cardJson: parseRecord(version.card_json),
     }
   })())
 }

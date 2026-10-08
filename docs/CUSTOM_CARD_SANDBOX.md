@@ -6,16 +6,16 @@ This document is the **single source of truth** for what custom-card TypeScript 
 
 Read this document if you maintain:
 
-- AI system prompts: `client/services/llmPrompts.ts` renders hook, phase, scope, and action-ID tables from source truth and descriptive metadata. Descriptions live in `shared/custom-code/sandbox-hook-meta.ts`, `sandbox-listener-phases.ts`, `sandbox-action-ids.ts`, and an exhaustive scope map in the prompt file.
+- AI system prompts: `client/services/llm/generation/prompt.ts` includes the deployed contract returned by `server/workshop-sandbox-contract.ts`. Hook, phase, scope, action-ID, helper and semantic facts come from the running backend and shared source metadata; reference examples are read from GitHub on demand.
 - Workshop UI copy in `client/app/workshop/AiCardDesigner.tsx` or `WorkshopPage.tsx`.
 - Sandbox references in [`docs/ARCHITECTURE.md`](ARCHITECTURE.md).
 - LLM automation in `docs/test/llm-card-gen.md`, whose fixtures exercise this contract against a real model.
 
 When this document changes:
 
-1. Treat it as the human-readable mirror of hooks, phases, scopes, and action IDs. Source constants own the name allowlists: `cardEffectHooks`, `sandboxListenerPhases`, `sandboxListenerScopes`, and `SANDBOX_ALLOWED_ACTION_IDS`. Exhaustive maps own descriptions. `CARD_DESIGNER_SYSTEM_PROMPT` renders them at runtime, so there is no hand-copied prompt table. CI command `pnpm run check:prompt-sync` checks only that the names in each `prompt-sync` block match source.
+1. Treat it as the human-readable mirror of hooks, phases, scopes, and action IDs. Source constants own the name allowlists: `cardEffectHooks`, `sandboxListenerPhases`, `sandboxListenerScopes`, and `SANDBOX_ALLOWED_ACTION_IDS`. Exhaustive maps own descriptions. The deployed sandbox contract renders them at runtime and the browser includes it in the generation prompt; there is no hand-copied prompt table. CI command `pnpm run check:prompt-sync` checks only that the names in each `prompt-sync` block match source.
 2. Make `docs/ARCHITECTURE.md` point here instead of maintaining another copy.
-3. Name synchronization does not cover payment semantics, hook parameters and return values, or helper data shapes. Update executor and prompt-contract tests and run live, record, then replay as described in `docs/test/llm-card-gen.md`.
+3. Name synchronization does not cover payment semantics, hook parameters and return values, or helper data shapes. Update executor and prompt-contract tests and run the fixed browser acceptance batch described by `docs/test/llm-card-gen.md`; historical golden replay remains a separate regression check.
 
 Official card authors working in `shared/cards/<deck>/<id>.ts` are not subject to this sandbox. They may import project helpers directly. This contract applies only to Workshop custom cards.
 
@@ -124,6 +124,8 @@ Player fields in `CardListenerContext` mean:
 | `context.effectPlayer` | Player who receives the effect, normally the owner | N/A | N/A | N/A |
 
 Use `context.ownerPlayer`, never `context.player`, to test the card owner.
+
+Bind each card listener with `cardIds: [CARD_ID]` so its scope and owner refer to this card. Read player identities through these objects: `context.player.id` and `context.ownerPlayer.id`. There is no `context.playerId`; comparing it with an owner ID can silently suppress every trigger. For a listener bound with `cardIds: [CARD_ID]`, `scope: 'player'` already restricts dispatch to the card owner, so it needs no extra actor/owner guard. Do not infer flat identity fields from native engine internals. The deployed Workshop contract exposes the supported object keys in `listeners.players`.
 
 ### 2.1 Readable fields on `context.space`
 
@@ -270,6 +272,8 @@ Fence discounts such as E16 Briar Hedge and C16 Field Fences use a `computeCosts
 
 A Workshop card may affect payment only through the value returned by a `computeCosts` listener. Major- and minor-improvement purchase costs both listen on `actions: ['improvement']`.
 
+`computeCosts` is a pure query evaluated repeatedly during previews and payment execution. Return the card's applicable contribution on every invocation. `context.costs` may contain an incoming computed delta: it is neither the base price nor proof that this listener has already contributed. In particular, do not skip a discount because that field already contains a negative value. The payment solver combines contributions and bounds payable costs at zero.
+
 - `costs`: a simple action-cost delta. Negative values discount and positive values add cost. Use it for ordinary action costs such as construct.
 - `trades`: payment substitutions such as using one resource instead of another.
 - `bonuses`: discounts or discount choices. Use `choices` for player selection and `optional` for whether the discount may be skipped.
@@ -356,7 +360,7 @@ These are frequent prompt and documentation mistakes, calibrated against `Player
 
 ```ts
 type CardState = {
-  counters?: Partial<Record<Resource, number>>  // written by store-on-card and take-from-card
+  counters?: Record<string, number>            // resources or named card-local counters
   flagged?: boolean                              // one-time trigger flag
   infobox?: string                               // small card-face label
   stack?: unknown[]                              // complex state such as a LIFO queue
@@ -535,6 +539,20 @@ return {
 
 `futureMeeplesAction.execute()` recognizes `params.__futureMeepleRequest`, queues each entry in `state.pendingFutureMeeples`, and places it on the round action card at the start of its round. `FutureMeepleRequest` also supports `{ startRound, count, resources }` for consecutive rounds; see `shared/contract/types.ts`.
 
+Preplaced rewards on future rounds must use this scheduling path so their visible entries, delivery and cleanup belong to the engine. Storing counters on the card and paying them from a flagged `onRoundStart` hook does not create future round placements.
+
+### 5.8 ActionFlow structure
+
+A leaf uses `{ type: 'leaf', actionId, params, sourceCard: CARD_ID }`. Composite nodes use `children`, with type `seq`, `or`, `xor`, or `parallel`:
+
+```ts
+{ type: 'seq', children: [gainLeaf(CARD_ID, { food: 1 }), gainLeaf(CARD_ID, { wood: 1 })] }
+```
+
+`optional` is a boolean on a node, not another node type. Flow effect hooks return the flow directly; listeners return `{ flow, sourceCard: CARD_ID }` (or their documented query result).
+
+Before execution, the AST validator rejects inspectable composite literals that omit `children` or provide a statically non-array value. This includes direct flow-hook returns, nested literal children, and listeners' `flow` / `alternativeFlow` results. It does not mistake arbitrary leaf parameters or private card data for flows, and does not infer dynamic helper results or spread-provided children. Static success still requires behavioral playtesting.
+
 ---
 
 ## 6. `actionId` behavior
@@ -562,14 +580,20 @@ These are frequent mistakes. `shared/actions/effects/*` contains the complete re
 | `pay` | Same shape, deducting resources. |
 | `bake-bread` | Starts a bread-baking subflow. |
 | `push-to-card-stack` | Pushes one item onto `player.cardStates[CARD_ID].stack`. |
-| `special-effect` | Sandbox entry for card-state mutation. Params use allowed `kind` values such as `set-flag`, `set-infobox`, `set-extra-data`, and `increment-extra-data`. It replaced five legacy mutation leaves. Section 6.1 lists the Workshop subset; unlisted repository-internal kinds are outside this contract. |
+| `special-effect` | Sandbox entry for card-state mutation. Params use allowed `kind` values such as `set-flag`, `set-infobox`, `set-counter`, `increment-counter`, `set-extra-data`, and `increment-extra-data`. It replaced five legacy mutation leaves. Section 6.1 lists the Workshop subset; unlisted repository-internal kinds are outside this contract. |
 | `future-meeples` | Sandbox form uses `params.__futureMeepleRequest`; see section 5.7. |
 
 Sprint 6b on 2026-04-30 removed five separate mutation IDs, `flag-card`, `unflag-card`, `set-card-infobox`, `clear-card-infobox`, and `write-card-extra-data`, plus three dead IDs, `hold-worker-on-card`, `release-worker-from-card`, and `gain-other-players`. Use the `special-effect` discriminated union. CI `check-prompt-sync` ensures the prompt exposes only allowlisted IDs. A sandbox card must not use another ID.
 
 ### 6.1 Allowed sandbox subset of `special-effect.params.kind`
 
+Each mutation is a `special-effect` leaf with `sourceCard: CARD_ID`. Its `params` use one of the shapes below.
+
 ```ts
+// Write player.cardStates[sourceCard].counters[key]
+{ kind: 'increment-counter', key: 'uses', amount: 1 }
+{ kind: 'set-counter', key: 'uses', value: 0 }
+
 // Set or clear player.cardStates[sourceCard].flagged
 { kind: 'set-flag', flag: true }
 { kind: 'set-flag', flag: false }
@@ -667,7 +691,7 @@ The local sandbox is a dry run for multiplayer play. Semantic divergence would b
 
 ### 9.1 After this document changes
 
-- `client/services/llmPrompts.ts` needs no manual table update. It renders hooks, phases, scopes, and action IDs from `cardEffectHooks`, `sandboxListenerPhases`, `sandboxListenerScopes`, `SANDBOX_ALLOWED_ACTION_IDS`, and descriptive metadata. `client/services/__tests__/llmPrompts.test.ts` guards the sets. CI `pnpm run check:prompt-sync` compares every marked block here with source.
+- `server/workshop-sandbox-contract.ts` derives deployed hooks, phases, scopes, action IDs and helper bodies from shared source and descriptive metadata. `client/services/llm/generation/prompt.ts` includes that contract, guarded by `client/services/__tests__/generation-prompt.test.ts`. CI `pnpm run check:prompt-sync` compares every marked block here with source. The browser reads this document and examples from current GitHub main, pinned per attempt; they are not bundled with the site.
 - `docs/ARCHITECTURE.md` only needs to point to this file.
 - `client/app/workshop/AiCardDesigner.tsx` only needs to point to this file.
 
@@ -680,7 +704,7 @@ The local sandbox is a dry run for multiplayer play. Semantic divergence would b
 
 CI catches a missing set update.
 
-`check:prompt-sync` prevents only name-set drift. A payment-solver, executor argument, JSON boundary, or injected-helper change also updates `client/services/__tests__/llmPrompts.test.ts`, corresponding executor or parity tests, and semantic contract tests. When generation strategy changes, add or tighten a real `GameSession` fixture, verify live, record a golden, then use replay by default.
+`check:prompt-sync` prevents only name-set drift. A payment-solver, executor argument, JSON boundary, or injected-helper change also updates `client/services/__tests__/generation-prompt.test.ts`, corresponding executor or parity tests, and semantic contract tests. When generation strategy changes, add or tighten a real `GameSession` fixture, freeze the implementation, and run the complete browser acceptance batch under the approved budget. Preserve earlier failures and distinguish synthetic runs and historical golden replay from model admission; see `docs/test/llm-card-gen.md`.
 
 ---
 

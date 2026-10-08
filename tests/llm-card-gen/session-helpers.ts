@@ -23,6 +23,7 @@ import {
 } from '../../shared/cards/custom-registry'
 import type { GameState, InteractionState, PlayerState, Resource } from '../../shared/contract/types'
 import { rewriteCardId } from './extract'
+import { workshopCardJsonFromDefinition } from '../../server/workshop-draft-validation'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import { solveBonusScoring } from '../../shared/domain/scoring'
 import {
@@ -43,6 +44,8 @@ export interface CompileLLMOptions {
   cardName: string
   cardCost?: Partial<Resource>
   cardPrerequisite?: string
+  /** Only historical recordings may use the old ID/metadata adaptation. */
+  historicalRecording?: boolean
 }
 
 export interface CompiledCardArtifacts {
@@ -53,20 +56,27 @@ export interface CompiledCardArtifacts {
 
 /**
  * Validate + compile the LLM-generated TS source. Throws with a useful error
- * message on validation failure. cardId in the source is rewritten to match
- * the provided fixture cardId so registration is stable.
+ * message on validation failure. New acceptance uses the original source and
+ * authoritative extracted metadata. Historical recordings opt in explicitly.
  */
 function compileLLMCard(opts: CompileLLMOptions): CompiledCardArtifacts {
-  const code = rewriteCardId(opts.llmGeneratedCode, opts.cardId)
+  const code = opts.historicalRecording
+    ? rewriteCardId(opts.llmGeneratedCode, opts.cardId)
+    : opts.llmGeneratedCode
   const result = validateAndCompileCustomCode(code, opts.cardId)
   if (!result.valid) {
     throw new Error(
       `validateAndCompileCustomCode failed for ${opts.cardId}:\n${result.errors.join('\n')}`,
     )
   }
+  const originalCardJson = workshopCardJsonFromDefinition(result.cardDefinition)
+  if (!opts.historicalRecording && (
+    !originalCardJson || originalCardJson.id !== opts.cardId
+    || result.cardDefinition?.cardType !== opts.cardType
+  )) throw new Error(`Generated CARD_DEF does not match ${opts.cardType} ${opts.cardId}`)
   const cardData: CustomCardData = {
     cardType: opts.cardType,
-    cardJson: {
+    cardJson: (opts.historicalRecording ? {
       id: opts.cardId,
       name: opts.cardName,
       deck: 'CUSTOM',
@@ -74,7 +84,7 @@ function compileLLMCard(opts: CompileLLMOptions): CompiledCardArtifacts {
       desc: ['LLM-generated test card'],
       ...(opts.cardCost ? { cost: opts.cardCost } : {}),
       ...(opts.cardPrerequisite ? { prerequisite: opts.cardPrerequisite } : {}),
-    } as CustomCardData['cardJson'],
+    } : originalCardJson) as CustomCardData['cardJson'],
     compiledCode: result.compiledCode,
     codeManifest: result.manifest,
   }
@@ -104,8 +114,8 @@ export const ALL_ZERO_RESOURCES: Resource = {
 
 export function clearAllHands(state: GameState): void {
   state.players.forEach((p) => {
-    p.minorHand = []
-    p.occupationHand = []
+    p.minorHand = ['__test_placeholder__']
+    p.occupationHand = ['__test_placeholder__']
   })
 }
 
@@ -139,6 +149,8 @@ export interface BuildOpts {
   cardName: string
   cardCost?: Partial<Resource>
   cardPrerequisite?: string
+  /** Only historical recordings may use the old ID/metadata adaptation. */
+  historicalRecording?: boolean
   playerCount?: number
 }
 
@@ -182,6 +194,7 @@ export function buildSessionWithLLMCard(llmCode: string, opts: BuildOpts): Build
     cardName: opts.cardName,
     cardCost: opts.cardCost,
     cardPrerequisite: opts.cardPrerequisite,
+    historicalRecording: opts.historicalRecording,
   })
   const rawSession = new GameSession(undefined, [compiled.cardData], {
     playerCount: opts.playerCount ?? 2,
@@ -256,6 +269,8 @@ export function getBonusBreakdownForSession(
 }
 
 export interface AutoAdvanceOptions {
+  /** Continue the caller's latest round-end response, even if it already completed the round. */
+  initialResponse?: SessionResponse
   /** Defensive max iterations to avoid infinite loops on engine bugs. Default 50. */
   maxIterations?: number
   /**
@@ -343,15 +358,14 @@ export function autoAdvanceRoundEnd(
 ): SessionResponse {
   const max = opts.maxIterations ?? 50
   let iter = 0
-  // If the session already has a pending interaction (e.g. caller already
-  // started performRoundEnd and manually walked through some prompts),
-  // resume from the current state instead of re-invoking performRoundEnd —
-  // which would reject with ok=false ("pending action exists") and the loop
-  // would burn iterations before throwing.
-  let resp: SessionResponse = session.peekEnginePendingEnvelope()
+  // Callers that already issued a round-end command pass its latest response,
+  // so a completed harvest never starts another round. Otherwise resume a
+  // pending interaction or start round-end, rejecting unsuccessful commands.
+  let resp: SessionResponse = opts.initialResponse ?? (session.peekEnginePendingEnvelope()
     ? session.emitResponse()
-    : session.performRoundEnd()
+    : session.performRoundEnd())
   while (iter++ < max) {
+    if (!resp.ok) throw new Error(`Round-end command failed: ${resp.error ?? "unknown error"}`)
     if (resp.interaction.stateId !== 'wait' && session.getState().state.gameOver) return resp
     // Round-end already complete: state advanced past the current round
     // (roundPhase==='work' means the next round started) and there's no
@@ -373,7 +387,7 @@ export function autoAdvanceRoundEnd(
       const pi = resp.interaction.playerIndex
       const player = session.getState().state.players[pi]
       const zones = player ? buildPreservingZones(player) : []
-      resp = session.resolveChoice(pi, 'confirm', zones)
+      resp = session.resolveChoice(pi, 'confirm', { zones })
       continue
     }
     if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-next-player') {

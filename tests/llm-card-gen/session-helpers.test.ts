@@ -8,22 +8,27 @@ import {
   fixRoundActionOrder,
   freezeOtherPlayers,
   getBonusBreakdown,
-  autoAdvanceRoundEnd,
   workersAvailable,
+  autoAdvanceRoundEnd,
+  markAllWorkersUsed,
 } from './session-helpers'
 
 const KNOWN_GOOD_GAIN_CARD = `
 const CARD_ID = 'CUSTOM_HELPER_SMOKE'
 const CARD_DEF = {
-  type: 'minor',
+  cardType: 'minor',
+  meta: {
   id: CARD_ID,
   name: 'Helper Smoke',
   deck: 'CUSTOM',
   number: 0,
   desc: ['+1 wood on buy'],
+  cost: { wood: 2 },
+  prerequisite: '3 Occupations',
+  },
 }
 const CARD_IMPL = {
-  effectHooks: {
+  effect: {
     onBuy: function (state, player) {
       return {
         type: 'leaf',
@@ -39,6 +44,21 @@ const CARD_IMPL = {
 afterEach(() => resetCards())
 
 describe('session-helpers', () => {
+  it('finishes an already completed round from its response without issuing another round-end command', () => {
+    const { session } = buildSessionWithLLMCard(KNOWN_GOOD_GAIN_CARD, {
+      cardId: 'CUSTOM_HELPER_SMOKE', cardType: 'minor', cardName: 'Helper Smoke',
+    })
+    const state = session.getState().state
+    expect(state.round).toBe(1)
+    state.players.forEach(player => markAllWorkersUsed(state, player))
+    const initialResponse = session.performRoundEnd()
+    expect(initialResponse.ok).toBe(true)
+    expect(initialResponse.state).toMatchObject({ round: 2, roundPhase: 'work' })
+    const completed = autoAdvanceRoundEnd(session, { initialResponse })
+    expect(completed.ok).toBe(true)
+    expect(completed.state).toMatchObject({ round: 2, roundPhase: 'work' })
+    expect(() => autoAdvanceRoundEnd(session)).toThrow('Round-end command failed: not all workers used')
+  })
   it('buildSessionWithLLMCard fixes round-action order and clears hands', () => {
     const { session, cardData } = buildSessionWithLLMCard(KNOWN_GOOD_GAIN_CARD, {
       cardId: 'CUSTOM_HELPER_SMOKE',
@@ -49,8 +69,8 @@ describe('session-helpers', () => {
     const state = session.getState().state
     expect(state.roundActionOrder).toEqual([...FIXED_ROUND_ACTION_ORDER])
     state.players.forEach((p) => {
-      expect(p.minorHand).toEqual([])
-      expect(p.occupationHand).toEqual([])
+      expect(p.minorHand).toEqual(['__test_placeholder__'])
+      expect(p.occupationHand).toEqual(['__test_placeholder__'])
     })
   })
 
@@ -63,8 +83,8 @@ describe('session-helpers', () => {
     const state = session.getState().state
     setHand(state, 0, { minor: ['CUSTOM_HELPER_SMOKE'] })
     expect(state.players[0]!.minorHand).toEqual(['CUSTOM_HELPER_SMOKE'])
-    expect(state.players[0]!.occupationHand).toEqual([])
-    expect(state.players[1]!.minorHand).toEqual([])
+    expect(state.players[0]!.occupationHand).toEqual(['__test_placeholder__'])
+    expect(state.players[1]!.minorHand).toEqual(['__test_placeholder__'])
   })
 
   it('clearAllHands + fixRoundActionOrder are idempotent', () => {
@@ -79,8 +99,8 @@ describe('session-helpers', () => {
     state.roundActionOrder = ['stale']
     clearAllHands(state)
     fixRoundActionOrder(state)
-    expect(state.players[0]!.minorHand).toEqual([])
-    expect(state.players[0]!.occupationHand).toEqual([])
+    expect(state.players[0]!.minorHand).toEqual(['__test_placeholder__'])
+    expect(state.players[0]!.occupationHand).toEqual(['__test_placeholder__'])
     expect(state.roundActionOrder).toEqual([...FIXED_ROUND_ACTION_ORDER])
   })
 
@@ -109,7 +129,19 @@ describe('session-helpers', () => {
     expect(breakdown).toEqual([])
   })
 
-  it('autoAdvanceRoundEnd is exported and callable (basic shape check)', () => {
-    expect(typeof autoAdvanceRoundEnd).toBe('function')
+  it('does not replace generated metadata with fixture values', () => {
+    const { cardData } = buildSessionWithLLMCard(KNOWN_GOOD_GAIN_CARD, {
+      cardId: 'CUSTOM_HELPER_SMOKE', cardType: 'minor', cardName: 'Do not substitute',
+      cardCost: { wood: 99 }, cardPrerequisite: '7 Occupations',
+    })
+    expect(cardData.cardJson.name).toBe('Helper Smoke')
+    expect(cardData.cardJson.cost).toEqual({ wood: 2 })
+    expect(cardData.cardJson.prerequisite).toBe('3 Occupations')
+  })
+
+  it('rejects an identity mismatch instead of rewriting the source', () => {
+    expect(() => buildSessionWithLLMCard(KNOWN_GOOD_GAIN_CARD, {
+      cardId: 'CUSTOM_DIFFERENT', cardType: 'minor', cardName: 'Wrong identity',
+    })).toThrow(/CARD_DEF|CUSTOM_DIFFERENT/)
   })
 })

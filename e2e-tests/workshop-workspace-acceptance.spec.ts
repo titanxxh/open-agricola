@@ -2,13 +2,14 @@ import AxeBuilder from '@axe-core/playwright'
 import { PostgresDatabase } from '../server/database/postgres'
 import {
   expect,
-  test,
   type APIRequestContext,
   type APIResponse,
   type Page,
 } from '@playwright/test'
 import { approveCurrentDraft, publish } from '../server/workshop-drafts.ts'
 import { BACKEND_URL, FRONTEND_URL } from './fixtures'
+import { test } from './server-fixtures'
+import { createLocalUserForTests, createSession } from '../server/auth'
 
 type Locale = 'zh' | 'en'
 type Viewport = 'desktop' | 'mobile'
@@ -80,38 +81,16 @@ const CARD_DEF = {
 const CARD_IMPL = ${invalid ? "{ onPlay() { eval('invalid') } }" : '{}'}
 `.trim()
 
-const cookieValue = (response: APIResponse, cookieName: string) => {
-  const header = response.headersArray().find(({ name, value }) =>
-    name.toLowerCase() === 'set-cookie' && value.startsWith(`${cookieName}=`),
-  )
-  if (!header) throw new Error(`missing ${cookieName} cookie`)
-  return header.value.split(';')[0]!.slice(cookieName.length + 1)
-}
-
 const createAccount = async (
-  request: APIRequestContext,
+  _request: APIRequestContext,
   page?: Page,
 ): Promise<Account> => {
   const suffix = unique('workspace')
   const username = `ws_${suffix}`.slice(0, 30)
   const password = 'workspace-pass-562'
-  const oauth = await request.post(`${BACKEND_URL}/api/test/oauth/github/callback`, {
-    data: {
-      providerUserId: `github-${suffix}`,
-      providerLogin: username,
-      email: `${username}@example.com`,
-      displayName: username,
-    },
-  })
-  expect(oauth.ok(), await oauth.text()).toBe(true)
-  const onboarding = cookieValue(oauth, 'oa_onboarding')
-  const complete = await request.post(`${BACKEND_URL}/api/auth/onboarding/complete`, {
-    data: { username, displayName: username, password, confirmPassword: password },
-    headers: { Cookie: `oa_onboarding=${onboarding}` },
-  })
-  const completeText = await complete.text()
-  expect(complete.ok(), completeText).toBe(true)
-  const cookie = cookieValue(complete, 'oa_session')
+  const user = await createLocalUserForTests(username, password)
+  const cookie = await createSession(user.id)
+  if (!cookie) throw new Error('Could not create the local test session')
   if (page) {
     await page.context().addCookies([{
       name: 'oa_session',
@@ -292,6 +271,16 @@ const setupPage = async (
   variant: Variant,
   options: { llm?: boolean } = {},
 ) => {
+  if (options.llm) {
+    await page.route('**/client/services/llm/generation/admission.ts*', async route => {
+      const response = await route.fetch()
+      const body = await response.text()
+      const registry = /ADMITTED_GENERATION_MODELS\s*=\s*\[[\s\S]*?\]/
+      expect(body).toMatch(registry)
+      await route.fulfill({ response, body: body.replace(registry, 'ADMITTED_GENERATION_MODELS = [{provider:"openrouter",endpoint:"https://openrouter.ai/api/v1/chat/completions",model:"qwen/qwen3.6-plus:free",batch:"fixture",evidence:"controlled browser test"}]') })
+    })
+    await page.route('**/api/workshop/references/**', route => route.fulfill({ json: route.request().url().endsWith('/main') ? { object: { sha: 'e'.repeat(40) } } : { truncated: false, tree: [] } }))
+  }
   await page.setViewportSize(variant.size)
   await page.addInitScript(({ locale, llm }) => {
     localStorage.setItem('open-agricola-locale-v2', locale)
@@ -407,7 +396,7 @@ const fakeChatService = async (
   await page.route('https://openrouter.ai/**/chat/completions', route => {
     const content = response(calls++)
     const body = content
-      ? `data: ${JSON.stringify({ choices: [{ delta: { content } }] })}\n\ndata: [DONE]\n\n`
+      ? `data: ${JSON.stringify({ choices: [{ index: 0, delta: { content }, finish_reason: 'stop' }] })}\n\ndata: [DONE]\n\n`
       : 'data: [DONE]\n\n'
     return route.fulfill({
       status: 200,
@@ -611,7 +600,7 @@ const CARD_IMPL = {}
 `.trim()
   const invalidSource = sourceFor(workspace.draft.cardId, workspace.draft.name, true)
   await fakeChatService(page, call =>
-    `\`\`\`typescript\n${call === 0 ? invalidSource : validSource}\n\`\`\``,
+    `\`\`\`typescript\n${call < 3 ? invalidSource : validSource}\n\`\`\``,
   )
   await openEditor(page, workspace.id)
   await stage(page, variant.locale, '卡牌能力', 'Card ability')
@@ -644,6 +633,9 @@ const CARD_IMPL = {}
   }
   await expect(page.locator('.aicw-ability-tabs button')).toHaveCount(3)
   await expect(page.locator('.aicw-current-code')).toBeHidden()
+  await expectSaved(page, variant.locale)
+  expect((await loadWorkspace(request, account, workspace.id)).draft.generation)
+    .toHaveProperty('ability.lastValid.provider', 'openrouter')
 
   const editor = page.getByLabel(
     text(variant.locale, '能力候选源码', 'Ability candidate source'),
@@ -700,7 +692,10 @@ const CARD_IMPL = {}
       },
     },
   })
-  expect(JSON.stringify(saved.draft.generation)).toContain('openrouter')
+  expect(saved.draft.generation).toHaveProperty('ability.adopted.sourceFingerprint')
+  for (const field of ['provider', 'model', 'provenance', 'inputFingerprint']) {
+    expect(saved.draft.generation).not.toHaveProperty(`ability.adopted.${field}`)
+  }
   expect((await versions(request, account, workspace.id)).versions).toHaveLength(1)
   await expectAccessibleWorkspace(page)
 }
@@ -1094,7 +1089,7 @@ const scenarioHandoff = async ({
 
   await openEditor(page, workspace.id)
   await stage(page, variant.locale, '验证与交付', 'Validate & hand off')
-  let sandboxLaunchMode: 'failure' | 'warning' | 'real' = 'failure'
+  let sandboxLaunchMode: 'failure' | 'warning' | 'single-warning' | 'real' = 'failure'
   await page.route('**/api/game/new-sandbox', route => {
     if (sandboxLaunchMode === 'failure') {
       return route.fulfill({
@@ -1103,17 +1098,16 @@ const scenarioHandoff = async ({
         body: JSON.stringify({ ok: false, error: 'deterministic sandbox failure' }),
       })
     }
-    if (sandboxLaunchMode === 'warning') {
+    if (sandboxLaunchMode === 'warning' || sandboxLaunchMode === 'single-warning') {
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
           ok: true,
           cardWarnings: ['deterministic sandbox warning'],
-          customCardVersionsLoaded: [{
-            cardId: workspace.id,
-            versionId,
-          }],
+          gameInstanceId: 'controlled-playtest',
+          customCardsLoaded: sandboxLaunchMode === 'single-warning' ? 1 : 2,
+          customCardVersionsLoaded: route.request().postDataJSON().customCardVersions,
         }),
       })
     }
@@ -1147,8 +1141,20 @@ const scenarioHandoff = async ({
   })
   await expect(sandboxConfirmation).toBeDisabled()
   await stage(page, variant.locale, '卡牌能力', 'Card ability')
+  await expect(page.getByText('deterministic sandbox warning', { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: text(variant.locale, 'AI 修复', 'AI repair'), exact: true })).toHaveCount(0)
+  await expect(page.getByText(text(variant.locale,
+    '无法确认这些错误属于当前固定源码。请在沙盒中只保留这张卡，再重新固化并试玩。',
+    'These errors cannot be attributed to the pinned source. Keep only this card in the sandbox, then pin and playtest again.',
+  ))).toBeVisible()
   await stage(page, variant.locale, '验证与交付', 'Validate & hand off')
   await expect(sandboxConfirmation).toBeDisabled()
+
+  sandboxLaunchMode = 'single-warning'
+  await launch.click()
+  await stage(page, variant.locale, '卡牌能力', 'Card ability')
+  await expect(page.getByRole('button', { name: text(variant.locale, 'AI 修复', 'AI repair'), exact: true })).toHaveCount(1)
+  await stage(page, variant.locale, '验证与交付', 'Validate & hand off')
 
   sandboxLaunchMode = 'real'
   const sandboxResponse = page.waitForResponse(response =>
@@ -1162,6 +1168,27 @@ const scenarioHandoff = async ({
     cardId: workspace.id,
     versionId,
   }])
+  await expect(sandboxConfirmation).toBeEnabled()
+  // Another tab can reuse the seed while replacing the HTTP session.
+  await page.route('**/api/game/state', async route => {
+    const response = await route.fetch()
+    const payload = await response.json()
+    await route.fulfill({ response, json: { ...payload, gameInstanceId: 'another-instance', cardWarnings: ['other game warning'] } })
+  })
+  await sandboxConfirmation.check()
+  await page.getByRole('button', {
+    name: text(variant.locale, '确认沙盒通过', 'Confirm sandbox pass'),
+  }).click()
+  await expect(page.getByText(text(variant.locale,
+    '试玩版本已改变，请重新固化并启动沙盒。',
+    'The playtest version changed. Pin and start the sandbox again.',
+  ))).toBeVisible()
+  await stage(page, variant.locale, '卡牌能力', 'Card ability')
+  await expect(page.getByRole('button', { name: text(variant.locale, 'AI 修复', 'AI repair'), exact: true })).toHaveCount(0)
+  await expect(page.getByText('other game warning', { exact: true })).toBeVisible()
+  await page.unroute('**/api/game/state')
+  await stage(page, variant.locale, '验证与交付', 'Validate & hand off')
+  await launch.click()
   await expect(sandboxConfirmation).toBeEnabled()
   await sandboxConfirmation.check()
   await page.getByRole('button', {
@@ -1262,6 +1289,7 @@ const scenarioPrivacy = async ({
   const privateModel = unique('secret-model')
   const locales = { zh: { name: '隐私卡', desc: ['公开说明'] } }
   let workspace = await createDraft(request, account, {
+    name: 'Workspace PublishedLongCardName',
     artUrl: imageData,
     locales,
   })
@@ -1393,8 +1421,8 @@ const scenarioErrors = async ({
   await page.getByRole('button', {
     name: text(variant.locale, '生成能力候选', 'Generate ability candidate'),
   }).click()
-  await expect(page.locator('.aicw-panel-error')).toBeVisible()
-  await expect(page.locator('.aicw-panel-error')).toBeFocused()
+  await expect(page.locator('.aicw-generation-progress')).toContainText(text(variant.locale, '已暂停', 'Paused'))
+  await expect(page.locator('.aicw-generation-progress')).toBeFocused()
 
   let validationFailed = true
   await page.route('**/api/workshop/cards/validate-code', route => {
@@ -1408,14 +1436,10 @@ const scenarioErrors = async ({
     return route.continue()
   })
   await page.getByRole('button', { name: text(variant.locale, '重发', 'Resend') }).click()
-  await expect(page.locator('.aicw-candidate-section')).toBeVisible({ timeout: 30_000 })
-  await expect(page.locator('.aicw-validation-errors')).toContainText(
-    'deterministic validator failure',
-  )
+  await expect(page.locator('.aicw-generation-progress')).toContainText('Code validation is unavailable')
+  await expect(page.locator('.aicw-candidate-section')).toBeHidden()
   validationFailed = false
-  await page.getByRole('button', {
-    name: text(variant.locale, '运行静态验证', 'Run static validation'),
-  }).click()
+  await page.getByRole('button', { name: text(variant.locale, '重试当前步骤', 'Retry this step') }).click()
   await expect(page.getByRole('button', {
     name: text(variant.locale, '采用为当前源码', 'Adopt as current source'),
   })).toBeEnabled({ timeout: 30_000 })

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it, beforeEach, vi } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 import { LocaleProvider, useLocale } from '../../../contexts/LocaleContext'
@@ -420,75 +420,17 @@ describe('AiCardDesigner AI config header', () => {
     expect(screen.queryByText('第一行能力')).not.toBeInTheDocument()
   })
 
-  it('keeps the current card context when resending an ability request', async () => {
-    localStorage.setItem(
-      'open-agricola-llm-config',
-      JSON.stringify({ provider: 'deepseek', apiKey: 'test', model: 'deepseek-v4-flash' }),
-    )
-    const card = {
-      ...existingCard,
-      card_json: {
-        ...existingCard.card_json,
-        _draft: { prerequisite: '2职业', costInput: '2木' },
-      },
-    }
-    const apiFetch = vi.fn(async (path: string) => {
-      if (path.includes('scope=mine')) {
-        return new Response(JSON.stringify({ ok: true, cards: [card] }))
-      }
-      return new Response(JSON.stringify({
-        ok: true,
-        workspace: {
-          ...JSON.parse(await apiFetchForExistingCard(path).then(response => response.text())).workspace,
-          draft: {
-            ...JSON.parse(await apiFetchForExistingCard(path).then(response => response.text())).workspace.draft,
-            cardJson: card.card_json,
-          },
-        },
-      }))
-    })
-    const providerBodies: Array<{ messages: Array<{ role: string; content: string }> }> = []
-    vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
-      if (String(input) !== 'https://api.deepseek.com/v1/chat/completions') {
-        return new Response(null, { status: 404 })
-      }
-      providerBodies.push(JSON.parse(String(init?.body)))
-      const encoder = new TextEncoder()
-      return new Response(new ReadableStream({
-        start(controller) {
-          controller.enqueue(encoder.encode(
-            `data: ${JSON.stringify({ choices: [{ delta: { content: 'no code' } }] })}\n\ndata: [DONE]\n\n`,
-          ))
-          controller.close()
-        },
-      }))
-    }))
-
-    render(
-      <LocaleProvider>
-        <AiCardDesigner
-          initialCard={card}
-          onClose={() => {}}
-          apiFetch={apiFetch}
-        />
-      </LocaleProvider>,
-    )
-
+  it('keeps unverified model generation closed without falling back to the old prompt', async () => {
+    localStorage.setItem('open-agricola-llm-config', JSON.stringify({ provider: 'deepseek', apiKey: 'test', model: 'deepseek-flash', baseUrl: 'https://unverified.example/v1' }))
+    const provider = vi.fn()
+    vi.stubGlobal('fetch', provider)
+    render(<LocaleProvider><AiCardDesigner initialCard={existingCard} onClose={() => {}} apiFetch={apiFetchForExistingCard} /></LocaleProvider>)
     await waitFor(() => expect(screen.queryByText('正在恢复草稿…')).not.toBeInTheDocument())
     await userEvent.click(screen.getByRole('button', { name: /卡牌能力\s*对话、源码与验证/ }))
-    await userEvent.type(screen.getByPlaceholderText('描述你想要的卡牌效果…'), '重新生成能力')
-    await userEvent.click(screen.getByRole('button', { name: '生成能力候选' }))
-    await waitFor(() => expect(screen.getByRole('button', { name: '重发' })).toBeInTheDocument())
-    await userEvent.click(screen.getByRole('button', { name: '重发' }))
-    await waitFor(() => expect(providerBodies).toHaveLength(2))
-
-    const resent = providerBodies[1]!.messages.at(-1)!.content
-    expect(resent).toContain('卡牌 ID: CUSTOM_MedievalMallet')
-    expect(resent).toContain('卡牌类型: 小改良卡 (Minor Improvement)')
-    expect(resent).toContain('卡牌名称: 中世纪木槌')
-    expect(resent).toContain('前置条件: 2职业')
-    expect(resent).toContain('消耗资源: 2木')
-    expect(resent).toContain(existingCard.effect_code)
+    await userEvent.type(screen.getByPlaceholderText('描述你想要的卡牌效果…'), 'Gain food')
+    expect(screen.getByRole('button', { name: '生成能力候选' })).toBeDisabled()
+    expect(screen.getByText('当前模型或接口尚未通过工具与卡牌行为验收，请换用已验收的组合。')).toBeInTheDocument()
+    expect(provider.mock.calls.some(([url]) => String(url).includes('chat/completions'))).toBe(false)
   })
 
   it('restores the saved art subject and adopted ability source without exposing the prompt', async () => {
@@ -628,7 +570,7 @@ describe('AiCardDesigner AI config header', () => {
     expect(screen.getByLabelText('画面主题')).toHaveValue('河谷木匠')
   })
 
-  it('pins, starts, and confirms one exact sandbox version', async () => {
+  it.each(['confirm', 'unmount'] as const)('pins an exact old version and owns its confirmation response (%s)', async completion => {
     const completeCard: ApiCard = {
       ...existingCard,
       art_url: '/card-art/complete.png',
@@ -662,17 +604,24 @@ describe('AiCardDesigner AI config header', () => {
       sandboxPassedAt: null,
     }
     let sandboxStateReads = 0
+    let releaseState: (() => void) | undefined
+    let includePinnedIdentity = false
     const apiFetch = vi.fn(async (path: string, init?: RequestInit) => {
       if (path.includes('scope=mine')) {
         return new Response(JSON.stringify({ ok: true, cards: [completeCard] }))
       }
       if (path === '/api/game/state') {
         sandboxStateReads += 1
+        if (completion === 'unmount' && sandboxStateReads === 2) return new Promise<Response>(resolve => {
+          releaseState = () => resolve(new Response(JSON.stringify({ ok: true, gameInstanceId: 'tested-instance', cardWarnings: [] })))
+        })
         return new Response(JSON.stringify({
           ok: true,
           cardWarnings: sandboxStateReads === 1 ? ['runtime hook failed'] : [],
+          gameInstanceId: 'tested-instance',
         }))
       }
+      if (path.endsWith('/versions')) return new Response(JSON.stringify({ ok: true, versions: [] }))
       if (!init) {
         return new Response(JSON.stringify({ ok: true, workspace: baseWorkspace }))
       }
@@ -681,6 +630,7 @@ describe('AiCardDesigner AI config header', () => {
           ok: true,
           workspace: baseWorkspace,
           versionId: 'version-2',
+          cardJson: { ...(includePinnedIdentity ? { id: 'CUSTOM_TestedB', card_type: 'minor', name: 'Pinned B' } : {}), _code: 'fixed version B source' },
         }))
       }
       return new Response(JSON.stringify({
@@ -698,12 +648,16 @@ describe('AiCardDesigner AI config header', () => {
       .mockResolvedValueOnce(true)
       .mockResolvedValueOnce(true)
 
-    render(
+    const mounted = render(
       <LocaleProvider>
         <AiCardDesigner
           initialCard={completeCard}
           onClose={() => {}}
           onAddToSandboxAndRestart={startSandbox}
+          sandboxPlaytest={{
+            instanceId: 'tested-instance', warningScope: 'single-custom-card',
+            source: { workspaceId: completeCard.id, versionId: 'version-2', source: 'fixed version B source', sourceFingerprint: 'tested-source', identity: { id: 'CUSTOM_TestedB', type: 'minor', name: 'Pinned B' } },
+          }}
           apiFetch={apiFetch}
         />
       </LocaleProvider>,
@@ -712,9 +666,14 @@ describe('AiCardDesigner AI config header', () => {
     await waitFor(() => expect(screen.queryByText('正在恢复草稿…')).not.toBeInTheDocument())
     await userEvent.click(screen.getByRole('button', { name: /验证与交付\s*沙盒测试和发布检查/ }))
     await userEvent.click(screen.getByRole('button', { name: '固化当前版本并启动沙盒' }))
+    await waitFor(() => expect(screen.getByText('无法读取固定版本的源码，请重新固化后再试玩。')).toBeInTheDocument())
+    expect(startSandbox).not.toHaveBeenCalled()
+    includePinnedIdentity = true
+    await userEvent.click(screen.getByRole('button', { name: '固化当前版本并启动沙盒' }))
     await waitFor(() => expect(startSandbox).toHaveBeenCalledWith(
       completeCard.id,
       'version-2',
+      expect.objectContaining({ workspaceId: completeCard.id, versionId: 'version-2', source: 'fixed version B source', identity: { id: 'CUSTOM_TestedB', type: 'minor', name: 'Pinned B' } }),
     ))
     expect(screen.queryByRole('checkbox', {
       name: '我确认这个固定版本在沙盒中没有运行错误',
@@ -736,6 +695,13 @@ describe('AiCardDesigner AI config header', () => {
       name: '我确认这个固定版本在沙盒中没有运行错误',
     }))
     await userEvent.click(screen.getByRole('button', { name: '确认沙盒通过' }))
+    if (completion === 'unmount') {
+      await waitFor(() => expect(releaseState).toBeTypeOf('function'))
+      mounted.unmount()
+      await act(async () => { releaseState!() })
+      expect(apiFetch.mock.calls.some(([path]) => path.endsWith('/sandbox-pass'))).toBe(false)
+      return
+    }
     await waitFor(() => expect(screen.getByText('已满足社区 PR 交接门槛')).toBeInTheDocument())
 
     const passCall = apiFetch.mock.calls.find(([path]) => path.endsWith('/sandbox-pass'))
@@ -892,7 +858,7 @@ describe('AiCardDesigner AI config header', () => {
     // DeepSeek selection on render, save a config first then test:
     localStorage.setItem(
       'open-agricola-llm-config-art',
-      JSON.stringify({ provider: 'deepseek', apiKey: 'test', model: 'deepseek-v4-flash' }),
+      JSON.stringify({ provider: 'deepseek', apiKey: 'test', model: 'deepseek-flash' }),
     )
     // The collapsed-bar test above already covers the summary rendering. Here we
     // just confirm the registry-derived label is "DeepSeek" so the mismatch path

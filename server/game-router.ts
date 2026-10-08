@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import type { SandboxAuthority } from './game/sandbox-authority'
 import { ExecutionRevokedError, type ExecutionStamp } from './game/execution-access'
 import { RoomOwnershipError } from './game/room-directory'
@@ -64,6 +65,8 @@ export const shutdownSandboxSessions = (): void => {
   for (const key of [...userSessions.keys()]) disposeSandboxSessionsForUser(key)
 }
 
+// A seed may be reused; HTTP playtest identity follows the actual session.
+const gameInstanceIds = new WeakMap<GameSession, string>()
 const userSessions = new Map<string, GameSession>()
 const sessionExecutors = new Map<string, CustomSessionExecutor>()
 const sessionLastAccess = new Map<string, number>()
@@ -205,6 +208,7 @@ const callAndRespond = async (
   const resp = executor
     ? await executor.execute(method, args)
     : session.withCtx(() => fn(session))
+  if (method === 'loadState' && resp.ok) gameInstanceIds.delete(session)
   const viewerId = resolveViewerPlayerId(req, session)
   return { resp, result: respondWith(resp, session, viewerId), viewerId }
 }
@@ -326,12 +330,15 @@ const respondWith = (
   session: GameSession,
   viewerPlayerId: string | null = null,
 ) => {
-  return buildSessionSyncPayload(
-    session,
-    resp,
-    viewerPlayerId,
-    viewerPlayerId === null ? 'debug' : 'viewer',
-  )
+  let gameInstanceId = gameInstanceIds.get(session)
+  if (!gameInstanceId) {
+    gameInstanceId = randomUUID()
+    gameInstanceIds.set(session, gameInstanceId)
+  }
+  return {
+    ...buildSessionSyncPayload(session, resp, viewerPlayerId, viewerPlayerId === null ? 'debug' : 'viewer'),
+    gameInstanceId,
+  }
 }
 
 const handleAuthorizedGameRoute = async (

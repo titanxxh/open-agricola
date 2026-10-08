@@ -125,28 +125,78 @@ App.tsx
 | OpenRouter | `openai/gpt-5-image-mini`             | GPT-5 Image Mini (图片生成)                     | 否   | 否   | 是    | OpenRouter 图片模型                                                |
 | OpenRouter | `google/gemini-2.5-flash-image`       | Gemini 2.5 Flash Image / Nano Banana (图片生成) | 否   | 否   | 是    | OpenRouter 图片模型                                                |
 | OpenRouter | `bytedance-seed/seedream-4.5`         | Seedream 4.5 (图片生成)                         | 否   | 否   | 是    | OpenRouter 图片模型                                                |
-| OpenRouter | `deepseek/deepseek-v4-flash`          | DeepSeek V4 Flash                           | 否   | 是   | 否    | OpenRouter 转发 DeepSeek 聊天模型                                    |
-| OpenRouter | `deepseek/deepseek-v4-pro`            | DeepSeek V4 Pro                             | 否   | 是   | 否    | OpenRouter 转发 DeepSeek 聊天模型                                    |
-| DeepSeek   | `deepseek-v4-flash`                   | DeepSeek V4 Flash                           | 是   | 是   | 否    | 官方 DeepSeek API                                                |
-| DeepSeek   | `deepseek-v4-pro`                     | DeepSeek V4 Pro (推理)                        | 否   | 是   | 否    | 官方 DeepSeek API；推理内容不渲染，只展示最终内容                                |
+| OpenRouter | `deepseek/deepseek-v4.1-flash`        | DeepSeek V4.1 Flash                         | 否   | 是   | 否    | OpenRouter 转发 DeepSeek 聊天模型                                    |
+| OpenRouter | `deepseek/deepseek-v4-pro-0813`       | DeepSeek V4 Pro (0813)                      | 否   | 是   | 否    | OpenRouter 转发 DeepSeek 聊天模型                                    |
+| DeepSeek   | `deepseek-flash`                     | DeepSeek V4.1 Flash                         | 是   | 是   | 否    | 官方 DeepSeek API                                                |
+| DeepSeek   | `deepseek-v4-pro`                    | DeepSeek V4 Pro (0813)                      | 否   | 是   | 否    | 官方 DeepSeek API；推理内容不渲染，只展示最终内容                                |
 | AiHubMix   | `gemini-3.1-flash-image-preview-free` | Gemini 3.1 Flash Image (免费)                 | 否   | 否   | 是    | AiHubMix 免费图片模型                                                |
 | AiHubMix   | `coding-glm-5.1-free`                 | Coding GLM 5.1 (免费)                         | 是   | 是   | 否    | AiHubMix 免费聊天模型                                                |
 | AiHubMix   | `k2.6-code-preview-free`              | K2.6 Code Preview (免费)                      | 否   | 是   | 否    | AiHubMix 免费聊天模型                                                |
 
 
+DeepSeek 名称于 2026-10-08 按[官方模型列表](https://api-docs.deepseek.com/quick_start/pricing/)和 [OpenRouter 目录](https://openrouter.ai/api/v1/models)核对。官方 Flash API 使用 `deepseek-flash` 调用 V4.1 Flash；已退役的 `deepseek-v4-flash` 名称仅作为临时转发别名。当前 Pro 是 V4 Pro 0813：官方 ID 仍为 `deepseek-v4-pro`，OpenRouter 则必须带 `-0813` 后缀，因为其无后缀 Pro 仍指向旧的 0423 版。两者均支持思考；图像理解不等于图片生成。
+
 OpenRouter 不在 provider 级别声明 `chat` / `image` 兜底能力；每个模型必须显式声明自己的能力，避免图片面板展示聊天模型或聊天面板展示图片模型。
+
+#### C1.2 浏览器工具循环
+
+生产编辑器使用 `client/services/llm/generation/` 中的浏览器循环；原有纯文本能力生成路径已移除。上方模型表列出的是现有 UI 注册项，不代表已经通过工具调用验收的组合。
+
+**Generation Attempt（生成尝试）**包含资料查询、模型回答和有界修复。暂停后继续沿用其模型配置、资料 commit 和累计统计；取消时不能把半截输出当作完成候选。每次新尝试解析 GitHub 最新 `main`，并将该次资料读取固定到这个 commit。参考资料独立于站点发布，生成的可执行代码仍须遵守实际 Custom Code Sandbox 的能力限制。LLM 凭据仍只由浏览器发送给模型服务。已登录浏览器通过 `GET /api/workshop/references/main` 和 `GET /api/workshop/references/tree/:sha` 读取 main 与固定版本的目录。后端使用项目自己的 GitHub 只读凭据，固定仓库与操作、限制响应大小，并只返回 commit/目录字段；不接收模型凭据、不执行模型循环。源码正文仍由浏览器匿名请求 `raw.githubusercontent.com`，并按目录中的 blob 哈希验证，不随站点发布。main 不缓存，也不以旧版本兜底；项目凭据缺失、GitHub 元数据不可达或目录不完整时暂停生成。
+
+未命中缓存的元数据读取在取得项目凭据前消耗 PostgreSQL 共享额度：每个已认证用户每分钟 20 次、每小时 120 次，全站每分钟 100 次、每小时 1,000 次。用户额度拒绝不消耗全站额度。GitHub 冷却期限也由多个后端实例共享，返回 `429` 与 `Retry-After`；每个进程另限制最多 3 个上游读取并发。目录接口仅接受过去一小时内成功读取 main 时确认过的 commit，在返回缓存前也检查。main 成功后重试目录仍沿用原 SHA。已经初始化的资料会话持有自己的目录，一小时授权窗口过后仍可继续读取同 SHA 的源码正文，不重新解析 main。
+
+循环初始允许 8 次模型请求、24 次资料调用和 5 分钟活跃时间；显式继续增加同等额度，不重置计数或资料 commit。模型 POST 同时最多 1 个，资料读取并发最多 3 个，资料临时 HTTP 故障最多重试 2 次，静态代码修复最多 2 次。意外 EOF、截断、provider 错误和取消不会完成半截源码。模型 POST 失败后暂停等待显式重试；校验服务故障只重试校验，不调用模型修复。推理与签名只留在当前页面的协议历史中。流式限制分别计算累计 SSE 传输的 32 MiB、单个事件的 2 MiB 和解码后消息的 2 MiB，避免重复帧元数据提前截断允许的 16,384 token 响应。
+
+资料工具搜索允许的路径与已获取文件的正文（不是 GitHub 全库全文搜索），每次最多返回 160 行，序列化结果最多 16 KiB，单文件最多 256 KiB，并核对 Git blob 哈希。缓存文本命中与 Markdown 章节标题附带行号，供模型直接跳到相关段落；分页标记不要求读完整个文件。提示词说明请求额度；浏览器每轮在完整工具组之后另加执行状态消息，告知剩余请求数和修复次数，要求确认所需契约后结束资料收集。每次尝试重新解析 main，同 commit 的 tree 与正文可缓存。请求上下文达到 192 KiB 后终止，不悄悄丢弃协议字段。传输层按精确 provider/endpoint/model 执行准入。已实测的 `deepseek` / `https://api.deepseek.com/v1/chat/completions` / `deepseek-flash` 请求组合现已开放；其他组合仍为待验。
+
+每段额度的最后一次模型请求保留工具定义，但使用 `tool_choice: none`，留出交付结果的一次响应。模型可以返回完整源码或有依据的澄清/能力缺口；若仍缺少关键资料事实，可返回 `reference-continuation`，保留当前检查点并等待用户显式追加额度，它不属于 Generation Result，也不能成为候选。浏览器执行状态使用宿主的 `system` 消息，不伪装成用户的新需求。保留工具定义是 DeepSeek 将先前推理纳入上下文的条件，见官方[思考模式契约](https://api-docs.deepseek.com/guides/thinking_mode/)；[Chat Completions 契约](https://api-docs.deepseek.com/api/create-chat-completion/)支持在思考模式中使用 `none`。
+
+决议保存在[资料契约](https://github.com/titanxxh/open-agricola/issues/1032)与[模型准入、循环边界及恢复](https://github.com/titanxxh/open-agricola/issues/1033)中，明确初始预算、显式继续、有限重试与修复，以及模型开放前所需的浏览器工具往返证据。
+
+#### C1.3 请求、结果与草稿恢复
+
+已确认的[请求/结果契约](https://github.com/titanxxh/open-agricola/issues/1034)规定：追加需求以当前选中的能力候选为基线，没有选中候选时使用已采用草稿；错误修复绑定实际报错的固定版本源码与卡牌身份。固化响应直接提供已存储的不可变版本快照，即使内容去重复用了最近五条历史之外的旧版本，也能读取该快照。身份必须从固定版本读取；字段缺失，或当前卡牌 ID、类型、名称发生变化时，在创建模型连接前拒绝修复，提示作者重新固化并试玩当前版本。各入口共用请求构造，明确卡牌身份、用户目标、源码与输入指纹，以及相关可见对话。修复请求只在 `input.source` 保留一份实际试玩源码；intent 仅保留错误和版本元数据。新请求读取最新资料 commit；自动校验修复和显式继续仍在同一次尝试内。实际沙盒试玩报错后，只有作者点击 **AI 修复**才开始新尝试。
+
+**Generation Result（生成结果）**可以包含完整源码候选、保留供修复的失败源码、澄清、能力缺口，或故障/中断说明。失败源码不能采用，也不替换最近通过代码校验的候选；半截输出不属于完整源码候选。源码与输入指纹将异步结果和校验回传绑定到对应内容，旧响应不能悄悄替换新编辑。
+
+| 存储边界 | 恢复范围 |
+|---|---|
+| 当前浏览器页面 | 完整工具协议、资料正文与 provider 推理/签名；刷新后不续接该协议 |
+| 同一浏览器的本地恢复 | 可见对话及已有编辑状态；未完成工作标为已中断，绝不自动续跑 |
+| 作者私有的服务端草稿 | 已采用内容、最近通过代码校验的能力候选、最近 Generation Result 和精简 Generation Provenance；不保存完整对话或原始工具协议 |
+
+最近结果与候选可关联同一份源码，不保留重复的完成内容副本。采用仍需作者明确操作并通过服务端校验。Draft Version 只保留已采用内容与白名单内的溯源；相同内容继续复用不可变版本，不改写其原始溯源。公开卡牌、投稿和 Replay 投影不包含私有生成记录。共享白名单 `shared/projections/workshop-generation.ts` 已贯通检查点、采用、版本溯源与本地恢复。能力分区分别保存 `lastValid` 与 `latestResult`；成功结果按候选 ID 与源码指纹引用源码，失败结果保留不可采用的完整源码。本地聊天仅投影可见字段，进行中的工作恢复为已中断。待采用的能力候选、失败源码和图片候选在保存检查点与刷新后保留原始基础版本和过期标记。手动修改源码会清除模型溯源，并须重新通过代码和身份校验后才能采用。同一候选和源码重新校验失败时，会撤销对应的旧校验结果。采用会清理该类型的所有待采用候选，包括保留的失败源码，同时保留最近结果的精简摘要。编辑器已使用这些投影完成生成、明确采用和恢复。
+
+`GET /api/workshop/sandbox-contract` 提供实际部署的 helper 源码、hook/listener 元数据、支持的行动参数、隔离限制与语义约束。其标识来自部署中的 shared/executor 源码、锁文件中解析出的依赖版本及运行时版本，与 GitHub 资料 commit 分开记录。`POST /api/workshop/cards/validate-code` 将成功和失败都绑定到该标识及提交源码指纹；过期契约返回 `sandbox_changed`，要求开始新尝试。主浏览器只接收数据，不导入规则运行时。
+
+#### C1.4 质量与成本验收
+
+模型逐个通过浏览器工具往返及现有固定卡牌测试后开放。`tests/llm-card-gen/fixtures/` 是 11 个题面和 Session 断言的唯一来源；`runner.test.ts` 用同一套测试验收历史录音或未经修改的 AI 单文件源码。owner 本机的浏览器命令每题生成 3 次（33 个任务加一次工具探测），保存首次和最终源码，再调用 Vitest。没有第二套行为判题器、自然语言关键词评分或旧 prompt 对照组；能力缺口说明不计作可执行卡牌通过。报告和生成源码只保存在已忽略的 `output/tmp/`，仓库保存测试而不保存运行报告。累计 20 美元账本和付费调用仅限 owner 本机的限制继续生效。详见 [LLM 测试指南](test/llm-card-gen.md#browser-tool-acceptance)。正式 `deepseek-flash` 组合保留[已有验收记录](https://github.com/titanxxh/open-agricola/issues/1041#issuecomment-6057596377)，其他精确组合仍为待验。
+
+#### C1.5 编辑器交互
+
+用户于 2026-10-08 认可[交互原型](https://github.com/titanxxh/open-agricola/issues/1036)。其中十个引导场景确定了生产工坊应遵守的展示要求：
+
+- 分别显示下一次普通需求的修改对象，以及本次尝试开始时固定的源码。采用操作写明候选及版本；代码校验状态与实际试玩结果使用不同标签。
+- 显示当前生成阶段、累计模型请求、资料查询和修复次数。暂停时说明原因，保留最近的完整进度，并在作者继续本次尝试前写明追加额度。继续本次与开始新尝试是不同操作。
+- 最近有效候选与后续失败源码可分别查看；失败源码的采用操作不可用。半截内容、已中断及过期结果均有明确标记，不能被误认为新的可用候选。
+- 能力缺口或澄清与连接故障、资料查询故障分开展示。模型状态区分已验收组合与待验组合。资料来源和有用的诊断信息按需展开；provider 推理与签名不作为普通聊天内容。
+- 试玩报错写明实际测试的源码，并提供明确的 **AI 修复**操作。恢复后的未完成工作标为已中断，刷新后不自动发请求或续接协议。
+
+原始单文件资产保留在独立的 `prototype/llm-tool-loop-interaction` 分支；提交、路径和浏览器观察记录在决策票中。它使用模拟响应和源码摘要，不能证明模型准入、规则行为或生产持久化已经完成。场景引导控件与状态转换代码属于可丢弃原型。`WorkshopAbilityPanel` 通过生产请求/结果契约实现这些交互。试玩修复读取实际固定版本的源码，并检查当前沙盒绑定，不会替换成另一个选中候选。
 
 ### C2. 系统提示词设计
 
-**源文件**：`client/services/llmPrompts.ts`（`CARD_DESIGNER_SYSTEM_PROMPT`）。以下是其结构摘要；以源文件为准。effect / 进阶 hook 表、listener phase 表、listener scope 表、actionId 表**运行时从真相源渲染**（`shared/cards/card-effects.ts` 的 `cardEffectHooks` + `shared/custom-code/sandbox-hook-meta.ts` / `sandbox-listener-phases.ts` / `sandbox-listener-scopes.ts` / `sandbox-action-ids.ts`），因此这四张表不会与引擎漂移，无需手工镜像。
+精简提示词位于 `client/services/llm/generation/prompt.ts`，定义任务、不可变输入、资料工具、信任边界和输出格式，并附上实际部署的沙盒契约。契约从共享真源派生 hook/listener/action 元数据，提供准确的注入 helper。运行时标识与资料 commit 分别记录。
 
-**结构：角色定义 + 输出格式 + 关键规则 + CARD_IMPL 结构详解 + effect hook 表 + listener 机制 + ActionFlow 类型 + 可用 helper + 可读 state/player 字段 + 沙盒限制 + 设计平衡参考 + 游戏规则速览 + few-shot 示例**
+契约包含 ActionFlow 节点结构，以及引擎调度的未来奖励与卡上存储资源的区别。可静态识别的错误组合节点在试玩前即校验失败，进入与其他编译错误相同的有界修复流程；这不等于完整的类型或行为证明。
 
----
+模型按需从 GitHub 读取本次尝试固定 commit 的样例和详细文档，资料集不打包进站点提示词。
 
 #### 输出格式
 
-LLM 每次回复**必须**包含一个 `` ```typescript `` 代码块，使用 `CARD_DEF` + `CARD_IMPL` 双常量结构（不使用 import / export）。`CARD_DEF` 只接受对象格式，不兼容 `new MinorImprovement(...)` / `new Occupation(...)`：
+源码回复**必须**包含且只包含一个完整 `` ```typescript `` 代码块，使用 `CARD_DEF` + `CARD_IMPL` 双常量结构（不使用 import / export）。`CARD_DEF` 只接受对象格式，不兼容 `new MinorImprovement(...)` / `new Occupation(...)`：
 
 ```typescript
 const CARD_ID = 'CUSTOM_英文驼峰名'
@@ -184,13 +234,15 @@ const CARD_IMPL = {
 }
 ```
 
+澄清和能力缺口改为返回含 `kind` 与 `message` 的结构化 JSON，不附源码。
+
 #### 关键规则（prompt 硬性约束）
 
 - `CARD_ID` 必须以 `"CUSTOM_"` 开头，英文驼峰
 - `deck` 固定 `'CUSTOM'`，`number` 固定 `0`，`implemented` 固定 `true`
 - 禁止 `import` / `export` / `require` / `registerCardEffect` / `registerCardListener`
 - 禁止 `class`、generator、`with`、`eval`、`Function`、`fetch` 等
-- `name` / `desc` / `prerequisite` 顶层字段必须英文；`locales.zh` 必须填全
+- 保持传入的卡牌身份与名称；规则说明和前置条件使用英文并提供完整 `locales.zh`，编辑时除明确要求修改外保留原有双语信息
 - 即使只做小修改，也要重新输出完整代码
 
 #### effect hook（`CARD_IMPL.effect`）
@@ -221,18 +273,13 @@ const CARD_IMPL = {
 
 #### few-shot 示例来源
 
-系统提示词末尾附加 `docs/community-card-examples.md`（原始 Markdown 通过 Vite `?raw` 导入），作为 few-shot 示例库随提示词一起发送给 LLM。
+模型从 GitHub 按需读取 `docs/community-card-examples.md` 的相关行。可执行样例继续由 `server/__tests__/workshop-prompt-runtime.test.ts` 中的 Session 测试保护。
 
 ### C3. 多轮对话设计
 
-- 对话历史和未发送输入只存在当前浏览器会话，并随本地恢复副本写入 localStorage
-- 每轮追加用户反馈 + LLM 响应
-- LLM 看到完整对话历史，支持迭代：
-  - "把费用降低一点"
-  - "加一个收获时的效果"
-  - "参考官方的 Ale Benches 风格"
-- 前端从每条响应中提取最后一个完整源码块作为能力候选，不直接覆盖当前已采用源码
-- 服务端只保存能力最近一次完成请求/结果；完整对话、未发送输入和 API Key 不上传
+浏览器捕获最近最多 12 条相关可见消息，以及选中候选或已采用草稿的准确源码。历史代码块从对话上下文省略，以明确传入的当前源码为准。重发保留当前卡牌上下文，开始新的尝试并重新解析资料 commit。工具消息、推理和签名仅留当前页面，刷新后不恢复。
+
+完整且通过校验的输出成为可审阅候选，静态代码最多自动修复两次；服务故障暂停在当前步骤。失败的完整源码保留供编辑，同时保住最近有效候选。服务端只保存 C1.3 所列的私有精简恢复投影，不接收完整对话或 LLM Key。
 
 ### C4. 卡牌美术生成
 
@@ -403,6 +450,8 @@ WorkshopPage
 | `POST /api/workshop/cards/:id/pin-version` | 固化当前草稿为不可变版本（沙盒确认流的版本来源；不动 review 轴） |
 | `POST /api/github/webhook` | GitHub App HMAC 验签；处理 review submitted/dismissed、PR synchronize/edited/converted-to-draft/closed，delivery 幂等 |
 | `POST /api/workshop/cards/:id/sandbox-pass` | 只记录当前精确发布版本且无运行错误的作者确认 |
+
+只有服务端确认整局恰好载入一张自定义卡及其不可变版本时，试玩错误才绑定到该源码。多卡诊断仍完整显示；无法确定归属时，须单独试玩后再使用 AI 修复。确认还须匹配 HTTP `gameInstanceId`，重用 seed 不会复用源码绑定；迟到响应不能恢复已替换试玩的绑定。
 
 能力首次生成和重发都会附带当前卡牌上下文；`CARD_ID`、卡牌类型和名称必须保持一致，采用时由 Workshop Card 聚合再次校验，效果描述、费用、VP 与本地化等其余定义字段仍可随候选更新。
 

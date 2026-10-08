@@ -1,0 +1,294 @@
+/** Local owner-only browser acceptance. No provider request is made by Node. */
+import { execFileSync, spawnSync } from 'node:child_process'
+import { createHash, randomUUID } from 'node:crypto'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { dirname, join, resolve } from 'node:path'
+import { parseArgs } from 'node:util'
+import { chromium } from '@playwright/test'
+import { ATTEMPT_ALLOWANCE, GENERATION_CONTEXT_BYTES } from '../client/services/llm/generation/attempt'
+import { GENERATION_MODEL_SETTINGS, MODEL_STREAM_LIMITS } from '../client/services/llm/generation/protocol'
+import { GENERATION_PROMPT_VERSION } from '../client/services/llm/generation/prompt'
+import { REFERENCE_LIMITS, REFERENCE_TOOL_VERSION } from '../client/services/llm/generation/references'
+import { BudgetFile } from '../tests/llm-card-gen/acceptance/budget-file'
+import { PRICE_BASIS, TOTAL_BUDGET_NANO_USD } from '../tests/llm-card-gen/acceptance/budget'
+import type { BrowserTaskResult, ReservationRequest, Settlement } from '../tests/llm-card-gen/acceptance/browser'
+import type { AcceptanceInput } from '../tests/llm-card-gen/acceptance/inputs'
+
+const { values } = parseArgs({ options: {
+  live: { type: 'boolean', default: false }, 'dry-run': { type: 'boolean', default: false },
+  model: { type: 'string' }, diagnose: { type: 'string' }, 'base-url': { type: 'string', default: 'http://127.0.0.1:5913' },
+  'runtime-env': { type: 'string', default: 'output/tmp/llm-runtime/local.env' },
+} })
+if (values.live === values['dry-run']) throw new Error('Choose exactly one of --dry-run or --live. Live requires an explicitly approved --model.')
+if (values.live && (process.env.CI || process.env.GITHUB_ACTIONS)) throw new Error('Paid LLM acceptance is owner-local only and cannot run in CI. No model credential was read or paid request issued.')
+if (values.live && values.model !== 'deepseek-flash') throw new Error('Only --model deepseek-flash is approved for paid acceptance; deprecated aliases cannot produce admission evidence.')
+const live = values.live!
+const model = values.model ?? 'deepseek-flash'
+const endpoint = 'https://api.deepseek.com/v1/chat/completions'
+const baseUrl = new URL(values['base-url']!)
+if (!['127.0.0.1', 'localhost'].includes(baseUrl.hostname) || baseUrl.protocol !== 'http:') throw new Error('Acceptance requires the dedicated local runtime, not a production site.')
+const root = process.cwd()
+const git = (...args: string[]) => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim()
+const commonGit = git('rev-parse', '--path-format=absolute', '--git-common-dir')
+const originalCheckout = dirname(commonGit)
+if (live && git('status', '--porcelain')) throw new Error('Commit the frozen implementation and assertions before starting a paid batch.')
+// This dedicated file contains database/runtime settings, never provider keys.
+const runtimeEnv = readFileSync(resolve(root, values['runtime-env']!), 'utf8')
+if (/^\s*(?:export\s+)?\w*(?:TOKEN|APIKEY|API_KEY)\s*=/m.test(runtimeEnv)) throw new Error('The dedicated runtime env must not contain provider or GitHub tokens.')
+process.loadEnvFile(resolve(root, values['runtime-env']!))
+if (!process.env.DATABASE_SCHEMA?.startsWith('test_')) throw new Error('Acceptance requires a test_ database schema.')
+function privateProviderKey(): string {
+  for (const name of ['MY_TEST_DEEPSEEK_APIKEY', 'DEEPSEEK_API_KEY']) if (process.env[name]) return process.env[name]!
+  // Read just this provider's value, without sourcing .env into the runtime.
+  for (const path of [join(root, '.env'), join(originalCheckout, '.env')]) {
+    if (!existsSync(path)) continue
+    const match = readFileSync(path, 'utf8').match(/^\s*(?:export\s+)?(?:MY_TEST_DEEPSEEK_APIKEY|DEEPSEEK_API_KEY)\s*=\s*(.+?)\s*$/m)
+    if (match) return match[1].replace(/^(['"])(.*)\1$/, '$2')
+  }
+  throw new Error('The owner DeepSeek key is unavailable; no paid request was issued.')
+}
+const apiKey = live ? privateProviderKey() : 'synthetic-acceptance-browser-credential'
+const sha256 = (value: string | Buffer) => createHash('sha256').update(value).digest('hex')
+const { acceptanceInputs } = await import('../tests/llm-card-gen/acceptance/inputs')
+const diagnostic = values.diagnose ? acceptanceInputs.find(input => input.id === values.diagnose) : undefined
+if (values.diagnose && !diagnostic) throw new Error('Unknown diagnostic scenario; use a declared acceptance scenario ID.')
+const { acceptanceSeed } = await import('../tests/llm-card-gen/acceptance/seeds')
+const { getWorkshopSandboxContract } = await import('../server/workshop-sandbox-contract')
+const { createLocalUserForTests, createSession } = await import('../server/auth')
+const { getDb } = await import('../server/db')
+const batch = `${diagnostic ? 'diagnostic-' : ''}${live ? 'live' : 'synthetic'}-${new Date().toISOString().replace(/[:.]/g, '-')}-${randomUUID().slice(0, 8)}`
+const directory = join(root, 'output/tmp/llm-acceptance', batch)
+mkdirSync(directory, { recursive: true })
+const save = (name: string, data: unknown) => {
+  const json = JSON.stringify(data, null, 2) + '\n'
+  if (json.includes(apiKey)) throw new Error('Refusing to save credential-bearing acceptance evidence')
+  writeFileSync(join(directory, name), json, { mode: 0o600 })
+}
+// Every paid probe/batch/worktree shares this exact ledger. There is no CLI
+// budget override or reset. Synthetic runs have their own labelled ledger.
+const budget = new BudgetFile(live ? join(commonGit, 'llm-acceptance-usd5.json') : join(directory, 'synthetic-budget.json'))
+const releaseBudget = () => budget.close()
+process.once('exit', releaseBudget)
+const freeze = () => Object.fromEntries(git('ls-files', '--cached', '--others', '--exclude-standard').split('\n')
+  .filter(path => /^(client\/|shared\/|server\/|tests\/llm-card-gen\/|scripts\/|package\.json$|pnpm-lock\.yaml$)/.test(path) && existsSync(path))
+  .map(path => [path, sha256(readFileSync(path))]))
+const frozenFiles = freeze()
+const frozenDigest = sha256(JSON.stringify(frozenFiles))
+function assertFrozen(): void {
+  if (sha256(JSON.stringify(freeze())) !== frozenDigest) throw new Error('Implementation or tests changed; this batch is incomplete. Start a new complete batch after validation.')
+}
+const sandboxContractId = getWorkshopSandboxContract().id
+type Task = { id: string; scenario: string; repetition: number }
+const tasks: Task[] = []
+for (let repetition = 1; repetition <= 3; repetition++) for (const input of acceptanceInputs) tasks.push({ id: `${input.id}-${repetition}`, scenario: input.id, repetition })
+if (diagnostic) tasks.splice(0, tasks.length, { id: `${diagnostic.id}-diagnostic`, scenario: diagnostic.id, repetition: 0 })
+save('manifest.json', {
+  format: 1, batch, synthetic: !live, diagnostic: Boolean(diagnostic), startedAt: new Date().toISOString(), implementationCommit: git('rev-parse', 'HEAD'),
+  dirty: Boolean(git('status', '--porcelain')), frozenDigest, files: frozenFiles,
+  provider: 'deepseek', endpoint, requestedModel: model, documentedService: PRICE_BASIS.documentedService,
+  priceBasis: PRICE_BASIS, totalEffortBudgetNanoUsd: TOTAL_BUDGET_NANO_USD,
+  settings: { ...GENERATION_MODEL_SETTINGS, thinking: { type: 'enabled' } },
+  responseLimits: MODEL_STREAM_LIMITS,
+  promptVersion: GENERATION_PROMPT_VERSION, toolVersion: REFERENCE_TOOL_VERSION, sandboxContractId,
+  allowance: ATTEMPT_ALLOWANCE, contextBytes: GENERATION_CONTEXT_BYTES, referenceLimits: REFERENCE_LIMITS,
+  tasks, inputs: acceptanceInputs,
+  method: diagnostic ? 'One labelled diagnostic run; shares the entire effort budget and cannot admit a model or replace a failed formal sample.' : 'Three repetitions of the fixed fixtures. Save complete source unchanged and run runner.test.ts; no task reruns or behavior-driven repairs. Synthetic results cannot admit a model.',
+})
+
+type TestResult = { ok: boolean; reason?: string }
+type TaskEvidence = { task: Task; startedAt: string; finishedAt: string; result: BrowserTaskResult; first: TestResult; final: TestResult }
+// The fixed Vitest suite is the only rule judge. This adapter writes each
+// first/final source as a single .ts file and collects Vitest's own verdicts.
+function runFixedTests(rows: TaskEvidence[], label: string): void {
+  assertFrozen()
+  const sources: Array<{ id: string; fixtureId: string; sourcePath: string }> = []
+  for (const row of rows) for (const stage of ['first', 'final'] as const) {
+    const source = stage === 'first' ? row.result.sources[0] : row.result.sources.at(-1)
+    row[stage] = { ok: false, reason: source?.validation?.errors.join('; ') || row.result.snapshot.reason || 'No validated complete source' }
+    if (!source) continue
+    const sourcePath = `${row.task.id}-${stage}.ts`
+    if (source.source.includes(apiKey)) throw new Error('Refusing to save credential-bearing source')
+    writeFileSync(join(directory, sourcePath), source.source, { mode: 0o600 })
+    if (!source.validation?.valid || (stage === 'final' && row.result.snapshot.result?.kind !== 'candidate')) continue
+    sources.push({ id: `${row.task.id}/${stage}`, fixtureId: row.task.scenario, sourcePath })
+  }
+  if (sources.length) {
+    save(`${label}-sources.json`, sources)
+    const reportPath = join(directory, `${label}-vitest.json`)
+    const child = spawnSync('pnpm', ['exec', 'vitest', 'run', '--project', 'llm', 'tests/llm-card-gen/runner.test.ts', '--reporter=json', '--outputFile', reportPath], {
+      cwd: root, env: { ...process.env, LLM_TEST_SOURCES: join(directory, `${label}-sources.json`) },
+      encoding: 'utf8', timeout: 10 * 60 * 1000, maxBuffer: 8 * 1024 * 1024,
+    })
+    if (child.error || child.signal || !existsSync(reportPath)) throw new Error(`Fixed case runner failed: ${child.error ?? child.signal ?? child.stderr}`)
+    const report = JSON.parse(readFileSync(reportPath, 'utf8')) as { numTotalTests: number; numFailedTests: number; testResults: Array<{ assertionResults: Array<{ title: string; status: string; failureMessages: string[] }> }> }
+    const results = new Map(report.testResults.flatMap(file => file.assertionResults).map(test => [test.title, test]))
+    if (report.numTotalTests !== sources.length || results.size !== sources.length || (child.status !== 0 && report.numFailedTests === 0)) throw new Error('Fixed case runner did not return every declared result')
+    for (const row of rows) for (const stage of ['first', 'final'] as const) {
+      const result = results.get(`${row.task.id}/${stage}`)
+      if (result) row[stage] = { ok: result.status === 'passed', reason: result.failureMessages.join('\n') || undefined }
+    }
+  }
+  assertFrozen()
+  for (const row of rows) {
+    save(`${row.task.id}.json`, row)
+    console.log(`${row.task.id}: ${row.final.ok ? 'PASS' : 'FAIL'}; first=${row.first.ok}; ${row.final.reason ?? ''}`)
+  }
+}
+
+const completed: TaskEvidence[] = []
+let probe: TaskEvidence | undefined
+let fatal: string | undefined
+let activeTask = ''
+let interrupted = false
+const browser = await chromium.launch({ headless: true })
+const stop = () => { interrupted = true; void browser.close() }
+process.once('SIGINT', stop)
+process.once('SIGTERM', stop)
+
+try {
+  const context = await browser.newContext()
+  const page = await context.newPage()
+  const destinations = new Map<string, { requests: number; credential: boolean }>()
+  // Inspect and block an accidental credential escape before a request leaves
+  // the browser. No request bodies, headers, HAR or traces are written to disk.
+  await page.route('**/*', async route => {
+    const request = route.request()
+    const url = new URL(request.url())
+    const credential = JSON.stringify(request.headers()).includes(apiKey) || (request.postData() ?? '').includes(apiKey)
+    if (credential && request.url() !== endpoint) {
+      fatal = 'A model credential was blocked from leaving for a non-provider destination.'
+      await route.abort(); return
+    }
+    if (url.hostname.endsWith('github.com') || url.hostname === 'raw.githubusercontent.com') {
+      if (request.headers().authorization) { fatal = 'Browser GitHub source requests must be anonymous.'; await route.abort(); return }
+    }
+    if (credential || url.hostname.includes('github') || url.pathname.startsWith('/api/workshop/')) {
+      const key = `${request.method()} ${url.origin}${url.hostname === '127.0.0.1' || url.hostname === 'localhost' ? url.pathname : ''}`
+      const prior = destinations.get(key)
+      destinations.set(key, { requests: (prior?.requests ?? 0) + 1, credential: credential || prior?.credential || false })
+    }
+    await route.fallback()
+  })
+  await page.exposeFunction('acceptanceReserve', (request: ReservationRequest) => {
+    if (fatal || request.task !== activeTask || interrupted) throw new Error(fatal ?? 'This task is no longer active')
+    try { return budget.reserve(request.inputBytes, request.maxOutputTokens, `${batch}/${request.task}`, request.sequence) } catch (error) {
+      fatal = error instanceof Error ? error.message : 'Budget reservation failed'
+      throw new Error(fatal, { cause: error })
+    }
+  })
+  await page.exposeFunction('acceptanceSettle', (settlement: Settlement) => {
+    try { budget.settle(settlement.id, settlement.usage, settlement.notPosted) } catch (error) {
+      fatal = error instanceof Error ? error.message : 'Budget settlement failed'
+      throw new Error(fatal, { cause: error })
+    }
+  })
+  const user = await createLocalUserForTests(`llm_${Date.now().toString(36)}`, 'owner-local-acceptance-only')
+  const cookie = await createSession(user.id)
+  if (!cookie) throw new Error('Could not create the isolated acceptance session')
+  await context.addCookies([{ name: 'oa_session', value: cookie, url: baseUrl.href }])
+  const referenceBody = 'Sandbox reference: gainLeaf(CARD_ID, { wood: 1 }); use collect on forest.\n'
+  const referenceCommit = 'e'.repeat(40)
+  const referencePath = 'docs/CUSTOM_CARD_SANDBOX.md'
+  if (!live) {
+    const blob = createHash('sha1').update(`blob ${Buffer.byteLength(referenceBody)}\0`).update(referenceBody).digest('hex')
+    await page.route('**/api/workshop/references/**', route => route.fulfill({ json: route.request().url().endsWith('/main') ? { object: { sha: referenceCommit } }
+      : { truncated: false, tree: [{ path: referencePath, type: 'blob', sha: blob, size: Buffer.byteLength(referenceBody) }] } }))
+    await page.route('https://raw.githubusercontent.com/**', route => route.fulfill({ body: referenceBody, contentType: 'text/plain' }))
+  }
+  await page.goto(baseUrl.href)
+  if (live) {
+    const reference = await page.evaluate(async () => {
+      const modulePath = '/client/services/llm/generation/references.ts'
+      const { ReferenceSession } = await import(modulePath)
+      const session = await ReferenceSession.createOpener()(AbortSignal.timeout(45_000))
+      return { transport: 'project-authenticated-metadata', commit: session.commit }
+    })
+    save('github-preflight.json', reference)
+  }
+  const run = async (task: Task, input: AcceptanceInput): Promise<TaskEvidence> => {
+    assertFrozen()
+    activeTask = task.id
+    let responses = 0
+    let sourceResponses = 0
+    if (!live) await page.route(endpoint, async route => {
+      responses++
+      const tools = responses === 1
+      let content = `\`\`\`typescript\n${acceptanceSeed(input.id)}\n\`\`\``
+      // Exercise exactly two production static repairs in the synthetic M1
+      // tasks. This mutation is never applied to paid model output.
+      if (!tools && input.id.startsWith('M1-') && ++sourceResponses <= 2) content = content.replace('\n```', '\neval("synthetic-invalid-source")\n```')
+      const delta = tools ? { role: 'assistant', reasoning_content: 'synthetic-private-reasoning', tool_calls: [{ index: 0, id: 'read-sandbox', type: 'function', function: { name: 'read_reference', arguments: JSON.stringify({ path: referencePath, startLine: 1, lineCount: 20 }) }, extra_content: { google: { thought_signature: 'synthetic-signature' } } }] }
+        : { role: 'assistant', content }
+      await route.fulfill({ contentType: 'text/event-stream', body: `data: ${JSON.stringify({ id: `synthetic-${responses}`, model, choices: [{ index: 0, delta, finish_reason: tools ? 'tool_calls' : 'stop' }] })}\n\ndata: ${JSON.stringify({ choices: [], usage: { prompt_tokens: 100, completion_tokens: 50, prompt_cache_hit_tokens: 20, completion_tokens_details: { reasoning_tokens: 10 } } })}\n\ndata: [DONE]\n\n` })
+    })
+    const startedAt = new Date().toISOString()
+    const result: BrowserTaskResult = await page.evaluate(async args => {
+      const moduleUrl = '/tests/llm-card-gen/acceptance/browser.ts'
+      const { runBrowserTask } = await import(/* @vite-ignore */ moduleUrl)
+      return runBrowserTask(args)
+    }, { task: task.id, input, config: { provider: 'deepseek' as const, model, apiKey }, sandboxContractId })
+    if (!live) await page.unroute(endpoint)
+    const evidence: TaskEvidence = { task, startedAt, finishedAt: new Date().toISOString(), result, first: { ok: false }, final: { ok: false } }
+    save(`${task.id}.json`, evidence)
+    save('destinations.json', Object.fromEntries(destinations))
+    console.log(`${task.id}: generated; POSTs=${result.snapshot.modelRequests}; repairs=${result.snapshot.repairs}`)
+    return evidence
+  }
+  if (!diagnostic) {
+    const probeInput = structuredClone(acceptanceInputs[1])
+    probeInput.intent.message += '\nBefore producing source, call read_reference for docs/CUSTOM_CARD_SANDBOX.md lines 1–80, then use the tool response to complete the source.'
+    probe = await run({ id: 'probe', scenario: probeInput.id, repetition: 0 }, probeInput)
+    runFixedTests([probe], 'probe')
+    if (!probe.final.ok || !probe.result.protocol.preserved || probe.result.protocol.toolGroupsChecked < 1 || !probe.result.snapshot.result?.provenance?.references.length) throw new Error('The real browser tool roundtrip probe did not pass; the complete batch was not started.')
+  }
+  for (const task of tasks) {
+    if (fatal || interrupted) throw new Error(fatal ?? 'Interrupted by owner')
+    const input = acceptanceInputs.find(item => item.id === task.scenario)!
+    const evidence = await run(task, input)
+    completed.push(evidence)
+    // Preserve failed quality samples and continue the declared matrix. A lost
+    // transport/checkpoint is an incomplete batch, not an automatic POST retry.
+    if (evidence.result.snapshot.status !== 'completed') throw new Error(evidence.result.snapshot.reason ?? 'The task paused; this batch is incomplete')
+  }
+} catch (error) {
+  fatal ??= interrupted ? 'Interrupted by owner' : error instanceof Error ? error.message : 'Acceptance stopped'
+  console.error(fatal)
+} finally {
+  await browser.close()
+  await getDb().close()
+  process.removeListener('SIGINT', stop)
+  process.removeListener('SIGTERM', stop)
+  try { runFixedTests(completed, 'cases') } catch (error) { fatal ??= String(error) }
+  const summary = (() => {
+    const rows = completed
+    const usage = rows.flatMap(row => row.result.requests).reduce((total, request) => ({
+      knownInputTokens: total.knownInputTokens + (request.usage.inputTokens ?? 0), knownOutputTokens: total.knownOutputTokens + (request.usage.outputTokens ?? 0),
+      unknownRequests: total.unknownRequests + Number(request.usage.inputTokens === null || request.usage.outputTokens === null),
+    }), { knownInputTokens: 0, knownOutputTokens: 0, unknownRequests: 0 })
+    const elapsed = rows.map(row => row.result.snapshot.activeMs).sort((a, b) => a - b)
+    const reservations = budget.ledger.state.reservations.filter(row => row.task.startsWith(`${batch}/`) && row.task !== `${batch}/probe`)
+    return { completed: rows.length, planned: tasks.length, firstPassed: rows.filter(row => row.first.ok).length, finalPassed: rows.filter(row => row.final.ok).length,
+      usage, modelRequests: rows.reduce((sum, row) => sum + row.result.snapshot.modelRequests, 0),
+      medianMs: elapsed.length ? elapsed[Math.floor(elapsed.length / 2)] : null, p95Ms: elapsed.length ? elapsed[Math.min(elapsed.length - 1, Math.ceil(elapsed.length * 0.95) - 1)] : null,
+      estimatedNanoUsd: reservations.reduce((sum, row) => sum + (row.settledNanoUsd ?? 0), 0), heldNanoUsd: reservations.reduce((sum, row) => sum + (row.settledNanoUsd === undefined ? row.reservedNanoUsd : 0), 0),
+    }
+  })()
+  try { assertFrozen() } catch (error) { fatal ??= String(error) }
+  const admitted = live && !diagnostic && !fatal && completed.length === tasks.length && probe?.final.ok === true && completed.every(row => row.final.ok && row.result.protocol.preserved)
+  const report = { batch, synthetic: !live, diagnostic: Boolean(diagnostic), admitted, finishedAt: new Date().toISOString(), fatal, complete: completed.length === tasks.length,
+    planned: tasks.length, completed: completed.length, summary, probePassed: probe?.final.ok ?? null,
+    totalEffortCommittedNanoUsd: budget.ledger.committedNanoUsd(), totalEffortRemainingNanoUsd: TOTAL_BUDGET_NANO_USD - budget.ledger.committedNanoUsd(),
+    failures: completed.filter(row => !row.final.ok).map(row => ({ task: row.task.id, reason: row.final.reason })),
+    unrun: tasks.filter(task => !completed.some(row => row.task.id === task.id)).map(task => task.id),
+    note: 'Costs use published peak rates and are estimates, not invoices. Unknown calls keep their full reservations. Passing synthetic output never admits a model; admission registry updates require the actual complete report.',
+  }
+  save('report.json', report)
+  save('budget-snapshot.json', budget.ledger.state)
+  budget.close()
+  process.removeListener('exit', releaseBudget)
+  console.log(JSON.stringify({ batch, admitted, complete: report.complete, completed: completed.length, directory, summary }))
+  if (fatal || !report.complete || (live && !diagnostic ? !admitted : completed.some(row => !row.final.ok))) process.exitCode = 1
+  // GameSession's process-owned executor worker stays alive for reuse. This
+  // one-shot owner CLI has finished all writes and closed its browser/DB.
+  process.stdout.write('', () => process.exit(process.exitCode ?? 0))
+}

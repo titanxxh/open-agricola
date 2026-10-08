@@ -19,7 +19,7 @@ export interface CardFixture {
   cardId: string
   cardType: 'minor' | 'occupation'
   userMessage: string
-  setup: (llmGeneratedCode: string) => { session: GameSession; ctx: FixtureContext }
+  setup: (llmGeneratedCode: string, options?: { historicalRecording?: boolean; cattle?: number }) => { session: GameSession; ctx: FixtureContext }
   scenario: (driver: Driver, ctx: FixtureContext) => void
   assert: (session: GameSession, ctx: FixtureContext) => FixtureResult
 }

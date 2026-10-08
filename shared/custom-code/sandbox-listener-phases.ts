@@ -20,7 +20,7 @@ export const isSandboxListenerPhase = (value: unknown): value is SandboxListener
 
 /**
  * Prompt 描述元数据（单一真相源）：listener phase 的中文说明。
- * `CARD_DESIGNER_SYSTEM_PROMPT` 运行时 import 此 map 渲染 phase 表。
+ * `getWorkshopSandboxContract` 运行时 import 此 map 提供 phase 描述。
  * `Record<SandboxListenerPhase, …>` 保证新增 phase 必须补描述，否则 tsc 报错。
  */
 export const sandboxListenerPhaseMeta: Record<SandboxListenerPhase, { desc: string; usage: string }> = {

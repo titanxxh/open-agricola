@@ -1,99 +1,62 @@
-# LLM Card-Gen 自动化测试套件
+# LLM Card Generation Tests
 
-验证**LLM 生成的自定义卡代码**能否在真实 `GameSession` 里跑通既定场景。默认 `record` 模式回放已提交的 golden，不调用 LLM；只有 `live` 或设置 `LLM_TEST_RECORD=1` 的刷新流程会调用外部模型。
+固定 case 的题面、初始状态、交互和断言统一放在 `tests/llm-card-gen/fixtures/`。AI 成功返回一份完整卡牌 TypeScript 源码，包含 `CARD_ID`、`CARD_DEF` 和 `CARD_IMPL`。将这份源码原样交给现有 `runner.test.ts`，在真实两人 `GameSession` 中执行同一套测试；不另建行为判题器或自然语言关键词评分。
 
 ## 位置
 
-```
-tests/llm-card-gen/
-├── runner.test.ts            # 读取 golden 或调用 LLM → 编译 → 跑 fixture.setup/scenario/assert
-├── driver.ts                 # 驱动 GameSession action / choice / pending
-├── session-helpers.ts        # buildSessionWithLLMCard / autoAdvanceRoundEnd / getBonusBreakdown 等
-├── session-helpers.test.ts   # helpers 自身的 smoke（不调 LLM）
-├── llm-client.ts             # Gemini / OpenAI / OpenRouter / DeepSeek / AiHubMix 兼容包装
-├── extract.ts / extract.test.ts   # 从 LLM 响应里抽 TS 代码块
-└── fixtures/
-    ├── types.ts              # CardFixture = { setup, scenario, assert }
-    ├── M1_immediate-gain-with-cost-prereq.ts  # minor + cost + prereq + onBuy gain
-    ├── M2_per-action-bonus.ts                 # listener: forest after → wood+1
-    ├── M3_harvest-feed-modifier.ts            # onStartHarvestFeedingPhase: food+1
-    ├── M4_endgame-vp.ts                       # computeBonusScore: 每 2 牛 1 分
-    ├── M5_cost-reduction.ts                   # computeCosts: renovate-house -1 reed
-    ├── M6_cardstate-counter.ts                # cardStates counter（special-effect）
-    ├── M7_anytime-ability.ts                  # anytime: 2 wood → 3 food 一次性
-    ├── M8_cross-player-trigger.ts             # scope:'any' listener cross-player gain
-    ├── M9_future-meeple.ts                    # onBuy: future-meeples leaf
-    ├── M10_payment-resource-provider.ts       # paymentResourceProviders 虚拟支付资源
-    └── M11_improvement-cost-reduction.ts      # 改良 mandatory capped bonus + ComplexCost
-```
+- `fixtures/`：11 个固定机制的题面与 `setup / scenario / assert`。
+- `runner.test.ts`：唯一的固定 case 执行入口，支持历史录音和生成源码。
+- `recordings/`：已有历史 golden；仅历史模式允许显式身份/元数据适配。
+- `fixtures.test.ts`：已知错误反例，验证固定测试能够发现相关回归。
+- `acceptance/`：浏览器生成入口、合成响应和共享费用账本；不维护另一份行为断言。
+- `scripts/llm-acceptance.ts`：owner 本机生成固定 case 源码，调用 Vitest 并记录用量。
+- `output/tmp/llm-acceptance/`：本地源码、manifest、Vitest 报告和费用快照；已被 Git 忽略，不提交运行产物。
 
 ## 运行
 
-普通 `pnpm test:fast` 不包含该 project；CI 另行执行确定性的 golden 回放。
-
 ```bash
-# 1. 默认代码生成使用 DeepSeek；API key 可直接放在 .env 的 MY_TEST_DEEPSEEK_APIKEY
-export LLM_TEST_CODE_PROVIDER=deepseek
-export LLM_TEST_CODE_MODEL=deepseek-v4-flash
-
-# 2. 全量 11 fixture golden 回放（确定性，不调 API）
+# 现有固定 case、历史 golden、反例和账本测试；不调用模型
 pnpm test:llm
 
-# 单跑一张 golden
-pnpm exec vitest run --project llm tests/llm-card-gen/runner.test.ts -t 'M2-per-action-bonus'
+# 重测某次生成保存的完整源码；不调用模型
+LLM_TEST_SOURCES=/absolute/path/cases-sources.json pnpm exec vitest run --project llm tests/llm-card-gen/runner.test.ts
 
-# 全量实时健康检查
-pnpm test:llm:live
+# 真实浏览器、后端校验和固定测试；模型/GitHub 响应使用合成数据
+pnpm test:llm:dry --base-url http://127.0.0.1:5913 --runtime-env output/tmp/llm-runtime/local.env
 
-# 单张实时检查；不要把 -t 放到 pnpm script 的 -- 后面
-LLM_TEST_MODE=live pnpm exec vitest run --project llm tests/llm-card-gen/runner.test.ts -t 'M11-improvement-cost-reduction'
+# owner 已确认模型与累计预算后，才运行真实生成
+pnpm test:llm:live --model deepseek-flash --base-url http://127.0.0.1:5913 --runtime-env output/tmp/llm-runtime/local.env
 
-# 单张确认通过后刷新 golden
-LLM_TEST_MODE=live LLM_TEST_RECORD=1 pnpm exec vitest run --project llm tests/llm-card-gen/runner.test.ts -t 'M11-improvement-cost-reduction'
-
-# 只跑 helper smoke（不调 LLM，~5s）
-pnpm exec vitest run --project llm tests/llm-card-gen/session-helpers.test.ts
-
-# 单独跑 Gemini 图片生成 smoke（2 个真实卡牌 case：1 张职业 + 1 张小改良）
-pnpm run smoke:gemini:image
-
-# 切换 provider / model（示例：AiHubMix 免费代码模型）
-LLM_TEST_CODE_PROVIDER=aihubmix \
-LLM_TEST_CODE_MODEL=coding-glm-5.1-free \
-AIHUBMIX_API_KEY=... \
-pnpm test:llm:live
+# 单独诊断一个固定 case，不作为完整模型准入
+pnpm test:llm:live --model deepseek-flash --diagnose M2-per-action-bonus --runtime-env output/tmp/llm-runtime/local.env
 ```
 
-实时代码生成默认 provider=`deepseek`、model=`deepseek-v4-flash`。三种模式都会把本次使用的响应写到 `output/tmp/llm-card-gen/<fixture-id>.txt`，失败时优先看这个文件。
+`LLM_TEST_SOURCES` 是一个本地 JSON 数组，每项包含 `id`（本次测试名称）、`fixtureId`（已有固定 case 的 ID）和 `sourcePath`（相对 manifest 的 `.ts` 路径）。它只选择源码，不能替换测试断言。缺失文件、未知 case、编译或行为失败都按普通 Vitest 失败处理。生成源码不改 ID、不补元数据、不做代码重写。
 
-环境变量按用途拆分，避免代码模型和图片模型混用：
-
-
-| 用途     | Provider env              | Model env              | 默认                                                 |
-| ------ | ------------------------- | ---------------------- | -------------------------------------------------- |
-| 卡牌代码生成 | `LLM_TEST_CODE_PROVIDER`  | `LLM_TEST_CODE_MODEL`  | `deepseek` / `deepseek-v4-flash`                   |
-| 卡牌图片生成 | `LLM_TEST_IMAGE_PROVIDER` | `LLM_TEST_IMAGE_MODEL` | `gemini` / `gemini-2.5-flash-image`                |
-
-
-当前 `tests/llm-card-gen/runner.test.ts` 只做代码生成，不调用图片模型。
-
-支持的代码生成 provider（用于 `LLM_TEST_CODE_PROVIDER`）：
-
-
-| Provider     | Chat completions endpoint                                                  | API key 环境变量                                       |
-| ------------ | -------------------------------------------------------------------------- | -------------------------------------------------- |
-| `gemini`     | `https://generativelanguage.googleapis.com/v1beta/openai/chat/completions` | `GEMINI_API_KEY` 或 `MY_TEST_GEMINI_APIKEY`         |
-| `openai`     | `https://api.openai.com/v1/chat/completions`                               | `OPENAI_API_KEY` 或 `MY_TEST_OPENAI_APIKEY`         |
-| `openrouter` | `https://openrouter.ai/api/v1/chat/completions`                            | `OPENROUTER_API_KEY` 或 `MY_TEST_OPENROUTER_APIKEY` |
-| `deepseek`   | `https://api.deepseek.com/v1/chat/completions`                             | `DEEPSEEK_API_KEY` 或 `MY_TEST_DEEPSEEK_APIKEY`     |
-| `aihubmix`   | `https://aihubmix.com/v1/chat/completions`                                 | `AIHUBMIX_API_KEY` 或 `MY_TEST_AIHUBMIX_APIKEY`     |
-
-
-`LLM_TEST_CODE_MODEL` / `LLM_TEST_IMAGE_MODEL` 不做白名单校验，直接透传给 provider，便于临时验证新模型。
+`test:llm:record` 是真实浏览器生成命令的别名，结果写入独立的本地批次目录，不覆盖历史 `recordings/`。旧的 `LLM_TEST_MODE=live` / `LLM_TEST_RECORD=1` 入口会拒绝执行，避免绕过浏览器调用和费用限制。
 
 ## CI / Workflow
 
-`.github/workflows/ci.yml` 只运行确定性的 `pnpm test:llm` golden 回放。真实调用外部 LLM 的健康检查仅在 owner 控制的本机运行 `pnpm test:llm:live`，API key 从已忽略的本地 `.env` 读取，不进入 GitHub Actions。
+普通 CI 运行确定性的 `pnpm test:llm`，不调用 LLM API。需要 LLM Token 的调用仅允许在 owner 控制的本机运行；入口发现 `CI` 或 `GITHUB_ACTIONS` 后，在读取配置、凭据和预约费用之前拒绝 `--live`。无 Token 的回放和合成演练不受限制。模型请求由浏览器发出，后端只收到源码校验和 GitHub 资料请求。
+
+## Browser-tool acceptance
+
+1. 浏览器按产品流程完成一次真实工具往返探测，并将输出源码交给固定测试。
+2. 依次运行 `fixtures/` 的 11 个 case，每题独立生成 3 次，共 33 个任务。
+3. 保存每次首次及最终输出的完整 `.ts` 文件，使用 `runner.test.ts` 执行既有 `setup / scenario / assert`，直接收集 Vitest 的测试结果。
+4. 分别报告首次和最终通过数、请求数、token、耗时、费用及失败。产品的静态校验最多修复两次；行为测试失败不会自动让模型重写或挑选成功样本。
+
+没有旧 prompt 对照组，也没有自然语言关键词判分。固定可实现题目返回能力缺口或澄清时，因为没有可执行源码而失败；对开放式需求的能力缺口说明，产品保留原始文本，不宣称固定测试已证明其语义正确。有限固定测试通过不代表任意需求都正确。
+
+产品准入按精确 provider、endpoint 和 model 登记在 `client/services/llm/generation/admission.ts`。真实工具探测和全部固定测试通过后才可登记；合成演练和历史 golden 都不能作为新的模型准入。`deepseek` / `https://api.deepseek.com/v1/chat/completions` / `deepseek-flash` 的[已有验收结论](https://github.com/titanxxh/open-agricola/issues/1041#issuecomment-6057596377)保留，其他组合待验。
+
+### 本地产物与预算
+
+每批写入独立的 `output/tmp/llm-acceptance/<batch>/`，保存版本 manifest、源码、首次/最终测试结果、参考来源和用量。可见最终回答保留有界文本；原始 provider 推理、签名和协议消息只留在页面内存。失败和中断记录同样保留，不覆盖、不改写为成功；这些运行文件不进入源码仓库。
+
+所有真实调用共用累计 **20 美元**预算，包括探测、失败、修复及后续批次。账本继续使用 `<git-common-dir>/llm-acceptance-usd5.json` 的历史文件名，保留以前的费用和未知用量预约；不会因新批次或 worktree 重置。每次 POST 前先持久预约，返回后结算，未知用量保留足额预约。合成演练使用独立临时账本。费用按配置的价格保守估算，不等于供应商账单。
+
+真实批次要求实现已提交且工作区干净；批次进行中修改源码或测试会使该批次不完整。LLM key 仅在测试进程与浏览器间传递，runtime env 只允许测试数据库和运行配置，不允许放入 provider/GitHub token。浏览器拦截器在请求发出前验证凭据目的地。
 
 ## Fixture 三段式
 
@@ -129,13 +92,13 @@ interface CardFixture {
 
 所以 fixture 不用自己 `withCtx`、也不用担心 seed 影响初始局面。
 
-### 不要调 `loadState`
+### 初始状态准备
 
-`session.loadState(state)` 会走 `normalizeState` → 任意 hand 为空就**重新发牌**，把 `clearAllHands` 效果抹掉。`buildSessionWithLLMCard` 返回后直接 mutate `session.getState().state`（live reference）即可。
+`clearAllHands` 现在将所有 hand 设为 `__test_placeholder__`，避免 `normalizeState` 对空 hand 重新发牌。`buildSessionWithLLMCard` 返回后可准备 `session.getState().state` 的测试初始状态。
 
 ### 多步骤行动
 
-连续 `takeAction` 之间可能进入 `interaction.request.kind === 'confirm-next-player'`（比如轮到对手但对手没工人）。优先使用 `Driver.takeAction()` 自动 drain；只有必须观察中间 pending 时才用 `takeActionRaw()` / `resolveChoiceRaw()`。
+连续 `takeAction` 之间可能进入 `interaction.request.kind === 'confirm-next-player'`（比如轮到对手但对手没工人）。新验收只自动处理确认及明确的本卡选择；支付等关键 pending 必须使用 `takeActionRaw()` / `resolveChoiceRaw()` 检查选项后明确选择。历史录音保留显式标记的旧 drain 行为。
 
 单回合内同一玩家多次 action 还需要：
 
@@ -167,8 +130,8 @@ setActiveWorkerCount(p1, 0)          // 对手零工人，避免轮转
 2. 新建 `tests/llm-card-gen/fixtures/M<n>_<slug>.ts`，follow `M2_per-action-bonus.ts` 模板
 3. 在 `tests/llm-card-gen/fixtures/index.ts` 注册导出
 4. 先让旧 golden 或 known-bad 实现跑出预期红灯，确认断言能捕获机制漂移
-5. 用 `LLM_TEST_MODE=live` 单跑一次并 review `output/tmp/llm-card-gen/`
-6. live 通过后用 `LLM_TEST_RECORD=1` 刷新 golden，再用默认 `pnpm test:llm` 回放
+5. 题面和断言只写在 fixture；浏览器输入由 fixtures 派生。用合成浏览器演练及同一份 `runner.test.ts` 验证生成源码。
+6. 如修改正式准入矩阵，先更新决议；重新冻结实现后开始完整付费批次，保留旧失败记录，不覆盖历史 golden
 
 ## 历史
 

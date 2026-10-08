@@ -1,3 +1,5 @@
+import { abilityDraftFingerprint, projectAbilityCandidate, projectGenerationResult, projectWorkshopGeneration, projectVisibleMessages, sourceFingerprint } from '../../../shared/projections/workshop-generation'
+import type { GenerationResult } from '../../../shared/contract/workshop-generation'
 import type {
   WorkshopAbilityCandidateContract,
   WorkshopArtCandidateContract,
@@ -31,6 +33,9 @@ export type WorkshopSessionState = {
   artSubject?: string
   abilityInput: string
   abilityMessages: unknown[]
+  latestAbilityResult?: GenerationResult
+  activeAbilityAttemptId?: string
+  activeAbilityValidationId?: string
   selectedArtCandidateId?: string
   selectedAbilityCandidateId?: string
   sandboxTestVersionId?: string
@@ -112,20 +117,9 @@ const candidateFromGeneration = (
         : {}),
     }
   }
-  if (kind === 'ability' && typeof candidate.sourceCode === 'string') {
-    const validation = asRecord(candidate.validation)
-    return {
-      ...common,
-      kind,
-      sourceCode: candidate.sourceCode,
-      cardJson: asRecord(candidate.cardJson),
-      validation: {
-        valid: validation.valid === true,
-        errors: Array.isArray(validation.errors)
-          ? validation.errors.filter((entry): entry is string => typeof entry === 'string')
-          : [],
-      },
-    }
+  if (kind === 'ability') {
+    const projected = projectAbilityCandidate(candidate)
+    if (projected) return { ...common, ...projected, validation: { ...projected.validation, errors: projected.validation.errors ?? [] } }
   }
   return null
 }
@@ -137,17 +131,21 @@ const sessionFromGeneration = (
   const ability = asRecord(workspace.draft.generation.ability)
   const lastArt = candidateFromGeneration('art', art.lastCompleted, workspace.revision)
   const adoptedArt = candidateFromGeneration('art', art.adopted, workspace.revision)
-  const lastAbility = candidateFromGeneration('ability', ability.lastCompleted, workspace.revision)
-  const adoptedAbility = candidateFromGeneration('ability', ability.adopted, workspace.revision)
+  const lastAbility = candidateFromGeneration('ability', ability.lastValid, workspace.revision)
+  const adoptedAbility = asRecord(ability.adopted)
   const pendingArt = lastArt?.id === adoptedArt?.id ? null : lastArt
-  const pendingAbility = lastAbility?.id === adoptedAbility?.id ? null : lastAbility
+  const pendingAbility = lastAbility?.id === adoptedAbility.id && lastAbility?.kind === 'ability' && lastAbility.sourceFingerprint === adoptedAbility.sourceFingerprint ? null : lastAbility
+  const latestResult = projectGenerationResult(ability.latestResult)
+  const failed = candidateFromGeneration('ability', latestResult?.failedCandidate, workspace.revision)
+  const abilityCandidates = [pendingAbility, failed].filter((candidate): candidate is AbilityCandidate => candidate?.kind === 'ability')
   return {
     ...emptySession(),
     artSubject: typeof art.subject === 'string' ? art.subject : '',
     artCandidates: pendingArt?.kind === 'art' ? [pendingArt] : [],
-    abilityCandidates: pendingAbility?.kind === 'ability' ? [pendingAbility] : [],
+    abilityCandidates,
+    latestAbilityResult: latestResult,
     ...(pendingArt ? { selectedArtCandidateId: pendingArt.id } : {}),
-    ...(pendingAbility ? { selectedAbilityCandidateId: pendingAbility.id } : {}),
+    ...(abilityCandidates.length ? { selectedAbilityCandidateId: abilityCandidates.at(-1)!.id } : {}),
   }
 }
 
@@ -158,6 +156,18 @@ const withLastCompleted = (
 ): WorkshopClientDraft => {
   const generation = { ...draft.generation }
   const group = { ...asRecord(generation[kind]) }
+  if (kind === 'ability') {
+    if (candidate?.kind === 'ability') {
+      const projected = projectAbilityCandidate(candidate)!
+      if (projected.validation.valid) group.lastValid = projected
+      group.latestResult = resultFromCandidate(projected)
+    } else {
+      delete group.latestResult
+    }
+    delete group.lastCompleted
+    generation.ability = group
+    return { ...draft, generation: projectWorkshopGeneration(generation) }
+  }
   if (candidate) {
     group.lastCompleted = candidate
   } else if (group.adopted) {
@@ -167,6 +177,20 @@ const withLastCompleted = (
   }
   generation[kind] = group
   return { ...draft, generation }
+}
+
+const resultFromCandidate = (candidate: WorkshopAbilityCandidateContract): GenerationResult => ({
+  kind: candidate.validation.valid ? 'candidate' : 'failed-source',
+  attemptId: candidate.provenance?.attemptId ?? candidate.id, createdAt: candidate.createdAt, message: '',
+  ...(candidate.provenance ? { provenance: candidate.provenance } : {}),
+  candidateId: candidate.id, sourceFingerprint: sourceFingerprint(candidate.sourceCode),
+  ...(!candidate.validation.valid ? { failedCandidate: candidate } : {}),
+})
+
+const keepAbilityCandidates = (candidates: AbilityCandidate[]): AbilityCandidate[] => {
+  const newest = candidates.slice(-3)
+  const valid = [...candidates].reverse().find(candidate => candidate.validation.valid)
+  return valid && !newest.includes(valid) ? [valid, ...newest.slice(-2)] : newest
 }
 
 export const createWorkshopDraftState = (
@@ -195,6 +219,11 @@ export type WorkshopDraftAction =
   | { type: 'serverLoaded'; state: WorkshopDraftState }
   | { type: 'draftChanged'; draft: WorkshopClientDraft }
   | { type: 'candidateCompleted'; candidate: WorkshopCandidate }
+  | { type: 'generationStarted'; attemptId: string }
+  | { type: 'generationInvalidated'; attemptId: string }
+  | { type: 'abilityValidationStarted'; validationId: string }
+  | { type: 'abilityValidationEnded'; validationId: string }
+  | { type: 'generationFinished'; attemptId: string; draftFingerprint: string; sourceCandidate?: { id: string; fingerprint: string }; result: GenerationResult; candidate?: AbilityCandidate }
   | { type: 'candidateDiscarded'; kind: WorkshopCandidate['kind']; candidateId: string }
   | {
       type: 'abilityCandidateEdited'
@@ -204,8 +233,11 @@ export type WorkshopDraftAction =
     }
   | {
       type: 'abilityCandidateValidated'
+      validationId: string
       candidateId: string
+      sourceFingerprint: string
       validation: AbilityCandidate['validation']
+      cardJson?: Record<string, unknown>
     }
   | { type: 'candidateAdopted'; kind: WorkshopCandidate['kind']; workspace: WorkshopWorkspaceDto }
   | { type: 'sessionChanged'; session: Partial<WorkshopSessionState> }
@@ -221,6 +253,19 @@ export type WorkshopDraftAction =
 
 const staleCandidates = <T extends WorkshopCandidate>(candidates: T[]): T[] =>
   candidates.map(candidate => ({ ...candidate, stale: true }))
+
+const stalePendingGeneration = (generation: Record<string, unknown>, abilityChanged: boolean): Record<string, unknown> => {
+  const projected = projectWorkshopGeneration(generation)
+  const art = asRecord(projected.art)
+  if (art.lastCompleted) projected.art = { ...art, lastCompleted: { ...asRecord(art.lastCompleted), stale: true } }
+  if (abilityChanged) {
+    const ability = asRecord(projected.ability)
+    const latest = asRecord(ability.latestResult)
+    if (ability.lastValid) ability.lastValid = { ...asRecord(ability.lastValid), stale: true }
+    if (latest.failedCandidate) ability.latestResult = { ...latest, failedCandidate: { ...asRecord(latest.failedCandidate), stale: true } }
+  }
+  return projected
+}
 
 const applyWorkspace = (
   state: WorkshopDraftState,
@@ -240,6 +285,15 @@ const applyWorkspace = (
   conflict: null,
 })
 
+export function isCurrentAbilityAttempt(state: WorkshopDraftState, attempt: {
+  attemptId: string; draftFingerprint: string; sourceCandidate?: { id: string; fingerprint: string }
+}): boolean {
+  return state.session.activeAbilityAttemptId === attempt.attemptId
+    && abilityDraftFingerprint(state.draft) === attempt.draftFingerprint
+    && (!attempt.sourceCandidate || state.session.abilityCandidates.some(candidate =>
+      candidate.id === attempt.sourceCandidate!.id && sourceFingerprint(candidate.sourceCode) === attempt.sourceCandidate!.fingerprint))
+}
+
 export const workshopDraftReducer = (
   state: WorkshopDraftState,
   action: WorkshopDraftAction,
@@ -247,14 +301,17 @@ export const workshopDraftReducer = (
   switch (action.type) {
     case 'serverLoaded':
       return action.state
-    case 'draftChanged':
+    case 'draftChanged': {
+      const abilityChanged = abilityDraftFingerprint(state.draft) !== abilityDraftFingerprint(action.draft)
       return {
         ...state,
-        draft: action.draft,
+        draft: { ...action.draft, generation: stalePendingGeneration(action.draft.generation, abilityChanged) },
         session: {
           ...state.session,
           artCandidates: staleCandidates(state.session.artCandidates),
-          abilityCandidates: staleCandidates(state.session.abilityCandidates),
+          activeAbilityAttemptId: abilityChanged ? undefined : state.session.activeAbilityAttemptId,
+          activeAbilityValidationId: abilityChanged ? undefined : state.session.activeAbilityValidationId,
+          abilityCandidates: abilityChanged ? staleCandidates(state.session.abilityCandidates) : state.session.abilityCandidates,
           sandboxTestVersionId: undefined,
           restoreUndoDraft: undefined,
         },
@@ -262,6 +319,32 @@ export const workshopDraftReducer = (
         sandboxPassedAt: null,
         save: { status: 'dirty' },
       }
+    }
+    case 'generationStarted':
+      return { ...state, session: { ...state.session, activeAbilityAttemptId: action.attemptId, activeAbilityValidationId: undefined } }
+    case 'abilityValidationStarted':
+      return { ...state, session: { ...state.session, activeAbilityValidationId: action.validationId } }
+    case 'abilityValidationEnded':
+      return state.session.activeAbilityValidationId === action.validationId
+        ? { ...state, session: { ...state.session, activeAbilityValidationId: undefined } }
+        : state
+    case 'generationInvalidated':
+      return state.session.activeAbilityAttemptId === action.attemptId
+        ? { ...state, session: { ...state.session, activeAbilityAttemptId: undefined } }
+        : state
+    case 'generationFinished': {
+      if (state.session.activeAbilityAttemptId !== action.attemptId) return state
+      if (!isCurrentAbilityAttempt(state, action)) {
+        return { ...state, session: { ...state.session, activeAbilityAttemptId: undefined } }
+      }
+      const next = action.candidate ? workshopDraftReducer(state, { type: 'candidateCompleted', candidate: action.candidate }) : state
+      return {
+        ...next,
+        draft: { ...next.draft, generation: projectWorkshopGeneration({ ...next.draft.generation, ability: { ...asRecord(next.draft.generation.ability), latestResult: action.result } }) },
+        session: { ...next.session, latestAbilityResult: action.result, activeAbilityAttemptId: undefined },
+        save: { status: 'dirty' },
+      }
+    }
     case 'candidateCompleted':
       return action.candidate.kind === 'art'
         ? {
@@ -279,7 +362,9 @@ export const workshopDraftReducer = (
             draft: withLastCompleted(state.draft, 'ability', action.candidate),
             session: {
               ...state.session,
-              abilityCandidates: [...state.session.abilityCandidates, action.candidate].slice(-3),
+              abilityCandidates: keepAbilityCandidates([...state.session.abilityCandidates, action.candidate]),
+              activeAbilityValidationId: undefined,
+              latestAbilityResult: resultFromCandidate(action.candidate),
               selectedAbilityCandidateId: action.candidate.id,
             },
             save: { status: 'dirty' },
@@ -305,12 +390,19 @@ export const workshopDraftReducer = (
       const remaining = state.session.abilityCandidates.filter(
         candidate => candidate.id !== action.candidateId,
       )
+      const ability = { ...asRecord(state.draft.generation.ability) }
+      if (asRecord(ability.lastValid).id === action.candidateId) {
+        const fallback = [...remaining].reverse().find(candidate => candidate.validation.valid)
+        if (fallback) ability.lastValid = fallback
+        else delete ability.lastValid
+      }
       return {
         ...state,
-        draft: withLastCompleted(state.draft, 'ability', remaining.at(-1) ?? null),
+        draft: withLastCompleted({ ...state.draft, generation: { ...state.draft.generation, ability } }, 'ability', remaining.at(-1) ?? null),
         session: {
           ...state.session,
           abilityCandidates: remaining,
+          activeAbilityValidationId: undefined,
           selectedAbilityCandidateId: state.session.selectedAbilityCandidateId === action.candidateId
             ? remaining.at(-1)?.id
             : state.session.selectedAbilityCandidateId,
@@ -319,35 +411,44 @@ export const workshopDraftReducer = (
       }
     }
     case 'abilityCandidateEdited': {
-      const candidates = state.session.abilityCandidates.map(candidate =>
-        candidate.id === action.candidateId
-          ? {
-              ...candidate,
-              sourceCode: action.sourceCode,
-              ...(action.cardJson ? { cardJson: action.cardJson } : {}),
-              validation: { valid: false, errors: [] },
-            }
-          : candidate,
-      )
-      const edited = candidates.find(candidate => candidate.id === action.candidateId) ?? null
+      const previous = state.session.abilityCandidates.find(candidate => candidate.id === action.candidateId)
+      if (!previous) return state
+      const editedId = `${action.candidateId.split(':edit:')[0]}:edit:${sourceFingerprint(action.sourceCode).slice(0, 16)}`
+      const edited: AbilityCandidate = {
+        ...previous,
+        id: editedId,
+        sourceCode: action.sourceCode,
+        sourceFingerprint: sourceFingerprint(action.sourceCode),
+        provenance: undefined,
+        inputFingerprint: undefined,
+        provider: undefined,
+        model: undefined,
+        ...(action.cardJson ? { cardJson: action.cardJson } : {}),
+        validation: { valid: false, errors: [] },
+      }
+      const candidates = state.session.abilityCandidates.filter(candidate =>
+        candidate.id !== editedId && (candidate.id !== previous.id || previous.validation.valid))
+      candidates.push(edited)
       return {
         ...state,
         draft: withLastCompleted(state.draft, 'ability', edited),
-        session: { ...state.session, abilityCandidates: candidates },
+        session: { ...state.session, activeAbilityAttemptId: undefined, activeAbilityValidationId: undefined, abilityCandidates: keepAbilityCandidates(candidates), selectedAbilityCandidateId: editedId, latestAbilityResult: resultFromCandidate(edited) },
         save: { status: 'dirty' },
       }
     }
     case 'abilityCandidateValidated': {
+      if (state.session.activeAbilityValidationId !== action.validationId) return state
+      if (!state.session.abilityCandidates.some(candidate => candidate.id === action.candidateId && sourceFingerprint(candidate.sourceCode) === action.sourceFingerprint)) return state
       const candidates = state.session.abilityCandidates.map(candidate =>
         candidate.id === action.candidateId
-          ? { ...candidate, validation: action.validation }
+          ? { ...candidate, ...(action.cardJson ? { cardJson: action.cardJson } : {}), validation: { ...action.validation, sourceFingerprint: action.sourceFingerprint } }
           : candidate,
       )
       const validated = candidates.find(candidate => candidate.id === action.candidateId) ?? null
       return {
         ...state,
         draft: withLastCompleted(state.draft, 'ability', validated),
-        session: { ...state.session, abilityCandidates: candidates },
+        session: { ...state.session, activeAbilityValidationId: undefined, abilityCandidates: candidates, latestAbilityResult: validated ? resultFromCandidate(validated) : undefined },
         save: { status: 'dirty' },
       }
     }
@@ -366,6 +467,8 @@ export const workshopDraftReducer = (
           : {
               ...next.session,
               abilityCandidates: [],
+              latestAbilityResult: projectGenerationResult(asRecord(next.draft.generation.ability).latestResult),
+              activeAbilityValidationId: undefined,
               selectedAbilityCandidateId: undefined,
               sandboxTestVersionId: undefined,
               restoreUndoDraft: undefined,
@@ -414,10 +517,23 @@ export const workshopDraftReducer = (
   }
 }
 
+const projectSessionRecovery = (session: WorkshopSessionState): WorkshopSessionState => ({
+  artCandidates: session.artCandidates.map(candidate => candidateFromGeneration('art', candidate, candidate.baseRevision)).filter((candidate): candidate is ArtCandidate => candidate?.kind === 'art'),
+  abilityCandidates: session.abilityCandidates.map(candidate => candidateFromGeneration('ability', candidate, candidate.baseRevision)).filter((candidate): candidate is AbilityCandidate => candidate?.kind === 'ability'),
+  artSubject: session.artSubject, abilityInput: session.abilityInput,
+  abilityMessages: projectVisibleMessages(session.abilityMessages),
+  latestAbilityResult: session.activeAbilityAttemptId
+    ? { kind: 'interrupted', attemptId: session.activeAbilityAttemptId, createdAt: Date.now(), message: 'Generation interrupted by page reload; start a new attempt to continue.' }
+    : projectGenerationResult(session.latestAbilityResult),
+  selectedArtCandidateId: session.selectedArtCandidateId, selectedAbilityCandidateId: session.selectedAbilityCandidateId,
+  sandboxTestVersionId: session.sandboxTestVersionId,
+  ...(session.restoreUndoDraft ? { restoreUndoDraft: { ...session.restoreUndoDraft, generation: projectWorkshopGeneration(session.restoreUndoDraft.generation) } } : {}),
+})
+
 export const toLocalRecovery = (state: WorkshopDraftState): WorkshopLocalRecovery => ({
   baseRevision: state.baseRevision,
-  draft: state.draft,
-  sessionState: state.session,
+  draft: { ...state.draft, generation: projectWorkshopGeneration(state.draft.generation) },
+  sessionState: projectSessionRecovery(state.session),
 })
 
 const migrateRecoveredArtInputs = (
@@ -477,7 +593,8 @@ export const resolveWorkshopRecovery = (
   | { kind: 'server'; state: WorkshopDraftState; clearLocal: boolean }
   | { kind: 'local'; state: WorkshopDraftState; clearLocal: false }
   | { kind: 'conflict'; state: WorkshopDraftState; clearLocal: false } => {
-  const recovered = local ? migrateRecoveredArtInputs(server, local) : null
+  const migrated = local ? migrateRecoveredArtInputs(server, local) : null
+  const recovered = migrated ? { ...migrated, draft: { ...migrated.draft, generation: projectWorkshopGeneration(migrated.draft.generation) }, sessionState: projectSessionRecovery(migrated.sessionState) } : null
   const serverState = createWorkshopDraftState(server, recovered?.sessionState)
   if (!recovered) return { kind: 'server', state: serverState, clearLocal: false }
   if (recovered.baseRevision !== server.revision) {

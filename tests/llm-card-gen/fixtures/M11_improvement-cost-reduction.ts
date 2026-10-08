@@ -39,8 +39,9 @@ const fixture: CardFixture = {
     '- 效果: 打出后，建造房间和购买改良时各少支付 2 木材。',
   ].join('\n'),
 
-  setup(llmCode) {
+  setup(llmCode, options) {
     const built = buildSessionWithLLMCard(llmCode, {
+      historicalRecording: options?.historicalRecording,
       cardId: CARD_ID,
       cardType: 'occupation',
       cardName: '中世纪木槌',
@@ -100,7 +101,16 @@ const fixture: CardFixture = {
       minorPlayed: [...afterPurchase.minorPlayed],
       logKeys: driver.getState().state.log.map((entry) => entry.key),
     }
-    driver.takeAction(0, 'farm-expansion')
+    let construction = driver.takeActionRaw(0, 'farm-expansion')
+    if (construction.interaction.request?.kind === 'choice') {
+      const option = construction.interaction.request.options?.find(item => item.value.includes('construct'))
+      if (!option) throw new Error('Expected the explicit room construction choice')
+      construction = driver.resolveChoiceRaw(0, option.value)
+    }
+    if (construction.interaction.request?.farm?.farmType !== 'room') throw new Error('Expected room placement')
+    const room = construction.interaction.request.farm.selectableTiles?.[0]
+    if (!room) throw new Error('Expected an available room tile')
+    driver.commitSelectionRaw(0, { rooms: [room] })
   },
 
   assert(session, ctx): FixtureResult {

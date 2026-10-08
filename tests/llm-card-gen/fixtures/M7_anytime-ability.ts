@@ -25,8 +25,9 @@ const fixture: CardFixture = {
     '- 实现提示: 用 listener、phases 设为 [\'anytime\'] 实现这个「任意时机」能力。',
   ].join('\n'),
 
-  setup(llmCode) {
+  setup(llmCode, options) {
     const built = buildSessionWithLLMCard(llmCode, {
+      historicalRecording: options?.historicalRecording,
       cardId: CARD_ID,
       cardType: 'occupation',
       cardName: '木材换食物',
@@ -49,8 +50,9 @@ const fixture: CardFixture = {
     return { session: built.session, ctx }
   },
 
-  scenario(driver) {
+  scenario(driver, ctx) {
     driver.takeActionRaw(0, 'farmland')
+    ctx.anytimeId = driver.findAnytimeId()
     driver.takeAnytimeForCard(0)
   },
 
@@ -58,9 +60,16 @@ const fixture: CardFixture = {
     const p0 = (session.getState().state as any).players[0]
     if (p0.resources.wood !== 0) return { ok: false, reason: `expected wood=0 (2-2 paid), got ${p0.resources.wood}` }
     if (p0.resources.food !== 3) return { ok: false, reason: `expected food=3 (gained), got ${p0.resources.food}` }
+    // Replenish payment so resource exhaustion cannot masquerade as once-only.
+    p0.resources.wood = 2
     const latest = session.getState() as any
     const stillExposed = (latest.interaction?.anytimeActions ?? []).some((a: any) => a.sourceCard === ctx.cardId)
     if (stillExposed) return { ok: false, reason: 'anytime still exposed after one-time use' }
+    if (typeof ctx.anytimeId !== 'string') return { ok: false, reason: 'missing original anytime id' }
+    const again = session.takeAnytimeAction(0, ctx.anytimeId)
+    if (again.ok || p0.resources.wood !== 2 || p0.resources.food !== 3) {
+      return { ok: false, reason: 'one-time action succeeded again after replenishing wood' }
+    }
     return { ok: true }
   },
 }

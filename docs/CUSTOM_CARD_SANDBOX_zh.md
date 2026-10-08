@@ -8,16 +8,16 @@
 
 > **谁该读这个文件**：
 >
-> - **AI 系统提示词作者** — `client/services/llmPrompts.ts` 运行时从源码真相源 + 描述元数据渲染 hook / phase / scope / actionId 表；hook / phase / actionId 描述分别维护在 `shared/custom-code/sandbox-hook-meta.ts` / `sandbox-listener-phases.ts` / `sandbox-action-ids.ts`，scope 描述维护在 prompt 文件的穷尽 map
+> - **AI 系统提示词作者** — `client/services/llm/generation/prompt.ts` 包含 `server/workshop-sandbox-contract.ts` 返回的已部署契约；hook / phase / scope / actionId、helper 和运行语义来自实际运行的后端及 shared 描述元数据，样例由浏览器按需从 GitHub 读取
 > - **Workshop UI 文案作者** — `client/app/workshop/AiCardDesigner.tsx` / `WorkshopPage.tsx` 文案
 > - **设计文档作者** — `docs/ARCHITECTURE.md` 提到沙盒的章节
 > - **LLM 自动化测试维护者** — `docs/test/llm-card-gen.md` 描述了用真 LLM 验证沙盒契约的 fixture 套件
 >
 > **修改本文件的同时**必须：
 >
-> 1. 本文件是 hook / phase / scope / actionId 的**人读镜像**：名字白名单由源码常量拥有（`cardEffectHooks` / `sandboxListenerPhases` / `sandboxListenerScopes` / `SANDBOX_ALLOWED_ACTION_IDS`），描述由穷尽 map 拥有；`CARD_DESIGNER_SYSTEM_PROMPT` 运行时渲染，**不再手工同步 prompt**。CI `pnpm run check:prompt-sync` 只校验本文件的 `prompt-sync` 块与源码名字一致。
+> 1. 本文件是 hook / phase / scope / actionId 的**人读镜像**：名字白名单由源码常量拥有（`cardEffectHooks` / `sandboxListenerPhases` / `sandboxListenerScopes` / `SANDBOX_ALLOWED_ACTION_IDS`），描述由穷尽 map 拥有；已部署沙盒契约在运行时派生这些内容，由浏览器放入生成 prompt，**不再手工同步 prompt 表格**。CI `pnpm run check:prompt-sync` 只校验本文件的 `prompt-sync` 块与源码名字一致。
 > 2. 让 `docs/ARCHITECTURE.md` 引用本文件而不是另行维护一份
-> 3. 支付语义、hook 参数/返回值和 helper 数据形状不是名字同步能覆盖的；同步更新 executor / prompt contract 测试，并按 `docs/test/llm-card-gen.md` 跑 live → record → replay
+> 3. 支付语义、hook 参数/返回值和 helper 数据形状不是名字同步能覆盖的；同步更新 executor / prompt contract 测试，并按 `docs/test/llm-card-gen.md` 跑固定浏览器验收批次；历史 golden 回放保留为独立回归检查
 
 > **官方卡作者**（在 `shared/cards/<deck>/<id>.ts` 里写 TS 模块）**不受**本文件约束 —— 直接 import `shared/domain/player.ts` 等任意 helper。本文件只覆盖 Workshop 自定义卡。
 
@@ -137,6 +137,8 @@ const jsonSafe = JSON.parse(JSON.stringify(value ?? null))
 
 
 **判定卡主必须用 `context.ownerPlayer`**，不能用 `context.player`。
+
+每个卡牌 listener 都应通过 `cardIds: [CARD_ID]` 绑定本卡，让 scope 和 owner 指向这张卡。玩家身份通过这些对象读取：`context.player.id` 和 `context.ownerPlayer.id`。不存在 `context.playerId`；将它与卡主 ID 比较可能导致所有触发静默失效。对于已通过 `cardIds: [CARD_ID]` 绑定的 listener，`scope: 'player'` 已经只向卡主分发，无需再判断行动玩家是否为卡主。不要从引擎内部字段推断扁平的身份字段；已部署的工坊契约通过 `listeners.players` 列出支持的玩家对象键。
 
 ### 2.1 `context.space` (ActionSpace) 可读字段
 
@@ -295,6 +297,8 @@ reaction-compatible hook（action listener 的 `before` / `during` / `immediatel
 
 Workshop 自定义卡只能通过 `computeCosts` listener 的 handler 返回值影响支付：
 
+`computeCosts` 是纯查询，会在预览与支付执行时反复求值。每次调用都应返回本卡当前适用的贡献。`context.costs` 可能带有传入的已计算费用差值，它既不是基础价格，也不表示本 listener 已经贡献过折扣。尤其不能因为该字段已经为负值就跳过本次折扣；支付求解器负责合并贡献，并将应付费用下限限制为零。
+
 购买主要或次要改良的费用统一监听 `actions: ['improvement']`。
 
 - `costs`：简单行动费用 delta；负数表示折扣，正数表示额外费用。适合 `construct` 等普通 action cost。
@@ -389,7 +393,7 @@ return {
 
 ```ts
 type CardState = {
-  counters?: Partial<Record<Resource, number>>  // store-on-card / take-from-card 写入这里
+  counters?: Record<string, number>            // 资源或有名称的卡牌局部计数器
   flagged?: boolean                              // 一次性触发标记
   infobox?: string                               // 显示在卡面的小标签
   stack?: unknown[]                              // 复杂状态（如 LIFO 队列）
@@ -511,7 +515,7 @@ AST validator 还会检查 `CARD_IMPL.effect` 中的键是否在 `cardEffectHook
 
 ## 5.5 listener `actions:` 字段（高频踩坑）
 
-`CARD_IMPL.listeners[].actions` 接受的字符串是**触发行动的内部 leaf actionId**（如 `place-farmer`、`gain`、`collect`），**不是**行动空间 ID（如 `forest`、`clay-pit`、`wish-children`）。完整列表见 `client/services/llmPrompts.ts §"可监听的行动"`。
+`CARD_IMPL.listeners[].actions` 接受的字符串是**触发行动的内部 leaf actionId**（如 `place-farmer`、`gain`、`collect`），**不是**行动空间 ID（如 `forest`、`clay-pit`、`wish-children`）。完整列表由 `shared/custom-code/sandbox-listener-actions.ts` 定义，并进入已部署沙盒契约。
 
 要在"玩家走某个行动空间"后触发，监听 `actions: ['place-farmer']` 然后在 handler 内用 `context.space?.id === '<空间ID>'` 过滤。
 
@@ -582,6 +586,20 @@ return {
 
 `futureMeeplesAction.execute()` 识别 `params.__futureMeepleRequest`，把 entry 入队到 `state.pendingFutureMeeples`，下一回合开始时落到当回合行动卡格上。`FutureMeepleRequest` 还有 `{ startRound, count, resources }` 形式（多个回合连续放），见 `shared/contract/types.ts` 的 `FutureMeepleRequest`。
 
+未来回合的预放奖励必须走该调度路径，由引擎管理可见的预放记录、到账与清理。把资源存在卡牌 counters，再通过带 flag 的 `onRoundStart` 发放，不会创建未来回合的预放记录。
+
+### 5.8 ActionFlow 结构
+
+单步使用 `{ type: 'leaf', actionId, params, sourceCard: CARD_ID }`。组合节点的数组字段是 `children`，类型可以是 `seq`、`or`、`xor` 或 `parallel`：
+
+```ts
+{ type: 'seq', children: [gainLeaf(CARD_ID, { food: 1 }), gainLeaf(CARD_ID, { wood: 1 })] }
+```
+
+`optional` 是节点上的布尔字段，不是另一种节点类型。返回流程的 effect hook 直接返回 flow；listener 返回 `{ flow, sourceCard: CARD_ID }`（或其文档规定的查询结果）。
+
+执行前，AST 校验会拒绝可静态识别的组合节点字面量：缺少 `children`，或其值明显不是数组。这覆盖 flow hook 的直接返回、嵌套的字面量 children，以及 listener 的 `flow` / `alternativeFlow` 结果。校验不会把 leaf 参数或卡牌私有数据当作 flow，也不推断动态 helper 结果或 spread 提供的 children。静态通过后仍需试玩验证行为。
+
 ---
 
 ## 6. `actionId` 行为校准
@@ -610,14 +628,20 @@ return {
 | `pay`                      | 同上，扣资源                                                                            |
 | `bake-bread`               | 启动一段烤面包子流程                                                                        |
 | `push-to-card-stack`       | 向 `player.cardStates[CARD_ID].stack` 推入一项                                         |
-| `special-effect`           | **沙盒 cardStates mutation 入口**（Sprint 6a/6b）。`params: { kind: 'set-flag' \| 'set-infobox' \| 'set-extra-data' \| 'set-private-data' \| 'increment-extra-data', ... }`。取代旧的 `flag-card` / `unflag-card` / `set-card-infobox` / `clear-card-infobox` / `write-card-extra-data` 5 个 leaf。详见 §6.1；未列出的仓库内部 kind 不属于 Workshop 合约。 |
+| `special-effect`           | **沙盒 cardStates mutation 入口**（Sprint 6a/6b）。`params: { kind: 'set-flag' \| 'set-infobox' \| 'set-counter' \| 'increment-counter' \| 'set-extra-data' \| 'set-private-data' \| 'increment-extra-data', ... }`。取代旧的 `flag-card` / `unflag-card` / `set-card-infobox` / `clear-card-infobox` / `write-card-extra-data` 5 个 leaf。详见 §6.1；未列出的仓库内部 kind 不属于 Workshop 合约。 |
 | `future-meeples`           | 沙箱专用：用 `params.__futureMeepleRequest` 预放未来回合资源（见 §5.7）                            |
 
 > Sprint 6b（2026-04-30）已删除 5 个独立 mutation actionId（`flag-card` / `unflag-card` / `set-card-infobox` / `clear-card-infobox` / `write-card-extra-data`）+ 3 个 dead actionId（`hold-worker-on-card` / `release-worker-from-card` / `gain-other-players`）。统一使用 `special-effect` discriminated-union。`check-prompt-sync` 在 CI 校验 prompt 只暴露白名单内 actionId；白名单外的 actionId 不会出现在 prompt 中，沙盒卡牌不应使用——改用 `special-effect`。
 
 ### 6.1 `special-effect` `params.kind` 沙盒可用子集
 
+每次修改都通过带有 `sourceCard: CARD_ID` 的 `special-effect` leaf 返回，`params` 使用下面的一种形状。
+
 ```ts
+// 写入 player.cardStates[sourceCard].counters[key]
+{ kind: 'increment-counter', key: 'uses', amount: 1 }
+{ kind: 'set-counter', key: 'uses', value: 0 }
+
 // 设/清除 player.cardStates[sourceCard].flagged
 { kind: 'set-flag', flag: true }
 { kind: 'set-flag', flag: false }
@@ -718,7 +742,7 @@ const CARD_IMPL = {
 
 ### 9.1 修改本文件 → 谁会自动同步
 
-- `**client/services/llmPrompts.ts`**：**不再手工同步**——它运行时从源码真相源（`cardEffectHooks` / `sandboxListenerPhases` / `sandboxListenerScopes` / `SANDBOX_ALLOWED_ACTION_IDS`）和描述元数据渲染 hook / phase / scope / actionId 表，由 `client/services/__tests__/llmPrompts.test.ts` 集合断言守卫。CI `pnpm run check:prompt-sync` 校验本文件的全部 `prompt-sync` 块与源码一致。
+- `server/workshop-sandbox-contract.ts` 从 shared 真相源和描述元数据派生部署的 hook / phase / scope / actionId 与 helper 正文，`client/services/llm/generation/prompt.ts` 包含该契约，由 `client/services/__tests__/generation-prompt.test.ts` 守卫。CI `pnpm run check:prompt-sync` 校验本文件的全部 `prompt-sync` 块与源码一致。浏览器从 GitHub 当前 main 读取本文和样例，每次尝试固定 SHA，不随站点打包发布。
 - `**docs/ARCHITECTURE.md**`：手工同步引用本文件即可。
 - `**client/app/workshop/AiCardDesigner.tsx**`：手工同步引用本文件即可。
 
@@ -731,7 +755,7 @@ const CARD_IMPL = {
 
 CI 会拦下漏改的情况。
 
-`check:prompt-sync` 只防名字集合漂移。修改支付器、executor 参数透传、JSON 边界或 injected helper 时，还必须更新 `client/services/__tests__/llmPrompts.test.ts`、对应 executor/parity 测试和语义 contract 测试；涉及生成策略时增加或收紧真实 `GameSession` fixture，先 live 验证，再 record golden，最后默认 replay。
+`check:prompt-sync` 只防名字集合漂移。修改支付器、executor 参数透传、JSON 边界或 injected helper 时，还必须更新 `client/services/__tests__/generation-prompt.test.ts`、对应 executor/parity 测试和语义 contract 测试；涉及生成策略时增加或收紧真实 `GameSession` fixture，冻结实现，并在已批准预算内跑完整浏览器验收批次。保留历史失败，将合成演练、历史 golden 回放与模型准入分开；详见 `docs/test/llm-card-gen.md`。
 
 ---
 

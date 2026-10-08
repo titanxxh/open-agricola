@@ -120,25 +120,77 @@ External `DATABASE_URL` and complete `S3_*` settings can be supplied later. Move
 | OpenRouter | `openai/gpt-5-image-mini` | GPT-5 Image Mini | No | No | Yes | OpenRouter image model |
 | OpenRouter | `google/gemini-2.5-flash-image` | Gemini 2.5 Flash Image / Nano Banana | No | No | Yes | OpenRouter image model |
 | OpenRouter | `bytedance-seed/seedream-4.5` | Seedream 4.5 | No | No | Yes | OpenRouter image model |
-| OpenRouter | `deepseek/deepseek-v4-flash` | DeepSeek V4 Flash | No | Yes | No | DeepSeek chat through OpenRouter |
-| OpenRouter | `deepseek/deepseek-v4-pro` | DeepSeek V4 Pro | No | Yes | No | DeepSeek chat through OpenRouter |
-| DeepSeek | `deepseek-v4-flash` | DeepSeek V4 Flash | Yes | Yes | No | Official DeepSeek API |
-| DeepSeek | `deepseek-v4-pro` | DeepSeek V4 Pro (Reasoning) | No | Yes | No | Official API; display final content but not reasoning content |
+| OpenRouter | `deepseek/deepseek-v4.1-flash` | DeepSeek V4.1 Flash | No | Yes | No | DeepSeek chat through OpenRouter |
+| OpenRouter | `deepseek/deepseek-v4-pro-0813` | DeepSeek V4 Pro (0813) | No | Yes | No | DeepSeek chat through OpenRouter |
+| DeepSeek | `deepseek-flash` | DeepSeek V4.1 Flash | Yes | Yes | No | Official DeepSeek API |
+| DeepSeek | `deepseek-v4-pro` | DeepSeek V4 Pro (0813) | No | Yes | No | Official API; display final content but not reasoning content |
 | AiHubMix | `gemini-3.1-flash-image-preview-free` | Gemini 3.1 Flash Image (Free) | No | No | Yes | Free AiHubMix image model |
 | AiHubMix | `coding-glm-5.1-free` | Coding GLM 5.1 (Free) | Yes | Yes | No | Free AiHubMix chat model |
 | AiHubMix | `k2.6-code-preview-free` | K2.6 Code Preview (Free) | No | Yes | No | Free AiHubMix chat model |
 
+DeepSeek names were verified on 2026-10-08 against the [official model list](https://api-docs.deepseek.com/quick_start/pricing/) and [OpenRouter catalog](https://openrouter.ai/api/v1/models). The official Flash API uses `deepseek-flash` for V4.1 Flash; its retired `deepseek-v4-flash` name is only a temporary forwarding alias. The current Pro is V4 Pro 0813: its official ID remains `deepseek-v4-pro`, while OpenRouter requires the `-0813` suffix because its unsuffixed Pro still identifies the older 0423 checkpoint. Both support thinking; image understanding does not imply image generation.
+
 OpenRouter has no provider-level fallback `chat` or `image` capability. Every model declares its own capabilities so image UI never shows chat-only models and chat UI never shows image-only models.
+
+#### C1.2 Browser tool loop
+
+The production editor uses the browser runner under `client/services/llm/generation/`; the text-only ability path has been removed. The model table above lists existing UI registrations, not verified tool-calling combinations.
+
+A **Generation Attempt** encompasses reference queries, model responses, and bounded repairs. Pausing and continuing preserves its model configuration, reference commit, and cumulative accounting; cancelling does not produce a completed candidate from partial output. Each new attempt resolves the latest GitHub `main` and pins that commit for its reference reads. Reference content is independent of site releases, while executable code must still obey the actual Custom Code Sandbox capabilities. LLM credentials remain browser-to-provider only. The logged-in browser reads main and pinned tree metadata through `GET /api/workshop/references/main` and `GET /api/workshop/references/tree/:sha`. The backend uses a project-owned GitHub read credential, fixes the repository and operations, bounds responses, and projects only commit/tree fields. It never receives model credentials or executes the model loop. Source text still comes directly from anonymous `raw.githubusercontent.com` requests and is verified against the pinned blob hash; nothing is bundled with a site release. Main is never cached or replaced by a stale fallback. Missing project credentials, inaccessible GitHub metadata or an incomplete tree pause generation.
+
+Uncached metadata reads spend shared PostgreSQL budgets before acquiring a project token: 20/minute and 120/hour per authenticated user, plus 100/minute and 1,000/hour across the site. Rejected user requests do not spend the global allowance. GitHub cooldowns are shared across backend instances and returned as `429` with `Retry-After`; each process also caps concurrent upstream reads at three. Tree requests accept only commits confirmed by a successful main read within the last hour, checked before serving a cached tree. A retry after main succeeds keeps that SHA. Already initialized reference sessions retain their tree and continue reading the same SHA's raw text after the authorization window; they do not re-resolve main.
+
+The runner allows eight model requests, 24 reference calls and five active minutes initially; explicit continuation adds that allowance without resetting counts or the reference commit. It has one model POST in flight, at most three concurrent reference reads, two transient reference HTTP retries and at most two static repairs. EOF, truncated output, provider errors and cancellation never complete partial source. A failed POST pauses for explicit retry; a validation-service failure retries validation, not the model. Provider reasoning/signatures remain in page-memory protocol history. Streaming limits distinguish 32 MiB of cumulative SSE transport from 2 MiB per event and per decoded message, so repeated frame metadata does not prematurely truncate an allowed 16,384-token response.
+
+Reference tools search allowed paths and text of files already fetched (not GitHub-wide full-text search), then read at most 160 numbered lines and 16 KiB per serialized result from files up to 256 KiB. Cached-text matches and Markdown section headings provide line numbers for targeted jumps; pagination does not require reading the entire file. The prompt explains the request allowance; each browser turn adds a separate execution-status message with remaining requests and repairs after complete tool groups, so the model can finish once the needed contract is established. Reads verify the Git blob hash. Main is resolved afresh for each attempt; same-commit trees and text may be cached. A 192 KiB request-context limit stops the attempt without silently dropping protocol fields. Exact provider/endpoint/model admission is enforced in the transport. The tested `deepseek` / `https://api.deepseek.com/v1/chat/completions` / `deepseek-flash` request tuple is admitted; all other combinations remain pending.
+
+The last model request in each allowance retains the tool definitions but uses `tool_choice: none`, reserving a response slot. It may return complete source or a justified clarification/capability gap. If an essential reference fact remains unresolved, `reference-continuation` pauses for explicit additional allowance, preserving the checkpoint; it is not a Generation Result or an adoptable candidate. Browser execution status uses host `system` messages rather than fabricated user requests. Keeping tool definitions is required for DeepSeek to retain prior reasoning in context, as described in its [thinking-mode contract](https://api-docs.deepseek.com/guides/thinking_mode/); the [Chat Completions contract](https://api-docs.deepseek.com/api/create-chat-completion/) supports `none` in thinking mode.
+
+The decisions live in [the reference contract](https://github.com/titanxxh/open-agricola/issues/1032) and [model admission, loop boundaries, and recovery](https://github.com/titanxxh/open-agricola/issues/1033). These records define the initial budgets, explicit continuation, limited retries and repairs, and browser tool-roundtrip evidence required before enabling a model.
+
+#### C1.3 Request/result and draft recovery
+
+The approved [request/result contract](https://github.com/titanxxh/open-agricola/issues/1034) makes follow-up requests use the selected ability candidate, or the adopted draft when none is selected. Error repair binds to the source and card identity read from the pinned version that actually failed. The pin response includes the stored immutable version snapshot, including when content deduplication reuses a version outside the five-item history list. Missing pinned identity or a changed card ID, type or name rejects repair before creating a model transport; the author must pin and playtest the current version again. Shared request construction captures card identity, the user's goal, source and input fingerprints, and the relevant visible conversation. Repair inputs contain the tested source once in `input.source`; the intent retains only its error and version metadata. New requests resolve the latest reference commit; automatic validation repairs and explicit continuation stay within the same attempt. Sandbox playtest errors start a new attempt only when the author clicks **AI repair**.
+
+A **Generation Result** can contain a complete source candidate, failed source retained for repair, a clarification, a capability gap, or a failure/interruption summary. Failed source cannot be adopted and does not replace the latest candidate that passed code validation. Partial output is not a completed source candidate. Source and input fingerprints bind asynchronous results and validation responses to the content they describe; old responses cannot silently replace newer work.
+
+| Storage boundary | Recovery |
+|---|---|
+| Current browser page | Complete tool protocol, reference bodies, and provider reasoning/signatures; no continuation across a page reload |
+| Same-browser local recovery | Visible conversation and existing editing state; unfinished work is marked interrupted and never resumes automatically |
+| Author-private server draft | Adopted draft content, latest ability candidate that passed code validation, latest Generation Result, and compact Generation Provenance; no complete conversation or raw tool protocol |
+
+The latest result and candidate may reference the same source without retaining duplicate completed copies. Adoption remains explicit and server-validated. Draft Versions retain only adopted content and its allowlisted provenance; identical content continues to reuse an immutable version without rewriting its original provenance. Public card, submission, and Replay projections exclude private generation records. The shared allowlist in `shared/projections/workshop-generation.ts` now protects checkpoint, adoption, version provenance and local recovery. The ability group stores `lastValid` and `latestResult` separately; successful results reference the candidate by ID and source fingerprint, while a failed result retains its complete non-adoptable source. Local chat recovery projects only visible fields and marks in-flight work interrupted. Pending ability, failed-source and art candidates retain their original base revision and stale marker through checkpoints and reloads. A manual source edit clears model provenance and requires fresh code and identity validation before adoption. A failed revalidation replaces the earlier validation of that exact candidate/source. Adoption clears all pending candidates of its type, including retained failed source, while keeping the compact latest-result summary. The editor uses these projections for generation, explicit adoption and recovery.
+
+`GET /api/workshop/sandbox-contract` exposes the actual deployed helper source, hook/listener metadata, supported action shapes, isolation limits and semantic restrictions. Its identifier hashes deployed shared/executor source, the resolved dependency lockfile and runtime versions, independently of the GitHub reference commit. `POST /api/workshop/cards/validate-code` binds success and failure to that identifier and the submitted source fingerprint; an obsolete contract returns `sandbox_changed` so a new attempt is required. The main browser receives data only, never imports the rule runtime.
+
+#### C1.4 Quality and cost acceptance
+
+Models are admitted individually after a browser tool roundtrip and the existing fixed card tests. `tests/llm-card-gen/fixtures/` owns the 11 requests and their Session assertions; `runner.test.ts` runs those same cases against historical recordings or unmodified generated single-file sources. The owner-local browser command generates three repetitions per case (33 tasks plus a tool probe), retains first/final source files, and invokes Vitest. There is no second behavior judge, keyword-based semantic grading, or legacy-prompt comparison. Capability-gap prose is not scored as a passing executable card. Reports and generated sources stay under ignored `output/tmp/`; the repository stores tests, not execution reports. The cumulative US$20 ledger and owner-local paid-call restriction remain in force. See the [LLM test guide](test/llm-card-gen.md#browser-tool-acceptance). The canonical `deepseek-flash` tuple retains its [recorded acceptance](https://github.com/titanxxh/open-agricola/issues/1041#issuecomment-6057596377); other exact tuples remain pending.
+
+#### C1.5 Editor interactions
+
+The author accepted the [interaction prototype](https://github.com/titanxxh/open-agricola/issues/1036) on 2026-10-08. Its ten guided scenarios establish the following presentation requirements for the production workshop:
+
+- Show the target of the next ordinary request separately from the source fixed when the current attempt began. An adoption action names its candidate and version. Code-validation status and actual playtest results have distinct labels.
+- Show the current generation stage, cumulative model requests, reference queries and repair counts. When paused, explain the reason, preserve the last complete progress, and state the additional allowance before the author continues the same attempt. Continuing and starting a new attempt remain distinct actions.
+- Keep the latest valid candidate and a later failed source separately inspectable; the failed source has no enabled adoption action. Clearly label partial, interrupted and stale results so they cannot be mistaken for a newly usable candidate.
+- Present a capability gap or clarification separately from a connection or reference-query failure. Model availability distinguishes admitted combinations from those awaiting verification. Reference sources and useful diagnostics are available on demand; provider reasoning and signatures are not ordinary chat content.
+- A playtest error identifies the source actually tested and offers an explicit **AI repair** action. Restored unfinished work says it was interrupted, with no automatic request or protocol continuation after reload.
+
+The original single-file artifact remains on the separate `prototype/llm-tool-loop-interaction` branch; its commit, path and browser observations are recorded in the decision issue. It uses simulated responses and source summaries, and does not prove model admission, rule behavior or production persistence. The guided scenario controls and reducer are disposable prototype assets. `WorkshopAbilityPanel` implements these interactions using the production request/result contracts. Playtest repair reads the exact pinned version source and checks the active sandbox binding; it never substitutes the selected candidate.
 
 ### C2. System prompt design
 
-The source is `CARD_DESIGNER_SYSTEM_PROMPT` in `client/services/llmPrompts.ts`. This section summarizes its shape; source code is authoritative. Tables for advanced effect hooks, listener phases, listener scopes, and action IDs render at runtime from truth sources: `cardEffectHooks` in `shared/cards/card-effects.ts`, plus `shared/custom-code/sandbox-hook-meta.ts`, `sandbox-listener-phases.ts`, `sandbox-listener-scopes.ts`, and `sandbox-action-ids.ts`. They cannot drift from the engine and need no manual mirror.
+The compact prompt lives in `client/services/llm/generation/prompt.ts`. It defines the task, immutable input, reference tools, trust boundary and output formats, then includes the actual deployed sandbox contract. The contract derives hook/listener/action metadata from their shared truth sources and supplies exact injected helpers. Runtime identity and reference commit remain separate.
 
-The prompt contains role definition, output format, hard rules, detailed `CARD_IMPL`, the effect-hook table, listeners, ActionFlow types, helpers, readable state and player fields, sandbox limits, balance guidance, a game-rules overview, and few-shot examples.
+The descriptor includes the ActionFlow node grammar and the distinction between engine-scheduled future rewards and resources stored on a card. Inspectable malformed composite flows fail static validation before play, using the same bounded repair path as other compilation errors; this is not a full type or behavior proof.
+
+Examples and detailed reference documents are fetched from GitHub on model request, at the attempt's fixed commit. No repository corpus is bundled into the site prompt.
 
 #### Output format
 
-Every response must include one `typescript` code fence with `CARD_DEF` and `CARD_IMPL` constants and no imports or exports. `CARD_DEF` accepts only object form, never `new MinorImprovement(...)` or `new Occupation(...)`:
+A source response must include exactly one complete `typescript` code fence with `CARD_DEF` and `CARD_IMPL` constants and no imports or exports. `CARD_DEF` accepts only object form, never `new MinorImprovement(...)` or `new Occupation(...)`:
 
 ```typescript
 const CARD_ID = 'CUSTOM_EnglishPascalName'
@@ -176,13 +228,15 @@ const CARD_IMPL = {
 }
 ```
 
+Clarifications and capability gaps instead return a structured JSON object with `kind` and `message`, without source.
+
 #### Hard prompt rules
 
 - `CARD_ID` starts with `CUSTOM_` and uses English PascalCase.
 - `deck` is always `CUSTOM`, `number` is zero, and `implemented` is true.
 - `import`, `export`, `require`, `registerCardEffect`, and `registerCardListener` are forbidden.
 - Classes, generators, `with`, `eval`, `Function`, `fetch`, and related constructs are forbidden.
-- Top-level `name`, `desc`, and `prerequisite` fields are English; `locales.zh` must be complete.
+- Preserve supplied identity and names. Rule descriptions and prerequisites use English with complete `locales.zh`; editing retains existing bilingual metadata unless explicitly changed.
 - Even a small revision returns the complete source.
 
 #### Effect hooks in `CARD_IMPL.effect`
@@ -209,15 +263,13 @@ One food is approximately the weakest benefit. An `onRoundStart` effect repeats 
 
 #### Few-shot examples
 
-The system prompt appends raw Markdown from `docs/community-card-examples.md`, imported through Vite `?raw`, as its few-shot library.
+The model reads relevant numbered ranges from `docs/community-card-examples.md` on GitHub. Executable reference examples retain Session tests in `server/__tests__/workshop-prompt-runtime.test.ts`.
 
 ### C3. Multi-turn conversation
 
-- Conversation history and unsent input stay in the current browser session and its localStorage recovery copy.
-- Each turn appends user feedback and the LLM response.
-- The model sees complete history and can iterate on requests such as lowering a cost, adding a Harvest effect, or following the official Ale Benches style.
-- The frontend extracts the last complete source block from each response as an ability candidate; it does not overwrite the adopted source.
-- The server stores only the most recently completed ability request and result. It never receives full conversation history, unsent input, or the API key.
+The browser captures up to 12 relevant visible messages and the exact selected/adopted source. Earlier code blocks are omitted from conversational context because the explicit source is authoritative. Resend starts a new attempt with current card context and a newly resolved reference commit. Tool messages, reasoning and signatures stay only in the active page and are never restored after reload.
+
+Complete validated output becomes a reviewable candidate. Exactly two automatic static repairs are allowed; service failures pause their current step. Failed full source stays editable while the latest valid candidate remains available. The server stores the private compact recovery projection described in C1.3, never the conversation or LLM key.
 
 ### C4. Card artwork generation
 
@@ -378,6 +430,8 @@ Version history comes from `GET /api/workshop/cards/:id/versions`, and players s
 | `POST /api/workshop/cards/:id/pin-version` | Freeze the current draft as an immutable version for sandbox confirmation without changing review state |
 | `POST /api/github/webhook` | Verify GitHub App HMAC and handle submitted or dismissed reviews and PR synchronize, edit, draft conversion, or close with idempotent delivery |
 | `POST /api/workshop/cards/:id/sandbox-pass` | Record author confirmation only for the exact current publishable version with no runtime errors |
+
+Playtest failures are attributed to a fixed source only when the server confirms exactly one loaded custom card and its immutable version. Multi-card diagnostics remain visible, but AI repair requires an isolated playtest when their owner is unknown. Confirmation also checks the HTTP `gameInstanceId`; reusing the seed cannot reuse a source binding. Late responses cannot restore a replaced playtest binding.
 
 First ability generation and regeneration include current card context. `CARD_ID`, card type, and name remain fixed and are revalidated by the Workshop Card aggregate at adoption. Other definition fields, including description, cost, VP, and localization, may change with a candidate.
 

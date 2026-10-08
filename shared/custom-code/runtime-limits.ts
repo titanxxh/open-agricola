@@ -1,0 +1,2 @@
+export const EXECUTION_TIMEOUT_MS = 100
+export const ISOLATE_MEMORY_LIMIT_MB = 8

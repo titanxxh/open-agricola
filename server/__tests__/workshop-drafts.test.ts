@@ -254,7 +254,8 @@ describe('workshop draft aggregate', () => {
 
     expect(saved.revision).toBe(2)
     expect(saved.draft.name).toBe('Field Keeper II')
-    expect(saved.draft.generation).toEqual({ ability: { prompt: 'gain grain' } })
+    // A bare request is local editing state, not a durable Generation Result.
+    expect(saved.draft.generation).toEqual({})
     expect(saved.sandboxPassVersionId).toBeNull()
     expect((await db.prepare('SELECT COUNT(*) AS count FROM workshop_card_versions').get())).toEqual({ count: 0 })
 
@@ -374,7 +375,7 @@ describe('workshop draft aggregate', () => {
   })
 
   it.each(['pending','blocked'])('retains the frozen version and artwork reference of a %s submission', async state => {
-    let workspace = await createCard(db,{authorId:'author',draft:baseDraft({artUrl:'/card-art/original.png'})})
+    let workspace = await createCard(db,{authorId:'author',draft:handoffDraft({artUrl:'/card-art/original.png'})})
     const {versionId} = await pinCurrentDraftVersion(db,{cardId:workspace.id,authorId:'author',baseRevision:workspace.revision})
     await db.prepare(`INSERT INTO workshop_submissions(id,card_id,author_id,version_id,revision,state,payload,created_at,updated_at)
       VALUES ('submission',?,'author',?,?,?,'{}',1,1)`).run(workspace.id,versionId,workspace.revision,state)
@@ -384,6 +385,11 @@ describe('workshop draft aggregate', () => {
     }
     expect((await loadSandboxVersion(db,{cardId:workspace.id,authorId:'author',versionId})).artUrl).toBe('/card-art/original.png')
     expect(await db.prepare("SELECT object_key FROM object_references WHERE owner_kind='workshop_card_versions' AND owner_id=?").get(versionId)).toEqual({object_key:'card-art/original.png'})
+    const recent = await db.prepare('SELECT id FROM workshop_card_versions WHERE card_id = ? ORDER BY version_number DESC LIMIT 5').all(workspace.id)
+    expect(recent).not.toContainEqual({ id: versionId })
+    workspace = await restoreVersion(db, { cardId: workspace.id, authorId: 'author', baseRevision: workspace.revision, versionId })
+    const pinned = await pinCurrentDraftVersion(db, { cardId: workspace.id, authorId: 'author', baseRevision: workspace.revision })
+    expect(pinned).toMatchObject({ versionId, cardJson: { id: 'CUSTOM_FieldKeeper', name: 'Field Keeper', card_type: 'occupation', _code: 'const CARD_DEF = {}; const CARD_IMPL = {}' } })
     await db.prepare("UPDATE workshop_submissions SET state='complete' WHERE id='submission'").run()
     workspace = await checkpointDraft(db,{cardId:workspace.id,authorId:'author',baseRevision:workspace.revision,draft:{...workspace.draft,artUrl:'/card-art/8.png'}})
     await pinCurrentDraftVersion(db,{cardId:workspace.id,authorId:'author',baseRevision:workspace.revision})
@@ -1192,4 +1198,51 @@ describe('workshop draft aggregate', () => {
     expect(checkpointed.sandboxPassVersionId).toBe(approved.versionId)
     expect((await getHandoffReadiness(db, created.id, 'author')).ready).toBe(true)
   })
+})
+
+
+it('persists A and failed B privately, strips protocol, and preserves immutable adopted provenance', async () => {
+  const makeCandidate = (id: string, valid: boolean) => ({
+    id, kind: 'ability' as const, prompt: `request ${id}`, createdAt: 1,
+    baseRevision: 1, stale: true,
+    sourceCode: 'const CARD_IMPL = {}', cardJson: baseDraft().cardJson,
+    validation: { valid }, compiledCode: 'const CARD_IMPL = {};', codeManifest: { listeners: [] },
+    provenance: { attemptId: id, inputFingerprint: 'a'.repeat(64), promptVersion: 'v1', toolVersion: 'v1',
+      provider: 'deepseek', endpoint: 'https://api.deepseek.com/v1/chat/completions', model: 'deepseek-v4-flash',
+      modelRequests: 2, referenceCalls: 1, repairs: 0, elapsedMs: 10,
+      usage: { inputTokens: 10, outputTokens: 5, cachedInputTokens: null, reasoningTokens: null }, references: [],
+      raw: 'private-canary', apiKey: 'private-canary' },
+    tool_calls: ['private-canary'],
+  })
+  const a = makeCandidate('A', true)
+  const b = makeCandidate('B', false)
+  const initial = await createCard(db, { authorId: 'author', draft: baseDraft() })
+  const saved = await checkpointDraft(db, { cardId: initial.id, authorId: 'author', baseRevision: initial.revision,
+    draft: { ...initial.draft, generation: { apiKey: 'private-canary', ability: { lastValid: a,
+      latestResult: { kind: 'failed-source', attemptId: 'B', createdAt: 2, message: 'invalid', failedCandidate: b, reasoning: 'private-canary' } },
+      art: { lastCompleted: { id: 'old-art', kind: 'art', prompt: 'field', promptFormat: 'subject', resultUrl: '/card-art/field.png', createdAt: 1, baseRevision: 1, stale: true } },
+    } },
+  })
+  expect(saved.draft.generation).toMatchObject({ ability: { lastValid: { id: 'A' }, latestResult: { failedCandidate: { id: 'B', validation: { valid: false } } } } })
+  expect((await loadWorkspace(db, initial.id, 'author')).draft.generation).toMatchObject({
+    ability: { lastValid: { baseRevision: 1, stale: true }, latestResult: { failedCandidate: { baseRevision: 1, stale: true } } },
+    art: { lastCompleted: { baseRevision: 1, stale: true } },
+  })
+  const row = await db.prepare('SELECT draft_generation_json FROM workshop_cards WHERE id = ?').get(initial.id)
+  expect(JSON.stringify(row)).not.toContain('private-canary')
+  await expect(adoptCandidate(db, { cardId: initial.id, authorId: 'author', baseRevision: saved.revision, candidate: b })).rejects.toMatchObject({ code: 'not_ready' })
+  const adopted = await adoptCandidate(db, { cardId: initial.id, authorId: 'author', baseRevision: saved.revision, candidate: a })
+  const reloaded = await loadWorkspace(db, initial.id, 'author')
+  expect(reloaded.draft.generation).toMatchObject({ ability: { latestResult: { kind: 'failed-source', message: 'invalid' } } })
+  expect(reloaded.draft.generation.ability).not.toHaveProperty('latestResult.failedCandidate')
+  expect(reloaded.draft.generation.ability).not.toHaveProperty('lastValid')
+  expect(reloaded.draft.generation.art).toHaveProperty('lastCompleted.id', 'old-art')
+  const first = await db.prepare('SELECT provenance_json FROM workshop_card_versions WHERE id = ?').get(adopted.versionId)
+  expect(JSON.stringify(first)).not.toContain('private-canary')
+  expect(JSON.stringify(first)).not.toContain('failedCandidate')
+  const same = await adoptCandidate(db, { cardId: initial.id, authorId: 'author', baseRevision: adopted.workspace.revision,
+    candidate: { ...a, id: 'new-attempt', provenance: { ...a.provenance, attemptId: 'new-attempt' } },
+  })
+  expect(same.versionId).toBe(adopted.versionId)
+  expect(await db.prepare('SELECT provenance_json FROM workshop_card_versions WHERE id = ?').get(same.versionId)).toEqual(first)
 })

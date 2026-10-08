@@ -25,7 +25,7 @@ pnpm run check:community-deck
 
 `check:architecture-tests` 复用现有 Vitest project 配置，执行 effect 架构、资源事实来源审计、事件映射策略、交互命令策略、Card Source、PromptKey、LLM prompt 契约、CI 接线，以及 listener 纯度 guard 的正负例与两人 Session 契约测试。跨层 Card State 检查覆盖 domain / actions（含 internal effects）/ engine / session / projections / server / client / Replay Viewer，检查固定单卡状态、提示键判断、私有状态 helper 导入和前端原始状态读取；静态 metadata 和卡牌文案声明可用，扫描根缺失、为空、解析错误及失效例外均失败。卡牌实现边界检查同时对每个已解析 listener handler / cost-candidate transform 做显式状态写入的静态扫描；运行时 guard 则由各 Vitest project 的 setup 安装，`pnpm test` 中任何 listener 直接修改权威状态都会失败。它们仍属于 `pnpm test` / `pnpm test:fast`，保证单独运行完整测试时不漏检；只跑架构入口也会执行这些断言。沙盒文档的名字集合同步由入口内的 strict prompt-sync 检查，完整 CI 无需再单独执行该命令。
 
-LLM prompt 的行为契约直接提取当前 prompt 中的喂食与建房示例，经沙盒编译后在两人 Session 中验证触发时序、支付结果及不触发条件；这些测试由 `check:architecture-tests` 执行。字符串断言只检查文案，strict prompt-sync 只检查名字集合，golden 回放只验证已有输出，三者都不能单独证明当前 prompt 的语义正确。行为契约仅覆盖已列出的场景，不替代真实 LLM 健康检查。
+LLM 参考样例的行为契约直接提取 `docs/community-card-examples.md` 中的喂食与建房示例，经沙盒编译后在两人 Session 中验证触发时序、支付结果及不触发条件；这些测试由 `check:architecture-tests` 执行。字符串断言只检查文案，strict prompt-sync 只检查名字集合，golden 回放只验证已有输出，三者都不能单独证明模型生成质量。当前简短 prompt 使用后端提供的已部署沙盒契约；浏览器按需读取 GitHub 资料。行为契约仅覆盖已列出的样例，模型准入另需按 `docs/test/llm-card-gen.md` 在浏览器生成单文件源码，并通过同一套固定 case 测试；CI 不持有 LLM key，也不发起付费调用。
 
 架构类型门禁执行 `tsc -p tsconfig.architecture.json --noEmit`，包含架构契约测试及日志、effect 扫描器测试。依赖检查按 TypeScript 模块解析构图，运行时循环一律失败；仅显式 type-only 声明从运行时图移除。浏览器检查对主页面和 Replay Viewer 分别执行不写产物的 Vite 构建，验证真实传递依赖；普通页面不保留规则运行时基线。确切的沙盒入口、Worker 文件及纯元数据权限见 `scripts/architecture-policy.mjs`，未知入口和失效权限均失败。
 

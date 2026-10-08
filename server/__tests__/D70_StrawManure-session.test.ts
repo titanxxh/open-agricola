@@ -60,7 +60,7 @@ describe('D070_StrawManure session', () => {
     resp = session.commitSelectionChoice(0, { positions: [{ row: 0, col: 0 }, { row: 0, col: 1 }] })
     expect(resp.ok).toBe(true)
 
-    autoAdvanceRoundEnd(session)
+    autoAdvanceRoundEnd(session, { initialResponse: resp })
 
     const p = session.getState().state.players[0]!
     // Initial grain=3, paid 1, harvested 1 from grain field: 3 - 1 + 1 = 3
@@ -89,7 +89,7 @@ describe('D070_StrawManure session', () => {
     resp = resolveTriggerIfPresent(session, resp, CARD_ID)
     resp = resolveSkipChoice(session, resp)
 
-    autoAdvanceRoundEnd(session)
+    autoAdvanceRoundEnd(session, { initialResponse: resp })
 
     const p = session.getState().state.players[0]!
     // Grain not spent: initial 3 + 1 from harvest = 4
@@ -105,7 +105,7 @@ describe('D070_StrawManure session', () => {
     resp = session.commitSelectionChoice(0, { positions: [{ row: -1, col: 2068 }] })
     expect(resp.ok).toBe(true)
 
-    autoAdvanceRoundEnd(session)
+    autoAdvanceRoundEnd(session, { initialResponse: resp })
 
     expect(session.getState().state.players[0]!.cardStates.B068_Beanfield?.extraData?.cardFieldStacks)
       .toEqual([{ crop: 'vegetable', remaining: 2 }])
@@ -279,7 +279,7 @@ describe('D070 Straw Manure parity', () => {
     response = session.commitSelectionChoice(0, {
       positions: [{ row: 0, col: 2 }, { row: 0, col: 3 }],
     })
-    response = autoAdvanceRoundEnd(session)
+    response = autoAdvanceRoundEnd(session, { initialResponse: response })
 
     expect(response.state.players[0]!.resources).toMatchObject({ grain: 0, vegetable: 2 })
     expect(fieldRemaining(response, 2)).toBe(2)
@@ -292,7 +292,7 @@ describe('D070 Straw Manure parity', () => {
     response = session.commitSelectionChoice(0, {
       positions: [{ row: 0, col: 2 }, { row: -1, col: 2068 }],
     })
-    response = autoAdvanceRoundEnd(session)
+    response = autoAdvanceRoundEnd(session, { initialResponse: response })
 
     expect(response.state.players[0]!.resources).toMatchObject({ grain: 0, vegetable: 2 })
     expect(fieldRemaining(response, 2)).toBe(1)

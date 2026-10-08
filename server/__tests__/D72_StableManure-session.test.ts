@@ -100,7 +100,7 @@ describe('D072_StableManure session', () => {
     expect(resp.ok).toBe(true)
 
     // Continue through harvest phases
-    autoAdvanceRoundEnd(session)
+    autoAdvanceRoundEnd(session, { initialResponse: resp })
 
     const p = session.getState().state.players[0]!
     // harvest-extra: gain 1 grain + 1 vegetable from card effect
@@ -119,7 +119,7 @@ describe('D072_StableManure session', () => {
     expect(resp.ok).toBe(true)
 
     // Continue through harvest
-    autoAdvanceRoundEnd(session)
+    autoAdvanceRoundEnd(session, { initialResponse: resp })
 
     const p = session.getState().state.players[0]!
     // Extra: 1 grain from card + 2 grain from normal harvest (0-0 and 0-2)
@@ -154,7 +154,7 @@ describe('D072_StableManure session', () => {
       positions: [{ row: -1, col: 4076 }],
     })
     expect(committed.ok).toBe(true)
-    autoAdvanceRoundEnd(session)
+    autoAdvanceRoundEnd(session, { initialResponse: committed })
 
     const harvested = session.getState().state.players[0]!
     expect(harvested.resources.wood).toBe(3)
@@ -225,7 +225,7 @@ describe('D072_StableManure session', () => {
       positions: [{ row: -1, col: 5082 }],
     })
     expect(committed.ok).toBe(true)
-    autoAdvanceRoundEnd(session)
+    autoAdvanceRoundEnd(session, { initialResponse: committed })
 
     const harvested = session.getState().state.players[0]!
     expect(harvested.resources.stone).toBe(4)
@@ -443,7 +443,7 @@ describe('D072 Stable Manure parity', () => {
     let response = session.performRoundEnd()
     response = resolveTriggerIfPresent(session, response, CARD_ID)
     response = resolveSkipChoice(session, response)
-    response = autoAdvanceRoundEnd(session)
+    response = autoAdvanceRoundEnd(session, { initialResponse: response })
 
     expect(response.state.players[0]!.resources).toMatchObject({ grain: 1, vegetable: 1 })
     expect(fieldRemaining(response, 2)).toBe(2)
@@ -458,7 +458,7 @@ describe('D072 Stable Manure parity', () => {
 
     expect(response.interaction.stateId === 'wait' ? response.interaction.sourceCard : undefined)
       .not.toBe(CARD_ID)
-    response = autoAdvanceRoundEnd(session)
+    response = autoAdvanceRoundEnd(session, { initialResponse: response })
     expect(response.state.players[0]!.resources.grain).toBe(1)
     expect(fieldRemaining(response, 2)).toBe(0)
   })

@@ -2063,6 +2063,7 @@
 
 .aicw-heading {
   min-width: 0;
+  max-width: 100%;
 }
 
 .aicw-heading > span,
@@ -2601,6 +2602,25 @@
   background: #292b25;
   font: 12px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   white-space: pre;
+}
+
+.aicw-generation-progress,
+.aicw-generation-result {
+  padding: 14px 16px;
+  border: 1px solid var(--aicw-border);
+  border-radius: 10px;
+  background: var(--aicw-paper);
+  overflow-wrap: anywhere;
+}
+
+.aicw-generation-progress p,
+.aicw-generation-result p {
+  margin: 8px 0;
+  white-space: pre-wrap;
+}
+
+.aicw-generation-progress button + button {
+  margin-left: 8px;
 }
 
 .aicw-generator-fields {
@@ -3148,6 +3168,10 @@
 
   .aicw-heading h2 {
     white-space: normal;
+  }
+
+  .aicw-heading > div {
+    flex-wrap: wrap;
   }
 
   .aicw-header-actions {

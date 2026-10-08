@@ -54,3 +54,6 @@ docs/superpowers/
 
 # RTK backup files
 *.bak.[0-9]*
+
+# LLM run reports are local artifacts, not source fixtures
+tests/llm-card-gen/acceptance/evidence/

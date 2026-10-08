@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
-import type { WorkshopDraftErrorCode } from '../../../shared/contract/workshop'
+import type { WorkshopDraftErrorCode, WorkshopPinnedVersionContract } from '../../../shared/contract/workshop'
+import { projectAbilityCandidate, projectWorkshopGeneration } from '../../../shared/projections/workshop-generation'
 import {
   createWorkshopDraftState,
   resolveWorkshopRecovery,
@@ -22,6 +23,7 @@ type WorkspaceResponse = {
   workspace?: WorkshopWorkspaceDto
   current?: WorkshopWorkspaceDto
   versionId?: string
+  cardJson?: WorkshopPinnedVersionContract['cardJson']
   error?: string
   code?: WorkshopDraftErrorCode
 }
@@ -51,7 +53,7 @@ const generationCandidate = (
   kind: WorkshopCandidate['kind'],
 ): Record<string, unknown> => {
   const record = generationGroup(draft, kind)
-  for (const key of ['lastCompleted', 'adopted']) {
+  for (const key of kind === 'ability' ? ['lastValid', 'adopted'] : ['lastCompleted', 'adopted']) {
     const candidate = record[key]
     if (candidate && typeof candidate === 'object' && !Array.isArray(candidate)) {
       return candidate as Record<string, unknown>
@@ -134,6 +136,8 @@ export const useWorkshopDraft = ({
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const stateRef = useRef<WorkshopDraftState | null>(null)
+  const workspaceOwnerRef = useRef({ cardId, lifetime: 0 })
+  workspaceOwnerRef.current.cardId = cardId
   const saveRequestRef = useRef<{
     promise: Promise<boolean>
     baseRevision: number
@@ -193,6 +197,7 @@ export const useWorkshopDraft = ({
       })
     return () => {
       cancelled = true
+      workspaceOwnerRef.current.lifetime += 1
     }
   }, [apiFetch, cardId, dispatch, storageKey])
 
@@ -232,7 +237,7 @@ export const useWorkshopDraft = ({
         {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ baseRevision, draft }),
+          body: JSON.stringify({ baseRevision, draft: { ...draft, generation: projectWorkshopGeneration(draft.generation) } }),
         },
       )
       const payload = await response.json() as WorkspaceResponse
@@ -410,7 +415,7 @@ export const useWorkshopDraft = ({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             baseRevision: current.baseRevision,
-            candidate,
+            candidate: candidate.kind === 'ability' ? projectAbilityCandidate(candidate) : candidate,
             ...(artInputs ? { artInputs } : {}),
           }),
         },
@@ -556,7 +561,7 @@ export const useWorkshopDraft = ({
     }
   }, [apiFetch, cardId, dispatch, persist, saveDraft])
 
-  const pinDraftVersion = useCallback(async (): Promise<string | null> => {
+  const pinDraftVersion = useCallback(async (): Promise<WorkshopPinnedVersionContract | null> => {
     let current = stateRef.current
     if (!current || current.save.status === 'conflict') return null
     if (current.save.status !== 'saved') {
@@ -582,11 +587,11 @@ export const useWorkshopDraft = ({
         })
         return null
       }
-      if (!response.ok || !payload.versionId) {
+      if (!response.ok || !payload.versionId || !isRecord(payload.cardJson)) {
         dispatch({
           type: 'saveFailed',
           status: 'error',
-          error: payload.error ?? `Request failed (${response.status})`,
+          error: payload.error ?? (response.ok ? 'Pinned version response is missing its snapshot' : `Request failed (${response.status})`),
           errorCode: payload.code,
         })
         return null
@@ -603,7 +608,7 @@ export const useWorkshopDraft = ({
         })
         return null
       }
-      return payload.versionId
+      return { versionId: payload.versionId, cardJson: payload.cardJson }
     } catch (reason) {
       dispatch({
         type: 'saveFailed',
@@ -696,7 +701,11 @@ export const useWorkshopDraft = ({
     runtimeErrors: string[] = [],
   ): Promise<boolean> => {
     const current = stateRef.current
-    if (!current || current.save.status === 'conflict') return false
+    if (!current || current.workspaceId !== cardId || current.save.status === 'conflict') return false
+    const lifetime = workspaceOwnerRef.current.lifetime
+    const stillOwned = () => workspaceOwnerRef.current.cardId === cardId
+      && workspaceOwnerRef.current.lifetime === lifetime
+      && stateRef.current?.workspaceId === cardId
     dispatch({ type: 'saving' })
     try {
       const response = await apiFetch(
@@ -712,6 +721,7 @@ export const useWorkshopDraft = ({
         },
       )
       const payload = await response.json() as WorkspaceResponse
+      if (!stillOwned()) return false
       if (!response.ok || !payload.workspace) {
         dispatch({
           type: 'saveFailed',
@@ -720,14 +730,26 @@ export const useWorkshopDraft = ({
         })
         return false
       }
-      const confirmed = workshopDraftReducer(current, {
+      const latest = stateRef.current!
+      if (payload.workspace.id !== cardId) throw new Error('Sandbox confirmation belongs to a different workspace')
+      if (payload.workspace.revision < latest.baseRevision) return false
+      const applied = workshopDraftReducer(latest, {
         type: 'checkpointSaved',
         workspace: payload.workspace,
       })
+      const changed = current.save.status !== 'saved' || latest.draft !== current.draft
+      const confirmed = changed ? {
+        ...applied,
+        draft: latest.draft,
+        sandboxPassVersionId: latest.sandboxPassVersionId,
+        sandboxPassedAt: latest.sandboxPassedAt,
+        save: { status: 'dirty' as const },
+      } : applied
       dispatch({ type: 'serverLoaded', state: confirmed })
       persist(confirmed)
-      return true
+      return !changed
     } catch (reason) {
+      if (!stillOwned()) return false
       dispatch({
         type: 'saveFailed',
         status: 'offline',

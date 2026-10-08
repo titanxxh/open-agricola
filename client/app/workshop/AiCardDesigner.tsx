@@ -1,13 +1,13 @@
 /**
  * Workshop AI Card Designer.
  *
- * The system prompt fed to the LLM lives in `client/services/llmPrompts.ts`.
+ * Browser generation, prompts and reference tools live in client/services/llm/generation/.
  * Sandbox constraints visible to users (sandbox-error tooltips, "what can I
  * write" hints, etc.) MUST stay consistent with the single source of truth:
  *   docs/CUSTOM_CARD_SANDBOX.md
  *
  * CI runs `pnpm run check:prompt-sync` for whitelist names. Runtime semantics
- * are guarded by llmPrompts / executor contract tests and LLM golden replay.
+ * are guarded by deployed sandbox contracts, browser loop tests and card behavior tests.
  *
  * If you add UI copy here that lists hooks / phases / denied identifiers,
  * link to the SANDBOX doc rather than embedding a parallel list.
@@ -16,18 +16,22 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   getLlmConfig, saveLlmConfig, clearLlmConfig,
   getProvider, listModelsFor, defaultModelFor,
-  streamChat, extractCardFromResponse, generateCardArt, buildCardArtPrompt,
+  generateCardArt, buildCardArtPrompt,
   supportsImageGeneration, KEY_LLM_CONFIG_ART,
   PROVIDER_LABELS, PROVIDER_KEY_HINTS,
-  type LlmConfig, type LlmProvider, type ChatMessage, type ReferenceImage,
+  type LlmConfig, type LlmProvider, type ReferenceImage,
 } from '../../services/llm'
-import { CARD_DESIGNER_SYSTEM_PROMPT } from '../../services/llmPrompts'
+import { WorkshopAbilityPanel } from './WorkshopAbilityPanel'
+import { generationAdmission, resolveGenerationTarget } from '../../services/llm/generation/admission'
+import type { PlaytestFailure, PlaytestSource } from '../../services/llm/generation/request'
+import { sandboxFailureFor, type SandboxPlaytest } from './sandbox-playtest'
 import { LocalizationModal, isLocaleEntryComplete } from './LocalizationModal'
 import { useLocale } from '../../contexts/LocaleContext'
 import { PlayerCard } from '../../components/common/PlayerCard'
 import { Section } from '../../components/common/Section'
 import type { CardMeta } from '../../services/card-meta'
 import { resolveCardArtUrl } from '../../../shared/utils/card-art-url'
+import { sourceFingerprint } from '../../../shared/projections/workshop-generation'
 import { API_BASE } from '../../config'
 import { publicAssetUrl } from '../../utils/public-asset-url'
 import { useWorkshopDraft } from './useWorkshopDraft'
@@ -183,7 +187,6 @@ export type ExtractedCard = {
   sourceCode?: string
 }
 
-type DisplayMessage = ChatMessage & { streaming?: boolean; isError?: boolean; promptSnapshot?: string }
 
 export type ApiCard = {
   id: string          // DB row id
@@ -208,76 +211,6 @@ type WorkshopDraftVersion = {
 }
 
 // ── Markdown with code copy ─────────────────────────────────────────────────
-
-function CodeBlock({ lang, code }: { lang: string; code: string }) {
-  const [copied, setCopied] = useState(false)
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText(code.trim()).then(() => {
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1500)
-    })
-  }
-
-  return (
-    <div className="ai-code-block">
-      <div className="ai-code-header">
-        {lang && <span className="ai-code-lang">{lang}</span>}
-        <button type="button" className="ai-code-copy" onClick={handleCopy}>
-          {copied ? '✓' : '复制'}
-        </button>
-      </div>
-      <pre tabIndex={0}><code>{code}</code></pre>
-    </div>
-  )
-}
-
-function MessageContent({ text }: { text: string }) {
-  // Split on complete code blocks first
-  const parts = text.split(/(```[\s\S]*?```)/g)
-
-  // Check if there's an unclosed code block at the end (during streaming)
-  const lastPart = parts[parts.length - 1] ?? ''
-  const openMatch = lastPart.match(/^([\s\S]*?)(```(\w*)\n[\s\S]*)$/)
-
-  const renderedParts: { type: 'text' | 'code'; content: string; lang?: string }[] = []
-
-  for (let i = 0; i < parts.length - 1; i++) {
-    const part = parts[i] ?? ''
-    const codeMatch = part.match(/^```(\w*)\n?([\s\S]*?)```$/)
-    if (codeMatch) {
-      renderedParts.push({ type: 'code', lang: codeMatch[1] ?? '', content: codeMatch[2] ?? '' })
-    } else {
-      renderedParts.push({ type: 'text', content: part })
-    }
-  }
-
-  if (openMatch) {
-    // Text before the unclosed block
-    if (openMatch[1]) renderedParts.push({ type: 'text', content: openMatch[1] })
-    // Unclosed code block — render as code anyway
-    const openLang = openMatch[3] ?? ''
-    const openCode = (openMatch[2] ?? '').replace(/^```\w*\n?/, '')
-    renderedParts.push({ type: 'code', lang: openLang, content: openCode })
-  } else {
-    const codeMatch = lastPart.match(/^```(\w*)\n?([\s\S]*?)```$/)
-    if (codeMatch) {
-      renderedParts.push({ type: 'code', lang: codeMatch[1] ?? '', content: codeMatch[2] ?? '' })
-    } else if (lastPart) {
-      renderedParts.push({ type: 'text', content: lastPart })
-    }
-  }
-
-  return (
-    <>
-      {renderedParts.map((part, i) =>
-        part.type === 'code'
-          ? <CodeBlock key={i} lang={part.lang ?? ''} code={part.content} />
-          : <span key={i}>{part.content}</span>
-      )}
-    </>
-  )
-}
 
 // ── Inline Config Bar ─────────────────────────────────────────────────────────
 
@@ -395,7 +328,7 @@ function ConfigBar({ config, onConfigured, onClear, storageKey, capability }: {
                 : '能力生成模型 / Ability generation model'}
             >
               {availableModels.map(m => (
-                <option key={m.id} value={m.id}>{m.label}</option>
+                <option key={m.id} value={m.id}>{m.label}{capability === 'chat' ? (generationAdmission(resolveGenerationTarget({ provider, model: m.id, apiKey: '' })) ? ' · 已验收 / Verified' : ' · 待验 / Pending') : ''}</option>
               ))}
             </select>
           )
@@ -942,522 +875,6 @@ function ArtPanel({
 
 // ── Ability Chat Panel ────────────────────────────────────────────────────────
 
-function AbilityPanel({
-  cardId,
-  cardType,
-  cardName,
-  prerequisite,
-  costHint,
-  extracted,
-  input,
-  messages,
-  candidates,
-  selectedCandidateId,
-  baseRevision,
-  apiFetch,
-  onInputChange,
-  onMessagesChange,
-  onCandidateCompleted,
-  onCandidateSelected,
-  onCandidateEdited,
-  onCandidateValidated,
-  onCandidateDiscarded,
-  onCandidateAdopted,
-  sandboxErrors,
-  validationErrors,
-  onValidationErrorsConsumed,
-}: {
-  cardId: string
-  cardType: 'minor' | 'occupation'
-  cardName: string
-  prerequisite?: string
-  costHint?: string
-  extracted: ExtractedCard | null
-  input: string
-  messages: DisplayMessage[]
-  candidates: AbilityCandidate[]
-  selectedCandidateId?: string
-  baseRevision: number
-  apiFetch: ApiFetch
-  onInputChange: (input: string) => void
-  onMessagesChange: (messages: DisplayMessage[]) => void
-  onCandidateCompleted: (candidate: AbilityCandidate) => Promise<void>
-  onCandidateSelected: (candidateId: string) => void
-  onCandidateEdited: (candidateId: string, sourceCode: string) => void
-  onCandidateValidated: (
-    candidateId: string,
-    validation: AbilityCandidate['validation'],
-  ) => Promise<void>
-  onCandidateDiscarded: (candidateId: string) => Promise<void>
-  onCandidateAdopted: (candidate: AbilityCandidate) => Promise<void>
-  sandboxErrors?: string[] | null
-  validationErrors?: string | null
-  onValidationErrorsConsumed?: () => void
-}) {
-  const { locale, t } = useLocale()
-  const config = getLlmConfig()
-  const [chatError, setChatError] = useState('')
-  const [streaming, setStreaming] = useState(false)
-  const [validatingCandidateId, setValidatingCandidateId] = useState<string | null>(null)
-  const messagesRef = useRef(messages)
-  const bottomRef = useRef<HTMLDivElement>(null)
-  const errorRef = useRef<HTMLDivElement>(null)
-  const injectedSandboxErrorsRef = useRef<string | null>(null)
-
-  useEffect(() => {
-    messagesRef.current = messages
-  }, [messages])
-
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
-
-  useEffect(() => {
-    if (chatError) errorRef.current?.focus()
-  }, [chatError])
-
-  const selectedCandidate = candidates.find(candidate => candidate.id === selectedCandidateId)
-    ?? candidates.at(-1)
-
-  const importAdoptedSource = () => {
-    if (!extracted?.sourceCode) return
-    void onCandidateCompleted({
-      id: globalThis.crypto?.randomUUID?.() ?? `ability-${Date.now()}`,
-      kind: 'ability',
-      prompt: locale === 'zh' ? '手动编辑当前源码' : 'Manually edit current source',
-      sourceCode: extracted.sourceCode,
-      cardJson: extracted.card,
-      validation: { valid: false, errors: [] },
-      createdAt: Date.now(),
-      baseRevision,
-      stale: false,
-    })
-  }
-
-  const commitMessages = useCallback((
-    update: DisplayMessage[] | ((current: DisplayMessage[]) => DisplayMessage[]),
-  ) => {
-    const next = typeof update === 'function' ? update(messagesRef.current) : update
-    messagesRef.current = next
-    onMessagesChange(next)
-  }, [onMessagesChange])
-
-  const buildChatHistory = useCallback((
-    visibleMessages: DisplayMessage[],
-    requestIndex: number,
-  ): ChatMessage[] => {
-    const typeLabel = cardType === 'occupation'
-      ? '职业卡 (Occupation)'
-      : '小改良卡 (Minor Improvement)'
-    const contextParts = ['CARD_ID、卡牌类型和卡牌名称必须与当前卡牌完全一致']
-    if (cardId.trim()) contextParts.push(`卡牌 ID: ${cardId.trim()}`)
-    contextParts.push(`卡牌类型: ${typeLabel}`)
-    if (cardName.trim()) contextParts.push(`卡牌名称: ${cardName.trim()}`)
-    if (prerequisite?.trim()) contextParts.push(`前置条件: ${prerequisite.trim()}`)
-    if (costHint?.trim()) contextParts.push(`消耗资源: ${costHint.trim()}`)
-    if (requestIndex === 0 && extracted?.sourceCode) {
-      contextParts.push(`\n当前已有代码:\n\`\`\`typescript\n${extracted.sourceCode}\n\`\`\``)
-    }
-    return visibleMessages.map((message, index) => ({
-      role: message.isError ? 'user' : message.role,
-      content: index === requestIndex
-        ? `[${contextParts.join(', ')}]\n${message.content}`
-        : message.content,
-    }))
-  }, [cardId, cardName, cardType, costHint, extracted, prerequisite])
-
-  const validateSource = useCallback(async (
-    sourceCode: string,
-  ): Promise<AbilityCandidate['validation']> => {
-    try {
-      const response = await apiFetch('/api/workshop/cards/validate-code', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ source: sourceCode, card_id: cardId }),
-      })
-      const data = await response.json() as {
-        ok: boolean
-        valid?: boolean
-        errors?: string[]
-        error?: string
-      }
-      if (!response.ok || !data.ok) {
-        return {
-          valid: false,
-          errors: [data.error ?? `Request failed (${response.status})`],
-        }
-      }
-      return {
-        valid: data.valid === true,
-        errors: data.errors ?? [],
-      }
-    } catch (reason) {
-      return {
-        valid: false,
-        errors: [reason instanceof Error ? reason.message : String(reason)],
-      }
-    }
-  }, [apiFetch, cardId])
-
-  const sendMessages = useCallback(async (
-    chatHistory: ChatMessage[],
-    promptSnapshot: string | undefined,
-    request: string,
-  ) => {
-    if (!config) return
-    setStreaming(true)
-    setChatError('')
-    commitMessages(current => [
-      ...current,
-      { role: 'assistant', content: '', streaming: true, promptSnapshot },
-    ])
-    try {
-      let fullText = ''
-      for await (const chunk of streamChat(chatHistory, CARD_DESIGNER_SYSTEM_PROMPT, config)) {
-        fullText += chunk
-        commitMessages(current => {
-          const updated = [...current]
-          updated[updated.length - 1] = {
-            role: 'assistant',
-            content: fullText,
-            streaming: true,
-            promptSnapshot,
-          }
-          return updated
-        })
-      }
-      commitMessages(current => {
-        const updated = [...current]
-        updated[updated.length - 1] = {
-          role: 'assistant',
-          content: fullText,
-          promptSnapshot,
-        }
-        return updated
-      })
-      const parsed = extractCardFromResponse(fullText)
-      if (!parsed?.sourceCode) {
-        setChatError(locale === 'zh'
-          ? 'AI 回复中没有可采用的完整源代码。'
-          : 'The AI response did not contain complete source code.')
-        return
-      }
-      const validation = await validateSource(parsed.sourceCode)
-      await onCandidateCompleted({
-        id: globalThis.crypto?.randomUUID?.() ?? `ability-${Date.now()}`,
-        kind: 'ability',
-        prompt: request,
-        sourceCode: parsed.sourceCode,
-        cardJson: parsed.card,
-        validation,
-        createdAt: Date.now(),
-        baseRevision,
-        stale: false,
-        provider: config.provider,
-        model: config.model,
-      })
-    } catch (reason) {
-      setChatError(reason instanceof Error ? reason.message : String(reason))
-      commitMessages(current => current.filter(message => !message.streaming))
-    } finally {
-      setStreaming(false)
-    }
-  }, [
-    baseRevision,
-    commitMessages,
-    config,
-    locale,
-    onCandidateCompleted,
-    validateSource,
-  ])
-
-  const handleSend = useCallback(async () => {
-    if (!input.trim() || !config || streaming) return
-    const request = input.trim()
-    const visibleMessages: DisplayMessage[] = [
-      ...messages,
-      { role: 'user', content: request },
-    ]
-    commitMessages(visibleMessages)
-    onInputChange('')
-    const chatHistory = buildChatHistory(visibleMessages, visibleMessages.length - 1)
-    const promptSnapshot = [
-      `[SYSTEM]\n${CARD_DESIGNER_SYSTEM_PROMPT}`,
-      ...chatHistory.map(message =>
-        `[${message.role.toUpperCase()}]\n${message.content}`),
-    ].join('\n\n---\n\n')
-    await sendMessages(chatHistory, promptSnapshot, request)
-  }, [
-    buildChatHistory,
-    commitMessages,
-    config,
-    input,
-    messages,
-    onInputChange,
-    sendMessages,
-    streaming,
-  ])
-
-  const handleResend = useCallback((messageIndex: number) => {
-    if (streaming || !config) return
-    const truncated = messages.slice(0, messageIndex + 1)
-    commitMessages(truncated)
-    const chatHistory = buildChatHistory(truncated, messageIndex)
-    const promptSnapshot = [
-      `[SYSTEM]\n${CARD_DESIGNER_SYSTEM_PROMPT}`,
-      ...chatHistory.map(message =>
-        `[${message.role.toUpperCase()}]\n${message.content}`),
-    ].join('\n\n---\n\n')
-    void sendMessages(
-      chatHistory,
-      promptSnapshot,
-      truncated[messageIndex]?.content ?? '',
-    )
-  }, [buildChatHistory, commitMessages, config, messages, sendMessages, streaming])
-
-  const handleValidate = async (candidate: AbilityCandidate) => {
-    setValidatingCandidateId(candidate.id)
-    const validation = await validateSource(candidate.sourceCode)
-    await onCandidateValidated(candidate.id, validation)
-    setValidatingCandidateId(null)
-  }
-
-  const injectError = useCallback((heading: string, errors: string[]) => {
-    if (!config || streaming) return
-    const content = [
-      heading,
-      '',
-      ...errors,
-      '',
-      '请根据错误修改卡牌定义，并返回完整源代码。',
-    ].join('\n')
-    const nextMessages: DisplayMessage[] = [
-      ...messagesRef.current,
-      { role: 'user', content, isError: true },
-    ]
-    commitMessages(nextMessages)
-    const chatHistory: ChatMessage[] = nextMessages.map(message => ({
-      role: message.isError ? 'user' : message.role,
-      content: message.content,
-    }))
-    void sendMessages(chatHistory, undefined, content)
-  }, [commitMessages, config, sendMessages, streaming])
-
-  useEffect(() => {
-    if (!sandboxErrors?.length) {
-      injectedSandboxErrorsRef.current = null
-      return
-    }
-    const signature = JSON.stringify(sandboxErrors)
-    if (injectedSandboxErrorsRef.current === signature || !config || streaming) return
-    injectedSandboxErrorsRef.current = signature
-    injectError('沙盒运行报错', sandboxErrors)
-  }, [config, injectError, sandboxErrors, streaming])
-
-  return (
-    <div className="ai-ability-panel">
-      <div className="ai-ability-panel-header">
-        <h3>{locale === 'zh' ? '卡牌能力' : 'Card ability'}</h3>
-        {extracted?.sourceCode && (
-          <button type="button" className="aicw-button" onClick={importAdoptedSource}>
-            {locale === 'zh' ? '导入手动编辑器' : 'Open in manual editor'}
-          </button>
-        )}
-      </div>
-
-      {extracted?.sourceCode && (
-        <section className="aicw-current-code">
-          <div>
-            <strong>{locale === 'zh' ? '当前已采用源码' : 'Currently adopted source'}</strong>
-            <span>{locale === 'zh' ? '新生成结果先进入候选，不会自动覆盖。' : 'New generations stay as candidates until adopted.'}</span>
-          </div>
-          <pre tabIndex={0}><code>{extracted.sourceCode}</code></pre>
-        </section>
-      )}
-
-      {!config && (
-        <div className="ai-panel-needs-config">
-          {locale === 'zh'
-            ? `请先在顶部「${t('platform.aiConfig')}」中配置能力生成模型。`
-            : `Configure an ability model in "${t('platform.aiConfig')}" first.`}
-        </div>
-      )}
-
-      {chatError && (
-        <div
-          ref={errorRef}
-          className="form-error aicw-panel-error"
-          role="alert"
-          tabIndex={-1}
-        >
-          {chatError}
-        </div>
-      )}
-
-      <div className="ai-chat-area">
-        {messages.length === 0 && (
-          <div className="ai-chat-hint">
-            <p>{locale === 'zh'
-              ? '描述想要的效果。AI 生成的源码会先进入候选，并自动做静态验证。'
-              : 'Describe the effect. Generated source becomes a candidate and is statically validated.'}</p>
-          </div>
-        )}
-        {messages.map((message, index) => (
-          <div
-            key={`${message.role}-${index}`}
-            className={`ai-message ai-message-${message.role}${message.isError ? ' ai-message-error' : ''}`}
-          >
-            <div className="ai-message-role">
-              {message.isError
-                ? (locale === 'zh' ? '错误反馈' : 'Error feedback')
-                : message.role === 'user'
-                  ? (locale === 'zh' ? '你' : 'You')
-                  : 'AI'}
-              {message.role === 'user' && !streaming && (
-                <button type="button" className="btn-link ai-resend-btn" onClick={() => handleResend(index)}>
-                  {locale === 'zh' ? '重发' : 'Resend'}
-                </button>
-              )}
-            </div>
-            {message.role === 'assistant' && message.promptSnapshot && (
-              <details className="ai-prompt-details">
-                <summary className="ai-prompt-summary">
-                  {locale === 'zh' ? '查看完整 Prompt' : 'View full prompt'}
-                </summary>
-                <pre className="ai-prompt-text" tabIndex={0}>{message.promptSnapshot}</pre>
-              </details>
-            )}
-            <div className={`ai-message-content${message.streaming ? ' ai-streaming' : ''}`}>
-              {message.role === 'assistant'
-                ? <MessageContent text={message.content || (message.streaming ? '▋' : '')} />
-                : message.content}
-            </div>
-          </div>
-        ))}
-        <div ref={bottomRef} />
-      </div>
-
-      {config && (
-        <div className="ai-input-area">
-          <textarea
-            value={input}
-            onChange={event => onInputChange(event.target.value)}
-            placeholder={locale === 'zh' ? '描述你想要的卡牌效果…' : 'Describe the card effect…'}
-            rows={3}
-            disabled={streaming}
-          />
-          <button
-            type="button"
-            className="aicw-button aicw-button-primary"
-            onClick={() => { void handleSend() }}
-            disabled={streaming || !input.trim()}
-          >
-            {streaming
-              ? (locale === 'zh' ? '生成中…' : 'Generating…')
-              : (locale === 'zh' ? '生成能力候选' : 'Generate ability candidate')}
-          </button>
-        </div>
-      )}
-
-      {candidates.length > 0 && (
-        <section className="aicw-candidate-section">
-          <div className="aicw-candidate-heading">
-            <div>
-              <strong>{locale === 'zh' ? '最近能力候选' : 'Recent ability candidates'}</strong>
-              <span>{locale === 'zh' ? '编辑后需要重新验证' : 'Editing requires revalidation'}</span>
-            </div>
-            <span>{candidates.length} / 3</span>
-          </div>
-          <div className="aicw-ability-tabs">
-            {candidates.map(candidate => (
-              <button
-                type="button"
-                key={candidate.id}
-                className={selectedCandidate?.id === candidate.id ? 'is-selected' : ''}
-                onClick={() => onCandidateSelected(candidate.id)}
-              >
-                <strong>{candidate.model ?? (locale === 'zh' ? '能力候选' : 'Ability candidate')}</strong>
-                <small>{candidate.validation.valid
-                  ? (locale === 'zh' ? '验证通过' : 'Validated')
-                  : (locale === 'zh' ? '待验证' : 'Needs validation')}</small>
-              </button>
-            ))}
-          </div>
-          {selectedCandidate && (
-            <div className="aicw-ability-review">
-              <div className="aicw-candidate-toolbar">
-                <span className={`aicw-candidate-state${selectedCandidate.stale ? ' is-stale' : ''}`}>
-                  {selectedCandidate.stale
-                    ? (locale === 'zh' ? '基于旧草稿生成' : 'Generated from an older draft')
-                    : selectedCandidate.validation.valid
-                      ? (locale === 'zh' ? '验证通过，待采用' : 'Validated, awaiting adoption')
-                      : (locale === 'zh' ? '待验证' : 'Needs validation')}
-                </span>
-                <details>
-                  <summary>{locale === 'zh' ? '生成记录' : 'Generation record'}</summary>
-                  <p>{selectedCandidate.prompt}</p>
-                  <small>
-                    {[selectedCandidate.provider, selectedCandidate.model].filter(Boolean).join(' · ')}
-                  </small>
-                </details>
-              </div>
-              <textarea
-                className="aicw-source-editor"
-                value={selectedCandidate.sourceCode}
-                onChange={event => onCandidateEdited(selectedCandidate.id, event.target.value)}
-                aria-label={locale === 'zh' ? '能力候选源码' : 'Ability candidate source'}
-                spellCheck={false}
-              />
-              {selectedCandidate.validation.errors.length > 0 && (
-                <ul className="aicw-validation-errors">
-                  {selectedCandidate.validation.errors.map(validationError => (
-                    <li key={validationError}>{validationError}</li>
-                  ))}
-                </ul>
-              )}
-              <div className="aicw-candidate-actions">
-                <button type="button" className="aicw-button" onClick={() => { void onCandidateDiscarded(selectedCandidate.id) }}>
-                  {locale === 'zh' ? '丢弃候选' : 'Discard'}
-                </button>
-                <button type="button" className="aicw-button" onClick={() => { void handleValidate(selectedCandidate) }} disabled={validatingCandidateId === selectedCandidate.id}>
-                  {validatingCandidateId === selectedCandidate.id
-                    ? (locale === 'zh' ? '验证中…' : 'Validating…')
-                    : (locale === 'zh' ? '运行静态验证' : 'Run static validation')}
-                </button>
-                <button
-                  type="button"
-                  className="aicw-button aicw-button-primary"
-                  onClick={() => { void onCandidateAdopted(selectedCandidate) }}
-                  disabled={!selectedCandidate.validation.valid}
-                >
-                  {locale === 'zh' ? '采用为当前源码' : 'Adopt as current source'}
-                </button>
-              </div>
-            </div>
-          )}
-        </section>
-      )}
-
-      {validationErrors && (
-        <div className="ai-validation-error-bar">
-          <div className="ai-validation-error-text">{validationErrors}</div>
-          <button
-            type="button"
-            className="aicw-button"
-            onClick={() => {
-              injectError('代码验证失败', [validationErrors])
-              onValidationErrorsConsumed?.()
-            }}
-            disabled={streaming || !config}
-          >
-            {locale === 'zh' ? '发送给 AI 修复' : 'Send to AI'}
-          </button>
-        </div>
-      )}
-    </div>
-  )
-}
-
 function sampleN<T>(arr: T[], n: number): T[] {
   const shuffled = [...arr].sort(() => Math.random() - 0.5)
   return shuffled.slice(0, n)
@@ -1517,8 +934,9 @@ type AiCardDesignerProps = {
   initialCard?: ApiCard
   initialCardId?: string
   onClose: () => void
-  onAddToSandboxAndRestart?: (cardDbId: string, versionId: string) => Promise<boolean>
+  onAddToSandboxAndRestart?: (cardDbId: string, versionId: string, source: PlaytestSource) => Promise<boolean>
   sandboxErrors?: string[] | null
+  sandboxPlaytest?: SandboxPlaytest | null
   onCardLoaded?: (cardDbId: string) => void
   apiFetch?: ApiFetch
 }
@@ -1529,6 +947,7 @@ export function AiCardDesigner({
   onClose,
   onAddToSandboxAndRestart,
   sandboxErrors,
+  sandboxPlaytest,
   onCardLoaded,
   apiFetch,
 }: AiCardDesignerProps) {
@@ -1556,6 +975,9 @@ export function AiCardDesigner({
   const [pendingStage, setPendingStage] = useState<WorkshopStage | null>(null)
   const [sandboxConfirmation, setSandboxConfirmation] = useState(false)
   const [runtimeSandboxErrors, setRuntimeSandboxErrors] = useState<string[] | null>(null)
+  const [runtimeSandboxFailure, setRuntimeSandboxFailure] = useState<PlaytestFailure | null>(null)
+  const testedSource = sandboxPlaytest?.source
+  const sandboxFailure = sandboxFailureFor(sandboxPlaytest, sandboxErrors ?? [])
   const sandboxGateErrors = sandboxErrors?.length ? sandboxErrors : runtimeSandboxErrors
   const [versions, setVersions] = useState<WorkshopDraftVersion[]>([])
   const [versionsLoading, setVersionsLoading] = useState(false)
@@ -1594,6 +1016,21 @@ export function AiCardDesigner({
   const workspaceState = controllerState?.workspaceId === currentCardDbId
     ? controllerState
     : null
+
+  const sandboxOwner = { workspaceId: currentCardDbId, playtest: sandboxPlaytest, versionId: workspaceState?.session.sandboxTestVersionId }
+  const sandboxOwnerRef = useRef(sandboxOwner)
+  sandboxOwnerRef.current = sandboxOwner
+  const confirmingPlaytestRef = useRef(false)
+  const sandboxLifetimeRef = useRef(0)
+
+  useEffect(() => () => { sandboxLifetimeRef.current += 1 }, [])
+
+  useEffect(() => {
+    setRuntimeSandboxErrors(null)
+    setRuntimeSandboxFailure(null)
+    if (confirmingPlaytestRef.current) setSaving(false)
+    confirmingPlaytestRef.current = false
+  }, [sandboxPlaytest, currentCardDbId])
 
   useEffect(() => {
     if (error) errorRef.current?.focus()
@@ -1941,24 +1378,11 @@ export function AiCardDesigner({
     await checkpoint()
   }
 
-  const completeAbilityCandidate = async (candidate: AbilityCandidate) => {
-    dispatch({ type: 'candidateCompleted', candidate })
-    await checkpoint()
-  }
-
   const discardCandidate = async (
     kind: 'art' | 'ability',
     candidateId: string,
   ) => {
     dispatch({ type: 'candidateDiscarded', kind, candidateId })
-    await checkpoint()
-  }
-
-  const validateAbilityCandidate = async (
-    candidateId: string,
-    validation: AbilityCandidate['validation'],
-  ) => {
-    dispatch({ type: 'abilityCandidateValidated', candidateId, validation })
     await checkpoint()
   }
 
@@ -2004,12 +1428,25 @@ export function AiCardDesigner({
     setSaving(true)
     setError('')
     try {
-      const versionId = await pinDraftVersion()
-      if (!versionId) return
+      const pinned = await pinDraftVersion()
+      if (!pinned) return
+      const { versionId, cardJson: pinnedCard } = pinned
+      const source = pinnedCard?._code
+      if (typeof source !== 'string' || !source.trim()
+        || typeof pinnedCard?.id !== 'string' || !pinnedCard.id.trim()
+        || typeof pinnedCard.name !== 'string' || !pinnedCard.name.trim()
+        || (pinnedCard.card_type !== 'minor' && pinnedCard.card_type !== 'occupation')) {
+        throw new Error(locale === 'zh' ? '无法读取固定版本的源码，请重新固化后再试玩。' : 'Cannot read the pinned source. Pin the version again before playtesting.')
+      }
+      const binding: PlaytestSource = {
+        workspaceId: currentCardDbId, versionId, source, sourceFingerprint: sourceFingerprint(source),
+        identity: { id: pinnedCard.id, type: pinnedCard.card_type, name: pinnedCard.name },
+      }
       updateSession({ sandboxTestVersionId: undefined })
       setSandboxConfirmation(false)
       setRuntimeSandboxErrors(null)
-      if (await onAddToSandboxAndRestart(currentCardDbId, versionId)) {
+      setRuntimeSandboxFailure(null)
+      if (await onAddToSandboxAndRestart(currentCardDbId, versionId, binding)) {
         updateSession({ sandboxTestVersionId: versionId })
       }
     } catch (reason) {
@@ -2022,6 +1459,13 @@ export function AiCardDesigner({
   const handleConfirmSandboxPass = async () => {
     const versionId = workspaceState?.session.sandboxTestVersionId
     if (!versionId || !sandboxConfirmation) return
+    const owner = sandboxOwnerRef.current
+    const lifetime = sandboxLifetimeRef.current
+    const stillCurrent = () => sandboxLifetimeRef.current === lifetime
+      && sandboxOwnerRef.current.workspaceId === owner.workspaceId
+      && sandboxOwnerRef.current.playtest === owner.playtest
+      && sandboxOwnerRef.current.versionId === owner.versionId
+    confirmingPlaytestRef.current = true
     setSaving(true)
     setError('')
     try {
@@ -2029,7 +1473,9 @@ export function AiCardDesigner({
       const payload = await response.json() as {
         cardWarnings?: unknown
         error?: string
+        gameInstanceId?: string
       }
+      if (!stillCurrent()) return
       if (!response.ok) {
         throw new Error(payload.error ?? `Request failed (${response.status})`)
       }
@@ -2037,13 +1483,20 @@ export function AiCardDesigner({
         ? payload.cardWarnings.filter((value): value is string => typeof value === 'string')
         : []
       setRuntimeSandboxErrors(errors.length > 0 ? errors : null)
+      const samePlaytest = testedSource?.workspaceId === currentCardDbId && testedSource?.versionId === versionId
+        && sandboxPlaytest?.instanceId === payload.gameInstanceId
+      setRuntimeSandboxFailure(samePlaytest ? sandboxFailureFor(sandboxPlaytest, errors) : null)
+      if (!samePlaytest) throw new Error(locale === 'zh' ? '试玩版本已改变，请重新固化并启动沙盒。' : 'The playtest version changed. Pin and start the sandbox again.')
       if (errors.length > 0) return
       await confirmSandboxPass(versionId, errors)
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : String(reason))
+      if (stillCurrent()) setError(reason instanceof Error ? reason.message : String(reason))
     } finally {
-      setSaving(false)
-      setSandboxConfirmation(false)
+      if (stillCurrent()) {
+        confirmingPlaytestRef.current = false
+        setSaving(false)
+        setSandboxConfirmation(false)
+      }
     }
   }
 
@@ -2588,42 +2041,27 @@ export function AiCardDesigner({
               />
             )}
 
-            {!controllerLoading && activeStage === 'ability' && (
-              <AbilityPanel
-                cardId={cardIdInput}
-                cardType={cardType}
-                cardName={cardName}
-                prerequisite={prerequisite}
-                costHint={costInput}
-                extracted={extracted}
-                input={workspaceState?.session.abilityInput ?? ''}
-                messages={(workspaceState?.session.abilityMessages ?? []) as DisplayMessage[]}
-                candidates={workspaceState?.session.abilityCandidates ?? []}
-                selectedCandidateId={workspaceState?.session.selectedAbilityCandidateId}
-                baseRevision={workspaceState?.baseRevision ?? 0}
+            {!controllerLoading && workspaceState && <div style={{ display: activeStage === 'ability' ? undefined : 'none' }}>
+              {sandboxGateErrors?.length && !sandboxFailure && !runtimeSandboxFailure && <section className="ai-validation-error-bar" role="status">
+                <div><strong>{locale === 'zh' ? '试玩报错' : 'Playtest failed'}</strong>
+                  <p>{sandboxGateErrors.join('\n')}</p>
+                  <p>{locale === 'zh'
+                    ? '无法确认这些错误属于当前固定源码。请在沙盒中只保留这张卡，再重新固化并试玩。'
+                    : 'These errors cannot be attributed to the pinned source. Keep only this card in the sandbox, then pin and playtest again.'}</p>
+                </div>
+              </section>}
+              <WorkshopAbilityPanel key={workspaceState.workspaceId}
+                state={workspaceState}
+                config={abilityConfig}
                 apiFetch={workshopApiFetch}
-                onInputChange={input => updateSession({ abilityInput: input })}
-                onMessagesChange={messages => updateSession({ abilityMessages: messages })}
-                onCandidateCompleted={completeAbilityCandidate}
-                onCandidateSelected={candidateId => updateSession({
-                  selectedAbilityCandidateId: candidateId,
-                })}
-                onCandidateEdited={(candidateId, sourceCode) => dispatch({
-                  type: 'abilityCandidateEdited',
-                  candidateId,
-                  sourceCode,
-                  cardJson: extractCardFromResponse(
-                    `\`\`\`typescript\n${sourceCode}\n\`\`\``,
-                  )?.card,
-                })}
-                onCandidateValidated={validateAbilityCandidate}
-                onCandidateDiscarded={candidateId => discardCandidate('ability', candidateId)}
-                onCandidateAdopted={adoptCandidate}
-                sandboxErrors={sandboxGateErrors}
+                dispatch={dispatch}
+                checkpoint={checkpoint}
+                onAdopt={adoptCandidate}
+                sandboxFailure={sandboxFailure?.workspaceId === workspaceState.workspaceId ? sandboxFailure : runtimeSandboxFailure?.workspaceId === workspaceState.workspaceId ? runtimeSandboxFailure : null}
                 validationErrors={validationErrors}
                 onValidationErrorsConsumed={() => setValidationErrors(null)}
               />
-            )}
+            </div>}
 
             {!controllerLoading && activeStage === 'localization' && (
               <div className="aicw-localization">

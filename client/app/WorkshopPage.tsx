@@ -3,6 +3,8 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useLocale } from '../contexts/LocaleContext'
 import { AiCardDesigner } from './workshop/AiCardDesigner'
+import type { PlaytestSource } from '../services/llm/generation/request'
+import { bindSandboxPlaytest, type SandboxPlaytest, type SandboxStartResult } from './workshop/sandbox-playtest'
 import { ProposeModal } from './workshop/ProposeModal'
 import { BrandMark } from '../components/common/BrandMark'
 import { LocaleSwitcher } from '../components/common/LocaleSwitcher'
@@ -291,12 +293,6 @@ export function buildSandboxCardIds(
   const trimmed = typeof extraCardId === 'string' ? extraCardId.trim() : ''
   if (trimmed && !ids.includes(trimmed)) ids.push(trimmed)
   return ids
-}
-
-export type SandboxStartResult = {
-  ok: boolean
-  error?: string
-  cardWarnings?: string[]
 }
 
 export async function readSandboxStartResponse(
@@ -824,14 +820,15 @@ function CardDetail({ card, isLoggedIn, apiFetch, onBack, onEdit, onAddSandbox, 
 
 // ── Card Editor ──────────────────────────────────────────────────────────────
 
-function CardEditor({ initial, initialCardId, apiFetch, onCancel, onAddToSandboxAndRestart, sandboxErrors, onCardLoaded }: {
+function CardEditor({ initial, initialCardId, apiFetch, onCancel, onAddToSandboxAndRestart, sandboxErrors, sandboxPlaytest, onCardLoaded }: {
   initial?: WorkshopCard
   initialCardId?: string
   apiFetch: (path: string, init?: RequestInit) => Promise<Response>
   onCancel: () => void
-  onAddToSandboxAndRestart?: (cardDbId: string, versionId: string) => Promise<boolean>
+  onAddToSandboxAndRestart?: (cardDbId: string, versionId: string, source: PlaytestSource) => Promise<boolean>
   t: (key: string, params?: Record<string, string | number>) => string
   sandboxErrors?: string[] | null
+  sandboxPlaytest?: SandboxPlaytest | null
   onCardLoaded?: (cardDbId: string) => void
 }) {
   return (
@@ -842,6 +839,7 @@ function CardEditor({ initial, initialCardId, apiFetch, onCancel, onAddToSandbox
         onClose={onCancel}
         onAddToSandboxAndRestart={onAddToSandboxAndRestart}
         sandboxErrors={sandboxErrors}
+        sandboxPlaytest={sandboxPlaytest}
         onCardLoaded={onCardLoaded}
         apiFetch={apiFetch}
       />
@@ -1316,12 +1314,20 @@ export function WorkshopPage() {
   const [myLoading, setMyLoading] = useState(false)
   const [resetSandboxOpen, setResetSandboxOpen] = useState(false)
   const [pendingSandboxErrors, setPendingSandboxErrors] = useState<string[] | null>(null)
+  const [sandboxPlaytest, setSandboxPlaytest] = useState<SandboxPlaytest | null>(null)
+  const sandboxLaunchRef = useRef(0)
   const [sandboxActive, setSandboxActive] = useState(false)
   const [sandboxKey, setSandboxKey] = useState(0)
   const [sandboxLocalMode, setSandboxLocalMode] = useState(false)
   const [sandboxLocalFresh, setSandboxLocalFresh] = useState(false)
   const prevView = useRef<View>('home')
   const prevBrowseQuery = useRef({ search: '', sort: 'recent' as 'recent' | 'popular' })
+
+  useEffect(() => {
+    sandboxLaunchRef.current += 1
+    setSandboxPlaytest(null)
+    setPendingSandboxErrors(null)
+  }, [editCardId, user?.id])
 
   const communityDeckEnabled = import.meta.env.VITE_ENABLE_COMMUNITY_DECK === 'true'
 
@@ -1519,7 +1525,10 @@ export function WorkshopPage() {
   const handleStartSandboxGame = async (
     extraCardId?: string,
     exactVersionId?: string,
+    testedSource?: PlaytestSource,
   ): Promise<boolean> => {
+    const launch = ++sandboxLaunchRef.current
+    setSandboxPlaytest(null)
     // Browser-local executor: the playtest runs entirely in this browser.
     // Editor flows that pin an extra card / exact draft version still go
     // through the server sandbox (card data isn't in workshop state yet).
@@ -1572,8 +1581,10 @@ export function WorkshopPage() {
           error: `${response.status} ${response.statusText || 'HTTP error'}`,
         })
       const data = await readSandboxStartResponse(response, fallbackError)
+      if (launch !== sandboxLaunchRef.current) return false
       if (data.ok) {
         const warnings: string[] = data.cardWarnings ?? []
+        setSandboxPlaytest(bindSandboxPlaytest(data, testedSource))
         setSandboxActive(true)
         setSandboxKey(k => k + 1)
         setPendingSandboxErrors(warnings.length > 0 ? warnings : null)
@@ -1585,6 +1596,7 @@ export function WorkshopPage() {
         return false
       }
     } catch (err) {
+      if (launch !== sandboxLaunchRef.current) return false
       const detail = err instanceof Error && err.message ? `: ${err.message}` : ''
       const error = `${t('platform.sandboxNetworkError')}${detail}`
       setPendingSandboxErrors([error])
@@ -1754,12 +1766,13 @@ export function WorkshopPage() {
             // the link or refresh without losing their selection.
             writeWorkshopUrl({ view: 'editor', card: cardDbId }, 'replace')
           }}
-          onAddToSandboxAndRestart={async (cardDbId: string, versionId: string) => {
+          onAddToSandboxAndRestart={async (cardDbId, versionId, source) => {
             await handleAddSandbox(cardDbId)
-            return handleStartSandboxGame(cardDbId, versionId)
+            return handleStartSandboxGame(cardDbId, versionId, source)
           }}
           t={t}
           sandboxErrors={pendingSandboxErrors}
+          sandboxPlaytest={sandboxPlaytest}
         />
         <div className="sandbox-embed">
           <div className="sandbox-embed-toolbar">

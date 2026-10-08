@@ -1,7 +1,7 @@
 /**
  * 沙盒卡牌（Workshop / LLM card-gen）可以 dispatch 的 actionId 白名单。
  *
- * 单一真相源：CARD_DESIGNER_SYSTEM_PROMPT 的 actionId 表、
+ * 单一真相源：getWorkshopSandboxContract 的 actionId 表、
  * docs/CUSTOM_CARD_SANDBOX.md 的 action-ids 块都对照此常量
  * （由 scripts/check-prompt-sync.ts 在 CI strict 模式校验）。
  *
@@ -24,7 +24,7 @@ export type SandboxActionId = (typeof SANDBOX_ALLOWED_ACTION_IDS)[number]
 
 /**
  * Prompt 描述元数据（单一真相源）：actionId 的中文说明与 params 形态。
- * `CARD_DESIGNER_SYSTEM_PROMPT` 运行时 import 此 map 渲染 actionId 表 + 白名单块。
+ * `getWorkshopSandboxContract` 运行时 import 此 map 提供 actionId 描述。
  * `Record<SandboxActionId, …>` 保证新增 actionId 必须补描述，否则 tsc 报错。
  */
 export const sandboxActionIdMeta: Record<SandboxActionId, { desc: string; params: string }> = {

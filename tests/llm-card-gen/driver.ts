@@ -17,7 +17,7 @@ type SessionResp = {
     stateId: string
     request?: {
       kind?: string
-      options?: Array<{ value: string }>
+      options?: Array<{ value: string; labelKey?: string; labelParams?: { resourcesPaid?: Record<string, number> } }>
       farm?: {
         farmType?: string
         selectableTiles?: Array<{ row: number; col: number }>
@@ -35,25 +35,27 @@ export class Driver {
   constructor(
     private readonly session: GameSession,
     private readonly ctx: FixtureContext,
+    private readonly options: { historicalRecording?: boolean } = {},
   ) {}
 
   private record(label: string, resp: SessionResp): SessionResp {
     this.steps.push({ label, ok: resp.ok, error: resp.error, stateId: resp.interaction.stateId })
+    if (!resp.ok) throw new Error(`${label} failed: ${resp.error ?? 'unknown error'}`)
     return resp
   }
 
-  private drain(label: string, resp: SessionResp): SessionResp {
+  private drain(label: string, resp: SessionResp, exactPayment?: Record<string, number>): SessionResp {
     let cur = resp
     let guard = 0
     while (cur.interaction.stateId === 'wait') {
       if (++guard > 50) throw new Error(`driver drain exceeded 50 iterations at ${label}`)
-      cur = this.resolveInteraction(label, cur)
+      cur = this.resolveInteraction(label, cur, exactPayment)
       if (!cur.ok) return cur
     }
     return cur
   }
 
-  private resolveInteraction(label: string, resp: SessionResp): SessionResp {
+  private resolveInteraction(label: string, resp: SessionResp, exactPayment?: Record<string, number>): SessionResp {
     const it = resp.interaction
     const kind = it.request?.kind
     if (kind === 'confirm-next-player') {
@@ -64,15 +66,17 @@ export class Driver {
     }
     if (kind === 'choice') {
       const opts = it.request?.options ?? []
+      const signature = (cost: Record<string, number>) => JSON.stringify(Object.entries(cost).filter(([, amount]) => amount > 0).sort(([a], [b]) => a.localeCompare(b)))
+      const payments = exactPayment ? opts.filter(option => option.labelParams?.resourcesPaid && signature(option.labelParams.resourcesPaid) === signature(exactPayment)) : []
       const pick =
         opts.find((o) => o.value === this.ctx.cardId) ??
-        opts.find((o) => o.value !== '__skip__') ??
-        opts[0]
-      if (!pick) throw new Error(`driver: choice with no options at ${label}`)
+        (payments.length === 1 ? payments[0] : undefined) ??
+        (this.options.historicalRecording ? opts.find((o) => o.value !== '__skip__') ?? opts[0] : undefined)
+      if (!pick) throw new Error(`driver: fixture must explicitly resolve choice at ${label}: ${JSON.stringify(it.request)}`)
       const pi = it.playerIndex ?? 0
       return this.resolveChoiceRaw(pi, pick.value)
     }
-    if (kind === 'farm-select' && it.request?.farm?.farmType === 'room') {
+    if (this.options.historicalRecording && kind === 'farm-select' && it.request?.farm?.farmType === 'room') {
       const room = it.request.farm.selectableTiles?.[0]
       if (!room) throw new Error(`driver: room selection with no selectable tiles at ${label}`)
       const pi = it.playerIndex ?? 0
@@ -109,6 +113,10 @@ export class Driver {
     )
   }
 
+  commitSelectionRaw(pi: number, selection: Parameters<GameSession['commitSelectionChoice']>[1]): SessionResp {
+    return this.record(`commitSelectionChoice(${pi})`, this.session.commitSelectionChoice(pi, selection) as unknown as SessionResp)
+  }
+
   resolveChoice(pi: number, choice: string): SessionResp {
     const label = `resolveChoice(${pi},'${choice}')`
     return this.drain(label, this.resolveChoiceRaw(pi, choice))
@@ -118,8 +126,15 @@ export class Driver {
     return this.session.getState()
   }
 
-  playMinorViaMeetingPlace(pi: number): SessionResp {
-    return this.takeAction(pi, 'meeting-place')
+  playMinorViaMeetingPlace(pi: number, exactPayment?: Record<string, number>): SessionResp {
+    return this.drain(`meeting-place(${pi})`, this.openMinorChoice(pi), exactPayment)
+  }
+
+  openMinorChoice(pi: number): SessionResp {
+    const response = this.takeActionRaw(pi, 'meeting-place')
+    const improvements = response.interaction.request?.options?.filter(option => option.labelKey === 'actions.improvement.name') ?? []
+    if (improvements.length > 1) throw new Error('Expected exactly one optional improvement action')
+    return improvements.length === 1 ? this.resolveChoiceRaw(pi, improvements[0].value) : response
   }
 
   playOccupationViaLessons(pi: number): SessionResp {

@@ -25,8 +25,9 @@ const fixture: CardFixture = {
     '- 实现提示: 把计数累计在本卡计数器（counter）的键名 `actionCount` 上。',
   ].join('\n'),
 
-  setup(llmCode) {
+  setup(llmCode, options) {
     const built = buildSessionWithLLMCard(llmCode, {
+      historicalRecording: options?.historicalRecording,
       cardId: CARD_ID,
       cardType: 'occupation',
       cardName: '行动计数官',
@@ -58,8 +59,13 @@ const fixture: CardFixture = {
   },
 
   scenario(driver) {
+    let expected = 0
     for (const sp of ['forest', 'fishing', 'clay-pit', 'reed-bank']) {
       driver.takeAction(0, sp)
+      if (sp !== 'fishing') expected++
+      const cardState = driver.getState().state.players[0].cardStates[CARD_ID]
+      const count = cardState?.counters?.actionCount ?? cardState?.extraData?.actionCount ?? 0
+      if (count !== expected) throw new Error(`${sp}: expected count ${expected}, got ${count}`)
     }
   },
 

@@ -97,7 +97,7 @@ client/        浏览器 React UI（双 bundle）
 ├── components/          board/、interaction/、common/、header/
 ├── contexts/            AuthContext、LocaleContext
 ├── hooks/               useGameSync、useFarmSelection 等
-├── services/            gameTransport、card-meta、rehydrate、llmPrompts
+├── services/            gameTransport、card-meta、rehydrate、llm/generation
 ├── sandbox/             Hot-seat 离线 client（独立 bundle）
 └── types/、utils/、styles/、assets/、config.ts、main.tsx
 
@@ -278,7 +278,7 @@ type GameSyncPayload = {
 }
 ```
 
-**广播 vs 单播**：`stateUpdate` / `roomWaiting` / `gameStarted` / `playerJoined` / `playerDisconnected` / `roomDissolved` 广播；`roomCreated` / `roomJoined` / `authOk` / 请求级 `error` 单播。WS 广播会按连接对应的 `viewerPlayerId` 构造 per-viewer payload：目标玩家收到真实私有 prompt 和 `privateEvents`，其他玩家收到 `private-prompt` redaction。HTTP sandbox 默认无 `X-Viewer-Player` 时保持未过滤多座位开发流；带 `X-Viewer-Player` 时使用同一套 viewer 过滤和 seat guard。`cardWarnings` 只进入 HTTP debug/sandbox payload，用于把该局运行期自定义卡异常送回工坊确认门禁，不向 WS viewer 广播。
+**广播 vs 单播**：`stateUpdate` / `roomWaiting` / `gameStarted` / `playerJoined` / `playerDisconnected` / `roomDissolved` 广播；`roomCreated` / `roomJoined` / `authOk` / 请求级 `error` 单播。WS 广播会按连接对应的 `viewerPlayerId` 构造 per-viewer payload：目标玩家收到真实私有 prompt 和 `privateEvents`，其他玩家收到 `private-prompt` redaction。HTTP sandbox 默认无 `X-Viewer-Player` 时保持未过滤多座位开发流；带 `X-Viewer-Player` 时使用同一套 viewer 过滤和 seat guard。`cardWarnings` 只进入 HTTP debug/sandbox payload，用于把该局运行期自定义卡异常送回工坊确认门禁，不向 WS viewer 广播。 HTTP 游戏响应另带 `gameInstanceId`：它由服务端生成、绑定实际会话实例，并在成功载入状态后轮换。工坊试玩确认比较此标识，因为同一个游戏 seed 可以重用；该标识不承担鉴权，也不进入模型输入。
 
 托管写命令携带 `commandContext`：绑定已认证用户的服务端 scope、稳定 command ID、原 Room ID 与预期提交版本。draft / parent 同时提交还携带该阶段共享、不可 undo 的输入窗口 ID。`requestId` 仅关联单次传输。路由先查询持久回执，再检查输入是否过期；同一身份内容变化时拒绝，结果与 Room / 生命周期写入在同一事务提交。回执只保存结果身份与 Hash，不复制另一份 Frame，且仅对原用户可见。scope 过期或清理后不能当作新操作执行。
 
@@ -1503,7 +1503,9 @@ Durable Room Commit 要求 PostgreSQL、共享资源、`REPLAY_VIEWER_BUILD_ID` 
 - `gameTransport.ts` —— `WsGameTransport` 类管理 WebSocket 连接（不在 React Context；在 service 层）；URL 切换 `?transport=ws` / `?player=p1|p2` / `?room=devN`。
 - `card-meta.ts` —— 启动时 `GET /cards-manifest.json` 运行时拉取卡牌元数据；`CUSTOM_*` overlay 只读 `shared/cards/custom-card-metadata.ts`。
 - `rehydrate.ts` —— 轻量 rehydrator，跳过 `ActionSpace.onTaken` 回调，切断对 `shared/actions` / `shared/cards/catalog` 的依赖链。
-- `llmPrompts.ts` —— Workshop 卡牌设计师 system prompt；hook / phase / scope / actionId 表运行时从 shared 真相源 + 描述元数据（`sandbox-hook-meta.ts` 等）渲染，不再手工镜像。
+- `llm/generation/` —— 浏览器拥有 `GenerationAttempt`、不可变请求构造、provider 工具协议、有界 GitHub 读取和完整源码结果。LLM 凭据只发往配置的 provider，游戏后端与 GitHub 均不接收。每次尝试解析 GitHub 当前 main，后续读取固定该 SHA；文件缺失返回工具错误，模型可改查同 SHA 的其他资料；网络或限流失败暂停，等待显式重试。`server/workshop-references.ts` 使用项目 GitHub 凭据，为已登录工坊用户读取最新 main 与固定 commit 的目录元数据；不接受任意 URL 或模型凭据。浏览器仍匿名读取固定 SHA 的源码正文并校验 blob 哈希，资料与站点发布独立。 PostgreSQL 在实例之间共享用户与全站读取额度、上游冷却期限，以及一小时内由 main 确认的 commit 授权，详见 Platform C1.2；初始化重试保留已确认的 SHA。
+- `GET /api/workshop/sandbox-contract` 通过 `server/workshop-sandbox-contract.ts` 提供实际部署运行时的 hooks、actions、helper 正文、语义与内容标识，包括校验器要求的对象/数组字面量结构及内联 listener 函数，不提供参考资料包。简短生成 prompt 包含该契约；按需读取的 GitHub 文档与内置卡样例不能扩大它。`POST /api/workshop/cards/validate-code` 将校验绑定源码及沙盒标识。仅逐一通过验收的 provider/endpoint/model 组合可用。
+- `WorkshopAbilityPanel` 通过草稿 reducer 应用结果：追加需求使用选中候选，试玩修复使用实际报错源码，原始费用与前置条件保留在固定输入中。编辑能力输入或切换模型配置会取消旧尝试，阻止迟到结果采用或继续修复。失败与手动编辑保留上一份有效候选。恢复只投影可见聊天和精简溯源，原始工具、reasoning、signature 记录仅留页面内存。完整请求、恢复及验收契约见 `docs/PLATFORM_DESIGN.md` 与 `docs/test/llm-card-gen.md`。
 
 ### 12.3 同步状态层
 
