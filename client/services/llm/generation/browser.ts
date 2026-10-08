@@ -12,7 +12,7 @@ type ApiFetch = (path: string, init?: RequestInit) => Promise<Response>
 export function createBrowserGenerationPorts(config: LlmConfig, apiFetch: ApiFetch): AttemptPorts {
   return {
     model: createToolTransport(config),
-    openReferences: signal => ReferenceSession.open(signal, fetch, apiFetch),
+    openReferences: ReferenceSession.createOpener(fetch, apiFetch),
     ...createSandboxPorts(apiFetch),
   }
 }

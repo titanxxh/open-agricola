@@ -2,7 +2,14 @@ import type { WorkshopAbilityCandidateContract, WorkshopDraftContract } from '..
 import type { WorkshopVisibleMessage } from '../../../../shared/contract/workshop-generation'
 import { abilityDraftFingerprint, canonicalGenerationJson, projectAbilityRequirements, projectVisibleMessages, sourceFingerprint } from '../../../../shared/projections/workshop-generation'
 
-export type PlaytestSource = { workspaceId: string; versionId: string; source: string; sourceFingerprint: string; gameSeed?: number | string }
+export type PlaytestSource = {
+  workspaceId: string
+  versionId: string
+  source: string
+  sourceFingerprint: string
+  identity: { id: string; type: 'minor' | 'occupation'; name: string }
+  gameSeed?: number | string
+}
 export type PlaytestFailure = PlaytestSource & { errors: string[] }
 export type GenerationIntent = { kind: 'generate' | 'follow-up' | 'resend'; message: string }
   | { kind: 'repair'; message: string; failure: PlaytestFailure }
@@ -46,6 +53,10 @@ export function buildGenerationRequest(options: {
   if (!intent.message.trim()) throw new Error('Describe the requested card behavior first.')
   if (intent.kind === 'repair' && intent.failure.workspaceId !== options.workspaceId) throw new Error('The playtest belongs to a different card workspace.')
   if (intent.kind === 'repair' && sourceFingerprint(intent.failure.source) !== intent.failure.sourceFingerprint) throw new Error('The playtest error does not match its recorded source.')
+  const identity = intent.kind === 'repair' ? intent.failure.identity : { id: draft.cardId, type: draft.cardType, name: draft.name }
+  if (!identity || identity.id !== draft.cardId || identity.type !== draft.cardType || identity.name !== draft.name) {
+    throw new Error('The playtest card identity changed or is missing. Pin the current version and playtest again before repairing.')
+  }
   const selected = intent.kind === 'repair' ? undefined : options.selectedCandidate
   const source = intent.kind === 'repair' ? intent.failure.source : selected?.sourceCode ?? draft.effectCode
   const fingerprint = source === null ? null : sourceFingerprint(source)
@@ -61,7 +72,7 @@ export function buildGenerationRequest(options: {
   delete definition._compiled
   const input: GenerationRequest['input'] = structuredClone({
     intent,
-    card: { id: draft.cardId, type: draft.cardType, name: draft.name, description, definition, requirements: projectAbilityRequirements(cardJson) },
+    card: { ...identity, description, definition, requirements: projectAbilityRequirements(cardJson) },
     source,
     sourceFingerprint: fingerprint,
     conversation: projectVisibleMessages(options.messages).filter(message => !message.interrupted && !message.isError).slice(-12).map(message => ({

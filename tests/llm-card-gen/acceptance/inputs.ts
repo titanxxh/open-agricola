@@ -39,7 +39,7 @@ const followupDraft = cardDraft(FOLLOWUP_ID, 'Workshop Mallet', 'minor', followu
 followupDraft.cardJson = { ...followupDraft.cardJson, ...FOLLOWUP_META }
 const repairBase = original.find(item => item.id.startsWith('M9-'))!
 const repairSource = sourceWith(repairBase.draft.cardId, repairBase.draft.name, 'occupation', '{ effect: { onBuy: (state, player) => futureMeeplesNode({ cardId: CARD_ID, playerId: player.id, entries: [{ round: state.round + 1, resources: { wood: 1 } }] }) } }')
-const failed: PlaytestFailure = { workspaceId: 'acceptance-M14', versionId: 'tested-B-v2', source: repairSource, sourceFingerprint: sourceFingerprint(repairSource), errors: ['onBuy: ReferenceError: futureMeeplesNode is not defined'] }
+const failed: PlaytestFailure = { workspaceId: 'acceptance-M14', versionId: 'tested-B-v2', source: repairSource, sourceFingerprint: sourceFingerprint(repairSource), identity: { id: repairBase.draft.cardId, type: repairBase.draft.cardType, name: repairBase.draft.name }, errors: ['onBuy: ReferenceError: futureMeeplesNode is not defined'] }
 
 export const acceptanceInputs: AcceptanceInput[] = [
   ...original,

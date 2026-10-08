@@ -377,7 +377,7 @@ export async function handleWorkshopRoute(
     const disconnect = () => controller.abort()
     res.once('close', disconnect)
     try {
-      const data = await readWorkshopReference(routeUrl.pathname.slice('/api/workshop/references/'.length), controller.signal)
+      const data = await readWorkshopReference(db, user.id, routeUrl.pathname.slice('/api/workshop/references/'.length), controller.signal)
       sendJson(res, 200, data)
     } catch (error) {
       const failure = error instanceof WorkshopReferenceError ? error : new WorkshopReferenceError(503, 'GitHub reference metadata is unavailable.')

@@ -163,7 +163,7 @@ test('browser tools preserve protocol through the final response slot and author
         if (target.provider !== 'deepseek' || target.model !== 'deepseek-flash' || target.endpoint !== 'https://api.deepseek.com/v1/chat/completions') throw new Error('Unexpected test target')
       },
     })
-    return await new GenerationAttempt(request, { model, ...createSandboxPorts((path: string, init?: RequestInit) => fetch(path, { ...init, credentials: 'include' })), openReferences: (signal: AbortSignal) => ReferenceSession.open(signal) }).start()
+    return await new GenerationAttempt(request, { model, ...createSandboxPorts((path: string, init?: RequestInit) => fetch(path, { ...init, credentials: 'include' })), openReferences: ReferenceSession.createOpener() }).start()
   }, { cardId, modelKey })
   expect(posts).toBe(8)
   expect(preservedProtocol).toBe(true)
@@ -188,7 +188,7 @@ test('project metadata and anonymous GitHub source work from the real browser or
     const modulePath = '/client/services/llm/generation/references.ts'
     const { ReferenceSession } = await import(modulePath)
     const signal = AbortSignal.timeout(45_000)
-    const refs = await ReferenceSession.open(signal)
+    const refs = await ReferenceSession.createOpener()(signal)
     const result = JSON.parse(await refs.execute({ id: 'probe', type: 'function', function: { name: 'read_reference', arguments: JSON.stringify({ path: 'docs/CUSTOM_CARD_SANDBOX.md', startLine: 1, lineCount: 8 }) } }, signal))
     return { commit: refs.commit, path: result.path, text: result.text, url: result.url }
   })

@@ -62,7 +62,7 @@ describe('immutable generation input', () => {
     expect(buildGenerationRequest({ ...base, selectedCandidate: { ...selected, cardJson: { ...selected.cardJson, _draft: { costInput: '1 wood or 1 reed' } } },
       intent: { kind: 'follow-up', message: 'Only change the reward' } }).input.card.requirements).toEqual({ cost: '1 wood or 1 reed' })
     const repair = buildGenerationRequest({ ...base, intent: { kind: 'repair', message: 'Fix the tested code; preserve its cost',
-      failure: { workspaceId: 'w', versionId: 'tested', source: 'tested B', sourceFingerprint: sourceFingerprint('tested B'), errors: ['unsupported helper'] } } })
+      failure: { workspaceId: 'w', versionId: 'tested', source: 'tested B', sourceFingerprint: sourceFingerprint('tested B'), identity: { id: draft.cardId, type: draft.cardType, name: draft.name }, errors: ['unsupported helper'] } } })
     expect(repair.input.card.requirements).toEqual({})
     expect(repair.input.card.definition).toEqual({})
     expect(repair.input.card.description).toBe('')
@@ -81,11 +81,24 @@ describe('immutable generation input', () => {
   it('binds repair to tested version B while C is selected', () => {
     const snapshot = buildGenerationRequest({ workspaceId: 'w', baseRevision: 1, draft,
       selectedCandidate: { id: 'C', kind: 'ability', sourceCode: 'selected C', cardJson: {}, validation: { valid: true }, createdAt: 1, prompt: 'other' },
-      intent: { kind: 'repair', message: 'fix it', failure: { workspaceId: 'w', versionId: 'version-B', source: 'tested B', sourceFingerprint: sourceFingerprint('tested B'), errors: ['runtime error'] } },
+      intent: { kind: 'repair', message: 'fix it', failure: { workspaceId: 'w', versionId: 'version-B', source: 'tested B', sourceFingerprint: sourceFingerprint('tested B'), identity: { id: draft.cardId, type: draft.cardType, name: draft.name }, errors: ['runtime error'] } },
     })
     expect(snapshot.input.source).toBe('tested B')
     expect(snapshot.sourceCandidate).toBeUndefined()
-    expect(() => buildGenerationRequest({ workspaceId: 'w', baseRevision: 1, draft, intent: { kind: 'repair', message: 'fix', failure: { workspaceId: 'w', versionId: 'B', source: 'B', sourceFingerprint: 'mismatch', errors: [] } } })).toThrow('does not match')
+    expect(() => buildGenerationRequest({ workspaceId: 'w', baseRevision: 1, draft, intent: { kind: 'repair', message: 'fix', failure: { workspaceId: 'w', versionId: 'B', source: 'B', sourceFingerprint: 'mismatch', identity: { id: draft.cardId, type: draft.cardType, name: draft.name }, errors: [] } } })).toThrow('does not match')
+  })
+
+  it.each([
+    { cardId: 'CUSTOM_Renamed' },
+    { cardType: 'occupation' as const },
+    { name: 'Renamed after playtest' },
+  ])('rejects repair after the pinned card identity changes: %j', change => {
+    expect(() => buildGenerationRequest({ workspaceId: 'w', baseRevision: 2, draft: { ...draft, ...change },
+      intent: { kind: 'repair', message: 'Fix B', failure: {
+        workspaceId: 'w', versionId: 'B', source: 'tested B', sourceFingerprint: sourceFingerprint('tested B'),
+        identity: { id: draft.cardId, type: draft.cardType, name: draft.name }, errors: ['runtime error'],
+      } },
+    })).toThrow('card identity changed')
   })
 
   it('does not extract a partial or ambiguous source as a completed result', () => {
@@ -108,7 +121,7 @@ describe('bounded browser generation attempt', () => {
       .mockResolvedValueOnce(new Response('', { status }))
       .mockResolvedValueOnce(new Response(body))
     const io = ports()
-    io.openReferences = signal => ReferenceSession.open(signal, fetchReference)
+    io.openReferences = ReferenceSession.createOpener(fetchReference)
     const read = (id: string, path: string): ToolCall => ({ id, type: 'function', function: {
       name: 'read_reference', arguments: JSON.stringify({ path, startLine: 1, lineCount: 2 }),
     } })
