@@ -7,6 +7,7 @@ import { seedResourceCatalog } from './_helpers/objects'
 import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { EventEmitter } from 'node:events'
+import { generateKeyPairSync } from 'node:crypto'
 import { createTestDatabase } from './_helpers/postgres'
 import {
   approveCurrentDraft,
@@ -267,6 +268,54 @@ it('requires a project GitHub identity instead of falling back to anonymous meta
     expect(response.statusCode).toBe(503)
     expect(upstream).not.toHaveBeenCalled()
   } finally { vi.unstubAllEnvs(); vi.unstubAllGlobals() }
+})
+
+it('honors App token rate limits and cancels token acquisition before reading reference metadata', async () => {
+  const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 })
+  vi.stubEnv('WORKSHOP_REFERENCE_GITHUB_TOKEN', '')
+  vi.stubEnv('WORKSHOP_REVIEW_GITHUB_APP_ID', '123')
+  vi.stubEnv('WORKSHOP_REVIEW_GITHUB_INSTALLATION_ID', '456')
+  vi.stubEnv('WORKSHOP_REVIEW_GITHUB_PRIVATE_KEY', privateKey.export({ type: 'pkcs8', format: 'pem' }).toString())
+  vi.stubEnv('GITHUB_UPSTREAM_OWNER', 'titanxxh')
+  vi.stubEnv('GITHUB_UPSTREAM_REPO', 'open-agricola')
+  const upstream = vi.fn<typeof fetch>().mockResolvedValueOnce(new Response('private upstream body', { status: 429, headers: { 'Retry-After': '120' } }))
+  vi.stubGlobal('fetch', upstream)
+  const now = Date.now()
+  const clock = vi.spyOn(Date, 'now').mockReturnValue(now)
+  try {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const response = mockRes()
+      await handleWorkshopRoute(mockReq('GET', '/api/workshop/references/main', null, 'tok-alice'), response)
+      expect(response.statusCode).toBe(429)
+      expect(response.getHeader('Retry-After')).toBe('120')
+      expect(response.body).not.toContain('private upstream body')
+    }
+    expect(upstream).toHaveBeenCalledTimes(1)
+    expect(JSON.parse(String(upstream.mock.calls[0][1]?.body))).toEqual({ repositories: ['open-agricola'], permissions: { contents: 'read', pull_requests: 'read' } })
+    clock.mockReturnValue(now + 121_000)
+    let aborted = false
+    upstream.mockImplementationOnce(async (_url, init) => {
+      const signal = init?.signal
+      if (!signal) throw new Error('Missing App request signal')
+      await new Promise<void>((_resolve, reject) => signal.addEventListener('abort', () => { aborted = true; reject(new Error('cancelled')) }, { once: true }))
+      return Response.json({})
+    })
+    const disconnected = mockRes()
+    const request = handleWorkshopRoute(mockReq('GET', '/api/workshop/references/main', null, 'tok-alice'), disconnected)
+    await vi.waitFor(() => expect(upstream).toHaveBeenCalledTimes(2))
+    Object.defineProperty(disconnected, 'destroyed', { value: true })
+    disconnected.emit('close')
+    await vi.waitFor(() => expect(aborted).toBe(true))
+    await request
+    upstream.mockResolvedValueOnce(Response.json({ token: 'project-app-read-secret', expires_at: new Date(now + 3_600_000).toISOString() }))
+      .mockResolvedValueOnce(Response.json({ object: { sha: 'a'.repeat(40) } }))
+    const recovered = mockRes()
+    await handleWorkshopRoute(mockReq('GET', '/api/workshop/references/main', null, 'tok-alice'), recovered)
+    expect(recovered.statusCode).toBe(200)
+    expect(upstream.mock.calls.slice(0, 3).every(([url]) => url === 'https://api.github.com/app/installations/456/access_tokens')).toBe(true)
+    expect(new Headers(upstream.mock.calls[3][1]?.headers).get('Authorization')).toBe('Bearer project-app-read-secret')
+    expect(recovered.body).not.toContain('secret')
+  } finally { clock.mockRestore(); vi.unstubAllEnvs(); vi.unstubAllGlobals() }
 })
 
 const approveForPublish = async (

@@ -86,7 +86,12 @@ export async function requestGitHub(
   fetchImpl: typeof fetch = fetch, now = Date.now(),
 ): Promise<GitHubResponse> {
   let raw: Response
-  try { raw = await fetchImpl(url, {...init, signal:AbortSignal.timeout(15_000)}) }
+  try {
+    const timeout = AbortSignal.timeout(15_000)
+    const signal = init.signal ? AbortSignal.any([init.signal, timeout]) : timeout
+    signal.throwIfAborted()
+    raw = await fetchImpl(url, {...init, signal})
+  }
   catch (error) { throw transportError(error, {kind:'network',operation}) }
   const response = new GitHubResponse(raw, operation)
   if (raw.status === 429 || raw.status === 403 && (raw.headers.has('retry-after') || raw.headers.get('x-ratelimit-remaining') === '0')) {
