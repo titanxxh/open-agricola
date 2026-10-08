@@ -56,6 +56,10 @@ export default defineConfig({
   base: process.env.VITE_BASE_PATH ?? '/',
   plugins,
   server: {
+    watch: {
+      // Scope the exclusion to this checkout so worktree development still watches its own source.
+      ignored: [path.resolve(import.meta.dirname, '.worktree/**')],
+    },
     fs: {
       allow: ['..'],
     },
