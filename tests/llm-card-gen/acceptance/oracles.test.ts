@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { acceptanceInputs, assertCapabilityGap } from './inputs'
+import { acceptanceInputs, assertCapabilityGap, sourceWith } from './inputs'
 import { evaluateBehavior } from './behavior'
 import { acceptanceSeed as seed } from './seeds'
 import { resetCards } from '../session-helpers'
+import { getWorkshopSandboxContract } from '../../../server/workshop-sandbox-contract'
 
 afterEach(resetCards)
 
@@ -15,6 +16,24 @@ describe('complete declared acceptance matrix', () => {
   it.each(acceptanceInputs.filter(input => input.expected === 'source'))('$id has a working unmodified-source oracle', input => {
     const result = evaluateBehavior(input, seed(input.id))
     expect(result, result.reason).toMatchObject({ ok: true })
+  })
+  it('uses the deployed listener identity paths to distinguish the actor from the card owner', () => {
+    const input = acceptanceInputs.find(input => input.id === 'M16-forest-english')!
+    const { actor, owner } = getWorkshopSandboxContract().listeners.players
+    const actorId = `context[${JSON.stringify(actor)}].id`
+    const ownerId = `context[${JSON.stringify(owner)}].id`
+    const source = sourceWith(input.draft.cardId, input.draft.name, 'occupation', `{
+      listeners: [{ cardIds: [CARD_ID], actions: ['collect'], phases: ['after'], scope: 'any', handler: context => {
+        if (context.space.id !== 'forest' || ${actorId} !== ${ownerId}) return;
+        return { flow: gainLeaf(CARD_ID, { wood: 1 }), sourceCard: CARD_ID };
+      } }]
+    }`)
+    const result = evaluateBehavior(input, source)
+    expect(result, result.reason).toMatchObject({ ok: true })
+    resetCards()
+    // Regression: a flat, nonexistent actor ID silently suppresses the reward.
+    const bad = evaluateBehavior(input, source.replace(actorId, 'context.playerId'))
+    expect(bad.ok, bad.reason).toBe(false)
   })
   it.each([
     ['M1-immediate-gain-with-cost-prereq', /"prerequisite":"3 Occupations"/, '"prerequisite":""'],

@@ -16,7 +16,7 @@ const draft = {
   effectCode: 'adopted source', artUrl: null, generation: {},
 }
 const request = () => buildGenerationRequest({ workspaceId: 'workspace', baseRevision: 1, draft, intent: { kind: 'generate', message: 'gain food' }, attemptId: 'attempt', now: 1 })
-const contract: WorkshopSandboxContract = { format: 1, id: 'sandbox-v1:' + 'a'.repeat(64), runtime: 'server-isolated-vm', limits: { memoryLimitMb: 8, executionTimeoutMs: 100 }, effects: {}, listeners: { actions: [], phases: {}, scopes: [] }, actions: {}, helpers: '', semantics: [] }
+const contract: WorkshopSandboxContract = { format: 1, id: 'sandbox-v1:' + 'a'.repeat(64), runtime: 'server-isolated-vm', limits: { memoryLimitMb: 8, executionTimeoutMs: 100 }, effects: {}, listeners: { actions: [], phases: {}, scopes: [], players: { actor: 'player', owner: 'ownerPlayer', effectRecipient: 'effectPlayer' } }, actions: {}, helpers: '', semantics: [] }
 const source = 'const CARD_DEF = { cardType: "minor", meta: {} }; const CARD_IMPL = {}'
 const text = `\`\`\`typescript\n${source}\n\`\`\``
 const call = (id: string): ToolCall => ({ id, type: 'function', function: { name: 'search_references', arguments: '{"query":"wood"}' } })

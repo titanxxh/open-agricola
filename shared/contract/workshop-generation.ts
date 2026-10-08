@@ -63,7 +63,13 @@ export type WorkshopSandboxContract = {
   runtime: 'server-isolated-vm'
   limits: { executionTimeoutMs: number; memoryLimitMb: number }
   effects: Record<string, unknown>
-  listeners: { actions: readonly string[]; phases: Record<string, unknown>; scopes: readonly string[] }
+  listeners: {
+    actions: readonly string[]
+    phases: Record<string, unknown>
+    scopes: readonly string[]
+    /** Keys of the player objects in the deployed listener context; IDs live inside them. */
+    players: { actor: string; owner: string; effectRecipient: string }
+  }
   actions: Record<string, { desc: string; params: string }>
   helpers: string
   semantics: readonly string[]

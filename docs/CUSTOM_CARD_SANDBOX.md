@@ -125,6 +125,8 @@ Player fields in `CardListenerContext` mean:
 
 Use `context.ownerPlayer`, never `context.player`, to test the card owner.
 
+Read player identities through these objects: `context.player.id` and `context.ownerPlayer.id`. There is no `context.playerId`; comparing it with an owner ID can silently suppress every trigger. `scope: 'player'` already restricts dispatch to the card owner, so it needs no extra actor/owner guard. Do not infer flat identity fields from native engine internals. The deployed Workshop contract exposes the supported object keys in `listeners.players`.
+
 ### 2.1 Readable fields on `context.space`
 
 Runtime `context.space` is `ActionDefinition + resources + takenBy`, as defined in `shared/contract/types.ts`. A listener should read only:
