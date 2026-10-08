@@ -11,7 +11,7 @@ const bytes = utf8ToBytes(text)
 const sha = bytesToHex(sha1(concatBytes(utf8ToBytes(`blob ${bytes.length}\0`), bytes)))
 const signal = () => new AbortController().signal
 
-describe('anonymous pinned references', () => {
+describe('project metadata and anonymous pinned source reads', () => {
   it('locates relevant sections and matching lines without requiring sequential document reads', async () => {
     const path = 'docs/CUSTOM_CARD_SANDBOX.md'
     const text = '# Sandbox\nIntro\n```\n## Not a heading\n```\n## Collect listener\nUse collect after forest.\n'
@@ -58,8 +58,8 @@ describe('anonymous pinned references', () => {
     const fetched: Array<{ url: string; init?: RequestInit }> = []
     const fetchReference: typeof fetch = async (input, init) => {
       const url = String(input); fetched.push({ url, init })
-      if (url.includes('/git/ref/heads/main')) return Response.json({ object: { sha: main } })
-      if (url.includes('/git/trees/')) return Response.json({ truncated: false, tree: [{ path, sha, type: 'blob', size: bytes.length }] })
+      if (url === '/api/workshop/references/main') return Response.json({ object: { sha: main } })
+      if (url.startsWith('/api/workshop/references/tree/')) return Response.json({ truncated: false, tree: [{ path, sha, type: 'blob', size: bytes.length }] })
       return new Response(text)
     }
     const references = await ReferenceSession.open(signal(), fetchReference)
@@ -69,7 +69,10 @@ describe('anonymous pinned references', () => {
     expect(fetched.at(-1)?.url).toContain(`/${first}/`)
     expect(JSON.parse(await references.execute(call('search_references', { query: 'Frame Builder' }), signal())).results[0].path).toBe(path)
     expect((await ReferenceSession.open(signal(), fetchReference)).commit).toBe(second)
-    expect(fetched.every(entry => !entry.init?.headers && entry.init?.credentials === 'omit' && entry.init?.redirect === 'error')).toBe(true)
+    expect(fetched.every(entry => !entry.init?.headers && entry.init?.redirect === 'error')).toBe(true)
+    expect(fetched.filter(entry => entry.url.startsWith('/api/workshop/')).every(entry => entry.init?.credentials === 'include')).toBe(true)
+    expect(fetched.filter(entry => entry.url.startsWith('https://')).map(entry => ({ url: entry.url, credentials: entry.init?.credentials })))
+      .toEqual([{ url: `https://raw.githubusercontent.com/titanxxh/open-agricola/${first}/${path}`, credentials: 'omit' }])
   })
 
   it('never falls back to a cached main when branch resolution fails, and bounds retries', async () => {

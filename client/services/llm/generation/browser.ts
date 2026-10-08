@@ -6,13 +6,13 @@ import { GenerationStopError, type AttemptPorts, type CodeValidation } from './a
 
 type ApiFetch = (path: string, init?: RequestInit) => Promise<Response>
 
-/** Backend requests contain only the sandbox contract or source validation.
+/** Backend requests contain only reference metadata, the sandbox contract or source validation.
  * The LLM config is captured solely by the provider transport closure.
  */
 export function createBrowserGenerationPorts(config: LlmConfig, apiFetch: ApiFetch): AttemptPorts {
   return {
     model: createToolTransport(config),
-    openReferences: signal => ReferenceSession.open(signal),
+    openReferences: signal => ReferenceSession.open(signal, fetch, apiFetch),
     ...createSandboxPorts(apiFetch),
   }
 }

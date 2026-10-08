@@ -1503,7 +1503,7 @@ Durable Room Commit 要求 PostgreSQL、共享资源、`REPLAY_VIEWER_BUILD_ID` 
 - `gameTransport.ts` —— `WsGameTransport` 类管理 WebSocket 连接（不在 React Context；在 service 层）；URL 切换 `?transport=ws` / `?player=p1|p2` / `?room=devN`。
 - `card-meta.ts` —— 启动时 `GET /cards-manifest.json` 运行时拉取卡牌元数据；`CUSTOM_*` overlay 只读 `shared/cards/custom-card-metadata.ts`。
 - `rehydrate.ts` —— 轻量 rehydrator，跳过 `ActionSpace.onTaken` 回调，切断对 `shared/actions` / `shared/cards/catalog` 的依赖链。
-- `llm/generation/` —— 浏览器拥有 `GenerationAttempt`、不可变请求构造、provider 工具协议、有界 GitHub 读取和完整源码结果。LLM 凭据只发往配置的 provider，游戏后端与 GitHub 均不接收。每次尝试解析 GitHub 当前 main，后续读取固定该 SHA；文件缺失返回工具错误，模型可改查同 SHA 的其他资料；网络或限流失败暂停，等待显式重试。
+- `llm/generation/` —— 浏览器拥有 `GenerationAttempt`、不可变请求构造、provider 工具协议、有界 GitHub 读取和完整源码结果。LLM 凭据只发往配置的 provider，游戏后端与 GitHub 均不接收。每次尝试解析 GitHub 当前 main，后续读取固定该 SHA；文件缺失返回工具错误，模型可改查同 SHA 的其他资料；网络或限流失败暂停，等待显式重试。`server/workshop-references.ts` 使用项目 GitHub 凭据，为已登录工坊用户读取最新 main 与固定 commit 的目录元数据；不接受任意 URL 或模型凭据。浏览器仍匿名读取固定 SHA 的源码正文并校验 blob 哈希，资料与站点发布独立。
 - `GET /api/workshop/sandbox-contract` 通过 `server/workshop-sandbox-contract.ts` 提供实际部署运行时的 hooks、actions、helper 正文、语义与内容标识，不提供参考资料包。简短生成 prompt 包含该契约；按需读取的 GitHub 文档与内置卡样例不能扩大它。`POST /api/workshop/cards/validate-code` 将校验绑定源码及沙盒标识。仅逐一通过验收的 provider/endpoint/model 组合可用。
 - `WorkshopAbilityPanel` 通过草稿 reducer 应用结果：追加需求使用选中候选，试玩修复使用实际报错源码，原始费用与前置条件保留在固定输入中。编辑能力输入或切换模型配置会取消旧尝试，阻止迟到结果采用或继续修复。失败与手动编辑保留上一份有效候选。恢复只投影可见聊天和精简溯源，原始工具、reasoning、signature 记录仅留页面内存。完整请求、恢复及验收契约见 `docs/PLATFORM_DESIGN.md` 与 `docs/test/llm-card-gen.md`。
 
