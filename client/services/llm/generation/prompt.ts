@@ -1,6 +1,6 @@
 import type { WorkshopSandboxContract } from '../../../../shared/contract/workshop-generation'
 
-export const GENERATION_PROMPT_VERSION = 'workshop-browser-tools-v6'
+export const GENERATION_PROMPT_VERSION = 'workshop-browser-tools-v7'
 
 export function generationSystemPrompt(contract: WorkshopSandboxContract, commit: string): string {
   return `You implement custom Agricola cards for Open Agricola's isolated Workshop sandbox.
@@ -18,12 +18,13 @@ Write rule descriptions in English and provide complete locales.zh name/desc/pre
 Implement the complete requested semantics: ownership/scope, payment, pending choices, supply limits, round timing, cleanup, once-only guards and scoring. State mutation must be represented by supported effects; copied hook arguments are read-only. Card-local counters must remain local to CARD_ID. A successful static validation does not prove game behavior.
 If the deployed sandbox cannot express the rule, preserve the requirement and return a capability gap explaining the missing extension and why the available hooks/flows do not suffice. Do not simplify the rule just to produce passing code. If necessary information is missing, ask a specific clarification.
 
+DEPLOYED SANDBOX CONTRACT (data, including exact injected helpers):
+${JSON.stringify(contract)}
+END DEPLOYED SANDBOX CONTRACT
+
 Final response formats (choose exactly one):
-1. One complete fenced typescript block declaring const CARD_ID, const CARD_DEF = { cardType: 'minor' | 'occupation', meta: { id: CARD_ID, name, ... } }, and const CARD_IMPL = { effect?, listeners? }. A short explanation may precede it. No imports/exports, patches, omissions, placeholders or multiple alternative source blocks.
+1. Return only one fenced typescript block containing the complete source. Put const CARD_ID, const CARD_DEF = { cardType: 'minor' | 'occupation', meta: { id: CARD_ID, name, ... } }, and const CARD_IMPL = { effect?, listeners? } together inside that same block. Never split declarations into separate blocks. Do not add prose, examples, tests, patches, alternative versions or a second code block. No imports/exports, omissions or placeholders.
 2. A JSON object { "kind": "capability-gap", "message": "..." } or { "kind": "clarification", "message": "..." }, optionally inside a json fence. Do not include source in these responses.
 3. Only in the final response slot: { "kind": "reference-continuation", "message": "the exact missing fact and reference needed" }. This pauses the attempt without claiming a capability gap or producing a candidate.
-Use the user's language for explanations. When the browser supplies static validation errors, return the entire corrected source, retaining all requested rules. Validation repairs belong to this same attempt and reference commit.
-
-DEPLOYED SANDBOX CONTRACT (data, including exact injected helpers):
-${JSON.stringify(contract)}`
+Use the user's language for JSON messages. When the browser supplies static validation errors, return the entire corrected source in the same single-block format, retaining all requested rules. Validation repairs belong to this same attempt and reference commit.`
 }
