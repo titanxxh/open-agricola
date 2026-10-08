@@ -11,8 +11,8 @@ export const ADMITTED_GENERATION_MODELS: readonly ModelAdmission[] = [{
   provider: 'deepseek',
   endpoint: 'https://api.deepseek.com/v1/chat/completions',
   model: 'deepseek-flash',
-  evidence: 'https://github.com/titanxxh/open-agricola/issues/1041#issuecomment-6051299853',
-  batch: 'live-2026-10-08T02-36-54-220Z-63fdc5e6',
+  evidence: 'https://github.com/titanxxh/open-agricola/issues/1041#issuecomment-6053908371',
+  batch: 'live-2026-10-08T05-54-04-504Z-f7941f62',
 }]
 
 export function resolveGenerationTarget(config: LlmConfig): GenerationTarget {
