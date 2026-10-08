@@ -15,7 +15,8 @@ const sandbox = readFileSync('docs/CUSTOM_CARD_SANDBOX.md', 'utf8')
 
 describe('browser generation prompt and deployed sandbox contract', () => {
   it('includes the exact deployed hook, action, phase and scope sets', () => {
-    expect(JSON.parse(prompt.split('DEPLOYED SANDBOX CONTRACT (data, including exact injected helpers):\n')[1])).toEqual(contract)
+    const contractText = prompt.split('DEPLOYED SANDBOX CONTRACT (data, including exact injected helpers):\n')[1].split('\nEND DEPLOYED SANDBOX CONTRACT')[0]
+    expect(JSON.parse(contractText)).toEqual(contract)
     expect(new Set(Object.keys(contract.effects))).toEqual(new Set(cardEffectHooks))
     expect(new Set(Object.keys(contract.actions))).toEqual(new Set(SANDBOX_ALLOWED_ACTION_IDS))
     expect(contract.listeners.actions).toEqual(sandboxListenerActions)
