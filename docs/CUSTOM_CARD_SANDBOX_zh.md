@@ -138,6 +138,8 @@ const jsonSafe = JSON.parse(JSON.stringify(value ?? null))
 
 **判定卡主必须用 `context.ownerPlayer`**，不能用 `context.player`。
 
+玩家身份通过这些对象读取：`context.player.id` 和 `context.ownerPlayer.id`。不存在 `context.playerId`；将它与卡主 ID 比较可能导致所有触发静默失效。`scope: 'player'` 已经只向卡主分发，无需再判断行动玩家是否为卡主。不要从引擎内部字段推断扁平的身份字段；已部署的工坊契约通过 `listeners.players` 列出支持的玩家对象键。
+
 ### 2.1 `context.space` (ActionSpace) 可读字段
 
 `context.space` 的运行时形状是 `ActionDefinition + resources + takenBy`（见 `shared/contract/types.ts` 的 `ActionDefinition`）。Listener handler 只应读以下字段：
