@@ -393,7 +393,7 @@ return {
 
 ```ts
 type CardState = {
-  counters?: Partial<Record<Resource, number>>  // store-on-card / take-from-card 写入这里
+  counters?: Record<string, number>            // 资源或有名称的卡牌局部计数器
   flagged?: boolean                              // 一次性触发标记
   infobox?: string                               // 显示在卡面的小标签
   stack?: unknown[]                              // 复杂状态（如 LIFO 队列）
@@ -628,14 +628,20 @@ return {
 | `pay`                      | 同上，扣资源                                                                            |
 | `bake-bread`               | 启动一段烤面包子流程                                                                        |
 | `push-to-card-stack`       | 向 `player.cardStates[CARD_ID].stack` 推入一项                                         |
-| `special-effect`           | **沙盒 cardStates mutation 入口**（Sprint 6a/6b）。`params: { kind: 'set-flag' \| 'set-infobox' \| 'set-extra-data' \| 'set-private-data' \| 'increment-extra-data', ... }`。取代旧的 `flag-card` / `unflag-card` / `set-card-infobox` / `clear-card-infobox` / `write-card-extra-data` 5 个 leaf。详见 §6.1；未列出的仓库内部 kind 不属于 Workshop 合约。 |
+| `special-effect`           | **沙盒 cardStates mutation 入口**（Sprint 6a/6b）。`params: { kind: 'set-flag' \| 'set-infobox' \| 'set-counter' \| 'increment-counter' \| 'set-extra-data' \| 'set-private-data' \| 'increment-extra-data', ... }`。取代旧的 `flag-card` / `unflag-card` / `set-card-infobox` / `clear-card-infobox` / `write-card-extra-data` 5 个 leaf。详见 §6.1；未列出的仓库内部 kind 不属于 Workshop 合约。 |
 | `future-meeples`           | 沙箱专用：用 `params.__futureMeepleRequest` 预放未来回合资源（见 §5.7）                            |
 
 > Sprint 6b（2026-04-30）已删除 5 个独立 mutation actionId（`flag-card` / `unflag-card` / `set-card-infobox` / `clear-card-infobox` / `write-card-extra-data`）+ 3 个 dead actionId（`hold-worker-on-card` / `release-worker-from-card` / `gain-other-players`）。统一使用 `special-effect` discriminated-union。`check-prompt-sync` 在 CI 校验 prompt 只暴露白名单内 actionId；白名单外的 actionId 不会出现在 prompt 中，沙盒卡牌不应使用——改用 `special-effect`。
 
 ### 6.1 `special-effect` `params.kind` 沙盒可用子集
 
+每次修改都通过带有 `sourceCard: CARD_ID` 的 `special-effect` leaf 返回，`params` 使用下面的一种形状。
+
 ```ts
+// 写入 player.cardStates[sourceCard].counters[key]
+{ kind: 'increment-counter', key: 'uses', amount: 1 }
+{ kind: 'set-counter', key: 'uses', value: 0 }
+
 // 设/清除 player.cardStates[sourceCard].flagged
 { kind: 'set-flag', flag: true }
 { kind: 'set-flag', flag: false }
