@@ -324,4 +324,24 @@ describe('bounded browser generation attempt', () => {
     expect(await new GenerationAttempt(request(), io).start()).toMatchObject({ result: { kind: 'capability-gap' } })
     expect(io.validate).not.toHaveBeenCalled()
   })
+
+  it('preserves a multiline gap without a candidate, another request, or a static repair', async () => {
+    const io = ports()
+    const message = 'Missing construction hook.\nKeep the field, crop and payment.'
+    io.model.complete = vi.fn(async () => turn([], `{"kind":"capability-gap","message":"${message}"}`))
+    const result = await new GenerationAttempt(request(), io).start()
+    expect(result).toMatchObject({ status: 'completed', modelRequests: 1, repairs: 0, result: { kind: 'capability-gap', message } })
+    expect(result.candidate).toBeUndefined()
+    expect(io.model.complete).toHaveBeenCalledTimes(1)
+    expect(io.validate).not.toHaveBeenCalled()
+  })
+
+  it('still rejects a multiline reference continuation before the final response slot', async () => {
+    const io = ports()
+    io.model.complete = vi.fn(async () => turn([], '{"kind":"reference-continuation","message":"Need a field.\nRead its interface."}'))
+    expect(await new GenerationAttempt(request(), io).start()).toMatchObject({
+      status: 'completed', modelRequests: 1, result: { kind: 'failure', message: expect.stringContaining('outside the final response slot') },
+    })
+    expect(io.validate).not.toHaveBeenCalled()
+  })
 })

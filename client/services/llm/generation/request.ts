@@ -102,6 +102,25 @@ export function buildGenerationRequest(options: {
 export type GenerationOutput = { kind: 'source'; source: string; message: string }
   | { kind: 'clarification' | 'capability-gap' | 'reference-continuation'; message: string }
 
+function parseMessageJson(text: string): unknown {
+  try { return JSON.parse(text) } catch {
+    // Models can emit literal line breaks inside a message. Preserve those
+    // characters losslessly; all other JSON syntax still belongs to JSON.parse.
+    let quoted = false
+    let escaped = false
+    let normalized = ''
+    for (const character of text) {
+      normalized += quoted && !escaped && (character === '\n' || character === '\r')
+        ? (character === '\n' ? '\\n' : '\\r')
+        : character
+      if (escaped) escaped = false
+      else if (quoted && character === '\\') escaped = true
+      else if (character === '"') quoted = !quoted
+    }
+    return JSON.parse(normalized)
+  }
+}
+
 export function extractGenerationOutput(text: string): GenerationOutput {
   const sourceBlocks = [...text.matchAll(/```(?:typescript|ts)\s*\r?\n([\s\S]*?)```/g)]
   if (sourceBlocks.length === 1) {
@@ -112,7 +131,7 @@ export function extractGenerationOutput(text: string): GenerationOutput {
   if (sourceBlocks.length > 1) throw new Error('The completed response contains multiple source candidates; request one complete source.')
   const json = /```json\s*\r?\n([\s\S]*?)```/.exec(text)?.[1] ?? text
   try {
-    const value = JSON.parse(json) as Record<string, unknown>
+    const value = parseMessageJson(json) as Record<string, unknown>
     if ((value.kind === 'clarification' || value.kind === 'capability-gap' || value.kind === 'reference-continuation') && typeof value.message === 'string' && value.message.trim()) return { kind: value.kind, message: value.message }
   } catch { /* A malformed final answer must not become a code candidate. */ }
   throw new Error('Expected one complete TypeScript source or a structured clarification/capability gap.')
