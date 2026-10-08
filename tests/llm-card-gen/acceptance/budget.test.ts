@@ -21,7 +21,7 @@ describe('shared paid acceptance budget', () => {
     expect(restored.state.reservations[0].status).toBe('unknown')
     expect(() => restored.settle(row.id, unknown)).toThrow('already settled')
   })
-  it('stops before exceeding US$5 without deleting prior failed or unknown calls', () => {
+  it('stops before exceeding US$20 without deleting prior failed or unknown calls', () => {
     const ledger = new AcceptanceBudget()
     for (let i = 0; i < 1000; i++) {
       try { ledger.reserve(request, `attempt-${i}`, 1) } catch { break }
