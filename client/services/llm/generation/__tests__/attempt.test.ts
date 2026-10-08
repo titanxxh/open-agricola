@@ -109,6 +109,30 @@ describe('immutable generation input', () => {
 })
 
 describe('bounded browser generation attempt', () => {
+  it('repairs a large tested source without duplicating it across model messages', async () => {
+    const marker = 'unique-tested-source-marker'
+    const tested = `const CARD_DEF = {}; const CARD_IMPL = {}; /* ${marker}${'x'.repeat(110 * 1024)} */`
+    const repair = buildGenerationRequest({ workspaceId: 'w', baseRevision: 1, draft, intent: {
+      kind: 'repair', message: 'Fix this runtime error', failure: {
+        workspaceId: 'w', versionId: 'tested-version', source: tested, sourceFingerprint: sourceFingerprint(tested),
+        identity: { id: draft.cardId, type: draft.cardType, name: draft.name }, errors: ['invalid reward'], gameSeed: 7,
+      },
+    } })
+    const io = ports()
+    const history: WireMessage[][] = []
+    io.model.complete = vi.fn(async messages => {
+      history.push(structuredClone([...messages]))
+      return history.length === 1 ? turn([call('reference')], '') : turn()
+    })
+    const result = await new GenerationAttempt(repair, io).start()
+    expect(result).toMatchObject({ status: 'completed', modelRequests: 2, result: { kind: 'candidate' } })
+    for (const messages of history) {
+      expect(JSON.stringify(messages).split(marker)).toHaveLength(2)
+      expect(messages.find(message => message.role === 'user')?.content).toContain('tested-version')
+      expect(messages.find(message => message.role === 'user')?.content).toContain('invalid reward')
+    }
+    expect(repair.input.intent).toMatchObject({ kind: 'repair', failure: { versionId: 'tested-version', gameSeed: 7, identity: { name: 'Test' } } })
+  })
   it.each([404, 410])('lets the model choose another file at the same commit after a file returns HTTP %i', async status => {
     const commit = (status === 404 ? '8' : '9').repeat(40)
     const unavailable = 'docs/CUSTOM_CARD_SANDBOX.md'
@@ -201,7 +225,7 @@ describe('bounded browser generation attempt', () => {
     const result = await new GenerationAttempt(request(), io).start()
     expect(io.model.complete).toHaveBeenCalledTimes(3)
     expect(io.validate).toHaveBeenCalledTimes(3)
-    expect(result).toMatchObject({ repairs: 2, result: { kind: 'failed-source', failedCandidate: { sourceCode: source, validation: { valid: false } } } })
+    expect(result).toMatchObject({ repairs: 2, result: { kind: 'failed-source', failedCandidate: { sourceCode: source, baseRevision: 1, stale: false, validation: { valid: false } } } })
   })
 
   it('reserves the eighth response for source or an explicit research continuation, retaining the checkpoint', async () => {

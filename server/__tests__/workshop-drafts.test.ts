@@ -1199,6 +1199,7 @@ describe('workshop draft aggregate', () => {
 it('persists A and failed B privately, strips protocol, and preserves immutable adopted provenance', async () => {
   const makeCandidate = (id: string, valid: boolean) => ({
     id, kind: 'ability' as const, prompt: `request ${id}`, createdAt: 1,
+    baseRevision: 1, stale: true,
     sourceCode: 'const CARD_IMPL = {}', cardJson: baseDraft().cardJson,
     validation: { valid }, compiledCode: 'const CARD_IMPL = {};', codeManifest: { listeners: [] },
     provenance: { attemptId: id, inputFingerprint: 'a'.repeat(64), promptVersion: 'v1', toolVersion: 'v1',
@@ -1213,13 +1214,24 @@ it('persists A and failed B privately, strips protocol, and preserves immutable 
   const initial = await createCard(db, { authorId: 'author', draft: baseDraft() })
   const saved = await checkpointDraft(db, { cardId: initial.id, authorId: 'author', baseRevision: initial.revision,
     draft: { ...initial.draft, generation: { apiKey: 'private-canary', ability: { lastValid: a,
-      latestResult: { kind: 'failed-source', attemptId: 'B', createdAt: 2, message: 'invalid', failedCandidate: b, reasoning: 'private-canary' } } } },
+      latestResult: { kind: 'failed-source', attemptId: 'B', createdAt: 2, message: 'invalid', failedCandidate: b, reasoning: 'private-canary' } },
+      art: { lastCompleted: { id: 'old-art', kind: 'art', prompt: 'field', promptFormat: 'subject', resultUrl: '/card-art/field.png', createdAt: 1, baseRevision: 1, stale: true } },
+    } },
   })
   expect(saved.draft.generation).toMatchObject({ ability: { lastValid: { id: 'A' }, latestResult: { failedCandidate: { id: 'B', validation: { valid: false } } } } })
+  expect((await loadWorkspace(db, initial.id, 'author')).draft.generation).toMatchObject({
+    ability: { lastValid: { baseRevision: 1, stale: true }, latestResult: { failedCandidate: { baseRevision: 1, stale: true } } },
+    art: { lastCompleted: { baseRevision: 1, stale: true } },
+  })
   const row = await db.prepare('SELECT draft_generation_json FROM workshop_cards WHERE id = ?').get(initial.id)
   expect(JSON.stringify(row)).not.toContain('private-canary')
   await expect(adoptCandidate(db, { cardId: initial.id, authorId: 'author', baseRevision: saved.revision, candidate: b })).rejects.toMatchObject({ code: 'not_ready' })
   const adopted = await adoptCandidate(db, { cardId: initial.id, authorId: 'author', baseRevision: saved.revision, candidate: a })
+  const reloaded = await loadWorkspace(db, initial.id, 'author')
+  expect(reloaded.draft.generation).toMatchObject({ ability: { latestResult: { kind: 'failed-source', message: 'invalid' } } })
+  expect(reloaded.draft.generation.ability).not.toHaveProperty('latestResult.failedCandidate')
+  expect(reloaded.draft.generation.ability).not.toHaveProperty('lastValid')
+  expect(reloaded.draft.generation.art).toHaveProperty('lastCompleted.id', 'old-art')
   const first = await db.prepare('SELECT provenance_json FROM workshop_card_versions WHERE id = ?').get(adopted.versionId)
   expect(JSON.stringify(first)).not.toContain('private-canary')
   expect(JSON.stringify(first)).not.toContain('failedCandidate')

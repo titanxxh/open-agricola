@@ -2,7 +2,7 @@ import type { WorkshopAbilityCandidateContract } from '../../../../shared/contra
 import type { GenerationProvenance, GenerationResult, GenerationUsage, WorkshopSandboxContract } from '../../../../shared/contract/workshop-generation'
 import { sourceFingerprint } from '../../../../shared/projections/workshop-generation'
 import { GENERATION_PROMPT_VERSION, generationSystemPrompt } from './prompt'
-import { extractGenerationOutput, type GenerationOutput, type GenerationRequest } from './request'
+import { extractGenerationOutput, matchesGenerationIdentity, type GenerationOutput, type GenerationRequest } from './request'
 import { REFERENCE_LIMITS, REFERENCE_TOOLS, REFERENCE_TOOL_VERSION, type ReferenceSession } from './references'
 import { ModelTurnError, UNKNOWN_USAGE, type ToolCall, type ToolDefinition, type ToolTransport, type WireMessage } from './protocol'
 
@@ -240,13 +240,14 @@ export class GenerationAttempt {
         signal.throwIfAborted()
         if (validation.sourceFingerprint !== fingerprint || validation.sandboxContractId !== this.contract.id) throw new GenerationStopError('The validation result belongs to different source or a different sandbox deployment. Start a new attempt.')
         const card = this.request.input.card
-        if (validation.valid && (validation.cardJson?.id !== card.id || validation.cardJson?.card_type !== card.type || validation.cardJson?.name !== card.name)) {
+        if (validation.valid && !matchesGenerationIdentity(validation.cardJson, card)) {
           validation.valid = false
           validation.errors = [...validation.errors, 'CARD_DEF id, card type and name must match the immutable request identity.']
         }
         this.lastCandidate = {
           id: `${this.request.attemptId}:${fingerprint.slice(0, 16)}`, kind: 'ability', prompt: this.request.input.intent.message,
           createdAt: this.clock(), sourceCode: output.source, cardJson: validation.cardJson ?? {},
+          baseRevision: this.request.baseRevision, stale: false,
           sourceFingerprint: fingerprint, inputFingerprint: this.request.inputFingerprint,
           provider: this.ports.model.target.provider, model: this.ports.model.target.model,
           validation: { ...validation },
@@ -296,6 +297,7 @@ export class GenerationAttempt {
           this.lastCandidate = {
             id: `${this.request.attemptId}:${fingerprint.slice(0, 16)}`, kind: 'ability', prompt: this.request.input.intent.message,
             createdAt: this.clock(), sourceCode: output.source, cardJson: {}, sourceFingerprint: fingerprint, inputFingerprint: this.request.inputFingerprint,
+            baseRevision: this.request.baseRevision, stale: false,
             provider: this.ports.model.target.provider, model: this.ports.model.target.model,
             validation: { valid: false, errors: ['Code validation has not completed.'], sourceFingerprint: fingerprint, sandboxContractId: this.contract.id },
           }

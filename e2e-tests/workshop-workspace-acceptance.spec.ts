@@ -633,6 +633,9 @@ const CARD_IMPL = {}
   }
   await expect(page.locator('.aicw-ability-tabs button')).toHaveCount(3)
   await expect(page.locator('.aicw-current-code')).toBeHidden()
+  await expectSaved(page, variant.locale)
+  expect((await loadWorkspace(request, account, workspace.id)).draft.generation)
+    .toHaveProperty('ability.lastValid.provider', 'openrouter')
 
   const editor = page.getByLabel(
     text(variant.locale, '能力候选源码', 'Ability candidate source'),
@@ -689,7 +692,10 @@ const CARD_IMPL = {}
       },
     },
   })
-  expect(JSON.stringify(saved.draft.generation)).toContain('openrouter')
+  expect(saved.draft.generation).toHaveProperty('ability.adopted.sourceFingerprint')
+  for (const field of ['provider', 'model', 'provenance', 'inputFingerprint']) {
+    expect(saved.draft.generation).not.toHaveProperty(`ability.adopted.${field}`)
+  }
   expect((await versions(request, account, workspace.id)).versions).toHaveLength(1)
   await expectAccessibleWorkspace(page)
 }

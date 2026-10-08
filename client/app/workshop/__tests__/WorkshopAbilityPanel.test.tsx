@@ -48,6 +48,19 @@ beforeEach(() => {
 })
 
 describe('Workshop ability request entry points', () => {
+  it.each([{ id: 'CUSTOM_Other' }, { card_type: 'occupation' }, { name: 'Other name' }])('keeps a manual identity edit unadoptable after code validation: %j', async change => {
+    const sandbox: Pick<AttemptPorts, 'loadContract' | 'validate'> = seams.sandbox()
+    vi.mocked(sandbox.validate).mockImplementation(async (code, _cardId, contractId) => ({
+      valid: true, errors: [], sourceFingerprint: sourceFingerprint(code), sandboxContractId: contractId,
+      cardJson: { id: draft.cardId, card_type: draft.cardType, name: draft.name, ...change },
+    }))
+    render(<Harness />)
+    await userEvent.type(screen.getByLabelText('能力候选源码'), ' with edited identity')
+    await userEvent.click(screen.getByRole('button', { name: '运行静态验证' }))
+    await waitFor(() => expect(checkpoint).toHaveBeenCalledTimes(1))
+    expect(screen.getByRole('button', { name: '采用为当前源码' })).toBeDisabled()
+    expect(screen.getByText(/id, card type and name must match/)).toBeInTheDocument()
+  })
   it('cancels manual validation on unmount without checkpointing its late response', async () => {
     const sandbox: Pick<AttemptPorts, 'loadContract' | 'validate'> = seams.sandbox()
     let resolve!: (value: Awaited<ReturnType<AttemptPorts['validate']>>) => void
@@ -68,7 +81,8 @@ describe('Workshop ability request entry points', () => {
     await userEvent.click(screen.getByRole('button', { name: 'AI 修复' }))
     await waitFor(() => expect(complete).toHaveBeenCalledTimes(1))
     const input = JSON.parse(String(complete.mock.calls[0][0][1].content))
-    expect(input).toMatchObject({ source: 'actually tested B', intent: { kind: 'repair', failure: { versionId: 'tested-version-B', source: 'actually tested B' } } })
+    expect(input).toMatchObject({ source: 'actually tested B', intent: { kind: 'repair', failure: { versionId: 'tested-version-B' } } })
+    expect(input.intent.failure).not.toHaveProperty('source')
     await waitFor(() => expect(screen.getByText('需要补充信息')).toBeInTheDocument())
     expect(screen.getByLabelText('能力候选源码')).toHaveValue('selected C')
   })
