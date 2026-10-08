@@ -11,6 +11,9 @@ export type PlaytestSource = {
   gameSeed?: number | string
 }
 export type PlaytestFailure = PlaytestSource & { errors: string[] }
+export function matchesGenerationIdentity(card: Record<string, unknown> | undefined, identity: PlaytestSource['identity']): boolean {
+  return card?.id === identity.id && card.card_type === identity.type && card.name === identity.name
+}
 export type GenerationIntent = { kind: 'generate' | 'follow-up' | 'resend'; message: string }
   | { kind: 'repair'; message: string; failure: PlaytestFailure }
 export type GenerationRequest = {
@@ -22,7 +25,8 @@ export type GenerationRequest = {
   inputFingerprint: string
   sourceCandidate?: { id: string; fingerprint: string }
   input: {
-    intent: GenerationIntent
+    intent: Exclude<GenerationIntent, { kind: 'repair' }>
+      | { kind: 'repair'; message: string; failure: Omit<PlaytestFailure, 'source'> }
     card: { id: string; type: 'minor' | 'occupation'; name: string; description: string; definition: Record<string, unknown>; requirements: ReturnType<typeof projectAbilityRequirements> }
     source: string | null
     sourceFingerprint: string | null
@@ -71,7 +75,14 @@ export function buildGenerationRequest(options: {
   delete definition._code
   delete definition._compiled
   const input: GenerationRequest['input'] = structuredClone({
-    intent,
+    intent: intent.kind === 'repair' ? {
+      kind: intent.kind, message: intent.message,
+      failure: {
+        workspaceId: intent.failure.workspaceId, versionId: intent.failure.versionId,
+        sourceFingerprint: intent.failure.sourceFingerprint, identity: intent.failure.identity, errors: intent.failure.errors,
+        ...(intent.failure.gameSeed !== undefined ? { gameSeed: intent.failure.gameSeed } : {}),
+      },
+    } : intent,
     card: { ...identity, description, definition, requirements: projectAbilityRequirements(cardJson) },
     source,
     sourceFingerprint: fingerprint,

@@ -4,7 +4,7 @@ import type { LlmConfig } from '../../services/llm'
 import { ADMITTED_GENERATION_MODELS, generationAdmission, resolveGenerationTarget } from '../../services/llm/generation/admission'
 import { GenerationAttempt, ATTEMPT_ALLOWANCE, type AttemptSnapshot } from '../../services/llm/generation/attempt'
 import { createBrowserGenerationPorts, createSandboxPorts } from '../../services/llm/generation/browser'
-import { buildGenerationRequest, type GenerationIntent, type GenerationRequest, type PlaytestFailure } from '../../services/llm/generation/request'
+import { buildGenerationRequest, matchesGenerationIdentity, type GenerationIntent, type GenerationRequest, type PlaytestFailure } from '../../services/llm/generation/request'
 import type { WorkshopVisibleMessage } from '../../../shared/contract/workshop-generation'
 import { sourceFingerprint } from '../../../shared/projections/workshop-generation'
 import { isCurrentAbilityAttempt, type AbilityCandidate, type WorkshopDraftAction, type WorkshopDraftState } from './workshop-draft-model'
@@ -180,6 +180,10 @@ export function WorkshopAbilityPanel({ state, config, apiFetch, dispatch, checkp
       signal.throwIfAborted()
       if (!mounted.current || stateRef.current.session.activeAbilityValidationId !== validationId) return
       if (result.sourceFingerprint !== sourceFingerprint(candidate.sourceCode) || result.sandboxContractId !== contract.id) throw new Error('Validation belongs to different source or sandbox.')
+      if (result.valid && !matchesGenerationIdentity(result.cardJson, { id: draft.cardId, type: draft.cardType, name: draft.name })) {
+        result.valid = false
+        result.errors = [...result.errors, 'CARD_DEF id, card type and name must match the immutable request identity.']
+      }
       dispatch({ type: 'abilityCandidateValidated', validationId, candidateId: candidate.id, sourceFingerprint: result.sourceFingerprint, validation: result, cardJson: result.cardJson })
       await checkpoint()
     } catch (reason) {

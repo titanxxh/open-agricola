@@ -43,6 +43,8 @@ export type WorkshopGenerationCandidateBase = {
   provider?: string
   model?: string
   createdAt: number
+  baseRevision?: number
+  stale?: boolean
 }
 
 export type WorkshopArtCandidateContract = WorkshopGenerationCandidateBase & {

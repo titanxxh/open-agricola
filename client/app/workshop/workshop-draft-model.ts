@@ -254,6 +254,19 @@ export type WorkshopDraftAction =
 const staleCandidates = <T extends WorkshopCandidate>(candidates: T[]): T[] =>
   candidates.map(candidate => ({ ...candidate, stale: true }))
 
+const stalePendingGeneration = (generation: Record<string, unknown>, abilityChanged: boolean): Record<string, unknown> => {
+  const projected = projectWorkshopGeneration(generation)
+  const art = asRecord(projected.art)
+  if (art.lastCompleted) projected.art = { ...art, lastCompleted: { ...asRecord(art.lastCompleted), stale: true } }
+  if (abilityChanged) {
+    const ability = asRecord(projected.ability)
+    const latest = asRecord(ability.latestResult)
+    if (ability.lastValid) ability.lastValid = { ...asRecord(ability.lastValid), stale: true }
+    if (latest.failedCandidate) ability.latestResult = { ...latest, failedCandidate: { ...asRecord(latest.failedCandidate), stale: true } }
+  }
+  return projected
+}
+
 const applyWorkspace = (
   state: WorkshopDraftState,
   workspace: WorkshopWorkspaceDto,
@@ -288,20 +301,17 @@ export const workshopDraftReducer = (
   switch (action.type) {
     case 'serverLoaded':
       return action.state
-    case 'draftChanged':
+    case 'draftChanged': {
+      const abilityChanged = abilityDraftFingerprint(state.draft) !== abilityDraftFingerprint(action.draft)
       return {
         ...state,
-        draft: action.draft,
+        draft: { ...action.draft, generation: stalePendingGeneration(action.draft.generation, abilityChanged) },
         session: {
           ...state.session,
           artCandidates: staleCandidates(state.session.artCandidates),
-          activeAbilityAttemptId: abilityDraftFingerprint(state.draft) === abilityDraftFingerprint(action.draft)
-            ? state.session.activeAbilityAttemptId : undefined,
-          activeAbilityValidationId: abilityDraftFingerprint(state.draft) === abilityDraftFingerprint(action.draft)
-            ? state.session.activeAbilityValidationId : undefined,
-          abilityCandidates: abilityDraftFingerprint(state.draft) === abilityDraftFingerprint(action.draft)
-            ? state.session.abilityCandidates
-            : staleCandidates(state.session.abilityCandidates),
+          activeAbilityAttemptId: abilityChanged ? undefined : state.session.activeAbilityAttemptId,
+          activeAbilityValidationId: abilityChanged ? undefined : state.session.activeAbilityValidationId,
+          abilityCandidates: abilityChanged ? staleCandidates(state.session.abilityCandidates) : state.session.abilityCandidates,
           sandboxTestVersionId: undefined,
           restoreUndoDraft: undefined,
         },
@@ -309,6 +319,7 @@ export const workshopDraftReducer = (
         sandboxPassedAt: null,
         save: { status: 'dirty' },
       }
+    }
     case 'generationStarted':
       return { ...state, session: { ...state.session, activeAbilityAttemptId: action.attemptId, activeAbilityValidationId: undefined } }
     case 'abilityValidationStarted':
@@ -408,6 +419,10 @@ export const workshopDraftReducer = (
         id: editedId,
         sourceCode: action.sourceCode,
         sourceFingerprint: sourceFingerprint(action.sourceCode),
+        provenance: undefined,
+        inputFingerprint: undefined,
+        provider: undefined,
+        model: undefined,
         ...(action.cardJson ? { cardJson: action.cardJson } : {}),
         validation: { valid: false, errors: [] },
       }
@@ -452,6 +467,7 @@ export const workshopDraftReducer = (
           : {
               ...next.session,
               abilityCandidates: [],
+              latestAbilityResult: projectGenerationResult(asRecord(next.draft.generation.ability).latestResult),
               activeAbilityValidationId: undefined,
               selectedAbilityCandidateId: undefined,
               sandboxTestVersionId: undefined,

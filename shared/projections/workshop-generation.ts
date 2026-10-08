@@ -8,6 +8,10 @@ const record = (value: unknown): Record<string, unknown> =>
 const text = (value: unknown, limit = 2000): string => typeof value === 'string' ? value.slice(0, limit) : ''
 const count = (value: unknown): number => typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : 0
 const tokens = (value: unknown): number | null => typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null
+const candidateFreshness = (raw: Record<string, unknown>) => ({
+  ...(typeof raw.baseRevision === 'number' && Number.isSafeInteger(raw.baseRevision) && raw.baseRevision >= 0 ? { baseRevision: raw.baseRevision } : {}),
+  ...(typeof raw.stale === 'boolean' ? { stale: raw.stale } : {}),
+})
 
 export const sourceFingerprint = (source: string): string => bytesToHex(sha256(utf8ToBytes(source)))
 
@@ -78,6 +82,7 @@ export function projectAbilityCandidate(value: unknown): WorkshopAbilityCandidat
   const provenance = projectGenerationProvenance(raw.provenance)
   return {
     id: text(raw.id, 200), kind: 'ability', prompt: text(raw.prompt, 16000), createdAt: count(raw.createdAt),
+    ...candidateFreshness(raw),
     sourceCode: raw.sourceCode, cardJson: record(raw.cardJson), sourceFingerprint: fingerprint,
     ...(typeof raw.inputFingerprint === 'string' ? { inputFingerprint: text(raw.inputFingerprint, 64) } : {}),
     ...(typeof raw.provider === 'string' ? { provider: text(raw.provider, 100) } : {}),
@@ -131,8 +136,10 @@ export function projectWorkshopGeneration(value: unknown): Record<string, unknow
   const lastValid = projectAbilityCandidate(ability.lastValid)
   const adopted = projectAdoptedAbility(ability.adopted)
   const latestResult = projectGenerationResult(ability.latestResult)
+  const revalidatedFailure = latestResult?.failedCandidate
+  const invalidatesLastValid = revalidatedFailure?.id === lastValid?.id && revalidatedFailure?.sourceFingerprint === lastValid?.sourceFingerprint
   if (lastValid || adopted || latestResult) result.ability = {
-    ...(lastValid?.validation.valid && !(lastValid.id === adopted?.id && lastValid.sourceFingerprint === adopted.sourceFingerprint) ? { lastValid } : {}),
+    ...(lastValid?.validation.valid && !invalidatesLastValid && !(lastValid.id === adopted?.id && lastValid.sourceFingerprint === adopted.sourceFingerprint) ? { lastValid } : {}),
     ...(adopted ? { adopted } : {}),
     ...(latestResult ? { latestResult } : {}),
   }
@@ -150,6 +157,7 @@ export function projectWorkshopGeneration(value: unknown): Record<string, unknow
       projected[key] = {
         id: text(candidate.id, 200), kind: 'art', prompt: subject, promptFormat: 'subject', resultUrl: candidate.resultUrl,
         createdAt: count(candidate.createdAt),
+        ...candidateFreshness(candidate),
         ...(typeof candidate.provider === 'string' ? { provider: text(candidate.provider, 100) } : {}),
         ...(typeof candidate.model === 'string' ? { model: text(candidate.model, 200) } : {}),
         ...(Array.isArray(candidate.referenceImages) ? { referenceImages: candidate.referenceImages.filter((entry): entry is string => typeof entry === 'string').slice(0, 10) } : {}),

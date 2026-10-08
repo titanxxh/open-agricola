@@ -12,7 +12,7 @@ import type {
 import { workshopCardJsonFromDefinition } from './workshop-draft-validation.ts'
 import { canGoLive, isReviewStatus, type ReviewStatus } from './workshop-status.ts'
 import { getReviewDecisionProvider } from './workshop-review-provider.ts'
-import { projectWorkshopGeneration, projectGenerationProvenance } from '../shared/projections/workshop-generation.ts'
+import { projectWorkshopGeneration, projectGenerationProvenance, projectGenerationResult } from '../shared/projections/workshop-generation.ts'
 
 export type WorkshopDraft = WorkshopDraftContract & {
   compiledCode: string | null
@@ -552,7 +552,7 @@ export async function adoptCandidate(
 
     const generation = structuredClone(current.draft.generation)
     const previous = generation[input.candidate.kind]
-    generation[input.candidate.kind] = {
+    const adoptedGroup: Record<string, unknown> = {
       ...(previous && typeof previous === 'object' && !Array.isArray(previous)
         ? previous as Record<string, unknown>
         : {}),
@@ -560,6 +560,14 @@ export async function adoptCandidate(
       ...(input.candidate.kind === 'ability' ? { lastValid: input.candidate } : { lastCompleted: input.candidate }),
       adopted: input.candidate,
     }
+    if (input.candidate.kind === 'ability') {
+      const latestResult = projectGenerationResult(adoptedGroup.latestResult)
+      if (latestResult) {
+        delete latestResult.failedCandidate
+        adoptedGroup.latestResult = latestResult
+      }
+    }
+    generation[input.candidate.kind] = adoptedGroup
     let draft: WorkshopDraft
     if (input.candidate.kind === 'art') {
       if (!input.candidate.prompt.trim() || !input.candidate.resultUrl.trim()) {

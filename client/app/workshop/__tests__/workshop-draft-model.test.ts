@@ -1,4 +1,4 @@
-import { abilityDraftFingerprint, sourceFingerprint } from '../../../../shared/projections/workshop-generation'
+import { abilityDraftFingerprint, projectWorkshopGeneration, sourceFingerprint } from '../../../../shared/projections/workshop-generation'
 import { describe, expect, it } from 'vitest'
 import {
   createWorkshopDraftState,
@@ -328,6 +328,49 @@ describe('generation result ownership and recovery', () => {
     id, kind: 'ability', sourceCode: `const CARD_ID = '${id}'`, cardJson: {}, prompt: 'request',
     validation: { valid, errors: valid ? [] : ['invalid'] }, createdAt: 1, baseRevision: 1, stale: false,
   })
+  it.each([true, false])('retains pending candidate age after a draft edit, checkpoint and reload (valid: %s)', valid => {
+    let state = workshopDraftReducer(createWorkshopDraftState(workspace()), { type: 'candidateCompleted', candidate: candidate('A', valid) })
+    state = workshopDraftReducer(state, { type: 'candidateCompleted', candidate: {
+      id: 'art-A', kind: 'art', prompt: 'field', promptFormat: 'subject', resultUrl: '/card-art/a.png', createdAt: 1, baseRevision: 1, stale: false,
+    } })
+    state = workshopDraftReducer(state, { type: 'draftChanged', draft: { ...state.draft, description: 'Newer rules' } })
+    const saved = { ...workspace(2), draft: { ...state.draft, generation: projectWorkshopGeneration(state.draft.generation) } }
+    state = workshopDraftReducer(state, { type: 'checkpointSaved', workspace: saved })
+    const reloaded = createWorkshopDraftState(saved)
+    expect(reloaded.draft.description).toBe('Newer rules')
+    expect(reloaded.session.abilityCandidates[0]).toMatchObject({ baseRevision: 1, stale: true })
+    expect(reloaded.session.artCandidates[0]).toMatchObject({ baseRevision: 1, stale: true })
+    expect(state.session.abilityCandidates[0].stale).toBe(true)
+  })
+  it('keeps a fresh ability candidate fresh when only checkpointing or changing artwork', () => {
+    let state = workshopDraftReducer(createWorkshopDraftState(workspace()), { type: 'candidateCompleted', candidate: candidate('A', true) })
+    state = workshopDraftReducer(state, { type: 'draftChanged', draft: { ...state.draft, artUrl: '/card-art/new.png' } })
+    const restored = createWorkshopDraftState({ ...workspace(2), draft: { ...state.draft, generation: projectWorkshopGeneration(state.draft.generation) } })
+    expect(restored.session.abilityCandidates[0]).toMatchObject({ baseRevision: 1, stale: false })
+  })
+  it('does not restore an earlier successful validation after the same candidate fails revalidation', () => {
+    const original = candidate('A', true)
+    let state = workshopDraftReducer(createWorkshopDraftState(workspace()), { type: 'candidateCompleted', candidate: original })
+    state = workshopDraftReducer(state, { type: 'draftChanged', draft: { ...state.draft, name: 'Changed identity' } })
+    state = workshopDraftReducer(state, { type: 'abilityValidationStarted', validationId: 'revalidate' })
+    state = workshopDraftReducer(state, { type: 'abilityCandidateValidated', validationId: 'revalidate', candidateId: 'A',
+      sourceFingerprint: sourceFingerprint(original.sourceCode), validation: { valid: false, errors: ['Card identity changed'] } })
+    const restored = createWorkshopDraftState({ ...workspace(2), draft: state.draft })
+    expect(restored.session.abilityCandidates).toHaveLength(1)
+    expect(restored.session.abilityCandidates.find(item => item.id === restored.session.selectedAbilityCandidateId)?.validation.valid).toBe(false)
+  })
+  it('clears failed source from local recovery when adopting another candidate', () => {
+    const a = candidate('A', true)
+    let state = workshopDraftReducer(createWorkshopDraftState(workspace()), { type: 'candidateCompleted', candidate: a })
+    state = workshopDraftReducer(state, { type: 'candidateCompleted', candidate: candidate('B', false) })
+    const adopted = { ...workspace(2), draft: { ...state.draft, effectCode: a.sourceCode,
+      generation: { ability: { adopted: a, latestResult: { kind: 'failed-source', attemptId: 'B', createdAt: 2, message: 'invalid' } } },
+    } }
+    state = workshopDraftReducer(state, { type: 'candidateAdopted', kind: 'ability', workspace: adopted })
+    expect(state.session.abilityCandidates).toEqual([])
+    expect(toLocalRecovery(state).sessionState.latestAbilityResult).not.toHaveProperty('failedCandidate')
+    expect(createWorkshopDraftState(adopted).session.abilityCandidates).toEqual([])
+  })
   it('keeps a valid A through repeated failures, including cross-device recovery', () => {
     let state = createWorkshopDraftState(workspace())
     for (const item of [candidate('A', true), candidate('B', false), candidate('C', false), candidate('D', false)]) {
@@ -346,6 +389,34 @@ describe('generation result ownership and recovery', () => {
     state = workshopDraftReducer(state, { type: 'abilityCandidateEdited', candidateId: 'A', sourceCode: 'edited' })
     expect(workshopDraftReducer(state, { type: 'abilityCandidateValidated', validationId: 'validate', candidateId: 'A',
       sourceFingerprint: sourceFingerprint(candidate('A', false).sourceCode), validation: { valid: true, errors: [] } })).toBe(state)
+  })
+  it('does not attribute a manually edited source to the original generation attempt', () => {
+    const original = candidate('A', true)
+    original.provider = 'deepseek'
+    original.model = 'deepseek-flash'
+    original.inputFingerprint = 'input-A'
+    original.provenance = {
+      attemptId: 'generated-A', inputFingerprint: 'input-A', sourceFingerprint: sourceFingerprint(original.sourceCode),
+      promptVersion: 'prompt', toolVersion: 'tools', provider: 'deepseek', endpoint: 'https://api.deepseek.com/v1/chat/completions', model: 'deepseek-flash',
+      modelRequests: 1, referenceCalls: 1, repairs: 0, elapsedMs: 10,
+      usage: { inputTokens: 10, outputTokens: 20, cachedInputTokens: 0, reasoningTokens: 0 }, references: [],
+    }
+    let state = workshopDraftReducer(createWorkshopDraftState(workspace()), { type: 'candidateCompleted', candidate: original })
+    state = workshopDraftReducer(state, { type: 'abilityCandidateEdited', candidateId: 'A', sourceCode: 'manually edited source' })
+    const edited = state.session.abilityCandidates.find(item => item.id === state.session.selectedAbilityCandidateId)!
+    expect(edited.provenance).toBeUndefined()
+    expect(edited.provider).toBeUndefined()
+    expect(edited.model).toBeUndefined()
+    expect(edited.inputFingerprint).toBeUndefined()
+    expect(state.session.latestAbilityResult?.provenance).toBeUndefined()
+    expect(state.session.abilityCandidates.find(item => item.id === 'A')?.provenance).toEqual(original.provenance)
+    state = workshopDraftReducer(state, { type: 'abilityValidationStarted', validationId: 'manual-validation' })
+    state = workshopDraftReducer(state, { type: 'abilityCandidateValidated', validationId: 'manual-validation', candidateId: edited.id,
+      sourceFingerprint: sourceFingerprint(edited.sourceCode), validation: { valid: true, errors: [] } })
+    const recovered = createWorkshopDraftState({ ...workspace(2), draft: state.draft })
+    expect(recovered.session.abilityCandidates[0].sourceCode).toBe('manually edited source')
+    expect(recovered.session.abilityCandidates[0].provenance).toBeUndefined()
+    expect(recovered.session.latestAbilityResult?.provenance).toBeUndefined()
   })
   it('preserves an edited source in cross-device recovery when validation of its retained valid original arrives late', () => {
     let state = createWorkshopDraftState(workspace())
