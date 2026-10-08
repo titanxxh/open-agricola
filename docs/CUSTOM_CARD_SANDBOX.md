@@ -360,7 +360,7 @@ These are frequent prompt and documentation mistakes, calibrated against `Player
 
 ```ts
 type CardState = {
-  counters?: Partial<Record<Resource, number>>  // written by store-on-card and take-from-card
+  counters?: Record<string, number>            // resources or named card-local counters
   flagged?: boolean                              // one-time trigger flag
   infobox?: string                               // small card-face label
   stack?: unknown[]                              // complex state such as a LIFO queue
@@ -580,14 +580,20 @@ These are frequent mistakes. `shared/actions/effects/*` contains the complete re
 | `pay` | Same shape, deducting resources. |
 | `bake-bread` | Starts a bread-baking subflow. |
 | `push-to-card-stack` | Pushes one item onto `player.cardStates[CARD_ID].stack`. |
-| `special-effect` | Sandbox entry for card-state mutation. Params use allowed `kind` values such as `set-flag`, `set-infobox`, `set-extra-data`, and `increment-extra-data`. It replaced five legacy mutation leaves. Section 6.1 lists the Workshop subset; unlisted repository-internal kinds are outside this contract. |
+| `special-effect` | Sandbox entry for card-state mutation. Params use allowed `kind` values such as `set-flag`, `set-infobox`, `set-counter`, `increment-counter`, `set-extra-data`, and `increment-extra-data`. It replaced five legacy mutation leaves. Section 6.1 lists the Workshop subset; unlisted repository-internal kinds are outside this contract. |
 | `future-meeples` | Sandbox form uses `params.__futureMeepleRequest`; see section 5.7. |
 
 Sprint 6b on 2026-04-30 removed five separate mutation IDs, `flag-card`, `unflag-card`, `set-card-infobox`, `clear-card-infobox`, and `write-card-extra-data`, plus three dead IDs, `hold-worker-on-card`, `release-worker-from-card`, and `gain-other-players`. Use the `special-effect` discriminated union. CI `check-prompt-sync` ensures the prompt exposes only allowlisted IDs. A sandbox card must not use another ID.
 
 ### 6.1 Allowed sandbox subset of `special-effect.params.kind`
 
+Each mutation is a `special-effect` leaf with `sourceCard: CARD_ID`. Its `params` use one of the shapes below.
+
 ```ts
+// Write player.cardStates[sourceCard].counters[key]
+{ kind: 'increment-counter', key: 'uses', amount: 1 }
+{ kind: 'set-counter', key: 'uses', value: 0 }
+
 // Set or clear player.cardStates[sourceCard].flagged
 { kind: 'set-flag', flag: true }
 { kind: 'set-flag', flag: false }
