@@ -8,6 +8,7 @@ import { buildGenerationRequest } from '../../../client/services/llm/generation/
 import { createToolTransport, ModelTurnError, UNKNOWN_USAGE, type WireMessage } from '../../../client/services/llm/generation/protocol'
 import { ReferenceSession } from '../../../client/services/llm/generation/references'
 import type { GenerationReference, GenerationUsage } from '../../../shared/contract/workshop-generation'
+import { sourceFingerprint } from '../../../shared/projections/workshop-generation'
 import type { LlmConfig } from '../../../client/services/llm/types'
 import type { AcceptanceInput } from './inputs'
 
@@ -24,6 +25,7 @@ export type BrowserTaskResult = {
   inputFingerprint: string
   snapshot: AttemptSnapshot
   requests: RequestAccounting[]
+  answers: Array<{ sequence: number; text: string; textBytes: number; sha256: string; truncated: boolean }>
   sources: Array<{ source: string; validation?: CodeValidation }>
   referenceReads: GenerationReference[]
   referenceOperations: Array<{ tool: string; query?: string; path?: string; startLine?: number; lineCount?: number; elapsedMs: number; resultBytes?: number; ok: boolean; error?: string }>
@@ -38,6 +40,7 @@ export async function runBrowserTask(options: {
 }): Promise<BrowserTaskResult> {
   const request = buildGenerationRequest(options.input)
   const sources: BrowserTaskResult['sources'] = []
+  const answers: BrowserTaskResult['answers'] = []
   const referenceReads: GenerationReference[] = []
   const referenceOperations: BrowserTaskResult['referenceOperations'] = []
   const referenceHttp: BrowserTaskResult['referenceHttp'] = []
@@ -125,6 +128,15 @@ export async function runBrowserTask(options: {
           throw error
         }
         if (reservation) await window.acceptanceSettle({ id: reservation, usage: turn.usage, notPosted: false })
+        if (!turn.calls.length) {
+          // Retain visible final answers even when parsing rejects their format.
+          // Opaque provider messages, reasoning and signatures stay page-local.
+          const bytes = new TextEncoder().encode(turn.text)
+          const truncated = bytes.length > 64 * 1024
+          // Preserve a leading BOM and omit a partial UTF-8 character at the cap.
+          answers.push({ sequence, text: new TextDecoder('utf-8', { ignoreBOM: true }).decode(bytes.subarray(0, 64 * 1024), { stream: truncated }),
+            textBytes: bytes.length, sha256: sourceFingerprint(turn.text), truncated })
+        }
         previous.push({ message: structuredClone(turn.message), index: messages.length, callIds: turn.calls.map(call => call.id) })
         for (const key of Object.keys(turn.message)) if (!['role', 'content', 'tool_calls'].includes(key) && !protocol.opaqueFieldsPresent.includes(key)) protocol.opaqueFieldsPresent.push(key)
         return turn
@@ -135,5 +147,5 @@ export async function runBrowserTask(options: {
     systemPrompt: () => options.control.text, tools: [], modelRequests: 3,
   } } : {})
   const snapshot = await attempt.start()
-  return { inputFingerprint: request.inputFingerprint, snapshot, requests: attempt.requestAccounting(), sources, referenceReads, referenceOperations, referenceHttp, protocol }
+  return { inputFingerprint: request.inputFingerprint, snapshot, requests: attempt.requestAccounting(), answers, sources, referenceReads, referenceOperations, referenceHttp, protocol }
 }
