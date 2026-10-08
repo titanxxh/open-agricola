@@ -25,7 +25,7 @@ for (const locale of ['zh', 'en'] as const) test(`editor candidate recovery and 
   const name = 'Editor Tool Test'
   const id = await page.evaluate(async ({ cardId, name, modelKey, locale }) => {
     localStorage.setItem('open-agricola-locale-v2', locale)
-    localStorage.setItem('open-agricola-llm-config', JSON.stringify({ provider: 'deepseek', apiKey: modelKey, model: 'deepseek-v4-flash' }))
+    localStorage.setItem('open-agricola-llm-config', JSON.stringify({ provider: 'deepseek', apiKey: modelKey, model: 'deepseek-flash' }))
     const response = await fetch('/api/workshop/cards', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ card_id: cardId, card_type: 'minor', name, description: '', card_json: { id: cardId, card_type: 'minor', name, cost: { wood: 2 }, desc: [] }, status: 'draft' }) })
     const data = await response.json()
     if (!response.ok || !data.id) throw new Error(JSON.stringify(data))
@@ -37,7 +37,7 @@ for (const locale of ['zh', 'en'] as const) test(`editor candidate recovery and 
   await page.route(modelUrl, async route => {
     bodies.push(route.request().postDataJSON())
     const content = `\`\`\`typescript\n${source(fail ? 9 : bodies.length, fail)}\n\`\`\``
-    await route.fulfill({ contentType: 'text/event-stream', body: `data: ${JSON.stringify({ model: 'deepseek-v4-flash', choices: [{ index: 0, delta: { role: 'assistant', content }, finish_reason: 'stop' }], usage: { prompt_tokens: 20, completion_tokens: 40 } })}\n\ndata: [DONE]\n\n` })
+    await route.fulfill({ contentType: 'text/event-stream', body: `data: ${JSON.stringify({ model: 'deepseek-flash', choices: [{ index: 0, delta: { role: 'assistant', content }, finish_reason: 'stop' }], usage: { prompt_tokens: 20, completion_tokens: 40 } })}\n\ndata: [DONE]\n\n` })
   })
   const zh = locale === 'zh'
   const enter = async () => {
@@ -142,7 +142,7 @@ test('browser tools preserve protocol through the final response slot and author
     const delta = posts < 8 ? { role: 'assistant', reasoning_content: 'private-reasoning-canary', tool_calls: [{ index: 0, id: `reference-call-${posts}`, type: 'function', function: { name: 'read_reference', arguments: JSON.stringify({ path: referencePath, startLine: 1, lineCount: 10 }) } }] }
       : { role: 'assistant', content: `\`\`\`typescript\n${source}\n\`\`\`` }
     const frames = [
-      { id: `request-${posts}`, model: 'deepseek-v4-flash', choices: [{ index: 0, delta, finish_reason: posts < 8 ? 'tool_calls' : 'stop' }] },
+      { id: `request-${posts}`, model: 'deepseek-flash', choices: [{ index: 0, delta, finish_reason: posts < 8 ? 'tool_calls' : 'stop' }] },
       { choices: [], usage: { prompt_tokens: 100, completion_tokens: 50 } },
     ]
     await route.fulfill({ contentType: 'text/event-stream', headers: { 'Access-Control-Allow-Origin': '*' }, body: frames.map(frame => `data: ${JSON.stringify(frame)}\n\n`).join('') + 'data: [DONE]\n\n' })
@@ -157,10 +157,10 @@ test('browser tools preserve protocol through the final response slot and author
       draft: { cardId, cardType: 'minor', name: 'Browser Loop', description: '', cardJson: {}, effectCode: null, artUrl: null, generation: {} },
       intent: { kind: 'generate', message: 'Cost 2 wood; gain 1 food when played.' },
     })
-    const model = createToolTransport({ provider: 'deepseek', model: 'deepseek-v4-flash', apiKey: modelKey }, {
+    const model = createToolTransport({ provider: 'deepseek', model: 'deepseek-flash', apiKey: modelKey }, {
       // Test-only authorization of the exact candidate tuple. Product admission remains closed.
       authorize: (target: { provider: string; model: string; endpoint: string }) => {
-        if (target.provider !== 'deepseek' || target.model !== 'deepseek-v4-flash' || target.endpoint !== 'https://api.deepseek.com/v1/chat/completions') throw new Error('Unexpected test target')
+        if (target.provider !== 'deepseek' || target.model !== 'deepseek-flash' || target.endpoint !== 'https://api.deepseek.com/v1/chat/completions') throw new Error('Unexpected test target')
       },
     })
     return await new GenerationAttempt(request, { model, ...createSandboxPorts((path: string, init?: RequestInit) => fetch(path, { ...init, credentials: 'include' })), openReferences: (signal: AbortSignal) => ReferenceSession.open(signal) }).start()

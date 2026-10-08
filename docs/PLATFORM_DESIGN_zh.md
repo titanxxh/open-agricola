@@ -146,7 +146,7 @@ OpenRouter 不在 provider 级别声明 `chat` / `image` 兜底能力；每个�
 
 循环初始允许 8 次模型请求、24 次资料调用和 5 分钟活跃时间；显式继续增加同等额度，不重置计数或资料 commit。模型 POST 同时最多 1 个，资料读取并发最多 3 个，资料临时 HTTP 故障最多重试 2 次，静态代码修复最多 2 次。意外 EOF、截断、provider 错误和取消不会完成半截源码。模型 POST 失败后暂停等待显式重试；校验服务故障只重试校验，不调用模型修复。推理与签名只留在当前页面的协议历史中。流式限制分别计算累计 SSE 传输的 32 MiB、单个事件的 2 MiB 和解码后消息的 2 MiB，避免重复帧元数据提前截断允许的 16,384 token 响应。
 
-资料工具搜索允许的路径与已获取文件的正文（不是 GitHub 全库全文搜索），每次最多返回 160 行，序列化结果最多 16 KiB，单文件最多 256 KiB，并核对 Git blob 哈希。缓存文本命中与 Markdown 章节标题附带行号，供模型直接跳到相关段落；分页标记不要求读完整个文件。提示词说明请求额度；浏览器每轮在完整工具组之后另加执行状态消息，告知剩余请求数和修复次数，要求确认所需契约后结束资料收集。每次尝试重新解析 main，同 commit 的 tree 与正文可缓存。请求上下文达到 192 KiB 后终止，不悄悄丢弃协议字段。传输层按精确 provider/endpoint/model 执行准入。已实测的 `deepseek` / `https://api.deepseek.com/v1/chat/completions` / `deepseek-v4-flash` 请求组合现已开放；其他组合仍为待验。
+资料工具搜索允许的路径与已获取文件的正文（不是 GitHub 全库全文搜索），每次最多返回 160 行，序列化结果最多 16 KiB，单文件最多 256 KiB，并核对 Git blob 哈希。缓存文本命中与 Markdown 章节标题附带行号，供模型直接跳到相关段落；分页标记不要求读完整个文件。提示词说明请求额度；浏览器每轮在完整工具组之后另加执行状态消息，告知剩余请求数和修复次数，要求确认所需契约后结束资料收集。每次尝试重新解析 main，同 commit 的 tree 与正文可缓存。请求上下文达到 192 KiB 后终止，不悄悄丢弃协议字段。传输层按精确 provider/endpoint/model 执行准入。已实测的 `deepseek` / `https://api.deepseek.com/v1/chat/completions` / `deepseek-flash` 请求组合现已开放；其他组合仍为待验。
 
 每段额度的最后一次模型请求保留工具定义，但使用 `tool_choice: none`，留出交付结果的一次响应。模型可以返回完整源码或有依据的澄清/能力缺口；若仍缺少关键资料事实，可返回 `reference-continuation`，保留当前检查点并等待用户显式追加额度，它不属于 Generation Result，也不能成为候选。浏览器执行状态使用宿主的 `system` 消息，不伪装成用户的新需求。保留工具定义是 DeepSeek 将先前推理纳入上下文的条件，见官方[思考模式契约](https://api-docs.deepseek.com/guides/thinking_mode/)；[Chat Completions 契约](https://api-docs.deepseek.com/api/create-chat-completion/)支持在思考模式中使用 `none`。
 
@@ -170,7 +170,7 @@ OpenRouter 不在 provider 级别声明 `chat` / `image` 兜底能力；每个�
 
 #### C1.4 质量与成本验收
 
-[验收决议](https://github.com/titanxxh/open-agricola/issues/1035)规定模型逐个通过浏览器协议与卡牌行为验证后开放，首先验收当前配置的 DeepSeek Flash 组合。已确认的批次覆盖 17 个场景，两组各重复 3 次，全部付费调用共用 5 美元预算。新架构每次运行都必须通过相应行为或能力缺口断言；首次输出质量、修复、token 和耗时分别记录。[LLM 测试指南](test/llm-card-gen.md#browser-tool-acceptance)说明样本与证据要求。`scripts/llm-acceptance.ts` 已实现浏览器探测、102 任务固定批次、原始源码行为检查和跨批次共用的 5 美元持久费用账本。[2026-10-08 付费验收](test/llm-card-gen.md#completed-paid-acceptance)已完成全部 102 项：新架构的 48/48 源码行为与 3/3 能力缺口判断全部首次通过，无自动修复；对照组通过 47/51。provider 对已批准的 `deepseek-v4-flash` 请求返回 `deepseek-flash`，证据明确记录实际转向的 V4.1 Flash 服务，不将返回名称自动开放为请求别名。新架构费用更高、耗时更长；实测质量、用量、耗时以及整个实施期间占用的 $1.785903270 预算均留在证据中。合成演练不构成模型准入。
+[验收决议](https://github.com/titanxxh/open-agricola/issues/1035)规定模型逐个通过浏览器协议与卡牌行为验证后开放，首先验收当前配置的 DeepSeek Flash 组合。已确认的批次覆盖 17 个场景，两组各重复 3 次，全部付费调用共用 5 美元预算。新架构每次运行都必须通过相应行为或能力缺口断言；首次输出质量、修复、token 和耗时分别记录。[LLM 测试指南](test/llm-card-gen.md#browser-tool-acceptance)说明样本与证据要求。`scripts/llm-acceptance.ts` 已实现浏览器探测、102 任务固定批次、原始源码行为检查和跨批次共用的 5 美元持久费用账本。[2026-10-08 付费验收](test/llm-card-gen.md#completed-paid-acceptance)在 prompt v8 与带项目凭据的元数据工具 v4 上完成全部 102 项：新架构通过 48/48 源码行为和 3/3 能力缺口判断，首次通过 51/51，静态修复 0 次；对照组通过 47/51。已开放正式请求名 `deepseek-flash`，旧转发别名及其他精确组合仍为待验。实测质量、用量、耗时，以及整个实施期间占用的 $3.924752304 预算均保留在证据中，包含历次失败和未知用量的预约。合成演练不构成模型准入。
 
 #### C1.5 编辑器交互
 

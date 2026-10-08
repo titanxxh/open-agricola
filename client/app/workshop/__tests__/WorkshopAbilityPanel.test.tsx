@@ -17,7 +17,7 @@ vi.mock('../../../services/llm/generation/admission', () => ({
   ADMITTED_GENERATION_MODELS: [{}], generationAdmission: () => ({}), resolveGenerationTarget: () => ({}),
 }))
 
-const config = { provider: 'deepseek' as const, model: 'deepseek-v4-flash', apiKey: 'browser-only' }
+const config = { provider: 'deepseek' as const, model: 'deepseek-flash', apiKey: 'browser-only' }
 const draft = { cardId: 'CUSTOM_UITest', cardType: 'minor' as const, name: 'UI Test', description: '', cardJson: {}, effectCode: 'adopted A', artUrl: null, generation: {} }
 const failure = { workspaceId: 'w', versionId: 'tested-version-B', source: 'actually tested B', sourceFingerprint: sourceFingerprint('actually tested B'), errors: ['B runtime error'] }
 const checkpoint = vi.fn(async () => true)

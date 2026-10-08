@@ -28,7 +28,7 @@ const turn = (calls: ToolCall[] = [], content = text): ModelTurn => ({
 
 function ports(): AttemptPorts {
   return {
-    model: { target: { provider: 'deepseek', endpoint: 'https://api.deepseek.com/v1/chat/completions', model: 'deepseek-v4-flash' }, complete: vi.fn(async () => turn()) },
+    model: { target: { provider: 'deepseek', endpoint: 'https://api.deepseek.com/v1/chat/completions', model: 'deepseek-flash' }, complete: vi.fn(async () => turn()) },
     loadContract: vi.fn(async () => contract),
     openReferences: vi.fn(async () => ({ commit: 'b'.repeat(40), reads: [], execute: vi.fn(async () => 'reference') })),
     validate: vi.fn(async code => ({ valid: true, errors: [], sourceFingerprint: sourceFingerprint(code), sandboxContractId: contract.id, cardJson: draft.cardJson })),
