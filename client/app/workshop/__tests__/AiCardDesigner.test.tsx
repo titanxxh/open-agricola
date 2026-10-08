@@ -604,6 +604,7 @@ describe('AiCardDesigner AI config header', () => {
       sandboxPassedAt: null,
     }
     let sandboxStateReads = 0
+    let includePinnedIdentity = false
     const apiFetch = vi.fn(async (path: string, init?: RequestInit) => {
       if (path.includes('scope=mine')) {
         return new Response(JSON.stringify({ ok: true, cards: [completeCard] }))
@@ -615,7 +616,7 @@ describe('AiCardDesigner AI config header', () => {
           cardWarnings: sandboxStateReads === 1 ? ['runtime hook failed'] : [],
         }))
       }
-      if (path.endsWith('/versions')) return new Response(JSON.stringify({ ok: true, versions: [{ id: 'version-2', card_json: { _code: 'fixed version B source' } }] }))
+      if (path.endsWith('/versions')) return new Response(JSON.stringify({ ok: true, versions: [{ id: 'version-2', card_json: { ...(includePinnedIdentity ? { id: 'CUSTOM_TestedB', card_type: 'minor', name: 'Pinned B' } : {}), _code: 'fixed version B source' } }] }))
       if (!init) {
         return new Response(JSON.stringify({ ok: true, workspace: baseWorkspace }))
       }
@@ -655,10 +656,14 @@ describe('AiCardDesigner AI config header', () => {
     await waitFor(() => expect(screen.queryByText('正在恢复草稿…')).not.toBeInTheDocument())
     await userEvent.click(screen.getByRole('button', { name: /验证与交付\s*沙盒测试和发布检查/ }))
     await userEvent.click(screen.getByRole('button', { name: '固化当前版本并启动沙盒' }))
+    await waitFor(() => expect(screen.getByText('无法读取固定版本的源码，请重新固化后再试玩。')).toBeInTheDocument())
+    expect(startSandbox).not.toHaveBeenCalled()
+    includePinnedIdentity = true
+    await userEvent.click(screen.getByRole('button', { name: '固化当前版本并启动沙盒' }))
     await waitFor(() => expect(startSandbox).toHaveBeenCalledWith(
       completeCard.id,
       'version-2',
-      expect.objectContaining({ workspaceId: completeCard.id, versionId: 'version-2', source: 'fixed version B source' }),
+      expect.objectContaining({ workspaceId: completeCard.id, versionId: 'version-2', source: 'fixed version B source', identity: { id: 'CUSTOM_TestedB', type: 'minor', name: 'Pinned B' } }),
     ))
     expect(screen.queryByRole('checkbox', {
       name: '我确认这个固定版本在沙盒中没有运行错误',

@@ -57,6 +57,16 @@ export async function runBrowserTask(options: {
     },
   })
   const sandbox = createSandboxPorts((path, init) => fetch(path, { ...init, credentials: 'include' }))
+  const openReferences = ReferenceSession.createOpener(async (url, init) => {
+    const entry: BrowserTaskResult['referenceHttp'][number] = { url: String(url), elapsedMs: 0 }
+    const started = Date.now()
+    referenceHttp.push(entry)
+    try {
+      const response = await fetch(url, init)
+      entry.status = response.status
+      return response
+    } catch (error) { entry.failed = true; throw error } finally { entry.elapsedMs = Date.now() - started }
+  })
   const attempt = new GenerationAttempt(request, {
     ...sandbox,
     loadContract: async signal => {
@@ -65,16 +75,7 @@ export async function runBrowserTask(options: {
       return contract
     },
     openReferences: options.arm === 'tools' ? async signal => {
-      const references = await ReferenceSession.open(signal, async (url, init) => {
-        const entry: BrowserTaskResult['referenceHttp'][number] = { url: String(url), elapsedMs: 0 }
-        const started = Date.now()
-        referenceHttp.push(entry)
-        try {
-          const response = await fetch(url, init)
-          entry.status = response.status
-          return response
-        } catch (error) { entry.failed = true; throw error } finally { entry.elapsedMs = Date.now() - started }
-      })
+      const references = await openReferences(signal)
       return { commit: references.commit, reads: references.reads, execute: async (call, signal) => {
         const entry: BrowserTaskResult['referenceOperations'][number] = { tool: call.function.name, elapsedMs: 0, ok: false }
         const started = Date.now()

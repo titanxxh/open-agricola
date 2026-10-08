@@ -9,6 +9,7 @@ import { LocaleProvider } from '../../../contexts/LocaleContext'
 import { sourceFingerprint } from '../../../../shared/projections/workshop-generation'
 import type { AttemptPorts } from '../../../services/llm/generation/attempt'
 import type { ModelTurn, ToolTransport } from '../../../services/llm/generation/protocol'
+import type { WorkshopDraftContract } from '../../../../shared/contract/workshop'
 import type { LlmConfig } from '../../../services/llm'
 
 const seams = vi.hoisted(() => ({ create: vi.fn(), sandbox: vi.fn() }))
@@ -19,14 +20,14 @@ vi.mock('../../../services/llm/generation/admission', () => ({
 
 const config = { provider: 'deepseek' as const, model: 'deepseek-flash', apiKey: 'browser-only' }
 const draft = { cardId: 'CUSTOM_UITest', cardType: 'minor' as const, name: 'UI Test', description: '', cardJson: {}, effectCode: 'adopted A', artUrl: null, generation: {} }
-const failure = { workspaceId: 'w', versionId: 'tested-version-B', source: 'actually tested B', sourceFingerprint: sourceFingerprint('actually tested B'), errors: ['B runtime error'] }
+const failure = { workspaceId: 'w', versionId: 'tested-version-B', source: 'actually tested B', sourceFingerprint: sourceFingerprint('actually tested B'), identity: { id: draft.cardId, type: draft.cardType, name: draft.name }, errors: ['B runtime error'] }
 const checkpoint = vi.fn(async () => true)
 const apiFetch = vi.fn()
 const complete = vi.fn<ToolTransport['complete']>()
 const clarification: ModelTurn = { calls: [], text: '{"kind":"clarification","message":"Which round?"}', message: { role: 'assistant', content: 'Which round?' }, finishReason: 'stop', usage: { inputTokens: 1, outputTokens: 1, cachedInputTokens: null, reasoningTokens: null } }
 
-function Harness({ modelConfig = config }: { modelConfig?: LlmConfig } = {}) {
-  const initial = createWorkshopDraftState({ id: 'w', authorId: 'author', revision: 1, reviewStatus: 'unsubmitted', live: false, draft, approvedVersionId: null, sandboxPassVersionId: null, sandboxPassedAt: null })
+function Harness({ modelConfig = config, currentDraft = draft }: { modelConfig?: LlmConfig; currentDraft?: WorkshopDraftContract } = {}) {
+  const initial = createWorkshopDraftState({ id: 'w', authorId: 'author', revision: 1, reviewStatus: 'unsubmitted', live: false, draft: currentDraft, approvedVersionId: null, sandboxPassVersionId: null, sandboxPassedAt: null })
   const [state, dispatch] = useReducer(workshopDraftReducer, workshopDraftReducer(initial, { type: 'candidateCompleted', candidate: { id: 'C', kind: 'ability', sourceCode: 'selected C', cardJson: {}, prompt: 'C request', createdAt: 1, baseRevision: 1, stale: false, validation: { valid: true, errors: [] } } }))
   return <LocaleProvider><WorkshopAbilityPanel state={state} config={modelConfig} dispatch={dispatch} checkpoint={checkpoint} apiFetch={apiFetch} onAdopt={async () => {}} sandboxFailure={failure} /></LocaleProvider>
 }
@@ -38,7 +39,7 @@ beforeEach(() => {
   complete.mockResolvedValue(clarification)
   const ports: AttemptPorts = {
     model: { target: { provider: config.provider, model: config.model, endpoint: 'https://api.deepseek.com/v1/chat/completions' }, complete },
-    loadContract: async () => ({ format: 1, id: 'sandbox-v1:' + 'a'.repeat(64), runtime: 'server-isolated-vm', limits: { memoryLimitMb: 8, executionTimeoutMs: 100 }, effects: {}, actions: {}, listeners: { actions: [], phases: {}, scopes: [] }, helpers: '', semantics: [] }),
+    loadContract: async () => ({ format: 1, id: 'sandbox-v1:' + 'a'.repeat(64), runtime: 'server-isolated-vm', limits: { memoryLimitMb: 8, executionTimeoutMs: 100 }, effects: {}, actions: {}, listeners: { actions: [], phases: {}, scopes: [], players: { actor: 'player', owner: 'ownerPlayer', effectRecipient: 'effectPlayer' } }, helpers: '', semantics: [] }),
     openReferences: async () => ({ commit: 'b'.repeat(40), reads: [], execute: async () => '' }),
     validate: vi.fn(),
   }
@@ -69,6 +70,15 @@ describe('Workshop ability request entry points', () => {
     const input = JSON.parse(String(complete.mock.calls[0][0][1].content))
     expect(input).toMatchObject({ source: 'actually tested B', intent: { kind: 'repair', failure: { versionId: 'tested-version-B', source: 'actually tested B' } } })
     await waitFor(() => expect(screen.getByText('需要补充信息')).toBeInTheDocument())
+    expect(screen.getByLabelText('能力候选源码')).toHaveValue('selected C')
+  })
+
+  it.each([{ cardId: 'CUSTOM_Renamed' }, { cardType: 'occupation' as const }, { name: 'Renamed after playtest' }])('rejects repair before creating a model transport when the tested identity changed: %j', async change => {
+    render(<Harness currentDraft={{ ...draft, ...change }} />)
+    await userEvent.click(screen.getByRole('button', { name: 'AI 修复' }))
+    expect(screen.getByText(/playtest card identity changed/)).toBeInTheDocument()
+    expect(seams.create).not.toHaveBeenCalled()
+    expect(complete).not.toHaveBeenCalled()
     expect(screen.getByLabelText('能力候选源码')).toHaveValue('selected C')
   })
 

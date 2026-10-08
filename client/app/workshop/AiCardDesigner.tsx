@@ -1423,11 +1423,18 @@ export function AiCardDesigner({
       if (!versionId) return
       const response = await workshopApiFetch(`/api/workshop/cards/${encodeURIComponent(currentCardDbId)}/versions`)
       const payload = await response.json() as { versions?: WorkshopDraftVersion[] }
-      const source = payload.versions?.find(version => version.id === versionId)?.card_json._code
-      if (!response.ok || typeof source !== 'string' || !source.trim()) {
+      const pinnedCard = payload.versions?.find(version => version.id === versionId)?.card_json
+      const source = pinnedCard?._code
+      if (!response.ok || typeof source !== 'string' || !source.trim()
+        || typeof pinnedCard?.id !== 'string' || !pinnedCard.id.trim()
+        || typeof pinnedCard.name !== 'string' || !pinnedCard.name.trim()
+        || (pinnedCard.card_type !== 'minor' && pinnedCard.card_type !== 'occupation')) {
         throw new Error(locale === 'zh' ? '无法读取固定版本的源码，请重新固化后再试玩。' : 'Cannot read the pinned source. Pin the version again before playtesting.')
       }
-      const binding: PlaytestSource = { workspaceId: currentCardDbId, versionId, source, sourceFingerprint: sourceFingerprint(source) }
+      const binding: PlaytestSource = {
+        workspaceId: currentCardDbId, versionId, source, sourceFingerprint: sourceFingerprint(source),
+        identity: { id: pinnedCard.id, type: pinnedCard.card_type, name: pinnedCard.name },
+      }
       updateSession({ sandboxTestVersionId: undefined })
       setSandboxConfirmation(false)
       setRuntimeSandboxErrors(null)

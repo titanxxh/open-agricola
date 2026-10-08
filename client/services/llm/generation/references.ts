@@ -4,7 +4,7 @@ import type { GenerationReference } from '../../../../shared/contract/workshop-g
 import type { ToolCall, ToolDefinition } from './protocol'
 
 export const REFERENCE_REPOSITORY = 'titanxxh/open-agricola'
-export const REFERENCE_TOOL_VERSION = 'github-text-v4'
+export const REFERENCE_TOOL_VERSION = 'github-text-v5'
 export const REFERENCE_LIMITS = Object.freeze({ fileBytes: 256 * 1024, readLines: 160, resultBytes: 16 * 1024, searchHits: 40, httpRetries: 2, concurrency: 3 })
 export const REFERENCE_TOOLS: readonly ToolDefinition[] = [
   { type: 'function', function: {
@@ -94,19 +94,26 @@ export class ReferenceSession {
     this.fetchReference = fetchReference
   }
 
-  static async open(signal: AbortSignal, fetchReference: typeof fetch = fetch, fetchMetadata: ReferenceFetch = fetchReference): Promise<ReferenceSession> {
-    // Never cache branch resolution or silently substitute an older commit.
-    const main = JSON.parse(new TextDecoder().decode(await this.get(fetchMetadata, '/api/workshop/references/main', 128 * 1024, signal, 'include'))) as { object?: { sha?: string } }
-    const commit = main.object?.sha
-    if (!commit || !/^[a-f0-9]{40}$/.test(commit)) throw new ReferenceError('Cannot confirm the latest GitHub main commit.', true)
-    const cachedTree = treeCache.get(commit)
-    if (cachedTree) return new ReferenceSession(commit, cachedTree, fetchReference)
-    const tree = JSON.parse(new TextDecoder().decode(await this.get(fetchMetadata, `/api/workshop/references/tree/${commit}`, 7 * 1024 * 1024, signal, 'include'))) as { tree?: TreeEntry[]; truncated?: boolean }
-    if (tree.truncated || !Array.isArray(tree.tree)) throw new ReferenceError('GitHub returned an incomplete repository tree.', true)
-    const entries = tree.tree.filter(entry => entry.type === 'blob' && typeof entry.path === 'string' && allowedReferencePath(entry.path) && /^[a-f0-9]{40}$/.test(entry.sha))
-    if (treeCache.size >= 4) treeCache.clear()
-    treeCache.set(commit, entries)
-    return new ReferenceSession(commit, entries, fetchReference)
+  /** Create once per attempt: a failed tree read must retain its confirmed main SHA. */
+  static createOpener(fetchReference: typeof fetch = fetch, fetchMetadata: ReferenceFetch = fetchReference): (signal: AbortSignal) => Promise<ReferenceSession> {
+    let commit: string | undefined
+    return async signal => {
+      if (!commit) {
+        // Never cache branch resolution or silently substitute an older commit.
+        const main = JSON.parse(new TextDecoder().decode(await this.get(fetchMetadata, '/api/workshop/references/main', 128 * 1024, signal, 'include'))) as { object?: { sha?: string } }
+        const confirmed = main.object?.sha
+        if (!confirmed || !/^[a-f0-9]{40}$/.test(confirmed)) throw new ReferenceError('Cannot confirm the latest GitHub main commit.', true)
+        commit = confirmed
+      }
+      const cachedTree = treeCache.get(commit)
+      if (cachedTree) return new ReferenceSession(commit, cachedTree, fetchReference)
+      const tree = JSON.parse(new TextDecoder().decode(await this.get(fetchMetadata, `/api/workshop/references/tree/${commit}`, 7 * 1024 * 1024, signal, 'include'))) as { tree?: TreeEntry[]; truncated?: boolean }
+      if (tree.truncated || !Array.isArray(tree.tree)) throw new ReferenceError('GitHub returned an incomplete repository tree.', true)
+      const entries = tree.tree.filter(entry => entry.type === 'blob' && typeof entry.path === 'string' && allowedReferencePath(entry.path) && /^[a-f0-9]{40}$/.test(entry.sha))
+      if (treeCache.size >= 4) treeCache.clear()
+      treeCache.set(commit, entries)
+      return new ReferenceSession(commit, entries, fetchReference)
+    }
   }
 
   private static async get(fetchReference: ReferenceFetch, url: string, limit: number, signal: AbortSignal, credentials: RequestCredentials = 'omit'): Promise<Uint8Array> {

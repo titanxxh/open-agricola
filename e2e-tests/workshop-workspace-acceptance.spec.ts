@@ -279,7 +279,7 @@ const setupPage = async (
       expect(body).toMatch(registry)
       await route.fulfill({ response, body: body.replace(registry, 'ADMITTED_GENERATION_MODELS = [{provider:"openrouter",endpoint:"https://openrouter.ai/api/v1/chat/completions",model:"qwen/qwen3.6-plus:free",batch:"fixture",evidence:"controlled browser test"}]') })
     })
-    await page.route('https://api.github.com/**', route => route.fulfill({ json: route.request().url().includes('/git/ref/') ? { object: { sha: 'e'.repeat(40) } } : { truncated: false, tree: [] } }))
+    await page.route('**/api/workshop/references/**', route => route.fulfill({ json: route.request().url().endsWith('/main') ? { object: { sha: 'e'.repeat(40) } } : { truncated: false, tree: [] } }))
   }
   await page.setViewportSize(variant.size)
   await page.addInitScript(({ locale, llm }) => {

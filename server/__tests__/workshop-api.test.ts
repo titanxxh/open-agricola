@@ -4,7 +4,7 @@ import { seedResourceCatalog } from './_helpers/objects'
  * Tests card CRUD, like toggle, and comment operations
  * by calling the handler functions with mock req/res objects.
  */
-import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest'
+import { describe, it, expect, vi, beforeAll, afterAll, beforeEach } from 'vitest'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { EventEmitter } from 'node:events'
 import { generateKeyPairSync } from 'node:crypto'
@@ -125,6 +125,13 @@ beforeAll(async () => {
   handleWorkshopRoute = (req, res) => mod.handleWorkshopRoute(req, res, reviewRuntime)
 })
 
+describe('Workshop reference metadata', () => {
+  beforeEach(async () => {
+    await db.prepare("DELETE FROM request_rate_limits WHERE scope LIKE 'workshop-reference:%'").run()
+    await db.prepare('DELETE FROM workshop_reference_commits').run()
+    await db.prepare('DELETE FROM workshop_reference_cooldowns').run()
+  })
+
 it('serves fresh public reference metadata with the project credential, never the caller credential', async () => {
   vi.stubEnv('WORKSHOP_REFERENCE_GITHUB_TOKEN', 'project-reference-secret')
   const upstream = vi.fn<typeof fetch>()
@@ -157,9 +164,20 @@ it('pins and caches complete tree metadata, rejects arbitrary targets and strips
   vi.stubEnv('WORKSHOP_REFERENCE_GITHUB_TOKEN', 'project-reference-secret')
   const sha = 'c'.repeat(40)
   const blob = { path: 'docs/CUSTOM_CARD_SANDBOX.md', type: 'blob', sha: 'd'.repeat(40), size: 12 }
-  const upstream = vi.fn<typeof fetch>().mockResolvedValue(Response.json({ tree: [{ ...blob, url: 'https://untrusted.example', token: 'do-not-forward' }], truncated: false, secret: 'do-not-forward' }))
+  const upstream = vi.fn<typeof fetch>()
+    .mockResolvedValueOnce(Response.json({ object: { sha } }))
+    .mockResolvedValueOnce(Response.json({ tree: [{ ...blob, url: 'https://untrusted.example', token: 'do-not-forward' }], truncated: false, secret: 'do-not-forward' }))
   vi.stubGlobal('fetch', upstream)
+  const now = Date.now()
+  const clock = vi.spyOn(Date, 'now').mockReturnValue(now)
   try {
+    const unissued = mockRes()
+    await handleWorkshopRoute(mockReq('GET', `/api/workshop/references/tree/${sha}`, null, 'tok-alice'), unissued)
+    expect(unissued.statusCode).toBe(400)
+    expect(upstream).not.toHaveBeenCalled()
+    const main = mockRes()
+    await handleWorkshopRoute(mockReq('GET', '/api/workshop/references/main', null, 'tok-alice'), main)
+    expect(main.statusCode).toBe(200)
     for (let attempt = 0; attempt < 2; attempt++) {
       const response = mockRes()
       await handleWorkshopRoute(mockReq('GET', `/api/workshop/references/tree/${sha}`, null, 'tok-alice'), response)
@@ -171,9 +189,14 @@ it('pins and caches complete tree metadata, rejects arbitrary targets and strips
       await handleWorkshopRoute(mockReq('GET', `/api/workshop/references/${target}`, null, 'tok-alice'), response)
       expect(response.statusCode).toBe(400)
     }
-    expect(upstream).toHaveBeenCalledTimes(1)
-    expect(upstream.mock.calls[0][0]).toBe(`https://api.github.com/repos/titanxxh/open-agricola/git/trees/${sha}?recursive=1`)
-  } finally { vi.unstubAllEnvs(); vi.unstubAllGlobals() }
+    expect(upstream).toHaveBeenCalledTimes(2)
+    expect(upstream.mock.calls[1][0]).toBe(`https://api.github.com/repos/titanxxh/open-agricola/git/trees/${sha}?recursive=1`)
+    clock.mockReturnValue(now + 3_600_001)
+    const expired = mockRes()
+    await handleWorkshopRoute(mockReq('GET', `/api/workshop/references/tree/${sha}`, null, 'tok-alice'), expired)
+    expect(expired.statusCode).toBe(400)
+    expect(upstream).toHaveBeenCalledTimes(2)
+  } finally { clock.mockRestore(); vi.unstubAllEnvs(); vi.unstubAllGlobals() }
 })
 
 it('pauses reference reads for GitHub rate limits without exposing upstream errors or making repeated calls', async () => {
@@ -220,12 +243,16 @@ it('bounds simultaneous reference requests across users before contacting GitHub
 it('rejects incomplete, oversized and malformed reference responses without leaking upstream data', async () => {
   vi.stubEnv('WORKSHOP_REFERENCE_GITHUB_TOKEN', 'project-reference-secret')
   const upstream = vi.fn<typeof fetch>()
+    .mockResolvedValueOnce(Response.json({ object: { sha: '9'.repeat(40) } }))
     .mockResolvedValueOnce(Response.json({ tree: [], truncated: true }))
     .mockResolvedValueOnce(new Response('project-reference-secret'.repeat(7000)))
     .mockResolvedValueOnce(Response.json({ object: { sha: 'invalid' } }))
     .mockRejectedValueOnce(new Error('project-reference-secret in transport error'))
   vi.stubGlobal('fetch', upstream)
   try {
+    const main = mockRes()
+    await handleWorkshopRoute(mockReq('GET', '/api/workshop/references/main', null, 'tok-alice'), main)
+    expect(main.statusCode).toBe(200)
     for (const target of [`tree/${'9'.repeat(40)}`, 'main', 'main', 'main']) {
       const response = mockRes()
       await handleWorkshopRoute(mockReq('GET', `/api/workshop/references/${target}`, null, 'tok-alice'), response)
@@ -316,6 +343,118 @@ it('honors App token rate limits and cancels token acquisition before reading re
     expect(new Headers(upstream.mock.calls[3][1]?.headers).get('Authorization')).toBe('Bearer project-app-read-secret')
     expect(recovered.body).not.toContain('secret')
   } finally { clock.mockRestore(); vi.unstubAllEnvs(); vi.unstubAllGlobals() }
+})
+
+it('shares confirmed commits, request budgets and GitHub cooldown across backend instances', async () => {
+  vi.stubEnv('WORKSHOP_REFERENCE_GITHUB_TOKEN', 'project-reference-secret')
+  const sha = '8'.repeat(40)
+  const upstream = vi.fn<typeof fetch>().mockImplementation(async url => Response.json(String(url).includes('/git/trees/')
+    ? { tree: [], truncated: false } : { object: { sha } }))
+  vi.stubGlobal('fetch', upstream)
+  const now = Date.now()
+  const clock = vi.spyOn(Date, 'now').mockReturnValue(now)
+  try {
+    const main = mockRes()
+    await handleWorkshopRoute(mockReq('GET', '/api/workshop/references/main', null, 'tok-alice'), main)
+    expect(main.statusCode).toBe(200)
+    vi.resetModules()
+    const otherInstance = (await import('../workshop.ts')).handleWorkshopRoute
+    const tree = mockRes()
+    await otherInstance(mockReq('GET', `/api/workshop/references/tree/${sha}`, null, 'tok-alice'), tree, reviewRuntime)
+    expect(tree.statusCode).toBe(200)
+    for (let index = 0; index < 18; index++) {
+      const response = mockRes()
+      await handleWorkshopRoute(mockReq('GET', '/api/workshop/references/main', null, 'tok-alice'), response)
+      expect(response.statusCode).toBe(200)
+    }
+    const limited = mockRes()
+    await otherInstance(mockReq('GET', '/api/workshop/references/main', null, 'tok-alice'), limited, reviewRuntime)
+    expect(limited.statusCode).toBe(429)
+    expect(limited.getHeader('Retry-After')).toBe('60')
+    expect(upstream).toHaveBeenCalledTimes(20)
+    clock.mockReturnValue(now + 60_000)
+    upstream.mockResolvedValueOnce(new Response('private upstream body', { status: 429, headers: { 'Retry-After': '120' } }))
+    const throttled = mockRes()
+    await handleWorkshopRoute(mockReq('GET', '/api/workshop/references/main', null, 'tok-alice'), throttled)
+    expect(throttled.statusCode).toBe(429)
+    const sharedCooldown = mockRes()
+    await otherInstance(mockReq('GET', '/api/workshop/references/main', null, 'tok-bob'), sharedCooldown, reviewRuntime)
+    expect(sharedCooldown.statusCode).toBe(429)
+    expect(sharedCooldown.getHeader('Retry-After')).toBe('120')
+    expect(upstream).toHaveBeenCalledTimes(21)
+    const cached = mockRes()
+    await otherInstance(mockReq('GET', `/api/workshop/references/tree/${sha}`, null, 'tok-bob'), cached, reviewRuntime)
+    expect(cached.statusCode).toBe(200)
+    expect(upstream).toHaveBeenCalledTimes(21)
+    clock.mockReturnValue(now + 181_000)
+    const recovered = mockRes()
+    await otherInstance(mockReq('GET', '/api/workshop/references/main', null, 'tok-bob'), recovered, reviewRuntime)
+    expect(recovered.statusCode).toBe(200)
+  } finally { clock.mockRestore(); vi.unstubAllEnvs(); vi.unstubAllGlobals() }
+})
+
+it.each([
+  { name: 'user hourly', users: 1, minutes: 6, perUser: 20, calls: 120, nextUser: 0, nextMinute: 6, retryAfter: '3240' },
+  { name: 'global minute', users: 5, minutes: 1, perUser: 20, calls: 100, nextUser: 5, nextMinute: 0, retryAfter: '60' },
+  { name: 'global hourly', users: 10, minutes: 10, perUser: 10, calls: 1000, nextUser: 0, nextMinute: 10, retryAfter: '3000' },
+])('enforces the $name budget across successive metadata requests', async scenario => {
+  vi.stubEnv('WORKSHOP_REFERENCE_GITHUB_TOKEN', 'project-reference-secret')
+  const upstream = vi.fn<typeof fetch>().mockImplementation(async () => Response.json({ object: { sha: 'a'.repeat(40) } }))
+  vi.stubGlobal('fetch', upstream)
+  const now = Date.now()
+  const clock = vi.spyOn(Date, 'now').mockReturnValue(now)
+  try {
+    for (let user = 0; user < 10; user++) {
+      const id = `reference-budget-${user}`
+      await db.prepare('INSERT INTO users (id, username, display_name, password_hash, created_at) VALUES (?,?,?,?,?) ON CONFLICT (id) DO NOTHING').run(id, id, id, 'hash', now)
+      await db.prepare('INSERT INTO sessions VALUES (?,?,?,?) ON CONFLICT (token) DO UPDATE SET expires_at = excluded.expires_at').run(id, id, now + 86_400_000, now)
+    }
+    for (let minute = 0; minute < scenario.minutes; minute++) {
+      clock.mockReturnValue(now + minute * 60_000)
+      for (let user = 0; user < scenario.users; user++) {
+        for (let index = 0; index < scenario.perUser; index++) {
+          const response = mockRes()
+          await handleWorkshopRoute(mockReq('GET', '/api/workshop/references/main', null, `reference-budget-${user}`), response)
+          expect(response.statusCode).toBe(200)
+        }
+      }
+    }
+    clock.mockReturnValue(now + scenario.nextMinute * 60_000)
+    const limited = mockRes()
+    await handleWorkshopRoute(mockReq('GET', '/api/workshop/references/main', null, `reference-budget-${scenario.nextUser}`), limited)
+    expect(limited.statusCode).toBe(429)
+    expect(limited.getHeader('Retry-After')).toBe(scenario.retryAfter)
+    expect(upstream).toHaveBeenCalledTimes(scenario.calls)
+  } finally { clock.mockRestore(); vi.unstubAllEnvs(); vi.unstubAllGlobals() }
+}, 30_000)
+
+it('limits sequential metadata reads by authenticated user before using the project credential', async () => {
+  vi.stubEnv('WORKSHOP_REFERENCE_GITHUB_TOKEN', 'project-reference-secret')
+  const upstream = vi.fn<typeof fetch>().mockImplementation(async () => Response.json({ object: { sha: 'a'.repeat(40) } }))
+  vi.stubGlobal('fetch', upstream)
+  const now = Date.now()
+  const clock = vi.spyOn(Date, 'now').mockReturnValue(now)
+  try {
+    for (let index = 0; index < 20; index++) {
+      const response = mockRes()
+      await handleWorkshopRoute(mockReq('GET', '/api/workshop/references/main', null, 'tok-alice'), response)
+      expect(response.statusCode).toBe(200)
+    }
+    const limited = mockRes()
+    await handleWorkshopRoute(mockReq('GET', '/api/workshop/references/main', null, 'tok-alice'), limited)
+    expect(limited.statusCode).toBe(429)
+    expect(limited.getHeader('Retry-After')).toBe('60')
+    expect(upstream).toHaveBeenCalledTimes(20)
+    const anotherUser = mockRes()
+    await handleWorkshopRoute(mockReq('GET', '/api/workshop/references/main', null, 'tok-bob'), anotherUser)
+    expect(anotherUser.statusCode).toBe(200)
+    clock.mockReturnValue(now + 60_000)
+    const recovered = mockRes()
+    await handleWorkshopRoute(mockReq('GET', '/api/workshop/references/main', null, 'tok-alice'), recovered)
+    expect(recovered.statusCode).toBe(200)
+    expect(upstream).toHaveBeenCalledTimes(22)
+  } finally { clock.mockRestore(); vi.unstubAllEnvs(); vi.unstubAllGlobals() }
+})
 })
 
 const approveForPublish = async (
