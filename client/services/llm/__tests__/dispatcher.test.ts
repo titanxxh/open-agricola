@@ -70,7 +70,7 @@ describe('streamChat dispatcher', () => {
     expect(JSON.parse(init.body).max_tokens).toBe(65536)
   })
 
-  it('routes deepseek to api.deepseek.com/v1 with Bearer auth and v4 model', async () => {
+  it('routes deepseek to api.deepseek.com/v1 with Bearer auth and the canonical Flash model', async () => {
     fetchMock.mockResolvedValue({
       ok: true,
       body: makeFakeStream(fakeOpenAISseChunks('ds-out')),
@@ -78,7 +78,7 @@ describe('streamChat dispatcher', () => {
     const config: LlmConfig = {
       provider: 'deepseek',
       apiKey: 'sk-deepseek',
-      model: 'deepseek-v4-flash',
+      model: 'deepseek-flash',
     }
     const out = await collect(streamChat([{ role: 'user', content: 'hi' }], 'sys', config))
     expect(out).toBe('ds-out')
@@ -86,7 +86,7 @@ describe('streamChat dispatcher', () => {
     expect(url).toBe('https://api.deepseek.com/v1/chat/completions')
     const headers = init.headers as Record<string, string>
     expect(headers['Authorization']).toBe('Bearer sk-deepseek')
-    expect(JSON.parse(init.body).model).toBe('deepseek-v4-flash')
+    expect(JSON.parse(init.body).model).toBe('deepseek-flash')
   })
 })
 

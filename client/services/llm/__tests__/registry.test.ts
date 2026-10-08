@@ -41,10 +41,10 @@ describe('PROVIDERS registry', () => {
     }
   })
 
-  it('deepseek exposes only V4 models', () => {
+  it('deepseek defaults to canonical V4.1 Flash and offers the current V4 Pro', () => {
     const ds = PROVIDERS.deepseek!
-    expect(ds.models.map(m => m.id)).toEqual(['deepseek-v4-flash', 'deepseek-v4-pro'])
-    expect(ds.defaultModel).toBe('deepseek-v4-flash')
+    expect(ds.models.map(m => m.id)).toEqual(['deepseek-flash', 'deepseek-v4-pro'])
+    expect(ds.defaultModel).toBe('deepseek-flash')
     expect(ds.baseUrl).toBe('https://api.deepseek.com/v1')
     expect(ds.capabilities).toEqual({ chat: true, image: false })
   })
@@ -60,11 +60,11 @@ describe('PROVIDERS registry', () => {
     expect(listModelsFor(openrouter, 'image').map(m => m.id)).not.toContain('qwen/qwen3.6-plus:free')
   })
 
-  it('openrouter exposes DeepSeek V4 chat models', () => {
+  it('openrouter exposes the current DeepSeek Flash and Pro checkpoints', () => {
     const openrouter = PROVIDERS.openrouter!
     expect(listModelsFor(openrouter, 'chat').map(m => m.id)).toEqual(expect.arrayContaining([
-      'deepseek/deepseek-v4-flash',
-      'deepseek/deepseek-v4-pro',
+      'deepseek/deepseek-v4.1-flash',
+      'deepseek/deepseek-v4-pro-0813',
     ]))
     expect(listModelsFor(openrouter, 'chat').map(m => m.id)).not.toContain('openai/gpt-5-image-mini')
   })

@@ -125,14 +125,16 @@ App.tsx
 | OpenRouter | `openai/gpt-5-image-mini`             | GPT-5 Image Mini (图片生成)                     | 否   | 否   | 是    | OpenRouter 图片模型                                                |
 | OpenRouter | `google/gemini-2.5-flash-image`       | Gemini 2.5 Flash Image / Nano Banana (图片生成) | 否   | 否   | 是    | OpenRouter 图片模型                                                |
 | OpenRouter | `bytedance-seed/seedream-4.5`         | Seedream 4.5 (图片生成)                         | 否   | 否   | 是    | OpenRouter 图片模型                                                |
-| OpenRouter | `deepseek/deepseek-v4-flash`          | DeepSeek V4 Flash                           | 否   | 是   | 否    | OpenRouter 转发 DeepSeek 聊天模型                                    |
-| OpenRouter | `deepseek/deepseek-v4-pro`            | DeepSeek V4 Pro                             | 否   | 是   | 否    | OpenRouter 转发 DeepSeek 聊天模型                                    |
-| DeepSeek   | `deepseek-v4-flash`                   | DeepSeek V4 Flash                           | 是   | 是   | 否    | 官方 DeepSeek API                                                |
-| DeepSeek   | `deepseek-v4-pro`                     | DeepSeek V4 Pro (推理)                        | 否   | 是   | 否    | 官方 DeepSeek API；推理内容不渲染，只展示最终内容                                |
+| OpenRouter | `deepseek/deepseek-v4.1-flash`        | DeepSeek V4.1 Flash                         | 否   | 是   | 否    | OpenRouter 转发 DeepSeek 聊天模型                                    |
+| OpenRouter | `deepseek/deepseek-v4-pro-0813`       | DeepSeek V4 Pro (0813)                      | 否   | 是   | 否    | OpenRouter 转发 DeepSeek 聊天模型                                    |
+| DeepSeek   | `deepseek-flash`                     | DeepSeek V4.1 Flash                         | 是   | 是   | 否    | 官方 DeepSeek API                                                |
+| DeepSeek   | `deepseek-v4-pro`                    | DeepSeek V4 Pro (0813)                      | 否   | 是   | 否    | 官方 DeepSeek API；推理内容不渲染，只展示最终内容                                |
 | AiHubMix   | `gemini-3.1-flash-image-preview-free` | Gemini 3.1 Flash Image (免费)                 | 否   | 否   | 是    | AiHubMix 免费图片模型                                                |
 | AiHubMix   | `coding-glm-5.1-free`                 | Coding GLM 5.1 (免费)                         | 是   | 是   | 否    | AiHubMix 免费聊天模型                                                |
 | AiHubMix   | `k2.6-code-preview-free`              | K2.6 Code Preview (免费)                      | 否   | 是   | 否    | AiHubMix 免费聊天模型                                                |
 
+
+DeepSeek 名称于 2026-10-08 按[官方模型列表](https://api-docs.deepseek.com/quick_start/pricing/)和 [OpenRouter 目录](https://openrouter.ai/api/v1/models)核对。官方 Flash API 使用 `deepseek-flash` 调用 V4.1 Flash；已退役的 `deepseek-v4-flash` 名称仅作为临时转发别名。当前 Pro 是 V4 Pro 0813：官方 ID 仍为 `deepseek-v4-pro`，OpenRouter 则必须带 `-0813` 后缀，因为其无后缀 Pro 仍指向旧的 0423 版。两者均支持思考；图像理解不等于图片生成。
 
 OpenRouter 不在 provider 级别声明 `chat` / `image` 兜底能力；每个模型必须显式声明自己的能力，避免图片面板展示聊天模型或聊天面板展示图片模型。
 
