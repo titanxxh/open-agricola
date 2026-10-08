@@ -1257,6 +1257,7 @@ const scenarioPrivacy = async ({
   const privateModel = unique('secret-model')
   const locales = { zh: { name: '隐私卡', desc: ['公开说明'] } }
   let workspace = await createDraft(request, account, {
+    name: 'Workspace PublishedLongCardName',
     artUrl: imageData,
     locales,
   })

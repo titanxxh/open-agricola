@@ -7,6 +7,7 @@ import type {
   WorkshopCardType,
   WorkshopDraftContract,
   WorkshopDraftErrorCode,
+  WorkshopPinnedVersionContract,
   WorkshopWorkspaceContract,
 } from '../shared/contract/workshop'
 import { workshopCardJsonFromDefinition } from './workshop-draft-validation.ts'
@@ -1171,7 +1172,7 @@ export async function pinCurrentDraftVersion(
     authorId: string
     baseRevision: number
   },
-): Promise<Awaited<{ workspace: WorkshopWorkspace; versionId: string }>> {
+): Promise<{ workspace: WorkshopWorkspace } & WorkshopPinnedVersionContract> {
   return (await db.transaction(async () => {
     const current = (await loadWorkspace(db, input.cardId, input.authorId))
     if (current.revision !== input.baseRevision) {
@@ -1181,9 +1182,12 @@ export async function pinCurrentDraftVersion(
     if (!validation.valid) {
       throw new WorkshopDraftError('not_ready', validation.errors.join('; '), current)
     }
+    const versionId = await ensureVersion(db, current)
+    const version = await loadVersion(db, current.id, versionId)
     return {
       workspace: current,
-      versionId: (await ensureVersion(db, current)),
+      versionId,
+      cardJson: parseRecord(version.card_json),
     }
   })())
 }

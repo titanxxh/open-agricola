@@ -570,7 +570,7 @@ describe('AiCardDesigner AI config header', () => {
     expect(screen.getByLabelText('画面主题')).toHaveValue('河谷木匠')
   })
 
-  it('pins, starts, and confirms one exact sandbox version', async () => {
+  it('pins, starts, and confirms an exact sandbox version outside recent history', async () => {
     const completeCard: ApiCard = {
       ...existingCard,
       art_url: '/card-art/complete.png',
@@ -616,7 +616,7 @@ describe('AiCardDesigner AI config header', () => {
           cardWarnings: sandboxStateReads === 1 ? ['runtime hook failed'] : [],
         }))
       }
-      if (path.endsWith('/versions')) return new Response(JSON.stringify({ ok: true, versions: [{ id: 'version-2', card_json: { ...(includePinnedIdentity ? { id: 'CUSTOM_TestedB', card_type: 'minor', name: 'Pinned B' } : {}), _code: 'fixed version B source' } }] }))
+      if (path.endsWith('/versions')) return new Response(JSON.stringify({ ok: true, versions: [] }))
       if (!init) {
         return new Response(JSON.stringify({ ok: true, workspace: baseWorkspace }))
       }
@@ -625,6 +625,7 @@ describe('AiCardDesigner AI config header', () => {
           ok: true,
           workspace: baseWorkspace,
           versionId: 'version-2',
+          cardJson: { ...(includePinnedIdentity ? { id: 'CUSTOM_TestedB', card_type: 'minor', name: 'Pinned B' } : {}), _code: 'fixed version B source' },
         }))
       }
       return new Response(JSON.stringify({

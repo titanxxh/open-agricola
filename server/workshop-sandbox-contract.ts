@@ -17,7 +17,8 @@ let cached: WorkshopSandboxContract | undefined
 /** Hash deployed source, not GitHub main or an optional build environment label.
  * Production ships these source directories and runs them with tsx (Dockerfile).
  * Including shared rule code also invalidates the contract when action semantics
- * change without a corresponding hook name change. No source corpus is served.
+ * change without a corresponding hook name change. The shipped lockfile also
+ * binds resolved validation/executor dependencies. No source corpus is served.
  */
 function runtimeDigest(): string {
   const hash = createHash('sha256')
@@ -34,6 +35,7 @@ function runtimeDigest(): string {
   visit(new URL('./custom-code/', import.meta.url), 'server/custom-code/')
   hash.update(readFileSync(import.meta.filename))
   hash.update(readFileSync(new URL('../package.json', import.meta.url)))
+  hash.update(readFileSync(new URL('../pnpm-lock.yaml', import.meta.url)))
   hash.update(process.versions.node).update(process.versions.v8)
   return hash.digest('hex')
 }

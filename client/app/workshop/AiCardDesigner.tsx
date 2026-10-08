@@ -1419,13 +1419,11 @@ export function AiCardDesigner({
     setSaving(true)
     setError('')
     try {
-      const versionId = await pinDraftVersion()
-      if (!versionId) return
-      const response = await workshopApiFetch(`/api/workshop/cards/${encodeURIComponent(currentCardDbId)}/versions`)
-      const payload = await response.json() as { versions?: WorkshopDraftVersion[] }
-      const pinnedCard = payload.versions?.find(version => version.id === versionId)?.card_json
+      const pinned = await pinDraftVersion()
+      if (!pinned) return
+      const { versionId, cardJson: pinnedCard } = pinned
       const source = pinnedCard?._code
-      if (!response.ok || typeof source !== 'string' || !source.trim()
+      if (typeof source !== 'string' || !source.trim()
         || typeof pinnedCard?.id !== 'string' || !pinnedCard.id.trim()
         || typeof pinnedCard.name !== 'string' || !pinnedCard.name.trim()
         || (pinnedCard.card_type !== 'minor' && pinnedCard.card_type !== 'occupation')) {
