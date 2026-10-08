@@ -63,14 +63,21 @@ export type WorkshopSandboxContract = {
   runtime: 'server-isolated-vm'
   limits: { executionTimeoutMs: number; memoryLimitMb: number }
   effects: Record<string, unknown>
+  cardMetadataKeys: readonly string[]
+  flowFields: { leaf: readonly string[]; composite: readonly string[] }
+  commonActionContextKeys: readonly string[]
+  effectMetadata: Record<string, string>
+  specialEffectKinds: readonly string[]
   listeners: {
+    fields: Record<string, string>
+    interactionKinds: readonly string[]
     actions: readonly string[]
     phases: Record<string, unknown>
     scopes: readonly string[]
     /** Keys of the player objects in the deployed listener context; IDs live inside them. */
     players: { actor: string; owner: string; effectRecipient: string }
   }
-  actions: Record<string, { desc: string; params: string }>
+  actions: Record<string, { desc: string; params: string; paramKeys?: readonly string[]; contextKeys?: readonly string[] }>
   helpers: string
   semantics: readonly string[]
 }

@@ -885,6 +885,10 @@ _Avoid_: 中文界面中的 Sandbox、Reset Sandbox、Custom Code Sandbox
 自定义卡代码的校验、编译和隔离执行链路，服务端通过 `server/custom-code/` 和 executor-backed runtime 注入卡牌能力。
 _Avoid_: 直接执行用户源码
 
+**Workshop Capability Contract（工坊能力契约）**:
+工坊在当前部署中承诺可执行的自定义卡牌能力及其限制。模型生成、源码校验和实际执行遵守同一契约，其范围可以小于原生卡牌能力。
+_Avoid_: 原生接口全集、仅用于提示词的允许名单
+
 **主 client bundle**:
 线上 React 前端，只能使用协议、展示数据、安全领域 helper 和 i18n，不运行完整规则引擎。
 _Avoid_: `shared/session`、`shared/engine`、`shared/cards` impl

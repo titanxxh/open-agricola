@@ -145,6 +145,9 @@ describe('custom session routes', () => {
       customCardIds: [customCard.id],
     }, 'sandbox-token'), start)
     expect(start.statusCode).toBe(200)
+    const played = mockRes()
+    await handleGameRoute(mockReq('POST', '/api/game/dev/play-card', { playerIndex: 0, cardId: 'CUSTOM_RouteRunaway' }, 'sandbox-token'), played)
+    expect(played.statusCode).toBe(200)
 
     const action = mockRes()
     const command = handleGameRoute(mockReq('POST', '/api/game/action', {
@@ -392,6 +395,9 @@ describe('custom session routes', () => {
       roomId: host.currentRoom!.id,
       name: 'Guest',
     })
+    const ownedState = JSON.parse(JSON.stringify(host.currentRoom!.session.state))
+    ownedState.players[0]!.minorPlayed.push('CUSTOM_RouteRunaway')
+    await host.currentRoom!.customSessionExecutor!.execute('loadState', [ownedState])
     hostWs.send.mockClear()
     const command = dispatch(host, {
       type: 'action',

@@ -398,7 +398,7 @@ export const executeCardListener = (
     ?? listenerContext.ownerCardId
     ?? registration.cardIds?.find(candidate => candidate.startsWith('CUSTOM_'))
   if (cardId?.startsWith('CUSTOM_')) {
-    return validateCustomListenerResult(result, cardId) ?? undefined
+    return validateCustomListenerResult(result, cardId, listenerContext) ?? undefined
   }
   return result ?? undefined
 }

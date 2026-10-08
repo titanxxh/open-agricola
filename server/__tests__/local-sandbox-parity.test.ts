@@ -115,8 +115,7 @@ describe('browser executor parity with server executor', () => {
       compiledCode: compiled.compiledCode,
       cardId: 'CUSTOM_ParityCard',
       hook: 'onReturnHome' as const,
-      state,
-      player: state.players[0]!,
+      args: [state, state.players[0]!],
     }
     const server = invokeCustomCodeEffect(request)
     const local = invokeCustomCodeEffectLocal(request)
@@ -139,8 +138,7 @@ describe('browser executor parity with server executor', () => {
       compiledCode: compiled.compiledCode,
       cardId: 'CUSTOM_ParityCard',
       hook: 'onBeforeEndGame' as const,
-      state,
-      player: state.players[0]!,
+      args: [state, state.players[0]!],
     }
     expect(invokeCustomCodeEffectLocal(request)).toEqual(invokeCustomCodeEffect(request))
     expect(invokeCustomCodeEffectLocal(request)).toEqual({ ok: true, result: null })
@@ -180,8 +178,7 @@ describe('browser executor parity with server executor', () => {
       compiledCode: compiled.compiledCode,
       cardId: 'CUSTOM_ParityCard',
       hook: 'onReturnHome' as const,
-      state,
-      player: state.players[0]!,
+      args: [state, state.players[0]!],
     }
     const server = invokeCustomCodeEffect(request)
     const local = invokeCustomCodeEffectLocal(request)
@@ -256,5 +253,95 @@ describe('validateFarmChoice request-level errors', () => {
     expect(validateFarmChoice(state, 'bogus' as never, playerId, {}).requestError).toBe(true)
     // An ordinary invalid placement is a well-formed 200 response, not a 400.
     expect(validateFarmChoice(state, 'sow', playerId, {}).requestError).toBeUndefined()
+  })
+})
+
+// Fixed permission cases complement rule scenarios; they are not a behavioral judge.
+describe('shared Workshop capability admission', () => {
+  it.each([
+    ['unsupported declaration', 'effect: {allowAnytimeReentry:true}', 'unknown effect hook'],
+    ['unsupported listener callback', 'listeners:[{getBaseCosts:()=>({food:0}),handler:()=>{}}]', 'unsupported listener field'],
+    ['unsupported implementation modifiers', 'modifiers:[]', 'unsupported CARD_IMPL field'],
+    ['foreign card listener', "listeners:[{cardIds:['CUSTOM_Other'],handler:()=>{}}]", 'listener.cardIds'],
+    ['malformed block list', "listeners:[{blockedAnytimeInteractionKinds:true,handler:()=>{}}]", 'must be an array'],
+  ])('rejects %s on both save paths',(_label,implementation,error)=>{
+    const source=`const CARD_ID='CUSTOM_ParityCard';const CARD_DEF={cardType:'minor',meta:{id:CARD_ID,name:'Parity'}};const CARD_IMPL={${implementation}}`
+    const server=validateAndCompileCustomCode(source,'CUSTOM_ParityCard');const browser=validateAndCompileCustomCodeLocal(source,'CUSTOM_ParityCard')
+    expect(browser).toEqual(server);expect(server).toMatchObject({valid:false,errors:[expect.stringContaining(error)]})
+  })
+
+  it.each([
+    ['nested internal action', {type:'seq',children:[{type:'leaf',actionId:'place-farmer'}]}, 'Unsupported Workshop action'],
+    ['lifecycle mutation', {type:'leaf',actionId:'special-effect',params:{kind:'clear-round-flags'}}, 'Unsupported special-effect kind'],
+    ['foreign local source', {type:'leaf',actionId:'special-effect',sourceCard:'CUSTOM_Other',params:{kind:'set-counter',key:'x',value:1}}, 'impersonate'],
+    ['native stable mutation', {type:'leaf',actionId:'stables',actionContext:{farmHand:true}}, 'unsupported field'],
+    ['implicit Harvest reap', {type:'leaf',actionId:'reap'}, 'Reap trigger'],
+    ['extra sowing variant', {type:'leaf',actionId:'sow',actionContext:{cropType:'wood'}}, 'ordinary crops'],
+    ['foreign trade side effect', {type:'leaf',actionId:'exchange',actionContext:{directTrade:{from:{wood:1},to:{food:1},sideEffect:{type:'drainSpace',spaceId:'forest',resource:'wood'}}}}, 'unsupported field'],
+    ['future settlement override', {type:'leaf',actionId:'future-meeples',params:{__futureMeepleRequest:{cardId:'CUSTOM_ParityCard',playerId:'p1',entries:[{round:2,resources:{field:1},actionContext:{unrestricted:true}}]}}}, 'settlement contract'],
+    ['forged payment attribution', {type:'leaf',actionId:'pay',params:{cost:{fee:{food:1}},candidateMetadataByFeeIndex:{0:{originalFeeIndex:0,sources:['CUSTOM_Other'],costAttribution:{CUSTOM_Other:{saved:{wood:99}}}}}}}, 'candidateMetadataByFeeIndex'],
+    ['forged resource-removal attribution', {type:'leaf',actionId:'pay',params:{cost:{fee:{wood:5},costResourceRemovals:[{resource:'wood',sourceCard:'CUSTOM_Other',savedByFee:[5]}]}}}, 'costResourceRemovals'],
+    ['fabricated card ownership', {type:'leaf',actionId:'pay',params:{cost:{fee:{wood:5}},playedCards:['Major_Fireplace1']}}, 'playedCards'],
+    ['unsettled direct card-return cost', {type:'leaf',actionId:'pay',params:{cost:{fee:{wood:5},cards:{type:'major',list:['Major_Fireplace1']}}}}, 'cards'],
+    ['foreign choice source', {type:'leaf',actionId:'emit-choice',params:{options:[{value:'yes',labelKey:'ui.yes',sourceCard:'CUSTOM_Other'}]}}, 'impersonate'],
+  ])('rejects runtime-computed %s before dispatch',(_label,flow,error)=>{
+    // Deliberately dynamic return, beyond AST literal inspection.
+    const source=`const CARD_ID='CUSTOM_ParityCard';const CARD_DEF={cardType:'minor',meta:{id:CARD_ID,name:'Parity'}};const CARD_IMPL={effect:{onBuy:state=>state.customFlow}}`
+    const compiled=validateAndCompileCustomCode(source,'CUSTOM_ParityCard');if(!compiled.valid)throw Error(compiled.errors.join(';'))
+    const request={compiledCode:compiled.compiledCode,cardId:'CUSTOM_ParityCard',hook:'onBuy' as const,args:[{customFlow:flow},{}]}
+    const server=invokeCustomCodeEffect(request);expect(invokeCustomCodeEffectLocal(request)).toEqual(server);expect(server).toMatchObject({ok:false,error:expect.stringContaining(error)})
+  })
+
+  it('preserves all five arguments and strips host callbacks on both adapters',()=>{
+    const source=`const CARD_ID='CUSTOM_ParityCard';const CARD_DEF={cardType:'minor',meta:{id:CARD_ID,name:'Parity'}};const CARD_IMPL={effect:{computeBreedableAnimalCount:(state,player,animal,count,ctx)=>ctx.sourceCard===CARD_ID&&ctx.callback===undefined&&animal==='sheep'?count+state.round+player.resources.food:0}}`
+    const compiled=validateAndCompileCustomCode(source,'CUSTOM_ParityCard');if(!compiled.valid)throw Error(compiled.errors.join(';'))
+    const request={compiledCode:compiled.compiledCode,cardId:'CUSTOM_ParityCard',hook:'computeBreedableAnimalCount' as const,args:[{round:3},{resources:{food:2}},'sheep',4,{sourceCard:'CUSTOM_ParityCard',callback:()=>999}]}
+    expect(invokeCustomCodeEffect(request)).toEqual({ok:true,result:9});expect(invokeCustomCodeEffectLocal(request)).toEqual({ok:true,result:9})
+  })
+
+  it.each([
+    ['computeCostedBonus', {}, 'must be an array'],
+    ['computeCostedBonus', [{cost:{food:-1},score:1}], 'nonnegative'],
+    ['computeSharedPostScore', {}, 'must be an array'],
+    ['computeSharedPostScore', [{playerId:'unknown',score:1}], 'player not found'],
+    ['computeLockedFarmTiles', {}, 'must be an array'],
+    ['getBuiltSpecialStables', [{row:'0',col:1}], 'finite number'],
+    ['getInvalidAnimals', [{type:'sheep'},{type:'sheep'}], 'subset'],
+    ['getRuleContributions', {reservedSupply:{room:1}}, 'unsupported field'],
+    ['getStatePresentation', [], 'must be an object'],
+    ['countExtraTurns', 1.5, 'integer'],
+  ] as const)('rejects malformed %s results before host consumption',(hook,result,error)=>{
+    const source=`const CARD_ID='CUSTOM_ParityCard';const CARD_IMPL={effect:{${hook}:()=>(${JSON.stringify(result)})}}`
+    const compiled=validateAndCompileCustomCode(source,'CUSTOM_ParityCard')
+    if(!compiled.valid)throw Error(compiled.errors.join(';'))
+    const request={compiledCode:compiled.compiledCode,cardId:'CUSTOM_ParityCard',hook,args:[{players:[{id:'p1'}]}, {}, [{type:'sheep'}]]}
+    const server=invokeCustomCodeEffect(request);expect(invokeCustomCodeEffectLocal(request)).toEqual(server)
+    expect(server).toMatchObject({ok:false,error:expect.stringContaining(error)})
+  })
+
+  it('keeps valid scoring query data and rejects foreign listener choice sources on both adapters',()=>{
+    const source=`const CARD_ID='CUSTOM_ParityCard';const CARD_IMPL={effect:{computeCostedBonus:()=>[{cost:{food:2},score:3}],computeSharedPostScore:()=>[{playerId:'p1',score:2}]},listeners:[{handler:()=>({extraOptions:[{value:'yes',labelKey:'ui.yes',sourceCard:'CUSTOM_Other'}]})}]}`
+    const compiled=validateAndCompileCustomCode(source,'CUSTOM_ParityCard');if(!compiled.valid)throw Error(compiled.errors.join(';'))
+    for(const [hook,result] of [['computeCostedBonus',[{cost:{food:2},score:3}]],['computeSharedPostScore',[{playerId:'p1',score:2}]]] as const){
+      const request={compiledCode:compiled.compiledCode,cardId:'CUSTOM_ParityCard',hook,args:[{players:[{id:'p1'}]},{}]}
+      expect(invokeCustomCodeEffect(request)).toEqual({ok:true,result});expect(invokeCustomCodeEffectLocal(request)).toEqual({ok:true,result})
+    }
+    const state=createInitialState(42)
+    const context={state,player:state.players[0]!,ownerPlayer:state.players[0]!,effectPlayer:state.players[0]!,triggerPlayer:state.players[0]!,space:state.actionSpaces[0]!,actionId:'collect',phase:'after' as const,extraData:{},transactionEvents:[],eventQuery:{} as never}
+    const request={compiledCode:compiled.compiledCode,cardId:'CUSTOM_ParityCard',registrationId:'CUSTOM_ParityCard:listener:0',context}
+    const server=invokeCustomCodeListener(request);expect(invokeCustomCodeListenerLocal(request)).toEqual(server)
+    expect(server).toMatchObject({ok:false,error:expect.stringContaining('impersonate')})
+  })
+
+  it('does not turn omitted filters into a global listener',()=>{
+    const source="const CARD_ID='CUSTOM_ParityCard';const CARD_IMPL={listeners:[{handler:()=>({flow:gainLeaf(CARD_ID,{food:1})})}]}"
+    const compiled=validateAndCompileCustomCode(source,'CUSTOM_ParityCard');if(!compiled.valid)throw Error(compiled.errors.join(';'))
+    expect(validateAndCompileCustomCodeLocal(source,'CUSTOM_ParityCard')).toEqual(compiled)
+    const session=new GameSession(42,[cardDataFrom(compiled.compiledCode,compiled.manifest)],{playerCount:2})
+    for(const player of session.state.players){player.minorHand=['__test_placeholder__'];player.occupationHand=['__test_placeholder__']}
+    // Neither player owns this card: even repeated collect/query dispatch cannot award its flow.
+    session.loadState(session.state);const response=session.takeAction(0,'forest')
+    expect(response.ok,response.error).toBe(true);expect(response.state.players[0]!.resources.food).toBe(2);expect(response.state.players[1]!.resources.food).toBe(3)
+    session.dispose()
   })
 })

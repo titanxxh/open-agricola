@@ -39,4 +39,11 @@ export const cardEffectHooks: CardEffectField[] = [
   'getBuiltSpecialStables',
   'getRuleContributions',
   'getStatePresentation',
+  'computeResourceCommitments',
+  'countExtraTurns',
+  'enforceReorganizeOnLastHarvest',
+  'computeBreedThreshold',
+  'computeBreedableAnimalCount',
+  'computeAnimalScoreAdjustment',
+  'onComputeSharedAnimalZones',
 ]

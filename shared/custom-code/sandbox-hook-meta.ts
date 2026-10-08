@@ -55,7 +55,7 @@ export const cardEffectHookMeta: Record<CardEffectField, HookMeta> = {
   },
 
   // --- 进阶 hook：签名与普通 hook 不同 ---
-  resolveChoice: { table: 'advanced', signature: '(state, player, choice) => ActionFlow', usage: '处理玩家选择；沙盒不传 ctx' },
+  resolveChoice: { table: 'advanced', signature: '(state, player, choice, ctx) => ActionFlow', usage: '处理本卡选择；ctx 仅包含可序列化来源与 actionContext，不提供宿主回调' },
   computeBonusScore: {
     table: 'advanced',
     signature: '(state, player, ctx) => number',
@@ -95,8 +95,8 @@ export const cardEffectHookMeta: Record<CardEffectField, HookMeta> = {
   computeLockedFarmTiles: { table: 'advanced', signature: '(player) => FarmTilePosition[]', usage: '返回锁定位置' },
   getInvalidAnimals: {
     table: 'advanced',
-    signature: '(player, zone, meeples) => Meeple[]',
-    usage: '卡牌专属动物分区禁入校验；沙盒不传 state',
+    signature: '(player, zone, meeples, state) => Meeple[]',
+    usage: '卡牌专属动物分区禁入校验，返回输入 meeples 的不合法子集',
   },
   getSpecialStablePositions: {
     table: 'advanced',
@@ -121,7 +121,13 @@ export const cardEffectHookMeta: Record<CardEffectField, HookMeta> = {
   // 联合成员但不在 cardEffectHooks 数组，不会被渲染进 prompt（仅为 Record 穷尽性）
   onComputeSharedAnimalZones: {
     table: 'advanced',
-    signature: '修改共享 zones 数组',
-    usage: '共享动物分区扩展（跨玩家）',
+    signature: '(owner, animalOwner, zones, state) => AnimalZone[]',
+    usage: '只返回新增共享分区；明确卡主、动物主人及繁殖主人，不修改输入 zones',
   },
+  computeResourceCommitments: { table: 'advanced', signature: '(state, owner) => Array<{playerId, resources}>', usage: '纯查询未结算的资源承诺；资源数量非负，实际付款仍由引擎结算' },
+  countExtraTurns: { table: 'advanced', signature: '(state, player) => number', usage: '有限非负整数；与 contributeExtraTurn 配对提供机会数量，不直接放置工人' },
+  enforceReorganizeOnLastHarvest: { table: 'advanced', signature: '(state, player) => boolean', usage: '仅第14轮正式收获要求动物重组' },
+  computeBreedThreshold: { table: 'advanced', signature: '(state, player, animalType, ctx) => number | void', usage: '繁殖所需数量；ctx.sourceCard 区分正式收获与卡牌效果' },
+  computeBreedableAnimalCount: { table: 'advanced', signature: '(state, player, animalType, currentCount, ctx) => number | void', usage: '可繁殖动物数量，保留已有数量及第五参数来源上下文' },
+  computeAnimalScoreAdjustment: { table: 'advanced', signature: '(state, player, animalType, ctx) => number | void', usage: '当前消费者仅 Farmers of the Moor 马计分；ctx 包含 quantity/baseScore/categoryKey' },
 }

@@ -1,13 +1,14 @@
 /**
- * Pure isolated-vm execution logic — no project imports.
+ * Isolated-vm worker execution with shared capability admission.
  *
  * This module is loaded by the Worker Thread. It deliberately avoids
- * importing any shared/ modules to keep the worker's dependency tree
- * minimal and avoid module resolution issues across thread boundaries.
+ * importing the card registry or engine. Its shared imports are pure data and
+ * admission functions, keeping the worker independent of session context.
  *
- * Shared imports below are pure constants with no transitive runtime deps.
+ * The host performs native listener cost attribution validation as well.
  */
 import ivm from 'isolated-vm'
+import { validateCustomEffectResult, assertCustomListenerCapabilities } from '../../shared/custom-code/runtime-capabilities.ts'
 import { HELPERS_INJECTION_SOURCE } from '../../shared/custom-code/injected-helpers.ts'
 
 import { EXECUTION_TIMEOUT_MS, ISOLATE_MEMORY_LIMIT_MB } from '../../shared/custom-code/runtime-limits.ts'
@@ -68,9 +69,7 @@ export interface EffectRequest {
   compiledCode: string
   cardId: string
   hook: string
-  state: unknown
-  player: unknown
-  paymentInfo?: unknown
+  args: unknown[]
 }
 
 export interface ListenerRequest {
@@ -92,7 +91,7 @@ export function invokeEffect(request: EffectRequest): InvokeResult {
 var __eff = __captured.CARD_IMPL && __captured.CARD_IMPL.effect;
 var __handler = __eff && __eff[${JSON.stringify(request.hook)}];
 __result = typeof __handler === 'function'
-  ? __handler(__input_state, __input_player, __input_paymentInfo)
+  ? __handler.apply(null, __input_args)
   : null;
     `
     const result = runInIsolate(
@@ -100,12 +99,10 @@ __result = typeof __handler === 'function'
       request.cardId,
       postlude,
       {
-        __input_state: request.state,
-        __input_player: request.player,
-        __input_paymentInfo: request.paymentInfo ?? null,
+        __input_args: request.args,
       },
     )
-    return { ok: true, result: result ?? null }
+    return { ok: true, result: validateCustomEffectResult(result, request.cardId, request.hook, request.args) }
   } catch (error) {
     return {
       ok: false,
@@ -135,6 +132,7 @@ __result = __listener && typeof __listener.handler === 'function'
         __input_context: request.context,
       },
     )
+    assertCustomListenerCapabilities(result, request.cardId, request.context as import('../../shared/cards/card-listeners.ts').CardListenerContext)
     return { ok: true, result: result ?? null }
   } catch (error) {
     return {

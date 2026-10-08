@@ -1531,6 +1531,8 @@ Durable Room Commit 要求 PostgreSQL、共享资源、`REPLAY_VIEWER_BUILD_ID` 
 
 ### 12.5 浏览器本地试玩沙盒（client/local-sandbox/）
 
+- Workshop Capability Contract（ADR 0024）：`shared/custom-code/sandbox-declarations.ts` 与 `runtime-capabilities.ts` 是自定义输出进入原生引擎的共享准入。源码校验、部署契约、isolated-vm worker、浏览器执行器共用 hook / 元数据 / listener / action 范围；全部位置参数以 JSON 传递，不传宿主回调。仅含元数据的 effect 也注册；省略 listener 过滤时绑定明确集合与本卡。动态嵌套 flow、参数变体在权威执行前校验，可信引擎生成的内部结算仍使用原生权限。行为通过固定 Session 场景验收，不另建行为判定程序。精确范围与延期的原生修改 / 回调机制见 `docs/CUSTOM_CARD_SANDBOX.md` §3、§6、§9。
+
 `VITE_SANDBOX_EXECUTOR=browser` 时工坊试玩全程在浏览器运行，零服务器参与；缺省走服务端 `/api/game/new-sandbox`（原样保留）。
 
 - 启动链路：`WorkshopPage` 组装 `LocalGameConfig`（卡 JSON + 源码 + 沙盒设置）写 sessionStorage → 嵌入 iframe 带 `?localSandbox=1` → `useTransportSetup` 创建 `LocalGameTransport`（实现 `GameTransport` 全部接口，与 HTTP/WS transport 同构接入 `useGameSync`）。

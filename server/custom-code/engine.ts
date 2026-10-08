@@ -1,12 +1,10 @@
 import ivm from 'isolated-vm'
 import { validateCardCode } from '../../shared/custom-code/ast-validator.ts'
 import { compileCardCode } from '../../shared/custom-code/compiler.ts'
-import { cardEffectHooks, isHandCardEffectHook, type CardEffectField } from '../../shared/cards/card-effects.ts'
-import type { ActionFlow } from '../../shared/contract/types.ts'
+import type { CardEffectField } from '../../shared/cards/card-effects.ts'
+import { MANIFEST_EXTRACTION_SOURCE, normalizeCustomManifest } from '../../shared/custom-code/sandbox-declarations.ts'
+import { assertCustomCardDefinition, validateCustomEffectResult } from '../../shared/custom-code/runtime-capabilities.ts'
 import { validateCustomListenerResult } from '../../shared/custom-code/listener-result-validator.ts'
-import { isSandboxListenerAction } from '../../shared/custom-code/sandbox-listener-actions.ts'
-import { isSandboxListenerPhase } from '../../shared/custom-code/sandbox-listener-phases.ts'
-import { isSandboxListenerScope } from '../../shared/custom-code/sandbox-listener-scopes.ts'
 import type {
   CustomCodeEffectMetadata,
   CustomCodeEffectInvocation,
@@ -118,40 +116,8 @@ function runManifestExtraction(compiledCode: string, cardId: string): {
           CARD_IMPL: typeof CARD_IMPL !== 'undefined' ? CARD_IMPL : null,
         };
       })();
-      var __effectKeys = [];
-      var __effectMetadata = {};
-      var __listeners = [];
-      if (__captured.CARD_IMPL && __captured.CARD_IMPL.effect) {
-        var eff = __captured.CARD_IMPL.effect;
-        for (var k in eff) {
-          if (Object.prototype.hasOwnProperty.call(eff, k) && typeof eff[k] === 'function') {
-            __effectKeys.push(k);
-          }
-        }
-        if (eff.beforeEndGameScope === 'owner' || eff.beforeEndGameScope === 'allPlayers') {
-          __effectMetadata.beforeEndGameScope = eff.beforeEndGameScope;
-        }
-        if (Array.isArray(eff.handHooks)) {
-          __effectMetadata.handHooks = eff.handHooks.filter(function(x) { return typeof x === 'string'; });
-        }
-        if (typeof eff.beforeEndGameMandatory === 'boolean') {
-          __effectMetadata.beforeEndGameMandatory = eff.beforeEndGameMandatory;
-        }
-      }
-      if (__captured.CARD_IMPL && Array.isArray(__captured.CARD_IMPL.listeners)) {
-        for (var i = 0; i < __captured.CARD_IMPL.listeners.length; i++) {
-          var listener = __captured.CARD_IMPL.listeners[i];
-          var registrationId = ${JSON.stringify(cardId)} + ':listener:' + i;
-          __listeners.push({
-            registrationId: registrationId,
-            cardIds: Array.isArray(listener.cardIds) ? listener.cardIds.filter(function(x) { return typeof x === 'string'; }) : undefined,
-            actions: Array.isArray(listener.actions) ? listener.actions.filter(function(x) { return typeof x === 'string'; }) : undefined,
-            phases: Array.isArray(listener.phases) ? listener.phases : undefined,
-            order: typeof listener.order === 'number' ? listener.order : undefined,
-            scope: typeof listener.scope === 'string' ? listener.scope : undefined,
-          });
-        }
-      }
+      var __sandbox_card_id = ${JSON.stringify(cardId)};
+      ${MANIFEST_EXTRACTION_SOURCE}
       JSON.stringify({
         effectKeys: __effectKeys,
         effectMetadata: __effectMetadata,
@@ -177,27 +143,10 @@ function runManifestExtraction(compiledCode: string, cardId: string): {
       cardDefinitionType: null,
     }
 
-    const effectHooks = parsed.effectKeys.filter((hook): hook is CardEffectField =>
-      cardEffectHooks.includes(hook as CardEffectField),
-    )
-    const listeners = parsed.listeners.map((l) => ({
-      ...l,
-      actions: l.actions?.filter(isSandboxListenerAction),
-      phases: l.phases?.filter(isSandboxListenerPhase),
-      scope: isSandboxListenerScope(l.scope) ? l.scope : undefined,
-    }))
-
-    const effectMetadata = parsed.effectMetadata && Object.keys(parsed.effectMetadata).length > 0
-      ? {
-          ...parsed.effectMetadata,
-          ...(parsed.effectMetadata.handHooks
-            ? { handHooks: parsed.effectMetadata.handHooks.filter(isHandCardEffectHook) }
-            : {}),
-        }
-      : undefined
-
+    const manifest = normalizeCustomManifest({ effectHooks: parsed.effectKeys as CardEffectField[], effectMetadata: parsed.effectMetadata, listeners: parsed.listeners }, cardId)
+    if (parsed.cardDefinition) assertCustomCardDefinition(parsed.cardDefinition, cardId)
     return {
-      manifest: { effectHooks, effectMetadata, listeners },
+      manifest,
       cardDefinition: parsed.cardDefinition && parsed.cardDefinitionType
         ? {
             cardType: parsed.cardDefinitionType,
@@ -254,7 +203,7 @@ export const invokeCustomCodeEffect = (
 var __eff = __captured.CARD_IMPL && __captured.CARD_IMPL.effect;
 var __handler = __eff && __eff[${JSON.stringify(request.hook)}];
 __result = typeof __handler === 'function'
-  ? __handler(__input_state, __input_player, __input_paymentInfo)
+  ? __handler.apply(null, __input_args)
   : null;
     `
     const result = runInIsolate(
@@ -262,12 +211,10 @@ __result = typeof __handler === 'function'
       request.cardId,
       postlude,
       {
-        __input_state: request.state,
-        __input_player: request.player,
-        __input_paymentInfo: request.paymentInfo ?? null,
+        __input_args: request.args,
       },
     )
-    return { ok: true, result: (result ?? null) as ActionFlow | null }
+    return { ok: true, result: validateCustomEffectResult(result, request.cardId, request.hook, request.args) }
   } catch (error) {
     return {
       ok: false,
@@ -299,7 +246,7 @@ __result = __listener && typeof __listener.handler === 'function'
         __input_context: request.context,
       },
     )
-    return { ok: true, result: validateCustomListenerResult(result, request.cardId) }
+    return { ok: true, result: validateCustomListenerResult(result, request.cardId, request.context) }
   } catch (error) {
     return {
       ok: false,

@@ -5,7 +5,7 @@
  * native crash (segfault in isolated-vm or V8 itself), only this worker
  * dies — the main server process and all other players are unaffected.
  *
- * Imports only isolate-runner.ts (which only depends on isolated-vm),
+ * Imports isolate-runner.ts and its pure capability definitions,
  * avoiding the full project module tree and its directory-import issues.
  *
  * Communication protocol:

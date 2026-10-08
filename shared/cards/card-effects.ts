@@ -161,6 +161,8 @@ export const isHandCardEffectHook = (hook: string): hook is HandCardEffectHook =
  * `countExtraTurns` are deliberately excluded.
  */
 export type CardEffectField = CardEffectHook
+  | 'computeResourceCommitments' | 'countExtraTurns' | 'enforceReorganizeOnLastHarvest'
+  | 'computeBreedThreshold' | 'computeBreedableAnimalCount' | 'computeAnimalScoreAdjustment'
   | 'resolveChoice'
   | 'contributeExtraTurn'
   | 'computeBonusScore' | 'computeSharedPostScore' | 'computeCostedBonus'

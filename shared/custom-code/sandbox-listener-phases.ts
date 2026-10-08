@@ -11,6 +11,7 @@ export const sandboxListenerPhases = [
   'computeReplace',
   'isDoable',
   'anytime',
+  'computeExchanges',
 ] as const satisfies readonly ActionHookPhase[]
 
 export type SandboxListenerPhase = typeof sandboxListenerPhases[number]
@@ -34,4 +35,5 @@ export const sandboxListenerPhaseMeta: Record<SandboxListenerPhase, { desc: stri
   computeReplace: { desc: '替换行动', usage: '替换为别的效果' },
   isDoable: { desc: '判断行动可用性', usage: '让不可用行动变可用' },
   anytime: { desc: '任意时刻', usage: '全局触发' },
+  computeExchanges: { desc: '计算兑换目录', usage: '纯查询，返回 extraExchanges；结算走引擎正式兑换管线' },
 }

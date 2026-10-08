@@ -1,14 +1,15 @@
 import { type CardEffect } from '../../shared/cards/card-effects.ts'
-import type { PaymentInfo } from '../../shared/cards/card-effects.ts'
 import type { CardListenerContext } from '../../shared/cards/card-listeners.ts'
-import type { GameState, PlayerState } from '../../shared/contract/types.ts'
 import { requireActiveCardRegistry } from '../../shared/cards/active-registry.ts'
 import { getCurrentSessionContext, type CustomCardData } from '../../shared/cards/session-card-context.ts'
+import { normalizeCustomManifest } from '../../shared/custom-code/sandbox-declarations.ts'
+import { customEffectFallback } from '../../shared/custom-code/runtime-capabilities.ts'
 import { setCardListenerSource } from '../../shared/cards/card-listener-source.ts'
 import { invokeCustomCodeEffectSync, invokeCustomCodeListenerSync } from './client.ts'
 
 export const registerExecutorBackedCustomCard = (cardData: CustomCardData): void => {
-  const { cardJson, compiledCode, codeManifest } = cardData
+  const { cardJson, compiledCode } = cardData
+  const codeManifest = cardData.codeManifest && normalizeCustomManifest(cardData.codeManifest, cardJson.id)
   if (!compiledCode || !codeManifest) return
 
   const cardId = cardJson.id
@@ -16,25 +17,21 @@ export const registerExecutorBackedCustomCard = (cardData: CustomCardData): void
   const effect: CardEffect = { id: cardId }
   for (const hook of codeManifest.effectHooks) {
     ;(effect as Record<string, unknown>)[hook] = (
-      state: GameState,
-      player: PlayerState,
-      paymentInfo?: PaymentInfo,
+      ...args: unknown[]
     ) => {
       const response = invokeCustomCodeEffectSync({
         compiledCode,
         cardId,
         hook,
-        state,
-        player,
-        paymentInfo,
+        args,
       })
       if (!response.ok) {
         const warning = `Custom card ${cardId} hook "${hook}" failed: ${response.error}`
         console.warn(`[custom-code-runtime] ${warning}`)
         sessionCtx?.reportWarning(warning)
-        return undefined
+        return customEffectFallback(hook)
       }
-      return response.result ?? undefined
+      return response.result ?? customEffectFallback(hook)
     }
   }
   if (codeManifest.effectMetadata) {
@@ -43,7 +40,7 @@ export const registerExecutorBackedCustomCard = (cardData: CustomCardData): void
 
   // Register into session context when one is active; otherwise write
   // directly to the active CardRegistry (test-only path).
-  if (codeManifest.effectHooks.length > 0) {
+  if (codeManifest.effectHooks.length > 0 || codeManifest.effectMetadata) {
     if (sessionCtx) {
       sessionCtx.registerEffect(effect)
     } else {
@@ -52,8 +49,10 @@ export const registerExecutorBackedCustomCard = (cardData: CustomCardData): void
   }
 
   for (const listener of codeManifest.listeners) {
+    const { registrationId, ...declaration } = listener
     const reg = {
-      id: listener.registrationId,
+      ...declaration,
+      id: registrationId,
       cardIds: listener.cardIds,
       actions: listener.actions,
       phases: listener.phases,

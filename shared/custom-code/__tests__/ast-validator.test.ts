@@ -33,7 +33,7 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
     expect(result.valid === false && result.errors.some(e => e.includes("unknown effect hook 'onMagicThing'"))).toBe(true)
   })
 
-  it('rejects animal effect hooks that require unsupported sandbox arguments', () => {
+  it('accepts pure animal hooks with complete positional arguments', () => {
     const code = `
       const CARD_IMPL = {
         effect: {
@@ -43,8 +43,7 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
       }
     `
     const result = validateCardCode(code)
-    expect(result.valid).toBe(false)
-    expect(result.valid === false && result.errors.some(e => e.includes("unknown effect hook 'computeBreedableAnimalCount'"))).toBe(true)
+    expect(result.valid).toBe(true)
   })
 
   it('accepts valid listener phases', () => {
@@ -665,7 +664,7 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
     expect(nestedImpl.valid === false && nestedImpl.errors.some(e => e.includes('CARD_IMPL must be declared as a top-level const'))).toBe(true)
   })
 
-  it('rejects computeExchanges for sandbox custom cards', () => {
+  it('accepts computeExchanges for sandbox custom cards', () => {
     const code = `
       const CARD_IMPL = {
         listeners: [
@@ -678,8 +677,7 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
       }
     `
     const result = validateCardCode(code)
-    expect(result.valid).toBe(false)
-    expect(result.valid === false && result.errors.some(e => e.includes("unknown listener phase 'computeExchanges'"))).toBe(true)
+    expect(result.valid).toBe(true)
   })
 
   it('accepts handHooks as a meta field', () => {

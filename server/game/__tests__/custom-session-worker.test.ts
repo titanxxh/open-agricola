@@ -200,7 +200,7 @@ describe('custom session executor', () => {
   it.each(['forest', 'collect'])('rejects a query when a custom-card %s listener emits a warning', async (actionId) => {
     const { session, executor } = setup(card(
       'CUSTOM_QueryFailure',
-      `if (context.actionId === '${actionId}') throw new Error('query boom')`,
+      `if (${actionId === 'forest' ? "context.space.id === 'forest'" : "context.actionId === 'collect'"}) throw new Error('query boom')`,
       null,
       '',
       'isDoable',

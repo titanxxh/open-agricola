@@ -11,6 +11,7 @@
  * catalog.ts lookup functions fall back to this registry when
  * the id starts with "CUSTOM_".
  */
+import { assertCustomCardDefinition } from '../custom-code/runtime-capabilities'
 import { getActiveCardRegistry } from './active-registry.ts'
 import type { CardRegistry } from './registry.ts'
 import { getCurrentSessionContext, type CustomCardData } from './session-card-context.ts'
@@ -56,6 +57,11 @@ export function registerCustomCard(
   data: CustomCardData,
   options: RegisterCustomCardOptions = {},
 ): void {
+  if (data.compiledCode) {
+    // Persisted Workshop envelopes carry source alongside declarative metadata.
+    const { _code, _compiled, _draft, ...definition } = data.cardJson as CustomCardData['cardJson'] & Record<string, unknown>
+    assertCustomCardDefinition(definition, data.cardJson.id)
+  }
   // Inject modifier / modifiers into the active per-session CardRegistry so
   // getCardModifiers (which reads only from the active registry post-D1)
   // resolves the same data as built-in occupation/minor cards. Custom cards

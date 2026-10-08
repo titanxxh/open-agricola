@@ -1216,7 +1216,8 @@ const CARD_IMPL = {}
       expect(adoptRes.statusCode).toBe(400)
       expect(JSON.parse(adoptRes.body)).toMatchObject({
         ok: false,
-        error: 'Ability candidate identity does not match current card',
+        error: 'Code validation failed',
+        errors: [expect.stringContaining('CARD_DEF id must match')],
       })
 
       const workspaceRes = mockRes()

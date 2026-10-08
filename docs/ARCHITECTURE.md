@@ -1557,6 +1557,8 @@ Strict main-bundle budgets in `scripts/check-bundle-size.ts` are 550 KB raw and 
 
 ### 12.5 Browser-local playtest sandbox under `client/local-sandbox/`
 
+- Workshop Capability Contract (ADR 0024): `shared/custom-code/sandbox-declarations.ts` and `runtime-capabilities.ts` are shared admission at the custom/native seam. Source validation, deployed descriptor, isolated-vm worker and browser executor share hook/metadata/listener/action admission. Complete positional arguments cross as JSON, without host callbacks. Metadata-only effects register; omitted listener filters bind explicit supported sets and owning card. Dynamic nested flows and parameter variants are checked before authoritative execution, while trusted engine-generated internal settlement keeps native authority. Fixed Session scenarios verify behavior; there is no separate behavior judge. Exact scope and deferred native mutation/callback mechanisms are in `docs/CUSTOM_CARD_SANDBOX.md` sections 3, 6 and 9.
+
 With `VITE_SANDBOX_EXECUTOR=browser`, Workshop playtesting runs entirely in the browser without server participation. The default remains backend `POST /api/game/new-sandbox`.
 
 - Startup: `WorkshopPage` assembles `LocalGameConfig`, including card JSON, source, and sandbox settings, and writes it to sessionStorage. An embedded iframe uses `?localSandbox=1`. `useTransportSetup` creates `LocalGameTransport`, which implements the complete `GameTransport` interface and enters `useGameSync` exactly like HTTP or WebSocket transport.

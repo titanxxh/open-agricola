@@ -334,7 +334,7 @@ const CARD_IMPL = {
     expect(response.state.players[0]!.resources.food).toBe(1)
   })
 
-  it('does not expose shared animal zone hooks without executor argument plumbing', () => {
+  it('accepts serializable shared animal zone hooks with complete arguments', () => {
     const result = validateAndCompileCustomCode(`
 const CARD_ID = 'CUSTOM_ExecutorCard'
 const CARD_DEF = MinorImprovement({ id: CARD_ID, name: 'Executor Card' })
@@ -346,9 +346,7 @@ const CARD_IMPL = {
 }
     `, 'CUSTOM_ExecutorCard')
 
-    expect(result.valid).toBe(false)
-    if (result.valid) return
-    expect(result.errors.join('\n')).toContain("unknown effect hook 'onComputeSharedAnimalZones'")
+    expect(result.valid).toBe(true)
   })
 
   it('rejects forbidden globals during validation', () => {
@@ -561,8 +559,7 @@ const CARD_IMPL = {
       compiledCode: compiled.compiledCode,
       cardId: 'CUSTOM_ExecutorCard',
       hook: 'onReturnHome',
-      state,
-      player: state.players[0]!,
+      args: [state, state.players[0]!],
     })
     expect(result.ok).toBe(false)
   })
@@ -588,8 +585,7 @@ const CARD_IMPL = {
       compiledCode: compiled.compiledCode,
       cardId: 'CUSTOM_HelperCard',
       hook: 'onReturnHome',
-      state,
-      player: state.players[0]!,
+      args: [state, state.players[0]!],
     })
     expect(result.ok).toBe(true)
     if (!result.ok) return
@@ -625,8 +621,7 @@ const CARD_IMPL = {
       compiledCode: compiled.compiledCode,
       cardId: 'CUSTOM_HelperCard',
       hook: 'onReturnHome',
-      state,
-      player: state.players[0]!,
+      args: [state, state.players[0]!],
     })
     expect(result).toEqual({
       ok: true,

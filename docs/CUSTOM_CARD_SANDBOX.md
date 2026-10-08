@@ -110,7 +110,7 @@ const jsonSafe = JSON.parse(JSON.stringify(value ?? null))
 Consequences:
 
 - There are no methods. Calling `player.xxx()` throws `TypeError`.
-- Mutation has no effect on host state. A handler must return `{ flow }` and let the engine execute ActionFlow.
+- Mutation has no effect on host state. A flow hook returns ActionFlow directly; a listener returns `{ flow }`. The engine performs all settlement.
 - `undefined` fields disappear because `JSON.stringify` drops their keys. Use optional chaining and nullish fallbacks when reading.
 - Circular references fail during host `JSON.stringify`. `GameState` is acyclic; custom effects must not embed `state` back into effect objects.
 
@@ -153,7 +153,7 @@ The marked blocks below are machine checked against `cardEffectHooks` in `shared
 
 ### 3.1 Hooks available under `CARD_IMPL.effect`
 
-`extractManifestFromCompiledCode` filters function keys through `cardEffectHooks`. Only listed keys are registered. The AST validator hard-fails an unlisted key when saving.
+`extractManifestFromCompiledCode` validates function keys against `cardEffectHooks`. Only admitted keys are registered. The AST validator hard-fails an unlisted key when saving.
 
 <!-- prompt-sync:begin id=card-effect-hooks -->
 - `onBuy`
@@ -184,8 +184,8 @@ The marked blocks below are machine checked against `cardEffectHooks` in `shared
 - `resolveChoice`
 - `contributeExtraTurn`
 - `computeBonusScore`
-- `computeCostedBonus`
 - `computeSharedPostScore`
+- `computeCostedBonus`
 - `computeExtraRoomCapacity`
 - `computeHarvestBreedOrderPriority`
 - `onComputeAnimalZones`
@@ -194,6 +194,13 @@ The marked blocks below are machine checked against `cardEffectHooks` in `shared
 - `getBuiltSpecialStables`
 - `getRuleContributions`
 - `getStatePresentation`
+- `computeResourceCommitments`
+- `countExtraTurns`
+- `enforceReorganizeOnLastHarvest`
+- `computeBreedThreshold`
+- `computeBreedableAnimalCount`
+- `computeAnimalScoreAdjustment`
+- `onComputeSharedAnimalZones`
 <!-- prompt-sync:end id=card-effect-hooks -->
 
 `onBeforeWork` runs after round growth and future-meeple actions but before `onRoundStart`. Use it only when the card explicitly acts before the work phase.
@@ -202,9 +209,9 @@ The marked blocks below are machine checked against `cardEffectHooks` in `shared
 
 Reaction-compatible hooks, namely action-listener `before`, `during`, `immediatelyAfter`, and `after`; the three Harvest-field hooks; `onBeforeEndGame`; and `contributeExtraTurn`, cannot depend on scan order. Multiple simultaneous items enter trigger-select, and the player selects a source card before execution. A custom card should return a replayable ActionFlow for mutation and never treat a handler invocation as final settlement.
 
-`contributeExtraTurn` returns this card's extra-turn provider flow. When several cards contribute, the system asks for the provider source before expanding that flow. `countExtraTurns` is an internal official-card field and is not exposed to Workshop.
+`contributeExtraTurn` returns this card's extra-turn provider flow. When several cards contribute, the system asks for the provider source before expanding that flow. `countExtraTurns(state, player)` reports remaining opportunities; pair it with `contributeExtraTurn`. `extraTurnBeforeWorkers` also offers the provider before ordinary workers.
 
-Allowed metadata keys outside `cardEffectHooks` are `id` and `handHooks`.
+Allowed metadata keys outside `cardEffectHooks` are `id`, `handHooks`, `beforeEndGameScope`, `beforeEndGameMandatory`, `preHarvestGoodsWanted`, `preHarvestGoodsWantedBeforeReap`, `maySkipHarvestFieldPhase`, and `extraTurnBeforeWorkers`.
 
 Advanced-hook details:
 
@@ -214,26 +221,37 @@ Advanced-hook details:
 | `computeCostedBonus` | `(state, player, ctx) => BonusScoreLevel[]` | Spend resources for VP; declare levels for solver optimization |
 | `computeSharedPostScore` | `(state, owner, summaries) => Array<{ playerId, score }>` | Cross-player score such as awarding the owner from the lowest opponent score |
 | `contributeExtraTurn` | `(state, player) => ActionFlow | void` | Provider after ordinary workers are exhausted; player selects among multiple providers |
-| `resolveChoice` | `(state, player, choice) => ActionFlow` | Handle player choice; sandbox supplies no `ctx` |
+| `resolveChoice` | `(state, player, choice, ctx) => ActionFlow` | Handle player choice; `ctx` provides sourceCard/actionContext data, without host callbacks |
 | `computeExtraRoomCapacity` | `(player) => number` | Extra housing capacity |
 | `computeHarvestBreedOrderPriority` | `(state, player) => number | void` | Harvest breeding order, with larger values later |
 | `onComputeAnimalZones` | `(player, zones, state) => AnimalZone[]` | Return only new zones; do not append input zones, and mutation of the JSON snapshot is ineffective |
 | `computeLockedFarmTiles` | `(player) => FarmTilePosition[]` | Locked farm tiles |
-| `getInvalidAnimals` | `(player, zone, meeples) => Meeple[]` | Card-zone animal restriction; sandbox supplies no `state` |
+| `getInvalidAnimals` | `(player, zone, meeples, state) => Meeple[]` | Card-zone animal restriction; fourth argument supplies the state snapshot |
 | `getBuiltSpecialStables` | `(player) => FarmTilePosition[]` | Currently standing special stables for derived snapshot display |
 | `getRuleContributions` | `(player) => CardRuleContributions` | Read-only source-owned component reservations and unused-space quantity adjustments; finite, floored, nonnegative and capped by the consuming category |
 | `getStatePresentation` | `(player) => CardStatePresentation` | Explicit public counters, resource groups, crop layers and markers; ordinary clients do not read internal storage |
 | `handHooks` metadata | `HandCardEffectHook[]` | Stage hooks that also run while the card remains in hand |
 
-Extra sowing and special stables each require a paired candidate and settlement contract: `onComputeSowableFields` with `onSowExtraField`, and `getSpecialStablePositions` with `applySpecialStable`. Settlement relies on in-place host mutation that cannot return through sandbox JSON snapshots, so Workshop exposes neither pair. `handHooks` does not support `onBuy`, `onEndTurn`, `onBeforeEndGame`, or `onBeforePlayerTurn`. `CARD_IMPL.effect` must be a direct object literal with no variable reference, spread, computed key, or accessor, preventing static-validation bypass. Server and browser manifests also filter unsupported hand hooks on the host side.
+Extra sowing and special stables each require a paired candidate and settlement contract: `onComputeSowableFields` with `onSowExtraField`, and `getSpecialStablePositions` with `applySpecialStable`. Settlement relies on in-place host mutation that cannot return through sandbox JSON snapshots, so Workshop exposes neither pair. `handHooks` does not support `onBuy`, `onEndTurn`, `onBeforeEndGame`, or `onBeforePlayerTurn`. `CARD_IMPL.effect` must be a direct object literal with no variable reference, spread, computed key, or accessor, preventing static-validation bypass. Server and browser manifests also reject unsupported hand hooks on the host side. `contributeExtraTurn` is not a hand hook.
 
 Fence discounts such as E16 Briar Hedge and C16 Field Fences use a `computeCosts` listener on `actions: ['fence']`. C1 Overhaul rebuilds only own ordinary fences through `consume-fence` `ownOnly` and generic `fencePolicy`.
+
+
+### 3.1.1 Complete arguments and additional pure queries
+
+Executors preserve every positional argument, including the fourth and fifth. Ordinary stage hooks receive optional `FlowEffectContext` as their third argument (data field `triggerActionId`); `onBuy(state, player, paymentInfo, ctx)` receives payment and that context. `resolveChoice` receives sourceCard/actionContext in its fourth argument. All arguments are JSON snapshots, without host callbacks.
+
+Additional queries: `computeResourceCommitments(state, owner)` declares player/resource reservations; `countExtraTurns(state, player)` reports remaining opportunities; `enforceReorganizeOnLastHarvest(state, player)` requests final reorganization; `computeBreedThreshold(state, player, animal, ctx)` and `computeBreedableAnimalCount(state, player, animal, count, ctx)` affect breeding; `computeAnimalScoreAdjustment(state, player, animal, ctx)` currently affects only FOTM horse scoring; `onComputeSharedAnimalZones(owner, animalOwner, zones, state)` returns new card zones with distinct owner/animal-owner identities.
+
+`beforeEndGameScope` / `beforeEndGameMandatory` govern targets and obligation. The two `preHarvestGoodsWanted*` declarations distinguish current inventory from guaranteed reaping; `maySkipHarvestFieldPhase` changes that estimate. Metadata-only effects are registered too.
 
 ### 3.2 `CARD_IMPL.listeners` allowlists
 
 `actions` accepts only these high-level action IDs. The AST validator rejects an unknown ID:
 
 <!-- prompt-sync:begin id=listener-actions -->
+- `anytime`
+- `compute-exchanges`
 - `collect`
 - `gain`
 - `receive`
@@ -251,9 +269,21 @@ Fence discounts such as E16 Briar Hedge and C16 Field Fences use a `computeCosts
 - `bake-bread`
 - `breed`
 - `reap`
+- `pay`
+- `bonus-vp`
+- `store-on-card`
+- `take-from-card`
+- `push-to-card-stack`
+- `special-effect`
+- `future-meeples`
+- `exchange`
+- `set-first-player`
+- `selection`
+- `emit-choice`
+- `reorganize`
 <!-- prompt-sync:end id=listener-actions -->
 
-`sandboxListenerPhases` is the Workshop listener-phase allowlist. Unsupported values are filtered before registration, and the AST validator hard-fails them on save:
+`sandboxListenerPhases` is the Workshop listener-phase allowlist. Unsupported values are rejected before registration, and the AST validator hard-fails them on save:
 
 <!-- prompt-sync:begin id=action-hook-phases -->
 - `before`
@@ -262,15 +292,19 @@ Fence discounts such as E16 Briar Hedge and C16 Field Fences use a `computeCosts
 - `after`
 - `computeCosts`
 - `computeArgs`
+- `computeChoiceCandidates`
 - `computeReplace`
 - `isDoable`
 - `anytime`
-- `computeChoiceCandidates`
+- `computeExchanges`
 <!-- prompt-sync:end id=action-hook-phases -->
+
+
+Listener `zones` (default played), `mandatory`, `preScoring`, `replacesTurn`, and `blockedAnytimeInteractionKinds` survive extraction and registration. Omitted cardIds/actions/phases bind this card and these explicit sets, never a global or future wildcard. `anytime` and `compute-exchanges` are dispatcher query identities, usable only in listener filters, not leaf dispatch. `computeExchanges` returns admitted `extraExchanges`. Unsupported listener fields are explicit errors.
 
 ### 3.3 Payment-mechanism boundary
 
-A Workshop card may affect payment only through the value returned by a `computeCosts` listener. Major- and minor-improvement purchase costs both listen on `actions: ['improvement']`.
+Dynamic contributions to an existing action payment use the value returned by a `computeCosts` listener. Declarative costs, exchanges and modifiers belong in `CARD_DEF.meta`. Major- and minor-improvement purchase costs both listen on `actions: ['improvement']`.
 
 `computeCosts` is a pure query evaluated repeatedly during previews and payment execution. Return the card's applicable contribution on every invocation. `context.costs` may contain an incoming computed delta: it is neither the base price nor proof that this listener has already contributed. In particular, do not skip a discount because that field already contains a negative value. The payment solver combines contributions and bounds payable costs at zero.
 
@@ -320,7 +354,7 @@ return {
 }
 ```
 
-Do not generate `deriveCardCostCandidate`, `cardCostCandidateMandatory`, `getBaseCosts`, `modifiers`, or `computeExchanges`. They are internal official-card APIs unsupported by Workshop. `deriveCardCostCandidate` and `getBaseCosts` belong to the major- and minor-improvement candidate pipeline; `computeExchanges` injects runtime exchanges. Sandbox manifests do not fully register these fields.
+Do not generate `deriveCardCostCandidate`, `cardCostCandidateMandatory`, `getBaseCosts`, or `CARD_IMPL.modifiers`: these official-card callbacks have no admitted sandbox invocation or registration contract. Declarative `CARD_DEF.meta.modifier` / `modifiers` and `exchanges` do reach the native registry and settlement paths; their placement must not be confused with `CARD_IMPL` fields. `computeExchanges` is admitted and returns `extraExchanges`; omitted filters include its explicit dispatcher identity, under the same trade admission rules.
 
 ### 3.4 `scope` values
 
@@ -332,7 +366,7 @@ Do not generate `deriveCardCostCandidate`, `cardCostCandidateMandatory`, `getBas
 - `any`
 <!-- prompt-sync:end id=listener-scopes -->
 
-An unlisted scope becomes `undefined`, equivalent to default `player` behavior.
+An unlisted scope is rejected. An omitted scope defaults to `player`.
 
 ---
 
@@ -569,6 +603,22 @@ These are frequent mistakes. `shared/actions/effects/*` contains the complete re
 - `push-to-card-stack`
 - `special-effect`
 - `future-meeples`
+- `plow`
+- `sow`
+- `fence`
+- `stables`
+- `construct`
+- `renovate-house`
+- `improvement`
+- `occupation`
+- `family-growth`
+- `breed`
+- `reap`
+- `exchange`
+- `set-first-player`
+- `selection`
+- `emit-choice`
+- `reorganize`
 <!-- prompt-sync:end id=action-ids -->
 
 | Action ID | Constraint |
@@ -584,6 +634,13 @@ These are frequent mistakes. `shared/actions/effects/*` contains the complete re
 | `future-meeples` | Sandbox form uses `params.__futureMeepleRequest`; see section 5.7. |
 
 Sprint 6b on 2026-04-30 removed five separate mutation IDs, `flag-card`, `unflag-card`, `set-card-infobox`, `clear-card-infobox`, and `write-card-extra-data`, plus three dead IDs, `hold-worker-on-card`, `release-worker-from-card`, and `gain-other-players`. Use the `special-effect` discriminated union. CI `check-prompt-sync` ensures the prompt exposes only allowlisted IDs. A sandbox card must not use another ID.
+
+
+Ordinary farm actions retain native adjacency, components, payment and prerequisites. Occupation `allowedCards` / `exactCost` belong in params; improvement `types` / `allowedPurchases` also belong in params. Farm pending uses `commitSelectionChoice`, without internal `farmPayload` shortcuts. `selection` supports explicit farm-position candidates only. `reap` requires `actionContext.trigger: {phase: 'private-field-phase', cardId: CARD_ID}`; `breed` uses this card as source; `reorganize` permits ordinary anytime only. `fencePolicy` admits own-fence `segmentBounds` (fence/total), `newPastureBounds` and `cancelPolicy` only. The deployed descriptor's paramKeys/contextKeys identify exact allowed fields; dynamic nested flows, listener overrides and declarative exchanges cross the same admission gate.
+
+Custom `pay` cannot supply `playedCards`, `candidateMetadataByFeeIndex` or `costResourceRemovals`: ownership and attribution come from the authoritative engine. Direct custom `pay.cost.cards` is deferred until a host-owned card-eligibility adapter exists; declarative card-return purchase costs in `CARD_DEF.meta.cost.cards` keep the native ownership path. Choice options cannot impersonate another source card. Scoring queries validate their arrays, player identities, resource costs and finite scores before native consumers; malformed results become card warnings.
+
+Future scheduling admits ordinary resources and field/stable, without entry actionContext or native sourceSummary. Additional local special-effect kinds are `pop-card-stack-top`, `set-infobox(text)`, and `remove-future-meeples(rounds?)`; cancellation affects this card and effect player only. Other kinds are rejected explicitly.
 
 ### 6.1 Allowed sandbox subset of `special-effect.params.kind`
 
@@ -604,7 +661,6 @@ Each mutation is a `special-effect` leaf with `sourceCard: CARD_ID`. Its `params
 
 // Write player.cardStates[sourceCard].extraData[key]
 { kind: 'set-extra-data', key: 'foo', value: 1 } // internal
-{ kind: 'set-private-data', key: 'secret', value: 'owner only' }
 
 // Add amount to player.cardStates[sourceCard].extraData[key]
 { kind: 'increment-extra-data', key: 'used', amount: 1 }
@@ -612,9 +668,9 @@ Each mutation is a `special-effect` leaf with `sourceCard: CARD_ID`. Its `params
 
 The repository may use nonsandbox kinds such as `emit-card-triggered` for visible card-trigger event logs. They are not part of the Workshop contract and are not recommended by the LLM prompt.
 
-Optional `actionContext.targetPlayerId?: string` routes a mutation to the matching player in `state.players`; it defaults to the actor in `context.player`. Workshop rarely needs it except for cross-player cases such as D134 Oyster Eater.
+Cross-player flows use the admitted top-level `targetPlayerId`, identifying an existing player. `special-effect` actionContext does not admit a target override; its source stays this card. `set-private-data` is native-only and is rejected in Workshop because its private-observation lifecycle is not admitted.
 
-Repository-internal single-card actions with a `card_*` prefix, such as `card_E112_GrainThief_protect`, register through `registerAdHocAction()` and exist only in repository code. A Workshop card cannot dispatch them: they are absent from `SANDBOX_ALLOWED_ACTION_IDS`, absent from the prompt, and rejected by sandbox runtime. Use `special-effect` or a standard action such as `gain`.
+Repository-internal single-card actions with a `card_*` prefix, such as `card_E112_GrainThief_protect`, register through `registerAdHocAction()`. Workshop provides no registration interface for them and generated cards must not depend on another card's native action. Source validation and runtime admission reject unsupported leaves, including `card_*` actions. Presence in a native registry is not proof of Workshop support; use the deployed capability contract.
 
 ---
 
@@ -678,7 +734,7 @@ The browser-local executor in `client/local-sandbox/browser-executor.ts`, used w
 
 - It exposes the same `MinorImprovement(def) => def`, `Occupation(def) => def`, simplified `console`, and every helper in section 1 through the same string constants in `shared/custom-code/injected-helpers.ts`.
 - Inputs use `JSON.parse(JSON.stringify(...))` and outputs complete a JSON round trip.
-- Hook and phase filtering uses the same shared functions and section 3 allowlists.
+- Hook, phase and output admission uses the same shared functions and section 3 allowlists.
 - It captures the same `CARD_DEF` and `CARD_IMPL` constants.
 
 `server/__tests__/local-sandbox-parity.test.ts` compares validation and compilation, effect and listener results, and error tolerance for identical source on both executors.
@@ -707,6 +763,68 @@ CI catches a missing set update.
 `check:prompt-sync` prevents only name-set drift. A payment-solver, executor argument, JSON boundary, or injected-helper change also updates `client/services/__tests__/generation-prompt.test.ts`, corresponding executor or parity tests, and semantic contract tests. When generation strategy changes, add or tighten a real `GameSession` fixture, freeze the implementation, and run the complete browser acceptance batch under the approved budget. Preserve earlier failures and distinguish synthetic runs and historical golden replay from model admission; see `docs/test/llm-card-gen.md`.
 
 ---
+
+### 9.3 Capability completion review (2026-10-08)
+
+The owner confirmed expansion of suitable real Workshop capabilities and one shared generation, validation and execution scope; see [ADR 0024](adr/0024-workshop-capability-contract-is-an-execution-boundary.md). This section records the pre-completion audit at c136edc83 and adaptation decisions. Section 9.4 is the implemented first slice; remaining rows are deferred design work and do not enlarge the deployed surface.
+
+| Audited mechanism | Current limitation | Proposed treatment and reason |
+|---|---|---|
+| `beforeEndGameScope`, `beforeEndGameMandatory` | Already extracted and executed, but absent from the model contract | Describe both fields and their owner/all-player and mandatory semantics. |
+| Listener `zones`, `mandatory`, `preScoring`, `replacesTurn`, `blockedAnytimeInteractionKinds` | Source accepts the fields but manifests discard them | Preserve their declarative data through both executors and registration; verify hand triggers, scoring windows, mandatory effects and turn completion. |
+| Declarative `modifier` / `modifiers` and `exchanges` | Already supported in `CARD_DEF.meta`; documentation conflated them with unsupported implementation fields | Define the actual placement, schemas and settlement restrictions. `reward` metadata has no current consumer; immediate rewards require `onBuy` flow. |
+| `computeExchanges` | Explicit phase rejected; unfiltered listeners can still reach it | Admit and validate the pure query explicitly, including exchange windows, and close implicit listener-filter expansion. |
+| `computeResourceCommitments`, `countExtraTurns`, `enforceReorganizeOnLastHarvest` | Native queries absent from the sandbox hook set | Suitable JSON queries; constrain result domains and preserve the pairing of `countExtraTurns` with `contributeExtraTurn`. Resource commitments affect payment admission, not just display. |
+| Breeding threshold/count, animal score adjustment, shared animal zones | Pure native queries need four or five arguments; the executor preserves only three | Add complete serializable arguments and return contracts. Score adjustment currently has a horse-scoring consumer in Farmers of the Moor; do not promise all-animal applicability. |
+| Existing `resolveChoice`, `getInvalidAnimals`, `onBuy` context | Fourth argument is lost; functions inside context are removed by JSON | Preserve serializable context and state; functions such as protected-observation/event callbacks require a separate host-owned protocol, not direct exposure. |
+| `projectInteractionRequest` | Missing four-argument bridge; native hook can change an interaction | Needs a bounded projection contract. It must not manufacture settlement commands or bypass authoritative option validation. |
+| Standard actions and the nine documented IDs | Custom return flows can currently use other registered actions | Audit and admit complete ordinary action semantics, then validate custom flows, nested nodes and parameter variants at their origin. Trusted internal engine work retains its native contracts. |
+| `special-effect` | One documented action covers 29 native `kind` variants, while the contract describes five local variants | Admit parameter variants individually. Local counters, flags, data and presentation differ from component supply, farm writes, global action-space transfers and internal cleanup. |
+
+The following native interfaces or control declarations must not be exposed merely by copying their names:
+
+| Interface or declaration | Why direct exposure is unsuitable | Mechanism-level alternative |
+|---|---|---|
+| `computePastureCapacityModifiers` | Returns `appliesTo` / `apply` functions that JSON removes | Serializable capacity contributions or a bounded per-pasture query, settled by the host. |
+| `consumeAnimalPayment`, `onAnimalRemoved` | Native implementations change animal/card state in place; copying only their return can report payment or cleanup without applying it | Named authoritative payment and marker-settlement operations. |
+| `onComputeSowableFields` + `onSowExtraField` | Candidate query alone cannot settle sowing; native settlement mutates crop storage | Design candidates, crop payment, logical-field ownership and settlement together. |
+| `getSpecialStablePositions` + `applySpecialStable` + `returnSpecialStable` | Native writes update positions, once-only state and component supply; sandbox copies cannot persist them | One generic build/return mechanism covering occupancy, supply, card state and event/log semantics. |
+| `allowAnytimeReentry` | Disables the active-entry recursion guard | Retain the guard until a bounded reentry/completion design exists. |
+| `monotoneFenceCost` | An unproved optimization assertion may prune legal fence candidates | Keep native trusted declarations or derive the guarantee from a restricted cost description. |
+| `deriveCardCostCandidate`, `cardCostCandidateMandatory` | Requires a separate candidate callback, mandatory saturation and bounded closure traversal; ordinary listener handlers do not provide these | A dedicated bounded cost-candidate adapter, reviewed as a separate slice. |
+
+An unsuitable native signature does not make the corresponding game rule permanently unsupported. Its generic settlement alternative must be designed before admission. Fixed rule scenarios and Session assertions verify behavior; capability checks do not become a separate behavior judge.
+
+Ordinary `CARD_DEF.meta.cardField` cannot be admitted as metadata alone: native `makeCardFieldImpl` registers candidates, mutating crop settlement and global definitions. A declaration alone cannot sow in the sandbox, while copying global registration would violate session isolation for the same card ID. It is deferred with the extra-sowing pair until a session-local declarative adapter and generated Card Source parity are available; the current contract rejects it explicitly. Native catalog-identity, house/card-holder and FOTM-specific metadata switches are also outside this slice because their catalog consumers and lifecycle paths need separate acceptance. The deployed `cardMetadataKeys` lists the exact admitted set.
+
+### 9.4 First implementation slice and fixed acceptance
+
+The owner selected reuse of reliable existing engine mechanisms for this slice. The following precise scope and fixed test design were confirmed before implementation. This slice now exposes 45 hooks, 11 phases, 31 listener identities (including two query identities), 25 leaf actions and eight local special-effect kinds.
+
+- Add seven pure queries: `computeResourceCommitments`, `countExtraTurns`, `enforceReorganizeOnLastHarvest`, `computeBreedThreshold`, `computeBreedableAnimalCount`, `computeAnimalScoreAdjustment`, and `onComputeSharedAnimalZones`. The hook set becomes 45. Preserve every serializable argument, including fourth/fifth arguments, in both executors; host callbacks remain unavailable. Existing `resolveChoice`, `getInvalidAnimals` and `onBuy` receive their missing serializable context. Horse-only scoring applicability remains explicit.
+- Preserve effect metadata `handHooks`, `beforeEndGameScope`, `beforeEndGameMandatory`, `preHarvestGoodsWanted`, `preHarvestGoodsWantedBeforeReap`, `maySkipHarvestFieldPhase`, and `extraTurnBeforeWorkers`. Preserve listener `zones`, `mandatory`, `preScoring`, `replacesTurn`, and `blockedAnytimeInteractionKinds`. Reject unsupported behavioral declarations rather than dropping them. Describe existing declarative card prerequisites, cost modifiers, exchanges in their actual metadata locations; defer Card Field declaration with its paired settlement.
+- Admit `computeExchanges`, making 11 phases. Expand listener actions to the corresponding admitted ordinary actions and payment/card-storage events. Omitted filters must resolve to the explicit supported sets, not all future native actions/phases; scope and card ownership remain bound to the custom card.
+- Keep the original nine leaf actions and add ordinary forms of `plow`, `sow`, `fence`, `stables`, `construct`, `renovate-house`, `improvement`, `occupation`, `family-growth`, `breed`, `reap`, `exchange`, `set-first-player`, `selection`, `emit-choice`, and `reorganize`, giving 25 IDs. Construction and purchases use their normal authoritative payment, supply and prerequisite paths. Selection is limited to explicit farm-position candidates; arbitrary native selection callbacks and private-hand follow-ups are excluded. Card-triggered breeding/reaping/reorganization must not impersonate Harvest or round-end lifecycle. Ordinary native constraints remain authoritative.
+- Admit exactly eight `special-effect` variants: `increment-counter`, `set-counter`, `set-flag`, `increment-extra-data`, `set-extra-data`, `pop-card-stack-top`, `set-infobox`, and `remove-future-meeples`. Bind local writes and schedule cancellation to the custom card and authorized effect player. Other variants are explicit gaps, including private-observation writes and internal lifecycle cleanup.
+- Validate both inspectable source and dynamic custom output against the same descriptors, including nested flows, metadata-triggered operations and parameter variants. Apply the boundary where custom values enter the host; native internal children retain their own authority. Align the browser-local executor with the server executor. Continue using the two existing reference tools and user-owned browser-to-model connection.
+
+Deferred items are the section 9.3 native mutation/callback pairs, bounded interaction projection, derived-cost callbacks, reentry and optimization declarations, plus `place-farmer`. The last combines action-space expansion, worker supply and turn rotation; its ordinary and no-worker/temporary-worker variants require a separate complete chain review and fixed Session acceptance. None is enabled by an undocumented escape path.
+
+**Test design:** This is a generic sandbox-boundary adaptation, not a single-card core branch. Mechanical admission/serialization uses existing validator/executor tests. Simple local effects use public direct behavior tests. Payment, choices, phases, cross-player zones and multi-step flows use fixed `GameSession` scenarios. Every Session begins with a new two-player game (seed 42), explicit hands for both players (`['__test_placeholder__']` when irrelevant), the source-owned custom card in the stated hand/played zone, empty initial `cardStates`, normal farm/worker supply and no occupied action spaces unless the scenario states otherwise. Each scenario sets its resources and only the required board/phase facts; it must not depend on random dealt cards.
+
+| Fixed scenario | Preparation and public sequence | Required assertions and non-triggering cases |
+|---|---|---|
+| Hand/played listener and ownership | P0 holds the custom card; Forest contains 3 wood; run `takeAction(0, 'forest')`, finish its explicit choices, and repeat with the card played or owned only by P1 | Resource deltas and source-attributed log/event; trigger only in the declared zone/scope; no double activation. |
+| Phase metadata and scoring window | Round 14, used workers, fixed played cards; before-end gain is mandatory/all-player; prepare 1 wood and a registered exchange; run `invokeAfterRoundEnd`, resolve activation, then `takeAnytimeAction` / `resolveChoice` in the scoring window | Correct target resources, mandatory/pass availability, declared pre-scoring entry and costs, final `gameOver`/scores; absent cards and blocked interaction kinds do not offer it. |
+| Complete query arguments | Prepare fixed animal counts/zones and card-local counters; run public breeding/zone aggregators inside Session context, then the corresponding real breed/reorganization commands | Fourth/fifth arguments distinguish source, current count, owner and animal owner; actual animal totals and pending placement agree; unrelated species/source does not change behavior; JSON-copy writes do not alter input state. |
+| Commitments and repeated opportunities | P0 has 2 food; the card reserves 2 while its local condition holds; attempt a 1-food payment, release the condition, retry; separately exhaust workers with a two-opportunity provider | Failed commitment preserves state/resources/log; accepted payment settles once; count-driven opportunities are consumed once and do not suppress or invent another player's turn. |
+| Farm and purchases | Prepare seeds/building resources, legal empty adjacent tiles and explicit eligible hand cards; enter each admitted action through the custom flow; submit `commitSelectionChoice`, payment `resolveChoice` and card selection explicitly | Fields/crops/rooms/stables/pastures, costs, component supply, hand/played cards, pending completion and logs; reject occupied/disconnected tiles, insufficient resources/supply and unmet prerequisites without partial writes. |
+| Private field/breed and ordinary reorganization | Fixed crop stack, two animals and sufficient housing; run the custom extra-reap/breed flow and submit ordinary animal placement | Correct crop depletion, resource/animal deltas and placement totals; no fabricated official Harvest summaries or lifecycle; invalid placement rejected. |
+| Choice, selector and exchange | Emit a source-owned choice, resolve its stated value through `resolveChoice`; select an explicit farm tile through `commitSelectionChoice`, then read the stored result in a later flow step; execute a stated registered exchange | Selected outcome, stored local data and exact payment/reward; unknown choice/tile, internal selector callbacks and unregistered trade side effects rejected. |
+| Local state and schedules | Fixed own-card and other-card counters/stacks/schedules; call each local public effect; cancel stated future rounds; exercise snapshot restoration | Exact counter/flag/stack/infobox changes and schedule cancellation; preserve another card/player and nonselected rounds; restored state remains equivalent. |
+| Closed capability boundary | Fixed invalid declarations and runtime-computed nested flows; submit via the existing validator and both executors | Explicit failure for unsupported keys, phases/actions, foreign local source IDs and forbidden parameter variants; no implicit expansion through omitted filters or declarative metadata. |
+
+Keep all existing fixed LLM fixtures and historical replay. Add precise rule scenarios to the existing test infrastructure; do not introduce a separate behavior judge or commit run-result JSON. Verification includes executor parity, the fixed LLM suite, a real local browser contract/validation flow, `test:fast`, lint and build. The deterministic acceptance path does not contact a model provider.
 
 ## 10. History
 

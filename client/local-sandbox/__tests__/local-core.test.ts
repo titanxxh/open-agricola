@@ -200,8 +200,7 @@ const CARD_IMPL = {
       compiledCode: compiled.compiledCode,
       cardId: 'CUSTOM_BoomCard',
       hook: 'onReturnHome',
-      state: { players: [] } as never,
-      player: { minorPlayed: [] } as never,
+      args: [{ players: [] }, { minorPlayed: [] }],
     })
     expect(result).toEqual({ ok: false, error: expect.stringContaining('local boom') })
   })
@@ -252,8 +251,7 @@ const CARD_IMPL = {
       compiledCode: compiled.compiledCode,
       cardId: 'CUSTOM_ThisEscape',
       hook: 'onReturnHome',
-      state: {} as never,
-      player: {} as never,
+      args: [{}, {}],
     })
     expect(result).toEqual({
       ok: true,
@@ -278,8 +276,7 @@ const CARD_IMPL = { effect: { id: CARD_ID, onReturnHome: () => gainLeaf(CARD_ID,
       compiledCode: compiled.compiledCode,
       cardId: 'CUSTOM_SlowCard',
       hook: 'onReturnHome',
-      state: {} as never,
-      player: {} as never,
+      args: [{}, {}],
     })
 
     expect(result).toEqual({

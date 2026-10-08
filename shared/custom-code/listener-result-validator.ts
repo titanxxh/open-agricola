@@ -1,3 +1,5 @@
+import { assertCustomListenerCapabilities } from './runtime-capabilities'
+import type { CardListenerContext } from '../cards/card-listeners'
 import type { ActionHookResult } from '../actions/hooks'
 import { REAL_RESOURCE_KEYS } from '../contract/resource-keys'
 
@@ -36,9 +38,11 @@ const equalResourceDeltas = (
 export const validateCustomListenerResult = (
   value: unknown,
   cardId: string,
+  context?: CardListenerContext,
 ): ActionHookResult | null => {
   if (value === null || value === undefined) return null
   if (!isPlainRecord(value)) throw new Error('custom listener result must be a plain object')
+  assertCustomListenerCapabilities(value, cardId, context)
   if (!Object.hasOwn(value, 'costs')) {
     if ('costs' in value) throw new Error('custom listener costs must be an own property')
     if ('costAttribution' in value) {

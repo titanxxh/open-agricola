@@ -119,7 +119,7 @@ setActiveWorkerCount(p1, 0)          // 对手零工人，避免轮转
 
 见 `docs/CUSTOM_CARD_SANDBOX.md` §5.5 / §5.6 / §5.7：
 
-- `listeners[].actions:` 是 leaf actionId（`place-farmer` / `gain` / `collect` 等），不是行动空间 id
+- `listeners[].actions:` 使用站点准入的分发身份（`gain` / `collect` / `plow` 等），不是行动空间 id；`anytime` 和 `compute-exchanges` 是仅供 listener 使用的查询身份，不能作为 leaf。`place-farmer` 尚未开放
 - `harvest-feed` 不是 listener 动作——喂食阶段开始时的收益用 `onStartHarvestFeedingPhase` effect hook
 - Anytime = `phases: ['anytime']` listener，不用 `actions:` 字段；一次性能力用 `special-effect` 的 `set-flag` + `cardStates.flagged` 闸门
 - `futureMeeplesNode` 没注入沙盒，手写 `params.__futureMeepleRequest` leaf

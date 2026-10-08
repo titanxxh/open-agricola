@@ -13,6 +13,8 @@ import { cardEffectHooks, flowCardEffectHooks, isHandCardEffectHook } from '../c
 import { REAL_RESOURCE_KEYS } from '../contract/resource-keys'
 import { isSandboxListenerAction } from './sandbox-listener-actions'
 import { sandboxListenerPhases } from './sandbox-listener-phases'
+import { sandboxEffectMetadata, sandboxListenerFields, sandboxCommonActionContextKeys, sandboxFlowFields } from './sandbox-declarations'
+import { SANDBOX_ALLOWED_ACTION_IDS, sandboxActionIdMeta, sandboxSpecialEffectKinds, type SandboxActionId } from './sandbox-action-ids'
 
 export type ValidationResult = { valid: true } | { valid: false; errors: string[] }
 
@@ -49,9 +51,7 @@ const DENIED_PROPERTY_ACCESS = new Set([
 const ALLOWED_EFFECT_KEYS = new Set<string>([
   ...cardEffectHooks,
   'id',
-  'handHooks',
-  'beforeEndGameScope',
-  'beforeEndGameMandatory',
+  ...Object.keys(sandboxEffectMetadata),
 ])
 
 /** Allowed values inside listener.phases arrays. */
@@ -80,6 +80,42 @@ function validateLiteralFlow(
   const properties = [...expression.properties].reverse()
   const type = properties.find(property => getStaticPropertyName(property, constants) === 'type')
   const kind = type && ts.isPropertyAssignment(type) ? getStaticStringValue(type.initializer, constants) : undefined
+  if (kind && ['leaf', 'seq', 'or', 'xor', 'parallel'].includes(kind)) {
+    const fields: readonly string[] = kind === 'leaf' ? sandboxFlowFields.leaf : sandboxFlowFields.composite
+    for (const property of properties) {
+      const key = getStaticPropertyName(property, constants)
+      if (key && !fields.includes(key) && !['items', 'steps'].includes(key)) errors.push(`line ${getLine(property)}: unsupported ActionFlow field '${key}'`)
+      if (key === 'sourceCard' && ts.isPropertyAssignment(property)) {
+        const source = getStaticStringValue(property.initializer, constants)
+        if (source && constants.get('CARD_ID') && source !== constants.get('CARD_ID')) errors.push(`line ${getLine(property)}: flow sourceCard must be CARD_ID`)
+      }
+    }
+  }
+  if (kind === 'leaf') {
+    const action = properties.find(property => getStaticPropertyName(property, constants) === 'actionId')
+    const actionId = action && ts.isPropertyAssignment(action) ? getStaticStringValue(action.initializer, constants) : undefined
+    if (actionId && !(SANDBOX_ALLOWED_ACTION_IDS as readonly string[]).includes(actionId)) errors.push(`line ${getLine(action!)}: unsupported Workshop action '${actionId}'`)
+    if (actionId && (SANDBOX_ALLOWED_ACTION_IDS as readonly string[]).includes(actionId)) {
+      const descriptor = sandboxActionIdMeta[actionId as SandboxActionId]
+      for (const [name, allowed] of [['params', descriptor.paramKeys], ['actionContext', [...sandboxCommonActionContextKeys, ...descriptor.contextKeys]]] as const) {
+        const field = properties.find(property => getStaticPropertyName(property, constants) === name)
+        if (!field || !ts.isPropertyAssignment(field) || !ts.isObjectLiteralExpression(field.initializer)) continue
+        for (const property of field.initializer.properties) {
+          const key = getStaticPropertyName(property, constants)
+          if (key && !allowed.includes(key)) errors.push(`line ${getLine(property)}: unsupported ${actionId}.${name} field '${key}'`)
+        }
+      }
+    }
+    if (actionId === 'special-effect') {
+      const params = properties.find(property => getStaticPropertyName(property, constants) === 'params')
+      if (params && ts.isPropertyAssignment(params) && ts.isObjectLiteralExpression(params.initializer)) {
+        const tag = params.initializer.properties.find(property => getStaticPropertyName(property, constants) === 'kind')
+        const variant = tag && ts.isPropertyAssignment(tag) ? getStaticStringValue(tag.initializer, constants) : undefined
+        if (variant && !(sandboxSpecialEffectKinds as readonly string[]).includes(variant)) errors.push(`line ${getLine(tag!)}: unsupported special-effect kind '${variant}'`)
+      }
+    }
+    return
+  }
   if (!kind || !['seq', 'or', 'xor', 'parallel'].includes(kind)) return
   const children = properties.find(property => getStaticPropertyName(property, constants) === 'children')
   const report = () => errors.push(`line ${getLine(expression)}: ActionFlow '${kind}' requires a children array, not items or steps`)
@@ -652,6 +688,10 @@ function validateCardImplObject(
       errors.push(`line ${getLine(prop)}: CARD_IMPL.listeners must use a property assignment`)
       continue
     }
+    if (propName !== 'listeners') {
+      errors.push(`line ${getLine(prop)}: unsupported CARD_IMPL field '${propName}'`)
+      continue
+    }
     if (!ts.isPropertyAssignment(prop)) continue
     if (!propName) continue
 
@@ -789,6 +829,10 @@ function validateListenersArray(
         : ts.isStringLiteral(prop.name) ? prop.name.text : undefined
       if (propName === '__proto__') {
         errors.push(`line ${getLine(prop)}: CARD_IMPL listener properties must not set __proto__`)
+        continue
+      }
+      if (!propName || !['handler', 'id', ...Object.keys(sandboxListenerFields)].includes(propName)) {
+        errors.push(`line ${getLine(prop)}: unsupported listener field '${propName}'`)
         continue
       }
       if ((propName === 'actions' || propName === 'phases') && !ts.isPropertyAssignment(prop)) {

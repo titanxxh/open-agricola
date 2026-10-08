@@ -15,7 +15,7 @@ describe('workshop cost prompt contract', () => {
       expect(content).toMatch(/payment-only|虚拟支付资源/)
       expect(content).toMatch(/(?:deriveCardCostCandidate[\s\S]{0,240}(?:official-card|官方卡)|(?:official-card|官方卡)[\s\S]{0,240}deriveCardCostCandidate)/i)
       expect(content).toMatch(/(?:getBaseCosts[\s\S]{0,240}(?:official-card|官方卡)|(?:official-card|官方卡)[\s\S]{0,240}getBaseCosts)/i)
-      expect(content).toMatch(/(?:computeExchanges[\s\S]{0,240}(?:unavailable|unsupported|do not|不可用|不支持|不要|官方卡)|(?:unavailable|unsupported|do not|不可用|不支持|不要|官方卡)[\s\S]{0,240}computeExchanges)/i)
+      expect(content).toContain('`computeExchanges` is admitted and returns `extraExchanges`')
     }
   })
 
