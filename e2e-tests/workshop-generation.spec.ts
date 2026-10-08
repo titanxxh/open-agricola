@@ -203,3 +203,51 @@ test('project metadata and anonymous GitHub source work from the real browser or
   expect(rawRequests.every(item => !item.authorization)).toBe(true)
   console.log(JSON.stringify({ githubBrowserProbe: 'passed', commit: evidence.commit, path: evidence.path }))
 })
+
+for (const large of [false, true]) test(`acceptance captures bounded visible answers without opaque fields (${large ? 'large' : 'malformed'})`, async ({ page }) => {
+  const user = await createLocalUserForTests(`answer_${large}_${Date.now().toString(36)}`, 'answer-test-password')
+  const cookie = await createSession(user.id)
+  if (!cookie) throw new Error('No answer evidence test session')
+  await page.context().addCookies([{ name: 'oa_session', value: cookie, url: FRONTEND_URL }])
+  await page.route('**/api/workshop/references/**', route => route.fulfill({ json: route.request().url().endsWith('/main') ? { object: { sha: referenceCommit } } : { truncated: false, tree: [] } }))
+  const answer = large ? '缺'.repeat(30_000) : '\uFEFF{"kind":"capability-gap","message":"Unavailable capability."}'
+  const reasoning = 'private-answer-reasoning-canary'
+  const signature = 'private-answer-signature-canary'
+  let posts = 0
+  let settlements = 0
+  await page.exposeFunction('acceptanceReserve', () => 'synthetic-answer-reservation')
+  await page.exposeFunction('acceptanceSettle', () => { settlements += 1 })
+  await page.route(modelUrl, async route => {
+    posts += 1
+    const frames = [
+      { model: 'deepseek-flash', choices: [{ index: 0, delta: { role: 'assistant', content: answer, reasoning_content: reasoning, extra_content: { google: { thought_signature: signature } } }, finish_reason: 'stop' }] },
+      { choices: [], usage: { prompt_tokens: 100, completion_tokens: 50 } },
+    ]
+    await route.fulfill({ contentType: 'text/event-stream', body: frames.map(frame => `data: ${JSON.stringify(frame)}\n\n`).join('') + 'data: [DONE]\n\n' })
+  })
+  await page.goto(FRONTEND_URL)
+  const result = await page.evaluate(async ({ modelKey, referenceCommit }) => {
+    const modulePath = '/tests/llm-card-gen/acceptance/browser.ts'
+    const { runBrowserTask } = await import(modulePath)
+    const { contract } = await (await fetch('/api/workshop/sandbox-contract')).json()
+    return runBrowserTask({
+      task: 'visible-answer-evidence', arm: 'tools',
+      input: { id: 'visible-answer-evidence', workspaceId: 'answer-evidence', baseRevision: 1,
+        draft: { cardId: 'CUSTOM_AnswerEvidence', cardType: 'minor', name: 'Answer Evidence', description: '', cardJson: {}, effectCode: null, artUrl: null, generation: {} },
+        intent: { kind: 'generate', message: 'Explain the unavailable capability.' }, oracle: 'M15', expected: 'capability-gap',
+      },
+      config: { provider: 'deepseek', model: 'deepseek-flash', apiKey: modelKey },
+      control: { text: '', sha256: '', sourceCommit: referenceCommit }, sandboxContractId: contract.id,
+    })
+  }, { modelKey, referenceCommit })
+  expect(posts).toBe(1)
+  expect(settlements).toBe(1)
+  expect(result.snapshot).toMatchObject({ status: 'completed', modelRequests: 1, result: { kind: 'failure' } })
+  expect(result.snapshot.candidate).toBeUndefined()
+  expect(result.sources).toHaveLength(0)
+  expect(result.answers).toHaveLength(1)
+  expect(result.answers[0]).toMatchObject({ sequence: 1, textBytes: Buffer.byteLength(answer), sha256: createHash('sha256').update(answer).digest('hex'), truncated: large })
+  expect(result.answers[0].text).toBe(large ? '缺'.repeat(Math.floor(65_536 / 3)) : answer)
+  expect(Buffer.byteLength(result.answers[0].text)).toBeLessThanOrEqual(65_536)
+  for (const secret of [reasoning, signature, modelKey]) expect(JSON.stringify(result)).not.toContain(secret)
+})
