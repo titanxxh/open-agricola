@@ -120,13 +120,15 @@ External `DATABASE_URL` and complete `S3_*` settings can be supplied later. Move
 | OpenRouter | `openai/gpt-5-image-mini` | GPT-5 Image Mini | No | No | Yes | OpenRouter image model |
 | OpenRouter | `google/gemini-2.5-flash-image` | Gemini 2.5 Flash Image / Nano Banana | No | No | Yes | OpenRouter image model |
 | OpenRouter | `bytedance-seed/seedream-4.5` | Seedream 4.5 | No | No | Yes | OpenRouter image model |
-| OpenRouter | `deepseek/deepseek-v4-flash` | DeepSeek V4 Flash | No | Yes | No | DeepSeek chat through OpenRouter |
-| OpenRouter | `deepseek/deepseek-v4-pro` | DeepSeek V4 Pro | No | Yes | No | DeepSeek chat through OpenRouter |
-| DeepSeek | `deepseek-v4-flash` | DeepSeek V4 Flash | Yes | Yes | No | Official DeepSeek API |
-| DeepSeek | `deepseek-v4-pro` | DeepSeek V4 Pro (Reasoning) | No | Yes | No | Official API; display final content but not reasoning content |
+| OpenRouter | `deepseek/deepseek-v4.1-flash` | DeepSeek V4.1 Flash | No | Yes | No | DeepSeek chat through OpenRouter |
+| OpenRouter | `deepseek/deepseek-v4-pro-0813` | DeepSeek V4 Pro (0813) | No | Yes | No | DeepSeek chat through OpenRouter |
+| DeepSeek | `deepseek-flash` | DeepSeek V4.1 Flash | Yes | Yes | No | Official DeepSeek API |
+| DeepSeek | `deepseek-v4-pro` | DeepSeek V4 Pro (0813) | No | Yes | No | Official API; display final content but not reasoning content |
 | AiHubMix | `gemini-3.1-flash-image-preview-free` | Gemini 3.1 Flash Image (Free) | No | No | Yes | Free AiHubMix image model |
 | AiHubMix | `coding-glm-5.1-free` | Coding GLM 5.1 (Free) | Yes | Yes | No | Free AiHubMix chat model |
 | AiHubMix | `k2.6-code-preview-free` | K2.6 Code Preview (Free) | No | Yes | No | Free AiHubMix chat model |
+
+DeepSeek names were verified on 2026-10-08 against the [official model list](https://api-docs.deepseek.com/quick_start/pricing/) and [OpenRouter catalog](https://openrouter.ai/api/v1/models). The official Flash API uses `deepseek-flash` for V4.1 Flash; its retired `deepseek-v4-flash` name is only a temporary forwarding alias. The current Pro is V4 Pro 0813: its official ID remains `deepseek-v4-pro`, while OpenRouter requires the `-0813` suffix because its unsuffixed Pro still identifies the older 0423 checkpoint. Both support thinking; image understanding does not imply image generation.
 
 OpenRouter has no provider-level fallback `chat` or `image` capability. Every model declares its own capabilities so image UI never shows chat-only models and chat UI never shows image-only models.
 
