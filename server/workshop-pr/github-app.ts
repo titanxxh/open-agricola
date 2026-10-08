@@ -32,7 +32,8 @@ export class WorkshopGitHubApp {
 
   invalidate(): void { this.tokens.clear() }
 
-  async token(permission: 'read' | 'write'): Promise<string> {
+  async token(permission: 'read' | 'write', signal?: AbortSignal): Promise<string> {
+    signal?.throwIfAborted()
     const now = this.options.now?.() ?? Date.now()
     const cached = this.tokens.get(permission)
     if (cached && cached.expiresAt - 60_000 > now) return cached.token
@@ -42,6 +43,7 @@ export class WorkshopGitHubApp {
       `https://api.github.com/app/installations/${encodeURIComponent(this.options.installationId)}/access_tokens`,
       {
         method: 'POST',
+        signal,
         headers: {
           Accept: 'application/vnd.github+json', Authorization: `Bearer ${jwt}`,
           'Content-Type': 'application/json', 'X-GitHub-Api-Version': '2022-11-28',

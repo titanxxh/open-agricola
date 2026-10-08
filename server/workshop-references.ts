@@ -1,4 +1,5 @@
 import { WorkshopGitHubApp } from './workshop-pr/github-app'
+import { GitHubApiError } from './workshop-pr/github-transport'
 
 const repository = 'titanxxh/open-agricola'
 const commitPattern = /^[a-f0-9]{40}$/
@@ -14,14 +15,14 @@ export class WorkshopReferenceError extends Error {
   constructor(status: number, message: string, retryAfter?: number) { super(message); this.status = status; this.retryAfter = retryAfter }
 }
 
-async function projectToken(): Promise<string> {
+async function projectToken(signal: AbortSignal): Promise<string> {
   const dedicated = process.env.WORKSHOP_REFERENCE_GITHUB_TOKEN?.trim()
   if (dedicated) return dedicated
   app ??= WorkshopGitHubApp.fromEnv()
   if (!app || `${app.options.repositoryOwner}/${app.options.repositoryName}` !== repository) {
     throw new WorkshopReferenceError(503, 'Project GitHub reference credentials are unavailable.')
   }
-  return app.token('read')
+  return app.token('read', signal)
 }
 
 async function boundedJson(response: Response, limit: number, signal: AbortSignal): Promise<unknown> {
@@ -60,7 +61,7 @@ export async function readWorkshopReference(target: string, callerSignal: AbortS
   inFlight += 1
   const signal = AbortSignal.any([callerSignal, AbortSignal.timeout(15_000)])
   try {
-    const token = await projectToken()
+    const token = await projectToken(signal)
     signal.throwIfAborted()
     const resource = commit ? `git/trees/${commit}?recursive=1` : 'git/ref/heads/main'
     const response = await fetch(`https://api.github.com/repos/${repository}/${resource}`, {
@@ -99,6 +100,11 @@ export async function readWorkshopReference(target: string, callerSignal: AbortS
     return { object: { sha } }
   } catch (error) {
     if (error instanceof WorkshopReferenceError) throw error
+    if (error instanceof GitHubApiError && error.status === 429) {
+      const delay = Number.isFinite(error.retryAfter) ? error.retryAfter! : 60
+      blockedUntil = Math.max(blockedUntil, Date.now() + Math.max(60, delay) * 1000)
+      throw new WorkshopReferenceError(429, 'GitHub reference rate-limit cooldown is active.', Math.ceil((blockedUntil - Date.now()) / 1000))
+    }
     // Never expose upstream bodies, credential-bearing errors or request headers.
     throw new WorkshopReferenceError(503, 'GitHub reference metadata is unavailable.')
   } finally { inFlight -= 1 }
