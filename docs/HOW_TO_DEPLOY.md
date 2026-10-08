@@ -46,6 +46,8 @@ pnpm install --frozen-lockfile
 cp .env.example .env
 ```
 
+The production image also includes the original `pnpm-lock.yaml` used by the frozen install. Workshop sandbox identity hashes it with the deployed source and runtime versions; omitting it fails contract loading instead of silently ignoring dependency changes.
+
 Set the existing `PUBLIC_API_BASE`, `PUBLIC_APP_ORIGIN`, `CORS_ORIGIN`, and account/OAuth settings in `.env`; preserve registered callbacks. Leave `DATABASE_URL` and the S3 connection group blank to use local services. External S3 requires a complete endpoint, region, private bucket, access key, and secret.
 
 ```bash

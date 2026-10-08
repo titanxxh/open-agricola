@@ -375,7 +375,7 @@ describe('workshop draft aggregate', () => {
   })
 
   it.each(['pending','blocked'])('retains the frozen version and artwork reference of a %s submission', async state => {
-    let workspace = await createCard(db,{authorId:'author',draft:baseDraft({artUrl:'/card-art/original.png'})})
+    let workspace = await createCard(db,{authorId:'author',draft:handoffDraft({artUrl:'/card-art/original.png'})})
     const {versionId} = await pinCurrentDraftVersion(db,{cardId:workspace.id,authorId:'author',baseRevision:workspace.revision})
     await db.prepare(`INSERT INTO workshop_submissions(id,card_id,author_id,version_id,revision,state,payload,created_at,updated_at)
       VALUES ('submission',?,'author',?,?,?,'{}',1,1)`).run(workspace.id,versionId,workspace.revision,state)
@@ -385,6 +385,11 @@ describe('workshop draft aggregate', () => {
     }
     expect((await loadSandboxVersion(db,{cardId:workspace.id,authorId:'author',versionId})).artUrl).toBe('/card-art/original.png')
     expect(await db.prepare("SELECT object_key FROM object_references WHERE owner_kind='workshop_card_versions' AND owner_id=?").get(versionId)).toEqual({object_key:'card-art/original.png'})
+    const recent = await db.prepare('SELECT id FROM workshop_card_versions WHERE card_id = ? ORDER BY version_number DESC LIMIT 5').all(workspace.id)
+    expect(recent).not.toContainEqual({ id: versionId })
+    workspace = await restoreVersion(db, { cardId: workspace.id, authorId: 'author', baseRevision: workspace.revision, versionId })
+    const pinned = await pinCurrentDraftVersion(db, { cardId: workspace.id, authorId: 'author', baseRevision: workspace.revision })
+    expect(pinned).toMatchObject({ versionId, cardJson: { id: 'CUSTOM_FieldKeeper', name: 'Field Keeper', card_type: 'occupation', _code: 'const CARD_DEF = {}; const CARD_IMPL = {}' } })
     await db.prepare("UPDATE workshop_submissions SET state='complete' WHERE id='submission'").run()
     workspace = await checkpointDraft(db,{cardId:workspace.id,authorId:'author',baseRevision:workspace.revision,draft:{...workspace.draft,artUrl:'/card-art/8.png'}})
     await pinCurrentDraftVersion(db,{cardId:workspace.id,authorId:'author',baseRevision:workspace.revision})

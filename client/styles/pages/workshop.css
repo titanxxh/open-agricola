@@ -2063,6 +2063,7 @@
 
 .aicw-heading {
   min-width: 0;
+  max-width: 100%;
 }
 
 .aicw-heading > span,
@@ -3167,6 +3168,10 @@
 
   .aicw-heading h2 {
     white-space: normal;
+  }
+
+  .aicw-heading > div {
+    flex-wrap: wrap;
   }
 
   .aicw-header-actions {

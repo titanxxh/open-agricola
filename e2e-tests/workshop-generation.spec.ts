@@ -113,6 +113,9 @@ for (const locale of ['zh', 'en'] as const) test(`editor candidate recovery and 
   await expect(editor).toHaveValue(source(9, true))
   await expect(adopt).toBeDisabled()
   expect(bodies).toHaveLength(5) // Original + exactly two static repairs.
+  // Verify recovery after the final result is saved, not the conflict branch
+  // caused by navigating while its revision update is still in flight.
+  await expect(page.locator('.aicw-save-state')).toContainText(zh ? '已同步' : 'Synced')
   await page.reload()
   await page.getByRole('button', { name: zh ? /卡牌能力\s*对话、源码与验证/ : /Card ability\s*Conversation/ }).click()
   await expect(editor).toHaveValue(source(9, true))
@@ -145,6 +148,7 @@ for (const locale of ['zh', 'en'] as const) test(`editor candidate recovery and 
   await input.fill('An interrupted response')
   await generate.click()
   await expect(page.locator('.aicw-generation-progress')).toContainText(zh ? '已暂停' : 'Paused')
+  await expect(page.locator('.aicw-save-state')).toContainText(zh ? '已同步' : 'Synced')
   await page.reload()
   await page.getByRole('button', { name: zh ? /卡牌能力\s*对话、源码与验证/ : /Card ability\s*Conversation/ }).click()
   await expect(page.locator('.aicw-generation-result')).toContainText(zh ? '上次尝试已中断' : 'Previous attempt interrupted')

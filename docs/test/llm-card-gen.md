@@ -98,6 +98,8 @@ Deterministic protocol replay and browser E2E cover reference versions and failu
 
 Prompt v13 keeps repair source only in `input.source`; its error/version metadata is projected separately. It also retains candidate revision/staleness through checkpoints, clears model attribution after manual source edits, and applies the same card-identity check to generated and manually validated source. The completed v13 batch below verifies generation quality for the frozen implementation containing these fixes; editor/server regressions cover their state and recovery behavior. All earlier complete and failed batches remain historical evidence.
 
+The v14 review fixes add resolved dependencies to runtime identity, return the immutable snapshot directly when pinning, and reject retired model aliases before paid acceptance. A new complete frozen batch is required before updating admission evidence; the v13 result below remains historical evidence.
+
 ### Completed paid acceptance
 
 On 2026-10-08 (UTC+8), batch `live-2026-10-08T07-24-21-177Z-1a74d648` completed all 102 planned runs against clean implementation `987078668637da28a883283c6ed502c975dd656a`, prompt `workshop-browser-tools-v13` and tools `github-text-v5`. The [resolution evidence](https://github.com/titanxxh/open-agricola/issues/1041#issuecomment-6055439718) and [compact evidence artifact](../../tests/llm-card-gen/acceptance/evidence/deepseek-flash-v13-2026-10-08.json) retain exact settings, deployed sandbox identity, per-scenario counts, earlier failures, accounting and hashes of the original local artifacts.

@@ -37,6 +37,11 @@ export type WorkshopWorkspaceContract = {
   sandboxPassedAt: number | null
 }
 
+export type WorkshopPinnedVersionContract = {
+  versionId: string
+  cardJson: Record<string, unknown>
+}
+
 export type WorkshopGenerationCandidateBase = {
   id: string
   prompt: string

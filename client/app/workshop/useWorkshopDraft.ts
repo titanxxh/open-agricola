@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
-import type { WorkshopDraftErrorCode } from '../../../shared/contract/workshop'
+import type { WorkshopDraftErrorCode, WorkshopPinnedVersionContract } from '../../../shared/contract/workshop'
 import { projectAbilityCandidate, projectWorkshopGeneration } from '../../../shared/projections/workshop-generation'
 import {
   createWorkshopDraftState,
@@ -23,6 +23,7 @@ type WorkspaceResponse = {
   workspace?: WorkshopWorkspaceDto
   current?: WorkshopWorkspaceDto
   versionId?: string
+  cardJson?: WorkshopPinnedVersionContract['cardJson']
   error?: string
   code?: WorkshopDraftErrorCode
 }
@@ -557,7 +558,7 @@ export const useWorkshopDraft = ({
     }
   }, [apiFetch, cardId, dispatch, persist, saveDraft])
 
-  const pinDraftVersion = useCallback(async (): Promise<string | null> => {
+  const pinDraftVersion = useCallback(async (): Promise<WorkshopPinnedVersionContract | null> => {
     let current = stateRef.current
     if (!current || current.save.status === 'conflict') return null
     if (current.save.status !== 'saved') {
@@ -583,11 +584,11 @@ export const useWorkshopDraft = ({
         })
         return null
       }
-      if (!response.ok || !payload.versionId) {
+      if (!response.ok || !payload.versionId || !isRecord(payload.cardJson)) {
         dispatch({
           type: 'saveFailed',
           status: 'error',
-          error: payload.error ?? `Request failed (${response.status})`,
+          error: payload.error ?? (response.ok ? 'Pinned version response is missing its snapshot' : `Request failed (${response.status})`),
           errorCode: payload.code,
         })
         return null
@@ -604,7 +605,7 @@ export const useWorkshopDraft = ({
         })
         return null
       }
-      return payload.versionId
+      return { versionId: payload.versionId, cardJson: payload.cardJson }
     } catch (reason) {
       dispatch({
         type: 'saveFailed',
