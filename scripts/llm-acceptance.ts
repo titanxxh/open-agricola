@@ -163,7 +163,7 @@ try {
     const reference = await page.evaluate(async () => {
       const modulePath = '/client/services/llm/generation/references.ts'
       const { ReferenceSession } = await import(modulePath)
-      const session = await ReferenceSession.open(AbortSignal.timeout(45_000))
+      const session = await ReferenceSession.createOpener()(AbortSignal.timeout(45_000))
       return { transport: 'project-authenticated-metadata', commit: session.commit }
     })
     save('github-preflight.json', reference)
