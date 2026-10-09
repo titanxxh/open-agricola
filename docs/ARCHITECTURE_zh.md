@@ -705,7 +705,7 @@ anytime                  额外注册的 anytime 行动
 
 matched card listener set 冻结后，activation 前不重新检查 owner card 是否仍在原 zone。触发资格由 trigger-time 判定；listener body 读取 live `ownerPlayer` / `effectPlayer`，返回的 flow 再把收益、pending 和状态写入路由到正确玩家。
 
-trigger frame 必须随 trailing `activate-card` node 持久化：`ActivateCardActionParams` 携带 `triggerSnapshot`，`transactionEvents` / `actionEvents` / `triggerSnapshot` 随 node cursor 序列化与恢复。pending 恢复后继续使用 cursor 中的 trigger frame，禁止从恢复后的 live state 重算 snapshot、重新匹配 listener 或重排 listener。该约束必须有 cursor roundtrip 测试覆盖。
+trigger frame 必须随 trailing `activate-card` node 持久化：`ActivateCardActionParams` 携带 `triggerSnapshot`，`transactionEvents` / `actionEvents` / `triggerSnapshot` 随 node cursor 序列化与恢复。pending 恢复后继续使用 cursor 中的 trigger frame，禁止从恢复后的 live state 重算 snapshot、重新匹配 listener 或重排 listener。该约束必须有 cursor roundtrip 测试覆盖。host 返回 flow 时，其 reaction 没有固定 frame：它在 `preservedTransactionEvents` / `preservedActionEvents` 中携带 host 前缀，并从记录的起点读取 live 事件。每次事务提交（包括显式 flush 和 pending 重发）都会把已提交事件按事件 id 合并进这些保留范围，以及 pending / deferred host 捕获的事件中，因此经过支付或选择等待后，reaction 仍能看到 host 自己的事实及 flow 主体的事实。trigger-select 预览通过 `activationEventReadContext()` 读取与执行相同的范围。
 
 卡牌不得用宿主 `onBuy` flow 补偿另一个 trailing listener 的数量判断。E97 这类“onBuy 继续打职业”的卡只表达自己的额外 action；E89 / D42 这类按第几张职业触发的效果必须留在自己的 listener 中，通过 trigger snapshot 读触发时数量。
 

@@ -46,6 +46,7 @@ import { resolveChoiceSourceCard } from './nodes/interaction-helpers'
 import { isPendingChoiceValueAllowed, pendingEnvelopeChoices } from './pending-validation'
 import { isProtectedActionCancel } from './protected-action-cancel'
 import { isInjectedAnytimeActionContext, tagInjectedAnytimeFlow } from './action-context-flags'
+import { preserveContinuationEventScopes } from './continuation-events'
 
 type EngineDeps = {
   registry: ActionRegistry
@@ -507,18 +508,7 @@ export class Engine {
     context.state.events ??= []
     context.state.nextEventSeq ??= 1
     const committed = this.events.commitTransaction(context.state)
-    const pendingHost = this.peekPendingHost()
-    if (pendingHost instanceof ActionNode && committed.length > 0) {
-      const preserved = committed.map((event) => cloneSnapshotValue(event))
-      pendingHost.deferredHostTransactionEvents = [
-        ...(pendingHost.deferredHostTransactionEvents ?? []),
-        ...preserved,
-      ]
-      pendingHost.deferredHostActionEvents = [
-        ...(pendingHost.deferredHostActionEvents ?? []),
-        ...preserved,
-      ]
-    }
+    preserveContinuationEventScopes(this._internals(), committed)
     this.eventLogDerivations = []
     const playerNames = Object.fromEntries(
       context.state.players.map((player) => [player.id, player.name]),

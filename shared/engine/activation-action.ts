@@ -21,6 +21,9 @@ export type ActivateCardActionParams = {
   transactionEvents?: GameEvent[]
   actionEvents?: GameEvent[]
   actionEventStartIndex?: number
+  /** Facts committed before a returned-flow reaction runs. */
+  preservedTransactionEvents?: GameEvent[]
+  preservedActionEvents?: GameEvent[]
   triggerSnapshot?: TriggerSnapshot
   beforeHostNodeId?: string
 }

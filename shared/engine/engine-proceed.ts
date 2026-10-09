@@ -67,6 +67,7 @@ import type { GameEvent } from '../contract/events'
 import { createEventQuery } from '../events/query'
 import { createBufferedEventSink, emitCardTriggered } from './card-trigger-events'
 import { interactionRequestChoices } from './pending-validation'
+import { activationEventReadContext, mergeContinuationEvents, preserveContinuationEventScopes } from './continuation-events'
 import { createTriggerSnapshot } from '../cards/helpers/trigger-snapshot'
 import { applyComputeCostResults } from './compute-cost-results'
 import { findActionSpaceById } from '../domain/space'
@@ -201,12 +202,16 @@ const deferredHostEventReadContext = (
   int: EngineInternals,
   node: ActionNode,
 ) => {
-  const transactionEvents = [...int.events.currentTransactionEvents()]
+  const liveEvents = int.events.currentTransactionEvents()
   const capturedTransactionEvents = node.deferredHostTransactionEvents ?? []
-  const actionEvents = [
-    ...(node.deferredHostActionEvents ?? []),
-    ...transactionEvents.slice(capturedTransactionEvents.length),
-  ]
+  // After a commit the live transaction no longer contains the captured
+  // prefix, so join by event identity instead of by position.
+  const capturedIds = new Set(capturedTransactionEvents.map((event) => event.id))
+  const transactionEvents = mergeContinuationEvents(capturedTransactionEvents, liveEvents)
+  const actionEvents = mergeContinuationEvents(
+    node.deferredHostActionEvents ?? [],
+    liveEvents.filter((event) => !capturedIds.has(event.id)),
+  )
   return {
     transactionEvents,
     actionEvents,
@@ -217,25 +222,7 @@ const deferredHostEventReadContext = (
 const eventReadContextForActivation = (
   int: EngineInternals,
   params: ActivateCardActionNode['params'],
-) => {
-  const transactionEvents = params.transactionEvents
-  if (!transactionEvents) {
-    const live = currentEventReadContext(int)
-    if (typeof params.actionEventStartIndex === 'number') {
-      return {
-        ...live,
-        actionEvents: live.transactionEvents.slice(params.actionEventStartIndex),
-      }
-    }
-    return live
-  }
-  const events = [...transactionEvents]
-  return {
-    transactionEvents: events,
-    actionEvents: params.actionEvents ? [...params.actionEvents] : undefined,
-    eventQuery: createEventQuery(events),
-  }
-}
+) => activationEventReadContext(params, int.events.currentTransactionEvents())
 
 const commitIfEngineComplete = (
   int: EngineInternals,
@@ -254,6 +241,7 @@ const commitOpenEventTransaction = (
 ): void => {
   ensureEventState(context.state)
   const committed = int.events.commitTransaction(context.state)
+  preserveContinuationEventScopes(int, committed)
   appendDerivedLogsForEventOnlyResult(int, context, committed, result)
   clearEventLogDerivations(int)
 }
@@ -812,6 +800,10 @@ const executeDeferredHostAction = (
   })
   const trailingTransactionEvents = result.type === 'flow' ? undefined : eventReadContext.transactionEvents
   const trailingActionEvents = result.type === 'flow' ? undefined : eventReadContext.actionEvents
+  const trailingActionEventStartIndex = result.type === 'flow'
+    ? int.events.currentTransactionEvents().length
+    : undefined
+  const trailingPreservedEvents = result.type === 'flow' ? eventReadContext : undefined
   const immediateActivateNodes = buildPhaseTrailingNodes(
     int,
     immediatePhase.matchedListeners,
@@ -822,8 +814,9 @@ const executeDeferredHostAction = (
     executionContext.player.id,
     trailingTransactionEvents,
     trailingActionEvents,
-    undefined,
+    trailingActionEventStartIndex,
     triggerSnapshot,
+    trailingPreservedEvents,
   )
   const afterActivateNodes = buildPhaseTrailingNodes(
     int,
@@ -835,8 +828,9 @@ const executeDeferredHostAction = (
     executionContext.player.id,
     trailingTransactionEvents,
     trailingActionEvents,
-    undefined,
+    trailingActionEventStartIndex,
     triggerSnapshot,
+    trailingPreservedEvents,
   )
   const afterHostNodes = buildInternalActionChildNodes(
     int,
@@ -1283,6 +1277,9 @@ export function engineProceed(
       ? createTriggerSnapshot(context.state)
       : undefined
     if (result.type === 'request') {
+      // Its facts so far survive a commit while the request waits.
+      node.deferredHostTransactionEvents = [...eventReadContext.transactionEvents]
+      node.deferredHostActionEvents = [...completedEvents]
       // Mirror the resolveChoice second-pass: ActionDef-declared
       // actionContext patches in result.extraData.actionContextWrite are
       // shallow-merged into the pending-interaction context so subsequent
@@ -1391,8 +1388,9 @@ export function engineProceed(
     const trailingTransactionEvents = result.type === 'flow' ? undefined : eventReadContext.transactionEvents
     const trailingActionEvents = result.type === 'flow' ? undefined : eventReadContext.actionEvents
     const trailingActionEventStartIndex = result.type === 'flow'
-      ? eventReadContext.transactionEvents.length - completedEvents.length
+      ? int.events.currentTransactionEvents().length
       : undefined
+    const trailingPreservedEvents = result.type === 'flow' ? eventReadContext : undefined
     const immediateActivateNodes = buildPhaseTrailingNodes(
       int,
       immediatePhase.matchedListeners,
@@ -1405,6 +1403,7 @@ export function engineProceed(
       trailingActionEvents,
       trailingActionEventStartIndex,
       triggerSnapshot,
+      trailingPreservedEvents,
     )
     const afterActivateNodes = buildPhaseTrailingNodes(
       int,
@@ -1418,6 +1417,7 @@ export function engineProceed(
       trailingActionEvents,
       trailingActionEventStartIndex,
       triggerSnapshot,
+      trailingPreservedEvents,
     )
     const afterHostNodes = result.type === 'ok'
       ? buildInternalActionChildNodes(

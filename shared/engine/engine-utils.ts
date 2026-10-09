@@ -286,6 +286,7 @@ export function buildPhaseTrailingNodes(
   actionEvents?: readonly GameEvent[],
   actionEventStartIndex?: number,
   triggerSnapshot?: TriggerSnapshot,
+  preservedEvents?: { transactionEvents: readonly GameEvent[]; actionEvents?: readonly GameEvent[] },
 ): EngineNode[] {
   if (matchedListeners.length === 0) return []
 
@@ -336,6 +337,8 @@ export function buildPhaseTrailingNodes(
       transactionEvents: transactionEvents ? [...transactionEvents] : undefined,
       actionEvents: actionEvents ? [...actionEvents] : undefined,
       actionEventStartIndex,
+      preservedTransactionEvents: preservedEvents ? [...preservedEvents.transactionEvents] : undefined,
+      preservedActionEvents: preservedEvents?.actionEvents ? [...preservedEvents.actionEvents] : undefined,
       triggerSnapshot,
     }
     const node = new ActionNode(
