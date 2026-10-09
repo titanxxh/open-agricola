@@ -32,6 +32,8 @@ export type CandidateClosureOptions<C> = {
   /** Defensive cap: emit a warning (no truncation) past this node count. */
   warnLimit?: number
   onWarn?: (nodeCount: number) => void
+  /** Optional caller-owned work budget; exceeding it rejects, never truncates. */
+  onStep?: () => void
 }
 
 const DEFAULT_WARN_LIMIT = 512
@@ -86,6 +88,7 @@ export const closeCandidates = <C>(
   while (frontier.length > 0) {
     const node = frontier.pop()!
     for (const transform of ordered) {
+      options.onStep?.()
       const used = node.usesBySource[transform.source] ?? 0
       if (used >= (transform.maxUses ?? 1)) continue
       const derived = transform.apply(node.candidate)

@@ -39,7 +39,6 @@ const CARD_IMPL = {
     },
   },
   listeners: [{
-    id: CARD_ID,
     cardIds: [CARD_ID],
     actions: ['collect'],
     phases: ['after'],
@@ -335,7 +334,7 @@ describe('shared Workshop capability admission', () => {
     ['empty xor', {type:'xor',children:[]}, 'nonempty children'],
     ['empty or', {type:'or',children:[]}, 'nonempty children'],
     ['non-string payment choice', {type:'leaf',actionId:'pay',params:{cost:{food:1},paymentChoice:{}}}, 'paymentChoice'],
-    ['fractional exchange limit', {type:'leaf',actionId:'exchange',actionContext:{directTrade:{from:{wood:1},to:{food:1},max:0.5}}}, 'integer'],
+    ['inactive direct-trade max', {type:'leaf',actionId:'exchange',actionContext:{directTrade:{from:{wood:1},to:{food:1},max:0.5}}}, 'max'],
     ['fractional gain', {type:'leaf',actionId:'gain',params:{food:0.5}}, 'integer'],
     ['malformed leaf preview', {type:'leaf',actionId:'gain',params:{food:1},effectPreview:{kind:'futureSchedule',entries:{}}}, 'Preview entries'],
     ['forged issued payment identities',{type:'leaf',actionId:'pay',params:{cost:{food:1}},actionContext:{issuedPaymentChoices:{'pay:generic:0':'forged'}}},'unsupported field'],
@@ -406,7 +405,7 @@ describe('shared Workshop capability admission', () => {
     ['computeExtraRoomCapacity', -1, 'nonnegative'],
     ['computeExtraRoomCapacity', 0.5, 'integer'],
   ] as const)('rejects malformed %s results before host consumption',(hook,result,error)=>{
-    const source=`const CARD_ID='CUSTOM_ParityCard';const CARD_IMPL={effect:{${hook}:()=>(${JSON.stringify(result)})}}`
+    const source=`const CARD_ID='CUSTOM_ParityCard';const CARD_IMPL={effect:{${hook==='countExtraTurns'?'contributeExtraTurn:()=>undefined,':''}${hook}:()=>(${JSON.stringify(result)})}}`
     const compiled=validateAndCompileCustomCode(source,'CUSTOM_ParityCard')
     if(!compiled.valid)throw Error(compiled.errors.join(';'))
     const request={compiledCode:compiled.compiledCode,cardId:'CUSTOM_ParityCard',hook,args:[{players:[{id:'p1'}]}, {}, [{type:'sheep'}]]}
@@ -436,7 +435,7 @@ describe('shared Workshop capability admission', () => {
       expect(invokeCustomCodeEffect(request)).toEqual({ok:true,result});expect(invokeCustomCodeEffectLocal(request)).toEqual({ok:true,result})
     }
     const state=createInitialState(42)
-    const context={state,player:state.players[0]!,ownerPlayer:state.players[0]!,effectPlayer:state.players[0]!,triggerPlayer:state.players[0]!,space:state.actionSpaces[0]!,actionId:'collect',phase:'after' as const,extraData:{},transactionEvents:[],eventQuery:{} as never}
+    const context={state,player:state.players[0]!,ownerPlayer:state.players[0]!,effectPlayer:state.players[0]!,triggerPlayer:state.players[0]!,space:state.actionSpaces[0]!,actionId:'collect',phase:'computeArgs' as const,extraData:{},transactionEvents:[],eventQuery:{} as never}
     const request={compiledCode:compiled.compiledCode,cardId:'CUSTOM_ParityCard',registrationId:'CUSTOM_ParityCard:listener:0',context}
     const server=invokeCustomCodeListener(request);expect(invokeCustomCodeListenerLocal(request)).toEqual(server)
     expect(server).toMatchObject({ok:false,error:expect.stringContaining('impersonate')})
@@ -509,5 +508,61 @@ describe('Shared factory prerequisite normalization',()=>{
     const source=`const CARD_ID='CUSTOM_ParityCard';const CARD_DEF=MinorImprovement({id:CARD_ID,name:'Parity',prerequisite:${JSON.stringify(prerequisite)}});const CARD_IMPL={}`
     const server=validateAndCompileCustomCode(source,'CUSTOM_ParityCard');expect(validateAndCompileCustomCodeLocal(source,'CUSTOM_ParityCard')).toEqual(server)
     expect(server).toMatchObject({valid:false,errors:[expect.stringContaining('prerequisite must be a string')]})
+  })
+})
+
+
+describe('Frozen manifest and listener correspondence parity',()=>{
+  it.each([
+    '{effect:{computeBonusScore:2}}',
+    '{effect:{id:"CUSTOM_Other",onBuy:()=>undefined}}',
+    '{effect:{handHooks:["onReturnHome"]}}',
+    '{effect:{beforeEndGameMandatory:true}}',
+    '{effect:{extraTurnBeforeWorkers:true}}',
+    '{effect:{countExtraTurns:()=>1}}',
+    '{listeners:[{actions:["collect"],phases:["after"]}]}',
+    '{listeners:[{order:1,handler:()=>undefined}]}',
+    '{listeners:[{id:"arbitrary",handler:()=>undefined}]}',
+    '{listeners:[{actions:["collect"],phases:["after"],preScoring:true,handler:()=>undefined}]}',
+  ])('rejects declarations with no consumer or callable implementation: %s',implementation=>{
+    const source=`const CARD_ID='CUSTOM_ParityCard';const CARD_IMPL=${implementation}`
+    const server=validateAndCompileCustomCode(source,'CUSTOM_ParityCard')
+    expect(validateAndCompileCustomCodeLocal(source,'CUSTOM_ParityCard')).toEqual(server)
+    expect(server.valid).toBe(false)
+  })
+
+  it.each([
+    ['before',{costs:{food:-1},costAttribution:[{sourceCard:'CUSTOM_ParityCard',costs:{food:-1}}]}],
+    ['computeArgs',{extraData:{max:1}}], ['computeArgs',{flow:{type:'leaf',actionId:'gain',params:{food:1}}}],
+    ['computeReplace',{extraData:{skipRoomCheck:true}}],
+    ['isDoable',{flow:{type:'leaf',actionId:'gain',params:{food:1}}}],
+    ['isDoable',{reserveResources:{food:1}}], ['anytime',{countCardUse:true}],
+    ['computeExchanges',{doable:true}],
+  ] as const)('rejects ignored %s result fields on both executors',(phase,result)=>{
+    const source=`const CARD_ID='CUSTOM_ParityCard';const CARD_IMPL={listeners:[{handler:()=>(${JSON.stringify(result).replaceAll('"sourceCard":"CUSTOM_ParityCard"','"sourceCard":CARD_ID')})}]}`
+    const compiled=validateAndCompileCustomCode(source,'CUSTOM_ParityCard');if(!compiled.valid)throw Error(compiled.errors.join(';'))
+    const state=createInitialState(42)
+    const context={state,player:state.players[0]!,space:state.actionSpaces[0]!,phase,actionId:phase==='anytime'?'anytime':phase==='computeExchanges'?'compute-exchanges':'collect',transactionEvents:[],eventQuery:createEventQuery([])}
+    const request={compiledCode:compiled.compiledCode,cardId:'CUSTOM_ParityCard',registrationId:'CUSTOM_ParityCard:listener:0',context}
+    const server=invokeCustomCodeListener(request);expect(invokeCustomCodeListenerLocal(request)).toEqual(server);expect(server.ok).toBe(false)
+  })
+
+  it.each([
+    {type:'leaf',actionId:'stables',actionContext:{exactCost:{stable:1}}},
+    {type:'leaf',actionId:'plow',actionContext:{exactCost:{'CUSTOM_ParityCard:key':1}}},
+    {type:'leaf',actionId:'pay',params:{cost:{fees:[{food:1},{food:2}],feeIdentities:'ab'}}},
+    {type:'leaf',actionId:'pay',params:{cost:{fees:[{food:1},{food:2}],feeIdentities:[1]}}},
+    {type:'leaf',actionId:'pay',params:{cost:{food:1},trackSourceCardPaymentStats:'false'}},
+    {type:'leaf',actionId:'pay',params:{cost:{food:1},includeReturnedCard:'false'}},
+    {type:'leaf',actionId:'emit-choice',params:{options:[],multiSelect:{valuePrefix:'empty:',minSelections:0,maxSelections:0}}},
+    {type:'leaf',actionId:'exchange',actionContext:{directTrade:{from:{food:1},to:{wood:1},max:0}}},
+    {type:'leaf',actionId:'exchange',actionContext:{directTrade:{from:{food:1},to:{wood:1}},tradeIds:['x']}},
+    {type:'leaf',actionId:'reap',actionContext:{trigger:{phase:'private-field-phase',actionId:123}}},
+  ])('rejects malformed or inactive nested payloads before native dispatch',flow=>{
+    const source="const CARD_ID='CUSTOM_ParityCard';const CARD_IMPL={effect:{onBuy:s=>s.customFlow}}"
+    const compiled=validateAndCompileCustomCode(source,'CUSTOM_ParityCard');if(!compiled.valid)throw Error(compiled.errors.join(';'))
+    const state={...createInitialState(42),customFlow:flow}
+    const request={compiledCode:compiled.compiledCode,cardId:'CUSTOM_ParityCard',hook:'onBuy' as const,args:[state,state.players[0]!]}
+    const server=invokeCustomCodeEffect(request);expect(invokeCustomCodeEffectLocal(request)).toEqual(server);expect(server.ok).toBe(false)
   })
 })

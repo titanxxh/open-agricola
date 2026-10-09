@@ -846,6 +846,81 @@ Deferred items are the section 9.3 native mutation/callback pairs, bounded inter
 
 Keep all existing fixed LLM fixtures and historical replay. Add precise rule scenarios to the existing test infrastructure; do not introduce a separate behavior judge or commit run-result JSON. Verification includes executor parity, the fixed LLM suite, a real local browser contract/validation flow, `test:fast`, lint and build. The deterministic acceptance path does not contact a model provider.
 
+### 9.5 Frozen correspondence audit and consolidated acceptance (2026-10-09)
+
+The baseline was `53e8585a7` on main `8fa967bd4`. The audit traced every advertised item through deployed contract → source admission → shared manifest → server Worker/browser executor → native consumer → fixed acceptance. It covered 45 hooks, seven effect metadata declarations, 11 phases, 31 listener identities, 25 actions, eight local mutations, 32 card metadata keys, all 13 leaf/12 composite fields, two common context fields and every action-specific params/context slot. At baseline these were 186 outer field slots, plus nested payment/choice/preview/future/fence schemas. This is a correspondence audit of the fixed scope, not proof of every possible generated card or the 31 × 11 Cartesian product.
+
+**Frozen decision:** retain the existing hook/action/identity sets and reliable native behavior. Listener registration has nine admitted fields after removing `order`; `handler` is required. `listener.id` is also rejected: the host owns `${CARD_ID}:listener:${index}` identity. An optional `effect.id` must equal `CARD_ID`. Nonmetadata hook values must be callable; each `handHooks` entry must have its implementation. Before-end metadata requires `onBeforeEndGame`; `countExtraTurns` and `extraTurnBeforeWorkers` require `contributeExtraTurn`. The two Harvest demand lists and `maySkipHarvestFieldPhase` remain independent preparation declarations. The latter affects the guaranteed-reaping estimate; it does not grant an arbitrary Harvest-skip operation.
+
+#### Hook and query correspondence
+
+All 45 names remain in section 3.1 and the deployed exhaustive hook map. They have native consumers; no hook was removed just because its specialized test was absent.
+
+| Surface | Actual native consumer and limits | Fixed behavioral evidence |
+|---|---|---|
+| 24 ordinary flow stage hooks (including `onBuy`) | `session/stage-dispatch.ts` and stage continuations in `session-core.ts`; `onBuy` uses the native purchase activation; owner/target and hand membership are preserved | Purchase/onBuy cases plus a complete two-player 14-round game record actual stage execution and relative order; hand/played transitions have separate cases |
+| `onBeforePlayerTurn` | `card-effects.ts` → round work rotation; `{skipTurn:boolean}`, no flow/pending | Real opponent action advances past the owner, emits `turn.skipped` and keeps the owner's unused worker |
+| `resolveChoice`, `contributeExtraTurn`, `countExtraTurns` | Existing card-choice and provider activation; card-managed remaining count, additionally reduced by host skip/explicit-consume counters | Real choices and exactly two provider opportunities through ordinary rotation; no new counter protocol |
+| Bonus/costed/shared scoring | `domain/scoring.ts` and the native bonus solver; numeric values and declared payment costs/player identities | Actual score categories, costed bonus allocation, shared score recipient and detached inventory; malformed query fallback tested separately |
+| Room capacity, breed priority/threshold/count, animal score adjustment | `card-effects.ts` collectors and growth/breed/scoring consumers | Real growth/breeding, source-sensitive fourth/fifth args, public priority normalization, FOM horse scoring; threshold is normalized to 1..2, priority to `max(0,floor(value))` |
+| Own/shared animal zones and invalid animals | `domain/animal-zones.ts`; added zones only, distinct owner/animal owner, admitted types | Real housing/reorganization/storage, shared-owner constraints and four-argument invalid-animal restrictions; whitelists intersect ordinary placement restrictions |
+| Locked tiles and rule contributions | Native farm geometry, component supply and unused-space score collectors | Locked selection rejection/release, actual supply reservation and scoring contribution; no direct farm writes |
+| Resource commitments and final-Harvest reorganization | Native payment admission and official round-14 breed/reorganization | Payment failure/release; actual official Harvest requires no-newborn reorganization only at round 14; private breeding does not impersonate Harvest |
+| Built special stable positions and state presentation | Existing authoritative public projection only | Display coordinates/public fields and detached snapshot behavior; these queries do not build/return stables or mutate rules |
+
+`onBeforeStartOfTurn` belongs to round preparation, not every individual turn. Queries may run repeatedly for previews and settlement. Mutating their JSON inputs is ineffective. Outside an authoritative command, errors produce warnings and the documented neutral query value; inside a command, every invocation failure is detected and rolls back. Failure events are tracked independently of deduplicated display warnings, so a previously reported error cannot turn the next command into a successful no-op. Production Worker and browser use the same complete listener result validation, including matching cost attribution.
+
+#### Listener result fields and applicability
+
+The deployed phase map owns `resultKeys`, and runtime admission reads that same map. `sourceCard` is an own-card marker, not an actor/owner override.
+
+| Phase | Consumed result fields (plus `sourceCard`) | Applicability |
+|---|---|---|
+| `before`, `during`, `immediatelyAfter`, `after` | `flow`, `followUpActions`, `countCardUse`, `doable` | Normal reaction activation; `doable` is a preview signal. `during` runs after execution, including XOR and real payment-choice completion, and does not change executed params |
+| `before` / `place-farmer` special collector | `flow` only | Flow inherits the matched owner unless it explicitly targets another player; cross-player work uses the ordinary session driver/handoff. This collector has no separate mandatory/count/follow-up activation |
+| Per-crop `immediatelyAfter` / `reap` collector | `flow` only | Crop/amount event; ordinary engine completion of `reap` still has the normal reaction fields |
+| `computeCosts` | `costs`, `costAttribution`, `trades`, `bonuses`, `paymentResourceProviders` | Pure query; the native priced consumer must use the contribution. Whole signed costs require exactly matching own-source attribution |
+| `computeArgs` | `extraOptions` | Applicable ordinary choice requests without an authoritative base-candidate builder; also native occupied-placement queries. Farm-position/selection/animal requests do not consume parameter patches |
+| `computeChoiceCandidates` | `extraOptions` | Native base-choice builders and explicit improvement candidate collectors |
+| `computeReplace` | `actionId`, `decline`, `alternativeFlow` | Replacement retains native params/context; no `extraData` override. An alternative flow requires `decline:true` and is validated for the actual actor |
+| `isDoable` | `doable`; `reserveResources` only for an occupation candidate | False veto remains stronger than true; this does not bypass native settlement |
+| `anytime` | `flow`, `labelKey`, `labelParams` | Dispatcher identity `anytime`, current card owner only; `scope:opponent` does not provide an opponent's ability |
+| `computeExchanges` | `extraExchanges` | Dispatcher identity `compute-exchanges`; recipes are settled by native exchange/payment, not by the query |
+
+`mandatory` is limited to normal reaction activation. `preScoring`, `replacesTurn`, and `blockedAnytimeInteractionKinds` require anytime discovery. Omitted filters still bind the explicit deployed sets and this card. The 31 identities divide into two query-only identities (`anytime`, `compute-exchanges`), ordinary engine actions, and native-only listened identities (`collect`, `receive`, `place-farmer`, `wish-children`). Availability of one phase for one identity does not imply every phase applies to it. The source phase descriptors state these distinctions instead of promising generic parameter editing.
+
+#### Action and nested-payload closure
+
+Every action's exact params/context keys remain in `sandbox-action-ids.ts`, deployed by the server. Section 6 lists all 25 IDs; section 6.1 lists all eight local mutations. The audit closed these groups together:
+
+| Group | Frozen execution boundary / retained native behavior |
+|---|---|
+| Flow shell and farm actions | Top-level `actionContext` only for all six farm actions. `mode` is parallel-only; one-shot requires trigger-select. Existing native owner, optionality, supply, geometry, pending and payment remain authoritative |
+| Exact payment vs ordinary payment | `ExactCost` is real resources plus `max`; supply/virtual keys reject instead of disappearing. Ordinary ComplexCost retains fee/fees/unitFee precedence, grouping and native discounts |
+| Fee identities and payment controls | Nonnegative safe-integer identity array aligned to effective fee rows; duplicates intentionally share identity. `includeReturnedCard`/`trackSourceCardPaymentStats` are booleans. Native owned-card return eligibility remains host-owned; cards.type is a legacy annotation, not an extra restriction |
+| Payment expansion | Provider product stays at most 512 after merging. Unit/action trades, bonus expansion and final dominance filtering share a 100000-step host work budget; overflow rejects the whole query without truncation. The bound applies before an oversized unit loop or trade expansion |
+| Resource domain | All 13 known real names remain structurally recognized; nonzero horse/fuel require a FOM inventory. Shared native gain/trade/future/payment consumers reject unavailable slots before mutation; zero values do not enable an expansion |
+| Exchange | Catalog trades retain their discovery windows and limits; explicit `tradeIds` uses the native explicit-selection path. `directTrade` is exactly one immediate conversion with from/to and optional fromFarmyard/source/sourceId; catalog max/windows and simultaneous catalog selectors/caps reject |
+| Choice/preview | Custom values and final emitted menus are distinct; documented native first-wins candidate merging is retained. `options` is nonempty; zero-minimum multi-select can submit an empty subset of real candidates. Preview/description fields are display data, not settlement operations |
+| Breed/reap/reorganize | Breed's leaf source binds the private source, including follow-ups; Harvest remains native-only. Type allowlists constrain placement/accommodation/recovery, not the native type-agnostic birth-capacity rule. Reap uses private-field-phase and optional string actionId; ordinary reorganization keeps native validation |
+| Futures | Existing-player, own-card entries; resources/field/stable plus matching roomType's native one-room addition. No custom actionContext overrides. Schedule filtering/entries precedence and exact own-card cancellation remain native |
+| Card-local mutation | Own card/effect player only. Numeric increments require finite existing numbers (missing is zero) and finite result; arbitrary JSON assignment remains available. set-counter retains native nonnegative normalization |
+| Injected helpers | Both executors inject the same bodies. payLeaf forwards cost as the entire params payload: structured payment uses `payLeaf({cardId:CARD_ID,cost:{cost:complexCost}})`. Stack/extra-data helpers only read isolated snapshots; getCardDefinition remains an always-null stub |
+
+#### Card metadata and reference boundary
+
+| All admitted metadata groups | Actual meaning / limits |
+|---|---|
+| id, name, deck, number, category, desc, rules, artUrl, locales, card_type, playerActionCardType, implemented | Identity/presentation/catalog data; Workshop normalization owns CUSTOM deck, number and primary card type. Labels and action-card classification do not register rule actions. The CARD_DEF wrapper admits only cardType/meta with minor/occupation type |
+| cost, altCosts, returnCards, passing, providesOccupation, vp | Native minor purchase/transfer/occupation-count/printed-score paths. Occupation lessons/exact cost own their fee; altCosts/passing/printed minor VP are not general occupation behaviors |
+| prerequisite, occupationPrerequisites, improvementPrerequisites, maxRound, players | Native eligibility parser/filter. Numeric bounds are enforced; arbitrary prose or unknown player-count strings are not new enforced rules. Do not represent an unsupported condition by invented text |
+| exchanges, modifier, modifiers, isCookery, isBaking | Native catalogs and active payment modifiers; flags alone do not create a recipe |
+| isField, providesField, extraVp, evenMoreSet | Markers/legacy data; none registers a sowable Logical Field or awards a score by itself. Card Field and its authoritative crop settlement remain deferred |
+
+No reference-tool or credential architecture changed: `search_references` searches allowed filenames and already-fetched text; `read_reference` retrieves checked line ranges from current GitHub main pinned for the attempt, with blob checksum verification. Browser model credentials stay in the direct provider transport. Backend reference metadata uses project GitHub credentials, never the user's LLM token. Newer GitHub implementations cannot expand the deployed execution contract.
+
+**Consolidated acceptance:** existing validator/executor parity cases cover mechanical admission; fixed two-player Session cases cover payment, selections, owner handoff, deferred receipt, cross-player animals, local mutation, error rollback, provider turns and full lifecycle. Public detached query tests cover their real scoring/supply/housing consumers; browser E2E separately covers rendering and interaction. The frozen batch includes negative declarations, dynamic nested results, repeated identical failures, direct/XOR/payment continuations and applicable expansion controls. Existing LLM cases and golden replay stay intact; replay is historical regression evidence and does not admit a model or claim fresh generation quality. No paid model calls or standalone behavior judge are needed for this audit.
+
 ## 10. History
 
 | Date | Change |

@@ -8,11 +8,13 @@ import {
   addResourcesFromCards,
 } from '../../session/stats'
 import { findPlayerById } from '../../domain/player'
+import { assertEnabledResourceAmounts } from '../../contract/resource-keys'
 
 export const gainResources = (
   player: PlayerState,
   resources: Partial<Resource>,
 ) => {
+  assertEnabledResourceAmounts(resources, player.resources)
   Object.keys(resources).forEach((key) => {
     const resourceKey = key as keyof Resource
     const amount = resources[resourceKey] ?? 0

@@ -1535,7 +1535,7 @@ Durable Room Commit 要求 PostgreSQL、共享资源、`REPLAY_VIEWER_BUILD_ID` 
 
 ### 12.5 浏览器本地试玩沙盒（client/local-sandbox/）
 
-- Workshop Capability Contract（ADR 0025）：`shared/custom-code/sandbox-declarations.ts` 与 `runtime-capabilities.ts` 是自定义输出进入原生引擎的共享准入。源码校验、部署契约、isolated-vm worker、浏览器执行器共用 hook / 元数据 / listener / action 范围；全部位置参数以 JSON 传递，不传宿主回调。仅含元数据的 effect 也注册；省略 listener 过滤时绑定明确集合与本卡。动态嵌套 flow、参数变体在权威执行前校验，可信引擎生成的内部结算仍使用原生权限。多个 listener 合并后的最终选择值必须不同；引擎在写入 pending 前拒绝重复值并恢复命令 checkpoint。行为通过固定 Session 场景验收，不另建行为判定程序。精确范围与延期的原生修改 / 回调机制见 `docs/CUSTOM_CARD_SANDBOX.md` §3、§6、§9。
+- Workshop Capability Contract（ADR 0025）：`shared/custom-code/sandbox-declarations.ts` 与 `runtime-capabilities.ts` 是自定义输出进入原生引擎的共享准入。源码校验、部署契约、isolated-vm worker、浏览器执行器共用 hook / 元数据 / listener / action 范围；全部位置参数以 JSON 传递，不传宿主回调。仅含元数据的 effect 也注册；省略 listener 过滤时绑定明确集合与本卡。动态嵌套 flow、参数变体在权威执行前校验，可信引擎生成的内部结算仍使用原生权限。多个 listener 合并后的最终选择值必须不同；引擎在写入 pending 前拒绝重复值并恢复命令 checkpoint。行为通过固定 Session 场景验收，不另建行为判定程序。精确范围与延期的原生修改 / 回调机制见 `docs/CUSTOM_CARD_SANDBOX.md` §3、§6、§9。 listener 返回按 phase 准入；调用失败事件独立于警告去重，每次命令失败都回滚。放工前卡主切换及 during 反应复用正常归属/续跑路径，包含 XOR/付款选择。原生付款枚举有100000步类型化限制，并拒绝不适用资源槽，不返回部分候选。完整对应矩阵与集中固定验收见沙盒 §9.5。
 
 `VITE_SANDBOX_EXECUTOR=browser` 时工坊试玩全程在浏览器运行，零服务器参与；缺省走服务端 `/api/game/new-sandbox`（原样保留）。
 

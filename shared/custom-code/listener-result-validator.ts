@@ -1,7 +1,7 @@
-import { assertCustomListenerCapabilities } from './runtime-capabilities'
-import type { CardListenerContext } from '../cards/card-listeners'
-import type { ActionHookResult } from '../actions/hooks'
-import { REAL_RESOURCE_KEYS } from '../contract/resource-keys'
+import { assertCustomListenerCapabilities } from './runtime-capabilities.ts'
+import type { CardListenerContext } from '../cards/card-listeners.ts'
+import type { ActionHookResult } from '../actions/hooks.ts'
+import { REAL_RESOURCE_KEYS } from '../contract/resource-keys.ts'
 
 const RESOURCE_KEYS = new Set<string>(REAL_RESOURCE_KEYS)
 

@@ -1,10 +1,13 @@
 import { afterEach, describe, expect, it } from 'vitest'
+import { GameCore } from '../../shared/session/session-core'
+import { registerBrowserBackedCustomCard } from '../../client/local-sandbox/browser-runtime'
+import { flowCardEffectHooks } from '../../shared/cards/card-effects'
 import { GameSession } from '../game/authoritative-session'
 import { validateAndCompileCustomCode } from '../custom-code/engine'
 import type { CustomCardData } from '../../shared/cards/session-card-context'
 import { workshopCardJsonFromDefinition } from '../workshop-draft-validation'
 import { clearCustomCards, registerCustomCard } from '../../shared/cards/custom-registry'
-import { getCardEffect, countPendingExtraTurns, getAnimalScoreAdjustment, getBreedThreshold, getBreedableAnimalCount, shouldEnforceReorganizeOnLastHarvest } from '../../shared/cards/card-effects'
+import { getCardEffect, countPendingExtraTurns, getAnimalScoreAdjustment, getBreedThreshold, getBreedableAnimalCount, shouldEnforceReorganizeOnLastHarvest, getHarvestBreedOrderPriority } from '../../shared/cards/card-effects'
 import { Scoring } from '../../shared/domain/scoring'
 import { computeAnimalZones, canAccommodateAnimalTotals, prefillAnimalZones } from '../../shared/domain/animal-zones'
 import { markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome, workersAvailable } from '../../shared/domain/player'
@@ -13,18 +16,19 @@ import type { ActionFlow } from '../../shared/contract/types'
 import { readCardResourceStats } from '../../shared/cards/helpers/card-state'
 
 const CARD = 'CUSTOM_Capabilities'
-const sessions: GameSession[] = []
+const sessions: GameCore[] = []
 // Approved design: existing engine extension, no card-specific rule path.
 // Every scenario starts with seed 42 / 2 players / explicit placeholder hands.
 // Payment, farm pending, shared zones and delayed state cross GameSession;
 // pure numeric queries use the public collector inside its session context.
-function setup(implementation: string, metadata = '', enableFarmersOfTheMoor = false, useMinorFactory = false) {
+function setup(implementation: string, metadata = '', enableFarmersOfTheMoor = false, useMinorFactory = false, adapter: 'server' | 'browser' = 'server') {
   const meta = `{id:CARD_ID,name:'Capabilities',${metadata}}`
   const source = `const CARD_ID='${CARD}'; const CARD_DEF=${useMinorFactory?`MinorImprovement(${meta})`:`{cardType:'minor',meta:${meta}}`}; const CARD_IMPL=${implementation}`
   const compiled = validateAndCompileCustomCode(source, CARD)
   if (!compiled.valid) throw new Error(compiled.errors.join('\n'))
   const card: CustomCardData = { cardType: 'minor' as const, cardJson: { ...workshopCardJsonFromDefinition(compiled.cardDefinition), id: CARD, name: 'Capabilities', deck: 'CUSTOM', number: 0, desc: [] }, compiledCode: compiled.compiledCode, codeManifest: compiled.manifest }
-  const session = new GameSession(42, [card], { playerCount: 2, ...(enableFarmersOfTheMoor ? {enableFarmersOfTheMoor:true,allowIncompleteFarmersOfTheMoorMinorDeal:true} : {}) })
+  const options = { playerCount: 2, ...(enableFarmersOfTheMoor ? {enableFarmersOfTheMoor:true,allowIncompleteFarmersOfTheMoorMinorDeal:true} : {}) }
+  const session = adapter === 'server' ? new GameSession(42, [card], options) : new GameCore({stateOrSeed:42,customCards:[card],initialStateOptions:options,registerCustomCardImpl:registerBrowserBackedCustomCard})
   sessions.push(session)
   for (const player of session.state.players) {
     player.minorHand = ['__test_placeholder__']; player.occupationHand = ['__test_placeholder__']
@@ -35,7 +39,7 @@ function setup(implementation: string, metadata = '', enableFarmersOfTheMoor = f
 }
 const leaf = (actionId: string, rest: Record<string, unknown> = {}): ActionFlow => ({ type: 'leaf', actionId, sourceCard: CARD, ...rest })
 const afterCollect = (flow: ActionFlow, effect = '', listenerMetadata = '') => `{effect:{${effect}},listeners:[{actions:['collect'],phases:['after'],mandatory:true,${listenerMetadata}handler:()=>({flow:${JSON.stringify(flow)}})}]}`
-function collect(session: GameSession) { session.loadState(session.state); const response = session.takeAction(0, 'forest'); expect(response.ok, response.error).toBe(true); return response }
+function collect(session: GameCore) { session.loadState(session.state); const response = session.takeAction(0, 'forest'); expect(response.ok, response.error).toBe(true); return response }
 afterEach(() => { sessions.splice(0).forEach(session => session.dispose()); clearCustomCards() })
 
 describe('Workshop capabilities through fixed Session scenarios', () => {
@@ -305,7 +309,9 @@ describe('Workshop stage and animal settlement',()=>{
     const groups=valid?"['group']":"{}"
     const {session,opponent}=setup(`{effect:{onComputeSharedAnimalZones:()=>[{id:'shared',zoneType:'card',capacity:1,requiredEmptyZoneGroupIds:${groups}}]},listeners:[{actions:['collect'],phases:['after'],scope:'any',mandatory:true,handler:ctx=>({flow:{type:'leaf',actionId:'reorganize',sourceCard:CARD_ID,targetPlayerId:ctx.player.id}})}]}`)
     opponent.resources.sheep=1;opponent.pastures=[{id:'pasture',size:1,tiles:[{row:0,col:1}],stables:0,animalType:null,animalCount:0}];session.state.currentPlayerIndex=1;session.loadState(session.state)
+    const before=JSON.stringify(session.state)
     let r=session.takeAction(1,'forest')
+    if(!valid){expect(r.ok).toBe(false);expect(JSON.stringify(session.state)).toBe(before);return}
     expect(r.ok,r.error).toBe(true)
     expect(r.interaction.request?.kind).toBe('animal-reorg')
     r=session.resolveChoice(1,'confirm',{zones:[{id:'house',zoneType:'house',animalType:'sheep',animalCount:1},{id:'pasture',zoneType:'pasture',animalType:null,animalCount:0},...(valid?[{id:'shared',zoneType:'card',animalType:null,animalCount:0}]:[])]})
@@ -546,9 +552,9 @@ describe('Workshop admitted player, choice and payment data',()=>{
     expect(scores[0]!.categories.flatMap(category=>category.entries)).toContainEqual(expect.objectContaining({cardId:CARD,score:2}))
   })
 
-  it.each(['flow','extraData','alternativeFlow'] as const)('selects an opponent farm extension with %s bound to its native actor',kind=>{
+  it.each(['flow','alternativeFlow'] as const)('selects an opponent farm extension with %s bound to its native actor',kind=>{
     const selection={selectableTiles:[{row:-1,col:1},{row:-1,col:2}],minSelections:1,maxSelections:1}
-    const override=kind==='flow'?'':`,{actions:['selection'],phases:['${kind==='extraData'?'computeArgs':'computeReplace'}'],scope:'any',handler:()=>(${JSON.stringify(kind==='extraData'?{extraData:selection}:{decline:true,alternativeFlow:leaf('selection',{actionContext:selection})})})}`
+    const override=kind==='flow'?'':`,{actions:['selection'],phases:['computeReplace'],scope:'any',handler:()=>(${JSON.stringify({decline:true,alternativeFlow:leaf('selection',{actionContext:selection})})})}`
     const {session,player,opponent}=setup(`{listeners:[{actions:['collect'],phases:['after'],mandatory:true,handler:ctx=>({flow:{type:'seq',targetPlayerId:ctx.state.players[1].id,children:[{type:'leaf',actionId:'selection',actionContext:${JSON.stringify(selection)}},gainLeaf(CARD_ID,{food:1})]}})}${override}]}`,'',true)
     for (const player of session.state.players) player.farmTerrain=[]
     player.resources.food=2;opponent.resources.food=3
@@ -720,11 +726,11 @@ describe('Workshop admitted player, choice and payment data',()=>{
     expect(r.state.events).toContainEqual(expect.objectContaining({type:'resource.paid',resources:{food:1}}));expect(session.cardWarnings).toEqual([])
   })
 
-  it('rejects malformed computeCosts bonuses while native stable payment still completes',()=>{
+  it('rejects malformed computeCosts bonuses and rolls back ordinary placement',()=>{
     const implementation=afterCollect(leaf('stables')).slice(0,-2)+",{actions:['stables'],phases:['computeCosts'],handler:()=>({bonuses:[{}]})}]}"
-    const {session}=setup(implementation);collect(session)
-    const r=session.commitSelectionChoice(0,{stables:[{row:0,col:0}]})
-    expect(r.ok,r.error).toBe(true);expect(r.state.players[0]!.resources.wood).toBe(1)
+    const {session}=setup(implementation);session.loadState(session.state)
+    const before=JSON.stringify(session.state),r=session.takeAction(0,'forest')
+    expect(r.ok).toBe(false);expect(JSON.stringify(session.state)).toBe(before)
     expect(session.cardWarnings).toEqual(expect.arrayContaining([expect.stringContaining('exactly one')]))
   })
 
@@ -788,7 +794,9 @@ describe('Workshop typed query and settlement regressions',()=>{
     // possible backing for this private breeding action.
     player.minorPlayed.push('D012_MilkingPlace');player.cardStates[CARD]={counters:{held:2}};player.resources.sheep=0
     player.pastures=[];player.stableTiles=[];player.stableAnimals={};player.houseAnimalType=null;player.houseAnimalCount=0
-    let r=collect(session)
+    session.loadState(session.state);const before=JSON.stringify(session.state)
+    let r=capacity===1?collect(session):session.takeAction(0,'forest')
+    if(capacity!==1){expect(r.ok).toBe(false);expect(JSON.stringify(session.state)).toBe(before)}
     expect(r.state.players[0]!.resources.sheep).toBe(capacity===1?1:0)
     if(capacity===1){
       expect(r.interaction.request?.kind).toBe('animal-reorg')
@@ -923,11 +931,10 @@ describe('Workshop typed query and settlement regressions',()=>{
     else expect(r.state.players[0]!.resources.wood).toBe(3)
   })
 
-  it.each([['doable','isDoable'],['countCardUse','after'],['decline','computeReplace']])('rejects nonboolean %s and keeps native behavior', (key,phase)=>{
-    const {session}=setup(`{listeners:[{actions:['collect'],phases:['${phase}'],mandatory:true,handler:()=>({${key}:'false',alternativeFlow:gainLeaf(CARD_ID,{stone:9})})}]}`)
+  it.each([['doable','isDoable'],['countCardUse','after'],['decline','computeReplace']])('rejects nonboolean %s with complete command rollback', (key,phase)=>{
+    const {session}=setup(`{listeners:[{actions:['collect'],phases:['${phase}'],handler:()=>({${key}:'false'})}]}`)
     session.loadState(session.state);const before=JSON.stringify(session.state),r=session.takeAction(0,'forest')
-    if(key==='countCardUse'){expect(r.ok).toBe(false);expect(JSON.stringify(session.state)).toBe(before)}
-    else {expect(r.ok,r.error).toBe(true);expect(r.state.players[0]!.resources).toMatchObject({wood:3,stone:0})}
+    expect(r.ok).toBe(false);expect(JSON.stringify(session.state)).toBe(before)
     expect(session.cardWarnings).toEqual(expect.arrayContaining([expect.stringContaining(`Listener ${key} must be boolean`)]))
   })
 
@@ -948,8 +955,11 @@ describe('Workshop typed query and settlement regressions',()=>{
   it('rejects fractional listener cost deltas while preserving signed whole discounts',()=>{
     for(const amount of [-0.5,-1]){
       const implementation=afterCollect(leaf('stables')).slice(0,-2)+`,{actions:['stables'],phases:['computeCosts'],handler:ctx=>ctx.params?.stableCount?({costs:{wood:${amount}},costAttribution:[{sourceCard:CARD_ID,costs:{wood:${amount}}}]}):undefined}]}`
-      const {session}=setup(implementation);collect(session);const r=session.commitSelectionChoice(0,{stables:[{row:0,col:0}]})
-      expect(r.ok,r.error).toBe(true);expect(r.state.players[0]!.resources.wood).toBe(amount===-1?2:1)
+      const {session}=setup(implementation);session.loadState(session.state);const before=JSON.stringify(session.state)
+      let r=session.takeAction(0,'forest')
+      if(amount===-0.5){expect(r.ok).toBe(false);expect(JSON.stringify(session.state)).toBe(before);continue}
+      expect(r.ok,r.error).toBe(true);r=session.commitSelectionChoice(0,{stables:[{row:0,col:0}]})
+      expect(r.ok,r.error).toBe(true);expect(r.state.players[0]!.resources.wood).toBe(2)
       expect(Object.values(r.state.players[0]!.resources).every(Number.isSafeInteger)).toBe(true)
       if(amount===-1)expect(session.cardWarnings).toEqual([])
     }
@@ -1083,4 +1093,191 @@ describe('Workshop declarations match native consumers',()=>{
     expect(r.state.players[0]!.cardStates[CARD]?.extraData?.animalCountsByZone).toMatchObject({[id]:{animalCounts:{sheep:1},animalOwnerPlayerId:opponent.id}})
     expect(r.state.players[0]!.resources).toMatchObject({cattle:0,sheep:0});expect(session.cardWarnings).toEqual([])
   })
+})
+
+
+// Frozen 2026-10-09 correspondence audit: actual consumers and failure closure,
+// not a second card-behavior judge. Cross-player and continuation cases use
+// both registrars; every setup retains fresh 2p seed42 / fixed explicit hands.
+describe('Frozen Workshop correspondence acceptance',()=>{
+  it.each(['server','browser'] as const)('rolls back repeated identical invocation failures with %s',adapter=>{
+    const {session}=setup(afterCollect(leaf('gain',{params:{food:1.5}})),'',false,false,adapter)
+    session.loadState(session.state)
+    const before=JSON.stringify(session.state)
+    for(const action of ['forest','clay-pit']){
+      const r=session.takeAction(0,action)
+      expect(r.ok).toBe(false);expect(r.error).toContain('safe integer')
+      expect(JSON.stringify(session.state)).toBe(before)
+    }
+    expect(session.cardWarnings).toHaveLength(1)
+  })
+
+  it.each(['server','browser'] as const)('preserves before-placement owner and explicit target with %s',adapter=>{
+    for(const explicit of [false,true]){
+      const {session,player,opponent}=setup(`{listeners:[{actions:['place-farmer'],phases:['before'],scope:'opponent',handler:ctx=>({flow:{...gainLeaf(CARD_ID,{food:1}),${explicit?"targetPlayerId:ctx.player.id":""}}})}]}`,'',false,false,adapter)
+      player.resources.food=2;opponent.resources.food=2
+      session.state.currentPlayerIndex=1;session.loadState(session.state)
+      let r=session.takeAction(1,'forest');expect(r.ok,r.error).toBe(true)
+      for(let i=0;i<4 && r.interaction.request?.kind==='confirm-player-switch';i++) r=session.resolveChoice(r.interaction.playerIndex,'confirm')
+      expect(r.ok,r.error).toBe(true)
+      expect(r.state.players.map(p=>p.resources.food)).toEqual(explicit?[2,3]:[3,2])
+      expect(r.state.players[1]!.resources.wood).toBe(3)
+      expect(r.state.events).toContainEqual(expect.objectContaining({type:'resource.moved',sourceCardId:CARD,to:expect.objectContaining({playerId:explicit?opponent.id:player.id})}))
+      expect(session.cardWarnings).toEqual([])
+    }
+  })
+
+  it.each(['server','browser'] as const)('executes during reactions once across leaf, XOR and choice continuation with %s',adapter=>{
+    for(const type of ['leaf','xor','choice']){
+      const gain=leaf('gain',{params:{food:1}})
+      const flow=type==='leaf'?gain:type==='xor'?{type:'xor',children:[gain,leaf('gain',{params:{wood:1}})]}:leaf('emit-choice',{params:{requiresExplicitChoice:true,options:[{value:'chosen',labelKey:'actions.gain.name'}]}})
+      const implementation=afterCollect(flow as ActionFlow,type==='choice'?'resolveChoice:()=>gainLeaf(CARD_ID,{food:1})':'').slice(0,-2)+",{actions:['gain'],phases:['during'],mandatory:true,handler:()=>({flow:{type:'leaf',actionId:'special-effect',params:{kind:'increment-counter',key:'during',amount:1},sourceCard:CARD_ID}})}]}"
+      const {session}=setup(implementation,'',false,false,adapter)
+      let r=collect(session)
+      if(type!=='leaf'){
+        expect(r.interaction.request?.kind).toBe('choice')
+        r=session.resolveChoice(0,r.interaction.request!.options[0]!.value)
+      }
+      expect(r.ok,r.error).toBe(true);expect(r.state.players[0]!.resources.food).toBe(3)
+      expect(r.state.players[0]!.cardStates[CARD]?.counters?.during).toBe(1)
+      expect(session.cardWarnings).toEqual([])
+    }
+  })
+
+  it.each(['horse','fuel'] as const)('enforces the %s inventory domain for gain, exchange and future schedules',resource=>{
+    const flows=[leaf('pay',{params:{cost:{[resource]:1}}}),leaf('pay',{params:{cost:{fee:{[resource]:1}}}}),leaf('gain',{params:{[resource]:1}}),leaf('exchange',{actionContext:{directTrade:{from:{food:1},to:{[resource]:1}}}}),leaf('future-meeples',{params:{__futureMeepleRequest:{cardId:CARD,playerId:'player-1',entries:[{round:2,resources:{[resource]:1}}]}}})]
+    for(const flow of flows){
+      const implementation=afterCollect(flow).replace('handler:()=>','handler:ctx=>').replace('"playerId":"player-1"','"playerId":ctx.effectPlayer.id')
+      const {session}=setup(implementation)
+      session.loadState(session.state);const before=JSON.stringify(session.state)
+      const r=session.takeAction(0,'forest');expect(r.ok).toBe(false);expect(r.error).toContain('unavailable')
+      expect(JSON.stringify(session.state)).toBe(before)
+    }
+    const {session}=setup(afterCollect(leaf('gain',{params:{[resource]:1}})),'',true)
+    const r=collect(session);expect(r.state.players[0]!.resources[resource]).toBe(1)
+    expect(session.cardWarnings).toEqual([])
+  })
+
+  it('rejects nonnumeric local increments while preserving arbitrary JSON assignment',()=>{
+    const {session}=setup(afterCollect({type:'seq',children:[leaf('special-effect',{params:{kind:'set-extra-data',key:'count',value:'2'}}),leaf('special-effect',{params:{kind:'increment-extra-data',key:'count',amount:1}})]}))
+    session.loadState(session.state);const before=JSON.stringify(session.state)
+    const r=session.takeAction(0,'forest');expect(r.ok).toBe(false);expect(r.error).toContain('numeric card data');expect(JSON.stringify(session.state)).toBe(before)
+    const valid=setup(afterCollect({type:'seq',children:[leaf('special-effect',{params:{kind:'set-extra-data',key:'count',value:2}}),leaf('special-effect',{params:{kind:'increment-extra-data',key:'count',amount:1}})]}))
+    expect(collect(valid.session).state.players[0]!.cardStates[CARD]?.extraData?.count).toBe(3)
+  })
+
+  it('rejects oversized unit-trade enumeration before expansion and continuation',()=>{
+    const cost={unitFee:{food:1},nb:Number.MAX_SAFE_INTEGER,trades:[{from:{food:1},to:{wood:1},scope:'unit',max:1}]}
+    const {session}=setup(afterCollect({type:'seq',children:[leaf('pay',{params:{cost}}),leaf('gain',{params:{stone:99}})]}))
+    session.loadState(session.state);const before=JSON.stringify(session.state)
+    const r=session.takeAction(0,'forest');expect(r.ok).toBe(false);expect(r.error).toContain('enumeration')
+    expect(JSON.stringify(session.state)).toBe(before)
+  })
+
+  it('runs all ordinary stage hooks through a fixed complete two-player game',()=>{
+    const hooks=flowCardEffectHooks.filter(h=>h!=='onBuy')
+    const entries=hooks.map(h=>`${h}:(s,p)=>({type:'leaf',actionId:'special-effect',sourceCard:CARD_ID,params:{kind:'set-extra-data',key:'stageOrder',value:(readCardExtraData(p,CARD_ID).stageOrder||[]).concat('${h}')}})`)
+    const {session,player,opponent}=setup(`{effect:{${entries.join(',')}}}`)
+    player.resources.food=1000;opponent.resources.food=1000;session.loadState(session.state)
+    let r=session.getState()
+    for(let i=0;i<250 && !r.state.gameOver;i++){
+      const request=r.interaction.request
+      if(request){
+        expect(['confirm-next-player','confirm-player-switch','feed']).toContain(request.kind)
+        r=session.resolveChoice(r.interaction.playerIndex,'confirm',request.kind==='feed'?{selections:[]}:undefined)
+      }else{
+        const space=['forest','clay-pit','reed-bank','grain-seeds'].find(id=>!r.state.actionSpaces.find(s=>s.id===id)!.takenBy.length)!
+        r=session.takeAction(r.state.currentPlayerIndex,space)
+      }
+      expect(r.ok,r.error).toBe(true)
+    }
+    expect(r.state.gameOver).toBe(true)
+    const order=r.state.players[0]!.cardStates[CARD]?.extraData?.stageOrder as string[]
+    expect(new Set(order)).toEqual(new Set(hooks))
+    expect(order.indexOf('onBeforeHarvest')).toBeLessThan(order.indexOf('onStartHarvest'))
+    expect(order.indexOf('onStartHarvestFieldPhase')).toBeLessThan(order.indexOf('onAfterReap'))
+    expect(order.indexOf('onEndHarvestFieldPhase')).toBeLessThan(order.indexOf('onStartHarvestFeedingPhase'))
+    expect(order.indexOf('onBeforeReturnHome')).toBeLessThan(order.indexOf('onReturnHome'))
+    expect(order.at(-1)).toBe('onBeforeEndGame')
+    expect(session.cardWarnings).toEqual([])
+  })
+  it.each(['server','browser'] as const)('runs pay.during exactly once after a real payment choice with %s',adapter=>{
+    const implementation=afterCollect({type:'seq',children:[leaf('pay',{params:{cost:{fees:[{food:1},{wood:1}]}}}),leaf('gain',{params:{stone:1}})]}).slice(0,-2)+",{actions:['pay'],phases:['during'],mandatory:true,handler:()=>({flow:{type:'leaf',actionId:'special-effect',params:{kind:'increment-counter',key:'paid',amount:1},sourceCard:CARD_ID}})}]}"
+    const {session}=setup(implementation,'',false,false,adapter)
+    let r=collect(session);expect(r.interaction.request?.kind).toBe('choice')
+    const choice=r.interaction.request!.options.find(option=>(option.labelParams?.resourcesPaid as Record<string,number>|undefined)?.food===1)!
+    r=session.resolveChoice(0,choice.value)
+    expect(r.ok,r.error).toBe(true);expect(r.state.players[0]!.resources).toMatchObject({food:1,wood:3,stone:1})
+    expect(r.state.players[0]!.cardStates[CARD]?.counters?.paid).toBe(1)
+    expect(r.state.events.filter(e=>e.type==='resource.paid'&&e.sourceCardId===CARD)).toHaveLength(1)
+    expect(session.cardWarnings).toEqual([])
+  })
+
+  it('binds private breeding from followUpActions to this card',()=>{
+    const {session,player}=setup(`{effect:{computeBreedThreshold:(_s,_p,animal,ctx)=>animal==='cattle'&&ctx.sourceCard===CARD_ID?1:undefined},listeners:[{actions:['collect'],phases:['after'],mandatory:true,handler:()=>({followUpActions:['breed']})}]}`)
+    player.resources.cattle=1;player.houseAnimalType='cattle';player.houseAnimalCount=1
+    const r=collect(session)
+    expect(r.state.players[0]!.resources.cattle).toBe(2)
+    expect(r.state.events).toContainEqual(expect.objectContaining({type:'farm.animalBred',sourceCardId:CARD}))
+    expect(r.interaction.request?.kind).toBe('animal-reorg')
+  })
+
+  it('enforces locked farm candidates and releases them after card state changes',()=>{
+    const {session,player}=setup(afterCollect(leaf('plow'),"computeLockedFarmTiles:p=>p.cardStates[CARD_ID]?.flagged?[]:[{row:0,col:1}]"))
+    let r=collect(session);const before=JSON.stringify(session.state)
+    expect(session.commitSelectionChoice(0,{tile:{row:0,col:1}}).ok).toBe(false);expect(JSON.stringify(session.state)).toBe(before)
+    session.state.players[0]!.cardStates[CARD]={flagged:true};session.loadState(session.state)
+    r=session.takeAction(0,'clay-pit');expect(r.ok,r.error).toBe(true)
+    r=session.commitSelectionChoice(0,{tile:{row:0,col:1}})
+    expect(r.ok,r.error).toBe(true);expect(r.state.players[0]!.fields).toContainEqual(expect.objectContaining({row:0,col:1}))
+  })
+
+  it('applies valid costed/shared scoring and keeps score queries detached from inventory',()=>{
+    const {session,player,opponent}=setup(`{effect:{computeCostedBonus:()=>[{cost:{food:1},score:3}],computeSharedPostScore:(s)=>[{playerId:s.players[1].id,score:2}]}}`)
+    const before=JSON.stringify(session.state)
+    const scores=session.withCtx(()=>Scoring.computeAll(session.state))
+    expect(scores[0]!.categories.find(c=>c.key==='cardBonusVp')!.entries).toContainEqual(expect.objectContaining({cardId:CARD,score:3}))
+    expect(scores[1]!.categories.find(c=>c.key==='cardBonusVp')!.entries).toContainEqual(expect.objectContaining({cardId:CARD,score:2}))
+    expect(JSON.stringify(session.state)).toBe(before);expect(player.resources.food).toBe(2);expect(opponent.resources.food).toBe(3)
+    expect(session.cardWarnings).toEqual([])
+  })
+
+  it('uses all four getInvalidAnimals arguments to constrain real housing',()=>{
+    const {session,player}=setup(`{effect:{onComputeAnimalZones:()=>[{id:'animals',zoneType:'card',capacity:2,animalType:null,animalCount:0}],getInvalidAnimals:(p,z,meeples,s)=>s.round===1&&z.id==='animals'?meeples.filter(m=>m.type==='cattle'):[]}}`)
+    player.minorPlayed.push('D012_MilkingPlace');player.resources.cattle=1
+    session.withCtx(()=>expect(canAccommodateAnimalTotals(session.state,player,{cattle:1})).toBe(false))
+    session.state.round=2
+    session.withCtx(()=>expect(canAccommodateAnimalTotals(session.state,player,{cattle:1})).toBe(true))
+    expect(session.cardWarnings).toEqual([])
+  })
+
+  it('normalizes breeding priority and skips a real owner turn without using its worker',()=>{
+    const {session,player}=setup(`{effect:{computeHarvestBreedOrderPriority:()=>2.8,onBeforePlayerTurn:()=>({skipTurn:true})}}`)
+    session.withCtx(()=>{expect(getHarvestBreedOrderPriority(session.state,player)).toBe(2);expect(getHarvestBreedOrderPriority(session.state,session.state.players[1]!)).toBe(0)})
+    session.state.currentPlayerIndex=1;session.loadState(session.state)
+    const beforeWorkers=workersAvailable(session.state,player)
+    let r=session.takeAction(1,'forest')
+    if(r.interaction.request?.kind==='confirm-next-player')r=session.resolveChoice(r.interaction.playerIndex,'confirm')
+    expect(r.ok,r.error).toBe(true);expect(r.state.currentPlayerIndex).toBe(1)
+    expect(workersAvailable(session.state,r.state.players[0]!)).toBe(beforeWorkers)
+    expect(r.state.events).toContainEqual(expect.objectContaining({type:'turn.skipped',playerId:player.id}))
+    expect(session.cardWarnings).toEqual([])
+  })
+
+  it.each([4,14])('requests no-newborn reorganization only in the final official Harvest (round %i)',round=>{
+    const {session}=setup('{effect:{enforceReorganizeOnLastHarvest:()=>true}}')
+    session.state.round=round
+    for(const p of session.state.players){markAllWorkersUsed(session.state,p);p.resources.food=100}
+    session.loadState(session.state)
+    let r=session.performRoundEnd()
+    for(let i=0;i<8 && r.interaction.request && r.interaction.request.kind!=='animal-reorg';i++){
+      expect(['feed','confirm-player-switch','confirm-next-player']).toContain(r.interaction.request.kind)
+      r=session.resolveChoice(r.interaction.playerIndex,'confirm',r.interaction.request.kind==='feed'?{selections:[]}:undefined)
+    }
+    expect(r.ok,r.error).toBe(true)
+    if(round===14){expect(r.interaction.request?.kind).toBe('animal-reorg');expect(r.interaction.playerIndex).toBe(0)}
+    else {expect(r.interaction.request?.kind).not.toBe('animal-reorg');expect(r.state.round).toBe(5)}
+    expect(session.cardWarnings).toEqual([])
+  })
+
 })

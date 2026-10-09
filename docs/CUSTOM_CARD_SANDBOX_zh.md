@@ -897,6 +897,81 @@ Owner 已选择本轮复用现有引擎能可靠处理的机制。以下具体�
 
 保留所有现有固定 LLM fixture 与历史回放；将精确规则场景补进已有测试设施，不新建行为判断器，不提交运行结果 JSON。验证包含 executor parity、固定 LLM 测试、本地真实浏览器契约/校验流程、`test:fast`、lint 与 build；确定性验收路径不联系模型 provider。
 
+### 9.5 固定范围的完整对应审计与集中验收（2026-10-09）
+
+审计基线为 main `8fa967bd4` 上的 `53e8585a7`。逐项追踪部署契约 → 源码准入 → 共享 manifest → 服务端 Worker / 浏览器执行器 → 原生消费者 → 固定验收。覆盖 45 个 hooks、7 个 effect 元数据、11 个 phases、31 个监听身份、25 个 actions、8 个局部修改、32 个卡牌元数据字段、全部 13 个 leaf / 12 个 composite 字段、2 个公共 context 字段，以及每个行动的 params/context 槽位。基线共 186 个外层字段槽位，另审嵌套付款、选择、预览、排程、围栏结构。这是固定范围的对应审计，不代表证明了任意生成卡或 31 × 11 的每种组合。
+
+**冻结决定：**保留既有 hook / action / 身份集合及可靠原生规则。移除 `order` 后 listener 有 9 个准入字段，`handler` 必须存在且可调用。`listener.id` 也拒绝：宿主固定 `${CARD_ID}:listener:${index}` 身份。可选 `effect.id` 必须等于 CARD_ID。非元数据 hook 必须是函数，handHooks 每项必须有实现；终局元数据必须配 onBeforeEndGame，countExtraTurns / extraTurnBeforeWorkers 必须配 contributeExtraTurn。两组收获需求及 maySkipHarvestFieldPhase 保持独立的准备声明；后者改变保证收获的估计，不授予任意跳收获能力。
+
+#### Hook 与查询对应
+
+全部 45 个名字继续由英文 §3.1 与部署的穷尽 map 维护，均有原生消费者，不因缺专门测试而删除。
+
+| 范围 | 真实消费者与限制 | 固定行为证据 |
+|---|---|---|
+| 24 个普通 flow 阶段 hook（含 onBuy） | stage-dispatch 与 session-core 阶段续跑；onBuy 走原生购卡激活，保留卡主/目标及手牌身份 | 购卡/onBuy，加完整 14 轮两人游戏记录实际阶段执行和相对顺序；手牌/已打出另验 |
+| onBeforePlayerTurn | card-effects → 工作轮转；只返回 skipTurn 布尔，不建 flow/pending | 对手真实行动后跳过卡主，发出 turn.skipped，并保留卡主未使用工人 |
+| resolveChoice / contributeExtraTurn / countExtraTurns | 原生选择与额外机会激活；卡维护剩余次数，宿主另减 skip / 显式消费次数 | 真实选择及正常轮转中恰好两次额外机会，不新增计数协议 |
+| 普通 / 付费 / 跨玩家计分 | domain/scoring 与原生 bonus solver | 实际计分类别、成本分配、共享分接收者及不修改资源；错误查询中性值另验 |
+| 房间容量、繁殖优先级/门槛/数量、动物计分 | card-effects collector → 成长/繁殖/计分 | 实际成长/繁殖、来源敏感的第4/5参数、公开优先级归一化、FOM 马计分；门槛归一到1..2，优先级为 max(0,floor(value)) |
+| 自有/共享动物区与非法动物 | animal-zones；只新增区，区主/动物主人不同 | 真实安置/重组/存储、共享归属、四参数限制；白名单与原生安置限制取交集 |
+| 锁定格、规则贡献 | 原生农场几何、组件余量、空地扣分 | 锁格拒绝/释放、供给预留与计分贡献，不直接写农场 |
+| 资源承诺与最后收获重组 | 原生付款门禁与正式第14轮繁殖/重组 | 付款拒绝/释放，最后收获无新生也重组；私有繁殖不冒充收获 |
+| 特殊畜栏位置与状态展示 | 权威公共投影，只作展示 | 坐标/公共字段及快照隔离，不授予建造/退还畜栏或写规则能力 |
+
+onBeforeStartOfTurn 属于新一轮准备，并非每次个人轮转。查询会为预览和结算重复调用，修改 JSON 输入不生效。权威命令外错误给出警告和规定中性值；命令内每次调用失败都检测并回滚。失败事件独立于显示警告去重，已记录的相同错误不能让下一命令成功空跑。生产 Worker 与浏览器共用完整 listener 返回校验，包含费用归因匹配。
+
+#### Listener 返回字段与适用范围
+
+部署 phase map 持有 resultKeys，运行准入读取同一 map。sourceCard 仅是本卡来源标记，不能覆写行动者或卡主。
+
+| Phase | 消费字段（另可有 sourceCard） | 适用范围 |
+|---|---|---|
+| before / during / immediatelyAfter / after | flow、followUpActions、countCardUse、doable | 普通反应激活；doable 为预览信号。during 在执行后追加反应，包含 XOR 与真实付款选择完成，不改已执行参数 |
+| before / place-farmer 专用 collector | 仅 flow | 未显式 target 时继承匹配卡主；跨玩家交给正常 session driver / 切人。这条路径没有独立 mandatory / count / follow-up 激活 |
+| 逐作物 immediatelyAfter / reap collector | 仅 flow | crop/amount 事件；普通引擎完成 reap 仍消费普通反应字段 |
+| computeCosts | costs、costAttribution、trades、bonuses、paymentResourceProviders | 纯查询，须由原生定价消费者落到账单；整数量差必须有匹配本卡归因 |
+| computeArgs | extraOptions | 没有原生 base 候选构造器的普通 choice 请求，以及 occupied-placement 查询；农场位置/selection/动物请求不消费参数覆写 |
+| computeChoiceCandidates | extraOptions | 原生 base 选择及改良候选 collector |
+| computeReplace | actionId、decline、alternativeFlow | 继承原 params/context，不开放 extraData 覆写；alternativeFlow 要求 decline:true，按实际行动者校验 |
+| isDoable | doable；仅职业候选可 reserveResources | false veto 优先于 true，不绕过正式结算 |
+| anytime | flow、labelKey、labelParams | 身份 anytime，卡主必须是当前玩家；scope:opponent 不提供对手能力 |
+| computeExchanges | extraExchanges | 身份 compute-exchanges，配方由正式兑换/付款结算 |
+
+mandatory 只用于普通反应激活；preScoring / replacesTurn / blockedAnytimeInteractionKinds 必须用于 anytime 发现。省略过滤仍绑定明确集合和本卡。31 个身份包括两个纯查询身份、普通引擎行动及仅可监听的原生 collect / receive / place-farmer / wish-children；某身份支持某 phase 不代表任意组合都适用。部署描述明确这些差异，不承诺通用参数修改。
+
+#### 行动与嵌套参数闭合
+
+所有精确 params/context keys 仍由 sandbox-action-ids.ts 部署，英文 §6 / §6.1 分别列全部25行动与8种局部修改。本轮统一收口：
+
+| 范围 | 冻结边界与保留的原生语义 |
+|---|---|
+| Flow 外壳/农场 | 六种农场行动只读顶层 actionContext；mode 仅 parallel，one-shot 须 trigger-select。归属、optional、组件、几何、pending、付款保留原生规则 |
+| ExactCost / 普通付款 | ExactCost 仅真实资源加 max，拒绝会被忽略的组件/虚拟键；ComplexCost 保留 fee/fees/unitFee 优先级、分组与折扣 |
+| 费用身份/控制 | feeIdentities 是与实际 fee 行对齐的非负安全整数数组，重复值有意归为同一路径；付款控制为布尔。退卡资格归宿主，cards.type 是历史标注，不是附加限制 |
+| 付款展开 | provider 合并后乘积仍≤512；unit/action trade、bonus 与最终支配筛选共用100000步宿主预算；超限整次拒绝，不截候选，巨大单位循环/兑换展开前就检查 |
+| 资源域 | 结构识别13种名称；非零 horse/fuel 须 FOM 资源槽。共享 gain/trade/future/payment 消费者在修改前拒绝不适用资源，0值不启用扩展 |
+| 兑换 | catalog 配方保留发现窗口/限次，tradeIds 走明确指定路径；directTrade 只作一次即时 from/to 兑换，可带 fromFarmyard/source/sourceId，拒绝 catalog max/窗口及混用过滤/次数限制 |
+| 选择/预览 | 自定义数组和最终菜单 value 唯一，保留原生 first-wins 合并；options 非空，零下限可提交实际候选的空子集。预览只是显示数据 |
+| 繁殖/收割/重组 | leaf 来源绑定私有繁殖，包含 follow-up；正式 Harvest 仍由宿主控制。动物白名单约束安置/恢复，不改原生按总容量繁殖；reap 为 private-field-phase，可选 actionId 为字符串 |
+| 未来排程 | 当前玩家、本卡 entries；资源/field/stable 及匹配 roomType 时原生加一房；不开 actionContext。过滤、entries优先、精确取消保留原生语义 |
+| 局部状态 | 本卡/效果玩家；数字增加要求现值为有限数字（缺失视作0）且结果有限；set-extra-data 可存任意 JSON，set-counter 保留非负归一化 |
+| 注入 helper | 两执行器同一正文；payLeaf 的 cost 是完整 params，复杂费用写 payLeaf({cardId:CARD_ID,cost:{cost:complexCost}})；读 stack/extraData 不写宿主，getCardDefinition 始终为 null |
+
+#### 卡牌元数据与参考资料边界
+
+| 全部准入元数据分组 | 实际意义与限制 |
+|---|---|
+| id / name / deck / number / category / desc / rules / artUrl / locales / card_type / playerActionCardType / implemented | 身份/展示/catalog；CUSTOM deck、number 和主卡类型由工坊归一化，标签或分类不注册规则行动。CARD_DEF 外壳只允许 cardType/meta 与 minor/occupation 类型 |
+| cost / altCosts / returnCards / passing / providesOccupation / vp | 原生小发展购卡/转手/职业数量/印刷分；职业学费或 exact cost 独立，altCosts/passing/小发展印刷分不是通用职业能力 |
+| prerequisite / occupationPrerequisites / improvementPrerequisites / maxRound / players | 原生资格 parser/filter；数字 bounds 执行，任意文字或未知人数串不是新增条件，不用杜撰文本表达未支持规则 |
+| exchanges / modifier / modifiers / isCookery / isBaking | 原生配方与活动付款修饰；标记本身不制造配方 |
+| isField / providesField / extraVp / evenMoreSet | 标记/历史数据，不能注册可播种田或自动加分；Card Field 与权威作物结算仍延期 |
+
+参考工具与凭据架构不变：search_references 搜允许路径和已读正文；read_reference 读取每次尝试固定的最新 main，校验 blob 与行范围。模型凭据只在浏览器直连 provider；后端资料元数据用项目 GitHub 凭据，不接触用户 LLM Token。更新的 GitHub 代码不能扩大已部署执行范围。
+
+**集中验收：**沿用 validator/executor parity 查机械准入；固定两人 Session 验付款、选择、卡主切换、延迟奖励、共享动物、局部状态、错误回滚、额外机会和完整生命周期。公开隔离查询验真实计分/供给/安置消费者，浏览器 E2E 单验渲染交互。冻结批次覆盖非法声明、动态嵌套结果、重复错误、直接/XOR/付款续跑及扩展模式对照。保留既有 LLM cases 和 golden；回放仅作历史回归，不代表新生成质量或模型准入。本次审计不需要付费模型调用或单独行为判定程序。
+
 ## 10. 历史
 
 

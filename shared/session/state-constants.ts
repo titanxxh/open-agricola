@@ -17,6 +17,7 @@ import type { DraftMode } from '../draft/types'
 import { createSeededRng, shuffleWithRng, type GameSeed } from '../utils/rng'
 import { tryAddRoomTile } from '../domain/farmyard'
 import { findPlayerById } from '../domain/player'
+import { assertEnabledResourceAmounts } from '../contract/resource-keys'
 import {
   emptyResources,
   extendedResourceKeyList,
@@ -154,6 +155,7 @@ export const applyFutureMeeples = (
     }
     const player = findPlayerById(state, entry.playerId)
     if (!player) return
+    assertEnabledResourceAmounts(entry.resources, player.resources)
     Object.entries(entry.resources).forEach(([key, value]) => {
       const amount = value ?? 0
       if (key === 'field' || key === 'stable' || key === 'forest' || key === 'moor') return

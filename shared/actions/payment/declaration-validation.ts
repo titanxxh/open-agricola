@@ -3,6 +3,17 @@ import type { Bonus, CardProvidedPaymentResourceProvider, GameState, PaymentSolu
 import { InvalidActionContextError } from '../../contract/action-context-error.ts'
 
 export const MAX_PAYMENT_PROVIDER_COMBINATIONS = 512
+export const MAX_PAYMENT_ENUMERATION_STEPS = 100_000
+
+/** Host-side expansion is outside the code isolate. Abort the whole query,
+ * never truncate candidates or return an incomplete payment menu. */
+export const createPaymentEnumerationBudget = (): ((steps?: number) => void) => {
+  let remaining = MAX_PAYMENT_ENUMERATION_STEPS
+  return (steps = 1) => {
+    remaining -= steps
+    if (!Number.isSafeInteger(remaining) || remaining < 0) throw new InvalidActionContextError('Payment enumeration exceeds the 100000-step limit')
+  }
+}
 
 /** Bound the conservative cover/provider product before any host enumeration.
  * The final merged list is checked too; separate contributions cannot bypass it. */

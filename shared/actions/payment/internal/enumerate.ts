@@ -33,8 +33,8 @@ import {
   hasValidResources,
 } from '../../helpers/trades'
 import { isFireplaceIdentityCard } from '../../../cards/helpers/card-type'
-import { PAYMENT_RESOURCE_KEYS } from '../../../contract/resource-keys'
-import { assertPaymentProviderEnumerationBudget, canConsumePaymentResourceProviders } from '../declaration-validation'
+import { PAYMENT_RESOURCE_KEYS, assertEnabledResourceAmounts } from '../../../contract/resource-keys'
+import { assertPaymentProviderEnumerationBudget, canConsumePaymentResourceProviders, createPaymentEnumerationBudget } from '../declaration-validation'
 import { solutionCache, makeCacheKey } from './cache'
 import {
   canPayResources,
@@ -283,10 +283,11 @@ const dominates = (a: PaymentSolution, b: PaymentSolution): boolean => {
 
 export const keepOnlyOptimals = (
   solutions: PaymentSolution[],
+  spend?: () => void,
 ): PaymentSolution[] => {
   if (solutions.length <= 1) return solutions
   return solutions.filter(
-    (candidate) => !solutions.some((other) => other !== candidate && dominates(other, candidate)),
+    (candidate) => !solutions.some((other) => { spend?.(); return other !== candidate && dominates(other, candidate) }),
   )
 }
 
@@ -741,6 +742,7 @@ const dedupeUnitCostOptions = (options: UnitCostOption[]) => {
 const buildUnitCostOptions = (
   unitFee: PaymentResourceMap,
   unitTrades: Trade[],
+  spend: (steps?: number) => void,
 ): UnitCostOption[] => {
   // Candidate closure (ADR 0004): unit trades are optional transforms, the
   // reachable option set is order-independent by construction. Per-trade
@@ -767,13 +769,14 @@ const buildUnitCostOptions = (
       }
     },
   }))
-  return closeCandidates([base], transforms, { key: unitCostOptionSignature })
+  return closeCandidates([base], transforms, { key: unitCostOptionSignature, onStep: spend })
 }
 
 const buildUnitTotalOptions = (
   unitFee: PaymentResourceMap,
   unitTrades: Trade[],
   nb?: number,
+  spend = createPaymentEnumerationBudget(),
 ): UnitCostOption[] => {
   if (nb === undefined || nb <= 0) {
     return [{ cost: {}, tradesUsed: [] }]
@@ -782,13 +785,15 @@ const buildUnitTotalOptions = (
     return [{ cost: scaleResources(unitFee, nb), tradesUsed: [] }]
   }
 
-  const unitOptions = buildUnitCostOptions(unitFee, unitTrades)
+  spend(nb)
+  const unitOptions = buildUnitCostOptions(unitFee, unitTrades, spend)
   let totals: UnitCostOption[] = [{ cost: {}, tradesUsed: [] }]
 
   for (let i = 0; i < nb; i += 1) {
     const nextTotals: UnitCostOption[] = []
     for (const total of totals) {
       for (const unitOption of unitOptions) {
+        spend()
         const tradesUsed = mergeTradeUsage(total.tradesUsed, unitOption.tradesUsed)
         if (!isWithinTradeGroupLimits(tradesUsed)) continue
         nextTotals.push({
@@ -806,18 +811,23 @@ const buildUnitTotalOptions = (
 const enumerateActionTradeCombos = (
   actionTrades: Trade[],
   playerResources: PaymentResourceMap,
+  spend: (steps?: number) => void,
 ): TradeCombo[] => {
+  // Charge the tail copies before recursing, as well as generated rows.
+  // A long zero-use list must reject before exhausting the native call stack.
+  spend(actionTrades.length)
   if (actionTrades.length === 0) {
     return [{ tradesUsed: [], result: { ...playerResources } }]
   }
   const [firstTrade, ...restTrades] = actionTrades
-  const restCombos = enumerateActionTradeCombos(restTrades, playerResources)
+  const restCombos = enumerateActionTradeCombos(restTrades, playerResources, spend)
   const results: TradeCombo[] = []
   for (const combo of restCombos) {
     const maxTimes = Math.min(
       getMaxTradeTimesFromPartial(firstTrade, combo.result),
       getRemainingTradeGroupUses(combo.tradesUsed, firstTrade),
     )
+    spend(maxTimes + 1)
     for (let t = 0; t <= maxTimes; t++) {
       const afterTrade = convertResources(combo.result as Partial<Resource>, firstTrade, t) as PaymentResourceMap
       if (hasValidResources(afterTrade)) {
@@ -835,9 +845,10 @@ export const generateTradeCombinations = (
   trades: Trade[],
   playerResources: PaymentResourceMap,
   _nb?: number,
+  spend = createPaymentEnumerationBudget(),
 ): TradeCombo[] => {
   const actionTrades = trades.filter((t) => (t.scope ?? 'action') === 'action')
-  return enumerateActionTradeCombos(actionTrades, playerResources)
+  return enumerateActionTradeCombos(actionTrades, playerResources, spend)
 }
 
 const canCoverCost = (
@@ -926,6 +937,13 @@ export const computeAllBuyableCombinations = (
     : normalizedCost
   validateComplexCost(effectiveCost)
 
+  const resourceMaps = [effectiveCost.fee, ...(effectiveCost.fees ?? []), effectiveCost.unitFee,
+    effectiveCost.paymentBudget, effectiveCost.minimumResourcesPaid, effectiveCost.cards?.cost,
+    ...(effectiveCost.trades ?? []).flatMap(trade => [trade.from, trade.to, trade.minCost, trade.maxCost]),
+    ...(effectiveCost.bonuses ?? []).flatMap(bonus => [bonus.discount, bonus.minCost, bonus.maxCost,
+      ...(bonus.choices ?? []).flatMap(choice => [choice.discount, choice.minCost, choice.maxCost])])]
+  for (const map of resourceMaps) if (map) assertEnabledResourceAmounts(map, player.resources)
+
   const paymentResourceProviders = effectiveCost.paymentResourceProviders ?? []
   assertPaymentProviderEnumerationBudget(paymentResourceProviders)
   // Provider backing is live game state, including shared supplies. It is
@@ -934,6 +952,7 @@ export const computeAllBuyableCombinations = (
   const cacheKey = canUseCache ? makeCacheKey(player, effectiveCost, costType, playedCards) : ''
   const cached = canUseCache ? solutionCache.get(cacheKey) : undefined
   if (cached) return cached
+  const spend = createPaymentEnumerationBudget()
 
   const providerResources: PaymentResourceMap = {}
   for (const provider of paymentResourceProviders) {
@@ -968,7 +987,7 @@ export const computeAllBuyableCombinations = (
   const allTrades = effectiveCost.trades ?? []
   const actionTrades = allTrades.filter((trade) => (trade.scope ?? 'action') === 'action')
   const unitTrades = allTrades.filter((trade) => trade.scope === 'unit')
-  const unitTotals = buildUnitTotalOptions(effectiveCost.unitFee ?? {}, unitTrades, nb)
+  const unitTotals = buildUnitTotalOptions(effectiveCost.unitFee ?? {}, unitTrades, nb, spend)
   const costResourceRemovals = effectiveCost.costResourceRemovals ?? []
 
   const removeCostResources = (costToFilter: PaymentResourceMap) => {
@@ -1008,7 +1027,7 @@ export const computeAllBuyableCombinations = (
       const removedBaseFee = removeCostResources(mergedBaseFee)
       const baseFee = removedBaseFee.cost
       const tradeCombos = actionTrades.length > 0
-        ? generateTradeCombinations(actionTrades, playerResources)
+        ? generateTradeCombinations(actionTrades, playerResources, undefined, spend)
         : [{ tradesUsed: [], result: { ...playerResources } }]
 
       for (const tradeCombo of tradeCombos) {
@@ -1037,6 +1056,7 @@ export const computeAllBuyableCombinations = (
         ]
 
         for (const bonus of effectiveCost.bonuses ?? []) {
+          spend()
           if (!evaluateConditions(player, bonus.conditions, nb)) {
             continue
           }
@@ -1044,6 +1064,7 @@ export const computeAllBuyableCombinations = (
           const expanded: BonusPath[] = []
           if (bonus.optional) {
             for (const path of bonusPaths) {
+              spend()
               expanded.push({
                 cost: path.cost,
                 sources: [...path.sources],
@@ -1095,6 +1116,7 @@ export const computeAllBuyableCombinations = (
           const bonusKey = bonus.sources?.[0]
           for (const path of bonusPaths) {
             for (const candidate of candidates) {
+              spend()
               if (!costBoundsSatisfied(path.cost, candidate.minCost, candidate.maxCost)) {
                 continue
               }
@@ -1148,6 +1170,7 @@ export const computeAllBuyableCombinations = (
           const { resources: realCost, supplyTokens } = splitSupplyTokenCost(effectiveCostFee)
           const providerCoverOptions = buildProviderCoverOptions(realCost, paymentResourceProviders)
           for (const providerCover of providerCoverOptions) {
+            spend()
             if (!canCoverCost(tradeCombo.result, providerCover.remainingCost)
               || !canPaySupplyTokens(state, player, effectiveCostFee)) {
               continue
@@ -1226,6 +1249,7 @@ export const computeAllBuyableCombinations = (
     if (cost.cards.required) {
       const requiredCardSolutions: PaymentSolution[] = []
       if (eligibleCards.length > 0 && canPayCardCost) {
+        spend(paymentSolutions.length * eligibleCards.length)
         paymentSolutions.forEach((solution) => {
           eligibleCards.forEach((cardId) => {
             const resourcesPaid = mergePaymentResources(solution.resourcesPaid, cardCost)
@@ -1243,6 +1267,7 @@ export const computeAllBuyableCombinations = (
       paymentSolutions.length = 0
       paymentSolutions.push(...requiredCardSolutions)
     } else if (canPayCardCost) {
+      spend(eligibleCards.length)
       eligibleCards.forEach((cardId) => {
         const cardSolution: PaymentSolution = {
           resourcesPaid: cardCost,
@@ -1260,7 +1285,7 @@ export const computeAllBuyableCombinations = (
         (solution.resourcesPaid[resource as PaymentResourceKey] ?? 0) >= (amount ?? 0))
       && (!state || canConsumePaymentResourceProviders(state, solution, paymentResourceProviders)),
   )
-  const result = sortPaymentSolutions(keepOnlyOptimals(budgetedSolutions))
+  const result = sortPaymentSolutions(keepOnlyOptimals(budgetedSolutions, spend))
   if (canUseCache) solutionCache.set(cacheKey, result)
   return result
 }

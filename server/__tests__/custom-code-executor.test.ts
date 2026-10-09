@@ -235,7 +235,6 @@ const CARD_IMPL = {
     },
   },
   listeners: [{
-    id: CARD_ID,
     cardIds: [CARD_ID],
     actions: ['collect'],
     phases: ['after'],
@@ -271,6 +270,7 @@ const CARD_IMPL = {
   effect: {
     id: CARD_ID,
     handHooks: ['onBeforeStartOfTurn'],
+    onBeforeStartOfTurn: () => undefined,
     beforeEndGameScope: 'allPlayers',
     beforeEndGameMandatory: true,
     onBeforeEndGame: (_state: any, _player: any) => {
@@ -374,7 +374,7 @@ const CARD_IMPL = {
       compiledCode: compileCardCode(source),
       cardId: 'CUSTOM_ExecutorCard',
       registrationId: 'CUSTOM_ExecutorCard:listener:0',
-      context: {} as never,
+      context: {phase:'computeCosts',actionId:'construct',state:createInitialState(42)} as never,
     })).toEqual({ ok: false, error: expect.stringContaining('costAttribution') })
   })
 
@@ -454,7 +454,6 @@ const CARD_IMPL = {
     },
   },
   listeners: [{
-    id: CARD_ID,
     cardIds: [CARD_ID],
     actions: ['collect'],
     phases: ['after'],

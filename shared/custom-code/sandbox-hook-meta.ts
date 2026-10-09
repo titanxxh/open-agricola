@@ -118,7 +118,7 @@ export const cardEffectHookMeta: Record<CardEffectField, HookMeta> = {
     usage: '所属来源返回特殊畜栏（native；沙盒写入尚未开放）',
   },
 
-  // 联合成员但不在 cardEffectHooks 数组，不会被渲染进 prompt（仅为 Record 穷尽性）
+  // 已开放的纯查询；与 mutating native-only adjuncts 区分。
   onComputeSharedAnimalZones: {
     table: 'advanced',
     signature: '(owner, animalOwner, zones, state) => AnimalZone[]',

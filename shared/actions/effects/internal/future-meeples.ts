@@ -7,6 +7,8 @@ import type {
 } from '../../../contract/types'
 import type { EventSink } from '../../../contract/events'
 import { describeFutureSchedule, normalizeFutureSchedule } from '../../future-schedule'
+import { assertEnabledResourceAmounts } from '../../../contract/resource-keys'
+import { findPlayerById } from '../../../domain/player'
 
 export const futureMeeplesNode = (request?: FutureMeepleRequest): Extract<ActionFlow, { type: 'leaf' }> => ({
   type: 'leaf',
@@ -18,6 +20,8 @@ export const queueFutureMeeples = (
   state: GameState,
   request: FutureMeepleRequest,
 ) => {
+  const player = findPlayerById(state, request.playerId)
+  if (player) for (const entry of normalizeFutureSchedule(state.round, request)) assertEnabledResourceAmounts(entry.resources, player.resources)
   state.pendingFutureMeeples = [...state.pendingFutureMeeples, request]
 }
 

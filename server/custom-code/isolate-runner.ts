@@ -8,7 +8,8 @@
  * The host performs native listener cost attribution validation as well.
  */
 import ivm from 'isolated-vm'
-import { validateCustomEffectResult, assertCustomListenerCapabilities } from '../../shared/custom-code/runtime-capabilities.ts'
+import { validateCustomEffectResult } from '../../shared/custom-code/runtime-capabilities.ts'
+import { validateCustomListenerResult } from '../../shared/custom-code/listener-result-validator.ts'
 import { HELPERS_INJECTION_SOURCE } from '../../shared/custom-code/injected-helpers.ts'
 import { CARD_DEFINITION_NORMALIZATION_SOURCE } from '../../shared/custom-code/sandbox-declarations.ts'
 
@@ -134,8 +135,7 @@ __result = __listener && typeof __listener.handler === 'function'
         __input_context: request.context,
       },
     )
-    assertCustomListenerCapabilities(result, request.cardId, request.context as import('../../shared/cards/card-listeners.ts').CardListenerContext)
-    return { ok: true, result: result ?? null }
+    return { ok: true, result: validateCustomListenerResult(result, request.cardId, request.context as import('../../shared/cards/card-listeners.ts').CardListenerContext) }
   } catch (error) {
     return {
       ok: false,

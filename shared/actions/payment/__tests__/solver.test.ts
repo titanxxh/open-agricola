@@ -2,6 +2,7 @@ import { describe, expect, it, beforeEach } from 'vitest'
 import { PaymentSolver } from '../index'
 import type { PaymentCtx } from '../index'
 import type { CostModifier, GameState, PlayerState } from '../../../contract/types'
+import { InvalidActionContextError } from '../../../contract/action-context-error'
 
 const makePlayerWithResources = (res: Partial<Record<string, number>>): PlayerState => {
   return {
@@ -44,6 +45,12 @@ const ctx: PaymentCtx = { actionId: 'test-action', costType: 'none' }
 describe('PaymentSolver', () => {
   beforeEach(() => {
     PaymentSolver.clearCache()
+  })
+
+  it('rejects a deep zero-use trade list before native recursion exhausts the stack', () => {
+    const state=makeState(makePlayerWithResources({food:1,wood:0}))
+    const trades=Array.from({length:6000},()=>({from:{food:1},to:{wood:1},max:0}))
+    expect(()=>PaymentSolver.computeOptions(state,0,{fee:{food:1},trades},ctx)).toThrow(InvalidActionContextError)
   })
 
   it('filters actual minimum payments before removing dominated alternatives', () => {

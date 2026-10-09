@@ -51,7 +51,6 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
       const CARD_IMPL = {
         listeners: [
           {
-            id: 'test-listener',
             phases: ['before', 'after', 'during'],
             handler: (ctx) => {},
           },
@@ -67,7 +66,6 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
       const CARD_IMPL = {
         listeners: [
           {
-            id: 'test-listener',
             phases: ['before', 'superPhase'],
             handler: (ctx) => {},
           },
@@ -84,7 +82,6 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
       const CARD_IMPL = {
         listeners: [
           {
-            id: 'test-listener',
             actions: ['collect', 'improvement'],
             phases: ['computeCosts'],
             handler: (ctx) => {},
@@ -553,7 +550,6 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
       const CARD_IMPL = {
         listeners: [
           {
-            id: 'test-listener',
             actions: ['improvement-any'],
             phases: ['computeCosts'],
             handler: (ctx) => {},
@@ -669,7 +665,6 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
       const CARD_IMPL = {
         listeners: [
           {
-            id: 'test-listener',
             phases: ['computeExchanges'],
             handler: (ctx) => {},
           },
@@ -836,7 +831,6 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
       const CARD_IMPL = {
         listeners: [
           {
-            id: 'test',
             phases: ['before', 'during', 'immediatelyAfter', 'after', 'computeCosts', 'computeArgs', 'computeChoiceCandidates', 'computeReplace', 'isDoable'],
             handler: (ctx) => {},
           },

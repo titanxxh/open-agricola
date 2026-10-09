@@ -60,7 +60,6 @@ export const registerBrowserBackedCustomCard = (cardData: CustomCardData): void 
       cardIds: listener.cardIds,
       actions: listener.actions,
       phases: listener.phases,
-      order: listener.order,
       scope: listener.scope,
       handler: (context: CardListenerContext) => {
         const response = invokeCustomCodeListenerLocal({

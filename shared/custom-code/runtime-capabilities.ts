@@ -1,7 +1,7 @@
 import { SANDBOX_ALLOWED_ACTION_IDS, sandboxActionIdMeta, sandboxSpecialEffectKinds } from './sandbox-action-ids.ts'
 import { cardEffectHooks } from '../projections/card-effect-hooks.ts'
 import { cardEffectHookMeta } from './sandbox-hook-meta.ts'
-import { REAL_RESOURCE_KEYS, isPaymentResourceKey, isCardProvidedPaymentResourceKey } from '../contract/resource-keys.ts'
+import { REAL_RESOURCE_KEYS, isPaymentResourceKey, isCardProvidedPaymentResourceKey, assertEnabledResourceAmounts } from '../contract/resource-keys.ts'
 import { validateBonus, validateTradeModifier, assertPaymentProviderEnumerationBudget, MAX_PAYMENT_PROVIDER_COMBINATIONS } from '../actions/payment/declaration-validation.ts'
 import { getFarmyardTilePositions, positionKey } from '../domain/farmyard-geometry.ts'
 import { ALL_ANIMAL_KEYS, animalKeysForState } from '../contract/animals.ts'
@@ -11,6 +11,7 @@ import type { CardEffectField } from '../cards/card-effects.ts'
 import type { CardListenerContext } from '../cards/card-listeners.ts'
 import { COST_MODIFIER_TYPES } from '../contract/types.ts'
 import { assertDistinctChoiceOptionValues } from '../contract/choice-options.ts'
+import { sandboxListenerPhaseMeta, isSandboxListenerPhase } from './sandbox-listener-phases.ts'
 
 const resources = REAL_RESOURCE_KEYS as readonly string[]
 const specialKeys: Record<typeof sandboxSpecialEffectKinds[number], readonly string[]> = {
@@ -241,6 +242,10 @@ function cost(value: unknown, cardId: string, allowCardReturn = false): void {
     if (!Array.isArray(value.fees)) throw new Error('Cost fees must be an array')
     value.fees.forEach(fee => resourceMap(fee, true))
   }
+  if (value.feeIdentities !== undefined) {
+    if (!Array.isArray(value.feeIdentities) || value.feeIdentities.length !== (Array.isArray(value.fees) && value.fees.length ? value.fees.length : 1)) throw new Error('feeIdentities must align with the effective fee rows')
+    value.feeIdentities.forEach(identity => integer(identity, 'Fee identity'))
+  }
   if (value.nb !== undefined) integer(value.nb, 'Cost unit count')
   if (value.resourceReserve !== undefined) {
     assertRecord(value.resourceReserve, 'Resource reserve')
@@ -267,6 +272,10 @@ function cost(value: unknown, cardId: string, allowCardReturn = false): void {
 
 export function assertCustomCardDefinition(definition: unknown, cardId: string): void {
   assertRecord(definition, 'CARD_DEF')
+  if ('meta' in definition) {
+    assertKeys(definition, ['cardType','meta'], 'CARD_DEF')
+    if (definition.cardType !== 'minor' && definition.cardType !== 'occupation') throw new Error('CARD_DEF cardType must be minor or occupation')
+  }
   const meta = 'meta' in definition ? definition.meta : definition
   assertRecord(meta, 'CARD_DEF.meta')
   safeData(meta)
@@ -338,7 +347,7 @@ export function assertCustomActionData(actionId: string, params: Record<string, 
   }
   for (const exact of [context.exactCost, params.exactCost]) if (exact !== undefined) {
     assertRecord(exact, 'Exact cost')
-    resourceMap(Object.fromEntries(Object.entries(exact).filter(([key]) => key !== 'max')), true)
+    resourceMap(Object.fromEntries(Object.entries(exact).filter(([key]) => key !== 'max')))
     if (exact.max !== undefined) integer(exact.max, 'Exact cost maximum')
   }
   if (context.costOverride !== undefined) resourceMap(context.costOverride, false, false)
@@ -346,6 +355,7 @@ export function assertCustomActionData(actionId: string, params: Record<string, 
   if (actionId === 'pay' && params.costType !== undefined && !(COST_MODIFIER_TYPES as readonly unknown[]).includes(params.costType)) throw new Error('Unsupported payment costType')
   if (actionId === 'pay' && params.reserveResources !== undefined) resourceMap(params.reserveResources)
   if (actionId === 'pay') for (const key of ['paymentChoice', 'optionPrefix']) if (params[key] !== undefined && typeof params[key] !== 'string') throw new Error(`${key} must be a string`)
+  if (actionId === 'pay') for (const key of ['includeReturnedCard', 'trackSourceCardPaymentStats']) if (params[key] !== undefined && typeof params[key] !== 'boolean') throw new Error(`${key} must be boolean`)
   if (actionId === 'occupation' && params.allowedCards !== undefined) stringArray(params.allowedCards, 'Allowed occupation cards')
   if (actionId === 'push-to-card-stack' && (typeof params.item !== 'string' || !params.item)) throw new Error('Card stack item must be a nonempty string')
   if (actionId === 'improvement') {
@@ -360,6 +370,8 @@ export function assertCustomActionData(actionId: string, params: Record<string, 
     if (new Set(context.animalTypes).size !== context.animalTypes.length) throw new Error('Breed animal types must be distinct')
   }
   if (['gain', 'store-on-card', 'take-from-card'].includes(actionId)) resourceMap(Object.fromEntries(Object.entries(params).filter(([key]) => resources.includes(key))))
+  const inventory = state?.players?.[0]?.resources
+  if (inventory && ['gain', 'store-on-card', 'take-from-card'].includes(actionId)) assertEnabledResourceAmounts(params, inventory)
   if (actionId === 'gain') {
     for (const key of ['recipientPlayerId', 'payerId']) if (params[key] !== undefined && (typeof params[key] !== 'string' || !state?.players?.some(player => player.id === params[key]))) throw new Error(`Gain ${key} must identify an existing player`)
     if (params.recipientMode !== undefined && params.recipientMode !== 'self' && params.recipientMode !== 'others') throw new Error('Gain recipientMode must be self or others')
@@ -431,6 +443,7 @@ export function assertCustomActionData(actionId: string, params: Record<string, 
     if (params.promptParams !== undefined) assertRecord(params.promptParams, 'Choice promptParams')
     if (params.requiresExplicitChoice !== undefined && typeof params.requiresExplicitChoice !== 'boolean') throw new Error('Choice requiresExplicitChoice must be boolean')
     choiceOptions(params.options, cardId)
+    if ((params.options as unknown[]).length === 0) throw new Error('Choice requires a nonempty options array')
     if (params.multiSelect !== undefined) {
       assertRecord(params.multiSelect, 'Multi-select'); assertKeys(params.multiSelect, ['valuePrefix', 'minSelections', 'maxSelections'], 'Multi-select')
       if (typeof params.multiSelect.valuePrefix !== 'string' || !params.multiSelect.valuePrefix) throw new Error('Multi-select valuePrefix must be a nonempty string')
@@ -448,9 +461,15 @@ export function assertCustomActionData(actionId: string, params: Record<string, 
     assertKeys(context.trigger, ['phase', 'actionId', 'cardId'], 'Reap trigger')
     if (context.trigger.phase !== 'private-field-phase') throw new Error('Custom reap must use private-field-phase')
     ownSource(context.trigger.cardId, cardId)
+    if (context.trigger.actionId !== undefined && typeof context.trigger.actionId !== 'string') throw new Error('Reap trigger actionId must be a string')
   }
   if (actionId === 'exchange') {
-    if (context.directTrade !== undefined) trade(context.directTrade, cardId, 'exchange')
+    if (context.directTrade !== undefined) {
+      assertRecord(context.directTrade, 'Direct trade')
+      assertKeys(context.directTrade, ['from', 'to', 'fromFarmyard', 'source', 'sourceId'], 'Direct trade')
+      if (context.tradeIds !== undefined || context.maxTradeTimesBySourceId !== undefined) throw new Error('Direct trade cannot combine catalog selectors or caps')
+      trade({...context.directTrade, max:1}, cardId, 'exchange')
+    }
     if (context.tradeIds !== undefined) stringArray(context.tradeIds, 'Exchange trade IDs', undefined, true)
     if (context.maxTradeTimesBySourceId !== undefined) {
       assertRecord(context.maxTradeTimesBySourceId, 'Exchange source caps')
@@ -498,6 +517,10 @@ export function validateCustomFlow(value: unknown, cardId: string, depth = 0, st
     const params = value.params ?? {}; const context = value.actionContext ?? {}
     assertRecord(params, 'Flow params'); assertRecord(context, 'Flow actionContext')
     assertCustomActionData(value.actionId, params, context, cardId, state, target)
+    if (value.actionId === 'breed') {
+      context.sourceCard ??= cardId
+      value.actionContext = context
+    }
     value.sourceCard ??= cardId
   } else if (typeof value.type !== 'string' || !['seq', 'or', 'xor', 'parallel'].includes(value.type) || !Array.isArray(value.children)) throw new Error('Composite ActionFlow requires supported type and children')
   else {
@@ -622,6 +645,15 @@ export function assertCustomListenerCapabilities(value: unknown, cardId: string,
   if (value === null || value === undefined) return
   assertRecord(value, 'Listener result'); safeData(value); ownSource(value.sourceCard, cardId)
   assertKeys(value, ['doable', 'actionId', 'extraData', 'extraOptions', 'extraExchanges', 'followUpActions', 'flow', 'costs', 'costAttribution', 'reserveResources', 'trades', 'bonuses', 'paymentResourceProviders', 'sourceCard', 'countCardUse', 'labelKey', 'labelParams', 'decline', 'alternativeFlow'], 'Listener result')
+  if (context) {
+    if (!isSandboxListenerPhase(context.phase)) throw new Error('Unsupported listener result phase')
+    let keys = sandboxListenerPhaseMeta[context.phase].resultKeys
+    if (context.phase === 'before' && context.actionId === 'place-farmer' || context.phase === 'immediatelyAfter' && context.actionId === 'reap' && context.extraData?.crop !== undefined) keys = ['flow','sourceCard']
+    assertKeys(value, keys, `${context.phase} result`)
+    if (context.phase === 'anytime' && context.actionId !== 'anytime' || context.phase === 'computeExchanges' && context.actionId !== 'compute-exchanges') throw new Error('Query phase requires its dispatcher identity')
+    if (value.reserveResources !== undefined && (context.actionId !== 'occupation' || typeof context.choice !== 'string')) throw new Error('reserveResources requires an occupation candidate query')
+  }
+  if (value.alternativeFlow !== undefined && value.decline !== true) throw new Error('alternativeFlow requires decline: true')
   for (const key of ['doable', 'countCardUse', 'decline']) if (value[key] !== undefined && typeof value[key] !== 'boolean') throw new Error(`Listener ${key} must be boolean`)
   if (value.labelKey !== undefined && typeof value.labelKey !== 'string') throw new Error('Listener labelKey must be a string')
   if (value.labelParams !== undefined) assertRecord(value.labelParams, 'Listener label params')
@@ -636,6 +668,7 @@ export function assertCustomListenerCapabilities(value: unknown, cardId: string,
   if (value.actionId !== undefined) assertCustomActionData(String(value.actionId), {}, (value.extraData ?? {}) as Record<string, unknown>, cardId, context?.state, context?.player?.id)
   if (value.followUpActions !== undefined) {
     if (!Array.isArray(value.followUpActions)) throw new Error('followUpActions must be an array')
+    if (value.followUpActions.length > 0) value.sourceCard ??= cardId
     for (const action of value.followUpActions) {
       const id = typeof action === 'string' ? action : action?.actionId
       if (!(SANDBOX_ALLOWED_ACTION_IDS as readonly unknown[]).includes(id)) throw new Error('Unsupported follow-up action')

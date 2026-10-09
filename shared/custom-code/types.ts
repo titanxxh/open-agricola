@@ -22,7 +22,6 @@ export type CustomCodeListenerManifest = {
   cardIds?: string[]
   actions?: string[]
   phases?: ActionHookPhase[]
-  order?: number
   scope?: CardListenerScope
   zones?: ('played' | 'hand')[]
   mandatory?: boolean

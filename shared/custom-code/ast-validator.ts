@@ -831,7 +831,7 @@ function validateListenersArray(
         errors.push(`line ${getLine(prop)}: CARD_IMPL listener properties must not set __proto__`)
         continue
       }
-      if (!propName || !['handler', 'id', ...Object.keys(sandboxListenerFields)].includes(propName)) {
+      if (!propName || !['handler', ...Object.keys(sandboxListenerFields)].includes(propName)) {
         errors.push(`line ${getLine(prop)}: unsupported listener field '${propName}'`)
         continue
       }

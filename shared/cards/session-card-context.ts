@@ -55,12 +55,17 @@ export class SessionCardContext {
   /** Art URLs for custom cards, keyed by card ID. */
   readonly customArtUrls = new Map<string, string>()
   private readonly warnings: string[]
+  /** Invocation failures are events; display warnings may be deduplicated. */
+  failureCount = 0
+  latestFailure = ''
 
   constructor(warnings: string[] = []) {
     this.warnings = warnings
   }
 
   reportWarning(warning: string): void {
+    this.failureCount += 1
+    this.latestFailure = warning
     if (!this.warnings.includes(warning)) this.warnings.push(warning)
   }
 

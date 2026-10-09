@@ -15,6 +15,7 @@ import type { DraftGameEvent, EventSink } from '../../contract/events'
 import type { PromptKey } from '../../contract/prompt-keys'
 import { PaymentSolver } from '../payment'
 import { animalKeysForState } from '../../contract/animals'
+import { assertEnabledResourceAmounts } from '../../contract/resource-keys'
 import { trackWorkPhaseBuildingResources } from '../../session/work-phase-resources'
 import { addFoodFromConversion, incResourceConverted } from '../../session/stats'
 import {
@@ -308,6 +309,8 @@ export const applyTrade = (
   animalPaymentPreference?: AnimalPaymentPreference,
   state?: GameState,
 ): void => {
+  assertEnabledResourceAmounts(trade.from, player.resources)
+  assertEnabledResourceAmounts(trade.to, player.resources)
   // Deduct 'from' resources
   const fromKeys = Object.keys(trade.from) as ResourceKey[]
   for (const key of fromKeys) {

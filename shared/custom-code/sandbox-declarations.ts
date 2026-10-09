@@ -28,7 +28,6 @@ export const sandboxListenerFields = {
   cardIds: 'Bound to [CARD_ID]; omitted means this card, never a global listener.',
   actions: 'Supported action IDs; omitted means the explicit deployed set.',
   phases: 'Supported phases; omitted means the explicit deployed set.',
-  order: 'Finite numeric ordering hint under the native dispatcher.',
   scope: 'player | opponent | any; defaults to player.',
   zones: 'played | hand; defaults to played.',
   mandatory: 'boolean: native mandatory reaction semantics.',
@@ -52,7 +51,13 @@ var __listenerKeys = ${JSON.stringify(Object.keys(sandboxListenerFields))};
 if (__captured.CARD_IMPL && __captured.CARD_IMPL.effect) {
   var eff = __captured.CARD_IMPL.effect;
   for (var k in eff) {
-    if (Object.prototype.hasOwnProperty.call(eff, k) && typeof eff[k] === 'function') __effectKeys.push(k);
+    if (!Object.prototype.hasOwnProperty.call(eff, k)) continue;
+    if (k === 'id') {
+      if (eff[k] !== __sandbox_card_id) throw new Error('effect.id must match CARD_ID');
+    } else if (__metadataKeys.indexOf(k) === -1) {
+      if (typeof eff[k] !== 'function') throw new Error('Effect hook ' + k + ' must be callable');
+      __effectKeys.push(k);
+    }
   }
   for (var m = 0; m < __metadataKeys.length; m++) {
     var mk = __metadataKeys[m];
@@ -62,6 +67,7 @@ if (__captured.CARD_IMPL && __captured.CARD_IMPL.effect) {
 if (__captured.CARD_IMPL && Array.isArray(__captured.CARD_IMPL.listeners)) {
   for (var i = 0; i < __captured.CARD_IMPL.listeners.length; i++) {
     var listener = __captured.CARD_IMPL.listeners[i];
+    if (typeof listener.handler !== 'function') throw new Error('Listener handler must be callable');
     var entry = { registrationId: __sandbox_card_id + ':listener:' + i };
     for (var j = 0; j < __listenerKeys.length; j++) {
       var lk = __listenerKeys[j];
@@ -98,12 +104,15 @@ export function normalizeCustomManifest(manifest: CustomCodeManifest, cardId: st
         if (!Array.isArray(value) || value.some(item => !(REAL_RESOURCE_KEYS as readonly unknown[]).includes(item))) throw new Error(`${key} must be resource names`)
       } else if (typeof value !== 'boolean') throw new Error(`${key} must be boolean`)
     }
+    for (const hook of metadata.handHooks ?? []) if (!effectHooks.includes(hook)) throw new Error(`handHooks requires callable ${hook}`)
+    for (const key of ['beforeEndGameScope', 'beforeEndGameMandatory'] as const) if (metadata[key] !== undefined && !effectHooks.includes('onBeforeEndGame')) throw new Error(`${key} requires onBeforeEndGame`)
+    if (metadata.extraTurnBeforeWorkers !== undefined && !effectHooks.includes('contributeExtraTurn')) throw new Error('extraTurnBeforeWorkers requires contributeExtraTurn')
   }
+  if (effectHooks.includes('countExtraTurns') && !effectHooks.includes('contributeExtraTurn')) throw new Error('countExtraTurns requires contributeExtraTurn')
   const listeners = manifest.listeners.map((listener, index): CustomCodeListenerManifest => {
     assertKeys(listener, ['registrationId', ...Object.keys(sandboxListenerFields)], 'listener')
     if (listener.registrationId !== `${cardId}:listener:${index}`) throw new Error('Listener registration belongs to another card')
     if (listener.cardIds !== undefined) stringSet(listener.cardIds, [cardId], 'listener.cardIds')
-    if (listener.order !== undefined && !Number.isFinite(listener.order)) throw new Error('listener.order must be finite')
     for (const key of ['mandatory', 'preScoring', 'replacesTurn'] as const) {
       if (listener[key] !== undefined && typeof listener[key] !== 'boolean') throw new Error(`listener.${key} must be boolean`)
     }
@@ -111,6 +120,10 @@ export function normalizeCustomManifest(manifest: CustomCodeManifest, cardId: st
       if (!Array.isArray(listener.blockedAnytimeInteractionKinds)) throw new Error('blockedAnytimeInteractionKinds must be an array')
       if (listener.blockedAnytimeInteractionKinds.length) stringSet(listener.blockedAnytimeInteractionKinds, sandboxInteractionKinds, 'blockedAnytimeInteractionKinds')
     }
+    const phases = listener.phases ?? sandboxListenerPhases
+    const actions = listener.actions ?? sandboxListenerActions
+    if (listener.mandatory !== undefined && !phases.some(phase => ['before','during','immediatelyAfter','after'].includes(phase) && actions.some(action => phase !== 'before' || action !== 'place-farmer'))) throw new Error('listener.mandatory requires a normal reaction activation')
+    for (const key of ['preScoring', 'replacesTurn', 'blockedAnytimeInteractionKinds'] as const) if (listener[key] !== undefined && (!phases.includes('anytime') || listener.actions && !listener.actions.includes('anytime'))) throw new Error(`listener.${key} requires an anytime listener`)
     return {
       ...listener, cardIds: [cardId],
       actions: listener.actions === undefined ? [...sandboxListenerActions] : stringSet(listener.actions, sandboxListenerActions, 'listener.actions'),

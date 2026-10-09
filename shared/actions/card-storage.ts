@@ -3,6 +3,7 @@ import { readCardExtraData, writeCardExtraData } from '../cards/helpers/card-sta
 import { incCounter, initCardState } from '../cards/__stubs__/helpers'
 import { getCardEffect } from '../cards/card-effects'
 import { computeSourceCardContribution } from '../domain/scoring'
+import { InvalidActionContextError } from '../contract/action-context-error'
 
 export type CardStorageOperation =
   | { kind: 'increment-extra-data'; key: string; amount: number }
@@ -21,15 +22,22 @@ export const readCardStorageOperation = (params?: Record<string, unknown>): Card
 /** The same deterministic write is used by execution and detached projection. */
 export const applyCardStorageOperation = (player: PlayerState, sourceCard: string, operation: CardStorageOperation): void => {
   switch (operation.kind) {
-    case 'increment-extra-data':
-      writeCardExtraData(player, sourceCard, operation.key, (readCardExtraData<number>(player, sourceCard, operation.key) ?? 0) + operation.amount)
+    case 'increment-extra-data': {
+      const stored = readCardExtraData<unknown>(player, sourceCard, operation.key)
+      const current = stored === undefined ? 0 : stored
+      if (typeof current !== 'number' || !Number.isFinite(current) || !Number.isFinite(current + operation.amount)) throw new InvalidActionContextError('Increment requires finite numeric card data')
+      writeCardExtraData(player, sourceCard, operation.key, current + operation.amount)
       break
+    }
     case 'set-extra-data':
       writeCardExtraData(player, sourceCard, operation.key, operation.value)
       break
-    case 'increment-counter':
+    case 'increment-counter': {
+      const current = player.cardStates?.[sourceCard]?.counters?.[operation.key] ?? 0
+      if (!Number.isFinite(current + operation.amount)) throw new InvalidActionContextError('Increment requires a finite counter result')
       incCounter(player, sourceCard, operation.key, operation.amount)
       break
+    }
     case 'set-counter':
       initCardState(player, sourceCard)[operation.key] = Math.max(0, operation.value)
       break

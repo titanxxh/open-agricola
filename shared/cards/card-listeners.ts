@@ -425,7 +425,7 @@ export const collectBeforePlacementFlows = (
       if (seen.has(key)) continue
       seen.add(key)
       const result = executeCardListener(entry.registration, context, listenerOwnerOptions(entry))
-      if (result?.flow) flows.push(result.flow)
+      if (result?.flow) flows.push({ ...result.flow, targetPlayerId: result.flow.targetPlayerId ?? (entry.ownerPlayerId || player.id) })
     }
   }
   return flows

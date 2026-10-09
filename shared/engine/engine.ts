@@ -661,6 +661,9 @@ export class Engine {
     while (safety-- > 0) {
       const next = this.tree.nextUnresolved()
       if (!next || !injectedIds.has(next.id)) break
+      // Cross-player work must return to the normal session driver, which
+      // selects the owner context and performs the visible player handoff.
+      if (next.ownerPlayerId && next.ownerPlayerId !== ctx.player.id) break
       const step = this.proceed(ctx)
       if (step.type !== 'ok') break
     }

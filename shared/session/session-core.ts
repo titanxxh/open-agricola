@@ -339,6 +339,7 @@ export type SessionCommandCheckpoint = {
   turnOwnerPlayerIndex: number | null
   engineLog: ReturnType<LogStore['all']>
   cardWarningCount: number
+  cardFailureCount: number
 }
 
 export type NormalizedAuthoritativeCommand = {
@@ -1028,6 +1029,7 @@ export class GameCore {
       turnOwnerPlayerIndex: this.turnOwnerPlayerIndex,
       engineLog: structuredClone(this.engineLog.all()),
       cardWarningCount: this.cardWarnings.length,
+      cardFailureCount: this.sessionCardContext?.failureCount ?? 0,
     }))
   }
 
@@ -1237,12 +1239,12 @@ export class GameCore {
       try {
         const response = run()
         const warnings = this.cardWarnings.slice(settlement.checkpoint.cardWarningCount)
-        if (warnings.length > 0) {
+        if (warnings.length > 0 || (this.sessionCardContext?.failureCount ?? 0) > settlement.checkpoint.cardFailureCount) {
           this.restoreCommandCheckpoint(settlement.checkpoint)
           this.provisionalContinuationScopes = settlement.scopeSnapshot
           this.failedAuthoritativeCommands = settlement.failedCommandSnapshot
           this.cardWarnings.push(...warnings)
-          return this.respond(false, warnings.join('; '))
+          return this.respond(false, warnings.join('; ') || this.sessionCardContext?.latestFailure)
         }
         return this.settleAuthoritativeCommand(response, settlement)
       } catch (error) {

@@ -21,7 +21,7 @@ import {
   getAvailableStableSupplyCount,
   getOwnOrdinaryFenceReserveCount,
 } from '../../../domain/supply-tokens'
-import { REAL_RESOURCE_KEYS } from '../../../contract/resource-keys'
+import { REAL_RESOURCE_KEYS, assertEnabledResourceAmounts } from '../../../contract/resource-keys'
 import { applyAnimalPayment, isAnimalResourceKey } from '../../../domain/animal-payment'
 
 const SUPPLY_TOKEN_KEYS = new Set<SupplyTokenKey>(['fence', 'stable'])
@@ -71,6 +71,7 @@ export const payResources = (
   cost: PaymentResourceMap,
   state?: GameState,
 ) => {
+  assertEnabledResourceAmounts(cost, player.resources)
   const { resources } = splitSupplyTokenCost(cost)
   Object.keys(resources).forEach((key) => {
     const resourceKey = key as keyof Resource
@@ -103,12 +104,14 @@ export const applyCostOverride = (
 export const canPayResources = (
   player: PlayerState,
   cost: PaymentResourceMap,
-) =>
-  Object.keys(splitSupplyTokenCost(cost).resources).every((key) => {
+) => {
+  assertEnabledResourceAmounts(cost, player.resources)
+  return Object.keys(splitSupplyTokenCost(cost).resources).every((key) => {
     const resourceKey = key as keyof Resource
     const amount = cost[resourceKey] ?? 0
     return amount <= 0 || (player.resources[resourceKey] ?? 0) >= amount
   })
+}
 
 export const isComplexCost = (
   cost: PaymentResourceMap | ComplexCost | undefined,

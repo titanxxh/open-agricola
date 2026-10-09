@@ -27,6 +27,7 @@ import {
   applyDefaultSourceCardToFlow,
   applyInteractionRequest,
   buildPhaseTrailingNodes,
+  buildActivationActionNodes,
   buildChoiceExecutionContext,
   buildOwnedFlowNode,
   buildReplacementChoiceNode,
@@ -691,7 +692,7 @@ export function engineResolveChoice(
         int.tree.insertAfter(insertAnchor, [...beforeHostNodes, deferredHostNode])
         return { type: 'ok' }
       }
-      int.hooks.during({ ...executionContext, ...currentEventReadContext(int, completedEvents), actionId }, result)
+      const duringPhase = int.hooks.during({ ...executionContext, ...currentEventReadContext(int, completedEvents), actionId }, result)
       if (result.type === 'request' && (result.request.kind === 'choice' || result.request.kind === 'farm-select' || result.request.kind === 'selection')) {
         // Structured farm/position requests emitted by an Or/Xor child must
         // retain their pending submission before the branch continues.
@@ -757,6 +758,9 @@ export function engineResolveChoice(
       const triggerSnapshot = result.type === 'ok'
         ? createTriggerSnapshot(context.state)
         : undefined
+      const duringActivateNodes = buildActivationActionNodes(int, duringPhase.matchedListeners,
+        'during', actionId, {}, executionContext.player.id,
+        eventReadContext.transactionEvents, eventReadContext.actionEvents, triggerSnapshot)
       const immediatePhase = int.hooks.immediatelyAfter(
         { ...executionContext, ...eventReadContext, actionId, choice },
         result,
@@ -837,8 +841,9 @@ export function engineResolveChoice(
         ...afterActivateNodes,
         ...afterHostNodes,
       ]
+      const leadingNodes = [...duringActivateNodes, ...hookFlows]
       if (child.continuationParentHostNodeId) {
-        [...hookFlows, ...trailingHookNodes].forEach((insertedNode) =>
+        [...leadingNodes, ...trailingHookNodes].forEach((insertedNode) =>
           stampContinuationParentHost(insertedNode, child.continuationParentHostNodeId!))
       }
       if (result.type === 'flow') {
@@ -853,11 +858,11 @@ export function engineResolveChoice(
           int.tree.insertAfter(insertAnchor, trailingHookNodes)
         }
         int.tree.insertAfter(insertAnchor, [flowNode])
-        if (hookFlows.length > 0) {
-          int.tree.insertAfter(insertAnchor, hookFlows)
+        if (leadingNodes.length > 0) {
+          int.tree.insertAfter(insertAnchor, leadingNodes)
         }
       } else {
-        const allInsertNodes = [...hookFlows, ...trailingHookNodes]
+        const allInsertNodes = [...leadingNodes, ...trailingHookNodes]
         if (allInsertNodes.length > 0) {
           int.tree.insertAfter(insertAnchor, allInsertNodes)
         }
@@ -1069,7 +1074,7 @@ export function engineResolveChoice(
     int.tree.insertAfter(insertAnchor, [...beforeHostNodes, deferredHostNode])
     return result
   }
-  int.hooks.during({ ...executionContext, ...pendingEventReadContext(completedEvents), actionId: committedActionId }, result)
+  const duringPhase = int.hooks.during({ ...executionContext, ...pendingEventReadContext(completedEvents), actionId: committedActionId }, result)
   if (
     result.type === 'fail' &&
     result.recoverable === true &&
@@ -1139,6 +1144,9 @@ export function engineResolveChoice(
   const triggerSnapshot = result.type === 'ok'
     ? createTriggerSnapshot(context.state)
     : undefined
+  const duringActivateNodes = buildActivationActionNodes(int, duringPhase.matchedListeners,
+    'during', committedActionId, {}, executionContext.player.id,
+    eventReadContext.transactionEvents, eventReadContext.actionEvents, triggerSnapshot)
   const immediatePhase = int.hooks.immediatelyAfter(
     { ...executionContext, ...eventReadContext, actionId: committedActionId, choice },
     result,
@@ -1222,8 +1230,9 @@ export function engineResolveChoice(
       ...afterActivateNodes,
       ...afterHostNodes,
     ]
+    const leadingNodes = [...duringActivateNodes, ...hookFlows]
     if (pendingActionNode?.continuationParentHostNodeId) {
-      [...hookFlows, ...trailingHookNodes].forEach((insertedNode) =>
+      [...leadingNodes, ...trailingHookNodes].forEach((insertedNode) =>
         stampContinuationParentHost(insertedNode, pendingActionNode.continuationParentHostNodeId!))
     }
     if (result.type === 'flow') {
@@ -1238,11 +1247,11 @@ export function engineResolveChoice(
         int.tree.insertAfter(insertionTargetId, trailingHookNodes)
       }
       int.tree.insertAfter(insertionTargetId, [flowNode])
-      if (hookFlows.length > 0) {
-        int.tree.insertAfter(insertionTargetId, hookFlows)
+      if (leadingNodes.length > 0) {
+        int.tree.insertAfter(insertionTargetId, leadingNodes)
       }
     } else {
-      const allInsertNodes = [...hookFlows, ...trailingHookNodes]
+      const allInsertNodes = [...leadingNodes, ...trailingHookNodes]
       if (allInsertNodes.length > 0) {
         int.tree.insertAfter(insertionTargetId, allInsertNodes)
       }

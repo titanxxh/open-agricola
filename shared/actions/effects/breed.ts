@@ -114,9 +114,9 @@ export const breedAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
-  execute: ({ state, player, actionContext, eventSink }): ActionExecutionResult => {
+  execute: ({ state, player, actionContext, sourceCard: leafSourceCard, eventSink }): ActionExecutionResult => {
     const ctx = (actionContext ?? {}) as BreedActionContext
-    const sourceCard = ctx.sourceCard ?? 'unknown'
+    const sourceCard = leafSourceCard ?? ctx.sourceCard ?? 'unknown'
     const { breedSummary, placementMinimums } = breed(state, player, {
       animalTypes: ctx.animalTypes ?? undefined,
       sourceCard,
