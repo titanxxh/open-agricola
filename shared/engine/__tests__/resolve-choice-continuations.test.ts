@@ -7,6 +7,7 @@ import { createInitialState } from '../../session/state-bootstrap'
 import { getActionDefinition } from '../../actions'
 import { ActionNode, OrNode, SequenceNode, XorNode } from '../nodes'
 import { asActionSpace, makeEventTestEngine } from './event-test-helpers'
+import { isPendingChoiceValueAllowed } from '../pending-validation'
 
 const CARD = 'Test_Continuation_Card'
 
@@ -25,9 +26,12 @@ const action = (
   ...(resolveChoice ? { resolveChoice } : {}),
 })
 
-const reorgRequest = (): ActionExecutionResult => ({
+// A structured request that the Session also keeps pending and resolves
+// through the engine. (An action's `animal-reorg` request is instead turned
+// into a reorganize subflow by the Session; see the Session test.)
+const quantityRequest = (): ActionExecutionResult => ({
   type: 'request',
-  request: { kind: 'animal-reorg', zones: [] },
+  request: { kind: 'resource-quantity-select', cardId: CARD, availableByResource: { wood: 1 } },
   promptKey: 'ui.interactionContinue',
 })
 
@@ -63,25 +67,25 @@ describe('resolveChoice continuations keep native requests pending', () => {
   it.each(['xor', 'or'] as const)('waits for a non-choice request from a selected %s branch', (kind) => {
     const { state, player } = setup()
     const submitted: string[] = []
-    const reorg = action('continuation-reorg', reorgRequest, (_context, choice) => {
+    const quantity = action('continuation-quantity', quantityRequest, (_context, choice) => {
       submitted.push(choice)
       return { type: 'ok' }
     })
     const other = action('continuation-other', () => ({ type: 'ok' }))
     const branch = kind === 'xor'
-      ? new XorNode('branch', [new ActionNode('reorg-node', reorg.id), new ActionNode('other-node', other.id)])
-      : new OrNode('branch', [new ActionNode('reorg-node', reorg.id), new ActionNode('other-node', other.id)])
-    const { engine } = makeEventTestEngine([reorg, other], new SequenceNode('root', [branch]))
-    const context = { state, player, space: asActionSpace(reorg) }
+      ? new XorNode('branch', [new ActionNode('quantity-node', quantity.id), new ActionNode('other-node', other.id)])
+      : new OrNode('branch', [new ActionNode('quantity-node', quantity.id), new ActionNode('other-node', other.id)])
+    const { engine } = makeEventTestEngine([quantity, other], new SequenceNode('root', [branch]))
+    const context = { state, player, space: asActionSpace(quantity) }
     const seen: Array<{ phase: string; choice?: string }> = []
     const cards = new CardRegistry()
-    cards.registerListener(recordingListener('continuation-reorg-after', [reorg.id], ['immediatelyAfter', 'after'], seen))
+    cards.registerListener(recordingListener('continuation-quantity-after', [quantity.id], ['immediatelyAfter', 'after'], seen))
 
     withActiveRegistry(cards, () => {
       expect(engine.proceed(context).type).toBe('choice')
-      engine.resolveChoice('reorg-node', context)
+      engine.resolveChoice('quantity-node', context)
 
-      expect(engine.peekPendingEnvelope()?.request.kind).toBe('animal-reorg')
+      expect(engine.peekPendingEnvelope()?.request.kind).toBe('resource-quantity-select')
       expect(seen).toEqual([])
       expect(submitted).toEqual([])
 
@@ -109,7 +113,7 @@ describe('resolveChoice continuations keep native requests pending', () => {
       }),
       (_context, choice) => {
         submitted.push(choice)
-        return choice === 'continue' ? reorgRequest() : { type: 'ok' }
+        return choice === 'continue' ? quantityRequest() : { type: 'ok' }
       },
     )
     const { engine } = makeEventTestEngine([host], new SequenceNode('root', [new ActionNode('host-node', host.id)]))
@@ -122,7 +126,7 @@ describe('resolveChoice continuations keep native requests pending', () => {
       expect(engine.proceed(context).type).toBe('choice')
       engine.resolveChoice('continue', context)
 
-      expect(engine.peekPendingEnvelope()?.request.kind).toBe('animal-reorg')
+      expect(engine.peekPendingEnvelope()?.request.kind).toBe('resource-quantity-select')
       expect(seen).toEqual([])
 
       engine.resolveChoice('confirm', context)
@@ -132,6 +136,29 @@ describe('resolveChoice continuations keep native requests pending', () => {
     })
     expect(submitted).toEqual(['continue', 'confirm'])
     expect(seen.map((entry) => entry.phase)).toEqual(['immediatelyAfter', 'after'])
+  })
+
+  it('accepts only offered select-trigger values from a selected branch', () => {
+    const { state, player } = setup()
+    const trigger = action('continuation-trigger', () => ({
+      type: 'request',
+      request: { kind: 'select-trigger', ownerPlayerId: player.id, options: [{ value: 'first', labelKey: 'ui.yes' }] },
+      promptKey: 'ui.interactionContinue',
+    }), () => ({ type: 'ok' }))
+    const other = action('continuation-other', () => ({ type: 'ok' }))
+    const { engine } = makeEventTestEngine([trigger, other], new SequenceNode('root', [
+      new XorNode('branch', [new ActionNode('trigger-node', trigger.id), new ActionNode('other-node', other.id)]),
+    ]))
+    const context = { state, player, space: asActionSpace(trigger) }
+
+    expect(engine.proceed(context).type).toBe('choice')
+    engine.resolveChoice('trigger-node', context)
+
+    // The Session validates submissions with this same predicate.
+    const envelope = engine.peekPendingEnvelope()!
+    expect(envelope.request.kind).toBe('select-trigger')
+    expect(isPendingChoiceValueAllowed(envelope, 'first')).toBe(true)
+    expect(isPendingChoiceValueAllowed(envelope, 'not-offered')).toBe(false)
   })
 })
 
