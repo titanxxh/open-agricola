@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import * as rng from '../../../shared/utils/rng'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import type { ClientCommand } from '../../../shared/contract/protocol/ws'
 import * as database from '../../db'
@@ -35,6 +36,8 @@ const scheduler: RoomCommitScheduler = {
 }
 
 beforeEach(async () => {
+  const resolveSeed = rng.resolveSeed
+  vi.spyOn(rng, 'resolveSeed').mockImplementation((seed) => resolveSeed(seed ?? 42))
   db = await createTestDatabase()
   vi.spyOn(database, 'getDb').mockReturnValue(db)
   recording = await recordingResources(db)

@@ -5,7 +5,11 @@ const actionCard = (page: Page, name: string) =>
   page.locator('.action-card', { hasText: name });
 
 async function resetGame(page: Page) {
-  await page.getByRole('button', { name: 'Reset' }).click();
+  await page.locator('.dev-panel .seed-input input').fill('42');
+  await Promise.all([
+    page.waitForResponse(response => response.url().endsWith('/api/game/new') && response.ok()),
+    page.getByRole('button', { name: 'Reset' }).click(),
+  ]);
   await expect(actionCard(page, 'Farmland')).toBeEnabled();
 }
 

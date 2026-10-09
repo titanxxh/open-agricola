@@ -126,6 +126,17 @@ test.describe('WS dual-player sync', () => {
     await p2.waitForSelector('.game-layout', { timeout: 15000 })
     await p1.waitForSelector('.game-layout', { timeout: 15000 })
     console.log('Both boards loaded')
+    // Ordinary rooms keep random deals; decline a possible round-one hand offer
+    // before exercising action/undo synchronization.
+    const firstAction = p1.locator('.action-card-holder button:not([disabled])').first()
+    const setupSkips = [p1, p2].map(page =>
+      page.locator('.interaction-bar').getByRole('button', { name: /^(Skip|跳过)$/ }),
+    )
+    await expect.poll(async () =>
+      await firstAction.isVisible() || (await Promise.all(setupSkips.map(skip => skip.isVisible()))).some(Boolean),
+    ).toBe(true)
+    for (const skip of setupSkips) if (await skip.isVisible()) await skip.click()
+    await expect(firstAction).toBeVisible()
     await saveScreenshot(p1, '02-p1-board')
     await saveScreenshot(p2, '02-p2-board')
 
@@ -211,6 +222,11 @@ test.describe('WS dual-player sync', () => {
     try {
       await page.goto(`${FRONTEND_URL}/?player=p1&transport=ws&room=dev2&devMode=1`)
       await expect(page.locator('.game-layout')).toBeVisible()
+      const initialRoomId = new URL(page.url()).searchParams.get('room')
+      await page.locator('.seed-input input').fill('42')
+      await page.getByRole('button', { name: /Reset|重开/ }).click()
+      await expect.poll(() => new URL(page.url()).searchParams.get('room')).not.toBe(initialRoomId)
+      await expect(page.locator('[data-action-id="forest"] button').first()).toBeEnabled()
       const previousRoomId = new URL(page.url()).searchParams.get('room')
       expect(previousRoomId).toBeTruthy()
       await page.locator('[data-action-id="forest"] button').first().click()
@@ -224,6 +240,7 @@ test.describe('WS dual-player sync', () => {
       await expect(page.locator('[data-action-id="farmland"] button').first()).toBeDisabled()
       await expect(reset, 'A development room reset must remain available during another seat turn').toBeEnabled({ timeout: 5000 })
       await expect(page.locator('.seed-input input')).toBeEditable()
+      await page.locator('.seed-input input').fill('42')
       await reset.click()
       try {
         await expect.poll(() => new URL(page.url()).searchParams.get('room'), { timeout: 8000 }).not.toBe(previousRoomId)

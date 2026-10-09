@@ -1,5 +1,6 @@
 import { recordedRouterFixture } from '../../__tests__/_helpers/room-router'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import * as rng from '../../../shared/utils/rng'
 import { createConnectionCtx } from '../connection-ctx.ts'
 import { snapshotToRoom, summarizeRoomsForLobby, toRoomMeta } from '../../game/room.ts'
 import { GameSession } from '../../game/authoritative-session.ts'
@@ -17,6 +18,12 @@ const GameSessionPrototype = GameSession.prototype as unknown as { getState: () 
 const GameSessionGetState = GameSessionPrototype.getState
 
 const { newDeps, dispatch } = recordedRouterFixture()
+
+beforeEach(() => {
+  // Seat-routing fixtures must not start on an unrelated random card choice.
+  const resolveSeed = rng.resolveSeed
+  vi.spyOn(rng, 'resolveSeed').mockImplementation((seed) => resolveSeed(seed ?? 42))
+})
 
 const newCtx = (deps = newDeps()) => {
   const ws = fakeWs() as never
