@@ -792,7 +792,7 @@ export class GameCore {
     this.state = finalizeDraft(this.state)
     startParentSelectionIfNeeded(this.state, this.parentSelectionSeed)
     ensureParentMotherScheduleLogs(this.state)
-    if (this.state.phase === 'playing') this.continueBeforeStartOfTurn(0, 0, true)
+    this.startFirstRoundAfterSetup()
   }
   /** @internal Round phase — read the captured pre-action player snapshot. */
   getActionStartPlayerSnapshot(): PlayerState | null { return this.actionStartPlayerSnapshot }
@@ -975,13 +975,7 @@ export class GameCore {
       })
     }
     this.syncDynamicActionSpaces()
-    if (
-      isFreshState &&
-      this.state.phase === 'playing' &&
-      this.state.futureMeeples.some((entry) => entry.round === this.state.round)
-    ) {
-      this.continueCurrentFutureMeepleActions()
-    }
+    if (isFreshState) this.withCtx(() => this.startFirstRoundAfterSetup())
   }
 
   /**
@@ -3487,6 +3481,15 @@ export class GameCore {
     }
   }
 
+  private startFirstRoundAfterSetup(): SessionResponse {
+    if (this.state.phase !== 'playing') return this.respond()
+    this.state.roundPhase = 'preparation'
+    this.state.roundFirstPlayerId = this.state.players.find((player) => player.startPlayer)?.id
+    // Bootstrap already applied the initial accumulation. All setup modes
+    // enter the same resumable stage chain without applying it a second time.
+    return this.continueBeforeStartOfTurn(0, 0, true)
+  }
+
   private continueBeforeStartOfTurn(
     playerIndex = 0,
     cardIndex = 0,
@@ -3501,9 +3504,7 @@ export class GameCore {
       return this.respond()
     }
     if (roundPreparationAlreadyApplied) {
-      return this.state.futureMeeples.some((entry) => entry.round === this.state.round)
-        ? this.continueCurrentFutureMeepleActions()
-        : this.respond()
+      return this.continueCurrentFutureMeepleActions()
     }
     this.state.players.forEach((player) => {
       resetRoundPlacements(player)
@@ -5086,10 +5087,7 @@ export class GameCore {
     if (!player) return this.respond(false, 'invalid player')
     const result = commitParentSelection(this.state, player.id, submission)
     if (!result.ok) return this.respond(false, result.error)
-    if (this.state.phase === 'playing') {
-      return this.continueCurrentFutureMeepleActions()
-    }
-    return this.respond()
+    return this.startFirstRoundAfterSetup()
   }
 
   loadState(raw: unknown): SessionResponse {

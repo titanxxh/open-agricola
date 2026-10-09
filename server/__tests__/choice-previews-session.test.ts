@@ -26,6 +26,7 @@ const setup = (cardId: string, round: number, moor = false, playerCount = 2, occ
   })
   const state = session.state
   state.round = round
+  state.roundPhase = 'work'
   state.currentPlayerIndex = 0
   state.players.forEach((player) => {
     player.minorHand = ['__test_placeholder__']
@@ -38,6 +39,7 @@ const setup = (cardId: string, round: number, moor = false, playerCount = 2, occ
   })
   if (occupation) state.players[0]!.occupationHand.push(cardId)
   else state.players[0]!.minorHand.push(cardId)
+  session.loadState(state)
   return session
 }
 

@@ -7,6 +7,7 @@ export const setupMoorAudit = (playerCount = 2, round = 5) => {
   const state = session.getState().state
   state.currentPlayerIndex = 0
   state.round = round
+  state.roundPhase = 'work'
   for (const player of state.players) {
     player.minorHand = ['__test_placeholder__']
     player.occupationHand = ['__test_placeholder__']

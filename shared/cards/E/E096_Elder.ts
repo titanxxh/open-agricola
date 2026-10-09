@@ -6,8 +6,8 @@ const CARD_ID = 'E096_Elder'
 const cardImpl = {
   effect: {
   id: CARD_ID,
-  handHooks: ['onBeforeStartOfTurn'],
-  onBeforeStartOfTurn: (state, _player) => {
+  handHooks: ['onRoundStart'],
+  onRoundStart: (state, _player) => {
     if (state.round !== 1) return
     return {
       type: 'seq',

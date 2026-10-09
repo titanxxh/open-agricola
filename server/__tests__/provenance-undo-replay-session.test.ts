@@ -25,7 +25,7 @@ const cloneJson = <T>(value: T): T =>
 
 describe('provenance undo/replay reconstruction', () => {
   it('undoAction removes E78 public events, derived log, and private prompt from the current view', () => {
-    const session = new GameSession()
+    const session = new GameSession(42, undefined, { playerCount: 2 })
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -154,7 +154,7 @@ describe('provenance undo/replay reconstruction', () => {
   })
 
   it('undoStep cancels worker placement public events exactly', () => {
-    const session = new GameSession()
+    const session = new GameSession(42, undefined, { playerCount: 2 })
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -205,7 +205,7 @@ describe('provenance undo/replay reconstruction', () => {
   })
 
   it('undoStep preserves prior canceled archive packets across continuous public event undos', () => {
-    const session = new GameSession()
+    const session = new GameSession(42, undefined, { playerCount: 2 })
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -224,6 +224,7 @@ describe('provenance undo/replay reconstruction', () => {
       to: { kind: 'player', playerId: liveState.players[0]!.id },
       reason: 'gain',
     }])
+    const firstEvent = liveState.events.at(-1)!
     session.appendHistory()
     appendImmediateEvents(liveState, [{
       type: 'resource.moved',
@@ -233,14 +234,15 @@ describe('provenance undo/replay reconstruction', () => {
       reason: 'gain',
     }])
 
+    const secondEvent = liveState.events.at(-1)!
     const undoSecond = session.undoStep()
     expect(undoSecond.ok).toBe(true)
-    expect(undoSecond.publicEventCancellations?.[0]?.canceledSeqs).toEqual([3])
+    expect(undoSecond.publicEventCancellations?.[0]?.canceledSeqs).toEqual([secondEvent.seq])
     const archiveAfterSecondUndo = cloneJson(undoSecond.state.publicEventArchive)
 
     const undoFirst = session.undoStep()
     expect(undoFirst.ok).toBe(true)
-    expect(undoFirst.publicEventCancellations?.[0]?.canceledSeqs).toEqual([2])
+    expect(undoFirst.publicEventCancellations?.[0]?.canceledSeqs).toEqual([firstEvent.seq])
     expect(undoFirst.state.publicEventArchive.slice(0, archiveAfterSecondUndo.length))
       .toEqual(archiveAfterSecondUndo)
     expect(undoFirst.state.publicEventArchive.map((packet) => packet.packetSeq))
@@ -248,12 +250,13 @@ describe('provenance undo/replay reconstruction', () => {
   })
 
   it('keeps archive packetSeq monotonic when undo allows event id and seq reuse', () => {
-    const session = new GameSession()
+    const session = new GameSession(42, undefined, { playerCount: 2 })
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     session.loadState(state)
     const liveState = session.getState().state
+    const initialPacketCount = liveState.publicEventArchive.length
 
     session.appendHistory()
     appendImmediateEvents(liveState, [{
@@ -271,7 +274,7 @@ describe('provenance undo/replay reconstruction', () => {
     if (firstCanceledPacket.type !== 'publicEvents.canceled') {
       throw new Error('expected first canceled archive packet')
     }
-    expect(firstCanceledPacket.packetSeq).toBe(3)
+    expect(firstCanceledPacket.packetSeq).toBe(initialPacketCount + 2)
     expect(firstCanceledPacket.canceledEventIds).toEqual([firstEvent.id])
     expect(firstCanceledPacket.canceledSeqs).toEqual([firstEvent.seq])
     expect(firstCanceledPacket.canceledEvents).toEqual([
@@ -294,7 +297,7 @@ describe('provenance undo/replay reconstruction', () => {
     })
     expect(redoState.publicEventArchive.at(-1)).toMatchObject({
       type: 'publicEvents.committed',
-      packetSeq: 4,
+      packetSeq: initialPacketCount + 3,
       eventIds: [reusedEvent.id],
       eventSeqs: [reusedEvent.seq],
     })
@@ -302,7 +305,7 @@ describe('provenance undo/replay reconstruction', () => {
     const undoReused = session.undoStep()
     expect(undoReused.ok).toBe(true)
     expect(undoReused.state.publicEventArchive.map((packet) => packet.packetSeq))
-      .toEqual([1, 2, 3, 4, 5])
+      .toEqual(Array.from({ length: initialPacketCount + 4 }, (_, index) => index + 1))
     const secondCanceledPacket = undoReused.state.publicEventArchive.at(-1)!
     if (secondCanceledPacket.type !== 'publicEvents.canceled') {
       throw new Error('expected second canceled archive packet')
@@ -312,11 +315,11 @@ describe('provenance undo/replay reconstruction', () => {
     expect(secondCanceledPacket.canceledEvents).toEqual([
       expect.objectContaining({ resources: { clay: 1 } }),
     ])
-    expect(undoReused.state.publicEventArchive[2]).toEqual(firstCanceledPacket)
+    expect(undoReused.state.publicEventArchive[initialPacketCount + 1]).toEqual(firstCanceledPacket)
   })
 
   it('failed undo leaves public event archive unchanged', () => {
-    const session = new GameSession()
+    const session = new GameSession(42, undefined, { playerCount: 2 })
     stabilizeRandomHands(session.state.players)
     const beforeArchive = cloneJson(session.getState().state.publicEventArchive)
 
@@ -327,7 +330,7 @@ describe('provenance undo/replay reconstruction', () => {
   })
 
   it('undoStep does not append a canceled archive packet when no public event is removed', () => {
-    const session = new GameSession()
+    const session = new GameSession(42, undefined, { playerCount: 2 })
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -345,7 +348,7 @@ describe('provenance undo/replay reconstruction', () => {
   })
 
   it('undoStep still returns when canceled archive payload validation rejects a corrupted event', () => {
-    const session = new GameSession()
+    const session = new GameSession(42, undefined, { playerCount: 2 })
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -373,7 +376,7 @@ describe('provenance undo/replay reconstruction', () => {
   })
 
   it('does not land undoStep when public event archive cursor is stale', () => {
-    const session = new GameSession()
+    const session = new GameSession(42, undefined, { playerCount: 2 })
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -398,7 +401,7 @@ describe('provenance undo/replay reconstruction', () => {
   })
 
   it('does not land undoStep when live public event archive has duplicate packetSeq', () => {
-    const session = new GameSession()
+    const session = new GameSession(42, undefined, { playerCount: 2 })
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -427,7 +430,7 @@ describe('provenance undo/replay reconstruction', () => {
   })
 
   it('does not land undoStep when live public event archive has non-json packet fields', () => {
-    const session = new GameSession()
+    const session = new GameSession(42, undefined, { playerCount: 2 })
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

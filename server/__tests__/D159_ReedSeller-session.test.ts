@@ -16,6 +16,8 @@ const setup = (playerCount = 4) => {
   }
   session.state.players[0]!.occupationHand = [CARD_ID, '__test_placeholder__']
   session.state.players[0]!.resources.reed = 2
+  session.state.roundPhase = 'work'
+  session.loadState(session.state)
   let response = session.takeAction(0, 'lessons')
   if (!response.state.players[0]!.occupationPlayed.includes(CARD_ID)) response = session.resolveChoice(0, CARD_ID)
   expect(response.ok, response.error).toBe(true)

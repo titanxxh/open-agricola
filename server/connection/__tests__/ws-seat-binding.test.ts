@@ -1,3 +1,4 @@
+import * as rng from '../../../shared/utils/rng'
 import * as database from '../../db'
 import { sendCommand } from '../../__tests__/_helpers/command-socket'
 import { createTestDatabase } from '../../__tests__/_helpers/postgres'
@@ -174,6 +175,9 @@ describe('WS seat binding', () => {
   let recording: Awaited<ReturnType<typeof recordingResources>>
 
   beforeEach(async () => {
+    // Transport tests start in work; random hands can now offer Elder first.
+    const resolveSeed = rng.resolveSeed
+    vi.spyOn(rng, 'resolveSeed').mockImplementation((seed) => resolveSeed(seed ?? 42))
     db = await createTestDatabase()
     vi.spyOn(database, 'getDb').mockReturnValue(db)
     vi.stubEnv('ALLOW_ANONYMOUS_WS', 'true')
