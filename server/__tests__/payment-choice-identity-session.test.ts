@@ -142,4 +142,72 @@ describe('#1070 payment menu choice after an anytime action', () => {
     ])
     expect(scoreOf(r)).toBe(total)
   })
+
+  it('keeps the menu when every offered payment has become unaffordable', () => {
+    const session = createWorkSession({ configure: (state) => {
+      const player = state.players[0]!
+      player.minorPlayed = [CARD]
+      player.resources = { ...player.resources, food: 0, clay: 1, reed: 1, grain: 0 }
+    } })
+    session.withCtx(() => {
+      const registry = requireActiveCardRegistry('stale payment menu')
+      registry.registerListener(payAfterForest([{ clay: 1 }, { reed: 1 }, { grain: 1 }]))
+      // Stand-ins for anytime abilities that spend both resources, then return one.
+      registry.registerListener({
+        id: `${CARD}:spend-all`, cardIds: [CARD], phases: ['anytime'],
+        handler: ({ player }) => (player.resources.clay ?? 0) > 0 && (player.resources.reed ?? 0) > 0
+          ? { labelKey: 'ui.yes', flow: { type: 'leaf', actionId: 'pay', sourceCard: CARD, params: { cost: { clay: 1, reed: 1 } } } }
+          : undefined,
+      })
+      registry.registerListener({
+        id: `${CARD}:regain-reed`, cardIds: [CARD], phases: ['anytime'],
+        handler: ({ player }) => (player.resources.reed ?? 0) === 0
+          ? { labelKey: 'ui.yes', flow: { type: 'leaf', actionId: 'gain', sourceCard: CARD, params: { reed: 1 } } }
+          : undefined,
+      })
+    })
+
+    let r = session.takeAction(0, 'forest')
+    expect(r.ok, r.error).toBe(true)
+    expect(waiting(r)).toEqual({ kind: 'choice', playerIndex: 0 })
+    expect(choiceOptions(r).map(paid)).toEqual(['{"clay":1}', '{"reed":1}'])
+    expect(logs(r, 'log.cardEffectPay')).toEqual([])
+    const total = scoreOf(r)
+    const issued = choiceOptions(r).map((option) => option.value)
+    const [clay, reed] = choiceOptions(r)
+
+    r = session.takeAnytimeAction(0, `${CARD}:spend-all`)
+    expect(r.ok, r.error).toBe(true)
+    expect(waiting(r)).toEqual({ kind: 'choice', playerIndex: 0 })
+    expect(choiceOptions(r).map((option) => option.value)).toEqual(issued)
+    expect(r.state.players[0]!.resources).toMatchObject({ clay: 0, reed: 0 })
+    expect(logs(r, 'log.cardEffectPay')).toHaveLength(1)
+    expect(scoreOf(r)).toBe(total)
+
+    // No offered payment is affordable now; the choice is rejected and the menu stays.
+    r = session.resolveChoice(0, clay!.value)
+    expect(r.ok).toBe(false)
+    expect(r.error).toBeTruthy()
+    expect(waiting(r)).toEqual({ kind: 'choice', playerIndex: 0 })
+    expect(choiceOptions(r).map((option) => option.value)).toEqual(issued)
+    expect(r.state.players[0]!.resources).toMatchObject({ clay: 0, reed: 0 })
+    expect(logs(r, 'log.cardEffectPay')).toHaveLength(1)
+    expect(scoreOf(r)).toBe(total)
+
+    r = session.takeAnytimeAction(0, `${CARD}:regain-reed`)
+    expect(r.ok, r.error).toBe(true)
+    expect(waiting(r)).toEqual({ kind: 'choice', playerIndex: 0 })
+    expect(choiceOptions(r).map((option) => option.value)).toEqual(issued)
+    expect(r.state.players[0]!.resources).toMatchObject({ clay: 0, reed: 1 })
+    expect(logs(r, 'log.cardEffectPay')).toHaveLength(1)
+    expect(scoreOf(r)).toBe(total)
+
+    r = session.resolveChoice(0, reed!.value)
+    expect(r.ok, r.error).toBe(true)
+    expect(waiting(r)).toEqual({ kind: 'confirm-next-player', playerIndex: 0 })
+    expect(r.state.players[0]!.resources).toMatchObject({ clay: 0, reed: 0 })
+    expect(logs(r, 'log.cardEffectPay')[0]).toEqual(expect.objectContaining({ params: expect.objectContaining({ cost: { reed: 1 } }) }))
+    expect(logs(r, 'log.cardEffectPay')).toHaveLength(2)
+    expect(scoreOf(r)).toBe(total)
+  })
 })
