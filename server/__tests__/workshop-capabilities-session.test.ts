@@ -1189,6 +1189,8 @@ describe('Frozen Workshop correspondence acceptance',()=>{
     expect(JSON.stringify(session.state)).toBe(before)
   })
 
+  // A complete 14-round game exceeds Vitest's 5s default on hosted runners.
+  // Keep the fixed command bound and every lifecycle assertion unchanged.
   it('runs all ordinary stage hooks through a fixed complete two-player game',()=>{
     const hooks=flowCardEffectHooks.filter(h=>h!=='onBuy')
     const entries=hooks.map(h=>`${h}:(s,p)=>({type:'leaf',actionId:'special-effect',sourceCard:CARD_ID,params:{kind:'set-extra-data',key:'stageOrder',value:(readCardExtraData(p,CARD_ID).stageOrder||[]).concat('${h}')}})`)
@@ -1215,7 +1217,7 @@ describe('Frozen Workshop correspondence acceptance',()=>{
     expect(order.indexOf('onBeforeReturnHome')).toBeLessThan(order.indexOf('onReturnHome'))
     expect(order.at(-1)).toBe('onBeforeEndGame')
     expect(session.cardWarnings).toEqual([])
-  })
+  },30_000)
   it.each(['server','browser'] as const)('runs pay.during exactly once after a real payment choice with %s',adapter=>{
     const implementation=afterCollect({type:'seq',children:[leaf('pay',{params:{cost:{fees:[{food:1},{wood:1}]}}}),leaf('gain',{params:{stone:1}})]}).slice(0,-2)+",{actions:['pay'],phases:['during'],mandatory:true,handler:()=>({flow:{type:'leaf',actionId:'special-effect',params:{kind:'increment-counter',key:'paid',amount:1},sourceCard:CARD_ID}})}]}"
     const {session}=setup(implementation,'',false,false,adapter)
