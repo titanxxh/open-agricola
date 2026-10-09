@@ -425,7 +425,13 @@ export const collectBeforePlacementFlows = (
       if (seen.has(key)) continue
       seen.add(key)
       const result = executeCardListener(entry.registration, context, listenerOwnerOptions(entry))
-      if (result?.flow) flows.push({ ...result.flow, targetPlayerId: result.flow.targetPlayerId ?? (entry.ownerPlayerId || player.id) })
+      if (result?.flow) {
+        // Sandbox declarations use the card owner by default. Native before
+        // listeners retain their existing actor context and explicit targets.
+        flows.push(entry.cardId.startsWith('CUSTOM_')
+          ? { ...result.flow, targetPlayerId: result.flow.targetPlayerId ?? (entry.ownerPlayerId || player.id) }
+          : result.flow)
+      }
     }
   }
   return flows

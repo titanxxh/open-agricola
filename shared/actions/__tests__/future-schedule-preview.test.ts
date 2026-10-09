@@ -6,6 +6,7 @@ import { SequenceNode, ActionNode } from '../../engine/nodes'
 import { ActionRegistry } from '../../engine/registry'
 import { specialEffectAction } from '../effects/special-effect'
 import { GameSession } from '../../../server/game/authoritative-session'
+import { createWorkSession } from '../../../server/__tests__/_helpers/session-fixtures'
 
 describe('executable future request previews', () => {
   it('retains action cost, conditions, room type and duplicate target entries', () => {
@@ -83,7 +84,7 @@ describe('executable future request previews', () => {
   })
 
   it('does not repeat a queued descriptor after the existing drain-all execution', () => {
-    const session = new GameSession(409, undefined, { playerCount: 2 })
+    const session = createWorkSession({ seed:409, options:{ enableFarmersOfTheMoor:true, allowIncompleteFarmersOfTheMoorMinorDeal:true } })
     const state = session.state
     const player = state.players[0]!
     const flow = queueFutureMeeplesFlow(state, { cardId: 'test', playerId: player.id, startRound: 3, count: 2, resources: { fuel: 1 } })
@@ -96,5 +97,6 @@ describe('executable future request previews', () => {
     expect(state.pendingFutureMeeples).toHaveLength(0)
     expect(state.futureMeeples).toHaveLength(2)
     expect(futureMeeplesAction.previewEffect?.(context)).toBeUndefined()
+    session.dispose()
   })
 })

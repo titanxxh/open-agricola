@@ -891,6 +891,8 @@ The deployed phase map owns `resultKeys`, and runtime admission reads that same 
 
 #### Action and nested-payload closure
 
+The before-placement owner default applies to sandbox declarations. Existing native before-listeners retain their actor context and explicit target semantics.
+
 Every action's exact params/context keys remain in `sandbox-action-ids.ts`, deployed by the server. Section 6 lists all 25 IDs; section 6.1 lists all eight local mutations. The audit closed these groups together:
 
 | Group | Frozen execution boundary / retained native behavior |

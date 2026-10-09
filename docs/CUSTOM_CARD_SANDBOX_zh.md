@@ -942,6 +942,8 @@ mandatory 只用于普通反应激活；preScoring / replacesTurn / blockedAnyti
 
 #### 行动与嵌套参数闭合
 
+放工前默认归属卡主的规则适用于沙盒声明；既有原生 before listener 保留行动者上下文和显式目标语义。
+
 所有精确 params/context keys 仍由 sandbox-action-ids.ts 部署，英文 §6 / §6.1 分别列全部25行动与8种局部修改。本轮统一收口：
 
 | 范围 | 冻结边界与保留的原生语义 |
