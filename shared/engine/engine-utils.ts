@@ -415,6 +415,7 @@ export function cloneNode(int: EngineInternals, node: EngineNode): EngineNode {
     clone.resolvedReplacement = node.resolvedReplacement
     clone.beforePhaseResolved = node.beforePhaseResolved
     clone.bodyStarted = node.bodyStarted
+    clone.selectedBranchChoice = node.selectedBranchChoice
     clone.continuationParentHostNodeId = node.continuationParentHostNodeId
     return copySharedNodeMetadata(node, clone)
   }

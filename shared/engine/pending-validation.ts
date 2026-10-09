@@ -1,5 +1,41 @@
-import type { ActionChoiceOption } from '../contract/types'
+import type { ActionChoiceOption, InteractionRequest } from '../contract/types'
 import type { PendingEnvelope } from './types'
+
+/**
+ * Option surface stored with a pending request. Every engine path that opens
+ * a pending interaction uses it, so no request kind completes before the
+ * player submits it.
+ */
+export const interactionRequestChoices = (request: InteractionRequest): ActionChoiceOption[] => {
+  switch (request.kind) {
+    case 'choice':
+      return request.options
+    case 'animal-reorg':
+      // Reorganization submits `confirm`; cancel stays unavailable.
+      return [{ value: 'confirm', labelKey: 'ui.interactionAnimalReorgConfirm' }]
+    case 'farm-select':
+      return request.options ?? [
+        { value: 'confirm', labelKey: 'ui.interactionFarmSelectConfirm' },
+        { value: 'cancel', labelKey: 'ui.interactionFarmSelectCancel' },
+      ]
+    case 'confirm-next-player':
+    case 'confirm-player-switch':
+    case 'feed':
+    case 'heating':
+    case 'selection':
+    case 'card-draft':
+    case 'select-trigger':
+    case 'engine-blocked':
+    case 'resource-quantity-select':
+    case 'resource-batch-exchange-select':
+      // Structured submissions carry their own payload validation.
+      return []
+    default: {
+      const exhaustive: never = request
+      return exhaustive
+    }
+  }
+}
 
 export const pendingEnvelopeChoices = (
   envelope: PendingEnvelope | null,

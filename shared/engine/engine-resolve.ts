@@ -4,7 +4,6 @@ import type {
   ActionExecutionResult,
   ActionFlow,
   InternalActionChild,
-  ActionChoiceOption,
   InteractionRequest,
   Resource,
   ActionSpace,
@@ -18,6 +17,7 @@ import {
 } from './nodes'
 import type { EngineInternals } from './engine-internals'
 import {
+  interactionRequestChoices,
   isPendingChoiceValueAllowed,
   pendingEnvelopeChoices,
 } from './pending-validation'
@@ -523,6 +523,9 @@ export function engineResolveChoice(
         const children = 'children' in target ? target.children as EngineNode[] : []
         return !!children[0] && beginsWithChoice(children[0])
       }
+      // The selected leaf may run later, after before reactions or an owner
+      // handoff; its completion reactions still see the branch choice.
+      if (targetNode && !beginsWithChoice(targetNode)) child.selectedBranchChoice = choice
       if (targetNode && (
         beginsWithChoice(targetNode) ||
         (node instanceof XorNode && node.replacementOriginalNodeId && targetNode.optional && !targetNode.optionalActive) ||
@@ -690,23 +693,16 @@ export function engineResolveChoice(
         int.tree.insertAfter(insertAnchor, [...beforeHostNodes, deferredHostNode])
         return { type: 'ok' }
       }
-      if (result.type === 'request' && (result.request.kind === 'choice' || result.request.kind === 'farm-select')) {
-        // S2 Task 6: also accept farm-select kind emitted from an Or/Xor
-        // child leaf. The computeArgs merging path only applies to 'choice'
-        // kind (extraOptions hook); farm-select carries its own structured
-        // payload + optional `options` (confirm/cancel).
+      if (result.type === 'request') {
+        // Every request kind from the selected child stays pending until it
+        // is submitted. Only 'choice' merges computeArgs extraOptions.
         const argResults = result.request.kind === 'choice'
           ? int.hooks.computeArgs(
               { ...executionContext, ...currentEventReadContext(int), actionId },
               result,
             )
           : []
-        const baseOptions: ActionChoiceOption[] = result.request.kind === 'choice'
-          ? result.request.options
-          : (result.request.options ?? [
-              { value: 'confirm', labelKey: 'ui.interactionFarmSelectConfirm' },
-              { value: 'cancel', labelKey: 'ui.interactionFarmSelectCancel' },
-            ])
+        const baseOptions = interactionRequestChoices(result.request)
         const existingValues = new Set(baseOptions.map((o) => o.value))
         const extraOptions = argResults
           .flatMap((entry) => entry.extraOptions ?? [])
@@ -1100,7 +1096,7 @@ export function engineResolveChoice(
   if (result.type === 'fail') {
     return pendingHost?.mandatory ? result : rollbackAndReturn(int, result)
   }
-  if (result.type === 'request' && result.request.kind === 'choice') {
+  if (result.type === 'request') {
     // Merge ActionDef-declared actionContext patches into the pending context.
     // Used by farm ActionDefs to persist payload (e.g. fence geometry) across
     // payment-combo second prompts.
@@ -1108,7 +1104,7 @@ export function engineResolveChoice(
       result.extraData && typeof result.extraData === 'object'
         ? (result.extraData.actionContextWrite as Record<string, unknown> | undefined)
         : undefined
-    const requestOptions = result.request.options
+    const requestOptions = interactionRequestChoices(result.request)
     applyInteractionRequest(int, {
       targetNode: pendingHost,
       hostNodeId: pendingHost?.id ?? null,
