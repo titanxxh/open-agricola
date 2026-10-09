@@ -17,12 +17,12 @@ const sessions: GameSession[] = []
 // Every scenario starts with seed 42 / 2 players / explicit placeholder hands.
 // Payment, farm pending, shared zones and delayed state cross GameSession;
 // pure numeric queries use the public collector inside its session context.
-function setup(implementation: string, metadata = '') {
+function setup(implementation: string, metadata = '', enableFarmersOfTheMoor = false) {
   const source = `const CARD_ID='${CARD}'; const CARD_DEF={cardType:'minor',meta:{id:CARD_ID,name:'Capabilities',${metadata}}}; const CARD_IMPL=${implementation}`
   const compiled = validateAndCompileCustomCode(source, CARD)
   if (!compiled.valid) throw new Error(compiled.errors.join('\n'))
   const card: CustomCardData = { cardType: 'minor' as const, cardJson: { ...workshopCardJsonFromDefinition(compiled.cardDefinition), id: CARD, name: 'Capabilities', deck: 'CUSTOM', number: 0, desc: [] }, compiledCode: compiled.compiledCode, codeManifest: compiled.manifest }
-  const session = new GameSession(42, [card], { playerCount: 2 })
+  const session = new GameSession(42, [card], { playerCount: 2, ...(enableFarmersOfTheMoor ? {enableFarmersOfTheMoor:true,allowIncompleteFarmersOfTheMoorMinorDeal:true} : {}) })
   sessions.push(session)
   for (const player of session.state.players) {
     player.minorHand = ['__test_placeholder__']; player.occupationHand = ['__test_placeholder__']
@@ -445,6 +445,81 @@ describe('Workshop declarative metadata settlement',()=>{
 })
 
 describe('Workshop admitted player, choice and payment data',()=>{
+  it.each(['flow','extraData','alternativeFlow'] as const)('selects an opponent farm extension with %s bound to its native actor',kind=>{
+    const selection={selectableTiles:[{row:-1,col:1},{row:-1,col:2}],minSelections:1,maxSelections:1}
+    const override=kind==='flow'?'':`,{actions:['selection'],phases:['${kind==='extraData'?'computeArgs':'computeReplace'}'],scope:'any',handler:()=>(${JSON.stringify(kind==='extraData'?{extraData:selection}:{decline:true,alternativeFlow:leaf('selection',{actionContext:selection})})})}`
+    const {session,player,opponent}=setup(`{listeners:[{actions:['collect'],phases:['after'],mandatory:true,handler:ctx=>({flow:{type:'seq',targetPlayerId:ctx.state.players[1].id,children:[{type:'leaf',actionId:'selection',actionContext:${JSON.stringify(selection)}},gainLeaf(CARD_ID,{food:1})]}})}${override}]}`,'',true)
+    for (const player of session.state.players) player.farmTerrain=[]
+    player.resources.food=2;opponent.resources.food=3
+    opponent.farmyardExtensions=[{id:'native-extension',tiles:[{row:-1,col:1},{row:-1,col:2}]}]
+    let r=collect(session);expect(r.interaction.request).toMatchObject({kind:'confirm-player-switch',fromPlayerIndex:0,toPlayerIndex:1})
+    r=session.resolveChoice(r.interaction.playerIndex,'confirm');expect(r.ok,r.error).toBe(true)
+    if(kind==='alternativeFlow'){
+      expect(r.interaction.request?.kind).toBe('choice')
+      const replacement=r.interaction.request!.options.find(option=>option.labelKey!=='ui.interactionDoNotReplace')!
+      r=session.resolveChoice(1,replacement.value);expect(r.ok,r.error).toBe(true)
+    }
+    expect(r.interaction.request?.kind).toBe('selection');expect(r.interaction.playerIndex).toBe(1)
+    expect(r.state.players[1]!.resources.food).toBe(3);expect(r.state.players[1]!.cardStates[CARD]?.extraData?.selectedPositions).toBeUndefined()
+    const before=JSON.stringify(session.state)
+    expect(session.commitSelectionChoice(1,{positions:['0-1']}).ok).toBe(false);expect(JSON.stringify(session.state)).toBe(before)
+    r=session.commitSelectionChoice(1,{positions:['-1-1']});expect(r.ok,r.error).toBe(true)
+    expect(r.state.players[1]!.cardStates[CARD]?.extraData?.selectedPositions).toEqual(['-1-1'])
+    expect(r.state.players[1]!.resources.food).toBe(4);expect(r.state.players[0]!.resources.food).toBe(2);expect(session.cardWarnings).toEqual([])
+  })
+
+  it('retains an empty multi-selection when every option is disabled',()=>{
+    const flow=leaf('emit-choice',{params:{options:[{value:'a',labelKey:'ui.yes',disabled:true}],multiSelect:{valuePrefix:'s:',minSelections:0,maxSelections:0}}})
+    const {session}=setup(afterCollect(flow,"resolveChoice:(_s,_p,value)=>value==='s:'?gainLeaf(CARD_ID,{food:1}):undefined"))
+    let r=collect(session);expect(r.interaction.request?.kind).toBe('choice')
+    r=session.resolveChoice(0,'s:');expect(r.ok,r.error).toBe(true);expect(r.state.players[0]!.resources.food).toBe(3);expect(session.cardWarnings).toEqual([])
+  })
+
+  it('enforces the stable count limit before paying or writing farm tiles',()=>{
+    const {session,player}=setup(afterCollect(leaf('stables',{actionContext:{max:1}})));player.resources.wood=5
+    let r=collect(session);const before=JSON.stringify(session.state)
+    expect(session.commitSelectionChoice(0,{stables:[{row:0,col:0},{row:0,col:1}]}).ok).toBe(false);expect(JSON.stringify(session.state)).toBe(before)
+    r=session.commitSelectionChoice(0,{stables:[{row:0,col:0}]});expect(r.ok,r.error).toBe(true)
+    expect(r.state.players[0]!.stableTiles).toEqual([{row:0,col:0}]);expect(r.state.players[0]!.resources.wood).toBe(6)
+    expect(r.state.events).toContainEqual(expect.objectContaining({type:'resource.paid',resources:{wood:2}}))
+  })
+
+  it('enforces fence segment and pasture bounds with authoritative payment',()=>{
+    const {session,player}=setup(afterCollect(leaf('fence',{actionContext:{fencePolicy:{segmentBounds:{total:{min:4,max:4}},newPastureBounds:{count:{min:1,max:1},totalSize:{min:1,max:1}},cancelPolicy:'forbidCancel'}}})));player.resources.wood=6
+    collect(session);const before=JSON.stringify(session.state)
+    expect(session.commitSelectionChoice(0,{edges:['H-0-1','H-0-2','H-1-1','H-1-2','V-0-1','V-0-3'],extraWood:0}).ok).toBe(false);expect(JSON.stringify(session.state)).toBe(before)
+    const r=session.commitSelectionChoice(0,{edges:['H-0-1','H-1-1','V-0-1','V-0-2'],extraWood:0})
+    expect(r.ok,r.error).toBe(true);expect(r.state.players[0]!.pastures).toHaveLength(1);expect(r.state.players[0]!.pastures[0]!.size).toBe(1)
+    expect(r.state.players[0]!.fenceSegments).toHaveLength(4);expect(r.state.players[0]!.resources.wood).toBe(5)
+    expect(r.state.events).toContainEqual(expect.objectContaining({type:'resource.paid',resources:{wood:4}}));expect(session.cardWarnings).toEqual([])
+  })
+
+  it.each(['params','actionContext'] as const)('keeps %s improvement types restricted to the declared kind',location=>{
+    for(const type of ['minor','major'] as const){
+      const allowed=[CARD,'A053_Claypipe','Major_Fireplace1','Major_Fireplace2']
+      const flow=leaf('improvement',{params:{allowedPurchases:allowed,...(location==='params'?{types:[type]}:{})},...(location==='actionContext'?{actionContext:{types:[type]}}:{})})
+      const {session,player}=setup(afterCollect(flow,'',"zones:['hand'],"),'cost:{wood:1}')
+      player.minorPlayed=[];player.minorHand=[CARD,'A053_Claypipe'];player.resources.clay=3;player.resources.wood=2
+      let r=collect(session);expect(r.interaction.request?.kind).toBe('choice')
+      expect(r.interaction.request!.options.every(option=>type==='major'?option.value.includes('Major_'):!option.value.includes('Major_'))).toBe(true)
+      const before=JSON.stringify(session.state);expect(session.resolveChoice(0,type==='minor'?'Major_Fireplace1':CARD).ok).toBe(false);expect(JSON.stringify(session.state)).toBe(before)
+      const chosen=type==='minor'?CARD:'Major_Fireplace1'
+      r=session.resolveChoice(0,r.interaction.request!.options.find(option=>option.value.includes(chosen))!.value);expect(r.ok,r.error).toBe(true)
+      expect(r.state.players[0]!.minorPlayed.includes(CARD)).toBe(type==='minor');expect(r.state.players[0]!.improvements.includes('Major_Fireplace1')).toBe(type==='major')
+      expect(r.state.players[0]!.resources).toMatchObject({wood:type==='minor'?4:5,clay:type==='major'?1:3});expect(session.cardWarnings).toEqual([])
+    }
+  })
+
+  it('caps a registered exchange source at one conversion inside the admitted flow',()=>{
+    const {session,player}=setup(afterCollect(leaf('exchange',{actionContext:{tradeIds:[CARD],maxTradeTimesBySourceId:{[CARD]:1}}})),"exchanges:[{from:{wood:1},to:{food:1},triggers:['anytime']}]")
+    player.resources.wood=2;let r=collect(session);expect(r.interaction.request?.kind).toBe('choice')
+    const options=r.interaction.request!.options.filter(option=>option.effectPreview?.kind==='resourceExchange')
+    expect(options.length).toBeGreaterThan(0);expect(options.every(option=>option.effectPreview?.kind==='resourceExchange'&&option.effectPreview.resourcesPaid?.wood===1)).toBe(true)
+    r=session.resolveChoice(0,options[0]!.value);expect(r.ok,r.error).toBe(true)
+    expect(r.state.players[0]!.resources).toMatchObject({wood:4,food:3});expect(session.cardWarnings).toEqual([])
+    expect(r.state.events.filter(event=>event.type==='resource.exchanged')).toHaveLength(1)
+  })
+
   it('stores a string stack item across pending and pops it after continuation',()=>{
     const flow={type:'seq',children:[leaf('push-to-card-stack',{params:{item:'wood'}}),leaf('emit-choice',{params:{options:[{value:'yes',labelKey:'ui.yes'}],requiresExplicitChoice:true}}),leaf('special-effect',{params:{kind:'pop-card-stack-top'}})]} as ActionFlow
     const {session}=setup(afterCollect(flow));let r=collect(session)
@@ -456,6 +531,21 @@ describe('Workshop admitted player, choice and payment data',()=>{
     leaf('gain',{targetPlayerId:'missing',params:{food:1}}),
     {type:'seq',targetPlayerId:42,children:[leaf('gain',{params:{food:1}})]},
     leaf('occupation',{params:{allowedCards:{}}}),
+    leaf('selection',{actionContext:{selectableTiles:[]}}),
+    leaf('selection',{actionContext:{selectableTiles:[{row:'0',col:1}]}}),
+    leaf('selection',{actionContext:{selectableTiles:[{row:99,col:1}]}}),
+    leaf('selection',{actionContext:{selectableTiles:[{row:0,col:1},{row:0,col:1}]}}),
+    leaf('selection',{actionContext:{selectableTiles:[{row:0,col:1}],minSelections:2,maxSelections:2}}),
+    leaf('selection',{actionContext:{selectableTiles:[{row:0,col:1}],minSelections:0.5,maxSelections:1}}),
+    leaf('improvement',{params:{types:'minor'}}), leaf('improvement',{params:{types:[]}}),
+    leaf('improvement',{actionContext:{types:['invalid']}}),
+    leaf('emit-choice',{params:{options:[{value:'a',labelKey:'ui.yes',disabled:true}]}}),
+    leaf('exchange',{actionContext:{tradeIds:[CARD],maxTradeTimesBySourceId:{[CARD]:'1'}}}),
+    leaf('exchange',{actionContext:{tradeIds:{}}}),
+    leaf('fence',{actionContext:{fencePolicy:{segmentBounds:{total:{min:{}}}}}}),
+    leaf('fence',{actionContext:{fencePolicy:{newPastureBounds:{count:{min:2,max:1}}}}}),
+    leaf('stables',{actionContext:{max:'1'}}),
+
     leaf('emit-choice',{params:{options:[{value:'a',labelKey:'ui.yes'}],multiSelect:{}}}),
     leaf('emit-choice',{params:{options:[{value:'a',labelKey:'ui.yes'}],multiSelect:{valuePrefix:'s:',minSelections:2,maxSelections:1}}}),
     leaf('emit-choice',{params:{options:[{value:'a',labelKey:'ui.yes'}],multiSelect:{valuePrefix:'s:',minSelections:0.5,maxSelections:1}}}),

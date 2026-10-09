@@ -691,11 +691,10 @@ export function engineResolveChoice(
         return { type: 'ok' }
       }
       int.hooks.during({ ...executionContext, ...currentEventReadContext(int, completedEvents), actionId }, result)
-      if (result.type === 'request' && (result.request.kind === 'choice' || result.request.kind === 'farm-select')) {
-        // S2 Task 6: also accept farm-select kind emitted from an Or/Xor
-        // child leaf. The computeArgs merging path only applies to 'choice'
-        // kind (extraOptions hook); farm-select carries its own structured
-        // payload + optional `options` (confirm/cancel).
+      if (result.type === 'request' && (result.request.kind === 'choice' || result.request.kind === 'farm-select' || result.request.kind === 'selection')) {
+        // Structured farm/position requests emitted by an Or/Xor child must
+        // retain their pending submission before the branch continues.
+        // Only choice requests merge extraOptions through computeArgs.
         const argResults = result.request.kind === 'choice'
           ? int.hooks.computeArgs(
               { ...executionContext, ...currentEventReadContext(int), actionId },
