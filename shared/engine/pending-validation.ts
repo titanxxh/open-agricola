@@ -9,6 +9,8 @@ import type { PendingEnvelope } from './types'
 export const interactionRequestChoices = (request: InteractionRequest): ActionChoiceOption[] => {
   switch (request.kind) {
     case 'choice':
+    case 'select-trigger':
+      // Only the offered values may be submitted.
       return request.options
     case 'animal-reorg':
       // Reorganization submits `confirm`; cancel stays unavailable.
@@ -24,7 +26,6 @@ export const interactionRequestChoices = (request: InteractionRequest): ActionCh
     case 'heating':
     case 'selection':
     case 'card-draft':
-    case 'select-trigger':
     case 'engine-blocked':
     case 'resource-quantity-select':
     case 'resource-batch-exchange-select':
