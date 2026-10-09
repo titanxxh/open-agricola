@@ -14,7 +14,7 @@ import type {
 import type { EventSink, PaymentPurpose, ResourceLocation } from '../../contract/events'
 import { addCardResourcePaid, recordCardCostAttribution } from '../../cards/helpers/card-state'
 import { PaymentSolver } from '../payment'
-import type { PaymentCtx, PaymentReceipt } from '../payment'
+import type { PaymentCtx, PaymentExecuteError, PaymentReceipt } from '../payment'
 import { returnCardToBoard } from '../../cards/helpers/return-card'
 import { isPaymentResourceKey } from '../../contract/resource-keys'
 
@@ -250,6 +250,11 @@ const buildSelectedResult = (
   }
 }
 
+/** A choice that matches no current payment keeps the menu for another choice. */
+const payFailure = (reason: PaymentExecuteError): ActionExecutionResult => (
+  { type: 'fail', errorKey: 'log.payFail', recoverable: reason === 'invalid-choice' }
+)
+
 export const payAction: ActionDefinition = {
   id: 'pay',
   nameKey: 'actions.pay.name',
@@ -304,7 +309,7 @@ export const payAction: ActionDefinition = {
       buildPaymentCtx(p, undefined, sourceCard),
     )
     if (resolved.type === 'request') return resolved.request
-    if (resolved.type === 'failed') return { type: 'fail', errorKey: 'log.payFail' }
+    if (resolved.type === 'failed') return payFailure(resolved.reason)
     return buildSelectedResult(
       resolved.receipt,
       sourceCard,
@@ -352,7 +357,7 @@ export const payAction: ActionDefinition = {
         buildPaymentCtx(p, choice, sourceCard),
       )
       if (resolved.type === 'request') return resolved.request
-      if (resolved.type === 'failed') return { type: 'fail', errorKey: 'log.payFail' }
+      if (resolved.type === 'failed') return payFailure(resolved.reason)
       return buildSelectedResult(
         resolved.receipt,
         sourceCard,
@@ -394,7 +399,7 @@ export const payAction: ActionDefinition = {
       buildPaymentCtx(p, choice, sourceCard),
     )
     if (resolved.type === 'request') return resolved.request
-    if (resolved.type === 'failed') return { type: 'fail', errorKey: 'log.payFail' }
+    if (resolved.type === 'failed') return payFailure(resolved.reason)
     return buildSelectedResult(
       resolved.receipt,
       sourceCard,

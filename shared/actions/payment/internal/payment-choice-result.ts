@@ -146,6 +146,40 @@ export const filterPaymentSolutionsByReserve = (
     ),
   )
 
+const canonicalPaymentData = (value: unknown): unknown => {
+  if (Array.isArray(value)) return value.map(canonicalPaymentData)
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, child]) => [key, canonicalPaymentData(child)]))
+  }
+  return value
+}
+
+const fnv1a = (text: string, seed: number): string => {
+  let hash = seed
+  for (let index = 0; index < text.length; index++) {
+    hash ^= text.charCodeAt(index)
+    hash = Math.imul(hash, 0x01000193)
+  }
+  return (hash >>> 0).toString(36)
+}
+
+/**
+ * Identity of one offered payment, carried in its option value. Resources or
+ * provider supplies can change while a menu is open (for example through an
+ * anytime action), so the submitted option is matched by identity, never by
+ * its old position in a recomputed list.
+ */
+const paymentSolutionIdentity = (solution: PaymentSolution): string => {
+  const resourcesPaid = Object.fromEntries(Object.entries(solution.resourcesPaid)
+    .filter(([, amount]) => amount !== undefined && amount !== 0))
+  const text = JSON.stringify(canonicalPaymentData({ ...solution, resourcesPaid }))
+  return `${fnv1a(text, 0x811c9dc5)}${fnv1a(text, 0x050c5d1f)}`
+}
+
+const PAYMENT_IDENTITY_SEPARATOR = '~'
+
 export const buildPaymentChoiceResult = (
   solutions: PaymentSolution[],
   optionValuePrefix: string,
@@ -154,7 +188,7 @@ export const buildPaymentChoiceResult = (
 ): ActionExecutionResult => {
   const orderedSolutions = sortPaymentSolutions(solutions)
   const options = orderedSolutions.map((solution, idx) => ({
-    value: `${optionValuePrefix}:${idx}`,
+    value: `${optionValuePrefix}:${idx}${PAYMENT_IDENTITY_SEPARATOR}${paymentSolutionIdentity(solution)}`,
     labelKey: 'prompt.selectPaymentOption',
     labelParams: describePaymentSolution(
       solution,
@@ -191,10 +225,16 @@ export const resolvePaymentSolutionSelection = (
   }
 
   if (paymentChoice !== undefined) {
-    const choiceIndex = parseInt(paymentChoice, 10)
-    const solution = orderedSolutions[choiceIndex]
+    const [indexPart, identity] = paymentChoice.split(PAYMENT_IDENTITY_SEPARATOR)
+    const atIndex = orderedSolutions[parseInt(indexPart!, 10)]
+    // An issued option names its payment; a choice whose payment is no longer
+    // available fails instead of settling whatever now sits at that index.
+    const solution = identity === undefined || (atIndex && paymentSolutionIdentity(atIndex) === identity)
+      ? atIndex
+      : orderedSolutions.find((candidate) => paymentSolutionIdentity(candidate) === identity)
     if (!solution) {
-      return failure
+      // Keep the issued menu so the player can choose a payment that still exists.
+      return failure.type === 'fail' ? { ...failure, recoverable: true } : failure
     }
     return { type: 'selected', solution }
   }

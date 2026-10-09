@@ -330,7 +330,9 @@ const finalizeStables = (
     'stables',
     ctx.state,
   )
-  if (payment.type !== 'selected') return { type: 'fail', errorKey: 'log.buildStableFail' }
+  if (payment.type !== 'selected') {
+    return { type: 'fail', errorKey: 'log.buildStableFail', recoverable: payment.type === 'fail' && payment.recoverable === true }
+  }
   const nextPlayer = JSON.parse(JSON.stringify(ctx.player)) as PlayerState
   nextPlayer.stableTiles = [...nextPlayer.stableTiles, ...stables]
   let specialSourceCardId: string | undefined

@@ -206,7 +206,9 @@ const finalizePlow = (
     'plow',
     ctx.state,
   )
-  if (payment.type !== 'selected') return { type: 'fail', errorKey: 'log.action' }
+  if (payment.type !== 'selected') {
+    return { type: 'fail', errorKey: 'log.action', recoverable: payment.type === 'fail' && payment.recoverable === true }
+  }
   const nextPlayer = JSON.parse(JSON.stringify(validated.player)) as PlayerState
   PaymentSolver.executeResolvedTypedFlatPayment(nextPlayer, payment, 'plow', ctx.state)
   applyPlayerMutation(ctx.player, nextPlayer)

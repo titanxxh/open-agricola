@@ -617,7 +617,7 @@ const finalizeFence = (
     ctx.state,
   )
   if (payment.type !== 'selected') {
-    return { type: 'fail', errorKey: 'log.fencingFail' }
+    return { type: 'fail', errorKey: 'log.fencingFail', recoverable: payment.type === 'fail' && payment.recoverable === true }
   }
   const nextPlayer = JSON.parse(JSON.stringify(validated.player)) as PlayerState
   const consumed = isBorrowedFenceSourcePolicy(currentPolicy.sourcePolicy)

@@ -190,7 +190,9 @@ const finalizeRoom = (
     ctx.actionContext,
     readConstructCostAdjustments(ctx),
   )
-  if (payment.type !== 'selected') return { type: 'fail', errorKey: 'log.buildRoomFail' }
+  if (payment.type !== 'selected') {
+    return { type: 'fail', errorKey: 'log.buildRoomFail', recoverable: payment.type === 'fail' && payment.recoverable === true }
+  }
   const payCost = buildConstructPayCost(
     ctx.player,
     ctx.costs,
