@@ -674,7 +674,7 @@ export const zh = {
     choiceClickFarmTarget: '请点击高亮的农场格或卡牌田。',
     choiceChooseTargetAlternative: '请选择这个目标对应的行动。',
     choiceMinimumResource: '需要至少',
-    choiceFutureRoom: '将房屋转换为{room}屋',
+    choiceFutureRoom: '若为{room}屋，增加 1 间{room}房间',
     choiceActionCard: '行动卡',
     choiceCardScore: '{card} 的计分变化：{delta} 分',
     choiceScheduleRound: '第 {round} 回合：',

@@ -36,9 +36,14 @@ export const applyCardStorageOperation = (player: PlayerState, sourceCard: strin
   }
 }
 
-export const previewCardStorageOperation = (state: GameState, player: PlayerState, sourceCard: string, operation: CardStorageOperation): ChoiceEffectPreview | undefined => {
+export const cardStorageAffectsScore = (sourceCard: string, operation: CardStorageOperation): boolean => {
   const effect = getCardEffect(sourceCard)
-  if (!effect?.computeBonusScore && !effect?.computeCostedBonus) return undefined
+  return Boolean(effect?.computeBonusScore || effect?.computeCostedBonus ||
+    ((operation.kind === 'increment-counter' || operation.kind === 'set-counter') && operation.key === 'bonusVp'))
+}
+
+export const previewCardStorageOperation = (state: GameState, player: PlayerState, sourceCard: string, operation: CardStorageOperation): ChoiceEffectPreview | undefined => {
+  if (!cardStorageAffectsScore(sourceCard, operation)) return undefined
   const projectedPlayer: PlayerState = { ...player, resources: { ...player.resources }, cardStates: structuredClone(player.cardStates ?? {}) }
   const projectedState: GameState = { ...state, players: state.players.map((candidate) => candidate.id === player.id ? projectedPlayer : candidate) }
   applyCardStorageOperation(projectedPlayer, sourceCard, operation)

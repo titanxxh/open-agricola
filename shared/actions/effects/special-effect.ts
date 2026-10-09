@@ -1,10 +1,10 @@
+import { resolveActionTargetPlayer } from '../helpers/target-player'
 import { applyCardStorageOperation, previewCardStorageOperation, readCardStorageOperation } from '../card-storage'
 import type {
   ActionDefinition,
   ActionFlow,
   FenceSegment,
   FenceSegmentType,
-  GameState,
   FarmyardSpaceState,
   PlayerState,
   Resource,
@@ -117,17 +117,6 @@ export type SpecialEffectParams =
       locations: PlantAdditionalGoodLocation[]
     }
 
-const resolveTargetPlayer = (
-  state: GameState | undefined,
-  actor: PlayerState,
-  actionContext: Record<string, unknown> | undefined,
-): PlayerState => {
-  const targetId = actionContext?.targetPlayerId
-  if (typeof targetId !== 'string' || !targetId) return actor
-  const target = state?.players?.find((p) => p.id === targetId)
-  return target ?? actor
-}
-
 type CardFieldStack = {
   crop: 'grain' | 'vegetable' | 'wood' | 'stone'
   remaining: number
@@ -206,7 +195,7 @@ export const specialEffectAction: ActionDefinition = {
   canBeExecutedByPlayer: () => true,
   previewEffect: ({ state, player, sourceCard, params, actionContext }) => {
     const operation = readCardStorageOperation(params)
-    return sourceCard && operation ? previewCardStorageOperation(state, resolveTargetPlayer(state, player, actionContext), sourceCard, operation) : undefined
+    return sourceCard && operation ? previewCardStorageOperation(state, resolveActionTargetPlayer(state, player, actionContext), sourceCard, operation) : undefined
   },
   execute: ({ state, player, sourceCard, params, actionContext, eventSink }) => {
     if (!sourceCard) return { type: 'fail', errorKey: 'log.specialEffectFail' }
@@ -214,7 +203,7 @@ export const specialEffectAction: ActionDefinition = {
     if (!p || typeof p !== 'object' || !('kind' in p)) {
       return { type: 'fail', errorKey: 'log.specialEffectFail' }
     }
-    const target = resolveTargetPlayer(state, player, actionContext)
+    const target = resolveActionTargetPlayer(state, player, actionContext)
     switch (p.kind) {
       case 'increment-extra-data':
       case 'set-extra-data':

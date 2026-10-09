@@ -32,7 +32,7 @@ export { filterSerializedStateForPlayer } from '../projections/serialized-state'
 
 export type SerializedActionSpace = Omit<
   ActionSpace,
-  'canBeExecutedByPlayer' | 'execute' | 'resolveChoice' | 'flow'
+  'canBeExecutedByPlayer' | 'execute' | 'resolveChoice' | 'flow' | 'previewEffect'
 >
 
 /**
@@ -207,7 +207,7 @@ export const serializeState = (
     })),
     actionSpaces: actionSpaces.map(
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      ({ canBeExecutedByPlayer, execute, resolveChoice, flow, ...s }) => s,
+      ({ canBeExecutedByPlayer, execute, resolveChoice, flow, previewEffect, ...s }) => s,
     ),
     engineStack: { frames: [] },
   }
@@ -238,7 +238,7 @@ export const serializeSessionSnapshot = (
       players: players.map((player, index) => ({ ...player, ...displays[index]! })),
       actionSpaces: actionSpaces.map(
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        ({ canBeExecutedByPlayer, execute, resolveChoice, flow, ...space }) => space,
+        ({ canBeExecutedByPlayer, execute, resolveChoice, flow, previewEffect, ...space }) => space,
       ),
       engineStack: { frames: [] },
     },
