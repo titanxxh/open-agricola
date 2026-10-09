@@ -1,3 +1,4 @@
+import { resolveActionTargetPlayer } from '../actions/helpers/target-player'
 import { isActionDoableInFlowContext, type FlowDoableContext } from '../actions/flow'
 import type {
   ActionDefinition,
@@ -29,8 +30,7 @@ import type { EngineNode } from './types'
 import type { PendingCursor, PendingEnvelope, PendingSyntheticKind, PendingView } from './types'
 import type { EngineInternals } from './engine-internals'
 import type { ActionRegistry } from './registry'
-import { applyCardStorageOperation, readCardStorageOperation } from '../actions/card-storage'
-import { getCardEffect } from '../cards/card-effects'
+import { applyCardStorageOperation, cardStorageAffectsScore, readCardStorageOperation } from '../actions/card-storage'
 import { getLogicalFields } from '../cards/helpers/card-field'
 import { getPlayOrderIndex } from './matched-trigger'
 import type { MatchedCardListener } from '../cards/card-listeners'
@@ -617,6 +617,13 @@ export function collectOrderedActionNodes(node: EngineNode): ActionNode[] | null
   return null
 }
 
+/** Prune optional descendants and unresolved alternatives during storage projection. */
+const collectMandatoryActionNodes = (node: EngineNode): ActionNode[] => {
+  if (node.optional) return []
+  if (node instanceof ActionNode) return [node]
+  return node instanceof SequenceNode ? node.children.flatMap(collectMandatoryActionNodes) : []
+}
+
 const isBookkeepingAction = (node: ActionNode): boolean =>
   node.actionId === 'push-to-card-stack' ||
   (node.actionId === 'special-effect' && ['set-infobox', 'increment-extra-data', 'set-extra-data', 'increment-counter', 'set-counter', 'set-flag'].includes(String(node.params?.kind)))
@@ -625,10 +632,11 @@ export function getSequenceEffectPreview(node: SequenceNode, _registry?: ActionR
   const actions = collectOrderedActionNodes(node)
   const hasOptionalDescendant = (entry: EngineNode): boolean => getNodeChildren(entry).some((child) => child.optional || hasOptionalDescendant(child))
   if (!actions || hasOptionalDescendant(node) || new Set(actions.map((action) => action.ownerPlayerId ?? context?.player.id)).size > 1) return undefined
-  const visible = actions.filter((action) => !isBookkeepingAction(action) || (
-    action.sourceCard && readCardStorageOperation(action.params) &&
-    (getCardEffect(action.sourceCard)?.computeBonusScore || getCardEffect(action.sourceCard)?.computeCostedBonus)
-  ))
+  const visible = actions.filter((action) => {
+    if (!isBookkeepingAction(action)) return true
+    const operation = readCardStorageOperation(action.params)
+    return Boolean(action.sourceCard && operation && cardStorageAffectsScore(action.sourceCard, operation))
+  })
   const [payment, ...rewards] = visible
   if (payment?.actionId !== 'pay' || rewards.length === 0 || !rewards.every((action) => action.actionId === 'gain' || action.actionId === 'bonus-vp')) return undefined
   let resourcesGained: Partial<Resource> = {}
@@ -771,16 +779,17 @@ export function getNodeDescriptionPreview(
       ...context,
       state: { ...context.state, players: context.state.players.map((player) => ({ ...player, cardStates: structuredClone(player.cardStates ?? {}), resources: { ...player.resources } })) },
     } : context
-    if (projection) projection.player = findPlayerById(projection.state, projection.player.id) ?? projection.player
+    if (projection && node instanceof SequenceNode) projection.player = findPlayerById(projection.state, projection.player.id) ?? projection.player
     const parts = node.children
       .map((child) => {
         const description = getNodeDescriptionPreview(child, registry, projection)
         if (projection && node instanceof SequenceNode && !child.optional) {
-          for (const action of collectOrderedActionNodes(child) ?? []) {
+          for (const action of collectMandatoryActionNodes(child)) {
             if (action.optional || action.actionId !== 'special-effect' || !action.sourceCard) continue
             const operation = readCardStorageOperation(action.params)
-            const player = findPlayerById(projection.state, action.ownerPlayerId ?? context!.player.id)
-            if (operation && player) applyCardStorageOperation(player, action.sourceCard, operation)
+            const actor = findPlayerById(projection.state, action.ownerPlayerId ?? context!.player.id)
+            const target = actor ? resolveActionTargetPlayer(projection.state, actor, { ...projection.actionContext, ...action.actionContext }) : undefined
+            if (operation && target) applyCardStorageOperation(target, action.sourceCard, operation)
           }
         }
         return description

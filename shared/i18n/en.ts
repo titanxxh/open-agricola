@@ -687,7 +687,7 @@ export const en = {
     choiceClickFarmTarget: 'Click a highlighted farm cell or Card Field.',
     choiceChooseTargetAlternative: 'Choose an action for this target.',
     choiceMinimumResource: 'Requires at least',
-    choiceFutureRoom: 'Convert house to {room}',
+    choiceFutureRoom: 'Add 1 {room} room if your house is {room}',
     choiceActionCard: 'Action card',
     choiceCardScore: '{card} contribution: {delta} points',
     choiceScheduleRound: 'Round {round}:',

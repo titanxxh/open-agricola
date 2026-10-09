@@ -6,48 +6,52 @@ import { BACKEND_URL } from './fixtures'
 
 for (const scenario of [{ locale: 'en', width: 1440 }, { locale: 'zh', width: 390 }] as const) {
   for (const target of ['farm', 'card'] as const) {
-  test(`whole-field ${target} choices click farm and Card Fields in ${scenario.locale} at ${scenario.width}px`, async ({ page, request }) => {
-    await page.setViewportSize({ width: scenario.width, height: 1000 })
-    await page.addInitScript((locale) => localStorage.setItem('open-agricola-locale-v2', locale), scenario.locale)
-    const fresh = await request.post(`${BACKEND_URL}/api/game/new-sandbox`, { data: { seed: 1073, playerCount: 2, customCardIds: [] } })
-    expect(fresh.ok()).toBe(true)
-    const { state } = await fresh.json() as { state: SerializedGameState }
-    state.round = 4
-    for (const player of state.players) {
-      player.minorHand = ['__test_placeholder__']
-      player.occupationHand = ['__test_placeholder__']
-      player.resources.food = 20
-      for (const worker of player.workers.filter((candidate) => candidate.isActive)) state.actionSpaces[0]!.takenBy.push({ playerId: player.id, workerId: worker.id })
-    }
-    const owner = state.players[0]!
-    owner.minorPlayed = ['E073_Scythe', 'D075_WoodField']
-    owner.fields = [{ row: 0, col: 2, stacks: [{ kind: 'grain', remaining: 3 }] }]
-    owner.cardStates.D075_WoodField = { extraData: { cardFieldStacks: [{ crop: 'wood', remaining: 3 }, { crop: 'wood', remaining: 2 }] } }
-    expect((await request.post(`${BACKEND_URL}/api/game/load`, { data: { state } })).ok()).toBe(true)
-    expect((await request.post(`${BACKEND_URL}/api/game/round-end`)).ok()).toBe(true)
-    await page.goto('/?page=game&player=p1&embedded=1&devMode=1')
-    const farm = page.locator('[data-farm-tile-player="p1"][data-farm-tile-key="0-2"]')
-    await expect(farm).toHaveClass(/position-selectable/)
-    // The crop strip is a visible sibling of the card anchor, independent of hover.
-    const cardSlots = page.locator('.played-card-slot').filter({ has: page.locator('[data-card-anchor="D075_WoodField"]') }).locator('.card-field-selection')
-    await expect(cardSlots).toHaveCount(2)
-    await page.reload()
-    await expect(cardSlots).toHaveCount(2)
-    const selected = page.waitForResponse((response) => response.url().endsWith('/api/game/choice'))
-    if (target === 'card') await cardSlots.last().click()
-    else await farm.click()
-    const result = await (await selected).json()
-    expect(result.ok, JSON.stringify(result)).toBe(true)
-    if (target === 'card') {
-      expect(result.state.players[0].cardStatePresentation.D075_WoodField.cropLayers).toEqual([])
-      expect(result.state.players[0].fields[0].stacks[0].remaining).toBe(2)
-    } else {
-      expect(result.state.players[0].fields[0].stacks).toEqual([])
-      expect(result.state.players[0].cardStatePresentation.D075_WoodField.cropLayers.map((layer: { stack: { remaining: number } }) => layer.stack.remaining)).toEqual([2, 1])
-    }
-    await expect(cardSlots).toHaveCount(0)
-    await page.screenshot({ path: `output/playwright/choice-${target}-field-${scenario.locale}.png` })
-  })
+    test(`whole-field ${target} choices click farm and Card Fields in ${scenario.locale} at ${scenario.width}px`, async ({ page, request }) => {
+      await page.setViewportSize({ width: scenario.width, height: 1000 })
+      await page.addInitScript((locale) => localStorage.setItem('open-agricola-locale-v2', locale), scenario.locale)
+      const fresh = await request.post(`${BACKEND_URL}/api/game/new-sandbox`, { data: { seed: 1073, playerCount: 2, customCardIds: [] } })
+      expect(fresh.ok()).toBe(true)
+      const { state } = await fresh.json() as { state: SerializedGameState }
+      state.round = 4
+      for (const player of state.players) {
+        player.minorHand = ['__test_placeholder__']
+        player.occupationHand = ['__test_placeholder__']
+        player.resources.food = 20
+        for (const worker of player.workers.filter((candidate) => candidate.isActive)) state.actionSpaces[0]!.takenBy.push({ playerId: player.id, workerId: worker.id })
+      }
+      const owner = state.players[0]!
+      owner.minorPlayed = ['E073_Scythe', 'D075_WoodField']
+      owner.fields = [{ row: 0, col: 2, stacks: [{ kind: 'grain', remaining: 3 }] }]
+      owner.cardStates.D075_WoodField = { extraData: { cardFieldStacks: [{ crop: 'wood', remaining: 3 }, { crop: 'wood', remaining: 2 }] } }
+      expect((await request.post(`${BACKEND_URL}/api/game/load`, { data: { state } })).ok()).toBe(true)
+      expect((await request.post(`${BACKEND_URL}/api/game/round-end`)).ok()).toBe(true)
+      await page.goto('/?page=game&player=p1&embedded=1&devMode=1')
+      const farm = page.locator('[data-farm-tile-player="p1"][data-farm-tile-key="0-2"]')
+      await expect(farm).toHaveClass(/position-selectable/)
+      // The crop strip is a visible sibling of the card anchor, independent of hover.
+      const cardSlots = page.locator('.played-card-slot').filter({ has: page.locator('[data-card-anchor="D075_WoodField"]') }).locator('.card-field-selection')
+      await expect(cardSlots).toHaveCount(2)
+      await page.reload()
+      await expect(cardSlots).toHaveCount(2)
+      await page.locator('[data-farm-tile-player="p1"][data-farm-tile-key="1-1"]').click()
+      await expect(cardSlots).toHaveCount(2)
+      const unchanged = await (await request.get(`${BACKEND_URL}/api/game/state`)).json()
+      expect(unchanged.state.players[0].fields[0].stacks[0].remaining).toBe(3)
+      const selected = page.waitForResponse((response) => response.url().endsWith('/api/game/choice'))
+      if (target === 'card') await cardSlots.last().click()
+      else await farm.click()
+      const result = await (await selected).json()
+      expect(result.ok, JSON.stringify(result)).toBe(true)
+      if (target === 'card') {
+        expect(result.state.players[0].cardStatePresentation.D075_WoodField.cropLayers).toEqual([])
+        expect(result.state.players[0].fields[0].stacks[0].remaining).toBe(2)
+      } else {
+        expect(result.state.players[0].fields[0].stacks).toEqual([])
+        expect(result.state.players[0].cardStatePresentation.D075_WoodField.cropLayers.map((layer: { stack: { remaining: number } }) => layer.stack.remaining)).toEqual([2, 1])
+      }
+      await expect(cardSlots).toHaveCount(0)
+      await page.screenshot({ path: `output/playwright/choice-${target}-field-${scenario.locale}.png` })
+    })
   }
 }
 
@@ -88,6 +92,31 @@ for (const scenario of [{ locale: 'en', width: 1440 }, { locale: 'zh', width: 39
     expect(result.state.futureMeeples).toEqual([expect.objectContaining({ round: 11, resources: { fuel: 6 } })])
   })
 }
+
+test('skipping a spatial Scythe choice retains normal field harvesting', async ({ page, request }) => {
+  await page.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'en'))
+  const fresh = await request.post(`${BACKEND_URL}/api/game/new-sandbox`, { data: { seed: 2073, playerCount: 2, customCardIds: [] } })
+  const { state } = await fresh.json() as { state: SerializedGameState }
+  state.round = 4
+  for (const player of state.players) {
+    player.minorHand = ['__test_placeholder__']
+    player.occupationHand = ['__test_placeholder__']
+    player.resources.food = 20
+    for (const worker of player.workers.filter((candidate) => candidate.isActive)) state.actionSpaces[0]!.takenBy.push({ playerId: player.id, workerId: worker.id })
+  }
+  state.players[0]!.minorPlayed = ['E073_Scythe']
+  state.players[0]!.fields = [{ row: 0, col: 2, stacks: [{ kind: 'grain', remaining: 3 }] }]
+  expect((await request.post(`${BACKEND_URL}/api/game/load`, { data: { state } })).ok()).toBe(true)
+  expect((await request.post(`${BACKEND_URL}/api/game/round-end`)).ok()).toBe(true)
+  await page.goto('/?page=game&player=p1&embedded=1&devMode=1')
+  await expect(page.locator('[data-farm-tile-player="p1"][data-farm-tile-key="0-2"]')).toHaveClass(/position-selectable/)
+  const submitted = page.waitForResponse((result) => result.url().endsWith('/api/game/choice'))
+  await page.locator('.interaction-bar').getByRole('button', { name: 'Skip', exact: true }).click()
+  const result = await (await submitted).json()
+  expect(result.ok).toBe(true)
+  expect(result.state.players[0].fields[0].stacks[0].remaining).toBe(2)
+  expect(result.state.players[0].resources.grain).toBe(1)
+})
 
 test('one farm cell with multiple authoritative options requires an explicit action-card choice', async ({ page, request }) => {
   await page.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'en'))

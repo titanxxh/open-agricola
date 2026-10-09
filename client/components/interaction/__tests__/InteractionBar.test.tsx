@@ -14,6 +14,7 @@ import {
   type InteractionBarPresentationInput,
 } from '../../../app/interaction-bar-presentation'
 import { InteractionBar } from '../InteractionBar'
+import { describeFutureSchedule } from '../../../../shared/actions/future-schedule'
 import { GameSession } from '../../../../server/game/authoritative-session'
 
 const noop = () => {}
@@ -190,6 +191,7 @@ describe('InteractionBar', () => {
     const pay = (session: GameSession, card: string) => {
       let response = session.takeAction(0, 'meeting-place')
       for (let i = 0; i < 8; i += 1) {
+        if (response.state.players[0]!.minorPlayed.includes(card)) return response
         if (response.interaction.stateId === 'wait' && response.interaction.promptKey === 'prompt.selectPayment') return response
         const choice = options(response).find((option) => option.value === card || option.value.startsWith('action-improvement-'))
         if (!choice) throw new Error('Missing purchase choice')
@@ -205,6 +207,20 @@ describe('InteractionBar', () => {
     const sackHtml = html(pay(sack, 'C040_CanvasSack'))
     expect(sackHtml).toContain('data-resource="vegetable"')
     expect(sackHtml).toContain('data-amount="4"')
+    const stall = make('M131_CattleStall', true)
+    const stallHtml = html(pay(stall, 'M131_CattleStall'))
+    expect(stallHtml).toContain(locale === 'en' ? 'Optional purchase' : '可选择购买')
+    expect(stallHtml).toContain(locale === 'en' ? 'Round 7:' : '第 7 回合：')
+    for (const resource of ['sheep', 'boar', 'cattle', 'horse', 'food']) expect(stallHtml).toContain(`data-resource="${resource}"`)
+    const trader = make('D114_SeedTrader')
+    trader.state.players[0]!.occupationPlayed = ['D114_SeedTrader']
+    trader.state.players[0]!.cardStates.D114_SeedTrader = { counters: { grain: 2, vegetable: 2 } }
+    expect(trader.takeAction(0, 'farmland').ok).toBe(true)
+    const movementHtml = html(trader.takeAnytimeAction(0, 'D114-seed-trader-anytime'))
+    expect(movementHtml).toContain(locale === 'en' ? 'Take from' : '从')
+    expect(movementHtml).toContain(locale === 'en' ? 'Seed Trader' : '种子商人')
+    expect(movementHtml).toContain('data-resource="grain"')
+    expect(movementHtml).toContain('data-resource="vegetable"')
     const artist = make('B152_JuniorArtist')
     artist.state.players[0]!.occupationPlayed = ['B152_JuniorArtist']
     artist.state.players[0]!.occupationHand = ['A116_WoodCutter']
@@ -228,6 +244,16 @@ describe('InteractionBar', () => {
     const scoreHtml = html(rod.takeAction(0, 'fishing'))
     expect(scoreHtml).toContain(locale === 'en' ? 'contribution: +1 points' : '计分变化：+1 分')
     expect(scoreHtml).not.toContain('Increment Extra Data')
+  })
+  it.each(['zh', 'en'] as const)('describes the executable room grant as conditional addition in %s', (locale) => {
+    const html = renderBarHtml((input) => {
+      input.locale = locale
+      input.pending.choice = { ...pendingChoice, options: [{ value: 'room', labelKey: 'actions.future-meeples.name', effectPreview: describeFutureSchedule(1, {
+        cardId: 'B014_Hawktower', playerId: 'p1', entries: [{ round: 12, roomType: 'stone' }],
+      }) }] }
+    })
+    expect(html).toContain(locale === 'en' ? 'Add 1 Stone room if your house is Stone' : '若为石料屋，增加 1 间石料房间')
+    expect(html).not.toContain('Convert house')
   })
   const configureMultiSelect = (input: InteractionBarPresentationInput, maxSelections = 2) => {
     input.pending.choice = {
