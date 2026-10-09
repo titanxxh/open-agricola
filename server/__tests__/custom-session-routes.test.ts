@@ -7,6 +7,7 @@ import { randomUUID } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import * as database from '../db.ts'
+import * as rng from '../../shared/utils/rng'
 import { validateAndCompileCustomCode } from '../custom-code/engine.ts'
 import {
   approveCurrentDraft,
@@ -353,6 +354,8 @@ describe('custom session routes', () => {
   })
 
   it('runs community-room commands through the WebSocket session worker', async () => {
+    const resolveSeed = rng.resolveSeed
+    vi.spyOn(rng, 'resolveSeed').mockImplementation((seed) => resolveSeed(seed ?? 42))
     const db = await createTestDatabase()
     databases.push(db)
     await addUser(db, 'host', 'host-token')
@@ -406,6 +409,7 @@ describe('custom session routes', () => {
       .find((message) => message.type === 'stateUpdate')
     expect(stateUpdate.requestId).toBe('runaway')
     expect(stateUpdate.payload.ok).toBe(false)
+    expect(stateUpdate.payload.error).toMatch(/timed out/i)
     expect(stateUpdate.payload.state.actionSpaces.find((space: { id: string }) => space.id === 'forest').takenBy)
       .toEqual([])
     registry.delete(host.currentRoom!.id)

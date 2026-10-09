@@ -1,4 +1,4 @@
-import type { Page, APIRequestContext } from '@playwright/test'
+import { expect, type Page, type APIRequestContext } from '@playwright/test'
 import { mkdirSync, writeFileSync } from 'fs'
 import path from 'path'
 
@@ -59,6 +59,30 @@ export async function advanceRound(page: Page, targetRound: number) {
   const advanceBtn = roundRow.locator('button')
   await advanceBtn.click()
   await page.waitForTimeout(500)
+}
+
+// Hotseat can visit another seat for an opening hand hook before normal work.
+export async function finishHotseatOpening(page: Page) {
+  const handoff = page.getByRole('dialog', { name: 'Hotseat handoff' })
+  const skip = page.locator('.interaction-bar').getByRole('button', { name: /^(Skip|跳过|Do not use Elder|不使用长者)$/ })
+  const confirm = page.getByRole('button', { name: /^(Confirm switch|确认切换)$/ })
+  const forest = page.locator('[data-action-id="forest"] button:enabled').first()
+  const nextStep = async () => {
+    if (await handoff.isVisible()) return 'handoff'
+    if (await skip.isVisible()) return 'skip'
+    if (await confirm.isVisible()) return 'confirm'
+    return await forest.isVisible() ? 'work' : 'waiting'
+  }
+  for (let step = 0; step < 12; step++) {
+    await expect.poll(nextStep).not.toBe('waiting')
+    const next = await nextStep()
+    if (next === 'work') return
+    if (next === 'waiting') continue
+    const control = next === 'handoff' ? handoff.getByRole('button') : next === 'skip' ? skip : confirm
+    await control.click()
+    await expect(control).toBeHidden()
+  }
+  throw new Error('Hotseat opening did not reach the work phase')
 }
 
 // ── Output helpers ───────────────────────────────────────────────────────────

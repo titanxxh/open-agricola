@@ -1,4 +1,5 @@
 import * as database from '../db'
+import * as rng from '../../shared/utils/rng'
 import { sendCommand } from './_helpers/command-socket'
 import { createTestDatabase } from './_helpers/postgres'
 import { recordingResources } from './_helpers/recording'
@@ -68,6 +69,9 @@ describe('WS broadcast per-viewer filter', () => {
   let recording: Awaited<ReturnType<typeof recordingResources>>
 
   beforeEach(async () => {
+    // Privacy assertions need a work-phase fixture, not a random opening offer.
+    const resolveSeed = rng.resolveSeed
+    vi.spyOn(rng, 'resolveSeed').mockImplementation((seed) => resolveSeed(seed ?? 42))
     db = await createTestDatabase()
     vi.spyOn(database, 'getDb').mockReturnValue(db)
     vi.stubEnv('ALLOW_ANONYMOUS_WS', 'true')

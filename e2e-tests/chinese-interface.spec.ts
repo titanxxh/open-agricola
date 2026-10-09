@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { BACKEND_URL, FRONTEND_URL, getJson, postJson } from './fixtures'
+import { BACKEND_URL, FRONTEND_URL, finishHotseatOpening, getJson, postJson } from './fixtures'
 
 const sandboxUrl = `${FRONTEND_URL}/?page=game&player=p1&embedded=1&devMode=1`
 
@@ -41,13 +41,13 @@ test('dev lobby creates a hotseat room and preserves identity after reload', asy
   const handoff = page.getByRole('dialog', { name: 'Hotseat handoff' })
   await expect(handoff).toBeVisible({ timeout: 15000 })
   // Synthetic dev account labels keep generated-name provenance through hotseat and reload.
-  await expect(handoff).toContainText('请把设备交给 玩家 1。')
+  await expect(handoff).toContainText(/请把设备交给 玩家 [12]。/)
+  await finishHotseatOpening(page)
   const url = new URL(page.url())
   expect(url.searchParams.get('player')).toBe('p1')
   expect(url.searchParams.get('devMode')).toBe('1')
   expect(url.searchParams.get('hotseat')).toBe('1')
   expect(url.searchParams.get('room')).toBeTruthy()
-  await handoff.getByRole('button').click()
   await expect(page.locator('.game-layout')).toBeVisible()
   await page.reload()
   await expect(handoff).toBeVisible({ timeout: 15000 })
