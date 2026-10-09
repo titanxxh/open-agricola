@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import type { GameEvent, PublicEventArchivePacket } from '../../../shared/contract/events'
 import type { LogEntry } from '../../../shared/contract/types'
 import { buildReplayActionLogPresentation } from '../replay-action-log-presentation'
+import { eventsToLogEntries } from '../../../shared/events/log-mapper'
+import { projectHistoryLogNames } from '../../../shared/projections/history-names'
 
 const movedEvent = (id: string, seq: number, resources = { wood: 3 }): GameEvent => ({
   schemaVersion: 1,
@@ -50,6 +52,50 @@ const canceled = (
 })
 
 describe('buildReplayActionLogPresentation', () => {
+  it.each(['gain', 'bonus-grain'])('deduplicates %s logs when the client only knows board action names', (actionId) => {
+    const event: GameEvent = actionId === 'gain' ? {
+      schemaVersion: 1, id: 'gain-trigger', seq: 1, round: 2, phase: 'work',
+      visibility: 'public', actorPlayerId: 'p1', type: 'card.triggered',
+      cardId: 'E116_FirCutter', triggerActionId: actionId,
+    } : {
+      ...movedEvent('summer-grain', 1), sourceActionId: actionId,
+      resources: { grain: 1 }, from: { kind: 'supply' }, reason: 'gain',
+    }
+    const playerNames = { p1: 'Alice' }
+    const stateLog = eventsToLogEntries([event], {
+      playerNames, actionNames: { [actionId]: `actions.${actionId}.name` },
+    })
+    const presentation = buildReplayActionLogPresentation({
+      events: [event], publicEventArchive: [committed(1, [event])], stateLog,
+      currentRound: 2, locale: 'en', playerNames,
+      actionNames: { forest: 'actions.forest.name' }, replayFilter: 'all',
+    })
+    const rows = presentation.timelineBuckets.flatMap(bucket => bucket.rows)
+    expect(rows.map(row => row.kind)).toEqual(['event'])
+    expect(rows[0]!.logEntry).toEqual(stateLog[0])
+  })
+
+  it('keeps canceled attempts ahead of older active rows after history name projection', () => {
+    const older = movedEvent('older', 1)
+    const attempt = movedEvent('attempt', 2)
+    const started: GameEvent = {
+      schemaVersion: 1, id: 'started', seq: 0, round: 2, phase: 'work',
+      visibility: 'public', type: 'game.started',
+    }
+    const context = { playerNames: { p1: 'Old name' }, actionNames: { forest: 'actions.forest.name' } }
+    const stateLog = eventsToLogEntries([older], context).map(entry => projectHistoryLogNames(
+      entry, { 'params.player': 'p1', 'params.playerName': 'p1' }, { p1: 'Player 1' },
+    ))
+    const presentation = buildReplayActionLogPresentation({
+      events: [started, older], publicEventArchive: [committed(1, [started, older]), committed(2, [attempt]), canceled(3, [attempt])],
+      stateLog: [...stateLog, { key: 'log.startGame' }], currentRound: 2, locale: 'zh', playerNames: { p1: '玩家 1' },
+      actionNames: context.actionNames, replayFilter: 'all',
+    })
+    const rows = presentation.timelineBuckets.flatMap(bucket => bucket.rows)
+    expect(rows.map(row => row.kind === 'event' ? row.status : row.kind)).toEqual(['canceled', 'active', 'active'])
+    expect(rows.slice(0, 2).map(row => row.logEntry?.params?.player)).toEqual(['玩家 1', '玩家 1'])
+  })
+
   it('derives Action Log buckets, replay controls, selected entry, and replay feedback together', () => {
     const active = movedEvent('evt-active', 2)
     const canceledPayload = movedEvent('evt-canceled', 1, { clay: 1 })

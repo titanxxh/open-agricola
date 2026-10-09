@@ -5,6 +5,19 @@ import { projectHistoryLogNames } from '../history-names'
 afterEach(() => vi.restoreAllMocks())
 
 describe('history participant name projection', () => {
+  it('only replaces existing string names when identity roles include unused fields', () => {
+    const entry: LogEntry = { key: 'log.placeFarmer', playerId: 'p1', params: {
+      player: 'Old name', action: 'actions.day-laborer.name', toPlayer: null,
+    } }
+    const projected = projectHistoryLogNames(entry, {
+      'params.player': 'p1', 'params.playerName': 'p1', 'params.toPlayer': 'p1',
+    }, { p1: 'Renamed player' })
+    expect(projected.params).toEqual({
+      player: 'Renamed player', action: 'actions.day-laborer.name', toPlayer: null,
+    })
+    expect(entry.params?.player).toBe('Old name')
+  })
+
   it('returns unchanged records without JSON copying when names match or roles cannot apply', () => {
     const entry: LogEntry = { key: 'transfer', params: { player: 'Actor', details: null, count: 2 } }
     const parse = vi.spyOn(JSON, 'parse')
