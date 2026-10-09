@@ -391,7 +391,7 @@ shared/engine/
 当前 runtime node 类型：
 
 - `ActionNode`：参考实现 `LeafNode(action)` 等价物；以 `actionId` + `params` 调 `ActionDefinition.execute`。
-- `SequenceNode` / `ParallelNode` / `OrNode` / `XorNode`：组合节点，对应 参考实现 `SEQ` / `PARALLEL` / `OR` / `XOR`。`XorNode` 在玩家选择复合分支后记录 `selectedChildId`，后续 traversal 只推进该分支直到完成，避免 `xor(seq(...))` 在第一个 leaf 成功后提前结束。由 OR/XOR 分支直接选中的 leaf 把分支值记为 `selectedBranchChoice` 并写入 cursor，因此无论立即执行、在 `before` reaction 之后执行，还是在 owner 交接之后执行，其 `immediatelyAfter` / `after` reaction 都收到同一个 `choice`。`ParallelNode(mode='trigger-select')` 承接 参考实现 `NODE_PARALLEL` 风格的多 reaction select/pass/mandatory 语义，用于 action listener、阶段 card-effect activation 和 extra-turn provider selection。
+- `SequenceNode` / `ParallelNode` / `OrNode` / `XorNode`：组合节点，对应 参考实现 `SEQ` / `PARALLEL` / `OR` / `XOR`。`XorNode` 在玩家选择复合分支后记录 `selectedChildId`，后续 traversal 只推进该分支直到完成，避免 `xor(seq(...))` 在第一个 leaf 成功后提前结束。由 OR/XOR 分支直接选中的 leaf 把分支值记为 `selectedBranchChoice` 并写入 cursor。该 leaf 不经过自己的交互就完成时，无论立即执行、在 `before` reaction 之后执行，还是在 owner 交接之后执行，其 `immediatelyAfter` / `after` reaction 都以分支值作为 `choice`。leaf 若发出了自己的请求，仍以提交的值作为 `choice`，例如职业 reaction 读取打出的卡牌。`ParallelNode(mode='trigger-select')` 承接 参考实现 `NODE_PARALLEL` 风格的多 reaction select/pass/mandatory 语义，用于 action listener、阶段 card-effect activation 和 extra-turn provider selection。
 
 共享 runtime metadata：
 
