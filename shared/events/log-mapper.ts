@@ -147,6 +147,8 @@ const MOOR_SPECIAL_ACTION_IDS = new Set([
 ])
 
 const BUILT_IN_LEAF_ACTION_NAMES: Record<string, string> = {
+  gain: 'actions.gain.name',
+  'bonus-grain': 'actions.bonus-grain.name',
   pay: 'actions.pay.name',
   breed: 'actions.breed.name',
   improvement: 'actions.improvement.name',

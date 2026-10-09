@@ -1,5 +1,4 @@
 import { registerActionHook } from '../actions/hooks'
-import { gainResources } from '../actions/effects/gain'
 import { stablesAction } from '../actions/effects/stables'
 import { PaymentSolver } from '../actions/payment'
 import {
@@ -56,7 +55,7 @@ export const registerThroughTheSeasonsHooks = (): void => {
         if (readActionSnapshotExtraData<boolean>(context.player, SUMMER_DAY_LABORER_USED_KEY)) return
         writeActionSnapshotExtraData(context.player, SUMMER_DAY_LABORER_USED_KEY, true)
       }
-      gainResources(context.player, { grain: 1 })
+      return { flow: { type: 'leaf', actionId: 'bonus-grain' } }
     },
   })
 

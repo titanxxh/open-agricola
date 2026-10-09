@@ -528,6 +528,36 @@ describe('Through the Seasons Summer rules', () => {
     expect(resp.state.players[0]!.resources.grain).toBe(grainBefore + 1)
   })
 
+  // Variant-local fix using the existing bonus resource effect; no new rule mechanism.
+  // A fresh two-player session with fixed hands must preserve the resource event
+  // and derived log through undo/retry, not only mutate the resource total.
+  it('records Summer grain in public events and logs once per placement, including undo and retry', () => {
+    const session = setupSummer()
+    const before = { ...session.state.players[0]!.resources }
+    const grainEvents = (response: SessionResponse) => response.state.events.filter(event =>
+      event.type === 'resource.moved' && event.to.kind === 'player' &&
+      event.to.playerId === 'p1' && event.resources.grain === 1)
+    const grainLogs = (response: SessionResponse) => response.state.log.filter(entry => {
+      const detail = entry.params?.detailParts as { gains?: { grain?: number } } | undefined
+      return entry.playerId === 'p1' && detail?.gains?.grain === 1
+    })
+
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const response = session.takeAction(0, 'day-laborer')
+      expect(response.ok, response.error).toBe(true)
+      expect(response.state.players[0]!.resources).toEqual({ ...before, food: before.food + 2, grain: before.grain + 1 })
+      expect(grainEvents(response)).toHaveLength(1)
+      expect(grainLogs(response)).toHaveLength(1)
+      expect(response.interaction).toEqual(session.getState().interaction)
+      const undone = session.undoAction()
+      expect(undone.ok, undone.error).toBe(true)
+      expect(undone.state.players[0]!.resources).toEqual(before)
+      expect(grainEvents(undone)).toHaveLength(0)
+      expect(grainLogs(undone)).toHaveLength(0)
+    }
+    session.dispose()
+  })
+
   it('adds Summer Day Laborer grain only once when card gain leaves run under the space', () => {
     const session = setupSummer()
     const player = session.state.players[0]!

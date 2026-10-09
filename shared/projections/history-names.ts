@@ -20,11 +20,10 @@ export const projectHistoryLogNames = (entry: LogEntry, roles: Record<string, st
       return target
     }
     const current = parent(projected ?? entry)
-    if (!current || current[keys.at(-1)!] === names[playerId]) continue
+    if (!current || typeof current[keys.at(-1)!] !== 'string' || current[keys.at(-1)!] === names[playerId]) continue
     projected ??= JSON.parse(JSON.stringify(entry)) as LogEntry
     const target = parent(projected)!
     target[keys.at(-1)!] = names[playerId]
   }
   return projected ?? entry
 }
-
