@@ -29,6 +29,10 @@ export const takeFromCardAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
+  previewEffect: ({ params, sourceCard }) => sourceCard ? {
+    kind: 'resourceMovement', resources: positiveResources(params),
+    from: { kind: 'card', cardId: sourceCard }, to: { kind: 'player' },
+  } : undefined,
   execute: ({ player, params, sourceCard, eventSink }) => {
     if (!sourceCard) {
       return { type: 'fail', errorKey: 'log.exchangeFail' }

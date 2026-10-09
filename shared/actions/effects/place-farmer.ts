@@ -100,6 +100,10 @@ export const placeFarmerAction: ActionDefinition = {
       : context?.actionContext?.workerSource !== undefined
       ? readTemporarySupplyWorker(player, context.actionContext, context.sourceCard) !== undefined
       : smallestAvailableWorker(state, player) !== null,
+  previewEffect: ({ state, actionContext }) => {
+    const target = state.actionSpaces.find((space) => space.id === actionContext?.targetSpaceId)
+    return target ? { kind: 'actionSpace', spaceId: target.id, nameKey: target.nameKey, descriptionKey: target.descriptionKey } : undefined
+  },
   execute: ({ state, player, sourceCard, actionContext, eventSink }) => {
     // viaCardJump branch (Sprint 5 mech-A): move farmer + return flow leaf so
     // the engine runs the second placement through the standard ActionNode path.

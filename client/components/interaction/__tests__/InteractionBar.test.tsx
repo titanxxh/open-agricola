@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { fireEvent, render, screen } from '@testing-library/react'
 
-import type { AnytimeAction } from '../../../../shared/contract/types'
+import type { AnytimeAction, SessionResponse } from '../../../../shared/contract/types'
 import { getParentCardDefinition } from '../../../../shared/parents'
 import type { PendingChoice } from '../../../types/ui'
 import {
@@ -14,6 +14,7 @@ import {
   type InteractionBarPresentationInput,
 } from '../../../app/interaction-bar-presentation'
 import { InteractionBar } from '../InteractionBar'
+import { GameSession } from '../../../../server/game/authoritative-session'
 
 const noop = () => {}
 
@@ -130,6 +131,104 @@ const renderBarHtml = (
 ) => renderToStaticMarkup(buildBar(configure, actionOverrides))
 
 describe('InteractionBar', () => {
+  it.each(['zh', 'en'] as const)('renders real Peat Sled choices with fuel and distinct rounds in %s', (locale) => {
+    const session = new GameSession(409, undefined, { playerCount: 2, enableFarmersOfTheMoor: true, allowIncompleteFarmersOfTheMoorMinorDeal: true })
+    session.state.round = 4
+    for (const player of session.state.players) {
+      player.minorHand = ['__test_placeholder__']
+      player.occupationHand = ['__test_placeholder__']
+      player.resources.wood = 20
+      player.farmTerrain = []
+    }
+    session.state.players[0]!.minorHand.push('M079_PeatSled')
+    let response = session.takeAction(0, 'meeting-place')
+    for (let step = 0; step < 8 && !response.state.players[0]!.minorPlayed.includes('M079_PeatSled'); step += 1) {
+      if (response.interaction.stateId !== 'wait') throw new Error('Expected purchase interaction')
+      const options = response.interaction.request.options ?? []
+      const option = options.find((candidate) => candidate.value === 'M079_PeatSled')
+        ?? options.find((candidate) => candidate.value.startsWith('action-improvement-'))
+        ?? (response.interaction.promptKey === 'prompt.selectPayment' ? options[0] : undefined)
+      if (!option) throw new Error('Expected card purchase option')
+      response = session.resolveChoice(0, option.value)
+    }
+    if (response.interaction.stateId !== 'wait') throw new Error('Expected Peat Sled options')
+    const html = renderBarHtml((input) => {
+      input.locale = locale
+      input.pending.choice = {
+        ...pendingChoice,
+        promptKey: response.interaction.stateId === 'wait' ? response.interaction.promptKey : undefined,
+        options: response.interaction.stateId === 'wait' ? response.interaction.request.options! : [],
+      }
+    })
+    expect(html).toContain('data-resource="fuel"')
+    expect(html).toContain('data-amount="6"')
+    expect(html).toContain(locale === 'en' ? 'Round 6:' : '第 6 回合：')
+    expect(html).toContain(locale === 'en' ? 'Round 14:' : '第 14 回合：')
+    expect(html).not.toContain(locale === 'en' ? 'Future Resources' : '未来资源')
+  })
+  it.each(['zh', 'en'] as const)('renders real payment outcomes, target names, action spaces and source scores in %s', (locale) => {
+    const make = (card: string, moor = false) => {
+      const session = new GameSession(409, undefined, { playerCount: 4, enableFarmersOfTheMoor: moor, allowIncompleteFarmersOfTheMoorMinorDeal: moor })
+      session.state.round = 5
+      for (const player of session.state.players) {
+        player.minorHand = ['__test_placeholder__']
+        player.occupationHand = ['__test_placeholder__']
+        player.resources = { ...player.resources, food: 20, wood: 20, clay: 20, reed: 20, stone: 20, grain: 1, fuel: 20 }
+        player.farmTerrain = []
+      }
+      session.state.players[0]!.minorHand.push(card)
+      return session
+    }
+    const options = (response: SessionResponse) => {
+      if (response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'choice') throw new Error('Expected real choice')
+      return response.interaction.request.options
+    }
+    const html = (response: SessionResponse) => renderBarHtml((input) => {
+      input.locale = locale
+      input.pending.choice = { ...pendingChoice, options: options(response) }
+    })
+    const pay = (session: GameSession, card: string) => {
+      let response = session.takeAction(0, 'meeting-place')
+      for (let i = 0; i < 8; i += 1) {
+        if (response.interaction.stateId === 'wait' && response.interaction.promptKey === 'prompt.selectPayment') return response
+        const choice = options(response).find((option) => option.value === card || option.value.startsWith('action-improvement-'))
+        if (!choice) throw new Error('Missing purchase choice')
+        response = session.resolveChoice(0, choice.value)
+      }
+      throw new Error('Missing payment')
+    }
+    const depot = make('B065_GrainDepot')
+    const depotHtml = html(pay(depot, 'B065_GrainDepot'))
+    expect(depotHtml).toContain('data-resource="grain"')
+    expect(depotHtml).toContain(locale === 'en' ? 'Rounds 6–9' : '第 6–9 回合')
+    const sack = make('C040_CanvasSack')
+    const sackHtml = html(pay(sack, 'C040_CanvasSack'))
+    expect(sackHtml).toContain('data-resource="vegetable"')
+    expect(sackHtml).toContain('data-amount="4"')
+    const artist = make('B152_JuniorArtist')
+    artist.state.players[0]!.occupationPlayed = ['B152_JuniorArtist']
+    artist.state.players[0]!.occupationHand = ['A116_WoodCutter']
+    const triggered = artist.takeAction(0, 'day-laborer')
+    const artistHtml = html(artist.resolveChoice(0, options(triggered).find((option) => option.value !== '__skip__')!.value))
+    expect(artistHtml).toContain(locale === 'en' ? 'Traveling Players' : '流浪艺人')
+    expect(artistHtml).toContain('interaction-option-subtitle')
+    expect(artistHtml).not.toContain('Place Farmer')
+    const illusionist = make('B146_Illusionist')
+    illusionist.state.players[0]!.occupationPlayed = ['B146_Illusionist']
+    illusionist.state.players[0]!.minorHand = ['A019_Handplow']
+    illusionist.state.players[0]!.occupationHand = ['A116_WoodCutter']
+    const trigger = illusionist.takeAction(0, 'forest')
+    const handHtml = html(illusionist.resolveChoice(0, options(trigger).find((option) => option.value !== '__skip__')!.value))
+    expect(handHtml).toContain(locale === 'en' ? 'Handplow' : '手犁')
+    expect(handHtml).toContain(locale === 'en' ? 'Wood Cutter' : '樵夫')
+    expect(handHtml).not.toContain('minorImprovements.')
+    const rod = make('E038_RodCollection')
+    rod.state.players[0]!.minorPlayed = ['E038_RodCollection']
+    rod.state.players[0]!.occupationPlayed = ['__a__', '__b__', '__c__']
+    const scoreHtml = html(rod.takeAction(0, 'fishing'))
+    expect(scoreHtml).toContain(locale === 'en' ? 'contribution: +1 points' : '计分变化：+1 分')
+    expect(scoreHtml).not.toContain('Increment Extra Data')
+  })
   const configureMultiSelect = (input: InteractionBarPresentationInput, maxSelections = 2) => {
     input.pending.choice = {
       ...pendingChoice,

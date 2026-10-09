@@ -1,3 +1,4 @@
+import { applyCardStorageOperation, previewCardStorageOperation, readCardStorageOperation } from '../card-storage'
 import type {
   ActionDefinition,
   ActionFlow,
@@ -18,7 +19,7 @@ import {
   writePrivateCardData,
   popFromCardStack,
 } from '../../cards/helpers/card-state'
-import { incCounter, initCardState } from '../../cards/__stubs__/helpers'
+import { initCardState } from '../../cards/__stubs__/helpers'
 import {
   fieldFindStackOfKind,
   fieldHasCrop,
@@ -203,6 +204,10 @@ export const specialEffectAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
+  previewEffect: ({ state, player, sourceCard, params, actionContext }) => {
+    const operation = readCardStorageOperation(params)
+    return sourceCard && operation ? previewCardStorageOperation(state, resolveTargetPlayer(state, player, actionContext), sourceCard, operation) : undefined
+  },
   execute: ({ state, player, sourceCard, params, actionContext, eventSink }) => {
     if (!sourceCard) return { type: 'fail', errorKey: 'log.specialEffectFail' }
     const p = params as SpecialEffectParams | undefined
@@ -211,15 +216,11 @@ export const specialEffectAction: ActionDefinition = {
     }
     const target = resolveTargetPlayer(state, player, actionContext)
     switch (p.kind) {
-      case 'increment-extra-data': {
-        const current = readCardExtraData<number>(target, sourceCard, p.key) ?? 0
-        const next = current + p.amount
-        writeCardExtraData(target, sourceCard, p.key, next)
-        emitCardStateChanged(eventSink, sourceCard, target, p.key)
-        return { type: 'ok' }
-      }
+      case 'increment-extra-data':
       case 'set-extra-data':
-        writeCardExtraData(target, sourceCard, p.key, p.value)
+      case 'increment-counter':
+      case 'set-counter':
+        applyCardStorageOperation(target, sourceCard, p)
         emitCardStateChanged(eventSink, sourceCard, target, p.key)
         return { type: 'ok' }
       case 'set-private-data':
@@ -262,18 +263,6 @@ export const specialEffectAction: ActionDefinition = {
           ...(typeof p.optional === 'boolean' ? { optional: p.optional } : {}),
         })
         return { type: 'ok' }
-      case 'increment-counter': {
-        incCounter(target, sourceCard, p.key, p.amount)
-        emitCardStateChanged(eventSink, sourceCard, target, p.key)
-        return { type: 'ok' }
-      }
-      case 'set-counter': {
-        const counters = initCardState(target, sourceCard)
-        const next = Math.max(0, p.value)
-        counters[p.key] = next
-        emitCardStateChanged(eventSink, sourceCard, target, p.key)
-        return { type: 'ok' }
-      }
       case 'pop-card-stack-top': {
         const popped = popFromCardStack(target, sourceCard)
         const resources = stackResource(popped)

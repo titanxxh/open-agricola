@@ -1,4 +1,5 @@
 import type { ActionFlow, FarmTilePosition, GameState, InteractionRequest, Pasture, PaymentResourceMap, PlayerState, ProtectedObservation, Resource, ResourceKey } from '../contract/types'
+import type { PurchaseOutcomeRule } from '../contract/rule-plans'
 import type { PrivateGameEvent } from '../contract/private-events'
 import type { CardRuleContributions, CardStatePresentation } from '../contract/card-state'
 import type { AnimalZone, PlayerScoreSummary, ScoreCategoryResult } from '../domain'
@@ -188,12 +189,12 @@ type FlowEffectHandlerWithContext = (
   player: PlayerState,
   ctx?: FlowEffectContext,
 ) => ActionFlow | void
-type FlowEffectHandlerWithPayment = (
+type FlowEffectHandlerWithPayment = ((
   state: GameState,
   player: PlayerState,
   paymentInfo?: PaymentInfo,
   ctx?: FlowEffectContext,
-) => ActionFlow | void
+) => ActionFlow | void) & { readonly paymentPaths?: readonly PurchaseOutcomeRule[] }
 export type BeforeEndGameScope = 'owner' | 'allPlayers'
 
 export type ResolveChoiceHandler = (

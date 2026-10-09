@@ -1,5 +1,5 @@
 import { defineMinorCard } from '../card-source'
-import { gainLeaf } from '../helpers/pay-gain-node'
+import { paymentPathOnBuy } from '../../actions/purchase-outcome'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C040_CanvasSack'
@@ -7,11 +7,7 @@ const CARD_ID = 'C040_CanvasSack'
 const cardImpl = {
   effect: {
   id: CARD_ID,
-  onBuy: (_state, _player, paymentInfo) => {
-    const pathIndex = paymentInfo?.originalFeeIndex ?? paymentInfo?.feeIndex
-    if (pathIndex === 0) return gainLeaf(CARD_ID, { vegetable: 1 })
-    if (pathIndex === 1) return gainLeaf(CARD_ID, { wood: 4 })
-  },
+  onBuy: paymentPathOnBuy(CARD_ID, [{ kind: 'gain', resources: { vegetable: 1 } }, { kind: 'gain', resources: { wood: 4 } }]),
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl

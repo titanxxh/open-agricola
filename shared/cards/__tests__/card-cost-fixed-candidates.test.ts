@@ -411,13 +411,10 @@ describe('fixed card-purchase cost candidates', () => {
     const result = playImprovement(state, player, free!.value, 'any')
 
     expect(result.type).toBe('flow')
-    expect(state.pendingFutureMeeples).toEqual([
-      expect.objectContaining({
-        cardId: 'B065_GrainDepot',
-        count: 3,
-        resources: { grain: 1 },
-      }),
-    ])
+    expect(result).toMatchObject({ type: 'flow', flow: { actionId: 'future-meeples', params: { __futureMeepleRequest: {
+      cardId: 'B065_GrainDepot', count: 3, resources: { grain: 1 },
+    } } } })
+    expect(state.pendingFutureMeeples).toEqual([])
   })
 
   // ADR 0004 closure property on production impls: A27 (mandatory fixed

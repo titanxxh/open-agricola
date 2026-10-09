@@ -744,7 +744,28 @@ export type ActionCostPreview = {
   getBaseCost: (context: ActionAvailabilityContext) => Partial<Resource>
 }
 
+export type ChoiceResourceLocation =
+  | { kind: 'player' }
+  | { kind: 'card'; cardId: string }
+  | { kind: 'actionSpace'; spaceId: string; nameKey: string }
+
 export type ChoiceEffectPreview =
+  | { kind: 'fieldContents'; resources: Partial<Resource>; sourceCard?: string }
+  | { kind: 'cardScore'; cardId: string; delta: number }
+  | { kind: 'actionSpace'; spaceId: string; nameKey: string; descriptionKey: string }
+  | { kind: 'futureOffers'; entries: { round: number; resources: Partial<Resource>; resourcesPaid: Partial<Resource>; actionNameKey?: string }[] }
+  | { kind: 'resourceMovement'; resources: Partial<Resource>; from: ChoiceResourceLocation; to: ChoiceResourceLocation }
+  | {
+      kind: 'futureSchedule'
+      entries: {
+        round: number
+        endRound?: number
+        resources: Partial<Resource>
+        actions?: { kind: 'field' | 'stable' | 'forest' | 'moor'; amount: number; resourcesPaid?: Partial<Resource> }[]
+        resourceCondition?: { kind: 'min-resource'; resource: keyof Resource; amount: number }
+        roomType?: FutureMeepleRoomType
+      }[]
+    }
   | {
       kind: 'resourceExchange'
       resourcesPaid?: PaymentResourceMap
@@ -766,6 +787,7 @@ export type ChoiceEffectPreview =
 export type ChoiceDescriptionPreview =
   | {
       kind: 'action'
+      showLabel?: boolean
       labelKey: string
       labelParams?: Record<string, unknown>
       effectPreview?: ChoiceEffectPreview
@@ -776,6 +798,11 @@ export type ChoiceDescriptionPreview =
       parts: ChoiceDescriptionPreview[]
     }
 
+export type ChoiceFarmPosition = FarmTilePosition & { sourceCard?: string; cardFieldSlot?: number }
+export type ChoiceFarmTarget =
+  | { kind: 'farm-cell'; playerId: string; positions: ChoiceFarmPosition[] }
+  | { kind: 'logical-field'; playerId: string; fieldId: string; positions: ChoiceFarmPosition[]; resources: Partial<Resource> }
+
 export type ActionChoiceOption = {
   value: string
   labelKey: string
@@ -783,6 +810,9 @@ export type ActionChoiceOption = {
   sourceCard?: string
   effectPreview?: ChoiceEffectPreview
   descriptionPreview?: ChoiceDescriptionPreview
+  /** Legal displayed targets bound to this opaque choice, declared by the backend. */
+  target?: ChoiceFarmTarget
+  targetCard?: { cardId: string; actionNameKeys: string[] }
   /** When true, UI greys out the option and server rejects attempts to pick it. */
   disabled?: boolean
   /** i18n key shown as tooltip explaining why the option is disabled. */
@@ -897,6 +927,8 @@ export type ActionDefinition = {
     context: ActionExecutionContext & { transactionEvents: readonly GameEvent[] },
   ) => boolean
   costPreview?: ActionCostPreview
+  /** Pure description of this shared primitive, derived from its executable rule parameters. */
+  previewEffect?: (context: ActionExecutionContext) => ChoiceEffectPreview | undefined
   execute: (context: ActionMutationContext) => ActionExecutionResult
   resolveChoice?: (
     context: ActionMutationContext,

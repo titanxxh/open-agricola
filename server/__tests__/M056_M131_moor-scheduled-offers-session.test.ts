@@ -142,9 +142,12 @@ const chooseM131Animals = (
   expect(response.interaction.stateId).toBe('wait')
   if (response.interaction.stateId !== 'wait') return response
   expect(response.interaction.sourceCard).toBe(M131)
-  const option = response.interaction.request.options?.find((entry) =>
-    entry.value === `animals:${animals.join(',')}`
-  )
+  const option = response.interaction.request.options?.find((entry) => {
+    const preview = entry.descriptionPreview
+    const effect = preview?.kind === 'action' ? preview.effectPreview : undefined
+    return effect?.kind === 'futureOffers' && effect.entries.length === animals.length &&
+      animals.every((animal, index) => effect.entries[index]?.resources[animal] === 1)
+  })
   expect(option).toBeDefined()
   const resp = session.resolveChoice(0, option!.value)
   expect(resp.ok).toBe(true)

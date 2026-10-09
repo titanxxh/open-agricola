@@ -143,7 +143,9 @@ const shouldTrackSourceCardPaymentStats = (p: PayParams): boolean =>
 const buildPaymentCtx = (
   p: PayParams,
   paymentChoice = p.paymentChoice,
+  sourceCard?: string,
 ): PaymentCtx => ({
+  ...((p.costType === 'minor-improvement' || p.costType === 'major-improvement') && sourceCard ? { sourceCard } : {}),
   actionId: 'pay',
   costType: p.costType ?? 'none',
   playedCards: p.playedCards,
@@ -299,7 +301,7 @@ export const payAction: ActionDefinition = {
       effectiveState,
       effectiveIndex,
       p.cost,
-      buildPaymentCtx(p),
+      buildPaymentCtx(p, undefined, sourceCard),
     )
     if (resolved.type === 'request') return resolved.request
     if (resolved.type === 'failed') return { type: 'fail', errorKey: 'log.payFail' }
@@ -347,7 +349,7 @@ export const payAction: ActionDefinition = {
         effectiveState,
         effectiveIndex,
         p.cost,
-        buildPaymentCtx(p, choice),
+        buildPaymentCtx(p, choice, sourceCard),
       )
       if (resolved.type === 'request') return resolved.request
       if (resolved.type === 'failed') return { type: 'fail', errorKey: 'log.payFail' }
@@ -389,7 +391,7 @@ export const payAction: ActionDefinition = {
       effectiveState,
       effectiveIndex,
       p.cost,
-      buildPaymentCtx(p, choice),
+      buildPaymentCtx(p, choice, sourceCard),
     )
     if (resolved.type === 'request') return resolved.request
     if (resolved.type === 'failed') return { type: 'fail', errorKey: 'log.payFail' }

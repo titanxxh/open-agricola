@@ -85,7 +85,7 @@ describe('Moor scheduled and counter clause audit', () => {
     expect(session.takeAction(0, 'major-improvement').ok).toBe(true)
     let response = session.resolveChoice(0, 'M131_CattleStall')
     expect(response.ok, response.error).toBe(true)
-    if (round === 11) response = session.resolveChoice(0, 'animals:sheep,boar,cattle,horse')
+    if (round === 11) response = session.resolveChoice(0, response.interaction.request.options[0]!.value)
     expect(response.ok, response.error).toBe(true)
     const offers = response.state.players[0]!.cardStates.M131_CattleStall?.extraData?.scheduledOffers ?? []
     expect(offers).toEqual(round === 11 ? [expect.objectContaining({ dueRound: 13, animal: 'sheep' })] : [])
@@ -123,7 +123,7 @@ describe('Moor scheduled and counter clause audit', () => {
     let response = session.resolveChoice(0, 'M131_CattleStall')
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources).toMatchObject({ wood: 18, clay: 18 })
-    response = session.resolveChoice(0, 'animals:sheep,boar,cattle,horse')
+    response = session.resolveChoice(0, response.interaction.request.options[0]!.value)
     expect(response.ok, response.error).toBe(true)
     const animals = ['sheep', 'boar', 'cattle', 'horse'] as const
     for (const [index, animal] of animals.entries()) {

@@ -1,3 +1,4 @@
+import { getCardEffect } from '../../cards/card-effects'
 import type { GameState } from '../../contract/types'
 import type {
   Cost,
@@ -177,6 +178,7 @@ const resolvePayment = (
   const { cost: effectiveCost, options } = computeLifecycleOptions(state, idx, cost, ctx)
   const paymentResourceProviders = solutionPaymentResourceProviders(effectiveCost, ctx)
   const optionPrefix = ctx.optionPrefix ?? 'pay:generic'
+  const paymentPaths = ctx.sourceCard ? getCardEffect(ctx.sourceCard)?.onBuy?.paymentPaths : undefined
   const selection = resolvePaymentSolutionSelection(
     options,
     normalizePaymentChoiceValue(ctx.paymentChoice, optionPrefix),
@@ -190,6 +192,9 @@ const resolvePayment = (
           solution,
         )?.sources ?? [],
       paymentResourceProviders,
+      ...(ctx.sourceCard && paymentPaths ? {
+        purchaseOutcome: { state, player, cardId: ctx.sourceCard, paymentPaths, metadata: ctx.candidateMetadataByFeeIndex },
+      } : {}),
     },
   )
   if (selection.type === 'request') {

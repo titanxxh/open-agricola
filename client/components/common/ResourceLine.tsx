@@ -1,7 +1,7 @@
 import type { Locale } from '../../../shared/i18n'
 import type { PaymentResourceKey, PaymentResourceMap } from '../../../shared/contract/types'
 import { PAYMENT_RESOURCE_KEYS, isCardProvidedPaymentResourceKey } from '../../../shared/contract/resource-keys'
-import { resourceKeyList } from '../../../shared/contract/state-constants'
+import { extendedResourceKeyList } from '../../../shared/contract/state-constants'
 
 type ResourceLineMode = 'inventory' | 'payment'
 
@@ -48,7 +48,7 @@ export const ResourceLine = ({
   emptyLabel,
   className,
 }: Props) => {
-  const keys = mode === 'payment' ? paymentResourceKeys(resources) : resourceKeyList
+  const keys = mode === 'payment' ? paymentResourceKeys(resources) : extendedResourceKeyList
   const items: Array<{ key: PaymentResourceKey | 'bonusVp'; amount: number }> = keys
     .map((key) => ({ key, amount: resources[key] ?? 0 }))
     .filter(({ amount }) => !hideZero || amount > 0)

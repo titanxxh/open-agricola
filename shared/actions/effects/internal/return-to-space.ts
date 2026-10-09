@@ -16,6 +16,17 @@ export const returnToSpaceAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
+  previewEffect: ({ state, space, params, actionContext }) => {
+    const target = typeof actionContext?.targetSpaceId === 'string'
+      ? state.actionSpaces.find((entry) => entry.id === actionContext.targetSpaceId) : space
+    if (!target) return undefined
+    return {
+      kind: 'resourceMovement',
+      resources: Object.fromEntries(Object.entries(params ?? {}).filter(([, value]) => typeof value === 'number' && value > 0)),
+      from: { kind: 'player' },
+      to: { kind: 'actionSpace', spaceId: target.id, nameKey: target.nameKey },
+    }
+  },
   costPreview: {
     getBaseCost: ({ params }) => params ?? {},
   },
