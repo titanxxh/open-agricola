@@ -253,7 +253,7 @@ const CARD_IMPL = {
 
 #### listener 机制（`CARD_IMPL.listeners`）
 
-监听行动触发：可用 `phases` 包括 `before`、`during`、`immediatelyAfter`、`after`、`computeCosts`、`computeArgs`、`computeReplace`、`isDoable`、`anytime`、`computeChoiceCandidates`。
+监听行动触发：可用 `phases` 包括 `before`、`immediatelyAfter`、`after`、`computeCosts`、`computeArgs`、`computeReplace`、`isDoable`、`anytime`、`computeChoiceCandidates`。权威白名单见 `shared/custom-code/sandbox-listener-phases.ts`；新源码和已保存的可执行 manifest 均须使用支持的阶段。
 
 可用 `scope`：`player`、`opponent`、`any`；权威白名单见 `shared/custom-code/sandbox-listener-scopes.ts`。
 
