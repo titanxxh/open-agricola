@@ -63,7 +63,7 @@ describe('B65 Grain Depot', () => {
     expect(resp.interaction.request.options?.length).toBeGreaterThan(1)
 
     const clayPayment = resp.interaction.request.options?.find((o) =>
-      o.value === `pay:improvement:minor:${CARD_ID}:1`,
+      o.value.startsWith(`pay:improvement:minor:${CARD_ID}:1~`),
     )
     expect(clayPayment).toBeDefined()
 

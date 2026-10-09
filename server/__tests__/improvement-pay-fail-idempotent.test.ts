@@ -91,7 +91,7 @@ describe('improvement: pay fail idempotent', () => {
     }
     expect(resp.interaction.promptKey).toBe('prompt.selectPayment')
 
-    const payOption = resp.interaction.request.options?.find((o) => o.value === 'pay:improvement:minor:B065_GrainDepot:1')
+    const payOption = resp.interaction.request.options?.find((o) => o.value.startsWith('pay:improvement:minor:B065_GrainDepot:1~'))
     expect(payOption).toBeDefined()
     liveState.players[0]!.resources = {
       ...liveState.players[0]!.resources,

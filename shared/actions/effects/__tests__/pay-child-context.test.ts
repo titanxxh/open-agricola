@@ -121,6 +121,14 @@ const runUntilDone = (
   return step
 }
 
+/** The issued payment option at `base` (`<prefix>:<index>`), including its identity suffix. */
+const issuedPaymentValue = (engine: { peekPendingEnvelope: () => { request: { kind: string; options?: Array<{ value: string }> } } | null }, base: string) => {
+  const request = engine.peekPendingEnvelope()?.request
+  const option = request?.kind === 'choice' ? request.options?.find((entry) => entry.value.startsWith(`${base}~`)) : undefined
+  if (!option) throw new Error(`missing issued payment option ${base}`)
+  return option.value
+}
+
 describe('pay child context', () => {
   beforeEach(() => {
     const registry = new CardRegistry()
@@ -173,7 +181,7 @@ describe('pay child context', () => {
       internalResultKey: 'payment',
     })
 
-    const resolved = engine.resolveChoice('pay:test:b65:1', { state, player, space })
+    const resolved = engine.resolveChoice(issuedPaymentValue(engine, 'pay:test:b65:1'), { state, player, space })
     expect(resolved.type).toBe('ok')
     const finalStep = runUntilDone(engine, { state, player, space })
 
@@ -214,7 +222,7 @@ describe('pay child context', () => {
       pendingActionId: 'pay',
     })
 
-    const paymentResolved = engine.resolveChoice(`pay:improvement:minor:${CARD_ID}:1`, { state, player, space })
+    const paymentResolved = engine.resolveChoice(issuedPaymentValue(engine, `pay:improvement:minor:${CARD_ID}:1`), { state, player, space })
     expect(paymentResolved.type).toBe('ok')
     const finalStep = runUntilDone(engine, { state, player, space })
 
