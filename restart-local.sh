@@ -417,6 +417,10 @@ start_and_wait() {
         # Its process group is shared with our shell, so check ancestry instead.
         if [ "$listener" = "$pid" ] || { [ "$detached" -eq 1 ] && [ "$listener_pgid" = "$pid" ]; } ||
           { [ "$detached" -eq 0 ] && is_descendant_of "$listener" "$pid"; }; then
+          if [ "$detached" -eq 0 ] && [ "$listener" != "$pid" ]; then
+            # Killing a launcher alone can orphan its listener after a later failure.
+            STARTED_PROCESS_TARGETS+=("$listener")
+          fi
           return 0
         fi
       done < <(list_listening_pids "$port")
