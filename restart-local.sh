@@ -246,6 +246,17 @@ wait_for_port_state() {
   return 1
 }
 
+is_descendant_of() {
+  local pid="$1"
+  local ancestor="$2"
+
+  while [[ "$pid" =~ ^[0-9]+$ ]] && [ "$pid" -gt 1 ]; do
+    [ "$pid" = "$ancestor" ] && return 0
+    pid="$(ps -o ppid= -p "$pid" 2>/dev/null | tr -d ' ')" || return 1
+  done
+  return 1
+}
+
 process_target_for_pid() {
   local pid="$1"
   local pgid=""
@@ -402,7 +413,10 @@ start_and_wait() {
       local listener listener_pgid
       while IFS= read -r listener; do
         listener_pgid="$(ps -o pgid= -p "$listener" 2>/dev/null | tr -d ' ')"
-        if [ "$listener" = "$pid" ] || { [ "$detached" -eq 1 ] && [ "$listener_pgid" = "$pid" ]; }; then
+        # Without setsid (macOS), tsx's listener is a child of the launcher.
+        # Its process group is shared with our shell, so check ancestry instead.
+        if [ "$listener" = "$pid" ] || { [ "$detached" -eq 1 ] && [ "$listener_pgid" = "$pid" ]; } ||
+          { [ "$detached" -eq 0 ] && is_descendant_of "$listener" "$pid"; }; then
           return 0
         fi
       done < <(list_listening_pids "$port")
