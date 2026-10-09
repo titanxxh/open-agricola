@@ -362,7 +362,7 @@ export function validateCustomEffectResult(value: unknown, cardId: string, hook:
       }
       if (zone.requiredEmptyZoneGroupIds !== undefined) stringArray(zone.requiredEmptyZoneGroupIds, 'Empty zone groups')
       if (zone.displayOwnerName !== undefined && typeof zone.displayOwnerName !== 'string') throw new Error('Display owner name must be a string')
-      if (zone.displaySource !== undefined && !['played-card', 'farm-position', 'borrowed-played-card'].includes(String(zone.displaySource))) throw new Error('Unsupported zone display source')
+      if (zone.displaySource !== undefined && (typeof zone.displaySource !== 'string' || !['played-card', 'farm-position', 'borrowed-played-card'].includes(zone.displaySource))) throw new Error('Unsupported zone display source')
       if (zone.capacityCounterKey !== undefined && (typeof zone.capacityCounterKey !== 'string' || !zone.capacityCounterKey || ['__proto__', 'constructor', 'prototype'].includes(zone.capacityCounterKey))) throw new Error('Invalid zone capacity counter key')
       if (zone.farmPosition !== undefined) {
         assertRecord(zone.farmPosition, 'Zone farm position'); assertKeys(zone.farmPosition, ['row', 'col'], 'Zone farm position')

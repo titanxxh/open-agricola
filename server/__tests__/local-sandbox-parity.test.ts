@@ -289,6 +289,7 @@ describe('shared Workshop capability admission', () => {
 
   it.each([
     ['nested internal action', {type:'seq',children:[{type:'leaf',actionId:'place-farmer'}]}, 'Unsupported Workshop action'],
+    ['misplaced purchase context', {type:'leaf',actionId:'improvement',params:{types:['major'],actionContext:{minimumResourcesPaid:{clay:1}}}}, 'unsupported field'],
     ['lifecycle mutation', {type:'leaf',actionId:'special-effect',params:{kind:'clear-round-flags'}}, 'Unsupported special-effect kind'],
     ['foreign local source', {type:'leaf',actionId:'special-effect',sourceCard:'CUSTOM_Other',params:{kind:'set-counter',key:'x',value:1}}, 'impersonate'],
     ['native stable mutation', {type:'leaf',actionId:'stables',actionContext:{farmHand:true}}, 'unsupported field'],
@@ -342,7 +343,7 @@ describe('shared Workshop capability admission', () => {
   it.each([
     {requiredEmptyZoneGroupIds:{}}, {allowedAnimalTypes:{}}, {animalCounts:{food:1}},
     {blocked:'yes'}, {exclusiveCardZoneLimit:'one'}, {farmPosition:{row:'0',col:1}},
-    {capacityCounterKey:'__proto__'}, {displayOwnerName:[]}, {displaySource:'unknown'},
+    {capacityCounterKey:'__proto__'}, {displayOwnerName:[]}, {displaySource:'unknown'}, {displaySource:['farm-position']},
   ])('rejects malformed optional animal-zone data on both adapters', fields=>{
     const zone={id:'shared',zoneType:'card',capacity:1,...fields}
     const source=`const CARD_ID='CUSTOM_ParityCard';const CARD_IMPL={effect:{onComputeSharedAnimalZones:()=>[${JSON.stringify(zone)}]}}`
