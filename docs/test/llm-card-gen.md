@@ -86,8 +86,9 @@ interface CardFixture {
 
 `buildSessionWithLLMCard(code, opts)` 内部自动：
 
-- `clearAllHands(state)` —— 不随机发牌
+- 使用固定 seed 创建 Session，`clearAllHands(state)` 将无关手牌替换为占位符
 - `fixRoundActionOrder(state)` —— 14 回合行动卡按 `FIXED_ROUND_ACTION_ORDER`（每 stage 按 `roundStageActions` 声明序取）
+- 显式设置工作阶段并 `loadState(state)`，清除准备测试局面之前产生的开局等待交互；占位手牌不会触发重新发牌
 - Wrap session in Proxy，每次方法调用自动走 `session.withCtx(...)`
 
 所以 fixture 不用自己 `withCtx`、也不用担心 seed 影响初始局面。

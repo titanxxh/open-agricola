@@ -196,16 +196,18 @@ export function buildSessionWithLLMCard(llmCode: string, opts: BuildOpts): Build
     cardPrerequisite: opts.cardPrerequisite,
     historicalRecording: opts.historicalRecording,
   })
-  const rawSession = new GameSession(undefined, [compiled.cardData], {
+  const rawSession = new GameSession(42, [compiled.cardData], {
     playerCount: opts.playerCount ?? 2,
   })
   // Force determinism on every fixture's session.
-  // getState().state returns the live this.state reference — mutating it
-  // mutates the session directly. Do NOT call loadState here: normalizeState
-  // re-deals hands when any minorHand/occupationHand is empty.
+  // These scenarios start in work with explicit hands. Clear any constructor
+  // setup interaction before returning the prepared fixture; placeholders keep
+  // normalizeState from re-dealing unrelated cards.
   const state = rawSession.getState().state
   clearAllHands(state)
   fixRoundActionOrder(state)
+  state.roundPhase = 'work'
+  rawSession.loadState(state)
   const session = wrapSessionWithCtx(rawSession)
   return { session, cardData: compiled.cardData, manifest: compiled.manifest }
 }
