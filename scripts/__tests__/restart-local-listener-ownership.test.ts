@@ -20,7 +20,13 @@ afterEach(() => {
 })
 
 describe('restart-local listener ownership without setsid', () => {
-  it.each(['child', 'grandchild', 'unrelated'] as const)('checks a real %s listener in the launcher process group', async (mode) => {
+  it.each([
+    { mode: 'child', failAfterStart: false },
+    { mode: 'grandchild', failAfterStart: false },
+    { mode: 'unrelated', failAfterStart: false },
+    { mode: 'child', failAfterStart: true },
+    { mode: 'grandchild', failAfterStart: true },
+  ])('checks a real $mode listener (later startup failure: $failAfterStart)', async ({ mode, failAfterStart }) => {
     const root = mkdtempSync(join(tmpdir(), 'oa-listener-'))
     roots.push(root)
     const reservation = createServer().listen(0, '127.0.0.1')
@@ -47,6 +53,7 @@ describe('restart-local listener ownership without setsid', () => {
       set -euo pipefail
       ${helpers}
       ${startup}
+      if [ "$TEST_FAIL_AFTER_START" = 1 ]; then trap cleanup_failed_start EXIT; fi
       # Only port discovery is stubbed; readiness and process ancestry are real.
       lsof() {
         [ "$*" = "-tiTCP:$TEST_PORT -sTCP:LISTEN" ] || return 1
@@ -63,12 +70,13 @@ describe('restart-local listener ownership without setsid', () => {
       mode="$TEST_MODE"
       if [ "$mode" = unrelated ]; then mode=idle; fi
       start_and_wait backend "$TEST_PORT" backend.log "$TEST_NODE" wrapper.cjs "$mode"
+      if [ "$TEST_FAIL_AFTER_START" = 1 ]; then exit 23; fi
     `
     const child = spawn('bash', ['-c', shell], {
       cwd: root,
-      env: { ...process.env, TEST_NODE: process.execPath, TEST_MODE: mode, TEST_PORT: String(address.port) },
+      env: { ...process.env, TEST_NODE: process.execPath, TEST_MODE: mode, TEST_PORT: String(address.port), TEST_FAIL_AFTER_START: failAfterStart ? '1' : '0' },
       detached: true,
-      timeout: 10000,
+      timeout: 15000,
     })
     if (child.pid) groups.push(child.pid)
     let output = ''
@@ -78,7 +86,17 @@ describe('restart-local listener ownership without setsid', () => {
       child.on('error', reject)
       child.on('close', resolve)
     })
-    expect(status, output).toBe(mode === 'unrelated' ? 1 : 0)
+    expect(status, output).toBe(failAfterStart ? 23 : mode === 'unrelated' ? 1 : 0)
     if (mode === 'unrelated') expect(output).toContain('another process acquired backend port')
-  })
+    if (failAfterStart) {
+      expect(output).toContain('Cleaning up processes from failed startup')
+      const probe = createServer()
+      try {
+        probe.listen(address.port, '127.0.0.1')
+        await once(probe, 'listening')
+      } finally {
+        probe.close()
+      }
+    }
+  }, 20000)
 })
