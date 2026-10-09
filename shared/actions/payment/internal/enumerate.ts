@@ -45,9 +45,9 @@ import {
   applyCostModifiers,
   evaluateConditions,
   getModifiersForCostType,
-  validateBonus,
   validateComplexCost,
 } from './cost-modifiers'
+import { validateBonus } from '../declaration-validation'
 import { closeCandidates, type CandidateTransform } from './candidate-closure'
 import type { InternalSolution } from './types'
 

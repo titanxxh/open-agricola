@@ -369,6 +369,13 @@ describe('Workshop stage and animal settlement',()=>{
 
 describe('Workshop declarative metadata settlement',()=>{
   it.each([
+    [{cost:{fee:{wood:2},bonuses:[{}]}},'exactly one'],
+    [{cost:{fee:{wood:2},bonuses:[{discount:{wood:1},choices:[]}]}},'exactly one'],
+    [{cost:{fee:{wood:2},bonuses:[{choices:[]}]}},'non-empty'],
+    [{modifier:{type:'trade',cardId:CARD,appliesTo:['stables'],from:{food:1},to:{wood:1},groupId:'g'}},'set together'],
+    [{modifier:{type:'trade',cardId:CARD,appliesTo:['stables'],from:{food:1},to:{wood:1},scope:'unit',conditions:{minNumRooms:2}}},'MUST NOT'],
+    [{occupationPrerequisites:{min:'2'}},'Prerequisite'],
+    [{improvementPrerequisites:{min:2,max:1}},'cannot exceed'],
     [{modifiers:[{type:'remove-resource',cardId:CARD,appliesTo:['stables']}]},'Removed cost resources'],
     [{altCosts:[{fee:{wood:2}}]},'Unsupported resource'],
     [{returnCards:'Major_Fireplace1'},'returnCards'],
@@ -434,5 +441,113 @@ describe('Workshop declarative metadata settlement',()=>{
   it('rejects Card Field metadata which cannot settle without native paired hooks',()=>{
     const result=validateAndCompileCustomCode(`const CARD_ID='${CARD}';const CARD_DEF={cardType:'minor',meta:{id:CARD_ID,name:'Field',cardField:{allowedCrops:['grain'],capacity:1}}};const CARD_IMPL={}`,CARD)
     expect(result).toMatchObject({valid:false,errors:[expect.stringContaining("unsupported field 'cardField'")]})
+  })
+})
+
+describe('Workshop admitted player, choice and payment data',()=>{
+  it('stores a string stack item across pending and pops it after continuation',()=>{
+    const flow={type:'seq',children:[leaf('push-to-card-stack',{params:{item:'wood'}}),leaf('emit-choice',{params:{options:[{value:'yes',labelKey:'ui.yes'}],requiresExplicitChoice:true}}),leaf('special-effect',{params:{kind:'pop-card-stack-top'}})]} as ActionFlow
+    const {session}=setup(afterCollect(flow));let r=collect(session)
+    expect(r.interaction.request?.kind).toBe('choice');expect(r.state.players[0]!.cardStates[CARD]?.stack).toEqual(['wood'])
+    r=session.resolveChoice(0,'yes');expect(r.ok,r.error).toBe(true);expect(r.state.players[0]!.cardStates[CARD]?.stack).toEqual([])
+    expect(session.cardWarnings).toEqual([])
+  })
+  it.each([
+    leaf('gain',{targetPlayerId:'missing',params:{food:1}}),
+    {type:'seq',targetPlayerId:42,children:[leaf('gain',{params:{food:1}})]},
+    leaf('occupation',{params:{allowedCards:{}}}),
+    leaf('emit-choice',{params:{options:[{value:'a',labelKey:'ui.yes'}],multiSelect:{}}}),
+    leaf('emit-choice',{params:{options:[{value:'a',labelKey:'ui.yes'}],multiSelect:{valuePrefix:'s:',minSelections:2,maxSelections:1}}}),
+    leaf('emit-choice',{params:{options:[{value:'a',labelKey:'ui.yes'}],multiSelect:{valuePrefix:'s:',minSelections:0.5,maxSelections:1}}}),
+    leaf('emit-choice',{params:{options:[{value:'a',labelKey:'ui.yes'},{value:'a',labelKey:'ui.no'}],multiSelect:{valuePrefix:'s:',minSelections:2,maxSelections:2}}}),
+    leaf('emit-choice',{params:{options:[{value:'a,b',labelKey:'ui.yes'}],multiSelect:{valuePrefix:'s:',minSelections:1,maxSelections:1}}}),
+    leaf('emit-choice',{params:{options:[{value:'',labelKey:'ui.yes'}],multiSelect:{valuePrefix:'s:',minSelections:1,maxSelections:1}}}),
+    leaf('emit-choice',{params:{options:[{value:'a',labelKey:'ui.yes',disabled:'false'}],multiSelect:{valuePrefix:'s:',minSelections:1,maxSelections:1}}}),
+    leaf('push-to-card-stack',{params:{item:{}}}),
+    {type:'xor',children:[]}, {type:'or',children:[]},
+    leaf('pay',{params:{cost:{food:1},paymentChoice:{}}}),
+    leaf('pay',{params:{cost:{food:1},optionPrefix:{}}}),
+    leaf('pay',{params:{cost:{fee:{food:1},paymentResourceProviders:[{key:'wood',sourceCard:CARD,available:1,covers:[{resource:'food',costAmount:1,paymentAmount:1}],consume:{type:'actionSpace',spaceId:'clay-pit',resource:'clay'}}]}}}),
+  ] as ActionFlow[])('rejects malformed reachable flow without partial state or a stuck interaction',flow=>{
+    const {session}=setup(afterCollect(flow));session.loadState(session.state)
+    const before=JSON.stringify(session.state), r=session.takeAction(0,'forest')
+    expect(r.ok).toBe(false);expect(JSON.stringify(session.state)).toBe(before)
+    expect(r.state.events.some(event=>event.type==='resource.paid')).toBe(false)
+    expect(r.state.players.every(player=>Object.values(player.resources).every(amount=>Number.isFinite(amount)&&amount>=0))).toBe(true)
+  })
+
+  it('targets an existing opponent through a composite without rewarding the triggering player',()=>{
+    const {session,player,opponent}=setup('{listeners:[{actions:["collect"],phases:["after"],mandatory:true,handler:ctx=>({flow:{type:"seq",targetPlayerId:ctx.state.players[1].id,children:[gainLeaf(CARD_ID,{food:1})]}})}]}')
+    const own=player.resources.food, other=opponent.resources.food
+    const r=collect(session)
+    expect(r.state.players[0]!.resources.food).toBe(own);expect(r.state.players[1]!.resources.food).toBe(other+1)
+    expect(r.state.events).toContainEqual(expect.objectContaining({type:'resource.moved',sourceCardId:CARD}));expect(session.cardWarnings).toEqual([])
+  })
+
+  it('filters occupations, rejects an excluded card and settles the allowed card payment',()=>{
+    const {session,player}=setup(afterCollect(leaf('occupation',{params:{allowedCards:['A087_Conservator','A088_HedgeKeeper'],exactCost:{food:1}}})))
+    player.occupationHand=['A087_Conservator','A088_HedgeKeeper','A089_StablePlanner'];player.resources.food=2
+    let r=collect(session);expect(r.interaction.request?.kind).toBe('choice')
+    expect(r.interaction.request!.options.map(option=>option.value)).not.toContain('A089_StablePlanner')
+    const before=JSON.stringify(session.state);expect(session.resolveChoice(0,'A089_StablePlanner').ok).toBe(false);expect(JSON.stringify(session.state)).toBe(before)
+    r=session.resolveChoice(0,'A087_Conservator');expect(r.ok,r.error).toBe(true)
+    expect(r.state.players[0]!.occupationPlayed).toContain('A087_Conservator');expect(r.state.players[0]!.resources.food).toBe(1)
+    expect(r.state.events).toContainEqual(expect.objectContaining({type:'resource.paid',resources:{food:1}}))
+  })
+
+  it('resolves a bounded multi-selection and resumes the following card flow',()=>{
+    const flow={type:'seq',children:[leaf('emit-choice',{params:{options:[{value:'a',labelKey:'ui.yes'},{value:'b',labelKey:'ui.no'}],multiSelect:{valuePrefix:'s:',minSelections:1,maxSelections:2}}}),leaf('gain',{params:{wood:1}})]} as ActionFlow
+    const {session}=setup(afterCollect(flow,"resolveChoice:(_s,_p,value)=>value==='s:a,b'?gainLeaf(CARD_ID,{food:2}):undefined"))
+    let r=collect(session);const before=JSON.stringify(session.state)
+    expect(session.resolveChoice(0,'s:').ok).toBe(false);expect(JSON.stringify(session.state)).toBe(before)
+    r=session.resolveChoice(0,'s:a,b');expect(r.ok,r.error).toBe(true)
+    expect(r.state.players[0]!.resources).toMatchObject({food:4,wood:4});expect(session.cardWarnings).toEqual([])
+  })
+
+  it('applies a valid bonus and selected payment with a string prefix',()=>{
+    const {session}=setup(afterCollect(leaf('pay',{params:{cost:{fee:{food:2},bonuses:[{choices:[{discount:{food:1}}]}]},optionPrefix:'pay:test',paymentChoice:'pay:test:0'}})))
+    const r=collect(session);expect(r.state.players[0]!.resources.food).toBe(1)
+    expect(r.state.events).toContainEqual(expect.objectContaining({type:'resource.paid',resources:{food:1}}));expect(session.cardWarnings).toEqual([])
+  })
+
+  it('rejects malformed computeCosts bonuses while native stable payment still completes',()=>{
+    const implementation=afterCollect(leaf('stables')).slice(0,-2)+",{actions:['stables'],phases:['computeCosts'],handler:()=>({bonuses:[{}]})}]}"
+    const {session}=setup(implementation);collect(session)
+    const r=session.commitSelectionChoice(0,{stables:[{row:0,col:0}]})
+    expect(r.ok,r.error).toBe(true);expect(r.state.players[0]!.resources.wood).toBe(1)
+    expect(session.cardWarnings).toEqual(expect.arrayContaining([expect.stringContaining('exactly one')]))
+  })
+
+  it('settles a grouped trade modifier without exceeding its payment limit',()=>{
+    const {session}=setup(afterCollect(leaf('stables')),"modifier:{type:'trade',cardId:CARD_ID,appliesTo:['stables'],from:{food:1},to:{wood:1},groupId:'g',groupMax:1,max:1}")
+    collect(session);let r=session.commitSelectionChoice(0,{stables:[{row:0,col:0}]})
+    expect(r.interaction.request?.kind).toBe('choice')
+    const options=r.interaction.request!.options
+    expect(options.some(option=>(option.labelParams?.resourcesPaid as Record<string,number>|undefined)?.food===2)).toBe(false)
+    r=session.resolveChoice(0,options.find(option=>(option.labelParams?.resourcesPaid as Record<string,number>|undefined)?.food===1)!.value)
+    expect(r.ok,r.error).toBe(true);expect(r.state.players[0]!.resources).toMatchObject({wood:2,food:1})
+    expect(r.state.players[0]!.stableTiles).toContainEqual({row:0,col:0});expect(session.cardWarnings).toEqual([])
+  })
+
+  it('consumes only this card’s virtual provider and preserves real inventory',()=>{
+    const key=CARD+':clay'
+    const flow=leaf('pay',{params:{cost:{fee:{food:1},paymentResourceProviders:[{key,sourceCard:CARD,available:1,covers:[{resource:'food',costAmount:1,paymentAmount:1}],consume:{type:'actionSpace',spaceId:'clay-pit',resource:'clay'}}]}}})
+    const {session}=setup(afterCollect(flow));session.state.actionSpaces.find(space=>space.id==='clay-pit')!.resources.clay=1
+    let r=collect(session);expect(r.interaction.request?.kind).toBe('choice')
+    r=session.resolveChoice(0,r.interaction.request!.options.find(option=>(option.labelParams?.resourcesPaid as Record<string,number>|undefined)?.[key]===1)!.value)
+    expect(r.ok,r.error).toBe(true);expect(r.state.players[0]!.resources.food).toBe(2)
+    expect(r.state.actionSpaces.find(space=>space.id==='clay-pit')!.resources.clay).toBe(0)
+    expect(r.state.players.every(player=>Object.values(player.resources).every(amount=>amount>=0))).toBe(true);expect(session.cardWarnings).toEqual([])
+  })
+
+  it.each(['occupationPrerequisites','improvementPrerequisites'])('enforces valid %s at native purchase',key=>{
+    for(const count of [0,1]){
+      const {session,player}=setup(afterCollect(leaf('improvement',{params:{types:['minor'],allowedPurchases:[CARD]}}),'',"zones:['hand'],"),`cost:{wood:1},${key}:{min:1,max:1}`)
+      player.minorPlayed=[];player.minorHand=[CARD]
+      if(count===1){if(key==='occupationPrerequisites')player.occupationPlayed=['A087_Conservator'];else player.improvements=['Major_Fireplace1']}
+      const r=collect(session)
+      expect(r.state.players[0]!.minorPlayed.includes(CARD)).toBe(count===1)
+      expect(r.state.players[0]!.resources.wood).toBe(count===1?2:3);expect(session.cardWarnings).toEqual([])
+    }
   })
 })

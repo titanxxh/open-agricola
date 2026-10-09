@@ -3,9 +3,9 @@ import {
   applyCostModifiers,
   evaluateStaticConditions,
   evaluateConditions,
-  validateTradeModifier,
   validateComplexCost,
 } from '../cost-modifiers'
+import { validateTradeModifier } from '../../declaration-validation'
 import type { PlayerState, TradeModifier } from '../../../../contract/types'
 
 const mkPlayer = (overrides: Partial<PlayerState> = {}): PlayerState => ({

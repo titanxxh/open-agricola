@@ -271,6 +271,13 @@ describe('shared Workshop capability admission', () => {
   })
 
   it.each([
+    [{cost:{fee:{wood:2},bonuses:[{}]}},'exactly one'],
+    [{cost:{fee:{wood:2},bonuses:[{discount:{wood:1},choices:[]}]}},'exactly one'],
+    [{cost:{fee:{wood:2},bonuses:[{choices:[]}]}},'non-empty'],
+    [{modifier:{type:'trade',cardId:'CUSTOM_ParityCard',appliesTo:['stables'],from:{food:1},to:{wood:1},groupId:'g'}},'set together'],
+    [{modifier:{type:'trade',cardId:'CUSTOM_ParityCard',appliesTo:['stables'],from:{food:1},to:{wood:1},scope:'unit',conditions:{minNumRooms:2}}},'MUST NOT'],
+    [{occupationPrerequisites:{min:'2'}},'Prerequisite'],
+    [{improvementPrerequisites:{min:2,max:1}},'cannot exceed'],
     [{modifiers:[{type:'remove-resource',cardId:'CUSTOM_ParityCard',appliesTo:['stables']}]},'Removed cost resources'],
     [{modifiers:[{type:'remove-resource',cardId:'CUSTOM_ParityCard',appliesTo:['stables'],resources:['room']}]},'Removed cost resources'],
     [{altCosts:[{fee:{wood:2}}]},'Unsupported resource'],
@@ -289,6 +296,18 @@ describe('shared Workshop capability admission', () => {
 
   it.each([
     ['nested internal action', {type:'seq',children:[{type:'leaf',actionId:'place-farmer'}]}, 'Unsupported Workshop action'],
+    ['unknown target', {type:'seq',targetPlayerId:'missing',children:[{type:'leaf',actionId:'gain',params:{food:1}}]}, 'Target player'],
+    ['invalid occupation filter', {type:'leaf',actionId:'occupation',params:{allowedCards:{}}}, 'Allowed occupation cards'],
+    ['invalid multi-select', {type:'leaf',actionId:'emit-choice',params:{options:[{value:'a',labelKey:'ui.yes'}],multiSelect:{}}}, 'valuePrefix'],
+    ['reversed multi-select bounds', {type:'leaf',actionId:'emit-choice',params:{options:[{value:'a',labelKey:'ui.yes'}],multiSelect:{valuePrefix:'s:',minSelections:2,maxSelections:1}}}, 'cannot exceed'],
+    ['duplicate multi-select values', {type:'leaf',actionId:'emit-choice',params:{options:[{value:'a',labelKey:'ui.yes'},{value:'a',labelKey:'ui.no'}],multiSelect:{valuePrefix:'s:',minSelections:2,maxSelections:2}}}, 'distinct available'],
+    ['unencodable multi-select value', {type:'leaf',actionId:'emit-choice',params:{options:[{value:'a,b',labelKey:'ui.yes'}],multiSelect:{valuePrefix:'s:',minSelections:1,maxSelections:1}}}, 'no commas'],
+    ['non-string stack item', {type:'leaf',actionId:'push-to-card-stack',params:{item:{}}}, 'stack item'],
+    ['empty xor', {type:'xor',children:[]}, 'nonempty children'],
+    ['empty or', {type:'or',children:[]}, 'nonempty children'],
+    ['non-string payment choice', {type:'leaf',actionId:'pay',params:{cost:{food:1},paymentChoice:{}}}, 'paymentChoice'],
+    ['non-string payment prefix', {type:'leaf',actionId:'pay',params:{cost:{food:1},optionPrefix:{}}}, 'optionPrefix'],
+    ['real provider key', {type:'leaf',actionId:'pay',params:{cost:{fee:{food:1},paymentResourceProviders:[{key:'wood',sourceCard:'CUSTOM_ParityCard',available:1,covers:[{resource:'food',costAmount:1,paymentAmount:1}],consume:{type:'actionSpace',spaceId:'traveling-players',resource:'food'}}]}}}, 'virtual'],
     ['misplaced purchase context', {type:'leaf',actionId:'improvement',params:{types:['major'],actionContext:{minimumResourcesPaid:{clay:1}}}}, 'unsupported field'],
     ['lifecycle mutation', {type:'leaf',actionId:'special-effect',params:{kind:'clear-round-flags'}}, 'Unsupported special-effect kind'],
     ['foreign local source', {type:'leaf',actionId:'special-effect',sourceCard:'CUSTOM_Other',params:{kind:'set-counter',key:'x',value:1}}, 'impersonate'],

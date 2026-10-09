@@ -1,10 +1,11 @@
 import { SANDBOX_ALLOWED_ACTION_IDS, sandboxActionIdMeta, sandboxSpecialEffectKinds } from './sandbox-action-ids.ts'
 import { cardEffectHooks } from '../projections/card-effect-hooks.ts'
 import { cardEffectHookMeta } from './sandbox-hook-meta.ts'
-import { REAL_RESOURCE_KEYS, isPaymentResourceKey } from '../contract/resource-keys.ts'
+import { REAL_RESOURCE_KEYS, isPaymentResourceKey, isCardProvidedPaymentResourceKey } from '../contract/resource-keys.ts'
+import { validateBonus, validateTradeModifier } from '../actions/payment/declaration-validation.ts'
 import { ALL_ANIMAL_KEYS, animalKeysForState } from '../contract/animals.ts'
 import { assertKeys, assertRecord, sandboxInteractionKinds, sandboxCardMetadataKeys, sandboxCommonActionContextKeys, sandboxFlowFields } from './sandbox-declarations.ts'
-import type { ActionFlow, GameState } from '../contract/types.ts'
+import type { ActionFlow, Bonus, GameState, TradeModifier } from '../contract/types.ts'
 import type { CardEffectField } from '../cards/card-effects.ts'
 import type { CardListenerContext } from '../cards/card-listeners.ts'
 
@@ -42,12 +43,22 @@ function resourceMap(value: unknown, payment = false, nonnegative = true): asser
 function stringArray(value: unknown, label: string, allowed?: readonly string[], nonempty = false): asserts value is string[] {
   if (!Array.isArray(value) || nonempty && value.length === 0 || value.some(item => typeof item !== 'string' || !item || allowed && !allowed.includes(item))) throw new Error(`${label} must be an array of supported strings`)
 }
+function integer(value: unknown, label: string): asserts value is number {
+  finite(value, label, true)
+  if (!Number.isInteger(value)) throw new Error(`${label} must be an integer`)
+}
+function prerequisite(value: unknown): void {
+  assertRecord(value, 'Numeric prerequisite'); assertKeys(value, ['min', 'max'], 'Numeric prerequisite')
+  for (const key of ['min', 'max']) if (value[key] !== undefined) integer(value[key], `Prerequisite ${key}`)
+  if (value.min !== undefined && value.max !== undefined && Number(value.min) > Number(value.max)) throw new Error('Prerequisite min cannot exceed max')
+}
 function choiceOptions(value: unknown, cardId: string): void {
   if (!Array.isArray(value)) throw new Error('Choice options must be an array')
   for (const option of value) {
     assertRecord(option, 'Choice option')
     assertKeys(option, ['value', 'labelKey', 'labelParams', 'sourceCard', 'effectPreview', 'descriptionPreview', 'disabled', 'disabledReasonKey'], 'Choice option')
     if (typeof option.value !== 'string' || typeof option.labelKey !== 'string') throw new Error('Choice option requires string value and labelKey')
+    if (option.disabled !== undefined && typeof option.disabled !== 'boolean') throw new Error('Choice disabled must be boolean')
     ownSource(option.sourceCard, cardId)
   }
 }
@@ -58,8 +69,13 @@ function bonus(value: unknown, cardId: string): void {
   if (value.sources !== undefined && (!Array.isArray(value.sources) || value.sources.some(source => source !== cardId))) throw new Error('Bonus sources must belong to this card')
   if (value.choices !== undefined) {
     if (!Array.isArray(value.choices)) throw new Error('Bonus choices must be an array')
-    value.choices.forEach(choice => bonus(choice, cardId))
+    value.choices.forEach(choice => {
+      assertRecord(choice, 'Bonus choice')
+      if (choice.discount === undefined || choice.choices !== undefined) throw new Error('Bonus choice requires a discount')
+      bonus(choice, cardId)
+    })
   }
+  validateBonus(value as Bonus)
 }
 function providers(value: unknown, cardId: string): void {
   if (!Array.isArray(value)) throw new Error('Payment providers must be an array')
@@ -67,16 +83,16 @@ function providers(value: unknown, cardId: string): void {
     assertRecord(provider, 'Payment provider')
     assertKeys(provider, ['key', 'sourceCard', 'available', 'covers', 'consume'], 'Payment provider')
     ownSource(provider.sourceCard, cardId); finite(provider.available, 'Provider availability', true)
-    if (typeof provider.key !== 'string' || !isPaymentResourceKey(provider.key)) throw new Error('Invalid provider resource key')
+    if (typeof provider.key !== 'string' || !isCardProvidedPaymentResourceKey(provider.key) || provider.key.split(':')[0] !== cardId || provider.sourceCard !== cardId) throw new Error('Provider resource key must be virtual and belong to this card')
     if (!Array.isArray(provider.covers)) throw new Error('Provider covers must be an array')
     for (const cover of provider.covers) {
       assertRecord(cover, 'Provider cover'); assertKeys(cover, ['resource', 'costAmount', 'paymentAmount'], 'Provider cover')
-      if (!resources.includes(String(cover.resource))) throw new Error('Invalid provider cover resource')
+      if (typeof cover.resource !== 'string' || !resources.includes(cover.resource)) throw new Error('Invalid provider cover resource')
       finite(cover.costAmount, 'Covered amount', true); finite(cover.paymentAmount, 'Provider amount', true)
     }
     assertRecord(provider.consume, 'Provider consumption')
     assertKeys(provider.consume, ['type', 'spaceId', 'resource'], 'Provider consumption')
-    if (provider.consume.type !== 'actionSpace' || typeof provider.consume.spaceId !== 'string' || !resources.includes(String(provider.consume.resource))) throw new Error('Unsupported provider consumption')
+    if (provider.consume.type !== 'actionSpace' || typeof provider.consume.spaceId !== 'string' || typeof provider.consume.resource !== 'string' || !resources.includes(provider.consume.resource)) throw new Error('Unsupported provider consumption')
   }
 }
 
@@ -136,6 +152,7 @@ export function assertCustomCardDefinition(definition: unknown, cardId: string):
     meta.altCosts.forEach(item => resourceMap(item, true))
   }
   if (meta.returnCards !== undefined) stringArray(meta.returnCards, 'returnCards')
+  for (const key of ['occupationPrerequisites', 'improvementPrerequisites']) if (meta[key] !== undefined) prerequisite(meta[key])
   if (meta.exchanges !== undefined) {
     if (!Array.isArray(meta.exchanges)) throw new Error('exchanges must be an array')
     meta.exchanges.forEach(item => trade(item, cardId, true))
@@ -147,7 +164,12 @@ export function assertCustomCardDefinition(definition: unknown, cardId: string):
     if (modifier.cardId !== cardId) throw new Error('Cost modifier cardId must be this card')
     if (!['trade', 'bonus', 'remove-resource'].includes(String(modifier.type))) throw new Error('Unsupported cost modifier')
     if (!Array.isArray(modifier.appliesTo) || modifier.appliesTo.some(type => !['construct', 'renovation', 'occupation', 'fencing', 'stables', 'plow', 'major-improvement', 'minor-improvement'].includes(type))) throw new Error('Unsupported modifier cost type')
-    if (modifier.type === 'trade') trade(Object.fromEntries(Object.entries(modifier).filter(([key]) => !['type', 'cardId', 'appliesTo', 'conditions'].includes(key))), cardId)
+    if (modifier.type === 'trade') {
+      trade(Object.fromEntries(Object.entries(modifier).filter(([key]) => !['type', 'cardId', 'appliesTo', 'conditions'].includes(key))), cardId)
+      if (modifier.scope !== undefined && modifier.scope !== 'unit' && modifier.scope !== 'action') throw new Error('Invalid trade modifier scope')
+      if (modifier.groupId !== undefined && typeof modifier.groupId !== 'string') throw new Error('Trade modifier groupId must be a string')
+      validateTradeModifier(modifier as TradeModifier)
+    }
     if (modifier.type === 'bonus') bonus(Object.fromEntries(Object.entries(modifier).filter(([key]) => !['type', 'cardId', 'appliesTo'].includes(key))), cardId)
     if (modifier.type === 'remove-resource') stringArray(modifier.resources, 'Removed cost resources', resources, true)
   }
@@ -176,6 +198,9 @@ export function assertCustomActionData(actionId: string, params: Record<string, 
   if (context.costOverride !== undefined) resourceMap(context.costOverride, false, false)
   if (actionId === 'pay') cost(params.cost ?? params, cardId)
   if (actionId === 'pay' && params.reserveResources !== undefined) resourceMap(params.reserveResources)
+  if (actionId === 'pay') for (const key of ['paymentChoice', 'optionPrefix']) if (params[key] !== undefined && typeof params[key] !== 'string') throw new Error(`${key} must be a string`)
+  if (actionId === 'occupation' && params.allowedCards !== undefined) stringArray(params.allowedCards, 'Allowed occupation cards')
+  if (actionId === 'push-to-card-stack' && (typeof params.item !== 'string' || !params.item)) throw new Error('Card stack item must be a nonempty string')
   if (actionId === 'improvement') {
     if (params.allowedPurchases !== undefined) stringArray(params.allowedPurchases, 'Allowed purchases')
     if (context.minimumResourcesPaid !== undefined) resourceMap(context.minimumResourcesPaid, true)
@@ -223,7 +248,18 @@ export function assertCustomActionData(actionId: string, params: Record<string, 
     if (params.crops !== undefined && (!Array.isArray(params.crops) || params.crops.some(crop => !crop || !['grain', 'vegetable'].includes(String(crop.crop))))) throw new Error('Workshop sow supports ordinary crop selections')
   }
   if (actionId === 'selection' && (context.selectionKind !== undefined && context.selectionKind !== 'farm-position' || !Array.isArray(context.selectableTiles))) throw new Error('Selection requires explicit farm-position candidates')
-  if (actionId === 'emit-choice') choiceOptions(params.options, cardId)
+  if (actionId === 'emit-choice') {
+    choiceOptions(params.options, cardId)
+    if (params.multiSelect !== undefined) {
+      assertRecord(params.multiSelect, 'Multi-select'); assertKeys(params.multiSelect, ['valuePrefix', 'minSelections', 'maxSelections'], 'Multi-select')
+      if (typeof params.multiSelect.valuePrefix !== 'string' || !params.multiSelect.valuePrefix) throw new Error('Multi-select valuePrefix must be a nonempty string')
+      integer(params.multiSelect.minSelections, 'Multi-select minSelections'); integer(params.multiSelect.maxSelections, 'Multi-select maxSelections')
+      if (params.multiSelect.minSelections > params.multiSelect.maxSelections) throw new Error('Multi-select minSelections cannot exceed maxSelections')
+      const values = (params.options as Array<{value: string; disabled?: boolean}>).filter(option => option.disabled !== true).map(option => option.value)
+      if (values.some(value => !value || value.includes(','))) throw new Error('Multi-select values must be nonempty and contain no commas')
+      if (params.multiSelect.minSelections > new Set(values).size) throw new Error('Multi-select minimum exceeds distinct available options')
+    }
+  }
   if (actionId === 'reorganize' && context.trigger !== undefined && context.trigger !== 'anytime') throw new Error('Custom reorganization cannot impersonate Harvest/round end')
   if (actionId === 'reap') {
     assertRecord(context.trigger, 'Reap trigger')
@@ -246,6 +282,7 @@ export function validateCustomFlow(value: unknown, cardId: string, depth = 0, st
   if (depth > 24) throw new Error('Custom flow exceeds the nesting limit')
   assertRecord(value, 'ActionFlow')
   ownSource(value.sourceCard, cardId)
+  if (value.targetPlayerId !== undefined && (typeof value.targetPlayerId !== 'string' || !(state?.players ?? []).some(player => player.id === value.targetPlayerId))) throw new Error('Target player must exist in the current game')
   if (value.anytimeWindow !== undefined) {
     assertRecord(value.anytimeWindow, 'Anytime window')
     assertKeys(value.anytimeWindow, ['allowed', 'blockedIds'], 'Anytime window')
@@ -260,7 +297,10 @@ export function validateCustomFlow(value: unknown, cardId: string, depth = 0, st
     assertCustomActionData(value.actionId, params, context, cardId, state)
     value.sourceCard ??= cardId
   } else if (!['seq', 'or', 'xor', 'parallel'].includes(String(value.type)) || !Array.isArray(value.children)) throw new Error('Composite ActionFlow requires supported type and children')
-  else value.children.forEach(child => validateCustomFlow(child, cardId, depth + 1, state))
+  else {
+    if (['xor', 'or'].includes(String(value.type)) && value.optional !== true && value.children.length === 0) throw new Error('Mandatory choice flow requires nonempty children')
+    value.children.forEach(child => validateCustomFlow(child, cardId, depth + 1, state))
+  }
   safeData(value)
   return value as ActionFlow
 }
