@@ -719,7 +719,7 @@ trigger frame 必须随 trailing `activate-card` node 持久化：`ActivateCardA
 
 ### 7.5.1 Public ActionNode 执行顺序
 
-普通 public action leaf 进入 engine 后按以下顺序处理：`computeReplace -> before -> strict isDoable -> computeCosts -> execute -> during -> immediatelyAfter -> after`。
+普通 public action leaf 进入 engine 后按以下顺序处理：`computeReplace -> before -> strict isDoable -> computeCosts -> execute -> immediatelyAfter -> after`。
 
 Direct `cancel` 不是 protected atomic action 的成功路径。`plow` / `sow` / `construct` / `stables` / `fence` / `reorganize` / internal `selection` 的 direct `cancel` 会在 option validation、`resolveChoice` 和 hooks 之前被 recoverable reject，pending 保持 active，因此不会触发 `before` / `immediatelyAfter` / `after`。Optionality 由父级 ActionFlow optional metadata 和 `__skip__` 表达；undo / 参考实现 `actRestart` 类回退走 history rollback。`construct` / `fence` 的 entry doability 必须先排除无 reachable room / 无 legal fence commit 的真实 state，避免 confirm-only pending 没有正常提交路径。`exchange` 与 `bake-bread` 暂按各自 legacy 窗口保留例外语义。
 
