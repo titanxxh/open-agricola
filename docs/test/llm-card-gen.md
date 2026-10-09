@@ -6,7 +6,7 @@
 
 - `fixtures/`：11 个固定机制的题面与 `setup / scenario / assert`。
 - `runner.test.ts`：唯一的固定 case 执行入口，支持历史录音和生成源码。
-- `recordings/`：已有历史 golden；仅历史模式允许显式身份/元数据适配。
+- `recordings/`：已有历史 golden；仅历史模式允许显式身份/元数据适配。M1 的旧字符串数组前提在编译前使用固定 fixture 前提规范化，原录制文件保持冻结；新生成源码和其他错误类型仍按原样拒绝。
 - `fixtures.test.ts`：已知错误反例，验证固定测试能够发现相关回归。
 - `acceptance/`：浏览器生成入口、合成响应和共享费用账本；不维护另一份行为断言。
 - `scripts/llm-acceptance.ts`：owner 本机生成固定 case 源码，调用 Vitest 并记录用量。

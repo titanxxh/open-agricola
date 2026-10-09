@@ -2,11 +2,11 @@ import { SANDBOX_ALLOWED_ACTION_IDS, sandboxActionIdMeta, sandboxSpecialEffectKi
 import { cardEffectHooks } from '../projections/card-effect-hooks.ts'
 import { cardEffectHookMeta } from './sandbox-hook-meta.ts'
 import { REAL_RESOURCE_KEYS, isPaymentResourceKey, isCardProvidedPaymentResourceKey } from '../contract/resource-keys.ts'
-import { validateBonus, validateTradeModifier } from '../actions/payment/declaration-validation.ts'
+import { validateBonus, validateTradeModifier, assertPaymentProviderEnumerationBudget, MAX_PAYMENT_PROVIDER_COMBINATIONS } from '../actions/payment/declaration-validation.ts'
 import { getFarmyardTilePositions, positionKey } from '../domain/farmyard-geometry.ts'
 import { ALL_ANIMAL_KEYS, animalKeysForState } from '../contract/animals.ts'
 import { assertKeys, assertRecord, sandboxInteractionKinds, sandboxCardMetadataKeys, sandboxCommonActionContextKeys, sandboxFlowFields } from './sandbox-declarations.ts'
-import type { ActionFlow, Bonus, GameState, TradeModifier } from '../contract/types.ts'
+import type { ActionFlow, Bonus, CardProvidedPaymentResourceProvider, GameState, TradeModifier } from '../contract/types.ts'
 import type { CardEffectField } from '../cards/card-effects.ts'
 import type { CardListenerContext } from '../cards/card-listeners.ts'
 
@@ -39,6 +39,7 @@ function resourceMap(value: unknown, payment = false, nonnegative = true): asser
   for (const [key, amount] of Object.entries(value)) {
     if (!(payment ? isPaymentResourceKey(key) : resources.includes(key))) throw new Error(`Unsupported resource '${key}'`)
     finite(amount, key, nonnegative)
+    if (!Number.isSafeInteger(amount)) throw new Error(`${key} must be a safe integer`)
   }
 }
 function stringArray(value: unknown, label: string, allowed?: readonly string[], nonempty = false): asserts value is string[] {
@@ -46,7 +47,7 @@ function stringArray(value: unknown, label: string, allowed?: readonly string[],
 }
 function integer(value: unknown, label: string): asserts value is number {
   finite(value, label, true)
-  if (!Number.isInteger(value)) throw new Error(`${label} must be an integer`)
+  if (!Number.isSafeInteger(value)) throw new Error(`${label} must be an integer within the safe range`)
 }
 function bounds(value: unknown, label = 'Prerequisite'): void {
   assertRecord(value, label); assertKeys(value, ['min', 'max'], label)
@@ -74,8 +75,93 @@ function choiceOptions(value: unknown, cardId: string): void {
     assertKeys(option, ['value', 'labelKey', 'labelParams', 'sourceCard', 'effectPreview', 'descriptionPreview', 'disabled', 'disabledReasonKey'], 'Choice option')
     if (typeof option.value !== 'string' || typeof option.labelKey !== 'string') throw new Error('Choice option requires string value and labelKey')
     if (option.disabled !== undefined && typeof option.disabled !== 'boolean') throw new Error('Choice disabled must be boolean')
+    if (option.labelParams !== undefined) assertRecord(option.labelParams, 'Choice label params')
+    if (option.disabledReasonKey !== undefined && typeof option.disabledReasonKey !== 'string') throw new Error('Choice disabled reason must be a string')
+    if (option.effectPreview !== undefined) effectPreview(option.effectPreview)
+    if (option.descriptionPreview !== undefined) descriptionPreview(option.descriptionPreview)
     ownSource(option.sourceCard, cardId)
   }
+}
+function previewString(value: unknown, label: string): void {
+  if (typeof value !== 'string') throw new Error(`${label} must be a string`)
+}
+function previewLocation(value: unknown): void {
+  assertRecord(value, 'Preview location')
+  if (value.kind === 'player') assertKeys(value, ['kind'], 'Preview location')
+  else if (value.kind === 'card') {
+    assertKeys(value, ['kind', 'cardId'], 'Preview location'); previewString(value.cardId, 'Preview card ID')
+  } else if (value.kind === 'actionSpace') {
+    assertKeys(value, ['kind', 'spaceId', 'nameKey'], 'Preview location'); previewString(value.spaceId, 'Preview space ID'); previewString(value.nameKey, 'Preview name key')
+  } else throw new Error('Unsupported preview location')
+}
+function previewRound(value: unknown): asserts value is number {
+  integer(value, 'Preview round')
+  if (value < 1 || value > 14) throw new Error('Preview round must be from 1 to 14')
+}
+function effectPreview(value: unknown): void {
+  assertRecord(value, 'Effect preview')
+  const fields: Record<string, string[]> = {
+    fieldContents:['resources','sourceCard'], cardScore:['cardId','delta'], actionSpace:['spaceId','nameKey','descriptionKey'],
+    futureOffers:['entries'], futureSchedule:['entries'], resourceMovement:['resources','from','to'],
+    resourceExchange:['resourcesPaid','resourcesGained','bonusVp'], payment:['resourcesPaid','cardUsed','sourceCards'], text:['text'],
+  }
+  if (typeof value.kind !== 'string' || !Object.hasOwn(fields, value.kind)) throw new Error('Unsupported effect preview kind')
+  assertKeys(value, ['kind', ...fields[value.kind]!], 'Effect preview')
+  for (const key of ['resources', 'resourcesGained']) if (value[key] !== undefined) resourceMap(value[key])
+  if (value.resourcesPaid !== undefined) resourceMap(value.resourcesPaid, true)
+  if (['fieldContents','resourceMovement'].includes(value.kind)) resourceMap(value.resources)
+  if (value.kind === 'fieldContents' && value.sourceCard !== undefined) previewString(value.sourceCard, 'Preview source card')
+  if (value.kind === 'cardScore') { previewString(value.cardId, 'Preview card ID'); finite(value.delta, 'Preview score delta') }
+  if (value.kind === 'actionSpace') for (const key of ['spaceId','nameKey','descriptionKey']) previewString(value[key], key)
+  if (value.kind === 'resourceMovement') { previewLocation(value.from); previewLocation(value.to) }
+  if (value.kind === 'text') previewString(value.text, 'Preview text')
+  if (value.bonusVp !== undefined) finite(value.bonusVp, 'Preview bonus VP')
+  if (value.cardUsed !== undefined) previewString(value.cardUsed, 'Preview returned card')
+  if (value.sourceCards !== undefined) stringArray(value.sourceCards, 'Preview source cards')
+  if (value.kind === 'futureOffers' || value.kind === 'futureSchedule') {
+    if (!Array.isArray(value.entries)) throw new Error('Preview entries must be an array')
+    for (const entry of value.entries) {
+      assertRecord(entry, 'Preview entry')
+      assertKeys(entry, value.kind === 'futureOffers' ? ['round','resources','resourcesPaid','actionNameKey'] : ['round','endRound','resources','actions','resourceCondition','roomType'], 'Preview entry')
+      previewRound(entry.round); resourceMap(entry.resources)
+      if (value.kind === 'futureOffers') {
+        resourceMap(entry.resourcesPaid)
+        if (entry.actionNameKey !== undefined) previewString(entry.actionNameKey, 'Preview action name')
+      } else {
+        if (entry.endRound !== undefined) { previewRound(entry.endRound); if (entry.endRound < entry.round) throw new Error('Preview round range must be ordered') }
+        if (entry.roomType !== undefined && (typeof entry.roomType !== 'string' || !['wood','clay','stone'].includes(entry.roomType))) throw new Error('Invalid preview room type')
+        if (entry.resourceCondition !== undefined) {
+          assertRecord(entry.resourceCondition, 'Preview resource condition'); assertKeys(entry.resourceCondition, ['kind','resource','amount'], 'Preview resource condition')
+          if (entry.resourceCondition.kind !== 'min-resource' || typeof entry.resourceCondition.resource !== 'string' || !resources.includes(entry.resourceCondition.resource)) throw new Error('Invalid preview resource condition')
+          integer(entry.resourceCondition.amount, 'Preview resource minimum')
+        }
+        if (entry.actions !== undefined) {
+          if (!Array.isArray(entry.actions)) throw new Error('Preview actions must be an array')
+          for (const action of entry.actions) {
+            assertRecord(action, 'Preview action'); assertKeys(action, ['kind','amount','resourcesPaid'], 'Preview action')
+            if (typeof action.kind !== 'string' || !['field','stable','forest','moor'].includes(action.kind)) throw new Error('Invalid preview action kind')
+            integer(action.amount, 'Preview action amount')
+            if (action.resourcesPaid !== undefined) resourceMap(action.resourcesPaid)
+          }
+        }
+      }
+    }
+  }
+}
+function descriptionPreview(value: unknown, depth = 0): void {
+  if (depth > 24) throw new Error('Description preview exceeds the nesting limit')
+  assertRecord(value, 'Description preview')
+  if (value.kind === 'action') {
+    assertKeys(value, ['kind','showLabel','labelKey','labelParams','effectPreview'], 'Description preview')
+    previewString(value.labelKey, 'Description label key')
+    if (value.showLabel !== undefined && typeof value.showLabel !== 'boolean') throw new Error('Description showLabel must be boolean')
+    if (value.labelParams !== undefined) assertRecord(value.labelParams, 'Description label params')
+    if (value.effectPreview !== undefined) effectPreview(value.effectPreview)
+  } else if (value.kind === 'group') {
+    assertKeys(value, ['kind','separator','parts'], 'Description preview'); previewString(value.separator, 'Description separator')
+    if (!Array.isArray(value.parts)) throw new Error('Description parts must be an array')
+    value.parts.forEach(part => descriptionPreview(part, depth + 1))
+  } else throw new Error('Unsupported description preview kind')
 }
 function conditions(value: unknown): void {
   assertRecord(value, 'Payment conditions')
@@ -105,18 +191,21 @@ function providers(value: unknown, cardId: string): void {
   for (const provider of value) {
     assertRecord(provider, 'Payment provider')
     assertKeys(provider, ['key', 'sourceCard', 'available', 'covers', 'consume'], 'Payment provider')
-    ownSource(provider.sourceCard, cardId); finite(provider.available, 'Provider availability', true)
+    ownSource(provider.sourceCard, cardId); integer(provider.available, 'Provider availability')
+    if (provider.available >= MAX_PAYMENT_PROVIDER_COMBINATIONS) throw new Error('Provider availability exceeds the 511-unit declaration limit')
     if (typeof provider.key !== 'string' || !isCardProvidedPaymentResourceKey(provider.key) || provider.key.split(':')[0] !== cardId || provider.sourceCard !== cardId) throw new Error('Provider resource key must be virtual and belong to this card')
     if (!Array.isArray(provider.covers)) throw new Error('Provider covers must be an array')
     for (const cover of provider.covers) {
       assertRecord(cover, 'Provider cover'); assertKeys(cover, ['resource', 'costAmount', 'paymentAmount'], 'Provider cover')
       if (typeof cover.resource !== 'string' || !resources.includes(cover.resource)) throw new Error('Invalid provider cover resource')
-      finite(cover.costAmount, 'Covered amount', true); finite(cover.paymentAmount, 'Provider amount', true)
+      integer(cover.costAmount, 'Covered amount'); integer(cover.paymentAmount, 'Provider amount')
+      if (cover.costAmount === 0 || cover.paymentAmount === 0) throw new Error('Provider cover ratios must be positive integers')
     }
     assertRecord(provider.consume, 'Provider consumption')
     assertKeys(provider.consume, ['type', 'spaceId', 'resource'], 'Provider consumption')
     if (provider.consume.type !== 'actionSpace' || typeof provider.consume.spaceId !== 'string' || typeof provider.consume.resource !== 'string' || !resources.includes(provider.consume.resource)) throw new Error('Unsupported provider consumption')
   }
+  assertPaymentProviderEnumerationBudget(value as CardProvidedPaymentResourceProvider[])
 }
 
 function trade(value: unknown, cardId: string, usage: 'payment' | 'exchange' | 'exchange-declaration' = 'payment'): void {
@@ -127,6 +216,13 @@ function trade(value: unknown, cardId: string, usage: 'payment' | 'exchange' | '
   ownSource(value.sourceId, cardId)
   ownSource(value.source, cardId)
   if (value.max !== undefined) integer(value.max, 'Trade max')
+  if (usage === 'payment') {
+    if (value.scope !== undefined && value.scope !== 'unit' && value.scope !== 'action') throw new Error('Invalid payment trade scope')
+    if (value.replaceUpTo !== undefined && typeof value.replaceUpTo !== 'boolean') throw new Error('Payment trade replaceUpTo must be boolean')
+    if (value.groupId !== undefined && typeof value.groupId !== 'string') throw new Error('Payment trade groupId must be a string')
+    for (const key of ['minCost', 'maxCost']) if (value[key] !== undefined) resourceMap(value[key])
+    validateTradeModifier({...value, cardId} as TradeModifier)
+  }
   if (value.fromFarmyard !== undefined && typeof value.fromFarmyard !== 'boolean') throw new Error('Exchange fromFarmyard must be boolean')
   if (value.triggers !== undefined && (!Array.isArray(value.triggers) || value.triggers.some(item => !['anytime', 'harvest', 'bake-bread'].includes(item)))) throw new Error('Unsupported exchange window')
   if (value.blockedAnytimeInteractionKinds !== undefined && (!Array.isArray(value.blockedAnytimeInteractionKinds) || value.blockedAnytimeInteractionKinds.some(item => !(sandboxInteractionKinds as readonly unknown[]).includes(item)))) throw new Error('Unsupported exchange interaction kind')
@@ -146,7 +242,7 @@ function cost(value: unknown, cardId: string, allowCardReturn = false): void {
     assertRecord(value.resourceReserve, 'Resource reserve')
     assertKeys(value.resourceReserve, ['resources', 'minimum'], 'Resource reserve')
     stringArray(value.resourceReserve.resources, 'Reserve resources', resources)
-    finite(value.resourceReserve.minimum, 'Reserve minimum', true)
+    integer(value.resourceReserve.minimum, 'Reserve minimum')
   }
   if (value.trades !== undefined) {
     if (!Array.isArray(value.trades)) throw new Error('Cost trades must be an array')
@@ -171,6 +267,7 @@ export function assertCustomCardDefinition(definition: unknown, cardId: string):
   assertKeys(meta, sandboxCardMetadataKeys, 'CARD_DEF.meta')
   if (meta.id !== cardId) throw new Error('CARD_DEF id must match CARD_ID')
   if (meta.vp !== undefined) finite(meta.vp, 'Printed VP')
+  if (meta.prerequisite !== undefined && typeof meta.prerequisite !== 'string') throw new Error('Card prerequisite must be a string')
   if (meta.cost !== undefined) cost(meta.cost, cardId, true)
   if (meta.altCosts !== undefined) {
     if (!Array.isArray(meta.altCosts)) throw new Error('altCosts must be an array')
@@ -239,6 +336,10 @@ export function assertCustomActionData(actionId: string, params: Record<string, 
     if (new Set(context.animalTypes).size !== context.animalTypes.length) throw new Error('Breed animal types must be distinct')
   }
   if (['gain', 'store-on-card', 'take-from-card'].includes(actionId)) resourceMap(Object.fromEntries(Object.entries(params).filter(([key]) => resources.includes(key))))
+  if (actionId === 'gain') {
+    for (const key of ['recipientPlayerId', 'payerId']) if (params[key] !== undefined && (typeof params[key] !== 'string' || !state?.players?.some(player => player.id === params[key]))) throw new Error(`Gain ${key} must identify an existing player`)
+    if (params.recipientMode !== undefined && params.recipientMode !== 'self' && params.recipientMode !== 'others') throw new Error('Gain recipientMode must be self or others')
+  }
   if (actionId === 'special-effect') {
     if (!(sandboxSpecialEffectKinds as readonly unknown[]).includes(params.kind)) throw new Error(`Unsupported special-effect kind '${String(params.kind)}'`)
     assertKeys(params, ['kind', ...specialKeys[params.kind as keyof typeof specialKeys]], 'special-effect')
@@ -270,7 +371,7 @@ export function assertCustomActionData(actionId: string, params: Record<string, 
       if (entry.resources !== undefined) {
         assertRecord(entry.resources, 'Future resources')
         assertKeys(entry.resources, [...resources, 'field', 'stable'], 'Future resources')
-        Object.values(entry.resources).forEach(amount => finite(amount, 'Future amount', true))
+        Object.values(entry.resources).forEach(amount => integer(amount, 'Future amount'))
       }
       if (entry.roomType !== undefined && !['wood', 'clay', 'stone'].includes(String(entry.roomType))) throw new Error('Invalid future room type')
       if (entry.actionContext !== undefined || request.actionContext !== undefined) throw new Error('Future action-context overrides require a separate admitted settlement contract')
@@ -360,6 +461,7 @@ export function validateCustomFlow(value: unknown, cardId: string, depth = 0, st
   const leaf = value.type === 'leaf'
   assertKeys(value, leaf ? sandboxFlowFields.leaf : sandboxFlowFields.composite, 'ActionFlow')
   if (leaf) {
+    if (value.effectPreview !== undefined) effectPreview(value.effectPreview)
     if (typeof value.actionId !== 'string') throw new Error('ActionFlow requires an action ID')
     const params = value.params ?? {}; const context = value.actionContext ?? {}
     assertRecord(params, 'Flow params'); assertRecord(context, 'Flow actionContext')
@@ -390,7 +492,7 @@ export function validateCustomEffectResult(value: unknown, cardId: string, hook:
   if ((metadata.table === 'effect' && hook !== 'onBeforePlayerTurn') || hook === 'resolveChoice') return validateCustomFlow(value, cardId, 0, args[0] as GameState, (args[1] as {id?: string})?.id)
   if (hook === 'onBeforePlayerTurn') { assertRecord(value, hook); assertKeys(value, ['skipTurn'], hook); if (value.skipTurn !== true && value.skipTurn !== false) throw new Error('skipTurn must be boolean'); return value }
   if (['computeBonusScore', 'computeExtraRoomCapacity', 'computeHarvestBreedOrderPriority', 'countExtraTurns', 'computeBreedThreshold', 'computeBreedableAnimalCount', 'computeAnimalScoreAdjustment'].includes(hook)) finite(value, hook, ['countExtraTurns', 'computeBreedThreshold', 'computeBreedableAnimalCount'].includes(hook))
-  if (hook === 'countExtraTurns' && !Number.isInteger(value)) throw new Error('countExtraTurns must be an integer')
+  if (['countExtraTurns', 'computeExtraRoomCapacity', 'computeBreedThreshold', 'computeBreedableAnimalCount'].includes(hook)) integer(value, hook)
   if (hook === 'computeCostedBonus') {
     if (!Array.isArray(value)) throw new Error('Costed bonus must be an array')
     for (const level of value) {
@@ -486,6 +588,13 @@ export function assertCustomListenerCapabilities(value: unknown, cardId: string,
   if (value === null || value === undefined) return
   assertRecord(value, 'Listener result'); safeData(value); ownSource(value.sourceCard, cardId)
   assertKeys(value, ['doable', 'actionId', 'extraData', 'extraOptions', 'extraExchanges', 'followUpActions', 'flow', 'costs', 'costAttribution', 'reserveResources', 'trades', 'bonuses', 'paymentResourceProviders', 'sourceCard', 'countCardUse', 'labelKey', 'labelParams', 'decline', 'alternativeFlow'], 'Listener result')
+  for (const key of ['doable', 'countCardUse', 'decline']) if (value[key] !== undefined && typeof value[key] !== 'boolean') throw new Error(`Listener ${key} must be boolean`)
+  if (value.labelKey !== undefined && typeof value.labelKey !== 'string') throw new Error('Listener labelKey must be a string')
+  if (value.labelParams !== undefined) assertRecord(value.labelParams, 'Listener label params')
+  if (value.costs !== undefined) {
+    assertRecord(value.costs, 'Listener costs')
+    resourceMap(Object.fromEntries(Object.entries(value.costs).filter(([,amount]) => amount !== undefined)), false, false)
+  }
   if (value.flow !== undefined) validateCustomFlow(value.flow, cardId, 0, context?.state, context?.effectPlayer?.id ?? context?.player?.id)
   if (value.alternativeFlow !== undefined) validateCustomFlow(value.alternativeFlow, cardId, 0, context?.state, context?.player?.id)
   if (value.extraOptions !== undefined) choiceOptions(value.extraOptions, cardId)

@@ -1,5 +1,23 @@
 /** Pure payment declaration invariants, shared by native settlement and custom-card admission. */
-import type { Bonus, TradeModifier } from '../../contract/types'
+import type { Bonus, CardProvidedPaymentResourceProvider, TradeModifier } from '../../contract/types'
+import { InvalidActionContextError } from '../../contract/action-context-error.ts'
+
+export const MAX_PAYMENT_PROVIDER_COMBINATIONS = 512
+
+/** Bound the conservative cover/provider product before any host enumeration.
+ * The final merged list is checked too; separate contributions cannot bypass it. */
+export const assertPaymentProviderEnumerationBudget = (providers: readonly CardProvidedPaymentResourceProvider[]): void => {
+  let combinations = 1
+  for (const provider of providers) {
+    const available = Math.max(0, Math.floor(provider.available))
+    if (available === 0) continue
+    for (const cover of provider.covers) {
+      if (cover.costAmount <= 0 || cover.paymentAmount <= 0) continue
+      combinations *= Math.floor(available / cover.paymentAmount) + 1
+      if (!Number.isFinite(combinations) || combinations > MAX_PAYMENT_PROVIDER_COMBINATIONS) throw new InvalidActionContextError('Payment provider enumeration exceeds the 512-combination limit')
+    }
+  }
+}
 
 export const validateTradeModifier = (modifier: TradeModifier): void => {
   if (modifier.scope === 'unit' && modifier.conditions?.minNumRooms !== undefined) {

@@ -719,7 +719,7 @@ trigger frame 必须随 trailing `activate-card` node 持久化：`ActivateCardA
 
 ### 7.5.1 Public ActionNode 执行顺序
 
-可信的 `ActionDefinition.assertExecutionContext` 仅在真实 leaf 执行前调用：所有 before 续行完成之后、最终 doability 之前。普通 leaf 和已选中的 OR/XOR leaf 都经过该入口。类型化 `InvalidActionContextError` 通过现有 Session checkpoint 拒绝并回滚当前命令；其他异常保留原错误行为。纯预览不调用此断言。受限 sow 使用原生候选与种子匹配，支持此前的犁地或资源获得步骤，同时避免不可达的选择。
+可信的 `ActionDefinition.assertExecutionContext` 仅在真实 leaf 执行前调用：所有 before 续行完成之后、最终 doability 之前。普通 leaf 和已选中的 OR/XOR leaf 都经过该入口。类型化 `InvalidActionContextError` 通过现有 Session checkpoint 拒绝并回滚当前命令；其他异常保留原错误行为。纯预览不调用此断言。provider 枚举在展开前对最终合并列表执行共享的 512 组合预算；纯 flow 可用性查询仅将此类带类型的上下文失败视为不可用，实际执行仍拒绝并恢复命令 checkpoint。受限 sow 使用原生候选与种子匹配，支持此前的犁地或资源获得步骤，同时避免不可达的选择。
 
 普通 public action leaf 进入 engine 后按以下顺序处理：`computeReplace -> before -> assertExecutionContext -> strict isDoable -> computeCosts -> execute -> during -> immediatelyAfter -> after`。
 

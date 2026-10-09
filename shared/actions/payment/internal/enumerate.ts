@@ -34,6 +34,7 @@ import {
 } from '../../helpers/trades'
 import { isFireplaceIdentityCard } from '../../../cards/helpers/card-type'
 import { PAYMENT_RESOURCE_KEYS } from '../../../contract/resource-keys'
+import { assertPaymentProviderEnumerationBudget } from '../declaration-validation'
 import { solutionCache, makeCacheKey } from './cache'
 import {
   canPayResources,
@@ -533,6 +534,7 @@ const buildProviderCoverOptions = (
   cost: PaymentResourceMap,
   providers: CardProvidedPaymentResourceProvider[],
 ): PaymentResourceCoverOption[] => {
+  assertPaymentProviderEnumerationBudget(providers)
   let options: PaymentResourceCoverOption[] = [
     { remainingCost: normalizePositiveResources(cost), resourcesPaid: {}, covers: [] },
   ]

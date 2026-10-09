@@ -726,7 +726,7 @@ As a `sourceCard` fallback, a top-level `ActionHookResult.flow.sourceCard` is re
 
 #### 7.5.1 Public `ActionNode` execution order
 
-Trusted `ActionDefinition.assertExecutionContext` preconditions run only at actual leaf dispatch, after all `before` continuations and before final doability. Both ordinary and selected OR/XOR leaves use the same cut. A typed `InvalidActionContextError` rejects the command through the existing Session checkpoint; unrelated exceptions retain their error behavior. Preview queries do not invoke this assertion. Constrained sow uses native candidate/seed matching so preceding plow or gain steps are respected without opening an unreachable selection.
+Trusted `ActionDefinition.assertExecutionContext` preconditions run only at actual leaf dispatch, after all `before` continuations and before final doability. Both ordinary and selected OR/XOR leaves use the same cut. A typed `InvalidActionContextError` rejects the command through the existing Session checkpoint; unrelated exceptions retain their error behavior. Preview queries do not invoke this assertion. Provider enumeration uses a shared 512-combination budget on the final merged list before any expansion; pure flow availability catches only this typed invalid-context failure and returns false, while actual dispatch rejects and restores the command checkpoint. Constrained sow uses native candidate/seed matching so preceding plow or gain steps are respected without opening an unreachable selection.
 
 An ordinary public-action leaf enters the engine in this order: `computeReplace -> before -> assertExecutionContext -> strict isDoable -> computeCosts -> execute -> during -> immediatelyAfter -> after`.
 

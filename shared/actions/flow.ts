@@ -1,3 +1,4 @@
+import { InvalidActionContextError } from '../contract/action-context-error'
 import type {
   ActionDefinition,
   ActionExecutionContext,
@@ -127,14 +128,18 @@ const applyChildActionDoable = (
     return doable
   }
 
-  return hooks.applyIsDoable(
+  try { return hooks.applyIsDoable(
     { ...context, actionId },
     action,
     // A leaf's cost preview replaces its base result. Keep composite traversal
     // eager so its child hooks and strict gates retain their existing order.
     action.flow ? initialDoable() : initialDoable,
     () => canStartAlternative() || canStartBefore(actionId, context, resolveAction, nextSeenActionIds),
-  )
+  ) } catch (error) {
+    // Availability is a pure query; actual dispatch still rejects and rolls back.
+    if (error instanceof InvalidActionContextError) return false
+    throw error
+  }
 }
 
 export const canStartBefore = (

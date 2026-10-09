@@ -31,7 +31,7 @@
 
 | 全局                                       | 形态      | 备注                                                                                 |
 | ---------------------------------------- | ------- | ---------------------------------------------------------------------------------- |
-| `MinorImprovement(def)`                  | 函数 stub | 直接 `return def`，`new MinorImprovement(def)` 也能跑                                    |
+| `MinorImprovement(def)`                  | 函数 stub | 将精确 `{occupation: n}` 前提规范化为文本及数值下限；`new MinorImprovement(def)` 也支持                                    |
 | `Occupation(def)`                        | 函数 stub | 同上                                                                                 |
 | `console.log(...)` / `console.warn(...)` | 函数      | 转发到宿主 `console`，参数会被 `JSON.stringify`（非字符串时）                                       |
 | `gainLeaf(cardId, resources)`            | 函数      | 返回 `{ type: 'leaf', actionId: 'gain', params: resources, sourceCard: cardId }`     |
@@ -692,7 +692,13 @@ Listener 的 `flow` 和 `followUpActions` 默认由 `context.effectPlayer` 执�
 
 付款 trade 不开放仅供兑换使用的 `triggers`、`fromFarmyard`、`blockedAnytimeInteractionKinds`；这些字段仅允许用于兑换声明。兑换 max 与复合费用 nb 为非负整数。bonus 与 modifier 的 conditions 只允许数值形式的 minNumRooms、houseTypeWood / houseTypeClay / houseTypeStone，其中房间下限为非负整数。印刷 vp 必须是有限数值。范围式未来请求必须包含资源对象，回合与次数为整数。播种下限在实际执行前按原生投影、逻辑田组和可用种子校验，此时此前行动和 before 效果已完成；原生播种结算即使声明零下限也至少需要选择一块田；不可达的显式边界会拒绝并回滚当前命令，不创建无法提交的等待交互。
 
-元数据 altCosts 的每项必须是平坦支付资源对象；returnCards 必须是字符串数组，要求退回真实持有的卡并支付牌面费用；cost.cards 在 required 不为 true 时是替代付款路径。remove-resource modifier 需要非空的支持资源数组。复合 resourceReserve 声明资源名及有限非负 minimum。兑换没有正输入时必须提供非负整数 max。breed 的选择必须是本局已启用且不重复的动物；动物分区的所有准入可选数据字段在原生安置前校验。
+资源数量、支付数量和未来资源数量必须为安全整数，费用 delta 仍允许有符号的整数折扣。文本 prerequisite 必须是字符串。gain 的接收者/付款者 ID 必须存在于本局，recipientMode 只允许 self 或 others。listener 的 doable/countCardUse/decline 必须是布尔值。额外房间容量、剩余额外机会和繁殖数量必须为非负整数。付款 trade 校验 scope、replaceUpTo、minCost/maxCost 及分组次数，并复用 modifier 的公开声明不变量。
+
+虚拟支付 provider 的可用数量为 0 到 511 的整数，覆盖/支付比例为正整数。所有 cover/provider 的 `(floor(available / paymentAmount) + 1)` 保守乘积不得超过 512；原生枚举前也对合并后的完整列表检查同一预算，不能通过拆分贡献绕过。可用性查询将超预算行动视为不可用，实际执行拒绝并回滚命令，不静默截断候选。首版明确排除更大的虚拟支付搜索，等待宿主具备另行设计的有界算法。
+
+选择项和 leaf 的 effectPreview 按原生九种判别结构校验：fieldContents、cardScore、actionSpace、futureOffers、resourceMovement、futureSchedule、resourceExchange、payment、text。descriptionPreview 为 action 或递归校验的 group。必需资源对象、位置、条目、行动、条件、标签及基础类型在发送给任何观看者前校验；沿用数组和深度上限。这些是展示声明，不是可执行的规则回调。
+
+元数据 altCosts 的每项必须是平坦支付资源对象；returnCards 必须是字符串数组，要求退回真实持有的卡并支付牌面费用；cost.cards 在 required 不为 true 时是替代付款路径。remove-resource modifier 需要非空的支持资源数组。复合 resourceReserve 声明资源名及非负整数 minimum。兑换没有正输入时必须提供非负整数 max。breed 的选择必须是本局已启用且不重复的动物；动物分区的所有准入可选数据字段在原生安置前校验。
 
 未来回合调度仅开放普通资源和 field/stable；不开放调度条目的 `actionContext` 或原生 `sourceSummary`。`special-effect` 另外开放 `pop-card-stack-top`、`set-infobox(text)`、`remove-future-meeples(rounds?)`，取消只作用于本卡及效果玩家。其他 kind 均明确拒绝。
 
@@ -789,7 +795,7 @@ const CARD_IMPL = {
 
 浏览器本地执行器（`client/local-sandbox/browser-executor.ts`，`VITE_SANDBOX_EXECUTOR=browser` 时的工坊试玩路径）在浏览器里跑用户自己的代码（"用户只能攻击自己"），不进 isolate。**注入清单与服务端 `server/custom-code/engine.ts` 完全一致**：
 
-- 同样暴露 `MinorImprovement(def) => def` / `Occupation(def) => def` / 简化 `console` / 所有 §1 中列出的 helper 函数（复用同一份 `shared/custom-code/injected-helpers.ts` 字符串常量）
+- 两种执行器共用 `shared/custom-code/sandbox-declarations.ts` 的 MinorImprovement/Occupation 构造器规范化、简化 console，及 `shared/custom-code/injected-helpers.ts` 中 §1 的所有 helper。仅精确 `{occupation: n}` 且 n 为非负安全整数时，在准入前转换为文本前提及数值下限；已有显式数值边界保留。直接 metadata 的 prerequisite 必须是字符串；数组、空对象、未知字段和小数计数仍拒绝。
 - 同样对输入做 `JSON.parse(JSON.stringify(...))` 拷贝、输出 JSON round-trip
 - 同样按本文件 §3 的准入定义校验 hook、phase 和动态输出（复用 shared 的同一组函数）
 - 同样使用 `CARD_DEF` / `CARD_IMPL` 双常量捕获

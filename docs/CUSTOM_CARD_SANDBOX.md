@@ -29,7 +29,7 @@ Official card authors working in `shared/cards/<deck>/<id>.ts` are not subject t
 
 | Global | Shape | Notes |
 |---|---|---|
-| `MinorImprovement(def)` | Function stub | Returns `def` directly; `new MinorImprovement(def)` also works |
+| `MinorImprovement(def)` | Function stub | Returns metadata with an exact `{occupation: n}` prerequisite normalized to text and numeric minimum; `new MinorImprovement(def)` also works |
 | `Occupation(def)` | Function stub | Same behavior |
 | `console.log(...)` / `console.warn(...)` | Functions | Forward to host `console`; nonstring arguments pass through `JSON.stringify` |
 | `gainLeaf(cardId, resources)` | Function | Returns `{ type: 'leaf', actionId: 'gain', params: resources, sourceCard: cardId }` |
@@ -644,7 +644,13 @@ Listener `flow` and `followUpActions` default to `context.effectPlayer`; replace
 
 Payment trade declarations exclude exchange-only `triggers`, `fromFarmyard` and `blockedAnytimeInteractionKinds`; these fields are accepted only on exchange declarations. Exchange maxima and complex-cost `nb` are nonnegative integers. Bonus and modifier conditions accept only numeric `minNumRooms` and `houseTypeWood` / `houseTypeClay` / `houseTypeStone`; room minima are nonnegative integers. Printed `vp` is finite numeric data. Range-based future requests require a resources map and whole round/count values. Sow minimums are checked by the native projection at actual dispatch, using logical field groups and compatible seeds after earlier actions and all before-phase continuations have completed. Native sow settlement requires at least one selected field, even with a declared zero minimum. Unreachable explicit bounds reject and roll back the current command instead of creating an impossible pending interaction.
 
-Metadata altCosts entries are flat payment resource maps; returnCards is a string array and requires returning an owned card in addition to the printed fee; cost.cards is an alternative payment unless required is true. remove-resource modifiers require a nonempty supported resource array. Complex resourceReserve declares resource keys and a finite nonnegative minimum. Exchanges with no positive input require a nonnegative integer max. Breed selections contain distinct enabled animals; animal zones validate all admitted optional data fields before native placement.
+Resource quantities, payment amounts and future-resource counts are safe integers; signed whole cost deltas remain supported. Textual `prerequisite` metadata is a string. Gain recipient/payer IDs must exist in the current game and recipientMode is `self` or `others`. Listener doable/countCardUse/decline fields are booleans. Extra room capacity and remaining turn/breeding counts are nonnegative integers. Payment trades validate scope, replaceUpTo, minCost/maxCost and grouped-use invariants, using the same public declaration rules as modifiers.
+
+Payment providers declare whole availability from 0 to 511 and positive integer cover/payment ratios. The conservative product of `(floor(available / paymentAmount) + 1)` across all covers/providers must not exceed 512. The same budget is enforced on the final merged provider list before native enumeration, so separate contributions cannot bypass it. Availability queries treat an over-budget action as unavailable; dispatch rejects with command rollback. Candidates are never silently truncated. This bounded first slice excludes larger virtual-payment searches until the host solver supports a separate bounded algorithm.
+
+Choice and leaf `effectPreview` follow the nine native discriminated shapes: fieldContents, cardScore, actionSpace, futureOffers, resourceMovement, futureSchedule, resourceExchange, payment and text. `descriptionPreview` is an action or a recursively validated group. Required resource maps, locations, entries, actions, conditions, labels and scalar types are checked before any viewer receives the option. Existing array/depth limits still apply; these are display declarations, not executable rule callbacks.
+
+Metadata altCosts entries are flat payment resource maps; returnCards is a string array and requires returning an owned card in addition to the printed fee; cost.cards is an alternative payment unless required is true. remove-resource modifiers require a nonempty supported resource array. Complex resourceReserve declares resource keys and a nonnegative integer minimum. Exchanges with no positive input require a nonnegative integer max. Breed selections contain distinct enabled animals; animal zones validate all admitted optional data fields before native placement.
 
 Future scheduling admits ordinary resources and field/stable, without entry actionContext or native sourceSummary. Additional local special-effect kinds are `pop-card-stack-top`, `set-infobox(text)`, and `remove-future-meeples(rounds?)`; cancellation affects this card and effect player only. Other kinds are rejected explicitly.
 
@@ -738,7 +744,7 @@ Important rules:
 
 The browser-local executor in `client/local-sandbox/browser-executor.ts`, used when `VITE_SANDBOX_EXECUTOR=browser`, runs a user's own source in the browser without an isolate. Its premise is that the user can affect only their own browser. Its injection contract exactly matches server `server/custom-code/engine.ts`:
 
-- It exposes the same `MinorImprovement(def) => def`, `Occupation(def) => def`, simplified `console`, and every helper in section 1 through the same string constants in `shared/custom-code/injected-helpers.ts`.
+- It exposes the same MinorImprovement/Occupation constructor normalization from `shared/custom-code/sandbox-declarations.ts`, simplified console, and every helper in section 1 from `shared/custom-code/injected-helpers.ts`. Only the exact `{occupation: n}` shorthand with a nonnegative safe integer is converted to textual prerequisite and a numeric minimum before admission; explicit numeric bounds are preserved. Direct metadata must already use a string. Arrays, empty/unknown objects and fractional counts remain invalid.
 - Inputs use `JSON.parse(JSON.stringify(...))` and outputs complete a JSON round trip.
 - Hook, phase and output admission uses the same shared functions and section 3 allowlists.
 - It captures the same `CARD_DEF` and `CARD_IMPL` constants.

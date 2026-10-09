@@ -16,6 +16,8 @@ import {
 import { InteractionBar } from '../InteractionBar'
 import { describeFutureSchedule } from '../../../../shared/actions/future-schedule'
 import { GameSession } from '../../../../server/game/authoritative-session'
+import { validateAndCompileCustomCode } from '../../../../server/custom-code/engine'
+import { workshopCardJsonFromDefinition } from '../../../../server/workshop-draft-validation'
 
 const noop = () => {}
 
@@ -132,6 +134,26 @@ const renderBarHtml = (
 ) => renderToStaticMarkup(buildBar(configure, actionOverrides))
 
 describe('InteractionBar', () => {
+  it('renders a nested Workshop preview admitted by the Session and settles the selected reward',()=>{
+    const cardId='CUSTOM_Preview'
+    const source=`const CARD_ID='${cardId}';const CARD_DEF={cardType:'minor',meta:{id:CARD_ID,name:'Preview'}};const CARD_IMPL={listeners:[{actions:['collect'],phases:['after'],mandatory:true,handler:()=>({flow:{type:'leaf',actionId:'emit-choice',params:{requiresExplicitChoice:true,options:[{value:'yes',labelKey:'ui.yes',descriptionPreview:{kind:'group',separator:' / ',parts:[{kind:'action',labelKey:'ui.yes',effectPreview:{kind:'futureSchedule',entries:[{round:2,resources:{food:1}}]}},{kind:'action',labelKey:'ui.yes',effectPreview:{kind:'text',text:'Workshop preview'}}]}},{value:'no',labelKey:'ui.no'}]}}})}],effect:{resolveChoice:(_s,_p,value)=>value==='yes'?gainLeaf(CARD_ID,{food:1}):undefined}}`
+    const compiled=validateAndCompileCustomCode(source,cardId)
+    if(!compiled.valid)throw new Error(compiled.errors.join(';'))
+    const session=new GameSession(42,[{cardType:'minor',cardJson:{...workshopCardJsonFromDefinition(compiled.cardDefinition),id:cardId,name:'Preview',deck:'CUSTOM',number:0,desc:[]},compiledCode:compiled.compiledCode,codeManifest:compiled.manifest}],{playerCount:2})
+    try {
+      for(const player of session.state.players){player.minorHand=['__test_placeholder__'];player.occupationHand=['__test_placeholder__'];player.minorPlayed=[];player.occupationPlayed=[]}
+      session.state.players[0]!.minorPlayed=[cardId];session.loadState(session.state)
+      const response=session.takeAction(0,'forest');expect(response.ok,response.error).toBe(true)
+      if(response.interaction.stateId!=='wait')throw new Error('Expected Workshop choice')
+      const resolveChoice=vi.fn()
+      renderBar(input=>{input.pending.choice={...pendingChoice,options:response.interaction.stateId==='wait'?response.interaction.request.options!:[]}}, {resolveChoice})
+      const button=screen.getByRole('button',{name:/Round 2:.*Workshop preview/})
+      expect(button.querySelector('[data-resource="food"]')).toBeInTheDocument();fireEvent.click(button)
+      expect(resolveChoice).toHaveBeenCalledExactlyOnceWith('yes')
+      const food=response.state.players[0]!.resources.food,r=session.resolveChoice(0,'yes')
+      expect(r.ok,r.error).toBe(true);expect(r.state.players[0]!.resources.food).toBe(food+1);expect(session.cardWarnings).toEqual([])
+    } finally {session.dispose()}
+  })
   it.each(['zh', 'en'] as const)('renders real Peat Sled choices with fuel and distinct rounds in %s', (locale) => {
     const session = new GameSession(409, undefined, { playerCount: 2, enableFarmersOfTheMoor: true, allowIncompleteFarmersOfTheMoorMinorDeal: true })
     session.state.round = 4

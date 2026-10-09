@@ -44,6 +44,14 @@ const CARD_IMPL = {
 afterEach(() => resetCards())
 
 describe('session-helpers', () => {
+  it('adapts only a frozen array prerequisite in explicit historical replay',()=>{
+    const source=KNOWN_GOOD_GAIN_CARD.replace("prerequisite: '3 Occupations'", "prerequisite: ['3 Occupations']")
+    const options={cardId:'CUSTOM_HELPER_SMOKE',cardType:'minor' as const,cardName:'Helper Smoke',cardPrerequisite:'3 Occupations'}
+    expect(()=>buildSessionWithLLMCard(source,options)).toThrow('prerequisite must be a string')
+    const {session,cardData}=buildSessionWithLLMCard(source,{...options,historicalRecording:true})
+    expect(cardData.cardJson.prerequisite).toBe('3 Occupations');session.dispose()
+    expect(()=>buildSessionWithLLMCard(KNOWN_GOOD_GAIN_CARD.replace("prerequisite: '3 Occupations'",'prerequisite: {}'),{...options,historicalRecording:true})).toThrow('prerequisite must be a string')
+  })
   it('finishes an already completed round from its response without issuing another round-end command', () => {
     const { session } = buildSessionWithLLMCard(KNOWN_GOOD_GAIN_CARD, {
       cardId: 'CUSTOM_HELPER_SMOKE', cardType: 'minor', cardName: 'Helper Smoke',

@@ -10,6 +10,7 @@
 import ivm from 'isolated-vm'
 import { validateCustomEffectResult, assertCustomListenerCapabilities } from '../../shared/custom-code/runtime-capabilities.ts'
 import { HELPERS_INJECTION_SOURCE } from '../../shared/custom-code/injected-helpers.ts'
+import { CARD_DEFINITION_NORMALIZATION_SOURCE } from '../../shared/custom-code/sandbox-declarations.ts'
 
 import { EXECUTION_TIMEOUT_MS, ISOLATE_MEMORY_LIMIT_MB } from '../../shared/custom-code/runtime-limits.ts'
 
@@ -42,9 +43,10 @@ function runInIsolate(
         log: function() { var args = Array.prototype.slice.call(arguments); __log.applySync(undefined, args.map(function(a) { return typeof a === 'object' ? JSON.stringify(a) : String(a); })); },
         warn: function() { var args = Array.prototype.slice.call(arguments); __warn.applySync(undefined, args.map(function(a) { return typeof a === 'object' ? JSON.stringify(a) : String(a); })); },
       };
-      function MinorImprovement(def) { return def; }
-      function Occupation(def) { return def; }
+      function MinorImprovement(def) { return __normalizeCardPrerequisite(def); }
+      function Occupation(def) { return __normalizeCardPrerequisite(def); }
       ${HELPERS_INJECTION_SOURCE}
+      ${CARD_DEFINITION_NORMALIZATION_SOURCE}
       var __captured = (function() {
         ${compiledCode}
         return {

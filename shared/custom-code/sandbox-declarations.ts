@@ -121,3 +121,18 @@ export function normalizeCustomManifest(manifest: CustomCodeManifest, cardId: st
   })
   return { effectHooks, ...(metadata && Object.keys(metadata).length ? { effectMetadata: metadata } : {}), listeners }
 }
+
+/** Existing constructor occupation shorthand, normalized before metadata admission. */
+export const CARD_DEFINITION_NORMALIZATION_SOURCE = `
+function __normalizeCardPrerequisite(def) {
+  var prerequisite = def && def.prerequisite;
+  if (!prerequisite || typeof prerequisite !== 'object' || Array.isArray(prerequisite)) return def;
+  var keys = Object.keys(prerequisite);
+  if (keys.length !== 1 || keys[0] !== 'occupation') return def;
+  var count = prerequisite.occupation;
+  if (!Number.isSafeInteger(count) || count < 0) return def;
+  var normalized = Object.assign({}, def, { prerequisite: count + ' Occupations' });
+  if (def.occupationPrerequisites === undefined) normalized.occupationPrerequisites = { min: count };
+  return normalized;
+}
+`

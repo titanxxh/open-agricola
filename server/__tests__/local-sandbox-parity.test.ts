@@ -11,6 +11,7 @@ import { createInitialState } from '../../shared/session/state-bootstrap.ts'
 import { GameCore } from '../../shared/session/session-core.ts'
 import type { CustomCardData } from '../../shared/cards/session-card-context.ts'
 import { validateFarmChoice } from '../../shared/session/farm-choice-validation.ts'
+import { createEventQuery } from '../../shared/events/query.ts'
 import {
   invokeCustomCodeEffect,
   invokeCustomCodeListener,
@@ -272,6 +273,9 @@ describe('shared Workshop capability admission', () => {
 
   it.each([
     [{vp:'2'},'Printed VP'],
+    [{prerequisite:{}},'prerequisite'],
+    [{cost:{wood:0.5}},'integer'],
+    [{cost:{fee:{wood:1},trades:[{from:{food:1},to:{wood:1},replaceUpTo:'false'}]}},'replaceUpTo'],
     [{exchanges:[{from:{wood:1},to:{food:1},max:0.5}]},'integer'],
     [{cost:{unitFee:{food:1},nb:0.5}},'integer'],
     [{cost:{fee:{food:2},bonuses:[{discount:{food:1},conditions:{minNumRooms:'3'}}]}},'Condition minNumRooms'],
@@ -326,6 +330,12 @@ describe('shared Workshop capability admission', () => {
     ['empty or', {type:'or',children:[]}, 'nonempty children'],
     ['non-string payment choice', {type:'leaf',actionId:'pay',params:{cost:{food:1},paymentChoice:{}}}, 'paymentChoice'],
     ['fractional exchange limit', {type:'leaf',actionId:'exchange',actionContext:{directTrade:{from:{wood:1},to:{food:1},max:0.5}}}, 'integer'],
+    ['fractional gain', {type:'leaf',actionId:'gain',params:{food:0.5}}, 'integer'],
+    ['malformed leaf preview', {type:'leaf',actionId:'gain',params:{food:1},effectPreview:{kind:'futureSchedule',entries:{}}}, 'Preview entries'],
+    ['invalid gain mode', {type:'leaf',actionId:'gain',params:{food:1,recipientMode:'other'}}, 'recipientMode'],
+    ['missing gain recipient', {type:'leaf',actionId:'gain',params:{food:1,recipientPlayerId:'missing'}}, 'existing player'],
+    ['missing gain payer', {type:'leaf',actionId:'gain',params:{food:1,payerId:'missing'}}, 'existing player'],
+    ['fractional future resource', {type:'leaf',actionId:'future-meeples',params:{__futureMeepleRequest:{cardId:'CUSTOM_ParityCard',playerId:'p1',startRound:2,count:2,resources:{food:0.5}}}}, 'integer'],
     ['fractional unit payment', {type:'leaf',actionId:'pay',params:{cost:{unitFee:{food:1},nb:0.5}}}, 'integer'],
     ['missing future resources', {type:'leaf',actionId:'future-meeples',params:{__futureMeepleRequest:{cardId:'CUSTOM_ParityCard',playerId:'p1',startRound:2,count:2}}}, 'Future resources'],
     ['non-string payment prefix', {type:'leaf',actionId:'pay',params:{cost:{food:1},optionPrefix:{}}}, 'optionPrefix'],
@@ -372,6 +382,8 @@ describe('shared Workshop capability admission', () => {
     ['getRuleContributions', {reservedSupply:{room:1}}, 'unsupported field'],
     ['getStatePresentation', [], 'must be an object'],
     ['countExtraTurns', 1.5, 'integer'],
+    ['computeExtraRoomCapacity', -1, 'nonnegative'],
+    ['computeExtraRoomCapacity', 0.5, 'integer'],
   ] as const)('rejects malformed %s results before host consumption',(hook,result,error)=>{
     const source=`const CARD_ID='CUSTOM_ParityCard';const CARD_IMPL={effect:{${hook}:()=>(${JSON.stringify(result)})}}`
     const compiled=validateAndCompileCustomCode(source,'CUSTOM_ParityCard')
@@ -417,5 +429,62 @@ describe('shared Workshop capability admission', () => {
     session.loadState(session.state);const response=session.takeAction(0,'forest')
     expect(response.ok,response.error).toBe(true);expect(response.state.players[0]!.resources.food).toBe(2);expect(response.state.players[1]!.resources.food).toBe(3)
     session.dispose()
+  })
+})
+
+describe('Workshop preview and control data parity',()=>{
+  it.each([
+    {kind:'fieldContents',resources:{food:0.5}}, {kind:'cardScore',cardId:'CUSTOM_ParityCard',delta:{}},
+    {kind:'actionSpace',spaceId:'forest',nameKey:'actions.forest.name',descriptionKey:{}},
+    {kind:'futureOffers',entries:{}}, {kind:'resourceMovement',resources:{food:1},from:{},to:{kind:'player'}},
+    {kind:'futureSchedule',entries:{}}, {kind:'futureSchedule',entries:[{round:2,resources:{food:1},actions:{}}]},
+    {kind:'futureSchedule',entries:[{round:2,resources:{food:1},resourceCondition:{kind:'min-resource',resource:'unknown',amount:1}}]},
+    {kind:'resourceExchange',resourcesPaid:{food:'one'}}, {kind:'payment',sourceCards:{}}, {kind:'text',text:{}}, {kind:'unknown'},
+  ])('rejects malformed $kind preview on both adapters',preview=>{
+    const flow={type:'leaf',actionId:'emit-choice',params:{options:[{value:'yes',labelKey:'ui.yes',effectPreview:preview}]}}
+    const source="const CARD_ID='CUSTOM_ParityCard';const CARD_IMPL={effect:{onBuy:s=>s.customFlow}}"
+    const compiled=validateAndCompileCustomCode(source,'CUSTOM_ParityCard');if(!compiled.valid)throw Error(compiled.errors.join(';'))
+    const request={compiledCode:compiled.compiledCode,cardId:'CUSTOM_ParityCard',hook:'onBuy' as const,args:[{customFlow:flow},{}]}
+    const server=invokeCustomCodeEffect(request);expect(invokeCustomCodeEffectLocal(request)).toEqual(server);expect(server.ok).toBe(false)
+  })
+
+  it.each([{kind:'group',separator:' / ',parts:{}},{kind:'action',labelKey:{},effectPreview:{kind:'text',text:'ok'}},{kind:'unknown'}])('rejects malformed description $kind on both adapters',preview=>{
+    const source=`const CARD_ID='CUSTOM_ParityCard';const CARD_IMPL={effect:{onBuy:()=>({type:'leaf',actionId:'emit-choice',params:{options:[{value:'yes',labelKey:'ui.yes',descriptionPreview:${JSON.stringify(preview)}}]}})}}`
+    const compiled=validateAndCompileCustomCode(source,'CUSTOM_ParityCard');if(!compiled.valid)throw Error(compiled.errors.join(';'))
+    const request={compiledCode:compiled.compiledCode,cardId:'CUSTOM_ParityCard',hook:'onBuy' as const,args:[{},{}]}
+    const server=invokeCustomCodeEffect(request);expect(invokeCustomCodeEffectLocal(request)).toEqual(server);expect(server.ok).toBe(false)
+  })
+
+  it.each([{doable:'false'},{countCardUse:0},{decline:'false'},{costs:{wood:-0.5},costAttribution:[{sourceCard:'CUSTOM_ParityCard',costs:{wood:-0.5}}]}])('rejects malformed listener control or resource delta on both adapters',result=>{
+    const resultCode=JSON.stringify(result).replaceAll('"sourceCard":"CUSTOM_ParityCard"','"sourceCard":CARD_ID')
+    const source=`const CARD_ID='CUSTOM_ParityCard';const CARD_IMPL={listeners:[{handler:()=>(${resultCode})}]}`
+    const compiled=validateAndCompileCustomCode(source,'CUSTOM_ParityCard');if(!compiled.valid)throw Error(compiled.errors.join(';'))
+    const state=createInitialState(42),request={compiledCode:compiled.compiledCode,cardId:'CUSTOM_ParityCard',registrationId:'CUSTOM_ParityCard:listener:0',context:{state,player:state.players[0]!,space:state.actionSpaces[0]!,actionId:'collect',phase:'after' as const,transactionEvents:[],eventQuery:createEventQuery([])}}
+    const server=invokeCustomCodeListener(request);expect(invokeCustomCodeListenerLocal(request)).toEqual(server);expect(server.ok).toBe(false)
+  })
+
+  it.each([
+    {available:1e9}, {available:0.5}, {covers:[{resource:'food',costAmount:0.5,paymentAmount:1}]},
+    {covers:[{resource:'food',costAmount:1,paymentAmount:0}]},
+    {available:31,covers:[{resource:'food',costAmount:1,paymentAmount:1},{resource:'wood',costAmount:1,paymentAmount:1}]},
+  ])('rejects unsafe provider enumeration input on both adapters',fields=>{
+    const provider={key:'CUSTOM_ParityCard:clay',sourceCard:'CUSTOM_ParityCard',available:1,covers:[{resource:'food',costAmount:1,paymentAmount:1}],consume:{type:'actionSpace',spaceId:'clay-pit',resource:'clay'},...fields}
+    const source=`const CARD_ID='CUSTOM_ParityCard';const CARD_IMPL={effect:{onBuy:()=>({type:'leaf',actionId:'pay',params:{cost:{fee:{food:1e9},paymentResourceProviders:[${JSON.stringify(provider)}]}}})}}`
+    const compiled=validateAndCompileCustomCode(source,'CUSTOM_ParityCard');if(!compiled.valid)throw Error(compiled.errors.join(';'))
+    const request={compiledCode:compiled.compiledCode,cardId:'CUSTOM_ParityCard',hook:'onBuy' as const,args:[{},{}]}
+    const server=invokeCustomCodeEffect(request);expect(invokeCustomCodeEffectLocal(request)).toEqual(server);expect(server.ok).toBe(false)
+  })
+})
+
+describe('Shared factory prerequisite normalization',()=>{
+  it.each(['MinorImprovement','new MinorImprovement','Occupation','new Occupation'])('normalizes the existing occupation shorthand in %s on both adapters',factory=>{
+    const source=`const CARD_ID='CUSTOM_ParityCard';const CARD_DEF=${factory}({id:CARD_ID,name:'Parity',prerequisite:{occupation:2}});const CARD_IMPL={}`
+    const server=validateAndCompileCustomCode(source,'CUSTOM_ParityCard');expect(validateAndCompileCustomCodeLocal(source,'CUSTOM_ParityCard')).toEqual(server)
+    expect(server).toMatchObject({valid:true,cardDefinition:{meta:{prerequisite:'2 Occupations',occupationPrerequisites:{min:2}}}})
+  })
+  it.each([{},[],{occupation:0.5},{occupation:-1},{occupation:2,unknown:1}])('rejects a malformed factory prerequisite on both adapters',prerequisite=>{
+    const source=`const CARD_ID='CUSTOM_ParityCard';const CARD_DEF=MinorImprovement({id:CARD_ID,name:'Parity',prerequisite:${JSON.stringify(prerequisite)}});const CARD_IMPL={}`
+    const server=validateAndCompileCustomCode(source,'CUSTOM_ParityCard');expect(validateAndCompileCustomCodeLocal(source,'CUSTOM_ParityCard')).toEqual(server)
+    expect(server).toMatchObject({valid:false,errors:[expect.stringContaining('prerequisite must be a string')]})
   })
 })

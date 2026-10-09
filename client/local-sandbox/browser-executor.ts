@@ -12,13 +12,13 @@
  * - inputs are JSON-deep-copied before injection
  * - results round-trip through JSON (functions stripped)
  * - same injected environment: console shim, MinorImprovement/Occupation
- *   identity decorators, HELPERS_INJECTION_SOURCE
+ *   metadata constructors with shared prerequisite normalization, HELPERS_INJECTION_SOURCE
  */
 import { validateCardCode } from '../../shared/custom-code/ast-validator.ts'
 import { compileCardCode } from '../../shared/custom-code/compiler.ts'
 import { HELPERS_INJECTION_SOURCE } from '../../shared/custom-code/injected-helpers.ts'
 import type { CardEffectField } from '../../shared/cards/card-effects.ts'
-import { MANIFEST_EXTRACTION_SOURCE, normalizeCustomManifest } from '../../shared/custom-code/sandbox-declarations.ts'
+import { MANIFEST_EXTRACTION_SOURCE, normalizeCustomManifest, CARD_DEFINITION_NORMALIZATION_SOURCE } from '../../shared/custom-code/sandbox-declarations.ts'
 import { assertCustomCardDefinition, validateCustomEffectResult } from '../../shared/custom-code/runtime-capabilities.ts'
 import { validateCustomListenerResult } from '../../shared/custom-code/listener-result-validator.ts'
 import type {
@@ -69,9 +69,10 @@ function runCardCode(
       log: function() { var args = Array.prototype.slice.call(arguments); __log.apply(undefined, args.map(function(a) { return typeof a === 'object' ? JSON.stringify(a) : String(a); })); },
       warn: function() { var args = Array.prototype.slice.call(arguments); __warn.apply(undefined, args.map(function(a) { return typeof a === 'object' ? JSON.stringify(a) : String(a); })); },
     };
-    function MinorImprovement(def) { return def; }
-    function Occupation(def) { return def; }
+    function MinorImprovement(def) { return __normalizeCardPrerequisite(def); }
+    function Occupation(def) { return __normalizeCardPrerequisite(def); }
     ${HELPERS_INJECTION_SOURCE}
+      ${CARD_DEFINITION_NORMALIZATION_SOURCE}
     var __captured = (function() {
       ${compiledCode}
       return {
@@ -111,9 +112,10 @@ function runManifestExtraction(compiledCode: string, cardId: string): {
   const wrappedCode = `'use strict';
     var console = { log: function() {}, warn: function() {} };
     var __cardDefinitionType = null;
-    function MinorImprovement(def) { __cardDefinitionType = 'minor'; return def; }
-    function Occupation(def) { __cardDefinitionType = 'occupation'; return def; }
+    function MinorImprovement(def) { __cardDefinitionType = 'minor'; return __normalizeCardPrerequisite(def); }
+    function Occupation(def) { __cardDefinitionType = 'occupation'; return __normalizeCardPrerequisite(def); }
     ${HELPERS_INJECTION_SOURCE}
+      ${CARD_DEFINITION_NORMALIZATION_SOURCE}
     var __captured = (function() {
       ${compiledCode}
       return {

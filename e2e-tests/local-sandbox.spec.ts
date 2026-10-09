@@ -26,7 +26,7 @@ const CONFIG = {
   seed: 42,
 }
 
-const seedAndOpen = async (page: Page): Promise<string[]> => {
+const seedAndOpen = async (page: Page, config = CONFIG): Promise<string[]> => {
   const gameApiCalls: string[] = []
   page.on('request', (req) => {
     if (req.url().includes('/api/game/')) gameApiCalls.push(req.url())
@@ -35,7 +35,7 @@ const seedAndOpen = async (page: Page): Promise<string[]> => {
   // owner-scoped stash key must match (GameContainerApi uses user?.id ?? 'anon').
   await page.addInitScript((config) => {
     sessionStorage.setItem('open-agricola-local-sandbox-config', JSON.stringify({ owner: 'p1', config }))
-  }, CONFIG)
+  }, config)
   await page.goto('/?page=game&player=p1&embedded=1&devMode=1&localSandbox=1')
   await expect(page.locator('.action-board, [class*="ActionBoard"]').first())
     .toBeVisible({ timeout: 30_000 })
@@ -76,5 +76,26 @@ test.describe('browser-local sandbox', () => {
     await expect(page.locator('.action-board, [class*="ActionBoard"]').first())
       .toBeVisible({ timeout: 30_000 })
     await expect(page.locator('.farm-header', { hasText: '玩家 1' }).first()).toContainText('88')
+  })
+
+  test('renders an admitted nested Workshop preview and completes its choice', async ({ page }) => {
+    const config = structuredClone(CONFIG)
+    const errors: string[] = []
+    page.on('pageerror', error => errors.push(error.message))
+    config.cards[0]!.source = [
+      "const CARD_ID='CUSTOM_E2ECard'",
+      "const CARD_DEF=MinorImprovement({id:CARD_ID,name:'E2E Card'})",
+      `const CARD_IMPL={listeners:[{actions:['collect'],phases:['after'],mandatory:true,handler:()=>({flow:{type:'leaf',actionId:'emit-choice',params:{requiresExplicitChoice:true,options:[{value:'yes',labelKey:'ui.yes',descriptionPreview:{kind:'group',separator:' / ',parts:[{kind:'action',labelKey:'ui.yes',showLabel:false,effectPreview:{kind:'futureSchedule',entries:[{round:2,resources:{food:1}}]}},{kind:'action',labelKey:'ui.yes',showLabel:false,effectPreview:{kind:'text',text:'Workshop preview'}}]}},{value:'no',labelKey:'ui.no'}]}}})}],effect:{resolveChoice:(_s,_p,choice)=>choice==='yes'?gainLeaf(CARD_ID,{food:1}):undefined}}`,
+    ].join('\n')
+    const calls = await seedAndOpen(page, config)
+    await page.locator('.dev-field', { hasText: '卡牌 ID' }).getByRole('textbox').fill('CUSTOM_E2ECard')
+    await page.getByRole('button', { name: '打出卡牌', exact: true }).click()
+    await page.locator('[data-action-id="forest"] button').first().click()
+    await expect(page.locator('.interaction-future-schedule')).toBeVisible()
+    await expect(page.locator('.interaction-future-schedule')).toContainText('第 2 回合')
+    await page.getByRole('button').filter({ has: page.locator('.interaction-future-schedule') }).click()
+    await expect(page.locator('.interaction-future-schedule')).toHaveCount(0)
+    expect(errors).toEqual([])
+    expect(calls).toEqual([])
   })
 })
