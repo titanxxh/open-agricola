@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { ActionChoiceOption, GameState } from '../../shared/contract/types'
+import type { GameState } from '../../shared/contract/types'
 import type { SessionResponse } from '../game/authoritative-session'
 import { requireActiveCardRegistry } from '../../shared/cards/active-registry'
 import { createWorkSession } from './_helpers/session-fixtures'
@@ -15,7 +15,7 @@ type Restriction = { types: string[]; allowedPurchases: string[] }
 const setup = (restriction: Restriction, configure: (state: GameState) => void, injectMajor?: string) => {
   const session = createWorkSession({ configure: (state) => {
     state.players[0]!.minorPlayed = [CARD]
-    state.players[0]!.resources = { ...state.players[0]!.resources, wood: 0, clay: 0, reed: 0, stone: 0 }
+    state.players[0]!.resources = { ...state.players[0]!.resources, wood: 0, clay: 0, reed: 0, stone: 0, food: 0 }
     configure(state)
   } })
   session.withCtx(() => {
@@ -51,18 +51,21 @@ const setup = (restriction: Restriction, configure: (state: GameState) => void, 
   return session
 }
 
-const options = (response: SessionResponse): ActionChoiceOption[] =>
-  response.interaction.stateId === 'wait' && response.interaction.request.kind === 'choice'
-    ? response.interaction.request.options
-    : []
+const waiting = (response: SessionResponse) => response.interaction.stateId === 'wait'
+  ? {
+      kind: response.interaction.request.kind,
+      playerIndex: response.interaction.playerIndex,
+      options: response.interaction.request.kind === 'choice'
+        ? response.interaction.request.options.map((option) => option.value)
+        : undefined,
+    }
+  : { kind: response.interaction.stateId }
 
-/** Accepts the optional prompt and returns the improvement menu that follows. */
-const openMenu = (session: ReturnType<typeof setup>) => {
-  let response = session.takeAction(0, 'day-laborer')
-  const accept = options(response).find((option) => option.value !== '__skip__')
-  if (accept) response = session.resolveChoice(0, accept.value)
-  return response
-}
+const logs = (response: SessionResponse, key: string) => response.state.log.filter((entry) => entry.key === key)
+
+const cardPoints = (response: SessionResponse) => response.scores
+  ?.find((score) => score.playerId === response.state.players[0]!.id)
+  ?.categories.find((category) => category.key === 'cards')?.total ?? 0
 
 describe('improvement allowedPurchases', () => {
   it('does not offer a restricted improvement when only other improvements are affordable', () => {
@@ -74,10 +77,14 @@ describe('improvement allowedPurchases', () => {
     const response = session.takeAction(0, 'day-laborer')
 
     expect(response.ok, response.error).toBe(true)
-    expect(options(response)).toEqual([])
-    expect(response.interaction.stateId === 'wait' ? response.interaction.request.kind : response.interaction.stateId).not.toBe('engine-blocked')
+    // The turn ends normally instead of offering (and then blocking on) the purchase.
+    expect(waiting(response)).toEqual({ kind: 'confirm-next-player', playerIndex: 0, options: undefined })
     expect(response.state.players[0]!.improvements).toEqual([])
-    expect(response.state.players[0]!.resources.clay).toBe(2)
+    expect(response.state.players[0]!.resources).toMatchObject({ clay: 2, food: 2 })
+    expect(logs(response, 'log.placeFarmer')).toHaveLength(1)
+    expect(logs(response, 'log.improvementFail')).toEqual([])
+    expect(logs(response, 'log.playImprovement')).toEqual([])
+    expect(cardPoints(response)).toBe(0)
   })
 
   it('builds the allowed major when it is affordable, ignoring other affordable majors', () => {
@@ -86,12 +93,28 @@ describe('improvement allowedPurchases', () => {
       state.availableMajorImprovements = ['Major_Fireplace1', 'Major_Joinery']
     })
 
-    // The only allowed option is settled directly after accepting the prompt.
-    const response = openMenu(session)
+    let response = session.takeAction(0, 'day-laborer')
 
     expect(response.ok, response.error).toBe(true)
+    expect(waiting(response)).toEqual({ kind: 'choice', playerIndex: 0, options: ['flow-0', '__skip__'] })
+    expect(response.state.players[0]!.improvements).toEqual([])
+    expect(response.state.players[0]!.resources).toMatchObject({ clay: 2, wood: 2, stone: 2, food: 2 })
+    expect(logs(response, 'log.placeFarmer')).toHaveLength(1)
+    expect(logs(response, 'log.playImprovement')).toEqual([])
+    expect(cardPoints(response)).toBe(0)
+
+    // Accepting settles the only allowed improvement directly.
+    response = session.resolveChoice(0, 'flow-0')
+
+    expect(response.ok, response.error).toBe(true)
+    expect(waiting(response)).toEqual({ kind: 'confirm-next-player', playerIndex: 0, options: undefined })
     expect(response.state.players[0]!.improvements).toEqual(['Major_Joinery'])
-    expect(response.state.players[0]!.resources).toMatchObject({ clay: 2, wood: 0, stone: 0 })
+    expect(response.state.players[0]!.resources).toMatchObject({ clay: 2, wood: 0, stone: 0, food: 2 })
+    expect(logs(response, 'log.cardGrantedAction')).toEqual([expect.objectContaining({ params: expect.objectContaining({ cardId: CARD }) })])
+    expect(logs(response, 'log.playImprovement')).toEqual([
+      expect.objectContaining({ params: expect.objectContaining({ improvements: 'Major_Joinery', costResources: { wood: 2, stone: 2 } }) }),
+    ])
+    expect(cardPoints(response)).toBe(2)
   })
 
   it('keeps minor-only hand and injected candidates within the allowed purchases', () => {
@@ -101,19 +124,46 @@ describe('improvement allowedPurchases', () => {
       state.availableMajorImprovements = ['Major_Fireplace1']
     }, 'Major_Fireplace1')
 
-    let response = openMenu(session)
-    expect(options(response).map((option) => option.value)).toEqual([ALLOWED_MINOR, SECOND_ALLOWED_MINOR])
+    let response = session.takeAction(0, 'day-laborer')
 
-    const before = structuredClone(response.state.players[0]!)
+    expect(response.ok, response.error).toBe(true)
+    expect(waiting(response)).toEqual({ kind: 'choice', playerIndex: 0, options: ['flow-0', '__skip__'] })
+    expect(response.state.players[0]!.minorPlayed).toEqual([CARD])
+    expect(logs(response, 'log.placeFarmer')).toHaveLength(1)
+    expect(cardPoints(response)).toBe(0)
+
+    response = session.resolveChoice(0, 'flow-0')
+
+    expect(response.ok, response.error).toBe(true)
+    // Neither the other hand minor nor the injected major is offered.
+    expect(waiting(response)).toEqual({ kind: 'choice', playerIndex: 0, options: [ALLOWED_MINOR, SECOND_ALLOWED_MINOR] })
+    expect(response.state.players[0]!.minorHand).toEqual([ALLOWED_MINOR, SECOND_ALLOWED_MINOR, OTHER_MINOR])
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 2, clay: 2, food: 2 })
+    expect(logs(response, 'log.cardGrantedAction')).toHaveLength(1)
+    expect(logs(response, 'log.playMinorImprovement')).toEqual([])
+    expect(cardPoints(response)).toBe(0)
+
     const rejected = session.resolveChoice(0, OTHER_MINOR)
+
     expect(rejected.ok).toBe(false)
-    expect(rejected.state.players[0]!.minorPlayed).toEqual(before.minorPlayed)
-    expect(rejected.state.players[0]!.resources).toEqual(before.resources)
+    expect(rejected.error).toBe('invalid choice value')
+    expect(waiting(rejected)).toEqual({ kind: 'choice', playerIndex: 0, options: [ALLOWED_MINOR, SECOND_ALLOWED_MINOR] })
+    expect(rejected.state.players[0]!.minorHand).toEqual([ALLOWED_MINOR, SECOND_ALLOWED_MINOR, OTHER_MINOR])
+    expect(rejected.state.players[0]!.resources).toMatchObject({ wood: 2, clay: 2, food: 2 })
+    expect(logs(rejected, 'log.playMinorImprovement')).toEqual([])
+    expect(cardPoints(rejected)).toBe(0)
 
     response = session.resolveChoice(0, ALLOWED_MINOR)
+
     expect(response.ok, response.error).toBe(true)
-    expect(response.state.players[0]!.minorPlayed).toContain(ALLOWED_MINOR)
+    expect(waiting(response)).toEqual({ kind: 'confirm-next-player', playerIndex: 0, options: undefined })
+    expect(response.state.players[0]!.minorPlayed).toEqual([CARD, ALLOWED_MINOR])
     expect(response.state.players[0]!.minorHand).toEqual([SECOND_ALLOWED_MINOR, OTHER_MINOR])
     expect(response.state.players[0]!.improvements).toEqual([])
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 1, clay: 2, food: 2 })
+    expect(logs(response, 'log.playMinorImprovement')).toEqual([
+      expect.objectContaining({ params: expect.objectContaining({ improvements: ALLOWED_MINOR, costResources: { wood: 1 } }) }),
+    ])
+    expect(cardPoints(response)).toBe(0)
   })
 })
