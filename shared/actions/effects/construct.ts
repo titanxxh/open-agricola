@@ -86,7 +86,7 @@ const canStartConstruct = (
   actionContext: Record<string, unknown> | undefined,
   costAdjustments: ConstructCostAdjustments | undefined,
 ): boolean => {
-  if (PaymentSolver.getMaxBuildableRooms(player, costs, actionContext, costAdjustments) <= 0) return false
+  if (PaymentSolver.getMaxBuildableRooms(player, costs, actionContext, costAdjustments, state) <= 0) return false
   const costDelta = PaymentSolver.readConstructCostDelta(actionContext, costs)
   const farm = boardForPlayer(state, player).farmInteraction.selectableTiles('room', {
     costOverride: costDelta,
@@ -177,6 +177,7 @@ const finalizeRoom = (
     ctx.costs,
     ctx.actionContext,
     readConstructCostAdjustments(ctx),
+    ctx.state,
   )
   if (rooms.length > maxBuildableRooms) {
     return { type: 'fail', errorKey: 'log.buildRoomFail' }
@@ -189,6 +190,7 @@ const finalizeRoom = (
     paymentChoice,
     ctx.actionContext,
     readConstructCostAdjustments(ctx),
+    ctx.state,
   )
   if (payment.type !== 'selected') return { type: 'fail', errorKey: 'log.buildRoomFail' }
   const payCost = buildConstructPayCost(
@@ -247,6 +249,7 @@ const finalizeRoom = (
           paymentChoice,
           sourceCard: ctx.sourceCard,
           sourceActionId: ctx.space.id,
+          actionContext: { issuedPaymentChoices: ctx.actionContext?.issuedPaymentChoices },
           candidateMetadataByFeeIndex: costAttributionSources.length > 0
             ? { 0: { originalFeeIndex: 0, sources: costAttributionSources } }
             : undefined,
@@ -326,6 +329,7 @@ export const constructAction: ActionDefinition = {
         ctx.costs,
         ctx.actionContext,
         readConstructCostAdjustments(ctx),
+        ctx.state,
       )
       if (rooms.length > maxBuildableRooms) {
         return { type: 'fail', errorKey: 'log.buildRoomFail', recoverable: true }
@@ -338,6 +342,7 @@ export const constructAction: ActionDefinition = {
         undefined,
         ctx.actionContext,
         readConstructCostAdjustments(ctx),
+        ctx.state,
       )
       if (payment.type === 'request') {
         const options = payment.request.kind === 'choice' ? payment.request.options : []
@@ -346,7 +351,7 @@ export const constructAction: ActionDefinition = {
           request: { kind: 'choice', options },
           promptKey: payment.promptKey,
           extraData: {
-            actionContextWrite: { farmPayload: { rooms } },
+            actionContextWrite: { ...(payment.extraData?.actionContextWrite as Record<string,unknown> | undefined), farmPayload: { rooms } },
           },
         }
       }

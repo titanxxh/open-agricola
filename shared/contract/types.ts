@@ -168,7 +168,8 @@ export type Bonus = {
   maxCost?: Partial<Resource>
 }
 
-export type CostModifierType = 'construct' | 'renovation' | 'occupation' | 'fencing' | 'stables' | 'plow' | 'major-improvement' | 'minor-improvement'
+export const COST_MODIFIER_TYPES = ['construct', 'renovation', 'occupation', 'fencing', 'stables', 'plow', 'major-improvement', 'minor-improvement'] as const
+export type CostModifierType = typeof COST_MODIFIER_TYPES[number]
 
 export type TradeModifier = {
   type: 'trade'

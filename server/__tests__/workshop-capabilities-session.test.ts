@@ -373,6 +373,9 @@ describe('Workshop declarative metadata settlement',()=>{
   it.each([
     [{vp:'2'},'Printed VP'],
     [{prerequisite:{}},'prerequisite'],
+    ...[{}, [], 2, null].map(players=>[{players},'Card players'] as const),
+    [{name:{}},'Card name'],[{passing:'false'},'Card passing'],[{desc:{}},'Card desc'],[{rules:[{}]},'Card rules'],[{number:0.5},'integer'],[{locales:{zh:{name:[],desc:[]}}},'Card locale name'],
+    ...['conditions','discount','from','max'].map(key=>[{modifier:{type:'remove-resource',cardId:CARD,appliesTo:['stables'],resources:['wood'],[key]:key==='conditions'?{houseTypeStone:1}:1}},'unsupported field'] as const),
     [{cost:{wood:0.5}},'integer'],
     [{exchanges:[{from:{wood:1},to:{food:1},max:0.5}]},'integer'],
     [{cost:{unitFee:{food:1},nb:0.5}},'integer'],
@@ -631,6 +634,10 @@ describe('Workshop admitted player, choice and payment data',()=>{
     leaf('gain',{params:{food:1,recipientPlayerId:'missing'}}),
     leaf('gain',{params:{food:1,payerId:'missing'}}),
     leaf('gain',{params:{food:0.5}}),
+    ...['promptKey','choiceLabelKey','optionId'].map(key=>({type:'xor',children:[leaf('gain',{params:{food:1},[key]:{}}),leaf('gain',{params:{stone:1}})]})),
+    leaf('gain',{params:{food:1},choiceLabelParams:[]}),
+    ...[{},'pay'].map(costType=>leaf('pay',{params:{cost:{food:1},costType}})),
+    ...[{startRound:2,count:1,resources:{food:1}},{entries:[{round:2,resources:{food:1}}]}].map(fields=>leaf('future-meeples',{params:{__futureMeepleRequest:{cardId:CARD,playerId:'ghost',...fields}}})),
     {type:'xor',children:[leaf('gain',{params:{food:1},effectPreview:{kind:'futureSchedule',entries:{}}}),leaf('gain',{params:{stone:1}})]},
     leaf('future-meeples',{params:{__futureMeepleRequest:{cardId:CARD,playerId:'p1',startRound:2,count:2,resources:{food:0.5}}}}),
     ...[{scope:'other'},{replaceUpTo:'false'},{minCost:{wood:'1'}},{maxCost:{wood:0.5}},{groupId:1,groupMax:1},{groupMax:1},{groupId:'g',groupMin:2,groupMax:1}].map(fields=>leaf('pay',{params:{cost:{unitFee:{wood:1},nb:1,trades:[{from:{food:1},to:{wood:1},...fields}]}}})),
@@ -753,6 +760,129 @@ describe('Workshop admitted player, choice and payment data',()=>{
 })
 
 describe('Workshop typed query and settlement regressions',()=>{
+  it.each(['','2','2+','unknown'])('starts a fresh two-player Session with textual players=%s',players=>{
+    const {session}=setup(afterCollect(leaf('gain',{params:{food:1}})),`players:${JSON.stringify(players)}`)
+    const r=collect(session);expect(r.state.players).toHaveLength(2);expect(r.state.players[0]!.resources.food).toBe(3);expect(session.cardWarnings).toEqual([])
+  })
+  it.each(['range','entries'])('delivers %s future rewards to the existing opponent',kind=>{
+    const fields=kind==='range'?{startRound:2,count:1,resources:{food:1}}:{entries:[{round:2,resources:{food:1}}]}
+    const {session,player,opponent}=setup(afterCollect(leaf('future-meeples',{params:{__futureMeepleRequest:{cardId:CARD,playerId:'p2',...fields}}})))
+    let r=collect(session);expect(r.state.futureMeeples).toContainEqual(expect.objectContaining({playerId:opponent.id,round:2,resources:{food:1}}))
+    const ownFood=player.resources.food,otherFood=opponent.resources.food
+    for(const p of session.state.players){markAllWorkersUsed(session.state,p);setActiveWorkerCount(p,0)}
+    session.loadState(session.state);r=session.invokeAfterRoundEnd();expect(r.ok,r.error).toBe(true)
+    expect(r.state.round).toBe(2);expect(r.state.players[0]!.resources.food).toBe(ownFood);expect(r.state.players[1]!.resources.food).toBe(otherFood+1)
+    expect(r.state.futureMeeples).toEqual([]);expect(session.cardWarnings).toEqual([])
+  })
+  it('uses the declared native payment purpose and its matching modifier',()=>{
+    const {session}=setup(afterCollect(leaf('pay',{params:{cost:{wood:2},costType:'stables'}})),"modifier:{type:'bonus',cardId:CARD_ID,appliesTo:['stables'],discount:{wood:1},optional:false}")
+    const r=collect(session);expect(r.state.players[0]!.resources.wood).toBe(2)
+    expect(r.state.events).toContainEqual(expect.objectContaining({type:'resource.paid',resources:{wood:1},paymentFor:'stables'}));expect(session.cardWarnings).toEqual([])
+  })
+  it.each([0.5,1])('requires whole animal-zone capacity %s for private breeding',capacity=>{
+    const {session,player}=setup(afterCollect(leaf('breed',{actionContext:{animalTypes:['sheep']}}),`computeBreedableAnimalCount:(_s,p,animal,count)=>animal==='sheep'?count+(p.cardStates[CARD_ID]?.counters.held||0):count,onComputeAnimalZones:()=>[{id:'card-zone',zoneType:'card',cardId:CARD_ID,capacity:${capacity},animalType:null,animalCount:0}]`))
+    // Milking Place removes house capacity; the custom zone is the only
+    // possible backing for this private breeding action.
+    player.minorPlayed.push('D012_MilkingPlace');player.cardStates[CARD]={counters:{held:2}};player.resources.sheep=0
+    player.pastures=[];player.stableTiles=[];player.stableAnimals={};player.houseAnimalType=null;player.houseAnimalCount=0
+    let r=collect(session)
+    expect(r.state.players[0]!.resources.sheep).toBe(capacity===1?1:0)
+    if(capacity===1){
+      expect(r.interaction.request?.kind).toBe('animal-reorg')
+      r=session.resolveChoice(0,'confirm',{zones:[{id:'card-zone',zoneType:'card',animalType:'sheep',animalCount:1}]})
+      expect(r.ok,r.error).toBe(true);expect(r.state.events).toContainEqual(expect.objectContaining({type:'farm.animalBred',animals:{sheep:1}}));expect(session.cardWarnings).toEqual([])
+    } else {
+      expect(r.interaction.request?.kind).not.toBe('animal-reorg');expect(r.state.events.some(event=>event.type==='farm.animalBred')).toBe(false)
+      expect(session.cardWarnings).toEqual(expect.arrayContaining([expect.stringContaining('Animal capacity')]))
+    }
+  })
+  it('preserves labeled XOR branches and settles the selected reward',()=>{
+    const {session}=setup(afterCollect({type:'xor',promptKey:'ui.yes',children:[leaf('gain',{params:{food:1},choiceLabelKey:'ui.yes',choiceLabelParams:{},optionId:'food'}),leaf('gain',{params:{stone:1},choiceLabelKey:'ui.no',optionId:'stone'})]}))
+    let r=collect(session);expect(r.interaction.request).toMatchObject({kind:'choice',options:expect.arrayContaining([expect.objectContaining({labelKey:'ui.yes'}),expect.objectContaining({labelKey:'ui.no'})])})
+    r=session.resolveChoice(0,r.interaction.request!.options.find(option=>option.labelKey==='ui.yes')!.value)
+    expect(r.ok,r.error).toBe(true);expect(r.state.players[0]!.resources).toMatchObject({food:3,stone:0});expect(session.cardWarnings).toEqual([])
+  })
+  it.each(['missing','clay-pit'])('filters unavailable %s provider backing before offering payment',spaceId=>{
+    const key=CARD+':clay',provider={key,sourceCard:CARD,available:1,covers:[{resource:'food',costAmount:1,paymentAmount:1}],consume:{type:'actionSpace',spaceId,resource:'clay'}}
+    const {session}=setup(afterCollect(leaf('pay',{params:{cost:{fee:{food:1},paymentResourceProviders:[provider]}}})))
+    session.state.actionSpaces.find(space=>space.id==='clay-pit')!.resources.clay=0
+    const r=collect(session);expect(r.interaction.request?.kind).not.toBe('choice');expect(r.state.players[0]!.resources.food).toBe(1)
+    expect(r.state.events).toContainEqual(expect.objectContaining({type:'resource.paid',resources:{food:1}}));expect(session.cardWarnings).toEqual([])
+  })
+  it.each([1,2])('accounts for %s units of shared backing across distinct provider keys',backing=>{
+    const provider=(suffix:string)=>({key:CARD+':'+suffix,sourceCard:CARD,available:1,covers:[{resource:'food',costAmount:1,paymentAmount:1}],consume:{type:'actionSpace',spaceId:'clay-pit',resource:'clay'}})
+    const {session}=setup(afterCollect(leaf('pay',{params:{cost:{fee:{food:2},paymentResourceProviders:[provider('a'),provider('b')]}}})))
+    session.state.actionSpaces.find(space=>space.id==='clay-pit')!.resources.clay=backing
+    let r=collect(session);expect(r.interaction.request?.kind).toBe('choice')
+    const paidFromBacking=(option:{labelParams?:Record<string,unknown>})=>Object.entries(option.labelParams?.resourcesPaid??{}).filter(([key])=>key.startsWith(CARD+':')).reduce((sum,[,amount])=>sum+Number(amount),0)
+    expect(r.interaction.request!.options.every(option=>paidFromBacking(option)<=backing)).toBe(true)
+    const option=r.interaction.request!.options.find(option=>paidFromBacking(option)===backing)!
+    r=session.resolveChoice(0,option.value);expect(r.ok,r.error).toBe(true);expect(r.state.players[0]!.resources.food).toBe(backing)
+    expect(r.state.actionSpaces.find(space=>space.id==='clay-pit')!.resources.clay).toBe(0);expect(session.cardWarnings).toEqual([])
+  })
+  it('does not offer an unbacked provider as the only payment or run an unpaid follow-up',()=>{
+    const p={key:CARD+':ghost',sourceCard:CARD,available:1,covers:[{resource:'food',costAmount:1,paymentAmount:1}],consume:{type:'actionSpace',spaceId:'missing',resource:'food'}}
+    const {session,player}=setup(afterCollect({type:'seq',children:[leaf('pay',{params:{cost:{fee:{food:1},paymentResourceProviders:[p]}}}),leaf('gain',{params:{food:9}})]}))
+    player.resources.food=0
+    session.loadState(session.state);const before=JSON.stringify(session.state),r=session.takeAction(0,'forest')
+    expect(r.ok).toBe(false);expect(r.error).toContain('no available backing');expect(JSON.stringify(session.state)).toBe(before)
+    expect(r.interaction.request).toBeUndefined();expect(r.state.players[0]!.resources.food).toBe(0)
+    expect(r.state.events.some(event=>event.type==='resource.paid')).toBe(false)
+  })
+  it('rejects a stale provider payment after anytime consumption without substituting another backing',()=>{
+    const provider=(suffix:string,spaceId:string,resource:string)=>({key:CARD+':'+suffix,sourceCard:CARD,available:1,covers:[{resource:'food',costAmount:1,paymentAmount:1}],consume:{type:'actionSpace',spaceId,resource}})
+    const a=provider('a','clay-pit','clay'),b=provider('b','reed-bank','reed')
+    const main=afterCollect(leaf('pay',{params:{cost:{fee:{food:1},paymentResourceProviders:[a,b]}}})).slice(0,-2)
+    const {session,player}=setup(main+`,{actions:['anytime'],phases:['anytime'],handler:()=>({flow:${JSON.stringify(leaf('pay',{params:{optionPrefix:'pay:drain',cost:{fee:{food:1},paymentResourceProviders:[a]}}}))}})}]}`)
+    player.resources.food=1;session.state.actionSpaces.find(space=>space.id==='clay-pit')!.resources.clay=1;session.state.actionSpaces.find(space=>space.id==='reed-bank')!.resources.reed=1
+    let r=collect(session);const original=r.interaction.request!.options.find(option=>(option.labelParams?.resourcesPaid as Record<string,number>|undefined)?.[a.key]===1)!
+    r=session.takeAnytimeAction(0,CARD+':listener:1');expect(r.ok,r.error).toBe(true)
+    r=session.resolveChoice(0,r.interaction.request!.options.find(option=>(option.labelParams?.resourcesPaid as Record<string,number>|undefined)?.[a.key]===1)!.value)
+    expect(r.ok,r.error).toBe(true);expect(r.state.actionSpaces.find(space=>space.id==='clay-pit')!.resources.clay).toBe(0)
+    const paidBefore=r.state.events.filter(event=>event.type==='resource.paid').length
+    const before=JSON.stringify(session.state)
+    r=session.resolveChoice(0,original.value);expect(r.ok).toBe(false);expect(r.error).toContain('no longer available');expect(JSON.stringify(session.state)).toBe(before)
+    expect(r.interaction.request).toMatchObject({kind:'choice'})
+    expect(r.state.players[0]!.resources.food).toBe(1);expect(r.state.actionSpaces.find(space=>space.id==='reed-bank')!.resources.reed).toBe(1)
+    expect(r.state.events.filter(event=>event.type==='resource.paid')).toHaveLength(paidBefore)
+    expect(r.interaction.request!.options.some(option=>option.value===original.value)).toBe(true)
+    r=session.resolveChoice(0,r.interaction.request!.options.find(option=>(option.labelParams?.resourcesPaid as Record<string,number>|undefined)?.[b.key]===1)!.value)
+    expect(r.ok,r.error).toBe(true);expect(r.state.actionSpaces.find(space=>space.id==='reed-bank')!.resources.reed).toBe(0);expect(r.state.players[0]!.resources.food).toBe(1);expect(session.cardWarnings).toEqual([])
+  })
+  it('rejects repeated provider identities before enumeration',()=>{
+    const p={key:CARD+':clay',sourceCard:CARD,available:1,covers:[{resource:'food',costAmount:1,paymentAmount:1}],consume:{type:'actionSpace',spaceId:'clay-pit',resource:'clay'}}
+    const {session}=setup(afterCollect(leaf('pay',{params:{cost:{fee:{food:2},paymentResourceProviders:[p,p]}}})))
+    session.loadState(session.state);const before=JSON.stringify(session.state),r=session.takeAction(0,'forest')
+    expect(r.ok).toBe(false);expect(JSON.stringify(session.state)).toBe(before);expect(session.cardWarnings).toEqual(expect.arrayContaining([expect.stringContaining('keys must be distinct')]))
+  })
+  it('keeps an issued real-payment choice usable when a native cost listener withdraws its provider',()=>{
+    const key=CARD+':clay',p={key,sourceCard:CARD,available:1,covers:[{resource:'wood',costAmount:2,paymentAmount:1}],consume:{type:'actionSpace',spaceId:'clay-pit',resource:'clay'}}
+    const drain={...p,covers:[{resource:'food',costAmount:1,paymentAmount:1}]}
+    const base=afterCollect(leaf('stables')).slice(0,-2)
+    const {session}=setup(base+`,{actions:['stables'],phases:['computeCosts'],handler:ctx=>ctx.state.actionSpaces.find(s=>s.id==='clay-pit').resources.clay>0?{paymentResourceProviders:${JSON.stringify([p])}}:undefined},{actions:['anytime'],phases:['anytime'],handler:()=>({flow:${JSON.stringify(leaf('pay',{params:{optionPrefix:'pay:drain',cost:{fee:{food:1},paymentResourceProviders:[drain]}}}))}})}]}`)
+    session.state.actionSpaces.find(space=>space.id==='clay-pit')!.resources.clay=1
+    collect(session);let r=session.commitSelectionChoice(0,{stables:[{row:0,col:0}]});expect(r.ok,r.error).toBe(true)
+    const original=r.interaction.request!.options,virtual=original.find(option=>(option.labelParams?.resourcesPaid as Record<string,number>|undefined)?.[key]===1)!,own=original.find(option=>(option.labelParams?.resourcesPaid as Record<string,number>|undefined)?.wood===2)!
+    r=session.takeAnytimeAction(0,CARD+':listener:2');expect(r.ok,r.error).toBe(true)
+    r=session.resolveChoice(0,r.interaction.request!.options.find(option=>(option.labelParams?.resourcesPaid as Record<string,number>|undefined)?.[key]===1)!.value);expect(r.ok,r.error).toBe(true)
+    const before=JSON.stringify(session.state)
+    r=session.resolveChoice(0,virtual.value);expect(r.ok).toBe(false);expect(r.error).toContain('no longer available');expect(JSON.stringify(session.state)).toBe(before)
+    r=session.resolveChoice(0,own.value);expect(r.ok,r.error).toBe(true)
+    expect(r.state.players[0]!.resources.wood).toBe(1);expect(r.state.players[0]!.stableTiles).toContainEqual({row:0,col:0});expect(session.cardWarnings).toEqual([])
+  })
+  it('keeps an issued real payment when a native cost listener adds a provider after an anytime action',()=>{
+    const key=CARD+':clay',p={key,sourceCard:CARD,available:1,covers:[{resource:'wood',costAmount:2,paymentAmount:1}],consume:{type:'actionSpace',spaceId:'clay-pit',resource:'clay'}}
+    const base=afterCollect(leaf('stables')).slice(0,-2)
+    const {session,player}=setup(base+`,{actions:['stables'],phases:['computeCosts'],handler:ctx=>ctx.player.resources.food>=3?{trades:[{from:{clay:1},to:{wood:1},max:2}],paymentResourceProviders:${JSON.stringify([p])}}:{trades:[{from:{clay:1},to:{wood:1},max:2}]}},{actions:['anytime'],phases:['anytime'],handler:()=>({flow:gainLeaf(CARD_ID,{food:1})})}]}`)
+    player.resources.clay=2;session.state.actionSpaces.find(space=>space.id==='clay-pit')!.resources.clay=1
+    collect(session);let r=session.commitSelectionChoice(0,{stables:[{row:0,col:0}]});expect(r.ok,r.error).toBe(true)
+    const original=r.interaction.request!.options.find(option=>(option.labelParams?.resourcesPaid as Record<string,number>|undefined)?.wood===2)!
+    expect(original.value).toMatch(/^pay:stable:\d+$/)
+    r=session.takeAnytimeAction(0,CARD+':listener:2');expect(r.ok,r.error).toBe(true);expect(r.state.players[0]!.resources.food).toBe(3)
+    r=session.resolveChoice(0,original.value);expect(r.ok,r.error).toBe(true)
+    expect(r.state.players[0]!.resources).toMatchObject({wood:1,clay:2,food:3});expect(r.state.players[0]!.stableTiles).toContainEqual({row:0,col:0})
+    expect(r.state.actionSpaces.find(space=>space.id==='clay-pit')!.resources.clay).toBe(1);expect(session.cardWarnings).toEqual([])
+  })
   it('retains an admitted leaf preview in its menu and queues the selected future reward',()=>{
     const preview={kind:'futureSchedule',entries:[{round:2,resources:{food:1}}]}
     const flow={type:'xor',children:[leaf('future-meeples',{params:{__futureMeepleRequest:{cardId:CARD,playerId:'p1',entries:[{round:2,resources:{food:1}}]}},effectPreview:preview}),leaf('gain',{params:{food:1}})]} as ActionFlow

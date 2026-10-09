@@ -78,6 +78,22 @@ test.describe('browser-local sandbox', () => {
     await expect(page.locator('.farm-header', { hasText: '玩家 1' }).first()).toContainText('88')
   })
 
+  test('renders admitted Workshop flow labels and completes its choice', async ({ page }) => {
+    const config=structuredClone(CONFIG),errors:string[]=[]
+    page.on('pageerror',error=>errors.push(error.message))
+    config.cards[0]!.source=[
+      "const CARD_ID='CUSTOM_E2ECard'",
+      "const CARD_DEF=MinorImprovement({id:CARD_ID,name:'E2E Card'})",
+      "const CARD_IMPL={listeners:[{actions:['collect'],phases:['after'],mandatory:true,handler:()=>({flow:{type:'xor',promptKey:'ui.interactionFlowSelect',children:[{type:'leaf',actionId:'gain',sourceCard:CARD_ID,params:{food:1},choiceLabelKey:'ui.interactionUseAbility',choiceLabelParams:{},effectPreview:{kind:'text',text:'Labeled Workshop branch'}},{type:'leaf',actionId:'gain',sourceCard:CARD_ID,params:{wood:1},choiceLabelKey:'actions.gain.name'}]}})}]}",
+    ].join('\n')
+    const calls=await seedAndOpen(page,config)
+    await page.locator('.dev-field',{hasText:'卡牌 ID'}).getByRole('textbox').fill('CUSTOM_E2ECard')
+    await page.getByRole('button',{name:'打出卡牌',exact:true}).click()
+    await page.locator('[data-action-id="forest"] button').first().click()
+    const option=page.getByRole('button',{name:/Labeled Workshop branch/})
+    await expect(option).toContainText('使用能力');await option.click()
+    await expect(option).toHaveCount(0);expect(errors).toEqual([]);expect(calls).toEqual([])
+  })
   test('renders an admitted nested Workshop preview and completes its choice', async ({ page }) => {
     const config = structuredClone(CONFIG)
     const errors: string[] = []

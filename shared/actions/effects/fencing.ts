@@ -615,6 +615,7 @@ const finalizeFence = (
     { type: 'fail', errorKey: 'log.fencingFail' },
     'fencing',
     ctx.state,
+    ctx.actionContext,
   )
   if (payment.type !== 'selected') {
     return { type: 'fail', errorKey: 'log.fencingFail' }
@@ -690,6 +691,7 @@ const finalizeFence = (
           paymentChoice,
           sourceCard: ctx.sourceCard,
           sourceActionId: ctx.space.id,
+          actionContext: { issuedPaymentChoices: ctx.actionContext?.issuedPaymentChoices },
         }),
       ],
     },
@@ -998,6 +1000,7 @@ export const fenceAction: ActionDefinition = {
         { type: 'fail', errorKey: 'log.fencingFail', recoverable: true },
         'fencing',
         ctx.state,
+        ctx.actionContext,
       )
       if (payment.type === 'request') {
         const options = payment.request.kind === 'choice' ? payment.request.options : []
@@ -1007,6 +1010,7 @@ export const fenceAction: ActionDefinition = {
           promptKey: payment.promptKey,
           extraData: {
             actionContextWrite: {
+              ...(payment.extraData?.actionContextWrite as Record<string,unknown> | undefined),
               farmPayload: { edges, palisadeEdges, extraWood, fenceSources },
             },
           },

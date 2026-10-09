@@ -1,5 +1,5 @@
 /** Pure payment declaration invariants, shared by native settlement and custom-card admission. */
-import type { Bonus, CardProvidedPaymentResourceProvider, TradeModifier } from '../../contract/types'
+import type { Bonus, CardProvidedPaymentResourceProvider, GameState, PaymentSolution, TradeModifier } from '../../contract/types'
 import { InvalidActionContextError } from '../../contract/action-context-error.ts'
 
 export const MAX_PAYMENT_PROVIDER_COMBINATIONS = 512
@@ -8,7 +8,10 @@ export const MAX_PAYMENT_PROVIDER_COMBINATIONS = 512
  * The final merged list is checked too; separate contributions cannot bypass it. */
 export const assertPaymentProviderEnumerationBudget = (providers: readonly CardProvidedPaymentResourceProvider[]): void => {
   let combinations = 1
+  const keys = new Set<string>()
   for (const provider of providers) {
+    if (keys.has(provider.key)) throw new InvalidActionContextError('Payment provider keys must be distinct')
+    keys.add(provider.key)
     const available = Math.max(0, Math.floor(provider.available))
     if (available === 0) continue
     for (const cover of provider.covers) {
@@ -17,6 +20,30 @@ export const assertPaymentProviderEnumerationBudget = (providers: readonly CardP
       if (!Number.isFinite(combinations) || combinations > MAX_PAYMENT_PROVIDER_COMBINATIONS) throw new InvalidActionContextError('Payment provider enumeration exceeds the 512-combination limit')
     }
   }
+}
+
+/** A candidate must have enough backing for all virtual keys together. This
+ * query is reused before offering a payment and immediately before consuming it. */
+export const canConsumePaymentResourceProviders = (
+  state: GameState | undefined,
+  solution: PaymentSolution,
+  providers: readonly CardProvidedPaymentResourceProvider[] | undefined,
+): boolean => {
+  const providerByKey = new Map((providers ?? []).map(provider => [provider.key, provider]))
+  const demand = new Map<string, { spaceId: string; resource: CardProvidedPaymentResourceProvider['consume']['resource']; amount: number }>()
+  for (const [key, amount] of Object.entries(solution.resourcesPaid)) {
+    if (!key.includes(':') || !amount || amount <= 0) continue
+    const provider = providerByKey.get(key as CardProvidedPaymentResourceProvider['key'])
+    if (!provider || !state || amount > Math.max(0, Math.floor(provider.available))) return false
+    if (provider.consume.type !== 'actionSpace') return false
+    const { spaceId, resource } = provider.consume
+    const backingKey = JSON.stringify([spaceId, resource])
+    const previous = demand.get(backingKey)?.amount ?? 0
+    demand.set(backingKey, { spaceId, resource, amount: previous + amount })
+  }
+  return [...demand.values()].every(({spaceId, resource, amount}) =>
+    (state?.actionSpaces?.find(space => space.id === spaceId)?.resources?.[resource] ?? 0) >= amount,
+  )
 }
 
 export const validateTradeModifier = (modifier: TradeModifier): void => {

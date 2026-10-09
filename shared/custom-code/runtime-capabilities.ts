@@ -9,6 +9,7 @@ import { assertKeys, assertRecord, sandboxInteractionKinds, sandboxCardMetadataK
 import type { ActionFlow, Bonus, CardProvidedPaymentResourceProvider, GameState, TradeModifier } from '../contract/types.ts'
 import type { CardEffectField } from '../cards/card-effects.ts'
 import type { CardListenerContext } from '../cards/card-listeners.ts'
+import { COST_MODIFIER_TYPES } from '../contract/types.ts'
 
 const resources = REAL_RESOURCE_KEYS as readonly string[]
 const specialKeys: Record<typeof sandboxSpecialEffectKinds[number], readonly string[]> = {
@@ -204,6 +205,7 @@ function providers(value: unknown, cardId: string): void {
     assertRecord(provider.consume, 'Provider consumption')
     assertKeys(provider.consume, ['type', 'spaceId', 'resource'], 'Provider consumption')
     if (provider.consume.type !== 'actionSpace' || typeof provider.consume.spaceId !== 'string' || typeof provider.consume.resource !== 'string' || !resources.includes(provider.consume.resource)) throw new Error('Unsupported provider consumption')
+    if (!provider.consume.spaceId.trim()) throw new Error('Provider action-space ID must be nonempty')
   }
   assertPaymentProviderEnumerationBudget(value as CardProvidedPaymentResourceProvider[])
 }
@@ -267,7 +269,21 @@ export function assertCustomCardDefinition(definition: unknown, cardId: string):
   assertKeys(meta, sandboxCardMetadataKeys, 'CARD_DEF.meta')
   if (meta.id !== cardId) throw new Error('CARD_DEF id must match CARD_ID')
   if (meta.vp !== undefined) finite(meta.vp, 'Printed VP')
-  if (meta.prerequisite !== undefined && typeof meta.prerequisite !== 'string') throw new Error('Card prerequisite must be a string')
+  for (const key of ['name', 'deck', 'category', 'artUrl', 'prerequisite', 'players']) if (meta[key] !== undefined && typeof meta[key] !== 'string') throw new Error(`Card ${key} must be a string`)
+  for (const key of ['passing', 'implemented', 'isCookery', 'isBaking', 'isField', 'providesField', 'providesOccupation', 'extraVp', 'evenMoreSet']) if (meta[key] !== undefined && typeof meta[key] !== 'boolean') throw new Error(`Card ${key} must be boolean`)
+  for (const key of ['number', 'maxRound']) if (meta[key] !== undefined) integer(meta[key], `Card ${key}`)
+  const cardText = (text: Record<string, unknown>): void => {
+    for (const key of ['desc', 'rules']) if (text[key] !== undefined && (!Array.isArray(text[key]) || text[key].some(line => typeof line !== 'string'))) throw new Error(`Card ${key} must be a string array`)
+  }
+  cardText(meta)
+  for (const key of ['playerActionCardType', 'card_type']) if (meta[key] !== undefined && meta[key] !== 'minor' && meta[key] !== 'occupation') throw new Error(`Card ${key} must be minor or occupation`)
+  if (meta.locales !== undefined) {
+    assertRecord(meta.locales, 'Card locales')
+    for (const locale of Object.values(meta.locales)) {
+      assertRecord(locale, 'Card locale'); assertKeys(locale, ['name', 'desc', 'rules', 'prerequisite'], 'Card locale'); cardText(locale)
+      for (const key of ['name', 'prerequisite']) if (locale[key] !== undefined && typeof locale[key] !== 'string') throw new Error(`Card locale ${key} must be a string`)
+    }
+  }
   if (meta.cost !== undefined) cost(meta.cost, cardId, true)
   if (meta.altCosts !== undefined) {
     if (!Array.isArray(meta.altCosts)) throw new Error('altCosts must be an array')
@@ -286,7 +302,7 @@ export function assertCustomCardDefinition(definition: unknown, cardId: string):
     if (modifier.cardId !== cardId) throw new Error('Cost modifier cardId must be this card')
     if (modifier.conditions !== undefined) conditions(modifier.conditions)
     if (!['trade', 'bonus', 'remove-resource'].includes(String(modifier.type))) throw new Error('Unsupported cost modifier')
-    if (!Array.isArray(modifier.appliesTo) || modifier.appliesTo.some(type => !['construct', 'renovation', 'occupation', 'fencing', 'stables', 'plow', 'major-improvement', 'minor-improvement'].includes(type))) throw new Error('Unsupported modifier cost type')
+    if (!Array.isArray(modifier.appliesTo) || modifier.appliesTo.some(type => !(COST_MODIFIER_TYPES as readonly unknown[]).includes(type))) throw new Error('Unsupported modifier cost type')
     if (modifier.type === 'trade') {
       trade(Object.fromEntries(Object.entries(modifier).filter(([key]) => !['type', 'cardId', 'appliesTo', 'conditions'].includes(key))), cardId)
       if (modifier.scope !== undefined && modifier.scope !== 'unit' && modifier.scope !== 'action') throw new Error('Invalid trade modifier scope')
@@ -294,7 +310,10 @@ export function assertCustomCardDefinition(definition: unknown, cardId: string):
       validateTradeModifier(modifier as TradeModifier)
     }
     if (modifier.type === 'bonus') bonus(Object.fromEntries(Object.entries(modifier).filter(([key]) => !['type', 'cardId', 'appliesTo'].includes(key))), cardId)
-    if (modifier.type === 'remove-resource') stringArray(modifier.resources, 'Removed cost resources', resources, true)
+    if (modifier.type === 'remove-resource') {
+      assertKeys(modifier, ['type', 'cardId', 'appliesTo', 'resources'], 'Remove-resource modifier')
+      stringArray(modifier.resources, 'Removed cost resources', resources, true)
+    }
   }
 
 }
@@ -320,6 +339,7 @@ export function assertCustomActionData(actionId: string, params: Record<string, 
   }
   if (context.costOverride !== undefined) resourceMap(context.costOverride, false, false)
   if (actionId === 'pay') cost(params.cost ?? params, cardId)
+  if (actionId === 'pay' && params.costType !== undefined && !(COST_MODIFIER_TYPES as readonly unknown[]).includes(params.costType)) throw new Error('Unsupported payment costType')
   if (actionId === 'pay' && params.reserveResources !== undefined) resourceMap(params.reserveResources)
   if (actionId === 'pay') for (const key of ['paymentChoice', 'optionPrefix']) if (params[key] !== undefined && typeof params[key] !== 'string') throw new Error(`${key} must be a string`)
   if (actionId === 'occupation' && params.allowedCards !== undefined) stringArray(params.allowedCards, 'Allowed occupation cards')
@@ -376,6 +396,7 @@ export function assertCustomActionData(actionId: string, params: Record<string, 
       if (entry.roomType !== undefined && !['wood', 'clay', 'stone'].includes(String(entry.roomType))) throw new Error('Invalid future room type')
       if (entry.actionContext !== undefined || request.actionContext !== undefined) throw new Error('Future action-context overrides require a separate admitted settlement contract')
     }
+    if (!state?.players?.some(player => player.id === request.playerId)) throw new Error('Future recipient must exist in the current game')
   }
   if (actionId === 'sow') {
     if (context.cropType !== undefined && !['grain', 'vegetable'].includes(String(context.cropType))) throw new Error('Workshop sow supports ordinary crops')
@@ -402,6 +423,9 @@ export function assertCustomActionData(actionId: string, params: Record<string, 
     if (context.excludedFields !== undefined) farmPositions(context.excludedFields, state, playerId)
   }
   if (actionId === 'emit-choice') {
+    if (params.promptKey !== undefined && typeof params.promptKey !== 'string') throw new Error('Choice promptKey must be a string')
+    if (params.promptParams !== undefined) assertRecord(params.promptParams, 'Choice promptParams')
+    if (params.requiresExplicitChoice !== undefined && typeof params.requiresExplicitChoice !== 'boolean') throw new Error('Choice requiresExplicitChoice must be boolean')
     choiceOptions(params.options, cardId)
     if (params.multiSelect !== undefined) {
       assertRecord(params.multiSelect, 'Multi-select'); assertKeys(params.multiSelect, ['valuePrefix', 'minSelections', 'maxSelections'], 'Multi-select')
@@ -448,6 +472,8 @@ export function assertCustomActionData(actionId: string, params: Record<string, 
 export function validateCustomFlow(value: unknown, cardId: string, depth = 0, state?: GameState, playerId?: string): ActionFlow {
   if (depth > 24) throw new Error('Custom flow exceeds the nesting limit')
   assertRecord(value, 'ActionFlow')
+  for (const key of ['promptKey', 'choiceLabelKey', 'optionId']) if (value[key] !== undefined && typeof value[key] !== 'string') throw new Error(`Flow ${key} must be a string`)
+  if (value.choiceLabelParams !== undefined) assertRecord(value.choiceLabelParams, 'Flow choiceLabelParams')
   for (const key of ['optional', 'triggerSelectOnce']) if (value[key] !== undefined && typeof value[key] !== 'boolean') throw new Error(`${key} must be boolean`)
   if (value.mode !== undefined && !['all', 'trigger-select'].includes(value.mode as string)) throw new Error('Unsupported composite mode')
   ownSource(value.sourceCard, cardId)
@@ -514,6 +540,7 @@ export function validateCustomEffectResult(value: unknown, cardId: string, hook:
     for (const position of value) {
       assertRecord(position, 'Farm position'); assertKeys(position, ['row', 'col'], 'Farm position')
       finite(position.row, 'Farm row'); finite(position.col, 'Farm column')
+      if (!Number.isSafeInteger(position.row) || !Number.isSafeInteger(position.col)) throw new Error('Farm coordinates must be safe integers')
     }
   }
   if (hook === 'getInvalidAnimals') {
@@ -530,7 +557,7 @@ export function validateCustomEffectResult(value: unknown, cardId: string, hook:
     assertRecord(value, 'Rule contributions'); assertKeys(value, ['reservedSupply', 'unusedSpaceReduction'], 'Rule contributions')
     if (value.reservedSupply !== undefined) {
       assertRecord(value.reservedSupply, 'Reserved supply'); assertKeys(value.reservedSupply, ['fence', 'stable'], 'Reserved supply')
-      Object.values(value.reservedSupply).forEach(amount => finite(amount, 'Reserved supply', true))
+      Object.values(value.reservedSupply).forEach(amount => integer(amount, 'Reserved supply'))
     }
     if (value.unusedSpaceReduction !== undefined) finite(value.unusedSpaceReduction, 'Unused-space reduction', true)
   }
@@ -558,7 +585,7 @@ export function validateCustomEffectResult(value: unknown, cardId: string, hook:
       assertRecord(zone, 'Animal zone'); ownSource(zone.cardId, cardId)
       assertKeys(zone, ['id', 'zoneType', 'capacity', 'blocked', 'houseAnimalZone', 'animalType', 'animalCount', 'animalCounts', 'allowedAnimalType', 'allowedAnimalTypes', 'cardId', 'ownerPlayerId', 'animalOwnerPlayerId', 'breedingOwnerPlayerId', 'displayOwnerName', 'pastureIndex', 'farmPosition', 'countsFarmyardSpaceAsUnused', 'displaySource', 'exclusiveCardZoneLimit', 'capacityCounterKey', 'capacityLossOnPayment', 'requiredEmptyZoneGroupIds'], 'Animal zone')
       if (zone.zoneType !== 'card' || typeof zone.id !== 'string' || seen.has(zone.id)) throw new Error('Animal query must return distinct new card zones')
-      seen.add(zone.id); finite(zone.capacity, 'Animal capacity', true)
+      seen.add(zone.id); integer(zone.capacity, 'Animal capacity')
       const owner = args[0] as { id: string }
       const animalOwner = (hook === 'onComputeSharedAnimalZones' ? args[1] : args[0]) as { id: string }
       if (zone.ownerPlayerId !== undefined && zone.ownerPlayerId !== owner?.id || zone.animalOwnerPlayerId !== undefined && zone.animalOwnerPlayerId !== animalOwner?.id) throw new Error('Animal-zone owners must match the query players')
@@ -566,10 +593,10 @@ export function validateCustomEffectResult(value: unknown, cardId: string, hook:
       for (const key of ['blocked', 'houseAnimalZone', 'countsFarmyardSpaceAsUnused', 'capacityLossOnPayment']) if (zone[key] !== undefined && typeof zone[key] !== 'boolean') throw new Error(`${key} must be boolean`)
       for (const key of ['animalType', 'allowedAnimalType']) if (zone[key] != null && !(ALL_ANIMAL_KEYS as readonly unknown[]).includes(zone[key])) throw new Error('Animal-zone type must be an animal')
       if (zone.allowedAnimalTypes !== undefined) stringArray(zone.allowedAnimalTypes, 'Allowed zone animals', ALL_ANIMAL_KEYS)
-      for (const key of ['animalCount', 'pastureIndex', 'exclusiveCardZoneLimit']) if (zone[key] !== undefined) finite(zone[key], key, true)
+      for (const key of ['animalCount', 'pastureIndex', 'exclusiveCardZoneLimit']) if (zone[key] !== undefined) integer(zone[key], key)
       if (zone.animalCounts !== undefined) {
         assertRecord(zone.animalCounts, 'Zone animal counts'); assertKeys(zone.animalCounts, ALL_ANIMAL_KEYS, 'Zone animal counts')
-        Object.values(zone.animalCounts).forEach(amount => finite(amount, 'Animal count', true))
+        Object.values(zone.animalCounts).forEach(amount => integer(amount, 'Animal count'))
       }
       if (zone.requiredEmptyZoneGroupIds !== undefined) stringArray(zone.requiredEmptyZoneGroupIds, 'Empty zone groups')
       if (zone.displayOwnerName !== undefined && typeof zone.displayOwnerName !== 'string') throw new Error('Display owner name must be a string')
@@ -578,6 +605,7 @@ export function validateCustomEffectResult(value: unknown, cardId: string, hook:
       if (zone.farmPosition !== undefined) {
         assertRecord(zone.farmPosition, 'Zone farm position'); assertKeys(zone.farmPosition, ['row', 'col'], 'Zone farm position')
         finite(zone.farmPosition.row, 'Zone row'); finite(zone.farmPosition.col, 'Zone column')
+        if (!Number.isSafeInteger(zone.farmPosition.row) || !Number.isSafeInteger(zone.farmPosition.col)) throw new Error('Zone coordinates must be safe integers')
       }
     }
   }

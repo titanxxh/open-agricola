@@ -205,6 +205,7 @@ const finalizePlow = (
     { type: 'fail', errorKey: 'log.action' },
     'plow',
     ctx.state,
+    ctx.actionContext,
   )
   if (payment.type !== 'selected') return { type: 'fail', errorKey: 'log.action' }
   const nextPlayer = JSON.parse(JSON.stringify(validated.player)) as PlayerState
@@ -313,6 +314,7 @@ export const plowAction: ActionDefinition = {
         { type: 'fail', errorKey: 'log.action', recoverable: true },
         'plow',
         ctx.state,
+        ctx.actionContext,
       )
       if (payment.type === 'request') {
         const options = payment.request.kind === 'choice' ? payment.request.options : []
@@ -321,7 +323,7 @@ export const plowAction: ActionDefinition = {
           request: { kind: 'choice', options },
           promptKey: payment.promptKey,
           extraData: {
-            actionContextWrite: { farmPayload: { tile: selectedTile } },
+            actionContextWrite: { ...(payment.extraData?.actionContextWrite as Record<string,unknown> | undefined), farmPayload: { tile: selectedTile } },
           },
         }
       }

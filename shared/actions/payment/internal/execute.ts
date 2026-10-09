@@ -22,34 +22,13 @@ import type {
 import { recordPaymentStats } from '../../../cards/helpers/payment-stats'
 import { payResources, paySupplyTokens } from './affordability'
 import { findActionSpaceById } from '../../../domain/space'
+import { canConsumePaymentResourceProviders } from '../declaration-validation'
+export { canConsumePaymentResourceProviders } from '../declaration-validation'
 
 const providerAmountPaid = (
   solution: PaymentSolution,
   provider: CardProvidedPaymentResourceProvider,
 ): number => solution.resourcesPaid[provider.key] ?? 0
-
-export const canConsumePaymentResourceProviders = (
-  state: GameState | undefined,
-  solution: PaymentSolution,
-  providers: CardProvidedPaymentResourceProvider[] | undefined,
-): boolean => {
-  const providerByKey = new Map((providers ?? []).map((provider) => [provider.key, provider]))
-  for (const key of Object.keys(solution.resourcesPaid)) {
-    if (!key.includes(':')) continue
-    const provider = providerByKey.get(key as CardProvidedPaymentResourceProvider['key'])
-    const amount = solution.resourcesPaid[key as CardProvidedPaymentResourceProvider['key']] ?? 0
-    if (amount <= 0) continue
-    if (!provider || !state) return false
-    if (providerAmountPaid(solution, provider) > Math.max(0, Math.floor(provider.available))) {
-      return false
-    }
-    if (provider.consume.type === 'actionSpace') {
-      const space = findActionSpaceById(state, provider.consume.spaceId)
-      if ((space?.resources?.[provider.consume.resource] ?? 0) < amount) return false
-    }
-  }
-  return true
-}
 
 const consumePaymentResourceProviders = (
   state: GameState | undefined,

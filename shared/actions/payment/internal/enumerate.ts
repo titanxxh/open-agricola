@@ -34,7 +34,7 @@ import {
 } from '../../helpers/trades'
 import { isFireplaceIdentityCard } from '../../../cards/helpers/card-type'
 import { PAYMENT_RESOURCE_KEYS } from '../../../contract/resource-keys'
-import { assertPaymentProviderEnumerationBudget } from '../declaration-validation'
+import { assertPaymentProviderEnumerationBudget, canConsumePaymentResourceProviders } from '../declaration-validation'
 import { solutionCache, makeCacheKey } from './cache'
 import {
   canPayResources,
@@ -534,7 +534,6 @@ const buildProviderCoverOptions = (
   cost: PaymentResourceMap,
   providers: CardProvidedPaymentResourceProvider[],
 ): PaymentResourceCoverOption[] => {
-  assertPaymentProviderEnumerationBudget(providers)
   let options: PaymentResourceCoverOption[] = [
     { remainingCost: normalizePositiveResources(cost), resourcesPaid: {}, covers: [] },
   ]
@@ -927,12 +926,15 @@ export const computeAllBuyableCombinations = (
     : normalizedCost
   validateComplexCost(effectiveCost)
 
-  const canUseCache = !hasSupplyTokenCost(effectiveCost)
+  const paymentResourceProviders = effectiveCost.paymentResourceProviders ?? []
+  assertPaymentProviderEnumerationBudget(paymentResourceProviders)
+  // Provider backing is live game state, including shared supplies. It is
+  // intentionally outside the player/cost cache key.
+  const canUseCache = !hasSupplyTokenCost(effectiveCost) && paymentResourceProviders.length === 0
   const cacheKey = canUseCache ? makeCacheKey(player, effectiveCost, costType, playedCards) : ''
   const cached = canUseCache ? solutionCache.get(cacheKey) : undefined
   if (cached) return cached
 
-  const paymentResourceProviders = effectiveCost.paymentResourceProviders ?? []
   const providerResources: PaymentResourceMap = {}
   for (const provider of paymentResourceProviders) {
     const available = Math.max(0, Math.floor(provider.available))
@@ -1255,7 +1257,8 @@ export const computeAllBuyableCombinations = (
   const budgetedSolutions = paymentSolutions.filter((solution) =>
     withinPaymentBudget(solution, effectiveCost.paymentBudget)
       && Object.entries(effectiveCost.minimumResourcesPaid ?? {}).every(([resource, amount]) =>
-        (solution.resourcesPaid[resource as PaymentResourceKey] ?? 0) >= (amount ?? 0)),
+        (solution.resourcesPaid[resource as PaymentResourceKey] ?? 0) >= (amount ?? 0))
+      && (!state || canConsumePaymentResourceProviders(state, solution, paymentResourceProviders)),
   )
   const result = sortPaymentSolutions(keepOnlyOptimals(budgetedSolutions))
   if (canUseCache) solutionCache.set(cacheKey, result)

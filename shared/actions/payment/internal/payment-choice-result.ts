@@ -28,6 +28,25 @@ import type { PurchaseOutcomeRule } from '../../../contract/rule-plans'
 import { describePurchaseOutcome } from '../../purchase-outcome'
 import { isComplexCost } from './affordability'
 import { computeAllBuyableCombinations, sortPaymentSolutions } from './enumerate'
+import { sha256 } from '@noble/hashes/sha2.js'
+import { bytesToHex, utf8ToBytes } from '@noble/hashes/utils.js'
+import { InvalidActionContextError } from '../../../contract/action-context-error'
+
+const canonicalPaymentData = (value: unknown): unknown => {
+  if (Array.isArray(value)) return value.map(canonicalPaymentData)
+  if (value && typeof value === 'object') return Object.fromEntries(
+    Object.entries(value).sort(([a],[b])=>a.localeCompare(b)).map(([key,child])=>[key,canonicalPaymentData(child)]),
+  )
+  return value
+}
+/** Live provider supplies can change while a menu is open. Keep the identity
+ * of the requested payment, rather than reusing its old position in a list. */
+const paymentChoiceIdentity = (solution: PaymentSolution, providers: readonly CardProvidedPaymentResourceProvider[]): string => {
+  const backing = providers.filter(provider=>(solution.resourcesPaid[provider.key]??0)>0)
+    .map(({key,sourceCard,consume})=>({key,sourceCard,consume})).sort((a,b)=>a.key.localeCompare(b.key))
+  const payment = { ...solution, resourcesPaid: Object.fromEntries(Object.entries(solution.resourcesPaid).filter(([,amount])=>amount !== undefined && amount !== 0)) }
+  return bytesToHex(sha256(utf8ToBytes(JSON.stringify(canonicalPaymentData([payment,backing])))))
+}
 
 const collectPaymentSolutionSources = (
   solution: PaymentSolution,
@@ -57,6 +76,7 @@ const collectPaymentSolutionSources = (
 }
 
 type PaymentChoiceResultOptions = {
+  actionContext?: Record<string, unknown>
   purchaseOutcome?: { state: GameState; player: PlayerState; cardId: string; paymentPaths: readonly PurchaseOutcomeRule[]; metadata?: Record<number, CardCostCandidateMetadata> }
   extraSourcesForSolution?: (solution: PaymentSolution) => readonly string[]
   paymentResourceProviders?: readonly CardProvidedPaymentResourceProvider[]
@@ -168,6 +188,9 @@ export const buildPaymentChoiceResult = (
     type: 'request',
     request: { kind: 'choice', options },
     promptKey: 'prompt.selectPayment',
+    extraData: { actionContextWrite: { issuedPaymentChoices: Object.fromEntries(orderedSolutions.map((solution,idx)=>[
+      `${optionValuePrefix}:${idx}`, paymentChoiceIdentity(solution,choiceOptions.paymentResourceProviders??[]),
+    ])) } },
   }
 }
 
@@ -182,6 +205,16 @@ export const resolvePaymentSolutionSelection = (
   | ActionExecutionResult
   | { type: 'selected'; solution: PaymentSolution } => {
   const orderedSolutions = sortPaymentSolutions(solutions)
+  const issued = options.actionContext?.issuedPaymentChoices as Record<string,string> | undefined
+  if (paymentChoice !== undefined && issued) {
+    const identity = issued[`${optionValuePrefix}:${paymentChoice}`]
+    const solution = orderedSolutions.find(candidate=>paymentChoiceIdentity(candidate,options.paymentResourceProviders??[])===identity)
+    if (solution) return { type: 'selected', solution }
+    // Reject the current command with checkpoint rollback, preserving the
+    // issued menu. Other still-valid identities remain selectable even if
+    // the live provider list no longer contains this payment's source.
+    throw new InvalidActionContextError('Selected payment is no longer available; choose another payment')
+  }
   if (orderedSolutions.length === 0) {
     return failure
   }
@@ -219,6 +252,7 @@ const normalizePaymentChoiceValue = (
 }
 
 type ResolveCostPaymentSelectionOptions = {
+  actionContext?: Record<string, unknown>
   costType?: CostModifierType
   includeReturnedCard?: boolean
   playedCards?: string[]
@@ -263,6 +297,7 @@ export const resolveCostPaymentSelection = (
     options.includeReturnedCard ?? false,
     failure,
     {
+      actionContext: options.actionContext,
       extraSourcesForSolution: options.extraSourcesForSolution,
       paymentResourceProviders: options.paymentResourceProviders ?? normalizedCost.paymentResourceProviders,
     },

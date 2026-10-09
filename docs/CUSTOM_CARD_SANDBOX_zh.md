@@ -696,6 +696,12 @@ Listener 的 `flow` 和 `followUpActions` 默认由 `context.effectPlayer` 执�
 
 虚拟支付 provider 的可用数量为 0 到 511 的整数，覆盖/支付比例为正整数。所有 cover/provider 的 `(floor(available / paymentAmount) + 1)` 保守乘积不得超过 512；原生枚举前也对合并后的完整列表检查同一预算，不能通过拆分贡献绕过。可用性查询将超预算行动视为不可用，实际执行拒绝并回滚命令，不静默截断候选。首版明确排除更大的虚拟支付搜索，等待宿主具备另行设计的有界算法。
 
+卡牌文本元数据（包括 players）为字符串，描述/规则行为字符串数组，能力标志为布尔值，回合/卡牌编号为非负整数。locale 条目开放相同的可选文本字段。人数文本沿用原生解释方式，准入不另造格式。remove-resource modifier 仅允许 type/cardId/appliesTo/resources，不可声明原生会忽略的 trade/bonus 字段或条件。pay.costType 使用八种原生成本类别。未来请求的接收者必须存在。动物分区容量/数量、独占上限和牧场索引为非负整数；农场坐标为可带负号的安全整数。flow 提示/选择标签及 option ID 为字符串，标签参数为对象；发出的选择提示同样校验文本和参数类型。
+
+provider key 必须各不相同，来源行动格 ID 不能为空。原生候选在最优筛选和菜单展示前按当前来源库存过滤，所有消费同一资源池的虚拟 key 合计需求。provider 费用不使用玩家/费用缓存，实际消费复查同一判断。宿主记录每个已发菜单值对应的付款和消费来源，包括没有 provider 的菜单。提交时原样使用菜单值；付款已不可用时拒绝并回滚命令，其他仍有效的已发值在 provider 新增或撤回后仍可结算。宿主管理的 issuedPaymentChoices 上下文不是自定义 flow 字段，不会换扣另一付款方案。
+
+含 provider 的必需 `pay` 按当前来源库存没有可行付款时，执行拒绝并回滚命令，不能留下未付款的阻塞流程，也不能执行后续奖励。
+
 选择项和 leaf 的 effectPreview 按原生九种判别结构校验：fieldContents、cardScore、actionSpace、futureOffers、resourceMovement、futureSchedule、resourceExchange、payment、text。descriptionPreview 为 action 或递归校验的 group。必需资源对象、位置、条目、行动、条件、标签及基础类型在发送给任何观看者前校验；沿用数组和深度上限。这些是展示声明，不是可执行的规则回调。
 
 元数据 altCosts 的每项必须是平坦支付资源对象；returnCards 必须是字符串数组，要求退回真实持有的卡并支付牌面费用；cost.cards 在 required 不为 true 时是替代付款路径。remove-resource modifier 需要非空的支持资源数组。复合 resourceReserve 声明资源名及非负整数 minimum。兑换没有正输入时必须提供非负整数 max。breed 的选择必须是本局已启用且不重复的动物；动物分区的所有准入可选数据字段在原生安置前校验。

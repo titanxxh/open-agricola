@@ -186,6 +186,7 @@ const resolvePayment = (
     ctx.includeReturnedCard ?? false,
     { type: 'fail', errorKey: 'log.payFail' },
     {
+      actionContext: ctx.actionContext,
       extraSourcesForSolution: (solution) =>
         cardCostCandidateMetadataForSolution(
           ctx.candidateMetadataByFeeIndex,

@@ -329,6 +329,7 @@ const finalizeStables = (
     { type: 'fail', errorKey: 'log.buildStableFail' },
     'stables',
     ctx.state,
+    ctx.actionContext,
   )
   if (payment.type !== 'selected') return { type: 'fail', errorKey: 'log.buildStableFail' }
   const nextPlayer = JSON.parse(JSON.stringify(ctx.player)) as PlayerState
@@ -390,6 +391,7 @@ const finalizeStables = (
           paymentChoice,
           sourceCard: ctx.sourceCard,
           sourceActionId: ctx.space.id,
+          actionContext: { issuedPaymentChoices: ctx.actionContext?.issuedPaymentChoices },
         }),
       ],
     },
@@ -477,6 +479,7 @@ export const stablesAction: ActionDefinition = {
         { type: 'fail', errorKey: 'log.buildStableFail', recoverable: true },
         'stables',
         ctx.state,
+        ctx.actionContext,
       )
       if (payment.type === 'request') {
         const options = payment.request.kind === 'choice' ? payment.request.options : []
@@ -485,7 +488,7 @@ export const stablesAction: ActionDefinition = {
           request: { kind: 'choice', options },
           promptKey: payment.promptKey,
           extraData: {
-            actionContextWrite: { farmPayload: { stables, farmHand } },
+            actionContextWrite: { ...(payment.extraData?.actionContextWrite as Record<string,unknown> | undefined), farmPayload: { stables, farmHand } },
           },
         }
       }

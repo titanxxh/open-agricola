@@ -16,6 +16,7 @@ import type {
   CardProvidedPaymentResourceProvider,
   ComplexCost,
   ExactCost,
+  GameState,
   PaymentSolution,
   PlayerState,
   Resource,
@@ -124,6 +125,7 @@ export const getMaxBuildableRooms = (
   costs?: Partial<Resource>,
   actionContext?: Record<string, unknown>,
   adjustments?: ConstructCostAdjustments,
+  state?: GameState,
 ): number => {
   const argMax = typeof actionContext?.maxRooms === 'number'
     ? Math.max(0, Math.floor(actionContext.maxRooms))
@@ -132,7 +134,7 @@ export const getMaxBuildableRooms = (
   for (let nb = 1; nb <= structuralMax; nb += 1) {
     const cost = buildConstructCost(player, costs, nb, actionContext, adjustments)
     if (!cost) return nb - 1
-    if (!canPayCost(player, cost, 'construct')) return nb - 1
+    if (!canPayCost(player, cost, 'construct', state)) return nb - 1
   }
   return structuralMax
 }
@@ -158,6 +160,7 @@ export const resolveRoomPaymentSelection = (
   paymentChoice?: string,
   actionContext?: Record<string, unknown>,
   adjustments?: ConstructCostAdjustments,
+  state?: GameState,
 ): RoomPaymentSelectionResult => {
   const cost = buildConstructCost(player, costs, nb, actionContext, adjustments)
   if (!cost) return ROOM_PAYMENT_FAILURE
@@ -167,7 +170,7 @@ export const resolveRoomPaymentSelection = (
     ROOM_PAYMENT_OPTION_PREFIX,
     paymentChoice,
     ROOM_PAYMENT_FAILURE,
-    { costType: 'construct' },
+    { costType: 'construct', actionContext, state },
   )
   if (resolved.type !== 'selected') return resolved
   return { type: 'selected', solution: resolved.solution }

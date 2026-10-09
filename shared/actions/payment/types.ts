@@ -25,6 +25,8 @@ export type PaymentCtx = {
   reserveResources?: Partial<Resource>
   candidateMetadataByFeeIndex?: Record<number, CardCostCandidateMetadata>
   paymentResourceProviders?: CardProvidedPaymentResourceProvider[]
+  /** Host-owned context of the issued payment menu; custom flows cannot set it. */
+  actionContext?: Record<string, unknown>
 }
 
 export type PaymentExecuteError =

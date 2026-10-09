@@ -190,7 +190,7 @@ describe('stablesAction.resolveChoice', () => {
     expect(result.type).toBe('request')
     if (result.type !== 'request') return
     expect(result.request.kind).toBe('choice')
-    expect(result.extraData?.actionContextWrite).toEqual({ farmPayload: { stables: [tile] } })
+    expect(result.extraData?.actionContextWrite).toMatchObject({ farmPayload: { stables: [tile] } })
   })
 
   it('second call after payment combo reads farmPayload from actionContext', () => {

@@ -274,6 +274,9 @@ describe('shared Workshop capability admission', () => {
   it.each([
     [{vp:'2'},'Printed VP'],
     [{prerequisite:{}},'prerequisite'],
+    ...[{}, [], 2, null].map(players=>[{players},'Card players'] as const),
+    [{name:{}},'Card name'],[{passing:'false'},'Card passing'],[{desc:{}},'Card desc'],[{rules:[{}]},'Card rules'],[{number:0.5},'integer'],[{locales:{zh:{name:[],desc:[]}}},'Card locale name'],
+    ...['conditions','discount','from','max'].map(key=>[{modifier:{type:'remove-resource',cardId:'CUSTOM_ParityCard',appliesTo:['stables'],resources:['wood'],[key]:key==='conditions'?{houseTypeStone:1}:1}},'unsupported field'] as const),
     [{cost:{wood:0.5}},'integer'],
     [{cost:{fee:{wood:1},trades:[{from:{food:1},to:{wood:1},replaceUpTo:'false'}]}},'replaceUpTo'],
     [{exchanges:[{from:{wood:1},to:{food:1},max:0.5}]},'integer'],
@@ -332,6 +335,13 @@ describe('shared Workshop capability admission', () => {
     ['fractional exchange limit', {type:'leaf',actionId:'exchange',actionContext:{directTrade:{from:{wood:1},to:{food:1},max:0.5}}}, 'integer'],
     ['fractional gain', {type:'leaf',actionId:'gain',params:{food:0.5}}, 'integer'],
     ['malformed leaf preview', {type:'leaf',actionId:'gain',params:{food:1},effectPreview:{kind:'futureSchedule',entries:{}}}, 'Preview entries'],
+    ['forged issued payment identities',{type:'leaf',actionId:'pay',params:{cost:{food:1}},actionContext:{issuedPaymentChoices:{'pay:generic:0':'forged'}}},'unsupported field'],
+    ...['promptKey','choiceLabelKey','optionId'].map(key=>['malformed flow '+key,{type:'xor',children:[{type:'leaf',actionId:'gain',params:{food:1},[key]:{}}]},`Flow ${key}`]),
+    ['malformed flow label params',{type:'leaf',actionId:'gain',params:{food:1},choiceLabelParams:[]},'choiceLabelParams'],
+    ['malformed choice prompt',{type:'leaf',actionId:'emit-choice',params:{options:[{value:'yes',labelKey:'ui.yes'}],promptKey:{}}},'promptKey'],
+    ['malformed choice prompt params',{type:'leaf',actionId:'emit-choice',params:{options:[{value:'yes',labelKey:'ui.yes'}],promptParams:[]}},'promptParams'],
+    ...[{},'pay'].map(costType=>['invalid payment costType',{type:'leaf',actionId:'pay',params:{cost:{food:1},costType}},'costType']),
+    ...[{startRound:2,count:1,resources:{food:1}},{entries:[{round:2,resources:{food:1}}]}].map(fields=>['missing future recipient',{type:'leaf',actionId:'future-meeples',params:{__futureMeepleRequest:{cardId:'CUSTOM_ParityCard',playerId:'ghost',...fields}}},'Future recipient']),
     ['invalid gain mode', {type:'leaf',actionId:'gain',params:{food:1,recipientMode:'other'}}, 'recipientMode'],
     ['missing gain recipient', {type:'leaf',actionId:'gain',params:{food:1,recipientPlayerId:'missing'}}, 'existing player'],
     ['missing gain payer', {type:'leaf',actionId:'gain',params:{food:1,payerId:'missing'}}, 'existing player'],
@@ -380,6 +390,8 @@ describe('shared Workshop capability admission', () => {
     ['getBuiltSpecialStables', [{row:'0',col:1}], 'finite number'],
     ['getInvalidAnimals', [{type:'sheep'},{type:'sheep'}], 'subset'],
     ['getRuleContributions', {reservedSupply:{room:1}}, 'unsupported field'],
+    ['getRuleContributions', {reservedSupply:{stable:0.5}}, 'integer'],
+    ['computeLockedFarmTiles', [{row:0.5,col:1}], 'integers'],
     ['getStatePresentation', [], 'must be an object'],
     ['countExtraTurns', 1.5, 'integer'],
     ['computeExtraRoomCapacity', -1, 'nonnegative'],
@@ -397,6 +409,8 @@ describe('shared Workshop capability admission', () => {
     {requiredEmptyZoneGroupIds:{}}, {allowedAnimalTypes:{}}, {animalCounts:{food:1}},
     {blocked:'yes'}, {exclusiveCardZoneLimit:'one'}, {farmPosition:{row:'0',col:1}},
     {capacityCounterKey:'__proto__'}, {displayOwnerName:[]}, {displaySource:'unknown'}, {displaySource:['farm-position']},
+    {capacity:0.5}, {animalCount:0.5}, {animalCounts:{sheep:0.5}}, {exclusiveCardZoneLimit:0.5}, {pastureIndex:0.5},
+    {farmPosition:{row:0.5,col:1}},
   ])('rejects malformed optional animal-zone data on both adapters', fields=>{
     const zone={id:'shared',zoneType:'card',capacity:1,...fields}
     const source=`const CARD_ID='CUSTOM_ParityCard';const CARD_IMPL={effect:{onComputeSharedAnimalZones:()=>[${JSON.stringify(zone)}]}}`

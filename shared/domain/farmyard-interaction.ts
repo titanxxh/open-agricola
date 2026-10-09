@@ -1,6 +1,7 @@
 import type {
   ExactCost,
   FarmTilePosition,
+  GameState,
   InteractionFarmSelection,
   InteractionSelection,
   PlayerState,
@@ -67,6 +68,7 @@ export const buildRoomFarmInteraction = (
   costOverride?: Partial<Resource>,
   actionContext?: Record<string, unknown>,
   costAdjustments?: ConstructCostAdjustments,
+  state?: GameState,
 ): InteractionFarmSelection => {
   const normalized = normalizePlayerFarm(player)
   const occupied = new Set(normalized.roomTiles.map(positionKey))
@@ -83,7 +85,7 @@ export const buildRoomFarmInteraction = (
   })
   const maxSelections = Math.min(
     selectableTiles.length,
-    PaymentSolver.getMaxBuildableRooms(player, costOverride, actionContext, costAdjustments),
+    PaymentSolver.getMaxBuildableRooms(player, costOverride, actionContext, costAdjustments, state),
   )
   const reachableTiles = getReachableRoomTiles(
     normalized,
@@ -388,9 +390,11 @@ export type SelectableTilesOpts = {
 
 export class FarmInteraction {
   private readonly player: PlayerState
+  private readonly state: GameState | undefined
 
-  constructor(player: PlayerState) {
+  constructor(player: PlayerState, state?: GameState) {
     this.player = player
+    this.state = state
   }
 
   selectableTiles(
@@ -420,6 +424,7 @@ export class FarmInteraction {
           cost,
           opts?.exactCost ? { ...(ctx ?? {}), exactCost: opts.exactCost } : ctx,
           opts?.costAdjustments,
+          this.state,
         )
       case 'stable':
         return buildStableFarmInteraction(this.player, cost, {

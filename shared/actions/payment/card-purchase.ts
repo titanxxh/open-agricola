@@ -30,6 +30,7 @@ export type CardPurchasePayParams = {
 }
 
 type ResolvePaymentArgs = {
+  actionContext?: Record<string, unknown>
   state: GameState
   playerIndex: number
   player: PlayerState
@@ -101,7 +102,9 @@ const buildCtx = (
   preview: CardPurchasePreview,
   paymentChoice?: string,
   optionPrefix = directOptionPrefix(kind, cardId),
+  actionContext?: Record<string, unknown>,
 ): PaymentCtx => ({
+  actionContext,
   actionId: actionId(kind),
   costType: 'none',
   sourceCard: cardId,
@@ -175,6 +178,7 @@ const resolvePayment = (
       args.preview,
       args.paymentChoice,
       args.optionPrefix,
+      args.actionContext,
     ),
   )
   if (resolved.type === 'request') return resolved.request

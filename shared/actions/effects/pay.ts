@@ -17,6 +17,7 @@ import { PaymentSolver } from '../payment'
 import type { PaymentCtx, PaymentReceipt } from '../payment'
 import { returnCardToBoard } from '../../cards/helpers/return-card'
 import { isPaymentResourceKey } from '../../contract/resource-keys'
+import { InvalidActionContextError } from '../../contract/action-context-error'
 
 /**
  * Construct a minimal GameState wrapping a single player. Used by
@@ -144,7 +145,9 @@ const buildPaymentCtx = (
   p: PayParams,
   paymentChoice = p.paymentChoice,
   sourceCard?: string,
+  actionContext?: Record<string, unknown>,
 ): PaymentCtx => ({
+  actionContext,
   ...((p.costType === 'minor-improvement' || p.costType === 'major-improvement') && sourceCard ? { sourceCard } : {}),
   actionId: 'pay',
   costType: p.costType ?? 'none',
@@ -264,6 +267,14 @@ export const payAction: ActionDefinition = {
   // player choice back through resolveChoice.
   skipChoiceWrap: true,
   canBeExecutedByPlayer: () => true,
+  assertExecutionContext: ({ state, player, params, actionContext }) => {
+    const p = normalizePayParams(params)
+    if (!p || !PaymentSolver.isComplexCost(p.cost) || !p.cost.paymentResourceProviders?.length) return
+    const idx = state.players.indexOf(player)
+    if (!PaymentSolver.hasPaymentOption(state, idx, p.cost, buildPaymentCtx(p, undefined, undefined, actionContext))) {
+      throw new InvalidActionContextError('Payment providers have no available backing for this payment')
+    }
+  },
   costPreview: {
     getBaseCost: ({ params }) => {
       const p = normalizePayParams(params)
@@ -291,7 +302,7 @@ export const payAction: ActionDefinition = {
       )
     },
   },
-  execute: ({ player, params, sourceCard, state, eventSink }) => {
+  execute: ({ player, params, sourceCard, state, eventSink, actionContext }) => {
     const p = normalizePayParams(params)
     if (!p?.cost) return { type: 'fail', errorKey: 'log.payFail' }
     const playerIndex = state.players.indexOf(player)
@@ -301,7 +312,7 @@ export const payAction: ActionDefinition = {
       effectiveState,
       effectiveIndex,
       p.cost,
-      buildPaymentCtx(p, undefined, sourceCard),
+      buildPaymentCtx(p, undefined, sourceCard, actionContext),
     )
     if (resolved.type === 'request') return resolved.request
     if (resolved.type === 'failed') return { type: 'fail', errorKey: 'log.payFail' }
@@ -322,7 +333,7 @@ export const payAction: ActionDefinition = {
   // time landing on the `selected` branch and actually mutating resources.
   // Without this hook the engine's fallthrough would return `{type:'ok'}`
   // without paying, leaving host action completion running on un-paid state.
-  resolveChoice: ({ player, params, sourceCard, state, eventSink }, choice) => {
+  resolveChoice: ({ player, params, sourceCard, state, eventSink, actionContext }, choice) => {
     const p = normalizePayParams(params)
     if (!p?.cost) return { type: 'fail', errorKey: 'log.payFail' }
     const optionPrefix = p.optionPrefix ?? 'pay:generic'
@@ -349,7 +360,7 @@ export const payAction: ActionDefinition = {
         effectiveState,
         effectiveIndex,
         p.cost,
-        buildPaymentCtx(p, choice, sourceCard),
+        buildPaymentCtx(p, choice, sourceCard, actionContext),
       )
       if (resolved.type === 'request') return resolved.request
       if (resolved.type === 'failed') return { type: 'fail', errorKey: 'log.payFail' }
@@ -391,7 +402,7 @@ export const payAction: ActionDefinition = {
       effectiveState,
       effectiveIndex,
       p.cost,
-      buildPaymentCtx(p, choice, sourceCard),
+      buildPaymentCtx(p, choice, sourceCard, actionContext),
     )
     if (resolved.type === 'request') return resolved.request
     if (resolved.type === 'failed') return { type: 'fail', errorKey: 'log.payFail' }

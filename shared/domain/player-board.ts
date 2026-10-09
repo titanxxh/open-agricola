@@ -30,7 +30,7 @@ export class PlayerBoard {
     this.state = state
     this.animals = new AnimalZones(player, state)
     this.farmyard = new Farmyard(player, state, () => this.animals.nonPastureAnimalCounts())
-    this.farmInteraction = new FarmInteraction(player)
+    this.farmInteraction = new FarmInteraction(player, state)
   }
 
   /** Underlying state (escape hatch for PR2+ migrations). */

@@ -721,6 +721,8 @@ trigger frame 必须随 trailing `activate-card` node 持久化：`ActivateCardA
 
 可信的 `ActionDefinition.assertExecutionContext` 仅在真实 leaf 执行前调用：所有 before 续行完成之后、最终 doability 之前。普通 leaf 和已选中的 OR/XOR leaf 都经过该入口。类型化 `InvalidActionContextError` 通过现有 Session checkpoint 拒绝并回滚当前命令；其他异常保留原错误行为。纯预览不调用此断言。provider 枚举在展开前对最终合并列表执行共享的 512 组合预算；纯 flow 可用性查询仅将此类带类型的上下文失败视为不可用，实际执行仍拒绝并恢复命令 checkpoint。受限 sow 使用原生候选与种子匹配，支持此前的犁地或资源获得步骤，同时避免不可达的选择。
 
+支付枚举和消费复用同一纯查询，按行动格资源池合计所有虚拟 key 的需求。provider 费用不使用玩家/费用缓存，不可行付款在 Pareto 筛选前排除。原生菜单保持现有值，通过宿主管理的 actionContextWrite 保存 issuedPaymentChoices 身份。农场菜单包装合并此写入，内部 pay 子节点把身份传到实际结算。提交时按最初菜单中的付款匹配当前可行解，包含 provider 新增或撤回的情况；失效选择抛出 InvalidActionContextError 并回滚，不替换为另一付款。自定义输出不可声明这一上下文字段。
+
 普通 public action leaf 进入 engine 后按以下顺序处理：`computeReplace -> before -> assertExecutionContext -> strict isDoable -> computeCosts -> execute -> during -> immediatelyAfter -> after`。
 
 Direct `cancel` 不是 protected atomic action 的成功路径。`plow` / `sow` / `construct` / `stables` / `fence` / `reorganize` / internal `selection` 的 direct `cancel` 会在 option validation、`resolveChoice` 和 hooks 之前被 recoverable reject，pending 保持 active，因此不会触发 `before` / `during` / `immediatelyAfter` / `after`。Optionality 由父级 ActionFlow optional metadata 和 `__skip__` 表达；undo / 参考实现 `actRestart` 类回退走 history rollback。`construct` / `fence` 的 entry doability 必须先排除无 reachable room / 无 legal fence commit 的真实 state，避免 confirm-only pending 没有正常提交路径。`exchange` 与 `bake-bread` 暂按各自 legacy 窗口保留例外语义。

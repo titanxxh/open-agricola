@@ -56,7 +56,7 @@ export interface CompiledCardArtifacts {
   cardData: CustomCardData
 }
 
-/** Frozen recordings used array prerequisites before the current contract.
+/** Frozen recordings used base and locale array prerequisites before the current contract.
  * Only explicit historical replay may use its already authoritative fixture
  * prerequisite. New acceptance never rewrites generated source. */
 function adaptHistoricalPrerequisite(code: string, prerequisite: string | undefined): string {
@@ -64,16 +64,29 @@ function adaptHistoricalPrerequisite(code: string, prerequisite: string | undefi
   const file = ts.createSourceFile('historical.ts', code, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
   const property = (object: ts.ObjectLiteralExpression, name: string) => object.properties.find((member): member is ts.PropertyAssignment =>
     ts.isPropertyAssignment(member) && (ts.isIdentifier(member.name) || ts.isStringLiteral(member.name)) && member.name.text === name)
+  const edits: { start: number; end: number; text: string }[] = []
+  const adapt = (object: ts.ObjectLiteralExpression, replacement?: string) => {
+    const value = property(object, 'prerequisite')?.initializer
+    if (!value || !ts.isArrayLiteralExpression(value) || !value.elements.every(ts.isStringLiteral)) return
+    const text = replacement ?? value.elements.map(element => (element as ts.StringLiteral).text).join('; ')
+    edits.push({ start: value.getStart(file), end: value.getEnd(), text: JSON.stringify(text) })
+  }
   for (const statement of file.statements) {
     if (!ts.isVariableStatement(statement)) continue
     for (const declaration of statement.declarationList.declarations) {
       if (!ts.isIdentifier(declaration.name) || declaration.name.text !== 'CARD_DEF' || !declaration.initializer || !ts.isObjectLiteralExpression(declaration.initializer)) continue
       const meta = property(declaration.initializer, 'meta')?.initializer
       if (!meta || !ts.isObjectLiteralExpression(meta)) continue
-      const value = property(meta, 'prerequisite')?.initializer
-      if (!value || !ts.isArrayLiteralExpression(value) || !value.elements.every(ts.isStringLiteral)) continue
-      return code.slice(0, value.getStart(file)) + JSON.stringify(prerequisite) + code.slice(value.getEnd())
+      adapt(meta, prerequisite)
+      const locales = property(meta, 'locales')?.initializer
+      if (!locales || !ts.isObjectLiteralExpression(locales)) continue
+      for (const locale of locales.properties) {
+        if (ts.isPropertyAssignment(locale) && ts.isObjectLiteralExpression(locale.initializer)) adapt(locale.initializer)
+      }
     }
+  }
+  for (const edit of edits.sort((a, b) => b.start - a.start)) {
+    code = code.slice(0, edit.start) + edit.text + code.slice(edit.end)
   }
   return code
 }
