@@ -90,7 +90,7 @@ describe('Collect action card listeners', () => {
     }
   }
 
-  const boarSpearDuringListener: Record<string, unknown> = {
+  const boarSpearAfterListener: Record<string, unknown> = {
     id: 'E53-boar-spear-after',
     phases: ['after' as ActionHookPhase],
     handler: (context: CardListenerContext): ActionHookResult | void => {
@@ -168,7 +168,7 @@ describe('Collect action card listeners', () => {
 
   describe('E053_BoarSpear', () => {
     beforeEach(() => {
-      requireActiveCardRegistry('collect-cards').registerListener(boarSpearDuringListener)
+      requireActiveCardRegistry('collect-cards').registerListener(boarSpearAfterListener)
     })
 
     it('registers after listener', () => {

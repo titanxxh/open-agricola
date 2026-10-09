@@ -729,7 +729,7 @@ describe('Engine flow nodes', () => {
   it('after listener activation preserves original trigger player for cross-owner listeners', () => {
     const p1 = createPlayer()
     const p2 = { ...createPlayer(), id: 'p2', name: 'P2', color: 'blue' as const }
-    p2.minorPlayed = ['CROSS_DURING_CARD']
+    p2.minorPlayed = ['CROSS_AFTER_CARD']
     const state = createState()
     state.players = [p1, p2]
 
@@ -742,7 +742,7 @@ describe('Engine flow nodes', () => {
     const cardRegistry = new CardRegistry()
     cardRegistry.registerListener({
       id: 'cross-owner-after',
-      cardIds: ['CROSS_DURING_CARD'],
+      cardIds: ['CROSS_AFTER_CARD'],
       actions: ['trigger-cross-owner-after'],
       phases: ['after'],
       scope: 'any',
@@ -761,8 +761,8 @@ describe('Engine flow nodes', () => {
 
     const triggerAction: ActionDefinition = {
       id: 'trigger-cross-owner-after',
-      nameKey: 'test.crossOwnerDuring',
-      descriptionKey: 'test.crossOwnerDuring',
+      nameKey: 'test.crossOwnerAfter',
+      descriptionKey: 'test.crossOwnerAfter',
       roundAvailable: 1,
       gainPerRound: {},
       canBeExecutedByPlayer: () => true,
