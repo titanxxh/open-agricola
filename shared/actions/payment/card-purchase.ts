@@ -178,7 +178,12 @@ const resolvePayment = (
     ),
   )
   if (resolved.type === 'request') return resolved.request
-  if (resolved.type === 'failed') return args.failure
+  if (resolved.type === 'failed') {
+    // A choice that matches no current payment keeps the menu for another choice.
+    return resolved.reason === 'invalid-choice' && args.failure.type === 'fail'
+      ? { ...args.failure, recoverable: true }
+      : args.failure
+  }
   recordCardCostAttribution(args.player, resolved.receipt.costAttribution)
   return {
     type: 'selected',
