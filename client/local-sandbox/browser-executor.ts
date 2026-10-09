@@ -151,16 +151,11 @@ function runManifestExtraction(compiledCode: string, cardId: string): {
   }
 
   const manifest = normalizeCustomManifest({ effectHooks: parsed.effectKeys as CardEffectField[], effectMetadata: parsed.effectMetadata, listeners: parsed.listeners }, cardId)
-  if (parsed.cardDefinition) assertCustomCardDefinition(parsed.cardDefinition, cardId)
-  return {
-    manifest,
-    cardDefinition: parsed.cardDefinition && parsed.cardDefinitionType
-      ? {
-          cardType: parsed.cardDefinitionType,
-          meta: parsed.cardDefinition,
-        }
-      : parsed.cardDefinition,
-  }
+  const cardDefinition = parsed.cardDefinition && parsed.cardDefinitionType
+    ? { cardType: parsed.cardDefinitionType, meta: parsed.cardDefinition }
+    : parsed.cardDefinition
+  if (cardDefinition) assertCustomCardDefinition(cardDefinition, cardId)
+  return { manifest, cardDefinition }
 }
 
 export const validateAndCompileCustomCodeLocal = (

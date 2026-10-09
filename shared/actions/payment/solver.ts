@@ -1,3 +1,4 @@
+import { queryPaymentAvailability } from './declaration-validation'
 import { getCardEffect } from '../../cards/card-effects'
 import type { GameState } from '../../contract/types'
 import type {
@@ -138,6 +139,7 @@ const computeOptions = (
 ): Option[] => {
   const player = state.players[idx]
   if (!player) return []
+  cost = normalizeLifecycleCost(cost, ctx)
   if (!isComplexCost(cost)) {
     const simpleCost = cost as Parameters<typeof canPayResources>[1]
     if (!canPayResources(player, simpleCost) || !canPaySupplyTokens(state, player, simpleCost)) return []
@@ -157,15 +159,7 @@ const canAfford = (
   idx: number,
   cost: Cost,
   ctx: PaymentCtx,
-): boolean => {
-  const player = state.players[idx]
-  if (!player) return false
-  if (!isComplexCost(cost)) {
-    const simpleCost = cost as Parameters<typeof canPayResources>[1]
-    return canPayResources(player, simpleCost) && canPaySupplyTokens(state, player, simpleCost)
-  }
-  return computeOptions(state, idx, cost, ctx).length > 0
-}
+): boolean => queryPaymentAvailability(() => computeLifecycleOptions(state, idx, cost, ctx).options.length > 0)
 
 const resolvePayment = (
   state: GameState,
@@ -225,7 +219,7 @@ const hasPaymentOption = (
   idx: number,
   cost: Cost,
   ctx: PaymentCtx,
-): boolean => computeLifecycleOptions(state, idx, cost, ctx).options.length > 0
+): boolean => queryPaymentAvailability(() => computeLifecycleOptions(state, idx, cost, ctx).options.length > 0)
 
 const clearCache = (): void => {
   clearPaymentCache()

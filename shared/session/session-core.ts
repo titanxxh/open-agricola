@@ -707,15 +707,20 @@ export class GameCore {
     return this.listenersVetoIsDoable(player, space)
   }
   applyIsDoableCheck(player: PlayerState, space: ActionSpace, baseDoable: () => boolean): boolean {
-    if (this.listenersVetoIsDoable(player, space)) return false
-    // Only a strict custom predicate needs this preliminary gate; the full flow
-    // query below evaluates ordinary and flow-derived predicates itself.
-    if (space.strictCanExecute && space.flow && !isFlowDerivedDoable(space.canBeExecutedByPlayer) && !baseDoable()) return false
-    const resolveAction = (actionId: string) => this.registry.get(actionId)
-    if (isActionDoableInFlowContext({ actionId: space.id, action: space, state: this.state, player, space, resolveAction })) return true
-    const context = { state: this.state, player, space, actionId: space.id }
-    return this.hookDispatcher.applyIsDoable(context, space, false, () =>
-      canStartBefore('place-farmer', context, resolveAction))
+    try {
+      if (this.listenersVetoIsDoable(player, space)) return false
+      // Only a strict custom predicate needs this preliminary gate; the full flow
+      // query below evaluates ordinary and flow-derived predicates itself.
+      if (space.strictCanExecute && space.flow && !isFlowDerivedDoable(space.canBeExecutedByPlayer) && !baseDoable()) return false
+      const resolveAction = (actionId: string) => this.registry.get(actionId)
+      if (isActionDoableInFlowContext({ actionId: space.id, action: space, state: this.state, player, space, resolveAction })) return true
+      const context = { state: this.state, player, space, actionId: space.id }
+      return this.hookDispatcher.applyIsDoable(context, space, false, () =>
+        canStartBefore('place-farmer', context, resolveAction))
+    } catch (error) {
+      if (error instanceof InvalidActionContextError) return false
+      throw error
+    }
   }
   /** @internal Harvest phase trampoline — kicks off the beforeHarvest stage hook chain. */
   invokeHarvestFromBeforeHarvest(): SessionResponse { return this.withCtx(() => this.continueHarvestFromBeforeHarvest()) }

@@ -675,7 +675,7 @@ return {
 | `store-on-card`            | params 形如 `{ wood: 1, clay: 2 }`，写入 `player.cardStates[CARD_ID].counters`         |
 | `take-from-card`           | params 形如 `{ grain: 1 }`，从 `player.cardStates[CARD_ID].counters` 扣，扣完 leaf 就 fail |
 | `gain`                     | params 形如 `{ food: 2, wood: 1 }`                                                  |
-| `pay`                      | 同上，扣资源                                                                            |
+| `pay`                      | 非空平坦真实资源对象，或 `{cost: flatOrComplexCost, ...paymentControls}`，不能混用两种形状                                                                            |
 | `bake-bread`               | 启动一段烤面包子流程                                                                        |
 | `push-to-card-stack`       | 向 `player.cardStates[CARD_ID].stack` 推入一项                                         |
 | `special-effect`           | **沙盒 cardStates mutation 入口**（Sprint 6a/6b）。`params: { kind: 'set-flag' \| 'set-infobox' \| 'set-counter' \| 'increment-counter' \| 'set-extra-data' \| 'increment-extra-data', ... }`。取代旧的 `flag-card` / `unflag-card` / `set-card-infobox` / `clear-card-infobox` / `write-card-extra-data` 5 个 leaf。详见 §6.1；未列出的仓库内部 kind 不属于 Workshop 合约。 |
@@ -685,6 +685,10 @@ return {
 
 
 新增普通农场行动保留原生邻接、组件、支付和前提。plow、sow、fence、stables、construct 和 renovate-house 的限制放在叶子顶层 `actionContext`；原生结算不读取 `params.actionContext`，因此该嵌套形式明确拒绝。`occupation` 的 `allowedCards` / `exactCost` 放在 params；`improvement` 的 `types` / `allowedPurchases` 也放在 params，限制同时覆盖主要、小发展专用和注入候选；`minimumResourcesPaid` 放在叶子顶层的 `actionContext`，不能放入 `params.actionContext`；它约束实际支付，包含资源替换。农场选择走 `commitSelectionChoice`，不得用内部 `farmPayload` 绕过。`selection` 仅开放明确的 farm-position 候选。`reap` 必须显式给 `actionContext.trigger: {phase: 'private-field-phase', cardId: CARD_ID}`；`breed` 来源为本卡；`reorganize` 仅普通 anytime。`fencePolicy` 仅开放自有围栏的 `segmentBounds`（fence/total）、`newPastureBounds` 和 `cancelPolicy`。具体允许字段由站点契约的 `paramKeys` / `contextKeys` 提供，动态嵌套 flow、listener 覆盖与声明式兑换也执行相同准入。指定目标的子树必须引用当前游戏中的玩家；必选 choice 组合必须含有子节点，多选声明必须使用字符串前缀与有序的非负整数上下限。多选下限按不同的可用值计数，可选值必须非空且不含逗号。农场候选必须为实际执行玩家农场上的不同整数坐标，包含已有农场扩展，且最低选择数必须可达。发展类型限制必须为非空的 major/minor 列表；畜栏和兑换次数上限为非负整数。围栏、牧场数量限制必须使用有序整数上下限。普通选择必须有可用选项；多选下限为零时仍可提交空选择。职业候选限制与卡牌堆项保持声明的字符串形态。
+
+付款声明区分三个资源域。原始费用（平坦 cost、fee、每行 fees、unitFee、altCosts、cards.cost）只允许真实资源和 fence/stable，不能使用虚拟 provider 键。provider 覆盖普通费用，其虚拟键只出现在实际付款结果中；paymentBudget / minimumResourcesPaid 筛选该结果，可使用虚拟键。保留库存、兑换和 bonus 折扣只使用真实库存资源。平坦 pay.params 必须非空且不能带付款控制项；显式 `{cost:{}}` 表示免费。包装形式不能同时含顶层资源键，值为0也拒绝。
+
+unitFee 必须有显式非负整数 nb；nb:0 有效，nb 也能单独供条件判断。unit scope 的 trade 必须有 nb；nb 与 cards 互斥。自定义准入和原生 modifier/listener 合成后的有效费用，在所有环境执行共享的原生组合约束。纯可付款查询把无效组合显示为不可用，实际执行保留类型化错误并恢复命令 checkpoint。非空 fees 优先于 fee，空 fees 回退到 fee 或空费用；选中的基础费用与 nb × unitFee 相加。只含控制项的 ComplexCost 仍执行预算、保留库存和身份约束，不会当作平坦资源对象。次要改良的非空 altCosts 先替换牌面 cost，再由 returnCards 添加必需的真实持有卡返还；这个有效费用同样遵守 nb/cards 互斥。
 
 自定义 `pay` 不允许填写 `playedCards`、`candidateMetadataByFeeIndex`、`costResourceRemovals`，卡牌归属和支付归因由权威引擎产生。直接自定义 `pay.cost.cards` 延期，等待宿主提供真实卡牌候选适配；`CARD_DEF.meta.cost.cards` 的声明式购买退卡费用继续使用原生归属路径。选择项不能冒充另一张来源卡。计分查询在进入原生消费者前校验数组、玩家身份、资源费用和有限分数；格式错误记录为卡牌警告。bonus 与 trade modifier 复用原生声明不变量；虚拟支付来源 key 必须属于本卡，支付选择和前缀必须为字符串。结构化职业/发展前提使用有序的非负整数上下限。
 
@@ -711,6 +715,8 @@ provider key 必须各不相同，来源行动格 ID 不能为空。原生候选
 未来回合调度仅开放普通资源和 field/stable；不开放调度条目的 `actionContext` 或原生 `sourceSummary`。`special-effect` 另外开放 `pop-card-stack-top`、`set-infobox(text)`、`remove-future-meeples(rounds?)`，取消只作用于本卡及效果玩家。其他 kind 均明确拒绝。
 
 ### 6.1 `special-effect` `params.kind` 沙盒可用子集
+
+set-counter 接受有限数字，并保存 Math.max(0, value)：负数归零，正小数原样保留。需要有符号数字时使用 set-extra-data。这是有意保留的原生归一化；非有限值在修改前拒绝。
 
 每次修改都通过带有 `sourceCard: CARD_ID` 的 `special-effect` leaf 返回，`params` 使用下面的一种形状。
 
@@ -949,7 +955,7 @@ mandatory 只用于普通反应激活；preScoring / replacesTurn / blockedAnyti
 | 范围 | 冻结边界与保留的原生语义 |
 |---|---|
 | Flow 外壳/农场 | 六种农场行动只读顶层 actionContext；mode 仅 parallel，one-shot 须 trigger-select。归属、optional、组件、几何、pending、付款保留原生规则 |
-| ExactCost / 普通付款 | ExactCost 仅真实资源加 max，拒绝会被忽略的组件/虚拟键；ComplexCost 保留 fee/fees/unitFee 优先级、分组与折扣 |
+| ExactCost / 普通付款 | ExactCost 仅真实资源加 max，拒绝会被忽略的组件/虚拟键；原始费用只用真实/组件键，虚拟键只用于实际付款筛选。平坦/包装 pay 不混用，单位数量显式声明，执行原生组合约束及 returnCards 派生约束；仅控制项的 ComplexCost 也执行限制，保留 fee/fees 优先级和单位费累加 |
 | 费用身份/控制 | feeIdentities 是与实际 fee 行对齐的非负安全整数数组，重复值有意归为同一路径；付款控制为布尔。退卡资格归宿主，cards.type 是历史标注，不是附加限制 |
 | 付款展开 | provider 合并后乘积仍≤512；unit/action trade、bonus 与最终支配筛选共用100000步宿主预算；超限整次拒绝，不截候选，巨大单位循环/兑换展开前就检查 |
 | 资源域 | 结构识别13种名称；非零 horse/fuel 须 FOM 资源槽。共享 gain/trade/future/payment 消费者在修改前拒绝不适用资源，0值不启用扩展 |
@@ -957,7 +963,7 @@ mandatory 只用于普通反应激活；preScoring / replacesTurn / blockedAnyti
 | 选择/预览 | 自定义数组和最终菜单 value 唯一，保留原生 first-wins 合并；options 非空，零下限可提交实际候选的空子集。预览只是显示数据 |
 | 繁殖/收割/重组 | leaf 来源绑定私有繁殖，包含 follow-up；正式 Harvest 仍由宿主控制。动物白名单约束安置/恢复，不改原生按总容量繁殖；reap 为 private-field-phase，可选 actionId 为字符串 |
 | 未来排程 | 当前玩家、本卡 entries；资源/field/stable 及匹配 roomType 时原生加一房；不开 actionContext。过滤、entries优先、精确取消保留原生语义 |
-| 局部状态 | 本卡/效果玩家；数字增加要求现值为有限数字（缺失视作0）且结果有限；set-extra-data 可存任意 JSON，set-counter 保留非负归一化 |
+| 局部状态 | 本卡/效果玩家；数字增加要求现值为有限数字（缺失视作0）且结果有限；set-extra-data 可存任意 JSON，set-counter 保存 Math.max(0, value)，有限正小数不变；有符号值写 extraData |
 | 注入 helper | 两执行器同一正文；payLeaf 的 cost 是完整 params，复杂费用写 payLeaf({cardId:CARD_ID,cost:{cost:complexCost}})；读 stack/extraData 不写宿主，getCardDefinition 始终为 null |
 
 #### 卡牌元数据与参考资料边界

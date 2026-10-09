@@ -43,6 +43,7 @@ import {
   normalizeCardCostCandidates,
   dedupeEquivalentRowCandidates,
 } from './card-cost-candidates'
+import { queryPaymentAvailability } from '../declaration-validation'
 import { canPayCost, computeAllBuyableCombinations } from './enumerate'
 import { executePaymentSolution } from './execute'
 import { buildCardCostListenerContext } from './hook-context'
@@ -300,7 +301,7 @@ const canAffordCardPreviewCost = (
   actionCardId?: string,
   costType?: CostModifierType,
 ) =>
-  (() => {
+  queryPaymentAvailability(() => {
     const previewCost = resolveCardPreviewCost(
       state,
       player,
@@ -314,7 +315,7 @@ const canAffordCardPreviewCost = (
       return canAffordTypedFlatCost(player, previewCost, costType, state)
     }
     return canPayCost(player, previewCost, costType, state)
-  })()
+  })
 
 export const canAffordCardPreviewCostByProvider = (
   state: GameState,

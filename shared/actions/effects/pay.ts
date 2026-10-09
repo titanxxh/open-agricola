@@ -269,9 +269,13 @@ export const payAction: ActionDefinition = {
   canBeExecutedByPlayer: () => true,
   assertExecutionContext: ({ state, player, params, actionContext }) => {
     const p = normalizePayParams(params)
-    if (!p || !PaymentSolver.isComplexCost(p.cost) || !p.cost.paymentResourceProviders?.length) return
+    if (!p) return
     const idx = state.players.indexOf(player)
-    if (!PaymentSolver.hasPaymentOption(state, idx, p.cost, buildPaymentCtx(p, undefined, undefined, actionContext))) {
+    // Affordability suppresses typed errors; actual dispatch must still validate
+    // the final cost after native modifiers, even without virtual providers.
+    const effectiveState = idx >= 0 ? state : buildSingletonState(player)
+    const options = PaymentSolver.computeOptions(effectiveState, idx >= 0 ? idx : 0, p.cost, buildPaymentCtx(p, undefined, undefined, actionContext))
+    if (PaymentSolver.isComplexCost(p.cost) && p.cost.paymentResourceProviders?.length && options.length === 0) {
       throw new InvalidActionContextError('Payment providers have no available backing for this payment')
     }
   },

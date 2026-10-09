@@ -1,10 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   applyCostModifiers,
   evaluateStaticConditions,
   evaluateConditions,
   validateComplexCost,
 } from '../cost-modifiers'
+import { InvalidActionContextError } from '../../../../contract/action-context-error'
 import { validateTradeModifier } from '../../declaration-validation'
 import type { PlayerState, TradeModifier } from '../../../../contract/types'
 
@@ -93,6 +94,15 @@ describe('validateTradeModifier', () => {
 })
 
 describe('validateComplexCost', () => {
+  it.each(['development','production'])('rejects invalid combined costs with a typed error in %s',mode=>{
+    vi.stubEnv('NODE_ENV',mode)
+    try {
+      const effective=applyCostModifiers({fee:{wood:1}},[{type:'trade',cardId:'CUSTOM_Test',appliesTo:['minor-improvement'],from:{food:1},to:{wood:1},scope:'unit',max:1}])
+      expect(()=>validateComplexCost(effective)).toThrow(InvalidActionContextError)
+      expect(()=>validateComplexCost({nb:1,cards:{type:'Major',list:['Major_Fireplace1']}})).toThrow(InvalidActionContextError)
+    }finally {vi.unstubAllEnvs()}
+  })
+
   it('throws when nb and cards both present', () => {
     expect(() => validateComplexCost({
       nb: 3, unitFee: { wood: 5 },

@@ -34,7 +34,7 @@ import {
 } from '../../helpers/trades'
 import { isFireplaceIdentityCard } from '../../../cards/helpers/card-type'
 import { PAYMENT_RESOURCE_KEYS, assertEnabledResourceAmounts } from '../../../contract/resource-keys'
-import { assertPaymentProviderEnumerationBudget, canConsumePaymentResourceProviders, createPaymentEnumerationBudget } from '../declaration-validation'
+import { assertPaymentProviderEnumerationBudget, canConsumePaymentResourceProviders, createPaymentEnumerationBudget, queryPaymentAvailability } from '../declaration-validation'
 import { solutionCache, makeCacheKey } from './cache'
 import {
   canPayResources,
@@ -1295,10 +1295,10 @@ export const canPayCost = (
   cost: PaymentResourceMap | ComplexCost,
   costType?: CostModifierType,
   state?: GameState,
-): boolean => {
+): boolean => queryPaymentAvailability(() => {
   if (!isComplexCost(cost) && !costType) {
     return canPayResources(player, cost) && canPaySupplyTokens(state, player, cost)
   }
   const complex: ComplexCost = isComplexCost(cost) ? cost : { fee: cost }
   return computeAllBuyableCombinations(player, complex, undefined, costType, state).length > 0
-}
+})

@@ -20,7 +20,7 @@ import type {
   PlayerState,
 } from '../../../contract/types'
 import { isComplexCost } from './affordability'
-import { computeAllBuyableCombinations } from './enumerate'
+import { canPayCost, computeAllBuyableCombinations } from './enumerate'
 import { executePaymentSolution } from './execute'
 import { resolveCostPaymentSelection } from './payment-choice-result'
 
@@ -76,7 +76,7 @@ export const canAffordTypedFlatCost = (
   const complex: ComplexCost = isComplexCost(cost)
     ? cost
     : { fee: cost }
-  return computeAllBuyableCombinations(player, complex, undefined, costType, state).length > 0
+  return canPayCost(player, complex, costType, state)
 }
 
 export const payTypedFlatCost = (

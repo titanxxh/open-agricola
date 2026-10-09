@@ -1,9 +1,29 @@
 /** Pure payment declaration invariants, shared by native settlement and custom-card admission. */
-import type { Bonus, CardProvidedPaymentResourceProvider, GameState, PaymentSolution, TradeModifier } from '../../contract/types'
+import type { Bonus, CardProvidedPaymentResourceProvider, ComplexCost, GameState, PaymentSolution, TradeModifier } from '../../contract/types'
 import { InvalidActionContextError } from '../../contract/action-context-error.ts'
 
 export const MAX_PAYMENT_PROVIDER_COMBINATIONS = 512
 export const MAX_PAYMENT_ENUMERATION_STEPS = 100_000
+
+/** Invalid composed prices are unavailable in pure affordability queries. */
+export class InvalidPaymentCostError extends InvalidActionContextError {}
+
+/** Pure affordability queries report invalid composed costs as unavailable.
+ * Enumeration and execution retain the typed error for command rollback. */
+export const queryPaymentAvailability = (query: () => boolean): boolean => {
+  try { return query() } catch (error) {
+    if (error instanceof InvalidPaymentCostError) return false
+    throw error
+  }
+}
+
+/** Native cost combinations, also enforced before sandbox admission. */
+export const collectComplexCostViolations = (cost: ComplexCost): string[] => {
+  const violations: string[] = []
+  if (cost.nb !== undefined && cost.cards !== undefined) violations.push('`nb` and `cards` are mutually exclusive')
+  if (cost.trades?.some(trade => trade.scope === 'unit') && cost.nb === undefined) violations.push('unit-scoped trades present but `nb` is missing')
+  return violations
+}
 
 /** Host-side expansion is outside the code isolate. Abort the whole query,
  * never truncate candidates or return an incomplete payment menu. */

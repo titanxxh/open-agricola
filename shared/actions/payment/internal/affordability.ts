@@ -120,11 +120,15 @@ export const isComplexCost = (
   return (
     'fee' in cost ||
     'fees' in cost ||
+    'feeIdentities' in cost ||
     'trades' in cost ||
     'cards' in cost ||
     'bonuses' in cost ||
     'paymentResourceProviders' in cost ||
     'minimumResourcesPaid' in cost ||
+    'paymentBudget' in cost ||
+    'resourceReserve' in cost ||
+    'costResourceRemovals' in cost ||
     'unitFee' in cost ||
     'nb' in cost
   )

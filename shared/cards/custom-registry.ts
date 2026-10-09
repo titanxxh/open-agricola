@@ -60,7 +60,7 @@ export function registerCustomCard(
   if (data.compiledCode) {
     // Persisted Workshop envelopes carry source alongside declarative metadata.
     const { _code, _compiled, _draft, ...definition } = data.cardJson as CustomCardData['cardJson'] & Record<string, unknown>
-    assertCustomCardDefinition(definition, data.cardJson.id)
+    assertCustomCardDefinition({cardType:data.cardType,meta:definition}, data.cardJson.id)
   }
   // Inject modifier / modifiers into the active per-session CardRegistry so
   // getCardModifiers (which reads only from the active registry post-D1)

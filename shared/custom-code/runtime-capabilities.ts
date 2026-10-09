@@ -2,11 +2,11 @@ import { SANDBOX_ALLOWED_ACTION_IDS, sandboxActionIdMeta, sandboxSpecialEffectKi
 import { cardEffectHooks } from '../projections/card-effect-hooks.ts'
 import { cardEffectHookMeta } from './sandbox-hook-meta.ts'
 import { REAL_RESOURCE_KEYS, isPaymentResourceKey, isCardProvidedPaymentResourceKey, assertEnabledResourceAmounts } from '../contract/resource-keys.ts'
-import { validateBonus, validateTradeModifier, assertPaymentProviderEnumerationBudget, MAX_PAYMENT_PROVIDER_COMBINATIONS } from '../actions/payment/declaration-validation.ts'
+import { collectComplexCostViolations, validateBonus, validateTradeModifier, assertPaymentProviderEnumerationBudget, MAX_PAYMENT_PROVIDER_COMBINATIONS } from '../actions/payment/declaration-validation.ts'
 import { getFarmyardTilePositions, positionKey } from '../domain/farmyard-geometry.ts'
 import { ALL_ANIMAL_KEYS, animalKeysForState } from '../contract/animals.ts'
 import { assertKeys, assertRecord, sandboxInteractionKinds, sandboxCardMetadataKeys, sandboxCommonActionContextKeys, sandboxFlowFields } from './sandbox-declarations.ts'
-import type { ActionFlow, Bonus, CardProvidedPaymentResourceProvider, GameState, TradeModifier } from '../contract/types.ts'
+import type { ActionFlow, Bonus, CardProvidedPaymentResourceProvider, ComplexCost, GameState, TradeModifier } from '../contract/types.ts'
 import type { CardEffectField } from '../cards/card-effects.ts'
 import type { CardListenerContext } from '../cards/card-listeners.ts'
 import { COST_MODIFIER_TYPES } from '../contract/types.ts'
@@ -44,6 +44,11 @@ function resourceMap(value: unknown, payment = false, nonnegative = true): asser
     finite(amount, key, nonnegative)
     if (!Number.isSafeInteger(amount)) throw new Error(`${key} must be a safe integer`)
   }
+}
+/** Virtual provider keys describe actual payment, never an original debit. */
+function feeMap(value: unknown): void {
+  resourceMap(value, true)
+  if (Object.keys(value).some(isCardProvidedPaymentResourceKey)) throw new Error('Virtual resource keys cannot be declared fees')
 }
 function stringArray(value: unknown, label: string, allowed?: readonly string[], nonempty = false): asserts value is string[] {
   if (!Array.isArray(value) || nonempty && value.length === 0 || value.some(item => typeof item !== 'string' || !item || allowed && !allowed.includes(item))) throw new Error(`${label} must be an array of supported strings`)
@@ -235,18 +240,20 @@ function trade(value: unknown, cardId: string, usage: 'payment' | 'exchange' | '
 
 function cost(value: unknown, cardId: string, allowCardReturn = false): void {
   assertRecord(value, 'Cost')
-  if (Object.keys(value).every(isPaymentResourceKey)) { resourceMap(value, true); return }
+  if (Object.keys(value).every(isPaymentResourceKey)) { feeMap(value); return }
   assertKeys(value, ['fee', 'fees', 'feeIdentities', 'unitFee', 'nb', 'trades', 'bonuses', 'paymentResourceProviders', 'paymentBudget', 'minimumResourcesPaid', 'resourceReserve', ...(allowCardReturn ? ['cards'] : [])], 'Cost')
-  for (const key of ['fee', 'unitFee', 'paymentBudget', 'minimumResourcesPaid']) if (value[key] !== undefined) resourceMap(value[key], true)
+  for (const key of ['fee', 'unitFee']) if (value[key] !== undefined) feeMap(value[key])
+  for (const key of ['paymentBudget', 'minimumResourcesPaid']) if (value[key] !== undefined) resourceMap(value[key], true)
   if (value.fees !== undefined) {
     if (!Array.isArray(value.fees)) throw new Error('Cost fees must be an array')
-    value.fees.forEach(fee => resourceMap(fee, true))
+    value.fees.forEach(feeMap)
   }
   if (value.feeIdentities !== undefined) {
     if (!Array.isArray(value.feeIdentities) || value.feeIdentities.length !== (Array.isArray(value.fees) && value.fees.length ? value.fees.length : 1)) throw new Error('feeIdentities must align with the effective fee rows')
     value.feeIdentities.forEach(identity => integer(identity, 'Fee identity'))
   }
   if (value.nb !== undefined) integer(value.nb, 'Cost unit count')
+  if (value.unitFee !== undefined && value.nb === undefined) throw new Error('unitFee requires an explicit nb')
   if (value.resourceReserve !== undefined) {
     assertRecord(value.resourceReserve, 'Resource reserve')
     assertKeys(value.resourceReserve, ['resources', 'minimum'], 'Resource reserve')
@@ -264,10 +271,12 @@ function cost(value: unknown, cardId: string, allowCardReturn = false): void {
     assertRecord(value.cards, 'Card-return cost')
     assertKeys(value.cards, ['type', 'list', 'cost', 'required'], 'Card-return cost')
     if (typeof value.cards.type !== 'string' || !Array.isArray(value.cards.list) || value.cards.list.some(id => typeof id !== 'string')) throw new Error('Invalid card-return cost')
-    if (value.cards.cost !== undefined) resourceMap(value.cards.cost, true)
+    if (value.cards.cost !== undefined) feeMap(value.cards.cost)
     if (value.cards.required !== undefined && typeof value.cards.required !== 'boolean') throw new Error('Card-return required must be boolean')
     if (value.cards.required === true && value.cards.list.length === 0) throw new Error('Required card-return list must be nonempty')
   }
+  const violations = collectComplexCostViolations(value as ComplexCost)
+  if (violations.length) throw new Error(`Invalid ComplexCost: ${violations.join('; ')}`)
 }
 
 export function assertCustomCardDefinition(definition: unknown, cardId: string): void {
@@ -300,9 +309,16 @@ export function assertCustomCardDefinition(definition: unknown, cardId: string):
   if (meta.cost !== undefined) cost(meta.cost, cardId, true)
   if (meta.altCosts !== undefined) {
     if (!Array.isArray(meta.altCosts)) throw new Error('altCosts must be an array')
-    meta.altCosts.forEach(item => resourceMap(item, true))
+    meta.altCosts.forEach(feeMap)
   }
   if (meta.returnCards !== undefined) stringArray(meta.returnCards, 'returnCards')
+  // Nonempty altCosts replaces the printed cost before native returnCards is
+  // attached. Check the active combination, not a discarded unit declaration.
+  const cardType = 'meta' in definition ? definition.cardType : meta.card_type ?? 'minor'
+  if (cardType === 'minor' && Array.isArray(meta.returnCards) && meta.returnCards.length && !(Array.isArray(meta.altCosts) && meta.altCosts.length)) {
+    const violations = collectComplexCostViolations({ ...(meta.cost as ComplexCost | undefined), cards:{type:'Major',list:meta.returnCards,required:true} })
+    if (violations.length) throw new Error(`Invalid effective minor cost: ${violations.join('; ')}`)
+  }
   for (const key of ['occupationPrerequisites', 'improvementPrerequisites']) if (meta[key] !== undefined) bounds(meta[key])
   if (meta.exchanges !== undefined) {
     if (!Array.isArray(meta.exchanges)) throw new Error('exchanges must be an array')
@@ -351,7 +367,15 @@ export function assertCustomActionData(actionId: string, params: Record<string, 
     if (exact.max !== undefined) integer(exact.max, 'Exact cost maximum')
   }
   if (context.costOverride !== undefined) resourceMap(context.costOverride, false, false)
-  if (actionId === 'pay') cost(params.cost ?? params, cardId)
+  if (actionId === 'pay') {
+    if (Object.hasOwn(params, 'cost')) {
+      if (resources.some(key => Object.hasOwn(params, key))) throw new Error('Cannot mix a wrapped pay cost with flat resources')
+      cost(params.cost, cardId)
+    } else {
+      if (!Object.keys(params).length || Object.keys(params).some(key => !resources.includes(key))) throw new Error('Flat pay params requires nonempty resources; payment controls require a wrapped cost')
+      feeMap(params)
+    }
+  }
   if (actionId === 'pay' && params.costType !== undefined && !(COST_MODIFIER_TYPES as readonly unknown[]).includes(params.costType)) throw new Error('Unsupported payment costType')
   if (actionId === 'pay' && params.reserveResources !== undefined) resourceMap(params.reserveResources)
   if (actionId === 'pay') for (const key of ['paymentChoice', 'optionPrefix']) if (params[key] !== undefined && typeof params[key] !== 'string') throw new Error(`${key} must be a string`)

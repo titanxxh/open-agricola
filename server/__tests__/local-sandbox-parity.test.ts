@@ -87,6 +87,20 @@ describe('browser executor parity with server executor', () => {
     expect(server.manifest.effectMetadata).toEqual({ handHooks: ['onReturnHome'] })
   })
 
+  it.each(['minor','occupation'] as const)('admits the same effective return cost for %s factory and envelope',cardType=>{
+    const meta={id:'CUSTOM_ParityCard',cost:{nb:1},returnCards:['Major_Fireplace1']}
+    const prefix="const CARD_ID='CUSTOM_ParityCard';const CARD_DEF="
+    const factory=cardType==='minor'?'MinorImprovement':'Occupation'
+    const source=prefix+`${factory}(${JSON.stringify(meta)});const CARD_IMPL={}`
+    const envelope=prefix+`${JSON.stringify({cardType,meta})};const CARD_IMPL={}`
+    const server=validateAndCompileCustomCode(source,'CUSTOM_ParityCard')
+    expect(validateAndCompileCustomCodeLocal(source,'CUSTOM_ParityCard')).toEqual(server)
+    expect(validateAndCompileCustomCode(envelope,'CUSTOM_ParityCard').valid).toBe(server.valid)
+    expect(server.valid).toBe(cardType==='occupation')
+    if(server.valid)expect(server.cardDefinition).toEqual({cardType,meta})
+    else expect(server.errors.join(';')).toContain('mutually exclusive')
+  })
+
   it('rejects forbidden globals identically', () => {
     const server = validateAndCompileCustomCode('process.exit(1)', 'CUSTOM_BadCard')
     const local = validateAndCompileCustomCodeLocal('process.exit(1)', 'CUSTOM_BadCard')
