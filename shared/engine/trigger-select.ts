@@ -17,6 +17,7 @@ import {
   getOwnOrdinaryFenceReserveCount,
 } from '../domain/supply-tokens'
 import { isActivateCardActionNode, type ActivateCardActionNode } from './activation-action'
+import { activationEventReadContext } from './continuation-events'
 import { ActionNode } from './nodes/action-node'
 import type { ParallelNode } from './nodes'
 import type { EngineNode } from './types'
@@ -126,12 +127,8 @@ const previewContextForChild = (
     ownerCardZone: params.ownerCardZone,
     mandatory: params.mandatory,
   }
-  const transactionEvents = context.transactionEvents ?? params.transactionEvents
-  const actionEvents = context.actionEvents
-    ?? params.actionEvents
-    ?? (typeof params.actionEventStartIndex === 'number' && transactionEvents
-      ? transactionEvents.slice(params.actionEventStartIndex)
-      : undefined)
+  // Preview reads the same captured scope that activation will execute with.
+  const eventReadContext = activationEventReadContext(params, context.transactionEvents ?? [])
   if (params.countCardUse !== undefined) event.countCardUse = params.countCardUse
   return {
     ownerPlayerId,
@@ -149,9 +146,7 @@ const previewContextForChild = (
         : context.space,
       actionId: params.actionId,
       phase: params.phase,
-      transactionEvents,
-      actionEvents,
-      eventQuery: context.eventQuery,
+      ...eventReadContext,
       triggerSnapshot: params.triggerSnapshot,
       ...event,
     },

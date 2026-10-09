@@ -22,6 +22,7 @@ import {
   pendingEnvelopeChoices,
 } from './pending-validation'
 import { rejectProtectedActionCancel } from './protected-action-cancel'
+import { mergeContinuationEvents } from './continuation-events'
 import { evaluateTriggerSelect, type TriggerSelectEvaluationOptions } from './trigger-select'
 import {
   applyDefaultSourceCardToFlow,
@@ -137,14 +138,12 @@ const currentEventReadContext = (
   preservedTransactionEvents?: readonly GameEvent[],
   preservedActionEvents?: readonly GameEvent[],
 ) => {
-  const transactionEvents = [
-    ...(preservedTransactionEvents ?? []),
-    ...int.events.currentTransactionEvents(),
-  ]
+  // Preserved facts may also still be live; join them by event identity.
+  const transactionEvents = mergeContinuationEvents(preservedTransactionEvents ?? [], int.events.currentTransactionEvents())
   return {
     transactionEvents,
     actionEvents: actionEvents
-      ? [...(preservedActionEvents ?? []), ...actionEvents]
+      ? mergeContinuationEvents(preservedActionEvents ?? [], actionEvents)
       : undefined,
     eventQuery: createEventQuery(transactionEvents),
   }
@@ -696,6 +695,9 @@ export function engineResolveChoice(
       if (result.type === 'request') {
         // Every request kind from the selected child stays pending until it
         // is submitted. Only 'choice' merges computeArgs extraOptions.
+        // Its facts so far survive a commit while the request waits.
+        child.deferredHostTransactionEvents = [...currentEventReadContext(int).transactionEvents]
+        child.deferredHostActionEvents = [...completedEvents]
         const argResults = result.request.kind === 'choice'
           ? int.hooks.computeArgs(
               { ...executionContext, ...currentEventReadContext(int), actionId },
@@ -785,8 +787,9 @@ export function engineResolveChoice(
       const trailingTransactionEvents = result.type === 'flow' ? undefined : eventReadContext.transactionEvents
       const trailingActionEvents = result.type === 'flow' ? undefined : eventReadContext.actionEvents
       const trailingActionEventStartIndex = result.type === 'flow'
-        ? eventReadContext.transactionEvents.length - completedEvents.length
+        ? int.events.currentTransactionEvents().length
         : undefined
+      const trailingPreservedEvents = result.type === 'flow' ? eventReadContext : undefined
       const immediateActivateNodes = buildPhaseTrailingNodes(
         int,
         immediatePhase.matchedListeners,
@@ -799,6 +802,7 @@ export function engineResolveChoice(
         trailingActionEvents,
         trailingActionEventStartIndex,
         triggerSnapshot,
+        trailingPreservedEvents,
       )
       const afterActivateNodes = buildPhaseTrailingNodes(
         int,
@@ -812,6 +816,7 @@ export function engineResolveChoice(
         trailingActionEvents,
         trailingActionEventStartIndex,
         triggerSnapshot,
+        trailingPreservedEvents,
       )
       const afterHostNodes = result.type === 'ok'
         ? buildInternalActionChildNodes(
@@ -1097,6 +1102,12 @@ export function engineResolveChoice(
     return pendingHost?.mandatory ? result : rollbackAndReturn(int, result)
   }
   if (result.type === 'request') {
+    if (pendingActionNode) {
+      // Keep this action's facts for the next wait as well.
+      const events = pendingEventReadContext(completedEvents)
+      pendingActionNode.deferredHostTransactionEvents = [...events.transactionEvents]
+      pendingActionNode.deferredHostActionEvents = [...(events.actionEvents ?? [])]
+    }
     // Merge ActionDef-declared actionContext patches into the pending context.
     // Used by farm ActionDefs to persist payload (e.g. fence geometry) across
     // payment-combo second prompts.
@@ -1166,8 +1177,9 @@ export function engineResolveChoice(
   const trailingTransactionEvents = result.type === 'flow' ? undefined : eventReadContext.transactionEvents
   const trailingActionEvents = result.type === 'flow' ? undefined : eventReadContext.actionEvents
   const trailingActionEventStartIndex = result.type === 'flow'
-    ? eventReadContext.transactionEvents.length - completedEvents.length
+    ? int.events.currentTransactionEvents().length
     : undefined
+  const trailingPreservedEvents = result.type === 'flow' ? eventReadContext : undefined
   const immediateActivateNodes = buildPhaseTrailingNodes(
     int,
     immediatePhase.matchedListeners,
@@ -1180,6 +1192,7 @@ export function engineResolveChoice(
     trailingActionEvents,
     trailingActionEventStartIndex,
     triggerSnapshot,
+    trailingPreservedEvents,
   )
   const afterActivateNodes = buildPhaseTrailingNodes(
     int,
@@ -1193,6 +1206,7 @@ export function engineResolveChoice(
     trailingActionEvents,
     trailingActionEventStartIndex,
     triggerSnapshot,
+    trailingPreservedEvents,
   )
   const afterHostNodes =
     result.type === 'ok' && pendingHost instanceof ActionNode
