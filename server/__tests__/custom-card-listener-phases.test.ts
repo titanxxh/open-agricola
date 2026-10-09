@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { createIsolatedGameSession, workerObservation } from '../game/custom-session-executor'
 import { registerExecutorBackedCustomCard } from '../custom-code/runtime'
 import { registerBrowserBackedCustomCard } from '../../client/local-sandbox/browser-runtime'
 import { SessionCardContext, withSessionContext, type CustomCardData } from '../../shared/cards/session-card-context'
@@ -34,5 +35,20 @@ describe('saved custom-card listener phase admission', () => {
 
   it('rejects the saved manifest at the session boundary instead of downgrading it to a warning', () => {
     expect(() => new GameSession(1063, [staleCard()], { playerCount: 2 })).toThrow(error)
+  })
+
+  it('rejects Room and HTTP session creation before the facade strips executable manifests', () => {
+    const workersBefore = workerObservation()
+    let created: ReturnType<typeof createIsolatedGameSession> | undefined
+    try {
+      expect(() => {
+        created = createIsolatedGameSession(1063, [staleCard()], { playerCount: 2 })
+      }).toThrow(error)
+      expect(created).toBeUndefined()
+      expect(workerObservation()).toEqual(workersBefore)
+    } finally {
+      created?.executor?.dispose()
+      created?.session.dispose()
+    }
   })
 })

@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 import type { GameState } from '../../shared/contract/types.ts'
 import type { GameSyncPayload } from '../../shared/contract/protocol/game.ts'
 import type { CustomCardData } from '../../shared/cards/session-card-context.ts'
+import { assertSandboxListenerPhases } from '../../shared/custom-code/sandbox-listener-phases.ts'
 import type { InitialStateOptions } from '../../shared/session/state-bootstrap.ts'
 import {
   rehydrateState,
@@ -386,6 +387,11 @@ export const createIsolatedGameSession = (
   customCards?: CustomCardData[],
   initialStateOptions?: InitialStateOptions,
 ): { session: GameSession; executor?: CustomSessionExecutor } => {
+  // The parent facade strips executable fields; reject incompatible cards while
+  // their original manifests are still available, before creating a Room/session.
+  for (const card of customCards ?? []) {
+    if (card.compiledCode && card.codeManifest) assertSandboxListenerPhases(card.cardJson.id, card.codeManifest)
+  }
   const executable = hasExecutableCards(customCards)
   const session = new GameSession(
     stateOrSeed,

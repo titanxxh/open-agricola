@@ -253,7 +253,7 @@ Fence discounts such as E16 Briar Hedge and C16 Field Fences use a `computeCosts
 - `reap`
 <!-- prompt-sync:end id=listener-actions -->
 
-`sandboxListenerPhases` is the Workshop listener-phase allowlist. The AST validator rejects unsupported phases in new source. Saved executable manifests are checked before session or runtime registration; an unsupported phase rejects execution before any card effects or listeners are installed. `during` is unsupported and is never translated to `after`. Saved drafts and versions remain readable for editing.
+`sandboxListenerPhases` is the Workshop listener-phase allowlist. The AST validator rejects unsupported phases in new source. Saved executable manifests are checked before session or runtime registration; the isolated session factory checks original cards before stripping executable fields from its parent mirror. An unsupported phase rejects creation before any card effects, listeners, or workers are installed. HTTP game creation returns 400 with `code: 'unsupported_listener_phase'` and the specific phase error; WS creation reports the error before persisting the Room. `during` is unsupported and is never translated to `after`. Saved drafts and versions remain readable for editing.
 
 <!-- prompt-sync:begin id=action-hook-phases -->
 - `before`
