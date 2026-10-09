@@ -12,7 +12,7 @@ const CARD_ID = 'B117_Informant'
 
 describe('B117_Informant session', () => {
   it('onBuy returns a gain-1-wood flow', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -29,7 +29,7 @@ describe('B117_Informant session', () => {
   })
 
   it('onBeforeReturnHome gives 1 wood when stone > clay', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -52,7 +52,7 @@ describe('B117_Informant session', () => {
   })
 
   it('onBeforeReturnHome does not trigger when stone <= clay', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -72,7 +72,7 @@ describe('B117_Informant session', () => {
   })
 
   it('onBeforeReturnHome does not trigger when stone < clay', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -95,7 +95,7 @@ describe('B117_Informant session', () => {
     // The reference L29-33 isListeningTo isPlayerEvent → handler scoped to card owner only.
     // Our onBeforeReturnHome runs runCardEffectHook(state, player, ...) per
     // owner of the played card, so opponent without the card is unaffected.
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -126,7 +126,7 @@ describe('B117_Informant session', () => {
   })
 
   it('integration: end of work phase gives wood when stone > clay', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

@@ -5,7 +5,7 @@ import { workersAvailable } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 describe('dev create pasture', () => {
   it('does not consume worker and enters fence select pending', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     const beforeWorkers = workersAvailable(state, state.players[0])

@@ -11,7 +11,7 @@ import '../../shared/cards/D/D050_ForeignAid'
 const CARD_ID = 'D050_ForeignAid'
 
 const setup = () => {
-  const session = new GameSession()
+  const session = new GameSession(42)
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)

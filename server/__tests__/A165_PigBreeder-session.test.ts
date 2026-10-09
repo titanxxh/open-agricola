@@ -11,7 +11,7 @@ import '../../shared/cards/A/A165_PigBreeder'
 const CARD_ID = 'A165_PigBreeder'
 
 const setupPlayerWithCard = (round: number) => {
-  const session = new GameSession()
+  const session = new GameSession(42)
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
@@ -90,7 +90,7 @@ describe('A165 PigBreeder session integration', () => {
   })
 
   it('round 12 finalize: boar+1 + animalReorg pending', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -122,7 +122,7 @@ describe('A165 PigBreeder session integration', () => {
   })
 
   it('round 12 finalize: triggers onBreed-style after listener with sourceCard A165', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     // GameSession constructor calls clearActionHooks(); register AFTER it so the
     // hook survives until performRoundEnd is invoked.

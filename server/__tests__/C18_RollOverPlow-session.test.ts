@@ -13,7 +13,7 @@ const CARD_ID = 'C018_RollOverPlow'
 
 describe('C018_RollOverPlow session', () => {
   const setup = (options?: { includeEmptyField?: boolean; includeCardField?: boolean }) => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -182,7 +182,7 @@ describe('C018_RollOverPlow session', () => {
   })
 
   it('NOT available with < 3 planted fields', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

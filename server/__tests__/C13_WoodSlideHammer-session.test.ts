@@ -12,7 +12,7 @@ const CARD_ID = 'C013_WoodSlideHammer'
 const CONSERVATOR_ID = 'A087_Conservator'
 
 const setupOwner = () => {
-  const session = new GameSession()
+  const session = new GameSession(42)
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
@@ -120,7 +120,7 @@ describe('C013_WoodSlideHammer — renovation -2 stone discount gated by conditi
   })
 
   it('without C13 modifier: 5-room wood stays gated normally on stone-deficient renovate', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

@@ -10,7 +10,7 @@ const CARD_ID = 'B051_DiggingSpade'
 
 describe('B051_DiggingSpade session', () => {
   const setup = (pigsInPasture: number) => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -74,7 +74,7 @@ describe('B051_DiggingSpade session', () => {
 
   describe('prerequisite "Play in Round 7 or Later"', () => {
     it('blocks when round < 7', () => {
-      const session = new GameSession()
+      const session = new GameSession(42)
       stabilizeRandomHands(session.state.players)
       const state = session.getState().state
       state.round = 6
@@ -83,7 +83,7 @@ describe('B051_DiggingSpade session', () => {
     })
 
     it('allows when round >= 7', () => {
-      const session = new GameSession()
+      const session = new GameSession(42)
       stabilizeRandomHands(session.state.players)
       const state = session.getState().state
       state.round = 7

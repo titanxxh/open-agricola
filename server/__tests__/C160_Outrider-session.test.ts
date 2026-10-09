@@ -16,7 +16,7 @@ describe('C160_Outrider session', () => {
     const listener = findListener('C160-outrider-before-place-farmer')!
     expect(listener).toBeDefined()
 
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 5
@@ -45,7 +45,7 @@ describe('C160_Outrider session', () => {
 
   it('does not trigger when placing on a different action space', () => {
     const listener = findListener('C160-outrider-before-place-farmer')!
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 5
@@ -67,7 +67,7 @@ describe('C160_Outrider session', () => {
 
   it('does not trigger when roundActionOrder entry is null', () => {
     const listener = findListener('C160-outrider-before-place-farmer')!
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 5

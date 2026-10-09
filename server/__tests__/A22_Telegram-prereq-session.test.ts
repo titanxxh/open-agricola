@@ -7,7 +7,7 @@ import type { FenceSegment } from '../../shared/contract/types'
 
 describe('A022_Telegram prerequisite', () => {
   it('blocks when player has placed all fences (no fences in supply)', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     const player = state.players[0]!
     player.fenceSegments = Array.from({ length: maxFences }, (_, i): FenceSegment => ({
@@ -18,7 +18,7 @@ describe('A022_Telegram prerequisite', () => {
   })
 
   it('allows when at least one fence remains in supply', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     const player = state.players[0]!
     player.fenceSegments = []
@@ -26,7 +26,7 @@ describe('A022_Telegram prerequisite', () => {
   })
 
   it('blocks when all unbuilt ordinary fences are held on E74', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     const player = state.players[0]!
     player.fenceSegments = []
@@ -36,7 +36,7 @@ describe('A022_Telegram prerequisite', () => {
   })
 
   it('blocks when supply fence tokens have all been consumed', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     const player = state.players[0]!
     player.fenceSegments = []

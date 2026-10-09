@@ -18,7 +18,7 @@ const findListener = (id: string) =>
   getRegisteredCardListeners().find((l) => l.id === id)
 
 const setupParity = ({ inHand = false, wood = 0, food = 0 } = {}) => {
-  const session = new GameSession()
+  const session = new GameSession(42)
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
@@ -93,7 +93,7 @@ describe('C094_StableCleaner — exact cost 1 wood + 1 food', () => {
     stableTilesLength = 0,
     consumedStables = 0,
   ) => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -176,7 +176,7 @@ describe('C094_StableCleaner — exact cost 1 wood + 1 food', () => {
   })
 
   it('anytime stable can be built with C88 discount and no wood', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

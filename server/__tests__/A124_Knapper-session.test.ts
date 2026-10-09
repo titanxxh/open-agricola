@@ -10,7 +10,7 @@ const CARD_ID = 'A124_Knapper'
 
 describe('A124_Knapper session', () => {
   const setupForRound = (round: number, revealedSpaceId: string) => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -76,7 +76,7 @@ describe('A124_Knapper session', () => {
   })
 
   it('does not trigger when card is not played', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

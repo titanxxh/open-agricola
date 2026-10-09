@@ -167,7 +167,7 @@ describe('E148_Lazybones session', () => {
   })
 
   const setup = (reservedActionSpaces = TRIGGER_SPACES) => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.currentPlayerIndex = 1
@@ -206,7 +206,7 @@ describe('E148_Lazybones session', () => {
   }
 
   it('onBuy offers selectable action-space choices up to dynamic reserve', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     const owner = state.players[0]!
@@ -231,7 +231,7 @@ describe('E148_Lazybones session', () => {
   })
 
   it('onBuy returns nothing if dynamic reserve is empty', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
 

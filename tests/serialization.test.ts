@@ -153,7 +153,7 @@ describe('shared/session/serialization', () => {
       const serialized = serializeState(modified, emptyCtx())
       serialized.players[0]!.activeModifiers = []
 
-      const session = new GameSession()
+      const session = new GameSession(42)
       session.loadState(serialized)
 
       let resp = session.takeAction(0, 'farm-expansion')

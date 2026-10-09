@@ -12,7 +12,7 @@ const CARD_ID = 'B079_Corf'
 const LISTENER = B079_Corf_impl.listeners[0]!
 
 const setup = () => {
-  const session = new GameSession()
+  const session = new GameSession(42)
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
@@ -48,7 +48,7 @@ const directContext = (
   transactionEvents: DraftGameEvent<'resource.moved'>[],
   actionEvents = transactionEvents,
 ): CardListenerContext => {
-  const session = new GameSession()
+  const session = new GameSession(42)
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)

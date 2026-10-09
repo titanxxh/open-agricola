@@ -68,7 +68,7 @@ const gainProbe: CardListenerRegistration = {
 describe('future receive round-start resources', () => {
   const setup = () => {
     const outerRegistry = getActiveCardRegistry()
-    const session = new GameSession()
+    const session = new GameSession(42)
     const registry = requireActiveCardRegistry('future receive test')
     registry.registerListener(receiveProbe)
     registry.registerListener(gainProbe)

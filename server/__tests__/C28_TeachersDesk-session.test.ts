@@ -14,7 +14,7 @@ describe('C028_TeachersDesk session', () => {
   it('before-place-farmer on major-improvement offers optional occupation with 1 food cost', () => {
     const listener = findListener('C28-teachers-desk-before-place-farmer')!
     expect(listener).toBeDefined()
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
@@ -40,7 +40,7 @@ describe('C028_TeachersDesk session', () => {
 
   it('before-place-farmer on house-redevelopment also triggers', () => {
     const listener = findListener('C28-teachers-desk-before-place-farmer')!
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 3 // house-redevelopment becomes available by mid game
@@ -64,7 +64,7 @@ describe('C028_TeachersDesk session', () => {
 
   it('does not trigger when occupation hand is empty', () => {
     const listener = findListener('C28-teachers-desk-before-place-farmer')!
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
@@ -85,7 +85,7 @@ describe('C028_TeachersDesk session', () => {
 
   it('does not trigger on other spaces', () => {
     const listener = findListener('C28-teachers-desk-before-place-farmer')!
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!

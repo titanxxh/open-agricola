@@ -34,7 +34,7 @@ const handFeedConversionListener: CardListenerRegistration = {
 describe('harvest feed conversion card listener dispatch', () => {
   const setup = () => {
     const outerRegistry = getActiveCardRegistry()
-    const session = new GameSession()
+    const session = new GameSession(42)
     requireActiveCardRegistry('harvest feed conversion listener test')
       .registerListener(handFeedConversionListener)
     const state = session.getState().state

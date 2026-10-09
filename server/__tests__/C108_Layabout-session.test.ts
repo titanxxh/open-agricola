@@ -9,7 +9,7 @@ import '../../shared/cards/C/C108_Layabout'
 const CARD_ID = 'C108_Layabout'
 
 const setupHarvest = (round: number, layaboutInHand = false) => {
-  const session = new GameSession()
+  const session = new GameSession(42)
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)

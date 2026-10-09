@@ -90,7 +90,7 @@ const setupDirectContext = (
   >,
   result?: ActionExecutionResult,
 ): CardListenerContext => {
-  const session = new GameSession()
+  const session = new GameSession(42)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   const player = state.players[0]!
@@ -112,7 +112,7 @@ const setupDirectContext = (
 
 describe('D036_BreedRegistry session', () => {
   it('keeps the session sheep collect path and records boardSheep from hand', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -235,7 +235,7 @@ describe('D036_BreedRegistry session', () => {
   })
 
   it('fails No Sheep prerequisite when current animal zones contain sheep', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     const player = state.players[0]!
     player.houseAnimalType = 'sheep'

@@ -9,7 +9,7 @@ const CARD_ID = 'A123_FrameBuilder'
 
 describe('A123_FrameBuilder renovation action log attribution', () => {
   const setup = () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -84,7 +84,7 @@ describe('A123_FrameBuilder renovation action log attribution', () => {
   })
 
   it('does NOT attribute renovate-house log when paying directly (no bonus used)', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

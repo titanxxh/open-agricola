@@ -81,7 +81,7 @@ describe('C37 Dwelling Mound session', () => {
   })
 
   it('C037 S3: each new field costs one food after Dwelling Mound is in play', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -103,7 +103,7 @@ describe('C37 Dwelling Mound session', () => {
   })
 
   it('C037 S4: without food a new field cannot be placed', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

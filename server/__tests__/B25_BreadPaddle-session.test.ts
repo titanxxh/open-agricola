@@ -16,7 +16,7 @@ const CARD_ID = 'B025_BreadPaddle'
 
 describe('B025_BreadPaddle session', () => {
   it('onBuy returns a gain-1-food flow', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -33,7 +33,7 @@ describe('B025_BreadPaddle session', () => {
   })
 
   it('after playing occupation, triggers optional bake-bread', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -81,7 +81,7 @@ describe('B025_BreadPaddle session', () => {
   })
 
   it('logs only the bake substep food when Bread Paddle triggers after a paid occupation', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -132,7 +132,7 @@ describe('B025_BreadPaddle session', () => {
   })
 
   it('does not trigger bake-bread if card is not played', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

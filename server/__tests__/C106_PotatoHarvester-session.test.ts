@@ -15,7 +15,7 @@ describe('C106_PotatoHarvester session', () => {
     vegetableFields?: { row: number; col: number; crop: 'vegetable'; remaining: number }[]
     grainFields?: { row: number; col: number; crop: 'grain'; remaining: number }[]
   }) => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -42,7 +42,7 @@ describe('C106_PotatoHarvester session', () => {
   }
 
   it('onBuy grants 3 food', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -57,7 +57,7 @@ describe('C106_PotatoHarvester session', () => {
   })
 
   it('onAfterReap grants 1 food per vegetable harvested', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -78,7 +78,7 @@ describe('C106_PotatoHarvester session', () => {
   })
 
   it('onAfterReap does not trigger when no vegetables harvested', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

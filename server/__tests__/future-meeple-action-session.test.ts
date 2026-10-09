@@ -5,7 +5,7 @@ import '../../shared/cards/B/B069_PottersMarket'
 
 describe('future meeple round-start actions', () => {
   it('offers plow when a field future meeple resolves', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 1
@@ -44,7 +44,7 @@ describe('future meeple round-start actions', () => {
   })
 
   it('offers a free stable build when a stable future meeple resolves', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 1
@@ -86,7 +86,7 @@ describe('future meeple round-start actions', () => {
   })
 
   it('applies future field actionContext cost when the plow resolves', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 1
@@ -129,7 +129,7 @@ describe('future meeple round-start actions', () => {
   })
 
   it('can exchange before a paid future field action is checked', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 1
@@ -200,7 +200,7 @@ describe('future meeple round-start actions', () => {
   })
 
   it('does not expose round-start schedulers in the future action preparation window', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 1

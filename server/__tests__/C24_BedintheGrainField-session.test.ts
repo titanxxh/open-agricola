@@ -12,7 +12,7 @@ import type { ActionChoiceOption } from '../../shared/contract/types'
 const CARD_ID = 'C024_BedintheGrainField'
 
 const setupHarvest = (options: { rooms: number; ready?: boolean } = { rooms: 3, ready: true }) => {
-  const session = new GameSession()
+  const session = new GameSession(42)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   state.round = 4

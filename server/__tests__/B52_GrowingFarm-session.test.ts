@@ -5,7 +5,7 @@ import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites
 
 describe('B052_GrowingFarm prerequisite', () => {
   it('blocks when covered pasture zones < round - 1', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.round = 5
     const player = state.players[0]!
@@ -21,7 +21,7 @@ describe('B052_GrowingFarm prerequisite', () => {
   })
 
   it('allows when covered pasture zones >= round - 1', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.round = 5
     const player = state.players[0]!

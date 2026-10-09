@@ -11,14 +11,14 @@ import { getAllTilePositions } from '../../shared/domain/farm'
 
 describe('A033_BigCountry prerequisite', () => {
   it('blocks when there is at least one free farmyard space', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     const player = state.players[0]!
     expect(meetsCardPrerequisites(player, A033_BigCountry, state.round, state)).toBe(false)
   })
 
   it('allows when all 15 farmyard spaces are used', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     const player = state.players[0]!
     // Cover the 15 spaces by stuffing them as roomTiles for the prereq check.

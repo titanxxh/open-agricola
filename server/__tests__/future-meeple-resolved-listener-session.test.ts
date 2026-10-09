@@ -33,7 +33,7 @@ const handFutureMeepleListener: CardListenerRegistration = {
 describe('future meeple resolved card listener dispatch', () => {
   const setup = () => {
     const outerRegistry = getActiveCardRegistry()
-    const session = new GameSession()
+    const session = new GameSession(42)
     requireActiveCardRegistry('future meeple listener test')
       .registerListener(handFutureMeepleListener)
     const state = session.getState().state

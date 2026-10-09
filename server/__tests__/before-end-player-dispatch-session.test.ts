@@ -20,7 +20,7 @@ const setPlaceholderHands = (player: PlayerState) => {
 }
 
 const setupEndGameSession = () => {
-  const session = new GameSession()
+  const session = new GameSession(42)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   state.currentPlayerIndex = 0
@@ -168,7 +168,7 @@ describe('Before-End Player Dispatch session', () => {
   })
 
   it('opens repeatable player-order anytime windows after the final harvest and before scoring', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -231,7 +231,7 @@ describe('Before-End Player Dispatch session', () => {
   })
 
   it('skips the pre-scoring window when only unlisted or unavailable anytime cards remain', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0

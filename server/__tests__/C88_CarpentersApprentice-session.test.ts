@@ -14,7 +14,7 @@ const CARD_ID = 'C088_CarpentersApprentice'
 
 describe('C088 Carpenter\'s Apprentice parity', () => {
   it('C088 S1: playing Carpenter\'s Apprentice through Lessons keeps the occupation in play', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -33,7 +33,7 @@ describe('C088 Carpenter\'s Apprentice parity', () => {
   })
 
   it('C088 S2: a wooden room costs three wood and two reed', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -65,7 +65,7 @@ describe('C088 Carpenter\'s Apprentice parity', () => {
   })
 
   it('C088 S3: the third and fourth stables each cost one wood', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -92,7 +92,7 @@ describe('C088 Carpenter\'s Apprentice parity', () => {
 })
 
 const makeFencePlayer = (fenceCount: number, wood = 0): PlayerState => {
-  const session = new GameSession()
+  const session = new GameSession(42)
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   const p = state.players[0]!
@@ -160,7 +160,7 @@ const stablesDiscount = (player: PlayerState, stableCount = 1): number => {
 
 describe('C88 Carpenter\'s Apprentice — session w/ palisades', () => {
   it('低 fence 不打折:0 fence 造 2 fence + 2 palisade 全额付费', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -194,7 +194,7 @@ describe('C88 Carpenter\'s Apprentice — session w/ palisades', () => {
   })
 
   it('palisade 不打折:5 wood 不足 6 wood 的 2 fence + 2 palisade build', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -224,7 +224,7 @@ describe('C88 Carpenter\'s Apprentice — session w/ palisades', () => {
 
   describe('stables-cost listener cap (3rd & 4th stables only)', () => {
     const makePlayer = (stables: number, farmHand = false): PlayerState => {
-      const session = new GameSession()
+      const session = new GameSession(42)
       stabilizeRandomHands(session.state.players)
       const state = session.getState().state
       const p = state.players[0]!
@@ -336,7 +336,7 @@ describe('C88 — fenceIsDoableListener 精确 reference doability', () => {
     expect(fenceDoable(makeFencePlayer(13, 0))).toBe(true)
   })
   it('12 fences,no legal commit → not doable', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -384,7 +384,7 @@ describe('C88 — fenceIsDoableListener 精确 reference doability', () => {
 
 describe('C88 — fence 折扣经 collectComputeCostsForFarmChoice 聚合', () => {
   it('before 12,造 3 个 → 聚合 wood -3(hook 路径生效)', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     const player = makeFencePlayer(12)
@@ -398,7 +398,7 @@ describe('C88 — fence 折扣经 collectComputeCostsForFarmChoice 聚合', () =
     expect(result.wood).toBe(-3)
   })
   it('before 0,造 2 个 → 聚合无 wood 折扣', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     const player = makeFencePlayer(0)
@@ -415,7 +415,7 @@ describe('C88 — fence 折扣经 collectComputeCostsForFarmChoice 聚合', () =
 
 describe('C88 — fence 折扣 Session 端到端(第 13-14 个免费)', () => {
   it('C088 S4: 0 fence 一次造 14 个 fence:第 13/14 个免费,wood 12→0', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

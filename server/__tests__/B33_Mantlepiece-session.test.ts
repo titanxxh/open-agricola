@@ -11,7 +11,7 @@ const CARD_ID = 'B033_Mantlepiece'
 
 describe('B033_Mantlepiece prerequisite', () => {
   it('blocks when player still lives in a wooden house', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     const player = state.players[0]!
     player.houseType = 'wood'
@@ -19,7 +19,7 @@ describe('B033_Mantlepiece prerequisite', () => {
   })
 
   it('allows when player lives in a clay house', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     const player = state.players[0]!
     player.houseType = 'clay'
@@ -27,7 +27,7 @@ describe('B033_Mantlepiece prerequisite', () => {
   })
 
   it('allows when player lives in a stone house', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     const player = state.players[0]!
     player.houseType = 'stone'

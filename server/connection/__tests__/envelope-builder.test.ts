@@ -13,7 +13,7 @@ describe('buildEnvelope', () => {
   }]
 
   it('emits a stateUpdate envelope with the given metadata', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const resp = session.withCtx(() => session.getState())
     const env = buildEnvelope({
       room: { id: 'r1', session, players: [] },
@@ -48,7 +48,7 @@ describe('buildEnvelope', () => {
   })
 
   it('redacts state for the given viewer id', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const resp = session.withCtx(() => session.getState())
     const player0Id = resp.state.players[0]!.id
     const env = buildEnvelope({
@@ -65,7 +65,7 @@ describe('buildEnvelope', () => {
   })
 
   it('redacts private prompts and emits private events only for the target viewer', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const resp = session.withCtx(() => session.getState())
     const p0 = resp.state.players[0]!
     const p1 = resp.state.players[1]!
@@ -137,7 +137,7 @@ describe('buildEnvelope', () => {
   })
 
   it('redacts owner-only harvest and reorganization prompts from other viewers', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const resp = session.withCtx(() => session.getState())
     const p0 = resp.state.players[0]!
     const p1 = resp.state.players[1]!
@@ -182,7 +182,7 @@ describe('buildEnvelope', () => {
   })
 
   it('filters response private events for each viewer', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const resp = session.withCtx(() => session.getState())
     const p0 = resp.state.players[0]!
     const p1 = resp.state.players[1]!
@@ -243,7 +243,7 @@ describe('buildEnvelope', () => {
   })
 
   it('only sends hand-card availability to the active viewer', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const resp = session.withCtx(() => {
       const next = session.getState()
       next.state.players = next.state.players.slice(0, 2)
@@ -286,7 +286,7 @@ describe('buildEnvelope', () => {
   })
 
   it('filters hidden hand-card public event cancellations per viewer', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const resp = session.withCtx(() => {
       const next = session.getState()
       const state = next.state

@@ -9,7 +9,7 @@ describe('C009_AutomaticWaterTrough session', () => {
     // The reference `getValidAnimals` returns empty list when no zone can accommodate
     // sheep / boar / cattle. In that case `onBuy` returns void, so the player
     // does not enter a degenerate XOR with no real options.
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
@@ -34,7 +34,7 @@ describe('C009_AutomaticWaterTrough session', () => {
   })
 
   it('onBuy XOR includes only animals that can be accommodated', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
@@ -56,7 +56,7 @@ describe('C009_AutomaticWaterTrough session', () => {
   })
 
   it('onBuy filters out animals when already-occupied house pins type', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
@@ -77,7 +77,7 @@ describe('C009_AutomaticWaterTrough session', () => {
   })
 
   it('onBuy uses final animal totals when animals can be reorganized', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!

@@ -19,7 +19,7 @@ const CUBBYHOLE_ID = 'E052_Cubbyhole'
 const STABLE_CLEANER_ID = 'C94-stable-cleaner-anytime'
 
 const setupPlayed = (food = 5) => {
-  const session = new GameSession()
+  const session = new GameSession(42)
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)

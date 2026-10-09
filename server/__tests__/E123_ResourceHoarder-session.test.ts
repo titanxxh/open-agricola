@@ -73,7 +73,7 @@ const executeSpecialEffectLeaves = (
 
 describe('E123_ResourceHoarder session', () => {
   it('onBuy initializes the stack with 6 resources bottom to top', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
 

@@ -12,7 +12,7 @@ void _bakeBreadAction
 
 describe('PlayerStats conversion tracking', () => {
   it('bake-bread records grain converted + food output', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     const player = state.players[0]!
     player.improvements = ['Major_Fireplace1'] // bake rate 1:2 (Fireplace bakes grain → 2 food)

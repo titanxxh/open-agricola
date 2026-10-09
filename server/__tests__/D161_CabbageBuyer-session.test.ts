@@ -28,7 +28,7 @@ const setup = (options?: {
   const withCard = options?.withCard ?? true
   const ownerFood = options?.ownerFood ?? 10
 
-  const session = new GameSession()
+  const session = new GameSession(42)
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
@@ -552,7 +552,7 @@ describe('D161_CabbageBuyer session', () => {
   })
 
   it('T9: anytime renovation without worker placement still presents the D161 offer', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

@@ -35,7 +35,7 @@ const buyMinor = (
 
 describe('passing-mechanism: C001_Overhaul complex onBuy', () => {
   it('buyer 执行强制免费 rebuild，pending owner 是 buyer，卡传入 next.minorHand', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -83,7 +83,7 @@ describe('passing-mechanism: C001_Overhaul complex onBuy', () => {
   })
 
   it('buyer 无 fence 时 onBuy 直接完成，卡仍传给 next', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -109,7 +109,7 @@ describe('passing-mechanism: C001_Overhaul complex onBuy', () => {
 
 describe('passing-mechanism: E005_NightLoot complex onBuy', () => {
   it('buyer onBuy auto-executes batch collect；P0 获得 wood+stone；卡传入 next.minorHand', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0

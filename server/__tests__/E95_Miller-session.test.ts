@@ -14,7 +14,7 @@ describe('E095_Miller session', () => {
    * p1 = opponent, will use grain-seeds.
    */
   const setup = () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.currentPlayerIndex = 1 // opponent's turn
@@ -149,7 +149,7 @@ describe('E095_Miller session', () => {
   })
 
   it('onBuy offers optional improvement purchase', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.currentPlayerIndex = 0
@@ -200,7 +200,7 @@ describe('E095_Miller session', () => {
   })
 
   it('onBuy allows purchasing a baking improvement', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.currentPlayerIndex = 0

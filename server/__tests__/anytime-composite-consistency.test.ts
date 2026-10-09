@@ -12,7 +12,7 @@ const WHISKY = 'D106_WhiskyDistiller'
 
 describe('anytime — composite pending policy/UI consistency', () => {
   it('UI interaction snapshot and listAnytimeEntries agree on composite-hosted pending', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0

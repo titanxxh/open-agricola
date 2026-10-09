@@ -9,7 +9,7 @@ const CARD_ID = 'A123_FrameBuilder'
 
 describe('A123_FrameBuilder renovation choice repro', () => {
   it('should prompt payment choice when BOTH direct (2 clay + 1 reed) AND bonus (1 wood + 1 reed) are affordable', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -74,7 +74,7 @@ describe('A123_FrameBuilder renovation choice repro', () => {
   })
 
   it('keeps the house wooden when payment choice resolution fails', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

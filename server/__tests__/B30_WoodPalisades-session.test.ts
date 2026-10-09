@@ -15,7 +15,7 @@ const tile00Fences = ['H-1-0', 'V-0-1']     // internal edges
 const tile00Palisades = ['H-0-0', 'V-0-0']  // border edges
 
 const setup = (overrides: { withCard?: boolean; wood?: number } = {}) => {
-  const session = new GameSession()
+  const session = new GameSession(42)
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)

@@ -138,7 +138,7 @@ describe('C006 Stone Clearing parity', () => {
 })
 describe('C006_StoneClearing session (reference-aligned)', () => {
   const setupWithFields = (fields: Array<{ row: number; col: number; stacks: Array<{ kind: 'grain' | 'vegetable' | 'stone'; remaining: number }> }>) => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -402,7 +402,7 @@ describe('C006_StoneClearing session (reference-aligned)', () => {
 
 describe('C006_StoneClearing cross-card integration', () => {
   it('D63 Lynchet: stone fields adjacent to room tiles count for the food bonus', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -437,7 +437,7 @@ describe('C006_StoneClearing cross-card integration', () => {
   })
 
   it('A11-style empty-field counters: stone-clearing fields are NOT empty', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0

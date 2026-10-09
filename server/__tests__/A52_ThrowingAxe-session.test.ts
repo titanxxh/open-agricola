@@ -9,7 +9,7 @@ import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites
 
 describe('A052_ThrowingAxe prerequisite', () => {
   it('blocks when round < 7', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.round = 6
     const player = state.players[0]!
@@ -17,7 +17,7 @@ describe('A052_ThrowingAxe prerequisite', () => {
   })
 
   it('allows when round >= 7', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.round = 7
     const player = state.players[0]!

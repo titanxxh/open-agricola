@@ -14,14 +14,14 @@ const leaves = (flow: ActionFlow | undefined): Extract<ActionFlow, { type: 'leaf
 
 describe('A040_PottersYard prerequisite', () => {
   it('blocks when player has more than 7 free farmyard spaces', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     const player = state.players[0]!
     expect(meetsCardPrerequisites(player, A040_PottersYard, state.round, state)).toBe(false)
   })
 
   it('allows when free spaces <= 7 (e.g. 8 spaces used)', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     const player = state.players[0]!
     player.roomTiles = getAllTilePositions().slice(0, 8)
@@ -32,7 +32,7 @@ describe('A040_PottersYard prerequisite', () => {
   })
 
   it('records and consumes used-space counts through ordered leaves', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     const player = state.players[0]!
     A040_PottersYard_impl.effect!.onBuy!(state, player)

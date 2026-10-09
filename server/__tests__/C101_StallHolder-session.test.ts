@@ -7,7 +7,7 @@ import '../../shared/cards/C/C101_StallHolder'
 
 describe('C101_StallHolder session', () => {
   const setup = (opts?: { stableCount?: number }) => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -38,7 +38,7 @@ describe('C101_StallHolder session', () => {
   }
 
   it('C101 S1: playing Stall Holder through Lessons keeps the occupation in play', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

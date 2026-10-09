@@ -30,7 +30,7 @@ const findListener = (id: string) =>
  */
 describe('C027_Blueprint session — verify chooseOne aligned to the reference majors', () => {
   const setup = () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -139,7 +139,7 @@ describe('C027_Blueprint session — minor-improvement routing for 3 majors', ()
   const ALLOWED_MAJORS = ['Major_Joinery', 'Major_Pottery', 'Major_Basket'] as const
 
   const setupWithResources = (overrides?: { playC27?: boolean }) => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0

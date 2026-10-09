@@ -5,7 +5,7 @@ import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites
 
 describe('E043_BarnCats prerequisite', () => {
   it('blocks when player owns no stable', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     const player = state.players[0]!
     player.stableTiles = []
@@ -13,7 +13,7 @@ describe('E043_BarnCats prerequisite', () => {
   })
 
   it('allows when player has at least 1 stable', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     const player = state.players[0]!
     player.stableTiles = [{ row: 0, col: 4 }]
@@ -21,7 +21,7 @@ describe('E043_BarnCats prerequisite', () => {
   })
 
   it('allows when the only stable is the B85 FarmHand stable (card-facing count)', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     const player = state.players[0]!
     player.stableTiles = []

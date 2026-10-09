@@ -9,7 +9,7 @@ const CARD_ID = 'B110_Pavior'
 
 describe('B110_Pavior session', () => {
   it('onRoundStart gives 1 food when player has stone', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 3
@@ -30,7 +30,7 @@ describe('B110_Pavior session', () => {
   })
 
   it('onRoundStart does not trigger when player has no stone', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 3
@@ -48,7 +48,7 @@ describe('B110_Pavior session', () => {
   })
 
   it('onRoundStart gives 1 vegetable in round 14', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 14
@@ -69,7 +69,7 @@ describe('B110_Pavior session', () => {
   })
 
   it('onRoundStart gives food (not vegetable) in rounds other than 14', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 13

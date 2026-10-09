@@ -9,7 +9,7 @@ const CARD_ID = 'C164_GermanHeathKeeper'
 
 describe('C164_GermanHeathKeeper session', () => {
   const setup = (currentPlayerIndex: number) => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     // GermanHeathKeeper is a 4+ player card, keep all 4 players

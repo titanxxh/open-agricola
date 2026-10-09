@@ -9,7 +9,7 @@ const CARD_ID = 'D084_FeedPellets'
 
 describe('D084_FeedPellets session', () => {
   it('onBuy returns gain 1 sheep flow', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
 
@@ -26,7 +26,7 @@ describe('D084_FeedPellets session', () => {
   })
 
   it('offers exchange during feeding when player has vegetable and sheep', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
 
@@ -46,7 +46,7 @@ describe('D084_FeedPellets session', () => {
   })
 
   it('offers xor when player has multiple animal types', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
 
@@ -67,7 +67,7 @@ describe('D084_FeedPellets session', () => {
   })
 
   it('returns undefined during feeding when no vegetable', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
 
@@ -84,7 +84,7 @@ describe('D084_FeedPellets session', () => {
   })
 
   it('returns undefined during feeding when no animals owned', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
 

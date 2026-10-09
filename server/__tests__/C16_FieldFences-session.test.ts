@@ -11,7 +11,7 @@ import '../../shared/cards/C/C016_FieldFences'
 const CARD_ID = 'C016_FieldFences'
 
 const setup = (opts: { wood: number; withField?: boolean; food?: number }) => {
-  const session = new GameSession()
+  const session = new GameSession(42)
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)

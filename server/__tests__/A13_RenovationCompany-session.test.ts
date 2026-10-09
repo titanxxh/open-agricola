@@ -9,7 +9,7 @@ import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites
 
 describe('A013_RenovationCompany prerequisite', () => {
   it('blocks when house is not wooden or rooms != 2', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     const player = state.players[0]!
     player.houseType = 'clay'
@@ -17,7 +17,7 @@ describe('A013_RenovationCompany prerequisite', () => {
   })
 
   it('allows when in wooden house with exactly 2 rooms', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     const player = state.players[0]!
     player.houseType = 'wood'

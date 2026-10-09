@@ -14,7 +14,7 @@ import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
  */
 describe('house-redevelopment leaf-flush logging', () => {
   it('continues into optional improvement choice after auto-resolved renovation', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -54,7 +54,7 @@ describe('house-redevelopment leaf-flush logging', () => {
   })
 
   it('emits log.actionDetail for renovate-house before improvement choice prompt', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -92,7 +92,7 @@ describe('house-redevelopment leaf-flush logging', () => {
   })
 
   it('does not duplicate renovation in the wrapper actionDetail when improvement is skipped', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

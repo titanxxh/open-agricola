@@ -11,7 +11,7 @@ const FIREPLACE1 = 'Major_Fireplace1'
 const COOKING_HEARTH1 = 'Major_CookingHearth1'
 
 const setupTwoPlayer = () => {
-  const session = new GameSession()
+  const session = new GameSession(42)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   state.players[0]!.name = 'P1'

@@ -8,7 +8,7 @@ import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites
 const playedKey = (cardId: string, type: 'minor' | 'occupation') => `${type}:${cardId}`
 
 const setup = (withSheepRug: boolean) => {
-  const session = new GameSession()
+  const session = new GameSession(42)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   state.round = 2
@@ -86,7 +86,7 @@ describe('E021_SheepRug session', () => {
 
   describe('prerequisite "4 Sheep"', () => {
     it('blocks when player has fewer than 4 sheep on board', () => {
-      const session = new GameSession()
+      const session = new GameSession(42)
       const state = session.getState().state
       const player = state.players[0]!
       player.pastures = []
@@ -97,7 +97,7 @@ describe('E021_SheepRug session', () => {
     })
 
     it('allows when player has 4+ sheep on board (in pasture)', () => {
-      const session = new GameSession()
+      const session = new GameSession(42)
       const state = session.getState().state
       const player = state.players[0]!
       player.pastures = [{

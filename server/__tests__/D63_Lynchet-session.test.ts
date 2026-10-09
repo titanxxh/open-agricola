@@ -10,7 +10,7 @@ const CARD_ID = 'D063_Lynchet'
 
 describe('D063_Lynchet session', () => {
   it('onAfterReap counts only adjacent harvested positions', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
@@ -36,7 +36,7 @@ describe('D063_Lynchet session', () => {
   })
 
   it('counts only positions that are orthogonally adjacent to a room tile', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
@@ -66,7 +66,7 @@ describe('D063_Lynchet session', () => {
     // Old summary-only counting could not distinguish which fields were
     // harvested when there are multiple grain fields with different
     // adjacencies. The new harvestedPositions field makes it precise.
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
@@ -98,7 +98,7 @@ describe('D063_Lynchet session', () => {
   })
 
   it('does not trigger when no fields were harvested', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
@@ -113,7 +113,7 @@ describe('D063_Lynchet session', () => {
   })
 
   it('does not trigger when no harvested positions are adjacent to rooms', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!

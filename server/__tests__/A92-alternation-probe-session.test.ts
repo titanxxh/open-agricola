@@ -21,7 +21,7 @@ describe('A92 alternation probe (session)', () => {
   // all spaces) turns it into an available worker. Foundation for grow-only →
   // natural-alternation.
   it('probe A: promoting a space-occupying newborn makes it an available worker', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -61,7 +61,7 @@ describe('A92 alternation probe (session)', () => {
   // skipping. This is the rotation half of capability B (the contributed XOR is
   // pushed by handleConfirmNextPlayerResolved; see A92-extra-turn-session).
   it('the rotation stops on a player whose only worker is a parked newborn (with A92)', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 1

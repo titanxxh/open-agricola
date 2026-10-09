@@ -11,7 +11,7 @@ import '../../shared/cards/E/E153_StoneSculptor'
 const CARD_ID = 'E153_StoneSculptor'
 
 const setupHarvestRound = (round = 4) => {
-  const session = new GameSession()
+  const session = new GameSession(42)
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
@@ -53,7 +53,7 @@ const drainHarvest = (session: GameSession, feedSelections: Record<number, FeedS
 
 describe('E153_StoneSculptor exchange metadata', () => {
   it('declares a harvest-window exchange with bonusVp sideEffect', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     const player = state.players[0]!
@@ -71,7 +71,7 @@ describe('E153_StoneSculptor exchange metadata', () => {
   })
 
   it('exposes nothing in the anytime window', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     const player = state.players[0]!
@@ -82,7 +82,7 @@ describe('E153_StoneSculptor exchange metadata', () => {
   })
 
   it('computeBonusScore reads cardStates.bonusVpEarned', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     const player = state.players[0]!
@@ -98,7 +98,7 @@ describe('E153_StoneSculptor exchange metadata', () => {
   })
 
   it('computeBonusScore returns 0 when no usage recorded', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     const player = state.players[0]!
@@ -215,7 +215,7 @@ describe('E153_StoneSculptor harvest integration', () => {
   })
 
   it('player without E153: harvest exchange not exposed', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     const player = state.players[0]!

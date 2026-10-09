@@ -45,7 +45,7 @@ describe('D072_StableManure session', () => {
   }
 
   const setupHarvest = (unfencedStableCount: number) => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -295,7 +295,7 @@ describe('D072_StableManure session', () => {
   })
 
   it('does not trigger when no cropped fields', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

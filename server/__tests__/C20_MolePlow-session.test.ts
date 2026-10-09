@@ -5,7 +5,7 @@ import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites
 
 describe('C020_MolePlow prerequisite', () => {
   it('blocks when round < 9', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.round = 8
     const player = state.players[0]!
@@ -13,7 +13,7 @@ describe('C020_MolePlow prerequisite', () => {
   })
 
   it('allows when round >= 9', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.round = 9
     const player = state.players[0]!

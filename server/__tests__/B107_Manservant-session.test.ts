@@ -8,7 +8,7 @@ import '../../shared/cards/B/B107_Manservant'
 
 describe('B107_Manservant session', () => {
   const setup = (options?: { houseType?: 'wood' | 'clay' | 'stone'; round?: number }) => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

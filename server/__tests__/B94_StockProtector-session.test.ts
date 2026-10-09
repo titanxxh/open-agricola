@@ -35,7 +35,7 @@ describe('B094_StockProtector session', () => {
   })
 
   it('B094 S2-S3: Fencing grants two wood and can place another person', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -85,7 +85,7 @@ describe('B094_StockProtector session', () => {
   })
 
   it('B094 S5: blocks after gaining wood if fencing is still not doable, then explicitly undoes', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

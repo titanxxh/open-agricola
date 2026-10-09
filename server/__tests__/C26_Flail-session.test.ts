@@ -18,7 +18,7 @@ const findListener = (id: string) =>
 
 describe('C026_Flail session', () => {
   it('onBuy grants 2 food', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     session.loadState(state)
@@ -34,7 +34,7 @@ describe('C026_Flail session', () => {
   it('after-place-farmer on farmland offers optional bake-bread', () => {
     const listener = findListener('C26-flail-after-place-farmer')!
     expect(listener).toBeDefined()
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
@@ -59,7 +59,7 @@ describe('C026_Flail session', () => {
 
   it('after-place-farmer on cultivation offers optional bake-bread', () => {
     const listener = findListener('C26-flail-after-place-farmer')!
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 5 // cultivation available from round 5
@@ -82,7 +82,7 @@ describe('C026_Flail session', () => {
 
   it('does not trigger on non-trigger spaces', () => {
     const listener = findListener('C26-flail-after-place-farmer')!
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!

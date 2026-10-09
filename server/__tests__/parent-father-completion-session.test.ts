@@ -28,7 +28,7 @@ const setDeterministicHands = (state: GameState): void => {
 }
 
 const setup = (father: FatherParentCardId, mutate?: (player: PlayerState, state: GameState) => void) => {
-  const session = new GameSession()
+  const session = new GameSession(42)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   state.enableParentCards = true
@@ -1361,7 +1361,7 @@ describe('Parent father completion session', () => {
   })
 
   it('does not expose or execute father completion when Parent Cards are disabled', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.enableParentCards = false

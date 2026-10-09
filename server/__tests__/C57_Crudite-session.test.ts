@@ -45,7 +45,7 @@ const createState = (...players: PlayerState[]): GameState =>
   }) as GameState
 
 const setupSession = (fieldCounts = [3, 2, 1]) => {
-  const session = new GameSession()
+  const session = new GameSession(42)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   state.round = 4
@@ -71,7 +71,7 @@ const setupSession = (fieldCounts = [3, 2, 1]) => {
 }
 
 const setupAnytimeSession = (fieldCounts = [3, 2, 1], cardFieldRemaining?: number) => {
-  const session = new GameSession()
+  const session = new GameSession(42)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   state.round = 4

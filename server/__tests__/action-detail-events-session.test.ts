@@ -23,7 +23,7 @@ describe('action detail events', () => {
   })
 
   it('records legacy action detail deltas as public events and UI log entries', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.players.forEach((player) => {
@@ -72,7 +72,7 @@ describe('action detail events', () => {
   })
 
   it('flushes events before returning a farm-select pending prompt', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.players.forEach((player) => {
@@ -128,7 +128,7 @@ describe('action detail events', () => {
   })
 
   it('flushes events before returning a selection pending prompt', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.players.forEach((player) => {
@@ -184,7 +184,7 @@ describe('action detail events', () => {
   })
 
   it('keeps pre-prompt farm-select events visible to after hooks after confirm', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.players.forEach((player) => {

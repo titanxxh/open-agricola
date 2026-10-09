@@ -81,7 +81,7 @@ const exchangedForFood = (
 })
 
 const setupLessonsExchangeSession = (exchangeSource: 'kettle' | 'fireplace') => {
-  const session = new GameSession()
+  const session = new GameSession(42)
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
@@ -159,7 +159,7 @@ describe('B029_CookeryLesson — real Lessons exchange flow', () => {
 
 describe('B029_CookeryLesson — per-action token tracking, not per-round', () => {
   const setup = () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!

@@ -16,7 +16,7 @@ describe('E165_MasterHuntsman session', () => {
     const listener = findListener('E165-master-huntsman-onbuy')
     expect(listener).toBeDefined()
 
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
@@ -43,7 +43,7 @@ describe('E165_MasterHuntsman session', () => {
     const listener = findListener('E165-master-huntsman-onbuy')
     expect(listener).toBeDefined()
 
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
@@ -66,7 +66,7 @@ describe('E165_MasterHuntsman session', () => {
     const listener = findListener('E165-master-huntsman-after-major')
     expect(listener).toBeDefined()
 
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
@@ -93,7 +93,7 @@ describe('E165_MasterHuntsman session', () => {
     const listener = findListener('E165-master-huntsman-after-major')
     expect(listener).toBeDefined()
 
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!

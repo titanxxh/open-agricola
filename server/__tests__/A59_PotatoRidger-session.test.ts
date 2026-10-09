@@ -15,7 +15,7 @@ describe('A059_PotatoRidger session', () => {
     vegetableFields?: { row: number; col: number; crop: 'vegetable'; remaining: number }[]
     extraVegetable?: number
   }) => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -45,7 +45,7 @@ describe('A059_PotatoRidger session', () => {
   }
 
   it('with 3 veg after harvest → optional exchange available (direct hook test)', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -65,7 +65,7 @@ describe('A059_PotatoRidger session', () => {
   })
 
   it('with 4 veg after harvest → mandatory exchange', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -84,7 +84,7 @@ describe('A059_PotatoRidger session', () => {
   })
 
   it('with 2 veg after harvest → no trigger', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -101,7 +101,7 @@ describe('A059_PotatoRidger session', () => {
   })
 
   it('no vegetable harvested → no trigger even with 5 veg in supply', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

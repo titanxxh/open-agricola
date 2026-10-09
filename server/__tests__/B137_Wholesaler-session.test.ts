@@ -13,7 +13,7 @@ describe('B137_Wholesaler session', () => {
    * Player 0 gets a large pasture so animal-giving actions work.
    */
   const setup = (round = 1) => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

@@ -10,7 +10,7 @@ const CARD_ID = 'A085_Homekeeper'
 
 describe('A085_Homekeeper session', () => {
   const setup = () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

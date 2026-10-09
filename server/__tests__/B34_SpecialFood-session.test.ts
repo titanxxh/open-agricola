@@ -31,7 +31,7 @@ const moved = (
 })
 
 const setup = () => {
-  const session = new GameSession()
+  const session = new GameSession(42)
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
@@ -146,7 +146,7 @@ describe('B034_SpecialFood action-space provenance', () => {
   })
 
   it('awards bonus VP when A137 takes an animal from the other action space', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

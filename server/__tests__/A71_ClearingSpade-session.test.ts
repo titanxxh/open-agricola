@@ -9,7 +9,7 @@ import type { AnytimeAction } from '../../shared/contract/types';
 
 describe('A071_ClearingSpade session', () => {
   const setup = (fields?: { row: number; col: number; crop: string | null; remaining: number }[]) => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

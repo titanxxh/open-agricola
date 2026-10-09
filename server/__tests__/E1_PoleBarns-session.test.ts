@@ -10,7 +10,7 @@ import type { FenceSegment } from '../../shared/contract/types'
 
 describe('E001_PoleBarns prerequisite', () => {
   it('blocks when player has fewer than 15 fence segments on board', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     const player = state.players[0]!
     player.fenceSegments = []
@@ -18,7 +18,7 @@ describe('E001_PoleBarns prerequisite', () => {
   })
 
   it('does not count Wood Palisades toward the 15-fence prerequisite', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     const player = state.players[0]!
     player.fenceSegments = [
@@ -32,7 +32,7 @@ describe('E001_PoleBarns prerequisite', () => {
   })
 
   it('allows when player has 15 fence segments on board', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     const player = state.players[0]!
     player.fenceSegments = Array.from({ length: 15 }, (_, i): FenceSegment => ({

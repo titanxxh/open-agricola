@@ -10,7 +10,7 @@ import type { ActionFlow } from '../../shared/contract/types'
 const CARD_ID = 'E058_LunchtimeBeer'
 
 const setupHarvestRound = (round = 4) => {
-  const session = new GameSession()
+  const session = new GameSession(42)
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
@@ -49,7 +49,7 @@ const drainHarvest = (session: GameSession) => {
 
 describe('E058_LunchtimeBeer onStartHarvest flow shape', () => {
   it('returns optional SEQ with [gain food:1, special-effect set-extra-data]', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -82,7 +82,7 @@ describe('E058_LunchtimeBeer onStartHarvest flow shape', () => {
   })
 
   it('emits special-effect with state.round value (round 7 → value 7)', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

@@ -21,7 +21,7 @@ const CARD_ID = 'D157_PartyOrganizer'
 const buildOpponentLikePlayer = (overrides: Partial<PlayerState>): PlayerState => {
   // Lightweight player fixture for listener handler unit calls. Family size
   // is read from the workers array, so we build workers minimally.
-  const session = new GameSession()
+  const session = new GameSession(42)
   const state = session.getState().state
   const proto = state.players[1]!
   return { ...proto, ...overrides } as PlayerState
@@ -29,7 +29,7 @@ const buildOpponentLikePlayer = (overrides: Partial<PlayerState>): PlayerState =
 
 describe('D157 Party Organizer — listener', () => {
   it('listener handler triggers when opponent reaches family of exactly 5', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     const owner = state.players[0]!
     const opponent = state.players[1]!
@@ -86,7 +86,7 @@ describe('D157 Party Organizer — listener', () => {
   })
 
   it('listener handler does not fire when opponent only has 4', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     const owner = state.players[0]!
     const opponent = state.players[1]!
@@ -107,7 +107,7 @@ describe('D157 Party Organizer — listener', () => {
   })
 
   it('listener handler does not fire when opponent has 3 → no trigger', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     const owner = state.players[0]!
     const opponent = state.players[1]!
@@ -127,7 +127,7 @@ describe('D157 Party Organizer — listener', () => {
   })
 
   it('computeBonusScore: +3 VP when owner has 5 + sole 5-family', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state as GameState
     const owner = state.players[0]!
     setActiveWorkerCount(owner, 5)
@@ -138,7 +138,7 @@ describe('D157 Party Organizer — listener', () => {
   })
 
   it('computeBonusScore: 0 VP when multiple players have 5', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state as GameState
     const owner = state.players[0]!
     setActiveWorkerCount(owner, 5)
@@ -149,7 +149,7 @@ describe('D157 Party Organizer — listener', () => {
   })
 
   it('computeBonusScore: 0 VP when owner has < 5 family', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state as GameState
     const owner = state.players[0]!
     setActiveWorkerCount(owner, 4)

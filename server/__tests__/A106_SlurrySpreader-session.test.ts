@@ -20,7 +20,7 @@ const expectGainFoodLeaf = (flow: ReturnType<typeof runCardEffectHook>, expected
 }
 
 const setup = () => {
-  const session = new GameSession()
+  const session = new GameSession(42)
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
@@ -85,7 +85,7 @@ describe('A106_SlurrySpreader session', () => {
   })
 
   it('integration: harvest chain grants food for an emptied grain field', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

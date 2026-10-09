@@ -19,7 +19,7 @@ const tile00BorderPalisades = ['H-0-0', 'V-0-0']
 const tile00InternalFences = ['H-1-0', 'V-0-1']
 
 const setup = (opts: { withB30?: boolean; wood: number; round?: number }) => {
-  const session = new GameSession()
+  const session = new GameSession(42)
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
@@ -79,7 +79,7 @@ describe('A68 Asparagus Gift — session', () => {
 
   describe('prerequisite "1 Unplanted Field"', () => {
     it('blocks when player has no empty fields', () => {
-      const session = new GameSession()
+      const session = new GameSession(42)
       stabilizeRandomHands(session.state.players)
       const state = session.getState().state
       const player = state.players[0]!
@@ -88,7 +88,7 @@ describe('A68 Asparagus Gift — session', () => {
     })
 
     it('allows when player has at least one empty field', () => {
-      const session = new GameSession()
+      const session = new GameSession(42)
       stabilizeRandomHands(session.state.players)
       const state = session.getState().state
       const player = state.players[0]!

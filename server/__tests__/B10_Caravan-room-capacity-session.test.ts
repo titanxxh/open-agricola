@@ -17,7 +17,7 @@ describe('B010_Caravan — provides room for 1 person via computeExtraRoomCapaci
   })
 
   it('returns 1 when the card is in player.minorPlayed', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
@@ -29,7 +29,7 @@ describe('B010_Caravan — provides room for 1 person via computeExtraRoomCapaci
   })
 
   it('returns 0 when the card is not played', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!

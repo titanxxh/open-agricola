@@ -10,7 +10,7 @@ const FILLER = '__test_placeholder__'
 
 describe('A042_ForestLakeHut session', () => {
   const setup = () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -115,7 +115,7 @@ describe('A042_ForestLakeHut session', () => {
   })
 
   it('does not trigger when card is not in play', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

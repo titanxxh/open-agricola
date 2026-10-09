@@ -56,7 +56,7 @@ const setStored = (player: PlayerState, stored: string[]): void => {
 }
 
 const setupEffect = () => {
-  const session = new GameSession()
+  const session = new GameSession(42)
   stabilizeRandomHands(session.state.players)
   const effect = getCardEffect(CARD_ID)
   expect(effect).toBeDefined()

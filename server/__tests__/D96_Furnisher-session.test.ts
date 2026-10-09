@@ -26,7 +26,7 @@ const advancePlayerSwitches = (session: GameSession, response: SessionResponse) 
 }
 
 const setupTwoRoomBuild = () => {
-  const session = new GameSession()
+  const session = new GameSession(42)
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
@@ -46,7 +46,7 @@ const setupTwoRoomBuild = () => {
 }
 
 const setup = () => {
-  const session = new GameSession()
+  const session = new GameSession(42)
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
@@ -164,7 +164,7 @@ describe('D096_Furnisher session', () => {
   })
 
   it('offers an improvement after the owner builds a room through Building Tycoon', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

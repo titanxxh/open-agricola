@@ -128,7 +128,7 @@ describe('B14 Hawktower — session', () => {
 
   describe('prerequisite "Play in Round 7 or Before"', () => {
     it('blocks when round > 7', () => {
-      const session = new GameSession()
+      const session = new GameSession(42)
       const state = session.getState().state
       state.round = 8
       const player = state.players[0]!
@@ -136,7 +136,7 @@ describe('B14 Hawktower — session', () => {
     })
 
     it('allows when round <= 7', () => {
-      const session = new GameSession()
+      const session = new GameSession(42)
       const state = session.getState().state
       state.round = 7
       const player = state.players[0]!

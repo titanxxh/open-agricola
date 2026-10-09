@@ -14,7 +14,7 @@ function setupPassingSession(opts: {
   const playerCount = opts.playerCount ?? 2
   const startIdx = opts.startPlayerIndex ?? 0
   const session = playerCount === 2
-    ? new GameSession()
+    ? new GameSession(42)
     : new GameSession(undefined, undefined, { playerCount })
   const state = session.getState().state
   state.players = state.players.slice(0, playerCount)
