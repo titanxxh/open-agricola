@@ -53,7 +53,9 @@ export const makeCacheKey = (
   const costKey = JSON.stringify(cost)
   const typeKey = costType ?? 'none'
   const playedCardsKey = [...(playedCards ?? [])].sort().join(',')
-  return `${reserveKey}|${costKey}|${typeKey}|${playedCardsKey}`
+  // Bonus conditions read rooms and house type; include them so players
+  // with the same resources never share solutions.
+  return `${reserveKey}|${player.rooms}|${player.houseType}|${costKey}|${typeKey}|${playedCardsKey}`
 }
 
 export const clearPaymentCache = () => {
