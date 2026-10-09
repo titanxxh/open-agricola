@@ -7,6 +7,7 @@ import {
   validateAndCompileCustomCodeLocal,
 } from '../browser-executor.ts'
 import { compileCardCode } from '../../../shared/custom-code/compiler.ts'
+import { createInitialState } from '../../../shared/session/state-bootstrap.ts'
 import '../../../shared/cards/B/B178_TagAlong'
 
 const DEBUG_VIEWER: ViewerSpec = { viewerPlayerId: null, mode: 'debug' }
@@ -23,7 +24,6 @@ const CARD_IMPL = {
     },
   },
   listeners: [{
-    id: CARD_ID,
     cardIds: [CARD_ID],
     actions: ['collect'],
     phases: ['after'],
@@ -223,7 +223,7 @@ const CARD_IMPL = {
       compiledCode: compileCardCode(source),
       cardId: 'CUSTOM_DynamicCosts',
       registrationId: 'CUSTOM_DynamicCosts:listener:0',
-      context: {} as never,
+      context: {phase:'computeCosts',actionId:'construct',state:createInitialState(42)} as never,
     })).toEqual({ ok: false, error: expect.stringContaining('costAttribution') })
   })
 
