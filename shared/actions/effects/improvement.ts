@@ -326,6 +326,15 @@ const constrainedImprovementPreview = (
 const costActionCardId = (context?: { sourceCard?: string; space?: Pick<ActionSpace, 'id'> }) =>
   context?.sourceCard ?? context?.space?.id ?? 'improvement'
 
+/** `params.allowedPurchases` limits every candidate source: majors, hand minors and injected options. */
+const readAllowedPurchases = (params: unknown): string[] | undefined => {
+  const allowed = (params as { allowedPurchases?: unknown } | undefined)?.allowedPurchases
+  return Array.isArray(allowed) ? allowed.filter((id): id is string => typeof id === 'string') : undefined
+}
+
+const isAllowedPurchase = (allowed: readonly string[] | undefined, choice: string): boolean =>
+  !allowed || allowed.includes(parseImprovementChoice(choice).id)
+
 const meetsMinimumPayment = (
   state: GameState,
   player: PlayerState,
@@ -410,16 +419,19 @@ export const improvementAction: ActionDefinition = {
     const allowedMajor = types.includes('major')
     const allowedMinor = types.includes('minor')
     const isMinorOnly = types.length === 1 && types[0] === 'minor'
+    const allowedPurchases = readAllowedPurchases(context?.params)
+    const isPurchasable = (choice: string) =>
+      isAllowedPurchase(allowedPurchases, choice) && meetsMinimumPayment(state, player, choice, context)
     if (allowedMajor &&
       buildMajorImprovementOptions(state, player, costActionCardId(context))
-        .some((option) => meetsMinimumPayment(state, player, option.value, context))) {
+        .some((option) => isPurchasable(option.value))) {
       return true
     }
     if (allowedMinor) {
       const minorOpts = isMinorOnly
         ? buildPlayableMinorOptions(state, player, costActionCardId(context), types)
         : buildMinorImprovementOptions(state, player, costActionCardId(context), undefined, types)
-      if (minorOpts.some((option) => meetsMinimumPayment(state, player, option.value, context))) return true
+      if (minorOpts.some((option) => isPurchasable(option.value))) return true
       const extras = collectComputeChoiceCandidates(
         state,
         player,
@@ -428,7 +440,7 @@ export const improvementAction: ActionDefinition = {
         context?.sourceCard,
       )
       if (extras.some((opt) => canAffordInjectedImprovement(state, player, opt.value, costActionCardId(context))
-        && meetsMinimumPayment(state, player, opt.value, context))) {
+        && isPurchasable(opt.value))) {
         return true
       }
     }
@@ -438,9 +450,7 @@ export const improvementAction: ActionDefinition = {
     const types = readImprovementTypes({ params, actionContext })
     const actionCardId = costActionCardId({ sourceCard, space })
     const isMinorOnly = types.length === 1 && types[0] === 'minor'
-    const allowedPurchases = Array.isArray((params as { allowedPurchases?: string[] } | undefined)?.allowedPurchases)
-      ? (params as { allowedPurchases?: string[] }).allowedPurchases
-      : undefined
+    const allowedPurchases = readAllowedPurchases(params)
     const majorOpts = types.includes('major')
       ? buildMajorImprovementOptions(state, player, actionCardId, allowedPurchases)
       : []
@@ -467,7 +477,8 @@ export const improvementAction: ActionDefinition = {
       })
       .filter((o) => canAffordInjectedImprovement(state, player, o.value, actionCardId))
     const options = [...majorOpts, ...baseMinor, ...extraMinor]
-      .filter((option) => meetsMinimumPayment(state, player, option.value, { sourceCard, space, actionContext }))
+      .filter((option) => isAllowedPurchase(allowedPurchases, option.value)
+        && meetsMinimumPayment(state, player, option.value, { sourceCard, space, actionContext }))
     if (options.length === 0) {
       return types.includes('major')
         ? { type: 'fail', errorKey: 'log.improvementFail' }
@@ -481,7 +492,8 @@ export const improvementAction: ActionDefinition = {
   },
   resolveChoice: ({ state, player, space, sourceCard, params, actionContext }, choice) => {
     const actionCardId = costActionCardId({ sourceCard, space })
-    if (!meetsMinimumPayment(state, player, choice, { sourceCard, space, actionContext })) {
+    if (!isAllowedPurchase(readAllowedPurchases(params), choice)
+      || !meetsMinimumPayment(state, player, choice, { sourceCard, space, actionContext })) {
       return { type: 'fail', errorKey: 'log.improvementFail' }
     }
     const internalChildren = buildImprovementInternalChildren(
