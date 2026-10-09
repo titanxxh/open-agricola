@@ -973,7 +973,11 @@ export function engineResolveChoice(
       ),
     )
     if (!doable) {
-      return rollbackAndReturn(int, { type: 'fail', errorKey: 'log.buildRoomFail' })
+      // An issued choice menu stays open: an anytime action may make one of
+      // its options payable again, or the player may undo. Other request
+      // kinds keep blocking a mandatory host.
+      const keepIssuedMenu = pendingEnvelope?.request.kind === 'choice'
+      return rollbackAndReturn(int, { type: 'fail', errorKey: 'log.buildRoomFail', ...(keepIssuedMenu ? { recoverable: true } : {}) })
     }
     const costResults = int.hooks.computeCosts({
       ...executionContext,

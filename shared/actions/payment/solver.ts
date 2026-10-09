@@ -201,7 +201,8 @@ const resolvePayment = (
     return { type: 'request', request: selection }
   }
   if (selection.type !== 'selected') {
-    return { type: 'failed', reason: options.length === 0 ? 'cannot-afford' : 'invalid-choice' }
+    // A submitted choice that matches no current payment keeps its menu.
+    return { type: 'failed', reason: ctx.paymentChoice !== undefined || options.length > 0 ? 'invalid-choice' : 'cannot-afford' }
   }
   if (isComplexCost(effectiveCost)) {
     if (!canConsumePaymentResourceProviders(state, selection.solution, paymentResourceProviders)) {

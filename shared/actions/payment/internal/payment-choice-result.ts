@@ -216,14 +216,8 @@ export const resolvePaymentSolutionSelection = (
   | ActionExecutionResult
   | { type: 'selected'; solution: PaymentSolution } => {
   const orderedSolutions = sortPaymentSolutions(solutions)
-  if (orderedSolutions.length === 0) {
-    return failure
-  }
-
-  if (orderedSolutions.length === 1 && paymentChoice === undefined) {
-    return { type: 'selected', solution: orderedSolutions[0] }
-  }
-
+  // A submitted choice is checked first: even when no payment remains
+  // affordable, it is rejected recoverably and the issued menu is kept.
   if (paymentChoice !== undefined) {
     const [indexPart, identity] = paymentChoice.split(PAYMENT_IDENTITY_SEPARATOR)
     const atIndex = orderedSolutions[parseInt(indexPart!, 10)]
@@ -237,6 +231,14 @@ export const resolvePaymentSolutionSelection = (
       return failure.type === 'fail' ? { ...failure, recoverable: true } : failure
     }
     return { type: 'selected', solution }
+  }
+
+  if (orderedSolutions.length === 0) {
+    return failure
+  }
+
+  if (orderedSolutions.length === 1) {
+    return { type: 'selected', solution: orderedSolutions[0] }
   }
 
   return buildPaymentChoiceResult(
