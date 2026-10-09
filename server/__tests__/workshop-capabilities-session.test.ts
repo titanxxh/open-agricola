@@ -6,7 +6,7 @@ import { workshopCardJsonFromDefinition } from '../workshop-draft-validation'
 import { clearCustomCards, registerCustomCard } from '../../shared/cards/custom-registry'
 import { getCardEffect, countPendingExtraTurns, getAnimalScoreAdjustment, getBreedThreshold, getBreedableAnimalCount, shouldEnforceReorganizeOnLastHarvest } from '../../shared/cards/card-effects'
 import { Scoring } from '../../shared/domain/scoring'
-import { computeAnimalZones } from '../../shared/domain/animal-zones'
+import { computeAnimalZones, canAccommodateAnimalTotals, prefillAnimalZones } from '../../shared/domain/animal-zones'
 import { markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome, workersAvailable } from '../../shared/domain/player'
 import { serializeSessionSnapshot, rehydrateState } from '../../shared/session/serialization'
 import type { ActionFlow } from '../../shared/contract/types'
@@ -646,6 +646,9 @@ describe('Workshop admitted player, choice and payment data',()=>{
     leaf('pay',{params:{cost:{unitFee:{food:1},nb:0.5}}}),
     leaf('pay',{params:{cost:{fee:{food:2},trades:[{from:{wood:1},to:{food:1},triggers:['harvest']}]}}}),
     leaf('pay',{params:{cost:{fee:{food:2},bonuses:[{discount:{food:1},conditions:{minNumRooms:'3'}}]}}}),
+    leaf('pay',{params:{cost:{fee:{food:2},bonuses:[{choices:[{discount:{food:1},optional:true}]}]}}}),
+    leaf('pay',{params:{cost:{fee:{wood:2},resourceReserve:{resources:['wood','wood'],minimum:2}}}}),
+    leaf('emit-choice',{params:{options:[{value:'same',labelKey:'ui.interactionUseAbility'},{value:'same',labelKey:'actions.gain.name'}]}}),
     {type:'seq',targetPlayerId:42,children:[leaf('gain',{params:{food:1}})]},
     leaf('occupation',{params:{allowedCards:{}}}),
     leaf('selection',{actionContext:{selectableTiles:[]}}),
@@ -983,5 +986,101 @@ describe('Workshop typed query and settlement regressions',()=>{
     let r=collect(session);r=session.resolveChoice(0,r.interaction.request!.options.find(option=>(option.labelParams?.resourcesPaid as Record<string,number>|undefined)?.[key]===2)!.value)
     expect(r.ok,r.error).toBe(true);expect(r.state.players[0]!.resources).toMatchObject({food:2,wood:3})
     expect(r.state.actionSpaces.find(space=>space.id==='clay-pit')!.resources.clay).toBe(0);expect(session.cardWarnings).toEqual([])
+  })
+})
+
+// Review boundary cases use the same approved two-player Session setup. Illegal
+// declarations must roll back forest collection; valid choices settle once.
+describe('Workshop declarations match native consumers',()=>{
+  it.each([
+    ['plow',{allowedTiles:[{row:0,col:0}]}],
+    ['sow',{cropType:'vegetable',minSelections:1}],
+    ['fence',{fencePolicy:{segmentBounds:{total:{min:4,max:4}}}}],
+    ['stables',{max:1}],
+    ['construct',{exactCost:{wood:1}}],
+    ['renovate-house',{exactCost:{clay:1}}],
+  ] as const)('rejects ignored nested %s context before any action', (id,context)=>{
+    const {session,player}=setup("{listeners:[{actions:['collect'],phases:['after'],mandatory:true,handler:ctx=>({flow:ctx.ownerPlayer.cardStates[CARD_ID].extraData.badFlow})}]}")
+    player.cardStates[CARD]={extraData:{badFlow:leaf(id,{params:{actionContext:context}})}}
+    session.loadState(session.state);const before=JSON.stringify(session.state),r=session.takeAction(0,'forest')
+    expect(r.ok).toBe(false);expect(r.error).toContain("unsupported field 'actionContext'")
+    expect(JSON.stringify(session.state)).toBe(before)
+  })
+  it.each([
+    {type:'seq',mode:'trigger-select'},
+    {type:'xor',mode:'all'},
+    {type:'parallel',triggerSelectOnce:true},
+    {type:'parallel',mode:'all',triggerSelectOnce:false},
+  ])('rejects ignored composite configuration %j',config=>{
+    const flow={...config,children:[leaf('gain',{params:{food:1}}),leaf('gain',{params:{stone:1}})]} as ActionFlow
+    const {session}=setup(afterCollect(flow));session.loadState(session.state)
+    const before=JSON.stringify(session.state),r=session.takeAction(0,'forest')
+    expect(r.ok).toBe(false);expect(JSON.stringify(session.state)).toBe(before)
+  })
+  it('selects the second trigger in a one-shot parallel flow without running the first',()=>{
+    const {session}=setup(afterCollect({type:'parallel',mode:'trigger-select',triggerSelectOnce:true,children:[leaf('gain',{params:{food:1}}),leaf('gain',{params:{stone:1}})]}))
+    let r=collect(session);expect(r.interaction.request?.kind).toBe('select-trigger')
+    const options=r.interaction.request!.options.filter(option=>option.value!=='__pass__')
+    expect(options).toHaveLength(2);expect(new Set(options.map(option=>option.value)).size).toBe(2)
+    r=session.resolveChoice(0,options[1]!.value);expect(r.ok,r.error).toBe(true)
+    expect(r.state.players[0]!.resources).toMatchObject({food:2,stone:1});expect(session.cardWarnings).toEqual([])
+  })
+  it.each([true,false])('checks final choice identities after computeArgs merging (duplicate=%s)',duplicate=>{
+    const base=afterCollect(leaf('emit-choice',{params:{options:[{value:'base',labelKey:'ui.interactionUseAbility'}],requiresExplicitChoice:true}}),"resolveChoice:(_s,_p,v)=>v==='y'?gainLeaf(CARD_ID,{stone:2}):gainLeaf(CARD_ID,{food:1})").slice(0,-2)
+    const {session}=setup(base+`,{actions:['emit-choice'],phases:['computeArgs'],handler:()=>({extraOptions:[{value:'x',labelKey:'ui.interactionUseAbility'}]})},{actions:['emit-choice'],phases:['computeArgs'],handler:()=>({extraOptions:[{value:'${duplicate?'x':'y'}',labelKey:'actions.gain.name'}]})}]}`)
+    session.loadState(session.state);const before=JSON.stringify(session.state);let r=session.takeAction(0,'forest')
+    if(duplicate){expect(r.ok).toBe(false);expect(r.error).toContain('distinct');expect(JSON.stringify(session.state)).toBe(before);return}
+    expect(r.ok,r.error).toBe(true);expect(r.interaction.request!.options.map(option=>option.value)).toEqual(['base','x','y'])
+    r=session.resolveChoice(0,'y');expect(r.ok,r.error).toBe(true);expect(r.state.players[0]!.resources).toMatchObject({food:2,stone:2})
+    expect(r.state.events.filter(event=>event.type==='resource.moved'&&event.resources.stone===2)).toHaveLength(1)
+  })
+  it.each([1,2])('keeps outer optional bonus payment of %s food selectable',food=>{
+    const bonus={optional:true,sources:[CARD],choices:[{discount:{food:1},choiceAffectsState:true}]}
+    const {session}=setup(afterCollect(leaf('pay',{params:{cost:{fee:{food:2},bonuses:[bonus]}}})))
+    let r=collect(session);expect(r.interaction.request?.kind).toBe('choice')
+    const options=r.interaction.request!.options
+    expect(options.map(option=>(option.labelParams!.resourcesPaid as Record<string,number>).food).sort()).toEqual([1,2])
+    r=session.resolveChoice(0,options.find(option=>(option.labelParams!.resourcesPaid as Record<string,number>).food===food)!.value)
+    expect(r.ok,r.error).toBe(true);expect(r.state.players[0]!.resources.food).toBe(2-food)
+    expect(r.state.events).toContainEqual(expect.objectContaining({type:'resource.paid',resources:{food}}))
+  })
+  it('filters a reserve-violating fee before paying the accepted alternative',()=>{
+    const {session,player}=setup(afterCollect(leaf('pay',{params:{cost:{fees:[{wood:2},{food:1}],resourceReserve:{resources:['wood'],minimum:2}}}})))
+    player.resources.wood=0;const r=collect(session)
+    expect(r.ok,r.error).toBe(true);expect(r.state.players[0]!.resources).toMatchObject({wood:3,food:1})
+    expect(r.state.events).toContainEqual(expect.objectContaining({type:'resource.paid',resources:{food:1}}))
+    expect(r.state.events.some(event=>event.type==='resource.paid'&&event.resources.wood)).toBe(false)
+  })
+  it.each([false,true])('requires an actually owned card for required purchase return (owned=%s)',owned=>{
+    const {session,player}=setup(afterCollect(leaf('improvement',{params:{types:['minor'],allowedPurchases:[CARD]}}),'',"zones:['hand'],"),"cost:{fee:{wood:1},cards:{type:'Major',list:['Major_Fireplace1'],required:true}}")
+    player.minorPlayed=[];player.minorHand=[CARD];player.resources.wood=0;if(owned)player.improvements=['Major_Fireplace1']
+    const r=collect(session);expect(r.state.players[0]!.minorPlayed.includes(CARD)).toBe(owned)
+    expect(r.state.players[0]!.resources.wood).toBe(owned?2:3)
+    expect(r.state.players[0]!.improvements).not.toContain('Major_Fireplace1')
+    if(owned){expect(r.state.events).toContainEqual(expect.objectContaining({type:'resource.paid',resources:{wood:1}}));expect(r.state.availableMajorImprovements).toContain('Major_Fireplace1')}
+    else expect(r.state.events.some(event=>event.type==='resource.paid')).toBe(false)
+  })
+  it('preserves optional empty card-return alternatives as an ordinary resource purchase',()=>{
+    const {session,player}=setup(afterCollect(leaf('improvement',{params:{types:['minor'],allowedPurchases:[CARD]}}),'',"zones:['hand'],"),"cost:{fee:{wood:1},cards:{type:'Major',list:[],required:false}}")
+    player.minorPlayed=[];player.minorHand=[CARD];player.resources.wood=0
+    const r=collect(session);expect(r.state.players[0]!.minorPlayed).toContain(CARD);expect(r.state.players[0]!.resources.wood).toBe(2)
+  })
+  it.each([{allowed:[]},{allowed:['sheep']}])('enforces shared animal allowlist $allowed in placement and accommodation',({allowed})=>{
+    const {session,player,opponent}=setup(`{effect:{onComputeSharedAnimalZones:(_owner,animalOwner)=>[{id:'shared:'+animalOwner.id,zoneType:'card',capacity:1,allowedAnimalTypes:${JSON.stringify(allowed)}}]},listeners:[{actions:['collect'],phases:['after'],scope:'any',mandatory:true,handler:ctx=>({flow:{type:'leaf',actionId:'reorganize',sourceCard:CARD_ID,targetPlayerId:ctx.player.id}})}]}`)
+    opponent.resources.cattle=2;session.state.currentPlayerIndex=1;session.loadState(session.state)
+    const zones=session.withCtx(()=>computeAnimalZones(opponent,session.state)),id='shared:'+opponent.id
+    expect(session.withCtx(()=>canAccommodateAnimalTotals(session.state,opponent,{cattle:2}))).toBe(false)
+    expect(session.withCtx(()=>prefillAnimalZones(session.state,opponent,zones)).find(zone=>zone.id===id)?.animalType).not.toBe('cattle')
+    let r=session.takeAction(1,'forest');expect(r.ok,r.error).toBe(true)
+    expect(r.interaction.request).toMatchObject({kind:'animal-reorg',zones:expect.arrayContaining([expect.objectContaining({id,allowedAnimalTypes:allowed})])})
+    const before=JSON.stringify(session.state)
+    r=session.resolveChoice(1,'confirm',{zones:[{id:'house',zoneType:'house',animalType:'cattle',animalCount:1},{id,zoneType:'card',animalType:'cattle',animalCount:1}]})
+    expect(r.ok).toBe(false);expect(JSON.stringify(session.state)).toBe(before);expect(player.cardStates[CARD]?.extraData?.animalCountsByZone).toBeUndefined()
+    if(!allowed.length)return
+    session.state.players[1]!.resources.cattle=1;session.state.players[1]!.resources.sheep=1
+    r=session.resolveChoice(1,'confirm',{zones:[{id:'house',zoneType:'house',animalType:'cattle',animalCount:1},{id,zoneType:'card',animalType:'sheep',animalCount:1}]})
+    expect(r.ok,r.error).toBe(true);expect(r.state.players[1]!.resources).toMatchObject({cattle:1,sheep:1})
+    expect(r.state.players[0]!.cardStates[CARD]?.extraData?.animalCountsByZone).toMatchObject({[id]:{animalCounts:{sheep:1},animalOwnerPlayerId:opponent.id}})
+    expect(r.state.players[0]!.resources).toMatchObject({cattle:0,sheep:0});expect(session.cardWarnings).toEqual([])
   })
 })

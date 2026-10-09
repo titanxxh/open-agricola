@@ -152,6 +152,9 @@ export const areRequiredEmptyZoneGroupsSatisfied = (
 const isAnimalKeyForState = (state: GameState, value: unknown): value is AnimalType =>
   isAnimalKey(value) && animalKeysForState(state).includes(value)
 
+const isAllowedAnimalTypeForZone = (zone: AnimalZone, type: AnimalType): boolean =>
+  zone.allowedAnimalTypes === undefined || zone.allowedAnimalTypes.includes(type)
+
 const fixedAnimalTypeForZone = (state: GameState, zone: AnimalZone): AnimalType | null => {
   if ('allowedAnimalType' in zone && zone.allowedAnimalType == null) return null
   if (isAnimalKeyForState(state, zone.allowedAnimalType)) return zone.allowedAnimalType
@@ -211,7 +214,7 @@ export const normalizeAnimalCountsForZone = (
   const raw = readAnimalCountsForZoneAssignment(value)
   const keys = animalKeysForState(state)
   for (const key of ALL_ANIMAL_KEYS) {
-    if (!keys.includes(key)) raw[key] = 0
+    if (!keys.includes(key) || !isAllowedAnimalTypeForZone(zone, key)) raw[key] = 0
   }
   if (fixedType) {
     for (const key of keys) {
@@ -658,7 +661,7 @@ const canPlaceAnimalInWorkZone = (
   zone: AnimalAccommodationWorkZone,
   type: AnimalType,
 ): AnimalAccommodationWorkZone | null => {
-  if (zone.blocked || zone.animalCount >= zone.capacity) return null
+  if (zone.blocked || zone.animalCount >= zone.capacity || !isAllowedAnimalTypeForZone(zone, type)) return null
   if (zone.zoneType === 'card' && zone.cardId && zone.animalCount === 0 && zone.exclusiveCardZoneLimit !== undefined) {
     const limit = Math.max(0, Math.floor(zone.exclusiveCardZoneLimit))
     const occupied = zones.filter((entry, index) =>
@@ -752,7 +755,7 @@ export const prefillAnimalZones = (
     const occupied = ALL_ANIMAL_KEYS.filter((type) => (zone.animalCounts[type] ?? 0) > 0)
     if (zone.animalCount > zone.capacity
       || (zone.blocked && zone.animalCount > 0)
-      || occupied.some((type) => !keys.includes(type))
+      || occupied.some((type) => !keys.includes(type) || !isAllowedAnimalTypeForZone(zone, type))
       || (!allowsMixedAnimalTypes(zone) && occupied.length > 1)
       || (zone.allowedAnimalType != null && occupied.some((type) => type !== zone.allowedAnimalType))
       || computeInvalidAnimalsForZone(state, player, zone).length > 0) return zones

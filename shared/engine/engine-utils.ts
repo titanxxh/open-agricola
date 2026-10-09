@@ -45,6 +45,7 @@ import {
 import { applyComputeCostResults } from './compute-cost-results'
 import { pendingEnvelopeChoices } from './pending-validation'
 import { findPlayerById, findPlayerIndexById } from '../domain/player'
+import { assertDistinctChoiceOptionValues } from '../contract/choice-options'
 import {
   INJECTED_ANYTIME_ACTION_CONTEXT_KEY,
   isInjectedAnytimeActionContext,
@@ -1304,6 +1305,7 @@ export function applyInteractionRequest(
   },
 ): void {
   const { targetNode, hostNodeId, request, promptKey, promptParams, choiceOptions, actionId, ownerNodeId } = args
+  if (request.kind === 'choice') assertDistinctChoiceOptionValues(choiceOptions)
   const host = targetNode ?? (hostNodeId ? int.tree.findNodeById(hostNodeId) : null)
   if (!host) {
     int.pendingNodeIdRef.value = hostNodeId

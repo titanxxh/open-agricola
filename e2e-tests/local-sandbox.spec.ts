@@ -94,6 +94,25 @@ test.describe('browser-local sandbox', () => {
     await expect(option).toContainText('使用能力');await option.click()
     await expect(option).toHaveCount(0);expect(errors).toEqual([]);expect(calls).toEqual([])
   })
+  test('renders distinct merged Workshop choices and settles the selected reward once', async ({ page }) => {
+    const config=structuredClone(CONFIG),errors:string[]=[]
+    page.on('pageerror',error=>errors.push(error.message))
+    config.cards[0]!.source=[
+      "const CARD_ID='CUSTOM_E2ECard'",
+      "const CARD_DEF=MinorImprovement({id:CARD_ID,name:'E2E Card'})",
+      "const CARD_IMPL={effect:{resolveChoice:(_s,_p,v)=>v==='y'?gainLeaf(CARD_ID,{stone:2}):undefined},listeners:[{actions:['collect'],phases:['after'],mandatory:true,handler:()=>({flow:{type:'leaf',actionId:'emit-choice',sourceCard:CARD_ID,params:{requiresExplicitChoice:true,options:[{value:'base',labelKey:'ui.interactionUseAbility'}]}}})},{actions:['emit-choice'],phases:['computeArgs'],handler:()=>({extraOptions:[{value:'x',labelKey:'ui.interactionFlowDone'}]})},{actions:['emit-choice'],phases:['computeArgs'],handler:()=>({extraOptions:[{value:'y',labelKey:'actions.gain.name'}]})}]}",
+    ].join('\n')
+    const calls=await seedAndOpen(page,config)
+    await page.locator('.dev-field',{hasText:'卡牌 ID'}).getByRole('textbox').fill('CUSTOM_E2ECard')
+    await page.getByRole('button',{name:'打出卡牌',exact:true}).click()
+    await page.locator('[data-action-id="forest"] button').first().click()
+    const choices=page.locator('.interaction-bar')
+    await expect(choices.getByRole('button',{name:'使用能力',exact:true})).toHaveCount(1)
+    await expect(choices.getByRole('button',{name:'完成',exact:true})).toHaveCount(1)
+    const gain=choices.getByRole('button',{name:'获得',exact:true})
+    await expect(gain).toHaveCount(1);await gain.click();await expect(gain).toHaveCount(0)
+    expect(errors).toEqual([]);expect(calls).toEqual([])
+  })
   test('renders an admitted nested Workshop preview and completes its choice', async ({ page }) => {
     const config = structuredClone(CONFIG)
     const errors: string[] = []

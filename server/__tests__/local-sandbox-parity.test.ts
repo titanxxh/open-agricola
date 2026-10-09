@@ -298,6 +298,9 @@ describe('shared Workshop capability admission', () => {
     [{returnCards:'Major_Fireplace1'},'returnCards'],
     [{exchanges:[{from:{},to:{food:1}}]},'positive input'],
     [{exchanges:[{from:{wood:0},to:{food:1}}]},'positive input'],
+    [{cost:{fee:{food:2},bonuses:[{choices:[{discount:{food:1},optional:true}]}]}},'unsupported field'],
+    [{cost:{fee:{wood:2},resourceReserve:{resources:['wood','wood'],minimum:2}}},'distinct'],
+    [{cost:{fee:{wood:1},cards:{type:'Major',list:[],required:true}}},'nonempty'],
     [{cost:{fee:{wood:2},resourceReserve:{}}},'Reserve resources'],
     [{cost:{fee:{wood:2},resourceReserve:{resources:['wood'],minimum:-1}}},'Reserve minimum'],
   ] as const)('rejects invalid metadata on both save paths', (metadata,error)=>{
@@ -326,7 +329,7 @@ describe('shared Workshop capability admission', () => {
     ['invalid stable cap', {type:'leaf',actionId:'stables',actionContext:{max:'1'}}, 'Stable max'],
     ['invalid multi-select', {type:'leaf',actionId:'emit-choice',params:{options:[{value:'a',labelKey:'ui.yes'}],multiSelect:{}}}, 'valuePrefix'],
     ['reversed multi-select bounds', {type:'leaf',actionId:'emit-choice',params:{options:[{value:'a',labelKey:'ui.yes'}],multiSelect:{valuePrefix:'s:',minSelections:2,maxSelections:1}}}, 'cannot exceed'],
-    ['duplicate multi-select values', {type:'leaf',actionId:'emit-choice',params:{options:[{value:'a',labelKey:'ui.yes'},{value:'a',labelKey:'ui.no'}],multiSelect:{valuePrefix:'s:',minSelections:2,maxSelections:2}}}, 'distinct available'],
+    ['duplicate multi-select values', {type:'leaf',actionId:'emit-choice',params:{options:[{value:'a',labelKey:'ui.yes'},{value:'a',labelKey:'ui.no'}],multiSelect:{valuePrefix:'s:',minSelections:2,maxSelections:2}}}, 'distinct'],
     ['unencodable multi-select value', {type:'leaf',actionId:'emit-choice',params:{options:[{value:'a,b',labelKey:'ui.yes'}],multiSelect:{valuePrefix:'s:',minSelections:1,maxSelections:1}}}, 'no commas'],
     ['non-string stack item', {type:'leaf',actionId:'push-to-card-stack',params:{item:{}}}, 'stack item'],
     ['empty xor', {type:'xor',children:[]}, 'nonempty children'],
@@ -365,6 +368,12 @@ describe('shared Workshop capability admission', () => {
     ['foreign choice source', {type:'leaf',actionId:'emit-choice',params:{options:[{value:'yes',labelKey:'ui.yes',sourceCard:'CUSTOM_Other'}]}}, 'impersonate'],
     ['misplaced payment minimum', {type:'leaf',actionId:'improvement',params:{minimumResourcesPaid:{clay:1}}}, 'minimumResourcesPaid'],
     ['non-animal breeding', {type:'leaf',actionId:'breed',actionContext:{animalTypes:['food']}}, 'Breed animals'],
+    ...['plow','sow','fence','stables','construct','renovate-house'].map(actionId=>['ignored nested farm context',{type:'leaf',actionId,params:{actionContext:{}}},'unsupported field']),
+    ['ignored sequential mode',{type:'seq',mode:'trigger-select',children:[]},'parallel'],
+    ['ignored one-shot flag',{type:'parallel',mode:'all',triggerSelectOnce:false,children:[]},'trigger-select'],
+    ['duplicate choice value',{type:'leaf',actionId:'emit-choice',params:{options:[{value:'same',labelKey:'ui.interactionUseAbility'},{value:'same',labelKey:'actions.gain.name'}]}},'distinct'],
+    ['optional bonus choice',{type:'leaf',actionId:'pay',params:{cost:{fee:{food:2},bonuses:[{choices:[{discount:{food:1},optional:true}]}]}}},'unsupported field'],
+    ['duplicate reserve resource',{type:'leaf',actionId:'pay',params:{cost:{fee:{wood:2},resourceReserve:{resources:['wood','wood'],minimum:2}}}},'distinct'],
     ['malformed payment reserve', {type:'leaf',actionId:'pay',params:{cost:{fee:{wood:2},resourceReserve:{}}}}, 'Reserve resources'],
   ])('rejects runtime-computed %s before dispatch',(_label,flow,error)=>{
     // Deliberately dynamic return, beyond AST literal inspection.

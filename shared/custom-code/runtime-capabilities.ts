@@ -10,6 +10,7 @@ import type { ActionFlow, Bonus, CardProvidedPaymentResourceProvider, GameState,
 import type { CardEffectField } from '../cards/card-effects.ts'
 import type { CardListenerContext } from '../cards/card-listeners.ts'
 import { COST_MODIFIER_TYPES } from '../contract/types.ts'
+import { assertDistinctChoiceOptionValues } from '../contract/choice-options.ts'
 
 const resources = REAL_RESOURCE_KEYS as readonly string[]
 const specialKeys: Record<typeof sandboxSpecialEffectKinds[number], readonly string[]> = {
@@ -82,6 +83,7 @@ function choiceOptions(value: unknown, cardId: string): void {
     if (option.descriptionPreview !== undefined) descriptionPreview(option.descriptionPreview)
     ownSource(option.sourceCard, cardId)
   }
+  assertDistinctChoiceOptionValues(value)
 }
 function previewString(value: unknown, label: string): void {
   if (typeof value !== 'string') throw new Error(`${label} must be a string`)
@@ -170,9 +172,9 @@ function conditions(value: unknown): void {
   for (const [key, amount] of Object.entries(value)) finite(amount, `Condition ${key}`, true)
   if (value.minNumRooms !== undefined) integer(value.minNumRooms, 'Condition minNumRooms')
 }
-function bonus(value: unknown, cardId: string): void {
+function bonus(value: unknown, cardId: string, isChoice = false): void {
   assertRecord(value, 'Bonus')
-  assertKeys(value, ['discount', 'choices', 'capDiscountAtCost', 'trackChoiceIndex', 'choiceAffectsState', 'optional', 'sources', 'conditions', 'minCost', 'maxCost'], 'Bonus')
+  assertKeys(value, ['discount', 'capDiscountAtCost', 'trackChoiceIndex', 'choiceAffectsState', 'sources', 'conditions', 'minCost', 'maxCost', ...(isChoice ? [] : ['choices', 'optional'])], isChoice ? 'Bonus choice' : 'Bonus')
   for (const key of ['discount', 'minCost', 'maxCost']) if (value[key] !== undefined) resourceMap(value[key])
   if (value.conditions !== undefined) conditions(value.conditions)
   for (const key of ['capDiscountAtCost', 'trackChoiceIndex', 'choiceAffectsState', 'optional']) if (value[key] !== undefined && typeof value[key] !== 'boolean') throw new Error(`Bonus ${key} must be boolean`)
@@ -182,7 +184,7 @@ function bonus(value: unknown, cardId: string): void {
     value.choices.forEach(choice => {
       assertRecord(choice, 'Bonus choice')
       if (choice.discount === undefined || choice.choices !== undefined) throw new Error('Bonus choice requires a discount')
-      bonus(choice, cardId)
+      bonus(choice, cardId, true)
     })
   }
   validateBonus(value as Bonus)
@@ -244,6 +246,7 @@ function cost(value: unknown, cardId: string, allowCardReturn = false): void {
     assertRecord(value.resourceReserve, 'Resource reserve')
     assertKeys(value.resourceReserve, ['resources', 'minimum'], 'Resource reserve')
     stringArray(value.resourceReserve.resources, 'Reserve resources', resources)
+    if (new Set(value.resourceReserve.resources).size !== value.resourceReserve.resources.length) throw new Error('Reserve resources must be distinct')
     integer(value.resourceReserve.minimum, 'Reserve minimum')
   }
   if (value.trades !== undefined) {
@@ -258,6 +261,7 @@ function cost(value: unknown, cardId: string, allowCardReturn = false): void {
     if (typeof value.cards.type !== 'string' || !Array.isArray(value.cards.list) || value.cards.list.some(id => typeof id !== 'string')) throw new Error('Invalid card-return cost')
     if (value.cards.cost !== undefined) resourceMap(value.cards.cost, true)
     if (value.cards.required !== undefined && typeof value.cards.required !== 'boolean') throw new Error('Card-return required must be boolean')
+    if (value.cards.required === true && value.cards.list.length === 0) throw new Error('Required card-return list must be nonempty')
   }
 }
 
@@ -476,6 +480,8 @@ export function validateCustomFlow(value: unknown, cardId: string, depth = 0, st
   if (value.choiceLabelParams !== undefined) assertRecord(value.choiceLabelParams, 'Flow choiceLabelParams')
   for (const key of ['optional', 'triggerSelectOnce']) if (value[key] !== undefined && typeof value[key] !== 'boolean') throw new Error(`${key} must be boolean`)
   if (value.mode !== undefined && !['all', 'trigger-select'].includes(value.mode as string)) throw new Error('Unsupported composite mode')
+  if (value.mode !== undefined && value.type !== 'parallel') throw new Error('Composite mode is only supported by parallel flows')
+  if (value.triggerSelectOnce !== undefined && (value.type !== 'parallel' || value.mode !== 'trigger-select')) throw new Error('triggerSelectOnce requires parallel mode trigger-select')
   ownSource(value.sourceCard, cardId)
   if (value.targetPlayerId !== undefined && (typeof value.targetPlayerId !== 'string' || !(state?.players ?? []).some(player => player.id === value.targetPlayerId))) throw new Error('Target player must exist in the current game')
   const target = value.targetPlayerId as string | undefined ?? playerId
