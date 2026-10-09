@@ -2,7 +2,7 @@ import { SANDBOX_ALLOWED_ACTION_IDS, sandboxActionIdMeta, sandboxSpecialEffectKi
 import { cardEffectHooks } from '../projections/card-effect-hooks.ts'
 import { cardEffectHookMeta } from './sandbox-hook-meta.ts'
 import { REAL_RESOURCE_KEYS, isPaymentResourceKey } from '../contract/resource-keys.ts'
-import { ALL_ANIMAL_KEYS } from '../contract/animals.ts'
+import { ALL_ANIMAL_KEYS, animalKeysForState } from '../contract/animals.ts'
 import { assertKeys, assertRecord, sandboxInteractionKinds, sandboxCardMetadataKeys, sandboxCommonActionContextKeys, sandboxFlowFields } from './sandbox-declarations.ts'
 import type { ActionFlow, GameState } from '../contract/types.ts'
 import type { CardEffectField } from '../cards/card-effects.ts'
@@ -32,12 +32,15 @@ function safeData(value: unknown, depth = 0): void {
     }
   }
 }
-function resourceMap(value: unknown, payment = false, nonnegative = true): void {
+function resourceMap(value: unknown, payment = false, nonnegative = true): asserts value is Record<string, number> {
   assertRecord(value, 'Resources')
   for (const [key, amount] of Object.entries(value)) {
     if (!(payment ? isPaymentResourceKey(key) : resources.includes(key))) throw new Error(`Unsupported resource '${key}'`)
     finite(amount, key, nonnegative)
   }
+}
+function stringArray(value: unknown, label: string, allowed?: readonly string[], nonempty = false): asserts value is string[] {
+  if (!Array.isArray(value) || nonempty && value.length === 0 || value.some(item => typeof item !== 'string' || !item || allowed && !allowed.includes(item))) throw new Error(`${label} must be an array of supported strings`)
 }
 function choiceOptions(value: unknown, cardId: string): void {
   if (!Array.isArray(value)) throw new Error('Choice options must be an array')
@@ -81,6 +84,7 @@ function trade(value: unknown, cardId: string, declaration = false): void {
   assertRecord(value, 'Trade')
   assertKeys(value, ['from', 'to', 'max', 'fromFarmyard', 'sourceId', 'triggers', 'blockedAnytimeInteractionKinds', ...(declaration ? [] : ['source', 'scope', 'minCost', 'maxCost', 'groupId', 'groupMin', 'groupMax', 'replaceUpTo'])], 'Trade')
   resourceMap(value.from); resourceMap(value.to)
+  if (!Object.values(value.from).some(amount => Number(amount) > 0) && value.max === undefined) throw new Error('An exchange without positive input requires a finite max')
   ownSource(value.sourceId, cardId)
   ownSource(value.source, cardId)
   if (value.max !== undefined) finite(value.max, 'Trade max', true)
@@ -98,6 +102,12 @@ function cost(value: unknown, cardId: string, allowCardReturn = false): void {
     value.fees.forEach(fee => resourceMap(fee, true))
   }
   if (value.nb !== undefined) finite(value.nb, 'Cost unit count', true)
+  if (value.resourceReserve !== undefined) {
+    assertRecord(value.resourceReserve, 'Resource reserve')
+    assertKeys(value.resourceReserve, ['resources', 'minimum'], 'Resource reserve')
+    stringArray(value.resourceReserve.resources, 'Reserve resources', resources)
+    finite(value.resourceReserve.minimum, 'Reserve minimum', true)
+  }
   if (value.trades !== undefined) {
     if (!Array.isArray(value.trades)) throw new Error('Cost trades must be an array')
     value.trades.forEach(item => trade(item, cardId))
@@ -123,8 +133,9 @@ export function assertCustomCardDefinition(definition: unknown, cardId: string):
   if (meta.cost !== undefined) cost(meta.cost, cardId, true)
   if (meta.altCosts !== undefined) {
     if (!Array.isArray(meta.altCosts)) throw new Error('altCosts must be an array')
-    meta.altCosts.forEach(item => cost(item, cardId, true))
+    meta.altCosts.forEach(item => resourceMap(item, true))
   }
+  if (meta.returnCards !== undefined) stringArray(meta.returnCards, 'returnCards')
   if (meta.exchanges !== undefined) {
     if (!Array.isArray(meta.exchanges)) throw new Error('exchanges must be an array')
     meta.exchanges.forEach(item => trade(item, cardId, true))
@@ -138,11 +149,12 @@ export function assertCustomCardDefinition(definition: unknown, cardId: string):
     if (!Array.isArray(modifier.appliesTo) || modifier.appliesTo.some(type => !['construct', 'renovation', 'occupation', 'fencing', 'stables', 'plow', 'major-improvement', 'minor-improvement'].includes(type))) throw new Error('Unsupported modifier cost type')
     if (modifier.type === 'trade') trade(Object.fromEntries(Object.entries(modifier).filter(([key]) => !['type', 'cardId', 'appliesTo', 'conditions'].includes(key))), cardId)
     if (modifier.type === 'bonus') bonus(Object.fromEntries(Object.entries(modifier).filter(([key]) => !['type', 'cardId', 'appliesTo'].includes(key))), cardId)
+    if (modifier.type === 'remove-resource') stringArray(modifier.resources, 'Removed cost resources', resources, true)
   }
 
 }
 
-export function assertCustomActionData(actionId: string, params: Record<string, unknown>, context: Record<string, unknown>, cardId: string): void {
+export function assertCustomActionData(actionId: string, params: Record<string, unknown>, context: Record<string, unknown>, cardId: string, state?: GameState): void {
   if (!(SANDBOX_ALLOWED_ACTION_IDS as readonly string[]).includes(actionId)) throw new Error(`Unsupported Workshop action '${actionId}'`)
   const descriptor = sandboxActionIdMeta[actionId as keyof typeof sandboxActionIdMeta]
   const paramKeys = descriptor.paramKeys ?? []
@@ -154,7 +166,7 @@ export function assertCustomActionData(actionId: string, params: Record<string, 
   if (params.actionContext !== undefined) {
     assertRecord(params.actionContext, 'params.actionContext')
     const nestedParams = Object.fromEntries(Object.entries(params).filter(([key]) => key !== 'actionContext'))
-    assertCustomActionData(actionId, nestedParams, params.actionContext, cardId)
+    assertCustomActionData(actionId, nestedParams, params.actionContext, cardId, state)
   }
   for (const exact of [context.exactCost, params.exactCost]) if (exact !== undefined) {
     assertRecord(exact, 'Exact cost')
@@ -164,6 +176,14 @@ export function assertCustomActionData(actionId: string, params: Record<string, 
   if (context.costOverride !== undefined) resourceMap(context.costOverride, false, false)
   if (actionId === 'pay') cost(params.cost ?? params, cardId)
   if (actionId === 'pay' && params.reserveResources !== undefined) resourceMap(params.reserveResources)
+  if (actionId === 'improvement') {
+    if (params.allowedPurchases !== undefined) stringArray(params.allowedPurchases, 'Allowed purchases')
+    if (context.minimumResourcesPaid !== undefined) resourceMap(context.minimumResourcesPaid, true)
+  }
+  if (actionId === 'breed' && context.animalTypes != null) {
+    stringArray(context.animalTypes, 'Breed animals', state ? animalKeysForState(state) : ALL_ANIMAL_KEYS)
+    if (new Set(context.animalTypes).size !== context.animalTypes.length) throw new Error('Breed animal types must be distinct')
+  }
   if (['gain', 'store-on-card', 'take-from-card'].includes(actionId)) resourceMap(Object.fromEntries(Object.entries(params).filter(([key]) => resources.includes(key))))
   if (actionId === 'special-effect') {
     if (!(sandboxSpecialEffectKinds as readonly unknown[]).includes(params.kind)) throw new Error(`Unsupported special-effect kind '${String(params.kind)}'`)
@@ -222,7 +242,7 @@ export function assertCustomActionData(actionId: string, params: Record<string, 
   }
 }
 
-export function validateCustomFlow(value: unknown, cardId: string, depth = 0): ActionFlow {
+export function validateCustomFlow(value: unknown, cardId: string, depth = 0, state?: GameState): ActionFlow {
   if (depth > 24) throw new Error('Custom flow exceeds the nesting limit')
   assertRecord(value, 'ActionFlow')
   ownSource(value.sourceCard, cardId)
@@ -237,10 +257,10 @@ export function validateCustomFlow(value: unknown, cardId: string, depth = 0): A
     if (typeof value.actionId !== 'string') throw new Error('ActionFlow requires an action ID')
     const params = value.params ?? {}; const context = value.actionContext ?? {}
     assertRecord(params, 'Flow params'); assertRecord(context, 'Flow actionContext')
-    assertCustomActionData(value.actionId, params, context, cardId)
+    assertCustomActionData(value.actionId, params, context, cardId, state)
     value.sourceCard ??= cardId
   } else if (!['seq', 'or', 'xor', 'parallel'].includes(String(value.type)) || !Array.isArray(value.children)) throw new Error('Composite ActionFlow requires supported type and children')
-  else value.children.forEach(child => validateCustomFlow(child, cardId, depth + 1))
+  else value.children.forEach(child => validateCustomFlow(child, cardId, depth + 1, state))
   safeData(value)
   return value as ActionFlow
 }
@@ -258,7 +278,7 @@ export function validateCustomEffectResult(value: unknown, cardId: string, hook:
   if (value === null || value === undefined) return customEffectFallback(hook) ?? null
   safeData(value)
   const metadata = cardEffectHookMeta[hook as CardEffectField]
-  if ((metadata.table === 'effect' && hook !== 'onBeforePlayerTurn') || hook === 'resolveChoice') return validateCustomFlow(value, cardId)
+  if ((metadata.table === 'effect' && hook !== 'onBeforePlayerTurn') || hook === 'resolveChoice') return validateCustomFlow(value, cardId, 0, args[0] as GameState)
   if (hook === 'onBeforePlayerTurn') { assertRecord(value, hook); assertKeys(value, ['skipTurn'], hook); if (value.skipTurn !== true && value.skipTurn !== false) throw new Error('skipTurn must be boolean'); return value }
   if (['computeBonusScore', 'computeExtraRoomCapacity', 'computeHarvestBreedOrderPriority', 'countExtraTurns', 'computeBreedThreshold', 'computeBreedableAnimalCount', 'computeAnimalScoreAdjustment'].includes(hook)) finite(value, hook, ['countExtraTurns', 'computeBreedThreshold', 'computeBreedableAnimalCount'].includes(hook))
   if (hook === 'countExtraTurns' && !Number.isInteger(value)) throw new Error('countExtraTurns must be an integer')
@@ -322,13 +342,32 @@ export function validateCustomEffectResult(value: unknown, cardId: string, hook:
     if (!Array.isArray(value)) throw new Error('Animal-zone query must return new zones')
     const existing = args[hook === 'onComputeSharedAnimalZones' ? 2 : 1] as Array<{ id: string }>
     const seen = new Set((existing ?? []).map(zone => zone.id))
+    const state = args[hook === 'onComputeSharedAnimalZones' ? 3 : 2] as GameState
     for (const zone of value) {
       assertRecord(zone, 'Animal zone'); ownSource(zone.cardId, cardId)
+      assertKeys(zone, ['id', 'zoneType', 'capacity', 'blocked', 'houseAnimalZone', 'animalType', 'animalCount', 'animalCounts', 'allowedAnimalType', 'allowedAnimalTypes', 'cardId', 'ownerPlayerId', 'animalOwnerPlayerId', 'breedingOwnerPlayerId', 'displayOwnerName', 'pastureIndex', 'farmPosition', 'countsFarmyardSpaceAsUnused', 'displaySource', 'exclusiveCardZoneLimit', 'capacityCounterKey', 'capacityLossOnPayment', 'requiredEmptyZoneGroupIds'], 'Animal zone')
       if (zone.zoneType !== 'card' || typeof zone.id !== 'string' || seen.has(zone.id)) throw new Error('Animal query must return distinct new card zones')
       seen.add(zone.id); finite(zone.capacity, 'Animal capacity', true)
       const owner = args[0] as { id: string }
       const animalOwner = (hook === 'onComputeSharedAnimalZones' ? args[1] : args[0]) as { id: string }
       if (zone.ownerPlayerId !== undefined && zone.ownerPlayerId !== owner?.id || zone.animalOwnerPlayerId !== undefined && zone.animalOwnerPlayerId !== animalOwner?.id) throw new Error('Animal-zone owners must match the query players')
+      if (zone.breedingOwnerPlayerId !== undefined && !(state?.players ?? []).some(player => player.id === zone.breedingOwnerPlayerId)) throw new Error('Breeding owner player not found')
+      for (const key of ['blocked', 'houseAnimalZone', 'countsFarmyardSpaceAsUnused', 'capacityLossOnPayment']) if (zone[key] !== undefined && typeof zone[key] !== 'boolean') throw new Error(`${key} must be boolean`)
+      for (const key of ['animalType', 'allowedAnimalType']) if (zone[key] != null && !(ALL_ANIMAL_KEYS as readonly unknown[]).includes(zone[key])) throw new Error('Animal-zone type must be an animal')
+      if (zone.allowedAnimalTypes !== undefined) stringArray(zone.allowedAnimalTypes, 'Allowed zone animals', ALL_ANIMAL_KEYS)
+      for (const key of ['animalCount', 'pastureIndex', 'exclusiveCardZoneLimit']) if (zone[key] !== undefined) finite(zone[key], key, true)
+      if (zone.animalCounts !== undefined) {
+        assertRecord(zone.animalCounts, 'Zone animal counts'); assertKeys(zone.animalCounts, ALL_ANIMAL_KEYS, 'Zone animal counts')
+        Object.values(zone.animalCounts).forEach(amount => finite(amount, 'Animal count', true))
+      }
+      if (zone.requiredEmptyZoneGroupIds !== undefined) stringArray(zone.requiredEmptyZoneGroupIds, 'Empty zone groups')
+      if (zone.displayOwnerName !== undefined && typeof zone.displayOwnerName !== 'string') throw new Error('Display owner name must be a string')
+      if (zone.displaySource !== undefined && !['played-card', 'farm-position', 'borrowed-played-card'].includes(String(zone.displaySource))) throw new Error('Unsupported zone display source')
+      if (zone.capacityCounterKey !== undefined && (typeof zone.capacityCounterKey !== 'string' || !zone.capacityCounterKey || ['__proto__', 'constructor', 'prototype'].includes(zone.capacityCounterKey))) throw new Error('Invalid zone capacity counter key')
+      if (zone.farmPosition !== undefined) {
+        assertRecord(zone.farmPosition, 'Zone farm position'); assertKeys(zone.farmPosition, ['row', 'col'], 'Zone farm position')
+        finite(zone.farmPosition.row, 'Zone row'); finite(zone.farmPosition.col, 'Zone column')
+      }
     }
   }
   return value
@@ -338,17 +377,17 @@ export function assertCustomListenerCapabilities(value: unknown, cardId: string,
   if (value === null || value === undefined) return
   assertRecord(value, 'Listener result'); safeData(value); ownSource(value.sourceCard, cardId)
   assertKeys(value, ['doable', 'actionId', 'extraData', 'extraOptions', 'extraExchanges', 'followUpActions', 'flow', 'costs', 'costAttribution', 'reserveResources', 'trades', 'bonuses', 'paymentResourceProviders', 'sourceCard', 'countCardUse', 'labelKey', 'labelParams', 'decline', 'alternativeFlow'], 'Listener result')
-  for (const key of ['flow', 'alternativeFlow']) if (value[key] !== undefined) validateCustomFlow(value[key], cardId)
+  for (const key of ['flow', 'alternativeFlow']) if (value[key] !== undefined) validateCustomFlow(value[key], cardId, 0, context?.state)
   if (value.extraOptions !== undefined) choiceOptions(value.extraOptions, cardId)
   if (value.actionId !== undefined && !(SANDBOX_ALLOWED_ACTION_IDS as readonly unknown[]).includes(value.actionId)) throw new Error('Unsupported replacement action')
-  if (value.actionId !== undefined) assertCustomActionData(String(value.actionId), {}, (value.extraData ?? {}) as Record<string, unknown>, cardId)
+  if (value.actionId !== undefined) assertCustomActionData(String(value.actionId), {}, (value.extraData ?? {}) as Record<string, unknown>, cardId, context?.state)
   if (value.followUpActions !== undefined) {
     if (!Array.isArray(value.followUpActions)) throw new Error('followUpActions must be an array')
     for (const action of value.followUpActions) {
       const id = typeof action === 'string' ? action : action?.actionId
       if (!(SANDBOX_ALLOWED_ACTION_IDS as readonly unknown[]).includes(id)) throw new Error('Unsupported follow-up action')
       if (typeof action === 'object' && action) ownSource(action.sourceCard, cardId)
-      assertCustomActionData(String(id), {}, {}, cardId)
+      assertCustomActionData(String(id), {}, {}, cardId, context?.state)
       if (typeof action === 'object' && action) { assertRecord(action, 'Follow-up'); assertKeys(action, ['actionId', 'sourceCard'], 'Follow-up') }
     }
   }
@@ -361,6 +400,6 @@ export function assertCustomListenerCapabilities(value: unknown, cardId: string,
   }
   if (value.extraData !== undefined) {
     assertRecord(value.extraData, 'Listener extraData')
-    if (Object.keys(value.extraData).length) assertCustomActionData(String(value.actionId ?? context?.actionId ?? ''), {}, value.extraData, cardId)
+    if (Object.keys(value.extraData).length) assertCustomActionData(String(value.actionId ?? context?.actionId ?? ''), {}, value.extraData, cardId, context?.state)
   }
 }

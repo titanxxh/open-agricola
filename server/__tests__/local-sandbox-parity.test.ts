@@ -271,6 +271,23 @@ describe('shared Workshop capability admission', () => {
   })
 
   it.each([
+    [{modifiers:[{type:'remove-resource',cardId:'CUSTOM_ParityCard',appliesTo:['stables']}]},'Removed cost resources'],
+    [{modifiers:[{type:'remove-resource',cardId:'CUSTOM_ParityCard',appliesTo:['stables'],resources:['room']}]},'Removed cost resources'],
+    [{altCosts:[{fee:{wood:2}}]},'Unsupported resource'],
+    [{returnCards:'Major_Fireplace1'},'returnCards'],
+    [{exchanges:[{from:{},to:{food:1}}]},'positive input'],
+    [{exchanges:[{from:{wood:0},to:{food:1}}]},'positive input'],
+    [{cost:{fee:{wood:2},resourceReserve:{}}},'Reserve resources'],
+    [{cost:{fee:{wood:2},resourceReserve:{resources:['wood'],minimum:-1}}},'Reserve minimum'],
+  ] as const)('rejects invalid metadata on both save paths', (metadata,error)=>{
+    const meta={id:'CUSTOM_ParityCard',name:'Parity',...metadata}
+    const source=`const CARD_ID='CUSTOM_ParityCard';const CARD_DEF={cardType:'minor',meta:${JSON.stringify(meta)}};const CARD_IMPL={}`
+    const server=validateAndCompileCustomCode(source,'CUSTOM_ParityCard')
+    expect(validateAndCompileCustomCodeLocal(source,'CUSTOM_ParityCard')).toEqual(server)
+    expect(server).toMatchObject({valid:false,errors:[expect.stringContaining(error)]})
+  })
+
+  it.each([
     ['nested internal action', {type:'seq',children:[{type:'leaf',actionId:'place-farmer'}]}, 'Unsupported Workshop action'],
     ['lifecycle mutation', {type:'leaf',actionId:'special-effect',params:{kind:'clear-round-flags'}}, 'Unsupported special-effect kind'],
     ['foreign local source', {type:'leaf',actionId:'special-effect',sourceCard:'CUSTOM_Other',params:{kind:'set-counter',key:'x',value:1}}, 'impersonate'],
@@ -284,6 +301,9 @@ describe('shared Workshop capability admission', () => {
     ['fabricated card ownership', {type:'leaf',actionId:'pay',params:{cost:{fee:{wood:5}},playedCards:['Major_Fireplace1']}}, 'playedCards'],
     ['unsettled direct card-return cost', {type:'leaf',actionId:'pay',params:{cost:{fee:{wood:5},cards:{type:'major',list:['Major_Fireplace1']}}}}, 'cards'],
     ['foreign choice source', {type:'leaf',actionId:'emit-choice',params:{options:[{value:'yes',labelKey:'ui.yes',sourceCard:'CUSTOM_Other'}]}}, 'impersonate'],
+    ['misplaced payment minimum', {type:'leaf',actionId:'improvement',params:{minimumResourcesPaid:{clay:1}}}, 'minimumResourcesPaid'],
+    ['non-animal breeding', {type:'leaf',actionId:'breed',actionContext:{animalTypes:['food']}}, 'Breed animals'],
+    ['malformed payment reserve', {type:'leaf',actionId:'pay',params:{cost:{fee:{wood:2},resourceReserve:{}}}}, 'Reserve resources'],
   ])('rejects runtime-computed %s before dispatch',(_label,flow,error)=>{
     // Deliberately dynamic return, beyond AST literal inspection.
     const source=`const CARD_ID='CUSTOM_ParityCard';const CARD_DEF={cardType:'minor',meta:{id:CARD_ID,name:'Parity'}};const CARD_IMPL={effect:{onBuy:state=>state.customFlow}}`
@@ -317,6 +337,18 @@ describe('shared Workshop capability admission', () => {
     const request={compiledCode:compiled.compiledCode,cardId:'CUSTOM_ParityCard',hook,args:[{players:[{id:'p1'}]}, {}, [{type:'sheep'}]]}
     const server=invokeCustomCodeEffect(request);expect(invokeCustomCodeEffectLocal(request)).toEqual(server)
     expect(server).toMatchObject({ok:false,error:expect.stringContaining(error)})
+  })
+
+  it.each([
+    {requiredEmptyZoneGroupIds:{}}, {allowedAnimalTypes:{}}, {animalCounts:{food:1}},
+    {blocked:'yes'}, {exclusiveCardZoneLimit:'one'}, {farmPosition:{row:'0',col:1}},
+    {capacityCounterKey:'__proto__'}, {displayOwnerName:[]}, {displaySource:'unknown'},
+  ])('rejects malformed optional animal-zone data on both adapters', fields=>{
+    const zone={id:'shared',zoneType:'card',capacity:1,...fields}
+    const source=`const CARD_ID='CUSTOM_ParityCard';const CARD_IMPL={effect:{onComputeSharedAnimalZones:()=>[${JSON.stringify(zone)}]}}`
+    const compiled=validateAndCompileCustomCode(source,'CUSTOM_ParityCard');if(!compiled.valid)throw Error(compiled.errors.join(';'))
+    const request={compiledCode:compiled.compiledCode,cardId:'CUSTOM_ParityCard',hook:'onComputeSharedAnimalZones' as const,args:[{id:'p1'},{id:'p2'},[],{players:[{id:'p1'},{id:'p2'}]}]}
+    const server=invokeCustomCodeEffect(request);expect(invokeCustomCodeEffectLocal(request)).toEqual(server);expect(server.ok).toBe(false)
   })
 
   it('keeps valid scoring query data and rejects foreign listener choice sources on both adapters',()=>{

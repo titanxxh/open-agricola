@@ -50,7 +50,7 @@ export const sandboxActionIdMeta: Record<SandboxActionId, {
   stables: { desc: '普通畜栏，检查占地、供给和付款；不含 farmHand', params: 'actionContext.max/exactCost/costOverride?', paramKeys: ['actionContext'], contextKeys: ['max', 'exactCost', 'costOverride'] },
   construct: { desc: '按当前房型建造普通房间并付款', params: 'actionContext.exactCost/costOverride?', paramKeys: ['actionContext'], contextKeys: ['exactCost', 'costOverride'] },
   'renovate-house': { desc: '正常 wood→clay→stone 翻修', params: 'actionContext.exactCost?', paramKeys: ['actionContext'], contextKeys: ['exactCost'] },
-  improvement: { desc: '从合法候选购买改良，保留前提、付款及 onBuy', params: 'types?, allowedPurchases?, minimumResourcesPaid?', paramKeys: ['types', 'allowedPurchases', 'minimumResourcesPaid', 'actionContext'], contextKeys: ['types'] },
+  improvement: { desc: '从合法候选购买改良，保留前提、付款及 onBuy', params: 'params.types/allowedPurchases?；actionContext.minimumResourcesPaid?', paramKeys: ['types', 'allowedPurchases', 'actionContext'], contextKeys: ['types', 'minimumResourcesPaid'] },
   occupation: { desc: '从当前手牌打出职业，明确费用并执行 onBuy', params: 'params.allowedCards/exactCost?；费用在 params，不在 actionContext', paramKeys: ['allowedCards', 'exactCost'], contextKeys: [] },
   'family-growth': { desc: '正常家庭成长，保留供给和 newborn 语义', params: 'actionContext.skipRoomCheck?（仅牌面明确无房成长时）', paramKeys: [], contextKeys: ['skipRoomCheck'] },
   breed: { desc: '本卡私有繁殖与正常动物安置，不冒充 Harvest', params: 'actionContext.animalTypes?；sourceCard 绑定本卡', paramKeys: [], contextKeys: ['animalTypes', 'sourceCard'] },
