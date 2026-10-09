@@ -38,6 +38,7 @@ import { BrandMark } from '../components/common/BrandMark'
 import { GameLoadScreen } from '../components/common/GameLoadScreen'
 import { getGameLoadProgress, resolveGameLoadPhase } from './game-load-progress'
 import { buildActionBoardProjection, buildFarmBoardProjection } from './farm-board-projection'
+import { buildFarmTargetChoiceBindings, getFarmTargetChoices } from './farm-target-choice'
 import { Section } from '../components/common/Section'
 import { PublicEventResourceAnimations } from '../components/effects/PublicEventResourceAnimations'
 import { PublicEventCardPassAnimation } from '../components/effects/PublicEventCardPassAnimation'
@@ -765,6 +766,22 @@ export const GameContainerApi = () => {
       ? interactionPresentationPlan.pendingChoice
       : null
   const pendingChoice = planPendingChoice
+  const farmChoiceOptions = useMemo(() => isInteractive && interactionPresentationPlan.kind === 'choice-bar' && !planPendingChoice?.multiSelect
+    ? planPendingChoice?.options ?? [] : [], [isInteractive, interactionPresentationPlan.kind, planPendingChoice])
+  const farmChoiceBindings = buildFarmTargetChoiceBindings(farmChoiceOptions, displayPlayer?.id)
+  const farmChoiceTargets = useMemo(() => farmChoiceOptions.flatMap((option) => {
+    const target = option.target
+    return target && !option.disabled && target.playerId === displayPlayer?.id ? [target] : []
+  }), [farmChoiceOptions, displayPlayer?.id])
+  const farmChoiceKey = JSON.stringify(farmChoiceOptions)
+  const [selectedFarmChoice, setSelectedFarmChoice] = useState<{ key: string; tile: FarmTilePosition } | null>(null)
+  const farmChoiceAlternatives = selectedFarmChoice?.key === farmChoiceKey
+    ? getFarmTargetChoices(farmChoiceBindings, selectedFarmChoice.tile) : []
+  const farmChoiceBar = planPendingChoice && farmChoiceTargets.length > 0 ? {
+    ...planPendingChoice,
+    promptKey: farmChoiceAlternatives.length > 1 ? 'ui.choiceChooseTargetAlternative' : 'ui.choiceClickFarmTarget',
+    options: planPendingChoice.options.filter((option) => !option.target || farmChoiceAlternatives.some((alternative) => alternative.value === option.value)),
+  } : planPendingChoice
   const currentSelectionRejected = isInteractionSubmitDraftRejected({
     value: 'confirm',
     ...farmSelectionDraft.submitDraft,
@@ -778,13 +795,13 @@ export const GameContainerApi = () => {
     interactionPresentationPlan.kind === 'exchange-center' ||
     interactionPresentationPlan.kind === 'moor-special-action'
       ? null
-      : currentSelectionRejected && planPendingChoice
+      : currentSelectionRejected && farmChoiceBar
         ? {
-            ...planPendingChoice,
-            options: planPendingChoice.options.map((option) =>
+            ...farmChoiceBar,
+            options: farmChoiceBar.options.map((option) =>
               option.value === 'confirm' ? { ...option, disabled: true } : option),
           }
-        : planPendingChoice
+        : farmChoiceBar
   const suppressPendingChoiceOptions = interactionPresentationPlan.kind === 'moor-special-action'
   const pendingNextPlayerIndex =
     interactionPresentationPlan.kind === 'confirm-next-player'
@@ -1098,6 +1115,7 @@ export const GameContainerApi = () => {
       pendingAnimalReorg,
       ...farmSelectionDraft.projectionDraft,
       extraPositionSelectableSet: specialTerrainSelectableSet,
+      farmChoiceTargets,
     }),
     [
       displayPlayer,
@@ -1110,6 +1128,7 @@ export const GameContainerApi = () => {
       pendingAnimalReorg,
       farmSelectionDraft.projectionDraft,
       specialTerrainSelectableSet,
+      farmChoiceTargets,
     ],
   )
   const actionBoardProjection = useMemo(
@@ -1128,6 +1147,12 @@ export const GameContainerApi = () => {
     confirmAnimalReorgDraft(reorgRemaining, resolveChoice)
   }, [confirmAnimalReorgDraft, reorgRemaining, resolveChoice])
   const wrappedTogglePositionSelection = (tile: FarmTilePosition) => {
+    if (farmChoiceTargets.length > 0) {
+      const options = getFarmTargetChoices(farmChoiceBindings, tile)
+      if (options.length === 1) resolveChoice(options[0]!.value)
+      else if (options.length > 1) setSelectedFarmChoice({ key: farmChoiceKey, tile })
+      return
+    }
     if (selectedSpecialAction && state && isInteractive && interaction.stateId === 'wait' && pendingMoorSpecialActionChoices.isActive) {
       const option = getPendingMoorSpecialActionTileChoice(
         pendingMoorSpecialActionChoices,

@@ -39,6 +39,7 @@ import { drawOrdinaryCardsAction } from './effects/internal/draw-ordinary-cards'
 import { placeFarmerOnSpaceAction } from './effects/internal/place-farmer-on-space'
 import { turnScopeAction } from './effects/internal/turn-scope'
 import { scheduledOfferAction } from './effects/internal/scheduled-offers'
+import { scheduleOffersAction } from './effects/internal/schedule-offers'
 import { passMinorCardToLeftAction } from './effects/internal/pass-minor-card-to-left'
 import { specialEffectAction } from './effects/special-effect'
 import { reapAction } from './effects/reap'
@@ -93,6 +94,7 @@ export const createInternalActionDefinitions = (resolveAction: FlowActionResolve
   placeFarmerOnSpaceAction,
   turnScopeAction,
   scheduledOfferAction,
+  scheduleOffersAction,
   passMinorCardToLeftAction,
   specialEffectAction,
   reapAction,

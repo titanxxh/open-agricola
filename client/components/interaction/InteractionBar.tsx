@@ -171,6 +171,52 @@ const renderEffectPreview = (
   locale: Locale,
   effectPreview: ChoiceEffectPreview,
 ): ReactNode => {
+  if (effectPreview.kind === 'fieldContents') {
+    return <span>{effectPreview.sourceCard ? getAnyCardDisplayName(locale, effectPreview.sourceCard) : t(locale, 'ui.tileField')}{': '}
+      <ResourceLine locale={locale} resources={effectPreview.resources} hideZero />
+    </span>
+  }
+  if (effectPreview.kind === 'cardScore') {
+    return <span data-card-score={effectPreview.delta}>{t(locale, 'ui.choiceCardScore', {
+      card: getAnyCardDisplayName(locale, effectPreview.cardId),
+      delta: `${effectPreview.delta >= 0 ? '+' : ''}${effectPreview.delta}`,
+    })}</span>
+  }
+  if (effectPreview.kind === 'actionSpace') {
+    return <span data-space-id={effectPreview.spaceId}>
+      <strong>{t(locale, effectPreview.nameKey)}</strong>
+      <span className="interaction-option-subtitle">{renderResourceAwareText(t(locale, effectPreview.descriptionKey))}</span>
+    </span>
+  }
+  if (effectPreview.kind === 'futureOffers') {
+    return <span>{effectPreview.entries.map((entry, index) => <span key={index} className="interaction-description-part">
+      {index > 0 ? '; ' : ''}{t(locale, 'ui.choiceScheduleRound', { round: entry.round })}{' '}
+      {t(locale, 'ui.choiceOptionalPurchase')}{' '}
+      <ResourceLine locale={locale} mode="payment" resources={entry.resourcesPaid} hideZero />
+      <span aria-hidden="true"> → </span>
+      {entry.actionNameKey ? t(locale, entry.actionNameKey) : <ResourceLine locale={locale} resources={entry.resources} hideZero />}
+    </span>)}</span>
+  }
+  if (effectPreview.kind === 'resourceMovement') {
+    const location = effectPreview.from.kind === 'card' ? effectPreview.from : effectPreview.to
+    const name = location.kind === 'card' ? getAnyCardDisplayName(locale, location.cardId)
+      : location.kind === 'actionSpace' ? t(locale, location.nameKey) : ''
+    return <span>
+      {t(locale, effectPreview.from.kind === 'card' ? 'ui.choiceTakeFromCard' : 'ui.choiceReturnToSpace', { target: name })}{' '}
+      <ResourceLine locale={locale} resources={effectPreview.resources} hideZero />
+    </span>
+  }
+  if (effectPreview.kind === 'futureSchedule') {
+    return <span className="interaction-future-schedule">{effectPreview.entries.map((entry, index) => (
+      <span key={index} className="interaction-description-part">
+        {index > 0 ? '; ' : ''}{entry.endRound ? t(locale, 'ui.choiceScheduleRounds', { start: entry.round, end: entry.endRound }) : t(locale, 'ui.choiceScheduleRound', { round: entry.round })}{' '}
+        <ResourceLine locale={locale} resources={entry.resources} hideZero />
+        {entry.resourceCondition ? <span> ({t(locale, 'ui.choiceMinimumResource')} <ResourceLine locale={locale} resources={{ [entry.resourceCondition.resource]: entry.resourceCondition.amount }} hideZero />)</span> : null}
+        {entry.roomType ? <span>{t(locale, 'ui.choiceFutureRoom', { room: t(locale, `resources.${entry.roomType}`) })}</span> : null}
+        {entry.actions?.map((action) => <span key={action.kind}> {t(locale, `ui.choiceFuture${action.kind}`, { amount: action.amount })}{action.resourcesPaid ? <> — <ResourceLine locale={locale} mode="payment" resources={action.resourcesPaid} hideZero /></> : null}</span>)}
+      </span>
+    ))}</span>
+  }
   if (effectPreview.kind === 'payment') {
     return (
       <span className="payment-option-content">
@@ -192,19 +238,10 @@ const renderEffectPreview = (
   if (effectPreview.kind === 'resourceExchange') {
     return (
       <span className="interaction-resource-exchange">
-        {hasPositiveResources(effectPreview.resourcesPaid) ? (
-          <ResourceLine
-            locale={locale}
-            mode="payment"
-            resources={effectPreview.resourcesPaid ?? {}}
-            hideZero
-          />
-        ) : (
-          <span>{t(locale, 'ui.interactionPaymentFree')}</span>
-        )}
-        <span className="interaction-resource-exchange-arrow" aria-hidden="true">
-          <span className="res-icon res-icon-arrow" />
-        </span>
+        {effectPreview.resourcesPaid ? <>
+          {hasPositiveResources(effectPreview.resourcesPaid) ? <ResourceLine locale={locale} mode="payment" resources={effectPreview.resourcesPaid} hideZero /> : <span>{t(locale, 'ui.interactionPaymentFree')}</span>}
+          <span className="interaction-resource-exchange-arrow" aria-hidden="true"><span className="res-icon res-icon-arrow" /></span>
+        </> : null}
         <ResourceLine
           locale={locale}
           resources={effectPreview.resourcesGained ?? {}}
@@ -233,7 +270,7 @@ const renderDescriptionAction = (
       <span className="interaction-description-action-main">
         {renderEffectPreview(locale, preview.effectPreview)}
       </span>
-      <span className="interaction-option-subtitle">{renderResourceAwareText(label)}</span>
+      <>{preview.showLabel !== false || labelOverride ? <span className="interaction-option-subtitle">{renderResourceAwareText(label)}</span> : null}</>
     </span>
   )
 }
@@ -376,7 +413,9 @@ const renderOptionContent = (
     )
   }
   if (!option.effectPreview) {
-    return renderOptionLabel(locale, option)
+    return <span>{renderOptionLabel(locale, option)}{option.targetCard ? <span className="interaction-option-subtitle" data-target-card={option.targetCard.cardId}>
+      {t(locale, 'ui.choiceActionCard')}: {option.targetCard.actionNameKeys.map((key) => t(locale, key)).join(' / ')}
+    </span> : null}</span>
   }
   const subtitle = getEffectPreviewSubtitle(locale, option)
   return (

@@ -1,3 +1,4 @@
+import { cardIdentityChoice } from '../../actions/helpers/card-choice'
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
@@ -20,14 +21,8 @@ const discardFromHandAction: ActionDefinition = {
   canBeExecutedByPlayer: () => true,
   execute: ({ player }) => {
     const options: ActionChoiceOption[] = [
-      ...player.occupationHand.map((id) => ({
-        value: `occ:${id}`,
-        labelKey: `occupations.${id}.name`,
-      })),
-      ...player.minorHand.map((id) => ({
-        value: `min:${id}`,
-        labelKey: `minors.${id}.name`,
-      })),
+      ...player.occupationHand.map((id) => cardIdentityChoice(id, 'occupation', `occ:${id}`)),
+      ...player.minorHand.map((id) => cardIdentityChoice(id, 'minor', `min:${id}`)),
     ]
     if (options.length === 0) return { type: 'fail', errorKey: 'log.actionFail' }
     return {

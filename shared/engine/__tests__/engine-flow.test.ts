@@ -2265,7 +2265,7 @@ describe('Engine flow nodes', () => {
     }
   })
 
-  it('xor of pay-then-gain sequences: descriptionPreview groups pay and gain', () => {
+  it('xor of pay-then-gain sequences: describes each complete exchange once', () => {
     const registry = new ActionRegistry()
     registry.register(payAction)
     registry.register(gainAction)
@@ -2295,10 +2295,7 @@ describe('Engine flow nodes', () => {
     if (first.type !== 'choice') return
     for (const opt of first.choice.options) {
       expect(opt.labelKey).not.toBe('ui.interactionResourceExchange')
-      expect(collectDescriptionLabelKeys(opt.descriptionPreview)).toEqual([
-        'actions.pay.name',
-        'actions.gain.name',
-      ])
+      expect(collectDescriptionLabelKeys(opt.descriptionPreview)).toEqual(['ui.interactionResourceExchange'])
     }
   })
 
@@ -2337,14 +2334,8 @@ describe('Engine flow nodes', () => {
     expect(vpBranch).toBeDefined()
     expect(foodBranch!.labelKey).not.toBe('ui.interactionResourceExchange')
     expect(vpBranch!.labelKey).not.toBe('ui.interactionResourceExchange')
-    expect(collectDescriptionLabelKeys(foodBranch!.descriptionPreview)).toEqual([
-      'actions.pay.name',
-      'actions.gain.name',
-    ])
-    expect(collectDescriptionLabelKeys(vpBranch!.descriptionPreview)).toEqual([
-      'actions.pay.name',
-      'actions.bonus-vp.name',
-    ])
+    expect(collectDescriptionLabelKeys(foodBranch!.descriptionPreview)).toEqual(['ui.interactionResourceExchange'])
+    expect(collectDescriptionLabelKeys(vpBranch!.descriptionPreview)).toEqual(['ui.interactionResourceExchange'])
   })
 
   it('optional action descriptions ignore custom choice labels', () => {
@@ -2437,7 +2428,6 @@ describe('Engine flow nodes', () => {
     ])
     expect(collectDescriptionLabelKeys(byValue['decline-offspring']!.descriptionPreview)).toEqual([
       'actions.special-effect.emit-card-triggered.declined.name',
-      'actions.special-effect.set-extra-data.name',
     ])
     expect(byValue['decline-offspring']!.labelKey).toBe('ui.interactionDecline')
   })

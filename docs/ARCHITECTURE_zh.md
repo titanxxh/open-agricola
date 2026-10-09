@@ -336,9 +336,17 @@ type ActionChoiceOption = {
 }
 ```
 
-`effectPreview` 三类（`resourceExchange` / `payment` / `text`）。引擎对 `seq(pay-resources, gain[, bonus-vp])` option 自动聚合 preview；卡牌手写 `payLeaf+gainLeaf` 也能拿到 preview。生产点：`shared/cards/helpers/pay-gain-node.ts`、`shared/actions/effects/pay-helpers.ts`、`shared/actions/effects/exchange.ts`。
+`effectPreview` 包括 `resourceExchange`、`payment`、`text`、`resourceMovement`、`futureSchedule`、`futureOffers`、`actionSpace`、`cardScore` 和 `fieldContents`。共用行动原语提供纯查询 `ActionDefinition.previewEffect`，卡牌不新增展示回调。未来请求与执行共用 `normalizeFutureSchedule`，保留确切目标过滤、前缀、条件、费用及屋型。排队 flow 描述自己的可执行请求，队列清空后不再重复展示。引擎将连续的支付和收益步骤合成一次完整交换，同时保留真实的重复收益。
 
 `descriptionPreview` 是 递归 ActionFlow 描述：leaf 使用 `ActionDefinition.nameKey` + leaf `effectPreview`，组合节点按类型拼接子描述（`SeqNode: ', '` / `XorNode: ' / '` / `OrNode: ' + '` / `ParallelNode: ' | '`）。前端优先渲染 `descriptionPreview`，这样普通 leaf、pay/gain 组合、嵌套 XOR/SEQ 都由引擎自动生成 option 文案。`pay-gain-node` 等通用 helper **不再**为机械 pay/gain 默认塞 `choiceLabelKey: 'ui.interactionResourceExchange'`；选项可见文案以 `descriptionPreview`（及 `effectPreview`）为准。`choiceLabelKey` / `choiceLabelParams` 仅用于**语义覆盖**（例如字段/数量选择、`ui.interactionUseCard`、`ui.interactionSeedResearcher` 等），不要为纯资源交换重复 i18n。`special-effect` 根据 `params.kind` 提供自己的语义描述，避免把内部状态同步暴露成泛化的 “Card Effect”；纯展示同步如 `set-infobox` 不进入描述。
+
+Choice Preview（选项预览）在提交前描述已声明的效果，不承诺未来条件或后续选择必然可以完成。保留能够区分分支含义的显式选项名字；当通用行动名或重复卡名在效果旁没有提供额外信息时，省略这些名字。未来安排只合并资源、数量和已声明条件完全相同的连续回合；交替、非连续或其他内容不同的条目按原有声明顺序逐项显示。
+
+Choice Preview 由通用机制从权威规则数据生成，不要求每张卡维护单独的展示实现。对于农场格选择，后端提供合法目标及其选择绑定，玩家直接在农场版图上点击目标。前端不推断目标合法性，也不解释卡牌特定的选项值。
+
+ADR-0024 记录了共用规则计划的归属决策。不透明的购买结果及未来购买选项可以迁移为可执行的通用原语，让执行与预览读取同一份规则。已声明的确定性状态写入可以在隔离副本上投影，并调用现有的来源卡牌计分查询；显示的是当前来源卡牌的计分贡献变化，而非整个分支的最终总分预测。卡牌田在其显示的作物槽上选择，多个槽保留同一逻辑田身份。一个空间目标对应多个备选行动时，必须明确选择其中一个。
+
+`ActionChoiceOption.target` 携带行动者、适用时的逻辑田身份、已占用位置及明确的卡牌田槽引用。多个绑定共享一个格子时，`targetCard` 保留实体行动卡身份及其声明的行动。前端渲染这些事实并提交原始不透明选项值。
 
 ### 4.8 LogEntry
 

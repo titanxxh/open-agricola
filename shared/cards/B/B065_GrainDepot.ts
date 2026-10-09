@@ -1,5 +1,5 @@
 import { defineMinorCard } from '../card-source'
-import { queueFutureMeeplesFlow } from '../../actions/effects/internal/future-meeples'
+import { paymentPathOnBuy } from '../../actions/purchase-outcome'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B065_GrainDepot'
@@ -7,24 +7,7 @@ const CARD_ID = 'B065_GrainDepot'
 const cardImpl = {
   effect: {
   id: CARD_ID,
-  onBuy: (state, player, paymentInfo) => {
-    const pathIndex = paymentInfo?.originalFeeIndex ?? paymentInfo?.feeIndex
-    if (pathIndex === undefined) return
-
-    // altCosts order: [{ wood: 2 }, { clay: 2 }, { stone: 2 }]
-    // wood → 2 rounds, clay → 3 rounds, stone → 4 rounds
-    const roundsByFee = [2, 3, 4]
-    const rounds = roundsByFee[pathIndex]
-    if (!rounds) return
-
-    return queueFutureMeeplesFlow(state, {
-      cardId: CARD_ID,
-      playerId: player.id,
-      startRound: state.round + 1,
-      count: rounds,
-      resources: { grain: 1 },
-    })
-  },
+  onBuy: paymentPathOnBuy(CARD_ID, [2, 3, 4].map((count) => ({ kind: 'future-prefix', offset: 1, count, resources: { grain: 1 } }))),
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl

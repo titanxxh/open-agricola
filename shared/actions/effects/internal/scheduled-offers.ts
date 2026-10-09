@@ -135,6 +135,8 @@ const moorSpecialActionOptions = (
             ? `offer:${offer.id}:moor:${card.id}:${offer.actionId}:${tile.row}:${tile.col}`
             : `offer:${offer.id}:moor:${card.id}:${offer.actionId}`,
           labelKey: `moor.specialActions.${offer.actionId}`,
+          targetCard: { cardId: card.id, actionNameKeys: card.actions.map((actionId) => `moor.specialActions.${actionId}`) },
+          ...(tile ? { target: { kind: 'farm-cell' as const, playerId: player.id, positions: [{ ...tile }] } } : {}),
         }]
       }),
     )

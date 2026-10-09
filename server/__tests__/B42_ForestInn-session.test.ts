@@ -40,7 +40,7 @@ const descriptionPaysWood = (
 ): boolean => {
   if (!preview) return false
   if (preview.kind === 'action') {
-    return preview.effectPreview?.kind === 'payment' &&
+    return (preview.effectPreview?.kind === 'payment' || preview.effectPreview?.kind === 'resourceExchange') &&
       preview.effectPreview.resourcesPaid?.wood === amount
   }
   return preview.parts.some((part) => descriptionPaysWood(part, amount))
@@ -86,10 +86,7 @@ const choiceByPaidWood = (
     descriptionPaysWood(entry.descriptionPreview, woodPaid))
   expect(option).toBeDefined()
   if (!option) throw new Error(`missing option paying ${woodPaid} wood`)
-  expect(collectDescriptionLabelKeys(option.descriptionPreview)).toEqual([
-    'actions.pay.name',
-    'actions.gain.name',
-  ])
+  expect(collectDescriptionLabelKeys(option.descriptionPreview)).toEqual(['ui.interactionResourceExchange'])
   return option
 }
 
@@ -220,7 +217,7 @@ describe('B042 Forest Inn parity', () => {
   ): boolean => {
     if (!preview) return false
     if (preview.kind === 'action') {
-      return preview.effectPreview?.kind === 'payment'
+      return (preview.effectPreview?.kind === 'payment' || preview.effectPreview?.kind === 'resourceExchange')
         && preview.effectPreview.resourcesPaid?.wood === amount
     }
     return preview.parts.some((part) => descriptionPaysWood(part, amount))

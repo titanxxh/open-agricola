@@ -250,6 +250,14 @@ _Avoid_: 首次展示时的候选快照、未来完整流程保证、前端规�
 前端把服务端 `InteractionState` 映射为具体交互展示面和提交动作的边界。它只消费服务端交互真相，不做规则裁定。
 _Avoid_: 后端规则裁定、Pending Envelope、DOM 状态推断
 
+**Choice Preview（选项预览）**:
+玩家提交选择前看到的效果说明，用来区分不同选择的即时支付、资源变化和未来安排。预览描述当前已声明的效果，不承诺未来条件或后续选择必然可以完成。
+_Avoid_: 已执行结果、未来可执行性保证、前端规则裁定
+
+**Farm Target Choice（农场目标选择）**:
+以当前合法的已有农场格或逻辑田为对象的选择。卡牌田保留自身的逻辑田身份，不被当作普通农场格；一个目标对应多个合法行动时，玩家仍须明确选择其中一个。
+_Avoid_: 前端推断合法格、把卡牌田的每个作物槽算作独立田、默认选择目标上的第一个行动
+
 **Exchange Draft Presentation**:
 Interaction Presentation 的一种本地草稿展示，覆盖 bake-bread、anytime exchange 和 harvest-feed 这类资源交换计数器、上限、汇总和提交 payload 派生。它只管理玩家尚未提交的前端草稿，不改变资源兑换规则。
 _Avoid_: Payment Pipeline、规则执行、真实资源变更

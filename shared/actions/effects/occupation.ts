@@ -1,3 +1,4 @@
+import { cardIdentityChoice } from '../helpers/card-choice'
 import type { ActionChoiceOption, ActionDefinition, ActionExecutionResult, ActionSpace, ComplexCost, GameState, InternalActionChild, InternalActionChildren, PaymentSolution, PlayerState, ProtectedObservation, Resource } from '../../contract/types'
 import type { EventSink } from '../../contract/events'
 import { meetsCardPrerequisites } from '../../cards/helpers/prerequisites'
@@ -307,8 +308,7 @@ const buildPlayableOccupationOptions = (
       actionCardId,
     ).doable)
     .map((occupation) => ({
-      value: occupation.id,
-      labelKey: `occupations.${occupation.id}.name`,
+      ...cardIdentityChoice(occupation.id, 'occupation'),
     }))
 
 const getOccupationChoicePolicy = (

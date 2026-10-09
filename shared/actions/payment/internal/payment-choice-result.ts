@@ -12,6 +12,8 @@
 
 import type {
   ActionExecutionResult,
+  ChoiceDescriptionPreview,
+  CardCostCandidateMetadata,
   CardProvidedPaymentResourceProvider,
   ComplexCost,
   CostModifierType,
@@ -22,6 +24,8 @@ import type {
   Resource,
   ResourceReserve,
 } from '../../../contract/types'
+import type { PurchaseOutcomeRule } from '../../../contract/rule-plans'
+import { describePurchaseOutcome } from '../../purchase-outcome'
 import { isComplexCost } from './affordability'
 import { computeAllBuyableCombinations, sortPaymentSolutions } from './enumerate'
 
@@ -53,6 +57,7 @@ const collectPaymentSolutionSources = (
 }
 
 type PaymentChoiceResultOptions = {
+  purchaseOutcome?: { state: GameState; player: PlayerState; cardId: string; paymentPaths: readonly PurchaseOutcomeRule[]; metadata?: Record<number, CardCostCandidateMetadata> }
   extraSourcesForSolution?: (solution: PaymentSolution) => readonly string[]
   paymentResourceProviders?: readonly CardProvidedPaymentResourceProvider[]
 }
@@ -90,6 +95,21 @@ const describePaymentEffectPreview = (
     cardUsed: includeReturnedCard && solution.cardUsed ? solution.cardUsed : undefined,
     sourceCards: sourceCards.length > 0 ? sourceCards : undefined,
   }
+}
+
+const describePaymentOutcome = (solution: PaymentSolution, includeReturnedCard: boolean, options: PaymentChoiceResultOptions): ChoiceDescriptionPreview | undefined => {
+  const context = options.purchaseOutcome
+  if (!context) return undefined
+  const feeIndex = solution.feeIndex
+  const originalIndex = (feeIndex === undefined ? undefined : context.metadata?.[feeIndex]?.originalFeeIndex) ?? feeIndex
+  const rule = originalIndex === undefined ? undefined : context.paymentPaths[originalIndex]
+  if (!rule) return undefined
+  const outcome = describePurchaseOutcome(context.state, context.player, context.cardId, rule)
+  if (!outcome) return undefined
+  return { kind: 'group', separator: ' → ', parts: [
+    { kind: 'action', labelKey: 'actions.pay.name', showLabel: false, effectPreview: describePaymentEffectPreview(solution, includeReturnedCard, options) },
+    outcome,
+  ] }
 }
 
 export const preservesResourceReserve = (
@@ -142,6 +162,7 @@ export const buildPaymentChoiceResult = (
       choiceOptions,
     ) as unknown as Record<string, string | number>,
     effectPreview: describePaymentEffectPreview(solution, includeReturnedCard, choiceOptions),
+    descriptionPreview: describePaymentOutcome(solution, includeReturnedCard, choiceOptions),
   }))
   return {
     type: 'request',

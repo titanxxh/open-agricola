@@ -25,7 +25,6 @@ const anytimeListener: CardListenerRegistration = {
           payLeaf({
             cardId: CARD_ID,
             cost: { [from]: 1 },
-            effectPreview: { kind: 'resourceExchange', resourcesPaid: { [from]: 1 }, resourcesGained: { [to]: 1 } },
           }),
           setUsageCounterLeaf(CARD_ID, usage - 1),
           gainLeaf(CARD_ID, { [to]: 1 }),

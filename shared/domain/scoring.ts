@@ -723,6 +723,13 @@ export const computeScores = (state: GameState): PlayerScoreSummary[] => {
   return summaries
 }
 
+/** Query one source card's present contribution, including shared scoring adjustments. */
+export const computeSourceCardContribution = (state: GameState, playerId: string, cardId: string): number =>
+  computeScores(state).find((score) => score.playerId === playerId)?.categories
+    .flatMap((category) => category.entries)
+    .filter((entry) => 'cardId' in entry && entry.cardId === cardId)
+    .reduce((sum, entry) => sum + entry.score, 0) ?? 0
+
 // ---------------------------------------------------------------------------
 // Scoring namespace — domain facade over scoring queries.
 // ---------------------------------------------------------------------------

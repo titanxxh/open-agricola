@@ -46,7 +46,8 @@ import {
   enforceCompositeContinuationMandatory,
   findActionNode,
   getNodeDescriptionPreview,
-  getNodeEffectPreview,
+  getNodeFarmTarget,
+  firstDescriptionEffect,
   maybeBuildChoiceCandidates,
   normalizeFollowUpAction,
   pendingEnvelopeFromHostNode,
@@ -560,14 +561,16 @@ const buildOptionalPrompt = (
     labelKey: actionNode.choiceLabelKey ?? action.nameKey,
     labelParams: actionNode.choiceLabelParams,
   }
+  const optionalDescription = getNodeDescriptionPreview(node, int.registry, executionContext)
   const optionalOptions: ActionChoiceOption[] = [
     {
       value: actionNode.id,
       labelKey: label.labelKey,
       labelParams: label.labelParams,
       sourceCard: actionNode.sourceCard,
-      effectPreview: getNodeEffectPreview(node),
-      descriptionPreview: getNodeDescriptionPreview(node, int.registry),
+      effectPreview: firstDescriptionEffect(optionalDescription),
+      descriptionPreview: optionalDescription,
+      target: getNodeFarmTarget(node, executionContext),
     },
     { value: '__skip__', labelKey: 'ui.interactionOptionalSkip' },
   ]
@@ -973,13 +976,15 @@ export function engineProceed(
           int.hooks,
           (flow, sc) => applyDefaultSourceCardToFlow(flow, sc),
         )
+        const descriptionPreview = getNodeDescriptionPreview(entry.node, int.registry, executionContext)
         return {
           value: entry.nodeId,
           labelKey: label.labelKey,
           labelParams: label.labelParams,
           sourceCard: label.sourceCard ?? getNodeSourceCard(entry.node),
-          effectPreview: getNodeEffectPreview(entry.node),
-          descriptionPreview: getNodeDescriptionPreview(entry.node, int.registry),
+          effectPreview: firstDescriptionEffect(descriptionPreview),
+          descriptionPreview,
+          target: getNodeFarmTarget(entry.node, executionContext),
         }
       })
       .filter((option) => option !== null) as ActionChoiceOption[]

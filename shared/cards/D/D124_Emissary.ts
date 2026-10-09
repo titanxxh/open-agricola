@@ -25,7 +25,6 @@ const anytimeListener: CardListenerRegistration = {
           payLeaf({
             cardId: CARD_ID,
             cost: { [good]: 1 },
-            effectPreview: { kind: 'resourceExchange', resourcesPaid: { [good]: 1 }, resourcesGained: { stone: 1 } },
           }),
           gainLeaf(CARD_ID, { stone: 1 }),
           { type: 'leaf', actionId: 'push-to-card-stack', sourceCard: CARD_ID, params: { item: good } },

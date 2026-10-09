@@ -4,6 +4,7 @@ import type {
   ActionSpace,
   CardResourceStats,
   CropStack,
+  ChoiceFarmTarget,
   FarmTilePosition,
   FutureMeepleResourceMap,
   GameState,
@@ -161,6 +162,7 @@ export type FarmBoardProjectionInput = {
   pendingStableTiles?: readonly FarmTilePosition[]
   pendingFarmHand?: FarmTilePosition | null
   extraPositionSelectableSet?: ReadonlySet<string>
+  farmChoiceTargets?: readonly ChoiceFarmTarget[]
 }
 
 type DisplayPlayerWithSpecialStables = PlayerState & {
@@ -222,15 +224,17 @@ const buildParentCardDisplays = (
 const buildPlayedCardDisplays = (
   displayPlayer: PlayerState | null | undefined,
   selectionInteraction: InteractionSelection | null | undefined,
+  farmChoiceTargets: readonly ChoiceFarmTarget[],
 ): FarmBoardProjectionPlayedCardDisplay[] => {
   if (!displayPlayer) return []
   return getPlayedCardKeys(displayPlayer).map((cardId) => {
     const { rawId, cardType } = splitPlayedCardKey(cardId)
     const facts = cardPresentation(displayPlayer)[rawId]
     const cardStacks = facts?.cropLayers?.map((layer) => layer.stack) ?? null
-    const cardSelectionTargets = selectionInteraction?.kind === 'farm-position'
-      ? selectionInteraction.selectablePositions.filter((position) => position.sourceCard === rawId)
-      : []
+    const cardSelectionTargets = [
+      ...(selectionInteraction?.kind === 'farm-position' ? selectionInteraction.selectablePositions : []),
+      ...farmChoiceTargets.filter((target) => target.playerId === displayPlayer.id).flatMap((target) => target.positions),
+    ].filter((position) => position.sourceCard === rawId)
     return {
       cardId,
       rawId,
@@ -606,6 +610,7 @@ export const buildFarmBoardProjection = ({
   pendingStableTiles = [],
   pendingFarmHand = null,
   extraPositionSelectableSet,
+  farmChoiceTargets = [],
 }: FarmBoardProjectionInput): FarmBoardProjection => {
   const roomPositions = new Set(
     (displayPlayer?.roomTiles ?? []).map((pos: FarmTilePosition) => positionKey(pos)),
@@ -642,6 +647,7 @@ export const buildFarmBoardProjection = ({
       ? selectionInteraction.selectablePositions.map((tile) => positionKey(tile))
       : []),
     ...(extraPositionSelectableSet ?? []),
+    ...farmChoiceTargets.filter((target) => target.playerId === displayPlayer?.id).flatMap((target) => target.positions.map(positionKey)),
   ])
   const { sowSelectableMap, extraSowTargets } = buildSowSelectionDisplay(farmInteraction)
   const existingFenceSet = new Set((displayPlayer?.fenceSegments ?? []).map((segment) => segment.edge))
@@ -671,7 +677,7 @@ export const buildFarmBoardProjection = ({
     players[interaction.playerIndex]?.id === displayPlayer?.id
       ? selectionInteraction
       : null
-  const playedCardDisplays = buildPlayedCardDisplays(displayPlayer, activeSelection)
+  const playedCardDisplays = buildPlayedCardDisplays(displayPlayer, activeSelection, farmChoiceTargets)
   if (!displayPlayer) {
     return {
       farmCells: [],

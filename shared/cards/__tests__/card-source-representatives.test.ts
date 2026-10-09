@@ -134,7 +134,7 @@ describe('Card Source representative migrations', () => {
     const player = state.players[0]!
     const flow = runCardEffectHook(state, player, 'Major_Well', 'onBuy')
 
-    expect(flow).toEqual({ type: 'leaf', actionId: 'future-meeples' })
+    expect(flow).toMatchObject({ type: 'leaf', actionId: 'future-meeples', params: { __queuedFutureMeepleRequest: { cardId: 'Major_Well' } } })
     expect(state.pendingFutureMeeples).toEqual([
       {
         cardId: 'Major_Well',

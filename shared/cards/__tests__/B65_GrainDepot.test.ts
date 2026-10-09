@@ -152,6 +152,14 @@ describe('B65 Grain Depot', () => {
     )
     expect(freePayment).toBeDefined()
 
+    expect(freePayment!.descriptionPreview).toMatchObject({
+      kind: 'group',
+      parts: [
+        { effectPreview: { kind: 'payment' } },
+        { effectPreview: { kind: 'futureSchedule', entries: [{ round: 2, endRound: 4, resources: { grain: 1 } }] } },
+      ],
+    })
+
     resp = session.resolveChoice(0, freePayment!.value)
 
     const futureGrain = resp.state.futureMeeples.filter((entry) => entry.cardId === CARD_ID)

@@ -59,15 +59,11 @@ const cardImpl = {
         .filter((field) => field.stacks.reduce((sum, stack) => sum + stack.remaining, 0) >= 2)
       if (harvestable.length === 0) return
       const children: ActionFlow[] = harvestable.map((field) => {
-        const top = field.stacks.at(-1)
-        const total = field.stacks.reduce((sum, stack) => sum + stack.remaining, 0)
         return {
           type: 'leaf' as const,
           actionId: HARVEST_ACTION_ID,
           params: { fieldId: field.id },
           sourceCard: CARD_ID,
-          choiceLabelKey: 'ui.interactionScytheField',
-          choiceLabelParams: { crop: top?.kind ?? null, amount: total },
         }
       })
       return { type: 'xor', optional: true, children }
