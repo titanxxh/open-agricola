@@ -97,10 +97,10 @@ describe('Collect action card listeners integration', () => {
     setActiveCardRegistry(new CardRegistry())
   })
 
-  it('E053_BoarSpear: registers during listener for collect action', () => {
+  it('E053_BoarSpear: registers after listener for collect action', () => {
     const boarSpearListener = {
-      id: 'E53-boar-spear-during',
-      phases: ['during' as const],
+      id: 'E53-boar-spear-after',
+      phases: ['after' as const],
       actions: ['collect'],
       handler: (context: CardListenerContext) => {
         const obtainedBoar = context.result?.resourcesGained?.boar ?? 0
@@ -213,8 +213,8 @@ describe('Collect action card listeners integration', () => {
 
   it('card listener does not trigger for non-collect actions', () => {
     const boarSpearListener = {
-      id: 'E53-boar-spear-during',
-      phases: ['during' as const],
+      id: 'E53-boar-spear-after',
+      phases: ['after' as const],
       actions: ['collect'],
       handler: () => ({
         flow: {

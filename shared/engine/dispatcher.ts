@@ -197,16 +197,6 @@ export class HookDispatcher {
     }
   }
 
-  during(
-    context: ActionExecutionContext & { actionId: string },
-    result: ActionExecutionResult,
-  ): EffectPhaseResult {
-    return {
-      actionHookResults: runActionHooks({ ...context, phase: 'during', result }),
-      matchedListeners: getMatchingListeners({ ...context, phase: 'during', result }),
-    }
-  }
-
   immediatelyAfter(
     context: ActionExecutionContext & { actionId: string; choice?: string },
     result: ActionExecutionResult,

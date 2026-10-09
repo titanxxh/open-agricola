@@ -115,7 +115,7 @@ const CARD_SOURCE_FACTORIES = new Set([
   'definePlayerActionCard',
 ])
 
-const TRAILING_PHASES = new Set(['during', 'immediatelyAfter', 'after'])
+const TRAILING_PHASES = new Set(['immediatelyAfter', 'after'])
 
 function cardSourceDeclarationCall(node: ts.Node, cardId: string): ts.CallExpression | null {
   if (!ts.isVariableDeclaration(node) || !ts.isIdentifier(node.name) || node.name.text !== cardId) return null

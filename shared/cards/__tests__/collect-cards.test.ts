@@ -85,14 +85,14 @@ describe('Collect action card listeners', () => {
       player: { ...defaultPlayer, ...overrides.player } as PlayerState,
       space: { ...defaultSpace, ...overrides.space } as ActionSpace,
       actionId: overrides.actionId ?? 'collect',
-      phase: overrides.phase ?? 'during',
+      phase: overrides.phase ?? 'after',
       result: overrides.result,
     }
   }
 
   const boarSpearDuringListener: Record<string, unknown> = {
-    id: 'E53-boar-spear-during',
-    phases: ['during' as ActionHookPhase],
+    id: 'E53-boar-spear-after',
+    phases: ['after' as ActionHookPhase],
     handler: (context: CardListenerContext): ActionHookResult | void => {
       const { actionId, result } = context
       
@@ -171,20 +171,20 @@ describe('Collect action card listeners', () => {
       requireActiveCardRegistry('collect-cards').registerListener(boarSpearDuringListener)
     })
 
-    it('registers during listener', () => {
+    it('registers after listener', () => {
       const listeners = getRegisteredCardListeners()
       const boarSpearListeners = listeners.filter(l => l.id.startsWith('E53'))
       expect(boarSpearListeners.length).toBe(1)
-      expect(boarSpearListeners[0].phases?.includes('during')).toBe(true)
+      expect(boarSpearListeners[0].phases?.includes('after')).toBe(true)
     })
 
     it('allows exchange when boar is obtained during collect', () => {
       const listeners = getRegisteredCardListeners()
-      const listener = listeners.find(l => l.id === 'E53-boar-spear-during')
+      const listener = listeners.find(l => l.id === 'E53-boar-spear-after')
       
       const context = createMockContext({
         actionId: 'collect',
-        phase: 'during',
+        phase: 'after',
         result: { resourcesGained: { boar: 1 } },
       })
 
@@ -197,11 +197,11 @@ describe('Collect action card listeners', () => {
 
     it('does not trigger when no boar obtained', () => {
       const listeners = getRegisteredCardListeners()
-      const listener = listeners.find(l => l.id === 'E53-boar-spear-during')
+      const listener = listeners.find(l => l.id === 'E53-boar-spear-after')
       
       const context = createMockContext({
         actionId: 'collect',
-        phase: 'during',
+        phase: 'after',
         result: { resourcesGained: { wood: 3 } },
       })
 
@@ -211,11 +211,11 @@ describe('Collect action card listeners', () => {
 
     it('does not trigger for non-collect actions', () => {
       const listeners = getRegisteredCardListeners()
-      const listener = listeners.find(l => l.id === 'E53-boar-spear-during')
+      const listener = listeners.find(l => l.id === 'E53-boar-spear-after')
       
       const context = createMockContext({
         actionId: 'gain',
-        phase: 'during',
+        phase: 'after',
         result: { resourcesGained: { boar: 1 } },
       })
 

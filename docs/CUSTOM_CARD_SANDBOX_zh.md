@@ -216,7 +216,7 @@ const jsonSafe = JSON.parse(JSON.stringify(value ?? null))
 
 `onBeforePlayerTurn` 是 non-flow skip-control exception：签名是 `(state, player) => { skipTurn?: boolean } | void`，只用于 labor turn 入口同步跳过该玩家本次放工人机会；不能返回 `ActionFlow`，不能创建 pending。
 
-reaction-compatible hook（action listener 的 `before` / `during` / `immediatelyAfter` / `after`、harvest field 三个 stage hook、`onBeforeEndGame`、`contributeExtraTurn`）不能依赖卡牌扫描顺序。多个同一时机可触发项会进入 `trigger-select`，由玩家选择来源卡后再执行。自定义卡应返回可重放 `ActionFlow` 表达状态修改；不要假设 handler 调用本身就是最终结算。
+reaction-compatible hook（action listener 的 `before` / `immediatelyAfter` / `after`、harvest field 三个 stage hook、`onBeforeEndGame`、`contributeExtraTurn`）不能依赖卡牌扫描顺序。多个同一时机可触发项会进入 `trigger-select`，由玩家选择来源卡后再执行。自定义卡应返回可重放 `ActionFlow` 表达状态修改；不要假设 handler 调用本身就是最终结算。
 
 `contributeExtraTurn` 返回的是本卡 extra-turn provider 的 flow；多张卡同时返回 provider 时，系统先展示 provider 来源卡，选中后才展开该 flow。`countExtraTurns` 是官方卡内部字段，Workshop 不暴露。
 
@@ -274,13 +274,12 @@ reaction-compatible hook（action listener 的 `before` / `during` / `immediatel
 - `reap`
 <!-- prompt-sync:end id=listener-actions -->
 
-`sandboxListenerPhases` 是 Workshop listener phase 白名单。挂载 listener 前会过滤不在白名单里的项；AST validator 会**硬拒**不在白名单中的 phase——保存直接失败并给出错误信息。
+`sandboxListenerPhases` 是 Workshop listener phase 白名单。AST validator 拒绝新源码中不支持的阶段；已保存的可执行 manifest 在 Session 或 runtime 注册前检查。不支持的阶段会在任何卡牌 effect 或 listener 安装前拒绝执行。`during` 不再支持，也不会映射为 `after`；草稿和历史版本仍可读取、编辑。
 
 
 
 <!-- prompt-sync:begin id=action-hook-phases -->
 - `before`
-- `during`
 - `immediatelyAfter`
 - `after`
 - `computeCosts`

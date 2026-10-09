@@ -34,7 +34,6 @@ import type { EngineInternals } from './engine-internals'
 import {
   applyDefaultSourceCardToFlow,
   applyInteractionRequest,
-  buildActivationActionNodes,
   buildPhaseTrailingNodes,
   buildFollowUpNodes,
   buildListenerEvent,
@@ -779,10 +778,6 @@ const executeDeferredHostAction = (
   const triggerSnapshot =
     node.deferredHostTriggerSnapshot ?? createTriggerSnapshot(context.state)
   node.deferredHostTriggerSnapshot = triggerSnapshot
-  const duringPhase = int.hooks.during(
-    { ...executionContext, ...eventReadContext, actionId: node.actionId },
-    result,
-  )
   const immediatePhase = int.hooks.immediatelyAfter(
     { ...executionContext, ...eventReadContext, actionId: node.actionId },
     result,
@@ -816,15 +811,6 @@ const executeDeferredHostAction = (
   })
   const trailingTransactionEvents = result.type === 'flow' ? undefined : eventReadContext.transactionEvents
   const trailingActionEvents = result.type === 'flow' ? undefined : eventReadContext.actionEvents
-  const duringActivateNodes = buildActivationActionNodes(
-    int,
-    duringPhase.matchedListeners, 'during', node.actionId,
-    {},
-    executionContext.player.id,
-    eventReadContext.transactionEvents,
-    eventReadContext.actionEvents,
-    triggerSnapshot,
-  )
   const immediateActivateNodes = buildPhaseTrailingNodes(
     int,
     immediatePhase.matchedListeners,
@@ -864,7 +850,6 @@ const executeDeferredHostAction = (
     ...afterHostNodes,
   ]
   const leadingNodes = [
-    ...duringActivateNodes,
     ...hookFlows,
   ]
   if (node.continuationParentHostNodeId) {
@@ -1296,10 +1281,6 @@ export function engineProceed(
     const triggerSnapshot = result.type === 'ok'
       ? createTriggerSnapshot(context.state)
       : undefined
-    const duringPhase = int.hooks.during(
-      { ...executionContext, ...eventReadContext, actionId: replacedActionId },
-      result,
-    )
     if (result.type === 'request') {
       // Mirror the resolveChoice second-pass: ActionDef-declared
       // actionContext patches in result.extraData.actionContextWrite are
@@ -1433,14 +1414,6 @@ export function engineProceed(
         },
       }
     }
-    const duringActivateNodes = buildActivationActionNodes(int,
-      duringPhase.matchedListeners, 'during', replacedActionId,
-      {},
-      executionContext.player.id,
-      eventReadContext.transactionEvents,
-      eventReadContext.actionEvents,
-      triggerSnapshot,
-    )
     const immediatePhase = int.hooks.immediatelyAfter(
       { ...executionContext, ...eventReadContext, actionId: replacedActionId },
       result,
@@ -1518,7 +1491,6 @@ export function engineProceed(
       ...afterHostNodes,
     ]
     const leadingNodes = [
-      ...duringActivateNodes,
       ...hookFlows,
     ]
     if (node.continuationParentHostNodeId) {

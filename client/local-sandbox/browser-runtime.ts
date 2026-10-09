@@ -11,11 +11,13 @@ import type { GameState, PlayerState } from '../../shared/contract/types.ts'
 import { requireActiveCardRegistry } from '../../shared/cards/active-registry.ts'
 import { getCurrentSessionContext, type CustomCardData } from '../../shared/cards/session-card-context.ts'
 import { setCardListenerSource } from '../../shared/cards/card-listener-source.ts'
+import { assertSandboxListenerPhases } from '../../shared/custom-code/sandbox-listener-phases.ts'
 import { invokeCustomCodeEffectLocal, invokeCustomCodeListenerLocal } from './browser-executor.ts'
 
 export const registerBrowserBackedCustomCard = (cardData: CustomCardData): void => {
   const { cardJson, compiledCode, codeManifest } = cardData
   if (!compiledCode || !codeManifest) return
+  assertSandboxListenerPhases(cardJson.id, codeManifest)
 
   const cardId = cardJson.id
   const sessionCtx = getCurrentSessionContext()

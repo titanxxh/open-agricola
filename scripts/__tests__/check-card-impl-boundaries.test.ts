@@ -93,7 +93,7 @@ describe('check-card-impl-boundaries', () => {
     })
   })
 
-  it.each(['during', 'immediatelyAfter', 'after'])(
+  it.each(['immediatelyAfter', 'after'])(
     'reports live played-card counts in %s listeners',
     (phase) => {
       const root = mkdtempSync(path.join(tmpdir(), 'card-impl-boundaries-'))

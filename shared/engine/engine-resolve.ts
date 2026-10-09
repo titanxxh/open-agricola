@@ -690,7 +690,6 @@ export function engineResolveChoice(
         int.tree.insertAfter(insertAnchor, [...beforeHostNodes, deferredHostNode])
         return { type: 'ok' }
       }
-      int.hooks.during({ ...executionContext, ...currentEventReadContext(int, completedEvents), actionId }, result)
       if (result.type === 'request' && (result.request.kind === 'choice' || result.request.kind === 'farm-select')) {
         // S2 Task 6: also accept farm-select kind emitted from an Or/Xor
         // child leaf. The computeArgs merging path only applies to 'choice'
@@ -1069,7 +1068,6 @@ export function engineResolveChoice(
     int.tree.insertAfter(insertAnchor, [...beforeHostNodes, deferredHostNode])
     return result
   }
-  int.hooks.during({ ...executionContext, ...pendingEventReadContext(completedEvents), actionId: committedActionId }, result)
   if (
     result.type === 'fail' &&
     result.recoverable === true &&

@@ -274,45 +274,6 @@ export function canStartNode(int: EngineInternals, context: FlowDoableContext, n
   return children.length === 0 || children[0]!.optional === true || canStartNode(int, { ...context, player }, children[0]!)
 }
 
-export function buildActivationActionNodes(
-  int: EngineInternals,
-  matched: MatchedCardListener[],
-  phase: ActionHookPhase,
-  actionId: string,
-  event: Record<string, unknown> = {},
-  triggerPlayerId?: string,
-  transactionEvents?: readonly GameEvent[],
-  actionEvents?: readonly GameEvent[],
-  triggerSnapshot?: TriggerSnapshot,
-): EngineNode[] {
-  return matched.map((entry, index) => {
-    const nodeId = `activate-${phase}-${actionId}-${index}-${int.counterRef.value++}`
-    const params: ActivateCardActionParams = {
-      listenerId: entry.registration.id,
-      cardId: entry.cardId,
-      phase,
-      actionId,
-        event,
-        ownerPlayerId: entry.ownerPlayerId,
-        ownerCardZone: entry.ownerCardZone,
-        triggerPlayerId,
-      mandatory: entry.registration.mandatory === true,
-      countCardUse: typeof event.countCardUse === 'boolean' ? event.countCardUse : undefined,
-      transactionEvents: transactionEvents ? [...transactionEvents] : undefined,
-      actionEvents: actionEvents ? [...actionEvents] : undefined,
-      triggerSnapshot,
-    }
-    const node = new ActionNode(
-      nodeId,
-      ACTIVATE_CARD_ACTION_ID,
-      entry.cardId,
-      params,
-    )
-    if (entry.ownerPlayerId) node.ownerPlayerId = entry.ownerPlayerId
-    return node
-  })
-}
-
 export function buildPhaseTrailingNodes(
   int: EngineInternals,
   matchedListeners: MatchedCardListener[],
@@ -1025,7 +986,7 @@ export function buildListenerEvent(
  *   - a `choice` result with the merged & affordability-filtered options when
  *     two or more options remain (caller hands it to the regular choice flow).
  * Mutates `executionContext.params.selectedOption` for the auto-resolve case so
- * downstream `during/after` hooks can read which option was picked.
+ * downstream `immediatelyAfter/after` hooks can read which option was picked.
  */
 export function maybeBuildChoiceCandidates(
   int: EngineInternals,

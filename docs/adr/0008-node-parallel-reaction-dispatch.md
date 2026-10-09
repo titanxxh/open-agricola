@@ -2,6 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-07-02
+- Amended: 2026-10-09
 
 ## Context
 
@@ -18,7 +19,9 @@ OA 之前的 action listener 已有 `ParallelNode(mode='trigger-select')`，但�
 
 ## Decision
 
-1. Action reaction listener 的 `before` / `during` / `immediatelyAfter` / `after` 同一 trigger player / phase 下默认进入 `ParallelNode(mode='trigger-select')`。单 child 直接展开；compute / query hook 继续确定性聚合。
+Issue [#1063](https://github.com/titanxxh/open-agricola/issues/1063) retires `during` rather than repairing it. It ran after execution, had no reliable event/choice or pending semantics, and its only two native consumers express ordinary completed-action rewards through `after`. Successful-host trailing reactions are `immediatelyAfter` and `after`; they retain the existing commit snapshot, payment, continuation, and owner-controlled ordering boundaries. Workshop source validation and executable-manifest registration reject unsupported phases before execution, without translating `during` to `after` or rewriting saved source. A read-only production inventory on 2026-10-09 found no retained Workshop executable using `during`, so no data migration is required. Reading an author's saved draft or version remains available for editing.
+
+1. Action reaction listener 的 `before` / `immediatelyAfter` / `after` 同一 trigger player / phase 下默认进入 `ParallelNode(mode='trigger-select')`。单 child 直接展开；compute / query hook 继续确定性聚合。
 2. Harvest field 三个 stage hook 与 before-end card-effect step 使用同一个 `activate-card-effect` child。每个 target step 收集 activation 后进入 trigger-select，不再手写自动 / 交互分流。
 3. `trigger-select` preview 支持三类 child：
    - `activate-card`
