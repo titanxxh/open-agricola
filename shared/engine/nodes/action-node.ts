@@ -21,6 +21,8 @@ export class ActionNode extends BaseNode {
   public resolvedReplacement?: { actionId: string; sourceCard?: string }
   public beforePhaseResolved = false
   public bodyStarted = false
+  /** Explicit OR/XOR selection retained through before/owner deferral. */
+  public selectedBranchChoice?: string
   public continuationParentHostNodeId?: string
   public internalHostNodeId?: string
   public internalResultKey?: string
@@ -115,6 +117,7 @@ export class ActionNode extends BaseNode {
       resolvedReplacement: this.resolvedReplacement,
       beforePhaseResolved: this.beforePhaseResolved,
       bodyStarted: this.bodyStarted,
+      selectedBranchChoice: this.selectedBranchChoice,
       continuationParentHostNodeId: this.continuationParentHostNodeId,
       emittedRequest: this.emittedRequest,
       internalHostNodeId: this.internalHostNodeId,

@@ -933,7 +933,7 @@ onBeforeStartOfTurn 属于新一轮准备，并非每次个人轮转。查询会
 
 | Phase | 消费字段（另可有 sourceCard） | 适用范围 |
 |---|---|---|
-| before / during / immediatelyAfter / after | flow、followUpActions、countCardUse、doable | 普通反应激活；doable 为预览信号。during 在执行后追加反应，包含 XOR 与真实付款选择完成，不改已执行参数 |
+| before / during / immediatelyAfter / after | flow、followUpActions、countCardUse、doable | 普通反应激活；doable 为预览信号。during 在执行后追加反应，包含 XOR 与真实付款选择完成，不改已执行参数。普通、OR/XOR、pending 和延迟宿主路径的完成反应共用 result、choice、来源、params、actionContext、trueAction；多个反应按 owner 分组并走 trigger-select。所有原生请求在提交前保持 pending，request/fail 不触发已完成卡牌反应 |
 | before / place-farmer 专用 collector | 仅 flow | 未显式 target 时继承匹配卡主；跨玩家交给正常 session driver / 切人。这条路径没有独立 mandatory / count / follow-up 激活 |
 | 逐作物 immediatelyAfter / reap collector | 仅 flow | crop/amount 事件；普通引擎完成 reap 仍消费普通反应字段 |
 | computeCosts | costs、costAttribution、trades、bonuses、paymentResourceProviders | 纯查询，须由原生定价消费者落到账单；整数量差必须有匹配本卡归因 |
@@ -943,6 +943,8 @@ onBeforeStartOfTurn 属于新一轮准备，并非每次个人轮转。查询会
 | isDoable | doable；仅职业候选可 reserveResources | false veto 优先于 true，不绕过正式结算 |
 | anytime | flow、labelKey、labelParams | 身份 anytime，卡主必须是当前玩家；scope:opponent 不提供对手能力 |
 | computeExchanges | extraExchanges | 身份 compute-exchanges，配方由正式兑换/付款结算 |
+
+完成反应的 transactionEvents 包含捕获的事务前缀；actionEvents 只包含宿主自身帧和必要后续行动，排除前面的兄弟行动与无关历史。预览与实际激活用同一组事件重建 eventQuery。普通完成反应使用已捕获帧，不随前一反应新增的事件漂移。返回 flow 时 during 在正文之前执行；延迟的 immediatelyAfter / after 保留宿主前缀并追加正文事件，跨付款/选择等待、事务刷新、pending 再次发出和 cursor 恢复仍成立。延迟购卡宿主换续跑节点时也保留付款、购卡提交和 onBuy 事件。显式 OR/XOR 分支选择在 before 反应和切换 owner 后保留；自动执行的叶不一定有交互 choice。
 
 mandatory 只用于普通反应激活；preScoring / replacesTurn / blockedAnytimeInteractionKinds 必须用于 anytime 发现。省略过滤仍绑定明确集合和本卡。31 个身份包括两个纯查询身份、普通引擎行动及仅可监听的原生 collect / receive / place-farmer / wish-children；某身份支持某 phase 不代表任意组合都适用。部署描述明确这些差异，不承诺通用参数修改。
 

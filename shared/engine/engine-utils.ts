@@ -45,6 +45,7 @@ import {
 import { applyComputeCostResults } from './compute-cost-results'
 import { pendingEnvelopeChoices } from './pending-validation'
 import { findPlayerById, findPlayerIndexById } from '../domain/player'
+import { createEventQuery, type QueryableGameEvent } from '../events/query'
 import { assertDistinctChoiceOptionValues } from '../contract/choice-options'
 import {
   INJECTED_ANYTIME_ACTION_CONTEXT_KEY,
@@ -275,43 +276,64 @@ export function canStartNode(int: EngineInternals, context: FlowDoableContext, n
   return children.length === 0 || children[0]!.optional === true || canStartNode(int, { ...context, player }, children[0]!)
 }
 
-export function buildActivationActionNodes(
-  int: EngineInternals,
-  matched: MatchedCardListener[],
-  phase: ActionHookPhase,
-  actionId: string,
-  event: Record<string, unknown> = {},
-  triggerPlayerId?: string,
-  transactionEvents?: readonly GameEvent[],
-  actionEvents?: readonly GameEvent[],
-  triggerSnapshot?: TriggerSnapshot,
-): EngineNode[] {
-  return matched.map((entry, index) => {
-    const nodeId = `activate-${phase}-${actionId}-${index}-${int.counterRef.value++}`
-    const params: ActivateCardActionParams = {
-      listenerId: entry.registration.id,
-      cardId: entry.cardId,
-      phase,
-      actionId,
-        event,
-        ownerPlayerId: entry.ownerPlayerId,
-        ownerCardZone: entry.ownerCardZone,
-        triggerPlayerId,
-      mandatory: entry.registration.mandatory === true,
-      countCardUse: typeof event.countCardUse === 'boolean' ? event.countCardUse : undefined,
-      transactionEvents: transactionEvents ? [...transactionEvents] : undefined,
-      actionEvents: actionEvents ? [...actionEvents] : undefined,
-      triggerSnapshot,
-    }
-    const node = new ActionNode(
-      nodeId,
-      ACTIVATE_CARD_ACTION_ID,
-      entry.cardId,
-      params,
-    )
-    if (entry.ownerPlayerId) node.ownerPlayerId = entry.ownerPlayerId
-    return node
-  })
+/** Join captured and live continuation frames by authoritative event identity. */
+export function mergeContinuationEvents<T extends QueryableGameEvent>(...frames: Array<readonly T[]>): T[] {
+  const seen = new Set<string>()
+  return frames.flatMap(frame => frame.filter(event => {
+    // Uncommitted preview drafts have no authoritative identity yet.
+    if (!('id' in event) || typeof event.id !== 'string') return true
+    if (seen.has(event.id)) return false
+    seen.add(event.id)
+    return true
+  }))
+}
+
+/** Keep pending/ancestor scopes when a transaction is flushed or re-emitted. */
+export function preserveContinuationEventScopes(int: EngineInternals, committed: readonly GameEvent[]): void {
+  const nodes = int.tree.allNodes()
+  // A returned flow's trailing reactions span command boundaries. Preserve
+  // only their scoped prefix before the event store starts a new transaction.
+  for (const node of nodes) {
+    if (!isActivateCardActionNode(node) || node.getState() === 'resolved' ||
+      node.params.transactionEvents !== undefined ||
+      typeof node.params.actionEventStartIndex !== 'number') continue
+    node.params.preservedTransactionEvents = mergeContinuationEvents(
+      node.params.preservedTransactionEvents ?? [], committed,
+    ).map(event => JSON.parse(JSON.stringify(event)) as GameEvent)
+    node.params.preservedActionEvents = mergeContinuationEvents(
+      node.params.preservedActionEvents ?? [], committed.slice(node.params.actionEventStartIndex),
+    ).map(event => JSON.parse(JSON.stringify(event)) as GameEvent)
+    node.params.actionEventStartIndex = 0
+  }
+  const pendingHost = nodes.find(node => node.getPending() !== null)
+  for (const node of nodes) {
+    if (!(node instanceof ActionNode) || node.getState() === 'resolved' ||
+      (node !== pendingHost && node.deferredHostTransactionEvents === undefined)) continue
+    const capturedIds = new Set((node.deferredHostTransactionEvents ?? []).map(event => event.id))
+    node.deferredHostActionEvents = mergeContinuationEvents(
+      node.deferredHostActionEvents ?? [], committed.filter(event => !capturedIds.has(event.id)),
+    ).map(event => JSON.parse(JSON.stringify(event)) as GameEvent)
+    node.deferredHostTransactionEvents = mergeContinuationEvents(
+      node.deferredHostTransactionEvents ?? [], committed,
+    ).map(event => JSON.parse(JSON.stringify(event)) as GameEvent)
+  }
+}
+
+/** Preview and execution read the same captured event scope. Flow reactions
+ * without a snapshot use live events from their recorded action start. */
+export function activationEventReadContext(
+  params: ActivateCardActionParams,
+  liveEvents: readonly QueryableGameEvent[],
+) {
+  const transactionEvents = params.transactionEvents !== undefined
+    ? [...params.transactionEvents]
+    : mergeContinuationEvents(params.preservedTransactionEvents ?? [], liveEvents)
+  const actionEvents = params.transactionEvents !== undefined
+    ? params.actionEvents
+    : typeof params.actionEventStartIndex === 'number'
+      ? mergeContinuationEvents(params.preservedActionEvents ?? [], liveEvents.slice(params.actionEventStartIndex))
+      : params.actionEvents
+  return { transactionEvents, actionEvents: actionEvents ? [...actionEvents] : undefined, eventQuery: createEventQuery(transactionEvents) }
 }
 
 export function buildPhaseTrailingNodes(
@@ -326,6 +348,7 @@ export function buildPhaseTrailingNodes(
   actionEvents?: readonly GameEvent[],
   actionEventStartIndex?: number,
   triggerSnapshot?: TriggerSnapshot,
+  preservedEvents?: {transactionEvents: readonly GameEvent[]; actionEvents?: readonly GameEvent[]},
 ): EngineNode[] {
   if (matchedListeners.length === 0) return []
 
@@ -376,6 +399,8 @@ export function buildPhaseTrailingNodes(
       transactionEvents: transactionEvents ? [...transactionEvents] : undefined,
       actionEvents: actionEvents ? [...actionEvents] : undefined,
       actionEventStartIndex,
+      preservedTransactionEvents: preservedEvents ? [...preservedEvents.transactionEvents] : undefined,
+      preservedActionEvents: preservedEvents?.actionEvents ? [...preservedEvents.actionEvents] : undefined,
       triggerSnapshot,
     }
     const node = new ActionNode(
@@ -455,6 +480,7 @@ export function cloneNode(int: EngineInternals, node: EngineNode): EngineNode {
     clone.resolvedReplacement = node.resolvedReplacement
     clone.beforePhaseResolved = node.beforePhaseResolved
     clone.bodyStarted = node.bodyStarted
+    clone.selectedBranchChoice = node.selectedBranchChoice
     clone.continuationParentHostNodeId = node.continuationParentHostNodeId
     return copySharedNodeMetadata(node, clone)
   }

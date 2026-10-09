@@ -33,8 +33,10 @@ import { incCardUsed } from '../cards/helpers/card-state'
 import type { EngineInternals } from './engine-internals'
 import {
   applyDefaultSourceCardToFlow,
+  activationEventReadContext,
+  mergeContinuationEvents,
+  preserveContinuationEventScopes,
   applyInteractionRequest,
-  buildActivationActionNodes,
   buildPhaseTrailingNodes,
   buildFollowUpNodes,
   buildListenerEvent,
@@ -67,6 +69,7 @@ import { eventsToLogEntries } from '../events/log-mapper'
 import type { GameEvent } from '../contract/events'
 import { createEventQuery } from '../events/query'
 import { createBufferedEventSink, emitCardTriggered } from './card-trigger-events'
+import { interactionRequestChoices } from './pending-validation'
 import { createTriggerSnapshot } from '../cards/helpers/trigger-snapshot'
 import { applyComputeCostResults } from './compute-cost-results'
 import { findActionSpaceById } from '../domain/space'
@@ -201,40 +204,19 @@ const deferredHostEventReadContext = (
   int: EngineInternals,
   node: ActionNode,
 ) => {
-  const transactionEvents = [...int.events.currentTransactionEvents()]
+  const liveEvents = int.events.currentTransactionEvents()
   const capturedTransactionEvents = node.deferredHostTransactionEvents ?? []
-  const actionEvents = [
-    ...(node.deferredHostActionEvents ?? []),
-    ...transactionEvents.slice(capturedTransactionEvents.length),
-  ]
-  return {
-    transactionEvents,
-    actionEvents,
-    eventQuery: createEventQuery(transactionEvents),
-  }
+  const capturedIds = new Set(capturedTransactionEvents.map(event => event.id))
+  const transactionEvents = mergeContinuationEvents(capturedTransactionEvents, liveEvents)
+  const actionEvents = mergeContinuationEvents(node.deferredHostActionEvents ?? [], liveEvents.filter(event => !capturedIds.has(event.id)))
+  return { transactionEvents, actionEvents, eventQuery: createEventQuery(transactionEvents) }
 }
 
 const eventReadContextForActivation = (
   int: EngineInternals,
   params: ActivateCardActionNode['params'],
 ) => {
-  const transactionEvents = params.transactionEvents
-  if (!transactionEvents) {
-    const live = currentEventReadContext(int)
-    if (typeof params.actionEventStartIndex === 'number') {
-      return {
-        ...live,
-        actionEvents: live.transactionEvents.slice(params.actionEventStartIndex),
-      }
-    }
-    return live
-  }
-  const events = [...transactionEvents]
-  return {
-    transactionEvents: events,
-    actionEvents: params.actionEvents ? [...params.actionEvents] : undefined,
-    eventQuery: createEventQuery(events),
-  }
+  return activationEventReadContext(params, int.events.currentTransactionEvents())
 }
 
 const commitIfEngineComplete = (
@@ -254,6 +236,7 @@ const commitOpenEventTransaction = (
 ): void => {
   ensureEventState(context.state)
   const committed = int.events.commitTransaction(context.state)
+  preserveContinuationEventScopes(int, committed)
   appendDerivedLogsForEventOnlyResult(int, context, committed, result)
   clearEventLogDerivations(int)
 }
@@ -467,7 +450,7 @@ const buildDeferredHostNode = (
     result.type === 'ok' ? result.internalChildren?.afterHostListeners : undefined
   node.deferredHostTransactionEvents = [...transactionEvents]
   node.deferredHostActionEvents = [...actionEvents]
-  node.deferredHostChoice = choice
+  node.deferredHostChoice = choice ?? hostNode.selectedBranchChoice
   node.deferredHostResultTargetNodeId = hostNode.internalHostNodeId
   node.deferredHostResultKey = hostNode.internalResultKey
   return node
@@ -492,8 +475,9 @@ const buildDeferredHostContinuationNode = (
   node.deferredHostResult = result
   node.deferredAfterHostChildren = sourceNode.deferredAfterHostChildren
   node.deferredHostCommitCompleted = true
-  node.deferredHostTransactionEvents = sourceNode.deferredHostTransactionEvents
-  node.deferredHostActionEvents = sourceNode.deferredHostActionEvents
+  const eventReadContext = deferredHostEventReadContext(int, sourceNode)
+  node.deferredHostTransactionEvents = eventReadContext.transactionEvents
+  node.deferredHostActionEvents = eventReadContext.actionEvents
   node.deferredHostTriggerSnapshot = sourceNode.deferredHostTriggerSnapshot
   node.deferredHostChoice = sourceNode.deferredHostChoice
   node.deferredHostResultTargetNodeId = sourceNode.deferredHostResultTargetNodeId
@@ -816,14 +800,14 @@ const executeDeferredHostAction = (
   })
   const trailingTransactionEvents = result.type === 'flow' ? undefined : eventReadContext.transactionEvents
   const trailingActionEvents = result.type === 'flow' ? undefined : eventReadContext.actionEvents
-  const duringActivateNodes = buildActivationActionNodes(
+  const duringActivateNodes = buildPhaseTrailingNodes(
     int,
     duringPhase.matchedListeners, 'during', node.actionId,
-    {},
+    context.state, proceedBaseEvent,
     executionContext.player.id,
     eventReadContext.transactionEvents,
     eventReadContext.actionEvents,
-    triggerSnapshot,
+    undefined, triggerSnapshot,
   )
   const immediateActivateNodes = buildPhaseTrailingNodes(
     int,
@@ -835,8 +819,9 @@ const executeDeferredHostAction = (
     executionContext.player.id,
     trailingTransactionEvents,
     trailingActionEvents,
-    undefined,
+    result.type === 'flow' ? int.events.currentTransactionEvents().length : undefined,
     triggerSnapshot,
+    result.type === 'flow' ? eventReadContext : undefined,
   )
   const afterActivateNodes = buildPhaseTrailingNodes(
     int,
@@ -848,8 +833,9 @@ const executeDeferredHostAction = (
     executionContext.player.id,
     trailingTransactionEvents,
     trailingActionEvents,
-    undefined,
+    result.type === 'flow' ? int.events.currentTransactionEvents().length : undefined,
     triggerSnapshot,
+    result.type === 'flow' ? eventReadContext : undefined,
   )
   const afterHostNodes = buildInternalActionChildNodes(
     int,
@@ -1302,6 +1288,8 @@ export function engineProceed(
       result,
     )
     if (result.type === 'request') {
+      node.deferredHostTransactionEvents = [...eventReadContext.transactionEvents]
+      node.deferredHostActionEvents = [...completedEvents]
       // Mirror the resolveChoice second-pass: ActionDef-declared
       // actionContext patches in result.extraData.actionContextWrite are
       // shallow-merged into the pending-interaction context so subsequent
@@ -1337,67 +1325,7 @@ export function engineProceed(
           }
         }
         choiceOptions = mergedOptions
-      } else if (result.request.kind === 'animal-reorg') {
-        // Compatibility shim — RETAINED through Task 7 (re-evaluated).
-        //
-        // GameCore.resolvePendingChoice still validates the player's
-        // submitted value via `pending.options.find((o) => o.value === value)`
-        // (shared/session/session-core.ts ~L2249). Reorg confirm therefore
-        // must surface as a concrete option on the pending surface, while
-        // cancel remains absent and is rejected before action resolution.
-        //
-        // Removing this shim requires teaching resolvePendingChoice to
-        // bypass the options.find check for `request.kind === 'animal-reorg'`
-        // (or to read the allowed values off the request directly). Task 7 deliberately did not modify
-        // resolvePendingChoice (out of scope per task constraints), so
-        // the shim stays. Task 9 or Task 10 (when buildInteraction is
-        // rewritten and pending.options is removed) is the natural
-        // place to delete it.
-        //
-        const confirm: ActionChoiceOption = {
-          value: 'confirm',
-          labelKey: 'ui.interactionAnimalReorgConfirm',
-        }
-        choiceOptions = [confirm]
-      } else if (result.request.kind === 'farm-select') {
-        // Task 5/6: farm-select leaves emit InteractionFarmSelection plus an
-        // optional `options` list (confirm/cancel) so resolvePendingChoice's
-        // pending.options.find() validator still has a value to match.
-        choiceOptions = result.request.options ?? [
-          { value: 'confirm', labelKey: 'ui.interactionFarmSelectConfirm' },
-          { value: 'cancel', labelKey: 'ui.interactionFarmSelectCancel' },
-        ]
-      } else if (
-        result.request.kind === 'confirm-next-player' ||
-        result.request.kind === 'confirm-player-switch' ||
-        result.request.kind === 'feed' ||
-        result.request.kind === 'heating' ||
-        result.request.kind === 'selection' ||
-        result.request.kind === 'card-draft' ||
-        result.request.kind === 'select-trigger' ||
-        result.request.kind === 'engine-blocked' ||
-        result.request.kind === 'resource-quantity-select' ||
-        result.request.kind === 'resource-batch-exchange-select'
-      ) {
-        // Task 9 will add explicit emitters for these kinds. Until then no
-        // current effect emits them, so they fall through to empty choices
-        // here. The exhaustive check below ensures any future kind added to
-        // InteractionRequest forces this branch to be revisited.
-        // selection / card-draft were added in S2 Task 2; their emitters
-        // land in Tasks 7/12 — until then they share this same not-yet-wired
-        // path so typecheck stays green without granting them a real options
-        // surface.
-        choiceOptions = []
-      } else {
-        // Exhaustive check: every InteractionRequest kind must be handled
-        // above. If a new kind is added to InteractionRequest without
-        // updating this branch, the assignment below produces a typecheck
-        // failure here, signalling that Task 6/7 should have removed this
-        // shim OR the new kind needs an explicit branch.
-        const _exhaustive: never = result.request
-        void _exhaustive
-        choiceOptions = []
-      }
+      } else choiceOptions = interactionRequestChoices(result.request)
       // An optional leaf owns its accept/skip window. Its execution may reuse
       // this node for a payment choice, which must declare its own window.
       if (node.optional !== true && node.anytimeWindow !== undefined) {
@@ -1434,22 +1362,24 @@ export function engineProceed(
         },
       }
     }
-    const duringActivateNodes = buildActivationActionNodes(int,
+    const proceedBaseEvent = buildListenerEvent(executionContext, { result, choice: node.selectedBranchChoice })
+    const duringActivateNodes = buildPhaseTrailingNodes(int,
       duringPhase.matchedListeners, 'during', replacedActionId,
-      {},
+      context.state, proceedBaseEvent,
       executionContext.player.id,
       eventReadContext.transactionEvents,
       eventReadContext.actionEvents,
-      triggerSnapshot,
+      undefined, triggerSnapshot,
     )
     const immediatePhase = int.hooks.immediatelyAfter(
       { ...executionContext, ...eventReadContext, actionId: replacedActionId },
       result,
+      node.selectedBranchChoice,
     )
     const afterPhase = int.hooks.after(
       { ...executionContext, ...eventReadContext, actionId: replacedActionId },
       result,
-      undefined,
+      node.selectedBranchChoice,
     )
     const allActionHookResults = [
       ...immediatePhase.actionHookResults,
@@ -1468,11 +1398,10 @@ export function engineProceed(
         ),
       )
       .filter((action) => action)
-    const proceedBaseEvent = buildListenerEvent(executionContext, { result })
     const trailingTransactionEvents = result.type === 'flow' ? undefined : eventReadContext.transactionEvents
     const trailingActionEvents = result.type === 'flow' ? undefined : eventReadContext.actionEvents
     const trailingActionEventStartIndex = result.type === 'flow'
-      ? eventReadContext.transactionEvents.length - completedEvents.length
+      ? int.events.currentTransactionEvents().length
       : undefined
     const immediateActivateNodes = buildPhaseTrailingNodes(
       int,
@@ -1486,6 +1415,7 @@ export function engineProceed(
       trailingActionEvents,
       trailingActionEventStartIndex,
       triggerSnapshot,
+      result.type === 'flow' ? eventReadContext : undefined,
     )
     const afterActivateNodes = buildPhaseTrailingNodes(
       int,
@@ -1499,6 +1429,7 @@ export function engineProceed(
       trailingActionEvents,
       trailingActionEventStartIndex,
       triggerSnapshot,
+      result.type === 'flow' ? eventReadContext : undefined,
     )
     const afterHostNodes = result.type === 'ok'
       ? buildInternalActionChildNodes(

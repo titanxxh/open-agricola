@@ -1,5 +1,22 @@
-import type { ActionChoiceOption } from '../contract/types'
+import type { ActionChoiceOption, InteractionRequest } from '../contract/types'
 import type { PendingEnvelope } from './types'
+
+/** One canonical option surface for every native request producer. */
+export const interactionRequestChoices = (request: InteractionRequest): ActionChoiceOption[] => {
+  switch (request.kind) {
+    case 'choice':
+    case 'select-trigger': return request.options
+    case 'animal-reorg': return [{value:'confirm',labelKey:'ui.interactionAnimalReorgConfirm'}]
+    case 'farm-select': return request.options ?? [
+      {value:'confirm',labelKey:'ui.interactionFarmSelectConfirm'},
+      {value:'cancel',labelKey:'ui.interactionFarmSelectCancel'},
+    ]
+    case 'confirm-next-player': case 'confirm-player-switch': case 'feed': case 'heating':
+    case 'selection': case 'card-draft': case 'engine-blocked':
+    case 'resource-quantity-select': case 'resource-batch-exchange-select': return []
+    default: {const exhaustive: never = request; return exhaustive}
+  }
+}
 
 export const pendingEnvelopeChoices = (
   envelope: PendingEnvelope | null,

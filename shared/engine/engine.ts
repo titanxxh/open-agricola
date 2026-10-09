@@ -35,6 +35,7 @@ import {
   effectiveOwnerPlayerId,
   enforceCompositeContinuationMandatory,
   isActionStrictlyDoableWithoutBeforeTriggers,
+  preserveContinuationEventScopes,
   pendingEnvelopeFromHostNode,
   snapshotCompositeEmit,
   setEngineBlockedPending,
@@ -211,6 +212,7 @@ const restoreTreeFromCursor = (cursors: NodeCursor[]): EngineNode | null => {
         }
         action.beforePhaseResolved = data.beforePhaseResolved === true
         action.bodyStarted = data.bodyStarted === true
+        action.selectedBranchChoice = typeof data.selectedBranchChoice === 'string' ? data.selectedBranchChoice : undefined
         action.continuationParentHostNodeId = typeof data.continuationParentHostNodeId === 'string'
           ? data.continuationParentHostNodeId
           : undefined
@@ -506,18 +508,7 @@ export class Engine {
     context.state.events ??= []
     context.state.nextEventSeq ??= 1
     const committed = this.events.commitTransaction(context.state)
-    const pendingHost = this.peekPendingHost()
-    if (pendingHost instanceof ActionNode && committed.length > 0) {
-      const preserved = committed.map((event) => cloneSnapshotValue(event))
-      pendingHost.deferredHostTransactionEvents = [
-        ...(pendingHost.deferredHostTransactionEvents ?? []),
-        ...preserved,
-      ]
-      pendingHost.deferredHostActionEvents = [
-        ...(pendingHost.deferredHostActionEvents ?? []),
-        ...preserved,
-      ]
-    }
+    preserveContinuationEventScopes(this._internals(), committed)
     this.eventLogDerivations = []
     const playerNames = Object.fromEntries(
       context.state.players.map((player) => [player.id, player.name]),
