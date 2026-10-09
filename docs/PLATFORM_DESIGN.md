@@ -245,7 +245,7 @@ Common hooks are `onBuy`, `onRoundStart`, `onRoundEnd`, `onAllWorkersPlaced`, `o
 
 #### Listener mechanism in `CARD_IMPL.listeners`
 
-Listener phases include `before`, `during`, `immediatelyAfter`, `after`, `computeCosts`, `computeArgs`, `computeReplace`, `isDoable`, `anytime`, and `computeChoiceCandidates`.
+Listener phases include `before`, `immediatelyAfter`, `after`, `computeCosts`, `computeArgs`, `computeReplace`, `isDoable`, `anytime`, and `computeChoiceCandidates`. `shared/custom-code/sandbox-listener-phases.ts` is authoritative; new source and saved executable manifests must both use supported phases.
 
 Scopes are `player`, `opponent`, and `any`; `shared/custom-code/sandbox-listener-scopes.ts` is authoritative. `shared/custom-code/sandbox-listener-actions.ts` authoritatively lists listener `actions`, shared by the prompt, AST validator, and server and browser manifests. Major and minor improvement purchases both use `improvement`.
 
