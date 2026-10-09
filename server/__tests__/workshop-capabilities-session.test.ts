@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { GameCore } from '../../shared/session/session-core'
 import { registerBrowserBackedCustomCard } from '../../client/local-sandbox/browser-runtime'
+import { createWorkSession } from './_helpers/session-fixtures'
+import { createInitialState } from '../../shared/session/state-bootstrap'
 import { flowCardEffectHooks } from '../../shared/cards/card-effects'
 import { GameSession } from '../game/authoritative-session'
 import { validateAndCompileCustomCode } from '../custom-code/engine'
@@ -12,7 +14,7 @@ import { Scoring } from '../../shared/domain/scoring'
 import { computeAnimalZones, canAccommodateAnimalTotals, prefillAnimalZones } from '../../shared/domain/animal-zones'
 import { markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome, workersAvailable } from '../../shared/domain/player'
 import { serializeSessionSnapshot, rehydrateState } from '../../shared/session/serialization'
-import type { ActionFlow } from '../../shared/contract/types'
+import type { ActionFlow, GameState } from '../../shared/contract/types'
 import { readCardResourceStats } from '../../shared/cards/helpers/card-state'
 
 const CARD = 'CUSTOM_Capabilities'
@@ -21,20 +23,33 @@ const sessions: GameCore[] = []
 // Every scenario starts with seed 42 / 2 players / explicit placeholder hands.
 // Payment, farm pending, shared zones and delayed state cross GameSession;
 // pure numeric queries use the public collector inside its session context.
-function setup(implementation: string, metadata = '', enableFarmersOfTheMoor = false, useMinorFactory = false, adapter: 'server' | 'browser' = 'server') {
+function setup(implementation: string, metadata = '', enableFarmersOfTheMoor = false, useMinorFactory = false, adapter: 'server' | 'browser' = 'server', configureFixture?: (state: GameState) => void) {
   const meta = `{id:CARD_ID,name:'Capabilities',${metadata}}`
   const source = `const CARD_ID='${CARD}'; const CARD_DEF=${useMinorFactory?`MinorImprovement(${meta})`:`{cardType:'minor',meta:${meta}}`}; const CARD_IMPL=${implementation}`
   const compiled = validateAndCompileCustomCode(source, CARD)
   if (!compiled.valid) throw new Error(compiled.errors.join('\n'))
   const card: CustomCardData = { cardType: 'minor' as const, cardJson: { ...workshopCardJsonFromDefinition(compiled.cardDefinition), id: CARD, name: 'Capabilities', deck: 'CUSTOM', number: 0, desc: [] }, compiledCode: compiled.compiledCode, codeManifest: compiled.manifest }
   const options = { playerCount: 2, ...(enableFarmersOfTheMoor ? {enableFarmersOfTheMoor:true,allowIncompleteFarmersOfTheMoorMinorDeal:true} : {}) }
-  const session = adapter === 'server' ? new GameSession(42, [card], options) : new GameCore({stateOrSeed:42,customCards:[card],initialStateOptions:options,registerCustomCardImpl:registerBrowserBackedCustomCard})
-  sessions.push(session)
-  for (const player of session.state.players) {
-    player.minorHand = ['__test_placeholder__']; player.occupationHand = ['__test_placeholder__']
-    player.minorPlayed = []; player.occupationPlayed = []; player.improvements = []; player.cardStates = {}
+  const configure = (state: GameState) => {
+    for (const player of state.players) {
+      player.minorHand = ['__test_placeholder__']; player.occupationHand = ['__test_placeholder__']
+      player.minorPlayed = []; player.occupationPlayed = []; player.improvements = []; player.cardStates = {}
+    }
+    state.players[0]!.minorPlayed = [CARD]
+    configureFixture?.(state)
   }
-  session.state.players[0]!.minorPlayed = [CARD]
+  let session: GameCore
+  if(adapter==='server') session=createWorkSession({options,customCards:[card],configure})
+  else {
+    // Adapter construction is the subject of this parity path. Match the
+    // shared work fixture: configure fixed hands before loading, skip opening.
+    const state=createInitialState(42,{...options,ordinaryCardDeckSeed:42,parentSelectionSeed:42})
+    configure(state)
+    session=new GameCore({stateOrSeed:state,customCards:[card],registerCustomCardImpl:registerBrowserBackedCustomCard})
+    session.loadState(state)
+    expect(session.getState().interaction.stateId).toBe('idle')
+  }
+  sessions.push(session)
   return { session, card, player: session.state.players[0]!, opponent: session.state.players[1]! }
 }
 const leaf = (actionId: string, rest: Record<string, unknown> = {}): ActionFlow => ({ type: 'leaf', actionId, sourceCard: CARD, ...rest })
@@ -181,7 +196,7 @@ describe('Workshop capabilities through fixed Session scenarios', () => {
   })
 
   it('counts only remaining extra opportunities, without losing the contributor before workers',()=>{
-    const {session,player}=setup(`{effect:{extraTurnBeforeWorkers:true,countExtraTurns:()=>2,contributeExtraTurn:()=>gainLeaf(CARD_ID,{food:1})}}`)
+    const {session,player}=setup(`{effect:{extraTurnBeforeWorkers:true,countExtraTurns:()=>2,contributeExtraTurn:()=>gainLeaf(CARD_ID,{food:1})}}`,'',false,false,'server',state=>{state.currentPlayerIndex=1})
     session.withCtx(()=>{expect(countPendingExtraTurns(session.state,player)).toBe(2);player._extraTurnSkipCountsByCard={[CARD]:1};expect(countPendingExtraTurns(session.state,player)).toBe(1);player._extraTurnConsumedCountsByCard={[CARD]:1};expect(countPendingExtraTurns(session.state,player)).toBe(0);expect(getCardEffect(CARD)?.extraTurnBeforeWorkers).toBe(true)})
   })
 })
@@ -1277,6 +1292,14 @@ describe('Frozen Workshop correspondence acceptance',()=>{
     expect(r.ok,r.error).toBe(true)
     if(round===14){expect(r.interaction.request?.kind).toBe('animal-reorg');expect(r.interaction.playerIndex).toBe(0)}
     else {expect(r.interaction.request?.kind).not.toBe('animal-reorg');expect(r.state.round).toBe(5)}
+    expect(session.cardWarnings).toEqual([])
+  })
+
+  it('keeps zero expansion entries inert in a base-game exchange',()=>{
+    const {session}=setup(afterCollect(leaf('exchange',{actionContext:{directTrade:{from:{food:1,horse:0,fuel:0},to:{wood:1,horse:0,fuel:0}}}})))
+    const r=collect(session)
+    expect(r.state.players[0]!.resources).toMatchObject({food:1,wood:4})
+    expect(r.state.players[0]!.resources.horse).toBeUndefined();expect(r.state.players[0]!.resources.fuel).toBeUndefined()
     expect(session.cardWarnings).toEqual([])
   })
 

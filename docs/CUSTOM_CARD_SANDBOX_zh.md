@@ -221,7 +221,7 @@ const jsonSafe = JSON.parse(JSON.stringify(value ?? null))
 
 `onBeforeWork` 在回合资源增长和 future-meeple 行动之后、`onRoundStart` 之前触发；仅用于卡面明确写明“工作阶段开始前”的效果。
 
-`onBeforePlayerTurn` 是 non-flow skip-control exception：签名是 `(state, player) => { skipTurn?: boolean } | void`，只用于 labor turn 入口同步跳过该玩家本次放工人机会；不能返回 `ActionFlow`，不能创建 pending。
+`onBeforePlayerTurn` 是 non-flow skip-control exception：签名是 `(state, player) => { skipTurn: boolean } | void`，只用于 labor turn 入口同步跳过该玩家本次放工人机会；不能返回 `ActionFlow`，不能创建 pending。
 
 reaction-compatible hook（action listener 的 `before` / `during` / `immediatelyAfter` / `after`、harvest field 三个 stage hook、`onBeforeEndGame`、`contributeExtraTurn`）不能依赖卡牌扫描顺序。多个同一时机可触发项会进入 `trigger-select`，由玩家选择来源卡后再执行。自定义卡应返回可重放 `ActionFlow` 表达状态修改；不要假设 handler 调用本身就是最终结算。
 

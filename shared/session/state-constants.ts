@@ -158,6 +158,7 @@ export const applyFutureMeeples = (
     assertEnabledResourceAmounts(entry.resources, player.resources)
     Object.entries(entry.resources).forEach(([key, value]) => {
       const amount = value ?? 0
+      if (amount === 0) return
       if (key === 'field' || key === 'stable' || key === 'forest' || key === 'moor') return
       if (options.skipResourceReceive) return
       player.resources[key as keyof Resource] += amount

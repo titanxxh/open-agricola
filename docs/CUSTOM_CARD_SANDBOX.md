@@ -205,7 +205,7 @@ The marked blocks below are machine checked against `cardEffectHooks` in `shared
 
 `onBeforeWork` runs after round growth and future-meeple actions but before `onRoundStart`. Use it only when the card explicitly acts before the work phase.
 
-`onBeforePlayerTurn` is the non-flow skip-control exception. Its signature is `(state, player) => { skipTurn?: boolean } | void`, and it synchronously skips this labor-turn placement opportunity. It cannot return ActionFlow or create pending state.
+`onBeforePlayerTurn` is the non-flow skip-control exception. Its signature is `(state, player) => { skipTurn: boolean } | void`, and it synchronously skips this labor-turn placement opportunity. It cannot return ActionFlow or create pending state.
 
 Reaction-compatible hooks, namely action-listener `before`, `during`, `immediatelyAfter`, and `after`; the three Harvest-field hooks; `onBeforeEndGame`; and `contributeExtraTurn`, cannot depend on scan order. Multiple simultaneous items enter trigger-select, and the player selects a source card before execution. A custom card should return a replayable ActionFlow for mutation and never treat a handler invocation as final settlement.
 

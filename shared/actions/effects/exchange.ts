@@ -315,6 +315,7 @@ export const applyTrade = (
   const fromKeys = Object.keys(trade.from) as ResourceKey[]
   for (const key of fromKeys) {
     const amount = (trade.from[key] ?? 0) * times
+    if (amount === 0) continue
     if (amount > 0 && isAnimalResourceKey(key)) {
       applyAnimalPayment(
         player,
@@ -332,6 +333,7 @@ export const applyTrade = (
   const toKeys = Object.keys(trade.to) as ResourceKey[]
   for (const key of toKeys) {
     const amount = (trade.to[key] ?? 0) * times
+    if (amount === 0) continue
     player.resources[key] += amount
   }
 }
