@@ -18,12 +18,21 @@ export type SandboxListenerPhase = typeof sandboxListenerPhases[number]
 export const isSandboxListenerPhase = (value: unknown): value is SandboxListenerPhase =>
   typeof value === 'string' && (sandboxListenerPhases as readonly string[]).includes(value)
 
+export class UnsupportedSandboxListenerPhaseError extends Error {
+  readonly code = 'unsupported_listener_phase'
+
+  constructor(cardId: string, listenerId: string, phase: unknown) {
+    super(`Custom card ${cardId} listener "${listenerId}": unsupported listener phase '${String(phase)}'`)
+    this.name = 'UnsupportedSandboxListenerPhaseError'
+  }
+}
+
 /** Saved compiled manifests must obey the same phase contract as new source. */
 export const assertSandboxListenerPhases = (cardId: string, manifest: CustomCodeManifest): void => {
   for (const listener of manifest.listeners) {
     for (const phase of listener.phases ?? []) {
       if (!isSandboxListenerPhase(phase)) {
-        throw new Error(`Custom card ${cardId} listener "${listener.registrationId}": unsupported listener phase '${phase}'`)
+        throw new UnsupportedSandboxListenerPhaseError(cardId, listener.registrationId, phase)
       }
     }
   }

@@ -78,7 +78,7 @@ const mockRes = (): MockRes => {
   } as unknown as MockRes
 }
 
-const createRunawayCard = (db: PostgresDatabase, authorId: string) => {
+const createRunawayCard = (db: PostgresDatabase, authorId: string, manifestPhase = 'after') => {
   const compiled = validateAndCompileCustomCode(SOURCE, 'CUSTOM_RouteRunaway')
   expect(compiled.valid).toBe(true)
   if (!compiled.valid) throw new Error(compiled.errors.join('; '))
@@ -104,6 +104,7 @@ const createRunawayCard = (db: PostgresDatabase, authorId: string) => {
       compiledCode: compiled.compiledCode,
       codeManifest: {
         ...compiled.manifest,
+        listeners: compiled.manifest.listeners.map(listener => ({ ...listener, phases: [manifestPhase] })),
         cardDefinition: compiled.cardDefinition,
       },
       artUrl: null,
@@ -132,18 +133,67 @@ afterEach(async () => {
 })
 
 describe('custom session routes', () => {
+  it.each(['/api/game/new', '/api/game/new-sandbox'].flatMap(url =>
+    [false, true].map(guarded => ({ url, guarded })),
+  ))('rejects unsupported saved phases in $url (authority=$guarded) without replacing the game', async ({ url, guarded }) => {
+    const db = await createTestDatabase()
+    databases.push(db)
+    await addUser(db, 'phase-author', 'phase-token')
+    // Simulate a retained executable snapshot; new source cannot compile this phase.
+    const customCard = await createRunawayCard(db, 'phase-author', 'during')
+    await approveCurrentDraft(db, { cardId: customCard.id, authorId: 'phase-author' })
+    await publish(db, { cardId: customCard.id, authorId: 'phase-author', baseRevision: customCard.revision })
+    const gameDatabase = await import('../db.ts')
+    vi.spyOn(gameDatabase, 'getDb').mockReturnValue(db)
+    const { handleGameRoute, configureSandboxAuthority, shutdownSandboxSessions } = await import('../game-router.ts')
+    if (guarded) {
+      const { RoomDirectory } = await import('../game/room-directory.ts')
+      const { SandboxAuthority } = await import('../game/sandbox-authority.ts')
+      const directory = new RoomDirectory(db)
+      await directory.register('phase-test-node', 'http://127.0.0.1:7100', 'test')
+      await directory.activate('phase-test-node')
+      configureSandboxAuthority(new SandboxAuthority(directory, 'phase-test-node'))
+    }
+    const { workerObservation } = await import('../game/custom-session-executor.ts')
+    try {
+      const start = mockRes()
+      await handleGameRoute(mockReq('POST', '/api/game/new', { seed: 42, playerCount: 2 }, 'phase-token'), start)
+      expect(start.statusCode).toBe(200)
+      const workersBefore = workerObservation()
+
+      const rejected = mockRes()
+      expect(await handleGameRoute(mockReq('POST', url, {
+        seed: 99, playerCount: 2, enableCommunityDeck: true, customCardIds: [customCard.id],
+      }, 'phase-token'), rejected)).toBe(true)
+      expect(rejected.statusCode).toBe(400)
+      expect(JSON.parse(rejected.body)).toMatchObject({
+        ok: false,
+        code: 'unsupported_listener_phase',
+        error: expect.stringMatching(/CUSTOM_RouteRunaway.*unsupported listener phase 'during'/),
+      })
+      expect(workerObservation()).toEqual(workersBefore)
+      const current = mockRes()
+      await handleGameRoute(mockReq('GET', '/api/game/state', {}, 'phase-token'), current)
+      expect(JSON.parse(current.body).state).toEqual(JSON.parse(start.body).state)
+    } finally {
+      shutdownSandboxSessions()
+    }
+  })
+
   it('runs POST /api/game/new-sandbox commands off the HTTP event loop', async () => {
     const db = await createTestDatabase()
     databases.push(db)
     await addUser(db, 'author', 'sandbox-token')
     const customCard = await createRunawayCard(db, 'author')
-    vi.spyOn(database, 'getDb').mockReturnValue(db)
+    const gameDatabase = await import('../db.ts')
+    vi.spyOn(gameDatabase, 'getDb').mockReturnValue(db)
     const { handleGameRoute, disposeSandboxSessionsUsingCard } = await import('../game-router.ts')
     const start = mockRes()
     await handleGameRoute(mockReq('POST', '/api/game/new-sandbox', {
       seed: 42,
       customCardIds: [customCard.id],
     }, 'sandbox-token'), start)
+    expect(start.statusCode).toBe(200)
     expect(start.statusCode).toBe(200)
 
     const action = mockRes()

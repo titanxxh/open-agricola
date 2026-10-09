@@ -13,6 +13,7 @@ import { validateSession, extractToken } from './auth.ts'
 import { allowAnonymousAccess } from './anonymous-access.ts'
 import type { CustomCardData } from '../shared/cards/session-card-context.ts'
 import type { CustomCodeManifest } from '../shared/custom-code/types.ts'
+import { UnsupportedSandboxListenerPhaseError } from '../shared/custom-code/sandbox-listener-phases.ts'
 import { defaultSandboxDeckIds } from '../shared/session/state-bootstrap.ts'
 import { corsHeaders } from './http-origin.ts'
 import {
@@ -1072,8 +1073,8 @@ export const handleGameRoute = async (req: IncomingMessage, res: ServerResponse)
     rawJson(res, 401, { ok: false, code: 'login_required', error: 'Login required' })
     return true
   }
-  if (!authority) return handleAuthorizedGameRoute(req, res)
   try {
+    if (!authority) return await handleAuthorizedGameRoute(req, res)
     const key = await getSessionKey(req)
     const stamp = sessionStamps.get(key) ?? await authority.access.capture([], key === 'anonymous' ? [] : [key])
     await authority.check(stamp)
@@ -1081,6 +1082,10 @@ export const handleGameRoute = async (req: IncomingMessage, res: ServerResponse)
     responses.set(res, req)
     return await handleAuthorizedGameRoute(req, res)
   } catch (error) {
+    if (error instanceof UnsupportedSandboxListenerPhaseError) {
+      rawJson(res, 400, { ok: false, code: error.code, error: error.message })
+      return true
+    }
     if (!(error instanceof ExecutionRevokedError || error instanceof RoomOwnershipError)) throw error
     rawJson(res, 409, { ok: false, code: error.code, error: error.message })
     return true
