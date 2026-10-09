@@ -35,6 +35,7 @@ import {
 import { isFireplaceIdentityCard } from '../../../cards/helpers/card-type'
 import { PAYMENT_RESOURCE_KEYS } from '../../../contract/resource-keys'
 import { solutionCache, makeCacheKey } from './cache'
+import { canConsumePaymentResourceProviders } from './provider-backing'
 import {
   canPayResources,
   canPaySupplyTokens,
@@ -925,7 +926,8 @@ export const computeAllBuyableCombinations = (
     : normalizedCost
   validateComplexCost(effectiveCost)
 
-  const canUseCache = !hasSupplyTokenCost(effectiveCost)
+  // Provider backing is live action-space state, outside the cache key.
+  const canUseCache = !hasSupplyTokenCost(effectiveCost) && !effectiveCost.paymentResourceProviders?.length
   const cacheKey = canUseCache ? makeCacheKey(player, effectiveCost, costType, playedCards) : ''
   const cached = canUseCache ? solutionCache.get(cacheKey) : undefined
   if (cached) return cached
@@ -1253,7 +1255,9 @@ export const computeAllBuyableCombinations = (
   const budgetedSolutions = paymentSolutions.filter((solution) =>
     withinPaymentBudget(solution, effectiveCost.paymentBudget)
       && Object.entries(effectiveCost.minimumResourcesPaid ?? {}).every(([resource, amount]) =>
-        (solution.resourcesPaid[resource as PaymentResourceKey] ?? 0) >= (amount ?? 0)),
+        (solution.resourcesPaid[resource as PaymentResourceKey] ?? 0) >= (amount ?? 0))
+      // Offer only provider payments that settlement could consume now.
+      && (!state || canConsumePaymentResourceProviders(state, solution, paymentResourceProviders)),
   )
   const result = sortPaymentSolutions(keepOnlyOptimals(budgetedSolutions))
   if (canUseCache) solutionCache.set(cacheKey, result)
