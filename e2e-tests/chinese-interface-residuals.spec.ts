@@ -1,5 +1,5 @@
 import { expect, test, type APIResponse, type Page, type APIRequestContext } from '@playwright/test'
-import { BACKEND_URL, FRONTEND_URL, getJson, postJson } from './fixtures'
+import { BACKEND_URL, FRONTEND_URL, finishHotseatOpening, getJson, postJson } from './fixtures'
 
 const cookieValue = (response: APIResponse, name: string): string => {
   const header = response.headersArray().find((header) =>
@@ -29,6 +29,11 @@ const signIn = async (page: Page, request: APIRequestContext, displayName = '录
 test('WebSocket default names remain localized through development joins and reload', async ({ page, browser }) => {
   await page.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'zh'))
   await page.goto(`${FRONTEND_URL}/?page=game&transport=ws&room=dev2&player=p1&devMode=1`, { waitUntil: 'domcontentloaded' })
+  await expect(page.locator('.game-layout')).toBeVisible()
+  const initialRoomId = new URL(page.url()).searchParams.get('room')
+  await page.locator('.seed-input input').fill('42')
+  await page.getByRole('button', { name: '重开', exact: true }).click()
+  await expect.poll(() => new URL(page.url()).searchParams.get('room')).not.toBe(initialRoomId)
   const guestContext = await browser.newContext()
   try {
     await guestContext.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'zh'))
@@ -73,8 +78,7 @@ for (const displayName of ['录制玩家', 'PlayerF', 'Player 6']) {
       await selection.locator('[data-section="father"] .parent-choice-card').first().click()
       await selection.getByRole('button', { name: '确认父母卡', exact: true }).click()
     }
-    await expect(handoff).toBeVisible()
-    await handoff.getByRole('button').click()
+    await finishHotseatOpening(page)
     const tabs = page.locator('.player-tabs__tab')
     await expect(tabs).toHaveCount(6)
     await expect(tabs.first()).toContainText(displayName)

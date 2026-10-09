@@ -130,7 +130,7 @@ test.describe('WS dual-player sync', () => {
     // before exercising action/undo synchronization.
     const firstAction = p1.locator('.action-card-holder button:not([disabled])').first()
     const setupSkips = [p1, p2].map(page =>
-      page.locator('.interaction-bar').getByRole('button', { name: /^(Skip|跳过)$/ }),
+      page.locator('.interaction-bar').getByRole('button', { name: /^(Skip|跳过|Do not use Elder|不使用长者)$/ }),
     )
     await expect.poll(async () =>
       await firstAction.isVisible() || (await Promise.all(setupSkips.map(skip => skip.isVisible()))).some(Boolean),
