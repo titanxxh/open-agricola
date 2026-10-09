@@ -1,7 +1,7 @@
-import { GameSession, type SessionResponse } from '../../game/authoritative-session'
+import type { GameSession, SessionResponse } from '../../game/authoritative-session'
 import { setWorkersAtHome } from '../../../shared/domain/player'
 import { resolveTriggerIfPresent } from './trigger-select'
-import { stabilizeRandomHands } from './stabilize-random-hands'
+import { createWorkSession } from './session-fixtures'
 
 const FILLER = '__test_placeholder__'
 
@@ -18,35 +18,35 @@ export const setupMinorSession = ({
   minorPlayed?: string[]
   houseType?: 'wood' | 'clay' | 'stone'
 }) => {
-  const session = new GameSession(9701)
-  stabilizeRandomHands(session.state.players)
-  const state = session.state
-  state.currentPlayerIndex = 0
-  state.round = 5
-  state.roundPhase = 'work'
-  state.availableMajorImprovements = []
-  state.actionSpaces.forEach((space) => { space.takenBy = [] })
-  state.players.forEach((player) => {
-    setWorkersAtHome(state, player, 2)
-    player.minorHand = [FILLER]
-    player.occupationHand = [FILLER]
-    player.minorPlayed = []
-    player.occupationPlayed = []
-    player.improvements = []
-    player.cardStates = {}
-    player.resources = {
-      ...player.resources, wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0,
-      vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
-    }
+  return createWorkSession({
+    seed: 9701,
+    configure: state => {
+      state.currentPlayerIndex = 0
+      state.round = 5
+      state.roundPhase = 'work'
+      state.availableMajorImprovements = []
+      state.actionSpaces.forEach((space) => { space.takenBy = [] })
+      state.players.forEach((player) => {
+        setWorkersAtHome(state, player, 2)
+        player.minorHand = [FILLER]
+        player.occupationHand = [FILLER]
+        player.minorPlayed = []
+        player.occupationPlayed = []
+        player.improvements = []
+        player.cardStates = {}
+        player.resources = {
+          ...player.resources, wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0,
+          vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
+        }
+      })
+      const player = state.players[0]!
+      player.minorHand = [cardId]
+      player.improvements = improvements
+      player.minorPlayed = minorPlayed
+      player.houseType = houseType
+      Object.assign(player.resources, resources)
+    },
   })
-  const player = state.players[0]!
-  player.minorHand = [cardId]
-  player.improvements = improvements
-  player.minorPlayed = minorPlayed
-  player.houseType = houseType
-  Object.assign(player.resources, resources)
-  session.loadState(state)
-  return session
 }
 
 export const playMinor = (session: GameSession, cardId: string) => {
@@ -79,32 +79,32 @@ export const setupOccupationSession = ({
   hand?: string[]
   food?: number
 }) => {
-  const session = new GameSession(9702 + round, undefined, { playerCount })
-  stabilizeRandomHands(session.state.players)
-  const state = session.state
-  state.currentPlayerIndex = 0
-  state.round = round
-  state.roundPhase = 'work'
-  state.actionSpaces.forEach((space) => { space.takenBy = [] })
-  state.players.forEach((player, index) => {
-    setWorkersAtHome(state, player, index === 0 ? 2 : 0)
-    player.minorHand = [FILLER]
-    player.occupationHand = [FILLER]
-    player.minorPlayed = []
-    player.occupationPlayed = []
-    player.improvements = []
-    player.cardStates = {}
-    player.resources = {
-      ...player.resources, wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0,
-      vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
-    }
+  return createWorkSession({
+    seed: 9702 + round, options: { playerCount },
+    configure: state => {
+      state.currentPlayerIndex = 0
+      state.round = round
+      state.roundPhase = 'work'
+      state.actionSpaces.forEach((space) => { space.takenBy = [] })
+      state.players.forEach((player, index) => {
+        setWorkersAtHome(state, player, index === 0 ? 2 : 0)
+        player.minorHand = [FILLER]
+        player.occupationHand = [FILLER]
+        player.minorPlayed = []
+        player.occupationPlayed = []
+        player.improvements = []
+        player.cardStates = {}
+        player.resources = {
+          ...player.resources, wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0,
+          vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
+        }
+      })
+      const player = state.players[0]!
+      player.occupationHand = hand
+      player.occupationPlayed = played
+      player.resources.food = food
+    },
   })
-  const player = state.players[0]!
-  player.occupationHand = hand
-  player.occupationPlayed = played
-  player.resources.food = food
-  session.loadState(state)
-  return session
 }
 
 export const playOccupation = (session: GameSession, cardId: string) => {

@@ -4,6 +4,7 @@ import { markAllWorkersUsed, workersAvailable } from '../../shared/domain/player
 import { countOccupations } from '../../shared/cards/helpers/prerequisites'
 import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/serialization'
 import { resolveNonSkipChoice, resolveSkipChoice } from './_helpers/trigger-select'
+import { createOpeningSession } from './_helpers/session-fixtures'
 
 const CARD_ID = 'E096_Elder'
 const FILLER = '__test_placeholder__'
@@ -23,14 +24,23 @@ const modes = [
 // Payment, optional choice, stage continuation and persistence require Session
 // tests; directly calling the card hook would bypass the defect.
 const start = (mode: typeof modes[number], ownerIndex: number) => {
-  const session = new GameSession(ownerIndex === 0 ? 12 : 9, undefined, {
-    playerCount: 2,
-    deckIds: ['E'],
-    draftMode: mode.draft ? 'simultaneous' : undefined,
-    draftPoolSize: 7,
-    enableParentCards: mode.parents,
-    draftParents: mode.draftParents,
-    parentSelectionSeed: 1,
+  const awaitingSetup = mode.draft || (mode.parents && mode.draftParents)
+  const session = createOpeningSession({
+    seed: ownerIndex === 0 ? 12 : 9,
+    expected: {
+      phase: mode.draft ? 'draft' : awaitingSetup ? 'parent-selection' : 'playing',
+      roundPhase: awaitingSetup ? 'work' : 'preparation',
+      interaction: { stateId: awaitingSetup ? 'idle' : 'wait' },
+    },
+    options: {
+      playerCount: 2,
+      deckIds: ['E'],
+      draftMode: mode.draft ? 'simultaneous' : undefined,
+      draftPoolSize: 7,
+      enableParentCards: mode.parents,
+      draftParents: mode.draftParents,
+      parentSelectionSeed: 1,
+    },
   })
   let response = session.getState()
   while (response.state.phase === 'draft' && response.state.draft) {

@@ -25,7 +25,7 @@ Install dependencies and start the project:
 
 ```bash
 pnpm install
-./restart-local.sh    # Unified local development, runtime, and test entry point; starts backend (5175) and frontend (5173) on 127.0.0.1
+./restart-local.sh    # Unified app start/restart entry point; backend (5175) and frontend (5173) on 127.0.0.1
 ./restart-local.sh --intranet   # Bind to the LAN IP instead, for testing from another machine
 ```
 
@@ -40,12 +40,17 @@ The project has three test layers:
 ```bash
 pnpm test:fast              # Fast projects; the CI default
 pnpm test                   # Full Vitest suite: fast + slow
-pnpm exec vitest run <file> # One test file
+pnpm verify focus <file.test.ts> # Focused Vitest checks during debugging; no app restart
+pnpm verify prepush         # Complete fast suite + lint for the final sources
+pnpm verify <file.spec.ts>   # Restart an isolated app and run Playwright
+pnpm verify status          # Check whether verification records match current sources
 pnpm run test:e2e           # Playwright E2E
 pnpm run lint               # ESLint; errors must be zero
 ```
 
-After changing code, verify in this order: restart with `./restart-local.sh`, exercise the real behavior in a browser, run `pnpm test:fast`, then run `pnpm run lint`.
+During debugging, run focused tests for the affected behavior. Test, tooling, and documentation edits do not require an app restart on every iteration. For app behavior, UI, or WebSocket changes, restart with `./restart-local.sh` and exercise the real behavior before final verification; `pnpm verify <file.spec.ts>` handles this in an isolated environment. Run `pnpm verify prepush` on the final sources and add relevant slow Session or E2E tests according to risk. Focused checks do not replace the complete gate.
+
+Session fixtures distinguish real startup from prepared work scenarios; see [the card testing template](docs/CARD_TEST_TEMPLATE.md#52-preparing-state). Verification records, test-service setup, and full local CI are described in [CI operations](docs/operations/ci-checks.md). Records help identify stale results and never skip checks automatically.
 
 `./restart-local.sh` is the only shell script contributors need. `deploy-backend.sh` and `backup-offsite.sh` are maintainer-only: they operate the owner's production host and are not part of any contribution workflow.
 
@@ -61,7 +66,7 @@ See [AGENTS.md](AGENTS.md) for the complete card workflow, implementation rules,
 
 - Use concise English commit subjects with one of these prefixes: `feat:`, `fix:`, `refactor:`, or `docs:`.
 - Always rebase onto `main`; do not create merge commits.
-- Before pushing, run `pnpm run lint` and `pnpm test:fast` locally.
+- Before every push, rebase onto `main` and run `pnpm verify prepush` on the final sources. Wait for all related GitHub Actions runs to finish after pushing; failures need to be fixed and skipped jobs are not successful verification.
 - Card changes must update [docs/card_implementation_status.md](docs/card_implementation_status.md). Changes to shared extension points such as hook phases, ActionFlow nodes, or protocols must update [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Issues

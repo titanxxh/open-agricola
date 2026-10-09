@@ -27,7 +27,7 @@
 
 ```bash
 pnpm install
-./restart-local.sh    # 本地开发/运行/测试统一入口，在 127.0.0.1 上启动后端 (5175) + 前端 (5173)
+./restart-local.sh    # 本地应用启动 / 重启统一入口，在 127.0.0.1 上启动后端 (5175) + 前端 (5173)
 ./restart-local.sh --intranet   # 改绑局域网 IP，便于从另一台机器测试
 ```
 
@@ -42,12 +42,17 @@ pnpm install
 ```bash
 pnpm test:fast              # fast project（CI 默认）
 pnpm test                   # vitest 全量（fast + slow）
-pnpm exec vitest run <file> # 单文件
+pnpm verify focus <file.test.ts> # 调试期间定向 Vitest，不重启应用
+pnpm verify prepush         # 最终源码的完整 fast + lint
+pnpm verify <file.spec.ts>   # 重启隔离应用并跑 Playwright
+pnpm verify status          # 检查验证记录是否对应当前源码
 pnpm run test:e2e           # Playwright E2E
 pnpm run lint               # ESLint，error 必须清零
 ```
 
-改完代码的验证顺序：`./restart-local.sh` 重启 → 用浏览器验真实行为 → `pnpm test:fast` → `pnpm run lint`。
+调试期间针对受影响行为跑定向测试，纯测试、工具和文档改动不要求每次重启应用。涉及应用行为、UI 或 WebSocket 时，最终验证先通过 `./restart-local.sh` 重启并检查真实行为；`pnpm verify <file.spec.ts>` 会在隔离环境完成这些步骤。最终源码上运行 `pnpm verify prepush`，按风险补相关 slow Session / E2E。定向检查不能代替完整门禁。
+
+Session 夹具区分真实开局和预设工作阶段场景，见[卡牌测试模板](docs/CARD_TEST_TEMPLATE_zh.md#52-状态准备方式)。验证记录、测试依赖准备与本机全量 CI 见 [CI 操作文档](docs/operations/ci-checks.md)。记录用于识别过期结果，不会自动跳过检查。
 
 贡献者只需要 `./restart-local.sh` 这一个 shell 脚本。`deploy-backend.sh` 和 `backup-offsite.sh` 是维护者专用的，用于运维 owner 的生产机，不属于任何贡献流程。
 
@@ -63,7 +68,7 @@ pnpm run lint               # ESLint，error 必须清零
 
 - Commit 标题规范：`feat: ...` / `fix: ...` / `refactor: ...` / `docs: ...`，message 用英文，简洁明了。
 - 永远 rebase main，**禁止 merge commit**。
-- push 前本地先过 `pnpm run lint` + `pnpm test:fast`。
+- 每次 push 前 rebase main，在最终源码上运行 `pnpm verify prepush`。push 后等待所有相关 GitHub Actions run 结束；失败要修复，skipped 不算成功验证。
 - 卡牌相关改动必须同步 [docs/card_implementation_status_zh.md](docs/card_implementation_status_zh.md)；改动通用扩展点（hook phase、ActionFlow node、协议层）必须同步 [docs/ARCHITECTURE_zh.md](docs/ARCHITECTURE_zh.md)。
 
 ## Issue
