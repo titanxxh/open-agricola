@@ -77,10 +77,18 @@ function choiceOptions(value: unknown, cardId: string): void {
     ownSource(option.sourceCard, cardId)
   }
 }
+function conditions(value: unknown): void {
+  assertRecord(value, 'Payment conditions')
+  assertKeys(value, ['minNumRooms', 'houseTypeWood', 'houseTypeClay', 'houseTypeStone'], 'Payment conditions')
+  for (const [key, amount] of Object.entries(value)) finite(amount, `Condition ${key}`, true)
+  if (value.minNumRooms !== undefined) integer(value.minNumRooms, 'Condition minNumRooms')
+}
 function bonus(value: unknown, cardId: string): void {
   assertRecord(value, 'Bonus')
   assertKeys(value, ['discount', 'choices', 'capDiscountAtCost', 'trackChoiceIndex', 'choiceAffectsState', 'optional', 'sources', 'conditions', 'minCost', 'maxCost'], 'Bonus')
   for (const key of ['discount', 'minCost', 'maxCost']) if (value[key] !== undefined) resourceMap(value[key])
+  if (value.conditions !== undefined) conditions(value.conditions)
+  for (const key of ['capDiscountAtCost', 'trackChoiceIndex', 'choiceAffectsState', 'optional']) if (value[key] !== undefined && typeof value[key] !== 'boolean') throw new Error(`Bonus ${key} must be boolean`)
   if (value.sources !== undefined && (!Array.isArray(value.sources) || value.sources.some(source => source !== cardId))) throw new Error('Bonus sources must belong to this card')
   if (value.choices !== undefined) {
     if (!Array.isArray(value.choices)) throw new Error('Bonus choices must be an array')
@@ -111,14 +119,15 @@ function providers(value: unknown, cardId: string): void {
   }
 }
 
-function trade(value: unknown, cardId: string, declaration = false): void {
+function trade(value: unknown, cardId: string, usage: 'payment' | 'exchange' | 'exchange-declaration' = 'payment'): void {
   assertRecord(value, 'Trade')
-  assertKeys(value, ['from', 'to', 'max', 'fromFarmyard', 'sourceId', 'triggers', 'blockedAnytimeInteractionKinds', ...(declaration ? [] : ['source', 'scope', 'minCost', 'maxCost', 'groupId', 'groupMin', 'groupMax', 'replaceUpTo'])], 'Trade')
+  assertKeys(value, ['from', 'to', 'max', 'sourceId', ...(usage !== 'exchange-declaration' ? ['source'] : []), ...(usage === 'payment' ? ['scope', 'minCost', 'maxCost', 'groupId', 'groupMin', 'groupMax', 'replaceUpTo'] : ['fromFarmyard', 'triggers', 'blockedAnytimeInteractionKinds'])], 'Trade')
   resourceMap(value.from); resourceMap(value.to)
   if (!Object.values(value.from).some(amount => Number(amount) > 0) && value.max === undefined) throw new Error('An exchange without positive input requires a finite max')
   ownSource(value.sourceId, cardId)
   ownSource(value.source, cardId)
-  if (value.max !== undefined) finite(value.max, 'Trade max', true)
+  if (value.max !== undefined) integer(value.max, 'Trade max')
+  if (value.fromFarmyard !== undefined && typeof value.fromFarmyard !== 'boolean') throw new Error('Exchange fromFarmyard must be boolean')
   if (value.triggers !== undefined && (!Array.isArray(value.triggers) || value.triggers.some(item => !['anytime', 'harvest', 'bake-bread'].includes(item)))) throw new Error('Unsupported exchange window')
   if (value.blockedAnytimeInteractionKinds !== undefined && (!Array.isArray(value.blockedAnytimeInteractionKinds) || value.blockedAnytimeInteractionKinds.some(item => !(sandboxInteractionKinds as readonly unknown[]).includes(item)))) throw new Error('Unsupported exchange interaction kind')
 }
@@ -132,7 +141,7 @@ function cost(value: unknown, cardId: string, allowCardReturn = false): void {
     if (!Array.isArray(value.fees)) throw new Error('Cost fees must be an array')
     value.fees.forEach(fee => resourceMap(fee, true))
   }
-  if (value.nb !== undefined) finite(value.nb, 'Cost unit count', true)
+  if (value.nb !== undefined) integer(value.nb, 'Cost unit count')
   if (value.resourceReserve !== undefined) {
     assertRecord(value.resourceReserve, 'Resource reserve')
     assertKeys(value.resourceReserve, ['resources', 'minimum'], 'Resource reserve')
@@ -161,6 +170,7 @@ export function assertCustomCardDefinition(definition: unknown, cardId: string):
   safeData(meta)
   assertKeys(meta, sandboxCardMetadataKeys, 'CARD_DEF.meta')
   if (meta.id !== cardId) throw new Error('CARD_DEF id must match CARD_ID')
+  if (meta.vp !== undefined) finite(meta.vp, 'Printed VP')
   if (meta.cost !== undefined) cost(meta.cost, cardId, true)
   if (meta.altCosts !== undefined) {
     if (!Array.isArray(meta.altCosts)) throw new Error('altCosts must be an array')
@@ -170,13 +180,14 @@ export function assertCustomCardDefinition(definition: unknown, cardId: string):
   for (const key of ['occupationPrerequisites', 'improvementPrerequisites']) if (meta[key] !== undefined) bounds(meta[key])
   if (meta.exchanges !== undefined) {
     if (!Array.isArray(meta.exchanges)) throw new Error('exchanges must be an array')
-    meta.exchanges.forEach(item => trade(item, cardId, true))
+    meta.exchanges.forEach(item => trade(item, cardId, 'exchange-declaration'))
   }
   if (meta.modifiers !== undefined && !Array.isArray(meta.modifiers)) throw new Error('modifiers must be an array')
   for (const modifier of [...(Array.isArray(meta.modifiers) ? meta.modifiers : []), ...(meta.modifier !== undefined ? [meta.modifier] : [])]) {
     assertRecord(modifier, 'Cost modifier')
     assertKeys(modifier, ['type', 'cardId', 'appliesTo', 'from', 'to', 'max', 'scope', 'groupId', 'groupMin', 'groupMax', 'replaceUpTo', 'minCost', 'maxCost', 'conditions', 'discount', 'choices', 'capDiscountAtCost', 'trackChoiceIndex', 'choiceAffectsState', 'optional', 'resources'], 'Cost modifier')
     if (modifier.cardId !== cardId) throw new Error('Cost modifier cardId must be this card')
+    if (modifier.conditions !== undefined) conditions(modifier.conditions)
     if (!['trade', 'bonus', 'remove-resource'].includes(String(modifier.type))) throw new Error('Unsupported cost modifier')
     if (!Array.isArray(modifier.appliesTo) || modifier.appliesTo.some(type => !['construct', 'renovation', 'occupation', 'fencing', 'stables', 'plow', 'major-improvement', 'minor-improvement'].includes(type))) throw new Error('Unsupported modifier cost type')
     if (modifier.type === 'trade') {
@@ -246,7 +257,11 @@ export function assertCustomActionData(actionId: string, params: Record<string, 
     assertKeys(request, ['cardId', 'playerId', 'startRound', 'count', 'resources', 'entries', 'actionContext'], 'Future request')
     if (request.cardId !== cardId || typeof request.playerId !== 'string') throw new Error('Future request requires this card and a player ID')
     if (request.entries !== undefined && !Array.isArray(request.entries)) throw new Error('Future entries must be an array')
-    if (request.entries === undefined) { finite(request.startRound, 'Future start round', true); finite(request.count, 'Future count', true) }
+    if (request.entries === undefined) {
+      integer(request.startRound, 'Future start round'); integer(request.count, 'Future count')
+      if (request.startRound < 1 || request.startRound > 14) throw new Error('Future start round must be from 1 to 14')
+      assertRecord(request.resources, 'Future resources')
+    }
     const entries = Array.isArray(request.entries) ? request.entries : [request]
     for (const entry of entries) {
       assertRecord(entry, 'Future entry')
@@ -306,7 +321,7 @@ export function assertCustomActionData(actionId: string, params: Record<string, 
     ownSource(context.trigger.cardId, cardId)
   }
   if (actionId === 'exchange') {
-    if (context.directTrade !== undefined) trade(context.directTrade, cardId)
+    if (context.directTrade !== undefined) trade(context.directTrade, cardId, 'exchange')
     if (context.tradeIds !== undefined) stringArray(context.tradeIds, 'Exchange trade IDs', undefined, true)
     if (context.maxTradeTimesBySourceId !== undefined) {
       assertRecord(context.maxTradeTimesBySourceId, 'Exchange source caps')
@@ -491,7 +506,7 @@ export function assertCustomListenerCapabilities(value: unknown, cardId: string,
   if (value.reserveResources !== undefined) resourceMap(value.reserveResources)
   for (const key of ['extraExchanges', 'trades']) if (value[key] !== undefined) {
     if (!Array.isArray(value[key])) throw new Error(`${key} must be an array`)
-    value[key].forEach(item => trade(item, cardId, key === 'extraExchanges'))
+    value[key].forEach(item => trade(item, cardId, key === 'extraExchanges' ? 'exchange-declaration' : 'payment'))
   }
   if (value.extraData !== undefined) {
     assertRecord(value.extraData, 'Listener extraData')

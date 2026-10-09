@@ -369,6 +369,11 @@ describe('Workshop stage and animal settlement',()=>{
 
 describe('Workshop declarative metadata settlement',()=>{
   it.each([
+    [{vp:'2'},'Printed VP'],
+    [{exchanges:[{from:{wood:1},to:{food:1},max:0.5}]},'integer'],
+    [{cost:{unitFee:{food:1},nb:0.5}},'integer'],
+    [{cost:{fee:{food:2},bonuses:[{discount:{food:1},conditions:{minNumRooms:'3'}}]}},'Condition minNumRooms'],
+    [{cost:{fee:{food:2},trades:[{from:{wood:1},to:{food:1},triggers:['harvest']}]}},'unsupported field'],
     [{cost:{fee:{wood:2},bonuses:[{}]}},'exactly one'],
     [{cost:{fee:{wood:2},bonuses:[{discount:{wood:1},choices:[]}]}},'exactly one'],
     [{cost:{fee:{wood:2},bonuses:[{choices:[]}]}},'non-empty'],
@@ -445,6 +450,95 @@ describe('Workshop declarative metadata settlement',()=>{
 })
 
 describe('Workshop admitted player, choice and payment data',()=>{
+  it.each([{fields:1,grain:2,bounds:{minSelections:2,maxSelections:2}},{fields:2,grain:1,bounds:{minSelections:2,maxSelections:2}},{fields:1,grain:1,bounds:{maxSelections:0}},{fields:1,grain:1,bounds:{minSelections:0,maxSelections:0}}])('does not open an impossible sow selection with $fields fields and $grain seeds',({fields,grain,bounds})=>{
+    const {session,player}=setup(afterCollect(leaf('sow',{actionContext:bounds})))
+    player.fields=Array.from({length:fields},(_,index)=>({row:0,col:index+1,stacks:[]}));player.resources.grain=grain
+    session.loadState(session.state);const before=JSON.stringify(session.state),r=session.takeAction(0,'forest')
+    expect(r.ok).toBe(false);expect(JSON.stringify(session.state)).toBe(before)
+    expect(r.interaction.request?.kind).not.toBe('farm-select');expect(r.interaction.request?.kind).not.toBe('engine-blocked')
+    expect(r.state.players[0]!.resources.grain).toBe(grain);expect(r.state.players[0]!.fields.every(field=>field.stacks.length===0)).toBe(true)
+    expect(r.state.events.some(event=>event.type==='farm.sown')).toBe(false)
+  })
+
+  it('retains native nonempty sow settlement when the declared minimum is zero',()=>{
+    const {session,player}=setup(afterCollect(leaf('sow',{actionContext:{minSelections:0,maxSelections:1}})))
+    player.fields=[{row:0,col:1,stacks:[]}];player.resources.grain=1
+    let r=collect(session);expect(r.interaction.request).toMatchObject({kind:'farm-select',farm:{farmType:'sow',minSelections:0,maxSelections:1}})
+    const before=JSON.stringify(session.state);expect(session.commitSelectionChoice(0,{crops:[]}).ok).toBe(false);expect(JSON.stringify(session.state)).toBe(before)
+    r=session.commitSelectionChoice(0,{crops:[{row:0,col:1,crop:'grain'}]});expect(r.ok,r.error).toBe(true)
+    expect(r.state.players[0]!.fields[0]!.stacks).toEqual([{kind:'grain',remaining:3}]);expect(r.state.players[0]!.resources.grain).toBe(0);expect(r.interaction.request?.kind).not.toBe('engine-blocked')
+  })
+
+  it('sows the required two fields using two seeds before resuming its reward',()=>{
+    const flow={type:'seq',children:[leaf('sow',{actionContext:{minSelections:2,maxSelections:2}}),leaf('gain',{params:{food:1}})]} as ActionFlow
+    const {session,player}=setup(afterCollect(flow));player.fields=[{row:0,col:1,stacks:[]},{row:0,col:2,stacks:[]}];player.resources.grain=2
+    let r=collect(session);expect(r.interaction.request).toMatchObject({kind:'farm-select',farm:{farmType:'sow',minSelections:2,maxSelections:2}})
+    expect(r.state.players[0]!.resources.food).toBe(2)
+    const before=JSON.stringify(session.state);expect(session.commitSelectionChoice(0,{crops:[{row:0,col:1,crop:'grain'}]}).ok).toBe(false);expect(JSON.stringify(session.state)).toBe(before)
+    r=session.commitSelectionChoice(0,{crops:[{row:0,col:1,crop:'grain'},{row:0,col:2,crop:'grain'}]});expect(r.ok,r.error).toBe(true)
+    expect(r.state.players[0]!.resources).toMatchObject({grain:0,food:3});expect(r.state.players[0]!.fields.map(field=>field.stacks)).toEqual([[{kind:'grain',remaining:3}],[{kind:'grain',remaining:3}]])
+    expect(r.state.events).toContainEqual(expect.objectContaining({type:'farm.sown'}));expect(session.cardWarnings).toEqual([])
+  })
+
+  it('checks the sow minimum after an earlier plow creates the second field',()=>{
+    const flow={type:'seq',children:[leaf('plow'),leaf('sow',{actionContext:{minSelections:2,maxSelections:2}}),leaf('gain',{params:{food:1}})]} as ActionFlow
+    const {session,player}=setup(afterCollect(flow));player.fields=[{row:0,col:1,stacks:[]}];player.resources.grain=2
+    let r=collect(session);expect(r.interaction.request).toMatchObject({kind:'farm-select',farm:{farmType:'plow'}})
+    r=session.commitSelectionChoice(0,{tile:{row:0,col:2}});expect(r.ok,r.error).toBe(true);expect(r.interaction.request).toMatchObject({kind:'farm-select',farm:{farmType:'sow',minSelections:2}})
+    r=session.commitSelectionChoice(0,{crops:[{row:0,col:1,crop:'grain'},{row:0,col:2,crop:'grain'}]});expect(r.ok,r.error).toBe(true)
+    expect(r.state.players[0]!.resources).toMatchObject({grain:0,food:3});expect(r.state.players[0]!.fields).toContainEqual(expect.objectContaining({row:0,col:2,stacks:[{kind:'grain',remaining:3}]}));expect(session.cardWarnings).toEqual([])
+  })
+
+  it('rejects a forced unavailable sow branch and keeps its original menu for another choice',()=>{
+    const flow={type:'xor',children:[leaf('sow',{actionContext:{minSelections:2,maxSelections:2}}),leaf('gain',{params:{stone:1}})]} as ActionFlow
+    const implementation=afterCollect(flow).slice(0,-2)+",{actions:['sow'],phases:['isDoable'],handler:()=>({doable:true})}]}"
+    const {session,player}=setup(implementation);player.fields=[{row:0,col:1,stacks:[]}];player.resources.grain=2
+    let r=collect(session);expect(r.interaction.request?.kind).toBe('choice')
+    const options=r.interaction.request!.options,sow=options.find(option=>option.labelKey==='actions.sow.name')!
+    const before=JSON.stringify(session.state);r=session.resolveChoice(0,sow.value)
+    expect(r.ok).toBe(false);expect(r.error).toContain('Sow selection minimum');expect(JSON.stringify(session.state)).toBe(before);expect(r.interaction.request?.kind).toBe('choice')
+    r=session.resolveChoice(0,options.find(option=>option.value!==sow.value)!.value);expect(r.ok,r.error).toBe(true)
+    expect(r.state.players[0]!.resources).toMatchObject({grain:2,stone:1});expect(r.state.events.some(event=>event.type==='farm.sown')).toBe(false)
+  })
+
+  it('queues a complete range request and delivers food in the next two rounds',()=>{
+    const {session}=setup(`{listeners:[{actions:['collect'],phases:['after'],mandatory:true,handler:ctx=>({flow:{type:'leaf',actionId:'future-meeples',params:{__futureMeepleRequest:{cardId:CARD_ID,playerId:ctx.player.id,startRound:2,count:2,resources:{food:1}}}}})}]}`)
+    let r=collect(session);expect(r.state.futureMeeples.map(entry=>({round:entry.round,resources:entry.resources}))).toEqual([{round:2,resources:{food:1}},{round:3,resources:{food:1}}])
+    expect(r.state.events).toContainEqual(expect.objectContaining({type:'futureMeeple.queued',cardId:CARD}))
+    for(const round of [2,3]){
+      for(const player of session.state.players){markAllWorkersUsed(session.state,player);setActiveWorkerCount(player,0)}
+      session.loadState(session.state);r=session.invokeAfterRoundEnd();expect(r.ok,r.error).toBe(true)
+      expect(r.state.round).toBe(round);expect(r.state.players[0]!.resources.food).toBe(round+1);expect(r.state.players[1]!.resources.food).toBe(3)
+    }
+    expect(session.cardWarnings).toEqual([])
+  })
+
+  it('settles whole unit fees and a generated exchange choice capped at one use',()=>{
+    const flow={type:'seq',children:[leaf('pay',{params:{cost:{unitFee:{food:1},nb:2}}}),leaf('exchange',{actionContext:{tradeIds:[CARD]}})]} as ActionFlow
+    const {session}=setup(afterCollect(flow),"exchanges:[{from:{wood:1},to:{food:1},max:1,triggers:['anytime']}]");let r=collect(session);expect(r.interaction.request?.kind).toBe('choice')
+    const option=r.interaction.request!.options.find(option=>option.effectPreview?.kind==='resourceExchange')!
+    expect(option.effectPreview).toMatchObject({resourcesPaid:{wood:1},resourcesGained:{food:1}})
+    r=session.resolveChoice(0,option.value);expect(r.ok,r.error).toBe(true);expect(r.state.players[0]!.resources).toMatchObject({wood:2,food:1})
+    expect(r.state.events).toContainEqual(expect.objectContaining({type:'resource.paid',resources:{food:2}}))
+    expect(r.state.events.filter(event=>event.type==='resource.exchanged')).toHaveLength(1);expect(Object.values(r.state.players[0]!.resources).every(Number.isInteger)).toBe(true)
+  })
+
+  it.each([2,3])('applies a room-conditioned bonus only when %i rooms meet its minimum',rooms=>{
+    const {session,player}=setup(afterCollect(leaf('pay',{params:{cost:{fee:{food:2},bonuses:[{discount:{food:1},conditions:{minNumRooms:3}}]}}})))
+    if(rooms===3)player.roomTiles.push({row:0,col:0});player.rooms=rooms
+    const r=collect(session);const paid=rooms===3?1:2
+    expect(r.state.players[0]!.resources.food).toBe(2-paid);expect(r.state.events).toContainEqual(expect.objectContaining({type:'resource.paid',resources:{food:paid}}));expect(session.cardWarnings).toEqual([])
+  })
+
+  it('finishes scoring with numeric printed VP on the played custom card',()=>{
+    const {session}=setup('{}','vp:2');session.state.round=14
+    for(const player of session.state.players){markAllWorkersUsed(session.state,player);setActiveWorkerCount(player,0)}
+    session.loadState(session.state);const r=session.invokeAfterRoundEnd();expect(r.ok,r.error).toBe(true);expect(r.state.gameOver).toBe(true)
+    const scores=session.withCtx(()=>Scoring.computeAll(r.state))
+    expect(scores.every(score=>Number.isFinite(score.total))).toBe(true)
+    expect(scores[0]!.categories.flatMap(category=>category.entries)).toContainEqual(expect.objectContaining({cardId:CARD,score:2}))
+  })
+
   it.each(['flow','extraData','alternativeFlow'] as const)('selects an opponent farm extension with %s bound to its native actor',kind=>{
     const selection={selectableTiles:[{row:-1,col:1},{row:-1,col:2}],minSelections:1,maxSelections:1}
     const override=kind==='flow'?'':`,{actions:['selection'],phases:['${kind==='extraData'?'computeArgs':'computeReplace'}'],scope:'any',handler:()=>(${JSON.stringify(kind==='extraData'?{extraData:selection}:{decline:true,alternativeFlow:leaf('selection',{actionContext:selection})})})}`
@@ -529,6 +623,11 @@ describe('Workshop admitted player, choice and payment data',()=>{
   })
   it.each([
     leaf('gain',{targetPlayerId:'missing',params:{food:1}}),
+    leaf('future-meeples',{params:{__futureMeepleRequest:{cardId:CARD,playerId:'p1',startRound:2,count:2}}}),
+    leaf('exchange',{actionContext:{directTrade:{from:{wood:1},to:{food:1},max:0.5}}}),
+    leaf('pay',{params:{cost:{unitFee:{food:1},nb:0.5}}}),
+    leaf('pay',{params:{cost:{fee:{food:2},trades:[{from:{wood:1},to:{food:1},triggers:['harvest']}]}}}),
+    leaf('pay',{params:{cost:{fee:{food:2},bonuses:[{discount:{food:1},conditions:{minNumRooms:'3'}}]}}}),
     {type:'seq',targetPlayerId:42,children:[leaf('gain',{params:{food:1}})]},
     leaf('occupation',{params:{allowedCards:{}}}),
     leaf('selection',{actionContext:{selectableTiles:[]}}),

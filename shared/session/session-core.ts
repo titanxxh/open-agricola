@@ -1,4 +1,5 @@
 import { buildAnimalReorgRequest } from '../domain/animal-reorg'
+import { InvalidActionContextError } from '../contract/action-context-error'
 import { beginHistoryOperation, captureStateWithHistory, historyBranch, materializeHistoryBranch, recoveryRecordId, registerRecoveryRecordId } from './history-streams'
 import { cloneStateWithHistory } from './state-bootstrap'
 import { canStartBefore, evaluateFlowDoable, isActionDoableInFlowContext, isFlowDerivedDoable } from '../actions/flow'
@@ -1250,6 +1251,7 @@ export class GameCore {
         this.provisionalContinuationScopes = settlement.scopeSnapshot
         this.failedAuthoritativeCommands = settlement.failedCommandSnapshot
         this.cardWarnings.push(...warnings)
+        if (error instanceof InvalidActionContextError) return this.respond(false, error.message)
         throw error
       } finally {
         this.activeCommandSettlement = null

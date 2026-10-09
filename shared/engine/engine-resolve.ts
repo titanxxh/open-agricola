@@ -603,6 +603,7 @@ export function engineResolveChoice(
         int.pendingNodeIdRef.value = null
         return { type: 'ok' }
       }
+      action.assertExecutionContext?.(executionContext)
       const doabilityActionContext = { ...executionContext.actionContext, checkedReplaceAction: true }
       const doable = int.hooks.applyIsDoable(
         { ...executionContext, actionContext: doabilityActionContext, ...currentEventReadContext(int), actionId },

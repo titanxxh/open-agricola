@@ -8,9 +8,10 @@ import type {
 import { fieldIsEmpty } from '../../domain/field'
 import { positionKey } from '../../domain/farm'
 import { playerBoard, type SowSelection } from '../../domain'
-import { buildSowFarmInteraction, getAllowedSelectedFieldKeys } from '../../domain/farmyard-interaction'
+import { buildSowFarmInteraction, canSowFarmInteraction, getAllowedSelectedFieldKeys } from '../../domain/farmyard-interaction'
 import { handleSowExtraField } from '../../cards/card-effects'
 import { getLogicalFields, mutateLogicalFields } from '../../cards/helpers/card-field'
+import { InvalidActionContextError } from '../../contract/action-context-error'
 
 const sowedAmount = (crop: SowSelection['crop']) => crop === 'grain' || crop === 'wood' ? 3 : 2
 
@@ -162,9 +163,13 @@ export const sowAction: ActionDefinition = {
   descriptionKey: 'actions.sow.description',
   roundAvailable: 1,
   gainPerRound: {},
+  assertExecutionContext: ({player,actionContext}) => {
+    if (actionContext?.minSelections === undefined && actionContext?.maxSelections === undefined) return
+    if (!canSowFarmInteraction(player, buildSowFarmInteraction(player, actionContext))) throw new InvalidActionContextError('Sow selection minimum cannot be reached with the current fields and seeds')
+  },
   canBeExecutedByPlayer: (_state, player, context) => {
     const farm = buildSowFarmInteraction(player, context?.actionContext)
-    return farm.farmType === 'sow' && farm.selectableFields.length > 0
+    return canSowFarmInteraction(player, farm)
   },
   execute: (ctx): ActionExecutionResult => {
     if (Array.isArray(ctx.params?.crops)) {
@@ -174,6 +179,7 @@ export const sowAction: ActionDefinition = {
     const farm = playerBoard(ctx.state, idx).farmInteraction.selectableTiles('sow', {
       actionContext: ctx.actionContext,
     })
+    if (!canSowFarmInteraction(ctx.player, farm)) return { type: 'fail', errorKey: 'log.sowFail', recoverable: true }
     if (
       ctx.actionContext?.autoResolveSingleSelection === true &&
       farm.farmType === 'sow' &&

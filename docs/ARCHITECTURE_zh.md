@@ -719,7 +719,9 @@ trigger frame 必须随 trailing `activate-card` node 持久化：`ActivateCardA
 
 ### 7.5.1 Public ActionNode 执行顺序
 
-普通 public action leaf 进入 engine 后按以下顺序处理：`computeReplace -> before -> strict isDoable -> computeCosts -> execute -> during -> immediatelyAfter -> after`。
+可信的 `ActionDefinition.assertExecutionContext` 仅在真实 leaf 执行前调用：所有 before 续行完成之后、最终 doability 之前。普通 leaf 和已选中的 OR/XOR leaf 都经过该入口。类型化 `InvalidActionContextError` 通过现有 Session checkpoint 拒绝并回滚当前命令；其他异常保留原错误行为。纯预览不调用此断言。受限 sow 使用原生候选与种子匹配，支持此前的犁地或资源获得步骤，同时避免不可达的选择。
+
+普通 public action leaf 进入 engine 后按以下顺序处理：`computeReplace -> before -> assertExecutionContext -> strict isDoable -> computeCosts -> execute -> during -> immediatelyAfter -> after`。
 
 Direct `cancel` 不是 protected atomic action 的成功路径。`plow` / `sow` / `construct` / `stables` / `fence` / `reorganize` / internal `selection` 的 direct `cancel` 会在 option validation、`resolveChoice` 和 hooks 之前被 recoverable reject，pending 保持 active，因此不会触发 `before` / `during` / `immediatelyAfter` / `after`。Optionality 由父级 ActionFlow optional metadata 和 `__skip__` 表达；undo / 参考实现 `actRestart` 类回退走 history rollback。`construct` / `fence` 的 entry doability 必须先排除无 reachable room / 无 legal fence commit 的真实 state，避免 confirm-only pending 没有正常提交路径。`exchange` 与 `bake-bread` 暂按各自 legacy 窗口保留例外语义。
 
@@ -1531,7 +1533,7 @@ Durable Room Commit 要求 PostgreSQL、共享资源、`REPLAY_VIEWER_BUILD_ID` 
 
 ### 12.5 浏览器本地试玩沙盒（client/local-sandbox/）
 
-- Workshop Capability Contract（ADR 0024）：`shared/custom-code/sandbox-declarations.ts` 与 `runtime-capabilities.ts` 是自定义输出进入原生引擎的共享准入。源码校验、部署契约、isolated-vm worker、浏览器执行器共用 hook / 元数据 / listener / action 范围；全部位置参数以 JSON 传递，不传宿主回调。仅含元数据的 effect 也注册；省略 listener 过滤时绑定明确集合与本卡。动态嵌套 flow、参数变体在权威执行前校验，可信引擎生成的内部结算仍使用原生权限。行为通过固定 Session 场景验收，不另建行为判定程序。精确范围与延期的原生修改 / 回调机制见 `docs/CUSTOM_CARD_SANDBOX.md` §3、§6、§9。
+- Workshop Capability Contract（ADR 0025）：`shared/custom-code/sandbox-declarations.ts` 与 `runtime-capabilities.ts` 是自定义输出进入原生引擎的共享准入。源码校验、部署契约、isolated-vm worker、浏览器执行器共用 hook / 元数据 / listener / action 范围；全部位置参数以 JSON 传递，不传宿主回调。仅含元数据的 effect 也注册；省略 listener 过滤时绑定明确集合与本卡。动态嵌套 flow、参数变体在权威执行前校验，可信引擎生成的内部结算仍使用原生权限。行为通过固定 Session 场景验收，不另建行为判定程序。精确范围与延期的原生修改 / 回调机制见 `docs/CUSTOM_CARD_SANDBOX.md` §3、§6、§9。
 
 `VITE_SANDBOX_EXECUTOR=browser` 时工坊试玩全程在浏览器运行，零服务器参与；缺省走服务端 `/api/game/new-sandbox`（原样保留）。
 

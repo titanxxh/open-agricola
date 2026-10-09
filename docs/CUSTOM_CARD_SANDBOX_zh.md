@@ -690,7 +690,9 @@ return {
 
 Listener 的 `flow` 和 `followUpActions` 默认由 `context.effectPlayer` 执行；替代行动的 `alternativeFlow`、`actionId` 与当前行动的 `extraData` 使用 `context.player`。农场候选校验遵循原生执行玩家，包括指定目标后的玩家切换。
 
-元数据 altCosts 的每项必须是平坦支付资源对象；returnCards 必须是字符串数组，要求退回真实持有的卡并支付牌面费用；cost.cards 在 required 不为 true 时是替代付款路径。remove-resource modifier 需要非空的支持资源数组。复合 resourceReserve 声明资源名及有限非负 minimum。兑换没有正输入时必须提供有限 max。breed 的选择必须是本局已启用且不重复的动物；动物分区的所有准入可选数据字段在原生安置前校验。
+付款 trade 不开放仅供兑换使用的 `triggers`、`fromFarmyard`、`blockedAnytimeInteractionKinds`；这些字段仅允许用于兑换声明。兑换 max 与复合费用 nb 为非负整数。bonus 与 modifier 的 conditions 只允许数值形式的 minNumRooms、houseTypeWood / houseTypeClay / houseTypeStone，其中房间下限为非负整数。印刷 vp 必须是有限数值。范围式未来请求必须包含资源对象，回合与次数为整数。播种下限在实际执行前按原生投影、逻辑田组和可用种子校验，此时此前行动和 before 效果已完成；原生播种结算即使声明零下限也至少需要选择一块田；不可达的显式边界会拒绝并回滚当前命令，不创建无法提交的等待交互。
+
+元数据 altCosts 的每项必须是平坦支付资源对象；returnCards 必须是字符串数组，要求退回真实持有的卡并支付牌面费用；cost.cards 在 required 不为 true 时是替代付款路径。remove-resource modifier 需要非空的支持资源数组。复合 resourceReserve 声明资源名及有限非负 minimum。兑换没有正输入时必须提供非负整数 max。breed 的选择必须是本局已启用且不重复的动物；动物分区的所有准入可选数据字段在原生安置前校验。
 
 未来回合调度仅开放普通资源和 field/stable；不开放调度条目的 `actionContext` 或原生 `sourceSummary`。`special-effect` 另外开放 `pop-card-stack-top`、`set-infobox(text)`、`remove-future-meeples(rounds?)`，取消只作用于本卡及效果玩家。其他 kind 均明确拒绝。
 
@@ -821,7 +823,7 @@ CI 会拦下漏改的情况。
 
 ### 9.3 能力补齐评审（2026-10-08）
 
-项目 owner 已确认扩充适合的真实工坊能力，并让生成、校验与执行使用同一开放范围，见 [ADR 0024](adr/0024-workshop-capability-contract-is-an-execution-boundary.md)。本节记录 c136edc83 的补齐前审计与适配决定；§9.4 是本轮实现，其余项目仍为延期设计，不扩大已部署范围。
+项目 owner 已确认扩充适合的真实工坊能力，并让生成、校验与执行使用同一开放范围，见 [ADR 0025](adr/0025-workshop-capability-contract-is-an-execution-boundary.md)。本节记录 c136edc83 的补齐前审计与适配决定；§9.4 是本轮实现，其余项目仍为延期设计，不扩大已部署范围。
 
 | 已审计机制 | 当前限制 | 建议处理方式及原因 |
 |---|---|---|

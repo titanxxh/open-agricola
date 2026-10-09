@@ -56,6 +56,17 @@ const createMockPlayer = (overrides: Partial<PlayerState> = {}): PlayerState => 
 } as unknown as PlayerState)
 
 describe('Bonus.conditions / BonusChoice.conditions evaluation', () => {
+  it('does not reuse conditioned payments after room or house changes',()=>{
+    const player=createMockPlayer({rooms:5,houseType:'wood'})
+    const cost:ComplexCost={fee:{stone:4},bonuses:[{discount:{stone:2},conditions:{minNumRooms:5,houseTypeWood:1}}]}
+    expect(computeAllBuyableCombinations(player,cost).map(solution=>solution.resourcesPaid.stone)).toEqual([2])
+    player.rooms=4
+    expect(computeAllBuyableCombinations(player,cost).map(solution=>solution.resourcesPaid.stone)).toEqual([4])
+    player.rooms=5;player.houseType='clay'
+    expect(computeAllBuyableCombinations(player,cost).map(solution=>solution.resourcesPaid.stone)).toEqual([4])
+    player.houseType='wood'
+    expect(computeAllBuyableCombinations(player,cost).map(solution=>solution.resourcesPaid.stone)).toEqual([2])
+  })
   it('1. bonus.conditions satisfied applies discount', () => {
     const player = createMockPlayer({ rooms: 5, houseType: 'wood' })
     const cost: ComplexCost = {

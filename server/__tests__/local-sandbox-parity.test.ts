@@ -271,6 +271,13 @@ describe('shared Workshop capability admission', () => {
   })
 
   it.each([
+    [{vp:'2'},'Printed VP'],
+    [{exchanges:[{from:{wood:1},to:{food:1},max:0.5}]},'integer'],
+    [{cost:{unitFee:{food:1},nb:0.5}},'integer'],
+    [{cost:{fee:{food:2},bonuses:[{discount:{food:1},conditions:{minNumRooms:'3'}}]}},'Condition minNumRooms'],
+    [{cost:{fee:{food:2},bonuses:[{discount:{food:1},conditions:{unknown:1}}]}},'unsupported field'],
+    [{cost:{fee:{food:2},trades:[{from:{wood:1},to:{food:1},triggers:['harvest']}]}},'unsupported field'],
+    [{cost:{fee:{food:2},trades:[{from:{sheep:1},to:{food:1},fromFarmyard:true}]}},'unsupported field'],
     [{cost:{fee:{wood:2},bonuses:[{}]}},'exactly one'],
     [{cost:{fee:{wood:2},bonuses:[{discount:{wood:1},choices:[]}]}},'exactly one'],
     [{cost:{fee:{wood:2},bonuses:[{choices:[]}]}},'non-empty'],
@@ -318,6 +325,9 @@ describe('shared Workshop capability admission', () => {
     ['empty xor', {type:'xor',children:[]}, 'nonempty children'],
     ['empty or', {type:'or',children:[]}, 'nonempty children'],
     ['non-string payment choice', {type:'leaf',actionId:'pay',params:{cost:{food:1},paymentChoice:{}}}, 'paymentChoice'],
+    ['fractional exchange limit', {type:'leaf',actionId:'exchange',actionContext:{directTrade:{from:{wood:1},to:{food:1},max:0.5}}}, 'integer'],
+    ['fractional unit payment', {type:'leaf',actionId:'pay',params:{cost:{unitFee:{food:1},nb:0.5}}}, 'integer'],
+    ['missing future resources', {type:'leaf',actionId:'future-meeples',params:{__futureMeepleRequest:{cardId:'CUSTOM_ParityCard',playerId:'p1',startRound:2,count:2}}}, 'Future resources'],
     ['non-string payment prefix', {type:'leaf',actionId:'pay',params:{cost:{food:1},optionPrefix:{}}}, 'optionPrefix'],
     ['real provider key', {type:'leaf',actionId:'pay',params:{cost:{fee:{food:1},paymentResourceProviders:[{key:'wood',sourceCard:'CUSTOM_ParityCard',available:1,covers:[{resource:'food',costAmount:1,paymentAmount:1}],consume:{type:'actionSpace',spaceId:'traveling-players',resource:'food'}}]}}}, 'virtual'],
     ['misplaced purchase context', {type:'leaf',actionId:'improvement',params:{types:['major'],actionContext:{minimumResourcesPaid:{clay:1}}}}, 'unsupported field'],

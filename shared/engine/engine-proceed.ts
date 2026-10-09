@@ -1181,6 +1181,7 @@ export function engineProceed(
       return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
     }
     const doabilityEventReadContext = currentEventReadContext(int)
+    action.assertExecutionContext?.(executionContext)
     const doabilityActionContext = { ...executionContext.actionContext, checkedReplaceAction: true }
     const doable = int.hooks.applyIsDoable(
       { ...executionContext, actionContext: doabilityActionContext, ...doabilityEventReadContext, actionId: replacedActionId },

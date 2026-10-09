@@ -642,7 +642,9 @@ Custom `pay` cannot supply `playedCards`, `candidateMetadataByFeeIndex` or `cost
 
 Listener `flow` and `followUpActions` default to `context.effectPlayer`; replacement `alternativeFlow`, `actionId` and current-action `extraData` use `context.player`. Farm candidate validation follows that native actor, including after a targeted player switch.
 
-Metadata altCosts entries are flat payment resource maps; returnCards is a string array and requires returning an owned card in addition to the printed fee; cost.cards is an alternative payment unless required is true. remove-resource modifiers require a nonempty supported resource array. Complex resourceReserve declares resource keys and a finite nonnegative minimum. Exchanges with no positive input require a finite max. Breed selections contain distinct enabled animals; animal zones validate all admitted optional data fields before native placement.
+Payment trade declarations exclude exchange-only `triggers`, `fromFarmyard` and `blockedAnytimeInteractionKinds`; these fields are accepted only on exchange declarations. Exchange maxima and complex-cost `nb` are nonnegative integers. Bonus and modifier conditions accept only numeric `minNumRooms` and `houseTypeWood` / `houseTypeClay` / `houseTypeStone`; room minima are nonnegative integers. Printed `vp` is finite numeric data. Range-based future requests require a resources map and whole round/count values. Sow minimums are checked by the native projection at actual dispatch, using logical field groups and compatible seeds after earlier actions and all before-phase continuations have completed. Native sow settlement requires at least one selected field, even with a declared zero minimum. Unreachable explicit bounds reject and roll back the current command instead of creating an impossible pending interaction.
+
+Metadata altCosts entries are flat payment resource maps; returnCards is a string array and requires returning an owned card in addition to the printed fee; cost.cards is an alternative payment unless required is true. remove-resource modifiers require a nonempty supported resource array. Complex resourceReserve declares resource keys and a finite nonnegative minimum. Exchanges with no positive input require a nonnegative integer max. Breed selections contain distinct enabled animals; animal zones validate all admitted optional data fields before native placement.
 
 Future scheduling admits ordinary resources and field/stable, without entry actionContext or native sourceSummary. Additional local special-effect kinds are `pop-card-stack-top`, `set-infobox(text)`, and `remove-future-meeples(rounds?)`; cancellation affects this card and effect player only. Other kinds are rejected explicitly.
 
@@ -770,7 +772,7 @@ CI catches a missing set update.
 
 ### 9.3 Capability completion review (2026-10-08)
 
-The owner confirmed expansion of suitable real Workshop capabilities and one shared generation, validation and execution scope; see [ADR 0024](adr/0024-workshop-capability-contract-is-an-execution-boundary.md). This section records the pre-completion audit at c136edc83 and adaptation decisions. Section 9.4 is the implemented first slice; remaining rows are deferred design work and do not enlarge the deployed surface.
+The owner confirmed expansion of suitable real Workshop capabilities and one shared generation, validation and execution scope; see [ADR 0025](adr/0025-workshop-capability-contract-is-an-execution-boundary.md). This section records the pre-completion audit at c136edc83 and adaptation decisions. Section 9.4 is the implemented first slice; remaining rows are deferred design work and do not enlarge the deployed surface.
 
 | Audited mechanism | Current limitation | Proposed treatment and reason |
 |---|---|---|

@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest'
-import { buildSowFarmInteraction } from '../farmyard-interaction'
+import { buildSowFarmInteraction, canSowFarmInteraction } from '../farmyard-interaction'
 import { makeBlankPlayer } from './helpers'
 import { CardRegistry } from '../../cards/registry'
 import {
@@ -33,6 +33,22 @@ afterEach(() => {
 })
 
 describe('buildSowFarmInteraction', () => {
+  it('matches scarce seeds to compatible logical fields rather than counting slots',()=>{
+    const player=makeBlankPlayer({resources:{grain:1,vegetable:1},minorPlayed:[FAKE_PROVIDER_ID]}) as unknown as PlayerState
+    withFakeExtra([
+      {tile:{row:-1,col:0},allowedCrops:['grain','vegetable'],groupKey:'flexible'},
+      {tile:{row:-1,col:1},allowedCrops:['grain'],groupKey:'grain-only'},
+    ],()=>expect(canSowFarmInteraction(player,buildSowFarmInteraction(player,{minSelections:2}))).toBe(true))
+    withFakeExtra([
+      {tile:{row:-1,col:0},allowedCrops:['grain','vegetable'],groupKey:'same-field'},
+      {tile:{row:-1,col:1},allowedCrops:['grain'],groupKey:'same-field'},
+    ],()=>expect(canSowFarmInteraction(player,buildSowFarmInteraction(player,{minSelections:2}))).toBe(false))
+    player.resources.vegetable=0
+    withFakeExtra([
+      {tile:{row:-1,col:0},allowedCrops:['grain'],groupKey:'first'},
+      {tile:{row:-1,col:1},allowedCrops:['grain'],groupKey:'second'},
+    ],()=>expect(canSowFarmInteraction(player,buildSowFarmInteraction(player,{minSelections:2}))).toBe(false))
+  })
   it('passes through groupKey from extra fields', () => {
     const player = makeBlankPlayer({
       resources: { wood: 2 },

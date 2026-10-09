@@ -923,6 +923,9 @@ export type ActionDefinition = {
   allowAnytimeReentry?: boolean
   idleOnly?: boolean
   canBeExecutedByPlayer: CanBeExecutedByPlayer
+  /** Host-owned argument preconditions, checked only at actual dispatch after
+   * before effects. Throw to reject the command without opening a stuck pending. */
+  assertExecutionContext?: (context: ActionExecutionContext) => void
   isAlreadySatisfied?: (
     context: ActionExecutionContext & { transactionEvents: readonly GameEvent[] },
   ) => boolean

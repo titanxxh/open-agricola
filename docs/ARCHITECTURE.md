@@ -726,7 +726,9 @@ As a `sourceCard` fallback, a top-level `ActionHookResult.flow.sourceCard` is re
 
 #### 7.5.1 Public `ActionNode` execution order
 
-An ordinary public-action leaf enters the engine in this order: `computeReplace -> before -> strict isDoable -> computeCosts -> execute -> during -> immediatelyAfter -> after`.
+Trusted `ActionDefinition.assertExecutionContext` preconditions run only at actual leaf dispatch, after all `before` continuations and before final doability. Both ordinary and selected OR/XOR leaves use the same cut. A typed `InvalidActionContextError` rejects the command through the existing Session checkpoint; unrelated exceptions retain their error behavior. Preview queries do not invoke this assertion. Constrained sow uses native candidate/seed matching so preceding plow or gain steps are respected without opening an unreachable selection.
+
+An ordinary public-action leaf enters the engine in this order: `computeReplace -> before -> assertExecutionContext -> strict isDoable -> computeCosts -> execute -> during -> immediatelyAfter -> after`.
 
 Direct `cancel` is not a successful protected-atomic-action path. For `plow`, `sow`, `construct`, `stables`, `fence`, `reorganize`, and internal `selection`, direct cancellation is recoverably rejected before option validation, `resolveChoice`, and hooks. Pending remains active, so none of the four reaction phases runs. The parent `ActionFlow` optional metadata and `__skip__` express optionality; undo and the reference `actRestart`-style reversal use history rollback. Entry doability for construct and fence must reject a real state with no reachable room or no legal fence commit, avoiding a confirm-only pending interaction with no valid commit path. Exchange and bake-bread temporarily retain exceptions for their legacy windows.
 
@@ -1557,7 +1559,7 @@ Strict main-bundle budgets in `scripts/check-bundle-size.ts` are 550 KB raw and 
 
 ### 12.5 Browser-local playtest sandbox under `client/local-sandbox/`
 
-- Workshop Capability Contract (ADR 0024): `shared/custom-code/sandbox-declarations.ts` and `runtime-capabilities.ts` are shared admission at the custom/native seam. Source validation, deployed descriptor, isolated-vm worker and browser executor share hook/metadata/listener/action admission. Complete positional arguments cross as JSON, without host callbacks. Metadata-only effects register; omitted listener filters bind explicit supported sets and owning card. Dynamic nested flows and parameter variants are checked before authoritative execution, while trusted engine-generated internal settlement keeps native authority. Fixed Session scenarios verify behavior; there is no separate behavior judge. Exact scope and deferred native mutation/callback mechanisms are in `docs/CUSTOM_CARD_SANDBOX.md` sections 3, 6 and 9.
+- Workshop Capability Contract (ADR 0025): `shared/custom-code/sandbox-declarations.ts` and `runtime-capabilities.ts` are shared admission at the custom/native seam. Source validation, deployed descriptor, isolated-vm worker and browser executor share hook/metadata/listener/action admission. Complete positional arguments cross as JSON, without host callbacks. Metadata-only effects register; omitted listener filters bind explicit supported sets and owning card. Dynamic nested flows and parameter variants are checked before authoritative execution, while trusted engine-generated internal settlement keeps native authority. Fixed Session scenarios verify behavior; there is no separate behavior judge. Exact scope and deferred native mutation/callback mechanisms are in `docs/CUSTOM_CARD_SANDBOX.md` sections 3, 6 and 9.
 
 With `VITE_SANDBOX_EXECUTOR=browser`, Workshop playtesting runs entirely in the browser without server participation. The default remains backend `POST /api/game/new-sandbox`.
 

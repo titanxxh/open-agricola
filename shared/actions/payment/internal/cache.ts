@@ -53,7 +53,7 @@ export const makeCacheKey = (
   const costKey = JSON.stringify(cost)
   const typeKey = costType ?? 'none'
   const playedCardsKey = [...(playedCards ?? [])].sort().join(',')
-  return `${reserveKey}|${costKey}|${typeKey}|${playedCardsKey}`
+  return `${reserveKey}|${player.rooms}|${player.houseType}|${costKey}|${typeKey}|${playedCardsKey}`
 }
 
 export const clearPaymentCache = () => {

@@ -294,6 +294,38 @@ export const buildSowFarmInteraction = (
   return { farmType: 'sow', selectableFields, minSelections, maxSelections }
 }
 
+/** Match logical field groups to available seeds; slots of one Card Field
+ * count once towards the minimum even when several slots can be sown. */
+export const canSowFarmInteraction = (player: PlayerState, farm: InteractionFarmSelection): boolean => {
+  if (farm.farmType !== 'sow') return false
+  const groups = new Map<string, Set<SowSelection['crop']>>()
+  for (const field of farm.selectableFields) {
+    const key = field.groupKey ?? positionKey(field.tile)
+    const crops = groups.get(key) ?? new Set<SowSelection['crop']>()
+    field.allowedCrops.forEach(crop => crops.add(crop))
+    groups.set(key, crops)
+  }
+  // Native sow settlement always requires at least one selected field.
+  const required = Math.max(1, farm.minSelections ?? 1)
+  if (required > groups.size || required > (farm.maxSelections ?? groups.size)) return false
+  const seedSlots = (['grain', 'vegetable', 'wood', 'stone'] as const).flatMap(crop =>
+    Array.from({length:Math.min(groups.size, Math.max(0, Math.floor(player.resources[crop] ?? 0)))}, () => crop))
+  const allowed = [...groups.values()]
+  const owners: Array<number | undefined> = seedSlots.map(() => undefined)
+  const assign = (group: number, seen: Set<number>): boolean => {
+    for (let slot = 0; slot < seedSlots.length; slot++) {
+      if (seen.has(slot) || !allowed[group]!.has(seedSlots[slot]!)) continue
+      seen.add(slot)
+      const previous = owners[slot]
+      if (previous === undefined || assign(previous, seen)) { owners[slot] = group; return true }
+    }
+    return false
+  }
+  let matched = 0
+  for (let group = 0; group < allowed.length; group++) if (assign(group, new Set()) && ++matched >= required) return true
+  return false
+}
+
 export const buildFarmPositionSelectionInteraction = (
   player: PlayerState,
   actionContext?: Record<string, unknown>,
