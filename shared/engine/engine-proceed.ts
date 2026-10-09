@@ -66,6 +66,7 @@ import { eventsToLogEntries } from '../events/log-mapper'
 import type { GameEvent } from '../contract/events'
 import { createEventQuery } from '../events/query'
 import { createBufferedEventSink, emitCardTriggered } from './card-trigger-events'
+import { interactionRequestChoices } from './pending-validation'
 import { createTriggerSnapshot } from '../cards/helpers/trigger-snapshot'
 import { applyComputeCostResults } from './compute-cost-results'
 import { findActionSpaceById } from '../domain/space'
@@ -466,7 +467,7 @@ const buildDeferredHostNode = (
     result.type === 'ok' ? result.internalChildren?.afterHostListeners : undefined
   node.deferredHostTransactionEvents = [...transactionEvents]
   node.deferredHostActionEvents = [...actionEvents]
-  node.deferredHostChoice = choice
+  node.deferredHostChoice = choice ?? hostNode.selectedBranchChoice
   node.deferredHostResultTargetNodeId = hostNode.internalHostNodeId
   node.deferredHostResultKey = hostNode.internalResultKey
   return node
@@ -1317,66 +1318,8 @@ export function engineProceed(
           }
         }
         choiceOptions = mergedOptions
-      } else if (result.request.kind === 'animal-reorg') {
-        // Compatibility shim — RETAINED through Task 7 (re-evaluated).
-        //
-        // GameCore.resolvePendingChoice still validates the player's
-        // submitted value via `pending.options.find((o) => o.value === value)`
-        // (shared/session/session-core.ts ~L2249). Reorg confirm therefore
-        // must surface as a concrete option on the pending surface, while
-        // cancel remains absent and is rejected before action resolution.
-        //
-        // Removing this shim requires teaching resolvePendingChoice to
-        // bypass the options.find check for `request.kind === 'animal-reorg'`
-        // (or to read the allowed values off the request directly). Task 7 deliberately did not modify
-        // resolvePendingChoice (out of scope per task constraints), so
-        // the shim stays. Task 9 or Task 10 (when buildInteraction is
-        // rewritten and pending.options is removed) is the natural
-        // place to delete it.
-        //
-        const confirm: ActionChoiceOption = {
-          value: 'confirm',
-          labelKey: 'ui.interactionAnimalReorgConfirm',
-        }
-        choiceOptions = [confirm]
-      } else if (result.request.kind === 'farm-select') {
-        // Task 5/6: farm-select leaves emit InteractionFarmSelection plus an
-        // optional `options` list (confirm/cancel) so resolvePendingChoice's
-        // pending.options.find() validator still has a value to match.
-        choiceOptions = result.request.options ?? [
-          { value: 'confirm', labelKey: 'ui.interactionFarmSelectConfirm' },
-          { value: 'cancel', labelKey: 'ui.interactionFarmSelectCancel' },
-        ]
-      } else if (
-        result.request.kind === 'confirm-next-player' ||
-        result.request.kind === 'confirm-player-switch' ||
-        result.request.kind === 'feed' ||
-        result.request.kind === 'heating' ||
-        result.request.kind === 'selection' ||
-        result.request.kind === 'card-draft' ||
-        result.request.kind === 'select-trigger' ||
-        result.request.kind === 'engine-blocked' ||
-        result.request.kind === 'resource-quantity-select' ||
-        result.request.kind === 'resource-batch-exchange-select'
-      ) {
-        // Task 9 will add explicit emitters for these kinds. Until then no
-        // current effect emits them, so they fall through to empty choices
-        // here. The exhaustive check below ensures any future kind added to
-        // InteractionRequest forces this branch to be revisited.
-        // selection / card-draft were added in S2 Task 2; their emitters
-        // land in Tasks 7/12 — until then they share this same not-yet-wired
-        // path so typecheck stays green without granting them a real options
-        // surface.
-        choiceOptions = []
       } else {
-        // Exhaustive check: every InteractionRequest kind must be handled
-        // above. If a new kind is added to InteractionRequest without
-        // updating this branch, the assignment below produces a typecheck
-        // failure here, signalling that Task 6/7 should have removed this
-        // shim OR the new kind needs an explicit branch.
-        const _exhaustive: never = result.request
-        void _exhaustive
-        choiceOptions = []
+        choiceOptions = interactionRequestChoices(result.request)
       }
       // An optional leaf owns its accept/skip window. Its execution may reuse
       // this node for a payment choice, which must declare its own window.
@@ -1414,14 +1357,18 @@ export function engineProceed(
         },
       }
     }
+    // A leaf selected through OR/XOR keeps that choice even when it runs here
+    // after before reactions or an owner handoff.
+    const choice = node.selectedBranchChoice
     const immediatePhase = int.hooks.immediatelyAfter(
-      { ...executionContext, ...eventReadContext, actionId: replacedActionId },
+      { ...executionContext, ...eventReadContext, actionId: replacedActionId, choice },
       result,
+      choice,
     )
     const afterPhase = int.hooks.after(
-      { ...executionContext, ...eventReadContext, actionId: replacedActionId },
+      { ...executionContext, ...eventReadContext, actionId: replacedActionId, choice },
       result,
-      undefined,
+      choice,
     )
     const allActionHookResults = [
       ...immediatePhase.actionHookResults,
@@ -1440,7 +1387,7 @@ export function engineProceed(
         ),
       )
       .filter((action) => action)
-    const proceedBaseEvent = buildListenerEvent(executionContext, { result })
+    const proceedBaseEvent = buildListenerEvent(executionContext, { result, choice })
     const trailingTransactionEvents = result.type === 'flow' ? undefined : eventReadContext.transactionEvents
     const trailingActionEvents = result.type === 'flow' ? undefined : eventReadContext.actionEvents
     const trailingActionEventStartIndex = result.type === 'flow'

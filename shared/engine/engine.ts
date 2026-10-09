@@ -211,6 +211,7 @@ const restoreTreeFromCursor = (cursors: NodeCursor[]): EngineNode | null => {
         }
         action.beforePhaseResolved = data.beforePhaseResolved === true
         action.bodyStarted = data.bodyStarted === true
+        action.selectedBranchChoice = typeof data.selectedBranchChoice === 'string' ? data.selectedBranchChoice : undefined
         action.continuationParentHostNodeId = typeof data.continuationParentHostNodeId === 'string'
           ? data.continuationParentHostNodeId
           : undefined
@@ -661,6 +662,9 @@ export class Engine {
     while (safety-- > 0) {
       const next = this.tree.nextUnresolved()
       if (!next || !injectedIds.has(next.id)) break
+      // Another player's work returns to the session driver, which runs it
+      // with that player's context and performs the visible handoff.
+      if (next.ownerPlayerId && next.ownerPlayerId !== ctx.player.id) break
       const step = this.proceed(ctx)
       if (step.type !== 'ok') break
     }
