@@ -31,7 +31,9 @@ describe('restart-local listener ownership without setsid', () => {
     await once(reservation, 'close')
     writeFileSync(join(root, 'listener.cjs'), `
       const server = require('node:net').createServer()
-      server.listen(Number(process.env.TEST_PORT), '127.0.0.1')
+      server.listen(Number(process.env.TEST_PORT), '127.0.0.1', () => {
+        require('node:fs').writeFileSync('listener.pid', String(process.pid))
+      })
     `)
     writeFileSync(join(root, 'wrapper.cjs'), `
       const { spawn } = require('node:child_process')
@@ -45,6 +47,11 @@ describe('restart-local listener ownership without setsid', () => {
       set -euo pipefail
       ${helpers}
       ${startup}
+      # Only port discovery is stubbed; readiness and process ancestry are real.
+      lsof() {
+        [ "$*" = "-tiTCP:$TEST_PORT -sTCP:LISTEN" ] || return 1
+        [ -f listener.pid ] && cat listener.pid
+      }
       command() {
         if [ "$*" = '-v setsid' ]; then return 1; fi
         builtin command "$@"
