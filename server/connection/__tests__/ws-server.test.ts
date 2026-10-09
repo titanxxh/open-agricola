@@ -1,3 +1,4 @@
+import * as rng from '../../../shared/utils/rng'
 import { createHash, randomUUID } from 'node:crypto'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:http'
@@ -275,6 +276,9 @@ describe('room-manager ws sync', () => {
   const sockets: TestSocket[] = []
 
   beforeEach(async () => {
+    // Transport tests start in work; random hands can now offer Elder first.
+    const resolveSeed = rng.resolveSeed
+    vi.spyOn(rng, 'resolveSeed').mockImplementation((seed) => resolveSeed(seed ?? 42))
     persistence = new PostgresRoomPersistence(getDb())
     server = createServer()
     wsServerResult = (await createWsServer(server, { persistence, ...recording }))

@@ -53,12 +53,13 @@ const simulatePlacement = (
  * Each player has 2 active workers all at home.
  */
 const baseSetup = () => {
-  const session = new GameSession()
+  const session = new GameSession(42, undefined, { playerCount: 2 })
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   state.currentPlayerIndex = 0
   state.round = 2
+  state.roundPhase = 'work'
   state.roundActionOrder = state.roundActionOrder.map((spaceId) =>
     spaceId === 'wish-children' ? null : spaceId,
   )

@@ -17,12 +17,13 @@ const setup = (options?: {
   actionId?: string
   meetingPlaceOccupied?: boolean
 }) => {
-  const session = new GameSession()
+  const session = new GameSession(42, undefined, { playerCount: 2 })
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   state.currentPlayerIndex = 0
   state.round = 1
+  state.roundPhase = 'work'
   state.roundActionOrder = state.roundActionOrder.map(() => null)
   state.roundActionOrder[0] = options?.actionId ?? 'grain-utilization'
 

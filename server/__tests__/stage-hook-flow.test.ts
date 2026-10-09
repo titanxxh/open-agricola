@@ -122,9 +122,9 @@ describe('stage hook flows', () => {
     expect(resp.state.roundPhase).toBe('work')
     expect(resp.state.actionSpaces.find((space) => space.id === 'forest')!.resources.wood).toBe(9)
     expect(resp.state.events.filter((event) => event.type === 'round.started')).toHaveLength(1)
-    expect(resp.state.events.filter((event) => event.type === 'work.started')).toHaveLength(1)
+    expect(resp.state.events.filter((event) => event.type === 'work.started' && event.round === 2)).toHaveLength(1)
     expect(resp.state.log.filter((entry) => entry.key === 'log.enterRound')).toHaveLength(1)
-    expect(resp.state.log.filter((entry) => entry.key === 'log.workStarted')).toHaveLength(1)
+    expect(resp.state.log.filter((entry) => entry.key === 'log.workStarted')).toHaveLength(2)
   })
 
   it('resolves before-work cards before start-of-work cards', () => {
@@ -164,9 +164,9 @@ describe('stage hook flows', () => {
       }),
     ]))
     expect(resp.state.events.filter((event) => event.type === 'round.started')).toHaveLength(1)
-    expect(resp.state.events.filter((event) => event.type === 'work.started')).toHaveLength(1)
+    expect(resp.state.events.filter((event) => event.type === 'work.started' && event.round === 2)).toHaveLength(1)
     expect(resp.state.log.filter((entry) => entry.key === 'log.enterRound')).toHaveLength(1)
-    expect(resp.state.log.filter((entry) => entry.key === 'log.workStarted')).toHaveLength(1)
+    expect(resp.state.log.filter((entry) => entry.key === 'log.workStarted')).toHaveLength(2)
     expect(resp.scores[0]!.categories.find((category) => category.key === 'cardBonusVp')?.total).toBe(1)
   })
 
@@ -262,9 +262,9 @@ describe('stage hook flows', () => {
     })
     expect(markerEvent!.seq).toBeLessThan(romanPotEvent!.seq)
     expect(resp.state.events.filter((event) => event.type === 'round.started')).toHaveLength(1)
-    expect(resp.state.events.filter((event) => event.type === 'work.started')).toHaveLength(1)
+    expect(resp.state.events.filter((event) => event.type === 'work.started' && event.round === 2)).toHaveLength(1)
     expect(resp.state.log.filter((entry) => entry.key === 'log.enterRound')).toHaveLength(1)
-    expect(resp.state.log.filter((entry) => entry.key === 'log.workStarted')).toHaveLength(1)
+    expect(resp.state.log.filter((entry) => entry.key === 'log.workStarted')).toHaveLength(2)
 
     const roundTwoScores = resp.scores
     session.state.players.forEach((player) => {
