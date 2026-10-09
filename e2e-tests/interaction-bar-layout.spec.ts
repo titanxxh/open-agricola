@@ -41,7 +41,11 @@ test.describe('Interaction bar layout', () => {
       else document.addEventListener('readystatechange', applySafeArea, { once: true })
     })
     await page.goto('/?page=game&player=p1&embedded=1&devMode=1')
-    await page.getByRole('button', { name: 'Reset' }).click()
+    await page.locator('.dev-panel .seed-input input').fill('42')
+    await Promise.all([
+      page.waitForResponse(response => response.url().endsWith('/api/game/new') && response.ok()),
+      page.getByRole('button', { name: 'Reset' }).click(),
+    ])
     await expect(page.locator('[data-action-id="farmland"] button').first()).toBeEnabled()
   })
 

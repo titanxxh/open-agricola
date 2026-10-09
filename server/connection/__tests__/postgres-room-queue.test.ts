@@ -2,7 +2,8 @@ import { randomUUID } from 'node:crypto'
 import type { ClientCommand } from '../../../shared/contract/protocol/ws'
 import type { ConnectionCtx } from '../connection-ctx'
 import { CommandStore } from '../../game/command-store'
-import { afterAll, afterEach, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeEach, expect, it, vi } from 'vitest'
+import * as rng from '../../../shared/utils/rng'
 import type { WebSocket } from 'ws'
 import { createTestDatabase } from '../../__tests__/_helpers/postgres'
 import * as database from '../../db'
@@ -16,6 +17,10 @@ import { createConnectionCtx } from '../connection-ctx'
 import { dispatch as runDispatch } from '../room-router'
 
 const db = await createTestDatabase()
+beforeEach(() => {
+  const resolveSeed = rng.resolveSeed
+  vi.spyOn(rng, 'resolveSeed').mockImplementation((seed) => resolveSeed(seed ?? 42))
+})
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs() })
 afterAll(async () => { await db.close() })
 const socket = () => ({ OPEN: 1, readyState: 1, send: vi.fn(), close: vi.fn() }) as unknown as WebSocket
