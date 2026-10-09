@@ -127,9 +127,7 @@
 - 农场版图状态
 - 是否需要预先设置 `cardStates`
 
-Session 测试必须在首次行动前显式固定所有玩家的 `minorHand` 和
-`occupationHand`。与手牌无关时使用 `['__test_placeholder__']`；不要使用空数组，
-因为 `normalizeState` 会重新发牌。测试需要的目标卡应在固定背景手牌后单独加入。
+构造 Session 前先选择夹具（§5.2）。构造函数就可能产生开局交互，构造后再替换手牌无法隔离工作阶段测试。工作阶段夹具在加载前固定所有玩家的手牌；无关手牌用 `['__test_placeholder__']`，因为空数组会被 `normalizeState` 重新发牌。开局测试保留真实发牌，显式断言产生的阶段和交互。
 
 ### 4.4 同时机多卡反应
 
@@ -148,7 +146,7 @@ Session 卡牌测试优先使用后端边界驱动。房间规则主链路走 We
 
 按从轻到重排序：
 
-1. **直接 `new GameSession(stateOrSeed?, customCards?, initialStateOptions?)` + 调方法**（绝大多数 `server/__tests__/*.test.ts` 的写法）
+1. **通过公共测试夹具（§5.2）创建 `GameSession`，直接调用方法**；测试构造或快照加载行为本身时才直接使用构造函数
    - 不经网络，跑得最快；最适合"卡牌效果是否触发、状态怎么变"这类断言
    - 入口方法见 §5.3
 2. **通过 `server/connection/room-router.ts` 驱动内存房间**
@@ -158,6 +156,35 @@ Session 卡牌测试优先使用后端边界驱动。房间规则主链路走 We
    - 仅在需要验证浏览器 UI 主路径或多窗口同步时用；规则断言不放在这层
 
 ### 5.2 状态准备方式
+
+新 Session 场景使用 `server/__tests__/_helpers/session-fixtures.ts`。两个 helper 均默认 2 人，初始断言失败会释放 Session；成功返回的 Session 由调用方在使用后释放。
+
+| Helper | 契约 |
+|---|---|
+| `createOpeningSession({ seed, options?, customCards?, expected })` | 执行真实构造与开局生命周期。必须提供有限数值 seed 或显式 `'random'`。必须填写 `expected.phase`、`expected.roundPhase`、`expected.interaction.stateId`；可额外检查等待请求的 `kind`、`playerIndex` 和完整 `hands`。不会清空手牌或消费 pending。 |
+| `createWorkSession({ seed?, options?, customCards?, configure? })` | 创建新状态，把所有手牌固定为占位符，执行 `configure(state)`，再加载 Session 并重建 modifier。默认 seed 42。断言 `playing` / `work` / `idle` 和配置后的手牌未变。拒绝空手牌、轮抽和父母开局设置。跳过开局效果，不能证明第一回合生命周期正确。 |
+
+数值 seed 模式还会将独立的普通牌堆与父母选择随机流固定为 42，可通过 `options` 显式覆盖。随机开局测试必须写 `seed: 'random'`；不改变生产环境随机性。目标手牌、已打出卡牌、资源等前置条件放在 `configure` 中，于加载前准备：
+
+```ts
+const session = createWorkSession({
+  configure: state => {
+    state.players[0].occupationHand = ['E096_Elder']
+    state.players[0].resources.food = 3
+  },
+}) // playing / work / idle：可进行普通职业行动
+
+const opening = createOpeningSession({
+  seed: 12,
+  options: { deckIds: ['E'] },
+  expected: {
+    phase: 'playing', roundPhase: 'preparation',
+    interaction: { stateId: 'wait', kind: 'choice', playerIndex: 0 },
+  },
+}) // 保留 Elder 的真实第一回合选择
+```
+
+开局回归通过公开命令推进轮抽、父母选择和开局选择，继续行动前检查 `state` 与 `interaction`，不要用 `loadState` 抹掉意外的 wait。可用 `assertSessionFixture(session, expected)` 在开局命令后再次检查契约。完整示例见 `first-round-start-session.test.ts` 和 `session-fixtures.test.ts`。
 
 不要假设存在 `POST /api/game/dev/*`。当前可用的状态预设方式有：
 
@@ -276,8 +303,8 @@ Session 卡牌测试优先使用后端边界驱动。房间规则主链路走 We
 
 #### C.1 开局
 
-1. `const session = new GameSession(seed)`（默认 2 人；如需 3/4 人使用 `new GameSession(seed, undefined, { playerCount })`）
-2. 确认 `session.state.players.length === expectedPlayerCount`
+1. 真实开局用 `createOpeningSession`，预设工作阶段场景用 `createWorkSession`（§5.2）。均默认 2 人，3/4 人传 `options: { playerCount }`。
+2. 写明预期阶段、交互、手牌与人数。工作阶段前置条件在加载前配置；开局测试保留并完成真实开局选择。
 
 #### C.2 设置当前玩家 / 推进到目标阶段
 
@@ -317,9 +344,13 @@ state.players[0].resources = {
 `state.completedFeedingPhases` 是全局收获计数（A148_Woolgrower / B086_TruffleSearcher 等"按已完成 feeding +1 容量"卡牌从此字段读取）。Session 测试无需跑完整收获 phase；直接在 setup 阶段覆盖即可：
 
 ```ts
-const session = new GameSession(SEED)
-session.state.completedFeedingPhases = 3
-session.state.players[0].occupationPlayed.push('A148_Woolgrower')
+const session = createWorkSession({
+  seed: SEED,
+  configure: state => {
+    state.completedFeedingPhases = 3
+    state.players[0].occupationPlayed.push('A148_Woolgrower')
+  },
+})
 // 之后 onComputeAnimalZones(player, zones, state) 读到 cap = 3
 ```
 
@@ -467,16 +498,17 @@ const resp = session.takeAction(X, 'ACTION_ID')
 ```ts
 // server/__tests__/CXX_SomeCard-session.test.ts
 import { describe, it, expect } from 'vitest'
-import { GameSession } from '../game/authoritative-session'
+import { createWorkSession } from './_helpers/session-fixtures'
 
 describe('CXX_SomeCard', () => {
   it('在 fishing 后给玩家额外 1 食物', () => {
-    const session = new GameSession(42)
-    const state = session.state
-    state.currentPlayerIndex = 0
-    state.players[0].resources.wood = 0
-    state.players[0].resources.food = 0
-    state.players[0].minorPlayed.push('CXX_SomeCard')
+    const session = createWorkSession({
+      configure: state => {
+        state.players[0].resources.wood = 0
+        state.players[0].resources.food = 0
+        state.players[0].minorPlayed.push('CXX_SomeCard')
+      },
+    })
 
     const resp = session.takeAction(0, 'fishing')
 
@@ -488,10 +520,9 @@ describe('CXX_SomeCard', () => {
   })
 
   it('未打出该卡时 fishing 不触发额外效果（负向）', () => {
-    const session = new GameSession(42)
-    const state = session.state
-    state.currentPlayerIndex = 0
-    state.players[0].resources.food = 0
+    const session = createWorkSession({
+      configure: state => { state.players[0].resources.food = 0 },
+    })
 
     const resp = session.takeAction(0, 'fishing')
 

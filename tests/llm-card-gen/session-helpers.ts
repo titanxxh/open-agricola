@@ -32,7 +32,8 @@ import {
   setActiveWorkerCount,
   workersAvailable,
 } from '../../shared/domain/player'
-import { GameSession, type SessionResponse } from '../../server/game/authoritative-session'
+import type { GameSession, SessionResponse } from '../../server/game/authoritative-session'
+import { createWorkSession } from '../../server/__tests__/_helpers/session-fixtures'
 import { confirmNextPlayer, confirmPlayerSwitch } from '../../server/__tests__/_helpers/pending-confirms'
 
 export type CardType = 'minor' | 'occupation'
@@ -196,18 +197,11 @@ export function buildSessionWithLLMCard(llmCode: string, opts: BuildOpts): Build
     cardPrerequisite: opts.cardPrerequisite,
     historicalRecording: opts.historicalRecording,
   })
-  const rawSession = new GameSession(42, [compiled.cardData], {
-    playerCount: opts.playerCount ?? 2,
+  const rawSession = createWorkSession({
+    customCards: [compiled.cardData],
+    options: { playerCount: opts.playerCount ?? 2 },
+    configure: fixRoundActionOrder,
   })
-  // Force determinism on every fixture's session.
-  // These scenarios start in work with explicit hands. Clear any constructor
-  // setup interaction before returning the prepared fixture; placeholders keep
-  // normalizeState from re-dealing unrelated cards.
-  const state = rawSession.getState().state
-  clearAllHands(state)
-  fixRoundActionOrder(state)
-  state.roundPhase = 'work'
-  rawSession.loadState(state)
   const session = wrapSessionWithCtx(rawSession)
   return { session, cardData: compiled.cardData, manifest: compiled.manifest }
 }

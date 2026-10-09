@@ -122,7 +122,7 @@ For a Session test, state explicitly:
 - Farmyard state
 - Any required initial `cardStates`
 
-Before the first action, every Session test must explicitly fix every player's `minorHand` and `occupationHand`. Use `['__test_placeholder__']` when the hand is irrelevant. Do not use an empty array because `normalizeState` will deal a new hand. Add the target card separately after fixing these background hands.
+Choose the fixture before constructing the Session (§5.2). A constructor can already produce an opening interaction, so replacing hands after construction is too late to isolate a work-phase test. Work fixtures fix every player's hands before loading; irrelevant hands use `['__test_placeholder__']`, since empty hands are re-dealt by `normalizeState`. Opening tests preserve the real deal and explicitly assert the resulting phase and interaction.
 
 ### 4.4 Multiple Reactions at the Same Timing
 
@@ -141,7 +141,7 @@ Drive Session card tests through a backend boundary. Room gameplay uses WebSocke
 
 From lightest to heaviest:
 
-1. **Instantiate `new GameSession(stateOrSeed?, customCards?, initialStateOptions?)` and call methods directly.** This is the common pattern in `server/__tests__/*.test.ts`.
+1. **Create a `GameSession` with the shared test fixtures (§5.2) and call methods directly.** Use the constructor directly when its construction or snapshot-loading behavior is the subject of the test.
    - It avoids the network and runs fastest.
    - It is the preferred way to assert whether a card triggers and how state changes.
    - See section 5.3 for entry-point methods.
@@ -152,6 +152,35 @@ From lightest to heaviest:
    - Use this only for the browser UI path or multi-window synchronization. Keep rule assertions out of this layer.
 
 ### 5.2 Preparing State
+
+Use `server/__tests__/_helpers/session-fixtures.ts` for new Session scenarios. Both helpers default to two players and dispose the Session if their initial assertions fail; the caller disposes successful Sessions after use.
+
+| Helper | Contract |
+|---|---|
+| `createOpeningSession({ seed, options?, customCards?, expected })` | Runs the real constructor and setup lifecycle. Requires a finite numeric seed or explicit `'random'`. Requires `expected.phase`, `expected.roundPhase`, and `expected.interaction.stateId`; optionally checks waiting request `kind`, `playerIndex`, and exact `hands`. Never clears hands or consumes pending choices. |
+| `createWorkSession({ seed?, options?, customCards?, configure? })` | Builds a fresh state, fixes all hands to placeholders, applies `configure(state)`, then loads the Session and rebuilds modifiers. Defaults to seed 42. Asserts `playing` / `work` / `idle` and unchanged configured hands. Rejects empty hands, draft, and parent setup. It skips opening effects and cannot prove first-round lifecycle correctness. |
+
+Numeric seeds also fix the independent ordinary-deck and parent-selection streams to 42 unless explicitly overridden in `options`. Random opening tests must say `seed: 'random'`; production randomness is unchanged. Put target hands, played cards, resources, and other scenario prerequisites in `configure`, before loading:
+
+```ts
+const session = createWorkSession({
+  configure: state => {
+    state.players[0].occupationHand = ['E096_Elder']
+    state.players[0].resources.food = 3
+  },
+}) // playing / work / idle: ready for an ordinary occupation action
+
+const opening = createOpeningSession({
+  seed: 12,
+  options: { deckIds: ['E'] },
+  expected: {
+    phase: 'playing', roundPhase: 'preparation',
+    interaction: { stateId: 'wait', kind: 'choice', playerIndex: 0 },
+  },
+}) // Elder's real round-one choice remains pending
+```
+
+For startup regressions, drive draft, parent selection, and opening choices through public commands. Check `state` and `interaction` before proceeding; do not call `loadState` to erase an unexpected wait. `assertSessionFixture(session, expected)` can check the contract again after setup commands. See `first-round-start-session.test.ts` and `session-fixtures.test.ts` for complete examples.
 
 Do not assume that `POST /api/game/dev/*` exists. Available setup mechanisms are:
 
@@ -270,8 +299,8 @@ Every card test description should follow this structure.
 
 #### C.1 Start the Game
 
-1. Create `const session = new GameSession(seed)`. Two players are the default; use `new GameSession(seed, undefined, { playerCount })` for three or four players.
-2. Assert `session.state.players.length === expectedPlayerCount`.
+1. Choose `createOpeningSession` for real startup or `createWorkSession` for a prepared work scenario (§5.2). Both default to two players; pass `options: { playerCount }` for three or four.
+2. State the expected phase, interaction, hands, and player count. Configure work prerequisites before loading; preserve and resolve real startup choices in opening tests.
 
 #### C.2 Select the Current Player or Advance to the Target Phase
 
@@ -311,9 +340,13 @@ Add only what the card needs:
 `state.completedFeedingPhases` is the global completed-harvest count. Cards such as A148 Woolgrower and B086 Truffle Searcher use it for effects based on completed feeding phases plus one. A Session test does not need to run a complete harvest; override the field during setup:
 
 ```ts
-const session = new GameSession(SEED)
-session.state.completedFeedingPhases = 3
-session.state.players[0].occupationPlayed.push('A148_Woolgrower')
+const session = createWorkSession({
+  seed: SEED,
+  configure: state => {
+    state.completedFeedingPhases = 3
+    state.players[0].occupationPlayed.push('A148_Woolgrower')
+  },
+})
 // onComputeAnimalZones(player, zones, state) now reads cap = 3
 ```
 
@@ -450,16 +483,17 @@ Replace all placeholders with real values in an actual test description.
 ```ts
 // server/__tests__/CXX_SomeCard-session.test.ts
 import { describe, it, expect } from 'vitest'
-import { GameSession } from '../game/authoritative-session'
+import { createWorkSession } from './_helpers/session-fixtures'
 
 describe('CXX_SomeCard', () => {
   it('gives the player 1 additional food after fishing', () => {
-    const session = new GameSession(42)
-    const state = session.state
-    state.currentPlayerIndex = 0
-    state.players[0].resources.wood = 0
-    state.players[0].resources.food = 0
-    state.players[0].minorPlayed.push('CXX_SomeCard')
+    const session = createWorkSession({
+      configure: state => {
+        state.players[0].resources.wood = 0
+        state.players[0].resources.food = 0
+        state.players[0].minorPlayed.push('CXX_SomeCard')
+      },
+    })
 
     const resp = session.takeAction(0, 'fishing')
 
@@ -471,10 +505,9 @@ describe('CXX_SomeCard', () => {
   })
 
   it('does not add the effect when the card has not been played', () => {
-    const session = new GameSession(42)
-    const state = session.state
-    state.currentPlayerIndex = 0
-    state.players[0].resources.food = 0
+    const session = createWorkSession({
+      configure: state => { state.players[0].resources.food = 0 },
+    })
 
     const resp = session.takeAction(0, 'fishing')
 

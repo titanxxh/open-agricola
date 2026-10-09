@@ -32,7 +32,7 @@ Single-context layout: read root `CONTEXT.md` and any ADRs under `docs/adr/`. Se
 
 ```bash
 pnpm install                # canvas 需要系统库：libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev libpixman-1-dev
-./restart-local.sh       # 本地开发/运行/测试统一入口，默认绑 127.0.0.1（先重启再用浏览器/Playwright/命令行验真实行为）
+./restart-local.sh       # 本地应用启动 / 重启统一入口，默认绑 127.0.0.1
 ./restart-local.sh --intranet   # 改绑局域网 IP（eth0/en0），供同网段其他机器访问
 pnpm test                   # vitest 全量（fast + slow）
 pnpm test:fast              # 只跑 fast project（CI 默认）
@@ -41,7 +41,10 @@ pnpm test:llm               # 固定卡牌测试、历史 golden 与账本回归
 pnpm test:llm:dry           # 专用本地环境的固定 case 合成浏览器演练，不调付费 API
 pnpm test:llm:live --model <id> # 已确认模型/预算后的完整浏览器验收，保存独立批次
 pnpm run test:e2e           # Playwright E2E（需要后端 + 前端在跑）
-pnpm exec vitest run <file> # 单文件
+pnpm verify focus <file.test.ts> # 调试期间定向 Vitest，不启动应用
+pnpm verify prepush         # 最终版本的完整 fast + lint，记录源码指纹与结果
+pnpm verify <file.spec.ts>   # 隔离环境重启应用并跑 Playwright；不传文件则跑全部
+pnpm verify status          # 查看验证记录是否仍对应当前源码
 pnpm run lint               # ESLint（error 必须清零）
 pnpm run build              # tsc + vite build
 ```
@@ -123,18 +126,18 @@ pnpm run build              # tsc + vite build
 
 ## Verification After Changes
 
-每次代码改完，按以下顺序验证：
+调试与最终验证分开，命令和记录语义见 `docs/operations/ci-checks.md`：
 
-1. `./restart-local.sh`——重启前后端，**这是本地开发 / 运行 / 测试的统一入口**
-2. 用浏览器 / Playwright / 命令行验真实行为
-3. `pnpm test:fast`（关键单卡涉及收获 / 多步 flow 时跑相关 session 测试）
-4. `pnpm run lint`（error 必须清零）
+1. 调试期间用 `pnpm verify focus <file.test.ts>` 验证最小相关范围；纯测试 / 工具 / 文档改动不要求每次重启应用。
+2. 涉及应用运行行为、UI 或 WS 时，最终验证先通过 `./restart-local.sh` 重启，再用浏览器 / Playwright / 命令行验真实行为；`pnpm verify <file.spec.ts>` 会在隔离环境调用该重启入口。
+3. 最终源码上运行 `pnpm verify prepush`（完整 `pnpm test:fast` + `pnpm run lint`）；按风险补相关 slow Session / E2E，定向测试不能代替完整门禁。
+4. 修改源码或 rebase 改变文件内容后重新验证；`pnpm verify status` 可检查本地记录的新鲜度。记录只辅助核对，不自动跳过检查。
 
 ## Commit & CI Workflow
 
 **永远使用 rebase，禁止 merge。**
 
-每次 `git push` 之前需要 rebase main，发现冲突要先解决。先在本地跑一遍 CI（`pnpm run lint` + `pnpm test:fast`），失败立刻定位修复，再继续其他工作。
+每次 `git push` 之前需要 rebase main，发现冲突要先解决；在最终源码上运行 `pnpm verify prepush`，失败立刻定位修复。需要本机全量 CI 时按 `docs/operations/ci-checks.md` 执行，prepush 仅覆盖 fast + lint，不代表完整 CI。
 
 `git push` 之后**必须等到相关 GitHub Actions run 结束**；run 进行中或失败时当前任务都不算完成。失败立刻定位修复。
 
@@ -149,8 +152,8 @@ Commit 标题规范：`feat: ...` / `fix: ...` / `refactor: ...` / `docs: ...`�
 ## Common Pitfalls
 
 - **不要 commit `docs/superpowers/*`**：superpowers skill 产出的 spec / plan / working notes 不进 git。这是会话/PR 中间产物，污染 git history。即使 brainstorming / executing-plans skill 默认要求 commit spec，**违反默认行为，等用户明确要求才 commit**。每次 `git add` 必须显式排除 `docs/superpowers/`。
-- **`./restart-local.sh` 不仅是"启动方式"**：它是本地开发 / 运行 / 测试的统一入口。每次代码改完，先重启，再用浏览器 / Playwright / 命令行验真实行为，再考虑 `pnpm test:fast` 等单元测试。
-- **Session 测试里卡牌不要随机，必须显式设置 hand**：`new GameSession()` 不传 seed 时 `createSeed()` 抽取随机的宽种子（`shared/utils/rng.ts`），每次跑都给玩家发不同 7 张 minor / 7 张 occupation。Hand 内容会影响 `improvement-any` / `minor-improvement` / `wrapOptional(...)` 等节点的"是否 doable / 是 single auto-resolve 还是 multi-option wait"判定 → 测试断言对应的等待节点 / option 数随机生效，整体跑时偶发 fail。修法：setup 里显式覆盖所有玩家的 `minorHand` + `occupationHand`，最简洁用占位 id `['__test_placeholder__']`（在 `getMinorImprovement` 返回 undefined，被 buyable 列表过滤），既能避免 `normalizeState()` 因为空 hand 触发 re-deal，又让"任意可买 minor"的路径稳定为空。注意：放任 `player.minorHand = []` **不**等于 placeholder——它会触发 re-deal 重新发随机 7 张。
+- **应用真实行为验收必须重启**：统一用 `./restart-local.sh`；定向 Vitest 调试不需要启动应用，最终门禁见上文。
+- **Session 构造时就可能产生开局交互**：事后清手牌不能消除它。复用 `server/__tests__/_helpers/session-fixtures.ts`：真实开局用 `createOpeningSession`，显式选择 seed 并断言阶段 / interaction；工作阶段场景用 `createWorkSession`，在加载前固定所有手牌，无关手牌用 `['__test_placeholder__']`，不能用会触发重新发牌的空数组。两种夹具的边界和示例见 `docs/CARD_TEST_TEMPLATE.md` §5.2。
 
 ## Docs Map
 

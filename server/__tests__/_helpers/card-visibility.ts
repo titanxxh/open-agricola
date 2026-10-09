@@ -1,7 +1,8 @@
-import { GameSession } from '../../game/authoritative-session'
+import type { GameSession } from '../../game/authoritative-session'
 import { defineMinorCard } from '../../../shared/cards/card-source'
 import { getActiveCardRegistry } from '../../../shared/cards/active-registry'
 import type { CardImpl } from '../../../shared/cards/registry'
+import { createWorkSession } from './session-fixtures'
 
 export const CARD_ID = 'CUSTOM_VisibilitySource'
 const INTERNAL = 'INTERNAL_CARD_SENTINEL'
@@ -40,4 +41,4 @@ export const prepareVisibilitySession = (session: GameSession) => {
   return session
 }
 
-export const createVisibilitySession = () => prepareVisibilitySession(new GameSession(42, undefined, { playerCount: 2 }))
+export const createVisibilitySession = () => prepareVisibilitySession(createWorkSession())
