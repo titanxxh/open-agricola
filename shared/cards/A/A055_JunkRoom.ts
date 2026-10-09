@@ -6,9 +6,9 @@ import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A055_JunkRoom'
 const listener: CardListenerRegistration = {
-  id: 'A55-junk-room-during-improvement',
+  id: 'A55-junk-room-after-improvement',
   cardIds: [CARD_ID],
-  phases: ['during' as ActionHookPhase],
+  phases: ['after' as ActionHookPhase],
   actions: ['improvement'],
   handler: (_context: CardListenerContext): ActionHookResult | void => {
     return { flow: gainLeaf(CARD_ID, { food: 1 }), sourceCard: CARD_ID }

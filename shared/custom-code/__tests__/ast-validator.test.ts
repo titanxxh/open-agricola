@@ -53,7 +53,7 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
         listeners: [
           {
             id: 'test-listener',
-            phases: ['before', 'after', 'during'],
+            phases: ['before', 'after'],
             handler: (ctx) => {},
           },
         ],
@@ -63,13 +63,13 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
     expect(result.valid).toBe(true)
   })
 
-  it('rejects unknown listener phases', () => {
+  it.each(['superPhase', 'during'])('rejects unsupported listener phase %s', (phase) => {
     const code = `
       const CARD_IMPL = {
         listeners: [
           {
             id: 'test-listener',
-            phases: ['before', 'superPhase'],
+            phases: ['before', '${phase}'],
             handler: (ctx) => {},
           },
         ],
@@ -77,7 +77,7 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
     `
     const result = validateCardCode(code)
     expect(result.valid).toBe(false)
-    expect(result.valid === false && result.errors.some(e => e.includes("unknown listener phase 'superPhase'"))).toBe(true)
+    expect(result.valid === false && result.errors.some(e => e.includes(`unknown listener phase '${phase}'`))).toBe(true)
   })
 
   it('accepts supported listener actions', () => {
@@ -839,7 +839,7 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
         listeners: [
           {
             id: 'test',
-            phases: ['before', 'during', 'immediatelyAfter', 'after', 'computeCosts', 'computeArgs', 'computeChoiceCandidates', 'computeReplace', 'isDoable'],
+            phases: ['before', 'immediatelyAfter', 'after', 'computeCosts', 'computeArgs', 'computeChoiceCandidates', 'computeReplace', 'isDoable'],
             handler: (ctx) => {},
           },
         ],

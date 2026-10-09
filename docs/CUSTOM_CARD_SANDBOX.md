@@ -200,7 +200,7 @@ The marked blocks below are machine checked against `cardEffectHooks` in `shared
 
 `onBeforePlayerTurn` is the non-flow skip-control exception. Its signature is `(state, player) => { skipTurn?: boolean } | void`, and it synchronously skips this labor-turn placement opportunity. It cannot return ActionFlow or create pending state.
 
-Reaction-compatible hooks, namely action-listener `before`, `during`, `immediatelyAfter`, and `after`; the three Harvest-field hooks; `onBeforeEndGame`; and `contributeExtraTurn`, cannot depend on scan order. Multiple simultaneous items enter trigger-select, and the player selects a source card before execution. A custom card should return a replayable ActionFlow for mutation and never treat a handler invocation as final settlement.
+Reaction-compatible hooks, namely action-listener `before`, `immediatelyAfter`, and `after`; the three Harvest-field hooks; `onBeforeEndGame`; and `contributeExtraTurn`, cannot depend on scan order. Multiple simultaneous items enter trigger-select, and the player selects a source card before execution. A custom card should return a replayable ActionFlow for mutation and never treat a handler invocation as final settlement.
 
 `contributeExtraTurn` returns this card's extra-turn provider flow. When several cards contribute, the system asks for the provider source before expanding that flow. `countExtraTurns` is an internal official-card field and is not exposed to Workshop.
 
@@ -253,11 +253,10 @@ Fence discounts such as E16 Briar Hedge and C16 Field Fences use a `computeCosts
 - `reap`
 <!-- prompt-sync:end id=listener-actions -->
 
-`sandboxListenerPhases` is the Workshop listener-phase allowlist. Unsupported values are filtered before registration, and the AST validator hard-fails them on save:
+`sandboxListenerPhases` is the Workshop listener-phase allowlist. The AST validator rejects unsupported phases in new source. Saved executable manifests are checked before session or runtime registration; an unsupported phase rejects execution before any card effects or listeners are installed. `during` is unsupported and is never translated to `after`. Saved drafts and versions remain readable for editing.
 
 <!-- prompt-sync:begin id=action-hook-phases -->
 - `before`
-- `during`
 - `immediatelyAfter`
 - `after`
 - `computeCosts`

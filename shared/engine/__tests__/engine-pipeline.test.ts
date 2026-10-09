@@ -184,7 +184,7 @@ describe('Engine pipeline phase order', () => {
     registerActionHook({
       id: 'track-phases',
       actions: ['test-action'],
-      phases: ['isDoable', 'computeReplace', 'computeCosts', 'computeArgs', 'before', 'during', 'immediatelyAfter', 'after'],
+      phases: ['isDoable', 'computeReplace', 'computeCosts', 'computeArgs', 'before', 'immediatelyAfter', 'after'],
       handler: (ctx) => {
         phases.push(ctx.phase)
         return {}
@@ -211,7 +211,6 @@ describe('Engine pipeline phase order', () => {
       'isDoable',
       'computeCosts',
       'execute',
-      'during',
       'immediatelyAfter',
       'after',
     ])
@@ -240,7 +239,7 @@ describe('Engine pipeline phase order', () => {
     registerActionHook({
       id: 'track-phases',
       actions: ['choice-action'],
-      phases: ['isDoable', 'computeReplace', 'computeCosts', 'computeArgs', 'before', 'during', 'immediatelyAfter', 'after'],
+      phases: ['isDoable', 'computeReplace', 'computeCosts', 'computeArgs', 'before', 'immediatelyAfter', 'after'],
       handler: (ctx) => {
         phases.push(ctx.phase)
         return {}
@@ -272,7 +271,6 @@ describe('Engine pipeline phase order', () => {
       'isDoable',
       'computeCosts',
       'execute',
-      'during',
       'computeArgs',
     ])
   })
@@ -700,7 +698,7 @@ describe('Engine pipeline phase order', () => {
     registerActionHook({
       id: 'track-protected-cancel-phases',
       actions: [action.id],
-      phases: ['before', 'during', 'immediatelyAfter', 'after'],
+      phases: ['before', 'immediatelyAfter', 'after'],
       handler: (ctx) => {
         phases.push(ctx.phase)
         return {}
@@ -736,7 +734,6 @@ describe('Engine pipeline phase order', () => {
       'before',
       'canBeExecutedByPlayer',
       'resolveChoice:confirm',
-      'during',
       'immediatelyAfter',
       'after',
     ])

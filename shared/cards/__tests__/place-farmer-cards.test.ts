@@ -39,8 +39,8 @@ describe('PlaceFarmer card listeners', () => {
   }
 
   const huntsmansHatListener: CardListenerRegistration = {
-    id: 'C52-huntsmans-hat-during',
-    phases: ['during' as ActionHookPhase],
+    id: 'C52-huntsmans-hat-after',
+    phases: ['after' as ActionHookPhase],
     handler: (context: CardListenerContext): ActionHookResult | void => {
       const { actionId } = context
       
@@ -144,7 +144,7 @@ describe('PlaceFarmer card listeners', () => {
       player: { ...defaultPlayer, ...overrides.player } as PlayerState,
       space: { ...defaultSpace, ...overrides.space } as ActionSpace,
       actionId: overrides.actionId ?? 'place-farmer',
-      phase: overrides.phase ?? 'during',
+      phase: overrides.phase ?? 'after',
     }
   }
 
@@ -202,11 +202,11 @@ describe('PlaceFarmer card listeners', () => {
       requireActiveCardRegistry('place-farmer-cards').registerListener(huntsmansHatListener)
     })
 
-    it('registers during listener', () => {
+    it('registers after listener', () => {
       const listeners = getRegisteredCardListeners()
       const huntsmansHatListeners = listeners.filter(l => l.id.startsWith('C52'))
       expect(huntsmansHatListeners.length).toBe(1)
-      expect(huntsmansHatListeners[0].phases?.includes('during')).toBe(true)
+      expect(huntsmansHatListeners[0].phases?.includes('after')).toBe(true)
     })
   })
 

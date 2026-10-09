@@ -27,7 +27,7 @@ const RESOURCE_MARKET_IDS = new Set(['resource-market-4'])
 const placeFarmerListener: CardListenerRegistration = {
   id: 'E77-mattock-place-farmer',
   cardIds: [CARD_ID],
-  phases: ['during' as ActionHookPhase],
+  phases: ['after' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.space || !RESOURCE_MARKET_IDS.has(context.space.id)) return

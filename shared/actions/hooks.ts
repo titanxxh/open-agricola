@@ -10,7 +10,6 @@ import { createEventQuery, type EventQuery } from '../events/query'
 
 export type ActionHookPhase =
   | 'before'
-  | 'during'
   | 'immediatelyAfter'
   | 'after'
   | 'computeCosts'
@@ -23,7 +22,6 @@ export type ActionHookPhase =
 
 export const actionHookPhases: ActionHookPhase[] = [
   'before',
-  'during',
   'immediatelyAfter',
   'after',
   'computeCosts',
@@ -95,7 +93,7 @@ export type ActionHookRegistration = {
    *     accumulates non-optional and expands optional, independent of order)
    *
    * So `order` has NO observable effect for computeCosts. It is retained for
-   * other phases (before / during / after / immediatelyAfter etc.) where
+   * other phases (before / immediatelyAfter / after etc.) where
    * sequential side-effects may need deterministic ordering.
    */
   order?: number

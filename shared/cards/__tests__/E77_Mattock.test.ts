@@ -89,7 +89,7 @@ describe('E077_Mattock', () => {
     const player = createPlayer()
     const result = executeCardListener(listener, {
       state: createState(player), player, space: createSpace('resource-market-4'),
-      actionId: 'place-farmer', phase: 'during',
+      actionId: 'place-farmer', phase: 'after',
     } as unknown as CardListenerContext)
     expect(result).toBeDefined()
     const leaf = result!.flow as Extract<ActionFlow, { type: 'leaf' }>

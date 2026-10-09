@@ -93,6 +93,7 @@ import {
   getCustomOccupationIds,
 } from '../cards/custom-registry.ts'
 import { type CustomCardData, SessionCardContext, withSessionContext } from '../cards/session-card-context.ts'
+import { assertSandboxListenerPhases } from '../custom-code/sandbox-listener-phases.ts'
 import { CardRegistry, type CardImpl } from '../cards/registry.ts'
 import { getActiveCardRegistry, setActiveCardRegistry, withActiveRegistry } from '../cards/active-registry.ts'
 import { ensureCatalogLookupsInstalled } from '../cards/install-catalog-lookups.ts'
@@ -824,6 +825,11 @@ export class GameCore {
   constructor(options: GameCoreOptions = {}) {
     ensureCatalogLookupsInstalled()
     const { stateOrSeed, customCards, initialStateOptions, registerCustomCardImpl } = options
+    // Reject incompatible executable snapshots before registration's warning-only
+    // fallback can leave a card with missing rules, in either runtime.
+    for (const card of customCards ?? []) {
+      if (card.compiledCode && card.codeManifest) assertSandboxListenerPhases(card.cardJson.id, card.codeManifest)
+    }
     const isFreshState = stateOrSeed === undefined || typeof stateOrSeed === 'number'
     this.parentSelectionSeed = initialStateOptions?.parentSelectionSeed
     this.registerCustomCardImpl = registerCustomCardImpl ?? (() => {
