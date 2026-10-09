@@ -2,11 +2,12 @@ import { expect, test, type APIResponse, type Page } from '@playwright/test'
 import { BACKEND_URL, FRONTEND_URL } from './fixtures'
 import type { GameSyncPayload } from '../shared/contract/protocol/game'
 import type { ServerEvent } from '../shared/contract/protocol/ws'
+import { resolveRoomWorkPrompts } from './room-work-driver'
 
 const cookie = (response: APIResponse, name: string) => response.headersArray()
   .find(header => header.name.toLowerCase() === 'set-cookie' && header.value.startsWith(`${name}=`))!
   .value.split(';')[0]!.slice(name.length + 1)
-type AuditWindow = Window & { auditSocket: WebSocket; auditState: GameSyncPayload; auditMessages: ServerEvent[] }
+type AuditWindow = Window & typeof globalThis & { auditSocket: WebSocket; auditState: GameSyncPayload; auditMessages: ServerEvent[] }
 const snapshot = (page: Page) => page.evaluate(() => (window as AuditWindow).auditState)
 let sequence = 0
 const command = async (page: Page, body: Record<string, unknown>, observer?: Page) => {
@@ -88,20 +89,10 @@ test('real Room history loads earlier groups, preserves cancellation markers and
   await p2.goto(`/?player=p2&transport=ws&room=${room}`)
   for (const page of pages) await expect(page.locator('.game-layout')).toBeVisible({ timeout: 30000 })
   for (let index = 0; index < 28; index++) {
-    let current = await snapshot(p1)
-    while (current.interaction.stateId === 'wait') {
-      if (current.interaction.request.kind === 'private-prompt') {
-        const actor = current.interaction.playerIndex
-        await command(pages[actor]!, { type: 'getState' })
-        current = await snapshot(pages[actor]!)
-        if (current.interaction.stateId !== 'wait') throw new Error('Missing actor prompt')
-      }
-      const pending = current.interaction.request
-      if (pending.kind !== 'confirm-next-player' && pending.kind !== 'confirm-player-switch') throw new Error(pending.kind)
-      const actor = pending.kind === 'confirm-next-player' ? pending.nextPlayerIndex : pending.fromPlayerIndex
-      await command(pages[actor]!, { type: 'choice', value: 'confirm' }, p1)
-      current = await snapshot(p1)
-    }
+    const current = await resolveRoomWorkPrompts({
+      snapshot: actor => snapshot(pages[actor]!),
+      command: (actor, body) => command(pages[actor]!, body, p1),
+    })
     const actor = current.state.currentPlayerIndex
     const actorState = await snapshot(pages[actor]!)
     const spaceId = ['forest', 'reed-bank', 'fishing', 'day-laborer'].find(id => actorState.actionAvailability?.[id])
