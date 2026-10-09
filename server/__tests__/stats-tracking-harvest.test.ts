@@ -4,7 +4,7 @@ import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 describe('PlayerStats harvest tracking', () => {
   it('grain reaped from fields adds to harvestedGrain (1 per field)', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     const player = state.players[0]!
@@ -33,7 +33,7 @@ describe('PlayerStats harvest tracking', () => {
   })
 
   it('vegetable reaped tracked separately', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     const player = state.players[0]!
@@ -54,7 +54,7 @@ describe('PlayerStats harvest tracking', () => {
   })
 
   it('harvest reap summary keeps harvested crop details during field phase', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     const player = state.players[0]!

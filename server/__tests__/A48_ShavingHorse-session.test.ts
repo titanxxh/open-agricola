@@ -20,7 +20,7 @@ type SetupOptions = {
 }
 
 const setup = (options: SetupOptions = {}) => {
-  const session = new GameSession()
+  const session = new GameSession(42)
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
@@ -71,7 +71,7 @@ const directContext = (
   actionId: 'gain' | 'exchange',
   transactionEvents: DraftGameEvent[],
 ): CardListenerContext => {
-  const session = new GameSession()
+  const session = new GameSession(42)
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
@@ -206,7 +206,7 @@ describe('A048_ShavingHorse session', () => {
   })
 
   it('triggers once after a batched future receive adds wood', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -267,7 +267,7 @@ describe('A048_ShavingHorse session', () => {
   }
 
   const setup = (options: SetupOptions = {}) => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

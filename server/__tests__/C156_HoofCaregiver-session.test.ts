@@ -14,7 +14,7 @@ describe('C156_HoofCaregiver session', () => {
     //   2. gainNode([GRAIN => N, FOOD => N]) where N = cattle on space (after +1)
     // Our previous impl hard-coded gain {grain: 1, food: 1} and skipped the
     // space mutation entirely.
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const cattleMarketRound = state.roundActionOrder.indexOf('cattle-market') + 1
@@ -53,7 +53,7 @@ describe('C156_HoofCaregiver session', () => {
   })
 
   it('onBuy returns undefined when cattle-market exists but is not revealed', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!

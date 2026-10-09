@@ -13,7 +13,7 @@ import { B021_HayloftBarn_impl } from '../../shared/cards/B/B021_HayloftBarn'
 const CARD_ID = 'B021_HayloftBarn'
 
 const setup = (options?: { foodCount?: number }) => {
-  const session = new GameSession()
+  const session = new GameSession(42)
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
@@ -40,7 +40,7 @@ const setup = (options?: { foodCount?: number }) => {
 
 describe('B021_HayloftBarn session', () => {
   it('onBuy sets foodCount to 4', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

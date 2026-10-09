@@ -7,7 +7,7 @@ import type { ActionFlow } from '../../shared/contract/types'
 
 describe('B039_Loom — onHarvestFieldPhase uses on-board sheep (not reserve)', () => {
   const setup = () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -121,7 +121,7 @@ describe('B039_Loom — computeBonusScore uses on-board sheep', () => {
   }
 
   it('reserve only 6 sheep: 0 VP', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     const player = state.players[0]!
     player.resources.sheep = 6
@@ -129,7 +129,7 @@ describe('B039_Loom — computeBonusScore uses on-board sheep', () => {
   })
 
   it('6 sheep on board: 2 VP', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     const player = state.players[0]!
     player.pastures = [
@@ -139,7 +139,7 @@ describe('B039_Loom — computeBonusScore uses on-board sheep', () => {
   })
 
   it('counts sheep hosted on another player Night Pasture', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!

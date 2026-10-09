@@ -15,7 +15,7 @@ const CARD_ID = 'D070_StrawManure'
 
 describe('D070_StrawManure session', () => {
   const setupHarvest = (includeCardField = false) => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -112,7 +112,7 @@ describe('D070_StrawManure session', () => {
   })
 
   it('does not trigger when player has no grain', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -139,7 +139,7 @@ describe('D070_StrawManure session', () => {
   })
 
   it('does not trigger when no vegetable fields have crops', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

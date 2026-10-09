@@ -5,7 +5,7 @@ import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites
 
 describe('E041_MuddyWaters prerequisite', () => {
   it('blocks when player has fewer than 5 played cards', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     const player = state.players[0]!
     player.occupationPlayed = ['o1']
@@ -15,7 +15,7 @@ describe('E041_MuddyWaters prerequisite', () => {
   })
 
   it('allows when player has 5+ played cards', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     const player = state.players[0]!
     player.occupationPlayed = ['o1', 'o2']

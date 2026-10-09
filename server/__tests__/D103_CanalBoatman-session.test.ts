@@ -144,7 +144,7 @@ describe('D103_CanalBoatman listener', () => {
 
 describe('D103_CanalBoatman session', () => {
   const setup = () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -212,7 +212,7 @@ describe('D103_CanalBoatman session', () => {
   })
 
   it('D103 extra worker does not let D150_GodlySpouse miscount wish-children as second placement', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

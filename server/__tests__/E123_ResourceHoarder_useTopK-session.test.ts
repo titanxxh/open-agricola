@@ -363,7 +363,7 @@ describe('E123_ResourceHoarder use-top-k (reference full)', () => {
   })
 
   it('session renovation with C14 keeps E123 top reed unused', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

@@ -13,7 +13,7 @@ import '../../shared/cards/C/C088_CarpentersApprentice'
 
 describe('C089_StableMaster session', () => {
   const setup = () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -73,7 +73,7 @@ describe('C089_StableMaster session', () => {
   })
 
   it('no effect without the card', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -91,7 +91,7 @@ describe('C089_StableMaster session', () => {
   })
 
   it('onBuy returns optional stables flow with exact 1 wood cost', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -117,7 +117,7 @@ describe('C089_StableMaster session', () => {
   })
 
   it('onBuy skipped if player has 4 stables built', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -136,7 +136,7 @@ describe('C089_StableMaster session', () => {
   })
 
   it('onBuy skipped if consumed stable tokens exhaust reserve', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -153,7 +153,7 @@ describe('C089_StableMaster session', () => {
   })
 
   it('onBuy returns stables flow even when wood is paid by a stables cost modifier', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

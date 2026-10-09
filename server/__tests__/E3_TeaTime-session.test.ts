@@ -10,7 +10,7 @@ const CARD_ID = 'E003_TeaTime'
 
 describe('E003_TeaTime session', () => {
   const setup = () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -71,7 +71,7 @@ describe('E003_TeaTime session', () => {
 
   describe('prerequisite "Own Person on Grain Utilization"', () => {
     it('blocks when no own worker is on Grain Utilization', () => {
-      const session = new GameSession()
+      const session = new GameSession(42)
       stabilizeRandomHands(session.state.players)
       const state = session.getState().state
       const player = state.players[0]!
@@ -81,7 +81,7 @@ describe('E003_TeaTime session', () => {
     })
 
     it('allows when own worker sits on Grain Utilization', () => {
-      const session = new GameSession()
+      const session = new GameSession(42)
       stabilizeRandomHands(session.state.players)
       const state = session.getState().state
       const player = state.players[0]!

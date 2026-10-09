@@ -48,7 +48,7 @@ const createState = (...players: PlayerState[]): GameState => ({
 describe('E159_OldMiser session', () => {
   describe('feeding reduction', () => {
     it('with card, 2 adults, feeding needs 2 food (not 4)', () => {
-      const session = new GameSession()
+      const session = new GameSession(42)
       stabilizeRandomHands(session.state.players)
       const state = session.getState().state
       state.players = state.players.slice(0, 2)
@@ -97,7 +97,7 @@ describe('E159_OldMiser session', () => {
     })
 
     it('without card, 2 adults, feeding needs 4 food', () => {
-      const session = new GameSession()
+      const session = new GameSession(42)
       stabilizeRandomHands(session.state.players)
       const state = session.getState().state
       state.players = state.players.slice(0, 2)
@@ -147,7 +147,7 @@ describe('E159_OldMiser session', () => {
     })
 
     it('with card and newborn, feeding is further reduced', () => {
-      const session = new GameSession()
+      const session = new GameSession(42)
       stabilizeRandomHands(session.state.players)
       const state = session.getState().state
       state.players = state.players.slice(0, 2)

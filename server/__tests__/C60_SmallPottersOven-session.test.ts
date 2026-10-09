@@ -50,7 +50,7 @@ const setupBakeViaC60 = (
 
 describe('C060_SmallPottersOven server session', () => {
   it('returns the only oven from onBuy and logs separate cardEffectGain on play', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -98,7 +98,7 @@ describe('C060_SmallPottersOven server session', () => {
   })
 
   it('asks which oven to return from onBuy when both ovens are owned', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

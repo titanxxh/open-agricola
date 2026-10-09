@@ -14,7 +14,7 @@ describe('B063_Tasting session', () => {
   const setup = (grain = 2, opts?: { food?: number; playerCount?: number }) => {
     const session = opts?.playerCount
       ? new GameSession(42, undefined, { playerCount: opts.playerCount })
-      : new GameSession()
+      : new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, opts?.playerCount ?? 2)

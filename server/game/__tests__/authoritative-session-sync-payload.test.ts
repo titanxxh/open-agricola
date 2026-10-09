@@ -75,7 +75,7 @@ describe('GameSession.buildSyncPayload', () => {
   })
 
   it('keeps HTTP debug null-viewer payload unfiltered while WS null-viewer payload is a spectator view', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const resp = session.withCtx(() => session.getState())
     const p0 = resp.state.players[0]!
     const waitResp: SessionResponse = {
@@ -122,7 +122,7 @@ describe('GameSession.buildSyncPayload', () => {
   })
 
   it('includes custom-card runtime warnings only in HTTP debug payloads', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     session.cardWarnings.push('runtime hook failed')
     const resp = session.withCtx(() => session.getState())
 

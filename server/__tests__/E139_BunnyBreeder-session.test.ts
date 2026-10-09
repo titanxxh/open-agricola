@@ -6,7 +6,7 @@ const CARD_ID = 'E139_BunnyBreeder'
 
 describe('E139 Bunny Breeder — onBuy XOR optional + futureMeeples', () => {
   it('round 1: returns XOR optional with 13 children (one per future round)', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.round = 1
     const player = state.players[0]!
@@ -20,7 +20,7 @@ describe('E139 Bunny Breeder — onBuy XOR optional + futureMeeples', () => {
   })
 
   it('round 5: returns XOR optional with 9 children', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.round = 5
     const player = state.players[0]!
@@ -32,7 +32,7 @@ describe('E139 Bunny Breeder — onBuy XOR optional + futureMeeples', () => {
   })
 
   it('round 14: no XOR (turnsLeft = 0)', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.round = 14
     const player = state.players[0]!
@@ -42,7 +42,7 @@ describe('E139 Bunny Breeder — onBuy XOR optional + futureMeeples', () => {
   })
 
   it('each child carries an inline future-meeple request: i food at round = current+i', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.round = 3
     const player = state.players[0]!
@@ -69,7 +69,7 @@ describe('E139 Bunny Breeder — onBuy XOR optional + futureMeeples', () => {
   })
 
   it('round 13: single child for round 14, +1 food', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.round = 13
     const player = state.players[0]!

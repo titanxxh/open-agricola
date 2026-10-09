@@ -52,7 +52,7 @@ const createSpace = (id: string): ActionSpace => ({
 
 describe('E027_PiggyBank session', () => {
   it('onBeforeReturnHome offers to place 1 food on card when player has food', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
 
@@ -74,7 +74,7 @@ describe('E027_PiggyBank session', () => {
   })
 
   it('onBeforeReturnHome returns undefined when player has no food', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
 

@@ -32,7 +32,7 @@ const edgesForTile = (row: number, col: number) => [
 
 describe('fence payment session', () => {
   const setup = () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.currentPlayerIndex = 0
@@ -101,7 +101,7 @@ describe('fence payment session', () => {
     // Regression (I2): when a fence commit triggers a payment-choice pending,
     // the stored farmPayment payload must retain palisadeEdges so the resumed
     // applyFarmChoice places palisades instead of silently dropping them.
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.currentPlayerIndex = 0

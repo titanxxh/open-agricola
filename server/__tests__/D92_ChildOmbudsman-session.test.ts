@@ -15,7 +15,7 @@ import type { CardListenerContext } from '../../shared/cards/card-listeners'
 const CARD_ID = 'D092_ChildOmbudsman'
 
 const makeCtx = (round: number, rooms: number, family: number) => {
-  const session = new GameSession()
+  const session = new GameSession(42)
   const state = session.getState().state
   state.round = round
   const player = state.players[0]!

@@ -288,7 +288,7 @@ describe('B38 FutureBuildingSite — session', () => {
 
   describe('prerequisite "Play in Round 4 or Before"', () => {
     it('blocks when round > 4', () => {
-      const session = new GameSession()
+      const session = new GameSession(42)
       const state = session.getState().state
       state.round = 5
       const player = state.players[0]!
@@ -296,7 +296,7 @@ describe('B38 FutureBuildingSite — session', () => {
     })
 
     it('allows when round <= 4', () => {
-      const session = new GameSession()
+      const session = new GameSession(42)
       const state = session.getState().state
       state.round = 4
       const player = state.players[0]!

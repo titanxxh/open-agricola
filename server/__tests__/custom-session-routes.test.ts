@@ -178,7 +178,7 @@ describe('custom session routes', () => {
     const { CustomSessionExecutor } = await import('../game/custom-session-executor.ts')
     const slots = Array.from(
       { length: 14 },
-      () => new CustomSessionExecutor(new GameSession(), []),
+      () => new CustomSessionExecutor(new GameSession(42), []),
     )
     slots.forEach((executor) => expect(executor.reserveWorkerSlot()).toBe(true))
     const { handleGameRoute, disposeSandboxSessionsUsingCard } = await import('../game-router.ts')

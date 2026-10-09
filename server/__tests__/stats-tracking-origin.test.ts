@@ -20,7 +20,7 @@ describe('PlayerStats resource origin tracking', () => {
   })
 
   it('claims wood from Forest action space go to resourcesFromBoard', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.currentPlayerIndex = 0

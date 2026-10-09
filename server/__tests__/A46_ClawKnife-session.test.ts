@@ -84,7 +84,7 @@ const useSheepMarket = (session: GameSession, actor = 0) => {
 
 describe('A046_ClawKnife prerequisite', () => {
   it('blocks when player has zero pastures', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     const player = state.players[0]!
     player.pastures = []
@@ -92,7 +92,7 @@ describe('A046_ClawKnife prerequisite', () => {
   })
 
   it('allows when player has exactly 1 pasture', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     const player = state.players[0]!
     player.pastures = [{
@@ -107,7 +107,7 @@ describe('A046_ClawKnife prerequisite', () => {
   })
 
   it('blocks when player has 2 pastures', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     const player = state.players[0]!
     player.pastures = [

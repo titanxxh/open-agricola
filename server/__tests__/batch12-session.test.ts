@@ -15,7 +15,7 @@ import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 // ===== A54 Credit session tests =====
 describe('A054_Credit session', () => {
   const setup = () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -40,7 +40,7 @@ describe('A054_Credit session', () => {
 // ===== A96 Task Artisan session tests =====
 describe('A096_TaskArtisan session', () => {
   const setup = () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -67,7 +67,7 @@ describe('A096_TaskArtisan session', () => {
 // ===== B16 Mining Hammer session tests =====
 describe('B016_MiningHammer session', () => {
   const setup = () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -90,7 +90,7 @@ describe('B016_MiningHammer session', () => {
   }
 
   it('gains 1 food when bought through the improvement action', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -197,7 +197,7 @@ describe('B016_MiningHammer session', () => {
 // ===== A129 Swagman session tests =====
 describe('A129_Swagman session', () => {
   const setup = () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -353,7 +353,7 @@ describe('A129_Swagman session', () => {
 // ===== A82 Work Certificate session tests =====
 describe('A082_WorkCertificate session', () => {
   const setup = () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

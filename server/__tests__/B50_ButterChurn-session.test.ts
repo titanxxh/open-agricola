@@ -7,7 +7,7 @@ import type { ActionFlow } from '../../shared/contract/types'
 
 describe('B050_ButterChurn — onHarvestFieldPhase uses on-board sheep+cattle (not reserve)', () => {
   const setup = () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0

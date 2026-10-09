@@ -17,7 +17,7 @@ const PURE_CARD_ID = 'TEST_PurityGatePure'
 const IMPURE_CARD_ID = 'TEST_PurityGateImpure'
 
 const startTwoPlayerForestGame = (cardId: string, listener: CardListenerRegistration) => {
-  const session = new GameSession()
+  const session = new GameSession(42)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   state.currentPlayerIndex = 0

@@ -65,7 +65,7 @@ const mockRes = (): MockRes => {
 }
 
 const setupE78BatchPromptSession = () => {
-  const session = new GameSession()
+  const session = new GameSession(42)
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
@@ -258,7 +258,7 @@ describe('HTTP privacy + seat binding', () => {
     })
 
     it('filters active player cardAvailability from other viewers', async () => {
-      const session = new GameSession()
+      const session = new GameSession(42)
       stabilizeRandomHands(session.state.players)
       const state = session.getState().state
       state.players = state.players.slice(0, 2)
@@ -281,7 +281,7 @@ describe('HTTP privacy + seat binding', () => {
     })
 
     it('filters hidden hand-card public event cancellations from other viewers', async () => {
-      const session = new GameSession()
+      const session = new GameSession(42)
       stabilizeRandomHands(session.state.players)
       const originalGetState = session.getState.bind(session)
       const resp = originalGetState()

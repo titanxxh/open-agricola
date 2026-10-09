@@ -51,7 +51,7 @@ const scoreCategory = (response: SessionResponse, key: string) =>
 
 describe('E132_VeggieLover session', () => {
   it('offers optional feeding exchange when player has grain and vegetable', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
 
@@ -71,7 +71,7 @@ describe('E132_VeggieLover session', () => {
   })
 
   it('returns undefined when player has no grain', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
 
@@ -87,7 +87,7 @@ describe('E132_VeggieLover session', () => {
   })
 
   it('returns undefined when player has no vegetable', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
 

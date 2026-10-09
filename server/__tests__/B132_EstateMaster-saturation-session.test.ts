@@ -40,7 +40,7 @@ const fillFarmMinus1 = (player: PlayerState): void => {
 }
 
 const setupSession = () => {
-  const session = new GameSession()
+  const session = new GameSession(42)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   return { session, state }

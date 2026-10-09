@@ -15,7 +15,7 @@ describe('A072_CalciumFertilizers session', () => {
    * Player has sown fields and quarry spaces have accumulated resources.
    */
   const setup = (round = 4) => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -275,7 +275,7 @@ describe('A072_CalciumFertilizers session', () => {
   })
 
   it('prerequisite: cannot buy if player has fields', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -334,7 +334,7 @@ describe('A072_CalciumFertilizers session', () => {
   it('prerequisite: can buy if player has no fields (prerequisite text check)', () => {
     // The "No Field Tiles" prerequisite is handled by the prerequisite system.
     // We verify the prerequisite string is correctly set on the card definition.
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

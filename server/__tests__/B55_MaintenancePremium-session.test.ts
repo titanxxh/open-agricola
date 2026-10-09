@@ -9,7 +9,7 @@ import '../../shared/cards/B/B055_MaintenancePremium'
 const CARD_ID = 'B055_MaintenancePremium'
 
 const setup = () => {
-  const session = new GameSession()
+  const session = new GameSession(42)
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
@@ -42,7 +42,7 @@ const setup = () => {
 
 describe('B055_MaintenancePremium session', () => {
   it('onBuy sets foodCount to 3', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

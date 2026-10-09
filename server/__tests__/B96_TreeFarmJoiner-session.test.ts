@@ -14,7 +14,7 @@ const MINOR_ID = 'B004_WoodPile'
 
 describe('B96 Tree Farm Joiner session', () => {
   const setup = () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 2

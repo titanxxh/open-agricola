@@ -13,7 +13,7 @@ const CARD_ID = 'C049_BeerStall'
 
 describe('C049_BeerStall session', () => {
   it('offers optional exchange when player has grain and empty unfenced stable', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
 
@@ -37,7 +37,7 @@ describe('C049_BeerStall session', () => {
   })
 
   it('returns undefined when player has no grain', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
 
@@ -56,7 +56,7 @@ describe('C049_BeerStall session', () => {
   })
 
   it('returns undefined when no unfenced stables', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
 
@@ -83,7 +83,7 @@ describe('C049_BeerStall session', () => {
   })
 
   it('returns undefined when unfenced stables have animals', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
 
@@ -102,7 +102,7 @@ describe('C049_BeerStall session', () => {
   })
 
   it('counts the B85 FarmHand stable as one empty unfenced stable (card-facing count)', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
 
@@ -126,7 +126,7 @@ describe('C049_BeerStall session', () => {
   })
 
   it('offers xor with multiple options when multiple empty unfenced stables and grain', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
 
@@ -149,7 +149,7 @@ describe('C049_BeerStall session', () => {
   })
 
   it('caps exchanges at grain count when less grain than empty stables', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
 

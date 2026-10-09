@@ -12,7 +12,7 @@ const setWorkersAtHome = (state: any, player: any, count: number) => {
 
 describe('improvement: pay fail idempotent', () => {
   it('cannot afford major-improvement -> pending stays choice; player.improvements untouched', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

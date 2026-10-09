@@ -15,7 +15,7 @@ describe('D060_LargePottery computeBonusScore', () => {
   const ctx: BonusScoringContext = { categories: [] }
 
   it('clay=5 → 2 VP (matches scoresMap 5→2)', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
@@ -28,7 +28,7 @@ describe('D060_LargePottery computeBonusScore', () => {
   })
 
   it('clay=3 (post-solve) → 1 VP', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
@@ -41,7 +41,7 @@ describe('D060_LargePottery computeBonusScore', () => {
   })
 
   it('clay=0 (post-solve) → 0 VP', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
@@ -54,7 +54,7 @@ describe('D060_LargePottery computeBonusScore', () => {
   })
 
   it('clay=7 → 4 VP (top tier)', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!

@@ -32,7 +32,7 @@ import { D025_WitchesDanceFloor } from '../../shared/cards/D/D025_WitchesDanceFl
 const CARD_ID = 'D025_WitchesDanceFloor'
 
 const setup = () => {
-  const session = new GameSession()
+  const session = new GameSession(42)
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)

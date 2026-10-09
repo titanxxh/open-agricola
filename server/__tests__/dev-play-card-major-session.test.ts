@@ -5,7 +5,7 @@ import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 describe('devPlayCard major improvements', () => {
   it('plays a major into player improvements and removes it from the public supply', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -26,7 +26,7 @@ describe('devPlayCard major improvements', () => {
   })
 
   it('moves a major from the former owner and clears stale old-owner state', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

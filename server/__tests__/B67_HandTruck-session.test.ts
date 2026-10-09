@@ -6,7 +6,7 @@ import '../../shared/cards/B/B067_HandTruck'
 const CARD_ID = 'B067_HandTruck'
 
 const setupHandTruckBakeSession = () => {
-  const session = new GameSession()
+  const session = new GameSession(42)
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
@@ -83,7 +83,7 @@ describe('B067_HandTruck session', () => {
   })
 
   it('does not offer grain before bake-bread without a bake provider', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

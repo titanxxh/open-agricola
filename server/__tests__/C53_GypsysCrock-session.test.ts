@@ -35,7 +35,7 @@ describe('C053_GypsysCrock session', () => {
   }
 
   const setup = () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -205,7 +205,7 @@ describe('C053_GypsysCrock session', () => {
     // isCookery is NOT set). The trade-applied event fires with sourceId
     // 'E064_SimpleOven' which is not a cooking source — C53 must skip it.
     // Use direct listener-fire path to keep the assertion focused.
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

@@ -10,7 +10,7 @@ const CARD_ID = 'E143_Hewer'
 
 describe('E143_Hewer session', () => {
   it('effect returns gain flow when clay-pit unoccupied and round >= 3', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -39,7 +39,7 @@ describe('E143_Hewer session', () => {
   })
 
   it('does not trigger when round < 3', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -59,7 +59,7 @@ describe('E143_Hewer session', () => {
   })
 
   it('does not trigger when clay-pit is occupied', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

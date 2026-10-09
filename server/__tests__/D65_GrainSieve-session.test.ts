@@ -15,7 +15,7 @@ describe('D065_GrainSieve session', () => {
     grainFields?: { row: number; col: number; crop: 'grain'; remaining: number }[]
     vegetableFields?: { row: number; col: number; crop: 'vegetable'; remaining: number }[]
   }) => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -42,7 +42,7 @@ describe('D065_GrainSieve session', () => {
   }
 
   it('onAfterReap grants 1 grain when 2+ grain harvested', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -63,7 +63,7 @@ describe('D065_GrainSieve session', () => {
   })
 
   it('onAfterReap does not trigger when only 1 grain harvested', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -79,7 +79,7 @@ describe('D065_GrainSieve session', () => {
   })
 
   it('onAfterReap does not trigger when no grain harvested', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

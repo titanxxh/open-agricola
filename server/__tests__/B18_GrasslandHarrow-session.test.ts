@@ -14,7 +14,7 @@ const findListener = (id: string) => getRegisteredCardListeners().find((l) => l.
 
 describe('B018_GrasslandHarrow after-pay future field', () => {
   const setupState = (round: number, resources: Partial<Record<string, number>>) => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = round

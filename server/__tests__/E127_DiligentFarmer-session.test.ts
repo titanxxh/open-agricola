@@ -15,7 +15,7 @@ const emptyResources = (): Resource => ({
 
 describe('E127_DiligentFarmer session', () => {
   it('onBuy offers free room when player has 3+ scoring categories at 4 points', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
 
@@ -62,7 +62,7 @@ describe('E127_DiligentFarmer session', () => {
   })
 
   it('onBuy returns undefined when player has fewer than 3 categories at max score', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
 
@@ -87,7 +87,7 @@ describe('E127_DiligentFarmer session', () => {
   })
 
   it('onBuy returns undefined with no max score categories at all', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
 

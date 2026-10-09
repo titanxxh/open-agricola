@@ -15,7 +15,7 @@ const CARD_ID = 'D097_BeggingStudent'
 
 describe('D097_BeggingStudent session', () => {
   it('onBuy gives 1 begging marker', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
 
@@ -32,7 +32,7 @@ describe('D097_BeggingStudent session', () => {
   })
 
   it('onStartHarvest returns optional occupation with exactCost {} when player has occupations in hand', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 4
@@ -57,7 +57,7 @@ describe('D097_BeggingStudent session', () => {
   })
 
   it('onStartHarvest returns undefined when player has no occupations in hand', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 4

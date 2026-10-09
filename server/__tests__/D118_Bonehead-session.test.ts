@@ -13,7 +13,7 @@ describe('D118_Bonehead session', () => {
    * After onBuy: 6 wood placed, 1 popped immediately → 5 left on stack.
    */
   const setup = () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

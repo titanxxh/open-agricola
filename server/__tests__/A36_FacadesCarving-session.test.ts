@@ -5,7 +5,7 @@ import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites
 
 describe('A036_FacadesCarving prerequisite', () => {
   it('blocks when wood in supply < current round', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.round = 5
     const player = state.players[0]!
@@ -14,7 +14,7 @@ describe('A036_FacadesCarving prerequisite', () => {
   })
 
   it('allows when wood in supply >= current round', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.round = 5
     const player = state.players[0]!

@@ -13,7 +13,7 @@ const CARD_ID = 'C121_ClayKneader'
 
 describe('C121_ClayKneader session', () => {
   const setup = () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -28,7 +28,7 @@ describe('C121_ClayKneader session', () => {
   }
 
   it('onBuy grants 1 wood and 2 clay', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

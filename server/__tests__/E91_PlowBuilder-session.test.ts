@@ -24,7 +24,7 @@ const CARD_ID = 'E091_PlowBuilder'
 
 describe('E091_PlowBuilder session', () => {
   const setup = (round = 4, options?: { joineryUsed?: boolean }) => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -242,7 +242,7 @@ describe('E091_PlowBuilder session', () => {
   })
 
   it('trade-applied listener sets usedJoinery on Major_Joinery sourceId', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -266,7 +266,7 @@ describe('E091_PlowBuilder session', () => {
     ['Major_Moor_FurnitureStall'],
     ['Major_JoineryDeluxe'],
   ])('trade-applied listener ignores sources without Joinery identity: %s', (sourceId) => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -285,7 +285,7 @@ describe('E091_PlowBuilder session', () => {
   })
 
   it('trade-applied listener accepts the six-player Joinery copy', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -304,7 +304,7 @@ describe('E091_PlowBuilder session', () => {
   })
 
   it('onAfterHarvest clears both the per-use flag and usedJoinery', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

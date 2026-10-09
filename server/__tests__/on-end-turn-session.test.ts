@@ -26,7 +26,7 @@ describe('onEndTurn session', () => {
   })
 
   it('fires before confirmNextPlayer on a normal worker placement turn', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     registerCounterEffect()
     const state = session.getState().state
@@ -46,7 +46,7 @@ describe('onEndTurn session', () => {
   })
 
   it('does not fire during an intermediate confirmPlayerSwitch', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     registerCounterEffect()
     const state = session.getState().state
@@ -90,7 +90,7 @@ describe('onEndTurn session', () => {
   })
 
   it('waits until action-scoped animal reorg resolves', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     registerCounterEffect()
     const state = session.getState().state

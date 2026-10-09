@@ -38,7 +38,7 @@ const runCollectListener = (
 ): ActionFlow | undefined => {
   const listener = findCollectListener()
   expect(listener).toBeDefined()
-  const session = new GameSession()
+  const session = new GameSession(42)
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
@@ -65,7 +65,7 @@ const runCollectListener = (
 
 describe('E140_Carter session', () => {
   const setup = (buyRound = 1) => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

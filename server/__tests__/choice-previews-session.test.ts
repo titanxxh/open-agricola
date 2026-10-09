@@ -125,7 +125,7 @@ describe('authoritative choice previews', () => {
   it('restores choice previews without changing the executable future queue', () => {
     const session = setup('M079_PeatSled', 1, true)
     const response = purchaseMinor(session, 'M079_PeatSled')
-    const restored = new GameSession()
+    const restored = new GameSession(42)
     const loaded = restored.loadState(JSON.parse(JSON.stringify(serializeSessionSnapshot(session.state, session))))
     expect(loaded.ok).toBe(true)
     expect(choices(loaded)).toEqual(choices(response))

@@ -31,7 +31,7 @@ const fenceBuilt = (
 describe('A083_ShepherdsCrook session flow', () => {
   it('uses fence delta in listener context to grant sheep', () => {
     expect(getRegisteredCardListeners().some((entry) => entry.id === 'A83-shepherds-crook-after-fencing')).toBe(true)
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -77,7 +77,7 @@ describe('A083_ShepherdsCrook session flow', () => {
   it('does not grant sheep for smaller new pasture event metadata', () => {
     const listener = getRegisteredCardListeners().find((entry) => entry.id === 'A83-shepherds-crook-after-fencing')
     expect(listener).toBeDefined()
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

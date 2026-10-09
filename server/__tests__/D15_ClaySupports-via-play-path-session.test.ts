@@ -20,7 +20,7 @@ describe('D15 ClaySupports via play-path (with A143 Stonecutter co-played)', () 
     // stone -1) plus other listener paths. This test exercises the same
     // gameplay path used by the production server (no test-only injection
     // into `activeModifiers`).
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.players.forEach((p) => {

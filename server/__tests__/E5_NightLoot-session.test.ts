@@ -14,7 +14,7 @@ const CARD_ID = 'E005_NightLoot'
 
 describe('E005_NightLoot session', () => {
   const setupSession = () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     return { session, state }

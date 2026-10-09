@@ -9,7 +9,7 @@ const CARD_ID = 'B061_ThreeFieldRotation'
 
 describe('B061_ThreeFieldRotation session', () => {
   it('gains 3 food when player has grain field, vegetable field, and empty field', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 4
@@ -34,7 +34,7 @@ describe('B061_ThreeFieldRotation session', () => {
   })
 
   it('does NOT gain food if missing grain field', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 4
@@ -54,7 +54,7 @@ describe('B061_ThreeFieldRotation session', () => {
   })
 
   it('does NOT gain food if missing vegetable field', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 4
@@ -74,7 +74,7 @@ describe('B061_ThreeFieldRotation session', () => {
   })
 
   it('does NOT gain food if missing empty field', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 4

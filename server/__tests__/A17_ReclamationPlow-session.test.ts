@@ -160,7 +160,7 @@ describe('A017_ReclamationPlow session', () => {
   })
 
   it('does not let an existing animal hide a newly collected animal that was discarded', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

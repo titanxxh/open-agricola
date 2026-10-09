@@ -19,7 +19,7 @@ const findListener = (id: string) =>
 
 describe('B168_PastureMaster session', () => {
   const createBaseState = () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     return state

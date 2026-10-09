@@ -35,7 +35,7 @@ const moved = (
 })
 
 const setupListener = () => {
-  const session = new GameSession()
+  const session = new GameSession(42)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   const owner = state.players[0]!
@@ -70,7 +70,7 @@ const runCollectListener = (
 
 describe('C081_MaterialHub prerequisite', () => {
   it('blocks when no reed in supply', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     const player = state.players[0]!
     player.resources.reed = 0
@@ -79,7 +79,7 @@ describe('C081_MaterialHub prerequisite', () => {
   })
 
   it('blocks when no stone in supply', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     const player = state.players[0]!
     player.resources.reed = 2
@@ -88,7 +88,7 @@ describe('C081_MaterialHub prerequisite', () => {
   })
 
   it('allows when both reed and stone are >= 1', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     const player = state.players[0]!
     player.resources.reed = 1
@@ -138,7 +138,7 @@ describe('C081_MaterialHub action-space provenance', () => {
 	  })
 
 	  it('lets the owner take from the card when another player collects enough from an action space', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 1

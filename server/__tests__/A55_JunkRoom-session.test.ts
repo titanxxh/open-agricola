@@ -10,7 +10,7 @@ import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 describe('A055_JunkRoom session log dedupe', () => {
   it('logs Junk Room gain only once when playing a minor improvement', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
 

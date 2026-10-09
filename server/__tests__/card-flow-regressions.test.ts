@@ -17,7 +17,7 @@ const stabilizeRandomHands = (players: { minorHand: string[]; occupationHand: st
 
 describe('card flow regressions', () => {
   it('A017_ReclamationPlow still triggers after animal reorg resumes the collect flow', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     stabilizeRandomHands(state.players)
@@ -56,7 +56,7 @@ describe('card flow regressions', () => {
   })
 
   it('A017_ReclamationPlow does not prompt again after confirming the plow choice', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     stabilizeRandomHands(state.players)
@@ -109,7 +109,7 @@ describe('card flow regressions', () => {
   })
 
   it('D150_GodlySpouse returns the first placed worker based on round placement order', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     stabilizeRandomHands(state.players)

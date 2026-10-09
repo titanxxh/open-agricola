@@ -65,7 +65,7 @@ const playOccupation = (session: GameSession) => {
 
 describe('C117_Legworker session', () => {
   it('hasAdjacentWorker returns true when owner occupies neighbour', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
@@ -81,7 +81,7 @@ describe('C117_Legworker session', () => {
   })
 
   it('hasAdjacentWorker returns false when neighbour is taken by opponent', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
@@ -95,7 +95,7 @@ describe('C117_Legworker session', () => {
   })
 
   it('hasAdjacentWorker returns false when no neighbour is occupied', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     session.loadState(state)
@@ -105,7 +105,7 @@ describe('C117_Legworker session', () => {
   it('after-place-farmer gains 1 wood when adjacent to own worker', () => {
     const listener = findListener('C117-legworker-after-place-farmer')!
     expect(listener).toBeDefined()
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
@@ -132,7 +132,7 @@ describe('C117_Legworker session', () => {
 
   it('does not trigger when no adjacent worker', () => {
     const listener = findListener('C117-legworker-after-place-farmer')!
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!

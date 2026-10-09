@@ -7,7 +7,7 @@ import '../../shared/cards/B/B119_Lumberjack'
 
 describe('B119 Lumberjack — session regression (palisades excluded)', () => {
   it('queues future wood meeples only for fences, not palisades', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0

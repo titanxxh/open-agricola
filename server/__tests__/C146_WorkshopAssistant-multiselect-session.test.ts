@@ -517,7 +517,7 @@ describe('C146 — multi-select pairs (onBuy)', () => {
   })
 
   it('rejects an invalid stored-pair key without changing resources, card state, or stats', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const owner = state.players[0]!

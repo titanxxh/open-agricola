@@ -129,7 +129,7 @@ const setupAnglerSession = () => {
 
 describe('card effect hand notification response plumbing', () => {
   it('explicit privateEvents are returned without entering state.events', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const playerId = session.getState().state.players[0]!.id
     const event = handChangedEvent(playerId, ['A001_TestCard'])
 
@@ -140,7 +140,7 @@ describe('card effect hand notification response plumbing', () => {
   })
 
   it('buffered private events are drained once on successful responses', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const playerId = session.getState().state.players[0]!.id
     const event = handChangedEvent(playerId, ['A002_TestCard'])
 
@@ -155,7 +155,7 @@ describe('card effect hand notification response plumbing', () => {
   })
 
   it('failed responses clear buffered private events without leaking stale events', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const playerId = session.getState().state.players[0]!.id
     const event = handChangedEvent(playerId, ['A003_TestCard'])
 
@@ -172,7 +172,7 @@ describe('card effect hand notification response plumbing', () => {
 describe('card effect hand notification events', () => {
   it('B146 discard action emits a target-only private event for an occupation discard', () => {
     const def = getActionDefinition(B146_DISCARD_ACTION_ID)!
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     const player = state.players[0]!
     player.occupationHand = [TEST_OCCUPATION_ID]
@@ -203,7 +203,7 @@ describe('card effect hand notification events', () => {
 
   it('B146 discard action emits a target-only private event for a minor discard', () => {
     const def = getActionDefinition(B146_DISCARD_ACTION_ID)!
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     const player = state.players[0]!
     player.minorHand = [A006_MINOR_ID]

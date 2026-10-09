@@ -11,7 +11,7 @@ import '../../shared/cards/B/B030_WoodPalisades'
 
 describe('E016_BriarHedge session', () => {
   const setup = () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -80,7 +80,7 @@ describe('E016_BriarHedge session', () => {
 
 describe('E16 BriarHedge — border-fence discount', () => {
   const discountSetup = (opts: { withCard?: boolean; wood: number; withB30?: boolean }) => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

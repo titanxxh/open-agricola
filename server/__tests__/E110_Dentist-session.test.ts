@@ -14,7 +14,7 @@ const CARD_ID = 'E110_Dentist'
 
 describe('E110_Dentist session', () => {
   it('onStartHarvest returns optional flow to pay 1 wood when player has wood', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -36,7 +36,7 @@ describe('E110_Dentist session', () => {
   })
 
   it('onStartHarvest returns undefined when player has no wood', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -55,7 +55,7 @@ describe('E110_Dentist session', () => {
   })
 
   it('onHarvestFeedingPhase grants 1 food per wood on card', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -81,7 +81,7 @@ describe('E110_Dentist session', () => {
   })
 
   it('onHarvestFeedingPhase returns undefined when no wood on card', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -99,7 +99,7 @@ describe('E110_Dentist session', () => {
   })
 
   it('full harvest flow: pay wood and get food during feeding', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

@@ -75,7 +75,7 @@ describe('PlayerStats action tracking', () => {
   })
 
   it('totalRoomsBuilt increments when a room is constructed via farm-expansion', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.currentPlayerIndex = 0
@@ -114,7 +114,7 @@ describe('PlayerStats action tracking', () => {
   })
 
   it('totalOccupationBuilt increments when an occupation is played', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -150,7 +150,7 @@ describe('PlayerStats action tracking', () => {
   })
 
   it('totalMajorBuilt increments when a major improvement is played', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

@@ -11,7 +11,7 @@ import type { ActionFlow } from '../../shared/contract/types'
 
 describe('B089_Groom session', () => {
   const setup = (options?: { houseType?: 'wood' | 'clay' | 'stone' }) => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

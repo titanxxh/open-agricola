@@ -18,7 +18,7 @@ const setupForHarvestField = (options?: {
   e74HeldFences?: number
   grain?: number
 }) => {
-  const session = new GameSession()
+  const session = new GameSession(42)
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
@@ -73,7 +73,7 @@ const drainPending = (session: GameSession, accept: boolean) => {
 }
 
 const setupForPurchase = (options?: { noStableReserve?: boolean }) => {
-  const session = new GameSession()
+  const session = new GameSession(42)
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
@@ -125,7 +125,7 @@ const takeMeetingPlaceToMinorOptions = (session: GameSession) => {
 describe('C054_MarketBooth session', () => {
   it('has no prerequisite (reference C054_MarketBooth has no isBuyable / prerequisite)', () => {
     const card = getRegisteredMinorImprovement(CARD_ID)!
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     const player = state.players[0]!

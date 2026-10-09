@@ -8,7 +8,7 @@ const CARD_ID = 'TEST_ContextOwner'
 
 describe('lazy listener dispatch context', () => {
   it('executes opponent listener with trigger player and owner player separated', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0

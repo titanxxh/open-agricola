@@ -26,7 +26,7 @@ const edgesForOneTile = [
 
 describe('A073_AgriculturalFertilizers session', () => {
   const setupFencing = () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -82,7 +82,7 @@ describe('A073_AgriculturalFertilizers session', () => {
   })
 
   it('grants optional sow after building 2 stables via farm-expansion', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -125,7 +125,7 @@ describe('A073_AgriculturalFertilizers session', () => {
   })
 
   it('cannot play A73 without at least 1 pasture (prerequisite)', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -162,7 +162,7 @@ describe('A073_AgriculturalFertilizers session', () => {
   const CARD_ID = 'A073_AgriculturalFertilizers'
 
   const setupFencing = () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -221,7 +221,7 @@ describe('A073_AgriculturalFertilizers session', () => {
   })
 
   it('A073 S2: without a pasture Agricultural Fertilizers is not offered', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

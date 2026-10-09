@@ -9,7 +9,7 @@ const CARD_ID = 'B120_Sweep'
 
 describe('B120_Sweep session', () => {
   const setup = (round: number) => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

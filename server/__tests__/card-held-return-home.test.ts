@@ -5,7 +5,7 @@ import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 describe('GameSession return-home releases card-held workers', () => {
   it('clears every heldWorkerId on every player when return-home runs', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
 
@@ -24,7 +24,7 @@ describe('GameSession return-home releases card-held workers', () => {
   })
 
   it('does not remove other extraData keys when releasing heldWorkerId', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
 

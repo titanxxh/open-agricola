@@ -13,7 +13,7 @@ const setupOccupiedSpaceSession = (options?: {
   houseType?: 'wood' | 'clay' | 'stone'
   rooms?: number
 }) => {
-  const session = new GameSession()
+  const session = new GameSession(42)
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
@@ -40,7 +40,7 @@ const setupOccupiedSpaceSession = (options?: {
 }
 
 const setupPlaySession = () => {
-  const session = new GameSession()
+  const session = new GameSession(42)
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
@@ -82,7 +82,7 @@ describe('B151_LittlePeasant session', () => {
   })
 
   it('does not offer occupied urgent-wish-children when the player has no inactive worker to grow', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

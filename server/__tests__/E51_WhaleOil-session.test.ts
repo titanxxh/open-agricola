@@ -13,7 +13,7 @@ import '../../shared/cards/E/E051_WhaleOil'
 const CARD_ID = 'E051_WhaleOil'
 
 const setup = (options?: { foodCount?: number }) => {
-  const session = new GameSession()
+  const session = new GameSession(42)
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
@@ -43,7 +43,7 @@ const setup = (options?: { foodCount?: number }) => {
 
 describe('E051_WhaleOil session', () => {
   it('onBuy sets foodCount to 0', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

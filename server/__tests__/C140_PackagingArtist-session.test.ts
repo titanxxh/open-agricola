@@ -13,7 +13,7 @@ const findListener = (id: string) =>
   getRegisteredCardListeners().find((l) => l.id === id)
 
 const setupMajorImprovementAffordable = () => {
-  const session = new GameSession()
+  const session = new GameSession(42)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   state.currentPlayerIndex = 0
@@ -39,7 +39,7 @@ const setupMajorImprovementAffordable = () => {
 }
 
 const setupMajorImprovementWithBakeProvider = () => {
-  const session = new GameSession()
+  const session = new GameSession(42)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   state.currentPlayerIndex = 0
@@ -63,7 +63,7 @@ const setupMajorImprovementWithBakeProvider = () => {
 
 describe('C140_PackagingArtist session', () => {
   it('onBuy grants 1 grain', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     session.loadState(state)
@@ -82,7 +82,7 @@ describe('C140_PackagingArtist session', () => {
   it('computeReplace replaces minor-improvement with bake-bread (decline + alternativeFlow)', () => {
     const listener = findListener('C140-packaging-artist-replace-minor-improvement')
     expect(listener).toBeDefined()
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
@@ -106,7 +106,7 @@ describe('C140_PackagingArtist session', () => {
   it('computeReplace is silent when trueAction=false', () => {
     const listener = findListener('C140-packaging-artist-replace-minor-improvement')
     expect(listener).toBeDefined()
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
@@ -131,7 +131,7 @@ describe('C140_PackagingArtist session', () => {
   it('isDoable: minor-improvement stays doable even with no minor cards', () => {
     const listener = findListener('C140-packaging-artist-isdoable-minor-improvement')
     expect(listener).toBeDefined()
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
@@ -152,7 +152,7 @@ describe('C140_PackagingArtist session', () => {
   it('isDoable is silent when trueAction=false', () => {
     const listener = findListener('C140-packaging-artist-isdoable-minor-improvement')
     expect(listener).toBeDefined()
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
@@ -174,7 +174,7 @@ describe('C140_PackagingArtist session', () => {
   it('isDoable: keeps doable=true unchanged when already doable', () => {
     const listener = findListener('C140-packaging-artist-isdoable-minor-improvement')
     expect(listener).toBeDefined()
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
@@ -198,7 +198,7 @@ describe('C140_PackagingArtist session', () => {
     // Registration shape: listener must be registered on unified 'improvement'.
     expect(listener!.actions).toContain('improvement')
 
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
@@ -224,7 +224,7 @@ describe('C140_PackagingArtist session', () => {
     expect(listener).toBeDefined()
     expect(listener!.actions).toContain('improvement')
 
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
@@ -244,7 +244,7 @@ describe('C140_PackagingArtist session', () => {
   it('computeReplace bails out on re-entry (checkedReplaceAction guard, both action IDs)', () => {
     const listener = findListener('C140-packaging-artist-replace-minor-improvement')
     expect(listener).toBeDefined()
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
@@ -306,7 +306,7 @@ describe('C140_PackagingArtist session', () => {
   it('isDoable bails out on re-entry (checkedReplaceAction guard, both action IDs)', () => {
     const listener = findListener('C140-packaging-artist-isdoable-minor-improvement')
     expect(listener).toBeDefined()
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!

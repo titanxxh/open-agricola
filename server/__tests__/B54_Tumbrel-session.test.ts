@@ -11,7 +11,7 @@ const CARD_ID = 'B054_Tumbrel'
 
 describe('B054_Tumbrel session', () => {
   it('onBuy returns a gain-2-food flow', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
 
@@ -27,7 +27,7 @@ describe('B054_Tumbrel session', () => {
   })
 
   it('sow listener fires and gains food per stable', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 1
@@ -61,7 +61,7 @@ describe('B054_Tumbrel session', () => {
   })
 
   it('sow listener does not fire with 0 stables', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
 
@@ -92,7 +92,7 @@ describe('B054_Tumbrel session', () => {
 
 
   it('sow listener counts the B85 FarmHand stable (card-facing count)', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
 
@@ -126,7 +126,7 @@ describe('B054_Tumbrel session', () => {
   })
 
   it('sow listener gains 3 food with 3 stables', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
 

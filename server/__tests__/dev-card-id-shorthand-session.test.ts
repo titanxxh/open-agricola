@@ -4,7 +4,7 @@ import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 describe('dev card id shorthand', () => {
   it('draws the unique deck-number card id', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -21,7 +21,7 @@ describe('dev card id shorthand', () => {
   })
 
   it('plays the unique deck-number card id', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -38,7 +38,7 @@ describe('dev card id shorthand', () => {
   })
 
   it('matches exact card number instead of id prefix', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

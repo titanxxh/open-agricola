@@ -28,7 +28,7 @@ describe('onBeforePlayerTurn hook (game-core skip-turn dispatch)', () => {
   }
 
   it('skips a player whose card returns { skipTurn: true } and advances to next eligible player', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -60,7 +60,7 @@ describe('onBeforePlayerTurn hook (game-core skip-turn dispatch)', () => {
   })
 
   it('does not skip a player when handler returns void', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -82,7 +82,7 @@ describe('onBeforePlayerTurn hook (game-core skip-turn dispatch)', () => {
   })
 
   it('does not treat ActionFlow-shaped returns as stage flow', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -111,7 +111,7 @@ describe('onBeforePlayerTurn hook (game-core skip-turn dispatch)', () => {
   })
 
   it('caps consecutive skips at players.length to avoid infinite loop', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

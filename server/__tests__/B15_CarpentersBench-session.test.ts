@@ -31,7 +31,7 @@ const directContext = (
   transactionEvents: DraftGameEvent<'resource.moved'>[],
   actionEvents = transactionEvents,
 ): CardListenerContext => {
-  const session = new GameSession()
+  const session = new GameSession(42)
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
@@ -111,7 +111,7 @@ describe('B015_CarpentersBench session', () => {
   })
 
   it('does not apply a second B15 wood discount when E16 also discounts border fences', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -157,7 +157,7 @@ describe('B015_CarpentersBench session', () => {
   })
 
   it('rejects a B15 pasture whose non-border fence cost exceeds the taken wood budget', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

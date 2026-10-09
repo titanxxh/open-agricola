@@ -10,7 +10,7 @@ import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 describe('harvest session flow', () => {
   it('uses start-player harvest order and logs reap/feed/breed details with begging', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -190,7 +190,7 @@ describe('harvest session flow', () => {
   })
 
   it('emits a game-ended event when the last round completes', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -213,7 +213,7 @@ describe('harvest session flow', () => {
   // playerB has 0 active workers (no feed pending). Caller can set up
   // playerA's resources / cards before performRoundEnd.
   const setupSinglePlayerHarvest = () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

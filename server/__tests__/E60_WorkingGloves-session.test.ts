@@ -14,7 +14,7 @@ const CARD_ID = 'E060_WorkingGloves'
 
 describe('E060_WorkingGloves session — trade-style modifier on occupation cost', () => {
   const setup = () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0

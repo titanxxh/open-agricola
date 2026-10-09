@@ -23,7 +23,7 @@ const fenceBuilt = (
 
 describe('E108 Blackberry Farmer — session (palisades excluded)', () => {
   it('queues future meeples for fence edges only, not palisades', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -64,7 +64,7 @@ describe('E108 Blackberry Farmer — session (palisades excluded)', () => {
   })
 
   it('ignores legacy newFenceEdges extraData when fence event has only palisades', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

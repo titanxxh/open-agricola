@@ -34,7 +34,7 @@ const moved = (
 })
 
 const setup = () => {
-  const session = new GameSession()
+  const session = new GameSession(42)
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
@@ -92,7 +92,7 @@ const expectWoodFlow = (flow: ActionFlow | undefined) => {
 
 describe('E118_KindlingGatherer action-space provenance', () => {
   it('grants wood on the real day-laborer gain flow', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

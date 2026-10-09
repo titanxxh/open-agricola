@@ -12,7 +12,7 @@ const CARD_ID = 'B058_CrackWeeder'
 
 describe('B058_CrackWeeder session', () => {
   it('onBuy returns a gain-1-food flow', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -29,7 +29,7 @@ describe('B058_CrackWeeder session', () => {
   })
 
   it('onAfterReap gives 1 food per vegetable field harvested', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -51,7 +51,7 @@ describe('B058_CrackWeeder session', () => {
   })
 
   it('onAfterReap does not trigger when no vegetable fields harvested', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -72,7 +72,7 @@ describe('B058_CrackWeeder session', () => {
 
 
   it('integration: harvest with vegetable fields gives food bonus', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

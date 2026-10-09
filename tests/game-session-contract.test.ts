@@ -7,7 +7,7 @@ describe('GameSession contract', () => {
   let session: GameSession
 
   beforeEach(() => {
-    session = new GameSession()
+    session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
   })
 

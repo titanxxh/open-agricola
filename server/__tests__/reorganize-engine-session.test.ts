@@ -8,7 +8,7 @@ const NIGHT_PASTURE = 'M033_NightPasture'
 
 describe('reorganizeAction engine sub-flow integration', () => {
   const setupWorkPhase = (opts: { boar?: number } = {}) => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

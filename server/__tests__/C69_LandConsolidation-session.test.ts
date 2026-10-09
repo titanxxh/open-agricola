@@ -24,7 +24,7 @@ const pendingActionContext = (session: GameSession) =>
   )?.actionContext
 
 const setupC69ExtraCropSession = (sourceCard: 'B115_TinsmithMaster' | 'E071_CowPatty') => {
-  const session = new GameSession()
+  const session = new GameSession(42)
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
@@ -202,7 +202,7 @@ describe('C069_LandConsolidation session', () => {
   })
 
   it('shows C69 anytime during normal sow crop placement', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -244,7 +244,7 @@ describe('C069_LandConsolidation session', () => {
   })
 
   it('shows C69 anytime outside extra crop pending prompts', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

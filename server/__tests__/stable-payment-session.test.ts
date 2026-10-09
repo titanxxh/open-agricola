@@ -25,7 +25,7 @@ const stableTradeModifiers: PlayerState['activeModifiers'] = [
 
 describe('stable payment session', () => {
   const setup = () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.currentPlayerIndex = 0
@@ -97,7 +97,7 @@ describe('stable payment session', () => {
   })
 
   it('keeps Farm Expansion unavailable when neither rooms nor stables can complete', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.currentPlayerIndex = 0
@@ -183,7 +183,7 @@ describe('stable payment session', () => {
   })
 
   it('undoStep returns to action-space selection when farm-expansion auto-enters stable selection', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.currentPlayerIndex = 0

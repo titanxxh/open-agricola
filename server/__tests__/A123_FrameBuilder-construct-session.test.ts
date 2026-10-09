@@ -22,7 +22,7 @@ const CARD_ID = 'A123_FrameBuilder'
  */
 
 const setup3RoomsClayHouse = (resources: Record<string, number>) => {
-  const session = new GameSession()
+  const session = new GameSession(42)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   state.players.forEach((p) => {

@@ -5,7 +5,7 @@ import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites
 
 describe('B045_StrawberryPatch prerequisite', () => {
   it('blocks when player has fewer than 2 vegetable fields', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     const player = state.players[0]!
     player.fields = [{ row: 0, col: 0, stacks: [{ kind: 'vegetable', remaining: 1 }] }]
@@ -13,7 +13,7 @@ describe('B045_StrawberryPatch prerequisite', () => {
   })
 
   it('allows when player has 2 vegetable fields', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     const player = state.players[0]!
     player.fields = [

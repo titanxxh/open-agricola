@@ -12,7 +12,7 @@ const CARD_ID = 'B160_PubOwner'
 
 describe('B160_PubOwner session', () => {
   it('onBuy returns a gain-1-grain flow', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -29,7 +29,7 @@ describe('B160_PubOwner session', () => {
   })
 
   it('onBeforeReturnHome gives 1 grain when forest, clay-pit, reed-bank all occupied', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -58,7 +58,7 @@ describe('B160_PubOwner session', () => {
   })
 
   it('onBeforeReturnHome does not trigger when forest is not occupied', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -82,7 +82,7 @@ describe('B160_PubOwner session', () => {
   })
 
   it('onBeforeReturnHome does not trigger when no spaces occupied', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -101,7 +101,7 @@ describe('B160_PubOwner session', () => {
   })
 
   it('integration: end of work phase gives grain when all three spaces occupied', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

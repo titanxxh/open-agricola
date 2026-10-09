@@ -9,7 +9,7 @@ import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites
 
 describe('D001_ZigzagHarrow session', () => {
   const setupZigzagState = (withStable = false) => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -92,7 +92,7 @@ describe('D001_ZigzagHarrow session', () => {
 
   describe('prerequisite', () => {
     it('blocks when player has fewer than 2 fields', () => {
-      const session = new GameSession()
+      const session = new GameSession(42)
       const state = session.getState().state
       const player = state.players[0]!
       player.fields = [{ row: 0, col: 0, stacks: [] }]
@@ -100,7 +100,7 @@ describe('D001_ZigzagHarrow session', () => {
     })
 
     it('allows when fields can complete a zigzag pattern', () => {
-      const session = new GameSession()
+      const session = new GameSession(42)
       const state = session.getState().state
       const player = state.players[0]!
       player.fields = [
@@ -112,7 +112,7 @@ describe('D001_ZigzagHarrow session', () => {
     })
 
     it('allows when a raw zigzag candidate is occupied by a stable', () => {
-      const session = new GameSession()
+      const session = new GameSession(42)
       const state = session.getState().state
       const player = state.players[0]!
       player.fields = [

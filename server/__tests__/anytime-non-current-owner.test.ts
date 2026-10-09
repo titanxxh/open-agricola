@@ -8,7 +8,7 @@ const WHISKY_ANYTIME_ID = 'D106-whisky-distiller-anytime'
 
 describe('anytime — non-current-player owner', () => {
   it('player 1 is reorg owner while currentPlayerIndex = 0; only player 1 may trigger', () => {
-    const session = new GameSession()
+    const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
