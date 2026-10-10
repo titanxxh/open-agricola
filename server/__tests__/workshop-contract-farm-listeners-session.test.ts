@@ -4,19 +4,20 @@ import type { GameState } from '../../shared/contract/types'
 import { markAllWorkersUsed } from '../../shared/domain/player'
 import type { GameSession } from '../game/authoritative-session'
 import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
+import { confirmNextPlayer } from './_helpers/pending-confirms'
 import { COUNT_LEAF_SOURCE, compileContractCard, createRoundTenSession } from './_helpers/workshop-contract-card'
 
 /**
- * ADR 0025 fixed behavior tests for the listener actions that need a player
- * choice or a later phase: plow, sow, bake-bread, fence, stables,
- * family-growth, wish-children, receive and reap. One custom card listens to
+ * ADR 0025 fixed behavior tests for the listener actions gain, plow, sow,
+ * bake-bread, fence, stables, family-growth, wish-children, receive and reap,
+ * and for the opponent listener scope. One custom card listens to
  * each of them in the before, immediatelyAfter and after phases and counts
  * every call on its own card state. Each scenario is a two-player work phase
  * in round 10; player 0 has played the card and takes one action.
  */
 
 const CARD_ID = 'CUSTOM_FarmProbe'
-const ACTIONS = ['receive', 'plow', 'sow', 'fence', 'stables', 'wish-children', 'family-growth', 'bake-bread', 'reap']
+const ACTIONS = ['gain', 'receive', 'plow', 'sow', 'fence', 'stables', 'wish-children', 'family-growth', 'bake-bread', 'reap']
 const PHASES = ['before', 'immediatelyAfter', 'after']
 const ONE_CELL_FENCES = ['H-0-1', 'H-1-1', 'V-0-1', 'V-0-2']
 
@@ -45,6 +46,17 @@ const reactions = (action: string) => ({
 })
 
 describe('Workshop Capability Contract farm and round listeners', () => {
+  it('reacts to gain', () => {
+    const session = start()
+
+    const gained = session.takeAction(0, 'day-laborer')
+
+    expect(gained.ok).toBe(true)
+    expect(gained.state.players[0]!.resources.food).toBe(12)
+    expect(counters(session)).toEqual(reactions('gain'))
+    expect(session.cardWarnings).toEqual([])
+  })
+
   it('reacts to plow before the tile is chosen and after the field is placed', () => {
     const session = start()
 
@@ -192,6 +204,31 @@ describe('Workshop Capability Contract farm and round listeners', () => {
     expect(state.players[0]!.fields[0]!.stacks).toEqual([{ kind: 'grain', remaining: 1 }])
     // Reaping is dispatched as a single immediatelyAfter call per crop.
     expect(counters(session)).toEqual({ 'immediatelyAfter:reap': 1 })
+    expect(session.cardWarnings).toEqual([])
+  })
+
+  it('with the opponent scope, reacts to the opponent\'s action and not to the owner\'s', () => {
+    const card = compileContractCard(CARD_ID, `${COUNT_LEAF_SOURCE}
+const CARD_IMPL = { listeners: [{ cardIds: [CARD_ID], actions: ['plow'], phases: ['after'], scope: 'opponent',
+  handler: () => ({ sourceCard: CARD_ID, flow: count('opponent-plowed') }) }] }`)
+    const session = createRoundTenSession(card, { workers: [2, 2] })
+    sessions.push(session)
+    const plow = (playerIndex: number, space: string) => {
+      const pending = session.takeAction(playerIndex, space)
+      if (pending.interaction.stateId !== 'wait' || pending.interaction.request.kind !== 'farm-select') throw new Error(`expected a plow selection: ${pending.error}`)
+      return session.commitSelectionChoice(playerIndex, { tile: pending.interaction.request.farm.selectableTiles[0] })
+    }
+
+    expect(plow(0, 'farmland').state.players[0]!.fields).toHaveLength(1)
+    expect(counters(session)).toBeUndefined()
+
+    confirmNextPlayer(session)
+    // Farmland is taken; Cultivation is the other space that plows.
+    expect(plow(1, 'cultivation').state.players[1]!.fields).toHaveLength(1)
+
+    // The flow belongs to the card owner, whose card state records it.
+    expect(counters(session, 0)).toEqual({ 'opponent-plowed': 1 })
+    expect(counters(session, 1)).toBeUndefined()
     expect(session.cardWarnings).toEqual([])
   })
 })
