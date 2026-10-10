@@ -131,6 +131,28 @@ describe('Workshop Capability Contract native leaf actions', () => {
     expect(built.state.players[0]!.resources).toMatchObject({ wood: 0, reed: 0 })
   })
 
+  it.each([
+    { name: 'counts as the Build Rooms action by default', context: '', food: 11, family: 3 },
+    { name: 'does not count as that action with trueAction false', context: `, { actionContext: { trueAction: false } }`, food: 10, family: 2 },
+  ])('construct granted by the card $name', ({ context, food, family }) => {
+    // Family Friendly Home reacts to a Build Rooms action taken with more rooms than people:
+    // 1 food and a family growth.
+    const session = start(`leaf('construct'${context})`, (_state, owner) => {
+      owner.minorPlayed.push('A021_FamilyFriendHome')
+      owner.rooms = 3
+      owner.roomTiles = [...owner.roomTiles, { row: 0, col: 0 }]
+      Object.assign(owner.resources, { wood: 2, reed: 2 })
+    })
+
+    const pending = session.takeAction(0, 'forest')
+    const built = session.commitSelectionChoice(0, { rooms: [farmRequest(pending, 'room').selectableTiles[0]] })
+
+    expectSettled(session, built)
+    expect(built.state.players[0]!.rooms).toBe(4)
+    expect(built.state.players[0]!.resources.food).toBe(food)
+    expect(built.state.players[0]!.workers.filter(worker => worker.isActive)).toHaveLength(family)
+  })
+
   it('renovate-house upgrades the house and charges 1 clay per room plus 1 reed', () => {
     const session = start(`leaf('renovate-house')`, (_state, owner) => { Object.assign(owner.resources, { clay: 2, reed: 1 }) })
 

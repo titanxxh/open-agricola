@@ -211,7 +211,7 @@ Reaction-compatible hooks, namely action-listener `before`, `immediatelyAfter`, 
 
 `contributeExtraTurn` returns this card's extra-turn provider flow. When several cards contribute, the system asks for the provider source before expanding that flow. `countExtraTurns(state, player)` reports how many extra turns the card still offers this round; without it the card offers one while `contributeExtraTurn` returns a flow. The engine does not count the turns a card has used. The card records each use in its own state, for example with an `increment-counter` leaf in the returned flow, and both hooks read that state. A card that keeps offering a turn keeps the round from ending.
 
-Besides `id`, an effect may declare these metadata keys. Each is data, not a function, and a value of another type fails on save:
+Besides `id`, an effect may declare these metadata keys. Each is data, not a function, and a value of another type, `null` included, fails on save:
 
 | Metadata | Type | Meaning |
 |---|---|---|
@@ -260,7 +260,7 @@ Fence discounts such as E16 Briar Hedge and C16 Field Fences use a `computeCosts
 
 ### 3.2 `CARD_IMPL.listeners` allowlists
 
-A listener entry declares `handler`, `actions`, `phases`, `scope`, and `cardIds`, the data fields in the table below, and an optional `id` label that the host ignores. Any other field fails on save, because the manifest would drop it. So does a data field of another type: the engine reads the booleans by truthiness.
+A listener entry declares `handler`, `actions`, `phases`, `scope`, and `cardIds`, the data fields in the table below, and an optional `id` label that the host ignores. Any other field fails on save, because the manifest would drop it. So does a data field of another type, `null` included: the engine reads the booleans by truthiness.
 
 | Field | Type | Meaning |
 |---|---|---|
@@ -594,7 +594,7 @@ A leaf uses `{ type: 'leaf', actionId, params, sourceCard: CARD_ID }`. Composite
 { type: 'seq', children: [gainLeaf(CARD_ID, { food: 1 }), gainLeaf(CARD_ID, { wood: 1 })] }
 ```
 
-`optional` is a boolean on a node, not another node type. A node may also carry `promptKey` and `anytimeWindow`, and a leaf may carry `actionContext` with the key `targetPlayerId`; a `selection` leaf also writes its candidates there (section 6). Any other `actionContext` key is rejected. These fields are type-checked: `optional` is a boolean, `promptKey` and `actionContext.targetPlayerId` are strings, and `anytimeWindow` is `{ allowed: boolean, blockedIds?: string[] }`. A value of another type is rejected, so `optional: 'false'` is an error and not an optional step. The other native node fields are not open to Workshop cards and are rejected when a flow is returned: `mode`, `triggerSelectOnce`, `expandFlow`, `optionId`, `choiceLabelKey`, `choiceLabelParams`, `effectPreview`, `anytimeActionId`, and node-level `targetPlayerId`. Any other field on a node is rejected as well, so a misspelling such as `optoinal` is an error and not a silently ignored key. A `sourceCard` on a node, on a listener result, or on a `followUpActions` entry must be `CARD_ID`. A leaf that omits it, and a listener result that carries a flow without it, is attributed to the card. Flow effect hooks return the flow directly; listeners return `{ flow, sourceCard: CARD_ID }` (or their documented query result).
+`optional` is a boolean on a node, not another node type. A node may also carry `promptKey` and `anytimeWindow`, and a leaf may carry `actionContext` with the keys `targetPlayerId` and `trueAction`; a `selection` leaf also writes its candidates there (section 6). Any other `actionContext` key is rejected. These fields are type-checked: `optional` and `actionContext.trueAction` are booleans, `promptKey` and `actionContext.targetPlayerId` are strings, and `anytimeWindow` is `{ allowed: boolean, blockedIds?: string[] }`. A value of another type is rejected, so `optional: 'false'` is an error and not an optional step. The other native node fields are not open to Workshop cards and are rejected when a flow is returned: `mode`, `triggerSelectOnce`, `expandFlow`, `optionId`, `choiceLabelKey`, `choiceLabelParams`, `effectPreview`, `anytimeActionId`, and node-level `targetPlayerId`. Any other field on a node is rejected as well, so a misspelling such as `optoinal` is an error and not a silently ignored key. A `sourceCard` on a node, on a listener result, or on a `followUpActions` entry must be `CARD_ID`. A leaf that omits it, and a listener result that carries a flow without it, is attributed to the card. Flow effect hooks return the flow directly; listeners return `{ flow, sourceCard: CARD_ID }` (or their documented query result).
 
 Before execution, the AST validator rejects inspectable composite literals that omit `children` or provide a statically non-array value. This includes direct flow-hook returns, nested literal children, and listeners' `flow` / `alternativeFlow` results. It does not mistake arbitrary leaf parameters or private card data for flows, and does not infer dynamic helper results or spread-provided children. Static success still requires behavioral playtesting.
 
@@ -663,12 +663,14 @@ The sixteen actions from `plow` on run the native action for the effect player, 
 | `exchange` | Opens the player's own exchange menu, with the exchanges of their cooking improvements and cards. |
 | `set-first-player` | Gives the starting player marker to the effect player. |
 | `selection` | The player selects farm positions. Write the candidates in `actionContext: { selectableTiles: [{ row, col }], minSelections, maxSelections }`. The chosen positions are stored as `'row-col'` strings in `cardStates[CARD_ID].extraData.selectedPositions`, where a later hook reads them with `readCardExtraData`. |
-| `emit-choice` | Asks the card's own question: `params: { options: [{ value, labelKey }], promptKey }`. A `labelKey` or `promptKey` that is not a translation key is shown as written. The chosen `value` is passed to `effect.resolveChoice`, which returns the follow-up flow. |
+| `emit-choice` | Asks the card's own question: `params: { options: [{ value, labelKey }], promptKey }`. Each option is exactly a string `value` and a string `labelKey`; another field or type is rejected, because the options are sent to every client as written. A `labelKey` or `promptKey` that is not a translation key is shown as written. The chosen `value` is passed to `effect.resolveChoice`, which returns the follow-up flow. |
 | `reorganize` | The player rearranges their animals among their zones. |
 
 `resolveChoice` is called for every choice whose source is this card. That includes the choices a player makes inside a native action the card dispatched, such as the improvement, the occupation, or the exchange they pick. Return nothing for a value that is not one of the card's own `emit-choice` options.
 
-`reap` and `breed` are returned as flow leaves. A listener result's replacement `actionId` and its `followUpActions` name an action without a node, so they cannot carry what admission binds, and these two actions are rejected there.
+These sixteen actions are returned as flow leaves only. A listener result's replacement `actionId` keeps the replaced action's `actionContext`, such as a cost override meant for that action, and a `followUpActions` entry names an action without a node. Neither can carry an admitted context, so the sixteen actions are rejected in both places; use `flow`, or `decline` with `alternativeFlow`.
+
+A leaf of a native action counts as that action for other cards. A card that reacts to the Build Rooms action therefore also reacts to a `construct` leaf. Write `actionContext: { trueAction: false }` on the leaf when the card lets the player do the thing without taking that action, as in “build 1 room”; omit it when the card says the player takes the action. Listeners read the flag as `context.trueAction`.
 
 Sprint 6b on 2026-04-30 removed five separate mutation IDs, `flag-card`, `unflag-card`, `set-card-infobox`, `clear-card-infobox`, and `write-card-extra-data`, plus three dead IDs, `hold-worker-on-card`, `release-worker-from-card`, and `gain-other-players`. Use the `special-effect` discriminated union. CI `check-prompt-sync` ensures the prompt exposes only allowlisted IDs. A sandbox card must not use another ID.
 
@@ -820,7 +822,7 @@ Admission serves honest authors and model mistakes. It does not bound adversaria
 
 | Date | Change |
 |---|---|
-| 2026-10-10 | Opened the candidate capabilities of issue #1079, each with a fixed Session test: seven query hooks and the fourth and fifth hook arguments they need, six effect metadata keys, five listener data fields, the `computeExchanges` phase, sixteen leaf actions that run native farm, card and turn-order actions, and the `special-effect` kinds `pop-card-stack-top` and `remove-future-meeples`. |
+| 2026-10-10 | Opened the candidate capabilities of issue #1079, each with a fixed Session test: seven query hooks and the fourth and fifth hook arguments they need, six effect metadata keys, five listener data fields, the `computeExchanges` phase, sixteen leaf actions that run native farm, card and turn-order actions (flow leaves only, with `actionContext.trueAction` to mark a granted action), and the `special-effect` kinds `pop-card-stack-top` and `remove-future-meeples`. |
 | 2026-10-10 | Made the contract fail-closed (ADR 0025): enforced action IDs and `special-effect` kinds in source validation and both executors, rejected unsupported listener fields and the undocumented `beforeEndGameScope` / `beforeEndGameMandatory` metadata, bound every listener and returned node to its own card and omitted listener filters to the listed sets, rejected unopened native node fields, undocumented action parameter keys, malformed `special-effect` fields and query results of the wrong top-level type, and documented the hook-failure behavior. |
 | 2026-08-04 | Made discounts across all improvement candidates mandatory capped bonuses; completed and narrowed the `handHooks` manifest; required a direct accessor-free effect object literal plus host filtering; unified `positionKey({row,col})`; removed Workshop candidate-and-settlement hooks that cannot settle completely; added semantic contracts and M11 live, record, and replay guards. |
 | 2026-04-30 | Refactored scoring into two tracks: removed `computePostScore`, `scoringPriority`, and `ctx.reserved`; added `computeCostedBonus` through the Pareto solver. The archived spec and plan remain in Git history. |
