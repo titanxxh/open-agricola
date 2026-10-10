@@ -841,6 +841,8 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
             { type: 'leaf', actionId: 'selection', sourceCard: CARD_ID, actionContext: { selectableTiles: [{ row: 0, col: 2 }] } },
             { type: 'leaf', actionId: 'plow', sourceCard: CARD_ID, actionContext: { selectableTiles: [] } },
             { type: 'leaf', actionId: 'reap', sourceCard: CARD_ID, actionContext: { trigger: { phase: 'harvest' } } },
+            { type: 'leaf', actionId: 'construct', sourceCard: CARD_ID, actionContext: { trueAction: false } },
+            { type: 'leaf', actionId: 'construct', sourceCard: CARD_ID, actionContext: { trueAction: 'false' } },
           ] }),
         },
       }
@@ -852,6 +854,7 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
       // selectableTiles belongs to the selection leaf only; a card never writes the reap trigger.
       "line 10: actionContext key 'selectableTiles' is not available to Workshop cards",
       "line 11: actionContext key 'trigger' is not available to Workshop cards",
+      'line 13: actionContext.trueAction must be a boolean',
     ])
   })
 
