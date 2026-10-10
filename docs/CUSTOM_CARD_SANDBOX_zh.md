@@ -601,7 +601,7 @@ return {
 { type: 'seq', children: [gainLeaf(CARD_ID, { food: 1 }), gainLeaf(CARD_ID, { wood: 1 })] }
 ```
 
-`optional` 是节点上的布尔字段，不是另一种节点类型。返回流程的 effect hook 直接返回 flow；listener 返回 `{ flow, sourceCard: CARD_ID }`（或其文档规定的查询结果）。
+`optional` 是节点上的布尔字段，不是另一种节点类型。节点还可以带 `promptKey` 和 `anytimeWindow`，leaf 可以带 `actionContext`。其余原生节点字段不对工坊卡开放，返回 flow 时会被拒绝：`mode`、`triggerSelectOnce`、`expandFlow`、`optionId`、`choiceLabelKey`、`choiceLabelParams`、`effectPreview`、`anytimeActionId`，以及节点级的 `targetPlayerId`。节点、listener 返回值和 `followUpActions` 条目上的 `sourceCard` 必须是 `CARD_ID`。返回流程的 effect hook 直接返回 flow；listener 返回 `{ flow, sourceCard: CARD_ID }`（或其文档规定的查询结果）。
 
 执行前，AST 校验会拒绝可静态识别的组合节点字面量：缺少 `children`，或其值明显不是数组。这覆盖 flow hook 的直接返回、嵌套的字面量 children，以及 listener 的 `flow` / `alternativeFlow` 结果。校验不会把 leaf 参数或卡牌私有数据当作 flow，也不推断动态 helper 结果或 spread 提供的 children。静态通过后仍需试玩验证行为。
 
@@ -659,13 +659,15 @@ return {
 
 // 写 player.cardStates[sourceCard].extraData[key]
 { kind: 'set-extra-data', key: 'foo', value: 1 } // 内部状态
+
+// 写 player.cardStates[sourceCard].privateData[key]；readCardExtraData 读不到它
 { kind: 'set-private-data', key: 'secret', value: '仅本人可见' }
 
 // player.cardStates[sourceCard].extraData[key] += amount
 { kind: 'increment-extra-data', key: 'used', amount: 1 }
 ```
 
-以上七个 kind 是沙盒的完整集合，定义在 `SANDBOX_SPECIAL_EFFECT_KINDS`。仓库内部还使用其他 kind（例如 `emit-card-triggered` 用于写入可见卡牌触发事件日志）。这些 kind 不属于 Workshop 合约，使用它们的 `special-effect` leaf 会被拒绝。
+以上七个 kind 是沙盒的完整集合，定义在 `SANDBOX_SPECIAL_EFFECT_KINDS`。仓库内部还使用其他 kind（例如 `emit-card-triggered` 用于写入可见卡牌触发事件日志）。这些 kind 不属于 Workshop 合约，使用它们的 `special-effect` leaf 会被拒绝。已列出的 kind 如果字段类型与上面不符，同样被拒绝：`key` 和 `text` 是字符串，计数和累加类 kind 的 `amount`、`value` 是有限数字，`flag` 是布尔值。
 
 可选 `actionContext.targetPlayerId?: string` 让 mutation 路由到 `state.players` 中匹配的玩家（默认是 `context.player` 即 actor）。Workshop 通常用不到 targetPlayerId（仅 D134 OysterEater 等跨玩家场景需要）。
 
@@ -768,6 +770,7 @@ CI 会拦下漏改的情况。
 
 本文件遵守 [ADR 0025](adr/0025-workshop-capability-contract-is-fail-closed-and-opened-by-tests.md)。
 
+- **契约管的是名字、节点字段，以及文档写明的 `special-effect` 形状。**其他行动的参数由原生代码自己校验，与原生卡相同；准入不重复实现这些规则。
 - **未列出即未开放。**部署契约、源码校验和两个执行器接受同一组名字：§3.1 的 hook，§3.2 和 §3.4 的 listener 行动、阶段和 scope，§6 的 action ID，以及 §6.1 的 `special-effect` kind。本文件不逐项列出未开放的原生接口，候选能力记录在 [issue #1079](https://github.com/titanxxh/open-agricola/issues/1079)。
 - **有固定行为测试的名字才开放。**每个名字至少要有一个测试，在不改原生规则路径的前提下，用两人 `GameSession` 真实驱动它。新能力单独开 issue，并带上这个测试。
 - **hook 出错和返回契约外内容的处理相同。**第一次出现时拒绝这条命令，恢复到命令之前的状态，并返回错误；错误里写明被拒绝的行动、kind 或字段。同样的错误再次出现时不再报告：命令成功，这张卡本次的效果被跳过。这是有意的行为，让带着有问题卡牌的对局可以继续。
@@ -781,7 +784,7 @@ CI 会拦下漏改的情况。
 
 | 日期         | 变更                                                                                                                                                                                                                                                                                                                               |
 | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 2026-10-10 | 契约改为收紧执行（ADR 0025）：源码校验和两个执行器强制执行 action ID 与 `special-effect` kind，拒绝不支持的 listener 字段和未写入文档的 `beforeEndGameScope` / `beforeEndGameMandatory` 元数据，每个 listener 绑定到自己的卡，省略的 listener 过滤绑定到已列出的集合，并写明 hook 出错时的行为。 |
+| 2026-10-10 | 契约改为收紧执行（ADR 0025）：源码校验和两个执行器强制执行 action ID 与 `special-effect` kind，拒绝不支持的 listener 字段和未写入文档的 `beforeEndGameScope` / `beforeEndGameMandatory` 元数据，每个 listener 和返回的节点绑定到自己的卡，省略的 listener 过滤绑定到已列出的集合，拒绝未开放的原生节点字段和类型不符的 `special-effect` 字段，并写明 hook 出错时的行为。 |
 | 2026-08-04 | 修正跨全部改良候选折扣为 mandatory capped bonus；补齐并收窄 `handHooks` manifest、要求 effect 使用无 accessor 的直接对象字面量并在宿主侧过滤、统一 `positionKey({row,col})`，移除无法完整结算的 Workshop candidate/settlement hook；新增语义 contract 与 M11 live/record/replay 守卫。 |
 | 2026-04-30 | 双轨 scoring hook 重构：删除 `computePostScore` / `scoringPriority` / `ctx.reserved`；新增 `computeCostedBonus` 走 Pareto 求解器。详见 `(spec/plan 已归档，见 git history)`。|
 | 2026-04-24 | 修正 `computeBonusScore` / `computePostScore` / `computeSharedPostScore` 签名（实为 `=> number` / `=> Array<{playerId,score}>`，非 `{score,label}`）；新增 §5.5 listener `actions:` 高频踩坑（不含空间 ID、`harvest-feed` 不可监听）、§5.6 anytime 写法、§5.7 `futureMeeplesNode` 不在沙箱；登记 `flag-card` / `future-meeples` actionId。来源：LLM card-gen session 测试套件实测 |

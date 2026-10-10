@@ -63,6 +63,41 @@ const ALLOWED_LISTENER_PHASES = new Set<string>(sandboxListenerPhases)
 const RESOURCE_KEYS = new Set<string>(REAL_RESOURCE_KEYS)
 const FLOW_EFFECT_KEYS = new Set<string>([...flowCardEffectHooks, 'resolveChoice'])
 
+/** A leaf literal in a flow position: its statically visible action, special-effect
+ * kind and source card must stay inside the contract. Its params are card data and
+ * are not searched for flows; leaves built elsewhere are checked by the executors. */
+function validateLiteralLeaf(
+  properties: readonly ts.ObjectLiteralElementLike[],
+  errors: string[],
+  getLine: (node: ts.Node) => number,
+  constants: Map<string, string>,
+): void {
+  const initializer = (name: string): ts.Expression | undefined => {
+    const property = properties.find(candidate => getStaticPropertyName(candidate, constants) === name)
+    return property && ts.isPropertyAssignment(property) ? property.initializer : undefined
+  }
+  const actionIdNode = initializer('actionId')
+  const actionId = actionIdNode && getStaticStringValue(actionIdNode, constants)
+  if (actionId !== undefined && !isSandboxActionId(actionId)) {
+    errors.push(`line ${getLine(actionIdNode!)}: actionId '${actionId}' is not available to Workshop cards`)
+  }
+  const params = initializer('params')
+  if (actionId === 'special-effect' && params && ts.isObjectLiteralExpression(params)) {
+    const kindProperty = [...params.properties].reverse().find(candidate => getStaticPropertyName(candidate, constants) === 'kind')
+    const kindNode = kindProperty && ts.isPropertyAssignment(kindProperty) ? kindProperty.initializer : undefined
+    const kind = kindNode && getStaticStringValue(kindNode, constants)
+    if (kind !== undefined && !isSandboxSpecialEffectKind(kind)) {
+      errors.push(`line ${getLine(kindNode!)}: special-effect kind '${kind}' is not available to Workshop cards`)
+    }
+  }
+  const sourceCardNode = initializer('sourceCard')
+  const sourceCard = sourceCardNode && getStaticStringValue(sourceCardNode, constants)
+  const cardId = constants.get('CARD_ID')
+  if (sourceCard !== undefined && cardId !== undefined && sourceCard !== cardId) {
+    errors.push(`line ${getLine(sourceCardNode!)}: leaf sourceCard must be CARD_ID`)
+  }
+}
+
 /** Check known literal flow results without treating arbitrary card data as flow
  * or claiming to type-check dynamic helper calls/children. */
 function validateLiteralFlow(
@@ -84,6 +119,10 @@ function validateLiteralFlow(
   const properties = [...expression.properties].reverse()
   const type = properties.find(property => getStaticPropertyName(property, constants) === 'type')
   const kind = type && ts.isPropertyAssignment(type) ? getStaticStringValue(type.initializer, constants) : undefined
+  if (kind === 'leaf') {
+    validateLiteralLeaf(properties, errors, getLine, constants)
+    return
+  }
   if (!kind || !['seq', 'or', 'xor', 'parallel'].includes(kind)) return
   const children = properties.find(property => getStaticPropertyName(property, constants) === 'children')
   const report = () => errors.push(`line ${getLine(expression)}: ActionFlow '${kind}' requires a children array, not items or steps`)
@@ -100,41 +139,6 @@ function validateLiteralFlow(
     for (const child of value.elements) validateLiteralFlow(child, errors, getLine, constants)
   } else if (ts.isObjectLiteralExpression(value) || ts.isStringLiteralLike(value) || ts.isNumericLiteral(value)
     || [ts.SyntaxKind.NullKeyword, ts.SyntaxKind.TrueKeyword, ts.SyntaxKind.FalseKeyword].includes(value.kind)) report()
-}
-
-/** Reject statically visible leaves outside the contract at save time; flows
- * built dynamically are checked by the executors (flow-admission.ts). */
-function validateLiteralLeafActions(
-  sourceFile: ts.SourceFile,
-  errors: string[],
-  getLine: (node: ts.Node) => number,
-  constants: Map<string, string>,
-): void {
-  const staticProperty = (object: ts.ObjectLiteralExpression, name: string): ts.Expression | undefined => {
-    const property = [...object.properties].reverse().find(candidate => getStaticPropertyName(candidate, constants) === name)
-    return property && ts.isPropertyAssignment(property) ? property.initializer : undefined
-  }
-  const visit = (node: ts.Node): void => {
-    if (ts.isObjectLiteralExpression(node)) {
-      const type = staticProperty(node, 'type')
-      const actionIdNode = staticProperty(node, 'actionId')
-      const actionId = actionIdNode && getStaticStringValue(actionIdNode, constants)
-      if (type && getStaticStringValue(type, constants) === 'leaf' && actionId !== undefined) {
-        if (!isSandboxActionId(actionId)) {
-          errors.push(`line ${getLine(actionIdNode!)}: actionId '${actionId}' is not available to Workshop cards`)
-        } else if (actionId === 'special-effect') {
-          const params = staticProperty(node, 'params')
-          const kindNode = params && ts.isObjectLiteralExpression(params) ? staticProperty(params, 'kind') : undefined
-          const kind = kindNode && getStaticStringValue(kindNode, constants)
-          if (kind !== undefined && !isSandboxSpecialEffectKind(kind)) {
-            errors.push(`line ${getLine(kindNode!)}: special-effect kind '${kind}' is not available to Workshop cards`)
-          }
-        }
-      }
-    }
-    ts.forEachChild(node, visit)
-  }
-  visit(sourceFile)
 }
 
 function validateFlowHookReturns(
@@ -591,7 +595,6 @@ export function validateCardCode(source: string, expectedCardId?: string): Valid
   // Validate CARD_IMPL hook/listener whitelists
   validateCardImplHooksAndPhases(sourceFile, errors)
   const constants = collectStringConstants(sourceFile)
-  validateLiteralLeafActions(sourceFile, errors, getLine, constants)
   forEachListenerResultObject(sourceFile, constants, result => {
     for (const property of result.properties) {
       if (ts.isPropertyAssignment(property) && ['flow', 'alternativeFlow'].includes(getStaticPropertyName(property, constants) ?? '')) {

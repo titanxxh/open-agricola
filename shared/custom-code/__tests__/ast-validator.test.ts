@@ -750,28 +750,46 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
     expect(result).toEqual({ valid: false, errors: [expect.stringContaining('listener scope must be a supported string literal')] })
   })
 
-  it('rejects statically visible leaves outside the contract', () => {
+  it('rejects statically visible leaves outside the contract in flow positions', () => {
     const result = validateCardCode(`
       const CARD_ID = 'CUSTOM_Test'
       const PLOW = 'plow'
-      const helper = () => ({ type: 'leaf', actionId: 'selection', sourceCard: CARD_ID })
       const CARD_IMPL = {
         effect: {
+          onBuy: () => ({ type: 'leaf', actionId: 'selection', sourceCard: CARD_ID }),
           onRoundStart: () => ({ type: 'seq', children: [
             { type: 'leaf', actionId: PLOW, sourceCard: CARD_ID },
             { type: 'leaf', actionId: 'special-effect', params: { kind: 'consume-supply-token', key: 'fence' }, sourceCard: CARD_ID },
-            { type: 'leaf', actionId: 'special-effect', params: { kind: 'set-flag', flag: true }, sourceCard: CARD_ID },
+            { type: 'leaf', actionId: 'special-effect', params: { kind: 'set-flag', flag: true }, sourceCard: 'E033_BeaverColony' },
             gainLeaf(CARD_ID, { food: 1 }),
           ] }),
         },
+        listeners: [{ actions: ['collect'], phases: ['after'],
+          handler: () => ({ flow: { type: 'leaf', actionId: 'fence', sourceCard: CARD_ID } }) }],
       }
     `)
     expect(result.valid).toBe(false)
     expect(result.valid === false && result.errors).toEqual([
-      "line 4: actionId 'selection' is not available to Workshop cards",
+      "line 6: actionId 'selection' is not available to Workshop cards",
       "line 8: actionId 'plow' is not available to Workshop cards",
       "line 9: special-effect kind 'consume-supply-token' is not available to Workshop cards",
+      'line 10: leaf sourceCard must be CARD_ID',
+      "line 15: actionId 'fence' is not available to Workshop cards",
     ])
+  })
+
+  it('does not treat card data shaped like a leaf as a flow', () => {
+    const result = validateCardCode(`
+      const CARD_ID = 'CUSTOM_Test'
+      const TAG = { type: 'leaf', actionId: 'descriptive-tag' }
+      const CARD_IMPL = {
+        effect: {
+          onRoundStart: () => ({ type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID,
+            params: { kind: 'set-extra-data', key: 'tag', value: { type: 'leaf', actionId: 'descriptive-tag' } } }),
+        },
+      }
+    `)
+    expect(result.valid).toBe(true)
   })
 
   it('does not treat other objects carrying an actionId as flow leaves', () => {
