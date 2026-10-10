@@ -39,7 +39,7 @@ import {
   snapshotCompositeEmit,
   setEngineBlockedPending,
 } from './engine-utils'
-import { engineProceed } from './engine-proceed'
+import { buildDeferredHostNode, engineProceed } from './engine-proceed'
 import { engineResolveChoice } from './engine-resolve'
 import { getCardEffect } from '../cards/card-effects'
 import { resolveChoiceSourceCard } from './nodes/interaction-helpers'
@@ -486,12 +486,36 @@ export class Engine {
     }
   }
 
-  acknowledgePendingActionRequest(): void {
+  /**
+   * Hands the pending action's request to a session subflow (animal
+   * reorganization). The host settles as `ok` and its completion reactions
+   * move to an internal deferred-host node, which runs once when this engine
+   * resumes after the subflow, with the host's context and the facts captured
+   * when it made the request. Returns the host's action id.
+   */
+  deferPendingActionCompletion(): string | null {
     const pendingHost = this.peekPendingHost()
-    if (!(pendingHost instanceof ActionNode)) return
+    if (!(pendingHost instanceof ActionNode)) return null
+    const actionId = pendingHost.resolvedReplacement?.actionId ?? pendingHost.actionId
+    const result: ActionExecutionResult = { type: 'ok' }
+    const deferredHostNode = buildDeferredHostNode(
+      this._internals(),
+      pendingHost,
+      result,
+      actionId,
+      {
+        sourceCard: pendingHost.resolvedReplacement?.sourceCard ?? pendingHost.sourceCard,
+        params: pendingHost.params,
+        actionContext: pendingHost.actionContext,
+      },
+      pendingHost.deferredHostTransactionEvents ?? [],
+      pendingHost.deferredHostActionEvents ?? [],
+    )
     pendingHost.clearPending()
     pendingHost.emittedRequest = undefined
-    pendingHost.resolve({ type: 'ok' })
+    pendingHost.resolve(result)
+    this.tree.insertAfter(pendingHost.id, [deferredHostNode])
+    return actionId
   }
 
   hasPendingHostRequiringExternalResolution(pendingActionCanResolve: boolean): boolean {

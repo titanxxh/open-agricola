@@ -137,19 +137,17 @@ export const breedAction: ActionDefinition = {
       request: buildAnimalReorgRequest(state, player),
       sourceCard,
     })
-    // Animals bred: return 'ok' so the engine's after/immediatelyAfter hooks
-    // still run on the post-mutate state (D60 LargePottery, B104 SheepWalker,
-    // ...). GameCore's `getAnimalCount > before` heuristic then auto-launches
-    // the reorganize sub-flow — this preserves the legacy `'animalReorg'`
-    // behaviour without short-circuiting the engine's hook pipeline.
+    // Animals bred: return 'ok' so this action's immediatelyAfter/after
+    // reactions run on the post-breeding state. The session's
+    // `getAnimalCount > before` check then starts the reorganize sub-flow.
     if (breedSummary.animalCount > 0) {
       return { type: 'ok', ...(sourceCard === 'harvest' ? { extraData: { harvestBreedPlacementMinimums: placementMinimums } } : {}) }
     }
-    // Rule: in round 14 (last harvest), some cards (B104 SheepWalker, B35
-    // HookKnife, A153 PigOwner, ...) force a reorg even with no newborn so the
-    // engine has a chance to evict mis-placed animals. Edge-case path —
-    // returning 'request' here skips the `after` hooks, but round 14 is the
-    // terminal harvest where no further leaf-level after listeners fire.
+    // Last harvest without newborns: a played card that declares
+    // `enforceReorganizeOnLastHarvest` still requires a final reorganization
+    // (no card in this repository declares it yet). The session hands the
+    // request to the reorganize sub-flow; this action's completion reactions
+    // run once, after the reorganization.
     if (
       sourceCard === 'harvest'
       && state?.round === 14

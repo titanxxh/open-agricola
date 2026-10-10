@@ -35,7 +35,7 @@ describe('Engine surface guard', () => {
     'peekPendingHost',
     'probeMandatoryContinuations',
     'setEngineBlockedPending',
-    'acknowledgePendingActionRequest',
+    'deferPendingActionCompletion',
     'hasPendingHostRequiringExternalResolution',
   ]
 

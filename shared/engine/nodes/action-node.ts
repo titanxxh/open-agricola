@@ -41,12 +41,12 @@ export class ActionNode extends BaseNode {
    * S7 Batch 1 (Sprint S7) — when a leaf ActionNode is built from an
    * ActionDef without `resolveChoice`, its
    * `execute()` may still return `{ type: 'request', request: {...} }`
-   * (e.g. `breedAction` emitting `kind: 'animal-reorg'` for B104
-   * SheepWalker's last-harvest enforcement). In that case engine-proceed
+   * (e.g. `breedAction` emitting `kind: 'animal-reorg'` under last-harvest
+   * enforcement). In that case engine-proceed
    * routes the emit via `applyInteractionRequest` with `targetNode === null`
    * and falls back to `pendingNodeIdRef = ActionNode.id`. Without this
-   * field the request payload would be lost, so session-core could not pivot
-   * into `startReorganizeSubFlow`. Mirrors `OrNode.emittedRequest` /
+   * field the request payload would be lost, so session-core could not hand it
+   * to `startReorganizeSubFlow`. Mirrors `OrNode.emittedRequest` /
    * `XorNode.emittedRequest` so
    * pending-envelope callers can read the kind off the host node
    * uniformly regardless of whether the pending node is leaf-paired or

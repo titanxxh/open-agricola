@@ -365,13 +365,12 @@ export type CardEffect = {
   /** Return this source's standing tile, preserving any one-use marker. */
   returnSpecialStable?: (player: PlayerState, position: FarmTilePosition) => boolean
   /**
-   * The reference `enforceReorganizeOnLastHarvest`: cards like B104 SheepWalker, B35
-   * HookKnife, A153 PigOwner force an animal reorg on the round-14 harvest
-   * even when no breeding produced a newborn — to give the rules system a
-   * chance to evict animals (e.g. SheepWalker's "must accommodate before
-   * exchange" implies the final-harvest rearrangement). Returning true makes
-   * `breedAction` emit an `animalReorg` result regardless of `animalCount`.
-   * Only consulted when `state.round === 14` and `sourceCard === 'harvest'`.
+   * Requires a final animal reorganization on the round-14 harvest even when
+   * breeding produced no newborn. Returning true makes `breedAction` emit an
+   * `animal-reorg` request regardless of `animalCount`. Only consulted when
+   * `state.round === 14` and `sourceCard === 'harvest'`. Mirrors the
+   * reference implementation's `enforceReorganizeOnLastHarvest`; no card in
+   * this repository declares it yet.
    */
   enforceReorganizeOnLastHarvest?: (state: GameState, player: PlayerState) => boolean
   /**
@@ -501,10 +500,10 @@ export const runBeforeEndGameHooks = (state: GameState, player: PlayerState): vo
   runHookForAllCards(state, player, 'onBeforeEndGame')
 
 /**
- * Returns true when any of the player's played cards demand a reorg even on
- * the round-14 harvest with no newborn (e.g. B104 SheepWalker, B35 HookKnife,
- * A153 PigOwner). Mirrors the reference's `enforceReorganizeOnLastHarvest` aggregation
- * in `HarvestTrait::stHarvestBreed`.
+ * Returns true when any of the player's played cards declares
+ * `enforceReorganizeOnLastHarvest` for the round-14 harvest without newborns.
+ * Mirrors the reference implementation's aggregation in
+ * `HarvestTrait::stHarvestBreed`.
  */
 export const shouldEnforceReorganizeOnLastHarvest = (
   state: GameState,
