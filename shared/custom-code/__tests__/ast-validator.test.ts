@@ -838,6 +838,43 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
     ])
   })
 
+  it('checks the literals nested in anytimeWindow and actionContext', () => {
+    const result = validateCardCode(`
+      const CARD_ID = 'CUSTOM_Test'
+      const blocked = ['CUSTOM_Other']
+      const leaf = (rest) => ({ type: 'leaf', actionId: 'gain', params: { food: 1 }, sourceCard: CARD_ID, ...rest })
+      const CARD_IMPL = {
+        effect: {
+          onRoundStart: (state, player) => ({ type: 'seq', children: [
+            { type: 'leaf', actionId: 'gain', sourceCard: CARD_ID, anytimeWindow: { allowed: 'yes' } },
+            { type: 'leaf', actionId: 'gain', sourceCard: CARD_ID, anytimeWindow: { allowed: true, blockedIds: [1] } },
+            { type: 'leaf', actionId: 'gain', sourceCard: CARD_ID, anytimeWindow: { allowed: true, blockedIds: 'CUSTOM_Other' } },
+            { type: 'leaf', actionId: 'gain', sourceCard: CARD_ID, anytimeWindow: { blockedIds: [] } },
+            { type: 'leaf', actionId: 'gain', sourceCard: CARD_ID, anytimeWindow: { allowed: true, mode: 'all' } },
+            { type: 'leaf', actionId: 'gain', sourceCard: CARD_ID, actionContext: { targetPlayerId: 2 } },
+            { type: 'leaf', actionId: 'gain', sourceCard: CARD_ID, actionContext: 'p2' },
+            { type: 'leaf', actionId: 'gain', sourceCard: CARD_ID, anytimeWindow: { allowed: false },
+              actionContext: { targetPlayerId: 'p2' } },
+            { type: 'leaf', actionId: 'gain', sourceCard: CARD_ID, anytimeWindow: { allowed: state.round > 3, blockedIds: blocked },
+              actionContext: { targetPlayerId: player.id } },
+            { type: 'leaf', actionId: 'gain', sourceCard: CARD_ID, anytimeWindow: { allowed: true, blockedIds: ['CUSTOM_Other', player.id] } },
+          ] }),
+        },
+      }
+    `)
+    const window = 'anytimeWindow must be { allowed: boolean, blockedIds?: string[] }'
+    expect(result.valid).toBe(false)
+    expect(result.valid === false && result.errors).toEqual([
+      `line 8: ${window}`,
+      `line 9: ${window}`,
+      `line 10: ${window}`,
+      `line 11: ${window}`,
+      `line 12: ${window}`,
+      'line 13: actionContext.targetPlayerId must be a string',
+      'line 14: actionContext must be an object',
+    ])
+  })
+
   it('does not treat card data shaped like a leaf as a flow', () => {
     const result = validateCardCode(`
       const CARD_ID = 'CUSTOM_Test'
