@@ -778,6 +778,24 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
     ])
   })
 
+  it('rejects unknown and unopened node fields on literals in flow positions', () => {
+    const result = validateCardCode(`
+      const CARD_ID = 'CUSTOM_Test'
+      const CARD_IMPL = {
+        effect: {
+          onRoundStart: () => ({ type: 'seq', mode: 'trigger-select', children: [
+            { type: 'leaf', actionId: 'gain', params: { food: 1 }, sourceCard: CARD_ID, optoinal: true },
+          ] }),
+        },
+      }
+    `)
+    expect(result.valid).toBe(false)
+    expect(result.valid === false && result.errors).toEqual([
+      "line 5: flow field 'mode' is not available to Workshop cards",
+      "line 6: flow field 'optoinal' is not available to Workshop cards",
+    ])
+  })
+
   it('does not treat card data shaped like a leaf as a flow', () => {
     const result = validateCardCode(`
       const CARD_ID = 'CUSTOM_Test'

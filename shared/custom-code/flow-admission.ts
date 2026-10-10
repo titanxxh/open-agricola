@@ -19,7 +19,8 @@ type LeafFlow = Extract<ActionFlow, { type: 'leaf' }>
 type GroupFlow = Exclude<ActionFlow, { type: 'leaf' }>
 
 /** Every native node field is classified here; `false` means not open to custom cards.
- * A new native field fails to compile until it is classified. */
+ * A new native field fails to compile until it is classified. A field that is not
+ * listed at all is rejected too, so a misspelled `optional` cannot silently change a flow. */
 const LEAF_FIELDS = {
   type: true,
   actionId: true,
@@ -86,10 +87,15 @@ export function assertOwnSourceCard(sourceCard: unknown, cardId: string, path: s
   if (sourceCard !== undefined && sourceCard !== cardId) throw new Error(`${path}: sourceCard must be this card's id`)
 }
 
-function assertNodeFields(node: Record<string, unknown>, fields: Record<string, boolean>, path: string): void {
-  for (const key of Object.keys(node)) {
-    if (Object.hasOwn(fields, key) && !fields[key]) throw outsideContract(path, `flow field '${key}'`)
-  }
+/** Whether a custom card may set this field on a leaf or on a group node. */
+export const isOpenFlowField = (node: 'leaf' | 'group', field: string): boolean => {
+  const fields: Record<string, boolean> = node === 'leaf' ? LEAF_FIELDS : GROUP_FIELDS
+  return Object.hasOwn(fields, field) && fields[field]!
+}
+
+function assertNodeFields(node: Record<string, unknown>, kind: 'leaf' | 'group', path: string): void {
+  const field = Object.keys(node).find(key => !isOpenFlowField(kind, key))
+  if (field !== undefined) throw outsideContract(path, `flow field '${field}'`)
 }
 
 function assertSpecialEffectParams(params: Record<string, unknown>, _cardId: string, path: string): void {
@@ -140,7 +146,7 @@ function admitFlowNode(node: unknown, cardId: string, path: string): void {
   assertOwnSourceCard(node.sourceCard, cardId, path)
   if (node.type === 'leaf') {
     assertSandboxActionId(node.actionId, path)
-    assertNodeFields(node, LEAF_FIELDS, path)
+    assertNodeFields(node, 'leaf', path)
     if (node.params !== undefined && !isRecord(node.params)) throw new Error(`${path}: params must be an object`)
     PARAM_RULES[node.actionId as SandboxActionId](node.params ?? {}, cardId, path)
     // An omitted source would be settled without card attribution.
@@ -150,8 +156,9 @@ function admitFlowNode(node: unknown, cardId: string, path: string): void {
   if (node.type !== 'seq' && node.type !== 'or' && node.type !== 'xor' && node.type !== 'parallel') {
     throw outsideContract(path, `flow node type '${String(node.type)}'`)
   }
-  assertNodeFields(node, GROUP_FIELDS, path)
+  // Checked first: `items` or `steps` in place of `children` deserves the specific message.
   if (!Array.isArray(node.children)) throw new Error(`${path}: '${node.type}' requires a children array`)
+  assertNodeFields(node, 'group', path)
   node.children.forEach((child, index) => admitFlowNode(child, cardId, `${path}.children[${index}]`))
 }
 
