@@ -6,14 +6,14 @@ This document is the **single source of truth** for what custom-card TypeScript 
 
 Read this document if you maintain:
 
-- AI system prompts: `client/services/llm/generation/prompt.ts` includes the deployed contract returned by `server/workshop-sandbox-contract.ts`. Hook, phase, scope, action-ID, helper and semantic facts come from the running backend and shared source metadata; reference examples are read from GitHub on demand.
+- AI system prompts: `client/services/llm/generation/prompt.ts` includes the deployed Workshop Capability Contract returned by `server/workshop-sandbox-contract.ts`. Hook, phase, scope, action-ID, helper and semantic facts come from the running backend and shared source metadata; reference examples are read from GitHub on demand.
 - Workshop UI copy in `client/app/workshop/AiCardDesigner.tsx` or `WorkshopPage.tsx`.
 - Sandbox references in [`docs/ARCHITECTURE.md`](ARCHITECTURE.md).
 - LLM automation in `docs/test/llm-card-gen.md`, whose fixtures exercise this contract against a real model.
 
 When this document changes:
 
-1. Treat it as the human-readable mirror of hooks, phases, scopes, and action IDs. Source constants own the name allowlists: `cardEffectHooks`, `sandboxListenerPhases`, `sandboxListenerScopes`, and `SANDBOX_ALLOWED_ACTION_IDS`. Exhaustive maps own descriptions. The deployed sandbox contract renders them at runtime and the browser includes it in the generation prompt; there is no hand-copied prompt table. CI command `pnpm run check:prompt-sync` checks only that the names in each `prompt-sync` block match source.
+1. Treat it as the human-readable mirror of hooks, phases, scopes, and action IDs. Source constants own the name allowlists: `cardEffectHooks`, `sandboxListenerPhases`, `sandboxListenerScopes`, and `SANDBOX_ALLOWED_ACTION_IDS`. Exhaustive maps own descriptions. The deployed Workshop Capability Contract renders them at runtime and the browser includes it in the generation prompt; there is no hand-copied prompt table. CI command `pnpm run check:prompt-sync` checks only that the names in each `prompt-sync` block match source.
 2. Make `docs/ARCHITECTURE.md` point here instead of maintaining another copy.
 3. Name synchronization does not cover payment semantics, hook parameters and return values, or helper data shapes. Update executor and prompt-contract tests and run the fixed browser acceptance batch described by `docs/test/llm-card-gen.md`; historical golden replay remains a separate regression check.
 
