@@ -243,7 +243,7 @@ reaction-compatible hook（action listener 的 `before` / `immediatelyAfter` / `
 | `getStatePresentation` | `(player) => CardStatePresentation` | 明确的公开计数、资源组、作物层和标记；普通客户端不读取内部状态 |
 | `handHooks`（meta）                            | `HandCardEffectHook[]`                                           | 声明哪些 stage hook 在卡牌还在手牌时也触发                          |
 
-查询类 hook 返回文档规定的顶层类型（数字、数组或对象），也可以不返回。类型不符按 hook 出错处理。出错或没有返回值的查询贡献一个中性结果：空数组；`computeBonusScore` 和 `computeExtraRoomCapacity` 为 `0`；其余为空。
+查询类 hook 返回文档规定的顶层类型（数字、数组或对象），也可以不返回。类型不符或返回非有限数字（`NaN`、无穷大）按 hook 出错处理。出错或没有返回值的查询贡献一个中性结果：空数组；`computeBonusScore` 和 `computeExtraRoomCapacity` 为 `0`；其余为空。
 
 额外播种与特殊 stable 都是“候选 + 结算”成对契约：`onComputeSowableFields` / `onSowExtraField`、`getSpecialStablePositions` / `applySpecialStable`。结算 hook 依赖原地修改宿主对象，沙盒的 JSON 快照无法回传，因此 Workshop 不暴露这两对 hook。`handHooks` 不支持 `onBuy`、`onEndTurn`、`onBeforeEndGame`、`onBeforePlayerTurn`；`CARD_IMPL.effect` 必须直接写对象字面量，禁止变量引用、spread、computed key 和 accessor，避免 hook 或 meta 字段绕过静态校验；server/browser manifest 还会在宿主侧过滤不支持的 hand hook。
 

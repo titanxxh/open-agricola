@@ -204,6 +204,24 @@ const CARD_IMPL = {
     expect(invokeCustomCodeListenerLocal(listener as never)).toEqual(listenerRejection)
   })
 
+  it.each(['NaN', 'Infinity', '-Infinity'])('rejects a hook returning %s identically, before serialization hides it', (value) => {
+    const source = `
+const CARD_ID = 'CUSTOM_ParityCard'
+const CARD_DEF = MinorImprovement({ id: CARD_ID, name: 'Parity Card' })
+const CARD_IMPL = { effect: { id: CARD_ID, computeBonusScore: () => ${value} } }
+`
+    const compiled = validateAndCompileCustomCode(source, 'CUSTOM_ParityCard')
+    expect(compiled.valid).toBe(true)
+    if (!compiled.valid) return
+    const state = createInitialState(42)
+    const request = { compiledCode: compiled.compiledCode, cardId: 'CUSTOM_ParityCard', hook: 'computeBonusScore' as const, state, player: state.players[0]! }
+
+    const rejection = { ok: false, error: 'returned a non-finite number' }
+    expect(invokeCustomCodeEffect(request)).toEqual(rejection)
+    expect(invokeCustomCodeEffectSync(request)).toEqual(rejection)
+    expect(invokeCustomCodeEffectLocal(request)).toEqual(rejection)
+  })
+
   it('reports throwing card code identically as ok:false', () => {
     const compiled = validateAndCompileCustomCode(THROWING_SOURCE, 'CUSTOM_ParityCard')
     expect(compiled.valid).toBe(true)

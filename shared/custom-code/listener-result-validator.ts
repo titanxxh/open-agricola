@@ -43,8 +43,6 @@ export const validateCustomListenerResult = (
   assertOwnSourceCard(value.sourceCard, cardId, 'result')
   admitCustomFlow(value.flow, cardId, 'flow')
   admitCustomFlow(value.alternativeFlow, cardId, 'alternativeFlow')
-  // A result that carries a flow is attributed to its card even when the source was omitted.
-  if (value.flow || value.alternativeFlow) value.sourceCard = cardId
   if (value.actionId !== undefined) assertSandboxActionId(value.actionId, 'actionId')
   if (value.followUpActions !== undefined) {
     if (!Array.isArray(value.followUpActions)) throw new Error('followUpActions must be an array')
@@ -54,6 +52,10 @@ export const validateCustomListenerResult = (
       if (isPlainRecord(action)) assertOwnSourceCard(action.sourceCard, cardId, path)
     })
   }
+  // A result that dispatches anything is attributed to its card even when the source was omitted.
+  const dispatches = value.flow || value.alternativeFlow
+    || (Array.isArray(value.followUpActions) && value.followUpActions.length > 0)
+  if (dispatches) value.sourceCard = cardId
   if (!Object.hasOwn(value, 'costs')) {
     if ('costs' in value) throw new Error('custom listener costs must be an own property')
     if ('costAttribution' in value) {

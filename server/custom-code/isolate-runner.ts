@@ -94,6 +94,8 @@ var __handler = __eff && __eff[${JSON.stringify(request.hook)}];
 __result = typeof __handler === 'function'
   ? __handler(__input_state, __input_player, __input_paymentInfo)
   : null;
+// JSON would turn NaN or Infinity into null and hide the mistake.
+if (typeof __result === 'number' && !isFinite(__result)) throw new Error('returned a non-finite number');
     `
     const result = runInIsolate(
       request.compiledCode,
