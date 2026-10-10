@@ -814,6 +814,30 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
     ])
   })
 
+  it('rejects a literal of the wrong type in an open control field, and leaves computed values to the executors', () => {
+    const result = validateCardCode(`
+      const CARD_ID = 'CUSTOM_Test'
+      const skippable = 'false'
+      const CARD_IMPL = {
+        effect: {
+          onRoundStart: () => ({ type: 'seq', optional: 'false', promptKey: 7, anytimeWindow: true, children: [
+            { type: 'leaf', actionId: 'gain', params: { food: 1 }, sourceCard: CARD_ID, optional: null },
+            { type: 'leaf', actionId: 'gain', params: { food: 1 }, sourceCard: CARD_ID, optional: true, promptKey: 'ui.prompt',
+              anytimeWindow: { allowed: false } },
+            { type: 'leaf', actionId: 'gain', params: { food: 1 }, sourceCard: CARD_ID, optional: skippable },
+          ] }),
+        },
+      }
+    `)
+    expect(result.valid).toBe(false)
+    expect(result.valid === false && result.errors).toEqual([
+      'line 6: optional must be a boolean',
+      'line 6: promptKey must be a string',
+      'line 6: anytimeWindow must be { allowed: boolean, blockedIds?: string[] }',
+      'line 7: optional must be a boolean',
+    ])
+  })
+
   it('does not treat card data shaped like a leaf as a flow', () => {
     const result = validateCardCode(`
       const CARD_ID = 'CUSTOM_Test'

@@ -12,7 +12,7 @@ A name belongs to the contract only while at least one fixed behavior test drive
 Admission checks these things and nothing else:
 
 - the listed names: effect hooks, listener actions, phases and scopes, leaf actions, and `special-effect` kinds;
-- the listener and flow-node fields a card may set, and that each listener and returned node belongs to the card itself;
+- the listener and flow-node fields a card may set, the types of the open node control fields (`optional`, `promptKey`, `anytimeWindow`, `actionContext.targetPlayerId`), and that each listener and returned node belongs to the card itself;
 - the parameter keys each action documents;
 - the field types of the card-local `special-effect` writes;
 - the top-level type of a query hook result.

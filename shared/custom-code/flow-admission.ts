@@ -8,10 +8,10 @@ import { isSandboxActionId, isSandboxSpecialEffectKind, type SandboxActionId, ty
  * node reaches the engine, so the caller can treat it like a failed hook.
  * Native card flows never pass through here.
  *
- * The contract covers names, node fields, the parameter keys each action
- * documents, and the field types of the card-local special-effect writes.
- * Parameter values (amounts, cost rules, schedules) stay with their native
- * consumers, exactly as for native cards.
+ * The contract covers names, node fields and the types of the open control
+ * fields, the parameter keys each action documents, and the field types of the
+ * card-local special-effect writes. Parameter values (amounts, cost rules,
+ * schedules) stay with their native consumers, exactly as for native cards.
  */
 
 type KeysOfUnion<T> = T extends T ? keyof T : never
@@ -92,6 +92,33 @@ const ACTION_CONTEXT_KEYS = new Set(['targetPlayerId'])
 
 export const isOpenActionContextKey = (key: string): boolean => ACTION_CONTEXT_KEYS.has(key)
 
+const isAnytimeWindow = (value: unknown): boolean =>
+  isRecord(value) && typeof value.allowed === 'boolean'
+  && Object.keys(value).every(key => key === 'allowed' || key === 'blockedIds')
+  && (value.blockedIds === undefined
+    || (Array.isArray(value.blockedIds) && value.blockedIds.every(id => typeof id === 'string')))
+
+/** The value each open control field must hold. The engine reads these by truthiness or
+ * passes them on, so `optional: 'false'` would otherwise make a step optional. `literal`
+ * is the kind of literal source validation accepts for the field. */
+const CONTROL_FIELDS = {
+  optional: { expected: 'a boolean', literal: 'boolean', matches: (value: unknown) => typeof value === 'boolean' },
+  promptKey: { expected: 'a string', literal: 'string', matches: (value: unknown) => typeof value === 'string' },
+  anytimeWindow: { expected: '{ allowed: boolean, blockedIds?: string[] }', literal: 'object', matches: isAnytimeWindow },
+} as const
+
+export type ControlFieldLiteral = (typeof CONTROL_FIELDS)[keyof typeof CONTROL_FIELDS]['literal']
+
+/** For source validation: the literal kind and wording an open control field expects. */
+export const controlFieldExpectation = (field: string): { expected: string; literal: ControlFieldLiteral } | undefined =>
+  Object.hasOwn(CONTROL_FIELDS, field) ? CONTROL_FIELDS[field as keyof typeof CONTROL_FIELDS] : undefined
+
+function assertControlFields(node: Record<string, unknown>, path: string): void {
+  for (const [field, rule] of Object.entries(CONTROL_FIELDS)) {
+    if (node[field] !== undefined && !rule.matches(node[field])) throw new Error(`${path}: ${field} must be ${rule.expected}`)
+  }
+}
+
 /** Whether a custom card may set this field on a leaf or on a group node. */
 export const isOpenFlowField = (node: 'leaf' | 'group', field: string): boolean => {
   const fields: Record<string, boolean> = node === 'leaf' ? LEAF_FIELDS : GROUP_FIELDS
@@ -152,10 +179,13 @@ function admitFlowNode(node: unknown, cardId: string, path: string): void {
   if (node.type === 'leaf') {
     assertSandboxActionId(node.actionId, path)
     assertNodeFields(node, 'leaf', path)
+    assertControlFields(node, path)
     if (node.actionContext !== undefined) {
       if (!isRecord(node.actionContext)) throw new Error(`${path}: actionContext must be an object`)
       const key = Object.keys(node.actionContext).find(candidate => !isOpenActionContextKey(candidate))
       if (key !== undefined) throw outsideContract(path, `actionContext key '${key}'`)
+      const target = node.actionContext.targetPlayerId
+      if (target !== undefined && typeof target !== 'string') throw new Error(`${path}: actionContext.targetPlayerId must be a string`)
     }
     if (node.params !== undefined && !isRecord(node.params)) throw new Error(`${path}: params must be an object`)
     PARAM_RULES[node.actionId as SandboxActionId](node.params ?? {}, cardId, path)
@@ -169,6 +199,7 @@ function admitFlowNode(node: unknown, cardId: string, path: string): void {
   // Checked first: `items` or `steps` in place of `children` deserves the specific message.
   if (!Array.isArray(node.children)) throw new Error(`${path}: '${node.type}' requires a children array`)
   assertNodeFields(node, 'group', path)
+  assertControlFields(node, path)
   node.children.forEach((child, index) => admitFlowNode(child, cardId, `${path}.children[${index}]`))
 }
 

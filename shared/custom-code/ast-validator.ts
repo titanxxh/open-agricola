@@ -12,7 +12,7 @@ import ts from 'typescript'
 import { cardEffectHooks, isHandCardEffectHook } from '../cards/card-effects'
 import { REAL_RESOURCE_KEYS } from '../contract/resource-keys'
 import { isFlowResultHook } from './contract-admission'
-import { isOpenActionContextKey, isOpenFlowField } from './flow-admission'
+import { controlFieldExpectation, isOpenActionContextKey, isOpenFlowField, type ControlFieldLiteral } from './flow-admission'
 import { isSandboxActionId, isSandboxSpecialEffectKind } from './sandbox-action-ids'
 import { isSandboxListenerAction } from './sandbox-listener-actions'
 import { sandboxListenerPhases } from './sandbox-listener-phases'
@@ -108,6 +108,16 @@ function validateLiteralLeaf(
   }
 }
 
+/** The kind of a literal as written in source; undefined for anything computed. */
+function literalKind(expression: ts.Expression): ControlFieldLiteral | 'other' | undefined {
+  if (expression.kind === ts.SyntaxKind.TrueKeyword || expression.kind === ts.SyntaxKind.FalseKeyword) return 'boolean'
+  if (ts.isStringLiteralLike(expression)) return 'string'
+  if (ts.isObjectLiteralExpression(expression)) return 'object'
+  if (ts.isNumericLiteral(expression) || ts.isArrayLiteralExpression(expression)
+    || expression.kind === ts.SyntaxKind.NullKeyword) return 'other'
+  return undefined
+}
+
 /** Check known literal flow results without treating arbitrary card data as flow
  * or claiming to type-check dynamic helper calls/children. */
 function validateLiteralFlow(
@@ -137,6 +147,11 @@ function validateLiteralFlow(
       if (kind !== 'leaf' && !hasChildren && (field === 'items' || field === 'steps')) continue
       if (!isOpenFlowField(kind === 'leaf' ? 'leaf' : 'group', field)) {
         errors.push(`line ${getLine(property)}: flow field '${field}' is not available to Workshop cards`)
+      }
+      const control = controlFieldExpectation(field)
+      const written = control && ts.isPropertyAssignment(property) ? literalKind(property.initializer) : undefined
+      if (control && written !== undefined && written !== control.literal) {
+        errors.push(`line ${getLine(property)}: ${field} must be ${control.expected}`)
       }
     }
   }
