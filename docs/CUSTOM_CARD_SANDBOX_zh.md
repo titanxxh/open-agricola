@@ -228,7 +228,7 @@ reaction-compatible hook（action listener 的 `before` / `immediatelyAfter` / `
 `contributeExtraTurn` 返回的是本卡 extra-turn provider 的 flow；多张卡同时返回 provider 时，系统先展示 provider 来源卡，选中后才展开该 flow。`countExtraTurns(state, player)` 报告本卡本轮还能提供几次额外行动；不写时，只要 `contributeExtraTurn` 返回 flow 就算 1 次。引擎不会替卡牌统计已经用掉的次数：卡牌要在自己的状态里记录每次使用（例如在返回的 flow 里放一个 `increment-counter` leaf），两个 hook 都读这份状态。一直提供额外行动的卡会让这一轮无法结束。
 
 
-除 `id` 外，effect 还可以声明下面这些元数据。它们是数据，不是函数；类型不符时保存失败：
+除 `id` 外，effect 还可以声明下面这些元数据。它们是数据，不是函数；类型不符（包括 `null`）时保存失败：
 
 | 元数据 | 类型 | 含义 |
 | --- | --- | --- |
@@ -281,7 +281,7 @@ reaction-compatible hook（action listener 的 `before` / `immediatelyAfter` / `
 
 ### 3.2 `CARD_IMPL.listeners` 白名单
 
-listener 条目可以声明 `handler`、`actions`、`phases`、`scope`、`cardIds`、下表的数据字段，另可带一个宿主会忽略的 `id` 标签。其他字段在保存时失败，因为 manifest 会丢弃它们。数据字段类型不符同样失败：引擎按真假值读取其中的布尔字段。
+listener 条目可以声明 `handler`、`actions`、`phases`、`scope`、`cardIds`、下表的数据字段，另可带一个宿主会忽略的 `id` 标签。其他字段在保存时失败，因为 manifest 会丢弃它们。数据字段类型不符（包括 `null`）同样失败：引擎按真假值读取其中的布尔字段。
 
 | 字段 | 类型 | 含义 |
 | --- | --- | --- |
@@ -641,7 +641,7 @@ return {
 { type: 'seq', children: [gainLeaf(CARD_ID, { food: 1 }), gainLeaf(CARD_ID, { wood: 1 })] }
 ```
 
-`optional` 是节点上的布尔字段，不是另一种节点类型。节点还可以带 `promptKey` 和 `anytimeWindow`，leaf 可以带 `actionContext`，其中可以有 `targetPlayerId`；`selection` leaf 还在这里写候选位置（见 §6）。其他键会被拒绝。这些字段会校验类型：`optional` 是布尔值，`promptKey` 和 `actionContext.targetPlayerId` 是字符串，`anytimeWindow` 是 `{ allowed: boolean, blockedIds?: string[] }`。类型不符的值会被拒绝，所以 `optional: 'false'` 是错误，不会被当成可选步骤。其余原生节点字段不对工坊卡开放，返回 flow 时会被拒绝：`mode`、`triggerSelectOnce`、`expandFlow`、`optionId`、`choiceLabelKey`、`choiceLabelParams`、`effectPreview`、`anytimeActionId`，以及节点级的 `targetPlayerId`。节点上的其他任何字段同样被拒绝，所以 `optoinal` 这样的拼写错误会报错，不会被悄悄忽略。节点、listener 返回值和 `followUpActions` 条目上的 `sourceCard` 必须是 `CARD_ID`。没写 `sourceCard` 的 leaf，以及带 flow 但没写它的 listener 返回值，会被归到本卡。返回流程的 effect hook 直接返回 flow；listener 返回 `{ flow, sourceCard: CARD_ID }`（或其文档规定的查询结果）。
+`optional` 是节点上的布尔字段，不是另一种节点类型。节点还可以带 `promptKey` 和 `anytimeWindow`，leaf 可以带 `actionContext`，其中可以有 `targetPlayerId` 和 `trueAction`；`selection` leaf 还在这里写候选位置（见 §6）。其他键会被拒绝。这些字段会校验类型：`optional` 和 `actionContext.trueAction` 是布尔值，`promptKey` 和 `actionContext.targetPlayerId` 是字符串，`anytimeWindow` 是 `{ allowed: boolean, blockedIds?: string[] }`。类型不符的值会被拒绝，所以 `optional: 'false'` 是错误，不会被当成可选步骤。其余原生节点字段不对工坊卡开放，返回 flow 时会被拒绝：`mode`、`triggerSelectOnce`、`expandFlow`、`optionId`、`choiceLabelKey`、`choiceLabelParams`、`effectPreview`、`anytimeActionId`，以及节点级的 `targetPlayerId`。节点上的其他任何字段同样被拒绝，所以 `optoinal` 这样的拼写错误会报错，不会被悄悄忽略。节点、listener 返回值和 `followUpActions` 条目上的 `sourceCard` 必须是 `CARD_ID`。没写 `sourceCard` 的 leaf，以及带 flow 但没写它的 listener 返回值，会被归到本卡。返回流程的 effect hook 直接返回 flow；listener 返回 `{ flow, sourceCard: CARD_ID }`（或其文档规定的查询结果）。
 
 执行前，AST 校验会拒绝可静态识别的组合节点字面量：缺少 `children`，或其值明显不是数组。这覆盖 flow hook 的直接返回、嵌套的字面量 children，以及 listener 的 `flow` / `alternativeFlow` 结果。校验不会把 leaf 参数或卡牌私有数据当作 flow，也不推断动态 helper 结果或 spread 提供的 children。静态通过后仍需试玩验证行为。
 
@@ -711,12 +711,14 @@ return {
 | `exchange` | 打开玩家自己的兑换菜单，包含其烹饪改良和卡牌提供的兑换 |
 | `set-first-player` | 把起始玩家标记交给效果玩家 |
 | `selection` | 玩家选择农场位置。候选写在 `actionContext: { selectableTiles: [{ row, col }], minSelections, maxSelections }`。选中的位置以 `'row-col'` 字符串存入 `cardStates[CARD_ID].extraData.selectedPositions`，之后的 hook 用 `readCardExtraData` 读取 |
-| `emit-choice` | 发出本卡自己的选择：`params: { options: [{ value, labelKey }], promptKey }`。`labelKey` 和 `promptKey` 如果不是翻译键，就按原文显示。玩家选中的 `value` 会传给 `effect.resolveChoice`，由它返回后续 flow |
+| `emit-choice` | 发出本卡自己的选择：`params: { options: [{ value, labelKey }], promptKey }`。每个选项只能有字符串 `value` 和字符串 `labelKey`，多出字段或类型不符都会被拒绝，因为选项会原样发给所有客户端。`labelKey` 和 `promptKey` 如果不是翻译键，就按原文显示。玩家选中的 `value` 会传给 `effect.resolveChoice`，由它返回后续 flow |
 | `reorganize` | 玩家在自己的各个分区之间重新安置动物 |
 
 凡是来源为本卡的选择，都会调用 `resolveChoice`。这包括玩家在本卡发出的原生行动里做的选择，例如选哪张改良、哪张职业、哪项兑换。对不是本卡 `emit-choice` 选项的值，不要返回任何东西。
 
-`reap` 和 `breed` 只能作为 flow 的 leaf 返回。listener 结果里用于替换的 `actionId` 和 `followUpActions` 只写行动名、没有节点，带不上准入绑定的内容，所以这两个行动在那里会被拒绝。
+这 16 个行动只能作为 flow 的 leaf 返回。listener 结果里用于替换的 `actionId` 会沿用被替换行动的 `actionContext`（例如为那个行动准备的费用覆盖），`followUpActions` 条目只写行动名、没有节点。两处都带不上经过准入的上下文，所以这 16 个行动在那里会被拒绝；请改用 `flow`，或者 `decline` 加 `alternativeFlow`。
+
+对其他卡来说，原生行动的 leaf 就算作那个行动本身。因此监听“建房行动”的卡，对 `construct` leaf 也会触发。如果卡牌只是让玩家做这件事、而不是执行那个行动（例如“建造 1 间房”），在 leaf 上写 `actionContext: { trueAction: false }`；卡面写明玩家执行该行动时不要写。listener 通过 `context.trueAction` 读到这个标记。
 
 > Sprint 6b（2026-04-30）已删除 5 个独立 mutation actionId（`flag-card` / `unflag-card` / `set-card-infobox` / `clear-card-infobox` / `write-card-extra-data`）+ 3 个 dead actionId（`hold-worker-on-card` / `release-worker-from-card` / `gain-other-players`）。统一使用 `special-effect` discriminated-union。`check-prompt-sync` 在 CI 校验 prompt 只暴露白名单内 actionId；白名单外的 actionId 不会出现在 prompt 中，沙盒卡牌不应使用——改用 `special-effect`。
 
@@ -871,7 +873,7 @@ CI 会拦下漏改的情况。
 
 | 日期         | 变更                                                                                                                                                                                                                                                                                                                               |
 | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 2026-10-10 | 开放 issue #1079 的候选能力，每项都有固定 Session 测试：7 个查询类 hook 及其需要的第四、第五个 hook 参数，6 项 effect 元数据，5 个 listener 数据字段，`computeExchanges` 阶段，16 个执行原生农场、卡牌和先手行动的 leaf action，以及 `special-effect` 的 `pop-card-stack-top` 和 `remove-future-meeples` 两个 kind。 |
+| 2026-10-10 | 开放 issue #1079 的候选能力，每项都有固定 Session 测试：7 个查询类 hook 及其需要的第四、第五个 hook 参数，6 项 effect 元数据，5 个 listener 数据字段，`computeExchanges` 阶段，16 个执行原生农场、卡牌和先手行动的 leaf action（只能作为 flow 的 leaf，可用 `actionContext.trueAction` 标明只是卡牌给予的行动），以及 `special-effect` 的 `pop-card-stack-top` 和 `remove-future-meeples` 两个 kind。 |
 | 2026-10-10 | 契约改为收紧执行（ADR 0025）：源码校验和两个执行器强制执行 action ID 与 `special-effect` kind，拒绝不支持的 listener 字段和未写入文档的 `beforeEndGameScope` / `beforeEndGameMandatory` 元数据，每个 listener 和返回的节点绑定到自己的卡，省略的 listener 过滤绑定到已列出的集合，拒绝未开放的原生节点字段、未写入文档的行动参数键、类型不符的 `special-effect` 字段和顶层类型不符的查询结果，并写明 hook 出错时的行为。 |
 | 2026-08-04 | 修正跨全部改良候选折扣为 mandatory capped bonus；补齐并收窄 `handHooks` manifest、要求 effect 使用无 accessor 的直接对象字面量并在宿主侧过滤、统一 `positionKey({row,col})`，移除无法完整结算的 Workshop candidate/settlement hook；新增语义 contract 与 M11 live/record/replay 守卫。 |
 | 2026-04-30 | 双轨 scoring hook 重构：删除 `computePostScore` / `scoringPriority` / `ctx.reserved`；新增 `computeCostedBonus` 走 Pareto 求解器。详见 `(spec/plan 已归档，见 git history)`。|

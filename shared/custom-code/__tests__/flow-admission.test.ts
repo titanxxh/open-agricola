@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { admitCustomFlow } from '../flow-admission'
 import { validateCustomListenerResult } from '../listener-result-validator'
-import { SANDBOX_ALLOWED_ACTION_IDS } from '../sandbox-action-ids'
+import { SANDBOX_ALLOWED_ACTION_IDS, SANDBOX_NATIVE_ACTION_IDS } from '../sandbox-action-ids'
 
 const CARD_ID = 'CUSTOM_Admission'
 const leaf = (actionId: string, params: Record<string, unknown> = {}, rest: Record<string, unknown> = {}) =>
@@ -188,7 +188,13 @@ describe('admitCustomFlow', () => {
     ['improvement', { types: ['occupation'] }, "improvement param 'types' must be a non-empty array of 'major' or 'minor'"],
     ['occupation', { allowedCards: ['A100_Curator'] }, "occupation param 'allowedCards' is not in the Workshop Capability Contract"],
     ['occupation', { exactCost: 'free' }, "occupation param 'exactCost' must be a resource object"],
-    ['emit-choice', { options: 'a,b' }, "emit-choice param 'options' must be an array of { value, labelKey }"],
+    ['emit-choice', { options: 'a,b' }, "emit-choice param 'options' must be an array of { value: string, labelKey: string }"],
+    // The options reach every client unchanged, so a malformed entry is refused here.
+    ['emit-choice', { options: [null] }, "emit-choice param 'options' must be an array of { value: string, labelKey: string }"],
+    ['emit-choice', { options: [{ value: 1, labelKey: 'One' }] }, "emit-choice param 'options' must be an array of { value: string, labelKey: string }"],
+    ['emit-choice', { options: [{ value: 'a' }] }, "emit-choice param 'options' must be an array of { value: string, labelKey: string }"],
+    ['emit-choice', { options: [{ value: 'a', labelKey: 'A', sourceCard: 'A100_Curator' }] },
+      "emit-choice param 'options' must be an array of { value: string, labelKey: string }"],
     ['emit-choice', { options: [], promptKey: 1 }, "emit-choice param 'promptKey' must be a string"],
     ['emit-choice', { options: [], multiSelect: {} }, "emit-choice param 'multiSelect' is not in the Workshop Capability Contract"],
   ])('checks the documented params of %s', (actionId, params, message) => {
@@ -225,11 +231,27 @@ describe('admitCustomFlow', () => {
       .toThrow("flow: actionContext key 'sourceCard' is not in the Workshop Capability Contract")
   })
 
-  it('refuses reap and breed where no node can carry the bound context', () => {
-    expect(() => validateCustomListenerResult({ actionId: 'reap' }, CARD_ID))
-      .toThrow("actionId: actionId 'reap' must be returned as a flow leaf")
-    expect(() => validateCustomListenerResult({ followUpActions: ['gain', { actionId: 'breed' }] }, CARD_ID))
-      .toThrow("followUpActions[1]: actionId 'breed' must be returned as a flow leaf")
-    expect(() => validateCustomListenerResult({ followUpActions: ['plow'] }, CARD_ID)).not.toThrow()
+  it.each([...SANDBOX_NATIVE_ACTION_IDS])('accepts the native action %s only as a flow leaf', (actionId) => {
+    // A replacement keeps the replaced action's context, and a follow-up entry has no node.
+    expect(() => validateCustomListenerResult({ actionId }, CARD_ID))
+      .toThrow(`actionId: actionId '${actionId}' must be returned as a flow leaf`)
+    expect(() => validateCustomListenerResult({ followUpActions: ['gain', { actionId }] }, CARD_ID))
+      .toThrow(`followUpActions[1]: actionId '${actionId}' must be returned as a flow leaf`)
+    expect(() => validateCustomListenerResult({ flow: leaf(actionId, DOCUMENTED_PARAMS[actionId]) }, CARD_ID)).not.toThrow()
+  })
+
+  it('still accepts the goods and card-state actions as a replacement or a follow-up', () => {
+    expect(() => validateCustomListenerResult({ actionId: 'bake-bread' }, CARD_ID)).not.toThrow()
+    expect(() => validateCustomListenerResult({ followUpActions: ['gain', { actionId: 'bonus-vp' }] }, CARD_ID)).not.toThrow()
+  })
+
+  it('opens trueAction on any leaf as a boolean', () => {
+    expect(admit(leaf('construct', {}, { actionContext: { trueAction: false } }))).not.toThrow()
+    expect(admit(leaf('bake-bread', {}, { actionContext: { trueAction: false, targetPlayerId: 'p2' } }))).not.toThrow()
+    // Only the boolean false marks a granted action; the string would be read as a true action.
+    expect(admit(leaf('construct', {}, { actionContext: { trueAction: 'false' } })))
+      .toThrow('flow: actionContext.trueAction must be a boolean')
+    expect(admit(leaf('construct', {}, { actionContext: { trueAction: 0 } })))
+      .toThrow('flow: actionContext.trueAction must be a boolean')
   })
 })

@@ -79,6 +79,9 @@ describe('normalizeCustomManifest', () => {
     [listener({ preScoring: 1 }), 'listener preScoring must be a boolean'],
     [listener({ replacesTurn: 'true' }), 'listener replacesTurn must be a boolean'],
     [listener({ blockedAnytimeInteractionKinds: 'choice' }), 'listener blockedAnytimeInteractionKinds must be an array of interaction kinds'],
+    // null is a declared value, not an omitted key: it must not fall back to the engine default.
+    [listener({ mandatory: null }), 'listener mandatory must be a boolean'],
+    [manifest({ effectMetadata: { beforeEndGameMandatory: null } }), 'effect beforeEndGameMandatory must be a boolean'],
   ])('rejects a declaration of the wrong type', (raw, message) => {
     expect(() => normalizeCustomManifest(raw, CARD_ID)).toThrow(message)
   })
@@ -88,7 +91,7 @@ describe('normalizeCustomManifest', () => {
       effectHooks: [], listeners: [],
       effectMetadata: { handHooks: ['onRoundStart', 'onBuy'], beforeEndGameMandatory: 'false', extraTurnBeforeWorkers: true } as never,
     })).toEqual({ handHooks: ['onRoundStart'], extraTurnBeforeWorkers: true })
-    expect(registeredListenerData({ registrationId: 'x', mandatory: 'false', preScoring: true, allowAnytimeReentry: true } as never))
+    expect(registeredListenerData({ registrationId: 'x', mandatory: 'false', preScoring: true, replacesTurn: null, allowAnytimeReentry: true } as never))
       .toEqual({ preScoring: true })
   })
 

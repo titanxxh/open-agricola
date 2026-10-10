@@ -67,7 +67,8 @@ function admit<T>(raw: Record<string, unknown>, rules: Record<string, Rule>, lab
   const admitted: Record<string, unknown> = {}
   for (const [key, rule] of Object.entries(rules)) {
     const value = raw[key]
-    if (value === undefined || value === null) continue
+    // Only an absent key means the default: `mandatory: null` is a declaration of the wrong type.
+    if (value === undefined) continue
     if (rule.matches(value)) admitted[key] = value
     else if (strict) throw new Error(`${label} ${key} must be ${rule.expected}`)
   }

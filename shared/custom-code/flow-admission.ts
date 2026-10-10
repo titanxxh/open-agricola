@@ -1,6 +1,8 @@
 import { REAL_RESOURCE_KEYS, isPaymentResourceKey } from '../contract/resource-keys'
 import type { ActionFlow } from '../contract/types'
-import { isSandboxActionId, isSandboxSpecialEffectKind, type SandboxActionId, type SandboxSpecialEffectKind } from './sandbox-action-ids'
+import {
+  isSandboxActionId, isSandboxNativeActionId, isSandboxSpecialEffectKind, type SandboxActionId, type SandboxSpecialEffectKind,
+} from './sandbox-action-ids'
 
 /**
  * Runtime admission for flows returned by custom cards (ADR 0025). A flow that
@@ -96,8 +98,18 @@ type KeyTypes = Record<string, { expected: string; matches: (value: unknown) => 
 
 const finiteNumber = { expected: 'a finite number', matches: (value: unknown) => matchesShape(value, 'finite') }
 
-/** The documented actionContext keys: `targetPlayerId` on any leaf, plus the keys an action
- * reads only from there. The rest are native execution controls. */
+/** The actionContext keys any leaf may carry. `trueAction: false` says the card lets the
+ * player do the thing without taking that action, so listeners on the action itself stay quiet. */
+const COMMON_CONTEXT_KEYS = {
+  targetPlayerId: { expected: 'a string', literal: 'string', matches: (value: unknown) => typeof value === 'string' },
+  trueAction: { expected: 'a boolean', literal: 'boolean', matches: (value: unknown) => typeof value === 'boolean' },
+} as const
+
+/** For source validation: the literal kind and wording a common actionContext key expects. */
+export const commonContextKeyExpectation = (key: string): { expected: string; literal: 'string' | 'boolean' } | undefined =>
+  Object.hasOwn(COMMON_CONTEXT_KEYS, key) ? COMMON_CONTEXT_KEYS[key as keyof typeof COMMON_CONTEXT_KEYS] : undefined
+
+/** The keys an action reads only from actionContext. The rest are native execution controls. */
 const ACTION_CONTEXT_KEYS: Partial<Record<SandboxActionId, KeyTypes>> = {
   selection: {
     selectableTiles: { expected: 'an array of { row, col }', matches: Array.isArray },
@@ -108,7 +120,7 @@ const ACTION_CONTEXT_KEYS: Partial<Record<SandboxActionId, KeyTypes>> = {
 
 /** Source validation passes no action when a leaf's actionId is computed; the executors decide then. */
 export const isOpenActionContextKey = (key: string, actionId?: string): boolean =>
-  key === 'targetPlayerId'
+  Object.hasOwn(COMMON_CONTEXT_KEYS, key)
   || (actionId === undefined
     ? Object.values(ACTION_CONTEXT_KEYS).some(keys => Object.hasOwn(keys, key))
     : isSandboxActionId(actionId) && Object.hasOwn(ACTION_CONTEXT_KEYS[actionId] ?? {}, key))
@@ -120,11 +132,12 @@ const BOUND_ACTION_CONTEXT: Partial<Record<SandboxActionId, (cardId: string) => 
   breed: cardId => ({ sourceCard: cardId }),
 }
 
-/** A replacement `actionId` and a `followUpActions` entry name an action without a node, so
- * they cannot carry what admission binds on a leaf of these actions. */
+/** A replacement `actionId` keeps the replaced action's actionContext, such as a cost
+ * override meant for that action, and a `followUpActions` entry names an action without a
+ * node. Neither can carry an admitted context, so the native actions are flow leaves only. */
 export function assertSandboxFollowUpActionId(actionId: unknown, path: string): void {
   assertSandboxActionId(actionId, path)
-  if (BOUND_ACTION_CONTEXT[actionId as SandboxActionId]) {
+  if (isSandboxNativeActionId(actionId)) {
     throw new Error(`${path}: actionId '${String(actionId)}' must be returned as a flow leaf`)
   }
 }
@@ -243,8 +256,14 @@ const PARAM_RULES: Record<SandboxActionId, ParamRule> = {
   exchange: noParams('exchange'),
   'set-first-player': noParams('set-first-player'),
   selection: noParams('selection'),
+  // The options go to every client as they are, so each must be exactly a value and a label.
   'emit-choice': typedParams('emit-choice', {
-    options: { expected: 'an array of { value, labelKey }', matches: Array.isArray },
+    options: {
+      expected: 'an array of { value: string, labelKey: string }',
+      matches: value => Array.isArray(value) && value.every(option => isRecord(option)
+        && typeof option.value === 'string' && typeof option.labelKey === 'string'
+        && Object.keys(option).every(key => key === 'value' || key === 'labelKey')),
+    },
     promptKey: { expected: 'a string', matches: value => typeof value === 'string' },
   }),
   reorganize: noParams('reorganize'),
@@ -267,8 +286,10 @@ function admitFlowNode(node: unknown, cardId: string, path: string): void {
         && JSON.stringify(context[candidate]) !== JSON.stringify(bound?.[candidate]))
       if (key !== undefined) throw outsideContract(path, `actionContext key '${key}'`)
       assertKeyTypes(context, ACTION_CONTEXT_KEYS[actionId] ?? {}, 'actionContext key', path)
-      if (context.targetPlayerId !== undefined && typeof context.targetPlayerId !== 'string') {
-        throw new Error(`${path}: actionContext.targetPlayerId must be a string`)
+      for (const [common, rule] of Object.entries(COMMON_CONTEXT_KEYS)) {
+        if (context[common] !== undefined && !rule.matches(context[common])) {
+          throw new Error(`${path}: actionContext.${common} must be ${rule.expected}`)
+        }
       }
     }
     if (node.params !== undefined && !isRecord(node.params)) throw new Error(`${path}: params must be an object`)
