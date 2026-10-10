@@ -862,7 +862,7 @@ Generation Attempt 产出的作者私有结果，包含完整源码候选、供�
 _Avoid_: Generation Candidate、完整工作对话、Draft Version
 
 **Generation Provenance（生成溯源）**:
-描述生成来源的作者私有不可变事实，包括生成目标与输入基线、provider、model、参考资料与执行契约的版本及可用的调用统计；图片仍保留参考图标识和可用的 seed 或 request ID。它是来源证据，不承诺确定性复现，也不包含完整协议记录或模型凭据。
+描述生成来源的作者私有不可变事实，包括生成目标与输入基线、provider、model、参考资料与工坊能力契约的版本及可用的调用统计；图片仍保留参考图标识和可用的 seed 或 request ID。它是来源证据，不承诺确定性复现，也不包含完整协议记录或模型凭据。
 _Avoid_: 可复现信息、API Key、模型凭据
 
 **Draft Version**:
@@ -884,6 +884,10 @@ _Avoid_: 中文界面中的 Sandbox、Reset Sandbox、Custom Code Sandbox
 **Custom Code Sandbox**:
 自定义卡代码的校验、编译和隔离执行链路，服务端通过 `server/custom-code/` 和 executor-backed runtime 注入卡牌能力。
 _Avoid_: 直接执行用户源码
+
+**Workshop Capability Contract（工坊能力契约）**:
+一个部署承诺执行的自定义卡能力及其限制，是模型生成、源码校验和实际执行共用的同一范围。它可以小于原生卡牌能力；GitHub 上存在对应的原生实现不代表该能力可用。
+_Avoid_: 沙盒契约、部署契约、执行契约、原生接口全集、仅用于提示词的允许名单
 
 **主 client bundle**:
 线上 React 前端，只能使用协议、展示数据、安全领域 helper 和 i18n，不运行完整规则引擎。
@@ -945,6 +949,7 @@ _Avoid_: 永久放弃、全局出局名单
 - **Game Replay Archive** 由 **Replay Step** 组织，用 **Replay Participant** 表达座位身份，并由 **Replay Perspective** 决定展示遮蔽；内容删除后原 `roomId` 只解析为 **Replay Tombstone**。
 - **Game Bug Reporter** 可以用自己的 **Issue Submission Connection** 提交，也可以明确选择 **Hosted Issue Identity**；两者都从同一 **Bug Report Draft** 和 **Bug Report Anchor** 创建公开 Issue，未完成局可用 **Reported Game Evidence** 暂时还原该 Anchor。
 - **Workshop** 生成或上传自定义卡；**Custom Code Sandbox** 校验、编译并隔离执行这些卡的 impl。
+- **Workshop Capability Contract** 界定 **Custom Code Sandbox** 应当接受的能力；原生 **Card Impl** 不受该契约限制。
 - 未发布 Workshop Card 进入正式多人局前必须确认其 **Replay Card Snapshot** 会永久公开；不同意时只允许在 **Workshop Sandbox** 使用。
 - 主 client bundle 只渲染和发命令；sandbox client bundle 可以在浏览器内运行完整 shared engine。
 - 规则正确性优先用 **Session Test**；前端视觉和多人连接行为再用 E2E。

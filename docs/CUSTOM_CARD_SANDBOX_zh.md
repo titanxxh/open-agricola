@@ -8,14 +8,14 @@
 
 > **谁该读这个文件**：
 >
-> - **AI 系统提示词作者** — `client/services/llm/generation/prompt.ts` 包含 `server/workshop-sandbox-contract.ts` 返回的已部署契约；hook / phase / scope / actionId、helper 和运行语义来自实际运行的后端及 shared 描述元数据，样例由浏览器按需从 GitHub 读取
+> - **AI 系统提示词作者** — `client/services/llm/generation/prompt.ts` 包含 `server/workshop-sandbox-contract.ts` 返回的已部署工坊能力契约；hook / phase / scope / actionId、helper 和运行语义来自实际运行的后端及 shared 描述元数据，样例由浏览器按需从 GitHub 读取
 > - **Workshop UI 文案作者** — `client/app/workshop/AiCardDesigner.tsx` / `WorkshopPage.tsx` 文案
 > - **设计文档作者** — `docs/ARCHITECTURE.md` 提到沙盒的章节
-> - **LLM 自动化测试维护者** — `docs/test/llm-card-gen.md` 描述了用真 LLM 验证沙盒契约的 fixture 套件
+> - **LLM 自动化测试维护者** — `docs/test/llm-card-gen.md` 描述了用真 LLM 验证工坊能力契约的 fixture 套件
 >
 > **修改本文件的同时**必须：
 >
-> 1. 本文件是 hook / phase / scope / actionId 的**人读镜像**：名字白名单由源码常量拥有（`cardEffectHooks` / `sandboxListenerPhases` / `sandboxListenerScopes` / `SANDBOX_ALLOWED_ACTION_IDS`），描述由穷尽 map 拥有；已部署沙盒契约在运行时派生这些内容，由浏览器放入生成 prompt，**不再手工同步 prompt 表格**。CI `pnpm run check:prompt-sync` 只校验本文件的 `prompt-sync` 块与源码名字一致。
+> 1. 本文件是 hook / phase / scope / actionId 的**人读镜像**：名字白名单由源码常量拥有（`cardEffectHooks` / `sandboxListenerPhases` / `sandboxListenerScopes` / `SANDBOX_ALLOWED_ACTION_IDS`），描述由穷尽 map 拥有；已部署的工坊能力契约在运行时派生这些内容，由浏览器放入生成 prompt，**不再手工同步 prompt 表格**。CI `pnpm run check:prompt-sync` 只校验本文件的 `prompt-sync` 块与源码名字一致。
 > 2. 让 `docs/ARCHITECTURE.md` 引用本文件而不是另行维护一份
 > 3. 支付语义、hook 参数/返回值和 helper 数据形状不是名字同步能覆盖的；同步更新 executor / prompt contract 测试，并按 `docs/test/llm-card-gen.md` 跑固定浏览器验收批次；历史 golden 回放保留为独立回归检查
 

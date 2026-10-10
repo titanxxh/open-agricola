@@ -188,7 +188,7 @@ OpenRouter 不在 provider 级别声明 `chat` / `image` 兜底能力；每个�
 
 ### C2. 系统提示词设计
 
-精简提示词位于 `client/services/llm/generation/prompt.ts`，定义任务、不可变输入、资料工具、信任边界和输出格式，并附上实际部署的沙盒契约。契约从共享真源派生 hook/listener/action 元数据，提供准确的注入 helper。运行时标识与资料 commit 分别记录。
+精简提示词位于 `client/services/llm/generation/prompt.ts`，定义任务、不可变输入、资料工具、信任边界和输出格式，并附上实际部署的工坊能力契约。契约从共享真源派生 hook/listener/action 元数据，提供准确的注入 helper。运行时标识与资料 commit 分别记录。
 
 契约包含 ActionFlow 节点结构，以及引擎调度的未来奖励与卡上存储资源的区别。可静态识别的错误组合节点在试玩前即校验失败，进入与其他编译错误相同的有界修复流程；这不等于完整的类型或行为证明。
 
