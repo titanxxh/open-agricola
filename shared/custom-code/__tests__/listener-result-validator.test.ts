@@ -26,6 +26,10 @@ describe('validateCustomListenerResult', () => {
     expect(validateCustomListenerResult({ followUpActions: [] }, 'CUSTOM_Test')).toEqual({ followUpActions: [] })
   })
 
+  it('attributes a result that only replaces the action', () => {
+    expect(validateCustomListenerResult({ actionId: 'gain' }, 'CUSTOM_Test')).toEqual({ actionId: 'gain', sourceCard: 'CUSTOM_Test' })
+  })
+
   it('leaves a query result without a flow unattributed', () => {
     expect(validateCustomListenerResult({ doable: true }, 'CUSTOM_Test')).toEqual({ doable: true })
   })

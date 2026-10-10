@@ -87,6 +87,11 @@ export function assertOwnSourceCard(sourceCard: unknown, cardId: string, path: s
   if (sourceCard !== undefined && sourceCard !== cardId) throw new Error(`${path}: sourceCard must be this card's id`)
 }
 
+/** The only documented actionContext key; the rest are native execution controls. */
+const ACTION_CONTEXT_KEYS = new Set(['targetPlayerId'])
+
+export const isOpenActionContextKey = (key: string): boolean => ACTION_CONTEXT_KEYS.has(key)
+
 /** Whether a custom card may set this field on a leaf or on a group node. */
 export const isOpenFlowField = (node: 'leaf' | 'group', field: string): boolean => {
   const fields: Record<string, boolean> = node === 'leaf' ? LEAF_FIELDS : GROUP_FIELDS
@@ -147,6 +152,11 @@ function admitFlowNode(node: unknown, cardId: string, path: string): void {
   if (node.type === 'leaf') {
     assertSandboxActionId(node.actionId, path)
     assertNodeFields(node, 'leaf', path)
+    if (node.actionContext !== undefined) {
+      if (!isRecord(node.actionContext)) throw new Error(`${path}: actionContext must be an object`)
+      const key = Object.keys(node.actionContext).find(candidate => !isOpenActionContextKey(candidate))
+      if (key !== undefined) throw outsideContract(path, `actionContext key '${key}'`)
+    }
     if (node.params !== undefined && !isRecord(node.params)) throw new Error(`${path}: params must be an object`)
     PARAM_RULES[node.actionId as SandboxActionId](node.params ?? {}, cardId, path)
     // An omitted source would be settled without card attribution.
