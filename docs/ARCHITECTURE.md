@@ -1367,7 +1367,7 @@ Completed Replay and Bug Report behavior uses ADR 0013's public and private read
 server/custom-code/
 ├── compiler.ts          TypeScript to JavaScript through ts-blank-space and esbuild
 ├── runtime.ts           sandbox runtime
-├── engine.ts            hook, phase, and scope validation plus dispatch
+├── engine.ts            source validation, compilation, and manifest extraction
 ├── isolate-runner.ts    isolated-vm entry
 ├── executor-worker.ts   Worker Thread entry
 └── client.ts            synchronous main-process to Worker Thread client

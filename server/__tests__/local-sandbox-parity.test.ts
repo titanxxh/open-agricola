@@ -1,8 +1,9 @@
 /**
  * Parity tests: the browser-local custom-card executor
  * (`client/local-sandbox/browser-executor.ts`) must behave identically to the
- * server isolated-vm executor (`server/custom-code/engine.ts`) for the same
- * card source — same manifest, same invocation results, same error handling.
+ * server executor for the same card source — same manifest
+ * (`server/custom-code/engine.ts`), same invocation results and error handling
+ * through the worker client that rooms use (`server/custom-code/client.ts`).
  */
 import { afterEach, describe, expect, it } from 'vitest'
 import { clearCustomCards } from '../../shared/cards/custom-registry.ts'
@@ -11,11 +12,7 @@ import { createInitialState } from '../../shared/session/state-bootstrap.ts'
 import { GameCore } from '../../shared/session/session-core.ts'
 import type { CustomCardData } from '../../shared/cards/session-card-context.ts'
 import { validateFarmChoice } from '../../shared/session/farm-choice-validation.ts'
-import {
-  invokeCustomCodeEffect,
-  invokeCustomCodeListener,
-  validateAndCompileCustomCode,
-} from '../custom-code/engine.ts'
+import { validateAndCompileCustomCode } from '../custom-code/engine.ts'
 import { GameSession } from '../game/authoritative-session.ts'
 import { invokeCustomCodeEffectSync, invokeCustomCodeListenerSync } from '../custom-code/client.ts'
 import {
@@ -119,7 +116,7 @@ describe('browser executor parity with server executor', () => {
       state,
       player: state.players[0]!,
     }
-    const server = invokeCustomCodeEffect(request)
+    const server = invokeCustomCodeEffectSync(request)
     const local = invokeCustomCodeEffectLocal(request)
 
     expect(local).toEqual(server)
@@ -143,7 +140,7 @@ describe('browser executor parity with server executor', () => {
       state,
       player: state.players[0]!,
     }
-    expect(invokeCustomCodeEffectLocal(request)).toEqual(invokeCustomCodeEffect(request))
+    expect(invokeCustomCodeEffectLocal(request)).toEqual(invokeCustomCodeEffectSync(request))
     expect(invokeCustomCodeEffectLocal(request)).toEqual({ ok: true, result: null })
   })
 
@@ -165,7 +162,7 @@ describe('browser executor parity with server executor', () => {
         phase: 'after' as const,
       },
     }
-    const server = invokeCustomCodeListener(request as never)
+    const server = invokeCustomCodeListenerSync(request as never)
     const local = invokeCustomCodeListenerLocal(request as never)
     expect(local).toEqual(server)
     expect(server.ok).toBe(true)
@@ -194,12 +191,10 @@ const CARD_IMPL = {
       context: { state, player: state.players[0]!, space: state.actionSpaces[0]!, actionId: 'collect', phase: 'after' as const } }
 
     const effectRejection = { ok: false, error: "onRoundStart: actionId 'plow' is not in the Workshop Capability Contract" }
-    expect(invokeCustomCodeEffect(effect)).toEqual(effectRejection)
     expect(invokeCustomCodeEffectSync(effect)).toEqual(effectRejection)
     expect(invokeCustomCodeEffectLocal(effect)).toEqual(effectRejection)
 
     const listenerRejection = { ok: false, error: "flow.children[0]: actionId 'sow' is not in the Workshop Capability Contract" }
-    expect(invokeCustomCodeListener(listener as never)).toEqual(listenerRejection)
     expect(invokeCustomCodeListenerSync(listener as never)).toEqual(listenerRejection)
     expect(invokeCustomCodeListenerLocal(listener as never)).toEqual(listenerRejection)
   })
@@ -217,7 +212,6 @@ const CARD_IMPL = { effect: { id: CARD_ID, computeBonusScore: () => ${value} } }
     const request = { compiledCode: compiled.compiledCode, cardId: 'CUSTOM_ParityCard', hook: 'computeBonusScore' as const, state, player: state.players[0]! }
 
     const rejection = { ok: false, error: 'returned a non-finite number' }
-    expect(invokeCustomCodeEffect(request)).toEqual(rejection)
     expect(invokeCustomCodeEffectSync(request)).toEqual(rejection)
     expect(invokeCustomCodeEffectLocal(request)).toEqual(rejection)
   })
@@ -235,7 +229,7 @@ const CARD_IMPL = { effect: { id: CARD_ID, computeBonusScore: () => ${value} } }
       state,
       player: state.players[0]!,
     }
-    const server = invokeCustomCodeEffect(request)
+    const server = invokeCustomCodeEffectSync(request)
     const local = invokeCustomCodeEffectLocal(request)
     expect(server).toEqual({ ok: false, error: expect.stringContaining('parity boom') })
     expect(local).toEqual({ ok: false, error: expect.stringContaining('parity boom') })

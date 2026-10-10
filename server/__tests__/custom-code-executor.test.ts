@@ -5,11 +5,8 @@ import { getCardEffect, runCardEffectHook } from '../../shared/cards/card-effect
 import { computeAnimalZones } from '../../shared/domain/animal-zones.ts'
 import { createInitialState } from '../../shared/session/state-bootstrap.ts'
 import { CardRegistry } from '../../shared/cards/registry.ts'
-import {
-  validateAndCompileCustomCode,
-  invokeCustomCodeEffect,
-  invokeCustomCodeListener,
-} from '../custom-code/engine.ts'
+import { invokeCustomCodeEffectSync, invokeCustomCodeListenerSync } from '../custom-code/client.ts'
+import { validateAndCompileCustomCode } from '../custom-code/engine.ts'
 import { registerExecutorBackedCustomCard } from '../custom-code/runtime.ts'
 import { GameSession } from '../game/authoritative-session.ts'
 import { workshopCardJsonFromDefinition } from '../workshop-draft-validation.ts'
@@ -387,7 +384,7 @@ const CARD_IMPL = {
 }
     `
 
-    expect(invokeCustomCodeListener({
+    expect(invokeCustomCodeListenerSync({
       compiledCode: compileCardCode(source),
       cardId: 'CUSTOM_ExecutorCard',
       registrationId: 'CUSTOM_ExecutorCard:listener:0',
@@ -574,7 +571,7 @@ const CARD_IMPL = {
 
     const state = createInitialState(42)
     state.players[0]!.minorPlayed.push('CUSTOM_ExecutorCard')
-    const result = invokeCustomCodeEffect({
+    const result = invokeCustomCodeEffectSync({
       compiledCode: compiled.compiledCode,
       cardId: 'CUSTOM_ExecutorCard',
       hook: 'onReturnHome',
@@ -601,7 +598,7 @@ const CARD_IMPL = {
     if (!compiled.valid) return
 
     const state = createInitialState(42)
-    const result = invokeCustomCodeEffect({
+    const result = invokeCustomCodeEffectSync({
       compiledCode: compiled.compiledCode,
       cardId: 'CUSTOM_HelperCard',
       hook: 'onReturnHome',
@@ -638,7 +635,7 @@ const CARD_IMPL = {
     if (!compiled.valid) return
 
     const state = createInitialState(42)
-    const result = invokeCustomCodeEffect({
+    const result = invokeCustomCodeEffectSync({
       compiledCode: compiled.compiledCode,
       cardId: 'CUSTOM_HelperCard',
       hook: 'onReturnHome',
