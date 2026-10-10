@@ -157,23 +157,23 @@ test('mobile targets and keyboard focus stay large, visible, and unobscured', as
   await page.goto('/?page=settings&bg=none')
 
   const navigation = page.getByRole('navigation', { name: 'Main navigation' })
-  const githubLink = page.getByRole('link', { name: 'Link GitHub' })
+  const githubButton = page.getByRole('button', { name: 'Link GitHub' })
   await expect(navigation).toBeVisible()
-  await expect(githubLink).toBeVisible()
-  for (const target of [githubLink, ...await navigation.getByRole('button').all()]) {
+  await expect(githubButton).toBeVisible()
+  for (const target of [githubButton, ...await navigation.getByRole('button').all()]) {
     const box = await target.boundingBox()
     expect(box).not.toBeNull()
     expect(box!.width).toBeGreaterThanOrEqual(44)
     expect(box!.height).toBeGreaterThanOrEqual(44)
   }
 
-  for (let index = 0; index < 30 && !await githubLink.evaluate(element =>
+  for (let index = 0; index < 30 && !await githubButton.evaluate(element =>
     element === document.activeElement
   ); index += 1) {
     await page.keyboard.press('Tab')
   }
-  await expect(githubLink).toBeFocused()
-  const focus = await githubLink.evaluate(element => {
+  await expect(githubButton).toBeFocused()
+  const focus = await githubButton.evaluate(element => {
     const rect = element.getBoundingClientRect()
     const navigationRect = document.querySelector('.mobile-tab-bar')!.getBoundingClientRect()
     const style = getComputedStyle(element)
@@ -287,7 +287,7 @@ for (const width of [320, 375, 390, 768, 1280]) {
     for (const scenario of [
       { url: '/?bg=none', control: () => page.getByRole('button', { name: 'Create Multiplayer Game' }) },
       { url: '/?page=workshop&bg=none', control: () => page.getByRole('searchbox', { name: 'Search' }) },
-      { url: '/?page=settings&bg=none', control: () => page.getByRole('link', { name: 'Link GitHub' }) },
+      { url: '/?page=settings&bg=none', control: () => page.getByRole('button', { name: 'Link GitHub' }) },
     ]) {
       await checkScenario(scenario)
     }
