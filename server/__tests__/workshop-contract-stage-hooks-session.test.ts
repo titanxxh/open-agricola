@@ -21,6 +21,8 @@ import { createWorkSession } from './_helpers/session-fixtures'
 const CARD_ID = 'CUSTOM_StageProbe'
 const STAGE_HOOKS = flowCardEffectHooks.filter(hook => hook !== 'onBuy')
 const PLACEMENTS = ['forest', 'clay-pit', 'reed-bank', 'fishing']
+// A full game runs every stage hook in the isolate; on CI it takes longer than the default 5 s.
+const FULL_GAME_TIMEOUT_MS = 30_000
 
 const sessions: GameSession[] = []
 afterEach(() => {
@@ -114,7 +116,7 @@ describe('Workshop Capability Contract stage hooks', () => {
     })
     // The card belongs to player 0 only.
     expect(final.players[1]!.cardStates[CARD_ID]).toBeUndefined()
-  })
+  }, FULL_GAME_TIMEOUT_MS)
 
   it('dispatches no stage hook while the card stays in hand without handHooks', () => {
     const session = start((state) => { state.players[0]!.minorHand = [CARD_ID] })
@@ -125,5 +127,5 @@ describe('Workshop Capability Contract stage hooks', () => {
     expect(session.cardWarnings).toEqual([])
     expect(final.players[0]!.minorHand).toEqual([CARD_ID])
     expect(final.players[0]!.cardStates[CARD_ID]?.counters ?? {}).toEqual({})
-  })
+  }, FULL_GAME_TIMEOUT_MS)
 })

@@ -21,6 +21,8 @@ const CARD_ID = 'CUSTOM_ReactionProbe'
 const ACTIONS = ['collect', 'place-farmer', 'breed']
 const PHASES = ['before', 'immediatelyAfter', 'after']
 const PLACEMENTS = ['forest', 'clay-pit', 'reed-bank', 'fishing']
+// Four rounds and a Harvest of isolate calls come close to the default 5 s on CI.
+const FOUR_ROUNDS_TIMEOUT_MS = 20_000
 
 const sessions: GameSession[] = []
 afterEach(() => {
@@ -88,5 +90,5 @@ ${ACTIONS.flatMap(action => PHASES.map(phase => `  { cardIds: [CARD_ID], actions
       'after:breed': 1,
     })
     expect(final.players[1]!.cardStates[CARD_ID]).toBeUndefined()
-  })
+  }, FOUR_ROUNDS_TIMEOUT_MS)
 })
