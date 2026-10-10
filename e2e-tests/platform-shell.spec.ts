@@ -59,23 +59,24 @@ for (const width of [320, 375, 390]) {
     await page.setViewportSize({ width, height: 844 })
     await page.goto('/?page=settings')
 
-    for (const link of [
-      page.getByRole('link', { name: 'Link GitHub' }),
-      page.getByRole('link', { name: 'Link Google' }),
+    for (const button of [
+      page.getByRole('button', { name: 'Link GitHub' }),
+      page.getByRole('button', { name: 'Link Google' }),
     ]) {
-      await expectFullyWithinViewport(link, width)
+      await expectFullyWithinViewport(button, width)
     }
   })
 }
 
 test('button-styled links stay undecorated across interaction states', async ({ page }) => {
   await mockPlatformApis(page)
-  await page.goto('/?page=settings')
+  // Account binding now uses POST buttons; login OAuth still uses styled links.
+  await page.route('**/api/auth/me', route => route.fulfill({ status: 401, json: { ok: false } }))
+  await page.goto('/?page=login')
+  const links = page.locator('a.oauth-provider-link')
+  await expect(links).toHaveCount(2)
 
-  for (const link of [
-    page.getByRole('link', { name: 'Link GitHub' }),
-    page.getByRole('link', { name: 'Link Google' }),
-  ]) {
+  for (const link of await links.all()) {
     await expect(link).toHaveCSS('text-decoration-line', 'none')
     await link.hover()
     await expect(link).toHaveCSS('text-decoration-line', 'none')
