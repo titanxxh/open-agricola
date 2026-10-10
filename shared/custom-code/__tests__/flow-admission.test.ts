@@ -85,13 +85,20 @@ describe('admitCustomFlow', () => {
       .toThrow("flow.children[0]: sourceCard must be this card's id")
   })
 
-  it('accepts the open node fields and ignores fields the engine does not read', () => {
+  it('accepts the open node fields', () => {
     expect(admit(leaf('pay', { cost: { food: 1 } }, {
       optional: true, promptKey: 'ui.interactionOptionalAction', anytimeWindow: { allowed: true },
-      actionContext: { targetPlayerId: 'p2' }, note: 'ignored',
+      actionContext: { targetPlayerId: 'p2' },
     }))).not.toThrow()
-    expect(admit({ type: 'xor', optional: true, promptKey: 'prompt.choose', sourceCard: CARD_ID, children: [leaf('gain')], label: 'ignored' }))
+    expect(admit({ type: 'xor', optional: true, promptKey: 'prompt.choose', sourceCard: CARD_ID, children: [leaf('gain')] }))
       .not.toThrow()
+  })
+
+  it('rejects a field that is not a node field at all, such as a misspelling', () => {
+    expect(admit(leaf('gain', { food: 1 }, { optoinal: true })))
+      .toThrow("flow: flow field 'optoinal' is not in the Workshop Capability Contract")
+    expect(admit({ type: 'seq', childs: [], children: [leaf('gain')] }))
+      .toThrow("flow: flow field 'childs' is not in the Workshop Capability Contract")
   })
 
   it.each(['optionId', 'choiceLabelKey', 'choiceLabelParams', 'effectPreview', 'targetPlayerId', 'expandFlow'])(

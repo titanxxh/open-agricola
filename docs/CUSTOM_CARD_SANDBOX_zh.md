@@ -603,7 +603,7 @@ return {
 { type: 'seq', children: [gainLeaf(CARD_ID, { food: 1 }), gainLeaf(CARD_ID, { wood: 1 })] }
 ```
 
-`optional` 是节点上的布尔字段，不是另一种节点类型。节点还可以带 `promptKey` 和 `anytimeWindow`，leaf 可以带 `actionContext`。其余原生节点字段不对工坊卡开放，返回 flow 时会被拒绝：`mode`、`triggerSelectOnce`、`expandFlow`、`optionId`、`choiceLabelKey`、`choiceLabelParams`、`effectPreview`、`anytimeActionId`，以及节点级的 `targetPlayerId`。节点、listener 返回值和 `followUpActions` 条目上的 `sourceCard` 必须是 `CARD_ID`。没写 `sourceCard` 的 leaf，以及带 flow 但没写它的 listener 返回值，会被归到本卡。返回流程的 effect hook 直接返回 flow；listener 返回 `{ flow, sourceCard: CARD_ID }`（或其文档规定的查询结果）。
+`optional` 是节点上的布尔字段，不是另一种节点类型。节点还可以带 `promptKey` 和 `anytimeWindow`，leaf 可以带 `actionContext`。其余原生节点字段不对工坊卡开放，返回 flow 时会被拒绝：`mode`、`triggerSelectOnce`、`expandFlow`、`optionId`、`choiceLabelKey`、`choiceLabelParams`、`effectPreview`、`anytimeActionId`，以及节点级的 `targetPlayerId`。节点上的其他任何字段同样被拒绝，所以 `optoinal` 这样的拼写错误会报错，不会被悄悄忽略。节点、listener 返回值和 `followUpActions` 条目上的 `sourceCard` 必须是 `CARD_ID`。没写 `sourceCard` 的 leaf，以及带 flow 但没写它的 listener 返回值，会被归到本卡。返回流程的 effect hook 直接返回 flow；listener 返回 `{ flow, sourceCard: CARD_ID }`（或其文档规定的查询结果）。
 
 执行前，AST 校验会拒绝可静态识别的组合节点字面量：缺少 `children`，或其值明显不是数组。这覆盖 flow hook 的直接返回、嵌套的字面量 children，以及 listener 的 `flow` / `alternativeFlow` 结果。校验不会把 leaf 参数或卡牌私有数据当作 flow，也不推断动态 helper 结果或 spread 提供的 children。静态通过后仍需试玩验证行为。
 

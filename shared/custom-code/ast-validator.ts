@@ -11,6 +11,7 @@
 import ts from 'typescript'
 import { cardEffectHooks, flowCardEffectHooks, isHandCardEffectHook } from '../cards/card-effects'
 import { REAL_RESOURCE_KEYS } from '../contract/resource-keys'
+import { isOpenFlowField } from './flow-admission'
 import { isSandboxActionId, isSandboxSpecialEffectKind } from './sandbox-action-ids'
 import { isSandboxListenerAction } from './sandbox-listener-actions'
 import { sandboxListenerPhases } from './sandbox-listener-phases'
@@ -119,6 +120,17 @@ function validateLiteralFlow(
   const properties = [...expression.properties].reverse()
   const type = properties.find(property => getStaticPropertyName(property, constants) === 'type')
   const kind = type && ts.isPropertyAssignment(type) ? getStaticStringValue(type.initializer, constants) : undefined
+  if (kind === 'leaf' || (kind && ['seq', 'or', 'xor', 'parallel'].includes(kind))) {
+    const hasChildren = properties.some(property => getStaticPropertyName(property, constants) === 'children')
+    for (const property of expression.properties) {
+      const field = getStaticPropertyName(property, constants)!
+      // A group written with items or steps gets the dedicated children message below.
+      if (kind !== 'leaf' && !hasChildren && (field === 'items' || field === 'steps')) continue
+      if (!isOpenFlowField(kind === 'leaf' ? 'leaf' : 'group', field)) {
+        errors.push(`line ${getLine(property)}: flow field '${field}' is not available to Workshop cards`)
+      }
+    }
+  }
   if (kind === 'leaf') {
     validateLiteralLeaf(properties, errors, getLine, constants)
     return
