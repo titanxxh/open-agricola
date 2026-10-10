@@ -138,7 +138,7 @@ export const invokeCustomCodeEffectSync = (
   }
   if (!response.ok) return response
   try {
-    assertCustomEffectResult(request.hook, response.result)
+    assertCustomEffectResult(request.hook, response.result, request.cardId)
     return response
   } catch (error) {
     return outsideContract(error)

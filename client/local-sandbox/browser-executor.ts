@@ -225,7 +225,7 @@ __result = typeof __handler === 'function'
         __input_paymentInfo: request.paymentInfo ?? null,
       },
     )
-    assertCustomEffectResult(request.hook, result)
+    assertCustomEffectResult(request.hook, result, request.cardId)
     return { ok: true, result: (result ?? null) as ActionFlow | null }
   } catch (error) {
     return {

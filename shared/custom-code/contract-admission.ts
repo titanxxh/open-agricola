@@ -88,6 +88,6 @@ export function normalizeCustomManifest(raw: RawCustomManifest, cardId: string):
 }
 
 /** Flow hooks may only return contract flows; query hooks keep their own result shapes. */
-export function assertCustomEffectResult(hook: string, result: unknown): void {
-  if (FLOW_RESULT_HOOKS.has(hook)) assertCustomFlow(result, hook)
+export function assertCustomEffectResult(hook: string, result: unknown, cardId: string): void {
+  if (FLOW_RESULT_HOOKS.has(hook)) assertCustomFlow(result, cardId, hook)
 }

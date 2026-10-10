@@ -28,4 +28,12 @@ describe('validateCustomListenerResult', () => {
     expect(() => validateCustomListenerResult(result, 'CUSTOM_Test'))
       .toThrow(`${detail} is not in the Workshop Capability Contract`)
   })
+
+  it.each([
+    [{ sourceCard: 'E033_BeaverColony' }, 'result'],
+    [{ flow: { type: 'leaf', actionId: 'gain', sourceCard: 'E033_BeaverColony' } }, 'flow'],
+    [{ followUpActions: [{ actionId: 'gain', sourceCard: 'E033_BeaverColony' }] }, 'followUpActions[0]'],
+  ])('rejects a result attributed to another card', (result, path) => {
+    expect(() => validateCustomListenerResult(result, 'CUSTOM_Test')).toThrow(`${path}: sourceCard must be this card's id`)
+  })
 })

@@ -52,14 +52,16 @@ describe('normalizeCustomManifest', () => {
 
 describe('assertCustomEffectResult', () => {
   it.each(['onBuy', 'onRoundStart', 'resolveChoice', 'contributeExtraTurn'])('checks the flow returned by %s', (hook) => {
-    expect(() => assertCustomEffectResult(hook, { type: 'leaf', actionId: 'gain', params: { food: 1 } })).not.toThrow()
-    expect(() => assertCustomEffectResult(hook, { type: 'leaf', actionId: 'plow' }))
+    expect(() => assertCustomEffectResult(hook, { type: 'leaf', actionId: 'gain', params: { food: 1 } }, CARD_ID)).not.toThrow()
+    expect(() => assertCustomEffectResult(hook, { type: 'leaf', actionId: 'plow' }, CARD_ID))
       .toThrow(`${hook}: actionId 'plow' is not in the Workshop Capability Contract`)
+    expect(() => assertCustomEffectResult(hook, { type: 'leaf', actionId: 'gain', sourceCard: 'A001_Other' }, CARD_ID))
+      .toThrow(`${hook}: sourceCard must be this card's id`)
   })
 
   it('leaves query hook results to their native consumers', () => {
-    expect(() => assertCustomEffectResult('computeBonusScore', 3)).not.toThrow()
-    expect(() => assertCustomEffectResult('onBeforePlayerTurn', { skipTurn: true })).not.toThrow()
-    expect(() => assertCustomEffectResult('onComputeAnimalZones', [{ type: 'card' }])).not.toThrow()
+    expect(() => assertCustomEffectResult('computeBonusScore', 3, CARD_ID)).not.toThrow()
+    expect(() => assertCustomEffectResult('onBeforePlayerTurn', { skipTurn: true }, CARD_ID)).not.toThrow()
+    expect(() => assertCustomEffectResult('onComputeAnimalZones', [{ type: 'card' }], CARD_ID)).not.toThrow()
   })
 })

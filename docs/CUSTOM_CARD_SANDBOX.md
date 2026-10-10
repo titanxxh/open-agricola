@@ -554,7 +554,7 @@ A leaf uses `{ type: 'leaf', actionId, params, sourceCard: CARD_ID }`. Composite
 { type: 'seq', children: [gainLeaf(CARD_ID, { food: 1 }), gainLeaf(CARD_ID, { wood: 1 })] }
 ```
 
-`optional` is a boolean on a node, not another node type. Flow effect hooks return the flow directly; listeners return `{ flow, sourceCard: CARD_ID }` (or their documented query result).
+`optional` is a boolean on a node, not another node type. A node may also carry `promptKey` and `anytimeWindow`, and a leaf may carry `actionContext`. The other native node fields are not open to Workshop cards and are rejected when a flow is returned: `mode`, `triggerSelectOnce`, `expandFlow`, `optionId`, `choiceLabelKey`, `choiceLabelParams`, `effectPreview`, `anytimeActionId`, and node-level `targetPlayerId`. A `sourceCard` on a node, on a listener result, or on a `followUpActions` entry must be `CARD_ID`. Flow effect hooks return the flow directly; listeners return `{ flow, sourceCard: CARD_ID }` (or their documented query result).
 
 Before execution, the AST validator rejects inspectable composite literals that omit `children` or provide a statically non-array value. This includes direct flow-hook returns, nested literal children, and listeners' `flow` / `alternativeFlow` results. It does not mistake arbitrary leaf parameters or private card data for flows, and does not infer dynamic helper results or spread-provided children. Static success still requires behavioral playtesting.
 
@@ -611,13 +611,15 @@ Each mutation is a `special-effect` leaf with `sourceCard: CARD_ID`. Its `params
 
 // Write player.cardStates[sourceCard].extraData[key]
 { kind: 'set-extra-data', key: 'foo', value: 1 } // internal
+
+// Write player.cardStates[sourceCard].privateData[key]; readCardExtraData does not return it
 { kind: 'set-private-data', key: 'secret', value: 'owner only' }
 
 // Add amount to player.cardStates[sourceCard].extraData[key]
 { kind: 'increment-extra-data', key: 'used', amount: 1 }
 ```
 
-These seven kinds are the complete sandbox set, held in `SANDBOX_SPECIAL_EFFECT_KINDS`. The repository uses other kinds, such as `emit-card-triggered` for visible card-trigger event logs. They are not part of the Workshop contract, and a `special-effect` leaf that uses one is rejected.
+These seven kinds are the complete sandbox set, held in `SANDBOX_SPECIAL_EFFECT_KINDS`. The repository uses other kinds, such as `emit-card-triggered` for visible card-trigger event logs. They are not part of the Workshop contract, and a `special-effect` leaf that uses one is rejected. So is a listed kind whose fields do not have the types shown above: `key` and `text` are strings, `amount` and `value` of the counter and increment kinds are finite numbers, and `flag` is a boolean.
 
 Optional `actionContext.targetPlayerId?: string` routes a mutation to the matching player in `state.players`; it defaults to the actor in `context.player`. Workshop rarely needs it except for cross-player cases such as D134 Oyster Eater.
 
@@ -717,6 +719,7 @@ CI catches a missing set update.
 
 [ADR 0025](adr/0025-workshop-capability-contract-is-fail-closed-and-opened-by-tests.md) sets the rules for this document.
 
+- **The contract covers names, node fields, and the documented `special-effect` shapes.** Parameters of the other actions are validated by their native consumers, exactly as for native cards; admission does not mirror those rules.
 - **Not listed means not open.** The deployed contract, source validation, and both executors accept the same names: the hooks in section 3.1, the listener actions, phases, and scopes in sections 3.2 and 3.4, the action IDs in section 6, and the `special-effect` kinds in section 6.1. This document does not list unopened native interfaces. Candidates are tracked in [issue #1079](https://github.com/titanxxh/open-agricola/issues/1079).
 - **A name is open only with a fixed behavior test.** Each name needs at least one test that drives it through a two-player `GameSession` without changing native rule paths. Open a new capability in its own issue, with that test.
 - **A failed hook and an out-of-contract result behave the same way.** The first occurrence rejects the command, restores the state before it, and returns the error, which names the rejected action, kind, or field. A repeated identical failure is not reported again: the command then succeeds and that card's effect is skipped. This is deliberate, so a game that contains a faulty card can continue.
@@ -729,7 +732,7 @@ Admission serves honest authors and model mistakes. It does not bound adversaria
 
 | Date | Change |
 |---|---|
-| 2026-10-10 | Made the contract fail-closed (ADR 0025): enforced action IDs and `special-effect` kinds in source validation and both executors, rejected unsupported listener fields and the undocumented `beforeEndGameScope` / `beforeEndGameMandatory` metadata, bound every listener to its own card and omitted listener filters to the listed sets, and documented the hook-failure behavior. |
+| 2026-10-10 | Made the contract fail-closed (ADR 0025): enforced action IDs and `special-effect` kinds in source validation and both executors, rejected unsupported listener fields and the undocumented `beforeEndGameScope` / `beforeEndGameMandatory` metadata, bound every listener and returned node to its own card and omitted listener filters to the listed sets, rejected unopened native node fields and malformed `special-effect` fields, and documented the hook-failure behavior. |
 | 2026-08-04 | Made discounts across all improvement candidates mandatory capped bonuses; completed and narrowed the `handHooks` manifest; required a direct accessor-free effect object literal plus host filtering; unified `positionKey({row,col})`; removed Workshop candidate-and-settlement hooks that cannot settle completely; added semantic contracts and M11 live, record, and replay guards. |
 | 2026-04-30 | Refactored scoring into two tracks: removed `computePostScore`, `scoringPriority`, and `ctx.reserved`; added `computeCostedBonus` through the Pareto solver. The archived spec and plan remain in Git history. |
 | 2026-04-24 | Corrected `computeBonusScore`, `computePostScore`, and `computeSharedPostScore` signatures; added the listener-action-ID, anytime, and unavailable-`futureMeeplesNode` guidance; registered `flag-card` and `future-meeples`. Findings came from the LLM card-generation session suite. |
