@@ -163,6 +163,7 @@ describe('auth routes', () => {
   beforeEach(async () => {
     wsServerMocks.endRoomsForUser.mockClear()
     wsServerMocks.closeUserConnections.mockClear()
+    vi.mocked(exchangeOAuthCode).mockReset()
     vi.stubEnv('REPLAY_TRUST_PROXY', 'true')
     process.env.DISABLE_RATE_LIMIT = '1'
     process.env.ACCOUNT_REGISTRATION_POLICY = 'open'
@@ -1483,68 +1484,126 @@ describe('auth routes', () => {
     expect(res.status).toBe(404)
   })
 
-  it('rejects link callback when provider identity is already linked to another user', async () => {
-    const linkedUser = await createLocalUserForTests('linkeduser', 'password123', 'Linked User')
-    const currentUser = await createLocalUserForTests('currentuser', 'password123', 'Current User')
-    const profile = {
-      provider: 'github' as const,
-      providerUserId: 'gh-linked',
-      providerLogin: 'linked-gh',
-      emailVerified: true,
+  describe.each(['github', 'google'] as const)('%s account linking', (provider) => {
+    async function startLink(userId: string) {
+      const token = await createSession(userId)
+      const headers = { Cookie: `oa_session=${token}`, Origin: 'https://app.example' }
+      process.env.PUBLIC_APP_ORIGIN = 'https://app.example/open-agricola/'
+      const start = await requestJson('POST', `/api/auth/oauth/${provider}/start?intent=link`, {}, headers)
+      expect(start.status).toBe(200)
+      expect(start.json.ok).toBe(true)
+      expect(start.headers['Set-Cookie']).toBeUndefined()
+      const state = new URL(String(start.json.authorizationUrl)).searchParams.get('state')!
+      return { state, headers }
     }
-    ;(await linkIdentity(linkedUser.id, profile))
-    vi.mocked(exchangeOAuthCode).mockResolvedValueOnce(profile)
 
-    const state = (await createOAuthState({ provider: 'github', intent: 'link', userId: currentUser.id }))
-    const currentToken = (await createSession(currentUser.id))
-    const res = await requestJson(
-      'GET',
-      `/api/auth/oauth/github/callback?code=ok&state=${state}`,
-      undefined,
-      { Cookie: `${oauthCookieForState(state)}; oa_session=${currentToken}` },
-    )
+    it('returns a cookie-free callback handoff and completes under the original session', async () => {
+      const user = await createLocalUserForTests(`link_${provider}`, 'password123', 'Link User')
+      const { state, headers } = await startLink(user.id)
+      const profile = { provider, providerUserId: `${provider}-link`, emailVerified: true }
+      vi.mocked(exchangeOAuthCode).mockResolvedValueOnce(profile)
+      const callback = await requestJson('GET', `/api/auth/oauth/${provider}/callback?state=${state}&code=secret-code`)
+      expect(callback.status).toBe(302)
+      const location = new URL(String(callback.headers.Location))
+      expect(location.pathname).toBe('/open-agricola/')
+      expect(location.search).toBe('?page=settings')
+      expect(location.search).not.toContain('secret-code')
+      expect(new URLSearchParams(location.hash.slice(1))).toEqual(new URLSearchParams({
+        accountLinkProvider: provider, accountLinkState: state, accountLinkCode: 'secret-code',
+      }))
+      expect(await findIdentity(provider, profile.providerUserId)).toBeNull()
+      const complete = await requestJson('POST', `/api/auth/oauth/${provider}/complete`, {
+        state, code: 'secret-code',
+      }, headers)
+      expect(complete.status).toBe(200)
+      expect(complete.json).toMatchObject({ ok: true })
+      expect(await getDb().prepare('SELECT account_pkce_verifier FROM oauth_states WHERE used_at IS NOT NULL').get()).toEqual({ account_pkce_verifier: null })
+      expect(await findIdentity(provider, profile.providerUserId)).toEqual({ userId: user.id })
+      expect(exchangeOAuthCode).toHaveBeenCalledWith(provider, 'secret-code', expect.anything(), expect.anything(), expect.stringMatching(/^[\w-]{43}$/))
+      const replay = await requestJson('POST', `/api/auth/oauth/${provider}/complete`, { state, code: 'secret-code' }, headers)
+      expect(replay.status).toBe(400)
+      expect(replay.json.code).toBe('oauth_state_invalid')
+    })
 
-    expect(res.status).toBe(302)
-    expect(res.headers.Location).toContain('page=settings')
-    expect(res.headers.Location).toContain('authError=oauth_identity_taken')
-    expect(res.headers['Set-Cookie']).toContain(`${OAUTH_STATE_COOKIE}=;`)
-    expect(res.headers['Set-Cookie']).not.toContain('oa_session=')
-    expect((await getDb().prepare('SELECT COUNT(*) AS count FROM sessions').get())).toMatchObject({ count: 1 })
+    it('rejects unauthenticated, foreign-user and wrong-provider completion without consuming owner state', async () => {
+      const user = await createLocalUserForTests(`owner_${provider}`, 'password123', 'Owner')
+      const other = await createLocalUserForTests(`other_${provider}`, 'password123', 'Other')
+      const { state, headers } = await startLink(user.id)
+      const body = { state, code: 'code' }
+      const anonymous = await requestJson('POST', `/api/auth/oauth/${provider}/complete`, body)
+      expect(anonymous.status).toBe(401)
+      const foreign = await requestJson('POST', `/api/auth/oauth/${provider}/complete`, body, {
+        ...headers, Cookie: `oa_session=${await createSession(other.id)}`,
+      })
+      expect(foreign.status).toBe(400)
+      const wrong = provider === 'github' ? 'google' : 'github'
+      expect((await requestJson('POST', `/api/auth/oauth/${wrong}/complete`, body, headers)).status).toBe(400)
+      const profile = { provider, providerUserId: `${provider}-owner`, emailVerified: true }
+      vi.mocked(exchangeOAuthCode).mockResolvedValueOnce(profile)
+      expect((await requestJson('POST', `/api/auth/oauth/${provider}/complete`, body, headers)).status).toBe(200)
+      expect(await findIdentity(provider, profile.providerUserId)).toEqual({ userId: user.id })
+    })
+
+    it('returns cancellation to settings and leaves identities unchanged', async () => {
+      const user = await createLocalUserForTests(`cancel_${provider}`, 'password123', 'Cancel')
+      const { state, headers } = await startLink(user.id)
+      const callback = await requestJson('GET', `/api/auth/oauth/${provider}/callback?state=${state}&error=access_denied`)
+      const location = new URL(String(callback.headers.Location))
+      expect(location.search).toBe('?page=settings')
+      expect(new URLSearchParams(location.hash.slice(1)).get('accountLinkError')).toBe('oauth_cancelled')
+      const complete = await requestJson('POST', `/api/auth/oauth/${provider}/complete`, { state, error: 'oauth_cancelled' }, headers)
+      expect(complete.status).toBe(400)
+      expect(complete.json.code).toBe('oauth_cancelled')
+      expect((await requestJson('GET', '/api/auth/identities', undefined, headers)).json.identities).toEqual([])
+    })
+
+    it('rejects expired and non-link states and reports provider failures', async () => {
+      const user = await createLocalUserForTests(`expired_${provider}`, 'password123', 'Expired')
+      const { state, headers } = await startLink(user.id)
+      await getDb().exec('UPDATE oauth_states SET expires_at = 0')
+      const expired = await requestJson('POST', `/api/auth/oauth/${provider}/complete`, { state, code: 'code' }, headers)
+      expect(expired.json.code).toBe('oauth_state_invalid')
+      const loginState = await createOAuthState({ provider, intent: 'login', userId: user.id })
+      expect((await requestJson('POST', `/api/auth/oauth/${provider}/complete`, { state: loginState, code: 'code' }, headers)).json.code).toBe('oauth_state_invalid')
+      const retry = await startLink(user.id)
+      vi.mocked(exchangeOAuthCode).mockRejectedValueOnce(new Error('provider unavailable'))
+      expect((await requestJson('POST', `/api/auth/oauth/${provider}/complete`, { state: retry.state, code: 'code' }, headers)).json.code).toBe('oauth_profile_failed')
+    })
+
+    it('preserves identity uniqueness and never creates a new login session on linking', async () => {
+      const owner = await createLocalUserForTests(`taken_${provider}`, 'password123', 'Taken')
+      const user = await createLocalUserForTests(`current_${provider}`, 'password123', 'Current')
+      const profile = { provider, providerUserId: `${provider}-taken`, emailVerified: true }
+      await linkIdentity(owner.id, profile)
+      const { state, headers } = await startLink(user.id)
+      vi.mocked(exchangeOAuthCode).mockResolvedValueOnce(profile)
+      const complete = await requestJson('POST', `/api/auth/oauth/${provider}/complete`, { state, code: 'code' }, headers)
+      expect(complete.status).toBe(409)
+      expect(complete.json.code).toBe('oauth_identity_taken')
+      expect(complete.headers['Set-Cookie']).toBeUndefined()
+      expect(await findIdentity(provider, profile.providerUserId)).toEqual({ userId: owner.id })
+      expect(await getDb().prepare('SELECT COUNT(*) AS count FROM sessions').get()).toMatchObject({ count: 1 })
+    })
+
+    it('requires an authenticated trusted POST to start linking', async () => {
+      expect((await requestJson('POST', `/api/auth/oauth/${provider}/start?intent=link`, {})).status).toBe(401)
+      const user = await createLocalUserForTests(`csrf_${provider}`, 'password123', 'CSRF')
+      const token = await createSession(user.id)
+      expect((await requestJson('POST', `/api/auth/oauth/${provider}/start?intent=link`, {}, {
+        Cookie: `oa_session=${token}`, Origin: 'https://untrusted.example',
+      })).status).toBe(403)
+    })
   })
 
-  it('rejects link callback without a matching current session cookie', async () => {
-    const stateUser = await createLocalUserForTests('stateuser', 'password123', 'State User')
-    const otherUser = await createLocalUserForTests('otheruser', 'password123', 'Other User')
-    const profile = {
-      provider: 'github' as const,
-      providerUserId: 'gh-session-required',
-      providerLogin: 'session-required-gh',
-      emailVerified: true,
-    }
-    const state = (await createOAuthState({ provider: 'github', intent: 'link', userId: stateUser.id }))
-
-    const noCookie = await requestJson(
-      'GET',
-      `/api/auth/oauth/github/callback?code=ok&state=${state}`,
-      undefined,
-      { Cookie: oauthCookieForState(state) },
-    )
-    expect(noCookie.status).toBe(302)
-    expect(noCookie.headers.Location).toContain('page=settings')
-    expect(noCookie.headers.Location).toContain('authError=not_authenticated')
-    expect((await findIdentity('github', 'gh-session-required'))).toBeNull()
-
-    const secondState = (await createOAuthState({ provider: 'github', intent: 'link', userId: stateUser.id }))
-    const otherToken = (await createSession(otherUser.id))
-    const mismatch = await requestJson(
-      'GET',
-      `/api/auth/oauth/github/callback?code=ok&state=${secondState}`,
-      undefined,
-      { Cookie: `${oauthCookieForState(secondState)}; oa_session=${otherToken}` },
-    )
-    expect(mismatch.status).toBe(302)
-    expect(mismatch.headers.Location).toContain('authError=not_authenticated')
-    expect((await findIdentity('github', 'gh-session-required'))).toBeNull()
+  it('rejects link states without PKCE even when callback cookies are present', async () => {
+    const user = await createLocalUserForTests('unsafe_link', 'password123', 'Unsafe Link')
+    const state = await createOAuthState({ provider: 'github', intent: 'link', userId: user.id })
+    const callback = await requestJson('GET', `/api/auth/oauth/github/callback?code=ok&state=${state}`, undefined, {
+      Cookie: `${oauthCookieForState(state)}; oa_session=${await createSession(user.id)}`,
+    })
+    expect(callback.status).toBe(302)
+    expect(callback.headers.Location).toContain('page=settings&authError=oauth_state_invalid')
+    expect(await getDb().prepare('SELECT COUNT(*) AS count FROM auth_identities').get()).toMatchObject({ count: 0 })
   })
 
   it('binds OAuth callback state to the initiating browser cookie', async () => {

@@ -25,24 +25,21 @@ export function buildOAuthCallbackUrl(provider: OAuthProvider, req: IncomingMess
   return `${deriveBaseUrl(req)}/api/auth/oauth/${provider}/callback`
 }
 
-export function buildOAuthAuthorizationUrl(provider: OAuthProvider, state: string, req: IncomingMessage): string {
+export function buildOAuthAuthorizationUrl(provider: OAuthProvider, state: string, req: IncomingMessage, codeChallenge?: string): string {
   assertOAuthProvider(provider)
-  const redirectUri = buildOAuthCallbackUrl(provider, req)
-  if (provider === 'github') {
-    const url = new URL('https://github.com/login/oauth/authorize')
-    url.searchParams.set('client_id', accountOAuthClientId(provider))
-    url.searchParams.set('redirect_uri', redirectUri)
-    url.searchParams.set('scope', 'read:user user:email')
-    url.searchParams.set('state', state)
-    return url.toString()
-  }
-
-  const url = new URL('https://accounts.google.com/o/oauth2/v2/auth')
+  const url = URL.parse(provider === 'github'
+    ? 'https://github.com/login/oauth/authorize'
+    : 'https://accounts.google.com/o/oauth2/v2/auth')
+  if (!url) throw new Error('invalid oauth endpoint')
   url.searchParams.set('client_id', accountOAuthClientId(provider))
-  url.searchParams.set('redirect_uri', redirectUri)
-  url.searchParams.set('response_type', 'code')
-  url.searchParams.set('scope', 'openid profile email')
+  url.searchParams.set('redirect_uri', buildOAuthCallbackUrl(provider, req))
+  if (provider === 'google') url.searchParams.set('response_type', 'code')
+  url.searchParams.set('scope', provider === 'github' ? 'read:user user:email' : 'openid profile email')
   url.searchParams.set('state', state)
+  if (codeChallenge) {
+    url.searchParams.set('code_challenge', codeChallenge)
+    url.searchParams.set('code_challenge_method', 'S256')
+  }
   return url.toString()
 }
 
@@ -51,10 +48,11 @@ export async function exchangeOAuthCode(
   code: string,
   req: IncomingMessage,
   fetchImpl: typeof fetch = fetch,
+  codeVerifier?: string,
 ): Promise<OAuthProfile> {
   assertOAuthProvider(provider)
   if (provider === 'github') {
-    return exchangeGitHubOAuthCode(code, buildOAuthCallbackUrl(provider, req), fetchImpl)
+    return exchangeGitHubOAuthCode(code, buildOAuthCallbackUrl(provider, req), fetchImpl, codeVerifier)
   }
-  return exchangeGoogleOAuthCode(code, buildOAuthCallbackUrl(provider, req), fetchImpl)
+  return exchangeGoogleOAuthCode(code, buildOAuthCallbackUrl(provider, req), fetchImpl, codeVerifier)
 }

@@ -51,6 +51,7 @@ import { createInvite, listInvites, revokeInvite } from './invites.ts'
 import {
   handleLinkedIdentities,
   handleOAuthCallback,
+  handleOAuthLinkComplete,
   handleOAuthStart,
   handleOnboardingComplete,
   handleRegistrationPolicy,
@@ -487,8 +488,12 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
   // ── Auth routes ────────────────────────────────────────
   if (req.url?.startsWith('/api/auth/oauth/')) {
     const url = new URL(req.url, `http://${req.headers.host ?? 'localhost'}`)
-    if (req.method === 'GET' && url.pathname.endsWith('/start')) {
-      ;(await handleOAuthStart(req, res, url))
+    if ((req.method === 'GET' || req.method === 'POST') && url.pathname.endsWith('/start')) {
+      await handleOAuthStart(req, res, url, requestUser)
+      return
+    }
+    if (req.method === 'POST' && url.pathname.endsWith('/complete')) {
+      await handleOAuthLinkComplete(req, res, url, requestUser)
       return
     }
     if (req.method === 'GET' && url.pathname.endsWith('/callback')) {

@@ -1388,7 +1388,12 @@ The main thread retains only a nonexecuting mirror of the latest successful snap
 - `POST /api/game/load`: load test state;
 - `POST /api/game/dev/*`: single-player debugging and E2E setup;
 - `POST /api/game/new-sandbox`: create an independent `GameSession` without a WebSocket Room;
-- `GET /cards-manifest.json`: card metadata fetched by the main bundle at startup.
+- `GET /cards-manifest.json`: card metadata fetched by the main bundle at startup;
+- `POST /api/auth/oauth/:provider/start?intent=link`: authenticated GitHub / Google binding start, returning the provider authorization URL with PKCE S256;
+- `GET /api/auth/oauth/:provider/callback`: login/registration callback, or a cookie-free binding handoff to `?page=settings` with short-lived state/code (or cancellation) in the URL fragment;
+- `POST /api/auth/oauth/:provider/complete`: binding completion in the original frontend cookie partition. It atomically consumes a live binding state matching the current site user and provider before exchanging the code; it never creates a new site session.
+
+`client/app/useAccountLinking.ts` removes handoff fragment fields before submitting once, including during StrictMode effect replay, and refreshes linked identities on success. Errors remain in Settings rather than being normalized into the authenticated homepage. Binding does not widen account OAuth scopes or use the Issue Submission Connection's tokens or encryption keys.
 
 HTTP serves operations, tests, and debugging; it is not the real-time synchronization path. Responses match `SessionResponse`. Validation endpoints are pure and never write authoritative state. Inside a WebSocket Room, development commands should use `ClientCommand`.
 
@@ -1451,7 +1456,7 @@ The following tables remain in use:
 
 - `rooms` and `room_players` for active recovery snapshots and site-seat ownership;
 - `game_results` and `game_result_players` for completed scalar results, Replay Participant names, and internal user associations;
-- `oauth_states`, extended with an encrypted PKCE verifier under its existing short-lived state and `returnTo` lifecycle.
+- `oauth_states`, extended with an encrypted Bug Report PKCE verifier under its existing short-lived state and `returnTo` lifecycle. Account binding uses the separate server-only `account_pkce_verifier` column, valid for ten minutes and cleared on consumption; no new deployment secret is needed.
 
 Do not add Replay Segment, Reported Evidence payload, quota-counter, or webhook-delivery tables. `checkpointStepNo` represents Segments. `bug_reports.evidence_expires_at` protects a shared Segment only while the Context is incomplete; normal completion switches to the permanent Replay Archive. Report and attempt rows answer quotas and the sitewide GitHub sending window of 20 requests per minute. Revocation webhook operations are intrinsically idempotent.
 

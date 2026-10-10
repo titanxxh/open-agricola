@@ -2,6 +2,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { StrictMode } from 'react'
 import { SettingsPage } from '../SettingsPage'
 
 const apiFetchMock = vi.fn()
@@ -30,6 +31,9 @@ const labels: Record<string, string> = {
   'platform.notLinked': '未绑定',
   'platform.linkGithub': '绑定 GitHub',
   'platform.linkGoogle': '绑定 Google',
+  'platform.accountLinked': '账号绑定成功',
+  'platform.authErrors.oauth_cancelled': '授权已取消',
+  'platform.authErrors.not_authenticated': '请先登录',
   'platform.adminInvites': '邀请注册',
   'platform.bugReport.settingsTitle': 'GitHub Issue 提交',
   'platform.bugReport.settingsConnected': '已连接 Issue 提交身份',
@@ -110,6 +114,60 @@ afterEach(() => {
 })
 
 describe('SettingsPage', () => {
+  it.each(['GitHub', 'Google'])('starts %s linking via a credentialed POST and displays failures without navigating', async (name) => {
+    apiFetchMock.mockResolvedValue(new Response(JSON.stringify({ ok: true, identities: [] })))
+    const fetchMock = vi.fn(async (input: string | URL | Request) => new Response(JSON.stringify(
+      String(input).includes('/start') ? { ok: false, code: 'not_authenticated' } : { ok: true, enabled: false },
+    ), { status: String(input).includes('/start') ? 401 : 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+    render(<SettingsPage />)
+    await userEvent.click(screen.getByRole('button', { name: `绑定 ${name}` }))
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/auth/oauth/${name.toLowerCase()}/start?intent=link`,
+      expect.objectContaining({ method: 'POST', credentials: 'include' }),
+    )
+    expect(await screen.findByRole('alert')).toHaveTextContent('请先登录')
+    expect(window.location.search).not.toContain('page=login')
+  })
+
+  it.each(['github', 'google'])('completes %s handoff once, clears secrets and reloads linked identities', async (provider) => {
+    window.history.replaceState(null, '', `/?page=settings#accountLinkProvider=${provider}&accountLinkState=state&accountLinkCode=code`)
+    apiFetchMock.mockResolvedValue(new Response(JSON.stringify({ ok: true, identities: [] })))
+    const fetchMock = vi.fn(async (input: string | URL | Request) => new Response(JSON.stringify(
+      String(input).includes('/complete') ? { ok: true } : { ok: true, enabled: false },
+    )))
+    vi.stubGlobal('fetch', fetchMock)
+    render(<SettingsPage />)
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(`/api/auth/oauth/${provider}/complete`, expect.objectContaining({
+      method: 'POST', credentials: 'include', body: JSON.stringify({ state: 'state', code: 'code' }),
+    })))
+    expect(window.location.hash).toBe('')
+    expect(await screen.findByRole('status')).toHaveTextContent('账号绑定成功')
+    await waitFor(() => expect(apiFetchMock.mock.calls.filter(([url]) => url === '/api/auth/identities')).toHaveLength(2))
+  })
+
+  it('does not submit a callback twice during StrictMode effect replay', async () => {
+    window.history.replaceState(null, '', '/?page=settings#accountLinkProvider=github&accountLinkState=state&accountLinkCode=code')
+    apiFetchMock.mockResolvedValue(new Response(JSON.stringify({ ok: true, identities: [] })))
+    const fetchMock = vi.fn(async (_input: string | URL | Request) => new Response(JSON.stringify({ ok: true, enabled: false })))
+    vi.stubGlobal('fetch', fetchMock)
+    render(<StrictMode><SettingsPage /></StrictMode>)
+    expect(await screen.findByRole('status')).toHaveTextContent('账号绑定成功')
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith('/complete'))).toHaveLength(1)
+  })
+
+  it('keeps cancelled authorization visible in settings', async () => {
+    window.history.replaceState(null, '', '/?page=settings#accountLinkProvider=google&accountLinkState=state&accountLinkError=oauth_cancelled')
+    apiFetchMock.mockResolvedValue(new Response(JSON.stringify({ ok: true, identities: [] })))
+    vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => new Response(JSON.stringify(
+      String(input).includes('/complete') ? { ok: false, code: 'oauth_cancelled' } : { ok: true, enabled: false },
+    ), { status: String(input).includes('/complete') ? 400 : 200 })))
+    render(<SettingsPage />)
+    expect(await screen.findByRole('alert')).toHaveTextContent('授权已取消')
+    expect(window.location.hash).toBe('')
+    expect(window.location.search).toBe('?page=settings')
+  })
+
   it('uses the Open Agricola wordmark as the home link', () => {
     apiFetchMock.mockResolvedValueOnce(
       new Response(JSON.stringify({ ok: true, identities: [] })),

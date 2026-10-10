@@ -35,6 +35,7 @@ export async function exchangeGitHubOAuthCode(
   code: string,
   redirectUri: string,
   fetchImpl: typeof fetch,
+  codeVerifier?: string,
 ): Promise<OAuthProfile> {
   const tokenResponse = await fetchImpl('https://github.com/login/oauth/access_token', {
     method: 'POST',
@@ -44,6 +45,7 @@ export async function exchangeGitHubOAuthCode(
       client_secret: clientSecret(),
       code,
       redirect_uri: redirectUri,
+      ...(codeVerifier ? { code_verifier: codeVerifier } : {}),
     }),
   })
   const tokenData = await readJson<GitHubTokenResponse>(tokenResponse)

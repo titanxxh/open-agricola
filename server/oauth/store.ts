@@ -11,6 +11,7 @@ type OAuthStateRow = {
   user_id: string | null
   return_to: string | null
   invite_code_hash: string | null
+  account_pkce_verifier: string | null
 }
 
 type OnboardingTicketRow = {
@@ -50,13 +51,14 @@ export async function createOAuthState(input: {
   userId?: string
   returnTo?: string
   inviteCodeHash?: string
+  accountPkceVerifier?: string
 }): Promise<Awaited<string>> {
   const raw = createRawSecret()
   const now = Date.now()
   ;(await pruneExpiredOAuthRows(now))
   ;(await getDb().prepare(`
-    INSERT INTO oauth_states (state_hash, provider, intent, user_id, return_to, invite_code_hash, expires_at, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO oauth_states (state_hash, provider, intent, user_id, return_to, invite_code_hash, expires_at, created_at, account_pkce_verifier)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     hashSecret(raw),
     input.provider,
@@ -66,26 +68,12 @@ export async function createOAuthState(input: {
     input.inviteCodeHash ?? null,
     now + STATE_TTL_MS,
     now,
+    input.accountPkceVerifier ?? null,
   ))
   return raw
 }
 
-export async function consumeOAuthState(rawState: string): Promise<Awaited<{
-  provider: OAuthProvider
-  intent: OAuthIntent
-  userId?: string
-  returnTo?: string
-  inviteCodeHash?: string
-} | null>> {
-  const db = getDb()
-  const stateHash = hashSecret(rawState)
-  const now = Date.now()
-  const row = (await db.prepare(`
-    UPDATE oauth_states SET used_at = ?
-    WHERE state_hash = ? AND used_at IS NULL AND expires_at > ?
-    RETURNING provider, intent, user_id, return_to, invite_code_hash
-  `).get(now, stateHash, now)) as OAuthStateRow | undefined
-
+function stateFromRow(row: OAuthStateRow | undefined) {
   if (!row) return null
   return {
     provider: row.provider,
@@ -93,7 +81,31 @@ export async function consumeOAuthState(rawState: string): Promise<Awaited<{
     ...(row.user_id ? { userId: row.user_id } : {}),
     ...(row.return_to ? { returnTo: row.return_to } : {}),
     ...(row.invite_code_hash ? { inviteCodeHash: row.invite_code_hash } : {}),
+    ...(row.account_pkce_verifier ? { accountPkceVerifier: row.account_pkce_verifier } : {}),
   }
+}
+
+export async function getOAuthState(rawState: string) {
+  const row = await getDb().prepare(`
+    SELECT provider, intent, user_id, return_to, invite_code_hash, account_pkce_verifier
+    FROM oauth_states WHERE state_hash = ? AND used_at IS NULL AND expires_at > ?
+  `).get(hashSecret(rawState), Date.now()) as OAuthStateRow | undefined
+  return stateFromRow(row)
+}
+
+export async function consumeOAuthState(rawState: string, owner?: { provider: OAuthProvider; userId: string }) {
+  const now = Date.now()
+  const db = getDb()
+  const row = await db.prepare(`
+    UPDATE oauth_states SET used_at = ?
+    WHERE state_hash = ? AND used_at IS NULL AND expires_at > ?
+    AND (?::text IS NULL OR (provider = ? AND intent = 'link' AND user_id = ? AND account_pkce_verifier IS NOT NULL))
+    RETURNING provider, intent, user_id, return_to, invite_code_hash, account_pkce_verifier
+  `).get(now, hashSecret(rawState), now, owner?.userId ?? null, owner?.provider ?? null, owner?.userId ?? null) as OAuthStateRow | undefined
+  if (row?.account_pkce_verifier) {
+    await db.prepare('UPDATE oauth_states SET account_pkce_verifier = NULL WHERE state_hash = ?').run(hashSecret(rawState))
+  }
+  return stateFromRow(row)
 }
 
 export async function findIdentity(provider: OAuthProvider, providerUserId: string): Promise<Awaited<{ userId: string } | null>> {

@@ -82,6 +82,14 @@ describe('PageRouter auth routes', () => {
     await waitFor(() => expect(window.location.pathname + window.location.search).toBe('/'))
   })
 
+  it('preserves OAuth errors for authenticated users instead of silently returning home', async () => {
+    stubMe({ ok: true, user: { id: 'u1', username: 'host', displayName: 'Host' } })
+    window.history.replaceState(null, '', '/?page=login&authError=not_authenticated')
+    renderWithAuth()
+    expect(await screen.findByText('Settings Page')).toBeInTheDocument()
+    await waitFor(() => expect(window.location.search).toBe('?page=settings&authError=not_authenticated'))
+  })
+
   it('normalizes authenticated login page back to lobby navigation', async () => {
     stubMe({ ok: true, user: { id: 'u1', username: 'host', displayName: 'Host' } })
     window.history.replaceState(null, '', '/?page=login')

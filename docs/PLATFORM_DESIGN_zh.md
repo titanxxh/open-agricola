@@ -30,7 +30,7 @@
 
 - 支持密码注册（邮箱验证）与 GitHub / Google OAuth
 - 登录创建不透明 session token（`crypto.randomUUID()`），存入 `sessions` 表，7 天过期
-- 浏览器通过 HttpOnly session cookie 访问 HTTP 与 WebSocket
+- 浏览器通过 HttpOnly session cookie 访问 HTTP 与 WebSocket。跨站密码登录使用分区 cookie，因此 GitHub / Google 账号绑定在原前端顶层上下文中用携带凭据的 POST 发起和完成，不在后端导航上下文中检查原 session。provider callback 将受 PKCE 保护的交接返回设置页，错误保留在该页；登录/注册和独立的 Issue Submission Connection 仍走各自流程。
 - WebSocket 协议仍支持 `{ type: 'auth', token: '...' }` 显式认证
 - 单服务器不需要 JWT 的无状态优势；服务端 session 支持即时吊销
 
