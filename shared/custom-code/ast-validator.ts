@@ -75,7 +75,7 @@ function validateLiteralLeaf(
 ): void {
   const initializer = (name: string): ts.Expression | undefined => {
     const property = properties.find(candidate => getStaticPropertyName(candidate, constants) === name)
-    return property && ts.isPropertyAssignment(property) ? property.initializer : undefined
+    return property && ts.isPropertyAssignment(property) ? unwrapExpression(property.initializer) : undefined
   }
   const actionIdNode = initializer('actionId')
   const actionId = actionIdNode && getStaticStringValue(actionIdNode, constants)
@@ -117,7 +117,8 @@ function validateLiteralLeaf(
 }
 
 /** The kind of a literal as written in source; undefined for anything computed. */
-function literalKind(expression: ts.Expression): ControlFieldLiteral | 'array' | 'other' | undefined {
+function literalKind(input: ts.Expression): ControlFieldLiteral | 'array' | 'other' | undefined {
+  const expression = unwrapExpression(input)
   if (expression.kind === ts.SyntaxKind.TrueKeyword || expression.kind === ts.SyntaxKind.FalseKeyword) return 'boolean'
   if (ts.isStringLiteralLike(expression)) return 'string'
   if (ts.isObjectLiteralExpression(expression)) return 'object'
@@ -133,7 +134,7 @@ function isAnytimeWindowLiteral(literal: ts.ObjectLiteralExpression, constants: 
   let hasAllowed = false
   for (const property of literal.properties) {
     const key = getStaticPropertyName(property, constants)
-    const value = ts.isPropertyAssignment(property) ? property.initializer : undefined
+    const value = ts.isPropertyAssignment(property) ? unwrapExpression(property.initializer) : undefined
     const written = value && literalKind(value)
     if (key === 'allowed') {
       hasAllowed = true
@@ -159,9 +160,7 @@ function validateLiteralFlow(
   getLine: (node: ts.Node) => number,
   constants: Map<string, string>,
 ): void {
-  while (ts.isParenthesizedExpression(expression) || ts.isAsExpression(expression)
-    || ts.isTypeAssertionExpression(expression) || ts.isNonNullExpression(expression)
-    || ts.isSatisfiesExpression(expression)) expression = expression.expression
+  expression = unwrapExpression(expression)
   if (ts.isConditionalExpression(expression)) {
     validateLiteralFlow(expression.whenTrue, errors, getLine, constants)
     validateLiteralFlow(expression.whenFalse, errors, getLine, constants)
@@ -182,7 +181,7 @@ function validateLiteralFlow(
         errors.push(`line ${getLine(property)}: flow field '${field}' is not available to Workshop cards`)
       }
       const control = controlFieldExpectation(field)
-      const value = control && ts.isPropertyAssignment(property) ? property.initializer : undefined
+      const value = control && ts.isPropertyAssignment(property) ? unwrapExpression(property.initializer) : undefined
       const written = value && literalKind(value)
       const wrongShape = field === 'anytimeWindow' && value !== undefined && ts.isObjectLiteralExpression(value)
         && !isAnytimeWindowLiteral(value, constants)
@@ -235,10 +234,8 @@ function validateFlowHookReturns(
   ts.forEachChild(hook.body, visit)
 }
 
-function getStaticStringValue(
-  input: ts.Expression,
-  constants: Map<string, string>,
-): string | undefined {
+/** Parentheses and type-only wrappers do not change the value an expression holds. */
+function unwrapExpression(input: ts.Expression): ts.Expression {
   let expression = input
   while (
     ts.isParenthesizedExpression(expression)
@@ -247,6 +244,14 @@ function getStaticStringValue(
     || ts.isNonNullExpression(expression)
     || ts.isSatisfiesExpression(expression)
   ) expression = expression.expression
+  return expression
+}
+
+function getStaticStringValue(
+  input: ts.Expression,
+  constants: Map<string, string>,
+): string | undefined {
+  const expression = unwrapExpression(input)
   if (ts.isStringLiteral(expression) || ts.isNoSubstitutionTemplateLiteral(expression)) {
     return expression.text
   }
