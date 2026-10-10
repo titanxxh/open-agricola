@@ -125,6 +125,8 @@ describe('admitCustomFlow', () => {
     [{ kind: 'increment-counter', key: 'uses', amount: '1' }, "special-effect 'increment-counter' requires amount to be a finite number"],
     [{ kind: 'set-counter', key: 'uses', value: null }, "special-effect 'set-counter' requires value to be a finite number"],
     [{ kind: 'increment-extra-data', amount: 1 }, "special-effect 'increment-extra-data' requires key to be a string"],
+    [{ kind: 'set-extra-data', key: 'note' }, "special-effect 'set-extra-data' requires value to be present"],
+    [{ kind: 'set-private-data', key: 'secret', value: undefined }, "special-effect 'set-private-data' requires value to be present"],
   ])('rejects a special-effect outside its documented shape', (params, message) => {
     expect(admit(leaf('special-effect', params))).toThrow(`flow: ${message}`)
   })

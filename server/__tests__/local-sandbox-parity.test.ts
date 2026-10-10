@@ -6,7 +6,7 @@
  */
 import { afterEach, describe, expect, it } from 'vitest'
 import { clearCustomCards } from '../../shared/cards/custom-registry.ts'
-import { runCardEffectHook } from '../../shared/cards/card-effects.ts'
+import { getCardEffect, runCardEffectHook } from '../../shared/cards/card-effects.ts'
 import { createInitialState } from '../../shared/session/state-bootstrap.ts'
 import { GameCore } from '../../shared/session/session-core.ts'
 import type { CustomCardData } from '../../shared/cards/session-card-context.ts'
@@ -221,6 +221,31 @@ const CARD_IMPL = {
     const local = invokeCustomCodeEffectLocal(request)
     expect(server).toEqual({ ok: false, error: expect.stringContaining('parity boom') })
     expect(local).toEqual({ ok: false, error: expect.stringContaining('parity boom') })
+  })
+
+  it('registers only the open metadata of an older saved manifest on both registrars', () => {
+    const compiled = validateAndCompileCustomCode(CARD_SOURCE, 'CUSTOM_ParityCard')
+    expect(compiled.valid).toBe(true)
+    if (!compiled.valid) return
+    const legacyMetadata = { handHooks: ['onReturnHome', 'onBuy'], beforeEndGameScope: 'allPlayers', beforeEndGameMandatory: true }
+    const cardData = cardDataFrom(compiled.compiledCode, { ...compiled.manifest, effectMetadata: legacyMetadata as never })
+
+    const serverSession = new GameSession(42, [cardData])
+    const serverEffect = serverSession.withCtx(() => getCardEffect('CUSTOM_ParityCard'))
+    serverSession.dispose()
+    const localCore = new GameCore({
+      stateOrSeed: 42,
+      customCards: [cardData],
+      registerCustomCardImpl: registerBrowserBackedCustomCard,
+    })
+    const localEffect = localCore.withCtx(() => getCardEffect('CUSTOM_ParityCard'))
+    localCore.dispose()
+
+    for (const effect of [serverEffect, localEffect]) {
+      expect(effect?.handHooks).toEqual(['onReturnHome'])
+      expect(effect).not.toHaveProperty('beforeEndGameScope')
+      expect(effect).not.toHaveProperty('beforeEndGameMandatory')
+    }
   })
 
   it('surfaces runtime failures as cardWarnings on both registrars', () => {
