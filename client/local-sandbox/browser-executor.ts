@@ -21,6 +21,7 @@ import { HELPERS_INJECTION_SOURCE } from '../../shared/custom-code/injected-help
 import type { ActionFlow } from '../../shared/contract/types.ts'
 import { assertCustomEffectResult, normalizeCustomManifest, type RawCustomManifest } from '../../shared/custom-code/contract-admission.ts'
 import { validateCustomListenerResult } from '../../shared/custom-code/listener-result-validator.ts'
+import { sandboxEffectMetadataKeys, sandboxListenerDataFields } from '../../shared/custom-code/sandbox-declarations.ts'
 import type {
   CustomCodeEffectInvocation,
   CustomCodeEffectResult,
@@ -132,18 +133,31 @@ function runManifestExtraction(compiledCode: string, cardId: string): {
       if (Array.isArray(eff.handHooks)) {
         __effectMetadata.handHooks = eff.handHooks;
       }
+      var __metadataKeys = ${JSON.stringify(sandboxEffectMetadataKeys)};
+      for (var m = 0; m < __metadataKeys.length; m++) {
+        if (Object.prototype.hasOwnProperty.call(eff, __metadataKeys[m])) {
+          __effectMetadata[__metadataKeys[m]] = eff[__metadataKeys[m]];
+        }
+      }
     }
     if (__captured.CARD_IMPL && Array.isArray(__captured.CARD_IMPL.listeners)) {
       for (var i = 0; i < __captured.CARD_IMPL.listeners.length; i++) {
         var listener = __captured.CARD_IMPL.listeners[i];
         var registrationId = ${JSON.stringify(cardId)} + ':listener:' + i;
-        __listeners.push({
+        var __entry = {
           registrationId: registrationId,
           cardIds: Array.isArray(listener.cardIds) ? listener.cardIds : undefined,
           actions: Array.isArray(listener.actions) ? listener.actions : undefined,
           phases: Array.isArray(listener.phases) ? listener.phases : undefined,
           scope: listener.scope,
-        });
+        };
+        var __dataFields = ${JSON.stringify(sandboxListenerDataFields)};
+        for (var d = 0; d < __dataFields.length; d++) {
+          // JSON would drop a function and hide the declaration from admission.
+          var __value = listener[__dataFields[d]];
+          __entry[__dataFields[d]] = typeof __value === 'function' ? '[function]' : __value;
+        }
+        __listeners.push(__entry);
       }
     }
     return JSON.stringify({
@@ -213,7 +227,7 @@ export const invokeCustomCodeEffectLocal = (
 var __eff = __captured.CARD_IMPL && __captured.CARD_IMPL.effect;
 var __handler = __eff && __eff[${JSON.stringify(request.hook)}];
 __result = typeof __handler === 'function'
-  ? __handler(__input_state, __input_player, __input_paymentInfo)
+  ? __handler.apply(undefined, [__input_state, __input_player, __input_paymentInfo].concat(__input_extraArgs))
   : null;
 // JSON would turn NaN or Infinity into null and hide the mistake.
 if (typeof __result === 'number' && !isFinite(__result)) throw new Error('returned a non-finite number');
@@ -226,6 +240,7 @@ if (typeof __result === 'number' && !isFinite(__result)) throw new Error('return
         __input_state: request.state,
         __input_player: request.player,
         __input_paymentInfo: request.paymentInfo ?? null,
+        __input_extraArgs: request.extraArgs ?? [],
       },
     )
     assertCustomEffectResult(request.hook, result, request.cardId)

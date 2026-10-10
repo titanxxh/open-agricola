@@ -71,6 +71,7 @@ export interface EffectRequest {
   state: unknown
   player: unknown
   paymentInfo?: unknown
+  extraArgs?: unknown[]
 }
 
 export interface ListenerRequest {
@@ -92,7 +93,7 @@ export function invokeEffect(request: EffectRequest): InvokeResult {
 var __eff = __captured.CARD_IMPL && __captured.CARD_IMPL.effect;
 var __handler = __eff && __eff[${JSON.stringify(request.hook)}];
 __result = typeof __handler === 'function'
-  ? __handler(__input_state, __input_player, __input_paymentInfo)
+  ? __handler.apply(undefined, [__input_state, __input_player, __input_paymentInfo].concat(__input_extraArgs))
   : null;
 // JSON would turn NaN or Infinity into null and hide the mistake.
 if (typeof __result === 'number' && !isFinite(__result)) throw new Error('returned a non-finite number');
@@ -105,6 +106,7 @@ if (typeof __result === 'number' && !isFinite(__result)) throw new Error('return
         __input_state: request.state,
         __input_player: request.player,
         __input_paymentInfo: request.paymentInfo ?? null,
+        __input_extraArgs: request.extraArgs ?? [],
       },
     )
     return { ok: true, result: result ?? null }

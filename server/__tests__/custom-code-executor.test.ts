@@ -38,14 +38,13 @@ afterEach(() => {
 })
 
 describe('custom code executor', () => {
-  // `selection` is not in the Workshop Capability Contract, so only the native card covers it.
-  it.each([{ mode: 'native', kind: 'selection' }, { mode: 'native', kind: 'pay' }, { mode: 'sandbox', kind: 'pay' }])(
+  it.each([{ mode: 'native', kind: 'selection' }, { mode: 'sandbox', kind: 'selection' }, { mode: 'native', kind: 'pay' }, { mode: 'sandbox', kind: 'pay' }])(
     'uses a source-owned quantity and current-step window through $mode / $kind, including restoration', ({ mode, kind }) => {
     const flow: ActionFlow = { type: 'leaf', actionId: kind, sourceCard: 'CUSTOM_ExecutorCard', optional: true,
       promptKey: 'ui.interactionOptionalAction', anytimeWindow: { allowed: true },
       ...(kind === 'pay'
         ? { params: { cost: { fees: [{ food: 1 }, { wood: 1 }] } } }
-        : { actionContext: { selectionKind: 'farm-position', selectableTiles: [{ row: 0, col: 1 }], minSelections: 1, maxSelections: 1 } }) }
+        : { actionContext: { selectableTiles: [{ row: 0, col: 1 }], minSelections: 1, maxSelections: 1 } }) }
     const compileSandboxCard = () => {
       const compiled = validateAndCompileCustomCode(`
 const CARD_ID = 'CUSTOM_ExecutorCard'
@@ -290,7 +289,7 @@ const CARD_IMPL = {
     expect(getCardEffect('CUSTOM_ExecutorCard')).toMatchObject({ handHooks: ['onBeforeStartOfTurn'] })
   })
 
-  it('registers only the open metadata of a manifest saved before the contract was narrowed', () => {
+  it('registers only the open, well-typed metadata of an already saved manifest', () => {
     const result = validateAndCompileCustomCode(`
 const CARD_ID = 'CUSTOM_ExecutorCard'
 const CARD_DEF = MinorImprovement({ id: CARD_ID, name: 'Executor Card' })
@@ -300,15 +299,19 @@ const CARD_IMPL = {
     `, 'CUSTOM_ExecutorCard')
     expect(result.valid).toBe(true)
     if (!result.valid) return
-    const legacyMetadata = { handHooks: ['onBeforeStartOfTurn', 'onBuy'], beforeEndGameScope: 'allPlayers', beforeEndGameMandatory: true }
-    const cardData = makeCardData(result.compiledCode, { ...result.manifest, effectMetadata: legacyMetadata as never })
+    const savedMetadata = {
+      handHooks: ['onBeforeStartOfTurn', 'onBuy'], beforeEndGameScope: 'allPlayers', beforeEndGameMandatory: 'false', paymentPaths: [],
+    }
+    const cardData = makeCardData(result.compiledCode, { ...result.manifest, effectMetadata: savedMetadata as never })
     registerCustomCard(cardData, { allowGlobal: true })
     registerExecutorBackedCustomCard(cardData)
 
     const effect = getCardEffect('CUSTOM_ExecutorCard')!
     expect(effect.handHooks).toEqual(['onBeforeStartOfTurn'])
-    expect(effect).not.toHaveProperty('beforeEndGameScope')
+    expect(effect.beforeEndGameScope).toBe('allPlayers')
+    // The string would be read as true; an unopened key is never copied.
     expect(effect).not.toHaveProperty('beforeEndGameMandatory')
+    expect(effect).not.toHaveProperty('paymentPaths')
   })
 
   it('dispatches a supported custom hand hook through a real session stage', () => {
@@ -346,21 +349,36 @@ const CARD_IMPL = {
     expect(response.state.players[0]!.resources.food).toBe(1)
   })
 
-  it('does not expose shared animal zone hooks without executor argument plumbing', () => {
+  it('passes the fourth and fifth argument to the hooks that document them, and to no other hook', () => {
     const result = validateAndCompileCustomCode(`
 const CARD_ID = 'CUSTOM_ExecutorCard'
 const CARD_DEF = MinorImprovement({ id: CARD_ID, name: 'Executor Card' })
 const CARD_IMPL = {
   effect: {
     id: CARD_ID,
-    onComputeSharedAnimalZones: () => [],
+    computeBreedThreshold: (state, player, animalType, ctx) => ctx.sourceCard === 'harvest' ? 1 : 2,
+    computeBreedableAnimalCount: (state, player, animalType, currentCount, ctx) => currentCount + (ctx.sourceCard === 'harvest' ? 10 : 0),
+    computeAnimalScoreAdjustment: (state, player, animalType, ctx) => ctx.baseScore + ctx.quantity,
+    onComputeSharedAnimalZones: (owner, animalOwner, zones, state) => [{ id: 'round-' + state.round, zoneType: 'card', capacity: zones.length }],
+    getInvalidAnimals: (player, zone, meeples, state) => state === undefined ? meeples : [],
   },
 }
     `, 'CUSTOM_ExecutorCard')
+    expect(result.valid).toBe(true)
+    if (!result.valid) return
+    const cardData = makeCardData(result.compiledCode, result.manifest)
+    registerCustomCard(cardData, { allowGlobal: true })
+    registerExecutorBackedCustomCard(cardData)
+    const state = createInitialState(42)
+    const [owner, opponent] = state.players
+    const effect = getCardEffect('CUSTOM_ExecutorCard')!
 
-    expect(result.valid).toBe(false)
-    if (result.valid) return
-    expect(result.errors.join('\n')).toContain("unknown effect hook 'onComputeSharedAnimalZones'")
+    expect(effect.computeBreedThreshold!(state, owner!, 'sheep', { sourceCard: 'harvest' })).toBe(1)
+    expect(effect.computeBreedableAnimalCount!(state, owner!, 'sheep', 3, { sourceCard: 'harvest' })).toBe(13)
+    expect(effect.computeAnimalScoreAdjustment!(state, owner!, 'horse', { quantity: 2, baseScore: 5, categoryKey: 'horses' })).toBe(7)
+    expect(effect.onComputeSharedAnimalZones!(owner!, opponent!, [], state)).toEqual([{ id: `round-${state.round}`, zoneType: 'card', capacity: 0 }])
+    // getInvalidAnimals keeps its documented three arguments: the state is not passed.
+    expect(effect.getInvalidAnimals!(owner!, { id: 'zone' } as never, [{ type: 'sheep' }], state)).toEqual([{ type: 'sheep' }])
   })
 
   it('rejects forbidden globals during validation', () => {

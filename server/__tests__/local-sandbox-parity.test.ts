@@ -174,9 +174,9 @@ describe('browser executor parity with server executor', () => {
 const CARD_ID = 'CUSTOM_ParityCard'
 const CARD_DEF = MinorImprovement({ id: CARD_ID, name: 'Parity Card' })
 const CARD_IMPL = {
-  effect: { id: CARD_ID, onRoundStart: () => ({ type: 'leaf', actionId: ['pl', 'ow'].join(''), sourceCard: CARD_ID }) },
+  effect: { id: CARD_ID, onRoundStart: () => ({ type: 'leaf', actionId: ['place', 'farmer'].join('-'), sourceCard: CARD_ID }) },
   listeners: [{ cardIds: [CARD_ID], actions: ['collect'], phases: ['after'],
-    handler: () => ({ flow: { type: 'seq', children: [{ type: 'leaf', actionId: ['so', 'w'].join(''), sourceCard: CARD_ID }] } }) }],
+    handler: () => ({ flow: { type: 'seq', children: [{ type: 'leaf', actionId: ['col', 'lect'].join(''), sourceCard: CARD_ID }] } }) }],
 }
 `
     const compiled = validateAndCompileCustomCode(source, 'CUSTOM_ParityCard')
@@ -190,13 +190,29 @@ const CARD_IMPL = {
     const listener = { ...base, registrationId: 'CUSTOM_ParityCard:listener:0',
       context: { state, player: state.players[0]!, space: state.actionSpaces[0]!, actionId: 'collect', phase: 'after' as const } }
 
-    const effectRejection = { ok: false, error: "onRoundStart: actionId 'plow' is not in the Workshop Capability Contract" }
+    const effectRejection = { ok: false, error: "onRoundStart: actionId 'place-farmer' is not in the Workshop Capability Contract" }
     expect(invokeCustomCodeEffectSync(effect)).toEqual(effectRejection)
     expect(invokeCustomCodeEffectLocal(effect)).toEqual(effectRejection)
 
-    const listenerRejection = { ok: false, error: "flow.children[0]: actionId 'sow' is not in the Workshop Capability Contract" }
+    const listenerRejection = { ok: false, error: "flow.children[0]: actionId 'collect' is not in the Workshop Capability Contract" }
     expect(invokeCustomCodeListenerSync(listener as never)).toEqual(listenerRejection)
     expect(invokeCustomCodeListenerLocal(listener as never)).toEqual(listenerRejection)
+  })
+
+  it.each([
+    [`effect: { id: CARD_ID, beforeEndGameMandatory: 'false', onBeforeEndGame: () => undefined }`, 'effect beforeEndGameMandatory must be a boolean'],
+    [`listeners: [{ phases: ['anytime'], replacesTurn: 1, handler: () => undefined }]`, 'listener replacesTurn must be a boolean'],
+    // A function would vanish in serialization and leave the listener optional.
+    [`listeners: [{ actions: ['collect'], phases: ['before'], mandatory: () => true, handler: () => undefined }]`, 'listener mandatory must be a boolean'],
+  ])('rejects a declaration of the wrong type identically when saving: %s', (impl, message) => {
+    const source = `
+const CARD_ID = 'CUSTOM_ParityCard'
+const CARD_DEF = MinorImprovement({ id: CARD_ID, name: 'Parity Card' })
+const CARD_IMPL = { ${impl} }
+`
+    const rejection = { valid: false, errors: [`Compilation failed: ${message}`] }
+    expect(validateAndCompileCustomCode(source, 'CUSTOM_ParityCard')).toEqual(rejection)
+    expect(validateAndCompileCustomCodeLocal(source, 'CUSTOM_ParityCard')).toEqual(rejection)
   })
 
   it.each(['NaN', 'Infinity', '-Infinity'])('rejects a hook returning %s identically, before serialization hides it', (value) => {
@@ -235,12 +251,12 @@ const CARD_IMPL = { effect: { id: CARD_ID, computeBonusScore: () => ${value} } }
     expect(local).toEqual({ ok: false, error: expect.stringContaining('parity boom') })
   })
 
-  it('registers only the open metadata of an older saved manifest on both registrars', () => {
+  it('registers only the open, well-typed metadata of an already saved manifest on both registrars', () => {
     const compiled = validateAndCompileCustomCode(CARD_SOURCE, 'CUSTOM_ParityCard')
     expect(compiled.valid).toBe(true)
     if (!compiled.valid) return
-    const legacyMetadata = { handHooks: ['onReturnHome', 'onBuy'], beforeEndGameScope: 'allPlayers', beforeEndGameMandatory: true }
-    const cardData = cardDataFrom(compiled.compiledCode, { ...compiled.manifest, effectMetadata: legacyMetadata as never })
+    const savedMetadata = { handHooks: ['onReturnHome', 'onBuy'], beforeEndGameScope: 'allPlayers', beforeEndGameMandatory: 'false', paymentPaths: [] }
+    const cardData = cardDataFrom(compiled.compiledCode, { ...compiled.manifest, effectMetadata: savedMetadata as never })
 
     const serverSession = new GameSession(42, [cardData])
     const serverEffect = serverSession.withCtx(() => getCardEffect('CUSTOM_ParityCard'))
@@ -255,8 +271,9 @@ const CARD_IMPL = { effect: { id: CARD_ID, computeBonusScore: () => ${value} } }
 
     for (const effect of [serverEffect, localEffect]) {
       expect(effect?.handHooks).toEqual(['onReturnHome'])
-      expect(effect).not.toHaveProperty('beforeEndGameScope')
+      expect(effect?.beforeEndGameScope).toBe('allPlayers')
       expect(effect).not.toHaveProperty('beforeEndGameMandatory')
+      expect(effect).not.toHaveProperty('paymentPaths')
     }
   })
 

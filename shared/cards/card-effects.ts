@@ -157,15 +157,17 @@ export const isHandCardEffectHook = (hook: string): hook is HandCardEffectHook =
  * `cardEffectHooks` below is the actual sandbox allowlist; this wider union also
  * retains official-only fields used by shared invocation types.
  *
- * `handHooks` (meta-field) and engine-internal adjuncts such as
- * `countExtraTurns` are deliberately excluded.
+ * Meta-fields such as `handHooks` are data, not functions, and are excluded.
  */
 export type CardEffectField = CardEffectHook
   | 'resolveChoice'
-  | 'contributeExtraTurn'
+  | 'contributeExtraTurn' | 'countExtraTurns'
   | 'computeBonusScore' | 'computeSharedPostScore' | 'computeCostedBonus'
+  | 'computeResourceCommitments'
   | 'computeExtraRoomCapacity'
   | 'computeHarvestBreedOrderPriority'
+  | 'enforceReorganizeOnLastHarvest'
+  | 'computeBreedThreshold' | 'computeBreedableAnimalCount' | 'computeAnimalScoreAdjustment'
   | 'onComputeAnimalZones' | 'onComputeSharedAnimalZones' | 'onComputeSowableFields' | 'onSowExtraField'
   | 'computeLockedFarmTiles'
   | 'getInvalidAnimals'
