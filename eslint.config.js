@@ -8,7 +8,8 @@ import { defineConfig, globalIgnores } from 'eslint/config'
 import { architectureImportRule } from './scripts/architecture-policy.mjs'
 
 export default defineConfig([
-  globalIgnores(['dist', '**/.build/**', '.worktree/**', '.scratch/**', '.gitnexus/**', 'scripts/__tests__/fixtures/**', 'public/**']),
+  // `output/` is git-ignored and holds run artifacts, including model-generated card sources.
+  globalIgnores(['dist', 'output/**', '**/.build/**', '.worktree/**', '.scratch/**', '.gitnexus/**', 'scripts/__tests__/fixtures/**', 'public/**']),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [

@@ -10,7 +10,7 @@
 - `fixtures.test.ts`：已知错误反例，验证固定测试能够发现相关回归。
 - `acceptance/`：浏览器生成入口、合成响应和共享费用账本；不维护另一份行为断言。
 - `scripts/llm-acceptance.ts`：owner 本机生成固定 case 源码，调用 Vitest 并记录用量。
-- `output/tmp/llm-acceptance/`：本地源码、manifest、Vitest 报告和费用快照；已被 Git 忽略，不提交运行产物。
+- `output/tmp/llm-acceptance/`：本地源码、manifest、Vitest 报告和费用快照；已被 Git 忽略，不提交运行产物，也不参与 lint。
 
 ## 运行
 
