@@ -33,18 +33,36 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
     expect(result.valid === false && result.errors.some(e => e.includes("unknown effect hook 'onMagicThing'"))).toBe(true)
   })
 
-  it('rejects animal effect hooks that require unsupported sandbox arguments', () => {
+  it('accepts the query hooks that receive a fourth and fifth argument', () => {
+    const result = validateCardCode(`
+      const CARD_IMPL = {
+        effect: {
+          id: 'test',
+          computeBreedThreshold: (state, player, animalType, ctx) => 1,
+          computeBreedableAnimalCount: (state, player, animalType, currentCount, ctx) => currentCount,
+          computeAnimalScoreAdjustment: (state, player, animalType, ctx) => 0,
+          onComputeSharedAnimalZones: (owner, animalOwner, zones, state) => [],
+          computeResourceCommitments: (state, owner) => [],
+          countExtraTurns: () => 1,
+          enforceReorganizeOnLastHarvest: () => false,
+        },
+      }
+    `)
+    expect(result).toEqual({ valid: true })
+  })
+
+  it('rejects effect hooks whose native settlement writes authoritative state', () => {
     const code = `
       const CARD_IMPL = {
         effect: {
           id: 'test',
-          computeBreedableAnimalCount: (state, player, animalType, currentCount) => currentCount,
+          consumeAnimalPayment: (state, player, animalType, amount) => amount,
         },
       }
     `
     const result = validateCardCode(code)
     expect(result.valid).toBe(false)
-    expect(result.valid === false && result.errors.some(e => e.includes("unknown effect hook 'computeBreedableAnimalCount'"))).toBe(true)
+    expect(result.valid === false && result.errors.some(e => e.includes("unknown effect hook 'consumeAnimalPayment'"))).toBe(true)
   })
 
   it('accepts valid listener phases', () => {
@@ -569,7 +587,7 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
 
   it('rejects indirect and non-string listener phases', () => {
     const code = `
-      const phases = ['computeExchanges']
+      const phases = ['computeCosts']
       const CARD_IMPL = {
         listeners: [
           { phases: phases, handler: (ctx) => {} },
@@ -665,21 +683,16 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
     expect(nestedImpl.valid === false && nestedImpl.errors.some(e => e.includes('CARD_IMPL must be declared as a top-level const'))).toBe(true)
   })
 
-  it('rejects computeExchanges for sandbox custom cards', () => {
-    const code = `
+  it('accepts the computeExchanges phase and rejects a phase the engine does not have', () => {
+    const listenerWithPhase = (phase: string) => validateCardCode(`
       const CARD_IMPL = {
-        listeners: [
-          {
-            id: 'test-listener',
-            phases: ['computeExchanges'],
-            handler: (ctx) => {},
-          },
-        ],
+        listeners: [{ id: 'test-listener', phases: ['${phase}'], handler: (ctx) => ({ extraExchanges: [] }) }],
       }
-    `
-    const result = validateCardCode(code)
-    expect(result.valid).toBe(false)
-    expect(result.valid === false && result.errors.some(e => e.includes("unknown listener phase 'computeExchanges'"))).toBe(true)
+    `)
+    expect(listenerWithPhase('computeExchanges')).toEqual({ valid: true })
+    const retired = listenerWithPhase('during')
+    expect(retired.valid).toBe(false)
+    expect(retired.valid === false && retired.errors.some(e => e.includes("unknown listener phase 'during'"))).toBe(true)
   })
 
   it('accepts handHooks as a meta field', () => {
@@ -696,12 +709,30 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
     expect(result.valid).toBe(true)
   })
 
-  it.each(['beforeEndGameScope', 'beforeEndGameMandatory'])('rejects the unopened end-game metadata %s', (key) => {
+  it('accepts the effect metadata beside the hooks', () => {
     const result = validateCardCode(`
       const CARD_IMPL = {
         effect: {
           id: 'test',
-          ${key}: ${key === 'beforeEndGameScope' ? "'allPlayers'" : 'true'},
+          beforeEndGameScope: 'allPlayers',
+          beforeEndGameMandatory: false,
+          preHarvestGoodsWanted: ['grain'],
+          preHarvestGoodsWantedBeforeReap: ['vegetable'],
+          maySkipHarvestFieldPhase: true,
+          extraTurnBeforeWorkers: true,
+          onBeforeEndGame: () => {},
+        },
+      }
+    `)
+    expect(result).toEqual({ valid: true })
+  })
+
+  it.each(['paymentPaths', 'projectInteractionRequest', 'computePastureCapacityModifiers'])('rejects the unopened effect key %s', (key) => {
+    const result = validateCardCode(`
+      const CARD_IMPL = {
+        effect: {
+          id: 'test',
+          ${key}: [],
           onBeforeEndGame: () => {},
         },
       }
@@ -709,7 +740,7 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
     expect(result).toEqual({ valid: false, errors: [expect.stringContaining(`unknown effect hook '${key}'`)] })
   })
 
-  it.each(['zones', 'mandatory', 'preScoring', 'replacesTurn', 'order', 'deriveCardCostCandidate'])(
+  it.each(['allowAnytimeReentry', 'monotoneFenceCost', 'cardCostCandidateMandatory', 'order', 'deriveCardCostCandidate'])(
     'rejects the listener field %s instead of dropping it', (field) => {
       const result = validateCardCode(`
         const CARD_IMPL = {
@@ -723,7 +754,9 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
     const result = validateCardCode(`
       const CARD_ID = 'CUSTOM_Test'
       const CARD_IMPL = {
-        listeners: [{ id: 'label', cardIds: [CARD_ID], actions: ['collect'], phases: ['after'], scope: 'any', handler: () => {} }],
+        listeners: [{ id: 'label', cardIds: [CARD_ID], actions: ['collect'], phases: ['after'], scope: 'any', handler: () => {} },
+          { phases: ['anytime'], zones: ['hand', 'played'], mandatory: true, preScoring: true, replacesTurn: false,
+            blockedAnytimeInteractionKinds: ['animal-reorg'], handler: () => {} }],
       }
     `)
     expect(result.valid).toBe(true)
@@ -753,28 +786,28 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
   it('rejects statically visible leaves outside the contract in flow positions', () => {
     const result = validateCardCode(`
       const CARD_ID = 'CUSTOM_Test'
-      const PLOW = 'plow'
+      const PLACE = 'place-farmer'
       const CARD_IMPL = {
         effect: {
-          onBuy: () => ({ type: 'leaf', actionId: 'selection', sourceCard: CARD_ID }),
+          onBuy: () => ({ type: 'leaf', actionId: 'collect', sourceCard: CARD_ID }),
           onRoundStart: () => ({ type: 'seq', children: [
-            { type: 'leaf', actionId: PLOW, sourceCard: CARD_ID },
+            { type: 'leaf', actionId: PLACE, sourceCard: CARD_ID },
             { type: 'leaf', actionId: 'special-effect', params: { kind: 'consume-supply-token', key: 'fence' }, sourceCard: CARD_ID },
             { type: 'leaf', actionId: 'special-effect', params: { kind: 'set-flag', flag: true }, sourceCard: 'E033_BeaverColony' },
             gainLeaf(CARD_ID, { food: 1 }),
           ] }),
         },
         listeners: [{ actions: ['collect'], phases: ['after'],
-          handler: () => ({ flow: { type: 'leaf', actionId: 'fence', sourceCard: CARD_ID } }) }],
+          handler: () => ({ flow: { type: 'leaf', actionId: 'receive', sourceCard: CARD_ID } }) }],
       }
     `)
     expect(result.valid).toBe(false)
     expect(result.valid === false && result.errors).toEqual([
-      "line 6: actionId 'selection' is not available to Workshop cards",
-      "line 8: actionId 'plow' is not available to Workshop cards",
+      "line 6: actionId 'collect' is not available to Workshop cards",
+      "line 8: actionId 'place-farmer' is not available to Workshop cards",
       "line 9: special-effect kind 'consume-supply-token' is not available to Workshop cards",
       'line 10: leaf sourceCard must be CARD_ID',
-      "line 15: actionId 'fence' is not available to Workshop cards",
+      "line 15: actionId 'receive' is not available to Workshop cards",
     ])
   })
 
@@ -801,16 +834,27 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
       const CARD_ID = 'CUSTOM_Test'
       const CARD_IMPL = {
         effect: {
-          contributeExtraTurn: () => ({ type: 'leaf', actionId: 'plow', sourceCard: CARD_ID }),
+          contributeExtraTurn: () => ({ type: 'leaf', actionId: 'place-farmer', sourceCard: CARD_ID }),
           onRoundStart: () => ({ type: 'leaf', actionId: 'gain', params: { food: 1 }, sourceCard: CARD_ID,
             actionContext: { targetPlayerId: 'p2', __hostOwnedListenerPhases: true } }),
+          onRoundEnd: () => ({ type: 'seq', children: [
+            { type: 'leaf', actionId: 'selection', sourceCard: CARD_ID, actionContext: { selectableTiles: [{ row: 0, col: 2 }] } },
+            { type: 'leaf', actionId: 'plow', sourceCard: CARD_ID, actionContext: { selectableTiles: [] } },
+            { type: 'leaf', actionId: 'reap', sourceCard: CARD_ID, actionContext: { trigger: { phase: 'harvest' } } },
+            { type: 'leaf', actionId: 'construct', sourceCard: CARD_ID, actionContext: { trueAction: false } },
+            { type: 'leaf', actionId: 'construct', sourceCard: CARD_ID, actionContext: { trueAction: 'false' } },
+          ] }),
         },
       }
     `)
     expect(result.valid).toBe(false)
     expect(result.valid === false && result.errors).toEqual([
-      "line 5: actionId 'plow' is not available to Workshop cards",
+      "line 5: actionId 'place-farmer' is not available to Workshop cards",
       "line 7: actionContext key '__hostOwnedListenerPhases' is not available to Workshop cards",
+      // selectableTiles belongs to the selection leaf only; a card never writes the reap trigger.
+      "line 10: actionContext key 'selectableTiles' is not available to Workshop cards",
+      "line 11: actionContext key 'trigger' is not available to Workshop cards",
+      'line 13: actionContext.trueAction must be a boolean',
     ])
   })
 

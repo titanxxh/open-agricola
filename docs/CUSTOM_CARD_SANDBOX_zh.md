@@ -209,6 +209,13 @@ const jsonSafe = JSON.parse(JSON.stringify(value ?? null))
 - `getBuiltSpecialStables`
 - `getRuleContributions`
 - `getStatePresentation`
+- `computeResourceCommitments`
+- `countExtraTurns`
+- `enforceReorganizeOnLastHarvest`
+- `computeBreedThreshold`
+- `computeBreedableAnimalCount`
+- `computeAnimalScoreAdjustment`
+- `onComputeSharedAnimalZones`
 <!-- prompt-sync:end id=card-effect-hooks -->
 
 
@@ -218,10 +225,22 @@ const jsonSafe = JSON.parse(JSON.stringify(value ?? null))
 
 reaction-compatible hook（action listener 的 `before` / `immediatelyAfter` / `after`、harvest field 三个 stage hook、`onBeforeEndGame`、`contributeExtraTurn`）不能依赖卡牌扫描顺序。多个同一时机可触发项会进入 `trigger-select`，由玩家选择来源卡后再执行。自定义卡应返回可重放 `ActionFlow` 表达状态修改；不要假设 handler 调用本身就是最终结算。
 
-`contributeExtraTurn` 返回的是本卡 extra-turn provider 的 flow；多张卡同时返回 provider 时，系统先展示 provider 来源卡，选中后才展开该 flow。`countExtraTurns` 是官方卡内部字段，Workshop 不暴露。
+`contributeExtraTurn` 返回的是本卡 extra-turn provider 的 flow；多张卡同时返回 provider 时，系统先展示 provider 来源卡，选中后才展开该 flow。`countExtraTurns(state, player)` 报告本卡本轮还能提供几次额外行动；不写时，只要 `contributeExtraTurn` 返回 flow 就算 1 次。引擎不会替卡牌统计已经用掉的次数：卡牌要在自己的状态里记录每次使用（例如在返回的 flow 里放一个 `increment-counter` leaf），两个 hook 都读这份状态。一直提供额外行动的卡会让这一轮无法结束。
 
 
-额外允许的 meta 字段（不在 `cardEffectHooks` 数组中，但 AST validator 放行）：`id`、`handHooks`。
+除 `id` 外，effect 还可以声明下面这些元数据。它们是数据，不是函数；类型不符（包括 `null`）时保存失败：
+
+| 元数据 | 类型 | 含义 |
+| --- | --- | --- |
+| `handHooks` | `HandCardEffectHook[]` | 卡牌还在手牌时也触发的 stage hook |
+| `beforeEndGameScope` | `'owner'` 或 `'allPlayers'` | `onBeforeEndGame` 为谁执行。默认 `'owner'`，只为持有者执行一次；`'allPlayers'` 为每名玩家各执行一次，返回的 flow 作用于那名玩家 |
+| `beforeEndGameMandatory` | `boolean` | 写 `false` 时玩家可以跳过 `onBeforeEndGame` 的效果；默认不询问，直接执行 |
+| `preHarvestGoodsWanted` | 资源名数组 | 本卡在收获阶段需要的物品。玩家缺少其中某种时（已算上田间阶段将收割的作物），引擎会在收获开始前提供他能产出该物品的收获期兑换 |
+| `preHarvestGoodsWantedBeforeReap` | 资源名数组 | 同上，但针对田间阶段之前就需要的物品：田里还没收割的作物不算 |
+| `maySkipHarvestFieldPhase` | `boolean` | 让上面的估算不把田间阶段的收成算进去 |
+| `extraTurnBeforeWorkers` | `boolean` | 持有者还有工人时，也把 `contributeExtraTurn` 的额外行动作为“放工人”之外的另一个选项提供 |
+
+只声明元数据、没有任何 hook 的 effect 也会注册。
 
 **进阶 hook 说明**：
 
@@ -241,9 +260,17 @@ reaction-compatible hook（action listener 的 `before` / `immediatelyAfter` / `
 | `getBuiltSpecialStables`                     | `(player) => FarmTilePosition[]`                                | 当前矗立的特殊 stable（驱动 snapshot `specialStables` 展示派生）    |
 | `getRuleContributions` | `(player) => CardRuleContributions` | 来源卡只读贡献组件预留或空格数量调整；有限、取整、非负并按类别上限约束 |
 | `getStatePresentation` | `(player) => CardStatePresentation` | 明确的公开计数、资源组、作物层和标记；普通客户端不读取内部状态 |
-| `handHooks`（meta）                            | `HandCardEffectHook[]`                                           | 声明哪些 stage hook 在卡牌还在手牌时也触发                          |
+| `computeResourceCommitments` | `(state, owner) => Array<{ playerId, resources }>` | 声明玩家必须留存的物品。一条命令如果会让被点名的玩家低于这个数量，就被拒绝并回滚。每条命令之后都会调用 |
+| `countExtraTurns` | `(state, player) => number` | 本卡本轮还能提供的额外行动次数，见上文 |
+| `enforceReorganizeOnLastHarvest` | `(state, player) => boolean` | 返回 `true` 时，第 14 轮收获的繁殖即使没有新生动物，也要求玩家重新安置一次动物 |
+| `computeBreedThreshold` | `(state, player, animalType, ctx) => number \| void` | 这种动物繁殖所需的数量。原生默认 2，取玩家各卡的最小值，最低为 1。收获繁殖时 `ctx.sourceCard` 为 `'harvest'`，`breed` leaf 触发时为卡牌 id |
+| `computeBreedableAnimalCount` | `(state, player, animalType, currentCount, ctx) => number \| void` | 计入繁殖判定的这种动物数量；返回调整后的数量 |
+| `computeAnimalScoreAdjustment` | `(state, player, animalType, ctx) => number \| void` | 给某个动物计分项加减分；`ctx` 含 `quantity`、`baseScore`、`categoryKey`。引擎只在 Farmers of the Moor 对局里为 `'horse'` 询问 |
+| `onComputeSharedAnimalZones` | `(owner, animalOwner, zones, state) => AnimalZone[]` | 本卡提供给其他每名玩家的动物分区。`owner` 是持卡者，`animalOwner` 是正在计算分区的那名玩家；持卡者自己的分区走 `onComputeAnimalZones`。只返回新增的 zones |
 
-查询类 hook 返回文档规定的顶层类型（数字、数组或对象），也可以不返回。类型不符或返回非有限数字（`NaN`、无穷大）按 hook 出错处理。出错或没有返回值的查询贡献一个中性结果：空数组；`computeBonusScore` 和 `computeExtraRoomCapacity` 为 `0`；其余为空。
+执行器把前三个位置参数传给 hook。上表里签名更长的四个 hook 还会收到后面的参数：`computeBreedThreshold`、`computeAnimalScoreAdjustment`、`onComputeSharedAnimalZones` 收到第四个，`computeBreedableAnimalCount` 收到第四和第五个。`resolveChoice` 和 `getInvalidAnimals` 仍然只有三个。
+
+查询类 hook 返回文档规定的顶层类型（数字、布尔值、数组或对象），也可以不返回。类型不符或返回非有限数字（`NaN`、无穷大）按 hook 出错处理。出错或没有返回值的查询贡献一个中性结果：空数组；`computeBonusScore` 和 `computeExtraRoomCapacity` 为 `0`；其余为空。
 
 额外播种与特殊 stable 都是“候选 + 结算”成对契约：`onComputeSowableFields` / `onSowExtraField`、`getSpecialStablePositions` / `applySpecialStable`。结算 hook 依赖原地修改宿主对象，沙盒的 JSON 快照无法回传，因此 Workshop 不暴露这两对 hook。`handHooks` 不支持 `onBuy`、`onEndTurn`、`onBeforeEndGame`、`onBeforePlayerTurn`；`CARD_IMPL.effect` 必须直接写对象字面量，禁止变量引用、spread、computed key 和 accessor，避免 hook 或 meta 字段绕过静态校验；server/browser manifest 还会在宿主侧过滤不支持的 hand hook。
 
@@ -254,11 +281,19 @@ reaction-compatible hook（action listener 的 `before` / `immediatelyAfter` / `
 
 ### 3.2 `CARD_IMPL.listeners` 白名单
 
-listener 条目只能声明 `handler`、`actions`、`phases`、`scope` 和 `cardIds`，另可带一个宿主会忽略的 `id` 标签。其他字段在保存时失败，因为 manifest 会丢弃它们。
+listener 条目可以声明 `handler`、`actions`、`phases`、`scope`、`cardIds`、下表的数据字段，另可带一个宿主会忽略的 `id` 标签。其他字段在保存时失败，因为 manifest 会丢弃它们。数据字段类型不符（包括 `null`）同样失败：引擎按真假值读取其中的布尔字段。
 
-listener 始终属于自己的卡：只有这张卡在 `scope` 选中的玩家面前已打出时才会触发，打出之前不会触发。`cardIds` 可以省略；如果写了，必须是 `[CARD_ID]`。
+| 字段 | 类型 | 含义 |
+| --- | --- | --- |
+| `zones` | 由 `'played'`、`'hand'` 组成的数组 | 卡牌在哪里时 listener 才触发。默认 `['played']`；`['hand']` 只在卡牌还在手牌时触发 |
+| `mandatory` | `boolean` | 同一时机有多个反应等待时，玩家选择执行顺序，其余可以放弃；标为强制的不能放弃。`before` 反应默认可放弃，除非这里写 `true` |
+| `preScoring` | `boolean` | 用于 `anytime` listener：在终局计分前的窗口里也提供它；未标记的 anytime listener 在这个窗口里不提供 |
+| `replacesTurn` | `boolean` | 用于 `anytime` listener：只在持有者轮到自己且空闲时提供，使用它就顶替这一回合的放工人 |
+| `blockedAnytimeInteractionKinds` | 交互类型数组 | 用于 `anytime` listener：玩家正在处理这些类型的交互（如 `'farm-select'`、`'animal-reorg'`）时隐藏这个入口 |
 
-省略 `actions` 或 `phases` 表示本节列出的集合；anytime listener 另加 anytime 身份。它不会匹配 `forest` 这类行动格 id，也不会匹配清单之外的原生行动和阶段。
+listener 始终属于自己的卡：只有这张卡在 `scope` 选中的玩家面前已打出时才会触发；`zones` 写了手牌时，卡在该玩家手牌里也会触发。`cardIds` 可以省略；如果写了，必须是 `[CARD_ID]`。
+
+省略 `actions` 或 `phases` 表示本节列出的集合；`anytime` 和 `computeExchanges` listener 另加各自的分发身份。它不会匹配 `forest` 这类行动格 id，也不会匹配清单之外的原生行动和阶段。
 
 `actions` 只能使用以下高层 action ID；AST validator 会硬拒绝未知 ID：
 
@@ -296,7 +331,10 @@ listener 始终属于自己的卡：只有这张卡在 `scope` 选中的玩家�
 - `isDoable`
 - `anytime`
 - `computeChoiceCandidates`
+- `computeExchanges`
 <!-- prompt-sync:end id=action-hook-phases -->
+
+`computeExchanges` listener 把依赖当前状态的兑换加进持有者的兑换菜单。不要写 `actions`。handler 是纯查询，从 `context.extraData.window` 读到窗口（`'anytime'` 或 `'harvest'`），返回 `{ extraExchanges: [{ from, to, triggers: [window] }], sourceCard: CARD_ID }`。
 
 
 
@@ -354,7 +392,7 @@ return {
 }
 ```
 
-不要生成这些字段：`deriveCardCostCandidate`、`cardCostCandidateMandatory`、`getBaseCosts`、`modifiers`、`computeExchanges`。这些字段是官方卡内部 API，Workshop 不支持。其中 `deriveCardCostCandidate` / `getBaseCosts` 属于 major/minor improvement 购买成本候选管线，`computeExchanges` 属于运行时 exchange 注入机制；沙盒 manifest 不会完整注册这些字段。
+不要生成这些字段：`deriveCardCostCandidate`、`cardCostCandidateMandatory`、`getBaseCosts`、`modifiers`。这些字段是官方卡内部 API，Workshop 不支持。其中 `deriveCardCostCandidate` / `getBaseCosts` 属于 major/minor improvement 购买成本候选管线。沙盒 manifest 不注册这些字段。
 
 ### 3.4 `scope` 取值
 
@@ -603,7 +641,7 @@ return {
 { type: 'seq', children: [gainLeaf(CARD_ID, { food: 1 }), gainLeaf(CARD_ID, { wood: 1 })] }
 ```
 
-`optional` 是节点上的布尔字段，不是另一种节点类型。节点还可以带 `promptKey` 和 `anytimeWindow`，leaf 可以带 `actionContext`，其中只能有 `targetPlayerId` 这一个键，其他键会被拒绝。这些字段会校验类型：`optional` 是布尔值，`promptKey` 和 `actionContext.targetPlayerId` 是字符串，`anytimeWindow` 是 `{ allowed: boolean, blockedIds?: string[] }`。类型不符的值会被拒绝，所以 `optional: 'false'` 是错误，不会被当成可选步骤。其余原生节点字段不对工坊卡开放，返回 flow 时会被拒绝：`mode`、`triggerSelectOnce`、`expandFlow`、`optionId`、`choiceLabelKey`、`choiceLabelParams`、`effectPreview`、`anytimeActionId`，以及节点级的 `targetPlayerId`。节点上的其他任何字段同样被拒绝，所以 `optoinal` 这样的拼写错误会报错，不会被悄悄忽略。节点、listener 返回值和 `followUpActions` 条目上的 `sourceCard` 必须是 `CARD_ID`。没写 `sourceCard` 的 leaf，以及带 flow 但没写它的 listener 返回值，会被归到本卡。返回流程的 effect hook 直接返回 flow；listener 返回 `{ flow, sourceCard: CARD_ID }`（或其文档规定的查询结果）。
+`optional` 是节点上的布尔字段，不是另一种节点类型。节点还可以带 `promptKey` 和 `anytimeWindow`，leaf 可以带 `actionContext`，其中可以有 `targetPlayerId` 和 `trueAction`；`selection` leaf 还在这里写候选位置（见 §6）。其他键会被拒绝。这些字段会校验类型：`optional` 和 `actionContext.trueAction` 是布尔值，`promptKey` 和 `actionContext.targetPlayerId` 是字符串，`anytimeWindow` 是 `{ allowed: boolean, blockedIds?: string[] }`。类型不符的值会被拒绝，所以 `optional: 'false'` 是错误，不会被当成可选步骤。其余原生节点字段不对工坊卡开放，返回 flow 时会被拒绝：`mode`、`triggerSelectOnce`、`expandFlow`、`optionId`、`choiceLabelKey`、`choiceLabelParams`、`effectPreview`、`anytimeActionId`，以及节点级的 `targetPlayerId`。节点上的其他任何字段同样被拒绝，所以 `optoinal` 这样的拼写错误会报错，不会被悄悄忽略。节点、listener 返回值和 `followUpActions` 条目上的 `sourceCard` 必须是 `CARD_ID`。没写 `sourceCard` 的 leaf，以及带 flow 但没写它的 listener 返回值，会被归到本卡。返回流程的 effect hook 直接返回 flow；listener 返回 `{ flow, sourceCard: CARD_ID }`（或其文档规定的查询结果）。
 
 执行前，AST 校验会拒绝可静态识别的组合节点字面量：缺少 `children`，或其值明显不是数组。这覆盖 flow hook 的直接返回、嵌套的字面量 children，以及 listener 的 `flow` / `alternativeFlow` 结果。校验不会把 leaf 参数或卡牌私有数据当作 flow，也不推断动态 helper 结果或 spread 提供的 children。静态通过后仍需试玩验证行为。
 
@@ -624,11 +662,29 @@ return {
 - `push-to-card-stack`
 - `special-effect`
 - `future-meeples`
+- `plow`
+- `sow`
+- `fence`
+- `stables`
+- `construct`
+- `renovate-house`
+- `improvement`
+- `occupation`
+- `family-growth`
+- `breed`
+- `reap`
+- `exchange`
+- `set-first-player`
+- `selection`
+- `emit-choice`
+- `reorganize`
 <!-- prompt-sync:end id=action-ids -->
 
-这九个 ID 是强制执行的，不只是推荐。源码校验会拒绝可见的其他 ID 的 leaf。两个执行器会拒绝使用其他 ID 的返回值，包括 `flow`、`alternativeFlow`、`followUpActions` 条目和替换用的 `actionId`，嵌套分组内也一样。整份返回值在任何节点执行前被拒绝；玩家随后看到的行为见 §9.3。
+这些 ID 是强制执行的，不只是推荐。源码校验会拒绝可见的其他 ID 的 leaf。两个执行器会拒绝使用其他 ID 的返回值，包括 `flow`、`alternativeFlow`、`followUpActions` 条目和替换用的 `actionId`，嵌套分组内也一样。整份返回值在任何节点执行前被拒绝；玩家随后看到的行为见 §9.3。
 
 每个行动只接受下表列出的参数键。`gain`、`store-on-card`、`take-from-card` 接受资源名；`pay` 接受资源名，或 `payLeaf` 产生的单个 `cost` 键；`bonus-vp` 和 `bake-bread` 不接受参数；`push-to-card-stack` 接受 `item`；`future-meeples` 接受 `__futureMeepleRequest`，其中的 `cardId` 必须是 `CARD_ID`。原生专用的控制项会被拒绝，例如 gain 上的 `payerId`、pay 上的 `costType`。数量、费用规则和排程由原生行动自己校验。
+
+从 `plow` 开始的 16 个行动为效果玩家执行对应的原生行动，邻接、前提、组件供给和付费都按原生规则。它们不接受参数，只有三个例外：`improvement` 接受 `types`，`occupation` 接受 `exactCost`，`emit-choice` 接受 `options` 和 `promptKey`。这些参数和 `selection` 的候选位置会校验类型，因为原生行动遇到别的类型会退回默认值：`types: 'minor'` 否则会变成提供全部改良。原生的费用和位置覆盖项（如 `allowedTiles`、`costOverride`、`skipRoomCheck`）没有开放。
 
 | actionId                   | 关键约束                                                                              |
 | -------------------------- | --------------------------------------------------------------------------------- |
@@ -641,6 +697,28 @@ return {
 | `push-to-card-stack`       | 向 `player.cardStates[CARD_ID].stack` 推入一项                                         |
 | `special-effect`           | **沙盒 cardStates mutation 入口**（Sprint 6a/6b）。`params: { kind: 'set-flag' \| 'set-infobox' \| 'set-counter' \| 'increment-counter' \| 'set-extra-data' \| 'set-private-data' \| 'increment-extra-data', ... }`。取代旧的 `flag-card` / `unflag-card` / `set-card-infobox` / `clear-card-infobox` / `write-card-extra-data` 5 个 leaf。详见 §6.1；未列出的仓库内部 kind 不属于 Workshop 合约。 |
 | `future-meeples`           | 沙箱专用：用 `params.__futureMeepleRequest` 预放未来回合资源（见 §5.7）                            |
+| `plow` | 玩家选 1 格犁田 |
+| `sow` | 玩家选田和作物，消耗自己的种子。没有空田或没有种子时什么也不发生 |
+| `fence` | 玩家选围栏边，每段围栏付 1 木头并用掉 1 个围栏组件 |
+| `stables` | 玩家选位置建畜栏，每个付 2 木头 |
+| `construct` | 玩家选位置加建 1 间房，按当前房型付费 |
+| `renovate-house` | 把房屋从木升级为砖或从砖升级为石，并收取翻修费用。只有一种付法时不询问 |
+| `improvement` | 玩家购买 1 张主要改良或从手牌打出 1 张次要改良，需满足前提、支付费用，并执行该卡的 `onBuy`。`params: { types: ['minor'] }` 或 `['major']` 限定可选范围。写 `types: ['minor']` 且只有 1 张可打的次要改良时不询问，直接打出 |
+| `occupation` | 玩家从手牌打出 1 张职业并执行它的 `onBuy`。不写参数时按课程格的费用：第 1 张免费，之后 1 食物。`params: { exactCost: {} }` 为免费，`{ exactCost: { food: 1 } }` 指定费用。手里只有 1 张职业时不询问，直接打出 |
+| `family-growth` | 增加 1 名家庭成员。需要空房间和未用的家庭成员 |
+| `breed` | 每种达到繁殖数量的动物增加 1 只新生动物，然后玩家安置动物。它不是收获阶段的繁殖：准入把 `actionContext.sourceCard` 设为 `CARD_ID` |
+| `reap` | 从每块已播种的田收 1 个作物。它是收获之外的田间阶段：准入把 `actionContext.trigger` 设为 `{ phase: 'private-field-phase' }`，卡牌不能自己写这个键 |
+| `exchange` | 打开玩家自己的兑换菜单，包含其烹饪改良和卡牌提供的兑换 |
+| `set-first-player` | 把起始玩家标记交给效果玩家 |
+| `selection` | 玩家选择农场位置。候选写在 `actionContext: { selectableTiles: [{ row, col }], minSelections, maxSelections }`。选中的位置以 `'row-col'` 字符串存入 `cardStates[CARD_ID].extraData.selectedPositions`，之后的 hook 用 `readCardExtraData` 读取 |
+| `emit-choice` | 发出本卡自己的选择：`params: { options: [{ value, labelKey }], promptKey }`。每个选项只能有字符串 `value` 和字符串 `labelKey`，多出字段或类型不符都会被拒绝，因为选项会原样发给所有客户端。`labelKey` 和 `promptKey` 如果不是翻译键，就按原文显示。玩家选中的 `value` 会传给 `effect.resolveChoice`，由它返回后续 flow |
+| `reorganize` | 玩家在自己的各个分区之间重新安置动物 |
+
+凡是来源为本卡的选择，都会调用 `resolveChoice`。这包括玩家在本卡发出的原生行动里做的选择，例如选哪张改良、哪张职业、哪项兑换。对不是本卡 `emit-choice` 选项的值，不要返回任何东西。
+
+这 16 个行动只能作为 flow 的 leaf 返回。listener 结果里用于替换的 `actionId` 会沿用被替换行动的 `actionContext`（例如为那个行动准备的费用覆盖），`followUpActions` 条目只写行动名、没有节点。两处都带不上经过准入的上下文，所以这 16 个行动在那里会被拒绝；请改用 `flow`，或者 `decline` 加 `alternativeFlow`。
+
+对其他卡来说，原生行动的 leaf 就算作那个行动本身。因此监听“建房行动”的卡，对 `construct` leaf 也会触发。如果卡牌只是让玩家做这件事、而不是执行那个行动（例如“建造 1 间房”），在 leaf 上写 `actionContext: { trueAction: false }`；卡面写明玩家执行该行动时不要写。listener 通过 `context.trueAction` 读到这个标记。
 
 > Sprint 6b（2026-04-30）已删除 5 个独立 mutation actionId（`flag-card` / `unflag-card` / `set-card-infobox` / `clear-card-infobox` / `write-card-extra-data`）+ 3 个 dead actionId（`hold-worker-on-card` / `release-worker-from-card` / `gain-other-players`）。统一使用 `special-effect` discriminated-union。`check-prompt-sync` 在 CI 校验 prompt 只暴露白名单内 actionId；白名单外的 actionId 不会出现在 prompt 中，沙盒卡牌不应使用——改用 `special-effect`。
 
@@ -669,9 +747,16 @@ return {
 
 // player.cardStates[sourceCard].extraData[key] += amount
 { kind: 'increment-extra-data', key: 'used', amount: 1 }
+
+// 移除 player.cardStates[sourceCard].stack 中最新的一项
+{ kind: 'pop-card-stack-top' }
+
+// 取消本卡用 future-meeples 为效果玩家预放的物品；rounds 把移除限定在这些回合
+{ kind: 'remove-future-meeples' }
+{ kind: 'remove-future-meeples', rounds: [11, 12] }
 ```
 
-以上七个 kind 是沙盒的完整集合，定义在 `SANDBOX_SPECIAL_EFFECT_KINDS`。仓库内部还使用其他 kind（例如 `emit-card-triggered` 用于写入可见卡牌触发事件日志）。这些 kind 不属于 Workshop 合约，使用它们的 `special-effect` leaf 会被拒绝。已列出的 kind 如果字段类型与上面不符，同样被拒绝：`key` 和 `text` 是字符串，计数和累加类 kind 的 `amount`、`value` 是有限数字，`flag` 是布尔值，两个写数据的 kind 必须带 `value`。
+以上九个 kind 是沙盒的完整集合，定义在 `SANDBOX_SPECIAL_EFFECT_KINDS`。仓库内部还使用其他 kind（例如 `emit-card-triggered` 用于写入可见卡牌触发事件日志）。这些 kind 不属于 Workshop 合约，使用它们的 `special-effect` leaf 会被拒绝。已列出的 kind 如果字段类型与上面不符，同样被拒绝：`key` 和 `text` 是字符串，计数和累加类 kind 的 `amount`、`value` 是有限数字，`flag` 是布尔值，两个写数据的 kind 必须带 `value`，`rounds` 如果写了必须是数字数组。
 
 可选 `actionContext.targetPlayerId?: string` 让 mutation 路由到 `state.players` 中匹配的玩家（默认是 `context.player` 即 actor）。Workshop 通常用不到 targetPlayerId（仅 D134 OysterEater 等跨玩家场景需要）。
 
@@ -774,7 +859,7 @@ CI 会拦下漏改的情况。
 
 本文件遵守 [ADR 0025](adr/0025-workshop-capability-contract-is-fail-closed-and-opened-by-tests.md)。
 
-- **契约管的是名字、节点字段、各行动的参数键、`special-effect` 的字段类型，以及查询类 hook 返回值的顶层类型。**参数的取值和查询结果的内容由原生代码自己校验，与原生卡相同；准入不重复实现这些规则。
+- **契约管的是名字、节点字段、已声明的 effect 元数据和 listener 数据字段的类型、各行动的参数键、`special-effect` 以及原生农场与卡牌行动所接受参数的字段类型，以及查询类 hook 返回值的顶层类型。**其余参数的取值和查询结果的内容由原生代码自己校验，与原生卡相同；准入不重复实现这些规则。
 - **未列出即未开放。**部署契约、源码校验和两个执行器接受同一组名字：§3.1 的 hook，§3.2 和 §3.4 的 listener 行动、阶段和 scope，§6 的 action ID，以及 §6.1 的 `special-effect` kind。本文件不逐项列出未开放的原生接口，候选能力记录在 [issue #1079](https://github.com/titanxxh/open-agricola/issues/1079)。
 - **有固定行为测试的名字才开放。**每个名字至少要有一个测试，在不改原生规则路径的前提下，用两人 `GameSession` 真实驱动它。新能力单独开 issue，并带上这个测试。
 - **hook 出错和返回契约外内容的处理相同。**如果出错发生在一条命令的结算过程中，第一次出现时拒绝这条命令，恢复到命令之前的状态，并返回错误；错误里写明被拒绝的行动、kind 或字段。同样的错误再次出现时不再报告：命令成功，这张卡本次的效果被跳过。这是有意的行为，让带着有问题卡牌的对局可以继续。出错如果发生在命令之外，例如为一次响应计算可用性、预览或分数时运行的查询，则只记一条卡牌警告，并贡献 §3.1 所说的中性结果；此时没有正在进行的命令，所以不回滚。
@@ -788,6 +873,7 @@ CI 会拦下漏改的情况。
 
 | 日期         | 变更                                                                                                                                                                                                                                                                                                                               |
 | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-10-10 | 开放 issue #1079 的候选能力，每项都有固定 Session 测试：7 个查询类 hook 及其需要的第四、第五个 hook 参数，6 项 effect 元数据，5 个 listener 数据字段，`computeExchanges` 阶段，16 个执行原生农场、卡牌和先手行动的 leaf action（只能作为 flow 的 leaf，可用 `actionContext.trueAction` 标明只是卡牌给予的行动），以及 `special-effect` 的 `pop-card-stack-top` 和 `remove-future-meeples` 两个 kind。 |
 | 2026-10-10 | 契约改为收紧执行（ADR 0025）：源码校验和两个执行器强制执行 action ID 与 `special-effect` kind，拒绝不支持的 listener 字段和未写入文档的 `beforeEndGameScope` / `beforeEndGameMandatory` 元数据，每个 listener 和返回的节点绑定到自己的卡，省略的 listener 过滤绑定到已列出的集合，拒绝未开放的原生节点字段、未写入文档的行动参数键、类型不符的 `special-effect` 字段和顶层类型不符的查询结果，并写明 hook 出错时的行为。 |
 | 2026-08-04 | 修正跨全部改良候选折扣为 mandatory capped bonus；补齐并收窄 `handHooks` manifest、要求 effect 使用无 accessor 的直接对象字面量并在宿主侧过滤、统一 `positionKey({row,col})`，移除无法完整结算的 Workshop candidate/settlement hook；新增语义 contract 与 M11 live/record/replay 守卫。 |
 | 2026-04-30 | 双轨 scoring hook 重构：删除 `computePostScore` / `scoringPriority` / `ctx.reserved`；新增 `computeCostedBonus` 走 Pareto 求解器。详见 `(spec/plan 已归档，见 git history)`。|

@@ -12,12 +12,15 @@ A name belongs to the contract only while at least one fixed behavior test drive
 Admission checks these things and nothing else:
 
 - the listed names: effect hooks, listener actions, phases and scopes, leaf actions, and `special-effect` kinds;
-- the listener and flow-node fields a card may set, the types of the open node control fields (`optional`, `promptKey`, `anytimeWindow`, `actionContext.targetPlayerId`), and that each listener and returned node belongs to the card itself;
-- the parameter keys each action documents;
+- the listener and flow-node fields a card may set, the types of the open node control fields (`optional`, `promptKey`, `anytimeWindow`, `actionContext.targetPlayerId`, `actionContext.trueAction`), and that each listener and returned node belongs to the card itself;
+- the types of the effect metadata and listener data fields a card declares, because the engine reads several of them by truthiness;
+- the parameter keys each action documents, and the types of the params that the leaf actions running a native farm or card action take (`improvement.types`, `occupation.exactCost`, `emit-choice.options` and `promptKey`, the `selection` candidates), because those actions fall back to a default on another type, and the shape of each `emit-choice` option, because the options are sent to every client as written;
 - the field types of the card-local `special-effect` writes;
 - the top-level type of a query hook result.
 
-Admission does not check parameter values, cost structures, schedules, or the contents of a query result. Their native consumers validate them, as they do for native cards. Mirroring those rules on the host is the approach this decision rejects, so a review finding of that kind is answered by pointing here, not by adding another validator.
+Admission also fixes what a custom `reap` and `breed` mean: a field phase outside Harvest, and breeding whose source is the card. It writes that context onto the leaf, and a card cannot write it. The leaf actions that run a native action are admitted as flow leaves only: a replacement `actionId` would keep the replaced action's context, and a `followUpActions` entry has no node to carry one.
+
+Admission does not check other parameter values, cost structures, schedules, or the contents of a query result. Their native consumers validate them, as they do for native cards. Mirroring those rules on the host is the approach this decision rejects, so a review finding of that kind is answered by pointing here, not by adding another validator.
 
 Admission serves honest authors and model mistakes. It must produce a clear error; it does not bound adversarial workloads beyond the isolate's existing time and memory limits.
 

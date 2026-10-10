@@ -12,8 +12,11 @@ import ts from 'typescript'
 import { cardEffectHooks, isHandCardEffectHook } from '../cards/card-effects'
 import { REAL_RESOURCE_KEYS } from '../contract/resource-keys'
 import { isFlowResultHook } from './contract-admission'
-import { controlFieldExpectation, isOpenActionContextKey, isOpenFlowField, type ControlFieldLiteral } from './flow-admission'
+import {
+  commonContextKeyExpectation, controlFieldExpectation, isOpenActionContextKey, isOpenFlowField, type ControlFieldLiteral,
+} from './flow-admission'
 import { isSandboxActionId, isSandboxSpecialEffectKind } from './sandbox-action-ids'
+import { sandboxEffectMetadataKeys, sandboxListenerDataFields } from './sandbox-declarations'
 import { isSandboxListenerAction } from './sandbox-listener-actions'
 import { sandboxListenerPhases } from './sandbox-listener-phases'
 import { isSandboxListenerScope } from './sandbox-listener-scopes'
@@ -54,11 +57,14 @@ const ALLOWED_EFFECT_KEYS = new Set<string>([
   ...cardEffectHooks,
   'id',
   'handHooks',
+  ...sandboxEffectMetadataKeys,
 ])
 
 /** Listener fields the manifest keeps; any other declaration would be dropped, so reject it.
  * `id` is a label only: the host assigns the registration identity. */
-const ALLOWED_LISTENER_FIELDS = new Set<string>(['id', 'handler', 'actions', 'phases', 'scope', 'cardIds'])
+const ALLOWED_LISTENER_FIELDS = new Set<string>([
+  'id', 'handler', 'actions', 'phases', 'scope', 'cardIds', ...sandboxListenerDataFields,
+])
 
 /** Allowed values inside listener.phases arrays. */
 const ALLOWED_LISTENER_PHASES = new Set<string>(sandboxListenerPhases)
@@ -99,12 +105,13 @@ function validateLiteralLeaf(
   if (actionContext && ts.isObjectLiteralExpression(actionContext)) {
     for (const property of actionContext.properties) {
       const key = getStaticPropertyName(property, constants)
-      if (key !== undefined && !isOpenActionContextKey(key)) {
+      if (key !== undefined && !isOpenActionContextKey(key, actionId)) {
         errors.push(`line ${getLine(property)}: actionContext key '${key}' is not available to Workshop cards`)
       }
-      const written = key === 'targetPlayerId' && ts.isPropertyAssignment(property) ? literalKind(property.initializer) : undefined
-      if (written !== undefined && written !== 'string') {
-        errors.push(`line ${getLine(property)}: actionContext.targetPlayerId must be a string`)
+      const common = key === undefined ? undefined : commonContextKeyExpectation(key)
+      const written = common && ts.isPropertyAssignment(property) ? literalKind(property.initializer) : undefined
+      if (common && written !== undefined && written !== common.literal) {
+        errors.push(`line ${getLine(property)}: actionContext.${key} must be ${common.expected}`)
       }
     }
   }

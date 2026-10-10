@@ -1,11 +1,13 @@
-import { isHandCardEffectHook, type CardEffect } from '../../shared/cards/card-effects.ts'
+import type { CardEffect } from '../../shared/cards/card-effects.ts'
 import type { PaymentInfo } from '../../shared/cards/card-effects.ts'
 import type { CardListenerContext } from '../../shared/cards/card-listeners.ts'
 import type { GameState, PlayerState } from '../../shared/contract/types.ts'
 import { requireActiveCardRegistry } from '../../shared/cards/active-registry.ts'
 import { getCurrentSessionContext, type CustomCardData } from '../../shared/cards/session-card-context.ts'
 import { setCardListenerSource } from '../../shared/cards/card-listener-source.ts'
-import { boundListenerFilters, neutralEffectResult } from '../../shared/custom-code/contract-admission.ts'
+import {
+  boundListenerFilters, extraHookArguments, neutralEffectResult, registeredEffectMetadata, registeredListenerData,
+} from '../../shared/custom-code/contract-admission.ts'
 import { assertSandboxListenerPhases } from '../../shared/custom-code/sandbox-listener-phases.ts'
 import { invokeCustomCodeEffectSync, invokeCustomCodeListenerSync } from './client.ts'
 
@@ -22,6 +24,7 @@ export const registerExecutorBackedCustomCard = (cardData: CustomCardData): void
       state: GameState,
       player: PlayerState,
       paymentInfo?: PaymentInfo,
+      ...rest: unknown[]
     ) => {
       const response = invokeCustomCodeEffectSync({
         compiledCode,
@@ -30,6 +33,7 @@ export const registerExecutorBackedCustomCard = (cardData: CustomCardData): void
         state,
         player,
         paymentInfo,
+        extraArgs: extraHookArguments(hook, [state, player, paymentInfo, ...rest]),
       })
       if (!response.ok) {
         const warning = `Custom card ${cardId} hook "${hook}" failed: ${response.error}`
@@ -40,13 +44,13 @@ export const registerExecutorBackedCustomCard = (cardData: CustomCardData): void
       return response.result ?? neutralEffectResult(hook)
     }
   }
-  // handHooks is the only open metadata; a manifest saved before ADR 0025 may carry more.
-  const handHooks = codeManifest.effectMetadata?.handHooks?.filter(isHandCardEffectHook)
-  if (handHooks) effect.handHooks = handHooks
+  // A card may declare metadata without any hook, so the effect is registered for either.
+  const metadata = registeredEffectMetadata(codeManifest)
+  Object.assign(effect, metadata)
 
   // Register into session context when one is active; otherwise write
   // directly to the active CardRegistry (test-only path).
-  if (codeManifest.effectHooks.length > 0) {
+  if (codeManifest.effectHooks.length > 0 || Object.keys(metadata).length > 0) {
     if (sessionCtx) {
       sessionCtx.registerEffect(effect)
     } else {
@@ -61,6 +65,7 @@ export const registerExecutorBackedCustomCard = (cardData: CustomCardData): void
       cardIds: [cardId],
       ...boundListenerFilters(listener),
       scope: listener.scope,
+      ...registeredListenerData(listener),
       handler: (context: CardListenerContext) => {
         const response = invokeCustomCodeListenerSync({
           compiledCode,

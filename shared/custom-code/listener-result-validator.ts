@@ -1,6 +1,6 @@
 import type { ActionHookResult } from '../actions/hooks'
 import { REAL_RESOURCE_KEYS } from '../contract/resource-keys'
-import { admitCustomFlow, assertOwnSourceCard, assertSandboxActionId } from './flow-admission'
+import { admitCustomFlow, assertOwnSourceCard, assertSandboxFollowUpActionId } from './flow-admission'
 
 const RESOURCE_KEYS = new Set<string>(REAL_RESOURCE_KEYS)
 
@@ -43,12 +43,12 @@ export const validateCustomListenerResult = (
   assertOwnSourceCard(value.sourceCard, cardId, 'result')
   admitCustomFlow(value.flow, cardId, 'flow')
   admitCustomFlow(value.alternativeFlow, cardId, 'alternativeFlow')
-  if (value.actionId !== undefined) assertSandboxActionId(value.actionId, 'actionId')
+  if (value.actionId !== undefined) assertSandboxFollowUpActionId(value.actionId, 'actionId')
   if (value.followUpActions !== undefined) {
     if (!Array.isArray(value.followUpActions)) throw new Error('followUpActions must be an array')
     value.followUpActions.forEach((action, index) => {
       const path = `followUpActions[${index}]`
-      assertSandboxActionId(isPlainRecord(action) ? action.actionId : action, path)
+      assertSandboxFollowUpActionId(isPlainRecord(action) ? action.actionId : action, path)
       if (isPlainRecord(action)) assertOwnSourceCard(action.sourceCard, cardId, path)
     })
   }
