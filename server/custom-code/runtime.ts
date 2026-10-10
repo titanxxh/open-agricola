@@ -5,6 +5,7 @@ import type { GameState, PlayerState } from '../../shared/contract/types.ts'
 import { requireActiveCardRegistry } from '../../shared/cards/active-registry.ts'
 import { getCurrentSessionContext, type CustomCardData } from '../../shared/cards/session-card-context.ts'
 import { setCardListenerSource } from '../../shared/cards/card-listener-source.ts'
+import { boundListenerFilters } from '../../shared/custom-code/contract-admission.ts'
 import { assertSandboxListenerPhases } from '../../shared/custom-code/sandbox-listener-phases.ts'
 import { invokeCustomCodeEffectSync, invokeCustomCodeListenerSync } from './client.ts'
 
@@ -56,10 +57,9 @@ export const registerExecutorBackedCustomCard = (cardData: CustomCardData): void
   for (const listener of codeManifest.listeners) {
     const reg = {
       id: listener.registrationId,
-      cardIds: listener.cardIds,
-      actions: listener.actions,
-      phases: listener.phases,
-      order: listener.order,
+      // Bound here as well, so a manifest saved before ADR 0025 follows the same contract.
+      cardIds: [cardId],
+      ...boundListenerFilters(listener),
       scope: listener.scope,
       handler: (context: CardListenerContext) => {
         const response = invokeCustomCodeListenerSync({

@@ -194,7 +194,13 @@ describe('custom session routes', () => {
       customCardIds: [customCard.id],
     }, 'sandbox-token'), start)
     expect(start.statusCode).toBe(200)
-    expect(start.statusCode).toBe(200)
+    // A listener only reacts while its card is in play.
+    const played = mockRes()
+    await handleGameRoute(mockReq('POST', '/api/game/dev/play-card', {
+      playerIndex: 0,
+      cardId: 'CUSTOM_RouteRunaway',
+    }, 'sandbox-token'), played)
+    expect(played.statusCode).toBe(200)
 
     const action = mockRes()
     const command = handleGameRoute(mockReq('POST', '/api/game/action', {
@@ -442,6 +448,8 @@ describe('custom session routes', () => {
       roomId: host.currentRoom!.id,
       name: 'Guest',
     })
+    // A listener only reacts while its card is in play.
+    expect((await host.currentRoom!.customSessionExecutor!.execute('devPlayCard', [0, 'CUSTOM_RouteRunaway'])).ok).toBe(true)
     hostWs.send.mockClear()
     const command = dispatch(host, {
       type: 'action',
