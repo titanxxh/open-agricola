@@ -225,7 +225,7 @@ Advanced-hook details:
 | `getStatePresentation` | `(player) => CardStatePresentation` | Explicit public counters, resource groups, crop layers and markers; ordinary clients do not read internal storage |
 | `handHooks` metadata | `HandCardEffectHook[]` | Stage hooks that also run while the card remains in hand |
 
-A query hook returns its documented top-level type, namely a number, an array, or an object, or nothing. Another type is reported as a failed hook. A failed or empty query contributes a neutral result: an empty array, `0` for `computeBonusScore` and `computeExtraRoomCapacity`, and nothing otherwise.
+A query hook returns its documented top-level type, namely a number, an array, or an object, or nothing. Another type, or a non-finite number, is reported as a failed hook. A failed or empty query contributes a neutral result: an empty array, `0` for `computeBonusScore` and `computeExtraRoomCapacity`, and nothing otherwise.
 
 Extra sowing and special stables each require a paired candidate and settlement contract: `onComputeSowableFields` with `onSowExtraField`, and `getSpecialStablePositions` with `applySpecialStable`. Settlement relies on in-place host mutation that cannot return through sandbox JSON snapshots, so Workshop exposes neither pair. `handHooks` does not support `onBuy`, `onEndTurn`, `onBeforeEndGame`, or `onBeforePlayerTurn`. `CARD_IMPL.effect` must be a direct object literal with no variable reference, spread, computed key, or accessor, preventing static-validation bypass. Server and browser manifests also filter unsupported hand hooks on the host side.
 

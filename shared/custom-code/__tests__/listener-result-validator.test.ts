@@ -20,6 +20,12 @@ describe('validateCustomListenerResult', () => {
     expect(result).toMatchObject({ sourceCard: 'CUSTOM_Test', flow: { children: [{ sourceCard: 'CUSTOM_Test' }] } })
   })
 
+  it('attributes a result that only dispatches follow-up actions', () => {
+    expect(validateCustomListenerResult({ followUpActions: ['bonus-vp'] }, 'CUSTOM_Test'))
+      .toEqual({ followUpActions: ['bonus-vp'], sourceCard: 'CUSTOM_Test' })
+    expect(validateCustomListenerResult({ followUpActions: [] }, 'CUSTOM_Test')).toEqual({ followUpActions: [] })
+  })
+
   it('leaves a query result without a flow unattributed', () => {
     expect(validateCustomListenerResult({ doable: true }, 'CUSTOM_Test')).toEqual({ doable: true })
   })
