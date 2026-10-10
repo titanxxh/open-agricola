@@ -1,7 +1,6 @@
 import type { CustomCardData } from '../../../shared/cards/session-card-context'
 import type { GameState } from '../../../shared/contract/types'
 import { setWorkersAtHome } from '../../../shared/domain/player'
-import { FIXED_ROUND_ACTION_ORDER } from '../../../tests/llm-card-gen/session-helpers'
 import { validateAndCompileCustomCode } from '../../custom-code/engine'
 import { createWorkSession } from './session-fixtures'
 
@@ -26,9 +25,9 @@ ${body}
   }
 }
 
-/** A two-player work phase in round 10 with the first ten round cards of the fixed order
- * revealed and every space free. Player 0 has played the card; `workers` sets the workers at
- * home, and every player starts with 10 food and no other goods. */
+/** A two-player work phase with the round set to 10 and every action space free; the fixture
+ * does not hide later round cards. Player 0 has played the card; `workers` sets the workers
+ * at home, and every player starts with 10 food and no other goods. */
 export function createRoundTenSession(
   card: CustomCardData,
   { workers = [2, 0], configure }: { workers?: [number, number]; configure?: (state: GameState) => void } = {},
@@ -37,7 +36,6 @@ export function createRoundTenSession(
     customCards: [card],
     configure: (state) => {
       state.round = 10
-      state.roundActionOrder = [...FIXED_ROUND_ACTION_ORDER]
       state.actionSpaces.forEach((space) => { space.takenBy = [] })
       state.players.forEach((player, index) => {
         setWorkersAtHome(state, player, workers[index]!)
