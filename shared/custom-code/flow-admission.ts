@@ -9,8 +9,9 @@ import { isSandboxActionId, isSandboxSpecialEffectKind, type SandboxActionId, ty
  * Native card flows never pass through here.
  *
  * The contract covers names, node fields and the types of the open control
- * fields, the parameter keys each action documents, and the field types of the
- * card-local special-effect writes. Parameter values (amounts, cost rules,
+ * fields, the parameter keys each action documents, the types of the params
+ * the native farm and card actions take, and the field types of the card-local
+ * special-effect writes. Other parameter values (amounts, cost rules,
  * schedules) stay with their native consumers, exactly as for native cards.
  */
 
@@ -65,6 +66,8 @@ const SPECIAL_EFFECT_SHAPES: Record<SandboxSpecialEffectKind, Record<string, Fie
   'set-extra-data': { key: 'string', value: 'json' },
   'set-private-data': { key: 'string', value: 'json' },
   'increment-extra-data': { key: 'string', amount: 'finite' },
+  'pop-card-stack-top': {},
+  'remove-future-meeples': {},
 }
 
 const matchesShape = (value: unknown, shape: FieldShape): boolean =>
@@ -87,10 +90,44 @@ export function assertOwnSourceCard(sourceCard: unknown, cardId: string, path: s
   if (sourceCard !== undefined && sourceCard !== cardId) throw new Error(`${path}: sourceCard must be this card's id`)
 }
 
-/** The only documented actionContext key; the rest are native execution controls. */
-const ACTION_CONTEXT_KEYS = new Set(['targetPlayerId'])
+/** The type a documented key must hold. The native actions fall back to a default on any
+ * other type, so `types: 'minor'` would otherwise offer every improvement. */
+type KeyTypes = Record<string, { expected: string; matches: (value: unknown) => boolean }>
 
-export const isOpenActionContextKey = (key: string): boolean => ACTION_CONTEXT_KEYS.has(key)
+const finiteNumber = { expected: 'a finite number', matches: (value: unknown) => matchesShape(value, 'finite') }
+
+/** The documented actionContext keys: `targetPlayerId` on any leaf, plus the keys an action
+ * reads only from there. The rest are native execution controls. */
+const ACTION_CONTEXT_KEYS: Partial<Record<SandboxActionId, KeyTypes>> = {
+  selection: {
+    selectableTiles: { expected: 'an array of { row, col }', matches: Array.isArray },
+    minSelections: finiteNumber,
+    maxSelections: finiteNumber,
+  },
+}
+
+/** Source validation passes no action when a leaf's actionId is computed; the executors decide then. */
+export const isOpenActionContextKey = (key: string, actionId?: string): boolean =>
+  key === 'targetPlayerId'
+  || (actionId === undefined
+    ? Object.values(ACTION_CONTEXT_KEYS).some(keys => Object.hasOwn(keys, key))
+    : isSandboxActionId(actionId) && Object.hasOwn(ACTION_CONTEXT_KEYS[actionId] ?? {}, key))
+
+/** What a custom leaf of these actions always means. Admission writes it, so a card cannot
+ * present its own reap as the Harvest field phase or its breeding as Harvest breeding. */
+const BOUND_ACTION_CONTEXT: Partial<Record<SandboxActionId, (cardId: string) => Record<string, unknown>>> = {
+  reap: () => ({ trigger: { phase: 'private-field-phase' } }),
+  breed: cardId => ({ sourceCard: cardId }),
+}
+
+/** A replacement `actionId` and a `followUpActions` entry name an action without a node, so
+ * they cannot carry what admission binds on a leaf of these actions. */
+export function assertSandboxFollowUpActionId(actionId: unknown, path: string): void {
+  assertSandboxActionId(actionId, path)
+  if (BOUND_ACTION_CONTEXT[actionId as SandboxActionId]) {
+    throw new Error(`${path}: actionId '${String(actionId)}' must be returned as a flow leaf`)
+  }
+}
 
 const isAnytimeWindow = (value: unknown): boolean =>
   isRecord(value) && typeof value.allowed === 'boolean'
@@ -139,6 +176,11 @@ function assertSpecialEffectParams(params: Record<string, unknown>, _cardId: str
       throw new Error(`${path}: special-effect '${kind}' requires ${field} to be ${expected}`)
     }
   }
+  // The one optional field: the rounds a removal is limited to.
+  const rounds = kind === 'remove-future-meeples' ? params.rounds : undefined
+  if (rounds !== undefined && !(Array.isArray(rounds) && rounds.every(round => matchesShape(round, 'finite')))) {
+    throw new Error(`${path}: special-effect '${kind}' requires rounds to be an array of numbers`)
+  }
 }
 
 type ParamRule = (params: Record<string, unknown>, cardId: string, path: string) => void
@@ -150,6 +192,17 @@ const onlyKeys = (actionId: string, allows: (key: string) => boolean): ParamRule
   if (key !== undefined) throw outsideContract(path, `${actionId} param '${key}'`)
 }
 const resourceMap = (actionId: string): ParamRule => onlyKeys(actionId, key => REAL_RESOURCES.has(key))
+const noParams = (actionId: string): ParamRule => onlyKeys(actionId, () => false)
+
+function assertKeyTypes(values: Record<string, unknown>, types: KeyTypes, label: string, path: string): void {
+  for (const [key, rule] of Object.entries(types)) {
+    if (values[key] !== undefined && !rule.matches(values[key])) throw new Error(`${path}: ${label} '${key}' must be ${rule.expected}`)
+  }
+}
+const typedParams = (actionId: string, types: KeyTypes): ParamRule => (params, cardId, path) => {
+  onlyKeys(actionId, key => Object.hasOwn(types, key))(params, cardId, path)
+  assertKeyTypes(params, types, `${actionId} param`, path)
+}
 
 /** The parameter keys each action documents (docs/CUSTOM_CARD_SANDBOX.md §6). Native-only
  * controls such as a gain's payerId are not open to custom cards. */
@@ -161,8 +214,8 @@ const PARAM_RULES: Record<SandboxActionId, ParamRule> = {
   pay: (params, cardId, path) => (Object.hasOwn(params, 'cost')
     ? onlyKeys('pay', key => key === 'cost')
     : onlyKeys('pay', isPaymentResourceKey))(params, cardId, path),
-  'bonus-vp': onlyKeys('bonus-vp', () => false),
-  'bake-bread': onlyKeys('bake-bread', () => false),
+  'bonus-vp': noParams('bonus-vp'),
+  'bake-bread': noParams('bake-bread'),
   'push-to-card-stack': onlyKeys('push-to-card-stack', key => key === 'item'),
   'special-effect': assertSpecialEffectParams,
   'future-meeples': (params, cardId, path) => {
@@ -171,6 +224,30 @@ const PARAM_RULES: Record<SandboxActionId, ParamRule> = {
     if (!isRecord(request)) throw new Error(`${path}: future-meeples requires params.__futureMeepleRequest`)
     if (request.cardId !== cardId) throw new Error(`${path}: __futureMeepleRequest.cardId must be this card's id`)
   },
+  plow: noParams('plow'),
+  sow: noParams('sow'),
+  fence: noParams('fence'),
+  stables: noParams('stables'),
+  construct: noParams('construct'),
+  'renovate-house': noParams('renovate-house'),
+  improvement: typedParams('improvement', {
+    types: {
+      expected: "a non-empty array of 'major' or 'minor'",
+      matches: value => Array.isArray(value) && value.length > 0 && value.every(type => type === 'major' || type === 'minor'),
+    },
+  }),
+  occupation: typedParams('occupation', { exactCost: { expected: 'a resource object', matches: isRecord } }),
+  'family-growth': noParams('family-growth'),
+  breed: noParams('breed'),
+  reap: noParams('reap'),
+  exchange: noParams('exchange'),
+  'set-first-player': noParams('set-first-player'),
+  selection: noParams('selection'),
+  'emit-choice': typedParams('emit-choice', {
+    options: { expected: 'an array of { value, labelKey }', matches: Array.isArray },
+    promptKey: { expected: 'a string', matches: value => typeof value === 'string' },
+  }),
+  reorganize: noParams('reorganize'),
 }
 
 function admitFlowNode(node: unknown, cardId: string, path: string): void {
@@ -178,19 +255,27 @@ function admitFlowNode(node: unknown, cardId: string, path: string): void {
   assertOwnSourceCard(node.sourceCard, cardId, path)
   if (node.type === 'leaf') {
     assertSandboxActionId(node.actionId, path)
+    const actionId = node.actionId as SandboxActionId
     assertNodeFields(node, 'leaf', path)
     assertControlFields(node, path)
-    if (node.actionContext !== undefined) {
-      if (!isRecord(node.actionContext)) throw new Error(`${path}: actionContext must be an object`)
-      const key = Object.keys(node.actionContext).find(candidate => !isOpenActionContextKey(candidate))
+    const bound = BOUND_ACTION_CONTEXT[actionId]?.(cardId)
+    const context = node.actionContext
+    if (context !== undefined) {
+      if (!isRecord(context)) throw new Error(`${path}: actionContext must be an object`)
+      // A flow can be admitted more than once, so the values admission wrote earlier pass.
+      const key = Object.keys(context).find(candidate => !isOpenActionContextKey(candidate, actionId)
+        && JSON.stringify(context[candidate]) !== JSON.stringify(bound?.[candidate]))
       if (key !== undefined) throw outsideContract(path, `actionContext key '${key}'`)
-      const target = node.actionContext.targetPlayerId
-      if (target !== undefined && typeof target !== 'string') throw new Error(`${path}: actionContext.targetPlayerId must be a string`)
+      assertKeyTypes(context, ACTION_CONTEXT_KEYS[actionId] ?? {}, 'actionContext key', path)
+      if (context.targetPlayerId !== undefined && typeof context.targetPlayerId !== 'string') {
+        throw new Error(`${path}: actionContext.targetPlayerId must be a string`)
+      }
     }
     if (node.params !== undefined && !isRecord(node.params)) throw new Error(`${path}: params must be an object`)
-    PARAM_RULES[node.actionId as SandboxActionId](node.params ?? {}, cardId, path)
+    PARAM_RULES[actionId](node.params ?? {}, cardId, path)
     // An omitted source would be settled without card attribution.
     node.sourceCard = cardId
+    if (bound) node.actionContext = { ...context, ...bound }
     return
   }
   if (node.type !== 'seq' && node.type !== 'or' && node.type !== 'xor' && node.type !== 'parallel') {

@@ -35,10 +35,10 @@ describe('validateCustomListenerResult', () => {
   })
 
   it.each([
-    [{ flow: { type: 'leaf', actionId: 'plow' } }, "flow: actionId 'plow'"],
-    [{ decline: true, alternativeFlow: { type: 'leaf', actionId: 'sow' } }, "alternativeFlow: actionId 'sow'"],
-    [{ actionId: 'fence' }, "actionId: actionId 'fence'"],
-    [{ followUpActions: ['gain', { actionId: 'construct' }] }, "followUpActions[1]: actionId 'construct'"],
+    [{ flow: { type: 'leaf', actionId: 'place-farmer' } }, "flow: actionId 'place-farmer'"],
+    [{ decline: true, alternativeFlow: { type: 'leaf', actionId: 'collect' } }, "alternativeFlow: actionId 'collect'"],
+    [{ actionId: 'receive' }, "actionId: actionId 'receive'"],
+    [{ followUpActions: ['gain', { actionId: 'wish-children' }] }, "followUpActions[1]: actionId 'wish-children'"],
   ])('rejects a result that dispatches outside the contract', (result, detail) => {
     expect(() => validateCustomListenerResult(result, 'CUSTOM_Test'))
       .toThrow(`${detail} is not in the Workshop Capability Contract`)

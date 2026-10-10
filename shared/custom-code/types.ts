@@ -6,12 +6,13 @@ import type {
   HandCardEffectHook,
   PaymentInfo,
 } from '../cards/card-effects'
+import type { SandboxEffectMetadata, SandboxListenerData } from './sandbox-declarations'
 
-export type CustomCodeEffectMetadata = {
+export type CustomCodeEffectMetadata = SandboxEffectMetadata & {
   handHooks?: HandCardEffectHook[]
 }
 
-export type CustomCodeListenerManifest = {
+export type CustomCodeListenerManifest = SandboxListenerData & {
   registrationId: string
   cardIds?: string[]
   actions?: string[]
@@ -32,6 +33,8 @@ export type CustomCodeEffectInvocation = {
   state: GameState
   player: PlayerState
   paymentInfo?: PaymentInfo
+  /** The fourth and later positional arguments, for the hooks that document them. */
+  extraArgs?: unknown[]
 }
 
 export type CustomCodeListenerInvocation = {

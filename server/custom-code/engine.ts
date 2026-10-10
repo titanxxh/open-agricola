@@ -2,6 +2,7 @@ import ivm from 'isolated-vm'
 import { validateCardCode } from '../../shared/custom-code/ast-validator.ts'
 import { compileCardCode } from '../../shared/custom-code/compiler.ts'
 import { normalizeCustomManifest, type RawCustomManifest } from '../../shared/custom-code/contract-admission.ts'
+import { sandboxEffectMetadataKeys, sandboxListenerDataFields } from '../../shared/custom-code/sandbox-declarations.ts'
 import type { CustomCodeManifest, CustomCodeValidateResult } from '../../shared/custom-code/types.ts'
 import { HELPERS_INJECTION_SOURCE } from '../../shared/custom-code/injected-helpers.ts'
 
@@ -47,18 +48,31 @@ function runManifestExtraction(compiledCode: string, cardId: string): {
         if (Array.isArray(eff.handHooks)) {
           __effectMetadata.handHooks = eff.handHooks;
         }
+        var __metadataKeys = ${JSON.stringify(sandboxEffectMetadataKeys)};
+        for (var m = 0; m < __metadataKeys.length; m++) {
+          if (Object.prototype.hasOwnProperty.call(eff, __metadataKeys[m])) {
+            __effectMetadata[__metadataKeys[m]] = eff[__metadataKeys[m]];
+          }
+        }
       }
       if (__captured.CARD_IMPL && Array.isArray(__captured.CARD_IMPL.listeners)) {
         for (var i = 0; i < __captured.CARD_IMPL.listeners.length; i++) {
           var listener = __captured.CARD_IMPL.listeners[i];
           var registrationId = ${JSON.stringify(cardId)} + ':listener:' + i;
-          __listeners.push({
+          var __entry = {
             registrationId: registrationId,
             cardIds: Array.isArray(listener.cardIds) ? listener.cardIds : undefined,
             actions: Array.isArray(listener.actions) ? listener.actions : undefined,
             phases: Array.isArray(listener.phases) ? listener.phases : undefined,
             scope: listener.scope,
-          });
+          };
+          var __dataFields = ${JSON.stringify(sandboxListenerDataFields)};
+          for (var d = 0; d < __dataFields.length; d++) {
+            // JSON would drop a function and hide the declaration from admission.
+            var __value = listener[__dataFields[d]];
+            __entry[__dataFields[d]] = typeof __value === 'function' ? '[function]' : __value;
+          }
+          __listeners.push(__entry);
         }
       }
       JSON.stringify({

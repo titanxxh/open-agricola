@@ -118,10 +118,39 @@ export const cardEffectHookMeta: Record<CardEffectField, HookMeta> = {
     usage: '所属来源返回特殊畜栏（native；沙盒写入尚未开放）',
   },
 
-  // 联合成员但不在 cardEffectHooks 数组，不会被渲染进 prompt（仅为 Record 穷尽性）
+  computeResourceCommitments: {
+    table: 'advanced',
+    signature: '(state, owner) => Array<{ playerId, resources }>',
+    usage: '声明玩家必须留存的资源；会让留存不足的结算被拒绝，只读',
+  },
+  countExtraTurns: {
+    table: 'advanced',
+    signature: '(state, player) => number',
+    usage: '本卡本轮还能提供几次额外行动；与 contributeExtraTurn 配对，缺省为 1 次',
+  },
+  enforceReorganizeOnLastHarvest: {
+    table: 'advanced',
+    signature: '(state, player) => boolean',
+    usage: '第 14 轮收获繁殖没有新生动物时，仍要求一次动物重组',
+  },
+  computeBreedThreshold: {
+    table: 'advanced',
+    signature: '(state, player, animalType, ctx) => number | void',
+    usage: '该种动物繁殖所需的最少数量（原生默认 2，取各卡最小值，不低于 1）；ctx.sourceCard 是触发繁殖的来源',
+  },
+  computeBreedableAnimalCount: {
+    table: 'advanced',
+    signature: '(state, player, animalType, currentCount, ctx) => number | void',
+    usage: '计入繁殖判定的该种动物数量；返回调整后的数量',
+  },
+  computeAnimalScoreAdjustment: {
+    table: 'advanced',
+    signature: '(state, player, animalType, ctx) => number | void',
+    usage: '某种动物计分项的加减分；ctx 含 quantity、baseScore、categoryKey',
+  },
   onComputeSharedAnimalZones: {
     table: 'advanced',
-    signature: '修改共享 zones 数组',
-    usage: '共享动物分区扩展（跨玩家）',
+    signature: '(owner, animalOwner, zones, state) => AnimalZone[]',
+    usage: '本卡为任一玩家（animalOwner）提供的额外动物分区；只返回新增 zones，原地修改无效',
   },
 }

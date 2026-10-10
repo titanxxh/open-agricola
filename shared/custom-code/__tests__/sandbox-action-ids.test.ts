@@ -14,21 +14,27 @@ describe('SANDBOX_ALLOWED_ACTION_IDS', () => {
   it('每个 id 去重', () => {
     expect(new Set(SANDBOX_ALLOWED_ACTION_IDS).size).toBe(SANDBOX_ALLOWED_ACTION_IDS.length)
   })
-  it('白名单恰好是预期的 9 个 actionId', () => {
+  it('白名单恰好是预期的 25 个 actionId', () => {
     expect([...SANDBOX_ALLOWED_ACTION_IDS].sort()).toEqual(
       [
         'bake-bread', 'bonus-vp', 'future-meeples', 'gain', 'pay',
         'push-to-card-stack', 'special-effect', 'store-on-card', 'take-from-card',
+        'plow', 'sow', 'fence', 'stables', 'construct', 'renovate-house', 'improvement', 'occupation',
+        'family-growth', 'breed', 'reap', 'exchange', 'set-first-player', 'selection', 'emit-choice', 'reorganize',
       ].sort(),
     )
+  })
+  it('只包含当前 action registry 中存在的 id', () => {
+    const runtimeActionIds = new Set([...actionDefinitions, ...internalActionDefinitions].map(action => action.id))
+    expect(SANDBOX_ALLOWED_ACTION_IDS.filter(id => !runtimeActionIds.has(id))).toEqual([])
   })
 })
 
 describe('SANDBOX_SPECIAL_EFFECT_KINDS', () => {
-  it('白名单恰好是文档 §6.1 的 7 个卡牌局部 kind', () => {
+  it('白名单恰好是文档 §6.1 的 9 个卡牌局部 kind', () => {
     expect([...SANDBOX_SPECIAL_EFFECT_KINDS].sort()).toEqual([
-      'increment-counter', 'increment-extra-data', 'set-counter', 'set-extra-data',
-      'set-flag', 'set-infobox', 'set-private-data',
+      'increment-counter', 'increment-extra-data', 'pop-card-stack-top', 'remove-future-meeples', 'set-counter',
+      'set-extra-data', 'set-flag', 'set-infobox', 'set-private-data',
     ])
   })
 })
