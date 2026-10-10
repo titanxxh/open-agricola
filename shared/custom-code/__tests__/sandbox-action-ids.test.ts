@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { actionDefinitions } from '../../actions'
 import { internalActionDefinitions } from '../../actions/index'
-import { SANDBOX_ALLOWED_ACTION_IDS } from '../sandbox-action-ids'
+import { SANDBOX_ALLOWED_ACTION_IDS, SANDBOX_SPECIAL_EFFECT_KINDS } from '../sandbox-action-ids'
 import { sandboxListenerActions } from '../sandbox-listener-actions'
 
 describe('SANDBOX_ALLOWED_ACTION_IDS', () => {
@@ -21,6 +21,15 @@ describe('SANDBOX_ALLOWED_ACTION_IDS', () => {
         'push-to-card-stack', 'special-effect', 'store-on-card', 'take-from-card',
       ].sort(),
     )
+  })
+})
+
+describe('SANDBOX_SPECIAL_EFFECT_KINDS', () => {
+  it('白名单恰好是文档 §6.1 的 7 个卡牌局部 kind', () => {
+    expect([...SANDBOX_SPECIAL_EFFECT_KINDS].sort()).toEqual([
+      'increment-counter', 'increment-extra-data', 'set-counter', 'set-extra-data',
+      'set-flag', 'set-infobox', 'set-private-data',
+    ])
   })
 })
 

@@ -17,6 +17,7 @@ import {
   validateAndCompileCustomCode,
 } from '../custom-code/engine.ts'
 import { GameSession } from '../game/authoritative-session.ts'
+import { invokeCustomCodeEffectSync, invokeCustomCodeListenerSync } from '../custom-code/client.ts'
 import {
   invokeCustomCodeEffectLocal,
   invokeCustomCodeListenerLocal,
@@ -168,6 +169,39 @@ describe('browser executor parity with server executor', () => {
     const local = invokeCustomCodeListenerLocal(request as never)
     expect(local).toEqual(server)
     expect(server.ok).toBe(true)
+  })
+
+  it('rejects results outside the Workshop Capability Contract identically on every execution path', () => {
+    // Leaves are assembled at runtime so that source validation cannot see them.
+    const source = `
+const CARD_ID = 'CUSTOM_ParityCard'
+const CARD_DEF = MinorImprovement({ id: CARD_ID, name: 'Parity Card' })
+const CARD_IMPL = {
+  effect: { id: CARD_ID, onRoundStart: () => ({ type: 'leaf', actionId: ['pl', 'ow'].join(''), sourceCard: CARD_ID }) },
+  listeners: [{ cardIds: [CARD_ID], actions: ['collect'], phases: ['after'],
+    handler: () => ({ flow: { type: 'seq', children: [{ type: 'leaf', actionId: ['so', 'w'].join(''), sourceCard: CARD_ID }] } }) }],
+}
+`
+    const compiled = validateAndCompileCustomCode(source, 'CUSTOM_ParityCard')
+    expect(validateAndCompileCustomCodeLocal(source, 'CUSTOM_ParityCard')).toEqual(compiled)
+    expect(compiled.valid).toBe(true)
+    if (!compiled.valid) return
+
+    const state = createInitialState(42)
+    const base = { compiledCode: compiled.compiledCode, cardId: 'CUSTOM_ParityCard' }
+    const effect = { ...base, hook: 'onRoundStart' as const, state, player: state.players[0]! }
+    const listener = { ...base, registrationId: 'CUSTOM_ParityCard:listener:0',
+      context: { state, player: state.players[0]!, space: state.actionSpaces[0]!, actionId: 'collect', phase: 'after' as const } }
+
+    const effectRejection = { ok: false, error: "onRoundStart: actionId 'plow' is not in the Workshop Capability Contract" }
+    expect(invokeCustomCodeEffect(effect)).toEqual(effectRejection)
+    expect(invokeCustomCodeEffectSync(effect)).toEqual(effectRejection)
+    expect(invokeCustomCodeEffectLocal(effect)).toEqual(effectRejection)
+
+    const listenerRejection = { ok: false, error: "flow.children[0]: actionId 'sow' is not in the Workshop Capability Contract" }
+    expect(invokeCustomCodeListener(listener as never)).toEqual(listenerRejection)
+    expect(invokeCustomCodeListenerSync(listener as never)).toEqual(listenerRejection)
+    expect(invokeCustomCodeListenerLocal(listener as never)).toEqual(listenerRejection)
   })
 
   it('reports throwing card code identically as ok:false', () => {

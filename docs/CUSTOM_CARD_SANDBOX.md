@@ -153,7 +153,7 @@ The marked blocks below are machine checked against `cardEffectHooks` in `shared
 
 ### 3.1 Hooks available under `CARD_IMPL.effect`
 
-`extractManifestFromCompiledCode` filters function keys through `cardEffectHooks`. Only listed keys are registered. The AST validator hard-fails an unlisted key when saving.
+Only keys in `cardEffectHooks` are registered. The AST validator hard-fails an unlisted key when saving, and manifest extraction rejects one that still reaches it instead of dropping it.
 
 <!-- prompt-sync:begin id=card-effect-hooks -->
 - `onBuy`
@@ -230,6 +230,12 @@ Extra sowing and special stables each require a paired candidate and settlement 
 Fence discounts such as E16 Briar Hedge and C16 Field Fences use a `computeCosts` listener on `actions: ['fence']`. C1 Overhaul rebuilds only own ordinary fences through `consume-fence` `ownOnly` and generic `fencePolicy`.
 
 ### 3.2 `CARD_IMPL.listeners` allowlists
+
+A listener entry declares only `handler`, `actions`, `phases`, `scope`, and `cardIds`, plus an optional `id` label that the host ignores. Any other field fails on save, because the manifest would drop it.
+
+A listener always belongs to its own card: it reacts only while that card is in play for the player its `scope` selects, and never before the card is played. `cardIds` may be omitted; when present, it must be `[CARD_ID]`.
+
+An omitted `actions` or `phases` filter means the lists in this section, with the anytime identity added for an anytime listener. It never matches action-space identities such as `forest`, or native actions and phases outside these lists.
 
 `actions` accepts only these high-level action IDs. The AST validator rejects an unknown ID:
 
@@ -331,7 +337,7 @@ Do not generate `deriveCardCostCandidate`, `cardCostCandidateMandatory`, `getBas
 - `any`
 <!-- prompt-sync:end id=listener-scopes -->
 
-An unlisted scope becomes `undefined`, equivalent to default `player` behavior.
+An unlisted scope fails on save. An omitted scope defaults to `player`.
 
 ---
 
@@ -399,7 +405,7 @@ const stored = player.cardStates?.[CARD_ID]?.grain ?? 0 // wrong level; always m
 
 Before compilation, `shared/custom-code/ast-validator.ts` rejects each construct below with an author-facing save error.
 
-It also checks that `CARD_IMPL.effect` keys belong to `cardEffectHooks` plus allowed metadata and that values in `CARD_IMPL.listeners[].phases` belong to `actionHookPhases`. An unknown hook or phase hard-fails compilation rather than being silently discarded.
+It also checks that `CARD_IMPL.effect` keys belong to `cardEffectHooks` plus allowed metadata and that values in `CARD_IMPL.listeners[].phases` belong to `actionHookPhases`. An unknown hook or phase hard-fails compilation rather than being silently discarded. A statically visible flow leaf is checked the same way: a literal `actionId` outside section 6, or a literal `special-effect` kind outside section 6.1, fails on save.
 
 ### 5.1 Denied bare identifiers
 
@@ -570,6 +576,8 @@ These are frequent mistakes. `shared/actions/effects/*` contains the complete re
 - `future-meeples`
 <!-- prompt-sync:end id=action-ids -->
 
+These nine IDs are enforced, not only recommended. Source validation rejects a visible leaf with another ID. Both executors reject a returned `flow`, `alternativeFlow`, `followUpActions` entry, or replacement `actionId` that uses one, including inside nested groups. The whole result is rejected before any node runs; section 9.3 describes what the player then sees.
+
 | Action ID | Constraint |
 |---|---|
 | `bonus-vp` | Always awards exactly one VP and accepts no `amount` or `vp`. For N points, sequence N leaves. |
@@ -609,7 +617,7 @@ Each mutation is a `special-effect` leaf with `sourceCard: CARD_ID`. Its `params
 { kind: 'increment-extra-data', key: 'used', amount: 1 }
 ```
 
-The repository may use nonsandbox kinds such as `emit-card-triggered` for visible card-trigger event logs. They are not part of the Workshop contract and are not recommended by the LLM prompt.
+These seven kinds are the complete sandbox set, held in `SANDBOX_SPECIAL_EFFECT_KINDS`. The repository uses other kinds, such as `emit-card-triggered` for visible card-trigger event logs. They are not part of the Workshop contract, and a `special-effect` leaf that uses one is rejected.
 
 Optional `actionContext.targetPlayerId?: string` routes a mutation to the matching player in `state.players`; it defaults to the actor in `context.player`. Workshop rarely needs it except for cross-player cases such as D134 Oyster Eater.
 
@@ -705,12 +713,23 @@ CI catches a missing set update.
 
 `check:prompt-sync` prevents only name-set drift. A payment-solver, executor argument, JSON boundary, or injected-helper change also updates `client/services/__tests__/generation-prompt.test.ts`, corresponding executor or parity tests, and semantic contract tests. When generation strategy changes, add or tighten a real `GameSession` fixture, freeze the implementation, and run the complete browser acceptance batch under the approved budget. Preserve earlier failures and distinguish synthetic runs and historical golden replay from model admission; see `docs/test/llm-card-gen.md`.
 
+### 9.3 Workshop Capability Contract rules
+
+[ADR 0025](adr/0025-workshop-capability-contract-is-fail-closed-and-opened-by-tests.md) sets the rules for this document.
+
+- **Not listed means not open.** The deployed contract, source validation, and both executors accept the same names: the hooks in section 3.1, the listener actions, phases, and scopes in sections 3.2 and 3.4, the action IDs in section 6, and the `special-effect` kinds in section 6.1. This document does not list unopened native interfaces. Candidates are tracked in [issue #1079](https://github.com/titanxxh/open-agricola/issues/1079).
+- **A name is open only with a fixed behavior test.** Each name needs at least one test that drives it through a two-player `GameSession` without changing native rule paths. Open a new capability in its own issue, with that test.
+- **A failed hook and an out-of-contract result behave the same way.** The first occurrence rejects the command, restores the state before it, and returns the error, which names the rejected action, kind, or field. A repeated identical failure is not reported again: the command then succeeds and that card's effect is skipped. This is deliberate, so a game that contains a faulty card can continue.
+
+Admission serves honest authors and model mistakes. It does not bound adversarial workloads beyond the isolate limits.
+
 ---
 
 ## 10. History
 
 | Date | Change |
 |---|---|
+| 2026-10-10 | Made the contract fail-closed (ADR 0025): enforced action IDs and `special-effect` kinds in source validation and both executors, rejected unsupported listener fields and the undocumented `beforeEndGameScope` / `beforeEndGameMandatory` metadata, bound every listener to its own card and omitted listener filters to the listed sets, and documented the hook-failure behavior. |
 | 2026-08-04 | Made discounts across all improvement candidates mandatory capped bonuses; completed and narrowed the `handHooks` manifest; required a direct accessor-free effect object literal plus host filtering; unified `positionKey({row,col})`; removed Workshop candidate-and-settlement hooks that cannot settle completely; added semantic contracts and M11 live, record, and replay guards. |
 | 2026-04-30 | Refactored scoring into two tracks: removed `computePostScore`, `scoringPriority`, and `ctx.reserved`; added `computeCostedBonus` through the Pareto solver. The archived spec and plan remain in Git history. |
 | 2026-04-24 | Corrected `computeBonusScore`, `computePostScore`, and `computeSharedPostScore` signatures; added the listener-action-ID, anytime, and unavailable-`futureMeeplesNode` guidance; registered `flag-card` and `future-meeples`. Findings came from the LLM card-generation session suite. |

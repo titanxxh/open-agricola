@@ -166,7 +166,7 @@ const jsonSafe = JSON.parse(JSON.stringify(value ?? null))
 
 ### 3.1 `CARD_IMPL.effect` 可用 hook
 
-`extractManifestFromCompiledCode` 用 `cardEffectHooks` 数组过滤 `CARD_IMPL.effect` 上的函数键。**只有列表中的 key 才会被沙盒注册**。AST validator 会**硬拒**不在列表中的键——保存直接失败并给出错误信息。
+**只有 `cardEffectHooks` 列表中的 key 才会被沙盒注册**。漏到 manifest 提取阶段的未列出函数键会被明确拒绝，不再被悄悄丢弃。AST validator 会**硬拒**不在列表中的键——保存直接失败并给出错误信息。
 
 
 
@@ -251,6 +251,12 @@ reaction-compatible hook（action listener 的 `before` / `immediatelyAfter` / `
 
 
 ### 3.2 `CARD_IMPL.listeners` 白名单
+
+listener 条目只能声明 `handler`、`actions`、`phases`、`scope` 和 `cardIds`，另可带一个宿主会忽略的 `id` 标签。其他字段在保存时失败，因为 manifest 会丢弃它们。
+
+listener 始终属于自己的卡：只有这张卡在 `scope` 选中的玩家面前已打出时才会触发，打出之前不会触发。`cardIds` 可以省略；如果写了，必须是 `[CARD_ID]`。
+
+省略 `actions` 或 `phases` 表示本节列出的集合；anytime listener 另加 anytime 身份。它不会匹配 `forest` 这类行动格 id，也不会匹配清单之外的原生行动和阶段。
 
 `actions` 只能使用以下高层 action ID；AST validator 会硬拒绝未知 ID：
 
@@ -362,7 +368,7 @@ return {
 
 
 
-不在列表里的 `scope` 会被设为 `undefined`（行为等价于默认 `player`）。
+不在列表里的 `scope` 在保存时失败；省略 `scope` 时默认为 `player`。
 
 ---
 
@@ -434,7 +440,7 @@ const stored = player.cardStates?.[CARD_ID]?.grain ?? 0  // ❌ 读不到
 
 `shared/custom-code/ast-validator.ts` 在编译前用 TypeScript AST 静态拦截以下结构。任何一条命中都会让自定义卡保存失败、给作者错误。
 
-AST validator 还会检查 `CARD_IMPL.effect` 中的键是否在 `cardEffectHooks` + meta 字段白名单中，以及 `CARD_IMPL.listeners[].phases` 中的值是否在 `actionHookPhases` 白名单中。**不在白名单中的 hook/phase 会导致编译失败**（hard-fail），而非静默丢弃。
+AST validator 还会检查 `CARD_IMPL.effect` 中的键是否在 `cardEffectHooks` + meta 字段白名单中，以及 `CARD_IMPL.listeners[].phases` 中的值是否在 `actionHookPhases` 白名单中。**不在白名单中的 hook/phase 会导致编译失败**（hard-fail），而非静默丢弃。 静态可见的 flow leaf 也按同样方式检查：字面量 `actionId` 不在 §6 之内，或字面量 `special-effect` kind 不在 §6.1 之内，保存时失败。
 
 ### 5.1 禁用标识符（裸引用即报错）
 
@@ -618,6 +624,8 @@ return {
 - `future-meeples`
 <!-- prompt-sync:end id=action-ids -->
 
+这九个 ID 是强制执行的，不只是推荐。源码校验会拒绝可见的其他 ID 的 leaf。两个执行器会拒绝使用其他 ID 的返回值，包括 `flow`、`alternativeFlow`、`followUpActions` 条目和替换用的 `actionId`，嵌套分组内也一样。整份返回值在任何节点执行前被拒绝；玩家随后看到的行为见 §9.3。
+
 | actionId                   | 关键约束                                                                              |
 | -------------------------- | --------------------------------------------------------------------------------- |
 | `bonus-vp`                 | **固定 +1 VP，不接受 `amount` / `vp` 参数**。要 N 分就把 N 个 leaf 串入 seq                       |
@@ -657,7 +665,7 @@ return {
 { kind: 'increment-extra-data', key: 'used', amount: 1 }
 ```
 
-仓库内部还可能使用非沙盒 kind（例如 `emit-card-triggered` 用于写入可见卡牌触发事件日志）。这些 kind 不属于 Workshop 合约，LLM prompt 也不会推荐。
+以上七个 kind 是沙盒的完整集合，定义在 `SANDBOX_SPECIAL_EFFECT_KINDS`。仓库内部还使用其他 kind（例如 `emit-card-triggered` 用于写入可见卡牌触发事件日志）。这些 kind 不属于 Workshop 合约，使用它们的 `special-effect` leaf 会被拒绝。
 
 可选 `actionContext.targetPlayerId?: string` 让 mutation 路由到 `state.players` 中匹配的玩家（默认是 `context.player` 即 actor）。Workshop 通常用不到 targetPlayerId（仅 D134 OysterEater 等跨玩家场景需要）。
 
@@ -756,6 +764,16 @@ CI 会拦下漏改的情况。
 
 `check:prompt-sync` 只防名字集合漂移。修改支付器、executor 参数透传、JSON 边界或 injected helper 时，还必须更新 `client/services/__tests__/generation-prompt.test.ts`、对应 executor/parity 测试和语义 contract 测试；涉及生成策略时增加或收紧真实 `GameSession` fixture，冻结实现，并在已批准预算内跑完整浏览器验收批次。保留历史失败，将合成演练、历史 golden 回放与模型准入分开；详见 `docs/test/llm-card-gen.md`。
 
+### 9.3 工坊能力契约规则
+
+本文件遵守 [ADR 0025](adr/0025-workshop-capability-contract-is-fail-closed-and-opened-by-tests.md)。
+
+- **未列出即未开放。**部署契约、源码校验和两个执行器接受同一组名字：§3.1 的 hook，§3.2 和 §3.4 的 listener 行动、阶段和 scope，§6 的 action ID，以及 §6.1 的 `special-effect` kind。本文件不逐项列出未开放的原生接口，候选能力记录在 [issue #1079](https://github.com/titanxxh/open-agricola/issues/1079)。
+- **有固定行为测试的名字才开放。**每个名字至少要有一个测试，在不改原生规则路径的前提下，用两人 `GameSession` 真实驱动它。新能力单独开 issue，并带上这个测试。
+- **hook 出错和返回契约外内容的处理相同。**第一次出现时拒绝这条命令，恢复到命令之前的状态，并返回错误；错误里写明被拒绝的行动、kind 或字段。同样的错误再次出现时不再报告：命令成功，这张卡本次的效果被跳过。这是有意的行为，让带着有问题卡牌的对局可以继续。
+
+准入面向诚实作者和模型写错的情况，除 isolate 自身的限制外，不限制恶意构造的工作量。
+
 ---
 
 ## 10. 历史
@@ -763,6 +781,7 @@ CI 会拦下漏改的情况。
 
 | 日期         | 变更                                                                                                                                                                                                                                                                                                                               |
 | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-10-10 | 契约改为收紧执行（ADR 0025）：源码校验和两个执行器强制执行 action ID 与 `special-effect` kind，拒绝不支持的 listener 字段和未写入文档的 `beforeEndGameScope` / `beforeEndGameMandatory` 元数据，每个 listener 绑定到自己的卡，省略的 listener 过滤绑定到已列出的集合，并写明 hook 出错时的行为。 |
 | 2026-08-04 | 修正跨全部改良候选折扣为 mandatory capped bonus；补齐并收窄 `handHooks` manifest、要求 effect 使用无 accessor 的直接对象字面量并在宿主侧过滤、统一 `positionKey({row,col})`，移除无法完整结算的 Workshop candidate/settlement hook；新增语义 contract 与 M11 live/record/replay 守卫。 |
 | 2026-04-30 | 双轨 scoring hook 重构：删除 `computePostScore` / `scoringPriority` / `ctx.reserved`；新增 `computeCostedBonus` 走 Pareto 求解器。详见 `(spec/plan 已归档，见 git history)`。|
 | 2026-04-24 | 修正 `computeBonusScore` / `computePostScore` / `computeSharedPostScore` 签名（实为 `=> number` / `=> Array<{playerId,score}>`，非 `{score,label}`）；新增 §5.5 listener `actions:` 高频踩坑（不含空间 ID、`harvest-feed` 不可监听）、§5.6 anytime 写法、§5.7 `futureMeeplesNode` 不在沙箱；登记 `flag-card` / `future-meeples` actionId。来源：LLM card-gen session 测试套件实测 |

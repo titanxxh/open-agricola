@@ -1,5 +1,6 @@
 import type { ActionHookResult } from '../actions/hooks'
 import { REAL_RESOURCE_KEYS } from '../contract/resource-keys'
+import { assertCustomFlow, assertSandboxActionId } from './flow-admission'
 
 const RESOURCE_KEYS = new Set<string>(REAL_RESOURCE_KEYS)
 
@@ -39,6 +40,15 @@ export const validateCustomListenerResult = (
 ): ActionHookResult | null => {
   if (value === null || value === undefined) return null
   if (!isPlainRecord(value)) throw new Error('custom listener result must be a plain object')
+  assertCustomFlow(value.flow, 'flow')
+  assertCustomFlow(value.alternativeFlow, 'alternativeFlow')
+  if (value.actionId !== undefined) assertSandboxActionId(value.actionId, 'actionId')
+  if (value.followUpActions !== undefined) {
+    if (!Array.isArray(value.followUpActions)) throw new Error('followUpActions must be an array')
+    value.followUpActions.forEach((action, index) => assertSandboxActionId(
+      isPlainRecord(action) ? action.actionId : action, `followUpActions[${index}]`,
+    ))
+  }
   if (!Object.hasOwn(value, 'costs')) {
     if ('costs' in value) throw new Error('custom listener costs must be an own property')
     if ('costAttribution' in value) {

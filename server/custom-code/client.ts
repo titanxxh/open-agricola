@@ -25,6 +25,8 @@ import type {
   CustomCodeListenerResult,
   CustomCodeValidateResult,
 } from '../../shared/custom-code/types.ts'
+import { assertCustomEffectResult } from '../../shared/custom-code/contract-admission.ts'
+import { validateCustomListenerResult } from '../../shared/custom-code/listener-result-validator.ts'
 
 const WORKER_SCRIPT = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -115,28 +117,50 @@ export const validateAndCompileCustomCodeRemote = async (
   return validateAndCompileCustomCode(source, cardId)
 }
 
+/** The worker only runs the isolate; contract admission (ADR 0025) happens here,
+ * so an out-of-contract result is reported like any other failed hook. */
+const outsideContract = (error: unknown): { ok: false; error: string } => ({
+  ok: false,
+  error: error instanceof Error ? error.message : String(error),
+})
+
 export const invokeCustomCodeEffectSync = (
   request: CustomCodeEffectInvocation,
 ): CustomCodeEffectResult => {
+  let response: CustomCodeEffectResult
   try {
-    return callWorkerSync('invokeEffect', request) as CustomCodeEffectResult
+    response = callWorkerSync('invokeEffect', request) as CustomCodeEffectResult
   } catch (error) {
     return {
       ok: false,
       error: `Worker error: ${error instanceof Error ? error.message : String(error)}`,
     }
   }
+  if (!response.ok) return response
+  try {
+    assertCustomEffectResult(request.hook, response.result)
+    return response
+  } catch (error) {
+    return outsideContract(error)
+  }
 }
 
 export const invokeCustomCodeListenerSync = (
   request: CustomCodeListenerInvocation,
 ): CustomCodeListenerResult => {
+  let response: CustomCodeListenerResult
   try {
-    return callWorkerSync('invokeListener', request) as CustomCodeListenerResult
+    response = callWorkerSync('invokeListener', request) as CustomCodeListenerResult
   } catch (error) {
     return {
       ok: false,
       error: `Worker error: ${error instanceof Error ? error.message : String(error)}`,
     }
+  }
+  if (!response.ok) return response
+  try {
+    return { ok: true, result: validateCustomListenerResult(response.result, request.cardId) }
+  } catch (error) {
+    return outsideContract(error)
   }
 }

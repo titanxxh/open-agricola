@@ -11,8 +11,10 @@
 import ts from 'typescript'
 import { cardEffectHooks, flowCardEffectHooks, isHandCardEffectHook } from '../cards/card-effects'
 import { REAL_RESOURCE_KEYS } from '../contract/resource-keys'
+import { isSandboxActionId, isSandboxSpecialEffectKind } from './sandbox-action-ids'
 import { isSandboxListenerAction } from './sandbox-listener-actions'
 import { sandboxListenerPhases } from './sandbox-listener-phases'
+import { isSandboxListenerScope } from './sandbox-listener-scopes'
 
 export type ValidationResult = { valid: true } | { valid: false; errors: string[] }
 
@@ -50,9 +52,11 @@ const ALLOWED_EFFECT_KEYS = new Set<string>([
   ...cardEffectHooks,
   'id',
   'handHooks',
-  'beforeEndGameScope',
-  'beforeEndGameMandatory',
 ])
+
+/** Listener fields the manifest keeps; any other declaration would be dropped, so reject it.
+ * `id` is a label only: the host assigns the registration identity. */
+const ALLOWED_LISTENER_FIELDS = new Set<string>(['id', 'handler', 'actions', 'phases', 'scope', 'cardIds'])
 
 /** Allowed values inside listener.phases arrays. */
 const ALLOWED_LISTENER_PHASES = new Set<string>(sandboxListenerPhases)
@@ -96,6 +100,41 @@ function validateLiteralFlow(
     for (const child of value.elements) validateLiteralFlow(child, errors, getLine, constants)
   } else if (ts.isObjectLiteralExpression(value) || ts.isStringLiteralLike(value) || ts.isNumericLiteral(value)
     || [ts.SyntaxKind.NullKeyword, ts.SyntaxKind.TrueKeyword, ts.SyntaxKind.FalseKeyword].includes(value.kind)) report()
+}
+
+/** Reject statically visible leaves outside the contract at save time; flows
+ * built dynamically are checked by the executors (flow-admission.ts). */
+function validateLiteralLeafActions(
+  sourceFile: ts.SourceFile,
+  errors: string[],
+  getLine: (node: ts.Node) => number,
+  constants: Map<string, string>,
+): void {
+  const staticProperty = (object: ts.ObjectLiteralExpression, name: string): ts.Expression | undefined => {
+    const property = [...object.properties].reverse().find(candidate => getStaticPropertyName(candidate, constants) === name)
+    return property && ts.isPropertyAssignment(property) ? property.initializer : undefined
+  }
+  const visit = (node: ts.Node): void => {
+    if (ts.isObjectLiteralExpression(node)) {
+      const type = staticProperty(node, 'type')
+      const actionIdNode = staticProperty(node, 'actionId')
+      const actionId = actionIdNode && getStaticStringValue(actionIdNode, constants)
+      if (type && getStaticStringValue(type, constants) === 'leaf' && actionId !== undefined) {
+        if (!isSandboxActionId(actionId)) {
+          errors.push(`line ${getLine(actionIdNode!)}: actionId '${actionId}' is not available to Workshop cards`)
+        } else if (actionId === 'special-effect') {
+          const params = staticProperty(node, 'params')
+          const kindNode = params && ts.isObjectLiteralExpression(params) ? staticProperty(params, 'kind') : undefined
+          const kind = kindNode && getStaticStringValue(kindNode, constants)
+          if (kind !== undefined && !isSandboxSpecialEffectKind(kind)) {
+            errors.push(`line ${getLine(kindNode!)}: special-effect kind '${kind}' is not available to Workshop cards`)
+          }
+        }
+      }
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(sourceFile)
 }
 
 function validateFlowHookReturns(
@@ -552,6 +591,7 @@ export function validateCardCode(source: string, expectedCardId?: string): Valid
   // Validate CARD_IMPL hook/listener whitelists
   validateCardImplHooksAndPhases(sourceFile, errors)
   const constants = collectStringConstants(sourceFile)
+  validateLiteralLeafActions(sourceFile, errors, getLine, constants)
   forEachListenerResultObject(sourceFile, constants, result => {
     for (const property of result.properties) {
       if (ts.isPropertyAssignment(property) && ['flow', 'alternativeFlow'].includes(getStaticPropertyName(property, constants) ?? '')) {
@@ -791,7 +831,11 @@ function validateListenersArray(
         errors.push(`line ${getLine(prop)}: CARD_IMPL listener properties must not set __proto__`)
         continue
       }
-      if ((propName === 'actions' || propName === 'phases') && !ts.isPropertyAssignment(prop)) {
+      if (propName !== undefined && !ALLOWED_LISTENER_FIELDS.has(propName)) {
+        errors.push(`line ${getLine(prop)}: unsupported listener field '${propName}' in CARD_IMPL.listeners`)
+        continue
+      }
+      if ((propName === 'actions' || propName === 'phases' || propName === 'scope' || propName === 'cardIds') && !ts.isPropertyAssignment(prop)) {
         errors.push(`line ${getLine(prop)}: listener ${propName} must use a property assignment`)
         continue
       }
@@ -820,6 +864,19 @@ function validateListenersArray(
           } else if (!isSandboxListenerAction(actionElement.text)) {
             errors.push(`line ${getLine(actionElement)}: unknown listener action '${actionElement.text}' in CARD_IMPL.listeners`)
           }
+        }
+      }
+      if (propName === 'scope') {
+        const scope = getStaticStringValue(prop.initializer, constants)
+        if (!isSandboxListenerScope(scope)) {
+          errors.push(`line ${getLine(prop.initializer)}: listener scope must be a supported string literal`)
+        }
+      }
+      if (propName === 'cardIds') {
+        const cardId = constants.get('CARD_ID')
+        const elements = ts.isArrayLiteralExpression(prop.initializer) ? prop.initializer.elements : undefined
+        if (elements?.length !== 1 || cardId === undefined || getStaticStringValue(elements[0]!, constants) !== cardId) {
+          errors.push(`line ${getLine(prop.initializer)}: listener cardIds must be [CARD_ID]`)
         }
       }
       if (propName === 'phases') {

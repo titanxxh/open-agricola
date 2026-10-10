@@ -1,18 +1,13 @@
 import ivm from 'isolated-vm'
 import { validateCardCode } from '../../shared/custom-code/ast-validator.ts'
 import { compileCardCode } from '../../shared/custom-code/compiler.ts'
-import { cardEffectHooks, isHandCardEffectHook, type CardEffectField } from '../../shared/cards/card-effects.ts'
 import type { ActionFlow } from '../../shared/contract/types.ts'
+import { assertCustomEffectResult, normalizeCustomManifest, type RawCustomManifest } from '../../shared/custom-code/contract-admission.ts'
 import { validateCustomListenerResult } from '../../shared/custom-code/listener-result-validator.ts'
-import { isSandboxListenerAction } from '../../shared/custom-code/sandbox-listener-actions.ts'
-import { isSandboxListenerPhase } from '../../shared/custom-code/sandbox-listener-phases.ts'
-import { isSandboxListenerScope } from '../../shared/custom-code/sandbox-listener-scopes.ts'
 import type {
-  CustomCodeEffectMetadata,
   CustomCodeEffectInvocation,
   CustomCodeEffectResult,
   CustomCodeListenerInvocation,
-  CustomCodeListenerManifest,
   CustomCodeListenerResult,
   CustomCodeManifest,
   CustomCodeValidateResult,
@@ -128,14 +123,8 @@ function runManifestExtraction(compiledCode: string, cardId: string): {
             __effectKeys.push(k);
           }
         }
-        if (eff.beforeEndGameScope === 'owner' || eff.beforeEndGameScope === 'allPlayers') {
-          __effectMetadata.beforeEndGameScope = eff.beforeEndGameScope;
-        }
         if (Array.isArray(eff.handHooks)) {
-          __effectMetadata.handHooks = eff.handHooks.filter(function(x) { return typeof x === 'string'; });
-        }
-        if (typeof eff.beforeEndGameMandatory === 'boolean') {
-          __effectMetadata.beforeEndGameMandatory = eff.beforeEndGameMandatory;
+          __effectMetadata.handHooks = eff.handHooks;
         }
       }
       if (__captured.CARD_IMPL && Array.isArray(__captured.CARD_IMPL.listeners)) {
@@ -144,11 +133,10 @@ function runManifestExtraction(compiledCode: string, cardId: string): {
           var registrationId = ${JSON.stringify(cardId)} + ':listener:' + i;
           __listeners.push({
             registrationId: registrationId,
-            cardIds: Array.isArray(listener.cardIds) ? listener.cardIds.filter(function(x) { return typeof x === 'string'; }) : undefined,
-            actions: Array.isArray(listener.actions) ? listener.actions.filter(function(x) { return typeof x === 'string'; }) : undefined,
+            cardIds: Array.isArray(listener.cardIds) ? listener.cardIds : undefined,
+            actions: Array.isArray(listener.actions) ? listener.actions : undefined,
             phases: Array.isArray(listener.phases) ? listener.phases : undefined,
-            order: typeof listener.order === 'number' ? listener.order : undefined,
-            scope: typeof listener.scope === 'string' ? listener.scope : undefined,
+            scope: listener.scope,
           });
         }
       }
@@ -163,10 +151,7 @@ function runManifestExtraction(compiledCode: string, cardId: string): {
 
     const script = isolate.compileScriptSync(wrappedCode)
     const resultJson = script.runSync(context, { timeout: EXECUTION_TIMEOUT_MS })
-    const parsed = resultJson ? JSON.parse(resultJson as string) as {
-      effectKeys: string[]
-      effectMetadata?: CustomCodeEffectMetadata
-      listeners: CustomCodeListenerManifest[]
+    const parsed = resultJson ? JSON.parse(resultJson as string) as RawCustomManifest & {
       cardDefinition: Record<string, unknown> | null
       cardDefinitionType: 'minor' | 'occupation' | null
     } : {
@@ -177,27 +162,8 @@ function runManifestExtraction(compiledCode: string, cardId: string): {
       cardDefinitionType: null,
     }
 
-    const effectHooks = parsed.effectKeys.filter((hook): hook is CardEffectField =>
-      cardEffectHooks.includes(hook as CardEffectField),
-    )
-    const listeners = parsed.listeners.map((l) => ({
-      ...l,
-      actions: l.actions?.filter(isSandboxListenerAction),
-      phases: l.phases?.filter(isSandboxListenerPhase),
-      scope: isSandboxListenerScope(l.scope) ? l.scope : undefined,
-    }))
-
-    const effectMetadata = parsed.effectMetadata && Object.keys(parsed.effectMetadata).length > 0
-      ? {
-          ...parsed.effectMetadata,
-          ...(parsed.effectMetadata.handHooks
-            ? { handHooks: parsed.effectMetadata.handHooks.filter(isHandCardEffectHook) }
-            : {}),
-        }
-      : undefined
-
     return {
-      manifest: { effectHooks, effectMetadata, listeners },
+      manifest: normalizeCustomManifest(parsed, cardId),
       cardDefinition: parsed.cardDefinition && parsed.cardDefinitionType
         ? {
             cardType: parsed.cardDefinitionType,
@@ -267,6 +233,7 @@ __result = typeof __handler === 'function'
         __input_paymentInfo: request.paymentInfo ?? null,
       },
     )
+    assertCustomEffectResult(request.hook, result)
     return { ok: true, result: (result ?? null) as ActionFlow | null }
   } catch (error) {
     return {

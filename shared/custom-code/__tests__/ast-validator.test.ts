@@ -688,13 +688,99 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
         effect: {
           id: 'test',
           handHooks: ['onRoundStart'],
-          beforeEndGameScope: 'allPlayers',
-          beforeEndGameMandatory: true,
           onRoundStart: (state, player) => {},
         },
       }
     `
     const result = validateCardCode(code)
+    expect(result.valid).toBe(true)
+  })
+
+  it.each(['beforeEndGameScope', 'beforeEndGameMandatory'])('rejects the unopened end-game metadata %s', (key) => {
+    const result = validateCardCode(`
+      const CARD_IMPL = {
+        effect: {
+          id: 'test',
+          ${key}: ${key === 'beforeEndGameScope' ? "'allPlayers'" : 'true'},
+          onBeforeEndGame: () => {},
+        },
+      }
+    `)
+    expect(result).toEqual({ valid: false, errors: [expect.stringContaining(`unknown effect hook '${key}'`)] })
+  })
+
+  it.each(['zones', 'mandatory', 'preScoring', 'replacesTurn', 'order', 'deriveCardCostCandidate'])(
+    'rejects the listener field %s instead of dropping it', (field) => {
+      const result = validateCardCode(`
+        const CARD_IMPL = {
+          listeners: [{ actions: ['collect'], phases: ['after'], ${field}: 1, handler: () => {} }],
+        }
+      `)
+      expect(result).toEqual({ valid: false, errors: [expect.stringContaining(`unsupported listener field '${field}'`)] })
+    })
+
+  it('accepts the listener fields the manifest keeps', () => {
+    const result = validateCardCode(`
+      const CARD_ID = 'CUSTOM_Test'
+      const CARD_IMPL = {
+        listeners: [{ id: 'label', cardIds: [CARD_ID], actions: ['collect'], phases: ['after'], scope: 'any', handler: () => {} }],
+      }
+    `)
+    expect(result.valid).toBe(true)
+  })
+
+  it.each(["['E033_BeaverColony']", '[CARD_ID, OTHER]', 'OTHER_IDS'])('rejects listener cardIds %s', (cardIds) => {
+    const result = validateCardCode(`
+      const CARD_ID = 'CUSTOM_Test'
+      const OTHER = 'E033_BeaverColony'
+      const OTHER_IDS = [OTHER]
+      const CARD_IMPL = {
+        listeners: [{ cardIds: ${cardIds}, actions: ['collect'], phases: ['after'], handler: () => {} }],
+      }
+    `)
+    expect(result).toEqual({ valid: false, errors: [expect.stringContaining('listener cardIds must be [CARD_ID]')] })
+  })
+
+  it('rejects an unsupported listener scope', () => {
+    const result = validateCardCode(`
+      const CARD_IMPL = {
+        listeners: [{ actions: ['collect'], phases: ['after'], scope: 'everyone', handler: () => {} }],
+      }
+    `)
+    expect(result).toEqual({ valid: false, errors: [expect.stringContaining('listener scope must be a supported string literal')] })
+  })
+
+  it('rejects statically visible leaves outside the contract', () => {
+    const result = validateCardCode(`
+      const CARD_ID = 'CUSTOM_Test'
+      const PLOW = 'plow'
+      const helper = () => ({ type: 'leaf', actionId: 'selection', sourceCard: CARD_ID })
+      const CARD_IMPL = {
+        effect: {
+          onRoundStart: () => ({ type: 'seq', children: [
+            { type: 'leaf', actionId: PLOW, sourceCard: CARD_ID },
+            { type: 'leaf', actionId: 'special-effect', params: { kind: 'consume-supply-token', key: 'fence' }, sourceCard: CARD_ID },
+            { type: 'leaf', actionId: 'special-effect', params: { kind: 'set-flag', flag: true }, sourceCard: CARD_ID },
+            gainLeaf(CARD_ID, { food: 1 }),
+          ] }),
+        },
+      }
+    `)
+    expect(result.valid).toBe(false)
+    expect(result.valid === false && result.errors).toEqual([
+      "line 4: actionId 'selection' is not available to Workshop cards",
+      "line 8: actionId 'plow' is not available to Workshop cards",
+      "line 9: special-effect kind 'consume-supply-token' is not available to Workshop cards",
+    ])
+  })
+
+  it('does not treat other objects carrying an actionId as flow leaves', () => {
+    const result = validateCardCode(`
+      const CARD_IMPL = {
+        listeners: [{ actions: ['collect'], phases: ['after'],
+          handler: (context) => context.actionId === 'plow' ? { doable: true } : undefined }],
+      }
+    `)
     expect(result.valid).toBe(true)
   })
 

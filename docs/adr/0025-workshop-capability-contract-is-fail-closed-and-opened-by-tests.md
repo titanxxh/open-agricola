@@ -1,9 +1,9 @@
 # Workshop Capability Contract is fail-closed and opened by fixed tests
 
-- Status: Accepted; enforcement is not implemented yet and is tracked in #1062
+- Status: Accepted
 - Date: 2026-10-10
 
-The Workshop Capability Contract is the one scope shared by model generation, source admission and execution. We reach that alignment by narrowing execution to the contract. Custom declarations and runtime return values outside the contract will be rejected explicitly before they reach authoritative settlement, and native rule paths are not changed to make a custom capability safe. At the time of this decision the action allowlist only feeds the prompt and its sync check, so a custom flow can still dispatch an unlisted native action.
+The Workshop Capability Contract is the one scope shared by model generation, source admission and execution. We reach that alignment by narrowing execution to the contract. Custom declarations and runtime return values outside the contract are rejected explicitly before they reach authoritative settlement, and native rule paths are not changed to make a custom capability safe. Before this decision the action allowlist only fed the prompt and its sync check, so a custom flow could dispatch an unlisted native action.
 
 A name belongs to the contract only while at least one fixed behavior test drives it through a two-player GameSession on unmodified native paths. Names in the previously documented list are candidates: each one gets such a test or is removed. New capabilities open in demand-driven slices, each with its own issue and fixed test. Anything not listed is not open. Candidate capabilities are tracked in a GitHub issue; the sandbox reference does not enumerate unopened native interfaces with reasons.
 

@@ -41,23 +41,27 @@ afterEach(() => {
 })
 
 describe('custom code executor', () => {
-  it.each(['native', 'sandbox'].flatMap(mode => ['selection', 'pay'].map(kind => ({ mode, kind }))))(
+  // `selection` is not in the Workshop Capability Contract, so only the native card covers it.
+  it.each([{ mode: 'native', kind: 'selection' }, { mode: 'native', kind: 'pay' }, { mode: 'sandbox', kind: 'pay' }])(
     'uses a source-owned quantity and current-step window through $mode / $kind, including restoration', ({ mode, kind }) => {
     const flow: ActionFlow = { type: 'leaf', actionId: kind, sourceCard: 'CUSTOM_ExecutorCard', optional: true,
       promptKey: 'ui.interactionOptionalAction', anytimeWindow: { allowed: true },
       ...(kind === 'pay'
         ? { params: { cost: { fees: [{ food: 1 }, { wood: 1 }] } } }
         : { actionContext: { selectionKind: 'farm-position', selectableTiles: [{ row: 0, col: 1 }], minSelections: 1, maxSelections: 1 } }) }
-    const compiled = validateAndCompileCustomCode(`
+    const compileSandboxCard = () => {
+      const compiled = validateAndCompileCustomCode(`
 const CARD_ID = 'CUSTOM_ExecutorCard'
 const CARD_DEF = MinorImprovement({ id: CARD_ID, name: 'Executor Card' })
 const CARD_IMPL = { effect: { id: CARD_ID,
   getRuleContributions: (player) => ({ unusedSpaceReduction: player.cardStates[CARD_ID].extraData.quantity }),
   onBeforeEndGame: () => (${JSON.stringify(flow)})
 } }
-    `, 'CUSTOM_ExecutorCard')
-    if (!compiled.valid) throw new Error(compiled.errors.join('\n'))
-    const cards = mode === 'sandbox' ? [makeCardData(compiled.compiledCode, compiled.manifest)] : undefined
+      `, 'CUSTOM_ExecutorCard')
+      if (!compiled.valid) throw new Error(compiled.errors.join('\n'))
+      return [makeCardData(compiled.compiledCode, compiled.manifest)]
+    }
+    const cards = mode === 'sandbox' ? compileSandboxCard() : undefined
     const session = new GameSession(42, cards, { playerCount: 2 })
     const installNative = (target: GameSession) => {
       if (mode === 'native') target.withCtx(() => getActiveCardRegistry()!.loadImpl('CUSTOM_ExecutorCard', { effect: {
@@ -263,7 +267,7 @@ const CARD_IMPL = {
     expect(result.manifest.listeners[0]?.actions).toEqual(['collect'])
   })
 
-  it('extracts before-end metadata for executor-backed custom cards', () => {
+  it('extracts hand-hook metadata for executor-backed custom cards', () => {
     const result = validateAndCompileCustomCode(`
 const CARD_ID = 'CUSTOM_ExecutorCard'
 const CARD_DEF = MinorImprovement({ id: CARD_ID, name: 'Executor Card' })
@@ -271,9 +275,7 @@ const CARD_IMPL = {
   effect: {
     id: CARD_ID,
     handHooks: ['onBeforeStartOfTurn'],
-    beforeEndGameScope: 'allPlayers',
-    beforeEndGameMandatory: true,
-    onBeforeEndGame: (_state: any, _player: any) => {
+    onBeforeStartOfTurn: (_state: any, _player: any) => {
       return { type: 'leaf', actionId: 'gain', params: { food: 1 }, sourceCard: CARD_ID }
     },
   },
@@ -282,21 +284,13 @@ const CARD_IMPL = {
 
     expect(result.valid).toBe(true)
     if (!result.valid) return
-    expect((result.manifest as any).effectMetadata).toEqual({
-      handHooks: ['onBeforeStartOfTurn'],
-      beforeEndGameScope: 'allPlayers',
-      beforeEndGameMandatory: true,
-    })
+    expect(result.manifest.effectMetadata).toEqual({ handHooks: ['onBeforeStartOfTurn'] })
 
     const cardData = makeCardData(result.compiledCode, result.manifest)
     registerCustomCard(cardData, { allowGlobal: true })
     registerExecutorBackedCustomCard(cardData)
 
-    expect(getCardEffect('CUSTOM_ExecutorCard')).toMatchObject({
-      handHooks: ['onBeforeStartOfTurn'],
-      beforeEndGameScope: 'allPlayers',
-      beforeEndGameMandatory: true,
-    })
+    expect(getCardEffect('CUSTOM_ExecutorCard')).toMatchObject({ handHooks: ['onBeforeStartOfTurn'] })
   })
 
   it('dispatches a supported custom hand hook through a real session stage', () => {

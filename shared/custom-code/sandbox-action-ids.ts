@@ -4,6 +4,7 @@
  * 单一真相源：getWorkshopSandboxContract 的 actionId 表、
  * docs/CUSTOM_CARD_SANDBOX.md 的 action-ids 块都对照此常量
  * （由 scripts/check-prompt-sync.ts 在 CI strict 模式校验）。
+ * 源码校验和两个执行器的运行时准入（flow-admission.ts）也只接受这份名单（ADR 0025）。
  *
  * 不含 card_ 前缀 ad-hoc actionId —— 那些由 registerAdHocAction 注册，
  * 仅主仓库单卡可用，沙盒卡牌不能 dispatch。
@@ -21,6 +22,28 @@ export const SANDBOX_ALLOWED_ACTION_IDS = [
 ] as const
 
 export type SandboxActionId = (typeof SANDBOX_ALLOWED_ACTION_IDS)[number]
+
+export const isSandboxActionId = (value: unknown): value is SandboxActionId =>
+  typeof value === 'string' && (SANDBOX_ALLOWED_ACTION_IDS as readonly string[]).includes(value)
+
+/**
+ * `special-effect` 的 `params.kind` 沙盒白名单（docs/CUSTOM_CARD_SANDBOX.md §6.1）。
+ * 原生还有其它 kind（组件供给、农场写入、内部清理等），沙盒卡牌不能使用。
+ */
+export const SANDBOX_SPECIAL_EFFECT_KINDS = [
+  'increment-counter',
+  'set-counter',
+  'set-flag',
+  'set-infobox',
+  'set-extra-data',
+  'set-private-data',
+  'increment-extra-data',
+] as const
+
+export type SandboxSpecialEffectKind = (typeof SANDBOX_SPECIAL_EFFECT_KINDS)[number]
+
+export const isSandboxSpecialEffectKind = (value: unknown): value is SandboxSpecialEffectKind =>
+  typeof value === 'string' && (SANDBOX_SPECIAL_EFFECT_KINDS as readonly string[]).includes(value)
 
 /**
  * Prompt 描述元数据（单一真相源）：actionId 的中文说明与 params 形态。
