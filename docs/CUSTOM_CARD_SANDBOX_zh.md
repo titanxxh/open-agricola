@@ -522,7 +522,7 @@ AST validator 还会检查 `CARD_IMPL.effect` 中的键是否在 `cardEffectHook
 
 ## 5.5 listener `actions:` 字段（高频踩坑）
 
-`CARD_IMPL.listeners[].actions` 接受的字符串是**触发行动的内部 leaf actionId**（如 `place-farmer`、`gain`、`collect`），**不是**行动空间 ID（如 `forest`、`clay-pit`、`wish-children`）。完整列表由 `shared/custom-code/sandbox-listener-actions.ts` 定义，并进入已部署沙盒契约。
+`CARD_IMPL.listeners[].actions` 接受的字符串是**触发行动的内部 leaf actionId**（如 `place-farmer`、`gain`、`collect`），**不是**行动空间 ID（如 `forest`、`clay-pit`）。唯一的例外是 `wish-children`：它在清单里，玩家使用“渴望孩子”行动格时，监听它的 listener 会在 `before` 阶段被调用。完整列表由 `shared/custom-code/sandbox-listener-actions.ts` 定义，并进入已部署沙盒契约。
 
 要在"玩家走某个行动空间"后触发，监听 `actions: ['place-farmer']` 然后在 handler 内用 `context.space?.id === '<空间ID>'` 过滤。
 

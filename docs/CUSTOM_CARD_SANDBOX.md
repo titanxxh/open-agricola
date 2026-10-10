@@ -475,7 +475,7 @@ It also checks that `CARD_IMPL.effect` keys belong to `cardEffectHooks` plus all
 
 ### 5.5 Listener `actions`: a frequent mistake
 
-`CARD_IMPL.listeners[].actions` contains the internal leaf action ID that triggers the listener, such as `place-farmer`, `gain`, or `collect`. It does not contain an action-space ID such as `forest`, `clay-pit`, or `wish-children`. Section 3.2 has the complete list.
+`CARD_IMPL.listeners[].actions` contains the internal leaf action ID that triggers the listener, such as `place-farmer`, `gain`, or `collect`. It does not contain an action-space ID such as `forest` or `clay-pit`. The one exception is `wish-children`: it is in the list, and a listener on it is called in the `before` phase when a player uses the Wish for Children action space. Section 3.2 has the complete list.
 
 To trigger after a player visits a particular action space, listen on `actions: ['place-farmer']` and filter with `context.space?.id === '<space-id>'`:
 
