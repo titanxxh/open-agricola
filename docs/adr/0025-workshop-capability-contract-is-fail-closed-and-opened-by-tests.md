@@ -19,7 +19,9 @@ Admission checks these things and nothing else:
 
 Admission does not check parameter values, cost structures, schedules, or the contents of a query result. Their native consumers validate them, as they do for native cards. Mirroring those rules on the host is the approach this decision rejects, so a review finding of that kind is answered by pointing here, not by adding another validator.
 
-Admission serves honest authors and model mistakes. It must produce a clear error; it does not bound adversarial workloads beyond the isolate's existing time and memory limits. A hook failure or an out-of-contract result keeps the existing behavior: the first occurrence rejects and rolls back the command with the error, and a repeated identical failure skips that card's effect so a game containing a faulty card can continue. This is deliberate.
+Admission serves honest authors and model mistakes. It must produce a clear error; it does not bound adversarial workloads beyond the isolate's existing time and memory limits.
+
+That threat model rests on where custom code can run. A room loads only the approved snapshot of a card that passed pull-request review and that its author then switched live. A card that is not live is refused when its own author creates the room, and skipped otherwise. An unreviewed card runs only in its author's own Workshop Sandbox session. Code that reaches other players has therefore been reviewed, and the isolate still bounds its memory, time and access. A hook failure or an out-of-contract result keeps the existing behavior: the first occurrence rejects and rolls back the command with the error, and a repeated identical failure skips that card's effect so a game containing a faulty card can continue. This is deliberate.
 
 ## Considered options
 
