@@ -11,12 +11,17 @@ describe('validateCustomListenerResult', () => {
     expect(result).not.toBeNull()
   })
 
-  it('accepts results that stay inside the contract', () => {
+  it('accepts results that stay inside the contract and attributes their flow to the card', () => {
     const result = {
       flow: { type: 'seq', children: [{ type: 'leaf', actionId: 'gain', params: { food: 1 } }] },
       followUpActions: ['bake-bread', { actionId: 'gain', sourceCard: 'CUSTOM_Test' }],
     }
     expect(validateCustomListenerResult(result, 'CUSTOM_Test')).toBe(result)
+    expect(result).toMatchObject({ sourceCard: 'CUSTOM_Test', flow: { children: [{ sourceCard: 'CUSTOM_Test' }] } })
+  })
+
+  it('leaves a query result without a flow unattributed', () => {
+    expect(validateCustomListenerResult({ doable: true }, 'CUSTOM_Test')).toEqual({ doable: true })
   })
 
   it.each([

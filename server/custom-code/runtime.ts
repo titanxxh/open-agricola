@@ -5,7 +5,7 @@ import type { GameState, PlayerState } from '../../shared/contract/types.ts'
 import { requireActiveCardRegistry } from '../../shared/cards/active-registry.ts'
 import { getCurrentSessionContext, type CustomCardData } from '../../shared/cards/session-card-context.ts'
 import { setCardListenerSource } from '../../shared/cards/card-listener-source.ts'
-import { boundListenerFilters } from '../../shared/custom-code/contract-admission.ts'
+import { boundListenerFilters, neutralEffectResult } from '../../shared/custom-code/contract-admission.ts'
 import { assertSandboxListenerPhases } from '../../shared/custom-code/sandbox-listener-phases.ts'
 import { invokeCustomCodeEffectSync, invokeCustomCodeListenerSync } from './client.ts'
 
@@ -35,9 +35,9 @@ export const registerExecutorBackedCustomCard = (cardData: CustomCardData): void
         const warning = `Custom card ${cardId} hook "${hook}" failed: ${response.error}`
         console.warn(`[custom-code-runtime] ${warning}`)
         sessionCtx?.reportWarning(warning)
-        return undefined
+        return neutralEffectResult(hook)
       }
-      return response.result ?? undefined
+      return response.result ?? neutralEffectResult(hook)
     }
   }
   if (codeManifest.effectMetadata) {

@@ -1,5 +1,6 @@
+import { REAL_RESOURCE_KEYS, isPaymentResourceKey } from '../contract/resource-keys'
 import type { ActionFlow } from '../contract/types'
-import { isSandboxActionId, isSandboxSpecialEffectKind, type SandboxSpecialEffectKind } from './sandbox-action-ids'
+import { isSandboxActionId, isSandboxSpecialEffectKind, type SandboxActionId, type SandboxSpecialEffectKind } from './sandbox-action-ids'
 
 /**
  * Runtime admission for flows returned by custom cards (ADR 0025). A flow that
@@ -7,9 +8,10 @@ import { isSandboxActionId, isSandboxSpecialEffectKind, type SandboxSpecialEffec
  * node reaches the engine, so the caller can treat it like a failed hook.
  * Native card flows never pass through here.
  *
- * The contract covers names, node fields and the documented shapes of the
- * card-local special-effect writes. Parameters of the other actions stay with
- * their native consumers, exactly as for native cards.
+ * The contract covers names, node fields, the parameter keys each action
+ * documents, and the field types of the card-local special-effect writes.
+ * Parameter values (amounts, cost rules, schedules) stay with their native
+ * consumers, exactly as for native cards.
  */
 
 type KeysOfUnion<T> = T extends T ? keyof T : never
@@ -89,11 +91,9 @@ function assertNodeFields(node: Record<string, unknown>, fields: Record<string, 
   }
 }
 
-function assertSpecialEffectParams(params: unknown, path: string): void {
-  const kind = isRecord(params) ? params.kind : undefined
-  if (!isRecord(params) || !isSandboxSpecialEffectKind(kind)) {
-    throw outsideContract(path, `special-effect kind '${String(kind)}'`)
-  }
+function assertSpecialEffectParams(params: Record<string, unknown>, _cardId: string, path: string): void {
+  const kind = params.kind
+  if (!isSandboxSpecialEffectKind(kind)) throw outsideContract(path, `special-effect kind '${String(kind)}'`)
   for (const [field, shape] of Object.entries(SPECIAL_EFFECT_SHAPES[kind])) {
     if (!matchesShape(params[field], shape)) {
       throw new Error(`${path}: special-effect '${kind}' requires ${field} to be a ${shape === 'finite' ? 'finite number' : shape}`)
@@ -101,13 +101,48 @@ function assertSpecialEffectParams(params: unknown, path: string): void {
   }
 }
 
-function assertFlowNode(node: unknown, cardId: string, path: string): void {
+type ParamRule = (params: Record<string, unknown>, cardId: string, path: string) => void
+
+const REAL_RESOURCES = new Set<string>(REAL_RESOURCE_KEYS)
+
+const onlyKeys = (actionId: string, allows: (key: string) => boolean): ParamRule => (params, _cardId, path) => {
+  const key = Object.keys(params).find(candidate => !allows(candidate))
+  if (key !== undefined) throw outsideContract(path, `${actionId} param '${key}'`)
+}
+const resourceMap = (actionId: string): ParamRule => onlyKeys(actionId, key => REAL_RESOURCES.has(key))
+
+/** The parameter keys each action documents (docs/CUSTOM_CARD_SANDBOX.md §6). Native-only
+ * controls such as a gain's payerId are not open to custom cards. */
+const PARAM_RULES: Record<SandboxActionId, ParamRule> = {
+  gain: resourceMap('gain'),
+  'store-on-card': resourceMap('store-on-card'),
+  'take-from-card': resourceMap('take-from-card'),
+  // Either a flat resource cost, or the payLeaf wrapper whose cost the payment solver validates.
+  pay: (params, cardId, path) => (Object.hasOwn(params, 'cost')
+    ? onlyKeys('pay', key => key === 'cost')
+    : onlyKeys('pay', isPaymentResourceKey))(params, cardId, path),
+  'bonus-vp': onlyKeys('bonus-vp', () => false),
+  'bake-bread': onlyKeys('bake-bread', () => false),
+  'push-to-card-stack': onlyKeys('push-to-card-stack', key => key === 'item'),
+  'special-effect': assertSpecialEffectParams,
+  'future-meeples': (params, cardId, path) => {
+    onlyKeys('future-meeples', key => key === '__futureMeepleRequest')(params, cardId, path)
+    const request = params.__futureMeepleRequest
+    if (!isRecord(request)) throw new Error(`${path}: future-meeples requires params.__futureMeepleRequest`)
+    if (request.cardId !== cardId) throw new Error(`${path}: __futureMeepleRequest.cardId must be this card's id`)
+  },
+}
+
+function admitFlowNode(node: unknown, cardId: string, path: string): void {
   if (!isRecord(node)) throw new Error(`${path}: must be an ActionFlow object`)
   assertOwnSourceCard(node.sourceCard, cardId, path)
   if (node.type === 'leaf') {
     assertSandboxActionId(node.actionId, path)
     assertNodeFields(node, LEAF_FIELDS, path)
-    if (node.actionId === 'special-effect') assertSpecialEffectParams(node.params, path)
+    if (node.params !== undefined && !isRecord(node.params)) throw new Error(`${path}: params must be an object`)
+    PARAM_RULES[node.actionId as SandboxActionId](node.params ?? {}, cardId, path)
+    // An omitted source would be settled without card attribution.
+    node.sourceCard = cardId
     return
   }
   if (node.type !== 'seq' && node.type !== 'or' && node.type !== 'xor' && node.type !== 'parallel') {
@@ -115,11 +150,12 @@ function assertFlowNode(node: unknown, cardId: string, path: string): void {
   }
   assertNodeFields(node, GROUP_FIELDS, path)
   if (!Array.isArray(node.children)) throw new Error(`${path}: '${node.type}' requires a children array`)
-  node.children.forEach((child, index) => assertFlowNode(child, cardId, `${path}.children[${index}]`))
+  node.children.forEach((child, index) => admitFlowNode(child, cardId, `${path}.children[${index}]`))
 }
 
-/** A hook may return nothing; anything else must be a contract flow of this card. */
-export function assertCustomFlow(value: unknown, cardId: string, path = 'flow'): void {
+/** A hook may return nothing; anything else must be a contract flow of this card.
+ * Admission also binds each leaf to the card, so the returned object is updated in place. */
+export function admitCustomFlow(value: unknown, cardId: string, path = 'flow'): void {
   if (value === null || value === undefined) return
-  assertFlowNode(value, cardId, path)
+  admitFlowNode(value, cardId, path)
 }

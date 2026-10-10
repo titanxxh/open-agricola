@@ -28,6 +28,15 @@ const sources = {
       { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID,
         params: { kind: ['consume', 'supply', 'token'].join('-'), key: 'fence' } },
     ] }) },`,
+  nativeOnlyGainParams: `
+    listeners: [{ cardIds: [CARD_ID], actions: ['collect'], phases: ['after'],
+      handler: (context) => ({ sourceCard: CARD_ID, flow: { type: 'leaf', actionId: 'gain', sourceCard: CARD_ID,
+        params: { food: 1, payerId: context.state.players[1].id, recipientPlayerId: context.player.id } } }) }],`,
+  unattributedLeaf: `
+    listeners: [{ cardIds: [CARD_ID], actions: ['collect'], phases: ['after'],
+      handler: () => ({ flow: { type: 'leaf', actionId: 'gain', params: { food: 1 } } }) }],`,
+  malformedScoringQuery: `
+    effect: { id: CARD_ID, computeSharedPostScore: () => ({}) },`,
   listenerInsideContract: `
     listeners: [{ cardIds: [CARD_ID], actions: ['collect'], phases: ['after'],
       handler: () => ({ sourceCard: CARD_ID, flow: gainLeaf(CARD_ID, { food: 1 }) }) }],`,
@@ -89,6 +98,7 @@ describe('Workshop Capability Contract at the Session boundary', () => {
   it.each([
     ['listener', sources.listenerOutsideContract, "actionId 'plow' is not in the Workshop Capability Contract"],
     ['effect hook', sources.effectOutsideContract, "special-effect kind 'consume-supply-token' is not in the Workshop Capability Contract"],
+    ['listener using a native-only gain parameter', sources.nativeOnlyGainParams, "gain param 'payerId' is not in the Workshop Capability Contract"],
   ])('rejects the command when a %s returns a flow outside the contract, then skips the card on retry', (_kind, impl, message) => {
     const session = start(impl)
     const { fields: fieldsBefore, cardStates: cardStatesBefore } = structuredClone(session.getState().state.players[0]!)
@@ -144,6 +154,29 @@ describe('Workshop Capability Contract at the Session boundary', () => {
     expect(inHand.cardWarnings).toEqual([])
     expect(response.state.players[0]!.minorHand).toEqual([CARD_ID])
     expect(response.state.players[0]!.resources).toMatchObject({ wood: 3, food: 0 })
+  })
+
+  it('attributes a leaf that omits sourceCard to its card', () => {
+    const session = start(sources.unattributedLeaf)
+
+    const response = session.takeAction(0, 'forest')
+
+    expect(response.ok).toBe(true)
+    expect(session.cardWarnings).toEqual([])
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 3, food: 1 })
+    expect(response.state.players[0]!.cardStates[CARD_ID]?.extraData?.resourceStats).toMatchObject({ gained: { food: 1 } })
+  })
+
+  it('reports a query hook result of the wrong type as a card warning instead of throwing', () => {
+    const session = start(sources.malformedScoringQuery)
+
+    // Scores are computed for every response, so the query already ran while the fixture loaded.
+    const response = session.takeAction(0, 'forest')
+
+    expect(session.cardWarnings).toEqual([expect.stringContaining('computeSharedPostScore: must return an array')])
+    expect(response.ok).toBe(true)
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 3 })
+    expect(() => session.getState()).not.toThrow()
   })
 
   it('runs a listener flow that stays inside the contract', () => {

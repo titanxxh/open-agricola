@@ -1,6 +1,6 @@
 import type { ActionHookResult } from '../actions/hooks'
 import { REAL_RESOURCE_KEYS } from '../contract/resource-keys'
-import { assertCustomFlow, assertOwnSourceCard, assertSandboxActionId } from './flow-admission'
+import { admitCustomFlow, assertOwnSourceCard, assertSandboxActionId } from './flow-admission'
 
 const RESOURCE_KEYS = new Set<string>(REAL_RESOURCE_KEYS)
 
@@ -41,8 +41,10 @@ export const validateCustomListenerResult = (
   if (value === null || value === undefined) return null
   if (!isPlainRecord(value)) throw new Error('custom listener result must be a plain object')
   assertOwnSourceCard(value.sourceCard, cardId, 'result')
-  assertCustomFlow(value.flow, cardId, 'flow')
-  assertCustomFlow(value.alternativeFlow, cardId, 'alternativeFlow')
+  admitCustomFlow(value.flow, cardId, 'flow')
+  admitCustomFlow(value.alternativeFlow, cardId, 'alternativeFlow')
+  // A result that carries a flow is attributed to its card even when the source was omitted.
+  if (value.flow || value.alternativeFlow) value.sourceCard = cardId
   if (value.actionId !== undefined) assertSandboxActionId(value.actionId, 'actionId')
   if (value.followUpActions !== undefined) {
     if (!Array.isArray(value.followUpActions)) throw new Error('followUpActions must be an array')

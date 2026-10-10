@@ -1,24 +1,64 @@
 import { describe, expect, it } from 'vitest'
-import { assertCustomFlow } from '../flow-admission'
+import { admitCustomFlow } from '../flow-admission'
 import { SANDBOX_ALLOWED_ACTION_IDS } from '../sandbox-action-ids'
 
 const CARD_ID = 'CUSTOM_Admission'
 const leaf = (actionId: string, params: Record<string, unknown> = {}, rest: Record<string, unknown> = {}) =>
   ({ type: 'leaf', actionId, params, sourceCard: CARD_ID, ...rest })
-const admit = (flow: unknown) => () => assertCustomFlow(flow, CARD_ID)
+const admit = (flow: unknown) => () => admitCustomFlow(flow, CARD_ID)
 
-describe('assertCustomFlow', () => {
+describe('admitCustomFlow', () => {
   it('accepts an absent flow', () => {
     expect(admit(undefined)).not.toThrow()
     expect(admit(null)).not.toThrow()
   })
 
-  it.each(SANDBOX_ALLOWED_ACTION_IDS.filter(id => id !== 'special-effect'))('accepts the contract leaf %s', (actionId) => {
-    expect(admit(leaf(actionId))).not.toThrow()
+  const DOCUMENTED_PARAMS: Record<string, Record<string, unknown>> = {
+    gain: { food: 2, wood: 1 },
+    pay: { grain: 1 },
+    'bonus-vp': {},
+    'bake-bread': {},
+    'store-on-card': { grain: 6 },
+    'take-from-card': { grain: 1 },
+    'push-to-card-stack': { item: 'token' },
+    'special-effect': { kind: 'set-flag', flag: true },
+    'future-meeples': { __futureMeepleRequest: { cardId: CARD_ID, playerId: 'p1', startRound: 2, count: 3, resources: { food: 1 } } },
+  }
+
+  it.each([...SANDBOX_ALLOWED_ACTION_IDS])('accepts the contract leaf %s with its documented params', (actionId) => {
+    expect(admit(leaf(actionId, DOCUMENTED_PARAMS[actionId]))).not.toThrow()
+  })
+
+  it.each([
+    ['gain', { food: 1, payerId: 'p2', recipientPlayerId: 'p1' }, "gain param 'payerId'"],
+    ['store-on-card', { uses: 1 }, "store-on-card param 'uses'"],
+    ['take-from-card', { grain: 1, targetCardId: 'A001_Other' }, "take-from-card param 'targetCardId'"],
+    ['pay', { food: 1, costType: 'minor-improvement' }, "pay param 'costType'"],
+    ['pay', { cost: { food: 1 }, paymentChoice: '0' }, "pay param 'paymentChoice'"],
+    ['bonus-vp', { amount: 3 }, "bonus-vp param 'amount'"],
+    ['bake-bread', { free: true }, "bake-bread param 'free'"],
+    ['push-to-card-stack', { item: 'x', cardId: 'A001_Other' }, "push-to-card-stack param 'cardId'"],
+    ['future-meeples', { __futureMeepleRequest: { cardId: CARD_ID }, extra: 1 }, "future-meeples param 'extra'"],
+  ])('rejects the native-only %s parameter', (actionId, params, detail) => {
+    expect(admit(leaf(actionId, params))).toThrow(`flow: ${detail} is not in the Workshop Capability Contract`)
+  })
+
+  it('accepts the payLeaf cost wrapper and leaves the cost itself to the payment solver', () => {
+    expect(admit(leaf('pay', { cost: { fees: [{ food: 1 }, { wood: 1 }] } }))).not.toThrow()
+  })
+
+  it('binds a scheduled reward to the invoking card', () => {
+    expect(admit(leaf('future-meeples', {}))).toThrow('flow: future-meeples requires params.__futureMeepleRequest')
+    expect(admit(leaf('future-meeples', { __futureMeepleRequest: { cardId: 'A001_Other', playerId: 'p1' } })))
+      .toThrow("flow: __futureMeepleRequest.cardId must be this card's id")
   })
 
   it.each(['plow', 'selection', 'card_E112_GrainThief_protect'])('rejects the native leaf %s', (actionId) => {
     expect(admit(leaf(actionId))).toThrow(`flow: actionId '${actionId}' is not in the Workshop Capability Contract`)
+  })
+
+  it('rejects params that are not an object', () => {
+    expect(admit(leaf('gain', 'food' as never))).toThrow('flow: params must be an object')
   })
 
   it('rejects the whole flow and names the nested node', () => {
@@ -34,7 +74,10 @@ describe('assertCustomFlow', () => {
   })
 
   it('binds every node to the invoking card', () => {
-    expect(admit({ type: 'leaf', actionId: 'gain', params: { food: 1 } })).not.toThrow()
+    // A leaf that omits its source is attributed to the card rather than settled without one.
+    const unbound = { type: 'seq', children: [{ type: 'leaf', actionId: 'gain', params: { food: 1 } }] }
+    admitCustomFlow(unbound, CARD_ID)
+    expect(unbound.children[0]).toEqual({ type: 'leaf', actionId: 'gain', params: { food: 1 }, sourceCard: CARD_ID })
     expect(admit(leaf('special-effect', { kind: 'set-flag', flag: true }, { sourceCard: 'E033_BeaverColony' })))
       .toThrow("flow: sourceCard must be this card's id")
     expect(admit({ type: 'seq', sourceCard: 'E033_BeaverColony', children: [] })).toThrow("flow: sourceCard must be this card's id")

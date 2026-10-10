@@ -11,7 +11,7 @@ import type { GameState, PlayerState } from '../../shared/contract/types.ts'
 import { requireActiveCardRegistry } from '../../shared/cards/active-registry.ts'
 import { getCurrentSessionContext, type CustomCardData } from '../../shared/cards/session-card-context.ts'
 import { setCardListenerSource } from '../../shared/cards/card-listener-source.ts'
-import { boundListenerFilters } from '../../shared/custom-code/contract-admission.ts'
+import { boundListenerFilters, neutralEffectResult } from '../../shared/custom-code/contract-admission.ts'
 import { assertSandboxListenerPhases } from '../../shared/custom-code/sandbox-listener-phases.ts'
 import { invokeCustomCodeEffectLocal, invokeCustomCodeListenerLocal } from './browser-executor.ts'
 
@@ -41,9 +41,9 @@ export const registerBrowserBackedCustomCard = (cardData: CustomCardData): void 
         const warning = `Custom card ${cardId} hook "${hook}" failed: ${response.error}`
         console.warn(`[local-sandbox-runtime] ${warning}`)
         sessionCtx?.reportWarning(warning)
-        return undefined
+        return neutralEffectResult(hook)
       }
-      return response.result ?? undefined
+      return response.result ?? neutralEffectResult(hook)
     }
   }
   if (codeManifest.effectMetadata) {

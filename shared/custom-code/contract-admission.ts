@@ -1,7 +1,7 @@
 import { cardEffectHooks, flowCardEffectHooks, isHandCardEffectHook, type CardEffectField } from '../cards/card-effects'
 import type { ActionHookPhase } from '../actions/hooks'
 import type { CardListenerScope } from '../cards/card-listeners'
-import { assertCustomFlow } from './flow-admission'
+import { admitCustomFlow } from './flow-admission'
 import { isSandboxListenerAction, sandboxListenerActions } from './sandbox-listener-actions'
 import { isSandboxListenerPhase, sandboxListenerPhases } from './sandbox-listener-phases'
 import { isSandboxListenerScope } from './sandbox-listener-scopes'
@@ -87,7 +87,52 @@ export function normalizeCustomManifest(raw: RawCustomManifest, cardId: string):
   return { effectHooks, effectMetadata: handHooks ? { handHooks } : undefined, listeners }
 }
 
-/** Flow hooks may only return contract flows; query hooks keep their own result shapes. */
+type QueryResultKind = 'number' | 'array' | 'object'
+
+/**
+ * The top-level type each query hook returns. A wrong one would throw inside a
+ * native consumer, outside the failed-hook path; the contents stay with that consumer.
+ */
+export const QUERY_HOOK_RESULT_KINDS: Record<string, QueryResultKind> = {
+  onBeforePlayerTurn: 'object',
+  computeBonusScore: 'number',
+  computeSharedPostScore: 'array',
+  computeCostedBonus: 'array',
+  computeExtraRoomCapacity: 'number',
+  computeHarvestBreedOrderPriority: 'number',
+  onComputeAnimalZones: 'array',
+  computeLockedFarmTiles: 'array',
+  getInvalidAnimals: 'array',
+  getBuiltSpecialStables: 'array',
+  getRuleContributions: 'object',
+  getStatePresentation: 'object',
+}
+
+const matchesKind = (value: unknown, kind: QueryResultKind): boolean =>
+  kind === 'number' ? typeof value === 'number' && Number.isFinite(value)
+    : kind === 'array' ? Array.isArray(value)
+      : !!value && typeof value === 'object' && !Array.isArray(value)
+
+export const isFlowResultHook = (hook: string): boolean => FLOW_RESULT_HOOKS.has(hook)
+
+/**
+ * What a query hook contributes when it fails or returns nothing. Native
+ * consumers iterate arrays and add these two numbers without checking, so the
+ * sandbox adapters must not hand them `undefined`.
+ */
+export function neutralEffectResult(hook: string): unknown {
+  if (QUERY_HOOK_RESULT_KINDS[hook] === 'array') return []
+  return hook === 'computeBonusScore' || hook === 'computeExtraRoomCapacity' ? 0 : undefined
+}
+
+/** Flow hooks may only return contract flows; a query hook may return nothing or its documented top-level type. */
 export function assertCustomEffectResult(hook: string, result: unknown, cardId: string): void {
-  if (FLOW_RESULT_HOOKS.has(hook)) assertCustomFlow(result, cardId, hook)
+  if (FLOW_RESULT_HOOKS.has(hook)) {
+    admitCustomFlow(result, cardId, hook)
+    return
+  }
+  const kind = QUERY_HOOK_RESULT_KINDS[hook]
+  if (kind && result !== null && result !== undefined && !matchesKind(result, kind)) {
+    throw new Error(`${hook}: must return ${kind === 'number' ? 'a finite number' : kind === 'array' ? 'an array' : 'an object'}`)
+  }
 }
