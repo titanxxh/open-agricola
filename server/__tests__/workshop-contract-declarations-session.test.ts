@@ -191,6 +191,18 @@ describe('Workshop Capability Contract query hooks', () => {
     expect(zonesOf(owner).some(zone => zone.id === 'shared-probe')).toBe(false)
     expect(session.cardWarnings).toEqual([])
   })
+
+  it('onComputeSharedAnimalZones: a zone attributed to the other player is refused with a card warning', () => {
+    const session = start(effect(`onComputeSharedAnimalZones: (owner, animalOwner) =>
+      [{ id: 'shared-probe', zoneType: 'card', capacity: 2, ownerPlayerId: animalOwner.id }]`))
+    const state = session.state
+    const opponent = state.players[1]!
+
+    const zones = session.withCtx(() => computeAnimalZones(opponent, state))
+
+    expect(zones.some(zone => zone.id === 'shared-probe')).toBe(false)
+    expect(session.cardWarnings.at(-1)).toContain("onComputeSharedAnimalZones: zone ownerPlayerId must be the card owner's id")
+  })
 })
 
 describe('Workshop Capability Contract effect metadata', () => {

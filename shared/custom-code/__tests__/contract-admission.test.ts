@@ -74,6 +74,9 @@ describe('normalizeCustomManifest', () => {
     [manifest({ effectMetadata: { extraTurnBeforeWorkers: 'yes' } }), 'effect extraTurnBeforeWorkers must be a boolean'],
     [manifest({ effectMetadata: { preHarvestGoodsWanted: 'grain' } }), 'effect preHarvestGoodsWanted must be an array of resource names'],
     [manifest({ effectMetadata: { preHarvestGoodsWantedBeforeReap: [1] } }), 'effect preHarvestGoodsWantedBeforeReap must be an array of resource names'],
+    // A misspelled resource would match no exchange and silently switch the declaration off.
+    [manifest({ effectMetadata: { preHarvestGoodsWanted: ['grane'] } }), 'effect preHarvestGoodsWanted must be an array of resource names'],
+    [manifest({ effectMetadata: { preHarvestGoodsWantedBeforeReap: ['grain', 'fence'] } }), 'effect preHarvestGoodsWantedBeforeReap must be an array of resource names'],
     [listener({ zones: ['discard'] }), "listener zones must be an array of 'played' or 'hand'"],
     [listener({ mandatory: 'false' }), 'listener mandatory must be a boolean'],
     [listener({ preScoring: 1 }), 'listener preScoring must be a boolean'],
@@ -142,6 +145,31 @@ describe('assertCustomEffectResult', () => {
     ['onComputeSharedAnimalZones', { id: 'zone' }, 'an array'],
   ])('rejects a %s result of the wrong top-level type', (hook, result, expected) => {
     expect(() => assertCustomEffectResult(hook, result, CARD_ID)).toThrow(`${hook}: must return ${expected}`)
+  })
+})
+
+describe('animal zone ownership', () => {
+  const owner = { id: 'p1' }
+  const other = { id: 'p2' }
+  const zone = (fields: Record<string, unknown>) => [{ id: 'zone', zoneType: 'card', capacity: 2, ...fields }]
+
+  it('accepts zones that name nothing, or their own card and the players the hook was called for', () => {
+    expect(() => assertCustomEffectResult('onComputeAnimalZones', zone({}), CARD_ID, [owner, []])).not.toThrow()
+    expect(() => assertCustomEffectResult('onComputeAnimalZones',
+      zone({ cardId: CARD_ID, ownerPlayerId: 'p1', animalOwnerPlayerId: 'p1' }), CARD_ID, [owner, []])).not.toThrow()
+    expect(() => assertCustomEffectResult('onComputeSharedAnimalZones',
+      zone({ cardId: CARD_ID, ownerPlayerId: 'p1', animalOwnerPlayerId: 'p2' }), CARD_ID, [owner, other])).not.toThrow()
+  })
+
+  it.each([
+    ['onComputeAnimalZones', { cardId: 'A012_DrinkingTrough' }, "zone cardId must be this card's id"],
+    ['onComputeAnimalZones', { ownerPlayerId: 'p2' }, "zone ownerPlayerId must be the card owner's id"],
+    ['onComputeSharedAnimalZones', { cardId: 'A012_DrinkingTrough' }, "zone cardId must be this card's id"],
+    // Reorganization would store the animals in the other player's card state.
+    ['onComputeSharedAnimalZones', { ownerPlayerId: 'p2' }, "zone ownerPlayerId must be the card owner's id"],
+    ['onComputeSharedAnimalZones', { animalOwnerPlayerId: 'p1' }, 'zone animalOwnerPlayerId must be the id of the player the zones are computed for'],
+  ])('rejects a %s zone attributed elsewhere', (hook, fields, message) => {
+    expect(() => assertCustomEffectResult(hook, zone(fields), CARD_ID, [owner, other])).toThrow(`${hook}: ${message}`)
   })
 })
 
