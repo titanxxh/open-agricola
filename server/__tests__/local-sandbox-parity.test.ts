@@ -215,6 +215,28 @@ const CARD_IMPL = { ${impl} }
     expect(validateAndCompileCustomCodeLocal(source, 'CUSTOM_ParityCard')).toEqual(rejection)
   })
 
+  it('rejects an animal zone attributed to another player identically', () => {
+    const source = `
+const CARD_ID = 'CUSTOM_ParityCard'
+const CARD_DEF = MinorImprovement({ id: CARD_ID, name: 'Parity Card' })
+const CARD_IMPL = { effect: { id: CARD_ID,
+  onComputeSharedAnimalZones: (owner, animalOwner) => [{ id: 'zone', zoneType: 'card', capacity: 1, ownerPlayerId: animalOwner.id }] } }
+`
+    const compiled = validateAndCompileCustomCode(source, 'CUSTOM_ParityCard')
+    expect(compiled.valid).toBe(true)
+    if (!compiled.valid) return
+    const state = createInitialState(42)
+    // The hook's positional arguments are (owner, animalOwner, zones, state).
+    const request = {
+      compiledCode: compiled.compiledCode, cardId: 'CUSTOM_ParityCard', hook: 'onComputeSharedAnimalZones' as const,
+      state: state.players[0] as never, player: state.players[1]!, paymentInfo: [] as never, extraArgs: [state],
+    }
+    const rejection = { ok: false, error: "onComputeSharedAnimalZones: zone ownerPlayerId must be the card owner's id" }
+
+    expect(invokeCustomCodeEffectSync(request)).toEqual(rejection)
+    expect(invokeCustomCodeEffectLocal(request)).toEqual(rejection)
+  })
+
   it.each(['NaN', 'Infinity', '-Infinity'])('rejects a hook returning %s identically, before serialization hides it', (value) => {
     const source = `
 const CARD_ID = 'CUSTOM_ParityCard'

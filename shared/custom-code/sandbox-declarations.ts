@@ -1,5 +1,6 @@
 import type { BeforeEndGameScope } from '../cards/card-effects'
 import type { CardListenerZone } from '../cards/card-listeners'
+import { REAL_RESOURCE_KEYS } from '../contract/resource-keys'
 import type { InteractionRequest, ResourceKey } from '../contract/types'
 
 /**
@@ -13,6 +14,9 @@ import type { InteractionRequest, ResourceKey } from '../contract/types'
 const isBoolean = (value: unknown): value is boolean => typeof value === 'boolean'
 const isStringArray = (value: unknown): value is string[] =>
   Array.isArray(value) && value.every(entry => typeof entry === 'string')
+/** A misspelled resource would match no exchange and switch the declaration off without a word. */
+const isResourceNameArray = (value: unknown): boolean =>
+  isStringArray(value) && value.every(name => (REAL_RESOURCE_KEYS as readonly string[]).includes(name))
 
 type Rule = { expected: string; matches: (value: unknown) => boolean }
 
@@ -23,8 +27,8 @@ const EFFECT_METADATA = {
     matches: (value: unknown) => value === 'owner' || value === 'allPlayers',
   },
   beforeEndGameMandatory: { expected: 'a boolean', matches: isBoolean },
-  preHarvestGoodsWanted: { expected: 'an array of resource names', matches: isStringArray },
-  preHarvestGoodsWantedBeforeReap: { expected: 'an array of resource names', matches: isStringArray },
+  preHarvestGoodsWanted: { expected: 'an array of resource names', matches: isResourceNameArray },
+  preHarvestGoodsWantedBeforeReap: { expected: 'an array of resource names', matches: isResourceNameArray },
   maySkipHarvestFieldPhase: { expected: 'a boolean', matches: isBoolean },
   extraTurnBeforeWorkers: { expected: 'a boolean', matches: isBoolean },
 } as const satisfies Record<string, Rule>

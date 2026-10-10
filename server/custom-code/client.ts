@@ -138,7 +138,8 @@ export const invokeCustomCodeEffectSync = (
   }
   if (!response.ok) return response
   try {
-    assertCustomEffectResult(request.hook, response.result, request.cardId)
+    // state and player hold the first two positional arguments, whatever the hook calls them.
+    assertCustomEffectResult(request.hook, response.result, request.cardId, [request.state, request.player])
     return response
   } catch (error) {
     return outsideContract(error)

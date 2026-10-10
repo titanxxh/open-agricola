@@ -166,8 +166,37 @@ export function neutralEffectResult(hook: string): unknown {
   return hook === 'computeBonusScore' || hook === 'computeExtraRoomCapacity' ? 0 : undefined
 }
 
-/** Flow hooks may only return contract flows; a query hook may return nothing or its documented top-level type. */
-export function assertCustomEffectResult(hook: string, result: unknown, cardId: string): void {
+/** Where the two animal-zone hooks find the card owner and the player the zones are for,
+ * among their positional arguments. */
+const ZONE_HOOK_PLAYERS: Record<string, { owner: number; animalOwner: number }> = {
+  onComputeAnimalZones: { owner: 0, animalOwner: 0 },
+  onComputeSharedAnimalZones: { owner: 0, animalOwner: 1 },
+}
+
+const playerIdOf = (value: unknown): unknown =>
+  value && typeof value === 'object' ? (value as { id?: unknown }).id : undefined
+
+/** Reorganization stores animals under a zone's card and owner, so a zone may only name
+ * its own card and the players the hook was called for. The engine fills what is omitted. */
+function assertOwnAnimalZones(hook: string, zones: unknown[], cardId: string, args: readonly unknown[]): void {
+  const players = ZONE_HOOK_PLAYERS[hook]!
+  const expected = {
+    cardId: [cardId, "this card's id"],
+    ownerPlayerId: [playerIdOf(args[players.owner]), "the card owner's id"],
+    animalOwnerPlayerId: [playerIdOf(args[players.animalOwner]), 'the id of the player the zones are computed for'],
+  } as const
+  for (const zone of zones) {
+    if (!zone || typeof zone !== 'object') continue
+    for (const [field, [value, wording]] of Object.entries(expected)) {
+      const written = (zone as Record<string, unknown>)[field]
+      if (written !== undefined && written !== value) throw new Error(`${hook}: zone ${field} must be ${wording}`)
+    }
+  }
+}
+
+/** Flow hooks may only return contract flows; a query hook may return nothing or its documented
+ * top-level type. `args` are the hook's positional arguments. */
+export function assertCustomEffectResult(hook: string, result: unknown, cardId: string, args: readonly unknown[] = []): void {
   if (FLOW_RESULT_HOOKS.has(hook)) {
     admitCustomFlow(result, cardId, hook)
     return
@@ -176,4 +205,5 @@ export function assertCustomEffectResult(hook: string, result: unknown, cardId: 
   if (kind && result !== null && result !== undefined && !matchesKind(result, kind)) {
     throw new Error(`${hook}: must return ${KIND_WORDING[kind]}`)
   }
+  if (ZONE_HOOK_PLAYERS[hook] && Array.isArray(result)) assertOwnAnimalZones(hook, result, cardId, args)
 }

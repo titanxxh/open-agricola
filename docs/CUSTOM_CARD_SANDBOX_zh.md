@@ -235,7 +235,7 @@ reaction-compatible hook（action listener 的 `before` / `immediatelyAfter` / `
 | `handHooks` | `HandCardEffectHook[]` | 卡牌还在手牌时也触发的 stage hook |
 | `beforeEndGameScope` | `'owner'` 或 `'allPlayers'` | `onBeforeEndGame` 为谁执行。默认 `'owner'`，只为持有者执行一次；`'allPlayers'` 为每名玩家各执行一次，返回的 flow 作用于那名玩家 |
 | `beforeEndGameMandatory` | `boolean` | 写 `false` 时玩家可以跳过 `onBeforeEndGame` 的效果；默认不询问，直接执行 |
-| `preHarvestGoodsWanted` | 资源名数组 | 本卡在收获阶段需要的物品。玩家缺少其中某种时（已算上田间阶段将收割的作物），引擎会在收获开始前提供他能产出该物品的收获期兑换 |
+| `preHarvestGoodsWanted` | 资源名数组，如 `'grain'`；写了不是资源名的字符串时保存失败 | 本卡在收获阶段需要的物品。玩家缺少其中某种时（已算上田间阶段将收割的作物），引擎会在收获开始前提供他能产出该物品的收获期兑换 |
 | `preHarvestGoodsWantedBeforeReap` | 资源名数组 | 同上，但针对田间阶段之前就需要的物品：田里还没收割的作物不算 |
 | `maySkipHarvestFieldPhase` | `boolean` | 让上面的估算不把田间阶段的收成算进去 |
 | `extraTurnBeforeWorkers` | `boolean` | 持有者还有工人时，也把 `contributeExtraTurn` 的额外行动作为“放工人”之外的另一个选项提供 |
@@ -267,6 +267,8 @@ reaction-compatible hook（action listener 的 `before` / `immediatelyAfter` / `
 | `computeBreedableAnimalCount` | `(state, player, animalType, currentCount, ctx) => number \| void` | 计入繁殖判定的这种动物数量；返回调整后的数量 |
 | `computeAnimalScoreAdjustment` | `(state, player, animalType, ctx) => number \| void` | 给某个动物计分项加减分；`ctx` 含 `quantity`、`baseScore`、`categoryKey`。引擎只在 Farmers of the Moor 对局里为 `'horse'` 询问 |
 | `onComputeSharedAnimalZones` | `(owner, animalOwner, zones, state) => AnimalZone[]` | 本卡提供给其他每名玩家的动物分区。`owner` 是持卡者，`animalOwner` 是正在计算分区的那名玩家；持卡者自己的分区走 `onComputeAnimalZones`。只返回新增的 zones |
+
+`onComputeAnimalZones` 和 `onComputeSharedAnimalZones` 返回的分区属于本卡，以及调用这个 hook 时对应的玩家。不要写 `cardId`、`ownerPlayerId`、`animalOwnerPlayerId`，引擎会填上。写了别的卡或别的玩家的分区按 hook 出错处理，因为重新安置动物时会把动物存到这些 id 名下。
 
 执行器把前三个位置参数传给 hook。上表里签名更长的四个 hook 还会收到后面的参数：`computeBreedThreshold`、`computeAnimalScoreAdjustment`、`onComputeSharedAnimalZones` 收到第四个，`computeBreedableAnimalCount` 收到第四和第五个。`resolveChoice` 和 `getInvalidAnimals` 仍然只有三个。
 
@@ -859,7 +861,7 @@ CI 会拦下漏改的情况。
 
 本文件遵守 [ADR 0025](adr/0025-workshop-capability-contract-is-fail-closed-and-opened-by-tests.md)。
 
-- **契约管的是名字、节点字段、已声明的 effect 元数据和 listener 数据字段的类型、各行动的参数键、`special-effect` 以及原生农场与卡牌行动所接受参数的字段类型，以及查询类 hook 返回值的顶层类型。**其余参数的取值和查询结果的内容由原生代码自己校验，与原生卡相同；准入不重复实现这些规则。
+- **契约管的是名字（包括收获前元数据里的资源名）、节点字段、返回的动物分区的归属、已声明的 effect 元数据和 listener 数据字段的类型、各行动的参数键、`special-effect` 以及原生农场与卡牌行动所接受参数的字段类型，以及查询类 hook 返回值的顶层类型。**其余参数的取值和查询结果的内容由原生代码自己校验，与原生卡相同；准入不重复实现这些规则。
 - **未列出即未开放。**部署契约、源码校验和两个执行器接受同一组名字：§3.1 的 hook，§3.2 和 §3.4 的 listener 行动、阶段和 scope，§6 的 action ID，以及 §6.1 的 `special-effect` kind。本文件不逐项列出未开放的原生接口，候选能力记录在 [issue #1079](https://github.com/titanxxh/open-agricola/issues/1079)。
 - **有固定行为测试的名字才开放。**每个名字至少要有一个测试，在不改原生规则路径的前提下，用两人 `GameSession` 真实驱动它。新能力单独开 issue，并带上这个测试。
 - **hook 出错和返回契约外内容的处理相同。**如果出错发生在一条命令的结算过程中，第一次出现时拒绝这条命令，恢复到命令之前的状态，并返回错误；错误里写明被拒绝的行动、kind 或字段。同样的错误再次出现时不再报告：命令成功，这张卡本次的效果被跳过。这是有意的行为，让带着有问题卡牌的对局可以继续。出错如果发生在命令之外，例如为一次响应计算可用性、预览或分数时运行的查询，则只记一条卡牌警告，并贡献 §3.1 所说的中性结果；此时没有正在进行的命令，所以不回滚。

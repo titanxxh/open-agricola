@@ -243,7 +243,8 @@ if (typeof __result === 'number' && !isFinite(__result)) throw new Error('return
         __input_extraArgs: request.extraArgs ?? [],
       },
     )
-    assertCustomEffectResult(request.hook, result, request.cardId)
+    // state and player hold the first two positional arguments, whatever the hook calls them.
+    assertCustomEffectResult(request.hook, result, request.cardId, [request.state, request.player])
     return { ok: true, result: (result ?? null) as ActionFlow | null }
   } catch (error) {
     return {
