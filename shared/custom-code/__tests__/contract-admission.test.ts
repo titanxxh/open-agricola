@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { assertCustomEffectResult, normalizeCustomManifest, type RawCustomManifest } from '../contract-admission'
+import { cardEffectHooks } from '../../cards/card-effects'
+import { assertCustomEffectResult, isFlowResultHook, normalizeCustomManifest, QUERY_HOOK_RESULT_KINDS, type RawCustomManifest } from '../contract-admission'
 import { sandboxListenerActions } from '../sandbox-listener-actions'
 import { sandboxListenerPhases } from '../sandbox-listener-phases'
 
@@ -59,9 +60,27 @@ describe('assertCustomEffectResult', () => {
       .toThrow(`${hook}: sourceCard must be this card's id`)
   })
 
-  it('leaves query hook results to their native consumers', () => {
+  it('classifies every contract hook as a flow hook or a typed query hook', () => {
+    expect(cardEffectHooks.filter(hook => !isFlowResultHook(hook) && !QUERY_HOOK_RESULT_KINDS[hook])).toEqual([])
+  })
+
+  it('accepts a query hook result of the documented top-level type, or none', () => {
     expect(() => assertCustomEffectResult('computeBonusScore', 3, CARD_ID)).not.toThrow()
     expect(() => assertCustomEffectResult('onBeforePlayerTurn', { skipTurn: true }, CARD_ID)).not.toThrow()
     expect(() => assertCustomEffectResult('onComputeAnimalZones', [{ type: 'card' }], CARD_ID)).not.toThrow()
+    expect(() => assertCustomEffectResult('computeHarvestBreedOrderPriority', null, CARD_ID)).not.toThrow()
+    expect(() => assertCustomEffectResult('getRuleContributions', undefined, CARD_ID)).not.toThrow()
+  })
+
+  it.each([
+    ['computeBonusScore', { score: 2, label: 'bonus' }, 'a finite number'],
+    ['computeExtraRoomCapacity', '1', 'a finite number'],
+    ['computeSharedPostScore', {}, 'an array'],
+    ['computeCostedBonus', { levels: [] }, 'an array'],
+    ['computeLockedFarmTiles', 'none', 'an array'],
+    ['getRuleContributions', [], 'an object'],
+    ['onBeforePlayerTurn', true, 'an object'],
+  ])('rejects a %s result of the wrong top-level type', (hook, result, expected) => {
+    expect(() => assertCustomEffectResult(hook, result, CARD_ID)).toThrow(`${hook}: must return ${expected}`)
   })
 })

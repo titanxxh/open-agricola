@@ -486,6 +486,7 @@ const CARD_IMPL = {
     const matched = getMatchingListeners(listenerContext)
     expect(matched).toHaveLength(1)
     const listenerResult = executeCardListener(matched[0]!.registration, listenerContext, { ownerPlayerId: matched[0]!.ownerPlayerId })
+    // The listener omitted the result-level source; admission attributes the flow to its card.
     expect(listenerResult).toEqual({
       flow: {
         type: 'leaf',
@@ -493,6 +494,7 @@ const CARD_IMPL = {
         params: { wood: 1 },
         sourceCard: 'CUSTOM_ExecutorCard',
       },
+      sourceCard: 'CUSTOM_ExecutorCard',
     })
   })
 
