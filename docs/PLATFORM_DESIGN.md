@@ -251,7 +251,7 @@ Scopes are `player`, `opponent`, and `any`; `shared/custom-code/sandbox-listener
 
 #### Available ActionFlow leaf action IDs
 
-The nine IDs are `gain`, `pay`, `bonus-vp`, `bake-bread`, `store-on-card`, `take-from-card`, `push-to-card-stack`, `special-effect`, and `future-meeples`. `SANDBOX_ALLOWED_ACTION_IDS` in `shared/custom-code/sandbox-action-ids.ts` is authoritative. Old IDs such as `pay-resources`, `gain-other-players`, `write-card-extra-data`, and `hold-worker-on-card` are removed.
+Nine IDs move goods and write card state: `gain`, `pay`, `bonus-vp`, `bake-bread`, `store-on-card`, `take-from-card`, `push-to-card-stack`, `special-effect`, and `future-meeples`. Sixteen run a native farm, card or turn-order action for the effect player: `plow`, `sow`, `fence`, `stables`, `construct`, `renovate-house`, `improvement`, `occupation`, `family-growth`, `breed`, `reap`, `exchange`, `set-first-player`, `selection`, `emit-choice`, and `reorganize`. `SANDBOX_ALLOWED_ACTION_IDS` in `shared/custom-code/sandbox-action-ids.ts` is authoritative. Old IDs such as `pay-resources`, `gain-other-players`, `write-card-extra-data`, and `hold-worker-on-card` are removed.
 
 #### Injected sandbox helpers
 
