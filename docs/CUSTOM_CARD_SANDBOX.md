@@ -194,6 +194,13 @@ Only keys in `cardEffectHooks` are registered. The AST validator hard-fails an u
 - `getBuiltSpecialStables`
 - `getRuleContributions`
 - `getStatePresentation`
+- `computeResourceCommitments`
+- `countExtraTurns`
+- `enforceReorganizeOnLastHarvest`
+- `computeBreedThreshold`
+- `computeBreedableAnimalCount`
+- `computeAnimalScoreAdjustment`
+- `onComputeSharedAnimalZones`
 <!-- prompt-sync:end id=card-effect-hooks -->
 
 `onBeforeWork` runs after round growth and future-meeple actions but before `onRoundStart`. Use it only when the card explicitly acts before the work phase.
@@ -202,9 +209,21 @@ Only keys in `cardEffectHooks` are registered. The AST validator hard-fails an u
 
 Reaction-compatible hooks, namely action-listener `before`, `immediatelyAfter`, and `after`; the three Harvest-field hooks; `onBeforeEndGame`; and `contributeExtraTurn`, cannot depend on scan order. Multiple simultaneous items enter trigger-select, and the player selects a source card before execution. A custom card should return a replayable ActionFlow for mutation and never treat a handler invocation as final settlement.
 
-`contributeExtraTurn` returns this card's extra-turn provider flow. When several cards contribute, the system asks for the provider source before expanding that flow. `countExtraTurns` is an internal official-card field and is not exposed to Workshop.
+`contributeExtraTurn` returns this card's extra-turn provider flow. When several cards contribute, the system asks for the provider source before expanding that flow. `countExtraTurns(state, player)` reports how many extra turns the card still offers this round; without it the card offers one while `contributeExtraTurn` returns a flow. The engine does not count the turns a card has used. The card records each use in its own state, for example with an `increment-counter` leaf in the returned flow, and both hooks read that state. A card that keeps offering a turn keeps the round from ending.
 
-Allowed metadata keys outside `cardEffectHooks` are `id` and `handHooks`.
+Besides `id`, an effect may declare these metadata keys. Each is data, not a function, and a value of another type fails on save:
+
+| Metadata | Type | Meaning |
+|---|---|---|
+| `handHooks` | `HandCardEffectHook[]` | Stage hooks that also run while the card remains in hand |
+| `beforeEndGameScope` | `'owner'` or `'allPlayers'` | Whom `onBeforeEndGame` runs for. The default `'owner'` runs it once for the owner; `'allPlayers'` runs it once per player, and that player receives the returned flow |
+| `beforeEndGameMandatory` | `boolean` | `false` lets the player skip the `onBeforeEndGame` effect; the default runs it without asking |
+| `preHarvestGoodsWanted` | resource names | Goods the card needs during Harvest. When the player lacks one, even counting the crops the field phase will reap, the engine offers their Harvest exchanges that produce it before Harvest starts |
+| `preHarvestGoodsWantedBeforeReap` | resource names | The same, for goods needed before the field phase: crops still on the fields do not count |
+| `maySkipHarvestFieldPhase` | `boolean` | Tells that estimate not to count on the field phase |
+| `extraTurnBeforeWorkers` | `boolean` | Offers the `contributeExtraTurn` turn as an alternative to placing a worker, while the owner still has workers |
+
+An effect that declares only metadata is registered too.
 
 Advanced-hook details:
 
@@ -223,9 +242,17 @@ Advanced-hook details:
 | `getBuiltSpecialStables` | `(player) => FarmTilePosition[]` | Currently standing special stables for derived snapshot display |
 | `getRuleContributions` | `(player) => CardRuleContributions` | Read-only source-owned component reservations and unused-space quantity adjustments; finite, floored, nonnegative and capped by the consuming category |
 | `getStatePresentation` | `(player) => CardStatePresentation` | Explicit public counters, resource groups, crop layers and markers; ordinary clients do not read internal storage |
-| `handHooks` metadata | `HandCardEffectHook[]` | Stage hooks that also run while the card remains in hand |
+| `computeResourceCommitments` | `(state, owner) => Array<{ playerId, resources }>` | Goods a player must keep. A command that would leave a named player with less is rejected and rolled back. The hook runs after every command |
+| `countExtraTurns` | `(state, player) => number` | Extra turns the card still offers this round; see above |
+| `enforceReorganizeOnLastHarvest` | `(state, player) => boolean` | `true` asks the player for an animal reorganization after the breeding of the round-14 Harvest even without a newborn |
+| `computeBreedThreshold` | `(state, player, animalType, ctx) => number | void` | Animals of that type needed to breed. The native default is 2, the lowest value among the player's cards wins, and it is never below 1. `ctx.sourceCard` is `'harvest'` for Harvest breeding and the card id for a `breed` leaf |
+| `computeBreedableAnimalCount` | `(state, player, animalType, currentCount, ctx) => number | void` | The number of animals of that type counted for breeding; return the adjusted count |
+| `computeAnimalScoreAdjustment` | `(state, player, animalType, ctx) => number | void` | Points added to an animal scoring category; `ctx` has `quantity`, `baseScore`, and `categoryKey`. The engine asks only for `'horse'`, in a Farmers of the Moor game |
+| `onComputeSharedAnimalZones` | `(owner, animalOwner, zones, state) => AnimalZone[]` | Animal zones this card offers to every other player. `owner` holds the card and `animalOwner` is the player the zones are computed for; the owner's own zones come from `onComputeAnimalZones`. Return only new zones |
 
-A query hook returns its documented top-level type, namely a number, an array, or an object, or nothing. Another type, or a non-finite number, is reported as a failed hook. A failed or empty query contributes a neutral result: an empty array, `0` for `computeBonusScore` and `computeExtraRoomCapacity`, and nothing otherwise.
+Executors pass a hook its first three positional arguments. The four hooks whose table row shows more receive those as well: `computeBreedThreshold`, `computeAnimalScoreAdjustment`, and `onComputeSharedAnimalZones` a fourth, and `computeBreedableAnimalCount` a fourth and fifth. `resolveChoice` and `getInvalidAnimals` keep three.
+
+A query hook returns its documented top-level type, namely a number, a boolean, an array, or an object, or nothing. Another type, or a non-finite number, is reported as a failed hook. A failed or empty query contributes a neutral result: an empty array, `0` for `computeBonusScore` and `computeExtraRoomCapacity`, and nothing otherwise.
 
 Extra sowing and special stables each require a paired candidate and settlement contract: `onComputeSowableFields` with `onSowExtraField`, and `getSpecialStablePositions` with `applySpecialStable`. Settlement relies on in-place host mutation that cannot return through sandbox JSON snapshots, so Workshop exposes neither pair. `handHooks` does not support `onBuy`, `onEndTurn`, `onBeforeEndGame`, or `onBeforePlayerTurn`. `CARD_IMPL.effect` must be a direct object literal with no variable reference, spread, computed key, or accessor, preventing static-validation bypass. Server and browser manifests also filter unsupported hand hooks on the host side.
 
@@ -233,11 +260,19 @@ Fence discounts such as E16 Briar Hedge and C16 Field Fences use a `computeCosts
 
 ### 3.2 `CARD_IMPL.listeners` allowlists
 
-A listener entry declares only `handler`, `actions`, `phases`, `scope`, and `cardIds`, plus an optional `id` label that the host ignores. Any other field fails on save, because the manifest would drop it.
+A listener entry declares `handler`, `actions`, `phases`, `scope`, and `cardIds`, the data fields in the table below, and an optional `id` label that the host ignores. Any other field fails on save, because the manifest would drop it. So does a data field of another type: the engine reads the booleans by truthiness.
 
-A listener always belongs to its own card: it reacts only while that card is in play for the player its `scope` selects, and never before the card is played. `cardIds` may be omitted; when present, it must be `[CARD_ID]`.
+| Field | Type | Meaning |
+|---|---|---|
+| `zones` | array of `'played'` and `'hand'` | Where the card must be for the listener to react. The default is `['played']`; `['hand']` reacts only while the card is still in hand |
+| `mandatory` | `boolean` | When several reactions wait at the same moment, the player chooses their order and may pass the rest. A mandatory one cannot be passed. A `before` reaction is optional unless this is `true` |
+| `preScoring` | `boolean` | On an `anytime` listener: also offer it in the window before final scoring, where unmarked anytime listeners are not offered |
+| `replacesTurn` | `boolean` | On an `anytime` listener: the entry is offered only while the owner is idle on their turn, and using it takes the place of that turn's worker placement |
+| `blockedAnytimeInteractionKinds` | array of interaction kinds | On an `anytime` listener: hide the entry while the player answers an interaction of one of these kinds, such as `'farm-select'` or `'animal-reorg'` |
 
-An omitted `actions` or `phases` filter means the lists in this section, with the anytime identity added for an anytime listener. It never matches action-space identities such as `forest`, or native actions and phases outside these lists.
+A listener always belongs to its own card: it reacts only while that card is in play for the player its `scope` selects, or in that player's hand when `zones` says so. `cardIds` may be omitted; when present, it must be `[CARD_ID]`.
+
+An omitted `actions` or `phases` filter means the lists in this section, with the dispatch identity added for an `anytime` or `computeExchanges` listener. It never matches action-space identities such as `forest`, or native actions and phases outside these lists.
 
 `actions` accepts only these high-level action IDs. The AST validator rejects an unknown ID:
 
@@ -273,7 +308,10 @@ An omitted `actions` or `phases` filter means the lists in this section, with th
 - `isDoable`
 - `anytime`
 - `computeChoiceCandidates`
+- `computeExchanges`
 <!-- prompt-sync:end id=action-hook-phases -->
+
+A `computeExchanges` listener adds exchanges that depend on the current state to the owner's exchange menu. Omit `actions`. The handler is a pure query that receives the window in `context.extraData.window`, `'anytime'` or `'harvest'`, and returns `{ extraExchanges: [{ from, to, triggers: [window] }], sourceCard: CARD_ID }`.
 
 ### 3.3 Payment-mechanism boundary
 
@@ -327,7 +365,7 @@ return {
 }
 ```
 
-Do not generate `deriveCardCostCandidate`, `cardCostCandidateMandatory`, `getBaseCosts`, `modifiers`, or `computeExchanges`. They are internal official-card APIs unsupported by Workshop. `deriveCardCostCandidate` and `getBaseCosts` belong to the major- and minor-improvement candidate pipeline; `computeExchanges` injects runtime exchanges. Sandbox manifests do not fully register these fields.
+Do not generate `deriveCardCostCandidate`, `cardCostCandidateMandatory`, `getBaseCosts`, or `modifiers`. They are internal official-card APIs unsupported by Workshop. `deriveCardCostCandidate` and `getBaseCosts` belong to the major- and minor-improvement candidate pipeline. Sandbox manifests do not register these fields.
 
 ### 3.4 `scope` values
 
@@ -556,7 +594,7 @@ A leaf uses `{ type: 'leaf', actionId, params, sourceCard: CARD_ID }`. Composite
 { type: 'seq', children: [gainLeaf(CARD_ID, { food: 1 }), gainLeaf(CARD_ID, { wood: 1 })] }
 ```
 
-`optional` is a boolean on a node, not another node type. A node may also carry `promptKey` and `anytimeWindow`, and a leaf may carry `actionContext` with the single key `targetPlayerId`; any other `actionContext` key is rejected. These fields are type-checked: `optional` is a boolean, `promptKey` and `actionContext.targetPlayerId` are strings, and `anytimeWindow` is `{ allowed: boolean, blockedIds?: string[] }`. A value of another type is rejected, so `optional: 'false'` is an error and not an optional step. The other native node fields are not open to Workshop cards and are rejected when a flow is returned: `mode`, `triggerSelectOnce`, `expandFlow`, `optionId`, `choiceLabelKey`, `choiceLabelParams`, `effectPreview`, `anytimeActionId`, and node-level `targetPlayerId`. Any other field on a node is rejected as well, so a misspelling such as `optoinal` is an error and not a silently ignored key. A `sourceCard` on a node, on a listener result, or on a `followUpActions` entry must be `CARD_ID`. A leaf that omits it, and a listener result that carries a flow without it, is attributed to the card. Flow effect hooks return the flow directly; listeners return `{ flow, sourceCard: CARD_ID }` (or their documented query result).
+`optional` is a boolean on a node, not another node type. A node may also carry `promptKey` and `anytimeWindow`, and a leaf may carry `actionContext` with the key `targetPlayerId`; a `selection` leaf also writes its candidates there (section 6). Any other `actionContext` key is rejected. These fields are type-checked: `optional` is a boolean, `promptKey` and `actionContext.targetPlayerId` are strings, and `anytimeWindow` is `{ allowed: boolean, blockedIds?: string[] }`. A value of another type is rejected, so `optional: 'false'` is an error and not an optional step. The other native node fields are not open to Workshop cards and are rejected when a flow is returned: `mode`, `triggerSelectOnce`, `expandFlow`, `optionId`, `choiceLabelKey`, `choiceLabelParams`, `effectPreview`, `anytimeActionId`, and node-level `targetPlayerId`. Any other field on a node is rejected as well, so a misspelling such as `optoinal` is an error and not a silently ignored key. A `sourceCard` on a node, on a listener result, or on a `followUpActions` entry must be `CARD_ID`. A leaf that omits it, and a listener result that carries a flow without it, is attributed to the card. Flow effect hooks return the flow directly; listeners return `{ flow, sourceCard: CARD_ID }` (or their documented query result).
 
 Before execution, the AST validator rejects inspectable composite literals that omit `children` or provide a statically non-array value. This includes direct flow-hook returns, nested literal children, and listeners' `flow` / `alternativeFlow` results. It does not mistake arbitrary leaf parameters or private card data for flows, and does not infer dynamic helper results or spread-provided children. Static success still requires behavioral playtesting.
 
@@ -576,11 +614,29 @@ These are frequent mistakes. `shared/actions/effects/*` contains the complete re
 - `push-to-card-stack`
 - `special-effect`
 - `future-meeples`
+- `plow`
+- `sow`
+- `fence`
+- `stables`
+- `construct`
+- `renovate-house`
+- `improvement`
+- `occupation`
+- `family-growth`
+- `breed`
+- `reap`
+- `exchange`
+- `set-first-player`
+- `selection`
+- `emit-choice`
+- `reorganize`
 <!-- prompt-sync:end id=action-ids -->
 
-These nine IDs are enforced, not only recommended. Source validation rejects a visible leaf with another ID. Both executors reject a returned `flow`, `alternativeFlow`, `followUpActions` entry, or replacement `actionId` that uses one, including inside nested groups. The whole result is rejected before any node runs; section 9.3 describes what the player then sees.
+These IDs are enforced, not only recommended. Source validation rejects a visible leaf with another ID. Both executors reject a returned `flow`, `alternativeFlow`, `followUpActions` entry, or replacement `actionId` that uses one, including inside nested groups. The whole result is rejected before any node runs; section 9.3 describes what the player then sees.
 
 Each action accepts only the parameter keys in the table below. `gain`, `store-on-card`, and `take-from-card` take resource names; `pay` takes resource names or the single `cost` key that `payLeaf` produces; `bonus-vp` and `bake-bread` take none; `push-to-card-stack` takes `item`; `future-meeples` takes `__futureMeepleRequest`, whose `cardId` must be `CARD_ID`. Native-only controls, such as `payerId` on a gain or `costType` on a pay, are rejected. Amounts, cost rules, and schedules are validated by the native action.
+
+The sixteen actions from `plow` on run the native action for the effect player, with its ordinary adjacency, prerequisite, supply, and payment rules. They take no params, with three exceptions: `improvement` takes `types`, `occupation` takes `exactCost`, and `emit-choice` takes `options` and `promptKey`. These params and the `selection` candidates are type-checked, because the native actions fall back to a default on another type: `types: 'minor'` would otherwise offer every improvement. The native cost and placement overrides, such as `allowedTiles`, `costOverride`, or `skipRoomCheck`, are not open.
 
 | Action ID | Constraint |
 |---|---|
@@ -593,6 +649,26 @@ Each action accepts only the parameter keys in the table below. `gain`, `store-o
 | `push-to-card-stack` | Pushes one item onto `player.cardStates[CARD_ID].stack`. |
 | `special-effect` | Sandbox entry for card-state mutation. Params use allowed `kind` values such as `set-flag`, `set-infobox`, `set-counter`, `increment-counter`, `set-extra-data`, and `increment-extra-data`. It replaced five legacy mutation leaves. Section 6.1 lists the Workshop subset; unlisted repository-internal kinds are outside this contract. |
 | `future-meeples` | Sandbox form uses `params.__futureMeepleRequest`; see section 5.7. |
+| `plow` | The player chooses one tile to plow. |
+| `sow` | The player chooses fields and crops and pays their own seed. Nothing happens without an empty field and a seed. |
+| `fence` | The player chooses fence edges and pays 1 wood and one fence piece per fence. |
+| `stables` | The player chooses tiles for stables and pays 2 wood per stable. |
+| `construct` | The player chooses a tile for a room and pays the cost of the current house type. |
+| `renovate-house` | Upgrades the house from wood to clay or from clay to stone and charges the renovation cost. It asks nothing when there is one way to pay. |
+| `improvement` | The player buys one major improvement or plays one minor improvement from hand, meeting its prerequisite, paying its cost, and running its `onBuy`. `params: { types: ['minor'] }` or `['major']` limits the offer. With `types: ['minor']`, a single playable minor improvement is played without asking. |
+| `occupation` | The player plays one occupation from hand and its `onBuy` runs. Without params it charges the Lessons cost: free for the first occupation, then 1 food. `params: { exactCost: {} }` makes it free and `{ exactCost: { food: 1 } }` sets the cost. A single occupation in hand is played without asking. |
+| `family-growth` | Adds a family member. It needs a free room and an unused family member. |
+| `breed` | Each animal type that meets the breeding count gains one newborn, then the player places the animals. It is not Harvest breeding: admission sets `actionContext.sourceCard` to `CARD_ID`. |
+| `reap` | Takes one crop from each sown field. It is a field phase outside Harvest: admission sets `actionContext.trigger` to `{ phase: 'private-field-phase' }`, and a card cannot write that key. |
+| `exchange` | Opens the player's own exchange menu, with the exchanges of their cooking improvements and cards. |
+| `set-first-player` | Gives the starting player marker to the effect player. |
+| `selection` | The player selects farm positions. Write the candidates in `actionContext: { selectableTiles: [{ row, col }], minSelections, maxSelections }`. The chosen positions are stored as `'row-col'` strings in `cardStates[CARD_ID].extraData.selectedPositions`, where a later hook reads them with `readCardExtraData`. |
+| `emit-choice` | Asks the card's own question: `params: { options: [{ value, labelKey }], promptKey }`. A `labelKey` or `promptKey` that is not a translation key is shown as written. The chosen `value` is passed to `effect.resolveChoice`, which returns the follow-up flow. |
+| `reorganize` | The player rearranges their animals among their zones. |
+
+`resolveChoice` is called for every choice whose source is this card. That includes the choices a player makes inside a native action the card dispatched, such as the improvement, the occupation, or the exchange they pick. Return nothing for a value that is not one of the card's own `emit-choice` options.
+
+`reap` and `breed` are returned as flow leaves. A listener result's replacement `actionId` and its `followUpActions` name an action without a node, so they cannot carry what admission binds, and these two actions are rejected there.
 
 Sprint 6b on 2026-04-30 removed five separate mutation IDs, `flag-card`, `unflag-card`, `set-card-infobox`, `clear-card-infobox`, and `write-card-extra-data`, plus three dead IDs, `hold-worker-on-card`, `release-worker-from-card`, and `gain-other-players`. Use the `special-effect` discriminated union. CI `check-prompt-sync` ensures the prompt exposes only allowlisted IDs. A sandbox card must not use another ID.
 
@@ -621,9 +697,17 @@ Each mutation is a `special-effect` leaf with `sourceCard: CARD_ID`. Its `params
 
 // Add amount to player.cardStates[sourceCard].extraData[key]
 { kind: 'increment-extra-data', key: 'used', amount: 1 }
+
+// Remove the newest item of player.cardStates[sourceCard].stack
+{ kind: 'pop-card-stack-top' }
+
+// Cancel the goods this card scheduled for the effect player with future-meeples;
+// rounds limits the removal to those rounds
+{ kind: 'remove-future-meeples' }
+{ kind: 'remove-future-meeples', rounds: [11, 12] }
 ```
 
-These seven kinds are the complete sandbox set, held in `SANDBOX_SPECIAL_EFFECT_KINDS`. The repository uses other kinds, such as `emit-card-triggered` for visible card-trigger event logs. They are not part of the Workshop contract, and a `special-effect` leaf that uses one is rejected. So is a listed kind whose fields do not have the types shown above: `key` and `text` are strings, `amount` and `value` of the counter and increment kinds are finite numbers, `flag` is a boolean, and the two data kinds must supply a `value`.
+These nine kinds are the complete sandbox set, held in `SANDBOX_SPECIAL_EFFECT_KINDS`. The repository uses other kinds, such as `emit-card-triggered` for visible card-trigger event logs. They are not part of the Workshop contract, and a `special-effect` leaf that uses one is rejected. So is a listed kind whose fields do not have the types shown above: `key` and `text` are strings, `amount` and `value` of the counter and increment kinds are finite numbers, `flag` is a boolean, the two data kinds must supply a `value`, and `rounds`, when present, is an array of numbers.
 
 Optional `actionContext.targetPlayerId?: string` routes a mutation to the matching player in `state.players`; it defaults to the actor in `context.player`. Workshop rarely needs it except for cross-player cases such as D134 Oyster Eater.
 
@@ -723,7 +807,7 @@ CI catches a missing set update.
 
 [ADR 0025](adr/0025-workshop-capability-contract-is-fail-closed-and-opened-by-tests.md) sets the rules for this document.
 
-- **The contract covers names, node fields, each action's parameter keys, the field types of `special-effect`, and the top-level result type of query hooks.** Parameter values and the contents of query results are validated by their native consumers, exactly as for native cards; admission does not mirror those rules.
+- **The contract covers names, node fields, the types of the declared effect metadata and listener data fields, each action's parameter keys, the field types of `special-effect` and of the params the native farm and card actions take, and the top-level result type of query hooks.** Other parameter values and the contents of query results are validated by their native consumers, exactly as for native cards; admission does not mirror those rules.
 - **Not listed means not open.** The deployed contract, source validation, and both executors accept the same names: the hooks in section 3.1, the listener actions, phases, and scopes in sections 3.2 and 3.4, the action IDs in section 6, and the `special-effect` kinds in section 6.1. This document does not list unopened native interfaces. Candidates are tracked in [issue #1079](https://github.com/titanxxh/open-agricola/issues/1079).
 - **A name is open only with a fixed behavior test.** Each name needs at least one test that drives it through a two-player `GameSession` without changing native rule paths. Open a new capability in its own issue, with that test.
 - **A failed hook and an out-of-contract result behave the same way.** When the failure happens while a command is being settled, its first occurrence rejects the command, restores the state before it, and returns the error, which names the rejected action, kind, or field. A repeated identical failure is not reported again: the command then succeeds and that card's effect is skipped. This is deliberate, so a game that contains a faulty card can continue. A failure outside a command, such as a query that runs while availability, a preview, or scores are computed for a response, is recorded as a card warning and contributes the neutral result of section 3.1; nothing is rolled back, because no command is in progress.
@@ -736,6 +820,7 @@ Admission serves honest authors and model mistakes. It does not bound adversaria
 
 | Date | Change |
 |---|---|
+| 2026-10-10 | Opened the candidate capabilities of issue #1079, each with a fixed Session test: seven query hooks and the fourth and fifth hook arguments they need, six effect metadata keys, five listener data fields, the `computeExchanges` phase, sixteen leaf actions that run native farm, card and turn-order actions, and the `special-effect` kinds `pop-card-stack-top` and `remove-future-meeples`. |
 | 2026-10-10 | Made the contract fail-closed (ADR 0025): enforced action IDs and `special-effect` kinds in source validation and both executors, rejected unsupported listener fields and the undocumented `beforeEndGameScope` / `beforeEndGameMandatory` metadata, bound every listener and returned node to its own card and omitted listener filters to the listed sets, rejected unopened native node fields, undocumented action parameter keys, malformed `special-effect` fields and query results of the wrong top-level type, and documented the hook-failure behavior. |
 | 2026-08-04 | Made discounts across all improvement candidates mandatory capped bonuses; completed and narrowed the `handHooks` manifest; required a direct accessor-free effect object literal plus host filtering; unified `positionKey({row,col})`; removed Workshop candidate-and-settlement hooks that cannot settle completely; added semantic contracts and M11 live, record, and replay guards. |
 | 2026-04-30 | Refactored scoring into two tracks: removed `computePostScore`, `scoringPriority`, and `ctx.reserved`; added `computeCostedBonus` through the Pareto solver. The archived spec and plan remain in Git history. |

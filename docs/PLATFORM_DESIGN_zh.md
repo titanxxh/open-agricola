@@ -261,7 +261,7 @@ const CARD_IMPL = {
 
 #### 可用 actionId（ActionFlow leaf）
 
-`gain`、`pay`、`bonus-vp`、`bake-bread`、`store-on-card`、`take-from-card`、`push-to-card-stack`、`special-effect`、`future-meeples`（共 9 个；权威白名单见 `shared/custom-code/sandbox-action-ids.ts` 的 `SANDBOX_ALLOWED_ACTION_IDS`）。旧 id（`pay-resources` / `gain-other-players` / `write-card-extra-data` / `hold-worker-on-card` 等）已从引擎删除。
+移动物品和写卡牌状态的 9 个：`gain`、`pay`、`bonus-vp`、`bake-bread`、`store-on-card`、`take-from-card`、`push-to-card-stack`、`special-effect`、`future-meeples`。为效果玩家执行原生农场、卡牌或先手行动的 16 个：`plow`、`sow`、`fence`、`stables`、`construct`、`renovate-house`、`improvement`、`occupation`、`family-growth`、`breed`、`reap`、`exchange`、`set-first-player`、`selection`、`emit-choice`、`reorganize`（权威白名单见 `shared/custom-code/sandbox-action-ids.ts` 的 `SANDBOX_ALLOWED_ACTION_IDS`）。旧 id（`pay-resources` / `gain-other-players` / `write-card-extra-data` / `hold-worker-on-card` 等）已从引擎删除。
 
 #### 沙盒注入 helper
 
