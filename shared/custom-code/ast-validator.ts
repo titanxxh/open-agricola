@@ -92,11 +92,19 @@ function validateLiteralLeaf(
     }
   }
   const actionContext = initializer('actionContext')
+  const actionContextKind = actionContext && literalKind(actionContext)
+  if (actionContext && actionContextKind !== undefined && actionContextKind !== 'object') {
+    errors.push(`line ${getLine(actionContext)}: actionContext must be an object`)
+  }
   if (actionContext && ts.isObjectLiteralExpression(actionContext)) {
     for (const property of actionContext.properties) {
       const key = getStaticPropertyName(property, constants)
       if (key !== undefined && !isOpenActionContextKey(key)) {
         errors.push(`line ${getLine(property)}: actionContext key '${key}' is not available to Workshop cards`)
+      }
+      const written = key === 'targetPlayerId' && ts.isPropertyAssignment(property) ? literalKind(property.initializer) : undefined
+      if (written !== undefined && written !== 'string') {
+        errors.push(`line ${getLine(property)}: actionContext.targetPlayerId must be a string`)
       }
     }
   }
@@ -109,13 +117,38 @@ function validateLiteralLeaf(
 }
 
 /** The kind of a literal as written in source; undefined for anything computed. */
-function literalKind(expression: ts.Expression): ControlFieldLiteral | 'other' | undefined {
+function literalKind(expression: ts.Expression): ControlFieldLiteral | 'array' | 'other' | undefined {
   if (expression.kind === ts.SyntaxKind.TrueKeyword || expression.kind === ts.SyntaxKind.FalseKeyword) return 'boolean'
   if (ts.isStringLiteralLike(expression)) return 'string'
   if (ts.isObjectLiteralExpression(expression)) return 'object'
-  if (ts.isNumericLiteral(expression) || ts.isArrayLiteralExpression(expression)
-    || expression.kind === ts.SyntaxKind.NullKeyword) return 'other'
+  if (ts.isArrayLiteralExpression(expression)) return 'array'
+  if (ts.isNumericLiteral(expression) || expression.kind === ts.SyntaxKind.NullKeyword) return 'other'
   return undefined
+}
+
+/** Whether an anytimeWindow written as an object literal has the documented shape.
+ * Computed keys and values are left to the executors. */
+function isAnytimeWindowLiteral(literal: ts.ObjectLiteralExpression, constants: Map<string, string>): boolean {
+  if (literal.properties.some(property => !hasInspectablePropertyName(property, constants))) return true
+  let hasAllowed = false
+  for (const property of literal.properties) {
+    const key = getStaticPropertyName(property, constants)
+    const value = ts.isPropertyAssignment(property) ? property.initializer : undefined
+    const written = value && literalKind(value)
+    if (key === 'allowed') {
+      hasAllowed = true
+      if (written !== undefined && written !== 'boolean') return false
+    } else if (key === 'blockedIds') {
+      if (written !== undefined && written !== 'array') return false
+      if (value && ts.isArrayLiteralExpression(value) && value.elements.some((element) => {
+        const kind = literalKind(element)
+        return kind !== undefined && kind !== 'string'
+      })) return false
+    } else {
+      return false
+    }
+  }
+  return hasAllowed
 }
 
 /** Check known literal flow results without treating arbitrary card data as flow
@@ -149,8 +182,11 @@ function validateLiteralFlow(
         errors.push(`line ${getLine(property)}: flow field '${field}' is not available to Workshop cards`)
       }
       const control = controlFieldExpectation(field)
-      const written = control && ts.isPropertyAssignment(property) ? literalKind(property.initializer) : undefined
-      if (control && written !== undefined && written !== control.literal) {
+      const value = control && ts.isPropertyAssignment(property) ? property.initializer : undefined
+      const written = value && literalKind(value)
+      const wrongShape = field === 'anytimeWindow' && value !== undefined && ts.isObjectLiteralExpression(value)
+        && !isAnytimeWindowLiteral(value, constants)
+      if (control && ((written !== undefined && written !== control.literal) || wrongShape)) {
         errors.push(`line ${getLine(property)}: ${field} must be ${control.expected}`)
       }
     }
