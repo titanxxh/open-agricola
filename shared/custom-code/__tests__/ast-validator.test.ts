@@ -875,6 +875,31 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
     ])
   })
 
+  it('sees through parentheses and type assertions around control literals', () => {
+    const result = validateCardCode(`
+      const CARD_ID = 'CUSTOM_Test'
+      const CARD_IMPL = {
+        effect: {
+          onRoundStart: () => ({ type: 'seq', children: [
+            { type: 'leaf', actionId: 'gain', sourceCard: CARD_ID, optional: ('false') },
+            { type: 'leaf', actionId: 'gain', sourceCard: CARD_ID, anytimeWindow: { allowed: ('yes') } },
+            { type: 'leaf', actionId: 'gain', sourceCard: CARD_ID, anytimeWindow: ({ allowed: true, blockedIds: ([(1)]) } as const) },
+            { type: 'leaf', actionId: 'gain', sourceCard: CARD_ID, actionContext: ({ targetPlayerId: 2 } as const) },
+            { type: 'leaf', actionId: 'gain', sourceCard: CARD_ID, optional: (true), promptKey: ('ui.prompt' as string),
+              anytimeWindow: ({ allowed: (false) }), actionContext: ({ targetPlayerId: ('p2') } as const) },
+          ] }),
+        },
+      }
+    `)
+    expect(result.valid).toBe(false)
+    expect(result.valid === false && result.errors).toEqual([
+      'line 6: optional must be a boolean',
+      'line 7: anytimeWindow must be { allowed: boolean, blockedIds?: string[] }',
+      'line 8: anytimeWindow must be { allowed: boolean, blockedIds?: string[] }',
+      'line 9: actionContext.targetPlayerId must be a string',
+    ])
+  })
+
   it('does not treat card data shaped like a leaf as a flow', () => {
     const result = validateCardCode(`
       const CARD_ID = 'CUSTOM_Test'
