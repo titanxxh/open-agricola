@@ -1,6 +1,7 @@
 /**
  * Browser-local custom-card executor — the browser counterpart of
- * `server/custom-code/engine.ts`.
+ * `server/custom-code/engine.ts` (validation and manifest) and
+ * `server/custom-code/isolate-runner.ts` (hook and listener invocation).
  *
  * Runs compiled card code via `new Function` instead of an isolated-vm
  * isolate: in the local sandbox the code is the author's own and runs in
@@ -47,7 +48,7 @@ const SHADOWED_GLOBALS = [
 ]
 const HARMLESS_THIS = Object.freeze(Object.create(null))
 
-// Matches EXECUTION_TIMEOUT_MS in server/custom-code/engine.ts.
+// Matches EXECUTION_TIMEOUT_MS in shared/custom-code/runtime-limits.ts.
 const SERVER_EXECUTION_BUDGET_MS = 100
 
 function runCardCode(
@@ -92,7 +93,7 @@ function runCardCode(
   ) as string | undefined
   // Synchronous card code can't be interrupted mid-run, so the browser dry-run
   // can't hard-enforce the server's per-invocation budget; warn instead so a
-  // card that would time out in multiplayer (server engine.ts caps at 100 ms)
+  // card that would time out in multiplayer (the server isolate caps at 100 ms)
   // is flagged during playtesting rather than silently "passing" locally.
   const elapsed = performance.now() - start
   if (elapsed > SERVER_EXECUTION_BUDGET_MS) {

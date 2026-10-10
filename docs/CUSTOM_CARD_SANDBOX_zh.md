@@ -25,7 +25,7 @@
 
 ## 1. 沙盒注入的全局
 
-`server/custom-code/engine.ts` 往 isolate 注入以下全局：
+服务端 isolate 注入以下全局：hook 和 listener 调用在 `server/custom-code/isolate-runner.ts`，manifest 提取在 `server/custom-code/engine.ts`：
 
 <!-- prompt-sync:begin id=sandbox-injections -->
 
@@ -738,7 +738,7 @@ const CARD_IMPL = {
 
 ## 8. 浏览器本地执行器的语义对齐
 
-浏览器本地执行器（`client/local-sandbox/browser-executor.ts`，`VITE_SANDBOX_EXECUTOR=browser` 时的工坊试玩路径）在浏览器里跑用户自己的代码（"用户只能攻击自己"），不进 isolate。**注入清单与服务端 `server/custom-code/engine.ts` 完全一致**：
+浏览器本地执行器（`client/local-sandbox/browser-executor.ts`，`VITE_SANDBOX_EXECUTOR=browser` 时的工坊试玩路径）在浏览器里跑用户自己的代码（"用户只能攻击自己"），不进 isolate。**注入清单与服务端 isolate（`server/custom-code/isolate-runner.ts`）完全一致**：
 
 - 同样暴露 `MinorImprovement(def) => def` / `Occupation(def) => def` / 简化 `console` / 所有 §1 中列出的 helper 函数（复用同一份 `shared/custom-code/injected-helpers.ts` 字符串常量）
 - 同样对输入做 `JSON.parse(JSON.stringify(...))` 拷贝、输出 JSON round-trip

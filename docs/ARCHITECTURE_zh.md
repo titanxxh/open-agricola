@@ -1346,7 +1346,7 @@ ClientCommand
 server/custom-code/
 ├── compiler.ts          TS → JS（ts-blank-space + esbuild）
 ├── runtime.ts           沙盒运行时
-├── engine.ts            hook / phase / scope 校验 + 调度
+├── engine.ts            源码校验、编译与 manifest 提取
 ├── isolate-runner.ts    isolate-vm 隔离入口
 ├── executor-worker.ts   Worker Thread 入口
 └── client.ts            主进程 → Worker Thread 同步调用客户端

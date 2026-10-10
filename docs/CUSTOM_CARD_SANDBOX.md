@@ -23,7 +23,7 @@ Official card authors working in `shared/cards/<deck>/<id>.ts` are not subject t
 
 ## 1. Injected globals
 
-`server/custom-code/engine.ts` injects these globals into the isolate:
+The server isolate injects these globals, in `server/custom-code/isolate-runner.ts` for hook and listener calls and in `server/custom-code/engine.ts` for manifest extraction:
 
 <!-- prompt-sync:begin id=sandbox-injections -->
 
@@ -687,7 +687,7 @@ Important rules:
 
 ## 8. Browser-local executor parity
 
-The browser-local executor in `client/local-sandbox/browser-executor.ts`, used when `VITE_SANDBOX_EXECUTOR=browser`, runs a user's own source in the browser without an isolate. Its premise is that the user can affect only their own browser. Its injection contract exactly matches server `server/custom-code/engine.ts`:
+The browser-local executor in `client/local-sandbox/browser-executor.ts`, used when `VITE_SANDBOX_EXECUTOR=browser`, runs a user's own source in the browser without an isolate. Its premise is that the user can affect only their own browser. Its injection contract exactly matches the server isolate in `server/custom-code/isolate-runner.ts`:
 
 - It exposes the same `MinorImprovement(def) => def`, `Occupation(def) => def`, simplified `console`, and every helper in section 1 through the same string constants in `shared/custom-code/injected-helpers.ts`.
 - Inputs use `JSON.parse(JSON.stringify(...))` and outputs complete a JSON round trip.
