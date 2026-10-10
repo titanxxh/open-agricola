@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { admitCustomFlow } from '../flow-admission'
+import { validateCustomListenerResult } from '../listener-result-validator'
 import { SANDBOX_ALLOWED_ACTION_IDS } from '../sandbox-action-ids'
 
 const CARD_ID = 'CUSTOM_Admission'
@@ -23,6 +24,9 @@ describe('admitCustomFlow', () => {
     'push-to-card-stack': { item: 'token' },
     'special-effect': { kind: 'set-flag', flag: true },
     'future-meeples': { __futureMeepleRequest: { cardId: CARD_ID, playerId: 'p1', startRound: 2, count: 3, resources: { food: 1 } } },
+    improvement: { types: ['minor'] },
+    occupation: { exactCost: { food: 1 } },
+    'emit-choice': { options: [{ value: 'a', labelKey: 'A' }], promptKey: 'Pick one' },
   }
 
   it.each([...SANDBOX_ALLOWED_ACTION_IDS])('accepts the contract leaf %s with its documented params', (actionId) => {
@@ -53,7 +57,7 @@ describe('admitCustomFlow', () => {
       .toThrow("flow: __futureMeepleRequest.cardId must be this card's id")
   })
 
-  it.each(['plow', 'selection', 'card_E112_GrainThief_protect'])('rejects the native leaf %s', (actionId) => {
+  it.each(['place-farmer', 'collect', 'card_E112_GrainThief_protect'])('rejects the native leaf %s', (actionId) => {
     expect(admit(leaf(actionId))).toThrow(`flow: actionId '${actionId}' is not in the Workshop Capability Contract`)
   })
 
@@ -62,8 +66,8 @@ describe('admitCustomFlow', () => {
   })
 
   it('rejects the whole flow and names the nested node', () => {
-    const flow = { type: 'seq', children: [leaf('gain', { food: 1 }), { type: 'or', children: [leaf('gain'), leaf('sow')] }] }
-    expect(admit(flow)).toThrow("flow.children[1].children[1]: actionId 'sow' is not in the Workshop Capability Contract")
+    const flow = { type: 'seq', children: [leaf('gain', { food: 1 }), { type: 'or', children: [leaf('gain'), leaf('place-farmer')] }] }
+    expect(admit(flow)).toThrow("flow.children[1].children[1]: actionId 'place-farmer' is not in the Workshop Capability Contract")
   })
 
   it('rejects malformed nodes', () => {
@@ -150,6 +154,9 @@ describe('admitCustomFlow', () => {
     { kind: 'set-extra-data', key: 'note', value: { type: 'leaf', actionId: 'descriptive-tag' } },
     { kind: 'set-private-data', key: 'secret', value: null },
     { kind: 'increment-extra-data', key: 'total', amount: -2 },
+    { kind: 'pop-card-stack-top' },
+    { kind: 'remove-future-meeples' },
+    { kind: 'remove-future-meeples', rounds: [11, 12] },
   ])('accepts the documented special-effect shape $kind', (params) => {
     expect(admit(leaf('special-effect', params))).not.toThrow()
   })
@@ -164,7 +171,65 @@ describe('admitCustomFlow', () => {
     [{ kind: 'increment-extra-data', amount: 1 }, "special-effect 'increment-extra-data' requires key to be a string"],
     [{ kind: 'set-extra-data', key: 'note' }, "special-effect 'set-extra-data' requires value to be present"],
     [{ kind: 'set-private-data', key: 'secret', value: undefined }, "special-effect 'set-private-data' requires value to be present"],
+    [{ kind: 'remove-future-meeples', rounds: 11 }, "special-effect 'remove-future-meeples' requires rounds to be an array of numbers"],
   ])('rejects a special-effect outside its documented shape', (params, message) => {
     expect(admit(leaf('special-effect', params))).toThrow(`flow: ${message}`)
+  })
+
+  it.each(['plow', 'sow', 'fence', 'stables', 'construct', 'renovate-house', 'family-growth', 'breed', 'reap', 'exchange',
+    'set-first-player', 'selection', 'reorganize'])('rejects any param on the native action %s', (actionId) => {
+    expect(admit(leaf(actionId, { exactCost: {} }))).toThrow(`flow: ${actionId} param 'exactCost' is not in the Workshop Capability Contract`)
+  })
+
+  it.each([
+    ['improvement', { allowedPurchases: ['Major_Well'] }, "improvement param 'allowedPurchases' is not in the Workshop Capability Contract"],
+    // A string would fall back to every improvement inside the native action.
+    ['improvement', { types: 'minor' }, "improvement param 'types' must be a non-empty array of 'major' or 'minor'"],
+    ['improvement', { types: ['occupation'] }, "improvement param 'types' must be a non-empty array of 'major' or 'minor'"],
+    ['occupation', { allowedCards: ['A100_Curator'] }, "occupation param 'allowedCards' is not in the Workshop Capability Contract"],
+    ['occupation', { exactCost: 'free' }, "occupation param 'exactCost' must be a resource object"],
+    ['emit-choice', { options: 'a,b' }, "emit-choice param 'options' must be an array of { value, labelKey }"],
+    ['emit-choice', { options: [], promptKey: 1 }, "emit-choice param 'promptKey' must be a string"],
+    ['emit-choice', { options: [], multiSelect: {} }, "emit-choice param 'multiSelect' is not in the Workshop Capability Contract"],
+  ])('checks the documented params of %s', (actionId, params, message) => {
+    expect(admit(leaf(actionId, params))).toThrow(`flow: ${message}`)
+  })
+
+  it('opens the selection candidates in actionContext for the selection leaf only', () => {
+    const context = { selectableTiles: [{ row: 0, col: 2 }], minSelections: 1, maxSelections: 1 }
+    expect(admit(leaf('selection', {}, { actionContext: context }))).not.toThrow()
+    expect(admit(leaf('plow', {}, { actionContext: context })))
+      .toThrow("flow: actionContext key 'selectableTiles' is not in the Workshop Capability Contract")
+    expect(admit(leaf('selection', {}, { actionContext: { selectionKind: 'occupation-hand' } })))
+      .toThrow("flow: actionContext key 'selectionKind' is not in the Workshop Capability Contract")
+    expect(admit(leaf('selection', {}, { actionContext: { selectableTiles: '0-2' } })))
+      .toThrow("flow: actionContext key 'selectableTiles' must be an array of { row, col }")
+    expect(admit(leaf('selection', {}, { actionContext: { maxSelections: '2' } })))
+      .toThrow("flow: actionContext key 'maxSelections' must be a finite number")
+  })
+
+  it('binds what a custom reap and breed mean, and admits the bound flow again', () => {
+    const reap = leaf('reap', {}, { actionContext: { targetPlayerId: 'p2' } })
+    const breed = leaf('breed')
+    admitCustomFlow({ type: 'seq', children: [reap, breed] }, CARD_ID)
+
+    expect(reap.actionContext).toEqual({ targetPlayerId: 'p2', trigger: { phase: 'private-field-phase' } })
+    expect((breed as Record<string, unknown>).actionContext).toEqual({ sourceCard: CARD_ID })
+    // Session dispatch admits a listener result a second time.
+    expect(admit({ type: 'seq', children: [reap, breed] })).not.toThrow()
+
+    // A card cannot present its reap as the Harvest field phase, or its breeding as Harvest breeding.
+    expect(admit(leaf('reap', {}, { actionContext: { trigger: { phase: 'harvest' } } })))
+      .toThrow("flow: actionContext key 'trigger' is not in the Workshop Capability Contract")
+    expect(admit(leaf('breed', {}, { actionContext: { sourceCard: 'harvest' } })))
+      .toThrow("flow: actionContext key 'sourceCard' is not in the Workshop Capability Contract")
+  })
+
+  it('refuses reap and breed where no node can carry the bound context', () => {
+    expect(() => validateCustomListenerResult({ actionId: 'reap' }, CARD_ID))
+      .toThrow("actionId: actionId 'reap' must be returned as a flow leaf")
+    expect(() => validateCustomListenerResult({ followUpActions: ['gain', { actionId: 'breed' }] }, CARD_ID))
+      .toThrow("followUpActions[1]: actionId 'breed' must be returned as a flow leaf")
+    expect(() => validateCustomListenerResult({ followUpActions: ['plow'] }, CARD_ID)).not.toThrow()
   })
 })

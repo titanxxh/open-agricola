@@ -20,7 +20,7 @@ const sources = {
     listeners: [{ cardIds: [CARD_ID], actions: ['collect'], phases: ['after'],
       handler: () => ({ sourceCard: CARD_ID, flow: { type: 'seq', children: [
         gainLeaf(CARD_ID, { food: 1 }),
-        { type: 'leaf', actionId: ['pl', 'ow'].join(''), sourceCard: CARD_ID },
+        { type: 'leaf', actionId: ['place', 'farmer'].join('-'), sourceCard: CARD_ID },
       ] } }) }],`,
   effectOutsideContract: `
     effect: { id: CARD_ID, onEndTurn: () => ({ type: 'seq', children: [
@@ -96,7 +96,7 @@ const forest = (session: GameSession) => session.getState().state.actionSpaces.f
 
 describe('Workshop Capability Contract at the Session boundary', () => {
   it.each([
-    ['listener', sources.listenerOutsideContract, "actionId 'plow' is not in the Workshop Capability Contract"],
+    ['listener', sources.listenerOutsideContract, "actionId 'place-farmer' is not in the Workshop Capability Contract"],
     ['effect hook', sources.effectOutsideContract, "special-effect kind 'consume-supply-token' is not in the Workshop Capability Contract"],
     ['listener using a native-only gain parameter', sources.nativeOnlyGainParams, "gain param 'payerId' is not in the Workshop Capability Contract"],
   ])('rejects the command when a %s returns a flow outside the contract, then skips the card on retry', (_kind, impl, message) => {

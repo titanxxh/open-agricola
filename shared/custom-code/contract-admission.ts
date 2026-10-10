@@ -5,7 +5,8 @@ import { admitCustomFlow } from './flow-admission'
 import { isSandboxListenerAction, sandboxListenerActions } from './sandbox-listener-actions'
 import { isSandboxListenerPhase, sandboxListenerPhases } from './sandbox-listener-phases'
 import { isSandboxListenerScope } from './sandbox-listener-scopes'
-import type { CustomCodeManifest } from './types'
+import { admitEffectMetadata, admitListenerData } from './sandbox-declarations'
+import type { CustomCodeEffectMetadata, CustomCodeListenerManifest, CustomCodeManifest } from './types'
 
 /**
  * Shared admission for both executors (ADR 0025): the manifest extracted from a
@@ -13,22 +14,25 @@ import type { CustomCodeManifest } from './types'
  * Workshop Capability Contract. Anything else throws, never silently narrows.
  */
 
-/** The anytime dispatch uses this action identity; it is not a listener action name. */
-const ANYTIME_ACTION_ID = 'anytime'
+/** Two phases are dispatched under their own action identity; neither is a listener action name. */
+const PHASE_DISPATCH_IDS: Partial<Record<ActionHookPhase, string>> = {
+  anytime: 'anytime',
+  computeExchanges: 'compute-exchanges',
+}
 
 const FLOW_RESULT_HOOKS = new Set<string>([...flowCardEffectHooks, 'resolveChoice', 'contributeExtraTurn'])
 
 /** What the manifest extraction script reports before any admission. */
 export type RawCustomManifest = {
   effectKeys: string[]
-  effectMetadata?: { handHooks?: unknown[] }
+  effectMetadata?: { handHooks?: unknown[] } & Record<string, unknown>
   listeners: Array<{
     registrationId: string
     cardIds?: unknown[]
     actions?: unknown[]
     phases?: unknown[]
     scope?: unknown
-  }>
+  } & Record<string, unknown>>
 }
 
 const outsideContract = (detail: string): Error =>
@@ -43,7 +47,7 @@ export function boundListenerFilters(
 ): { actions: string[]; phases: ActionHookPhase[] } {
   const phases = listener.phases ?? [...sandboxListenerPhases]
   const actions = listener.actions
-    ?? [...sandboxListenerActions, ...(phases.includes('anytime') ? [ANYTIME_ACTION_ID] : [])]
+    ?? [...sandboxListenerActions, ...phases.flatMap(phase => PHASE_DISPATCH_IDS[phase] ?? [])]
   return { actions, phases }
 }
 
@@ -81,13 +85,38 @@ export function normalizeCustomManifest(raw: RawCustomManifest, cardId: string):
       actions,
       phases,
       scope: listener.scope as CardListenerScope | undefined,
+      ...admitListenerData(listener, true),
     }
   })
 
-  return { effectHooks, effectMetadata: handHooks ? { handHooks } : undefined, listeners }
+  const effectMetadata: CustomCodeEffectMetadata = {
+    ...(handHooks ? { handHooks } : {}),
+    ...admitEffectMetadata(raw.effectMetadata, true),
+  }
+  return { effectHooks, effectMetadata: Object.keys(effectMetadata).length > 0 ? effectMetadata : undefined, listeners }
 }
 
-type QueryResultKind = 'number' | 'array' | 'object'
+/** What registration copies from a saved manifest. Saving rejects a wrong type; a manifest
+ * saved earlier that carries one, or a hand hook that is not open, loses that entry here. */
+export function registeredEffectMetadata(manifest: CustomCodeManifest): CustomCodeEffectMetadata {
+  const handHooks = manifest.effectMetadata?.handHooks?.filter(isHandCardEffectHook)
+  return { ...(handHooks ? { handHooks } : {}), ...admitEffectMetadata(manifest.effectMetadata, false) }
+}
+
+export const registeredListenerData = (listener: CustomCodeListenerManifest) => admitListenerData(listener, false)
+
+/** Positional arguments an executor passes to a hook: three, unless the hook documents more. */
+const HOOK_ARGUMENT_COUNTS: Record<string, number> = {
+  computeBreedThreshold: 4,
+  computeBreedableAnimalCount: 5,
+  computeAnimalScoreAdjustment: 4,
+  onComputeSharedAnimalZones: 4,
+}
+
+export const extraHookArguments = (hook: string, args: readonly unknown[]): unknown[] =>
+  args.slice(3, HOOK_ARGUMENT_COUNTS[hook] ?? 3)
+
+type QueryResultKind = 'number' | 'array' | 'object' | 'boolean'
 
 /**
  * The top-level type each query hook returns. A wrong one would throw inside a
@@ -106,12 +135,24 @@ export const QUERY_HOOK_RESULT_KINDS: Record<string, QueryResultKind> = {
   getBuiltSpecialStables: 'array',
   getRuleContributions: 'object',
   getStatePresentation: 'object',
+  computeResourceCommitments: 'array',
+  countExtraTurns: 'number',
+  enforceReorganizeOnLastHarvest: 'boolean',
+  computeBreedThreshold: 'number',
+  computeBreedableAnimalCount: 'number',
+  computeAnimalScoreAdjustment: 'number',
+  onComputeSharedAnimalZones: 'array',
+}
+
+const KIND_WORDING: Record<QueryResultKind, string> = {
+  number: 'a finite number', array: 'an array', object: 'an object', boolean: 'a boolean',
 }
 
 const matchesKind = (value: unknown, kind: QueryResultKind): boolean =>
   kind === 'number' ? typeof value === 'number' && Number.isFinite(value)
-    : kind === 'array' ? Array.isArray(value)
-      : !!value && typeof value === 'object' && !Array.isArray(value)
+    : kind === 'boolean' ? typeof value === 'boolean'
+      : kind === 'array' ? Array.isArray(value)
+        : !!value && typeof value === 'object' && !Array.isArray(value)
 
 export const isFlowResultHook = (hook: string): boolean => FLOW_RESULT_HOOKS.has(hook)
 
@@ -133,6 +174,6 @@ export function assertCustomEffectResult(hook: string, result: unknown, cardId: 
   }
   const kind = QUERY_HOOK_RESULT_KINDS[hook]
   if (kind && result !== null && result !== undefined && !matchesKind(result, kind)) {
-    throw new Error(`${hook}: must return ${kind === 'number' ? 'a finite number' : kind === 'array' ? 'an array' : 'an object'}`)
+    throw new Error(`${hook}: must return ${KIND_WORDING[kind]}`)
   }
 }
