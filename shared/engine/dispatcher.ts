@@ -21,12 +21,14 @@ import { resolveActionPreviewCost } from '../actions/helpers/cost-preview'
 import { PaymentSolver } from '../actions/payment'
 import { getSkipComputeReplaceListenerIds } from './replace-guard'
 import { applyComputeCostResults } from './compute-cost-results'
-import { getSuppressedBeforeListenerIds } from './action-context-flags'
+import { areListenerPhasesHostOwned, getSuppressedBeforeListenerIds } from './action-context-flags'
 
 export type EffectPhaseResult = {
   actionHookResults: ActionHookResult[]
   matchedListeners: MatchedCardListener[]
 }
+
+const noEffectPhase = (): EffectPhaseResult => ({ actionHookResults: [], matchedListeners: [] })
 
 export type ComputeReplaceResult = {
   actionId: string
@@ -71,7 +73,7 @@ export class HookDispatcher {
   }
 
   applyComputeReplace(context: ActionExecutionContext & { actionId: string }): ComputeReplaceResult {
-    if (context.actionContext?.checkedReplaceAction === true) {
+    if (context.actionContext?.checkedReplaceAction === true || areListenerPhasesHostOwned(context.actionContext)) {
       return { actionId: context.actionId, alternatives: [], sourceCard: context.sourceCard }
     }
     let actionId = applyComputeReplaceHooks(context)
@@ -187,6 +189,7 @@ export class HookDispatcher {
   }
 
   before(context: ActionExecutionContext & { actionId: string }): EffectPhaseResult {
+    if (areListenerPhasesHostOwned(context.actionContext)) return noEffectPhase()
     const suppressed = new Set(getSuppressedBeforeListenerIds(context.actionContext))
     return {
       actionHookResults: runActionHooks({ ...context, phase: 'before' }),
@@ -202,6 +205,7 @@ export class HookDispatcher {
     result: ActionExecutionResult,
     choice?: string,
   ): EffectPhaseResult {
+    if (areListenerPhasesHostOwned(context.actionContext)) return noEffectPhase()
     return {
       actionHookResults: runActionHooks({ ...context, phase: 'immediatelyAfter', result, choice }),
       matchedListeners: getMatchingListeners({ ...context, phase: 'immediatelyAfter', result, choice }),
@@ -213,6 +217,7 @@ export class HookDispatcher {
     result: ActionExecutionResult,
     choice?: string,
   ): EffectPhaseResult {
+    if (areListenerPhasesHostOwned(context.actionContext)) return noEffectPhase()
     return {
       actionHookResults: runActionHooks({ ...context, phase: 'after', result, choice }),
       matchedListeners: getMatchingListeners({ ...context, phase: 'after', result, choice }),

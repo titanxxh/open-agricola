@@ -59,7 +59,7 @@ import {
   isSyntheticInteractionFrame,
   type MandatoryContinuationProbe,
 } from '../engine/index.ts'
-import { isInjectedAnytimeResult, tagInjectedAnytimeFlow } from '../engine/action-context-flags.ts'
+import { HOST_OWNED_LISTENER_PHASES_KEY, isInjectedAnytimeResult, tagInjectedAnytimeFlow } from '../engine/action-context-flags.ts'
 import type { EngineFrame, EngineSource, EngineStackCursor, SubFlowReason } from '../engine/index.ts'
 import { isProtectedActionCancel } from '../engine/protected-action-cancel.ts'
 import type { PendingCursor, PendingEnvelope } from '../engine/types.ts'
@@ -1694,7 +1694,13 @@ export class GameCore {
   private startReorganizeSubFlow(
     playerIndex: number,
     trigger: import('../actions/effects/reorganize').ReorganizeTrigger,
-    resumeExtra: { originPlayerIndex?: number | null; triggerActionId?: string | null; harvestBreedPlacementMinimums?: unknown } = {},
+    resumeExtra: {
+      originPlayerIndex?: number | null
+      triggerActionId?: string | null
+      harvestBreedPlacementMinimums?: unknown
+      /** The leaf only performs the interaction of a host `reorganize` node. */
+      hostOwnedListenerPhases?: boolean
+    } = {},
   ): void {
     const visibleFrame = this.engineStack.current()
     const visiblePlayerIndex = visibleFrame
@@ -1710,7 +1716,11 @@ export class GameCore {
     const flow: ActionFlow = {
       type: 'leaf',
       actionId: 'reorganize',
-      actionContext: { trigger, harvestBreedPlacementMinimums: resumeExtra.harvestBreedPlacementMinimums },
+      actionContext: {
+        trigger,
+        harvestBreedPlacementMinimums: resumeExtra.harvestBreedPlacementMinimums,
+        ...(resumeExtra.hostOwnedListenerPhases ? { [HOST_OWNED_LISTENER_PHASES_KEY]: true } : {}),
+      },
     }
     this.engineStack.push({
       engine: this.createFlowEngine(flow, playerIndex),
@@ -3844,8 +3854,8 @@ export class GameCore {
     return this.state.players[frame.ownerPlayerIndex]?.id ?? defaultPlayerId
   }
 
-  private acknowledgeCurrentActionAnimalReorgRequest(): void {
-    this.engineStack.current()?.engine.acknowledgePendingActionRequest()
+  private deferCurrentActionCompletion(): string | null {
+    return this.engineStack.current()?.engine.deferPendingActionCompletion() ?? null
   }
 
   private runEngineSteps(): void {
@@ -3937,15 +3947,16 @@ export class GameCore {
       if (step.type === 'choice') {
         this.refreshPendingInteractionRequest()
         step.choice.options = this.engineStack.peekPendingView()?.choices ?? step.choice.options
-        // breed action (e.g. harvest reap or B104 last-harvest enforcement)
-        // emits ActionExecutionResult { type: 'request', request: { kind:
-        // 'animal-reorg' } } — the engine wraps it in the new 'request'
-        // branch and surfaces it as step.type === 'choice', losing the
-        // direct kind discriminator. Detect it via the host node's request
-        // field and pivot to the same anytime sub-flow path the previous
-        // 'animalReorg' result took. After Task 6 we leave the parent
-        // frame on the stack and push a reorganize sub-flow frame.
-        // Task 2: read public wait data through PendingView and resume metadata through PendingCursor.
+        // An action that needs the player to arrange animals (a `reorganize`
+        // leaf, or `breed` under last-harvest enforcement) returns an
+        // `animal-reorg` request, which surfaces here as a choice step.
+        // Detect it via the host's pending request and hand the
+        // reorganization to the reorganize sub-flow pushed on top of this
+        // frame. The host settles now; its completion reactions run once
+        // when this frame resumes, after the reorganization. A host
+        // `reorganize` keeps all of its listener phases, so the sub-flow
+        // leaf only performs the interaction.
+        // Read public wait data through PendingView and resume metadata through PendingCursor.
         const pendingView = this.engineStack.peekPendingView()
         const pendingCursor = this.engineStack.peekPendingCursor()
         const hostRequestKind = pendingView?.request.kind ?? null
@@ -3959,11 +3970,11 @@ export class GameCore {
             pendingCursor?.hostNodeId,
             pendingView,
           )
-          this.acknowledgeCurrentActionAnimalReorgRequest()
+          const hostActionId = this.deferCurrentActionCompletion()
           const trigger = frame.stageResume?.hook === 'onBreedPhase'
             ? 'harvest-breed'
             : 'anytime'
-          this.startReorganizeSubFlow(pIdx, trigger)
+          this.startReorganizeSubFlow(pIdx, trigger, { hostOwnedListenerPhases: hostActionId === 'reorganize' })
           return
         }
         // Synthetic interaction-only frames (the `__interaction_only__`
@@ -4135,17 +4146,11 @@ export class GameCore {
         this.flushLeafActionDetail(step.actionId, false)
       }
 
-      // NOTE: the previous `step.result.type === 'animalReorg'` block lived
-      // here, used to handle `breed` returning that variant explicitly when
-      // animal count did not change (B104 last-harvest enforcement). Since
-      // Task 5 migrated breed to emit `'request' + kind: 'animal-reorg'`,
-      // the engine now wraps it in step.type === 'choice' (handled in the
-      // dedicated reorg branch in the `step.type === 'choice'` block above
-      // via the pending envelope request kind). The
-      // generic `getAnimalCount > before` check below still picks up the
-      // animals-bred path where breed returns `'ok'` so engine after-hooks
-      // (D60 LargePottery, B104 SheepWalker, ...) keep firing on the
-      // post-mutate state.
+      // `breed` with newborns returns `'ok'`, so its completion reactions run
+      // on the post-breeding state before the generic
+      // `getAnimalCount > before` check below starts the reorganize
+      // sub-flow. An `animal-reorg` request (last-harvest enforcement without
+      // newborns) is handled in the `step.type === 'choice'` block above.
 
       if (this.getAnimalCount(player) > this.getAnimalCount(before)) {
         const pIdx = effectivePlayerIndex

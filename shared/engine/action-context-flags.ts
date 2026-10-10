@@ -4,6 +4,16 @@ export const INJECTED_ANYTIME_ACTION_CONTEXT_KEY = '__injectedAnytimeAction' as 
 export const INJECTED_ANYTIME_COMPLETION_CONTEXT_KEY = '__injectedAnytimeCompletion' as const
 export const INJECTED_ANYTIME_RESULT_KEY = '__injectedAnytimeResult' as const
 export const SUPPRESSED_BEFORE_LISTENER_IDS_KEY = '__suppressedBeforeListenerIds' as const
+/**
+ * Marks a leaf that only performs the interaction of another node of the same
+ * action. That host keeps its replace, before and completion phases, so the
+ * leaf matches no listeners or action hooks in them.
+ */
+export const HOST_OWNED_LISTENER_PHASES_KEY = '__hostOwnedListenerPhases' as const
+
+export const areListenerPhasesHostOwned = (
+  actionContext: Record<string, unknown> | undefined,
+): boolean => actionContext?.[HOST_OWNED_LISTENER_PHASES_KEY] === true
 
 export const getSuppressedBeforeListenerIds = (
   actionContext: Record<string, unknown> | undefined,

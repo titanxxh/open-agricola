@@ -426,12 +426,12 @@ const buildInternalActionChildNodes = (
     return node
   })
 
-const buildDeferredHostNode = (
+export const buildDeferredHostNode = (
   int: EngineInternals,
   hostNode: ActionNode,
   result: ActionExecutionResult,
   actionId: string,
-  executionContext: ActionExecutionContext,
+  executionContext: Pick<ActionExecutionContext, 'sourceCard' | 'params' | 'actionContext'>,
   transactionEvents: readonly GameEvent[],
   actionEvents: readonly GameEvent[],
   choice?: string,
