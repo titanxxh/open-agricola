@@ -70,6 +70,10 @@
   min-width: 200px;
 }
 
+.settings-link-actions .btn-primary {
+  min-height: 44px;
+}
+
 .settings-success {
   color: var(--color-success);
   background: var(--color-success-bg);
