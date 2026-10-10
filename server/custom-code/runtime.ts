@@ -1,4 +1,4 @@
-import { type CardEffect } from '../../shared/cards/card-effects.ts'
+import { isHandCardEffectHook, type CardEffect } from '../../shared/cards/card-effects.ts'
 import type { PaymentInfo } from '../../shared/cards/card-effects.ts'
 import type { CardListenerContext } from '../../shared/cards/card-listeners.ts'
 import type { GameState, PlayerState } from '../../shared/contract/types.ts'
@@ -40,9 +40,9 @@ export const registerExecutorBackedCustomCard = (cardData: CustomCardData): void
       return response.result ?? neutralEffectResult(hook)
     }
   }
-  if (codeManifest.effectMetadata) {
-    Object.assign(effect, codeManifest.effectMetadata)
-  }
+  // handHooks is the only open metadata; a manifest saved before ADR 0025 may carry more.
+  const handHooks = codeManifest.effectMetadata?.handHooks?.filter(isHandCardEffectHook)
+  if (handHooks) effect.handHooks = handHooks
 
   // Register into session context when one is active; otherwise write
   // directly to the active CardRegistry (test-only path).

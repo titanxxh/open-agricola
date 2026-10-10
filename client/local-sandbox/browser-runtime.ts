@@ -4,7 +4,7 @@
  * replaced by direct in-thread invocation (`browser-executor.ts`).
  * Injected into `GameCore` via `registerCustomCardImpl`.
  */
-import { type CardEffect } from '../../shared/cards/card-effects.ts'
+import { isHandCardEffectHook, type CardEffect } from '../../shared/cards/card-effects.ts'
 import type { PaymentInfo } from '../../shared/cards/card-effects.ts'
 import type { CardListenerContext } from '../../shared/cards/card-listeners.ts'
 import type { GameState, PlayerState } from '../../shared/contract/types.ts'
@@ -46,9 +46,9 @@ export const registerBrowserBackedCustomCard = (cardData: CustomCardData): void 
       return response.result ?? neutralEffectResult(hook)
     }
   }
-  if (codeManifest.effectMetadata) {
-    Object.assign(effect, codeManifest.effectMetadata)
-  }
+  // handHooks is the only open metadata; a manifest saved before ADR 0025 may carry more.
+  const handHooks = codeManifest.effectMetadata?.handHooks?.filter(isHandCardEffectHook)
+  if (handHooks) effect.handHooks = handHooks
 
   if (codeManifest.effectHooks.length > 0) {
     if (sessionCtx) {

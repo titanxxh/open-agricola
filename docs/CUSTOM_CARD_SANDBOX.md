@@ -623,7 +623,7 @@ Each mutation is a `special-effect` leaf with `sourceCard: CARD_ID`. Its `params
 { kind: 'increment-extra-data', key: 'used', amount: 1 }
 ```
 
-These seven kinds are the complete sandbox set, held in `SANDBOX_SPECIAL_EFFECT_KINDS`. The repository uses other kinds, such as `emit-card-triggered` for visible card-trigger event logs. They are not part of the Workshop contract, and a `special-effect` leaf that uses one is rejected. So is a listed kind whose fields do not have the types shown above: `key` and `text` are strings, `amount` and `value` of the counter and increment kinds are finite numbers, and `flag` is a boolean.
+These seven kinds are the complete sandbox set, held in `SANDBOX_SPECIAL_EFFECT_KINDS`. The repository uses other kinds, such as `emit-card-triggered` for visible card-trigger event logs. They are not part of the Workshop contract, and a `special-effect` leaf that uses one is rejected. So is a listed kind whose fields do not have the types shown above: `key` and `text` are strings, `amount` and `value` of the counter and increment kinds are finite numbers, `flag` is a boolean, and the two data kinds must supply a `value`.
 
 Optional `actionContext.targetPlayerId?: string` routes a mutation to the matching player in `state.players`; it defaults to the actor in `context.player`. Workshop rarely needs it except for cross-player cases such as D134 Oyster Eater.
 

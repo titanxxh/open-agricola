@@ -293,6 +293,27 @@ const CARD_IMPL = {
     expect(getCardEffect('CUSTOM_ExecutorCard')).toMatchObject({ handHooks: ['onBeforeStartOfTurn'] })
   })
 
+  it('registers only the open metadata of a manifest saved before the contract was narrowed', () => {
+    const result = validateAndCompileCustomCode(`
+const CARD_ID = 'CUSTOM_ExecutorCard'
+const CARD_DEF = MinorImprovement({ id: CARD_ID, name: 'Executor Card' })
+const CARD_IMPL = {
+  effect: { id: CARD_ID, handHooks: ['onBeforeStartOfTurn'], onBeforeStartOfTurn: () => gainLeaf(CARD_ID, { food: 1 }), onBeforeEndGame: () => gainLeaf(CARD_ID, { food: 1 }) },
+}
+    `, 'CUSTOM_ExecutorCard')
+    expect(result.valid).toBe(true)
+    if (!result.valid) return
+    const legacyMetadata = { handHooks: ['onBeforeStartOfTurn', 'onBuy'], beforeEndGameScope: 'allPlayers', beforeEndGameMandatory: true }
+    const cardData = makeCardData(result.compiledCode, { ...result.manifest, effectMetadata: legacyMetadata as never })
+    registerCustomCard(cardData, { allowGlobal: true })
+    registerExecutorBackedCustomCard(cardData)
+
+    const effect = getCardEffect('CUSTOM_ExecutorCard')!
+    expect(effect.handHooks).toEqual(['onBeforeStartOfTurn'])
+    expect(effect).not.toHaveProperty('beforeEndGameScope')
+    expect(effect).not.toHaveProperty('beforeEndGameMandatory')
+  })
+
   it('dispatches a supported custom hand hook through a real session stage', () => {
     const result = validateAndCompileCustomCode(`
 const CARD_ID = 'CUSTOM_ExecutorCard'

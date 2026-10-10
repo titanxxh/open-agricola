@@ -55,7 +55,7 @@ const GROUP_FIELDS = {
 
 type FieldShape = 'string' | 'finite' | 'boolean' | 'json'
 
-/** docs/CUSTOM_CARD_SANDBOX.md §6.1. `json` accepts any serialized value. */
+/** docs/CUSTOM_CARD_SANDBOX.md §6.1. `json` accepts any serialized value, but the field must be present. */
 const SPECIAL_EFFECT_SHAPES: Record<SandboxSpecialEffectKind, Record<string, FieldShape>> = {
   'increment-counter': { key: 'string', amount: 'finite' },
   'set-counter': { key: 'string', value: 'finite' },
@@ -67,8 +67,9 @@ const SPECIAL_EFFECT_SHAPES: Record<SandboxSpecialEffectKind, Record<string, Fie
 }
 
 const matchesShape = (value: unknown, shape: FieldShape): boolean =>
-  shape === 'json'
-    || (shape === 'finite' ? typeof value === 'number' && Number.isFinite(value) : typeof value === shape)
+  shape === 'json' ? value !== undefined
+    : shape === 'finite' ? typeof value === 'number' && Number.isFinite(value)
+      : typeof value === shape
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === 'object' && !Array.isArray(value)
@@ -96,7 +97,8 @@ function assertSpecialEffectParams(params: Record<string, unknown>, _cardId: str
   if (!isSandboxSpecialEffectKind(kind)) throw outsideContract(path, `special-effect kind '${String(kind)}'`)
   for (const [field, shape] of Object.entries(SPECIAL_EFFECT_SHAPES[kind])) {
     if (!matchesShape(params[field], shape)) {
-      throw new Error(`${path}: special-effect '${kind}' requires ${field} to be a ${shape === 'finite' ? 'finite number' : shape}`)
+      const expected = shape === 'finite' ? 'a finite number' : shape === 'json' ? 'present' : `a ${shape}`
+      throw new Error(`${path}: special-effect '${kind}' requires ${field} to be ${expected}`)
     }
   }
 }

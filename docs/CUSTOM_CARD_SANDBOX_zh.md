@@ -671,7 +671,7 @@ return {
 { kind: 'increment-extra-data', key: 'used', amount: 1 }
 ```
 
-以上七个 kind 是沙盒的完整集合，定义在 `SANDBOX_SPECIAL_EFFECT_KINDS`。仓库内部还使用其他 kind（例如 `emit-card-triggered` 用于写入可见卡牌触发事件日志）。这些 kind 不属于 Workshop 合约，使用它们的 `special-effect` leaf 会被拒绝。已列出的 kind 如果字段类型与上面不符，同样被拒绝：`key` 和 `text` 是字符串，计数和累加类 kind 的 `amount`、`value` 是有限数字，`flag` 是布尔值。
+以上七个 kind 是沙盒的完整集合，定义在 `SANDBOX_SPECIAL_EFFECT_KINDS`。仓库内部还使用其他 kind（例如 `emit-card-triggered` 用于写入可见卡牌触发事件日志）。这些 kind 不属于 Workshop 合约，使用它们的 `special-effect` leaf 会被拒绝。已列出的 kind 如果字段类型与上面不符，同样被拒绝：`key` 和 `text` 是字符串，计数和累加类 kind 的 `amount`、`value` 是有限数字，`flag` 是布尔值，两个写数据的 kind 必须带 `value`。
 
 可选 `actionContext.targetPlayerId?: string` 让 mutation 路由到 `state.players` 中匹配的玩家（默认是 `context.player` 即 actor）。Workshop 通常用不到 targetPlayerId（仅 D134 OysterEater 等跨玩家场景需要）。
 
