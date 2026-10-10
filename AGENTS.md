@@ -129,7 +129,7 @@ pnpm run build              # tsc + vite build
 调试与最终验证分开，命令和记录语义见 `docs/operations/ci-checks.md`：
 
 1. 调试期间用 `pnpm verify focus <file.test.ts>` 验证最小相关范围；纯测试 / 工具 / 文档改动不要求每次重启应用。
-2. 涉及应用运行行为、UI 或 WS 时，最终验证先通过 `./restart-local.sh` 重启，再用浏览器 / Playwright / 命令行验真实行为；`pnpm verify <file.spec.ts>` 会在隔离环境调用该重启入口。
+2. 涉及应用运行行为、UI 或 WS 时，最终验证先通过 `./restart-local.sh` 重启，再用浏览器 / Playwright / 命令行验真实行为；`pnpm verify <file.spec.ts>` 会在隔离环境调用该重启入口。PR 不在 GitHub Actions 上跑浏览器 E2E：本机跑通相关 spec 并把结果写进 PR 描述即可。
 3. 最终源码上运行 `pnpm verify prepush`（完整 `pnpm test:fast` + `pnpm run lint`）；按风险补相关 slow Session / E2E，定向测试不能代替完整门禁。
 4. 修改源码或 rebase 改变文件内容后重新验证；`pnpm verify status` 可检查本地记录的新鲜度。记录只辅助核对，不自动跳过检查。
 

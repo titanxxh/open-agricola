@@ -72,7 +72,9 @@ describe('canonical architecture verification wiring', () => {
   it.each([...workflows, 'e2e.yml'])('%s is ready for public PRs without running automatic private jobs', (name) => {
     const workflow = fs.readFileSync(path.join(repoRoot, '.github/workflows', name), 'utf8')
 
-    expect(workflow).toMatch(/^ {2}pull_request:\n {4}branches: \[main\]$/m)
+    // Browser E2E for a pull request runs locally; the workflow covers main and manual runs.
+    if (name === 'e2e.yml') expect(workflow).not.toMatch(/^ {2}pull_request:/m)
+    else expect(workflow).toMatch(/^ {2}pull_request:\n {4}branches: \[main\]$/m)
     expect(workflow).toMatch(/^ {2}push:\n {4}branches: \[main\]$/m)
     expect(workflow).toMatch(/^ {2}workflow_dispatch:$/m)
     expect(workflow).toMatch(/permissions:\s*\n\s+contents: read/)

@@ -1,9 +1,9 @@
 name: E2E
 
+# Pull requests run browser E2E on the author's machine (`pnpm verify <spec>`) and
+# record the result in the PR; see docs/operations/ci-checks.md.
 on:
   workflow_dispatch:
-  pull_request:
-    branches: [main]
   push:
     branches: [main]
 
