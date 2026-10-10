@@ -796,6 +796,24 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
     ])
   })
 
+  it('checks literal leaves returned by contributeExtraTurn and literal actionContext keys', () => {
+    const result = validateCardCode(`
+      const CARD_ID = 'CUSTOM_Test'
+      const CARD_IMPL = {
+        effect: {
+          contributeExtraTurn: () => ({ type: 'leaf', actionId: 'plow', sourceCard: CARD_ID }),
+          onRoundStart: () => ({ type: 'leaf', actionId: 'gain', params: { food: 1 }, sourceCard: CARD_ID,
+            actionContext: { targetPlayerId: 'p2', __hostOwnedListenerPhases: true } }),
+        },
+      }
+    `)
+    expect(result.valid).toBe(false)
+    expect(result.valid === false && result.errors).toEqual([
+      "line 5: actionId 'plow' is not available to Workshop cards",
+      "line 7: actionContext key '__hostOwnedListenerPhases' is not available to Workshop cards",
+    ])
+  })
+
   it('does not treat card data shaped like a leaf as a flow', () => {
     const result = validateCardCode(`
       const CARD_ID = 'CUSTOM_Test'

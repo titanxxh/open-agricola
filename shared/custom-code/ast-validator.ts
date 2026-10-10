@@ -9,9 +9,10 @@
  * (separate V8 heap, no prototype chain escapes possible).
  */
 import ts from 'typescript'
-import { cardEffectHooks, flowCardEffectHooks, isHandCardEffectHook } from '../cards/card-effects'
+import { cardEffectHooks, isHandCardEffectHook } from '../cards/card-effects'
 import { REAL_RESOURCE_KEYS } from '../contract/resource-keys'
-import { isOpenFlowField } from './flow-admission'
+import { isFlowResultHook } from './contract-admission'
+import { isOpenActionContextKey, isOpenFlowField } from './flow-admission'
 import { isSandboxActionId, isSandboxSpecialEffectKind } from './sandbox-action-ids'
 import { isSandboxListenerAction } from './sandbox-listener-actions'
 import { sandboxListenerPhases } from './sandbox-listener-phases'
@@ -62,7 +63,6 @@ const ALLOWED_LISTENER_FIELDS = new Set<string>(['id', 'handler', 'actions', 'ph
 /** Allowed values inside listener.phases arrays. */
 const ALLOWED_LISTENER_PHASES = new Set<string>(sandboxListenerPhases)
 const RESOURCE_KEYS = new Set<string>(REAL_RESOURCE_KEYS)
-const FLOW_EFFECT_KEYS = new Set<string>([...flowCardEffectHooks, 'resolveChoice'])
 
 /** A leaf literal in a flow position: its statically visible action, special-effect
  * kind and source card must stay inside the contract. Its params are card data and
@@ -89,6 +89,15 @@ function validateLiteralLeaf(
     const kind = kindNode && getStaticStringValue(kindNode, constants)
     if (kind !== undefined && !isSandboxSpecialEffectKind(kind)) {
       errors.push(`line ${getLine(kindNode!)}: special-effect kind '${kind}' is not available to Workshop cards`)
+    }
+  }
+  const actionContext = initializer('actionContext')
+  if (actionContext && ts.isObjectLiteralExpression(actionContext)) {
+    for (const property of actionContext.properties) {
+      const key = getStaticPropertyName(property, constants)
+      if (key !== undefined && !isOpenActionContextKey(key)) {
+        errors.push(`line ${getLine(property)}: actionContext key '${key}' is not available to Workshop cards`)
+      }
     }
   }
   const sourceCardNode = initializer('sourceCard')
@@ -747,7 +756,7 @@ function validateEffectKeys(
     if (!ALLOWED_EFFECT_KEYS.has(name)) {
       errors.push(`line ${getLine(prop)}: unknown effect hook '${name}' in CARD_IMPL.effect`)
     }
-    if (FLOW_EFFECT_KEYS.has(name)) {
+    if (isFlowResultHook(name)) {
       if (ts.isMethodDeclaration(prop)) validateFlowHookReturns(prop, errors, getLine, constants)
       else if (ts.isPropertyAssignment(prop) && (ts.isArrowFunction(prop.initializer) || ts.isFunctionExpression(prop.initializer))) {
         validateFlowHookReturns(prop.initializer, errors, getLine, constants)

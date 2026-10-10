@@ -603,7 +603,7 @@ return {
 { type: 'seq', children: [gainLeaf(CARD_ID, { food: 1 }), gainLeaf(CARD_ID, { wood: 1 })] }
 ```
 
-`optional` 是节点上的布尔字段，不是另一种节点类型。节点还可以带 `promptKey` 和 `anytimeWindow`，leaf 可以带 `actionContext`。其余原生节点字段不对工坊卡开放，返回 flow 时会被拒绝：`mode`、`triggerSelectOnce`、`expandFlow`、`optionId`、`choiceLabelKey`、`choiceLabelParams`、`effectPreview`、`anytimeActionId`，以及节点级的 `targetPlayerId`。节点上的其他任何字段同样被拒绝，所以 `optoinal` 这样的拼写错误会报错，不会被悄悄忽略。节点、listener 返回值和 `followUpActions` 条目上的 `sourceCard` 必须是 `CARD_ID`。没写 `sourceCard` 的 leaf，以及带 flow 但没写它的 listener 返回值，会被归到本卡。返回流程的 effect hook 直接返回 flow；listener 返回 `{ flow, sourceCard: CARD_ID }`（或其文档规定的查询结果）。
+`optional` 是节点上的布尔字段，不是另一种节点类型。节点还可以带 `promptKey` 和 `anytimeWindow`，leaf 可以带 `actionContext`，其中只能有 `targetPlayerId` 这一个键，其他键会被拒绝。其余原生节点字段不对工坊卡开放，返回 flow 时会被拒绝：`mode`、`triggerSelectOnce`、`expandFlow`、`optionId`、`choiceLabelKey`、`choiceLabelParams`、`effectPreview`、`anytimeActionId`，以及节点级的 `targetPlayerId`。节点上的其他任何字段同样被拒绝，所以 `optoinal` 这样的拼写错误会报错，不会被悄悄忽略。节点、listener 返回值和 `followUpActions` 条目上的 `sourceCard` 必须是 `CARD_ID`。没写 `sourceCard` 的 leaf，以及带 flow 但没写它的 listener 返回值，会被归到本卡。返回流程的 effect hook 直接返回 flow；listener 返回 `{ flow, sourceCard: CARD_ID }`（或其文档规定的查询结果）。
 
 执行前，AST 校验会拒绝可静态识别的组合节点字面量：缺少 `children`，或其值明显不是数组。这覆盖 flow hook 的直接返回、嵌套的字面量 children，以及 listener 的 `flow` / `alternativeFlow` 结果。校验不会把 leaf 参数或卡牌私有数据当作 flow，也不推断动态 helper 结果或 spread 提供的 children。静态通过后仍需试玩验证行为。
 
@@ -777,7 +777,7 @@ CI 会拦下漏改的情况。
 - **契约管的是名字、节点字段、各行动的参数键、`special-effect` 的字段类型，以及查询类 hook 返回值的顶层类型。**参数的取值和查询结果的内容由原生代码自己校验，与原生卡相同；准入不重复实现这些规则。
 - **未列出即未开放。**部署契约、源码校验和两个执行器接受同一组名字：§3.1 的 hook，§3.2 和 §3.4 的 listener 行动、阶段和 scope，§6 的 action ID，以及 §6.1 的 `special-effect` kind。本文件不逐项列出未开放的原生接口，候选能力记录在 [issue #1079](https://github.com/titanxxh/open-agricola/issues/1079)。
 - **有固定行为测试的名字才开放。**每个名字至少要有一个测试，在不改原生规则路径的前提下，用两人 `GameSession` 真实驱动它。新能力单独开 issue，并带上这个测试。
-- **hook 出错和返回契约外内容的处理相同。**第一次出现时拒绝这条命令，恢复到命令之前的状态，并返回错误；错误里写明被拒绝的行动、kind 或字段。同样的错误再次出现时不再报告：命令成功，这张卡本次的效果被跳过。这是有意的行为，让带着有问题卡牌的对局可以继续。
+- **hook 出错和返回契约外内容的处理相同。**如果出错发生在一条命令的结算过程中，第一次出现时拒绝这条命令，恢复到命令之前的状态，并返回错误；错误里写明被拒绝的行动、kind 或字段。同样的错误再次出现时不再报告：命令成功，这张卡本次的效果被跳过。这是有意的行为，让带着有问题卡牌的对局可以继续。出错如果发生在命令之外，例如为一次响应计算可用性、预览或分数时运行的查询，则只记一条卡牌警告，并贡献 §3.1 所说的中性结果；此时没有正在进行的命令，所以不回滚。
 
 准入面向诚实作者和模型写错的情况，除 isolate 自身的限制外，不限制恶意构造的工作量。
 

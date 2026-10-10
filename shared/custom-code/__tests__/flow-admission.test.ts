@@ -94,6 +94,13 @@ describe('admitCustomFlow', () => {
       .not.toThrow()
   })
 
+  it('admits only the documented actionContext key', () => {
+    expect(admit(leaf('gain', { food: 1 }, { actionContext: { targetPlayerId: 'p2' } }))).not.toThrow()
+    expect(admit(leaf('gain', { food: 1 }, { actionContext: { __hostOwnedListenerPhases: true } })))
+      .toThrow("flow: actionContext key '__hostOwnedListenerPhases' is not in the Workshop Capability Contract")
+    expect(admit(leaf('gain', { food: 1 }, { actionContext: 'p2' }))).toThrow('flow: actionContext must be an object')
+  })
+
   it('rejects a field that is not a node field at all, such as a misspelling', () => {
     expect(admit(leaf('gain', { food: 1 }, { optoinal: true })))
       .toThrow("flow: flow field 'optoinal' is not in the Workshop Capability Contract")

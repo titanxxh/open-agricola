@@ -53,7 +53,7 @@ export const validateCustomListenerResult = (
     })
   }
   // A result that dispatches anything is attributed to its card even when the source was omitted.
-  const dispatches = value.flow || value.alternativeFlow
+  const dispatches = value.flow || value.alternativeFlow || value.actionId !== undefined
     || (Array.isArray(value.followUpActions) && value.followUpActions.length > 0)
   if (dispatches) value.sourceCard = cardId
   if (!Object.hasOwn(value, 'costs')) {
