@@ -101,6 +101,29 @@ describe('admitCustomFlow', () => {
     expect(admit(leaf('gain', { food: 1 }, { actionContext: 'p2' }))).toThrow('flow: actionContext must be an object')
   })
 
+  it('requires the open control fields to hold their documented types on leaves and groups', () => {
+    const group = (rest: Record<string, unknown>) => ({ type: 'seq', children: [leaf('gain', { food: 1 })], ...rest })
+    expect(admit(leaf('gain', { food: 1 }, { optional: true, promptKey: 'ui.prompt', anytimeWindow: { allowed: false } }))).not.toThrow()
+    expect(admit(group({ optional: false, anytimeWindow: { allowed: true, blockedIds: ['CUSTOM_Other'] } }))).not.toThrow()
+
+    // The engine reads optional by truthiness, so the string 'false' would make the step optional.
+    expect(admit(leaf('gain', { food: 1 }, { optional: 'false' }))).toThrow('flow: optional must be a boolean')
+    expect(admit(group({ optional: 1 }))).toThrow('flow: optional must be a boolean')
+    expect(admit(group({ children: [leaf('gain', { food: 1 }, { optional: null })] })))
+      .toThrow('flow.children[0]: optional must be a boolean')
+    expect(admit(leaf('gain', { food: 1 }, { promptKey: 7 }))).toThrow('flow: promptKey must be a string')
+    expect(admit(leaf('gain', { food: 1 }, { anytimeWindow: true })))
+      .toThrow('flow: anytimeWindow must be { allowed: boolean, blockedIds?: string[] }')
+    expect(admit(group({ anytimeWindow: { allowed: 'yes' } })))
+      .toThrow('flow: anytimeWindow must be { allowed: boolean, blockedIds?: string[] }')
+    expect(admit(group({ anytimeWindow: { allowed: true, blockedIds: [1] } })))
+      .toThrow('flow: anytimeWindow must be { allowed: boolean, blockedIds?: string[] }')
+    expect(admit(group({ anytimeWindow: { allowed: true, mode: 'all' } })))
+      .toThrow('flow: anytimeWindow must be { allowed: boolean, blockedIds?: string[] }')
+    expect(admit(leaf('gain', { food: 1 }, { actionContext: { targetPlayerId: 2 } })))
+      .toThrow('flow: actionContext.targetPlayerId must be a string')
+  })
+
   it('rejects a field that is not a node field at all, such as a misspelling', () => {
     expect(admit(leaf('gain', { food: 1 }, { optoinal: true })))
       .toThrow("flow: flow field 'optoinal' is not in the Workshop Capability Contract")
