@@ -1657,6 +1657,7 @@ export const en = {
     cardTakedownComplete: 'Card taken down',
     accountDeleted: 'Account deleted',
     linkedAccounts: 'Linked accounts',
+    accountLinked: 'Account linked successfully',
     linkGithub: 'Link GitHub',
     linkGoogle: 'Link Google',
     notLinked: 'Not linked',

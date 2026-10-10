@@ -30,6 +30,7 @@ export async function exchangeGoogleOAuthCode(
   code: string,
   redirectUri: string,
   fetchImpl: typeof fetch,
+  codeVerifier?: string,
 ): Promise<OAuthProfile> {
   const tokenResponse = await fetchImpl('https://oauth2.googleapis.com/token', {
     method: 'POST',
@@ -40,6 +41,7 @@ export async function exchangeGoogleOAuthCode(
       code,
       grant_type: 'authorization_code',
       redirect_uri: redirectUri,
+      ...(codeVerifier ? { code_verifier: codeVerifier } : {}),
     }),
   })
   const tokenData = await readJson<GoogleTokenResponse>(tokenResponse)

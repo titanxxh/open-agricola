@@ -1366,6 +1366,11 @@ server/custom-code/
 - `POST /api/game/dev/*` 单机调试 / E2E 场景布置
 - `POST /api/game/new-sandbox` 创建独立 `GameSession`，**不创建 WS 房间**
 - `GET /cards-manifest.json` 主 bundle 启动时拉卡牌元数据
+- `POST /api/auth/oauth/:provider/start?intent=link` 已认证的 GitHub / Google 绑定入口，返回带 PKCE S256 的 provider 授权 URL
+- `GET /api/auth/oauth/:provider/callback` 登录/注册回调，或不依赖 cookie 的绑定交接：返回 `?page=settings`，短期 state/code（或取消）只进入 URL fragment
+- `POST /api/auth/oauth/:provider/complete` 在原前端 cookie 分区完成绑定；先按当前站点用户和 provider 原子消费有效的绑定 state，再交换授权 code，不创建新的站点 session
+
+`client/app/useAccountLinking.ts` 在提交前移除交接 fragment 字段，并保证 StrictMode effect 重放不重复提交；成功后刷新已绑定身份。错误保留在设置页，不再规范化为已登录首页。账号绑定不扩大 OAuth scope，也不使用 Issue Submission Connection 的 token 或加密密钥。
 
 不变量：HTTP 仅运维 / 测试 / 调试，不是实时同步主路径；返回结构与 `SessionResponse` 一致；`validate` 接口纯校验，不写权威状态。WS 房间内 dev 命令优先走 `ClientCommand`。
 
@@ -1428,7 +1433,7 @@ ADR-0014 使用下一可用迁移增加十张表；首个正式 Replay `schemaVe
 
 - `rooms` / `room_players`：活动恢复 snapshot 与站点座位所有权。
 - `game_results` / `game_result_players`：完成局标量结果、Replay Participant 显示名和内部用户关联。
-- `oauth_states`：增加加密 PKCE verifier，复用短期 state/returnTo 生命周期。
+- `oauth_states`：增加 Bug Report 的加密 PKCE verifier，复用短期 state/returnTo 生命周期。账号绑定使用独立的服务端专用 `account_pkce_verifier` 字段，十分钟内有效、消费后清除，无需新增部署密钥。
 
 不增加 Replay Segment、Reported Evidence payload、quota counter 或 webhook delivery 表。Segment 由 `checkpointStepNo` 表达；`bug_reports.evidence_expires_at` 只在 Context 尚未完成时保护共享 Segment，正常完赛后改用永久 Replay Archive；额度和全站 20 次/分钟 GitHub 发送窗口从 report/attempt 行查询；撤销 webhook 操作本身幂等。
 

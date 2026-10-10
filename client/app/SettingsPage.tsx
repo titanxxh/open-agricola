@@ -8,6 +8,7 @@ import { DangerButton } from '../components/common/DangerButton'
 import { API_BASE } from '../config'
 import { authErrorMessage } from './auth-errors'
 import { setPage } from '../utils/platform-page-url'
+import { useAccountLinking } from './useAccountLinking'
 
 type LinkedIdentity = {
   provider: 'github' | 'google'
@@ -44,6 +45,7 @@ const toLocalDateTimeValue = (timestamp: number) => {
 export function SettingsPage() {
   const { user, apiFetch, logout, logoutAll, oauthStartUrl } = useAuth()
   const { t } = useLocale()
+  const accountLink = useAccountLinking(oauthStartUrl)
   const [displayName, setDisplayName] = useState(user?.displayName ?? '')
   const [oldPassword, setOldPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
@@ -84,7 +86,7 @@ export function SettingsPage() {
       })
       .catch(() => {})
     return () => { cancelled = true }
-  }, [apiFetch])
+  }, [apiFetch, accountLink.linked])
 
   useEffect(() => {
     let cancelled = false
@@ -370,7 +372,11 @@ export function SettingsPage() {
 
       <Section icon="🔗" title={t('platform.linkedAccounts')} variant="parchment">
         <div className="settings-form">
-          {authError && <div className="form-error" role="alert">{authErrorMessage(authError, undefined, t)}</div>}
+          {(accountLink.errorCode || authError) && <div className="form-error" role="alert">{
+            accountLink.errorCode === 'network_error' ? t('platform.networkError')
+              : authErrorMessage(accountLink.errorCode ?? authError, undefined, t)
+          }</div>}
+          {accountLink.linked && <div className="settings-success" role="status">{t('platform.accountLinked')}</div>}
           <p className="settings-readonly">
             GitHub
             <span className="settings-readonly-chip">{githubIdentity?.providerLogin ?? githubIdentity?.providerEmail ?? t('platform.notLinked')}</span>
@@ -380,8 +386,8 @@ export function SettingsPage() {
             <span className="settings-readonly-chip">{googleIdentity?.providerEmail ?? googleIdentity?.providerLogin ?? t('platform.notLinked')}</span>
           </p>
           <div className="settings-actions settings-link-actions">
-            <a className="btn-primary" href={oauthStartUrl('github', 'link')}>{t('platform.linkGithub')}</a>
-            <a className="btn-primary" href={oauthStartUrl('google', 'link')}>{t('platform.linkGoogle')}</a>
+            <button type="button" className="btn-primary" disabled={accountLink.busy || !!githubIdentity} onClick={() => { void accountLink.start('github') }}>{t('platform.linkGithub')}</button>
+            <button type="button" className="btn-primary" disabled={accountLink.busy || !!googleIdentity} onClick={() => { void accountLink.start('google') }}>{t('platform.linkGoogle')}</button>
           </div>
         </div>
       </Section>

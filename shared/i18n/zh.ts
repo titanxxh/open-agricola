@@ -2432,6 +2432,7 @@ export const zh = {
     cardTakedownComplete: '卡牌已下架',
     accountDeleted: '账号已删除',
     linkedAccounts: '已绑定账号',
+    accountLinked: '账号绑定成功',
     linkGithub: '绑定 GitHub',
     linkGoogle: '绑定 Google',
     notLinked: '未绑定',

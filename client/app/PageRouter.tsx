@@ -58,6 +58,11 @@ export function PageRouter() {
         window.dispatchEvent(new PopStateEvent('popstate'))
         return
       }
+      const authError = params.get('authError')
+      if (authError) {
+        setPage('settings', { authError })
+        return
+      }
     }
     if (page === 'onboarding' || page === 'login') {
       setPage('lobby')

@@ -1,5 +1,5 @@
 import { isUniqueViolation } from '../database/errors'
-import { randomBytes, scrypt } from 'node:crypto'
+import { createHash, randomBytes, scrypt } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { nanoid } from 'nanoid'
 import {
@@ -13,7 +13,7 @@ import {
   serializeSessionCookie,
   SESSION_COOKIE,
 } from '../auth-cookies.ts'
-import { createSession, isUsernameReserved, validateSession } from '../auth.ts'
+import { createSession, isUsernameReserved, validateSession, type AuthUser } from '../auth.ts'
 import { getDb } from '../db.ts'
 import { corsHeaders, getRequestOrigin } from '../http-origin.ts'
 import { assertOAuthProvider, buildOAuthAuthorizationUrl, exchangeOAuthCode } from './providers.ts'
@@ -24,6 +24,7 @@ import {
   createOnboardingTicket,
   findIdentity,
   getOnboardingTicket,
+  getOAuthState,
   getLinkedIdentities,
   linkIdentity,
 } from './store.ts'
@@ -223,20 +224,36 @@ async function createLocalUserForOnboarding(input: {
   return { ok: true as const, user: { id, username: name, displayName: localDisplayName } }
 }
 
-export async function handleOAuthStart(req: IncomingMessage, res: ServerResponse, url: URL): Promise<Awaited<void>> {
+export async function handleOAuthStart(req: IncomingMessage, res: ServerResponse, url: URL, user: AuthUser | null): Promise<void> {
   let provider: OAuthProvider
   try {
     provider = parseProvider(url)
   } catch {
-    redirect(res, appLocation('/?page=login&authError=unsupported_oauth_provider'))
+    if (req.method === 'POST') sendJson(res, 400, { ok: false, code: 'unsupported_oauth_provider' })
+    else redirect(res, appLocation('/?page=login&authError=unsupported_oauth_provider'))
     return
   }
 
   const intent = parseIntent(url)
-  const token = readCookie(req.headers.cookie, SESSION_COOKIE)
-  const user = token ? (await validateSession(token)) : null
-  if (intent === 'link' && !user) {
-    redirect(res, appLocation('/?page=login&authError=not_authenticated'))
+  if (intent === 'link') {
+    if (req.method !== 'POST') {
+      redirect(res, appLocation('/?page=settings&authError=oauth_state_invalid'))
+      return
+    }
+    if (!user) {
+      sendJson(res, 401, { ok: false, code: 'not_authenticated' })
+      return
+    }
+    const verifier = randomBytes(32).toString('base64url')
+    const state = await createOAuthState({ provider, intent, userId: user.id, accountPkceVerifier: verifier })
+    const challenge = createHash('sha256').update(verifier).digest('base64url')
+    sendJson(res, 200, { ok: true, authorizationUrl: buildOAuthAuthorizationUrl(provider, state, req, challenge) }, {
+      'Cache-Control': 'no-store',
+    })
+    return
+  }
+  if (req.method === 'POST') {
+    sendJson(res, 400, { ok: false, code: 'oauth_state_invalid' })
     return
   }
 
@@ -270,12 +287,35 @@ export async function handleOAuthStart(req: IncomingMessage, res: ServerResponse
 }
 
 export async function handleOAuthCallback(req: IncomingMessage, res: ServerResponse, url: URL): Promise<void> {
+  const rawState = url.searchParams.get('state') ?? ''
+  const pending = rawState.length <= 128 ? await getOAuthState(rawState) : null
+  if (pending?.intent === 'link') {
+    let provider: OAuthProvider
+    try {
+      provider = parseProvider(url)
+      if (provider !== pending.provider || !pending.accountPkceVerifier) throw new Error('invalid link state')
+    } catch {
+      redirect(res, appLocation('/?page=settings&authError=oauth_state_invalid'))
+      return
+    }
+    const code = url.searchParams.get('code') ?? ''
+    const error = url.searchParams.has('error') ? 'oauth_cancelled'
+      : !code || code.length > 2048 ? 'oauth_state_invalid' : undefined
+    const fragment = new URLSearchParams({ accountLinkProvider: provider, accountLinkState: rawState })
+    if (error) fragment.set('accountLinkError', error)
+    else fragment.set('accountLinkCode', code)
+    // Do not consume or exchange here: navigation has left the frontend's cookie partition.
+    redirect(res, `${appLocation('/?page=settings')}#${fragment}`, {
+      'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer',
+    })
+    return
+  }
+
   if (url.searchParams.get('error')) {
     redirect(res, appLocation('/?page=login&authError=oauth_cancelled'), oauthStateClearHeaders(req))
     return
   }
 
-  const rawState = url.searchParams.get('state') ?? ''
   const cookieState = readCookie(req.headers.cookie, OAUTH_STATE_COOKIE)
   if (!rawState || cookieState !== rawState) {
     redirect(res, appLocation('/?page=login&authError=oauth_state_invalid'), oauthStateClearHeaders(req))
@@ -298,12 +338,8 @@ export async function handleOAuthCallback(req: IncomingMessage, res: ServerRespo
   }
 
   if (state.intent === 'link') {
-    const token = readCookie(req.headers.cookie, SESSION_COOKIE)
-    const currentUser = token ? (await validateSession(token)) : null
-    if (!state.userId || !currentUser || currentUser.id !== state.userId) {
-      redirect(res, appLocation('/?page=settings&authError=not_authenticated'), oauthStateClearHeaders(req))
-      return
-    }
+    redirect(res, appLocation('/?page=settings&authError=oauth_state_invalid'), oauthStateClearHeaders(req))
+    return
   }
 
   let profile: OAuthProfile
@@ -311,24 +347,6 @@ export async function handleOAuthCallback(req: IncomingMessage, res: ServerRespo
     profile = await exchangeOAuthCode(provider, url.searchParams.get('code') ?? '', req)
   } catch {
     redirect(res, appLocation('/?page=login&authError=oauth_profile_failed'), oauthStateClearHeaders(req))
-    return
-  }
-
-  if (state.intent === 'link') {
-    if (!state.userId) {
-      redirect(res, appLocation('/?page=settings&authError=not_authenticated'), oauthStateClearHeaders(req))
-      return
-    }
-    if ((await findIdentity(profile.provider, profile.providerUserId))) {
-      redirect(res, appLocation('/?page=settings&authError=oauth_identity_taken'), oauthStateClearHeaders(req))
-      return
-    }
-    try {
-      ;(await linkIdentity(state.userId, profile))
-      redirect(res, appLocation(`/?page=settings&linked=${provider}`), oauthStateClearHeaders(req))
-    } catch {
-      redirect(res, appLocation('/?page=settings&authError=oauth_identity_taken'), oauthStateClearHeaders(req))
-    }
     return
   }
 
@@ -349,6 +367,41 @@ export async function handleOAuthCallback(req: IncomingMessage, res: ServerRespo
   redirect(res, appLocation('/?page=onboarding'), oauthStateClearHeaders(req, {
     'Set-Cookie': serializeOnboardingCookie(ticket, { backendOrigin: getRequestOrigin(req) }),
   }))
+}
+
+export async function handleOAuthLinkComplete(req: IncomingMessage, res: ServerResponse, url: URL, user: AuthUser | null): Promise<void> {
+  const fail = (status: number, code: string) => sendJson(res, status, { ok: false, code }, { 'Cache-Control': 'no-store' })
+  if (!user) { fail(401, 'not_authenticated'); return }
+  let provider: OAuthProvider
+  try { provider = parseProvider(url) } catch { fail(400, 'unsupported_oauth_provider'); return }
+  const body = await parseBody<{ state?: unknown; code?: unknown; error?: unknown }>(req)
+  if (typeof body?.state !== 'string' || !body.state || body.state.length > 128
+    || (body.error !== 'oauth_cancelled' && body.error !== 'oauth_state_invalid'
+      && (typeof body.code !== 'string' || !body.code || body.code.length > 2048))) {
+    fail(400, 'oauth_state_invalid')
+    return
+  }
+  const state = await consumeOAuthState(body.state, { provider, userId: user.id })
+  if (!state?.accountPkceVerifier) { fail(400, 'oauth_state_invalid'); return }
+  if (body.error === 'oauth_cancelled' || body.error === 'oauth_state_invalid') {
+    fail(400, body.error)
+    return
+  }
+  let profile: OAuthProfile
+  try {
+    profile = await exchangeOAuthCode(provider, body.code as string, req, fetch, state.accountPkceVerifier)
+    if (profile.provider !== provider) throw new Error('provider mismatch')
+  } catch { fail(502, 'oauth_profile_failed'); return }
+  try {
+    await linkIdentity(user.id, profile)
+  } catch (error) {
+    if (isUniqueViolation(error) || (error instanceof Error && /already linked/.test(error.message))) {
+      fail(409, 'oauth_identity_taken')
+      return
+    }
+    throw error
+  }
+  sendJson(res, 200, { ok: true }, { 'Cache-Control': 'no-store' })
 }
 
 export async function handleOnboardingComplete(req: IncomingMessage, res: ServerResponse): Promise<void> {

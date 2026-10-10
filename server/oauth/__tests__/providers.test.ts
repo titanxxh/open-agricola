@@ -45,6 +45,24 @@ describe('oauth providers', () => {
     expect(url.searchParams.get('state')).toBe('state-2')
   })
 
+  it.each(['github', 'google'] as const)('uses PKCE S256 on %s authorization and exchanges with the server verifier', async (provider) => {
+    const url = new URL(buildOAuthAuthorizationUrl(provider, 'state', fakeReq('https://app.test'), 'challenge'))
+    expect(url.searchParams.get('code_challenge')).toBe('challenge')
+    expect(url.searchParams.get('code_challenge_method')).toBe('S256')
+    let body: string | undefined
+    const fakeFetch: typeof fetch = async (input, init) => {
+      const endpoint = String(input)
+      if (endpoint.includes('access_token') || endpoint.endsWith('/token')) {
+        body = String(init?.body)
+        return new Response(JSON.stringify({ access_token: 'dummy-token' }))
+      }
+      return new Response(JSON.stringify(endpoint.endsWith('/emails') ? [] : { id: 123, sub: 'google-123' }))
+    }
+    await exchangeOAuthCode(provider, 'code', fakeReq('https://app.test'), fakeFetch, 'server-verifier')
+    const verifier = provider === 'github' ? JSON.parse(body!).code_verifier : new URLSearchParams(body).get('code_verifier')
+    expect(verifier).toBe('server-verifier')
+  })
+
   it('does not use workshop OAuth client env names for account auth', () => {
     process.env.GITHUB_OAUTH_CLIENT_ID = 'workshop-gh-client'
     process.env.GOOGLE_OAUTH_CLIENT_ID = 'workshop-google-client'
