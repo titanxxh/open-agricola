@@ -4722,6 +4722,9 @@
   flex-direction: column;
   gap: 4px;
 }
+.exchange-view-navigation {
+  margin-top: 8px;
+}
 .exchange-title {
   font-weight: 700;
   font-size: 18px;
@@ -5202,6 +5205,22 @@ details[open] .ai-prompt-summary::before { transform: rotate(90deg); }
   flex-direction: column;
   gap: 12px;
   text-align: center;
+}
+.hotseat-public-farm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px;
+  margin-bottom: 8px;
+  background: #fffaf0;
+  border-radius: 8px;
+  overflow-wrap: anywhere;
+}
+.hotseat-public-farm .btn-primary {
+  white-space: normal;
+  max-width: 100%;
 }
 .hotseat-handoff-title {
   margin: 0;

@@ -70,6 +70,7 @@ type ExchangeOverlayPresentationProps = {
   draft: ExchangeOverlayDraft
   cardLabel: (id: string) => string
   actions: ExchangeOverlayActions
+  navigation?: ReactNode
 }
 
 const resourceMap = (resources: Partial<Resource>): Resource => ({
@@ -113,16 +114,19 @@ const ExchangeModal = ({
   title,
   subtitle,
   children,
+  navigation,
 }: {
   title: string
   subtitle: string
   children: ReactNode
+  navigation?: ReactNode
 }) => (
   <div className="exchange-overlay">
     <div className="exchange-modal">
       <div className="exchange-header">
         <div className="exchange-title">{title}</div>
         <div className="exchange-subtitle">{subtitle}</div>
+        {navigation ? <div className="exchange-view-navigation">{navigation}</div> : null}
       </div>
       <div className="exchange-content">{children}</div>
     </div>
@@ -187,6 +191,7 @@ export const ExchangeOverlayPresentation = ({
   draft,
   cardLabel,
   actions,
+  navigation,
 }: ExchangeOverlayPresentationProps) => {
   if (draft.harvestFeed.isActive && harvestPending && draft.harvestFeed.options.length > 0 && isInteractive) {
     return (
@@ -196,6 +201,7 @@ export const ExchangeOverlayPresentation = ({
           player: harvestPending.playerName,
           count: harvestPending.remaining,
         })}
+        navigation={navigation}
       >
         <div className="exchange-options">
           {draft.harvestFeed.options.map((option) => (
@@ -256,6 +262,7 @@ export const ExchangeOverlayPresentation = ({
       <ExchangeModal
         title={t(locale, 'ui.exchangeCenterTitle')}
         subtitle={translateCardText(locale, pendingChoice.promptKey ?? 'ui.interactionChooseOne')}
+        navigation={navigation}
       >
         <div className="exchange-options">
           {draft.anytime.options.map((option) => (
@@ -310,6 +317,7 @@ export const ExchangeOverlayPresentation = ({
       <ExchangeModal
         title={t(locale, 'ui.bakeBreadTitle')}
         subtitle={translateCardText(locale, pendingChoice.promptKey ?? 'ui.interactionChooseOne')}
+        navigation={navigation}
       >
         <div className="exchange-options">
           {draft.bake.options.map((option) => {

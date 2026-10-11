@@ -338,8 +338,7 @@ export const GameContainerApi = () => {
   const isLocalMode = currentUrlParams.get('localSandbox') === '1' && isBrowserSandbox()
   const isWsMode = !isLocalMode && (contextRoomId !== null || currentUrlParams.get('transport') === 'ws')
   const isEmbedded = currentUrlParams.get('embedded') === '1'
-  // Seat whose cards the person at the device has agreed to look at, during
-  // the draft / parent-selection phases (see `hotseat-seat.ts`).
+  // Confirmation is scoped to this room and the seat holding the shared device.
   const [hotseatSeatConfirmed, setHotseatSeatConfirmed] = useState<string | null>(null)
 
   const requestedPlayerId = useMemo(() => requestedWsPlayerIdFromQuery(window.location.search), [])
@@ -431,38 +430,56 @@ export const GameContainerApi = () => {
   // One connection holds every seat, as confirmed by the server's room answer.
   const isHotseat = wsStatus.phase === 'ready' && wsStatus.hotseat === true
   const localPlayerId = lockedViewPlayerId ?? wsAssignedPlayerId
+  const activePlayer =
+    interaction.stateId === 'wait' && typeof interaction.playerIndex === 'number'
+      ? state?.players[interaction.playerIndex] ?? currentPlayer
+      : currentPlayer
   // In WS mode, selfPlayer is locked to the URL ?player= param.
   // If the URL omits ?player=, use the seat assigned by the join/create handshake.
   // In HTTP mode (sandbox/single-player), selfPlayer follows the current player.
   const selfPlayer = isWs && localPlayerId && !isHotseat
     ? state?.players.find((p) => p.id === localPlayerId) ?? currentPlayer
-    : currentPlayer
+    : isHotseat ? activePlayer : currentPlayer
   const viewedPlayer = state?.players.find((p) => p.id === viewPlayerId) ?? selfPlayer ?? currentPlayer
-  // In WS mode, viewPlayerId lets you peek at another player's board.
-  // In HTTP (sandbox) mode, display follows the current player so the panel switches on turn change.
-  const activePlayer =
-    interaction.stateId === 'wait' && typeof interaction.playerIndex === 'number'
-      ? state?.players[interaction.playerIndex] ?? currentPlayer
-      : currentPlayer
-  // Hotseat follows the seat that actually has to act: a pending interaction can
-  // belong to someone other than the current player (harvest feeding walks the
-  // harvest order without advancing currentPlayerIndex), and that seat is the
-  // one whose cards may be shown — and who the device has to be handed to.
-  const displayPlayer = isHotseat
-    ? (activePlayer ?? currentPlayer ?? state?.players[0] ?? null)
-    : isWs
-      ? ((viewPlayerId ? viewedPlayer : selfPlayer ?? currentPlayer) ?? state?.players[0] ?? null)
-      : (selfPlayer ?? currentPlayer ?? state?.players[0] ?? null)
+  // Browsing a public farm never changes the interaction or confirmed seat.
+  // HTTP sandbox still follows the current player rather than a browsing preference.
+  const displayPlayer = isWs
+    ? ((viewPlayerId ? viewedPlayer : selfPlayer ?? currentPlayer) ?? state?.players[0] ?? null)
+    : (selfPlayer ?? currentPlayer ?? state?.players[0] ?? null)
+  const isPublicFarmView = isHotseat && displayPlayer?.id !== activePlayer?.id
+  const hotseatRoomId = isHotseat && wsStatus.phase === 'ready' ? wsStatus.roomId : null
+  const hotseatAudienceId = isHotseat && state
+    ? state.phase === 'draft' && state.draft
+      ? nextHotseatDraftSeatId(state.draft)
+      : state.phase === 'parent-selection'
+        ? nextHotseatParentSeatId(state)
+        : activePlayer?.id ?? null
+    : null
+  const hotseatAudienceKey = hotseatRoomId && hotseatAudienceId
+    ? `${hotseatRoomId}:${hotseatAudienceId}` : null
+  const lastHotseatAudienceRef = useRef<string | null>(null)
+  useLayoutEffect(() => {
+    // A short disconnect has no audience; it must not erase same-seat confirmation.
+    if (!hotseatAudienceKey || lastHotseatAudienceRef.current === hotseatAudienceKey) return
+    lastHotseatAudienceRef.current = hotseatAudienceKey
+    setHotseatSeatConfirmed(null)
+  }, [hotseatAudienceKey])
+  const confirmHotseatSeat = (playerId: string) => {
+    if (!hotseatRoomId) return
+    setHotseatSeatConfirmed(`${hotseatRoomId}:${playerId}`)
+    setViewPlayerId(playerId)
+  }
   const isMyTurn = !!(activePlayer && selfPlayer && activePlayer.id === selfPlayer.id)
   // In HTTP (non-WS) mode, one human controls all players — always interactive
   const isInteractive = isHotseat
-    ? !persistencePaused && (!isWs || wsStatus.phase === 'ready') && !!(activePlayer && displayPlayer)
+    ? !persistencePaused && !!activePlayer && hotseatSeatConfirmed === hotseatAudienceKey && !isPublicFarmView
     : isWs
       ? !persistencePaused && (!isWs || wsStatus.phase === 'ready') && !!(activePlayer && selfPlayer && displayPlayer &&
            activePlayer.id === selfPlayer.id && displayPlayer.id === selfPlayer.id)
       : !!(activePlayer && displayPlayer)
   const hasGameView = !!(state && currentPlayer && displayPlayer)
   const canResetGame = hasGameView && !persistencePaused && (!isWs || wsStatus.phase === 'ready') &&
+    (!isHotseat || isInteractive) &&
     (!isWs || isHotseat || selfPlayer?.id === displayPlayer?.id)
   const bugReportRoomId = isWs && wsStatus.phase === 'ready'
     ? wsStatus.roomId
@@ -520,7 +537,8 @@ export const GameContainerApi = () => {
   const farmSelectionDraft = useFarmSelectionDraftPresentation({
     interactionPresentationPlan,
     locale,
-    displayPlayer,
+    // Budgets and geometry belong to the responder, even while inspecting another farm.
+    displayPlayer: isHotseat ? activePlayer : displayPlayer,
     players: state?.players,
   })
   const farmInteraction = farmSelectionDraft.farmInteraction
@@ -664,7 +682,7 @@ export const GameContainerApi = () => {
     submitCommand: InteractionSubmitCommand,
     farmType?: FarmCommitType,
   ) => {
-    if (submitCommand.kind === 'none') return false
+    if (!isInteractive || submitCommand.kind === 'none') return false
     if (submitCommand.kind === 'rejected') return true
     if (submitCommand.kind === 'undoStep') {
       void transport.undoStep().catch((e) => console.error('undoStep error', e))
@@ -703,7 +721,7 @@ export const GameContainerApi = () => {
     }
     void transport.confirmPlayerSwitch().catch((e) => console.error(e))
     return true
-  }, [setFarmCommitError, setLocalFarmSubmitError, transport])
+  }, [isInteractive, setFarmCommitError, setLocalFarmSubmitError, transport])
 
   const resolveChoice = useCallback((value: string) => {
     if (!isInteractive) return
@@ -1106,19 +1124,20 @@ export const GameContainerApi = () => {
     () => buildFarmBoardProjection({
       displayPlayer,
       interaction,
-      farmInteraction,
-      selectionInteraction,
+      farmInteraction: isPublicFarmView ? null : farmInteraction,
+      selectionInteraction: isPublicFarmView ? null : selectionInteraction,
       players: state?.players,
       state,
       pastureCapacities,
-      animalReorg,
-      pendingAnimalReorg,
-      ...farmSelectionDraft.projectionDraft,
+      animalReorg: isPublicFarmView ? null : animalReorg,
+      pendingAnimalReorg: isPublicFarmView ? null : pendingAnimalReorg,
+      ...(isPublicFarmView ? {} : farmSelectionDraft.projectionDraft),
       extraPositionSelectableSet: specialTerrainSelectableSet,
       farmChoiceTargets,
     }),
     [
       displayPlayer,
+      isPublicFarmView,
       interaction,
       farmInteraction,
       selectionInteraction,
@@ -1147,6 +1166,7 @@ export const GameContainerApi = () => {
     confirmAnimalReorgDraft(reorgRemaining, resolveChoice)
   }, [confirmAnimalReorgDraft, reorgRemaining, resolveChoice])
   const wrappedTogglePositionSelection = (tile: FarmTilePosition) => {
+    if (!isInteractive) return
     if (farmChoiceTargets.length > 0) {
       const options = getFarmTargetChoices(farmChoiceBindings, tile)
       if (options.length === 1) resolveChoice(options[0]!.value)
@@ -1444,7 +1464,10 @@ export const GameContainerApi = () => {
     return <GameLoadScreen percent={percent} label={t(locale, labelKey)} />
   }
 
-  const notificationStack = recoveryNotice || persistencePaused || privateEventNotifications.length > 0 || displayPublicEventNotifications.length > 0 ? (
+  const visiblePrivateNotifications = isPublicFarmView ? [] : isHotseat
+    ? privateEventNotifications.filter(notification => notification.recipientPlayerId === hotseatAudienceId)
+    : privateEventNotifications
+  const notificationStack = recoveryNotice || persistencePaused || visiblePrivateNotifications.length > 0 || displayPublicEventNotifications.length > 0 ? (
     <div className="event-notifications" role="status" aria-live="polite">
       {recoveryNotice ? (
         <div role="alert" className="event-notification">
@@ -1457,7 +1480,7 @@ export const GameContainerApi = () => {
           {t(locale, 'ui.roomPersistencePaused')}
         </div>
       ) : null}
-      {buildEventNotificationStackItems(privateEventNotifications, displayPublicEventNotifications).map((notification) => (
+      {buildEventNotificationStackItems(visiblePrivateNotifications, displayPublicEventNotifications).map((notification) => (
         <div
           key={notification.id}
           className={notification.className}
@@ -1479,13 +1502,13 @@ export const GameContainerApi = () => {
     const meId = (isWs && localPlayerId && !isHotseat)
       ? localPlayerId
       : (hotseatSeatId ?? selfPlayer?.id ?? state.players[0]?.id ?? '')
-    if (hotseatSeatId && hotseatSeatConfirmed !== hotseatSeatId) {
+    if (hotseatSeatId && hotseatSeatConfirmed !== hotseatAudienceKey) {
       return (
         <div className={`app${isEmbedded ? ' app--embedded' : ''}`}>
           <HotseatHandoff
             playerName={playerNames[hotseatSeatId] ?? hotseatSeatId}
             locale={locale}
-            onConfirm={() => setHotseatSeatConfirmed(hotseatSeatId)}
+            onConfirm={() => confirmHotseatSeat(hotseatSeatId)}
           />
         </div>
       )
@@ -1517,13 +1540,13 @@ export const GameContainerApi = () => {
       ? localPlayerId
       : (hotseatSeatId ?? selfPlayer?.id ?? state.players[0]?.id ?? '')
     const playerIndex = Math.max(0, state.players.findIndex((player) => player.id === meId))
-    if (hotseatSeatId && hotseatSeatConfirmed !== hotseatSeatId) {
+    if (hotseatSeatId && hotseatSeatConfirmed !== hotseatAudienceKey) {
       return (
         <div className={`app${isEmbedded ? ' app--embedded' : ''}`}>
           <HotseatHandoff
             playerName={playerNames[hotseatSeatId] ?? hotseatSeatId}
             locale={locale}
-            onConfirm={() => setHotseatSeatConfirmed(hotseatSeatId)}
+            onConfirm={() => confirmHotseatSeat(hotseatSeatId)}
           />
         </div>
       )
@@ -1551,13 +1574,13 @@ export const GameContainerApi = () => {
   // Ordinary turns hand the device over too: once the board would start showing
   // a different seat's cards, cover it until that player says they are holding
   // the device. Draft / parent selection are covered by their own branches above.
-  if (isHotseat && displayPlayer && hotseatSeatConfirmed !== displayPlayer.id) {
+  if (isHotseat && activePlayer && hotseatSeatConfirmed !== hotseatAudienceKey) {
     return (
       <div className={`app${isEmbedded ? ' app--embedded' : ''}`}>
         <HotseatHandoff
-          playerName={playerNames[displayPlayer.id] ?? displayPlayer.id}
+          playerName={playerNames[activePlayer.id] ?? activePlayer.id}
           locale={locale}
-          onConfirm={() => setHotseatSeatConfirmed(displayPlayer.id)}
+          onConfirm={() => confirmHotseatSeat(activePlayer.id)}
         />
       </div>
     )
@@ -1566,14 +1589,24 @@ export const GameContainerApi = () => {
   const farmBoardView = {
     ...farmBoardProjection,
     ...farmSelectionDraft.farmBoardDraft,
+    ...(isPublicFarmView ? {
+      plowSelectableSet: new Set<string>(),
+      pendingPlowTile: null,
+      pendingPositionSelections: new Set<string>(),
+      pendingSowSelections: {},
+      sowRemaining: { grain: 0, vegetable: 0, wood: 0, stone: 0 },
+      pendingFenceSet: new Set<string>(),
+      pendingFenceSourceMap: undefined,
+      pendingPalisadeSet: new Set<string>(),
+    } : {}),
     locale,
     activePlayerId: activePlayer?.id,
     currentStartPlayerId: state.players.find((p) => p.startPlayer)?.id ?? '',
     nextStartPlayerId: state.players.find((p) => p.startPlayer)?.id ?? '',
     fieldPositions,
-    isReorgActive,
-    hasReorgOverflow,
-    animalReorg,
+    isReorgActive: !isPublicFarmView && isReorgActive,
+    hasReorgOverflow: !isPublicFarmView && hasReorgOverflow,
+    animalReorg: isPublicFarmView ? null : animalReorg,
     isSelectingMinor,
     isSelectingOccupation,
     isSelectingImprovementAny,
@@ -1581,7 +1614,7 @@ export const GameContainerApi = () => {
     selectableOccupationIds,
     cardAvailability,
     futureCardResources,
-    devMode,
+    devMode: !isPublicFarmView && devMode,
     isInteractive,
     occupationHandSelection: occupationHandInteraction ?? undefined,
     highlightedHandCardId,
@@ -1737,6 +1770,8 @@ export const GameContainerApi = () => {
       anytimeActions: pendingEngineBlocked ? [] : interaction.anytimeActions,
     },
   })
+  // Keep choice-local drafts mounted under the privacy cover, with controls disabled.
+  if (isPublicFarmView && interactionBarPendingChoice) interactionBarModel.body = { kind: 'choice' }
   const interactionBarActions = buildInteractionBarActions({
     resolveChoice,
     confirmNextPlayer,
@@ -1750,14 +1785,32 @@ export const GameContainerApi = () => {
     confirmAnimalReorg,
     cancelAnimalDiscardPrompt,
   })
+  const playerTabsPresentation = (
+    <PlayerTabs
+      players={state.players.map((p, i) => ({
+        id: p.id,
+        name: playerNames[p.id],
+        // PlayerState has no score field; use the live score projection.
+        score: scoreRows.find((r) => r.id === p.id)?.total ?? 0,
+        color: p.color,
+        isYou: selfPlayer ? p.id === selfPlayer.id : false,
+        isCurrent: i === state.currentPlayerIndex,
+      }))}
+      active={displayPlayer.id}
+      onChange={setViewPlayerIdSafe}
+    />
+  )
+  const hasHotseatExchangeOverlay = isHotseat && !isPublicFarmView && (
+    isBakeExchange || isAnytimeExchange || (!!harvestPending && exchangeDraft.harvestFeed.options.length > 0)
+  )
   const majorImprovementsPresentation = (
     <MajorImprovements
       locale={locale}
       availableMajorImprovements={state.availableMajorImprovements}
       majorImprovementSupply={state.majorImprovementSupply}
-      isSelectingMajor={isSelectingImprovementAny}
-      selectableMajorIds={selectableMajorIds}
-      cardAvailability={cardAvailability}
+      isSelectingMajor={isSelectingImprovementAny && !isPublicFarmView}
+      selectableMajorIds={isPublicFarmView ? new Set<string>() : selectableMajorIds}
+      cardAvailability={isPublicFarmView ? {} : cardAvailability}
       resolveChoice={resolveChoice}
       futureCardResources={futureCardResources}
       isInteractive={isInteractive}
@@ -1766,7 +1819,7 @@ export const GameContainerApi = () => {
   )
   const actionBoardOverview = (
     <section className="board-panel board-action">
-      <ActionBoard locale={locale} baseActions={baseActions} roundSlots={roundSlots} currentPlayer={currentPlayer} players={state.players} futureMeeples={state.futureMeeples} canTakeAction={canTakeActionForBoard} takeAction={takeAction} currentRound={state.round} devMode={devMode} highlightedActionIds={highlightedActionIds} actionSpaceSelectionActive={placeFarmerChoiceBySpaceId.size > 0} actionSpaceReservations={actionBoardProjection.actionSpaceReservations} actionSpaceAttachments={actionBoardProjection.actionSpaceAttachments} leftActionNames={actionBoardProjection.leftActionNames} enablePrecisionMode={isMobile} />
+      <ActionBoard locale={locale} baseActions={baseActions} roundSlots={roundSlots} currentPlayer={currentPlayer} players={state.players} futureMeeples={state.futureMeeples} canTakeAction={canTakeActionForBoard} takeAction={takeAction} currentRound={state.round} devMode={devMode} highlightedActionIds={highlightedActionIds} actionSpaceSelectionActive={!isPublicFarmView && placeFarmerChoiceBySpaceId.size > 0} actionSpaceReservations={actionBoardProjection.actionSpaceReservations} actionSpaceAttachments={actionBoardProjection.actionSpaceAttachments} leftActionNames={actionBoardProjection.leftActionNames} enablePrecisionMode={isMobile} />
     </section>
   )
   const expansionActionBoards = (
@@ -1811,39 +1864,43 @@ export const GameContainerApi = () => {
       <PublicEventCardPassAnimation
         animations={displayPublicEventCardPassAnimations}
       />
-      {selfPlayer ? (
-        <OrdinaryCardDrawOverlay
-          state={state}
-          playerId={selfPlayer.id}
+      <div hidden={isPublicFarmView} inert={isPublicFarmView}>
+        {selfPlayer ? (
+          <OrdinaryCardDrawOverlay
+            state={state}
+            playerId={selfPlayer.id}
+            locale={locale}
+            onKeep={async (choiceId, keepCardId) => {
+              if (!isInteractive) return
+              const playerIndex = state.players.findIndex((player) => player.id === selfPlayer.id)
+              if (playerIndex < 0) return
+              try {
+                await transport.ordinaryDrawKeep(playerIndex, choiceId, keepCardId)
+              } catch (e) {
+                console.error('ordinaryDrawKeep error', e)
+              }
+            }}
+          />
+        ) : null}
+        <ExchangeOverlayPresentation
           locale={locale}
-          onKeep={async (choiceId, keepCardId) => {
-            const playerIndex = state.players.findIndex((player) => player.id === selfPlayer.id)
-            if (playerIndex < 0) return
-            try {
-              await transport.ordinaryDrawKeep(playerIndex, choiceId, keepCardId)
-            } catch (e) {
-              console.error('ordinaryDrawKeep error', e)
-            }
+          isInteractive={isInteractive}
+          pendingChoice={pendingChoice}
+          harvestPending={harvestPending}
+          harvestFeedConfirmDisabled={harvestFeedConfirmDisabled}
+          draft={exchangeDraft}
+          cardLabel={cardLabel}
+          navigation={isHotseat ? playerTabsPresentation : undefined}
+          actions={{
+            confirmBakeExchange,
+            confirmAnytimeExchange,
+            cancelAnytimeExchange,
+            confirmHarvestFeed,
           }}
         />
-      ) : null}
-      <ExchangeOverlayPresentation
-        locale={locale}
-        isInteractive={isInteractive}
-        pendingChoice={pendingChoice}
-        harvestPending={harvestPending}
-        harvestFeedConfirmDisabled={harvestFeedConfirmDisabled}
-        draft={exchangeDraft}
-        cardLabel={cardLabel}
-        actions={{
-          confirmBakeExchange,
-          confirmAnytimeExchange,
-          cancelAnytimeExchange,
-          confirmHarvestFeed,
-        }}
-      />
-      {shouldShowScoringPad ? <ScoringPad locale={locale} scores={scores ?? []} players={state.players} onClose={closeScoring} showDraftHistory={state.gameOver} /> : null}
-      {shouldShowDevPanel({ devMode, hasGameView }) ? (
+        {shouldShowScoringPad ? <ScoringPad locale={locale} scores={scores ?? []} players={state.players} onClose={closeScoring} showDraftHistory={state.gameOver} /> : null}
+      </div>
+      {shouldShowDevPanel({ devMode: devMode && !isPublicFarmView, hasGameView }) ? (
         <DevPanel
           locale={locale} players={state.players}
           devPlayerId={devPlayerId} devResource={devResource} devAmount={devAmount} devRound={devRound}
@@ -1884,20 +1941,15 @@ export const GameContainerApi = () => {
         </div>
         <div className="game-layout__center">
           <StageBar currentRound={state.round ?? 1} locale={locale} />
-          <PlayerTabs
-            players={state.players.map((p, i) => ({
-              id: p.id,
-              name: playerNames[p.id],
-              // PlayerState has no `score` field — pull live total from
-              // computeScores summary (falls back to 0 if unavailable).
-              score: scoreRows.find((r) => r.id === p.id)?.total ?? 0,
-              color: p.color,
-              isYou: selfPlayer ? p.id === selfPlayer.id : false,
-              isCurrent: i === state.currentPlayerIndex,
-            }))}
-            active={displayPlayer.id}
-            onChange={setViewPlayerIdSafe}
-          />
+          {isPublicFarmView && activePlayer ? (
+            <div className="hotseat-public-farm" role="status">
+              <span>{t(locale, 'ui.hotseatPublicFarm', { player: playerNames[displayPlayer.id] })}</span>
+              <button type="button" className="btn-primary" onClick={() => setViewPlayerIdSafe(activePlayer.id)}>
+                {t(locale, 'ui.hotseatReturnToPlayer', { player: playerNames[activePlayer.id] })}
+              </button>
+            </div>
+          ) : null}
+          {!hasHotseatExchangeOverlay ? playerTabsPresentation : null}
           <section className="board-panel board-farm">
             <PlayerFarmPanel
               state={state}
@@ -1962,7 +2014,10 @@ export const GameContainerApi = () => {
       </div>
 
       {bugReportBar}
-      <InteractionBar model={interactionBarModel} actions={interactionBarActions} />
+      {/* Keep local panel drafts mounted, but neither visible nor actionable while browsing. */}
+      <div hidden={isPublicFarmView} inert={isPublicFarmView}>
+        <InteractionBar model={interactionBarModel} actions={interactionBarActions} />
+      </div>
     </div>
   )
 }
