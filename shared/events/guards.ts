@@ -10,6 +10,7 @@ export const assertPublicGameEvent = (event: unknown): void => {
 const baseEventKeys = new Set([
   'schemaVersion',
   'id',
+  'occurrenceId',
   'seq',
   'round',
   'phase',
@@ -680,6 +681,7 @@ export const assertGameEventEnvelope = (event: unknown): void => {
   const entry = event as {
     schemaVersion?: unknown
     id?: unknown
+    occurrenceId?: unknown
     seq?: unknown
     round?: unknown
     phase?: unknown
@@ -691,6 +693,7 @@ export const assertGameEventEnvelope = (event: unknown): void => {
   if (typeof entry.id !== 'string' || entry.id.length === 0) {
     throw new Error('GameEvent id must be a non-empty string')
   }
+  assertOptionalStringField(entry.occurrenceId, 'occurrenceId')
   if (typeof entry.seq !== 'number' || !Number.isSafeInteger(entry.seq) || entry.seq <= 0) {
     throw new Error('GameEvent seq must be a positive safe integer')
   }

@@ -6,20 +6,16 @@ import { eventsToLogEntries } from '../../shared/events/log-mapper'
 import type { GameEvent } from '../../shared/contract/events'
 import { withRoomParticipantNames } from '../connection/history-presentation'
 import { GameSession } from '../game/authoritative-session'
+import { createWorkSession } from './_helpers/session-fixtures'
+import { buildReplayActionLogPresentation } from '../../client/app/replay-action-log-presentation'
 import { rehydrateState, serializeSessionSnapshot, serializeState } from '../../shared/session/serialization'
 import { buildRoomHistoryPage, describeHistory, HISTORY_WINDOW_GROUPS, HistoryBranchChangedError } from '../../shared/session/history-window'
 import { frameHash, type JsonValue } from '../game/replay-codec'
 
-const setup = () => {
-  const session = new GameSession(563, undefined, { playerCount: 2 })
-  for (const player of session.state.players) {
-    player.minorHand = ['__test_placeholder__']
-    player.occupationHand = ['__test_placeholder__']
-    player.resources.food = 100
-  }
-  session.loadState(session.state)
-  return session
-}
+const setup = () => createWorkSession({
+  seed: 563,
+  configure: state => { state.players.forEach(player => { player.resources.food = 100 }) },
+})
 const addActions = (session: GameSession, count: number) => {
   for (let index = 0; index < count; index++) {
     let response = session.getState()
@@ -54,6 +50,19 @@ describe('complete operation-group Room history pages', () => {
     expect(pages.flatMap(page => page.log)).toEqual(full.log)
     expect(pages.toReversed().flatMap(page => page.events)).toEqual(full.events)
     expect(pages.toReversed().flatMap(page => page.publicEventArchive)).toEqual(full.publicEventArchive)
+    for (const page of pages) {
+      const eventOccurrences = new Set(page.events.map(event => event.occurrenceId))
+      for (const log of page.log) {
+        if (log.sourceEvent) expect(eventOccurrences.has(log.sourceEvent.occurrenceId)).toBe(true)
+      }
+      const rows = buildReplayActionLogPresentation({
+        events: page.events, publicEventArchive: page.publicEventArchive, stateLog: page.log,
+        currentRound: canonical.round, locale: 'en', replayFilter: 'all',
+        playerNames: Object.fromEntries(canonical.players.map(player => [player.id, player.name])),
+        actionNames: Object.fromEntries(canonical.actionSpaces.map(space => [space.id, space.nameKey])),
+      }).timelineBuckets.flatMap(bucket => bucket.rows)
+      expect(rows.filter(row => row.kind === 'stateLog' && row.logEntry.sourceEvent)).toEqual([])
+    }
     for (const field of ['logRecords', 'eventRecords', 'archiveRecords'] as const) {
       const ids = pages.flatMap(page => page.window[field].map(record => record.recordId))
       expect(new Set(ids).size).toBe(ids.length)

@@ -60,10 +60,9 @@ export type LogPresentationSuppressedEvent = {
   reason: LogPresentationSuppressedEventReason
 }
 
-export type LogPresentationRowIdentity = {
-  logKey: LogEntry['key']
-  params: unknown
-}
+export type LogPresentationRowIdentity =
+  | { logKey: LogEntry['key']; sourceEvent: NonNullable<LogEntry['sourceEvent']> }
+  | { logKey: LogEntry['key']; params: unknown }
 
 export type LogPresentationRow = {
   logEntry: LogEntry
@@ -84,9 +83,13 @@ const eventRef = (event: GameEvent): LogPresentationEventRef => ({
   type: event.type,
 })
 
-const stablePresentationValue = (value: unknown): unknown => {
+type LogIdentityValue = string | number | boolean | null | LogIdentityValue[] | { [key: string]: LogIdentityValue }
+
+const stablePresentationValue = (value: unknown): LogIdentityValue => {
+  if (value === null || value === undefined) return null
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return value
   if (Array.isArray(value)) return value.map(stablePresentationValue)
-  if (!value || typeof value !== 'object') return value
+  if (typeof value !== 'object') throw new TypeError('Log identity parameters must be JSON values')
   return Object.fromEntries(
     Object.entries(value)
       .filter(([, entryValue]) => entryValue !== undefined)
@@ -95,7 +98,7 @@ const stablePresentationValue = (value: unknown): unknown => {
   )
 }
 
-const logPresentationIdentityParams = (entry: LogEntry): unknown => {
+const logPresentationIdentityParams = (entry: LogEntry): NonNullable<LogEntry['params']> => {
   const params = entry.params ?? {}
   if (
     entry.key !== 'log.playImprovement' &&
@@ -108,10 +111,19 @@ const logPresentationIdentityParams = (entry: LogEntry): unknown => {
   return rest
 }
 
-export const logPresentationRowIdentity = (entry: LogEntry): LogPresentationRowIdentity => ({
-  logKey: entry.key,
-  params: stablePresentationValue(logPresentationIdentityParams(entry)),
-})
+export const logPresentationRowIdentity = (entry: LogEntry): LogPresentationRowIdentity =>
+  entry.sourceEvent
+    ? {
+        logKey: entry.key,
+        sourceEvent: {
+          occurrenceId: entry.sourceEvent.occurrenceId,
+          rowIndex: entry.sourceEvent.rowIndex,
+        },
+      }
+    : {
+        logKey: entry.key,
+        params: stablePresentationValue(logPresentationIdentityParams(entry)),
+      }
 
 export const logPresentationRowIdentityKey = (identity: LogPresentationRowIdentity): string =>
   JSON.stringify(identity)
@@ -754,12 +766,17 @@ const presentationRows = (
   entries: readonly LogEntry[],
   consumedEvents: readonly LogPresentationConsumedEvent[] = [],
 ): LogPresentationRow[] =>
-  entries.map((logEntry) => ({
-    logEntry,
-    sourceEventRef: eventRef(event),
-    consumedEventRefs: consumedEvents.map((consumed) => consumed.consumedEventRef),
-    identity: logPresentationRowIdentity(logEntry),
-  }))
+  entries.map((entry, rowIndex) => {
+    const logEntry = event.occurrenceId
+      ? { ...entry, sourceEvent: { occurrenceId: event.occurrenceId, rowIndex } }
+      : entry
+    return {
+      logEntry,
+      sourceEventRef: eventRef(event),
+      consumedEventRefs: consumedEvents.map((consumed) => consumed.consumedEventRef),
+      identity: logPresentationRowIdentity(logEntry),
+    }
+  })
 
 export const buildLogPresentationPlan = (
   events: readonly GameEvent[],
@@ -1162,6 +1179,7 @@ export const eventsToLogEntries = (events: readonly GameEvent[], ctx: EventLogMa
   buildLogPresentationPlan(events, ctx).rows.map(row => {
     const event = events.find(event => event.id === row.sourceEventRef.id && event.seq === row.sourceEventRef.seq)
     if (event) {
+      // SAFETY: All GameEvent variants are validated JSON objects; optional role fields span the union.
       const source = event as unknown as Record<string, unknown>
       const location = (key: string): string | undefined => (source[key] as { playerId?: string } | undefined)?.playerId
       const ids = {

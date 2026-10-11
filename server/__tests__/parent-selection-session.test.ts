@@ -464,11 +464,19 @@ describe('Parent Card selection setup', () => {
         key: 'log.parentMotherScheduled',
         playerId: 'p1',
         params: { player: 'Player 1', cardId: 'PR02', round: 12, reward: 'field' },
+        sourceEvent: {
+          occurrenceId: resp.state.events.find((event) => event.type === 'parent.motherScheduled' && event.cardId === 'PR02')?.occurrenceId,
+          rowIndex: 0,
+        },
       },
       {
         key: 'log.parentMotherScheduled',
         playerId: 'p2',
         params: { player: 'Player 2', cardId: 'PR05', round: 4, reward: 'sheep' },
+        sourceEvent: {
+          occurrenceId: resp.state.events.find((event) => event.type === 'parent.motherScheduled' && event.cardId === 'PR05')?.occurrenceId,
+          rowIndex: 0,
+        },
       },
     ]))
     expect(resp.state.events).toEqual(expect.arrayContaining([

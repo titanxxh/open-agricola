@@ -259,7 +259,13 @@ const auditAssertCompleted = (session: GameSession, father: FatherParentCardId, 
   expect(response.state.players[0]!.cardStates[father]).toMatchObject({ infobox: 'Completed', extraData: { fatherCompletedTier: tier } })
   expect(response.state.players[0]!.parentCards.father).toBe(father)
   expect(response.state.log.filter((entry) => entry.key === 'log.cardInfoboxChanged' && entry.params?.cardId === father))
-    .toEqual([{ key: 'log.cardInfoboxChanged', params: { cardId: father, text: 'Completed' } }])
+    .toEqual([{
+      key: 'log.cardInfoboxChanged', params: { cardId: father, text: 'Completed' },
+      sourceEvent: {
+        occurrenceId: response.state.events.find((event) => event.type === 'card.infoboxChanged' && event.cardId === father)?.occurrenceId,
+        rowIndex: 0,
+      },
+    }])
   expect(response.state.events.filter((event) => event.type === 'card.stateChanged' && event.cardId === father && event.key === 'fatherCompletedTier'))
     .toEqual([expect.objectContaining({ actorPlayerId: 'p1', targetPlayerId: 'p1' })])
   expect(response.state.events.filter((event) => event.type === 'card.stateChanged' && event.cardId === father)
