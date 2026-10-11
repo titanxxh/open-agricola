@@ -1,7 +1,7 @@
 import type { ActionDefinition, ActionSpace, Resource } from '../contract/types'
 import { initializeFlowDerivedCanBeExecutedByPlayer } from './flow'
 import { createInternalActionDefinitions } from './internal-actions'
-import { getAdHocAction } from './helpers/ad-hoc-action-registry'
+import { getActionDefinition, registerActionDefinitions } from './action-definition-lookup'
 import { cattleMarket } from '../cards/action/round-cattle-market'
 import { clayPit } from '../cards/action/common-clay-pit'
 import { copse } from '../cards/action/common-copse'
@@ -122,26 +122,18 @@ const baseActionDefinitions: ActionDefinition[] = [
 
 export const internalActionDefinitions = createInternalActionDefinitions((id) => getActionDefinition(id))
 
-const actionDefinitionLookup = new Map(
-  [...baseActionDefinitions, ...internalActionDefinitions].map((action) => [
-    action.id,
-    action,
-  ]),
-)
+registerActionDefinitions([...baseActionDefinitions, ...internalActionDefinitions])
 
 baseActionDefinitions.forEach((action) => {
   initializeFlowDerivedCanBeExecutedByPlayer(
     action,
-    (actionId) => actionDefinitionLookup.get(actionId),
+    getActionDefinition,
   )
 })
 
 export const actionDefinitions: ActionDefinition[] = baseActionDefinitions
 
-export const getActionDefinition = (
-  actionId: string,
-): ActionDefinition | undefined =>
-  actionDefinitionLookup.get(actionId) ?? getAdHocAction(actionId)
+export { getActionDefinition } from './action-definition-lookup'
 
 export const createActionSpaces = (playerCount?: number): ActionSpace[] =>
   actionDefinitions

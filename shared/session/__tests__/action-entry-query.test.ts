@@ -18,13 +18,12 @@ describe('computeActionEntryAvailability', () => {
       }
     }
 
-    computeAllowedPlacementSpaces(state, player)
+    const options = { isActionDoable: (_space: import('../../contract/types').ActionSpace, baseDoable: () => boolean) => baseDoable() }
+    computeAllowedPlacementSpaces(state, player, options)
     const callsPerPlacementScan = calls
     calls = 0
 
-    computeActionEntryAvailability(state, player, {
-      isActionDoable: (_space, baseDoable) => baseDoable(),
-    })
+    computeActionEntryAvailability(state, player, options)
 
     expect(callsPerPlacementScan).toBeGreaterThan(0)
     expect(calls).toBe(callsPerPlacementScan)

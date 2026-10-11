@@ -8,7 +8,7 @@ import type {
   GameState,
   Resource,
 } from '../contract/types'
-import type { ActionHookContext } from './hooks'
+import { applyIsDoableHooksDetailed, type ActionHookContext } from './hooks'
 import { HookDispatcher } from '../engine/dispatcher'
 import { getMatchingListeners, executeCardListener, listenerOwnerOptions } from '../cards/card-listeners'
 import { getSuppressedBeforeListenerIds, suppressBeforeListeners } from '../engine/action-context-flags'
@@ -220,6 +220,27 @@ export const isActionDoableInFlowContext = (
 ): boolean => {
   const { actionId, action, resolveAction, ...context } = args
   return applyChildActionDoable(actionId, action, context, resolveAction, new Set())
+}
+
+export const isActionVetoedInFlowContext = (context: FlowDoableContext & { actionId: string }): boolean => {
+  const actionHookDoable = applyIsDoableHooksDetailed(context, true)
+  if (actionHookDoable.vetoed) return true
+  const listenerContext = { ...context, phase: 'isDoable' as const, doable: actionHookDoable.doable }
+  return getMatchingListeners(listenerContext).some((entry) =>
+    executeCardListener(entry.registration, listenerContext, listenerOwnerOptions(entry))?.doable === false)
+}
+
+export const isPlacementActionDoableInFlowContext = (
+  args: Parameters<typeof isActionDoableInFlowContext>[0] & { baseDoable?: () => boolean },
+): boolean => {
+  const { action, resolveAction, baseDoable, ...context } = args
+  if (isActionVetoedInFlowContext(context)) return false
+  if (action.strictCanExecute && action.flow && !isFlowDerivedDoable(action.canBeExecutedByPlayer)
+    && !(baseDoable?.() ?? action.canBeExecutedByPlayer.call(context.space, context.state, context.player,
+      childCanBeExecutedContext(context)))) return false
+  if (isActionDoableInFlowContext(args)) return true
+  return getFlowHookDispatcher().applyIsDoable(context, action, false, () =>
+    canStartBefore('place-farmer', context, resolveAction))
 }
 
 export const initializeFlowDerivedCanBeExecutedByPlayer = (

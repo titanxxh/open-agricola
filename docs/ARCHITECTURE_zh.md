@@ -749,7 +749,7 @@ Card listener 区域默认只匹配已打出卡：`zones` 省略等价于 `['pla
 
 ### 7.5.2 当前步骤准入、before 与 blocked 恢复
 
-行动格可用性与权威入口共用 `GameCore.applyIsDoableCheck()` 和 flow 准入 helper。原子判断携带 params、sourceCard、actionContext、owner、目标行动格、实际费用修正与替代行动信息。当前步骤可执行，或适用的 before 可以开始，就允许尝试；不保证整条流程能够完成。SEQ 检查下一步，OR/XOR 检查是否有分支可以开始。显式 veto 和放人限制仍然有效。入口 helper 延迟求值基础判定，只对带自定义判定的 strict 复合行动执行这次前置检查。flow 查询中，叶子的基础回退只在没有 `costPreview` 时执行；复合流程遍历和 strict gate 保持原有顺序。每次查询仍基于完整的当前状态执行适用的 hook 与费用预览，不缓存可用性结果。查询不消费资源、触发、事件或私有 cursor。
+行动格可用性与权威入口共用 `GameCore.applyIsDoableCheck()` 和 flow 准入 helper。原子判断携带 params、sourceCard、actionContext、owner、目标行动格、实际费用修正与替代行动信息。当前步骤可执行，或适用的 before 可以开始，就允许尝试；不保证整条流程能够完成。SEQ 检查下一步，OR/XOR 检查是否有分支可以开始。显式 veto 和放人限制仍然有效。入口 helper 延迟求值基础判定，只对带自定义判定的 strict 复合行动执行这次前置检查。flow 查询中，叶子的基础回退只在没有 `costPreview` 时执行；复合流程遍历和 strict gate 保持原有顺序。每次查询仍基于完整的当前状态执行适用的 hook 与费用预览，不缓存可用性结果。查询不消费资源、触发、事件或私有 cursor。 普通放人和卡牌授予的额外放人共享 `isPlacementActionDoableInFlowContext()`，包含 `place-farmer.before` 的准入回退、显式 veto、strict 前置条件和 before 抑制语义。额外放人的可达性 resolver 通过无环的 `action-definition-lookup.ts` 同时查询行动格及内部行动，能够预览包含 `gain` / `pay` 的 before flow。
 
 引擎在状态变化后重新评估 before 候选，每次 activation 只消费一次。已接受的根行动和必选续行会向复合后代传播义务。选中分支不能返回父选择以逃过未履行的义务；明确 optional 节点在接受前仍可跳过。必选叶节点或复合节点不可执行时产生 `engine-blocked`；普通失败保留先前效果，等待玩家显式 `undoStep` 或 `undoAction`。无效结构化提交恢复命令检查点并保留原交互。已发出的选择菜单中，若提交选项对应的行动已不可执行（例如 anytime 行动花掉了所有可选支付所需的资源），该提交以可恢复失败被拒绝并保留菜单，不进入阻塞；支付选项只会结算其标识所指的那种支付。
 

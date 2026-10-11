@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-07-02
-- Amended: 2026-10-09
+- Amended: 2026-10-11
 
 ## Context
 
@@ -20,6 +20,8 @@ OA 之前的 action listener 已有 `ParallelNode(mode='trigger-select')`，但�
 ## Decision
 
 Issue [#1063](https://github.com/titanxxh/open-agricola/issues/1063) retires `during` rather than repairing it. It ran after execution, had no reliable event/choice or pending semantics, and its only two native consumers express ordinary completed-action rewards through `after`. Successful-host trailing reactions are `immediatelyAfter` and `after`; they retain the existing commit snapshot, payment, continuation, and owner-controlled ordering boundaries. Workshop source validation and executable-manifest registration reject unsupported phases before execution, without translating `during` to `after` or rewriting saved source. A read-only production inventory on 2026-10-09 found no retained Workshop executable using `during`, so no data migration is required. Reading an author's saved draft or version remains available for editing.
+
+Issues #1096 and #1099–#1102 separate card activation from completion reactions. Own-play benefits run in the existing `onBuy` slot after payment and card commitment. A played card cannot match its own direct `occupation` / `improvement.immediatelyAfter` or `.after`; explicit self-inclusive rules supply that component in `onBuy`. Other cards and owners still react, and the newly committed card still counts in the trigger snapshot. This boundary does not freeze enclosing placement reactions. Normal and extra placement admission share before-flow resolution and preserve veto/strict guards.
 
 1. Action reaction listener 的 `before` / `immediatelyAfter` / `after` 同一 trigger player / phase 下默认进入 `ParallelNode(mode='trigger-select')`。单 child 直接展开；compute / query hook 继续确定性聚合。
 2. Harvest field 三个 stage hook 与 before-end card-effect step 使用同一个 `activate-card-effect` child。每个 target step 收集 activation 后进入 trigger-select，不再手写自动 / 交互分流。

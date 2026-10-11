@@ -9,7 +9,7 @@ const CARD_ID = 'E105_Pioneer'
 /**
  * E105 Pioneer (Occupation):
  * On purchase: XOR choice of 1 building resource (wood/clay/reed/stone) + 1 food.
- * Each time you use the most recently revealed action space: same XOR choice.
+ * Each time before you use the most recently revealed action space: same XOR choice.
  *
  * "Most recently revealed" = the action space revealed at the start of the current
  * round, i.e., state.roundActionOrder[state.round - 1].
@@ -31,10 +31,10 @@ export const getMostRecentlyRevealedSpaceId = (state: { round: number; roundActi
   return state.roundActionOrder[state.round - 1] ?? null
 }
 
-const afterPlaceFarmerListener: CardListenerRegistration = {
-  id: 'E105-pioneer-after-place-farmer',
+const beforePlaceFarmerListener: CardListenerRegistration = {
+  id: 'E105-pioneer-before-place-farmer',
   cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
+  phases: ['before' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const lastRevealedId = getMostRecentlyRevealedSpaceId(context.state)
@@ -48,7 +48,7 @@ const afterPlaceFarmerListener: CardListenerRegistration = {
 }
 
 const cardImpl = {
-  listeners: [afterPlaceFarmerListener],
+  listeners: [beforePlaceFarmerListener],
   effect: {
   id: CARD_ID,
   onBuy: () => {
