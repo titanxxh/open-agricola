@@ -1,0 +1,250 @@
+@media (min-width: 1101px) {
+  .app--desktop-table {
+    max-width: none;
+    margin: 0;
+    background: rgba(247, 245, 232, 0.96);
+  }
+
+  .app--desktop-table .game-layout {
+    --desktop-action-width: 830px;
+    grid-template-columns: minmax(720px, var(--desktop-action-width)) minmax(580px, 1fr) 250px;
+    grid-template-areas:
+      "stage stage sidebar"
+      "actions personal sidebar"
+      "hand hand sidebar"
+      "farms farms sidebar";
+    grid-template-rows: auto auto auto auto;
+    max-width: none;
+    gap: 16px;
+  }
+
+  .app--desktop-table .game-layout[data-player-count="3"],
+  .app--desktop-table .game-layout[data-player-count="4"] { --desktop-action-width: 1000px; }
+  .app--desktop-table .game-layout[data-player-count="5"] { --desktop-action-width: 1190px; }
+  .app--desktop-table .game-layout[data-player-count="6"] { --desktop-action-width: 1370px; }
+
+  .game-layout__stage { grid-area: stage; min-width: 0; }
+  .app--desktop-table .game-layout__left { grid-area: actions; }
+  .app--desktop-table .game-layout__center { grid-area: personal; }
+  .game-layout__hand { grid-area: hand; min-width: 0; }
+  .desktop-public-farms { grid-area: farms; min-width: 0; }
+  .app--desktop-table .game-layout__right {
+    grid-area: sidebar;
+    display: flex;
+    flex-direction: column;
+    max-height: none;
+    overflow: visible;
+  }
+  .app--desktop-table .game-layout__right > * { flex-shrink: 0; }
+  .app--desktop-table:not(.app--embedded) .action-log { max-height: 480px; }
+
+  .app--desktop-table .actions {
+    padding: 0;
+    background: transparent;
+    box-shadow: none;
+    border-radius: 0;
+  }
+  .app--desktop-table .actions > h2 { display: none; }
+  .app--desktop-table .action-board-wrapper { max-width: var(--desktop-action-width); }
+  .app--desktop-table .center { padding: 12px; }
+  .app--desktop-table .game-layout__center .farm-grid { max-width: 680px; }
+  .app--desktop-table .played-cards,
+  .app--desktop-table .hand-cards {
+    padding: 12px 0;
+    margin: 0;
+    background: transparent;
+    border-radius: 0;
+  }
+  .app--desktop-table .played-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, 150px);
+    gap: 12px;
+  }
+  .app--desktop-table .played-row > * {
+    width: 150px;
+    max-width: none;
+    min-width: 0;
+  }
+  .app--desktop-table .played-cards .player-card:not(.player-card-preview-body) {
+    width: 150px;
+    max-width: 150px;
+    aspect-ratio: 1;
+  }
+  .app--desktop-table .played-cards .player-card-inner {
+    height: 235px;
+    overflow: hidden;
+  }
+  .app--desktop-table .played-cards .card-title {
+    font-size: 19px;
+    line-height: 21px;
+  }
+  .app--desktop-table .played-cards .card-desc { display: none; }
+  .app--desktop-table .parent-cards-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .app--desktop-table .parent-card-tile { max-width: 188px; }
+  .app--desktop-table .hand-sections { gap: 12px; }
+  .app--desktop-table .hand-section {
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.65);
+    border-color: #dedbcc;
+  }
+  .app--desktop-table .hand-row {
+    justify-content: flex-start;
+    gap: 12px;
+  }
+  .app--desktop-table .hand-row > * {
+    flex: 0 0 200px;
+    max-width: 200px;
+  }
+  .app--desktop-table .hand-row .player-card { max-width: 200px; }
+  .app--desktop-table .hand-row .card-title { font-size: 16px; }
+  .app--desktop-table .hand-row .card-desc { font-size: 14px; line-height: 16px; }
+
+  .desktop-player-overview { display: grid; gap: 10px; }
+  .desktop-player-overview__player {
+    padding: 10px;
+    background: #faf7e7;
+    border: 1px solid #d9cfb7;
+    border-radius: 8px;
+  }
+  .desktop-player-overview__name {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    padding: 0 0 8px;
+    border: 0;
+    background: transparent;
+    color: var(--color-text);
+    text-align: left;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .desktop-player-overview__name > span:first-child { overflow-wrap: anywhere; }
+  .desktop-player-overview__name[aria-pressed="true"] { color: var(--color-primary); }
+  .desktop-player-overview__score { margin-left: auto; font-variant-numeric: tabular-nums; }
+  .desktop-player-overview__turn { color: #ab442e; }
+  .desktop-player-overview__resources {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px 4px;
+    font-size: 14px;
+  }
+  .desktop-player-overview__resources > span {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+    font-variant-numeric: tabular-nums;
+  }
+  .desktop-public-farms > h2 { margin: 0 0 12px; font-size: 16px; }
+  .desktop-public-farms__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(600px, 100%), 1fr));
+    gap: 16px;
+    align-items: start;
+  }
+  .desktop-public-farm { min-width: 0; max-width: 740px; }
+
+  .seasons-board__map--compact {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+    aspect-ratio: auto;
+    background: none;
+  }
+  .seasons-board__map--compact > .seasons-board__board-copy,
+  .seasons-board__map--compact > .seasons-board__resource-adjustment,
+  .seasons-board__map--compact > .seasons-board__route,
+  .seasons-board__map--compact > .seasons-board__token { display: none; }
+  .seasons-board__map--compact .seasons-board__space-button {
+    position: relative;
+    inset: auto;
+    width: auto;
+    height: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    overflow: visible;
+    padding: 8px;
+    background: #ece9db;
+    border: 1px solid #d7d0ba;
+    --seasons-board-copy-size: 13px;
+  }
+  .seasons-board__map--compact .seasons-board__space-button.is-current {
+    background: #e2edcf;
+    border-color: #718c52;
+  }
+  .seasons-board__map--compact .seasons-board__space-button::before { display: none; }
+  .seasons-board__map--compact .seasons-board__season-action-card {
+    position: relative;
+    inset: auto;
+    width: 100%;
+    height: 160px;
+    flex: 0 0 160px;
+    box-shadow: none;
+  }
+  .seasons-board__map--compact .seasons-board__action-header { font-size: 14px; line-height: 1.1; }
+  .seasons-board__compact-name { font-weight: 600; font-size: 14px; }
+  .seasons-board__compact-adjustments { display: grid; gap: 5px; font-size: 12px; text-align: left; }
+  .seasons-board__map--compact .seasons-board__badge {
+    position: static;
+    width: auto;
+    height: auto;
+    clip-path: none;
+    font-size: 12px;
+    margin-top: auto;
+  }
+  .seasons-board__map--compact [data-season="winter"] { order: 0; }
+  .seasons-board__map--compact [data-season="spring"] { order: 1; }
+  .seasons-board__map--compact [data-season="summer"] { order: 2; }
+  .seasons-board__map--compact [data-season="autumn"] { order: 3; }
+  .seasons-board__map--compact .seasons-board__worker { bottom: 120px; font-size: 12px; }
+
+  @media (max-width: 1759px) {
+    .app--desktop-table .game-layout {
+      grid-template-columns: minmax(0, 1fr) 250px;
+      grid-template-areas:
+        "stage sidebar"
+        "actions sidebar"
+        "personal sidebar"
+        "hand sidebar"
+        "farms sidebar";
+    }
+    .app--desktop-table .game-layout__left { max-width: var(--desktop-action-width); }
+  }
+
+  @media (max-width: 1910px) {
+    .app--desktop-table .game-layout[data-player-count="3"],
+    .app--desktop-table .game-layout[data-player-count="4"] {
+      grid-template-columns: minmax(0, 1fr) 250px;
+      grid-template-areas: "stage sidebar" "actions sidebar" "personal sidebar" "hand sidebar" "farms sidebar";
+    }
+    .app--desktop-table .game-layout[data-player-count="3"] .game-layout__left,
+    .app--desktop-table .game-layout[data-player-count="4"] .game-layout__left { max-width: var(--desktop-action-width); }
+  }
+  @media (max-width: 2100px) {
+    .app--desktop-table .game-layout[data-player-count="5"] {
+      grid-template-columns: minmax(0, 1fr) 250px;
+      grid-template-areas: "stage sidebar" "actions sidebar" "personal sidebar" "hand sidebar" "farms sidebar";
+    }
+    .app--desktop-table .game-layout[data-player-count="5"] .game-layout__left { max-width: var(--desktop-action-width); }
+  }
+  @media (max-width: 2290px) {
+    .app--desktop-table .game-layout[data-player-count="6"] {
+      grid-template-columns: minmax(0, 1fr) 250px;
+      grid-template-areas:
+        "stage sidebar"
+        "actions sidebar"
+        "personal sidebar"
+        "hand sidebar"
+        "farms sidebar";
+    }
+    .app--desktop-table .game-layout[data-player-count="6"] .game-layout__left { max-width: var(--desktop-action-width); }
+  }
+}

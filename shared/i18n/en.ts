@@ -132,6 +132,7 @@ export const en = {
     roundHidden: 'To Be Revealed',
     roundLocked: 'Locked',
     farmTitle: 'Player Farm',
+    publicFarms: 'Public farms',
     startPlayer: 'Start Player',
     nextStartPlayer: 'Next Round Start Player',
     activePlayer: 'Active Player',

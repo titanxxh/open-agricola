@@ -25,6 +25,8 @@ import { DevPanel } from '../components/dev/DevPanel'
 import { ActionBoard } from '../components/board/ActionBoard'
 import { SeasonsBoard } from '../components/board/SeasonsBoard'
 import { PlayerFarmPanel } from '../components/board/PlayerFarmPanel'
+import { DesktopPlayerOverview } from '../components/board/DesktopPlayerOverview'
+import { DesktopPublicFarms } from './DesktopPublicFarms'
 import { SpecialActionsPanel } from '../components/board/SpecialActionsPanel'
 import { MajorImprovements } from '../components/board/MajorImprovements'
 import { ScoringPad } from '../components/board/ScoringPad'
@@ -373,6 +375,15 @@ export const GameContainerApi = () => {
   const [devResource, setDevResource] = useState<keyof Resource>('wood')
   const [devAmount, setDevAmount] = useState(1)
   const [devRound, setDevRound] = useState(1)
+  const [isDesktopTable, setIsDesktopTable] = useState(() => typeof window !== 'undefined' && window.matchMedia?.('(min-width: 1101px)').matches || false)
+  const [handOutlet, setHandOutlet] = useState<HTMLDivElement | null>(null)
+  useEffect(() => {
+    const query = window.matchMedia?.('(min-width: 1101px)')
+    if (!query) return
+    const update = () => setIsDesktopTable(query.matches)
+    query.addEventListener('change', update)
+    return () => query.removeEventListener('change', update)
+  }, [])
   const [isMobile, setIsMobile] = useState(getIsMobileViewport)
   useEffect(() => {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return
@@ -1827,6 +1838,7 @@ export const GameContainerApi = () => {
       {state.enableThroughTheSeasons && state.throughTheSeasons ? (
         <section className="board-panel board-seasons">
           <SeasonsBoard
+            compact={isDesktopTable}
             locale={locale}
             throughTheSeasons={state.throughTheSeasons}
             seasonActions={seasonActions}
@@ -1854,7 +1866,7 @@ export const GameContainerApi = () => {
   )
 
   return (
-    <div className={`app${isEmbedded ? ' app--embedded' : ''}`}>
+    <div className={`app${isEmbedded ? ' app--embedded' : ''}${isDesktopTable ? ' app--desktop-table' : ''}`}>
       {notificationStack}
       <PublicEventResourceAnimations
         animations={displayPublicEventResourceAnimations}
@@ -1933,14 +1945,18 @@ export const GameContainerApi = () => {
 
       <div
         className="game-layout"
+        data-player-count={state.players.length}
         style={{ '--game-header-height': `${headerHeight}px` } as CSSProperties}
       >
+        {isDesktopTable ? (
+          <div className="game-layout__stage"><StageBar currentRound={state.round ?? 1} locale={locale} /></div>
+        ) : null}
         <div className="game-layout__left">
           {actionBoardOverview}
           {expansionActionBoards}
         </div>
         <div className="game-layout__center">
-          <StageBar currentRound={state.round ?? 1} locale={locale} />
+          {isDesktopTable ? null : <StageBar currentRound={state.round ?? 1} locale={locale} />}
           {isPublicFarmView && activePlayer ? (
             <div className="hotseat-public-farm" role="status">
               <span>{t(locale, 'ui.hotseatPublicFarm', { player: playerNames[displayPlayer.id] })}</span>
@@ -1957,10 +1973,23 @@ export const GameContainerApi = () => {
               view={farmBoardView}
               actions={farmBoardActions}
               inlineCardStats={isMobile}
+              handOutlet={isDesktopTable ? handOutlet : null}
             />
           </section>
         </div>
+        {isDesktopTable ? <div className="game-layout__hand" ref={setHandOutlet} /> : null}
         <div className="game-layout__right">
+          {isDesktopTable ? (
+            <DesktopPlayerOverview
+              locale={locale}
+              players={state.players}
+              playerNames={playerNames}
+              scores={scoreRows}
+              viewedPlayerId={displayPlayer.id}
+              currentPlayerId={currentPlayer.id}
+              onViewPlayer={setViewPlayerIdSafe}
+            />
+          ) : null}
           {isMobile ? (
             <>
               <Section collapsible defaultCollapsed locale={locale} title={t(locale, 'ui.scoringPadTitle')} variant="parchment">
@@ -1989,7 +2018,11 @@ export const GameContainerApi = () => {
             </>
           ) : (
             <>
-              <ScorePanel locale={locale} rows={scoreRows} />
+              {isDesktopTable ? (
+                <Section collapsible defaultCollapsed locale={locale} title={t(locale, 'ui.scoringPadTitle')} variant="parchment">
+                  <ScorePanel locale={locale} rows={scoreRows} />
+                </Section>
+              ) : <ScorePanel locale={locale} rows={scoreRows} />}
               <ActionLog
                 locale={locale}
                 log={roomHistory.log}
@@ -2011,6 +2044,14 @@ export const GameContainerApi = () => {
             </>
           )}
         </div>
+        {isDesktopTable ? (
+          <DesktopPublicFarms
+            state={state}
+            viewedPlayerId={displayPlayer.id}
+            view={farmBoardView}
+            actions={farmBoardActions}
+          />
+        ) : null}
       </div>
 
       {bugReportBar}
