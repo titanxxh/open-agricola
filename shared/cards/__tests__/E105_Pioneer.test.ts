@@ -107,16 +107,16 @@ describe('E105_Pioneer', () => {
     })
   })
 
-  describe('after place-farmer on most recently revealed space', () => {
+  describe('before place-farmer on most recently revealed space', () => {
     it('returns XOR choice when placing on the last revealed space', () => {
-      const listener = findListener('E105-pioneer-after-place-farmer')!
+      const listener = findListener('E105-pioneer-before-place-farmer')!
       expect(listener).toBeDefined()
       const player = createPlayer()
       const state = createState(player)
       state.round = 5 // revealed: wish-children (index 4)
       const result = executeCardListener(listener, {
         state, player, space: createSpace('wish-children'),
-        actionId: 'place-farmer', phase: 'after',
+        actionId: 'place-farmer', phase: 'before',
       } as unknown as CardListenerContext)
       expect(result).toBeDefined()
       const flow = result!.flow as Extract<ActionFlow, { type: 'seq' }>
@@ -126,26 +126,26 @@ describe('E105_Pioneer', () => {
     })
 
     it('does not trigger for non-latest revealed space', () => {
-      const listener = findListener('E105-pioneer-after-place-farmer')!
+      const listener = findListener('E105-pioneer-before-place-farmer')!
       const player = createPlayer()
       const state = createState(player)
       state.round = 5 // revealed: wish-children
       const result = executeCardListener(listener, {
         state, player, space: createSpace('sheep-market'),
-        actionId: 'place-farmer', phase: 'after',
+        actionId: 'place-farmer', phase: 'before',
       } as unknown as CardListenerContext)
       expect(result).toBeUndefined()
     })
 
 
     it('does not trigger on round 1 for non-matching base action space', () => {
-      const listener = findListener('E105-pioneer-after-place-farmer')!
+      const listener = findListener('E105-pioneer-before-place-farmer')!
       const player = createPlayer()
       const state = createState(player)
       state.round = 1 // revealed: sheep-market
       const result = executeCardListener(listener, {
         state, player, space: createSpace('forest'), // forest is base, not round-action
-        actionId: 'place-farmer', phase: 'after',
+        actionId: 'place-farmer', phase: 'before',
       } as unknown as CardListenerContext)
       expect(result).toBeUndefined()
     })

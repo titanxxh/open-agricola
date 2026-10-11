@@ -5,7 +5,8 @@ import { canMoorWorkerEnterSpace } from '../../moor/heating'
 import { getMatchingListeners, executeCardListener, listenerOwnerOptions } from '../../cards/card-listeners'
 import { resetComputeReplaceGuards } from '../../engine/replace-guard'
 import { runActionHooks } from '../hooks'
-import { isActionDoableInFlowContext } from '../flow'
+import { isPlacementActionDoableInFlowContext } from '../flow'
+import { getActionDefinition } from '../action-definition-lookup'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from './placement-constants'
 
 export type AllowedPlacement = {
@@ -72,7 +73,7 @@ const canExecutePlacementSpace = (
     )
     return contextOverrides.isActionDoable(space, baseDoable)
   }
-  return isActionDoableInFlowContext({
+  return isPlacementActionDoableInFlowContext({
     actionId: space.id,
     action: space,
     state,
@@ -80,7 +81,7 @@ const canExecutePlacementSpace = (
     space,
     sourceCard: contextOverrides.sourceCard,
     actionContext,
-    resolveAction: (actionId) => findActionSpaceById(state, actionId),
+    resolveAction: (actionId) => findActionSpaceById(state, actionId) ?? getActionDefinition(actionId),
   })
 }
 

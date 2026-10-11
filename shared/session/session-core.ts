@@ -1,7 +1,7 @@
 import { buildAnimalReorgRequest } from '../domain/animal-reorg'
 import { beginHistoryOperation, captureStateWithHistory, historyBranch, materializeHistoryBranch, recoveryRecordId, registerRecoveryRecordId } from './history-streams'
 import { cloneStateWithHistory } from './state-bootstrap'
-import { canStartBefore, evaluateFlowDoable, isActionDoableInFlowContext, isFlowDerivedDoable } from '../actions/flow'
+import { evaluateFlowDoable, isActionVetoedInFlowContext, isPlacementActionDoableInFlowContext } from '../actions/flow'
 import type {
   DraftGameEvent,
   EventSink,
@@ -44,7 +44,6 @@ import {
 import { getAllAdHocActions } from '../actions/helpers/ad-hoc-action-registry.ts'
 import { validateSelectionEffect } from '../actions/helpers/selection-effect-registry.ts'
 import {
-  applyIsDoableHooksDetailed,
   clearActionHooks,
 } from '../actions/hooks.ts'
 import { finalizeDraft } from '../draft/draft-manager.ts'
@@ -706,15 +705,10 @@ export class GameCore {
     return this.listenersVetoIsDoable(player, space)
   }
   applyIsDoableCheck(player: PlayerState, space: ActionSpace, baseDoable: () => boolean): boolean {
-    if (this.listenersVetoIsDoable(player, space)) return false
-    // Only a strict custom predicate needs this preliminary gate; the full flow
-    // query below evaluates ordinary and flow-derived predicates itself.
-    if (space.strictCanExecute && space.flow && !isFlowDerivedDoable(space.canBeExecutedByPlayer) && !baseDoable()) return false
-    const resolveAction = (actionId: string) => this.registry.get(actionId)
-    if (isActionDoableInFlowContext({ actionId: space.id, action: space, state: this.state, player, space, resolveAction })) return true
-    const context = { state: this.state, player, space, actionId: space.id }
-    return this.hookDispatcher.applyIsDoable(context, space, false, () =>
-      canStartBefore('place-farmer', context, resolveAction))
+    return isPlacementActionDoableInFlowContext({
+      actionId: space.id, action: space, state: this.state, player, space, baseDoable,
+      resolveAction: (actionId) => this.registry.get(actionId),
+    })
   }
   /** @internal Harvest phase trampoline — kicks off the beforeHarvest stage hook chain. */
   invokeHarvestFromBeforeHarvest(): SessionResponse { return this.withCtx(() => this.continueHarvestFromBeforeHarvest()) }
@@ -4179,25 +4173,7 @@ export class GameCore {
    * base unavailability does not masquerade as a listener veto.
    */
   private listenersVetoIsDoable(player: PlayerState, space: ActionSpace): boolean {
-    const actionHookDoable = applyIsDoableHooksDetailed(
-      { state: this.state, player, space, actionId: space.id },
-      true,
-    )
-    if (actionHookDoable.vetoed) return true
-    const ctx: import('../cards/card-listeners.ts').CardListenerContextInput = {
-      state: this.state,
-      player,
-      space,
-      actionId: space.id,
-      phase: 'isDoable',
-      doable: actionHookDoable.doable,
-    }
-    const matched = getMatchingListeners(ctx)
-    for (const entry of matched) {
-      const result = executeCardListener(entry.registration, ctx, listenerOwnerOptions(entry))
-      if (result && result.doable === false) return true
-    }
-    return false
+    return isActionVetoedInFlowContext({ state: this.state, player, space, actionId: space.id })
   }
 
   private isActionSpaceAvailableToPlayer(player: PlayerState, space: ActionSpace): boolean {
