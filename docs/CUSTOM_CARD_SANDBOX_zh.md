@@ -291,7 +291,7 @@ listener 条目可以声明 `handler`、`actions`、`phases`、`scope`、`cardId
 | `mandatory` | `boolean` | 同一时机有多个反应等待时，玩家选择执行顺序，其余可以放弃；标为强制的不能放弃。`before` 反应默认可放弃，除非这里写 `true` |
 | `preScoring` | `boolean` | 用于 `anytime` listener：在终局计分前的窗口里也提供它；未标记的 anytime listener 在这个窗口里不提供 |
 | `replacesTurn` | `boolean` | 用于 `anytime` listener：只在持有者轮到自己且空闲时提供，使用它就顶替这一回合的放工人 |
-| `blockedAnytimeInteractionKinds` | 交互类型数组 | 用于 `anytime` listener：玩家正在处理这些类型的交互（如 `'farm-select'`、`'animal-reorg'`）时隐藏这个入口 |
+| `blockedAnytimeInteractionKinds` | 交互类型数组 | 用于 `anytime` listener：玩家正在处理这些类型的交互（如 `'farm-select'`、`'animal-reorg'`）时隐藏这个入口。可用的类型是 `'choice'`、`'animal-reorg'`、`'confirm-next-player'`、`'confirm-player-switch'`、`'feed'`、`'heating'`、`'farm-select'`、`'selection'`、`'card-draft'`、`'select-trigger'`、`'engine-blocked'`、`'resource-quantity-select'`、`'resource-batch-exchange-select'`；写了其他字符串时保存失败 |
 
 listener 始终属于自己的卡：只有这张卡在 `scope` 选中的玩家面前已打出时才会触发；`zones` 写了手牌时，卡在该玩家手牌里也会触发。`cardIds` 可以省略；如果写了，必须是 `[CARD_ID]`。
 
@@ -861,7 +861,7 @@ CI 会拦下漏改的情况。
 
 本文件遵守 [ADR 0025](adr/0025-workshop-capability-contract-is-fail-closed-and-opened-by-tests.md)。
 
-- **契约管的是名字（包括收获前元数据里的资源名）、节点字段、返回的动物分区的归属、已声明的 effect 元数据和 listener 数据字段的类型、各行动的参数键、`special-effect` 以及原生农场与卡牌行动所接受参数的字段类型，以及查询类 hook 返回值的顶层类型。**其余参数的取值和查询结果的内容由原生代码自己校验，与原生卡相同；准入不重复实现这些规则。
+- **契约管的是名字（包括收获前元数据里的资源名和 listener 屏蔽的交互类型）、节点字段、返回的动物分区的归属、已声明的 effect 元数据和 listener 数据字段的类型、各行动的参数键、`special-effect` 以及原生农场与卡牌行动所接受参数的字段类型，以及查询类 hook 返回值的顶层类型。**其余参数的取值和查询结果的内容由原生代码自己校验，与原生卡相同；准入不重复实现这些规则。
 - **未列出即未开放。**部署契约、源码校验和两个执行器接受同一组名字：§3.1 的 hook，§3.2 和 §3.4 的 listener 行动、阶段和 scope，§6 的 action ID，以及 §6.1 的 `special-effect` kind。本文件不逐项列出未开放的原生接口，候选能力记录在 [issue #1079](https://github.com/titanxxh/open-agricola/issues/1079)。
 - **有固定行为测试的名字才开放。**每个名字至少要有一个测试，在不改原生规则路径的前提下，用两人 `GameSession` 真实驱动它。新能力单独开 issue，并带上这个测试。
 - **hook 出错和返回契约外内容的处理相同。**如果出错发生在一条命令的结算过程中，第一次出现时拒绝这条命令，恢复到命令之前的状态，并返回错误；错误里写明被拒绝的行动、kind 或字段。同样的错误再次出现时不再报告：命令成功，这张卡本次的效果被跳过。这是有意的行为，让带着有问题卡牌的对局可以继续。出错如果发生在命令之外，例如为一次响应计算可用性、预览或分数时运行的查询，则只记一条卡牌警告，并贡献 §3.1 所说的中性结果；此时没有正在进行的命令，所以不回滚。
