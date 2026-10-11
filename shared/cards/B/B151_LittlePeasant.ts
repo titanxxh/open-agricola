@@ -22,16 +22,6 @@ const isOpenSpace = (state: GameState, space: ActionSpace) => {
   return state.round >= getOpenRound(state, space)
 }
 
-const onPlayListener: CardListenerRegistration = {
-  id: 'B151-little-peasant-after-play',
-  phases: ['after' as ActionHookPhase],
-  actions: ['occupation'],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (context.choice !== CARD_ID) return
-    return { flow: gainLeaf(CARD_ID, { stone: 1 }), sourceCard: CARD_ID }
-  },
-}
-
 const computeArgsListener: CardListenerRegistration = {
   id: 'B151-little-peasant-compute-args-place-farmer',
   cardIds: [CARD_ID],
@@ -57,7 +47,11 @@ const computeArgsListener: CardListenerRegistration = {
 }
 
 const cardImpl = {
-  listeners: [onPlayListener, computeArgsListener],
+  effect: {
+    id: CARD_ID,
+    onBuy: () => gainLeaf(CARD_ID, { stone: 1 }),
+  },
+  listeners: [computeArgsListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
 

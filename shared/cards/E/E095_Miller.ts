@@ -24,39 +24,6 @@ const BAKING_IMPROVEMENT_IDS = [
 ]
 
 /**
- * Part 1: onBuy — when Miller is played, optionally purchase a baking improvement.
- *
- * This uses a card listener on occupation (after phase) rather than
- * registerCardEffect.onBuy because the engine does not process onBuy flows
- * for occupation cards — only for improvements. Card listeners on
- * occupation are the standard pattern for occupation onBuy flows.
- */
-const onBuyListener: CardListenerRegistration = {
-  id: 'E95-miller-onbuy-improvement',
-  cardIds: [CARD_ID],
-  actions: ['occupation'],
-  phases: ['after' as ActionHookPhase],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    // Only trigger when the Miller card itself was just played
-    if (context.choice !== CARD_ID) return
-    return {
-      flow: {
-        type: 'leaf',
-        actionId: 'improvement',
-        optional: true,
-        sourceCard: CARD_ID,
-        actionContext: { trueAction: false },
-        params: {
-          types: ['major', 'minor'],
-          allowedPurchases: BAKING_IMPROVEMENT_IDS,
-        },
-      },
-      sourceCard: CARD_ID,
-    }
-  },
-}
-
-/**
  * Part 2: opponent listener — bake bread when opponent uses grain-seeds.
  */
 const opponentGrainSeedsListener: CardListenerRegistration = {
@@ -81,7 +48,18 @@ const opponentGrainSeedsListener: CardListenerRegistration = {
 }
 
 const cardImpl = {
-  listeners: [onBuyListener, opponentGrainSeedsListener],
+  effect: {
+    id: CARD_ID,
+    onBuy: () => ({
+      type: 'leaf',
+      actionId: 'improvement',
+      optional: true,
+      sourceCard: CARD_ID,
+      actionContext: { trueAction: false },
+      params: { types: ['major', 'minor'], allowedPurchases: BAKING_IMPROVEMENT_IDS },
+    }),
+  },
+  listeners: [opponentGrainSeedsListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
 

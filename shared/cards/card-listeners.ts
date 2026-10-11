@@ -338,6 +338,14 @@ export const getMatchingListeners = (
   listeners?: readonly CardListenerRegistration[],
 ): MatchedCardListener[] => {
   const listenerContext = normalizeCardListenerContext(context)
+  const isCardPlay = listenerContext.actionId === 'occupation' || listenerContext.actionId === 'improvement'
+  const isTrailing = listenerContext.phase === 'after' || listenerContext.phase === 'immediatelyAfter'
+  const playedCardId = isCardPlay && isTrailing
+    ? listenerContext.choice?.replace(/^(?:major|minor):/, '')
+    : undefined
+  const triggerPlayerId = (listenerContext.triggerPlayer ?? listenerContext.player).id
+  const canRespond = (ownerPlayerId: string, ref: NonNullable<ReturnType<typeof findPlayerCardRef>>) =>
+    ref.zone !== 'played' || ownerPlayerId !== triggerPlayerId || ref.cardId !== playedCardId
   const matched: MatchedCardListener[] = []
   getOrderedListeners(listenerContext, listeners).forEach((registration) => {
     if (!registration.cardIds || registration.cardIds.length === 0) {
@@ -349,7 +357,8 @@ export const getMatchingListeners = (
     for (const cardId of registration.cardIds) {
       if (scope === 'player') {
         const ref = findPlayerCardRef(listenerContext.player, cardId, zones)
-        if (ref && !isPlayerSkippingCurrentHarvest(listenerContext.state, listenerContext.player)) {
+        if (ref && canRespond(listenerContext.player.id, ref)
+          && !isPlayerSkippingCurrentHarvest(listenerContext.state, listenerContext.player)) {
           matched.push({
             registration,
             cardId,
@@ -363,6 +372,7 @@ export const getMatchingListeners = (
           if (
             p.id !== listenerContext.player.id &&
             ref &&
+            canRespond(p.id, ref) &&
             !isPlayerSkippingCurrentHarvest(listenerContext.state, p)
           ) {
             matched.push({ registration, cardId, ownerPlayerId: p.id, ownerCardZone: ref.zone })
@@ -371,7 +381,7 @@ export const getMatchingListeners = (
       } else {
         for (const p of listenerContext.state.players ?? []) {
           const ref = findPlayerCardRef(p, cardId, zones)
-          if (ref && !isPlayerSkippingCurrentHarvest(listenerContext.state, p)) {
+          if (ref && canRespond(p.id, ref) && !isPlayerSkippingCurrentHarvest(listenerContext.state, p)) {
             matched.push({ registration, cardId, ownerPlayerId: p.id, ownerCardZone: ref.zone })
             break
           }

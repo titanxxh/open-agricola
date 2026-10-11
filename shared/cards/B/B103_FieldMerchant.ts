@@ -31,17 +31,6 @@ const computeReplaceListener: CardListenerRegistration = {
   },
 }
 
-const onPlayListener: CardListenerRegistration = {
-  id: 'B103-field-merchant-after-play',
-  cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
-  actions: ['occupation'],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (context.choice !== CARD_ID) return
-    return { flow: gainLeaf(CARD_ID, { wood: 1, reed: 1 }), sourceCard: CARD_ID }
-  },
-}
-
 const isDoableListener: CardListenerRegistration = {
   id: 'B103-field-merchant-isdoable-improvement',
   cardIds: [CARD_ID],
@@ -54,7 +43,11 @@ const isDoableListener: CardListenerRegistration = {
 }
 
 const cardImpl = {
-  listeners: [computeReplaceListener, onPlayListener, isDoableListener],
+  effect: {
+    id: CARD_ID,
+    onBuy: () => gainLeaf(CARD_ID, { wood: 1, reed: 1 }),
+  },
+  listeners: [computeReplaceListener, isDoableListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
 

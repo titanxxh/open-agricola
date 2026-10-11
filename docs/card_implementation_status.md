@@ -216,6 +216,8 @@ If you discover a new mechanism that needs to span multiple cards in the future,
 
 ## 8. The reference anti-patterns: do not copy
 
+- Do not implement a one-time own-play benefit with an `occupation` / `improvement.after` listener, or react to `pay.after` when the printed condition is a successfully played or built card. Use `onBuy` for own activation and the committed host for later reactions.
+
 Do not read one card's raw state or prompt key in generic consumers, enumerate internal fields for display, or send full internal state to its owner. Add a source-owned rule/presentation query or a reusable explicit flow contract; the default card-state architecture guard enforces these boundaries.
 
 - Centralization`SpecialEffect.js`cardId dispatch and single card JS method. OA should retain typed pending/action flow.

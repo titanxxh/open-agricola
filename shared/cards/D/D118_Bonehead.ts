@@ -3,8 +3,13 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { getCardStack, pushToCardStack } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
+import type { ActionFlow, PlayerState } from '../../contract/types'
 
 const CARD_ID = 'D118_Bonehead'
+const takeWoodFlow = (player: PlayerState): ActionFlow | undefined => {
+  if (getCardStack(player, CARD_ID).length === 0) return
+  return { type: 'leaf', actionId: 'pop-card-stack', sourceCard: CARD_ID }
+}
 /**
  * After playing an occupation (occupation action), give 1 wood from stack.
  */
@@ -14,10 +19,10 @@ const afterOccupationListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['occupation'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    const stack = getCardStack(context.player, CARD_ID)
-    if (stack.length === 0) return
+    const flow = takeWoodFlow(context.player)
+    if (!flow) return
     return {
-      flow: { type: 'leaf', actionId: 'pop-card-stack', sourceCard: CARD_ID },
+      flow,
       sourceCard: CARD_ID,
     }
   },
@@ -32,10 +37,10 @@ const afterImprovementListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['improvement'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    const stack = getCardStack(context.player, CARD_ID)
-    if (stack.length === 0) return
+    const flow = takeWoodFlow(context.player)
+    if (!flow) return
     return {
-      flow: { type: 'leaf', actionId: 'pop-card-stack', sourceCard: CARD_ID },
+      flow,
       sourceCard: CARD_ID,
     }
   },
@@ -44,11 +49,12 @@ const afterImprovementListener: CardListenerRegistration = {
 const cardImpl = {
   listeners: [afterOccupationListener, afterImprovementListener],
   effect: {
-  id: CARD_ID,
-  onBuy: (_state, player) => {
-    pushToCardStack(player, CARD_ID, ['wood', 'wood', 'wood', 'wood', 'wood', 'wood'])
+    id: CARD_ID,
+    onBuy: (_state, player) => {
+      pushToCardStack(player, CARD_ID, ['wood', 'wood', 'wood', 'wood', 'wood', 'wood'])
+      return takeWoodFlow(player)
+    },
   },
-},
   reaches: [] as readonly string[],
 } satisfies CardImpl
 

@@ -9,6 +9,7 @@ import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { createWorkSession } from './_helpers/session-fixtures'
 import { expectWait } from './_helpers/trigger-select'
+import { choose, restoreSession, snapshotResponse } from './_helpers/card-play-lifecycle'
 
 describe('A055_JunkRoom session log dedupe', () => {
   it('logs Junk Room gain only once when playing a minor improvement', () => {
@@ -70,17 +71,17 @@ describe('A055 Junk Room after-reaction ordering', () => {
   const sessions: GameSession[] = []
   afterEach(() => sessions.splice(0).forEach((session) => session.dispose()))
 
-  const setup = () => {
+  const setup = (preplayed = false) => {
     const session = createWorkSession({
       seed: 1063,
       configure: (state) => {
         state.round = 14
-        state.players[0]!.minorHand = [CARD_ID]
-        state.players[0]!.minorPlayed = [UPHOLSTERY]
+        state.players[0]!.minorHand = [preplayed ? 'A037_Bucksaw' : CARD_ID]
+        state.players[0]!.minorPlayed = preplayed ? [UPHOLSTERY, CARD_ID] : [UPHOLSTERY]
         state.players[0]!.cardStates[UPHOLSTERY] = { counters: { reed: 0, bonusVp: 0 } }
         for (const [index, player] of state.players.entries()) {
           Object.assign(player.resources, { wood: 0, clay: 0, reed: 0, stone: 0, food: 0 })
-          if (index === 0) Object.assign(player.resources, { wood: 1, clay: 1, reed: 1 })
+          if (index === 0) Object.assign(player.resources, { wood: 1, clay: preplayed ? 0 : 1, reed: 1 })
         }
       },
     })
@@ -88,18 +89,18 @@ describe('A055 Junk Room after-reaction ordering', () => {
     return session
   }
 
-  const buyJunkRoom = (session: GameSession) => {
+  const buyJunkRoom = (session: GameSession, cardId = CARD_ID) => {
     let response = session.takeAction(0, 'major-improvement')
     expect(response.ok, response.error).toBe(true)
-    if (!response.state.players[0]!.minorPlayed.includes(CARD_ID)) {
+    if (!response.state.players[0]!.minorPlayed.includes(cardId)) {
       const wait = expectWait(response)
       expect(wait.interaction.request.kind).toBe('choice')
       const branch = wait.interaction.request.options?.find((option) => option.value.startsWith('action-improvement-'))
       if (branch) response = session.resolveChoice(0, branch.value)
     }
-    if (!response.state.players[0]!.minorPlayed.includes(CARD_ID)) {
+    if (!response.state.players[0]!.minorPlayed.includes(cardId)) {
       const wait = expectWait(response)
-      const card = wait.interaction.request.options?.find((option) => option.value === CARD_ID)
+      const card = wait.interaction.request.options?.find((option) => option.value === cardId)
       expect(card).toBeDefined()
       response = session.resolveChoice(0, card!.value)
     }
@@ -109,13 +110,37 @@ describe('A055 Junk Room after-reaction ordering', () => {
   const gainLogs = (response: SessionResponse) => response.state.log.filter((entry) =>
     entry.key === 'log.cardEffectGain' && entry.params?.cardId === CARD_ID)
 
-  it.each([CARD_ID, UPHOLSTERY])('lets the owner choose %s first and reconstructs the selection after undo', (first) => {
+  it('grants its own food in onBuy before another card reacts, including restore and undo', () => {
     const session = setup()
+    const before = snapshotResponse(session.getState())
+    let response: SessionResponse = buyJunkRoom(session)
+    expect(response.state.players[0]!.resources.food).toBe(1)
+    expect(response.interaction).toMatchObject({ stateId: 'wait', sourceCard: UPHOLSTERY, request: { kind: 'choice' } })
+    expect(response.interaction.request?.options?.some((option) => option.value === CARD_ID)).toBe(false)
+    const restored = restoreSession(session)
+    sessions.push(restored)
+    response = restored.getState()
+    if (response.interaction.stateId !== 'wait') throw new Error('Expected Upholstery choice')
+    const accept = response.interaction.request.options!.find((option) => option.value !== '__skip__')!
+    response = choose(restored, response, accept.value)
+    expect(response.state.players[0]!.resources.food).toBe(1)
+    response = restored.undoStep()
+    expect(response.ok).toBe(true)
+    expect(response.state.players[0]!.resources.food).toBe(1)
+    expect(response.interaction.request?.options?.some((option) => option.value === CARD_ID)).toBe(false)
+    response = choose(restored, response, '__skip__')
+    expect(response.state.players[0]!.resources.food).toBe(1)
+    expect(gainLogs(response)).toHaveLength(1)
+    expect(snapshotResponse(restored.undoAction())).toEqual(before)
+  })
+
+  it.each([CARD_ID, UPHOLSTERY])('lets the owner choose %s first and reconstructs the selection after undo', (first) => {
+    const session = setup(true)
     const before = session.getState()
     const resourcesBefore = { ...before.state.players[0]!.resources }
     const scoresBefore = structuredClone(before.scores)
     const logsBefore = structuredClone(before.state.log)
-    let response: SessionResponse = buyJunkRoom(session)
+    let response: SessionResponse = buyJunkRoom(session, 'A037_Bucksaw')
     expect(response.state.players[0]!.minorPlayed).toContain(CARD_ID)
     expect(response.state.players[0]!.resources).toMatchObject({ wood: 0, clay: 0, reed: 1, food: 0 })
     expect(gainLogs(response)).toEqual([])
@@ -186,13 +211,13 @@ describe('A055 Junk Room after-reaction ordering', () => {
     response = session.undoAction()
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources).toEqual(resourcesBefore)
-    expect(response.state.players[0]!.minorHand).toEqual([CARD_ID])
-    expect(response.state.players[0]!.minorPlayed).toEqual([UPHOLSTERY])
+    expect(response.state.players[0]!.minorHand).toEqual(['A037_Bucksaw'])
+    expect(response.state.players[0]!.minorPlayed).toEqual([UPHOLSTERY, CARD_ID])
     expect(response.state.players[0]!.cardStates[UPHOLSTERY]?.counters).toEqual({ reed: 0, bonusVp: 0 })
     expect(response.interaction.stateId).toBe('idle')
     expect(response.state.log).toEqual(logsBefore)
     expect(response.scores).toEqual(scoresBefore)
-    expect(buyJunkRoom(session).interaction.request.kind).toBe('select-trigger')
+    expect(buyJunkRoom(session, 'A037_Bucksaw').interaction.request.kind).toBe('select-trigger')
   })
 })
 

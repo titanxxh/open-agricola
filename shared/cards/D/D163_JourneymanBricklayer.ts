@@ -14,16 +14,6 @@ const CARD_ID = 'D163_JourneymanBricklayer'
  * "Renovates to stone" means the opponent's houseType is 'stone' after renovation.
  * "Builds stone room" means the opponent constructs while their houseType is 'stone'.
  */
-const onBuyListener: CardListenerRegistration = {
-  id: 'D163-journeyman-bricklayer-onbuy',
-  cardIds: [CARD_ID],
-  actions: ['occupation'],
-  phases: ['after' as ActionHookPhase],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (context.choice !== CARD_ID) return
-    return { flow: gainLeaf(CARD_ID, { stone: 2 }), sourceCard: CARD_ID }
-  },
-}
 
 const renovateListener: CardListenerRegistration = {
   id: 'D163-journeyman-bricklayer-opponent-renovate',
@@ -52,7 +42,11 @@ const constructListener: CardListenerRegistration = {
 }
 
 const cardImpl = {
-  listeners: [onBuyListener, renovateListener, constructListener],
+  effect: {
+    id: CARD_ID,
+    onBuy: () => gainLeaf(CARD_ID, { stone: 2 }),
+  },
+  listeners: [renovateListener, constructListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
 

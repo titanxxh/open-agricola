@@ -1,35 +1,12 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookPhase } from '../../actions/hooks'
 import type { CardCostCandidate } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { isMajorImprovementPlayable } from '../../actions/helpers/improvement-helpers'
 
 const CARD_ID = 'C095_BasketWeaver'
 const TARGET_MAJOR = 'Major_Basket'
-
-const onBuyListener: CardListenerRegistration = {
-  id: 'C95-basket-weaver-onbuy',
-  cardIds: [CARD_ID],
-  actions: ['occupation'],
-  phases: ['after' as ActionHookPhase],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (context.choice !== CARD_ID) return
-    if (!isMajorImprovementPlayable(context.state, context.player, TARGET_MAJOR, CARD_ID)) return
-    return {
-      flow: {
-        type: 'leaf',
-        actionId: 'improvement',
-        sourceCard: CARD_ID,
-        actionContext: { trueAction: false },
-        params: {
-          allowedPurchases: [TARGET_MAJOR],
-        },
-      },
-      sourceCard: CARD_ID,
-    }
-  },
-}
 
 const computeCostsListener: CardListenerRegistration = {
   id: 'C95-basket-weaver-compute-costs',
@@ -49,7 +26,20 @@ const computeCostsListener: CardListenerRegistration = {
 }
 
 const cardImpl = {
-  listeners: [onBuyListener, computeCostsListener],
+  effect: {
+    id: CARD_ID,
+    onBuy: (state, player) => {
+      if (!isMajorImprovementPlayable(state, player, TARGET_MAJOR, CARD_ID)) return
+      return {
+        type: 'leaf',
+        actionId: 'improvement',
+        sourceCard: CARD_ID,
+        actionContext: { trueAction: false },
+        params: { allowedPurchases: [TARGET_MAJOR] },
+      }
+    },
+  },
+  listeners: [computeCostsListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
 

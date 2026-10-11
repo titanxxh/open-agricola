@@ -1,6 +1,4 @@
 import { defineOccupationCard } from '../card-source'
-import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 
@@ -31,27 +29,16 @@ const buildTaskArtisanFlow = () => ({
   ],
 })
 
-const onBuyListener: CardListenerRegistration = {
-  id: 'A96-task-artisan-onbuy',
-  cardIds: [CARD_ID],
-  actions: ['occupation'],
-  phases: ['after' as ActionHookPhase],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (context.choice !== CARD_ID) return
-    return { flow: buildTaskArtisanFlow(), sourceCard: CARD_ID }
-  },
-}
-
 const cardImpl = {
-  listeners: [onBuyListener],
   effect: {
-  id: CARD_ID,
-  onRoundStart: (state, _player) => {
-    const revealedAction = state.roundActionOrder[state.round - 1]
-    if (revealedAction !== 'western-quarry' && revealedAction !== 'eastern-quarry') return
-    return buildTaskArtisanFlow()
+    id: CARD_ID,
+    onBuy: () => buildTaskArtisanFlow(),
+    onRoundStart: (state, _player) => {
+      const revealedAction = state.roundActionOrder[state.round - 1]
+      if (revealedAction !== 'western-quarry' && revealedAction !== 'eastern-quarry') return
+      return buildTaskArtisanFlow()
+    },
   },
-},
   reaches: [] as readonly string[],
 } satisfies CardImpl
 

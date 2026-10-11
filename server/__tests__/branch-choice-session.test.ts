@@ -34,7 +34,10 @@ describe('completion choice of a leaf selected through an XOR branch', () => {
       })
       registry.registerListener({
         id: `${CARD}:occupation-after`, cardIds: [CARD], phases: ['after'], actions: ['occupation'],
-        handler: (context) => { seen.push(context.choice); return undefined },
+        handler: (context) => {
+          seen.push(context.choice)
+          return { sourceCard: CARD, flow: { type: 'leaf', actionId: 'gain', sourceCard: CARD, params: { stone: 1 } } }
+        },
       })
     })
 
@@ -45,19 +48,13 @@ describe('completion choice of a leaf selected through an XOR branch', () => {
     expect(choiceOptions(response).map((option) => option.value)).toContain(PLAYED)
 
     response = session.resolveChoice(0, PLAYED)
-    // Field Merchant's on-play reaction is offered in the reaction menu.
-    const trigger = response.interaction.stateId === 'wait' && response.interaction.request.kind === 'select-trigger'
-      ? response.interaction.request.options.find((option) => option.value === PLAYED)
-      : undefined
-    expect(trigger).toBeDefined()
-    response = session.resolveChoice(0, trigger!.value)
-
+    expect(response.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'confirm-next-player' } })
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.occupationPlayed).toContain(PLAYED)
     // Listeners read the submitted card, not the branch that offered the action;
-    // Field Merchant's own on-play reward depends on it.
+    // Field Merchant's onBuy reward has already completed before this reaction.
     // Reaction previews also call the handler; every call sees the same choice.
     expect(new Set(seen)).toEqual(new Set([PLAYED]))
-    expect(response.state.players[0]!.resources).toMatchObject({ wood: 1, reed: 1, clay: 0 })
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 1, reed: 1, clay: 0, stone: 1 })
   })
 })

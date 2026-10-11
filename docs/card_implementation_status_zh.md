@@ -215,6 +215,8 @@ Issue #893 补充不改变固定槽身份的 Card Field 作物分层；播种提
 
 ## 8. 参考实现坏味道：不要照抄
 
+- 一次性自身打出效果不得用 `occupation` / `improvement.after` listener；文案要求成功打出或建造卡牌后生效时，不得提前监听 `pay.after`。自身生效用 `onBuy`，后续反应用已提交的 host 行动。
+
 通用消费者不得读取固定单卡的原始状态或提示键，不得枚举内部字段生成展示，也不得把完整内部状态发送给本人。应添加来源只读规则／展示查询或可复用的显式 flow 契约；默认 card-state 架构门禁检查这些边界。
 
 - 中心化 `SpecialEffect.js` cardId dispatch 和单卡 JS 方法。OA 应保留 typed pending/action flow。

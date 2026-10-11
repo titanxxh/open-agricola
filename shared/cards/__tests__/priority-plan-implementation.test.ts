@@ -229,27 +229,6 @@ describe('priority plan implementations', () => {
     expect(result.flow.children[1]).toMatchObject({ type: 'leaf', actionId: 'bonus-vp' })
   })
 
-  it('B103 Field Merchant gains wood and reed when played', () => {
-    const listener = findListener('B103-field-merchant-after-play')
-    const player = createPlayer()
-    player.occupationPlayed = ['B103_FieldMerchant']
-
-    const result = executeCardListener(listener!, {
-      state: createState(player),
-      player,
-      space: createSpace('occupation'),
-      actionId: 'occupation',
-      phase: 'after',
-      choice: 'B103_FieldMerchant',
-    } as unknown as CardListenerContext)
-
-    expect(result?.flow).toMatchObject({
-      type: 'leaf',
-      actionId: 'gain',
-      params: { wood: 1, reed: 1 },
-    })
-  })
-
   it('E101 Blighter blocks further occupation plays via isDoable', () => {
     const listener = findListener('E101-blighter-isdoable-occupation')
     const player = createPlayer()
@@ -265,29 +244,6 @@ describe('priority plan implementations', () => {
     } as unknown as CardListenerContext)
 
     expect(result?.doable).toBe(false)
-  })
-
-  it('E101 Blighter grants bonus VP when played', () => {
-    const listener = findListener('E101-blighter-after-play')
-    const player = createPlayer()
-    player.occupationPlayed = ['E101_Blighter']
-    const state = createState(player)
-    state.round = 8
-
-    const result = executeCardListener(listener!, {
-      state,
-      player,
-      space: createSpace('occupation'),
-      actionId: 'occupation',
-      phase: 'after',
-      choice: 'E101_Blighter',
-    } as unknown as CardListenerContext)
-
-    expect(result?.flow?.type).toBe('seq')
-    if (result?.flow?.type === 'seq') {
-      expect(result.flow.children).toHaveLength(3)
-      expect(result.flow.children.every((child) => child.type === 'leaf' && child.actionId === 'bonus-vp')).toBe(true)
-    }
   })
 
   it('B94 Stock Protector can make fencing doable with bonus wood', () => {

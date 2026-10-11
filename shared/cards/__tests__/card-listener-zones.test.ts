@@ -42,6 +42,44 @@ const makeState = (players: PlayerState[]): GameState => ({
 const makeSpace = (): ActionSpace => ({ id: 'test', resources: {} } as ActionSpace)
 
 describe('card listener zones', () => {
+  it.each(['after', 'immediatelyAfter'] as const)('excludes the newly played card from its own %s listeners', (phase) => {
+    const player = makePlayer({ occupationPlayed: ['X_TestCard', 'X_OldCard'] })
+    const context = { state: makeState([player]), player, space: makeSpace(), actionId: 'occupation',
+      phase, choice: 'X_TestCard' }
+    const listener: CardListenerRegistration = { id: 'self-play', cardIds: ['X_TestCard', 'X_OldCard'] }
+    expect(getMatchingListeners(context, [listener])).toMatchObject([{ cardId: 'X_OldCard' }])
+  })
+
+  it.each(['X_TestCard', 'minor:X_TestCard', 'major:X_TestCard'])('normalizes improvement choice %s for self exclusion', (choice) => {
+    const player = makePlayer({ minorPlayed: ['X_TestCard'] })
+    const context = { state: makeState([player]), player, space: makeSpace(), actionId: 'improvement',
+      phase: 'after' as const, choice }
+    expect(getMatchingListeners(context, [{ id: 'self-play', cardIds: ['X_TestCard'] }])).toEqual([])
+  })
+
+  it('keeps opponent and any owners eligible when the acting player just played the same card id', () => {
+    const player = makePlayer({ minorPlayed: ['X_TestCard'] })
+    const opponent = makePlayer({ id: 'p2', minorPlayed: ['X_TestCard'] })
+    const context = { state: makeState([player, opponent]), player, space: makeSpace(), actionId: 'improvement',
+      phase: 'after' as const, choice: 'X_TestCard' }
+    for (const scope of ['opponent', 'any'] as const) {
+      expect(getMatchingListeners(context, [{ id: `self-${scope}`, cardIds: ['X_TestCard'], scope }]))
+        .toMatchObject([{ cardId: 'X_TestCard', ownerPlayerId: 'p2' }])
+    }
+  })
+
+  it('preserves hand listeners, global listeners, before phases, and enclosing placement reactions', () => {
+    const player = makePlayer({ minorHand: ['X_TestCard'], minorPlayed: ['X_OldCard'] })
+    const context = { state: makeState([player]), player, space: makeSpace(), actionId: 'improvement',
+      phase: 'after' as const, choice: 'X_TestCard' }
+    expect(getMatchingListeners(context, [{ id: 'hand', cardIds: ['X_TestCard'], zones: ['hand'] }]))
+      .toMatchObject([{ ownerCardZone: 'hand' }])
+    expect(getMatchingListeners(context, [{ id: 'global' }])).toHaveLength(1)
+    player.minorPlayed.push('X_TestCard')
+    expect(getMatchingListeners({ ...context, phase: 'before' }, [{ id: 'before', cardIds: ['X_TestCard'] }])).toHaveLength(1)
+    expect(getMatchingListeners({ ...context, actionId: 'place-farmer' }, [{ id: 'outer', cardIds: ['X_TestCard'] }])).toHaveLength(1)
+  })
+
   it('keeps listeners played-only by default', () => {
     const player = makePlayer({ minorHand: ['X_TestCard'] })
     const context = {

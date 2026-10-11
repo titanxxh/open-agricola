@@ -3,16 +3,19 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payThenActionFlow } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { isMajorCardId } from '../helpers/card-type'
+import { getPlowableTiles } from '../../actions/effects/plow'
 
 const CARD_ID = 'E128_Saddler'
 const listener: CardListenerRegistration = {
-  id: 'E128-saddler-after-pay',
+  id: 'E128-saddler-after-improvement',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: ['pay'],
+  actions: ['improvement'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    const ctx = context as unknown as { costType?: string }
-    if (ctx.costType !== 'major-improvement') return
+    const cardId = context.choice?.replace(/^(?:major|minor):/, '')
+    if (!cardId || !isMajorCardId(cardId)) return
+    if (getPlowableTiles(context.player).length === 0) return
     return {
       ...payThenActionFlow({
         cardId: CARD_ID,

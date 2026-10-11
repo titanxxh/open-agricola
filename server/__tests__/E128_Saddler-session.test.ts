@@ -1,40 +1,27 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { setWorkersAtHome } from '../../shared/domain/player'
+import { createWorkSession } from './_helpers/session-fixtures'
+import { choose, playImprovement, restoreSession, snapshotResponse } from './_helpers/card-play-lifecycle'
 import { getAllTilePositions } from '../../shared/domain/farm'
 import type { ActionRegistry } from '../../shared/engine/registry'
 
 const CARD_ID = 'E128_Saddler'
 const MAJOR_ID = 'Major_Fireplace1'
 
+const sessions: GameSession[] = []
+afterEach(() => sessions.splice(0).forEach((session) => session.dispose()))
 const setup = (fullFarm = true) => {
-  const session = new GameSession(7128, undefined, { playerCount: 2 })
-  const state = session.getState().state
-  state.round = 14
-  state.roundPhase = 'work'
-  state.currentPlayerIndex = 0
-  state.availableMajorImprovements = [MAJOR_ID]
-  for (const space of state.actionSpaces) space.takenBy = []
-  for (const player of state.players) {
-    player.minorHand = ['__test_placeholder__']
-    player.occupationHand = ['__test_placeholder__']
-    player.minorPlayed = []
-    player.occupationPlayed = []
-    player.improvements = []
-    player.cardStates = {}
-    for (const resource of Object.keys(player.resources) as Array<keyof typeof player.resources>) {
-      player.resources[resource] = 0
-    }
-    setWorkersAtHome(state, player, 2)
-  }
-  const player = state.players[0]!
-  player.occupationPlayed = [CARD_ID]
-  player.resources.clay = 2
-  player.resources.food = 1
-  player.fields = (fullFarm ? getAllTilePositions() : [])
-    .filter((tile) => !player.roomTiles.some((room) => room.row === tile.row && room.col === tile.col))
-    .map((tile) => ({ ...tile, stacks: [] }))
-  session.loadState(state)
+  const session = createWorkSession({ seed: 9707, configure: (state) => {
+    state.round = 14
+    state.availableMajorImprovements = [MAJOR_ID]
+    const player = state.players[0]!
+    player.occupationPlayed = [CARD_ID]
+    Object.assign(player.resources, { wood: 0, clay: 2, reed: 0, stone: 0, food: 1, grain: 0 })
+    player.fields = (fullFarm ? getAllTilePositions() : [])
+      .filter((tile) => !player.roomTiles.some((room) => room.row === tile.row && room.col === tile.col))
+      .map((tile) => ({ ...tile, stacks: [] }))
+  } })
+  sessions.push(session)
   return session
 }
 
@@ -66,9 +53,10 @@ const acceptSaddler = (session: GameSession) => {
 }
 
 describe('E128 Saddler session', () => {
-  it('pays once, rejects an occupied tile, and completes the major after a legal plow', () => {
+  it('pays once, rejects an occupied tile, and plows after the major is already committed', () => {
     const session = setup(false)
     const pending = acceptSaddler(session)
+    expect(pending.state.players[0]!.improvements).toContain(MAJOR_ID)
     const tile = pending.interaction.request.farm.selectableTiles[0]!
     const invalid = session.commitSelectionChoice(0, { tile: session.state.players[0]!.roomTiles[0]! })
     expect(invalid.ok).toBe(false)
@@ -94,13 +82,11 @@ describe('E128 Saddler session', () => {
   it.each([false, true])('keeps a failed paid follow-up blocked until explicit undo, reconnect=%s', (reconnect) => {
     let session = setup(false)
     const pending = acceptSaddler(session)
+    expect(pending.state.players[0]!.improvements).toContain(MAJOR_ID)
     const tile = pending.interaction.request.farm.selectableTiles[0]!
     if (reconnect) {
-      const state = JSON.parse(JSON.stringify(session.state))
-      const cursor = session.createSessionPrivateCursor()
-      session = new GameSession(7128, undefined, { playerCount: 2 })
-      session.loadState(state)
-      session.restoreSessionPrivateCursor(cursor)
+      session = restoreSession(session)
+      sessions.push(session)
     }
     const registry = (session as unknown as { registry: ActionRegistry }).registry
     const plow = registry.get('plow')!
@@ -119,7 +105,7 @@ describe('E128 Saddler session', () => {
     expect(failed).toBe(true)
     expect(response.ok).toBe(false)
     expect(response.interaction.request.kind).toBe('engine-blocked')
-    expect(response.state.players[0]!.improvements).not.toContain(MAJOR_ID)
+    expect(response.state.players[0]!.improvements).toContain(MAJOR_ID)
     expect(response.state.players[0]!.resources).toMatchObject({ food: 0 })
     expect(response.state.players[0]!.fields).toHaveLength(0)
     const undone = session.undoAction(0)
@@ -130,51 +116,79 @@ describe('E128 Saddler session', () => {
 
   })
 
-  it.each(['none', 'accept', 'blocked', 'undo'])('blocks after paying for an impossible plow until undo, reconnect at %s', (point) => {
-    let session = setup()
-    const reconnect = () => {
-      const state = JSON.parse(JSON.stringify(session.state))
-      const cursor = session.createSessionPrivateCursor()
-      session = new GameSession(7128, undefined, { playerCount: 2 })
-      session.loadState(state)
-      session.restoreSessionPrivateCursor(cursor)
-    }
-    const offered = openSaddler(session)
-    if (point === 'accept') reconnect()
-    const accept = offered.interaction.request.options?.find((option) => option.value !== '__skip__' && !option.disabled)
-    expect(accept).toBeDefined()
-    let response = session.resolveChoice(0, accept!.value)
-    expect(response.ok, response.error).toBe(true)
-    expect(response.interaction.request.kind).toBe('engine-blocked')
-    expect(response.state.players[0]!.resources.food).toBe(0)
-    expect(response.state.players[0]!.improvements).not.toContain(MAJOR_ID)
-    if (point === 'blocked') reconnect()
-    response = session.undoStep(0)
-    expect(response.ok, response.error).toBe(true)
-    expect(response.interaction.promptKey).toBe('ui.interactionSaddlerPlow')
-    expect(response.state.players[0]!.resources.food).toBe(1)
-    if (point === 'undo') reconnect()
-    response = session.resolveChoice(0, '__skip__')
-    expect(response.ok, response.error).toBe(true)
-    expect(response.state.players[0]!.improvements).toContain(MAJOR_ID)
-    expect(response.state.availableMajorImprovements).not.toContain(MAJOR_ID)
-    expect(response.state.players[0]!.resources).toMatchObject({ clay: 0, food: 1 })
-    expect(response.state.players[0]!.fields).toHaveLength(13)
-    expect(response.interaction.request.kind).not.toBe('engine-blocked')
-  })
-  it('undoAction restores the entire purchase and placement after an impossible plow', () => {
+  it('does not offer a paid plow on a full farm and restores the completed purchase', () => {
     const session = setup()
-    const initial = JSON.parse(JSON.stringify(session.state))
-    const offered = openSaddler(session)
-    session.resolveChoice(0, offered.interaction.request.options!.find((option) => option.value !== '__skip__')!.value)
-    const response = session.undoAction(0)
-    expect(response.ok, response.error).toBe(true)
-    expect(response.state.players[0]!.resources).toEqual(initial.players[0].resources)
-    expect(response.state.players[0]!.fields).toEqual(initial.players[0].fields)
-    expect(response.state.players[0]!.cardStates).toEqual(initial.players[0].cardStates)
-    expect(response.state.players[0]!.improvements).not.toContain(MAJOR_ID)
+    const before = snapshotResponse(session.getState())
+    let response = playImprovement(session, MAJOR_ID)
+    expect(response.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'confirm-next-player' } })
+    expect(response.state.players[0]!.improvements).toContain(MAJOR_ID)
+    expect(response.state.players[0]!.resources).toMatchObject({ food: 1, clay: 0 })
+    expect(response.state.players[0]!.fields).toHaveLength(13)
+    expect(response.state.events.some((event) => event.type === 'resource.paid' && event.sourceCardId === CARD_ID)).toBe(false)
+    const restored = restoreSession(session)
+    sessions.push(restored)
+    expect(restored.getState().state.players[0]!.resources.food).toBe(1)
+    response = restored.undoAction()
+    expect(response.ok).toBe(true)
+    expect(snapshotResponse(response)).toEqual(before)
     expect(response.state.availableMajorImprovements).toContain(MAJOR_ID)
     expect(response.state.actionSpaces.find((space) => space.id === 'major-improvement')!.takenBy).toEqual([])
   })
 
+  it('recovers a paid plow pending, rejects illegal placement atomically, and can undo the entire purchase', () => {
+    const session = setup(false)
+    const before = snapshotResponse(session.getState())
+    const pending = acceptSaddler(session)
+    const events = pending.state.events
+    const major = events.find((event) => event.type === 'card.played' && event.cardId === MAJOR_ID)!
+    const food = events.filter((event) => event.type === 'resource.paid' && event.sourceCardId === CARD_ID)
+    expect(food).toHaveLength(1)
+    expect(food[0]!.seq).toBeGreaterThan(major.seq)
+    const restored = restoreSession(session)
+    sessions.push(restored)
+    const invalid = restored.commitSelectionChoice(0, { tile: restored.state.players[0]!.roomTiles[0]! })
+    expect(invalid.ok).toBe(false)
+    expect(invalid.state.players[0]!.resources.food).toBe(0)
+    expect(invalid.state.players[0]!.improvements).toContain(MAJOR_ID)
+    const response = restored.commitSelectionChoice(0, { tile: pending.interaction.request.farm.selectableTiles[0]! })
+    expect(response.ok).toBe(true)
+    expect(response.state.players[0]!.fields).toHaveLength(1)
+    expect(snapshotResponse(restored.undoAction())).toEqual(before)
+  })
+
+  it('does not react to a minor improvement purchase', () => {
+    const session = setup(false)
+    session.state.players[0]!.minorHand = ['A030_BakingSheet']
+    const response = playImprovement(session, 'A030_BakingSheet')
+    expect(response.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'confirm-next-player' } })
+    expect(response.state.players[0]!.resources.food).toBe(1)
+    expect(response.state.players[0]!.fields).toEqual([])
+  })
+
+  it('finishes the built Clay Oven onBuy before offering Saddler, then restores and plows once', () => {
+    const session = setup(false)
+    const oven = 'Major_ClayOven'
+    session.state.availableMajorImprovements = [oven]
+    Object.assign(session.state.players[0]!.resources, { clay: 3, stone: 1, food: 10, grain: 1 })
+    const before = snapshotResponse(session.getState())
+    let response = playImprovement(session, oven)
+    expect(response.state.players[0]!.improvements).toContain(oven)
+    expect(response.interaction).toMatchObject({ stateId: 'wait', sourceCard: oven, request: { kind: 'choice' } })
+    expect(response.state.events.some((event) => event.type === 'resource.paid' && event.sourceCardId === CARD_ID)).toBe(false)
+    response = choose(session, response, '__skip__')
+    expect(response.interaction).toMatchObject({ stateId: 'wait', sourceCard: CARD_ID, request: { kind: 'choice' } })
+    const restored = restoreSession(session)
+    sessions.push(restored)
+    response = restored.getState()
+    if (response.interaction.stateId !== 'wait') throw new Error('Expected Saddler optional plow')
+    const accept = response.interaction.request.options!.find((option) => option.value !== '__skip__')!
+    response = choose(restored, response, accept.value)
+    if (response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'farm-select') throw new Error('Expected plow')
+    expect(response.state.players[0]!.improvements).toContain(oven)
+    response = restored.commitSelectionChoice(0, { tile: response.interaction.request.farm.selectableTiles[0]! })
+    expect(response.ok).toBe(true)
+    expect(response.state.players[0]!.resources).toMatchObject({ clay: 0, stone: 0, food: 9, grain: 1 })
+    expect(response.state.players[0]!.fields).toHaveLength(1)
+    expect(snapshotResponse(restored.undoAction())).toEqual(before)
+  })
 })

@@ -16,32 +16,24 @@ const isDoableListener: CardListenerRegistration = {
   },
 }
 
-const onPlayListener: CardListenerRegistration = {
-  id: 'E101-blighter-after-play',
-  cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
-  actions: ['occupation'],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (context.choice !== CARD_ID) return
-    const remainingTurns = Math.max(0, 14 - context.state.round)
-    const bonusVp = SCORE_MAP[remainingTurns] ?? 5
-    if (bonusVp <= 0) return
-    return {
-      flow: {
+const cardImpl = {
+  effect: {
+    id: CARD_ID,
+    onBuy: (state) => {
+      const remainingTurns = Math.max(0, 14 - state.round)
+      const bonusVp = SCORE_MAP[remainingTurns] ?? 5
+      if (bonusVp <= 0) return
+      return {
         type: 'seq',
         children: Array.from({ length: bonusVp }, () => ({
           type: 'leaf' as const,
           actionId: 'bonus-vp',
           sourceCard: CARD_ID,
         })),
-      },
-      sourceCard: CARD_ID,
-    }
+      }
+    },
   },
-}
-
-const cardImpl = {
-  listeners: [isDoableListener, onPlayListener],
+  listeners: [isDoableListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
 

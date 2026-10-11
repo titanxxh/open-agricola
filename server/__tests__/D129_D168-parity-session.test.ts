@@ -483,7 +483,7 @@ describe('D163 Journeyman Bricklayer parity', () => {
       cardId: 'D163_JourneymanBricklayer', played: false, playerCount: 4,
     }), 'D163_JourneymanBricklayer')
     expect(response.state.players[0]!.occupationPlayed).toContain('D163_JourneymanBricklayer')
-    expect(response.state.players[0]!.resources.stone).toBe(0)
+    expect(response.state.players[0]!.resources.stone).toBe(2)
   })
 
   it('D163 S2: an opponent renovating to stone gives the owner one stone', () => {

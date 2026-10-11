@@ -1,49 +1,23 @@
-import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game/authoritative-session'
-import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
-import { setWorkersAtHome } from '../../shared/domain/player'
-import { C095_BasketWeaver } from '../../shared/cards/C/C095_BasketWeaver'
-import { occupations } from '../../shared/cards/_lookup'
+import { afterEach, describe, expect, it } from 'vitest'
+import { type GameSession } from '../game/authoritative-session'
+import { createWorkSession } from './_helpers/session-fixtures'
 
 const CARD_ID = 'C095_BasketWeaver'
 const BASKET = 'Major_Basket'
 const FILLER = '__test_placeholder__'
 
-if (!occupations.some((card) => card.id === CARD_ID)) occupations.push(C095_BasketWeaver)
-
-const setup = ({ reed = 1, stone = 1, basketAvailable = true } = {}) => {
-  const session = new GameSession(5095, undefined, { playerCount: 2 })
-  stabilizeRandomHands(session.state.players)
-  const state = session.getState().state
-  state.currentPlayerIndex = 0
-  state.round = 1
-  state.players.forEach((player, index) => {
-    setWorkersAtHome(state, player, index === 0 ? 2 : 0)
-    player.minorHand = [FILLER]
-    player.occupationHand = [FILLER]
-    player.minorPlayed = []
-    player.occupationPlayed = []
-    player.improvements = []
-    player.cardStates = {}
-    player.resources = {
-      ...player.resources, wood: 0, clay: 0, reed: 0, stone: 0, food: 20, grain: 0,
-      vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
-    }
-  })
-  const owner = state.players[0]!
-  owner.occupationHand = [CARD_ID, FILLER]
-  owner.resources.food = 0
-  owner.resources.reed = reed
-  owner.resources.stone = stone
-  if (basketAvailable) {
-    if (!state.availableMajorImprovements.includes(BASKET)) {
-      state.availableMajorImprovements.push(BASKET)
-    }
-  } else {
-    state.availableMajorImprovements = state.availableMajorImprovements
-      .filter((id) => id !== BASKET)
-  }
-  session.loadState(state)
+const sessions: GameSession[] = []
+afterEach(() => sessions.splice(0).forEach((session) => session.dispose()))
+const setup = ({ reed = 1, stone = 1, basketAvailable = true, paid = false } = {}) => {
+  const session = createWorkSession({ seed: 9707, configure: (state) => {
+    const owner = state.players[0]!
+    owner.occupationHand = [CARD_ID, FILLER]
+    owner.occupationPlayed = paid ? ['A125_Priest'] : []
+    Object.assign(owner.resources, { wood: 0, clay: 0, food: paid ? 1 : 0, reed, stone })
+    state.availableMajorImprovements = basketAvailable ? [BASKET] : ['Major_Fireplace1']
+    if (!basketAvailable) state.players[1]!.improvements = [BASKET]
+  } })
+  sessions.push(session)
   return session
 }
 
@@ -60,31 +34,34 @@ const playBasketWeaver = (session: GameSession) => {
   return response
 }
 
-const resolveBasketWeaverTrigger = (session: GameSession, response: SessionResponse) => {
-  expect(response.interaction.stateId).toBe('wait')
-  if (response.interaction.stateId !== 'wait') return response
-  expect(response.interaction.request.kind).toBe('select-trigger')
-  const trigger = response.interaction.request.options?.find((option) => option.value === CARD_ID)
-  expect(trigger, JSON.stringify(response.interaction)).toBeDefined()
-  return session.resolveChoice(response.interaction.playerIndex, trigger!.value)
-}
-
-const acceptBasketBuild = resolveBasketWeaverTrigger
-
 describe('C095 Basket Weaver parity', () => {
   it('C095 S1: with exactly one reed and one stone resolves the immediate Basket build', () => {
     const session = setup()
-    const response = acceptBasketBuild(session, playBasketWeaver(session))
+    const response = playBasketWeaver(session)
 
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.occupationPlayed).toContain(CARD_ID)
     expect(response.state.players[0]!.improvements).toContain(BASKET)
     expect(response.state.players[0]!.resources).toMatchObject({ reed: 0, stone: 0 })
+    expect(response.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'confirm-next-player' } })
+    const events = response.state.events
+    const occupation = events.find((event) => event.type === 'card.played' && event.cardId === CARD_ID)!
+    const fee = events.find((event) => event.type === 'resource.paid' && event.sourceCardId === BASKET)!
+    const basket = events.find((event) => event.type === 'card.played' && event.cardId === BASKET)!
+    expect(fee.seq).toBeGreaterThan(occupation.seq)
+    expect(basket.seq).toBeGreaterThan(fee.seq)
+    const undone = session.undoAction()
+    expect(undone.ok).toBe(true)
+    expect(undone.state.players[0]!.occupationHand).toContain(CARD_ID)
+    expect(undone.state.players[0]!.improvements).not.toContain(BASKET)
+    expect(undone.state.availableMajorImprovements).toContain(BASKET)
+    expect(undone.state.players[0]!.resources).toMatchObject({ reed: 1, stone: 1 })
+    expect(playBasketWeaver(session).state.players[0]!.improvements.filter((id) => id === BASKET)).toHaveLength(1)
   })
 
   it('C095 S2: with two reed and two stone resolves a selected Basket payment', () => {
     const session = setup({ reed: 2, stone: 2 })
-    const response = acceptBasketBuild(session, playBasketWeaver(session))
+    const response = playBasketWeaver(session)
 
     expect(response.state.players[0]!.improvements).toContain(BASKET)
     expect(response.state.players[0]!.resources).toMatchObject({ reed: 1, stone: 1 })
@@ -117,11 +94,24 @@ describe('C095 Basket Weaver parity', () => {
 
   it('C095 S5: an affordable immediate build cannot be declined', () => {
     const session = setup()
-    const response = resolveBasketWeaverTrigger(session, playBasketWeaver(session))
+    const response = playBasketWeaver(session)
     expect(response.state.players[0]!.improvements).toContain(BASKET)
     expect(response.state.players[0]!.resources).toMatchObject({ reed: 0, stone: 0 })
     const rejected = session.resolveChoice(0, '__skip__')
     expect(rejected.ok).toBe(false)
     expect(rejected.state.players[0]!.improvements).toContain(BASKET)
   })
+  it('uses the post-occupation-payment state and pays for Basket only after occupation commitment', () => {
+    const response = playBasketWeaver(setup({ paid: true }))
+    expect(response.ok).toBe(true)
+    expect(response.state.players[0]!.resources).toMatchObject({ food: 0, reed: 0, stone: 0 })
+    expect(response.state.players[0]!.improvements).toEqual([BASKET])
+    const events = response.state.events
+    const occupationFee = events.find((event) => event.type === 'resource.paid' && event.sourceCardId === CARD_ID)!
+    const occupation = events.find((event) => event.type === 'card.played' && event.cardId === CARD_ID)!
+    const basketFee = events.find((event) => event.type === 'resource.paid' && event.sourceCardId === BASKET)!
+    expect(occupation.seq).toBeGreaterThan(occupationFee.seq)
+    expect(basketFee.seq).toBeGreaterThan(occupation.seq)
+  })
+
 })

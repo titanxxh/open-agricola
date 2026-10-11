@@ -1,20 +1,23 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { sumResourcePaid } from '../helpers/event-provenance'
+import { sumActualPaidResource } from '../helpers/event-provenance'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C116_FurnitureMaker'
-const afterPayListener: CardListenerRegistration = {
-  id: 'C116-furniture-maker-after-pay',
+const afterOccupationListener: CardListenerRegistration = {
+  id: 'C116-furniture-maker-after-occupation',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: ['pay'],
+  actions: ['occupation'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (!context.choice || context.choice === CARD_ID) return
     const events = context.actionEvents ?? context.transactionEvents
-    const foodPaid = sumResourcePaid(events, 'food', (event) =>
-      event.paymentFor === 'occupation' && event.sourceCardId !== CARD_ID,
+    const foodPaid = sumActualPaidResource(events, 'food', (event) =>
+      event.paymentFor === 'occupation'
+      && event.sourceCardId === context.choice
+      && event.actorPlayerId === (context.triggerPlayer ?? context.player).id,
     )
     if (foodPaid <= 0) return
     return { flow: gainLeaf(CARD_ID, { wood: foodPaid }), sourceCard: CARD_ID }
@@ -22,7 +25,7 @@ const afterPayListener: CardListenerRegistration = {
 }
 
 const cardImpl = {
-  listeners: [afterPayListener],
+  listeners: [afterOccupationListener],
   effect: {
     id: CARD_ID,
     onBuy: () => gainLeaf(CARD_ID, { wood: 1 }),

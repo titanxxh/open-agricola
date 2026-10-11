@@ -8,7 +8,6 @@ import { storePendingFenceBonus } from '../helpers/pending-fence-bonus'
 import { A068_AsparagusGift_impl } from '../A/A068_AsparagusGift'
 import { A073_AgriculturalFertilizers_impl } from '../A/A073_AgriculturalFertilizers'
 import { A092_AdoptiveParents_impl } from '../A/A092_AdoptiveParents'
-import { B018_GrasslandHarrow_impl } from '../B/B018_GrasslandHarrow'
 import { B034_SpecialFood_impl } from '../B/B034_SpecialFood'
 import { B076_Ceilings_impl } from '../B/B076_Ceilings'
 import { C048_Farmstead_impl } from '../C/C048_Farmstead'
@@ -362,25 +361,6 @@ describe('listener purity wave 2b/c', () => {
 
     expectUnchanged(before, game)
     expect(flow?.type).toBe('xor')
-  })
-
-  it('B18 GrasslandHarrow queues target round and future meeple lazily', () => {
-    const p = player('B018_GrasslandHarrow', {
-      resources: resource({ wood: 2, clay: 1 }),
-    })
-    const game = state([p], { round: 4 })
-    const before = stateSnapshot(game)
-
-    const result = listenerById(B018_GrasslandHarrow_impl.listeners, 'B18-grassland-harrow-after-pay')
-      .handler(context(p, { state: game, actionId: 'pay', phase: 'after', sourceCard: 'B018_GrasslandHarrow' }))
-
-    expectUnchanged(before, game)
-    expect(result?.flow).toMatchObject({
-      type: 'leaf',
-      actionId: 'future-meeples',
-      sourceCard: 'B018_GrasslandHarrow',
-      params: { __futureMeepleRequest: { cardId: 'B018_GrasslandHarrow', playerId: p.id } },
-    })
   })
 
   it('B34 SpecialFood before-collect stores animal snapshot by flow only', () => {

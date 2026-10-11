@@ -1,8 +1,8 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
+import { createWorkSession } from './_helpers/session-fixtures'
+import { choose, playOccupation, restoreSession, snapshotResponse } from './_helpers/card-play-lifecycle'
 import { setWorkersAtHome } from '../../shared/domain/player'
-import { executeCardListener, getRegisteredCardListeners, type CardListenerContext } from '../../shared/cards/card-listeners'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 
 import '../../shared/cards/register-all'
@@ -12,27 +12,14 @@ import '../../shared/cards/A/A123_FrameBuilder'
 
 const CARD_ID = 'C116_FurnitureMaker'
 
-const paidEvent = (resources: Record<string, number>, sourceCardId: string) => ({
-  type: 'resource.paid',
-  resources,
-  paymentFor: 'occupation',
-  sourceCardId,
-})
-
-const findAfterPayListener = () => {
-  const listener = getRegisteredCardListeners().find((l) => l.id === 'C116-furniture-maker-after-pay')
-  if (!listener) throw new Error('C116 after-pay listener missing')
-  return listener
-}
-
+const sessions: GameSession[] = []
+afterEach(() => sessions.splice(0).forEach((session) => session.dispose()))
 const setupBase = (playerCount = 2) => {
-  const session = new GameSession(undefined, undefined, { playerCount })
-  stabilizeRandomHands(session.state.players)
-  const state = session.getState().state
-  state.currentPlayerIndex = 0
-  state.round = 5
-  state.roundPhase = 'work'
-  return { session, state }
+  const session = createWorkSession({ seed: 9707, options: { playerCount }, configure: (state) => {
+    state.round = 5
+  } })
+  sessions.push(session)
+  return { session, state: session.state }
 }
 
 const playLessons = (
@@ -60,82 +47,7 @@ const playLessons = (
   return resp
 }
 
-describe('C116 FurnitureMaker — actions:[\'pay\'] migration', () => {
-  it('listener reads occupation food from resource.paid events without legacy result payload', () => {
-    const { state } = setupBase()
-    const player = state.players[0]!
-    player.occupationPlayed = [CARD_ID]
-    const result = { type: 'ok' as const }
-
-    expect('resourcesPaid' in result).toBe(false)
-    expect('extraData' in result).toBe(false)
-
-    const listenerResult = executeCardListener(findAfterPayListener(), {
-      state,
-      player,
-      space: { id: 'lessons' },
-      actionId: 'pay',
-      phase: 'after',
-      sourceCard: 'A123_FrameBuilder',
-      result,
-      transactionEvents: [paidEvent({ food: 2 }, 'A123_FrameBuilder')],
-    } as unknown as CardListenerContext)
-
-    expect(listenerResult?.flow).toEqual({
-      type: 'leaf',
-      actionId: 'gain',
-      params: { wood: 2 },
-      sourceCard: CARD_ID,
-    })
-  })
-
-  it('listener only counts current actionEvents when transaction has prior occupation food', () => {
-    const { state } = setupBase()
-    const player = state.players[0]!
-    player.occupationPlayed = [CARD_ID]
-
-    const listenerResult = executeCardListener(findAfterPayListener(), {
-      state,
-      player,
-      space: { id: 'lessons' },
-      actionId: 'pay',
-      phase: 'after',
-      sourceCard: 'A123_FrameBuilder',
-      result: { type: 'ok' },
-      transactionEvents: [
-        paidEvent({ food: 4 }, 'A123_FrameBuilder'),
-        paidEvent({ food: 2 }, 'A123_FrameBuilder'),
-      ],
-      actionEvents: [paidEvent({ food: 2 }, 'A123_FrameBuilder')],
-    } as unknown as CardListenerContext)
-
-    expect(listenerResult?.flow).toEqual({
-      type: 'leaf',
-      actionId: 'gain',
-      params: { wood: 2 },
-      sourceCard: CARD_ID,
-    })
-  })
-
-  it('listener excludes food paid by FurnitureMaker itself via resource.paid sourceCardId', () => {
-    const { state } = setupBase()
-    const player = state.players[0]!
-    player.occupationPlayed = [CARD_ID]
-    const result = { type: 'ok' as const }
-
-    const listenerResult = executeCardListener(findAfterPayListener(), {
-      state,
-      player,
-      space: { id: 'lessons' },
-      actionId: 'pay',
-      phase: 'after',
-      result,
-      transactionEvents: [paidEvent({ food: 2 }, CARD_ID)],
-    } as unknown as CardListenerContext)
-
-    expect(listenerResult).toBeUndefined()
-  })
-
+describe('C116 Furniture Maker after occupation commitment', () => {
   it('case 1: lessons cost 1 food → +1 wood', () => {
     const { session, state } = setupBase()
     const player = state.players[0]!
@@ -217,8 +129,7 @@ describe('C116 FurnitureMaker — actions:[\'pay\'] migration', () => {
     const resp = playLessons(session, 'lessons', CARD_ID)
     expect(resp.state.players[0]!.occupationPlayed).toContain(CARD_ID)
     // Lessons cost 0 food (first occupation), C116 itself onBuy gives 1 wood
-    // (defined on the card). Furniture-maker after-pay listener should NOT
-    // double-fire from the same occupation pay step.
+    // (defined on the card). Its after listener excludes its own play.
     expect(resp.state.players[0]!.resources.wood).toBe(1)
   })
 
@@ -235,4 +146,55 @@ describe('C116 FurnitureMaker — actions:[\'pay\'] migration', () => {
     expect(resp.state.players[0]!.occupationPlayed).toContain('A123_FrameBuilder')
     expect(resp.state.players[0]!.resources.wood).toBe(0)
   })
+  it('commits the occupation before rewarding its food cost, and restores the complete action', () => {
+    const { session, state } = setupBase()
+    const player = state.players[0]!
+    player.occupationPlayed = [CARD_ID]
+    player.occupationHand = ['A125_Priest']
+    Object.assign(player.resources, { wood: 4, food: 10 })
+    session.loadState(state)
+    const before = snapshotResponse(session.getState())
+    const response = playOccupation(session, 'A125_Priest')
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 5, food: 9 })
+    const played = response.state.events.find((event) => event.type === 'card.played' && event.cardId === 'A125_Priest')!
+    const gain = response.state.events.filter((event) => event.type === 'resource.moved' && event.sourceCardId === CARD_ID)
+    expect(gain).toHaveLength(1)
+    expect(gain[0]!.seq).toBeGreaterThan(played.seq)
+    const restored = restoreSession(session)
+    sessions.push(restored)
+    expect(restored.getState().state.players[0]!.resources.wood).toBe(5)
+    const undone = restored.undoAction()
+    expect(undone.ok).toBe(true)
+    expect(snapshotResponse(undone)).toEqual(before)
+    expect(playOccupation(restored, 'A125_Priest').state.players[0]!.resources.wood).toBe(5)
+  })
+
+  it('counts each nested occupation payment once and recovers the outer onBuy choice', () => {
+    const { session, state } = setupBase()
+    const player = state.players[0]!
+    player.occupationPlayed = [CARD_ID, 'A085_Homekeeper']
+    player.occupationHand = ['E097_Beneficiary', 'A114_SeasonalWorker']
+    Object.assign(player.resources, { wood: 0, food: 10 })
+    session.loadState(state)
+    const before = snapshotResponse(session.getState())
+    let response = playOccupation(session, 'E097_Beneficiary')
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 0, food: 9 })
+    expect(response.state.players[0]!.occupationPlayed).toContain('E097_Beneficiary')
+    expect(response.interaction).toMatchObject({ stateId: 'wait', sourceCard: 'E097_Beneficiary', request: { kind: 'choice' } })
+    const restored = restoreSession(session)
+    sessions.push(restored)
+    response = restored.getState()
+    if (response.interaction.stateId !== 'wait') throw new Error('Expected the Beneficiary occupation action')
+    const accept = response.interaction.request.options!.find((option) => option.value !== '__skip__')!
+    response = choose(restored, response, accept.value)
+    expect(response.state.players[0]!.occupationPlayed).toContain('A114_SeasonalWorker')
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 2, food: 8 })
+    const events = response.state.events
+    expect(events.filter((event) => event.type === 'resource.moved' && event.sourceCardId === CARD_ID)).toHaveLength(2)
+    for (const cardId of ['E097_Beneficiary', 'A114_SeasonalWorker']) {
+      expect(events.filter((event) => event.type === 'resource.paid' && event.paymentFor === 'occupation' && event.sourceCardId === cardId)).toHaveLength(1)
+    }
+    expect(snapshotResponse(restored.undoAction())).toEqual(before)
+  })
+
 })

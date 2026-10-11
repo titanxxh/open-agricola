@@ -3,9 +3,21 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { countTriggerCardsAs } from '../helpers/trigger-snapshot'
 import type { CardImpl } from '../registry'
+import type { ActionFlow } from '../../contract/types'
+import { collectCardsAs } from '../helpers/card-type'
 
 const CARD_ID = 'E089_Stallwright'
 const TRIGGER_COUNTS = new Set([2, 3, 5, 7])
+const stableFlow = (occupationCount: number): ActionFlow | undefined => {
+  if (!TRIGGER_COUNTS.has(occupationCount)) return
+  return {
+    type: 'leaf',
+    actionId: 'stables',
+    optional: true,
+    sourceCard: CARD_ID,
+    actionContext: { max: 1, exactCost: { max: 1 }, trueAction: false },
+  }
+}
 
 const listener: CardListenerRegistration = {
   id: 'E89-stallwright-after-occupation',
@@ -13,16 +25,10 @@ const listener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['occupation'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    const n = countTriggerCardsAs(context, context.player, 'occupation')
-    if (!TRIGGER_COUNTS.has(n)) return
+    const flow = stableFlow(countTriggerCardsAs(context, context.player, 'occupation'))
+    if (!flow) return
     return {
-      flow: {
-        type: 'leaf',
-        actionId: 'stables',
-        optional: true,
-        sourceCard: CARD_ID,
-        actionContext: { max: 1, exactCost: { max: 1 }, trueAction: false },
-      },
+      flow,
       sourceCard: CARD_ID,
     }
   },
@@ -30,6 +36,10 @@ const listener: CardListenerRegistration = {
 
 const cardImpl = {
   listeners: [listener],
+  effect: {
+    id: CARD_ID,
+    onBuy: (_state, player) => stableFlow(collectCardsAs(player, 'occupation').length),
+  },
   reaches: [] as readonly string[],
 } satisfies CardImpl
 

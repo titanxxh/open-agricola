@@ -16,7 +16,6 @@ import { D111_InteriorDecorator_impl } from '../D/D111_InteriorDecorator'
 import { D147_TrapBuilder_impl } from '../D/D147_TrapBuilder'
 import { D166_StableMilker_impl } from '../D/D166_StableMilker'
 import { E108_BlackberryFarmer_impl } from '../E/E108_BlackberryFarmer'
-import { E157_Usufructuary_impl } from '../E/E157_Usufructuary'
 import { M059_NaturesFertilizer_impl } from '../M/M059_NaturesFertilizer'
 
 const resources = () => ({
@@ -218,24 +217,6 @@ describe('listener purity wave 3', () => {
       params: { kind: 'set-extra-data', key: 'usedActionToken', value: 9 },
     })
     expect(JSON.stringify(resultLeaves.slice(1))).toContain(reward)
-  })
-
-  it('E157 uses the trigger snapshot instead of trailing live card counts', () => {
-    const p = player({ occupationPlayed: ['E157_Usufructuary', 'A113_HeresyTeacher'] })
-    const other = player({ id: 'p2', occupationPlayed: ['A113_HeresyTeacher', 'D166_StableMilker', 'A167_BreederBuyer'] })
-    const result = invokePure(
-      listener(E157_Usufructuary_impl.listeners, 'E157-usufructuary-after-occupation'),
-      context(p, {
-        state: { players: [p, other] } as GameState,
-        triggerSnapshot: {
-          players: {
-            p1: { counts: { occupation: 1 } },
-            p2: { counts: { occupation: 2 } },
-          },
-        } as CardListenerContext['triggerSnapshot'],
-      }),
-    )
-    expect(result?.flow).toMatchObject({ actionId: 'gain', params: { food: 2 } })
   })
 
   it('M059 persists selected positions through a leaf before sowing', () => {

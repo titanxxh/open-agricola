@@ -51,11 +51,6 @@ const allowedContextResultUses = {
     expectedContextResultReferences: 2,
     expectedResultPaths: ['request', 'request.kind', 'type'],
   },
-  'shared/cards/B/B018_GrasslandHarrow.ts': {
-    reason: 'after-pay ok guard; resource facts come from state reserve',
-    expectedContextResultReferences: 1,
-    expectedResultPaths: ['type'],
-  },
   'shared/cards/C/C148_MudWallower.ts': {
     reason: 'after-pay ok guard; boar payment facts come from resource.paid events',
     expectedContextResultReferences: 1,
@@ -502,28 +497,6 @@ function hasResultStringComparison(
   return found
 }
 
-function hasContextSourceCardGuard(sourceFile: ts.SourceFile): boolean {
-  const aliases = collectAliases(sourceFile)
-  let found = false
-
-  forEachNode(sourceFile, (node) => {
-    if (!ts.isBinaryExpression(node) || node.operatorToken.kind !== ts.SyntaxKind.ExclamationEqualsEqualsToken) return
-    const left = unwrapExpression(node.left)
-    const right = unwrapExpression(node.right)
-    if (
-      (ts.isPropertyAccessExpression(left) || ts.isElementAccessExpression(left)) &&
-      accessPropertyName(left) === 'sourceCard' &&
-      isContextExpression(left.expression, aliases) &&
-      ts.isIdentifier(right) &&
-      right.text === 'CARD_ID'
-    ) {
-      found = true
-    }
-  })
-
-  return found
-}
-
 function hasCallWithStringArg(sourceFile: ts.SourceFile, functionName: string, value: string): boolean {
   let found = false
 
@@ -556,17 +529,6 @@ const requiredShapeChecks = {
       label: 'guards choice request kind',
       check: (sourceFile) =>
         hasResultStringComparison(sourceFile, 'request.kind', ts.SyntaxKind.ExclamationEqualsEqualsToken, 'choice'),
-    },
-  ],
-  'shared/cards/B/B018_GrasslandHarrow.ts': [
-    {
-      label: 'guards own source card',
-      check: hasContextSourceCardGuard,
-    },
-    {
-      label: 'guards ok result',
-      check: (sourceFile) =>
-        hasResultStringComparison(sourceFile, 'type', ts.SyntaxKind.ExclamationEqualsEqualsToken, 'ok'),
     },
   ],
   'shared/cards/C/C148_MudWallower.ts': [

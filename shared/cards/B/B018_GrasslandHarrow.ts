@@ -1,51 +1,34 @@
 import { defineMinorCard } from '../card-source'
-import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
-import type { Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B018_GrasslandHarrow'
 const BUILDING_RESOURCES = ['wood', 'clay', 'stone', 'reed'] as const
 
-const afterPayListener: CardListenerRegistration = {
-  id: 'B18-grassland-harrow-after-pay',
-  phases: ['after' as ActionHookPhase],
-  actions: ['pay'],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (context.sourceCard !== CARD_ID) return
-    const result = context.result
-    if (!result || result.type !== 'ok') return
-    const supply = context.player.resources as Resource
-    const reserve = BUILDING_RESOURCES.reduce(
-      (total, resource) => total + (supply[resource] ?? 0),
-      0,
-    )
-    if (reserve <= 0) return
-    const targetRound = context.state.round + reserve
-    if (targetRound > 14) return
-    return {
-      sourceCard: CARD_ID,
-      flow: {
-        ...futureMeeplesNode({
-          cardId: CARD_ID,
-          playerId: context.player.id,
-          entries: [{ round: targetRound, resources: { field: 1 } }],
-        }),
-        sourceCard: CARD_ID,
-      },
-    }
-  },
-}
 
 const cardImpl = {
-  listeners: [afterPayListener],
   getBaseCosts: () => ({
     fee: { wood: 2 },
     resourceReserve: { resources: BUILDING_RESOURCES, minimum: 1 },
   }),
   effect: {
     id: CARD_ID,
+    onBuy: (state, player) => {
+      const reserve = BUILDING_RESOURCES.reduce(
+        (total, resource) => total + player.resources[resource],
+        0,
+      )
+      const targetRound = state.round + reserve
+      if (reserve <= 0 || targetRound > 14) return
+      return {
+        ...futureMeeplesNode({
+          cardId: CARD_ID,
+          playerId: player.id,
+          entries: [{ round: targetRound, resources: { field: 1 } }],
+        }),
+        sourceCard: CARD_ID,
+      }
+    },
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl
