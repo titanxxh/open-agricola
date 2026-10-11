@@ -218,19 +218,10 @@
   color: var(--color-text-muted);
 }
 
-.bug-report-connect,
-.bug-report-success a {
-  justify-self: start;
-  color: var(--color-primary);
-  font-weight: 700;
-}
-
 .bug-report-connect {
-  padding: 0;
-  border: 0;
-  background: none;
-  cursor: pointer;
-  font: inherit;
+  justify-self: start;
+  min-height: 44px;
+  min-width: 132px;
 }
 
 .bug-report-actions {
@@ -243,6 +234,9 @@
 }
 
 .bug-report-success a {
+  justify-self: start;
+  color: var(--color-primary);
+  font-weight: 700;
   padding: 12px;
   border: 1px solid var(--color-accent);
   border-radius: var(--radius-sm);
