@@ -172,7 +172,7 @@ OpenRouter 不在 provider 级别声明 `chat` / `image` 兜底能力；每个�
 
 #### C1.4 质量与成本验收
 
-模型逐个通过浏览器工具往返及现有固定卡牌测试后开放。`tests/llm-card-gen/fixtures/` 是 11 个题面和 Session 断言的唯一来源；`runner.test.ts` 用同一套测试验收历史录音或未经修改的 AI 单文件源码。owner 本机的浏览器命令每题生成 3 次（33 个任务加一次工具探测），保存首次和最终源码，再调用 Vitest。没有第二套行为判题器、自然语言关键词评分或旧 prompt 对照组；能力缺口说明不计作可执行卡牌通过。报告和生成源码只保存在已忽略的 `output/tmp/`，仓库保存测试而不保存运行报告。累计 20 美元账本和付费调用仅限 owner 本机的限制继续生效。详见 [LLM 测试指南](test/llm-card-gen.md#browser-tool-acceptance)。正式 `deepseek-flash` 组合保留[已有验收记录](https://github.com/titanxxh/open-agricola/issues/1041#issuecomment-6057596377)，其他精确组合仍为待验。
+模型逐个通过浏览器工具往返及现有固定卡牌测试后开放。`tests/llm-card-gen/fixtures/` 是 11 个题面和 Session 断言的唯一来源；`runner.test.ts` 用同一套测试验收历史录音或未经修改的 AI 单文件源码。owner 本机的浏览器命令每题生成 3 次（33 个任务加一次工具探测），保存首次和最终源码，再调用 Vitest。没有第二套行为判题器、自然语言关键词评分或旧 prompt 对照组；能力缺口说明不计作可执行卡牌通过。报告和生成源码只保存在已忽略的 `output/tmp/`，仓库保存测试而不保存运行报告。累计 20 美元账本和付费调用仅限 owner 本机的限制继续生效。详见 [LLM 测试指南](test/llm-card-gen.md#browser-tool-acceptance)。正式 `deepseek-flash` 组合以[最新的验收记录](https://github.com/titanxxh/open-agricola/pull/1089#issuecomment-6104006958)为准入依据（工坊能力契约扩大后重新执行），其他精确组合仍为待验。
 
 #### C1.5 编辑器交互
 
