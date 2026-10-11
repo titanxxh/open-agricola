@@ -343,6 +343,8 @@ export const en = {
     hotseatHandoffPrompt: 'Pass the device to {player}.',
     hotseatHandoffHint: "{player}'s cards stay hidden until you confirm.",
     hotseatHandoffConfirm: "I'm {player} — continue",
+    hotseatPublicFarm: "Viewing {player}'s public farm",
+    hotseatReturnToPlayer: 'Return to {player} to continue',
     interactionSowChoice: 'Choose a crop to sow',
     interactionSowGrain: 'Sow grain',
     interactionSowVegetable: 'Sow vegetable',

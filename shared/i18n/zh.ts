@@ -343,6 +343,8 @@ export const zh = {
     hotseatHandoffPrompt: '请把设备交给 {player}。',
     hotseatHandoffHint: '确认前不会显示 {player} 的牌。',
     hotseatHandoffConfirm: '我是 {player}，开始',
+    hotseatPublicFarm: '正在查看 {player} 的公开农场',
+    hotseatReturnToPlayer: '返回 {player} 继续操作',
     interactionSowChoice: '选择播种作物',
     interactionSowGrain: '播种谷物',
     interactionSowVegetable: '播种蔬菜',

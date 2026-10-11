@@ -3,6 +3,7 @@ import type { Locale } from '../../shared/i18n'
 
 export type PrivateEventNotification = {
   id: string
+  recipientPlayerId: string
   kind: 'prompt' | 'draft' | 'hand'
   message: string
 }
@@ -90,6 +91,7 @@ export const collectPrivateEventNotifications = (
     seenSignatures.add(signature)
     notifications.push({
       id: idPrefix ? `${idPrefix}:${signature}` : signature,
+      recipientPlayerId: event.recipientPlayerId,
       kind: kindForPrivateEvent(event),
       message: messageForPrivateEvent(event, locale),
     })
