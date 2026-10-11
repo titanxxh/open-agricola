@@ -82,6 +82,8 @@ describe('normalizeCustomManifest', () => {
     [listener({ preScoring: 1 }), 'listener preScoring must be a boolean'],
     [listener({ replacesTurn: 'true' }), 'listener replacesTurn must be a boolean'],
     [listener({ blockedAnytimeInteractionKinds: 'choice' }), 'listener blockedAnytimeInteractionKinds must be an array of interaction kinds'],
+    // A misspelled kind would never match, leaving the entry offered during that interaction.
+    [listener({ blockedAnytimeInteractionKinds: ['farm-selct'] }), 'listener blockedAnytimeInteractionKinds must be an array of interaction kinds'],
     // null is a declared value, not an omitted key: it must not fall back to the engine default.
     [listener({ mandatory: null }), 'listener mandatory must be a boolean'],
     [manifest({ effectMetadata: { beforeEndGameMandatory: null } }), 'effect beforeEndGameMandatory must be a boolean'],

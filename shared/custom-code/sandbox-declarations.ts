@@ -18,6 +18,29 @@ const isStringArray = (value: unknown): value is string[] =>
 const isResourceNameArray = (value: unknown): boolean =>
   isStringArray(value) && value.every(name => (REAL_RESOURCE_KEYS as readonly string[]).includes(name))
 
+/** Every interaction kind. The type check fails when the engine gains or loses one. */
+const INTERACTION_KINDS = {
+  choice: true,
+  'animal-reorg': true,
+  'confirm-next-player': true,
+  'confirm-player-switch': true,
+  feed: true,
+  heating: true,
+  'farm-select': true,
+  selection: true,
+  'card-draft': true,
+  'select-trigger': true,
+  'engine-blocked': true,
+  'resource-quantity-select': true,
+  'resource-batch-exchange-select': true,
+} as const satisfies Record<InteractionRequest['kind'], true>
+
+export const sandboxInteractionKinds = Object.keys(INTERACTION_KINDS) as InteractionRequest['kind'][]
+
+/** A misspelled kind would never match, and the entry would stay offered during that interaction. */
+const isInteractionKindArray = (value: unknown): boolean =>
+  isStringArray(value) && value.every(kind => Object.hasOwn(INTERACTION_KINDS, kind))
+
 type Rule = { expected: string; matches: (value: unknown) => boolean }
 
 /** `handHooks` is the seventh metadata key; its hook names are admitted with the effect hooks. */
@@ -41,7 +64,7 @@ const LISTENER_DATA_FIELDS = {
   mandatory: { expected: 'a boolean', matches: isBoolean },
   preScoring: { expected: 'a boolean', matches: isBoolean },
   replacesTurn: { expected: 'a boolean', matches: isBoolean },
-  blockedAnytimeInteractionKinds: { expected: 'an array of interaction kinds', matches: isStringArray },
+  blockedAnytimeInteractionKinds: { expected: 'an array of interaction kinds', matches: isInteractionKindArray },
 } as const satisfies Record<string, Rule>
 
 export type SandboxEffectMetadataKey = keyof typeof EFFECT_METADATA

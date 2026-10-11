@@ -11,7 +11,7 @@ A name belongs to the contract only while at least one fixed behavior test drive
 
 Admission checks these things and nothing else:
 
-- the listed names: effect hooks, listener actions, phases and scopes, leaf actions, `special-effect` kinds, and the resource names in the pre-Harvest metadata;
+- the listed names: effect hooks, listener actions, phases and scopes, leaf actions, `special-effect` kinds, and the resource names and interaction kinds in the declared metadata and listener fields;
 - the listener and flow-node fields a card may set, the types of the open node control fields (`optional`, `promptKey`, `anytimeWindow`, `actionContext.targetPlayerId`, `actionContext.trueAction`), and that each listener, returned node and returned animal zone belongs to the card itself;
 - the types of the effect metadata and listener data fields a card declares, because the engine reads several of them by truthiness;
 - the parameter keys each action documents, and the types of the params that the leaf actions running a native farm or card action take (`improvement.types`, `occupation.exactCost`, `emit-choice.options` and `promptKey`, the `selection` candidates), because those actions fall back to a default on another type, and the shape of each `emit-choice` option, because the options are sent to every client as written;
