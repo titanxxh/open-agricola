@@ -1,5 +1,6 @@
 import type { CardStatePresentation } from '../../../shared/contract/card-state'
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
+import { createPortal } from 'react-dom'
 import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
 import type {
@@ -533,6 +534,8 @@ export type FarmBoardProps = {
   view: FarmBoardView
   actions: FarmBoardActions
   inlineCardStats?: boolean
+  handOutlet?: HTMLElement | null
+  showHand?: boolean
 }
 
 type TooltipPosition = {
@@ -854,7 +857,7 @@ const ParentCardTile = ({
   )
 }
 
-export const FarmBoard = ({ view, actions, inlineCardStats = false }: FarmBoardProps) => {
+export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, showHand = true }: FarmBoardProps) => {
   const {
     locale,
     players,
@@ -1041,6 +1044,137 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false }: FarmBoardP
           )
         })}
       </div>
+    </div>
+  )
+
+  const handPanel = (
+    <div className="hand-cards">
+      <h3>{t(locale, 'ui.handCards')}</h3>
+      {displayPlayer.id === activeFarmPlayerId || devMode ? (
+        <div className="hand-sections" data-hand-anchor={displayPlayer.id}>
+          <div className="hand-section occupation">
+            <div className="hand-section-title">{t(locale, 'ui.occupationCards')}</div>
+            <div className="hand-row">
+              {displayPlayer.occupationHand.length === 0 ? (
+                <div className="hand-empty">{t(locale, 'ui.noOccupationCards')}</div>
+              ) : (
+                displayPlayer.occupationHand.map((cardId) => {
+                  if (isMultiOccupationSelect) {
+                    const isSelectable = occupationHandSelection!.selectableCards.includes(cardId)
+                    return (
+                      <PlayerCard
+                        key={`occupation-${cardId}`}
+                        locale={locale}
+                        cardId={cardId}
+                        cardType="occupation"
+                        devMode={devMode}
+                        onClick={() => {
+                          if (isSelectable) toggleOcc(cardId)
+                        }}
+                        disabled={!isSelectable}
+                        selectable={isSelectable}
+                        selected={selectedOccIds.has(cardId) || highlightedHandCardId === cardId}
+                      />
+                    )
+                  }
+                  const canPlay = cardAvailability[`occupation:${cardId}`] !== false
+                  const isSelectingThisHand = isSelectingOccupation
+                  const isOptionSelectable =
+                    !isSelectingThisHand || selectableOccupationIds.has(cardId)
+                  const canInteract = isSelectingThisHand
+                    ? canInteractHand && isOptionSelectable
+                    : canInteractHand && canPlay && isOptionSelectable
+                  return (
+                    <PlayerCard
+                      key={`occupation-${cardId}`}
+                      locale={locale}
+                      cardId={cardId}
+                      cardType="occupation"
+                      devMode={devMode}
+                      onClick={() => {
+                        if (isSelectingOccupation && canInteract) {
+                          resolveChoice(cardId)
+                        }
+                      }}
+                      disabled={
+                        isSelectingThisHand
+                          ? !canInteractHand || !isOptionSelectable
+                          : !canInteractHand || !canPlay || !isOptionSelectable
+                      }
+                      selectable={isSelectingOccupation && canInteract}
+                      selected={highlightedHandCardId === cardId}
+                    />
+                  )
+                })
+              )}
+            </div>
+            {isMultiOccupationSelect && occupationHandSelection && (
+              <div className="hand-select-confirm">
+                <button
+                  type="button"
+                  disabled={
+                    selectedOccIds.size < occupationHandSelection.minSelections ||
+                    selectedOccIds.size > occupationHandSelection.maxSelections ||
+                    isOccupationHandSelectionRejected?.([...selectedOccIds])
+                  }
+                  onClick={() => onConfirmOccupationHandSelection?.([...selectedOccIds])}
+                  data-testid="occupation-hand-confirm"
+                >
+                  {t(locale, 'ui.interactionOccupationHandConfirm', {
+                    selected: selectedOccIds.size,
+                    max: occupationHandSelection.maxSelections,
+                  })}
+                </button>
+              </div>
+            )}
+          </div>
+          <div className="hand-section minor">
+            <div className="hand-section-title">{t(locale, 'ui.minorCards')}</div>
+            <div className="hand-row">
+              {displayPlayer.minorHand.length === 0 ? (
+                <div className="hand-empty">{t(locale, 'ui.noHandCards')}</div>
+              ) : (
+                displayPlayer.minorHand.map((cardId) => {
+                  const canPlay = cardAvailability[`minor:${cardId}`] !== false
+                  const isSelectingThisHand =
+                    isSelectingMinor || isSelectingImprovementAny
+                  const isOptionSelectable =
+                    !isSelectingThisHand ||
+                    selectableMinorIds.has(cardId)
+                  const canInteract = isSelectingThisHand
+                    ? canInteractHand && isOptionSelectable
+                    : canInteractHand && canPlay && isOptionSelectable
+                  const canSelect =
+                    isSelectingThisHand && canInteract
+                  return (
+                    <PlayerCard
+                      key={`hand-${cardId}`}
+                      locale={locale}
+                      cardId={cardId}
+                      cardType="minor"
+                      devMode={devMode}
+                      onClick={() => {
+                        if (canSelect) {
+                          resolveChoice(cardId)
+                        }
+                      }}
+                      disabled={
+                        isSelectingThisHand
+                          ? !canInteractHand || !isOptionSelectable
+                          : !canInteractHand || !canPlay || !isOptionSelectable
+                      }
+                      selectable={canSelect}
+                      selected={highlightedHandCardId === cardId}
+                    />
+                  )
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="hand-hidden">{t(locale, 'ui.handHidden')}</div>
+      )}
     </div>
   )
 
@@ -1797,134 +1931,7 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false }: FarmBoardP
         </div>
       ) : null}
     </div>
-    <div className="hand-cards">
-      <h3>{t(locale, 'ui.handCards')}</h3>
-      {displayPlayer.id === activeFarmPlayerId || devMode ? (
-        <div className="hand-sections" data-hand-anchor={displayPlayer.id}>
-          <div className="hand-section occupation">
-            <div className="hand-section-title">{t(locale, 'ui.occupationCards')}</div>
-            <div className="hand-row">
-              {displayPlayer.occupationHand.length === 0 ? (
-                <div className="hand-empty">{t(locale, 'ui.noOccupationCards')}</div>
-              ) : (
-                displayPlayer.occupationHand.map((cardId) => {
-                  if (isMultiOccupationSelect) {
-                    const isSelectable = occupationHandSelection!.selectableCards.includes(cardId)
-                    return (
-                      <PlayerCard
-                        key={`occupation-${cardId}`}
-                        locale={locale}
-                        cardId={cardId}
-                        cardType="occupation"
-                        devMode={devMode}
-                        onClick={() => {
-                          if (isSelectable) toggleOcc(cardId)
-                        }}
-                        disabled={!isSelectable}
-                        selectable={isSelectable}
-                        selected={selectedOccIds.has(cardId) || highlightedHandCardId === cardId}
-                      />
-                    )
-                  }
-                  const canPlay = cardAvailability[`occupation:${cardId}`] !== false
-                  const isSelectingThisHand = isSelectingOccupation
-                  const isOptionSelectable =
-                    !isSelectingThisHand || selectableOccupationIds.has(cardId)
-                  const canInteract = isSelectingThisHand
-                    ? canInteractHand && isOptionSelectable
-                    : canInteractHand && canPlay && isOptionSelectable
-                  return (
-                    <PlayerCard
-                      key={`occupation-${cardId}`}
-                      locale={locale}
-                      cardId={cardId}
-                      cardType="occupation"
-                      devMode={devMode}
-                      onClick={() => {
-                        if (isSelectingOccupation && canInteract) {
-                          resolveChoice(cardId)
-                        }
-                      }}
-                      disabled={
-                        isSelectingThisHand
-                          ? !canInteractHand || !isOptionSelectable
-                          : !canInteractHand || !canPlay || !isOptionSelectable
-                      }
-                      selectable={isSelectingOccupation && canInteract}
-                      selected={highlightedHandCardId === cardId}
-                    />
-                  )
-                })
-              )}
-            </div>
-            {isMultiOccupationSelect && occupationHandSelection && (
-              <div className="hand-select-confirm">
-                <button
-                  type="button"
-                  disabled={
-                    selectedOccIds.size < occupationHandSelection.minSelections ||
-                    selectedOccIds.size > occupationHandSelection.maxSelections ||
-                    isOccupationHandSelectionRejected?.([...selectedOccIds])
-                  }
-                  onClick={() => onConfirmOccupationHandSelection?.([...selectedOccIds])}
-                  data-testid="occupation-hand-confirm"
-                >
-                  {t(locale, 'ui.interactionOccupationHandConfirm', {
-                    selected: selectedOccIds.size,
-                    max: occupationHandSelection.maxSelections,
-                  })}
-                </button>
-              </div>
-            )}
-          </div>
-          <div className="hand-section minor">
-            <div className="hand-section-title">{t(locale, 'ui.minorCards')}</div>
-            <div className="hand-row">
-              {displayPlayer.minorHand.length === 0 ? (
-                <div className="hand-empty">{t(locale, 'ui.noHandCards')}</div>
-              ) : (
-                displayPlayer.minorHand.map((cardId) => {
-                  const canPlay = cardAvailability[`minor:${cardId}`] !== false
-                  const isSelectingThisHand =
-                    isSelectingMinor || isSelectingImprovementAny
-                  const isOptionSelectable =
-                    !isSelectingThisHand ||
-                    selectableMinorIds.has(cardId)
-                  const canInteract = isSelectingThisHand
-                    ? canInteractHand && isOptionSelectable
-                    : canInteractHand && canPlay && isOptionSelectable
-                  const canSelect =
-                    isSelectingThisHand && canInteract
-                  return (
-                    <PlayerCard
-                      key={`hand-${cardId}`}
-                      locale={locale}
-                      cardId={cardId}
-                      cardType="minor"
-                      devMode={devMode}
-                      onClick={() => {
-                        if (canSelect) {
-                          resolveChoice(cardId)
-                        }
-                      }}
-                      disabled={
-                        isSelectingThisHand
-                          ? !canInteractHand || !isOptionSelectable
-                          : !canInteractHand || !canPlay || !isOptionSelectable
-                      }
-                      selectable={canSelect}
-                      selected={highlightedHandCardId === cardId}
-                    />
-                  )
-                })
-              )}
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div className="hand-hidden">{t(locale, 'ui.handHidden')}</div>
-      )}
-    </div>
+    {showHand ? (handOutlet ? createPortal(handPanel, handOutlet) : handPanel) : null}
   </section>
   )
 }

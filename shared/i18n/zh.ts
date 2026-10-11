@@ -132,6 +132,7 @@ export const zh = {
     roundHidden: '待翻开',
     roundLocked: '未开放',
     farmTitle: '玩家农场',
+    publicFarms: '公开农场',
     startPlayer: '起始玩家',
     nextStartPlayer: '下回合起始玩家',
     activePlayer: '当前行动',

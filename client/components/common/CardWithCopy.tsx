@@ -194,6 +194,9 @@ export const CardWithCopy = ({
     onClick?.()
   }, [onClick])
 
+  const keyboardPreview = enablePreview && !!previewCard && typeof window !== 'undefined'
+    && (window.matchMedia?.('(min-width: 1101px)').matches ?? false)
+
   return (
     <>
       <div
@@ -207,6 +210,24 @@ export const CardWithCopy = ({
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
         aria-disabled={disabled}
+        tabIndex={keyboardPreview ? 0 : undefined}
+        onFocus={() => {
+          if (!keyboardPreview || !rootRef.current) return
+          stateRef.current.card = true
+          setAnchor(rootRef.current.getBoundingClientRect())
+        }}
+        onBlur={(event) => {
+          if (!keyboardPreview || event.currentTarget.contains(event.relatedTarget)) return
+          stateRef.current.card = false
+          evaluate()
+        }}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') {
+            clearShowTimer()
+            clearHideTimer()
+            setAnchor(null)
+          }
+        }}
         data-card-anchor={dataCardAnchor}
         data-card-id={dataCardId}
       >

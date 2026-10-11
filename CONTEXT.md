@@ -736,6 +736,18 @@ _Avoid_: 前端主 bundle 可见
 主前端可读的卡牌展示投影，只描述 UI metadata。
 _Avoid_: 规则执行逻辑
 
+**Player Tableau（玩家桌面）**:
+同一玩家的公开农场、父母卡、已打出牌及牌上公开状态组成的展示区域；Private Hand 保持该玩家自己的可见权限，展示位置不改变信息归属或行动权限。
+_Avoid_: 当前行动玩家、InteractionState、完整玩家私有状态
+
+**Private Hand（私有手牌）**:
+尚未打出的职业卡与小改良，属于持有玩家的私有信息；浏览另一名玩家的公开桌面不改变查看手牌的权限。
+_Avoid_: 公开已打出牌、共享桌面手牌、当前浏览玩家自动获得的私有信息
+
+**Compact Played Card（紧凑已打出牌）**:
+用于辨认已打出牌的卡面，展示名称、插画和印刷标记，牌上动态事实保持可见，完整规则通过全卡预览阅读。
+_Avoid_: 删除卡牌规则、私有手牌缩略图、前端解释卡牌规则
+
 **Card State**:
 单卡局部状态，写在 `player.cardStates[cardId]`，用于计数、flag、infobox、stack、extraData 等。
 _Avoid_: 为单卡新增 PlayerState / GameState 顶层字段

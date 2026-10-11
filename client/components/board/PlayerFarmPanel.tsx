@@ -14,6 +14,8 @@ export interface PlayerFarmPanelProps {
   >
   actions: FarmBoardActions
   inlineCardStats?: boolean
+  handOutlet?: HTMLElement | null
+  showHand?: boolean
 }
 
 export function PlayerFarmPanel({
@@ -22,6 +24,8 @@ export function PlayerFarmPanel({
   view,
   actions,
   inlineCardStats,
+  handOutlet,
+  showHand,
 }: PlayerFarmPanelProps) {
   const currentPlayer = state.players[state.currentPlayerIndex]
   const displayPlayer =
@@ -47,6 +51,8 @@ export function PlayerFarmPanel({
         }}
         actions={actions}
         inlineCardStats={inlineCardStats}
+        handOutlet={handOutlet}
+        showHand={showHand}
       />
       {/* occupations CardCarousel — added in Task 6 */}
       {/* minor improvements CardCarousel — added in Task 6 */}
