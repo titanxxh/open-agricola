@@ -5,6 +5,7 @@ import { getRegisteredCardListeners, executeCardListener } from '../../shared/ca
 import type { CardListenerContext } from '../../shared/cards/card-listeners'
 import type { ActionSpace, ComplexCost, CostModifierType, GameState, PlayerState, Resource } from '../../shared/contract/types'
 import { payAction } from '../../shared/actions/effects/pay'
+import { internalActionDefinitions } from '../../shared/actions'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { Engine } from '../../shared/engine/engine'
 import { HookDispatcher } from '../../shared/engine/dispatcher'
@@ -83,6 +84,7 @@ const payWithEngine = (
 ) => {
   const registry = new ActionRegistry()
   registry.register(payAction)
+  for (const action of internalActionDefinitions) registry.register(action)
   const engine = new Engine({
     tree: new EngineTree(new ActionNode('pay-e123', 'pay', CARD_ID, {
       cost,
@@ -101,9 +103,12 @@ const payWithEngine = (
   } else {
     result = first.result ?? { type: 'ok' }
   }
+  let done = false
   for (let safety = 0; safety < 10; safety += 1) {
-    if (engine.proceed({ state, player, space }).type === 'done') break
+    if (engine.proceed({ state, player, space }).type === 'done') { done = true; break }
   }
+  expect(done).toBe(true)
+  engine.flushEventTransaction({ state, player, space })
   return result
 }
 

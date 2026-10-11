@@ -15,33 +15,8 @@ const CARD_ID = 'A139_HollowWarden'
  *      A060_OrientalFireplace). isListeningTo → isActionCardEvent(Hollow).
  *      onPlayerPlaceFarmer → gain 1 food.
  *
- * Occupation onBuy flows must use a occupation listener (engine does not
- * process onBuy flows for occupations — only for improvements).
  */
 const FIREPLACE_IDS = ['Major_Fireplace1', 'Major_Fireplace2', 'A060_OrientalFireplace']
-
-const onBuyListener: CardListenerRegistration = {
-  id: 'A139-hollow-warden-onbuy',
-  cardIds: [CARD_ID],
-  actions: ['occupation'],
-  phases: ['after' as ActionHookPhase],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (context.choice !== CARD_ID) return
-    return {
-      flow: {
-        type: 'leaf',
-        actionId: 'improvement',
-        optional: true,
-        sourceCard: CARD_ID,
-        actionContext: { trueAction: false },
-        params: {
-          allowedPurchases: FIREPLACE_IDS,
-        },
-      },
-      sourceCard: CARD_ID,
-    }
-  },
-}
 
 const hollowListener: CardListenerRegistration = {
   id: 'A139-hollow-warden-after-hollow',
@@ -55,7 +30,18 @@ const hollowListener: CardListenerRegistration = {
 }
 
 const cardImpl = {
-  listeners: [onBuyListener, hollowListener],
+  effect: {
+    id: CARD_ID,
+    onBuy: () => ({
+      type: 'leaf',
+      actionId: 'improvement',
+      optional: true,
+      sourceCard: CARD_ID,
+      actionContext: { trueAction: false },
+      params: { allowedPurchases: FIREPLACE_IDS },
+    }),
+  },
+  listeners: [hollowListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
 

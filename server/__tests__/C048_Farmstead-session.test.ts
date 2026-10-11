@@ -113,10 +113,17 @@ const buildRoomAndStable = (session: GameSession) => {
 
 describe('C048 Farmstead parity', () => {
   it('C048 S1: one occupation allows Farmstead to be played for free', () => {
-    const response = playMinor(setup({ played: false }))
+    const session = setup({ played: false })
+    const player = session.state.players[0]!
+    const farmBefore = structuredClone({ rooms: player.roomTiles, fields: player.fields,
+      stables: player.stableTiles, pastures: player.pastures })
+    const response = playMinor(session)
 
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.minorPlayed).toContain(CARD_ID)
+    expect(response.state.players[0]!.resources.food).toBe(0)
+    expect({ rooms: player.roomTiles, fields: player.fields, stables: player.stableTiles, pastures: player.pastures }).toEqual(farmBefore)
+    expect(response.state.events.some((event) => event.type === 'resource.moved' && event.sourceCardId === CARD_ID)).toBe(false)
   })
 
   it('C048 S2: without an occupation Farmstead remains unavailable', () => {

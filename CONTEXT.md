@@ -677,7 +677,7 @@ _Avoid_: 展开整个 Action Space、模拟放置工人、继承行动格附带�
 _Avoid_: 前端规则补丁、核心路径单卡 if-else
 
 **Card Effect Hook**:
-卡牌在阶段或计分时被调用的 effect 字段，如 `onBuy`、`onRoundStart`、`onStartHarvestFieldPhase`、`onAfterReap`、`computeBonusScore`。
+卡牌在打出、阶段或计分时被调用的 effect 字段，如 `onBuy`、`onRoundStart`、`onStartHarvestFieldPhase`、`onAfterReap`、`computeBonusScore`。一次性打出效果用 `onBuy`，在支付和卡牌提交后执行；明确包括本牌的持续效果也把自身部分放在这里，后续打牌仍由 listener 响应。
 _Avoid_: listener phase
 
 **Before-End Player Dispatch**:
@@ -685,7 +685,7 @@ _Avoid_: listener phase
 _Avoid_: 卡牌自己扫所有玩家、为单卡新增 custom turn-order
 
 **Card Listener**:
-监听 action / event phase 的卡牌反应。listener handler 必须是 state-pure flow builder：只能读 state / events 并返回 flow 或结构化结果。
+监听 action / event phase 的卡牌反应。listener handler 必须是 state-pure flow builder：只能读 state / events 并返回 flow 或结构化结果。本牌的 played listener 不响应自身 `occupation` / `improvement` 的 `immediatelyAfter` / `after`；该资格排除不改变提交后卡牌数量，也不冻结外层 `place-farmer.after`。
 _Avoid_: dispatch 阶段直接修改 `GameState`、`PlayerState` 或 `cardStates`
 
 **Reaction Hook**:

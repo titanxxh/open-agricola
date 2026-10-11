@@ -3,6 +3,7 @@ import { GameSession, type SessionResponse } from '../game/authoritative-session
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
+import { playImprovement } from './_helpers/card-play-lifecycle'
 
 import '../../shared/cards/A/A057_MilkingParlor'
 import '../../shared/cards/D/D074_RoyalWood'
@@ -115,9 +116,7 @@ describe('D074 Royal Wood parity', () => {
     state.availableMajorImprovements = ['Major_Joinery']
     session.loadState(state)
 
-    let response = session.takeAction(0, 'major-improvement')
-    expect(response.interaction.stateId).toBe('wait')
-    response = session.resolveChoice(response.interaction.playerIndex, 'Major_Joinery')
+    let response = playImprovement(session, 'Major_Joinery')
     response = finishRoyalTrigger(session, response)
 
     expect(response.ok, response.error).toBe(true)

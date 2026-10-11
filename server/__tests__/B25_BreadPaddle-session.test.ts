@@ -260,7 +260,7 @@ describe('B025 Bread Paddle parity', () => {
 
   it('B025 S2: after playing an occupation Bread Paddle can bake one grain', () => {
     const session = setup()
-    let response = acceptBreadPaddle(session, playOccupation(session))
+    let response = playOccupation(session)
     expect(response.interaction).toMatchObject({
       stateId: 'wait', promptKey: 'ui.interactionOptionalAction', sourceCard: CARD_ID,
     })
@@ -274,7 +274,7 @@ describe('B025 Bread Paddle parity', () => {
   it('B025 S3: the Bread Paddle bake after an occupation may be declined', () => {
     const session = setup()
     const selected = playOccupation(session)
-    const pending = acceptBreadPaddle(session, selected)
+    const pending = selected
     expect(options(pending).some((option) => option.value === '__skip__'), JSON.stringify(pending.interaction))
       .toBe(true)
 

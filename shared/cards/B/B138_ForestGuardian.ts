@@ -15,16 +15,6 @@ const CARD_ID = 'B138_ForestGuardian'
  * Wood accumulation spaces: forest, copse, grove.
  * Triggers on 'before' phase of 'collect' action when space has 5+ wood.
  */
-const onBuyListener: CardListenerRegistration = {
-  id: 'B138-forest-guardian-onbuy',
-  cardIds: [CARD_ID],
-  actions: ['occupation'],
-  phases: ['after' as ActionHookPhase],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (context.choice !== CARD_ID) return
-    return { flow: gainLeaf(CARD_ID, { wood: 2 }), sourceCard: CARD_ID }
-  },
-}
 
 const collectListener: CardListenerRegistration = {
   id: 'B138-forest-guardian-before-opponent-collect',
@@ -68,7 +58,11 @@ const collectListener: CardListenerRegistration = {
 }
 
 const cardImpl = {
-  listeners: [onBuyListener, collectListener],
+  effect: {
+    id: CARD_ID,
+    onBuy: () => gainLeaf(CARD_ID, { wood: 2 }),
+  },
+  listeners: [collectListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
 

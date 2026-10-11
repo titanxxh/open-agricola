@@ -5,18 +5,20 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A055_JunkRoom'
+const foodGainFlow = () => gainLeaf(CARD_ID, { food: 1 })
 const listener: CardListenerRegistration = {
   id: 'A55-junk-room-after-improvement',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
   actions: ['improvement'],
   handler: (_context: CardListenerContext): ActionHookResult | void => {
-    return { flow: gainLeaf(CARD_ID, { food: 1 }), sourceCard: CARD_ID }
+    return { flow: foodGainFlow(), sourceCard: CARD_ID }
   },
 }
 
 const cardImpl = {
   listeners: [listener],
+  effect: { id: CARD_ID, onBuy: foodGainFlow },
   reaches: [] as readonly string[],
 } satisfies CardImpl
 

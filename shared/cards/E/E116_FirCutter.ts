@@ -19,22 +19,10 @@ const CARD_ID = 'E116_FirCutter'
  *
  * countPlacedFarmers excludes card-jump relocations from the recorded round placement order.
  *
- * Occupation onBuy flows must use a occupation listener.
  */
 const ANIMAL_MARKET_SPACES = new Set(['sheep-market', 'pig-market', 'cattle-market'])
 
 const WOOD_BY_PLACEMENT = [0, 1, 1, 2, 2, 3]
-
-const onBuyListener: CardListenerRegistration = {
-  id: 'E116-fir-cutter-onbuy',
-  cardIds: [CARD_ID],
-  actions: ['occupation'],
-  phases: ['after' as ActionHookPhase],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (context.choice !== CARD_ID) return
-    return { flow: gainLeaf(CARD_ID, { food: 1 }), sourceCard: CARD_ID }
-  },
-}
 
 const animalMarketListener: CardListenerRegistration = {
   id: 'E116-fir-cutter-after-animal-market',
@@ -53,7 +41,11 @@ const animalMarketListener: CardListenerRegistration = {
 }
 
 const cardImpl = {
-  listeners: [onBuyListener, animalMarketListener],
+  effect: {
+    id: CARD_ID,
+    onBuy: () => gainLeaf(CARD_ID, { food: 1 }),
+  },
+  listeners: [animalMarketListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
 

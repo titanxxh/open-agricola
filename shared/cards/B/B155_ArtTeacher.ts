@@ -17,21 +17,9 @@ const TRAVELING_PLAYERS_FOOD = `${CARD_ID}:traveling-players-food` as const
  *     the Traveling Players accumulation space.
  *
  * Implementation:
- *   - occupation after-listener (existing) triggers the wood+reed gain.
  *   - occupation computeCosts listener provides a card-scoped payment
  *     resource backed by Traveling Players food.
  */
-
-const onBuyListener: CardListenerRegistration = {
-  id: 'B155-art-teacher-onbuy',
-  cardIds: [CARD_ID],
-  actions: ['occupation'],
-  phases: ['after' as ActionHookPhase],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (context.choice !== CARD_ID) return
-    return { flow: gainLeaf(CARD_ID, { wood: 1, reed: 1 }), sourceCard: CARD_ID }
-  },
-}
 
 const computeCostsListener: CardListenerRegistration = {
   id: 'B155-art-teacher-compute-costs',
@@ -59,7 +47,11 @@ const computeCostsListener: CardListenerRegistration = {
 }
 
 const cardImpl = {
-  listeners: [onBuyListener, computeCostsListener],
+  effect: {
+    id: CARD_ID,
+    onBuy: () => gainLeaf(CARD_ID, { wood: 1, reed: 1 }),
+  },
+  listeners: [computeCostsListener],
   reaches: TRAVELING_PLAYERS_SPACE_IDS,
 } satisfies CardImpl
 

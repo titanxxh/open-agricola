@@ -1,6 +1,6 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookPhase } from '../../actions/hooks'
 import type { CardCostCandidate, PaymentResourceKey, PaymentResourceMap } from '../../contract/types'
 import type { CardImpl } from '../registry'
 
@@ -17,28 +17,6 @@ const BUILDING_RESOURCES = ['wood', 'clay', 'stone', 'reed'] as const
  * candidate for every non-empty subset of building resources present in the
  * current candidate, preserving the original candidate.
  */
-const onBuyListener: CardListenerRegistration = {
-  id: 'D95-site-manager-onbuy',
-  cardIds: [CARD_ID],
-  actions: ['occupation'],
-  phases: ['after' as ActionHookPhase],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (context.choice !== CARD_ID) return
-    return {
-      flow: {
-        type: 'leaf',
-        actionId: 'improvement',
-        optional: true,
-        sourceCard: CARD_ID,
-        actionContext: { trueAction: false },
-        params: {
-          types: ['major'],
-        },
-      },
-      sourceCard: CARD_ID,
-    }
-  },
-}
 
 const computeCostsListener: CardListenerRegistration = {
   id: 'D95-site-manager-compute-costs',
@@ -77,7 +55,18 @@ const computeCostsListener: CardListenerRegistration = {
 }
 
 const cardImpl = {
-  listeners: [onBuyListener, computeCostsListener],
+  effect: {
+    id: CARD_ID,
+    onBuy: () => ({
+      type: 'leaf',
+      actionId: 'improvement',
+      optional: true,
+      sourceCard: CARD_ID,
+      actionContext: { trueAction: false },
+      params: { types: ['major'] },
+    }),
+  },
+  listeners: [computeCostsListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
 

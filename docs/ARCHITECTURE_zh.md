@@ -764,7 +764,7 @@ Card listener 区域默认只匹配已打出卡：`zones` 省略等价于 `['pla
 `beforeHostListeners` / `afterHostCommitListeners` / `afterHostListeners` 是 host action 在 参考实现 pay slot 上的显式差异：
 
 - `renovation` / `improvement` / `occupation` / `construct` / `fencing` / `stables` 在 `beforeHostListeners` 或主 action 内先完成 mandatory payment，再进入 trailing effects。
-- `improvement` / `occupation` 的 `onBuy` 使用 `afterHostCommitListeners`：先完成 mandatory payment，再由 host `completeInternalChildren` 提交卡牌，随后触发 onBuy，最后才进入 host `immediatelyAfter` / `after`。
+- `improvement` / `occupation` 的 `onBuy` 使用 `afterHostCommitListeners`：先完成 mandatory payment，再由 host `completeInternalChildren` 提交卡牌，随后触发 onBuy，最后才进入 host `immediatelyAfter` / `after`。 自身打出的一次性资源、购买、未来安排及文案明确包括本牌的收益统一放在 `onBuy`。`getMatchingListeners()` 按完成选择排除触发玩家刚打出的本牌对自身 `occupation` / `improvement` 的尾随反应；旧牌、其他玩家、手牌监听、compute/before 阶段及外层 `place-farmer.after` 的资格保留。已提交本牌仍计入触发快照的卡牌数量；资格排除不改变快照。文案规定在牌打出或建造后生效的能力监听已提交的 host 行动，而非较早的 `pay` 子行动。
 - `stables` 保持 `farm.stableBuilt -> resource.paid(stables) -> after-stables effects`：农场 mutation 仍是 host action 的事实，但 mandatory payment 会在 reaction 花费这些资源前结算。
 - `fencing` 明确是 `beforeHostListeners`，避免 `A034_Loppers` 这类 after-fencing 效果先于 mandatory fence pay 结算而饿死支付。
 - mandatory 传播不改变 fencing 结算顺序：先校验合法布局，再结算支付，最后提交权威 fence；不得因此允许 `seq:[pay, apply-*]`。
