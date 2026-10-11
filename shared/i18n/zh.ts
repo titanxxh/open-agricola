@@ -2340,7 +2340,7 @@ export const zh = {
       identityTitle: '选择 Issue 作者',
       identityIntro: '可以使用自己的 GitHub 账号，也可以由站点 GitHub App 代为提交。',
       githubUser: '我的 GitHub 账号',
-      githubUserBody: '使用这个身份前需要先连接 GitHub。',
+      githubUserBody: '需单独授权 GitHub 提交 Issue；登录账号绑定不包含此权限。',
       githubUserConfirm: '我知道 GitHub 会公开显示我的 GitHub 账号为 Issue 作者，删除站点账号也无法匿名化该 GitHub 作者身份。',
       connectedAs: '已连接 GitHub 用户 ID {id}',
       connectGithub: '连接 GitHub',

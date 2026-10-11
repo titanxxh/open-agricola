@@ -657,7 +657,7 @@ export function BugReportBar({
                 {!connection?.connected ? (
                   <button
                     type="button"
-                    className="bug-report-connect"
+                    className="btn-primary bug-report-connect"
                     disabled={busy}
                     onClick={() => { void startGitHubConnection() }}
                   >

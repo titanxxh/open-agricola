@@ -7,6 +7,8 @@ import {
 } from '@playwright/test'
 import { createHash } from 'node:crypto'
 import { BACKEND_URL, FRONTEND_URL } from './fixtures'
+import { en } from '../shared/i18n/en'
+import { zh } from '../shared/i18n/zh'
 
 const cookieValue = (response: APIResponse, name: string): string => {
   const header = response.headersArray().find(({ name: headerName, value }) =>
@@ -281,3 +283,97 @@ test('completed replay submits one hosted bug report with the current anchor', a
   expect(duplicateConfirmed).toBe(true)
   expect(submitCount).toBe(1)
 })
+
+for (const locale of ['en', 'zh'] as const) {
+  const copy = (locale === 'en' ? en : zh).platform.bugReport
+  for (const width of [320, 1280]) {
+    test(`GitHub connection is a visible keyboard-operable button (${locale}, ${width}px)`, async ({
+      page,
+      request,
+    }, testInfo) => {
+      await page.setViewportSize({ width, height: 800 })
+      await page.addInitScript(value => {
+        window.localStorage.setItem('open-agricola-locale-v2', value)
+      }, locale)
+      const fixtureResponse = await request.post(`${BACKEND_URL}/api/test/replays/completed`)
+      expect(fixtureResponse.status()).toBe(201)
+      const fixture = await fixtureResponse.json() as {
+        roomId: string
+        firstStepHash: string
+      }
+      const submissionId = `connect-button-${locale}-${width}`
+      const report = {
+        submissionId,
+        roomId: fixture.roomId,
+        reporterUserId: 'site-user-e2e',
+        playerIndex: 0,
+        lifecycle: 'completed',
+        roomVersion: 3,
+        stepNo: 0,
+        frameHash: fixture.firstStepHash,
+        phenomenon: 'The final score is wrong',
+        authorIdentity: null,
+        status: 'draft',
+        issueNumber: null,
+        issueUrl: null,
+        lastErrorCode: null,
+      }
+      await page.route('**/api/v1/issue-submission-connection?**', route =>
+        route.fulfill({ json: { ok: true, enabled: true, connected: false } }))
+      await page.route(`**/api/v1/bug-reports/${submissionId}`, route =>
+        route.fulfill({ json: { ok: true, report, existingIssues: [] } }))
+      const authorizations: unknown[] = []
+      let finishAuthorization!: () => void
+      const authorizationGate = new Promise<void>(resolve => { finishAuthorization = resolve })
+      await page.route('**/api/v1/issue-submission-connection/github/start', async route => {
+        expect(route.request().method()).toBe('POST')
+        authorizations.push(route.request().postDataJSON())
+        await authorizationGate
+        const authorizationUrl = new URL(page.url())
+        authorizationUrl.hash = 'github-authorize'
+        await route.fulfill({ json: { ok: true, authorizationUrl: authorizationUrl.toString() } })
+      })
+
+      await page.goto(`/?context=${fixture.roomId}&bugReport=${submissionId}`)
+      await page.getByRole('button', { name: copy.continue, exact: true }).click()
+      await page.getByRole('button', { name: copy.continue, exact: true }).click()
+      const connect = page.getByRole('button', { name: copy.connectGithub, exact: true })
+      await expect(connect).toBeVisible()
+      await expect(connect).toBeEnabled()
+      const appearance = await connect.evaluate(element => {
+        const style = getComputedStyle(element)
+        return {
+          background: style.backgroundColor,
+          padding: parseFloat(style.paddingTop),
+          radius: parseFloat(style.borderTopLeftRadius),
+        }
+      })
+      expect(appearance.background).not.toBe('rgba(0, 0, 0, 0)')
+      expect(appearance.padding).toBeGreaterThan(0)
+      expect(appearance.radius).toBeGreaterThan(0)
+      const box = await connect.boundingBox()
+      expect(box).not.toBeNull()
+      expect(box!.height).toBeGreaterThanOrEqual(44)
+      expect(box!.x).toBeGreaterThanOrEqual(0)
+      expect(box!.x + box!.width).toBeLessThanOrEqual(width)
+      await expect(page.getByRole('radio', { name: new RegExp(copy.githubUser) })).toBeDisabled()
+      await page.getByRole('radio', { name: new RegExp(copy.hosted) }).focus()
+      await page.keyboard.press('Shift+Tab')
+      await expect(connect).toBeFocused()
+      await expect(connect).toHaveCSS('outline-style', 'solid')
+      await expect(connect).toHaveCSS('outline-width', '2px')
+      await page.screenshot({ path: testInfo.outputPath('github-connect.png'), fullPage: true })
+
+      try {
+        await page.keyboard.press('Enter')
+        await expect.poll(() => authorizations.length).toBe(1)
+        await expect(connect).toBeDisabled()
+        await page.keyboard.press('Enter')
+        expect(authorizations).toEqual([{ submissionId }])
+      } finally {
+        finishAuthorization()
+      }
+      await expect(page).toHaveURL(/#github-authorize$/)
+    })
+  }
+}
