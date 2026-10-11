@@ -48,7 +48,7 @@ pnpm test:llm:live --model deepseek-flash --diagnose M2-per-action-bonus --runti
 
 没有旧 prompt 对照组，也没有自然语言关键词判分。固定可实现题目返回能力缺口或澄清时，因为没有可执行源码而失败；对开放式需求的能力缺口说明，产品保留原始文本，不宣称固定测试已证明其语义正确。有限固定测试通过不代表任意需求都正确。
 
-产品准入按精确 provider、endpoint 和 model 登记在 `client/services/llm/generation/admission.ts`。真实工具探测和全部固定测试通过后才可登记；合成演练和历史 golden 都不能作为新的模型准入。`deepseek` / `https://api.deepseek.com/v1/chat/completions` / `deepseek-flash` 的[已有验收结论](https://github.com/titanxxh/open-agricola/issues/1041#issuecomment-6057596377)保留，其他组合待验。
+产品准入按精确 provider、endpoint 和 model 登记在 `client/services/llm/generation/admission.ts`。真实工具探测和全部固定测试通过后才可登记；合成演练和历史 golden 都不能作为新的模型准入。`deepseek` / `https://api.deepseek.com/v1/chat/completions` / `deepseek-flash` 以[最新的验收记录](https://github.com/titanxxh/open-agricola/pull/1089#issuecomment-6104006958)为准（工坊能力契约扩大后在 2026-10-11 重新执行）；[首次验收结论](https://github.com/titanxxh/open-agricola/issues/1041#issuecomment-6057596377)保留作历史记录。其他组合待验。
 
 ### 本地产物与预算
 
