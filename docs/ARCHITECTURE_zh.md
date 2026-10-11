@@ -165,6 +165,10 @@ ESLint 三层强制（`eslint.config.js`）：
 
 `buildLogPresentationPlan()` 是 Action Log 展示关系的单一来源：`rows` 表示可见日志，`consumedEvents` 表示已被更丰富日志吸收的事件，`suppressedEvents` 表示按事件自身语义明确不生成 Action Log 行的事件。客户端 timeline 只按这些结构化 event ref 过滤，不得通过玩家名、资源数量、卡牌 id 或跨 archive packet 猜测事件对应关系。纯普通资源的 `futureMeeple.resolved` 由后续 `resource.moved(reason='receive')` 展示实际入账，因此进入 `suppressedEvents`；带房间或 field/stable/forest/moor 独立效果的结算仍保留独立日志。
 
+新事件在 `EventStore` 完成 draft 时获得不透明的 `occurrenceId`，独立标识一次 Public Event Occurrence，不依赖会复用的 `id`/`seq`、archive 编号、玩家名称或翻译。transaction snapshot、commit 重编号、取消和 viewer 投影都保留该身份。mapper 为每条派生日志附上 `LogEntry.sourceEvent = { occurrenceId, rowIndex }`；snapshot 缓存与事件时间线按该来源关联及 log key 配对，不再比较展示参数。因此两次相同的真实触发仍为两条记录，已取消尝试也不能消耗后来发生实例的缓存行。没有匹配事件的日志仍保留。
+
+发生实例身份及日志来源关联是新写入规则事件和日志记录中的 JSON 字段，不仅是 Room History 展示 metadata，因此新 Replay Frame 能保留关联，无须依赖 Room 或重新执行规则。这不改变规则结果，也不改写已有 Frame/hash。缺少发生实例或来源字段的已有记录保留原有的参数计数配对；不补齐或迁移旧数据。带身份的新行不进入旧记录的配对池。
+
 `publicEventArchive` 是 append-only 的公共事件 archive metadata。`publicEvents.committed` packet 记录每次提交的 public event ids/seqs；`publicEvents.canceled` packet 记录 undo 或 provisional scope rollback 取消的 event ids/seqs 和完整 public event payload，供后续 replay/archive UI 使用。archive 写入会先校验 live archive 的 packetSeq/cursor 不变量，并拒绝 private / malformed / non-json / oversized payload；若异常腐败事件导致 canceled packet 写入失败，runtime cancellation 仍返回，但不会持久化非法 archive payload；若 live archive 不变量已损坏，本次恢复不落地。规则层和卡牌监听仍只读当前 `GameState.events` / 当前 transaction events，不读 archive。
 
 客户端 Action Log 以只读 replay timeline 消费 `publicEventArchive`。UI 用 `publicEventArchive` 加当前 `events` 重建 active、canceled、missing 行；canceled 行保留 canceled packet payload 并用删除线渲染。选择 replay 行只生成带 `replay:` 前缀 id 的本地 notification、highlight 和 resource animation cue，不修改 `GameState`、不发送游戏命令，也不推进 live public-event cursor。

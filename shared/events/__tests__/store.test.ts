@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { GameEvent } from '../../contract/events'
 import type { GameState } from '../../contract/types'
 import { EventStore } from '../store'
+import { eventsToLogEntries } from '../log-mapper'
 
 const makeState = (): GameState => ({
   round: 2,
@@ -280,7 +281,11 @@ describe('EventStore', () => {
       to: { kind: 'player', playerId: 'p1' },
       reason: 'gain',
     })
-    expect(delayed.complete(state)[0]?.seq).toBe(1)
+    const completed = delayed.complete(state)
+    expect(completed[0]?.seq).toBe(1)
+    const logBeforeCommit = eventsToLogEntries(completed, { playerNames: { p1: 'Alice' } })
+    const restored = new EventStore()
+    restored.restore(JSON.parse(JSON.stringify(store.snapshot())))
 
     const other = new EventStore()
     const immediate = other.beginFrame({ actorPlayerId: 'p1', sourceActionId: 'immediate' })
@@ -294,7 +299,12 @@ describe('EventStore', () => {
     immediate.complete(state)
     other.commitTransaction(state)
 
-    const committed = store.commitTransaction(state)
+    const committed = restored.commitTransaction(state)
+    expect(committed[0]!.occurrenceId).toEqual(expect.any(String))
+    expect(committed[0]!.occurrenceId).toBe(completed[0]!.occurrenceId)
+    expect(committed[0]!.occurrenceId).not.toBe(state.events[0]!.occurrenceId)
+    expect(eventsToLogEntries(committed, { playerNames: { p1: 'Alice' } })[0]?.sourceEvent)
+      .toEqual(logBeforeCommit[0]?.sourceEvent)
     expect(state.events.map((event) => event.seq)).toEqual([1, 2])
     expect(state.events.map((event) => event.sourceActionId)).toEqual(['immediate', 'delayed'])
     expect(committed[0]).toMatchObject({ id: '2', seq: 2 })

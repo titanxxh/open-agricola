@@ -62,6 +62,10 @@ describe('executable Workshop reference contracts', () => {
       key: 'log.cardEffectGain',
       playerId: state.players[0]!.id,
       params: { player: state.players[0]!.name, gain: { food: 1 }, cardId: CARD_ID },
+      sourceEvent: {
+        occurrenceId: response.state.events.find((event) => event.type === 'resource.moved' && event.sourceCardId === CARD_ID)?.occurrenceId,
+        rowIndex: 0,
+      },
     })
     expect(response.scores?.map((score) => score.total)).toEqual([
       scoresBefore[0]!.total,
@@ -98,7 +102,13 @@ describe('executable Workshop reference contracts', () => {
     expect(response.state.players[0]).toMatchObject({ rooms: 2, resources: resourcesBefore })
     expect(response.scores).toEqual(before.scores)
     expect(response.state.log).toEqual([
-      { key: 'log.placeFarmer', playerId: player.id, params: { player: player.name, action: 'actions.farm-expansion.name' } },
+      {
+        key: 'log.placeFarmer', playerId: player.id, params: { player: player.name, action: 'actions.farm-expansion.name' },
+        sourceEvent: {
+          occurrenceId: response.state.events.find((event) => event.type === 'worker.placed' && event.actorPlayerId === player.id)?.occurrenceId,
+          rowIndex: 0,
+        },
+      },
       ...logBefore,
     ])
     expect(response.interaction).toMatchObject({

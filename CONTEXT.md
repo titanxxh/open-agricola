@@ -804,6 +804,10 @@ _Avoid_: 直接写 UI log 当规则事实
 写入 `GameState.events` 的公开规则事实，用于派生日志、动画提示、审计和 replay。
 _Avoid_: 直接写 state.log
 
+**Public Event Occurrence（公开事件发生实例）**:
+一次具体发生并进入公开历史的规则事实。撤销后再次发生的事件属于新的实例，即使其事件编号或展示内容与已取消事件相同。
+_Avoid_: 可复用的事件序号、日志展示文字、完整操作组
+
 **Public Event Archive（公开事件归档）**:
 记录一局游戏中公开事件被提交和被取消的沿革，撤销或系统回退也保留相应记录，完整整局历史须可供玩家按需查阅。它不等同于当前仍有效的 Public Event 集合，也不是按 Replay Step 固定完整权威状态的 Game Replay Archive。
 _Avoid_: 当前有效事件列表、Game Replay Archive、把归档视为全部事件正文的副本

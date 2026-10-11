@@ -3,6 +3,7 @@ import type { GameEvent, PublicEventArchiveCanceledPacket, PublicEventArchiveCom
 import { getHistoryRecordIdentity, registerHistoryRecordIdentity } from '../../projections/history-record-identity'
 import { createInitialState } from '../state-bootstrap'
 import { filterSerializedStateForPlayer, serializeState } from '../serialization'
+import { appendImmediateEvents } from '../../events/append'
 
 // Public projection seam: no rule/card mocks. Explicit hands keep every viewer
 // deterministic; existing serialization-filter tests cover undo id/seq reuse.
@@ -36,6 +37,30 @@ const setup = () => {
 }
 
 describe('viewer archive projection', () => {
+  it('retains new log source associations when hidden events compact viewer numbering', () => {
+    const state = createInitialState(42, { playerCount: 2, ordinaryCardDeckSeed: 42, parentSelectionSeed: 42 })
+    state.players.forEach(player => {
+      player.minorHand = ['__test_placeholder__']
+      player.occupationHand = ['__test_placeholder__']
+    })
+    state.players[1]!.minorHand = ['D036_BreedRegistry']
+    state.players[0]!.minorPlayed = ['B033_Mantlepiece']
+    const [hidden, visible] = appendImmediateEvents(state, [
+      { type: 'card.triggered', actorPlayerId: 'p2', cardId: 'D036_BreedRegistry', triggerActionId: 'bonus-vp' },
+      { type: 'card.triggered', actorPlayerId: 'p1', cardId: 'B033_Mantlepiece', triggerActionId: 'bonus-vp' },
+    ])
+    const raw = serializeState(state, {})
+    const before = JSON.stringify(raw)
+    const projected = filterSerializedStateForPlayer(raw, 'p1')
+    const event = projected.events.find(event => event.occurrenceId === visible!.occurrenceId)!
+    const log = projected.log.find(log => log.sourceEvent?.occurrenceId === visible!.occurrenceId)!
+    expect(event.seq).not.toBe(visible!.seq)
+    expect(event.occurrenceId).toEqual(expect.any(String))
+    expect(log.sourceEvent).toEqual({ occurrenceId: event.occurrenceId, rowIndex: 0 })
+    expect(JSON.stringify(projected)).not.toContain(hidden!.occurrenceId)
+    expect(JSON.stringify(raw)).toBe(before)
+  })
+
   it('reuses unchanged committed and canceled packets while keeping output arrays independent', () => {
     const { base, committed, canceled } = setup()
     const before = JSON.stringify(base)

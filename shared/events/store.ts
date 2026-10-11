@@ -173,6 +173,7 @@ export class EventStore {
       phase: state.roundPhase ?? 'work',
       visibility: 'public',
       ...details,
+      occurrenceId: crypto.randomUUID(),
     } as Record<string, unknown>
     const envelope = {
       actorPlayerId: actorPlayerId ?? defaults.actorPlayerId,

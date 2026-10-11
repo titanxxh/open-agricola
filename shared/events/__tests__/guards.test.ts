@@ -33,6 +33,11 @@ describe('event guards', () => {
     expect(() => assertEventSizeUnderLimit(event, 4096)).not.toThrow()
   })
 
+  it.each(['', null, 1, {}])('rejects invalid occurrence identity %j', occurrenceId => {
+    expect(() => assertGameEventEnvelope({ ...baseEvent, type: 'game.started', occurrenceId }))
+      .toThrow(/occurrenceId/)
+  })
+
   it('accepts empty card infobox text as an explicit clear event', () => {
     expect(() => assertKnownGameEventShape({
       ...baseEvent,

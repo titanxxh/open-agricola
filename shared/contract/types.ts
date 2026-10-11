@@ -484,6 +484,8 @@ export type PlayerStats = {
 export type LogEntry = {
   key: string
   params?: Record<string, unknown>
+  /** Association with the event occurrence that produced this presentation row. */
+  sourceEvent?: { occurrenceId: string; rowIndex: number }
   playerId?: string
   /** Identity for additional player-name parameters such as fromPlayer/toPlayer. */
   playerRefs?: Record<string, string>

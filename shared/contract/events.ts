@@ -14,6 +14,8 @@ import type { AnimalKey } from './animals'
 export type GameEventBase<T extends string> = {
   schemaVersion: 1
   id: string
+  /** Stable occurrence identity; unlike id/seq it is not reused after undo. */
+  occurrenceId?: string
   seq: number
   round: number
   phase: GameState['roundPhase']
@@ -450,7 +452,7 @@ export type GameEvent =
   | ContinuationRestoredEvent
 
 export type DraftGameEvent<T extends GameEvent['type'] = GameEvent['type']> =
-  Omit<Extract<GameEvent, { type: T }>, 'id' | 'seq' | 'round' | 'phase' | 'visibility' | 'schemaVersion'> & {
+  Omit<Extract<GameEvent, { type: T }>, 'id' | 'occurrenceId' | 'seq' | 'round' | 'phase' | 'visibility' | 'schemaVersion'> & {
     visibility?: 'public'
   }
 
