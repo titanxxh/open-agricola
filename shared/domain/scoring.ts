@@ -1,4 +1,5 @@
 import { getCardUnusedSpaceReduction } from '../cards/card-rule-contributions'
+import { getFencedStableCount } from './pasture'
 import type { GameState, PlayerState, Resource } from '../contract/types.ts'
 import { getFarmyardTileCount } from '../domain/farm.ts'
 import { fieldHasCrop } from '../domain/field.ts'
@@ -449,10 +450,7 @@ export const computeScores = (state: GameState): PlayerScoreSummary[] => {
       entries: [{ type: 'quantity', quantity: emptyCount, score: emptyScore }],
     })
 
-    const fencedStables = player.pastures.reduce(
-      (sum, pasture) => sum + pasture.stables,
-      0,
-    )
+    const fencedStables = getFencedStableCount(player)
     categories.push({
       key: 'stables',
       total: fencedStables,

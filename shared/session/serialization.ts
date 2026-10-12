@@ -23,6 +23,7 @@ import { normalizeBlockedBy, normalizeTakenBy } from '../domain/space'
 import { collectLockedFarmTileKeys, collectBuiltSpecialStables, type BuiltSpecialStable } from '../cards/card-effects'
 import { createSeasonActionSpaces } from '../seasons/action-spaces'
 import { computeAnimalZones, type AnimalZone } from '../domain/animal-zones'
+import { getPastureSize, getPastureStableCount, type Pasture as PastureView } from '../domain/pasture'
 
 import { canTakeVisibleMoorSpecialAction, isMoorSpecialActionCardUsableByPlayer } from '../moor/special-action-availability'
 import type { MoorSpecialActionId } from '../moor/types'
@@ -40,7 +41,8 @@ export type SerializedActionSpace = Omit<
  * derived from card effects. The domain truth stays in `cardStates`; these
  * never enter `PlayerState`.
  */
-export type SerializedPlayerState = PlayerState & {
+export type SerializedPlayerState = Omit<PlayerState, 'pastures'> & {
+  pastures: Omit<PastureView, 'capacity' | 'hasWell'>[]
   cardStatePresentation: Record<string, CardStatePresentation>
   moorSpecialActionAvailability: Record<string, Partial<Record<MoorSpecialActionId, boolean>> & { cardUsable: boolean }>
   lockedFarmTileKeys: string[]
@@ -165,6 +167,7 @@ const collectFarmCardAnimalZones = (
     .map(serializeAnimalZone)
 
 type SerializedPlayerDisplayFields = Omit<SerializedPlayerState, keyof PlayerState>
+  & Pick<SerializedPlayerState, 'pastures'>
 
 const serializePlayerDisplayFields = (
   state: GameState,
@@ -181,6 +184,11 @@ const serializePlayerDisplayFields = (
   const specialStables = collectBuiltSpecialStables(player)
   const zones = computeAnimalZones(player, state)
   return {
+    pastures: player.pastures.map(pasture => ({
+      ...pasture,
+      size: getPastureSize(pasture),
+      stables: getPastureStableCount(player, pasture),
+    })),
     moorSpecialActionAvailability,
     cardStatePresentation: { ...collectCardStatePresentation(player), ...projectParentCardState(player) },
     lockedFarmTileKeys,

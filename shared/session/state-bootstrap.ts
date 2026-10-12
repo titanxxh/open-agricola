@@ -496,17 +496,12 @@ export const normalizeState = (raw: GameState): GameState => {
       return [{ ...field, row: next.row, col: next.col }]
     })
     normalized.fields = normalizedFields
-    const stableSet = new Set(
-      normalized.stableTiles.map((tile) => positionKey(tile)),
-    )
     normalized.pastures = (normalized.pastures ?? []).map((pasture, index) => {
-      const tiles = pasture.tiles ?? []
       return {
-        ...pasture,
         id: pasture.id ?? `pasture-${index + 1}`,
-        tiles,
-        stables: tiles.filter((tile) => stableSet.has(positionKey(tile)))
-          .length,
+        tiles: pasture.tiles ?? [],
+        animalType: pasture.animalType,
+        animalCount: pasture.animalCount,
       }
     })
     const pastureTileKeys = new Set(

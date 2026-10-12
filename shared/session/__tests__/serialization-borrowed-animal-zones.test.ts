@@ -123,7 +123,7 @@ describe('borrowed played-card animal zones serialization', () => {
         animalCountsByZone: { [ownedZoneId]: { animalCounts: { sheep: 2 } } },
       } }
       owner.pastures = [{
-        id: 'test-pasture', size: 1, stables: 0, animalType: 'sheep', animalCount: 2,
+        id: 'test-pasture', animalType: 'sheep', animalCount: 2,
         tiles: [{ row: 0, col: 2 }],
       }]
       const effect = session.withCtx(() => getCardEffect('M033_NightPasture'))!
@@ -151,7 +151,7 @@ describe('borrowed played-card animal zones serialization', () => {
       ])
 
       owner.name = 'Renamed owner'
-      owner.pastures[0]!.stables = 1
+      owner.stableTiles = [{ row: 0, col: 2 }]
       owner.cardStates.M033_NightPasture.extraData = {
         animalCountsByZone: { [ownedZoneId]: { animalCounts: { sheep: 1 } } },
       }

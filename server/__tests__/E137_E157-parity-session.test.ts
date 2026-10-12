@@ -107,7 +107,8 @@ describe('E137-E145 parity', () => {
   })
   it('E138 S1: before round twelve Livestock Expert doubles one chosen animal type', () => {
     const s = setup({ cardId: 'E138_LivestockExpert', played: false, playerCount: 3, round: 11, resources: { sheep: 2 } })
-    s.state.players[0]!.pastures = [{ id: 'sheep', size: 2, tiles: [{ row: 1, col: 0 }, { row: 1, col: 1 }], stables: 1, animalType: 'sheep', animalCount: 2 }]
+    s.state.players[0]!.pastures = [{ id: 'sheep', tiles: [{ row: 1, col: 0 }, { row: 1, col: 1 }], animalType: 'sheep', animalCount: 2 }]
+    s.state.players[0]!.stableTiles = [{ row: 1, col: 0 }]
     let r = playOccupation(s, 'E138_LivestockExpert')
     if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'animal-reorg') {
       const zones = structuredClone(r.interaction.request.zones)
@@ -124,7 +125,8 @@ describe('E137-E145 parity', () => {
   })
   it.each([{ scenario: 'S3', animal: 'boar' as const }, { scenario: 'S4', animal: 'cattle' as const }])('E138 $scenario: Livestock Expert may double existing $animal', ({ animal }) => {
     const s = setup({ cardId: 'E138_LivestockExpert', played: false, playerCount: 3, round: 11, resources: { [animal]: 2 } })
-    s.state.players[0]!.pastures = [{ id: animal, size: 2, tiles: [{ row: 1, col: 0 }, { row: 1, col: 1 }], stables: 1, animalType: animal, animalCount: 2 }]
+    s.state.players[0]!.pastures = [{ id: animal, tiles: [{ row: 1, col: 0 }, { row: 1, col: 1 }], animalType: animal, animalCount: 2 }]
+    s.state.players[0]!.stableTiles = [{ row: 1, col: 0 }]
     let r = playOccupation(s, 'E138_LivestockExpert')
     if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'animal-reorg') {
       const zones = structuredClone(r.interaction.request.zones)

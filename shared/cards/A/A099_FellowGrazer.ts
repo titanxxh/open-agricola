@@ -1,4 +1,5 @@
 import { defineOccupationCard } from '../card-source'
+import { getPastureSize } from '../../domain/pasture'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A099_FellowGrazer'
@@ -7,7 +8,7 @@ const cardImpl = {
   effect: {
   id: CARD_ID,
   computeBonusScore: (_state, player) => {
-    return player.pastures.filter((p) => p.size >= 3).length * 2
+    return player.pastures.filter((p) => getPastureSize(p) >= 3).length * 2
   },
 },
   reaches: [] as readonly string[],

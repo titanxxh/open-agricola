@@ -110,9 +110,7 @@ const setup = (opts: SetupOptions = {}) => {
     player.pastures = [
       {
         id: 'pasture-1',
-        size: 1,
         tiles: [{ row: 0, col: 0 }],
-        stables: 0,
         animalType: 'sheep',
         animalCount: 2,
       },
@@ -467,9 +465,7 @@ describe('C1 Overhaul session', () => {
     expect(player.pastures).toEqual([
       {
         id: 'pasture-1',
-        size: 1,
         tiles: [{ row: 0, col: 0 }],
-        stables: 0,
         animalType: 'sheep',
         animalCount: 2,
       },

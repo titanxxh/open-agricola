@@ -470,7 +470,6 @@ describe('listener purity wave 2a', () => {
 
     p.cardStates[B124] = { extraData: { pastureArea: 3 }, flagged: false }
     p.pastures[0]!.tiles.push({ row: 0, col: 3 })
-    p.pastures[0]!.size = 4
 
     const second = listener.handler(context(p, {
       actionId: 'fence',

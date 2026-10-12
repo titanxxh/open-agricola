@@ -13,15 +13,6 @@ const removeStableAtTile = (
   )
   if (index === -1) return false
   player.stableTiles.splice(index, 1)
-
-  for (const pasture of player.pastures ?? []) {
-    if ((pasture.stables ?? 0) <= 0) continue
-    if (pasture.tiles?.some((t) => positionKey(t) === targetKey)) {
-      pasture.stables = Math.max(0, pasture.stables - 1)
-      break
-    }
-  }
-
   return true
 }
 

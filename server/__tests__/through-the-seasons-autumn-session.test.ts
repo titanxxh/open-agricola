@@ -110,7 +110,7 @@ describe('Seasons batch 3 autumn audit', () => {
     for (const player of session.state.players) {
       player.fields = [{ row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 1 }] }, { row: 0, col: 1, stacks: [{ kind: 'vegetable', remaining: 2 }] }, { row: 0, col: 2, stacks: [] }]
       player.resources.sheep = 2
-      player.pastures = [{ id: 'pen', size: 2, tiles: [{ row: 0, col: 3 }, { row: 0, col: 4 }], stables: 0, animalType: 'sheep', animalCount: 2 }]
+      player.pastures = [{ id: 'pen', tiles: [{ row: 0, col: 3 }, { row: 0, col: 4 }], animalType: 'sheep', animalCount: 2 }]
       player.fenceSegments = ['H-0-3', 'H-0-4', 'H-1-3', 'H-1-4', 'V-0-3', 'V-0-5'].map((edge) => ({ edge, type: 'fence', source: { kind: 'own', ownerPlayerId: player.id } }))
     }
     const before = auditClone(session.state)

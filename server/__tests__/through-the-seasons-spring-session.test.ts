@@ -83,7 +83,7 @@ const auditRestore = (session: GameSession) => {
 }
 const auditPen = (player: PlayerState, count: number, animal: 'sheep' | 'boar' | 'cattle' = 'sheep') => {
   player.resources[animal] = count
-  player.pastures = [{ id: 'pen', size: 2, tiles: [{ row: 0, col: 0 }, { row: 0, col: 1 }], stables: 0, animalType: count > 0 ? animal : null, animalCount: count }]
+  player.pastures = [{ id: 'pen', tiles: [{ row: 0, col: 0 }, { row: 0, col: 1 }], animalType: count > 0 ? animal : null, animalCount: count }]
   player.fenceSegments = ['H-0-0', 'H-0-1', 'H-1-0', 'H-1-1', 'V-0-0', 'V-0-2'].map((edge) => ({ edge, type: 'fence', source: { kind: 'own', ownerPlayerId: player.id } }))
 }
 const auditAnimals = (session: GameSession) => {

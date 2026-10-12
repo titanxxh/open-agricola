@@ -1,4 +1,5 @@
 import { defineMinorCard } from '../card-source'
+import { getPastureSize } from '../../domain/pasture'
 import type { ExtraSowableField } from '../card-effects'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
@@ -17,9 +18,6 @@ type PastureCrop = {
 
 const posKey = (tile: FarmTilePosition) => `${tile.row}-${tile.col}`
 
-const getPastureSize = (pasture: { tiles?: FarmTilePosition[]; size: number }) =>
-  pasture.tiles && pasture.tiles.length > 0 ? pasture.tiles.length : pasture.size
-
 const getPastureCrops = (player: PlayerState): PastureCrop[] =>
   readCardExtraData<PastureCrop[]>(player, CARD_ID, 'pastureCrops') ?? []
 
@@ -32,7 +30,7 @@ const setPastureCrops = (player: PlayerState, crops: PastureCrop[]) =>
 const getEligiblePastures = (player: PlayerState) => {
   const sownPastureIds = new Set(getPastureCrops(player).map((c) => c.pastureId))
   return player.pastures.filter(
-    (p) => (p.size === 1 || p.size === 2) && !sownPastureIds.has(p.id),
+    (p) => (getPastureSize(p) === 1 || getPastureSize(p) === 2) && !sownPastureIds.has(p.id),
   )
 }
 
@@ -71,7 +69,7 @@ const findPastureByTile = (
 ): string | null => {
   const key = posKey(tile)
   for (const pasture of player.pastures) {
-    if (pasture.size !== 1 && pasture.size !== 2) continue
+    if (getPastureSize(pasture) !== 1 && getPastureSize(pasture) !== 2) continue
     for (const t of pasture.tiles ?? []) {
       if (posKey(t) === key) return pasture.id
     }
@@ -124,7 +122,7 @@ const cardImpl = {
     if (!pastureId) return false
     if (crop !== 'grain' && crop !== 'vegetable') return false
     const pasture = player.pastures.find((p) => p.id === pastureId)
-    if (!pasture || (pasture.size !== 1 && pasture.size !== 2)) return false
+    if (!pasture || (getPastureSize(pasture) !== 1 && getPastureSize(pasture) !== 2)) return false
 
     // Check not already sown
     const existing = getPastureCrops(player)

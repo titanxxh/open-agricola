@@ -1,6 +1,7 @@
 import type { GameState, PlayerState, Pasture } from '../contract/types.ts'
 import { ALL_ANIMAL_KEYS, animalKeysForState, type AnimalKey } from '../contract/animals.ts'
 import { positionKey } from '../domain/farm.ts'
+import { getPastureCapacity, getPastureViews, type Pasture as PastureView } from './pasture'
 import {
   getCardEffect,
   notifyAnimalsRemovedFromCardEffects,
@@ -85,10 +86,6 @@ export const countHouseAnimals = (
       return sum + count
     }, 0)
 
-/** Pasture capacity formula: `size * 2 * 2^stables`. */
-export const getPastureCapacity = (pasture: Pasture) =>
-  pasture.size * 2 * Math.pow(2, pasture.stables)
-
 const getPlayedCardIds = (player: PlayerState) => [
   ...(player.minorPlayed ?? []),
   ...(player.occupationPlayed ?? []),
@@ -108,7 +105,7 @@ const applyPastureCapacityModifiers = (
   ctx: {
     player: PlayerState
     state: GameState
-    pasture: Pasture
+    pasture: PastureView
     pastureIndex: number
   },
   modifiers: PastureCapacityModifier[],
@@ -467,9 +464,9 @@ export const computeAnimalZones = (
   const allCards = getPlayedCardIds(player)
   const pastureCapacityModifiers = collectPastureCapacityModifiers(player, state)
   const zones: AnimalZone[] = [
-    ...player.pastures.map((pasture, index) => {
+    ...getPastureViews(player).map((pasture, index) => {
       const capacity = applyPastureCapacityModifiers(
-        getPastureCapacity(pasture),
+        pasture.capacity,
         { player, state, pasture, pastureIndex: index },
         pastureCapacityModifiers,
       )
@@ -1045,7 +1042,7 @@ export class AnimalZones {
   pastureCapacity(zoneId: string): number {
     const pasture = (this.player.pastures ?? []).find((p) => p.id === zoneId)
     if (!pasture) return 0
-    return getPastureCapacity(pasture)
+    return getPastureCapacity(this.player, pasture)
   }
 
   /** Loose-stable tile keys (stables not inside any pasture). */

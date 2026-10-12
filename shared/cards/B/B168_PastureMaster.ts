@@ -1,4 +1,5 @@
 import { defineOccupationCard } from '../card-source'
+import { getPastureStableCount } from '../../domain/pasture'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
@@ -25,7 +26,7 @@ const listener: CardListenerRegistration = {
 
     // Check each pasture for stables and animals
     for (const pasture of context.player.pastures) {
-      if (pasture.stables === 0) continue
+      if (getPastureStableCount(context.player, pasture) === 0) continue
       if (pasture.animalType && pasture.animalCount > 0) {
         const animalKey = pasture.animalType as keyof Resource
         gain[animalKey] = (gain[animalKey] ?? 0) + 1

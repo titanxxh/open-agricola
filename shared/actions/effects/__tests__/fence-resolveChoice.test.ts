@@ -996,7 +996,7 @@ describe('fenceAction.resolveChoice', () => {
     expect(ctx.player.resources.wood).toBe(2)
     expect(ctx.player.fenceSegments).toHaveLength(6)
     expect(ctx.player.pastures).toHaveLength(1)
-    expect(ctx.player.pastures[0]?.size).toBe(2)
+    expect(ctx.player.pastures[0]?.tiles).toHaveLength(2)
   })
 
   it('rejects pastureBounds violations recoverably without fixedWood payment', () => {
@@ -1064,12 +1064,10 @@ describe('fenceAction.resolveChoice', () => {
         pastures: [
           {
             id: 'pasture-1',
-            size: 2,
             tiles: [
               { row: 0, col: 1 },
               { row: 0, col: 2 },
             ],
-            stables: 0,
             animalType: null,
             animalCount: 0,
           },

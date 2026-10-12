@@ -1,4 +1,5 @@
 import { defineMinorCard } from '../card-source'
+import { getPastureStableCount } from '../../domain/pasture'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E012_AnimalBedding'
@@ -10,7 +11,7 @@ const cardImpl = {
     // Collect pasture IDs that have stables
     const stabledPastureIndices = new Set<number>(
       player.pastures
-        .map((p, i) => (p.stables > 0 ? i : -1))
+        .map((p, i) => (getPastureStableCount(player, p) > 0 ? i : -1))
         .filter((i) => i >= 0),
     )
     for (const zone of zones) {

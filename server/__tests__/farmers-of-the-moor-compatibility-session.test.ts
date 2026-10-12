@@ -224,7 +224,7 @@ const auditPastures = (player: PlayerState, entries: Array<{ col: number; size?:
     const size = entry.size ?? 1
     const tiles = Array.from({ length: size }, (_, offset) => ({ row: 0, col: entry.col + offset }))
     player.farmTerrain = player.farmTerrain?.filter((terrain) => !tiles.some((tile) => positionKey(tile) === positionKey(terrain)))
-    player.pastures.push({ id: `pen-${entry.col}`, size, tiles, stables: 0, animalType: entry.animal, animalCount: entry.count })
+    player.pastures.push({ id: `pen-${entry.col}`, tiles, animalType: entry.animal, animalCount: entry.count })
     player.resources[entry.animal] = (player.resources[entry.animal] ?? 0) + entry.count
     const edges = [...tiles.flatMap((tile) => [`H-0-${tile.col}`, `H-1-${tile.col}`]), `V-0-${entry.col}`, `V-0-${entry.col + size}`]
     for (const edge of edges) if (!player.fenceSegments.some((segment) => segment.edge === edge)) player.fenceSegments.push({ edge, type: 'fence', source: { kind: 'own', ownerPlayerId: player.id } })

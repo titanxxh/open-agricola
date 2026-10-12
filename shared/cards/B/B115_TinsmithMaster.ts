@@ -1,4 +1,5 @@
 import { defineOccupationCard } from '../card-source'
+import { getPastureStableCount } from '../../domain/pasture'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { AnimalZone } from '../../domain'
@@ -100,7 +101,7 @@ const cardImpl = {
       if (pastureIndex === undefined) continue
       const pasture = player.pastures[pastureIndex]
       if (!pasture) continue
-      if (pasture.stables === 0) {
+      if (getPastureStableCount(player, pasture) === 0) {
         zone.capacity += 1
       }
     }

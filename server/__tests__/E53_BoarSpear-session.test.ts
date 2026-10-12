@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { setWorkersAtHome } from '../../shared/domain/player'
+import { getPastureCapacity } from '../../shared/domain/pasture'
 import { readCardExtraData } from '../../shared/cards/helpers/card-state'
 import { recordActionSnapshot } from '../../shared/cards/helpers/action-snapshot'
 import { E053_BoarSpear_impl } from '../../shared/cards/E/E053_BoarSpear'
@@ -117,7 +118,7 @@ const driveToCompletion = (
         zoneType: 'pasture' as const,
         animalType: pasture.animalType ?? null,
         animalCount: pasture.animalCount,
-        capacity: pasture.size * (1 + (pasture.stables ?? 0)),
+        capacity: getPastureCapacity(p, pasture),
       })),
     ]
     resp = session.resolveChoice(0, 'confirm', placeBoarInHouse(zones) as unknown as Record<string, unknown>)

@@ -19,6 +19,7 @@ import {
   type SowSelection,
 } from './farmyard.ts'
 import { getOrdinaryStableCount } from './stables.ts'
+import { getPastureSize } from './pasture'
 import { buildFarmPositionSelectionRequest } from './farm-position-selection.ts'
 
 const STABLE_WOOD_COST = 2
@@ -119,7 +120,7 @@ export const buildStableFarmInteraction = (
   if (options?.zoneFilter === 'pasture-1') {
     const oneSizePastureCells = new Set<string>()
     for (const pasture of player.pastures) {
-      if (pasture.size === 1) {
+      if (getPastureSize(pasture) === 1) {
         for (const cell of pasture.tiles ?? []) {
           oneSizePastureCells.add(positionKey(cell))
         }

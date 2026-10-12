@@ -27,6 +27,7 @@ import {
 import { collectFarmChoiceCostAdjustments } from '../../cards/card-listeners'
 import { addCardResourceGained, recordActionCostAttribution } from '../../cards/helpers/card-state'
 import { getAvailableStableSupplyCount } from '../../domain/supply-tokens'
+import { getPastureSize } from '../../domain/pasture'
 
 // `actionContext.farmHand === true` is the generic gate set by the
 // Farm-Expansion stables leaf wrapper to allow special card stables (e.g. B85
@@ -126,7 +127,7 @@ const isWithinStableZoneFilter = (
   if (actionContext?.zoneFilter !== 'pasture-1') return true
   const oneSizePastureCells = new Set<string>()
   for (const pasture of player.pastures ?? []) {
-    if (pasture.size !== 1) continue
+    if (getPastureSize(pasture) !== 1) continue
     for (const tile of pasture.tiles ?? []) {
       oneSizePastureCells.add(positionKey(tile))
     }

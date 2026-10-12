@@ -115,7 +115,7 @@ describe('Animal Reorg Prefill', () => {
   it('reserves the sheep-only card for sheep so the empty pasture can hold pigs', () => {
     const session = setup()
     const state = session.getState().state
-    state.players[0]!.pastures[0]!.size = 1
+    state.players[0]!.pastures[0]!.tiles = [{ row: 0, col: 0 }]
     state.players[0]!.minorPlayed = ['E084_DollysMother']
     session.loadState(state)
     const pending = session.devSetResources(0, { sheep: 1, boar: 2 })

@@ -20,6 +20,7 @@ import type {
 import { PaymentSolver } from '../payment'
 import { buildInternalPayChild } from '../helpers/pay-child'
 import { playerBoard, normalizePlayerFarm } from '../../domain'
+import { getPastureSize } from '../../domain/pasture'
 import {
   getFarmyardTileCount,
   getFarmyardTilePositions,
@@ -389,7 +390,7 @@ const fenceFail = (
 export { getFenceCount, getPalisadeCount } from '../../domain/fence-segments'
 
 export const getTotalPastureCells = (player: PlayerState) =>
-  player.pastures.reduce((sum, pasture) => sum + pasture.size, 0)
+  player.pastures.reduce((sum, pasture) => sum + getPastureSize(pasture), 0)
 
 export const canStartFencing = (
   state: GameState,

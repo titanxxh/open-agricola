@@ -801,9 +801,9 @@ describe('D167 Pure Breeder parity', () => {
       cardId: 'D167_PureBreeder', playerCount: 4, round, resources: { sheep: 2 },
     })
     session.state.players[0]!.pastures = [{
-      id: 'sheep-pasture', size: 2,
+      id: 'sheep-pasture',
       tiles: [{ row: 1, col: 0 }, { row: 1, col: 1 }],
-      stables: 0, animalType: 'sheep', animalCount: 2,
+      animalType: 'sheep', animalCount: 2,
     }]
     prepareRoundEnd(session)
     return autoAdvanceRoundEnd(session, {

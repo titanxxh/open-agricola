@@ -1,4 +1,5 @@
 import { defineOccupationCard } from '../card-source'
+import { getFencedStableCount } from '../../domain/pasture'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 
@@ -10,7 +11,7 @@ const cardImpl = {
   onStartHarvest: (_state, player) => {
 
     // Count fenced stables: sum of stables inside pastures
-    const fencedStables = player.pastures.reduce((sum, pasture) => sum + pasture.stables, 0)
+    const fencedStables = getFencedStableCount(player)
     if (fencedStables === 0) return
 
     // 1 fenced stable → sheep; 2 → pig; 3+ → cattle

@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { giveResource, advanceRound } from './fixtures';
+import { giveResource, advanceRound, BACKEND_URL, getJson, postJson } from './fixtures';
 
 const actionCard = (page: Page, name: string) =>
   page.locator('.action-card', { hasText: name });
@@ -114,6 +114,44 @@ test.describe('FarmSelect Interactions End-to-End Tests', () => {
     await selectFirstTile(page);
     await confirm(page, 'Confirm stables');
     await expect(page.locator('.farm-tile.stable').first()).toBeVisible();
+  });
+
+  test('stable: capacity display updates immediately inside an occupied pasture', async ({ page, request }) => {
+    const { state } = await getJson(request, BACKEND_URL + '/api/game/state');
+    for (const player of state.players) {
+      player.minorHand = ['__test_placeholder__'];
+      player.occupationHand = ['__test_placeholder__'];
+    }
+    const player = state.players[0];
+    Object.assign(player.resources, { wood: 2, reed: 0, sheep: 2, boar: 0, cattle: 0 });
+    player.houseAnimalType = null;
+    player.houseAnimalCount = 0;
+    player.stableTiles = [];
+    player.stableAnimals = {};
+    player.pastures = [{
+      id: 'stable-capacity', tiles: [{ row: 0, col: 2 }], animalType: 'sheep', animalCount: 2,
+    }];
+    player.fenceSegments = ['H-0-2', 'H-1-2', 'V-0-2', 'V-0-3'].map(edge => ({ edge, type: 'fence' }));
+    expect((await postJson(request, BACKEND_URL + '/api/game/load', { state })).ok).toBe(true);
+    await page.reload();
+
+    const tile = page.locator('[data-farm-tile-player="p1"][data-farm-tile-key="0-2"]');
+    const pastureCount = tile.locator('.pasture-info').first().locator('span.pasture-count');
+    await expect(pastureCount).toHaveText('2/2');
+    await actionCard(page, 'Farm Expansion').click();
+    await expectInteraction(page, 'Select stable tiles');
+    await expect(tile).toHaveClass(/stable-selectable/);
+    await tile.click();
+    await confirm(page, 'Confirm stables');
+
+    await expect(tile).toHaveClass(/\bstable\b/);
+    await expect(pastureCount).toHaveText('2/4');
+    const after = await getJson(request, BACKEND_URL + '/api/game/state');
+    expect(after.state.players[0].pastures[0]).toMatchObject({
+      id: 'stable-capacity', size: 1, stables: 1, animalType: 'sheep', animalCount: 2,
+    });
+    expect(after.state.players[0].resources.wood).toBe(0);
+    expect(after.scores[0].categories.find((category: { key: string }) => category.key === 'stables').total).toBe(1);
   });
 
   test('fence: build fence requires wood', async ({ page }) => {

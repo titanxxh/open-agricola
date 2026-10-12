@@ -206,7 +206,7 @@ describe('Five-plus action printed-rule audit', () => {
     const session = setup('C170_AmateurFencer')
     session.state.players[0]!.occupationPlayed = []
     session.state.players[0]!.occupationHand = ['C170_AmateurFencer']
-    if (existing) session.state.players[0]!.pastures = [{ id: 'existing', size: 1, tiles: [{ row: 1, col: 1 }], stables: 0, animalType: null, animalCount: 0 }]
+    if (existing) session.state.players[0]!.pastures = [{ id: 'existing', tiles: [{ row: 1, col: 1 }], animalType: null, animalCount: 0 }]
     let response = session.takeAction(0, 'lessons')
     expect(response.ok).toBe(true)
     expect(response.state.players[0]!.occupationPlayed).toContain('C170_AmateurFencer')
@@ -223,7 +223,7 @@ describe('Five-plus action printed-rule audit', () => {
     response = session.commitSelectionChoice(0, { edges: ['H-1-1', 'H-2-1', 'V-1-1', 'V-1-2'], extraWood: 0 })
     expect(response.ok).toBe(true)
     expect(response.state.players[0]!.pastures).toHaveLength(1)
-    expect(response.state.players[0]!.pastures[0]!.size).toBe(1)
+    expect(response.state.players[0]!.pastures[0]!.tiles).toHaveLength(1)
     expect(response.state.players[0]!.resources.wood).toBe(0)
     expect(response.state.players[0]!.fenceSegments).toHaveLength(4)
   })
@@ -283,7 +283,7 @@ describe('Five-plus action printed-rule audit', () => {
   it('C179 Bovine Pioneer does not reward subdividing an already fenced pasture', () => {
     const session = setup('C179_BovinePioneer')
     session.state.players[0]!.resources.wood = 1
-    session.state.players[0]!.pastures = [{ id: 'existing', size: 2, tiles: [{ row: 1, col: 1 }, { row: 1, col: 2 }], stables: 0, animalType: null, animalCount: 0 }]
+    session.state.players[0]!.pastures = [{ id: 'existing', tiles: [{ row: 1, col: 1 }, { row: 1, col: 2 }], animalType: null, animalCount: 0 }]
     session.state.players[0]!.fenceSegments = ['H-1-1', 'H-1-2', 'H-2-1', 'H-2-2', 'V-1-1', 'V-1-3'].map((edge) => ({ edge, type: 'fence', source: { kind: 'own', ownerPlayerId: session.state.players[0]!.id } }))
     session.loadState(session.state)
     const offered = session.takeAction(0, 'fencing')
