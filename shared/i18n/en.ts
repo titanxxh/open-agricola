@@ -321,6 +321,7 @@ export const en = {
     languageZh: '中文',
     languageEn: 'English',
     languageSelectLabel: 'Display language',
+    githubRepository: 'GitHub repository (opens in a new tab)',
     headerMenu: 'Menu',
     snakeOpening: 'Snake opening',
     snakeOpeningDescription: 'Round 1 only: each player’s second person is placed in reverse turn order.',

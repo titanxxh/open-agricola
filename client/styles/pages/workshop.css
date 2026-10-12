@@ -1452,8 +1452,11 @@
       align-items: stretch;
     }
 
-  .ws-nav-actions,
-    .ws-sandbox-summary,
+  .ws-nav-actions {
+      justify-content: flex-end;
+    }
+
+  .ws-sandbox-summary,
     .ws-section-header,
     .ws-modal-toolbar,
     .ws-sandbox-header {

@@ -5020,6 +5020,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
+  margin-left: auto;
   position: relative;
 }
 .header-actions {

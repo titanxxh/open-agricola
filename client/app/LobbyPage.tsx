@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useLocale } from '../contexts/LocaleContext'
 import { setPage } from '../utils/platform-page-url'
 import { LocaleSwitcher } from '../components/common/LocaleSwitcher'
+import { GitHubRepoLink } from '../components/common/GitHubRepoLink'
 import { BrandMark } from '../components/common/BrandMark'
 import { DonateWidgets } from '../components/common/DonateWidgets'
 import { Section } from '../components/common/Section'
@@ -188,6 +189,7 @@ export function LobbyPage() {
           titleClassName="site-home-brand__title"
           homeLinkLabel={t('platform.backToLobbyPlain')}
         />
+        <GitHubRepoLink />
         <div className="lobby-header__right">
           <LocaleSwitcher />
           <button

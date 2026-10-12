@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useLocale } from '../contexts/LocaleContext'
+import { GitHubRepoLink } from '../components/common/GitHubRepoLink'
 import { API_BASE } from '../config'
 import { setPage } from '../utils/platform-page-url'
 import './OperationsPage.css'
@@ -39,10 +40,19 @@ export function OperationsPage() {
       else window.location.assign(target.href)
     } catch { tab?.close(); setError(t('platform.operationsUnavailable')) }
   }
-  if (!user?.isAdmin) return <main className="operations-page"><p>{t('platform.operationsAdminOnly')}</p><button onClick={() => setPage('lobby')}>{t('platform.operationsBack')}</button></main>
+  if (!user?.isAdmin) return <main className="operations-page">
+    <header className="operations-nav">
+      <button className="operations-back" onClick={() => setPage('lobby')}>{t('platform.operationsBack')}</button>
+      <GitHubRepoLink />
+    </header>
+    <p>{t('platform.operationsAdminOnly')}</p>
+  </main>
   const labels: Record<string, string> = { instances: t('platform.operationsInstances'), onlineUsers: t('platform.operationsUsers'), playingRooms: t('platform.operationsRooms'), commandP95: t('platform.operationsLatency'), errorRate: t('platform.operationsErrors') }
   return <main className="operations-page">
-    <button className="operations-back" onClick={() => setPage('settings')}>{t('platform.operationsBack')}</button>
+    <header className="operations-nav">
+      <button className="operations-back" onClick={() => setPage('settings')}>{t('platform.operationsBack')}</button>
+      <GitHubRepoLink />
+    </header>
     <h1>{t('platform.operationsTitle')}</h1>
     <p>{t('platform.operationsDescription')}</p>
     <div className={`operations-health operations-health-${data?.level ?? 'unknown'}`} role="status">{t(`platform.operationsHealth.${data?.level ?? 'unknown'}`)}</div>

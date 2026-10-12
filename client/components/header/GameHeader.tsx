@@ -5,6 +5,7 @@ import type { GameState, PlayerState, RoundPhase } from '../../../shared/contrac
 import { harvestRounds } from '../../../shared/contract/state-constants'
 import { BrandMark } from '../common/BrandMark'
 import { LocaleSwitcher } from '../common/LocaleSwitcher'
+import { GitHubRepoLink } from '../common/GitHubRepoLink'
 import { snakeOpeningPlacementOrders } from './snake-opening-orders'
 import { getPlayerDisplayName } from '../../utils/player-name'
 
@@ -123,6 +124,7 @@ export const GameHeader = ({
           </span>
         )}
         <div className="header-actions" ref={menuContainerRef}>
+          {!embedded && <GitHubRepoLink />}
           <LocaleSwitcher className="header-locale-select" />
           <button
             type="button"

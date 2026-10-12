@@ -3,6 +3,7 @@ import { AuthProvider } from './contexts/AuthContext'
 import { LocaleProvider, useLocale } from './contexts/LocaleContext'
 import { loadCardsManifest } from './services/card-meta'
 import { BrandMark } from './components/common/BrandMark'
+import { GitHubRepoLink } from './components/common/GitHubRepoLink'
 import { GameLoadScreen } from './components/common/GameLoadScreen'
 import { AppErrorBoundary } from './app/AppErrorBoundary'
 import { AppShellLoadScreen } from './app/AppShellLoadScreen'
@@ -20,6 +21,7 @@ function AppLoadFailure({ detail }: { detail?: string }) {
   return (
     <div className="ws-status-screen">
       <div className="ws-status-card">
+        {!embedded && <div className="site-header-links"><GitHubRepoLink /></div>}
         {!embedded ? (
           <BrandMark
             title="Open Agricola"

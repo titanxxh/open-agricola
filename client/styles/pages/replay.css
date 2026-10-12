@@ -29,8 +29,21 @@
   color: #f4ead3;
 }
 
-.reported-evidence__brand {
+.replay-shell--chooser .github-repo-link,
+.replay-shell--viewer .github-repo-link {
+  color: #f4ead3;
+}
+
+.reported-evidence__nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   margin-bottom: 18px;
+}
+
+.reported-evidence__brand {
+  margin-bottom: 0;
 }
 
 .replay-shell--status {

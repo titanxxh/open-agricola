@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useLocale } from '../contexts/LocaleContext'
 import { BrandMark } from '../components/common/BrandMark'
 import { LocaleSwitcher } from '../components/common/LocaleSwitcher'
+import { GitHubRepoLink } from '../components/common/GitHubRepoLink'
 import { Section } from '../components/common/Section'
 import { DangerButton } from '../components/common/DangerButton'
 import { API_BASE } from '../config'
@@ -297,7 +298,10 @@ export function SettingsPage() {
           />
           <h1>{t('platform.settingsTitle')}</h1>
         </div>
-        <LocaleSwitcher />
+        <div className="site-header-links">
+          <GitHubRepoLink />
+          <LocaleSwitcher />
+        </div>
       </header>
 
       <Section icon="👤" title={t('platform.basicInfo')} variant="parchment">

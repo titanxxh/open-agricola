@@ -321,6 +321,7 @@ export const zh = {
     languageZh: '中文',
     languageEn: 'English',
     languageSelectLabel: '界面语言',
+    githubRepository: 'GitHub 项目仓库（在新标签页打开）',
     headerMenu: '菜单',
     snakeOpening: '蛇形开局',
     snakeOpeningDescription: '仅第 1 回合：每人的第二个人按反向顺序放置。',
