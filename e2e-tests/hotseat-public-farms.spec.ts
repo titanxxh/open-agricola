@@ -86,6 +86,66 @@ const reachCrossPlayerFeed = async (page: Page, names: string[]) => {
   throw new Error('Cross-player feeding interaction was not reached')
 }
 
+test('real hotseat Moor drafts stay private during public browsing and remain usable on return', async ({ page }, testInfo) => {
+  const pageErrors: string[] = []
+  page.on('pageerror', error => pageErrors.push(error.message))
+  await captureRoom(page)
+  const username = `hotseat_moor_${Date.now().toString(36)}`
+  const oauth = await page.request.post(`${BACKEND_URL}/api/test/oauth/github/callback`, { data: {
+    providerUserId: username, providerLogin: username, email: `${username}@example.com`, displayName: 'Alice',
+  } })
+  expect(oauth.ok()).toBe(true)
+  const complete = await page.request.post(`${BACKEND_URL}/api/auth/onboarding/complete`, { data: {
+    username, displayName: 'Alice', password: 'hotseat-moor-pass', confirmPassword: 'hotseat-moor-pass',
+  } })
+  expect(complete.ok(), `${complete.status()} ${await complete.text()}`).toBe(true)
+  await page.goto(FRONTEND_URL)
+  await page.getByRole('button', { name: 'Local Hotseat', exact: true }).click()
+  await page.getByRole('checkbox', { name: /Snake opening/ }).uncheck()
+  await page.getByRole('checkbox', { name: 'Enable Farmers of the Moor expansion', exact: true }).check()
+  await page.getByRole('checkbox', { name: 'Allow an incomplete Farmers of the Moor minor improvement pool', exact: true }).check()
+  await page.getByRole('button', { name: 'Start Hotseat Game', exact: true }).click()
+  await finishHotseatOpening(page)
+  const initial = await snapshot(page)
+  expect(initial.state.players).toHaveLength(2)
+  const names = initial.state.players.map((player, index) => getPlayerDisplayName('en', player.name, index, player.nameIsDefault))
+  const cutPeat = page.locator('[data-card-id="moor-special-1-2-terrain"]').getByRole('button', { name: 'Cut Peat', exact: true })
+  await expect(cutPeat).toBeEnabled()
+  await page.evaluate(() => { window.hotseatProbe.sent = [] })
+  await cutPeat.click()
+  await expect(cutPeat).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.locator('.farm-tile.selectable').first()).toBeVisible()
+  expect(await ruleCommands(page)).toEqual([])
+
+  for (const mobile of [false, true]) {
+    await page.setViewportSize(mobile ? { width: 390, height: 844 } : { width: 1440, height: 1000 })
+    await browse(page, names[1]!, mobile)
+    await expect(cutPeat).toBeDisabled()
+    await expect(cutPeat).toHaveAttribute('aria-pressed', 'false')
+    await expect(cutPeat).not.toHaveClass(/\bselected\b/)
+    await expect(page.locator('.farm-tile.selectable, .farm-tile.selected')).toHaveCount(0)
+    await page.locator('[data-farm-tile-player="p2"]').first().click()
+    expect(await ruleCommands(page)).toEqual([])
+    await page.screenshot({ path: testInfo.outputPath(mobile ? 'moor-public-mobile.png' : 'moor-public-desktop.png') })
+    await page.getByRole('button', { name: `Return to ${names[0]} to continue` }).click()
+    await expect(cutPeat).toBeEnabled()
+    await expect(cutPeat).toHaveAttribute('aria-pressed', 'true')
+    await expect(cutPeat).toHaveClass(/\bselected\b/)
+    await expect(page.locator('.farm-tile.selectable').first()).toBeVisible()
+    expect(await ruleCommands(page)).toEqual([])
+  }
+
+  await page.locator('.farm-tile.selectable').first().click()
+  await expect.poll(async () => (await snapshot(page)).state.players[0]!.resources.fuel)
+    .toBe((initial.state.players[0]!.resources.fuel ?? 0) + 3)
+  expect(((await snapshot(page)).state.players[0]!.farmTerrain ?? []).filter(tile => tile.kind === 'moor'))
+    .toHaveLength((initial.state.players[0]!.farmTerrain ?? []).filter(tile => tile.kind === 'moor').length - 1)
+  await expect(cutPeat).toHaveAttribute('aria-pressed', 'false')
+  await expect(cutPeat).not.toHaveClass(/\bselected\b/)
+  expect(await ruleCommands(page)).toMatchObject([{ type: 'specialAction' }])
+  expect(pageErrors).toEqual([])
+})
+
 test('real hotseat public farms stay read-only on desktop/mobile, across reconnect, turns, harvest and reload', async ({ page }, testInfo) => {
   const pageErrors: string[] = []
   page.on('pageerror', error => pageErrors.push(error.message))

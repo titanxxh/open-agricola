@@ -152,6 +152,70 @@ afterEach(() => {
 })
 
 describe('hotseat public farm browsing', () => {
+  it.each([
+    { mobile: false, waiting: false },
+    { mobile: true, waiting: false },
+    { mobile: false, waiting: true },
+  ])('hides a private Moor action draft while browsing and restores it on return (mobile=$mobile, waiting=$waiting)', async ({ mobile, waiting }) => {
+    setupViewport(mobile)
+    const user = userEvent.setup()
+    const state = createInitialState(1098, {
+      playerCount: 2,
+      enableFarmersOfTheMoor: true,
+      allowIncompleteFarmersOfTheMoorMinorDeal: true,
+    })
+    state.players.forEach((player, index) => {
+      player.name = index === 0 ? 'Alice' : 'Bob'
+      player.nameIsDefault = false
+    })
+    state.players[0]!.farmTerrain = [{ row: 2, col: 1, kind: 'moor' }]
+    if (waiting) state.currentPlayerIndex = 1
+    GameSocket.payload = {
+      ...workPayload(),
+      state: serializeState(state, { engineStack: new EngineStack() }),
+      ...(waiting ? {
+        interaction: {
+          stateId: 'wait', playerIndex: 0, allowedCommands: ['resolveChoice'], anytimeActions: [],
+          promptKey: 'ui.interactionOptionalAction', request: { kind: 'choice', options: [{
+            value: ['card-action', 'moor-special-1-2-terrain', 'action', 'cut-peat', 2, 1].join(':'),
+            labelKey: 'moor.specialActions.cut-peat',
+          }] },
+        },
+      } : {}),
+    }
+    const { container } = renderGame()
+    await confirmAlice(user)
+    const card = container.querySelector('[data-card-id="moor-special-1-2-terrain"]')
+    if (!card) throw new Error('Expected the two-player Cut Peat special action card')
+    const cutPeat = within(card).getByRole('button', { name: 'Cut Peat' })
+    expect(cutPeat).toBeEnabled()
+    await user.click(cutPeat)
+    expect(cutPeat).toHaveAttribute('aria-pressed', 'true')
+    expect(cutPeat).toHaveClass('selected')
+    expect(container.querySelector('[data-farm-tile-player="p1"][data-farm-tile-key="2-1"]')).toHaveClass('selectable')
+    expect(ruleCommands()).toEqual([])
+
+    await selectBob(user, mobile)
+    expect(cutPeat).toBeDisabled()
+    expect(ruleCommands()).toEqual([])
+    expect(cutPeat).toHaveAttribute('aria-pressed', 'false')
+    expect(cutPeat).not.toHaveClass('selected')
+    expect(container.querySelector('.farm-tile.selectable, .farm-tile.selected')).not.toBeInTheDocument()
+    await user.click(cutPeat)
+    expect(ruleCommands()).toEqual([])
+
+    await user.click(screen.getByRole('button', { name: 'Return to Alice to continue' }))
+    expect(cutPeat).toBeEnabled()
+    expect(cutPeat).toHaveAttribute('aria-pressed', 'true')
+    expect(cutPeat).toHaveClass('selected')
+    expect(container.querySelector('[data-farm-tile-player="p1"][data-farm-tile-key="2-1"]')).toHaveClass('selectable')
+    expect(ruleCommands()).toEqual([])
+
+    act(() => GameSocket.snapshot())
+    expect(cutPeat).toHaveAttribute('aria-pressed', 'false')
+    expect(cutPeat).not.toHaveClass('selected')
+  })
+
   it('hides private improvement candidates and affordability hints in the public supply, then restores them on return', async () => {
     const user = userEvent.setup()
     const payload = choicePayload(0)
