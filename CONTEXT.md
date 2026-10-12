@@ -238,6 +238,18 @@ _Avoid_: 精确天文交节时间、节气当日、农历月份、游戏内 Seas
 前端唯一交互真相，只有 `idle`、`wait`、`gameover` 三类；`wait.request.kind` 决定 UI 展示选择、农场选择、喂食、动物整理、draft 等哪种交互。
 _Avoid_: 前端从 DOM 或规则代码推断可操作性
 
+**Farm View Player（农场观察玩家）**:
+当前被选择、供浏览其农场和已打出牌公开信息的玩家。观察对象不代表私有信息的可见对象或规则操作身份。
+_Avoid_: 交互玩家、已确认接机玩家、换座位、Replay Perspective
+
+**Interaction Player（交互玩家）**:
+当前规则流程要求提供输入的玩家，可能不同于普通工作轮转中的当前玩家。该身份不随农场观察对象改变。
+_Avoid_: 农场观察玩家、登录用户、把当前工作轮转玩家当作所有等待交互的回应者
+
+**Confirmed Hotseat Player（已确认接机玩家）**:
+共享设备上最近一次明确确认自己接机的玩家身份。接机确认是私有信息展示的隐私边界，不是浏览对象选择或永久座位授权。
+_Avoid_: 农场观察玩家、RoomPlayer 身份凭据、仅切换玩家标签
+
 **InteractionRequest**:
 等待玩家输入的结构化请求，常见 kind 有 `choice`、`farm-select`、`selection`、`animal-reorg`、`feed`、`confirm-next-player`、`confirm-player-switch`、`card-draft`。
 _Avoid_: 未类型化 pending blob
