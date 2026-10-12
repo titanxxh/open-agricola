@@ -1,3 +1,5 @@
+import { createBaseActionDescriber } from '../actions/base-description'
+import { collectScheduledEffectPreviews } from '../actions/scheduled-effect-preview'
 import { importRecoveryCatalog } from './recovery-catalog'
 import type { CardStatePresentation } from '../contract/card-state'
 import { collectCardStatePresentation } from '../cards/card-state-presentation'
@@ -10,6 +12,7 @@ import type {
   GameState,
   InteractionAnimalReorgZone,
   PlayerState,
+  ScheduledEffectPreview,
 } from '../contract/types'
 import type { FatherParentCardId, MotherParentCardId } from '../parents/types'
 import type { PublicEventCancellation } from '../contract/protocol/game'
@@ -33,7 +36,7 @@ export { filterSerializedStateForPlayer } from '../projections/serialized-state'
 
 export type SerializedActionSpace = Omit<
   ActionSpace,
-  'canBeExecutedByPlayer' | 'execute' | 'resolveChoice' | 'flow' | 'previewEffect'
+  'canBeExecutedByPlayer' | 'execute' | 'resolveChoice' | 'flow' | 'previewEffect' | 'flowFactory'
 >
 
 /**
@@ -52,6 +55,7 @@ export type SerializedPlayerState = Omit<PlayerState, 'pastures'> & {
   farmCardAnimalZones: InteractionAnimalReorgZone[]
   borrowedPlayedCardAnimalZones: InteractionAnimalReorgZone[]
   pastureCapacities: Record<string, number>
+  scheduledEffects: ScheduledEffectPreview[]
 }
 
 export type SerializedParentSelectionCandidates = {
@@ -198,6 +202,7 @@ const serializePlayerDisplayFields = (
     farmCardAnimalZones: collectFarmCardAnimalZones(zones),
     borrowedPlayedCardAnimalZones: collectBorrowedPlayedCardAnimalZones(zones),
     pastureCapacities: collectPastureCapacities(zones),
+    scheduledEffects: collectScheduledEffectPreviews(state, player),
   }
 }
 
@@ -206,6 +211,7 @@ export const serializeState = (
   _ctx: SerializeStateContext,
 ): SerializedGameState => {
   const { actionSpaces, players, ...rest } = state
+  const describeBaseAction = createBaseActionDescriber(state)
   return {
     ...rest,
     roundStartSnapshot: null,
@@ -215,7 +221,7 @@ export const serializeState = (
     })),
     actionSpaces: actionSpaces.map(
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      ({ canBeExecutedByPlayer, execute, resolveChoice, flow, previewEffect, ...s }) => s,
+      ({ canBeExecutedByPlayer, execute, resolveChoice, flow, previewEffect, flowFactory, ...s }, index) => ({ ...s, baseDescriptionPreview: describeBaseAction(actionSpaces[index]!) }),
     ),
     engineStack: { frames: [] },
   }
@@ -238,18 +244,23 @@ export const serializeSessionSnapshot = (
     state.players.map(player => serializePlayerDisplayFields(state, player)),
   )) as SerializedPlayerDisplayFields[])
   const { actionSpaces, players, ...rest } = captured
-  return {
-    state: captured as SerializedAuthoritativeGameState,
-    frame: {
+  const baseDescriptions = session.withCtx(() => {
+    const describe = createBaseActionDescriber(state)
+    return JSON.parse(JSON.stringify(state.actionSpaces.map(describe))) as (import('../contract/types').ChoiceDescriptionPreview | null)[]
+  })
+  const frame: SerializedGameState = {
       ...rest,
       roundStartSnapshot: null,
       players: players.map((player, index) => ({ ...player, ...displays[index]! })),
       actionSpaces: actionSpaces.map(
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        ({ canBeExecutedByPlayer, execute, resolveChoice, flow, previewEffect, ...space }) => space,
+        ({ canBeExecutedByPlayer, execute, resolveChoice, flow, previewEffect, flowFactory, ...space }, index) => ({ ...space, ...(baseDescriptions[index] ? { baseDescriptionPreview: baseDescriptions[index]! } : {}) }),
       ),
       engineStack: { frames: [] },
-    },
+    }
+  return {
+    state: captured as SerializedAuthoritativeGameState,
+    frame,
     sessionCursor: session.createSessionPrivateCursor(),
   }
 }
@@ -311,6 +322,7 @@ export const rehydrateState = (
       cardStatePresentation: _cardStatePresentation,
       borrowedPlayedCardAnimalZones: _borrowedPlayedCardAnimalZones,
       pastureCapacities: _pastureCapacities,
+      scheduledEffects: _scheduledEffects,
       ...player
     }) => player),
   }

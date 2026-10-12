@@ -32,7 +32,7 @@ const buildReclamationPlowUseFlow = (): ActionFlow => ({
       sourceCard: CARD_ID,
       optional: true,
       promptKey: 'ui.interactionReclamationPlow',
-      choiceLabelKey: 'ui.interactionReclamationPlowUse',
+      choiceLabelKey: 'ui.interactionUseAbility',
     },
   ],
 })

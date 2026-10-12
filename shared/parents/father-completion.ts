@@ -486,6 +486,8 @@ export const completeParentFatherAction: ActionDefinition = {
   gainPerRound: {},
   anytime: true,
   idleOnly: true,
+  previewEffect: ({ state, player }) => ({ kind: 'rule', description: { kind: 'group', operator: 'xor', separator: ' / ',
+    parts: satisfiedFatherCompletionOptions(state, player).map(({ option }) => option.descriptionPreview ?? { kind: 'action', labelKey: option.labelKey, labelParams: option.labelParams, effectPreview: option.effectPreview }) } }),
   canBeExecutedByPlayer: (state, player) =>
     state.currentPlayerIndex === state.players.indexOf(player) &&
     satisfiedFatherCompletionOptions(state, player).length > 0,

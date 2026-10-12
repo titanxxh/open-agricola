@@ -1,0 +1,130 @@
+import type { ActionDefinition, ActionExecutionContext, ActionFlow, BonusModifier } from '../contract/types'
+import type { RuleFixedOperation } from '../contract/rule-fixed-operations'
+import { getLogicalFields, mutateLogicalFields } from '../cards/helpers/card-field'
+import { readCardExtraData, writeCardExtraData } from '../cards/helpers/card-state'
+import { familySize } from '../domain/player'
+import { isSyntheticLinkedOccupancy } from '../domain/space'
+import { getOwnOrdinaryFenceReserveCount } from '../domain/supply-tokens'
+import { parsePositionKey } from '../domain/farm'
+import { registerSelectionEffect } from './helpers/selection-effect-registry'
+import { evaluateRuleAmount } from './rule-queries'
+import { gainLeaf, payLeaf } from '../cards/helpers/pay-gain-node'
+import { canRenovate } from './effects/renovation'
+import { breedLeaf } from './effects/breed'
+import { canAccommodateAllAnimals } from '../domain/animal-zones'
+import { canStartFencing } from './effects/fencing'
+
+registerSelectionEffect('rule-take-field-crop', ({ state, player, positions, sourceCard, actionContext, eventSink }) => {
+  const crop = actionContext?.ruleCrop
+  const amount = actionContext?.ruleCropAmount
+  if (!sourceCard || (crop !== 'grain' && crop !== 'vegetable') || typeof amount !== 'number') return
+  for (const key of positions) {
+    const position = parsePositionKey(key)
+    if (!position) continue
+    const field = getLogicalFields(player).find(candidate => candidate.slots.some(slot => slot.tile.row === position.row && slot.tile.col === position.col))
+    const top = field && [...field.slots].reverse().find(slot => slot.stack)
+    if (!field || top?.stack?.kind !== crop || top.stack.remaining < amount) continue
+    const removed = mutateLogicalFields(state, player, { sourceCard, eventSink }).remove({ fieldId: field.id, slot: top.index }, amount)
+    if (removed.ok) return removed.flow
+  }
+})
+
+export const ruleDiscountModifier = (cardId: string, operation: Extract<RuleFixedOperation, { kind: 'discounted-action' }>): BonusModifier => ({
+  type: 'bonus', cardId, appliesTo: ['renovation'], optional: false,
+  choices: operation.discounts.map(discount => ({ discount: { ...discount }, sources: [cardId] })),
+})
+
+export const canExecuteFixedRuleOperation = (operation: RuleFixedOperation, context: Pick<ActionExecutionContext, 'state' | 'player' | 'sourceCard'>): boolean => {
+  const { state, player, sourceCard } = context
+  switch (operation.kind) {
+    case 'collect-board-resources': return state.actionSpaces.some(space => operation.resources.some(resource => (space.resources[resource] ?? 0) > 0))
+    case 'discounted-action': return !!sourceCard && canRenovate({ ...player, activeModifiers: [...player.activeModifiers.filter(modifier => modifier.cardId !== sourceCard), ruleDiscountModifier(sourceCard, operation)] })
+    case 'each-space-worker': return state.actionSpaces.some(space => space.id === operation.spaceId && space.takenBy.some(worker => worker.playerId === player.id && !isSyntheticLinkedOccupancy(worker)))
+    default: return true
+  }
+}
+
+const exchange = (cardId: string, operation: Extract<RuleFixedOperation, { kind: 'bounded-exchange' }>, count: number): ActionFlow => ({
+  type: 'seq', children: [
+    payLeaf({ cardId, cost: Object.fromEntries(Object.entries(operation.cost).map(([resource, amount]) => [resource, amount * count])) }),
+    ...(Object.keys(operation.gain).length ? [gainLeaf(cardId, Object.fromEntries(Object.entries(operation.gain).map(([resource, amount]) => [resource, amount * count])))] : []),
+    ...Array.from({ length: operation.bonusVp * count }, (): ActionFlow => ({ type: 'leaf', actionId: 'bonus-vp', sourceCard: cardId })),
+  ],
+})
+
+export const executeFixedRuleOperation = (operation: RuleFixedOperation, context: ActionExecutionContext): ReturnType<ActionDefinition['execute']> => {
+  const { state, player, sourceCard } = context
+  if (!sourceCard) return { type: 'fail', errorKey: 'log.cardEffectFail' }
+  switch (operation.kind) {
+    case 'breed-animals': return canAccommodateAllAnimals(state, player, [...operation.animals]) ? { type: 'flow', flow: breedLeaf(sourceCard, operation.animals) } : { type: 'ok' }
+    case 'take-field-crop': {
+      const selectableTiles = getLogicalFields(player).flatMap(field => {
+        const top = [...field.slots].reverse().find(slot => slot.stack)
+        if (top?.stack?.kind !== operation.crop || top.stack.remaining < operation.amount) return []
+        return [{ ...top.tile, ...(field.sourceCard ? { sourceCard: field.sourceCard, groupKey: field.groupKey, cardFieldSlot: top.index } : {}) }]
+      })
+      if (!selectableTiles.length) return { type: 'ok' }
+      return { type: 'flow', flow: { type: 'leaf', actionId: 'selection', sourceCard, actionContext: {
+        selectionKind: 'farm-position', selectableTiles, minSelections: 1, maxSelections: 1,
+        selectionEffect: 'rule-take-field-crop', ruleCrop: operation.crop, ruleCropAmount: operation.amount,
+      } } }
+    }
+    case 'expire-extra-room': {
+      if (readCardExtraData<unknown>(player, sourceCard, operation.fact) !== true) return { type: 'ok' }
+      if (operation.removeUnhousedWorker && player.rooms < familySize(player)) {
+        const active = player.workers.filter(worker => worker.isActive)
+        const atHome = active.filter(worker => !state.actionSpaces.some(space => space.takenBy.some(ref => ref.playerId === player.id && ref.workerId === worker.id)))
+        const victim = [...(atHome.length ? atHome : active)].sort((a, b) => Number(b.id) - Number(a.id))[0]
+        if (victim) { victim.isActive = false; victim.isNewborn = false }
+      }
+      writeCardExtraData(player, sourceCard, operation.fact, false)
+      return { type: 'ok' }
+    }
+    case 'collect-board-resources': {
+      const children: ActionFlow[] = state.actionSpaces.filter(space => operation.resources.some(resource => (space.resources[resource] ?? 0) > 0)).map(space => ({
+        type: 'leaf', actionId: 'collect', sourceCard, actionContext: { spaceId: space.id, targetSpaceId: space.id, resourceTypes: [...operation.resources] },
+      }))
+      return children.length ? { type: 'flow', flow: { type: 'seq', children } } : { type: 'ok' }
+    }
+    case 'each-space-worker': {
+      const workers = state.actionSpaces.find(space => space.id === operation.spaceId)?.takenBy.filter(worker => worker.playerId === player.id && !isSyntheticLinkedOccupancy(worker)) ?? []
+      const children: ActionFlow[] = workers.map(worker => ({ type: 'xor', children: [
+        gainLeaf(sourceCard, operation.alternativeGain),
+        { type: 'leaf', actionId: 'move-farmer-to-space', sourceCard, params: { excludeSpaceId: operation.spaceId, workerId: worker.workerId }, actionContext: { moveFarmerSourceSpaceId: operation.spaceId, moveFarmerWorkerId: worker.workerId } },
+      ] }))
+      return children.length ? { type: 'flow', flow: { type: 'seq', children } } : { type: 'ok' }
+    }
+    case 'discounted-action': {
+      if (player.houseType === 'stone') return { type: 'ok' }
+      const binding = context.params
+      return { type: 'flow', flow: { type: 'seq', optional: true, children: [
+        { type: 'leaf', actionId: 'rule-discount', sourceCard, params: { ...binding, install: true } },
+        { type: 'leaf', actionId: operation.actionId, sourceCard },
+        { type: 'leaf', actionId: 'rule-discount', sourceCard, params: { ...binding, install: false } },
+      ] } }
+    }
+    case 'borrow-fences': {
+      const donorCaps: Record<string, number> = {}
+      for (const opponent of state.players) if (opponent.id !== player.id) donorCaps[opponent.id] = Math.min(operation.maximumPerOpponent, getOwnOrdinaryFenceReserveCount(opponent))
+      const max = Object.values(donorCaps).reduce((count, value) => count + value, 0)
+      const actionContext = { trueAction: false, fencePolicy: {
+        allowedSegmentTypes: ['fence'], sourcePolicy: { kind: 'borrowed', donorCaps },
+        segmentBounds: { fence: { min: 1, max }, total: { min: 1, max } }, costPolicy: { fence: { wood: 0 } }, cancelPolicy: 'forbidCancel',
+      } }
+      if (!max || !canStartFencing(state, player, undefined, actionContext)) return { type: 'ok' }
+      return { type: 'flow', flow: { type: 'leaf', actionId: 'fence', sourceCard, optional: true, actionContext } }
+    }
+    case 'bounded-exchange': {
+      let max = Math.max(0, Math.floor(evaluateRuleAmount(state, player, operation.maximum, sourceCard)))
+      for (const [resource, amount] of Object.entries(operation.cost)) {
+        const available = Object.entries(player.resources).find(([key]) => key === resource)?.[1] ?? 0
+        if (amount > 0) max = Math.min(max, Math.floor(available / amount))
+      }
+      if (max <= 0) return { type: 'ok' }
+      const flow = operation.quantity === 'maximum' || max === 1 ? exchange(sourceCard, operation, max) : {
+        type: 'xor', children: Array.from({ length: max }, (_, index) => exchange(sourceCard, operation, index + 1)),
+      } satisfies ActionFlow
+      return { type: 'flow', flow: { ...flow, optional: operation.quantity === 'choose' } }
+    }
+  }
+}

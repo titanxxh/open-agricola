@@ -1,3 +1,4 @@
+import { createWorkSession } from './_helpers/session-fixtures'
 import { type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -6,37 +7,21 @@ import '../../shared/cards/C/C024_BedintheGrainField'
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { readCardExtraData } from '../../shared/cards/helpers/card-state'
-import { familySize, markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
+import { familySize, markAllWorkersUsed } from '../../shared/domain/player'
 import type { ActionChoiceOption } from '../../shared/contract/types'
 
 const CARD_ID = 'C024_BedintheGrainField'
 
 const setupHarvest = (options: { rooms: number; ready?: boolean } = { rooms: 3, ready: true }) => {
-  const session = new GameSession(42)
-  const state = session.getState().state
-  state.players = state.players.slice(0, 2)
-  state.round = 4
-  state.currentPlayerIndex = 0
-  state.players[0]!.startPlayer = true
-  state.players[1]!.startPlayer = false
-
-  state.players.forEach((player) => {
-    setActiveWorkerCount(player, 2)
-    markAllWorkersUsed(state, player)
-    player.resources.food = 20
-    player.minorHand = ['__test_placeholder__']
-    player.occupationHand = ['__test_placeholder__']
-  })
-
-  const player = state.players[0]!
-  player.rooms = options.rooms
-  player.minorPlayed.push(CARD_ID)
-  player.cardStates[CARD_ID] = {
-    extraData: { nextHarvestReady: options.ready ?? true },
-  }
-
-  session.loadState(state)
-  return session
+  return createWorkSession({ seed: 6024, configure: state => {
+    state.round = 4
+    state.players.forEach(player => { markAllWorkersUsed(state, player); player.resources.food = 20 })
+    const player = state.players[0]!
+    player.rooms = options.rooms
+    if (options.rooms === 3) player.roomTiles.push({ row: 2, col: 0 })
+    player.minorPlayed = [CARD_ID]
+    player.cardStates[CARD_ID] = { extraData: { nextHarvestReady: options.ready ?? true } }
+  } })
 }
 
 const expectC24Prompt = (resp: ReturnType<GameSession['performRoundEnd']>) => {

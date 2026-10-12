@@ -1,4 +1,4 @@
-import type { ActionDefinition, ActionFlow, ActionSpace, Resource } from '../contract/types'
+import type { ActionDefinition, ActionFlow, ActionFlowPlanningContext, ActionSpace, Resource } from '../contract/types'
 import { bakeBreadAction } from '../actions/effects/bake-bread'
 import { isActionDoableInFlowContext, type FlowActionResolver } from '../actions/flow'
 
@@ -37,39 +37,27 @@ const breadOrSellHostSpace = (
   }
 }
 
+const summerSellGrainFlow = ({ player, previewMode }: ActionFlowPlanningContext): ActionFlow | undefined => {
+  if (previewMode !== 'base' && player.resources.grain < 1) return undefined
+  return {
+    type: 'seq', sourceCard: summerSourceCard,
+    children: [
+      { type: 'leaf', actionId: 'pay', sourceCard: summerSourceCard, params: { cost: { grain: 1 }, sourceActionId: 'season-summer-sell-grain' } },
+      { type: 'leaf', actionId: 'gain', sourceCard: summerSourceCard, params: { food: 4 } },
+    ],
+  }
+}
+
 export const summerSellGrainAction: ActionDefinition = {
   id: 'season-summer-sell-grain',
   nameKey: 'actions.season-summer-farmers-market.option-sell-grain',
   descriptionKey: 'actions.season-summer-farmers-market.option-sell-grain',
-  roundAvailable: 1,
-  gainPerRound: {},
+  roundAvailable: 1, gainPerRound: {},
   canBeExecutedByPlayer: (_state, player) => player.resources.grain >= 1,
-  execute: ({ player }) => {
-    if (player.resources.grain < 1) return { type: 'fail', errorKey: 'log.action' }
-    return {
-      type: 'flow',
-      flow: {
-        type: 'seq',
-        sourceCard: summerSourceCard,
-        children: [
-          {
-            type: 'leaf',
-            actionId: 'pay',
-            sourceCard: summerSourceCard,
-            params: {
-              cost: { grain: 1 },
-              sourceActionId: summerSellGrainAction.id,
-            },
-          },
-          {
-            type: 'leaf',
-            actionId: 'gain',
-            sourceCard: summerSourceCard,
-            params: { food: 4 },
-          },
-        ],
-      },
-    }
+  flowFactory: summerSellGrainFlow,
+  execute: context => {
+    const flow = summerSellGrainFlow(context)
+    return flow ? { type: 'flow', flow } : { type: 'fail', errorKey: 'log.action' }
   },
 }
 
@@ -93,10 +81,11 @@ export const summerBreadOrSellFlow = (
   player: Parameters<ActionDefinition['canBeExecutedByPlayer']>[1],
   space: ActionSpace,
   resolveAction: FlowActionResolver,
+  previewMode?: ActionFlowPlanningContext['previewMode'],
 ): ActionFlow | undefined => {
   const children: ActionFlow[] = []
   if (
-    isActionDoableInFlowContext({
+    previewMode === 'base' || isActionDoableInFlowContext({
       actionId: bakeBreadAction.id,
       action: bakeBreadAction,
       state,
@@ -108,7 +97,7 @@ export const summerBreadOrSellFlow = (
   ) {
     children.push(summerBakeLeaf())
   }
-  if (summerSellGrainAction.canBeExecutedByPlayer(state, player)) children.push(summerSellGrainLeaf())
+  if (previewMode === 'base' || summerSellGrainAction.canBeExecutedByPlayer(state, player)) children.push(summerSellGrainLeaf())
   if (children.length === 0) return undefined
   if (children.length === 1) return children[0]
   return {
@@ -119,6 +108,8 @@ export const summerBreadOrSellFlow = (
 }
 
 export const createSummerBreadOrSellAction = (resolveAction: FlowActionResolver): ActionDefinition => {
+  const flowFactory = ({ state, player, space, previewMode }: ActionFlowPlanningContext) =>
+    summerBreadOrSellFlow(state, player, space, resolveAction, previewMode)
   const action: ActionDefinition = {
     id: 'season-summer-bread-or-sell',
     nameKey: 'actions.season-summer-farmers-market.option-bread-or-sell',
@@ -128,8 +119,9 @@ export const createSummerBreadOrSellAction = (resolveAction: FlowActionResolver)
     canBeExecutedByPlayer: function (this: ActionDefinition | ActionSpace, state, player) {
       return summerBreadOrSellFlow(state, player, breadOrSellHostSpace(this, action), resolveAction) !== undefined
     },
-    execute: ({ state, player, space }) => {
-      const flow = summerBreadOrSellFlow(state, player, space, resolveAction)
+    flowFactory,
+    execute: context => {
+      const flow = flowFactory(context)
       return flow ? { type: 'flow', flow } : { type: 'ok' }
     },
   }

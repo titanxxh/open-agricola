@@ -1,6 +1,6 @@
 import { defineOccupationCard } from '../card-source'
 import { canStartFencing } from '../../actions/effects/fencing'
-import { createPlayerActionSpaces, registerPlayerActionSpace } from '../player-action-space'
+import { createPlayerActionSpaces, registerPlayerActionSpace, definePlayerActionSpaceFlow } from '../player-action-space'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D170_FoldBuilder'
@@ -11,7 +11,7 @@ const FOLD_BUILDER_FENCE_CONTEXT = {
 registerPlayerActionSpace({
   cardId: CARD_ID,
   access: 'all',
-  createDefinition: (ownerId) => ({
+  createDefinition: (ownerId) => definePlayerActionSpaceFlow({
     id: CARD_ID,
     nameKey: `cards.${CARD_ID}.name`,
     descriptionKey: `cards.${CARD_ID}.desc`,
@@ -20,28 +20,12 @@ registerPlayerActionSpace({
       if (player.id !== ownerId && (player.resources.food ?? 0) < 1) return false
       return canStartFencing(state, player, undefined, FOLD_BUILDER_FENCE_CONTEXT)
     },
-    execute: ({ state, player }) => {
-      if (player.id !== ownerId) {
-        player.resources.food -= 1
-        const owner = state.players.find((candidate) => candidate.id === ownerId)
-        if (owner) owner.resources.food += 1
-      }
-      return {
-        type: 'flow',
-        flow: {
-          type: 'seq',
-          children: [
-            {
-              type: 'leaf',
-              actionId: 'fence',
-              sourceCard: CARD_ID,
-              actionContext: FOLD_BUILDER_FENCE_CONTEXT,
-            },
-            { type: 'leaf', actionId: 'gain', params: { sheep: 1 }, sourceCard: CARD_ID },
-          ],
-        },
-      }
-    },
+    flowFactory: ({ player }) => ({ type: 'seq', children: [
+      ...(player.id !== ownerId ? [{ type: 'leaf' as const, actionId: 'gain', sourceCard: CARD_ID,
+        params: { food: 1, recipientPlayerId: ownerId, payerId: player.id } }] : []),
+      { type: 'leaf', actionId: 'fence', sourceCard: CARD_ID, actionContext: FOLD_BUILDER_FENCE_CONTEXT },
+      { type: 'leaf', actionId: 'gain', params: { sheep: 1 }, sourceCard: CARD_ID },
+    ] }),
   }),
 })
 

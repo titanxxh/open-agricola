@@ -1,129 +1,56 @@
-import { describe, expect, it } from 'vitest'
-import { getCardEffect } from '../../shared/cards/card-effects'
-import type { GameState, PlayerState, ActionSpace } from '../../shared/contract/types'
-
+import { afterEach, describe, expect, it } from 'vitest'
+import { createWorkSession } from './_helpers/session-fixtures'
+import { markAllWorkersUsed } from '../../shared/domain/player'
+import type { GameSession } from '../game/authoritative-session'
+import { collectScheduledEffectPreviews } from '../../shared/actions/scheduled-effect-preview'
 import '../../shared/cards/C/C155_FoodDistributor'
-import type { ActionFlow } from '../../shared/contract/types'
 
 const CARD_ID = 'C155_FoodDistributor'
-
-const createPlayer = (id = 'p1'): PlayerState =>
-  ({
-    id, name: id, color: 'red',
-    resources: {
-      wood: 0, clay: 0, reed: 0, stone: 0, food: 0,
-      grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
-    },
-    workers: [
-      { id: '1', isActive: true, isNewborn: false },
-      { id: '2', isActive: true, isNewborn: false },
-      { id: '3', isActive: false, isNewborn: false },
-      { id: '4', isActive: false, isNewborn: false },
-      { id: '5', isActive: false, isNewborn: false },
-    ],
-    rooms: 2, houseType: 'wood',
-    fields: [], fences: 0, roomTiles: [], stableTiles: [],
-    improvements: [], minorHand: [], minorPlayed: [],
-    occupationHand: [], occupationPlayed: [CARD_ID],houseAnimalType: null, houseAnimalCount: 0, stableAnimals: {},
-    pastures: [], fenceSegments: [],
-    majorEffects: { wellRounds: 0 }, startPlayer: false,
-    activeModifiers: [], cardStates: {},
-  }) as PlayerState
-
-const createSpace = (id: string, roundAvailable = 1): ActionSpace =>
-  ({
-    id, nameKey: `actions.${id}.name`, descriptionKey: `actions.${id}.description`,
-    roundAvailable, gainPerRound: {},
-    canBeExecutedByPlayer: () => true, execute: () => ({ type: 'ok' }),
-    resources: { wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 },
-    takenBy: [],
-  }) as ActionSpace
-
-const createState = (player: PlayerState, occupiedSpaces: number): GameState => {
-  const spaces: ActionSpace[] = []
-  for (let i = 0; i < 14; i++) {
-    const space = createSpace(`space-${i}`, i + 1)
-    if (i < occupiedSpaces) {
-      space.takenBy = [{ playerId: 'p1', workerId: '1' }]
-    }
-    spaces.push(space)
-  }
-  return {
-    round: 3, currentPlayerIndex: 0, players: [player],
-    actionSpaces: spaces, log: [],
-    roundActionOrder: Array.from({ length: 14 }).map((_, index) => `space-${index}`),
-    gameSeed: 1, availableMajorImprovements: [],
-    futureMeeples: [], pendingFutureMeeples: [],
-    gameOver: false, workPhaseObtainedResources: {},
-  } as GameState
+const sessions: GameSession[] = []
+afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+const setup = (purchaseRound = 5, occupied = 2) => {
+  const session = createWorkSession({ seed: 6155, options: { playerCount: 4 }, configure: state => {
+    state.round = 5
+    state.players.forEach(player => { player.resources.food = 30; markAllWorkersUsed(state, player) })
+    const owner = state.players[0]!
+    owner.resources.grain = 0
+    owner.occupationPlayed = [CARD_ID]
+    owner.cardStates[CARD_ID] = { extraData: { purchaseRound } }
+    state.roundActionOrder.slice(0, occupied).forEach((id, index) => {
+      const space = state.actionSpaces.find(entry => entry.id === id)
+      if (space) space.takenBy = [{ playerId: state.players[index]!.id, workerId: '1' }]
+    })
+  } })
+  sessions.push(session)
+  return session
 }
 
-describe('C155_FoodDistributor', () => {
-  it('onBuy gives 1 grain and records purchase round', () => {
-    const effect = getCardEffect(CARD_ID)
-    expect(effect).toBeDefined()
-
-    const player = createPlayer()
-    const state = createState(player, 0)
-    state.round = 5
-
-    const flow = effect!.onBuy!(state, player)
-    expect(flow).toBeDefined()
-    expect(flow!.type).toBe('leaf')
-    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('gain')
-    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params).toEqual({ grain: 1 })
-
-    // Check purchase round was recorded
-    expect(player.cardStates?.[CARD_ID]?.extraData?.purchaseRound).toBe(5)
+describe('C155 authoritative timed reward', () => {
+  it('describes the future occupancy formula without mutating state, then counts distinct round action spaces at return home', () => {
+    const session = setup()
+    const before = JSON.stringify(session.state)
+    expect(collectScheduledEffectPreviews(session.state, session.state.players[0]!).find(entry => entry.sourceCard === CARD_ID))
+      .toMatchObject({ round: 5, timing: 'onStartReturnHome', description: { effectPreview: { kind: 'formulaGain', resources: { food: { kind: 'occupied-round-spaces' } } } } })
+    expect(JSON.stringify(session.state)).toBe(before)
+    const response = session.performRoundEnd()
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.round).toBe(6)
+    expect(response.state.players[0]!.resources.food).toBe(32)
+    expect(response.state.events.some(event => event.type === 'resource.moved' && event.sourceCardId === CARD_ID && event.resources.food === 2)).toBe(true)
+    expect(response.state.players[0]!.cardStates[CARD_ID]?.extraData?.timedRuleReceipts).toEqual(['occupied-round-reward:5'])
+    expect(response.interaction.stateId).toBe('idle')
   })
-
-  it('onStartReturnHome gives food = occupied round spaces on purchase round', () => {
-    const effect = getCardEffect(CARD_ID)
-    expect(effect).toBeDefined()
-
-    const player = createPlayer()
-    // Simulate purchase on round 5, after five round spaces are revealed.
-    player.cardStates = {
-      [CARD_ID]: { extraData: { purchaseRound: 5 } },
-    }
-    const state = createState(player, 5)
-    state.round = 5
-
-    const flow = effect!.onStartReturnHome!(state, player)
-    expect(flow).toBeDefined()
-    expect(flow!.type).toBe('leaf')
-    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('gain')
-    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params).toEqual({ food: 5 })
+  it('does not pay in a later round or promise another payout after consumption', () => {
+    const session = setup(4)
+    expect(collectScheduledEffectPreviews(session.state, session.state.players[0]!).filter(entry => entry.sourceCard === CARD_ID)).toEqual([])
+    const response = session.performRoundEnd()
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources.food).toBe(30)
   })
-
-  it('onStartReturnHome does not fire on different round', () => {
-    const effect = getCardEffect(CARD_ID)
-    expect(effect).toBeDefined()
-
-    const player = createPlayer()
-    player.cardStates = {
-      [CARD_ID]: { extraData: { purchaseRound: 3 } },
-    }
-    const state = createState(player, 5)
-    state.round = 4  // Different round
-
-    const flow = effect!.onStartReturnHome!(state, player)
-    // Should not return a gain flow (just flags the card)
-    expect(flow).toBeUndefined()
-  })
-
-  it('onStartReturnHome does not fire after being flagged', () => {
-    const effect = getCardEffect(CARD_ID)
-    expect(effect).toBeDefined()
-
-    const player = createPlayer()
-    player.cardStates = {
-      [CARD_ID]: { flagged: true, extraData: { purchaseRound: 3 } },
-    }
-    const state = createState(player, 5)
-    state.round = 3
-
-    const flow = effect!.onStartReturnHome!(state, player)
-    expect(flow).toBeUndefined()
+  it('pays zero when no round action space is occupied', () => {
+    const session = setup(5, 0)
+    const response = session.performRoundEnd()
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources.food).toBe(30)
   })
 })

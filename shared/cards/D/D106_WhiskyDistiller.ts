@@ -39,7 +39,6 @@ const anytimeListener: CardListenerRegistration = {
         ],
       },
       sourceCard: CARD_ID,
-      labelKey: 'cards.D106_WhiskyDistiller.anytime',
     }
   },
 }

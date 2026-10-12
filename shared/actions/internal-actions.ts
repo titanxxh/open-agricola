@@ -1,3 +1,8 @@
+import { ruleOperationAction } from './effects/internal/rule-operation'
+import { ruleDiscountAction } from './effects/internal/rule-discount'
+import { resolveTimedRuleAction } from './effects/internal/resolve-timed-rule'
+import { ruleConditionAction } from './effects/internal/rule-condition'
+import { ruleGainAction } from './effects/internal/rule-gain'
 import type { ActionDefinition } from '../contract/types'
 import { futureMeeplesAction } from './effects/internal/future-meeples'
 import { collectAction } from './effects/collect'
@@ -31,6 +36,12 @@ import { moveFarmerToSpaceAction } from './effects/internal/move-farmer-to-space
 import { popCardStackAction } from './effects/internal/pop-card-stack'
 import { pushCardStackAction } from './effects/internal/push-to-card-stack'
 import { buildFarmhandRoomAction } from './effects/internal/build-farmhand-room'
+import { consumeCardCounterAction } from './effects/internal/consume-card-counter'
+import { lieAnimalAction } from './effects/internal/lie-animal'
+import { addAnimalCapacityAction } from './effects/internal/add-animal-capacity'
+import { discardCardStackAction } from './effects/internal/discard-card-stack'
+import { repeatAction } from './effects/internal/repeat-action'
+import { fieldOperationAction } from './effects/internal/field-operation'
 import { selectionAction } from './effects/internal/selection'
 import { spendWorkerAction } from './effects/internal/spend-worker'
 import { activateCardEffectAction } from './effects/internal/activate-card-effect'
@@ -53,6 +64,11 @@ import type { FlowActionResolver } from './flow'
 export const createInternalActionDefinitions = (resolveAction: FlowActionResolver): ActionDefinition[] => [
   futureMeeplesAction,
   collectAction,
+  resolveTimedRuleAction,
+  ruleConditionAction,
+  ruleGainAction,
+  ruleOperationAction,
+  ruleDiscountAction,
   gainAction,
   receiveAction,
   bonusWoodAction,
@@ -88,6 +104,12 @@ export const createInternalActionDefinitions = (resolveAction: FlowActionResolve
   pushCardStackAction,
   buildFarmhandRoomAction,
   selectionAction,
+  fieldOperationAction,
+  repeatAction,
+  discardCardStackAction,
+  addAnimalCapacityAction,
+  lieAnimalAction,
+  consumeCardCounterAction,
   activateCardEffectAction,
   activateExtraTurnAction,
   drawOrdinaryCardsAction,

@@ -12,13 +12,14 @@ const CARD_ID = 'E047_SyrupTap'
  * E47 Syrup Tap: Each time you get at least 1 wood from an action space,
  * place 1 food on the next round space. At the start of that round, you get the food.
  *
- * Implementation: listen on 'collect' after phase, check if wood was gained.
+ * Implementation: observe the resource-producing collect/gain leaf after phase.
  * Use deferred futureMeeplesNode pattern to queue 1 food on next round.
  */
 const afterCollectListener: CardListenerRegistration = {
   id: 'E47-syrup-tap-after-collect',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
+  actions: ['collect', 'gain'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.sourceCard === CARD_ID) return
 

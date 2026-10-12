@@ -1,3 +1,4 @@
+import { descriptionEffects } from './_helpers/choice-description'
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -55,8 +56,7 @@ describe('E074_AshTrees session flow', () => {
     }
     const useAll = resp.interaction.request.options?.find(
       (option) =>
-        option.labelKey === 'ui.interactionAshTreesUseCount' &&
-        option.labelParams?.count === 4,
+        descriptionEffects(option.descriptionPreview).some(effect => effect.kind === 'fenceReserve' && effect.amount === 4),
     )
     expect(useAll).toBeDefined()
 
@@ -102,7 +102,7 @@ describe('E074_AshTrees session flow', () => {
     // Select "use 3" to reserve freeFences=3
     if (resp.interaction.stateId !== 'wait') throw new Error('expected choice')
     const useThree = resp.interaction.request.options?.find(
-      (o) => o.labelParams?.count === 3,
+      (o) => descriptionEffects(o.descriptionPreview).some(effect => effect.kind === 'fenceReserve' && effect.amount === 3),
     )
     expect(useThree).toBeDefined()
     resp = session.resolveChoice(0, useThree!.value)

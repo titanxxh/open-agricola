@@ -219,11 +219,6 @@ describe('card-local table-driven flows', () => {
           actionContext: {
             directTrade: { ...trade, sourceId: 'E142_Smuggler' },
           },
-          effectPreview: {
-            kind: 'resourceExchange',
-            resourcesPaid: trade.from,
-            resourcesGained: trade.to,
-          },
         })
       })
     })

@@ -1,6 +1,7 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardImpl } from '../registry'
-import type { ActionChoiceOption, ActionFlow, PlayerState, Resource } from '../../contract/types'
+import type { ActionFlow, PlayerState, Resource } from '../../contract/types'
+import { scoringOfferFlow, scoringOfferOption, type ScoringOffer } from '../../actions/plans/scoring-offer'
 import { sumSelectedScoringReserve } from '../../domain/scoring-reserve'
 
 const CARD_ID = 'C133_Soldier'
@@ -16,24 +17,14 @@ const maxSoldierPairs = (player: PlayerState) => {
 
 const choiceValue = (pairs: number) => `${CHOICE_PREFIX}${pairs}`
 
-const parseChoice = (choice: string): number | null => {
-  if (!choice.startsWith(CHOICE_PREFIX)) return null
-  const raw = Number(choice.slice(CHOICE_PREFIX.length))
-  return Number.isInteger(raw) && raw >= 0 ? raw : null
-}
-
-const choiceOptions = (maxPairs: number): ActionChoiceOption[] =>
-  Array.from({ length: maxPairs + 1 }, (_, pairs) => ({
-    value: choiceValue(pairs),
-    labelKey: 'ui.cards.C133_Soldier.scorePairs',
-    labelParams: { pairs, score: pairs },
-    sourceCard: CARD_ID,
-  }))
-
 const reserveForPairs = (pairs: number): Partial<Resource> => ({
   wood: pairs,
   stone: pairs,
 })
+
+const scoringOffers = (maxCount: number): ScoringOffer[] => Array.from({ length: maxCount + 1 }, (_, pairs) => ({
+  value: choiceValue(pairs), kind: 'reserve', resources: reserveForPairs(pairs), score: pairs, cardType: 'occupation'
+}))
 
 const cardImpl = {
   effect: {
@@ -50,27 +41,13 @@ const cardImpl = {
         actionContext: { targetPlayerId: player.id },
         params: {
           promptKey: 'ui.cards.C133_Soldier.prompt',
-          options: choiceOptions(maxPairs),
+          options: scoringOffers(maxPairs).map(offer => scoringOfferOption(CARD_ID, offer)),
         },
       } satisfies ActionFlow
     },
     resolveChoice: (_state, player, choice) => {
-      const pairs = parseChoice(choice)
-      if (pairs === null || pairs <= 0) return
-      if (pairs > maxSoldierPairs(player)) return
-      return {
-        type: 'leaf',
-        actionId: 'special-effect',
-        sourceCard: CARD_ID,
-        targetPlayerId: player.id,
-        actionContext: { targetPlayerId: player.id },
-        params: {
-          kind: 'record-scoring-reserve-bonus',
-          reserved: reserveForPairs(pairs),
-          score: pairs,
-          cardType: 'occupation',
-        },
-      } satisfies ActionFlow
+      const offer = scoringOffers(maxSoldierPairs(player)).find(candidate => candidate.value === choice)
+      return offer ? scoringOfferFlow(CARD_ID, offer) : undefined
     },
   },
   reaches: [] as readonly string[],

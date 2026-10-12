@@ -102,7 +102,7 @@ export const placeFarmerAction: ActionDefinition = {
       : smallestAvailableWorker(state, player) !== null,
   previewEffect: ({ state, actionContext }) => {
     const target = state.actionSpaces.find((space) => space.id === actionContext?.targetSpaceId)
-    return target ? { kind: 'actionSpace', spaceId: target.id, nameKey: target.nameKey, descriptionKey: target.descriptionKey } : undefined
+    return target ? { kind: 'actionSpace', spaceId: target.id, nameKey: target.nameKey } : undefined
   },
   execute: ({ state, player, sourceCard, actionContext, eventSink }) => {
     // viaCardJump branch (Sprint 5 mech-A): move farmer + return flow leaf so

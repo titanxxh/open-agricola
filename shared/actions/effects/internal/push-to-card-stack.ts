@@ -8,6 +8,7 @@ export const pushCardStackAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
+  previewEffect: ({ sourceCard, params }) => sourceCard && typeof params?.item === 'string' ? { kind: 'cardStack', cardId: sourceCard, item: params.item, amount: 1 } : undefined,
   execute: ({ player, sourceCard, params }) => {
     if (!sourceCard) {
       return { type: 'fail', errorKey: 'log.actionFail' }

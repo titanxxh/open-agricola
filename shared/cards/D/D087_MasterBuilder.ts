@@ -34,7 +34,6 @@ const anytimeListener: CardListenerRegistration = {
         ],
       },
       sourceCard: CARD_ID,
-      labelKey: 'cards.D087_MasterBuilder.anytime',
     }
   },
 }

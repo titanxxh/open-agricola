@@ -1,11 +1,14 @@
 import { defineMinorCard } from '../card-source'
-import { writeCardExtraData, readCardExtraData, writeCardInfobox, isCardFlagged } from '../helpers/card-state'
+import { writeCardExtraData, writeCardInfobox } from '../helpers/card-state'
 import { getOwnOrdinaryFenceReserveCount } from '../../domain/supply-tokens'
-import { hasInactiveWorkerInSupply } from '../../domain/player'
-import { supplyWorkerTurnFlow, consumeSupplyWorkerTurn } from '../helpers/supply-worker-flow'
+import { timedExtraTurnFlow } from '../timed-rule-obligations'
+import type { RuleBody, TimedRule } from '../../contract/rule-plans'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A022_Telegram'
+const supplyTurnBody = { kind: 'operation', operation: { kind: 'supply-worker-turn' } } satisfies RuleBody
+
+const supplyTurnRules = [{ retainAfterCardLeaves: true, key: 'scheduled-supply-turn', at: { kind: 'supply-worker-round', fact: 'triggerRound', phase: 'contributeExtraTurn' }, body: supplyTurnBody }] satisfies readonly TimedRule[]
 
 const cardImpl = {
   effect: {
@@ -18,12 +21,9 @@ const cardImpl = {
       writeCardInfobox(player, CARD_ID, `Round ${targetRound}`)
     }
   },
+  timedRules: supplyTurnRules,
   extraTurnBeforeWorkers: true,
-  contributeExtraTurn: (state, player) => {
-    if (readCardExtraData<number>(player, CARD_ID, 'triggerRound') !== state.round) return
-    if (isCardFlagged(player, CARD_ID) || !hasInactiveWorkerInSupply(player)) return
-    return supplyWorkerTurnFlow(state, player, CARD_ID, [consumeSupplyWorkerTurn(CARD_ID)])
-  },
+  contributeExtraTurn: (state, player) => timedExtraTurnFlow(state, player, CARD_ID, supplyTurnRules),
 },
   prerequisiteCheck: (player) => getOwnOrdinaryFenceReserveCount(player) >= 1,
   reaches: [] as readonly string[],

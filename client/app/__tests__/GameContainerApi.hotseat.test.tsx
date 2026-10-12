@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import '@testing-library/jest-dom/vitest'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { GameSyncPayload } from '../../../shared/contract/protocol/game'
+import { createWorkSession } from '../../../server/__tests__/_helpers/session-fixtures'
 import { EngineStack } from '../../../shared/engine'
 import { createInitialState } from '../../../shared/session/state-bootstrap'
 import { serializeState } from '../../../shared/session/serialization'
@@ -422,6 +423,39 @@ describe('hotseat public farm browsing', () => {
     expect(ruleCommands()).toEqual([])
     await user.click(screen.getByRole('button', { name: 'Return to Alice to continue' }))
     expect(screen.getByRole('checkbox', { name: 'Private response' })).toBeChecked()
+  })
+
+  it('preserves actual baking recipes and the owner draft while browsing another public farm', async () => {
+    const session = createWorkSession({ seed: 42, configure: state => {
+      state.players[0]!.name = 'Alice'
+      state.players[1]!.name = 'Bob'
+      state.players.forEach(player => { player.nameIsDefault = false })
+      state.players[0]!.improvements = ['Major_Fireplace1', 'Major_ClayOven']
+      Object.assign(state.players[0]!.resources, { grain: 2, food: 0 })
+      state.players[1]!.improvements = ['Major_StoneOven']
+      Object.assign(state.players[1]!.resources, { grain: 9, food: 20 })
+    } })
+    try {
+      const response = session.takeAction(0, 'grain-utilization')
+      expect(response.ok, response.error).toBe(true)
+      GameSocket.payload = session.buildSyncPayload(response, null, 'debug')
+      const user = userEvent.setup()
+      const { container } = renderGame()
+      await confirmAlice(user)
+      const oven = () => [...container.querySelectorAll('.exchange-row')].find(row => row.textContent?.includes('Clay Oven'))!
+      expect(oven().querySelector('.exchange-rate')).toHaveTextContent('5')
+      await user.click(within(oven() as HTMLElement).getByRole('button', { name: '+', exact: true }))
+      expect(within(oven() as HTMLElement).getByRole('button', { name: '+', exact: true })).toBeDisabled()
+      await selectBob(user)
+      expect(container.querySelector('.exchange-overlay')).not.toBeInTheDocument()
+      expect(ruleCommands()).toEqual([])
+      await user.click(screen.getByRole('button', { name: 'Return to Alice to continue' }))
+      expect(oven().querySelector('.exchange-rate')).toHaveTextContent('5')
+      expect(within(oven() as HTMLElement).getByRole('button', { name: '+', exact: true })).toBeDisabled()
+      expect([...container.querySelectorAll('.exchange-row')].some(row => row.textContent?.includes('Stone Oven'))).toBe(false)
+      expect(session.state.players[0]!.resources).toMatchObject({ grain: 2, food: 0 })
+      expect(session.state.players[1]!.resources).toMatchObject({ grain: 9, food: 20 })
+    } finally { session.dispose() }
   })
 
   it('hands off to the waiting responder, even when browsing that farm, and invalidates the old confirmation', async () => {

@@ -68,7 +68,6 @@ const anytimeListener: CardListenerRegistration = {
     return {
       flow,
       sourceCard: CARD_ID,
-      labelKey: 'cards.D114_SeedTrader.anytime',
     }
   },
 }

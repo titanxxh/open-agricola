@@ -1,5 +1,4 @@
 import { defineMinorCard } from '../card-source'
-import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'M128_Workbench'
@@ -7,10 +6,7 @@ const CARD_ID = 'M128_Workbench'
 const cardImpl = {
   effect: {
     id: CARD_ID,
-    onHarvestFieldPhase: (state) => {
-      if (state.round !== 13 && state.round !== 14) return
-      return gainLeaf(CARD_ID, { wood: 3, clay: 2, reed: 1 })
-    },
+  timedRules: [{ key: 'late-harvest-materials', at: { kind: 'rounds', rounds: [13, 14], phase: 'onHarvestFieldPhase' }, body: { kind: 'gain', resources: { wood: 3, clay: 2, reed: 1 } } }],
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl

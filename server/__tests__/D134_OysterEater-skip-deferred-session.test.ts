@@ -1,5 +1,6 @@
+import { createWorkSession } from './_helpers/session-fixtures'
 import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game/authoritative-session'
+import type { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
 
@@ -30,7 +31,7 @@ const drainPending = (session: GameSession, resp: SessionResponse) => {
  */
 describe('D134_OysterEater skip-next-placement (onBeforePlayerTurn)', () => {
   it('owner skips their next labor turn when flag is set', () => {
-    const session = new GameSession(134, undefined, { playerCount: 4 })
+    const session = createWorkSession({ seed: 134, options: { playerCount: 4 } })
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.currentPlayerIndex = 3
@@ -69,7 +70,7 @@ describe('D134_OysterEater skip-next-placement (onBeforePlayerTurn)', () => {
   })
 
   it('owner skips only once when flag is 1', () => {
-    const session = new GameSession(134, undefined, { playerCount: 4 })
+    const session = createWorkSession({ seed: 134, options: { playerCount: 4 } })
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.currentPlayerIndex = 3
@@ -102,7 +103,7 @@ describe('D134_OysterEater skip-next-placement (onBeforePlayerTurn)', () => {
   })
 
   it('does not skip when flag is absent', () => {
-    const session = new GameSession(134, undefined, { playerCount: 4 })
+    const session = createWorkSession({ seed: 134, options: { playerCount: 4 } })
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.currentPlayerIndex = 3
@@ -125,7 +126,7 @@ describe('D134_OysterEater skip-next-placement (onBeforePlayerTurn)', () => {
   })
 
   it('D134 S4 clears an unused same-round skip before the next work phase', () => {
-    const session = new GameSession(134, undefined, { playerCount: 4 })
+    const session = createWorkSession({ seed: 134, options: { playerCount: 4 } })
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.currentPlayerIndex = 3

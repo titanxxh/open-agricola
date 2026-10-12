@@ -64,11 +64,16 @@ export const bakeBread = (
   return { type: 'ok' }
 }
 
-const buildBakeBreadOptions = (player: PlayerState): ActionChoiceOption[] => {
+const buildBakeBreadOptions = (player: PlayerState) => {
   const rates = getPlayerBakeRates(player)
   return rates
     .filter(() => player.resources.grain > 0)
-    .map((r) => ({ value: r.cardId, labelKey: r.labelKey }))
+    .map((r) => ({
+      value: r.cardId,
+      labelKey: r.labelKey,
+      quantityLimit: Math.min(player.resources.grain, r.max),
+      effectPreview: { kind: 'resourceExchange' as const, resourcesPaid: { grain: 1 }, resourcesGained: { food: r.rate } },
+    })) satisfies ActionChoiceOption[]
 }
 
 const parseBulkBakePlan = (
@@ -174,6 +179,7 @@ export const bakeBreadAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: (_state, player) => canBakeBreadDirectly(player),
+  previewEffect: ({ player }) => ({ kind: 'bakeRecipes', recipes: buildBakeBreadOptions(player).map(option => ({ sourceCard: option.value, exchange: option.effectPreview, quantityLimit: option.quantityLimit })) }),
   execute: ({ player, actionContext }) => {
     const options = buildBakeBreadOptions(player)
     if (options.length === 0) return { type: 'ok' }

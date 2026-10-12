@@ -93,7 +93,6 @@ describe('A097_Freshman', () => {
     expect(result?.alternativeFlow).toEqual({
       type: 'seq',
       promptKey: 'ui.interactionFreshmanOccupation',
-      choiceLabelKey: 'ui.interactionFreshmanOccupation',
       children: [
         { type: 'leaf', actionId: 'special-effect', sourceCard: 'A097_Freshman', params: { kind: 'set-flag', flag: true } },
         {

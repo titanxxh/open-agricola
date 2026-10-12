@@ -25,7 +25,6 @@ const anytimeListener: CardListenerRegistration = {
         ],
       },
       sourceCard: CARD_ID,
-      labelKey: 'cards.B035_HookKnife.anytime',
     }
   },
 }

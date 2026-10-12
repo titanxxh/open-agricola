@@ -105,24 +105,6 @@ describe('priority plan implementations', () => {
     })
   })
 
-  it('A81 Interim Storage pays out stored goods on round start', () => {
-    const player = createPlayer()
-    player.minorPlayed = ['A081_InterimStorage']
-    player.cardStates = {
-      A081_InterimStorage: { counters: { wood: 1, clay: 2 } },
-    }
-    const state = createState(player)
-    state.round = 7
-
-    const flow = getCardEffect('A081_InterimStorage')?.onRoundStart?.(state, player)
-    expect(flow).toMatchObject({
-      type: 'seq',
-      children: [
-        { type: 'leaf', actionId: 'take-from-card', params: { wood: 1 } },
-        { type: 'leaf', actionId: 'take-from-card', params: { clay: 2 } },
-      ],
-    })
-  })
 
   it('E52 Cubbyhole stores food for rooms built this action', () => {
     const listener = findListener('E52-cubbyhole-after-construct')

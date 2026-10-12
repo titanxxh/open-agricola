@@ -15,6 +15,9 @@ import type {
 } from '../shared/contract/types'
 import { CardPurchasePayment, PaymentSolver } from '../shared/actions/payment'
 import { buildRenovationPlan } from '../shared/actions/effects/renovation'
+import { resolveTimedRuleAction } from '../shared/actions/effects/internal/resolve-timed-rule'
+import { ruleOperationAction } from '../shared/actions/effects/internal/rule-operation'
+import { ruleDiscountAction } from '../shared/actions/effects/internal/rule-discount'
 import { getActiveCardRegistry } from '../shared/cards/active-registry'
 import { getCardModifiers } from '../shared/cards/card-modifiers'
 import { runCardListeners } from '../shared/cards/card-listeners'
@@ -552,7 +555,36 @@ const playScenarioCards = (player: PlayerState, state: GameState, scenario: Scen
     player.cardStates[cardId] = { ...(player.cardStates[cardId] ?? {}), flagged: true }
   }
   if (scenario.cards.some((card) => card.id === 'E087_MasterRenovator')) {
-    getActiveCardRegistry()?.getEffect('E087_MasterRenovator')?.onStartReturnHome?.(state, player)
+    const hookFlow = getActiveCardRegistry()?.getEffect('E087_MasterRenovator')?.onStartReturnHome?.(state, player)
+    if (hookFlow?.type !== 'seq' || hookFlow.children.length !== 1) {
+      throw new Error(`${scenario.name}: expected one due timed renovation rule`)
+    }
+    const due = hookFlow.children[0]!
+    if (due.type !== 'leaf' || due.actionId !== resolveTimedRuleAction.id) {
+      throw new Error(`${scenario.name}: expected a compiled timed-rule leaf`)
+    }
+    const context = { state, player, space: createSpace('renovate-house') }
+    const resolved = resolveTimedRuleAction.execute({
+      ...context, sourceCard: due.sourceCard, params: due.params, actionContext: due.actionContext,
+    })
+    if (resolved.type !== 'flow' || resolved.flow.type !== 'leaf'
+      || resolved.flow.actionId !== ruleOperationAction.id) {
+      throw new Error(`${scenario.name}: expected the timed renovation operation`)
+    }
+    const operation = resolved.flow
+    const planned = ruleOperationAction.execute({
+      ...context, sourceCard: operation.sourceCard, params: operation.params, actionContext: operation.actionContext,
+    })
+    if (planned.type !== 'flow' || planned.flow.type !== 'seq') {
+      throw new Error(`${scenario.name}: expected the discounted-action sequence`)
+    }
+    const install = planned.flow.children[0]
+    if (install?.type !== 'leaf' || install.actionId !== ruleDiscountAction.id || install.params?.install !== true) {
+      throw new Error(`${scenario.name}: expected the discount installation leaf`)
+    }
+    expect(ruleDiscountAction.execute({
+      ...context, sourceCard: install.sourceCard, params: install.params, actionContext: install.actionContext,
+    }), scenario.name).toEqual({ type: 'ok' })
   }
 }
 

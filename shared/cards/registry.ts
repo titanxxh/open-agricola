@@ -1,3 +1,4 @@
+import { compileTimedRuleHooks } from '../actions/timed-rules'
 /**
  * CardRegistry — per-session, injectable card registration container.
  *
@@ -28,6 +29,13 @@ export type CardPurchaseBaseCostContext = {
 export type CardPurchaseBaseCostHandler = (
   context: CardPurchaseBaseCostContext,
 ) => PaymentResourceMap | PaymentResourceMap[] | ComplexCost | null | undefined
+
+const withTimedRuleHooks = (effect: CardEffect): CardEffect => {
+  if (!effect.timedRules?.length) return effect
+  const hooks = compileTimedRuleHooks(effect.id, effect.timedRules)
+  for (const rule of effect.timedRules) if (rule.at.phase !== 'afterReceive' && rule.at.phase !== 'afterCollect' && rule.at.phase !== 'contributeExtraTurn' && rule.at.phase !== 'onBeforePlayerTurn' && effect[rule.at.phase]) throw new Error(`Timed rule conflicts with old hook ${effect.id}:${rule.at.phase}`)
+  return { ...effect, ...hooks }
+}
 
 export type CardImpl = {
   listeners?: CardListenerRegistration[]
@@ -70,7 +78,7 @@ export class CardRegistry {
       }
     }
     if (impl.effect) {
-      this.effectsByCard.set(cardId, impl.effect)
+      this.effectsByCard.set(cardId, withTimedRuleHooks(impl.effect))
       if (options.protected) this.protectedEffectIds.add(cardId)
     }
     if (impl.modifiers && impl.modifiers.length > 0) {
@@ -107,7 +115,7 @@ export class CardRegistry {
 
   /** Set or replace the effect keyed by its id. */
   setEffect(effect: CardEffect): void {
-    this.effectsByCard.set(effect.id, effect)
+    this.effectsByCard.set(effect.id, withTimedRuleHooks(effect))
   }
 
   /** Remove listeners matching a predicate across all cards. */
@@ -155,7 +163,7 @@ export class CardRegistry {
   registerEffects(effects: readonly CardEffect[], options: CardRegistryLoadOptions = {}): void {
     for (const effect of effects) {
       if (this.effectsByCard.has(effect.id)) continue
-      this.effectsByCard.set(effect.id, effect)
+      this.effectsByCard.set(effect.id, withTimedRuleHooks(effect))
       if (options.protected) this.protectedEffectIds.add(effect.id)
     }
   }

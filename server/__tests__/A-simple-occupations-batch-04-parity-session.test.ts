@@ -207,7 +207,7 @@ describe('A162 Forest Tallyman parity', () => {
 })
 
 const setupPigBreederRound = ({ round = 12, boar = 2, capacity = true } = {}) => {
-  const session = setupOccupation('A165_PigBreeder', { playerCount: 4, played: true, round })
+  const session = setupOccupation('A165_PigBreeder', { played: true, round })
   const state = session.getState().state
   state.players.forEach((player) => {
     markAllWorkersUsed(state, player)
@@ -243,9 +243,7 @@ const setupPigBreederRound = ({ round = 12, boar = 2, capacity = true } = {}) =>
 
 describe('A165 Pig Breeder parity', () => {
   it('A165 S1: playing Pig Breeder immediately gains one pig', () => {
-    const response = playOccupation(setupOccupation('A165_PigBreeder', {
-      playerCount: 4,
-    }), 'A165_PigBreeder')
+    const response = playOccupation(setupOccupation('A165_PigBreeder'), 'A165_PigBreeder')
 
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.occupationPlayed).toContain('A165_PigBreeder')

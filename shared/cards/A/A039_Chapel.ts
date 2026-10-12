@@ -1,6 +1,5 @@
 import { definePlayerActionCard } from '../card-source'
-import { registerPlayerActionSpace, createPlayerActionSpaces } from '../player-action-space'
-import { incCounter } from '../__stubs__/helpers'
+import { registerPlayerActionSpace, createPlayerActionSpaces, definePlayerActionSpaceFlow } from '../player-action-space'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A039_Chapel'
@@ -8,7 +7,7 @@ const CARD_ID = 'A039_Chapel'
 registerPlayerActionSpace({
   cardId: CARD_ID,
   access: 'all',
-  createDefinition: (ownerId) => ({
+  createDefinition: (ownerId) => definePlayerActionSpaceFlow({
     id: CARD_ID,
     nameKey: 'cards.A039_Chapel.name',
     descriptionKey: 'cards.A039_Chapel.desc',
@@ -17,17 +16,11 @@ registerPlayerActionSpace({
       if (player.id !== ownerId && player.resources.grain < 1) return false
       return true
     },
-    execute: ({ state, player }) => {
-      // Always: +3 bonus VP for the user
-      incCounter(player, CARD_ID, 'bonusVp', 3)
-      // Non-owner pays 1 grain to owner
-      if (player.id !== ownerId) {
-        player.resources.grain -= 1
-        const owner = state.players.find((p) => p.id === ownerId)
-        if (owner) owner.resources.grain += 1
-      }
-      return { type: 'ok' }
-    },
+    flowFactory: ({ player }) => ({ type: 'seq', children: [
+      ...(player.id !== ownerId ? [{ type: 'leaf' as const, actionId: 'gain', sourceCard: CARD_ID,
+        params: { grain: 1, recipientPlayerId: ownerId, payerId: player.id } }] : []),
+      ...Array.from({ length: 3 }, () => ({ type: 'leaf' as const, actionId: 'bonus-vp', sourceCard: CARD_ID })),
+    ] }),
   }),
 })
 

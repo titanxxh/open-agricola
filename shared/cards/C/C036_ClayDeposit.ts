@@ -17,7 +17,6 @@ const listener: CardListenerRegistration = {
       cardId: CARD_ID,
       cost: { clay: 1 },
       gain: { score: 1 },
-      choiceLabelKey: 'ui.interactionClayDepositExchange',
     })
   },
 }

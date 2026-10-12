@@ -7,6 +7,7 @@ import {
 import { runSelectionEffect, validateSelectionEffect } from '../../helpers/selection-effect-registry'
 import { buildFarmPositionSelectionInteraction } from '../../../domain/farmyard-interaction'
 import { validateOccupationHandSelection } from '../../../domain/occupation-hand-selection'
+import { describeTerrainSelection } from '../../../moor/terrain-flow'
 
 const validateFarmPositions = (
   positions: string[],
@@ -25,6 +26,7 @@ export const selectionAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
+  previewEffect: ({ actionContext }) => describeTerrainSelection(actionContext),
   execute: ({ player, actionContext }) => {
     const kind = (actionContext?.selectionKind as string | undefined) ?? 'farm-position'
     const promptKey =

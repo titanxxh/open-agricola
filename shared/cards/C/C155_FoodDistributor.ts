@@ -1,9 +1,6 @@
 import { defineOccupationCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { isCardFlagged, setCardFlag } from '../helpers/card-state'
-import { writeCardExtraData, readCardExtraData } from '../helpers/card-state'
-import { getReturnHomePlacements } from '../helpers/round-placement'
-import { getRoundActionSlot } from '../helpers/round-action-topology'
+import { writeCardExtraData } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C155_FoodDistributor'
@@ -15,23 +12,7 @@ const cardImpl = {
     writeCardExtraData(player, CARD_ID, 'purchaseRound', state.round)
     return gainLeaf(CARD_ID, { grain: 1 })
   },
-  onStartReturnHome: (state, player) => {
-    // Only fire once, on the same round as purchase
-    if (isCardFlagged(player, CARD_ID)) return
-    const purchaseRound = readCardExtraData<number>(player, CARD_ID, 'purchaseRound')
-    if (purchaseRound !== state.round) {
-      // Not the purchase round — flag and skip
-      setCardFlag(player, CARD_ID, true)
-      return
-    }
-    const occupiedCount = new Set(getReturnHomePlacements(state)
-      .filter((entry) => getRoundActionSlot(state, entry.spaceId) !== null)
-      .map((entry) => entry.spaceId)).size
-    // Flag so it doesn't fire again
-    setCardFlag(player, CARD_ID, true)
-    if (occupiedCount <= 0) return
-    return gainLeaf(CARD_ID, { food: occupiedCount })
-  },
+  timedRules: [{ retainAfterCardLeaves: true, key: 'occupied-round-reward', at: { kind: 'card-round', fact: 'purchaseRound', phase: 'onStartReturnHome' }, body: { kind: 'gain', resources: { food: { kind: 'occupied-round-spaces' } } } }],
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl

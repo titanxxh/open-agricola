@@ -1,23 +1,17 @@
 import { definePlayerActionCard } from '../card-source'
-import { registerPlayerActionSpace, createPlayerActionSpaces } from '../player-action-space'
+import { registerPlayerActionSpace, createPlayerActionSpaces, definePlayerActionSpaceFlow } from '../player-action-space'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D051_Archway'
 registerPlayerActionSpace({
   cardId: CARD_ID,
   access: 'all',
-  createDefinition: (_ownerId) => ({
+  createDefinition: (_ownerId) => definePlayerActionSpaceFlow({
     id: CARD_ID,
     nameKey: 'cards.D051_Archway.name',
     descriptionKey: 'cards.D051_Archway.desc',
     canBeExecutedByPlayer: () => true,
-    execute: ({ player }) => {
-      player.resources.food += 1
-      return {
-        type: 'ok',
-        resourcesGained: { food: 1 },
-      }
-    },
+    flowFactory: () => ({ type: 'leaf', actionId: 'gain', sourceCard: CARD_ID, params: { food: 1 } }),
   }),
 })
 
@@ -32,23 +26,9 @@ const cardImpl = {
       }
     }
   },
-  onBeforeReturnHome: (state, player) => {
-    const d51Space = state.actionSpaces.find((s) => s.id === CARD_ID)
-    const worker = d51Space?.takenBy.find((entry) => entry.playerId === player.id)
-    if (!worker) return
-    const actionContext = {
-      moveFarmerSourceSpaceId: CARD_ID,
-      moveFarmerWorkerId: worker.workerId,
-    }
-    return {
-      type: 'leaf',
-      actionId: 'move-farmer-to-space',
-      params: { excludeSpaceId: CARD_ID, workerId: worker.workerId },
-      sourceCard: CARD_ID,
-      actionContext,
-      optional: true,
-    }
-  },
+  timedRules: [{ retainAfterCardLeaves: true, key: 'archway-reuse', at: { kind: 'worker-on-space', spaceId: CARD_ID, phase: 'onBeforeReturnHome' }, body: {
+    kind: 'optional', body: { kind: 'operation', operation: { kind: 'move-worker-from-space', spaceId: CARD_ID } },
+  } }],
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl

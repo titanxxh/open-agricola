@@ -25,6 +25,7 @@ import { isOwnOrdinaryFenceSegment } from './fence-segments.ts'
 import { computeFencedRegions } from './farmyard-regions.ts'
 
 export { computeFencedRegions } from './farmyard-regions.ts'
+export const defaultFenceWoodCosts = { fence: 1, palisade: 2 } as const
 
 // ---------------------------------------------------------------------------
 // Local farm validation types for the inlined validators. These mirror the
@@ -978,9 +979,9 @@ export const validateFenceSelection = <T extends PlayerFarmState>(
   const fenceWoodCost = options.costPolicy?.fence?.wood
   const payableFenceWoodCost =
     fenceWoodCost === undefined
-      ? payableFenceCount
+      ? payableFenceCount * defaultFenceWoodCosts.fence
       : payableFenceCount * fenceWoodCost
-  const palisadeWoodCost = options.costPolicy?.palisade?.wood ?? 2
+  const palisadeWoodCost = options.costPolicy?.palisade?.wood ?? defaultFenceWoodCosts.palisade
   const fixedWoodCost = Math.max(0, options.costPolicy?.fixedWood ?? 0)
   const payableWoodCost =
     payableFenceWoodCost + palisadeWoodCost * newPalisadeEdges.length + extraCost + fixedWoodCost

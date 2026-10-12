@@ -33,6 +33,13 @@ describe('AnytimeBar', () => {
         id: 'C115-sower-anytime',
         labelKey: 'cards.C115_Sower.anytime',
         sourceCard: 'C115_Sower',
+        descriptionPreview: { kind: 'group', operator: 'xor', separator: ' / ', parts: [
+          { kind: 'action', showLabel: false, labelKey: 'actions.pop-card-stack.name', effectPreview: { kind: 'resourceMovement', from: { kind: 'card', cardId: 'C115_Sower' }, to: { kind: 'player' }, resources: { reed: 1 } } },
+          { kind: 'group', operator: 'sequence', separator: ', ', parts: [
+            { kind: 'action', labelKey: 'actions.pay.name', effectPreview: { kind: 'payment', resourcesPaid: { reed: 1 } } },
+            { kind: 'action', labelKey: 'actions.sow.name', optional: true },
+          ] },
+        ] },
       },
     ]
 
@@ -45,7 +52,10 @@ describe('AnytimeBar', () => {
       />,
     )
 
-    expect(html).toContain('播种者：取1芦苇或换取播种行动')
+    expect(html).toContain('播种者')
+    expect(html).toContain('res-icon-reed')
+    expect(html).toContain('选择一项')
+    expect(html).toContain('播种')
     expect(html).not.toContain('付1食物')
     expect(html).not.toContain('获1谷物')
   })

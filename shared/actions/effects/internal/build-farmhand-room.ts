@@ -13,6 +13,7 @@ export const buildFarmhandRoomAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
+  previewEffect: () => ({ kind: 'virtualRoom', amount: 1, animalCapacity: 0 }),
   execute: ({ player }) => {
     player.rooms += 1
     incRoomsBuilt(player, 1)

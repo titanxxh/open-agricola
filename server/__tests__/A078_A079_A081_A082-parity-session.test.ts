@@ -1,5 +1,6 @@
+import { createWorkSession } from './_helpers/session-fixtures'
 import { describe, expect, it } from 'vitest'
-import { GameSession, type SessionResponse } from '../game/authoritative-session'
+import type { GameSession, SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import { setStoredResource, getStoredResource } from '../../shared/cards/helpers/card-storage'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -28,7 +29,7 @@ const setup = ({
   occupations?: number
   resources?: Record<string, number>
 }) => {
-  const session = new GameSession(7080 + round, undefined, { playerCount })
+  const session = createWorkSession({ seed: 7080 + round, options: { playerCount } })
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.currentPlayerIndex = 0

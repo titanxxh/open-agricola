@@ -411,7 +411,7 @@ describe('stage hook flows', () => {
     player.resources.clay = 2
     player.cardStates = {
       ...player.cardStates,
-      D099_EarthenwarePotter: { counters: { earlyBuy: 1 } },
+      D099_EarthenwarePotter: { extraData: { purchaseRound: 4 } },
     }
 
     session.loadState(state)

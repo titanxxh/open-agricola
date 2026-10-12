@@ -25,10 +25,8 @@ export const createMoorActionSpaces = (playerCount: number): ActionSpace[] => {
       gainPerRound: {},
       maxOccupancy: null,
       canBeExecutedByPlayer: () => true,
-      execute: ({ player }) => {
-        player.resources.food += 1
-        return { type: 'ok' }
-      },
+      flow: { type: 'leaf', actionId: 'gain', params: { food: 1 } },
+      execute: () => ({ type: 'ok' }),
       resources: { ...emptyResources },
       takenBy: [],
       blockedBy: [],
@@ -42,11 +40,8 @@ export const createMoorActionSpaces = (playerCount: number): ActionSpace[] => {
       roundAvailable: 1,
       gainPerRound: {},
       canBeExecutedByPlayer: () => true,
-      execute: ({ player }) => {
-        player.resources.food += 1
-        player.resources.stone += 1
-        return { type: 'ok' }
-      },
+      flow: { type: 'leaf', actionId: 'gain', params: { food: 1, stone: 1 } },
+      execute: () => ({ type: 'ok' }),
       resources: { ...emptyResources },
       takenBy: [],
       blockedBy: [],

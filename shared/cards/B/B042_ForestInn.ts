@@ -1,5 +1,5 @@
 import { definePlayerActionCard } from '../card-source'
-import { registerPlayerActionSpace, createPlayerActionSpaces } from '../player-action-space'
+import { registerPlayerActionSpace, createPlayerActionSpaces, definePlayerActionSpaceFlow } from '../player-action-space'
 import { payThenGainActionFlow } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import type { ActionFlow } from '../../contract/types'
@@ -54,7 +54,7 @@ const forestInnFlow = (ownerId: string, usedByOwner: boolean): ActionFlow => {
 registerPlayerActionSpace({
   cardId: CARD_ID,
   access: 'all',
-  createDefinition: (ownerId) => ({
+  createDefinition: (ownerId) => definePlayerActionSpaceFlow({
     id: CARD_ID,
     nameKey: 'cards.B042_ForestInn.name',
     descriptionKey: 'cards.B042_ForestInn.desc',
@@ -62,10 +62,7 @@ registerPlayerActionSpace({
       if (player.id !== ownerId && player.resources.food < 1) return false
       return player.resources.wood >= 5
     },
-    execute: ({ player }) => ({
-      type: 'flow',
-      flow: forestInnFlow(ownerId, player.id === ownerId),
-    }),
+    flowFactory: ({ player }) => forestInnFlow(ownerId, player.id === ownerId),
   }),
 })
 

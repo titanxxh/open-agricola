@@ -10,6 +10,7 @@ export type PromptKey =
   | 'ui.confirmPlayerSwitch'
   | 'ui.harvestFeed'
   | 'ui.harvestHeating'
+  | 'ui.interactionE134Prompt'
   | 'ui.interactionFlowSelect'
   | 'ui.interactionSelectReplacement'
   | 'ui.interactionOptionalAction'

@@ -1,7 +1,8 @@
 import { defineOccupationCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import type { ActionChoiceOption, ActionFlow, PlayerState, Resource } from '../../contract/types'
+import type { ActionFlow, PlayerState, Resource } from '../../contract/types'
+import { scoringOfferFlow, scoringOfferOption, type ScoringOffer } from '../../actions/plans/scoring-offer'
 import { sumSelectedScoringReserve } from '../../domain/scoring-reserve'
 
 const CARD_ID = 'A136_DrudgeryReeve'
@@ -23,26 +24,16 @@ const maxScoringSets = (player: PlayerState) => {
 
 const choiceValue = (sets: number) => `${CHOICE_PREFIX}${sets}`
 
-const parseChoice = (choice: string): number | null => {
-  if (!choice.startsWith(CHOICE_PREFIX)) return null
-  const raw = Number(choice.slice(CHOICE_PREFIX.length))
-  return Number.isInteger(raw) && raw >= 0 ? raw : null
-}
-
-const choiceOptions = (maxSets: number): ActionChoiceOption[] =>
-  Array.from({ length: maxSets + 1 }, (_, sets) => ({
-    value: choiceValue(sets),
-    labelKey: 'ui.cards.A136_DrudgeryReeve.scoreSets',
-    labelParams: { sets, score: BONUS_BY_SETS[sets] ?? 0 },
-    sourceCard: CARD_ID,
-  }))
-
 const reserveForSets = (sets: number): Partial<Resource> => ({
   wood: sets,
   clay: sets,
   reed: sets,
   stone: sets,
 })
+
+const scoringOffers = (maxCount: number): ScoringOffer[] => Array.from({ length: maxCount + 1 }, (_, sets) => ({
+  value: choiceValue(sets), kind: 'reserve', resources: reserveForSets(sets), score: BONUS_BY_SETS[sets] ?? 0, cardType: 'occupation'
+}))
 
 const cardImpl = {
   effect: {
@@ -67,27 +58,13 @@ const cardImpl = {
         actionContext: { targetPlayerId: player.id },
         params: {
           promptKey: 'ui.cards.A136_DrudgeryReeve.prompt',
-          options: choiceOptions(maxSets),
+          options: scoringOffers(maxSets).map(offer => scoringOfferOption(CARD_ID, offer)),
         },
       } satisfies ActionFlow
     },
     resolveChoice: (_state, player, choice) => {
-      const sets = parseChoice(choice)
-      if (sets === null || sets <= 0) return
-      if (sets > maxScoringSets(player)) return
-      return {
-        type: 'leaf',
-        actionId: 'special-effect',
-        sourceCard: CARD_ID,
-        targetPlayerId: player.id,
-        actionContext: { targetPlayerId: player.id },
-        params: {
-          kind: 'record-scoring-reserve-bonus',
-          reserved: reserveForSets(sets),
-          score: BONUS_BY_SETS[sets] ?? 0,
-          cardType: 'occupation',
-        },
-      } satisfies ActionFlow
+      const offer = scoringOffers(maxScoringSets(player)).find(candidate => candidate.value === choice)
+      return offer ? scoringOfferFlow(CARD_ID, offer) : undefined
     },
   },
   reaches: [] as readonly string[],

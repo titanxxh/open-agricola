@@ -1,3 +1,4 @@
+import { descriptionEffects } from './_helpers/choice-description'
 import { describe, expect, it } from 'vitest'
 import { setupMoorAudit, playMoorAuditMinor, advanceMoorAuditToRound } from './_helpers/moor-rules-audit'
 import { markAllWorkersUsed, workersAvailable } from '../../shared/domain/player'
@@ -38,9 +39,9 @@ describe('Moor scheduled and counter clause audit', () => {
       response = session.takeAnytimeAction(0, 'M126-cooperative-store-anytime')
       expect(response.ok, response.error).toBe(true)
       const options = response.interaction.request.options
-      expect(options.some((option) => option.effectPreview?.resourcesGained?.stone)).toBe(false)
-      expect(options.some((option) => (['wood', 'clay', 'reed'] as const).some((resource) => option.effectPreview?.resourcesPaid?.[resource] && option.effectPreview?.resourcesGained?.[resource]))).toBe(false)
-      const choice = options.find((option) => option.effectPreview?.resourcesPaid?.stone === 1 && option.effectPreview.resourcesGained?.wood === 1)!
+      expect(options.some((option) => descriptionEffects(option.descriptionPreview).some(effect => effect.resourcesGained?.stone))).toBe(false)
+      expect(options.some((option) => (['wood', 'clay', 'reed'] as const).some((resource) => descriptionEffects(option.descriptionPreview).some(effect => effect.resourcesPaid?.[resource]) && descriptionEffects(option.descriptionPreview).some(effect => effect.resourcesGained?.[resource])))).toBe(false)
+      const choice = options.find((option) => descriptionEffects(option.descriptionPreview).some(effect => effect.resourcesPaid?.stone === 1) && descriptionEffects(option.descriptionPreview).some(effect => effect.resourcesGained?.wood === 1))!
       expect(choice).toBeDefined()
       response = session.resolveChoice(0, choice.value)
       expect(response.ok, response.error).toBe(true)

@@ -105,16 +105,9 @@ export const useExchangeDraftPresentation = ({
   const [anytimeExchangeCounts, setAnytimeExchangeCounts] = useState<Record<string, number>>({})
 
   const isBakeExchange = pendingChoice?.promptKey === 'ui.interactionBakeBreadChoice'
-  const bakeExchangeSourceIds = useMemo(
-    () =>
-      isBakeExchange
-        ? (pendingChoice?.options ?? []).map((option) => option.value)
-        : [],
-    [isBakeExchange, pendingChoice?.options],
-  )
   const bakeExchangeInfo = useMemo(
-    () => buildBakeExchangeInfo(bakeExchangeSourceIds, getCardMeta),
-    [bakeExchangeSourceIds, getCardMeta],
+    () => buildBakeExchangeInfo(isBakeExchange ? pendingChoice?.options ?? [] : []),
+    [isBakeExchange, pendingChoice?.options],
   )
   const bakeExchangePlayer =
     isBakeExchange && pendingChoice && state

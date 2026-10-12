@@ -1,3 +1,6 @@
+import { retainedTimedRuleHook, retainedTimedTurnSkip, timedRuleSources, timedExtraTurnFlow } from './timed-rule-obligations'
+import { flowCardEffectHooks, type CardEffectHook, type FlowCardEffectHook } from '../contract/card-effect-hooks'
+import type { TimedRule } from '../contract/rule-plans'
 import type { ActionFlow, FarmTilePosition, GameState, InteractionRequest, PaymentResourceMap, PlayerState, ProtectedObservation, Resource, ResourceKey } from '../contract/types'
 import type { Pasture } from '../domain/pasture'
 import type { PurchaseOutcomeRule } from '../contract/rule-plans'
@@ -105,47 +108,8 @@ export type PaymentInfo = {
   returnedCardId?: string
 }
 
-export type CardEffectHook = 'onBuy' | 'onBeforeWork' | 'onRoundStart' | 'onHarvest' | 'onRoundEnd' | 'onEndTurn' | 'onReturnHome'
-  | 'onBeforeReturnHome' | 'onStartReturnHome'
-  | 'onAfterRoundEnd'
-  | 'onBeforeHarvest' | 'onStartHarvest'
-  | 'onStartHarvestFieldPhase' | 'onHarvestFieldPhase' | 'onEndHarvestFieldPhase'
-  | 'onAfterReap'
-  | 'onStartHarvestFeedingPhase' | 'onHarvestFeedingPhase' | 'onEndHarvestFeedingPhase'
-  | 'onEndHarvest' | 'onAfterHarvest'
-  | 'onBeforeEndGame'
-  | 'onBeforeStartOfTurn'
-  | 'onBeforePlayerTurn'
-  | 'onAllWorkersPlaced'
-
-export type FlowCardEffectHook = Exclude<CardEffectHook, 'onBeforePlayerTurn'>
-
-export const flowCardEffectHooks: FlowCardEffectHook[] = [
-  'onBuy',
-  'onBeforeWork',
-  'onRoundStart',
-  'onHarvest',
-  'onRoundEnd',
-  'onEndTurn',
-  'onReturnHome',
-  'onBeforeReturnHome',
-  'onStartReturnHome',
-  'onAfterRoundEnd',
-  'onBeforeHarvest',
-  'onStartHarvest',
-  'onStartHarvestFieldPhase',
-  'onHarvestFieldPhase',
-  'onEndHarvestFieldPhase',
-  'onAfterReap',
-  'onStartHarvestFeedingPhase',
-  'onHarvestFeedingPhase',
-  'onEndHarvestFeedingPhase',
-  'onEndHarvest',
-  'onAfterHarvest',
-  'onBeforeEndGame',
-  'onBeforeStartOfTurn',
-  'onAllWorkersPlaced',
-]
+export { flowCardEffectHooks } from '../contract/card-effect-hooks'
+export type { CardEffectHook, FlowCardEffectHook } from '../contract/card-effect-hooks'
 
 export type HandCardEffectHook = Exclude<FlowCardEffectHook, 'onBuy' | 'onEndTurn' | 'onBeforeEndGame'>
 
@@ -246,6 +210,7 @@ export type ResourceCommitment = { playerId: string; resources: Partial<Resource
 
 export type CardEffect = {
   id: string
+  timedRules?: readonly TimedRule[]
   projectInteractionRequest?: (state: GameState, player: PlayerState, request: InteractionRequest, actionId: string | undefined) => InteractionRequest
   computeResourceCommitments?: (state: GameState, owner: PlayerState) => readonly ResourceCommitment[]
   preHarvestGoodsWanted?: ResourceKey[]
@@ -429,6 +394,11 @@ export const runCardEffectHook = (
   ctx?: FlowEffectContext,
 ): ActionFlow | null => {
   const effect = getCardEffect(cardId)
+  const owned = [...player.improvements, ...player.minorPlayed, ...player.occupationPlayed].includes(cardId)
+  const handHook = isHandCardEffectHook(hook) && effect?.handHooks?.includes(hook) && [...player.minorHand, ...player.occupationHand].includes(cardId)
+  if (!owned && !handHook && hook !== 'onBuy' && effect?.timedRules?.some(rule => rule.retainAfterCardLeaves)) {
+    return retainedTimedRuleHook(state, player, cardId, hook, id => getCardEffect(id)?.timedRules ?? []) ?? null
+  }
   const handler = effect?.[hook]
   if (!handler) return null
   try {
@@ -736,7 +706,7 @@ export const shouldSkipPlayerTurn = (state: GameState, player: PlayerState): boo
     ...player.minorPlayed,
     ...player.occupationPlayed,
   ]
-  let skip = false
+  let skip = retainedTimedTurnSkip(state, player, id => getCardEffect(id)?.timedRules ?? [])
   for (const cardId of allCards) {
     const effect = getCardEffect(cardId)
     const handler = effect?.onBeforePlayerTurn
@@ -811,6 +781,14 @@ export const collectExtraTurnContributions = (
       }
       throw err
     }
+  }
+  const owned = new Set(extraTurnCardIds(player))
+  for (const source of timedRuleSources(state, player, id => getCardEffect(id)?.timedRules ?? [])) {
+    if (owned.has(source.cardId)) continue
+    const skipped = extraTurnCounter(player._extraTurnSkipCountsByCard, source.cardId) + extraTurnCounter(player._extraTurnConsumedCountsByCard, source.cardId)
+    if (skipped > 0) continue
+    const flow = timedExtraTurnFlow(state, player, source.cardId, source.rules)
+    if (flow) contributions.push({ cardId: source.cardId, ownerPlayerId: player.id, count: 1, flow })
   }
   return contributions
 }

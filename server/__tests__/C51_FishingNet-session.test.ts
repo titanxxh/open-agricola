@@ -1,29 +1,23 @@
-import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game/authoritative-session'
-import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
+import { afterEach, describe, expect, it } from 'vitest'
+import type { GameSession } from '../game/authoritative-session'
+import { createWorkSession } from './_helpers/session-fixtures'
 import type { ActionDetailParts } from '../../shared/contract/protocol/game'
 
 import { markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
 import { confirmNextPlayer, confirmPlayerSwitch } from './_helpers/pending-confirms'
 import '../../shared/cards/C/C051_FishingNet'
 
+const sessions: GameSession[] = []
+afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+
 describe('C051_FishingNet session', () => {
   const setup = (currentPlayerIndex: number) => {
-    const session = new GameSession(42)
-    stabilizeRandomHands(session.state.players)
-    const state = session.getState().state
-    state.players = state.players.slice(0, 2)
-    state.currentPlayerIndex = currentPlayerIndex
-
-    const owner = state.players[0]!
-    owner.minorPlayed.push('C051_FishingNet')
-
-    // Ensure fishing space has some accumulated food
-    const fishingSpace = state.actionSpaces.find((s) => s.id === 'fishing')
-    if (!fishingSpace) throw new Error('fishing space missing')
-    fishingSpace.resources.food = 2
-
-    session.loadState(state)
+    const session = createWorkSession({ seed: 42, configure: state => {
+      state.currentPlayerIndex = currentPlayerIndex
+      state.players[0]!.minorPlayed = ['C051_FishingNet']
+      state.actionSpaces.find(space => space.id === 'fishing')!.resources.food = 2
+    } })
+    sessions.push(session)
     return session
   }
 
@@ -52,7 +46,7 @@ describe('C051_FishingNet session', () => {
     expect(after.players[0]!.resources.food).toBe(ownerFoodBefore + 1)
   })
 
-  it('card is flagged after opponent uses fishing', () => {
+  it('records a pending deposit and an independent activation episode after opponent uses fishing', () => {
     const session = setup(1)
 
     // Opponent (p1) uses fishing
@@ -65,20 +59,17 @@ describe('C051_FishingNet session', () => {
     }
 
     const after = session.getState().state
-    // Card should be flagged on the owner
-    expect(after.players[0]!.cardStates?.C051_FishingNet?.flagged).toBe(true)
+    expect(after.players[0]!.cardStates.C051_FishingNet?.extraData).toMatchObject({ pendingDeposits: 1, depositEpisode: 1 })
   })
 
   it('2 food placed on fishing space during return-home phase', () => {
-    const session = new GameSession(42)
-    stabilizeRandomHands(session.state.players)
+    const session = setup(1)
     const state = session.getState().state
-    state.players = state.players.slice(0, 2)
     state.round = 1
     state.currentPlayerIndex = 1
 
     const owner = state.players[0]!
-    owner.minorPlayed.push('C051_FishingNet')
+    owner.minorPlayed = ['C051_FishingNet']
 
     // Each player has 1 worker
     state.players.forEach((p) => {
@@ -93,7 +84,7 @@ describe('C051_FishingNet session', () => {
 
     session.loadState(state)
 
-    // Opponent (p1) uses fishing — collects 2 food, card triggers: owner gains 1 food + card flagged
+    // Opponent (p1) uses fishing — collects 2 food, card triggers: owner gains 1 food and a pending deposit
     let resp = session.takeAction(1, 'fishing')
     expect(resp.ok).toBe(true)
 
@@ -128,8 +119,10 @@ describe('C051_FishingNet session', () => {
     // Fishing space: was 2, opponent collected it (→ 0), onReturnHome adds +2 (→ 2),
     // round growth adds +1 for new round (→ 3)
     expect(afterFishing.resources.food).toBe(3)
-    // Card should be unflagged after return-home
-    expect(after.players[0]!.cardStates?.C051_FishingNet?.flagged).toBe(false)
+    expect(after.round).toBe(2)
+    expect(after.players[0]!.cardStates.C051_FishingNet?.extraData).toMatchObject({ pendingDeposits: 0, depositEpisode: 1 })
+    expect(after.events.filter(event => event.type === 'resource.moved' && event.sourceCardId === 'C051_FishingNet'
+      && event.to.kind === 'actionSpace' && event.to.spaceId === 'fishing' && event.resources.food === 2)).toHaveLength(1)
   })
 
   it('no trigger when owner uses fishing themselves', () => {
@@ -152,8 +145,8 @@ describe('C051_FishingNet session', () => {
     // Owner gains food from the fishing space itself (accumulated 2 food)
     // But should NOT gain the extra 1 food from FishingNet (opponent scope only)
     expect(after.players[0]!.resources.food).toBe(ownerFoodBefore + fishingFoodBefore)
-    // Card should not be flagged
-    expect(after.players[0]!.cardStates?.C051_FishingNet?.flagged).toBeFalsy()
+    expect(after.players[0]!.cardStates.C051_FishingNet?.extraData?.pendingDeposits ?? 0).toBe(0)
+    expect(after.players[0]!.cardStates.C051_FishingNet?.extraData?.depositEpisode ?? 0).toBe(0)
   })
 
   it('opponent food is deducted by 1 when they use fishing (payerId fix)', () => {
@@ -205,7 +198,7 @@ describe('C051_FishingNet session', () => {
     const fishingAfter = after.actionSpaces.find((sp) => sp.id === 'fishing')!
     expect(fishingAfter.resources.food).toBe(2)
     // Owner did not gain anything either.
-    expect(after.players[0]!.cardStates?.C051_FishingNet?.flagged).toBeFalsy()
+    expect(after.players[0]!.cardStates.C051_FishingNet?.extraData?.pendingDeposits ?? 0).toBe(0)
   })
 
   it('owner with 0 food can still use fishing themselves (own card does not block)', () => {
@@ -218,15 +211,13 @@ describe('C051_FishingNet session', () => {
     expect(resp.ok).toBe(true)
   })
 
-  it('no extra food on fishing space when card is not flagged during return-home', () => {
-    const session = new GameSession(42)
-    stabilizeRandomHands(session.state.players)
+  it('no extra food on fishing space without an activated deposit during return-home', () => {
+    const session = setup(0)
     const state = session.getState().state
-    state.players = state.players.slice(0, 2)
     state.round = 1
 
     const owner = state.players[0]!
-    owner.minorPlayed.push('C051_FishingNet')
+    owner.minorPlayed = ['C051_FishingNet']
 
     // All workers used, ready for round end
     state.players.forEach((p) => {
@@ -245,7 +236,7 @@ describe('C051_FishingNet session', () => {
     // After round end, fishing space should have accumulated food for next round but no extra from card
     const afterFishing = resp.state.actionSpaces.find((s) => s.id === 'fishing')!
     // Fishing accumulates 1 food per round. Round 1 → round 2 start adds 1 food.
-    // No extra 2 food because card was not flagged.
+    // No extra 2 food because no deposit was activated.
     expect(afterFishing.resources.food).toBe(1)
   })
 })

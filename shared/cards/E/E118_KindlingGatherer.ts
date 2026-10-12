@@ -34,7 +34,7 @@ const listener: CardListenerRegistration = {
   id: 'E118-kindling-gatherer-after-action-space-food',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: ['place-farmer', 'collect', 'gain'],
+  actions: ['collect', 'gain'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (hasActionSpaceFoodMovedToTriggerPlayer(context)) {
       return { flow: gainLeaf(CARD_ID, { wood: 1 }), sourceCard: CARD_ID }

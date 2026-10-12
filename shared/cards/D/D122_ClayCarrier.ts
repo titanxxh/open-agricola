@@ -23,7 +23,6 @@ const anytimeListener: CardListenerRegistration = {
         ],
       },
       sourceCard: CARD_ID,
-      labelKey: 'cards.D122_ClayCarrier.anytime',
     }
   },
 }

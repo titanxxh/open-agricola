@@ -550,6 +550,7 @@ export const filterSerializedStateForPlayer = (
     const cardStatePresentation = Object.fromEntries(Object.entries(p.cardStatePresentation ?? {}).filter(([id]) =>
       !hiddenCardIds.get(p.id)?.has(id),
     ))
+    visiblePlayer.scheduledEffects = (p.scheduledEffects ?? []).filter(effect => !hiddenCardIds.get(p.id)?.has(effect.sourceCard))
     return p.id === viewerPlayerId
       ? { ...visiblePlayer, cardStates, cardStatePresentation }
       : {

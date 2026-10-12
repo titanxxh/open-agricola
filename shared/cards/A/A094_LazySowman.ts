@@ -49,7 +49,7 @@ const computeReplaceListener: CardListenerRegistration = {
         promptKey: 'ui.interactionLazySowmanPlace',
         choiceLabelKey: 'ui.interactionUseCard',
         choiceLabelParams: {
-          cardNameKey: 'occupations.A094_LazySowman.name',
+          cardNameKey: 'cards.A094_LazySowman.name',
         },
         children: [
           {

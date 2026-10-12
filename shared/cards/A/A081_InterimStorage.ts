@@ -1,11 +1,9 @@
 import { defineMinorCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { getStoredResource } from '../helpers/card-storage'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A081_InterimStorage'
-const PAYOUT_ROUNDS = new Set([7, 11, 14])
 
 const COLLECT_MAP = {
   clay: 'wood',
@@ -40,28 +38,7 @@ const cardImpl = {
   listeners: [collectListener],
   effect: {
   id: CARD_ID,
-  onRoundStart: (state, player) => {
-    if (!PAYOUT_ROUNDS.has(state.round)) return
-
-    const takeable = (['wood', 'clay', 'reed'] as const)
-      .map((resource) => ({
-        resource,
-        amount: getStoredResource(player, CARD_ID, resource),
-      }))
-      .filter((entry) => entry.amount > 0)
-
-    if (takeable.length === 0) return
-
-    return {
-      type: 'seq',
-      children: takeable.map((entry) => ({
-        type: 'leaf' as const,
-        actionId: 'take-from-card',
-        params: { [entry.resource]: entry.amount },
-        sourceCard: CARD_ID,
-      })),
-    }
-  },
+  timedRules: [{ retainAfterCardLeaves: true, key: 'stored-goods-payout', at: { kind: 'next-stored-payout', rounds: [7, 11, 14], resources: ['wood', 'clay', 'reed'], phase: 'onRoundStart' }, body: { kind: 'operation', operation: { kind: 'take-stored-resources', resources: ['wood', 'clay', 'reed'] } } }],
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl

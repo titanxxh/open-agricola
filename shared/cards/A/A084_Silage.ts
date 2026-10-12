@@ -1,10 +1,9 @@
 import { defineMinorCard } from '../card-source'
-import type { ActionDefinition, ActionFlow, PlayerState } from '../../contract/types'
-import { payLeaf } from '../helpers/pay-gain-node'
-import { isMinorCardId } from '../helpers/card-type'
+import type { ActionFlow } from '../../contract/types'
+import { createCropPaymentAction } from '../../actions/plans/crop-payment'
 import { registerAdHocAction } from '../../actions/helpers/ad-hoc-action-registry'
 import type { CardImpl } from '../registry'
-import { getLogicalFields, mutateLogicalFields } from '../helpers/card-field'
+import { getLogicalFields } from '../helpers/card-field'
 
 const CARD_ID = 'A084_Silage'
 const PAY_GRAIN_ACTION_ID = 'card_A084_Silage_pay-grain-any'
@@ -13,43 +12,7 @@ const harvestRounds = [4, 7, 9, 11, 13, 14]
 
 const BREEDABLE_TYPES = ['cattle', 'boar', 'sheep'] as const
 
-const grainFields = (player: PlayerState) => getLogicalFields(player).flatMap((field) => {
-  const top = [...field.slots].reverse().find((slot) => slot.stack)
-  return top?.stack?.kind === 'grain' ? [{ field, top }] : []
-})
-
-const payGrainAnyAction: ActionDefinition = {
-  id: PAY_GRAIN_ACTION_ID,
-  nameKey: 'actions.pay-grain-any.name',
-  descriptionKey: 'actions.pay-grain-any.description',
-  roundAvailable: 1,
-  gainPerRound: {},
-  canBeExecutedByPlayer: (_state, player) => player.resources.grain > 0 || grainFields(player).length > 0,
-  getBaseChoiceOptions: ({ player }) => [
-    ...(player.resources.grain > 0 ? [{ value: 'reserve', labelKey: 'ui.cards.A084_Silage.reserve' }] : []),
-    ...grainFields(player).map(({ field }) => ({
-      value: field.id,
-      labelKey: field.sourceCard
-        ? `${isMinorCardId(field.sourceCard) ? 'minorImprovements' : 'occupations'}.${field.sourceCard}.name`
-        : 'ui.cards.A084_Silage.field',
-      labelParams: { row: field.row + 1, col: field.col + 1 },
-    })),
-  ],
-  execute: () => ({ type: 'fail', errorKey: 'log.exchangeFail' }),
-  resolveChoice: ({ state, player, eventSink }, choice) => {
-    if (choice === 'reserve' && player.resources.grain > 0) {
-      return { type: 'flow', flow: payLeaf({ cardId: CARD_ID, cost: { grain: 1 } }) }
-    }
-    const grainField = grainFields(player).find(({ field }) => field.id === choice)
-    if (!grainField) return { type: 'fail', errorKey: 'log.exchangeFail' }
-    const removed = mutateLogicalFields(state, player, { sourceCard: CARD_ID, eventSink })
-      .remove({ fieldId: grainField.field.id, slot: grainField.top.index }, 1)
-    if (removed.ok) return removed.flow ? { type: 'flow', flow: removed.flow } : { type: 'ok' }
-    return { type: 'fail', errorKey: 'log.exchangeFail' }
-  },
-}
-
-registerAdHocAction(payGrainAnyAction)
+registerAdHocAction(createCropPaymentAction(CARD_ID, PAY_GRAIN_ACTION_ID, 'grain', 1))
 
 const cardImpl = {
   effect: {
@@ -76,8 +39,6 @@ const cardImpl = {
         { type: 'leaf' as const, actionId: PAY_GRAIN_ACTION_ID, sourceCard: CARD_ID },
         { type: 'leaf' as const, actionId: 'gain', params: { [animalType]: 1 }, sourceCard: CARD_ID },
       ],
-      choiceLabelKey: `ui.interactionSilageBreed`,
-      choiceLabelParams: { animal: animalType },
     }))
 
     return {

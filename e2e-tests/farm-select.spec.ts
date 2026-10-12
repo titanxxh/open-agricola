@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { giveResource, advanceRound, BACKEND_URL, getJson, postJson } from './fixtures';
 
 const actionCard = (page: Page, name: string) =>
-  page.locator('.action-card', { hasText: name });
+  page.getByRole('button', { name, exact: true }).and(page.locator('.action-card'));
 
 async function resetGame(page: Page) {
   await page.locator('.dev-panel .seed-input input').fill('42');

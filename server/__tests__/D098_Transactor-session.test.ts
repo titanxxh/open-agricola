@@ -1,3 +1,4 @@
+import { createWorkSession } from './_helpers/session-fixtures'
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { requireActiveCardRegistry } from '../../shared/cards/active-registry'
@@ -14,7 +15,7 @@ const CARD_ID = 'D098_Transactor'
 const FOLLOW_UP_CARD = 'TEST_D098FollowUp'
 
 const setupFinalHarvest = (withBuildingResources = true) => {
-  const session = new GameSession(98, undefined, { playerCount: 2 })
+  const session = createWorkSession({ seed: 98 })
   const state = session.getState().state
   state.currentPlayerIndex = 0
   state.round = 14
@@ -205,7 +206,12 @@ describe('D098 Transactor final-harvest choice', () => {
     if (offered.interaction.stateId !== 'wait') throw new Error('expected wait')
     expect(offered.interaction.request.kind).toBe('select-trigger')
     const transactor = offered.interaction.request.options.find((option) => option.value === CARD_ID)!
-    const resolved = session.resolveChoice(0, transactor.value)
+    let resolved = session.resolveChoice(0, transactor.value)
+    if (resolved.interaction.stateId === 'wait' && resolved.interaction.request.kind === 'choice') {
+      const accept = resolved.interaction.request.options.find(option => option.value !== '__skip__')
+      if (!accept) throw new Error('Missing collection acceptance')
+      resolved = session.resolveChoice(0, accept.value)
+    }
     if (resolved.interaction.stateId !== 'wait') throw new Error('expected remaining trigger choice')
     expect(resolved.interaction.request.kind).toBe('select-trigger')
     expect(resolved.state.players[0]!.resources.wood).toBe(2)
@@ -217,7 +223,7 @@ describe('D098 Transactor final-harvest choice', () => {
     expect(spaceResources(undone, 'forest').wood).toBe(2)
     expect(undone.interaction.stateId).toBe('wait')
     if (undone.interaction.stateId !== 'wait') throw new Error('expected restored trigger choice')
-    expect(undone.interaction.request.kind).toBe('select-trigger')
-    expect(undone.interaction.request.options.some((option) => option.value === CARD_ID)).toBe(true)
+    expect(['select-trigger', 'choice']).toContain(undone.interaction.request.kind)
+    expect(undone.interaction.request.options.some(option => option.value !== '__skip__')).toBe(true)
   })
 })

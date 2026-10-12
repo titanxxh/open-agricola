@@ -1,3 +1,4 @@
+import { descriptionEffects } from './_helpers/choice-description'
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { getCardStack, pushToCardStack } from '../../shared/cards/helpers/card-state'
@@ -87,8 +88,8 @@ const resolveEntrepreneur = (
     const preferred = options.find((option) => option.effectPreview?.resourcesGained?.[resource] === 1)
       ?? options.find((option) =>
       option.sourceCard === CARD_ID && (mode === 'discard'
-        ? option.labelKey === 'ui.interactionEntrepreneurDiscard'
-        : option.labelKey !== 'ui.interactionEntrepreneurDiscard' && option.value !== '__skip__'),
+        ? descriptionEffects(option.descriptionPreview).some(effect => effect.kind === 'cardStack' && effect.amount === -1)
+        : !descriptionEffects(option.descriptionPreview).some(effect => effect.kind === 'cardStack' && effect.amount === -1) && option.value !== '__skip__'),
     )
     const option = preferred
       ?? cardOptions.find((candidate) => candidate.value !== '__skip__')
@@ -144,7 +145,7 @@ describe('E162 Entrepreneur parity', () => {
   it('restores a pending resource choice and undoes discarding stored food', () => {
     const session = setup({ food: 1, storedFood: 1, resources: { clay: 1, reed: 1 } })
     const offered = startNextRound(session)
-    const discard = optionsOf(offered).find((option) => option.labelKey === 'ui.interactionEntrepreneurDiscard')
+    const discard = optionsOf(offered).find((option) => descriptionEffects(option.descriptionPreview).some(effect => effect.kind === 'cardStack' && effect.amount === -1))
     expect(discard, JSON.stringify(offered.interaction)).toBeDefined()
     const pending = session.resolveChoice(0, discard!.value)
     expect(getCardStack(pending.state.players[0]!, CARD_ID)).toEqual([])

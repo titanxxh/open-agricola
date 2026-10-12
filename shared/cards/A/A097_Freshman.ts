@@ -22,7 +22,6 @@ const computeReplaceListener: CardListenerRegistration = {
       alternativeFlow: {
         type: 'seq',
         promptKey: 'ui.interactionFreshmanOccupation',
-        choiceLabelKey: 'ui.interactionFreshmanOccupation',
         children: [
           { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: true } },
           {

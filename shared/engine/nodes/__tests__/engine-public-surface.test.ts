@@ -10,6 +10,7 @@ import { Engine } from '../../engine'
  */
 describe('Engine surface guard', () => {
   const PUBLIC_API = [
+    'describe',
     'injectBeforeFlows',
     'proceed',
     'resolveChoice',
@@ -50,7 +51,7 @@ describe('Engine surface guard', () => {
     expect(ownMethods).toEqual(expected)
   })
 
-  it('public API count is exactly 5', () => {
-    expect(PUBLIC_API.length).toBe(5)
+  it('public API count is exactly 6', () => {
+    expect(PUBLIC_API.length).toBe(6)
   })
 })

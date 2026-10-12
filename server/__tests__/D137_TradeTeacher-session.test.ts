@@ -1,3 +1,5 @@
+import { descriptionEffects } from './_helpers/choice-description'
+import type { ActionChoiceOption } from '../../shared/contract/types'
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
@@ -62,9 +64,14 @@ const takeLessons = (
   return response
 }
 
+const goodsOf = (option: ActionChoiceOption): string => {
+  const preview = descriptionEffects(option.descriptionPreview).find(effect => effect.kind === 'resourceExchange')
+  return preview?.kind === 'resourceExchange' ? Object.keys(preview.resourcesGained ?? {}).join('+') : ''
+}
+
 const tradeOptions = (response: SessionResponse) => response.interaction.stateId === 'wait'
   ? (response.interaction.request.options ?? []).filter(
-      (option) => typeof option.labelParams?.goods === 'string',
+      (option) => goodsOf(option).length > 0,
     )
   : []
 
@@ -95,7 +102,7 @@ const buy = (
 ) => {
   response = enterTradeTeacherPurchase(session, response)
   const option = tradeOptions(response).find(
-    (candidate) => candidate.labelParams?.goods === goods,
+    (candidate) => goodsOf(candidate) === goods,
   )
   expect(option).toBeDefined()
   if (!option || response.interaction.stateId !== 'wait') return response
@@ -162,10 +169,10 @@ describe('D137 Trade Teacher parity', () => {
 
     expect(options.length).toBeGreaterThan(0)
     for (const option of options) {
-      const goods = String(option.labelParams?.goods).split('+')
+      const goods = goodsOf(option).split('+')
       expect(new Set(goods).size).toBe(goods.length)
     }
-    const grain = options.find((option) => option.labelParams?.goods === 'grain')
+    const grain = options.find((option) => goodsOf(option) === 'grain')
     expect(grain).toBeDefined()
     if (grain && response.interaction.stateId === 'wait') {
       response = session.resolveChoice(response.interaction.playerIndex, grain.value)
@@ -179,7 +186,7 @@ describe('D137 Trade Teacher parity', () => {
     const before = response.state.players[0]!.resources
 
     expect(tradeOptions(response).every((option) =>
-      String(option.labelParams?.goods).split('+').length <= 2)).toBe(true)
+      goodsOf(option).split('+').length <= 2)).toBe(true)
     const rejected = session.resolveChoice(0, 'three-goods')
     expect(rejected.ok).toBe(false)
     expect(rejected.state.players[0]!.resources).toEqual(before)

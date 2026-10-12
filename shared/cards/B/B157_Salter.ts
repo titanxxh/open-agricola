@@ -1,16 +1,7 @@
 import { defineOccupationCard } from '../card-source'
-import type {
-  ActionDefinition,
-  ActionExecutionContext,
-  ActionExecutionResult,
-  ActionFlow,
-  GameState,
-  PlayerState,
-  Resource,
-} from '../../contract/types'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { getAssignedAnimalsByType, subtractAnimalsFromBoard } from '../../domain/animals'
-import { queueFutureMeeplesFlow } from '../../actions/effects/internal/future-meeples'
+import { getAssignedAnimalsByType } from '../../domain/animals'
+import { createAnimalScheduleSelectionAction, type QuantitySchedule } from '../../actions/plans/quantity-schedule'
 import { registerAdHocAction } from '../../actions/helpers/ad-hoc-action-registry'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { CardImpl } from '../registry'
@@ -18,131 +9,13 @@ import type { CardImpl } from '../registry'
 const CARD_ID = 'B157_Salter'
 const PICK_ACTION_ID = 'card_B157_Salter_salt-pick'
 
-const TURNS = { sheep: 3, boar: 5, cattle: 7 } as const
-const ANIMAL_TYPES = ['sheep', 'boar', 'cattle'] as const
+const SCHEDULE = [
+  { resource: 'sheep', rounds: 3, resourcesPerUnit: { food: 1 } },
+  { resource: 'boar', rounds: 5, resourcesPerUnit: { food: 1 } },
+  { resource: 'cattle', rounds: 7, resourcesPerUnit: { food: 1 } },
+] as const satisfies QuantitySchedule
 
-const clampRound = (round: number) => Math.max(1, Math.min(14, round))
-
-const formatAnimalSummary = (counts: Record<typeof ANIMAL_TYPES[number], number>) =>
-  ANIMAL_TYPES
-    .filter((t) => counts[t] > 0)
-    .map((t) => `${counts[t]} ${t}`)
-    .join(', ')
-
-const buildSalterLogParams = (
-  state: GameState,
-  counts: Record<typeof ANIMAL_TYPES[number], number>,
-) => {
-  const schedule: string[] = []
-  let futureFood = 0
-  for (const t of ANIMAL_TYPES) {
-    if (counts[t] <= 0) continue
-    const startRound = clampRound(state.round + 1)
-    const endRound = clampRound(state.round + TURNS[t])
-    if (endRound < startRound) continue
-    futureFood += counts[t] * (endRound - startRound + 1)
-    schedule.push(`${counts[t]} food in rounds ${startRound}-${endRound}`)
-  }
-  return {
-    cardId: CARD_ID,
-    animals: formatAnimalSummary(counts),
-    sheep: counts.sheep,
-    boar: counts.boar,
-    cattle: counts.cattle,
-    futureFood,
-    schedule: schedule.join('; '),
-  }
-}
-
-const resolveSalterCounts = (
-  state: GameState,
-  player: PlayerState,
-  raw: Partial<Record<keyof Resource, number>>,
-): ActionExecutionResult => {
-  const counts = {
-    sheep: raw.sheep ?? 0,
-    boar: raw.boar ?? 0,
-    cattle: raw.cattle ?? 0,
-  }
-  for (const t of ['sheep', 'boar', 'cattle'] as const) {
-    if (!Number.isInteger(counts[t]) || counts[t] < 0) {
-      return { type: 'fail', errorKey: `salter-pick.error.invalid-count-${t}` }
-    }
-  }
-  if (counts.sheep + counts.boar + counts.cattle < 1) {
-    return { type: 'fail', errorKey: 'salter-pick.error.must-pick-at-least-one' }
-  }
-  const onBoard = getAssignedAnimalsByType(player, state)
-  for (const t of ['sheep', 'boar', 'cattle'] as const) {
-    if (counts[t] > onBoard[t]) {
-      return { type: 'fail', errorKey: `salter-pick.error.invalid-count-${t}` }
-    }
-  }
-  subtractAnimalsFromBoard(player, counts, state)
-  const sourceSummary = {
-    key: 'log.salterFutureFood',
-    params: buildSalterLogParams(state, counts),
-  } as const
-  let summaryAttached = false
-  const flows: ActionFlow[] = (['sheep', 'boar', 'cattle'] as const)
-    .filter((t) => counts[t] > 0)
-    .map((t) => {
-      const attachSummary = !summaryAttached
-      summaryAttached = true
-      return queueFutureMeeplesFlow(state, {
-        cardId: CARD_ID,
-        playerId: player.id,
-        ...(attachSummary ? { sourceSummary } : {}),
-        startRound: state.round + 1,
-        count: TURNS[t],
-        resources: { food: counts[t] },
-      })
-    })
-  return {
-    type: 'flow',
-    flow: flows.length === 1 ? flows[0] : { type: 'seq', children: flows },
-  }
-}
-
-export const salterPickAction: ActionDefinition = {
-  id: PICK_ACTION_ID,
-  nameKey: 'actions.salter-pick.name',
-  descriptionKey: 'actions.salter-pick.description',
-  roundAvailable: 1,
-  gainPerRound: {},
-  canBeExecutedByPlayer: () => true,
-  execute: (ctx: ActionExecutionContext): ActionExecutionResult => {
-    const { state, player } = ctx
-    const preset = ctx.params?.presetCounts as
-      | Partial<Record<keyof Resource, number>>
-      | undefined
-    if (preset) {
-      return resolveSalterCounts(state, player, preset)
-    }
-    const onBoard = getAssignedAnimalsByType(player, state)
-    if (onBoard.sheep + onBoard.boar + onBoard.cattle < 1) {
-      return { type: 'fail', errorKey: 'salter-pick.error.no-animals-on-board' }
-    }
-    return {
-      type: 'request',
-      request: {
-        kind: 'resource-quantity-select',
-        cardId: CARD_ID,
-        availableByResource: {
-          sheep: onBoard.sheep,
-          boar: onBoard.boar,
-          cattle: onBoard.cattle,
-        },
-        promptKey: 'cards.B157_Salter.pickAnimals',
-        requireAtLeastOne: true,
-      },
-    }
-  },
-  resolveChoice: (ctx, _choice, payload) => {
-    const counts = ((payload as Record<string, unknown> | undefined)?.resourceCounts ?? payload ?? {}) as Partial<Record<keyof Resource, number>>
-    return resolveSalterCounts(ctx.state, ctx.player, counts)
-  },
-}
+export const salterPickAction = createAnimalScheduleSelectionAction(PICK_ACTION_ID, CARD_ID, SCHEDULE, 'cards.B157_Salter.pickAnimals', 'log.salterFutureFood')
 
 registerAdHocAction(salterPickAction)
 
@@ -176,13 +49,11 @@ const anytimeListener: CardListenerRegistration = {
           params: { presetCounts: { [singleOnly]: 1 } },
         },
         sourceCard: CARD_ID,
-        labelKey: `cards.B157_Salter.single.${singleOnly}`,
       }
     }
     return {
       flow: { type: 'leaf', actionId: PICK_ACTION_ID, sourceCard: CARD_ID },
       sourceCard: CARD_ID,
-      labelKey: 'cards.B157_Salter.anytime',
     }
   },
 }

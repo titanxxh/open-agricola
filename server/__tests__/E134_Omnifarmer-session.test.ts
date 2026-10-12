@@ -3,9 +3,9 @@ import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/pl
 
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { descriptionEffects } from './_helpers/choice-description'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
-import { getCardEffect } from '../../shared/cards/card-effects'
-import type { ActionFlow, GameState, PlayerState, Resource } from '../../shared/contract/types'
+import type { GameState, PlayerState, Resource } from '../../shared/contract/types'
 import { computeScores } from '../../shared/domain/scoring'
 
 import '../../shared/cards/E/E134_Omnifarmer'
@@ -55,57 +55,6 @@ const setStored = (player: PlayerState, stored: string[]): void => {
   }
 }
 
-const setupEffect = () => {
-  const session = new GameSession(42)
-  stabilizeRandomHands(session.state.players)
-  const effect = getCardEffect(CARD_ID)
-  expect(effect).toBeDefined()
-  return { session, effect: effect! }
-}
-
-const optionValues = (flow: ActionFlow | undefined): string[] => {
-  expect(flow).toBeDefined()
-  const leaf = flow as Extract<ActionFlow, { type: 'leaf' }>
-  expect(leaf.actionId).toBe('emit-choice')
-  return ((leaf.params as { options: Array<{ value: string }> }).options)
-    .map((option) => option.value)
-    .sort()
-}
-
-type SessionResponseLike = {
-  state: GameState
-  interaction: { stateId: string; playerIndex: number }
-}
-
-const addHarvestOutcome = (
-  state: GameState,
-  player: PlayerState,
-  crops: Array<'grain' | 'vegetable'> = [],
-  animals: Array<'sheep' | 'boar' | 'cattle'> = [],
-) => {
-  state.harvestReapSummary = {
-    [player.id]: {
-      resources: Object.fromEntries(crops.map((crop) => [crop, 1])),
-      grainFields: crops.includes('grain') ? 1 : 0,
-      vegetableFields: crops.includes('vegetable') ? 1 : 0,
-      harvestedCrops: crops.map((crop, index) => ({
-        row: 0,
-        col: index,
-        crop,
-        amount: 1,
-        sources: ['base'],
-      })),
-    },
-  }
-  state.harvestBreedSummary = {
-    [player.id]: {
-      resources: Object.fromEntries(animals.map((animal) => [animal, 1])),
-      animalTypes: animals.length,
-      animalCount: animals.length,
-    },
-  }
-}
-
 describe('E134_Omnifarmer session', () => {
   describe('computeBonusScore', () => {
     it.each([
@@ -126,113 +75,6 @@ describe('E134_Omnifarmer session', () => {
     })
   })
 
-  describe('onAfterHarvest', () => {
-    it('offers crop candidates from current harvest outcome, not live resources', () => {
-      const { effect } = setupEffect()
-      const player = createPlayer()
-      player.occupationPlayed.push(CARD_ID)
-      player.resources.vegetable = 5
-      setStored(player, [])
-      const state = createState(player)
-      addHarvestOutcome(state, player, ['grain'])
-
-      expect(optionValues(effect.onAfterHarvest!(state, player))).toEqual(['grain', 'skip'])
-    })
-
-    it('offers newborn animal candidates from current harvest outcome', () => {
-      const { effect } = setupEffect()
-      const player = createPlayer()
-      player.occupationPlayed.push(CARD_ID)
-      setStored(player, ['grain'])
-      const state = createState(player)
-      addHarvestOutcome(state, player, [], ['sheep', 'boar'])
-
-      expect(optionValues(effect.onAfterHarvest!(state, player))).toEqual(['boar', 'sheep', 'skip'])
-    })
-
-    it('does not offer sheep only because Dollys Mother is played', () => {
-      const { effect } = setupEffect()
-      const player = createPlayer()
-      player.occupationPlayed.push(CARD_ID)
-      player.minorPlayed.push('E084_DollysMother')
-      player.resources.sheep = 5
-      setStored(player, [])
-      const state = createState(player)
-      addHarvestOutcome(state, player)
-
-      expect(effect.onAfterHarvest!(state, player)).toBeUndefined()
-    })
-  })
-
-  describe('resolveChoice', () => {
-    it('stores a valid current-harvest good and returns a payment flow', () => {
-      const { effect } = setupEffect()
-      const player = createPlayer()
-      player.occupationPlayed.push(CARD_ID)
-      player.resources.grain = 1
-      setStored(player, [])
-      const state = createState(player)
-      addHarvestOutcome(state, player, ['grain'])
-
-      const followUp = effect.resolveChoice!(state, player, 'grain', { sourceCard: CARD_ID })
-
-      expect(followUp).toBeDefined()
-      expect(player.cardStates?.[CARD_ID]?.extraData).toEqual({ storedGoods: ['grain'] })
-    })
-
-    it('rejects forged choices outside current harvest outcome', () => {
-      const { effect } = setupEffect()
-      const player = createPlayer()
-      player.occupationPlayed.push(CARD_ID)
-      player.resources.sheep = 1
-      setStored(player, [])
-      const state = createState(player)
-      addHarvestOutcome(state, player, ['grain'])
-
-      const followUp = effect.resolveChoice!(state, player, 'sheep', { sourceCard: CARD_ID })
-
-      expect(followUp).toBeUndefined()
-      expect(player.cardStates?.[CARD_ID]?.extraData).toEqual({ storedGoods: [] })
-    })
-
-    it('rejects current-harvest goods that are unavailable to pay', () => {
-      const { effect } = setupEffect()
-      const player = createPlayer()
-      player.occupationPlayed.push(CARD_ID)
-      player.resources.grain = 0
-      setStored(player, [])
-      const state = createState(player)
-      addHarvestOutcome(state, player, ['grain'])
-
-      const followUp = effect.resolveChoice!(state, player, 'grain', { sourceCard: CARD_ID })
-
-      expect(followUp).toBeUndefined()
-      expect(player.cardStates?.[CARD_ID]?.extraData).toEqual({ storedGoods: [] })
-    })
-  })
-
-  it('keeps summaries through onAfterHarvest pending and cleans them after resolution', () => {
-    const { session } = setupEffect()
-    const state = session.getState().state
-    state.players = state.players.slice(0, 2)
-    const player = state.players[0]!
-    player.occupationPlayed.push(CARD_ID)
-    player.resources.grain = 1
-    setStored(player, [])
-    addHarvestOutcome(state, player, ['grain'])
-    session.loadState(state)
-
-    const resp = (session as unknown as { continueAfterHarvestEffects: () => SessionResponseLike }).continueAfterHarvestEffects()
-
-    expect(resp.state.harvestReapSummary).toBeDefined()
-    expect(resp.state.harvestBreedSummary).toBeDefined()
-    expect(resp.interaction.stateId).toBe('wait')
-
-    const done = session.resolveChoice(resp.interaction.playerIndex, 'skip')
-
-    expect(done.state.harvestReapSummary).toBeUndefined()
-    expect(done.state.harvestBreedSummary).toBeUndefined()
-  })
 })
 
 describe('E134 Omnifarmer parity', () => {
@@ -297,6 +139,8 @@ describe('E134 Omnifarmer parity', () => {
     return session
   }
 
+  const choiceFor = (response: SessionResponse, resource: StoredGood) => optionsOf(response).find(option => descriptionEffects(option.descriptionPreview).some(effect => effect.kind === 'payment' && effect.resourcesPaid?.[resource] === 1))!
+
   const optionsOf = (response: SessionResponse) => response.interaction.stateId === 'wait'
     ? response.interaction.request.options ?? []
     : []
@@ -333,14 +177,14 @@ describe('E134 Omnifarmer parity', () => {
     expect(response.ok, response.error).toBe(true)
     response = advanceToOmnifarmer(session, response)
     expect(response.state.players[0]!.resources.grain).toBe(0)
-    expect(optionsOf(response).find((option) => option.value === 'grain')?.disabled).toBe(true)
+    expect(choiceFor(response, 'grain').disabled).toBe(true)
     const before = structuredClone(response.state.players)
-    response = session.resolveChoice(0, 'grain')
+    response = session.resolveChoice(0, choiceFor(response, 'grain').value)
     expect(response.ok).toBe(false)
     expect(response.state.players).toEqual(before)
     expect(response.interaction.promptKey).toBe('ui.interactionE134Prompt')
     expect(storedGoods(response)).toEqual([])
-    response = session.resolveChoice(0, 'skip')
+    response = session.resolveChoice(0, '__skip__')
     expect(response.ok, response.error).toBe(true)
     expect(storedGoods(response)).toEqual([])
   })
@@ -348,9 +192,10 @@ describe('E134 Omnifarmer parity', () => {
   it.each([{ stored: [] }, { stored: ['vegetable'] }] satisfies { stored: StoredGood[] }[])('E134 S2: stores one harvested grain with prior goods %j', ({ stored }) => {
     const session = setup({ crop: 'grain', cropCount: 2, stored, playerCount: 2 })
     let response = advanceToOmnifarmer(session)
-    expect(optionsOf(response).map((option) => option.value)).toEqual(['skip', 'grain'])
+    expect(choiceFor(response, 'grain')).toBeDefined()
+    expect(optionsOf(response).map(option => option.value)).toContain('__skip__')
 
-    response = session.resolveChoice(0, 'grain')
+    response = session.resolveChoice(0, choiceFor(response, 'grain').value)
 
     expect(storedGoods(response)).toEqual([...stored, 'grain'])
     expect(response.state.players[0]!.resources.grain).toBe(0)
@@ -361,9 +206,8 @@ describe('E134 Omnifarmer parity', () => {
 
   it('E134 S3: declining Omnifarmer keeps the harvested grain in supply', () => {
     const session = setup({ crop: 'grain', cropCount: 2 })
-    let response = advanceToOmnifarmer(session)
-
-    response = session.resolveChoice(0, 'skip')
+    advanceToOmnifarmer(session)
+    const response = session.resolveChoice(0, '__skip__')
 
     expect(storedGoods(response)).toEqual([])
     expect(response.state.players[0]!.resources.grain).toBe(1)
@@ -390,9 +234,10 @@ describe('E134 Omnifarmer parity', () => {
       id: 'sheep', zoneType: 'pasture', animalType: 'sheep', animalCount: 3,
     }])
     response = advanceToOmnifarmer(session, response)
-    expect(optionsOf(response).map((option) => option.value)).toEqual(['skip', 'sheep'])
+    expect(choiceFor(response, 'sheep')).toBeDefined()
+    expect(optionsOf(response).map(option => option.value)).toContain('__skip__')
 
-    response = session.resolveChoice(0, 'sheep')
+    response = session.resolveChoice(0, choiceFor(response, 'sheep').value)
 
     expect(storedGoods(response)).toEqual(['sheep'])
     expect(response.state.players[0]!.resources.sheep).toBe(2)

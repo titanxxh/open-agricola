@@ -32,8 +32,6 @@ const buildTakeWoodFlow = (woodOnCard: number): ActionHookResult | void => {
         actionId: 'take-from-card',
         params: { wood: index + 1 },
         sourceCard: CARD_ID,
-        choiceLabelKey: 'ui.interactionFirewoodExchangeCount',
-        choiceLabelParams: { count: index + 1 },
       })),
     },
   }

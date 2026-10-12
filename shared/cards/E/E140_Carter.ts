@@ -1,19 +1,14 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { readCardExtraData, writeCardExtraData, writeCardInfobox } from '../helpers/card-state'
-import { sumActionSpaceMovedToTriggerPlayer } from '../helpers/event-provenance'
-import { gainLeaf } from '../helpers/pay-gain-node'
+import { writeCardExtraData, writeCardInfobox } from '../helpers/card-state'
+import { timedEventFlow } from '../timed-rule-obligations'
+import type { RuleBody, TimedRule } from '../../contract/rule-plans'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E140_Carter'
-const BUILDING_RESOURCES = ['wood', 'clay', 'reed', 'stone'] as const
-
-const isBuildingResourceSpace = (space: CardListenerContext['space']): boolean =>
-  (space.gainPerRound?.wood ?? 0) > 0 ||
-  (space.gainPerRound?.clay ?? 0) > 0 ||
-  (space.gainPerRound?.reed ?? 0) > 0 ||
-  (space.gainPerRound?.stone ?? 0) > 0
+const collectRewardBody = { kind: 'operation', operation: { kind: 'gain-per-building-resource-collected', resource: 'food', perBuildingResource: 1 } } satisfies RuleBody
+const timedRules = [{ retainAfterCardLeaves: true, key: 'next-round-collection-window', at: { kind: 'round-window', fact: 'triggerRound', phase: 'afterCollect' }, body: collectRewardBody }] satisfies readonly TimedRule[]
 
 const afterCollectListener: CardListenerRegistration = {
   id: 'E140-carter-after-collect',
@@ -21,20 +16,8 @@ const afterCollectListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['collect'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    const triggerRound = readCardExtraData<number>(context.player, CARD_ID, 'triggerRound')
-    if (triggerRound == null || context.state.round !== triggerRound) return
-    if (!isBuildingResourceSpace(context.space)) return
-
-    let buildingResourceCount = 0
-    for (const res of BUILDING_RESOURCES) {
-      buildingResourceCount += sumActionSpaceMovedToTriggerPlayer(context, res)
-    }
-    if (buildingResourceCount <= 0) return
-
-    return {
-      flow: gainLeaf(CARD_ID, { food: buildingResourceCount }),
-      sourceCard: CARD_ID,
-    }
+    const flow = timedEventFlow(context, CARD_ID, timedRules, 'afterCollect')
+    return flow ? { flow, sourceCard: CARD_ID } : undefined
   },
 }
 
@@ -42,6 +25,7 @@ const cardImpl = {
   listeners: [afterCollectListener],
   effect: {
   id: CARD_ID,
+  timedRules,
   onBuy: (state, player) => {
     const triggerRound = state.round + 1
     writeCardExtraData(player, CARD_ID, 'triggerRound', triggerRound)

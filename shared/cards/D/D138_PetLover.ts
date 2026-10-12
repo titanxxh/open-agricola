@@ -39,7 +39,6 @@ const computeReplaceListener: CardListenerRegistration = {
       decline: true,
       alternativeFlow: {
         type: 'seq',
-        choiceLabelKey: 'ui.interactionPetLoverBonus',
         children: [
           gainLeaf(CARD_ID, { [animalType]: 1, food: 3, grain: 1 }),
         ],

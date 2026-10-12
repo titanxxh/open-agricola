@@ -34,6 +34,7 @@ import type {
   FenceValidationOptions,
 } from '../../domain/farmyard'
 import {
+  defaultFenceWoodCosts,
   borrowedFenceDonorCapTotal,
   isBorrowedFenceSourcePolicy,
 } from '../../domain/farmyard'
@@ -497,7 +498,7 @@ const computeSpringFreeFences = (
   if (!isThroughTheSeasonsSeason(state, 'spring')) return 0
   if (isBorrowedFenceSourcePolicy(policy.sourcePolicy)) return 0
   if (newFenceEdges.length <= 0) return 0
-  const fenceWoodCost = policy.costPolicy?.fence?.wood ?? 1
+  const fenceWoodCost = policy.costPolicy?.fence?.wood ?? defaultFenceWoodCosts.fence
   if (fenceWoodCost <= 0) return 0
   const ordinaryWoodBeforeSpring =
     Math.max(0, newFenceEdges.length - freeFencesBeforeSpring) * fenceWoodCost +
@@ -749,8 +750,8 @@ function* affordableFencePlans(
         const free = (readPendingFenceBonus(player)?.freeFences ?? 0) + Math.max(0, -(costOverride?.wood ?? 0))
         const extra = Math.max(0, costOverride?.wood ?? 0)
         const spring = computeSpringFreeFences(state, player, Array.from({ length: fences }, () => ''), policy, free, extra)
-        const wood = Math.max(0, fences - free - spring) * (policy.costPolicy?.fence?.wood ?? 1)
-          + palisades * (policy.costPolicy?.palisade?.wood ?? 2) + Math.max(0, policy.costPolicy?.fixedWood ?? 0) + extra
+        const wood = Math.max(0, fences - free - spring) * (policy.costPolicy?.fence?.wood ?? defaultFenceWoodCosts.fence)
+          + palisades * (policy.costPolicy?.palisade?.wood ?? defaultFenceWoodCosts.palisade) + Math.max(0, policy.costPolicy?.fixedWood ?? 0) + extra
         if (!canAffordFencePayment(player, { fee: { wood }, paymentBudget: policy.paymentBudget }, state)) continue
       }
       pairs.push([fences, palisades])
@@ -832,8 +833,8 @@ function* affordableFencePlans(
             adjustment.freeFences += Math.max(0, -(costOverride.wood ?? 0))
             adjustment.extraWood += Math.max(0, costOverride.wood ?? 0)
           }
-          const wood = Math.max(0, requiredFence.length - adjustment.freeFences) * (policy.costPolicy?.fence?.wood ?? 1)
-            + requiredPalisades.length * (policy.costPolicy?.palisade?.wood ?? 2)
+          const wood = Math.max(0, requiredFence.length - adjustment.freeFences) * (policy.costPolicy?.fence?.wood ?? defaultFenceWoodCosts.fence)
+            + requiredPalisades.length * (policy.costPolicy?.palisade?.wood ?? defaultFenceWoodCosts.palisade)
             + Math.max(0, policy.costPolicy?.fixedWood ?? 0) + adjustment.extraWood
           if (!canAffordFencePayment(player, buildFencePaymentCost(wood, adjustment, policy), state)) continue
         }
@@ -868,6 +869,14 @@ export const fenceAction: ActionDefinition = {
         costOverride,
         (ctx as { actionContext?: Record<string, unknown> }).actionContext,
       ),
+  },
+  previewEffect: ({ player, actionContext, previewMode }) => {
+    const policy = readFenceActionPolicy(actionContext)
+    const kinds: FenceSegmentType[] = policy.allowedSegmentTypes ?? ['fence', ...(previewMode !== 'base' && playerCanBuildPalisades(player) ? ['palisade' as const] : [])]
+    return { kind: 'fencePlan', segments: kinds.map(kind => ({ kind, woodCost: policy.costPolicy?.[kind]?.wood ?? defaultFenceWoodCosts[kind], ...policy.segmentBounds?.[kind] })),
+      totalBounds: policy.segmentBounds?.total, fixedWood: Math.max(0, policy.costPolicy?.fixedWood ?? 0),
+      freeFences: previewMode === 'base' ? 0 : readPendingFenceBonus(player)?.freeFences ?? 0,
+      borrowed: isBorrowedFenceSourcePolicy(policy.sourcePolicy), paymentBudget: policy.paymentBudget }
   },
   execute: ({ state, player, space, sourceCard, actionContext }): ActionExecutionResult => {
     const idx = state.players.indexOf(player)

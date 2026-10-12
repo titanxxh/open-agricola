@@ -37,7 +37,6 @@ const listener: CardListenerRegistration = {
       flow: {
         type: 'seq',
         optional: true,
-        choiceLabelKey: 'cards.B150_LargeScaleFarmer.choice',
         children: [
           payLeaf({ cardId: CARD_ID, cost: { food: 1 } }),
           jumpLeaf({

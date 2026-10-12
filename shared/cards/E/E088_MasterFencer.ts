@@ -36,7 +36,6 @@ const cardImpl = {
           payLeaf({ cardId: CARD_ID, cost: { wood: 2 } }),
           freeFencingLeaf(3),
         ],
-        choiceLabelKey: 'ui.interactionMasterFencer2',
       })
     }
 
@@ -47,7 +46,6 @@ const cardImpl = {
           payLeaf({ cardId: CARD_ID, cost: { wood: 3 } }),
           freeFencingLeaf(4),
         ],
-        choiceLabelKey: 'ui.interactionMasterFencer3',
       })
     }
 

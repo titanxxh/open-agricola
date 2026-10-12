@@ -1,31 +1,13 @@
 import { defineMinorCard } from '../card-source'
-import { getLogicalFields } from '../helpers/card-field'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D032_WoodRake'
 
 const cardImpl = {
   effect: {
-  id: CARD_ID,
-  onBeforeHarvest: (state, player) => {
-    if (state.round !== 14) return
-
-    // Count all crop tokens in all fields before final harvest
-    let totalCrops = 0
-    for (const field of getLogicalFields(player)) {
-      totalCrops += field.stacks.reduce((sum, stack) => sum + stack.remaining, 0)
-    }
-    if (totalCrops < 7) return
-
-    return {
-      type: 'seq',
-      children: [
-        { type: 'leaf', actionId: 'bonus-vp', sourceCard: CARD_ID },
-        { type: 'leaf', actionId: 'bonus-vp', sourceCard: CARD_ID },
-      ],
-    }
+    id: CARD_ID,
+  timedRules: [{ key: 'final-crops', at: { kind: 'rounds', rounds: [14], phase: 'onBeforeHarvest' }, body: { kind: 'condition', condition: { kind: 'compare', left: { kind: 'crop-total' }, operator: 'ge', right: 7 }, body: { kind: 'seq', children: [{ kind: 'action', actionId: 'bonus-vp' }, { kind: 'action', actionId: 'bonus-vp' }] } } }],
   },
-},
   reaches: [] as readonly string[],
 } satisfies CardImpl
 

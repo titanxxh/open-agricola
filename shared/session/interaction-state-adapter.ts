@@ -72,7 +72,10 @@ export const redactInteractionForViewer = (
   interaction: InteractionState,
   playerIds: readonly string[],
   viewerPlayerId: string | null,
+  idleRecipientPlayerId: string | null = null,
 ): ClientInteractionState => {
+  if (interaction.stateId === 'idle') return idleRecipientPlayerId !== null && idleRecipientPlayerId === viewerPlayerId
+    ? interaction : { ...interaction, allowedCommands: [], anytimeActions: [] }
   if (interaction.stateId !== 'wait') return interaction
   const recipient = interactionRecipientPlayerId(interaction, playerIds)
   if (recipient !== null && recipient === viewerPlayerId) return interaction

@@ -1,3 +1,4 @@
+import { descriptionEffects } from './_helpers/choice-description'
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
@@ -78,7 +79,7 @@ const cardFood = (response: SessionResponse) =>
 
 const storeFood = (session: GameSession, response: SessionResponse, count: number) => {
   const option = options(response).find((entry) => count === 0
-    ? entry.value === '__skip__' : entry.labelParams?.count === count)
+    ? entry.value === '__skip__' : descriptionEffects(entry.descriptionPreview).some(effect => effect.kind === 'payment' && effect.resourcesPaid?.food === count))
   expect(option, JSON.stringify(response.interaction)).toBeDefined()
   return session.resolveChoice(0, option!.value)
 }

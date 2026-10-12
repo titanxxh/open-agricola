@@ -1,10 +1,9 @@
 import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { registerSelectionEffect } from '../../actions/helpers/selection-effect-registry'
+import { fieldOperationFlow } from '../../actions/plans/field-operation'
 import { positionKey } from '../../domain/farm'
-import { parseFarmPositionKey } from '../../domain/farm-position-selection'
-import { getLogicalFields, mutateLogicalFields } from '../helpers/card-field'
+import { getLogicalFields } from '../helpers/card-field'
 import type { CardImpl } from '../registry'
 import type { GameState, PlayerState } from '../../contract/types'
 
@@ -27,17 +26,6 @@ const eligibleFields = (state: GameState, player: PlayerState) => {
   })
 }
 
-registerSelectionEffect('discard-single-crop', ({ state, player, positions, sourceCard, eventSink }) => {
-  const eligible = new Set(eligibleFields(state, player).map(({ tile }) => positionKey(tile)))
-  for (const key of positions) {
-    if (!eligible.has(key)) continue
-    const tile = parseFarmPositionKey(key)
-    if (!tile) continue
-    const removed = mutateLogicalFields(state, player, { sourceCard, eventSink }).remove(tile, 1)
-    return removed.ok ? removed.flow : undefined
-  }
-})
-
 const anytimeListener: CardListenerRegistration = {
   id: 'D71-changeover-anytime',
   cardIds: [CARD_ID],
@@ -49,17 +37,7 @@ const anytimeListener: CardListenerRegistration = {
       flow: {
         type: 'seq',
         children: [
-          {
-            type: 'leaf',
-            actionId: 'selection',
-            sourceCard: CARD_ID,
-            actionContext: {
-              selectionKind: 'farm-position',
-              selectableTiles: fields.map(({ tile, ...metadata }) => ({ ...tile, ...metadata })),
-              maxSelections: 1,
-              selectionEffect: 'discard-single-crop',
-            },
-          },
+          fieldOperationFlow(CARD_ID, { kind: 'remove-top', amount: 1, gain: {} }, fields.map(({ tile, ...metadata }) => ({ ...tile, ...metadata }))),
           {
             type: 'leaf',
             actionId: 'sow',
@@ -76,7 +54,6 @@ const anytimeListener: CardListenerRegistration = {
         ],
       },
       sourceCard: CARD_ID,
-      labelKey: 'cards.D071_Changeover.anytime',
     }
   },
 }

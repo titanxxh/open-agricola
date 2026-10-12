@@ -1,4 +1,5 @@
 export { PaymentSolver } from './solver'
+export { describePaymentEffectPreview } from './internal/payment-choice-result'
 export { CardPurchasePayment } from './card-purchase'
 export type {
   CardPurchasePreview,

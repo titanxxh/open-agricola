@@ -1,5 +1,5 @@
 import type { ActionDefinition, Resource } from '../../../contract/types'
-import { popFromCardStack } from '../../../cards/helpers/card-state'
+import { getCardStack, popFromCardStack } from '../../../cards/helpers/card-state'
 import { addCardResourceGained } from '../../../cards/helpers/card-state'
 import { gainResources } from '../gain'
 import { trackWorkPhaseBuildingResources } from '../../../session/work-phase-resources'
@@ -18,6 +18,12 @@ export const popCardStackAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
+  previewEffect: ({ player, sourceCard }) => {
+    const resource = sourceCard ? getCardStack(player, sourceCard).at(-1) : undefined
+    return sourceCard && resource && isRealResourceKey(resource) ? {
+      kind: 'resourceMovement', resources: { [resource]: 1 }, from: { kind: 'card', cardId: sourceCard }, to: { kind: 'player' },
+    } : undefined
+  },
   execute: ({ state, player, sourceCard, eventSink }) => {
     if (!sourceCard) {
       return { type: 'fail', errorKey: 'log.actionFail' }

@@ -23,11 +23,6 @@ const animalTradeFlow = (animal: AnimalKey): ActionFlow => ({
       sourceId: CARD_ID,
     },
   },
-  effectPreview: {
-    kind: 'resourceExchange',
-    resourcesPaid: { [animal]: 1 },
-    resourcesGained: { food: FOOD_BY_ANIMAL[animal] },
-  },
 })
 
 const conversionFlow = (

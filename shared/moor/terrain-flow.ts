@@ -1,4 +1,4 @@
-import type { ActionFlow, FarmTilePosition, PlayerState, Resource } from '../contract/types'
+import type { ActionFlow, ChoiceEffectPreview, FarmTilePosition, PlayerState, Resource } from '../contract/types'
 import {
   getFarmyardTilePositions,
   isWithinFarmyard,
@@ -39,6 +39,27 @@ type BuildTerrainSelectionLeafOptions = {
 
 const isTerrainKind = (value: unknown): value is FarmTerrainKind =>
   value === 'forest' || value === 'moor'
+
+export const describeTerrainSelection = (context?: Record<string, unknown>): ChoiceEffectPreview | undefined => {
+  if (context?.selectionEffect !== TERRAIN_SELECTION_EFFECT) return
+  const mode = context.terrainMode
+  if (mode !== 'place' && mode !== 'remove' && mode !== 'replace-kind' && mode !== 'replace-with-field' && mode !== 'cover') return
+  const from = context.terrainFromKind ?? context.terrainKind
+  const to = mode === 'replace-with-field' ? 'field' : context.terrainToKind ?? (mode === 'place' ? context.terrainKind : undefined)
+  const gainPerSelection: Partial<Resource> = {}
+  const raw = context.gainPerSelection
+  if (raw && typeof raw === 'object') for (const key of ['wood', 'clay', 'reed', 'stone', 'grain', 'vegetable', 'food', 'fuel', 'sheep', 'boar', 'cattle', 'horse'] as const) {
+    const value = Reflect.get(raw, key)
+    if (typeof value === 'number' && Number.isFinite(value) && value > 0) gainPerSelection[key] = value
+  }
+  return { kind: 'terrainOperation', operation: mode,
+    ...(isTerrainKind(from) ? { from } : {}), ...(isTerrainKind(to) || to === 'field' ? { to } : {}),
+    minSelections: typeof context.minSelections === 'number' ? context.minSelections : 1,
+    maxSelections: typeof context.maxSelections === 'number' ? context.maxSelections : 1,
+    ...(Object.keys(gainPerSelection).length ? { gainPerSelection } : {}),
+    ...(typeof context.bonusVpPerSelection === 'number' ? { bonusVpPerSelection: context.bonusVpPerSelection } : {}),
+  }
+}
 
 const parsePositions = (positions: string[]): FarmTilePosition[] =>
   positions.flatMap((position) => {

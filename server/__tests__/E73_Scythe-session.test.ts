@@ -1,9 +1,11 @@
-import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game/authoritative-session'
+import { afterEach, describe, expect, it } from 'vitest'
+import type { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
 
 import '../../shared/cards/E/E073_Scythe'
-import { E112_GrainThief_impl } from '../../shared/cards/E/E112_GrainThief'
+import '../../shared/cards/E/E112_GrainThief'
+import { createWorkSession } from './_helpers/session-fixtures'
+import { markAllWorkersUsed } from '../../shared/domain/player'
 import type { ActionFlow, ActionSpace, Field } from '../../shared/contract/types'
 import { getAdHocAction } from '../../shared/actions/helpers/ad-hoc-action-registry'
 import { reap } from '../../shared/actions/effects/reap'
@@ -18,10 +20,13 @@ const makeField = (
   stacks: Array<{ kind: 'grain' | 'vegetable'; remaining: number }>,
 ): Field => ({ row, col, stacks })
 
+const sessions: GameSession[] = []
+afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+
 const setupSession = () => {
-  const session = new GameSession(42)
+  const session = createWorkSession({ seed: 42 })
+  sessions.push(session)
   const state = session.getState().state
-  state.players = state.players.slice(0, 2)
   state.round = 4
   state.players.forEach((player) => {
     player.minorHand = ['__test_placeholder__']
@@ -289,42 +294,51 @@ describe('E073_Scythe session — token model + reap full stack', () => {
     expect(player.resources.vegetable).toBe(1)
   })
 
-  it('E73 full reap overrides E112 on the same field and E112 does not gain supply grain', () => {
-    const { session, state } = setupSession()
-    const player = state.players[0]!
-    player.minorPlayed.push(CARD_ID)
-    player.occupationPlayed.push('E112_GrainThief')
-    player.fields = [
-      makeField(0, 0, [{ kind: 'grain', remaining: 3 }]),
-    ]
-    player.resources.grain = 0
-    player.cardStates = {
-      [CARD_ID]: { extraData: { fullReapPosition: '0-0' } },
-      E112_GrainThief: { extraData: { selectedPositions: ['0-0'] } },
+  it('E73 full reap overrides E112 on the same mixed field through the real harvest without a supply grain reward', () => {
+    const session = createWorkSession({ seed: 73112, configure: state => {
+      state.round = 4
+      state.players.forEach(player => { player.resources.food = 30; markAllWorkersUsed(state, player) })
+      const player = state.players[0]!
+      player.minorPlayed = [CARD_ID]
+      player.occupationPlayed = ['E112_GrainThief']
+      player.resources.grain = 0
+      player.resources.vegetable = 0
+      player.fields = [makeField(0, 0, [{ kind: 'vegetable', remaining: 1 }, { kind: 'grain', remaining: 3 }])]
+    } })
+    sessions.push(session)
+    let response = session.performRoundEnd()
+    const selectedSources = new Set<string>()
+    for (let step = 0; step < 8 && response.interaction.stateId === 'wait'; step++) {
+      const interaction = response.interaction
+      if (interaction.request.kind === 'select-trigger') {
+        const option = ['E112_GrainThief', CARD_ID].map(card => interaction.request.options?.find(candidate => candidate.value === card && !candidate.disabled)).find(candidate => candidate !== undefined)
+        expect(option, JSON.stringify(interaction)).toBeDefined()
+        selectedSources.add(option!.value)
+        response = session.resolveChoice(interaction.playerIndex, option!.value)
+        expect(response.ok, response.error).toBe(true)
+        continue
+      }
+      expect([CARD_ID, 'E112_GrainThief'], JSON.stringify(interaction)).toContain(interaction.sourceCard)
+      if (interaction.sourceCard) selectedSources.add(interaction.sourceCard)
+      if (interaction.request.selection?.kind === 'farm-position') {
+        response = session.commitSelectionChoice(interaction.playerIndex, { positions: [{ row: 0, col: 0 }] })
+      } else {
+        const use = interaction.request.options?.find(option => option.value !== '__skip__')
+        expect(use, JSON.stringify(interaction)).toBeDefined()
+        response = session.resolveChoice(interaction.playerIndex, use!.value)
+      }
+      expect(response.ok, response.error).toBe(true)
     }
-    session.loadState(state)
-
-    const reapResult = reap(state, player)
-
-    expect(player.resources.grain).toBe(3)
-    expect(player.fields[0]!.stacks).toEqual([])
-    expect(reapResult.reapSummary.harvestedCrops).toEqual([
-      { row: 0, col: 0, crop: 'grain', amount: 3, sources: ['base', CARD_ID] },
-    ])
-
-    const endFlow = E112_GrainThief_impl.effect.onEndHarvestFieldPhase!(state, player)
-
-    expect(endFlow).toEqual({
-      type: 'seq',
-      children: [
-        {
-          type: 'leaf',
-          actionId: 'special-effect',
-          sourceCard: 'E112_GrainThief',
-          params: { kind: 'set-extra-data', key: 'selectedPositions', value: undefined },
-        },
-      ],
-    })
+    expect(selectedSources).toEqual(new Set([CARD_ID, 'E112_GrainThief']))
+    expect(response.ok, response.error).toBe(true)
+    expect(response.interaction.stateId).toBe('idle')
+    expect(response.state.round).toBe(5)
+    expect(response.state.players[0]!.resources).toMatchObject({ grain: 3, vegetable: 1 })
+    expect(response.state.players[0]!.fields[0]!.stacks).toEqual([])
+    expect(response.state.players[0]!.cardStates.E112_GrainThief?.extraData?.selectedPositions).toBeUndefined()
+    expect(response.state.players[0]!.cardStates[CARD_ID]?.extraData?.fullReapPosition).toBeUndefined()
+    expect(response.state.events.filter(event => event.type === 'resource.moved' && event.sourceCardId === 'E112_GrainThief' && (event.resources.grain ?? 0) > 0)).toHaveLength(0)
+    expect(response.scores).toHaveLength(2)
   })
 
   it('records full-reap harvestedCrops per crop type and merges repeated crop entries', () => {

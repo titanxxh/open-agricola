@@ -79,7 +79,7 @@ const cardImpl = {
     onBuy: (state, player) => ({
       type: 'xor',
       children: [
-        { ...payLeaf({ cardId: CARD_ID, cost: { boar: 1 } }), optionId: 'return-boar', choiceLabelKey: 'ui.interactionHuntingTrophyReturn' },
+        { ...payLeaf({ cardId: CARD_ID, cost: { boar: 1 } }), optionId: 'return-boar' },
         ...getExchangesInWindow(player, 'anytime', state).filter((trade) =>
           trade.from.boar === 1 && Object.keys(trade.from).length === 1 && (trade.to.food ?? 0) > 0 &&
           getCardDefinitionById(trade.sourceId ?? '')?.isCookery,
@@ -87,7 +87,6 @@ const cardImpl = {
           type: 'leaf' as const, actionId: 'exchange', sourceCard: CARD_ID,
           optionId: `cook:${trade.sourceId}`,
           choiceLabelKey: 'ui.interactionResourceExchange',
-          choiceLabelParams: { resourcesPaid: trade.from, resourcesGained: trade.to },
           actionContext: { directTrade: trade },
         })),
       ],

@@ -1,8 +1,9 @@
+import { createWorkSession } from './_helpers/session-fixtures'
 import type { GameState } from '../../shared/contract/types'
 import { chooseSupplyWorkerTurn } from './_helpers/supply-worker-turn'
 import { confirmNextPlayer } from './_helpers/pending-confirms'
 import { describe, expect, it } from 'vitest'
-import { GameSession, type SessionResponse } from '../game/authoritative-session'
+import type { GameSession, SessionResponse } from '../game/authoritative-session'
 import { readCardExtraData } from '../../shared/cards/helpers/card-state'
 import {
   familySize,
@@ -27,7 +28,7 @@ const setup = ({
   supply?: boolean
   ownerAtHome?: number
 } = {}, configure?: (state: GameState) => void) => {
-  const session = new GameSession(7125, undefined, { playerCount: 2 })
+  const session = createWorkSession({ seed: 7125, options: { playerCount: 2 } })
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.currentPlayerIndex = 0
@@ -157,7 +158,7 @@ describe('E125 Delayed Wayfarer parity', () => {
     expect(familySize(response.state.players[0]!)).toBe(2)
     expect(workersAtHome(response.state, response.state.players[0]!)).toHaveLength(2)
     expect(inactiveWorkersInSupply(response.state.players[0]!)).toHaveLength(3)
-    expect(readCardExtraData<number>(response.state.players[0]!, CARD_ID, 'playedRound')).toBe(-1)
+    expect(readCardExtraData<string[]>(response.state.players[0]!, CARD_ID, 'timedRuleReceipts')).toContain('work-end-supply-person:5')
   })
 
   it('E125 S5: declining ends the round without consuming a supply person', () => {
@@ -171,7 +172,7 @@ describe('E125 Delayed Wayfarer parity', () => {
     expect(response.state.round).toBe(6)
     expect(familySize(response.state.players[0]!)).toBe(2)
     expect(inactiveWorkersInSupply(response.state.players[0]!)).toHaveLength(3)
-    expect(readCardExtraData<number>(response.state.players[0]!, CARD_ID, 'playedRound')).toBe(-1)
+    expect(readCardExtraData<string[]>(response.state.players[0]!, CARD_ID, 'timedRuleReceipts')).toContain('work-end-supply-person:5')
   })
 
   it('E125 S6: no supply person means no extra-placement offer', () => {

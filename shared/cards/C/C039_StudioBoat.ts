@@ -1,7 +1,5 @@
 import { definePlayerActionCard } from '../card-source'
-import { registerPlayerActionSpace, createPlayerActionSpaces } from '../player-action-space'
-import { collectAccumulatedResources } from '../../actions/effects/collect'
-import { incCounter } from '../__stubs__/helpers'
+import { registerPlayerActionSpace, createPlayerActionSpaces, definePlayerActionSpaceFlow } from '../player-action-space'
 import type { CardImpl } from '../registry'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
@@ -11,29 +9,17 @@ const CARD_ID = 'C039_StudioBoat'
 registerPlayerActionSpace({
   cardId: CARD_ID,
   access: 'all',
+  gainPerRound: { food: 1 },
   shouldRegister: (state) => state.players.length < 4,
-  createDefinition: (ownerId) => ({
+  createDefinition: (ownerId) => definePlayerActionSpaceFlow({
     id: CARD_ID,
     nameKey: 'cards.C039_StudioBoat.name',
     descriptionKey: 'cards.C039_StudioBoat.desc',
     canBeExecutedByPlayer: () => true,
-    execute: ({ player, space }) => {
-      const gained: Record<string, number> = {}
-      if (space.resources.food > 0) {
-        gained.food = space.resources.food
-      }
-      collectAccumulatedResources(player, space)
-
-      // Rule: bonus VP only when the owner is the actor.
-      if (player.id === ownerId) {
-        incCounter(player, CARD_ID, 'bonusVp')
-      }
-
-      return {
-        type: 'ok',
-        resourcesGained: gained,
-      }
-    },
+    flowFactory: ({ player }) => ({ type: 'seq', children: [
+      { type: 'leaf', actionId: 'collect', sourceCard: CARD_ID },
+      ...(player.id === ownerId ? [{ type: 'leaf' as const, actionId: 'bonus-vp', sourceCard: CARD_ID }] : []),
+    ] }),
   }),
 })
 
@@ -72,12 +58,6 @@ const cardImpl = {
           state.actionSpaces.push(space)
         }
       }
-    },
-    onRoundStart: (state, _player) => {
-      if (state.players.length >= 4) return
-      const space = state.actionSpaces.find((s) => s.id === CARD_ID)
-      if (!space) return
-      space.resources.food = (space.resources.food ?? 0) + 1
     },
     computeBonusScore: (_state, player) =>
       player.cardStates?.[CARD_ID]?.counters?.bonusVp ?? 0,

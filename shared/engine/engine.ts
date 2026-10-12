@@ -8,6 +8,7 @@ import type {
   GameState,
   ActionChoiceOption,
   InteractionRequest,
+  ChoiceDescriptionPreview,
 } from '../contract/types'
 import type { PromptKey } from '../contract/prompt-keys'
 import {
@@ -38,6 +39,7 @@ import {
   pendingEnvelopeFromHostNode,
   snapshotCompositeEmit,
   setEngineBlockedPending,
+  getNodeDescriptionPreview,
 } from './engine-utils'
 import { buildDeferredHostNode, engineProceed } from './engine-proceed'
 import { engineResolveChoice } from './engine-resolve'
@@ -321,6 +323,15 @@ export class Engine {
     engine.tree.root = buildFlowNode(engine._internals(), flow, ownerPlayerId, undefined, 'session')
     if (deps.requireRootCompletion) enforceCompositeContinuationMandatory(engine.tree.root)
     return engine
+  }
+
+  describe(context: ActionExecutionContext): ChoiceDescriptionPreview | undefined {
+    return getNodeDescriptionPreview(this.tree.root, this.registry, context)
+  }
+
+  static describeFlow(flow: ActionFlow, registry: ActionRegistry, context: ActionExecutionContext): ChoiceDescriptionPreview | undefined {
+    const root = buildFlowNode({ registry, counterRef: { value: 0 } }, flow, context.player.id, undefined, 'session')
+    return getNodeDescriptionPreview(root, registry, context)
   }
 
   static fromAction(actionId: string, deps: EngineDeps, ownerPlayerId?: string): Engine {

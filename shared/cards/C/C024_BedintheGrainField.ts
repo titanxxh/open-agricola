@@ -1,6 +1,5 @@
 import { defineMinorCard } from '../card-source'
-import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
-import { familySize } from '../../domain/player'
+import { writeCardExtraData } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C024_BedintheGrainField'
@@ -11,18 +10,10 @@ const cardImpl = {
   onBuy: (_state, player) => {
     writeCardExtraData(player, CARD_ID, 'nextHarvestReady', true)
   },
-  onStartHarvest: (_state, player) => {
-    const ready = readCardExtraData<boolean>(player, CARD_ID, 'nextHarvestReady')
-    if (!ready) return
-    writeCardExtraData(player, CARD_ID, 'nextHarvestReady', false)
-    if (player.rooms <= familySize(player)) return
-    return {
-      type: 'leaf',
-      actionId: 'family-growth',
-      optional: true,
-      sourceCard: CARD_ID,
-    }
-  },
+  timedRules: [{ key: 'next-harvest-growth', at: { kind: 'flag', fact: 'nextHarvestReady', clock: 'next-harvest', phase: 'onStartHarvest' },
+    consume: { clearFlag: 'nextHarvestReady' },
+    body: { kind: 'condition', condition: { kind: 'room-for-newborn' }, body: { kind: 'optional', body: { kind: 'action', actionId: 'family-growth' } } },
+  }],
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl

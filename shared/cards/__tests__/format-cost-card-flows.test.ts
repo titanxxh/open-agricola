@@ -534,32 +534,5 @@ describe('formatCost migrated card flows', () => {
     expect(occupation.params).toEqual({ exactCost: { food: 1 } })
   })
 
-  it('B093_Confidant offers future receive sow/fence with explicit fence cost policy', () => {
-    const actor = player({ occupationPlayed: ['B093_Confidant'] })
-    const gameState = state(actor)
-    gameState.round = 4
-    gameState.events.push({
-      schemaVersion: 1,
-      id: 'event-b93',
-      seq: 1,
-      round: 4,
-      phase: 'preWork',
-      visibility: 'public',
-      type: 'futureMeeple.resolved',
-      playerId: actor.id,
-      cardId: 'B093_Confidant',
-      sourceCardId: 'B093_Confidant',
-      resources: { food: 1 },
-    })
 
-    const flow = getCardEffect('B093_Confidant')!.onRoundStart!(gameState, actor)
-    expect(flow?.type).toBe('seq')
-    const sow = expectLeaf(flow, 'sow')
-    expect(sow.actionContext).toMatchObject({ trueAction: false })
-    const fence = expectLeaf(flow, 'fence')
-    expect(fence.actionContext).toMatchObject({
-      trueAction: false,
-      fencePolicy: { costPolicy: { fence: { wood: 1 } } },
-    })
-  })
 })

@@ -47,7 +47,7 @@ const buildSpecialFoodFlow = (count: number, ambiguous: boolean): ActionFlow => 
     ...flow,
     optional: true,
     promptKey: 'ui.interactionReclamationPlowAmbiguous',
-    choiceLabelKey: 'ui.interactionReclamationPlowUse',
+    choiceLabelKey: 'ui.interactionUseAbility',
   }
 }
 

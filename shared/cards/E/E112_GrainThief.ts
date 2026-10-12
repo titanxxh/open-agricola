@@ -1,7 +1,6 @@
 import { defineOccupationCard } from '../card-source'
 import { readCardExtraData } from '../helpers/card-state'
-import { gainLeaf } from '../helpers/pay-gain-node'
-import type { ActionFlow, GameState, PlayerState } from '../../contract/types'
+import type { ActionFlow, PlayerState } from '../../contract/types'
 import { fieldTopStack } from '../../domain/field'
 import {
   registerHarvestCountModifier,
@@ -47,27 +46,6 @@ const selectionFlow = (fields: readonly LogicalField[]): ActionFlow => ({
   },
 })
 
-const clearSelectionLeaf = (): ActionFlow => ({
-  type: 'leaf',
-  actionId: 'special-effect',
-  sourceCard: CARD_ID,
-  params: { kind: 'set-extra-data', key: SELECTED_POSITIONS_KEY, value: undefined },
-})
-
-const selectedSupplyApplicationCount = (state: GameState, player: PlayerState) => {
-  const selected = new Set(selectedPositionKeys(player))
-  const counted = new Set<string>()
-  for (const app of state.harvestReapSummary?.[player.id]?.harvestCountApplications ?? []) {
-    if (app.crop !== 'grain') continue
-    const key = `${app.row}-${app.col}`
-    if (!selected.has(key)) continue
-    if (!app.tags.includes('supply-instead-of-field')) continue
-    if (app.tags.includes('full-field-reap')) continue
-    counted.add(key)
-  }
-  return counted.size
-}
-
 registerHarvestCountModifier(CARD_ID, ({ player, field, logicalField }) => {
   if (!player.occupationPlayed?.includes(CARD_ID)) return
   const selected = new Set(selectedPositionKeys(player))
@@ -100,17 +78,9 @@ const cardImpl = {
         children: [selectionFlow(fields)],
       } satisfies ActionFlow
     },
-    onEndHarvestFieldPhase: (state, player) => {
-      const count = selectedSupplyApplicationCount(state, player)
-      if (selectedPositionKeys(player).length === 0) return
-      return {
-        type: 'seq',
-        children: [
-          ...(count > 0 ? [gainLeaf(CARD_ID, { grain: count })] : []),
-          clearSelectionLeaf(),
-        ],
-      } satisfies ActionFlow
-    },
+    timedRules: [{ retainAfterCardLeaves: true, key: 'selected-harvest-supply', at: { kind: 'card-list-nonempty', fact: SELECTED_POSITIONS_KEY, phase: 'onEndHarvestFieldPhase' }, body: {
+      kind: 'operation', operation: { kind: 'harvest-selected-supply-reward', crop: 'grain', selectionFact: SELECTED_POSITIONS_KEY, applicationTag: 'supply-instead-of-field', excludedTag: 'full-field-reap' },
+    } }],
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl

@@ -28,7 +28,6 @@ const anytimeListener: CardListenerRegistration = {
         ],
       },
       sourceCard: CARD_ID,
-      labelKey: 'cards.D053_TeaHouse.anytime',
     }
   },
 }

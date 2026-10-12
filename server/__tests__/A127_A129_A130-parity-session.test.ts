@@ -1,3 +1,5 @@
+import { collectScheduledEffectPreviews } from '../../shared/actions/scheduled-effect-preview'
+import { createWorkSession } from './_helpers/session-fixtures'
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import {
@@ -13,7 +15,7 @@ import '../../shared/cards/A/A130_MummysBoy'
 const FILLER = '__test_placeholder__'
 
 const setup = (cardId: string, playerCount: number, round = 5, played = true) => {
-  const session = new GameSession(7127 + round, undefined, { playerCount })
+  const session = createWorkSession({ seed: 7127 + round, options: { playerCount } })
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.currentPlayerIndex = 0
@@ -58,7 +60,7 @@ const openWishChildren = (session: GameSession) => {
 
 describe('A127 Lodger parity', () => {
   it('A127 S1: playing Lodger by round nine enables one room-limited family growth', () => {
-    const session = setup('A127_Lodger', 3, 9, false)
+    const session = setup('A127_Lodger', 2, 9, false)
     const played = playOccupation(session, 'A127_Lodger')
     expect(played.state.players[0]!.occupationPlayed).toContain('A127_Lodger')
     const state = session.getState().state
@@ -73,7 +75,7 @@ describe('A127 Lodger parity', () => {
   })
 
   it('A127 S2: playing Lodger after round nine grants no extra room', () => {
-    const session = setup('A127_Lodger', 3, 10, false)
+    const session = setup('A127_Lodger', 2, 10, false)
     const played = playOccupation(session, 'A127_Lodger')
     expect(played.state.players[0]!.occupationPlayed).toContain('A127_Lodger')
     const state = session.getState().state
@@ -90,7 +92,7 @@ describe('A127 Lodger parity', () => {
     ['S3', 2, 2],
     ['S4', 3, 3],
   ] as const)('A127 %s: round nine returning home with %i rooms leaves %i people', (_scenario, rooms, expected) => {
-    const session = setup('A127_Lodger', 3, 9)
+    const session = setup('A127_Lodger', 2, 9)
     const state = session.getState().state
     const owner = state.players[0]!
     setActiveWorkerCount(owner, 3)
@@ -103,6 +105,12 @@ describe('A127 Lodger parity', () => {
       player.resources.food = 20
     })
     session.loadState(state)
+    expect(session.state.players).toHaveLength(2)
+    const preview = session.withCtx(() => collectScheduledEffectPreviews(session.state, session.state.players[0]!))
+      .find(entry => entry.sourceCard === 'A127_Lodger')
+    expect(preview?.description.kind).toBe('conditional')
+    if (preview?.description.kind !== 'conditional') throw new Error('Missing room activation condition')
+    expect(preview.description.condition).toEqual({ kind: 'extra-room-active', fact: 'hasRoom' })
     const response = session.performRoundEnd()
     expect(response.ok, response.error).toBe(true)
     expect(familySize(response.state.players[0]!)).toBe(expected)

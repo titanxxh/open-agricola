@@ -49,14 +49,13 @@ const anytimeListener: CardListenerRegistration = {
             type: 'leaf',
             actionId: 'improvement',
             sourceCard: CARD_ID,
-            actionContext: { types: ['major'], trueAction: false },
+            actionContext: { types: ['major'], trueAction: false, exactCost: {} },
           },
           // Unflag card
           { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: false } },
         ],
       },
       sourceCard: CARD_ID,
-      labelKey: 'cards.E027_PiggyBank.anytime',
     }
   },
 }

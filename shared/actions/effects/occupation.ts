@@ -1,10 +1,10 @@
 import { cardIdentityChoice } from '../helpers/card-choice'
-import type { ActionChoiceOption, ActionDefinition, ActionExecutionResult, ActionSpace, ComplexCost, GameState, InternalActionChild, InternalActionChildren, PaymentSolution, PlayerState, ProtectedObservation, Resource } from '../../contract/types'
+import type { ActionChoiceOption, ActionDefinition, ActionExecutionResult, ActionSpace, ChoiceEffectPreview, ComplexCost, GameState, InternalActionChild, InternalActionChildren, PaymentSolution, PlayerState, ProtectedObservation, Resource } from '../../contract/types'
 import type { CardPayment, EventSink } from '../../contract/events'
 import { meetsCardPrerequisites } from '../../cards/helpers/prerequisites'
 import { getOccupation } from '../../cards/registry-display'
 import { runCardListeners } from '../../cards/card-listeners'
-import { PaymentSolver } from '../payment'
+import { describePaymentEffectPreview, PaymentSolver } from '../payment'
 import { ensureCardModifiers } from '../../cards/card-modifiers'
 import { activateCardEffect } from './internal/activate-card-effect'
 import { addCardResourceGained } from '../../cards/helpers/card-state'
@@ -217,26 +217,15 @@ const getOccupationCost = (
   return cost
 }
 
+const occupationFeeSchedule = (spaceId: string): readonly number[] => {
+  if (spaceId === 'lessons-3' || spaceId === 'lessons-56-2f') return [2]
+  if (spaceId === 'lessons-4' || spaceId === 'lessons-56-variable') return [1, 1, 2]
+  return [0, 1]
+}
+
 const getLessonsCost = (player: PlayerState, spaceId: string) => {
-  const isLessons4 = spaceId === 'lessons-4'
-  const isLessons3 = spaceId === 'lessons-3'
-  const isLessons56TwoFood = spaceId === 'lessons-56-2f'
-  const isLessons56Variable = spaceId === 'lessons-56-variable'
-  const base = isLessons3
-    ? 2
-    : isLessons56TwoFood
-      ? 2
-      : isLessons56Variable
-        ? player.occupationPlayed.length <= 1
-          ? 1
-          : 2
-    : isLessons4
-      ? player.occupationPlayed.length <= 1
-        ? 1
-        : 2
-      : player.occupationPlayed.length === 0
-        ? 0
-        : 1
+  const schedule = occupationFeeSchedule(spaceId)
+  const base = schedule[Math.min(player.occupationPlayed.length, schedule.length - 1)] ?? 0
   let food = base
   for (const mod of player.activeModifiers ?? []) {
     if (mod.type === 'bonus' && mod.appliesTo.includes('occupation') && mod.discount) {
@@ -301,17 +290,13 @@ const buildPlayableOccupationOptions = (
         actionCardId,
       ),
     )
-    .filter((occupation) => getOccupationChoicePolicy(
-      state,
-      player,
-      space,
-      occupation.id,
-      cost,
-      actionCardId,
-    ).doable)
-    .map((occupation) => ({
-      ...cardIdentityChoice(occupation.id, 'occupation'),
-    }))
+    .flatMap((occupation): ActionChoiceOption[] => {
+      const identity = cardIdentityChoice(occupation.id, 'occupation')
+      const policy = getOccupationChoicePolicy(state, player, space, occupation.id, cost, actionCardId)
+      if (!policy.doable) return []
+      const effectPreview = describeOccupationActionPayment(state, player, occupation.id, cost, actionCardId, policy.reserveResources)
+      return [{ ...identity, effectPreview, descriptionPreview: { kind: 'action', labelKey: identity.labelKey, effectPreview } }]
+    })
 
 const getOccupationChoicePolicy = (
   state: GameState,
@@ -383,29 +368,64 @@ export const collectOccupationActionPaymentOptions = (
   actionCardId?: string,
   reserveResources?: Partial<Resource>,
 ): PaymentSolution[] => {
-  const previewCost = PaymentSolver.resolveCardPreviewCostByProvider(
-    state,
-    player,
-    'occupation',
-    occupationId,
-    () => cost,
-    actionCardId,
-  )
-  if (!previewCost) return []
+  const normalizedCost = resolveOccupationActionPaymentCost(state, player, occupationId, cost, actionCardId)
+  return computeOccupationPaymentOptions(state, player, occupationId, normalizedCost, actionCardId, reserveResources)
+}
+
+const computeOccupationPaymentOptions = (
+  state: GameState,
+  player: PlayerState,
+  occupationId: string,
+  cost: ComplexCost,
+  actionCardId?: string,
+  reserveResources?: Partial<Resource>,
+): PaymentSolution[] => {
   const playerIndex = state.players.indexOf(player)
   const paymentState =
     playerIndex >= 0 ? state : ({ ...state, players: [player] } as GameState)
   const paymentPlayerIndex = playerIndex >= 0 ? playerIndex : 0
-  const normalizedCost: ComplexCost = PaymentSolver.isComplexCost(previewCost)
-    ? previewCost
-    : { fee: previewCost }
-  return PaymentSolver.computeOptions(paymentState, paymentPlayerIndex, normalizedCost, {
+  return PaymentSolver.computeOptions(paymentState, paymentPlayerIndex, cost, {
     actionId: 'pay',
     costType: 'occupation',
     sourceCard: occupationId,
     spaceId: actionCardId,
     reserveResources,
   })
+}
+
+const resolveOccupationActionPaymentCost = (
+  state: GameState,
+  player: PlayerState,
+  occupationId: string,
+  baseCost: Partial<Resource>,
+  actionCardId?: string,
+): ComplexCost => {
+  const resolvedCost = PaymentSolver.resolveCardPreviewCostByProvider(
+    state,
+    player,
+    'occupation',
+    occupationId,
+    () => baseCost,
+    actionCardId,
+  ) ?? baseCost
+  // Every occupation payment uses the same solver path, including modifier trades.
+  return PaymentSolver.isComplexCost(resolvedCost) ? resolvedCost : { fee: resolvedCost }
+}
+
+const describeOccupationActionPayment = (
+  state: GameState,
+  player: PlayerState,
+  occupationId: string,
+  baseCost: Partial<Resource>,
+  actionCardId?: string,
+  reserveResources?: Partial<Resource>,
+): ChoiceEffectPreview | undefined => {
+  const cost = resolveOccupationActionPaymentCost(state, player, occupationId, baseCost, actionCardId)
+  const previews = computeOccupationPaymentOptions(state, player, occupationId, cost, actionCardId, reserveResources)
+    .map(solution => describePaymentEffectPreview(solution, false, { paymentResourceProviders: cost.paymentResourceProviders }))
+  if (previews.length === 0) return undefined
+  if (previews.length === 1) return previews[0]
+  return { kind: 'rule', description: { kind: 'group', operator: 'xor', separator: ' / ', parts: previews.map(effectPreview => ({ kind: 'action', showLabel: false, labelKey: 'actions.pay.name', effectPreview })) } }
 }
 
 type OccupationCommitData = {
@@ -471,6 +491,19 @@ export const playOccupationAction: ActionDefinition = {
   id: 'occupation',
   nameKey: 'actions.lessons.name',
   descriptionKey: 'actions.lessons.description',
+  previewEffect: ({ state, player, space, params, previewMode }) => {
+    if (previewMode === 'base') return !PaymentSolver.readExactCost(params)
+      ? { kind: 'occupationFees', food: occupationFeeSchedule(space.id) }
+      : { kind: 'payment', resourcesPaid: getOccupationActionBaseCost(player, space.id, params) ?? {} }
+    const cost = getOccupationActionBaseCost(player, space.id, params)
+    if (!cost) return undefined
+    const allowedCards = (params as { allowedCards?: string[] } | undefined)?.allowedCards
+    const options = buildPlayableOccupationOptions(state, player, cost, space, space.id)
+      .filter(option => !allowedCards || allowedCards.includes(option.value))
+    if (options.length === 0) return undefined
+    if (options.every(option => JSON.stringify(option.effectPreview) === JSON.stringify(options[0]!.effectPreview))) return options[0]!.effectPreview
+    return { kind: 'rule', description: { kind: 'group', operator: 'xor', separator: ' / ', parts: options.flatMap(option => option.descriptionPreview ? [option.descriptionPreview] : []) } }
+  },
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: (state, player, context) =>
@@ -521,30 +554,7 @@ export const playOccupationAction: ActionDefinition = {
     if (!choicePolicy.doable) {
       return { type: 'fail', errorKey: 'log.occupationFail' }
     }
-    // Apply computeCosts hook so card-driven trades (B109 PaperMaker
-    // wood→food) and bonus modifiers participate in the pay leaf's
-    // multi-solution enumeration. Without this the pay leaf only sees the
-    // raw lessons cost and ignores B109's wood-for-food trade.
-    const previewCost = PaymentSolver.resolveCardPreviewCostByProvider(
-      state,
-      player,
-      'occupation',
-      choice,
-      () => baseCost,
-      space.id,
-    )
-    // Always wrap as ComplexCost so the pay leaf routes through
-    // resolveCostPaymentSelection. When `activeModifiers` contributes a
-    // trade (A28 ForestSchool wood→food) the resulting multi-solution
-    // payment surfaces a `prompt.selectPayment` choice instead of being
-    // silently auto-resolved by the typed-flat fast path. Single-solution
-    // cases (no trade / no bonus) auto-resolve inside the pay leaf without
-    // any extra prompt.
-    const resolvedCost: ComplexCost | Partial<PlayerState['resources']> =
-      previewCost ?? baseCost
-    const finalCost: ComplexCost = PaymentSolver.isComplexCost(resolvedCost)
-      ? resolvedCost
-      : { fee: resolvedCost as Partial<PlayerState['resources']> }
+    const finalCost = resolveOccupationActionPaymentCost(state, player, choice, baseCost, space.id)
     const childContext = compactContext(privateHandChangeContext(
       sourceCard,
       choice,

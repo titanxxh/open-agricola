@@ -2,7 +2,7 @@ import { defineOccupationCard } from '../card-source'
 import { canStartFencing } from '../../actions/effects/fencing'
 import { buildRenovationPlan } from '../../actions/effects/renovation'
 import type { ActionFlow, GameState, PlayerState } from '../../contract/types'
-import { createPlayerActionSpaces, registerPlayerActionSpace } from '../player-action-space'
+import { createPlayerActionSpaces, registerPlayerActionSpace, definePlayerActionSpaceFlow } from '../player-action-space'
 import { wrapOptional } from '../../actions/flow'
 import type { CardImpl } from '../registry'
 
@@ -46,20 +46,14 @@ const greenhouseBranches = (state: GameState, player: PlayerState): ActionFlow[]
 registerPlayerActionSpace({
   cardId: CARD_ID,
   access: 'owner',
-  createDefinition: (ownerId) => ({
+  createDefinition: (ownerId) => definePlayerActionSpaceFlow({
     id: CARD_ID,
     nameKey: `cards.${CARD_ID}.name`,
     descriptionKey: `cards.${CARD_ID}.desc`,
     strictCanExecute: true,
     canBeExecutedByPlayer: (state, player) =>
       player.id === ownerId && greenhouseBranches(state, player).length > 0,
-    execute: ({ state, player }) => ({
-      type: 'flow',
-      flow: {
-        type: 'xor',
-        children: greenhouseBranches(state, player),
-      },
-    }),
+    flowFactory: ({ state, player }) => ({ type: 'xor', children: greenhouseBranches(state, player) }),
   }),
 })
 

@@ -1,5 +1,6 @@
+import { createWorkSession } from './_helpers/session-fixtures'
 import { describe, expect, it } from 'vitest'
-import { GameSession, type SessionResponse } from '../game/authoritative-session'
+import type { GameSession, SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import type { Field } from '../../shared/contract/types'
@@ -10,7 +11,7 @@ const CARD_ID = 'B093_Confidant'
 const FILLER = '__test_placeholder__'
 
 const setup = ({ food = 4, round = 5 }: { food?: number; round?: number } = {}) => {
-  const session = new GameSession(5393 + round, undefined, { playerCount: 2 })
+  const session = createWorkSession({ seed: 5393 + round, options: { playerCount: 2 } })
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.currentPlayerIndex = 0

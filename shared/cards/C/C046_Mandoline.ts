@@ -33,7 +33,6 @@ const anytimeListener: CardListenerRegistration = {
         ],
       },
       sourceCard: CARD_ID,
-      labelKey: 'cards.C046_Mandoline.anytime',
     }
   },
 }

@@ -3,7 +3,8 @@ import { getStableCountForCards } from '../../domain/stables'
 import { getFenceCount } from '../../domain/fence-segments'
 import { ensureCardState } from './card-state'
 
-const ACTION_SNAPSHOT_CARD_ID = '__actionSnapshot__'
+import { ACTION_SNAPSHOT_CARD_ID } from './action-snapshot-state'
+export { readActionSnapshotToken, readActionSnapshotExtraData } from './action-snapshot-state'
 
 const lastActionToken = (player: PlayerState): number => {
   const extraData = player.cardStates?.[ACTION_SNAPSHOT_CARD_ID]?.extraData
@@ -36,15 +37,6 @@ export const endTurnScope = (player: PlayerState): void => {
   const lastToken = lastActionToken(player)
   cardState.extraData = lastToken > 0 ? { lastToken } : {}
 }
-
-export const readActionSnapshotToken = (player: PlayerState): number | undefined =>
-  player.cardStates?.[ACTION_SNAPSHOT_CARD_ID]?.extraData?.token as number | undefined
-
-export const readActionSnapshotExtraData = <T>(
-  player: PlayerState,
-  key: string,
-): T | undefined =>
-  player.cardStates?.[ACTION_SNAPSHOT_CARD_ID]?.extraData?.[key] as T | undefined
 
 export const writeActionSnapshotExtraData = (
   player: PlayerState,

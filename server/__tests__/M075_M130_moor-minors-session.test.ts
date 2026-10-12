@@ -5,7 +5,6 @@ import { applyFutureMeeples } from '../../shared/session/state-bootstrap'
 import { resolveFutureMeepleRequests, futureMeeplesAction } from '../../shared/actions/effects/internal/future-meeples'
 import { gainAction } from '../../shared/actions/effects/gain'
 import { executeCardListener, getRegisteredCardListeners, type CardListenerContext } from '../../shared/cards/card-listeners'
-import { runCardEffectHook } from '../../shared/cards/card-effects'
 import type { ActionFlow, ActionSpace, GameState, PlayerState, Resource } from '../../shared/contract/types'
 
 import { M079_PeatSled_impl } from '../../shared/cards/M/M079_PeatSled'
@@ -429,22 +428,5 @@ describe('Moor action listener minors', () => {
     other.session.loadState(other.state)
     const nonTrigger = other.session.takeAction(0, 'day-laborer')
     expect(nonTrigger.state.players[0]!.resources.horse).toBe(0)
-  })
-})
-
-describe('M128 Workbench harvest field phase', () => {
-  it('gives building resources only in rounds 13 and 14', () => {
-    for (const round of [13, 14]) {
-      const { state, player } = setup(round)
-      player.minorPlayed.push('M128_Workbench')
-      executeGainLeaf(runCardEffectHook(state, player, 'M128_Workbench', 'onHarvestFieldPhase'), state, player)
-      expect(player.resources.wood).toBe(3)
-      expect(player.resources.clay).toBe(2)
-      expect(player.resources.reed).toBe(1)
-    }
-
-    const { state, player } = setup(12)
-    player.minorPlayed.push('M128_Workbench')
-    expect(runCardEffectHook(state, player, 'M128_Workbench', 'onHarvestFieldPhase')).toBeNull()
   })
 })

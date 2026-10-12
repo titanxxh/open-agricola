@@ -1,8 +1,10 @@
-import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game/authoritative-session'
-import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
+import { afterEach, describe, expect, it } from 'vitest'
+import type { GameSession } from '../game/authoritative-session'
+import { createWorkSession } from './_helpers/session-fixtures'
+import { createPlayerActionSpaces } from '../../shared/cards/player-action-space'
 import {
   executeCardListener,
+  getMatchingListeners,
   getRegisteredCardListeners,
   type CardListenerContext,
 } from '../../shared/cards/card-listeners'
@@ -12,6 +14,9 @@ import { setWorkersAtHome } from '../../shared/domain/player'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 
 import '../../shared/cards/E/E118_KindlingGatherer'
+import '../../shared/cards/C/C042_RavenousHunger'
+import '../../shared/cards/C/C039_StudioBoat'
+import '../../shared/cards/D/D051_Archway'
 
 const CARD_ID = 'E118_KindlingGatherer'
 const LISTENER_ID = 'E118-kindling-gatherer-after-action-space-food'
@@ -33,14 +38,16 @@ const moved = (
   reason,
 })
 
+const sessions: GameSession[] = []
+afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+
 const setup = () => {
-  const session = new GameSession(42)
-  stabilizeRandomHands(session.state.players)
+  const session = createWorkSession({ seed: 42118, configure: state => {
+    state.players[0]!.occupationPlayed.push(CARD_ID)
+  } })
+  sessions.push(session)
   const state = session.getState().state
-  state.players = state.players.slice(0, 2)
-  const player = state.players[0]!
-  player.occupationPlayed.push(CARD_ID)
-  return { state, player }
+  return { session, state, player: state.players[0]! }
 }
 
 const actionSpace = (id: string): ActionSpace => ({
@@ -92,14 +99,8 @@ const expectWoodFlow = (flow: ActionFlow | undefined) => {
 
 describe('E118_KindlingGatherer action-space provenance', () => {
   it('grants wood on the real day-laborer gain flow', () => {
-    const session = new GameSession(42)
-    stabilizeRandomHands(session.state.players)
-    const state = session.getState().state
-    state.players = state.players.slice(0, 2)
-    state.currentPlayerIndex = 0
-    const player = state.players[0]!
+    const { session, state, player } = setup()
     setWorkersAtHome(state, player, 1)
-    player.occupationPlayed.push(CARD_ID)
     player.resources.food = 0
     player.resources.wood = 0
     session.loadState(state)
@@ -127,19 +128,72 @@ describe('E118_KindlingGatherer action-space provenance', () => {
     ]))
   })
 
-  it('place-farmer grants wood for food moved from an action space to the trigger player', () => {
-    const { player } = setup()
-    const events = [moved({ food: 1 }, player.id, { kind: 'actionSpace', spaceId: 'resource-market-4' })]
-    expect(events).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        type: 'resource.moved',
-        from: expect.objectContaining({ kind: 'actionSpace' }),
-        to: expect.objectContaining({ kind: 'player', playerId: player.id }),
-      }),
-    ]))
-    const flow = runListener(LISTENER_ID, 'place-farmer', 'resource-market-4', events)
+  it('grants exactly one wood for a nested Ravenous Hunger placement onto Studio Boat', () => {
+    const { session, state, player } = setup()
+    state.round = 14
+    player.minorPlayed = ['C042_RavenousHunger', 'C039_StudioBoat']
+    player.resources.food = 0
+    player.resources.wood = 0
+    player.resources.vegetable = 0
+    setWorkersAtHome(state, player, 2)
+    state.actionSpaces.push(...createPlayerActionSpaces(state))
+    state.actionSpaces.find(space => space.id === 'C039_StudioBoat')!.resources.food = 3
+    session.loadState(state)
 
-    expectWoodFlow(flow)
+    let response = session.takeAction(0, 'vegetable-seeds')
+    response = resolveTriggerIfPresent(session, response, 'C042_RavenousHunger')
+    expect(response.ok, response.error).toBe(true)
+    expect(response.interaction.stateId).toBe('wait')
+    const accept = response.interaction.request.options?.find(option => option.value !== '__skip__')
+    expect(accept).toBeDefined()
+    response = session.resolveChoice(0, accept!.value)
+    expect(response.ok, response.error).toBe(true)
+    expect(response.interaction.request.options?.map(option => option.value)).toContain('C039_StudioBoat')
+    response = session.resolveChoice(0, 'C039_StudioBoat')
+    for (let count = 0; count < 6 && response.interaction.request.kind === 'select-trigger'; count += 1) {
+      const option = response.interaction.request.options?.find(candidate => !candidate.disabled)
+      expect(option).toBeDefined()
+      response = session.resolveChoice(response.interaction.playerIndex, option!.value)
+      expect(response.ok, response.error).toBe(true)
+    }
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources).toMatchObject({ food: 4, wood: 1, vegetable: 1 })
+    expect(response.state.actionSpaces.find(space => space.id === 'C039_StudioBoat')!.resources.food).toBe(0)
+    expect(response.state.actionSpaces.find(space => space.id === 'C039_StudioBoat')!.takenBy).toHaveLength(1)
+    expect(response.state.events.filter(event => event.type === 'card.triggered' && event.sourceCardId === CARD_ID)).toHaveLength(1)
+    expect(response.state.events).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: 'resource.moved', resources: { food: 3 }, from: { kind: 'actionSpace', spaceId: 'C039_StudioBoat' } }),
+      expect.objectContaining({ type: 'resource.moved', resources: { food: 1 }, from: expect.objectContaining({ kind: 'card', cardId: 'C042_RavenousHunger' }) }),
+    ]))
+    expect(response.state.players[0]!.cardStates.C039_StudioBoat?.counters?.bonusVp).toBe(1)
+    expect(response.scores).toHaveLength(2)
+  })
+
+  it.each([
+    { action: 'meeting-place', food: 0, wood: 0 },
+    { action: 'D051_Archway', food: 1, wood: 1 },
+    { action: 'fishing', food: 3, wood: 1 },
+  ])('uses actual food provenance through $action', ({ action, food, wood }) => {
+    const { session, state, player } = setup()
+    player.resources.food = 0
+    player.resources.wood = 0
+    if (action === 'D051_Archway') {
+      player.minorPlayed.push(action)
+      state.actionSpaces.push(...createPlayerActionSpaces(state))
+    }
+    if (action === 'fishing') state.actionSpaces.find(space => space.id === action)!.resources.food = food
+    session.loadState(state)
+
+    let response = session.takeAction(0, action)
+    response = resolveTriggerIfPresent(session, response, CARD_ID)
+    if (response.interaction.stateId === 'wait' && response.interaction.request.options?.some(option => option.value === '__skip__')) {
+      response = session.resolveChoice(response.interaction.playerIndex, '__skip__')
+    }
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources).toMatchObject({ food, wood })
+    expect(response.state.events.filter(event => event.type === 'card.triggered' && event.sourceCardId === CARD_ID)).toHaveLength(wood)
+    expect(response.scores).toHaveLength(2)
   })
 
   it('collect grants wood for food moved from an action space to the trigger player', () => {
@@ -177,14 +231,14 @@ describe('E118_KindlingGatherer action-space provenance', () => {
 
     expect(runListener(
       LISTENER_ID,
-      'place-farmer',
+      'gain',
       'resource-market-4',
       [moved({ food: 1 }, player.id, { kind: 'supply' })],
       { food: 1 },
     )).toBeUndefined()
     expect(runListener(
       LISTENER_ID,
-      'place-farmer',
+      'gain',
       'resource-market-4',
       [moved({ food: 1 }, player.id, { kind: 'card', playerId: player.id, cardId: 'Test_Source' })],
       { food: 1 },
@@ -210,6 +264,15 @@ describe('E118_KindlingGatherer action-space provenance', () => {
       [moved({ food: 2 }, player.id, { kind: 'card', playerId: player.id, cardId: 'Test_Source' })],
       { food: 2 },
     )).toBeUndefined()
+  })
+
+  it('does not register a second reward on a place-farmer ancestor carrying the same food receipt', () => {
+    const { state, player } = setup()
+    const events = [moved({ food: 3 }, player.id, { kind: 'actionSpace', spaceId: 'C039_StudioBoat' })]
+    expect(getMatchingListeners({
+      state, player, space: actionSpace('C039_StudioBoat'), actionId: 'place-farmer', phase: 'after',
+      transactionEvents: events, actionEvents: events,
+    }).filter(entry => entry.registration.id === LISTENER_ID)).toEqual([])
   })
 
   it('does not replay stale action-space food from an earlier transaction frame during card gain follow-up', () => {

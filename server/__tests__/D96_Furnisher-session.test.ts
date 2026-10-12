@@ -10,9 +10,13 @@ import { runCardEffectHook } from '../../shared/cards/card-effects'
 
 import '../../shared/cards/D/D096_Furnisher'
 import '../../shared/cards/B/B003_Moonshine'
-import type { ActionFlow } from '../../shared/contract/types'
+import type { ActionFlow, ChoiceDescriptionPreview } from '../../shared/contract/types'
 
 const CARD_ID = 'D096_Furnisher'
+const improvementCount = (description?: ChoiceDescriptionPreview): number => !description ? 0 : description.kind === 'action'
+  ? description.effectPreview?.kind === 'rule' ? improvementCount(description.effectPreview.description) : description.labelKey === 'actions.improvement.name' ? 1 : 0
+  : description.kind === 'conditional' ? improvementCount(description.body) : description.parts.reduce((sum, part) => sum + improvementCount(part), 0)
+
 
 const advancePlayerSwitches = (session: GameSession, response: SessionResponse) => {
   let current = response
@@ -93,8 +97,8 @@ describe('D096_Furnisher session', () => {
     expect(resp.interaction.playerIndex).toBe(0)
     expect(resp.interaction.sourceCard).toBe(CARD_ID)
     const countOptions = resp.interaction.request.options ?? []
-    expect(countOptions.map((option) => option.labelParams?.count)).toEqual([0, 1, 2])
-    const useFurnisherTwice = countOptions.find((option) => option.labelParams?.count === 2)
+    expect(countOptions.map(option => improvementCount(option.descriptionPreview)).sort((a, b) => a - b)).toEqual([0, 1, 2])
+    const useFurnisherTwice = countOptions.find((option) => improvementCount(option.descriptionPreview) === 2)
     expect(useFurnisherTwice).toBeDefined()
 
     resp = session.resolveChoice(0, useFurnisherTwice!.value)
@@ -108,6 +112,7 @@ describe('D096_Furnisher session', () => {
     expect(resp.interaction.request.options?.some((option) => option.value === '__skip__')).toBe(false)
 
     resp = session.resolveChoice(0, 'A037_Bucksaw')
+    expect(resp.ok, resp.error).toBe(true)
     expect(resp.state.players[0]!.minorPlayed).toContain('A037_Bucksaw')
     expect(resp.state.players[0]!.resources.wood).toBe(0)
     expect(resp.interaction.stateId).toBe('wait')
@@ -146,7 +151,7 @@ describe('D096_Furnisher session', () => {
     if (resp.interaction.stateId !== 'wait') throw new Error('expected Furnisher count choice')
     expect(resp.state.players[0]!.rooms).toBe(3)
     const skipFurnisher = resp.interaction.request.options?.find(
-      (option) => option.labelParams?.count === 0,
+      (option) => option.value === '__skip__',
     )
     expect(skipFurnisher).toBeDefined()
     const resources = resp.state.players[0]!.resources
@@ -220,7 +225,7 @@ describe('D096_Furnisher session', () => {
     expect(resp.interaction.playerIndex).toBe(1)
     expect(resp.interaction.sourceCard).toBe(CARD_ID)
     const skipFurnisher = resp.interaction.request.options?.find(
-      (option) => option.labelParams?.count === 0,
+      (option) => option.value === '__skip__',
     )
     expect(skipFurnisher).toBeDefined()
     expect(resp.state.log.filter(
@@ -297,7 +302,7 @@ describe('D096_Furnisher session', () => {
     if (resp.interaction.stateId !== 'wait') throw new Error('expected Furnisher choice')
     expect(resp.interaction.sourceCard).toBe(CARD_ID)
     const useFurnisher = resp.interaction.request.options.find(
-      (option) => option.labelParams?.count === 1,
+      (option) => improvementCount(option.descriptionPreview) === 1,
     )
     expect(useFurnisher).toBeDefined()
 
@@ -426,7 +431,7 @@ describe('D096 Furnisher parity', () => {
     expect(response.interaction.stateId).toBe('wait')
     expect(response.interaction.stateId === 'wait' ? response.interaction.sourceCard : undefined)
       .toBe(CARD_ID)
-    const countChoice = options(response).find((option) => option.labelParams?.count === count)
+    const countChoice = options(response).find((option) => (count === 0 ? option.value === '__skip__' : improvementCount(option.descriptionPreview) === count))
     expect(countChoice, JSON.stringify(response.interaction)).toBeDefined()
     return countChoice
       ? session.resolveChoice(response.interaction.playerIndex, countChoice.value)

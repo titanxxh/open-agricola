@@ -1,6 +1,8 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { markAllWorkersUsed } from '../../shared/domain/player'
+import { createWorkSession } from './_helpers/session-fixtures'
+import { descriptionEffects } from './_helpers/choice-description'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 const setup = (cardId: string, sheep = 2) => {
@@ -22,6 +24,27 @@ const setup = (cardId: string, sheep = 2) => {
     { id: 'boar', animalType: 'boar', animalCount: 2, size: 2, stables: 0, tiles: [{ row: 2, col: 1 }, { row: 2, col: 2 }] },
   ]
   session.loadState(state)
+  return session
+}
+
+const omnifarmerSessions: GameSession[] = []
+afterEach(() => omnifarmerSessions.splice(0).forEach(session => session.dispose()))
+const setupOmnifarmer = () => {
+  const session = createWorkSession({ seed: 829, configure: state => {
+    state.round = 4
+    for (const player of state.players) {
+      markAllWorkersUsed(state, player)
+      player.resources.food = 20
+    }
+    const player = state.players[0]!
+    player.occupationPlayed = ['E134_Omnifarmer']
+    Object.assign(player.resources, { sheep: 2, boar: 2 })
+    player.pastures = [
+      { id: 'sheep', animalType: 'sheep', animalCount: 2, size: 2, stables: 1, tiles: [{ row: 1, col: 1 }, { row: 1, col: 2 }] },
+      { id: 'boar', animalType: 'boar', animalCount: 2, size: 2, stables: 0, tiles: [{ row: 2, col: 1 }, { row: 2, col: 2 }] },
+    ]
+  } })
+  omnifarmerSessions.push(session)
   return session
 }
 
@@ -154,12 +177,44 @@ describe('harvest rewards count placed newborn animals', () => {
   })
 
   it('E134 offers only the species whose newborn was placed', () => {
-    const session = setup('E134_Omnifarmer')
-    session.performRoundEnd()
-    const response = arrange(session, 3, 2)
+    const session = setupOmnifarmer()
+    expect(session.performRoundEnd().interaction.request.kind).toBe('animal-reorg')
+    let response = arrange(session, 3, 2)
     expect(response.interaction).toMatchObject({ stateId: 'wait', promptKey: 'ui.interactionE134Prompt' })
     if (response.interaction.stateId !== 'wait') throw new Error('expected deposit choice')
-    expect(response.interaction.request.options?.map((option) => option.value)).toEqual(['skip', 'sheep'])
+    const options = response.interaction.request.options
+    expect(options).toHaveLength(2)
+    expect(options.map(option => option.value)).toContain('__skip__')
+    const paymentOptions = options.filter(option => descriptionEffects(option.descriptionPreview).some(effect => effect.kind === 'payment'))
+    expect(paymentOptions).toHaveLength(1)
+    expect(descriptionEffects(paymentOptions[0]!.descriptionPreview)).toContainEqual({ kind: 'payment', resourcesPaid: { sheep: 1 } })
+    response = session.resolveChoice(0, paymentOptions[0]!.value)
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources).toMatchObject({ sheep: 2, boar: 2 })
+    expect(response.state.players[0]!.cardStates.E134_Omnifarmer?.extraData?.storedGoods).toEqual(['sheep'])
+    expect(response.scores).toHaveLength(2)
+  })
+
+  it.each(['sheep', 'boar'] as const)('E134 binds multiple eligible newborns uniquely and stores only the chosen %s', species => {
+    const session = setupOmnifarmer()
+    expect(session.performRoundEnd().interaction.request.kind).toBe('animal-reorg')
+    let response = arrange(session, 3, 3)
+    expect(response.interaction).toMatchObject({ stateId: 'wait', promptKey: 'ui.interactionE134Prompt' })
+    const options = response.interaction.request.options
+    expect(options).toHaveLength(3)
+    expect(new Set(options.map(option => option.value)).size).toBe(3)
+    expect(options.map(option => option.value)).toContain('__skip__')
+    for (const resource of ['sheep', 'boar'] as const) {
+      expect(options.filter(option => descriptionEffects(option.descriptionPreview).some(effect => effect.kind === 'payment' && effect.resourcesPaid?.[resource] === 1))).toHaveLength(1)
+    }
+    const option = options.find(option => descriptionEffects(option.descriptionPreview).some(effect => effect.kind === 'payment' && effect.resourcesPaid?.[species] === 1))!
+    response = session.resolveChoice(0, option.value)
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources).toMatchObject({ sheep: species === 'sheep' ? 2 : 3, boar: species === 'boar' ? 2 : 3 })
+    expect(response.state.players[0]!.cardStates.E134_Omnifarmer?.extraData?.storedGoods).toEqual([species])
+    expect(response.scores[0]!.categories.find(category => category.key === 'cardBonusVp')?.total ?? 0).toBe(0)
+    expect(response.state.round).toBe(5)
+    expect(response.interaction.stateId).toBe('idle')
   })
 
   it('counts a placed newborn even when discarding an older animal leaves no net resource gain', () => {

@@ -1,14 +1,13 @@
 import { defineMinorCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { isCardFlagged, setCardFlag } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C051_FishingNet'
 /**
  * Part 1: When an opponent uses the Fishing accumulation space,
  * the card owner gains 1 food (simplified from "opponent pays 1 food")
- * and the card is flagged for the delayed return-home effect.
+ * and each use schedules its delayed return-home deposit.
  */
 const listener: CardListenerRegistration = {
   id: 'C51-fishing-net-opponent-fishing',
@@ -35,7 +34,8 @@ const listener: CardListenerRegistration = {
             },
             sourceCard: CARD_ID,
           },
-          { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: true } },
+          { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'increment-extra-data', key: 'pendingDeposits', amount: 1 } },
+          { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'increment-extra-data', key: 'depositEpisode', amount: 1 } },
         ],
       },
       sourceCard: CARD_ID,
@@ -74,14 +74,7 @@ const cardImpl = {
   listeners: [listener, isDoableListener],
   effect: {
   id: CARD_ID,
-  onReturnHome: (state, player) => {
-    if (!isCardFlagged(player, CARD_ID)) return
-    setCardFlag(player, CARD_ID, false)
-    const fishingSpace = state.actionSpaces.find(s => s.id === 'fishing')
-    if (fishingSpace) {
-      fishingSpace.resources.food = (fishingSpace.resources.food ?? 0) + 2
-    }
-  },
+  timedRules: [{ retainAfterCardLeaves: true, key: 'return-food-to-fishing', at: { kind: 'card-positive', fact: 'pendingDeposits', clock: 'current-round', phase: 'onReturnHome', episodeFact: 'depositEpisode' }, body: { kind: 'operation', operation: { kind: 'put-on-action-space', spaceId: 'fishing', resources: { food: 2 }, occurrencesFact: 'pendingDeposits' } } }],
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl

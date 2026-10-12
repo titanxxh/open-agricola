@@ -1,3 +1,4 @@
+import { descriptionEffects } from './_helpers/choice-description'
 import { describe, expect, it } from 'vitest'
 
 import { GameSession } from '../game/authoritative-session'
@@ -17,9 +18,8 @@ const tradeOption = (response: ReturnType<GameSession['getState']>, from: keyof 
   expect(response.ok, response.error).toBe(true)
   if (response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'choice') throw new Error('expected resource exchange choice')
   const option = response.interaction.request.options.find((candidate) =>
-    candidate.effectPreview?.kind === 'resourceExchange'
-    && candidate.effectPreview.resourcesPaid?.[from] === 1
-    && candidate.effectPreview.resourcesGained?.[to] === 1,
+    descriptionEffects(candidate.descriptionPreview).some(effect => effect.resourcesPaid?.[from] === 1)
+    && descriptionEffects(candidate.descriptionPreview).some(effect => effect.resourcesGained?.[to] === 1),
   )
   expect(option).toBeDefined()
   return option!

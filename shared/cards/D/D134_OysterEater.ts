@@ -1,10 +1,14 @@
+import { readCardExtraData } from '../helpers/card-state'
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
+import { consumePlannedTurnSkip } from '../../actions/rule-activated-operation'
+import type { RuleActivatedOperation } from '../../contract/rule-activated-operations'
 import type { CardEffect } from '../card-effects'
 
 const CARD_ID = 'D134_OysterEater'
+const skipOperation = { kind: 'skip-next-turns', countFact: 'skipNextPlacement' } satisfies RuleActivatedOperation
 /**
  * D134 Oyster Eater (Occupation, D, 134)
  * Each time the Fishing accumulation space is used (by any player), the card owner
@@ -41,9 +45,10 @@ const listener: CardListenerRegistration = {
             type: 'leaf',
             actionId: 'special-effect',
             sourceCard: CARD_ID,
-            params: { kind: 'increment-extra-data', key: 'skipNextPlacement', amount: 1 },
+            params: { kind: 'set-extra-data', key: 'skipNextPlacement', value: (readCardExtraData<number>(owner, CARD_ID, 'skipRound') === context.state.round ? readCardExtraData<number>(owner, CARD_ID, 'skipNextPlacement') ?? 0 : 0) + 1 },
             actionContext: { targetPlayerId: owner.id },
           },
+          { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-extra-data', key: 'skipRound', value: context.state.round }, actionContext: { targetPlayerId: owner.id } },
           {
             type: 'leaf',
             actionId: 'bonus-vp',
@@ -63,21 +68,8 @@ const effect: CardEffect = {
     const extra = player.cardStates?.[CARD_ID]?.extraData
     if (extra) delete extra.skipNextPlacement
   },
-  onBeforePlayerTurn: (_state, player) => {
-    const remaining = (player.cardStates?.[CARD_ID]?.extraData as { skipNextPlacement?: number } | undefined)
-      ?.skipNextPlacement ?? 0
-    if (remaining <= 0) return
-    const cs = player.cardStates![CARD_ID]!
-    const extra = (cs.extraData ?? {}) as { skipNextPlacement?: number }
-    const next = remaining - 1
-    if (next <= 0) {
-      delete extra.skipNextPlacement
-    } else {
-      extra.skipNextPlacement = next
-    }
-    cs.extraData = extra
-    return { skipTurn: true }
-  },
+  timedRules: [{ retainAfterCardLeaves: true, key: 'next-turn-placement-skip', at: { kind: 'card-positive', fact: 'skipNextPlacement', roundFact: 'skipRound', clock: 'current-round', phase: 'onBeforePlayerTurn' }, body: { kind: 'operation', operation: skipOperation } }],
+  onBeforePlayerTurn: (_state, player) => consumePlannedTurnSkip(player, CARD_ID, skipOperation) ? { skipTurn: true } : undefined,
 }
 
 const cardImpl = {

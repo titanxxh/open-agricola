@@ -3,7 +3,7 @@ import type { CardListenerContext, CardListenerRegistration } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { initUsageCounters, setUsageCounterLeaf, usageCounters } from './moor-batch1-helpers'
+import { initUsageCounters, usageCounters } from './moor-batch1-helpers'
 
 const CARD_ID = 'M090_WinterStorehouse'
 
@@ -21,7 +21,7 @@ const listener: CardListenerRegistration = {
       flow: {
         type: 'seq',
         children: [
-          setUsageCounterLeaf(CARD_ID, usage - 1),
+          { type: 'leaf', actionId: 'consume-card-counter', sourceCard: CARD_ID, params: { counter: 'usage', amount: 1 } },
           gainLeaf(CARD_ID, { fuel, food }),
         ],
       },

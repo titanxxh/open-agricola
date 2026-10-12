@@ -1,3 +1,4 @@
+import { descriptionEffects } from './_helpers/choice-description'
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import {
@@ -188,7 +189,7 @@ describe('E074 Ash Trees parity', () => {
     const session = ashTreesSession(0)
     let response = session.takeAction(0, 'fencing')
     const useFour = response.interaction.stateId === 'wait'
-      ? response.interaction.request.options?.find((option) => option.labelParams?.count === 4)
+      ? response.interaction.request.options?.find((option) => descriptionEffects(option.descriptionPreview).some(effect => effect.kind === 'fenceReserve' && effect.amount === 4))
       : undefined
     expect(useFour).toBeDefined()
     response = session.resolveChoice(0, useFour!.value)

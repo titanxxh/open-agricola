@@ -60,7 +60,9 @@ describe('executable future request previews', () => {
     const before = JSON.stringify(state)
     const description = session.withCtx(() => getNodeDescriptionPreview(node, registry, { state, player, space: state.actionSpaces[0]! }))
     expect(description).toMatchObject({ kind: 'group', parts: [
-      { effectPreview: { kind: 'cardScore', delta: 0 } }, { effectPreview: { kind: 'cardScore', delta: mode === 'optional' ? 0 : 1 } },
+      mode === 'optional' ? { kind: 'group', optional: true, parts: [{ effectPreview: { kind: 'cardScore', delta: 0 } }] }
+        : { effectPreview: { kind: 'cardScore', delta: 0 } },
+      { effectPreview: { kind: 'cardScore', delta: mode === 'optional' ? 0 : 1 } },
     ] })
     expect(JSON.stringify(state)).toBe(before)
   })

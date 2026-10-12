@@ -14,7 +14,7 @@ import type {
   Trade,
 } from '../../contract/types'
 import { canExecuteWithCostPreview } from '../helpers/cost-preview'
-import { PaymentSolver } from '../payment'
+import { PaymentSolver, describePaymentEffectPreview } from '../payment'
 import { mergeResources } from '../../utils/resources'
 import { buildInternalPayChild } from '../helpers/pay-child'
 import { playerHasCardCapability } from '../../cards/helpers/card-type'
@@ -223,6 +223,7 @@ const flattenRenovationCost = (cost: ComplexCost): Partial<Resource> => {
 }
 
 const renovateHouseCostPreview: ActionCostPreview = {
+  dependsOnHouseType: true,
   isStructurallyPossible: ({ player }) =>
     !playerHasCardCapability(player, 'blocksRenovation') &&
     (player.houseType === 'wood' || player.houseType === 'clay'),
@@ -277,6 +278,16 @@ export const renovateHouseAction: ActionDefinition = {
   id: 'renovate-house',
   nameKey: 'actions.renovate-house.name',
   descriptionKey: 'actions.renovate-house.description',
+  previewEffect: context => {
+    const { state, player, params, previewMode, actionContext, costs } = context
+    const plan = planForContext(player, params)
+    if (!plan) return undefined
+    if (previewMode === 'base') return { kind: 'unitCost', resourcesPaid: plan.cost.unitFee ?? {}, fixedFee: plan.cost.fees?.[0] ?? plan.cost.fee ?? {}, unit: 'room', actionNameKey: 'actions.renovate-house.name' }
+    const cost = resolveRenovationActionCost(plan.cost, actionContext, costs, readRenovationCostAdjustments(context))
+    if (!cost) return undefined
+    const solutions = PaymentSolver.computeOptions(state, state.players.indexOf(player), cost, { actionId: 'renovate-house', costType: 'renovation' })
+    return { kind: 'rule', description: { kind: 'group', operator: 'xor', separator: ' / ', parts: solutions.map(solution => ({ kind: 'action', labelKey: plan.nextType === 'clay' ? 'ui.interactionRenovateToClay' : 'ui.interactionRenovateToStone', effectPreview: describePaymentEffectPreview(solution, false, { paymentResourceProviders: cost.paymentResourceProviders }) })) } }
+  },
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: (state, player, opts) =>

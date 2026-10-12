@@ -1,6 +1,7 @@
 import type { GameState, PlayerState } from '../contract/types'
 import type { MoorSpecialActionCardState, MoorSpecialActionId } from './types'
 import { hasHealthyWorkerAtHome } from './heating'
+import { moorSpecialActionBaseResources, moorSpecialActionBorrowCost } from '../domain/moor-special-action-values'
 export const isMoorSpecialActionCardUsableByPlayer = (
   card: MoorSpecialActionCardState,
   playerId: string,
@@ -17,14 +18,10 @@ export const canTakeVisibleMoorSpecialAction = (
   if (state.players[state.currentPlayerIndex]?.id !== currentPlayer.id) return false
   if (!isMoorSpecialActionCardUsableByPlayer(card, currentPlayer.id)) return false
   if (!hasHealthyWorkerAtHome(state, currentPlayer)) return false
-  const borrowFood = card.location.kind === 'playerFaceUp' && card.location.playerId !== currentPlayer.id ? 2 : 0
-  const actionFood =
-    actionId === 'horse-market' && [2, 5, 6].includes(state.players.length) ? 1
-      : actionId === 'illicit-work' ? 1
-        : 0
-  const actionFuel = actionId === 'black-market' || actionId === 'illicit-work' ? 1 : 0
+  const borrowFood = moorSpecialActionBorrowCost(state, card.id).food ?? 0
+  const { cost } = moorSpecialActionBaseResources(actionId, state.players.length)
   return (
-    currentPlayer.resources.food >= borrowFood + actionFood &&
-    (currentPlayer.resources.fuel ?? 0) >= actionFuel
+    currentPlayer.resources.food >= borrowFood + (cost.food ?? 0) &&
+    (currentPlayer.resources.fuel ?? 0) >= (cost.fuel ?? 0)
   )
 }
