@@ -1,3 +1,5 @@
+[![Open Agricola — 一起玩，创造你的农场世界](docs/assets/social-preview.png)](https://titanxxh.github.io/open-agricola/)
+
 # Open Agricola
 
 [English](README.md) | [中文](README_zh.md)
