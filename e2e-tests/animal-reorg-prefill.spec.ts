@@ -1,6 +1,46 @@
 import { expect, test } from '@playwright/test'
 import { BACKEND_URL, getJson, postJson } from './fixtures'
 
+for (const destination of ['stone', 'boar']) {
+  test(`Sheep Walker exchanges placed sheep for ${destination} during animal reorganization`, async ({ page, request }) => {
+    await page.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'en'))
+    await postJson(request, BACKEND_URL + '/api/game/new', { seed: 1118, maxPlayers: 2 })
+    const { state } = await getJson(request, BACKEND_URL + '/api/game/state')
+    state.round = 5
+    state.roundPhase = 'work'
+    state.currentPlayerIndex = 0
+    for (const player of state.players) {
+      player.minorHand = ['__test_placeholder__']
+      player.occupationHand = ['__test_placeholder__']
+      player.resources.food = 20
+    }
+    const player = state.players[0]
+    player.occupationPlayed = ['B104_SheepWalker']
+    Object.assign(player.resources, { sheep: 1, boar: 0, cattle: 0, stone: 0 })
+    player.pastures = [{ id: 'sheep-pasture', size: 1, tiles: [{ row: 0, col: 0 }], stables: 0, animalType: 'sheep', animalCount: 1 }]
+    state.actionSpaces.find((space: { id: string }) => space.id === 'sheep-market').resources.sheep = 1
+    expect((await postJson(request, BACKEND_URL + '/api/game/load', { state })).ok).toBe(true)
+
+    await page.goto('/?page=game&player=p1&embedded=1&devMode=1')
+    await page.locator('.action-card').filter({ hasText: 'Sheep Market' }).click()
+    await expect(page.locator('.interaction-reorg-panel')).toBeVisible()
+    await page.locator('.anytime-bar').getByRole('button').filter({ hasText: /Exchange|Convert/i }).first().click()
+    const recipe = page.getByTestId(`anytime-exchange-option-B104_SheepWalker-ex${destination === 'boar' ? 0 : 2}`)
+    await expect(recipe).toBeVisible()
+    const add = recipe.getByRole('button', { name: '+', exact: true })
+    await add.click()
+    await expect(add).toBeDisabled()
+    await page.locator('.exchange-confirm').click()
+    await expect(page.locator('.exchange-overlay')).toHaveCount(0)
+    await expect(page.locator('.interaction-reorg-panel')).toBeVisible()
+    await page.locator('.interaction-reorg-panel').getByRole('button', { name: 'Confirm', exact: true }).click()
+    await expect(page.locator('.interaction-reorg-panel')).toHaveCount(0)
+    const completed = await getJson(request, BACKEND_URL + '/api/game/state')
+    expect(completed.state.players[0].resources).toMatchObject({ sheep: 1, [destination]: 1 })
+    expect(completed.interaction.request.kind).toBe('confirm-next-player')
+  })
+}
+
 test('collecting animals presents a full draft that can be confirmed without adjustments', async ({ page, request }) => {
   await page.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'en'))
   await postJson(request, BACKEND_URL + '/api/game/new', { seed: 960, maxPlayers: 2 })

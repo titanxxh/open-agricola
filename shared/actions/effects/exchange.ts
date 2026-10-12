@@ -603,19 +603,23 @@ const resolveExchangeChoice = (
   if (choice.startsWith('bulk:')) {
     const payload = choice.replace('bulk:', '').trim()
     if (!payload) return { type: 'ok' }
-    if (payload.split(',').some((entry) => {
-      const trade = trades[Number(entry.split('=')[0])]
-      return trade && !isTradeAllowed(trade, actionContext)
-    })) return { type: 'fail', errorKey: 'log.actionNoExchange', recoverable: true }
+    const requestedTrades: { trade: Trade; count: number }[] = []
+    for (const entry of payload.split(',')) {
+      const parts = entry.split('=')
+      const index = Number(parts[0])
+      const count = Number(parts[1])
+      const trade = trades[index]
+      if (parts.length !== 2 || parts[0].trim() === ''
+        || !Number.isSafeInteger(index) || index < 0
+        || !Number.isSafeInteger(count) || count <= 0
+        || !trade || !isTradeAllowed(trade, actionContext)) {
+        return { type: 'fail', errorKey: 'log.actionNoExchange', recoverable: true }
+      }
+      requestedTrades.push({ trade, count })
+    }
     let gained: Partial<Resource> = {}
     let paid: Partial<Resource> = {}
-    payload.split(',').forEach((entry) => {
-      const [indexStr, countStr] = entry.split('=')
-      const index = Number(indexStr)
-      const count = Number(countStr)
-      if (!Number.isFinite(index) || !Number.isFinite(count) || count <= 0) return
-      const trade = trades[index]
-      if (!trade) return
+    for (const { trade, count } of requestedTrades) {
       const sourceId = trade.sourceId ?? trade.source
       const contextMax = sourceId ? maxTradeTimesBySourceId?.[sourceId] : undefined
       const max = Math.min(getMaxTradeTimes(player, trade, state), contextMax ?? Infinity)
@@ -649,7 +653,7 @@ const resolveExchangeChoice = (
         paid = mergePositiveResources(paid, scaleResources(trade.from, times))
         gained = mergePositiveResources(gained, scaleResources(trade.to, times))
       }
-    })
+    }
     trackWorkPhaseBuildingResources(state, player.id, gained)
     return { type: 'ok', resourcesGained: gained, resourcesPaid: paid }
   }
@@ -657,9 +661,13 @@ const resolveExchangeChoice = (
     const parts = choice.split(':')
     const index = Number(parts[1])
     const trade = trades[index]
-    if (!trade) return { type: 'ok' }
-    if (!isTradeAllowed(trade, actionContext)) return { type: 'fail', errorKey: 'log.actionNoExchange', recoverable: true }
-    const count = parts[2] ? Number(parts[2]) : 1
+    const count = parts.length === 2 ? 1 : Number(parts[2])
+    if ((parts.length !== 2 && parts.length !== 3) || parts[1].trim() === ''
+      || !Number.isSafeInteger(index) || index < 0
+      || !Number.isSafeInteger(count) || count <= 0
+      || !trade || !isTradeAllowed(trade, actionContext)) {
+      return { type: 'fail', errorKey: 'log.actionNoExchange', recoverable: true }
+    }
     const max = getMaxTradeTimes(player, trade, state)
     const sourceId = trade.sourceId ?? trade.source
     const contextMax = sourceId ? maxTradeTimesBySourceId?.[sourceId] : undefined

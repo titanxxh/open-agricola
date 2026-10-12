@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { cloneState } from '../../shared/session/state-bootstrap'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
-import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
+import { createWorkSession } from './_helpers/session-fixtures'
 import { markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
 
 import '../../shared/cards/B/B104_SheepWalker'
@@ -31,47 +31,44 @@ const exchangeOption = (response: SessionResponse, destination: 'boar' | 'vegeta
 }
 
 const setupWorkPhase = ({ played = true, accommodated = true } = {}) => {
-  const session = new GameSession(5104, undefined, { playerCount: 2 })
-  stabilizeRandomHands(session.state.players)
-  const state = session.getState().state
-  state.currentPlayerIndex = 0
-  state.round = 5
-  state.roundPhase = 'work'
-  state.players.forEach((player) => {
-    setWorkersAtHome(state, player, 2)
-    player.minorHand = [FILLER]
-    player.occupationHand = [FILLER]
-    player.resources = {
-      ...player.resources,
-      wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0, vegetable: 0,
-      sheep: 0, boar: 0, cattle: 0,
+  return createWorkSession({ seed: 5104, configure: state => {
+    state.currentPlayerIndex = 0
+    state.round = 5
+    state.roundPhase = 'work'
+    state.players.forEach((player) => {
+      setWorkersAtHome(state, player, 2)
+      player.minorHand = [FILLER]
+      player.occupationHand = [FILLER]
+      player.resources = {
+        ...player.resources,
+        wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0, vegetable: 0,
+        sheep: 0, boar: 0, cattle: 0,
+      }
+      player.pastures = []
+      player.fields = []
+      player.improvements = []
+      player.minorPlayed = []
+      player.occupationPlayed = []
+      player.cardStates = {}
+      player.houseAnimalType = null
+      player.houseAnimalCount = 0
+    })
+    state.actionSpaces.forEach((space) => { space.takenBy = [] })
+    const owner = state.players[0]!
+    owner.occupationHand = played ? [FILLER] : [B104]
+    owner.occupationPlayed = played ? [B104] : []
+    owner.resources.sheep = 1
+    if (accommodated) {
+      owner.pastures = [{
+        id: 'sheep-pasture',
+        size: 1,
+        tiles: [{ row: 0, col: 0 }],
+        stables: 0,
+        animalType: 'sheep',
+        animalCount: 1,
+      }]
     }
-    player.pastures = []
-    player.fields = []
-    player.improvements = []
-    player.minorPlayed = []
-    player.occupationPlayed = []
-    player.cardStates = {}
-    player.houseAnimalType = null
-    player.houseAnimalCount = 0
-  })
-  state.actionSpaces.forEach((space) => { space.takenBy = [] })
-  const owner = state.players[0]!
-  owner.occupationHand = played ? [FILLER] : [B104]
-  owner.occupationPlayed = played ? [B104] : []
-  owner.resources.sheep = 1
-  if (accommodated) {
-    owner.pastures = [{
-      id: 'sheep-pasture',
-      size: 1,
-      tiles: [{ row: 0, col: 0 }],
-      stables: 0,
-      animalType: 'sheep',
-      animalCount: 1,
-    }]
-  }
-  session.loadState(state)
-  return session
+  } })
 }
 
 const play = (session: GameSession) => {
@@ -120,7 +117,7 @@ describe('B104 Sheep Walker parity', () => {
       nested = session.getState()
     }
     if (nested.interaction.stateId !== 'wait' || nested.interaction.request.kind !== 'choice') throw new Error('expected nested exchange')
-    expect(nested.interaction.request.options.some((option) => option.sourceCard === B104)).toBe(false)
+    expect(nested.interaction.request.options.filter((option) => option.sourceCard === B104)).toHaveLength(3)
     const cooking = nested.interaction.request.options.find((option) =>
       option.sourceCard === 'Major_Fireplace1'
       && option.effectPreview?.kind === 'resourceExchange'
@@ -430,14 +427,11 @@ describe('B104 Sheep Walker anytime timing', () => {
     }))
   })
 
-  it('excludes its recipes during animal reorganization while leaving cooking available', () => {
+  it('offers placed-sheep recipes during final breeding reorganization alongside cooking', () => {
     const session = setupRound14(2)
     const state = session.getState().state
     state.players[0]!.improvements = ['Major_Fireplace1']
     session.loadState(state)
-    const initial = session.takeAnytimeAction(0, 'exchange')
-    const forbidden = exchangeOption(initial, 'stone').value
-    expect(session.resolveChoice(0, 'cancel').ok).toBe(true)
     const before = snapshot(passFeed(session))
     expect(before.interaction.stateId === 'wait' && before.interaction.request.kind).toBe('animal-reorg')
     const choice = session.takeAnytimeAction(0, 'exchange')
@@ -445,16 +439,9 @@ describe('B104 Sheep Walker anytime timing', () => {
     if (choice.interaction.stateId !== 'wait' || choice.interaction.request.kind !== 'choice') {
       throw new Error('expected exchange choice')
     }
-    expect(choice.interaction.request.options.some((option) => option.sourceCard === B104)).toBe(false)
+    expect(choice.interaction.request.options.filter((option) => option.sourceCard === B104)).toHaveLength(3)
     const cooking = choice.interaction.request.options.find((option) => option.sourceCard === 'Major_Fireplace1')!
     expect(cooking).toBeDefined()
-    const unchanged = snapshot(choice)
-    for (const value of [forbidden, `bulk:${cooking.value.split(':')[1]}=1,${forbidden.split(':')[1]}=1`]) {
-      const rejected = session.resolveChoice(0, value)
-      expect(rejected.ok).toBe(false)
-      expect(snapshot(rejected).state).toEqual(unchanged.state)
-      expect(rejected.interaction).toEqual(unchanged.interaction)
-    }
     const response = session.resolveChoice(0, `bulk:${cooking.value.split(':')[1]}=1`)
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources.sheep).toBe(before.state.players[0]!.resources.sheep - 1)
@@ -480,7 +467,7 @@ describe('B104 Sheep Walker anytime timing', () => {
     expect(response.scores).toHaveLength(2)
   })
 
-  it('B104 S7: hides Sheep Walker and Emissary while animal reorganization is pending', () => {
+  it('B104 S7: exchanges placed sheep in final breeding reorganization without adding a pre-scoring window', () => {
     const session = setupRound14(2)
     let response = snapshot(passFeed(session))
 
@@ -490,13 +477,17 @@ describe('B104 Sheep Walker anytime timing', () => {
     expect(response.interaction.anytimeActions.map((action) => action.id).some((id) =>
       id.startsWith('B104-sheep-walker-') || id.startsWith('D124-emissary-'),
     )).toBe(false)
-    expect(response.interaction.anytimeActions.map((action) => action.id)).not.toContain('exchange')
-    for (const actionId of ['exchange', 'D124-emissary-anytime']) {
-      const rejected = session.takeAnytimeAction(0, actionId)
-      expect(rejected.ok).toBe(false)
-      expect(rejected.interaction).toEqual(response.interaction)
-      expect(snapshot(rejected).state).toEqual(response.state)
-    }
+    expect(response.interaction.anytimeActions.map((action) => action.id)).toContain('exchange')
+    const rejected = session.takeAnytimeAction(0, 'D124-emissary-anytime')
+    expect(rejected.ok).toBe(false)
+    expect(rejected.interaction).toEqual(response.interaction)
+    expect(snapshot(rejected).state).toEqual(response.state)
+    const host = session.peekEnginePendingEnvelope()?.hostNodeId
+    response = session.takeAnytimeAction(0, 'exchange')
+    response = session.resolveChoice(0, `bulk:${exchangeOption(response, 'stone').value.split(':')[1]}=1`)
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources).toMatchObject({ sheep: 2, stone: 1 })
+    expect(session.peekEnginePendingEnvelope()?.hostNodeId).toBe(host)
 
     response = session.resolveChoice(0, 'confirm', [
       { id: 'sheep-pasture', zoneType: 'pasture', animalType: 'sheep', animalCount: 2 },
@@ -508,5 +499,9 @@ describe('B104 Sheep Walker anytime timing', () => {
     if (response.interaction.request.kind !== 'choice') throw new Error('expected choice')
     expect(response.interaction.request.options.some((option) => option.sourceCard === B104)).toBe(false)
     expect(response.interaction.request.options.some((option) => option.sourceCard === D124)).toBe(true)
+    expect(response.interaction.anytimeActions.map((action) => action.id)).not.toContain('exchange')
+    response = session.resolveChoice(0, '__skip__')
+    expect(response.state.gameOver).toBe(true)
+    expect(response.scores).toHaveLength(2)
   })
 })
