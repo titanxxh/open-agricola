@@ -62,6 +62,25 @@ const canceled = (
 })
 
 describe('buildReplayTimeline', () => {
+  it('keeps occurrence keys stable when viewer event and packet sequences change', () => {
+    const original = { ...event('visible-3', 3), occurrenceId: 'stable-occurrence' }
+    const remapped = { ...original, id: 'visible-5', seq: 5 }
+    const before = buildReplayTimeline({ events: [original], publicEventArchive: [committed(2, [original])] })
+    const after = buildReplayTimeline({ events: [remapped], publicEventArchive: [committed(4, [remapped])] })
+    expect(after[0]!.key).toBe(before[0]!.key)
+    expect(after[0]!.key).toBe('event:stable-occurrence')
+  })
+
+  it('uses canceled occurrence identity rather than a later reused display reference', () => {
+    const previous = { ...event('reused', 3), occurrenceId: 'canceled-occurrence' }
+    const current = { ...event('reused', 3), occurrenceId: 'replacement-occurrence' }
+    const entries = buildReplayTimeline({ events: [current], publicEventArchive: [
+      committed(1, [previous]), canceled(2, [previous]), committed(3, [current]),
+    ] })
+    expect(entries.map(entry => [entry.key, entry.status])).toEqual([
+      ['event:canceled-occurrence', 'canceled'], ['event:replacement-occurrence', 'active'],
+    ])
+  })
   it('builds active entries from committed packets and current events', () => {
     const entries = buildReplayTimeline({
       events: [event('evt-1', 1), event('evt-2', 2)],

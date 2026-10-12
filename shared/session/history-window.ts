@@ -1,18 +1,35 @@
+import { sha256 } from '@noble/hashes/sha2.js'
+import { bytesToHex, utf8ToBytes } from '@noble/hashes/utils.js'
 import type { GameState } from '../contract/types'
 import { projectHistoryLogNames, isHistoryParticipantNamePath } from '../projections/history-names'
 import type { GameSyncPayload } from '../contract/protocol/game'
-import type { HistoryDisplayRecord, RoomHistoryPage } from '../contract/protocol/history'
+import type { HistoryDisplayRecord, HistoryProjectionAnchor, RoomHistoryPage } from '../contract/protocol/history'
 import type { SerializedGameState } from './serialization'
 import { filterSerializedStateForPlayer } from '../projections/serialized-state'
 import { getHistoryRecordIdentity, historyBranch, historyStreamKeys, inheritHistoryRecordIdentity } from './history-streams'
 
 export const HISTORY_WINDOW_GROUPS = 20
 export class HistoryBranchChangedError extends Error {}
+export class HistoryProjectionChangedError extends HistoryBranchChangedError {}
 type HistorySource = Pick<GameState, 'log' | 'events' | 'publicEventArchive' | 'players'>
 type HistoryDescription = { branchId: string; groups: string[] }
-const displayRecords = new WeakMap<object, HistoryDisplayRecord>()
-const logDisplayRecords = new WeakMap<object, HistoryDisplayRecord>()
+type HistoryValue = HistorySource['log'][number] | HistorySource['events'][number] | HistorySource['publicEventArchive'][number]
+type StaticDisplayRecord = Omit<HistoryDisplayRecord, 'projectionHash'>
+const displayRecords = new WeakMap<object, StaticDisplayRecord>()
+const logDisplayRecords = new WeakMap<object, StaticDisplayRecord>()
 const descriptions = new WeakMap<object, { events: object; archive: object; value: HistoryDescription }>()
+
+/** Normalize identity-based log names during encoding, without a second display projection/copy. */
+const projectionJson = (entry: HistoryValue, roles?: Record<string, string>): string => {
+  if (!roles) return JSON.stringify(entry)
+  const paths = new WeakMap<object, string>()
+  return JSON.stringify(entry, function (this: Record<string, unknown>, key: string, value: unknown) {
+    const parent = paths.get(this) ?? ''
+    const path = key ? (parent ? `${parent}.${key}` : key) : ''
+    if (value && typeof value === 'object') paths.set(value, path)
+    return typeof value === 'string' && isHistoryParticipantNamePath(path) && roles[path] ? roles[path] : value
+  })
+}
 
 export const describeHistory = (state: HistorySource): HistoryDescription => {
   const branches = historyStreamKeys.map(kind => historyBranch(state[kind], kind, state))
@@ -50,8 +67,8 @@ export const historyPageFromFilteredState = (canonical: HistorySource, filtered:
   }
   const ordered = groups.filter(group => visibleGroups.has(group))
   let end = ordered.length
+  let parsed: { branchId?: string; beforeGroup?: string; heads?: Array<string | null>; projectionHeads?: Array<HistoryProjectionAnchor | null> } = {}
   if (cursor) {
-    let parsed: { branchId?: string; beforeGroup?: string; heads?: Array<string | null> }
     try { parsed = JSON.parse(cursor) as typeof parsed } catch { throw new Error('Invalid history cursor') }
     if (parsed.branchId !== branchId) throw new HistoryBranchChangedError('History changed; refresh the current window')
     if (!Array.isArray(parsed.heads) || parsed.heads.length !== historyStreamKeys.length) throw new Error('Invalid history anchors')
@@ -68,6 +85,35 @@ export const historyPageFromFilteredState = (canonical: HistorySource, filtered:
   const start = Math.max(0, end - HISTORY_WINDOW_GROUPS)
   const selected = ordered.slice(start, end)
   const selectedSet = new Set(selected)
+  if (cursor && (!Array.isArray(parsed.projectionHeads) || parsed.projectionHeads.length !== historyStreamKeys.length)) throw new Error('Invalid history projection anchors')
+  // Hash ONLY the already-filtered public projection, never hidden hands/counts
+  // or raw event values. Ordinary appends preserve earlier prefix hashes. Names
+  // are normalized because their client projection already updates cached logs.
+  const hashes = historyStreamKeys.map((kind, streamIndex) => {
+    const entries = kind === 'log' ? [...filtered.log].reverse() : filtered[kind]
+    const hash = sha256.create()
+    const result = new Map<string, string>()
+    entries.forEach((entry, index) => {
+      const identity = getHistoryRecordIdentity(entry)!
+      const encoded = projectionJson(entry, kind === 'log' ? identity.participantRoles : undefined)
+      hash.update(utf8ToBytes(`[${JSON.stringify(identity.recordId)},${encoded}]\n`))
+      if (selectedSet.has(identity.operationGroupId) || index === entries.length - 1 || parsed?.projectionHeads?.[streamIndex]?.recordId === identity.recordId) {
+        result.set(identity.recordId, bytesToHex(hash.clone().digest()))
+      }
+    })
+    return result
+  })
+  parsed?.projectionHeads?.forEach((anchor, index) => {
+    if (anchor === null) return
+    if (!anchor || typeof anchor.recordId !== 'string' || typeof anchor.projectionHash !== 'string') throw new Error('Invalid history projection anchor')
+    if (hashes[index]!.get(anchor.recordId) !== anchor.projectionHash) throw new HistoryProjectionChangedError('History projection changed; refresh the current window')
+  })
+  const projectionHeads = historyStreamKeys.map((kind, index) => {
+    const entry = kind === 'log' ? filtered.log[0] : filtered[kind].at(-1)
+    if (!entry) return null
+    const recordId = getHistoryRecordIdentity(entry)!.recordId
+    return { recordId, projectionHash: hashes[index]!.get(recordId)! }
+  })
   const select = <T extends object>(entries: T[]): T[] => entries.filter(entry => selectedSet.has(getHistoryRecordIdentity(entry)?.operationGroupId ?? ''))
   const log = select(filtered.log)
   const events = select(filtered.events)
@@ -82,11 +128,12 @@ export const historyPageFromFilteredState = (canonical: HistorySource, filtered:
       })
       cache.set(identity, record)
     }
-    return record
+    const kind = display ? 'log' : 'type' in entry && (entry.type === 'publicEvents.committed' || entry.type === 'publicEvents.canceled') ? 'publicEventArchive' : 'events'
+    return { ...record, projectionHash: hashes[historyStreamKeys.indexOf(kind)]!.get(identity.recordId)! }
   }
   return { log, events, publicEventArchive, window: {
-    branchId, streamLengths: historyStreamKeys.map(kind => filtered[kind].length), operationGroupIds: selected,
-    nextCursor: start > 0 ? JSON.stringify({ branchId, beforeGroup: ordered[start], heads: historyStreamKeys.map(kind => historyBranch(canonical[kind], kind, canonical).head?.id ?? null) }) : null,
+    branchId, projectionHeads, streamLengths: historyStreamKeys.map(kind => filtered[kind].length), operationGroupIds: selected,
+    nextCursor: start > 0 ? JSON.stringify({ branchId, beforeGroup: ordered[start], projectionHeads, heads: historyStreamKeys.map(kind => historyBranch(canonical[kind], kind, canonical).head?.id ?? null) }) : null,
     logRecords: log.map(entry => metadata(entry, true)), eventRecords: events.map(entry => metadata(entry)), archiveRecords: publicEventArchive.map(entry => metadata(entry)),
   } }
 }

@@ -73,7 +73,7 @@ export const buildReplayTimeline = ({
         if (typeof eventSeq !== 'number') return
         const event = byRef.get(eventRefKey(eventId, eventSeq)) ?? null
         entries.push({
-          key: `event:${packet.packetSeq}:${packetLocalIndex}:${eventId}:${eventSeq}`,
+          key: event?.occurrenceId ? `event:${event.occurrenceId}` : `event:${packet.packetSeq}:${packetLocalIndex}:${eventId}:${eventSeq}`,
           kind: 'event',
           packetSeq: packet.packetSeq,
           packetLocalIndex,
@@ -92,6 +92,7 @@ export const buildReplayTimeline = ({
       const match = findNearestActiveMatch(entries, event.id, event.seq)
       if (!match) return
       match.event = event
+      if (event.occurrenceId) match.key = `event:${event.occurrenceId}`
       match.status = 'canceled'
       match.payloadSource = 'canceledArchive'
       match.replayable = isPublicEventReplayable(event)
