@@ -7,6 +7,7 @@ import type {
 } from '../../shared/contract/protocol/replay'
 import { BrandMark } from '../components/common/BrandMark'
 import { LocaleSwitcher } from '../components/common/LocaleSwitcher'
+import { GitHubRepoLink } from '../components/common/GitHubRepoLink'
 import { API_BASE } from '../config'
 import { useLocale } from '../contexts/LocaleContext'
 import { getPlayerDisplayName } from '../utils/player-name'
@@ -258,7 +259,10 @@ export function ReplayShell({
         titleClassName="site-home-brand__title replay-home-brand__title"
         homeLinkLabel={t('platform.backToLobbyPlain')}
       />
-      <LocaleSwitcher className="replay-locale-switcher" />
+      <div className="site-header-links">
+        <GitHubRepoLink />
+        <LocaleSwitcher className="replay-locale-switcher" />
+      </div>
     </div>
   )
 

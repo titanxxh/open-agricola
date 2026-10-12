@@ -23,6 +23,9 @@
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-paper);
 }
+.lobby-header > .github-repo-link {
+  margin-left: auto;
+}
 .lobby-header__right {
   display: flex;
   align-items: center;
@@ -262,7 +265,7 @@
     flex-direction: row;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
+    gap: 8px;
   }
   .lobby-header__right {
     display: none;

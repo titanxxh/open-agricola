@@ -1,0 +1,42 @@
+.github-repo-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  color: var(--color-primary, #2d5228);
+  text-decoration: none;
+}
+
+.github-repo-link svg {
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+}
+
+.github-repo-link:hover {
+  background: rgba(45, 82, 40, 0.08);
+}
+
+.github-repo-link:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+.site-header-links {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+@media (pointer: coarse) {
+  .github-repo-link {
+    width: 44px;
+    height: 44px;
+  }
+}

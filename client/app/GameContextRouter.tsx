@@ -21,6 +21,7 @@ import { API_BASE } from '../config'
 import { useLocale } from '../contexts/LocaleContext'
 import { getPlayerDisplayName } from '../utils/player-name'
 import { BrandMark } from '../components/common/BrandMark'
+import { GitHubRepoLink } from '../components/common/GitHubRepoLink'
 import { GameLoadScreen } from '../components/common/GameLoadScreen'
 import { BugReportBar } from './BugReportBar'
 import {
@@ -61,6 +62,7 @@ const statusPage = (
 ) => (
   <main className="ws-status-screen">
     <section className="ws-status-card" aria-labelledby="game-context-title">
+      <div className="site-header-links"><GitHubRepoLink /></div>
       <BrandMark
         title="Open Agricola"
         titleAs="h2"
@@ -174,12 +176,15 @@ function ReportedEvidenceContext({
       className={`reported-evidence${embedded ? ' reported-evidence--drawer' : ''}`}
     >
       {!embedded ? (
-        <BrandMark
-          title="Open Agricola"
-          className="site-home-brand reported-evidence__brand"
-          titleClassName="site-home-brand__title"
-          homeLinkLabel={t('platform.backToLobbyPlain')}
-        />
+        <div className="reported-evidence__nav">
+          <BrandMark
+            title="Open Agricola"
+            className="site-home-brand reported-evidence__brand"
+            titleClassName="site-home-brand__title"
+            homeLinkLabel={t('platform.backToLobbyPlain')}
+          />
+          <GitHubRepoLink />
+        </div>
       ) : null}
       <header className="reported-evidence__header">
         <p>{t('platform.gameContext.room', { id: roomId })}</p>

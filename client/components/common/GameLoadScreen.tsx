@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { useLocale } from '../../contexts/LocaleContext'
 import { BrandMark } from './BrandMark'
+import { GitHubRepoLink } from './GitHubRepoLink'
 
 type GameLoadScreenProps = {
   percent: number
@@ -21,6 +22,7 @@ export function GameLoadScreen({
   return (
     <div className="ws-status-screen">
       <div className="ws-status-card">
+        {showHomeLink && <div className="site-header-links"><GitHubRepoLink /></div>}
         {showHomeLink ? (
           <BrandMark
             title="Open Agricola"

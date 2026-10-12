@@ -3,6 +3,7 @@ import { API_BASE } from '../config'
 import { useAuth } from '../contexts/AuthContext'
 import { useLocale } from '../contexts/LocaleContext'
 import { LocaleSwitcher } from '../components/common/LocaleSwitcher'
+import { GitHubRepoLink } from '../components/common/GitHubRepoLink'
 import { BrandMark } from '../components/common/BrandMark'
 import { authErrorMessage } from './auth-errors'
 import { setPage } from '../utils/platform-page-url'
@@ -133,6 +134,7 @@ export function OnboardingPage() {
     <div className="login-page">
       <div className="login-card">
         <div className="login-top-bar">
+          <GitHubRepoLink />
           <LocaleSwitcher />
         </div>
         <BrandMark
