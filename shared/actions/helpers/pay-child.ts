@@ -9,6 +9,7 @@ import type {
   Resource,
 } from '../../contract/types'
 import type { PaymentInfo } from '../../cards/card-effects'
+import type { CardPayment } from '../../contract/events'
 
 export type PayChildOptions = {
   cost: PaymentResourceMap | ComplexCost
@@ -56,6 +57,7 @@ export const paymentInfoFromPayResult = (result: ActionExecutionResult | undefin
   if (!resourcesPaid) return undefined
   return {
     resourcesPaid,
+    publicPayment: extra.publicPayment as CardPayment | undefined,
     feeIndex: typeof extra.feeIndex === 'number' ? extra.feeIndex : undefined,
     originalFeeIndex: typeof extra.originalFeeIndex === 'number' ? extra.originalFeeIndex : undefined,
     returnedCardId: typeof extra.returnedCardId === 'string' ? extra.returnedCardId : undefined,

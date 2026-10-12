@@ -3,6 +3,24 @@
 > Historical SQLite measurements: the results below apply to the recorded commits and harness versions, not the PostgreSQL/S3 deployment. The non-recording capacity and scalar terminal-room probes were retired with mandatory recording; their source remains in Git history at `54c2cb8a`. The current recorded workload harness uses PostgreSQL. This migration does not claim new capacity, RTO, or fault-test acceptance.
 
 
+## Issue #1105: history-growth diagnostic (PostgreSQL)
+
+This is a current-source diagnostic, not a new optimization or capacity acceptance result. [Raw results, source fingerprints and the reproducible harness](issue1105-history-growth.json) retain three independent Node 24.19.0 processes. Each uses a disposable PostgreSQL test schema and the same two-player seed-563 work fixture: placeholder hands, sufficient initial food, 48 legal collection actions through round 12, then 200 legal undo/replacement pairs. Every command is saved through `PostgresRoomPersistence`; standalone Replay hash/delta computation is measured separately, without claiming a production Durable Commit/broadcast trace. Both viewers each perform 30 window reads and older-page reads per point; recovery performs 12 warm single-Room restores per point. Page completeness, record uniqueness and restored identities are asserted.
+
+The timing ranges below are the three runs' individual p95 values (ms), not pooled percentiles. Logical write bytes count latest/history/recovery document bodies, not indexes, keys, WAL, filesystem writes or physical amplification. Replay delta bytes are computed documents, not database writes. Latest Room bodies stay approximately 12.5 KiB throughout.
+
+| Workload | Live events / archive packets | Stored history / recovery nodes | Cumulative Room document MiB | Cumulative Replay delta MiB | Command p95 | Older page p95, p1 / p2 | Warm Room restore p95 |
+| :--- | ---: | ---: | ---: | ---: | ---: | :--- | ---: |
+| 12 actions | 44 / 33 | 121 / 12 | 0.46 | 0.13 | 3.39–3.85 | no older page | 10.46–12.65 |
+| 28 actions | 126 / 89 | 341 / 28 | 1.10 | 0.76 | 4.23–4.95 | 0.20–0.33 / 0.16–0.31 | 6.32–10.81 |
+| 48 actions | 254 / 173 | 681 / 48 | 1.92 | 2.40 | 5.90–6.22 | 0.25–0.38 / 0.23–0.34 | 15.61–16.77 |
+| +50 undo/replacements | 254 / 323 | 1031 / 98 | 3.84 | 10.60 | 4.33–4.59 | 0.33–0.42 / 0.24–0.48 | 19.46–27.23 |
+| +200 undo/replacements | 254 / 773 | 2081 / 248 | 9.59 | 35.18 | 9.49–9.63 | 0.39–0.74 / 0.38–0.50 | 25.34–29.34 |
+
+The data confirms growth outside the 20-group response window: recovery reads all stored records (about 0.18 → 3.66 MiB of document bodies), and archive churn increases canonical hashing cost (Replay hash p95 0.36–0.53 → 2.04–2.16 ms). The last collection's head-inserted log delta grows from roughly 16 to 84 KiB. Older-page projection stays below 1 ms in this fixture; it does not establish a service-level bottleneck warranting an index or projection rewrite. Raw CPU/RSS/heap samples are retained, but GC is not forced and these are not per-Room retained-memory estimates. Warm recovery is not cold application startup, distributed failover, or RTO acceptance. Card-heavy/many-Room/browser rendering workloads remain outside this diagnostic.
+
+**Decision:** keep the existing rules, full Frame hashes, undo/provisional checkpoints and recovery-node lifecycle. No performance rewrite is adopted for #1105. Recovery-node reachability and archive/hash growth are candidates for a separately budgeted production-path profile, with frozen before/after gates; this diagnostic does not revise any historical results or Room limits below.
+
 ## Result
 
 The 2 CPU / 2 GiB launch limit remains 30 ordinary in-memory Rooms. The original #941 optimization group passed its frozen latency/CPU/write gates and the 30-Room capacity checks below. The additional history projection change is assessed separately under the later owner-authorized policy described below. The original production Durable Room Commit probe passed at 30 Rooms and exceeded the action-latency threshold at 35 Rooms; the current optimization probe revalidates 30 Rooms. This probe used built-in cards and did not include the two-Worker topology of executable Workshop Rooms; those Rooms are separately capped at 15 until that topology is measured.

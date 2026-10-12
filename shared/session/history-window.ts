@@ -19,13 +19,16 @@ export const describeHistory = (state: HistorySource): HistoryDescription => {
   const [log, events, archive] = branches
   const cached = descriptions.get(log!)
   if (cached?.events === events && cached.archive === archive) return cached.value
-  const heads = branches.map(branch => branch.head?.id ?? 'empty')
+  const paths = branches.map(branch => branch.head?.continuationId ?? branch.head?.id ?? 'empty')
+  // Cancellation is a presentation rebranch even though the archive itself appends.
+  const canceled = [...state.publicEventArchive].reverse().find(packet => packet.type === 'publicEvents.canceled')
+  const cancellationId = canceled ? getHistoryRecordIdentity(canceled)?.recordId ?? canceled.id : 'none'
   const groups = new Set<string>()
   for (const record of [...state.publicEventArchive, ...state.events, ...[...state.log].reverse()]) {
     const identity = getHistoryRecordIdentity(record)
     if (identity) groups.add(identity.operationGroupId)
   }
-  const value = { branchId: heads.join('.'), groups: [...groups] }
+  const value = { branchId: [...paths, cancellationId].join('.'), groups: [...groups] }
   descriptions.set(log!, { events: events!, archive: archive!, value })
   return value
 }
@@ -48,9 +51,17 @@ export const historyPageFromFilteredState = (canonical: HistorySource, filtered:
   const ordered = groups.filter(group => visibleGroups.has(group))
   let end = ordered.length
   if (cursor) {
-    let parsed: { branchId?: string; beforeGroup?: string }
+    let parsed: { branchId?: string; beforeGroup?: string; heads?: Array<string | null> }
     try { parsed = JSON.parse(cursor) as typeof parsed } catch { throw new Error('Invalid history cursor') }
     if (parsed.branchId !== branchId) throw new HistoryBranchChangedError('History changed; refresh the current window')
+    if (!Array.isArray(parsed.heads) || parsed.heads.length !== historyStreamKeys.length) throw new Error('Invalid history anchors')
+    historyStreamKeys.forEach((kind, index) => {
+      const anchor = parsed.heads![index]
+      if (anchor === null) return
+      let node = historyBranch(canonical[kind], kind, canonical).head
+      while (node && node.id !== anchor) node = node.previous
+      if (!node) throw new HistoryBranchChangedError('History changed; refresh the current window')
+    })
     end = ordered.indexOf(parsed.beforeGroup ?? '')
     if (end < 0) throw new Error('Invalid history group cursor')
   }
@@ -61,7 +72,7 @@ export const historyPageFromFilteredState = (canonical: HistorySource, filtered:
   const log = select(filtered.log)
   const events = select(filtered.events)
   const publicEventArchive = select(filtered.publicEventArchive)
-  const metadata = (entry: object, display = false): HistoryDisplayRecord => {
+  const metadata = (entry: HistorySource['log'][number] | HistorySource['events'][number] | HistorySource['publicEventArchive'][number], display = false): HistoryDisplayRecord => {
     const identity = getHistoryRecordIdentity(entry)!
     const cache = display ? logDisplayRecords : displayRecords
     let record = cache.get(identity)
@@ -74,7 +85,8 @@ export const historyPageFromFilteredState = (canonical: HistorySource, filtered:
     return record
   }
   return { log, events, publicEventArchive, window: {
-    branchId, operationGroupIds: selected, nextCursor: start > 0 ? JSON.stringify({ branchId, beforeGroup: ordered[start] }) : null,
+    branchId, streamLengths: historyStreamKeys.map(kind => filtered[kind].length), operationGroupIds: selected,
+    nextCursor: start > 0 ? JSON.stringify({ branchId, beforeGroup: ordered[start], heads: historyStreamKeys.map(kind => historyBranch(canonical[kind], kind, canonical).head?.id ?? null) }) : null,
     logRecords: log.map(entry => metadata(entry, true)), eventRecords: events.map(entry => metadata(entry)), archiveRecords: publicEventArchive.map(entry => metadata(entry)),
   } }
 }

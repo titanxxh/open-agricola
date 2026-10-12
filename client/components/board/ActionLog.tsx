@@ -230,7 +230,7 @@ export function ActionLog({
           <p className="action-log__empty">{t(locale, 'ui.noLogEntries')}</p>
         )}
         {buckets.map((bucket, idx) => (
-          <div key={`round-${bucket.round}-${idx}`} className="action-log__round-group">
+          <div key={isTimelineMode ? `round-${bucket.round}` : `round-${bucket.round}-${idx}`} className="action-log__round-group">
             <div className="action-log__round-header">
               {t(locale, 'ui.roundHeader', { round: bucket.round })}
             </div>

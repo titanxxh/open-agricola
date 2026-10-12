@@ -5,7 +5,7 @@ import { historyBranch, historyStreamKeys, recoveryRecordId, registerRecoveryRec
 
 type Path = Array<string | number>
 export type RecoveryHistoryCatalog = {
-  nodes: Array<{ id: string; kind: HistoryStreamKind; previousId: string | null; length: number; identity: HistoryRecordIdentity }>
+  nodes: Array<{ id: string; kind: HistoryStreamKind; previousId: string | null; length: number; identity: HistoryRecordIdentity; continuationId?: string }>
   streams: Array<{ path: Path; kind: HistoryStreamKind; head: string | null; length: number }>
   recoveries: Array<{ path: Path; id: string }>
 }
@@ -25,7 +25,7 @@ export const exportRecoveryCatalog = (snapshot: PersistedSessionSnapshot, preser
       catalog.streams.push({ path: [...path, kind], kind, head: branch.head?.id ?? null, length: branch.length })
       for (let node = branch.head; node && !nodes.has(node.id); node = node.previous) {
         nodes.add(node.id)
-        catalog.nodes.push({ id: node.id, kind, previousId: node.previous?.id ?? null, length: node.length, identity: node.identity })
+        catalog.nodes.push({ id: node.id, kind, previousId: node.previous?.id ?? null, length: node.length, identity: node.identity, continuationId: node.continuationId })
       }
     }
   }
@@ -76,7 +76,7 @@ export const importRecoveryCatalog = (snapshot: PersistedSessionSnapshot): void 
       let node = nodes.get(row.id)
       if (!node) {
         if (row.length !== index + 1) throw new Error('Mismatched recovery history position')
-        node = { id: row.id, kind: row.kind, previous, length: row.length, identity: row.identity, value: values[valueIndex]! }
+        node = { id: row.id, kind: row.kind, previous, length: row.length, identity: row.identity, continuationId: row.continuationId, value: values[valueIndex]! }
         nodes.set(row.id, node)
         registerRestoredHistoryNode(node)
       }

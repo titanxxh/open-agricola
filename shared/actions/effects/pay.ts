@@ -11,7 +11,7 @@ import type {
   PlayerState,
   Resource,
 } from '../../contract/types'
-import type { EventSink, PaymentPurpose, ResourceLocation } from '../../contract/events'
+import type { CardPayment, EventSink, PaymentPurpose, ResourceLocation } from '../../contract/events'
 import { addCardResourcePaid, recordCardCostAttribution } from '../../cards/helpers/card-state'
 import { PaymentSolver } from '../payment'
 import type { PaymentCtx, PaymentExecuteError, PaymentReceipt } from '../payment'
@@ -88,6 +88,7 @@ const normalizePayParams = (
   raw: Record<string, unknown> | undefined,
 ): PayParams | undefined => {
   if (!raw) return undefined
+  // SAFETY: internal pay-flow params use this shape; PaymentSolver validates costs before deduction.
   if ('cost' in raw) return raw as unknown as PayParams
   if (looksLikeFlatResource(raw)) {
     return { cost: raw as PaymentResourceMap }
@@ -174,20 +175,26 @@ const emitPaidEvent = (
     candidateSources?: readonly string[]
     paymentResourceProviders?: CardProvidedPaymentResourceProvider[]
   } = {},
-) => {
+): CardPayment => {
   const paid = positiveResources(resources)
   const bonusSources = [...new Set([
     ...splitSourceIds(provenance.bonusUsed),
     ...(provenance.candidateSources ?? []),
   ])]
+  const summary: CardPayment = { resources: paid,
+    ...(bonusSources.length ? { bonusSources } : {}),
+    ...(provenance.returnedCardId ? { returnedCardId: provenance.returnedCardId } : {}),
+  }
   if (
     Object.keys(paid).length === 0 &&
     bonusSources.length === 0 &&
     !provenance.bonusChoiceIndex &&
     !provenance.returnedCardId
-  ) return
+  ) return summary
+  const paymentId = crypto.randomUUID()
   eventSink?.emit<'resource.paid'>({
     type: 'resource.paid',
+    paymentId,
     ...(sourceActionId ? { sourceActionId } : {}),
     resources: paid,
     to: { kind: 'supply' },
@@ -198,6 +205,7 @@ const emitPaidEvent = (
     ...(provenance.bonusChoiceIndex ? { bonusChoiceIndex: provenance.bonusChoiceIndex } : {}),
     ...(provenance.returnedCardId ? { returnedCardId: provenance.returnedCardId } : {}),
   })
+  return { ...summary, paymentId }
 }
 
 const buildSelectedResult = (
@@ -217,7 +225,7 @@ const buildSelectedResult = (
   if (sourceCard && trackSourceCardPaymentStats) {
     addCardResourcePaid(player, sourceCard, resourcesPaid)
   }
-  emitPaidEvent(eventSink, player, resourcesPaid, costType, sourceCard, sourceActionId, {
+  const publicPayment = emitPaidEvent(eventSink, player, resourcesPaid, costType, sourceCard, sourceActionId, {
     bonusUsed: receipt.bonusUsed,
     bonusChoiceIndex: receipt.bonusChoiceIndex,
     returnedCardId: receipt.returnedCardId,
@@ -227,6 +235,7 @@ const buildSelectedResult = (
   recordCardCostAttribution(player, receipt.costAttribution)
   const extraData: Record<string, unknown> = {
     resourcesPaid,
+    publicPayment,
     bonusUsed: receipt.bonusUsed
       ? receipt.bonusUsed.split(',').map((s: string) => s.trim()).filter(Boolean)
       : [],

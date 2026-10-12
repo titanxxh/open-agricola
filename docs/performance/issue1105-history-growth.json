@@ -1,0 +1,1333 @@
+{
+  "issue": 1105,
+  "measuredAt": "2026-10-12T00:04:34.333Z",
+  "decision": "Diagnostic only; no history/persistence performance optimization or capacity/RTO claim adopted.",
+  "gitHead": "cfd78ba104d12ede1840696071eb39320e7340d2",
+  "source": "Uncommitted current production sources; fingerprints below",
+  "sourceSha256": {
+    "shared/session/history-window.ts": "a1150bef0d154e43974469734d90a1a15360637dd805200599ecd2a47df29995",
+    "shared/session/history-streams.ts": "14f9a092a1b35c1948266ce673026c03e46c5cbd8dfb4b9b4020f8640bc3cfe8",
+    "shared/session/recovery-catalog.ts": "f6a535869664e62604e260171825943a25d998373339c1cb2f511f810d57a52b",
+    "shared/session/serialization.ts": "5561ee9018f203417c0ebd63e383e6be8b20d77cb4e21fdd3b0f2eaac7621106",
+    "shared/session/session-core.ts": "4c720a4e3949637dd49de4a14b75f7d52816b6028ce5c4ec865bac747f528844",
+    "shared/events/archive.ts": "c494ad022a09a90c77dc10df7c7bf240cc3f68e605a4dc0fb7b6e065e922046d",
+    "server/game/authoritative-session.ts": "cf4b10d277593663d702aad5f81c617f6613222a1665f60d16cefbee250f61bf",
+    "server/game/replay-codec.ts": "9433a03d9f1ad90c190b6f1100f705d78134c92987c268a203ff91fca82178ba",
+    "server/game/persistence/room-history-store.ts": "c190a8f3fb479f8975d8f84fcdd2f084bb32527dbdc6cbc22c9902ef9538d2d2",
+    "server/game/persistence/postgres-adapter.ts": "c429dbcd903d5428cf45f3a6f8f337202fee992d9fae4af693febc96c4a3e341",
+    "server/game/persistence/room-body-codec.ts": "d7ee604373fa469c8bc089f9d0119bf35d810247af2721a9fa891e17f696718e",
+    "server/database/postgres.ts": "70269d9721fe836a3bb91f8e66dace13da7a37452fecaa67c959e854794522d4"
+  },
+  "reproduction": "Save harnessSource to output/issue1105-performance.mts and run pnpm exec tsx output/issue1105-performance.mts three times in independent processes. Requires the normal local test PostgreSQL service; each process creates and drops only its own test schema. No paid API or production database.",
+  "harnessSource": "import assert from 'node:assert/strict'\nimport { writeFile } from 'node:fs/promises'\nimport { createWorkSession } from '../server/__tests__/_helpers/session-fixtures.ts'\nimport { createTestDatabase } from '../server/__tests__/_helpers/postgres.ts'\nimport { PostgresRoomPersistence } from '../server/game/persistence/postgres-adapter.ts'\nimport { RoomHistoryStore } from '../server/game/persistence/room-history-store.ts'\nimport { frameHash, createReplayDelta, type JsonValue } from '../server/game/replay-codec.ts'\nimport { serializeSessionSnapshot, serializeState } from '../shared/session/serialization.ts'\nimport { buildRoomHistoryPage } from '../shared/session/history-window.ts'\nimport { getHistoryRecordIdentity } from '../shared/session/history-streams.ts'\n\nconst db = await createTestDatabase() // isolated disposable schema, never DATABASE_URL\nconst session = createWorkSession({ seed: 563, configure: state => state.players.forEach(p => { p.resources.food = 100 }) })\nconst adapter = new PostgresRoomPersistence(db)\nconst cache = new RoomHistoryStore(db)\nconst meta = { createdBy: null, maxPlayers: 2, customCardDbIds: [], status: 'playing' as const, players: [] }\nconst samples: Record<string, number[]> = {}\nlet writeBytes = 0, newNodes = 0, writes = 0, latestBytes = 0\nlet previousCpu = process.cpuUsage()\nlet previousFrame: JsonValue | undefined\nlet replayDeltaBytes = 0, latestReplayDeltaBytes = 0\nconst timed = <T>(key: string, fn: () => T): T => { const start = performance.now(); const result = fn(); (samples[key] ??= []).push(performance.now() - start); return result }\nconst timedAsync = async <T>(key: string, fn: () => Promise<T>): Promise<T> => { const start = performance.now(); const result = await fn(); (samples[key] ??= []).push(performance.now() - start); return result }\nconst stats = (values: number[] = []) => { const sorted = values.toSorted((a,b) => a-b); return { n: sorted.length, p50_ms: sorted[Math.floor(sorted.length * .5)], p95_ms: sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * .95))] } }\nconst save = async () => {\n  const snapshot = timed('capture', () => serializeSessionSnapshot(session.state, session))\n  // SAFETY: native serialized Frames contain immutable JSON data only.\n  const frame = snapshot.frame as unknown as JsonValue\n  timed('replay_hash', () => frameHash(frame))\n  const delta = timed('replay_delta', () => createReplayDelta(previousFrame ?? frame, frame))\n  latestReplayDeltaBytes = Buffer.byteLength(JSON.stringify(delta))\n  replayDeltaBytes += latestReplayDeltaBytes\n  previousFrame = frame\n  const packed = timed('prepare', () => cache.prepare('history-bench', snapshot))\n  await timedAsync('postgres_save', () => adapter.save('history-bench', snapshot, meta))\n  cache.accept('history-bench', packed.nodes, packed.recoveryNodes)\n  latestBytes = Buffer.byteLength(packed.json)\n  writeBytes += latestBytes + packed.nodes.reduce((n,node) => n + Buffer.byteLength(JSON.stringify(node.value)) + Buffer.byteLength(JSON.stringify({ ...node.identity, continuationId: node.continuationId })),0) + packed.recoveryNodes.reduce((n,node) => n + Buffer.byteLength(node.json),0)\n  newNodes += packed.nodes.length; writes++\n}\nconst points: unknown[] = []\nconst point = async (label: string) => {\n  const canonical = session.withCtx(() => serializeState(session.state, {}))\n  const check = buildRoomHistoryPage(canonical, 'p1')\n  const allPages = [check]\n  while (allPages.at(-1)!.window.nextCursor) allPages.push(buildRoomHistoryPage(canonical,'p1',allPages.at(-1)!.window.nextCursor!))\n  assert.equal(allPages.flatMap(p=>p.log).length, canonical.log.length)\n  assert.equal(allPages.flatMap(p=>p.window.logRecords.map(r=>r.recordId)).length, new Set(allPages.flatMap(p=>p.window.logRecords.map(r=>r.recordId))).size)\n  for (const viewer of ['p1','p2']) {\n    const window = buildRoomHistoryPage(canonical,viewer)\n    for (let index=0;index<30;index++) {\n      timed(`window_${viewer}`, () => session.buildSyncPayload(session.getState(), viewer, undefined, undefined, true))\n      if (window.window.nextCursor) timed(`older_page_${viewer}`, () => buildRoomHistoryPage(canonical,viewer,window.window.nextCursor!))\n    }\n  }\n  const restored = []\n  const restoreCpu = []\n  const row = (await db.prepare('SELECT state_json FROM rooms WHERE id=?').get<{state_json:string}>('history-bench'))!\n  for (let index=0;index<12;index++) {\n    const start = performance.now()\n    const cpu = process.cpuUsage()\n    const value = await new RoomHistoryStore(db).restore('history-bench',row.state_json)\n    restored.push(performance.now()-start)\n    const spent = process.cpuUsage(cpu)\n    restoreCpu.push((spent.user+spent.system)/1000)\n    assert.equal(value.state.events.length, session.state.events.length)\n    assert.equal(value.state.publicEventArchive.length, session.state.publicEventArchive.length)\n    assert.equal(getHistoryRecordIdentity(value.state.events.at(-1)!)?.recordId, getHistoryRecordIdentity(session.state.events.at(-1)!)?.recordId)\n  }\n  const counts = await db.prepare('SELECT count(*)::int AS nodes, sum(octet_length(record_json)+octet_length(identity_json))::bigint AS history_bytes FROM room_history_nodes WHERE room_id=?').get('history-bench')\n  const recovery = await db.prepare('SELECT count(*)::int AS nodes, sum(octet_length(body_json))::bigint AS recovery_bytes FROM room_recovery_nodes WHERE room_id=?').get('history-bench')\n  const cpu = process.cpuUsage(previousCpu)\n  previousCpu = process.cpuUsage()\n  points.push({label,interval_cpu_ms:(cpu.user+cpu.system)/1000, rss_mib:process.memoryUsage().rss/1024/1024,heap_used_mib:process.memoryUsage().heapUsed/1024/1024,restore_cpu_ms:stats(restoreCpu),round:session.state.round, events:session.state.events.length,log:session.state.log.length,archive:session.state.publicEventArchive.length,latestBytes,writes,newNodes,latest_replay_delta_bytes:latestReplayDeltaBytes,cumulative_replay_delta_bytes:replayDeltaBytes,logical_written_document_bytes:writeBytes,counts,recovery,windowBytes:Buffer.byteLength(JSON.stringify(check)),pages:allPages.length,warm_room_restore_ms:stats(restored),samples:Object.fromEntries(Object.entries(samples).map(([key,values])=>[key,stats(values)]))})\n  for (const key of Object.keys(samples)) samples[key]=[]\n}\ntry {\n  await save()\n  for (let actions=1;actions<=48;actions++) {\n    let response = session.getState()\n    while (response.interaction.stateId==='wait') {\n      const request=response.interaction.request\n      assert.ok(request.kind==='confirm-next-player'||request.kind==='confirm-player-switch',request.kind)\n      response=timed('command',()=>session.resolveChoice(request.kind==='confirm-next-player'?request.nextPlayerIndex:request.fromPlayerIndex,'confirm'))\n      assert.ok(response.ok,response.error); await save()\n    }\n    const actor=response.state.currentPlayerIndex\n    const available=session.getActionAvailability(actor)\n    const space=['forest','reed-bank','fishing','day-laborer'].find(id=>available[id])!\n    assert.ok(space)\n    response=timed('command',()=>session.takeAction(actor,space)); assert.ok(response.ok,response.error); await save()\n    if ([12,28,48].includes(actions)) await point(`${actions} legal collection actions`)\n  }\n  const actor=session.state.currentPlayerIndex\n  const event=session.state.events.toReversed().find(e=>e.type==='worker.placed')!\n  assert.ok(event.type==='worker.placed')\n  for(let index=1;index<=200;index++) {\n    assert.ok(timed('command',()=>session.undoAction()).ok); await save()\n    assert.ok(timed('command',()=>session.takeAction(actor,event.spaceId)).ok); await save()\n    if([50,200].includes(index))await point(`48 actions + ${index} legal undo/replacement pairs`)\n  }\n  await writeFile('output/issue1105-performance.json',JSON.stringify({node:process.version,scope:'Current source, deterministic two-player legal collection/undo workload; local PostgreSQL disposable test schema; warm single-Room reads, no distributed/load acceptance. Logical document bytes exclude indexes, PKs, WAL and physical amplification. Collections have sufficient fixture food and placeholder hands; not a card-heavy game.',points},null,2)+'\\n')\n  console.log(JSON.stringify(points,null,2))\n} finally { session.dispose(); await db.close() }\n",
+  "runs": [
+    {
+      "node": "v24.19.0",
+      "scope": "Current source, deterministic two-player legal collection/undo workload; local PostgreSQL disposable test schema; warm single-Room reads, no distributed/load acceptance. Logical document bytes exclude indexes, PKs, WAL and physical amplification. Collections have sufficient fixture food and placeholder hands; not a card-heavy game.",
+      "points": [
+        {
+          "label": "12 legal collection actions",
+          "interval_cpu_ms": 343.019,
+          "rss_mib": 201.06640625,
+          "heap_used_mib": 77.06023406982422,
+          "restore_cpu_ms": {
+            "n": 12,
+            "p50_ms": 3.632,
+            "p95_ms": 9.963
+          },
+          "round": 3,
+          "events": 44,
+          "log": 44,
+          "archive": 33,
+          "latestBytes": 12825,
+          "writes": 24,
+          "newNodes": 121,
+          "latest_replay_delta_bytes": 16436,
+          "cumulative_replay_delta_bytes": 140382,
+          "logical_written_document_bytes": 482467,
+          "counts": {
+            "nodes": 121,
+            "history_bytes": 49087
+          },
+          "recovery": {
+            "nodes": 12,
+            "recovery_bytes": 134724
+          },
+          "windowBytes": 40372,
+          "pages": 1,
+          "warm_room_restore_ms": {
+            "n": 12,
+            "p50_ms": 3.131153999999924,
+            "p95_ms": 10.462734999999952
+          },
+          "samples": {
+            "capture": {
+              "n": 24,
+              "p50_ms": 0.5114750000000186,
+              "p95_ms": 0.7747080000000324
+            },
+            "replay_hash": {
+              "n": 24,
+              "p50_ms": 0.2791540000000623,
+              "p95_ms": 0.3612340000000813
+            },
+            "replay_delta": {
+              "n": 24,
+              "p50_ms": 0.33024199999999837,
+              "p95_ms": 0.47965099999998984
+            },
+            "prepare": {
+              "n": 24,
+              "p50_ms": 0.8906610000000228,
+              "p95_ms": 1.1716710000000603
+            },
+            "postgres_save": {
+              "n": 24,
+              "p50_ms": 5.7865150000000085,
+              "p95_ms": 9.72575299999994
+            },
+            "command": {
+              "n": 23,
+              "p50_ms": 1.5598809999999048,
+              "p95_ms": 3.8528390000000172
+            },
+            "window_p1": {
+              "n": 30,
+              "p50_ms": 0.19550500000002557,
+              "p95_ms": 0.35244999999997617
+            },
+            "window_p2": {
+              "n": 30,
+              "p50_ms": 0.19040099999995164,
+              "p95_ms": 0.4840510000000222
+            }
+          }
+        },
+        {
+          "label": "28 legal collection actions",
+          "interval_cpu_ms": 498.736,
+          "rss_mib": 276.53515625,
+          "heap_used_mib": 113.63275909423828,
+          "restore_cpu_ms": {
+            "n": 12,
+            "p50_ms": 5.908,
+            "p95_ms": 8.924
+          },
+          "round": 7,
+          "events": 126,
+          "log": 126,
+          "archive": 89,
+          "latestBytes": 12841,
+          "writes": 56,
+          "newNodes": 341,
+          "latest_replay_delta_bytes": 43902,
+          "cumulative_replay_delta_bytes": 801595,
+          "logical_written_document_bytes": 1150686,
+          "counts": {
+            "nodes": 341,
+            "history_bytes": 137470
+          },
+          "recovery": {
+            "nodes": 28,
+            "recovery_bytes": 315056
+          },
+          "windowBytes": 81059,
+          "pages": 2,
+          "warm_room_restore_ms": {
+            "n": 12,
+            "p50_ms": 5.174511000000166,
+            "p95_ms": 6.324838
+          },
+          "samples": {
+            "capture": {
+              "n": 32,
+              "p50_ms": 0.6011879999998655,
+              "p95_ms": 0.9941020000001117
+            },
+            "replay_hash": {
+              "n": 32,
+              "p50_ms": 0.5298109999998815,
+              "p95_ms": 0.695508000000018
+            },
+            "replay_delta": {
+              "n": 32,
+              "p50_ms": 0.5548350000001392,
+              "p95_ms": 0.9552220000000489
+            },
+            "prepare": {
+              "n": 32,
+              "p50_ms": 0.9474929999998949,
+              "p95_ms": 1.3008230000000367
+            },
+            "postgres_save": {
+              "n": 32,
+              "p50_ms": 5.334431999999879,
+              "p95_ms": 14.627383000000009
+            },
+            "command": {
+              "n": 32,
+              "p50_ms": 1.6502649999999903,
+              "p95_ms": 4.9507329999999
+            },
+            "window_p1": {
+              "n": 30,
+              "p50_ms": 0.25500899999997273,
+              "p95_ms": 0.3417299999998704
+            },
+            "window_p2": {
+              "n": 30,
+              "p50_ms": 0.2316169999999147,
+              "p95_ms": 0.3058579999999438
+            },
+            "older_page_p1": {
+              "n": 30,
+              "p50_ms": 0.14868899999987661,
+              "p95_ms": 0.19601699999998345
+            },
+            "older_page_p2": {
+              "n": 30,
+              "p50_ms": 0.1229609999998047,
+              "p95_ms": 0.16363300000011805
+            }
+          }
+        },
+        {
+          "label": "48 legal collection actions",
+          "interval_cpu_ms": 614.556,
+          "rss_mib": 325.56640625,
+          "heap_used_mib": 108.61650848388672,
+          "restore_cpu_ms": {
+            "n": 12,
+            "p50_ms": 11.467,
+            "p95_ms": 36.431
+          },
+          "round": 12,
+          "events": 254,
+          "log": 254,
+          "archive": 173,
+          "latestBytes": 12865,
+          "writes": 96,
+          "newNodes": 681,
+          "latest_replay_delta_bytes": 86263,
+          "cumulative_replay_delta_bytes": 2517726,
+          "logical_written_document_bytes": 2013215,
+          "counts": {
+            "nodes": 681,
+            "history_bytes": 273895
+          },
+          "recovery": {
+            "nodes": 48,
+            "recovery_bytes": 540900
+          },
+          "windowBytes": 96201,
+          "pages": 3,
+          "warm_room_restore_ms": {
+            "n": 12,
+            "p50_ms": 7.8531990000001315,
+            "p95_ms": 16.12427200000002
+          },
+          "samples": {
+            "capture": {
+              "n": 40,
+              "p50_ms": 0.7216040000000703,
+              "p95_ms": 1.158631000000014
+            },
+            "replay_hash": {
+              "n": 40,
+              "p50_ms": 0.6972839999998541,
+              "p95_ms": 0.933093000000099
+            },
+            "replay_delta": {
+              "n": 40,
+              "p50_ms": 0.8394609999998011,
+              "p95_ms": 1.0893659999999272
+            },
+            "prepare": {
+              "n": 40,
+              "p50_ms": 1.0505189999998947,
+              "p95_ms": 1.272023999999874
+            },
+            "postgres_save": {
+              "n": 40,
+              "p50_ms": 4.508105999999998,
+              "p95_ms": 18.261244999999917
+            },
+            "command": {
+              "n": 40,
+              "p50_ms": 1.3548880000000736,
+              "p95_ms": 6.2216849999999795
+            },
+            "window_p1": {
+              "n": 30,
+              "p50_ms": 0.3154580000000351,
+              "p95_ms": 0.3940350000000308
+            },
+            "window_p2": {
+              "n": 30,
+              "p50_ms": 0.26268900000013673,
+              "p95_ms": 0.33725000000004
+            },
+            "older_page_p1": {
+              "n": 30,
+              "p50_ms": 0.23907400000007328,
+              "p95_ms": 0.3002569999998741
+            },
+            "older_page_p2": {
+              "n": 30,
+              "p50_ms": 0.20577700000012555,
+              "p95_ms": 0.2269290000001547
+            }
+          }
+        },
+        {
+          "label": "48 actions + 50 legal undo/replacement pairs",
+          "interval_cpu_ms": 1615.212,
+          "rss_mib": 374.046875,
+          "heap_used_mib": 141.6820526123047,
+          "restore_cpu_ms": {
+            "n": 12,
+            "p50_ms": 20.703,
+            "p95_ms": 121.405
+          },
+          "round": 12,
+          "events": 254,
+          "log": 254,
+          "archive": 323,
+          "latestBytes": 12865,
+          "writes": 196,
+          "newNodes": 1031,
+          "latest_replay_delta_bytes": 86263,
+          "cumulative_replay_delta_bytes": 11111126,
+          "logical_written_document_bytes": 4023735,
+          "counts": {
+            "nodes": 1031,
+            "history_bytes": 460945
+          },
+          "recovery": {
+            "nodes": 98,
+            "recovery_bytes": 1108382
+          },
+          "windowBytes": 17633,
+          "pages": 8,
+          "warm_room_restore_ms": {
+            "n": 12,
+            "p50_ms": 10.728544000000056,
+            "p95_ms": 27.228354999999738
+          },
+          "samples": {
+            "capture": {
+              "n": 100,
+              "p50_ms": 0.7627889999998843,
+              "p95_ms": 1.007238000000143
+            },
+            "replay_hash": {
+              "n": 100,
+              "p50_ms": 0.9470450000003439,
+              "p95_ms": 1.1973510000002534
+            },
+            "replay_delta": {
+              "n": 100,
+              "p50_ms": 1.06394199999977,
+              "p95_ms": 1.2397510000000693
+            },
+            "prepare": {
+              "n": 100,
+              "p50_ms": 1.2337349999997969,
+              "p95_ms": 1.536714000000302
+            },
+            "postgres_save": {
+              "n": 100,
+              "p50_ms": 5.29571100000021,
+              "p95_ms": 7.8945269999999255
+            },
+            "command": {
+              "n": 100,
+              "p50_ms": 3.148547000000235,
+              "p95_ms": 4.325098000000253
+            },
+            "window_p1": {
+              "n": 30,
+              "p50_ms": 0.28396999999995387,
+              "p95_ms": 0.46827399999983754
+            },
+            "window_p2": {
+              "n": 30,
+              "p50_ms": 0.24352100000032806,
+              "p95_ms": 0.2872339999998985
+            },
+            "older_page_p1": {
+              "n": 30,
+              "p50_ms": 0.2778579999999238,
+              "p95_ms": 0.4221950000001016
+            },
+            "older_page_p2": {
+              "n": 30,
+              "p50_ms": 0.22393800000008923,
+              "p95_ms": 0.24241799999981595
+            }
+          }
+        },
+        {
+          "label": "48 actions + 200 legal undo/replacement pairs",
+          "interval_cpu_ms": 4857.731,
+          "rss_mib": 460.875,
+          "heap_used_mib": 199.27257537841797,
+          "restore_cpu_ms": {
+            "n": 12,
+            "p50_ms": 18.526,
+            "p95_ms": 46.103
+          },
+          "round": 12,
+          "events": 254,
+          "log": 254,
+          "archive": 773,
+          "latestBytes": 12873,
+          "writes": 496,
+          "newNodes": 2081,
+          "latest_replay_delta_bytes": 86263,
+          "cumulative_replay_delta_bytes": 36891326,
+          "logical_written_document_bytes": 10057275,
+          "counts": {
+            "nodes": 2081,
+            "history_bytes": 1022095
+          },
+          "recovery": {
+            "nodes": 248,
+            "recovery_bytes": 2811396
+          },
+          "windowBytes": 17633,
+          "pages": 23,
+          "warm_room_restore_ms": {
+            "n": 12,
+            "p50_ms": 19.05496299999868,
+            "p95_ms": 25.34253600000011
+          },
+          "samples": {
+            "capture": {
+              "n": 300,
+              "p50_ms": 1.1334310000002006,
+              "p95_ms": 1.4727599999987433
+            },
+            "replay_hash": {
+              "n": 300,
+              "p50_ms": 1.6772259999997914,
+              "p95_ms": 2.156412000000273
+            },
+            "replay_delta": {
+              "n": 300,
+              "p50_ms": 1.1212070000001404,
+              "p95_ms": 1.3376080000016373
+            },
+            "prepare": {
+              "n": 300,
+              "p50_ms": 1.8010670000003302,
+              "p95_ms": 2.3779500000000553
+            },
+            "postgres_save": {
+              "n": 300,
+              "p50_ms": 5.88441899999998,
+              "p95_ms": 9.11242300000049
+            },
+            "command": {
+              "n": 300,
+              "p50_ms": 5.102878000000146,
+              "p95_ms": 9.625448999999207
+            },
+            "window_p1": {
+              "n": 30,
+              "p50_ms": 0.38096199999927194,
+              "p95_ms": 0.4388990000006743
+            },
+            "window_p2": {
+              "n": 30,
+              "p50_ms": 0.36568199999965145,
+              "p95_ms": 0.4248180000013235
+            },
+            "older_page_p1": {
+              "n": 30,
+              "p50_ms": 0.34811400000035064,
+              "p95_ms": 0.3857299999999668
+            },
+            "older_page_p2": {
+              "n": 30,
+              "p50_ms": 0.31660999999985506,
+              "p95_ms": 0.38277000000016415
+            }
+          }
+        }
+      ]
+    },
+    {
+      "node": "v24.19.0",
+      "scope": "Current source, deterministic two-player legal collection/undo workload; local PostgreSQL disposable test schema; warm single-Room reads, no distributed/load acceptance. Logical document bytes exclude indexes, PKs, WAL and physical amplification. Collections have sufficient fixture food and placeholder hands; not a card-heavy game.",
+      "points": [
+        {
+          "label": "12 legal collection actions",
+          "interval_cpu_ms": 374.258,
+          "rss_mib": 190.6875,
+          "heap_used_mib": 76.52300262451172,
+          "restore_cpu_ms": {
+            "n": 12,
+            "p50_ms": 4.125,
+            "p95_ms": 10.513
+          },
+          "round": 3,
+          "events": 44,
+          "log": 44,
+          "archive": 33,
+          "latestBytes": 12817,
+          "writes": 24,
+          "newNodes": 121,
+          "latest_replay_delta_bytes": 16436,
+          "cumulative_replay_delta_bytes": 140382,
+          "logical_written_document_bytes": 482403,
+          "counts": {
+            "nodes": 121,
+            "history_bytes": 49087
+          },
+          "recovery": {
+            "nodes": 12,
+            "recovery_bytes": 134700
+          },
+          "windowBytes": 40372,
+          "pages": 1,
+          "warm_room_restore_ms": {
+            "n": 12,
+            "p50_ms": 3.1056350000000066,
+            "p95_ms": 11.21446800000001
+          },
+          "samples": {
+            "capture": {
+              "n": 24,
+              "p50_ms": 0.42137800000000425,
+              "p95_ms": 0.7648209999999835
+            },
+            "replay_hash": {
+              "n": 24,
+              "p50_ms": 0.2798249999999598,
+              "p95_ms": 0.48121899999989637
+            },
+            "replay_delta": {
+              "n": 24,
+              "p50_ms": 0.3523699999999508,
+              "p95_ms": 0.5633479999999054
+            },
+            "prepare": {
+              "n": 24,
+              "p50_ms": 0.8550770000000512,
+              "p95_ms": 1.1611110000000053
+            },
+            "postgres_save": {
+              "n": 24,
+              "p50_ms": 6.892457000000036,
+              "p95_ms": 10.473279000000048
+            },
+            "command": {
+              "n": 23,
+              "p50_ms": 1.3399919999999383,
+              "p95_ms": 3.3943250000000944
+            },
+            "window_p1": {
+              "n": 30,
+              "p50_ms": 0.1930409999999938,
+              "p95_ms": 0.31233799999995426
+            },
+            "window_p2": {
+              "n": 30,
+              "p50_ms": 0.17742499999997108,
+              "p95_ms": 0.2053290000000061
+            }
+          }
+        },
+        {
+          "label": "28 legal collection actions",
+          "interval_cpu_ms": 514.546,
+          "rss_mib": 263.96875,
+          "heap_used_mib": 113.22373962402344,
+          "restore_cpu_ms": {
+            "n": 12,
+            "p50_ms": 6.407,
+            "p95_ms": 8.751
+          },
+          "round": 7,
+          "events": 126,
+          "log": 126,
+          "archive": 89,
+          "latestBytes": 12837,
+          "writes": 56,
+          "newNodes": 341,
+          "latest_replay_delta_bytes": 43902,
+          "cumulative_replay_delta_bytes": 801595,
+          "logical_written_document_bytes": 1150650,
+          "counts": {
+            "nodes": 341,
+            "history_bytes": 137470
+          },
+          "recovery": {
+            "nodes": 28,
+            "recovery_bytes": 315048
+          },
+          "windowBytes": 81059,
+          "pages": 2,
+          "warm_room_restore_ms": {
+            "n": 12,
+            "p50_ms": 5.055213999999978,
+            "p95_ms": 6.902649999999994
+          },
+          "samples": {
+            "capture": {
+              "n": 32,
+              "p50_ms": 0.6160989999998492,
+              "p95_ms": 0.9563419999999496
+            },
+            "replay_hash": {
+              "n": 32,
+              "p50_ms": 0.5586600000001454,
+              "p95_ms": 0.743364000000156
+            },
+            "replay_delta": {
+              "n": 32,
+              "p50_ms": 0.5715399999999136,
+              "p95_ms": 0.9174929999999222
+            },
+            "prepare": {
+              "n": 32,
+              "p50_ms": 1.0073979999999665,
+              "p95_ms": 1.2585999999998876
+            },
+            "postgres_save": {
+              "n": 32,
+              "p50_ms": 7.043803000000025,
+              "p95_ms": 14.806569000000081
+            },
+            "command": {
+              "n": 32,
+              "p50_ms": 1.6479139999999006,
+              "p95_ms": 4.226840999999922
+            },
+            "window_p1": {
+              "n": 30,
+              "p50_ms": 0.26438600000005863,
+              "p95_ms": 0.39246699999989687
+            },
+            "window_p2": {
+              "n": 30,
+              "p50_ms": 0.2394730000000891,
+              "p95_ms": 0.2835210000000643
+            },
+            "older_page_p1": {
+              "n": 30,
+              "p50_ms": 0.1467370000000301,
+              "p95_ms": 0.22896100000002662
+            },
+            "older_page_p2": {
+              "n": 30,
+              "p50_ms": 0.1189440000000559,
+              "p95_ms": 0.209568999999874
+            }
+          }
+        },
+        {
+          "label": "48 legal collection actions",
+          "interval_cpu_ms": 612.408,
+          "rss_mib": 311.54296875,
+          "heap_used_mib": 108.11592864990234,
+          "restore_cpu_ms": {
+            "n": 12,
+            "p50_ms": 11.577,
+            "p95_ms": 33.526
+          },
+          "round": 12,
+          "events": 254,
+          "log": 254,
+          "archive": 173,
+          "latestBytes": 12869,
+          "writes": 96,
+          "newNodes": 681,
+          "latest_replay_delta_bytes": 86263,
+          "cumulative_replay_delta_bytes": 2517726,
+          "logical_written_document_bytes": 2013219,
+          "counts": {
+            "nodes": 681,
+            "history_bytes": 273895
+          },
+          "recovery": {
+            "nodes": 48,
+            "recovery_bytes": 540908
+          },
+          "windowBytes": 96201,
+          "pages": 3,
+          "warm_room_restore_ms": {
+            "n": 12,
+            "p50_ms": 8.53742699999998,
+            "p95_ms": 15.614877999999862
+          },
+          "samples": {
+            "capture": {
+              "n": 40,
+              "p50_ms": 0.7470120000000406,
+              "p95_ms": 1.302712000000156
+            },
+            "replay_hash": {
+              "n": 40,
+              "p50_ms": 0.7251570000000811,
+              "p95_ms": 1.0661350000000311
+            },
+            "replay_delta": {
+              "n": 40,
+              "p50_ms": 0.78707600000007,
+              "p95_ms": 1.095397999999932
+            },
+            "prepare": {
+              "n": 40,
+              "p50_ms": 1.0480379999999059,
+              "p95_ms": 1.4180080000000999
+            },
+            "postgres_save": {
+              "n": 40,
+              "p50_ms": 4.579419000000144,
+              "p95_ms": 14.441207000000077
+            },
+            "command": {
+              "n": 40,
+              "p50_ms": 1.368024000000105,
+              "p95_ms": 5.899891000000025
+            },
+            "window_p1": {
+              "n": 30,
+              "p50_ms": 0.31016200000021854,
+              "p95_ms": 0.47521900000015194
+            },
+            "window_p2": {
+              "n": 30,
+              "p50_ms": 0.26629000000002634,
+              "p95_ms": 0.36910599999987426
+            },
+            "older_page_p1": {
+              "n": 30,
+              "p50_ms": 0.22638499999993655,
+              "p95_ms": 0.3758419999999205
+            },
+            "older_page_p2": {
+              "n": 30,
+              "p50_ms": 0.20563300000003437,
+              "p95_ms": 0.2516490000000431
+            }
+          }
+        },
+        {
+          "label": "48 actions + 50 legal undo/replacement pairs",
+          "interval_cpu_ms": 1413.511,
+          "rss_mib": 368.3125,
+          "heap_used_mib": 131.4509506225586,
+          "restore_cpu_ms": {
+            "n": 12,
+            "p50_ms": 11.551,
+            "p95_ms": 33.615
+          },
+          "round": 12,
+          "events": 254,
+          "log": 254,
+          "archive": 323,
+          "latestBytes": 12873,
+          "writes": 196,
+          "newNodes": 1031,
+          "latest_replay_delta_bytes": 86263,
+          "cumulative_replay_delta_bytes": 11111126,
+          "logical_written_document_bytes": 4023483,
+          "counts": {
+            "nodes": 1031,
+            "history_bytes": 460945
+          },
+          "recovery": {
+            "nodes": 98,
+            "recovery_bytes": 1108230
+          },
+          "windowBytes": 17633,
+          "pages": 8,
+          "warm_room_restore_ms": {
+            "n": 12,
+            "p50_ms": 10.85926500000005,
+            "p95_ms": 19.46395799999982
+          },
+          "samples": {
+            "capture": {
+              "n": 100,
+              "p50_ms": 0.8478770000001532,
+              "p95_ms": 1.0825830000003407
+            },
+            "replay_hash": {
+              "n": 100,
+              "p50_ms": 1.0558630000000448,
+              "p95_ms": 1.2478320000000167
+            },
+            "replay_delta": {
+              "n": 100,
+              "p50_ms": 1.069974000000002,
+              "p95_ms": 1.213430999999673
+            },
+            "prepare": {
+              "n": 100,
+              "p50_ms": 1.3130000000001019,
+              "p95_ms": 1.6737379999999575
+            },
+            "postgres_save": {
+              "n": 100,
+              "p50_ms": 5.180079000000205,
+              "p95_ms": 7.733885999999984
+            },
+            "command": {
+              "n": 100,
+              "p50_ms": 3.3737009999999827,
+              "p95_ms": 4.589579999999842
+            },
+            "window_p1": {
+              "n": 30,
+              "p50_ms": 0.30846599999995306,
+              "p95_ms": 0.6156190000001516
+            },
+            "window_p2": {
+              "n": 30,
+              "p50_ms": 0.24916899999971065,
+              "p95_ms": 0.3076820000001135
+            },
+            "older_page_p1": {
+              "n": 30,
+              "p50_ms": 0.2812340000000404,
+              "p95_ms": 0.33044999999992797
+            },
+            "older_page_p2": {
+              "n": 30,
+              "p50_ms": 0.22504099999969185,
+              "p95_ms": 0.27101000000038766
+            }
+          }
+        },
+        {
+          "label": "48 actions + 200 legal undo/replacement pairs",
+          "interval_cpu_ms": 4922.665,
+          "rss_mib": 387.44921875,
+          "heap_used_mib": 139.7215805053711,
+          "restore_cpu_ms": {
+            "n": 12,
+            "p50_ms": 19.095,
+            "p95_ms": 50.145
+          },
+          "round": 12,
+          "events": 254,
+          "log": 254,
+          "archive": 773,
+          "latestBytes": 12869,
+          "writes": 496,
+          "newNodes": 2081,
+          "latest_replay_delta_bytes": 86263,
+          "cumulative_replay_delta_bytes": 36891326,
+          "logical_written_document_bytes": 10056095,
+          "counts": {
+            "nodes": 2081,
+            "history_bytes": 1022095
+          },
+          "recovery": {
+            "nodes": 248,
+            "recovery_bytes": 2810716
+          },
+          "windowBytes": 17633,
+          "pages": 23,
+          "warm_room_restore_ms": {
+            "n": 12,
+            "p50_ms": 18.80616199999895,
+            "p95_ms": 29.33745799999997
+          },
+          "samples": {
+            "capture": {
+              "n": 300,
+              "p50_ms": 1.092837999999574,
+              "p95_ms": 1.3944719999999506
+            },
+            "replay_hash": {
+              "n": 300,
+              "p50_ms": 1.5694180000000415,
+              "p95_ms": 2.0366359999998167
+            },
+            "replay_delta": {
+              "n": 300,
+              "p50_ms": 1.0953349999999773,
+              "p95_ms": 1.2429200000005949
+            },
+            "prepare": {
+              "n": 300,
+              "p50_ms": 1.7300750000003973,
+              "p95_ms": 2.2894690000011906
+            },
+            "postgres_save": {
+              "n": 300,
+              "p50_ms": 5.782850999999937,
+              "p95_ms": 8.767541000000165
+            },
+            "command": {
+              "n": 300,
+              "p50_ms": 5.116222999999991,
+              "p95_ms": 9.490648999999394
+            },
+            "window_p1": {
+              "n": 30,
+              "p50_ms": 0.40812999999980093,
+              "p95_ms": 0.7752679999994143
+            },
+            "window_p2": {
+              "n": 30,
+              "p50_ms": 0.3684659999998985,
+              "p95_ms": 0.4157459999987623
+            },
+            "older_page_p1": {
+              "n": 30,
+              "p50_ms": 0.3717949999991106,
+              "p95_ms": 0.7449489999999059
+            },
+            "older_page_p2": {
+              "n": 30,
+              "p50_ms": 0.3343699999986711,
+              "p95_ms": 0.4241619999993418
+            }
+          }
+        }
+      ]
+    },
+    {
+      "node": "v24.19.0",
+      "scope": "Current source, deterministic two-player legal collection/undo workload; local PostgreSQL disposable test schema; warm single-Room reads, no distributed/load acceptance. Logical document bytes exclude indexes, PKs, WAL and physical amplification. Collections have sufficient fixture food and placeholder hands; not a card-heavy game.",
+      "points": [
+        {
+          "label": "12 legal collection actions",
+          "interval_cpu_ms": 382.313,
+          "rss_mib": 191.265625,
+          "heap_used_mib": 76.39442443847656,
+          "restore_cpu_ms": {
+            "n": 12,
+            "p50_ms": 3.54,
+            "p95_ms": 11.376
+          },
+          "round": 3,
+          "events": 44,
+          "log": 44,
+          "archive": 33,
+          "latestBytes": 12821,
+          "writes": 24,
+          "newNodes": 121,
+          "latest_replay_delta_bytes": 16436,
+          "cumulative_replay_delta_bytes": 140382,
+          "logical_written_document_bytes": 482419,
+          "counts": {
+            "nodes": 121,
+            "history_bytes": 49087
+          },
+          "recovery": {
+            "nodes": 12,
+            "recovery_bytes": 134708
+          },
+          "windowBytes": 40372,
+          "pages": 1,
+          "warm_room_restore_ms": {
+            "n": 12,
+            "p50_ms": 2.8685449999999264,
+            "p95_ms": 12.652972999999974
+          },
+          "samples": {
+            "capture": {
+              "n": 24,
+              "p50_ms": 0.45933000000002266,
+              "p95_ms": 0.7989649999999529
+            },
+            "replay_hash": {
+              "n": 24,
+              "p50_ms": 0.3139380000000074,
+              "p95_ms": 0.5263229999999339
+            },
+            "replay_delta": {
+              "n": 24,
+              "p50_ms": 0.3574740000000247,
+              "p95_ms": 0.5052029999999377
+            },
+            "prepare": {
+              "n": 24,
+              "p50_ms": 0.8687260000000379,
+              "p95_ms": 1.1889830000000075
+            },
+            "postgres_save": {
+              "n": 24,
+              "p50_ms": 5.922147999999993,
+              "p95_ms": 10.336862999999994
+            },
+            "command": {
+              "n": 23,
+              "p50_ms": 1.471129000000019,
+              "p95_ms": 3.6369019999999637
+            },
+            "window_p1": {
+              "n": 30,
+              "p50_ms": 0.19428899999991245,
+              "p95_ms": 0.5022749999999405
+            },
+            "window_p2": {
+              "n": 30,
+              "p50_ms": 0.1829930000000104,
+              "p95_ms": 0.2109609999999975
+            }
+          }
+        },
+        {
+          "label": "28 legal collection actions",
+          "interval_cpu_ms": 515.898,
+          "rss_mib": 272.359375,
+          "heap_used_mib": 78.63224029541016,
+          "restore_cpu_ms": {
+            "n": 12,
+            "p50_ms": 7.065,
+            "p95_ms": 20.805
+          },
+          "round": 7,
+          "events": 126,
+          "log": 126,
+          "archive": 89,
+          "latestBytes": 12841,
+          "writes": 56,
+          "newNodes": 341,
+          "latest_replay_delta_bytes": 43902,
+          "cumulative_replay_delta_bytes": 801595,
+          "logical_written_document_bytes": 1150622,
+          "counts": {
+            "nodes": 341,
+            "history_bytes": 137470
+          },
+          "recovery": {
+            "nodes": 28,
+            "recovery_bytes": 315036
+          },
+          "windowBytes": 81059,
+          "pages": 2,
+          "warm_room_restore_ms": {
+            "n": 12,
+            "p50_ms": 5.308800000000019,
+            "p95_ms": 10.813474000000042
+          },
+          "samples": {
+            "capture": {
+              "n": 32,
+              "p50_ms": 0.6423240000000305,
+              "p95_ms": 0.8644530000001396
+            },
+            "replay_hash": {
+              "n": 32,
+              "p50_ms": 0.5851070000001073,
+              "p95_ms": 0.9196050000000469
+            },
+            "replay_delta": {
+              "n": 32,
+              "p50_ms": 0.4659389999999348,
+              "p95_ms": 0.9908860000000459
+            },
+            "prepare": {
+              "n": 32,
+              "p50_ms": 0.9984060000001591,
+              "p95_ms": 1.408984000000146
+            },
+            "postgres_save": {
+              "n": 32,
+              "p50_ms": 6.094724999999926,
+              "p95_ms": 15.129019999999969
+            },
+            "command": {
+              "n": 32,
+              "p50_ms": 1.6506500000000415,
+              "p95_ms": 4.446650999999974
+            },
+            "window_p1": {
+              "n": 30,
+              "p50_ms": 0.32036999999991167,
+              "p95_ms": 0.47689900000000307
+            },
+            "window_p2": {
+              "n": 30,
+              "p50_ms": 0.23137799999994968,
+              "p95_ms": 0.5292030000000523
+            },
+            "older_page_p1": {
+              "n": 30,
+              "p50_ms": 0.15748899999994137,
+              "p95_ms": 0.32894599999985985
+            },
+            "older_page_p2": {
+              "n": 30,
+              "p50_ms": 0.11372899999992114,
+              "p95_ms": 0.3073139999999057
+            }
+          }
+        },
+        {
+          "label": "48 legal collection actions",
+          "interval_cpu_ms": 639.815,
+          "rss_mib": 309.43359375,
+          "heap_used_mib": 125.57430267333984,
+          "restore_cpu_ms": {
+            "n": 12,
+            "p50_ms": 9.664,
+            "p95_ms": 34.506
+          },
+          "round": 12,
+          "events": 254,
+          "log": 254,
+          "archive": 173,
+          "latestBytes": 12861,
+          "writes": 96,
+          "newNodes": 681,
+          "latest_replay_delta_bytes": 86263,
+          "cumulative_replay_delta_bytes": 2517726,
+          "logical_written_document_bytes": 2013167,
+          "counts": {
+            "nodes": 681,
+            "history_bytes": 273895
+          },
+          "recovery": {
+            "nodes": 48,
+            "recovery_bytes": 540892
+          },
+          "windowBytes": 96201,
+          "pages": 3,
+          "warm_room_restore_ms": {
+            "n": 12,
+            "p50_ms": 8.216097999999874,
+            "p95_ms": 16.773045999999795
+          },
+          "samples": {
+            "capture": {
+              "n": 40,
+              "p50_ms": 0.8546619999999621,
+              "p95_ms": 1.1135910000000422
+            },
+            "replay_hash": {
+              "n": 40,
+              "p50_ms": 0.7765649999998914,
+              "p95_ms": 1.1193349999998645
+            },
+            "replay_delta": {
+              "n": 40,
+              "p50_ms": 0.8273330000001806,
+              "p95_ms": 1.0691269999999804
+            },
+            "prepare": {
+              "n": 40,
+              "p50_ms": 1.1295430000000124,
+              "p95_ms": 1.5325530000000072
+            },
+            "postgres_save": {
+              "n": 40,
+              "p50_ms": 5.14689599999997,
+              "p95_ms": 11.643446999999924
+            },
+            "command": {
+              "n": 40,
+              "p50_ms": 1.4338649999999689,
+              "p95_ms": 5.982484999999997
+            },
+            "window_p1": {
+              "n": 30,
+              "p50_ms": 0.2737130000000434,
+              "p95_ms": 0.31277000000000044
+            },
+            "window_p2": {
+              "n": 30,
+              "p50_ms": 0.31454600000006394,
+              "p95_ms": 0.41763399999990725
+            },
+            "older_page_p1": {
+              "n": 30,
+              "p50_ms": 0.21206599999982245,
+              "p95_ms": 0.24603400000000875
+            },
+            "older_page_p2": {
+              "n": 30,
+              "p50_ms": 0.2684649999998783,
+              "p95_ms": 0.34449799999993047
+            }
+          }
+        },
+        {
+          "label": "48 actions + 50 legal undo/replacement pairs",
+          "interval_cpu_ms": 1554.276,
+          "rss_mib": 366.68359375,
+          "heap_used_mib": 71.7026138305664,
+          "restore_cpu_ms": {
+            "n": 12,
+            "p50_ms": 16.136,
+            "p95_ms": 93.416
+          },
+          "round": 12,
+          "events": 254,
+          "log": 254,
+          "archive": 323,
+          "latestBytes": 12869,
+          "writes": 196,
+          "newNodes": 1031,
+          "latest_replay_delta_bytes": 86263,
+          "cumulative_replay_delta_bytes": 11111126,
+          "logical_written_document_bytes": 4023547,
+          "counts": {
+            "nodes": 1031,
+            "history_bytes": 460945
+          },
+          "recovery": {
+            "nodes": 98,
+            "recovery_bytes": 1108298
+          },
+          "windowBytes": 17633,
+          "pages": 8,
+          "warm_room_restore_ms": {
+            "n": 12,
+            "p50_ms": 11.39885299999969,
+            "p95_ms": 24.150082999999995
+          },
+          "samples": {
+            "capture": {
+              "n": 100,
+              "p50_ms": 0.8357810000002246,
+              "p95_ms": 1.0972069999997984
+            },
+            "replay_hash": {
+              "n": 100,
+              "p50_ms": 1.1010940000001028,
+              "p95_ms": 1.3257360000002336
+            },
+            "replay_delta": {
+              "n": 100,
+              "p50_ms": 1.0677990000003774,
+              "p95_ms": 1.1948550000001887
+            },
+            "prepare": {
+              "n": 100,
+              "p50_ms": 1.335783999999876,
+              "p95_ms": 1.730746000000181
+            },
+            "postgres_save": {
+              "n": 100,
+              "p50_ms": 5.6670899999999165,
+              "p95_ms": 7.7479669999997896
+            },
+            "command": {
+              "n": 100,
+              "p50_ms": 3.163666999999805,
+              "p95_ms": 4.518459000000348
+            },
+            "window_p1": {
+              "n": 30,
+              "p50_ms": 0.27563400000008187,
+              "p95_ms": 0.46968199999992066
+            },
+            "window_p2": {
+              "n": 30,
+              "p50_ms": 0.24692899999990914,
+              "p95_ms": 0.3252980000002026
+            },
+            "older_page_p1": {
+              "n": 30,
+              "p50_ms": 0.27979400000003807,
+              "p95_ms": 0.3407540000002882
+            },
+            "older_page_p2": {
+              "n": 30,
+              "p50_ms": 0.22539400000005116,
+              "p95_ms": 0.48051500000019587
+            }
+          }
+        },
+        {
+          "label": "48 actions + 200 legal undo/replacement pairs",
+          "interval_cpu_ms": 4893.562,
+          "rss_mib": 398.046875,
+          "heap_used_mib": 127.75723266601562,
+          "restore_cpu_ms": {
+            "n": 12,
+            "p50_ms": 18.098,
+            "p95_ms": 47.531
+          },
+          "round": 12,
+          "events": 254,
+          "log": 254,
+          "archive": 773,
+          "latestBytes": 12873,
+          "writes": 496,
+          "newNodes": 2081,
+          "latest_replay_delta_bytes": 86263,
+          "cumulative_replay_delta_bytes": 36891326,
+          "logical_written_document_bytes": 10056555,
+          "counts": {
+            "nodes": 2081,
+            "history_bytes": 1022095
+          },
+          "recovery": {
+            "nodes": 248,
+            "recovery_bytes": 2810992
+          },
+          "windowBytes": 17633,
+          "pages": 23,
+          "warm_room_restore_ms": {
+            "n": 12,
+            "p50_ms": 19.13475699999981,
+            "p95_ms": 29.2413000000015
+          },
+          "samples": {
+            "capture": {
+              "n": 300,
+              "p50_ms": 1.1269829999991998,
+              "p95_ms": 1.4445689999993192
+            },
+            "replay_hash": {
+              "n": 300,
+              "p50_ms": 1.6648260000001756,
+              "p95_ms": 2.162172999998802
+            },
+            "replay_delta": {
+              "n": 300,
+              "p50_ms": 1.1099270000004253,
+              "p95_ms": 1.2712719999999536
+            },
+            "prepare": {
+              "n": 300,
+              "p50_ms": 1.780507000000398,
+              "p95_ms": 2.3642870000003313
+            },
+            "postgres_save": {
+              "n": 300,
+              "p50_ms": 6.240646000000197,
+              "p95_ms": 8.962070999999924
+            },
+            "command": {
+              "n": 300,
+              "p50_ms": 5.167695999999978,
+              "p95_ms": 9.59276300000056
+            },
+            "window_p1": {
+              "n": 30,
+              "p50_ms": 0.3931059999995341,
+              "p95_ms": 0.4789469999996072
+            },
+            "window_p2": {
+              "n": 30,
+              "p50_ms": 0.3733140000003914,
+              "p95_ms": 0.5485150000004069
+            },
+            "older_page_p1": {
+              "n": 30,
+              "p50_ms": 0.3532820000000356,
+              "p95_ms": 0.45104300000093644
+            },
+            "older_page_p2": {
+              "n": 30,
+              "p50_ms": 0.33808200000021316,
+              "p95_ms": 0.5048990000013873
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

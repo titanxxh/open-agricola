@@ -1015,6 +1015,7 @@ describe('payAction', () => {
     expect(capturedEvents).toEqual([
       {
         type: 'resource.paid',
+        paymentId: expect.any(String),
         resources: { wood: 2 },
         to: { kind: 'supply' },
         paymentFor: 'cardEffect',
@@ -1023,6 +1024,15 @@ describe('payAction', () => {
         ],
       },
     ])
+  })
+
+  it('keeps a free payment explicit in the host receipt without emitting a payment event', () => {
+    const player = createMockPlayer({ wood: 3 })
+    const { result, capturedEvents } = callPay(player, { cost: {} })
+    expect(result.type).toBe('ok')
+    expect(player.resources.wood).toBe(3)
+    expect(capturedEvents).toEqual([])
+    if (result.type === 'ok') expect(result.extraData).toMatchObject({ publicPayment: { resources: {} } })
   })
 
   it('does not attribute typed action payments to the source card by default', () => {

@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../../authoritative-session'
 import { rehydrateState, serializeSessionSnapshot } from '../../../../shared/session/serialization'
 import { PostgresRoomPersistence } from '../postgres-adapter'
-import { RoomHistoryCorruptionError } from '../room-history-store'
+import { RoomHistoryCorruptionError, RoomHistoryStore } from '../room-history-store'
 import { parseRoomBody } from '../room-body-codec'
 import type { RoomMeta } from '../room-persistence'
 
@@ -27,6 +27,39 @@ const database = async () => {
 }
 
 describe('Room-owned history recovery', () => {
+  it.each(['single', 'batch'])('classifies decode and integrity failures as corruption after %s reads', async (mode) => {
+    const db = await database()
+    const game = session()
+    try {
+      const persistence = new PostgresRoomPersistence(db)
+      await persistence.save('r', serializeSessionSnapshot(game.state, game), meta)
+      const row = await db.prepare('SELECT state_json FROM rooms WHERE id = ?').get<{ state_json: string }>('r')
+      const store = new RoomHistoryStore(db)
+      const restore = async (json: string) => mode === 'single'
+        ? store.restore('r', json)
+        : (await store.restoreMany(['r']))('r', json)
+      await expect(restore('{broken')).rejects.toBeInstanceOf(RoomHistoryCorruptionError)
+      await db.prepare("UPDATE room_history_nodes SET record_json = '{}' WHERE room_id = ?").run('r')
+      await expect(restore(row!.state_json)).rejects.toThrow(RoomHistoryCorruptionError)
+      await db.prepare('DELETE FROM room_history_nodes WHERE room_id = ?').run('r')
+      await expect(restore(row!.state_json)).rejects.toThrow(RoomHistoryCorruptionError)
+    } finally { game.dispose(); await db.close() }
+  })
+
+  it.each(['room_history_nodes', 'room_recovery_nodes'])('preserves %s query errors during single and batch reads', async (table) => {
+    const db = await database()
+    const transient = Object.assign(new Error('temporary database connection reset'), { code: 'ECONNRESET' })
+    const store = new RoomHistoryStore({ prepare: (sql: string) => {
+      const statement = db.prepare(sql)
+      if (!sql.includes(`FROM ${table} `)) return statement
+      return { ...statement, all: async () => { throw transient } }
+    } })
+    try {
+      await expect(store.restore('r', '{}')).rejects.toBe(transient)
+      await expect(store.restoreMany(['r'])).rejects.toBe(transient)
+    } finally { await db.close() }
+  })
+
   it('preserves own prototype-named keys and undefined values through command rollback', () => {
     const game = session()
     const data = JSON.parse('{"__proto__":{"marker":true}}') as Record<string, unknown>

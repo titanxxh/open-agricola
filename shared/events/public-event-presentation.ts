@@ -546,6 +546,35 @@ export const collectPublicEventFeedback = (
   ),
 })
 
+export type PublicEventOccurrenceCursor = ReadonlySet<string>
+
+const occurrenceKey = (event: GameEvent): string => event.occurrenceId ?? `${event.id}:${event.seq}`
+
+export const publicEventOccurrenceCursorFor = (
+  events: readonly GameEvent[] = [],
+  previous: PublicEventOccurrenceCursor = new Set(),
+): PublicEventOccurrenceCursor => new Set([...previous, ...events.map(occurrenceKey)])
+
+/** Live cues follow occurrences, not a reusable sequence or the sliding window. */
+export const collectUnseenPublicEventFeedback = (
+  events: readonly GameEvent[],
+  cursor: PublicEventOccurrenceCursor | null,
+  locale: Locale,
+  idPrefix = '',
+): PublicEventFeedback & { nextCursor: PublicEventOccurrenceCursor } => {
+  const seen = new Set(cursor ?? [])
+  const unseen = events.filter(event => {
+    const key = occurrenceKey(event)
+    if (seen.has(key)) return false
+    seen.add(key)
+    return cursor !== null // Initial snapshot is a baseline, not live feedback.
+  })
+  // Cue ids are presentation-only; keep distinct occurrences distinct even if
+  // authoritative display ids were reused by an undo/replacement.
+  const cueEvents = unseen.map(event => ({ ...event, id: event.occurrenceId ?? event.id }))
+  return { ...collectPublicEventFeedback(cueEvents, locale, idPrefix), nextCursor: seen }
+}
+
 export const maxPublicEventSeq = (events?: readonly { seq: number }[]): number =>
   events?.reduce((max, event) => Math.max(max, event.seq), 0) ?? 0
 

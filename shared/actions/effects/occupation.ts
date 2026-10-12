@@ -1,6 +1,6 @@
 import { cardIdentityChoice } from '../helpers/card-choice'
 import type { ActionChoiceOption, ActionDefinition, ActionExecutionResult, ActionSpace, ComplexCost, GameState, InternalActionChild, InternalActionChildren, PaymentSolution, PlayerState, ProtectedObservation, Resource } from '../../contract/types'
-import type { EventSink } from '../../contract/events'
+import type { CardPayment, EventSink } from '../../contract/events'
 import { meetsCardPrerequisites } from '../../cards/helpers/prerequisites'
 import { getOccupation } from '../../cards/registry-display'
 import { runCardListeners } from '../../cards/card-listeners'
@@ -162,6 +162,7 @@ const commitOccupationPlay = (
   emitPrivateEvent?: (event: ReturnType<typeof cardEffectHandChangedEvent>) => void,
   eventSink?: EventSink,
   reportProtectedObservation?: (observation: ProtectedObservation) => void,
+  payment?: CardPayment,
 ): Extract<ActionExecutionResult, { type: 'ok' }> => {
   const wasInHand = player.occupationHand.includes(occupationId)
   if (wasInHand) {
@@ -185,6 +186,7 @@ const commitOccupationPlay = (
     type: 'card.played',
     cardId: occupationId,
     cardType: 'occupation',
+    payment,
     sourceActionId: 'occupation',
     sourceCardId: occupationId,
   })
@@ -585,6 +587,7 @@ export const playOccupationAction: ActionDefinition = {
       emitPrivateEvent,
       eventSink,
       reportProtectedObservation,
+      paymentInfo.publicPayment ?? { resources: paymentInfo.resourcesPaid },
     )
   },
 }

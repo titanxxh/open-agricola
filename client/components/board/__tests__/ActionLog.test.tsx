@@ -97,6 +97,16 @@ it('retains the receiving player identity in action detail logs when names colli
   expect(container).not.toHaveTextContent('Player 6')
 })
 
+it('preserves an older timeline DOM row when a new round is prepended', () => {
+  const old: ActionLogTimelineBucket = { round: 1, rows: [{
+    kind: 'stateLog', key: 'older', logEntry: { key: 'log.startGame' }, label: '', round: 1, replayable: false, strikethrough: false,
+  }] }
+  const { rerender } = render(<ActionLog locale="en" log={[]} currentRound={1} timelineBuckets={[old]} />)
+  const original = screen.getByTestId('action-log-row-older')
+  rerender(<ActionLog locale="en" log={[]} currentRound={2} timelineBuckets={[{ round: 2, rows: [] }, old]} />)
+  expect(screen.getByTestId('action-log-row-older')).toBe(original)
+})
+
 const replayEvent = (id: string, seq: number): GameEvent => ({
   schemaVersion: 1,
   id,

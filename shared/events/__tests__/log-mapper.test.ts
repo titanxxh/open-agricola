@@ -31,6 +31,24 @@ describe('eventsToLogEntries', () => {
       })])
   })
 
+  it('uses the exact host receipt with interleaved payments and when a page omits the payment event', () => {
+    const base = { schemaVersion: 1, round: 1, phase: 'work', visibility: 'public', actorPlayerId: 'p1' } as const
+    const receipt = { paymentId: 'host-payment', resources: { wood: 1 }, returnedCardId: 'Major_Fireplace1', bonusSources: ['A075_LumberMill'] }
+    const events = [
+      { ...base, id: 'host-pay', seq: 1, type: 'resource.paid', paymentFor: 'minor-improvement', ...receipt },
+      { ...base, id: 'other-pay', seq: 2, type: 'resource.paid', paymentFor: 'minor-improvement', paymentId: 'other-payment', resources: { wood: 9 } },
+      { ...base, id: 'host-play', seq: 3, type: 'card.played', cardType: 'minor', cardId: 'host-card', payment: receipt },
+      { ...base, id: 'free-play', seq: 4, type: 'card.played', cardType: 'minor', cardId: 'free-card', payment: { resources: {} } },
+    ] satisfies GameEvent[]
+    const plan = buildLogPresentationPlan(events, { playerNames: {} })
+    expect(plan.consumedEvents).toEqual([{ consumedEventRef: { id: 'host-pay', seq: 1, type: 'resource.paid' },
+      consumerEventRef: { id: 'host-play', seq: 3, type: 'card.played' }, reason: 'cardPayment' }])
+    const expected = { costResources: { wood: 1 }, returnedCards: ['Major_Fireplace1'], bonusSources: ['A075_LumberMill'] }
+    expect(plan.rows.find(row => row.logEntry.params?.improvements === 'host-card')?.logEntry.params).toMatchObject(expected)
+    expect(eventsToLogEntries(events.slice(2), { playerNames: {} }).find(entry => entry.params?.improvements === 'host-card')?.params).toMatchObject(expected)
+    expect(plan.rows.find(row => row.logEntry.params?.improvements === 'free-card')?.logEntry.params?.costResources).toEqual({})
+  })
+
   it('builds a presentation plan with source identity and consumed payment refs', () => {
     const events = [
       {
@@ -243,7 +261,7 @@ describe('eventsToLogEntries', () => {
     expect(row?.logEntry.params?.player).toBe('Alice')
   })
 
-  it('records a consumed payment once when repeated consumers match it', () => {
+  it('does not reuse a paid card payment for a subsequent free card', () => {
     const events = [
       {
         schemaVersion: 1,
@@ -296,7 +314,7 @@ describe('eventsToLogEntries', () => {
     expect(plan.consumedEvents).toHaveLength(1)
     expect(plan.consumedEvents[0]).toEqual({
       consumedEventRef: { id: 'pay', seq: 1, type: 'resource.paid' },
-      consumerEventRef: { id: 'play-b', seq: 3, type: 'card.played' },
+      consumerEventRef: { id: 'play-a', seq: 2, type: 'card.played' },
       reason: 'cardPayment',
     })
     expect(eventsToLogEntries(events, { playerNames: { p1: 'Alice' } })).toEqual([
@@ -305,7 +323,7 @@ describe('eventsToLogEntries', () => {
         params: {
           player: 'Alice',
           improvements: 'A002_Second',
-          costResources: { food: 1 },
+          costResources: {},
         },
       },
       {

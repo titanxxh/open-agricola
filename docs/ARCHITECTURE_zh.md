@@ -157,13 +157,15 @@ ESLint 三层强制（`eslint.config.js`）：
 
 `completedFeedingPhases` 在 `shared/session/phases/harvest.ts` 的 feeding phase 结束时 `+= 1`，等价于 参考实现 Globals 同款全局计数；A148/B86 等"按已完成收获 +1 容量"卡牌从此字段读取，避免再走 per-card post-play counter。
 
-`events` 是公共结构化规则事件流，位于 `GameState.log` 下层。后端规则执行时先写 `GameEvent`，再由 mapper 派生 UI log、动画提示、审计报告和未来 replay；`log` 仍是当前可见文字日志，不作为规则来源。`GameState.log` 是由 public events 派生出来的 UI 缓存。规则代码不直接写 `state.log`；允许的写入点只有命名 cache writer：`appendImmediateEvents()` 的 mapper 结果，以及 `GameCore.flushEngineLog()` 从 engine `LogStore` 刷出的 mapper 结果。`pnpm run check:direct-session-log` 守住这个边界。客户端还会按 `seq` 增量消费部分 public events，转成本地 transient notification、action/farm/fence highlight 和 resource animation；首次 snapshot 只初始化 cursor，不回放历史事件。该 cue 层只服务 UI 反馈，不作为规则来源。旧 action-result detail 也通过 `action.detailLogged` 这类公开事件进入 mapper，而不是直接把规则事实写进 `state.log`。`nextEventSeq` 是持久化事件序号游标，`normalizeState` 会丢弃不符合公开事件 envelope/schema/json/size guard 的旧事件并从最大 `seq` 继续。
+`events` 是公共结构化规则事件流，位于 `GameState.log` 下层。后端规则执行时先写 `GameEvent`，再由 mapper 派生 UI log、动画提示、审计报告和未来 replay；`log` 仍是当前可见文字日志，不作为规则来源。`GameState.log` 是由 public events 派生出来的 UI 缓存。规则代码不直接写 `state.log`；允许的写入点只有命名 cache writer：`appendImmediateEvents()` 的 mapper 结果，以及 `GameCore.flushEngineLog()` 从 engine `LogStore` 刷出的 mapper 结果。`pnpm run check:direct-session-log` 守住这个边界。客户端按稳定的 `occurrenceId` 增量消费部分 public events，转成本地 transient notification、action/farm/fence highlight 和 resource animation。房间级 seen set 跨滑动窗口和 viewer 序号重映射保留；新发生实例即使复用展示序号也会产生反馈。首次 snapshot 只初始化 cursor，不回放历史事件；cancellation 清理临时反馈并把恢复后的 snapshot 加入 seen set，本地 replay 不推进它。该 cue 层只服务 UI 反馈，不作为规则来源。旧 action-result detail 也通过 `action.detailLogged` 这类公开事件进入 mapper，而不是直接把规则事实写进 `state.log`。`nextEventSeq` 是持久化事件序号游标，`normalizeState` 会丢弃不符合公开事件 envelope/schema/json/size guard 的旧事件并从最大 `seq` 继续。
 
 `farm.animalMoved.newlyPlacedOnFarmyard` 记录待安置动物实际进入实体农场区域的数量。重组提交按区域比较数量，用所有已有区域的减少量抵扣农场区域的增加量，再截断至零；旧动物搬迁优先占用农场增加量，剩余才算新动物。仅存入纯牌上区域或旧动物换区不计。通过 `farmPosition` 绑定动物所有者农场格的 card zone（如 Home Wood、Horse Trough）仍算实体农场区域。它是聚合放置事实，不引入动物个体身份。`addFarmyardSpaceState(..., eventSink)` 将货物的正增量发为到实体田格的 `resource.moved`；逻辑卡牌田仍是独立位置。
 
 每个 public `GameEvent['type']` 都必须列入 `shared/events/event-mapping-policy.ts`。该 policy 记录 Action Log、public notification、board/farm highlight、resource animation 和 replay 是否 mapped、conditionally mapped 或 intentionally silent。`eventsToLogEntries()` 不向 `GameState.log` 写 generic fallback rows；replay-only summaries 保留在客户端 timeline layer。新增 event type 时，同一个 PR 必须同时补 policy、mapper fixtures 和文档。
 
 `buildLogPresentationPlan()` 是 Action Log 展示关系的单一来源：`rows` 表示可见日志，`consumedEvents` 表示已被更丰富日志吸收的事件，`suppressedEvents` 表示按事件自身语义明确不生成 Action Log 行的事件。客户端 timeline 只按这些结构化 event ref 过滤，不得通过玩家名、资源数量、卡牌 id 或跨 archive packet 猜测事件对应关系。纯普通资源的 `futureMeeple.resolved` 由后续 `resource.moved(reason='receive')` 展示实际入账，因此进入 `suppressedEvents`；带房间或 field/stable/forest/moor 独立效果的结算仍保留独立日志。
+
+卡牌购买把 pay child 的 `PaymentInfo.publicPayment` 传入 `card.played.payment`：实际资源、bonus 来源、返还卡，以及与所属 `resource.paid` 共享的不透明 `paymentId`。免费打牌携带明确的空资源凭据，不虚构零支付事件。即使付款处于另一 packet/page，mapper 也从本牌凭据渲染成本；consumed relation 使用明确 ID，不猜最近付款。没有凭据的合成事件仅使用受限 fallback，不会复用另一张牌之前的付款或来自其他卡的付款。新凭据字段保留在新录制的 Replay Frame 中，不改写已有 Frame。
 
 新事件在 `EventStore` 完成 draft 时获得不透明的 `occurrenceId`，独立标识一次 Public Event Occurrence，不依赖会复用的 `id`/`seq`、archive 编号、玩家名称或翻译。transaction snapshot、commit 重编号、取消和 viewer 投影都保留该身份。mapper 为每条派生日志附上 `LogEntry.sourceEvent = { occurrenceId, rowIndex }`；snapshot 缓存与事件时间线按该来源关联及 log key 配对，不再比较展示参数。因此两次相同的真实触发仍为两条记录，已取消尝试也不能消耗后来发生实例的缓存行。没有匹配事件的日志仍保留。
 
@@ -1278,7 +1280,7 @@ server/game/
 
 **Issues #938–#940 的恢复约束：**活动恢复必须保留普通 Undo History 和嵌套暂定作用域的回退检查点。恢复权威会话及继续提交所需的 RoomCommitter 基准帧，必须独立于历史 Replay payload；可以核对 Replay head 元数据，但不能要求解码 Replay checkpoint 或 delta。参见 ADR-0011 §11 和 ADR-0015。
 
-**Room 历史与恢复（Issues #947–#954）：** PostgreSQL 把不可变历史节点存入 `room_history_nodes`，把普通撤销和嵌套检查点的共享记录存入 `room_recovery_nodes`（保留原有恢复格式）。`shared/session/history-streams.ts` 捕获较小的核心主体和不可变分支，避免复制完整历史数组；`RoomHistoryStore` 在现有 Room/Replay 事务内只写新节点。写入失败不会把未提交 ID 加入持久缓存。引用缺失、校验和错误或原始 Frame Hash 不符均停止恢复。内存测试适配器保留逻辑完整快照。启动通过固定批次数量的查询加载 Room 自有历史和恢复记录。
+**Room 历史与恢复（Issues #947–#954）：** PostgreSQL 把不可变历史节点存入 `room_history_nodes`，把普通撤销和嵌套检查点的共享记录存入 `room_recovery_nodes`（保留原有恢复格式）。`shared/session/history-streams.ts` 捕获较小的核心主体和不可变分支，避免复制完整历史数组；`RoomHistoryStore` 在现有 Room/Replay 事务内只写新节点。写入失败不会把未提交 ID 加入持久缓存。查询失败原样传播以便存储重试；只有成功读取后的解码与完整性失败归为 `RoomHistoryCorruptionError`。引用缺失、校验和错误或原始 Frame Hash 不符均停止恢复。内存测试适配器保留逻辑完整快照。启动通过固定批次数量的查询加载 Room 自有历史和恢复记录。
 
 **快照所有权（Issue #941）：** `serializeSessionSnapshot` 只捕获并冻结一次权威核心数据。独立的 `state` 与 `frame` 视图共享不可变的嵌套核心值和历史记录；玩家展示字段在当前 session 上下文中计算并单独复制。每次玩家序列化只计算一次动物区，供四个展示投影使用；结果只存在于本次调用，不跨查询或命令缓存。Frame 常量键、行动格执行字段的剥离及序列化键顺序保持不变。`rehydrateState` 在规范化或执行规则前复制较小的核心主体，也覆盖 Worker IPC 保留别名但移除对象冻结的情况，因此恢复后的规则写入不会改动任一已保存视图。
 
@@ -1288,7 +1290,7 @@ server/game/
 
 恢复时将已保存的 Frame 差异应用于较小 state 主体的独立副本，拼接精确历史引用，再校验原始规范 Frame Hash；不读取 Replay payload，也不按当前规则重算。规则、Workshop、Worker IPC、Replay 和调试快照保留完整逻辑历史。Worker IPC 在原始 Frame 之外携带恢复身份目录，让记录、操作组和检查点身份跨消息保持一致。JSON 快照为每个序列化别名路径保存同一目录，让这些身份在重启后继续保留。普通撤销、命令回退、嵌套暂定作用域及 Protected Observation 保持既有行为；见 [ADR-0021](adr/0021-room-owned-history-branches-and-recovery-snapshots.md)。
 
-WebSocket 的玩家快照包含 `historyWindow`：最近 **20 个完整操作组**、稳定记录 ID、绑定观察者的分支 ID，以及可选的旧页游标。`getHistory` / `historyPage` 复用活动座位授权（包括拒绝已被替换的连接），先对完整历史做 viewer 过滤，再分页，隐藏手牌事件与取消 payload 同样过滤。读取不写 Room，也不推进版本。HTTP、本地及调试 payload 保持完整。客户端按需加载旧操作组，分支或观察者变化时清空缓存；过期游标返回 `history_branch_changed`，触发新窗口读取。记录身份独立于可复用事件序号。操作者及其他参与者姓名按稳定身份投影，改名不再重写原始历史参数。完赛 Replay 沿用归档参与者名与现有匿名化投影。在相同规则与运行时源码下，这些存储和展示改动保持 Replay schema、原始 Frame Hash 链及不可变 Viewer Build 不变。
+WebSocket 的玩家快照包含 `historyWindow`：最近 **20 个完整操作组**、稳定记录 ID、绑定观察者的分支 ID，以及可选的旧页游标。`getHistory` / `historyPage` 复用活动座位授权（包括拒绝已被替换的连接），先对完整历史做 viewer 过滤，再分页，隐藏手牌事件与取消 payload 同样过滤。读取不写 Room，也不推进版本。HTTP、本地及调试 payload 保持完整。历史节点持久化独立于变化 head 的追加路径 `continuationId`：普通追加保留分支身份，分叉后继或取消改变它。旧页游标携带 head anchor，必须仍为当前流的祖先。客户端保留已加载页及滑出实时窗口的完整操作组，按 record ID 去重，并以稳定的 timeline round DOM key 保持阅读位置。重连漏收整个窗口时，保留原阅读范围，并暴露游标补齐中间缺口。用于识别回退的长度只描述 viewer 过滤后的流，不泄露隐藏记录数量。分叉、回退或观察者切换会清页；请求 scope 身份使切走再切回后的旧响应仍失效。过期游标返回 `history_branch_changed`，触发新窗口读取。记录身份独立于可复用事件序号。操作者及其他参与者姓名按稳定身份投影，改名不再重写原始历史参数。完赛 Replay 沿用归档参与者名与现有匿名化投影。在相同规则与运行时源码下，这些存储和展示改动保持 Replay schema、原始 Frame Hash 链及不可变 Viewer Build 不变。
 
 原生 Session 的窗口化 Room envelope 将 Session 姓名投影延迟到最终的 Room 姓名投影；座位姓名缺失或为空白时，回退到 Session 姓名。完整或直接调用 Session 的 payload 及本地 payload 默认保留 Session 姓名投影；debug 保留原始历史姓名，Worker 预先生成的 payload 沿用既有投影路径。当前事件和已取消事件均无隐藏项时，archive 投影复用派生字段已经一致的非空 packet。输出数组仍是新数组，但共享的 packet 记录及嵌套字段必须只读使用，投影不保证深层所有权独立。每次调用都会重新计算可见性，不跨命令缓存。
 

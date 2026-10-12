@@ -624,10 +624,20 @@ const cardPaymentFor = (
   const purposes = played.cardType === 'occupation'
     ? new Set(['occupation'])
     : new Set(['major-improvement', 'minor-improvement'])
+  if (played.payment) {
+    return events.find((event): event is ResourcePaidEvent => event.type === 'resource.paid' &&
+      !!played.payment?.paymentId && event.paymentId === played.payment.paymentId &&
+      event.actorPlayerId === played.actorPlayerId && purposes.has(event.paymentFor))
+  }
+  // Historical/synthetic events without a receipt may only consume a payment
+  // after the previous card play, and never one explicitly sourced from another card.
+  const previousPlay = events.reduce((seq, event) => event.type === 'card.played' &&
+    event.actorPlayerId === played.actorPlayerId && event.seq < played.seq ? Math.max(seq, event.seq) : seq, 0)
   return [...events]
     .filter((event): event is ResourcePaidEvent =>
       event.type === 'resource.paid' &&
-      event.seq < played.seq &&
+      event.seq > previousPlay && event.seq < played.seq &&
+      (!event.sourceCardId || event.sourceCardId === played.cardId) &&
       event.actorPlayerId === played.actorPlayerId &&
       purposes.has(event.paymentFor),
     )
@@ -686,7 +696,7 @@ const isNearestFollowingStablePayment = (
 
 const mapCardPlayed = (
   event: CardPlayedEvent,
-  payment: ResourcePaidEvent | undefined,
+  payment: CardPlayedEvent['payment'],
   ctx: EventLogMapperContext,
 ): LogEntry => {
   if (event.cardType === 'occupation') {
@@ -808,7 +818,7 @@ export const buildLogPresentationPlan = (
         const payment = cardPaymentFor(events, event)
         return presentationRows(
           event,
-          [mapCardPlayed(event, payment, ctx)],
+          [mapCardPlayed(event, event.payment ?? payment, ctx)],
           payment ? consumePayment(event, payment, 'cardPayment') : [],
         )
       }

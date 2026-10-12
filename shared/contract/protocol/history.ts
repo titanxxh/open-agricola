@@ -7,6 +7,8 @@ export type HistoryDisplayRecord = {
 }
 export type HistoryWindow = {
   branchId: string
+  /** Full stream lengths distinguish a restored prefix from an ordinary append. */
+  streamLengths?: number[]
   operationGroupIds: string[]
   nextCursor: string | null
   logRecords: HistoryDisplayRecord[]
