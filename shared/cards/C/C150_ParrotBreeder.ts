@@ -9,6 +9,13 @@ import {
   writeCardExtraData,
 } from '../helpers/card-state'
 import { payLeaf } from '../helpers/pay-gain-node'
+import { getRoundPlacementOrder } from '../helpers/round-placement'
+import { evaluateWithReservedResources } from '../helpers/reserved-resources'
+import { isPlacementActionDoableInFlowContext } from '../../actions/flow'
+import { canEnterSpace } from '../../actions/helpers/placement-availability'
+import { getActionDefinition } from '../../actions/action-definition-lookup'
+import { findActionSpaceById, isSpaceBlocked, isSpaceOccupied } from '../../domain/space'
+import { canMoorWorkerEnterSpace } from '../../moor/heating'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/helpers/placement-constants'
 import type { CardImpl } from '../registry'
 
@@ -22,8 +29,7 @@ const RIGHT_KEY = 'right'
  * to your right just used (not retroactive; not Meeting Place).
  *
  * State (`cardStates.C150_ParrotBreeder`):
- *   - `flags.flagged` — grain paid, waiting for the next place-farmer to
- *     consume the "copy right-neighbour" option.
+ *   - `flags.flagged` — grain paid within the mandatory copy placement flow.
  *   - `extraData.right: string | null` — the space id the right-neighbour
  *     used on their most recent place-farmer.
  *
@@ -31,8 +37,8 @@ const RIGHT_KEY = 'right'
  *   1. `after:place-farmer` scope `player`  — owner placed → clear tracker + flag.
  *   2. `after:place-farmer` scope `opponent` — any opponent placed → update tracker
  *      (record if they are the right-neighbour, else clear) + unflag.
- *   3. `anytime` scope `player` — during work phase, unflagged, grain≥1: offer
- *      `pay 1 grain + flag`.
+ *   3. `anytime` scope `player` — replace an idle work turn with payment and
+ *      placement on the sole legal target, evaluated after reserving grain.
  *   4. `computeArgs:place-farmer` scope `player` — while flagged with a tracked
  *      non-MeetingPlace right space, inject an `OCCUPIED_SPACE_CHOICE_PREFIX`
  *      extra option so the owner can place on the tracked space even when it
@@ -110,7 +116,9 @@ const afterPlaceFarmerOpponentListener: CardListenerRegistration = {
     const placer = context.player
     const rightIdx = rightNeighbourIndex(context.state, owner.id)
     const rightId = rightIdx >= 0 ? context.state.players[rightIdx]?.id : undefined
-    const right = placer.id === rightId && context.space?.id ? context.space.id : null
+    const right = placer.id === rightId
+      ? getRoundPlacementOrder(placer).at(-1) ?? context.space?.id ?? null
+      : null
     const flagged = isCardFlagged(owner, CARD_ID)
     const currentRight = readCardExtraData<string | null>(owner, CARD_ID, RIGHT_KEY) ?? null
     if (!flagged && currentRight === right) return
@@ -123,16 +131,36 @@ const anytimeListener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   phases: ['anytime' as ActionHookPhase],
   scope: 'player',
+  replacesTurn: true,
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (isCardFlagged(context.player, CARD_ID)) return
     if ((context.player.resources.grain ?? 0) < 1) return
     if (context.state.roundPhase !== 'work') return
+    const right = readCardExtraData<string | null>(context.player, CARD_ID, RIGHT_KEY)
+    if (typeof right !== 'string' || right === 'meeting-place') return
+    const space = findActionSpaceById(context.state, right)
+    if (!space || !isSpaceOccupied(space) || isSpaceBlocked(space)) return
+    if (space.flow?.type === 'seq' && space.flow.children.every(child =>
+      child.type === 'leaf' && child.actionId === 'collect',
+    ) && !Object.values(space.resources).some(amount => amount > 0)) return
+    if (!canEnterSpace(space, context.player, context.state)) return
+    if (!canMoorWorkerEnterSpace(context.state, context.player, space.id)) return
+    if (!evaluateWithReservedResources(context.state, context.player, { grain: 1 }, (state, player) =>
+      isPlacementActionDoableInFlowContext({
+        state, player, space, action: space, actionId: space.id, sourceCard: CARD_ID,
+        resolveAction: (actionId) => findActionSpaceById(state, actionId) ?? getActionDefinition(actionId),
+      }),
+    )) return
     return {
       flow: {
         type: 'seq',
         children: [
           payLeaf({ cardId: CARD_ID, cost: { grain: 1 } }),
           { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: true } },
+          {
+            type: 'leaf', actionId: 'place-farmer', sourceCard: CARD_ID,
+            actionContext: { constraints: [right] },
+          },
         ],
       },
       sourceCard: CARD_ID,
@@ -149,6 +177,7 @@ const computeArgsListener: CardListenerRegistration = {
   scope: 'player',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!isCardFlagged(context.player, CARD_ID)) return
+    if (context.sourceCard !== CARD_ID) return
     const right = readCardExtraData<string | null>(context.player, CARD_ID, RIGHT_KEY)
     if (typeof right !== 'string' || right.length === 0) return
     if (right === 'meeting-place') return

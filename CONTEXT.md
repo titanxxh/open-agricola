@@ -342,6 +342,10 @@ _Avoid_: Action Execution Scope、跨 Turn 复用身份或起点状态
 一次完整使用行动格，或规则明确授予的一次命名行动。Rule Action 可以发生在 Turn 内，也可以在阶段或 anytime 窗口中脱离 Turn 执行；选择和 continuation 只是该行动的结算过程。
 _Avoid_: Turn、ActionNode、单独的资源增减 / 支付 / 选择
 
+**Most Recent Action Space（最近使用的行动格）**:
+按实际使用先后确定的最后一个 Action Space。同一个 Turn 使用多个行动格时，C150 Parrot Breeder 的复制目标仍只有最后使用的一格。
+_Avoid_: 最近 Turn 使用过的全部行动格、最后结算的卡牌反应所对应的行动格
+
 **Anytime Availability（随时行动可用性）**:
 玩家在当前规则窗口内可以合法开始一项随时行动或其前置效果的条件。当前必须支付的费用无法支付时，该行动不属于可用入口。
 _Avoid_: 仅持有对应卡牌、无效尝试结束原行动

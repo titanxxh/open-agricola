@@ -97,27 +97,29 @@ describe('C150 Parrot Breeder parity', () => {
     session.loadState(after)
   }
 
-  it('C150 S1: after the right neighbor uses Forest, paying one grain allows the owner to use occupied Forest', () => {
+  it('C150 S1: copying the right neighbour pays one grain and uses their occupied Day Laborer space', () => {
     const session = setup()
-    setSpaceResource(session.state, 'forest', 'wood', 3)
-    session.loadState(session.state)
-    rightUses(session, 'forest')
-    expect(readCardExtraData(session.state.players[0]!, 'C150_ParrotBreeder', 'right')).toBe('forest')
-    session.takeAnytimeAction(0, 'C150-parrot-breeder-anytime')
-    expect(session.getState().state.players[0]!.resources.grain).toBe(0)
-    expect(isCardFlagged(session.getState().state.players[0]!, 'C150_ParrotBreeder')).toBe(true)
-    const response = session.takeAction(0, 'forest')
+    rightUses(session, 'day-laborer')
+    expect(readCardExtraData(session.state.players[0]!, 'C150_ParrotBreeder', 'right')).toBe('day-laborer')
+    const response = session.takeAnytimeAction(0, 'C150-parrot-breeder-anytime')
     expect(response.ok, response.error).toBe(true)
-    expect(response.state.actionSpaces.find((space) => space.id === 'forest')?.takenBy).toHaveLength(2)
+    expect(response.state.players[0]!.resources.grain).toBe(0)
+    expect(isCardFlagged(response.state.players[0]!, 'C150_ParrotBreeder')).toBe(false)
+    expect(response.state.actionSpaces.find((space) => space.id === 'day-laborer')?.takenBy).toHaveLength(2)
+    session.dispose()
   })
 
   it('C150 S2: Meeting Place used by the right neighbor cannot be copied', () => {
     const session = setup()
     rightUses(session, 'meeting-place')
-    session.takeAnytimeAction(0, 'C150-parrot-breeder-anytime')
+    const grain = session.state.players[0]!.resources.grain
+    const rejected = session.takeAnytimeAction(0, 'C150-parrot-breeder-anytime')
+    expect(rejected.ok).toBe(false)
+    expect(rejected.state.players[0]!.resources.grain).toBe(grain)
     const response = session.takeAction(0, 'meeting-place')
     expect(response.ok).toBe(false)
     expect(response.error).toBe('space unavailable')
+    session.dispose()
   })
 })
 
