@@ -1,4 +1,5 @@
 import { defineMinorCard } from '../card-source'
+import { getPastureSize } from '../../domain/pasture'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A032_Manger'
@@ -7,7 +8,7 @@ const cardImpl = {
   effect: {
   id: CARD_ID,
   computeBonusScore: (_state, player) => {
-    const totalSize = player.pastures.reduce((sum, p) => sum + p.size, 0)
+    const totalSize = player.pastures.reduce((sum, p) => sum + getPastureSize(p), 0)
     if (totalSize >= 10) return 4
     if (totalSize >= 8) return 3
     if (totalSize >= 7) return 2

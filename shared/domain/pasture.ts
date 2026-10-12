@@ -1,37 +1,41 @@
-import type { PlayerState, FarmTilePosition } from '../contract/types.ts'
+import type { Pasture as PastureState, PlayerState } from '../contract/types'
+import { positionKey } from './farmyard-geometry'
 
-/**
- * Readonly view of a fenced pasture region. Projects the persisted
- * `PlayerState.pastures` entries into a domain value type.
- *
- * We reuse the persisted view (computed upstream by
- * `validateFenceSelection`) rather than re-running geometry from
- * `fenceSegments`; that keeps the `stables` factor honest so capacity
- * matches the legacy authority
- * `actions/helpers/animal-zones.getPastureCapacity`
- * (`size * 2 * 2^stables`).
- */
-export type Pasture = {
-  readonly id: string
-  readonly tiles: ReadonlyArray<FarmTilePosition>
-  readonly capacity: number
+/** Read-only pasture facts derived from the current farm, never stored. */
+export type Pasture = Readonly<PastureState> & {
+  readonly size: number
   readonly stables: number
+  readonly capacity: number
   readonly hasWell: boolean
 }
 
-/**
- * Project `player.pastures` into the domain `Pasture` value type.
- *
- * Name retained for migration stability — `player.pastures` is itself
- * derived from `fenceSegments` upstream by `validateFenceSelection`,
- * so the "from fences" framing is still accurate at one remove.
- */
-export function computePasturesFromFences(player: PlayerState): Pasture[] {
-  return (player.pastures ?? []).map((p) => ({
-    id: p.id,
-    tiles: p.tiles ?? [],
-    capacity: p.size * 2 * Math.pow(2, p.stables ?? 0),
-    stables: p.stables ?? 0,
+export const getPastureSize = (pasture: Pick<PastureState, 'tiles'>): number =>
+  pasture.tiles.length
+
+export const getPastureStableCount = (
+  player: Pick<PlayerState, 'stableTiles'>,
+  pasture: Pick<PastureState, 'tiles'>,
+): number => {
+  const stableKeys = new Set(player.stableTiles.map(positionKey))
+  return pasture.tiles.filter(tile => stableKeys.has(positionKey(tile))).length
+}
+
+/** Base capacity; animal-zone queries apply card capacity modifiers afterwards. */
+export const getPastureCapacity = (
+  player: Pick<PlayerState, 'stableTiles'>,
+  pasture: Pick<PastureState, 'tiles'>,
+): number => getPastureSize(pasture) * 2 * 2 ** getPastureStableCount(player, pasture)
+
+export const getFencedStableCount = (
+  player: Pick<PlayerState, 'pastures' | 'stableTiles'>,
+): number => player.pastures.reduce((sum, pasture) => sum + getPastureStableCount(player, pasture), 0)
+
+export const getPastureViews = (player: Pick<PlayerState, 'pastures' | 'stableTiles'>): Pasture[] =>
+  player.pastures.map(pasture => ({
+    ...pasture,
+    tiles: pasture.tiles.map(tile => ({ ...tile })),
+    size: getPastureSize(pasture),
+    stables: getPastureStableCount(player, pasture),
+    capacity: getPastureCapacity(player, pasture),
     hasWell: false,
   }))
-}

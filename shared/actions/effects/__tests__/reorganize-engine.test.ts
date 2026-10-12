@@ -8,6 +8,7 @@ import type {
   PlayerState,
 } from '../../../contract/types'
 import { getActiveCardRegistry } from '../../../cards/active-registry'
+import { getPastureCapacity } from '../../../domain/pasture'
 import '../../../cards/B/B012_Stockyard'
 import '../../../cards/C/C011_WildlifeReserve'
 import '../../../cards/C/C148_MudWallower'
@@ -294,7 +295,7 @@ describe('reorganizeAction.resolveChoice', () => {
     expect(result.type).toBe('ok')
     expect(ctx.player.resources.sheep).toBe(2)
     expect(ctx.player.pastures.map((pasture) => pasture.animalCount)).toEqual([2, 0])
-    expect(ctx.player.pastures.map((pasture) => pasture.size * 2 * (2 ** pasture.stables))).toEqual([2, 2])
+    expect(ctx.player.pastures.map((pasture) => getPastureCapacity(ctx.player, pasture))).toEqual([2, 2])
   })
 
   it('confirm with zones reduces reserve sheep when assigned to pasture', () => {

@@ -1,6 +1,7 @@
 import type { ActionChoiceOption, ActionDefinition, ActionExecutionContext, ActionExecutionResult, ActionFlow, ChoiceEffectPreview, GameState, OrdinaryCardType, PlayerState, Resource } from '../contract/types'
 import { animalKeysForState, type AnimalKey } from '../contract/animals'
 import { countUnusedFarmyardSpaces } from '../domain/farm'
+import { getFencedStableCount } from '../domain/pasture'
 import { computeAnimalZones } from '../domain/animal-zones'
 import { buildSowFarmInteraction } from '../domain/farmyard-interaction'
 import { validateSow } from '../actions/effects/sow'
@@ -110,7 +111,7 @@ export const isFatherRequirementSatisfied = (
         case 'stable':
           return player.stableTiles.length >= requirement.amount
         case 'fenced-stable':
-          return player.pastures.reduce((sum, pasture) => sum + pasture.stables, 0) >= requirement.amount
+          return getFencedStableCount(player) >= requirement.amount
         case 'family-member':
           return player.workers.filter((worker) => worker.isActive).length >= requirement.amount
         case 'fence':

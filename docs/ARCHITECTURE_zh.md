@@ -1153,7 +1153,7 @@ shared/domain/
 ├── player-board.ts    PlayerBoard（playerBoard 工厂）
 ├── farmyard.ts        农场规则校验 / normalizePlayerFarm
 ├── farmyard-interaction.ts  farm-select / farm-position 交互 payload 投影
-├── pasture.ts         围栏验证 / computePasturesFromFences
+├── pasture.ts         派生牧场面积、马厩数量与基础容量
 ├── animal-zones.ts    动物分区容量与容纳判定（getTotalAnimalCapacity / getPastureCapacity / canAccommodateAnimalTotals）
 ├── animals.ts         动物模型
 ├── scoring.ts         计分 / PlayerScoreSummary
@@ -1165,6 +1165,8 @@ shared/domain/
 `PlayerBoard(player, state)` 暴露 `farmyard`、`farmInteraction`、`animals` 三个子边界。`farmyard` 只做农场规则校验与查询（如 `canPlow` / `canSow` / `canBuildFence` / `canBuildRoom` / `canBuildStable`）；`farmInteraction` 只把当前玩家农场、行动上下文和支付可行性派生成 `farm-select` / `farm-position` `InteractionRequest` payload；`animals` 负责动物分区容量与容纳判定。前端本地 farm draft 只消费服务端给出的 interaction payload，不调用这些规则边界。
 
 域聚合可被三方共用（主 client + sandbox + server），属于 `[A]` 主 bundle 安全层。
+
+`PlayerState.pastures` 保存牧场身份、格子与动物分配，不保存 `size` 或 `stables`。`getPastureSize()`、`getPastureStableCount()` 和 `getFencedStableCount()` 从牧场格子与当前 `stableTiles` 派生这些事实；`getPastureViews()` 返回脱离原状态的视图，包含实时面积、马厩数量与基础容量。动物区容量修正先接收这些当前视图，再按 replacement、additive 顺序执行。建造与归还马厩只改变真实马厩位置，规则查询、计分及父母卡条件随即读到结果，无需同步额外计数。序列化的玩家牧场增加仅用于展示的 `size` 和 `stables`；加载时移除这些字段，保留牧场身份和动物分配。读取视图或序列化不会重新分配动物，也不写入规则状态。
 
 `Scoring Reserve` 是终局计分选择占用，不是 Payment Pipeline。卡牌通过 `special-effect.record-scoring-reserve-bonus` 把 `{ reserved, score, cardType? }` 写入目标玩家的 `cardStates[sourceCard].extraData.scoringReserveBonus`；`computeScores()` 先汇总所有已选 Scoring Reserve 并从 scoring clone 扣除，再运行现有 automatic costed-bonus solver。若后续 pre-scoring 行动使玩家无法覆盖合并后的选择，则整组 reserve 及其 bonus entry 改为失效。之后 resource-based major scoring 读取最终 clone 的剩余资源。`ScoreEntry.type='bonus'` 必须携带 `cardId`，并可以携带 `cardType` / `reserved` attribution；当 target player 没有打出 source card 时，`cardType` 由 Scoring Reserve 记录显式提供。
 

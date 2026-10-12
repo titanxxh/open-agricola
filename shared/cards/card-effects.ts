@@ -1,4 +1,5 @@
-import type { ActionFlow, FarmTilePosition, GameState, InteractionRequest, Pasture, PaymentResourceMap, PlayerState, ProtectedObservation, Resource, ResourceKey } from '../contract/types'
+import type { ActionFlow, FarmTilePosition, GameState, InteractionRequest, PaymentResourceMap, PlayerState, ProtectedObservation, Resource, ResourceKey } from '../contract/types'
+import type { Pasture } from '../domain/pasture'
 import type { PurchaseOutcomeRule } from '../contract/rule-plans'
 import type { CardPayment } from '../contract/events'
 import type { PrivateGameEvent } from '../contract/private-events'

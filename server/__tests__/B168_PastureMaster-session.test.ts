@@ -60,13 +60,12 @@ describe('B168_PastureMaster session', () => {
     player.pastures = [
       {
         id: 'p1',
-        size: 2,
         tiles: [{ row: 0, col: 2 }, { row: 0, col: 3 }],
-        stables: 1,
         animalType: 'sheep',
         animalCount: 2,
       },
     ]
+    player.stableTiles = [{ row: 0, col: 2 }]
 
     const result = executeCardListener(listener!, {
       state,
@@ -94,29 +93,24 @@ describe('B168_PastureMaster session', () => {
     player.pastures = [
       {
         id: 'p1',
-        size: 2,
         tiles: [{ row: 0, col: 2 }, { row: 0, col: 3 }],
-        stables: 1,
         animalType: 'sheep',
         animalCount: 3,
       },
       {
         id: 'p2',
-        size: 1,
         tiles: [{ row: 1, col: 2 }],
-        stables: 1,
         animalType: 'boar',
         animalCount: 1,
       },
       {
         id: 'p3',
-        size: 1,
         tiles: [{ row: 2, col: 2 }],
-        stables: 0, // no stable
         animalType: 'cattle',
         animalCount: 2,
       },
     ]
+    player.stableTiles = [{ row: 0, col: 2 }, { row: 1, col: 2 }]
 
     const result = executeCardListener(listener!, {
       state,
@@ -147,13 +141,12 @@ describe('B168_PastureMaster session', () => {
     player.pastures = [
       {
         id: 'p1',
-        size: 2,
         tiles: [{ row: 0, col: 2 }, { row: 0, col: 3 }],
-        stables: 1,
         animalType: null,
         animalCount: 0,
       },
     ]
+    player.stableTiles = [{ row: 0, col: 2 }]
 
     const result = executeCardListener(listener!, {
       state,
@@ -234,7 +227,6 @@ describe('B168 Pasture Master parity', () => {
     owner.resources.reed = 1
     owner.pastures = pastures.map((pasture) => ({
       id: pasture.id,
-      size: 1,
       tiles: [{ row: pasture.row, col: pasture.col }],
       stables: pasture.stable ? 1 : 0,
       animalType: pasture.animalType,

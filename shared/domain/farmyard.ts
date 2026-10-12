@@ -4,6 +4,7 @@ import type {
   FenceSegmentType,
   GameState,
   PlayerState,
+  Pasture,
   FarmTilePosition,
 } from '../contract/types.ts'
 import {
@@ -19,7 +20,7 @@ import {
 } from '../domain/farm.ts'
 import { ANIMAL_KEYS } from './animal-holder-state.ts'
 import { ALL_ANIMAL_KEYS, type AnimalKey } from '../contract/animals.ts'
-import { computePasturesFromFences, type Pasture as PastureView } from './pasture.ts'
+import { getPastureCapacity, getPastureSize, getPastureViews, type Pasture as PastureView } from './pasture.ts'
 import { isOwnOrdinaryFenceSegment } from './fence-segments.ts'
 import { computeFencedRegions } from './farmyard-regions.ts'
 
@@ -39,14 +40,7 @@ export type FarmField = {
   col: number
 }
 
-export type Pasture = {
-  id: string
-  size: number
-  tiles: FarmTilePosition[]
-  stables: number
-  animalType: AnimalKey | null
-  animalCount: number
-}
+export type { Pasture } from '../contract/types.ts'
 
 type FarmAnimalType = NonNullable<Pasture['animalType']>
 
@@ -355,9 +349,6 @@ export function normalizePlayerFarm<T extends PlayerFarmState>(player: T): T {
   }
 }
 
-const getPastureCapacityLocal = (pasture: Pasture) =>
-  pasture.size * 2 * Math.pow(2, pasture.stables ?? 0)
-
 const animalTypesForPlayer = (player: PlayerFarmAnimalState): readonly AnimalKey[] =>
   (player.resources?.horse ?? 0) > 0 ||
   player.houseAnimalType === 'horse' ||
@@ -393,7 +384,7 @@ const enforcePastureAnimalCapacity = (
     )
   }
   player.pastures = (player.pastures ?? []).map((pasture) => {
-    const capacity = getPastureCapacityLocal(pasture)
+    const capacity = getPastureCapacity(player, pasture)
     if (pasture.animalType) {
       const remaining = totals[pasture.animalType] ?? 0
       const count = Math.min(remaining, capacity)
@@ -408,7 +399,7 @@ const enforcePastureAnimalCapacity = (
   })
   const fillPasture = (pasture: Pasture, animalType: Pasture['animalType']) => {
     if (!animalType) return pasture
-    const capacity = getPastureCapacityLocal(pasture)
+    const capacity = getPastureCapacity(player, pasture)
     const remaining = totals[animalType] ?? 0
     if (remaining <= 0) return pasture
     const count = Math.min(remaining, capacity)
@@ -1178,7 +1169,6 @@ export const validateFenceSelection = <T extends PlayerFarmState>(
     }
   }
 
-  const stableSet = new Set(normalized.stableTiles.map(localPositionKey))
   const pastureRegions = options.suppressTerrainRegions
     ? fencedRegions.filter((region) =>
       !region.tiles.some((tile) => terrainSet.has(localPositionKey(tile))),
@@ -1186,11 +1176,7 @@ export const validateFenceSelection = <T extends PlayerFarmState>(
     : fencedRegions
   const pastures: Pasture[] = pastureRegions.map((region, index) => ({
     id: `pasture-${index + 1}`,
-    size: region.tiles.length,
     tiles: region.tiles,
-    stables: region.tiles.filter((tile) =>
-      stableSet.has(localPositionKey(tile)),
-    ).length,
     animalType: null,
     animalCount: 0,
   }))
@@ -1219,7 +1205,7 @@ export const validateFenceSelection = <T extends PlayerFarmState>(
   const pastureSizeError =
     sizeBounds &&
     newPastures
-      .map((pasture) => boundError(pasture.size, sizeBounds))
+      .map((pasture) => boundError(getPastureSize(pasture), sizeBounds))
       .find((error): error is 'TOO_FEW_FENCES' | 'TOO_MANY_FENCES' => error !== undefined)
   if (pastureSizeError) {
     return {
@@ -1237,7 +1223,7 @@ export const validateFenceSelection = <T extends PlayerFarmState>(
   const newPastureBounds = options.newPastureBounds
   if (newPastureBounds) {
     const count = newPastures.length
-    const totalSize = newPastures.reduce((sum, pasture) => sum + pasture.size, 0)
+    const totalSize = newPastures.reduce((sum, pasture) => sum + getPastureSize(pasture), 0)
     const countBounds = newPastureBounds.count
     const sizeBounds = newPastureBounds.totalSize
     const countTooLow = countBounds?.min !== undefined && count < countBounds.min
@@ -1471,7 +1457,7 @@ export class Farmyard {
 
   /** Derived pasture view (projected from `player.pastures`). */
   pastures(): PastureView[] {
-    return computePasturesFromFences(this.player)
+    return getPastureViews(this.player)
   }
 
   /** Currently-placed fence edges (raw edge IDs). */

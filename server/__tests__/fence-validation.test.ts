@@ -778,7 +778,7 @@ describe('validateFenceSelection — generic fence policy', () => {
     player.houseAnimalCount = 0
     player.stableAnimals = {}
     player.pastures = [
-      { id: 'old-pasture', size: 1, tiles: [{ row: 2, col: 1 }], stables: 0, animalType: 'boar', animalCount: 1 },
+      { id: 'old-pasture', tiles: [{ row: 2, col: 1 }], animalType: 'boar', animalCount: 1 },
     ]
     player.cardStates = {
       C148_MudWallower: { counters: { counter: 0, held: 2 } },
@@ -810,12 +810,10 @@ describe('validateFenceSelection — generic fence policy', () => {
     player.pastures = [
       {
         id: 'pasture-1',
-        size: 2,
         tiles: [
           { row: 0, col: 1 },
           { row: 0, col: 2 },
         ],
-        stables: 0,
         animalType: null,
         animalCount: 0,
       },
@@ -846,12 +844,10 @@ describe('validateFenceSelection — generic fence policy', () => {
     player.pastures = [
       {
         id: 'pasture-1',
-        size: 2,
         tiles: [
           { row: 0, col: 1 },
           { row: 0, col: 2 },
         ],
-        stables: 0,
         animalType: null,
         animalCount: 0,
       },
@@ -889,7 +885,7 @@ describe('validateFenceSelection — generic fence policy', () => {
       expect(result.payableWoodCost).toBe(2)
       expect(result.player.resources.wood).toBe(0)
       expect(result.newPastures).toHaveLength(1)
-      expect(result.newPastures[0]?.size).toBe(2)
+      expect(result.newPastures[0]?.tiles).toHaveLength(2)
     }
   })
 
@@ -969,12 +965,10 @@ describe('validateFenceSelection — generic fence policy', () => {
     player.pastures = [
       {
         id: 'pasture-1',
-        size: 2,
         tiles: [
           { row: 0, col: 1 },
           { row: 0, col: 2 },
         ],
-        stables: 0,
         animalType: null,
         animalCount: 0,
       },

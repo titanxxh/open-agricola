@@ -1,4 +1,5 @@
 import { defineOccupationCard } from '../card-source'
+import { getFencedStableCount } from '../../domain/pasture'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 
@@ -20,11 +21,9 @@ const cardImpl = {
     return gainLeaf(CARD_ID, { wood })
   },
   computeSharedPostScore: (state) => {
-    const fencedStables = (player: (typeof state.players)[number]) =>
-      player.pastures.reduce((sum, pasture) => sum + pasture.stables, 0)
-    const maxCount = Math.max(...state.players.map(fencedStables))
+    const maxCount = Math.max(...state.players.map(getFencedStableCount))
     return state.players.flatMap((player) =>
-      fencedStables(player) === maxCount ? [{ playerId: player.id, score: 2 }] : [],
+      getFencedStableCount(player) === maxCount ? [{ playerId: player.id, score: 2 }] : [],
     )
   },
 },

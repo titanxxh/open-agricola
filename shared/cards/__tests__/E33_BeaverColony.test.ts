@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { getRegisteredCardListeners, executeCardListener } from '../card-listeners'
 import { getCardEffect } from '../card-effects'
 import { computeAnimalZones, type AnimalZone } from '../../domain/animal-zones'
-import type { ActionSpace, GameState, Pasture, PlayerState } from '../../contract/types'
+import type { ActionSpace, FarmTilePosition, GameState, Pasture, PlayerState } from '../../contract/types'
 import type { DraftGameEvent } from '../../contract/events'
 
 import '../E/E033_BeaverColony'
@@ -22,11 +22,9 @@ const reedMoved = (
   reason: 'collect',
 })
 
-const makePasture = (id: string, size: number, stables: number, animal?: { type: 'sheep' | 'boar' | 'cattle'; count: number }): Pasture => ({
+const makePasture = (id: string, tiles: FarmTilePosition[], animal?: { type: 'sheep' | 'boar' | 'cattle'; count: number }): Pasture => ({
   id,
-  size,
-  tiles: [],
-  stables,
+  tiles,
   animalType: animal?.type ?? null,
   animalCount: animal?.count ?? 0,
 })
@@ -86,10 +84,11 @@ describe('E033_BeaverColony pasture constraint', () => {
     const player = createPlayer()
     player.minorPlayed = [CARD_ID]
     player.pastures = [
-      makePasture('big', 3, 1),
-      makePasture('small', 1, 1),
-      makePasture('medium', 2, 0),
+      makePasture('big', [{ row: 1, col: 0 }, { row: 1, col: 1 }, { row: 1, col: 2 }]),
+      makePasture('small', [{ row: 1, col: 3 }]),
+      makePasture('medium', [{ row: 2, col: 0 }, { row: 2, col: 1 }]),
     ]
+    player.stableTiles = [{ row: 1, col: 0 }, { row: 1, col: 3 }]
 
     const zones: AnimalZone[] = [
       { id: 'big', zoneType: 'pasture' as const, capacity: 12, animalType: null, animalCount: 0, pastureIndex: 0 },
@@ -112,7 +111,8 @@ describe('E033_BeaverColony pasture constraint', () => {
 
   it('does not tag pastures when the card is not played', () => {
     const player = createPlayer()
-    player.pastures = [makePasture('p1', 1, 1)]
+    player.pastures = [makePasture('p1', [{ row: 1, col: 0 }])]
+    player.stableTiles = [{ row: 1, col: 0 }]
     const pastureZones = computeAnimalZones(player).filter((zone) => zone.zoneType === 'pasture')
     expect(pastureZones).toHaveLength(1)
     expect(pastureZones[0]?.capacity).toBe(4)
@@ -122,7 +122,7 @@ describe('E033_BeaverColony pasture constraint', () => {
   it('does not tag unstabled pastures', () => {
     const player = createPlayer()
     player.minorPlayed = [CARD_ID]
-    player.pastures = [makePasture('p1', 2, 0)]
+    player.pastures = [makePasture('p1', [{ row: 1, col: 0 }, { row: 1, col: 1 }])]
     const pastureZones = computeAnimalZones(player).filter((zone) => zone.zoneType === 'pasture')
     expect(pastureZones).toHaveLength(1)
     expect(pastureZones[0]?.capacity).toBe(4)
@@ -133,9 +133,10 @@ describe('E033_BeaverColony pasture constraint', () => {
     const player = createPlayer()
     player.minorPlayed = [CARD_ID]
     player.pastures = [
-      makePasture('p1', 1, 1, { type: 'sheep', count: 2 }),
-      makePasture('p2', 1, 1, { type: 'sheep', count: 2 }),
+      makePasture('p1', [{ row: 1, col: 0 }], { type: 'sheep', count: 2 }),
+      makePasture('p2', [{ row: 1, col: 1 }], { type: 'sheep', count: 2 }),
     ]
+    player.stableTiles = [{ row: 1, col: 0 }, { row: 1, col: 1 }]
     player.resources.sheep = 4
     const before = structuredClone(player)
 

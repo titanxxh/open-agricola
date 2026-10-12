@@ -293,7 +293,7 @@ describe('B149 Open Air Farmer session', () => {
     expect(player.supplyTokensConsumed?.stable).toBe(3)
     expect(player.fenceSegments).toHaveLength(6)
     expect(player.pastures).toHaveLength(1)
-    expect(player.pastures[0]?.size).toBe(2)
+    expect(player.pastures[0]?.tiles).toHaveLength(2)
     expect(fencingPayments(resp.state)).toEqual([
       expect.objectContaining({
         resources: { wood: 2 },

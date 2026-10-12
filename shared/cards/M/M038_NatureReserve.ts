@@ -77,7 +77,6 @@ const activateReserveTiles = (player: PlayerState) => {
   const fieldKeys = new Set(getFarmyardFields(player).map(positionKey))
   const regions = fencedRegions(player)
   const pastureRegions = new Set(player.pastures.map((pasture) => regionKey(pasture.tiles ?? [])))
-  const stableKeys = new Set(player.stableTiles.map(positionKey))
   const nextPastures = [...player.pastures]
   const remaining: ReserveTile[] = []
   for (const reserve of reserves) {
@@ -98,9 +97,7 @@ const activateReserveTiles = (player: PlayerState) => {
     if (pastureRegions.has(fencedKey)) continue
     nextPastures.push({
       id: `pasture-${nextPastures.length + 1}`,
-      size: region.tiles.length,
       tiles: region.tiles,
-      stables: region.tiles.filter((tile) => stableKeys.has(positionKey(tile))).length,
       animalType: null,
       animalCount: 0,
     })

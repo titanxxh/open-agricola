@@ -1,4 +1,5 @@
 import { defineMinorCard } from '../card-source'
+import { getFencedStableCount, getPastureStableCount } from '../../domain/pasture'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { playerBoard } from '../../domain'
@@ -47,7 +48,7 @@ const afterGainListener: CardListenerRegistration = {
 }
 
 const cardImpl = {
-  prerequisiteCheck: (player) => player.pastures.some((pasture) => pasture.stables > 0),
+  prerequisiteCheck: (player) => getFencedStableCount(player) > 0,
   listeners: [afterCollectListener, afterGainListener],
   effect: {
     id: CARD_ID,
@@ -62,8 +63,9 @@ const cardImpl = {
         if (
           zone.zoneType !== 'pasture'
           || typeof zone.pastureIndex !== 'number'
-          || (player.pastures[zone.pastureIndex]?.stables ?? 0) <= 0
         ) continue
+        const pasture = player.pastures[zone.pastureIndex]
+        if (!pasture || getPastureStableCount(player, pasture) <= 0) continue
         zone.requiredEmptyZoneGroupIds ??= []
         if (!zone.requiredEmptyZoneGroupIds.includes(REQUIRED_EMPTY_GROUP_ID)) {
           zone.requiredEmptyZoneGroupIds.push(REQUIRED_EMPTY_GROUP_ID)

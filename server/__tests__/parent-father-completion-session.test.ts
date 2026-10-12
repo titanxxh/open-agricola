@@ -55,9 +55,7 @@ const pasture = (
   animalCount = 0,
 ): PlayerState['pastures'][number] => ({
   id,
-  size: 1,
   tiles: [{ row, col }],
-  stables: 0,
   animalType,
   animalCount,
 })
@@ -132,7 +130,7 @@ const auditPastures = (player: PlayerState, rows: Array<{ col: number; size?: nu
   for (const [index, entry] of rows.entries()) {
     const size = entry.size ?? 1
     const tiles = Array.from({ length: size }, (_, offset) => ({ row: 0, col: entry.col + offset }))
-    player.pastures.push({ id: `pen-${index}`, tiles, size, stables: 0, animalType: entry.animal ?? null, animalCount: entry.count ?? 0 })
+    player.pastures.push({ id: `pen-${index}`, tiles, animalType: entry.animal ?? null, animalCount: entry.count ?? 0 })
     const edges = [...tiles.flatMap((tile) => [`H-0-${tile.col}`, `H-1-${tile.col}`]), `V-0-${entry.col}`, `V-0-${entry.col + size}`]
     for (const edge of edges) if (!player.fenceSegments.some((segment) => segment.edge === edge)) player.fenceSegments.push({ edge, type: 'fence', source: { kind: 'own', ownerPlayerId: player.id } })
     if (entry.animal) player.resources[entry.animal] += entry.count ?? 0
@@ -777,7 +775,6 @@ describe('Parents batch 2 father interaction boundaries', () => {
     auditPastures(player, [{ col: 4 }])
     player.fields = player.fields.filter((field) => field.col !== 4)
     player.stableTiles = [{ row: 0, col: 4 }]
-    player.pastures[0]!.stables = 1
     expect(countUnusedFarmyardSpaces(player)).toBe(8)
     expect(session.loadState(session.state).ok).toBe(true)
     const before = auditClone(session.state)
@@ -801,10 +798,8 @@ describe('Parents batch 2 father interaction boundaries', () => {
     if (mode === 'house') {
       if (father === 'PS09') {
         auditPastures(player, [{ col: 0, size: 4, animal, count: 2 }])
-        player.pastures[0]!.stables = player.stableTiles.length
       } else {
         player.stableTiles = [{ row: 0, col: 0 }]
-        player.pastures[0]!.stables = 1
         player.pastures[0]!.animalType = animal
         player.pastures[0]!.animalCount = 2
         player.resources[animal] = 2
@@ -818,7 +813,7 @@ describe('Parents batch 2 father interaction boundaries', () => {
       player.resources.cattle = 1
       for (const pen of player.pastures) {
         pen.animalType = 'cattle'
-        pen.animalCount = pen.size * 2
+        pen.animalCount = pen.tiles.length * 2
         player.resources.cattle += pen.animalCount
       }
       player.stableAnimals = Object.fromEntries(player.stableTiles.map((tile) => [`${tile.row}-${tile.col}`, 'cattle' as const]))

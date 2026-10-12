@@ -1171,7 +1171,7 @@ shared/domain/
 ├── player-board.ts          PlayerBoard and the playerBoard factory
 ├── farmyard.ts             farm-rule validation and normalizePlayerFarm
 ├── farmyard-interaction.ts interaction payload projections for farm-select and farm-position
-├── pasture.ts              fence validation and computePasturesFromFences
+├── pasture.ts              derived pasture sizes, stable counts and base capacity
 ├── animal-zones.ts         animal-zone capacity and accommodation
 ├── animals.ts              animal model
 ├── scoring.ts              scoring and PlayerScoreSummary
@@ -1183,6 +1183,8 @@ shared/domain/
 `PlayerBoard(player, state)` exposes three sub-boundaries: `farmyard`, `farmInteraction`, and `animals`. `farmyard` only validates and queries farm rules, such as `canPlow`, `canSow`, `canBuildFence`, `canBuildRoom`, and `canBuildStable`. `farmInteraction` only derives `farm-select` or `farm-position` `InteractionRequest` payloads from the current farm, action context, and payment feasibility. `animals` owns zone capacity and accommodation. A frontend local farm draft consumes only the server-provided interaction payload; it does not call these rule boundaries.
 
 Domain aggregation is shared by the main client, sandbox, and server and therefore belongs to bundle-safe layer `[A]`.
+
+`PlayerState.pastures` stores pasture identity, tiles and animal placement. It does not store `size` or `stables`: `getPastureSize()`, `getPastureStableCount()` and `getFencedStableCount()` derive those facts from pasture tiles and current `stableTiles`. `getPastureViews()` exposes detached views with the derived area, stable count and base capacity. Animal-zone capacity modifiers receive those current views before replacement and additive modifiers run. Construction and stable returns change only the real stable positions; rule queries, scoring and parent-card requirements immediately see the result without count synchronization. Serialized player pastures add display-only `size` and `stables`; loading removes those fields while preserving pasture identity and animal assignments. Reading a view or serializing it never redistributes animals or writes rule state.
 
 Scoring Reserve is a final-scoring choice reservation, not part of the Payment Pipeline. A card writes `{ reserved, score, cardType? }` to the target player's `cardStates[sourceCard].extraData.scoringReserveBonus` through `special-effect.record-scoring-reserve-bonus`. `computeScores()` aggregates every selected reserve and deducts it from a scoring clone before running the existing automatic costed-bonus solver. If later pre-scoring actions leave the player unable to cover the combined selection, the reserve bundle and its bonus entries are invalidated instead. Resource-based major scoring also reads remaining resources from the resulting clone. `ScoreEntry.type='bonus'` must carry `cardId` and may carry `cardType` and `reserved` attribution. If the target has not played the source card, the Scoring Reserve record supplies `cardType` explicitly.
 

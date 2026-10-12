@@ -426,9 +426,7 @@ export type FarmyardSpaceState = {
 
 export type Pasture = {
   id: string
-  size: number
   tiles: FarmTilePosition[]
-  stables: number
   animalType: AnimalKey | null
   animalCount: number
 }

@@ -26,6 +26,7 @@ import { rewriteCardId } from './extract'
 import { workshopCardJsonFromDefinition } from '../../server/workshop-draft-validation'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import { solveBonusScoring } from '../../shared/domain/scoring'
+import { getPastureCapacity } from '../../shared/domain/pasture'
 import {
   setWorkersAtHome,
   markAllWorkersUsed,
@@ -294,7 +295,7 @@ export interface AutoAdvanceOptions {
  * pasture layout matches their animal counts.
  */
 function buildPreservingZones(
-  player: any,
+  player: PlayerState,
 ): { id: string; zoneType: 'pasture' | 'house' | 'stable'; animalType: 'sheep' | 'boar' | 'cattle' | null; animalCount: number }[] {
   const remaining: Record<'sheep' | 'boar' | 'cattle', number> = {
     sheep: player.resources?.sheep ?? 0,
@@ -304,8 +305,8 @@ function buildPreservingZones(
   const zones: { id: string; zoneType: 'pasture' | 'house' | 'stable'; animalType: 'sheep' | 'boar' | 'cattle' | null; animalCount: number }[] = []
   // Pasture zones: prefer existing animalType, else pick any species with >0.
   for (const pasture of player.pastures ?? []) {
-    const cap = (pasture.size ?? 1) * 2 + (pasture.stables ?? 0) * (pasture.size ?? 1) * 2
-    const preferred: 'sheep' | 'boar' | 'cattle' | null = pasture.animalType ?? null
+    const cap = getPastureCapacity(player, pasture)
+    const preferred = pasture.animalType === 'horse' ? null : pasture.animalType
     let chosen: 'sheep' | 'boar' | 'cattle' | null = null
     if (preferred && remaining[preferred] > 0) chosen = preferred
     else {
@@ -323,8 +324,8 @@ function buildPreservingZones(
   }
   // House zone (1 animal of any type).
   let houseAssigned = false
-  if (player.houseAnimalType && remaining[player.houseAnimalType as 'sheep' | 'boar' | 'cattle'] > 0) {
-    const k = player.houseAnimalType as 'sheep' | 'boar' | 'cattle'
+  if (player.houseAnimalType && player.houseAnimalType !== 'horse' && remaining[player.houseAnimalType] > 0) {
+    const k = player.houseAnimalType
     zones.push({ id: 'house', zoneType: 'house', animalType: k, animalCount: 1 })
     remaining[k] -= 1
     houseAssigned = true

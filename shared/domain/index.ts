@@ -21,11 +21,10 @@ export {
   AnimalZones,
   type AnimalZone,
   getTotalAnimalCapacity,
-  getPastureCapacity,
   isHouseAnimalZone,
   countHouseAnimals,
 } from './animal-zones.ts'
-export { computePasturesFromFences, type Pasture } from './pasture.ts'
+export { getPastureViews, getPastureSize, getPastureStableCount, getPastureCapacity, getFencedStableCount, type Pasture } from './pasture.ts'
 export {
   Scoring,
   type PlayerScoreSummary,
