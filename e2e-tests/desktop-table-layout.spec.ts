@@ -27,10 +27,9 @@ async function prepareTable(request: APIRequestContext) {
   other.occupationPlayed = ['A119_FirewoodCollector']
   other.minorPlayed = []
   other.cardStates = {}
-  other.pastures = [{ id: 'public-pasture', size: 1, tiles: [{ row: 1, col: 4 }], stables: 1, animalType: 'sheep', animalCount: 3 }]
+  other.pastures = [{ id: 'public-pasture', tiles: [{ row: 1, col: 4 }], animalType: 'sheep', animalCount: 3 }]
   other.stableTiles = [{ row: 1, col: 4 }]
   other.fenceSegments = ['H-1-4', 'H-2-4', 'V-1-4', 'V-1-5'].map(edge => ({ edge, type: 'fence', source: { kind: 'own', ownerPlayerId: other.id } }))
-  other.fences = 4
   other.resources.sheep = 3
   expect((await postJson(request, `${BACKEND_URL}/api/game/load`, { state })).ok).toBe(true)
 }
@@ -49,10 +48,13 @@ for (const width of [2239, 1920, 1440]) {
     await expect(page.locator('.desktop-public-farms [data-card-anchor="A102_Grocer"]')).toHaveCount(0)
     await expect(page.locator('.game-layout__center .resource-clay .resource-chip-count')).toHaveText('8')
     await expect(page.getByTestId('played-card-held-worker-C022_BasketChair')).toBeVisible()
-    await expect(page.locator('.seasons-board__map--compact')).toBeVisible()
-    const compactSeasons = await page.locator('.seasons-board__space-button').evaluateAll(buttons => buttons.map(button => ({ season: button.getAttribute('data-season'), left: button.getBoundingClientRect().left })))
-    expect(compactSeasons.map(button => button.season)).toEqual(['winter', 'spring', 'summer', 'autumn'])
-    expect(compactSeasons.map(button => button.left)).toEqual([...compactSeasons.map(button => button.left)].sort((a, b) => a - b))
+    const seasons = page.locator('.seasons-board__map')
+    await expect(seasons).toBeVisible()
+    await expect(seasons).toHaveCSS('background-image', /through-the-seasons-clean-background\.jpg/)
+    await expect(seasons.locator('.seasons-board__token')).toBeVisible()
+    await expect(seasons.locator('.seasons-board__route')).toBeVisible()
+    await expect(seasons.locator('.seasons-board__resource-adjustment').first()).toBeVisible()
+    expect(await seasons.locator('.seasons-board__space-button').evaluateAll(buttons => buttons.map(button => button.getAttribute('data-season')))).toEqual(['winter', 'spring', 'autumn', 'summer'])
 
     const geometry = await page.evaluate(() => {
       const center = document.querySelector('.game-layout__center')
@@ -97,7 +99,7 @@ for (const width of [2239, 1920, 1440]) {
     await expect(page.locator('.game-layout__center .hand-cards')).toBeVisible()
     await expect(page.locator('.game-layout__hand')).toHaveCount(0)
     await expect(page.locator('.desktop-public-farms')).toHaveCount(0)
-    await expect(page.locator('.seasons-board__map--compact')).toHaveCount(0)
+    await expect(seasons).toHaveCSS('background-image', /through-the-seasons-clean-background\.jpg/)
     expect(await page.locator('.seasons-board__space-button').evaluateAll(buttons => buttons.map(button => button.getAttribute('data-season')))).toEqual(['winter', 'spring', 'autumn', 'summer'])
     expect(await page.locator('.game-layout__center .played-row .player-card').first().evaluate(element => element.getBoundingClientRect().width)).toBeLessThan(50)
     await page.setViewportSize({ width, height: 1271 })
@@ -116,3 +118,39 @@ for (const width of [2239, 1920, 1440]) {
     }
   })
 }
+
+test('square played cards keep their frame artwork aligned with the full card', async ({ page, request }) => {
+  await prepareTable(request)
+  const { state }: { state: GameState } = await getJson(request, `${BACKEND_URL}/api/game/state`)
+  state.players[0]!.minorPlayed.push('D060_LargePottery')
+  state.players[0]!.improvements.push('Major_Joinery')
+  expect((await postJson(request, `${BACKEND_URL}/api/game/load`, { state })).ok).toBe(true)
+  await page.goto('/?page=game&player=p1&embedded=1&devMode=1')
+
+  for (const cardId of ['D106_WhiskyDistiller', 'B100_Clutterer', 'D075_WoodField', 'D060_LargePottery', 'Major_Joinery']) {
+    const played = page.locator(`.game-layout__center .played-row [data-card-anchor="${cardId}"]`)
+    await expect(played).toBeVisible()
+    await played.hover()
+    const preview = page.locator('.card-hover-preview .player-card')
+    await expect(preview).toBeVisible()
+    const spriteGeometry = (card: Element) => {
+      const frame = card.querySelector<HTMLElement>('.card-frame')!
+      const icon = card.querySelector<HTMLElement>('.card-icon')!
+      const style = getComputedStyle(frame)
+      const [width, height = 'auto'] = style.backgroundSize.split(' ')
+      const paintAreaHeight = frame.offsetHeight - Number.parseFloat(style.borderTopWidth) - Number.parseFloat(style.borderBottomWidth)
+      return {
+        frameImage: style.backgroundImage,
+        framePaintWidth: width,
+        framePaintHeight: height.endsWith('%') ? paintAreaHeight * Number.parseFloat(height) / 100 : height === 'auto' ? height : Number.parseFloat(height),
+        icon: { left: icon.offsetLeft, top: icon.offsetTop, width: icon.offsetWidth, height: icon.offsetHeight, position: getComputedStyle(icon).backgroundPosition },
+      }
+    }
+    expect(await played.evaluate(spriteGeometry), cardId).toEqual(await preview.evaluate(spriteGeometry))
+    const box = await played.boundingBox()
+    expect(box?.width).toBeCloseTo(150, 0)
+    expect(box?.height).toBeCloseTo(150, 0)
+    await page.mouse.move(0, 0)
+    await expect(preview).toHaveCount(0)
+  }
+})

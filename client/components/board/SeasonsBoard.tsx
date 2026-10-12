@@ -12,11 +12,9 @@ type Props = {
   players: PlayerState[]
   canTakeAction: (space: ActionSpace) => boolean
   takeAction: (spaceId: string) => void
-  compact?: boolean
 }
 
 const seasonOrder: SeasonId[] = ['winter', 'spring', 'autumn', 'summer']
-const compactSeasonOrder: SeasonId[] = ['winter', 'spring', 'summer', 'autumn']
 
 const seasonLabelKey: Record<SeasonId, string> = {
   winter: 'ui.seasons.winter',
@@ -227,7 +225,6 @@ export const SeasonsBoard = ({
   players,
   canTakeAction,
   takeAction,
-  compact = false,
 }: Props) => {
   const actionById = new Map(seasonActions.map((action) => [action.id, action]))
   const playerById = new Map(players.map((player) => [player.id, player]))
@@ -236,7 +233,7 @@ export const SeasonsBoard = ({
   return (
     <section className="seasons-board" aria-label={t(locale, 'ui.seasons.board')}>
       <h2 className="seasons-board__title">{t(locale, 'ui.seasons.board')}</h2>
-      <div className={`seasons-board__map${compact ? ' seasons-board__map--compact' : ''}`} data-board-art="clean-background">
+      <div className="seasons-board__map" data-board-art="clean-background">
         {boardLabelKeys.map(([className, labelKey]) => (
           <span key={className} className={`seasons-board__board-copy seasons-board__board-copy--${className}`}>
             {t(locale, labelKey)}
@@ -267,7 +264,7 @@ export const SeasonsBoard = ({
         <div className={`seasons-board__token seasons-board__token--${currentSeason}`} aria-hidden="true">
           {locale === 'zh' ? t(locale, `ui.seasons.short.${currentSeason}`) : englishSeasonToken[currentSeason]}
         </div>
-        {(compact ? compactSeasonOrder : seasonOrder).map((season) => {
+        {seasonOrder.map((season) => {
           const action = actionById.get(seasonActionIdBySeason[season])
           const seasonName = t(locale, seasonLabelKey[season])
           const actionName = action ? t(locale, action.nameKey) : t(locale, 'ui.seasons.missingAction')
@@ -293,7 +290,6 @@ export const SeasonsBoard = ({
                 if (action && available) takeAction(action.id)
               }}
             >
-              {compact ? <span className="seasons-board__compact-name">{seasonName}</span> : null}
               <span className="seasons-board__season-action-card">
                 <span className="seasons-board__action-header">
                   {actionName}
@@ -301,19 +297,6 @@ export const SeasonsBoard = ({
                 <SeasonActionBody locale={locale} season={season} />
                 <span className="seasons-board__action-footer" />
               </span>
-              {compact ? (
-                <span className="seasons-board__compact-adjustments">
-                  {seasonResourceAdjustments.filter(adjustment => adjustment.className.startsWith(`${season}-`)).map(adjustment => (
-                    <span key={adjustment.className}>
-                      {adjustment.labelKey ? <span>{t(locale, adjustment.labelKey)} </span> : null}
-                      {adjustment.accumulation ? <span aria-hidden="true">↗ </span> : null}
-                      <SeasonIconRow items={adjustment.items} />
-                    </span>
-                  ))}
-                  {season === 'winter' ? <span>{t(locale, 'ui.seasons.boardCopy.winterFishing')}</span> : null}
-                  {season === 'summer' ? <span>{t(locale, 'ui.seasons.boardCopy.summerNoHeating')}</span> : null}
-                </span>
-              ) : null}
               <span className="seasons-board__badge">
                 {isOccupied ? t(locale, 'ui.seasons.occupied') : available ? t(locale, 'ui.seasons.open') : t(locale, 'ui.seasons.locked')}
               </span>
