@@ -2708,7 +2708,7 @@ export const zh = {
       anytime: '{card:C143_StoneBuyer}：支付 2 食物 → 1 石料',
     },
     C150_ParrotBreeder: {
-      anytime: '{card:C150_ParrotBreeder}：付1食物 → 获1食物',
+      anytime: '{card:C150_ParrotBreeder}：支付 1 谷物，使用右邻最后使用的行动格',
     },
     C018_RollOverPlow: {
       anytime: '{card:C018_RollOverPlow}：弃掉田地里的作物 → 犁地',

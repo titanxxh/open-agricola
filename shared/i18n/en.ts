@@ -1936,7 +1936,7 @@ export const en = {
       anytime: '{card:B085_FarmHand}: Pay 1 Food → 1 Grain',
     },
     C150_ParrotBreeder: {
-      anytime: '{card:C150_ParrotBreeder}: Pay 1 Food → 1 Food',
+      anytime: '{card:C150_ParrotBreeder}: Pay 1 grain to copy your right neighbour\'s last action space',
     },
     C039_StudioBoat: {
       desc: 'Gain 1 occupation card',

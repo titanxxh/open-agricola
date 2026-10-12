@@ -48,7 +48,7 @@
 | 卡牌 | 参考实现 | OA | 比例 | 原因 / 后续判断 |
 |---|---:|---:|---:|---|
 | `B093_Confidant` | 59 | 132 | 2.24 | 参考实现用 `FOODPLUS` future meeple + `getPostReceiveBonus()` 隐式串起返还 food 后的 sow/fence；OA 还要显式处理职业支付时的 `reserveResources`、lessons doability、future meeple resolved provenance、防重复 `lastResolvedRound`、以及 1 wood fence policy。可等 future meeple 支持 post-receive bonus 后再简化。 |
-| `C150_ParrotBreeder` | 67 | 147 | 2.19 | 参考实现直接读座位 / actionCardId，并用 flag + extraData + dummy playerConstraint 注入已占行动格；OA 需要显式追踪右邻、anytime 付 grain 后 flag、自己 / 对手放人后清理、再向 `place-farmer` 注入 occupied option。完整单卡状态机，暂不抽通用 helper。 |
+| `C150_ParrotBreeder` | 67 | 147 | 2.19 | 保持卡内闭环：预留 1 谷物后检查唯一目标，再通过现有回合替换流程支付并执行受约束的放人。右邻目标按实际放人时序追踪，包含搬迁，不依赖 after listener 的结算顺序。Session 回归覆盖准入、支付、复制、撤销和轮转（#1117）。 |
 | `C094_StableCleaner` | 42 | 78 | 1.86 | 参考实现直接返回 fixed-cost `STABLES` flow；OA 在暴露 anytime 前要 probe `stables` 的 cost modifier / affordability，并显式包 flag、`trueAction:false`、固定 cost context 和执行后清理。若 anytime action 可统一内建 affordability probe，可再降。 |
 | `B157_Salter` | 104 | 177 | 1.70 | 参考实现的 `payNode` / `argsSalt` / `actSalt` 承担动物选择与支付；OA 需要自定义 `resource-quantity-select` ad-hoc action、校验动物必须来自农场且 reserve 为空、从 board 扣动物、单动物快捷路径、future food schedule 和日志。参考实现本身也长，优先级低。 |
 | `A130_MummysBoy` | 53 | 90 | 1.70 | 参考实现依赖 `Globals::getPlacedFarmers()` / `Farmers` manager 直接找到第 2 个农夫位置并注入 dummy action；OA 需要用 placement order、occupied-space option、meeting-place 过滤、once-per-round flag 和 start-turn 清理显式实现。和 C150 同类，除非抽 occupied action helper，否则保持卡内闭环。 |
