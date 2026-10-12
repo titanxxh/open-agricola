@@ -275,6 +275,13 @@ const inspectMobileInformation = async (
   await expect(logSection.locator('.action-log__entry').first()).toBeVisible()
 }
 
+const expandScorePanel = async (page: Page, locale: LocaleScenario) => {
+  const section = page.locator('.game-layout__right .section', {
+    has: page.locator('.section__title', { hasText: locale.score }),
+  })
+  await section.getByRole('button', { name: locale.expand }).click()
+}
+
 const GAMEPLAY_VIEWPORTS = [
   { width: 375, height: 812, orientation: 'portrait' },
   { width: 390, height: 844, orientation: 'portrait' },
@@ -310,12 +317,17 @@ for (const viewport of GAMEPLAY_VIEWPORTS) {
     await openStandaloneSandbox(page, ENGLISH)
 
     await expect(page.locator('.action-board')).toBeVisible()
-    await expect(page.locator('.farm-grid')).toBeVisible()
-    await expect(page.locator('.played-cards')).toBeVisible()
+    const personal = page.locator('.game-layout__center')
+    await expect(personal.locator('.farm-grid')).toBeVisible()
+    await expect(personal.locator('.played-cards')).toBeVisible()
     if (viewport.width <= 900) {
       await expect(page.getByRole('navigation', { name: 'Game presentation' })).toHaveCount(0)
       await expect(page.locator('.game-layout__right')).toBeVisible()
     } else {
+      if (viewport.width >= 1101) {
+        await expect(page.locator('.desktop-player-overview')).toBeVisible()
+        await expandScorePanel(page, ENGLISH)
+      }
       await expect(page.locator('.score-panel')).toBeVisible()
       await expect(page.locator('.action-log')).toBeVisible()
     }
@@ -476,6 +488,8 @@ test('real WebSocket 6-player boundary locks p6 identity and observes p1 farm in
     await completePlowInteraction(p1, ENGLISH)
     await expect(p6.locator('.action-card-holder.taken')).toHaveCount(1)
     await inspectMobileInformation(p1, ENGLISH, 6)
+    await expect(p6.locator('.desktop-player-overview__player')).toHaveCount(6)
+    await expandScorePanel(p6, ENGLISH)
     await expect(p6.locator('.score-panel__row')).toHaveCount(6)
     await expect(p6.locator('.action-log__entry').first()).toBeVisible()
   } finally {
