@@ -1841,7 +1841,6 @@ export const GameContainerApi = () => {
       {state.enableThroughTheSeasons && state.throughTheSeasons ? (
         <section className="board-panel board-seasons">
           <SeasonsBoard
-            compact={isDesktopTable}
             locale={locale}
             throughTheSeasons={state.throughTheSeasons}
             seasonActions={seasonActions}

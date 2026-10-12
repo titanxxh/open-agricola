@@ -74,6 +74,11 @@
     height: 235px;
     overflow: hidden;
   }
+  .app--desktop-table .played-cards .card-frame {
+    /* Crop the native 374px frame, rather than stretching it into a square.
+       Its paint area excludes the two 4px borders. */
+    background-size: 300% 366px;
+  }
   .app--desktop-table .played-cards .card-title {
     font-size: 19px;
     line-height: 21px;
@@ -150,57 +155,6 @@
     align-items: start;
   }
   .desktop-public-farm { min-width: 0; max-width: 740px; }
-
-  .seasons-board__map--compact {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 8px;
-    aspect-ratio: auto;
-    background: none;
-  }
-  .seasons-board__map--compact > .seasons-board__board-copy,
-  .seasons-board__map--compact > .seasons-board__resource-adjustment,
-  .seasons-board__map--compact > .seasons-board__route,
-  .seasons-board__map--compact > .seasons-board__token { display: none; }
-  .seasons-board__map--compact .seasons-board__space-button {
-    position: relative;
-    inset: auto;
-    width: auto;
-    height: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    overflow: visible;
-    padding: 8px;
-    background: #ece9db;
-    border: 1px solid #d7d0ba;
-    --seasons-board-copy-size: 13px;
-  }
-  .seasons-board__map--compact .seasons-board__space-button.is-current {
-    background: #e2edcf;
-    border-color: #718c52;
-  }
-  .seasons-board__map--compact .seasons-board__space-button::before { display: none; }
-  .seasons-board__map--compact .seasons-board__season-action-card {
-    position: relative;
-    inset: auto;
-    width: 100%;
-    height: 160px;
-    flex: 0 0 160px;
-    box-shadow: none;
-  }
-  .seasons-board__map--compact .seasons-board__action-header { font-size: 14px; line-height: 1.1; }
-  .seasons-board__compact-name { font-weight: 600; font-size: 14px; }
-  .seasons-board__compact-adjustments { display: grid; gap: 5px; font-size: 12px; text-align: left; }
-  .seasons-board__map--compact .seasons-board__badge {
-    position: static;
-    width: auto;
-    height: auto;
-    clip-path: none;
-    font-size: 12px;
-    margin-top: auto;
-  }
-  .seasons-board__map--compact .seasons-board__worker { bottom: 120px; font-size: 12px; }
 
   @media (max-width: 1759px) {
     .app--desktop-table .game-layout {
