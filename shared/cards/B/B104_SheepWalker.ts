@@ -15,9 +15,9 @@ export const B104_SheepWalker = defineOccupationCard({
     cost: {},
     players: '1+',
     exchanges: [
-        { from: { sheep: 1 }, to: { boar: 1 }, fromFarmyard: true, triggers: ['anytime', 'harvest'], blockedAnytimeInteractionKinds: ['animal-reorg'] },
-        { from: { sheep: 1 }, to: { vegetable: 1 }, fromFarmyard: true, triggers: ['anytime', 'harvest'], blockedAnytimeInteractionKinds: ['animal-reorg'] },
-        { from: { sheep: 1 }, to: { stone: 1 }, fromFarmyard: true, triggers: ['anytime', 'harvest'], blockedAnytimeInteractionKinds: ['animal-reorg'] },
+      { from: { sheep: 1 }, to: { boar: 1 }, fromFarmyard: true, triggers: ['anytime', 'harvest'] },
+      { from: { sheep: 1 }, to: { vegetable: 1 }, fromFarmyard: true, triggers: ['anytime', 'harvest'] },
+      { from: { sheep: 1 }, to: { stone: 1 }, fromFarmyard: true, triggers: ['anytime', 'harvest'] },
       ],
   },
   impl: {},

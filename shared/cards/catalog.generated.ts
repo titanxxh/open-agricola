@@ -4370,9 +4370,6 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
         "triggers": [
           "anytime",
           "harvest"
-        ],
-        "blockedAnytimeInteractionKinds": [
-          "animal-reorg"
         ]
       },
       {
@@ -4386,9 +4383,6 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
         "triggers": [
           "anytime",
           "harvest"
-        ],
-        "blockedAnytimeInteractionKinds": [
-          "animal-reorg"
         ]
       },
       {
@@ -4402,9 +4396,6 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
         "triggers": [
           "anytime",
           "harvest"
-        ],
-        "blockedAnytimeInteractionKinds": [
-          "animal-reorg"
         ]
       }
     ],

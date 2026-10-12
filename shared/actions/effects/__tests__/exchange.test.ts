@@ -390,7 +390,7 @@ describe('anytimeExchangeAction events', () => {
     expect(capturedEvents).toEqual([])
   })
 
-  it('does not emit resource.exchanged for zero-count bulk exchange', () => {
+  it.each(['bulk:0=0', 'bulk:0=0.5', 'trade:0:0.5', 'bulk:0=1,0=1.5', 'bulk:0.5=1', 'bulk:-1=1', 'bulk:=1', 'bulk:0=1=1', 'bulk:999=1'])('rejects invalid entries without emitting resource.exchanged (%s)', (choice) => {
     const player = createMockPlayer({ sheep: 1 })
     player.improvements = ['Major_Fireplace1']
     const state = { players: [player], actionSpaces: [], workPhaseObtainedResources: {} } as unknown as GameState
@@ -402,9 +402,10 @@ describe('anytimeExchangeAction events', () => {
         space: { id: 'exchange' } as ActionSpace,
         eventSink: makeEventSink(capturedEvents),
       } as ActionMutationContext,
-      'bulk:0=0',
+      choice,
     )
-    expect(result.type).toBe('ok')
+    expect(result.type).toBe('fail')
+    expect(player.resources).toMatchObject({ sheep: 1, food: 0 })
     expect(capturedEvents).toEqual([])
   })
 
