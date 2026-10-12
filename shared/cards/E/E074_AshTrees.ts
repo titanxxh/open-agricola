@@ -59,8 +59,6 @@ const beforeFenceListener: CardListenerRegistration = {
               freeFences: count,
               counterKey: 'fences',
             },
-            choiceLabelKey: 'ui.interactionAshTreesUseCount',
-            choiceLabelParams: { count },
           }
         }),
       },

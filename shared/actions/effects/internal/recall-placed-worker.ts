@@ -1,6 +1,6 @@
 import type { ActionDefinition, ActionSpace } from '../../../contract/types'
 import { getRoundPlacementDetails } from '../../../cards/helpers/round-placement'
-import { clearLinkedSpaceBlocksForWorker, findActionSpaceById, removeWorkerRef, spaceHasPlayer } from '../../../domain/space'
+import { clearLinkedSpaceBlocksForWorker, findActionSpaceById, findActionSpaceByWorker, removeWorkerRef, spaceHasPlayer } from '../../../domain/space'
 import { holdWorkerOnCard } from '../../../cards/helpers/card-held-workers'
 import { recallWorkerById } from '../../../cards/helpers/recall-worker'
 import { setCardFlag } from '../../../cards/helpers/card-state'
@@ -70,6 +70,19 @@ const finishOk = (
   return { type: 'ok' as const }
 }
 
+const recallParams = (raw: Record<string, unknown> | undefined): RecallPlacedWorkerParams => ({
+  workerId: typeof raw?.workerId === 'string' ? raw.workerId : undefined,
+  noOpIfMissing: raw?.noOpIfMissing === true,
+  excludeSpaceId: typeof raw?.excludeSpaceId === 'string' ? raw.excludeSpaceId : undefined,
+  excludeMeetingPlace: typeof raw?.excludeMeetingPlace === 'boolean' ? raw.excludeMeetingPlace : undefined,
+  targetCardHold: typeof raw?.targetCardHold === 'string' ? raw.targetCardHold : undefined,
+  flagSourceCard: raw?.flagSourceCard === true,
+  logCardTrigger: raw?.logCardTrigger === true,
+})
+const recallCandidates = (state: import('../../../contract/types').GameState, player: import('../../../contract/types').PlayerState, params: RecallPlacedWorkerParams): ActionSpace[] => state.actionSpaces.filter(space =>
+  spaceHasPlayer(space, player.id) && space.id !== params.excludeSpaceId && (!(params.excludeMeetingPlace ?? true) || !isMeetingPlace(space.id)),
+)
+
 export const recallPlacedWorkerAction: ActionDefinition = {
   id: 'recall-placed-worker',
   nameKey: 'actions.recall-placed-worker.name',
@@ -77,8 +90,17 @@ export const recallPlacedWorkerAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
+  previewEffect: ({ state, player, params }) => {
+    const p = recallParams(params)
+    const directSource = p.workerId !== undefined ? findActionSpaceByWorker(state, player.id, p.workerId) : undefined
+    const spaces = p.workerId !== undefined
+      ? directSource ? [directSource] : []
+      : recallCandidates(state, player, p)
+    const placements = getRoundPlacementDetails(player)
+    return { kind: 'workerRecall', destination: p.targetCardHold ? { kind: 'card', cardId: p.targetCardHold } : { kind: 'home' }, workers: spaces.map(space => ({ spaceId: space.id, spaceNameKey: space.nameKey, workerId: p.workerId ?? placements.find(entry => entry.spaceId === space.id)?.workerId })), select: p.workerId === undefined && spaces.length > 1, noOp: p.workerId !== undefined && spaces.length === 0 && p.noOpIfMissing === true }
+  },
   execute: ({ state, player, params, sourceCard }) => {
-    const p = (params as RecallPlacedWorkerParams | undefined) ?? {}
+    const p = recallParams(params)
     const targetCardHold = p.targetCardHold
 
     const applyRelocation = (space: ActionSpace, workerId: string | undefined) => {
@@ -99,15 +121,7 @@ export const recallPlacedWorkerAction: ActionDefinition = {
     }
 
     // ── Choice mode ────────────────────────────────────────────────
-    const excludeSpaceId = p.excludeSpaceId
-    const excludeMeetingPlace = p.excludeMeetingPlace ?? true
-
-    const candidates = state.actionSpaces.filter((space) => {
-      if (!spaceHasPlayer(space, player.id)) return false
-      if (excludeSpaceId && space.id === excludeSpaceId) return false
-      if (excludeMeetingPlace && isMeetingPlace(space.id)) return false
-      return true
-    })
+    const candidates = recallCandidates(state, player, p)
 
     if (candidates.length === 0) return { type: 'fail', errorKey: 'log.actionFail' }
 
@@ -132,7 +146,7 @@ export const recallPlacedWorkerAction: ActionDefinition = {
     }
   },
   resolveChoice: ({ state, player, params, sourceCard }, choice) => {
-    const p = (params as RecallPlacedWorkerParams | undefined) ?? {}
+    const p = recallParams(params)
     const target = findActionSpaceById(state, choice)
     if (target && !spaceHasPlayer(target, player.id)) return { type: 'fail', errorKey: 'log.actionFail' }
     if (!target) return { type: 'fail', errorKey: 'log.actionFail' }

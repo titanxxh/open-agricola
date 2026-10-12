@@ -45,7 +45,6 @@ const anytimeListener: CardListenerRegistration = {
         ],
       },
       sourceCard: CARD_ID,
-      labelKey: 'cards.E013_StoneHouseReconstruction.anytime',
     }
   },
 }

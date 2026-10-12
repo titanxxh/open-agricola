@@ -48,6 +48,7 @@ export const familyGrowthAction: ActionDefinition = {
   id: 'family-growth',
   nameKey: 'actions.family-growth.name',
   descriptionKey: 'actions.family-growth.description',
+  previewEffect: ({ actionContext }) => ({ kind: 'familyGrowth', roomRequired: actionContext?.skipRoomCheck !== true, heldOnCard: typeof actionContext?.holdNewbornOnCard === 'string' ? actionContext.holdNewbornOnCard : undefined }),
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: (_state, player, context) => {

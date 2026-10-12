@@ -86,7 +86,7 @@ describe('card flow regressions', () => {
       throw new Error('expected reclamation plow choice')
     }
 
-    const use = resp.interaction.request.options?.find((option) => option.labelKey === 'ui.interactionReclamationPlowUse')
+    const use = resp.interaction.request.options?.find((option) => option.labelKey === 'ui.interactionUseAbility')
     expect(use).toBeDefined()
 
     resp = session.resolveChoice(0, use!.value)

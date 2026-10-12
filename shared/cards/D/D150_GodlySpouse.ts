@@ -18,11 +18,9 @@ const afterWishChildrenListener: CardListenerRegistration = {
     if (!isCurrentActionSecondPersonPlacement(context.player, context.actionContext)) return
     const placements = getRoundPersonPlacementDetails(context.player)
 
-    // Rule: "unless the first is on Meeting Place" — drop the workerId in that
-    // case so the recall is a no-op while flag/log decorations still fire.
     const first = placements[0]!
-    const targetWorkerId =
-      first.spaceId.startsWith(MEETING_PLACE_PREFIX) ? undefined : first.workerId
+    if (first.spaceId.startsWith(MEETING_PLACE_PREFIX)) return
+    const targetWorkerId = first.workerId
 
     return {
       flow: {
@@ -36,7 +34,6 @@ const afterWishChildrenListener: CardListenerRegistration = {
           logCardTrigger: true,
         },
         promptKey: 'ui.interactionGodlySpouse',
-        choiceLabelKey: 'ui.interactionGodlySpouseUse',
       },
     }
   },

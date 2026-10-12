@@ -33,7 +33,7 @@ const replayFlow = (optionId: AnimalMarketOptionId): ActionFlow => ({
   optional: true,
   promptKey: 'ui.interactionOptionalAction',
   choiceLabelKey: 'ui.interactionUseCard',
-  choiceLabelParams: { cardNameKey: `occupations.${CARD_ID}.name` },
+  choiceLabelParams: { cardNameKey: `cards.${CARD_ID}.name` },
   children: [
     payLeaf({ cardId: CARD_ID, cost: { food: 1 } }),
     replayBranch(optionId),

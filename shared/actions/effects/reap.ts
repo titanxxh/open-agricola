@@ -288,6 +288,7 @@ export const reapAction: ActionDefinition = {
   id: 'reap',
   nameKey: 'actions.reap.name',
   descriptionKey: 'actions.reap.description',
+  previewEffect: ({ actionContext, sourceCard }) => ({ kind: 'harvestFields', privatePhase: readActionTrigger(actionContext, sourceCard).phase === 'private-field-phase' }),
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: (_state, player) =>

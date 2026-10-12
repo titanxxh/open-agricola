@@ -1,44 +1,24 @@
 import { defineMinorCard } from '../card-source'
 import type {
-  ActionDefinition,
-  ActionExecutionResult,
   GameState,
-  ActionMutationContext,
   PlayerState,
 } from '../../contract/types'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { gainAction } from '../../actions/effects/gain'
-import { registerAdHocAction } from '../../actions/helpers/ad-hoc-action-registry'
 import {
   getBogPonyLyingHorseCount,
   writeBogPonyLyingHorseCount,
 } from './M084_BogPony-state'
 import { getAssignedAnimalsByType, subtractAnimalsFromBoard } from '../../domain/animals'
-import { ensureCardState } from '../helpers/card-state'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { CardImpl } from '../registry'
 import type { AnimalKey } from '../../contract/animals'
 
 const CARD_ID = 'M084_BogPony'
-const ACTION_ID = 'card_M084_BogPony_lie-horse'
+const LIE_HORSE = { animal: 'horse', amount: 1, fuel: 2, counter: 'lyingHorseCount' } as const
 
 const countStandingHorses = (state: GameState | undefined, player: PlayerState): number => {
   const lyingHorses = getBogPonyLyingHorseCount(player)
   return Math.max(0, (getAssignedAnimalsByType(player, state).horse ?? 0) - lyingHorses)
-}
-
-const lieHorse = (ctx: ActionMutationContext): ActionExecutionResult => {
-  const { state, player } = ctx
-  if (countStandingHorses(state, player) <= 0) return { type: 'fail', errorKey: 'log.specialEffectFail' }
-  const cardState = ensureCardState(player, CARD_ID)
-  const extraData = { ...((cardState.extraData as Record<string, unknown> | undefined) ?? {}) }
-  writeBogPonyLyingHorseCount(extraData, getBogPonyLyingHorseCount(player) + 1)
-  cardState.extraData = extraData
-  return gainAction.execute({
-    ...ctx,
-    params: { fuel: 2 },
-    sourceCard: ctx.sourceCard ?? CARD_ID,
-  })
 }
 
 const consumeLyingHorses = (
@@ -69,18 +49,6 @@ const consumeRemovedLyingHorseMarkers = (player: PlayerState, animalType: Animal
   writeBogPonyLyingHorseCount(extraData, current - take)
 }
 
-export const bogPonyLieHorseAction: ActionDefinition = {
-  id: ACTION_ID,
-  nameKey: 'cards.M084_BogPony.anytime',
-  descriptionKey: 'cards.M084_BogPony.anytime',
-  roundAvailable: 1,
-  gainPerRound: {},
-  canBeExecutedByPlayer: () => true,
-  execute: (ctx) => lieHorse(ctx),
-}
-
-registerAdHocAction(bogPonyLieHorseAction)
-
 const anytimeListener: CardListenerRegistration = {
   id: 'M084-bog-pony-anytime',
   cardIds: [CARD_ID],
@@ -88,9 +56,8 @@ const anytimeListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (countStandingHorses(context.state, context.player) <= 0) return
     return {
-      flow: { type: 'leaf', actionId: ACTION_ID, sourceCard: CARD_ID },
+      flow: { type: 'leaf', actionId: 'lie-animal', sourceCard: CARD_ID, params: LIE_HORSE },
       sourceCard: CARD_ID,
-      labelKey: 'cards.M084_BogPony.anytime',
     }
   },
 }

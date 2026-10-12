@@ -120,8 +120,7 @@ describe('E074_AshTrees', () => {
     expect(result.flow.children[0]).toMatchObject({
       type: 'leaf',
       actionId: 'reserve-fence-bonus',
-      choiceLabelKey: 'ui.interactionAshTreesUseCount',
-      choiceLabelParams: { count: 1 },
+      params: { freeFences: 1 },
     })
   })
 

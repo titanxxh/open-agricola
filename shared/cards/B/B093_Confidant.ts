@@ -7,9 +7,7 @@ import {
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionFlow, GameState, PlayerState, Resource } from '../../contract/types'
-import type { GameEvent } from '../../contract/events'
 import { payLeaf } from '../helpers/pay-gain-node'
-import { readCardExtraData } from '../helpers/card-state'
 import { LESSONS_SPACE_IDS, isLessonsSpaceId } from '../helpers/lessons-spaces'
 import type { CardImpl } from '../registry'
 
@@ -79,49 +77,6 @@ const countChoices = (state: GameState, player: PlayerState): ActionFlow[] => {
   })
 }
 
-const isResolvedConfidantMeeple = (
-  event: GameEvent,
-  player: PlayerState,
-  round: number,
-) =>
-  event.type === 'futureMeeple.resolved' &&
-  event.cardId === CARD_ID &&
-  event.playerId === player.id &&
-  event.round === round
-
-const receiveFlow = (round: number): ActionFlow => ({
-  type: 'seq',
-  children: [
-    {
-      type: 'leaf',
-      actionId: 'special-effect',
-      sourceCard: CARD_ID,
-      params: { kind: 'set-extra-data', key: 'lastResolvedRound', value: round },
-    },
-    {
-      type: 'xor',
-      optional: true,
-      children: [
-        {
-          type: 'leaf',
-          actionId: 'sow',
-          sourceCard: CARD_ID,
-          actionContext: { trueAction: false },
-        },
-        {
-          type: 'leaf',
-          actionId: 'fence',
-          sourceCard: CARD_ID,
-          actionContext: {
-            trueAction: false,
-            fencePolicy: { costPolicy: { fence: { wood: 1 } } },
-          },
-        },
-      ],
-    },
-  ],
-})
-
 const cardImpl = {
   listeners: [minimumScheduleListener],
   effect: {
@@ -132,11 +87,12 @@ const cardImpl = {
       children: countChoices(state, player),
     }
   },
-  onRoundStart: (state, player) => {
-    if (readCardExtraData<number>(player, CARD_ID, 'lastResolvedRound') === state.round) return
-    if (!state.events.some((event) => isResolvedConfidantMeeple(event, player, state.round))) return
-    return receiveFlow(state.round)
-  },
+  timedRules: [{ retainAfterCardLeaves: true, key: 'after-scheduled-food', at: { kind: 'future-source', phase: 'onRoundStart' }, body: {
+    kind: 'optional', body: { kind: 'xor', children: [
+      { kind: 'action', actionId: 'sow', policy: { trueAction: false } },
+      { kind: 'action', actionId: 'fence', policy: { trueAction: false, fencePolicy: { costPolicy: { fence: { wood: 1 } } } } },
+    ] },
+  } }],
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl

@@ -29,7 +29,6 @@ const anytimeListener: CardListenerRegistration = {
         ],
       },
       sourceCard: CARD_ID,
-      labelKey: 'cards.B083_MuddyPuddles.anytime',
     }
   },
 }

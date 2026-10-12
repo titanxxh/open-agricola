@@ -4,7 +4,6 @@ import type { CardListenerContext } from '../card-listeners'
 import type { PlayerState } from '../../contract/types'
 import { E023_Apiary_impl } from '../E/E023_Apiary'
 import { E025_BumperCrop_impl } from '../E/E025_BumperCrop'
-import { E026_Sundial_impl } from '../E/E026_Sundial'
 import { E034_LandRegister_impl } from '../E/E034_LandRegister'
 import { E071_CowPatty_impl } from '../E/E071_CowPatty'
 import { E092_FieldDoctor_impl } from '../E/E092_FieldDoctor'
@@ -56,7 +55,6 @@ describe('E/M Logical Field consumers', () => {
     player.resources.grain = 1
 
     expect(E023_Apiary_impl.effect.onBeforeReturnHome!(state, player)).toMatchObject({ type: 'seq' })
-    expect(E026_Sundial_impl.effect.onBeforeReturnHome!(state, player)).toMatchObject({ type: 'seq' })
     expect(E107_LandSurveyor_impl.effect.onHarvestFieldPhase!(state, player)).toMatchObject({ params: { food: 1 } })
     expect(M025_HouseholdInventory_impl.prerequisiteCheck!(player)).toBe(true)
     expect(M058_PeatFertilizer_impl.prerequisiteCheck!(player)).toBe(true)

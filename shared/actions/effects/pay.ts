@@ -278,6 +278,14 @@ export const payAction: ActionDefinition = {
   // player choice back through resolveChoice.
   skipChoiceWrap: true,
   canBeExecutedByPlayer: () => true,
+  previewEffect: ({ state, player, params, sourceCard }) => {
+    const payment = normalizePayParams(params)
+    if (!payment) return undefined
+    const previews = PaymentSolver.describeOptions(state, state.players.indexOf(player), payment.cost, buildPaymentCtx(payment, undefined, sourceCard))
+    if (previews.length === 1) return previews[0]!.descriptionPreview ? { kind: 'rule', description: previews[0]!.descriptionPreview } : previews[0]!.effectPreview
+    if (previews.length > 1) return { kind: 'rule', description: { kind: 'group', operator: 'xor', separator: ' / ', parts: previews.map(preview => preview.descriptionPreview ?? { kind: 'action', showLabel: false, labelKey: 'actions.pay.name', effectPreview: preview.effectPreview }) } }
+    return PaymentSolver.isComplexCost(payment.cost) ? undefined : { kind: 'payment', resourcesPaid: payment.cost }
+  },
   costPreview: {
     getBaseCost: ({ params }) => {
       const p = normalizePayParams(params)

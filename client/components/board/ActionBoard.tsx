@@ -2,11 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FocusEvent, typ
 import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
 import type { ActionSpace, FutureMeeple, FutureMeepleResourceMap, PlayerState } from '../../../shared/contract/types'
+import { FutureEffectMarkers, type OwnedScheduledEffect } from './FutureEffectMarkers'
 import { PlayerCard } from '../common/PlayerCard'
 import { getAnyCardDisplayName, translateCardText } from '../common/cardText'
 import { getCardMeta } from '../../services/card-meta'
 import { getPlayerDisplayName } from '../../utils/player-name'
-import { ACTION_ICON_DESC, ACTION_TOOLTIP_DESC, ACTION_TOOLTIP_TEXT } from './action-descriptions'
+import { renderDescriptionPreview } from '../interaction/ActionDescription'
 
 const BOARD_W_2P = 830
 const BOARD_W_WITH_SIDE = 1000
@@ -207,61 +208,6 @@ const ACTION_SPRITE: Record<string, string> = {
   'farm-redevelopment': '75% 100%',
 }
 
-function getIconLineClassName(actionId?: string): string {
-  if (actionId === 'animal-market-56') return 'icon-line icon-line--animal-market'
-  return actionId === 'resource-market'
-    ? 'icon-line icon-line--resource-market'
-    : 'icon-line'
-}
-
-function getIconTokenClassName(actionId: string | undefined, token: string): string | undefined {
-  if (actionId !== 'resource-market') return undefined
-  const trimmed = token.trim()
-  if (trimmed === '/') return 'icon-token icon-token--slash'
-  if (token !== trimmed && trimmed.startsWith('+')) return 'icon-token icon-token--spaced-plus'
-  return undefined
-}
-
-function renderTextToken(key: number, token: string, actionId?: string): React.ReactNode {
-  const className = getIconTokenClassName(actionId, token)
-  return className
-    ? <span key={key} className={className}>{token}</span>
-    : <span key={key}>{token}</span>
-}
-
-function renderIconDesc(templates: string[], locale: Locale, actionId?: string): React.ReactNode {
-  return templates.map((tpl, i) => {
-    const parts: React.ReactNode[] = []
-    let rest = tpl
-    let key = 0
-    while (rest.length > 0) {
-      // Match <type> icons
-      const iconMatch = rest.match(/^<([a-z-]+)>/)
-      if (iconMatch) {
-        parts.push(<span key={key++} className={`res-icon res-icon-${iconMatch[1]}`} />)
-        rest = rest.slice(iconMatch[0].length)
-        continue
-      }
-      // Match [text] brackets
-      const textMatch = rest.match(/^\[([^\]]*)\]/)
-      if (textMatch) {
-        parts.push(<span key={key++} className="text">{t(locale, textMatch[1])}</span>)
-        rest = rest.slice(textMatch[0].length)
-        continue
-      }
-      // Plain text until next < or [
-      const nextSpecial = rest.search(/[<\[]/)
-      if (nextSpecial === -1) {
-        parts.push(renderTextToken(key++, rest, actionId))
-        break
-      }
-      parts.push(renderTextToken(key++, rest.slice(0, nextSpecial), actionId))
-      rest = rest.slice(nextSpecial)
-    }
-    return <div key={i} className={getIconLineClassName(actionId)}>{parts}</div>
-  })
-}
-
 const STAGE_LABELS: Record<number, string> = {
   1: '1', 2: '2', 3: '3', 4: '4', 5: '5', 6: '6',
 }
@@ -284,6 +230,7 @@ type Props = {
   currentPlayer: PlayerState
   players: PlayerState[]
   futureMeeples: FutureMeeple[]
+  scheduledEffects?: OwnedScheduledEffect[]
   canTakeAction: (space: ActionSpace, player: PlayerState) => boolean
   takeAction: (space: ActionSpace) => void
   currentRound: number
@@ -296,16 +243,18 @@ type Props = {
   enablePrecisionMode?: boolean
 }
 
-type TooltipInfo = {
-  kind: 'action' | 'resource'
-  actionId?: string
-  nameKey?: string
-  descKey?: string
-  title?: string
-  description?: string
+type TooltipInfo = ({
+  kind: 'action'
+  actionId: string
+  nameKey: string
   spritePos?: string
-  action?: ActionSpace
+  action: ActionSpace
   leftActionName?: string
+} | {
+  kind: 'resource'
+  title: string
+  description: string
+}) & {
   x: number
   y: number
 }
@@ -497,7 +446,7 @@ const getHarvestPositions = (playerCount: 2 | 3 | 4 | 5 | 6): Record<number, Slo
 
 export const ActionBoard = ({
   locale, baseActions, roundSlots, currentPlayer, players,
-  futureMeeples, canTakeAction, takeAction, currentRound, devMode,
+  futureMeeples, scheduledEffects = [], canTakeAction, takeAction, currentRound, devMode,
   highlightedActionIds = new Set<string>(),
   actionSpaceSelectionActive = false,
   actionSpaceReservations = new Map<string, ActionSpaceReservationDisplay[]>(),
@@ -551,33 +500,6 @@ export const ActionBoard = ({
     () => new Map(players.map((p) => [p.id, p])),
     [players],
   )
-
-  const buildFutureMeepleItems = (
-    action: ActionSpace | undefined,
-    options: { round?: number } = {},
-  ) => {
-    const { round } = options
-    const items: ResourceStackItem[] = []
-    const seen = new Map<string, number>()
-    const add = (resource: keyof FutureMeepleResourceMap, amount: number, player?: PlayerState) => {
-      if (amount <= 0) return
-      const key = `${player?.id ?? 'none'}:${resource}`
-      const idx = seen.get(key)
-      if (idx !== undefined) { items[idx].amount += amount; return }
-      seen.set(key, items.length)
-      items.push({ resource, amount, player })
-    }
-    for (const fm of futureMeeples) {
-      const matchesAction = !!action && fm.actionId === action.id
-      const matchesRound = round !== undefined && fm.round === round && (!action || fm.actionId === null || fm.actionId === action.id)
-      if (!matchesAction && !matchesRound) continue
-      const owner = playerById.get(fm.playerId)
-      for (const [k, v] of Object.entries(fm.resources)) {
-        if ((v ?? 0) > 0) add(k as keyof FutureMeepleResourceMap, v ?? 0, owner)
-      }
-    }
-    return items
-  }
 
   const buildActionResourceItems = (action: ActionSpace | undefined): ResourceStackItem[] =>
     action
@@ -637,14 +559,9 @@ export const ActionBoard = ({
     action: ActionSpace | undefined,
     options: { round?: number } = {},
   ) => {
-    const items = buildFutureMeepleItems(action, options)
-    if (!items.length) return null
-    const totalCount = items.reduce((sum, item) => sum + item.amount, 0)
-    return (
-      <div className="future-meeple-holder" data-n={totalCount}>
-        {renderResourceIcons(items)}
-      </div>
-    )
+    const effects = scheduledEffects.filter(effect => options.round !== undefined ? effect.round === options.round :
+      !!action && futureMeeples.some(entry => entry.actionId === action.id && entry.round === effect.round && entry.playerId === effect.playerId && entry.cardId === effect.sourceCard))
+    return <FutureEffectMarkers locale={locale} effects={effects} players={players} />
   }
 
   const renderStableMarker = (space: ActionSpace) => {
@@ -757,12 +674,12 @@ export const ActionBoard = ({
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
     const tooltipW = spritePos ? 470 : 240
     const rightSpace = window.innerWidth - rect.right
-    const x = rightSpace > tooltipW + 16 ? rect.right + 8 : rect.left - tooltipW - 8
+    const proposedX = rightSpace > tooltipW + 16 ? rect.right + 8 : rect.left - tooltipW - 8
+    const x = Math.max(8, Math.min(proposedX, window.innerWidth - Math.min(tooltipW, window.innerWidth - 16) - 8))
     setTooltip({
       kind: 'action',
       actionId: action.id,
       nameKey: action.nameKey,
-      descKey: action.descriptionKey,
       spritePos,
       action,
       leftActionName: leftActionNames.get(action.id),
@@ -844,17 +761,12 @@ export const ActionBoard = ({
     )
   }
 
-  const renderTooltipBody = (info: TooltipInfo): React.ReactNode => {
+  const renderTooltipBody = (info: Extract<TooltipInfo, { kind: 'action' }>): React.ReactNode => {
     const id = info.actionId
     if (!id) return null
-    const tipDesc = ACTION_TOOLTIP_DESC[id]
-    if (tipDesc?.length) return renderIconDesc(tipDesc, locale, id)
     const action = info.action
-    if (action && ACCUMULATE_DIR[id] && hasGainPerRound(action)) {
-      return renderGainDisplay(action)
-    }
-    if (ACTION_ICON_DESC[id]?.length) return renderIconDesc(ACTION_ICON_DESC[id], locale, id)
-    return info.descKey ? t(locale, info.descKey) : null
+    if (action && hasGainPerRound(action)) return renderGainDisplay(action)
+    return action?.baseDescriptionPreview ? renderDescriptionPreview(locale, action.baseDescriptionPreview) : action ? t(locale, action.nameKey) : null
   }
 
   const renderSupplementalRules = (action?: ActionSpace) => action?.rulesKey ? (
@@ -893,7 +805,7 @@ export const ActionBoard = ({
             const blocked = isBlocked(space)
             const canTake = !blocked && canTakeAction(space, currentPlayer)
             const hasFarmer = space.takenBy.length > 0
-            const label = blocked ? `${translateCardText(locale, space.nameKey)} (${blockedLabel(space)})` : undefined
+            const label = blocked ? `${translateCardText(locale, space.nameKey)} (${blockedLabel(space)})` : translateCardText(locale, space.nameKey)
             return (
               <div
                 key={space.id}
@@ -924,9 +836,9 @@ export const ActionBoard = ({
                   <div className="action-desc">
                     {accDir && hasGainPerRound(space)
                       ? renderGainDisplay(space)
-                      : ACTION_ICON_DESC[space.id]?.length
-                        ? renderIconDesc(ACTION_ICON_DESC[space.id], locale, space.id)
-                        : t(locale, space.descriptionKey)}
+                      : space.baseDescriptionPreview
+                        ? renderDescriptionPreview(locale, space.baseDescriptionPreview)
+                        : t(locale, space.nameKey)}
                   </div>
                   <div className="action-footer" />
                 </button>
@@ -951,7 +863,7 @@ export const ActionBoard = ({
             const blocked = action ? isBlocked(action) : false
             const canTake = action ? !blocked && canTakeAction(action, currentPlayer) : false
             const hasFarmer = action ? action.takenBy.length > 0 : false
-            const label = action && blocked ? `${translateCardText(locale, action.nameKey)} (${blockedLabel(action)})` : undefined
+            const label = action ? blocked ? `${translateCardText(locale, action.nameKey)} (${blockedLabel(action)})` : translateCardText(locale, action.nameKey) : undefined
             return (
               <div
                 key={`r-${slot.round}`}
@@ -987,9 +899,9 @@ export const ActionBoard = ({
                       <div className="action-desc">
                         {accDir && hasGainPerRound(action)
                           ? renderGainDisplay(action)
-                          : ACTION_ICON_DESC[action.id]?.length
-                            ? renderIconDesc(ACTION_ICON_DESC[action.id], locale, action.id)
-                            : t(locale, action.descriptionKey)}
+                          : action.baseDescriptionPreview
+                        ? renderDescriptionPreview(locale, action.baseDescriptionPreview)
+                        : t(locale, action.nameKey)}
                       </div>
                       <div className="action-footer" />
                     </button>
@@ -1052,14 +964,15 @@ export const ActionBoard = ({
                   >
                     <button
                       className="action-card player-action-space-card"
+                      aria-label={translateCardText(locale, space.nameKey)}
                       onClick={() => takeAction(space)}
                       disabled={!canTake}
                     >
                       <h4 className="action-header">{translateCardText(locale, space.nameKey)}</h4>
                       <div className="action-desc">
-                        {ACTION_ICON_DESC[space.id]?.length
-                          ? renderIconDesc(ACTION_ICON_DESC[space.id], locale, space.id)
-                          : t(locale, space.descriptionKey)}
+                        {space.baseDescriptionPreview
+                        ? renderDescriptionPreview(locale, space.baseDescriptionPreview)
+                        : t(locale, space.nameKey)}
                       </div>
                       <div className="action-footer" />
                     </button>
@@ -1131,9 +1044,6 @@ export const ActionBoard = ({
                     {t(locale, 'ui.leftActionSpace', { action: tooltip.leftActionName })}
                   </p>
                 )}
-                {(ACTION_TOOLTIP_TEXT[tooltip.actionId!] ?? [tooltip.descKey!]).map((key, i) => (
-                  <p key={i}>{t(locale, key)}</p>
-                ))}
                 {renderSupplementalRules(tooltip.action)}
               </div>
             </>
@@ -1146,7 +1056,7 @@ export const ActionBoard = ({
                 </p>
               )}
               {(tooltip.kind === 'action' || tooltip.description) && (
-                <p>{tooltip.kind === 'action' ? t(locale, tooltip.descKey!) : tooltip.description}</p>
+                <p>{tooltip.kind === 'action' ? renderTooltipBody(tooltip) : tooltip.description}</p>
               )}
               {tooltip.kind === 'action' && renderSupplementalRules(tooltip.action)}
             </div>

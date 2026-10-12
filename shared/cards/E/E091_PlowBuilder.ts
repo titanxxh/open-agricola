@@ -87,7 +87,6 @@ const anytimeListener: CardListenerRegistration = {
         ],
       },
       sourceCard: CARD_ID,
-      labelKey: 'cards.E091_PlowBuilder.anytime',
     }
   },
 }

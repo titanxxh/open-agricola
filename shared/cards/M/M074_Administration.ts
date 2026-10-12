@@ -1,44 +1,15 @@
 import { defineMinorCard } from '../card-source'
-import type { ActionFlow } from '../../contract/types'
-import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { majorImprovementCount } from './moor-batch1-helpers'
+import { gainLeaf } from '../helpers/pay-gain-node'
 
 const CARD_ID = 'M074_Administration'
 
-const realHandCount = (ids: readonly string[]) =>
-  ids.filter((id) => !id.startsWith('__')).length
-
-const exchangeFlow = (count: number): ActionFlow => ({
-  type: 'seq',
-  children: [
-    payLeaf({ cardId: CARD_ID, cost: { food: count } }),
-    ...Array.from({ length: count }, () => ({
-      type: 'leaf' as const,
-      actionId: 'bonus-vp' as const,
-      sourceCard: CARD_ID,
-    })),
-  ],
-})
-
 const cardImpl = {
-  prerequisiteCheck: (player) => realHandCount(player.minorHand ?? []) <= 4,
+  prerequisiteCheck: player => (player.minorHand ?? []).filter(id => !id.startsWith('__')).length <= 4,
   effect: {
     id: CARD_ID,
-    onBuy: () => gainLeaf(CARD_ID, { food: 2 }),
-    onHarvestFeedingPhase: (state, player) => {
-      if (state.round !== 14) return
-      const max = Math.min(player.resources.food ?? 0, majorImprovementCount(player))
-      if (max <= 0) return
-      if (max === 1) {
-        return { ...exchangeFlow(1), optional: true }
-      }
-      return {
-        type: 'xor' as const,
-        optional: true,
-        children: Array.from({ length: max }, (_, index) => exchangeFlow(index + 1)),
-      }
-    },
+  onBuy: () => gainLeaf(CARD_ID, { food: 2 }),
+  timedRules: [{ key: 'final-food-exchange', at: { kind: 'rounds', rounds: [14], phase: 'onHarvestFeedingPhase' }, body: { kind: 'operation', operation: { kind: 'bounded-exchange', maximum: { kind: 'major-improvements' }, cost: { food: 1 }, gain: {}, bonusVp: 1, quantity: 'choose' } } }],
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl

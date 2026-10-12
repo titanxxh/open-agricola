@@ -1,7 +1,7 @@
 import { defineOccupationCard } from '../card-source'
 import type { GameState } from '../../contract/types'
 import { isLessonsSpaceId } from '../helpers/lessons-spaces'
-import { createPlayerActionSpaces, registerPlayerActionSpace } from '../player-action-space'
+import { createPlayerActionSpaces, registerPlayerActionSpace, definePlayerActionSpaceFlow } from '../player-action-space'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D178_SubstituteTeacher'
@@ -14,16 +14,14 @@ const areAllVisibleLessonsOccupied = (state: GameState) => {
 registerPlayerActionSpace({
   cardId: CARD_ID,
   access: 'owner',
-  createDefinition: (ownerId) => ({
+  createDefinition: (ownerId) => definePlayerActionSpaceFlow({
     id: CARD_ID,
     nameKey: `cards.${CARD_ID}.name`,
     descriptionKey: `cards.${CARD_ID}.desc`,
     strictCanExecute: true,
     canBeExecutedByPlayer: (state, player) =>
       player.id === ownerId && areAllVisibleLessonsOccupied(state),
-    execute: () => ({
-      type: 'flow',
-      flow: {
+    flowFactory: () => ({
         type: 'xor',
         children: [
           { type: 'leaf', actionId: 'gain', params: { wood: 1 }, sourceCard: CARD_ID },
@@ -32,7 +30,6 @@ registerPlayerActionSpace({
           { type: 'leaf', actionId: 'gain', params: { stone: 1 }, sourceCard: CARD_ID },
           { type: 'leaf', actionId: 'gain', params: { grain: 1, vegetable: 1 }, sourceCard: CARD_ID },
         ],
-      },
     }),
   }),
 })

@@ -1,3 +1,4 @@
+import type { EventSink } from '../../shared/contract/events'
 import { describe, expect, it } from 'vitest'
 
 import '../../shared/cards/C/C146_WorkshopAssistant'
@@ -24,6 +25,7 @@ import type {
   PlayerState,
 } from '../../shared/contract/types'
 
+const eventSink: EventSink = { emit: () => undefined, emitMany: () => undefined }
 const CARD_ID = 'C146_WorkshopAssistant'
 const CHOOSE_PAIRS_ACTION_ID = 'card_C146_WorkshopAssistant_choosePairs'
 
@@ -175,6 +177,7 @@ describe('C146 — multi-select pairs (onBuy)', () => {
       player,
       space: createSpace(CHOOSE_PAIRS_ACTION_ID),
       params: {},
+      eventSink,
     } as unknown as ActionExecutionContext)
 
     expect(result.type).toBe('ok')
@@ -196,6 +199,7 @@ describe('C146 — multi-select pairs (onBuy)', () => {
       player,
       space: createSpace(CHOOSE_PAIRS_ACTION_ID),
       params: {},
+      eventSink,
     } as unknown as ActionExecutionContext
 
     const initial = def.execute(ctx)
@@ -231,6 +235,7 @@ describe('C146 — multi-select pairs (onBuy)', () => {
       player,
       space: createSpace(CHOOSE_PAIRS_ACTION_ID),
       params: {},
+      eventSink,
     } as unknown as ActionExecutionContext
 
     const reEmit = def.resolveChoice!(ctx, 'WC')
@@ -257,6 +262,7 @@ describe('C146 — multi-select pairs (onBuy)', () => {
       player,
       space: createSpace(CHOOSE_PAIRS_ACTION_ID),
       params: {},
+      eventSink,
     } as unknown as ActionExecutionContext
 
     const reEmit = def.resolveChoice!(ctx, 'WC,WC,WC')

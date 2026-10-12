@@ -1,5 +1,6 @@
+import { createWorkSession } from './_helpers/session-fixtures'
 import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game/authoritative-session'
+import type { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import { markAllWorkersUsed } from '../../shared/domain/player'
 import type { ActionChoiceOption, ActionFlow, FarmTilePosition, Field, PlayerState } from '../../shared/contract/types'
@@ -59,7 +60,7 @@ const fieldCountsOf = (player: PlayerState) =>
   player.fields.map((field) => field.stacks.at(-1)?.remaining ?? 0)
 
 const setupSession = () => {
-  const session = new GameSession(42)
+  const session = createWorkSession({ seed: 42 })
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   state.round = 4

@@ -26,7 +26,6 @@ const anytimeListener: CardListenerRegistration = {
         ],
       },
       sourceCard: CARD_ID,
-      labelKey: 'cards.B154_SheepKeeper.anytime',
     }
   },
 }

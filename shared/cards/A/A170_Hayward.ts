@@ -20,7 +20,6 @@ const anytimeListener: CardListenerRegistration = {
         actionContext: { trueAction: false },
       },
       sourceCard: CARD_ID,
-      labelKey: `cards.${CARD_ID}.anytime`,
     }
   },
 }

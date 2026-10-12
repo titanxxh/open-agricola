@@ -1,37 +1,27 @@
 import { defineOccupationCard } from '../card-source'
-import { payLeaf } from '../helpers/pay-gain-node'
-import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
+import { createCardGoodDepositAction } from '../../actions/plans/card-good-deposit'
+import { registerAdHocAction } from '../../actions/helpers/ad-hoc-action-registry'
+import { readCardExtraData } from '../helpers/card-state'
 import { getHarvestOutcome } from '../../actions/helpers/harvest-outcome'
-import { animalKeysForState } from '../../contract/animals'
-import type { ActionChoiceOption, ActionFlow, GameState, PlayerState } from '../../contract/types'
+import type { ActionFlow, GameState, PlayerState } from '../../contract/types'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E134_Omnifarmer'
 type Storable = 'grain' | 'vegetable' | 'sheep' | 'boar' | 'cattle' | 'horse'
 
 const KEY_STORED = 'storedGoods'
+const DEPOSIT_AMOUNT = 1
+const DEPOSIT_ACTION = 'card_E134_Omnifarmer_deposit'
+registerAdHocAction(createCardGoodDepositAction(DEPOSIT_ACTION, CARD_ID, KEY_STORED, DEPOSIT_AMOUNT))
+const isStorable = (value: unknown): value is Storable => value === 'grain' || value === 'vegetable' || value === 'sheep' || value === 'boar' || value === 'cattle' || value === 'horse'
 
 const readStored = (player: PlayerState): Storable[] =>
   readCardExtraData<Storable[]>(player, CARD_ID, KEY_STORED) ?? []
 
 const buildChoiceFlow = (types: Storable[]): ActionFlow | undefined => {
-  if (types.length === 0) return undefined
-  const options: ActionChoiceOption[] = [
-    { value: 'skip', labelKey: 'ui.interactionE134Skip', sourceCard: CARD_ID },
-    ...types.map((t) => ({
-      value: t,
-      labelKey: `ui.interactionE134Deposit_${t}`,
-      sourceCard: CARD_ID,
-    })),
-  ]
-  return {
-    type: 'leaf',
-    actionId: 'emit-choice',
-    sourceCard: CARD_ID,
-    params: {
-      promptKey: 'ui.interactionE134Prompt',
-      options,
-    },
+  if (types.length === 0) return
+  return { type: 'xor', optional: true, sourceCard: CARD_ID, promptKey: 'ui.interactionE134Prompt',
+    children: types.map(type => ({ type: 'leaf', actionId: DEPOSIT_ACTION, sourceCard: CARD_ID, params: { resource: type } })),
   }
 }
 
@@ -42,7 +32,7 @@ const outcomeStorableTypes = (state: GameState, player: PlayerState): Storable[]
   const types = [
     ...outcome.harvestedCropTypes,
     ...outcome.newbornAnimalTypes,
-  ] as Storable[]
+  ].filter(isStorable)
   return types.filter((type, index) =>
     !stored.includes(type) && types.indexOf(type) === index,
   )
@@ -51,31 +41,21 @@ const outcomeStorableTypes = (state: GameState, player: PlayerState): Storable[]
 const cardImpl = {
   effect: {
     id: CARD_ID,
-    projectInteractionRequest: (state, player, request, actionId) => {
-      if (actionId !== 'emit-choice' || request.kind !== 'choice') return request
+    projectInteractionRequest: (state, player, request) => {
+      if (request.kind !== 'choice') return request
       const eligible = outcomeStorableTypes(state, player)
-      return {
-        ...request,
-        options: request.options.map((option) => {
-          if (option.value === 'skip') return option
-          const disabled = !eligible.includes(option.value as Storable) || (player.resources[option.value as Storable] ?? 0) <= 0
-          return { ...option, disabled, disabledReasonKey: disabled ? 'ui.interactionTriggerUnavailable' : undefined }
-        }),
-      }
+      return { ...request, options: request.options.map(option => {
+        const description = option.effectPreview?.kind === 'rule' ? option.effectPreview.description : option.descriptionPreview
+        const parts = description?.kind === 'group' ? description.parts : []
+        const payment = parts[0]?.kind === 'action' ? parts[0].effectPreview : undefined
+        const resource = payment?.kind === 'payment' ? Object.keys(payment.resourcesPaid ?? {}).find(isStorable) : undefined
+        if (!isStorable(resource)) return option
+        const disabled = !eligible.includes(resource) || (player.resources[resource] ?? 0) < DEPOSIT_AMOUNT
+        return { ...option, disabled, disabledReasonKey: disabled ? 'ui.interactionTriggerUnavailable' : undefined }
+      }) }
     },
     onAfterHarvest: (state, player) => {
       return buildChoiceFlow(outcomeStorableTypes(state, player))
-    },
-    resolveChoice: (state, player, choice) => {
-      if (choice === 'skip') return
-      const validTypes: Storable[] = ['grain', 'vegetable', ...animalKeysForState(state)]
-      if (!validTypes.includes(choice as Storable)) return
-      const stored = readStored(player)
-      if (stored.includes(choice as Storable)) return
-      if (!outcomeStorableTypes(state, player).includes(choice as Storable)) return
-      if ((player.resources[choice as Storable] ?? 0) <= 0) return
-      writeCardExtraData(player, CARD_ID, KEY_STORED, [...stored, choice as Storable])
-      return payLeaf({ cardId: CARD_ID, cost: { [choice as Storable]: 1 } })
     },
     computeBonusScore: (_state, player) => {
       const n = readStored(player).length

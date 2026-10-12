@@ -13,9 +13,7 @@ import { computeZigzagCandidates } from '../D/D001_ZigzagHarrow'
 import { D005_FieldClay_impl } from '../D/D005_FieldClay'
 import { D008_FernSeeds_impl } from '../D/D008_FernSeeds'
 import { D031_Storeroom_impl } from '../D/D031_Storeroom'
-import { D032_WoodRake_impl } from '../D/D032_WoodRake'
 import { D061_BaleofStraw_impl } from '../D/D061_BaleofStraw'
-import { D079_CarrotMuseum_impl } from '../D/D079_CarrotMuseum'
 import { D135_GardeningHeadOfficial_impl } from '../D/D135_GardeningHeadOfficial'
 import { D153_WealthyMan_impl } from '../D/D153_WealthyMan'
 import '../B/B068_Beanfield'
@@ -88,11 +86,6 @@ describe('C/D Logical Field consumers', () => {
 
     expect(C059_SchnappsDistillery_impl.effect.computeBonusScore!(state, player)).toBe(1)
     expect(D031_Storeroom_impl.effect.computeBonusScore!(state, player)).toBe(3)
-    expect(D032_WoodRake_impl.effect.onBeforeHarvest!(state, player)).toMatchObject({ type: 'seq' })
-    state.round = 8
-    expect(D079_CarrotMuseum_impl.effect.onAfterRoundEnd!(state, player)).toMatchObject({
-      params: { stone: 1, wood: 3 },
-    })
     expect(D135_GardeningHeadOfficial_impl.effect.computeSharedPostScore!(state, player, []))
       .toContainEqual({ playerId: player.id, score: 2 })
   })

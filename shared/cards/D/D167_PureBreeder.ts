@@ -23,8 +23,6 @@ const cardImpl = {
         actionId: 'gain',
         params: { [t]: 1 },
         sourceCard: CARD_ID,
-        choiceLabelKey: 'ui.interactionBreed',
-        choiceLabelParams: { animal: t },
       }))
     if (children.length === 0) return
     return { type: 'xor', optional: true, children }

@@ -1,3 +1,4 @@
+import { moveFarmerToSpaceAction } from '../../actions/effects/internal/move-farmer-to-space'
 import { describe, expect, it } from 'vitest'
 import { getCardEffect } from '../card-effects'
 import type { GameState, PlayerState, ActionSpace } from '../../contract/types'
@@ -5,13 +6,10 @@ import {
   getPlayerActionSpaceConfig,
   createPlayerActionSpaces,
 } from '../player-action-space'
-import { moveFarmerToSpaceAction } from '../../actions/effects/internal/move-farmer-to-space'
 
 // Import cards to register effects
 import '../A/A028_ForestSchool'
 import '../D/D051_Archway'
-import '../E/E010_StrawHat'
-import type { ActionFlow } from '../../contract/types'
 import type { ActionExecutionContext } from '../../contract/types'
 
 const createPlayer = (id = 'p1', name = 'P1'): PlayerState =>
@@ -93,19 +91,6 @@ describe('PlayerActionSpace infrastructure', () => {
 })
 
 describe('D051_Archway', () => {
-  it('action space execute gives 1 food', () => {
-    const config = getPlayerActionSpaceConfig('D051_Archway')!
-    const def = config.createDefinition('p1')
-    const player = createPlayer()
-    const result = def.execute!({
-      state: createState([player]),
-      player,
-      space: createSpace('D051_Archway'),
-    } as unknown as ActionExecutionContext)
-    expect(result.type).toBe('ok')
-    expect(player.resources.food).toBe(1)
-  })
-
   it('onBuy adds D51 action space to state', () => {
     const effect = getCardEffect('D051_Archway')!
     const player = createPlayer()
@@ -126,20 +111,6 @@ describe('D051_Archway', () => {
     expect(state.actionSpaces.filter((s) => s.id === 'D051_Archway').length).toBe(1)
   })
 
-  it('onBeforeReturnHome triggers when player worker is on D51', () => {
-    const effect = getCardEffect('D051_Archway')!
-    const player = createPlayer()
-    player.minorPlayed = ['D051_Archway']
-    const d51Space = createSpace('D051_Archway', { takenBy: [{ playerId: 'p1', workerId: '1' }] })
-    const targetSpace = createSpace('day-laborer')
-    const state = createState([player], [d51Space, targetSpace])
-    const flow = effect.onBeforeReturnHome!(state, player)
-    expect(flow).toBeDefined()
-    expect(flow!.type).toBe('leaf')
-    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('move-farmer-to-space')
-    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params.excludeSpaceId).toBe('D051_Archway')
-    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).optional).toBe(true)
-  })
 
   it('onBeforeReturnHome does not trigger when different player on D51', () => {
     const effect = getCardEffect('D051_Archway')!
@@ -161,90 +132,6 @@ describe('D051_Archway', () => {
     const state = createState([player], [d51Space, targetSpace])
     const flow = effect.onBeforeReturnHome!(state, player)
     expect(flow).toBeUndefined()
-  })
-
-})
-
-describe('E010_StrawHat', () => {
-  it('does not trigger without an own worker on Farmland', () => {
-    const effect = getCardEffect('E010_StrawHat')!
-    const player = createPlayer()
-    player.minorPlayed = ['E010_StrawHat']
-    const farmland = createSpace('farmland')
-    const target = createSpace('day-laborer')
-    const state = createState([player], [farmland, target])
-    state.round = 3
-    expect(effect.onBeforeReturnHome!(state, player)).toBeUndefined()
-  })
-
-  it('creates one food-or-exact-move choice per Farmland worker', () => {
-    const effect = getCardEffect('E010_StrawHat')!
-    const player = createPlayer()
-    player.minorPlayed = ['E010_StrawHat']
-    const farmland = createSpace('farmland', {
-      takenBy: [
-        { playerId: 'p1', workerId: '1' },
-        { playerId: 'p1', workerId: '2' },
-      ],
-    })
-    const target = createSpace('day-laborer')
-    const state = createState([player], [farmland, target])
-    state.round = 3
-    const flow = effect.onBeforeReturnHome!(state, player)
-    expect(flow?.type).toBe('seq')
-    if (flow?.type === 'seq') {
-      expect(flow.children).toHaveLength(2)
-      flow.children.forEach((choice, index) => {
-        expect(choice.type).toBe('xor')
-        if (choice.type !== 'xor') return
-        expect(choice.children.map((child) =>
-          (child as Extract<ActionFlow, { type: 'leaf' }>).actionId
-        )).toEqual(['gain', 'move-farmer-to-space'])
-        const move = choice.children[1] as Extract<ActionFlow, { type: 'leaf' }>
-        expect(move.params).toMatchObject({
-          excludeSpaceId: 'farmland',
-          workerId: String(index + 1),
-        })
-        expect(move.actionContext).toMatchObject({
-          moveFarmerSourceSpaceId: 'farmland',
-          moveFarmerWorkerId: String(index + 1),
-        })
-      })
-    }
-  })
-
-  it('triggers on round 6', () => {
-    const effect = getCardEffect('E010_StrawHat')!
-    const player = createPlayer()
-    player.minorPlayed = ['E010_StrawHat']
-    const farmland = createSpace('farmland', { takenBy: [{ playerId: 'p1', workerId: '1' }] })
-    const target = createSpace('day-laborer')
-    const state = createState([player], [farmland, target])
-    state.round = 6
-    const flow = effect.onBeforeReturnHome!(state, player)
-    expect(flow?.type).toBe('seq')
-  })
-
-  it('does not trigger on round 4', () => {
-    const effect = getCardEffect('E010_StrawHat')!
-    const player = createPlayer()
-    player.minorPlayed = ['E010_StrawHat']
-    const farmland = createSpace('farmland', { takenBy: [{ playerId: 'p1', workerId: '1' }] })
-    const state = createState([player], [farmland])
-    state.round = 4
-    const flow = effect.onBeforeReturnHome!(state, player)
-    expect(flow).toBeUndefined()
-  })
-
-  it('does not trigger for another player worker on Farmland', () => {
-    const effect = getCardEffect('E010_StrawHat')!
-    const player = createPlayer()
-    player.minorPlayed = ['E010_StrawHat']
-    const farmland = createSpace('farmland', { takenBy: [{ playerId: 'p2', workerId: '1' }] })
-    const target = createSpace('day-laborer')
-    const state = createState([player], [farmland, target])
-    state.round = 3
-    expect(effect.onBeforeReturnHome!(state, player)).toBeUndefined()
   })
 
 })

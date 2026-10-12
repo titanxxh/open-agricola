@@ -1,7 +1,6 @@
 import { defineMinorCard } from '../card-source'
-import { queueFutureMeeplesFlow } from '../../actions/effects/internal/future-meeples'
-import { writeCardExtraData, readCardExtraData } from '../helpers/card-state'
-import { payGainFlow } from '../helpers/pay-gain-node'
+import { scheduleOffersNode } from '../../actions/effects/internal/schedule-offers'
+import { scheduledOffersRoundStartFlow, type ScheduledOffer } from '../../actions/effects/internal/scheduled-offers'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D069_SmallGreenhouse'
@@ -9,30 +8,19 @@ const CARD_ID = 'D069_SmallGreenhouse'
 const cardImpl = {
   effect: {
   id: CARD_ID,
-  onBuy: (state, player) => {
+  onBuy: (state) => {
     const offsets = [4, 7]
     const targetRounds = offsets
       .map((offset) => state.round + offset)
       .filter((r) => r <= 14)
     if (targetRounds.length === 0) return
-    writeCardExtraData(player, CARD_ID, 'targetRounds', targetRounds)
-    const entries = targetRounds.map((round) => ({ round, resources: { vegetable: 1 } }))
-    return queueFutureMeeplesFlow(state, {
-      cardId: CARD_ID,
-      playerId: player.id,
-      entries,
-    })
+    const offers: ScheduledOffer[] = targetRounds.map((round) => ({
+      id: `${CARD_ID}-${round}`, kind: 'resource-purchase', dueRound: round,
+      resources: { vegetable: 1 }, cost: { food: 1 }, consumed: false,
+    }))
+    return scheduleOffersNode(CARD_ID, offers)
   },
-  onRoundStart: (state, player) => {
-    const targetRounds = readCardExtraData<number[]>(player, CARD_ID, 'targetRounds') ?? []
-    if (!targetRounds.includes(state.round)) return
-    if ((player.resources.food ?? 0) < 1) return
-    return payGainFlow({
-      cardId: CARD_ID,
-      cost: { food: 1 },
-      gain: { vegetable: 1 },
-    })
-  },
+  onRoundStart: (state, player) => scheduledOffersRoundStartFlow(state, player, CARD_ID),
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl

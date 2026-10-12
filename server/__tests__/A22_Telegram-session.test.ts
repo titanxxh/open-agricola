@@ -1,8 +1,9 @@
+import { createWorkSession } from './_helpers/session-fixtures'
 import { confirmNextPlayer } from './_helpers/pending-confirms'
 import { inactiveWorkersInSupply, workersAtHome } from '../../shared/domain/player'
 import { chooseSupplyWorkerTurn, takeNormalWorkerTurn } from './_helpers/supply-worker-turn'
 import { describe, expect, it } from 'vitest'
-import { GameSession, type SessionResponse } from '../game/authoritative-session'
+import type { GameSession, SessionResponse } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { readCardExtraData } from '../../shared/cards/helpers/card-state'
 import { maxFences } from '../../shared/actions/effects/fencing'
@@ -14,7 +15,7 @@ const CARD_ID = 'A022_Telegram'
 const FILLER = '__test_placeholder__'
 
 const setupPurchase = ({ round = 1, fencesInSupply = 1 } = {}) => {
-  const session = new GameSession(5022, undefined, { playerCount: 2 })
+  const session = createWorkSession({ seed: 5022, options: { playerCount: 2 } })
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.currentPlayerIndex = 0
@@ -55,7 +56,7 @@ const play = (session: GameSession): SessionResponse => {
 }
 
 const setupDue = ({ supplyFarmer = true } = {}) => {
-  const session = new GameSession(6022, undefined, { playerCount: 2 })
+  const session = createWorkSession({ seed: 6022, options: { playerCount: 2 } })
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.round = 1

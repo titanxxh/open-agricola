@@ -1,5 +1,5 @@
 import { definePlayerActionCard } from '../card-source'
-import { registerPlayerActionSpace, createPlayerActionSpaces } from '../player-action-space'
+import { registerPlayerActionSpace, createPlayerActionSpaces, definePlayerActionSpaceFlow } from '../player-action-space'
 import { isSpaceOccupied } from '../../domain/space'
 import type { CardImpl } from '../registry'
 
@@ -8,7 +8,7 @@ const CARD_ID = 'A162_ForestTallyman'
 registerPlayerActionSpace({
   cardId: CARD_ID,
   access: 'owner',
-  createDefinition: (ownerId) => ({
+  createDefinition: (ownerId) => definePlayerActionSpaceFlow({
     id: CARD_ID,
     nameKey: 'cards.A162_ForestTallyman.name',
     descriptionKey: 'cards.A162_ForestTallyman.desc',
@@ -18,11 +18,7 @@ registerPlayerActionSpace({
       const clayPit = state.actionSpaces.find((s) => s.id === 'clay-pit')
       return !!(forest && clayPit && isSpaceOccupied(forest) && isSpaceOccupied(clayPit))
     },
-    execute: ({ player }) => {
-      player.resources.clay += 2
-      player.resources.wood += 3
-      return { type: 'ok', resourcesGained: { clay: 2, wood: 3 } }
-    },
+    flowFactory: () => ({ type: 'leaf', actionId: 'gain', sourceCard: CARD_ID, params: { clay: 2, wood: 3 } }),
   }),
 })
 

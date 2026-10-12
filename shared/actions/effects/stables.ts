@@ -15,7 +15,7 @@ import type { FarmStableBuiltEvent } from '../../contract/events'
 import { getNextEmptyTileForPlayer, positionKey } from '../../domain/farm'
 import { stableWoodCost } from './fencing'
 import { canExecuteWithCostPreview } from '../helpers/cost-preview'
-import { PaymentSolver } from '../payment'
+import { PaymentSolver, describePaymentEffectPreview } from '../payment'
 import type { PaymentCtx } from '../payment'
 import { buildInternalPayChild } from '../helpers/pay-child'
 import { playerBoard } from '../../domain'
@@ -274,6 +274,7 @@ const canExecuteStableCostPreview = (
 }
 
 const stablesCostPreview: ActionCostPreview = {
+  unitCost: 'stable',
   isStructurallyPossible: isStableStructurallyPossible,
   getBaseCost: (context) => {
     const actionContext = readStableActionContext(context)
@@ -412,6 +413,19 @@ export const stablesAction: ActionDefinition = {
       readStableCostDelta(opts?.actionContext, undefined),
   ),
   costPreview: stablesCostPreview,
+  previewEffect: ({ state, player, actionContext, costs, previewMode }) => {
+    if (previewMode === 'base') return { kind: 'unitCost', unit: 'stable' as const, actionNameKey: 'actions.stables.name', resourcesPaid: stablesCostPreview.getBaseCost({ state, player, params: { actionContext } }) }
+
+    const selection = buildStableFarmSelection(state, player, actionContext, costs)
+    if (selection.farmType !== 'stable') return undefined
+    return { kind: 'actionCosts', actionNameKey: 'actions.stables.name',
+      options: Array.from({ length: selection.maxSelections }, (_, index) => {
+        const resolution = resolveStableTotalCostWithDiscount(state, player, actionContext, costs, index + 1)
+        const solutions = resolution ? PaymentSolver.computeOptions(state, state.players.indexOf(player), resolution.paymentCost, { actionId: 'stables', costType: 'stables' }) : []
+        return { amount: index + 1, paymentOptions: solutions.map(solution => describePaymentEffectPreview(solution, false, { paymentResourceProviders: resolution?.paymentCost.paymentResourceProviders })) }
+      }),
+    }
+  },
   execute: ({ state, player, costs, actionContext }): ActionExecutionResult => {
     const farm = buildStableFarmSelection(state, player, actionContext, costs)
     return {

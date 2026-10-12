@@ -1,3 +1,4 @@
+import { createWorkSession } from './_helpers/session-fixtures'
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
@@ -44,7 +45,7 @@ const setupHarvest = (options: {
   donorConsumed?: number[]
   ownerFenceEdges?: string[]
 } = {}) => {
-  const session = new GameSession(undefined, undefined, { playerCount: 4 })
+  const session = createWorkSession({ seed: 2149, options: { playerCount: 4 } })
   const state = session.getState().state
   state.round = 14
   state.currentPlayerIndex = 0
@@ -149,7 +150,7 @@ describe('E149 Midnight Fencer', () => {
       })),
     )
     expect(owner.pastures).toHaveLength(1)
-    expect(owner.cardStates?.[CARD_ID]?.extraData?.offered).toBe(true)
+    expect(owner.cardStates?.[CARD_ID]?.extraData?.timedRuleReceipts).toContain('borrowed-final-fences:14')
     expect(owner.cardStates?.[CARD_ID]?.extraData?.owedFences).toBeUndefined()
     expect(getCardEffect(CARD_ID)?.computeBonusScore).toBeUndefined()
     expect(resp.state.players[1]!.supplyTokensConsumed?.fence).toBe(2)
@@ -191,7 +192,7 @@ describe('E149 Midnight Fencer', () => {
     resp = skipOptional(session, resp)
 
     const owner = resp.state.players[0]!
-    expect(owner.cardStates?.[CARD_ID]?.extraData?.offered).toBe(true)
+    expect(owner.cardStates?.[CARD_ID]?.extraData?.timedRuleReceipts).toContain('borrowed-final-fences:14')
     expect(owner.cardStates?.[CARD_ID]?.extraData?.owedFences).toBeUndefined()
     expect(owner.fenceSegments).toHaveLength(0)
     expect(owner.resources.wood).toBe(woodBefore)

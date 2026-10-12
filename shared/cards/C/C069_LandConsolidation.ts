@@ -1,34 +1,15 @@
 import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { registerSelectionEffect } from '../../actions/helpers/selection-effect-registry'
+import { fieldOperationFlow } from '../../actions/plans/field-operation'
 import { isExtraCropPlacementActionContext } from '../../actions/helpers/extra-crop-placement-context'
 import type { CardImpl } from '../registry'
-import { getLogicalFields, mutateLogicalFields } from '../helpers/card-field'
-import { parsePositionKey, positionKey } from '../../domain/farm'
+import { getLogicalFields } from '../helpers/card-field'
 
 const CARD_ID = 'C069_LandConsolidation'
-const SELECTION_EFFECT = 'c69-land-consolidation-swap'
-
 const hasExtraCropPending = (context: CardListenerContext): boolean => {
   return isExtraCropPlacementActionContext(context.actionContext)
 }
-
-registerSelectionEffect(SELECTION_EFFECT, ({ state, player, positions, eventSink }) => {
-  const position = positions.length === 1 ? parsePositionKey(positions[0]!) : undefined
-  const field = position && getLogicalFields(player).find((candidate) =>
-    candidate.slots.some((slot) => positionKey(slot.tile) === positionKey(position)),
-  )
-  const slot = field && [...field.slots].reverse().find((candidate) => candidate.stack)
-  const total = field?.stacks.reduce((sum, stack) => sum + stack.remaining, 0) ?? 0
-  if (
-    !field || slot?.stack?.kind !== 'grain' || slot.stack.remaining !== 3 || total !== 3 ||
-    (field.allowedCrops && !field.allowedCrops.includes('vegetable'))
-  ) return
-  const replaced = mutateLogicalFields(state, player, { sourceCard: CARD_ID, eventSink })
-    .replace({ fieldId: field.id, slot: slot.index }, 'vegetable', 1)
-  return replaced.ok ? replaced.flow : undefined
-})
 
 /**
  * C69 Land Consolidation (MinorImprovement, C, 69)
@@ -57,20 +38,8 @@ const anytimeListener: CardListenerRegistration = {
     })
     if (qualifying.length === 0) return
     return {
-      flow: {
-        type: 'leaf',
-        actionId: 'selection',
-        sourceCard: CARD_ID,
-        actionContext: {
-          selectionKind: 'farm-position',
-          selectableTiles: qualifying,
-          minSelections: 1,
-          maxSelections: 1,
-          selectionEffect: SELECTION_EFFECT,
-        },
-      },
+      flow: fieldOperationFlow(CARD_ID, { kind: 'replace', from: 'grain', fromAmount: 3, to: 'vegetable', toAmount: 1 }, qualifying),
       sourceCard: CARD_ID,
-      labelKey: 'cards.C069_LandConsolidation.anytime',
     }
   },
 }

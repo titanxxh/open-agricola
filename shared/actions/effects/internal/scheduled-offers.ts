@@ -4,10 +4,13 @@ import type {
   ActionFlow,
   GameState,
   PlayerState,
+  ChoiceEffectPreview,
   Resource,
 } from '../../../contract/types'
 import type { AnimalKey } from '../../../contract/animals'
 import { ALL_ANIMAL_KEYS } from '../../../contract/animals'
+import { extendedResourceKeyList } from '../../../contract/state-constants'
+import { payLeaf } from '../../../cards/helpers/pay-gain-node'
 import { readCardExtraData, writeCardExtraData } from '../../../cards/helpers/card-state'
 import { MOOR_SPECIAL_ACTION_APPLY_ACTION_ID } from '../../../moor/special-action-flow'
 import {
@@ -20,6 +23,15 @@ const ACTION_ID = 'scheduled-offer'
 const EXTRA_DATA_KEY = 'scheduledOffers'
 
 export type ScheduledOffer =
+  | {
+      id: string
+      kind: 'resource-purchase'
+      dueRound: number
+      resources: Partial<Resource>
+      cost: Partial<Resource>
+      consumed: boolean
+      consumedRound?: number
+    }
   | {
       id: string
       kind: 'moor-special-action'
@@ -39,14 +51,28 @@ export type ScheduledOffer =
       consumedRound?: number
     }
 
+const isResources = (value: unknown): value is Partial<Resource> => !!value && typeof value === 'object' &&
+  Object.entries(value).every(([key, amount]) => extendedResourceKeyList.some(resource => resource === key) && typeof amount === 'number' && Number.isFinite(amount) && amount >= 0)
+
 const isScheduledOffer = (value: unknown): value is ScheduledOffer => {
-  if (!value || typeof value !== 'object') return false
-  const raw = value as { id?: unknown; kind?: unknown; dueRound?: unknown; consumed?: unknown }
-  return typeof raw.id === 'string' &&
-    typeof raw.kind === 'string' &&
-    typeof raw.dueRound === 'number' &&
-    typeof raw.consumed === 'boolean'
+  if (!value || typeof value !== 'object' || !('id' in value) || typeof value.id !== 'string' ||
+    !('dueRound' in value) || typeof value.dueRound !== 'number' || !Number.isInteger(value.dueRound) ||
+    !('consumed' in value) || typeof value.consumed !== 'boolean' || !('kind' in value)) return false
+  if (value.kind === 'resource-purchase') return 'resources' in value && isResources(value.resources) && 'cost' in value && isResources(value.cost)
+  if (value.kind === 'animal-purchase') return 'animal' in value && ALL_ANIMAL_KEYS.some(animal => animal === value.animal) && 'cost' in value && isResources(value.cost)
+  if (value.kind === 'moor-special-action') return 'actionId' in value &&
+    ['cut-peat', 'fell-trees', 'slash-and-burn', 'hiring-fair', 'horse-market', 'black-market', 'illicit-work'].some(action => action === value.actionId) &&
+    (!('cost' in value) || value.cost === undefined || isResources(value.cost))
+  return false
 }
+
+export const describeScheduledOffers = (offers: readonly ScheduledOffer[]): ChoiceEffectPreview => ({
+  kind: 'futureOffers', entries: offers.map(offer => ({
+    round: offer.dueRound, resourcesPaid: offer.cost ?? {},
+    resources: offer.kind === 'animal-purchase' ? { [offer.animal]: 1 } : offer.kind === 'resource-purchase' ? offer.resources : {},
+    ...(offer.kind === 'moor-special-action' ? { actionNameKey: `moor.specialActions.${offer.actionId}` } : {}),
+  })),
+})
 
 export const readScheduledOffers = (
   player: PlayerState,
@@ -98,7 +124,7 @@ const markOfferConsumed = (
     offer.id === offerId && !offer.consumed && offer.dueRound === state.round
   )
   if (index === -1) return null
-  const consumed = { ...offers[index]!, consumed: true, consumedRound: state.round } as ScheduledOffer
+  const consumed: ScheduledOffer = { ...offers[index]!, consumed: true, consumedRound: state.round }
   offers[index] = consumed
   writeScheduledOffers(player, cardId, offers)
   return consumed
@@ -158,6 +184,16 @@ const animalPurchaseOptions = (
   }]
 }
 
+const resourcePurchaseOptions = (
+  player: PlayerState,
+  offer: Extract<ScheduledOffer, { kind: 'resource-purchase' }>,
+): ActionChoiceOption[] => extendedResourceKeyList.every((resource) =>
+  (player.resources[resource] ?? 0) >= (offer.cost[resource] ?? 0)) ? [{
+    value: `purchase:${offer.id}`,
+    labelKey: 'ui.interactionResourceExchange',
+    effectPreview: { kind: 'resourceExchange', resourcesPaid: offer.cost, resourcesGained: offer.resources },
+  }] : []
+
 const parseMoorChoice = (
   choice: string,
 ): { offerId: string; cardId: string; actionId: MoorSpecialActionId; payload: MoorSpecialActionPayload } | null => {
@@ -205,7 +241,8 @@ export const scheduledOfferAction: ActionDefinition = {
     if (playerIndex < 0) return { type: 'ok' }
     const options = offer.kind === 'moor-special-action'
       ? moorSpecialActionOptions(state, player, playerIndex, offer)
-      : animalPurchaseOptions(player, offer)
+      : offer.kind === 'animal-purchase' ? animalPurchaseOptions(player, offer)
+        : resourcePurchaseOptions(player, offer)
     if (options.length === 0) return { type: 'ok' }
     return {
       type: 'request',
@@ -224,6 +261,20 @@ export const scheduledOfferAction: ActionDefinition = {
     if (choice === '__skip__') return { type: 'ok' }
     const cardId = sourceCard
     if (!cardId) return { type: 'fail', errorKey: 'scheduled offer unavailable' }
+
+    if (choice.startsWith('purchase:')) {
+      const offer = readScheduledOffers(player, cardId).find((candidate) =>
+        candidate.id === choice.slice('purchase:'.length) && candidate.consumed &&
+        candidate.consumedRound === state.round)
+      if (!offer || offer.kind !== 'resource-purchase' || !resourcePurchaseOptions(player, offer).length) {
+        return { type: 'fail', errorKey: 'scheduled offer unavailable' }
+      }
+      return { type: 'flow', flow: { type: 'seq', children: [
+        payLeaf({ cardId, cost: offer.cost }),
+        { type: 'leaf', actionId: 'receive', sourceCard: cardId,
+          params: { entries: [{ cardId, round: state.round, resources: offer.resources }] } },
+      ] } }
+    }
 
     const moorChoice = parseMoorChoice(choice)
     if (moorChoice) {

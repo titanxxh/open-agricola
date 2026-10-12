@@ -127,7 +127,6 @@ const obtainListener: CardListenerRegistration = {
               maxTradeTimesBySourceId: { [CARD_ID]: obtainedBoar },
               animalPaymentPreference: animalPaymentPreference(context),
             },
-            choiceLabelKey: 'cards.E053_BoarSpear.choice',
           },
         ],
       },

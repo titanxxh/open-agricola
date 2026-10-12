@@ -1,6 +1,5 @@
 import { definePlayerActionCard } from '../card-source'
-import { registerPlayerActionSpace, createPlayerActionSpaces } from '../player-action-space'
-import { collectAccumulatedResources } from '../../actions/effects/collect'
+import { registerPlayerActionSpace, createPlayerActionSpaces, definePlayerActionSpaceFlow } from '../player-action-space'
 import { findActionSpaceById } from '../../domain/space'
 import type { CardImpl } from '../registry'
 
@@ -10,19 +9,12 @@ registerPlayerActionSpace({
   cardId: CARD_ID,
   access: 'owner',
   gainPerRound: { wood: 1 },
-  createDefinition: (ownerId) => ({
+  createDefinition: (ownerId) => definePlayerActionSpaceFlow({
     id: CARD_ID,
     nameKey: 'cards.D116_TreeInspector.name',
     descriptionKey: 'cards.D116_TreeInspector.desc',
     canBeExecutedByPlayer: (_state, player) => player.id === ownerId,
-    execute: ({ player, space }) => {
-      collectAccumulatedResources(player, space)
-      return { type: 'ok' }
-    },
-    flow: {
-      type: 'seq',
-      children: [{ type: 'leaf', actionId: 'collect' }],
-    },
+    flowFactory: () => ({ type: 'leaf', actionId: 'collect', sourceCard: CARD_ID }),
   }),
 })
 

@@ -1,5 +1,4 @@
 import { defineMinorCard } from '../card-source'
-import { getLogicalFields } from '../helpers/card-field'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D079_CarrotMuseum'
@@ -7,27 +6,9 @@ const CARD_ID = 'D079_CarrotMuseum'
 const cardImpl = {
   effect: {
   id: CARD_ID,
-  onAfterRoundEnd: (state, player) => {
-    if (![8, 10, 12].includes(state.round)) return
-
-    const vegFields = getLogicalFields(player).filter(
-      (field) => field.stacks.some((stack) => stack.kind === 'vegetable'),
-    ).length
-    const veg = player.resources.vegetable ?? 0
-
-    if (vegFields === 0 && veg === 0) return
-
-    const gainParams: Record<string, number> = {}
-    if (vegFields > 0) gainParams.stone = vegFields
-    if (veg > 0) gainParams.wood = veg
-
-    return {
-      type: 'leaf',
-      actionId: 'gain',
-      params: gainParams,
-      sourceCard: CARD_ID,
-    }
-  },
+  timedRules: [{ key: 'museum-reward', at: { kind: 'rounds', rounds: [8, 10, 12], phase: 'onAfterRoundEnd' },
+    body: { kind: 'gain', resources: { stone: { kind: 'fields', crop: 'vegetable' }, wood: { kind: 'supply', resource: 'vegetable' } } },
+  }],
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl

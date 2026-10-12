@@ -1,21 +1,14 @@
 import { defineOccupationCard } from '../card-source'
-import { gainLeaf } from '../helpers/pay-gain-node'
-import { breedLeaf } from '../../actions/effects/breed'
-import { canAccommodateAllAnimals } from '../../domain/animal-zones'
 import type { CardImpl } from '../registry'
+import { gainLeaf } from '../helpers/pay-gain-node'
 
 const CARD_ID = 'A165_PigBreeder'
 
 const cardImpl = {
   effect: {
     id: CARD_ID,
-    onBuy: (_state, _player) => gainLeaf(CARD_ID, { boar: 1 }),
-    onAfterRoundEnd: (state, player) => {
-      if (state.round !== 12) return
-      if (player.resources.boar < 2) return
-      if (!canAccommodateAllAnimals(state, player, ['boar'])) return
-      return breedLeaf(CARD_ID, ['boar'])
-    },
+  onBuy: () => gainLeaf(CARD_ID, { boar: 1 }),
+  timedRules: [{ key: 'extra-breeding', at: { kind: 'rounds', rounds: [12], phase: 'onAfterRoundEnd' }, body: { kind: 'condition', condition: { kind: 'compare', left: { kind: 'supply', resource: 'boar' }, operator: 'ge', right: 2 }, body: { kind: 'operation', operation: { kind: 'breed-animals', animals: ['boar'], requireCapacity: true } } } }],
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl

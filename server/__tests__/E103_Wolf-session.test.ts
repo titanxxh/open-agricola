@@ -1,3 +1,4 @@
+import { descriptionEffects } from './_helpers/choice-description'
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
@@ -77,7 +78,7 @@ const resolveWolf = (session: GameSession, initial: SessionResponse, count: numb
   const offered = resolveTriggerIfPresent(session, initial, CARD_ID)
   const option = options(offered).find((entry) => count === 0
     ? entry.value === '__skip__'
-    : entry.labelParams?.count === count || entry.effectPreview?.resourcesGained?.boar === count)
+    : descriptionEffects(entry.descriptionPreview).some(effect => effect.kind === 'resourceExchange' && effect.resourcesGained?.boar === count))
   expect(option, JSON.stringify(offered.interaction)).toBeDefined()
   let response = session.resolveChoice(offered.interaction.playerIndex, option!.value)
   if (count > 0) {

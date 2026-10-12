@@ -5,7 +5,10 @@ import type {
   ChoiceDescriptionPreview,
   GameState,
   PlayerState,
+  Resource,
 } from '../contract/types'
+import { improvementAction } from '../actions/effects/improvement'
+import { getMoorSpecialActionEffectPlan, MOOR_SPECIAL_ACTION_BORROW_FOOD, moorSpecialActionBorrowCost } from './special-action-plan'
 import {
   executeCardListener,
   getListenerById,
@@ -13,7 +16,7 @@ import {
   runCardListeners,
   type CardListenerContextInput,
   type CardListenerOwnerOptions,
-  type CardListenerZone,
+  type CardListenerOwnerZone,
 } from '../cards/card-listeners'
 import {
   applyMoorSpecialActionEffect,
@@ -53,7 +56,7 @@ type AfterSpecialActionListenerSnapshot = {
   listenerId: string
   ownerPlayerId?: string
   ownerCardId?: string
-  ownerCardZone?: CardListenerZone
+  ownerCardZone?: CardListenerOwnerZone
 }
 
 const readParams = (params?: Record<string, unknown>) => {
@@ -78,6 +81,43 @@ const readActionIds = (actionContext?: Record<string, unknown>): MoorSpecialActi
 
 const optionLabel = (actionId: MoorSpecialActionId) => `moor.specialActions.${actionId}`
 
+const describeMoorSpecialActionEffect = (
+  state: GameState,
+  player: PlayerState,
+  actionId: MoorSpecialActionId,
+  payload: MoorSpecialActionPayload,
+  cardId?: string,
+  previewMode?: 'base',
+): ChoiceDescriptionPreview => {
+  const plan = getMoorSpecialActionEffectPlan(state, player, actionId, payload)
+  const cost = { ...plan.cost }
+  const borrow = moorSpecialActionBorrowCost(state, cardId)
+  if (borrow.food) cost.food = (cost.food ?? 0) + borrow.food
+  const parts: ChoiceDescriptionPreview[] = []
+  if (Object.values(cost).some(amount => (amount ?? 0) > 0)) parts.push({ kind: 'action', showLabel: false, labelKey: 'actions.pay.name', effectPreview: { kind: 'payment', resourcesPaid: cost } })
+  if (plan.terrain) parts.push({ kind: 'action', showLabel: false, labelKey: optionLabel(actionId), effectPreview: {
+    kind: 'terrainOperation', operation: plan.terrain.operation, from: plan.terrain.from,
+    ...(plan.terrain.operation === 'replace-with-field' ? { to: 'field' } : {}),
+    minSelections: 1, maxSelections: 1, visibleLayerOnly: plan.terrain.visibleLayerOnly,
+    requiresUncovered: plan.terrain.requiresUncovered, adjacentFieldRequiredWhenPresent: plan.terrain.adjacentFieldRequiredWhenPresent,
+    ...(Object.values(plan.gain).some(amount => (amount ?? 0) > 0) ? { gainPerSelection: plan.gain } : {}),
+  } })
+  else if (Object.values(plan.gain).some(amount => (amount ?? 0) > 0)) parts.push({ kind: 'action', showLabel: false, labelKey: 'actions.gain.name', effectPreview: { kind: 'resourceExchange', resourcesGained: plan.gain } })
+  if (plan.improvementTypes) {
+    // This declared plan spends its fee before the improvement choice. Project
+    // only that known resource payment; do not execute actions or timing hooks.
+    const nextPlayer = { ...player, resources: { ...player.resources } }
+    for (const [raw, amount] of Object.entries(cost)) if (amount && amount > 0) {
+      const resource = raw as keyof Resource
+      nextPlayer.resources[resource] = (nextPlayer.resources[resource] ?? 0) - amount
+    }
+    const nextState = { ...state, players: state.players.map(candidate => candidate.id === player.id ? nextPlayer : candidate) }
+    const effectPreview = improvementAction.previewEffect?.({ state: nextState, player: nextPlayer, space: createMoorSpecialActionSpace(actionId), actionContext: { types: [...plan.improvementTypes] }, previewMode })
+    parts.push({ kind: 'action', labelKey: 'actions.improvement.name', effectPreview })
+  }
+  return { kind: 'group', operator: 'sequence', separator: ' → ', parts }
+}
+
 const tilePayloads = (
   player: PlayerState,
   actionId: MoorSpecialActionId,
@@ -98,11 +138,12 @@ const takeCardOptions = (
   (state.farmersOfTheMoor?.specialActionCards ?? [])
     .filter((card) => {
       if (!isMoorSpecialActionCardUsableByPlayer(card, player.id)) return false
-      return card.location.kind === 'market' || player.resources.food >= 2
+      return card.location.kind === 'market' || player.resources.food >= MOOR_SPECIAL_ACTION_BORROW_FOOD
     })
     .map((card) => ({
       value: `card:${card.id}`,
       labelKey: optionLabel(card.actions[0]!),
+      effectPreview: { kind: 'payment', resourcesPaid: moorSpecialActionBorrowCost(state, card.id) },
     }))
 
 export const hasMoorSpecialActionCardChoice = (
@@ -165,6 +206,7 @@ const takeActionOptions = (
   actionChoices(state, player, actionContext).map((choice) => ({
     value: choice.value,
     labelKey: optionLabel(choice.actionId),
+    descriptionPreview: describeMoorSpecialActionEffect(state, player, choice.actionId, choice.payload),
   }))
 
 const cardActionChoiceValue = (
@@ -236,12 +278,14 @@ const cardActionChoiceMetaPreview = (
 
 const cardActionChoiceDescriptionPreview = (
   state: GameState,
+  player: PlayerState,
   choice: CardActionChoice,
 ): ChoiceDescriptionPreview => ({
   kind: 'group',
+  operator: 'sequence',
   separator: ' · ',
   parts: [
-    { kind: 'action', labelKey: optionLabel(choice.actionId) },
+    describeMoorSpecialActionEffect(state, player, choice.actionId, choice.payload, choice.cardId),
     cardActionChoiceMetaPreview(state, choice),
   ],
 })
@@ -255,7 +299,7 @@ const takeCardActionOptions = (
     value: choice.value,
     labelKey: optionLabel(choice.actionId),
     labelParams: cardActionChoiceLabelParams(state, choice),
-    descriptionPreview: cardActionChoiceDescriptionPreview(state, choice),
+    descriptionPreview: cardActionChoiceDescriptionPreview(state, player, choice),
   }))
 
 const choiceMode = (actionContext?: Record<string, unknown>) => {
@@ -320,8 +364,9 @@ const takeSpecialActionCard = (
     card.location = { kind: 'playerFaceUp', playerId: player.id }
     return { type: 'ok' as const }
   }
-  if (player.resources.food < 2) return { type: 'fail' as const, errorKey: 'not enough food' }
-  player.resources.food -= 2
+  const cost = moorSpecialActionBorrowCost(state, cardId)
+  if (player.resources.food < (cost.food ?? 0)) return { type: 'fail' as const, errorKey: 'not enough food' }
+  player.resources.food -= cost.food ?? 0
   card.location = { kind: 'playerFaceDown', playerId: player.id }
   return { type: 'ok' as const }
 }
@@ -533,6 +578,10 @@ export const moorSpecialActionApplyAction: ActionDefinition = {
   descriptionKey: 'actions.moor-special-action-apply.description',
   roundAvailable: 1,
   gainPerRound: {},
+  previewEffect: ({ state, player, params, previewMode }) => {
+    const parsed = readParams(params)
+    return parsed ? { kind: 'rule', description: describeMoorSpecialActionEffect(state, player, parsed.actionId, parsed.payload, parsed.cardId, previewMode) } : undefined
+  },
   canBeExecutedByPlayer: () => true,
   execute: ({ state, player, params, eventSink }) => {
     const parsed = readParams(params)

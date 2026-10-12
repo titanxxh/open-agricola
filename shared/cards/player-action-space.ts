@@ -1,4 +1,4 @@
-import type { ActionDefinition, ActionSpace, GameState, Resource } from '../contract/types'
+import type { ActionDefinition, ActionFlow, ActionSpace, GameState, Resource } from '../contract/types'
 
 export type PlayerActionSpaceConfig = {
   /** The card ID */
@@ -54,6 +54,14 @@ export const createPlayerActionSpaces = (state: GameState): ActionSpace[] => {
       const def = config.createDefinition(player.id)
       spaces.push({
         ...def,
+        ...(def.flowFactory ? { flowFactory: context => {
+          if (context.previewMode !== 'base') return def.flowFactory?.(context)
+          const actors = config.access === 'owner' ? context.state.players.filter(actor => actor.id === player.id) : context.state.players
+          return { type: 'xor', children: actors.flatMap(actor => {
+            const flow = def.flowFactory?.({ ...context, player: actor })
+            return flow ? [{ ...flow, targetPlayerId: actor.id }] : []
+          }) }
+        } } : {}),
         id: cardId,
         roundAvailable: 1,
         gainPerRound: { ...config.gainPerRound },
@@ -64,4 +72,21 @@ export const createPlayerActionSpaces = (state: GameState): ActionSpace[] => {
     }
   }
   return spaces
+}
+
+/** The same pure plan drives runtime effects and recursive descriptions. */
+export const definePlayerActionSpaceFlow = (definition: Omit<ActionDefinition, 'roundAvailable' | 'gainPerRound' | 'execute' | 'flowFactory'> & {
+  flowFactory: (context: Parameters<NonNullable<ActionDefinition['flowFactory']>>[0]) => ActionFlow
+}): Omit<ActionDefinition, 'roundAvailable' | 'gainPerRound'> => {
+  const bindSpace = (flow: ActionFlow): ActionFlow => flow.type === 'leaf' ? {
+    ...flow,
+    actionContext: {
+      targetSpaceId: definition.id,
+      ...(flow.actionId === 'gain' && !flow.params?.recipientPlayerId && !flow.params?.recipientMode && !flow.params?.payerId
+        ? { sourceLocation: { kind: 'actionSpace', spaceId: definition.id } } : {}),
+      ...flow.actionContext,
+    },
+  } : { ...flow, children: flow.children.map(bindSpace) }
+  const flowFactory: typeof definition.flowFactory = context => bindSpace(definition.flowFactory(context))
+  return { ...definition, flowFactory, execute: context => ({ type: 'flow', flow: flowFactory(context) }) }
 }

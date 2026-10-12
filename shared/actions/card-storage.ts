@@ -1,16 +1,20 @@
 import type { ChoiceEffectPreview, GameState, PlayerState } from '../contract/types'
-import { readCardExtraData, writeCardExtraData } from '../cards/helpers/card-state'
+import { readCardExtraData, writeCardExtraData, popFromCardStack, pushToCardStack } from '../cards/helpers/card-state'
 import { incCounter, initCardState } from '../cards/__stubs__/helpers'
 import { getCardEffect } from '../cards/card-effects'
 import { computeSourceCardContribution } from '../domain/scoring'
 
 export type CardStorageOperation =
+  | { kind: 'pop-card-stack' }
+  | { kind: 'push-card-stack'; item: string }
   | { kind: 'increment-extra-data'; key: string; amount: number }
   | { kind: 'set-extra-data'; key: string; value: unknown }
   | { kind: 'increment-counter'; key: string; amount: number }
   | { kind: 'set-counter'; key: string; value: number }
 
 export const readCardStorageOperation = (params?: Record<string, unknown>): CardStorageOperation | undefined => {
+  if (params?.kind === 'pop-card-stack') return { kind: 'pop-card-stack' }
+  if (params?.kind === 'push-card-stack' && typeof params.item === 'string') return { kind: 'push-card-stack', item: params.item }
   if (!params || typeof params.key !== 'string') return undefined
   if ((params.kind === 'increment-counter' || params.kind === 'increment-extra-data') && typeof params.amount === 'number') return params as CardStorageOperation
   if (params.kind === 'set-extra-data') return params as CardStorageOperation
@@ -21,6 +25,8 @@ export const readCardStorageOperation = (params?: Record<string, unknown>): Card
 /** The same deterministic write is used by execution and detached projection. */
 export const applyCardStorageOperation = (player: PlayerState, sourceCard: string, operation: CardStorageOperation): void => {
   switch (operation.kind) {
+    case 'pop-card-stack': popFromCardStack(player, sourceCard); break
+    case 'push-card-stack': pushToCardStack(player, sourceCard, [operation.item]); break
     case 'increment-extra-data':
       writeCardExtraData(player, sourceCard, operation.key, (readCardExtraData<number>(player, sourceCard, operation.key) ?? 0) + operation.amount)
       break

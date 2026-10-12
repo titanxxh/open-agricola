@@ -27,7 +27,6 @@ const anytimeListener: CardListenerRegistration = {
         ],
       },
       sourceCard: CARD_ID,
-      labelKey: 'cards.E062_SourDough.anytime',
     }
   },
 }

@@ -39,7 +39,6 @@ const anytimeListener: CardListenerRegistration = {
         ],
       },
       sourceCard: CARD_ID,
-      labelKey: 'cards.C087_Mason.anytime',
     }
   },
 }

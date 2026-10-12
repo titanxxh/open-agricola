@@ -17,7 +17,6 @@ const anytimeListener: CardListenerRegistration = {
     return {
       flow,
       sourceCard: CARD_ID,
-      labelKey: 'cards.M040_MoorFire.anytime',
     }
   },
 }

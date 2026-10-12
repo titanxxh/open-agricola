@@ -11,7 +11,7 @@ import type {
   PlayerState,
   Resource,
 } from '../../contract/types'
-import { PaymentSolver, type ConstructCostAdjustments } from '../payment'
+import { PaymentSolver, describePaymentEffectPreview, type ConstructCostAdjustments } from '../payment'
 import { buildInternalPayChild } from '../helpers/pay-child'
 import { playerBoard } from '../../domain'
 import { collectLockedFarmTileKeys } from '../../cards/card-effects'
@@ -54,6 +54,8 @@ const readConstructCostAdjustments = (
 }
 
 const constructCostPreview: ActionCostPreview = {
+  dependsOnHouseType: true,
+  unitCost: 'room',
   getBaseCost: (context) => {
     const cost = PaymentSolver.buildConstructCost(
       context.player,
@@ -267,6 +269,21 @@ export const constructAction: ActionDefinition = {
   canBeExecutedByPlayer: (_state, player, context) =>
     canStartConstruct(_state, player, undefined, context?.actionContext, undefined),
   costPreview: constructCostPreview,
+  previewEffect: context => {
+    const { state, player, costs, actionContext, previewMode } = context
+    if (previewMode === 'base') return { kind: 'unitCost', unit: 'room', resourcesPaid: constructCostPreview.getBaseCost(context), actionNameKey: 'actions.construct.name' }
+    const adjustments = readConstructCostAdjustments(context)
+    const selection = boardForPlayer(state, player).farmInteraction.selectableTiles('room', {
+      costOverride: PaymentSolver.readConstructCostDelta(actionContext, costs),
+      exactCost: PaymentSolver.readExactCost(actionContext), actionContext, costAdjustments: adjustments,
+    })
+    if (selection.farmType !== 'room') return undefined
+    return { kind: 'actionCosts', actionNameKey: 'actions.construct.name', options: Array.from({ length: selection.maxSelections ?? 0 }, (_, index) => {
+      const cost = buildConstructPayCost(player, costs, actionContext, index + 1, adjustments)
+      const solutions = cost ? PaymentSolver.computeOptions(state, state.players.indexOf(player), cost, { actionId: 'construct', costType: 'construct' }) : []
+      return { amount: index + 1, paymentOptions: solutions.map(solution => describePaymentEffectPreview(solution, false, { paymentResourceProviders: cost?.paymentResourceProviders })) }
+    }) }
+  },
   execute: (context): ActionExecutionResult => {
     const { state, player, costs, actionContext } = context
     const idx = state.players.indexOf(player)

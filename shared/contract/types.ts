@@ -1,3 +1,4 @@
+import type { RuleOperationPreview } from './rule-operation-previews'
 import type { PromptKey } from './prompt-keys'
 import type { EventSink, GameEvent, PublicEventArchivePacket } from './events'
 import type { PrivateGameEvent } from './private-events'
@@ -522,6 +523,14 @@ export type FutureMeeple = {
   actionContext?: Record<string, unknown>
 }
 
+export type ScheduledEffectPreview = {
+  round: number
+  sourceCard: string
+  timing?: import('./rule-plans').TimedRulePhase | 'afterBeforeReturnHomeHooks' | 'afterReturnHomeHooks'
+  description: ChoiceDescriptionPreview
+  count: number
+}
+
 export type FutureMeepleSourceSummary = {
   key: 'log.salterFutureFood'
   params: {
@@ -716,6 +725,7 @@ export type ProtectedObservation = {
 }
 
 export type ActionExecutionContext = {
+  previewMode?: 'base'
   state: GameState
   player: PlayerState
   space: ActionSpace
@@ -731,11 +741,18 @@ export type ActionExecutionContext = {
   reportProtectedObservation?: (observation: ProtectedObservation) => void
 }
 
+/** Explicit pure planning input. Planning cannot emit events or protected observations. */
+export type ActionFlowPlanningContext = Pick<ActionExecutionContext,
+  'state' | 'player' | 'space' | 'params' | 'sourceCard' | 'actionContext' | 'previewMode'
+  | 'costs' | 'costTrades' | 'costBonuses' | 'paymentResourceProviders' | 'costAttribution'>
+
 export type ActionMutationContext = ActionExecutionContext & {
   eventSink: EventSink
 }
 
 export type ActionCostPreview = {
+  unitCost?: 'room' | 'stable' | 'fence'
+  dependsOnHouseType?: boolean
   isStructurallyPossible?: (context: ActionAvailabilityContext) => boolean
   canExecute?: (
     context: ActionAvailabilityContext,
@@ -749,10 +766,72 @@ export type ChoiceResourceLocation =
   | { kind: 'card'; cardId: string }
   | { kind: 'actionSpace'; spaceId: string; nameKey: string }
 
+export type RuleAmount = number
+  | { kind: 'supply'; resource: keyof Resource }
+  | { kind: 'fields'; crop: 'grain' | 'vegetable' }
+  | { kind: 'family' }
+  | { kind: 'crop-total' }
+  | { kind: 'major-improvements' }
+  | { kind: 'card-fact'; fact: string }
+  | { kind: 'occupied-round-spaces' }
+  | { kind: 'scale'; value: RuleAmount; by: number }
+  | { kind: 'min'; values: readonly RuleAmount[] }
+  | { kind: 'sum'; values: readonly RuleAmount[] }
+  | { kind: 'divide'; value: RuleAmount; by: number }
+
+export type RuleCondition =
+  | { kind: 'house-type'; houseType: PlayerState['houseType'] }
+  | { kind: 'room-for-newborn' }
+  | { kind: 'has-fields' }
+  | { kind: 'card-flag' }
+  | { kind: 'card-fact-positive'; fact: string }
+  | { kind: 'inactive-supply-worker' }
+  | { kind: 'card-fact-true'; fact: string }
+  | { kind: 'purchased-by-round'; round: number; fact: string }
+  | { kind: 'extra-room-active'; fact: string }
+  | { kind: 'compare'; left: RuleAmount; operator: 'eq' | 'ge' | 'gt'; right: RuleAmount }
+  | { kind: 'all'; conditions: readonly RuleCondition[] }
+
 export type ChoiceEffectPreview =
+  | { kind: 'collection'; spaceId: string; spaceNameKey: string; resourceTypes: (keyof Resource)[] }
+  | { kind: 'resourceBatchExchange'; available: Partial<Resource>; receiveResources: (keyof Resource)[]; minTotal: number; maxTotal: number }
+  | { kind: 'workerRecall'; destination: { kind: 'home' } | { kind: 'card'; cardId: string }; workers: { workerId?: string; spaceId: string; spaceNameKey: string }[]; select: boolean; noOp: boolean }
+  | { kind: 'exchangeCatalog'; choices: { sourceCard?: string; resourcesPaid: Partial<Resource>; resourcesGained: Partial<Resource>; minTimes: number; maxTimes: number }[] }
+  | { kind: 'resourceSetSelection'; choices: (keyof Resource)[]; minDistinct: number; maxDistinct: number; resourcesPerChoice: number; extraGain: Partial<Resource>; quantitiesByUse?: readonly number[] }
+  | { kind: 'resourceBundle'; resources: Partial<Resource> }
+  | { kind: 'cardRecordSelection'; cardId: string; count: number; choices: Partial<Resource>[] }
+  | { kind: 'cardStack'; cardId: string; item: string; amount: number }
+  | { kind: 'scoringReserve'; resourcesReserved: Partial<Resource>; bonusVp: number }
+  | { kind: 'animalCapacity'; amount: number }
+  | { kind: 'virtualRoom'; amount: number; animalCapacity: number }
+  | { kind: 'fenceReserve'; amount: number }
+  | { kind: 'resourceSale'; stage?: 'buyer-offer'; resourcesSold: Partial<Resource>; supplyReward: Partial<Resource>; buyerPays: Partial<Resource> }
+  | { kind: 'resourceQuantitySchedule'; choices: { resource: keyof Resource; available: number; rounds: number[]; resourcesPerUnit: Partial<Resource> }[]; preset?: Partial<Resource> }
+  | { kind: 'cardCounter'; cardId: string; counter: string; amount: number }
+  | { kind: 'terrainOperation'; operation: 'place' | 'remove' | 'replace-kind' | 'replace-with-field' | 'cover'; from?: 'forest' | 'moor'; to?: 'forest' | 'moor' | 'field'; minSelections: number; maxSelections: number; visibleLayerOnly?: true; requiresUncovered?: true; adjacentFieldRequiredWhenPresent?: true; gainPerSelection?: Partial<Resource>; bonusVpPerSelection?: number }
+  | { kind: 'fieldOperation'; operation:
+      | { kind: 'replace'; from: 'grain' | 'vegetable'; fromAmount: number; to: 'grain' | 'vegetable'; toAmount: number }
+      | { kind: 'remove-top'; amount: number; crop?: 'grain' | 'vegetable'; gain: Partial<Resource> }
+      | { kind: 'discard-all' }
+      | { kind: 'move'; amount: number };
+      minSelections: number; maxSelections: number; location?: 'crop-space' }
+  | { kind: 'animalPose'; animal: 'horse'; amount: number; pose: 'lying'; resourcesGained: Partial<Resource> }
+  | { kind: 'familyGrowth'; roomRequired: boolean; heldOnCard?: string }
+  | { kind: 'harvestFields'; privatePhase: boolean }
+  | { kind: 'cardSelection'; types: ('major' | 'minor')[]; allowedCards?: string[]; resourcesPaid?: Partial<Resource> }
+  | { kind: 'bakeRecipes'; recipes: { sourceCard: string; exchange: Extract<ChoiceEffectPreview, { kind: 'resourceExchange' }>; quantityLimit: number }[] }
+  | { kind: 'fencePlan'; segments: { kind: FenceSegmentType; woodCost: number; min?: number; max?: number }[]; totalBounds?: { min?: number; max?: number }; fixedWood: number; freeFences: number; borrowed: boolean; paymentBudget?: PaymentResourceMap }
+  | { kind: 'resourceTransfer'; resources: Partial<Resource>; recipients: NonNullable<ChoiceDescriptionPreview['actor']>[]; payer?: NonNullable<ChoiceDescriptionPreview['actor']> }
+  | { kind: 'ruleOperation'; operation: RuleOperationPreview }
+  | { kind: 'unitCost'; resourcesPaid: Partial<Resource>; actionNameKey: string; unit?: 'room' | 'stable' | 'fence'; fixedFee?: Partial<Resource> }
+  | { kind: 'occupationFees'; food: readonly number[] }
+  | { kind: 'timedOperation'; operation: 'return-worker' | 'remove-worker' | 'release-held-worker' | 'skip-harvest' | 'skip-field-and-breed' | 'exclusive-use-expires'; actionNameKey?: string }
+  | { kind: 'formulaGain'; resources: Readonly<Partial<Record<keyof Resource, RuleAmount>>> }
+  | { kind: 'rule'; description: ChoiceDescriptionPreview }
+  | { kind: 'actionCosts'; actionNameKey: string; options: { amount: number; paymentOptions: Extract<ChoiceEffectPreview, { kind: 'payment' }>[] }[] }
   | { kind: 'fieldContents'; resources: Partial<Resource>; sourceCard?: string }
   | { kind: 'cardScore'; cardId: string; delta: number }
-  | { kind: 'actionSpace'; spaceId: string; nameKey: string; descriptionKey: string }
+  | { kind: 'actionSpace'; spaceId: string; nameKey: string; description?: ChoiceDescriptionPreview }
   | { kind: 'futureOffers'; entries: { round: number; resources: Partial<Resource>; resourcesPaid: Partial<Resource>; actionNameKey?: string }[] }
   | { kind: 'resourceMovement'; resources: Partial<Resource>; from: ChoiceResourceLocation; to: ChoiceResourceLocation }
   | {
@@ -785,7 +864,7 @@ export type ChoiceEffectPreview =
     }
 
 export type ChoiceDescriptionPreview =
-  | {
+  ({ kind: 'conditional'; condition: RuleCondition; body: ChoiceDescriptionPreview } | {
       kind: 'action'
       showLabel?: boolean
       labelKey: string
@@ -794,8 +873,14 @@ export type ChoiceDescriptionPreview =
     }
   | {
       kind: 'group'
+      labelKey?: string
+      labelParams?: Record<string, unknown>
+      operator: 'sequence' | 'xor' | 'or' | 'parallel'
       separator: string
       parts: ChoiceDescriptionPreview[]
+    }) & {
+      optional?: boolean
+      actor?: { playerId: string; name: string; nameIsDefault: boolean; index: number }
     }
 
 export type ChoiceFarmPosition = FarmTilePosition & { sourceCard?: string; cardFieldSlot?: number }
@@ -811,6 +896,7 @@ export type ActionChoiceOption = {
   effectPreview?: ChoiceEffectPreview
   descriptionPreview?: ChoiceDescriptionPreview
   /** Legal displayed targets bound to this opaque choice, declared by the backend. */
+  quantityLimit?: number
   target?: ChoiceFarmTarget
   targetCard?: { cardId: string; actionNameKeys: string[] }
   /** When true, UI greys out the option and server rejects attempts to pick it. */
@@ -908,6 +994,7 @@ export type ActionFlow = (
  ) & { anytimeWindow?: AnytimeWindow }
 
 export type ActionDefinition = {
+  baseDescriptionPreview?: ChoiceDescriptionPreview
   id: string
   nameKey: string
   descriptionKey: string
@@ -929,6 +1016,8 @@ export type ActionDefinition = {
   costPreview?: ActionCostPreview
   /** Pure description of this shared primitive, derived from its executable rule parameters. */
   previewEffect?: (context: ActionExecutionContext) => ChoiceEffectPreview | undefined
+  /** Pure executable plan, also used for descriptions. Base mode includes all potential branches. */
+  flowFactory?: (context: ActionFlowPlanningContext) => ActionFlow | undefined
   execute: (context: ActionMutationContext) => ActionExecutionResult
   resolveChoice?: (
     context: ActionMutationContext,
@@ -1148,6 +1237,7 @@ export type AnytimeAction = {
   labelParams?: Record<string, unknown>
   actionId?: string
   sourceCard?: string
+  descriptionPreview?: ChoiceDescriptionPreview
 }
 
 export type InteractionAnimalReorgZone = {

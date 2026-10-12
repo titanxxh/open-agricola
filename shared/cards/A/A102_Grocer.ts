@@ -30,7 +30,6 @@ const anytimeListener: CardListenerRegistration = {
         ],
       },
       sourceCard: CARD_ID,
-      labelKey: 'cards.A102_Grocer.anytime',
     }
   },
 }

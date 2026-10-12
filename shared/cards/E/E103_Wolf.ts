@@ -42,7 +42,7 @@ const buildClaimFlow = (
   return {
     type: 'xor', optional: true, promptKey: 'ui.interactionFlowSelect',
     children: Array.from({ length: count }, (_, index) => ({
-      type: 'seq', choiceLabelKey: 'ui.interactionWolfTakeCount', choiceLabelParams: { count: index + 1 },
+      type: 'seq',
       children: [
         ...Array.from({ length: index + 1 }, () => ({
           type: 'leaf' as const, actionId: 'pop-card-stack', sourceCard: CARD_ID,

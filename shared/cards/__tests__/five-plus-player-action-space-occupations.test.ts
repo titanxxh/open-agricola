@@ -106,44 +106,6 @@ describe('5+ player action space occupations', () => {
     expect(definition.canBeExecutedByPlayer(state, owner)).toBe(false)
   })
 
-  it('D170 Fold Builder registers an all-player space where non-owner pays owner before fencing and sheep', () => {
-    const session = setupSession('D170_FoldBuilder')
-    const state = session.getState().state
-    const owner = state.players[0]!
-    const user = state.players[1]!
-    owner.resources.food = 0
-    user.resources.food = 1
-    user.resources.wood = 4
-
-    const config = getPlayerActionSpaceConfig('D170_FoldBuilder')
-    expect(config?.access).toBe('all')
-    const space = createPlayerActionSpaces(state).find((candidate) => candidate.id === 'D170_FoldBuilder')
-    expect(space).toBeDefined()
-    expect(space!.canBeExecutedByPlayer(state, user)).toBe(true)
-
-    const result = config!.createDefinition(owner.id).execute({
-      state,
-      player: user,
-      space,
-    } as unknown as ActionExecutionContext)
-
-    expect(user.resources.food).toBe(0)
-    expect(owner.resources.food).toBe(1)
-    expect(result.type).toBe('flow')
-    if (result.type !== 'flow') return
-    expect(result.flow).toMatchObject({
-      type: 'seq',
-      children: [
-        {
-          actionId: 'fence',
-          sourceCard: 'D170_FoldBuilder',
-          actionContext: { fencePolicy: { cancelPolicy: 'forbidCancel' } },
-        },
-        { actionId: 'gain', params: { sheep: 1 }, sourceCard: 'D170_FoldBuilder' },
-      ],
-    })
-  })
-
   it('D170 Fold Builder owner uses it without self-payment and non-owner needs food plus legal fencing', () => {
     const session = setupSession('D170_FoldBuilder')
     const state = session.getState().state

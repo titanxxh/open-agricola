@@ -34,7 +34,6 @@ const listener: CardListenerRegistration = {
       flow: {
         type: 'seq',
         optional: true,
-        choiceLabelKey: 'cards.A129_Swagman.choice',
         children: [
           jumpLeaf({
             sourceCard: CARD_ID,

@@ -1,3 +1,4 @@
+import { createWorkSession } from './_helpers/session-fixtures'
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { hasPendingExtraTurn } from '../../shared/cards/card-effects'
@@ -51,7 +52,7 @@ const setupRoundEnd = (options?: {
   farmlandWorkerIds?: string[]
   occupationHand?: string[]
 }) => {
-  const session = new GameSession(undefined, undefined, { playerCount: 2 })
+  const session = createWorkSession({ seed: 2010 })
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   state.currentPlayerIndex = 0
@@ -276,7 +277,7 @@ describe('E010_StrawHat session', () => {
   })
 
   it('moving an A92 extra-turn worker does not lose or duplicate the A92 opportunity', () => {
-    const session = new GameSession(undefined, undefined, { playerCount: 2 })
+    const session = createWorkSession({ seed: 2010 })
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 1
@@ -360,7 +361,7 @@ describe('E010_StrawHat session', () => {
 })
 
 const setupArchwayRoundEnd = (withAllowedTarget: boolean) => {
-  const session = new GameSession(undefined, undefined, { playerCount: 2 })
+  const session = createWorkSession({ seed: 2010 })
   const state = session.getState().state
   state.currentPlayerIndex = 0
   state.round = 14

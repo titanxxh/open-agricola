@@ -834,6 +834,14 @@ Harvest field 三个阶段 hook（`onStartHarvestFieldPhase` / `onHarvestFieldPh
 
 未来回合的一次性 optional offer 不应塞进 `futureMeeples` 资源 token。`scheduled-offer` internal action 读取 `player.cardStates[cardId].extraData.scheduledOffers`，offer 记录 `dueRound`、`kind`、cost、目标 special action 或 animal、`consumed` / `consumedRound`；`onRoundStart` 通过 `scheduledOffersRoundStartFlow()` 把到期 offer 交给 engine。执行时先消费 token，再按当前状态决定是否弹 choice；拒绝、资源不足或目标不可执行都不会保留 token。M056 通过该 action 复用 Cut Peat special action card 的可用性、费用、market / opponent face-up 和翻面规则；M131 通过同一模型购买预约动物后显式进入 `reorganize`。
 
+可执行说明使用 `ChoiceDescriptionPreview`。描述树保留顺序、互斥与多选分支、并行次序、可选性以及规则执行玩家。`Engine.describe()` 读取执行 flow，不推进 cursor，也不执行行动。`Engine.describeFlow()` 描述独立计划，不构造执行引擎或日志存储。原本不透明的原生行动通过纯 `ActionDefinition.flowFactory` 接收仅含数据的 `ActionFlowPlanningContext`，真实执行调用同一个工厂。四季行动和卡牌行动格复用此契约。卡牌行动格计划将每个 leaf 绑定到实际行动格，保留显式跨玩家转移，并声明本玩家从棋盘获得资源的来源。领取事件和资源统计遵循该来源；资源监听器观察实际产生资源的 leaf，避免外层行动对同一事件重复计数。基础说明注册普通、internal 和 ad-hoc 行动，排除所有玩家修正，并保留各执行玩家的分支。资源领取和选择说明与执行复用目标及选择计划。随时行动、选择项、棋盘规则和定时效果详情使用同一个渲染器。卡牌正文继续人工维护。棋盘基础费用排除玩家修正；当前交互选项使用 Interaction Player 和后端支付求解器，保留数量上限和替代支付来源。烤面包选项由后端提供实际兑换比例及数量上限。造房、建马厩数量，翻修目标、职业目标和设施购买均使用 PaymentSolver 的实际路径，包括资源提供者、退回卡牌、原支付路径身份及购买结果。显式 exact cost 同时作用于候选准入和真实付款。闲置时的私密 anytime 预览只发给当前操作玩家；浏览公共农场保留操作身份和草稿，同时隐藏私密操作。
+
+卡牌源码内的 `CardEffect.timedRules` 声明闭合的 `TimedRule` 和 `RuleBody`。官方卡注册将 flow 阶段编译到已有 hook。同一来源的到期规则合成一个 flow，因此阶段续接仍按卡牌恢复。通用 rule action 在真实执行时计算条件和公式。未来说明保留田地、供应、家庭人数和卡牌记录的符号数量，不预测未来状态，也不运行任意回调。事件阶段适配器保留收取、Receive、额外行动及轮到玩家时的实际时序。已激活义务只有显式声明保留时才随来源离区继续执行；派发保留原工人或效果拥有者，而非当前持卡人，恢复时重建相应监听器。即使公开描述合并数量，重复效果仍逐次执行。
+
+`timed-rules.ts` 编译计划并读取排期事实，不查询运行时卡牌注册表。`rule-queries.ts` 为 internal rule action 提供执行时的公式和条件查询。Snapshot 读取位于无运行时查询依赖的 `action-snapshot-state.ts`，写入操作及更广泛的棋盘查询保持分离。移动准入和执行共用目标计划，没有合法目标时不会弹出可选接受窗口。沼泽农夫特殊行动的执行、准入和展示也共用 `getMoorSpecialActionEffectPlan`，涵盖地形约束、卡牌加成及购买类型。
+
+`collectScheduledEffectPreviews()` 投影已安排的领取、购买机会、定时规则，以及明确的工人和阶段义务。`ScheduledEffectPreview` 包含回合、阶段、来源、完整描述和重复次数。分组身份包含完整归一化描述及时间，只改变展示。前端按领取玩家颜色分区，并按来源保留独立标记；点击回合打开完整清单。常驻能力不复制到棋盘各回合。玩家过滤隐藏私有来源和未揭示行动身份，rehydration 剥离展示投影。展示字段和行动描述在与不可变权威 core 组合成 Snapshot Frame 前经过 JSON 边界，避免 undefined 预览属性产生无效 Replay delta，同时保留 core 的共享引用。
+
 ### 7.7 Listener activation purity + 参考实现对齐
 
 **架构决策（2026-05-13）：`CardListenerRegistration.handler` 在 listener dispatch / preview / doable 路径中必须是 state-pure flow builder。** 它可以读取 `GameState` / `PlayerState` / event，返回 `ActionHookResult`、`ActionFlow`、`costs`、`doable`、`extraOptions` 等结构化结果；不能直接修改 `GameState`、`PlayerState`、`ActionSpace`、`player.cardStates`、资源、农场格、日志或 pending。

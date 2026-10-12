@@ -1,6 +1,8 @@
 import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { compileRuleBody } from '../../actions/timed-rules'
+import type { RuleBody } from '../../contract/rule-plans'
 import type { ActionFlow, PlayerState } from '../../contract/types'
 import { isCardFlagged, readCardExtraData, setCardFlag } from '../helpers/card-state'
 import {
@@ -74,15 +76,10 @@ const builtSomethingThisAction = (player: PlayerState): boolean =>
   getStableTilesBuiltThisAction(player) > 0 ||
   getFencesBuiltThisAction(player) > 0
 
-const makeToolboxFlow = (): ActionFlow => ({
-  type: 'leaf',
-  actionId: 'improvement',
-  optional: true,
-  promptKey: 'ui.interactionToolboxImprovement',
-  sourceCard: CARD_ID,
-  params: { allowedPurchases: ALLOWED_MAJORS, trueAction: false },
-  actionContext: { trueAction: false },
-})
+const toolboxBody = {
+  kind: 'optional', promptKey: 'ui.interactionToolboxImprovement', body: { kind: 'action', actionId: 'improvement', params: { allowedPurchases: ALLOWED_MAJORS, trueAction: false }, policy: { trueAction: false } },
+} satisfies RuleBody
+const makeToolboxFlow = (): ActionFlow => compileRuleBody(CARD_ID, 'toolbox-window', toolboxBody)
 
 const makeWindowedToolboxFlow = (turnToken: number, clearFlag = false): ActionFlow => ({
   type: 'seq',
@@ -111,12 +108,7 @@ const cardImpl = {
       if (state.roundPhase !== 'work') return
       setCardFlag(player, CARD_ID, builtSomethingThisAction(player))
     },
-    onEndTurn: (_state, player) => {
-      if (!isCardFlagged(player, CARD_ID)) return
-      setCardFlag(player, CARD_ID, false)
-      const turnToken = readActionSnapshotToken(player)
-      return turnToken === undefined ? makeToolboxFlow() : makeWindowedToolboxFlow(turnToken)
-    },
+    timedRules: [{ retainAfterCardLeaves: true, key: 'toolbox-window', at: { kind: 'card-flag', clock: 'current-turn', phase: 'onEndTurn' }, consume: { clearCardFlag: true, recordTurnFact: WINDOW_OFFERED_TURN_TOKEN_KEY }, body: toolboxBody }],
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl

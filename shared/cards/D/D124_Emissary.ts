@@ -34,7 +34,6 @@ const anytimeListener: CardListenerRegistration = {
     return {
       flow: children.length === 1 ? children[0]! : { type: 'xor', children },
       sourceCard: CARD_ID,
-      labelKey: 'cards.D124_Emissary.anytime',
     }
   },
 }

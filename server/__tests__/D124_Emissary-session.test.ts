@@ -1,3 +1,4 @@
+import { descriptionEffects } from './_helpers/choice-description'
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -21,6 +22,16 @@ const goodOption = (response: ReturnType<GameSession['getState']>, good: keyof R
   expect(option).toBeDefined()
   return option!
 }
+
+const expectRestoredParent = (response: ReturnType<GameSession['getState']>, parent: ReturnType<GameSession['getState']>) => {
+  const { anytimeActions: restoredActions, ...restoredInteraction } = response.interaction
+  const { anytimeActions: parentActions, ...parentInteraction } = parent.interaction
+  expect(restoredInteraction).toEqual(parentInteraction)
+  expect(restoredActions.map(action => action.id)).toEqual(parentActions.map(action => action.id))
+}
+const offeredCosts = (response: ReturnType<GameSession['getState']>) => descriptionEffects(
+  response.interaction.anytimeActions.find(action => action.id === ANYTIME)?.descriptionPreview,
+).flatMap(effect => effect.kind === 'resourceExchange' ? [effect.resourcesPaid] : [])
 
 describe('D124_Emissary session', () => {
   const setup = () => {
@@ -79,7 +90,8 @@ describe('D124_Emissary session', () => {
       .toEqual([expect.objectContaining({ resources: { wood: 1 } })])
     expect(resp.state.events.filter((event) => event.type === 'resource.moved' && event.sourceCardId === 'D124_Emissary'))
       .toEqual([expect.objectContaining({ resources: { stone: 1 } })])
-    expect(resp.interaction).toEqual(parent.interaction)
+    expectRestoredParent(resp, parent)
+    expect(offeredCosts(resp)).toEqual([{ clay: 1 }, { stone: 1 }, { food: 1 }])
     expectPublicCardGoods(session, 'D124_Emissary', { stack: ['wood'] })
   })
 
@@ -137,7 +149,8 @@ describe('D124_Emissary session', () => {
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources).toMatchObject({ wood: 0, stone: 1 })
     expect(getCardStack(response.state.players[0]!, 'D124_Emissary')).toEqual(['wood'])
-    expect(response.interaction).toEqual(parent.interaction)
+    expectRestoredParent(response, parent)
+    expect(offeredCosts(response)).toEqual([{ stone: 1 }])
   })
 
   it.each(['empty', 'already-placed'])('does not offer an activation with no eligible goods (%s)', (reason) => {

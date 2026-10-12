@@ -1,12 +1,12 @@
 import { definePlayerActionCard } from '../card-source'
-import { registerPlayerActionSpace, createPlayerActionSpaces } from '../player-action-space'
+import { registerPlayerActionSpace, createPlayerActionSpaces, definePlayerActionSpaceFlow } from '../player-action-space'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E081_AlchemistsLab'
 registerPlayerActionSpace({
   cardId: CARD_ID,
   access: 'all',
-  createDefinition: (ownerId) => ({
+  createDefinition: (ownerId) => definePlayerActionSpaceFlow({
     id: CARD_ID,
     nameKey: 'cards.E081_AlchemistsLab.name',
     descriptionKey: 'cards.E081_AlchemistsLab.desc',
@@ -19,23 +19,13 @@ registerPlayerActionSpace({
       )
       return hasBuilding
     },
-    execute: ({ state, player }) => {
-      // Non-owner pays 1 food to the owner
-      if (player.id !== ownerId) {
-        player.resources.food -= 1
-        const owner = state.players.find((p) => p.id === ownerId)
-        if (owner) owner.resources.food += 1
-      }
-      // Gain 1 of each building resource the player already has
-      const gained: Partial<Record<string, number>> = {}
-      for (const res of ['wood', 'clay', 'reed', 'stone'] as const) {
-        if (player.resources[res] > 0) {
-          player.resources[res] += 1
-          gained[res] = 1
-        }
-      }
-      return { type: 'ok', resourcesGained: gained }
-    },
+    flowFactory: ({ player }) => ({ type: 'seq', children: [
+      ...(player.id !== ownerId ? [{ type: 'leaf' as const, actionId: 'gain', sourceCard: CARD_ID,
+        params: { food: 1, recipientPlayerId: ownerId, payerId: player.id } }] : []),
+      { type: 'leaf', actionId: 'gain', sourceCard: CARD_ID, params: Object.fromEntries(
+        (['wood', 'clay', 'reed', 'stone'] as const).filter(resource => player.resources[resource] > 0).map(resource => [resource, 1]),
+      ) },
+    ] }),
   }),
 })
 

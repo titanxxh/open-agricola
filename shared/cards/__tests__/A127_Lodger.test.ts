@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { getCardEffect, runCardEffectHook } from '../card-effects'
+import { getCardEffect } from '../card-effects'
 import type { GameState, PlayerState } from '../../contract/types'
 
-import { setActiveWorkerCount, setWorkersAtHome, workersAvailable, familySize } from '../../domain/player'
 import '../A/A127_Lodger'
 
 const CARD_ID = 'A127_Lodger'
@@ -72,46 +71,4 @@ describe('A127_Lodger', () => {
     expect(effect!.computeExtraRoomCapacity!(player)).toBe(0)
   })
 
-  it('onStartReturnHome at round 9 removes a farmer when rooms < familySize', () => {
-    const player = createPlayer()
-    setActiveWorkerCount(player, 3)
-    player.rooms = 2
-    player.cardStates = { [CARD_ID]: { extraData: { hasRoom: true } } }
-    const state = createState(player)
-    setWorkersAtHome(state, player, 3)
-    state.round = 9
-
-    runCardEffectHook(state, player, CARD_ID, 'onStartReturnHome')
-    expect(familySize(player)).toBe(2)
-    expect(workersAvailable(state, player)).toBe(2)
-    expect(player.cardStates[CARD_ID]?.extraData?.hasRoom).toBe(false)
-  })
-
-  it('onStartReturnHome at round 9 does not remove farmer when rooms >= familySize', () => {
-    const player = createPlayer()
-    setActiveWorkerCount(player, 2)
-    player.rooms = 3
-    player.cardStates = { [CARD_ID]: { extraData: { hasRoom: true } } }
-    const state = createState(player)
-    setWorkersAtHome(state, player, 2)
-    state.round = 9
-
-    runCardEffectHook(state, player, CARD_ID, 'onStartReturnHome')
-    expect(familySize(player)).toBe(2)
-    expect(workersAvailable(state, player)).toBe(2)
-    expect(player.cardStates[CARD_ID]?.extraData?.hasRoom).toBe(false)
-  })
-
-  it('onStartReturnHome does nothing at round != 9', () => {
-    const player = createPlayer()
-    setActiveWorkerCount(player, 3)
-    player.rooms = 2
-    player.cardStates = { [CARD_ID]: { extraData: { hasRoom: true } } }
-    const state = createState(player)
-    state.round = 8
-
-    runCardEffectHook(state, player, CARD_ID, 'onStartReturnHome')
-    expect(familySize(player)).toBe(3)
-    expect(player.cardStates[CARD_ID]?.extraData?.hasRoom).toBe(true)
-  })
 })

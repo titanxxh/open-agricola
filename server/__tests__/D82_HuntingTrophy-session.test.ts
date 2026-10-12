@@ -1,3 +1,4 @@
+import { descriptionEffects } from './_helpers/choice-description'
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
@@ -133,7 +134,7 @@ describe('D082 Hunting Trophy parity', () => {
     const offered = playMinor(session)
     expect(offered.state.players[0]!.resources.boar).toBe(1)
     const options = offered.interaction.request.options ?? []
-    expect(options.map((option) => option.labelKey)).toContain('ui.interactionHuntingTrophyReturn')
+    expect(options.some(option => descriptionEffects(option.descriptionPreview).some(effect => effect.kind === 'payment' && effect.resourcesPaid?.boar === 1))).toBe(true)
     const cook = options.find((option) => option.labelKey === 'ui.interactionResourceExchange')
     expect(cook, JSON.stringify(offered.interaction)).toBeDefined()
     expect(options.map((option) => option.value)).not.toContain('__skip__')

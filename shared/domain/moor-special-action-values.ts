@@ -1,10 +1,16 @@
-import type { Resource } from '../contract/types'
+import type { GameState, Resource } from '../contract/types'
 import type { MoorSpecialActionId } from '../moor/types'
 
 type BaseResources = {
   cost: Partial<Resource>
   gain: Partial<Resource>
 }
+
+export const MOOR_SPECIAL_ACTION_BORROW_FOOD = 2
+
+export const moorSpecialActionBorrowCost = (state: GameState, cardId?: string): Partial<Resource> =>
+  state.farmersOfTheMoor?.specialActionCards.find(card => card.id === cardId)?.location.kind === 'playerFaceUp'
+    ? { food: MOOR_SPECIAL_ACTION_BORROW_FOOD } : {}
 
 /** Printed base resources for the current player count, before card bonuses or borrowing. */
 export const moorSpecialActionBaseResources = (

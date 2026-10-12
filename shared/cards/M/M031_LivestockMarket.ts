@@ -108,16 +108,7 @@ const exchangeLeaf = (trade: Trade): ActionFlow => ({
   actionContext: {
     directTrade: trade,
   },
-  choiceLabelKey: 'ui.interactionResourceExchange',
-  choiceLabelParams: {
-    resourcesPaid: trade.from,
-    resourcesGained: trade.to,
-  },
-  effectPreview: {
-    kind: 'resourceExchange',
-    resourcesPaid: trade.from,
-    resourcesGained: trade.to,
-  },
+
 })
 
 const cardImpl = {

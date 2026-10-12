@@ -1,7 +1,9 @@
+import { createWorkSession } from './_helpers/session-fixtures'
+import { collectScheduledEffectPreviews } from '../../shared/actions/scheduled-effect-preview'
 import { chooseSupplyWorkerTurn, takeNormalWorkerTurn } from './_helpers/supply-worker-turn'
 import { confirmNextPlayer } from './_helpers/pending-confirms'
 import { describe, expect, it } from 'vitest'
-import { GameSession, type SessionResponse } from '../game/authoritative-session'
+import type { GameSession, SessionResponse } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import {
   inactiveWorkersInSupply,
@@ -19,7 +21,7 @@ const FILLER = '__test_placeholder__'
 const setupPurchase = ({
   round = 5, food = 1, wood = 1, clay = 0, reed = 0, stone = 0, supplyFarmer = true,
 } = {}) => {
-  const session = new GameSession(6022, undefined, { playerCount: 2 })
+  const session = createWorkSession({ seed: 6022, options: { playerCount: 2 } })
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.currentPlayerIndex = 0
@@ -74,10 +76,8 @@ const play = (session: GameSession): SessionResponse => {
 const offered = (response: SessionResponse) => response.interaction.stateId === 'wait'
   && (response.interaction.request.options?.some((option) => option.value === CARD_ID) ?? false)
 
-const workPermitRounds = (response: SessionResponse) => response.state.futureMeeples
-  .filter((entry) => entry.cardId === CARD_ID)
-  .map((entry) => entry.round)
-  .sort((left, right) => left - right)
+const workPermitRounds = (response: SessionResponse) => [...new Set(collectScheduledEffectPreviews(response.state, response.state.players[0]!)
+  .filter(entry => entry.sourceCard === CARD_ID).map(entry => entry.round))].sort((left, right) => left - right)
 
 const setupDue = (buildingResources: { wood?: number; clay?: number; reed?: number; stone?: number } = { wood: 1 }) => {
   const session = setupPurchase({ food: 21, wood: 0, ...buildingResources })

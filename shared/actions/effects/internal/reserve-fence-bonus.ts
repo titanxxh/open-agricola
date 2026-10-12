@@ -8,6 +8,7 @@ export const reserveFenceBonusAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
+  previewEffect: ({ params }) => typeof params?.freeFences === 'number' ? { kind: 'fenceReserve', amount: params.freeFences } : undefined,
   execute: ({ player, params, sourceCard }) => {
     if (!sourceCard || typeof params?.freeFences !== 'number' || params.freeFences <= 0) {
       return { type: 'fail', errorKey: 'log.exchangeFail' }

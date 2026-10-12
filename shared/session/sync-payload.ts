@@ -49,6 +49,7 @@ export function buildSyncPayload(
         resp.interaction,
         resp.state.players.map((player) => player.id),
         viewerPlayerId,
+        resp.state.players[resp.state.currentPlayerIndex]?.id ?? null,
       ),
     scores: resp.scores ?? null,
     pastureCapacities: resp.pastureCapacities,

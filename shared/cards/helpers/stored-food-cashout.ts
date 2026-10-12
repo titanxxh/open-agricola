@@ -70,7 +70,7 @@ export const storedFoodCashoutListener = (
     return {
       flow,
       sourceCard: cardId,
-      labelKey: `cards.${cardId}.cashout`,
+      labelKey: `cards.${cardId}.name`,
     }
   },
 })

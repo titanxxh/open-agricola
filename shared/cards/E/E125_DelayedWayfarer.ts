@@ -1,9 +1,8 @@
 import { defineOccupationCard } from '../card-source'
-import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
+import { writeCardExtraData } from '../helpers/card-state'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
-import { hasInactiveWorkerInSupply } from '../../domain/player'
 
 const CARD_ID = 'E125_DelayedWayfarer'
 
@@ -26,25 +25,7 @@ const cardImpl = {
     writeCardExtraData(player, CARD_ID, PLAYED_ROUND_KEY, state.round)
     return buildingChoiceFlow()
   },
-  onAllWorkersPlaced: (state, player) => {
-    const playedRound = readCardExtraData<number>(player, CARD_ID, PLAYED_ROUND_KEY)
-    if (playedRound !== state.round) return
-    if (!hasInactiveWorkerInSupply(player)) return
-    // Clear flag so card cannot trigger again this round
-    writeCardExtraData(player, CARD_ID, PLAYED_ROUND_KEY, -1)
-    return {
-      type: 'seq',
-      optional: true,
-      children: [
-        {
-          type: 'leaf',
-          actionId: 'place-farmer',
-          sourceCard: CARD_ID,
-          actionContext: { trueAction: false, extraPlacement: true, workerSource: { kind: 'supply', disposition: 'return-to-supply' } },
-        },
-      ],
-    }
-  },
+  timedRules: [{ retainAfterCardLeaves: true, key: 'work-end-supply-person', at: { kind: 'card-round', fact: PLAYED_ROUND_KEY, phase: 'onAllWorkersPlaced' }, body: { kind: 'condition', condition: { kind: 'inactive-supply-worker' }, body: { kind: 'optional', body: { kind: 'operation', operation: { kind: 'supply-worker-placement' } } } } }],
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl

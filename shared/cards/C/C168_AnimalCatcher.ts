@@ -8,11 +8,11 @@ import type { CardImpl } from '../registry'
 const CARD_ID = 'C168_AnimalCatcher'
 const harvestRounds = [4, 7, 9, 11, 13, 14]
 const baseAnimals: Partial<Resource> = { sheep: 1, boar: 1, cattle: 1 }
-const farmersOfTheMoorAnimalCombos: { gain: Partial<Resource>; labelKey: string }[] = [
-  { gain: { sheep: 1, boar: 1, cattle: 1 }, labelKey: 'cards.C168_AnimalCatcher.choiceSheepBoarCattle' },
-  { gain: { sheep: 1, boar: 1, horse: 1 }, labelKey: 'cards.C168_AnimalCatcher.choiceSheepBoarHorse' },
-  { gain: { sheep: 1, cattle: 1, horse: 1 }, labelKey: 'cards.C168_AnimalCatcher.choiceSheepCattleHorse' },
-  { gain: { boar: 1, cattle: 1, horse: 1 }, labelKey: 'cards.C168_AnimalCatcher.choiceBoarCattleHorse' },
+const farmersOfTheMoorAnimalCombos: Partial<Resource>[] = [
+  { sheep: 1, boar: 1, cattle: 1 },
+  { sheep: 1, boar: 1, horse: 1 },
+  { sheep: 1, cattle: 1, horse: 1 },
+  { boar: 1, cattle: 1, horse: 1 },
 ]
 
 const animalGainFlow = (context: CardListenerContext): ActionFlow => {
@@ -22,7 +22,7 @@ const animalGainFlow = (context: CardListenerContext): ActionFlow => {
   return {
     type: 'xor' as const,
     children: farmersOfTheMoorAnimalCombos.map((combo) =>
-      gainLeaf(CARD_ID, combo.gain, combo.labelKey)),
+      gainLeaf(CARD_ID, combo)),
   }
 }
 

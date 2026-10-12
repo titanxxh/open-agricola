@@ -188,7 +188,7 @@ describe('C057_Crudite', () => {
     expect(flow!.type).toBe('seq')
     expect(flow!.optional).toBe(true)
     const selection = (flow as Extract<ActionFlow, { type: 'seq' }>).children[0] as Extract<ActionFlow, { type: 'leaf' }>
-    expect(selection.actionId).toBe('selection')
+    expect(selection.actionId).toBe('field-operation')
     expect(selection.actionContext?.selectionKind).toBe('farm-position')
     expect(selection.actionContext?.selectableTiles).toEqual([{ row: 0, col: 0 }, { row: 0, col: 1 }])
     expect(selection.actionContext?.minSelections).toBe(1)

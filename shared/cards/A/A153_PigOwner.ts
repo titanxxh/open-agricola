@@ -35,7 +35,6 @@ const anytimeListener: CardListenerRegistration = {
         ],
       },
       sourceCard: CARD_ID,
-      labelKey: 'cards.A153_PigOwner.anytime',
     }
   },
 }

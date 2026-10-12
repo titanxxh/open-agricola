@@ -1,29 +1,15 @@
 import { defineOccupationCard } from '../card-source'
-import { markCardCounterIfBoughtByRound, hasCardCounter } from '../helpers/stage-effects'
-import { payGainActionFlow } from '../helpers/pay-gain-node'
-import { familySize } from '../../domain/player'
 import type { CardImpl } from '../registry'
+import { writeCardExtraData } from '../helpers/card-state'
 
 const CARD_ID = 'D099_EarthenwarePotter'
 
 const cardImpl = {
   effect: {
-  id: CARD_ID,
-  onBuy: (state, player) => {
-    markCardCounterIfBoughtByRound(state, player, CARD_ID, 'earlyBuy', 4)
+    id: CARD_ID,
+  onBuy: (state, player) => { writeCardExtraData(player, CARD_ID, 'purchaseRound', state.round) },
+  timedRules: [{ key: 'final-clay-exchange', at: { kind: 'rounds', rounds: [14], phase: 'onAfterHarvest' }, body: { kind: 'condition', condition: { kind: 'purchased-by-round', round: 4, fact: 'purchaseRound' }, body: { kind: 'operation', operation: { kind: 'bounded-exchange', maximum: { kind: 'family' }, cost: { clay: 1 }, gain: {}, bonusVp: 1, quantity: 'maximum' } } } }],
   },
-  onAfterHarvest: (state, player) => {
-    if (!hasCardCounter(player, CARD_ID, 'earlyBuy')) return
-    if (state.round < 14) return
-    const n = Math.min(player.resources.clay ?? 0, familySize(player))
-    if (n <= 0) return
-    return payGainActionFlow({
-      cardId: CARD_ID,
-      cost: { clay: n },
-      gain: { score: n },
-    })
-  },
-},
   reaches: [] as readonly string[],
 } satisfies CardImpl
 

@@ -1,187 +1,73 @@
-import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game/authoritative-session'
-import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
+import { afterEach, describe, expect, it } from 'vitest'
+import { createWorkSession } from './_helpers/session-fixtures'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
-import {
-  executeCardListener,
-  getRegisteredCardListeners,
-  type CardListenerContext,
-} from '../../shared/cards/card-listeners'
-import { runCardEffectHook } from '../../shared/cards/card-effects'
-import { readCardExtraData } from '../../shared/cards/helpers/card-state'
-import type { DraftGameEvent } from '../../shared/contract/events'
-import type { ActionFlow, Resource } from '../../shared/contract/types'
-
+import { collectScheduledEffectPreviews } from '../../shared/actions/scheduled-effect-preview'
+import type { GameSession } from '../game/authoritative-session'
 import '../../shared/cards/E/E140_Carter'
 
 const CARD_ID = 'E140_Carter'
-
-const findCollectListener = () =>
-  getRegisteredCardListeners().find((listener) => listener.id === 'E140-carter-after-collect')
-
-const moved = (
-  resources: Partial<Resource>,
-  playerId: string,
-  from: DraftGameEvent<'resource.moved'>['from'] = { kind: 'actionSpace', spaceId: 'forest' },
-): DraftGameEvent<'resource.moved'> => ({
-  type: 'resource.moved',
-  resources,
-  from,
-  to: { kind: 'player', playerId },
-  reason: from.kind === 'actionSpace' ? 'collect' : 'cardEffect',
-})
-
-const runCollectListener = (
-  events: readonly DraftGameEvent<'resource.moved'>[],
-  resourcesGained?: Partial<Resource>,
-  actionEvents: readonly DraftGameEvent<'resource.moved'>[] = events,
-): ActionFlow | undefined => {
-  const listener = findCollectListener()
-  expect(listener).toBeDefined()
-  const session = new GameSession(42)
-  stabilizeRandomHands(session.state.players)
+const sessions: GameSession[] = []
+afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+const setup = () => {
+  const session = createWorkSession({ seed: 6140, configure: state => {
+    state.players[0]!.occupationHand = [CARD_ID]
+    state.players.forEach(player => { player.resources.food = 30; player.resources.wood = 0; player.resources.clay = 0 })
+  } })
+  sessions.push(session)
+  let response = session.takeAction(0, 'lessons')
+  if (response.interaction.stateId === 'wait' && response.state.players[0]!.occupationHand.includes(CARD_ID)) {
+    response = session.resolveChoice(response.interaction.playerIndex, CARD_ID)
+  }
+  expect(response.ok, response.error).toBe(true)
+  expect(response.state.players[0]!.occupationPlayed).toContain(CARD_ID)
+  return session
+}
+const prepareCollect = (session: GameSession, round = 2, actor = 0) => {
   const state = session.getState().state
-  state.players = state.players.slice(0, 2)
-  state.currentPlayerIndex = 0
-  state.round = 1
-  const player = state.players[0]!
-  player.occupationPlayed.push(CARD_ID)
-  runCardEffectHook(state, player, CARD_ID, 'onBuy')
-  state.round = 2
-  const space = state.actionSpaces.find((entry) => entry.id === 'forest')!
-  return executeCardListener(listener!, {
-    state,
-    player,
-    triggerPlayer: player,
-    ownerPlayer: player,
-    space,
-    actionId: 'collect',
-    phase: 'after',
-    result: resourcesGained ? { type: 'ok', resourcesGained } : { type: 'ok' },
-    transactionEvents: events,
-    actionEvents,
-  } as unknown as CardListenerContext)?.flow
+  state.round = round
+  state.currentPlayerIndex = actor
+  state.players[0]!.resources.food = 0
+  state.actionSpaces.forEach(space => { space.takenBy = [] })
+  const forest = state.actionSpaces.find(space => space.id === 'forest')!
+  forest.resources.wood = 2
+  forest.resources.clay = 1
+  session.loadState(state)
 }
 
-describe('E140_Carter session', () => {
-  const setup = (buyRound = 1) => {
-    const session = new GameSession(42)
-    stabilizeRandomHands(session.state.players)
-    const state = session.getState().state
-    state.players = state.players.slice(0, 2)
-    state.currentPlayerIndex = 0
-    state.round = buyRound
-
-    const player = state.players[0]!
-    player.occupationPlayed.push(CARD_ID)
-
-    // Manually trigger onBuy
-    runCardEffectHook(state, player, CARD_ID, 'onBuy')
-
-    session.loadState(state)
-    return session
-  }
-
-  it('onBuy sets triggerRound to round + 1', () => {
-    const session = setup(3)
-    const state = session.getState().state
-    const player = state.players[0]!
-    const triggerRound = readCardExtraData<number>(player, CARD_ID, 'triggerRound')
-    expect(triggerRound).toBe(4)
+describe('E140 actual next-round collection window', () => {
+  it('playing the occupation activates the next-round formula without paying resources during repeated description reads', () => {
+    const session = setup()
+    expect(session.state.players[0]!.cardStates[CARD_ID]?.extraData?.triggerRound).toBe(2)
+    const before = JSON.stringify(session.state)
+    const view = collectScheduledEffectPreviews(session.state, session.state.players[0]!).find(entry => entry.sourceCard === CARD_ID)
+    expect(view).toMatchObject({ round: 2, timing: 'afterCollect', description: { effectPreview: { kind: 'ruleOperation', operation: { kind: 'gain-per-building-resource-collected', resource: 'food', perBuildingResource: 1 } } } })
+    expect(JSON.stringify(session.state)).toBe(before)
   })
-
-  it('collecting building resources during trigger round grants food', () => {
-    const session = setup(1) // triggerRound = 2
-    const state = session.getState().state
-    state.round = 2
-
-    // Set up forest (wood accumulation space)
-    const forest = state.actionSpaces.find((s) => s.id === 'forest')
-    expect(forest).toBeDefined()
-    if (forest) {
-      forest.resources.wood = 3
-    }
-    state.players[0]!.resources.food = 0
-    session.loadState(state)
-
-    let resp = session.takeAction(0, 'forest')
-    resp = resolveTriggerIfPresent(session, resp, CARD_ID)
-    expect(resp.ok).toBe(true)
-
-    // Player should get 3 wood + 3 food (1 food per building resource taken)
-    expect(resp.state.players[0]!.resources.wood).toBe(3)
-    expect(resp.state.players[0]!.resources.food).toBe(3)
+  it('counts all actually collected building resources once and logs the exact reward', () => {
+    const session = setup()
+    prepareCollect(session)
+    const response = resolveTriggerIfPresent(session, session.takeAction(0, 'forest'), CARD_ID)
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 2, clay: 1, food: 3 })
+    expect(response.state.events.some(event => event.type === 'resource.moved' && event.sourceCardId === CARD_ID && event.resources.food === 3)).toBe(true)
+    expect(collectScheduledEffectPreviews(session.state, session.state.players[0]!).filter(entry => entry.sourceCard === CARD_ID)).toHaveLength(1)
   })
-
-  it('does not trigger outside trigger round', () => {
-    const session = setup(1) // triggerRound = 2
-    const state = session.getState().state
-    state.round = 3 // not trigger round
-
-    const forest = state.actionSpaces.find((s) => s.id === 'forest')
-    if (forest) {
-      forest.resources.wood = 3
-    }
-    state.players[0]!.resources.food = 0
-    session.loadState(state)
-
-    const resp = session.takeAction(0, 'forest')
-    expect(resp.ok).toBe(true)
-
-    // No extra food
-    expect(resp.state.players[0]!.resources.food).toBe(0)
+  it.each([1, 3])('does not pay outside its activated round (%i)', round => {
+    const session = setup()
+    prepareCollect(session, round)
+    const response = session.takeAction(0, 'forest')
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources.food).toBe(0)
   })
-
-  it('does not trigger for non-building-resource spaces', () => {
-    const session = setup(1) // triggerRound = 2
-    const state = session.getState().state
-    state.round = 2
-
-    state.players[0]!.resources.food = 0
-    session.loadState(state)
-
-    // Day laborer gives food, not building resources
-    const resp = session.takeAction(0, 'day-laborer')
-    expect(resp.ok).toBe(true)
-
-    // Only the day laborer food (2 food), no Carter bonus
-    expect(resp.state.players[0]!.resources.food).toBe(2)
-  })
-
-  it('counts building resources moved from an action space to the trigger player', () => {
-    const session = setup(1)
-    const player = session.getState().state.players[0]!
-    const events = [moved({ wood: 2, clay: 1 }, player.id)]
-    expect(events).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        type: 'resource.moved',
-        from: expect.objectContaining({ kind: 'actionSpace' }),
-        to: expect.objectContaining({ kind: 'player', playerId: player.id }),
-      }),
-    ]))
-    const flow = runCollectListener(events)
-
-    expect(flow).toEqual(expect.objectContaining({
-      type: 'leaf',
-      actionId: 'gain',
-      params: { food: 3 },
-      sourceCard: CARD_ID,
-    }))
-  })
-
-  it('does not count building resources moved from supply or a card', () => {
-    const session = setup(1)
-    const player = session.getState().state.players[0]!
-
-    expect(runCollectListener([moved({ wood: 2 }, player.id, { kind: 'supply' })], { wood: 2 })).toBeUndefined()
-    expect(runCollectListener([moved({ wood: 2 }, player.id, { kind: 'card', playerId: player.id, cardId: 'Test_Source' })], { wood: 2 })).toBeUndefined()
-  })
-
-  it('ignores stale earlier transaction building-resource events when current actionEvents has none', () => {
-    const session = setup(1)
-    const player = session.getState().state.players[0]!
-    const stale = moved({ wood: 3 }, player.id)
-
-    expect(runCollectListener([stale], undefined, [])).toBeUndefined()
+  it('does not reward food actions or the opponent collecting building resources', () => {
+    const session = setup()
+    prepareCollect(session)
+    const food = session.takeAction(0, 'day-laborer')
+    expect(food.ok, food.error).toBe(true)
+    expect(food.state.players[0]!.resources.food).toBe(2)
+    prepareCollect(session, 2, 1)
+    const opponent = session.takeAction(1, 'forest')
+    expect(opponent.ok, opponent.error).toBe(true)
+    expect(opponent.state.players[0]!.resources.food).toBe(0)
   })
 })

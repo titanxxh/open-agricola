@@ -19,7 +19,7 @@ const listener: CardListenerRegistration = {
       cardId: CARD_ID,
       cost: { wood: 2 },
       gain: { food: 3 },
-      choiceLabelKey: 'minors.A056_Basket.name',
+      choiceLabelKey: 'cards.A056_Basket.name',
     })
   },
 }

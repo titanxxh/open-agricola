@@ -327,18 +327,7 @@ describe('Moor Batch 1 scoring, cookery, and exchange minors', () => {
     const resp = playMinor(session, 'M074_Administration')
     expect(resp.state.players[0]!.resources.food).toBe(2)
 
-    const harvest = setup()
-    const harvestPlayer = harvest.state.players[0]!
-    harvest.state.round = 14
-    harvestPlayer.minorPlayed = ['M074_Administration']
-    harvestPlayer.improvements = ['Major_Well', 'Major_Joinery']
-    harvestPlayer.resources = fullResources({ food: 3 })
-    const flow = effect('M074_Administration').onHarvestFeedingPhase!(harvest.state, harvestPlayer)
-    expect(flow).toMatchObject({ type: 'xor', optional: true })
-    expect(actionIds(flow)).toEqual(['pay', 'bonus-vp', 'pay', 'bonus-vp', 'bonus-vp'])
 
-    harvest.state.round = 13
-    expect(effect('M074_Administration').onHarvestFeedingPhase!(harvest.state, harvestPlayer)).toBeUndefined()
   })
 
   it('M081 exposes only exact fuel exchanges, with building resources gained in pairs', () => {

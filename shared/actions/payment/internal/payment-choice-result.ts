@@ -79,7 +79,7 @@ const describePaymentSolution = (
   }
 }
 
-const describePaymentEffectPreview = (
+export const describePaymentEffectPreview = (
   solution: PaymentSolution,
   includeReturnedCard: boolean,
   options: PaymentChoiceResultOptions = {},
@@ -106,11 +106,20 @@ const describePaymentOutcome = (solution: PaymentSolution, includeReturnedCard: 
   if (!rule) return undefined
   const outcome = describePurchaseOutcome(context.state, context.player, context.cardId, rule)
   if (!outcome) return undefined
-  return { kind: 'group', separator: ' → ', parts: [
+  return { kind: 'group', operator: 'sequence', separator: ' → ', parts: [
     { kind: 'action', labelKey: 'actions.pay.name', showLabel: false, effectPreview: describePaymentEffectPreview(solution, includeReturnedCard, options) },
     outcome,
   ] }
 }
+
+export const describePaymentChoicePreview = (
+  solution: PaymentSolution,
+  includeReturnedCard: boolean,
+  options: PaymentChoiceResultOptions = {},
+) => ({
+  effectPreview: describePaymentEffectPreview(solution, includeReturnedCard, options),
+  descriptionPreview: describePaymentOutcome(solution, includeReturnedCard, options),
+})
 
 export const preservesResourceReserve = (
   resources: Partial<Resource>,
@@ -195,8 +204,7 @@ export const buildPaymentChoiceResult = (
       includeReturnedCard,
       choiceOptions,
     ) as unknown as Record<string, string | number>,
-    effectPreview: describePaymentEffectPreview(solution, includeReturnedCard, choiceOptions),
-    descriptionPreview: describePaymentOutcome(solution, includeReturnedCard, choiceOptions),
+    ...describePaymentChoicePreview(solution, includeReturnedCard, choiceOptions),
   }))
   return {
     type: 'request',

@@ -708,12 +708,35 @@ const resolveExchangeChoice = (
   return { type: 'ok' }
 }
 
+const batchExchangeAvailability = (player: PlayerState, maxTotal: number): Partial<Resource> => {
+  const available: Partial<Resource> = {}
+  for (const resource of BUILDING_RESOURCES) available[resource] = Math.min(player.resources[resource] ?? 0, maxTotal)
+  return available
+}
+
 export const anytimeExchangeAction: ActionDefinition = {
   id: 'exchange',
   nameKey: 'actions.exchange.name',
   descriptionKey: 'actions.exchange.description',
   roundAvailable: 1,
   gainPerRound: {},
+  previewEffect: ({ state, player, actionContext }) => {
+    const batch = actionContext?.batchExchange
+    if (batch && typeof batch === 'object' && 'maxTotal' in batch && typeof batch.maxTotal === 'number') {
+      const available = batchExchangeAvailability(player, batch.maxTotal)
+      return { kind: 'resourceBatchExchange', available, receiveResources: [...BUILDING_RESOURCES], minTotal: 'requireAtLeastOne' in batch && batch.requireAtLeastOne === true ? 1 : 0, maxTotal: batch.maxTotal }
+    }
+    const direct = readDirectTrade(actionContext)
+    if (direct) return { kind: 'resourceExchange', resourcesPaid: direct.from, resourcesGained: direct.to }
+    const rawIds = actionContext?.tradeIds
+    const ids = Array.isArray(rawIds) && rawIds.every((id): id is string => typeof id === 'string') ? rawIds : undefined
+    const { options, trades } = buildExchangeOptions(player, ids, state, readMaxTradeTimesBySourceId(actionContext), actionContext)
+    return { kind: 'exchangeCatalog', choices: options.flatMap(option => {
+      const match = /^trade:(\d+):(\d+)$/.exec(option.value)
+      const trade = match ? trades[Number(match[1])] : undefined
+      return trade && match ? [{ sourceCard: trade.sourceId ?? trade.source, resourcesPaid: trade.from, resourcesGained: trade.to, minTimes: 1, maxTimes: Number(match[2]) }] : []
+    }) }
+  },
   anytime: true,
   allowAnytimeReentry: true,
   canBeExecutedByPlayer: (state, player, ctx) => {
@@ -733,9 +756,7 @@ export const anytimeExchangeAction: ActionDefinition = {
       | { cardId: string; maxTotal: number; promptKey?: PromptKey; requireAtLeastOne?: boolean }
       | undefined
     if (batch) {
-      const discardAvailableByResource = Object.fromEntries(
-        BUILDING_RESOURCES.map((key) => [key, Math.min(player.resources[key] ?? 0, batch.maxTotal)]),
-      ) as Partial<Record<keyof Resource, number>>
+      const discardAvailableByResource = batchExchangeAvailability(player, batch.maxTotal)
       return {
         type: 'request' as const,
         request: {

@@ -1,3 +1,4 @@
+import { createWorkSession } from './_helpers/session-fixtures'
 import { type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -6,7 +7,7 @@ import '../../shared/cards/B/B096_TreeFarmJoiner'
 import '../../shared/cards/B/B004_WoodPile'
 
 import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game/authoritative-session'
+import type { GameSession } from '../game/authoritative-session'
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
 
 const CARD_ID = 'B096_TreeFarmJoiner'
@@ -14,7 +15,7 @@ const MINOR_ID = 'B004_WoodPile'
 
 describe('B96 Tree Farm Joiner session', () => {
   const setup = () => {
-    const session = new GameSession(42)
+    const session = createWorkSession({ seed: 42 })
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 2
@@ -66,7 +67,7 @@ describe('B096 Tree Farm Joiner parity', () => {
   const FILLER = '__test_placeholder__'
 
   const setup = ({ round, withMinor = false }: { round: number; withMinor?: boolean }) => {
-    const session = new GameSession(6096 + round, undefined, { playerCount: 3 })
+    const session = createWorkSession({ seed: 6096 + round, options: { playerCount: 2 } })
     const state = session.getState().state
     stabilizeRandomHands(state.players)
     state.currentPlayerIndex = 0

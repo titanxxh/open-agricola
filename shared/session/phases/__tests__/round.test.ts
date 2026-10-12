@@ -23,7 +23,7 @@ const makePlayer = (id: string, startPlayer = false, activeWorkers = 1): PlayerS
   } as unknown as PlayerState)
 
 const makeState = (players: PlayerState[]): GameState =>
-  ({ players, actionSpaces: [] } as unknown as GameState)
+  ({ players, actionSpaces: [], futureMeeples: [], events: [], round: 1 } as unknown as GameState)
 
 describe('round phase helpers', () => {
   it('computeStartPlayerIdx returns 0 when no startPlayer flag set', () => {

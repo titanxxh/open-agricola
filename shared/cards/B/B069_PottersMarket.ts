@@ -1,8 +1,8 @@
 import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
-import { initCardState } from '../__stubs__/helpers'
+import { payLeaf } from '../helpers/pay-gain-node'
+import { futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B069_PottersMarket'
@@ -19,38 +19,22 @@ const anytimeListener: CardListenerRegistration = {
         type: 'seq',
         children: [
           payLeaf({ cardId: CARD_ID, cost: { clay: 3, food: 2 } }),
-          // Store 2 pending vegetable rounds via store-on-card (adds to counter 'pending')
-          {
-            type: 'leaf',
-            actionId: 'store-on-card',
-            params: { pending: 2 },
-            sourceCard: CARD_ID,
-          },
+          futureMeeplesNode({ cardId: CARD_ID, playerId: context.player.id,
+            startRound: context.state.round + 1, count: 2, resources: { vegetable: 1 } }),
         ],
       },
       sourceCard: CARD_ID,
-      labelKey: 'cards.B069_PottersMarket.anytime',
     }
   },
 }
 
 const cardImpl = {
   listeners: [anytimeListener],
-  effect: {
-  id: CARD_ID,
-  onRoundStart: (_state, player) => {
-    const pending = player.cardStates?.[CARD_ID]?.counters?.pending ?? 0
-    if (pending <= 0) return
-    const counters = initCardState(player, CARD_ID)
-    counters.pending = pending - 1
-    return gainLeaf(CARD_ID, { vegetable: 1 })
-  },
-},
+  effect: { id: CARD_ID },
   reaches: [] as readonly string[],
 } satisfies CardImpl
 
 export const B069_PottersMarket = defineMinorCard({
-  presentation: { counters: ['pending'] },
   meta: {
     id: CARD_ID,
     name: "Potter's Market",

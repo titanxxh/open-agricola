@@ -38,7 +38,6 @@ const anytimeListener: CardListenerRegistration = {
         params: { maxRooms: 1 },
       },
       sourceCard: CARD_ID,
-      labelKey: 'cards.E014_WoodSaw.anytime',
     }
   },
 }

@@ -44,7 +44,6 @@ const listener: CardListenerRegistration = {
       flow: {
         type: 'seq',
         optional: true,
-        choiceLabelKey: 'cards.B152_JuniorArtist.choice',
         children: [
           payLeaf({ cardId: CARD_ID, cost: { food: 1 } }),
           chained,

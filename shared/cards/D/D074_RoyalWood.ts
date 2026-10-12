@@ -3,7 +3,6 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { sumResourcePaid } from '../helpers/event-provenance'
-import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D074_RoyalWood'
@@ -67,14 +66,7 @@ const cardImpl = {
     writeCardExtraData(player, CARD_ID, 'woodSpent', 0)
     writeCardExtraData(player, CARD_ID, 'woodBefore', 0)
   },
-  onEndTurn: (_state, player) => {
-    const totalSpent = readCardExtraData<number>(player, CARD_ID, 'woodSpent') ?? 0
-    const refund = Math.floor(totalSpent / 2)
-    writeCardExtraData(player, CARD_ID, 'woodSpent', 0)
-    writeCardExtraData(player, CARD_ID, 'woodBefore', 0)
-    if (refund <= 0) return
-    return gainLeaf(CARD_ID, { wood: refund })
-  },
+  timedRules: [{ retainAfterCardLeaves: true, key: 'paid-wood-refund', at: { kind: 'card-positive', fact: 'woodSpent', clock: 'current-turn', phase: 'onEndTurn' }, body: { kind: 'operation', operation: { kind: 'card-fact-refund', fact: 'woodSpent', divisor: 2, resource: 'wood' } } }],
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl

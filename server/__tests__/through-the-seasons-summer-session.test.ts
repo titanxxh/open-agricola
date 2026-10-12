@@ -480,9 +480,9 @@ describe('Through the Seasons Summer rules', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected Farmer\'s Market choice')
-    expect(resp.interaction.request.options?.map((option) => option.labelKey)).toContain('ui.interactionFreshmanOccupation')
-
-    resp = chooseByLabel(session, resp, 'ui.interactionFreshmanOccupation')
+    const freeOccupation = resp.interaction.request.options.find(option => option.sourceCard === 'A097_Freshman')
+    expect(freeOccupation).toBeDefined()
+    resp = session.resolveChoice(resp.interaction.playerIndex, freeOccupation!.value)
 
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')

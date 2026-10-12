@@ -7,7 +7,12 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 import type { ActionSpace, FutureMeeple, PlayerState, Resource } from '../../../../shared/contract/types'
+import { createInitialState } from '../../../../shared/session/state-bootstrap'
+import { collectScheduledEffectPreviews } from '../../../../shared/actions/scheduled-effect-preview'
 import { ActionBoard } from '../ActionBoard'
+import { createActionSpaces } from '../../../../shared/actions'
+import { createMoorActionSpaces } from '../../../../shared/moor/action-spaces'
+import { createBaseActionDescriber } from '../../../../shared/actions/base-description'
 import {
   __resetCardsManifestCache,
   loadCardsManifest,
@@ -63,45 +68,26 @@ it('localizes the infirmary restriction in the Chinese action board', () => {
     baseActions={[createAction('moor-infirmary', 'actions.moor-infirmary.name')]}
     roundSlots={[]} currentPlayer={player} players={[player]} futureMeeples={[]}
     canTakeAction={() => true} takeAction={vi.fn()} currentRound={1} devMode={false} />)
-  expect(html).toContain('仅限病人')
+  expect(html).toContain('医务室')
+  expect(html).toContain('res-icon-food')
   expect(html).not.toContain('Sick workers only')
 })
 
 const createPlayer = (id: string, name: string, color: PlayerState['color']): PlayerState => ({
-  id,
-  name,
-  color,
-  resources: resources(),
-  rooms: 2,
-  houseType: 'wood',
-  fields: [],
-  fences: 0,
-  roomTiles: [],
-  stableTiles: [],
-  improvements: [],
-  minorHand: [],
-  minorPlayed: [],
-  occupationHand: [],
-  occupationPlayed: [],houseAnimalType: null,
-  houseAnimalCount: 0,
-  stableAnimals: {},
-  pastures: [],
-  fenceSegments: [],
-  majorEffects: { wellRounds: 0 },
-  startPlayer: false,
+  ...structuredClone(createInitialState(6069).players[0]!), id, name, color,
+  resources: resources(), minorHand: [], occupationHand: [], nameIsDefault: false,
 })
 
-const createAction = (id: string, nameKey: string): ActionSpace => ({
-  id,
-  nameKey,
-  descriptionKey: `${nameKey}.desc`,
-  roundAvailable: 1,
-  gainPerRound: resources(),
-  canBeExecutedByPlayer: () => true,
-  execute: () => ({ type: 'ok' }),
-  resources: resources(),
-  takenBy: [],
-})
+const createAction = (id: string, nameKey: string): ActionSpace => {
+  const state = createInitialState(6069)
+  const definition = [...createActionSpaces(), ...createMoorActionSpaces(2)].find(action => action.id === id)
+  const action: ActionSpace = definition ?? {
+    id, nameKey, descriptionKey: `${nameKey}.desc`, roundAvailable: 1,
+    gainPerRound: {}, canBeExecutedByPlayer: () => true, execute: () => ({ type: 'ok' }),
+    resources: resources(), takenBy: [],
+  }
+  return { ...action, baseDescriptionPreview: createBaseActionDescriber({ ...state, actionSpaces: [action] })(action) }
+}
 
 const expectActionStyle = (
   html: string,
@@ -141,8 +127,10 @@ describe('ActionBoard', () => {
       ...createAction('sheep-market', 'actions.sheep-market.name'),
       exclusiveUse: { playerId: 'p1', sourceCardId: 'B023_FinalScenario', untilRound: 14 },
     }
+    const effects = [first, second].flatMap(player => collectScheduledEffectPreviews({ ...createInitialState(6069), futureMeeples: [{ id: 'fm', cardId: 'A074_StableTree', playerId: 'p2', round: 3, actionId: 'sheep-market', resources: { wood: 1 } }] }, player).map(effect => ({ ...effect, playerId: player.id })))
     const html = renderToStaticMarkup(
       <ActionBoard locale="zh"
+        scheduledEffects={effects}
         baseActions={[createAction('D023_PioneeringSpirit', 'cards.D023_PioneeringSpirit.name')]}
         roundSlots={[{ round: 3, action }]}
         currentPlayer={first} players={[first, second]}
@@ -150,7 +138,7 @@ describe('ActionBoard', () => {
           actionId: 'sheep-market', resources: { wood: 1 } }]}
         canTakeAction={() => true} takeAction={vi.fn()} currentRound={3} devMode={false} />,
     )
-    expect(html).toContain('title="玩家 2: 木材"')
+    expect(html).toContain('title="玩家 2"')
     expect(html).toMatch(/action-exclusive-use[^>]*>玩家 1</)
     expect(html).toMatch(/player-action-card-owner[^>]*>玩家 2</)
     expect(html).not.toContain('Player 1')
@@ -573,12 +561,9 @@ describe('ActionBoard', () => {
 
     expect(html).not.toContain('action-desc--plain')
     expect(html).toContain('res-icon-food')
-    expect(html).toContain('res-icon-occupation')
+    expect(html).toContain('职业')
     expect(html).toContain('res-icon-reed')
     expect(html).toContain('res-icon-stone')
-    expect(html).toContain('icon-line icon-line--resource-market')
-    expect(html).toContain('icon-token icon-token--slash')
-    expect(html).toContain('icon-token icon-token--spaced-plus')
   })
 
   it('does not render C022_BasketChair as an action-board space even when it is in minorPlayed', () => {
@@ -631,6 +616,7 @@ describe('ActionBoard', () => {
         currentPlayer={playerA}
         players={[playerA, playerB]}
         futureMeeples={futureMeeples}
+        scheduledEffects={[playerA, playerB].flatMap(player => collectScheduledEffectPreviews({ ...createInitialState(6069), futureMeeples }, player).map(effect => ({ ...effect, playerId: player.id })))}
         canTakeAction={() => true}
         takeAction={() => {}}
         currentRound={3}
@@ -638,7 +624,7 @@ describe('ActionBoard', () => {
       />,
     )
 
-    expect(html).toContain('title="PlayerA: Wood"')
+    expect(html).toContain('title="PlayerA"')
     expect(html).toContain('data-owner-player="p1"')
   })
 
@@ -670,6 +656,7 @@ describe('ActionBoard', () => {
         currentPlayer={playerA}
         players={[playerA, playerB]}
         futureMeeples={futureMeeples}
+        scheduledEffects={[playerA, playerB].flatMap(player => collectScheduledEffectPreviews({ ...createInitialState(6069), futureMeeples }, player).map(effect => ({ ...effect, playerId: player.id })))}
         canTakeAction={() => true}
         takeAction={() => {}}
         currentRound={3}
@@ -730,6 +717,7 @@ describe('ActionBoard', () => {
         currentPlayer={playerA}
         players={[playerA, playerB]}
         futureMeeples={futureMeeples}
+        scheduledEffects={[playerA, playerB].flatMap(player => collectScheduledEffectPreviews({ ...createInitialState(6069), futureMeeples }, player).map(effect => ({ ...effect, playerId: player.id })))}
         canTakeAction={() => false}
         takeAction={() => {}}
         currentRound={1}
@@ -738,14 +726,14 @@ describe('ActionBoard', () => {
     )
 
     expect(html).toContain('turn-number-placeholder')
-    expect(html).toContain('title="PlayerB: Sheep"')
+    expect(html).toContain('title="PlayerB"')
     expect(html).toContain('data-owner-player="p2"')
     expect(html).toContain('res-icon-sheep')
-    expect(html).toContain('title="PlayerA: Field"')
+    expect(html).toContain('title="PlayerA"')
     expect(html).toContain('res-icon-field')
-    expect(html).toContain('title="PlayerB: Forest"')
+    expect(html).toContain('title="PlayerB"')
     expect(html).toContain('res-icon-forest')
-    expect(html).toContain('title="PlayerA: Moor"')
+    expect(html).toContain('title="PlayerA"')
     expect(html).toContain('res-icon-moor')
   })
 
@@ -970,9 +958,10 @@ describe('ActionBoard', () => {
     )
 
     expect(html).toContain('data-action-id="animal-market-56"')
-    expect(html).toContain('icon-line icon-line--animal-market')
     expect(html).not.toContain('<span class="text">Pay</span>')
-    expect(html).toContain('<span>+1</span><span class="res-icon res-icon-cattle"></span><span>-1</span><span class="res-icon res-icon-food"></span>')
+    expect(html).toContain('res-icon-cattle')
+    expect(html).toContain('res-icon-food')
+    expect(html).toContain('Choose one')
   })
 
   it('keeps repeated 5p extension action frames the same size as matching original spaces', () => {

@@ -1,5 +1,5 @@
 import type { ActionDefinition, ActionFlow, GameState } from '../../../contract/types'
-import { writeScheduledOffers, type ScheduledOffer } from './scheduled-offers'
+import { describeScheduledOffers, writeScheduledOffers, type ScheduledOffer } from './scheduled-offers'
 
 const normalizeOffers = (round: number, offers: readonly ScheduledOffer[]): ScheduledOffer[] =>
   offers.filter((offer) => !offer.consumed && Number.isInteger(offer.dueRound) && offer.dueRound > round && offer.dueRound <= 14)
@@ -30,12 +30,7 @@ export const scheduleOffersAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
-  previewEffect: ({ state, params }) => ({
-    kind: 'futureOffers',
-    entries: normalizeOffers(state.round, (params?.offers ?? []) as ScheduledOffer[]).map((offer) => offer.kind === 'animal-purchase'
-      ? { round: offer.dueRound, resources: { [offer.animal]: 1 }, resourcesPaid: offer.cost }
-      : { round: offer.dueRound, resources: {}, resourcesPaid: offer.cost ?? {}, actionNameKey: `moor.specialActions.${offer.actionId}` }),
-  }),
+  previewEffect: ({ state, params }) => describeScheduledOffers(normalizeOffers(state.round, (params?.offers ?? []) as ScheduledOffer[])),
   execute: ({ state, player, sourceCard, params }) => {
     if (!sourceCard) return { type: 'fail', errorKey: 'log.cardEffectFail' }
     writeScheduledOffers(player, sourceCard, normalizeOffers(state.round, (params?.offers ?? []) as ScheduledOffer[]))

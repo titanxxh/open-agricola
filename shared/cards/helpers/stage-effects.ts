@@ -34,10 +34,5 @@ export const createSingleHarvestExchange = (
     actionContext: {
       directTrade: { from: { [resource]: 1 }, to: gain, max: 1, sourceId: options.sourceId },
     },
-    effectPreview: {
-      kind: 'resourceExchange',
-      resourcesPaid: { [resource]: 1 },
-      resourcesGained: gain,
-    },
   }
 }

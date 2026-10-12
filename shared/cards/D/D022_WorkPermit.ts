@@ -1,18 +1,19 @@
 import { defineMinorCard } from '../card-source'
-import { queueFutureMeeplesFlow } from '../../actions/effects/internal/future-meeples'
 import {
-  isCardFlagged,
-  readCardExtraData,
   writeCardExtraData,
   writeCardInfobox,
 } from '../helpers/card-state'
 import { hasInactiveWorkerInSupply } from '../../domain/player'
-import { reserveSupplyWorker, releaseSupplyWorker } from '../../domain/supply-workers'
-import { supplyWorkerTurnFlow, consumeSupplyWorkerTurn } from '../helpers/supply-worker-flow'
+import { reserveSupplyWorker } from '../../domain/supply-workers'
+import { timedExtraTurnFlow } from '../timed-rule-obligations'
+import type { RuleBody, TimedRule } from '../../contract/rule-plans'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D022_WorkPermit'
 const TARGET_ROUND_KEY = 'targetRound'
+const supplyTurnBody = { kind: 'operation', operation: { kind: 'supply-worker-turn' } } satisfies RuleBody
+
+const supplyTurnRules = [{ retainAfterCardLeaves: true, key: 'scheduled-supply-turn', at: { kind: 'supply-worker-round', fact: 'targetRound', phase: 'contributeExtraTurn' }, body: supplyTurnBody }] satisfies readonly TimedRule[]
 
 const cardImpl = {
   prerequisiteCheck: (player) => {
@@ -40,25 +41,13 @@ const cardImpl = {
     writeCardExtraData(player, CARD_ID, 'reservedWorkerId', worker.id)
     writeCardExtraData(player, CARD_ID, TARGET_ROUND_KEY, targetRound)
     writeCardInfobox(player, CARD_ID, `Round ${targetRound}`)
-    return queueFutureMeeplesFlow(state, {
-      cardId: CARD_ID,
-      playerId: player.id,
-      entries: [{ round: targetRound, resources: {} }],
-    })
   },
-  onBeforeStartOfTurn: (state, player) => {
-    if (readCardExtraData<number>(player, CARD_ID, TARGET_ROUND_KEY) !== state.round) return
-    const workerId = readCardExtraData<string>(player, CARD_ID, 'reservedWorkerId')
-    const worker = player.workers.find((entry) => entry.id === workerId)
-    if (worker?.supplyUse?.sourceCard === CARD_ID) releaseSupplyWorker(state, player, worker)
-    writeCardExtraData(player, CARD_ID, 'reservedWorkerId', undefined)
-  },
+  timedRules: [
+    { retainAfterCardLeaves: true, key: 'release-supply-reservation', at: { kind: 'card-round', fact: TARGET_ROUND_KEY, phase: 'onBeforeStartOfTurn' }, body: { kind: 'operation', operation: { kind: 'release-reserved-worker', workerFact: 'reservedWorkerId' } } },
+    ...supplyTurnRules,
+  ],
   extraTurnBeforeWorkers: true,
-  contributeExtraTurn: (state, player) => {
-    if (readCardExtraData<number>(player, CARD_ID, TARGET_ROUND_KEY) !== state.round) return
-    if (isCardFlagged(player, CARD_ID) || !hasInactiveWorkerInSupply(player)) return
-    return supplyWorkerTurnFlow(state, player, CARD_ID, [consumeSupplyWorkerTurn(CARD_ID)])
-  },
+  contributeExtraTurn: (state, player) => timedExtraTurnFlow(state, player, CARD_ID, supplyTurnRules),
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl

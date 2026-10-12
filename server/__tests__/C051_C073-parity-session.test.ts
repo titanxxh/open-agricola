@@ -1,5 +1,6 @@
+import { createWorkSession } from './_helpers/session-fixtures'
 import { describe, expect, it } from 'vitest'
-import { GameSession, type SessionResponse } from '../game/authoritative-session'
+import type { GameSession, SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
@@ -37,7 +38,7 @@ const setup = ({
   occupations?: number
   resources?: Record<string, number>
 }) => {
-  const session = new GameSession(7900 + round, undefined, { playerCount })
+  const session = createWorkSession({ seed: 7900 + round, options: { playerCount } })
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.currentPlayerIndex = 0
@@ -140,7 +141,7 @@ describe('C051 Fishing Net parity', () => {
     expect(response.state.players[1]!.resources.food).toBe(2)
   })
   it('C051 S3: after the opponent uses Fishing the return-home phase places two food there', () => {
-    const session = new GameSession(7951, undefined, { playerCount: 2 })
+    const session = createWorkSession({ seed: 7951, options: { playerCount: 2 } })
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -174,7 +175,7 @@ describe('C051 Fishing Net parity', () => {
 
     expect(response.state.round).toBe(2)
     expect(response.state.actionSpaces.find((space) => space.id === 'fishing')!.resources.food).toBe(3)
-    expect(response.state.players[0]!.cardStates.C051_FishingNet?.flagged).toBe(false)
+    expect(response.state.players[0]!.cardStates.C051_FishingNet?.extraData?.pendingDeposits).toBe(0)
   })
   it('C051 S4: OA rejects Fishing before placement when the opponent has no food', () => {
     const { response } = opponentFishing(0)

@@ -1,6 +1,6 @@
 import { defineOccupationCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { createPlayerActionSpaces, registerPlayerActionSpace } from '../player-action-space'
+import { createPlayerActionSpaces, registerPlayerActionSpace, definePlayerActionSpaceFlow } from '../player-action-space'
 import { isRoundSpaceOccupied } from '../helpers/round-action-topology'
 import type { CardImpl } from '../registry'
 
@@ -9,7 +9,7 @@ const CARD_ID = 'D179_Bullcatcher'
 registerPlayerActionSpace({
   cardId: CARD_ID,
   access: 'owner',
-  createDefinition: (ownerId) => ({
+  createDefinition: (ownerId) => definePlayerActionSpaceFlow({
     id: CARD_ID,
     nameKey: `cards.${CARD_ID}.name`,
     descriptionKey: `cards.${CARD_ID}.desc`,
@@ -18,10 +18,7 @@ registerPlayerActionSpace({
       player.id === ownerId &&
       isRoundSpaceOccupied(state, 3) &&
       isRoundSpaceOccupied(state, 6),
-    execute: () => ({
-      type: 'flow',
-      flow: gainLeaf(CARD_ID, { cattle: 1, food: 2 }),
-    }),
+    flowFactory: () => gainLeaf(CARD_ID, { cattle: 1, food: 2 }),
   }),
 })
 

@@ -56,7 +56,7 @@ const emitGainEvent = (
       ? { kind: 'card', playerId: actorPlayerId, cardId: sourceCard }
       : { kind: 'supply' },
     to: { kind: 'player', playerId: recipient.id },
-    reason: sourceCard ? 'cardEffect' : 'gain',
+    reason: !usePayer && sourceLocation?.kind === 'actionSpace' ? 'gain' : sourceCard ? 'cardEffect' : 'gain',
     ...(sourceCard ? { sourceCardId: sourceCard } : {}),
   })
 }
@@ -97,10 +97,22 @@ export const gainAction: ActionDefinition = {
   gainPerRound: {},
   canBeExecutedByPlayer: (state, player, context) =>
     canTransferGain(resolveGain(state, player, context?.space, context?.params)),
+  previewEffect: ({ state, player, space, params }) => {
+    const transfer = resolveGain(state, player, space, params)
+    if (!transfer.payer && transfer.recipients.length === 1 && transfer.recipients[0]?.id === player.id) {
+      return { kind: 'resourceExchange', resourcesGained: transfer.gained }
+    }
+    const actor = (recipient: PlayerState) => ({ playerId: recipient.id, name: recipient.name, nameIsDefault: recipient.nameIsDefault ?? false, index: state.players.indexOf(recipient) })
+    return { kind: 'resourceTransfer', resources: transfer.gained, recipients: transfer.recipients.map(actor), ...(transfer.payer ? { payer: actor(transfer.payer) } : {}) }
+  },
   execute: ({ state, player, space, params, sourceCard, actionContext, eventSink }) => {
     const transfer = resolveGain(state, player, space, params)
     if (!canTransferGain(transfer)) return { type: 'fail', errorKey: 'log.exchangeFail' }
     const { gained, recipients, payerId, payer, paid } = transfer
+    const sourceLocation = (actionContext?.sourceLocation as ResourceLocation | undefined) ??
+      (!sourceCard && state.actionSpaces.some((entry) => entry.id === space.id)
+        ? { kind: 'actionSpace' as const, spaceId: space.id } : undefined)
+    const fromBoard = !payer && sourceLocation?.kind === 'actionSpace'
     if (payer) {
       for (const [key, amount] of Object.entries(paid)) {
         payer.resources[key as keyof Resource] -= amount
@@ -116,21 +128,21 @@ export const gainAction: ActionDefinition = {
         sourceCard,
         player.id,
         payerId ? { playerId: payerId, resources: gained } : undefined,
-        (actionContext?.sourceLocation as ResourceLocation | undefined) ??
-          (!sourceCard && state.actionSpaces.some((entry) => entry.id === space.id)
-            ? { kind: 'actionSpace', spaceId: space.id } : undefined),
+        sourceLocation,
       )
       if (recipient.id === player.id) {
         trackWorkPhaseBuildingResources(state, recipient.id, gained)
       }
-      if (sourceCard) {
+      if (fromBoard) {
+        addResourcesFromBoard(recipient, gained)
+      } else if (sourceCard) {
         addResourcesFromCards(recipient, gained)
       } else if (recipient.id === player.id) {
         addResourcesFromBoard(recipient, gained)
       }
     }
 
-    if (sourceCard && recipients.length > 0) {
+    if (sourceCard && !fromBoard && recipients.length > 0) {
       const totalGain = Object.fromEntries(
         Object.entries(gained).map(([k, v]) => [k, v * recipients.length]),
       ) as Partial<Resource>

@@ -2,17 +2,15 @@ import { defineOccupationCard } from '../card-source'
 import { queueFutureMeeplesFlow } from '../../actions/effects/internal/future-meeples'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import type { DraftGameEvent, ResourceMovedEvent } from '../../contract/events'
+import { timedEventFlow } from '../timed-rule-obligations'
+import type { RuleBody, TimedRule } from '../../contract/rule-plans'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B096_TreeFarmJoiner'
 
-type QueryableResourceMovedEvent = ResourceMovedEvent | DraftGameEvent<'resource.moved'>
+const improvementBody = { kind: 'optional', body: { kind: 'action', actionId: 'improvement', params: { types: ['minor'] }, policy: { trueAction: false } } } satisfies RuleBody
 
-const isResourceMovedEvent = (
-  event: CardListenerContext['transactionEvents'][number],
-): event is QueryableResourceMovedEvent =>
-  event.type === 'resource.moved'
+const timedRules = [{ retainAfterCardLeaves: true, key: 'after-scheduled-wood', at: { kind: 'future-source', phase: 'afterReceive' }, body: improvementBody }] satisfies readonly TimedRule[]
 
 const receiveListener: CardListenerRegistration = {
   id: 'B96-tree-farm-joiner-after-future-wood-receive',
@@ -20,26 +18,8 @@ const receiveListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['receive'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    const receivedB96Wood = context.transactionEvents.some((event) =>
-      isResourceMovedEvent(event) &&
-      event.reason === 'receive' &&
-      event.sourceCardId === CARD_ID &&
-      event.to.kind === 'player' &&
-      event.to.playerId === context.player.id &&
-      (event.resources.wood ?? 0) > 0,
-    )
-    if (!receivedB96Wood) return
-    return {
-      sourceCard: CARD_ID,
-      flow: {
-        type: 'leaf',
-        actionId: 'improvement',
-        sourceCard: CARD_ID,
-        optional: true,
-        params: { types: ['minor'] },
-        actionContext: { trueAction: false, types: ['minor'] },
-      },
-    }
+    const flow = timedEventFlow(context, CARD_ID, timedRules, 'afterReceive')
+    return flow ? { flow, sourceCard: CARD_ID } : undefined
   },
 }
 
@@ -47,6 +27,7 @@ const cardImpl = {
   listeners: [receiveListener],
   effect: {
   id: CARD_ID,
+  timedRules,
   onBuy: (state, player) => {
     const cur = state.round
     // Find next 2 odd round numbers > current

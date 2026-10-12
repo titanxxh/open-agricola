@@ -14,6 +14,7 @@ const choices = (response: SessionResponse): ActionChoiceOption[] => {
 
 const effects = (description?: ChoiceDescriptionPreview): ChoiceEffectPreview[] => {
   if (!description) return []
+  if (description.kind === 'conditional') return effects(description.body)
   if (description.kind === 'group') return description.parts.flatMap(effects)
   return description.effectPreview ? [description.effectPreview] : []
 }
@@ -241,11 +242,15 @@ describe('authoritative choice previews', () => {
     const accepted = session.resolveChoice(0, choices(started).find((option) => option.value !== '__skip__')!.value)
     const options = choices(accepted)
     expect(options).toHaveLength(3)
-    expect(options.map((option) => effects(option.descriptionPreview)[0])).toEqual([
-      { kind: 'actionSpace', spaceId: 'lessons-4', nameKey: 'actions.lessons-4.name', descriptionKey: 'actions.lessons-4.description' },
-      { kind: 'actionSpace', spaceId: 'lessons', nameKey: 'actions.lessons.name', descriptionKey: 'actions.lessons.description' },
-      { kind: 'actionSpace', spaceId: 'traveling-players', nameKey: 'actions.traveling-players.name', descriptionKey: 'actions.traveling-players.description' },
+    expect(options.map((option) => effects(option.descriptionPreview)[0])).toMatchObject([
+      { kind: 'actionSpace', spaceId: 'lessons-4', nameKey: 'actions.lessons-4.name' },
+      { kind: 'actionSpace', spaceId: 'lessons', nameKey: 'actions.lessons.name' },
+      { kind: 'actionSpace', spaceId: 'traveling-players', nameKey: 'actions.traveling-players.name' },
     ])
+    for (const option of options) {
+      const preview = effects(option.descriptionPreview)[0]
+      expect(preview?.kind === 'actionSpace' ? preview.description : undefined).toBeDefined()
+    }
     const resolved = session.resolveChoice(0, options[2]!.value)
     expect(resolved.ok).toBe(true)
     expect(resolved.state.actionSpaces.find((space) => space.id === 'traveling-players')!.takenBy).toMatchObject([{ playerId: session.state.players[0]!.id }])
@@ -340,7 +345,7 @@ describe('authoritative choice previews', () => {
     }
     const options = choices(response).filter((option) => option.value !== '__skip__')
     expect(options).toHaveLength(2)
-    expect(options.map((option) => effects(option.descriptionPreview)[0])).toEqual([
+    expect(options.map((option) => effects(option.descriptionPreview)[0])).toMatchObject([
       { kind: 'resourceMovement', resources: { wood: 1, stone: 1 }, from: { kind: 'player' }, to: { kind: 'actionSpace', spaceId: 'forest', nameKey: 'actions.forest.name' } },
       { kind: 'resourceMovement', resources: { wood: 2 }, from: { kind: 'player' }, to: { kind: 'actionSpace', spaceId: 'forest', nameKey: 'actions.forest.name' } },
     ])
@@ -350,16 +355,16 @@ describe('authoritative choice previews', () => {
     expect(resolved.state.actionSpaces.find((space) => space.id === 'forest')!.resources).toMatchObject({ wood: 1, stone: 1 })
     expect(resolved.state.events).toContainEqual(expect.objectContaining({ type: 'resource.moved', reason: 'return', resources: { wood: 1, stone: 1 } }))
   })
-  it('composes Cooperative Store once without exposing its usage counter or offering stone', () => {
+  it("describes Cooperative Store usage cost and omits stone rewards", () => {
     const session = setup('M126_CooperativeStore', 1, true)
     session.state.players[0]!.minorPlayed = ['M126_CooperativeStore']
     session.state.players[0]!.cardStates.M126_CooperativeStore = { counters: { usage: 1 } }
     expect(session.takeAction(0, 'farmland').ok).toBe(true)
     const response = session.takeAnytimeAction(0, 'M126-cooperative-store-anytime')
     const options = choices(response)
-    const option = options.find((entry) => entry.effectPreview?.kind === 'resourceExchange' && entry.effectPreview.resourcesPaid?.wood === 1 && entry.effectPreview.resourcesGained?.clay === 1)!
+    const option = options.find(entry => effects(entry.descriptionPreview).some(effect => effect.kind === 'payment' && effect.resourcesPaid?.wood === 1) && effects(entry.descriptionPreview).some(effect => effect.kind === 'resourceExchange' && effect.resourcesGained?.clay === 1))!
     expect(option).toBeDefined()
-    expect(effects(option.descriptionPreview)).toEqual([{ kind: 'resourceExchange', resourcesPaid: { wood: 1 }, resourcesGained: { clay: 1 } }])
+    expect(effects(option.descriptionPreview)).toEqual([{ kind: 'payment', resourcesPaid: { wood: 1 } }, { kind: 'cardCounter', cardId: 'M126_CooperativeStore', counter: 'usage', amount: -1 }, { kind: 'resourceExchange', resourcesGained: { clay: 1 } }])
     expect(options.some((entry) => entry.effectPreview?.kind === 'resourceExchange' && entry.effectPreview.resourcesGained?.stone)).toBe(false)
     const resolved = session.resolveChoice(0, option.value)
     expect(resolved.ok).toBe(true)

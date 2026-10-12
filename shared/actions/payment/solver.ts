@@ -56,6 +56,7 @@ import {
   readConstructCostDelta,
   resolveRoomPaymentSelection,
 } from './internal/room-payment'
+import { describePaymentChoicePreview } from './internal/payment-choice-result'
 
 const normalizePaymentChoiceValue = (
   paymentChoice: string | undefined,
@@ -167,6 +168,25 @@ const canAfford = (
   return computeOptions(state, idx, cost, ctx).length > 0
 }
 
+const paymentChoicePreviewOptions = (state: GameState, idx: number, cost: Cost, ctx: PaymentCtx) => {
+  const player = state.players[idx]!
+  const paymentPaths = ctx.sourceCard ? getCardEffect(ctx.sourceCard)?.onBuy?.paymentPaths : undefined
+  return {
+    extraSourcesForSolution: (solution: Option) => cardCostCandidateMetadataForSolution(ctx.candidateMetadataByFeeIndex, solution)?.sources ?? [],
+    paymentResourceProviders: solutionPaymentResourceProviders(cost, ctx),
+    ...(ctx.sourceCard && paymentPaths ? {
+      purchaseOutcome: { state, player, cardId: ctx.sourceCard, paymentPaths, metadata: ctx.candidateMetadataByFeeIndex },
+    } : {}),
+  }
+}
+
+const describeOptions = (state: GameState, idx: number, cost: Cost, ctx: PaymentCtx) => {
+  const { cost: effectiveCost, options } = computeLifecycleOptions(state, idx, cost, ctx)
+  if (!state.players[idx]) return []
+  const previewOptions = paymentChoicePreviewOptions(state, idx, effectiveCost, ctx)
+  return options.map(solution => describePaymentChoicePreview(solution, ctx.includeReturnedCard ?? false, previewOptions))
+}
+
 const resolvePayment = (
   state: GameState,
   idx: number,
@@ -178,24 +198,13 @@ const resolvePayment = (
   const { cost: effectiveCost, options } = computeLifecycleOptions(state, idx, cost, ctx)
   const paymentResourceProviders = solutionPaymentResourceProviders(effectiveCost, ctx)
   const optionPrefix = ctx.optionPrefix ?? 'pay:generic'
-  const paymentPaths = ctx.sourceCard ? getCardEffect(ctx.sourceCard)?.onBuy?.paymentPaths : undefined
   const selection = resolvePaymentSolutionSelection(
     options,
     normalizePaymentChoiceValue(ctx.paymentChoice, optionPrefix),
     optionPrefix,
     ctx.includeReturnedCard ?? false,
     { type: 'fail', errorKey: 'log.payFail' },
-    {
-      extraSourcesForSolution: (solution) =>
-        cardCostCandidateMetadataForSolution(
-          ctx.candidateMetadataByFeeIndex,
-          solution,
-        )?.sources ?? [],
-      paymentResourceProviders,
-      ...(ctx.sourceCard && paymentPaths ? {
-        purchaseOutcome: { state, player, cardId: ctx.sourceCard, paymentPaths, metadata: ctx.candidateMetadataByFeeIndex },
-      } : {}),
-    },
+    paymentChoicePreviewOptions(state, idx, effectiveCost, ctx),
   )
   if (selection.type === 'request') {
     return { type: 'request', request: selection }
@@ -235,6 +244,7 @@ const isComplexCostPublic: typeof isComplexCost = (cost) => isComplexCost(cost)
 
 export const PaymentSolver = {
   computeOptions,
+  describeOptions,
   canAfford,
   resolvePayment,
   hasPaymentOption,

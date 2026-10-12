@@ -26,8 +26,6 @@ const afterExchangeListener: CardListenerRegistration = {
         type: 'xor', optional: true, promptKey: 'ui.interactionFlowSelect',
         children: Array.from({ length: toPlace }, (_, index) => ({
           type: 'seq',
-          choiceLabelKey: 'ui.interactionMasterTannerStoreCount',
-          choiceLabelParams: { count: index + 1 },
           children: [
             payLeaf({ cardId: CARD_ID, cost: { food: index + 1 } }),
             ...Array.from({ length: index + 1 }, () => ({

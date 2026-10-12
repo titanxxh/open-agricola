@@ -1,3 +1,4 @@
+import { paymentChoiceOption } from '../../actions/plans/payment-choice'
 import { defineMinorCard } from '../card-source'
 import { readPrivateCardData, writePrivateCardData } from '../helpers/card-state'
 import { rollAndCacheCardPick } from '../helpers/card-random'
@@ -9,6 +10,7 @@ import { cardEffectHandChangedEvent } from '../../session/private-hand-events'
 const CARD_ID = 'B003_Moonshine'
 
 const KEY_OCC = 'occ'
+const PLAY_COST = { food: 2 }
 
 const cardImpl = {
   effect: {
@@ -18,8 +20,8 @@ const cardImpl = {
       ...request,
       options: request.options.map((option) => option.value === 'play' ? {
         ...option,
-        disabled: player.resources.food < 2,
-        disabledReasonKey: player.resources.food < 2 ? `cards.${CARD_ID}.choicePlayDisabled` : undefined,
+        disabled: player.resources.food < PLAY_COST.food,
+        disabledReasonKey: player.resources.food < PLAY_COST.food ? `cards.${CARD_ID}.choicePlayDisabled` : undefined,
       } : option),
     } : request,
 
@@ -39,7 +41,7 @@ const cardImpl = {
 
     state.pendingUndoBoundary = true
 
-    const canPlay = (player.resources.food ?? 0) >= 2
+    const canPlay = (player.resources.food ?? 0) >= PLAY_COST.food
 
     const flow: ActionFlow = {
       type: 'leaf',
@@ -49,13 +51,13 @@ const cardImpl = {
         promptKey: 'cards.B003_Moonshine.choice',
         promptParams: { cardId: pick },
         options: [
-          {
+          paymentChoiceOption({
             value: 'play',
             labelKey: 'cards.B003_Moonshine.choicePlay',
             sourceCard: CARD_ID,
             disabled: !canPlay,
             ...(canPlay ? {} : { disabledReasonKey: 'cards.B003_Moonshine.choicePlayDisabled' }),
-          },
+          }, PLAY_COST),
           {
             value: 'pass',
             labelKey: 'cards.B003_Moonshine.choicePass',
@@ -77,7 +79,7 @@ const cardImpl = {
         type: 'leaf',
         actionId: 'occupation',
         sourceCard: CARD_ID,
-        params: { exactCost: { food: 2 }, allowedCards: [pick] },
+        params: { exactCost: PLAY_COST, allowedCards: [pick] },
       } satisfies ActionFlow
     }
 

@@ -1,3 +1,4 @@
+import { descriptionEffects } from './_helpers/choice-description'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
@@ -298,7 +299,7 @@ describe('A34 Loppers — supply fence payment', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     const useAll = resp.interaction.request.options?.find(
-      (option) => option.labelParams?.count === 4,
+      (option) => descriptionEffects(option.descriptionPreview).some(effect => effect.kind === 'fenceReserve' && effect.amount === 4),
     )
     expect(useAll).toBeDefined()
 
@@ -343,7 +344,7 @@ describe('A34 Loppers — supply fence payment', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     const useAll = resp.interaction.request.options?.find(
-      (option) => option.labelParams?.count === 4,
+      (option) => descriptionEffects(option.descriptionPreview).some(effect => effect.kind === 'fenceReserve' && effect.amount === 4),
     )
     expect(useAll).toBeDefined()
 

@@ -1,7 +1,8 @@
+import { createWorkSession } from './_helpers/session-fixtures'
 import { type SessionResponse } from '../game/authoritative-session'
 
 import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game/authoritative-session'
+import type { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { isCardFlagged, setCardFlag, writeCardExtraData } from '../../shared/cards/helpers/card-state'
@@ -19,7 +20,7 @@ const CUBBYHOLE_ID = 'E052_Cubbyhole'
 const STABLE_CLEANER_ID = 'C94-stable-cleaner-anytime'
 
 const setupPlayed = (food = 5) => {
-  const session = new GameSession(42)
+  const session = createWorkSession({ seed: 42 })
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
@@ -354,7 +355,7 @@ describe('B027 Toolbox parity', () => {
     played?: boolean
     resources?: Partial<{ wood: number; clay: number; reed: number; stone: number; food: number }>
   } = {}) => {
-    const session = new GameSession(6027, undefined, { playerCount: 2 })
+    const session = createWorkSession({ seed: 6027, options: { playerCount: 2 } })
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.currentPlayerIndex = 0

@@ -37,7 +37,6 @@ const cardImpl = {
               params: { exactCost: {} },
             },
           ],
-          choiceLabelKey: 'ui.interactionSeedResearcher',
         },
       ],
     }

@@ -152,16 +152,16 @@ describe('useExchangeDraftPresentation', () => {
             pendingChoice: {
               promptKey: 'ui.interactionBakeBreadChoice',
               options: [
-                { value: 'Major_Fireplace1', labelKey: 'Major_Fireplace1' },
-                { value: 'Major_ClayOven', labelKey: 'Major_ClayOven' },
+                { value: 'Major_Fireplace1', labelKey: 'Major_Fireplace1', quantityLimit: 3, effectPreview: { kind: 'resourceExchange', resourcesPaid: { grain: 1 }, resourcesGained: { food: 2 } } },
+                { value: 'Major_ClayOven', labelKey: 'Major_ClayOven', quantityLimit: 1, effectPreview: { kind: 'resourceExchange', resourcesPaid: { grain: 1 }, resourcesGained: { food: 5 } } },
               ],
               playerIndex: 0,
               spaceId: 'test',
             },
           } satisfies InteractionPresentationPlan,
           options: [
-            { value: 'Major_Fireplace1', labelKey: 'Major_Fireplace1' },
-            { value: 'Major_ClayOven', labelKey: 'Major_ClayOven' },
+            { value: 'Major_Fireplace1', labelKey: 'Major_Fireplace1', quantityLimit: 3, effectPreview: { kind: 'resourceExchange', resourcesPaid: { grain: 1 }, resourcesGained: { food: 2 } } },
+            { value: 'Major_ClayOven', labelKey: 'Major_ClayOven', quantityLimit: 1, effectPreview: { kind: 'resourceExchange', resourcesPaid: { grain: 1 }, resourcesGained: { food: 5 } } },
           ],
         },
       },

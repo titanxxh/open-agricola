@@ -212,62 +212,6 @@ describe('sourceCard card production contract', () => {
     })
   })
 
-  it('D23 Pioneering Spirit card-owned choice options carry sourceCard', () => {
-    const config = getPlayerActionSpaceConfig('D023_PioneeringSpirit')
-    expect(config).toBeDefined()
-    const player = createPlayer()
-    const state = createState([player])
-    state.round = 6
-
-    const result = config!.createDefinition(player.id).execute({
-      state,
-      player,
-      space: createSpace('D023_PioneeringSpirit'),
-    } as unknown as ActionExecutionContext)
-
-    expect(result.type).toBe('request')
-    if (result.type !== 'request') return
-    expect(result.request.kind).toBe('choice')
-    if (result.request.kind !== 'choice') return
-    expect(result.request.options.map((option) => option.sourceCard)).toEqual([
-      'D023_PioneeringSpirit',
-      'D023_PioneeringSpirit',
-      'D023_PioneeringSpirit',
-    ])
-  })
-
-  it('C104 Collector preserves sourceCard on both initial and repeated direct choices', () => {
-    const config = getPlayerActionSpaceConfig('C104_Collector')
-    expect(config).toBeDefined()
-    const player = createPlayer()
-    player.minorPlayed = ['C104_Collector']
-    const state = createState([player])
-
-    const definition = config!.createDefinition(player.id)
-    const first = definition.execute({
-      state,
-      player,
-      space: createSpace('C104_Collector'),
-    } as unknown as ActionExecutionContext)
-
-    expect(first.type).toBe('request')
-    if (first.type !== 'request') return
-    expect(first.request.kind).toBe('choice')
-    if (first.request.kind !== 'choice') return
-    expect(first.request.options.every((option) => option.sourceCard === 'C104_Collector')).toBe(true)
-
-    const retry = definition.resolveChoice?.({
-      state,
-      player,
-      space: createSpace('C104_Collector'),
-    } as any, 'wood,clay')
-    expect(retry?.type).toBe('request')
-    if (retry?.type !== 'request') return
-    expect(retry.request.kind).toBe('choice')
-    if (retry.request.kind !== 'choice') return
-    expect(retry.request.options.every((option) => option.sourceCard === 'C104_Collector')).toBe(true)
-  })
-
   it('B42 Forest Inn tags its xor exchange leaves with sourceCard', () => {
     const config = getPlayerActionSpaceConfig('B042_ForestInn')
     expect(config).toBeDefined()

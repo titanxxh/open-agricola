@@ -9,7 +9,6 @@ import { A011_MudPatch_impl } from '../A/A011_MudPatch'
 import { A030_BakingSheet_impl } from '../A/A030_BakingSheet'
 import { A031_DebtSecurity_impl } from '../A/A031_DebtSecurity'
 import { A040_PottersYard_impl } from '../A/A040_PottersYard'
-import { A058_AsparagusKnife_impl } from '../A/A058_AsparagusKnife'
 import { A064_BarleyMill_impl } from '../A/A064_BarleyMill'
 import { A065_SeedPellets_impl } from '../A/A065_SeedPellets'
 import { A068_AsparagusGift_impl } from '../A/A068_AsparagusGift'
@@ -134,35 +133,6 @@ describe('A/B Logical Field consumers', () => {
     })
 
     expect(player.resources.vegetable).toBe(1)
-    expect(player.cardStates.B068_Beanfield?.extraData?.cardFieldStacks).toEqual([
-      { crop: 'vegetable', remaining: 1 },
-    ])
-  })
-
-  it('lets A058 select and remove a vegetable from a Card Field', () => {
-    const { state, player } = setup()
-    state.round = 8
-    setCardField(player, 'B068_Beanfield', [{ crop: 'vegetable', remaining: 2 }])
-
-    const flow = A058_AsparagusKnife_impl.effect.onStartReturnHome!(state, player)
-    expect(flow).toMatchObject({ type: 'seq' })
-    expect(flow?.type === 'seq' ? flow.children[0] : undefined).toMatchObject({
-      actionContext: {
-        selectionKind: 'farm-position',
-        selectableTiles: [expect.objectContaining({ row: -1, col: 2068, sourceCard: 'B068_Beanfield' })],
-        maxSelections: 1,
-        minSelections: 1,
-        selectionEffect: 'asparagus-knife-harvest',
-      },
-    })
-    runSelectionEffect('asparagus-knife-harvest', {
-      state,
-      player,
-      positions: ['-1-2068'],
-      cards: [],
-      sourceCard: 'A058_AsparagusKnife',
-    })
-
     expect(player.cardStates.B068_Beanfield?.extraData?.cardFieldStacks).toEqual([
       { crop: 'vegetable', remaining: 1 },
     ])

@@ -56,8 +56,12 @@ export const resolveFutureMeepleRequests = (state: GameState, eventSink?: EventS
     for (const entry of normalizeFutureSchedule(state.round, request)) {
       const { round, resources, roomType, actionContext } = entry
       queuedEntries.push({ round, ...(Object.keys(resources).length ? { resources } : {}), ...(roomType ? { roomType } : {}) })
+      const baseId = `${request.cardId}-${request.playerId}-${round}-${requestIndex}`
+      let id = baseId
+      let occurrence = 1
+      while (nextEntries.some(entry => entry.id === id)) id = `${baseId}-${occurrence++}`
       nextEntries.push({
-        id: `${request.cardId}-${request.playerId}-${round}-${requestIndex}`,
+        id,
         cardId: request.cardId,
         playerId: request.playerId,
         round,

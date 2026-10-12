@@ -1,3 +1,4 @@
+import { readScheduledOffers } from '../../shared/actions/effects/internal/scheduled-offers'
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -112,7 +113,7 @@ describe('D069 Small Greenhouse parity', () => {
       cardId: 'D069_SmallGreenhouse', resources: { wood: 2 }, occupations: 1, round: 5,
     }), 'D069_SmallGreenhouse')
     expect(response.state.players[0]!.resources.wood).toBe(0)
-    expect(futureRounds(response.state, 'D069_SmallGreenhouse', 'vegetable')).toEqual([9, 12])
+    expect(readScheduledOffers(response.state.players[0]!, 'D069_SmallGreenhouse').map(offer => offer.dueRound)).toEqual([9, 12])
   })
 
   it('D069 S2: no occupation keeps Small Greenhouse unavailable', () => {
@@ -125,7 +126,7 @@ describe('D069 Small Greenhouse parity', () => {
     const response = playMinor(setupMinor({
       cardId: 'D069_SmallGreenhouse', resources: { wood: 2 }, occupations: 1, round: 10,
     }), 'D069_SmallGreenhouse')
-    expect(futureRounds(response.state, 'D069_SmallGreenhouse', 'vegetable')).toEqual([14])
+    expect(readScheduledOffers(response.state.players[0]!, 'D069_SmallGreenhouse').map(offer => offer.dueRound)).toEqual([14])
   })
 })
 

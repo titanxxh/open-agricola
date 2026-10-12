@@ -2,6 +2,8 @@ import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
 import type { AnytimeAction } from '../../../shared/contract/types'
 import { translateCardText } from '../common/cardText'
+import { getAnyCardDisplayName } from '../common/cardText'
+import { renderDescriptionPreview } from './ActionDescription'
 
 type Props = {
   anytimeActions: AnytimeAction[]
@@ -28,7 +30,8 @@ export const AnytimeBar = ({
             onClick={() => takeAnytimeAction(action.id)}
             disabled={!isInteractive}
           >
-            {translateCardText(
+            {action.sourceCard && !(action.descriptionPreview?.kind === 'action' && action.descriptionPreview.labelKey === `cards.${action.sourceCard}.name` && !action.descriptionPreview.effectPreview) ? <span className="anytime-source">{getAnyCardDisplayName(locale, action.sourceCard)}{': '}</span> : null}
+            {action.descriptionPreview ? renderDescriptionPreview(locale, action.descriptionPreview) : translateCardText(
               locale,
               action.labelKey,
               action.labelParams as Record<string, string | number> | undefined,

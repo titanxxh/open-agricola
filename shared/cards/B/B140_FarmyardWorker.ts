@@ -1,5 +1,4 @@
 import { defineOccupationCard } from '../card-source'
-import { gainLeaf } from '../helpers/pay-gain-node'
 import { isCardFlagged, setCardFlag } from '../helpers/card-state'
 import { createEventQuery } from '../../events/query'
 import { getFarmyardTilePositions } from '../../domain/farm'
@@ -46,10 +45,7 @@ const cardImpl = {
   onBeforeStartOfTurn: (_state, player) => {
     setCardFlag(player, CARD_ID, false)
   },
-  onBeforeReturnHome: (_state, player) => {
-    if (!isCardFlagged(player, CARD_ID)) return
-    return gainLeaf(CARD_ID, { food: 2 })
-  },
+  timedRules: [{ retainAfterCardLeaves: true, key: 'farmyard-reward', at: { kind: 'card-flag', clock: 'current-round', phase: 'onBeforeReturnHome' }, consume: { clearCardFlag: true }, body: { kind: 'gain', resources: { food: 2 } } }],
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl

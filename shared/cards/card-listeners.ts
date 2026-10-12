@@ -1,3 +1,5 @@
+import { timedRuleSources, timedEventFlow } from './timed-rule-obligations'
+import { getCardEffect } from './card-effects'
 import type { ActionCostAttribution, ActionExecutionContext, ActionExecutionResult, ActionFlow, ActionSpace, Bonus, CardCostCandidate, CardProvidedPaymentResourceProvider, GameState, InteractionRequest, PlayerState, Resource, Trade } from '../contract/types'
 import { runActionHooks, type ActionHookContext, type ActionHookPhase, type ActionHookResult } from '../actions/hooks'
 import { getCurrentSessionContext } from './session-card-context'
@@ -26,7 +28,7 @@ export type CardListenerContext = ActionExecutionContext & {
   triggerPlayer?: PlayerState
   ownerPlayer?: PlayerState
   ownerCardId?: string
-  ownerCardZone?: CardListenerZone
+  ownerCardZone?: CardListenerOwnerZone
   effectPlayer?: PlayerState
   trueAction?: boolean
   triggerSnapshot?: TriggerSnapshot
@@ -38,6 +40,7 @@ export type CardListenerContextInput =
 
 export type CardListenerScope = 'player' | 'opponent' | 'any'
 export type CardListenerZone = 'played' | 'hand'
+export type CardListenerOwnerZone = CardListenerZone | 'activated'
 
 export type CardListenerRegistration = {
   id: string
@@ -259,13 +262,13 @@ export type MatchedCardListener =
       registration: CardListenerRegistration
       cardId: string
       ownerPlayerId: string
-      ownerCardZone: CardListenerZone
+      ownerCardZone: CardListenerOwnerZone
     }
 
 export type CardListenerOwnerOptions = {
   ownerPlayerId?: string
   ownerCardId?: string
-  ownerCardZone?: CardListenerZone
+  ownerCardZone?: CardListenerOwnerZone
 }
 
 export const listenerOwnerOptions = (
@@ -389,6 +392,15 @@ export const getMatchingListeners = (
       }
     }
   })
+  if (listenerContext.phase === 'after' && (listenerContext.actionId === 'receive' || listenerContext.actionId === 'collect')) {
+    const owned = new Set([...listenerContext.player.improvements, ...listenerContext.player.minorPlayed, ...listenerContext.player.occupationPlayed])
+    const phase = listenerContext.actionId === 'receive' ? 'afterReceive' : 'afterCollect'
+    for (const source of timedRuleSources(listenerContext.state, listenerContext.player, id => getCardEffect(id)?.timedRules ?? [])) {
+      if (owned.has(source.cardId) || !source.rules.some(rule => rule.at.phase === phase)) continue
+      const registration = retainedTimedListener(source.cardId, phase, source.rules)
+      matched.push({ registration, cardId: source.cardId, ownerPlayerId: listenerContext.player.id, ownerCardZone: 'activated' })
+    }
+  }
   return matched
 }
 
@@ -441,7 +453,24 @@ export const collectBeforePlacementFlows = (
   return flows
 }
 
+const retainedTimedListener = (cardId: string, phase: 'afterReceive' | 'afterCollect', rules: readonly import('../contract/rule-plans').TimedRule[]): CardListenerRegistration => ({
+  id: `activated-timed:${phase}:${cardId}`, cardIds: [cardId], actions: [phase === 'afterReceive' ? 'receive' : 'collect'], phases: ['after'], mandatory: true,
+  handler: context => {
+    const flow = timedEventFlow(context, cardId, rules, phase)
+    return flow ? { flow, sourceCard: cardId } : undefined
+  },
+})
+
 export const getListenerById = (listenerId: string): CardListenerRegistration | undefined => {
+  if (listenerId.startsWith('activated-timed:')) {
+    const offset = listenerId.indexOf(':', 'activated-timed:'.length)
+    const phase = listenerId.slice('activated-timed:'.length, offset)
+    const cardId = listenerId.slice(offset + 1)
+    if (phase === 'afterReceive' || phase === 'afterCollect') {
+      const rules = (getCardEffect(cardId)?.timedRules ?? []).filter(rule => rule.retainAfterCardLeaves && rule.at.phase === phase)
+      if (rules.length) return retainedTimedListener(cardId, phase, rules)
+    }
+  }
   const sessionCtx = getCurrentSessionContext()
   if (sessionCtx) {
     const custom = sessionCtx.customListeners.find((l) => l.id === listenerId)

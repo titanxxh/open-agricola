@@ -46,10 +46,8 @@ const anytimeListener: CardListenerRegistration = {
         actionId: 'renovate-house',
         sourceCard: CARD_ID,
         params: { selectedOption: 'stone' },
-        choiceLabelKey: 'cards.D013_Trowel.anytime',
       },
       sourceCard: CARD_ID,
-      labelKey: 'cards.D013_Trowel.anytime',
     }
   },
 }

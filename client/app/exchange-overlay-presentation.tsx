@@ -312,7 +312,7 @@ export const ExchangeOverlayPresentation = ({
     )
   }
 
-  if (draft.bake.isActive && pendingChoice) {
+  if (draft.bake.isActive && pendingChoice && isInteractive) {
     return (
       <ExchangeModal
         title={t(locale, 'ui.bakeBreadTitle')}

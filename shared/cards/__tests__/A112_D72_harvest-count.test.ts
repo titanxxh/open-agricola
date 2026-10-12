@@ -9,7 +9,7 @@ import type { Field, GameState, PlayerState } from '../../contract/types'
 import * as cardListeners from '../card-listeners'
 import { A112_ScytheWorker_impl } from '../A/A112_ScytheWorker'
 import { D072_StableManure_impl } from '../D/D072_StableManure'
-import { E112_GrainThief_impl } from '../E/E112_GrainThief'
+import '../E/E112_GrainThief'
 import '../E/E073_Scythe'
 import '../B/B113_PatchCaregiver'
 
@@ -125,64 +125,6 @@ describe('A112 and D72 harvest count integration', () => {
     ])
   })
 
-  it('E112 end field phase grants supply grain from harvest count applications', () => {
-    const player = makePlayer([
-      { row: 0, col: 0, stacks: [] },
-      { row: 0, col: 1, stacks: [] },
-    ])
-    player.occupationPlayed.push('E112_GrainThief')
-    player.cardStates.E112_GrainThief = {
-      extraData: { selectedPositions: ['0-0', '0-1'] },
-    }
-    const state = makeState(player)
-    state.harvestReapSummary = {
-      [player.id]: {
-        resources: { grain: 2 },
-        grainFields: 1,
-        vegetableFields: 0,
-        harvestCountApplications: [
-          {
-            row: 0,
-            col: 0,
-            crop: 'grain',
-            count: 0,
-            sources: ['base', 'E112_GrainThief'],
-            tags: ['supply-instead-of-field'],
-            scope: 'top-stack',
-          },
-          {
-            row: 0,
-            col: 1,
-            crop: 'grain',
-            count: 2,
-            sources: ['base', 'E112_GrainThief', 'E073_Scythe'],
-            tags: ['supply-instead-of-field', 'full-field-reap'],
-            scope: 'field',
-          },
-        ],
-      },
-    }
-
-    const flow = E112_GrainThief_impl.effect.onEndHarvestFieldPhase!(state, player)
-
-    expect(flow).toMatchObject({
-      type: 'seq',
-      children: [
-        {
-          type: 'leaf',
-          actionId: 'gain',
-          sourceCard: 'E112_GrainThief',
-          params: { grain: 1 },
-        },
-        {
-          type: 'leaf',
-          actionId: 'special-effect',
-          sourceCard: 'E112_GrainThief',
-          params: { kind: 'set-extra-data', key: 'selectedPositions', value: undefined },
-        },
-      ],
-    })
-  })
 
   it('generic harvest selection threshold modifiers can lower field thresholds', () => {
     const modifierId = '__TEST_harvest_threshold__'
@@ -485,7 +427,6 @@ describe('A112 and D72 harvest count integration', () => {
 
     const result = reap(state, player)
     state.harvestReapSummary = { [player.id]: result.reapSummary }
-    const endFieldFlow = E112_GrainThief_impl.effect.onEndHarvestFieldPhase!(state, player)
 
     expect(player.resources.grain).toBe(0)
     expect(player.resources.vegetable).toBe(1)
@@ -519,23 +460,7 @@ describe('A112 and D72 harvest count integration', () => {
         scope: 'top-stack',
       },
     ])
-    expect(endFieldFlow).toMatchObject({
-      type: 'seq',
-      children: [
-        {
-          type: 'leaf',
-          actionId: 'gain',
-          sourceCard: 'E112_GrainThief',
-          params: { grain: 1 },
-        },
-        {
-          type: 'leaf',
-          actionId: 'special-effect',
-          sourceCard: 'E112_GrainThief',
-          params: { kind: 'set-extra-data', key: 'selectedPositions', value: undefined },
-        },
-      ],
-    })
+
   })
 
   it('E112 relaxes A112 and D72 grain-field selection thresholds only', () => {

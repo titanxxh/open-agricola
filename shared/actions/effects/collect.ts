@@ -1,4 +1,4 @@
-import type { ActionDefinition, ActionSpace, PlayerState, Resource } from '../../contract/types'
+import type { ActionDefinition, ActionExecutionContext, ActionSpace, PlayerState, Resource } from '../../contract/types'
 import type { EventSink } from '../../contract/events'
 import { trackWorkPhaseBuildingResources } from '../../session/work-phase-resources'
 import { addResourcesFromBoard } from '../../session/stats'
@@ -55,6 +55,11 @@ export const collectAccumulatedResources = (
   })
 }
 
+const collectionTarget = ({ state, space, actionContext }: ActionExecutionContext): ActionSpace | undefined => {
+  const hint = actionContext?.spaceId
+  return typeof hint === 'string' ? hint === space.id ? space : findActionSpaceById(state, hint) : space
+}
+
 export const collectAction: ActionDefinition = {
   id: 'collect',
   nameKey: 'actions.collect.name',
@@ -62,22 +67,22 @@ export const collectAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
+  previewEffect: context => {
+    const target = collectionTarget(context)
+    if (!target) return undefined
+    const { actionContext, previewMode } = context
+    const types = actionContext?.resourceTypes !== undefined ? readResourceTypes(actionContext.resourceTypes) : null
+    const resource = actionContext?.resource
+    const amount = actionContext?.amount
+    if (actionContext?.spaceId && !types && isCollectableResource(resource) && typeof amount === 'number' && Number.isFinite(amount) && amount > 0) return { kind: 'resourceExchange', resourcesGained: { [resource]: amount } }
+    if (previewMode === 'base') return { kind: 'collection', spaceId: target.id, spaceNameKey: target.nameKey, resourceTypes: types ?? Object.keys(positiveResources(target.gainPerRound)) as (keyof Resource)[] }
+    const resources = types ? Object.fromEntries(types.map(resourceType => [resourceType, target.resources[resourceType] ?? 0])) : target.resources
+    return { kind: 'resourceExchange', resourcesGained: positiveResources(resources) }
+  },
   execute: ({ state, player, space, actionContext, eventSink }) => {
     const spaceIdHint = actionContext?.spaceId as string | undefined
-    let targetSpace: ActionSpace | undefined
-    if (spaceIdHint) {
-      targetSpace = spaceIdHint === space?.id
-        ? space
-        : findActionSpaceById(state, spaceIdHint)
-      if (!targetSpace) {
-        return { type: 'fail', errorKey: 'log.collectNoSpace' }
-      }
-    } else {
-      targetSpace = space
-      if (!targetSpace) {
-        return { type: 'fail', errorKey: 'log.collectNoSpace' }
-      }
-    }
+    const targetSpace = collectionTarget({ state, player, space, actionContext })
+    if (!targetSpace) return { type: 'fail', errorKey: 'log.collectNoSpace' }
     const resource = actionContext?.resource
     const amount = actionContext?.amount
     const hasResourceTypes = actionContext?.resourceTypes !== undefined

@@ -47,11 +47,6 @@ const makeComboOption = (goods: GoodKey[]): ActionFlow => {
   for (const g of goods) gains[g] = 1
   return {
     type: 'seq',
-    choiceLabelKey: 'ui.interactionTradeTeacherBuy',
-    choiceLabelParams: {
-      goods: goods.join('+'),
-      food: totalCost,
-    },
     children: [
       {
         type: 'leaf',

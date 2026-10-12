@@ -124,6 +124,7 @@ import { executeImmediateSpecialEffectFlows } from '../actions/effects/internal/
 import { releaseWorkerFromCard } from '../cards/helpers/card-held-workers.ts'
 import {
   activatePendingHarvestSkips,
+  fieldAndBreedSkipSources,
   isPlayerSkippingCurrentHarvest,
 } from '../cards/helpers/harvest-skip.ts'
 import { recordReturnHomePlacements, resetRoundPlacements } from '../cards/helpers/round-placement.ts'
@@ -1879,14 +1880,7 @@ export class GameCore {
    * next round — we compare against the current round on every check.
    */
   private hasPassFieldAndBreed(player: PlayerState): boolean {
-    const cardStates = player.cardStates ?? {}
-    for (const cardId of Object.keys(cardStates)) {
-      const round = cardStates[cardId]?.extraData?.passFieldAndBreedRound
-      if (typeof round === 'number' && round === this.state.round) {
-        return true
-      }
-    }
-    return false
+    return fieldAndBreedSkipSources(this.state, player).length > 0
   }
 
   private hasPositiveResources(resources: Partial<Resource>) {
@@ -2335,7 +2329,7 @@ export class GameCore {
       anytimeEntries.push({
         descriptor: {
           id: entry.registration.id,
-          labelKey: result.labelKey ?? `cards.${entry.cardId}.anytime`,
+          labelKey: result.labelKey ?? `cards.${entry.cardId}.name`,
           labelParams: result.labelParams,
           sourceCard: entry.cardId,
         },
@@ -2345,7 +2339,13 @@ export class GameCore {
     }
 
     return anytimeEntries.map(({ descriptor, flow, replacesTurn }) => ({
-      descriptor,
+      descriptor: {
+        ...descriptor,
+        descriptionPreview: this.createFlowEngine(flow, this.state.players.indexOf(player)).describe({
+          state: this.state, player, space,
+          sourceCard: descriptor.sourceCard, actionContext: pendingActionContext,
+        }),
+      },
       replacesTurn,
       flow: {
         type: 'seq',

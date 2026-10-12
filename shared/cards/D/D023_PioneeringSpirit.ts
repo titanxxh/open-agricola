@@ -1,48 +1,30 @@
 import { definePlayerActionCard } from '../card-source'
-import { registerPlayerActionSpace, createPlayerActionSpaces } from '../player-action-space'
+import { registerPlayerActionSpace, createPlayerActionSpaces, definePlayerActionSpaceFlow } from '../player-action-space'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D023_PioneeringSpirit'
+const RENOVATION_ROUNDS = { start: 3, end: 5 }
+const GOODS_ROUNDS = { start: 6, end: 8 }
 registerPlayerActionSpace({
   cardId: CARD_ID,
   access: 'owner',
-  createDefinition: (ownerId) => ({
+  createDefinition: (ownerId) => definePlayerActionSpaceFlow({
     id: CARD_ID,
     nameKey: 'cards.D023_PioneeringSpirit.name',
     descriptionKey: 'cards.D023_PioneeringSpirit.desc',
     canBeExecutedByPlayer: (state, player) => {
       if (player.id !== ownerId) return false
-      return state.round >= 3 && state.round <= 8
+      return state.round >= RENOVATION_ROUNDS.start && state.round <= GOODS_ROUNDS.end
     },
-    execute: ({ state }) => {
-      if (state.round >= 3 && state.round <= 5) {
-        // Renovation action
-        return {
-          type: 'flow',
-          flow: { type: 'leaf', actionId: 'renovate-house', sourceCard: CARD_ID },
-        }
-      }
-      // Rounds 6-8: choice of vegetable, pig, or cattle
-      return {
-        type: 'request',
-        request: {
-          kind: 'choice',
-          options: [
-            { value: 'vegetable', labelKey: 'resources.vegetable', sourceCard: CARD_ID },
-            { value: 'boar', labelKey: 'resources.boar', sourceCard: CARD_ID },
-            { value: 'cattle', labelKey: 'resources.cattle', sourceCard: CARD_ID },
-          ],
-        },
-        promptKey: 'ui.interactionPioneeringSpirit',
-      }
-    },
-    resolveChoice: ({ player }, choice) => {
-      const resource = choice as 'vegetable' | 'boar' | 'cattle'
-      if (['vegetable', 'boar', 'cattle'].includes(resource)) {
-        player.resources[resource] += 1
-        return { type: 'ok', resourcesGained: { [resource]: 1 } }
-      }
-      return { type: 'ok' }
+    flowFactory: ({ state, previewMode }) => {
+      const renovation = { type: 'leaf' as const, actionId: 'renovate-house', sourceCard: CARD_ID }
+      const goods = { type: 'xor' as const, promptKey: 'ui.interactionPioneeringSpirit' as const,
+        children: ['vegetable', 'boar', 'cattle'].map(resource => ({ type: 'leaf' as const,
+          actionId: 'gain', sourceCard: CARD_ID, params: { [resource]: 1 }, choiceLabelKey: `resources.${resource}`, optionId: resource })) }
+      return previewMode === 'base' ? { type: 'xor', children: [
+        { type: 'seq', choiceLabelKey: 'ui.ruleRoundRange', choiceLabelParams: RENOVATION_ROUNDS, children: [renovation] },
+        { ...goods, choiceLabelKey: 'ui.ruleRoundRange', choiceLabelParams: GOODS_ROUNDS },
+      ] } : state.round <= RENOVATION_ROUNDS.end ? renovation : goods
     },
   }),
 })

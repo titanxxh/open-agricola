@@ -25,7 +25,7 @@ import {
   XorNode,
 } from './nodes'
 import { attachChoiceLabel, buildReplaceChoiceFlow, resolveChoiceSourceCard } from './nodes/interaction-helpers'
-import type { ComputeReplaceResult } from './dispatcher'
+import { HookDispatcher, type ComputeReplaceResult } from './dispatcher'
 import type { EngineNode } from './types'
 import type { PendingCursor, PendingEnvelope, PendingSyntheticKind, PendingView } from './types'
 import type { EngineInternals } from './engine-internals'
@@ -538,21 +538,62 @@ export function getNodeFarmTarget(node: EngineNode, context: ActionExecutionCont
   return unique.size === 1 ? [...unique.values()][0] : undefined
 }
 
-export function getActionEffectPreview(node: ActionNode, registry?: ActionRegistry, context?: ActionExecutionContext): ChoiceEffectPreview | undefined {
+type ActionDescriptionContext = ActionExecutionContext & { showActors?: boolean }
+
+export function getActionEffectPreview(node: ActionNode, registry?: ActionRegistry, context?: ActionDescriptionContext, descriptionPath: readonly string[] = []): ChoiceEffectPreview | undefined {
   if (context) {
-    const preview = registry?.get(node.actionId)?.previewEffect?.({
+    const definition = registry?.get(node.actionId)
+    const previewContext = {
       ...context,
       player: (node.ownerPlayerId ? findPlayerById(context.state, node.ownerPlayerId) : undefined) ?? context.player,
       params: node.params,
       sourceCard: node.sourceCard,
       actionContext: { ...context.actionContext, ...node.actionContext },
-    })
+    }
+    if (definition?.costPreview && context.previewMode !== 'base') applyComputeCostResults(previewContext,
+      new HookDispatcher().computeCosts({ ...previewContext, actionId: node.actionId }))
+    if (context.previewMode === 'base' && definition?.costPreview?.dependsOnHouseType) {
+      const price = definition.costPreview
+      const parts: ChoiceDescriptionPreview[] = (['wood', 'clay', 'stone'] as const).flatMap(houseType => {
+        const variant = { ...previewContext, player: { ...previewContext.player, houseType } }
+        if (price.isStructurallyPossible?.(variant) === false) return []
+        const effectPreview = definition.previewEffect?.(variant) ?? { kind: 'unitCost' as const, unit: price.unitCost, resourcesPaid: price.getBaseCost(variant), actionNameKey: definition.nameKey }
+        return [{ kind: 'conditional', condition: { kind: 'house-type', houseType }, body: { kind: 'action', labelKey: definition.nameKey, showLabel: false, effectPreview } }]
+      })
+      return { kind: 'rule', description: { kind: 'group', operator: 'xor', separator: ' / ', parts } }
+    }
+    if (definition?.flowFactory && registry && !descriptionPath.includes(node.actionId)) {
+      const flow = definition.flowFactory(previewContext)
+      if (flow) {
+        const planned = buildFlowNode({ registry, counterRef: { value: 0 } }, applyDefaultSourceCardToFlow(flow, node.sourceCard), previewContext.player.id)
+        const hasExplicitActor = (entry: ActionFlow): boolean => Boolean(entry.targetPlayerId) || entry.type !== 'leaf' && entry.children.some(hasExplicitActor)
+        const description = getNodeDescriptionPreview(planned, registry, { ...previewContext, showActors: context.previewMode === 'base' && hasExplicitActor(flow) }, [...descriptionPath, node.actionId])
+        if (description) return { kind: 'rule', description }
+      }
+    }
+    const preview = definition?.previewEffect?.(previewContext)
+    if (preview?.kind === 'actionSpace' && registry && !descriptionPath.includes(preview.spaceId)) {
+      const target = context.state.actionSpaces.find(space => space.id === preview.spaceId)
+      if (target) {
+        const flow: ActionFlow = target.flow ?? { type: 'leaf', actionId: target.id }
+        const targetNode = buildFlowNode({ registry, counterRef: { value: 0 } }, flow, previewContext.player.id)
+        return { ...preview, description: getNodeDescriptionPreview(targetNode, registry, { ...previewContext, space: target, params: undefined }, [...descriptionPath, target.id]) }
+      }
+    }
     if (preview) return preview
+    if (context.previewMode === 'base' && definition?.costPreview) return {
+      kind: 'unitCost', unit: definition.costPreview.unitCost,
+      resourcesPaid: definition.costPreview.getBaseCost(previewContext), actionNameKey: definition.nameKey,
+    }
+
   }
   if (node.effectPreview) return node.effectPreview
   const params = sanitizePreviewResources(node.params)
   if (node.actionId === 'pay') {
-    return { kind: 'payment', resourcesPaid: params }
+    if (context && registry?.get('pay')?.previewEffect) return undefined
+    const cost = node.params?.cost
+    if (cost && typeof cost === 'object' && ('fees' in cost || 'fee' in cost || 'unitFee' in cost)) return undefined
+    return { kind: 'payment', resourcesPaid: cost ? sanitizePreviewResources(cost) : params }
   }
   if (node.actionId === 'gain') {
     return { kind: 'resourceExchange', resourcesGained: params }
@@ -590,10 +631,11 @@ const collectMandatoryActionNodes = (node: EngineNode): ActionNode[] => {
 }
 
 const isBookkeepingAction = (node: ActionNode): boolean =>
+  node.actionId === 'rule-discount' ||
   node.actionId === 'push-to-card-stack' ||
   (node.actionId === 'special-effect' && ['set-infobox', 'increment-extra-data', 'set-extra-data', 'increment-counter', 'set-counter', 'set-flag'].includes(String(node.params?.kind)))
 
-export function getSequenceEffectPreview(node: SequenceNode, _registry?: ActionRegistry, context?: ActionExecutionContext): ChoiceEffectPreview | undefined {
+export function getSequenceEffectPreview(node: SequenceNode, registry?: ActionRegistry, context?: ActionExecutionContext): ChoiceEffectPreview | undefined {
   const actions = collectOrderedActionNodes(node)
   const hasOptionalDescendant = (entry: EngineNode): boolean => getNodeChildren(entry).some((child) => child.optional || hasOptionalDescendant(child))
   if (!actions || hasOptionalDescendant(node) || new Set(actions.map((action) => action.ownerPlayerId ?? context?.player.id)).size > 1) return undefined
@@ -604,6 +646,9 @@ export function getSequenceEffectPreview(node: SequenceNode, _registry?: ActionR
   })
   const [payment, ...rewards] = visible
   if (payment?.actionId !== 'pay' || rewards.length === 0 || !rewards.every((action) => action.actionId === 'gain' || action.actionId === 'bonus-vp')) return undefined
+  if (rewards.some(action => action.actionId === 'gain' && (action.params?.payerId || action.params?.recipientMode === 'others' || (action.params?.recipientPlayerId && action.params.recipientPlayerId !== context?.player.id)))) return undefined
+  const paymentPreview = getActionEffectPreview(payment, registry, context)
+  if (paymentPreview?.kind !== 'payment' || paymentPreview.cardUsed || paymentPreview.sourceCards?.length) return undefined
   let resourcesGained: Partial<Resource> = {}
   let bonusVp = 0
   for (const action of rewards) {
@@ -612,7 +657,7 @@ export function getSequenceEffectPreview(node: SequenceNode, _registry?: ActionR
   }
   return {
     kind: 'resourceExchange',
-    resourcesPaid: sanitizePreviewResources(payment.params),
+    resourcesPaid: paymentPreview.resourcesPaid,
     resourcesGained: sanitizePreviewResources(resourcesGained),
     ...(bonusVp > 0 ? { bonusVp } : {}),
   }
@@ -699,8 +744,16 @@ const cardChoiceLabelKeyPattern = /^cards\.[^.]+\.choice$/
 export function getNodeDescriptionPreview(
   node: EngineNode,
   registry: ActionRegistry,
-  context?: ActionExecutionContext,
+  context?: ActionDescriptionContext,
+  descriptionPath: readonly string[] = [],
 ): ChoiceDescriptionPreview | undefined {
+  const actor = context && node.ownerPlayerId && (context.showActors ? node instanceof ActionNode : node.ownerPlayerId !== context.player.id)
+    ? findPlayerById(context.state, node.ownerPlayerId) : undefined
+  const metadata = {
+    ...(node.optional ? { optional: true } : {}),
+    ...(actor && context ? { actor: { playerId: actor.id, name: actor.name,
+      nameIsDefault: actor.nameIsDefault === true, index: context.state.players.indexOf(actor) } } : {}),
+  }
   if (node instanceof ActionNode) {
     const action = registry.get(node.actionId)
     if (!action) return undefined
@@ -709,12 +762,13 @@ export function getNodeDescriptionPreview(
       !!node.choiceLabelKey && cardChoiceLabelKeyPattern.test(node.choiceLabelKey)
     const useChoiceLabelAsDescription =
       !!node.choiceLabelKey && !isCardChoiceLabel
-    const effectPreview = getActionEffectPreview(node, registry, context)
+    const effectPreview = getActionEffectPreview(node, registry, context, descriptionPath)
     if ((specialEffectLabelKey === null || isBookkeepingAction(node)) && !effectPreview && !useChoiceLabelAsDescription) return undefined
-    const redundantScheduleLabel = (effectPreview?.kind === 'futureSchedule' || effectPreview?.kind === 'futureOffers' || effectPreview?.kind === 'actionSpace' || effectPreview?.kind === 'cardScore' || effectPreview?.kind === 'fieldContents') &&
+    const redundantScheduleLabel = (effectPreview?.kind === 'rule' || effectPreview?.kind === 'ruleOperation' || effectPreview?.kind === 'formulaGain' || effectPreview?.kind === 'futureSchedule' || effectPreview?.kind === 'futureOffers' || effectPreview?.kind === 'actionSpace' || effectPreview?.kind === 'cardScore' || effectPreview?.kind === 'fieldContents') &&
       (!useChoiceLabelAsDescription || node.choiceLabelKey === `cards.${node.sourceCard}.name`)
     return {
       kind: 'action',
+      ...metadata,
       ...(redundantScheduleLabel ? { showLabel: false } : {}),
       labelKey: useChoiceLabelAsDescription
         ? node.choiceLabelKey!
@@ -727,6 +781,7 @@ export function getNodeDescriptionPreview(
     const effectPreview = getSequenceEffectPreview(node, registry, context)
     if (effectPreview) return {
       kind: 'action',
+      ...metadata,
       labelKey: node.choiceLabelKey ?? 'ui.interactionResourceExchange',
       ...(node.choiceLabelKey ? { labelParams: node.choiceLabelParams } : { showLabel: false }),
       effectPreview,
@@ -747,11 +802,13 @@ export function getNodeDescriptionPreview(
     if (projection && node instanceof SequenceNode) projection.player = findPlayerById(projection.state, projection.player.id) ?? projection.player
     const parts = node.children
       .map((child) => {
-        const description = getNodeDescriptionPreview(child, registry, projection)
+        const description = getNodeDescriptionPreview(child, registry, projection, descriptionPath)
         if (projection && node instanceof SequenceNode && !child.optional) {
           for (const action of collectMandatoryActionNodes(child)) {
-            if (action.optional || action.actionId !== 'special-effect' || !action.sourceCard) continue
-            const operation = readCardStorageOperation(action.params)
+            if (action.optional || !action.sourceCard) continue
+            const operation = action.actionId === 'pop-card-stack' ? readCardStorageOperation({ kind: 'pop-card-stack' })
+              : action.actionId === 'push-to-card-stack' ? readCardStorageOperation({ kind: 'push-card-stack', item: action.params?.item })
+              : action.actionId === 'special-effect' ? readCardStorageOperation(action.params) : undefined
             const actor = findPlayerById(projection.state, action.ownerPlayerId ?? context!.player.id)
             const target = actor ? resolveActionTargetPlayer(projection.state, actor, { ...projection.actionContext, ...action.actionContext }) : undefined
             if (operation && target) applyCardStorageOperation(target, action.sourceCard, operation)
@@ -761,9 +818,12 @@ export function getNodeDescriptionPreview(
       })
       .filter((part): part is ChoiceDescriptionPreview => part !== undefined)
     if (parts.length === 0) return undefined
-    if (parts.length === 1) return parts[0]
+    if (parts.length === 1 && !node.optional && !actor && !node.choiceLabelKey) return parts[0]
     return {
       kind: 'group',
+      ...metadata,
+      ...(node.choiceLabelKey ? { labelKey: node.choiceLabelKey, labelParams: node.choiceLabelParams } : {}),
+      operator: node instanceof SequenceNode ? 'sequence' : node instanceof XorNode ? 'xor' : node instanceof OrNode ? 'or' : 'parallel',
       separator: descriptionSeparatorForNode(node),
       parts,
     }
@@ -772,7 +832,7 @@ export function getNodeDescriptionPreview(
 }
 
 export function buildFlowNode(
-  int: EngineInternals,
+  int: Pick<EngineInternals, 'registry' | 'counterRef'>,
   flow: ActionFlow,
   ownerPlayerId?: string,
   inheritedOptionId?: string,
@@ -784,7 +844,7 @@ export function buildFlowNode(
 }
 
 function buildFlowNodeContent(
-  int: EngineInternals,
+  int: Pick<EngineInternals, 'registry' | 'counterRef'>,
   flow: ActionFlow,
   ownerPlayerId: string | undefined,
   inheritedOptionId: string | undefined,
@@ -1466,4 +1526,4 @@ export function pendingEnvelopeFromHostNode(node: EngineNode | null): PendingEnv
 
 /** Preserve the legacy first-effect view while deriving the complete description once. */
 export const firstDescriptionEffect = (description?: ChoiceDescriptionPreview): ChoiceEffectPreview | undefined =>
-  description?.kind === 'action' ? description.effectPreview : description?.parts.map(firstDescriptionEffect).find((effect) => effect !== undefined)
+  description?.kind === 'action' ? description.effectPreview : description?.kind === 'conditional' ? firstDescriptionEffect(description.body) : description?.parts.map(firstDescriptionEffect).find((effect) => effect !== undefined)

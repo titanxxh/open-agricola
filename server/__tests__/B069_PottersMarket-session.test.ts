@@ -72,7 +72,8 @@ const anytimeIds = (response: SessionResponse) =>
   response.interaction.anytimeActions.map((action: AnytimeAction) => action.id)
 
 const pendingVegetables = (response: SessionResponse) =>
-  response.state.players[0]!.cardStates[CARD_ID]?.counters?.pending ?? 0
+  response.state.futureMeeples.filter((entry) => entry.cardId === CARD_ID && entry.playerId === response.state.players[0]!.id)
+    .reduce((total, entry) => total + (entry.resources.vegetable ?? 0), 0)
 
 describe("B069 Potter's Market parity", () => {
   it("B069 S1: paying two wood plays Potter's Market for one point", () => {

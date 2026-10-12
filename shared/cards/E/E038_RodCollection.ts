@@ -20,7 +20,6 @@ const afterCollectListener: CardListenerRegistration = {
       return {
         type: 'seq',
         choiceLabelKey: 'ui.interactionResourceExchange',
-        choiceLabelParams: { resourcesPaid: { wood } },
         children: [
           { type: 'leaf', actionId: 'pay', sourceCard: CARD_ID, params: { wood } },
           {

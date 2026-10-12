@@ -31,7 +31,6 @@ const anytimeListener: CardListenerRegistration = {
         ],
       },
       sourceCard: CARD_ID,
-      labelKey: 'cards.D046_PelletPress.anytime',
     }
   },
 }

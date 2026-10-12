@@ -67,7 +67,6 @@ const anytimeGrowListener: CardListenerRegistration = {
     if (workersAvailable(context.state, context.player) <= 0) return
     return {
       sourceCard: CARD_ID,
-      labelKey: 'ui.interactionUseGrowOffspring',
       flow: {
         type: 'seq',
         children: [

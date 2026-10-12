@@ -1,8 +1,8 @@
 import { defineMinorCard } from '../card-source'
-import { registerSelectionEffect } from '../../actions/helpers/selection-effect-registry'
+import { fieldOperationFlow } from '../../actions/plans/field-operation'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
-import type { ActionFlow, FarmTilePosition, PlayerState } from '../../contract/types'
+import type { FarmTilePosition, PlayerState } from '../../contract/types'
 import type { ExtraSowableField } from '../card-effects'
 import { getFarmyardTilePositions, parsePositionKey, positionKey } from '../../domain/farm'
 import { getUsedFarmyardTileKeys } from '../../domain/farmyard-usage'
@@ -15,7 +15,6 @@ import type { CardImpl } from '../registry'
 import { getLogicalFields } from '../helpers/card-field'
 
 const CARD_ID = 'M111_NoTillFarming'
-const DISCARD_EFFECT = 'm111-no-till-farming-discard-crops'
 
 const cropSpaces = (player: PlayerState) =>
   getFarmyardSpaceStates(player).filter((state) =>
@@ -29,17 +28,6 @@ const discardableTiles = (player: PlayerState): FarmTilePosition[] =>
     const tile = parsePositionKey(state.spaceKey)
     return tile ? [tile] : []
   })
-
-registerSelectionEffect(DISCARD_EFFECT, ({ player, positions }) => {
-  const selected = new Set(positions)
-  player.farmyardSpaceStates = getFarmyardSpaceStates(player).filter((state) =>
-    !(
-      state.sourceCardId === CARD_ID &&
-      state.kind === 'non-field-crop-space' &&
-      selected.has(state.spaceKey)
-    ),
-  )
-})
 
 const reapCropSpaces = (player: PlayerState) => {
   const next = []
@@ -70,20 +58,8 @@ const anytimeListener: CardListenerRegistration = {
     const tiles = discardableTiles(context.player)
     if (tiles.length === 0) return
     return {
-      flow: {
-        type: 'leaf',
-        actionId: 'selection',
-        sourceCard: CARD_ID,
-        actionContext: {
-          selectionKind: 'farm-position',
-          selectionEffect: DISCARD_EFFECT,
-          minSelections: 1,
-          maxSelections: tiles.length,
-          selectableTiles: tiles,
-        },
-      } satisfies ActionFlow,
+      flow: fieldOperationFlow(CARD_ID, { kind: 'discard-crop-spaces' }, tiles, tiles.length),
       sourceCard: CARD_ID,
-      labelKey: 'cards.M111_NoTillFarming.anytime',
     }
   },
 }

@@ -1,5 +1,5 @@
 import { definePlayerActionCard } from '../card-source'
-import { registerPlayerActionSpace, createPlayerActionSpaces } from '../player-action-space'
+import { registerPlayerActionSpace, createPlayerActionSpaces, definePlayerActionSpaceFlow } from '../player-action-space'
 import type { CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase } from '../../actions/hooks'
 import type { ActionChoiceOption } from '../../contract/types'
@@ -43,15 +43,12 @@ const stoneOvenCandidateListener: CardListenerRegistration = {
 registerPlayerActionSpace({
   cardId: CARD_ID,
   access: 'owner',
-  createDefinition: (ownerId) => ({
+  createDefinition: (ownerId) => definePlayerActionSpaceFlow({
     id: CARD_ID,
     nameKey: 'cards.E161_ElderBaker.name',
     descriptionKey: 'cards.E161_ElderBaker.desc',
     canBeExecutedByPlayer: (_, player) => player.id === ownerId,
-    execute: ({ player }) => {
-      player.resources.grain += 3
-      return { type: 'ok', resourcesGained: { grain: 3 } }
-    },
+    flowFactory: () => ({ type: 'leaf', actionId: 'gain', sourceCard: CARD_ID, params: { grain: 3 } }),
   }),
 })
 

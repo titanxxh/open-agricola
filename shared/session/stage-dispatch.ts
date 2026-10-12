@@ -1,3 +1,4 @@
+import { timedRuleSources } from '../cards/timed-rule-obligations'
 import type { ReorganizeTrigger } from '../actions/effects/reorganize.ts'
 import { getCardEffect, isHandCardEffectHook, runCardEffectHook } from '../cards/card-effects.ts'
 import type { BeforeEndGameScope, FlowCardEffectHook } from '../cards/card-effects.ts'
@@ -232,7 +233,9 @@ export class StageDispatch {
   }
 
   private getPlayerEffectCardIds(player: PlayerState): string[] {
-    return [...player.improvements, ...player.minorPlayed, ...player.occupationPlayed]
+    return [...new Set([...player.improvements, ...player.minorPlayed, ...player.occupationPlayed,
+      ...timedRuleSources(this.state, player, id => getCardEffect(id)?.timedRules ?? []).map(source => source.cardId),
+    ])]
   }
 
   private getPlayerHandEffectCardIds(player: PlayerState, hook: StageCardEffectHook): string[] {
