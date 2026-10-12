@@ -33,6 +33,28 @@ const addActions = (session: GameSession, count: number) => {
 }
 
 describe('complete operation-group Room history pages', () => {
+  it('does not expose hidden hand payload changes through projection anchors', () => {
+    const session = createWorkSession({ seed: 10, configure: state => {
+      state.players[1]!.minorHand = ['D036_BreedRegistry']
+    } })
+    try {
+      expect(session.takeAction(0, 'forest').ok).toBe(true)
+      expect(session.resolveChoice(1, 'confirm').ok).toBe(true)
+      expect(session.takeAction(1, 'sheep-market').ok).toBe(true)
+      expect(session.resolveChoice(1, 'confirm', { zones: [] }).ok).toBe(true)
+      const raw = session.withCtx(() => serializeState(session.state, {}))
+      const hidden = raw.events.find(event => event.type === 'card.stateChanged' && event.cardId === 'D036_BreedRegistry')!
+      const before = buildRoomHistoryPage(raw, 'p1')
+      const extra = { ...hidden, id: 'additional-hidden-event', occurrenceId: 'hidden-occurrence', seq: raw.nextEventSeq }
+      const after = buildRoomHistoryPage({ ...raw, events: [...raw.events, extra], nextEventSeq: raw.nextEventSeq + 1 }, 'p1')
+      expect(after.window.projectionHeads).toEqual(before.window.projectionHeads)
+      expect(after.window.logRecords).toEqual(before.window.logRecords)
+      expect(after.window.eventRecords).toEqual(before.window.eventRecords)
+      expect(after.window.archiveRecords).toEqual(before.window.archiveRecords)
+      expect(JSON.stringify(after)).not.toContain('additional-hidden-event')
+      expect(JSON.stringify(after)).not.toContain('D036_BreedRegistry')
+    } finally { session.dispose() }
+  })
   it('accepts older cursors across normal appends but rejects same-length replacements outside the window', () => {
     const session = setup()
     try {

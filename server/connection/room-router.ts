@@ -6,7 +6,7 @@ import { CommandError, type CommandRequest } from '../game/command-store'
 import { assertCommandInput } from '../game/command-input'
 import type { CommandErrorCode } from '../../shared/contract/protocol/commands'
 import { withRoomParticipantNames } from './history-presentation'
-import { buildRoomHistoryPage, HistoryBranchChangedError } from '../../shared/session/history-window'
+import { buildRoomHistoryPage, HistoryBranchChangedError, HistoryProjectionChangedError } from '../../shared/session/history-window'
 import { enqueueRoomCommand, enqueueRoomTask, waitForConnection } from '../game/room-queue.ts'
 import { serializeState } from '../../shared/session/serialization'
 import { randomUUID } from 'node:crypto'
@@ -56,6 +56,9 @@ type DraftRoomOptions = { draftMode: 'simultaneous'; draftPoolSize: number }
 
 const workshopDraftToCustomCard = (draft: WorkshopDraft): CustomCardData => ({
   cardType: draft.cardType,
+  // SAFETY: Workshop's persistence DTO uses generic JSON for card-definition
+  // metadata. This preserves the existing stored-schema assumption at the
+  // custom-card input boundary; the cast is not runtime JSON validation.
   cardJson: draft.cardJson as unknown as CustomCardData['cardJson'],
   effectCode: draft.effectCode,
   compiledCode: draft.compiledCode,
@@ -142,6 +145,9 @@ const loadCustomCards = async (
       const compiledCode = typeof parsed._compiled === 'string' ? parsed._compiled : null
       result.push({
         cardType: row.card_type as 'minor' | 'occupation',
+        // SAFETY: card_json stores the same card-definition metadata accepted
+        // by the Workshop authoring boundary. JSON parsing preserves that shape;
+        // this bridges the generic persistence DTO, without claiming validation.
         cardJson: parsed as unknown as CustomCardData['cardJson'],
         effectCode,
         compiledCode,
@@ -180,7 +186,7 @@ const sendCommandError = (
   ctx: ConnectionCtx,
   error: string,
   requestId?: string,
-  code?: GameContextErrorCode | CommandErrorCode | 'seat_replaced' | 'history_branch_changed' | 'player_slot_required',
+  code?: GameContextErrorCode | CommandErrorCode | 'seat_replaced' | 'history_branch_changed' | 'history_projection_changed' | 'player_slot_required',
   lifecycle?: GameContextLifecycle,
 ) => {
   rejectObservedCommand(code === 'command_input_stale' ? 'stale' : code === 'login_required' || code === 'seat_replaced' ? 'canceled' : 'rule_rejected')
@@ -937,7 +943,7 @@ async function handleGetHistory(ctx: ConnectionCtx, msg: Extract<ClientCommand, 
     const page = buildRoomHistoryPage(withRoomParticipantNames(room, canonical), viewerPlayerId, msg.cursor)
     await ctx.broadcaster.sendRoomEvent(ctx.ws, room, { type: 'historyPage', roomId: room.id, requestId: msg.requestId, page })
   } catch (error) {
-    sendCommandError(ctx, error instanceof Error ? error.message : String(error), msg.requestId, error instanceof HistoryBranchChangedError ? 'history_branch_changed' : undefined)
+    sendCommandError(ctx, error instanceof Error ? error.message : String(error), msg.requestId, error instanceof HistoryProjectionChangedError ? 'history_projection_changed' : error instanceof HistoryBranchChangedError ? 'history_branch_changed' : undefined)
   }
 }
 
