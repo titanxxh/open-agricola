@@ -16,6 +16,7 @@ type Props = {
 }
 
 const seasonOrder: SeasonId[] = ['winter', 'spring', 'autumn', 'summer']
+const compactSeasonOrder: SeasonId[] = ['winter', 'spring', 'summer', 'autumn']
 
 const seasonLabelKey: Record<SeasonId, string> = {
   winter: 'ui.seasons.winter',
@@ -266,7 +267,7 @@ export const SeasonsBoard = ({
         <div className={`seasons-board__token seasons-board__token--${currentSeason}`} aria-hidden="true">
           {locale === 'zh' ? t(locale, `ui.seasons.short.${currentSeason}`) : englishSeasonToken[currentSeason]}
         </div>
-        {seasonOrder.map((season) => {
+        {(compact ? compactSeasonOrder : seasonOrder).map((season) => {
           const action = actionById.get(seasonActionIdBySeason[season])
           const seasonName = t(locale, seasonLabelKey[season])
           const actionName = action ? t(locale, action.nameKey) : t(locale, 'ui.seasons.missingAction')

@@ -200,10 +200,6 @@
     font-size: 12px;
     margin-top: auto;
   }
-  .seasons-board__map--compact [data-season="winter"] { order: 0; }
-  .seasons-board__map--compact [data-season="spring"] { order: 1; }
-  .seasons-board__map--compact [data-season="summer"] { order: 2; }
-  .seasons-board__map--compact [data-season="autumn"] { order: 3; }
   .seasons-board__map--compact .seasons-board__worker { bottom: 120px; font-size: 12px; }
 
   @media (max-width: 1759px) {
