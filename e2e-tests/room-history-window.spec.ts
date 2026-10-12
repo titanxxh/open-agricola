@@ -115,7 +115,7 @@ test('real Room history loads earlier groups, preserves cancellation markers and
       const bounds = entry.getBoundingClientRect()
       return bounds.top >= viewport.top + viewport.height / 3 && bounds.bottom <= viewport.bottom
     })!
-    return { id: row.getAttribute('data-testid')!, y: row.getBoundingClientRect().top }
+    return { id: row.getAttribute('data-testid')!, offsetY: row.getBoundingClientRect().top - viewport.top }
   })
   // Another player advances through a round boundary while p1 reads old entries.
   for (let index = 0; index < 4; index++) {
@@ -133,7 +133,11 @@ test('real Room history loads earlier groups, preserves cancellation markers and
   await expect(p1.getByRole('status').filter({ hasText: 'History updated' })).toHaveCount(0)
   const anchor = p1.getByTestId(reading.id)
   await expect(anchor).toBeVisible()
-  await expect.poll(async () => Math.abs((await anchor.boundingBox())!.y - reading.y)).toBeLessThanOrEqual(2)
+  await expect.poll(() => anchor.evaluate((element, offsetY) => {
+    const viewport = element.closest('.action-log__body')
+    if (!viewport) throw new Error('Log viewport is missing')
+    return Math.abs(element.getBoundingClientRect().top - viewport.getBoundingClientRect().top - offsetY)
+  }, reading.offsetY)).toBeLessThanOrEqual(2)
   await command(p2, { type: 'undoAction' })
   await expect(p1.getByRole('button', { name: 'Load earlier entries', exact: true })).toBeVisible()
   await expect(p1.getByRole('status').filter({ hasText: 'History updated' })).toBeVisible()
