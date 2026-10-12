@@ -45,6 +45,29 @@ describe('usePublicEventCuePresentation', () => {
     vi.useRealTimers()
   })
 
+  it('does not replay one occurrence when its display sequence changes', () => {
+    const event = { ...workerPlaced('display-1', 1, 'forest'), occurrenceId: 'same-occurrence' }
+    const { result, rerender } = renderHook(({ events }: { events: GameEvent[] }) => usePublicEventCuePresentation({
+      state: { events }, locale: 'en', replayFeedback: clearReplayFeedback(), displayPlayerId: 'p1',
+    }), { initialProps: { events: [] as GameEvent[] } })
+    act(() => rerender({ events: [event] }))
+    expect(result.current.highlightedActionIds).toEqual(new Set(['forest']))
+    act(() => vi.advanceTimersByTime(3200))
+    act(() => rerender({ events: [{ ...event, id: 'display-8', seq: 8 }] }))
+    expect(result.current.displayPublicEventHighlights).toEqual(emptyPublicEventHighlightTargets())
+  })
+
+  it('presents a new identical occurrence even when a branch reuses the sequence', () => {
+    const event = { ...workerPlaced('display-1', 1, 'forest'), occurrenceId: 'first-occurrence' }
+    const { result, rerender } = renderHook(({ events }: { events: GameEvent[] }) => usePublicEventCuePresentation({
+      state: { events }, locale: 'en', replayFeedback: clearReplayFeedback(), displayPlayerId: 'p1',
+    }), { initialProps: { events: [] as GameEvent[] } })
+    act(() => rerender({ events: [event] }))
+    act(() => vi.advanceTimersByTime(3200))
+    act(() => rerender({ events: [{ ...event, occurrenceId: 'replacement' }] }))
+    expect(result.current.highlightedActionIds).toEqual(new Set(['forest']))
+  })
+
   it('owns live, replay, cancellation, and viewer-scoped public event cues', () => {
     const live = workerPlaced('evt-live', 1, 'forest')
     const replay = workerPlaced('evt-replay', 2, 'clay-pit')

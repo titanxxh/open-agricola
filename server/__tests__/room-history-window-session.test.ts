@@ -33,6 +33,24 @@ const addActions = (session: GameSession, count: number) => {
 }
 
 describe('complete operation-group Room history pages', () => {
+  it('accepts older cursors across normal appends but rejects same-length replacements outside the window', () => {
+    const session = setup()
+    try {
+      addActions(session, 28)
+      const before = session.withCtx(() => serializeState(session.state, {}))
+      const page = buildRoomHistoryPage(before, 'p1')
+      const older = buildRoomHistoryPage(before, 'p1', page.window.nextCursor!)
+      addActions(session, 2)
+      const appended = session.withCtx(() => serializeState(session.state, {}))
+      expect(buildRoomHistoryPage(appended, 'p1').window.branchId).toBe(page.window.branchId)
+      expect(buildRoomHistoryPage(appended, 'p1', page.window.nextCursor!).log).toEqual(older.log)
+      const changed = [...session.state.log]
+      changed[changed.length - 1] = { key: 'log.startGame', params: { replaced: true } }
+      session.loadState({ ...session.state, log: changed })
+      expect(() => buildRoomHistoryPage(session.withCtx(() => serializeState(session.state, {})), 'p1', page.window.nextCursor!)).toThrow(HistoryBranchChangedError)
+    } finally { session.dispose() }
+  })
+
   it('pages every log, event and cancellation exactly once without changing the raw Frame or cursor', () => {
     const session = setup()
     addActions(session, 28)
@@ -178,7 +196,9 @@ describe('complete operation-group Room history pages', () => {
       const session = setup()
       addActions(session, 28)
       const [left, right] = session.state.players
+      const privateCursor = session.createSessionPrivateCursor()
       session.loadState({ ...session.state, log: [{ key: 'transfer', params: { fromPlayer: left!.name, toPlayer: right!.name } }, ...session.state.log] })
+      session.restoreSessionPrivateCursor(privateCursor) // Preserve the pending handover across fixture preparation.
       serializeSessionSnapshot(session.state, session) // capture roles before names change
       session.updatePlayerName(0, 'Renamed left')
       session.updatePlayerName(1, 'Renamed right')
@@ -197,6 +217,12 @@ describe('complete operation-group Room history pages', () => {
       expect(restarted.state.log[0]).toEqual(saved.state.log[0])
       const older = buildRoomHistoryPage(raw, 'p1', page.window.nextCursor!)
       expect(page.log.length + older.log.length).toBe(raw.log.length)
+      addActions(restarted, 2)
+      const appended = restarted.withCtx(() => serializeState(restarted.state, {}))
+      expect(buildRoomHistoryPage(appended, 'p1').window.branchId).toBe(page.window.branchId)
+      expect(buildRoomHistoryPage(appended, 'p1', page.window.nextCursor!).log).toEqual(older.log)
+      restarted.dispose()
+      session.dispose()
     } finally { await db?.close() }
   })
 

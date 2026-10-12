@@ -18,7 +18,7 @@ type NodeRow = { node_id: string; kind: HistoryStreamKind; previous_id: string |
 export type RecoveryNode = { id: string; kind: 'undo' | 'checkpoint'; json: string }
 export type PackedRoomSnapshot = { writtenBytes?: { history_nodes: number; recovery_nodes: number }; json: string; nodes: HistoryNode[]; recoveryNodes: RecoveryNode[] }
 export class RoomHistoryCorruptionError extends Error {}
-const checksum = (row: object): string => createHash('sha256').update(JSON.stringify(row)).digest('hex')
+const checksum = (row: Omit<NodeRow, 'checksum'> | { node_id: string; kind: string; body_json: string }): string => createHash('sha256').update(JSON.stringify(row)).digest('hex')
 
 export const ROOM_HISTORY_SCHEMA = `CREATE TABLE room_history_nodes (
   room_id TEXT NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
@@ -97,6 +97,7 @@ export class RoomHistoryStore {
     // Both views retain their exact history references. Shared captured core values
     // stop delta traversal at Object.is; only the Frame's differences are repeated.
     const frameDelta = createReplayDelta(state as JsonValue, frame as JsonValue)
+    // SAFETY: serialized Frames contain only JSON data, including captured immutable histories.
     const stored: StoredSnapshot = { roomHistoryVersion: 2, state, frameDelta, rawFrameHash: expectedFrameHash ?? frameHash(snapshot.frame as unknown as JsonValue), sessionCursor: {
       ...runtime,
       ...('history' in snapshot.sessionCursor ? { undoHistory: history.map(packUndo) } : {}),
@@ -123,7 +124,7 @@ export class RoomHistoryStore {
   async write(roomId: string, nodes: HistoryNode[], recoveryNodes: RecoveryNode[] = []): Promise<{ history_nodes: number; recovery_nodes: number }> {
     const bytes = { history_nodes: 0, recovery_nodes: 0 }
     for (const node of nodes) {
-      const row = { node_id: node.id, kind: node.kind, previous_id: node.previous?.id ?? null, length: node.length, record_json: JSON.stringify(node.value), identity_json: JSON.stringify(node.identity) }
+      const row = { node_id: node.id, kind: node.kind, previous_id: node.previous?.id ?? null, length: node.length, record_json: JSON.stringify(node.value), identity_json: JSON.stringify({ ...node.identity, continuationId: node.continuationId }) }
       const result = await this.insert.run({ roomId, ...row, checksum: checksum(row) })
       if (result.changes) bytes.history_nodes += Buffer.byteLength(row.record_json) + Buffer.byteLength(row.identity_json)
     }
@@ -142,16 +143,12 @@ export class RoomHistoryStore {
   }
   forget(roomId: string): void { this.durable.delete(roomId) }
   async restore(roomId: string, json: string): Promise<PersistedSessionSnapshot> {
-    try {
-      const [nodes, recovery] = await Promise.all([
-        this.select.all<NodeRow>(roomId),
-        this.selectRecovery.all<{ node_id: string; kind: string; body_json: string; checksum: string }>(roomId),
-      ])
-      return this.restoreRecords(roomId, json, new Map(nodes.map(row => [row.node_id, row])), new Map(recovery.map(row => [row.node_id, row])))
-    } catch (error) {
-      if (error instanceof RoomHistoryCorruptionError) throw error
-      throw new RoomHistoryCorruptionError(`Invalid Room recovery for ${roomId}`, { cause: error })
-    }
+    // Storage failures must reach the committer unchanged so it can retry.
+    const [nodes, recovery] = await Promise.all([
+      this.select.all<NodeRow>(roomId),
+      this.selectRecovery.all<{ node_id: string; kind: string; body_json: string; checksum: string }>(roomId),
+    ])
+    return this.restoreRecords(roomId, json, new Map(nodes.map(row => [row.node_id, row])), new Map(recovery.map(row => [row.node_id, row])))
   }
   /** Read all owned recovery records in two queries, without per-room round trips. */
   async restoreMany(roomIds: string[]): Promise<(roomId: string, json: string) => PersistedSessionSnapshot> {
@@ -176,12 +173,23 @@ export class RoomHistoryStore {
     return (roomId, json) => this.restoreRecords(roomId, json, nodes.get(roomId) ?? new Map(), recovery.get(roomId) ?? new Map())
   }
   private restoreRecords(roomId: string, json: string, nodes: Map<string, NodeRow>, recovery: Map<string, { kind: string; body_json: string; checksum: string }>): PersistedSessionSnapshot {
+    // Only decoding and integrity validation indicate corrupt Room data. Both
+    // single-Room and batched reads use this boundary after queries succeed.
+    try {
+      return this.decodeRecords(roomId, json, nodes, recovery)
+    } catch (error) {
+      if (error instanceof RoomHistoryCorruptionError) throw error
+      throw new RoomHistoryCorruptionError(`Invalid Room recovery for ${roomId}`, { cause: error })
+    }
+  }
+  private decodeRecords(roomId: string, json: string, nodes: Map<string, NodeRow>, recovery: Map<string, { kind: string; body_json: string; checksum: string }>): PersistedSessionSnapshot {
     const stored = parseRoomBody(json) as StoredSnapshot | PersistedSessionSnapshot
     if (!('roomHistoryVersion' in stored)) return stored
     if (stored.roomHistoryVersion !== 1 && stored.roomHistoryVersion !== 2) throw new RoomHistoryCorruptionError(`Unsupported Room history for ${roomId}`)
     const cache = new Map<string, HistoryNode>()
     const restoredRecovery: RecoveryNode[] = []
     const restoreState = (body: StoredState): PersistedSessionSnapshot['state'] => {
+      // SAFETY: packed state retains the game body; validated stream references are restored below.
       const state = { ...body } as unknown as GameState & { historyStreams?: Reference[] }
       if (!Array.isArray(body.historyStreams)) throw new RoomHistoryCorruptionError(`Missing Room history references for ${roomId}`)
       if (Array.isArray(body.players) && body.players.length > 0 && body.historyStreams.length !== 3) throw new RoomHistoryCorruptionError(`Incomplete Room history for ${roomId}`)
@@ -207,7 +215,9 @@ export class RoomHistoryStore {
           let previous = id ? cache.get(id)! : null
           for (const row of chain.reverse()) {
             if ((previous && previous.kind !== row.kind) || row.length !== (previous?.length ?? 0) + 1) throw new RoomHistoryCorruptionError(`Mismatched Room history length for ${roomId}`)
-            const restored: HistoryNode = { id: row.node_id, kind: row.kind, previous, length: row.length, value: JSON.parse(row.record_json) as object, identity: JSON.parse(row.identity_json) as HistoryRecordIdentity }
+            const { continuationId, ...identity } = JSON.parse(row.identity_json) as HistoryRecordIdentity & { continuationId?: string }
+            if (continuationId !== undefined && (typeof continuationId !== 'string' || !continuationId)) throw new RoomHistoryCorruptionError(`Invalid Room history continuation for ${roomId}`)
+            const restored: HistoryNode = { id: row.node_id, kind: row.kind, previous, length: row.length, value: JSON.parse(row.record_json) as object, identity, continuationId }
             registerRestoredHistoryNode(restored)
             cache.set(restored.id, restored)
             previous = restored
@@ -250,7 +260,9 @@ export class RoomHistoryStore {
     const frameBody = stored.roomHistoryVersion === 1
       ? stored.frameWithoutStreams
       : applyReplayDelta(stored.state as JsonValue, stored.frameDelta) as StoredState
+    // SAFETY: frameBody is the stored Frame body with its validated history streams rejoined.
     const frame = restoreState(frameBody) as unknown as PersistedSessionSnapshot['frame']
+    // SAFETY: the reconstructed Frame consists of decoded JSON and validated history records.
     if (frameHash(frame as unknown as JsonValue) !== stored.rawFrameHash) throw new RoomHistoryCorruptionError(`Room Frame hash mismatch for ${roomId}`)
     const snapshot = { state: restoreState(stored.state), frame, sessionCursor: {
       ...runtime,

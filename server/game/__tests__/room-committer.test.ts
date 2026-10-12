@@ -27,6 +27,8 @@ import {
 import { snapshotToRoom, type Room } from '../room.ts'
 import { PostgresRoomPersistence } from '../persistence/postgres-adapter.ts'
 import { RoomOwnershipError } from '../room-directory.ts'
+import { createWorkSession } from '../../__tests__/_helpers/session-fixtures.ts'
+import { RoomHistoryCorruptionError } from '../persistence/room-history-store.ts'
 
 const makeRoom = (id = 'room-1'): Room => ({
   id,
@@ -185,6 +187,93 @@ describe('RoomCommitter', () => {
     initial.lockNewRoom(corrupt)
     expect(await next.prepareRoom(corrupt, { missingPrefix: true })).toMatchObject({ kind: 'blocked', error: 'recorded room replay header is missing' })
     expect(await persistence.loadReplayHead(corrupt.id)).toBeNull()
+  })
+
+  it.each(['room_history_nodes', 'room_recovery_nodes'])('retries transient %s reads and resumes the committed Room', async (table) => {
+    const room = makeRoom()
+    room.session.dispose()
+    room.session = createWorkSession({ seed: 563 })
+    const initial = createCommitter()
+    expect(await initial.prepareRoom(room, { missingPrefix: false })).toMatchObject({ kind: 'committed', stepNo: 0 })
+    const before = room.session.getState()
+    const woodBefore = before.state.players[0]!.resources.wood
+    initial.shutdown()
+
+    const transient = Object.assign(new Error('temporary database connection reset'), { code: 'ECONNRESET' })
+    let remainingFailures = 2
+    const reads = new PostgresRoomPersistence({
+      transaction: db.transaction.bind(db),
+      prepare: (sql: string) => {
+        const statement = db.prepare(sql)
+        if (!sql.startsWith('SELECT node_id') || !sql.includes(`FROM ${table} `)) return statement
+        return { ...statement, all: async (...args: unknown[]) => {
+          if (remainingFailures-- > 0) throw transient
+          return statement.all(...args)
+        } }
+      },
+    })
+    const { scheduler, tasks } = fakeScheduler()
+    const committer = new RoomCommitter({
+      persistence: reads, viewerBuildId: 'viewer-1', gameBuildId: 'game-1',
+      viewerBuildExists: () => true, scheduler,
+    })
+    const ready = vi.fn()
+    const waiter = vi.fn()
+    try {
+      expect(await committer.prepareRoom(room, { missingPrefix: true, onReady: ready }))
+        .toEqual({ kind: 'blocked', error: transient.message })
+      expect(committer.isRetrying(room.id)).toBe(true)
+      expect(committer.observation().permanent_rooms).toBe(0)
+      expect(tasks.map(task => task.delay)).toEqual([1000])
+      expect(ready).not.toHaveBeenCalled()
+      expect(committer.waitUntilReady(room.id, waiter)).toBe(true)
+      await tasks.shift()!.callback()
+      expect(committer.isRetrying(room.id)).toBe(true)
+      expect(tasks.map(task => task.delay)).toEqual([2000])
+      expect(ready).not.toHaveBeenCalled()
+      expect(waiter).not.toHaveBeenCalled()
+      await tasks.shift()!.callback()
+      expect(ready).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ kind: 'committed', stepNo: 0 }))
+      expect(waiter).toHaveBeenCalledExactlyOnceWith(undefined)
+      expect(committer.isBlocked(room.id)).toBe(false)
+      expect(committer.observation().permanent_rooms).toBe(0)
+      expect(room.session.getState()).toEqual(before)
+      const response = room.session.takeAction(0, 'forest')
+      expect(response.ok).toBe(true)
+      expect(response.state.players[0]!.resources.wood).toBe(woodBefore + 3)
+      expect(response.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'confirm-next-player' } })
+      expect(response.state.log.some(entry => entry.key === 'log.actionDetail')).toBe(true)
+      expect(response.scores).toBeDefined()
+      expect(await committer.commit(room, response, actionIntent!, 0)).toMatchObject({ kind: 'committed', stepNo: 1 })
+    } finally { committer.shutdown(); room.session.dispose() }
+  })
+
+  it.each(['prepare', 'retry'])('permanently blocks corrupt history during %s without publishing it', async (phase) => {
+    const room = makeRoom()
+    const initial = createCommitter()
+    expect(await initial.prepareRoom(room, { missingPrefix: false })).toMatchObject({ kind: 'committed', stepNo: 0 })
+    initial.shutdown()
+    const { scheduler, tasks } = fakeScheduler()
+    const committer = createCommitter({ scheduler })
+    const ready = vi.fn()
+    const waiter = vi.fn()
+    if (phase === 'retry') {
+      vi.spyOn(persistence, 'loadReplayFrame').mockRejectedValueOnce(new Error('temporary read failure'))
+      expect(await committer.prepareRoom(room, { missingPrefix: true, onReady: ready })).toMatchObject({ kind: 'blocked' })
+      expect(committer.waitUntilReady(room.id, waiter)).toBe(true)
+    }
+    await db.prepare('DELETE FROM room_history_nodes WHERE room_id = ?').run(room.id)
+    try {
+      if (phase === 'retry') await tasks.shift()!.callback()
+      else expect(await committer.prepareRoom(room, { missingPrefix: true, onReady: ready })).toMatchObject({ kind: 'blocked' })
+      expect(committer.isRetrying(room.id)).toBe(false)
+      expect(committer.isBlocked(room.id)).toBe(true)
+      expect(committer.observation().permanent_rooms).toBe(1)
+      expect(tasks).toEqual([])
+      expect(ready).not.toHaveBeenCalled()
+      if (phase === 'retry') expect(waiter).toHaveBeenCalledWith(expect.stringContaining('Missing Room history'))
+      await expect(persistence.loadReplayFrame(room.id)).rejects.toBeInstanceOf(RoomHistoryCorruptionError)
+    } finally { committer.shutdown(); room.session.dispose() }
   })
 
   it('pauses and retries replay-head reads', async () => {

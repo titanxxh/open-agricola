@@ -75,7 +75,15 @@ export type ResourceAccumulatedEvent = GameEventBase<'resource.accumulated'> & {
   silent?: boolean
 }
 
+export type CardPayment = {
+  resources: PaymentResourceMap
+  paymentId?: string
+  bonusSources?: string[]
+  returnedCardId?: string
+}
+
 export type ResourcePaidEvent = GameEventBase<'resource.paid'> & {
+  paymentId?: string
   resources: PaymentResourceMap
   to?: ResourceLocation
   paymentFor: PaymentPurpose
@@ -230,6 +238,8 @@ export type StartPlayerChangedEvent = GameEventBase<'startPlayer.changed'> & {
 export type CardPlayedEvent = GameEventBase<'card.played'> & {
   cardId: string
   cardType: 'minor' | 'major' | 'occupation'
+  /** Exact host payment, including free plays; reference is independent of display seq. */
+  payment?: CardPayment
 }
 
 export type CardTriggeredEvent = GameEventBase<'card.triggered'> & {

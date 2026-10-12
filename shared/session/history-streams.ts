@@ -12,6 +12,8 @@ export type HistoryNode = {
   value: object
   identity: HistoryRecordIdentity
   length: number
+  /** Stable along an append-only path; a divergent child starts a new path. */
+  continuationId?: string
 }
 export type HistoryBranch = { kind: HistoryStreamKind; head: HistoryNode | null; length: number }
 const records = new WeakMap<object, { value: object; identity: HistoryRecordIdentity; links: Map<string, HistoryNode> }>()
@@ -21,6 +23,7 @@ const materialized = new WeakMap<HistoryBranch, object[]>()
 const emptyStreams = new Map<HistoryStreamKind, object[]>()
 const capturedRecords = new WeakSet<object>()
 const capturedStreams = new WeakSet<object>()
+const extensions = new WeakMap<HistoryNode, HistoryNode>()
 const identifier = (): string => crypto.randomUUID()
 const copyJson = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T
 
@@ -127,7 +130,10 @@ export const historyBranch = (values: readonly object[], kind: HistoryStreamKind
     const parentKey = `${kind}:${head?.id ?? ''}`
     let node = record.links.get(parentKey)
     if (!node) {
-      node = { id: identifier(), kind, previous: head, value: record.value, identity: record.identity, length }
+      const id = identifier()
+      node = { id, kind, previous: head, value: record.value, identity: record.identity, length,
+        continuationId: head && !extensions.has(head) ? head.continuationId ?? head.id : id }
+      if (head && !extensions.has(head)) extensions.set(head, node)
       record.links.set(parentKey, node)
     }
     head = node
@@ -156,6 +162,8 @@ export const materializeHistoryBranch = (branch: HistoryBranch): object[] => {
 }
 
 export const registerRestoredHistoryNode = (node: HistoryNode): void => {
+  node.continuationId ??= node.previous?.continuationId ?? node.id
+  if (node.previous && !extensions.has(node.previous)) extensions.set(node.previous, node)
   freeze(node.value)
   // Restoration normally supplies JSON-parsed data. Keep externally supplied
   // shallow-frozen objects and accessors outside the immutable-record boundary.

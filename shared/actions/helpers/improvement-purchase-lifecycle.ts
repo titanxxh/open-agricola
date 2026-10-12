@@ -163,6 +163,7 @@ export const commitImprovementPurchaseLifecycle = ({
       type: 'card.played',
       cardId: improvementId,
       cardType: kind,
+      payment: paymentInfo.publicPayment ?? { resources: costResources, ...(paymentInfo.returnedCardId ? { returnedCardId: paymentInfo.returnedCardId } : {}) },
       sourceActionId: 'improvement',
       sourceCardId: improvementId,
     })

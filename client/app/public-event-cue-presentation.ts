@@ -11,9 +11,11 @@ import type {
   PublicEventNotification,
   PublicEventCardPassAnimation,
   PublicEventResourceAnimation,
+  PublicEventOccurrenceCursor,
 } from './public-event-notifications'
 import {
-  collectNewPublicEventFeedback,
+  collectUnseenPublicEventFeedback,
+  publicEventOccurrenceCursorFor,
   collectPublicEventFeedback,
   emptyPublicEventHighlightTargets,
   maxPublicEventSeq,
@@ -159,6 +161,7 @@ type UsePublicEventCuePresentationArgs = {
   locale: Locale
   replayFeedback: ReplayFeedback
   displayPlayerId: string
+  scopeKey?: string
 }
 
 export const usePublicEventCuePresentation = ({
@@ -166,13 +169,15 @@ export const usePublicEventCuePresentation = ({
   locale,
   replayFeedback,
   displayPlayerId,
+  scopeKey = '',
 }: UsePublicEventCuePresentationArgs) => {
   const publicEventNotificationBatchSeqRef = useRef(0)
   const publicEventNotificationTimersRef = useRef<number[]>([])
   const publicEventHighlightTimersRef = useRef<number[]>([])
   const publicEventResourceAnimationTimersRef = useRef<number[]>([])
   const publicEventCardPassAnimationTimersRef = useRef<number[]>([])
-  const lastSeenPublicEventSeqRef = useRef<number | null>(null)
+  const occurrenceCursorRef = useRef<PublicEventOccurrenceCursor | null>(null)
+  const scopeRef = useRef(scopeKey)
   const [publicEventNotifications, setPublicEventNotifications] = useState<PublicEventNotification[]>([])
   const [publicEventHighlights, setPublicEventHighlights] = useState<PublicEventHighlightTargets>(() => emptyPublicEventHighlightTargets())
   const [publicEventResourceAnimations, setPublicEventResourceAnimations] = useState<PublicEventResourceAnimation[]>([])
@@ -202,16 +207,21 @@ export const usePublicEventCuePresentation = ({
   }, [clearPublicEventFeedbackTimers])
 
   useEffect(() => {
+    if (scopeRef.current !== scopeKey) {
+      scopeRef.current = scopeKey
+      occurrenceCursorRef.current = null
+      clearPublicEventFeedback()
+    }
     if (!state) return
     const events = state.events ?? []
     publicEventNotificationBatchSeqRef.current += 1
-    const batch = collectNewPublicEventFeedback(
+    const batch = collectUnseenPublicEventFeedback(
       events,
-      lastSeenPublicEventSeqRef.current,
+      occurrenceCursorRef.current,
       locale,
       `public-batch-${publicEventNotificationBatchSeqRef.current}`,
     )
-    lastSeenPublicEventSeqRef.current = batch.nextCursor
+    occurrenceCursorRef.current = batch.nextCursor
     if (hasPublicEventHighlights(batch.highlights)) {
       setPublicEventHighlights((current) => mergePublicEventHighlights(current, batch.highlights))
       const timer = window.setTimeout(() => {
@@ -258,13 +268,13 @@ export const usePublicEventCuePresentation = ({
         publicEventNotificationTimersRef.current.push(timer)
       })
     }
-  }, [state, locale])
+  }, [state?.events, locale, scopeKey, clearPublicEventFeedback])
 
-  const applySnapshotPublicEventCancellations = useCallback((payload: PublicEventCancellationSnapshotPayload): boolean =>
+  const applySnapshotPublicEventCancellations = useCallback((payload: PublicEventCancellationSnapshotPayload & { state: { events?: readonly GameEvent[] } }): boolean =>
     applyPublicEventCancellationSnapshot(payload, {
       clearPublicEventFeedback,
-      setLastSeenPublicEventSeq: (seq) => {
-        lastSeenPublicEventSeqRef.current = seq
+      setLastSeenPublicEventSeq: () => {
+        occurrenceCursorRef.current = publicEventOccurrenceCursorFor(payload.state.events, occurrenceCursorRef.current ?? undefined)
       },
     }), [clearPublicEventFeedback])
 

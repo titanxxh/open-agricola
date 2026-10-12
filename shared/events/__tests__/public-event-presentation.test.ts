@@ -18,8 +18,10 @@ describe('public event presentation', () => {
     expect(Object.keys(publicEventPresentation).sort()).toEqual([
       'collectNewPublicEventFeedback',
       'collectPublicEventFeedback',
+      'collectUnseenPublicEventFeedback',
       'emptyPublicEventHighlightTargets',
       'maxPublicEventSeq',
+      'publicEventOccurrenceCursorFor',
     ])
   })
 

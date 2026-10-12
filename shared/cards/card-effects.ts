@@ -1,5 +1,6 @@
 import type { ActionFlow, FarmTilePosition, GameState, InteractionRequest, Pasture, PaymentResourceMap, PlayerState, ProtectedObservation, Resource, ResourceKey } from '../contract/types'
 import type { PurchaseOutcomeRule } from '../contract/rule-plans'
+import type { CardPayment } from '../contract/events'
 import type { PrivateGameEvent } from '../contract/private-events'
 import type { CardRuleContributions, CardStatePresentation } from '../contract/card-state'
 import type { AnimalZone, PlayerScoreSummary, ScoreCategoryResult } from '../domain'
@@ -97,6 +98,7 @@ export type PastureCapacityModifier = {
 
 export type PaymentInfo = {
   resourcesPaid: PaymentResourceMap
+  publicPayment?: CardPayment
   feeIndex?: number
   originalFeeIndex?: number
   returnedCardId?: string

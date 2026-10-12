@@ -107,6 +107,33 @@ test('real Room history loads earlier groups, preserves cancellation markers and
   await p1.getByRole('button', { name: 'Load earlier entries', exact: true }).click()
   await expect(p1.getByTestId('room-history-controls').getByRole('button')).toHaveCount(0)
   expect(await rows.count()).toBeGreaterThan(liveRows)
+  const body = p1.locator('.action-log__body')
+  const reading = await body.evaluate(element => {
+    element.scrollTop = element.scrollHeight - element.clientHeight
+    const viewport = element.getBoundingClientRect()
+    const row = [...element.querySelectorAll('[data-testid^="action-log-row-"]')].find(entry => {
+      const bounds = entry.getBoundingClientRect()
+      return bounds.top >= viewport.top + viewport.height / 3 && bounds.bottom <= viewport.bottom
+    })!
+    return { id: row.getAttribute('data-testid')!, y: row.getBoundingClientRect().top }
+  })
+  // Another player advances through a round boundary while p1 reads old entries.
+  for (let index = 0; index < 4; index++) {
+    const current = await resolveRoomWorkPrompts({
+      snapshot: actor => snapshot(pages[actor]!),
+      command: (actor, next) => command(pages[actor]!, next, p1),
+    })
+    const actor = current.state.currentPlayerIndex
+    const actorState = await snapshot(pages[actor]!)
+    const spaceId = ['forest', 'reed-bank', 'fishing', 'day-laborer'].find(id => actorState.actionAvailability?.[id])
+    expect(spaceId).toBeTruthy()
+    await command(pages[actor]!, { type: 'action', spaceId }, p1)
+  }
+  await expect(p1.getByTestId('room-history-controls').getByRole('button')).toHaveCount(0)
+  await expect(p1.getByRole('status').filter({ hasText: 'History updated' })).toHaveCount(0)
+  const anchor = p1.getByTestId(reading.id)
+  await expect(anchor).toBeVisible()
+  await expect.poll(async () => Math.abs((await anchor.boundingBox())!.y - reading.y)).toBeLessThanOrEqual(2)
   await command(p2, { type: 'undoAction' })
   await expect(p1.getByRole('button', { name: 'Load earlier entries', exact: true })).toBeVisible()
   await expect(p1.getByRole('status').filter({ hasText: 'History updated' })).toBeVisible()

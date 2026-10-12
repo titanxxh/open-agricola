@@ -27,7 +27,7 @@ const eventKeysByType: Record<string, readonly string[]> = {
   'resource.moved': ['resources', 'from', 'to', 'reason'],
   'resource.exchanged': ['paid', 'gained', 'paidFrom', 'paidTo', 'gainedFrom', 'gainedTo', 'exchangeSource', 'times'],
   'resource.accumulated': ['resources', 'to', 'silent'],
-  'resource.paid': ['resources', 'to', 'paymentFor', 'paymentSources', 'bonusSources', 'bonusChoiceIndex', 'returnedCardId'],
+  'resource.paid': ['paymentId', 'resources', 'to', 'paymentFor', 'paymentSources', 'bonusSources', 'bonusChoiceIndex', 'returnedCardId'],
   'farm.sown': ['sows', 'placementOnly'],
   'farm.cropAdded': ['crops', 'reason'],
   'farm.cropRemoved': ['crops', 'reason'],
@@ -51,7 +51,7 @@ const eventKeysByType: Record<string, readonly string[]> = {
   'action.granted': ['playerId', 'actionId', 'cardId'],
   'turn.skipped': ['playerId', 'reason'],
   'startPlayer.changed': ['playerId'],
-  'card.played': ['cardId', 'cardType'],
+  'card.played': ['cardId', 'cardType', 'payment'],
   'card.triggered': ['cardId', 'triggerActionId', 'optional', 'accepted', 'replacement'],
   'card.stateChanged': ['cardId', 'key', 'value', 'targetPlayerId'],
   'card.infoboxChanged': ['cardId', 'text', 'targetPlayerId'],
@@ -414,6 +414,7 @@ const assertKnownEventDetails = (type: string, event: Record<string, unknown>): 
       assertResourceLocation(event.to, 'to')
       return
     case 'resource.paid':
+      assertOptionalStringField(event.paymentId, 'paymentId')
       assertPaymentResourceMap(event.resources, 'resources')
       assertStringField(event.paymentFor, 'paymentFor')
       if (event.to !== undefined) assertResourceLocation(event.to, 'to')
@@ -538,6 +539,14 @@ const assertKnownEventDetails = (type: string, event: Record<string, unknown>): 
     case 'card.played':
       assertStringField(event.cardId, 'cardId')
       assertStringField(event.cardType, 'cardType')
+      if (event.payment !== undefined) {
+        const payment = assertRecord(event.payment, 'payment')
+        assertOnlyKeys(payment, ['resources', 'paymentId', 'bonusSources', 'returnedCardId'], 'payment')
+        assertPaymentResourceMap(payment.resources, 'payment.resources')
+        assertOptionalStringField(payment.paymentId, 'payment.paymentId')
+        assertOptionalStringField(payment.returnedCardId, 'payment.returnedCardId')
+        if (payment.bonusSources !== undefined) assertStringArray(payment.bonusSources, 'payment.bonusSources')
+      }
       return
     case 'card.triggered':
       assertStringField(event.cardId, 'cardId')

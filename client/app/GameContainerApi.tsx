@@ -956,6 +956,7 @@ export const GameContainerApi = () => {
     highlightedFenceEdgeIds,
   } = usePublicEventCuePresentation({
     state,
+    scopeKey: wsTransport?.roomId ?? (isLocalMode ? `local:${user?.id ?? 'anon'}` : 'debug'),
     locale,
     replayFeedback,
     displayPlayerId: displayPlayer?.id ?? '',
