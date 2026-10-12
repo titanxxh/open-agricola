@@ -2048,6 +2048,7 @@ export const GameContainerApi = () => {
           <DesktopPublicFarms
             state={state}
             viewedPlayerId={displayPlayer.id}
+            pastureCapacities={pastureCapacities}
             view={farmBoardView}
             actions={farmBoardActions}
           />

@@ -7,9 +7,10 @@ import { buildFarmBoardProjection } from './farm-board-projection'
 type Props = Pick<PlayerFarmPanelProps, 'view' | 'actions'> & {
   state: ClientGameState
   viewedPlayerId: string
+  pastureCapacities: Record<string, Record<string, number>>
 }
 
-export function DesktopPublicFarms({ state, viewedPlayerId, view, actions }: Props) {
+export function DesktopPublicFarms({ state, viewedPlayerId, pastureCapacities, view, actions }: Props) {
   return (
     <section className="desktop-public-farms">
       <h2>{t(view.locale, 'ui.publicFarms')}</h2>
@@ -22,7 +23,7 @@ export function DesktopPublicFarms({ state, viewedPlayerId, view, actions }: Pro
               showHand={false}
               view={{
                 ...view,
-                ...buildFarmBoardProjection({ displayPlayer: player, interaction: { stateId: 'idle', allowedCommands: [], anytimeActions: [] }, selectionInteraction: null, players: state.players, state }),
+                ...buildFarmBoardProjection({ displayPlayer: player, interaction: { stateId: 'idle', allowedCommands: [], anytimeActions: [] }, selectionInteraction: null, players: state.players, state, pastureCapacities }),
                 fieldPositions: new Set(player.fields.map(positionKey)),
                 maxStableSelections: 0,
                 plowSelectableSet: new Set(),

@@ -27,6 +27,11 @@ async function prepareTable(request: APIRequestContext) {
   other.occupationPlayed = ['A119_FirewoodCollector']
   other.minorPlayed = []
   other.cardStates = {}
+  other.pastures = [{ id: 'public-pasture', size: 1, tiles: [{ row: 1, col: 4 }], stables: 1, animalType: 'sheep', animalCount: 3 }]
+  other.stableTiles = [{ row: 1, col: 4 }]
+  other.fenceSegments = ['H-1-4', 'H-2-4', 'V-1-4', 'V-1-5'].map(edge => ({ edge, type: 'fence', source: { kind: 'own', ownerPlayerId: other.id } }))
+  other.fences = 4
+  other.resources.sheep = 3
   expect((await postJson(request, `${BACKEND_URL}/api/game/load`, { state })).ok).toBe(true)
 }
 
@@ -39,11 +44,15 @@ for (const width of [2239, 1920, 1440]) {
     await expect(page.locator('.game-layout__hand .hand-cards')).toBeVisible()
     await expect(page.locator('.game-layout__center .hand-cards')).toHaveCount(0)
     await expect(page.locator('.desktop-public-farm[data-player-id="p2"] .farm-grid')).toBeVisible()
+    await expect(page.locator('.desktop-public-farm[data-player-id="p2"] [data-farm-tile-key="1-4"] .pasture-count').first()).toHaveText('3/4')
     await expect(page.locator('.desktop-public-farms .hand-cards')).toHaveCount(0)
     await expect(page.locator('.desktop-public-farms [data-card-anchor="A102_Grocer"]')).toHaveCount(0)
     await expect(page.locator('.game-layout__center .resource-clay .resource-chip-count')).toHaveText('8')
     await expect(page.getByTestId('played-card-held-worker-C022_BasketChair')).toBeVisible()
     await expect(page.locator('.seasons-board__map--compact')).toBeVisible()
+    const compactSeasons = await page.locator('.seasons-board__space-button').evaluateAll(buttons => buttons.map(button => ({ season: button.getAttribute('data-season'), left: button.getBoundingClientRect().left })))
+    expect(compactSeasons.map(button => button.season)).toEqual(['winter', 'spring', 'summer', 'autumn'])
+    expect(compactSeasons.map(button => button.left)).toEqual([...compactSeasons.map(button => button.left)].sort((a, b) => a - b))
 
     const geometry = await page.evaluate(() => {
       const center = document.querySelector('.game-layout__center')
@@ -89,6 +98,7 @@ for (const width of [2239, 1920, 1440]) {
     await expect(page.locator('.game-layout__hand')).toHaveCount(0)
     await expect(page.locator('.desktop-public-farms')).toHaveCount(0)
     await expect(page.locator('.seasons-board__map--compact')).toHaveCount(0)
+    expect(await page.locator('.seasons-board__space-button').evaluateAll(buttons => buttons.map(button => button.getAttribute('data-season')))).toEqual(['winter', 'spring', 'autumn', 'summer'])
     expect(await page.locator('.game-layout__center .played-row .player-card').first().evaluate(element => element.getBoundingClientRect().width)).toBeLessThan(50)
     await page.setViewportSize({ width, height: 1271 })
     await expect(page.locator('.game-layout__hand .hand-cards')).toBeVisible()
