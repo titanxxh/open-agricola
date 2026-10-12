@@ -1858,7 +1858,7 @@ export const GameContainerApi = () => {
             currentPlayerId={currentPlayer.id}
             availability={currentPlayer.moorSpecialActionAvailability}
             canTakeSpecialAction={canTakeSpecialAction}
-            selected={selectedSpecialAction}
+            selected={isPublicFarmView ? null : selectedSpecialAction}
             onTakeAction={takeSpecialAction}
           />
         </section>
