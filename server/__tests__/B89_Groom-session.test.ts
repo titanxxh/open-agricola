@@ -41,13 +41,13 @@ describe('B089_Groom session', () => {
     expect(leaf.params).toEqual({ wood: 1 })
   })
 
-  it('onBeforeStartOfTurn in stone house returns single optional stables leaf with internal cost', () => {
+  it('onRoundStart in stone house returns single optional stables leaf with internal cost', () => {
     const session = setup({ houseType: 'stone' })
     const state = session.getState().state
     const player = state.players[0]!
     player.resources.wood = 3 // enough for stable
 
-    const flow = runCardEffectHook(state, player, 'B089_Groom', 'onBeforeStartOfTurn')
+    const flow = runCardEffectHook(state, player, 'B089_Groom', 'onRoundStart')
     expect(flow).not.toBeNull()
     expect(flow!.type).toBe('leaf')
     const leaf = flow as Extract<ActionFlow, { type: 'leaf' }>
@@ -58,13 +58,13 @@ describe('B089_Groom session', () => {
     expect(leaf.actionContext?.costOverride).toBeUndefined()
   })
 
-  it('onBeforeStartOfTurn in stone house with 0 wood: still emits trigger (no upfront block)', () => {
+  it('onRoundStart in stone house with 0 wood: still emits trigger (no upfront block)', () => {
     const session = setup({ houseType: 'stone' })
     const state = session.getState().state
     const player = state.players[0]!
     player.resources.wood = 0
 
-    const flow = runCardEffectHook(state, player, 'B089_Groom', 'onBeforeStartOfTurn')
+    const flow = runCardEffectHook(state, player, 'B089_Groom', 'onRoundStart')
     // The reference does not block at trigger time — payability is checked when player
     // chooses to act. Effect must still emit the leaf.
     expect(flow).not.toBeNull()
@@ -74,23 +74,23 @@ describe('B089_Groom session', () => {
     expect(leaf.optional).toBe(true)
   })
 
-  it('onBeforeStartOfTurn does not trigger in clay house', () => {
+  it('onRoundStart does not trigger in clay house', () => {
     const session = setup({ houseType: 'clay' })
     const state = session.getState().state
     const player = state.players[0]!
     player.resources.wood = 3
 
-    const flow = runCardEffectHook(state, player, 'B089_Groom', 'onBeforeStartOfTurn')
+    const flow = runCardEffectHook(state, player, 'B089_Groom', 'onRoundStart')
     expect(flow).toBeNull()
   })
 
-  it('onBeforeStartOfTurn does not trigger in wood house', () => {
+  it('onRoundStart does not trigger in wood house', () => {
     const session = setup({ houseType: 'wood' })
     const state = session.getState().state
     const player = state.players[0]!
     player.resources.wood = 3
 
-    const flow = runCardEffectHook(state, player, 'B089_Groom', 'onBeforeStartOfTurn')
+    const flow = runCardEffectHook(state, player, 'B089_Groom', 'onRoundStart')
     expect(flow).toBeNull()
   })
 })
@@ -216,7 +216,7 @@ describe('B089 Groom parity', () => {
     const response = startNextRound(setup({ wood: 0 }))
 
     expect(options(response).filter((option) => option.value !== '__skip__'
-      && option.sourceCard === CARD_ID)).toHaveLength(0)
+      && option.sourceCard === CARD_ID && !option.disabled)).toHaveLength(0)
     expect(response.state.players[0]!.stableTiles).toHaveLength(0)
     expect(response.state.players[0]!.resources.wood).toBe(0)
   })

@@ -7,10 +7,10 @@ const CARD_ID = 'B114_Childless'
 const cardImpl = {
   effect: {
   id: CARD_ID,
-  onRoundStart: (_state, player) => {
+  stageEligibility: { onRoundStart: (_state, player) => player.roomTiles.length >= 3 && familySize(player) === 2 },
+  onRoundStart: (_state, player, ctx) => {
     const roomCount = player.roomTiles.length
-    if (roomCount < 3) return
-    if (familySize(player) !== 2) return
+    if (!ctx?.roundPreparation && (roomCount < 3 || familySize(player) !== 2)) return
     return {
       type: 'xor',
       children: [

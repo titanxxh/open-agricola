@@ -7,9 +7,10 @@ const CARD_ID = 'B118_SmallscaleFarmer'
 const cardImpl = {
   effect: {
   id: CARD_ID,
-  onRoundStart: (_state, player) => {
+  stageEligibility: { onRoundStart: (_state, player) => player.roomTiles.length === 2 },
+  onRoundStart: (_state, player, ctx) => {
     const roomCount = player.roomTiles.length
-    if (roomCount !== 2) return
+    if (!ctx?.roundPreparation && (roomCount !== 2)) return
     return gainLeaf(CARD_ID, { wood: 1 })
   },
 },

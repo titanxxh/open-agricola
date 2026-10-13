@@ -242,7 +242,7 @@ describe('formatCost migrated card flows', () => {
       occupationPlayed: ['B089_Groom'],
     })
     const gameState = state(actor)
-    const flow = runCardEffectHook(gameState, actor, 'B089_Groom', 'onBeforeStartOfTurn')
+    const flow = runCardEffectHook(gameState, actor, 'B089_Groom', 'onRoundStart')
     const leaf = expectLeaf(flow, 'stables')
     expect(leaf.actionContext).toMatchObject({ max: 1, exactCost: { wood: 1, max: 1 } })
     expectNoLegacyCostFields(leaf)

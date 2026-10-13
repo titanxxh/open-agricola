@@ -21,8 +21,9 @@ const freeFencingLeaf = (max: number) => ({
 const cardImpl = {
   effect: {
   id: CARD_ID,
-  onRoundStart: (_state, player) => {
-    if (player.houseType !== 'stone') return
+  stageEligibility: { onRoundStart: (_state, player) => player.houseType === 'stone' },
+  onRoundStart: (_state, player, ctx) => {
+    if (!ctx?.roundPreparation && (player.houseType !== 'stone')) return
 
     const wood = player.resources.wood ?? 0
     if (wood < 2) return

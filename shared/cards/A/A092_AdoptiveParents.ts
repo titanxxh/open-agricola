@@ -3,7 +3,7 @@ import type { ActionFlow, GameState, PlayerState } from '../../contract/types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookResult } from '../../actions/hooks'
 import { payLeaf } from '../helpers/pay-gain-node'
-import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
+import { readCardExtraData } from '../helpers/card-state'
 import { newbornCount, workersAvailable } from '../../domain/player'
 import type { CardImpl } from '../registry'
 
@@ -142,9 +142,10 @@ const cardImpl = {
       if (!adoptiveAvailable(player)) return 0
       return Math.min(newbornCount(player), player.resources.food)
     },
-    onRoundStart: (_state: GameState, player: PlayerState): void => {
+    onBeforeStartOfTurn: (_state, player) => {
       if (isForfeited(player)) {
-        writeCardExtraData(player, CARD_ID, FORFEITED_KEY, false)
+        return { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID,
+          params: { kind: 'set-extra-data', key: FORFEITED_KEY, value: false } }
       }
     },
   },

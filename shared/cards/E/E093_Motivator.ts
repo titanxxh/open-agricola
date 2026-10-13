@@ -2,7 +2,7 @@ import { defineOccupationCard } from '../card-source'
 import { getRoundPlacementOrder } from '../helpers/round-placement'
 import { hasNoUnusedFarmyardSpaces } from '../../domain/farm'
 import { hasInactiveWorkerInSupply } from '../../domain/player'
-import { isCardFlagged, setCardFlag } from '../helpers/card-state'
+import { isCardFlagged } from '../helpers/card-state'
 import { supplyWorkerTurnFlow, consumeSupplyWorkerTurn } from '../helpers/supply-worker-flow'
 import type { CardImpl } from '../registry'
 
@@ -12,8 +12,8 @@ const cardImpl = {
   effect: {
   id: CARD_ID,
   extraTurnBeforeWorkers: true,
-  onRoundStart: (_state, player) => { setCardFlag(player, CARD_ID, false) },
-  onEndTurn: (_state, player) => { setCardFlag(player, CARD_ID, true) },
+  onRoundStart: () => ({ type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: false } }),
+  onEndTurn: () => ({ type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: true } }),
   contributeExtraTurn: (state, player) => {
     if (getRoundPlacementOrder(player).length !== 0 || isCardFlagged(player, CARD_ID)) return
     if (!hasNoUnusedFarmyardSpaces(player) || !hasInactiveWorkerInSupply(player)) return

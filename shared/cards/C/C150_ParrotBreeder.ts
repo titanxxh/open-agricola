@@ -5,8 +5,6 @@ import type { PlayerState } from '../../contract/types'
 import {
   isCardFlagged,
   readCardExtraData,
-  setCardFlag,
-  writeCardExtraData,
 } from '../helpers/card-state'
 import { payLeaf } from '../helpers/pay-gain-node'
 import { getRoundPlacementOrder } from '../helpers/round-placement'
@@ -53,11 +51,6 @@ const rightNeighbourIndex = (state: { players: PlayerState[] }, ownerId: string)
   const ownerIdx = state.players.findIndex((p) => p.id === ownerId)
   if (ownerIdx < 0) return -1
   return (ownerIdx - 1 + n) % n
-}
-
-const clearTracker = (owner: PlayerState) => {
-  writeCardExtraData(owner, CARD_ID, RIGHT_KEY, null)
-  setCardFlag(owner, CARD_ID, false)
 }
 
 const trackerFlow = (
@@ -205,7 +198,7 @@ const cardImpl = {
     id: CARD_ID,
     // Defensive clear at round start so a dropped after-place hook can never
     // leak state across rounds.
-    onBeforeStartOfTurn: (_state, player) => clearTracker(player),
+    onBeforeStartOfTurn: () => trackerFlow(null).flow,
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl

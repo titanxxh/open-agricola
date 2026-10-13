@@ -22,7 +22,7 @@ const CARD_ID = 'B124_Trimmer'
  *
  * Implementation:
  * - We track pasture-covered tile count in extraData.
- * - onBeforeStartOfTurn: unflag (start of work phase)
+ * - onWorkStart: unflag (start of work phase)
  * - onReturnHome: flag (prevent triggering)
  * - afterFencing: if total pasture tile count increased → 2 stone. Update count.
  */
@@ -73,11 +73,12 @@ const cardImpl = {
     // If bought during work phase, unflag to allow triggering
     setCardFlag(player, CARD_ID, false)
   },
-  onBeforeStartOfTurn: (_state, player) => {
+  onWorkStart: (_state, player) => {
     // Unflag at start of work phase to allow triggering
-    setCardFlag(player, CARD_ID, false)
-    // Update stored area for comparison
-    setStoredArea(player, countPastureTiles(player))
+    return { type: 'seq', children: [
+      specialEffect({ kind: 'set-flag', flag: false }),
+      specialEffect({ kind: 'set-extra-data', key: 'pastureArea', value: countPastureTiles(player) }),
+    ] }
   },
   onReturnHome: (_state, player) => {
     // Flag at return home to prevent triggering outside work phase

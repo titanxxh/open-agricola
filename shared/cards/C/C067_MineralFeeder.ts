@@ -49,8 +49,9 @@ registerAdHocAction(postReorgCheckAction)
 const cardImpl = {
   effect: {
     id: CARD_ID,
-    onBeforeStartOfTurn: (state, player): ActionFlow | undefined => {
-      if (harvestRounds.includes(state.round)) return
+    stageEligibility: { onRoundStart: (state) => !harvestRounds.includes(state.round) },
+    onRoundStart: (state, player, ctx): ActionFlow | undefined => {
+      if (!ctx?.roundPreparation && harvestRounds.includes(state.round)) return
       if (hasSheepInPasture(player)) return gainLeaf(CARD_ID, { grain: 1 })
       if (!hasSheepAnywhere(player) || !hasPasture(player)) return
       return {

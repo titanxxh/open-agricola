@@ -7,9 +7,9 @@ const CARD_ID = 'A076_Cob'
 const cardImpl = {
   effect: {
   id: CARD_ID,
-  onRoundStart: (_state, player) => {
-    if ((player.resources.clay ?? 0) < 1) return
-    if ((player.resources.grain ?? 0) < 1) return
+  stageEligibility: { onWorkStart: (_state, player) => player.resources.clay >= 1 },
+  onWorkStart: (_state, player, ctx) => {
+    if (!ctx?.roundPreparation && ((player.resources.clay ?? 0) < 1)) return
     return payGainFlow({
       cardId: CARD_ID,
       cost: { grain: 1 },

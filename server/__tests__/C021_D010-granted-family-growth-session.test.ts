@@ -48,7 +48,11 @@ const acceptCardChoice = (
 describe('card-granted family growth does not expand Wish for Children', () => {
   it('C021 accepts its Quarry reveal growth without granting a minor improvement', () => {
     const session = setupRoundEnd('C021_HeartofStone', 5)
-    session.state.roundActionOrder[5] = 'western-quarry'
+    const order = session.state.roundActionOrder
+    const oldQuarrySlot = order.indexOf('western-quarry')
+    const replaced = order[5]
+    if (oldQuarrySlot !== -1 && replaced) order[oldQuarrySlot] = replaced
+    order[5] = 'western-quarry'
     session.loadState(session.state)
 
     const response = acceptCardChoice(session, session.performRoundEnd(), 'C021_HeartofStone')

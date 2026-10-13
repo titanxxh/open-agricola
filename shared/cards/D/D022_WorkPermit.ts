@@ -43,7 +43,7 @@ const cardImpl = {
     writeCardInfobox(player, CARD_ID, `Round ${targetRound}`)
   },
   timedRules: [
-    { retainAfterCardLeaves: true, key: 'release-supply-reservation', at: { kind: 'card-round', fact: TARGET_ROUND_KEY, phase: 'onBeforeStartOfTurn' }, body: { kind: 'operation', operation: { kind: 'release-reserved-worker', workerFact: 'reservedWorkerId' } } },
+    { retainAfterCardLeaves: true, key: 'release-supply-reservation', at: { kind: 'card-round', fact: TARGET_ROUND_KEY, phase: 'onRoundStart' }, body: { kind: 'operation', operation: { kind: 'release-reserved-worker', workerFact: 'reservedWorkerId' } } },
     ...supplyTurnRules,
   ],
   extraTurnBeforeWorkers: true,

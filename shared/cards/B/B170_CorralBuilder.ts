@@ -1,5 +1,5 @@
 import { defineOccupationCard } from '../card-source'
-import type { ActionFlow, GameState, PlayerState } from '../../contract/types'
+import type { ActionFlow } from '../../contract/types'
 import { canStartFencing } from '../../actions/effects/fencing'
 import type { CardImpl } from '../registry'
 
@@ -25,16 +25,14 @@ const oneSpacePastureFlow = (): ActionFlow => ({
   actionContext: ONE_SPACE_PASTURE_CONTEXT,
 })
 
-const revealedThisRound = (state: GameState): string | null => {
-  const actionId = state.roundActionOrder[state.round - 1]
-  return REVEAL_SPACES.has(actionId ?? '') ? actionId ?? null : null
-}
-
 const cardImpl = {
   effect: {
     id: CARD_ID,
-    onBeforeStartOfTurn: (state: GameState, player: PlayerState) => {
-      if (!revealedThisRound(state)) return
+    stageEligibility: { onAfterRevealAction: (_state, _player, ctx) =>
+      ctx.roundPreparation?.kind === 'after-reveal' && REVEAL_SPACES.has(ctx.roundPreparation.revealedAction?.actionId ?? ''),
+    },
+    onAfterRevealAction: (state, player, ctx) => {
+      if (ctx?.roundPreparation?.kind !== 'after-reveal' || !REVEAL_SPACES.has(ctx.roundPreparation.revealedAction?.actionId ?? '')) return
       if (!canStartFencing(state, player, undefined, ONE_SPACE_PASTURE_CONTEXT)) return
       return oneSpacePastureFlow()
     },

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { getCardEffect, runCardEffectHook } from '../../shared/cards/card-effects'
+import { getCardEffect } from '../../shared/cards/card-effects'
 
 import '../../shared/cards/B/B110_Pavior'
 import type { ActionFlow } from '../../shared/contract/types'
@@ -8,7 +8,7 @@ import type { ActionFlow } from '../../shared/contract/types'
 const CARD_ID = 'B110_Pavior'
 
 describe('B110_Pavior session', () => {
-  it('onRoundStart gives 1 food when player has stone', () => {
+  it('onEndPreparation gives 1 food when player has stone', () => {
     const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -23,13 +23,13 @@ describe('B110_Pavior session', () => {
 
     const effect = getCardEffect(CARD_ID)
     expect(effect).toBeDefined()
-    const flow = effect!.onRoundStart!(state, player)
+    const flow = effect!.onEndPreparation!(state, player)
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('leaf')
     expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params?.food).toBe(1)
   })
 
-  it('onRoundStart does not trigger when player has no stone', () => {
+  it('onEndPreparation does not trigger when player has no stone', () => {
     const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -43,11 +43,11 @@ describe('B110_Pavior session', () => {
     session.loadState(state)
 
     const effect = getCardEffect(CARD_ID)
-    const flow = effect!.onRoundStart!(state, player)
+    const flow = effect!.onEndPreparation!(state, player)
     expect(flow).toBeUndefined()
   })
 
-  it('onRoundStart gives 1 vegetable in round 14', () => {
+  it('onEndPreparation gives 1 vegetable in round 14', () => {
     const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -61,14 +61,14 @@ describe('B110_Pavior session', () => {
     session.loadState(state)
 
     const effect = getCardEffect(CARD_ID)
-    const flow = effect!.onRoundStart!(state, player)
+    const flow = effect!.onEndPreparation!(state, player)
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('leaf')
     expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params?.vegetable).toBe(1)
     expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params?.food).toBeUndefined()
   })
 
-  it('onRoundStart gives food (not vegetable) in rounds other than 14', () => {
+  it('onEndPreparation gives food (not vegetable) in rounds other than 14', () => {
     const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -81,7 +81,7 @@ describe('B110_Pavior session', () => {
     session.loadState(state)
 
     const effect = getCardEffect(CARD_ID)
-    const flow = effect!.onRoundStart!(state, player)
+    const flow = effect!.onEndPreparation!(state, player)
     expect(flow).toBeDefined()
     expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params?.food).toBe(1)
     expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params?.vegetable).toBeUndefined()

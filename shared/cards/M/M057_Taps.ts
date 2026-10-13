@@ -2,7 +2,7 @@ import { defineMinorCard } from '../card-source'
 import type { ActionFlow, GameState, PlayerState } from '../../contract/types'
 import { MOOR_SPECIAL_ACTION_CHOICE_ACTION_ID, hasMoorSpecialActionChoice } from '../../moor/special-action-flow'
 import { workersAvailable } from '../../domain/player'
-import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
+import { readCardExtraData } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'M057_Taps'
@@ -46,8 +46,9 @@ const cardImpl = {
     },
     countExtraTurns: (state: GameState, player: PlayerState): number =>
       tapsAvailable(state, player) ? 1 : 0,
-    onRoundStart: (_state: GameState, player: PlayerState): void => {
-      if (isUsed(player)) writeCardExtraData(player, CARD_ID, USED_KEY, false)
+    onWorkStart: (_state, player) => {
+      if (isUsed(player)) return { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID,
+        params: { kind: 'set-extra-data', key: USED_KEY, value: false } }
     },
   },
   reaches: [] as readonly string[],

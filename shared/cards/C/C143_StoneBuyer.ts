@@ -1,7 +1,7 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { isCardFlagged, setCardFlag } from '../helpers/card-state'
+import { isCardFlagged } from '../helpers/card-state'
 import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 
@@ -45,9 +45,7 @@ const cardImpl = {
       },
     ],
   }),
-  onBeforeStartOfTurn: (_state, player) => {
-    setCardFlag(player, CARD_ID, false)
-  },
+  onRoundStart: () => ({ type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: false } }),
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl

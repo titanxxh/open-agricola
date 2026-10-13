@@ -7,7 +7,7 @@ const CARD_ID = 'B110_Pavior'
 const cardImpl = {
   effect: {
   id: CARD_ID,
-  onRoundStart: (state, player) => {
+  onEndPreparation: (state, player) => {
     if (player.resources.stone < 1) return
     const resource = state.round === 14 ? 'vegetable' : 'food'
     return gainLeaf(CARD_ID, { [resource]: 1 })

@@ -6,8 +6,9 @@ const CARD_ID = 'E126_TaxCollector'
 const cardImpl = {
   effect: {
   id: CARD_ID,
-  onRoundStart: (_state, player) => {
-    if (player.houseType !== 'stone') return
+  stageEligibility: { onRoundStart: (_state, player) => player.houseType === 'stone' },
+  onRoundStart: (_state, player, ctx) => {
+    if (!ctx?.roundPreparation && (player.houseType !== 'stone')) return
     return {
       type: 'xor',
       optional: true,

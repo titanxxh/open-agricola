@@ -64,10 +64,8 @@ const listener: CardListenerRegistration = {
 
 const effect: CardEffect = {
   id: CARD_ID,
-  onBeforeStartOfTurn: (_state, player) => {
-    const extra = player.cardStates?.[CARD_ID]?.extraData
-    if (extra) delete extra.skipNextPlacement
-  },
+  onEndPreparation: () => ({ type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID,
+    params: { kind: 'set-extra-data', key: 'skipNextPlacement', value: 0 } }),
   timedRules: [{ retainAfterCardLeaves: true, key: 'next-turn-placement-skip', at: { kind: 'card-positive', fact: 'skipNextPlacement', roundFact: 'skipRound', clock: 'current-round', phase: 'onBeforePlayerTurn' }, body: { kind: 'operation', operation: skipOperation } }],
   onBeforePlayerTurn: (_state, player) => consumePlannedTurnSkip(player, CARD_ID, skipOperation) ? { skipTurn: true } : undefined,
 }

@@ -7,9 +7,10 @@ const CARD_ID = 'C123_Freemason'
 const cardImpl = {
   effect: {
   id: CARD_ID,
-  onRoundStart: (_state, player) => {
+  stageEligibility: { onWorkStart: (_state, player) => player.roomTiles.length === 2 && (player.houseType === 'clay' || player.houseType === 'stone') },
+  onWorkStart: (_state, player, ctx) => {
     const roomCount = player.roomTiles.length
-    if (roomCount !== 2) return
+    if (!ctx?.roundPreparation && (roomCount !== 2)) return
     if (player.houseType === 'stone') {
       return gainLeaf(CARD_ID, { stone: 2 })
     }

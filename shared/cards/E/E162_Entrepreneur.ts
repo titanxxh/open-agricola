@@ -13,7 +13,7 @@ const getMissingBuildingResources = (player: { resources: Resource }): (keyof Re
 const cardImpl = {
   effect: {
   id: CARD_ID,
-  onBeforeStartOfTurn: (_state, player) => {
+  onRoundStart: (_state, player) => {
 
     const missingResources = getMissingBuildingResources(player)
     if (missingResources.length === 0) return

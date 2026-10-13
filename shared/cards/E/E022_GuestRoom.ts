@@ -1,6 +1,6 @@
 import { defineMinorCard } from '../card-source'
 import { registerAdHocAction } from '../../actions/helpers/ad-hoc-action-registry'
-import { getCardStack, pushToCardStack, popFromCardStack, isCardFlagged, setCardFlag, writeCardInfobox } from '../helpers/card-state'
+import { getCardStack, pushToCardStack, popFromCardStack, isCardFlagged, writeCardInfobox } from '../helpers/card-state'
 import { hasInactiveWorkerInSupply } from '../../domain/player'
 import { supplyWorkerTurnFlow, consumeSupplyWorkerTurn } from '../helpers/supply-worker-flow'
 import type { ActionDefinition, PlayerState } from '../../contract/types'
@@ -65,7 +65,7 @@ const cardImpl = {
       return { ...request, availableByResource: { food: player.resources.food } }
     },
     onBuy: () => ({ type: 'leaf', actionId: FOOD_ACTION, sourceCard: CARD_ID }),
-    onRoundStart: (_state, player) => { setCardFlag(player, CARD_ID, false) },
+    onRoundStart: () => ({ type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: false } }),
     extraTurnBeforeWorkers: true,
     contributeExtraTurn: (state, player) => {
       if (isCardFlagged(player, CARD_ID) || getCardStack(player, CARD_ID).length === 0 || !hasInactiveWorkerInSupply(player)) return
