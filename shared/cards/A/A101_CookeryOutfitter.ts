@@ -7,10 +7,7 @@ const CARD_ID = 'A101_CookeryOutfitter'
 const cardImpl = {
   effect: {
     id: CARD_ID,
-    computeBonusScore: (_state, player) => {
-      const improvements = player.improvements ?? []
-      return getPlayerCookeryCards(player).filter((c) => improvements.includes(c.id)).length
-    },
+    computeBonusScore: (_state, player) => getPlayerCookeryCards(player).length,
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl
