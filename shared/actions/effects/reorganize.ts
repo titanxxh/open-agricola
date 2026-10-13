@@ -150,7 +150,7 @@ const preservedHostedZoneEntries = (
   return preserved
 }
 
-export const applyReorganizeMutate = (
+const applyReorganizeMutate = (
   state: GameState,
   player: PlayerState,
   zones: ZoneAssignment[],
@@ -219,21 +219,10 @@ export const applyReorganizeMutate = (
     const useZoneStorage = cardZones.length > 1 || cardZones.some((zone) =>
       zone.id !== buildCardAnimalZoneId(cardId) || zone.farmPosition
     )
-    const exclusiveLimit = Math.max(
-      0,
-      Math.floor(cardZones.find((zone) => zone.occupiedZoneLimit !== undefined)?.occupiedZoneLimit ?? Number.POSITIVE_INFINITY),
-    )
-    let occupiedExclusiveZones = 0
     for (const zone of cardZones) {
       allowedTypesByZone.set(zone.id, getAllowedAnimalTypesForZone(state, player, zone))
       const assigned = cardAssignmentForZone(zone.id)
-      let counts = normalizeAnimalCountsForZone(state, player, zone, assigned)
-      if (sumAnimalCounts(counts) > 0 && occupiedExclusiveZones >= exclusiveLimit) {
-        counts = createAnimalCounts(state.enableFarmersOfTheMoor === true)
-      }
-      if (sumAnimalCounts(counts) > 0 && Number.isFinite(exclusiveLimit)) {
-        occupiedExclusiveZones += 1
-      }
+      const counts = normalizeAnimalCountsForZone(state, player, zone, assigned)
       countsByZone.set(zone.id, counts)
       addAnimalCounts(assignedCounts, counts, animalKeys)
     }

@@ -190,7 +190,7 @@ viewer 投影 `filterSerializedStateForPlayer` 对所有座位和旁观者去掉
 - 身份：`id` / `name` / `color`
 - 经营：`resources` / `familySize` / `workersAvailable` / `rooms` / `houseType`
 - 农场：`fields`（多堆 `CropStack[]`）/ `roomTiles` / `stableTiles` / `fenceSegments` / `pastures` / FoM `farmTerrain`（top `kind` + optional `covered`）/ `farmyardExtensions` / `farmyardSpaceStates`
-- 动物：`houseAnimalType` / `houseAnimalCount` / `stableAnimals` / `newbornCount`
+- 动物：`houseAnimals`（按房间坐标安置） / `stableAnimals` / `newbornCount`
 - 出牌：`improvements` / `minorPlayed` / `occupationPlayed`
 - 手牌：`minorHand` / `occupationHand`
 - 持续效果：`majorEffects` / `activeModifiers`
