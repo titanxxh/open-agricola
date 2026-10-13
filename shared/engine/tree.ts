@@ -90,6 +90,7 @@ export class EngineTree {
     const replacement = new SequenceNode(`pre-${nodeId}`, [...nodes, found.node])
     if (parent instanceof OrNode || parent instanceof XorNode) {
       parent.children[index] = replacement
+      if (parent.selectedChildId === nodeId) parent.selectedChildId = replacement.id
       return true
     }
     return false
@@ -111,6 +112,7 @@ export class EngineTree {
     const replacement = new SequenceNode(`chain-${node.id}`, [node, ...nodes])
     if (parent instanceof OrNode || parent instanceof XorNode) {
       parent.children[index] = replacement
+      if (parent.selectedChildId === nodeId) parent.selectedChildId = replacement.id
       return true
     }
     return false
