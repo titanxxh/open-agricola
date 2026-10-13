@@ -1,8 +1,10 @@
-import type { ActionDefinition, ActionExecutionContext, ActionFlow, BonusModifier } from '../contract/types'
+import type { ActionDefinition, ActionExecutionContext, ActionMutationContext, ActionFlow, BonusModifier } from '../contract/types'
 import type { RuleFixedOperation } from '../contract/rule-fixed-operations'
 import { getLogicalFields, mutateLogicalFields } from '../cards/helpers/card-field'
 import { readCardExtraData, writeCardExtraData } from '../cards/helpers/card-state'
+import { getExtraRoomCapacity } from '../cards/card-effects'
 import { familySize } from '../domain/player'
+import { releaseSupplyWorker } from '../domain/supply-workers'
 import { isSyntheticLinkedOccupancy } from '../domain/space'
 import { getOwnOrdinaryFenceReserveCount } from '../domain/supply-tokens'
 import { parsePositionKey } from '../domain/farm'
@@ -55,7 +57,7 @@ const exchange = (cardId: string, operation: Extract<RuleFixedOperation, { kind:
   ],
 })
 
-export const executeFixedRuleOperation = (operation: RuleFixedOperation, context: ActionExecutionContext): ReturnType<ActionDefinition['execute']> => {
+export const executeFixedRuleOperation = (operation: RuleFixedOperation, context: ActionMutationContext): ReturnType<ActionDefinition['execute']> => {
   const { state, player, sourceCard } = context
   if (!sourceCard) return { type: 'fail', errorKey: 'log.cardEffectFail' }
   switch (operation.kind) {
@@ -74,13 +76,18 @@ export const executeFixedRuleOperation = (operation: RuleFixedOperation, context
     }
     case 'expire-extra-room': {
       if (readCardExtraData<unknown>(player, sourceCard, operation.fact) !== true) return { type: 'ok' }
-      if (operation.removeUnhousedWorker && player.rooms < familySize(player)) {
-        const active = player.workers.filter(worker => worker.isActive)
-        const atHome = active.filter(worker => !state.actionSpaces.some(space => space.takenBy.some(ref => ref.playerId === player.id && ref.workerId === worker.id)))
-        const victim = [...(atHome.length ? atHome : active)].sort((a, b) => Number(b.id) - Number(a.id))[0]
-        if (victim) { victim.isActive = false; victim.isNewborn = false }
-      }
       writeCardExtraData(player, sourceCard, operation.fact, false)
+      if (operation.removeUnhousedWorker && player.rooms + getExtraRoomCapacity(player) < familySize(player)) {
+        const victim = player.workers.find(worker => worker.isActive)
+        if (victim) {
+          victim.removedFromSupply = true
+          releaseSupplyWorker(state, player, victim)
+          context.eventSink?.emit<'worker.returned'>({
+            type: 'worker.returned', to: 'removed',
+            workers: [{ playerId: player.id, workerId: victim.id }], sourceCardId: sourceCard,
+          })
+        }
+      }
       return { type: 'ok' }
     }
     case 'collect-board-resources': {
