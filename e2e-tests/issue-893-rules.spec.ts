@@ -94,8 +94,10 @@ test('D159 public multi-player sale supports cooking and a chosen buyer', async 
   game.players[1].houseAnimalType = 'sheep'
   game.players[1].houseAnimalCount = 1
   await sendDebugCommand(pages[0]!, { type: 'loadGame', state: game, requestId: 'audit-setup' })
-  await expect(pages[0]!.getByRole('button', { name: 'Reed Seller: Sell 1 Reed' })).toBeVisible()
-  await pages[0]!.getByRole('button', { name: 'Reed Seller: Sell 1 Reed' }).click()
+  const sale = pages[0]!.locator('[data-anytime-action-id="D159-reed-seller-anytime"]')
+  await expect(sale).toContainText('Reed Seller')
+  await expect(sale.getByRole('img', { name: '1 Reed', exact: true })).toBeVisible()
+  await sale.click()
   for (let index = 1; index < 4; index++) {
     const previous = pages[index - 1]!
     const current = pages[index]!
@@ -104,24 +106,27 @@ test('D159 public multi-player sale supports cooking and a chosen buyer', async 
     if (snapshot.interaction.request.kind === 'confirm-player-switch') {
       await previous.locator('.interaction-bar').getByRole('button', { name: /Confirm/i }).click()
     }
-    await expect(current.getByRole('button', { name: 'Buy 1 Reed for 2 Food' })).toBeVisible()
-    await expect(pages[0]!.getByRole('button', { name: 'Buy 1 Reed for 2 Food' })).toHaveCount(0)
+    const buy = current.locator('.interaction-bar [data-choice-value="buy"]')
+    await expect(buy).toBeVisible()
+    await expect(buy.getByRole('img', { name: '1 Reed', exact: true })).toBeVisible()
+    await expect(buy.getByRole('img', { name: '2 Food', exact: true })).toBeVisible()
+    await expect(pages[0]!.locator('.interaction-bar [data-choice-value="buy"]')).toHaveCount(0)
     if (index === 1) {
       await current.locator('.anytime-bar').getByRole('button').filter({ hasText: /Exchange|Convert/i }).first().click()
       const recipe = current.getByTestId('anytime-exchange-option-Major_Fireplace1-ex0')
       await expect(recipe).toBeVisible()
       await recipe.getByRole('button', { name: '+', exact: true }).click()
       await current.locator('.exchange-confirm').click()
-      await expect(current.getByRole('button', { name: 'Buy 1 Reed for 2 Food' })).toBeVisible()
+      await expect(buy).toBeVisible()
       await expect.poll(async () => (await state(current)).state.players[1]!.resources.food).toBe(3)
       await current.screenshot({ path: '/tmp/oa-893-buyer-cooking.png' })
     }
-    await current.getByRole('button', { name: index === 3 ? 'Decline' : 'Buy 1 Reed for 2 Food', exact: true }).click()
+    await current.locator(`.interaction-bar [data-choice-value="${index === 3 ? 'decline' : 'buy'}"]`).click()
   }
   await expect.poll(async () => (await state(pages[3]!)).interaction.request?.kind).toBe('confirm-player-switch')
   await pages[3]!.locator('.interaction-bar').getByRole('button', { name: /Confirm/i }).click()
-  await expect(pages[0]!.locator('.interaction-bar').getByRole('button', { name: 'Player 3', exact: true })).toBeVisible()
-  await pages[0]!.locator('.interaction-bar').getByRole('button', { name: 'Player 3', exact: true }).click()
+  await expect(pages[0]!.locator('.interaction-bar [data-choice-value="p3"]')).toContainText('Player 3')
+  await pages[0]!.locator('.interaction-bar [data-choice-value="p3"]').click()
   for (const page of pages) {
     await expect.poll(async () => (await state(page)).state.players[0]!.resources.reed).toBe(0)
     await expect.poll(async () => (await state(page)).state.players[2]!.resources.reed).toBe(1)
@@ -192,8 +197,9 @@ test('D159 public multi-player sale supports cooking and a chosen buyer', async 
     moor.players[0].minorHand = [cardId]
     moor.players[0].improvements = ['Major_Fireplace1', 'Major_Fireplace2']
     await sendDebugCommand(pages[0]!, { type: 'loadGame', state: moor, requestId: 'audit-supply-setup' })
-    await expect(pages[0]!.getByRole('button', { name: /^Improvement 1/ })).toBeEnabled()
-    await pages[0]!.getByRole('button', { name: /^Improvement 1/ }).click()
+    const improvement = pages[0]!.locator('[data-action-id="major-improvement"] button').first()
+    await expect(improvement).toBeEnabled()
+    await improvement.click()
     const cardName = cardId === 'M062_HearthBrush' ? 'Hearth Brush' : 'Pastoral Letter'
     await pages[0]!.locator('.interaction-bar').getByRole('button', { name: new RegExp(cardName) }).click()
     await expect(pages[0]!.locator('.interaction-bar').getByRole('button', { name: `Do not use ${cardName}`, exact: true })).toBeVisible()

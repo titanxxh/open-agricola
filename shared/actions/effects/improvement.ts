@@ -453,7 +453,7 @@ const improvementChoiceOptions = (context: ActionExecutionContext): ActionChoice
     const children = buildImprovementInternalChildren(state, player, option.value, actionCardId, readTrueAction(params, actionContext), sourceCard, actionContext?.minimumResourcesPaid as PaymentResourceMap | undefined, exactCost)
     const payment = children?.beforeHostListeners?.[0]
     const effectPreview = payment ? payAction.previewEffect?.({ ...context, params: payment.params, actionContext: payment.actionContext, sourceCard: payment.sourceCard }) : undefined
-    return { ...option, effectPreview }
+    return { ...option, labelRole: 'identity', effectPreview } satisfies ActionChoiceOption
   })
 }
 

@@ -16,6 +16,7 @@ import {
 import { InteractionBar } from '../InteractionBar'
 import { describeFutureSchedule } from '../../../../shared/actions/future-schedule'
 import { GameSession } from '../../../../server/game/authoritative-session'
+import { createWorkSession } from '../../../../server/__tests__/_helpers/session-fixtures'
 
 const noop = () => {}
 
@@ -132,6 +133,36 @@ const renderBarHtml = (
 ) => renderToStaticMarkup(buildBar(configure, actionOverrides))
 
 describe('InteractionBar', () => {
+  it.each([
+    ['en', 'Hearth Brush', 'Pastoral Letter'], ['zh', '炉灶刷', '牧函'],
+  ] as const)('keeps real purchase identities visible alongside payment trees in %s', (locale, hearthName, pastoralName) => {
+    const session = createWorkSession({ seed: 7317, options: { enableFarmersOfTheMoor: true, allowIncompleteFarmersOfTheMoorMinorDeal: true }, configure: state => {
+      state.round = 14
+      const player = state.players[0]!
+      player.minorHand = ['M062_HearthBrush', 'M063_PastoralLetter']
+      player.improvements = ['Major_Fireplace1', 'Major_Fireplace2']
+      Object.assign(player.resources, { wood: 10, clay: 10, reed: 10, stone: 10, food: 10 })
+    } })
+    try {
+      let response = session.takeAction(0, 'major-improvement')
+      expect(response.ok, response.error).toBe(true)
+      if (response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'choice') throw new Error('Expected purchase choices')
+      const options = response.interaction.request.options!
+      renderBar(input => {
+        input.locale = locale
+        input.pending.choice = { ...pendingChoice, options }
+      }, { resolveChoice: value => { response = session.resolveChoice(0, value) } })
+      const hearth = screen.getByRole('button', { name: new RegExp(hearthName) })
+      expect(screen.getByRole('button', { name: new RegExp(pastoralName) })).toBeVisible()
+      expect(hearth).toHaveTextContent(hearthName)
+      expect(hearth.querySelector('[data-resource="reed"][data-amount="1"]')).toBeInTheDocument()
+      fireEvent.click(hearth)
+      expect(response.ok, response.error).toBe(true)
+      expect(response.state.players[0]!.minorPlayed).toContain('M062_HearthBrush')
+      expect(response.state.players[0]!.minorHand).toContain('M063_PastoralLetter')
+      expect(response.state.players[0]!.resources.reed).toBe(9)
+    } finally { session.dispose() }
+  })
   it.each(['zh', 'en'] as const)('renders real Peat Sled choices with fuel and distinct rounds in %s', (locale) => {
     const session = new GameSession(409, undefined, { playerCount: 2, enableFarmersOfTheMoor: true, allowIncompleteFarmersOfTheMoorMinorDeal: true })
     session.state.round = 4

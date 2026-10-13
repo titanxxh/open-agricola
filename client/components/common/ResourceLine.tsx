@@ -1,4 +1,4 @@
-import type { Locale } from '../../../shared/i18n'
+import { t, type Locale } from '../../../shared/i18n'
 import type { PaymentResourceKey, PaymentResourceMap } from '../../../shared/contract/types'
 import { PAYMENT_RESOURCE_KEYS, isCardProvidedPaymentResourceKey } from '../../../shared/contract/resource-keys'
 import { extendedResourceKeyList } from '../../../shared/contract/state-constants'
@@ -39,8 +39,14 @@ const iconClassForKey = (key: PaymentResourceKey | 'bonusVp'): string => {
   return key
 }
 
+const labelKeyForResource = (key: PaymentResourceKey | 'bonusVp'): string => {
+  if (!isCardProvidedPaymentResourceKey(key)) return `resources.${key}`
+  const localId = key.split(':')[1] ?? ''
+  return `resources.${PAYMENT_RESOURCE_KEYS.find(resource => localId.includes(resource)) ?? 'bonusVp'}`
+}
+
 export const ResourceLine = ({
-  locale: _locale,
+  locale,
   resources,
   mode = 'inventory',
   bonusVp = 0,
@@ -60,13 +66,15 @@ export const ResourceLine = ({
     return emptyLabel ? <span className="resource-inline-empty">{emptyLabel}</span> : null
   }
   return (
-    <span className={`resource-inline${className ? ` ${className}` : ''}`}>
+    <span className={`resource-inline${className ? ` ${className}` : ''}`} data-resource-mode={mode}>
       {items.map(({ key, amount }) => (
         <span
           key={`resource-${key}`}
           className={`resource-inline-item resource-${key}`}
           data-resource={key}
           data-amount={amount}
+          role="img"
+          aria-label={`${amount} ${t(locale, labelKeyForResource(key))}`}
         >
           <span className={`res-icon res-icon-${iconClassForKey(key)}`} />
           <span className="resource-inline-amount">{amount}</span>

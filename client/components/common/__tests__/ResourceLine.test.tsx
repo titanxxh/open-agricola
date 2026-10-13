@@ -4,6 +4,12 @@ import { describe, expect, it } from 'vitest'
 import { ResourceLine } from '../ResourceLine'
 
 describe('ResourceLine supply tokens', () => {
+  it.each([['en', '1 Grain'], ['zh', '1 谷物']] as const)('names payment icons accessibly in %s', (locale, name) => {
+    const html = renderToStaticMarkup(<ResourceLine locale={locale} resources={{ grain: 1 }} mode="payment" />)
+    expect(html).toContain(`aria-label="${name}"`)
+    expect(html).toContain('role="img"')
+    expect(html).toContain('data-resource-mode="payment"')
+  })
   it('renders fuel and horses in ordinary resource previews', () => {
     const html = renderToStaticMarkup(<ResourceLine locale="en" resources={{ fuel: 3, horse: 1 }} />)
     expect(html).toContain('data-resource="fuel"')

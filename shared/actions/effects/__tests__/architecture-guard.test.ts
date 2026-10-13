@@ -70,6 +70,24 @@ const cardPresentationOffenders = (source: string, fileName: string): string[] =
 }
 
 describe('effects architecture guard', () => {
+  it('keeps native board flows out of opaque execute callbacks', () => {
+    const directory = join(cardsDir, 'action')
+    const offenders = readdirSync(directory).filter(file => file.endsWith('.ts')).flatMap(file => {
+      const source = ts.createSourceFile(file, readFileSync(join(directory, file), 'utf8'), ts.ScriptTarget.Latest, true)
+      const found: string[] = []
+      const inspectExecute = (node: ts.Node) => {
+        if (ts.isPropertyAssignment(node) && node.name.getText(source) === 'flow' && ts.isObjectLiteralExpression(node.initializer)) found.push(file)
+        ts.forEachChild(node, inspectExecute)
+      }
+      const inspect = (node: ts.Node) => {
+        if (ts.isPropertyAssignment(node) && node.name.getText(source) === 'execute') inspectExecute(node.initializer)
+        else ts.forEachChild(node, inspect)
+      }
+      inspect(source)
+      return found
+    })
+    expect(offenders).toEqual([])
+  })
   it('keeps top-level effects limited to the approved files', () => {
     expect(checkEffectsFileList(effectsDir).ok).toBe(true)
   })

@@ -27,6 +27,7 @@ export const AnytimeBar = ({
         {anytimeActions.map((action) => (
           <button
             key={action.id}
+            data-anytime-action-id={action.id}
             onClick={() => takeAnytimeAction(action.id)}
             disabled={!isInteractive}
           >

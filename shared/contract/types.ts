@@ -819,6 +819,8 @@ export type ChoiceEffectPreview =
   | { kind: 'familyGrowth'; roomRequired: boolean; heldOnCard?: string }
   | { kind: 'harvestFields'; privatePhase: boolean }
   | { kind: 'cardSelection'; types: ('major' | 'minor')[]; allowedCards?: string[]; resourcesPaid?: Partial<Resource> }
+  | { kind: 'roundCardSelection'; ranges: readonly { from: number; to?: number; types: readonly ('major' | 'minor')[] }[] }
+  | { kind: 'firstMissingResource'; resources: readonly (keyof Resource)[]; amount: number }
   | { kind: 'bakeRecipes'; recipes: { sourceCard: string; exchange: Extract<ChoiceEffectPreview, { kind: 'resourceExchange' }>; quantityLimit: number }[] }
   | { kind: 'fencePlan'; segments: { kind: FenceSegmentType; woodCost: number; min?: number; max?: number }[]; totalBounds?: { min?: number; max?: number }; fixedWood: number; freeFences: number; borrowed: boolean; paymentBudget?: PaymentResourceMap }
   | { kind: 'resourceTransfer'; resources: Partial<Resource>; recipients: NonNullable<ChoiceDescriptionPreview['actor']>[]; payer?: NonNullable<ChoiceDescriptionPreview['actor']> }
@@ -880,6 +882,7 @@ export type ChoiceDescriptionPreview =
       parts: ChoiceDescriptionPreview[]
     }) & {
       optional?: boolean
+      workerPlacement?: 'sick-preferred'
       actor?: { playerId: string; name: string; nameIsDefault: boolean; index: number }
     }
 
@@ -891,6 +894,8 @@ export type ChoiceFarmTarget =
 export type ActionChoiceOption = {
   value: string
   labelKey: string
+  /** A selected entity's name remains visible alongside its consequence tree. */
+  labelRole?: 'identity'
   labelParams?: Record<string, unknown>
   sourceCard?: string
   effectPreview?: ChoiceEffectPreview

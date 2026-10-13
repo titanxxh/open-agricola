@@ -156,7 +156,7 @@ test('completed fathers and the infirmary restriction have Chinese labels', asyn
   await page.goto(sandboxUrl)
   await expect(page.locator('.parent-card-infobox')).toHaveText('已完成')
   const infirmaryCard = page.locator('[data-action-id="moor-infirmary"]')
-  const restriction = infirmaryCard.getByText('仅限病人', { exact: true })
+  const restriction = infirmaryCard.getByText('病人只能来此；健康工人也可使用', { exact: true })
   await expect(restriction).toBeVisible()
   await expect(infirmaryCard.locator('.action-farmer-stack')).toHaveCount(2)
   const textBox = await restriction.boundingBox()
