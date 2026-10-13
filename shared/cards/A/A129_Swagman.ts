@@ -4,6 +4,9 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { jumpLeaf, isJumpChainContains } from '../helpers/jump-leaf'
 import { computeAllowedPlacementSpaces } from '../../actions/helpers/placement-availability'
 import type { CardImpl } from '../registry'
+import { readActionSnapshotExtraData } from '../helpers/action-snapshot'
+import { findActionSpaceByWorker } from '../../domain/space'
+import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/helpers/placement-constants'
 
 const CARD_ID = 'A129_Swagman'
 const TRIGGER_PAIRS: Record<string, string> = {
@@ -24,11 +27,17 @@ const listener: CardListenerRegistration = {
     const targetSpaceId = TRIGGER_PAIRS[fromSpaceId]
     if (!targetSpaceId) return
 
-    const allowed = computeAllowedPlacementSpaces(context.state, context.player)
+    const workerId = context.actionContext?.workerId
+      ?? readActionSnapshotExtraData<unknown>(context.player, 'placedWorkerId')
+    if (typeof workerId !== 'string' || !context.space.takenBy.some(ref =>
+      ref.playerId === context.player.id && ref.workerId === workerId)) return
+    const actionContext = {
+      ...context.actionContext, viaCardJump: true, sourceCard: CARD_ID, workerId, targetSpaceId,
+    }
+    const allowed = computeAllowedPlacementSpaces(context.state, context.player, {
+      sourceCard: CARD_ID, actionContext, ignoreWorkerAvailability: true,
+    })
     if (!allowed.some(a => a.spaceId === targetSpaceId)) return
-
-    const myRef = context.space?.takenBy.find(t => t.playerId === context.player.id)
-    if (!myRef) return
 
     return {
       flow: {
@@ -37,7 +46,7 @@ const listener: CardListenerRegistration = {
         children: [
           jumpLeaf({
             sourceCard: CARD_ID,
-            workerId: myRef.workerId,
+            workerId,
             targetSpaceId,
           }),
         ],
@@ -47,8 +56,26 @@ const listener: CardListenerRegistration = {
   },
 }
 
+const occupiedTargetListener: CardListenerRegistration = {
+  id: 'A129-swagman-occupied-jump-target',
+  cardIds: [CARD_ID],
+  actions: ['place-farmer'],
+  phases: ['computeArgs'],
+  handler: context => {
+    const jump = context.actionContext
+    if (context.sourceCard !== CARD_ID || jump?.viaCardJump !== true
+      || typeof jump.workerId !== 'string' || typeof jump.targetSpaceId !== 'string') return
+    const from = findActionSpaceByWorker(context.state, context.player.id, jump.workerId)
+    if (!from || TRIGGER_PAIRS[from.id] !== jump.targetSpaceId) return
+    return { extraOptions: [{
+      value: `${OCCUPIED_SPACE_CHOICE_PREFIX}${jump.targetSpaceId}`,
+      labelKey: `actions.${jump.targetSpaceId}.name`, sourceCard: CARD_ID,
+    }] }
+  },
+}
+
 const cardImpl = {
-  listeners: [listener],
+  listeners: [listener, occupiedTargetListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
 

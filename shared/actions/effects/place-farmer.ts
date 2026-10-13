@@ -24,7 +24,7 @@ import type { SupplyWorkerSource } from '../../contract/types'
 import { incPlacedFarmers } from '../../session/stats'
 import { computeAllowedPlacementSpaces } from '../helpers/placement-availability'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../helpers/placement-constants'
-import { collectBeforePlacementFlows } from '../../cards/card-listeners'
+import { collectBeforeActionSpaceUseFlows, collectBeforePlacementFlows } from '../../cards/card-listeners'
 
 export { OCCUPIED_SPACE_CHOICE_PREFIX } from '../helpers/placement-constants'
 
@@ -95,8 +95,11 @@ export const placeFarmerAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: (state, player, context) =>
-    context?.actionContext?.viaCardJump === true && context.actionContext.workerId === undefined
-      ? true
+    context?.actionContext?.viaCardJump === true
+      ? context.actionContext.workerId === undefined || (
+        typeof context.actionContext.workerId === 'string'
+        && findActionSpaceByWorker(state, player.id, context.actionContext.workerId) !== undefined
+      )
       : context?.actionContext?.workerSource !== undefined
       ? readTemporarySupplyWorker(player, context.actionContext, context.sourceCard) !== undefined
       : smallestAvailableWorker(state, player) !== null,
@@ -137,7 +140,7 @@ export const placeFarmerAction: ActionDefinition = {
       // Reachability check only applies to worker mode (worker-less is invoked
       // by cards that have already verified the space is unoccupied / valid).
       if (!isWorkerless) {
-        const allowed = computeAllowedPlacementSpaces(state, player, { sourceCard, actionContext })
+        const allowed = computeAllowedPlacementSpaces(state, player, { sourceCard, actionContext, ignoreWorkerAvailability: true })
         if (!allowed.some(a => a.spaceId === targetSpaceId)) {
           return { type: 'fail', errorKey: 'log.placeFarmerFail' }
         }
@@ -178,7 +181,7 @@ export const placeFarmerAction: ActionDefinition = {
         sourceCard,
         actionContext: resetComputeReplaceGuards(actionContext),
       }
-      const beforeFlows = collectBeforePlacementFlows(state, player, targetSpace, resetComputeReplaceGuards(actionContext))
+      const beforeFlows = collectBeforeActionSpaceUseFlows(state, player, targetSpace, resetComputeReplaceGuards(actionContext))
       if (beforeFlows.length > 0) {
         return {
           type: 'flow',
