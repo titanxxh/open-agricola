@@ -50,6 +50,8 @@ export type CardListenerRegistration = {
   scope?: CardListenerScope
   zones?: CardListenerZone[]
   mandatory?: boolean
+  /** Before-space listeners that require placing a new worker, rather than using a space. */
+  requiresNewPlacement?: true
   preScoring?: boolean
   allowAnytimeReentry?: boolean
   /**
@@ -425,11 +427,12 @@ export const executeCardListener = (
   return result ?? undefined
 }
 
-export const collectBeforePlacementFlows = (
+const collectBeforeSpaceFlows = (
   state: GameState,
   player: PlayerState,
   space: ActionSpace,
-  actionContext?: Record<string, unknown>,
+  actionContext: Record<string, unknown> | undefined,
+  newPlacement: boolean,
 ): ActionFlow[] => {
   const seen = new Set<string>()
   const flows: ActionFlow[] = []
@@ -443,6 +446,7 @@ export const collectBeforePlacementFlows = (
       actionContext,
     }
     for (const entry of getMatchingListeners(context)) {
+      if (!newPlacement && entry.registration.requiresNewPlacement) continue
       const key = `${entry.registration.id}\0${entry.cardId}\0${entry.ownerPlayerId}`
       if (seen.has(key)) continue
       seen.add(key)
@@ -452,6 +456,20 @@ export const collectBeforePlacementFlows = (
   }
   return flows
 }
+
+export const collectBeforePlacementFlows = (
+  state: GameState,
+  player: PlayerState,
+  space: ActionSpace,
+  actionContext?: Record<string, unknown>,
+): ActionFlow[] => collectBeforeSpaceFlows(state, player, space, actionContext, true)
+
+export const collectBeforeActionSpaceUseFlows = (
+  state: GameState,
+  player: PlayerState,
+  space: ActionSpace,
+  actionContext?: Record<string, unknown>,
+): ActionFlow[] => collectBeforeSpaceFlows(state, player, space, actionContext, false)
 
 const retainedTimedListener = (cardId: string, phase: 'afterReceive' | 'afterCollect', rules: readonly import('../contract/rule-plans').TimedRule[]): CardListenerRegistration => ({
   id: `activated-timed:${phase}:${cardId}`, cardIds: [cardId], actions: [phase === 'afterReceive' ? 'receive' : 'collect'], phases: ['after'], mandatory: true,

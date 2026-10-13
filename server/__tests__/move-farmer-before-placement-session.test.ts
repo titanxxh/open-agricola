@@ -8,19 +8,25 @@ const ARCHWAY = 'D051_Archway'
 const STRAW_HAT = 'E010_StrawHat'
 const COMB = 'E059_CombandCutter'
 const BUCKET = 'D016_WoodenWheyBucket'
+const CAMPAIGNER = 'C158_ForestCampaigner'
+const HORA = 'A174_MasterHora'
 const MOVERS: Array<typeof ARCHWAY | typeof STRAW_HAT> = [ARCHWAY, STRAW_HAT]
 const sessions: GameSession[] = []
 afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
 
 // Approved generic adapter seam: real 2p work Sessions because movement can
 // pause in another card's before-placement payment, then resume the target.
-function setup({ mover, bonus = COMB, actor = 0 }: {
+function setup({ mover, bonus = COMB, actor = 0, placementCard, prepareMove = true }: {
   mover?: typeof ARCHWAY | typeof STRAW_HAT
   bonus?: typeof COMB | typeof BUCKET
   actor?: number
+  placementCard?: typeof CAMPAIGNER | typeof HORA
+  prepareMove?: boolean
 } = {}) {
   let workerId = ''
-  const session = createWorkSession({ seed: 42, options: { playerCount: 2 }, configure(state) {
+  const session = createWorkSession({ seed: 42, options: {
+    playerCount: placementCard === CAMPAIGNER ? 4 : placementCard === HORA ? 5 : 2,
+  }, configure(state) {
     state.round = mover === STRAW_HAT ? 3 : 1
     state.currentPlayerIndex = actor
     for (const player of state.players) {
@@ -33,16 +39,28 @@ function setup({ mover, bonus = COMB, actor = 0 }: {
     }
     const owner = state.players[actor]!
     owner.minorPlayed = [bonus, ...(mover ? [mover] : [])]
+    owner.occupationPlayed = placementCard ? [placementCard] : []
     owner.resources.food = 8
     owner.resources.wood = 2
     const sheep = state.actionSpaces.find(space => space.id === 'sheep-market')
     if (!sheep) throw new Error('Missing Sheep Market')
     sheep.resources.sheep = bonus === BUCKET ? 1 : 3
+    if (placementCard === CAMPAIGNER) {
+      for (const space of state.actionSpaces) space.resources.wood = 0
+      const forest = state.actionSpaces.find(space => space.id === 'forest')
+      if (!forest) throw new Error('Missing Forest')
+      forest.resources.wood = 8
+    }
+    if (placementCard === HORA) {
+      const copse = state.actionSpaces.find(space => space.id === 'copse-56')
+      if (!copse) throw new Error('Missing 5p Copse')
+      copse.resources.wood = 1
+    }
     const worker = owner.workers.find(entry => entry.isActive)
     if (!worker) throw new Error('Missing owner worker')
     workerId = worker.id
-    if (mover) {
-      if (mover === ARCHWAY) state.actionSpaces.push(...createPlayerActionSpaces(state))
+    if (mover === ARCHWAY) state.actionSpaces.push(...createPlayerActionSpaces(state))
+    if (mover && prepareMove) {
       const source = state.actionSpaces.find(space => space.id === (mover === ARCHWAY ? ARCHWAY : 'farmland'))
       if (!source) throw new Error('Missing move source')
       source.takenBy = [{ playerId: owner.id, workerId }]
@@ -154,4 +172,90 @@ describe('moving a farmer runs target before-placement flows', () => {
     expect(score.categories.find(category => category.key === 'sheeps'))
       .toMatchObject({ quantity: 1, total: 1 })
   })
+})
+
+function placeMoveSource(session: GameSession, mover: typeof ARCHWAY | typeof STRAW_HAT) {
+  let response = session.takeAction(0, mover === ARCHWAY ? ARCHWAY : 'farmland')
+  expect(response.ok, response.error).toBe(true)
+  if (mover === STRAW_HAT) {
+    expect(response.interaction).toMatchObject({ stateId: 'wait', playerIndex: 0,
+      request: { kind: 'farm-select', farm: { farmType: 'plow' } } })
+    response = session.commitSelectionChoice(0, { tile: { row: 0, col: 1 } })
+    expect(response.ok, response.error).toBe(true)
+  }
+  const state = response.state
+  state.players.forEach(player => markAllWorkersUsed(state, player))
+  session.loadState(state)
+  return response
+}
+
+function horaPurchase(response: SessionResponse) {
+  if (response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'choice') return
+  return response.interaction.request.options.find(option => option.effectPreview?.kind === 'resourceExchange'
+    && option.effectPreview.resourcesGained?.vegetable === 1)
+}
+
+// Placement-only boundary: C158 requires 4p and A174 requires 5p. First place
+// the worker through the public action, then reuse it; movement is space use.
+describe('moving an existing worker does not repeat placement-only rewards', () => {
+  it.each(MOVERS)('%s keeps the one C158 reward from its original placement', mover => {
+    const { session, workerId } = setup({ mover, placementCard: CAMPAIGNER, prepareMove: false })
+    const placed = placeMoveSource(session, mover)
+    expect(placed.state.players[0]!.resources.food).toBe(mover === ARCHWAY ? 10 : 9)
+    expect(placed.state.events.filter(event => event.type === 'resource.moved'
+      && event.sourceCardId === CAMPAIGNER && event.resources.food === 1)).toHaveLength(1)
+    startMove(session, mover)
+    const response = session.resolveChoice(0, 'day-laborer')
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.events.filter(event => event.type === 'worker.placed'
+      && event.spaceId === 'day-laborer' && event.workerId === workerId && event.viaCardId === mover)).toHaveLength(1)
+    expect(rewardEvents(response)).toHaveLength(1)
+    expect(response.state.players[0]!.resources.food).toBe(mover === ARCHWAY ? 15 : 14)
+    expect(response.state.events.filter(event => event.type === 'resource.moved'
+      && event.sourceCardId === CAMPAIGNER && event.resources.food === 1)).toHaveLength(1)
+  })
+
+  it('ordinary 5p Copse placement still offers A174 and pays for one vegetable', () => {
+    const { session, workerId } = setup({ placementCard: HORA })
+    let response = session.takeAction(0, 'copse-56')
+    expect(response.ok, response.error).toBe(true)
+    const purchase = horaPurchase(response)
+    if (!purchase) throw new Error('Expected ordinary placement vegetable purchase')
+    response = session.resolveChoice(0, purchase.value)
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources).toMatchObject({ food: 7, vegetable: 1, wood: 3 })
+    expect(response.state.actionSpaces.find(space => space.id === 'copse-56')?.takenBy)
+      .toEqual([{ playerId: response.state.players[0]!.id, workerId }])
+    expect(response.state.events.filter(event => event.type === 'resource.paid'
+      && event.sourceCardId === HORA && event.resources.food === 1)).toHaveLength(1)
+  })
+
+  it.each(MOVERS.flatMap(mover => ['copse-56', 'house-building-56'].map(target => ({ mover, target }))))(
+    '$mover does not offer A174 for its move to $target', ({ mover, target }) => {
+      const { session, workerId } = setup({ mover, placementCard: HORA, prepareMove: false })
+      placeMoveSource(session, mover)
+      startMove(session, mover)
+      let response = session.resolveChoice(0, target)
+      expect(response.ok, response.error).toBe(true)
+      // Exercise any erroneous purchase so resource assertions prove it cannot
+      // reward a move, even when the target subsequently has its own pending.
+      const extraPurchase = horaPurchase(response)
+      if (extraPurchase) {
+        response = session.resolveChoice(0, extraPurchase.value)
+        expect(response.ok, response.error).toBe(true)
+      }
+      expect(response.state.events.filter(event => event.type === 'worker.placed'
+        && event.spaceId === target && event.workerId === workerId && event.viaCardId === mover)).toHaveLength(1)
+      expect(response.state.players[0]!.resources.vegetable).toBe(0)
+      expect(response.state.players[0]!.resources.food).toBe(mover === ARCHWAY ? 9 : 8)
+      expect(response.state.events.filter(event => (event.type === 'resource.paid' || event.type === 'resource.moved')
+        && event.sourceCardId === HORA)).toHaveLength(0)
+      if (target === 'copse-56') {
+        expect(response.state.players[0]!.resources.wood).toBe(3)
+        expect(response.interaction.stateId).toBe('idle')
+      } else {
+        expect(response.interaction).toMatchObject({ stateId: 'wait', playerIndex: 0 })
+      }
+    },
+  )
 })
