@@ -25,14 +25,36 @@ vi.mock('../../db.ts', async () => {
   const db = await createTestDatabase()
   return { getDb: () => db }
 })
+// A real S3 request can retry beyond Vitest's default 10 second hook budget.
+const cleanupTimeout = 120_000
 let recording: Awaited<ReturnType<typeof recordingResources>>
-beforeEach(async () => { vi.stubEnv('ALLOW_ANONYMOUS_WS', 'true'); recording = await recordingResources(getDb()) })
+let pendingCleanup = Promise.resolve()
+beforeEach(async () => {
+  // A timed-out hook keeps running; never reuse its database until it finishes.
+  await pendingCleanup
+  vi.stubEnv('ALLOW_ANONYMOUS_WS', 'true')
+  recording = await recordingResources(getDb())
+}, cleanupTimeout)
 afterEach(async () => {
-  await recording.close()
-  await getDb().exec('TRUNCATE users, rooms, game_contexts, game_results, stored_objects, command_scopes, development_room_slots, app_instances CASCADE')
-  vi.restoreAllMocks(); vi.unstubAllEnvs()
-})
-afterAll(async () => { await getDb().close() })
+  const currentRecording = recording
+  vi.restoreAllMocks()
+  vi.unstubAllEnvs()
+  pendingCleanup = (async () => {
+    try {
+      await currentRecording.close()
+    } finally {
+      await getDb().exec('TRUNCATE users, rooms, game_contexts, game_results, stored_objects, command_scopes, development_room_slots, app_instances CASCADE')
+    }
+  })()
+  await pendingCleanup
+}, cleanupTimeout)
+afterAll(async () => {
+  try {
+    await pendingCleanup
+  } finally {
+    await getDb().close()
+  }
+}, cleanupTimeout)
 
 type TestSocket = WebSocket & {
   received: ServerEvent[]
@@ -405,7 +427,7 @@ describe('room-manager ws sync', () => {
   })
 
   it('accepts createRoom over websocket when oa_session cookie is valid', async () => {
-    process.env.ALLOW_ANONYMOUS_WS = 'false'
+    vi.stubEnv('ALLOW_ANONYMOUS_WS', 'false')
     const { createWsServer: createWsServerWithEnv } = await import('../ws-server.ts')
     const persistence = new PostgresRoomPersistence(getDb())
     const isolatedServer = createServer()
@@ -436,14 +458,15 @@ describe('room-manager ws sync', () => {
       expect(msg.roomId).toBeTruthy()
     } finally {
       await isolatedWsServerResult.shutdown()
-      isolatedServer.close()
-      delete process.env.ALLOW_ANONYMOUS_WS
+      await new Promise<void>((resolve, reject) => {
+        isolatedServer.close((error) => error ? reject(error) : resolve())
+      })
     }
   })
 
   it('closes websocket connections from untrusted origins before cookie auth', async () => {
-    process.env.ALLOW_ANONYMOUS_WS = 'false'
-    process.env.PUBLIC_APP_ORIGIN = 'https://frontend.example'
+    vi.stubEnv('ALLOW_ANONYMOUS_WS', 'false')
+    vi.stubEnv('PUBLIC_APP_ORIGIN', 'https://frontend.example')
     const { createWsServer: createWsServerWithEnv } = await import('../ws-server.ts')
     const persistence = new PostgresRoomPersistence(getDb())
     const isolatedServer = createServer()
@@ -475,14 +498,14 @@ describe('room-manager ws sync', () => {
       expect(closed).toEqual({ code: 1008, reason: 'invalid origin' })
     } finally {
       await isolatedWsServerResult.shutdown()
-      isolatedServer.close()
-      delete process.env.ALLOW_ANONYMOUS_WS
-      delete process.env.PUBLIC_APP_ORIGIN
+      await new Promise<void>((resolve, reject) => {
+        isolatedServer.close((error) => error ? reject(error) : resolve())
+      })
     }
   })
 
   it('can close active websocket connections for a revoked user session', async () => {
-    process.env.ALLOW_ANONYMOUS_WS = 'false'
+    vi.stubEnv('ALLOW_ANONYMOUS_WS', 'false')
     const { createWsServer: createWsServerWithEnv } = await import('../ws-server.ts')
     const persistence = new PostgresRoomPersistence(getDb())
     const isolatedServer = createServer()
@@ -515,13 +538,14 @@ describe('room-manager ws sync', () => {
       expect(await closed).toEqual({ code: 1008, reason: 'session revoked' })
     } finally {
       await isolatedWsServerResult.shutdown()
-      isolatedServer.close()
-      delete process.env.ALLOW_ANONYMOUS_WS
+      await new Promise<void>((resolve, reject) => {
+        isolatedServer.close((error) => error ? reject(error) : resolve())
+      })
     }
   })
 
   it('rejects non-fixed devMode-style unauthenticated room commands in production-like mode', async () => {
-    process.env.ALLOW_ANONYMOUS_WS = 'false'
+    vi.stubEnv('ALLOW_ANONYMOUS_WS', 'false')
     const { createWsServer: createWsServerWithEnv } = await import('../ws-server.ts')
     const persistence = new PostgresRoomPersistence(getDb())
     const isolatedServer = createServer()
@@ -547,8 +571,9 @@ describe('room-manager ws sync', () => {
       expect(msg.error).toMatch(/not authenticated|authentication timeout/)
     } finally {
       await isolatedWsServerResult.shutdown()
-      isolatedServer.close()
-      delete process.env.ALLOW_ANONYMOUS_WS
+      await new Promise<void>((resolve, reject) => {
+        isolatedServer.close((error) => error ? reject(error) : resolve())
+      })
     }
   })
 
