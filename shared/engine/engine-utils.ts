@@ -249,14 +249,13 @@ export function canStartNode(int: EngineInternals, context: FlowDoableContext, n
   const player = context.state.players.find((entry) => entry.id === node.ownerPlayerId) ?? context.player
   if (node instanceof ActionNode) {
     const actionId = node.resolvedReplacement?.actionId ?? node.actionId
-    const action = int.registry.get(actionId)
-    if (!action) throw new Error(`missing action definition: ${actionId}`)
+    const action = int.registry.getRequired(actionId)
     if (actionId === 'activate-card-effect') {
       const preview = previewActivateCardEffectChild(node, { ...context, player })
       if (!preview.result) return false
       return preview.result.flow ? evaluateFlowDoable({ ...preview.result.flow, optional: false }, {
         ...context, state: preview.previewState, player: preview.previewPlayer,
-      }, id => int.registry.get(id)) : preview.result.doable === true
+      }, id => int.registry.getRequired(id)) : preview.result.doable === true
     }
     const actionContext: Record<string, unknown> = {
       ...node.actionContext,
@@ -268,7 +267,7 @@ export function canStartNode(int: EngineInternals, context: FlowDoableContext, n
     return isActionDoableInFlowContext({
       ...context, actionId, action, player, space,
       params: node.params, sourceCard: node.resolvedReplacement?.sourceCard ?? node.sourceCard, actionContext,
-      resolveAction: (actionId) => int.registry.get(actionId),
+      resolveAction: (actionId) => int.registry.getRequired(actionId),
     })
   }
   const children = getNodeChildren(node).filter((child) => child.getState() !== 'resolved')

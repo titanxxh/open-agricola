@@ -190,7 +190,7 @@ const triggerSelectEvaluationOptions = (
   context: ActionExecutionContext,
   node: ParallelNode,
 ): TriggerSelectEvaluationOptions => ({
-  canStartFlow: (flow, flowContext) => evaluateFlowDoable(flow, flowContext, (actionId) => int.registry.get(actionId)),
+  canStartFlow: (flow, flowContext) => evaluateFlowDoable(flow, flowContext, (actionId) => int.registry.getRequired(actionId)),
   canStartNode: (child, childContext) => canStartNode(int, childContext, child),
   canContinueWithoutTriggers: (actionId, resources) => {
     const hostContext = getBeforeContinuationContext(int, context, node, actionId)
