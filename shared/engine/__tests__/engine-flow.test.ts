@@ -685,6 +685,7 @@ describe('Engine flow nodes', () => {
     setActiveCardRegistry(cardRegistry)
 
     const registry = new ActionRegistry()
+    registry.register(payAction)
     const engineForNodes = new Engine({
       tree: new EngineTree(new ActionNode('trigger', 'gain')),
       registry,
