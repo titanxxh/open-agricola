@@ -40,8 +40,12 @@ const readFlowEffectContext = (
   reportProtectedObservation?: FlowEffectContext['reportProtectedObservation'],
   transactionEvents?: FlowEffectContext['transactionEvents'],
 ): FlowEffectContext | undefined =>
-  typeof params?.triggerActionId === 'string' || params?.roundPreparation || reportProtectedObservation || transactionEvents
+  typeof params?.triggerActionId === 'string' || typeof params?.purchaseActionCardId === 'string'
+    || params?.roundPreparation || reportProtectedObservation || transactionEvents
     ? {
+        ...(typeof params?.purchaseActionCardId === 'string'
+          ? { purchaseActionCardId: params.purchaseActionCardId }
+          : {}),
         ...(typeof params?.triggerActionId === 'string'
           ? { triggerActionId: params.triggerActionId }
           : {}),

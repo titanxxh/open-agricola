@@ -328,6 +328,11 @@ const constrainedImprovementPreview = (
 const costActionCardId = (context?: { sourceCard?: string; space?: Pick<ActionSpace, 'id'> }) =>
   context?.sourceCard ?? context?.space?.id ?? 'improvement'
 
+const purchaseActionCardId = (context: Pick<ActionExecutionContext, 'sourceCard' | 'space' | 'actionContext'>): string =>
+  typeof context.actionContext?.purchaseActionCardId === 'string'
+    ? context.actionContext.purchaseActionCardId
+    : context.sourceCard ?? context.space?.id ?? 'improvement'
+
 const improvementExactCost = (context?: { params?: Record<string, unknown>; actionContext?: Record<string, unknown> }) =>
   PaymentSolver.readExactCost(context?.params) ?? PaymentSolver.readExactCost(context?.actionContext)
 
@@ -365,6 +370,7 @@ const buildImprovementInternalChildren = (
   sourceCard?: string,
   minimumResourcesPaid?: PaymentResourceMap,
   exactCost?: ExactCost,
+  purchaseActionCardId = actionCardId,
 ): InternalActionChildren | null => {
   const parsed = parseImprovementChoice(choice)
   let kind: 'major' | 'minor'
@@ -406,7 +412,7 @@ const buildImprovementInternalChildren = (
       {
         actionId: 'activate-card-effect',
         sourceCard: id,
-        params: { cardId: id, hook: 'onBuy' },
+        params: { cardId: id, hook: 'onBuy', purchaseActionCardId },
         actionContext,
         paymentInfoFrom: 'payment',
       },
@@ -449,7 +455,7 @@ const improvementChoiceOptions = (context: ActionExecutionContext): ActionChoice
       .filter((option) => isAllowedPurchase(allowedPurchases, option.value)
         && meetsMinimumPayment(state, player, option.value, context))
   return options.map(option => {
-    const children = buildImprovementInternalChildren(state, player, option.value, actionCardId, readTrueAction(params, actionContext), sourceCard, actionContext?.minimumResourcesPaid as PaymentResourceMap | undefined, exactCost)
+    const children = buildImprovementInternalChildren(state, player, option.value, actionCardId, readTrueAction(params, actionContext), sourceCard, actionContext?.minimumResourcesPaid as PaymentResourceMap | undefined, exactCost, purchaseActionCardId(context))
     const payment = children?.beforeHostListeners?.[0]
     const effectPreview = payment ? payAction.previewEffect?.({ ...context, params: payment.params, actionContext: payment.actionContext, sourceCard: payment.sourceCard }) : undefined
     return { ...option, labelRole: 'identity', effectPreview } satisfies ActionChoiceOption
@@ -539,6 +545,7 @@ export const improvementAction: ActionDefinition = {
       sourceCard,
       actionContext?.minimumResourcesPaid as PaymentResourceMap | undefined,
       improvementExactCost({ params, actionContext }),
+      purchaseActionCardId({ sourceCard, space, actionContext }),
     )
     if (!internalChildren) return { type: 'fail', errorKey: 'log.improvementFail' }
     const improvementId = parsed.kind === 'major' || parsed.kind === 'minor'
