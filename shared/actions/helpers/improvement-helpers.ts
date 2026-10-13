@@ -46,13 +46,14 @@ export const canPlayMinor = (
   improvementId: string,
   types?: readonly ImprovementType[],
   allowedPurchases?: string[],
+  trueAction?: boolean,
 ): boolean => {
   const improvement = getMinorImprovement(improvementId)
   if (!improvement) return false
   if (!player.minorHand.includes(improvement.id)) return false
   if (allowedPurchases && !allowedPurchases.includes(improvement.id)) return false
   if (!meetsCardPrerequisites(player, improvement, state.round, state)) return false
-  if (!isMinorImprovementEligibleForAction(improvement, types)) return false
+  if (!isMinorImprovementEligibleForAction(improvement, types, trueAction)) return false
   return true
 }
 

@@ -980,7 +980,7 @@ export type ActionFlow = (
     }
   | {
       type: 'seq' | 'or' | 'xor' | 'parallel'
-      /** Keep the choice open and refresh unselected OR/XOR branches after anytime actions. */
+      /** Keep the decision open and refresh unselected branches after anytime actions. */
       requiresExplicitChoice?: boolean
       anytimeActionId?: string
       promptKey?: PromptKey
@@ -1017,6 +1017,8 @@ export type ActionDefinition = {
   allowAnytimeReentry?: boolean
   idleOnly?: boolean
   canBeExecutedByPlayer: CanBeExecutedByPlayer
+  /** Non-payment eligibility for an explicit optional decision; never authorizes execution. */
+  canBeOfferedByPlayer?: CanBeExecutedByPlayer
   isAlreadySatisfied?: (
     context: ActionExecutionContext & { transactionEvents: readonly GameEvent[] },
   ) => boolean

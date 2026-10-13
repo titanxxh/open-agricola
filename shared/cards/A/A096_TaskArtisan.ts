@@ -22,11 +22,16 @@ const buildTaskArtisanFlow = () => ({
   children: [
     gainLeaf(CARD_ID, { wood: 1 }),
     {
-      type: 'leaf' as const,
-      actionId: 'improvement',
-      actionContext: { types: ['minor'] },
+      type: 'seq' as const,
       optional: true,
+      requiresExplicitChoice: true,
       sourceCard: CARD_ID,
+      children: [{
+        type: 'leaf' as const,
+        actionId: 'improvement',
+        actionContext: { types: ['minor'] },
+        sourceCard: CARD_ID,
+      }],
     },
   ],
 })

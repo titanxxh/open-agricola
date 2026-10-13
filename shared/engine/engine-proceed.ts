@@ -1,4 +1,4 @@
-import { evaluateFlowDoable } from '../actions/flow'
+import { evaluateFlowDoable, isActionVetoedInFlowContext } from '../actions/flow'
 import type {
   ActionExecutionContext,
   ActionExecutionResult,
@@ -530,7 +530,10 @@ const buildOptionalPrompt = (
     reportProtectedObservation: context.reportProtectedObservation,
   }
   const doable = canStartNode(int, { ...executionContext, ...currentEventReadContext(int) }, node)
-  if (!doable) {
+  const offerable = !doable && node.requiresExplicitChoice === true
+    && action.canBeOfferedByPlayer?.(context.state, context.player, executionContext) === true
+    && !isActionVetoedInFlowContext({ ...executionContext, ...currentEventReadContext(int), actionId: actionNode.actionId })
+  if (!doable && !offerable) {
     resolveSubtree(node)
     return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
   }
@@ -557,6 +560,7 @@ const buildOptionalPrompt = (
     {
       value: actionNode.id,
       labelKey: label.labelKey,
+      ...(!doable ? { disabled: true } : {}),
       labelParams: label.labelParams,
       sourceCard: actionNode.sourceCard,
       effectPreview: firstDescriptionEffect(optionalDescription),
