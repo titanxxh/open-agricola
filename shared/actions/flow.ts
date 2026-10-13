@@ -12,7 +12,7 @@ import { applyIsDoableHooksDetailed, type ActionHookContext } from './hooks'
 import { HookDispatcher } from '../engine/dispatcher'
 import { getMatchingListeners, executeCardListener, listenerOwnerOptions } from '../cards/card-listeners'
 import { getSuppressedBeforeListenerIds, suppressBeforeListeners } from '../engine/action-context-flags'
-import { withSkippedComputeReplaceListeners } from '../engine/replace-guard'
+import { getSkipComputeReplaceListenerIds, withSkippedComputeReplaceListeners } from '../engine/replace-guard'
 
 const deferredFlowDoableFns = new WeakSet<CanBeExecutedByPlayer>()
 const flowDerivedDoableFns = new WeakMap<CanBeExecutedByPlayer, FlowActionResolver | undefined>()
@@ -86,7 +86,11 @@ const applyChildActionDoable = (
   resolveAction: FlowActionResolver,
   seenActionIds: Set<string>,
 ): boolean => {
-  const actionKey = `${actionId}:${JSON.stringify(context.params ?? {})}`
+  const actionKey = JSON.stringify([
+    actionId,
+    context.params ?? {},
+    getSkipComputeReplaceListenerIds(context.actionContext).sort(),
+  ])
   if (seenActionIds.has(actionKey)) {
     return false
   }
@@ -122,7 +126,10 @@ const applyChildActionDoable = (
       childCanBeExecutedContext(context),
     ))
     if (!doable && action.flow) {
-      doable = evaluateFlowDoable(action.flow, context, flowDerivedDoableFns.get(action.canBeExecutedByPlayer) ?? resolveAction, nextSeenActionIds)
+      doable = evaluateFlowDoable(action.flow, {
+        ...context,
+        actionContext: { ...context.actionContext, checkedReplaceAction: false },
+      }, flowDerivedDoableFns.get(action.canBeExecutedByPlayer) ?? resolveAction, nextSeenActionIds)
     }
     return doable
   }

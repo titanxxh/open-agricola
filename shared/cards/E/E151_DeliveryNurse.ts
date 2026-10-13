@@ -4,6 +4,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged } from '../helpers/card-state'
 import { familySize, hasInactiveWorkerInSupply } from '../../domain/player'
 import { animalKeysForState } from '../../contract/animals'
+import { getExtraRoomCapacity } from '../card-effects'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E151_DeliveryNurse'
@@ -20,7 +21,7 @@ const canUseDeliveryNurse = (context: CardListenerContext): boolean => {
   if (isCardFlagged(context.player, CARD_ID)) return false
   if (animalKeysForState(context.state).some((animal) => (context.player.resources[animal] ?? 0) <= 0)) return false
   if (!hasInactiveWorkerInSupply(context.player)) return false
-  return context.player.rooms <= familySize(context.player)
+  return context.player.rooms + getExtraRoomCapacity(context.player) <= familySize(context.player)
 }
 /**
  * E151 Delivery Nurse — Once this game, if you have all types of animals,
@@ -60,19 +61,8 @@ const computeReplaceListener: CardListenerRegistration = {
   },
 }
 
-const isDoableListener: CardListenerRegistration = {
-  id: 'E151-delivery-nurse-isdoable-wish-children',
-  cardIds: [CARD_ID],
-  phases: ['isDoable' as ActionHookPhase],
-  actions: ['family-growth'],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!canUseDeliveryNurse(context)) return
-    return { doable: true }
-  },
-}
-
 const cardImpl = {
-  listeners: [computeReplaceListener, isDoableListener],
+  listeners: [computeReplaceListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
 

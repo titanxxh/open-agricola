@@ -518,7 +518,7 @@ export function engineResolveChoice(
       }
       const beginsWithChoice = (target: EngineNode): boolean => {
         if (target instanceof OrNode || target instanceof XorNode || target instanceof ParallelNode) return true
-        if (target instanceof ActionNode) return false
+        if (target instanceof ActionNode) return target.expandFlow === true && !!int.registry.get(target.actionId)?.flow
         const children = 'children' in target ? target.children as EngineNode[] : []
         return !!children[0] && beginsWithChoice(children[0])
       }

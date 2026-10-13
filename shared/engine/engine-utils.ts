@@ -416,6 +416,7 @@ export function cloneNode(int: EngineInternals, node: EngineNode): EngineNode {
       node.effectPreview,
     )
     clone.resolvedReplacement = node.resolvedReplacement
+    clone.expandFlow = node.expandFlow
     clone.beforePhaseResolved = node.beforePhaseResolved
     clone.bodyStarted = node.bodyStarted
     clone.selectedBranchChoice = node.selectedBranchChoice
@@ -876,20 +877,6 @@ function buildFlowNodeContent(
     return stampOwner(scopedNode, targetPlayerId)
   }
   if (flow.type === 'leaf') {
-    if (flow.expandFlow) {
-      const definition = int.registry.get(flow.actionId)
-      if (definition?.flow) {
-        const inner = mergeContextIntoFlow(
-          definition.flow,
-          flow.actionContext,
-          flow.sourceCard,
-        )
-        return buildFlowNode(int, inner, ownerPlayerId, optionId, idStyle)
-      }
-      // Fallback: action has no inner flow (plain leaf action like
-      // grain-seeds / day-laborer / traveling-players). Drop into the
-      // standard ActionNode path below.
-    }
     const actionNode = new ActionNode(
       nextActionId(flow.actionId),
       flow.actionId,
@@ -900,6 +887,7 @@ function buildFlowNodeContent(
       optionId ? { ...(flow.actionContext ?? {}), optionId } : flow.actionContext,
       flow.effectPreview,
     )
+    actionNode.expandFlow = flow.expandFlow
     // A nonoptional leaf owns its initial request. Optional metadata belongs
     // to the optional prompt, not the action's later selection or continuation.
     if (flow.optional !== true) actionNode.anytimeWindow = flow.anytimeWindow
