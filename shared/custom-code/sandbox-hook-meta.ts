@@ -21,7 +21,11 @@ export const cardEffectHookMeta: Record<CardEffectField, HookMeta> = {
   // --- effect 阶段 hook：签名 (state, player) => ActionFlow | void（onBuy 额外接收 paymentInfo）---
   onBuy: { table: 'effect', timing: '打出此卡时', freq: '一次' },
   onBeforeWork: { table: 'effect', timing: '工作阶段开始前', freq: '每轮' },
-  onRoundStart: { table: 'effect', timing: '新一轮格子翻开后', freq: '每轮' },
+  onAfterRevealAction: { table: 'effect', timing: '本次回合行动牌揭示后，累积格补充前', freq: '每轮' },
+  onPreparation: { table: 'effect', timing: '揭牌反应结束后，累积格补充前', freq: '每轮' },
+  onRoundStart: { table: 'effect', timing: '累积格补充后，与计划领取在同一回合开始窗口', freq: '每轮' },
+  onEndPreparation: { table: 'effect', timing: '回合开始窗口结束后，准备阶段结束', freq: '每轮' },
+  onWorkStart: { table: 'effect', timing: 'beforeWork 之后，普通工作行动开始前', freq: '每轮' },
   onHarvest: { table: 'effect', timing: '收获各阶段', freq: '约每4-5轮' },
   onRoundEnd: { table: 'effect', timing: '该轮结束', freq: '每轮' },
   onEndTurn: { table: 'effect', timing: '每名玩家行动结束后', freq: '每行动' },

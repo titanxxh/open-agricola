@@ -255,6 +255,7 @@ const triggerSelectEvaluationOptions = (
   node: ParallelNode,
 ): TriggerSelectEvaluationOptions => ({
   canStartFlow: (flow, flowContext) => evaluateFlowDoable(flow, flowContext, (actionId) => int.registry.get(actionId)),
+  canStartNode: (child, childContext) => canStartNode(int, childContext, child),
   canContinueWithoutTriggers: (actionId, resources) => {
     const hostContext = getBeforeContinuationContext(int, context, node, actionId)
     return canActionContinueWithoutBeforeTriggers(
@@ -1238,6 +1239,7 @@ export function engineProceed(
     node.beforeAnytimeAvailable = false
     const rawResult = optInChoice ?? action.execute({
       ...executionContext,
+      transactionEvents: currentEventReadContext(int).transactionEvents,
       eventSink: eventBuffer.sink,
     })
     const result = withInjectedAnytimeResultFlag(rawResult, executionContext.actionContext)

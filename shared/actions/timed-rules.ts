@@ -1,5 +1,7 @@
 import type { ActionFlow, GameState, PlayerState } from '../contract/types'
 import type { FlowCardEffectHook } from '../contract/card-effect-hooks'
+import type { FlowEffectContext } from '../cards/card-effects'
+import type { GameEvent } from '../contract/events'
 import type { RuleBody, TimedRule, TimedRulePhase } from '../contract/rule-plans'
 import { readActionSnapshotToken, readActionSnapshotExtraData } from '../cards/helpers/action-snapshot-state'
 import { getStoredResource } from '../cards/helpers/card-storage'
@@ -7,7 +9,9 @@ import { harvestRounds } from '../contract/state-constants'
 import { readCardExtraData, writeCardExtraData, isCardFlagged, setCardFlag } from '../cards/helpers/card-state'
 
 const phaseOrder: Partial<Record<TimedRulePhase, number>> = {
-  afterReceive: 2, afterCollect: 10, contributeExtraTurn: 10, onBeforePlayerTurn: 10, onBeforeStartOfTurn: 0, onBeforeWork: 1, onRoundStart: 2, onEndTurn: 11,
+  onBeforeStartOfTurn: 0, onAfterRevealAction: 1, onPreparation: 2, onRoundStart: 3,
+  afterReceive: 3, onEndPreparation: 4, onBeforeWork: 5, onWorkStart: 6,
+  afterCollect: 10, contributeExtraTurn: 10, onBeforePlayerTurn: 10, onEndTurn: 11,
   onAllWorkersPlaced: 20, onBeforeReturnHome: 30, onStartReturnHome: 31, onReturnHome: 32,
   onBeforeHarvest: 40, onStartHarvest: 41, onStartHarvestFieldPhase: 42, onHarvestFieldPhase: 43,
   onAfterReap: 44, onEndHarvestFieldPhase: 45, onHarvest: 46,
@@ -20,7 +24,7 @@ const phaseIsUpcoming = (state: GameState, phase: TimedRulePhase): boolean => (p
 const RECEIPTS_KEY = 'timedRuleReceipts'
 export type TimedRuleOccurrence = { rule: TimedRule; round: number; identity: string }
 
-export const timedRuleOccurrences = (state: GameState, player: PlayerState, cardId: string, rules: readonly TimedRule[], executingPhase?: TimedRule['at']['phase']): TimedRuleOccurrence[] => {
+export const timedRuleOccurrences = (state: GameState, player: PlayerState, cardId: string, rules: readonly TimedRule[], executingPhase?: TimedRule['at']['phase'], transactionEvents: readonly GameEvent[] = []): TimedRuleOccurrence[] => {
   const receipts = readCardExtraData<unknown>(player, cardId, RECEIPTS_KEY)
   const consumed = Array.isArray(receipts) ? receipts : []
   return rules.flatMap(rule => {
@@ -44,7 +48,7 @@ export const timedRuleOccurrences = (state: GameState, player: PlayerState, card
         rounds = typeof value === 'number' && value > 0 && (!target.roundFact || readCardExtraData<unknown>(player, cardId, target.roundFact) === state.round) ? [state.round] : []
         break
       }
-      case 'future-source': rounds = [...state.futureMeeples.filter(entry => entry.cardId === cardId && entry.playerId === player.id).map(entry => entry.round), ...state.events.filter(event => event.type === 'futureMeeple.resolved' && event.cardId === cardId && event.playerId === player.id && event.round === state.round).map(() => state.round)]; break
+      case 'future-source': rounds = [...state.futureMeeples.filter(entry => entry.cardId === cardId && entry.playerId === player.id).map(entry => entry.round), ...[...state.events, ...transactionEvents].filter(event => event.type === 'futureMeeple.resolved' && event.cardId === cardId && event.playerId === player.id && event.round === state.round).map(() => state.round)]; break
       case 'worker-on-space': rounds = state.actionSpaces.find(space => space.id === target.spaceId)?.takenBy.some(worker => worker.playerId === player.id) ? [state.round] : []; break
       case 'next-stored-payout': rounds = target.resources.some(resource => getStoredResource(player, cardId, resource) > 0)
         ? [target.rounds.find(round => round > state.round || round === state.round && (executingPhase === target.phase || phaseIsUpcoming(state, target.phase)))] : []; break
@@ -96,18 +100,21 @@ export const findRuleBody = (rules: readonly TimedRule[], params?: Record<string
   return { body, rule, path }
 }
 
-export const compileTimedRuleHooks = (cardId: string, rules: readonly TimedRule[]): Partial<Record<Exclude<FlowCardEffectHook, 'onBuy'>, (state: GameState, player: PlayerState) => ActionFlow | undefined>> => {
-  const hooks: Partial<Record<Exclude<FlowCardEffectHook, 'onBuy'>, (state: GameState, player: PlayerState) => ActionFlow | undefined>> = {}
+export const compileTimedRuleHooks = (cardId: string, rules: readonly TimedRule[]): Partial<Record<Exclude<FlowCardEffectHook, 'onBuy'>, (state: GameState, player: PlayerState, context?: FlowEffectContext) => ActionFlow | undefined>> => {
+  const hooks: ReturnType<typeof compileTimedRuleHooks> = {}
   const keys = new Set<string>()
   for (const rule of rules) {
     if (keys.has(rule.key)) throw new Error(`Duplicate timed rule ${cardId}:${rule.key}`)
     keys.add(rule.key)
     const phase = rule.at.phase
     if (phase === 'afterReceive' || phase === 'afterCollect' || phase === 'contributeExtraTurn' || phase === 'onBeforePlayerTurn') continue
-    hooks[phase] = (state, player) => {
-      const due = timedRuleOccurrences(state, player, cardId, rules, phase).filter(occurrence => occurrence.round === state.round && occurrence.rule.at.phase === phase)
+    hooks[phase] = (state, player, context) => {
+      const events = [...state.events, ...(context?.transactionEvents ?? [])]
+      const due = timedRuleOccurrences(state, player, cardId, rules, phase, context?.transactionEvents).filter(occurrence => occurrence.round === state.round && occurrence.rule.at.phase === phase
+        && (occurrence.rule.at.kind !== 'future-source' || events.some(event => event.type === 'futureMeeple.resolved'
+          && event.cardId === cardId && event.playerId === player.id && event.round === state.round)))
       const children: ActionFlow[] = due.map(occurrence => ({ type: 'leaf', sourceCard: cardId, actionId: 'resolve-timed-rule', params: { ruleKey: occurrence.rule.key, identity: occurrence.identity } }))
-      return children.length ? { type: 'seq', children } : undefined
+      return children.length ? { type: 'seq', children, ...(due.every(occurrence => occurrence.rule.body.kind === 'optional') ? { optional: true } : {}) } : undefined
     }
   }
   return hooks

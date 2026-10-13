@@ -750,6 +750,7 @@ export const createInitialState = (
   seed?: number,
   extraMinorIdsOrOptions: string[] | InitialStateOptions = [],
   extraOccupationIds: string[] = [],
+  preparation: 'apply' | 'defer' = 'apply',
 ): GameState => {
   const options: InitialStateOptions = Array.isArray(extraMinorIdsOrOptions)
     ? { extraMinorIds: extraMinorIdsOrOptions, extraOccupationIds }
@@ -949,8 +950,10 @@ export const createInitialState = (
     workPhaseObtainedResources: {},
     completedFeedingPhases: 0,
   }
-  applyRoundGrowth(initialState)
-  applySeasonPreparationAdjustments(initialState)
+  if (preparation === 'apply') {
+    applyRoundGrowth(initialState)
+    applySeasonPreparationAdjustments(initialState)
+  }
   if (options.draftParents === false) {
     dealParentCardsIfNeeded(initialState, parentSelectionSeed)
   } else {

@@ -8,8 +8,9 @@ const harvestRounds = [4, 7, 9, 11, 13, 14]
 const cardImpl = {
   effect: {
   id: CARD_ID,
-  onBeforeStartOfTurn: (state, _player) => {
-    if (!harvestRounds.includes(state.round)) return
+  onBeforeStartOfTurn: (state, _player, ctx) => {
+    const upcomingRound = ctx?.roundPreparation?.kind === 'before-reveal' ? ctx.roundPreparation.nextRound : state.round
+    if (!harvestRounds.includes(upcomingRound)) return
     return {
       type: 'seq',
       children: [

@@ -31,9 +31,9 @@ describe('future meeple round-start actions', () => {
 
     expect(resp.interaction.stateId).toBe('wait')
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
-      .toBe('ui.interactionOptionalAction')
+      .toBe('ui.interactionSelectTrigger')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected future field choice')
-    const accept = resp.interaction.request.options?.find((option) => option.value !== '__skip__')
+    const accept = resp.interaction.request.options?.find((option) => option.sourceCard === 'A019_Handplow')
     expect(accept).toBeDefined()
 
     resp = session.resolveChoice(0, accept!.value)
@@ -70,9 +70,9 @@ describe('future meeple round-start actions', () => {
 
     expect(resp.interaction.stateId).toBe('wait')
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
-      .toBe('ui.interactionOptionalAction')
+      .toBe('ui.interactionSelectTrigger')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected future stable choice')
-    const accept = resp.interaction.request.options?.find((option) => option.value !== '__skip__')
+    const accept = resp.interaction.request.options?.find((option) => option.sourceCard === 'A089_StablePlanner')
     expect(accept).toBeDefined()
 
     resp = session.resolveChoice(0, accept!.value)
@@ -112,7 +112,7 @@ describe('future meeple round-start actions', () => {
     session.loadState(state)
     let resp = session.performRoundEnd()
     if (resp.interaction.stateId !== 'wait') throw new Error('expected future field choice')
-    const accept = resp.interaction.request.options?.find((option) => option.value !== '__skip__')
+    const accept = resp.interaction.request.options?.find((option) => option.sourceCard === 'D091_Plowman')
     expect(accept).toBeDefined()
 
     resp = session.resolveChoice(0, accept!.value)
@@ -167,8 +167,16 @@ describe('future meeple round-start actions', () => {
     let resp = session.performRoundEnd()
 
     expect(resp.interaction.stateId).toBe('wait')
-    expect(resp.state.players[0]!.resources.vegetable).toBe(1)
+    expect(resp.state.players[0]!.resources.vegetable).toBe(0)
     if (resp.interaction.stateId !== 'wait') throw new Error('expected future action preparation')
+    expect(resp.interaction.request.options?.find(option => option.sourceCard === 'D091_Plowman')?.disabled).toBe(true)
+    expect(resp.interaction.request.options?.find(option => option.labelKey === 'actions.exchange.name')?.disabled).toBe(true)
+    const receipt = resp.interaction.request.options?.find(option => option.labelKey === 'actions.receive.name')
+    expect(receipt).toBeDefined()
+    resp = session.resolveChoice(0, receipt!.value)
+    expect(resp.ok, resp.error).toBe(true)
+    expect(resp.state.players[0]!.resources.vegetable).toBe(1)
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected choices after receiving the vegetable')
     const exchange = resp.interaction.request.options?.find((option) => option.labelKey === 'actions.exchange.name')
     expect(exchange).toBeDefined()
 
@@ -184,7 +192,7 @@ describe('future meeple round-start actions', () => {
 
     resp = session.resolveChoice(0, cookVegetable!.value)
     if (resp.interaction.stateId !== 'wait') throw new Error('expected future field choice')
-    const accept = resp.interaction.request.options?.find((option) => option.value !== '__skip__')
+    const accept = resp.interaction.request.options?.find((option) => option.sourceCard === 'D091_Plowman')
     expect(accept).toBeDefined()
 
     resp = session.resolveChoice(0, accept!.value)
@@ -233,10 +241,10 @@ describe('future meeple round-start actions', () => {
     expect(resp.interaction.request.options?.some((option) => option.sourceCard === 'B069_PottersMarket')).toBe(false)
     expect(resp.interaction.request.options?.some((option) => option.labelKey === 'actions.exchange.name')).toBe(true)
 
-    resp = session.resolveChoice(0, '__skip__')
-    if (resp.interaction.stateId !== 'wait') throw new Error('expected future field choice')
-    resp = session.resolveChoice(0, '__skip__')
-
+    resp = session.resolveChoice(0, '__pass__')
+    expect(resp.ok, resp.error).toBe(true)
+    expect(resp.interaction.stateId).toBe('idle')
+    expect(resp.state.futureMeeples).toEqual([])
     expect(resp.state.players[0]!.cardStates.B069_PottersMarket?.counters?.pending ?? 0).toBe(0)
   })
 })

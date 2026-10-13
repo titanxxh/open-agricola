@@ -6,6 +6,7 @@ import { isPlayerSkippingCurrentHarvest } from '../cards/helpers/harvest-skip.ts
 import type { ActionFlow, GameState, PlayerState, ProtectedObservation } from '../contract/types.ts'
 import type { Engine, EngineFrame } from '../engine/index.ts'
 import { cloneState } from './state-bootstrap.ts'
+import { roundPreparationHooks, type RoundPreparationHook, type RoundPreparationContext } from '../contract/card-effect-hooks'
 
 export type StageResumeState = {
   hook:
@@ -18,6 +19,10 @@ export type StageResumeState = {
     | 'onAfterHarvest'
     | 'onBeforeStartOfTurn'
     | 'onBeforeWork'
+    | 'onAfterRevealAction'
+    | 'onPreparation'
+    | 'onEndPreparation'
+    | 'onWorkStart'
     | 'onRoundStart'
     | 'onStartHarvestFeedingPhase'
     | 'onEndTurn'
@@ -36,9 +41,6 @@ export type StageResumeState = {
     | 'onBeforeReturnHome'
     | 'onAllWorkersPlaced'
     | 'onBreedPhase'
-    | 'futureMeepleReceives'
-    | 'futureActionAnytimeWindow'
-    | 'futureMeepleActions'
     | 'onReorganizeComplete'
   playerIndex: number
   cardIndex: number
@@ -48,8 +50,9 @@ export type StageResumeState = {
     triggerActionId?: string | null
     resumeAfterCardId?: string | null
     anytimeActionTaken?: boolean
-    roundPreparationAlreadyApplied?: boolean
     beforeHarvestPlayerOrder?: number[]
+    roundPreparationPlayerOrder?: number[]
+    roundPreparation?: RoundPreparationContext
   }
 }
 
@@ -63,11 +66,14 @@ export type StageDispatchHost = {
   driveEngineSteps(): void
   withDeferredPrivateEventDrain(fn: () => void): void
   reportProtectedObservation(observation: ProtectedObservation): void
+  getRoundStartScheduleFlows?(playerIndex: number): ActionFlow[]
+  getRoundStartCompletionFlow?(playerIndex: number): ActionFlow | null
 }
 
 export type StageContinuationTable = Record<StageResumeState['hook'], (stageResume: StageResumeState) => void>
 
 const stageReactionHooks = new Set<StageResumeState['hook']>([
+  'onRoundStart',
   'onAllWorkersPlaced',
   'onStartHarvestFieldPhase',
   'onHarvestFieldPhase',
@@ -91,7 +97,7 @@ export class StageDispatch {
   completeFrameIfStage(frame: EngineFrame): boolean {
     const stageResume = (frame.stageResume ?? null) as StageResumeState | null
     if (!stageResume) return false
-    const completedStageResume = stageResume.hook === 'preScoringWindow' || stageResume.hook === 'futureActionAnytimeWindow'
+    const completedStageResume = stageResume.hook === 'preScoringWindow'
       ? {
           ...stageResume,
           extra: {
@@ -148,6 +154,8 @@ export class StageDispatch {
     cardIndex = 0,
     extra?: StageResumeState['extra'],
   ): boolean {
+    const preparationHook = roundPreparationHooks.find(candidate => candidate === hook)
+    if (preparationHook) return this.continueRoundPreparationHook(preparationHook, playerIndex, extra)
     if (cardIndex === 0 && stageReactionHooks.has(hook)) {
       return this.continueStageReactionHook(hook, playerIndex)
     }
@@ -280,7 +288,7 @@ export class StageDispatch {
   private collectOwnStageReactionActivationFlows(
     hook: StageCardEffectHook,
     player: PlayerState,
-    options: { inferMandatoryFromPreview?: boolean } = {},
+    options: { inferMandatoryFromPreview?: boolean; roundPreparation?: RoundPreparationContext } = {},
   ): ActionFlow[] {
     const children: ActionFlow[] = []
     const cards = [
@@ -290,8 +298,12 @@ export class StageDispatch {
     for (const cardId of cards) {
       const effect = getCardEffect(cardId)
       if (!effect?.[hook]) continue
+      const preparationHook = roundPreparationHooks.find(candidate => candidate === hook)
+      if (preparationHook && effect.stageEligibility?.[preparationHook]?.(
+        this.state, player, { roundPreparation: options.roundPreparation },
+      ) === false) continue
       const preview = options.inferMandatoryFromPreview
-        ? this.previewStageEffectFlow(hook, player, cardId)
+        ? this.previewStageEffectFlow(hook, player, cardId, options.roundPreparation)
         : undefined
       const activation = this.buildStageEffectActivationFlow(
         cardId,
@@ -300,8 +312,8 @@ export class StageDispatch {
         player.id,
         options.inferMandatoryFromPreview ? false : true,
         options.inferMandatoryFromPreview
-          ? { commitOnTriggerSelection: true, previewApplicable: preview?.applicable === true }
-          : {},
+          ? { commitOnTriggerSelection: true, previewApplicable: preview?.applicable === true, roundPreparation: options.roundPreparation }
+          : { roundPreparation: options.roundPreparation },
       )
       if (options.inferMandatoryFromPreview && preview?.applicable) {
         activation.optional = preview.flow?.optional === true ? true : undefined
@@ -312,16 +324,50 @@ export class StageDispatch {
     return children
   }
 
+  private continueRoundPreparationHook(
+    hook: RoundPreparationHook,
+    offset: number,
+    extra?: StageResumeState['extra'],
+  ): boolean {
+    const start = Math.max(0, this.state.players.findIndex(player => player.startPlayer))
+    const order = extra?.roundPreparationPlayerOrder
+      ?? this.state.players.map((_, index) => (start + index) % this.state.players.length)
+    for (let currentOffset = offset; currentOffset < order.length; currentOffset += 1) {
+      const playerIndex = order[currentOffset]
+      const player = playerIndex === undefined ? undefined : this.state.players[playerIndex]
+      if (!player || playerIndex === undefined) continue
+      const children = this.collectOwnStageReactionActivationFlows(hook, player, {
+        roundPreparation: extra?.roundPreparation,
+        inferMandatoryFromPreview: true,
+      })
+      if (hook === 'onRoundStart') children.push(...(this.host.getRoundStartScheduleFlows?.(playerIndex) ?? []))
+      const completion = hook === 'onRoundStart' ? this.host.getRoundStartCompletionFlow?.(playerIndex) : null
+      if (!children.length && !completion) continue
+      const only = children.length === 1 ? children[0] : undefined
+      const inactiveActivation = only?.type === 'leaf' && only.actionId === 'activate-card-effect'
+        && only.actionContext?.previewApplicable !== true
+      const reactions: ActionFlow = only && only.optional !== true && !inactiveActivation ? only
+        : { type: 'parallel', mode: 'trigger-select', children }
+      const flow: ActionFlow = completion ? { type: 'seq', children: [reactions, completion] } : reactions
+      this.startFlow(flow, hook, playerIndex, 0, currentOffset + 1, {
+        ...extra, roundPreparationPlayerOrder: [...order],
+      })
+      return true
+    }
+    return false
+  }
+
   private previewStageEffectFlow(
     hook: StageCardEffectHook,
     player: PlayerState,
     cardId: string,
+    roundPreparation?: RoundPreparationContext,
   ): { flow: ActionFlow | null; applicable: boolean } | undefined {
     const previewState = cloneState(this.state)
     const previewPlayer = previewState.players.find((entry) => entry.id === player.id)
     if (!previewPlayer) return undefined
     const before = JSON.stringify({ state: previewState, player: previewPlayer })
-    const flow = runCardEffectHook(previewState, previewPlayer, cardId, hook)
+    const flow = runCardEffectHook(previewState, previewPlayer, cardId, hook, undefined, { roundPreparation })
     return {
       flow,
       applicable: flow !== null || JSON.stringify({ state: previewState, player: previewPlayer }) !== before,

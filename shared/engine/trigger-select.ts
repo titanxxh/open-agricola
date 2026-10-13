@@ -41,6 +41,7 @@ export type TriggerSelectEvaluation = {
 
 export type TriggerSelectEvaluationOptions = {
   canStartFlow?: (flow: ActionFlow, context: ActionExecutionContext) => boolean
+  canStartNode?: (node: EngineNode, context: ActionExecutionContext) => boolean
   canContinueWithoutTriggers?: (actionId: string, resources?: Resource) => boolean
   canReachContinuationThroughTriggers?: (actionId: string, resources?: Resource) => boolean
 }
@@ -174,6 +175,7 @@ const previewActivateCardEffectChild = (
       previewPlayer,
       child.params,
       child.actionContext,
+      context.transactionEvents,
     ),
   }
 }
@@ -369,7 +371,7 @@ export const evaluateTriggerSelect = (
       : true
     const doable = previewable
       ? (applicable ? evaluateChildDoable(result, previewState, previewPlayer, context, evalOptions) : false)
-      : true
+      : (evalOptions.canStartNode?.(child, context) ?? true)
     const resourcesAfter = doable && previewPlayer.id === context.player.id
       ? previewResourcesAfterChild(result, previewState, previewPlayer)
       : undefined
@@ -394,7 +396,8 @@ export const evaluateTriggerSelect = (
     if (!applicable) continue
     options.push({
       value: (cardIdCounts.get(state.cardId) ?? 0) > 1 ? state.child.id : state.cardId,
-      labelKey: `cards.${state.cardId}.name`,
+      labelKey: state.child.choiceLabelKey ?? `cards.${state.cardId}.name`,
+      ...(state.child.choiceLabelParams ? { labelParams: state.child.choiceLabelParams } : {}),
       sourceCard: state.cardId,
       ...(doable ? {} : { disabled: true, disabledReasonKey: TRIGGER_DISABLED_REASON }),
     })

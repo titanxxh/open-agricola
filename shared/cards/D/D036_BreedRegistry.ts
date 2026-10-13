@@ -96,6 +96,8 @@ const sheepMovementDeltas = (context: CardListenerContext) => {
       continue
     }
     if (!isResourceMovedEvent(event)) continue
+    if (event.reason === 'receive' && events.some(candidate => isFutureMeepleResolvedEvent(candidate)
+      && candidate.playerId === owner.id && candidate.cardId === event.sourceCardId)) continue
     const sheep = event.resources.sheep ?? 0
     if (sheep <= 0) continue
     if (event.to.kind !== 'player' || event.to.playerId !== owner.id) continue
@@ -166,7 +168,7 @@ const futureMeepleSheepGainListener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   zones: ['hand', 'played'],
   phases: ['immediatelyAfter'],
-  actions: ['future-meeple-resolved'],
+  actions: ['receive'],
   handler: sheepGainHandler,
 }
 

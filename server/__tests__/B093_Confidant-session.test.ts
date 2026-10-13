@@ -114,19 +114,22 @@ describe('B093 Confidant parity', () => {
     const foodBefore = state.players[0]!.resources.food
     session.loadState(state)
 
-    const response = session.performRoundEnd()
+    let response = session.performRoundEnd()
 
     expect(response.ok, response.error).toBe(true)
     expect(response.state.round).toBe(6)
-    expect(response.state.players[0]!.resources.food).toBe(foodBefore + 1)
+    expect(response.state.players[0]!.resources.food).toBe(foodBefore)
     expect(response.interaction.stateId).toBe('wait')
-    if (response.interaction.stateId !== 'wait') return
-    const options = response.interaction.request.options ?? []
-    expect(options.some((option) => option.value === '__skip__')).toBe(true)
-    expect(options.some((option) => option.labelKey === 'actions.sow.name')).toBe(true)
-    expect(options.some((option) => option.labelKey === 'actions.fencing.name')).toBe(true)
-
-    const skipped = session.resolveChoice(response.interaction.playerIndex, '__skip__')
+    if (response.interaction.stateId !== 'wait') throw new Error('Expected the scheduled receipt')
+    const receipt = response.interaction.request.options?.find(option => option.labelKey === 'actions.receive.name')
+    expect(receipt).toBeDefined()
+    expect(response.state.events.some(event => event.type === 'futureMeeple.resolved' && event.cardId === CARD_ID && event.round === 6)).toBe(false)
+    response = session.resolveChoice(response.interaction.playerIndex, receipt!.value)
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources.food).toBe(foodBefore + 1)
+    if (response.interaction.stateId !== 'wait') throw new Error('Expected the optional action after receipt')
+    expect(response.interaction.request.options?.some(option => option.sourceCard === CARD_ID && !option.disabled)).toBe(true)
+    const skipped = session.resolveChoice(response.interaction.playerIndex, '__pass__')
     expect(skipped.ok, skipped.error).toBe(true)
     expect(scheduledRounds(skipped)).toEqual([7])
   })

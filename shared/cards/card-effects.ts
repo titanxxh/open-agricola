@@ -1,5 +1,5 @@
 import { retainedTimedRuleHook, retainedTimedTurnSkip, timedRuleSources, timedExtraTurnFlow } from './timed-rule-obligations'
-import { flowCardEffectHooks, type CardEffectHook, type FlowCardEffectHook } from '../contract/card-effect-hooks'
+import { flowCardEffectHooks, type CardEffectHook, type FlowCardEffectHook, type RoundPreparationHook, type RoundPreparationContext } from '../contract/card-effect-hooks'
 import type { TimedRule } from '../contract/rule-plans'
 import type { ActionFlow, FarmTilePosition, GameState, InteractionRequest, PaymentResourceMap, PlayerState, ProtectedObservation, Resource, ResourceKey } from '../contract/types'
 import type { Pasture } from '../domain/pasture'
@@ -150,7 +150,9 @@ type FlowEffectHandler = (
   ctx?: FlowEffectContext,
 ) => ActionFlow | void
 export type FlowEffectContext = {
+  transactionEvents?: readonly import('../contract/events').GameEvent[]
   triggerActionId?: string
+  roundPreparation?: RoundPreparationContext
   reportProtectedObservation?: (observation: ProtectedObservation) => void
 }
 type FlowEffectHandlerWithContext = (
@@ -210,6 +212,10 @@ export type ResourceCommitment = { playerId: string; resources: Partial<Resource
 
 export type CardEffect = {
   id: string
+  /** Native stage source qualification, captured before live payment preview. */
+  stageEligibility?: Partial<Record<RoundPreparationHook, (
+    state: GameState, player: PlayerState, ctx: FlowEffectContext,
+  ) => boolean>>
   timedRules?: readonly TimedRule[]
   projectInteractionRequest?: (state: GameState, player: PlayerState, request: InteractionRequest, actionId: string | undefined) => InteractionRequest
   computeResourceCommitments?: (state: GameState, owner: PlayerState) => readonly ResourceCommitment[]
@@ -231,6 +237,10 @@ export type CardEffect = {
   countExtraTurns?: (state: GameState, player: PlayerState) => number
   extraTurnBeforeWorkers?: boolean
   onBeforeWork?: FlowEffectHandler
+  onAfterRevealAction?: FlowEffectHandler
+  onPreparation?: FlowEffectHandler
+  onEndPreparation?: FlowEffectHandler
+  onWorkStart?: FlowEffectHandler
   onRoundStart?: FlowEffectHandler
   onHarvest?: FlowEffectHandler
   onRoundEnd?: FlowEffectHandler
@@ -397,8 +407,9 @@ export const runCardEffectHook = (
   const owned = [...player.improvements, ...player.minorPlayed, ...player.occupationPlayed].includes(cardId)
   const handHook = isHandCardEffectHook(hook) && effect?.handHooks?.includes(hook) && [...player.minorHand, ...player.occupationHand].includes(cardId)
   if (!owned && !handHook && hook !== 'onBuy' && effect?.timedRules?.some(rule => rule.retainAfterCardLeaves)) {
-    return retainedTimedRuleHook(state, player, cardId, hook, id => getCardEffect(id)?.timedRules ?? []) ?? null
+    return retainedTimedRuleHook(state, player, cardId, hook, id => getCardEffect(id)?.timedRules ?? [], ctx) ?? null
   }
+  if (ctx?.roundPreparation && !owned && !handHook && hook !== 'onBuy') return null
   const handler = effect?.[hook]
   if (!handler) return null
   try {
