@@ -205,6 +205,8 @@ Issues #994–#1002 establish the Card State boundary: source-owned read-only ru
 
 Occupation-hand selection shares subset validation between Session submission and the internal selection effect. Duplicate or foreign cards and invalid counts are rejected before effects, RNG observations or private-cache writes; a rejected submission retains its original pending selection.
 
+Improvement purchase eligibility shares the granted types, named-action status, and card metadata between availability, hand candidates, and authoritative submission (#1128). A minor requiring a Major Improvement action may enter a genuine major opportunity while retaining minor hand, payment, played-card and scoring identity. Non-action building effects do not grant that exception, and major opportunities keep major-only replacement hooks.
+
 Room and ordinary stable selection reject a whole batch containing repeated coordinates before payment or placement (#1127/#1129). Session regressions cover ordinary actions and card-granted actions, unchanged resources, geometry, supply, card state and pending selections on rejection, and legal retries. Existing multi-building costs and discounts remain unchanged.
 
 Animal Reorg Prefill is implemented in the shared animal-zone and request boundaries (see the §5 infrastructure table); it introduces no card-specific core branches.

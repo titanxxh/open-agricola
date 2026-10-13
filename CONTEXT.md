@@ -344,7 +344,8 @@ _Avoid_: Action Execution Scope、跨 Turn 复用身份或起点状态
 
 **Rule Action（规则行动）**:
 一次完整使用行动格，或规则明确授予的一次命名行动。Rule Action 可以发生在 Turn 内，也可以在阶段或 anytime 窗口中脱离 Turn 执行；选择和 continuation 只是该行动的结算过程。
-_Avoid_: Turn、ActionNode、单独的资源增减 / 支付 / 选择
+卡牌效果产生同类结果，不必然构成该命名行动；D095 与 E027 的建造主要改良效果不构成 Major Improvement 行动，D127 明确提供该行动。
+_Avoid_: Turn、ActionNode、单独的资源增减 / 支付 / 选择、把所有卡牌建造效果当作命名行动
 
 **Most Recent Action Space（最近使用的行动格）**:
 按实际使用先后确定的最后一个 Action Space。同一个 Turn 使用多个行动格时，C150 Parrot Breeder 的复制目标仍只有最后使用的一格。
