@@ -29,7 +29,7 @@ _Avoid_: 房间连接、WebSocket version、React state
 _Avoid_: 当前行动玩家、本轮已冻结顺序
 
 **Round Work Order（本轮工作顺序）**:
-Preparation 开始时按 Start Player Marker 冻结的本轮普通放人顺序。随后在 work phase 前发生的标记转移不改变该顺序；Roman Pot 等本轮顺序消费者必须读取同一冻结结果。唯一例外是 Snake Opening 在第 1 回合的反转。
+Preparation 累积格补充完成、进入 StartOfTurn 前按 Start Player Marker 冻结的本轮普通放人顺序。随后在 work phase 前发生的标记转移不改变该顺序；Roman Pot 等本轮顺序消费者必须读取同一冻结结果。唯一例外是 Snake Opening 在第 1 回合的反转。
 _Avoid_: Start Player Marker、`currentPlayerIndex`、`roundActionOrder`
 
 **Snake Opening（蛇形开局）**:
@@ -424,7 +424,7 @@ Session 推进当前 `EngineFrame` 时使用的执行口径，负责把下一步
 _Avoid_: Session 直接调用 `_internals()`、Session 按 node class 分支、另建一套 EngineStack
 
 **Stage Dispatch**:
-阶段推进时负责发现并触发卡牌阶段效果、阶段 reaction、before-end 玩家分发，并写入后续可恢复的阶段 continuation。
+阶段推进时负责发现并触发卡牌阶段效果、阶段 reaction、before-end 玩家分发，并写入后续可恢复的阶段 continuation。准备窗口按每名玩家进入时的持牌和只读资格构建固定 activation 来源树，来源发现与实时 handler/支付分开；同一树在 pending 后继续，不重扫变化后的牌区。
 _Avoid_: Round/Harvest 业务顺序、响应生成、前端交互展示
 
 **Before-Harvest Reaction Window（收获前反应窗口）**:
@@ -706,7 +706,7 @@ _Avoid_: 展开整个 Action Space、模拟放置工人、继承行动格附带�
 _Avoid_: 前端规则补丁、核心路径单卡 if-else
 
 **Card Effect Hook**:
-卡牌在打出、阶段或计分时被调用的 effect 字段，如 `onBuy`、`onRoundStart`、`onStartHarvestFieldPhase`、`onAfterReap`、`computeBonusScore`。一次性打出效果用 `onBuy`，在支付和卡牌提交后执行；明确包括本牌的持续效果也把自身部分放在这里，后续打牌仍由 listener 响应。
+卡牌在打出、阶段或计分时被调用的 effect 字段，如 `onBuy`、`onAfterRevealAction`、`onRoundStart`、`onWorkStart`、`onStartHarvestFieldPhase`、`onAfterReap`、`computeBonusScore`。`onRoundStart` 只表示 StartOfTurn，与揭牌、Preparation、beforeWork、startOfWork 分开；原生资格查询不自动扩张 Workshop 支持范围。一次性打出效果用 `onBuy`，在支付和卡牌提交后执行；明确包括本牌的持续效果也把自身部分放在这里，后续打牌仍由 listener 响应。
 _Avoid_: listener phase
 
 **Before-End Player Dispatch**:
