@@ -1,3 +1,4 @@
+import { createWorkSession } from './_helpers/session-fixtures'
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -35,7 +36,7 @@ const setupMinor = ({
   played?: boolean
   improvements?: number
 }) => {
-  const session = new GameSession(4053, undefined, { playerCount: 2 })
+  const session = createWorkSession({ seed: 4053, options: { playerCount: 2 } })
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.currentPlayerIndex = 0
@@ -259,7 +260,15 @@ describe('D046 Pellet Press parity', () => {
     state.players.forEach((player) => markAllWorkersUsed(state, player))
     state.players.slice(1).forEach((player) => { player.resources.food = 20 })
     session.loadState(state)
-    session.performRoundEnd()
+    let preparation = session.performRoundEnd()
+    for (let step = 0; step < 3 && preparation.interaction.stateId === 'wait'
+      && preparation.interaction.request.kind === 'select-trigger'; step += 1) {
+      const source = preparation.interaction.request.options.find(option => !option.disabled
+        && option.labelKey !== 'actions.exchange.name' && option.value !== '__pass__')
+      if (!source) throw new Error('Expected Pellet Press reset or scheduled food')
+      preparation = session.resolveChoice(0, source.value)
+      expect(preparation.ok, preparation.error).toBe(true)
+    }
     const next = session.takeAction(0, 'day-laborer')
     expect(next.interaction.anytimeActions.map((action) => action.id)).toContain('D46-pellet-press-anytime')
   })

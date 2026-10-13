@@ -1,3 +1,4 @@
+import { createWorkSession } from './_helpers/session-fixtures'
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
@@ -10,7 +11,7 @@ const CARD_ID = 'A076_Cob'
 const FILLER = '__test_placeholder__'
 
 const setup = ({ clay = 0, grain = 0, food = 0, played = true } = {}) => {
-  const session = new GameSession(5076, undefined, { playerCount: 2 })
+  const session = createWorkSession({ seed: 5076, options: { playerCount: 2 } })
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.currentPlayerIndex = 0
@@ -94,11 +95,14 @@ describe('A076 Cob parity', () => {
     expect(response.state.players[0]!.resources).toMatchObject({ clay, grain, food: 20 })
   })
 
-  it('A076 S5: clay qualifies Cob even without grain, and declining leaves resources unchanged', () => {
+  it('A076 S5: clay without payable grain leaves resources unchanged at work start', () => {
     const session = setup({ clay: 1, grain: 0, food: 20 })
-    let response = roundStart(session)
-    expect(response.interaction.stateId === 'wait' ? response.interaction.sourceCard : undefined).toBe(CARD_ID)
-    response = resolveSkipChoice(session, response)
+    const state = session.getState().state
+    state.players.forEach(player => markAllWorkersUsed(state, player))
+    session.loadState(state)
+    const response = session.performRoundEnd()
+    expect(response.interaction.stateId).toBe('idle')
+    expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources).toMatchObject({ clay: 1, grain: 0, food: 20 })
     expect(response.state.roundPhase).toBe('work')
   })

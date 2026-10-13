@@ -1,3 +1,4 @@
+import { createWorkSession } from './_helpers/session-fixtures'
 import { describe, expect, it } from 'vitest'
 
 import { GameSession } from '../game/authoritative-session'
@@ -50,11 +51,11 @@ const prepareState = (state: GameState, round: number) => {
 }
 
 const setup = (round = 1) => {
-  const session = new GameSession(378, undefined, {
+  const session = createWorkSession({ seed: 378, options: {
     playerCount: 2,
     enableFarmersOfTheMoor: true,
     allowIncompleteFarmersOfTheMoorMinorDeal: true,
-  })
+  } })
   prepareState(session.state, round)
   session.loadState(session.state)
   return { session, state: session.state, player: session.state.players[0]! }
@@ -109,8 +110,9 @@ const acceptFuture = (
 ) => {
   expect(resp.interaction.stateId).toBe('wait')
   if (resp.interaction.stateId !== 'wait') throw new Error('expected wait')
-  expect(resp.interaction.promptKey).toBe('ui.interactionOptionalAction')
-  const option = resp.interaction.request.options?.find((entry) => entry.value !== '__skip__')
+  expect(resp.interaction.request.kind).toBe('select-trigger')
+  const option = resp.interaction.request.options?.find((entry) => !entry.disabled && entry.sourceCard
+    && ['M044_Swamp', 'M045_TreeNursery', 'M049_SurveyorsMap'].includes(entry.sourceCard))
   expect(option).toBeDefined()
   return session.resolveChoice(resp.interaction.playerIndex ?? 0, option!.value)
 }
@@ -121,7 +123,7 @@ const skipFuture = (
 ) => {
   expect(resp.interaction.stateId).toBe('wait')
   if (resp.interaction.stateId !== 'wait') throw new Error('expected wait')
-  return session.resolveChoice(resp.interaction.playerIndex ?? 0, '__skip__')
+  return session.resolveChoice(resp.interaction.playerIndex ?? 0, '__pass__')
 }
 
 const commitTerrain = (
@@ -209,7 +211,8 @@ describe('Moor future terrain minor cards', () => {
     readyForRoundEnd(state)
     session.loadState(state)
     let resp = session.performRoundEnd()
-    expect(resp.state.futureMeeples).toEqual([])
+    expect(resp.state.futureMeeples).toHaveLength(1)
+    expect(resp.state.events.some(event => event.type === 'futureMeeple.resolved' && event.cardId === 'M044_Swamp' && event.round === 2)).toBe(false)
     resp = commitTerrain(session, acceptFuture(session, resp), [{ row: 1, col: 2 }])
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.farmTerrain).toContainEqual({ row: 1, col: 2, kind: 'moor' })

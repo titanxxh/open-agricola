@@ -486,6 +486,14 @@ describe('C064 Corn Schnapps Distillery parity', () => {
     response.state.players.forEach((player) => markAllWorkersUsed(response.state, player))
     session.loadState(response.state)
     response = session.performRoundEnd()
+    for (let step = 0; step < 3 && response.interaction.stateId === 'wait'
+      && response.interaction.request.kind === 'select-trigger'; step += 1) {
+      const source = response.interaction.request.options.find(option => !option.disabled
+        && option.labelKey !== 'actions.exchange.name' && option.value !== '__pass__')
+      if (!source) throw new Error('Expected Corn Schnapps reset or scheduled food')
+      response = session.resolveChoice(0, source.value)
+      expect(response.ok, response.error).toBe(true)
+    }
     expect(response.state.round).toBe(6)
     expect(response.state.players[0]!.resources).toMatchObject({ food: 1, grain: 1 })
     expect(response.state.futureMeeples.filter((entry) => entry.cardId === 'C064_CornSchnappsDistillery').map((entry) => entry.round)).toEqual([7, 8, 9])

@@ -1,3 +1,4 @@
+import { createWorkSession } from './_helpers/session-fixtures'
 import { type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 
@@ -11,7 +12,7 @@ import type { ActionFlow } from '../../shared/contract/types'
 
 describe('B089_Groom session', () => {
   const setup = (options?: { houseType?: 'wood' | 'clay' | 'stone' }) => {
-    const session = new GameSession(42)
+    const session = createWorkSession({ seed: 42 })
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -103,7 +104,7 @@ describe('B089 Groom parity', () => {
   const setup = ({
     played = true, houseType = 'stone' as 'wood' | 'clay' | 'stone', wood = 0,
   }: { played?: boolean; houseType?: 'wood' | 'clay' | 'stone'; wood?: number } = {}) => {
-    const session = new GameSession(6089, undefined, { playerCount: 4 })
+    const session = createWorkSession({ seed: 6089, options: { playerCount: 4 } })
     const state = session.getState().state
     stabilizeRandomHands(state.players)
     state.currentPlayerIndex = 0

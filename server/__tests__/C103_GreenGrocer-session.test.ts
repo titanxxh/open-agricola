@@ -1,3 +1,4 @@
+import { createWorkSession } from './_helpers/session-fixtures'
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
@@ -17,7 +18,7 @@ const setup = ({
   round?: number
   resources?: Partial<Resource>
 } = {}) => {
-  const session = new GameSession(5103, undefined, { playerCount: 2 })
+  const session = createWorkSession({ seed: 5103, options: { playerCount: 2 } })
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.currentPlayerIndex = 0
@@ -88,7 +89,13 @@ const chooseExchange = (
   paid: Partial<Resource>,
   gained: Partial<Resource>,
 ) => {
-  const offered = greenGrocerPrompt(session, start)
+  let offered = greenGrocerPrompt(session, start)
+  const source = offered.interaction.request.options?.find(option => option.labelKey === 'actions.activate-card-effect.name')
+  if (source) {
+    offered = session.resolveChoice(offered.interaction.playerIndex, source.value)
+    expect(offered.ok, offered.error).toBe(true)
+    if (offered.interaction.stateId !== 'wait') return offered
+  }
   const exchange = offered.interaction.request.options?.find((option) =>
     option.effectPreview?.kind === 'resourceExchange'
       && Object.entries(paid).every(([resource, count]) =>

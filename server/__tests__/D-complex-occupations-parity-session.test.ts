@@ -1,3 +1,4 @@
+import { createWorkSession } from './_helpers/session-fixtures'
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
@@ -24,7 +25,7 @@ const setupOccupation = (cardId: CardId, {
   played?: boolean
   round?: number
 } = {}) => {
-  const session = new GameSession(91, undefined, { playerCount })
+  const session = createWorkSession({ seed: 91, options: { playerCount } })
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.currentPlayerIndex = 0
@@ -117,9 +118,9 @@ describe('D091 Plowman parity', () => {
     prepareRoundEnd(session, 5)
 
     let response = session.performRoundEnd()
-    expect(response.interaction.stateId === 'wait' ? response.interaction.sourceCard : undefined)
-      .toBe('D091_Plowman')
-    response = session.resolveChoice(0, '__skip__')
+    expect(response.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'select-trigger' } })
+    expect(response.interaction.stateId === 'wait' && response.interaction.request.options?.some(option => option.sourceCard === 'D091_Plowman')).toBe(true)
+    response = session.resolveChoice(0, response.interaction.stateId === 'wait' && response.interaction.request.kind === 'select-trigger' ? '__pass__' : '__skip__')
 
     expect(response.state.players[0]!.fields).toHaveLength(0)
     expect(response.state.players[0]!.resources.food).toBe(1)
@@ -238,7 +239,7 @@ describe('D102 Sample Stable Maker parity', () => {
 })
 
 const setupBuildingTycoon = () => {
-  const session = new GameSession(128, undefined, { playerCount: 3 })
+  const session = createWorkSession({ seed: 128, options: { playerCount: 3 } })
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.currentPlayerIndex = 0

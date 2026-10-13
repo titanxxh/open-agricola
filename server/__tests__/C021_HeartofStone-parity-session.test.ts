@@ -1,3 +1,4 @@
+import { createWorkSession } from './_helpers/session-fixtures'
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { familySize, markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
@@ -9,7 +10,7 @@ const CARD_ID = 'C021_HeartofStone'
 const FILLER = '__test_placeholder__'
 
 const setup = ({ played = false, food = 4, round = 5, rooms = 3 } = {}) => {
-  const session = new GameSession(5021, undefined, { playerCount: 2 })
+  const session = createWorkSession({ seed: 5021, options: { playerCount: 2 } })
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.currentPlayerIndex = 0

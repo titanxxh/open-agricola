@@ -1,3 +1,4 @@
+import { createWorkSession } from './_helpers/session-fixtures'
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
@@ -10,7 +11,7 @@ import '../../shared/cards/B/B082_ValueAssets'
 
 const FILLER = '__test_placeholder__'
 const setup = (cardId: string, round = 5, played = true) => {
-  const session = new GameSession(7500 + round, undefined, { playerCount: 2 })
+  const session = createWorkSession({ seed: 7500 + round, options: { playerCount: 2 } })
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.currentPlayerIndex = 0

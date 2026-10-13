@@ -1,3 +1,4 @@
+import { createWorkSession } from './_helpers/session-fixtures'
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
@@ -9,7 +10,7 @@ const CARD_ID = 'C067_MineralFeeder'
 const FILLER = '__test_placeholder__'
 
 const setupPlaySession = (reed: number) => {
-  const session = new GameSession(5067, undefined, { playerCount: 2 })
+  const session = createWorkSession({ seed: 5067, options: { playerCount: 2 } })
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.currentPlayerIndex = 0
@@ -57,7 +58,7 @@ const printedVp = (response: SessionResponse) => {
 }
 
 const setupRoundStartSession = (round = 1) => {
-  const session = new GameSession(6067, undefined, { playerCount: 2 })
+  const session = createWorkSession({ seed: 6067, options: { playerCount: 2 } })
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)

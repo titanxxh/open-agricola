@@ -338,15 +338,14 @@ describe('B104 Sheep Walker parity', () => {
     session.loadState(state)
     let response = session.performRoundEnd()
     expect(response.state.round).toBe(6)
-    if (response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'choice') throw new Error('expected preparation')
+    if (response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'select-trigger') throw new Error('expected preparation')
     const exchange = response.interaction.request.options.find((option) => option.labelKey === 'actions.exchange.name')
     expect(exchange).toBeDefined()
     response = session.resolveChoice(0, exchange!.value)
     response = session.resolveChoice(0, exchangeOption(response, 'stone').value)
     expect(response.state.players[0]!.resources).toMatchObject({ sheep: 0, stone: 1, food: 1 })
-    if (response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'choice') throw new Error('expected Plowman')
-    expect(response.interaction.sourceCard).toBe('D091_Plowman')
-    const accept = response.interaction.request.options.find((option) => option.value !== '__skip__')!
+    if (response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'select-trigger') throw new Error('expected Plowman')
+    const accept = response.interaction.request.options.find((option) => !option.disabled && option.sourceCard === 'D091_Plowman')!
     response = session.resolveChoice(0, accept.value)
     if (response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'farm-select') throw new Error('expected plow')
     response = session.commitSelectionChoice(0, { tile: response.interaction.request.farm.selectableTiles[0]! })

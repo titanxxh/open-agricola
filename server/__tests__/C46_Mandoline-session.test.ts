@@ -1,3 +1,4 @@
+import { createWorkSession } from './_helpers/session-fixtures'
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { isCardFlagged } from '../../shared/cards/helpers/card-state'
@@ -14,7 +15,7 @@ const FILLER = '__test_placeholder__'
 const setup = ({
   played = true, wood = 1, vegetable = 2, food = 20, round = 5,
 } = {}) => {
-  const session = new GameSession(5046, undefined, { playerCount: 2 })
+  const session = createWorkSession({ seed: 5046, options: { playerCount: 2 } })
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.currentPlayerIndex = 0
@@ -160,7 +161,15 @@ describe('C046 Mandoline parity', () => {
     completeFarmland(session, used)
     session.state.players.forEach((player) => markAllWorkersUsed(session.state, player))
 
-    const nextRound = session.performRoundEnd()
+    let nextRound = session.performRoundEnd()
+    for (let step = 0; step < 3 && nextRound.interaction.stateId === 'wait'
+      && nextRound.interaction.request.kind === 'select-trigger'; step += 1) {
+      const source = nextRound.interaction.request.options.find(option => !option.disabled
+        && option.labelKey !== 'actions.exchange.name' && option.value !== '__pass__')
+      if (!source) throw new Error('Expected Mandoline reset or scheduled food')
+      nextRound = session.resolveChoice(0, source.value)
+      expect(nextRound.ok, nextRound.error).toBe(true)
+    }
 
     expect(nextRound.ok, nextRound.error).toBe(true)
     expect(nextRound.state.round).toBe(6)

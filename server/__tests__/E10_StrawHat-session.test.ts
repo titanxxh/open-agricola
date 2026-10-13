@@ -407,12 +407,12 @@ const setupArchwayStableTurn = (options?: {
   royalWood?: boolean
   stableTree?: boolean
 }) => {
-  const session = new GameSession(42, undefined, {
+  const session = createWorkSession({ seed: 42, options: {
     playerCount: 2,
     ...(options?.hearthBrush
       ? { enableFarmersOfTheMoor: true, allowIncompleteFarmersOfTheMoorMinorDeal: true }
       : {}),
-  })
+  } })
   const state = session.getState().state
   state.currentPlayerIndex = 0
   state.round = 3

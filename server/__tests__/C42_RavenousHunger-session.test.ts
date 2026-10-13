@@ -1,3 +1,4 @@
+import { createWorkSession } from './_helpers/session-fixtures'
 import { describe, expect, it } from 'vitest'
 import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 import type { ActionChoiceOption, GameState, PlayerState, ActionSpace, Resource } from '../../shared/contract/types'
@@ -7,7 +8,7 @@ import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import '../../shared/cards/C/C042_RavenousHunger'
 import '../../shared/cards/C/C076_WoodCart'
-import { D116_TreeInspector_impl } from '../../shared/cards/D/D116_TreeInspector'
+import '../../shared/cards/D/D116_TreeInspector'
 import '../../shared/cards/D/D138_PetLover'
 import { applyRoundGrowth } from '../../shared/session/state-constants'
 import type { ActionFlow } from '../../shared/contract/types'
@@ -78,7 +79,7 @@ const resources = (values: Partial<Resource> = {}): Resource => ({
 })
 
 const setupSession = () => {
-  const session = new GameSession(5042, undefined, { playerCount: 2 })
+  const session = createWorkSession({ seed: 5042, options: { playerCount: 2 } })
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
@@ -168,7 +169,7 @@ const setupTreeInspectorSession = () => {
 }
 
 const setupPetLoverSession = () => {
-  const session = new GameSession(undefined, undefined, { playerCount: 3 })
+  const session = createWorkSession({ options: { playerCount: 3 } })
   const state = session.getState().state
   state.currentPlayerIndex = 0
   state.round = 14
@@ -428,9 +429,20 @@ describe('C042_RavenousHunger', () => {
     applyRoundGrowth(state)
     expect(treeInspector.resources.wood).toBe(3)
 
-    state.roundActionOrder[state.round - 1] = 'eastern-quarry'
-    D116_TreeInspector_impl.effect!.onBeforeStartOfTurn!(state, state.players[0]!)
-    expect(treeInspector.resources.wood).toBe(0)
+    state.round = 12
+    state.roundActionOrder[12] = 'eastern-quarry'
+    state.players.forEach(player => {
+      player.resources.food = 20
+      markAllWorkersUsed(state, player)
+    })
+    session.loadState(state)
+    const response = session.performRoundEnd()
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.round).toBe(13)
+    expect(response.state.actionSpaces.find(space => space.id === TREE_INSPECTOR_ID)?.resources.wood).toBe(1)
+    expect(response.state.events.filter(event => event.type === 'resource.moved'
+      && event.sourceCardId === TREE_INSPECTOR_ID && event.reason === 'discard'))
+      .toContainEqual(expect.objectContaining({ resources: { wood: 3 } }))
   })
 
   it('gains the printed sheep type after Pet Lover replaces collect', () => {

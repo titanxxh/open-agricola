@@ -1,6 +1,7 @@
+import { createWorkSession } from './_helpers/session-fixtures'
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { setWorkersAtHome } from '../../shared/domain/player'
+import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import type { AnimalKey } from '../../shared/contract/animals'
 import type { Resource, SessionResponse } from '../../shared/contract/types'
 import { confirmNextPlayer } from './_helpers/pending-confirms'
@@ -29,11 +30,11 @@ const resources = (overrides: Partial<Resource> = {}): Resource => ({
 })
 
 const setup = (cardId: string, round = 1, initialResources: Partial<Resource> = {}) => {
-  const session = new GameSession(409, undefined, {
+  const session = createWorkSession({ seed: 409, options: {
     playerCount: 2,
     enableFarmersOfTheMoor: true,
     allowIncompleteFarmersOfTheMoorMinorDeal: true,
-  })
+  } })
   const state = session.getState().state
   state.currentPlayerIndex = 0
   state.round = round
@@ -122,11 +123,31 @@ const playMinor = (
 
 const startRound = (session: GameSession, round: number) => {
   const state = session.getState().state
-  state.round = round
-  state.roundPhase = 'preparation'
+  state.round = round - 1
+  state.roundPhase = 'work'
   state.currentPlayerIndex = 0
+  state.players.forEach(player => {
+    markAllWorkersUsed(state, player)
+    if ([4, 7, 9, 11, 13].includes(state.round)) {
+      player.resources.food = 20
+      player.resources.fuel = 2
+    }
+  })
   session.loadState(state)
-  return (session as unknown as { continueBeforeStartOfTurn: () => SessionResponse }).continueBeforeStartOfTurn()
+  let response = session.performRoundEnd()
+  for (let step = 0; step < 12 && response.state.round < round && response.interaction.stateId === 'wait'; step += 1) {
+    const interaction = response.interaction
+    const request = interaction.request
+    if (request.kind === 'feed') response = session.resolveChoice(interaction.playerIndex, 'confirm', { selections: [] })
+    else if (request.kind === 'heating') response = session.resolveChoice(interaction.playerIndex, 'confirm', { fuelUsed: request.required, woodToFuel: 0 })
+    else if (request.kind === 'confirm-next-player') response = session.resolveChoice(request.fromPlayerIndex, 'confirm')
+    else if (request.kind === 'confirm-player-switch') response = session.resolveChoice(interaction.playerIndex, 'confirm')
+    else throw new Error(`Unexpected round-end request ${request.kind}`)
+    expect(response.ok, response.error).toBe(true)
+  }
+  expect(response.ok, response.error).toBe(true)
+  expect(response.state.round, JSON.stringify(response.interaction)).toBe(round)
+  return response
 }
 
 const offerState = (session: GameSession, cardId: string) =>

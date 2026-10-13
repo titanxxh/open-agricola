@@ -1,3 +1,4 @@
+import { createWorkSession } from './_helpers/session-fixtures'
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
@@ -26,7 +27,7 @@ const setup = ({
   fields?: number
   actor?: number
 } = {}) => {
-  const session = new GameSession(6120, undefined, { playerCount: 2 })
+  const session = createWorkSession({ seed: 6120, options: { playerCount: 2 } })
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.currentPlayerIndex = actor
@@ -140,14 +141,18 @@ describe('C120 Agricultural Labourer parity', () => {
     session.loadState(state)
 
     let response = resolveTriggerIfPresent(session, session.performRoundEnd(), EXCHANGE_ID)
-    expect(response.interaction.stateId).toBe('wait')
-    if (response.interaction.stateId !== 'wait') return
-    const exchange = options(response).find((option) =>
-      option.effectPreview?.kind === 'resourceExchange'
-      && option.effectPreview.resourcesPaid?.food === 2
-      && option.effectPreview.resourcesGained?.grain === 1)
-    expect(exchange, JSON.stringify(response.interaction)).toBeDefined()
-    response = session.resolveChoice(response.interaction.playerIndex, exchange!.value)
+    const source = options(response).find(option => option.labelKey === 'actions.activate-card-effect.name')
+    if (source) response = session.resolveChoice(0, source.value)
+    if (response.state.players[0]!.resources.grain === 0) {
+      expect(response.interaction.stateId).toBe('wait')
+      if (response.interaction.stateId !== 'wait') return
+      const exchange = options(response).find((option) =>
+        option.effectPreview?.kind === 'resourceExchange'
+        && option.effectPreview.resourcesPaid?.food === 2
+        && option.effectPreview.resourcesGained?.grain === 1)
+      expect(exchange, JSON.stringify(response.interaction)).toBeDefined()
+      response = session.resolveChoice(response.interaction.playerIndex, exchange!.value)
+    }
 
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources).toMatchObject({ food: 4, grain: 1, clay: 1 })

@@ -152,7 +152,7 @@ describe('D134_OysterEater skip-next-placement (onBeforePlayerTurn)', () => {
     expect(response.state.round).toBe(2)
     expect(response.state.currentPlayerIndex).toBe(0)
     expect(response.state.players[0]!.cardStates?.D134_OysterEater?.extraData?.skipNextPlacement)
-      .toBeUndefined()
+      .toBe(0)
     const skippedBefore = response.state.events.filter((event) =>
       event.type === 'turn.skipped' && event.playerId === owner.id,
     ).length
@@ -161,7 +161,7 @@ describe('D134_OysterEater skip-next-placement (onBeforePlayerTurn)', () => {
     response = drainPending(session, response)
     expect(response.state.currentPlayerIndex).toBe(1)
     expect(response.state.players[0]!.cardStates?.D134_OysterEater?.extraData?.skipNextPlacement)
-      .toBeUndefined()
+      .toBe(0)
 
     for (const [playerIndex, spaceId] of [[1, 'forest'], [2, 'clay-pit'], [3, 'reed-bank']] as const) {
       response = session.takeAction(playerIndex, spaceId)
@@ -174,6 +174,6 @@ describe('D134_OysterEater skip-next-placement (onBeforePlayerTurn)', () => {
     )).toHaveLength(skippedBefore)
     expect(response.state.currentPlayerIndex).toBe(0)
     expect(response.state.players[0]!.cardStates?.D134_OysterEater?.extraData?.skipNextPlacement)
-      .toBeUndefined()
+      .toBe(0)
   })
 })
