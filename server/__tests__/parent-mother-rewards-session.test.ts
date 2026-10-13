@@ -6,6 +6,7 @@ import { getAvailableStableSupplyCount } from '../../shared/domain/supply-tokens
 import { emptyResources } from '../../shared/session/state-bootstrap'
 import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/serialization'
 import type { MotherParentCardId } from '../../shared/parents/types'
+import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 
 const snapshot = <T>(value: T): T => JSON.parse(JSON.stringify(value))
 
@@ -80,7 +81,10 @@ const enterRound = (session: GameSession, round: number) => {
 }
 
 const accept = (session: GameSession) => {
-  const prompt = session.getState()
+  let prompt = session.getState()
+  const mother = session.state.players[0]!.parentCards?.mother
+  if (mother) prompt = resolveTriggerIfPresent(session, prompt, mother)
+  if (prompt.interaction.stateId === 'wait' && prompt.interaction.request.kind === 'farm-select') return prompt
   expect(prompt.interaction).toMatchObject({ stateId: 'wait', playerIndex: 0, request: { kind: 'choice' } })
   const option = prompt.interaction.request.options.find((entry) => entry.value !== '__skip__')!
   expect(option).toBeDefined()
@@ -88,6 +92,12 @@ const accept = (session: GameSession) => {
   expect(response.ok, response.error).toBe(true)
   expect(response.interaction.request.kind).toBe('farm-select')
   return response
+}
+
+const declineFarm = (session: GameSession) => {
+  const prompt = session.getState()
+  return session.resolveChoice(0, prompt.interaction.stateId === 'wait'
+    && prompt.interaction.request.kind === 'select-trigger' ? '__pass__' : '__skip__')
 }
 
 const restore = (session: GameSession) => {
@@ -235,7 +245,7 @@ describe('Parents batch 1 mother printed-rule audit', () => {
     const session = setup(cardId)
     enterRound(session, round)
     const before = structuredClone(session.state.players)
-    const response = session.resolveChoice(0, '__skip__')
+    const response = declineFarm(session)
     expect(response.ok, response.error).toBe(true)
     expect(response.interaction.stateId).toBe('idle')
     for (const [index, player] of response.state.players.entries()) {
@@ -441,7 +451,7 @@ describe('Parents batch 1 mother printed-rule audit', () => {
   it.each([['PR01', 2, -0.75], ['PR02', 12, -0.25]] as const)('%s keeps its printed end score even after declining its reward', (cardId, round, score) => {
     const session = setup(cardId)
     enterRound(session, round)
-    expect(session.resolveChoice(0, '__skip__').ok).toBe(true)
+    expect(declineFarm(session).ok).toBe(true)
     const response = finish(session)
     expect(response.scores![0]!.categories.find((category) => category.key === 'parentCards')?.total).toBe(score)
   })

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
+import { createWorkSession } from './_helpers/session-fixtures'
+import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 import { storePendingFenceBonus } from '../../shared/cards/helpers/pending-fence-bonus'
 import {
   markAllWorkersUsed,
@@ -44,12 +46,12 @@ const prepareHands = (session: GameSession) => {
 }
 
 const setupFarmersOfTheMoorSeason = (season: SeasonId) => {
-  const session = new GameSession(365, undefined, {
+  const session = createWorkSession({ seed: 365, options: {
     playerCount: 2,
     enableFarmersOfTheMoor: true,
     allowIncompleteFarmersOfTheMoorMinorDeal: true,
     enableThroughTheSeasons: true,
-  })
+  } })
   session.state.currentPlayerIndex = 0
   session.state.round = 1
   session.state.roundPhase = 'work'
@@ -105,11 +107,13 @@ const auditFathers = ['PS01', 'PS02', 'PS03', 'PS04', 'PS05', 'PS06', 'PS07', 'P
 const auditSetup = (options: { mother?: MotherParentCardId; father?: FatherParentCardId; otherMother?: MotherParentCardId; season?: SeasonId; moor?: boolean } = {}) => {
   const { mother, father = 'PS01', otherMother = mother === 'PR10' ? 'PR12' : 'PR10', season, moor = false } = options
   const seed = season ? { winter: 2, spring: 9, summer: 1, autumn: 3 }[season] : 56126
-  const session = new GameSession(seed, undefined, {
+  const sessionOptions = {
     playerCount: 2, enableParentCards: mother !== undefined, parentSelectionSeed: 9004,
     enableFarmersOfTheMoor: moor, allowIncompleteFarmersOfTheMoorMinorDeal: true,
     enableThroughTheSeasons: season !== undefined,
-  })
+  }
+  const session = mother ? new GameSession(seed, undefined, sessionOptions)
+    : createWorkSession({ seed, options: sessionOptions })
   for (const player of session.state.players) {
     player.minorHand = ['__test_placeholder__']
     player.occupationHand = ['__test_placeholder__']
@@ -194,7 +198,10 @@ const auditEnterRound = (session: GameSession, round: number, season?: SeasonId)
   return response
 }
 const auditAcceptFarm = (session: GameSession) => {
-  const response = session.getState()
+  const mother = session.state.players[0]!.parentCards?.mother
+  let response = session.getState()
+  if (mother) response = resolveTriggerIfPresent(session, response, mother)
+  if (response.interaction.stateId === 'wait' && response.interaction.request.kind === 'farm-select') return response
   expect(response.interaction.request.kind).toBe('choice')
   const option = response.interaction.request.options.find((entry) => entry.value !== '__skip__')
   expect(option).toBeDefined()
@@ -202,6 +209,11 @@ const auditAcceptFarm = (session: GameSession) => {
   expect(accepted.ok, accepted.error).toBe(true)
   expect(accepted.interaction.request.kind).toBe('farm-select')
   return accepted
+}
+const auditDeclineFarm = (session: GameSession) => {
+  const response = session.getState()
+  return session.resolveChoice(0, response.interaction.stateId === 'wait'
+    && response.interaction.request.kind === 'select-trigger' ? '__pass__' : '__skip__')
 }
 const auditClaim = (session: GameSession, father: FatherParentCardId, tier: number) => {
   let response = session.takeAnytimeAction(0, 'complete-parent-father')
@@ -315,7 +327,7 @@ describe('Cross expansions batch 4 parent reward sequencing audit', () => {
     expect(session.state.futureMeeples.filter((entry) => entry.cardId === 'PR01')).toHaveLength(1)
     auditEnterRound(session, 2, 'autumn')
     session = auditRestore(session)
-    if (mode === 'skip') expect(session.resolveChoice(0, '__skip__').ok).toBe(true)
+    if (mode === 'skip') expect(auditDeclineFarm(session).ok).toBe(true)
     else {
       const prompt = auditAcceptFarm(session)
       expect(session.commitSelectionChoice(0, { stables: [prompt.interaction.request.farm.selectableTiles[0]!] }).ok).toBe(true)
