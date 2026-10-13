@@ -27,6 +27,7 @@ import { PlayerCard, type CardType } from '../common/PlayerCard'
 import { farmHandTopLeftFromCenterKey } from './farmHandCenter'
 import { ALL_ANIMAL_KEYS, type AnimalKey } from '../../../shared/contract/animals'
 import { sumAnimalCounts } from '../../../shared/domain/animal-holder-state'
+import { wouldExceedZoneOccupancyLimit } from '../../app/hooks/use-animal-reorg-flow'
 
 type AnimalType = AnimalKey
 const ANIMAL_CONTROL_TYPES: readonly AnimalType[] = ALL_ANIMAL_KEYS
@@ -890,6 +891,7 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
     parentCardDisplays = [],
     playedCardDisplays = [],
     isReorgActive,
+    animalReorg,
     reorgRemaining,
     pendingFenceSet,
     pendingFenceSourceMap,
@@ -1511,7 +1513,8 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
                           houseDisplay.animalType === animalType && count > 0
                         const canIncrease =
                           (reorgRemaining?.[animalType] ?? 0) > 0 &&
-                          (houseDisplay.animalType !== animalType || count < 1)
+                          (houseDisplay.animalType !== animalType || count < 1) &&
+                          !wouldExceedZoneOccupancyLimit(animalReorg?.zones ?? [], `house:${tileKey}`)
                         return (
                           <div key={animalType} className="pasture-control-row">
                             <span className="pasture-control-label">

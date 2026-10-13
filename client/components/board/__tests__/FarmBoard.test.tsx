@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { renderToStaticMarkup } from 'react-dom/server'
 
 import type { GameState, PlayerState, Resource } from '../../../../shared/contract/types'
@@ -521,6 +521,32 @@ describe('FarmBoard', () => {
     expect(html).toContain('data-testid="public-card-marker-M027_GardenPath-garden-path"')
     expect(html).toContain('Garden Path')
     expect(html).not.toContain('farm-terrain-marker-M027_GardenPath')
+  })
+
+  it.each([{ limit: 1, disabled: true }, { limit: 2, disabled: false }])('honors whole-house occupancy $limit in empty-room addition controls', ({ limit, disabled }) => {
+    const player = createPlayer('p1', 'Player A', 'red')
+    player.roomTiles = [{ row: 0, col: 0 }, { row: 1, col: 0 }]
+    player.houseAnimals = { '0-0': 'sheep' }
+    const adjustReorgAnimal = vi.fn()
+    render(<FarmBoard {...createFarmBoardProps(player, {
+      farmCells: player.roomTiles.map(tile => ({ key: `tile-${tile.row}-${tile.col}`, type: 'tile', tileRow: tile.row, tileCol: tile.col, tileKey: `${tile.row}-${tile.col}`, isRoom: true })),
+      isReorgActive: true,
+      houseDisplayMap: new Map([
+        ['0-0', { animalType: 'sheep', animalCount: 1 }],
+        ['1-0', { animalType: null, animalCount: 0 }],
+      ]),
+      reorgRemaining: { sheep: 0, boar: 1, cattle: 0, horse: 0 },
+      animalReorg: { confirmDiscard: false, zones: [
+        { id: 'house:0-0', zoneType: 'house', animalType: 'sheep', animalCount: 1, capacity: 1, occupancyGroup: 'house:p1', occupiedZoneLimit: limit },
+        { id: 'house:1-0', zoneType: 'house', animalType: null, animalCount: 0, capacity: 1, occupancyGroup: 'house:p1', occupiedZoneLimit: limit },
+      ] },
+    }, { adjustReorgAnimal })} />)
+    const emptyRoom = screen.getByTestId('room-animal-1-0')
+    const boarAddition = within(emptyRoom).getAllByRole('button', { name: '+' })[1]!
+    expect(boarAddition.hasAttribute('disabled')).toBe(disabled)
+    fireEvent.click(boarAddition)
+    if (disabled) expect(adjustReorgAnimal).not.toHaveBeenCalled()
+    else expect(adjustReorgAnimal).toHaveBeenCalledWith('house:1-0', 'boar', 1)
   })
 
   it('renders horse as a house animal and reorg control when Farmers of the Moor is enabled', () => {

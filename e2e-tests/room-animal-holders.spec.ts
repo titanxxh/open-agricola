@@ -59,6 +59,22 @@ async function command(page: Page, body: Record<string, unknown>) {
   }, body)
 }
 
+function roomFixture(tamer: boolean) {
+  return createWorkSession({ seed: 42, configure(state) {
+      state.round = 8
+      const prior = state.roundActionOrder.indexOf('pig-market')
+      ;[state.roundActionOrder[7], state.roundActionOrder[prior]] = [state.roundActionOrder[prior]!, state.roundActionOrder[7]!]
+      for (const player of state.players) player.resources.food = 20
+      const owner = state.players[0]!
+      owner.occupationPlayed = tamer ? ['A086_AnimalTamer'] : []
+      owner.rooms = 2
+      owner.roomTiles = [{ row: 0, col: 0 }, { row: 1, col: 0 }]
+      owner.houseAnimals = { '0-0': 'sheep' }
+      Object.assign(owner.resources, { sheep: 1, boar: 0, cattle: 0 })
+      state.actionSpaces.find(space => space.id === 'pig-market')!.resources.boar = 1
+    } })
+}
+
 test('room assignments can be edited separately, remain after reload, and synchronize to another client', async ({ page, browser, request }) => {
   const observer = await browser.newPage()
   try {
@@ -78,19 +94,7 @@ test('room assignments can be edited separately, remain after reload, and synchr
       await client.goto(`${FRONTEND_URL}/?player=p${index + 1}&transport=ws&room=dev2&devMode=1`)
       await expect(client.locator('.game-layout')).toBeVisible({ timeout: 30000 })
     }
-    const fixture = createWorkSession({ seed: 42, configure(state) {
-      state.round = 8
-      const prior = state.roundActionOrder.indexOf('pig-market')
-      ;[state.roundActionOrder[7], state.roundActionOrder[prior]] = [state.roundActionOrder[prior]!, state.roundActionOrder[7]!]
-      for (const player of state.players) player.resources.food = 20
-      const owner = state.players[0]!
-      owner.occupationPlayed = ['A086_AnimalTamer']
-      owner.rooms = 2
-      owner.roomTiles = [{ row: 0, col: 0 }, { row: 1, col: 0 }]
-      owner.houseAnimals = { '0-0': 'sheep' }
-      Object.assign(owner.resources, { sheep: 1, boar: 0, cattle: 0 })
-      state.actionSpaces.find(space => space.id === 'pig-market')!.resources.boar = 1
-    } })
+    const fixture = roomFixture(true)
     try {
       const loaded = await command(page, { type: 'loadGame', state: fixture.withCtx(() => serializeState(fixture.state, {})) })
       expect(loaded.receipt.outcome.ok).toBe(true)
@@ -120,6 +124,19 @@ test('room assignments can be edited separately, remain after reload, and synchr
     await page.reload()
     await expect(page.getByTestId('room-animal-0-0').locator('.res-icon-sheep')).toBeVisible()
     await expect(page.getByTestId('room-animal-1-0').locator('.res-icon-boar')).toBeVisible()
+
+    const ordinary = roomFixture(false)
+    try {
+      const loaded = await command(page, { type: 'loadGame', state: ordinary.withCtx(() => serializeState(ordinary.state, {})) })
+      expect(loaded.receipt.outcome.ok).toBe(true)
+    } finally { ordinary.dispose() }
+    await expect(page.getByTestId('room-animal-0-0').locator('.res-icon-sheep')).toBeVisible()
+    await page.locator('[data-action-id="pig-market"] button').first().click()
+    await expect(page.locator('.interaction-reorg-panel')).toBeVisible()
+    const emptyRoom = page.getByTestId('room-animal-1-0')
+    await expect(emptyRoom.locator('.res-icon-boar')).toHaveCount(0)
+    await expect(emptyRoom.locator('.pasture-control-row').filter({ hasText: /Boar|Pig/i })
+      .getByRole('button', { name: '+', exact: true })).toBeDisabled()
   } finally {
     await observer.close()
   }

@@ -192,7 +192,7 @@ The viewer projection `filterSerializedStateForPlayer` drops `gameSeed` for ever
 - Identity: `id`, `name`, `color`
 - Economy: `resources`, `familySize`, `workersAvailable`, `rooms`, `houseType`
 - Farm: `fields` with multiple `CropStack[]`, `roomTiles`, `stableTiles`, `fenceSegments`, `pastures`, Farmers of the Moor `farmTerrain` with top `kind` and optional `covered`, `farmyardExtensions`, `farmyardSpaceStates`
-- Animals: `houseAnimalType`, `houseAnimalCount`, `stableAnimals`, `newbornCount`
+- Animals: `houseAnimals` (room-position assignments), `stableAnimals`, `newbornCount`
 - Played cards: `improvements`, `minorPlayed`, `occupationPlayed`
 - Hands: `minorHand`, `occupationHand`
 - Persistent effects: `majorEffects`, `activeModifiers`
