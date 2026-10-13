@@ -147,6 +147,14 @@ const startRound = (session: GameSession, round: number) => {
   }
   expect(response.ok, response.error).toBe(true)
   expect(response.state.round, JSON.stringify(response.interaction)).toBe(round)
+  for (let step = 0; step < 3 && response.interaction.stateId === 'wait'; step++) {
+    const options = response.interaction.request.options ?? []
+    if (options.some(option => option.value.startsWith('offer:') || option.value.startsWith('buy:'))) break
+    const source = options.find(option => !option.disabled && (option.sourceCard === M056 || option.sourceCard === M131))
+    if (!source) break
+    response = session.resolveChoice(response.interaction.playerIndex, source.value)
+    expect(response.ok, response.error).toBe(true)
+  }
   return response
 }
 
