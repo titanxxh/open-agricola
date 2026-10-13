@@ -19,8 +19,7 @@ const setup = (sheep: number) => {
   player.minorHand = [CARD_ID]
   player.resources.sheep = sheep
   player.resources.cattle = 0
-  player.houseAnimalType = null
-  player.houseAnimalCount = 0
+  player.houseAnimals = {};
   session.loadState(state)
   return session
 }
@@ -61,11 +60,11 @@ describe('A009 Young Animal Market parity', () => {
     expect(response.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'animal-reorg' } })
 
     response = session.resolveChoice(0, 'confirm', {
-      zones: [{ id: 'house', zoneType: 'house', animalType: 'cattle', animalCount: 1 }],
+      zones: [{ id: 'house:1-0', zoneType: 'house', animalType: 'cattle', animalCount: 1 }],
     })
 
     expect(response.ok, response.error).toBe(true)
-    expect(response.state.players[0]).toMatchObject({ houseAnimalType: 'cattle', houseAnimalCount: 1 })
+    expect(response.state.players[0]).toMatchObject({ houseAnimals: { '1-0': 'cattle' }, })
   })
 
   it('A009 S2: no sheep keeps Young Animal Market unavailable and preserves state', () => {

@@ -100,8 +100,7 @@ const createPlayer = (id: string, name: string, color: PlayerState['color']): Pl
   minorHand: [],
   minorPlayed: [],
   occupationHand: [],
-  occupationPlayed: [],houseAnimalType: null,
-  houseAnimalCount: 0,
+  occupationPlayed: [],houseAnimals: {},
   stableAnimals: {},
   pastures: [],
   fenceSegments: [],
@@ -165,7 +164,7 @@ const createFarmBoardProps = (
     pastureTiles: new Map(),
     pastureDisplayMap: new Map(),
     pastureCapacityMap: new Map(),
-    houseDisplay: { animalType: null, animalCount: 0 },
+    houseDisplayMap: new Map(),
     stableDisplayMap: new Map(),
     isReorgActive: false,
     reorgRemaining: null,
@@ -526,9 +525,8 @@ describe('FarmBoard', () => {
 
   it('renders horse as a house animal and reorg control when Farmers of the Moor is enabled', () => {
     const player = createPlayer('p1', 'Player A', 'red')
-    player.houseAnimalType = 'horse'
-    player.houseAnimalCount = 1
     player.roomTiles = [{ row: 0, col: 0 }]
+    player.houseAnimals = { '0-0': 'horse' }
 
     const html = renderToStaticMarkup(
       <FarmBoard
@@ -537,7 +535,7 @@ describe('FarmBoard', () => {
             { key: 'tile-0-0', type: 'tile', tileRow: 0, tileCol: 0, tileKey: '0-0', isRoom: true },
           ],
           isReorgActive: true,
-          houseDisplay: { animalType: 'horse', animalCount: 1 },
+          houseDisplayMap: new Map([['0-0', { animalType: 'horse', animalCount: 1 }]]),
           reorgRemaining: { sheep: 0, boar: 0, cattle: 0, horse: 1 },
         })}
       />,

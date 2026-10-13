@@ -151,7 +151,7 @@ describe('Collect action card listeners', () => {
       if (totalObtained <= 0) return
       
       const canAccommodate = 
-        (player.houseAnimalType !== null && player.houseAnimalCount < player.rooms * 2) ||
+        ((Object.values(player.houseAnimals)[0] ?? null) !== null && Object.values(player.houseAnimals).length < player.rooms * 2) ||
         Object.values(player.stableTiles || {}).some(t => t === null)
       
       if (!canAccommodate) return
@@ -289,8 +289,7 @@ describe('Collect action card listeners', () => {
         phase: 'after',
         result: { resourcesGained: { sheep: 1 } },
         player: {
-          houseAnimalType: 'sheep',
-          houseAnimalCount: 1,
+          houseAnimals: { '1-0': 'sheep' },
           rooms: 2,
           stableTiles: {},
         },
@@ -313,8 +312,7 @@ describe('Collect action card listeners', () => {
         phase: 'after',
         result: { resourcesGained: { boar: 1 } },
         player: {
-          houseAnimalType: null,
-          houseAnimalCount: 0,
+          houseAnimals: {},
           rooms: 1,
           stableTiles: { '0-0': null },
         },
@@ -334,8 +332,7 @@ describe('Collect action card listeners', () => {
         phase: 'after',
         result: { resourcesGained: { wood: 3 } },
         player: {
-          houseAnimalType: 'sheep',
-          houseAnimalCount: 1,
+          houseAnimals: { '1-0': 'sheep' },
           rooms: 2,
         },
       })
@@ -353,8 +350,7 @@ describe('Collect action card listeners', () => {
         phase: 'after',
         result: { resourcesGained: { sheep: 2 } },
         player: {
-          houseAnimalType: null,
-          houseAnimalCount: 0,
+          houseAnimals: {},
           rooms: 0,
           stableTiles: {},
         },

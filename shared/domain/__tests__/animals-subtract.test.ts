@@ -12,9 +12,9 @@ const emptyResources = () => ({
 const createPlayer = (overrides: Partial<PlayerState> = {}): PlayerState => ({
   id: 'p1', name: 'P1', color: 'red',
   resources: emptyResources(), workers: [], rooms: 2, houseType: 'wood',
-  fields: [], roomTiles: [], stableTiles: [], improvements: [],
+  fields: [], roomTiles: [{ row: 1, col: 0 }, { row: 2, col: 0 }], stableTiles: [], improvements: [],
   minorHand: [], minorPlayed: [], occupationHand: [], occupationPlayed: [],
-  houseAnimalType: null, houseAnimalCount: 0, stableAnimals: {},
+  houseAnimals: {}, stableAnimals: {},
   pastures: [], fenceSegments: [],
   majorEffects: { wellRounds: 0 }, startPlayer: false, cardStates: {},
   ...overrides,
@@ -52,14 +52,14 @@ describe('subtractAnimalsFromBoard', () => {
     const p = createPlayer({
       resources: { ...emptyResources(), sheep: 3 },
       pastures: [{ id: 'p1', size: 1, tiles: [{ row: 2, col: 0 }], stables: 0, animalType: 'sheep', animalCount: 1 }],
-      houseAnimalType: 'sheep', houseAnimalCount: 1,
+      houseAnimals: { '1-0': 'sheep' },
       stableAnimals: { '2-2': 'sheep' },
     })
     subtractAnimalsFromBoard(p, { sheep: 3 })
     expect(p.resources.sheep).toBe(0)
     expect(p.pastures[0].animalCount).toBe(0)
-    expect(p.houseAnimalCount).toBe(0)
-    expect(p.houseAnimalType).toBeNull()
+    expect(Object.values(p.houseAnimals).length).toBe(0)
+    expect((Object.values(p.houseAnimals)[0] ?? null)).toBeNull()
     expect(p.stableAnimals['2-2']).toBeNull()
   })
 

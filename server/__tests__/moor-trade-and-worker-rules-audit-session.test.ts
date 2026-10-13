@@ -28,8 +28,7 @@ describe('Moor worker and conversion printed-rule audit', () => {
     player.improvements = ['Major_Fireplace1']
     player.resources.food = 2
     player.resources.boar = 1
-    player.houseAnimalType = 'boar'
-    player.houseAnimalCount = 1
+    player.houseAnimals = Object.fromEntries(player.roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, 'boar']));
     for (const entry of session.state.players) markAllWorkersUsed(session.state, entry)
     session.loadState(session.state)
     let response = session.performRoundEnd()

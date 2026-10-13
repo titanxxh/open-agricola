@@ -7,8 +7,8 @@ const NIGHT_PASTURE = 'M033_NightPasture'
 const mkPlayer = (overrides: Partial<PlayerState>): PlayerState =>
   ({
     pastures: [],
-    houseAnimalType: null,
-    houseAnimalCount: 0,
+    roomTiles: [{ row: 1, col: 0 }, { row: 2, col: 0 }],
+    houseAnimals: {},
     stableAnimals: {},
     cardStates: {},
     resources: {
@@ -54,7 +54,7 @@ describe('getAssignedAnimalsByType', () => {
   })
 
   it('counts house animal', () => {
-    const p = mkPlayer({ houseAnimalType: 'boar', houseAnimalCount: 1 })
+    const p = mkPlayer({ houseAnimals: { '1-0': 'boar' }, })
     expect(getAssignedAnimalsByType(p)).toEqual({ sheep: 0, boar: 1, cattle: 0 })
   })
 
@@ -67,8 +67,7 @@ describe('getAssignedAnimalsByType', () => {
 
   it('counts assigned horses without producing NaN', () => {
     const p = mkPlayer({
-      houseAnimalType: 'horse',
-      houseAnimalCount: 1,
+      houseAnimals: { '1-0': 'horse' },
       stableAnimals: { 's-1': 'horse' },
     })
     expect(getAssignedAnimalsByType(p)).toEqual({ sheep: 0, boar: 0, cattle: 0, horse: 2 })
@@ -191,8 +190,7 @@ describe('getAssignedAnimalsByType', () => {
       pastures: [
         { id: 'pa-1', size: 1, tiles: [], stables: 0, animalType: 'sheep', animalCount: 2 },
       ] as PlayerState['pastures'],
-      houseAnimalType: 'sheep',
-      houseAnimalCount: 1,
+      houseAnimals: { '1-0': 'sheep' },
       stableAnimals: { 's-1': 'sheep' },
       cardStates: {
         C148_MudWallower: { extraData: { held: 1, animalType: 'boar' } },
@@ -208,8 +206,7 @@ describe('getAssignedAnimalCount (sum compat)', () => {
       pastures: [
         { id: 'pa-1', size: 1, tiles: [], stables: 0, animalType: 'sheep', animalCount: 2 },
       ] as PlayerState['pastures'],
-      houseAnimalType: 'cattle',
-      houseAnimalCount: 1,
+      houseAnimals: { '1-0': 'cattle' },
     })
     const byType = getAssignedAnimalsByType(p)
     expect(getAssignedAnimalCount(p)).toBe(byType.sheep + byType.boar + byType.cattle)

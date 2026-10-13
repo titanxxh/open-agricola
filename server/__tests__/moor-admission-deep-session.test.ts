@@ -83,8 +83,7 @@ describe('Moor printed prerequisites through actual improvement actions', () => 
       player.resources.vegetable = 2
       if (cardId === 'M059_NaturesFertilizer') {
         player.resources.boar = 1
-        player.houseAnimalType = 'boar'
-        player.houseAnimalCount = 1
+        player.houseAnimals = Object.fromEntries(player.roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, 'boar']));
       }
       player.improvements = MAJORS.slice(0, count)
       player.minorPlayed = ['M035_HorseTrough']

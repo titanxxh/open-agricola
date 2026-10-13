@@ -322,16 +322,15 @@ function buildPreservingZones(
       zones.push({ id: pasture.id, zoneType: 'pasture', animalType: null, animalCount: 0 })
     }
   }
-  // House zone (1 animal of any type).
-  let houseAssigned = false
-  if (player.houseAnimalType && player.houseAnimalType !== 'horse' && remaining[player.houseAnimalType] > 0) {
-    const k = player.houseAnimalType
-    zones.push({ id: 'house', zoneType: 'house', animalType: k, animalCount: 1 })
-    remaining[k] -= 1
-    houseAssigned = true
-  }
-  if (!houseAssigned) {
-    zones.push({ id: 'house', zoneType: 'house', animalType: null, animalCount: 0 })
+  for (const tile of player.roomTiles) {
+    const key = `${tile.row}-${tile.col}`
+    const animal = player.houseAnimals[key]
+    if (animal && animal !== 'horse' && remaining[animal] > 0) {
+      zones.push({ id: `house:${key}`, zoneType: 'house', animalType: animal, animalCount: 1 })
+      remaining[animal] -= 1
+    } else {
+      zones.push({ id: `house:${key}`, zoneType: 'house', animalType: null, animalCount: 0 })
+    }
   }
   // Loose stables: each holds 1.
   for (const key of Object.keys(player.stableAnimals ?? {})) {

@@ -306,8 +306,7 @@ describe('Moor complex special-action minors', () => {
     dropped.player.resources.food = 1
     dropped.player.resources.horse = 1
     dropped.player.resources.grain = 1
-    dropped.player.houseAnimalType = 'horse'
-    dropped.player.houseAnimalCount = 1
+    dropped.player.houseAnimals = Object.fromEntries(dropped.player.roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, 'horse']));
     dropped.player.fields = [{ row: 0, col: 1, stacks: [] }]
     dropped.session.loadState(dropped.state)
     let horseMarket = takeSpecial(dropped.session, 'horse-market')
@@ -315,7 +314,7 @@ describe('Moor complex special-action minors', () => {
     if (horseMarket.interaction.stateId !== 'wait') throw new Error('expected horse reorg')
     expect(horseMarket.interaction.request.kind).toBe('animal-reorg')
     horseMarket = dropped.session.resolveChoice(0, 'confirm', {
-      zones: [{ id: 'house', zoneType: 'house', animalType: 'horse', animalCount: 1 }],
+      zones: [{ id: 'house:1-0', zoneType: 'house', animalType: 'horse', animalCount: 1 }],
     })
     expect(horseMarket.state.players[0]!.resources.horse).toBe(1)
     expect(horseMarket.interaction.stateId === 'wait' ? horseMarket.interaction.sourceCard : undefined)

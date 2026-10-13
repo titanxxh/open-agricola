@@ -30,8 +30,7 @@ const setup = ({
   player.resources = { ...player.resources, wood: 0, grain: 0, sheep, boar, cattle: 0 }
   player.pastures = []
   player.stableTiles = []
-  player.houseAnimalType = sheep > 0 ? 'sheep' : null
-  player.houseAnimalCount = sheep
+  player.houseAnimals = Object.fromEntries(player.roomTiles.slice(0, sheep).map(tile => [`${tile.row}-${tile.col}`, sheep > 0 ? 'sheep' : null]));
   state.actionSpaces.find((space) => space.id === 'sheep-market')!.resources.sheep = 0
   state.actionSpaces.find((space) => space.id === 'pig-market')!.resources.boar = 0
   session.loadState(state)
@@ -82,16 +81,17 @@ describe('A086 Animal Tamer parity', () => {
     const session = setup()
     session.state.actionSpaces.find((space) => space.id === 'sheep-market')!.resources.sheep = 2
     const pending = animalReorg(session.takeAction(0, 'sheep-market'))
-    const house = pending.interaction.request.zones.find((zone) => zone.id === 'house')
-    expect(house?.capacity).toBe(2)
+    const house = pending.interaction.request.zones.find((zone) => zone.zoneType === 'house')
+    expect(house?.capacity).toBe(1)
 
     const response = session.resolveChoice(0, 'confirm', [
-      { id: 'house', zoneType: 'house', animalType: 'sheep', animalCount: 2 },
+      { id: 'house:1-0', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
+      { id: 'house:2-0', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
     ] as unknown as Record<string, unknown>)
 
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources.sheep).toBe(2)
-    expect(response.state.players[0]!.houseAnimalCount).toBe(2)
+    expect(Object.values(response.state.players[0]!.houseAnimals).length).toBe(2)
   })
 
   it('A086 S4: without Animal Tamer the house holds only one animal total', () => {
@@ -102,15 +102,15 @@ describe('A086 Animal Tamer parity', () => {
     const pending = animalReorg(session.takeAction(0, 'sheep-market'))
 
     const response = session.resolveChoice(0, 'confirm', [
-      { id: 'house', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
+      { id: 'house:1-0', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
     ] as unknown as Record<string, unknown>)
 
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources.sheep).toBe(1)
-    expect(response.state.players[0]!.houseAnimalCount).toBe(1)
+    expect(Object.values(response.state.players[0]!.houseAnimals).length).toBe(1)
   })
 
-  it('A086 S5: the two-room house cannot persist one sheep and one boar', () => {
+  it('A086 S5: duplicate assignments to the same room are rejected atomically', () => {
     const session = setup({ sheep: 1 })
     session.state.actionSpaces.find((space) => space.id === 'pig-market')!.resources.boar = 1
     session.loadState(session.state)
@@ -118,8 +118,8 @@ describe('A086 Animal Tamer parity', () => {
     const before = JSON.stringify({ state: pending.state, interaction: pending.interaction })
 
     const response = session.resolveChoice(0, 'confirm', [
-      { id: 'house', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
-      { id: 'house', zoneType: 'house', animalType: 'boar', animalCount: 1 },
+      { id: 'house:1-0', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
+      { id: 'house:1-0', zoneType: 'house', animalType: 'boar', animalCount: 1 },
     ] as unknown as Record<string, unknown>)
 
     expect(response.ok).toBe(false)
@@ -128,11 +128,11 @@ describe('A086 Animal Tamer parity', () => {
     expect(response.interaction.stateId === 'wait' ? response.interaction.request.kind : undefined)
       .toBe('animal-reorg')
     expect(response.state.players[0]!.resources).toMatchObject({ sheep: 1, boar: 1 })
-    expect(response.state.players[0]!.houseAnimalType).toBe('sheep')
-    expect(response.state.players[0]!.houseAnimalCount).toBe(1)
+    expect((Object.values(response.state.players[0]!.houseAnimals)[0] ?? null)).toBe('sheep')
+    expect(Object.values(response.state.players[0]!.houseAnimals).length).toBe(1)
 
     const retry = session.resolveChoice(0, 'confirm', [
-      { id: 'house', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
+      { id: 'house:1-0', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
     ] as unknown as Record<string, unknown>)
     expect(retry.ok, retry.error).toBe(true)
     expect(retry.state.players[0]!.resources).toMatchObject({ sheep: 1, boar: 0 })
@@ -147,11 +147,12 @@ describe('A086 Animal Tamer parity', () => {
     const pending = animalReorg(session.takeAction(0, 'cattle-market'))
 
     const response = session.resolveChoice(0, 'confirm', [
-      { id: 'house', zoneType: 'house', animalType: 'cattle', animalCount: 2 },
+      { id: 'house:1-0', zoneType: 'house', animalType: 'cattle', animalCount: 1 },
+      { id: 'house:2-0', zoneType: 'house', animalType: 'cattle', animalCount: 1 },
     ] as unknown as Record<string, unknown>)
 
     expect(response.ok, response.error).toBe(true)
-    expect(response.state.players[0]).toMatchObject({ houseAnimalType: 'cattle', houseAnimalCount: 2 })
+    expect(response.state.players[0]).toMatchObject({ houseAnimals: { '1-0': 'cattle', '2-0': 'cattle' } })
     expect(response.scores[0]!.categories.find((category) => category.key === 'cardBonusVp')?.entries)
       .toContainEqual(expect.objectContaining({ cardId: COW_PRINCE_ID, score: 2 }))
   })

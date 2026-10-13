@@ -102,8 +102,7 @@ describe('harvest reaction flow', () => {
     const player = state.players[0]!
     player.occupationPlayed.push('D038_MilkingStool')
     player.resources.cattle = 1
-    player.houseAnimalType = 'cattle'
-    player.houseAnimalCount = 1
+    player.houseAnimals = Object.fromEntries(player.roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, 'cattle']));
 
     session.loadState(state)
     let resp = session.performRoundEnd()

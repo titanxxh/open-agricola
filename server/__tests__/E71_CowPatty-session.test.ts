@@ -50,8 +50,7 @@ const setup = ({
     player.cardStates = {}
     player.fields = []
     player.pastures = []
-    player.houseAnimalType = null
-    player.houseAnimalCount = 0
+    player.houseAnimals = {};
     player.stableAnimals = {}
     Object.assign(player.resources, {
       wood: 0, clay: 0, reed: 0, stone: 0, food: 20,
@@ -68,8 +67,7 @@ const setup = ({
   owner.fields = fields.map(({ row, col }) => ({ row, col, stacks: [] }))
   owner.pastures = pasture ? [{ ...PASTURE, tiles: [...PASTURE.tiles] }] : []
   if (cattleOnFarm) {
-    owner.houseAnimalType = 'cattle'
-    owner.houseAnimalCount = 1
+    owner.houseAnimals = Object.fromEntries(owner.roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, 'cattle']));
   }
   session.loadState(state)
   return session
@@ -129,7 +127,7 @@ describe('E071 Cow Patty parity', () => {
 
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.minorPlayed).toContain(CARD_ID)
-    expect(response.state.players[0]!.houseAnimalCount).toBe(1)
+    expect(Object.values(response.state.players[0]!.houseAnimals).length).toBe(1)
   })
 
   it('E071 S2: without cattle Cow Patty remains unavailable', () => {

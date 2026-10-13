@@ -42,8 +42,7 @@ const setup = ({
     player.pastures = []
     player.stableTiles = []
     player.stableAnimals = {}
-    player.houseAnimalType = null
-    player.houseAnimalCount = 0
+    player.houseAnimals = {};
     if (played) markAllWorkersUsed(state, player)
     else setWorkersAtHome(state, player, 2)
   })
@@ -66,8 +65,7 @@ const setup = ({
   if (blockedTypes.length > 0) {
     const houseAnimal = blockedTypes.includes('boar') ? 'cattle' : 'boar'
     owner.resources[houseAnimal] += 1
-    owner.houseAnimalType = houseAnimal
-    owner.houseAnimalCount = 1
+    owner.houseAnimals = Object.fromEntries(owner.roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, houseAnimal]));
   }
 
   session.loadState(state)
@@ -96,12 +94,12 @@ const arrangeChampionAnimals = (session: GameSession, response: SessionResponse)
         return {
           ...zone,
           animalType,
-          animalCount: Math.min(player.resources[animalType] - (player.houseAnimalType === animalType ? player.houseAnimalCount : 0), zone.capacity),
+          animalCount: Math.min(player.resources[animalType] - ((Object.values(player.houseAnimals)[0] ?? null) === animalType ? Object.values(player.houseAnimals).length : 0), zone.capacity),
         }
       }
     }
-    if (zone.zoneType === 'house' && player.houseAnimalType) {
-      return { ...zone, animalType: player.houseAnimalType, animalCount: 1 }
+    if (zone.zoneType === 'house' && (Object.values(player.houseAnimals)[0] ?? null)) {
+      return { ...zone, animalType: (Object.values(player.houseAnimals)[0] ?? null), animalCount: 1 }
     }
     return { ...zone, animalType: null, animalCount: 0 }
   })

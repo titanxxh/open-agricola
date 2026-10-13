@@ -91,8 +91,7 @@ const player = (
   occupationPlayed: [],
   extraOccupationsFromCards: [],
   playedCards: [],
-  houseAnimalType: null,
-  houseAnimalCount: 0,
+  houseAnimals: {},
   stableAnimals: {},
   pastures: [],
   fenceSegments: [],
@@ -365,8 +364,8 @@ describe('listener purity wave 2b/c', () => {
 
   it('B34 SpecialFood before-collect stores animal snapshot by flow only', () => {
     const p = player('B034_SpecialFood', {
-      houseAnimalType: 'sheep',
-      houseAnimalCount: 1,
+      roomTiles: [{ row: 0, col: 0 }],
+      houseAnimals: { '0-0': 'sheep' },
     })
     const game = state([p])
     const before = stateSnapshot(game)

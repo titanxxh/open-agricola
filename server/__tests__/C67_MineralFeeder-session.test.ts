@@ -110,8 +110,7 @@ describe('C067_MineralFeeder session', () => {
     const { session, player } = setupRoundStartSession()
     addEmptyPasture(player)
     player.resources.sheep = 1
-    player.houseAnimalType = 'sheep'
-    player.houseAnimalCount = 1
+    player.houseAnimals = Object.fromEntries(player.roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, 'sheep']));
     session.loadState(session.getState().state)
 
     let resp = session.performRoundEnd()
@@ -127,8 +126,7 @@ describe('C067_MineralFeeder session', () => {
     const { session, player } = setupRoundStartSession()
     addEmptyPasture(player)
     player.resources.sheep = 1
-    player.houseAnimalType = 'sheep'
-    player.houseAnimalCount = 1
+    player.houseAnimals = Object.fromEntries(player.roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, 'sheep']));
     session.loadState(session.getState().state)
 
     let resp = session.performRoundEnd()
@@ -144,7 +142,7 @@ describe('C067_MineralFeeder session', () => {
 
     resp = session.resolveChoice(0, 'confirm', [
       { id: 'pasture-1', zoneType: 'pasture', animalType: 'sheep', animalCount: 1 },
-      { id: 'house', zoneType: 'house', animalType: null, animalCount: 0 },
+      { id: 'house:1-0', zoneType: 'house', animalType: null, animalCount: 0 },
     ])
     expect(resp.state.players[0]!.resources.grain).toBe(1)
     expect(resp.state.players[0]!.pastures[0]!.animalType).toBe('sheep')

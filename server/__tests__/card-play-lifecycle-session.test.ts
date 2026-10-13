@@ -136,7 +136,7 @@ describe('card activation through onBuy', () => {
     const house = response.interaction.request.zones.find((zone) => zone.zoneType === 'house')!
     response = restored.resolveChoice(0, 'confirm', { zones: [{ ...house, animalType: 'boar', animalCount: 1 }] })
     expect(response.ok, response.error).toBe(true)
-    expect(response.state.players[0]!.houseAnimalCount).toBe(1)
+    expect(Object.values(response.state.players[0]!.houseAnimals).length).toBe(1)
     expect(response.state.players[0]!.resources.boar).toBe(1)
     expect(response.state.log.filter((entry) => entry.key === 'log.cardEffectGain' && entry.params?.cardId === cardId)).toHaveLength(1)
   })

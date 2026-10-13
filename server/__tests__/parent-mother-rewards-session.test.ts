@@ -103,10 +103,10 @@ const restore = (session: GameSession) => {
 const house = (session: GameSession, animal: 'sheep' | 'boar' | 'cattle') => {
   expect(session.getState().interaction).toMatchObject({ stateId: 'wait', playerIndex: 0, request: { kind: 'animal-reorg' } })
   const response = session.resolveChoice(0, 'confirm', { zones: [
-    { id: 'house', zoneType: 'house', animalType: animal, animalCount: 1 },
+    { id: 'house:1-0', zoneType: 'house', animalType: animal, animalCount: 1 },
   ] })
   expect(response.ok, response.error).toBe(true)
-  expect(response.state.players[0]).toMatchObject({ houseAnimalType: animal, houseAnimalCount: 1 })
+  expect(response.state.players[0]).toMatchObject({ houseAnimals: { '1-0': animal }, })
   return response
 }
 
@@ -349,20 +349,19 @@ describe('Parents batch 1 mother printed-rule audit', () => {
     '%s lets an unhouseable animal go without food or breeding and rejects the other responder', (cardId, round, animal) => {
       const session = setup(cardId)
       const resident = animal === 'sheep' ? 'cattle' : 'sheep'
-      session.state.players[0]!.houseAnimalType = resident
-      session.state.players[0]!.houseAnimalCount = 1
+      session.state.players[0]!.houseAnimals = Object.fromEntries(session.state.players[0]!.roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, resident]));
       session.state.players[0]!.resources[resident] = 1
       const prompt = enterRound(session, round)
       expect(prompt.interaction).toMatchObject({ playerIndex: 0, request: { kind: 'animal-reorg' } })
       const before = snapshot(prompt.state)
-      const zones = [{ id: 'house', zoneType: 'house', animalType: resident, animalCount: 1 }]
+      const zones = [{ id: 'house:1-0', zoneType: 'house', animalType: resident, animalCount: 1 }]
       expect(session.resolveChoice(1, 'confirm', { zones }).ok).toBe(false)
       expect(snapshot(session.state)).toEqual(before)
       const response = session.resolveChoice(0, 'confirm', { zones })
       expect(response.ok, response.error).toBe(true)
       expect(response.interaction.stateId).toBe('idle')
       expect(response.state.players[0]!.resources).toEqual({ ...before.players[0]!.resources, [animal]: 0 })
-      expect(response.state.players[0]!.houseAnimalCount).toBe(1)
+      expect(Object.values(response.state.players[0]!.houseAnimals).length).toBe(1)
       expect(response.state.players[1]).toEqual(before.players[1])
       expect(response.state.harvestBreedSummary).toEqual(before.harvestBreedSummary)
       expect(response.state.round).toBe(round)

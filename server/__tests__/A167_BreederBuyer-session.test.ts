@@ -31,8 +31,7 @@ const setup = ({
       ...player.resources, wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0,
       vegetable: 0, sheep: 0, boar: 0, cattle: 0,
     }
-    player.houseAnimalType = null
-    player.houseAnimalCount = 0
+    player.houseAnimals = {};
     player.pastures = []
     player.stableAnimals = {}
   })

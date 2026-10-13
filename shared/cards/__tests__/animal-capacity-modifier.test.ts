@@ -26,7 +26,7 @@ const createPlayer = (overrides?: Partial<PlayerState>): PlayerState =>
     rooms: 2, houseType: 'wood',
     fields: [], fences: 0, roomTiles: [], stableTiles: [],
     improvements: [], minorHand: [], minorPlayed: [],
-    occupationHand: [], occupationPlayed: [],houseAnimalType: null, houseAnimalCount: 0, stableAnimals: {},
+    occupationHand: [], occupationPlayed: [],houseAnimals: {}, stableAnimals: {},
     pastures: [], fenceSegments: [],
     majorEffects: { wellRounds: 0 }, startPlayer: false,
     activeModifiers: [], cardStates: {},
@@ -51,7 +51,7 @@ describe('computeAnimalZones', () => {
     expect(zones.length).toBe(3)
     expect(zones[0]).toMatchObject({ id: 'p1', zoneType: 'pasture', capacity: 4 })
     expect(zones[1]).toMatchObject({ id: 'p2', zoneType: 'pasture', capacity: 4 })
-    expect(zones[2]).toMatchObject({ id: 'house', zoneType: 'house', capacity: 1 })
+    expect(zones[2]).toMatchObject({ id: 'house:1-0', zoneType: 'house', capacity: 1 })
   })
 
   it('includes loose stables', () => {
@@ -172,7 +172,7 @@ describe('pasture capacity modifiers', () => {
     })
     const zones = computeAnimalZones(player)
     expect(zones.find((z) => z.id === 'p1')!.capacity).toBe(4)
-    expect(zones.find((z) => z.id === 'house')!.capacity).toBe(1)
+    expect(zones.find((z) => z.zoneType === 'house')!.capacity).toBe(1)
     expect(zones.find((z) => z.zoneType === 'stable')!.capacity).toBe(1)
   })
 

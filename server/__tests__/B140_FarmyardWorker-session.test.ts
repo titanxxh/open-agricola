@@ -45,8 +45,7 @@ const setup = ({
     player.pastures = []
     player.fenceSegments = []
     player.stableTiles = []
-    player.houseAnimalType = null
-    player.houseAnimalCount = 0
+    player.houseAnimals = {};
     player.stableAnimals = {}
     Object.assign(player.resources, {
       wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0, vegetable: 0,
@@ -250,8 +249,7 @@ describe('B140 Farmyard Worker parity', () => {
     const player = state.players[0]!
     if (scenario === 'old-sheep') {
       player.resources.sheep = 1
-      player.houseAnimalType = 'sheep'
-      player.houseAnimalCount = 1
+      player.houseAnimals = Object.fromEntries(player.roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, 'sheep']));
     }
     if (scenario === 'card-zone') player.minorPlayed = ['B012_Stockyard']
     if (scenario === 'cook') player.improvements = ['Major_Fireplace1']
@@ -319,7 +317,7 @@ describe('B140 Farmyard Worker parity', () => {
     response = session.takeAction(0, actionId)
     if (actionId === 'sheep-market') {
       response = session.resolveChoice(0, 'confirm', { zones: [{
-        id: 'house', zoneType: 'house', animalType: 'sheep', animalCount: 1,
+        id: 'house:1-0', zoneType: 'house', animalType: 'sheep', animalCount: 1,
       }] })
       response = settleFarmyardWorker(session, response)
     }

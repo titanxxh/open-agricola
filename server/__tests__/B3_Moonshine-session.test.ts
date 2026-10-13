@@ -280,8 +280,7 @@ describe('B003_Moonshine session', () => {
     const player = session.state.players[0]!
     player.improvements = ['Major_Fireplace1']
     player.resources.sheep = 1
-    player.houseAnimalType = 'sheep'
-    player.houseAnimalCount = 1
+    player.houseAnimals = Object.fromEntries(player.roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, 'sheep']));
     const offered = playB3(session)
     expect(offered.interaction.request.options.find((option) => option.value === 'play')?.disabled).toBe(true)
     const snapshot = serializeSessionSnapshot(session.state, session)

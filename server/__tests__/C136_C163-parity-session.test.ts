@@ -32,7 +32,7 @@ const setup = ({ cardId, played = true, playerCount = 4, round = 5, resources = 
   state.players.forEach((player, index) => {
     setWorkersAtHome(state, player, index === 0 ? 2 : 0)
     player.minorHand = [FILLER]; player.occupationHand = [FILLER]; player.minorPlayed = []; player.occupationPlayed = []; player.improvements = []; player.cardStates = {}
-    player.fields = []; player.pastures = []; player.stableTiles = []; player.fenceSegments = []; player.houseAnimalType = null; player.houseAnimalCount = 0; player.stableAnimals = {}
+    player.fields = []; player.pastures = []; player.stableTiles = []; player.fenceSegments = []; player.houseAnimals = {}; player.stableAnimals = {}
     player.resources = { ...player.resources, wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 }
   })
   const owner = state.players[0]!; owner.occupationHand = played ? [FILLER] : [cardId]; owner.occupationPlayed = played ? [cardId] : []; Object.assign(owner.resources, resources)

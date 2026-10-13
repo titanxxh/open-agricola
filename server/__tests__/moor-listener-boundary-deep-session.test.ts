@@ -73,8 +73,7 @@ describe('Moor remaining listener clauses', () => {
     const session = setupMoorAudit()
     const player = session.state.players[0]!
     player.resources[animal] = 1
-    player.houseAnimalType = animal
-    player.houseAnimalCount = 1
+    player.houseAnimals = Object.fromEntries(player.roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, animal]));
     player.minorHand = ['M101_ButchersBlock']
     session.loadState(session.state)
     expect(session.takeAction(0, 'major-improvement').ok).toBe(true)
@@ -177,12 +176,12 @@ describe('Moor remaining listener clauses', () => {
     expect(response.state.players[0]!.resources).toMatchObject({ grain: 1, horse: 1 })
     expect(response.interaction.request.kind).toBe('animal-reorg')
     const before = JSON.stringify(response.state)
-    response = session.resolveChoice(0, 'confirm', { zones: [{ id: 'house', zoneType: 'house', animalType: 'horse', animalCount: 2 }] })
+    response = session.resolveChoice(0, 'confirm', { zones: [{ id: 'house:1-0', zoneType: 'house', animalType: 'horse', animalCount: 2 }] })
     expect(response.ok).toBe(false)
     expect(JSON.stringify(response.state)).toBe(before)
-    response = session.resolveChoice(0, 'confirm', { zones: [{ id: 'house', zoneType: 'house', animalType: 'horse', animalCount: 1 }] })
+    response = session.resolveChoice(0, 'confirm', { zones: [{ id: 'house:1-0', zoneType: 'house', animalType: 'horse', animalCount: 1 }] })
     expect(response.ok, response.error).toBe(true)
-    expect(response.state.players[0]!.houseAnimalCount).toBe(1)
+    expect(Object.values(response.state.players[0]!.houseAnimals).length).toBe(1)
     expect(response.interaction.request.kind).toBe('confirm-next-player')
   })
 
@@ -205,8 +204,8 @@ describe('Moor remaining listener clauses', () => {
     let response = playMoorAuditMinor(session, 'M080_AdvancePayment')
     expect(response.state.players[0]!.resources).toMatchObject({ fuel: 21, food: 21, wood: 21, clay: 21, reed: 21, stone: 21, sheep: 1, grain: 1, vegetable: 0 })
     expect(response.scores![0]!.categories.find((category) => category.key === 'cards')?.entries).toContainEqual(expect.objectContaining({ cardId: 'M080_AdvancePayment', score: -4 }))
-    response = session.resolveChoice(0, 'confirm', { zones: [{ id: 'house', zoneType: 'house', animalType: 'sheep', animalCount: 1 }] })
+    response = session.resolveChoice(0, 'confirm', { zones: [{ id: 'house:1-0', zoneType: 'house', animalType: 'sheep', animalCount: 1 }] })
     expect(response.ok, response.error).toBe(true)
-    expect(response.state.players[0]!.houseAnimalType).toBe('sheep')
+    expect((Object.values(response.state.players[0]!.houseAnimals)[0] ?? null)).toBe('sheep')
   })
 })

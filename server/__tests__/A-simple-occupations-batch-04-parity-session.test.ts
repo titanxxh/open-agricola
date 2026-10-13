@@ -217,8 +217,7 @@ const setupPigBreederRound = ({ round = 12, boar = 2, capacity = true } = {}) =>
   const player = state.players[0]!
   player.resources.boar = boar
   player.resources.sheep = capacity ? 0 : 1
-  player.houseAnimalType = capacity ? null : 'sheep'
-  player.houseAnimalCount = capacity ? 0 : 1
+  player.houseAnimals = Object.fromEntries(player.roomTiles.slice(0, capacity ? 0 : 1).map(tile => [`${tile.row}-${tile.col}`, capacity ? null : 'sheep']));
   player.stableAnimals = {}
   player.pastures = capacity
     ? [{
@@ -276,7 +275,7 @@ describe('A165 Pig Breeder parity', () => {
       response = session.resolveChoice(0, 'confirm', {
         zones: [
           { id: 'boar-pasture', zoneType: 'pasture', animalType: 'boar', animalCount: 2 },
-          { id: 'house', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
+          { id: 'house:1-0', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
         ],
       })
     }

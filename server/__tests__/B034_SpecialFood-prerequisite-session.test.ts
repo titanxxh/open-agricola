@@ -30,8 +30,7 @@ const setup = ({
     player.occupationPlayed = []
     player.cardStates = {}
     player.pastures = []
-    player.houseAnimalType = null
-    player.houseAnimalCount = 0
+    player.houseAnimals = {};
     player.resources = {
       ...player.resources,
       wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0, vegetable: 0,
@@ -42,8 +41,7 @@ const setup = ({
   owner.minorHand = played ? [FILLER] : [CARD_ID]
   owner.minorPlayed = played ? [CARD_ID] : []
   owner.resources.sheep = existingSheep
-  owner.houseAnimalType = existingSheep > 0 ? 'sheep' : null
-  owner.houseAnimalCount = existingSheep
+  owner.houseAnimals = Object.fromEntries(owner.roomTiles.slice(0, existingSheep).map(tile => [`${tile.row}-${tile.col}`, existingSheep > 0 ? 'sheep' : null]));
   owner.pastures = played ? [{
     id: 'sheep-pasture', size: 1, tiles: [{ row: 0, col: 1 }],
     stables: 0, animalType: null, animalCount: 0,

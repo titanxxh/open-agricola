@@ -13,8 +13,7 @@ describe('Moor major purchase clause audit', () => {
       const player = session.state.players[0]!
       player.improvements = [cardId]
       player.resources.horse = horses
-      player.houseAnimalType = horses ? 'horse' : null
-      player.houseAnimalCount = horses
+      player.houseAnimals = Object.fromEntries(player.roomTiles.slice(0, horses).map(tile => [`${tile.row}-${tile.col}`, horses ? 'horse' : null]));
       const tile = { row: 0, col: 2 }
       player.farmTerrain = [{ ...tile, kind }]
       session.loadState(session.state)

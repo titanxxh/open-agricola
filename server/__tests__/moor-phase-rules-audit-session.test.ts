@@ -334,11 +334,11 @@ describe('Moor delayed and harvest printed-rule audit', () => {
     expect(response.state.players[0]!.resources.horse).toBe(1)
     expect(response.interaction.request.kind).toBe('animal-reorg')
     const placed = session.resolveChoice(0, 'confirm', { zones: [
-      { id: 'house', zoneType: 'house', animalType: 'horse', animalCount: 1 },
+      { id: 'house:1-0', zoneType: 'house', animalType: 'horse', animalCount: 1 },
     ] })
     expect(placed.ok, placed.error).toBe(true)
-    expect(placed.state.players[0]!.houseAnimalType).toBe('horse')
-    expect(placed.state.players[0]!.houseAnimalCount).toBe(1)
+    expect((Object.values(placed.state.players[0]!.houseAnimals)[0] ?? null)).toBe('horse')
+    expect(Object.values(placed.state.players[0]!.houseAnimals).length).toBe(1)
   })
 
   it.each([[0, 7, 3], [1, 9, 4], [2, 12, 5]])('M079 choice %i delivers %i round fuel and excludes the round-15 option', (index, round, fuel) => {

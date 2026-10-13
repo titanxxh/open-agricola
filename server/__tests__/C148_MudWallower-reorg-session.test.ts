@@ -50,8 +50,7 @@ describe('C148_MudWallower reorg-after sync (zone-based)', () => {
     const session = setupWorkPhase({ boar: 1, held: 0 })
     const state = session.getState().state
     const player = state.players[0]!
-    player.houseAnimalType = 'boar'
-    player.houseAnimalCount = 1
+    player.houseAnimals = Object.fromEntries(player.roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, 'boar']));
     player.cardStates![CARD_ID]!.counters!.counter = 3
     const reedBank = state.actionSpaces.find((s) => s.id === 'reed-bank')
     if (reedBank) reedBank.resources.reed = 2
@@ -92,7 +91,7 @@ describe('C148_MudWallower reorg-after sync (zone-based)', () => {
 
     const before = session.getState()
     response = session.resolveChoice(0, 'confirm', [
-      { id: 'house', zoneType: 'house', animalType: 'boar', animalCount: 1 },
+      { id: 'house:1-0', zoneType: 'house', animalType: 'boar', animalCount: 1 },
       { id: `card:${CARD_ID}`, zoneType: 'card', animalType: 'sheep', animalCount: 1 },
     ] as unknown as Record<string, unknown>)
 
@@ -102,15 +101,14 @@ describe('C148_MudWallower reorg-after sync (zone-based)', () => {
     expect(response.interaction).toEqual(before.interaction)
 
     response = session.resolveChoice(0, 'confirm', [
-      { id: 'house', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
+      { id: 'house:1-0', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
       { id: `card:${CARD_ID}`, zoneType: 'card', animalType: 'boar', animalCount: 1 },
     ] as unknown as Record<string, unknown>)
 
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!).toMatchObject({
       resources: { boar: 1 },
-      houseAnimalType: 'sheep',
-      houseAnimalCount: 1,
+      houseAnimals: { '1-0': 'sheep' },
     })
     expect(response.state.players[0]!.cardStates[CARD_ID]?.counters?.held).toBe(1)
   })
@@ -130,12 +128,12 @@ describe('C148_MudWallower reorg-after sync (zone-based)', () => {
     expect(response.interaction.request.zones.some((zone) => zone.id === `card:${CARD_ID}`)).toBe(false)
 
     response = session.resolveChoice(0, 'confirm', [
-      { id: 'house', zoneType: 'house', animalType: 'boar', animalCount: 1 },
+      { id: 'house:1-0', zoneType: 'house', animalType: 'boar', animalCount: 1 },
     ] as unknown as Record<string, unknown>)
 
     expect(response.ok, response.error).toBe(true)
-    expect(response.state.players[0]!.houseAnimalType).toBe('boar')
-    expect(response.state.players[0]!.houseAnimalCount).toBe(1)
+    expect((Object.values(response.state.players[0]!.houseAnimals)[0] ?? null)).toBe('boar')
+    expect(Object.values(response.state.players[0]!.houseAnimals).length).toBe(1)
     expect(response.state.players[0]!.cardStates[CARD_ID]?.counters?.held).toBe(0)
   })
 
@@ -164,8 +162,7 @@ describe('C148_MudWallower reorg-after sync (zone-based)', () => {
     const session = setupWorkPhase({ boar: 2, held: 1 })
     const state = session.getState().state
     const player = state.players[0]!
-    player.houseAnimalType = 'boar'
-    player.houseAnimalCount = 1
+    player.houseAnimals = Object.fromEntries(player.roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, 'boar']));
     session.loadState(state)
 
     let response = session.takeAction(0, 'pig-market')
@@ -176,7 +173,7 @@ describe('C148_MudWallower reorg-after sync (zone-based)', () => {
     })
 
     response = session.resolveChoice(0, 'confirm', [
-      { id: 'house', zoneType: 'house', animalType: null, animalCount: 0 },
+      { id: 'house:1-0', zoneType: 'house', animalType: null, animalCount: 0 },
       { id: 'pasture-1', zoneType: 'pasture', animalType: 'boar', animalCount: 2 },
       { id: `card:${CARD_ID}`, zoneType: 'card', animalType: 'boar', animalCount: 1 },
     ] as unknown as Record<string, unknown>)
@@ -184,8 +181,7 @@ describe('C148_MudWallower reorg-after sync (zone-based)', () => {
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!).toMatchObject({
       resources: { boar: 3 },
-      houseAnimalType: null,
-      houseAnimalCount: 0,
+      houseAnimals: {},
       pastures: [expect.objectContaining({ animalType: 'boar', animalCount: 2 })],
     })
     expect(response.state.players[0]!.cardStates[CARD_ID]?.counters?.held).toBe(1)

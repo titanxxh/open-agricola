@@ -68,7 +68,7 @@ const createPlayer = (): PlayerState =>
     familySize: 2, workersAvailable: 2, rooms: 2, houseType: 'wood',
     fields: [], roomTiles: [], stableTiles: [],
     improvements: [], minorHand: [], minorPlayed: [CARD_ID],
-    occupationHand: [], occupationPlayed: [],houseAnimalType: null, houseAnimalCount: 0, stableAnimals: {},
+    occupationHand: [], occupationPlayed: [],houseAnimals: {}, stableAnimals: {},
     newbornCount: 0, pastures: [], fenceSegments: [],
     majorEffects: { wellRounds: 0 }, startPlayer: false,
     cardStates: {},

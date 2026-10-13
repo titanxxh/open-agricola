@@ -14,7 +14,7 @@ import {
   buildStableDisplayMap,
   hasUnassignedAnimals,
   shouldShowAnimalDiscardPrompt,
-  wouldExceedExclusiveCardZoneLimit,
+  wouldExceedZoneOccupancyLimit,
 } from '../hooks/use-animal-reorg-flow'
 
 const resources = (): Resource => ({
@@ -46,8 +46,7 @@ const player = (): PlayerState => ({
   minorHand: [],
   minorPlayed: [],
   occupationHand: [],
-  occupationPlayed: [],houseAnimalType: null,
-  houseAnimalCount: 0,
+  occupationPlayed: [],houseAnimals: {},
   stableAnimals: {},
   pastures: [
     {
@@ -77,7 +76,7 @@ const animalReorgState = (): AnimalReorgState => ({
   zones: [
     { id: 'pasture-1', zoneType: 'pasture', animalType: 'boar', animalCount: 4, capacity: 4 },
     { id: 'pasture-2', zoneType: 'pasture', animalType: null, animalCount: 0, capacity: 4 },
-    { id: 'house', zoneType: 'house', animalType: 'sheep', animalCount: 3, capacity: 1 },
+    { id: 'house:1-0', zoneType: 'house', animalType: 'sheep', animalCount: 3, capacity: 1 },
     { id: 'stable:1-1', zoneType: 'stable', animalType: 'cattle', animalCount: 1, capacity: 1 },
     { id: 'card:C148_MudWallower', zoneType: 'card', animalType: 'boar', animalCount: 1, capacity: 1, cardId: 'C148_MudWallower' },
   ],
@@ -132,8 +131,8 @@ describe('use-animal-reorg-flow helpers', () => {
       totals: { sheep: 5, boar: 2, cattle: 4 },
       getPastureCapacity: () => 2,
     })
-    expect(target.houseAnimalType).toBe('sheep')
-    expect(target.houseAnimalCount).toBe(1)
+    expect((Object.values(target.houseAnimals)[0] ?? null)).toBe('sheep')
+    expect(Object.values(target.houseAnimals).length).toBe(1)
     expect(target.stableAnimals['1-1']).toBe('cattle')
     expect(target.resources.sheep).toBe(5)
     expect(target.resources.boar).toBe(2)
@@ -439,7 +438,7 @@ describe('use-animal-reorg-flow helpers', () => {
         animalType: 'horse',
         animalCount: 1,
         capacity: 1,
-        exclusiveCardZoneLimit: 1,
+        occupiedZoneLimit: 1,
       },
       {
         id: 'card:M035_HorseTrough@0,1',
@@ -448,15 +447,15 @@ describe('use-animal-reorg-flow helpers', () => {
         animalType: null,
         animalCount: 0,
         capacity: 1,
-        exclusiveCardZoneLimit: 1,
+        occupiedZoneLimit: 1,
       },
     )
 
-    expect(wouldExceedExclusiveCardZoneLimit(reorg.zones, 'card:M035_HorseTrough@0,1')).toBe(true)
-    expect(wouldExceedExclusiveCardZoneLimit(reorg.zones, 'card:M035_HorseTrough@0,0')).toBe(false)
+    expect(wouldExceedZoneOccupancyLimit(reorg.zones, 'card:M035_HorseTrough@0,1')).toBe(true)
+    expect(wouldExceedZoneOccupancyLimit(reorg.zones, 'card:M035_HorseTrough@0,0')).toBe(false)
     reorg.zones.find((zone) => zone.id === 'card:M035_HorseTrough@0,0')!.ownerPlayerId = 'p1'
     reorg.zones.find((zone) => zone.id === 'card:M035_HorseTrough@0,1')!.ownerPlayerId = 'p2'
-    expect(wouldExceedExclusiveCardZoneLimit(reorg.zones, 'card:M035_HorseTrough@0,1')).toBe(false)
+    expect(wouldExceedZoneOccupancyLimit(reorg.zones, 'card:M035_HorseTrough@0,1')).toBe(false)
   })
 
   it('builds pending choice with farm-redevelopment fence bonus', () => {

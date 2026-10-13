@@ -32,8 +32,7 @@ const setup = ({ actor = 1, food = 2, played = true } = {}) => {
       ...player.resources, wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0,
       vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
     }
-    player.houseAnimalType = null
-    player.houseAnimalCount = 0
+    player.houseAnimals = {};
     player.pastures = []
     player.stableAnimals = {}
     player.fenceSegments = []
@@ -100,7 +99,7 @@ const chooseAnimal = (session: GameSession, initial: SessionResponse, animal: An
   if (response.interaction.stateId === 'wait'
     && response.interaction.request.kind === 'animal-reorg') {
     response = session.resolveChoice(response.interaction.playerIndex, 'confirm', {
-      zones: [{ id: 'house', zoneType: 'house', animalType: animal, animalCount: 1 }],
+      zones: [{ id: 'house:1-0', zoneType: 'house', animalType: animal, animalCount: 1 }],
     })
   }
   return response

@@ -76,7 +76,7 @@ describe('B115_TinsmithMaster session', () => {
       zones: [
         { id: 'p1', zoneType: 'pasture', animalType: 'sheep', animalCount: pastureCount },
         ...(houseCount > 0
-          ? [{ id: 'house', zoneType: 'house', animalType: 'sheep', animalCount: houseCount }]
+          ? [{ id: 'house:1-0', zoneType: 'house', animalType: 'sheep', animalCount: houseCount }]
           : []),
       ],
     })

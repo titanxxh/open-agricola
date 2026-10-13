@@ -28,7 +28,7 @@ const createPlayer = (overrides: Partial<PlayerState> = {}): PlayerState =>
     fields: [], fences: 0, roomTiles: [], stableTiles: [],
     improvements: [], minorHand: ['__test_placeholder__'], minorPlayed: [CARD_ID],
     occupationHand: ['__test_placeholder__'], occupationPlayed: [],
-    houseAnimalType: null, houseAnimalCount: 0, stableAnimals: {},
+    houseAnimals: {}, stableAnimals: {},
     pastures: [], fenceSegments: [],
     majorEffects: { wellRounds: 0 }, startPlayer: false,
     activeModifiers: [], cardStates: {},

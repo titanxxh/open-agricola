@@ -101,7 +101,7 @@ describe('reorganizeAction engine sub-flow integration', () => {
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources).toMatchObject({ sheep: 0, boar: 1 })
     expect(response.state.players[0]!.stableAnimals['2-4']).toBeNull()
-    expect(response.state.players[0]!.houseAnimalCount).toBe(0)
+    expect(Object.values(response.state.players[0]!.houseAnimals).length).toBe(0)
     expect(response.state.players[0]!.pastures[0]).toMatchObject({ animalType: 'boar', animalCount: 1 })
     expect(response.state.log.find((entry) => entry.key === 'log.reorganizeDiscard')?.params?.resources)
       .toEqual({ sheep: 1 })
@@ -161,7 +161,7 @@ describe('reorganizeAction engine sub-flow integration', () => {
 
     const resp = session.resolveChoice(0, 'confirm', {
       zones: [
-        { id: 'house', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
+        { id: 'house:1-0', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
       ],
     })
 

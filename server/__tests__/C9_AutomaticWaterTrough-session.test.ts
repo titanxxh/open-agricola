@@ -18,8 +18,7 @@ describe('C009_AutomaticWaterTrough session', () => {
     // is empty — so it CAN accommodate any 1 animal. To force no valid
     // animals, mark the house zone as already full of grain (impossible per
     // game rules but we use it to simulate a saturated state).
-    player.houseAnimalType = 'sheep' as never
-    player.houseAnimalCount = 1
+    player.houseAnimals = Object.fromEntries(player.roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, 'sheep' as never]));
     player.resources.sheep = 1
     // Also put a sheep already in any default stable / pasture so no zone
     // has spare capacity. Player has no pastures by default so house +
@@ -41,8 +40,7 @@ describe('C009_AutomaticWaterTrough session', () => {
     player.minorPlayed.push(CARD_ID)
     player.resources.food = 5
     // House holds an empty zone (capacity 1) — can take any 1 animal
-    player.houseAnimalType = null
-    player.houseAnimalCount = 0
+    player.houseAnimals = {};
     session.loadState(state)
 
     const effect = getCardEffect(CARD_ID)
@@ -66,8 +64,7 @@ describe('C009_AutomaticWaterTrough session', () => {
     // (zone occupied by sheep, capacity 1, count 1 → no spare). No other
     // animal can be placed; even sheep can't fit another. So result should
     // be undefined.
-    player.houseAnimalType = 'sheep' as never
-    player.houseAnimalCount = 1
+    player.houseAnimals = Object.fromEntries(player.roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, 'sheep' as never]));
     player.resources.sheep = 1
     session.loadState(state)
 
@@ -95,8 +92,7 @@ describe('C009_AutomaticWaterTrough session', () => {
         animalCount: 1,
       },
     ]
-    player.houseAnimalType = 'boar'
-    player.houseAnimalCount = 1
+    player.houseAnimals = Object.fromEntries(player.roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, 'boar']));
     session.loadState(state)
 
     const effect = getCardEffect(CARD_ID)

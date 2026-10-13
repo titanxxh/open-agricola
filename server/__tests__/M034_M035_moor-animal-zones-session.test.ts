@@ -53,8 +53,7 @@ const setup = (playedCards: string[]) => {
     player.pastures = []
     player.stableTiles = []
     player.stableAnimals = {}
-    player.houseAnimalType = null
-    player.houseAnimalCount = 0
+    player.houseAnimals = {};
     player.rooms = 2
     player.roomTiles = [{ row: 2, col: 3 }, { row: 2, col: 4 }]
     player.farmTerrain = [
@@ -239,7 +238,7 @@ describe('M034/M035 Farmers of the Moor animal zones', () => {
 
     const placed = session.resolveChoice(0, 'confirm', {
       zones: [
-        { id: 'house', zoneType: 'house', animalType: 'boar', animalCount: 1 },
+        { id: 'house:1-0', zoneType: 'house', animalType: 'boar', animalCount: 1 },
       ],
     })
 

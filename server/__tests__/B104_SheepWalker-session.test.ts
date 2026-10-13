@@ -50,8 +50,7 @@ const setupWorkPhase = ({ played = true, accommodated = true } = {}) => {
       player.minorPlayed = []
       player.occupationPlayed = []
       player.cardStates = {}
-      player.houseAnimalType = null
-      player.houseAnimalCount = 0
+      player.houseAnimals = {};
     })
     state.actionSpaces.forEach((space) => { space.takenBy = [] })
     const owner = state.players[0]!
@@ -100,9 +99,9 @@ describe('B104 Sheep Walker parity', () => {
     expect(reorg.ok, reorg.error).toBe(true)
     expect(reorg.interaction.stateId === 'wait' && reorg.interaction.request.kind).toBe('animal-reorg')
     expect(reorg.state.players[0]!.resources).toMatchObject({ sheep: 1, boar: 1, food: 0 })
-    expect(reorg.state.players[0]!).toMatchObject({ houseAnimalType: null, houseAnimalCount: 0 })
+    expect(reorg.state.players[0]!).toMatchObject({ houseAnimals: {}, })
     if (reorg.interaction.stateId !== 'wait' || reorg.interaction.request.kind !== 'animal-reorg') throw new Error('expected reorganization')
-    expect(reorg.interaction.request.zones.find((zone) => zone.id === 'house'))
+    expect(reorg.interaction.request.zones.find((zone) => zone.zoneType === 'house'))
       .toMatchObject({ animalType: 'boar', animalCount: 1 })
     expect(reorg.interaction.anytimeActions.map((action) => action.id)).toContain('exchange')
 
@@ -131,11 +130,11 @@ describe('B104 Sheep Walker parity', () => {
     // Cooking changes inventory, so the same pending host refreshes its draft.
     expect(cooked.interaction.request).toEqual({
       ...reorg.interaction.request,
-      zones: reorg.interaction.request.zones.map((zone) => zone.id === 'house'
+      zones: reorg.interaction.request.zones.map((zone) => zone.zoneType === 'house'
         ? { ...zone, animalType: null, animalCount: 0 }
         : zone),
     })
-    expect(cooked.state.players[0]!).toMatchObject({ houseAnimalType: null, houseAnimalCount: 0 })
+    expect(cooked.state.players[0]!).toMatchObject({ houseAnimals: {}, })
     expect(cooked.interaction.playerIndex).toBe(0)
     expect(session.peekEnginePendingEnvelope()?.hostNodeId).toBe(reorgHost)
     const resumed = session.resolveChoice(0, 'confirm', { zones: cooked.interaction.request.zones })
@@ -164,8 +163,7 @@ describe('B104 Sheep Walker parity', () => {
     player.resources.sheep = 2
     player.pastures[0]!.animalCount = 2
     player.resources.cattle = 1
-    player.houseAnimalType = 'cattle'
-    player.houseAnimalCount = 1
+    player.houseAnimals = Object.fromEntries(player.roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, 'cattle']));
     session.loadState(state)
     const before = session.takeAction(0, 'farmland')
     expect(before.interaction.stateId === 'wait' && before.interaction.request.kind).toBe('farm-select')
@@ -178,14 +176,14 @@ describe('B104 Sheep Walker parity', () => {
     expect(response.interaction.stateId === 'wait' && response.interaction.request.kind).toBe('animal-reorg')
     response = session.resolveChoice(0, 'confirm', { zones: [
       { id: 'sheep-pasture', zoneType: 'pasture', animalType: 'boar', animalCount: gained.boar },
-      { id: 'house', zoneType: 'house', animalType: 'cattle', animalCount: 1 },
+      { id: 'house:1-0', zoneType: 'house', animalType: 'cattle', animalCount: 1 },
     ] })
     expect(response.ok, response.error).toBe(true)
     if (before.interaction.stateId !== 'wait' || response.interaction.stateId !== 'wait') throw new Error('expected plow')
     expect(response.interaction.request).toEqual(before.interaction.request)
     expect(response.interaction.playerIndex).toBe(0)
     expect(response.state.players[0]!.pastures[0]).toMatchObject({ animalType: 'boar', animalCount: gained.boar })
-    expect(response.state.players[0]!).toMatchObject({ houseAnimalType: 'cattle', houseAnimalCount: 1 })
+    expect(response.state.players[0]!).toMatchObject({ houseAnimals: { '1-0': 'cattle' }, })
     response = session.commitSelectionChoice(0, { tile: { row: 0, col: 1 } })
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.fields).toHaveLength(1)
@@ -331,8 +329,7 @@ describe('B104 Sheep Walker parity', () => {
     player.occupationPlayed.push('D091_Plowman')
     player.resources.food = 1
     player.pastures = []
-    player.houseAnimalType = 'sheep'
-    player.houseAnimalCount = 1
+    player.houseAnimals = Object.fromEntries(player.roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, 'sheep']));
     state.futureMeeples = [6, 9, 12].map((round) => ({
       id: `D091_Plowman-${player.id}-${round}-0`, cardId: 'D091_Plowman', playerId: player.id,
       round, actionId: state.roundActionOrder[round - 1] ?? null,

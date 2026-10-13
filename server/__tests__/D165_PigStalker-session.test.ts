@@ -54,8 +54,7 @@ const setup = ({
     player.minorPlayed = []
     player.occupationPlayed = []
     player.cardStates = {}
-    player.houseAnimalType = null
-    player.houseAnimalCount = 0
+    player.houseAnimals = {};
     player.stableAnimals = {}
     player.pastures = [
       {

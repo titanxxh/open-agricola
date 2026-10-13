@@ -26,8 +26,7 @@ const setup = ({
     player.resources.wood = 0
     player.resources.food = 0
     player.resources.sheep = 0
-    player.houseAnimalType = null
-    player.houseAnimalCount = 0
+    player.houseAnimals = {};
     player.pastures = []
     player.stableAnimals = {}
     setWorkersAtHome(state, player, 2)
@@ -74,10 +73,10 @@ const keepSheepInHouse = (session: GameSession, response: SessionResponse) => {
   if (response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'animal-reorg') {
     throw new Error('expected animal reorganization')
   }
-  const house = response.interaction.request.zones.find((zone) => zone.id === 'house')
+  const house = response.interaction.request.zones.find((zone) => zone.zoneType === 'house')
   expect(house?.capacity).toBeGreaterThanOrEqual(1)
   return session.resolveChoice(0, 'confirm', [{
-    id: 'house', zoneType: 'house', animalType: 'sheep', animalCount: 1,
+    id: 'house:1-0', zoneType: 'house', animalType: 'sheep', animalCount: 1,
   }] as unknown as Record<string, unknown>)
 }
 
@@ -97,8 +96,8 @@ describe('A164 Wood Worker parity', () => {
 
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources).toMatchObject({ wood: 2, sheep: 1 })
-    expect(response.state.players[0]!.houseAnimalType).toBe('sheep')
-    expect(response.state.players[0]!.houseAnimalCount).toBe(1)
+    expect((Object.values(response.state.players[0]!.houseAnimals)[0] ?? null)).toBe('sheep')
+    expect(Object.values(response.state.players[0]!.houseAnimals).length).toBe(1)
     expect(response.state.actionSpaces.find((space) => space.id === 'forest')!.resources.wood).toBe(1)
   })
 
@@ -122,7 +121,7 @@ describe('A164 Wood Worker parity', () => {
 
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources).toMatchObject({ wood: 0, sheep: 1 })
-    expect(response.state.players[0]!.houseAnimalCount).toBe(1)
+    expect(Object.values(response.state.players[0]!.houseAnimals).length).toBe(1)
     expect(response.state.actionSpaces.find((space) => space.id === 'forest')!.resources.wood).toBe(1)
   })
 

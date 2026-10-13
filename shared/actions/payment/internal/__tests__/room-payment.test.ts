@@ -16,7 +16,7 @@ const makePlayer = (modifiers: CostModifier[], houseType: 'wood' | 'clay' | 'sto
   workers: [], rooms: 1, houseType, fields: [], roomTiles: [], stableTiles: [],
   improvements: [], minorHand: [], minorPlayed: [], occupationHand: [], occupationPlayed: [],
   extraOccupationsFromCards: [], playedCards: [],
-  houseAnimalType: null, houseAnimalCount: 0, stableAnimals: {}, pastures: [], fenceSegments: [],
+  houseAnimals: {}, stableAnimals: {}, pastures: [], fenceSegments: [],
   majorEffects: { wellRounds: 0 }, startPlayer: false, activeModifiers: modifiers, cardStates: {},
   stats: {} as never,
 })

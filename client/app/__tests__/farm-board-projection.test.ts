@@ -53,8 +53,7 @@ const createPlayer = (overrides: Partial<PlayerState & { lockedFarmTileKeys: str
   occupationPlayed: [],
   extraOccupationsFromCards: [],
   playedCards: [],
-  houseAnimalType: null,
-  houseAnimalCount: 0,
+  houseAnimals: {},
   stableAnimals: {},
   pastures: [],
   fenceSegments: [],
@@ -480,8 +479,7 @@ describe('buildFarmBoardProjection', () => {
         animalType: 'sheep',
         animalCount: 2,
       }],
-      houseAnimalType: 'boar',
-      houseAnimalCount: 1,
+      houseAnimals: { '2-0': 'boar' },
       stableTiles: [{ row: 1, col: 0 }],
       stableAnimals: { '1-0': 'cattle' },
     })
@@ -499,7 +497,8 @@ describe('buildFarmBoardProjection', () => {
         capacity: 5,
       },
       {
-        id: 'house',
+        id: 'house:2-0',
+        farmPosition: { row: 2, col: 0 },
         zoneType: 'house',
         animalType: 'sheep',
         animalCount: 1,
@@ -563,7 +562,7 @@ describe('buildFarmBoardProjection', () => {
       animalCount: 1,
     })
     expect(projection.pastureCapacityMap).toEqual(new Map([['pasture-1', 5]]))
-    expect(projection.houseDisplay).toEqual({ animalType: 'sheep', animalCount: 1 })
+    expect(projection.houseDisplayMap.get('2-0')).toEqual({ animalType: 'sheep', animalCount: 1 })
     expect(projection.stableDisplayMap.get('1-0')).toEqual({ animalType: 'boar', animalCount: 1 })
     expect(projection.cardDisplayMap.get('CARD1')).toMatchObject({
       animalType: 'horse',

@@ -143,7 +143,7 @@ describe('C011 Wildlife Reserve parity', () => {
     expect(response.interaction).toEqual(before.interaction)
     response = session.resolveChoice(0, 'confirm', [
       wildlifeAssignment({ sheep: 1 }),
-      { id: 'house', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
+      { id: 'house:1-0', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
     ])
     expect(response.ok, response.error).toBe(true)
     expect(response.interaction.stateId === 'wait' ? response.interaction.request.kind : response.interaction.stateId)

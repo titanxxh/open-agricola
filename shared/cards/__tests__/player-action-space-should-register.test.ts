@@ -27,7 +27,7 @@ const createPlayer = (id: string, played: string[]): PlayerState =>
     rooms: 2, houseType: 'wood', fields: [],
     roomTiles: [], stableTiles: [], improvements: [],
     minorHand: [], minorPlayed: played, occupationHand: [], occupationPlayed: [],
-    houseAnimalType: null, houseAnimalCount: 0, stableAnimals: {},
+    houseAnimals: {}, stableAnimals: {},
     pastures: [], fenceSegments: [],
     majorEffects: { wellRounds: 0 }, startPlayer: false,
   }) as PlayerState

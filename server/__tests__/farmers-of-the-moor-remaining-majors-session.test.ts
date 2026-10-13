@@ -216,8 +216,7 @@ describe('Farmers of the Moor remaining major improvements', () => {
       actionContext: { resourceCondition: { kind: 'min-resource', resource: 'horse', amount: 2 } },
     }]
     blockedPlayer.resources.horse = 1
-    blockedPlayer.houseAnimalType = 'horse'
-    blockedPlayer.houseAnimalCount = 1
+    blockedPlayer.houseAnimals = Object.fromEntries(blockedPlayer.roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, 'horse']));
     const foodBefore = blockedPlayer.resources.food
     for (const player of blockedSession.state.players) markAllWorkersUsed(blockedSession.state, player)
 
@@ -243,8 +242,7 @@ describe('Farmers of the Moor remaining major improvements', () => {
       actionContext: { resourceCondition: { kind: 'min-resource', resource: 'horse', amount: 2 } },
     }]
     paidPlayer.resources.horse = 2
-    paidPlayer.houseAnimalType = 'horse'
-    paidPlayer.houseAnimalCount = 1
+    paidPlayer.houseAnimals = Object.fromEntries(paidPlayer.roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, 'horse']));
     paidPlayer.stableTiles = [{ row: 0, col: 0 }]
     paidPlayer.stableAnimals = { '0-0': 'horse' }
     const paidFoodBefore = paidPlayer.resources.food

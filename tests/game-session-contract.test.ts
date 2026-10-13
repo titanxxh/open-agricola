@@ -79,14 +79,14 @@ describe('GameSession contract', () => {
       session.devSetResources(0, { sheep: 1 })
       const resp = session.resolveChoice(0, 'confirm', {
         zones: [
-          { id: 'house', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
+          { id: 'house:1-0', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
         ],
       })
       expect(resp.ok).toBe(true)
       expect(resp.state.currentPlayerIndex).toBe(0)
       expect(resp.interaction.stateId).toBe('idle')
-      expect(resp.state.players[0]?.houseAnimalType).toBe('sheep')
-      expect(resp.state.players[0]?.houseAnimalCount).toBe(1)
+      expect((Object.values(resp.state.players[0]?.houseAnimals)[0] ?? null)).toBe('sheep')
+      expect(Object.values(resp.state.players[0]?.houseAnimals).length).toBe(1)
     })
 
     it('rejects invalid player index', () => {

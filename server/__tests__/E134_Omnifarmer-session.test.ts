@@ -33,7 +33,7 @@ const createPlayer = (id = 'p1'): PlayerState => ({
   stableTiles: [],
   improvements: [], minorHand: [], minorPlayed: [],
   occupationHand: [], occupationPlayed: [],
-  houseAnimalType: null, houseAnimalCount: 0, stableAnimals: {},
+  houseAnimals: {}, stableAnimals: {},
   pastures: [], fenceSegments: [],
   majorEffects: { wellRounds: 0 }, startPlayer: false,
   cardStates: {},
@@ -104,8 +104,7 @@ describe('E134 Omnifarmer parity', () => {
       player.fields = []
       player.pastures = []
       player.stableTiles = []
-      player.houseAnimalType = null
-      player.houseAnimalCount = 0
+      player.houseAnimals = {};
       setActiveWorkerCount(player, 1)
       markAllWorkersUsed(state, player)
       Object.assign(player.resources, {

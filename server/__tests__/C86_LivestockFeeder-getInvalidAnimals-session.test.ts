@@ -34,8 +34,7 @@ const setup = ({
     player.pastures = []
     player.stableTiles = []
     player.stableAnimals = {}
-    player.houseAnimalType = null
-    player.houseAnimalCount = 0
+    player.houseAnimals = {};
     player.cardStates = {}
     player.resources = {
       ...player.resources, wood: 0, clay: 0, reed: 0, stone: 0, food: 20, grain: 0,
@@ -161,7 +160,7 @@ describe('C086 Livestock Feeder parity', () => {
     expect(rejected.interaction).toEqual(pending.interaction)
     const response = session.resolveChoice(0, 'confirm', [
       assignToCard(pending, { sheep: 1 }),
-      { id: 'house', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
+      { id: 'house:1-0', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
     ])
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources.sheep).toBe(2)
@@ -178,16 +177,16 @@ describe('C086 Livestock Feeder parity', () => {
 
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources).toMatchObject({ grain: 0, sheep: 1 })
-    expect(response.state.players[0]!.houseAnimalCount).toBe(0)
+    expect(Object.values(response.state.players[0]!.houseAnimals).length).toBe(0)
     expect(cardAnimals(response)?.sheep ?? 0).toBe(0)
     expect(response.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'animal-reorg' } })
     expect(cardZone(response)).toBeUndefined()
     const result = session.resolveChoice(0, 'confirm', { zones: keep
-      ? [{ id: 'house', zoneType: 'house', animalType: 'sheep', animalCount: 1 }]
+      ? [{ id: 'house:1-0', zoneType: 'house', animalType: 'sheep', animalCount: 1 }]
       : [] })
     expect(result.ok, result.error).toBe(true)
     expect(result.state.players[0]!.resources.sheep).toBe(keep ? 1 : 0)
-    expect(result.state.players[0]!.houseAnimalCount).toBe(keep ? 1 : 0)
+    expect(Object.values(result.state.players[0]!.houseAnimals).length).toBe(keep ? 1 : 0)
     expect(cardAnimals(result)?.sheep ?? 0).toBe(0)
     expect(result.state.log.some((entry) => entry.key === 'log.reorganizeDiscard')).toBe(!keep)
   })

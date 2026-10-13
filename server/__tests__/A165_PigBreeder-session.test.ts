@@ -13,8 +13,8 @@ const setup = (round: number, boar: number, capacity = true) => {
     owner.occupationPlayed = [CARD_ID]
     owner.resources.boar = boar
     owner.pastures = capacity ? [{ id: 'boar-pasture', tiles: [{ row: 0, col: 2 }, { row: 0, col: 3 }], stables: 0, animalType: boar ? 'boar' : null, animalCount: Math.min(boar, 4) }] : []
-    if (boar > 4) { owner.houseAnimalType = 'boar'; owner.houseAnimalCount = boar - 4 }
-    if (!capacity && boar) { owner.houseAnimalType = 'boar'; owner.houseAnimalCount = boar }
+    if (boar > 4) { owner.houseAnimals = Object.fromEntries(owner.roomTiles.slice(0, boar - 4).map(tile => [`${tile.row}-${tile.col}`, 'boar'])); }
+    if (!capacity && boar) { owner.houseAnimals = Object.fromEntries(owner.roomTiles.slice(0, boar).map(tile => [`${tile.row}-${tile.col}`, 'boar'])); }
   } })
   expect(session.state.players).toHaveLength(2)
   sessions.push(session)

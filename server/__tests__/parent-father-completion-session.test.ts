@@ -518,8 +518,7 @@ describe('Parents batch 2 father interaction boundaries', () => {
   it('PS03 counts animals housed as a pet and in an unfenced stable', () => {
     const session = auditSetup('PS03')
     const player = session.state.players[0]!
-    player.houseAnimalType = 'sheep'
-    player.houseAnimalCount = player.resources.sheep = 1
+    player.houseAnimals = Object.fromEntries(player.roomTiles.slice(0, player.resources.sheep = 1).map(tile => [`${tile.row}-${tile.col}`, 'sheep']));
     player.stableTiles = [{ row: 0, col: 0 }]
     player.stableAnimals = { '0-0': 'boar' }
     player.resources.boar = 1
@@ -808,8 +807,7 @@ describe('Parents batch 2 father interaction boundaries', () => {
       player.improvements = ['Major_Fireplace1']
       session.state.availableMajorImprovements = session.state.availableMajorImprovements.filter((id) => id !== 'Major_Fireplace1')
     } else {
-      player.houseAnimalType = 'cattle'
-      player.houseAnimalCount = 1
+      player.houseAnimals = Object.fromEntries(player.roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, 'cattle']));
       player.resources.cattle = 1
       for (const pen of player.pastures) {
         pen.animalType = 'cattle'

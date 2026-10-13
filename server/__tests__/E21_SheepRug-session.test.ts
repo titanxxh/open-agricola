@@ -90,8 +90,7 @@ describe('E021_SheepRug session', () => {
       const state = session.getState().state
       const player = state.players[0]!
       player.pastures = []
-      player.houseAnimalType = null
-      player.houseAnimalCount = 0
+      player.houseAnimals = {};
       player.stableAnimals = {}
       expect(meetsCardPrerequisites(player, E021_SheepRug, state.round, state)).toBe(false)
     })

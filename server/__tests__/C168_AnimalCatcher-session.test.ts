@@ -21,8 +21,7 @@ const setup = ({ round = 1, food = 10, fireplace = false } = {}) => {
     player.occupationPlayed = []
     player.improvements = []
     player.cardStates = {}
-    player.houseAnimalType = null
-    player.houseAnimalCount = 0
+    player.houseAnimals = {};
     player.stableAnimals = {}
     player.resources = { ...player.resources, wood: 0, clay: 0, reed: 0, stone: 0, grain: 0, vegetable: 0, food: 0, sheep: 0, boar: 0, cattle: 0 }
     setActiveWorkerCount(player, 2)

@@ -128,8 +128,7 @@ describe('Workshop Capability Contract query hooks', () => {
     { enforce: false, reorganizations: 0 },
   ])('enforceReorganizeOnLastHarvest: $enforce asks for $reorganizations reorganization after the last Harvest without newborns', ({ enforce, reorganizations }) => {
     const session = start(effect(`enforceReorganizeOnLastHarvest: () => ${enforce}`), roundEnding(14, (_state, owner) => {
-      owner.houseAnimalType = 'sheep'
-      owner.houseAnimalCount = 1
+      owner.houseAnimals = Object.fromEntries(owner.roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, 'sheep']));
       owner.resources.sheep = 1
     }))
 

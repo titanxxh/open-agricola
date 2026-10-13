@@ -78,8 +78,7 @@ const fixture: CardFixture = {
             animalCount: cattle,
           }]
         : []
-      p.houseAnimalType = null
-      p.houseAnimalCount = 0
+      p.houseAnimals = {};
       p.stableAnimals = {}
       // Avoid choice-prompting built-in cards during round-end scoring.
       p.improvements = []

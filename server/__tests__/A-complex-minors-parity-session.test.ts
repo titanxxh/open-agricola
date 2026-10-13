@@ -390,8 +390,7 @@ describe('A043 Farmyard Manure parity', () => {
     const session = setupMinor({ cardId: 'A043_FarmyardManure' })
     const player = session.state.players[0]!
     player.resources.sheep = 1
-    player.houseAnimalType = 'sheep'
-    player.houseAnimalCount = 1
+    player.houseAnimals = Object.fromEntries(player.roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, 'sheep']));
     session.loadState(session.state)
 
     const response = playMinor(session, 'A043_FarmyardManure')
@@ -587,7 +586,7 @@ const EDGES_FOR_ONE = ['H-0-1', 'H-1-1', 'V-0-1', 'V-0-2']
 const playerAnimalCount = (player: PlayerState, type: 'sheep' | 'boar' | 'cattle') => {
   const pasture = player.pastures.reduce((sum, current) =>
     sum + (current.animalType === type ? current.animalCount : 0), 0)
-  const house = player.houseAnimalType === type ? player.houseAnimalCount : 0
+  const house = (Object.values(player.houseAnimals)[0] ?? null) === type ? Object.values(player.houseAnimals).length : 0
   const stables = Object.values(player.stableAnimals).filter((animal) => animal === type).length
   return pasture + house + stables
 }

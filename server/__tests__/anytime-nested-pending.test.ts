@@ -69,7 +69,7 @@ describe('anytime nesting — sync card listener inside pending', () => {
 
     const done = session.resolveChoice(0, 'confirm', {
       zones: [
-        { id: 'house', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
+        { id: 'house:1-0', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
       ],
     })
     expect(done.ok).toBe(true)

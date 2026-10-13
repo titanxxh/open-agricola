@@ -65,8 +65,7 @@ const makeSingleExchangeBoard = (player: PlayerState) => {
       animalCount: 4,
     },
   ]
-  player.houseAnimalType = 'sheep'
-  player.houseAnimalCount = 1
+  player.houseAnimals = Object.fromEntries(player.roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, 'sheep']));
 }
 
 const makeC148NetNeutralBoarBoard = (player: PlayerState) => {
@@ -221,14 +220,14 @@ describe('M031_LivestockMarket session', () => {
     resp = session.resolveChoice(0, 'confirm', {
       zones: [
         { id: 'sheep-pasture', zoneType: 'pasture', animalType: 'sheep', animalCount: 4 },
-        { id: 'house', zoneType: 'house', animalType: 'boar', animalCount: 1 },
+        { id: 'house:1-0', zoneType: 'house', animalType: 'boar', animalCount: 1 },
       ],
     })
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.resources).toMatchObject({ sheep: 4, boar: 1 })
     expect(resp.state.players[0]!.pastures[0]).toMatchObject({ animalType: 'sheep', animalCount: 4 })
-    expect(resp.state.players[0]!.houseAnimalType).toBe('boar')
-    expect(resp.state.players[0]!.houseAnimalCount).toBe(1)
+    expect((Object.values(resp.state.players[0]!.houseAnimals)[0] ?? null)).toBe('boar')
+    expect(Object.values(resp.state.players[0]!.houseAnimals).length).toBe(1)
   })
 
   it('spends C148-held boar on net-neutral boar exchanges when no board boar is available', () => {

@@ -60,12 +60,12 @@ describe('Moor exchange printed-rule native audit', () => {
         expect(response.state.players[1]!.minorHand).toContain('M030_FarmAnimalMarket')
         const before = structuredClone(response.state.players[0])
         const rejected = session.resolveChoice(0, 'confirm', { zones: [
-          { id: 'house', zoneType: 'house', animalType: 'cattle', animalCount: 2 },
+          { id: 'house:1-0', zoneType: 'house', animalType: 'cattle', animalCount: 2 },
         ] })
         expect(rejected.ok).toBe(false)
         expect(rejected.state.players[0]).toEqual(before)
         response = session.resolveChoice(0, 'confirm', { zones: [
-          { id: 'house', zoneType: 'house', animalType: 'cattle', animalCount: 1 },
+          { id: 'house:1-0', zoneType: 'house', animalType: 'cattle', animalCount: 1 },
           { id: 'sheep', zoneType: 'pasture', animalType: sheep === 2 ? null : 'sheep', animalCount: sheep - 2 },
           { id: 'horse', zoneType: 'pasture', animalType: 'horse', animalCount: 1 },
         ] })
@@ -199,8 +199,7 @@ describe('Moor exchange printed-rule native audit', () => {
     player.improvements = ['Major_Fireplace1']
     player.resources.cattle = 1
     player.resources.horse = horses
-    player.houseAnimalType = 'cattle'
-    player.houseAnimalCount = 1
+    player.houseAnimals = Object.fromEntries(player.roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, 'cattle']));
     player.pastures = [{ id: 'horses', size: 2, tiles: [{ row: 0, col: 0 }, { row: 0, col: 1 }], stables: 0, animalType: 'horse', animalCount: horses }]
     session.loadState(session.state)
     const pending = session.takeAnytimeAction(0, 'exchange')
@@ -253,7 +252,7 @@ describe('Moor exchange printed-rule native audit', () => {
       if (to === 'sheep') {
         expect(traded.interaction.request.kind).toBe('animal-reorg')
         traded = session.resolveChoice(0, 'confirm', { zones: [
-          { id: 'house', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
+          { id: 'house:1-0', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
         ] })
         expect(traded.ok, traded.error).toBe(true)
       }
@@ -334,8 +333,7 @@ describe('Moor exchange printed-rule native audit', () => {
       player.minorPlayed = ['M107_PotRoastRecipe']
       player.improvements = [cookery]
       player.resources.horse = 1
-      player.houseAnimalType = 'horse'
-      player.houseAnimalCount = 1
+      player.houseAnimals = Object.fromEntries(player.roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, 'horse']));
       session.loadState(session.state)
       const response = session.takeAnytimeAction(0, 'exchange')
       expect(response.ok, response.error).toBe(true)
@@ -354,8 +352,7 @@ describe('Moor exchange printed-rule native audit', () => {
     player.improvements = ['Major_Fireplace1']
     player.resources.cattle = 1
     player.resources.horse = horses
-    player.houseAnimalType = 'cattle'
-    player.houseAnimalCount = 1
+    player.houseAnimals = Object.fromEntries(player.roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, 'cattle']));
     player.pastures = [{ id: 'horses', size: 2, tiles: [{ row: 0, col: 0 }, { row: 0, col: 1 }], stables: 0, animalType: 'horse', animalCount: horses }]
     startMoorAuditFeeding(session)
     const response = session.resolveChoice(0, 'confirm', { selections: [

@@ -126,8 +126,7 @@ describe('Moor immediate and terrain clause audit', () => {
     const session = setupMoorAudit()
     const player = session.state.players[0]!
     player.resources[animal] = 1
-    player.houseAnimalType = animal
-    player.houseAnimalCount = 1
+    player.houseAnimals = Object.fromEntries(player.roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, animal]));
     const response = playMoorAuditMinor(session, 'M022_EcologicalNiche')
     expect(response.state.players[0]!.resources.food).toBe(22)
     passed(session, 'M022_EcologicalNiche')
@@ -140,8 +139,7 @@ describe('Moor immediate and terrain clause audit', () => {
     player.resources.horse = 1
     player.resources.grain = 4
     player.resources.vegetable = 4
-    player.houseAnimalType = 'sheep'
-    player.houseAnimalCount = 1
+    player.houseAnimals = Object.fromEntries(player.roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, 'sheep']));
     player.stableTiles = [{ row: 1, col: 2 }]
     player.stableAnimals = { '1-2': 'horse' }
     session.loadState(session.state)
@@ -186,8 +184,7 @@ describe('Moor immediate and terrain clause audit', () => {
     const session = setupMoorAudit()
     session.state.players[0]!.resources.horse = count
     session.state.players[0]!.pastures = [{ id: 'horses', size: 2, tiles: [{ row: 2, col: 2 }, { row: 2, col: 3 }], stables: 0, animalType: 'horse', animalCount: Math.min(4, count) }]
-    session.state.players[0]!.houseAnimalType = count === 5 ? 'horse' : null
-    session.state.players[0]!.houseAnimalCount = count === 5 ? 1 : 0
+    session.state.players[0]!.houseAnimals = Object.fromEntries(session.state.players[0]!.roomTiles.slice(0, count === 5 ? 1 : 0).map(tile => [`${tile.row}-${tile.col}`, count === 5 ? 'horse' : null]));
     session.state.players[0]!.minorHand = ['M031_LivestockMarket']
     const offered = session.takeAction(0, 'major-improvement')
     expect(offered.ok, offered.error).toBe(true)

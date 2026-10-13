@@ -33,8 +33,7 @@ const setupHarvest = (
     player.fields = []
     player.pastures = []
     player.stableAnimals = {}
-    player.houseAnimalType = null
-    player.houseAnimalCount = 0
+    player.houseAnimals = {};
   })
 
   const player = state.players[0]!

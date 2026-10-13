@@ -80,8 +80,7 @@ describe('D159 Reed Seller', () => {
     const buyer = session.state.players[1]!
     buyer.resources.food = 1
     buyer.resources.sheep = 1
-    buyer.houseAnimalType = 'sheep'
-    buyer.houseAnimalCount = 1
+    buyer.houseAnimals = Object.fromEntries(buyer.roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, 'sheep']));
     buyer.improvements = ['Major_Fireplace1']
     let response = confirmSwitches(session, session.takeAnytimeAction(0, SALE))
     expect(response.interaction.request.options.find((option) => option.value === 'buy'))
@@ -134,8 +133,7 @@ describe('D159 Reed Seller', () => {
     const buyer = session.state.players[1]!
     buyer.resources.food = 1
     buyer.resources.sheep = 1
-    buyer.houseAnimalType = 'sheep'
-    buyer.houseAnimalCount = 1
+    buyer.houseAnimals = Object.fromEntries(buyer.roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, 'sheep']));
     buyer.improvements = ['Major_Fireplace1']
     let response = confirmSwitches(session, session.takeAnytimeAction(0, SALE))
     expect(response.interaction.playerIndex).toBe(1)

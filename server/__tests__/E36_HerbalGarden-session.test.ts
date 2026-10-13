@@ -145,7 +145,7 @@ describe('E036_HerbalGarden session', () => {
     const pasture = zones.find((zone) => zone.id === 'pasture-1')!
     pasture.animalType = null
     pasture.animalCount = 0
-    const house = zones.find((zone) => zone.id === 'house')!
+    const house = zones.find((zone) => zone.zoneType === 'house')!
     house.animalType = 'sheep'
     house.animalCount = 1
 
@@ -154,8 +154,7 @@ describe('E036_HerbalGarden session', () => {
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!).toMatchObject({
       resources: { sheep: 1 },
-      houseAnimalType: 'sheep',
-      houseAnimalCount: 1,
+      houseAnimals: { '1-0': 'sheep' },
       pastures: [expect.objectContaining({ animalType: null, animalCount: 0 })],
     })
   })
@@ -250,8 +249,7 @@ describe('E036_HerbalGarden session', () => {
         animalCount: 0,
       },
     ]
-    player.houseAnimalType = 'sheep'
-    player.houseAnimalCount = 1
+    player.houseAnimals = Object.fromEntries(player.roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, 'sheep']));
     session.loadState(state)
 
     const response = session.performRoundEnd()
@@ -292,8 +290,7 @@ describe('E036_HerbalGarden session', () => {
       },
     ]
     player.stableTiles = [{ row: 0, col: 0 }, { row: 0, col: 1 }]
-    player.houseAnimalType = 'boar'
-    player.houseAnimalCount = 1
+    player.houseAnimals = Object.fromEntries(player.roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, 'boar']));
     session.loadState(state)
 
     const response = session.performRoundEnd()

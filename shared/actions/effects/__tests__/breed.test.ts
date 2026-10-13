@@ -31,8 +31,7 @@ const makePlayer = (overrides: Partial<PlayerState> = {}): PlayerState =>
     improvements: [],
     cardStates: {},
     activeModifiers: [],
-    houseAnimalType: null,
-    houseAnimalCount: 0,
+    houseAnimals: {},
     ...overrides,
   } as unknown as PlayerState)
 
