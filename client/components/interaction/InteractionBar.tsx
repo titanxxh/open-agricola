@@ -249,9 +249,14 @@ const renderOptionContent = (
   locale: Locale,
   option: ActionChoiceOption,
 ): ReactNode => {
+  const description = option.descriptionPreview ?? (option.effectPreview?.kind === 'rule' ? option.effectPreview.description : undefined)
+  const identityInDescription = description && description.kind !== 'conditional' && description.labelKey === option.labelKey
+    && (description.kind !== 'action' || description.showLabel !== false)
+  const identity = option.labelRole === 'identity' && !identityInDescription ? renderOptionLabel(locale, option) : null
   if (option.descriptionPreview) {
     return (
       <span className="interaction-option-stack">
+        {identity ? <span className="interaction-option-title">{identity}</span> : null}
         <span className="interaction-option-main">
           {renderDescriptionPreview(locale, option.descriptionPreview, getParentFatherOptionText(locale, option))}
         </span>
@@ -263,9 +268,10 @@ const renderOptionContent = (
       {t(locale, 'ui.choiceActionCard')}: {option.targetCard.actionNameKeys.map((key) => t(locale, key)).join(' / ')}
     </span> : null}</span>
   }
-  const subtitle = getEffectPreviewSubtitle(locale, option)
+  const subtitle = identity ? null : getEffectPreviewSubtitle(locale, option)
   return (
     <span className="interaction-option-stack">
+      {identity ? <span className="interaction-option-title">{identity}</span> : null}
       <span className="interaction-option-main">
         {renderEffectPreview(locale, option.effectPreview)}
       </span>
@@ -709,6 +715,7 @@ export const InteractionBar = ({
                     return (
                       <button
                         key={option.value}
+                        data-choice-value={option.value}
                         disabled={disabled}
                         title={disabledTitleKey ? t(locale, disabledTitleKey) : undefined}
                         className={option.disabled ? 'choice-option-disabled' : undefined}

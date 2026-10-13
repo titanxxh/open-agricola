@@ -3,13 +3,12 @@ import { createAccumulatingAction } from '../../actions/factories/accumulate'
 import { createGainAction } from '../../actions/factories/gain'
 import { collectAccumulatedResources } from '../../actions/effects/collect'
 import { gainResources } from '../../actions/effects/gain'
-import {
-  isMajorImprovementPlayable,
-  isMinorImprovementPlayable,
-} from '../../actions/effects/improvement'
 import type { ActionDefinition, GameState, PlayerState } from '../../contract/types'
 import { hasPlayableOccupationChoice } from '../../actions/effects/occupation'
+import { isMajorImprovementPlayable, isMinorImprovementPlayable } from '../../actions/effects/improvement'
 import { getAvailableMajorImprovementIds } from '../major/supply'
+import { createRoundImprovementFlow, describeRoundImprovementPlan, improvementTypesForRound, type RoundImprovementPlan } from '../../actions/plans/round-improvement'
+import { createFirstMissingResourceFlow, describeFirstMissingResourcePlan, firstMissingResource, type FirstMissingResourcePlan } from '../../actions/plans/first-missing-resource'
 
 const canPlayOccupationWithFood = (spaceId: string, food: number) =>
   (state: Parameters<ActionDefinition['canBeExecutedByPlayer']>[0], player: Parameters<ActionDefinition['canBeExecutedByPlayer']>[1]) =>
@@ -260,20 +259,16 @@ export const resourceTrade6: ActionDefinition = {
   },
 }
 
-const corralAnimal = (player: PlayerState): 'sheep' | 'boar' | 'cattle' | null => {
-  if (player.resources.sheep <= 0) return 'sheep'
-  if (player.resources.boar <= 0) return 'boar'
-  if (player.resources.cattle <= 0) return 'cattle'
-  return null
-}
+const CORRAL_PLAN = { resources: ['sheep', 'boar', 'cattle'], amount: 1 } as const satisfies FirstMissingResourcePlan
+const IMPROVEMENT_ROUNDS = [
+  { from: 1, to: 4, types: ['minor'] },
+  { from: 5, types: ['major', 'minor'] },
+] as const satisfies RoundImprovementPlan
 
 const canPlayImprovement56 = (state: GameState, player: PlayerState) => {
-  const types = improvement56Types(state)
-  const canMinor = types.includes('minor') &&
-    player.minorHand.some((id) => isMinorImprovementPlayable(state, player, id, 'improvement', undefined, types))
-  const canMajor = types.includes('major') &&
-    getAvailableMajorImprovementIds(state).some((id) => isMajorImprovementPlayable(state, player, id))
-  return canMinor || canMajor
+  const types = improvementTypesForRound(state.round, IMPROVEMENT_ROUNDS)
+  return types.includes('minor') && player.minorHand.some(id => isMinorImprovementPlayable(state, player, id, 'improvement', undefined, types))
+    || types.includes('major') && getAvailableMajorImprovementIds(state).some(id => isMajorImprovementPlayable(state, player, id))
 }
 
 export const corral6: ActionDefinition = {
@@ -284,14 +279,12 @@ export const corral6: ActionDefinition = {
   players: [6],
   gainPerRound: {},
   strictCanExecute: true,
-  canBeExecutedByPlayer: (_state, player) => corralAnimal(player) !== null,
-  execute: ({ player }) => {
-    const animal = corralAnimal(player)
-    if (!animal) return { type: 'fail', errorKey: 'log.action' }
-    return {
-      type: 'flow',
-      flow: { type: 'leaf', actionId: 'gain', params: { [animal]: 1 } },
-    }
+  canBeExecutedByPlayer: (_state, player) => firstMissingResource(player, CORRAL_PLAN) !== undefined,
+  flowFactory: context => createFirstMissingResourceFlow(context, CORRAL_PLAN),
+  previewEffect: ({ previewMode }) => previewMode === 'base' ? describeFirstMissingResourcePlan(CORRAL_PLAN) : undefined,
+  execute: context => {
+    const flow = createFirstMissingResourceFlow(context, CORRAL_PLAN)
+    return flow ? { type: 'flow', flow } : { type: 'fail', errorKey: 'log.action' }
   },
 }
 
@@ -333,23 +326,10 @@ export const improvement6: ActionDefinition = {
   players: [6],
   strictCanExecute: true,
   canBeExecutedByPlayer: canPlayImprovement56,
-  execute: ({ state, player }) => {
-    if (!canPlayImprovement56(state, player)) return { type: 'fail', errorKey: 'log.action' }
-    return {
-      type: 'flow',
-      flow: {
-      type: 'seq',
-      children: [
-        {
-          type: 'leaf',
-          actionId: 'improvement',
-          actionContext: { types: improvement56Types(state) },
-        },
-      ],
-    },
-    }
+  flowFactory: context => createRoundImprovementFlow(context, IMPROVEMENT_ROUNDS),
+  previewEffect: ({ previewMode }) => previewMode === 'base' ? describeRoundImprovementPlan(IMPROVEMENT_ROUNDS) : undefined,
+  execute: context => {
+    const flow = createRoundImprovementFlow(context, IMPROVEMENT_ROUNDS)
+    return flow ? { type: 'flow', flow } : { type: 'fail', errorKey: 'log.action' }
   },
 }
-
-const improvement56Types = (state: GameState): Array<'major' | 'minor'> =>
-  state.round >= 5 ? ['major', 'minor'] : ['minor']

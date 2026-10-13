@@ -4,6 +4,7 @@ import { getPlayedCardDefinitions } from '../cards/helpers/card-type'
 import { availableWorkers, workersAtHome, smallestAvailableWorker } from '../domain/player'
 import { findActionSpaceById } from '../domain/space'
 import { isThroughTheSeasonsSeason } from '../seasons/rules'
+import { getMoorWorkerPlacementPolicy } from './worker-placement'
 
 export type HeatingPaymentPayload = {
   fuelUsed?: number
@@ -102,7 +103,7 @@ export const selectWorkerForMoorAction = (
   spaceId: string,
 ): Worker | null => {
   if (state.enableFarmersOfTheMoor !== true) return smallestAvailableWorker(state, player)
-  if (spaceId === 'moor-infirmary') {
+  if (getMoorWorkerPlacementPolicy(spaceId) === 'sick-preferred') {
     const sick = sickWorkersAtHome(state, player).sort((a, b) => workerNumber(b) - workerNumber(a))
     if (sick.length > 0) return sick[0]!
     const healthy = healthyWorkersAtHome(state, player).sort((a, b) => workerNumber(a) - workerNumber(b))

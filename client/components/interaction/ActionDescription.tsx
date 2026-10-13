@@ -89,6 +89,10 @@ export const renderEffectPreview = (
   effectPreview: ChoiceEffectPreview,
 ): ReactNode => {
   if (effectPreview.kind === 'resourceBundle') return <ResourceLine locale={locale} resources={effectPreview.resources} />
+  if (effectPreview.kind === 'firstMissingResource') return <span>{t(locale, 'ui.ruleFirstMissingResource')}{': '}{effectPreview.resources.map((resource, index) => <span key={resource}>{index ? ' → ' : ''}<ResourceLine locale={locale} resources={{ [resource]: effectPreview.amount }} /></span>)}</span>
+  if (effectPreview.kind === 'roundCardSelection') return <span>{effectPreview.ranges.map((range, index) => <span key={range.from} data-round-start={range.from} data-round-end={range.to}>
+    {index ? '; ' : ''}{t(locale, range.to === undefined ? 'ui.ruleFromRound' : 'ui.ruleRoundRange', { start: range.from, end: range.to ?? '' })}{': '}{renderEffectPreview(locale, { kind: 'cardSelection', types: [...range.types] })}
+  </span>)}</span>
   if (effectPreview.kind === 'cardRecordSelection') return <span>{t(locale, 'ui.ruleRecordSelection', { count: effectPreview.count, card: getAnyCardDisplayName(locale, effectPreview.cardId) })}{': '}{effectPreview.choices.map((resources, index) => <span key={index}>{index ? ' / ' : ''}<ResourceLine locale={locale} resources={resources} /></span>)}</span>
   if (effectPreview.kind === 'cardStack') return <span>{t(locale, effectPreview.amount < 0 ? 'ui.ruleDiscardCardMarker' : 'ui.ruleStoreCardMarker', { card: getAnyCardDisplayName(locale, effectPreview.cardId), amount: Math.abs(effectPreview.amount) })}{' '}{t(locale, `resources.${effectPreview.item}`)}</span>
   if (effectPreview.kind === 'scoringReserve') return <span>{t(locale, 'ui.ruleReserveForScoring')}{' '}<ResourceLine locale={locale} resources={effectPreview.resourcesReserved} />{' → '}<ResourceLine locale={locale} resources={{}} bonusVp={effectPreview.bonusVp} /></span>
@@ -266,6 +270,7 @@ export const renderDescriptionPreview = (
 ): ReactNode => {
   const actor = preview.actor
   const prefix = <>
+    {preview.workerPlacement === 'sick-preferred' ? <span className="action-description-worker-placement">{t(locale, 'ui.ruleSickWorkerDestination')}{' '}</span> : null}
     {preview.optional ? <span className="action-description-optional">{t(locale, 'ui.actionPreviewOptional')}{' '}</span> : null}
     {actor ? <span className="action-description-actor">{getPlayerDisplayName(locale, actor.name, actor.index, actor.nameIsDefault)}{': '}</span> : null}
   </>

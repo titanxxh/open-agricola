@@ -2,6 +2,7 @@ import type { ActionSpace, ChoiceDescriptionPreview, GameState } from '../contra
 import { Engine, ActionRegistry } from '../engine'
 import { getAllAdHocActions } from './helpers/ad-hoc-action-registry'
 import { createInternalActionDefinitions } from './internal-actions'
+import { getMoorWorkerPlacementPolicy } from '../moor/worker-placement'
 
 /** Base-board rules never acquire the viewed farm's discounts or admission state. */
 export const createBaseActionDescriber = (state: GameState): ((space: ActionSpace) => ChoiceDescriptionPreview | undefined) => {
@@ -11,6 +12,10 @@ export const createBaseActionDescriber = (state: GameState): ((space: ActionSpac
   const player = baseState.players[0]!
   const registry = new ActionRegistry()
   for (const action of [...state.actionSpaces, ...createInternalActionDefinitions(actionId => registry.get(actionId)), ...getAllAdHocActions()]) registry.register(action)
-  return space => Engine.describeFlow({ type: 'leaf', actionId: space.id, expandFlow: true }, registry,
-    { state: baseState, player, space, previewMode: 'base' })
+  return space => {
+    const description = Engine.describeFlow({ type: 'leaf', actionId: space.id, expandFlow: true }, registry,
+      { state: baseState, player, space, previewMode: 'base' })
+    return description && state.enableFarmersOfTheMoor && getMoorWorkerPlacementPolicy(space.id) === 'sick-preferred'
+      ? { ...description, workerPlacement: 'sick-preferred' } : description
+  }
 }

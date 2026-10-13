@@ -101,7 +101,10 @@ export const placeFarmerAction: ActionDefinition = {
       ? readTemporarySupplyWorker(player, context.actionContext, context.sourceCard) !== undefined
       : smallestAvailableWorker(state, player) !== null,
   previewEffect: ({ state, actionContext }) => {
-    const target = state.actionSpaces.find((space) => space.id === actionContext?.targetSpaceId)
+    const constraints = actionContext?.constraints
+    const fixedTarget = Array.isArray(constraints) && constraints.length === 1 && typeof constraints[0] === 'string'
+      ? constraints[0] : undefined
+    const target = state.actionSpaces.find((space) => space.id === (actionContext?.targetSpaceId ?? fixedTarget))
     return target ? { kind: 'actionSpace', spaceId: target.id, nameKey: target.nameKey } : undefined
   },
   execute: ({ state, player, sourceCard, actionContext, eventSink }) => {

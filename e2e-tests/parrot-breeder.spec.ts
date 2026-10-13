@@ -36,7 +36,9 @@ const openScenario = async (page: Page, request: APIRequestContext, target: stri
 test('Parrot Breeder copies the fixed target with one click and no target picker', async ({ page, request }) => {
   await openScenario(page, request, 'day-laborer')
   const copy = page.locator('.anytime-actions').getByRole('button', { name: /Parrot Breeder/ })
-  await expect(copy).toContainText('Pay 1 grain')
+  await expect(copy.locator('[data-resource-mode="payment"] [data-resource="grain"]')).toHaveAttribute('data-amount', '1')
+  await expect(copy.getByRole('img', { name: '1 Grain', exact: true })).toBeVisible()
+  await expect(copy).toContainText('Day Laborer')
   const activated = page.waitForResponse(response => response.url().endsWith('/api/game/anytime'))
   await copy.click()
   const result = await (await activated).json()
