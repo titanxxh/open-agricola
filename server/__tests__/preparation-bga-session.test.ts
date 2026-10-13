@@ -224,6 +224,7 @@ describe('BGA preparation windows', () => {
     if (response.interaction.stateId !== 'wait') throw new Error('The second crop continuation disappeared')
     const cropHostSpace = response.interaction.spaceId
     response = openGrainExchange(session, response)
+    expect(response.interaction.stateId).toBe('wait')
     const restored = new GameSession(rehydrateState(JSON.parse(JSON.stringify(serializeSessionSnapshot(session.state, session)))))
     sessions.push(restored)
     response = restored.getState()
