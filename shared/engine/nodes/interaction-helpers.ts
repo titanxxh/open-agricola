@@ -184,7 +184,7 @@ function markFlowSkippedComputeReplaceListeners(
 export function buildReplaceChoiceFlow(
   actionNode: Pick<
     ActionNode,
-    'actionId' | 'params' | 'sourceCard' | 'actionContext' | 'choiceLabelKey' | 'choiceLabelParams' | 'optional' | 'optionalPromptKey'
+    'actionId' | 'params' | 'sourceCard' | 'actionContext' | 'choiceLabelKey' | 'choiceLabelParams' | 'optional' | 'optionalPromptKey' | 'expandFlow'
   >,
   alternatives: ComputeReplaceResult['alternatives'],
   replacedActionId: string,
@@ -202,6 +202,7 @@ export function buildReplaceChoiceFlow(
       {
         type: 'leaf',
         actionId: replacedActionId,
+        expandFlow: actionNode.expandFlow,
         optional: actionNode.optional,
         promptKey: actionNode.optionalPromptKey,
         params: actionNode.params,

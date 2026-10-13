@@ -1,54 +1,57 @@
-import { describe, expect, it } from 'vitest'
-import { GameSession, type SessionResponse } from '../game/authoritative-session'
-import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
-import { setWorkersAtHome } from '../../shared/domain/player'
+import { afterEach, describe, expect, it } from 'vitest'
+import type { GameSession, SessionResponse } from '../game/authoritative-session'
+import { createWorkSession } from './_helpers/session-fixtures'
 
 import '../../shared/cards/B/B026_AgrarianFences'
 
 const CARD_ID = 'B026_AgrarianFences'
 const FENCE_EDGES = ['H-2-4', 'H-3-4', 'V-2-4', 'V-2-5']
+const sessions: GameSession[] = []
+afterEach(() => sessions.splice(0).forEach((session) => session.dispose()))
 
-const setup = ({ wood = 4, grain = 0, field = false, played = true } = {}) => {
-  const session = new GameSession(26, undefined, { playerCount: 2 })
-  const state = session.getState().state
-  stabilizeRandomHands(state.players)
-  state.currentPlayerIndex = 0
-  state.round = 5
-  const player = state.players[0]!
-  setWorkersAtHome(state, player, 2)
-  player.minorHand = played ? ['__test_placeholder__'] : [CARD_ID]
-  player.occupationHand = ['__test_placeholder__']
-  player.minorPlayed = played ? [CARD_ID] : []
-  player.resources = { ...player.resources, wood, grain, vegetable: 0 }
-  player.fields = field ? [{ row: 0, col: 2, crop: null, remaining: 0 }] : []
-  session.loadState(state)
-  return session
+const waiting = (response: SessionResponse) => {
+  expect(response.interaction.stateId).toBe('wait')
+  if (response.interaction.stateId !== 'wait') throw new Error('Expected pending interaction')
+  return response.interaction
 }
 
-const outerSowBranch = (session: GameSession, action = 'sow') => {
-  const response = session.takeAction(0, 'grain-utilization')
-  expect(response.ok, response.error).toBe(true)
-  expect(response.interaction.stateId).toBe('wait')
-  if (response.interaction.stateId !== 'wait') return response
-  const option = response.interaction.request.options?.find((candidate) =>
-    candidate.labelParams?.actionNameKey === `actions.${action}.name`
-  )
-  expect(option).toBeDefined()
-  return session.resolveChoice(0, option!.value)
+const choiceOptions = (response: SessionResponse) => {
+  const request = waiting(response).request
+  if (request.kind !== 'choice') throw new Error('Expected choice interaction')
+  return request.options
+}
+
+const farmSelection = (response: SessionResponse) => {
+  const request = waiting(response).request
+  return request.kind === 'farm-select' ? request.farm : undefined
+}
+
+const setup = ({ wood = 4, grain = 0, field = false, played = true } = {}) => {
+  const session = createWorkSession({ seed: 26, configure: (state) => {
+    state.round = 5
+    const player = state.players[0]!
+    player.minorHand = played ? ['__test_placeholder__'] : [CARD_ID]
+    player.minorPlayed = played ? [CARD_ID] : []
+    player.resources = { ...player.resources, wood, grain, vegetable: 0 }
+    player.fields = field ? [{ row: 0, col: 2, stacks: [] }] : []
+  } })
+  sessions.push(session)
+  return session
 }
 
 const chooseLabel = (session: GameSession, response: SessionResponse, labelKey: string) => {
   expect(response.interaction.stateId).toBe('wait')
   if (response.interaction.stateId !== 'wait') return response
-  const option = response.interaction.request.options?.find((candidate) => candidate.labelKey === labelKey)
+  const option = choiceOptions(response).find((candidate) => candidate.labelKey === labelKey)
   expect(option).toBeDefined()
   return session.resolveChoice(0, option!.value)
 }
 
 const commitSow = (session: GameSession, response: SessionResponse) => {
   expect(response.interaction.stateId).toBe('wait')
-  if (response.interaction.stateId !== 'wait' || response.interaction.request.farm.farmType !== 'sow') return response
-  const field = response.interaction.request.farm.selectableFields[0]!.tile
+  const farm = farmSelection(response)
+  if (farm?.farmType !== 'sow') throw new Error('Expected sow selection')
+  const field = farm.selectableFields[0]!.tile
   return session.commitSelectionChoice(0, { crops: [{ ...field, crop: 'grain' }] })
 }
 
@@ -65,15 +68,19 @@ describe('B026 Agrarian Fences parity', () => {
     expect(response.state.players[0]!.minorPlayed).toContain(CARD_ID)
   })
 
-  it.each(['sow', 'bake-bread'])('requires explicit replacement before fencing through %s', (action) => {
+  it.each(['ui.interactionAgrarianFencesSowAndFence', 'ui.interactionAgrarianFencesBakeAndFence'])('requires explicit replacement before fencing through %s', (plan) => {
     const session = setup()
-    let response = outerSowBranch(session, action)
-    expect(response.interaction.promptKey).toBe('ui.interactionSelectReplacement')
-    expect(response.interaction.request.options).toHaveLength(1)
+    let response = session.takeAction(0, 'grain-utilization')
+    expect(waiting(response).promptKey).toBe('ui.interactionSelectReplacement')
+    expect(choiceOptions(response)).toHaveLength(1)
     expect(response.state.players[0]!.resources.wood).toBe(4)
-    const source = response.interaction.request.options!.find((option) => option.sourceCard === CARD_ID)!
+    const source = choiceOptions(response).find((option) => option.sourceCard === CARD_ID)!
     response = session.resolveChoice(0, source.value)
-    expect(response.interaction.request.farm?.farmType).toBe('fence')
+    response = chooseLabel(session, response, plan)
+    if (farmSelection(response)?.farmType !== 'fence') {
+      response = chooseLabel(session, response, 'actions.fencing.name')
+    }
+    expect(farmSelection(response)?.farmType).toBe('fence')
     response = session.commitSelectionChoice(0, { edges: FENCE_EDGES, palisadeEdges: [], extraWood: 0 })
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources.wood).toBe(0)
@@ -83,8 +90,11 @@ describe('B026 Agrarian Fences parity', () => {
 
   it('B026 S4: Grain Utilization can retain its normal sow without fencing', () => {
     const session = setup({ grain: 1, field: true })
-    let response = outerSowBranch(session)
+    let response = session.takeAction(0, 'grain-utilization')
     response = chooseLabel(session, response, 'ui.interactionDoNotReplace')
+    if (farmSelection(response)?.farmType !== 'sow') {
+      response = chooseLabel(session, response, 'actions.sow.name')
+    }
 
     response = commitSow(session, response)
 
@@ -99,7 +109,7 @@ describe('B026 Agrarian Fences parity', () => {
 
     expect(response.ok, response.error).toBe(true)
     if (response.interaction.stateId !== 'wait') return
-    expect(response.interaction.request.options?.some((option) =>
+    expect(choiceOptions(response).some((option) =>
       option.labelKey === 'actions.fencing.name' || option.sourceCard === CARD_ID
     )).toBe(false)
   })

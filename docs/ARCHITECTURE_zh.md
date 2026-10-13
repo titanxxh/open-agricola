@@ -743,6 +743,8 @@ Direct `cancel` 不是 protected atomic action 的成功路径。`plow` / `sow` 
 10. `immediatelyAfter` / `after` 是 host action 成功后的 trailing phases；它们的 trigger frame 在 host commit 后立即固定。`beforeHostListeners` settlement 必须先完成，`afterHostCommitListeners` 在 host commit 后、trailing phases 的 activation 真正执行前运行，`afterHostListeners` settlement 则故意保留在 参考实现 slot 中，等 host `after` 之后再运行。
 11. `activate-card` 是 internal leaf，绕过上述 public action 流水线：只执行指定 listener body，并把 listener 返回的 `flow` / `followUpActions` 交回 engine 插入执行。
 
+组合行动的直接入口 `Engine.fromAction()` 和 `expandFlow` leaf 先创建保留展开标记的 ActionNode，在展开前运行已有 `computeReplace` 选择。选择原分支后才展开原 flow；该入口不额外执行组合宿主的 before/after 生命周期。展开继承 owner、来源、producer 守卫和 mandatory 义务，私有 cursor 保存展开标记。`checkedReplaceAction` 只冻结组合宿主的替换选择，展开时清除该标记，使子行动仍可使用自己的替代。B026 在此边界返回互斥的 Sow/Bake、Fencing/Sow 和 Fencing/Bake 计划，每个计划允许单个行动或任意顺序的两个行动。见 [ADR 0027](adr/0027-composite-actions-use-existing-replacement-selection.md)。
+
 作用域 scope：`player` / `opponent` / `any`。card listener 匹配层按 listener id 确定性枚举；phase trailing node 构建层再按 owner 分组（global → active player → 其他玩家），每个 owner 组内按卡牌 play order 与匹配序稳定排序，并由该 owner 执行 activation/prompt。reaction listener 默认进入 trigger-select；compute / query listener 仍按确定性顺序聚合，不产生玩家选择。
 
 Card listener 区域默认只匹配已打出卡：`zones` 省略等价于 `['played']`，扫描 `improvements` / `minorPlayed` / `occupationPlayed`。只有显式声明 `zones: ['hand']` 或 `zones: ['hand', 'played']` 的 listener 才会扫描 `minorHand` / `occupationHand`。匹配结果携带 `ownerCardId` 与 `ownerCardZone`，并通过 `activate-card` params、trigger-select preview、`executeCardListener()` 透传给 handler；handler 不应自行重扫手牌/已打出数组来推断 owner 区域。
@@ -752,6 +754,8 @@ Card listener 区域默认只匹配已打出卡：`zones` 省略等价于 `['pla
 ### 7.5.2 当前步骤准入、before 与 blocked 恢复
 
 行动格可用性与权威入口共用 `GameCore.applyIsDoableCheck()` 和 flow 准入 helper。原子判断携带 params、sourceCard、actionContext、owner、目标行动格、实际费用修正与替代行动信息。当前步骤可执行，或适用的 before 可以开始，就允许尝试；不保证整条流程能够完成。SEQ 检查下一步，OR/XOR 检查是否有分支可以开始。显式 veto 和放人限制仍然有效。入口 helper 延迟求值基础判定，只对带自定义判定的 strict 复合行动执行这次前置检查。flow 查询中，叶子的基础回退只在没有 `costPreview` 时执行；复合流程遍历和 strict gate 保持原有顺序。每次查询仍基于完整的当前状态执行适用的 hook 与费用预览，不缓存可用性结果。查询不消费资源、触发、事件或私有 cursor。 普通放人和卡牌授予的额外放人共享 `isPlacementActionDoableInFlowContext()`，包含 `place-farmer.before` 的准入回退、显式 veto、strict 前置条件和 before 抑制语义。额外放人的可达性 resolver 通过无环的 `action-definition-lookup.ts` 同时查询行动格及内部行动，能够预览包含 `gain` / `pay` 的 before flow。
+
+准入递归键由行动 ID、参数和排序后的已消费 replacement producer ID 组成。同名行动的替代若消耗了一个新来源，可以继续检查其实际可执行性；重复相同键则终止探测。这样 E151 的 `skipRoomCheck` 替代可以通过真实 family-growth 判定，无需卡牌 `isDoable` 绕过，也不会无限递归。
 
 引擎在状态变化后重新评估 before 候选，每次 activation 只消费一次。已接受的根行动和必选续行会向复合后代传播义务。选中分支不能返回父选择以逃过未履行的义务；明确 optional 节点在接受前仍可跳过。必选叶节点或复合节点不可执行时产生 `engine-blocked`；普通失败保留先前效果，等待玩家显式 `undoStep` 或 `undoAction`。无效结构化提交恢复命令检查点并保留原交互。已发出的选择菜单中，若提交选项对应的行动已不可执行（例如 anytime 行动花掉了所有可选支付所需的资源），该提交以可恢复失败被拒绝并保留菜单，不进入阻塞；支付选项只会结算其标识所指的那种支付。
 
