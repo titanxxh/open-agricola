@@ -143,7 +143,7 @@ describe('an action that hands its animal reorganization to the sub-flow', () =>
       const player = state.players[0]!
       player.minorPlayed = [CARD]
       player.resources = { ...player.resources, sheep: 1 }
-      player.houseAnimals = Object.fromEntries(player.roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, 'sheep']));
+      player.houseAnimals = { '1-0': 'sheep' }
     } })
     const reactions: Reaction[] = []
     session.withCtx(() => {
