@@ -1628,6 +1628,7 @@ export class GameCore {
   }
 
   private engineDeps() {
+    this.syncDynamicActionSpaces()
     return {
       registry: this.registry,
       hooks: this.hookDispatcher,
@@ -3665,6 +3666,7 @@ export class GameCore {
       const player = this.state.players[effectivePlayerIndex]
       if (!frameOwnerPlayer || !player) return
       const before = this.clonePlayer(player)
+      this.syncDynamicActionSpaces()
       const step = frame.engine.proceed(this.buildEngineExecutionContext(player, space))
       this.flushEngineLog()
 

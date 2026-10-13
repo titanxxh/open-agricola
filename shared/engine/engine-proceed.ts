@@ -516,8 +516,7 @@ const buildOptionalPrompt = (
   }
   const action = int.registry.get(actionNode.actionId)
   if (!action) {
-    resolveSubtree(node)
-    return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
+    throw new Error(`missing action definition: ${actionNode.actionId}`)
   }
   const actionContext = actionContextForNode(actionNode, int)
   const executionContext: ActionExecutionContext = {
@@ -941,7 +940,7 @@ export function engineProceed(
           reportProtectedObservation: context.reportProtectedObservation,
         }
         const action = int.registry.get(entry.actionNode.actionId)
-        if (!action) return null
+        if (!action) throw new Error(`missing action definition: ${entry.actionNode.actionId}`)
         const doable = canStartNode(int, { ...executionContext, ...currentEventReadContext(int) }, entry.node)
         const originalReplacementBranch = entry.nodeId === replacementOriginalNodeId
         if (!doable && !(originalReplacementBranch && entry.node.optional)) return null
@@ -1129,7 +1128,7 @@ export function engineProceed(
     node.resolvedReplacement = { actionId: replacedActionId, sourceCard: replaceSourceCard }
     const action = int.registry.get(replacedActionId)
     if (!action) {
-      return { type: 'blocked', nodeId: node.id }
+      throw new Error(`missing action definition: ${replacedActionId}`)
     }
     if (node.expandFlow && action.flow) {
       const flow = mergeContextIntoFlow(action.flow,
