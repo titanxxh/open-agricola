@@ -7,7 +7,6 @@ import { ActionNode } from '../action-node'
 import { ParallelNode } from '../parallel-node'
 import {
   evaluateTriggerSelect,
-  findIssuedInapplicableTriggerChild,
   isPureResourceFlowCurrentlyPayable,
 } from '../../trigger-select'
 import {
@@ -279,75 +278,6 @@ describe('ParallelNode trigger-select mode', () => {
 
     expect(child.getState()).not.toBe('resolved')
     expect(evaluation.options).toEqual([])
-  })
-
-  it('binds an issued stale selection to the same child while retaining a mandatory sibling', () => {
-    const registry = new CardRegistry()
-    registry.registerListener({ id: 'listener-a', cardIds: ['C1'], handler: context => context.player.resources.food > 0
-      ? { flow: { type: 'leaf', actionId: 'gain', params: { resources: { grain: 1 } } } } : undefined })
-    registry.registerListener({ id: 'listener-b', cardIds: ['C2'], mandatory: true,
-      handler: () => ({ flow: { type: 'leaf', actionId: 'gain', params: { resources: { wood: 1 } } } }) })
-    setActiveCardRegistry(registry)
-    const child = makeActivate('a', 'C1', false)
-    const sibling = makeActivate('b', 'C2', true)
-    const node = makeTriggerSelect([child, sibling])
-    const context = makeContext(makePlayer({ resources: baseResources({ food: 1 }) }))
-    const issued = evaluateTriggerSelect(node, context).options
-    context.player.resources.food = 0
-    const current = evaluateTriggerSelect(node, context)
-    expect(current.options.map(option => option.value)).toEqual(['C2', '__pass__'])
-    expect(current.options.find(option => option.value === '__pass__')?.disabled).toBe(true)
-    expect(findIssuedInapplicableTriggerChild(current, issued, 'C1')).toBe(child)
-    expect(node.chooseCard(child.id)).toBe(child)
-    expect(sibling.getState()).not.toBe('resolved')
-    expect(findIssuedInapplicableTriggerChild(current, issued, 'never-issued')).toBeUndefined()
-    expect(findIssuedInapplicableTriggerChild(current, [], 'C1')).toBeUndefined()
-    child.resolve({})
-    expect(findIssuedInapplicableTriggerChild(current, issued, 'C1')).toBeUndefined()
-  })
-
-  it('never relaxes disabled or still applicable selections', () => {
-    const registry = new CardRegistry()
-    registry.registerListener({ id: 'listener-a', cardIds: ['C1'], handler: context => context.player.resources.food > 0
-      ? { flow: { type: 'leaf', actionId: 'pay', params: { cost: { wood: 1 } } } } : undefined })
-    setActiveCardRegistry(registry)
-    const node = makeTriggerSelect([makeActivate('a', 'C1', false)])
-    const context = makeContext(makePlayer({ resources: baseResources({ food: 1 }) }))
-    const disabled = evaluateTriggerSelect(node, context).options
-    expect(disabled[0]?.disabled).toBe(true)
-    context.player.resources.food = 0
-    const inapplicable = evaluateTriggerSelect(node, context)
-    expect(inapplicable.options).toEqual([])
-    expect(findIssuedInapplicableTriggerChild(inapplicable, disabled, 'C1')).toBeUndefined()
-    context.player.resources.food = 1
-    context.player.resources.wood = 1
-    const enabled = evaluateTriggerSelect(node, context).options
-    context.player.resources.wood = 0
-    const unaffordable = evaluateTriggerSelect(node, context)
-    expect(unaffordable.optionStates[0]).toMatchObject({ applicable: true, doable: false })
-    expect(findIssuedInapplicableTriggerChild(unaffordable, enabled, 'C1')).toBeUndefined()
-  })
-
-  it('disambiguates same-card listeners by their issued node value without promoting a disabled sibling', () => {
-    const registry = new CardRegistry()
-    for (const id of ['a', 'b']) registry.registerListener({
-      id: `listener-${id}`, cardIds: ['C1'], handler: context => context.player.resources.food > 0
-        ? { flow: { type: 'leaf', actionId: id === 'a' ? 'gain' : 'pay', params: id === 'a'
-          ? { resources: { grain: 1 } } : { cost: { wood: 1 } } } } : undefined,
-    })
-    setActiveCardRegistry(registry)
-    const a = makeActivate('a', 'C1', false)
-    const b = makeActivate('b', 'C1', false)
-    const node = makeTriggerSelect([a, b])
-    const context = makeContext(makePlayer({ resources: baseResources({ food: 1 }) }))
-    const issued = evaluateTriggerSelect(node, context).options
-    expect(issued.slice(0, 2)).toMatchObject([{ value: 'a' }, { value: 'b', disabled: true }])
-    context.player.resources.food = 0
-    const current = evaluateTriggerSelect(node, context)
-    expect(findIssuedInapplicableTriggerChild(current, issued, 'a')).toBe(a)
-    expect(findIssuedInapplicableTriggerChild(current, issued, 'b')).toBeUndefined()
-    expect(findIssuedInapplicableTriggerChild(current, issued, 'C1')).toBeUndefined()
-    expect(findIssuedInapplicableTriggerChild(current, issued, '__pass__')).toBeUndefined()
   })
 
   it('rejects a listener that tries to signal applicability by mutating the preview clone', () => {

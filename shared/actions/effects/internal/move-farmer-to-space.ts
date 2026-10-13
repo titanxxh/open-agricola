@@ -1,4 +1,5 @@
 import type { ActionDefinition, ActionFlow, ActionSpace, GameState, PlayerState } from '../../../contract/types'
+import { collectBeforePlacementFlows } from '../../../cards/card-listeners'
 import {
   addLinkedSpaceBlocks,
   addWorkerRef,
@@ -126,6 +127,7 @@ export const moveFarmerToSpaceAction: ActionDefinition = {
 
     const targetActionContext = { ...resetComputeReplaceGuards(actionContext), targetSpaceId: targetSpace.id }
     if (actionContext) actionContext.targetSpaceId = targetSpace.id
+    const beforeFlows = collectBeforePlacementFlows(state, player, targetSpace, targetActionContext)
     const targetFlow: ActionFlow = {
       type: 'leaf',
       actionId: targetSpace.id,
@@ -139,6 +141,7 @@ export const moveFarmerToSpaceAction: ActionDefinition = {
         type: 'seq',
         children: [
           { type: 'leaf', actionId: 'turn-scope', params: { operation: 'begin' } },
+          ...beforeFlows,
           targetFlow,
           {
             type: 'leaf',

@@ -23,7 +23,7 @@ import {
 } from './pending-validation'
 import { rejectProtectedActionCancel } from './protected-action-cancel'
 import { mergeContinuationEvents } from './continuation-events'
-import { evaluateTriggerSelect, findIssuedInapplicableTriggerChild, type TriggerSelectEvaluationOptions } from './trigger-select'
+import { evaluateTriggerSelect, type TriggerSelectEvaluationOptions } from './trigger-select'
 import {
   applyDefaultSourceCardToFlow,
   applyInteractionRequest,
@@ -419,20 +419,20 @@ export function engineResolveChoice(
         return { type: 'ok' }
       }
       if (node instanceof ParallelNode && node.mode === 'trigger-select') {
-        const issuedOptions = pendingEnvelopeChoices(envelope)
         node.clearPending()
         const triggerContext = contextForPendingEnvelope(context, envelope)
-        const evaluation = evaluateTriggerSelect(
+        const offered = evaluateTriggerSelect(
           node,
           { ...triggerContext, ...currentEventReadContext(int) },
           triggerSelectEvaluationOptions(int, triggerContext, node),
-        )
-        const offered = evaluation.options
+        ).options
+        if (offered.length === 0) {
+          node.resolveRemainingTriggerChildrenForPass()
+          int.pendingNodeIdRef.value = null
+          return { type: 'ok' }
+        }
         const selected = offered.find((opt) => opt.value === choice || opt.sourceCard === choice)
-        const staleChild = selected ? undefined : findIssuedInapplicableTriggerChild(evaluation, issuedOptions, choice)
-        const exhaustedPass = offered.length === 0 && choice === '__pass__' &&
-          issuedOptions.some(option => option.value === choice && !option.disabled)
-        if ((!selected || selected.disabled) && !staleChild && !exhaustedPass) {
+        if (!selected || selected.disabled) {
           int.pendingNodeIdRef.value = null
           return rollbackAndReturn(int, { type: 'fail', errorKey: 'log.buildRoomFail' })
         }
@@ -441,7 +441,7 @@ export function engineResolveChoice(
           int.pendingNodeIdRef.value = null
           return { type: 'ok' }
         }
-        const child = node.chooseCard(staleChild?.id ?? choice)
+        const child = node.chooseCard(choice)
         if (!child) {
           int.pendingNodeIdRef.value = null
           return rollbackAndReturn(int, { type: 'fail', errorKey: 'log.buildRoomFail' })
@@ -462,22 +462,19 @@ export function engineResolveChoice(
     }
     if (node instanceof ParallelNode && node.mode === 'trigger-select') {
       const envelope = pendingEnvelopeFromHostNode(node)
-      if (envelope && !isPendingChoiceValueAllowed(envelope, choice)) {
-        return rollbackAndReturn(int, { type: 'fail', errorKey: 'log.buildRoomFail' })
-      }
-      const issuedOptions = pendingEnvelopeChoices(envelope)
       const triggerContext = contextForPendingEnvelope(context, envelope)
-      const evaluation = evaluateTriggerSelect(
+      const offered = evaluateTriggerSelect(
         node,
         { ...triggerContext, ...currentEventReadContext(int) },
         triggerSelectEvaluationOptions(int, triggerContext, node),
-      )
-      const offered = evaluation.options
+      ).options
+      if (offered.length === 0) {
+        node.resolveRemainingTriggerChildrenForPass()
+        int.pendingNodeIdRef.value = null
+        return { type: 'ok' }
+      }
       const selected = offered.find((opt) => opt.value === choice || opt.sourceCard === choice)
-      const staleChild = selected ? undefined : findIssuedInapplicableTriggerChild(evaluation, issuedOptions, choice)
-      const exhaustedPass = offered.length === 0 && choice === '__pass__' &&
-        issuedOptions.some(option => option.value === choice && !option.disabled)
-      if ((!selected || selected.disabled) && !staleChild && !exhaustedPass) {
+      if (!selected || selected.disabled) {
         return rollbackAndReturn(int, { type: 'fail', errorKey: 'log.buildRoomFail' })
       }
       if (choice === '__pass__') {
@@ -485,7 +482,7 @@ export function engineResolveChoice(
         int.pendingNodeIdRef.value = null
         return { type: 'ok' }
       }
-      const child = node.chooseCard(staleChild?.id ?? choice)
+      const child = node.chooseCard(choice)
       if (!child) {
         int.pendingNodeIdRef.value = null
         return rollbackAndReturn(int, { type: 'fail', errorKey: 'log.buildRoomFail' })
