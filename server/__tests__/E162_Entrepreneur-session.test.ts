@@ -5,6 +5,7 @@ import { getCardStack, pushToCardStack } from '../../shared/cards/helpers/card-s
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/serialization'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
+import { createWorkSession } from './_helpers/session-fixtures'
 
 import '../../shared/cards/E/E162_Entrepreneur'
 
@@ -144,8 +145,15 @@ describe('E162 Entrepreneur parity', () => {
 
   it('restores a pending resource choice and undoes discarding stored food', () => {
     const session = setup({ food: 1, storedFood: 1, resources: { clay: 1, reed: 1 } })
-    const offered = startNextRound(session)
-    const discard = optionsOf(offered).find((option) => descriptionEffects(option.descriptionPreview).some(effect => effect.kind === 'cardStack' && effect.amount === -1))
+    let offered = startNextRound(session)
+    let discard = optionsOf(offered).find((option) => descriptionEffects(option.descriptionPreview).some(effect => effect.kind === 'cardStack' && effect.amount === -1))
+    if (!discard) {
+      const source = optionsOf(offered).find(option => !option.disabled && option.sourceCard === CARD_ID)
+      if (!source) throw new Error('Entrepreneur is not a round-start source')
+      offered = session.resolveChoice(0, source.value)
+      expect(offered.ok, offered.error).toBe(true)
+      discard = optionsOf(offered).find((option) => descriptionEffects(option.descriptionPreview).some(effect => effect.kind === 'cardStack' && effect.amount === -1))
+    }
     expect(discard, JSON.stringify(offered.interaction)).toBeDefined()
     const pending = session.resolveChoice(0, discard!.value)
     expect(getCardStack(pending.state.players[0]!, CARD_ID)).toEqual([])
@@ -194,5 +202,73 @@ describe('E162 Entrepreneur parity', () => {
     expect(response.state.players[0]!.resources).toMatchObject({
       wood: 0, clay: 0, reed: 0, stone: 0,
     })
+  })
+
+  it('does not acquire StartOfTurn eligibility after Scholar spends the last clay', () => {
+    // E162 requires four players. Real placements finish round five; Scholar
+    // consumes clay in the same window whose source eligibility is captured.
+    const session = createWorkSession({
+      seed: 7162,
+      options: { playerCount: 4 },
+      configure(state) {
+        state.round = 5
+        state.availableMajorImprovements = []
+        for (const player of state.players) {
+          player.minorHand = [FILLER]
+          player.occupationHand = [FILLER]
+          Object.assign(player.resources, { food: 20, wood: 0, clay: 0, reed: 0, stone: 0 })
+        }
+        const owner = state.players[0]!
+        owner.houseType = 'stone'
+        owner.occupationPlayed = [CARD_ID, 'B097_Scholar']
+        owner.minorHand = ['A050_MilkJug']
+        Object.assign(owner.resources, { wood: 1, clay: 1, reed: 1, stone: 1 })
+      },
+    })
+    const choose = (response: SessionResponse, value: string): SessionResponse => {
+      if (response.interaction.stateId !== 'wait') throw new Error('Expected a round-start choice')
+      const actor = response.interaction.request.kind === 'confirm-next-player'
+        ? response.interaction.request.fromPlayerIndex
+        : response.interaction.playerIndex
+      const next = session.resolveChoice(actor, value)
+      expect(next.ok, next.error).toBe(true)
+      return next
+    }
+    try {
+      let response = session.getState()
+      for (const [actor, space] of [
+        [0, 'forest'], [1, 'clay-pit'], [2, 'reed-bank'], [3, 'fishing'],
+        [0, 'grain-seeds'], [1, 'day-laborer'], [2, 'grove'], [3, 'copse'],
+      ] as const) {
+        if (response.interaction.stateId === 'wait' && response.interaction.request.kind === 'confirm-next-player') {
+          response = choose(response, 'confirm')
+        }
+        expect(response.interaction.stateId).toBe('idle')
+        response = session.takeAction(actor, space)
+        expect(response.ok, response.error).toBe(true)
+      }
+      if (response.interaction.stateId === 'wait' && response.interaction.request.kind === 'confirm-next-player') {
+        response = choose(response, 'confirm')
+      }
+      expect(response.state.round).toBe(6)
+      expect(response.state.players[0]!.resources).toMatchObject({ clay: 1, reed: 1, stone: 1 })
+      for (let step = 0; step < 5 && !response.state.players[0]!.minorPlayed.includes('A050_MilkJug'); step += 1) {
+        const options = optionsOf(response)
+        const option = options.find(candidate => candidate.value === 'B097_Scholar')
+          ?? options.find(candidate => candidate.value === 'A050_MilkJug')
+          ?? options.find(candidate => !candidate.disabled && !['__skip__', '__pass__', '__done__'].includes(candidate.value))
+        if (!option) throw new Error('Scholar did not offer Milk Jug')
+        response = choose(response, option.value)
+      }
+      expect(response.state.players[0]!.minorPlayed).toContain('A050_MilkJug')
+      expect(response.state.players[0]!.resources).toMatchObject({ food: 20, clay: 0 })
+      expect(optionsOf(response).some(option => !option.disabled && option.sourceCard === CARD_ID)).toBe(false)
+      expect(getCardStack(response.state.players[0]!, CARD_ID)).toEqual([])
+      expect(response.state.events.filter(event => event.type === 'resource.moved' && event.sourceCardId === CARD_ID)).toEqual([])
+      expect(response.state.roundPhase).toBe('work')
+      expect(response.interaction.stateId).toBe('idle')
+    } finally {
+      session.dispose()
+    }
   })
 })
