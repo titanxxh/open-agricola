@@ -78,9 +78,7 @@ const setupAction = ({
   player.stableAnimals = {}
   player.pastures = ownedAnimal ? [{
     id: 'feeding-dish-pasture',
-    size: 2,
     tiles: [{ row: 0, col: 0 }, { row: 0, col: 1 }],
-    stables: 0,
     animalType: ownedAnimal,
     animalCount: 1,
   }] : []
@@ -134,22 +132,22 @@ describe('A066 Feeding Dish parity', () => {
     })
   })
 
-  it('A066 S3: characterize every animal market when its animal was not already owned', () => {
+  it('A066 S3: no grain when the animal market species was not already owned', () => {
     MARKETS.forEach((entry) => {
       const response = useSpace(setupAction(entry), entry.spaceId, entry.animal)
 
-      expect(response.state.players[0]!.resources.grain, entry.spaceId).toBe(1)
+      expect(response.state.players[0]!.resources.grain, entry.spaceId).toBe(0)
     })
   })
 
-  it('A066 S4: characterize an animal market when only a different animal was owned', () => {
+  it('A066 S4: a different previously owned animal does not qualify', () => {
     const response = useSpace(setupAction({
       spaceId: 'pig-market',
       animal: 'boar',
       ownedAnimal: 'sheep',
     }), 'pig-market', 'boar')
 
-    expect(response.state.players[0]!.resources.grain).toBe(1)
+    expect(response.state.players[0]!.resources.grain).toBe(0)
   })
 
   it('A066 S5: a non-animal accumulation space does not trigger Feeding Dish', () => {
