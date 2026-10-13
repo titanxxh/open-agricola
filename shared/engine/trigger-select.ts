@@ -39,22 +39,6 @@ export type TriggerSelectEvaluation = {
   optionStates: TriggerOptionState[]
 }
 
-export const findIssuedInapplicableTriggerChild = (
-  evaluation: TriggerSelectEvaluation,
-  issuedOptions: readonly ActionChoiceOption[],
-  choice: string,
-): EngineNode | undefined => {
-  const issued = issuedOptions.filter(option => option.value === choice || option.sourceCard === choice)
-  const [option] = issued
-  if (issued.length !== 1 || !option || option.disabled || option.value === '__pass__') return
-  const matches = evaluation.optionStates.filter(entry =>
-    entry.child.id === option.value || entry.cardId === option.value,
-  )
-  const [entry] = matches
-  if (matches.length !== 1 || !entry) return
-  if (!entry.applicable && entry.child.getState() !== 'resolved' && isActivateCardActionNode(entry.child)) return entry.child
-}
-
 export type TriggerSelectEvaluationOptions = {
   canStartFlow?: (flow: ActionFlow, context: ActionExecutionContext) => boolean
   canContinueWithoutTriggers?: (actionId: string, resources?: Resource) => boolean

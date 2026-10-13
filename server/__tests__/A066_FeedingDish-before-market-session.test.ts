@@ -6,9 +6,9 @@ import { serializeSessionSnapshot, rehydrateState } from '../../shared/session/s
 import type { GameState, PlayerState } from '../../shared/contract/types'
 
 /**
- * Confirmed #1131 plan: local card fix using the existing before-collect reaction
- * and ownership query, with no snapshot flag. The generic issued-reaction
- * continuation fix preserves the host if an enabled option becomes inapplicable. Real 2-player
+ * Confirmed #1131 boundary: actual animal-market use automatically checks live
+ * ownership and grants grain before the collect reaction menu. Cooking in that
+ * later menu preserves the reward; cooking before market use prevents it. Real 2-player
  * seed-42 work sessions start in round 8, fixed placeholder hands, two rooms,
  * food 20 and grain 0. Each scenario prepares actual animal placements before
  * loading, then uses takeAction/resolveChoice and generic anytime exchange.
@@ -38,7 +38,7 @@ function setup(configure?: (state: GameState) => void, moor = false) {
   return session
 }
 
-function settle(session: GameSession, response: SessionResponse, activateDish = true): SessionResponse {
+function settle(session: GameSession, response: SessionResponse): SessionResponse {
   for (let step = 0; response.interaction.stateId === 'wait' && step < 12; step++) {
     const { request, playerIndex } = response.interaction
     if (request.kind === 'animal-reorg') {
@@ -46,9 +46,8 @@ function settle(session: GameSession, response: SessionResponse, activateDish = 
         id: zone.id, zoneType: zone.zoneType, animalType: zone.animalType, animalCount: zone.animalCount,
       })) })
     } else if (request.kind === 'select-trigger' || request.kind === 'choice') {
-      const option = (activateDish ? request.options.find(option => option.sourceCard === CARD) : undefined)
-        ?? request.options.find(option => option.value === '__pass__' || option.value === '__skip__')
-        ?? request.options[0]
+      const available = request.options.filter(option => !('disabled' in option && option.disabled === true))
+      const option = available.find(option => option.value === '__pass__' || option.value === '__skip__') ?? available[0]
       if (!option) throw new Error('No available reaction choice')
       response = session.resolveChoice(playerIndex, option.value)
     } else break
@@ -78,8 +77,8 @@ function beforeChoices(session: GameSession) {
   expect(response.ok).toBe(true)
   expect(response.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'select-trigger' } })
   if (response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'select-trigger') throw new Error('Expected before reactions')
-  expect(response.interaction.request.options.map(option => option.sourceCard)).toContain(CARD)
-  expect(response.state.players[0]!.resources).toMatchObject({ sheep: 1, grain: 0 })
+  expect(response.interaction.request.options.map(option => option.sourceCard)).not.toContain(CARD)
+  expect(response.state.players[0]!.resources).toMatchObject({ sheep: 1, grain: 1 })
   return response
 }
 
@@ -106,7 +105,7 @@ function orderedSetup() {
   })
 }
 
-describe('A066 Feeding Dish before-collect qualification', () => {
+describe('A066 Feeding Dish ownership before actual market use', () => {
   it.each(markets)('does not qualify from the $animal just collected', ({ animal, space }) => {
     const session = setup()
     const response = settle(session, session.takeAction(0, space))
@@ -218,13 +217,9 @@ describe('A066 Feeding Dish before-collect qualification', () => {
     }
   })
 
-  it('keeps the grain if the last old sheep is cooked after the Feeding Dish reaction', () => {
+  it('awards grain before the collect menu and retains it when the last old sheep is cooked there', () => {
     const session = orderedSetup()
     beforeChoices(session)
-    const awarded = session.resolveChoice(0, CARD)
-    expect(awarded.ok).toBe(true)
-    expect(awarded.state.players[0]!.resources).toMatchObject({ sheep: 1, grain: 1 })
-    expect(awarded.state.actionSpaces.find(space => space.id === 'sheep-market')!.resources.sheep).toBe(1)
     const cooked = cookSheep(session)
     expect(cooked.state.players[0]!.resources.grain).toBe(1)
     const response = settle(session, cooked)
@@ -232,32 +227,18 @@ describe('A066 Feeding Dish before-collect qualification', () => {
     expect(grainEvents(response)).toHaveLength(1)
   })
 
-  it('rechecks live ownership when the last old sheep is cooked before its reaction', () => {
-    const session = orderedSetup()
-    beforeChoices(session)
-    const cooked = cookSheep(session)
-    const stale = session.resolveChoice(0, CARD)
-    expect(stale.ok).toBe(true)
-    expect(stale.state).toEqual(cooked.state)
-    expect(stale.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'select-trigger' } })
-    const response = settle(session, stale, false)
-    expect(response.state.players[0]!.resources).toMatchObject({ sheep: 1, grain: 0, food: 22 })
-    expect(grainEvents(response)).toEqual([])
-    expect(response.state.players[0]!.cardStates[CARD]?.extraData).toBeUndefined()
-  })
-
-  it('preserves issued stale permissions through a suspended cursor restoration', () => {
+  it('restores the collect menu after cooking without repeating or withdrawing the prior award', () => {
     const session = orderedSetup()
     beforeChoices(session)
     cookSheep(session)
     const restored = new GameSession(rehydrateState(JSON.parse(JSON.stringify(serializeSessionSnapshot(session.state, session)))))
     sessions.push(restored)
-    const stale = restored.resolveChoice(0, CARD)
-    expect(stale.ok).toBe(true)
-    expect(stale.state.players[0]!.resources).toMatchObject({ sheep: 0, grain: 0, food: 22 })
-    const response = settle(restored, stale, false)
-    expect(response.state.players[0]!.resources).toMatchObject({ sheep: 1, grain: 0, food: 22 })
-    expect(grainEvents(response)).toEqual([])
+    const pending = restored.getState()
+    expect(pending.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'select-trigger' } })
+    expect(pending.state.players[0]!.resources).toMatchObject({ sheep: 0, grain: 1, food: 22 })
+    const response = settle(restored, pending)
+    expect(response.state.players[0]!.resources).toMatchObject({ sheep: 1, grain: 1, food: 22 })
+    expect(grainEvents(response)).toHaveLength(1)
   })
 
   it.each([CARD, 'never-issued-listener'])('rejects a never-issued reaction value %s', choice => {
@@ -293,11 +274,13 @@ describe('A066 Feeding Dish before-collect qualification', () => {
   it('rejects another player responding to the issued reaction menu', () => {
     const session = orderedSetup()
     const pending = beforeChoices(session)
-    const rejected = session.resolveChoice(1, CARD)
+    if (pending.interaction.stateId !== 'wait' || pending.interaction.request.kind !== 'select-trigger') throw new Error('Expected collect menu')
+    const choice = pending.interaction.request.options.find(option => !('disabled' in option && option.disabled === true) && option.value !== '__pass__')!
+    const rejected = session.resolveChoice(1, choice.value)
     expect(rejected.ok).toBe(false)
     expect(rejected.state).toEqual(pending.state)
     expect(rejected.interaction).toEqual(pending.interaction)
-    const response = settle(session, session.resolveChoice(0, CARD))
+    const response = settle(session, session.resolveChoice(0, choice.value))
     expect(response.state.players[0]!.resources).toMatchObject({ sheep: 2, grain: 1 })
     expect(grainEvents(response)).toHaveLength(1)
   })
@@ -317,7 +300,9 @@ describe('A066 Feeding Dish before-collect qualification', () => {
     const snapshot = JSON.parse(JSON.stringify(serializeSessionSnapshot(session.state, session)))
     const restored = new GameSession(rehydrateState(snapshot))
     sessions.push(restored)
-    expect(restored.resolveChoice(0, CARD).state.players[0]!.resources.grain).toBe(1)
+    const pending = restored.getState()
+    expect(pending.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'select-trigger' } })
+    expect(pending.state.players[0]!.resources.grain).toBe(1)
     const undone = restored.undoAction()
     expect(undone.ok).toBe(true)
     expect(undone.state.players[0]!.resources).toMatchObject({ sheep: 1, grain: 0 })
