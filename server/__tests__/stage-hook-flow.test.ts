@@ -297,15 +297,34 @@ describe('stage hook flows', () => {
     session.loadState(state)
     let resp = session.performRoundEnd()
     expect(resp.interaction.stateId).toBe('wait')
-    expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
-      .toBe('ui.interactionNewPurchaseGrain')
-
-    resp = chooseFirstOption(session, 0)
+    expect(resp.state.round).toBe(3)
+    const purchase = (crop: 'grain' | 'vegetable') => {
+      const before = resp.state.players[0]!.resources[crop]
+      for (let step = 0; step < 3; step++) {
+        if (resp.interaction.stateId !== 'wait') throw new Error('Expected New Purchase crop choice')
+        const options = resp.interaction.request.options ?? []
+        const offer = options.find(option => !option.disabled && option.effectPreview?.kind === 'resourceExchange'
+          && option.effectPreview.resourcesGained?.[crop] === 1)
+        const source = offer ?? options.find(option => !option.disabled && option.sourceCard === 'B070_NewPurchase')
+        expect(source, JSON.stringify(resp.interaction)).toBeDefined()
+        if (!source) throw new Error('The crop purchase is unavailable')
+        resp = session.resolveChoice(0, source.value)
+        expect(resp.ok, resp.error).toBe(true)
+        if (resp.state.players[0]!.resources[crop] === before + 1) return
+      }
+      throw new Error('The crop purchase did not resolve')
+    }
+    purchase('grain')
     expect(resp.interaction.stateId).toBe('wait')
-    expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
-      .toBe('ui.interactionNewPurchaseVegetable')
-
-    resp = chooseFirstOption(session, 0)
+    expect(resp.state.round).toBe(3)
+    expect(resp.state.players[0]!.resources).toMatchObject({ food: 4, grain: 1, vegetable: 0 })
+    purchase('vegetable')
+    for (let step = 0; step < 3 && resp.interaction.stateId === 'wait'; step++) {
+      const exit = resp.interaction.request.options?.find(option => !option.disabled && ['__done__', '__pass__'].includes(option.value))
+      if (!exit) throw new Error('The completed crop window cannot finish')
+      resp = session.resolveChoice(0, exit.value)
+      expect(resp.ok, resp.error).toBe(true)
+    }
     expect(resp.interaction.stateId).toBe('idle')
     expect(resp.state.round).toBe(4)
     expect(resp.state.roundPhase).toBe('work')

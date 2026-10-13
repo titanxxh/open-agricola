@@ -26,6 +26,7 @@ export type EngineNode = {
   optionalActive?: boolean
   optionalPromptKey?: PromptKey
   anytimeWindow?: AnytimeWindow
+  requiresExplicitChoice?: boolean
   mandatory?: boolean
   beforeAnytimeAvailable?: boolean
   pending?: PendingEnvelope | null

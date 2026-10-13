@@ -198,6 +198,7 @@ function copySharedNodeMetadata(source: EngineNode, target: EngineNode): EngineN
   target.optionalActive = source.optionalActive
   target.optionalPromptKey = source.optionalPromptKey
   target.anytimeWindow = source.anytimeWindow
+  target.requiresExplicitChoice = source.requiresExplicitChoice
   target.mandatory = source.mandatory
   target.beforeAnytimeAvailable = source.beforeAnytimeAvailable
   const pending = source.getPending()
@@ -856,6 +857,7 @@ export function buildFlowNode(
 ): EngineNode {
   const node = buildFlowNodeContent(int, flow, ownerPlayerId, inheritedOptionId, idStyle)
   node.anytimeWindow = flow.anytimeWindow
+  if (flow.type !== 'leaf') node.requiresExplicitChoice = flow.requiresExplicitChoice
   return node
 }
 
