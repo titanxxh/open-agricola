@@ -208,9 +208,11 @@ describe('major action purchase eligibility', () => {
     expect(options(minor).map((option) => option.value)).not.toContain(SHED)
     expect(options(minor).map((option) => option.value)).toContain(ROAD)
     const before = snapshot(minor)
-    const rejected = minorSession.resolveChoice(0, SHED)
-    expect(rejected.ok).toBe(false)
-    expect(snapshot(rejected)).toBe(before)
+    for (const rejectedCard of [SHED, 'Major_Fireplace1']) {
+      const rejected = minorSession.resolveChoice(0, rejectedCard)
+      expect(rejected.ok).toBe(false)
+      expect(snapshot(rejected)).toBe(before)
+    }
 
     const majorSession = setup({ worker: false })
     const major = enterPurchase(majorSession, majorSession.takeAction(0, 'major-improvement'))
