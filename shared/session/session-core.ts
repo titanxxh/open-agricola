@@ -169,7 +169,7 @@ import {
 } from '../actions/effects/fencing.ts'
 import { rebuildActiveModifiers } from '../session/serialization.ts'
 import { clearAllLinkedSpaceBlocks, findActionSpaceById, removeWorkerRef } from '../domain/space.ts'
-import { buildPlaceTerrainFlow } from '../moor/terrain-flow.ts'
+import { buildLivePlaceTerrainFlow } from '../moor/terrain-flow.ts'
 import {
   computeAnytimePolicy,
   type AnytimePolicy,
@@ -854,7 +854,11 @@ export class GameCore {
       },
       reportProtectedObservation: (observation) => this.reportProtectedObservation(observation),
       getRoundStartScheduleFlows: (playerIndex) => this.buildRoundStartScheduleFlows(playerIndex),
-      getRoundStartCompletionFlow: (playerIndex) => this.buildRoundStartCompletionFlow(playerIndex),
+      getPreparationCompletionFlow: (hook, playerIndex, sourceCardIds) => this.buildPreparationCompletionFlow(hook, playerIndex, sourceCardIds),
+      canStartFlow: (flow, playerIndex) => evaluateFlowDoable(flow, {
+        state: this.state, player: this.state.players[playerIndex]!,
+        space: this.state.actionSpaces[0]!,
+      }, id => this.registry.get(id)),
     }, {
       onBeforeHarvest: (stageResume) => {
         this.continueHarvestFromBeforeHarvest(stageResume.playerIndex, stageResume.extra)
@@ -2273,8 +2277,12 @@ export class GameCore {
     const pendingSourceCard = this.peekPendingSourceCard()
     const pendingActionContext = pendingSnapshot?.actionContext
     const interactionKind = options.nestedWindow ? 'choice' : this.engineStack.peekPendingView()?.request.kind
-    const actionContext = interactionKind ? { anytimeInteractionKind: interactionKind } : undefined
+    const preparationWindow = this.stageResume?.extra?.roundPreparation !== undefined
+    const actionContext = interactionKind ? {
+      anytimeInteractionKind: interactionKind, ...(preparationWindow ? { includeBasicConversions: true } : {}),
+    } : undefined
     for (const action of options.preScoringOnly ? [] : this.registry.values()) {
+      if (preparationWindow && action.id !== 'exchange') continue
       if (!action.anytime) continue
       if (blockedIds.has(action.id)) continue
       if (activeIds.has(action.id) && action.allowAnytimeReentry !== true) continue
@@ -2294,6 +2302,7 @@ export class GameCore {
         flow: { type: 'leaf', actionId: action.id, ...(actionContext ? { actionContext } : {}) },
       })
     }
+    if (preparationWindow) return anytimeEntries
     // Card-sourced anytime actions via CardListener phases:['anytime']
     const anytimeContext: import('../cards/card-listeners').CardListenerContextInput = {
       state: this.state,
@@ -3032,8 +3041,6 @@ export class GameCore {
     const player = this.state.players[playerIndex]
     if (!player) return []
     const entries = this.state.futureMeeples.filter(entry => entry.round === this.state.round && entry.playerId === player.id)
-    const hasAction = (entry: GameState['futureMeeples'][number]) =>
-      (['field', 'stable', 'forest', 'moor'] as const).some(kind => futureMeepleActionCount(entry, kind) > 0)
     const hasGoods = (entry: GameState['futureMeeples'][number]) =>
       resourceKeyList.some(key => (entry.resources[key] ?? 0) > 0)
       || (entry.resources.horse ?? 0) > 0 || (entry.resources.fuel ?? 0) > 0
@@ -3057,31 +3064,27 @@ export class GameCore {
             type: 'leaf', actionId: action.actionId, sourceCard: entry.cardId,
             targetPlayerId: player.id, optional: true,
             actionContext: action.kind === 'stable'
-              ? { max: 1, exactCost: { max: 1 }, ...actionContext } : actionContext,
+              ? { max: 1, exactCost: { max: 1 }, ...actionContext, futureMeepleId: entry.id } : actionContext,
           })
         }
       }
       for (const kind of ['forest', 'moor'] as const) {
         for (let count = 0; count < futureMeepleActionCount(entry, kind); count += 1) {
-          const terrain = buildPlaceTerrainFlow(entry.cardId, player, kind)
-          if (terrain) flows.push({ ...terrain, optional: true, targetPlayerId: player.id })
+          flows.push({ ...buildLivePlaceTerrainFlow(entry.cardId, kind), optional: true, targetPlayerId: player.id })
         }
       }
     }
-    if (entries.some(hasAction)) flows.push(tagInjectedAnytimeFlow({
-      type: 'leaf', actionId: 'exchange', optional: true, targetPlayerId: player.id,
-      choiceLabelKey: 'actions.exchange.name', actionContext: { anytimeInteractionKind: 'choice' },
-    }))
     return flows
   }
 
-  private buildRoundStartCompletionFlow(playerIndex: number): ActionFlow | null {
+  private buildPreparationCompletionFlow(hook: import('../contract/card-effect-hooks').RoundPreparationHook, playerIndex: number, sourceCardIds: string[]): ActionFlow | null {
     const player = this.state.players[playerIndex]
     if (!player) return null
-    const due = this.state.futureMeeples.filter(entry => entry.round === this.state.round && entry.playerId === player.id)
-    return due.length ? {
-      type: 'leaf', actionId: 'receive', targetPlayerId: player.id,
-      params: { futureMeepleIds: due.map(entry => entry.id), resolveOnly: true },
+    const due = hook === 'onRoundStart' ? this.state.futureMeeples.filter(entry => entry.round === this.state.round && entry.playerId === player.id) : []
+    const timedSources = sourceCardIds.filter(cardId => getCardEffect(cardId)?.timedRules?.some(rule => rule.at.phase === hook && rule.body.kind === 'optional'))
+    return due.length || timedSources.length ? {
+      type: 'leaf', actionId: 'complete-preparation', targetPlayerId: player.id,
+      params: { futureMeepleIds: due.map(entry => entry.id), hook, timedSources },
     } : null
   }
 

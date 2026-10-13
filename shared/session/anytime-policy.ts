@@ -50,6 +50,7 @@ export function computeAnytimePolicy(input: AnytimePolicyInput): AnytimePolicy {
     return { allowed: true, blockedIds: [...(window.blockedIds ?? [])] }
   }
   if (input.stageResume !== null) {
+    if (input.stageResume.extra?.roundPreparation) return { allowed: true, blockedIds: [] }
     return { allowed: false, reason: 'stage-hook-chain' }
   }
   return { allowed: true, blockedIds: [] }

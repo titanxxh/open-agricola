@@ -397,7 +397,7 @@ export const getMatchingListeners = (
   if (listenerContext.phase === 'after' && (listenerContext.actionId === 'receive' || listenerContext.actionId === 'collect')) {
     const owned = new Set([...listenerContext.player.improvements, ...listenerContext.player.minorPlayed, ...listenerContext.player.occupationPlayed])
     const phase = listenerContext.actionId === 'receive' ? 'afterReceive' : 'afterCollect'
-    for (const source of timedRuleSources(listenerContext.state, listenerContext.player, id => getCardEffect(id)?.timedRules ?? [])) {
+    for (const source of timedRuleSources(listenerContext.state, listenerContext.player, id => getCardEffect(id)?.timedRules ?? [], listenerContext.transactionEvents)) {
       if (owned.has(source.cardId) || !source.rules.some(rule => rule.at.phase === phase)) continue
       const registration = retainedTimedListener(source.cardId, phase, source.rules)
       matched.push({ registration, cardId: source.cardId, ownerPlayerId: listenerContext.player.id, ownerCardZone: 'activated' })

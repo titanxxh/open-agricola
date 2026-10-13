@@ -1,4 +1,4 @@
-import type { ActionDefinition, FutureMeepleResourceMap, PlayerState, Resource } from '../../contract/types'
+import type { ActionDefinition, FutureMeepleResourceMap, GameState, PlayerState, Resource } from '../../contract/types'
 import type { EventSink } from '../../contract/events'
 import { addCardResourceGained } from '../../cards/helpers/card-state'
 import { addResourcesFromCards } from '../../session/stats'
@@ -51,14 +51,23 @@ const emitReceivedResources = (
   })
 }
 
+export const completeScheduledReceipts = (state: GameState, player: PlayerState, ids: unknown, eventSink: EventSink): void => {
+  const selected = Array.isArray(ids) ? new Set(ids.filter((id): id is string => typeof id === 'string')) : new Set<string>()
+  const due = state.futureMeeples.filter(entry => selected.has(entry.id) && entry.playerId === player.id && entry.round === state.round)
+  for (const entry of due) eventSink.emit<'futureMeeple.resolved'>({
+    type: 'futureMeeple.resolved', playerId: player.id, cardId: entry.cardId, sourceCardId: entry.cardId,
+  })
+  const completed = new Set(due.map(entry => entry.id))
+  state.futureMeeples = state.futureMeeples.filter(entry => !completed.has(entry.id))
+}
+
 export const receiveAction: ActionDefinition = {
   id: 'receive',
   nameKey: 'actions.receive.name',
   descriptionKey: 'actions.receive.description',
   roundAvailable: 1,
   gainPerRound: {},
-  canBeExecutedByPlayer: (state, player, context) => context?.params?.resolveOnly === true
-    || state.futureMeeples.filter(entry => Array.isArray(context?.params?.futureMeepleIds)
+  canBeExecutedByPlayer: (state, player, context) => state.futureMeeples.filter(entry => Array.isArray(context?.params?.futureMeepleIds)
       && context.params.futureMeepleIds.includes(entry.id) && entry.playerId === player.id && entry.round === state.round)
       .every(entry => canReceiveScheduledEntry(player, entry.actionContext?.resourceCondition)),
   execute: ({ state, player, params, eventSink }) => {
@@ -66,11 +75,10 @@ export const receiveAction: ActionDefinition = {
       ? new Set(params.futureMeepleIds.filter((id): id is string => typeof id === 'string')) : new Set<string>()
     const scheduled = state.futureMeeples.filter(entry => scheduledIds.has(entry.id)
       && entry.playerId === player.id && entry.round === state.round)
-    const resolveOnly = params?.resolveOnly === true
     const scheduledEntries = scheduled.map(entry => {
       const conditionMet = canReceiveScheduledEntry(player, entry.actionContext?.resourceCondition)
-      const resources = !resolveOnly && conditionMet ? positiveResources(entry.resources) : {}
-      if (!resolveOnly && entry.roomType && player.houseType === entry.roomType) tryAddRoomTile(player, entry.roomType)
+      const resources = conditionMet ? positiveResources(entry.resources) : {}
+      if (entry.roomType && player.houseType === entry.roomType) tryAddRoomTile(player, entry.roomType)
       eventSink?.emit<'futureMeeple.resolved'>({
         type: 'futureMeeple.resolved', playerId: player.id, cardId: entry.cardId,
         sourceCardId: entry.cardId,

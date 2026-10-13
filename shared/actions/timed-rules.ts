@@ -1,5 +1,5 @@
 import type { ActionFlow, GameState, PlayerState } from '../contract/types'
-import type { FlowCardEffectHook } from '../contract/card-effect-hooks'
+import { roundPreparationHooks, type FlowCardEffectHook } from '../contract/card-effect-hooks'
 import type { FlowEffectContext } from '../cards/card-effects'
 import type { GameEvent } from '../contract/events'
 import type { RuleBody, TimedRule, TimedRulePhase } from '../contract/rule-plans'
@@ -109,12 +109,14 @@ export const compileTimedRuleHooks = (cardId: string, rules: readonly TimedRule[
     const phase = rule.at.phase
     if (phase === 'afterReceive' || phase === 'afterCollect' || phase === 'contributeExtraTurn' || phase === 'onBeforePlayerTurn') continue
     hooks[phase] = (state, player, context) => {
-      const events = [...state.events, ...(context?.transactionEvents ?? [])]
+      const events = [...(state.events ?? []), ...(context?.transactionEvents ?? [])]
       const due = timedRuleOccurrences(state, player, cardId, rules, phase, context?.transactionEvents).filter(occurrence => occurrence.round === state.round && occurrence.rule.at.phase === phase
         && (occurrence.rule.at.kind !== 'future-source' || events.some(event => event.type === 'futureMeeple.resolved'
           && event.cardId === cardId && event.playerId === player.id && event.round === state.round)))
       const children: ActionFlow[] = due.map(occurrence => ({ type: 'leaf', sourceCard: cardId, actionId: 'resolve-timed-rule', params: { ruleKey: occurrence.rule.key, identity: occurrence.identity } }))
-      return children.length ? { type: 'seq', children, ...(due.every(occurrence => occurrence.rule.body.kind === 'optional') ? { optional: true } : {}) } : undefined
+      return children.length ? { type: 'seq', children,
+        ...(roundPreparationHooks.some(hook => hook === phase) && due.every(occurrence => occurrence.rule.body.kind === 'optional') ? { optional: true } : {}),
+      } : undefined
     }
   }
   return hooks

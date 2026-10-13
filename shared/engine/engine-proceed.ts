@@ -1048,7 +1048,7 @@ export function engineProceed(
         triggerSelectEvaluationOptions(int, context, node),
       )
       const options = evaluation.options
-      if (options.length === 0) {
+      if (options.length === 0 || evaluation.optionStates.every(entry => !entry.applicable || !entry.doable)) {
         node.resolveRemainingTriggerChildrenForPass()
         return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
       }
@@ -1242,7 +1242,7 @@ export function engineProceed(
     node.beforeAnytimeAvailable = false
     const rawResult = optInChoice ?? action.execute({
       ...executionContext,
-      transactionEvents: currentEventReadContext(int).transactionEvents,
+      completedTransactionEvents: currentEventReadContext(int).transactionEvents,
       eventSink: eventBuffer.sink,
     })
     const result = withInjectedAnytimeResultFlag(rawResult, executionContext.actionContext)

@@ -142,7 +142,11 @@ describe('BGA preparation windows', () => {
     expect(response.interaction.stateId).toBe('wait')
     if (response.interaction.stateId !== 'wait') throw new Error('Expected the Quarry improvement offer')
     expect(response.interaction.sourceCard).toBe(ARTISAN)
-    const next = choose(session, response, '__skip__')
+    let next = choose(session, response, '__skip__')
+    if (next.interaction.stateId === 'wait' && next.interaction.request.kind === 'select-trigger') {
+      expect(next.interaction.request.options?.some(option => option.sourceCard === NIGHTWORKER && !option.disabled)).toBe(false)
+      next = choose(session, next, '__pass__')
+    }
     expect(next.state.roundPhase).toBe('work')
     expect(next.interaction.stateId).toBe('idle')
     expect(next.state.actionSpaces.find(space => space.id === 'forest')!.resources.wood).toBe(6)
@@ -176,7 +180,8 @@ describe('BGA preparation windows', () => {
     }
     expect(response.state.players[0]!.occupationPlayed).toContain(ARTISAN)
     for (let step = 0; step < 4 && response.interaction.stateId === 'wait'; step += 1) {
-      const option = response.interaction.request.options?.find(candidate => !candidate.disabled && candidate.value !== '__pass__')
+      const option = response.interaction.request.options?.find(candidate => candidate.labelKey === 'actions.receive.name')
+        ?? response.interaction.request.options?.find(candidate => candidate.value === '__pass__')
       if (!option) break
       response = choose(session, response, option.value)
     }
@@ -221,6 +226,9 @@ describe('BGA preparation windows', () => {
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources.food).toBe(0)
     expect(response.state.players[0]!.fields).toHaveLength(1)
+    if (response.interaction.stateId === 'wait' && response.interaction.request.kind === 'select-trigger') {
+      response = choose(session, response, '__pass__')
+    }
     expect(response.state.roundPhase).toBe('work')
   })
 

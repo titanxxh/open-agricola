@@ -1,10 +1,11 @@
 import { ruleOperationAction } from './effects/internal/rule-operation'
 import { ruleDiscountAction } from './effects/internal/rule-discount'
-import { resolveTimedRuleAction } from './effects/internal/resolve-timed-rule'
+import { createResolveTimedRuleAction } from './effects/internal/resolve-timed-rule'
 import { ruleConditionAction } from './effects/internal/rule-condition'
 import { ruleGainAction } from './effects/internal/rule-gain'
 import type { ActionDefinition } from '../contract/types'
 import { futureMeeplesAction } from './effects/internal/future-meeples'
+import { completePreparationAction } from './effects/internal/complete-preparation'
 import { collectAction } from './effects/collect'
 import { gainAction, bonusWoodAction, bonusFoodAction, bonusGrainAction } from './effects/gain'
 import { receiveAction } from './effects/receive'
@@ -63,8 +64,9 @@ import type { FlowActionResolver } from './flow'
 
 export const createInternalActionDefinitions = (resolveAction: FlowActionResolver): ActionDefinition[] => [
   futureMeeplesAction,
+  completePreparationAction,
   collectAction,
-  resolveTimedRuleAction,
+  createResolveTimedRuleAction(resolveAction),
   ruleConditionAction,
   ruleGainAction,
   ruleOperationAction,
