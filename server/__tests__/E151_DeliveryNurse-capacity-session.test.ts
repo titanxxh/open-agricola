@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import type { GameSession, SessionResponse } from '../game/authoritative-session'
 import { createWorkSession } from './_helpers/session-fixtures'
+import { positionKey } from '../../shared/domain/farm'
 import { familySize } from '../../shared/domain/player'
 
 const CARD_ID = 'E151_DeliveryNurse'
@@ -34,8 +35,7 @@ const setup = (shed = true) => {
     player.occupationPlayed = [CARD_ID]
     player.minorPlayed = shed ? ['A010_WoodenShed'] : []
     Object.assign(player.resources, { sheep: 1, boar: 1, cattle: 1 })
-    player.houseAnimalType = 'sheep'
-    player.houseAnimalCount = 1
+    player.houseAnimals = { [positionKey(player.roomTiles[0]!)]: 'sheep' }
     player.stableTiles = [{ row: 0, col: 2 }, { row: 1, col: 2 }]
     player.stableAnimals = { '0-2': 'boar', '1-2': 'cattle' }
   } })
