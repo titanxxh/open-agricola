@@ -58,7 +58,8 @@ const beginBuilding = (session: GameSession, kind: 'room' | 'stable') => {
   expect(response.ok, response.error).toBe(true)
   expect(response.interaction.stateId).toBe('wait')
   if (response.interaction.stateId !== 'wait') throw new Error('Expected building choice')
-  if (response.interaction.request.farm?.farmType !== kind) {
+  if (response.interaction.request.kind !== 'farm-select' || response.interaction.request.farm.farmType !== kind) {
+    if (response.interaction.request.kind !== 'choice') throw new Error('Expected building branch choice')
     const option = response.interaction.request.options?.find((entry) =>
       entry.labelKey === (kind === 'room' ? 'actions.construct.name' : 'actions.stables.name'))
     expect(option).toBeDefined()
@@ -67,7 +68,7 @@ const beginBuilding = (session: GameSession, kind: 'room' | 'stable') => {
   }
   expect(response.ok, response.error).toBe(true)
   expect(response.interaction.stateId).toBe('wait')
-  if (response.interaction.stateId !== 'wait') throw new Error('Expected farm selection')
+  if (response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'farm-select') throw new Error('Expected farm selection')
   expect(response.interaction.request.farm.farmType).toBe(kind)
   return response
 }
@@ -78,7 +79,7 @@ describe('duplicate building coordinates', () => {
     const pending = session.takeAnytimeAction(0, 'C94-stable-cleaner-anytime')
     expect(pending.ok, pending.error).toBe(true)
     expect(pending.interaction.stateId).toBe('wait')
-    if (pending.interaction.stateId !== 'wait') throw new Error('Expected stable selection')
+    if (pending.interaction.stateId !== 'wait' || pending.interaction.request.kind !== 'farm-select') throw new Error('Expected stable selection')
     expect(pending.interaction.request.farm.farmType).toBe('stable')
     expect(pending.state.players[0]!.cardStates[CLEANER]?.flagged).toBe(true)
     const before = snapshot(pending)
