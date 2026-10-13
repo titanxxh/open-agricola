@@ -697,7 +697,10 @@ const CARD_IMPL = {
 
     const zones = session.withCtx(() => computeAnimalZones(player, state))
 
-    expect(zones.filter((zone) => zone.zoneType === 'house')).toHaveLength(1)
+    expect(zones.filter((zone) => zone.zoneType === 'house')).toEqual([
+      expect.objectContaining({ id: 'house:2-0', capacity: 1, occupiedZoneLimit: 1 }),
+      expect.objectContaining({ id: 'house:1-0', capacity: 1, occupiedZoneLimit: 1 }),
+    ])
     expect(zones.filter((zone) => zone.id === 'custom-zone')).toEqual([expect.objectContaining({
       ownerPlayerId: player.id,
       capacity: state.round,

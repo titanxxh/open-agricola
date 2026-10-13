@@ -1,3 +1,4 @@
+import { areZoneOccupancyLimitsSatisfied } from '../../contract/animal-zone-occupancy'
 import { buildAnimalReorgRequest } from '../../domain/animal-reorg'
 import { playerBoard } from '../../domain'
 import { copyHistoryRecordIdentity } from '../../session/history-streams'
@@ -13,7 +14,6 @@ import type {
 import { animalKeysForState, type AnimalKey } from '../../contract/animals'
 import {
   areRequiredEmptyZoneGroupsSatisfied,
-  areZoneOccupancyLimitsSatisfied,
   buildCardAnimalZoneId,
   getAllowedAnimalTypesForZone,
   normalizeAnimalCountsForZone,

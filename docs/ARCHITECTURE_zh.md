@@ -1194,7 +1194,7 @@ shared/domain/
 
 Animal Reorg Prefill（动物重整自动补位）由 `shared/domain/animal-reorg.ts` 为行动请求和实时交互投影统一生成。`prefillAnimalZones()` 固定已有有效安置，在兼容剩余空间中搜索最多可补入的待安置动物，同数量结果使用稳定顺序。容量、混养、卡牌校验、互斥区域和必空组复用容纳搜索的约束；容纳查询仍允许全局重排。已有布局本身非法时交给玩家手动修正。补位不写入真实安置、不弃养、不触发安置或繁殖奖励；确认仍是严格原子结算边界。明确的手动流程可通过 `actionContext.prefill=false` 关闭补位，并以 `InteractionRequest.prefill=false` 保留该意图；被动流程默认补位。前端用服务端草稿初始化，在相同快照下保留手动编辑，动物库存或区域元数据变化时刷新草稿。
 
-每个真实 `roomTiles` 位置对应容量 1 的房间动物容纳区（`house:<positionKey>`）。`PlayerState.houseAnimals` 是唯一可写的逐房安置；`roomAnimalZones` 仅为序列化展示投影，加载时剥离。共享 `occupancyGroup` 与 `occupiedZoneLimit` 约束房间或卡牌多个区域的占用数。普通房间组最多占用一间；A086 修改组限制，不改变各房间容量。容纳搜索、固定布局预填和最终提交使用同一分组规则。建房增加容纳区，翻修保留坐标身份。支付与住房查询从房间映射派生动物；带房养标记的卡牌边界区仍独立。详见 ADR 0026。
+每个真实 `roomTiles` 位置对应容量 1 的房间动物容纳区（`house:<positionKey>`）。`PlayerState.houseAnimals` 是唯一可写的逐房安置；`roomAnimalZones` 仅为序列化展示投影，加载时剥离。共享 `occupancyGroup` 与 `occupiedZoneLimit` 约束房间或卡牌多个区域的占用数。普通房间组最多占用一间；A086 修改组限制，不改变各房间容量。容纳搜索、固定布局预填、最终提交与前端草稿检查复用纯 `shared/contract/animal-zone-occupancy.ts` 分组查询。建房增加容纳区，翻修保留坐标身份。支付与住房查询从房间映射派生动物；带房养标记的卡牌边界区仍独立。详见 ADR 0026。
 
 `AnimalZone.houseAnimalZone?: boolean` 标记“视作 house 动物区”的非 house zone。`computeAnimalZones` 在所有 `onComputeAnimalZones` 完成后，如果玩家有 `blocksHouseAnimalZones` capability，会统一移除普通 `zoneType === 'house'` 和 `houseAnimalZone === true` 的 zone。House-zone 规则统计必须使用 `isHouseAnimalZone()` / `countHouseAnimals()`，不要再直接读取 `player.houseAnimals` 后漏掉 D148_DomesticianExpert 这类 tagged zone。
 

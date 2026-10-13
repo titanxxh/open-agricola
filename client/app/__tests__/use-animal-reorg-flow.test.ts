@@ -458,6 +458,22 @@ describe('use-animal-reorg-flow helpers', () => {
     expect(wouldExceedZoneOccupancyLimit(reorg.zones, 'card:M035_HorseTrough@0,1')).toBe(false)
   })
 
+  it('keeps explicit independent groups separate from the same card fallback group', () => {
+    const zones: AnimalReorgState['zones'] = [
+      { id: 'fallback', zoneType: 'card', cardId: 'holder', ownerPlayerId: 'p1', animalType: null, animalCount: 0, capacity: 1, occupiedZoneLimit: 1 },
+      { id: 'independent', zoneType: 'card', cardId: 'holder', ownerPlayerId: 'p1', occupancyGroup: 'independent', animalType: 'sheep', animalCount: 1, capacity: 1, occupiedZoneLimit: 1 },
+    ]
+    expect(wouldExceedZoneOccupancyLimit(zones, 'fallback')).toBe(false)
+  })
+
+  it('honors the strictest occupied-zone limit shared by group members', () => {
+    const zones: AnimalReorgState['zones'] = [
+      { id: 'empty', zoneType: 'card', occupancyGroup: 'shared', animalType: null, animalCount: 0, capacity: 1, occupiedZoneLimit: 2 },
+      { id: 'occupied', zoneType: 'card', occupancyGroup: 'shared', animalType: 'sheep', animalCount: 1, capacity: 1, occupiedZoneLimit: 1 },
+    ]
+    expect(wouldExceedZoneOccupancyLimit(zones, 'empty')).toBe(true)
+  })
+
   it('builds pending choice with farm-redevelopment fence bonus', () => {
     const pending: PendingAnimalReorg = { playerIndex: 1, spaceId: 'farm-redevelopment' }
     const choice = buildPendingChoiceFromReorgProgress(
