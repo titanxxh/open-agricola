@@ -75,8 +75,20 @@ describe('overlapping and paid future effects', () => {
     expect(response.state.round).toBe(9)
     expect(response.state.players[0]!.resources.vegetable).toBe(0)
     if (decision !== 'unaffordable') {
+      for (let step = 0; step < 3 && !choices(response).some(option => option.value.startsWith('purchase:')); step++) {
+        const source = choices(response).find(option => !option.disabled
+          && (option.value === 'D069_SmallGreenhouse' || option.sourceCard === 'D069_SmallGreenhouse'))
+        expect(source, JSON.stringify(response.interaction)).toBeDefined()
+        if (!source || response.interaction.stateId !== 'wait') throw new Error('Missing due purchase source')
+        response = session.resolveChoice(response.interaction.playerIndex, source.value)
+        expect(response.ok, response.error).toBe(true)
+      }
+      const purchase = choices(response).find(option => option.value.startsWith('purchase:'))
+      expect(purchase?.effectPreview).toEqual({
+        kind: 'resourceExchange', resourcesPaid: { food: 1 }, resourcesGained: { vegetable: 1 },
+      })
       const selected = choices(response).find((option) => decision === 'decline'
-        ? option.value === '__skip__' : option.value !== '__skip__')
+        ? option.value === '__skip__' : option.value.startsWith('purchase:'))
       expect(selected).toBeDefined()
       if (!selected || response.interaction.stateId !== 'wait') throw new Error('Missing due offer')
       expect(response.interaction.playerIndex).toBe(0)
