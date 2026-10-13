@@ -417,6 +417,7 @@ export function cloneNode(int: EngineInternals, node: EngineNode): EngineNode {
     )
     clone.resolvedReplacement = node.resolvedReplacement
     clone.expandFlow = node.expandFlow
+    clone.expandFlowIdStyle = node.expandFlowIdStyle
     clone.beforePhaseResolved = node.beforePhaseResolved
     clone.bodyStarted = node.bodyStarted
     clone.selectedBranchChoice = node.selectedBranchChoice
@@ -758,6 +759,13 @@ export function getNodeDescriptionPreview(
   if (node instanceof ActionNode) {
     const action = registry.get(node.actionId)
     if (!action) return undefined
+    if (node.expandFlow && action.flow && !descriptionPath.includes(node.actionId)) {
+      const flow = mergeContextIntoFlow(action.flow, node.actionContext, node.sourceCard)
+      const expanded = buildFlowNode({ registry, counterRef: { value: 0 } }, flow,
+        node.ownerPlayerId, undefined, node.expandFlowIdStyle)
+      expanded.optional ||= node.optional
+      return getNodeDescriptionPreview(expanded, registry, context, [...descriptionPath, node.actionId])
+    }
     const specialEffectLabelKey = specialEffectDescriptionLabelKey(node)
     const isCardChoiceLabel =
       !!node.choiceLabelKey && cardChoiceLabelKeyPattern.test(node.choiceLabelKey)
@@ -888,6 +896,7 @@ function buildFlowNodeContent(
       flow.effectPreview,
     )
     actionNode.expandFlow = flow.expandFlow
+    actionNode.expandFlowIdStyle = flow.expandFlow ? idStyle : undefined
     // A nonoptional leaf owns its initial request. Optional metadata belongs
     // to the optional prompt, not the action's later selection or continuation.
     if (flow.optional !== true) actionNode.anytimeWindow = flow.anytimeWindow
@@ -964,6 +973,8 @@ export function buildReplacementChoiceNode(
     child.id, replacement.alternatives[index]!.sourceCard,
   ]))
   const original = node.children.at(-1)!
+  const originalAction = findActionNode(original)
+  if (originalAction?.expandFlow) originalAction.expandFlowIdStyle = actionNode.expandFlowIdStyle
   const alternatives = node.children.slice(0, -1).filter((child) => canStartNode(int, context, child))
   if (alternatives.length === 0) return undefined
   node.children = [...alternatives, original]
