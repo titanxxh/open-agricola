@@ -34,7 +34,7 @@ const cardImpl = {
             farmPosition: tile,
             countsFarmyardSpaceAsUnused: true,
             displaySource: 'farm-position',
-            exclusiveCardZoneLimit: 1,
+            occupiedZoneLimit: 1,
           })
         })
     },

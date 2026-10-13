@@ -1,3 +1,4 @@
+import { countRoomAnimals } from '../../domain/animals'
 import { defineMinorCard } from '../card-source'
 import type { PlayerState, Pasture } from '../../contract/types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
@@ -15,7 +16,7 @@ const SPACE_TO_ANIMAL: Record<string, AnimalKey> = {
 }
 
 const countAnimalOfType = (player: PlayerState, animal: AnimalKey): number => {
-  const inHouse = player.houseAnimalType === animal ? player.houseAnimalCount : 0
+  const inHouse = countRoomAnimals(player, animal)
   const inStables = Object.values(player.stableAnimals ?? {}).filter((a) => a === animal).length
   const inPastures = (player.pastures ?? []).reduce(
     (sum: number, p: Pasture) => sum + (p.animalType === animal ? p.animalCount : 0),

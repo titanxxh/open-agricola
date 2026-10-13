@@ -1,3 +1,4 @@
+import { countRoomAnimals } from '../../domain/animals'
 import { defineMinorCard } from '../card-source'
 import type { PlayerState, Pasture } from '../../contract/types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
@@ -16,7 +17,7 @@ const CARD_ID = 'B051_DiggingSpade'
  */
 
 const countBoarInFarmyard = (player: PlayerState): number => {
-  const inHouse = player.houseAnimalType === 'boar' ? player.houseAnimalCount : 0
+  const inHouse = countRoomAnimals(player, 'boar')
   const inStables = Object.values(player.stableAnimals ?? {}).filter(
     (a) => a === 'boar',
   ).length

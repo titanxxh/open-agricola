@@ -1,3 +1,4 @@
+import { countRoomAnimals } from '../../domain/animals'
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
@@ -93,7 +94,7 @@ const computePigsInC148 = (player: PlayerState): number => {
   const pastureBoars = player.pastures
     .filter((p) => p.animalType === 'boar')
     .reduce((sum, p) => sum + p.animalCount, 0)
-  const houseBoars = player.houseAnimalType === 'boar' ? player.houseAnimalCount : 0
+  const houseBoars = countRoomAnimals(player, 'boar')
   const stableBoars = Object.values(player.stableAnimals ?? {})
     .filter((t) => t === 'boar').length
   return Math.max(

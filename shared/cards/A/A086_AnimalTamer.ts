@@ -15,9 +15,8 @@ const cardImpl = {
     ],
   }),
   onComputeAnimalZones: (player, zones, _state) => {
-    const houseZone = zones.find(z => z.zoneType === 'house')
-    if (houseZone) {
-      houseZone.capacity = player.rooms
+    for (const zone of zones) {
+      if (zone.zoneType === 'house') zone.occupiedZoneLimit = player.roomTiles.length
     }
   },
 },

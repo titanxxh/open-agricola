@@ -1,3 +1,4 @@
+import { countRoomAnimals } from '../../domain/animals'
 import { defineOccupationCard } from '../card-source'
 import type { CardImpl } from '../registry'
 
@@ -11,7 +12,7 @@ const cardImpl = {
       count += player.pastures
         .filter((pasture) => pasture.animalType === 'cattle')
         .reduce((sum, pasture) => sum + Math.min(pasture.tiles.length, pasture.animalCount), 0)
-      if (player.houseAnimalType === 'cattle') count += Math.min(player.rooms, player.houseAnimalCount)
+      count += countRoomAnimals(player, 'cattle')
       count += Object.values(player.stableAnimals ?? {}).filter((animal) => animal === 'cattle').length
       return count
     },

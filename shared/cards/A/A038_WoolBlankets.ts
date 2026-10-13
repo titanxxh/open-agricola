@@ -1,3 +1,4 @@
+import { countRoomAnimals } from '../../domain/animals'
 import { defineMinorCard } from '../card-source'
 import type { CardImpl } from '../registry'
 import type { PlayerState } from '../../contract/types'
@@ -8,7 +9,7 @@ const countSheepOnBoard = (player: PlayerState): number => {
   for (const pasture of player.pastures) {
     if (pasture.animalType === 'sheep') total += pasture.animalCount
   }
-  if (player.houseAnimalType === 'sheep') total += player.houseAnimalCount
+  total += countRoomAnimals(player, 'sheep')
   for (const animal of Object.values(player.stableAnimals ?? {})) {
     if (animal === 'sheep') total += 1
   }

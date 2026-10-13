@@ -1,3 +1,4 @@
+import { countRoomAnimals } from './animals'
 import type { GameState, PlayerState, Pasture } from '../contract/types.ts'
 import { ALL_ANIMAL_KEYS, animalKeysForState, type AnimalKey } from '../contract/animals.ts'
 import { positionKey } from '../domain/farm.ts'
@@ -47,7 +48,8 @@ export type AnimalZone = {
   farmPosition?: { row: number; col: number }
   countsFarmyardSpaceAsUnused?: boolean
   displaySource?: 'played-card' | 'farm-position' | 'borrowed-played-card'
-  exclusiveCardZoneLimit?: number
+  occupancyGroup?: string
+  occupiedZoneLimit?: number
   capacityCounterKey?: string
   capacityLossOnPayment?: boolean
   requiredEmptyZoneGroupIds?: string[]
@@ -67,6 +69,18 @@ export const buildHostedCardAnimalZoneId = (
   ownerPlayerId: string,
   animalOwnerPlayerId: string,
 ): string => `card:${cardId}:owner:${ownerPlayerId}:animalOwner:${animalOwnerPlayerId}`
+
+export const animalZoneOccupancyGroup = (zone: Pick<AnimalZone, 'occupancyGroup' | 'cardId' | 'ownerPlayerId'>): string | undefined =>
+  zone.occupancyGroup ?? (zone.cardId ? JSON.stringify([zone.cardId, zone.ownerPlayerId]) : undefined)
+
+export const areZoneOccupancyLimitsSatisfied = (
+  zones: readonly Pick<AnimalZone, 'occupancyGroup' | 'cardId' | 'ownerPlayerId' | 'occupiedZoneLimit' | 'animalCount'>[],
+): boolean => zones.every(zone => {
+  const group = animalZoneOccupancyGroup(zone)
+  return group === undefined || zone.occupiedZoneLimit === undefined || zones.filter(candidate =>
+    animalZoneOccupancyGroup(candidate) === group && (candidate.animalCount ?? 0) > 0,
+  ).length <= zone.occupiedZoneLimit
+})
 
 export const isHouseAnimalZone = (zone: AnimalZone): boolean =>
   zone.zoneType === 'house' || zone.houseAnimalZone === true
@@ -479,14 +493,17 @@ export const computeAnimalZones = (
         pastureIndex: index,
       }
     }),
-    {
-      id: 'house',
+    ...player.roomTiles.map(tile => ({
+      id: `house:${positionKey(tile)}`,
       zoneType: 'house' as const,
       capacity: 1,
       houseAnimalZone: true,
-      animalType: player.houseAnimalType ?? null,
-      animalCount: player.houseAnimalCount ?? 0,
-    },
+      farmPosition: tile,
+      occupancyGroup: `house:${player.id}`,
+      occupiedZoneLimit: 1,
+      animalType: player.houseAnimals?.[positionKey(tile)] ?? null,
+      animalCount: player.houseAnimals?.[positionKey(tile)] ? 1 : 0,
+    })),
     ...getLooseStableKeys(player).map((key) => ({
       id: `stable:${key}`,
       zoneType: 'stable' as const,
@@ -554,10 +571,7 @@ export const getAssignedAnimalCount = (player: PlayerState) => {
     (sum, pasture) => sum + pasture.animalCount,
     0,
   )
-  const houseCount =
-    player.houseAnimalType && player.houseAnimalCount > 0
-      ? player.houseAnimalCount
-      : 0
+  const houseCount = countRoomAnimals(player)
   const stableCount = Object.values(player.stableAnimals ?? {}).filter(Boolean).length
   return pastureCount + houseCount + stableCount
 }
@@ -566,7 +580,18 @@ export const getAssignedAnimalCount = (player: PlayerState) => {
 export const getTotalAnimalCapacity = (
   player: PlayerState,
   state: GameState = { completedFeedingPhases: 0 } as GameState,
-) => computeAnimalZones(player, state).reduce((sum, zone) => sum + zone.capacity, 0)
+) => {
+  const zones = computeAnimalZones(player, state)
+  let capacity = zones.reduce((sum, zone) => sum + zone.capacity, 0)
+  const groups = new Set(zones.map(animalZoneOccupancyGroup).filter(group => group !== undefined))
+  for (const group of groups) {
+    const members = zones.filter(zone => animalZoneOccupancyGroup(zone) === group)
+    const limit = Math.min(...members.map(zone => zone.occupiedZoneLimit ?? Infinity))
+    const capacities = members.map(zone => zone.capacity).sort((a, b) => b - a)
+    capacity -= capacities.slice(limit).reduce((sum, value) => sum + value, 0)
+  }
+  return capacity
+}
 
 const expandZoneToMeeples = (zone: AnimalZone): Meeple[] => {
   const counts = readAnimalCountsForZoneAssignment(zone)
@@ -656,17 +681,9 @@ const canPlaceAnimalInWorkZone = (
   type: AnimalType,
 ): AnimalAccommodationWorkZone | null => {
   if (zone.blocked || zone.animalCount >= zone.capacity) return null
-  if (zone.zoneType === 'card' && zone.cardId && zone.animalCount === 0 && zone.exclusiveCardZoneLimit !== undefined) {
-    const limit = Math.max(0, Math.floor(zone.exclusiveCardZoneLimit))
-    const occupied = zones.filter((entry, index) =>
-      index !== zoneIndex &&
-      entry.zoneType === 'card' &&
-      entry.cardId === zone.cardId &&
-      entry.ownerPlayerId === zone.ownerPlayerId &&
-      entry.animalCount > 0
-    ).length
-    if (occupied >= limit) return null
-  }
+  if (!areZoneOccupancyLimitsSatisfied(zones.map((entry, index) =>
+    index === zoneIndex ? { ...entry, animalCount: zone.animalCount + 1 } : entry,
+  ))) return null
   if ('allowedAnimalType' in zone && zone.allowedAnimalType !== null && zone.allowedAnimalType !== type) {
     return null
   }
@@ -742,8 +759,8 @@ export const prefillAnimalZones = (
     return { ...zone, animalCounts, animalCount: sumAnimalCounts(animalCounts), animalType: singleAnimalType(animalCounts) }
   })
   const placed = createAnimalCounts(state.enableFarmersOfTheMoor === true)
-  const groupKey = (zone: AnimalZone) => JSON.stringify([zone.cardId, zone.ownerPlayerId])
-  const exclusiveCounts = new Map<string, number>()
+  const groupKey = animalZoneOccupancyGroup
+  const exclusiveCounts = new Map<string | undefined, number>()
   for (const zone of workZones) {
     for (const type of ALL_ANIMAL_KEYS) placed[type] = (placed[type] ?? 0) + (zone.animalCounts[type] ?? 0)
     const occupied = ALL_ANIMAL_KEYS.filter((type) => (zone.animalCounts[type] ?? 0) > 0)
@@ -753,14 +770,14 @@ export const prefillAnimalZones = (
       || (!allowsMixedAnimalTypes(zone) && occupied.length > 1)
       || (zone.allowedAnimalType != null && occupied.some((type) => type !== zone.allowedAnimalType))
       || computeInvalidAnimalsForZone(state, player, zone).length > 0) return zones
-    if (zone.zoneType === 'card' && zone.cardId && zone.animalCount > 0) {
+    if (groupKey(zone) !== undefined && zone.animalCount > 0) {
       exclusiveCounts.set(groupKey(zone), (exclusiveCounts.get(groupKey(zone)) ?? 0) + 1)
     }
   }
   if (!areRequiredEmptyZoneGroupsSatisfied(workZones)
     || keys.some((type) => (placed[type] ?? 0) > (player.resources[type] ?? 0))
-    || workZones.some((zone) => zone.cardId && zone.exclusiveCardZoneLimit !== undefined
-      && (exclusiveCounts.get(groupKey(zone)) ?? 0) > zone.exclusiveCardZoneLimit)) return zones
+    || workZones.some((zone) => groupKey(zone) !== undefined && zone.occupiedZoneLimit !== undefined
+      && (exclusiveCounts.get(groupKey(zone)) ?? 0) > zone.occupiedZoneLimit)) return zones
 
   const freeCapacity = workZones.reduce((sum, zone) => sum + Math.max(0, zone.capacity - zone.animalCount), 0)
   const animals = keys.flatMap((type) => Array.from({
@@ -770,12 +787,12 @@ export const prefillAnimalZones = (
   let bestAdded = 0
   const seen = new Set<string>()
   const emptyGroups = [...new Set(workZones.flatMap((zone) => zone.requiredEmptyZoneGroupIds ?? []))]
-  const exclusiveLimits = new Map<string, number>()
+  const exclusiveLimits = new Map<string | undefined, number>()
   for (const zone of workZones) {
-    if (zone.cardId && zone.exclusiveCardZoneLimit !== undefined) {
+    if (groupKey(zone) !== undefined && zone.occupiedZoneLimit !== undefined) {
       exclusiveLimits.set(groupKey(zone), Math.min(
         exclusiveLimits.get(groupKey(zone)) ?? Infinity,
-        Math.max(0, Math.floor(zone.exclusiveCardZoneLimit)),
+        Math.max(0, Math.floor(zone.occupiedZoneLimit)),
       ))
     }
   }
@@ -816,7 +833,7 @@ export const prefillAnimalZones = (
       if (!candidate) continue
       const next = [...current]
       next[i] = candidate
-      const limit = candidate.cardId ? exclusiveLimits.get(groupKey(candidate)) : undefined
+      const limit = exclusiveLimits.get(groupKey(candidate))
       if (limit !== undefined && next.filter((zone) => groupKey(zone) === groupKey(candidate) && zone.animalCount > 0).length > limit) continue
       if (areRequiredEmptyZoneGroupsSatisfied(next)) search(index + 1, next, added + 1)
     }
@@ -836,7 +853,7 @@ export const prefillAnimalZones = (
 /**
  * Imperative: rebalance animals across zones to fit current capacity.
  *
- * **MUTATES** `player.pastures`, `player.houseAnimal*`,
+ * **MUTATES** `player.pastures`, `player.houseAnimals`,
  * `player.stableAnimals`, card animal-holder storage, and the per-type
  * counters in `player.resources`.
  */
@@ -871,17 +888,19 @@ export const enforceAnimalCapacity = (
     }
     return { ...pasture, animalCount: 0, animalType: null }
   })
-  const houseCapacity = zoneCapacity('house')
-  const houseCount =
-    player.houseAnimalType && (totals[player.houseAnimalType] ?? 0) > 0
-      ? Math.min(houseCapacity, totals[player.houseAnimalType] ?? 0)
-      : 0
-  if (player.houseAnimalType) {
-    totals[player.houseAnimalType] = (totals[player.houseAnimalType] ?? 0) - houseCount
+  const houseZones = zones.filter(zone => zone.zoneType === 'house')
+  player.houseAnimals = {}
+  const assignHouseAnimal = (zone: AnimalZone, animal: AnimalType): boolean => {
+    const occupied = houseZones.map(candidate => ({ ...candidate,
+      animalCount: candidate.id === zone.id || player.houseAnimals[candidate.id.slice('house:'.length)] ? 1 : 0,
+    }))
+    if (zone.capacity <= 0 || (totals[animal] ?? 0) <= 0 || !areZoneOccupancyLimitsSatisfied(occupied)) return false
+    player.houseAnimals[zone.id.slice('house:'.length)] = animal
+    totals[animal] = (totals[animal] ?? 0) - 1
+    return true
   }
-  player.houseAnimalCount = houseCount
-  if (houseCount === 0) {
-    player.houseAnimalType = null
+  for (const zone of houseZones) {
+    if (zone.animalType) assignHouseAnimal(zone, zone.animalType)
   }
   looseStableKeys.forEach((key) => {
     const type = stableAnimals[key]
@@ -912,13 +931,10 @@ export const enforceAnimalCapacity = (
     }
     return pasture
   })
-  if (!player.houseAnimalType) {
-    for (const animalType of animalKeys) {
-      if ((totals[animalType] ?? 0) <= 0) continue
-      player.houseAnimalType = animalType
-      player.houseAnimalCount = 1
-      totals[animalType] = (totals[animalType] ?? 0) - 1
-      break
+  for (const zone of houseZones) {
+    if (player.houseAnimals[zone.id.slice('house:'.length)]) continue
+    for (const animal of animalKeys) {
+      if (assignHouseAnimal(zone, animal)) break
     }
   }
   looseStableKeys.forEach((key) => {
@@ -936,9 +952,7 @@ export const enforceAnimalCapacity = (
     player.resources[animalType] += player.pastures
       .filter((pasture) => pasture.animalType === animalType)
       .reduce((sum, pasture) => sum + pasture.animalCount, 0)
-    if (player.houseAnimalType === animalType) {
-      player.resources[animalType] = (player.resources[animalType] ?? 0) + player.houseAnimalCount
-    }
+    player.resources[animalType] += Object.values(player.houseAnimals).filter(animal => animal === animalType).length
     Object.values(stableAnimals).forEach((type) => {
       if (type === animalType) player.resources[animalType] = (player.resources[animalType] ?? 0) + 1
     })
@@ -1031,7 +1045,7 @@ export class AnimalZones {
 
   /**
    * Imperative: rebalance animals across zones to fit current capacity.
-   * **MUTATES** `player.pastures`, `player.houseAnimal*`,
+   * **MUTATES** `player.pastures`, `player.houseAnimals`,
    * `player.stableAnimals`, and the per-type counters in `player.resources`.
    */
   enforceCapacity(): void {

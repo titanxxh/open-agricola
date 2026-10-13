@@ -13,6 +13,7 @@ import type {
 import { animalKeysForState, type AnimalKey } from '../../contract/animals'
 import {
   areRequiredEmptyZoneGroupsSatisfied,
+  areZoneOccupancyLimitsSatisfied,
   buildCardAnimalZoneId,
   getAllowedAnimalTypesForZone,
   normalizeAnimalCountsForZone,
@@ -181,12 +182,9 @@ export const applyReorganizeMutate = (
     return { ...p, animalType: count > 0 ? animalType : null, animalCount: count }
   })
 
-  const houseZone = zones.find((z) => z.zoneType === 'house')
-  const houseAnimalType = normalizeAnimalType(houseZone?.animalType)
-  player.houseAnimalType = houseAnimalType
-  player.houseAnimalCount = houseAnimalType
-    ? Math.max(0, Math.min(cap('house'), Math.floor(houseZone?.animalCount ?? 0)))
-    : 0
+  player.houseAnimals = Object.fromEntries(zones
+    .filter(zone => zone.zoneType === 'house' && zone.animalType && zone.animalCount > 0)
+    .map(zone => [zone.id.slice('house:'.length), zone.animalType!]))
 
   const stable: Record<string, AnimalKey | null> = {}
   zones
@@ -223,7 +221,7 @@ export const applyReorganizeMutate = (
     )
     const exclusiveLimit = Math.max(
       0,
-      Math.floor(cardZones.find((zone) => zone.exclusiveCardZoneLimit !== undefined)?.exclusiveCardZoneLimit ?? Number.POSITIVE_INFINITY),
+      Math.floor(cardZones.find((zone) => zone.occupiedZoneLimit !== undefined)?.occupiedZoneLimit ?? Number.POSITIVE_INFINITY),
     )
     let occupiedExclusiveZones = 0
     for (const zone of cardZones) {
@@ -372,13 +370,7 @@ const validateAssignments = (
     animalCounts: readAnimalCountsForZoneAssignment(byId.get(zone.id)),
   }))
   if (!areRequiredEmptyZoneGroupsSatisfied(finalZones)) return
-  for (const zone of finalZones) {
-    if (zone.exclusiveCardZoneLimit === undefined) continue
-    const occupied = finalZones.filter((candidate) =>
-      candidate.cardId === zone.cardId && candidate.ownerPlayerId === zone.ownerPlayerId && candidate.animalCount > 0,
-    ).length
-    if (occupied > zone.exclusiveCardZoneLimit) return
-  }
+  if (!areZoneOccupancyLimitsSatisfied(finalZones)) return
   return [...byId.values()]
 }
 

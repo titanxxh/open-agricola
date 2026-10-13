@@ -458,7 +458,7 @@ export type FarmBoardView = {
     { animalType: AnimalType | null; animalCount: number }
   >
   pastureCapacityMap: Map<string, number>
-  houseDisplay: { animalType: AnimalType | null; animalCount: number }
+  houseDisplayMap: Map<string, { animalType: AnimalType | null; animalCount: number }>
   stableDisplayMap: Map<
     string,
     { animalType: AnimalType | null; animalCount: number }
@@ -881,7 +881,7 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
     pastureTiles,
     pastureDisplayMap,
     pastureCapacityMap,
-    houseDisplay,
+    houseDisplayMap,
     stableDisplayMap,
     cardDisplayMap = new Map(),
     farmCardDisplayMap = new Map(),
@@ -983,21 +983,6 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
       return next
     })
   }
-  const houseLabelKey = (() => {
-    if (displayPlayer.roomTiles.length === 0) return null
-    let target = displayPlayer.roomTiles[0]
-    displayPlayer.roomTiles.forEach((tile) => {
-      if (tile.row > target.row) {
-        target = tile
-        return
-      }
-      if (tile.row === target.row && tile.col < target.col) {
-        target = tile
-      }
-    })
-    return `${target.row}-${target.col}`
-  })()
-
   const renderPlayedCardReorg = (cardDisplay: CardAnimalDisplay) => (
     <div className="played-card-reorg">
       <AnimalCount
@@ -1364,8 +1349,9 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
             : 0
           const pastureAnimalType = pastureDisplay?.animalType ?? null
           const pastureAnimalCount = pastureDisplay?.animalCount ?? 0
+          const houseDisplay = houseDisplayMap.get(tileKey)
           const houseLabel =
-            tileKey === houseLabelKey
+            houseDisplay !== undefined
               ? houseDisplay.animalCount > 0
                 ? `${houseDisplay.animalCount}${t(
                     locale,
@@ -1511,8 +1497,8 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
                   ) : null}
                 </div>
               ) : null}
-              {houseLabel ? (
-                <div className="pasture-info">
+              {houseLabel && houseDisplay ? (
+                <div className="pasture-info" data-testid={`room-animal-${tileKey}`}>
                   <div className="pasture-count"><AnimalCount count={houseDisplay.animalCount} animalType={houseDisplay.animalType} capacity={1} /></div>
                   {isReorgActive ? (
                     <div className="pasture-controls">
@@ -1533,7 +1519,7 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
                             </span>
                             <button
                               onClick={() =>
-                                adjustReorgAnimal('house', animalType, -1)
+                                adjustReorgAnimal(`house:${tileKey}`, animalType, -1)
                               }
                               disabled={!isInteractive || !canDecrease}
                             >
@@ -1541,7 +1527,7 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
                             </button>
                             <span className="pasture-control-value">{count}</span>
                             <button
-                              onClick={() => adjustReorgAnimal('house', animalType, 1)}
+                              onClick={() => adjustReorgAnimal(`house:${tileKey}`, animalType, 1)}
                               disabled={!isInteractive || !canIncrease}
                             >
                               +

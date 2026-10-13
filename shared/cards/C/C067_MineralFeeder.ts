@@ -1,3 +1,4 @@
+import { countRoomAnimals } from '../../domain/animals'
 import { defineMinorCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { registerAdHocAction } from '../../actions/helpers/ad-hoc-action-registry'
@@ -23,7 +24,7 @@ const hasSheepInPasture = (player: PlayerState): boolean =>
 
 const hasSheepAnywhere = (player: PlayerState): boolean =>
   (player.resources.sheep ?? 0) > 0 ||
-  (player.houseAnimalType === 'sheep' && player.houseAnimalCount > 0) ||
+  countRoomAnimals(player, 'sheep') > 0 ||
   Object.values(player.stableAnimals ?? {}).some((animal) => animal === 'sheep') ||
   hasSheepInPasture(player)
 

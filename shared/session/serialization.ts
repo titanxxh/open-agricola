@@ -51,6 +51,7 @@ export type SerializedPlayerState = Omit<PlayerState, 'pastures'> & {
   lockedFarmTileKeys: string[]
   playerPanelSummary: PlayerPanelSupplySummary
   specialStables: BuiltSpecialStable[]
+  roomAnimalZones: InteractionAnimalReorgZone[]
   playedCardAnimalZones: InteractionAnimalReorgZone[]
   farmCardAnimalZones: InteractionAnimalReorgZone[]
   borrowedPlayedCardAnimalZones: InteractionAnimalReorgZone[]
@@ -128,7 +129,8 @@ const serializeAnimalZone = (zone: AnimalZone): InteractionAnimalReorgZone => {
     out.countsFarmyardSpaceAsUnused = zone.countsFarmyardSpaceAsUnused
   }
   if (zone.displaySource) out.displaySource = zone.displaySource
-  if (zone.exclusiveCardZoneLimit !== undefined) out.exclusiveCardZoneLimit = zone.exclusiveCardZoneLimit
+  if (zone.occupancyGroup) out.occupancyGroup = zone.occupancyGroup
+  if (zone.occupiedZoneLimit !== undefined) out.occupiedZoneLimit = zone.occupiedZoneLimit
   return out
 }
 
@@ -198,6 +200,7 @@ const serializePlayerDisplayFields = (
     lockedFarmTileKeys,
     playerPanelSummary,
     specialStables,
+    roomAnimalZones: zones.filter(zone => zone.zoneType === 'house').map(serializeAnimalZone),
     playedCardAnimalZones: collectPlayedCardAnimalZones(zones),
     farmCardAnimalZones: collectFarmCardAnimalZones(zones),
     borrowedPlayedCardAnimalZones: collectBorrowedPlayedCardAnimalZones(zones),
@@ -317,6 +320,7 @@ export const rehydrateState = (
       lockedFarmTileKeys: _lockedFarmTileKeys,
       playerPanelSummary: _playerPanelSummary,
       specialStables: _specialStables,
+      roomAnimalZones: _roomAnimalZones,
       playedCardAnimalZones: _playedCardAnimalZones,
       farmCardAnimalZones: _farmCardAnimalZones,
       cardStatePresentation: _cardStatePresentation,
