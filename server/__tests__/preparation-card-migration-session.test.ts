@@ -49,8 +49,11 @@ function finishStages(session: GameSession, response: SessionResponse): SessionR
   for (let steps = 0; steps < 12 && response.interaction.stateId === 'wait'; steps += 1) {
     const request = response.interaction.request
     if (request.kind !== 'choice' && request.kind !== 'select-trigger') throw new Error(`Unexpected stage request ${request.kind}`)
-    const option = request.options.find(option => !option.disabled && !['__skip__', '__pass__', '__done__'].includes(option.value))
-      ?? request.options.find(option => !option.disabled)
+    const option = request.options.find(option => !option.disabled
+      && option.labelKey !== 'actions.exchange.name'
+      && !['__skip__', '__pass__', '__done__'].includes(option.value))
+      ?? request.options.find(option => !option.disabled && option.value === '__pass__')
+      ?? request.options.find(option => !option.disabled && option.labelKey !== 'actions.exchange.name')
     if (!option) throw new Error('No stage option')
     response = choose(session, response, option.value)
   }
@@ -162,5 +165,8 @@ it('Plow Driver remains a stage source with no food and can plow after scheduled
   expect(response.ok, response.error).toBe(true)
   expect(response.state.players[0]!.resources.food).toBe(0)
   expect(response.state.players[0]!.fields).toContainEqual(expect.objectContaining({ row: 0, col: 2 }))
+  expect(response.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'select-trigger' } })
+  response = choose(session, response, '__pass__')
+  expect(response.state.players[0]!.resources).toMatchObject({ food: 0, grain: 1 })
   expect(response.state.roundPhase).toBe('work')
 })
