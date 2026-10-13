@@ -6,6 +6,7 @@ import type { CardImpl } from '../registry'
 import { getLogicalFields, type LogicalField } from '../helpers/card-field'
 
 const CARD_ID = 'A071_ClearingSpade'
+const SOURCE_CROPS = ['grain', 'vegetable'] as const
 const topSlot = (field: LogicalField) => [...field.slots].reverse().find((slot) => slot.stack)
 
 const selectionTile = (field: LogicalField, slot: LogicalField['slots'][number]) => ({
@@ -13,7 +14,7 @@ const selectionTile = (field: LogicalField, slot: LogicalField['slots'][number])
   ...(field.sourceCard ? { sourceCard: field.sourceCard, groupKey: field.groupKey, cardFieldSlot: slot.index } : {}),
 })
 
-const emptyTargetsFor = (player: CardListenerContext['player'], crop: 'grain' | 'vegetable' | 'wood' | 'stone') =>
+const emptyTargetsFor = (player: CardListenerContext['player'], crop: 'grain' | 'vegetable') =>
   getLogicalFields(player).flatMap((field) => {
     if (field.stacks.length > 0 || (field.allowedCrops && !field.allowedCrops.includes(crop))) return []
     if (field.kind === 'farmyard') return [{ row: field.row, col: field.col }]
@@ -28,13 +29,14 @@ const anytimeListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const sourceFields = getLogicalFields(context.player).flatMap((field) => {
       const top = topSlot(field)
-      if (!top?.stack || top.stack.remaining < 2 || emptyTargetsFor(context.player, top.stack.kind).length === 0) return []
+      if (!top?.stack || (top.stack.kind !== 'grain' && top.stack.kind !== 'vegetable') ||
+          top.stack.remaining < 2 || emptyTargetsFor(context.player, top.stack.kind).length === 0) return []
       return [selectionTile(field, top)]
     })
     if (sourceFields.length === 0) return
 
     return {
-      flow: fieldOperationFlow(CARD_ID, { kind: 'move', amount: 1 }, sourceFields),
+      flow: fieldOperationFlow(CARD_ID, { kind: 'move', amount: 1, sourceCrops: SOURCE_CROPS }, sourceFields),
       sourceCard: CARD_ID,
     }
   },

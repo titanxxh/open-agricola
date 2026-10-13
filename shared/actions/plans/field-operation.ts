@@ -1,13 +1,13 @@
 import { positionKey } from '../../domain/farm'
-import type { ActionFlow, FarmTilePosition, Resource } from '../../contract/types'
+import type { ActionFlow, FarmTilePosition, Field, Resource } from '../../contract/types'
 
 export type FieldOperation =
   | { kind: 'replace'; from: 'grain' | 'vegetable'; fromAmount: number; to: 'grain' | 'vegetable'; toAmount: number }
   | { kind: 'remove-top'; amount: number; gain: Partial<Resource> }
   | { kind: 'discard-all' }
   | { kind: 'discard-crop-spaces' }
-  | { kind: 'move'; amount: number }
-  | { kind: 'move-destination'; amount: number; sourcePosition: string }
+  | { kind: 'move'; amount: number; sourceCrops?: readonly Field['stacks'][number]['kind'][] }
+  | { kind: 'move-destination'; amount: number; sourcePosition: string; sourceCrops?: readonly Field['stacks'][number]['kind'][] }
 
 export const fieldOperationFlow = (sourceCard: string, operation: FieldOperation, tiles: FarmTilePosition[], maxSelections = 1, autoSingle = false): ActionFlow => ({
   type: 'leaf', actionId: 'field-operation', sourceCard,

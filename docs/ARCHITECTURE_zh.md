@@ -1082,6 +1082,8 @@ cardField?: {
 
 Field storage 接受 grain、vegetable、wood、stone 四种合法 field good。Card Field 的 `allowedCrops` 表示普通 Sow 能力，不是存储 schema。`place` 默认执行该白名单，卡牌效果可显式绕过；普通 Sow 与 `replace` 仍受白名单限制。Owner callback 必须先检查实际 good，再执行特定作物副作用。
 
+`fieldOperationFlow` 的 `move` 支持可选 `sourceCrops` 限制。目标 continuation 携带同一限制，两次选择都在暂存位置或修改田地之前重新检查当前来源作物和数量；目标占用与 `allowedCrops` 也在提交选择前验证。允许的来源资源由卡牌局部声明，A071 允许两种 storage owner 上的 grain 和 vegetable。搬移继续使用共享 mutation，并返回来源 owner 的回调 flow。
+
 Card Field 固定槽存储顶层 `{ crop, remaining }`，可带按底到顶排列的 `below` 层。`insertBottom` 放置牌面授予的作物，不增加播种槽，也不应用普通播种白名单。投影同时提供全部作物层、各槽顶层和稳定身份。普通 Reap 每个非空槽取一枚，额外或整田收割可继续取下层；末枚回调检查所有层。客户端展示底层，但只有顶层映射回原固定槽的选择坐标，空槽不会造成错位。
 
 基础田地计分只统计 Farmyard Field；Card Field 继续参与 Logical Field 规则、播种与收割。

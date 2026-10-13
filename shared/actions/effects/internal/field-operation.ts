@@ -1,4 +1,4 @@
-import type { ActionDefinition, ActionFlow, PlayerState, Resource } from '../../../contract/types'
+import type { ActionDefinition, ActionFlow, Field, PlayerState, Resource } from '../../../contract/types'
 import { REAL_RESOURCE_KEYS } from '../../../contract/resource-keys'
 import { selectionAction } from './selection'
 import { getLogicalFields, mutateLogicalFields } from '../../../cards/helpers/card-field'
@@ -9,6 +9,12 @@ import { getFarmyardSpaceStates } from '../../../domain/farmyard-space-states'
 
 const positiveInteger = (value: unknown): value is number => typeof value === 'number' && Number.isSafeInteger(value) && value > 0
 const crop = (value: unknown): value is 'grain' | 'vegetable' => value === 'grain' || value === 'vegetable'
+const readSourceCrops = (value: object): { sourceCrops?: Field['stacks'][number]['kind'][] } | undefined => {
+  if (!('sourceCrops' in value)) return {}
+  if (!Array.isArray(value.sourceCrops) || !value.sourceCrops.length ||
+      !value.sourceCrops.every((kind): kind is Field['stacks'][number]['kind'] => crop(kind) || kind === 'wood' || kind === 'stone')) return
+  return { sourceCrops: value.sourceCrops }
+}
 const resources = (value: unknown): Partial<Resource> | undefined => {
   if (!value || typeof value !== 'object') return
   const result: Partial<Resource> = {}
@@ -36,10 +42,14 @@ const readOperation = (value: unknown): FieldOperation | undefined => {
       const gain = resources(value.gain)
       return gain ? { kind: value.kind, amount: value.amount, gain } : undefined
     }
-    case 'move': return 'amount' in value && positiveInteger(value.amount) ? { kind: value.kind, amount: value.amount } : undefined
-    case 'move-destination':
-      return 'amount' in value && positiveInteger(value.amount) && 'sourcePosition' in value && typeof value.sourcePosition === 'string'
-        ? { kind: value.kind, amount: value.amount, sourcePosition: value.sourcePosition } : undefined
+    case 'move':
+    case 'move-destination': {
+      const sourceCrops = readSourceCrops(value)
+      if (!sourceCrops || !('amount' in value) || !positiveInteger(value.amount)) return
+      if (value.kind === 'move') return { kind: value.kind, amount: value.amount, ...sourceCrops }
+      return 'sourcePosition' in value && typeof value.sourcePosition === 'string'
+        ? { kind: value.kind, amount: value.amount, sourcePosition: value.sourcePosition, ...sourceCrops } : undefined
+    }
   }
 }
 const findField = (player: PlayerState, key: string) => {
@@ -55,7 +65,7 @@ export const fieldOperationAction: ActionDefinition = {
   previewEffect: ({ params, actionContext }) => {
     const operation = readOperation(params?.operation)
     if (!operation) return
-    return { kind: 'fieldOperation', operation: operation.kind === 'move-destination' ? { kind: 'move', amount: operation.amount } : operation.kind === 'discard-crop-spaces' ? { kind: 'discard-all' } : operation,
+    return { kind: 'fieldOperation', operation: operation.kind === 'move' || operation.kind === 'move-destination' ? { kind: 'move', amount: operation.amount } : operation.kind === 'discard-crop-spaces' ? { kind: 'discard-all' } : operation,
       ...(operation.kind === 'discard-crop-spaces' ? { location: 'crop-space' as const } : {}),
       minSelections: typeof actionContext?.minSelections === 'number' ? actionContext.minSelections : 1,
       maxSelections: typeof actionContext?.maxSelections === 'number' ? actionContext.maxSelections : 1 }
@@ -66,6 +76,25 @@ export const fieldOperationAction: ActionDefinition = {
   resolveChoice: (context, choice, payload) => {
     const operation = readOperation(context.params?.operation)
     if (!operation) return { type: 'fail', errorKey: 'log.actionFail' }
+    if (operation.kind === 'move' || operation.kind === 'move-destination') {
+      const position = payload && typeof payload === 'object' && 'positions' in payload && Array.isArray(payload.positions)
+        ? payload.positions[0] : undefined
+      const source = typeof position === 'string' && findField(context.player, operation.kind === 'move' ? position : operation.sourcePosition)
+      const stack = source && top(source)?.stack
+      if (!stack || stack.remaining <= operation.amount || (operation.sourceCrops && !operation.sourceCrops.includes(stack.kind))) {
+        return { type: 'fail', errorKey: 'log.actionFail', recoverable: true }
+      }
+      if (operation.kind === 'move' && (!context.sourceCard || !getLogicalFields(context.player).some(target =>
+        !target.stacks.length && (!target.allowedCrops || target.allowedCrops.includes(stack.kind))))) {
+        return { type: 'fail', errorKey: 'log.actionFail', recoverable: true }
+      }
+      if (operation.kind === 'move-destination') {
+        const target = typeof position === 'string' && findField(context.player, position)
+        if (!target || target.stacks.length || (target.allowedCrops && !target.allowedCrops.includes(stack.kind))) {
+          return { type: 'fail', errorKey: 'log.actionFail', recoverable: true }
+        }
+      }
+    }
     const validation = selectionAction.resolveChoice?.(context, choice, payload)
     if (!validation || validation.type !== 'ok') return validation ?? { type: 'fail', errorKey: 'log.actionFail' }
     const raw = validation.extraData?.selectedPositions
@@ -91,7 +120,7 @@ export const fieldOperationAction: ActionDefinition = {
           return targetSlot ? [{ ...targetSlot.tile, ...(target.sourceCard ? { sourceCard: target.sourceCard, groupKey: target.groupKey, cardFieldSlot: targetSlot.index } : {}) }] : []
         })
         if (!targets.length) return { type: 'fail', errorKey: 'log.actionFail' }
-        return { type: 'flow', flow: fieldOperationFlow(context.sourceCard, { kind: 'move-destination', amount: operation.amount, sourcePosition: positionKey(slot.tile) }, targets), extraData: validation.extraData }
+        return { type: 'flow', flow: fieldOperationFlow(context.sourceCard, { kind: 'move-destination', amount: operation.amount, sourcePosition: positionKey(slot.tile), ...(operation.sourceCrops ? { sourceCrops: operation.sourceCrops } : {}) }, targets), extraData: validation.extraData }
       }
       if (operation.kind === 'move-destination') {
         const source = findField(context.player, operation.sourcePosition)

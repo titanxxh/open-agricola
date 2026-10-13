@@ -1101,6 +1101,8 @@ The card-facing interface has three entry points. `getLogicalFields(player)` ret
 
 Field storage accepts every legal field good: grain, vegetable, wood, and stone. A Card Field's `allowedCrops` is its ordinary Sow capability, not its storage schema. `place` applies that whitelist by default and lets a card effect explicitly bypass it; ordinary Sow and `replace` remain whitelist-restricted. Owner callbacks inspect the actual good before applying crop-specific effects.
 
+`fieldOperationFlow` supports an optional `sourceCrops` constraint for `move`. The destination continuation carries that same constraint and rechecks the current source crop and quantity before either selection stores temporary positions or mutates a field. Destination occupancy and `allowedCrops` are also checked before committing the selection. Cards declare their permitted source goods locally; A071 permits grain and vegetable from either storage owner. Movement still uses the shared mutations and returns the source owner's callback flow.
+
 Card Field slots store their top `{ crop, remaining }` and optional `below` layers in bottom-to-top order. `insertBottom` places a rule-granted crop without adding a slot or applying the ordinary sow whitelist. Projections expose all layers for crop counts while preserving each slot's top and identity. Normal Reap allocates one crop per occupied Card Field slot, additional or whole-field harvest counts continue through lower layers, and last-crop callbacks inspect every layer. The client displays buried layers but maps selectable tops to the original slot, including holes.
 
 Base field scoring counts Farmyard Fields only; Card Fields remain available to Logical Field rules, Sow, and Reap.
