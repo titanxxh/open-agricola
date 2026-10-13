@@ -12,6 +12,7 @@ const listener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   phases: ['before' as ActionHookPhase],
   actions: Array.from(EXTENSION_MEEPLE_SPACE_IDS),
+  requiresNewPlacement: true,
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!isExtensionMeepleSpaceId(context.space?.id)) return
     if ((context.player.resources.food ?? 0) < 1) return

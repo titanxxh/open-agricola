@@ -41,6 +41,7 @@ const beforePlaceFarmerListener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   phases: ['before' as ActionHookPhase],
   actions: ['place-farmer'],
+  requiresNewPlacement: true,
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const totalWood = countWoodOnAccumulationSpaces(context.state)
     if (totalWood < WOOD_THRESHOLD) return

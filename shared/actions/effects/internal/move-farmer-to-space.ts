@@ -1,5 +1,5 @@
 import type { ActionDefinition, ActionFlow, ActionSpace, GameState, PlayerState } from '../../../contract/types'
-import { collectBeforePlacementFlows } from '../../../cards/card-listeners'
+import { collectBeforeActionSpaceUseFlows } from '../../../cards/card-listeners'
 import {
   addLinkedSpaceBlocks,
   addWorkerRef,
@@ -127,7 +127,7 @@ export const moveFarmerToSpaceAction: ActionDefinition = {
 
     const targetActionContext = { ...resetComputeReplaceGuards(actionContext), targetSpaceId: targetSpace.id }
     if (actionContext) actionContext.targetSpaceId = targetSpace.id
-    const beforeFlows = collectBeforePlacementFlows(state, player, targetSpace, targetActionContext)
+    const beforeFlows = collectBeforeActionSpaceUseFlows(state, player, targetSpace, targetActionContext)
     const targetFlow: ActionFlow = {
       type: 'leaf',
       actionId: targetSpace.id,
