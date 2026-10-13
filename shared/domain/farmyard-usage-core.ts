@@ -1,6 +1,6 @@
 import type { PlayerState } from '../contract/types'
-import { getFarmyardTileCount, positionKey } from './farmyard-geometry'
-import { getBlockedFarmyardSpaceKeys } from './farmyard-space-states'
+import { getFarmyardTileCount, getFarmyardTilePositions, positionKey } from './farmyard-geometry'
+import { getBlockedFarmyardSpaceKeys, getPlacementBlockedFarmyardSpaceKeys } from './farmyard-space-states'
 import { computeFencedRegions } from './farmyard-regions'
 
 export const getPastureTileKeys = (player: PlayerState) => {
@@ -37,6 +37,15 @@ export const getUsedFarmyardTileKeys = (player: PlayerState) => {
 
 export const countUnusedFarmyardSpaces = (player: PlayerState) =>
   getFarmyardTileCount(player) - getUsedFarmyardTileKeys(player).size
+
+export const getUnusedFarmyardTilePositions = (player: PlayerState) => {
+  const used = getUsedFarmyardTileKeys(player)
+  const blocked = getPlacementBlockedFarmyardSpaceKeys(player)
+  return getFarmyardTilePositions(player).filter(tile => {
+    const key = positionKey(tile)
+    return !used.has(key) && !blocked.has(key)
+  })
+}
 
 export const hasNoUnusedFarmyardSpaces = (player: PlayerState) =>
   countUnusedFarmyardSpaces(player) === 0
