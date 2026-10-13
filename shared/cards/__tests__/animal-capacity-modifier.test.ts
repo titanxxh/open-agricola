@@ -24,7 +24,7 @@ const createPlayer = (overrides?: Partial<PlayerState>): PlayerState =>
       { id: '5', isActive: false, isNewborn: false },
     ],
     rooms: 2, houseType: 'wood',
-    fields: [], fences: 0, roomTiles: [], stableTiles: [],
+    fields: [], fences: 0, roomTiles: [{ row: 1, col: 0 }, { row: 2, col: 0 }], stableTiles: [],
     improvements: [], minorHand: [], minorPlayed: [],
     occupationHand: [], occupationPlayed: [],houseAnimals: {}, stableAnimals: {},
     pastures: [], fenceSegments: [],
@@ -48,10 +48,11 @@ describe('computeAnimalZones', () => {
       stableTiles: [{ row: 2, col: 2 }],
     })
     const zones = computeAnimalZones(player)
-    expect(zones.length).toBe(3)
+    expect(zones.length).toBe(4)
     expect(zones[0]).toMatchObject({ id: 'p1', zoneType: 'pasture', capacity: 4 })
     expect(zones[1]).toMatchObject({ id: 'p2', zoneType: 'pasture', capacity: 4 })
-    expect(zones[2]).toMatchObject({ id: 'house:1-0', zoneType: 'house', capacity: 1 })
+    expect(zones[2]).toMatchObject({ id: 'house:1-0', zoneType: 'house', capacity: 1, occupiedZoneLimit: 1 })
+    expect(zones[3]).toMatchObject({ id: 'house:2-0', zoneType: 'house', capacity: 1, occupiedZoneLimit: 1 })
   })
 
   it('includes loose stables', () => {
@@ -59,8 +60,8 @@ describe('computeAnimalZones', () => {
       stableTiles: [{ row: 0, col: 0 }],
     })
     const zones = computeAnimalZones(player)
-    expect(zones.length).toBe(2)
-    expect(zones[1]).toMatchObject({ zoneType: 'stable', capacity: 1 })
+    expect(zones.length).toBe(3)
+    expect(zones[2]).toMatchObject({ zoneType: 'stable', capacity: 1 })
   })
 
   it('keeps E033_BeaverColony stabled-pasture capacity', () => {

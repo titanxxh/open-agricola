@@ -1,3 +1,4 @@
+import { areZoneOccupancyLimitsSatisfied } from '../../../shared/contract/animal-zone-occupancy'
 import type { Pasture, PlayerState } from '../../../shared/contract/types'
 import type { ActionChoiceOption } from '../../../shared/contract/types'
 import type { GameState } from '../../../shared/contract/types'
@@ -53,17 +54,11 @@ export const wouldExceedZoneOccupancyLimit = (
 ) => {
   const target = zones.find((zone) => zone.id === zoneId)
   if (!target) return false
-  if (target.occupiedZoneLimit === undefined) return false
   if (interactionZoneAnimalTotal(target) > 0) return false
-  const limit = Math.max(0, Math.floor(target.occupiedZoneLimit))
-  const occupied = zones.filter((zone) =>
-    zone.id !== target.id &&
-    (target.occupancyGroup !== undefined
-      ? zone.occupancyGroup === target.occupancyGroup
-      : zone.cardId === target.cardId && zone.ownerPlayerId === target.ownerPlayerId) &&
-    interactionZoneAnimalTotal(zone) > 0
-  ).length
-  return occupied >= limit
+  return !areZoneOccupancyLimitsSatisfied(zones.map(zone => ({
+    ...zone,
+    animalCount: interactionZoneAnimalTotal(zone) + (zone.id === target.id ? 1 : 0),
+  })))
 }
 
 export const hasUnassignedAnimals = (remaining: AnimalTotals | null | undefined) =>

@@ -1,3 +1,4 @@
+import { animalZoneOccupancyGroup, areZoneOccupancyLimitsSatisfied } from '../contract/animal-zone-occupancy'
 import { countRoomAnimals } from './animals'
 import type { GameState, PlayerState, Pasture } from '../contract/types.ts'
 import { ALL_ANIMAL_KEYS, animalKeysForState, type AnimalKey } from '../contract/animals.ts'
@@ -69,18 +70,6 @@ export const buildHostedCardAnimalZoneId = (
   ownerPlayerId: string,
   animalOwnerPlayerId: string,
 ): string => `card:${cardId}:owner:${ownerPlayerId}:animalOwner:${animalOwnerPlayerId}`
-
-export const animalZoneOccupancyGroup = (zone: Pick<AnimalZone, 'occupancyGroup' | 'cardId' | 'ownerPlayerId'>): string | undefined =>
-  zone.occupancyGroup ?? (zone.cardId ? JSON.stringify([zone.cardId, zone.ownerPlayerId]) : undefined)
-
-export const areZoneOccupancyLimitsSatisfied = (
-  zones: readonly Pick<AnimalZone, 'occupancyGroup' | 'cardId' | 'ownerPlayerId' | 'occupiedZoneLimit' | 'animalCount'>[],
-): boolean => zones.every(zone => {
-  const group = animalZoneOccupancyGroup(zone)
-  return group === undefined || zone.occupiedZoneLimit === undefined || zones.filter(candidate =>
-    animalZoneOccupancyGroup(candidate) === group && (candidate.animalCount ?? 0) > 0,
-  ).length <= zone.occupiedZoneLimit
-})
 
 export const isHouseAnimalZone = (zone: AnimalZone): boolean =>
   zone.zoneType === 'house' || zone.houseAnimalZone === true
