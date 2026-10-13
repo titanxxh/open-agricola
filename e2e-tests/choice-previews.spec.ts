@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
-import { GameSession } from '../server/game/authoritative-session'
+import { createWorkSession } from '../server/__tests__/_helpers/session-fixtures'
+import type { ActionChoiceOption } from '../shared/contract/types'
 import { serializeState } from '../shared/session/serialization'
 import type { SerializedGameState } from '../shared/session/serialization'
 import { BACKEND_URL } from './fixtures'
@@ -123,8 +124,9 @@ test('one farm cell with multiple authoritative options requires an explicit act
   // Solo Moor rules provide several distinct physical cards offering Cut Peat.
   const fresh = await request.post(`${BACKEND_URL}/api/game/new-sandbox`, { data: { seed: 1056, playerCount: 1, customCardIds: [], enableFarmersOfTheMoor: true, allowIncompleteFarmersOfTheMoorMinorDeal: true } })
   expect(fresh.ok()).toBe(true)
-  const solo = new GameSession(1056, undefined, { playerCount: 1, enableFarmersOfTheMoor: true, allowIncompleteFarmersOfTheMoorMinorDeal: true })
+  const solo = createWorkSession({ seed: 1056, options: { playerCount: 1, enableFarmersOfTheMoor: true, allowIncompleteFarmersOfTheMoorMinorDeal: true } })
   const state = solo.withCtx(() => serializeState(solo.state, {}))
+  solo.dispose()
   state.round = 5
   const owner = state.players[0]!
   owner.minorHand = ['__test_placeholder__']
@@ -136,7 +138,32 @@ test('one farm cell with multiple authoritative options requires an explicit act
   for (const worker of owner.workers.filter((candidate) => candidate.isActive)) state.actionSpaces[0]!.takenBy.push({ playerId: owner.id, workerId: worker.id })
   owner.cardStates.M056_PeatCuttingRights = { extraData: { scheduledOffers: [{ id: 'browser-cut-peat', kind: 'moor-special-action', dueRound: 6, actionId: 'cut-peat', consumed: false }] } }
   expect((await request.post(`${BACKEND_URL}/api/game/load`, { data: { state } })).ok()).toBe(true)
-  expect((await request.post(`${BACKEND_URL}/api/game/round-end`)).ok()).toBe(true)
+  const roundEndResponse = await request.post(`${BACKEND_URL}/api/game/round-end`)
+  expect(roundEndResponse.ok()).toBe(true)
+  const roundEnd = await roundEndResponse.json()
+  expect(roundEnd.ok, JSON.stringify(roundEnd)).toBe(true)
+  expect(roundEnd.state).toMatchObject({ round: 6, roundPhase: 'preparation' })
+  expect(roundEnd.interaction).toMatchObject({
+    stateId: 'wait', playerIndex: 0, spaceId: '__stage:onRoundStart', sourceCard: 'M056_PeatCuttingRights',
+    request: { kind: 'choice' },
+  })
+  expect(roundEnd.state.players[0].farmTerrain).toEqual([{ row: 2, col: 1, kind: 'moor' }])
+  const activation = roundEnd.interaction.request.options.find((option: ActionChoiceOption) =>
+    option.sourceCard === 'M056_PeatCuttingRights' && option.value !== '__skip__')
+  expect(activation).toBeDefined()
+  expect(activation?.disabled).not.toBe(true)
+  if (!activation) throw new Error('Expected the Peat-Cutting Rights round-start activation')
+  const activatedResponse = await request.post(`${BACKEND_URL}/api/game/choice`, { data: { playerIndex: 0, value: activation.value } })
+  expect(activatedResponse.ok()).toBe(true)
+  const activated = await activatedResponse.json()
+  expect(activated.ok, JSON.stringify(activated)).toBe(true)
+  expect(activated.state).toMatchObject({ round: 6, roundPhase: 'preparation' })
+  expect(activated.interaction).toMatchObject({
+    stateId: 'wait', playerIndex: 0, sourceCard: 'M056_PeatCuttingRights', request: { kind: 'choice' },
+  })
+  expect(activated.state.players[0].farmTerrain).toEqual([{ row: 2, col: 1, kind: 'moor' }])
+  expect(activated.state.players[0].cardStates.M056_PeatCuttingRights.extraData.scheduledOffers)
+    .toEqual([expect.objectContaining({ id: 'browser-cut-peat', consumed: false })])
   await page.goto('/?page=game&player=p1&embedded=1&devMode=1')
   const tile = page.locator('[data-farm-tile-player="p1"][data-farm-tile-key="2-1"]')
   await expect(tile).toHaveClass(/position-selectable/)
