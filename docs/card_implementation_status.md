@@ -204,6 +204,8 @@ Issues #994–#1002 establish the Card State boundary: source-owned read-only ru
 
 Occupation-hand selection shares subset validation between Session submission and the internal selection effect. Duplicate or foreign cards and invalid counts are rejected before effects, RNG observations or private-cache writes; a rejected submission retains its original pending selection.
 
+Room and ordinary stable selection reject a whole batch containing repeated coordinates before payment or placement (#1127/#1129). Session regressions cover ordinary actions and card-granted actions, unchanged resources, geometry, supply, card state and pending selections on rejection, and legal retries. Existing multi-building costs and discounts remain unchanged.
+
 Animal Reorg Prefill is implemented in the shared animal-zone and request boundaries (see the §5 infrastructure table); it introduces no card-specific core branches.
 
 Current choice availability is implemented through the pure native `CardEffect.projectInteractionRequest` query: active pending choices and quantity limits refresh before presentation and authoritative validation, including nested anytime, undo, and restore. Card-local conditions preserve pending ownership, random observations, resource commitments, and existing option presentation policies; future mandatory continuations retain ADR 0015 semantics.
