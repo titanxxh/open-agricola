@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { createWorkSession } from './_helpers/session-fixtures'
+import { positionKey } from '../../shared/domain/farm'
 import { serializeSessionSnapshot, rehydrateState } from '../../shared/session/serialization'
 import type { GameState, PlayerState } from '../../shared/contract/types'
 
@@ -140,7 +141,7 @@ describe('A066 Feeding Dish before-collect qualification', () => {
       const player = state.players[0]!
       pasture(player)
       player.resources.sheep = 1
-      if (storage === 'room') { player.houseAnimalType = 'sheep'; player.houseAnimalCount = 1 }
+      if (storage === 'room') { player.houseAnimals = { [positionKey(player.roomTiles[0]!)]: 'sheep' } }
       if (storage === 'stable') { player.stableTiles = [{ row: 0, col: 2 }]; player.stableAnimals = { '0-2': 'sheep' } }
       if (storage === 'card') {
         player.occupationPlayed = ['D148_DomesticianExpert']
