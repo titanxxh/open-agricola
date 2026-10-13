@@ -21,6 +21,7 @@ import { activationEventReadContext } from './continuation-events'
 import { ActionNode } from './nodes/action-node'
 import type { ParallelNode } from './nodes'
 import type { EngineNode } from './types'
+import type { GameEvent } from '../contract/events'
 
 export type TriggerOptionState = {
   child: EngineNode
@@ -154,7 +155,7 @@ const previewContextForChild = (
   }
 }
 
-const previewActivateCardEffectChild = (
+export const previewActivateCardEffectChild = (
   child: ActionNode,
   context: TriggerSelectContext,
 ): { result: ActionHookResult | undefined; previewState: ActionExecutionContext['state']; previewPlayer: PlayerState } => {
@@ -175,7 +176,7 @@ const previewActivateCardEffectChild = (
       previewPlayer,
       child.params,
       child.actionContext,
-      context.transactionEvents,
+      context.transactionEvents?.filter((event): event is GameEvent => 'schemaVersion' in event),
     ),
   }
 }

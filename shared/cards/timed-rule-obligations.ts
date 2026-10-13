@@ -1,6 +1,7 @@
 import type { ActionFlow, GameState, PlayerState } from '../contract/types'
 import type { FlowCardEffectHook } from '../contract/card-effect-hooks'
 import type { FlowEffectContext } from './card-effects'
+import type { GameEvent, DraftGameEvent } from '../contract/events'
 import type { TimedRule, TimedRuleEventPhase } from '../contract/rule-plans'
 import type { CardListenerContext } from './card-listeners'
 import { compileRuleBody, compileTimedRuleHooks, timedRuleOccurrences } from '../actions/timed-rules'
@@ -13,10 +14,11 @@ export type TimedRuleResolver = (cardId: string) => readonly TimedRule[]
 const playedCards = (player: PlayerState): string[] => [...player.minorPlayed, ...player.occupationPlayed, ...player.improvements]
 
 /** Only declarations explicitly retaining an activated obligation survive source removal. */
-export const timedRuleSources = (state: GameState, player: PlayerState, resolveRules: TimedRuleResolver): { cardId: string; rules: readonly TimedRule[] }[] => {
+export const timedRuleSources = (state: GameState, player: PlayerState, resolveRules: TimedRuleResolver, transactionEvents: readonly (GameEvent | DraftGameEvent)[] = []): { cardId: string; rules: readonly TimedRule[] }[] => {
   const owned = new Set(playedCards(player))
   const scheduledSources = state.futureMeeples.filter(entry => entry.playerId === player.id).map(entry => entry.cardId)
-  const receivedSources = state.events.flatMap(event => event.type === 'futureMeeple.resolved' && event.playerId === player.id && event.round === state.round ? [event.cardId] : [])
+  const receivedSources = [...(state.events ?? []), ...transactionEvents].filter((event): event is GameEvent => 'schemaVersion' in event).flatMap(event => event.type === 'futureMeeple.resolved'
+    && event.playerId === player.id && event.round === state.round && typeof event.cardId === 'string' ? [event.cardId] : [])
   const occupiedSources = state.actionSpaces.filter(space => space.takenBy.some(worker => worker.playerId === player.id)).map(space => space.id)
   return [...new Set([...owned, ...Object.keys(player.cardStates), ...scheduledSources, ...receivedSources, ...occupiedSources])].flatMap(cardId => {
     const rules = resolveRules(cardId).filter(rule => owned.has(cardId) || rule.retainAfterCardLeaves === true)
@@ -35,7 +37,8 @@ export const retainedTimedHookFlows = (state: GameState, player: PlayerState, ph
 
 export const timedEventFlow = (context: CardListenerContext, cardId: string, rules: readonly TimedRule[], phase: Exclude<TimedRuleEventPhase, 'onBeforePlayerTurn'>): ActionFlow | undefined => {
   const { state, player } = context
-  const due = timedRuleOccurrences(state, player, cardId, rules, phase).filter(occurrence => occurrence.round === state.round && occurrence.rule.at.phase === phase)
+  const events = context.transactionEvents.filter((event): event is GameEvent => 'schemaVersion' in event)
+  const due = timedRuleOccurrences(state, player, cardId, rules, phase, events).filter(occurrence => occurrence.round === state.round && occurrence.rule.at.phase === phase)
   const children = due.flatMap(occurrence => {
     if (phase === 'afterReceive') {
       const received = createEventQuery(context.actionEvents ?? context.transactionEvents).has('resource.moved', event => event.reason === 'receive' && event.sourceCardId === cardId && event.to.kind === 'player' && event.to.playerId === player.id

@@ -75,6 +75,16 @@ const start = (mode: typeof modes[number], ownerIndex: number) => {
     response = session.resolveChoice(response.interaction.playerIndex, 'confirm')
     expect(response.ok, response.error).toBe(true)
   }
+  // PR10 and Elder now share the player's StartOfTurn window. These lifecycle
+  // cases explicitly choose the mandatory parent receipt before the Elder offer.
+  for (let step = 0; step < 4; step++) {
+    response = session.getState()
+    if (response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'select-trigger') break
+    const receipt = response.interaction.request.options?.find(option => option.labelKey === 'actions.receive.name')
+    if (!receipt) break
+    response = session.resolveChoice(response.interaction.playerIndex, receipt.value)
+    expect(response.ok, response.error).toBe(true)
+  }
   return session
 }
 
@@ -85,8 +95,9 @@ const expectOffer = (response: SessionResponse, ownerIndex: number) => {
   expect(response.interaction.stateId).toBe('wait')
   if (response.interaction.stateId !== 'wait') throw new Error('expected Elder offer')
   expect(response.interaction.playerIndex).toBe(ownerIndex)
-  expect(response.interaction.request.kind).toBe('choice')
-  expect(response.interaction.request.options?.some((option) => option.value === '__skip__')).toBe(true)
+  expect(['choice', 'select-trigger']).toContain(response.interaction.request.kind)
+  expect(response.interaction.request.options?.some((option) => !option.disabled
+    && option.value === (response.interaction.request.kind === 'select-trigger' ? '__pass__' : '__skip__'))).toBe(true)
   expect(response.state.actionSpaces.every((space) => space.takenBy.length === 0)).toBe(true)
   expect(response.state.actionSpaces.find((space) => space.id === 'forest')!.resources.wood).toBe(3)
 }

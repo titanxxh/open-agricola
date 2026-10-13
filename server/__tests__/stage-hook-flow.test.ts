@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { createWorkSession } from './_helpers/session-fixtures'
 import { GameSession } from '../game/authoritative-session'
 import { readCardResourceStats } from '../../shared/cards/helpers/card-state'
 
@@ -32,7 +33,7 @@ const chooseFirstOption = (session: GameSession, playerIndex: number) => {
 }
 
 const setupBeforeWorkOrderingSession = () => {
-  const session = new GameSession(42)
+  const session = createWorkSession({ seed: 42 })
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
@@ -60,7 +61,7 @@ const setupBeforeWorkOrderingSession = () => {
 
 describe('stage hook flows', () => {
   it('resumes start-of-feeding hooks without replaying harvest hooks', () => {
-    const session = new GameSession(42)
+    const session = createWorkSession({ seed: 42 })
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -92,7 +93,7 @@ describe('stage hook flows', () => {
   })
 
   it('resumes onBeforeWork without replaying preparation', () => {
-    const session = new GameSession(42)
+    const session = createWorkSession({ seed: 42 })
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -124,7 +125,7 @@ describe('stage hook flows', () => {
     expect(resp.state.events.filter((event) => event.type === 'round.started')).toHaveLength(1)
     expect(resp.state.events.filter((event) => event.type === 'work.started' && event.round === 2)).toHaveLength(1)
     expect(resp.state.log.filter((entry) => entry.key === 'log.enterRound')).toHaveLength(1)
-    expect(resp.state.log.filter((entry) => entry.key === 'log.workStarted')).toHaveLength(2)
+    expect(resp.state.log.filter((entry) => entry.key === 'log.workStarted')).toHaveLength(1)
   })
 
   it('resolves before-work cards before start-of-work cards', () => {
@@ -166,7 +167,7 @@ describe('stage hook flows', () => {
     expect(resp.state.events.filter((event) => event.type === 'round.started')).toHaveLength(1)
     expect(resp.state.events.filter((event) => event.type === 'work.started' && event.round === 2)).toHaveLength(1)
     expect(resp.state.log.filter((entry) => entry.key === 'log.enterRound')).toHaveLength(1)
-    expect(resp.state.log.filter((entry) => entry.key === 'log.workStarted')).toHaveLength(2)
+    expect(resp.state.log.filter((entry) => entry.key === 'log.workStarted')).toHaveLength(1)
     expect(resp.scores[0]!.categories.find((category) => category.key === 'cardBonusVp')?.total).toBe(1)
   })
 
@@ -189,7 +190,7 @@ describe('stage hook flows', () => {
   })
 
   it('freezes round work order before before-work marker changes', () => {
-    const session = new GameSession(42, undefined, { playerCount: 3 })
+    const session = createWorkSession({ seed: 42, options: { playerCount: 3 } })
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 3)
@@ -264,7 +265,7 @@ describe('stage hook flows', () => {
     expect(resp.state.events.filter((event) => event.type === 'round.started')).toHaveLength(1)
     expect(resp.state.events.filter((event) => event.type === 'work.started' && event.round === 2)).toHaveLength(1)
     expect(resp.state.log.filter((entry) => entry.key === 'log.enterRound')).toHaveLength(1)
-    expect(resp.state.log.filter((entry) => entry.key === 'log.workStarted')).toHaveLength(2)
+    expect(resp.state.log.filter((entry) => entry.key === 'log.workStarted')).toHaveLength(1)
 
     const roundTwoScores = resp.scores
     session.state.players.forEach((player) => {
@@ -280,7 +281,7 @@ describe('stage hook flows', () => {
   })
 
   it('runs B070_NewPurchase through before-start-of-turn flow', () => {
-    const session = new GameSession(42)
+    const session = createWorkSession({ seed: 42 })
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -318,7 +319,7 @@ describe('stage hook flows', () => {
   })
 
   it('runs A166_Haydryer through before-harvest flow', () => {
-    const session = new GameSession(42)
+    const session = createWorkSession({ seed: 42 })
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -364,7 +365,7 @@ describe('stage hook flows', () => {
   })
 
   it('makes A166_Haydryer mandatory when four pastures reduce its cost to zero', () => {
-    const session = new GameSession(42)
+    const session = createWorkSession({ seed: 42 })
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -396,7 +397,7 @@ describe('stage hook flows', () => {
   })
 
   it('runs D099_EarthenwarePotter through after-harvest flow on round 14', () => {
-    const session = new GameSession(42)
+    const session = createWorkSession({ seed: 42 })
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -427,7 +428,7 @@ describe('stage hook flows', () => {
   })
 
   it('runs A064_BarleyMill through after-reap flow', () => {
-    const session = new GameSession(42)
+    const session = createWorkSession({ seed: 42 })
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -466,7 +467,7 @@ describe('stage hook flows', () => {
   })
 
   it('runs C120_AgriculturalLabourer through after-reap flow', () => {
-    const session = new GameSession(42)
+    const session = createWorkSession({ seed: 42 })
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -507,7 +508,7 @@ describe('stage hook flows', () => {
   })
 
   it('runs C071_Slurry through end-harvest sow flow after multi-animal breeding', () => {
-    const session = new GameSession(42)
+    const session = createWorkSession({ seed: 42 })
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -581,7 +582,7 @@ describe('stage hook flows', () => {
   })
 
   it('runs D115_FodderPlanter through multi-sow flow based on newborn count', () => {
-    const session = new GameSession(42)
+    const session = createWorkSession({ seed: 42 })
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -663,7 +664,7 @@ describe('stage hook flows', () => {
   })
 
   it('limits D115_FodderPlanter sow count to the number of newborn animals', () => {
-    const session = new GameSession(42)
+    const session = createWorkSession({ seed: 42 })
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -726,7 +727,7 @@ describe('stage hook flows', () => {
   })
 
   it('does not let D167 non-harvest breeding write D115 harvest breeding summary', () => {
-    const session = new GameSession(42)
+    const session = createWorkSession({ seed: 42 })
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

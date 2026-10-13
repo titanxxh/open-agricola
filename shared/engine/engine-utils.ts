@@ -1,5 +1,6 @@
 import { resolveActionTargetPlayer } from '../actions/helpers/target-player'
-import { isActionDoableInFlowContext, type FlowDoableContext } from '../actions/flow'
+import { evaluateFlowDoable, isActionDoableInFlowContext, type FlowDoableContext } from '../actions/flow'
+import { previewActivateCardEffectChild } from './trigger-select'
 import type {
   ActionDefinition,
   ChoiceEffectPreview,
@@ -249,7 +250,14 @@ export function canStartNode(int: EngineInternals, context: FlowDoableContext, n
   if (node instanceof ActionNode) {
     const actionId = node.resolvedReplacement?.actionId ?? node.actionId
     const action = int.registry.get(actionId)
-    if (!action) return false
+    if (!action) throw new Error(`missing action definition: ${actionId}`)
+    if (actionId === 'activate-card-effect') {
+      const preview = previewActivateCardEffectChild(node, { ...context, player })
+      if (!preview.result) return false
+      return preview.result.flow ? evaluateFlowDoable({ ...preview.result.flow, optional: false }, {
+        ...context, state: preview.previewState, player: preview.previewPlayer,
+      }, id => int.registry.get(id)) : preview.result.doable === true
+    }
     const actionContext: Record<string, unknown> = {
       ...node.actionContext,
       ...(node.resolvedReplacement ? { checkedReplaceAction: true } : {}),

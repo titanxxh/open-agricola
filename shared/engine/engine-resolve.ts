@@ -649,7 +649,7 @@ export function engineResolveChoice(
         eventBuffer.sink,
       ) ?? action.execute({
         ...executionContext,
-        transactionEvents: currentEventReadContext(int).transactionEvents,
+        completedTransactionEvents: currentEventReadContext(int).transactionEvents,
         eventSink: eventBuffer.sink,
       })
       if (result.type === 'fail') {

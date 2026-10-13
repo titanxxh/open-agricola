@@ -35,8 +35,9 @@ export const resolveNonSkipChoice = (
   resp: SessionResponse,
 ): SessionResponse => {
   const wait = expectWait(resp)
-  expect(wait.interaction.request.kind).toBe('choice')
-  const option = wait.interaction.request.options?.find((candidate) => candidate.value !== '__skip__')
+  expect(['choice', 'select-trigger']).toContain(wait.interaction.request.kind)
+  const option = wait.interaction.request.options?.find((candidate) => !candidate.disabled
+    && candidate.value !== '__skip__' && candidate.value !== '__pass__')
   expect(option).toBeDefined()
   return session.resolveChoice(wait.interaction.playerIndex, option!.value)
 }
@@ -46,8 +47,9 @@ export const resolveSkipChoice = (
   resp: SessionResponse,
 ): SessionResponse => {
   const wait = expectWait(resp)
-  expect(wait.interaction.request.kind).toBe('choice')
-  const option = wait.interaction.request.options?.find((candidate) => candidate.value === '__skip__')
+  expect(['choice', 'select-trigger']).toContain(wait.interaction.request.kind)
+  const option = wait.interaction.request.options?.find((candidate) => !candidate.disabled
+    && candidate.value === (wait.interaction.request.kind === 'select-trigger' ? '__pass__' : '__skip__'))
   expect(option).toBeDefined()
   return session.resolveChoice(wait.interaction.playerIndex, option!.value)
 }

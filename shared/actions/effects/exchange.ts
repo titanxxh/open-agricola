@@ -550,6 +550,9 @@ const buildExchangeOptions = (
   // Anytime cookery first; if tradeIds provided, merge listener-driven trades
   // (these may have empty triggers, e.g. E53 BoarSpear).
   const trades: Trade[] = getPlayerCookeryTrades(player, state)
+  if (actionContext?.includeBasicConversions === true) {
+    trades.push(...basicConversionExchanges.map(exchange => exchangeToTrade(exchange, BASIC_CONVERSION_SOURCE_ID)))
+  }
   if (tradeIds && tradeIds.length > 0) {
     const seen = new Set<string>()
     for (const t of trades) {

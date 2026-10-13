@@ -112,7 +112,7 @@ export const activateCardEffectAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
-  execute: ({ state, player, params, actionContext, reportProtectedObservation, transactionEvents }) => {
+  execute: ({ state, player, params, actionContext, reportProtectedObservation, completedTransactionEvents }) => {
     const cardId = params?.cardId
     const hook = params?.hook
     if (typeof cardId !== 'string' || typeof hook !== 'string') {
@@ -129,7 +129,7 @@ export const activateCardEffectAction: ActionDefinition = {
       cardId,
       hook as FlowCardEffectHook,
       paymentInfo,
-      readFlowEffectContext(params, reportProtectedObservation, transactionEvents),
+      readFlowEffectContext(params, reportProtectedObservation, completedTransactionEvents),
     )
   },
 }

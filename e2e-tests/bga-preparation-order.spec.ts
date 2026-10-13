@@ -113,6 +113,7 @@ const expectVisibleResources = async (page: Page, response: SessionResponse) => 
 const reachArtisanImprovement = async (page: Page, request: APIRequestContext, accept: boolean) => {
   for (let step = 0; step < 6; step++) {
     const current = await snapshot(request)
+    if (accept && current.state.players[0]!.minorPlayed.includes(COB)) return current
     expect(current.interaction.stateId).toBe('wait')
     if (current.interaction.stateId !== 'wait') throw new Error('Expected reveal reaction')
     if (!('options' in current.interaction.request)) throw new Error('Expected reveal choices')
@@ -137,7 +138,8 @@ for (const accept of [false, true]) {
     await openScenario(page, request)
     const revealed = await reachReveal(page, request)
     expect(revealed.state.players[0]!.resources.wood).toBe(1)
-    expect(artisanGains(revealed)).toHaveLength(1)
+    // The suspended reaction owns the gain event until its tree completes.
+    expect(artisanGains(revealed)).toHaveLength(0)
     await expectVisibleResources(page, revealed)
     // Refresh the real pending window; no state or cursor is replaced here.
     await page.reload()
@@ -148,7 +150,7 @@ for (const accept of [false, true]) {
     expect(artisanGains(purchased)).toHaveLength(1)
     if (accept) {
       expect(purchased.state.players[0]!.minorPlayed).toContain(COB)
-      expect(purchased.state.players[0]!.resources).toMatchObject({ clay: 1, grain: 1, food: 37 })
+      expect(purchased.state.players[0]!.resources).toMatchObject({ clay: 1, grain: 1, food: 41 })
       expect(purchased.interaction).toMatchObject({ stateId: 'wait', playerIndex: 0, sourceCard: COB })
       await expect(page.locator('.interaction-bar')).toContainText('Cob')
       for (let step = 0; step < 4; step++) {
@@ -169,8 +171,8 @@ for (const accept of [false, true]) {
     expect(work.state.roundPhase).toBe('work')
     expect(work.interaction.stateId).toBe('idle')
     expect(work.state.players[0]!.resources).toMatchObject(accept
-      ? { wood: 1, clay: 3, grain: 0, food: 38 }
-      : { wood: 1, clay: 1, grain: 1, food: 38 })
+      ? { wood: 1, clay: 3, grain: 0, food: 42 }
+      : { wood: 1, clay: 1, grain: 1, food: 42 })
     expect(artisanGains(work)).toHaveLength(1)
     expect(work.state.events.filter(event => event.type === 'card.played' && event.cardId === COB)).toHaveLength(accept ? 1 : 0)
     expect(work.state.actionSpaces.find(space => space.id === 'western-quarry')!.resources.stone).toBe(1)
