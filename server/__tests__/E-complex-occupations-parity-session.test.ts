@@ -1,3 +1,4 @@
+import { createOpeningSession, createWorkSession } from './_helpers/session-fixtures'
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import {
@@ -37,7 +38,7 @@ const setupOccupation = (cardId: CardId, {
   played?: boolean
   round?: number
 } = {}) => {
-  const session = new GameSession(108, undefined, { playerCount })
+  const session = createWorkSession({ seed: 108, options: { playerCount } })
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.currentPlayerIndex = 0
@@ -228,12 +229,12 @@ describe('E112 Grain Thief parity', () => {
 
 const startElderRound = (round: number) => {
   if (round === 1) {
-    const session = new GameSession(12, undefined, {
+    const session = createOpeningSession({ seed: 12, options: {
       playerCount: 2,
       deckIds: ['E'],
       draftMode: 'simultaneous',
       draftPoolSize: 7,
-    })
+    }, expected: { phase: 'draft', roundPhase: 'work', interaction: { stateId: 'idle' } } })
     let response = session.getState()
     for (let step = 0; step < 64 && response.state.phase === 'draft' && response.state.draft; step++) {
       const draft = response.state.draft

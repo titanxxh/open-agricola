@@ -1,3 +1,4 @@
+import { createWorkSession } from './_helpers/session-fixtures'
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
@@ -9,7 +10,7 @@ import '../../shared/cards/C/C125_Nightworker'
 const CARD_ID = 'B116_Shoreforester'
 
 const setup = () => {
-  const session = new GameSession(116, undefined, { playerCount: 2 })
+  const session = createWorkSession({ seed: 116, options: { playerCount: 2 } })
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.currentPlayerIndex = 0
@@ -35,7 +36,7 @@ const playOccupation = (session: GameSession) => {
 }
 
 const setupRoundEnd = (reed: number) => {
-  const session = new GameSession(116, undefined, { playerCount: 2 })
+  const session = createWorkSession({ seed: 116, options: { playerCount: 2 } })
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.round = 1

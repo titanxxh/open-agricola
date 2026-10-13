@@ -1,3 +1,4 @@
+import { createWorkSession } from './_helpers/session-fixtures'
 import { describe, it, expect } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import {
@@ -54,7 +55,7 @@ const setupRotation = (opts: {
   const newborns = opts.newborns ?? 1
   const p1Workers = opts.p1Workers ?? 1
 
-  const session = new GameSession(42)
+  const session = createWorkSession({ seed: 42 })
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   state.currentPlayerIndex = 1
@@ -279,8 +280,8 @@ describe('A92 P2 fixes', () => {
           (e) => e.type === 'turn.skipped' && e.playerId === after.state.players[0]!.id,
         ),
       ).toBe(true)
-      // D134 skip flag is consumed exactly once (deleted → undefined).
-      expect(d134Skip(after)).toBeUndefined()
+      // The next preparation window clears the consumed skip to zero.
+      expect(d134Skip(after)).toBe(0)
       // Round advanced instead of stalling on P0's (now-forfeited) extra turn.
       expect(after.state.round).toBe(2)
     })
@@ -329,7 +330,7 @@ describe('A92 P2 fixes', () => {
       const afterSkips = drainConfirms(session, taken)
 
       expect(reqKind(afterSkips)).not.toBe('choice')
-      expect(d134Skip(afterSkips)).toBeUndefined()
+      expect(d134Skip(afterSkips)).toBe(0)
       expect(afterSkips.state.round).toBe(2)
     })
 
@@ -341,7 +342,7 @@ describe('A92 P2 fixes', () => {
       const afterSkips = drainConfirms(session, taken)
 
       expect(reqKind(afterSkips)).not.toBe('choice')
-      expect(d134Skip(afterSkips)).toBeUndefined()
+      expect(d134Skip(afterSkips)).toBe(0)
       expect(afterSkips.state.round).toBe(2)
     })
   })

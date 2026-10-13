@@ -42,17 +42,28 @@ describe('Bookmark uses its executable timed rule', () => {
     const response = session.getState()
     expect(readCardExtraData(response.state.players[0]!, CARD_ID, 'triggerRound')).toBe(6)
     const publicState = session.buildSyncPayload(response, null).state
-    expect(publicState.players[0]!.scheduledEffects).toMatchObject([{ round: 6, sourceCard: CARD_ID, timing: 'onBeforeStartOfTurn', description: { optional: true, labelKey: 'actions.lessons.name', effectPreview: { kind: 'payment', resourcesPaid: {} } } }])
+    expect(publicState.players[0]!.scheduledEffects).toMatchObject([{ round: 6, sourceCard: CARD_ID, timing: 'onRoundStart', description: { optional: true, labelKey: 'actions.lessons.name', effectPreview: { kind: 'payment', resourcesPaid: {} } } }])
     const before = JSON.stringify(session.state)
     session.buildSyncPayload(session.getState(), null)
     expect(JSON.stringify(session.state)).toBe(before)
     let due = mature(session)
     expect(due.ok).toBe(true)
     if (due.interaction.stateId !== 'wait') throw new Error('Missing Bookmark choice')
-    const option = due.interaction.request.options?.find(option => decision === 'decline' ? option.value === '__skip__' : option.value !== '__skip__')
-    if (!option) throw new Error('Missing Bookmark branch')
-    due = session.resolveChoice(0, option.value)
-    if (decision === 'accept' && !due.state.players[0]!.occupationPlayed.includes('A097_Freshman')) due = session.resolveChoice(0, 'A097_Freshman')
+    if (decision === 'decline') {
+      const skip = due.interaction.request.options?.find(option => ['__skip__', '__pass__'].includes(option.value))
+      if (!skip) throw new Error('Missing Bookmark decline')
+      due = session.resolveChoice(0, skip.value)
+    } else {
+      for (let step = 0; step < 5 && !due.state.players[0]!.occupationPlayed.includes('A097_Freshman'); step += 1) {
+        if (due.interaction.stateId !== 'wait') throw new Error('Missing Bookmark occupation choice')
+        const option = due.interaction.request.options?.find(option => option.value === 'A097_Freshman')
+          ?? due.interaction.request.options?.find(option => !option.disabled
+            && !['__skip__', '__pass__', '__done__'].includes(option.value) && option.labelKey !== 'actions.exchange.name')
+        if (!option) throw new Error('Missing Bookmark branch')
+        due = session.resolveChoice(0, option.value)
+        expect(due.ok, due.error).toBe(true)
+      }
+    }
     expect(due.ok).toBe(true)
     expect(due.state.players[0]!.occupationPlayed.includes('A097_Freshman')).toBe(decision === 'accept')
     expect(due.state.players[0]!.resources.food).toBe(20)

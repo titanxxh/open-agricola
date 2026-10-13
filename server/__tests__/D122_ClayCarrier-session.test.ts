@@ -1,3 +1,4 @@
+import { createWorkSession } from './_helpers/session-fixtures'
 import { type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import { confirmNextPlayer } from './_helpers/pending-confirms'
@@ -14,7 +15,7 @@ import type { ActionFlow } from '../../shared/contract/types'
 
 describe('D122_ClayCarrier session', () => {
   const setup = () => {
-    const session = new GameSession(42)
+    const session = createWorkSession({ seed: 42 })
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -124,7 +125,7 @@ describe('D122_ClayCarrier session', () => {
     expect(anytimeIds).not.toContain('D122-clay-carrier-anytime')
   })
 
-  it('flag resets via onBeforeStartOfTurn hook', () => {
+  it('flag resets when the next StartOfTurn window executes', () => {
     const session = setup()
     const state = session.getState().state
     const player = state.players[0]!
@@ -133,11 +134,12 @@ describe('D122_ClayCarrier session', () => {
     setCardFlag(player, 'D122_ClayCarrier', true)
     expect(isCardFlagged(player, 'D122_ClayCarrier')).toBe(true)
 
-    // Run onBeforeStartOfTurn hook directly
-    runCardEffectHook(state, player, 'D122_ClayCarrier', 'onBeforeStartOfTurn')
-
-    // Flag should be cleared
-    expect(isCardFlagged(player, 'D122_ClayCarrier')).toBe(false)
+    state.players.forEach(owner => markAllWorkersUsed(state, owner))
+    session.loadState(state)
+    const response = session.performRoundEnd()
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.round).toBe(2)
+    expect(isCardFlagged(response.state.players[0]!, 'D122_ClayCarrier')).toBe(false)
   })
 })
 
@@ -149,7 +151,7 @@ describe('D122 Clay Carrier parity', () => {
   const FILLER = '__test_placeholder__'
 
   const setup = ({ played = true, food = 0 } = {}) => {
-    const session = new GameSession(6122, undefined, { playerCount: 2 })
+    const session = createWorkSession({ seed: 6122, options: { playerCount: 2 } })
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.currentPlayerIndex = 0

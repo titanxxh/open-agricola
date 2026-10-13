@@ -1,3 +1,4 @@
+import { createWorkSession } from './_helpers/session-fixtures'
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
@@ -26,7 +27,7 @@ const setup = ({
   wood?: number
   existingFences?: boolean
 } = {}) => {
-  const session = new GameSession(6088, undefined, { playerCount: 2 })
+  const session = createWorkSession({ seed: 6088, options: { playerCount: 2 } })
   const state = session.getState().state
   stabilizeRandomHands(state.players)
   state.currentPlayerIndex = 0
@@ -81,6 +82,12 @@ const acceptMasterFencer = (session: GameSession, response: SessionResponse, cos
   }
   expect(current.interaction.stateId).toBe('wait')
   if (current.interaction.stateId !== 'wait') return current
+  const source = options(current).find(option => option.labelKey === 'actions.activate-card-effect.name')
+  if (source) {
+    current = session.resolveChoice(current.interaction.playerIndex, source.value)
+    expect(current.ok, current.error).toBe(true)
+  }
+  if (current.interaction.stateId === 'wait' && current.interaction.request.kind === 'farm-select') return current
   const branch = options(current).find((option) =>
     option.labelKey === `ui.interactionMasterFencer${cost}`
       || JSON.stringify(option).includes(`interactionMasterFencer${cost}`)

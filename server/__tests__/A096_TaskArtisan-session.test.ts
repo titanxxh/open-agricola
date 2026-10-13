@@ -1,3 +1,4 @@
+import { createWorkSession } from './_helpers/session-fixtures'
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
@@ -14,7 +15,7 @@ const OTHER_MINOR_ID = 'A067_CornScoop'
 const FILLER = '__test_placeholder__'
 
 const setup = ({ played = false, round = 1, withMinors = true } = {}) => {
-  const session = new GameSession(5096, undefined, { playerCount: 2 })
+  const session = createWorkSession({ seed: 5096, options: { playerCount: 2 } })
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.currentPlayerIndex = 0
@@ -112,9 +113,7 @@ describe('A096 Task Artisan parity', () => {
 
     expect(response.ok, response.error).toBe(true)
     expect(response.state.round).toBe(7)
-    // Characterize current OA behavior: returning from the nested improvement
-    // re-enters the same round-start hook, granting the wood a second time.
-    expect(response.state.players[0]!.resources.wood).toBe(2)
+    expect(response.state.players[0]!.resources.wood).toBe(1)
     expect(response.state.players[0]!.minorPlayed).toContain(MINOR_ID)
   })
 

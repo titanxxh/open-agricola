@@ -1,3 +1,4 @@
+import { createWorkSession } from './_helpers/session-fixtures'
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -39,7 +40,7 @@ const setupMinor = ({
   majors?: string[]
   round?: number
 }) => {
-  const session = new GameSession(404, undefined, { playerCount: 2 })
+  const session = createWorkSession({ seed: 404, options: { playerCount: 2 } })
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.currentPlayerIndex = 0
@@ -109,7 +110,7 @@ const futureRounds = (state: GameState, cardId: CardId, resource: keyof Resource
     .sort((left, right) => left - right)
 
 const setupNestSiteRoundEnd = (reed: number) => {
-  const session = new GameSession(449, undefined, { playerCount: 2 })
+  const session = createWorkSession({ seed: 449, options: { playerCount: 2 } })
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.round = 1
@@ -130,7 +131,7 @@ const setupNestSiteRoundEnd = (reed: number) => {
 }
 
 const setupClaypipeRoundEnd = (buildingResources: number) => {
-  const session = new GameSession(453, undefined, { playerCount: 2 })
+  const session = createWorkSession({ seed: 453, options: { playerCount: 2 } })
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.round = 5
@@ -164,7 +165,7 @@ const performRoundEndForFutureResources = (session: GameSession, beforeRound: nu
 }
 
 const dueHandplowField = () => {
-  const session = new GameSession(419, undefined, { playerCount: 2 })
+  const session = createWorkSession({ seed: 419, options: { playerCount: 2 } })
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.round = 9
@@ -300,7 +301,7 @@ describe('A019 Handplow parity', () => {
     expect(response.interaction.stateId).toBe('wait')
     if (response.interaction.stateId !== 'wait') throw new Error('expected future field choice')
 
-    response = session.resolveChoice(0, '__skip__')
+    response = session.resolveChoice(0, response.interaction.stateId === 'wait' && response.interaction.request.kind === 'select-trigger' ? '__pass__' : '__skip__')
 
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.fields).toHaveLength(0)

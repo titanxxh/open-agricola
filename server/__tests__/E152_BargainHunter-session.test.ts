@@ -1,3 +1,4 @@
+import { createWorkSession } from './_helpers/session-fixtures'
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
@@ -14,7 +15,7 @@ const setup = ({
   played = true, food = 1, minorCard = MINOR_ID as string | null, resources = {},
   travelingFood = 2,
 } = {}) => {
-  const session = new GameSession(6152, undefined, { playerCount: 4 })
+  const session = createWorkSession({ seed: 6152, options: { playerCount: 4 } })
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.currentPlayerIndex = 0

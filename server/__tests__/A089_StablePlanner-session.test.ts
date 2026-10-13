@@ -1,3 +1,4 @@
+import { createWorkSession } from './_helpers/session-fixtures'
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
@@ -9,7 +10,7 @@ const CARD_ID = 'A089_StablePlanner'
 const FILLER = '__test_placeholder__'
 
 const setup = ({ round = 2, reserveStables = 4 }: { round?: number; reserveStables?: number } = {}) => {
-  const session = new GameSession(6089 + round, undefined, { playerCount: 2 })
+  const session = createWorkSession({ seed: 6089 + round, options: { playerCount: 2 } })
   const state = session.getState().state
   stabilizeRandomHands(state.players)
   state.currentPlayerIndex = 0
@@ -117,10 +118,10 @@ describe('A089 Stable Planner parity', () => {
 
     let response = session.performRoundEnd()
     expect(response.interaction).toMatchObject({
-      stateId: 'wait', promptKey: 'ui.interactionOptionalAction',
+      stateId: 'wait', request: { kind: 'select-trigger' },
     })
     if (response.interaction.stateId !== 'wait') return
-    const accept = response.interaction.request.options?.find((option) => option.value !== '__skip__')
+    const accept = response.interaction.request.options?.find((option) => !option.disabled && option.sourceCard === CARD_ID)
     expect(accept).toBeDefined()
     response = session.resolveChoice(response.interaction.playerIndex, accept!.value)
     expect(response.interaction).toMatchObject({

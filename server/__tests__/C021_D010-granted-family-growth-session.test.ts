@@ -1,3 +1,4 @@
+import { createWorkSession } from './_helpers/session-fixtures'
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -10,7 +11,7 @@ const FILLER = '__test_placeholder__'
 const PLAYABLE_MINOR = 'A006_StorageBarn'
 
 const setupRoundEnd = (cardId: 'C021_HeartofStone' | 'D010_StorksNest', round: number) => {
-  const session = new GameSession(2110, undefined, { playerCount: 2 })
+  const session = createWorkSession({ seed: 2110, options: { playerCount: 2 } })
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.round = round

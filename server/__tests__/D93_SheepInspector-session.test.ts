@@ -1,8 +1,8 @@
+import { createWorkSession } from './_helpers/session-fixtures'
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
-import { getCardEffect } from '../../shared/cards/card-effects'
 import { setCardFlag, isCardFlagged } from '../../shared/cards/helpers/card-state'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import type {
@@ -187,26 +187,33 @@ describe('D093_SheepInspector listener', () => {
     expect(flow.children[2].params.excludeMeetingPlace).toBe(true)
   })
 
-  it('onRoundStart unflags the card if flagged', () => {
-    const player = createPlayer('p1')
-    player.occupationPlayed.push(CARD_ID)
-    setCardFlag(player, CARD_ID, true)
-    expect(isCardFlagged(player, CARD_ID)).toBe(true)
-
-    const effect = getCardEffect(CARD_ID)
-    expect(effect).toBeDefined()
-    expect(effect!.onRoundStart).toBeDefined()
-
-    const state = createState([player], [])
-    effect!.onRoundStart!(state, player)
-    expect(isCardFlagged(player, CARD_ID)).toBe(false)
+  it('work start unflags Sheep Inspector after the next preparation', () => {
+    const session = createWorkSession({ seed: 42, configure(state) {
+      state.round = 2
+      state.players[0]!.occupationPlayed = [CARD_ID]
+      setCardFlag(state.players[0]!, CARD_ID, true)
+      state.players.forEach(player => {
+        player.resources.food = 20
+        markAllWorkersUsed(state, player)
+      })
+    } })
+    try {
+      expect(isCardFlagged(session.state.players[0]!, CARD_ID)).toBe(true)
+      const response = session.performRoundEnd()
+      expect(response.ok, response.error).toBe(true)
+      expect(response.state.round).toBe(3)
+      expect(response.state.roundPhase).toBe('work')
+      expect(isCardFlagged(response.state.players[0]!, CARD_ID)).toBe(false)
+    } finally {
+      session.dispose()
+    }
   })
 
 })
 
 describe('D093_SheepInspector end-to-end via GameSession', () => {
   const setup = () => {
-    const session = new GameSession(42)
+    const session = createWorkSession({ seed: 42 })
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

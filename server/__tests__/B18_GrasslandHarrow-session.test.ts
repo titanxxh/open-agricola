@@ -97,14 +97,14 @@ describe('B018 Grassland Harrow activation', () => {
     state.players.forEach((player) => markAllWorkersUsed(state, player))
     session.loadState(state)
     let response = session.performRoundEnd()
-    expect(response.interaction).toMatchObject({ stateId: 'wait', playerIndex: 0, request: { kind: 'choice' } })
+    expect(response.interaction).toMatchObject({ stateId: 'wait', playerIndex: 0, request: { kind: 'select-trigger' } })
     const restored = restoreSession(session)
     sessions.push(restored)
     response = restored.getState()
-    if (decline) response = choose(restored, response, '__skip__')
+    if (decline) response = choose(restored, response, '__pass__')
     else {
       if (response.interaction.stateId !== 'wait') throw new Error('Expected due field choice')
-      const accept = response.interaction.request.options!.find((option) => option.value !== '__skip__')!
+      const accept = response.interaction.request.options!.find((option) => !option.disabled && option.sourceCard === CARD_ID)!
       response = choose(restored, response, accept.value)
       if (response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'farm-select') throw new Error('Expected plow selection')
       const pending = restoreSession(restored)

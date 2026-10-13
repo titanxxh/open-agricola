@@ -1,3 +1,4 @@
+import { createWorkSession } from './_helpers/session-fixtures'
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -36,7 +37,7 @@ const setupOccupation = (cardId: CardId, {
   resources?: Partial<Resource>
   workers?: number
 } = {}) => {
-  const session = new GameSession(4055, undefined, { playerCount })
+  const session = createWorkSession({ seed: 4055, options: { playerCount } })
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.currentPlayerIndex = 0

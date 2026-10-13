@@ -1,3 +1,4 @@
+import { createWorkSession } from './_helpers/session-fixtures'
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
@@ -27,7 +28,7 @@ const setupMinor = ({
   round?: number
   occupations?: number
 }) => {
-  const session = new GameSession(5200, undefined, { playerCount: 2 })
+  const session = createWorkSession({ seed: 5200, options: { playerCount: 2 } })
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.currentPlayerIndex = 0
@@ -168,7 +169,7 @@ describe('B020 Chain Float parity', () => {
     expect(response.interaction.stateId).toBe('wait')
     if (response.interaction.stateId !== 'wait') throw new Error('expected future field choice')
 
-    response = session.resolveChoice(response.interaction.playerIndex, '__skip__')
+    response = session.resolveChoice(response.interaction.playerIndex, response.interaction.stateId === 'wait' && response.interaction.request.kind === 'select-trigger' ? '__pass__' : '__skip__')
 
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.fields).toHaveLength(0)
