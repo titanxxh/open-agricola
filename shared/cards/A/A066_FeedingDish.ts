@@ -1,8 +1,7 @@
-import { countRoomAnimals } from '../../domain/animals'
 import { defineMinorCard } from '../card-source'
-import type { PlayerState, Pasture } from '../../contract/types'
+import { getAssignedAnimalsByType } from '../../domain/animals'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 
@@ -15,26 +14,16 @@ const SPACE_TO_ANIMAL: Record<string, AnimalKey> = {
   'cattle-market': 'cattle',
 }
 
-const countAnimalOfType = (player: PlayerState, animal: AnimalKey): number => {
-  const inHouse = countRoomAnimals(player, animal)
-  const inStables = Object.values(player.stableAnimals ?? {}).filter((a) => a === animal).length
-  const inPastures = (player.pastures ?? []).reduce(
-    (sum: number, p: Pasture) => sum + (p.animalType === animal ? p.animalCount : 0),
-    0,
-  )
-  return inHouse + inStables + inPastures
-}
-
 const listener: CardListenerRegistration = {
-  id: 'A66-feeding-dish-after-place-farmer',
+  id: 'A66-feeding-dish-before-collect',
   cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
-  actions: ['place-farmer'],
+  phases: ['before'],
+  actions: ['collect'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const spaceId = context.space?.id ?? ''
     const animal = SPACE_TO_ANIMAL[spaceId]
     if (!animal) return
-    if (countAnimalOfType(context.player, animal) < 1) return
+    if (getAssignedAnimalsByType(context.player, context.state)[animal] < 1) return
     return { flow: gainLeaf(CARD_ID, { grain: 1 }), sourceCard: CARD_ID }
   },
 }
