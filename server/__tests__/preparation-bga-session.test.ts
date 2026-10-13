@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import type { GameState } from '../../shared/contract/types'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { createOpeningSession, createWorkSession } from './_helpers/session-fixtures'
+import { markAllWorkersUsed } from '../../shared/domain/player'
 import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/serialization'
 
 const ARTISAN = 'A096_TaskArtisan'
@@ -255,4 +256,55 @@ describe('BGA preparation windows', () => {
     expect(response.state.players[0]!.cardStates.D036_BreedRegistry?.infobox).toBe('1 / 2')
     expect(response.state.events.filter(event => event.type === 'futureMeeple.resolved' && event.cardId === 'C081_CaseBuilder')).toHaveLength(1)
   })
+  it('lets a native Plow Driver source exchange grain before payment without a future action token', () => {
+    const session = prepare(state => {
+      for (const player of state.players) markAllWorkersUsed(state, player)
+      const owner = state.players[0]!
+      owner.houseType = 'stone'
+      owner.occupationPlayed = [PLOW_DRIVER]
+      owner.resources.food = 0
+      owner.resources.grain = 1
+    })
+    expect(session.state.futureMeeples).toEqual([])
+    let response = session.performRoundEnd()
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.round).toBe(7)
+    expect(response.state.roundPhase).toBe('preparation')
+    expect(response.state.players[0]!.resources).toMatchObject({ food: 0, grain: 1 })
+    if (response.interaction.stateId !== 'wait') throw new Error('Expected the live StartOfTurn source window')
+    const exchange = response.interaction.request.options?.find(option => option.labelKey === 'actions.exchange.name')
+    expect(exchange, JSON.stringify(response.interaction)).toBeDefined()
+    expect(exchange?.disabled).not.toBe(true)
+    response = choose(session, response, exchange!.value)
+    if (response.interaction.stateId !== 'wait') throw new Error('Expected a legal grain conversion')
+    const grain = response.interaction.request.options?.find(option =>
+      option.effectPreview?.kind === 'resourceExchange'
+        && option.effectPreview.resourcesPaid?.grain === 1
+        && option.effectPreview.resourcesGained?.food === 1)
+    expect(grain, JSON.stringify(response.interaction)).toBeDefined()
+    response = choose(session, response, grain!.value)
+    expect(response.state.players[0]!.resources).toMatchObject({ food: 1, grain: 0 })
+    for (let step = 0; step < 4; step++) {
+      if (response.interaction.stateId !== 'wait') throw new Error('Expected Plow Driver before work')
+      if (response.interaction.request.kind === 'farm-select') break
+      const plow = response.interaction.request.options?.find(option => option.value === PLOW_DRIVER)
+        ?? response.interaction.request.options?.find(option => !option.disabled && option.value !== '__skip__' && option.value !== '__pass__')
+      expect(plow, JSON.stringify(response.interaction)).toBeDefined()
+      response = choose(session, response, plow!.value)
+    }
+    if (response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'farm-select'
+      || response.interaction.request.farm.farmType !== 'plow') throw new Error('Expected paid Plow Driver farm selection')
+    expect(response.state.players[0]!.resources.food).toBe(0)
+    response = session.commitSelectionChoice(response.interaction.playerIndex, {
+      tile: response.interaction.request.farm.selectableTiles[0]!,
+    })
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.fields).toHaveLength(1)
+    expect(response.state.players[0]!.resources).toMatchObject({ food: 0, grain: 0 })
+    expect(response.state.futureMeeples).toEqual([])
+    expect(response.state.events.filter(event => event.type === 'resource.exchanged'
+      && event.paid.grain === 1 && event.gained.food === 1)).toHaveLength(1)
+    expect(response.state.roundPhase).toBe('work')
+  })
+
 })
