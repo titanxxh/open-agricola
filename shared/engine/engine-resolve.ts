@@ -34,6 +34,7 @@ import {
   buildFollowUpNodes,
   buildListenerEvent,
   canActionContinueWithoutBeforeTriggers,
+  canStartNode,
   getBeforeContinuationContext,
   cloneNode,
   enforceCompositeContinuationMandatory,
@@ -190,6 +191,7 @@ const triggerSelectEvaluationOptions = (
   node: ParallelNode,
 ): TriggerSelectEvaluationOptions => ({
   canStartFlow: (flow, flowContext) => evaluateFlowDoable(flow, flowContext, (actionId) => int.registry.get(actionId)),
+  canStartNode: (child, childContext) => canStartNode(int, childContext, child),
   canContinueWithoutTriggers: (actionId, resources) => {
     const hostContext = getBeforeContinuationContext(int, context, node, actionId)
     return canActionContinueWithoutBeforeTriggers(
@@ -446,7 +448,7 @@ export function engineResolveChoice(
           int.pendingNodeIdRef.value = null
           return rollbackAndReturn(int, { type: 'fail', errorKey: 'log.buildRoomFail' })
         }
-        if (child instanceof ActionNode && child.params?.commitOnTriggerSelection === true) {
+        if (child.optional === true) {
           child.optionalActive = true
         }
         int.pendingNodeIdRef.value = null
@@ -487,7 +489,7 @@ export function engineResolveChoice(
         int.pendingNodeIdRef.value = null
         return rollbackAndReturn(int, { type: 'fail', errorKey: 'log.buildRoomFail' })
       }
-      if (child instanceof ActionNode && child.params?.commitOnTriggerSelection === true) {
+      if (child.optional === true) {
         child.optionalActive = true
       }
       int.pendingNodeIdRef.value = null
@@ -647,6 +649,7 @@ export function engineResolveChoice(
         eventBuffer.sink,
       ) ?? action.execute({
         ...executionContext,
+        transactionEvents: currentEventReadContext(int).transactionEvents,
         eventSink: eventBuffer.sink,
       })
       if (result.type === 'fail') {

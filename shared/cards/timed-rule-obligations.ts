@@ -1,5 +1,6 @@
 import type { ActionFlow, GameState, PlayerState } from '../contract/types'
 import type { FlowCardEffectHook } from '../contract/card-effect-hooks'
+import type { FlowEffectContext } from './card-effects'
 import type { TimedRule, TimedRuleEventPhase } from '../contract/rule-plans'
 import type { CardListenerContext } from './card-listeners'
 import { compileRuleBody, compileTimedRuleHooks, timedRuleOccurrences } from '../actions/timed-rules'
@@ -89,7 +90,7 @@ export const retainedTimedExtraTurnFlows = (state: GameState, player: PlayerStat
   })
 }
 
-export const retainedTimedRuleHook = (state: GameState, player: PlayerState, cardId: string, phase: Exclude<FlowCardEffectHook, 'onBuy'>, resolveRules: TimedRuleResolver): ActionFlow | undefined => {
+export const retainedTimedRuleHook = (state: GameState, player: PlayerState, cardId: string, phase: Exclude<FlowCardEffectHook, 'onBuy'>, resolveRules: TimedRuleResolver, context?: FlowEffectContext): ActionFlow | undefined => {
   const rules = resolveRules(cardId).filter(rule => rule.retainAfterCardLeaves)
-  return compileTimedRuleHooks(cardId, rules)[phase]?.(state, player)
+  return compileTimedRuleHooks(cardId, rules)[phase]?.(state, player, context)
 }

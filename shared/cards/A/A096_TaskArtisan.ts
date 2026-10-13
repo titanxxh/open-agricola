@@ -6,13 +6,12 @@ const CARD_ID = 'A096_TaskArtisan'
 /**
  * A96 Task Artisan:
  * - onBuy: gain 1 wood + optional minor improvement action.
- * - onRoundStart: when a stone quarry is revealed, gain 1 wood + optional minor improvement action.
+ * - onAfterRevealAction: when a stone quarry is revealed, gain 1 wood + optional minor improvement action.
  *
  * Rule: onBuy → parallel(gain 1 wood, optional improvement(minor)).
  *       isListeningTo → AfterRevealAction on western/eastern quarry.
  *       onPlayerAfterRevealAction → parallel(gain 1 wood, optional improvement(minor)).
  *
- * In our system, quarry reveal is detected in onRoundStart by checking roundActionOrder.
  */
 
 const buildTaskArtisanFlow = () => ({
@@ -33,8 +32,9 @@ const cardImpl = {
   effect: {
     id: CARD_ID,
     onBuy: () => buildTaskArtisanFlow(),
-    onRoundStart: (state, _player) => {
-      const revealedAction = state.roundActionOrder[state.round - 1]
+    onAfterRevealAction: (_state, _player, ctx) => {
+      const revealedAction = ctx?.roundPreparation?.kind === 'after-reveal'
+        ? ctx.roundPreparation.revealedAction?.actionId : undefined
       if (revealedAction !== 'western-quarry' && revealedAction !== 'eastern-quarry') return
       return buildTaskArtisanFlow()
     },

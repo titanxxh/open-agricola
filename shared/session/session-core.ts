@@ -67,13 +67,11 @@ import {
   createInitialState,
   createRoundOpenById,
   emptyResources,
-  extendedResourceKeyList,
   harvestRounds,
   type InitialStateOptions,
   normalizeState,
   resourceKeyList,
   applyRoundGrowth,
-  applyFutureMeeples,
 } from './state-bootstrap.ts'
 import { clearWorkPhaseBuildingResources } from '../session/work-phase-resources.ts'
 import {
@@ -128,7 +126,7 @@ import {
   isPlayerSkippingCurrentHarvest,
 } from '../cards/helpers/harvest-skip.ts'
 import { recordReturnHomePlacements, resetRoundPlacements } from '../cards/helpers/round-placement.ts'
-import { familySize, findPlayerById, findPlayerIndexById, hasPlayer, smallestAvailableWorker } from '../domain/player.ts'
+import { familySize, findPlayerById, findPlayerIndexById, smallestAvailableWorker } from '../domain/player.ts'
 import { animalKeysForState, type AnimalKey } from '../contract/animals.ts'
 import { applyAnimalPayment, isAnimalResourceKey } from '../domain/animal-payment.ts'
 import { getPlacedAnimalsByType, readAnimalCountsForZoneAssignment } from '../domain/animal-zones.ts'
@@ -855,6 +853,8 @@ export class GameCore {
         }
       },
       reportProtectedObservation: (observation) => this.reportProtectedObservation(observation),
+      getRoundStartScheduleFlows: (playerIndex) => this.buildRoundStartScheduleFlows(playerIndex),
+      getRoundStartCompletionFlow: (playerIndex) => this.buildRoundStartCompletionFlow(playerIndex),
     }, {
       onBeforeHarvest: (stageResume) => {
         this.continueHarvestFromBeforeHarvest(stageResume.playerIndex, stageResume.extra)
@@ -869,19 +869,15 @@ export class GameCore {
         this.continueBeforeStartOfTurn(
           stageResume.playerIndex,
           stageResume.cardIndex,
-          stageResume.extra?.roundPreparationAlreadyApplied === true,
+          stageResume.extra,
         )
       },
-      onBeforeWork: (stageResume) => { this.continueAfterFutureMeepleActions(stageResume.playerIndex, stageResume.cardIndex) },
-      onRoundStart: (stageResume) => { this.continueAfterBeforeWork(stageResume.playerIndex, stageResume.cardIndex) },
-      futureMeepleReceives: () => { this.continueFutureMeepleAnytimeWindow() },
-      futureActionAnytimeWindow: (stageResume) => {
-        this.continueFutureMeepleAnytimeWindow(
-          stageResume.playerIndex,
-          stageResume.extra?.anytimeActionTaken === true,
-        )
-      },
-      futureMeepleActions: () => { this.continueAfterFutureMeepleActions() },
+      onAfterRevealAction: (resume) => { this.continueAfterRevealAction(resume.playerIndex, resume.extra) },
+      onPreparation: (resume) => { this.continuePreparation(resume.playerIndex, resume.extra) },
+      onRoundStart: (resume) => { this.continueRoundStart(resume.playerIndex, resume.extra) },
+      onEndPreparation: (resume) => { this.continueEndPreparation(resume.playerIndex, resume.extra) },
+      onBeforeWork: (resume) => { this.continueAfterFutureMeepleActions(resume.playerIndex, resume.cardIndex, resume.extra) },
+      onWorkStart: (resume) => { this.continueAfterBeforeWork(resume.playerIndex, resume.cardIndex, resume.extra) },
       onStartHarvestFeedingPhase: (stageResume) => {
         this.continueStartHarvestFeedingPhase(stageResume.playerIndex, stageResume.cardIndex)
       },
@@ -973,7 +969,7 @@ export class GameCore {
         ...initialStateOptions,
         extraMinorIds,
         extraOccupationIds,
-      })
+      }, [], 'defer')
     }
     this.syncDynamicActionSpaces()
     if (isFreshState) this.withCtx(() => this.startFirstRoundAfterSetup())
@@ -3031,143 +3027,61 @@ export class GameCore {
   /** S2 Task 10 part 6: thin delegator — body lives in `phases/round.ts`. */
   private finalizeActionLog(player: PlayerState) { return roundPhase.finalizeActionLog(this, player) }
 
-  private buildFutureMeepleReceiveFlow() {
-    const receiveEntriesByPlayer = new Map<string, Array<{
-      cardId: string
-      round: number
-      resources: Partial<Resource>
-    }>>()
-    for (const entry of this.state.futureMeeples) {
-      if (entry.round !== this.state.round) continue
-      const playerIndex = findPlayerIndexById(this.state, entry.playerId)
-      if (playerIndex === -1) continue
-      const receiveResources: Partial<Resource> = {}
-      if (this.futureMeepleResourceConditionMet(entry)) {
-        for (const key of extendedResourceKeyList) {
-          const amount = entry.resources[key] ?? 0
-          if (amount > 0) receiveResources[key] = amount
-        }
+  private buildRoundStartScheduleFlows(playerIndex: number): ActionFlow[] {
+    const player = this.state.players[playerIndex]
+    if (!player) return []
+    const entries = this.state.futureMeeples.filter(entry => entry.round === this.state.round && entry.playerId === player.id)
+    const hasAction = (entry: GameState['futureMeeples'][number]) =>
+      (['field', 'stable', 'forest', 'moor'] as const).some(kind => futureMeepleActionCount(entry, kind) > 0)
+    const hasGoods = (entry: GameState['futureMeeples'][number]) =>
+      resourceKeyList.some(key => (entry.resources[key] ?? 0) > 0)
+      || (entry.resources.horse ?? 0) > 0 || (entry.resources.fuel ?? 0) > 0
+    const ordinary = entries.filter(entry => hasGoods(entry) && !entry.roomType && !entry.actionContext?.resourceCondition)
+    const receive = (due: typeof entries): ActionFlow => ({
+      type: 'leaf', actionId: 'receive', targetPlayerId: player.id,
+      sourceCard: due[0]?.cardId, choiceLabelKey: 'actions.receive.name',
+      params: { futureMeepleIds: due.map(entry => entry.id) },
+    })
+    const flows: ActionFlow[] = ordinary.length ? [receive(ordinary)] : []
+    for (const entry of entries) {
+      if (!ordinary.includes(entry) && (hasGoods(entry) || entry.roomType)) {
+        flows.push({ ...receive([entry]), optional: !!entry.actionContext?.resourceCondition })
       }
-      if (Object.keys(receiveResources).length > 0) {
-        const receiveEntries = receiveEntriesByPlayer.get(entry.playerId) ?? []
-        receiveEntries.push({
-          cardId: entry.cardId,
-          round: entry.round,
-          resources: receiveResources,
-        })
-        receiveEntriesByPlayer.set(entry.playerId, receiveEntries)
-      }
-    }
-    const children: ActionFlow[] = []
-    let firstPlayerIndex = -1
-    for (const [playerId, entries] of receiveEntriesByPlayer) {
-      const playerIndex = findPlayerIndexById(this.state, playerId)
-      if (playerIndex === -1) continue
-      if (firstPlayerIndex === -1) firstPlayerIndex = playerIndex
-      children.push({
-        type: 'leaf',
-        actionId: 'receive',
-        targetPlayerId: playerId,
-        params: { entries },
-      })
-    }
-    if (children.length === 0 || firstPlayerIndex === -1) return null
-    return {
-      flow: children.length === 1 ? children[0]! : { type: 'seq', children } as ActionFlow,
-      playerIndex: firstPlayerIndex,
-    }
-  }
-
-  private buildFutureMeepleActionFlow() {
-    const children: ActionFlow[] = []
-    let firstPlayerIndex = -1
-    for (const entry of this.state.futureMeeples) {
-      if (entry.round !== this.state.round) continue
-      const playerIndex = findPlayerIndexById(this.state, entry.playerId)
-      if (playerIndex === -1) continue
-      const player = this.state.players[playerIndex]!
-      const actionContext = entry.actionContext ?? {}
-      for (let i = 0; i < futureMeepleActionCount(entry, 'field'); i += 1) {
-        if (firstPlayerIndex === -1) firstPlayerIndex = playerIndex
-        children.push({
-          type: 'seq',
-          optional: true,
-          children: [{
-            type: 'leaf',
-            actionId: 'plow',
-            sourceCard: entry.cardId,
-            targetPlayerId: entry.playerId,
-            actionContext: { ...actionContext, trueAction: false },
-          }],
-        })
-      }
-      for (let i = 0; i < futureMeepleActionCount(entry, 'stable'); i += 1) {
-        if (firstPlayerIndex === -1) firstPlayerIndex = playerIndex
-        children.push({
-          type: 'seq',
-          optional: true,
-          children: [{
-            type: 'leaf',
-            actionId: 'stables',
-            sourceCard: entry.cardId,
-            targetPlayerId: entry.playerId,
-            actionContext: { max: 1, exactCost: { max: 1 }, ...actionContext, trueAction: false },
-          }],
-        })
-      }
-      for (const kind of ['forest', 'moor'] as const) {
-        for (let i = 0; i < futureMeepleActionCount(entry, kind); i += 1) {
-          const flow = buildPlaceTerrainFlow(entry.cardId, player, kind)
-          if (!flow) continue
-          if (firstPlayerIndex === -1) firstPlayerIndex = playerIndex
-          children.push({
-            type: 'seq',
-            optional: true,
-            targetPlayerId: entry.playerId,
-            children: [flow],
+      const actionContext = { ...entry.actionContext, trueAction: false }
+      for (const action of [
+        { kind: 'field', actionId: 'plow' }, { kind: 'stable', actionId: 'stables' },
+      ] as const) {
+        for (let count = 0; count < futureMeepleActionCount(entry, action.kind); count += 1) {
+          flows.push({
+            type: 'leaf', actionId: action.actionId, sourceCard: entry.cardId,
+            targetPlayerId: player.id, optional: true,
+            actionContext: action.kind === 'stable'
+              ? { max: 1, exactCost: { max: 1 }, ...actionContext } : actionContext,
           })
         }
       }
+      for (const kind of ['forest', 'moor'] as const) {
+        for (let count = 0; count < futureMeepleActionCount(entry, kind); count += 1) {
+          const terrain = buildPlaceTerrainFlow(entry.cardId, player, kind)
+          if (terrain) flows.push({ ...terrain, optional: true, targetPlayerId: player.id })
+        }
+      }
     }
-    if (children.length === 0 || firstPlayerIndex === -1) return null
-    return {
-      flow: children.length === 1 ? children[0]! : { type: 'seq', children } as ActionFlow,
-      playerIndex: firstPlayerIndex,
-    }
+    if (entries.some(hasAction)) flows.push(tagInjectedAnytimeFlow({
+      type: 'leaf', actionId: 'exchange', optional: true, targetPlayerId: player.id,
+      choiceLabelKey: 'actions.exchange.name', actionContext: { anytimeInteractionKind: 'choice' },
+    }))
+    return flows
   }
 
-  private futureMeepleResourceConditionMet(entry: GameState['futureMeeples'][number]): boolean {
-    const condition = entry.actionContext?.resourceCondition
-    if (!condition || typeof condition !== 'object' || Array.isArray(condition)) return true
-    const raw = condition as { kind?: unknown; resource?: unknown; amount?: unknown }
-    if (raw.kind !== 'min-resource') return true
-    if (typeof raw.resource !== 'string') return true
-    const resource = raw.resource as keyof Resource
-    if (!resourceKeyList.includes(resource) && resource !== 'horse' && resource !== 'fuel') return true
-    if (typeof raw.amount !== 'number' || !Number.isFinite(raw.amount)) return true
-    const player = findPlayerById(this.state, entry.playerId)
-    if (!player) return false
-    return (player.resources[resource] ?? 0) >= Math.max(0, Math.floor(raw.amount))
-  }
-
-  private buildFutureMeepleResolvedEvents(): ImmediateEventDraft[] {
-    return this.state.futureMeeples
-      .filter((entry) =>
-        entry.round === this.state.round &&
-        hasPlayer(this.state, entry.playerId),
-      )
-      .map((entry) => {
-        const resources = this.futureMeepleResourceConditionMet(entry) ? entry.resources : {}
-        return {
-          type: 'futureMeeple.resolved',
-          playerId: entry.playerId,
-          cardId: entry.cardId,
-          sourceCardId: entry.cardId,
-          round: entry.round,
-          ...(Object.keys(resources ?? {}).length > 0 ? { resources } : {}),
-          ...(entry.roomType ? { roomType: entry.roomType } : {}),
-        } as ImmediateEventDraft
-      })
+  private buildRoundStartCompletionFlow(playerIndex: number): ActionFlow | null {
+    const player = this.state.players[playerIndex]
+    if (!player) return null
+    const due = this.state.futureMeeples.filter(entry => entry.round === this.state.round && entry.playerId === player.id)
+    return due.length ? {
+      type: 'leaf', actionId: 'receive', targetPlayerId: player.id,
+      params: { futureMeepleIds: due.map(entry => entry.id), resolveOnly: true },
+    } : null
   }
 
   /** S2 Task 10 part 6: thin delegator — body lives in `phases/round.ts`. */
@@ -3448,84 +3362,38 @@ export class GameCore {
     return this.finalizeRound()
   }
 
-  private dispatchFutureMeepleResolvedListeners(
-    events: readonly GameEvent[],
-  ): void {
-    const resolvedEvents = events.filter((event) => event.type === 'futureMeeple.resolved')
-    if (resolvedEvents.length === 0) return
-    const space = this.createSyntheticSpace('future-meeple-resolved')
-    for (const player of this.state.players) {
-      const transactionEvents = resolvedEvents.filter((event) => event.playerId === player.id)
-      if (transactionEvents.length === 0) continue
-      const results = runCardListeners({
-        state: this.state,
-        player,
-        space,
-        actionId: 'future-meeple-resolved',
-        phase: 'immediatelyAfter',
-        transactionEvents,
-      })
-      if (results.length === 0) continue
-      if (!Array.isArray(this.state.events)) this.state.events = []
-      if (!Number.isSafeInteger(this.state.nextEventSeq) || this.state.nextEventSeq < 1) {
-        this.state.nextEventSeq = 1
-      }
-      const store = new EventStore()
-      const frame = store.beginFrame({
-        actorPlayerId: player.id,
-        sourceActionId: 'future-meeple-resolved',
-      })
-      executeImmediateSpecialEffectFlows({
-        state: this.state,
-        player,
-        space,
-        eventSink: frame.sink,
-        results,
-      })
-      const completed = frame.complete(this.state)
-      if (completed.length > 0) {
-        store.commitTransaction(this.state)
-      } else {
-        store.rollbackTransaction()
-      }
-    }
-  }
-
   private startFirstRoundAfterSetup(): SessionResponse {
     if (this.state.phase !== 'playing') return this.respond()
     this.state.roundPhase = 'preparation'
-    this.state.roundFirstPlayerId = this.state.players.find((player) => player.startPlayer)?.id
-    // Bootstrap already applied the initial accumulation. All setup modes
-    // enter the same resumable stage chain without applying it a second time.
-    return this.continueBeforeStartOfTurn(0, 0, true)
+    return this.continueBeforeStartOfTurn(0, 0, {
+      roundPreparation: { kind: 'before-reveal', nextRound: 1 },
+    })
   }
 
   private continueBeforeStartOfTurn(
     playerIndex = 0,
     cardIndex = 0,
-    roundPreparationAlreadyApplied = false,
+    extra?: StageResumeState['extra'],
   ): SessionResponse {
+    const context = extra?.roundPreparation?.kind === 'before-reveal'
+      ? extra.roundPreparation : { kind: 'before-reveal' as const, nextRound: this.state.round + 1 }
     if (this.stageDispatch.continueStageHook(
       'onBeforeStartOfTurn',
       playerIndex,
       cardIndex,
-      roundPreparationAlreadyApplied ? { roundPreparationAlreadyApplied: true } : undefined,
+      { ...extra, roundPreparation: context },
     )) {
       return this.respond()
     }
-    if (roundPreparationAlreadyApplied) {
-      return this.continueCurrentFutureMeepleActions()
-    }
+    const advanced = context.nextRound > this.state.round
+    this.state.round = context.nextRound
+    if (advanced) advanceThroughTheSeasons(this.state)
     this.state.players.forEach((player) => {
       resetRoundPlacements(player)
       delete player._extraTurnSkipCountsByCard
       delete player._extraTurnConsumedCountsByCard
     })
     const roundOpen = createRoundOpenById(this.state.roundActionOrder)
-    const futureResolvedEvents = this.buildFutureMeepleResolvedEvents()
-    const futureMeepleReceiveFlow = this.buildFutureMeepleReceiveFlow()
-    const openActionSpaceIds = new Set<string>()
-    const actionSpaceResourcesBefore = new Map<string, Resource>()
     const actionEvents = this.state.actionSpaces.flatMap((space): ImmediateEventDraft[] => {
       const openRound = roundOpen.get(space.id) ?? space.roundAvailable
       const events: ImmediateEventDraft[] = []
@@ -3533,7 +3401,8 @@ export class GameCore {
         event.type === 'action.revealed' &&
         event.actionId === space.id &&
         event.roundSlot === this.state.round)
-      if (this.state.round === openRound && !alreadyRevealed) {
+      if (space.id === this.state.roundActionOrder[this.state.round - 1]
+        && this.state.round === openRound && !alreadyRevealed) {
         events.push({
           type: 'action.revealed',
           actionId: space.id,
@@ -3550,12 +3419,32 @@ export class GameCore {
         })
         delete space.exclusiveUse
       }
-      if (this.state.round >= openRound) {
+      return events
+    })
+    const committed = appendImmediateEvents(this.state, [{ type: 'round.started' }, ...actionEvents])
+    const revealed = committed.find(event => event.type === 'action.revealed')
+    return this.continueAfterRevealAction(0, {
+      roundPreparation: { kind: 'after-reveal', revealedAction: revealed?.type === 'action.revealed'
+        ? { actionId: revealed.actionId, roundSlot: revealed.roundSlot } : null },
+    })
+  }
+
+  private continueAfterRevealAction(offset = 0, extra?: StageResumeState['extra']): SessionResponse {
+    if (this.stageDispatch.continueStageHook('onAfterRevealAction', offset, 0, extra)) return this.respond()
+    return this.continuePreparation(0, { roundPreparation: extra?.roundPreparation })
+  }
+
+  private continuePreparation(offset = 0, extra?: StageResumeState['extra']): SessionResponse {
+    if (this.stageDispatch.continueStageHook('onPreparation', offset, 0, extra)) return this.respond()
+    const roundOpen = createRoundOpenById(this.state.roundActionOrder)
+    const openActionSpaceIds = new Set<string>()
+    const actionSpaceResourcesBefore = new Map<string, Resource>()
+    for (const space of this.state.actionSpaces) {
+      if (this.state.round >= (roundOpen.get(space.id) ?? space.roundAvailable)) {
         openActionSpaceIds.add(space.id)
         actionSpaceResourcesBefore.set(space.id, { ...space.resources })
       }
-      return events
-    })
+    }
     applyRoundGrowth(this.state)
     applySeasonPreparationAdjustments(this.state)
     const accumulatedActionEvents = this.state.actionSpaces.flatMap((space): ImmediateEventDraft[] => {
@@ -3573,112 +3462,30 @@ export class GameCore {
         resources,
       }]
     })
-    applyFutureMeeples(this.state, { skipResourceReceive: true, keepActionTokens: true })
-    const committedStartEvents = appendImmediateEvents(this.state, [
-      { type: 'round.started' },
-      ...futureResolvedEvents,
-      ...actionEvents,
-      ...accumulatedActionEvents,
-    ])
-    this.dispatchFutureMeepleResolvedListeners(committedStartEvents)
-    return this.startFutureMeepleResolution(futureMeepleReceiveFlow)
+    appendImmediateEvents(this.state, accumulatedActionEvents)
+    this.state.roundFirstPlayerId = this.state.players.find(player => player.startPlayer)?.id
+    return this.continueRoundStart(0, { roundPreparation: extra?.roundPreparation })
   }
 
-  private startFutureMeepleResolution(
-    receiveFlow = this.buildFutureMeepleReceiveFlow(),
-  ): SessionResponse {
-    if (receiveFlow) {
-      this.stageDispatch.startFlow(
-        receiveFlow.flow,
-        'futureMeepleReceives',
-        receiveFlow.playerIndex,
-        0,
-        0,
-      )
+  private continueRoundStart(offset = 0, extra: StageResumeState['extra'] = { roundPreparation: { kind: 'after-reveal', revealedAction: null } }): SessionResponse {
+    if (this.stageDispatch.continueStageHook('onRoundStart', offset, 0, extra)) return this.respond()
+    return this.continueEndPreparation(0, { roundPreparation: extra?.roundPreparation })
+  }
+
+  private continueEndPreparation(offset = 0, extra?: StageResumeState['extra']): SessionResponse {
+    if (this.stageDispatch.continueStageHook('onEndPreparation', offset, 0, extra)) return this.respond()
+    return this.continueAfterFutureMeepleActions(0, 0, { roundPreparation: extra?.roundPreparation })
+  }
+
+  private continueAfterFutureMeepleActions(playerIndex = 0, cardIndex = 0, extra?: StageResumeState['extra']): SessionResponse {
+    if (this.stageDispatch.continueStageHook('onBeforeWork', playerIndex, cardIndex, extra)) {
       return this.respond()
     }
-    return this.continueFutureMeepleAnytimeWindow()
+    return this.continueAfterBeforeWork(0, 0, { roundPreparation: extra?.roundPreparation })
   }
 
-  private continueFutureMeepleAnytimeWindow(
-    resumePlayerIndex?: number,
-    repeatCurrentPlayer = false,
-  ): SessionResponse {
-    const playerIndices: number[] = []
-    for (const entry of this.state.futureMeeples) {
-      if (entry.round !== this.state.round) continue
-      const hasAction = (['field', 'stable', 'forest', 'moor'] as const)
-        .some((key) => futureMeepleActionCount(entry, key) > 0)
-      if (!hasAction) continue
-      const playerIndex = findPlayerIndexById(this.state, entry.playerId)
-      if (playerIndex >= 0 && !playerIndices.includes(playerIndex)) playerIndices.push(playerIndex)
-    }
-    playerIndices.sort((left, right) => left - right)
-    let start = 0
-    if (resumePlayerIndex !== undefined) {
-      const resumeOffset = playerIndices.indexOf(resumePlayerIndex)
-      if (resumeOffset >= 0) {
-        start = resumeOffset + (repeatCurrentPlayer ? 0 : 1)
-      } else {
-        const nextOffset = playerIndices.findIndex((playerIndex) => playerIndex > resumePlayerIndex)
-        start = nextOffset === -1 ? playerIndices.length : nextOffset
-      }
-    }
-    for (let offset = Math.max(0, start); offset < playerIndices.length; offset += 1) {
-      const playerIndex = playerIndices[offset]!
-      this.state.currentPlayerIndex = playerIndex
-      const entries = this.buildAnytimeEntries({ nestedWindow: true })
-        .filter((entry) => entry.descriptor.actionId === 'exchange')
-      if (entries.length === 0) continue
-      const flow: ActionFlow = {
-        type: 'xor',
-        optional: true,
-        promptKey: 'ui.interactionOptionalAction',
-        children: entries.map(({ descriptor, flow: entryFlow }) => ({
-          ...tagInjectedAnytimeFlow(entryFlow),
-          optionId: descriptor.id,
-          choiceLabelKey: descriptor.labelKey,
-          choiceLabelParams: descriptor.labelParams,
-          sourceCard: descriptor.sourceCard ?? entryFlow.sourceCard,
-        })),
-      }
-      this.stageDispatch.startFlow(
-        flow,
-        'futureActionAnytimeWindow',
-        playerIndex,
-        0,
-        playerIndex,
-      )
-      return this.respond()
-    }
-    return this.startCurrentFutureMeepleActions()
-  }
-
-  private startCurrentFutureMeepleActions(): SessionResponse {
-    const futureMeepleActionFlow = this.buildFutureMeepleActionFlow()
-    applyFutureMeeples(this.state, { skipResourceReceive: true })
-    if (futureMeepleActionFlow) {
-      this.stageDispatch.startFlow(
-        futureMeepleActionFlow.flow,
-        'futureMeepleActions',
-        futureMeepleActionFlow.playerIndex,
-        0,
-        0,
-      )
-      return this.respond()
-    }
-    return this.continueAfterFutureMeepleActions()
-  }
-
-  private continueAfterFutureMeepleActions(playerIndex = 0, cardIndex = 0): SessionResponse {
-    if (this.stageDispatch.continueStageHook('onBeforeWork', playerIndex, cardIndex)) {
-      return this.respond()
-    }
-    return this.continueAfterBeforeWork()
-  }
-
-  private continueAfterBeforeWork(playerIndex = 0, cardIndex = 0): SessionResponse {
-    if (this.stageDispatch.continueStageHook('onRoundStart', playerIndex, cardIndex)) {
+  private continueAfterBeforeWork(playerIndex = 0, cardIndex = 0, extra?: StageResumeState['extra']): SessionResponse {
+    if (this.stageDispatch.continueStageHook('onWorkStart', playerIndex, cardIndex, extra)) {
       return this.respond()
     }
     const frozenStartIdx = this.state.players.findIndex((player) => player.id === this.state.roundFirstPlayerId)
@@ -3715,17 +3522,6 @@ export class GameCore {
     if (workComplete && placedBeforeWork) return this.continueAllWorkersPlacedHooks()
     roundPhase.startPendingExtraTurnIfAny(this)
     return this.respond()
-  }
-
-  private continueCurrentFutureMeepleActions(): SessionResponse {
-    const futureMeepleReceiveFlow = this.buildFutureMeepleReceiveFlow()
-    const futureResolvedEvents = this.buildFutureMeepleResolvedEvents()
-    applyFutureMeeples(this.state, { skipResourceReceive: true, keepActionTokens: true })
-    if (futureResolvedEvents.length > 0) {
-      const committedEvents = appendImmediateEvents(this.state, futureResolvedEvents)
-      this.dispatchFutureMeepleResolvedListeners(committedEvents)
-    }
-    return this.startFutureMeepleResolution(futureMeepleReceiveFlow)
   }
 
   /** S2 Task 10 part 5: thin delegator — body lives in `phases/round.ts`. */
@@ -4985,12 +4781,9 @@ export class GameCore {
         if (w.isActive) w.isNewborn = false
       }
     })
-    this.state.round += 1
-    if (this.state.round > 14) {
+    if (this.state.round >= 14) {
       return this.continueBeforeEndGameHooks(0, 0)
     }
-    this.state.roundFirstPlayerId = this.state.players.find((player) => player.startPlayer)?.id
-    advanceThroughTheSeasons(this.state)
     return this.continueBeforeStartOfTurn()
   }
 

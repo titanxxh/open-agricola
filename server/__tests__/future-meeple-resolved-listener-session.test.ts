@@ -11,7 +11,7 @@ const handFutureMeepleListener: CardListenerRegistration = {
   id: 'x-hand-future-meeple-listener',
   cardIds: [LISTENER_CARD],
   zones: ['hand'],
-  actions: ['future-meeple-resolved'],
+  actions: ['receive'],
   phases: ['immediatelyAfter'],
   handler: (context) => {
     const resolved = context.transactionEvents.find((event) => event.type === 'futureMeeple.resolved')
@@ -70,7 +70,11 @@ describe('future meeple resolved card listener dispatch', () => {
   it('dispatches resolved future meeple events to hand-zone listeners', () => {
     const { session, outerRegistry } = setup()
     try {
-      const resp = session.performRoundEnd()
+      let resp = session.performRoundEnd()
+      if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'animal-reorg') {
+        resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', resp.interaction.request.zones)
+      }
+      expect(resp.ok, resp.error).toBe(true)
       const playerA = resp.state.players[0]!
       expect(readCardExtraData<boolean>(playerA, LISTENER_CARD, 'seenFutureMeeple')).toBe(true)
       expect(resp.state.events.some((event) =>

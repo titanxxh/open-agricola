@@ -18,6 +18,8 @@ export type EngineNodeType =
 
 export type EngineNode = {
   id: string
+  choiceLabelKey?: string
+  choiceLabelParams?: Record<string, unknown>
   type: EngineNodeType
   ownerPlayerId?: string
   optional?: boolean

@@ -724,6 +724,7 @@ export type ProtectedObservation = {
 }
 
 export type ActionExecutionContext = {
+  transactionEvents?: readonly GameEvent[]
   previewMode?: 'base'
   state: GameState
   player: PlayerState

@@ -3,6 +3,22 @@ import { flowCardEffectHooks, runCardEffectHook } from '../../../cards/card-effe
 import type { FlowCardEffectHook, FlowEffectContext, PaymentInfo } from '../../../cards/card-effects'
 import type { ActionHookResult } from '../../hooks'
 import { findPlayerById } from '../../../domain/player'
+import type { RoundPreparationContext } from '../../../contract/card-effect-hooks'
+
+const readRoundPreparationContext = (value: unknown): RoundPreparationContext | undefined => {
+  if (!value || typeof value !== 'object' || !('kind' in value)) return undefined
+  if (value.kind === 'before-reveal' && 'nextRound' in value && typeof value.nextRound === 'number') {
+    return { kind: 'before-reveal', nextRound: value.nextRound }
+  }
+  if (value.kind !== 'after-reveal' || !('revealedAction' in value)) return undefined
+  const action = value.revealedAction
+  if (action === null) return { kind: 'after-reveal', revealedAction: null }
+  if (action && typeof action === 'object' && 'actionId' in action && typeof action.actionId === 'string'
+    && 'roundSlot' in action && typeof action.roundSlot === 'number') {
+    return { kind: 'after-reveal', revealedAction: { actionId: action.actionId, roundSlot: action.roundSlot } }
+  }
+  return undefined
+}
 
 const effectPlayerForHook = (
   state: GameState,
@@ -22,13 +38,16 @@ const jsonSnapshot = (state: GameState, player: PlayerState): string =>
 const readFlowEffectContext = (
   params?: Record<string, unknown>,
   reportProtectedObservation?: FlowEffectContext['reportProtectedObservation'],
+  transactionEvents?: FlowEffectContext['transactionEvents'],
 ): FlowEffectContext | undefined =>
-  typeof params?.triggerActionId === 'string' || reportProtectedObservation
+  typeof params?.triggerActionId === 'string' || params?.roundPreparation || reportProtectedObservation || transactionEvents
     ? {
         ...(typeof params?.triggerActionId === 'string'
           ? { triggerActionId: params.triggerActionId }
           : {}),
         ...(reportProtectedObservation ? { reportProtectedObservation } : {}),
+        roundPreparation: readRoundPreparationContext(params?.roundPreparation),
+        transactionEvents,
       }
     : undefined
 
@@ -50,6 +69,7 @@ export const previewActivateCardEffect = (
   player: PlayerState,
   params?: Record<string, unknown>,
   actionContext?: Record<string, unknown>,
+  transactionEvents?: FlowEffectContext['transactionEvents'],
 ): ActionHookResult | undefined => {
   const cardId = params?.cardId
   const hook = params?.hook
@@ -63,13 +83,13 @@ export const previewActivateCardEffect = (
     cardId,
     hook as FlowCardEffectHook,
     undefined,
-    readFlowEffectContext(params),
+    readFlowEffectContext(params, undefined, transactionEvents),
   )
   const mutated = !flow && jsonSnapshot(state, effectPlayer) !== before
   if (!flow && !mutated) return undefined
   return {
     flow: flow ?? undefined,
-    doable: true,
+    ...(flow ? {} : { doable: true }),
     sourceCard: cardId,
     extraData: {
       ownerPlayerId: params?.ownerPlayerId,
@@ -88,7 +108,7 @@ export const activateCardEffectAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
-  execute: ({ state, player, params, actionContext, reportProtectedObservation }) => {
+  execute: ({ state, player, params, actionContext, reportProtectedObservation, transactionEvents }) => {
     const cardId = params?.cardId
     const hook = params?.hook
     if (typeof cardId !== 'string' || typeof hook !== 'string') {
@@ -105,7 +125,7 @@ export const activateCardEffectAction: ActionDefinition = {
       cardId,
       hook as FlowCardEffectHook,
       paymentInfo,
-      readFlowEffectContext(params, reportProtectedObservation),
+      readFlowEffectContext(params, reportProtectedObservation, transactionEvents),
     )
   },
 }
