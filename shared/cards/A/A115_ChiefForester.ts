@@ -20,7 +20,7 @@ const listener: CardListenerRegistration = {
         actionId: 'sow',
         optional: true,
         sourceCard: CARD_ID,
-        actionContext: { max: 1 },
+        actionContext: { maxSelections: 1 },
       },
       sourceCard: CARD_ID,
     }
