@@ -1,3 +1,4 @@
+import { countRoomAnimals } from '../../domain/animals'
 import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
@@ -77,7 +78,7 @@ const cardImpl = {
     const inStables = Object.values(player.stableAnimals ?? {}).filter(
       (animal) => animal !== null,
     ).length
-    const inHouse = player.houseAnimalCount ?? 0
+    const inHouse = countRoomAnimals(player)
     const inPastures = (player.pastures ?? []).reduce(
       (sum, pasture) => sum + (pasture.animalCount ?? 0),
       0,

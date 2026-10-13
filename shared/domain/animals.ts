@@ -11,6 +11,14 @@ import {
 } from './animal-holder-state'
 export type { AnimalKey }
 
+export const getRoomAnimals = (player: Pick<PlayerState, 'houseAnimals' | 'roomTiles'>): Record<string, AnimalKey> => {
+  const rooms = new Set(player.roomTiles.map(tile => `${tile.row}-${tile.col}`))
+  return Object.fromEntries(Object.entries(player.houseAnimals).filter(([room]) => rooms.has(room)))
+}
+
+export const countRoomAnimals = (player: Pick<PlayerState, 'houseAnimals' | 'roomTiles'>, type?: AnimalKey): number =>
+  Object.values(getRoomAnimals(player)).filter(animal => type === undefined || animal === type).length
+
 const ZERO: AnimalCounts = createAnimalCounts()
 
 const addCounts = (
@@ -112,9 +120,7 @@ export const getAssignedAnimalsByType = (player: PlayerState, state?: GameState)
       result[pasture.animalType] = (result[pasture.animalType] ?? 0) + pasture.animalCount
     }
   }
-  if (player.houseAnimalType && player.houseAnimalCount > 0 && isAnimalKey(player.houseAnimalType)) {
-    result[player.houseAnimalType] = (result[player.houseAnimalType] ?? 0) + player.houseAnimalCount
-  }
+  for (const animal of Object.values(getRoomAnimals(player))) result[animal] = (result[animal] ?? 0) + 1
   for (const animal of Object.values(player.stableAnimals ?? {})) {
     if (animal && isAnimalKey(animal)) result[animal] = (result[animal] ?? 0) + 1
   }
@@ -167,11 +173,11 @@ export const subtractAnimalsFromBoard = (
       if (pasture.animalCount <= 0) pasture.animalType = null
     }
     // 2. house animal
-    if (remaining > 0 && player.houseAnimalType === type && player.houseAnimalCount > 0) {
-      const take = Math.min(player.houseAnimalCount, remaining)
-      player.houseAnimalCount -= take
-      remaining -= take
-      if (player.houseAnimalCount <= 0) player.houseAnimalType = null
+    for (const [room, animal] of Object.entries(getRoomAnimals(player))) {
+      if (remaining <= 0) break
+      if (animal !== type) continue
+      delete player.houseAnimals[room]
+      remaining -= 1
     }
     // 3. stable animals (each key = 1 animal)
     if (remaining > 0 && player.stableAnimals) {

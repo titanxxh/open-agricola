@@ -1,3 +1,4 @@
+import { countRoomAnimals } from '../../domain/animals'
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
@@ -10,7 +11,7 @@ const countPigsOnFarm = (player: CardListenerContext['player']): number => {
   for (const pasture of player.pastures) {
     if (pasture.animalType === 'boar') count += pasture.animalCount ?? 0
   }
-  if (player.houseAnimalType === 'boar') count += player.houseAnimalCount ?? 0
+  count += countRoomAnimals(player, 'boar')
   for (const animal of Object.values(player.stableAnimals ?? {})) {
     if (animal === 'boar') count++
   }

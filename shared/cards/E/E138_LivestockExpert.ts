@@ -1,3 +1,4 @@
+import { getRoomAnimals } from '../../domain/animals'
 import { defineOccupationCard } from '../card-source'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
@@ -17,8 +18,8 @@ const cardImpl = {
         pastureAnimals[pasture.animalType] = (pastureAnimals[pasture.animalType] ?? 0) + pasture.animalCount
       }
     }
-    if (player.houseAnimalType && player.houseAnimalCount > 0) {
-      pastureAnimals[player.houseAnimalType] = (pastureAnimals[player.houseAnimalType] ?? 0) + player.houseAnimalCount
+    for (const animal of Object.values(getRoomAnimals(player))) {
+      pastureAnimals[animal] = (pastureAnimals[animal] ?? 0) + 1
     }
 
     const animalTotals = [

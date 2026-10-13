@@ -373,8 +373,7 @@ export type PlayerState = {
   occupationPlayed: string[]
   extraOccupationsFromCards: string[]
   playedCards: string[]
-  houseAnimalType: AnimalKey | null
-  houseAnimalCount: number
+  houseAnimals: Record<string, AnimalKey>
   stableAnimals: Record<string, AnimalKey | null>
   pastures: Pasture[]
   fenceSegments: FenceSegment[]
@@ -1261,7 +1260,8 @@ export type InteractionAnimalReorgZone = {
   farmPosition?: FarmTilePosition
   countsFarmyardSpaceAsUnused?: boolean
   displaySource?: 'played-card' | 'farm-position' | 'borrowed-played-card'
-  exclusiveCardZoneLimit?: number
+  occupancyGroup?: string
+  occupiedZoneLimit?: number
   requiredEmptyZoneGroupIds?: string[]
 }
 

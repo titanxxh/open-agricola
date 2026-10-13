@@ -135,7 +135,7 @@ export type FarmBoardProjection = {
   pastureTiles: Map<string, FarmBoardProjectionPastureTile>
   pastureDisplayMap: Map<string, FarmBoardProjectionAnimalDisplay>
   pastureCapacityMap: Map<string, number>
-  houseDisplay: FarmBoardProjectionAnimalDisplay
+  houseDisplayMap: Map<string, FarmBoardProjectionAnimalDisplay>
   stableDisplayMap: Map<string, FarmBoardProjectionAnimalDisplay>
   cardDisplayMap: Map<string, CardAnimalDisplay>
   farmCardDisplayMap: Map<string, CardAnimalDisplay>
@@ -488,21 +488,14 @@ const attachTileRenderState = (
   })
 }
 
-const buildHouseDisplay = (
-  displayPlayer: PlayerState | null | undefined,
+const buildHouseDisplayMap = (
+  displayPlayer: (PlayerState & { roomAnimalZones?: InteractionAnimalReorgZone[] }) | null | undefined,
   animalReorg: AnimalReorgState | null | undefined,
-): FarmBoardProjectionAnimalDisplay => {
-  if (animalReorg) {
-    const zone = animalReorg.zones.find((entry) => entry.zoneType === 'house')
-    return {
-      animalType: zone?.animalType ?? null,
-      animalCount: zone?.animalCount ?? 0,
-    }
-  }
-  return {
-    animalType: displayPlayer?.houseAnimalType ?? null,
-    animalCount: displayPlayer?.houseAnimalCount ?? 0,
-  }
+): Map<string, FarmBoardProjectionAnimalDisplay> => {
+  const zones = animalReorg?.zones ?? displayPlayer?.roomAnimalZones ?? []
+  return new Map(zones.filter(zone => zone.zoneType === 'house' && zone.farmPosition).map(zone => [
+    positionKey(zone.farmPosition!), { animalType: zone.animalType, animalCount: zone.animalCount },
+  ]))
 }
 
 const buildReorgRemaining = (
@@ -659,7 +652,7 @@ export const buildFarmBoardProjection = ({
   const pastureTiles = buildPastureTiles(displayPlayer)
   const pastureDisplayMap = buildPastureDisplayMap(displayPlayer, animalReorg)
   const pastureCapacityMap = buildPastureCapacityMap(displayPlayer, pastureCapacities)
-  const houseDisplay = buildHouseDisplay(displayPlayer, animalReorg)
+  const houseDisplayMap = buildHouseDisplayMap(displayPlayer, animalReorg)
   const stableDisplayMap = buildStableDisplayMap(displayPlayer, animalReorg)
   const cardDisplayMap = buildCardDisplayMap(displayPlayer, animalReorg)
   const farmCardDisplayMap = buildFarmCardDisplayMap(displayPlayer, animalReorg)
@@ -700,7 +693,7 @@ export const buildFarmBoardProjection = ({
       pastureTiles,
       pastureDisplayMap,
       pastureCapacityMap,
-      houseDisplay,
+      houseDisplayMap,
       stableDisplayMap,
       cardDisplayMap,
       farmCardDisplayMap,
@@ -750,7 +743,7 @@ export const buildFarmBoardProjection = ({
     pastureTiles,
     pastureDisplayMap,
     pastureCapacityMap,
-    houseDisplay,
+    houseDisplayMap,
     stableDisplayMap,
     cardDisplayMap,
     farmCardDisplayMap,

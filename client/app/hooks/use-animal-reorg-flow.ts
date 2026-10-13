@@ -47,20 +47,20 @@ const interactionZoneAnimalTotal = (zone: AnimalReorgState['zones'][number]) => 
   return Math.max(0, zone.animalCount ?? 0)
 }
 
-export const wouldExceedExclusiveCardZoneLimit = (
+export const wouldExceedZoneOccupancyLimit = (
   zones: AnimalReorgState['zones'],
   zoneId: string,
 ) => {
   const target = zones.find((zone) => zone.id === zoneId)
-  if (!target || target.zoneType !== 'card' || !target.cardId) return false
-  if (target.exclusiveCardZoneLimit === undefined) return false
+  if (!target) return false
+  if (target.occupiedZoneLimit === undefined) return false
   if (interactionZoneAnimalTotal(target) > 0) return false
-  const limit = Math.max(0, Math.floor(target.exclusiveCardZoneLimit))
+  const limit = Math.max(0, Math.floor(target.occupiedZoneLimit))
   const occupied = zones.filter((zone) =>
     zone.id !== target.id &&
-    zone.zoneType === 'card' &&
-    zone.cardId === target.cardId &&
-    zone.ownerPlayerId === target.ownerPlayerId &&
+    (target.occupancyGroup !== undefined
+      ? zone.occupancyGroup === target.occupancyGroup
+      : zone.cardId === target.cardId && zone.ownerPlayerId === target.ownerPlayerId) &&
     interactionZoneAnimalTotal(zone) > 0
   ).length
   return occupied >= limit
@@ -103,9 +103,9 @@ export const applyAnimalReorgToPlayer = (params: {
       animalCount: count,
     }
   })
-  const houseZone = animalReorg.zones.find((zone) => zone.zoneType === 'house')
-  player.houseAnimalType = houseZone?.animalType ?? null
-  player.houseAnimalCount = houseZone?.animalType && houseZone.animalCount > 0 ? 1 : 0
+  player.houseAnimals = Object.fromEntries(animalReorg.zones
+    .filter(zone => zone.zoneType === 'house' && zone.animalType && zone.animalCount > 0)
+    .map(zone => [zone.id.slice('house:'.length), zone.animalType!]))
   const stableZones = animalReorg.zones.filter((zone) => zone.zoneType === 'stable')
   const stableAnimals: Record<string, AnimalType | null> = {}
   stableZones.forEach((zone) => {

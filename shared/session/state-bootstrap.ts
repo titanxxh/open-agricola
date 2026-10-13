@@ -401,8 +401,7 @@ export const normalizeState = (raw: GameState): GameState => {
               ...minorPlayed.map((id) => `minor:${id}`),
               ...occupationPlayed.map((id) => `occupation:${id}`),
             ],
-      houseAnimalType: player.houseAnimalType ?? null,
-      houseAnimalCount: player.houseAnimalCount ?? 0,
+      houseAnimals: player.houseAnimals ?? {},
       workers: player.workers && player.workers.length > 0
         ? player.workers
         : [
@@ -519,10 +518,8 @@ export const normalizeState = (raw: GameState): GameState => {
         looseStableKeys.has(key),
       ),
     )
-    if (!normalized.houseAnimalType || normalized.houseAnimalCount <= 0) {
-      normalized.houseAnimalType = null
-      normalized.houseAnimalCount = 0
-    }
+    const roomKeys = new Set(normalized.roomTiles.map(positionKey))
+    normalized.houseAnimals = Object.fromEntries(Object.entries(normalized.houseAnimals).filter(([key]) => roomKeys.has(key)))
     return normalized
   })
   const takenImprovements = new Set(
@@ -732,8 +729,7 @@ const createInitialPlayers = (
       occupationPlayed: [],
       extraOccupationsFromCards: [],
       playedCards: [],
-      houseAnimalType: null,
-      houseAnimalCount: 0,
+      houseAnimals: {},
       stableAnimals: {},
       pastures: [],
       fenceSegments: [],

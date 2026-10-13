@@ -6,7 +6,7 @@ import type { AnimalReorgState, PendingAnimalReorg } from '../types/ui'
 import {
   computeReorgAvailableAnimals,
   shouldShowAnimalDiscardPrompt,
-  wouldExceedExclusiveCardZoneLimit,
+  wouldExceedZoneOccupancyLimit,
   type AnimalTotals,
 } from './hooks/use-animal-reorg-flow'
 
@@ -134,7 +134,7 @@ export const useAnimalReorgDraftPresentation = ({
       const available = computeReorgAvailableAnimals(player)
 
       if (delta > 0) {
-        if (wouldExceedExclusiveCardZoneLimit(prev.zones, zoneId)) return prev
+        if (wouldExceedZoneOccupancyLimit(prev.zones, zoneId)) return prev
         const baseTotals = { ...totals }
         const currentCounts = zoneAnimalCounts(current)
         addAnimalCounts(baseTotals, {
