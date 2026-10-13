@@ -7,14 +7,19 @@ import {
 import { runSelectionEffect, validateSelectionEffect } from '../../helpers/selection-effect-registry'
 import { buildFarmPositionSelectionInteraction } from '../../../domain/farmyard-interaction'
 import { validateOccupationHandSelection } from '../../../domain/occupation-hand-selection'
-import { describeTerrainSelection } from '../../../moor/terrain-flow'
+import { describeTerrainSelection, getUnusedTerrainTiles } from '../../../moor/terrain-flow'
+
+const currentSelectionContext = (player: PlayerState, context?: Record<string, unknown>) =>
+  context?.liveTerrainPlacement === true
+    ? { ...context, selectableTiles: getUnusedTerrainTiles(player) }
+    : context
 
 const validateFarmPositions = (
   positions: string[],
   actionContext: Record<string, unknown> | undefined,
   player: PlayerState,
 ) => {
-  const request = buildFarmPositionSelectionRequest(player, actionContext)
+  const request = buildFarmPositionSelectionRequest(player, currentSelectionContext(player, actionContext))
   if (!request.hasConstraints) return { ok: true as const, positionStrings: positions }
   return validateFarmPositionSelection({ request, positions })
 }
@@ -25,7 +30,8 @@ export const selectionAction: ActionDefinition = {
   descriptionKey: 'actions.selection.description',
   roundAvailable: 1,
   gainPerRound: {},
-  canBeExecutedByPlayer: () => true,
+  canBeExecutedByPlayer: (_state, player, context) =>
+    context?.actionContext?.liveTerrainPlacement !== true || getUnusedTerrainTiles(player).length > 0,
   previewEffect: ({ actionContext }) => describeTerrainSelection(actionContext),
   execute: ({ player, actionContext }) => {
     const kind = (actionContext?.selectionKind as string | undefined) ?? 'farm-position'
@@ -41,7 +47,7 @@ export const selectionAction: ActionDefinition = {
         kind: 'selection',
         selection: kind === 'occupation-hand'
           ? { kind: 'occupation-hand', selectableCards: player.occupationHand, maxSelections, minSelections }
-          : buildFarmPositionSelectionInteraction(player, actionContext),
+          : buildFarmPositionSelectionInteraction(player, currentSelectionContext(player, actionContext)),
         options: [{ value: 'confirm', labelKey: 'ui.interactionSelectionConfirm' }],
       },
       promptKey,

@@ -28,14 +28,16 @@ type BuildTerrainSelectionLeafOptions = {
   kind?: FarmTerrainKind
   fromKind?: FarmTerrainKind
   toKind?: FarmTerrainKind
-  selectableTiles: FarmTilePosition[]
   minSelections?: number
   maxSelections?: number
   allowedSelectionCounts?: number[]
   optional?: boolean
   gainPerSelection?: Partial<Resource>
   bonusVpPerSelection?: number
-}
+} & (
+  | { selectableTiles: FarmTilePosition[] }
+  | { mode: 'place'; kind: FarmTerrainKind; liveTerrainPlacement: true }
+)
 
 const isTerrainKind = (value: unknown): value is FarmTerrainKind =>
   value === 'forest' || value === 'moor'
@@ -112,6 +114,9 @@ export const buildPlaceTerrainFlow = (
     optional,
   })
 }
+
+export const buildLivePlaceTerrainFlow = (sourceCard: string, kind: FarmTerrainKind): ActionFlow =>
+  buildTerrainSelectionLeaf({ sourceCard, mode: 'place', kind, liveTerrainPlacement: true, maxSelections: 1 })
 
 export const buildMoorToFieldFlow = (
   sourceCard: string,
@@ -281,7 +286,7 @@ registerSelectionEffect(TERRAIN_SELECTION_EFFECT, ({ player, positions, sourceCa
 
 export const buildTerrainSelectionLeaf = (
   options: BuildTerrainSelectionLeafOptions,
-): ActionFlow => ({
+): Extract<ActionFlow, { type: 'leaf' }> => ({
   type: 'leaf',
   actionId: 'selection',
   sourceCard: options.sourceCard,
@@ -290,8 +295,10 @@ export const buildTerrainSelectionLeaf = (
     selectionKind: 'farm-position',
     selectionEffect: TERRAIN_SELECTION_EFFECT,
     minSelections: options.minSelections ?? (options.optional ? 0 : 1),
-    maxSelections: options.maxSelections ?? options.selectableTiles.length,
-    selectableTiles: options.selectableTiles,
+    maxSelections: options.maxSelections ?? ('selectableTiles' in options ? options.selectableTiles.length : 1),
+    ...('selectableTiles' in options
+      ? { selectableTiles: options.selectableTiles }
+      : { liveTerrainPlacement: true }),
     terrainMode: options.mode,
     ...(options.kind ? { terrainKind: options.kind } : {}),
     ...(options.fromKind ? { terrainFromKind: options.fromKind } : {}),
