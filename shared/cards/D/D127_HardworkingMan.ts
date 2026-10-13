@@ -19,7 +19,7 @@ registerPlayerActionSpace({
       type: 'or', children: [
         { type: 'leaf', actionId: 'day-laborer', sourceCard: CARD_ID },
         { type: 'leaf', actionId: 'construct', sourceCard: CARD_ID },
-        { type: 'leaf', actionId: 'improvement', sourceCard: CARD_ID },
+        { type: 'leaf', actionId: 'improvement', sourceCard: CARD_ID, params: { types: ['major'] } },
       ],
     }),
   }),

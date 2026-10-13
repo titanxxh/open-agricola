@@ -159,7 +159,7 @@ import {
   isMajorImprovementPlayable,
   isMinorImprovementPlayable,
 } from '../actions/effects/improvement.ts'
-import { isBlockedByMajorImprovementActionGate } from '../actions/helpers/improvement-helpers'
+import { isMinorImprovementEligibleForAction } from '../actions/helpers/improvement-helpers'
 import { getPlayerActionSpaceConfig } from '../cards/player-action-space.ts'
 import {
   getOccupationActionCost,
@@ -4274,10 +4274,10 @@ export class GameCore {
       result[`minor:${improvementId}`] =
         (canUseMinorImprovement &&
           basePlayable &&
-          !isBlockedByMajorImprovementActionGate(improvement, ['minor'])) ||
+          isMinorImprovementEligibleForAction(improvement, ['minor'])) ||
         (canUseImprovementAny &&
           basePlayable &&
-          !isBlockedByMajorImprovementActionGate(improvement, ['major', 'minor']))
+          isMinorImprovementEligibleForAction(improvement, ['major', 'minor']))
     })
 
     getAvailableMajorImprovementIds(this.state).forEach((improvementId) => {
