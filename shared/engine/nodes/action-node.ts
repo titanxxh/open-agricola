@@ -15,6 +15,7 @@ export class ActionNode extends BaseNode {
   public sourceCard?: string
   public params?: Record<string, unknown>
   public expandFlow?: boolean
+  public expandFlowIdStyle?: 'flow' | 'session'
   public actionContext?: Record<string, unknown>
   public effectPreview?: ChoiceEffectPreview
   public choiceLabelKey?: string
@@ -112,6 +113,7 @@ export class ActionNode extends BaseNode {
       sourceCard: this.sourceCard,
       params: this.params,
       expandFlow: this.expandFlow,
+      expandFlowIdStyle: this.expandFlowIdStyle,
       actionContext: this.actionContext,
       effectPreview: this.effectPreview,
       choiceLabelKey: this.choiceLabelKey,

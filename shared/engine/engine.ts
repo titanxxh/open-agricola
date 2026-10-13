@@ -213,6 +213,9 @@ const restoreTreeFromCursor = (cursors: NodeCursor[]): EngineNode | null => {
           }
         }
         action.expandFlow = data.expandFlow === true ? true : undefined
+        if (data.expandFlowIdStyle === 'session' || data.expandFlowIdStyle === 'flow') {
+          action.expandFlowIdStyle = data.expandFlowIdStyle
+        }
         action.beforePhaseResolved = data.beforePhaseResolved === true
         action.bodyStarted = data.bodyStarted === true
         action.selectedBranchChoice = typeof data.selectedBranchChoice === 'string' ? data.selectedBranchChoice : undefined
@@ -337,8 +340,13 @@ export class Engine {
 
   static fromAction(actionId: string, deps: EngineDeps, ownerPlayerId?: string): Engine {
     const action = deps.registry.get(actionId)
-    if (action?.flow) return Engine.fromFlow({ type: 'leaf', actionId, expandFlow: true }, deps, ownerPlayerId)
     const actionNode = new ActionNode(`action-${actionId}`, actionId)
+    if (action?.flow) {
+      actionNode.expandFlow = true
+      actionNode.expandFlowIdStyle = 'session'
+      actionNode.ownerPlayerId = ownerPlayerId
+      return Engine.fromRoot(actionNode, deps)
+    }
     const root = action?.resolveChoice
       ? new SequenceNode(`seq-${actionId}`, [actionNode])
       : actionNode

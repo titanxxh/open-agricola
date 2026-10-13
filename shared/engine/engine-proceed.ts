@@ -38,6 +38,7 @@ import {
   buildFollowUpNodes,
   buildListenerEvent,
   buildOwnedFlowNode,
+  buildFlowNode,
   buildReplacementChoiceNode,
   canActionContinueWithoutBeforeTriggers,
   getBeforeContinuationContext,
@@ -53,6 +54,7 @@ import {
   pendingEnvelopeFromHostNode,
   resolveSubtree,
   stampBeforeHostNode,
+  stampOwner,
   stampContinuationParentHost,
   stampSuppressedBeforeListeners,
 } from './engine-utils'
@@ -1131,7 +1133,9 @@ export function engineProceed(
     if (node.expandFlow && action.flow) {
       const flow = mergeContextIntoFlow(action.flow,
         { ...actionContext, checkedReplaceAction: false }, replaceSourceCard)
-      const expanded = buildOwnedFlowNode(int, flow, context.player.id)
+      const optionId = typeof actionContext?.optionId === 'string' ? actionContext.optionId : undefined
+      const expanded = stampOwner(buildFlowNode(int, flow, context.player.id,
+        optionId, node.expandFlowIdStyle), context.player.id)
       if (node.mandatory) enforceCompositeContinuationMandatory(expanded)
       const parent = int.tree.findParent(node.id)
       const branchIndex = parent instanceof OrNode || parent instanceof XorNode
@@ -1141,7 +1145,7 @@ export function engineProceed(
       if ((parent instanceof OrNode || parent instanceof XorNode) && parent.selectedChildId === node.id) {
         parent.selectedChildId = parent.children[branchIndex]!.id
       }
-      return engineProceed(int, context)
+      return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
     }
     const executionContext: ActionExecutionContext = {
       state: context.state,

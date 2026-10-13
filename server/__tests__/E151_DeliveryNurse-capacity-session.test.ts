@@ -71,6 +71,19 @@ describe('E151 Delivery Nurse extra housing', () => {
     expect(response.state.events.some((event) => event.type === 'card.triggered' && event.sourceCardId === CARD_ID)).toBe(false)
   })
 
+  it('preserves its allowance when the player cancels before accepting its sole legal replacement', () => {
+    const session = setup(false)
+    const offered = session.takeAction(0, 'wish-children')
+    expect(choiceOptions(offered)).toHaveLength(1)
+    expect(choiceOptions(offered)[0]!.sourceCard).toBe(CARD_ID)
+    expect(familySize(offered.state.players[0]!)).toBe(2)
+    const response = session.undoAction()
+    expect(response.ok, response.error).toBe(true)
+    expect(familySize(response.state.players[0]!)).toBe(2)
+    expect(response.state.players[0]!.cardStates[CARD_ID]?.flagged).not.toBe(true)
+    expect(response.state.actionSpaces.find((space) => space.id === 'wish-children')!.takenBy).toHaveLength(0)
+  })
+
   it('restores its allowance and growth when the player undoes an accepted replacement', () => {
     const session = setup(false)
     let response = session.takeAction(0, 'wish-children')
