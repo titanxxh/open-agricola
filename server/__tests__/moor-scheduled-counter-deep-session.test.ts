@@ -2,8 +2,26 @@ import { descriptionEffects } from './_helpers/choice-description'
 import { describe, expect, it } from 'vitest'
 import { setupMoorAudit, playMoorAuditMinor, advanceMoorAuditToRound } from './_helpers/moor-rules-audit'
 import { markAllWorkersUsed, workersAvailable } from '../../shared/domain/player'
+import type { SessionResponse } from '../game/authoritative-session'
 
 const HARVESTS = [4, 7, 9, 11, 13]
+
+const openScheduledOffer = (session: ReturnType<typeof setupMoorAudit>, response: SessionResponse, cardId: string) => {
+  for (let step = 0; step < 3; step++) {
+    expect(response.interaction.stateId).toBe('wait')
+    if (response.interaction.stateId !== 'wait' || !('options' in response.interaction.request)) {
+      throw new Error('Expected the scheduled source choice')
+    }
+    const options = response.interaction.request.options ?? []
+    if (options.some(option => option.value.startsWith('offer:') || option.value.startsWith('buy:'))) return response
+    const source = options.find(option => !option.disabled && (option.value === cardId || option.sourceCard === cardId))
+    expect(source, JSON.stringify(response.interaction)).toBeDefined()
+    if (!source) throw new Error('Expected the scheduled source')
+    response = session.resolveChoice(response.interaction.playerIndex, source.value)
+    expect(response.ok, response.error).toBe(true)
+  }
+  throw new Error('Expected the scheduled offer choices')
+}
 
 describe('Moor scheduled and counter clause audit', () => {
   it('M125 pays its cost and exhausts all three actual counters while preserving nonempty stocks', () => {
@@ -102,7 +120,7 @@ describe('Moor scheduled and counter clause audit', () => {
     playMoorAuditMinor(session, 'M056_PeatCuttingRights')
     for (const [index, round] of [5, 8].entries()) {
       const fuel = session.state.players[0]!.resources.fuel!
-      let response = advanceMoorAuditToRound(session, round)
+      let response = openScheduledOffer(session, advanceMoorAuditToRound(session, round), 'M056_PeatCuttingRights')
       expect(response.interaction.sourceCard).toBe('M056_PeatCuttingRights')
       const option = response.interaction.request.options.find((entry) => entry.value.endsWith(`:cut-peat:0:${index + 2}`))!
       expect(option).toBeDefined()
@@ -129,7 +147,7 @@ describe('Moor scheduled and counter clause audit', () => {
     for (const [index, animal] of animals.entries()) {
       session.state.players.forEach((player) => { player.resources.food = 20; player.resources.fuel = 20 })
       const round = 3 + index * 2
-      response = advanceMoorAuditToRound(session, round)
+      response = openScheduledOffer(session, advanceMoorAuditToRound(session, round), 'M131_CattleStall')
       expect(response.interaction.sourceCard).toBe('M131_CattleStall')
       expect(response.interaction.request.options.map((entry) => entry.value)).toEqual([`buy:${animal}`, '__skip__'])
       const before = JSON.stringify(response.state)

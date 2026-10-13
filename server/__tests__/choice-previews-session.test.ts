@@ -148,7 +148,11 @@ describe('authoritative choice previews', () => {
       { id: 'test-cut-peat', kind: 'moor-special-action', dueRound: 6, actionId: 'cut-peat', consumed: false },
     ] } }
     session.state.players.forEach((candidate) => markAllWorkersUsed(session.state, candidate))
-    const response = session.performRoundEnd()
+    let response = session.performRoundEnd()
+    const activation = choices(response).find(option => option.sourceCard === 'M056_PeatCuttingRights'
+      && option.value.startsWith('action-activate-card-effect-'))
+    expect(activation).toBeDefined()
+    response = session.resolveChoice(response.interaction.playerIndex, activation!.value)
     const options = choices(response).filter((option) => option.value !== '__skip__')
     expect(options.map((option) => option.target)).toEqual([
       { kind: 'farm-cell', playerId: player.id, positions: [{ row: 2, col: 0 }] },
