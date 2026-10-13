@@ -101,11 +101,18 @@ describe('scheduled terrain in the BGA StartOfTurn window', () => {
     if (response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'selection'
       || response.interaction.request.selection.kind !== 'farm-position') throw new Error('Expected the live Nursery terrain choice')
     expect(response.interaction.request.selection.selectablePositions).toEqual([{ row: 0, col: 0 }])
+    const rejected = session.commitSelectionChoice(response.interaction.playerIndex, {
+      positions: [response.state.players[0]!.roomTiles[0]!],
+    })
+    expect(rejected.ok).toBe(false)
+    expect(rejected.error).toBe('invalid selection position')
+    expect(rejected.state.players[0]!.farmTerrain).toEqual([])
+    expect(rejected.interaction).toEqual(response.interaction)
     response = session.commitSelectionChoice(response.interaction.playerIndex, { positions: ['0-0'] })
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.farmTerrain).toEqual([{ row: 0, col: 0, kind: 'forest' }])
     expect(response.state.futureMeeples).toEqual([])
-    expect(response.state.events.filter(event => event.type === 'card.played' && event.cardId === EXPEDITION)).toHaveLength(1)
+    expect(response.state.events.filter(event => event.type === 'card.passed' && event.cardId === EXPEDITION)).toHaveLength(1)
     expect(response.state.events.filter(event => event.type === 'futureMeeple.resolved' && event.cardId === NURSERY)).toHaveLength(1)
     expect(response.state.roundPhase).toBe('work')
     expect(response.interaction.stateId).toBe('idle')

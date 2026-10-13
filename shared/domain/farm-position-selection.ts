@@ -1,6 +1,6 @@
 import type { FarmPositionSelectionTarget, FarmTilePosition, PlayerState } from '../contract/types'
 import { positionKey } from './farm'
-import { getUsedFarmyardTileKeys } from './farmyard-usage-core'
+import { getUnusedFarmyardTilePositions, getUsedFarmyardTileKeys } from './farmyard-usage-core'
 
 export type FarmPositionSelectionRequest = {
   selectablePositions: FarmPositionSelectionTarget[]
@@ -95,8 +95,9 @@ export const buildFarmPositionSelectionRequest = (
   const explicitSelectablePositions = Array.isArray(actionContext?.selectableTiles)
     ? normalizePositions(actionContext.selectableTiles)
     : null
-  const selectablePositions = explicitSelectablePositions ??
-    fieldPositionsForFilter(player, actionContext?.positionFilter as string | undefined)
+  const selectablePositions = actionContext?.liveTerrainPlacement === true
+    ? getUnusedFarmyardTilePositions(player)
+    : explicitSelectablePositions ?? fieldPositionsForFilter(player, actionContext?.positionFilter as string | undefined)
   const minSelections =
     typeof actionContext?.minSelections === 'number' ? actionContext.minSelections : 1
   const maxSelections =

@@ -1,11 +1,11 @@
 import type { ActionFlow, ChoiceEffectPreview, FarmTilePosition, PlayerState, Resource } from '../contract/types'
 import {
-  getFarmyardTilePositions,
   isWithinFarmyard,
   parsePositionKey,
   positionKey,
 } from '../domain/farm'
 import { getUsedFarmyardTileKeys } from '../domain/farmyard-usage'
+import { getUnusedFarmyardTilePositions } from '../domain/farmyard-usage-core'
 import { getPlacementBlockedFarmyardSpaceKeys } from '../domain/farmyard-space-states'
 import { registerSelectionEffect, registerSelectionValidator } from '../actions/helpers/selection-effect-registry'
 import {
@@ -74,14 +74,7 @@ export const getTerrainTiles = (
   kind?: FarmTerrainKind,
 ): FarmTilePosition[] => getVisibleTerrainTiles(player, kind)
 
-export const getUnusedTerrainTiles = (player: PlayerState): FarmTilePosition[] => {
-  const used = getUsedFarmyardTileKeys(player)
-  const blocked = getPlacementBlockedFarmyardSpaceKeys(player)
-  return getFarmyardTilePositions(player).filter((tile) => {
-    const key = positionKey(tile)
-    return !used.has(key) && !blocked.has(key)
-  })
-}
+export const getUnusedTerrainTiles = getUnusedFarmyardTilePositions
 
 const hasAdjacentField = (player: PlayerState, tile: FarmTilePosition): boolean => {
   if ((player.fields ?? []).length === 0) return true
