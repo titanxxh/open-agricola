@@ -1,8 +1,11 @@
 import { defineOccupationCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import type { RoundPreparationContext } from '../../contract/card-effect-hooks'
 
 const CARD_ID = 'A096_TaskArtisan'
+const isStoneQuarryReveal = (context?: RoundPreparationContext): boolean => context?.kind === 'after-reveal'
+  && (context.revealedAction?.actionId === 'western-quarry' || context.revealedAction?.actionId === 'eastern-quarry')
 /**
  * A96 Task Artisan:
  * - onBuy: gain 1 wood + optional minor improvement action.
@@ -32,10 +35,11 @@ const cardImpl = {
   effect: {
     id: CARD_ID,
     onBuy: () => buildTaskArtisanFlow(),
+    stageEligibility: {
+      onAfterRevealAction: (_state, _player, ctx) => isStoneQuarryReveal(ctx.roundPreparation),
+    },
     onAfterRevealAction: (_state, _player, ctx) => {
-      const revealedAction = ctx?.roundPreparation?.kind === 'after-reveal'
-        ? ctx.roundPreparation.revealedAction?.actionId : undefined
-      if (revealedAction !== 'western-quarry' && revealedAction !== 'eastern-quarry') return
+      if (!isStoneQuarryReveal(ctx?.roundPreparation)) return
       return buildTaskArtisanFlow()
     },
   },

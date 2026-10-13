@@ -52,6 +52,7 @@ const GROUP_FIELDS = {
   optionId: false,
   mode: false,
   triggerSelectOnce: false,
+  requiresExplicitChoice: false,
   choiceLabelKey: false,
   choiceLabelParams: false,
   targetPlayerId: false,

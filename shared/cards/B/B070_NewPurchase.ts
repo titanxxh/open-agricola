@@ -1,25 +1,32 @@
 import { defineMinorCard } from '../card-source'
-import { payGainFlow } from '../helpers/pay-gain-node'
+import { payGainActionFlow } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import type { RoundPreparationContext } from '../../contract/card-effect-hooks'
 
 const CARD_ID = 'B070_NewPurchase'
 const harvestRounds = [4, 7, 9, 11, 13, 14]
+const isHarvestPreparation = (round: number, context?: RoundPreparationContext): boolean =>
+  harvestRounds.includes(context?.kind === 'before-reveal' ? context.nextRound : round)
 
 const cardImpl = {
   effect: {
-  id: CARD_ID,
-  onBeforeStartOfTurn: (state, _player, ctx) => {
-    const upcomingRound = ctx?.roundPreparation?.kind === 'before-reveal' ? ctx.roundPreparation.nextRound : state.round
-    if (!harvestRounds.includes(upcomingRound)) return
-    return {
-      type: 'seq',
-      children: [
-        payGainFlow({ cardId: CARD_ID, cost: { food: 2 }, gain: { grain: 1 }, promptKey: 'ui.interactionNewPurchaseGrain' }),
-        payGainFlow({ cardId: CARD_ID, cost: { food: 4 }, gain: { vegetable: 1 }, promptKey: 'ui.interactionNewPurchaseVegetable' }),
-      ],
-    }
+    id: CARD_ID,
+    stageEligibility: {
+      onBeforeStartOfTurn: (state, _player, ctx) => isHarvestPreparation(state.round, ctx.roundPreparation),
+    },
+    onBeforeStartOfTurn: (state, _player, ctx) => {
+      if (!isHarvestPreparation(state.round, ctx?.roundPreparation)) return
+      return {
+        type: 'or',
+        optional: true,
+        requiresExplicitChoice: true,
+        children: [
+          payGainActionFlow({ cardId: CARD_ID, cost: { food: 2 }, gain: { grain: 1 } }),
+          payGainActionFlow({ cardId: CARD_ID, cost: { food: 4 }, gain: { vegetable: 1 } }),
+        ],
+      }
+    },
   },
-},
   reaches: [] as readonly string[],
 } satisfies CardImpl
 

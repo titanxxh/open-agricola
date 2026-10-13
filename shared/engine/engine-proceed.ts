@@ -566,7 +566,8 @@ const buildOptionalPrompt = (
     { value: '__skip__', labelKey: 'ui.interactionOptionalSkip' },
   ]
   const optionalPromptKey = node.optionalPromptKey ?? 'ui.interactionOptionalAction'
-  const request: InteractionRequest = { kind: 'choice', options: optionalOptions, anytimeWindow: node.anytimeWindow }
+  const request: InteractionRequest = { kind: 'choice', options: optionalOptions, anytimeWindow: node.anytimeWindow,
+    ...(node.requiresExplicitChoice ? { requiresExplicitChoice: true } : {}) }
   node.setPending({
     hostNodeId: node.id,
     request,
@@ -1000,7 +1001,10 @@ export function engineProceed(
       : (node.promptKey ?? 'ui.interactionFlowSelect')
     node.setPending({
       hostNodeId: node.id,
-      request: { kind: 'choice', options, anytimeWindow: node.anytimeWindow, ...(replacementOriginalNodeId ? { requiresExplicitChoice: true } : {}) },
+      request: { kind: 'choice', options, anytimeWindow: node.anytimeWindow,
+        ...(replacementOriginalNodeId || (node.requiresExplicitChoice
+          && (node instanceof XorNode || node.children.some(child => child.getState() !== 'resolved')))
+          ? { requiresExplicitChoice: true } : {}) },
       choices: options,
       promptKey: compositePromptKey,
       promptParams: undefined,

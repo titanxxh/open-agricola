@@ -83,6 +83,9 @@ const stageReactionHooks = new Set<StageResumeState['hook']>([
   'onEndHarvestFieldPhase',
 ])
 
+const containsOptionalFlow = (flow: ActionFlow): boolean => flow.optional === true
+  || (flow.type !== 'leaf' && flow.children.some(containsOptionalFlow))
+
 export class StageDispatch {
   private readonly host: StageDispatchHost
   private readonly continuations: StageContinuationTable
@@ -325,7 +328,10 @@ export class StageDispatch {
         activation.optional = preview.flow?.optional === true ? true : undefined
       }
       if (preview?.flow?.promptKey) activation.promptKey = preview.flow.promptKey
-      activation.actionContext = { ...activation.actionContext, previewDoable: preview?.applicable === true
+      activation.actionContext = { ...activation.actionContext,
+        previewHasNestedOptional: !!preview?.flow && preview.flow.type !== 'leaf'
+          && preview.flow.children.some(containsOptionalFlow),
+        previewDoable: preview?.applicable === true
         && (!preview.flow || (this.host.canStartFlow?.({ ...preview.flow, optional: false }, this.state.players.indexOf(player)) ?? true)) }
       children.push(activation)
     }
@@ -355,7 +361,9 @@ export class StageDispatch {
         : (this.host.canStartFlow?.({ ...single, optional: false }, playerIndex) ?? true))
       const singleActivation = single?.type === 'leaf' && single.actionId === 'activate-card-effect' ? single : undefined
       const eligibleOptionalSource = children.some(child => child.optional === true)
-      if (eligibleOptionalSource && (!single || !singleDoable || !singleActivation)) children.push(tagInjectedAnytimeFlow({
+      const nestedOptionalSource = children.some(child => child.type === 'leaf'
+        && child.actionId === 'activate-card-effect' && child.actionContext?.previewHasNestedOptional === true)
+      if (nestedOptionalSource || (eligibleOptionalSource && (!single || !singleDoable || !singleActivation))) children.push(tagInjectedAnytimeFlow({
         type: 'leaf', actionId: 'exchange', optional: true, targetPlayerId: player.id,
         choiceLabelKey: 'actions.exchange.name', actionContext: { anytimeInteractionKind: 'choice', includeBasicConversions: true },
       }))

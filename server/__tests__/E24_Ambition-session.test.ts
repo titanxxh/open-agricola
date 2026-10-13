@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
+import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 import { familySize, setWorkersAtHome } from '../../shared/domain/player'
 
 import '../../shared/cards/E/E024_Ambition'
@@ -165,6 +166,8 @@ describe('E024 Ambition parity', () => {
     session.loadState(state)
 
     let response = session.continueBeforeStartOfTurn()
+    response = resolveTriggerIfPresent(session, response, TASK_ARTISAN)
+    expect(response.state.players[0]!.resources.wood).toBe(11)
     response = enterOptionalImprovement(session, response)
 
     expect(response.interaction.stateId).toBe('wait')

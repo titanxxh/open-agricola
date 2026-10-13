@@ -144,6 +144,7 @@ const restoreSharedCursorData = (node: EngineNode, data: Record<string, unknown>
   }
   if (typeof data.optional === 'boolean') node.optional = data.optional
   if (typeof data.optionalActive === 'boolean') node.optionalActive = data.optionalActive
+  if (typeof data.requiresExplicitChoice === 'boolean') node.requiresExplicitChoice = data.requiresExplicitChoice
   if (typeof data.optionalPromptKey === 'string') {
     node.optionalPromptKey = data.optionalPromptKey as PromptKey
   }
@@ -676,6 +677,17 @@ export class Engine {
       : buildFlowNode(internals, flow))
     if (!ctx) flowNodes.forEach(enforceCompositeContinuationMandatory)
     const nextUnresolved = this.tree.nextUnresolved()
+    if (!ctx && (nextUnresolved instanceof OrNode || nextUnresolved instanceof XorNode)
+      && nextUnresolved.getPending() !== null) {
+      nextUnresolved.clearPending()
+      nextUnresolved.emittedChoices = []
+      nextUnresolved.emittedRequest = undefined
+      nextUnresolved.emittedPromptKey = undefined
+      nextUnresolved.emittedPromptParams = undefined
+      nextUnresolved.pendingContextSnapshot = undefined
+      nextUnresolved.pendingActionId = undefined
+      if (this._pendingNodeIdRef.value === nextUnresolved.id) this._pendingNodeIdRef.value = null
+    }
     if (ctx && nextUnresolved) {
       enforceCompositeContinuationMandatory(nextUnresolved)
       nextUnresolved.beforeAnytimeAvailable = true

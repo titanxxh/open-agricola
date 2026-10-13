@@ -64,13 +64,31 @@ const endRound = (session: GameSession) => {
   return session.performRoundEnd()
 }
 
-const chooseByResource = (session: GameSession, response: SessionResponse, resource: string) => {
-  if (response.interaction.stateId !== 'wait') return response
-  const option = options(response).find((candidate) => candidate.value !== '__skip__'
-    && JSON.stringify(candidate).includes(resource))
-    ?? options(response).find((candidate) => candidate.value !== '__skip__')
-  expect(option, JSON.stringify(response.interaction)).toBeDefined()
-  return session.resolveChoice(response.interaction.playerIndex, option!.value)
+const chooseByResource = (session: GameSession, response: SessionResponse, resource: 'grain' | 'vegetable') => {
+  const before = response.state.players[0]!.resources[resource]
+  for (let step = 0; step < 3; step++) {
+    if (response.interaction.stateId !== 'wait') throw new Error('Expected the crop purchase choice')
+    const crop = options(response).find(candidate => !candidate.disabled && candidate.effectPreview?.kind === 'resourceExchange'
+      && candidate.effectPreview.resourcesGained?.[resource] === 1)
+    const source = crop ?? options(response).find(candidate => !candidate.disabled && candidate.sourceCard === 'B070_NewPurchase')
+    expect(source, JSON.stringify(response.interaction)).toBeDefined()
+    if (!source) throw new Error('New Purchase crop is unavailable')
+    response = session.resolveChoice(response.interaction.playerIndex, source.value)
+    expect(response.ok, response.error).toBe(true)
+    if (response.state.players[0]!.resources[resource] === before + 1) return response
+  }
+  throw new Error('New Purchase did not open its crop choice')
+}
+
+const declinePurchases = (session: GameSession, response: SessionResponse) => {
+  for (let step = 0; step < 3 && response.interaction.stateId === 'wait'; step++) {
+    const exit = options(response).find(option => !option.disabled && ['__skip__', '__done__', '__pass__'].includes(option.value))
+    expect(exit, JSON.stringify(response.interaction)).toBeDefined()
+    if (!exit) throw new Error('The optional crop window cannot finish')
+    response = session.resolveChoice(response.interaction.playerIndex, exit.value)
+    expect(response.ok, response.error).toBe(true)
+  }
+  return response
 }
 
 describe('B070 New Purchase parity', () => {
@@ -81,7 +99,7 @@ describe('B070 New Purchase parity', () => {
 
   it('B070 S2: before a harvest round two food may buy one grain', () => {
     const session = setup({ cardId: 'B070_NewPurchase', round: 3, resources: { food: 2 } })
-    const response = chooseByResource(session, endRound(session), 'grain')
+    const response = declinePurchases(session, chooseByResource(session, endRound(session), 'grain'))
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources).toMatchObject({ food: 0, grain: 1, vegetable: 0 })
   })
@@ -91,14 +109,13 @@ describe('B070 New Purchase parity', () => {
     let response = endRound(session)
     response = chooseByResource(session, response, 'grain')
     response = chooseByResource(session, response, 'vegetable')
+    response = declinePurchases(session, response)
     expect(response.state.players[0]!.resources).toMatchObject({ food: 0, grain: 1, vegetable: 1 })
   })
 
   it('B070 S4: both crop purchases may be declined and non-harvest rounds offer neither', () => {
     const session = setup({ cardId: 'B070_NewPurchase', round: 3, resources: { food: 6 } })
-    let response = endRound(session)
-    if (response.interaction.stateId === 'wait') response = session.resolveChoice(0, '__skip__')
-    if (response.interaction.stateId === 'wait') response = session.resolveChoice(0, '__skip__')
+    const response = declinePurchases(session, endRound(session))
     expect(response.state.players[0]!.resources.food).toBe(6)
     const nonHarvest = endRound(setup({ cardId: 'B070_NewPurchase', round: 5, resources: { food: 6 } }))
     expect(nonHarvest.interaction.stateId !== 'wait' || nonHarvest.interaction.sourceCard !== 'B070_NewPurchase').toBe(true)
