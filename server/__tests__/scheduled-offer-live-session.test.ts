@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { createWorkSession } from './_helpers/session-fixtures'
 import { markAllWorkersUsed } from '../../shared/domain/player'
-import { readScheduledOffers, writeScheduledOffers } from '../../shared/actions/effects/internal/scheduled-offers'
+import { readScheduledOffers, writeScheduledOffers, type ScheduledOffer } from '../../shared/actions/effects/internal/scheduled-offers'
 import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/serialization'
 
 const GREENHOUSE = 'D069_SmallGreenhouse'
@@ -12,17 +12,23 @@ afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
 
 // A due purchase is a fixed StartOfTurn source. Its food cost is checked from
 // live resources; opening the choice or rejecting a command cannot consume it.
-const prepare = (food: number, grain: number) => {
+const prepare = (food: number, grain: number, { cardId = GREENHOUSE, offers, moor = false }: {
+  cardId?: string; offers?: ScheduledOffer[]; moor?: boolean
+} = {}) => {
   const session = createWorkSession({
     seed: 4242,
+    options: moor ? { enableFarmersOfTheMoor: true, allowIncompleteMoorMinorPool: true } : undefined,
     configure(state) {
       state.round = 6
-      for (const player of state.players) markAllWorkersUsed(state, player)
+      for (const player of state.players) {
+        markAllWorkersUsed(state, player)
+        if (moor) player.resources.fuel = 40
+      }
       const owner = state.players[0]!
-      owner.minorPlayed = [GREENHOUSE]
+      owner.minorPlayed = [cardId]
       owner.resources.food = food
       owner.resources.grain = grain
-      writeScheduledOffers(owner, GREENHOUSE, [{
+      writeScheduledOffers(owner, cardId, offers ?? [{
         id: OFFER_ID, kind: 'resource-purchase', dueRound: 7,
         resources: { vegetable: 1 }, cost: { food: 1 }, consumed: false,
       }])
@@ -30,6 +36,20 @@ const prepare = (food: number, grain: number) => {
   })
   sessions.push(session)
   return session
+}
+
+const finishRoundSix = (session: GameSession): SessionResponse => {
+  let response = session.performRoundEnd()
+  for (let step = 0; step < 2 && response.state.round === 6; step++) {
+    if (response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'heating') {
+      throw new Error('Expected Moor heating before round seven')
+    }
+    response = session.resolveChoice(response.interaction.playerIndex, 'confirm', {
+      fuel: response.interaction.request.required, convertWood: 0,
+    })
+  }
+  expect(response.ok, response.error).toBe(true)
+  return response
 }
 
 const choose = (session: GameSession, response: SessionResponse, value: string) => {
@@ -56,6 +76,20 @@ const openPurchase = (session: GameSession, response: SessionResponse): SessionR
 }
 
 describe('live scheduled purchase offers', () => {
+  it.each([
+    [GREENHOUSE, false], ['M056_PeatCuttingRights', true], ['M131_CattleStall', true],
+  ] as const)('%s does not open a preparation exchange window without a due offer', (cardId, moor) => {
+    const session = prepare(0, 1, { cardId, offers: [], moor })
+    const response = finishRoundSix(session)
+    expect(response.state.round).toBe(7)
+    expect(response.state.roundPhase).toBe('work')
+    expect(response.interaction.stateId).toBe('idle')
+    expect(response.state.players[0]!.resources).toMatchObject({ food: 0, grain: 1 })
+    expect(readScheduledOffers(response.state.players[0]!, cardId)).toEqual([])
+    expect(response.state.events.some(event => event.type === 'resource.exchanged')).toBe(false)
+    expect(response.state.events.filter(event => event.type === 'action.revealed' && event.roundSlot === 7)).toHaveLength(1)
+  })
+
   it('exchanges grain before buying and restores an unconsumed pending offer after invalid commands', () => {
     const session = prepare(0, 1)
     let response = session.performRoundEnd()

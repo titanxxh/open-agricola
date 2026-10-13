@@ -1,6 +1,7 @@
 import { defineMinorCard } from '../card-source'
 import type { CardImpl } from '../registry'
 import {
+  getDueScheduledOffers,
   scheduledOffersRoundStartFlow,
   writeScheduledOffers,
   type ScheduledOffer,
@@ -11,6 +12,7 @@ const CARD_ID = 'M056_PeatCuttingRights'
 const cardImpl = {
   effect: {
     id: CARD_ID,
+    stageEligibility: { onRoundStart: (state, player) => getDueScheduledOffers(state, player, CARD_ID).length > 0 },
     onBuy: (state, player) => {
       const offers: ScheduledOffer[] = [4, 7]
         .map((offset): ScheduledOffer => ({

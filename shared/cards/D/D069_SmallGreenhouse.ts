@@ -1,6 +1,6 @@
 import { defineMinorCard } from '../card-source'
 import { scheduleOffersNode } from '../../actions/effects/internal/schedule-offers'
-import { scheduledOffersRoundStartFlow, type ScheduledOffer } from '../../actions/effects/internal/scheduled-offers'
+import { getDueScheduledOffers, scheduledOffersRoundStartFlow, type ScheduledOffer } from '../../actions/effects/internal/scheduled-offers'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D069_SmallGreenhouse'
@@ -8,6 +8,7 @@ const CARD_ID = 'D069_SmallGreenhouse'
 const cardImpl = {
   effect: {
   id: CARD_ID,
+  stageEligibility: { onRoundStart: (state, player) => getDueScheduledOffers(state, player, CARD_ID).length > 0 },
   onBuy: (state) => {
     const offsets = [4, 7]
     const targetRounds = offsets

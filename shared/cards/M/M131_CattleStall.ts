@@ -3,6 +3,7 @@ import { animalKeysForState, type AnimalKey } from '../../contract/animals'
 import type { CardImpl } from '../registry'
 import { chooseScheduledOfferPlans } from '../../actions/effects/internal/schedule-offers'
 import {
+  getDueScheduledOffers,
   scheduledOffersRoundStartFlow,
   type ScheduledOffer,
 } from '../../actions/effects/internal/scheduled-offers'
@@ -37,6 +38,7 @@ const scheduleAnimals = (
 const cardImpl = {
   effect: {
     id: CARD_ID,
+    stageEligibility: { onRoundStart: (state, player) => getDueScheduledOffers(state, player, CARD_ID).length > 0 },
     onBuy: (state) => {
       const animals = animalKeysForState(state)
       if (animals.length < 4) return
