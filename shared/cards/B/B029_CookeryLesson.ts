@@ -33,7 +33,7 @@ const LESSONS_TOKEN_KEY = 'lessonsActionToken'
  * triggering listener call. USED_ACTION_TOKEN_KEY guards against double-award
  * within the same action (the two listeners can both detect the match).
  *
- * onRoundStart resets all three tokens defensively (action tokens normally
+ * onBeforeStartOfTurn resets all three tokens defensively (action tokens normally
  * monotonically increase across the game so this is mostly cosmetic).
  */
 
@@ -134,11 +134,12 @@ const cardImpl = {
   listeners: [afterExchangeListener, afterPlaceFarmerListener],
   effect: {
   id: CARD_ID,
-  onRoundStart: (_state, player) => {
-    writeCardExtraData(player, CARD_ID, COOKED_TOKEN_KEY, -1)
-    writeCardExtraData(player, CARD_ID, LESSONS_TOKEN_KEY, -1)
-    writeCardExtraData(player, CARD_ID, USED_ACTION_TOKEN_KEY, -1)
-  },
+  onBeforeStartOfTurn: () => ({ type: 'seq', children:
+    [COOKED_TOKEN_KEY, LESSONS_TOKEN_KEY, USED_ACTION_TOKEN_KEY].map(key => ({
+      type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID,
+      params: { kind: 'set-extra-data', key, value: -1 },
+    })),
+  }),
   onBuy: (_state, player) => {
     // onBuy fires within an exchange/lessons triggering action. If both tokens
     // already match the current action, award VP now.

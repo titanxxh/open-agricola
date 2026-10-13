@@ -15,7 +15,7 @@ const cardImpl = {
     writeCardExtraData(player, CARD_ID, 'foodCount', 4)
     updateInfobox(player, 4)
   },
-  onRoundStart: (state, player) => {
+  onWorkStart: (state, player) => {
     const playerIndex = state.players.indexOf(player)
     if (playerIndex < 0) return
     const roundFirstPlayerId = state.roundFirstPlayerId
@@ -27,9 +27,13 @@ const cardImpl = {
     const foodCount = readCardExtraData<number>(player, CARD_ID, 'foodCount') ?? 0
     if (foodCount <= 0) return
     const newCount = foodCount - 1
-    writeCardExtraData(player, CARD_ID, 'foodCount', newCount)
-    updateInfobox(player, newCount)
-    return gainLeaf(CARD_ID, { food: 1 })
+    return { type: 'seq', children: [
+      { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID,
+        params: { kind: 'set-extra-data', key: 'foodCount', value: newCount } },
+      { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID,
+        params: { kind: 'set-infobox', text: `${newCount} Food` } },
+      gainLeaf(CARD_ID, { food: 1 }),
+    ] }
   },
 },
   reaches: [] as readonly string[],

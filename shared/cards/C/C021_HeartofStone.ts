@@ -1,5 +1,6 @@
 import { defineMinorCard } from '../card-source'
 import { familySize } from '../../domain/player'
+import { getExtraRoomCapacity } from '../card-effects'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C021_HeartofStone'
@@ -7,11 +8,14 @@ const CARD_ID = 'C021_HeartofStone'
 const cardImpl = {
   effect: {
   id: CARD_ID,
-  onRoundStart: (state, player) => {
-    const revealedAction = state.roundActionOrder[state.round - 1]
+  stageEligibility: { onAfterRevealAction: (_state, _player, ctx) => {
+    const revealedAction = ctx.roundPreparation?.kind === 'after-reveal' ? ctx.roundPreparation.revealedAction?.actionId : undefined
+    return revealedAction === 'western-quarry' || revealedAction === 'eastern-quarry'
+  } },
+  onAfterRevealAction: (_state, player, ctx) => {
+    const revealedAction = ctx?.roundPreparation?.kind === 'after-reveal' ? ctx.roundPreparation.revealedAction?.actionId : undefined
     if (revealedAction !== 'western-quarry' && revealedAction !== 'eastern-quarry') return
-    // Check if player has room in house (fewer family members than rooms)
-    if (familySize(player) >= player.roomTiles.length) return
+    if (familySize(player) >= player.roomTiles.length + getExtraRoomCapacity(player)) return
     return {
       type: 'leaf',
       actionId: 'family-growth',

@@ -43,7 +43,7 @@ const cardImpl = {
   listeners: [afterWishChildrenListener],
   effect: {
   id: CARD_ID,
-  onBeforeStartOfTurn: (_state, _player) => {
+  onRoundStart: (_state, _player) => {
     return { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: false } }
   },
 },

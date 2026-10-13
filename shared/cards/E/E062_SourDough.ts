@@ -1,7 +1,7 @@
 import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { isCardFlagged, setCardFlag } from '../helpers/card-state'
+import { isCardFlagged } from '../helpers/card-state'
 import { workersAvailable } from '../../domain/player'
 import type { CardImpl } from '../registry'
 
@@ -35,9 +35,7 @@ const cardImpl = {
   listeners: [anytimeListener],
   effect: {
   id: CARD_ID,
-  onBeforeStartOfTurn: (_state, player) => {
-    setCardFlag(player, CARD_ID, false)
-  },
+  onRoundStart: () => ({ type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: false } }),
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl

@@ -1,5 +1,5 @@
 import { defineOccupationCard } from '../card-source'
-import { isCardFlagged, setCardFlag } from '../helpers/card-state'
+import { isCardFlagged } from '../helpers/card-state'
 import { createEventQuery } from '../../events/query'
 import { getFarmyardTilePositions } from '../../domain/farm'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
@@ -42,9 +42,7 @@ const cardImpl = {
   listeners: [farmyardListener],
   effect: {
   id: CARD_ID,
-  onBeforeStartOfTurn: (_state, player) => {
-    setCardFlag(player, CARD_ID, false)
-  },
+  onWorkStart: () => ({ type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: false } }),
   timedRules: [{ retainAfterCardLeaves: true, key: 'farmyard-reward', at: { kind: 'card-flag', clock: 'current-round', phase: 'onBeforeReturnHome' }, consume: { clearCardFlag: true }, body: { kind: 'gain', resources: { food: 2 } } }],
 },
   reaches: [] as readonly string[],

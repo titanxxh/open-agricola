@@ -7,8 +7,9 @@ const CARD_ID = 'E111_Recluse'
 const cardImpl = {
   effect: {
   id: CARD_ID,
-  onRoundStart: (_state, player) => {
-    if (player.minorPlayed.length > 0) return
+  stageEligibility: { onRoundStart: (_state, player) => player.minorPlayed.length === 0 },
+  onRoundStart: (_state, player, ctx) => {
+    if (!ctx?.roundPreparation && (player.minorPlayed.length > 0)) return
     return gainLeaf(CARD_ID, { food: 1 })
   },
   onStartHarvest: (_state, player) => {

@@ -3,7 +3,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionChoiceOption, ActionFlow } from '../../contract/types'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/effects/place-farmer'
-import { isCardFlagged, setCardFlag } from '../helpers/card-state'
+import { isCardFlagged } from '../helpers/card-state'
 import { getRoundPersonPlacementOrder } from '../helpers/round-placement'
 import { isSpaceOccupied } from '../../domain/space'
 import type { CardImpl } from '../registry'
@@ -90,10 +90,10 @@ const cardImpl = {
   listeners: [computeArgsListener, afterPlaceFarmerListener],
   effect: {
   id: CARD_ID,
-  onBeforeStartOfTurn: (_state, player) => {
+  onRoundStart: (_state, player) => {
     if (!player.occupationPlayed.includes(CARD_ID)) return
     if (isCardFlagged(player, CARD_ID)) {
-      setCardFlag(player, CARD_ID, false)
+      return { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: false } }
     }
   },
 },

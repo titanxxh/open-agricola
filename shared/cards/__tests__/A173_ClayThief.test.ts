@@ -69,7 +69,7 @@ const state = (owner: PlayerState, hollowClay: number): GameState => ({
 describe('A173 Clay Thief', () => {
   it('offers a once-game optional flow to mark used and collect all clay from hollow-56', () => {
     const owner = player()
-    const flow = runCardEffectHook(state(owner, 4), owner, CARD_ID, 'onRoundStart')
+    const flow = runCardEffectHook(state(owner, 4), owner, CARD_ID, 'onWorkStart')
 
     expect(flow).toMatchObject({
       type: 'seq',
@@ -84,9 +84,9 @@ describe('A173 Clay Thief', () => {
 
   it('does not trigger with no hollow-56 clay or after it has been used', () => {
     const owner = player()
-    expect(runCardEffectHook(state(owner, 0), owner, CARD_ID, 'onRoundStart')).toBeNull()
+    expect(runCardEffectHook(state(owner, 0), owner, CARD_ID, 'onWorkStart')).toBeNull()
 
     const usedOwner = player(true)
-    expect(runCardEffectHook(state(usedOwner, 4), usedOwner, CARD_ID, 'onRoundStart')).toBeNull()
+    expect(runCardEffectHook(state(usedOwner, 4), usedOwner, CARD_ID, 'onWorkStart')).toBeNull()
   })
 })

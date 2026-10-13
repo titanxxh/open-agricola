@@ -12,7 +12,7 @@ const cardImpl = {
     writeCardExtraData(player, CARD_ID, 'triggerRound', triggerRound)
     writeCardInfobox(player, CARD_ID, `Round ${triggerRound}`)
   },
-  timedRules: [{ key: 'free-occupation', at: { kind: 'card-round', fact: 'triggerRound', phase: 'onBeforeStartOfTurn' },
+  timedRules: [{ key: 'free-occupation', at: { kind: 'card-round', fact: 'triggerRound', phase: 'onRoundStart' },
     body: { kind: 'optional', body: { kind: 'action', actionId: 'occupation', params: { exactCost: {} } } },
   }],
 },

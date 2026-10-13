@@ -41,22 +41,10 @@ const cardImpl = {
       setExclusiveUse(state, player, round14SpaceId)
     }
   },
-  onRoundStart: (state, player) => {
+  onAfterRevealAction: (state) => {
     if (state.round === 14) {
-      const round14SpaceId = player.cardStates?.[CARD_ID]?.extraData?.round14Space
-      if (typeof round14SpaceId === 'string') {
-        const space = state.actionSpaces.find((entry) => entry.id === round14SpaceId)
-        if (space?.exclusiveUse?.sourceCardId === CARD_ID) {
-          delete space.exclusiveUse
-          appendImmediateEvents(state, [{
-            type: 'action.exclusiveUseCleared',
-            actionId: round14SpaceId,
-            playerId: player.id,
-            sourceCardId: CARD_ID,
-          }], { actorPlayerId: player.id, sourceCardId: CARD_ID })
-        }
-      }
-      writeCardExtraData(player, CARD_ID, 'exclusiveOwnerId', null)
+      return { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID,
+        params: { kind: 'set-extra-data', key: 'exclusiveOwnerId', value: null } }
     }
   },
 },

@@ -95,7 +95,7 @@ describe('B116_Shoreforester session', () => {
     expect(resp.scores.map((score) => score.total)).toEqual(beforeScoreTotals)
   })
 
-  it('observes the Reed Bank after accumulation when it was empty before preparation', () => {
+  it('rewards an empty Reed Bank before preparation accumulates its new reed', () => {
     const session = setupRoundEnd(0)
     const beforeScoreTotals = session.getState().scores.map((score) => score.total)
     const resp = session.performRoundEnd()
@@ -108,7 +108,7 @@ describe('B116_Shoreforester session', () => {
     expect(resp.state.players[0]!.resources.wood).toBe(1)
 
     const accumulated = resp.state.events.filter((event) =>
-      event.type === 'action.accumulated' && event.spaceId === 'reed-bank',
+      event.type === 'action.accumulated' && event.spaceId === 'reed-bank' && event.round === 2,
     )
     const gains = resp.state.events.filter((event) =>
       event.type === 'resource.moved' && event.sourceCardId === CARD_ID,
@@ -129,7 +129,7 @@ describe('B116_Shoreforester session', () => {
     expect(resp.state.events.filter((event) =>
       event.type === 'card.triggered' && event.sourceCardId === CARD_ID,
     )).toHaveLength(1)
-    expect(accumulated[0]!.seq).toBeLessThan(gains[0]!.seq)
+    expect(gains[0]!.seq).toBeLessThan(accumulated[0]!.seq)
     expect(resp.state.log.filter((entry) =>
       entry.key === 'log.cardEffectGain' && entry.params?.cardId === CARD_ID,
     )).toEqual([
@@ -168,7 +168,7 @@ describe('B116_Shoreforester session', () => {
     expect(resp.scores.map((score) => score.total)).toEqual(beforeScoreTotals)
   })
 
-  it('still gains wood when Nightworker takes the newly accumulated reed first', () => {
+  it('gains wood before Nightworker can take the newly accumulated reed', () => {
     const session = setupRoundEnd(0)
     const state = session.getState().state
     const nightworker = state.players[1]!
@@ -178,13 +178,22 @@ describe('B116_Shoreforester session', () => {
     const beforeScoreTotals = session.getState().scores.map((score) => score.total)
 
     let resp = session.performRoundEnd()
+    if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
+      resp = session.resolveChoice(resp.interaction.request.fromPlayerIndex, 'confirm')
+    }
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected Nightworker choice')
     expect(resp.interaction.sourceCard).toBe('C125_Nightworker')
     const activate = resp.interaction.request.options?.find((option) => option.value !== '__skip__')
     expect(activate).toBeDefined()
 
-    resp = session.resolveChoice(1, activate!.value)
+    resp = session.resolveChoice(resp.interaction.playerIndex, activate!.value)
+    if (resp.interaction.stateId === 'wait' && resp.interaction.request.options?.some(option => option.value === 'reed-bank')) {
+      resp = session.resolveChoice(resp.interaction.playerIndex, 'reed-bank')
+    }
+    if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
+      resp = session.resolveChoice(resp.interaction.request.fromPlayerIndex, 'confirm')
+    }
 
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('idle')
@@ -210,8 +219,8 @@ describe('B116_Shoreforester session', () => {
     expect(gained).toEqual([expect.objectContaining({ resources: { wood: 1 } })])
     expect(workStarted).toBeDefined()
     expect(accumulated!.seq).toBeLessThan(collected!.seq)
-    expect(collected!.seq).toBeLessThan(gained[0]!.seq)
-    expect(gained[0]!.seq).toBeLessThan(workStarted!.seq)
+    expect(gained[0]!.seq).toBeLessThan(accumulated!.seq)
+    expect(collected!.seq).toBeLessThan(workStarted!.seq)
     expect(resp.scores.map((score) => score.total)).toEqual(beforeScoreTotals)
   })
 })

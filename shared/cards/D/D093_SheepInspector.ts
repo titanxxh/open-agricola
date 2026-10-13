@@ -2,7 +2,7 @@ import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionFlow } from '../../contract/types'
-import { isCardFlagged, setCardFlag } from '../helpers/card-state'
+import { isCardFlagged } from '../helpers/card-state'
 import { spaceHasPlayer } from '../../domain/space'
 import type { CardImpl } from '../registry'
 
@@ -35,7 +35,7 @@ const MEETING_PLACE_PREFIX = 'meeting-place'
  *     pay-resources       ← 1 sheep + 2 food
  *     recall-placed-worker ← dynamic choice over owner's placed spaces
  *                            (excludes just-placed + Meeting Place)
- * - Unflag via onRoundStart card effect (work phase begins at round start).
+ * - Unflag via onWorkStart, after the before-work placements finish.
  */
 
 const isMeetingPlace = (spaceId: string) => spaceId.startsWith(MEETING_PLACE_PREFIX)
@@ -103,9 +103,9 @@ const cardImpl = {
   listeners: [listener],
   effect: {
   id: CARD_ID,
-  onRoundStart: (_state, player) => {
+  onWorkStart: (_state, player) => {
     if (isCardFlagged(player, CARD_ID)) {
-      setCardFlag(player, CARD_ID, false)
+      return { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: false } }
     }
     return
   },

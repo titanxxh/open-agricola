@@ -7,7 +7,7 @@ const CARD_ID = 'D054_TroutPool'
 const cardImpl = {
   effect: {
   id: CARD_ID,
-  onRoundStart: (state, _player) => {
+  onWorkStart: (state, _player) => {
     const fishingSpace = state.actionSpaces.find((s) => s.id === 'fishing')
     const fishFood = fishingSpace?.resources?.food ?? 0
     if (fishFood < 3) return

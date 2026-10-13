@@ -7,13 +7,13 @@ const CARD_ID = 'B106_MoralCrusader'
 const cardImpl = {
   effect: {
   id: CARD_ID,
-  onBeforeStartOfTurn: (state, player) => {
+  onBeforeStartOfTurn: (state, player, ctx) => {
     // Check if player has any future meeple entries (goods promised for future rounds)
-    const upcomingRound = state.round + 1
+    const upcomingRound = ctx?.roundPreparation?.kind === 'before-reveal' ? ctx.roundPreparation.nextRound : state.round + 1
     const hasFutureGoods = state.futureMeeples.some(
       (entry) => entry.playerId === player.id &&
                  entry.round >= upcomingRound &&
-                 Object.values(entry.resources ?? {}).some((v) => (v as number) > 0),
+                 Object.values(entry.resources ?? {}).some((v) => typeof v === 'number' && v > 0),
     )
     if (!hasFutureGoods) return
     return gainLeaf(CARD_ID, { food: 1 })

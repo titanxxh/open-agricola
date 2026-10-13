@@ -1,38 +1,16 @@
 import { defineOccupationCard } from '../card-source'
-import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B116_Shoreforester'
-const EMPTY_REED_BANK_ROUND = 'emptyReedBankRound'
 
 const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (_state, _player) => gainLeaf(CARD_ID, { wood: 1 }),
-  onBeforeStartOfTurn: (state, player) => {
+  onPreparation: (state) => {
     const reedBank = state.actionSpaces.find((space) => space.id === 'reed-bank')
-    writeCardExtraData(
-      player,
-      CARD_ID,
-      EMPTY_REED_BANK_ROUND,
-      reedBank && (reedBank.resources.reed ?? 0) === 0 ? state.round : null,
-    )
-  },
-  onRoundStart: (state, player) => {
-    const emptyRound = readCardExtraData<number | null>(player, CARD_ID, EMPTY_REED_BANK_ROUND)
-    writeCardExtraData(player, CARD_ID, EMPTY_REED_BANK_ROUND, null)
-    if (emptyRound !== state.round) return
-    const accumulatedOntoEmpty = state.events.some((event) =>
-      event.type === 'action.accumulated' &&
-      event.round === state.round &&
-      event.phase === 'preparation' &&
-      event.spaceId === 'reed-bank' &&
-      event.resources.reed === 1 &&
-      event.sourceCardId === undefined &&
-      event.sourceActionId === undefined,
-    )
-    if (!accumulatedOntoEmpty) return
+    if (!reedBank || reedBank.resources.reed !== 0) return
     return gainLeaf(CARD_ID, { wood: 1 })
   },
 },

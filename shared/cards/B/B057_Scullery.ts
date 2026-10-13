@@ -7,8 +7,9 @@ const CARD_ID = 'B057_Scullery'
 const cardImpl = {
   effect: {
   id: CARD_ID,
-  onRoundStart: (_state, player) => {
-    if (player.houseType !== 'wood') return
+  stageEligibility: { onRoundStart: (_state, player) => player.houseType === 'wood' },
+  onRoundStart: (_state, player, ctx) => {
+    if (!ctx?.roundPreparation && (player.houseType !== 'wood')) return
     return gainLeaf(CARD_ID, { food: 1 })
   },
 },

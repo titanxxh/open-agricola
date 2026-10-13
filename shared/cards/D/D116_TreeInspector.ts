@@ -1,9 +1,31 @@
 import { definePlayerActionCard } from '../card-source'
 import { registerPlayerActionSpace, createPlayerActionSpaces, definePlayerActionSpaceFlow } from '../player-action-space'
 import { findActionSpaceById } from '../../domain/space'
+import { registerAdHocAction } from '../../actions/helpers/ad-hoc-action-registry'
+import type { ActionDefinition } from '../../contract/types'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D116_TreeInspector'
+const DISCARD_WOOD = `card_${CARD_ID}_discardWood`
+
+registerAdHocAction({
+  id: DISCARD_WOOD,
+  nameKey: 'actions.special-effect.name',
+  descriptionKey: 'actions.special-effect.description',
+  roundAvailable: 1,
+  gainPerRound: {},
+  canBeExecutedByPlayer: () => true,
+  execute: ({ state, eventSink }) => {
+    const space = findActionSpaceById(state, CARD_ID)
+    const wood = space?.resources.wood ?? 0
+    if (space && wood > 0) {
+      space.resources.wood = 0
+      eventSink?.emit<'resource.moved'>({ type: 'resource.moved', resources: { wood },
+        from: { kind: 'actionSpace', spaceId: CARD_ID }, to: { kind: 'supply' }, reason: 'discard' })
+    }
+    return { type: 'ok' }
+  },
+} satisfies ActionDefinition)
 
 registerPlayerActionSpace({
   cardId: CARD_ID,
@@ -29,11 +51,14 @@ const cardImpl = {
       }
     }
   },
-  onBeforeStartOfTurn: (state) => {
-    const revealedAction = state.roundActionOrder[state.round - 1]
+  stageEligibility: { onAfterRevealAction: (_state, _player, ctx) => {
+    const revealedAction = ctx.roundPreparation?.kind === 'after-reveal' ? ctx.roundPreparation.revealedAction?.actionId : undefined
+    return revealedAction === 'western-quarry' || revealedAction === 'eastern-quarry'
+  } },
+  onAfterRevealAction: (_state, _player, ctx) => {
+    const revealedAction = ctx?.roundPreparation?.kind === 'after-reveal' ? ctx.roundPreparation.revealedAction?.actionId : undefined
     if (revealedAction !== 'western-quarry' && revealedAction !== 'eastern-quarry') return
-    const space = findActionSpaceById(state, CARD_ID)
-    if (space) space.resources.wood = 0
+    return { type: 'leaf', actionId: DISCARD_WOOD, sourceCard: CARD_ID }
   },
 },
   reaches: [] as readonly string[],

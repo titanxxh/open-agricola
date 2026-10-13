@@ -49,7 +49,7 @@ describe('5+ reveal and reaction occupation cards', () => {
     state.roundActionOrder[2] = 'pig-market'
     const owner = state.players[0]!
 
-    const flow = runCardEffectHook(state, owner, 'B170_CorralBuilder', 'onBeforeStartOfTurn')
+    const flow = runCardEffectHook(state, owner, 'B170_CorralBuilder', 'onAfterRevealAction', undefined, { roundPreparation: { kind: 'after-reveal', revealedAction: { actionId: state.roundActionOrder[state.round - 1]!, roundSlot: state.round } } })
 
     expect(flow).toMatchObject({
       type: 'leaf',
@@ -74,7 +74,7 @@ describe('5+ reveal and reaction occupation cards', () => {
     state.roundActionOrder[3] = 'cattle-market'
     let owner = state.players[0]!
 
-    expect(runCardEffectHook(state, owner, 'B170_CorralBuilder', 'onBeforeStartOfTurn')).toMatchObject({
+    expect(runCardEffectHook(state, owner, 'B170_CorralBuilder', 'onAfterRevealAction', undefined, { roundPreparation: { kind: 'after-reveal', revealedAction: { actionId: state.roundActionOrder[state.round - 1]!, roundSlot: state.round } } })).toMatchObject({
       actionId: 'fence',
       sourceCard: 'B170_CorralBuilder',
     })
@@ -85,7 +85,7 @@ describe('5+ reveal and reaction occupation cards', () => {
     state.roundActionOrder[2] = 'vegetable-seeds'
     owner = state.players[0]!
 
-    expect(runCardEffectHook(state, owner, 'B170_CorralBuilder', 'onBeforeStartOfTurn')).toBeNull()
+    expect(runCardEffectHook(state, owner, 'B170_CorralBuilder', 'onAfterRevealAction', undefined, { roundPreparation: { kind: 'after-reveal', revealedAction: { actionId: state.roundActionOrder[state.round - 1]!, roundSlot: state.round } } })).toBeNull()
   })
 
   it('B170 Corral Builder does not trigger when no one-space pasture can be fenced', () => {
@@ -99,7 +99,7 @@ describe('5+ reveal and reaction occupation cards', () => {
     owner.rooms = 2
     owner.fields = allTiles.slice(2).map((tile) => ({ row: tile.row, col: tile.col, stacks: [] }))
 
-    expect(runCardEffectHook(state, owner, 'B170_CorralBuilder', 'onBeforeStartOfTurn')).toBeNull()
+    expect(runCardEffectHook(state, owner, 'B170_CorralBuilder', 'onAfterRevealAction', undefined, { roundPreparation: { kind: 'after-reveal', revealedAction: { actionId: state.roundActionOrder[state.round - 1]!, roundSlot: state.round } } })).toBeNull()
   })
 
   it('B175 Field Overseer gives only the highest reached reward for other players harvested grain fields', () => {

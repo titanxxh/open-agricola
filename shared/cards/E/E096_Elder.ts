@@ -7,6 +7,7 @@ const cardImpl = {
   effect: {
   id: CARD_ID,
   handHooks: ['onRoundStart'],
+  stageEligibility: { onRoundStart: state => state.round === 1 },
   onRoundStart: (state, _player) => {
     if (state.round !== 1) return
     return {

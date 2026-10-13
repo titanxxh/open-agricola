@@ -7,8 +7,9 @@ const CARD_ID = 'A090_PlowDriver'
 const cardImpl = {
   effect: {
   id: CARD_ID,
-  onRoundStart: (_state, player) => {
-    if (player.houseType !== 'stone') return
+  stageEligibility: { onRoundStart: (_state, player) => player.houseType === 'stone' },
+  onRoundStart: (_state, player, ctx) => {
+    if (!ctx?.roundPreparation && (player.houseType !== 'stone')) return
     if ((player.resources.food ?? 0) < 1) return
     return {
       type: 'seq',

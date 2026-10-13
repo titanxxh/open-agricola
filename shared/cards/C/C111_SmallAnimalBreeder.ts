@@ -7,8 +7,8 @@ const CARD_ID = 'C111_SmallAnimalBreeder'
 const cardImpl = {
   effect: {
   id: CARD_ID,
-  onBeforeStartOfTurn: (state, player) => {
-    const upcomingRound = state.round
+  onBeforeStartOfTurn: (state, player, ctx) => {
+    const upcomingRound = ctx?.roundPreparation?.kind === 'before-reveal' ? ctx.roundPreparation.nextRound : state.round
     if ((player.resources.food ?? 0) >= upcomingRound) {
       return gainLeaf(CARD_ID, { food: 1 })
     }

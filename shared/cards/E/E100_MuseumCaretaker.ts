@@ -2,20 +2,22 @@ import { defineOccupationCard } from '../card-source'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E100_MuseumCaretaker'
+const REQUIRED_GOODS = ['wood', 'clay', 'reed', 'stone', 'grain', 'vegetable'] as const
 
 const cardImpl = {
   effect: {
   id: CARD_ID,
-  onRoundStart: (_state, player) => {
+  stageEligibility: { onWorkStart: (_state, player) => REQUIRED_GOODS.every(resource => (player.resources[resource] ?? 0) >= 1) },
+  onWorkStart: (_state, player, ctx) => {
     const r = player.resources
-    if (
+    if (ctx?.roundPreparation || (
       (r.wood ?? 0) >= 1 &&
       (r.clay ?? 0) >= 1 &&
       (r.reed ?? 0) >= 1 &&
       (r.stone ?? 0) >= 1 &&
       (r.grain ?? 0) >= 1 &&
       (r.vegetable ?? 0) >= 1
-    ) {
+    )) {
       return { type: 'leaf', actionId: 'bonus-vp', sourceCard: CARD_ID }
     }
   },

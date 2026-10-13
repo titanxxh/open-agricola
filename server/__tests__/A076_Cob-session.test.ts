@@ -84,14 +84,22 @@ describe('A076 Cob parity', () => {
     expect(response.state.players[0]!.resources).toMatchObject({ grain: 1, clay: 1, food: 20 })
   })
 
-  it.each([
-    ['S4', 0, 1],
-    ['S5', 1, 0],
-  ])('A076 %s: Cob is not offered with %i clay and %i grain', (_scenario, clay, grain) => {
+  it('A076 S4: no clay excludes Cob from the work-start window', () => {
+    const clay = 0
+    const grain = 1
     const response = roundStart(setup({ clay, grain, food: 20 }))
 
     expect(response.interaction.stateId === 'wait' ? response.interaction.sourceCard : undefined)
       .not.toBe(CARD_ID)
     expect(response.state.players[0]!.resources).toMatchObject({ clay, grain, food: 20 })
+  })
+
+  it('A076 S5: clay qualifies Cob even without grain, and declining leaves resources unchanged', () => {
+    const session = setup({ clay: 1, grain: 0, food: 20 })
+    let response = roundStart(session)
+    expect(response.interaction.stateId === 'wait' ? response.interaction.sourceCard : undefined).toBe(CARD_ID)
+    response = resolveSkipChoice(session, response)
+    expect(response.state.players[0]!.resources).toMatchObject({ clay: 1, grain: 0, food: 20 })
+    expect(response.state.roundPhase).toBe('work')
   })
 })
