@@ -678,6 +678,7 @@ export class Engine {
     if (!ctx) flowNodes.forEach(enforceCompositeContinuationMandatory)
     const nextUnresolved = this.tree.nextUnresolved()
     if (!ctx && (nextUnresolved instanceof OrNode || nextUnresolved instanceof XorNode)
+      && nextUnresolved.requiresExplicitChoice === true
       && nextUnresolved.getPending() !== null) {
       nextUnresolved.clearPending()
       nextUnresolved.emittedChoices = []

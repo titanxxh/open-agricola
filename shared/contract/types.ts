@@ -980,7 +980,7 @@ export type ActionFlow = (
     }
   | {
       type: 'seq' | 'or' | 'xor' | 'parallel'
-      /** Keep the choice open even when only one branch or Done remains. */
+      /** Keep the choice open and refresh unselected OR/XOR branches after anytime actions. */
       requiresExplicitChoice?: boolean
       anytimeActionId?: string
       promptKey?: PromptKey
