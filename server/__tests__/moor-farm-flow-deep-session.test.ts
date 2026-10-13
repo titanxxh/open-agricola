@@ -150,9 +150,16 @@ describe('Moor room and future terrain clause audit', () => {
       expect(response.state.futureMeeples.filter((entry) => entry.cardId === cardId).map((entry) => entry.round)).toEqual(entries.map(([round]) => round))
       for (const [index, [round, kind]] of entries.entries()) {
         response = advanceMoorAuditToRound(session, round)
-        expect(response.interaction.sourceCard).toBe(cardId)
+        expect(response.interaction.stateId).toBe('wait')
+        const sourceSelection = response.interaction.request.kind === 'select-trigger'
+        const source = response.interaction.request.options?.find(option => option.sourceCard === cardId && !option.disabled)
+        if (sourceSelection) expect(source, JSON.stringify(response.interaction)).toBeDefined()
+        else expect(response.interaction.sourceCard).toBe(cardId)
         if (accept) {
-          response = acceptMoorAuditChoice(session, response)
+          response = sourceSelection
+            ? session.resolveChoice(response.interaction.playerIndex, source!.value)
+            : acceptMoorAuditChoice(session, response)
+          expect(response.ok, response.error).toBe(true)
           const target = { row: 2, col: index + 2 }
           if (kind === 'field') response = session.commitSelectionChoice(0, { tile: target })
           else {
@@ -166,10 +173,16 @@ describe('Moor room and future terrain clause audit', () => {
           if (kind === 'field') expect(response.state.players[0]!.fields).toContainEqual({ ...target, stacks: [] })
           else expect(response.state.players[0]!.farmTerrain).toContainEqual({ ...target, kind })
         } else {
-          response = session.resolveChoice(0, '__skip__')
+          response = session.resolveChoice(response.interaction.playerIndex, sourceSelection ? '__pass__' : '__skip__')
           expect(response.ok, response.error).toBe(true)
           expect(response.state.players[0]!.farmTerrain).toEqual([])
           expect(response.state.players[0]!.fields).toEqual([])
+        }
+        if (response.interaction.stateId === 'wait' && response.interaction.request.kind === 'select-trigger') {
+          expect(response.interaction.request.options.filter(option => !option.disabled && option.value !== '__pass__')
+            .map(option => option.labelKey)).toEqual(['actions.exchange.name'])
+          response = session.resolveChoice(response.interaction.playerIndex, '__pass__')
+          expect(response.ok, response.error).toBe(true)
         }
         expect(response.state.futureMeeples.some((entry) => entry.cardId === cardId && entry.round === round)).toBe(false)
       }
