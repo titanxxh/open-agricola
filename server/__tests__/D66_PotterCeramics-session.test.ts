@@ -1,11 +1,32 @@
-import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game/authoritative-session'
-import { setWorkersAtHome } from '../../shared/domain/player'
+import { afterEach, describe, expect, it } from 'vitest'
+import type { GameSession, SessionResponse } from '../game/authoritative-session'
+import { createWorkSession } from './_helpers/session-fixtures'
 import '../../shared/cards/B/B026_AgrarianFences'
 import '../../shared/cards/D/D066_PotterCeramics'
 import '../../shared/cards/__stubs__/STUB_BeforeBakeGainClay'
 
 const CARD_ID = 'D066_PotterCeramics'
+const sessions: GameSession[] = []
+afterEach(() => sessions.splice(0).forEach((session) => session.dispose()))
+
+const waiting = (response: SessionResponse) => {
+  expect(response.ok, response.error).toBe(true)
+  if (response.interaction.stateId !== 'wait') throw new Error('Expected pending interaction')
+  return response.interaction
+}
+
+const choices = (response: SessionResponse) => {
+  const request = waiting(response).request
+  if (request.kind !== 'choice') throw new Error('Expected choice interaction')
+  return request.options
+}
+
+const chooseLabel = (session: GameSession, response: SessionResponse, labelKey: string) => {
+  const option = choices(response).find((candidate) => candidate.labelKey === labelKey
+    || candidate.labelParams?.actionNameKey === labelKey)
+  expect(option, JSON.stringify(response.interaction)).toBeDefined()
+  return session.resolveChoice(0, option!.value)
+}
 
 const setup = (overrides: {
   clay?: number
@@ -13,29 +34,18 @@ const setup = (overrides: {
   improvements?: string[]
   extraPlayedCards?: string[]
 } = {}) => {
-  const session = new GameSession(42)
-  const state = session.getState().state
-  state.players = state.players.slice(0, 2)
-  state.currentPlayerIndex = 0
-  state.round = 1
-  state.roundPhase = 'work'
-
-  const player = state.players[0]!
-  setWorkersAtHome(state, player, 2)
-  player.resources = {
-    ...player.resources,
-    clay: overrides.clay ?? 1,
-    grain: overrides.grain ?? 0,
-    food: 0,
-  }
-  player.improvements = overrides.improvements ?? ['Major_Fireplace1']
-  player.minorPlayed.push(CARD_ID, ...(overrides.extraPlayedCards ?? []))
-  player.minorHand = ['__test_placeholder__']
-  player.occupationHand = ['__test_placeholder__']
-  state.players[1]!.minorHand = ['__test_placeholder__']
-  state.players[1]!.occupationHand = ['__test_placeholder__']
-
-  session.loadState(state)
+  const session = createWorkSession({ configure: (state) => {
+    state.round = 1
+    const player = state.players[0]!
+    Object.assign(player.resources, {
+      clay: overrides.clay ?? 1,
+      grain: overrides.grain ?? 0,
+      food: 0,
+    })
+    player.improvements = overrides.improvements ?? ['Major_Fireplace1']
+    player.minorPlayed.push(CARD_ID, ...(overrides.extraPlayedCards ?? []))
+  } })
+  sessions.push(session)
   return session
 }
 
@@ -48,17 +58,17 @@ describe('D066_PotterCeramics session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    expect(resp.interaction.promptKey).toBe('ui.interactionOptionalAction')
-    expect(resp.interaction.sourceCard).toBe(CARD_ID)
+    expect(waiting(resp).promptKey).toBe('ui.interactionOptionalAction')
+    expect(waiting(resp).sourceCard).toBe(CARD_ID)
 
-    const d66 = resp.interaction.request.options?.find((option) => option.value !== '__skip__')
+    const d66 = choices(resp).find((option) => option.value !== '__skip__')
     expect(d66).toBeDefined()
     resp = session.resolveChoice(0, d66!.value)
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.resources.clay).toBe(0)
-    if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'ui.interactionBakeBreadChoice') {
-      expect(resp.interaction.promptKey).toBe('ui.interactionBakeBreadChoice')
-      expect(resp.interaction.request.options?.map((option) => option.value)).toContain('Major_Fireplace1')
+    if (resp.interaction.stateId === 'wait' && waiting(resp).promptKey === 'ui.interactionBakeBreadChoice') {
+      expect(waiting(resp).promptKey).toBe('ui.interactionBakeBreadChoice')
+      expect(choices(resp).map((option) => option.value)).toContain('Major_Fireplace1')
       resp = session.resolveChoice(0, 'Major_Fireplace1')
     }
     expect(resp.ok).toBe(true)
@@ -92,40 +102,32 @@ describe('D066_PotterCeramics session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    expect(resp.interaction.promptKey).toBe('ui.interactionGrainUtilizationChoice')
-    const bakeReplacement = resp.interaction.request.options?.find((option) =>
-      String(option.value).includes('bake-bread'),
-    )
-    expect(bakeReplacement).toBeDefined()
-
-    resp = session.resolveChoice(0, bakeReplacement!.value)
-    expect(resp.ok).toBe(true)
-    expect(resp.interaction.stateId).toBe('wait')
-    if (resp.interaction.stateId !== 'wait') return
-    expect(resp.interaction.promptKey).toBe('ui.interactionSelectReplacement')
-    const source = resp.interaction.request.options!.find((option) => option.sourceCard === 'B026_AgrarianFences')!
+    expect(waiting(resp).promptKey).toBe('ui.interactionSelectReplacement')
+    const source = choices(resp).find((option) => option.sourceCard === 'B026_AgrarianFences')!
     resp = session.resolveChoice(0, source.value)
-    expect(resp.interaction.promptKey).toBe('ui.interactionFlowSelect')
-    const bakeAndFence = resp.interaction.request.options?.find(
-      (option) => option.labelKey === 'ui.interactionAgrarianFencesBakeAndFence',
-    )
-    expect(bakeAndFence).toBeDefined()
-
-    resp = session.resolveChoice(0, bakeAndFence!.value)
-    expect(resp.ok).toBe(true)
-    expect(resp.interaction.stateId).toBe('wait')
-    if (resp.interaction.stateId !== 'wait') return
-    expect(resp.interaction.promptKey).toBe('ui.interactionOptionalAction')
-    expect(resp.interaction.sourceCard).toBe(CARD_ID)
+    resp = chooseLabel(session, resp, 'ui.interactionAgrarianFencesBakeAndFence')
+    resp = chooseLabel(session, resp, 'actions.bake-bread.name')
+    expect(waiting(resp).promptKey).toBe('ui.interactionOptionalAction')
+    expect(waiting(resp).sourceCard).toBe(CARD_ID)
 
     resp = session.resolveChoice(0, '__skip__')
-    if (resp.interaction.promptKey === 'ui.interactionBakeBreadChoice') resp = session.resolveChoice(0, 'Major_Fireplace1')
+    if (waiting(resp).promptKey === 'ui.interactionBakeBreadChoice') resp = session.resolveChoice(0, 'Major_Fireplace1')
 
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.resources.clay).toBe(1)
     expect(resp.state.players[0]!.resources.grain).toBe(0)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    expect(resp.interaction.promptKey).toBe('ui.interactionFenceSelect')
+    expect(resp.state.players[0]!.resources.food).toBe(2)
+    resp = chooseLabel(session, resp, 'actions.fencing.name')
+    expect(waiting(resp).promptKey).toBe('ui.interactionFenceSelect')
+    resp = session.commitSelectionChoice(0, { edges: ['H-2-4', 'H-3-4', 'V-2-4', 'V-2-5'], palisadeEdges: [], extraWood: 0 })
+    expect(resp.ok, resp.error).toBe(true)
+    expect(resp.state.players[0]!.resources).toMatchObject({ wood: 11, clay: 1, grain: 0, food: 2 })
+    expect(resp.state.players[0]!.fenceSegments).toHaveLength(4)
+    expect(resp.state.events.some((event) => event.type === 'resource.moved' && event.sourceCardId === CARD_ID)).toBe(false)
+    expect(waiting(resp).request.kind, JSON.stringify(resp.interaction)).toBe('confirm-next-player')
+    expect(resp.scores).toHaveLength(2)
+    expect(resp.state.log.length).toBeGreaterThan(0)
   })
 })

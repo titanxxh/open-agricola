@@ -1137,14 +1137,8 @@ export function engineProceed(
       const expanded = stampOwner(buildFlowNode(int, flow, context.player.id,
         optionId, node.expandFlowIdStyle), context.player.id)
       if (node.mandatory) enforceCompositeContinuationMandatory(expanded)
-      const parent = int.tree.findParent(node.id)
-      const branchIndex = parent instanceof OrNode || parent instanceof XorNode
-        ? parent.children.findIndex((child) => child.id === node.id) : -1
       node.resolve({ type: 'ok' })
       int.tree.insertAfter(node.id, [expanded])
-      if ((parent instanceof OrNode || parent instanceof XorNode) && parent.selectedChildId === node.id) {
-        parent.selectedChildId = parent.children[branchIndex]!.id
-      }
       return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
     }
     const executionContext: ActionExecutionContext = {
