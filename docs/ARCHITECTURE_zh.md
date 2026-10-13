@@ -429,6 +429,8 @@ listener activation 是 internal action leaf：`ActionNode(actionId='activate-ca
 
 如果接受某个 anytime 会消耗持有者当前工作阶段的回合，而不是插入另一个行动，该 listener 必须声明 `replacesTurn: true`。这种入口只在工作阶段的 idle 交互中提供；Session 在注入 flow 前建立普通 Turn Scope 与行动快照，结算完成后沿用人员行动相同的回合结束 hook 和玩家轮转。活动行动、阶段 flow 或嵌套 anytime 窗口内不得提供回合替代。E062 Sour Dough 是参考实现。
 
+`GameCore.engineDeps()` 和每次引擎 `proceed` 前共用 `syncDynamicActionSpaces()`，把当前棋盘中新建而尚未注册的 Action Space 加入执行目录。卡牌只通过公开机制创建棋盘格，不访问 Session 私有 registry。缺 ActionDefinition 是内部不变量错误，沿用权威命令回滚；它不能被当作普通 blocked、不可选分支或 optional 跳过。普通不可执行与已接受 mandatory continuation 仍遵守原有 blocked/undo 语义。购买后立即使用、同一 flow 内创建后使用、撤销重购及 pending 恢复共用这些同步入口。
+
 ### 5.4 EngineStack（子流程栈）
 
 `EngineStack`（`engine-stack.ts`）持有 `EngineFrame[]`：
@@ -535,9 +537,11 @@ A092_AdoptiveParents 引入轮转层额外回合机制（#203+#204）。provider
 
 卡牌只使用行动格而不放置人物时，通过 `place-farmer` 携带 `actionContext.viaCardJump: true`、`targetSpaceId` 且不提供 `workerId`。这个 worker-less 分支不要求或修改人物，不产生 `worker.placed`，也不增加放人统计。卡牌必须先用 `isActionDoableInFlowContext()` 校验目标；执行阶段再展开目标行动的普通 flow，使 replacement、费用、listener 和提交校验保持权威。A151 Minstrel 在普通人物全部放出后的归家阶段使用该路径。
 
+同一工人的 `jumpLeaf` 保留本次触发的精确人员 ID，候选与权威执行都以移动现有人查询目标，使用 `ignoreWorkerAvailability`，不要求家里另有工人。占用豁免由卡牌自己的 scoped `computeArgs` 授予；归属、来源位置、linked block、veto、目标费用和完整行动 flow 仍校验。before 反应读取使用格子的口径，排除 `requiresNewPlacement`。A129 在两个固定目标间移动同一人，并保留 `jumpChain` 防递归；搬迁不增加 Person Placement Order，也不另开新的 Turn Scope。
+
 `inactiveWorkersInSupply()` 排除预留、待放置、临时人物和已永久移除的组件。`availableWorkers()` 包含被召回版图外的临时人物，但家庭人数、住房、喂养和人物分仍只读取永久成员。`returnSupplyWorkers()` 在全部 `onBeforeReturnHome` 之后、`onStartReturnHome` 之前清理同一 ID 的所有位置，并执行原处置；召回和移动不改变该处置。已归还的人物立即可用于增员；没有到期归还轮次的预留跨归家保留，由卡牌在指定时机释放或解锁。清理前，`recordReturnHomePlacements()` 将全部归家前移动结束后的最终版图位置存入既有的玩家 `__roundPlacement__` 记录。归家占位效果通过 `getReturnHomePlacements()` 读取该快照，不再读取实时占位；已归还的供应人物仍被计入，刚清空的格子也不会错误产生归家机会。每条记录保留供应人物的处置：占位判断仍包含已移除人物的历史位置，而 `getReturningPersonPlacements()` 排除合成占位及 `remove-from-game`。Swimming Class、Curator、Seed Researcher、Night-School Student 使用归还人物视图；Turnip Farmer、Minstrel、Bohemian、Food Distributor 使用归家开始时的占位。快照随 pending 序列化和 undo 恢复，由 `resetRoundPlacements()` 在下一轮清除；实时 WorkerRef 仍是放置真源。Curator 按不同归家人物 ID 计数，并通过 `gainPerRound` 识别已取空的累积格。既有 blocked / anytime / undo 与 Protected Observation 边界保持不变。
 
-已确认的供应人物模型区分预留与放置机会。D022 在目标轮的 `onBeforeStartOfTurn` 释放预留 ID，早于未来资源结算和全部 `onRoundStart` 效果；使用 D022 前，增员或另一供应效果可以先消耗该人物。D022 实际使用时需要重新找到可用供应人物并锁定其 ID。将原人物一直预留到使用或拒绝，会违反已接受规则和最后一个人物的 Session 回归。
+供应人物模型区分预留与放置机会。D022 在目标轮 StartOfTurn 通过 `onRoundStart` 释放预留 ID，与该玩家其他回合开始来源一起选序。释放后，增员或另一供应效果可消耗该人物；D022 实际使用时重新要求可用供应人物并锁定其 ID。预留不能持续到使用或拒绝。
 
 供应机会沿用其他强制流程的当前步骤准入，不保证前面的支付或效果完成后仍有合法目标：E022 接受使用后若无合法目标，已扣卡上粮、使用标记和待放人物保留在 `engine-blocked`，直到显式 undo 恢复。B022 唯一供应人物被另一张卡预留时，同样沿用强制 blocked / undo 边界；不能跳过放置义务来保留打牌获得的两食物。不为这些 provider 增加后续目标预检或自动退款。普通抽牌选择未完成时禁止注入额外回合；最后一次选牌完成后恢复机会菜单。依据：[已确认模型](https://github.com/titanxxh/open-agricola/issues/841#issuecomment-5582219668)和 [Session 验收方案](https://github.com/titanxxh/open-agricola/issues/842#issuecomment-5582333821)。
 
@@ -787,10 +791,13 @@ Card listener 区域默认只匹配已打出卡：`zones` 省略等价于 `['pla
 
 声明 `mandatory: true` 的 listener，即使是唯一激活项、没有触发菜单，也会将强制义务传入其返回流程。无法足额转账时进入可撤销的阻塞，不会结束行动。
 
+`purchaseActionCardId` 保存本次购买节点由哪个行动格或卡牌提供。展开目标行动格 flow 时记录目标格身份；卡牌直接授予的新购买使用该卡自己的来源，不继承父购买身份。`improvement` 构造内部子流程时将来源快照传入本次 `onBuy` activation，支付 pending、恢复与撤销保留该值。它独立于 `sourceCard` 日志归因、`costActionCardId` 成本查询和用格统计。B059 直接 Major 购买或 Minstrel 展开 Major 得 4 食物；Merchant 新授予的第二买，包括 Minstrel→Major→Merchant，均得 2。奖励仍由卡牌自己的 `onBuy` 返回。
+
 ### 7.6 阶段型 Hook（按触发顺序）
 
 ```
-回合开始: onBeforeStartOfTurn → futureMeepleReceives → futureActionAnytimeWindow → futureMeepleActions → onBeforeWork → onRoundStart
+准备阶段: onBeforeStartOfTurn → 增轮 / action.revealed → onAfterRevealAction → onPreparation
+  → 累积格补充 → onRoundStart（StartOfTurn）→ onEndPreparation → onBeforeWork → onWorkStart → work.started
 工作:    PlaceFarmer → 各原子行动 → onEndTurn → allWorkersUsed → onAllWorkersPlaced
 回家:    onBeforeReturnHome → onStartReturnHome → onReturnHome
 回合结束: onRoundEnd → onAfterRoundEnd
@@ -801,7 +808,7 @@ Card listener 区域默认只匹配已打出卡：`zones` 省略等价于 `['pla
   → postReapAnytimeWindow → onStartHarvestFeedingPhase → onHarvestFeedingPhase
     → feed → onEndHarvestFeedingPhase
   → breed → onEndHarvest → onAfterHarvest
-终局前:  round 14 的 onAfterRoundEnd 完成并递增到 round 15 后，onBeforeEndGame → preScoringWindow → gameover
+终局前: round 14 的 onAfterRoundEnd 完成后，onBeforeEndGame → preScoringWindow → gameover；不进入第 15 轮准备窗口
 ```
 
 跳过整个收获只在全部 `onBeforeHarvest` hook 完成后、`harvestPrepWindow` 前激活一次。待生效的卡牌状态标记会被消费为本轮标记；标记生效期间，该玩家不参与收获准备、收田、收田后 anytime、喂食与供暖、繁殖、收获阶段 hook，也不触发由该玩家卡牌拥有的 listener。`onBeforeHarvest` 仍在排除前正常结算，阶段转入 `preparation` 后普通 `onRoundEnd` 恢复执行。E58 这类只跳过田地和繁殖的效果继续使用独立的窄机制。
@@ -822,9 +829,15 @@ Harvest outcome summary 是本次 Harvest 的事实，不是中间日志缓存�
 
 `onAllWorkersPlaced` 在所有玩家耗尽普通放人和正常轮转 provider 后、归家前执行。每名玩家的 activation 复用 `ParallelNode(mode='trigger-select')`，可自行选择同时发生的收尾效果顺序。供应放置使用 §6.4 的有限人物身份和统一清理，不激活永久家庭成员。
 
-阶段 hook 已可返回 `ActionFlow`（`continueStageHook` / `continueAllWorkersPlacedHooks`），用于"hook 触发子流程"统一走 `EngineStack.push`。future meeple 在 round-start 分三步结算：`futureMeepleReceives` 先把到期普通资源按 player 合并成一个内部 `receive` action transaction，`resource.moved.reason='receive'` 且每个 entry 保留自己的 `sourceCardId`，因此 Receive listener 会触发一次，Gain listener 不会被隐式触发；`futureActionAnytimeWindow` 再只遍历拥有到期 action token 的玩家，没有当前可执行标准 `exchange` 的玩家直接跳过，每个嵌套 flow 后都按实时状态重算该兑换。卡牌来源的 anytime 能力不进入该窗口，避免为未来回合安排的效果赶在当前轮 `onRoundStart` 前触发；最后 `futureMeepleActions` 才构造行动可行性并由 `applyFutureMeeples` 消费 token，把 `field` 转成 optional `plow`、`stable` 转成 optional 免费 `stables`。entry 可携带 `actionContext`，因此 D91 这类付费行动可以使用 receive transaction 或兑换窗口刚获得的资源。下一轮会在 `onBeforeStartOfTurn` 前从实时起始玩家标记冻结 `roundFirstPlayerId`；随后先用 `onBeforeWork` 结算卡面写明"工作阶段开始前"的卡牌。此时转移标记会立即生效，但只影响下一轮的冻结结果。这些 flow 全部完成后，再进入作为现有工作阶段开始时点的普通 `onRoundStart`；工作阶段入口和 E56 Roman Pot 等顺序消费者均从冻结 ID 派生循环顺序。若 before-work placement 已用完该玩家的工人而其他玩家仍可行动，入口会沿同一冻结顺序推进到首个可行动玩家；若实际的 before-work placement 用完所有玩家的工人，则立即进入正常的 all-workers-placed 级联，而没有实际放人的空轮仍保持 idle。两个 stage 恢复时都不会重复 round-start 初始化。
+阶段 hook 返回 `ActionFlow`，通过 `EngineStack` 执行可暂停的子流程。准备阶段按 BGA 窗口顺序推进，`onRoundStart` 只表示 StartOfTurn，`onBeforeWork` 与 `onWorkStart` 分别表示 beforeWork 与 startOfWork。`onBeforeStartOfTurn` 在增轮之前运行；`FlowEffectContext.roundPreparation` 的 `before-reveal` 分支提供 `nextRound`。揭牌入口更新轮号并提交实际 `action.revealed`，后续 `after-reveal` 上下文保存本次 `revealedAction` 的 `actionId` 与 `roundSlot`，没有本次揭牌则为 null。揭牌反应不得从当前轮的行动牌排列追发过去的事件。`onPreparation` 完成后才补充累积格，并提交 `action.accumulated`。
 
-新局直接发牌、普通选秀或父母选择完成后，统一进入 `startFirstRoundAfterSetup()`。Bootstrap 已完成初始补货；共享阶段续执行在 pending 交互期间保留这一事实，结算本轮到期资源和行动，并始终继续执行 `onBeforeWork` 与 `onRoundStart`，即使没有未来 token 也不跳过。Elder 使用允许手牌触发的 `onRoundStart`，在父母奖励之后、普通放人之前提供选择。恢复已有状态或私有游标不会重新进入新局准备流程。
+每个准备窗口冻结自己的起始玩家顺时针顺序。各玩家真正进入窗口时，Stage Dispatch 根据当时持牌、手牌 hook 和纯 `stageEligibility` 查询构造固定的 `activate-card-effect` 来源树。它不提前冻结所有玩家，不调用 handler 来筛选当时付不起的来源。Handler、费用和可执行性在 activation 被选择时从实时状态重算；例如石屋 Plow Driver 可以先领计划食物再支付。购买、传牌、随时行动、pending 恢复和撤销继续同一树，完成来源不重放，新购牌只参加之后开启的窗口。当前来源离场时遵守通用持牌检查，明确保留的定时义务继续执行。
+
+每名玩家的 StartOfTurn 树把回合开始 activation、计划领取、付款门控 offer 和计划行动放入同一 `ParallelNode(mode='trigger-select')`。普通到期货物按玩家合并为一次内部 `receive`，各 entry 保留 `sourceCardId`；Receive listener 不隐式触发 Gain listener。依赖领取完成的后续奖励保留顺序依赖，只有实际领取后才提交 `futureMeeple.resolved`。`field` / `stable` / `forest` / `moor` 仍展开为既有耕田、免费畜栏与地形行动，必要的标准兑换机会按实时状态重建；不另跑先全部领取、再全部行动、最后扫描卡牌的旧链。
+
+累积格补充完成、进入 StartOfTurn 前冻结本轮 `roundFirstPlayerId`。随后发生的起始玩家标记转移影响下一轮工作顺序；每个阶段窗口的玩家顺序是独立的 continuation。工作入口与 Roman Pot 等消费者使用冻结工作顺序。若 before-work 放人已耗尽起始玩家，入口沿同一工作顺序找首个仍可行动的玩家；所有人实际用完工人时进入正常 all-workers-placed 级联。准备窗口、领取与累积格补充在恢复时均不重复。四个新增阶段 hook 是原生 Card Effect 扩展，不新增 Action Hook phase，也不自动加入 Workshop 能力白名单；自定义能力仍由既有契约和执行准入测试开放。
+
+新局直接发牌、普通选秀或父母选择完成后，统一进入 `startFirstRoundAfterSetup()` 和完整准备阶段链。Bootstrap 不预先补充累积格；首轮实际揭牌与补充各执行一次。父母奖励与本轮计划进入对应的准备步骤，手牌 Elder 在 StartOfTurn 提供选择。加载工作阶段状态、恢复私有游标或创建工作阶段测试夹具均不重新进入首轮准备，不额外增长资源或追发揭牌。
 
 Before-Harvest 窗口会在激活 Harvest skip 前，根据 Start Player Marker 冻结顺时针玩家顺序；即使玩家将跳过本次 Harvest，也仍参与该窗口。每名玩家只结算自己的当前适用 `onBeforeHarvest` activation：单卡直接展开，多卡进入 `ParallelNode(mode='trigger-select')`。每次选择后都在克隆的实时状态上重新判断 applicability 与 mandatory/pass；选择 optional activation 后即视为承诺执行，不再弹出第二次 optional 确认。冻结顺序和当前 offset 保存在 `stageResume.extra.beforeHarvestPlayerOrder`，序列化恢复时不会重新读取已经变化的起始玩家标记。handler 必须返回可重放 flow，真实状态修改只能放在 action leaf。
 
@@ -834,7 +847,7 @@ Harvest field 三个阶段 hook（`onStartHarvestFieldPhase` / `onHarvestFieldPh
 
 阶段 hook 子流程产生 privateEvents 时，嵌套 `respond()` 不得提前 drain 外层 response buffer；`stageResume` 恢复阶段需要把私有事件保留到最外层响应统一发送。
 
-阶段 hook 子流程可能移除正在结算的卡牌（例如传牌）。`stageResume` 除 numeric `cardIndex` 外还保存 `resumeAfterCardId`；恢复时若该卡仍在 played-card 列表中，从它之后继续，若已被移除，则从旧 index 前一位继续，避免跳过原本紧随其后的同阶段 hook。
+准备阶段窗口通过固定 activation 树与完整 typed stage continuation 恢复，不依赖会变化的已打出牌数组索引；窗口上下文、玩家顺序和树 cursor 一起保留。其他尚未迁入 reaction dispatch 的串行阶段仍使用 `resumeAfterCardId` 辅助其索引恢复，不能把这个旧 anchor 机制用于准备窗口来源发现。
 
 未来回合的一次性 optional offer 不应塞进 `futureMeeples` 资源 token。`scheduled-offer` internal action 读取 `player.cardStates[cardId].extraData.scheduledOffers`，offer 记录 `dueRound`、`kind`、cost、目标 special action 或 animal、`consumed` / `consumedRound`；`onRoundStart` 通过 `scheduledOffersRoundStartFlow()` 把到期 offer 交给 engine。执行时先消费 token，再按当前状态决定是否弹 choice；拒绝、资源不足或目标不可执行都不会保留 token。M056 通过该 action 复用 Cut Peat special action card 的可用性、费用、market / opponent face-up 和翻面规则；M131 通过同一模型购买预约动物后显式进入 `reorganize`。
 

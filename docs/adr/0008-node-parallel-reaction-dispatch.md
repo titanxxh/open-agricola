@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-07-02
-- Amended: 2026-10-11
+- Amended: 2026-10-14
 
 ## Context
 
@@ -48,6 +48,9 @@ Issues #1096 and #1099–#1102 separate card activation from completion reaction
    - mandatory activation 未完成时禁止 Pass；完成后 Pass 只跳过当前 target player 剩余的 optional activation。
    - handler 只构造可重放 flow，真实状态修改必须落在选中后执行的 action leaf。
 
+8. Round preparation uses the same activation model under #1145, with distinct `onAfterRevealAction`, `onPreparation`, `onEndPreparation` and `onWorkStart` hooks. `onRoundStart` means BGA StartOfTurn. BeforeStart runs before incrementing and receives `nextRound`; reveal context records the actual action and slot. Each window freezes its own player order, then captures each player's eligible sources only on that player's entry. Native `stageEligibility` is a pure source-qualification query, separate from live handler/payment preview. The fixed source tree survives purchase, passing, anytime, pending restoration and undo; new cards join later windows rather than the active tree.
+9. StartOfTurn combines that player's scheduled receipts, offers, actions and card activations in one trigger-select tree. Receipt-dependent bonuses retain executable dependencies and resolved facts follow actual receipt. Source discovery never drops a stone-house Plow Driver merely because food is currently zero, or treats Cob's grain payment as source qualification. Accumulation follows Preparation, work order freezes before StartOfTurn, and the native hook vocabulary does not automatically expand Workshop support. First-round setup uses the same preparation chain and accumulates once; work-state loading does not reenter it.
+
 ## Consequences
 
 正面：
@@ -60,10 +63,10 @@ Issues #1096 and #1099–#1102 separate card activation from completion reaction
 
 约束：
 
-- Reaction hook 应返回可重放 `ActionFlow`，状态修改落到 action leaf。尚未迁入 generic reaction dispatcher 的 direct stage hook 仍保持串行扫描，新增同类能力应优先接入 activation 模型。
+- Reaction hook 应返回可重放 `ActionFlow`，状态修改落到 action leaf。准备窗口用固定来源树恢复；尚未迁入 generic reaction dispatcher 的其他 direct stage hook 仍保持串行扫描，新增同类能力应优先接入 activation 模型。
 - Compute / query hook 不能进入 trigger-select；费用、可达性、计分等聚合必须继续保持确定性和无玩家排序选择。
 - 测试不能断言同一时机多卡按打出区顺序自动执行；必须断言 trigger-select、来源卡选择、pass / mandatory gate 和 undo 重新派生。
-- Before Harvest 的冻结玩家顺序和当前 order cursor 属于可恢复的阶段 continuation；序列化恢复不得重新读取可能已经变化的 Start Player Marker，也不得复用旧 pending options。
+- Preparation 与 Before Harvest 的冻结玩家顺序、窗口上下文和当前 order cursor 属于可恢复的阶段 continuation；序列化恢复不得重新读取可能已经变化的 Start Player Marker，也不得复用旧 pending options。
 
 ## Alternatives considered
 
