@@ -214,13 +214,11 @@ const auditCompletePending = (session: GameSession, father: FatherParentCardId, 
   } else if (father === 'PS09' || father === 'PS10') {
     const prompt = session.getState()
     expect(prompt.interaction).toMatchObject({ stateId: 'wait', playerIndex: 0, request: { kind: 'animal-reorg' } })
-    let remaining = tier
-    const zones = prompt.interaction.request.zones.map((zone) => {
-      const animalCount = Math.min(remaining, zone.capacity)
-      remaining -= animalCount
-      return { id: zone.id, zoneType: zone.zoneType, animalType: animalCount > 0 ? father === 'PS09' ? 'sheep' : 'boar' : null, animalCount }
-    })
-    expect(remaining).toBe(0)
+    if (prompt.interaction.stateId !== 'wait' || prompt.interaction.request.kind !== 'animal-reorg') throw new Error('Expected animal reorganization')
+    const zones = prompt.interaction.request.zones.map(zone => ({
+      id: zone.id, zoneType: zone.zoneType, animalType: zone.animalType, animalCount: zone.animalCount,
+    }))
+    expect(zones.reduce((sum, zone) => sum + zone.animalCount, 0)).toBe(tier)
     expect(session.resolveChoice(0, 'confirm', { zones }).ok).toBe(true)
   }
   expect(session.getState().interaction.stateId).toBe('idle')

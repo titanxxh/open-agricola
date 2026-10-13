@@ -32,6 +32,8 @@ describe('PlayerStats conversion tracking', () => {
     // here that stats helpers receive the right arguments via direct call.
     const player: PlayerState = {
       id: 'p',
+      roomTiles: [{ row: 1, col: 0 }, { row: 2, col: 0 }],
+      houseAnimals: {},
       improvements: ['Major_Fireplace1'],
       resources: {
         wood: 0, clay: 0, reed: 0, stone: 0, food: 0,

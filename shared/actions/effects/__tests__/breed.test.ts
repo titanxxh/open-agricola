@@ -22,6 +22,7 @@ const makePlayer = (overrides: Partial<PlayerState> = {}): PlayerState =>
     stableTiles: [],
     farmTiles: {},
     rooms: 2,
+    roomTiles: [{ row: 1, col: 0 }, { row: 2, col: 0 }],
     workers: [],
     occupations: [],
     occupationHand: [],
@@ -41,7 +42,7 @@ const makeState = (player: PlayerState): GameState =>
 const makePasture = (capacityTiles: number): Pasture => ({
   id: `pasture-${Math.random()}`,
   size: capacityTiles,
-  tiles: Array.from({ length: capacityTiles }, () => ({ row: 0, col: 0 })),
+  tiles: Array.from({ length: capacityTiles }, (_, col) => ({ row: 0, col })),
   stables: 0,
   animalType: null,
   animalCount: 0,

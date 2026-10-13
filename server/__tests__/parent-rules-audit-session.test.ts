@@ -257,14 +257,12 @@ describe('Parent printed-rule native audit', () => {
       const animal = cardId === 'PS09' ? 'sheep' : 'boar'
       let response = complete(session, cardId, tier)
       expect(response.state.players[0]!.resources[animal]).toBe(tier)
-      expect(response.interaction.request.kind).toBe('animal-reorg')
-      let remaining = tier
-      const zones = response.interaction.request.zones.map((zone) => {
-        const count = Math.min(remaining, zone.capacity)
-        remaining -= count
-        return { id: zone.id, zoneType: zone.zoneType, animalType: count ? animal : null, animalCount: count }
-      })
-      expect(remaining).toBe(0)
+      expect(response.interaction.stateId).toBe('wait')
+      if (response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'animal-reorg') throw new Error('Expected animal reorganization')
+      const zones = response.interaction.request.zones.map(zone => ({
+        id: zone.id, zoneType: zone.zoneType, animalType: zone.animalType, animalCount: zone.animalCount,
+      }))
+      expect(zones.reduce((sum, zone) => sum + zone.animalCount, 0)).toBe(tier)
       response = session.resolveChoice(0, 'confirm', { zones })
       expect(response.ok, response.error).toBe(true)
       expect(response.state.players[0]!.resources[animal]).toBe(tier)

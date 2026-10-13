@@ -29,7 +29,7 @@ const setup = () => {
   }
   const player = state.players[0]!
   Object.assign(player.resources, { sheep: 0, boar: 0, cattle: 1 })
-  player.houseAnimals = Object.fromEntries(player.roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, 'cattle']));
+  player.houseAnimals = { '1-0': 'cattle' }
   player.pastures = [{ id: 'p', size: 2, tiles: [{ row: 0, col: 0 }, { row: 0, col: 1 }], stables: 0, animalType: null, animalCount: 0 }]
   session.loadState(state)
   return session
