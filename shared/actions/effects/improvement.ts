@@ -521,8 +521,7 @@ export const improvementAction: ActionDefinition = {
     const actionCardId = costActionCardId({ sourceCard, space })
     const types = readImprovementTypes({ params, actionContext })
     const parsed = parseImprovementChoice(choice)
-    if (parsed.kind === 'major' && !types.includes('major') ||
-      parsed.kind === 'minor' && !isMinorImprovementEligibleForAction(
+    if (parsed.kind === 'minor' && !isMinorImprovementEligibleForAction(
         getMinorImprovement(parsed.id), types, readTrueAction(params, actionContext),
       )) {
       return { type: 'fail', errorKey: 'log.improvementFail' }
