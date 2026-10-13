@@ -26,7 +26,7 @@ import {
 } from '../../cards/card-effects'
 import { collectFarmChoiceCostAdjustments } from '../../cards/card-listeners'
 import { addCardResourceGained, recordActionCostAttribution } from '../../cards/helpers/card-state'
-import { getAvailableStableSupplyCount } from '../../domain/supply-tokens'
+import { findMatureFutureStableEntry, getAvailableStableSupplyCount } from '../../domain/supply-tokens'
 import { getPastureSize } from '../../domain/pasture'
 
 // `actionContext.farmHand === true` is the generic gate set by the
@@ -102,6 +102,9 @@ const readStableActionContext = (
   if (!paramsActionContext || typeof paramsActionContext !== 'object') return undefined
   return paramsActionContext as Record<string, unknown>
 }
+
+const readFutureStableId = (actionContext?: Record<string, unknown>): string | undefined =>
+  typeof actionContext?.futureMeepleId === 'string' ? actionContext.futureMeepleId : undefined
 
 const readStableMax = (
   actionContext?: Record<string, unknown>,
@@ -220,7 +223,7 @@ const buildStableFarmSelection = (
 ) => {
   const zoneFilter = actionContext?.zoneFilter
   const max = actionContext?.max
-  const reserve = getAvailableStableSupplyCount(state, player)
+  const reserve = getAvailableStableSupplyCount(state, player, readFutureStableId(actionContext))
   const selectionMax = typeof max === 'number' ? Math.min(max, reserve) : reserve
   const idx = state.players.indexOf(player)
   // Affordability must use the count-dependent TOTAL cost, which the farmyard's
@@ -254,8 +257,8 @@ const buildStableFarmSelection = (
   return farmHandPositions.length > 0 ? { ...farm, farmHandPositions } : farm
 }
 
-const isStableStructurallyPossible = ({ state, player }: ActionAvailabilityContext) =>
-  getAvailableStableSupplyCount(state, player) > 0
+const isStableStructurallyPossible = (context: ActionAvailabilityContext) =>
+  getAvailableStableSupplyCount(context.state, context.player, readFutureStableId(readStableActionContext(context))) > 0
 
 const canExecuteStableCostPreview = (
   context: ActionAvailabilityContext,
@@ -310,7 +313,7 @@ const finalizeStables = (
   farmHand: FarmTilePosition | undefined,
 ): ActionExecutionResult => {
   const totalUnits = stables.length + (farmHand ? 1 : 0)
-  if (totalUnits > getAvailableStableSupplyCount(ctx.state, ctx.player)) {
+  if (totalUnits > getAvailableStableSupplyCount(ctx.state, ctx.player, readFutureStableId(ctx.actionContext))) {
     return { type: 'fail', errorKey: 'log.buildStableFail' }
   }
   const placementError = stables.length > 0 ? validateStablePlacement(ctx, stables) : undefined
@@ -344,6 +347,8 @@ const finalizeStables = (
     specialSourceCardId = applied.sourceCardId
   }
   applyPlayerMutation(ctx.player, nextPlayer)
+  const futureStable = findMatureFutureStableEntry(ctx.state, ctx.player, readFutureStableId(ctx.actionContext))
+  if (futureStable) futureStable.resources.stable = Math.max(0, (futureStable.resources.stable ?? 0) - totalUnits)
   recordActionCostAttribution(
     ctx.player,
     ctx.costAttribution,
@@ -473,7 +478,7 @@ export const stablesAction: ActionDefinition = {
       if (totalUnits === 0) {
         return { type: 'fail', errorKey: 'NO_SELECTION', recoverable: true }
       }
-      if (totalUnits > getAvailableStableSupplyCount(ctx.state, ctx.player)) {
+      if (totalUnits > getAvailableStableSupplyCount(ctx.state, ctx.player, readFutureStableId(ctx.actionContext))) {
         return { type: 'fail', errorKey: 'log.buildStableFail', recoverable: true }
       }
       const placementError = stables.length > 0 ? validateStablePlacement(ctx, stables) : undefined
