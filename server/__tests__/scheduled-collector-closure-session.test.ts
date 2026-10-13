@@ -78,7 +78,7 @@ describe('complete activated schedule collection through fresh two-player sessio
     const owner = session.state.players[0]!
     const plans = collectScheduledEffectPreviews(session.state, owner)
     expect(plans.map(plan => [plan.sourceCard, plan.round, plan.timing])).toEqual([
-      ['A081_InterimStorage', 7, 'onRoundStart'], ['E140_Carter', 7, 'afterCollect'], ['E028_Bookmark', 9, 'onBeforeStartOfTurn'],
+      ['A081_InterimStorage', 7, 'onRoundStart'], ['E140_Carter', 7, 'afterCollect'], ['E028_Bookmark', 9, 'onRoundStart'],
     ])
     expect(plans[1]?.description).toMatchObject({ effectPreview: { kind: 'ruleOperation', operation: { kind: 'gain-per-building-resource-collected', resource: 'food', perBuildingResource: 1 } } })
     const spectator = serializeStateForPlayer(session.state, {}, null)

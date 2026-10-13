@@ -191,7 +191,7 @@ describe('D036_BreedRegistry infobox', () => {
     expect(readCardInfobox(player, 'D036_BreedRegistry')).toBe('1 / 2')
   })
 
-  it('tracks future meeple sheep through immediatelyAfter synthetic dispatch', () => {
+  it('tracks future meeple sheep through the actual receive action', () => {
     const player = createPlayer()
     player.minorPlayed = []
     player.minorHand = ['D036_BreedRegistry']
@@ -201,8 +201,8 @@ describe('D036_BreedRegistry infobox', () => {
     const [result] = runCardListeners({
       state,
       player,
-      space: createSpace('future-meeple-resolved'),
-      actionId: 'future-meeple-resolved',
+      space: createSpace('receive'),
+      actionId: 'receive',
       phase: 'immediatelyAfter',
       transactionEvents: actionEvents,
       actionEvents,

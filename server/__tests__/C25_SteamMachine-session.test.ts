@@ -1,4 +1,5 @@
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
+import { createWorkSession } from './_helpers/session-fixtures'
 
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
@@ -19,7 +20,7 @@ const setup = (opts: {
   food?: number
   opponentWorkers?: number
 } = {}) => {
-  const session = new GameSession(42)
+  const session = createWorkSession({ seed: 42 })
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   state.currentPlayerIndex = 0
@@ -84,7 +85,7 @@ const placeableSpaces = (session: GameSession) =>
 const drainConfirms = (session: GameSession, start: SessionResponse): SessionResponse => {
   let resp = start
   let guard = 0
-  while (reqKind(resp) === 'confirm-next-player' && guard++ < 8) {
+  while ((reqKind(resp) === 'confirm-next-player' || reqKind(resp) === 'confirm-player-switch') && guard++ < 8) {
     const owner =
       resp.interaction.stateId === 'wait'
         ? resp.interaction.playerIndex
@@ -216,7 +217,13 @@ describe('C025_SteamMachine session', () => {
     resp = drainConfirms(session, resp)
 
     expect(reqKind(resp)).not.toBe('choice')
-    expect(resp.state.round).toBe(2)
+    for (let step = 0; step < 6 && resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'select-trigger'; step++) {
+      expect(resp.interaction.request.options.filter(option => !option.disabled && option.value !== '__pass__')
+        .map(option => option.labelKey)).toEqual(['actions.exchange.name'])
+      resp = drainConfirms(session, session.resolveChoice(resp.interaction.playerIndex, '__pass__'))
+      expect(resp.ok, resp.error).toBe(true)
+    }
+    expect(resp.state.round, JSON.stringify(resp.interaction)).toBe(2)
   })
 
   it('does not reference A92-specific code in the C25 implementation', () => {

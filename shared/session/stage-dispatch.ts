@@ -366,7 +366,7 @@ export class StageDispatch {
       const only = children.length === 1 ? children[0] : undefined
       const inactiveActivation = only?.type === 'leaf' && only.actionId === 'activate-card-effect'
         && only.actionContext?.previewApplicable !== true
-      const reactions: ActionFlow = only && !inactiveActivation ? only
+      const reactions: ActionFlow = only && singleDoable && !inactiveActivation ? only
         : { type: 'parallel', mode: 'trigger-select', children }
       const flow: ActionFlow = completion ? { type: 'seq', children: [reactions, completion] } : reactions
       this.startFlow(flow, hook, playerIndex, 0, currentOffset + 1, {

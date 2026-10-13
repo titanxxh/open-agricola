@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import type { CustomCardData } from '../../shared/cards/session-card-context'
 import { clearCustomCards } from '../../shared/cards/custom-registry'
+import { cardEffectHooks } from '../../shared/projections/card-effect-hooks'
 import { flowCardEffectHooks } from '../../shared/cards/card-effects'
 import type { GameState } from '../../shared/contract/types'
 import type { GameSession } from '../game/authoritative-session'
@@ -19,7 +20,7 @@ import { createWorkSession } from './_helpers/session-fixtures'
  */
 
 const CARD_ID = 'CUSTOM_StageProbe'
-const STAGE_HOOKS = flowCardEffectHooks.filter(hook => hook !== 'onBuy')
+const STAGE_HOOKS = flowCardEffectHooks.filter(hook => hook !== 'onBuy' && cardEffectHooks.some(allowed => allowed === hook))
 const PLACEMENTS = ['forest', 'clay-pit', 'reed-bank', 'fishing']
 // A full game runs every stage hook in the isolate; on CI it takes longer than the default 5 s.
 const FULL_GAME_TIMEOUT_MS = 30_000

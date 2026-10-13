@@ -1,3 +1,4 @@
+import { createWorkSession } from './_helpers/session-fixtures'
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
@@ -20,7 +21,7 @@ describe('card-granted minor improvement entitlement', () => {
     ['E109_BraidMaker', 'Major_Basket'],
   ])('%s converts a true minor action to %s but leaves Bargain Hunter restricted', (cardId, majorId) => {
     for (const trueAction of [true, false]) {
-      const session = new GameSession(848865, undefined, { playerCount: trueAction ? 2 : 4 })
+      const session = createWorkSession({ seed: 848865, options: { playerCount: trueAction ? 2 : 4 } })
       const state = session.getState().state
       stabilizeRandomHands(state.players)
       state.round = 5

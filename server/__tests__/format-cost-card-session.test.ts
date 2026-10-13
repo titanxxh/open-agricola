@@ -1,3 +1,4 @@
+import { createWorkSession } from './_helpers/session-fixtures'
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
@@ -23,6 +24,26 @@ import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 
 const FILLER = '__test_placeholder__'
 
+const openConfidantFutureActions = (session: GameSession, initial: ReturnType<GameSession['getState']>) => {
+  let response = initial
+  expect(response.interaction.stateId).toBe('wait')
+  const receipt = response.interaction.request.options.find(option => option.labelKey === 'actions.receive.name')
+  expect(receipt).toBeDefined()
+  response = session.resolveChoice(response.interaction.playerIndex, receipt!.value)
+  expect(response.ok, response.error).toBe(true)
+  const source = response.interaction.request.options.find(option => option.sourceCard === 'B093_Confidant' && !option.disabled)
+  expect(source).toBeDefined()
+  response = session.resolveChoice(response.interaction.playerIndex, source!.value)
+  expect(response.ok, response.error).toBe(true)
+  if (!response.interaction.request.options.some(option => option.labelKey === 'actions.sow.name' || option.labelKey === 'actions.fencing.name')) {
+    const accept = response.interaction.request.options.find(option => option.value !== '__skip__')
+    expect(accept).toBeDefined()
+    response = session.resolveChoice(response.interaction.playerIndex, accept!.value)
+    expect(response.ok, response.error).toBe(true)
+  }
+  return response
+}
+
 const edgesForTile = (row: number, col: number) => [
   `H-${row}-${col}`,
   `H-${row + 1}-${col}`,
@@ -31,7 +52,7 @@ const edgesForTile = (row: number, col: number) => [
 ]
 
 const setupMinor = (cardId: string) => {
-  const session = new GameSession(42)
+  const session = createWorkSession({ seed: 42 })
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   state.currentPlayerIndex = 0
@@ -516,9 +537,11 @@ describe('formatCost card session regressions', () => {
     }
     session.loadState(stateBeforeRoundStart)
 
-    const roundStarted = session.performRoundEnd()
+    let roundStarted = session.performRoundEnd()
     expect(roundStarted.ok).toBe(true)
     expect(roundStarted.state.round).toBe(2)
+    expect(roundStarted.state.players[0]!.resources.food).toBe(foodAfterScheduling)
+    roundStarted = openConfidantFutureActions(session, roundStarted)
     expect(roundStarted.state.players[0]!.resources.food).toBe(foodAfterScheduling + 1)
     expect(roundStarted.interaction.stateId).toBe('wait')
     if (roundStarted.interaction.stateId !== 'wait') return
@@ -557,8 +580,9 @@ describe('formatCost card session regressions', () => {
     }
     session.loadState(stateBeforeRoundStart)
 
-    const roundStarted = session.performRoundEnd()
+    let roundStarted = session.performRoundEnd()
     expect(roundStarted.ok).toBe(true)
+    roundStarted = openConfidantFutureActions(session, roundStarted)
     expect(roundStarted.interaction.stateId).toBe('wait')
     if (roundStarted.interaction.stateId !== 'wait') return
     expect(roundStarted.interaction.request.options?.some((entry) => entry.labelKey === 'actions.fencing.name')).toBe(true)

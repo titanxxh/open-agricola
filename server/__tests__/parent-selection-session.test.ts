@@ -256,29 +256,26 @@ describe('Parent Card selection setup', () => {
       parentSelectionSeed: 1,
     } as never)
 
-    const p1Mother = session.state.players[0]!.parentCards.mother
-    const p2Mother = session.state.players[1]!.parentCards.mother
-    const logsFor = (cardId: string | null) => session.buildSyncPayload(session.getState(), 'p1').state.log.filter((entry) =>
-      entry.params?.cardId === cardId ||
-      (cardId === p1Mother && entry.key === 'log.actionDetail'),
-    )
+    const logsFor = (playerId: string) => session.buildSyncPayload(session.getState(), 'p1').state.log.filter(entry => entry.playerId === playerId)
+    expect(logsFor('p1').length).toBeGreaterThan(0)
+    expect(logsFor('p2').length).toBeGreaterThan(0)
 
     session.updatePlayerName(0, 'PlayerB')
     session.updatePlayerName(1, 'Bob')
-    expect(logsFor(p1Mother).every((entry) => entry.params?.player === 'PlayerB')).toBe(true)
-    expect(logsFor(p2Mother).every((entry) => entry.params?.player === 'Bob')).toBe(true)
+    expect(logsFor('p1').every((entry) => entry.params?.player === 'PlayerB')).toBe(true)
+    expect(logsFor('p2').every((entry) => entry.params?.player === 'Bob')).toBe(true)
 
     session.updatePlayerName(0, 'Shared')
     session.updatePlayerName(1, 'Shared')
     session.updatePlayerName(0, 'Carol')
-    expect(logsFor(p1Mother).every((entry) => entry.params?.player === 'Carol')).toBe(true)
-    expect(logsFor(p2Mother).every((entry) => entry.params?.player === 'Shared')).toBe(true)
+    expect(logsFor('p1').every((entry) => entry.params?.player === 'Carol')).toBe(true)
+    expect(logsFor('p2').every((entry) => entry.params?.player === 'Shared')).toBe(true)
 
     const saved = snapshotForWorker(serializeSessionSnapshot(session.state, session))
     session = new GameSession(rehydrateState(JSON.parse(JSON.stringify(saved))))
     session.updatePlayerName(1, 'Dana')
-    expect(logsFor(p1Mother).every((entry) => entry.params?.player === 'Carol')).toBe(true)
-    expect(logsFor(p2Mother).every((entry) => entry.params?.player === 'Dana')).toBe(true)
+    expect(logsFor('p1').every((entry) => entry.params?.player === 'Carol')).toBe(true)
+    expect(logsFor('p2').every((entry) => entry.params?.player === 'Dana')).toBe(true)
   })
 
   it('resolves round-one direct-deal rewards after simultaneous draft finalizes', () => {

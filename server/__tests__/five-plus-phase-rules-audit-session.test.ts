@@ -1,9 +1,10 @@
+import { createWorkSession } from './_helpers/session-fixtures'
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { markAllWorkersUsed } from '../../shared/domain/player'
 
 const setup = (cardId: string, round = 2) => {
-  const session = new GameSession(5610, undefined, { playerCount: 6 })
+  const session = createWorkSession({ seed: 5610, options: { playerCount: 6 } })
   const state = session.getState().state
   state.currentPlayerIndex = 0
   state.round = round
@@ -141,9 +142,15 @@ describe('Five-plus phase printed-rule audit', () => {
 
   it.each(['pig-market', 'cattle-market'])('B170 Corral Builder fences one space when %s is revealed', (spaceId) => {
     const session = setup('B170_CorralBuilder', spaceId === 'pig-market' ? 7 : 9)
-    session.state.roundActionOrder[session.state.round] = spaceId
+    const state = session.getState().state
+    const oldIndex = state.roundActionOrder.indexOf(spaceId)
+    const targetIndex = state.round
+    ;[state.roundActionOrder[oldIndex], state.roundActionOrder[targetIndex]] =
+      [state.roundActionOrder[targetIndex]!, spaceId]
+    session.loadState(state)
     let response = finishConfirms(session, session.performRoundEnd())
     expect(response.ok).toBe(true)
+    expect(response.state.events.filter(event => event.type === 'action.revealed' && event.actionId === spaceId && event.roundSlot === targetIndex + 1)).toHaveLength(1)
     expect(response.interaction.sourceCard).toBe('B170_CorralBuilder')
     response = session.resolveChoice(0, response.interaction.request.options.find((option) => option.value !== '__skip__')!.value)
     expect(response.ok).toBe(true)
