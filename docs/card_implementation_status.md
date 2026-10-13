@@ -16,7 +16,6 @@ The 26 remaining card fixes from [Issue #848](https://github.com/titanxxh/open-a
 |---|---|---|
 | P2 | `B026_AgrarianFences` | Separate card-rule follow-up: the printed rule replaces one of the two Grain Utilization actions, while the current listeners also offer original-action-plus-fence branches and lack a shared once-per-use limit. Source mismatch identified; correcting that quota and the extra-action branches is outside the shared-mechanism change. |
 | P2 | `E151_DeliveryNurse` | Separate eligibility follow-up: compare room availability through the shared extra-room-capacity rules instead of only physical room count. Source review identified the discrepancy; add a Session reproduction before fixing it. |
-| P2 | `C168_AnimalCatcher` | Separate provenance investigation: the replacement matches `gain` by Day Laborer space and source exclusion, which may also match an additional reward. Verify that only the space's base reward is replaced. This is a source-level risk, not a reproduced Session failure. |
 
 ## 3. Accepted differences
 
@@ -190,7 +189,9 @@ Physical supply-row rules use `isBottomRowMajorImprovement()` and `getAvailableB
 
 Note: React/Suspense, CDN, browser fallback, etc. are normal terms for the platform/browser and are not considered card architecture risks.
 
-Shared action replacement uses one explicit source menu before the original optional prompt, including singleton replacements. Selected subtrees retain internal choices and optional children; required continuations remain committed across before, pending, reconnect, and undo. Per-leaf replacement decisions and opportunity-scoped producer guards preserve action identity and let newly granted action spaces calculate replacements again. This covers the eleven-card migration in #850–#852 and ordinary custom alternatives; architecture and executable Session coverage define the shared contract. The independent B026 quota, E151 capacity, and C168 provenance follow-ups remain in §2.
+Shared action replacement uses one explicit source menu before the original optional prompt, including singleton replacements. Selected subtrees retain internal choices and optional children; required continuations remain committed across before, pending, reconnect, and undo. Per-leaf replacement decisions and opportunity-scoped producer guards preserve action identity and let newly granted action spaces calculate replacements again. This covers the eleven-card migration in #850–#852 and ordinary custom alternatives; architecture and executable Session coverage define the shared contract. The independent B026 quota and E151 capacity follow-ups remain in §2.
+
+Gain provenance distinguishes explicit resource parameters from the action space's configured base gain. C168 uses this existing distinction locally (#1125), preserving additional rewards and genuine Day Laborer actions granted by another card. Four-player Session regressions cover acceptance, refusal, payment, animal housing, Farmers of the Moor combinations, and undo/retry without a new trigger marker.
 
 ## 6. Infrastructure backlog
 

@@ -39,6 +39,9 @@ const computeReplaceListener: CardListenerRegistration = {
     if (context.actionContext?.checkedReplaceAction) return
     if (context.sourceCard === CARD_ID) return
     if (context.space?.id !== 'day-laborer') return
+    if (Object.keys(context.params ?? {}).some((key) =>
+      key !== 'recipientPlayerId' && key !== 'recipientMode' && key !== 'payerId',
+    )) return
     const remaining = harvestRounds.filter((r) => r >= context.state.round).length
     return {
       decline: true,
