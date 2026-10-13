@@ -662,7 +662,7 @@ export const validateRoomSelection = (
       return { ok: false, code: 'INVALID_POSITION' }
     }
     const key = localPositionKey(room)
-    if (selectedSet.has(key)) continue
+    if (selectedSet.has(key)) return { ok: false, code: 'INVALID_POSITION' }
     if (
       roomSet.has(key) ||
       fieldSet.has(key) ||
@@ -730,7 +730,7 @@ export const validateStableSelection = (
       return { ok: false, code: 'INVALID_POSITION' }
     }
     const key = localPositionKey(stable)
-    if (selectedSet.has(key)) continue
+    if (selectedSet.has(key)) return { ok: false, code: 'INVALID_POSITION' }
     if (roomSet.has(key) || fieldSet.has(key) || stableSet.has(key) || terrainSet.has(key)) {
       return { ok: false, code: 'OCCUPIED' }
     }
