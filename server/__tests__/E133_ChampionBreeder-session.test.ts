@@ -94,12 +94,13 @@ const arrangeChampionAnimals = (session: GameSession, response: SessionResponse)
         return {
           ...zone,
           animalType,
-          animalCount: Math.min(player.resources[animalType] - ((Object.values(player.houseAnimals)[0] ?? null) === animalType ? Object.values(player.houseAnimals).length : 0), zone.capacity),
+          animalCount: Math.min(player.resources[animalType] - Object.values(player.houseAnimals).filter(animal => animal === animalType).length, zone.capacity),
         }
       }
     }
-    if (zone.zoneType === 'house' && (Object.values(player.houseAnimals)[0] ?? null)) {
-      return { ...zone, animalType: (Object.values(player.houseAnimals)[0] ?? null), animalCount: 1 }
+    if (zone.zoneType === 'house') {
+      const animalType = player.houseAnimals[zone.id.slice('house:'.length)]
+      return { ...zone, animalType: animalType ?? null, animalCount: animalType ? 1 : 0 }
     }
     return { ...zone, animalType: null, animalCount: 0 }
   })

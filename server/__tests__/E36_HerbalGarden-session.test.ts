@@ -145,7 +145,7 @@ describe('E036_HerbalGarden session', () => {
     const pasture = zones.find((zone) => zone.id === 'pasture-1')!
     pasture.animalType = null
     pasture.animalCount = 0
-    const house = zones.find((zone) => zone.zoneType === 'house')!
+    const house = zones.find((zone) => zone.id === 'house:1-0')!
     house.animalType = 'sheep'
     house.animalCount = 1
 

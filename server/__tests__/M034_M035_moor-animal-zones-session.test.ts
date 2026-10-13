@@ -238,7 +238,7 @@ describe('M034/M035 Farmers of the Moor animal zones', () => {
 
     const placed = session.resolveChoice(0, 'confirm', {
       zones: [
-        { id: 'house:1-0', zoneType: 'house', animalType: 'boar', animalCount: 1 },
+        { id: 'house:2-3', zoneType: 'house', animalType: 'boar', animalCount: 1 },
       ],
     })
 
