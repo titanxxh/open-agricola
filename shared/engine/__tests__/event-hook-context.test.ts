@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import type { ActionDefinition } from '../../contract/types'
 import { clearActionHooks, registerActionHook } from '../../actions/hooks'
+import { gainAction } from '../../actions/effects/gain'
 import type { CardListenerRegistration } from '../../cards/card-listeners'
 import { withActiveRegistry } from '../../cards/active-registry'
 import { CardRegistry } from '../../cards/registry'
@@ -332,7 +333,7 @@ describe('engine hook event context', () => {
         }
       },
     })
-    const setup = makeEventTestEngine([exchange, fallback, blocked])
+    const setup = makeEventTestEngine([exchange, fallback, blocked, gainAction])
     const [triggerSelect] = buildPhaseTrailingNodes(
       setup.engine._internals(),
       [
@@ -346,7 +347,7 @@ describe('engine hook event context', () => {
       player.id,
     )
     const { engine } = makeEventTestEngine(
-      [exchange, fallback, blocked],
+      [exchange, fallback, blocked, gainAction],
       new SequenceNode('trigger-preview-root', [
         new ActionNode('trigger-preview-exchange-node', exchange.id),
         triggerSelect!,
