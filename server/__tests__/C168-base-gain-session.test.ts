@@ -27,8 +27,7 @@ const setup = ({ sheep = 3, food = 8, catcher = true, comb = true, moor = false,
         player.minorPlayed = []
         player.occupationPlayed = []
         player.improvements = []
-        player.houseAnimalType = null
-        player.houseAnimalCount = 0
+        player.houseAnimals = {}
         player.stableAnimals = {}
         Object.assign(player.resources, {
           food: 20, wood: 0, clay: 0, reed: 0, stone: 0, grain: 0, vegetable: 0,
@@ -83,7 +82,7 @@ const houseAnimals = (session: GameSession, response: SessionResponse, lastAnima
   expect(response.interaction.request.kind).toBe('animal-reorg')
   return session.resolveChoice(0, 'confirm', {
     zones: [
-      { id: 'house', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
+      { id: 'house:1-0', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
       { id: 'stable:0-1', zoneType: 'stable', animalType: 'boar', animalCount: 1 },
       { id: 'stable:0-2', zoneType: 'stable', animalType: lastAnimal, animalCount: 1 },
     ],
