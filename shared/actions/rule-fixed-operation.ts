@@ -25,7 +25,10 @@ registerSelectionEffect('rule-take-field-crop', ({ state, player, positions, sou
     const top = field && [...field.slots].reverse().find(slot => slot.stack)
     if (!field || top?.stack?.kind !== crop || top.stack.remaining < amount) continue
     const removed = mutateLogicalFields(state, player, { sourceCard, eventSink }).remove({ fieldId: field.id, slot: top.index }, amount)
-    if (removed.ok) return removed.flow
+    if (removed.ok) return {
+      type: 'seq',
+      children: [gainLeaf(sourceCard, { [crop]: amount }), ...(removed.flow ? [removed.flow] : [])],
+    }
   }
 })
 

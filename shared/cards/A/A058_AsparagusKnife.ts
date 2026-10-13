@@ -8,7 +8,6 @@ const cardImpl = {
     id: CARD_ID,
   timedRules: [{ key: 'field-exchange', at: { kind: 'rounds', rounds: [8, 10, 12], phase: 'onStartReturnHome' }, body: { kind: 'condition', condition: { kind: 'compare', left: { kind: 'fields', crop: 'vegetable' }, operator: 'gt', right: 0 }, body: { kind: 'optional', body: { kind: 'seq', children: [
     { kind: 'operation', operation: { kind: 'take-field-crop', crop: 'vegetable', amount: 1 } },
-    { kind: 'gain', resources: { vegetable: 1 } },
     { kind: 'operation', operation: { kind: 'bounded-exchange', maximum: 1, cost: { vegetable: 1 }, gain: { food: 3 }, bonusVp: 1, quantity: 'choose' } },
   ] } } } }],
   },
