@@ -3,6 +3,7 @@ import { GameSession, type SessionResponse } from '../game/authoritative-session
 import { createWorkSession } from './_helpers/session-fixtures'
 import type { ActionFlow, ChoiceDescriptionPreview } from '../../shared/contract/types'
 import { cloneState } from '../../shared/session/state-bootstrap'
+import { requireActiveCardRegistry } from '../../shared/cards/active-registry'
 
 // Approved Session seam: real card purchase followed by action use, cursor
 // restore and undo. A162's printed 4+ requirement uses a four-player game.
@@ -287,6 +288,44 @@ it.each(['optional', 'xor'] as const)('a registered but unaffordable %s branch r
   const response = take(session, 0, 'card_test_missing_definition_host')
   expect(response.state.players[0]!.resources).toMatchObject({ wood: 3, clay: mode === 'xor' ? 1 : 0 })
   expect(response.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'confirm-next-player' } })
+})
+
+function preparationSourceSession(flow: ActionFlow): GameSession {
+  const cardId = 'CARD_TEST_PreparationDefinition'
+  const session = createWorkSession({ seed: 4242, configure(state) {
+    for (const player of state.players) player.resources.food = 40
+    state.players[0]!.minorPlayed = [cardId]
+  } })
+  sessions.push(session)
+  session.withCtx(() => requireActiveCardRegistry('preparation definition regression').loadImpl(cardId, {
+    effect: { id: cardId, onRoundStart: () => flow },
+  }))
+  take(session, 0, 'reed-bank')
+  take(session, 1, 'forest')
+  take(session, 0, 'clay-pit')
+  take(session, 1, 'day-laborer')
+  return session
+}
+
+it('a missing definition in a preparation activation preview rolls back the advancing confirmation', () => {
+  const session = preparationSourceSession({ type: 'leaf', actionId: 'card_test_unregistered_stage_leaf', optional: true })
+  const before = ruleOutcome(session.getState())
+  expect(() => ready(session))
+    .toThrow('missing action definition: card_test_unregistered_stage_leaf')
+  expect(ruleOutcome(session.getState())).toEqual(before)
+  expect(session.state.round).toBe(1)
+  expect(session.getState().interaction).toMatchObject({ stateId: 'wait', request: { kind: 'confirm-next-player' } })
+})
+
+it('a registered but unpaid preparation activation retains the normal skip semantics', () => {
+  const session = preparationSourceSession({ type: 'leaf', actionId: 'pay', params: { wood: 100 }, optional: true })
+  const response = ready(session)
+  expect(response.state.round).toBe(2)
+  expect(response.state.roundPhase).toBe('work')
+  expect(response.interaction.stateId).toBe('idle')
+  expect(response.state.players[0]!.resources.wood).toBe(0)
+  expect(response.state.events.filter(event => event.type === 'resource.paid'
+    && event.sourceCardId === 'CARD_TEST_PreparationDefinition')).toEqual([])
 })
 
 it('a flow can create a new composite space and immediately offer and execute it', () => {

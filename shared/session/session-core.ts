@@ -859,7 +859,7 @@ export class GameCore {
       canStartFlow: (flow, playerIndex) => evaluateFlowDoable(flow, {
         state: this.state, player: this.state.players[playerIndex]!,
         space: this.state.actionSpaces[0]!,
-      }, id => this.registry.get(id)),
+      }, id => this.registry.getRequired(id)),
     }, {
       onBeforeHarvest: (stageResume) => {
         this.continueHarvestFromBeforeHarvest(stageResume.playerIndex, stageResume.extra)
