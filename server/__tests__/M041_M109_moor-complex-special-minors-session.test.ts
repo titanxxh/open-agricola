@@ -314,7 +314,7 @@ describe('Moor complex special-action minors', () => {
     if (horseMarket.interaction.stateId !== 'wait') throw new Error('expected horse reorg')
     expect(horseMarket.interaction.request.kind).toBe('animal-reorg')
     horseMarket = dropped.session.resolveChoice(0, 'confirm', {
-      zones: [{ id: 'house:1-0', zoneType: 'house', animalType: 'horse', animalCount: 1 }],
+      zones: [{ id: 'house:2-3', zoneType: 'house', animalType: 'horse', animalCount: 1 }],
     })
     expect(horseMarket.state.players[0]!.resources.horse).toBe(1)
     expect(horseMarket.interaction.stateId === 'wait' ? horseMarket.interaction.sourceCard : undefined)

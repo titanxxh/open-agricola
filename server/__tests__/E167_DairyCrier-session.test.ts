@@ -66,8 +66,9 @@ const arrangeAnimals = (session: GameSession, response: SessionResponse) => {
     || response.interaction.request.kind !== 'animal-reorg') return response
   const playerIndex = response.interaction.playerIndex
   const player = response.state.players[playerIndex]!
+  const house = response.interaction.request.zones.find((zone) => zone.zoneType === 'house')
   const zones = response.interaction.request.zones.map((zone) => {
-    if (zone.zoneType === 'house' && player.resources.cattle > 0) {
+    if (zone.id === house?.id && player.resources.cattle > 0) {
       return { ...zone, animalType: 'cattle' as const, animalCount: 1 }
     }
     if (zone.zoneType === 'pasture' && player.resources.sheep > 0) {

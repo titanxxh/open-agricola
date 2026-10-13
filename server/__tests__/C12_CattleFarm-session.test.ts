@@ -112,7 +112,7 @@ describe('C012_CattleFarm session', () => {
 
     const response = session.resolveChoice(0, 'confirm', [
       assignment(pending, `card:${CARD_ID}`, 'cattle', 1),
-      assignment(pending, 'house', 'sheep', 1),
+      assignment(pending, 'house:1-0', 'sheep', 1),
     ] as unknown as Record<string, unknown>)
 
     expect(response.ok, response.error).toBe(true)
@@ -126,7 +126,7 @@ describe('C012_CattleFarm session', () => {
 
     const response = session.resolveChoice(0, 'confirm', [
       assignment(pending, `card:${CARD_ID}`, 'cattle', 2),
-      assignment(pending, 'house', 'sheep', 1),
+      assignment(pending, 'house:1-0', 'sheep', 1),
     ] as unknown as Record<string, unknown>)
 
     expect(response.ok, response.error).toBe(true)
@@ -139,14 +139,14 @@ describe('C012_CattleFarm session', () => {
 
     const rejected = session.resolveChoice(0, 'confirm', [
       assignment(pending, `card:${CARD_ID}`, 'sheep', 1),
-      assignment(pending, 'house', 'cattle', 1),
+      assignment(pending, 'house:1-0', 'cattle', 1),
     ] as unknown as Record<string, unknown>)
     expect(rejected.ok).toBe(false)
     expect(rejected.state.players[0]!.resources).toMatchObject({ sheep: 1, cattle: 1 })
 
     const response = session.resolveChoice(0, 'confirm', [
       assignment(pending, `card:${CARD_ID}`, 'cattle', 1),
-      assignment(pending, 'house', 'sheep', 1),
+      assignment(pending, 'house:1-0', 'sheep', 1),
     ] as unknown as Record<string, unknown>)
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.cardStates[CARD_ID]?.extraData?.animalCounts).toEqual({ cattle: 1 })
@@ -158,7 +158,7 @@ describe('C012_CattleFarm session', () => {
 
     const rejected = session.resolveChoice(0, 'confirm', [
       assignment(pending, `card:${CARD_ID}`, 'cattle', 2),
-      assignment(pending, 'house', 'sheep', 1),
+      assignment(pending, 'house:1-0', 'sheep', 1),
     ] as unknown as Record<string, unknown>)
     expect(rejected.ok).toBe(false)
     expect(rejected.error).toBe('log.reorganizeFail')
@@ -167,7 +167,7 @@ describe('C012_CattleFarm session', () => {
     const response = session.resolveChoice(0, 'confirm', [
       assignment(pending, `card:${CARD_ID}`, 'cattle', 1),
       assignment(pending, 'p1', 'cattle', 1),
-      assignment(pending, 'house', 'sheep', 1),
+      assignment(pending, 'house:1-0', 'sheep', 1),
     ])
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources).toMatchObject({ sheep: 1, cattle: 2 })
