@@ -74,8 +74,7 @@ const setupAction = ({
   player.resources.sheep = ownedAnimal === 'sheep' ? 1 : 0
   player.resources.boar = ownedAnimal === 'boar' ? 1 : 0
   player.resources.cattle = ownedAnimal === 'cattle' ? 1 : 0
-  player.houseAnimalType = null
-  player.houseAnimalCount = 0
+  player.houseAnimals = {};
   player.stableAnimals = {}
   player.pastures = ownedAnimal ? [{
     id: 'feeding-dish-pasture',
@@ -112,7 +111,7 @@ const useSpace = (session: GameSession, spaceId: string, animal?: Animal): Sessi
     response = session.resolveChoice(0, 'confirm', {
       zones: samePasture
         ? [{ id: samePasture.id, zoneType: 'pasture', animalType: animal, animalCount: count }]
-        : [{ id: 'house', zoneType: 'house', animalType: animal, animalCount: count }],
+        : [{ id: 'house:1-0', zoneType: 'house', animalType: animal, animalCount: count }],
     })
   }
   return response

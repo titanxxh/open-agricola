@@ -72,8 +72,7 @@ const makeCtx = (opts: {
     minorPlayed: [],
     occupationPlayed: [],
     activeModifiers: [],
-    houseAnimalType: null,
-    houseAnimalCount: 0,
+    houseAnimals: {},
     stableAnimals: {},
     ...(opts.player ?? {}),
   } as unknown as PlayerState
@@ -525,13 +524,13 @@ describe('reorganizeAction.resolveChoice', () => {
     const result = reorganizeAction.resolveChoice!(
       ctx,
       'confirm',
-      [{ id: 'house', zoneType: 'house', animalType: 'horse', animalCount: 1 }] as unknown as Record<string, unknown>,
+      [{ id: 'house:1-0', zoneType: 'house', animalType: 'horse', animalCount: 1 }] as unknown as Record<string, unknown>,
     )
 
     expect(result.type).toBe('ok')
     expect(ctx.player.resources.horse).toBe(1)
-    expect(ctx.player.houseAnimalType).toBe('horse')
-    expect(ctx.player.houseAnimalCount).toBe(1)
+    expect((Object.values(ctx.player.houseAnimals)[0] ?? null)).toBe('horse')
+    expect(Object.values(ctx.player.houseAnimals).length).toBe(1)
     expect(ctx.player.cardStates.M084_BogPony?.extraData?.lyingHorseCount).toBe(1)
   })
 

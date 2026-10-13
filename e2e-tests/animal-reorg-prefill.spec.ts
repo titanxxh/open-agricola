@@ -55,8 +55,7 @@ test('collecting animals presents a full draft that can be confirmed without adj
   }
   const player = state.players[0]
   Object.assign(player.resources, { sheep: 2, boar: 0, cattle: 1 })
-  player.houseAnimalType = 'cattle'
-  player.houseAnimalCount = 1
+  player.houseAnimals = Object.fromEntries(player.roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, 'cattle']));
   player.pastures = [{ id: 'prefill', size: 2, tiles: [{ row: 0, col: 0 }, { row: 0, col: 1 }], stables: 0, animalType: 'sheep', animalCount: 2 }]
   state.actionSpaces.find((space: { id: string }) => space.id === 'sheep-market').resources.sheep = 2
   expect((await postJson(request, BACKEND_URL + '/api/game/load', { state })).ok).toBe(true)
@@ -86,8 +85,7 @@ test('partial prefill leaves the remainder for an explicit discard confirmation'
   }
   const player = state.players[0]
   Object.assign(player.resources, { sheep: 4, boar: 2, cattle: 1 })
-  player.houseAnimalType = 'cattle'
-  player.houseAnimalCount = 1
+  player.houseAnimals = Object.fromEntries(player.roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, 'cattle']));
   player.pastures = [{ id: 'prefill', size: 2, tiles: [{ row: 0, col: 0 }, { row: 0, col: 1 }], stables: 0, animalType: null, animalCount: 0 }]
   expect((await postJson(request, BACKEND_URL + '/api/game/load', { state })).ok).toBe(true)
   expect((await postJson(request, BACKEND_URL + '/api/game/dev/set-resources', { playerIndex: 0, resources: { sheep: 5 } })).ok).toBe(true)

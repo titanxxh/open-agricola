@@ -101,14 +101,13 @@ describe('E168 Animal Tamers Apprentice parity', () => {
     setActiveWorkerCount(player, 2)
     player.rooms = 2
     player.roomTiles = [{ row: 0, col: 0 }, { row: 1, col: 0 }]
-    player.houseAnimalType = 'sheep'
-    player.houseAnimalCount = 1
+    player.houseAnimals = Object.fromEntries(player.roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, 'sheep']));
     player.resources.sheep = 1
     session.loadState(state)
     const response = session.performRoundEnd()
     expect(response.state.players[0]!.resources.sheep).toBe(1)
-    expect(response.state.players[0]!.houseAnimalType).toBe('sheep')
-    expect(response.state.players[0]!.houseAnimalCount).toBe(1)
+    expect((Object.values(response.state.players[0]!.houseAnimals)[0] ?? null)).toBe('sheep')
+    expect(Object.values(response.state.players[0]!.houseAnimals).length).toBe(1)
   })
 
   it('E168 S6: extra housing leaves one physical room unoccupied', () => {

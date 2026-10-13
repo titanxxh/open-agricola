@@ -179,8 +179,7 @@ describe('AnimalZones', () => {
     owner.cardStates = { [NIGHT_PASTURE]: { extraData: {} } }
     guest.pastures = []
     guest.stableTiles = []
-    guest.houseAnimalType = 'sheep'
-    guest.houseAnimalCount = 1
+    guest.houseAnimals = Object.fromEntries(guest.roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, 'sheep']));
 
     expect(canAccommodateAnimalTotals(state, guest, { sheep: 1, boar: 1 })).toBe(true)
   })
@@ -258,8 +257,7 @@ describe('AnimalZones', () => {
     const state = { players: [], enableFarmersOfTheMoor: true } as unknown as GameState
     const player = playerWithPasture({
       pastures: [],
-      houseAnimalType: 'horse',
-      houseAnimalCount: 1,
+      houseAnimals: { '1-0': 'horse' },
       minorPlayed: ['M084_BogPony'],
       cardStates: {
         M084_BogPony: {
@@ -430,7 +428,7 @@ describe('AnimalZones', () => {
           cardId: TEST_CARD,
           capacity: 2,
           allowedAnimalType: 'horse',
-          exclusiveCardZoneLimit: 1,
+          occupiedZoneLimit: 1,
         } as AnimalZone,
         {
           id: `card:${TEST_CARD}@0-1`,
@@ -438,7 +436,7 @@ describe('AnimalZones', () => {
           cardId: TEST_CARD,
           capacity: 2,
           allowedAnimalType: 'horse',
-          exclusiveCardZoneLimit: 1,
+          occupiedZoneLimit: 1,
         } as AnimalZone,
       ],
     })
@@ -523,8 +521,8 @@ describe('AnimalZones', () => {
     const pasture = player.pastures[0]
     expect(pasture.animalType).toBe('sheep')
     expect(pasture.animalCount).toBe(2)
-    expect(player.houseAnimalType).toBe('sheep')
-    expect(player.houseAnimalCount).toBe(1)
+    expect((Object.values(player.houseAnimals)[0] ?? null)).toBe('sheep')
+    expect(Object.values(player.houseAnimals).length).toBe(1)
   })
 
   it('enforceCapacity keeps M084 lying horses in visible animal zones', () => {
@@ -533,8 +531,7 @@ describe('AnimalZones', () => {
     state.enableFarmersOfTheMoor = true
     const player = state.players[0]
     player.resources.horse = 1
-    player.houseAnimalType = 'horse'
-    player.houseAnimalCount = 1
+    player.houseAnimals = Object.fromEntries(player.roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, 'horse']));
     player.pastures = []
     player.cardStates = {
       M084_BogPony: { extraData: { lyingHorseCount: 1 } },
@@ -543,8 +540,8 @@ describe('AnimalZones', () => {
     playerBoard(state, 0).animals.enforceCapacity()
 
     expect(player.resources.horse).toBe(1)
-    expect(player.houseAnimalType).toBe('horse')
-    expect(player.houseAnimalCount).toBe(1)
+    expect((Object.values(player.houseAnimals)[0] ?? null)).toBe('horse')
+    expect(Object.values(player.houseAnimals).length).toBe(1)
     expect(player.cardStates.M084_BogPony?.extraData?.lyingHorseCount).toBe(1)
   })
 
@@ -555,8 +552,7 @@ describe('AnimalZones', () => {
     const player = state.players[0]
     player.resources.sheep = 1
     player.resources.horse = 1
-    player.houseAnimalType = 'horse'
-    player.houseAnimalCount = 1
+    player.houseAnimals = Object.fromEntries(player.roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, 'horse']));
     player.pastures = []
     player.cardStates = {
       M084_BogPony: { extraData: { lyingHorseCount: 1 } },
@@ -566,8 +562,8 @@ describe('AnimalZones', () => {
 
     expect(player.resources.sheep).toBe(0)
     expect(player.resources.horse).toBe(1)
-    expect(player.houseAnimalType).toBe('horse')
-    expect(player.houseAnimalCount).toBe(1)
+    expect((Object.values(player.houseAnimals)[0] ?? null)).toBe('horse')
+    expect(Object.values(player.houseAnimals).length).toBe(1)
     expect(player.cardStates.M084_BogPony?.extraData?.lyingHorseCount).toBe(1)
   })
 
@@ -579,8 +575,7 @@ describe('AnimalZones', () => {
     player.resources.sheep = 1
     player.resources.horse = 1
     player.minorPlayed = ['M084_BogPony']
-    player.houseAnimalType = 'sheep'
-    player.houseAnimalCount = 1
+    player.houseAnimals = Object.fromEntries(player.roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, 'sheep']));
     player.pastures = []
     player.cardStates = {
       M084_BogPony: { extraData: { lyingHorseCount: 1 } },
@@ -590,8 +585,8 @@ describe('AnimalZones', () => {
 
     expect(player.resources.sheep).toBe(1)
     expect(player.resources.horse).toBe(0)
-    expect(player.houseAnimalType).toBe('sheep')
-    expect(player.houseAnimalCount).toBe(1)
+    expect((Object.values(player.houseAnimals)[0] ?? null)).toBe('sheep')
+    expect(Object.values(player.houseAnimals).length).toBe(1)
     expect(player.cardStates.M084_BogPony?.extraData?.lyingHorseCount ?? 0).toBe(0)
   })
 
@@ -604,8 +599,7 @@ describe('AnimalZones', () => {
     player.resources.horse = 1
     player.minorPlayed = ['M035_HorseTrough', 'M084_BogPony']
     player.pastures = []
-    player.houseAnimalType = null
-    player.houseAnimalCount = 0
+    player.houseAnimals = {};
     player.cardStates = {
       M035_HorseTrough: {
         extraData: {
@@ -620,8 +614,8 @@ describe('AnimalZones', () => {
     playerBoard(state, 0).animals.enforceCapacity()
 
     expect(player.resources.horse).toBe(1)
-    expect(player.houseAnimalType).toBeNull()
-    expect(player.houseAnimalCount).toBe(0)
+    expect((Object.values(player.houseAnimals)[0] ?? null)).toBeNull()
+    expect(Object.values(player.houseAnimals).length).toBe(0)
     expect(player.cardStates.M035_HorseTrough?.extraData?.animalCountsByZone).toEqual({
       [zoneId]: expect.objectContaining({ animalCounts: { horse: 1 } }),
     })
@@ -697,8 +691,7 @@ describe('AnimalZones', () => {
     guest.minorPlayed = [NIGHT_PASTURE]
     guest.resources.sheep = 4
     guest.pastures = []
-    guest.houseAnimalType = null
-    guest.houseAnimalCount = 0
+    guest.houseAnimals = {};
     const guestOwnZoneId = `card:${NIGHT_PASTURE}:owner:${guest.id}:animalOwner:${guest.id}`
     const borrowedZoneId = `card:${NIGHT_PASTURE}:owner:${owner.id}:animalOwner:${guest.id}`
     owner.cardStates = {
@@ -750,8 +743,7 @@ describe('AnimalZones', () => {
     player.resources.boar = 1
     player.occupationPlayed = ['C148_MudWallower']
     player.pastures = []
-    player.houseAnimalType = null
-    player.houseAnimalCount = 0
+    player.houseAnimals = {};
     player.cardStates = {
       C148_MudWallower: { counters: { counter: 0, held: 1 } },
     }
@@ -759,8 +751,8 @@ describe('AnimalZones', () => {
     playerBoard(state, 0).animals.enforceCapacity()
 
     expect(player.resources.boar).toBe(1)
-    expect(player.houseAnimalType).toBeNull()
-    expect(player.houseAnimalCount).toBe(0)
+    expect((Object.values(player.houseAnimals)[0] ?? null)).toBeNull()
+    expect(Object.values(player.houseAnimals).length).toBe(0)
     expect(player.cardStates.C148_MudWallower?.extraData).toBeUndefined()
     expect(getAssignedAnimalsByType(player).boar).toBe(0)
 
@@ -780,8 +772,7 @@ describe('AnimalZones', () => {
     player.resources.sheep = 1
     player.minorPlayed = [TEST_CARD]
     player.pastures = []
-    player.houseAnimalType = null
-    player.houseAnimalCount = 0
+    player.houseAnimals = {};
     player.cardStates = {
       [TEST_CARD]: {
         extraData: {
@@ -794,8 +785,8 @@ describe('AnimalZones', () => {
 
     playerBoard(state, 0).animals.enforceCapacity()
 
-    expect(player.houseAnimalType).toBe('sheep')
-    expect(player.houseAnimalCount).toBe(1)
+    expect((Object.values(player.houseAnimals)[0] ?? null)).toBe('sheep')
+    expect(Object.values(player.houseAnimals).length).toBe(1)
     expect(player.cardStates[TEST_CARD]?.extraData?.animalCountsByZone).toBeUndefined()
     expect(getAssignedAnimalsByType(player).sheep).toBe(1)
   })
@@ -807,8 +798,7 @@ describe('AnimalZones', () => {
     player.resources.boar = 2
     player.occupationPlayed = ['C148_MudWallower']
     player.pastures = []
-    player.houseAnimalType = null
-    player.houseAnimalCount = 0
+    player.houseAnimals = {};
     player.cardStates = {
       C148_MudWallower: { counters: { counter: 0, held: 1 } },
     }
@@ -816,8 +806,8 @@ describe('AnimalZones', () => {
     playerBoard(state, 0).animals.enforceCapacity()
 
     expect(player.resources.boar).toBe(2)
-    expect(player.houseAnimalType).toBe('boar')
-    expect(player.houseAnimalCount).toBe(1)
+    expect((Object.values(player.houseAnimals)[0] ?? null)).toBe('boar')
+    expect(Object.values(player.houseAnimals).length).toBe(1)
     expect(player.cardStates.C148_MudWallower?.extraData).toBeUndefined()
     const c148Zone = computeAnimalZones(player, state).find((zone) => zone.cardId === 'C148_MudWallower')
     expect(c148Zone?.animalCount).toBe(1)

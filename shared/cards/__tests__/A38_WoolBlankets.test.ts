@@ -14,10 +14,10 @@ const createPlayer = (overrides?: Partial<PlayerState>): PlayerState =>
       grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
     },
     workers: [], rooms: 2, houseType: 'wood',
-    fields: [], roomTiles: [], stableTiles: [],
+    fields: [], roomTiles: [{ row: 1, col: 0 }, { row: 2, col: 0 }], stableTiles: [],
     improvements: [], minorHand: [], minorPlayed: [],
     occupationHand: [], occupationPlayed: [],
-    houseAnimalType: null, houseAnimalCount: 0, stableAnimals: {},
+    houseAnimals: {}, stableAnimals: {},
     pastures: [], fenceSegments: [],
     majorEffects: { wellRounds: 0 }, startPlayer: false,
     activeModifiers: [], cardStates: {},
@@ -50,7 +50,7 @@ describe('A038_WoolBlankets prerequisite (5 Sheep)', () => {
   it('IS satisfied with 4 pasture sheep + 1 house sheep', () => {
     const player = createPlayer({
       pastures: [makePasture(2, 4, 'sheep')],
-      houseAnimalType: 'sheep', houseAnimalCount: 1,
+      houseAnimals: { '1-0': 'sheep' },
     })
     expect(A038_WoolBlankets_impl.prerequisiteCheck!(player)).toBe(true)
   })

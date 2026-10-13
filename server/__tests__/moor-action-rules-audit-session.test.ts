@@ -38,8 +38,7 @@ describe('Moor action printed-rule native audit', () => {
       const player = session.state.players[0]!
       player.minorPlayed = ['M041_CattleCollar']
       player.resources.cattle = mode === 'no-cattle' ? 0 : 1
-      player.houseAnimalType = mode === 'no-cattle' ? null : 'cattle'
-      player.houseAnimalCount = player.resources.cattle
+      player.houseAnimals = Object.fromEntries(player.roomTiles.slice(0, player.resources.cattle).map(tile => [`${tile.row}-${tile.col}`, mode === 'no-cattle' ? null : 'cattle']));
       let response = session.takeAction(0, spaceId)
       expect(response.ok, response.error).toBe(true)
       if (response.interaction.request.kind === 'choice') response = acceptMoorAuditChoice(session, response)
@@ -104,8 +103,7 @@ describe('Moor action printed-rule native audit', () => {
       const player = session.state.players[0]!
       player.minorPlayed = ['M117_DraughtHorses']
       player.resources.horse = mode === 'no-horse' ? 0 : 1
-      player.houseAnimalType = mode === 'no-horse' ? null : 'horse'
-      player.houseAnimalCount = mode === 'no-horse' ? 0 : 1
+      player.houseAnimals = Object.fromEntries(player.roomTiles.slice(0, mode === 'no-horse' ? 0 : 1).map(tile => [`${tile.row}-${tile.col}`, mode === 'no-horse' ? null : 'horse']));
       player.resources.food = mode === 'no-food' ? 0 : 1
       session.state.actionSpaces.find((space) => space.id === 'forest')!.resources.wood = wood
       let response = session.takeAction(0, 'forest')
@@ -160,9 +158,9 @@ describe('Moor action printed-rule native audit', () => {
       expect(response.state.players[0]!.fields).toContainEqual({ ...tile, stacks: [] })
       if (mode === 'accept') {
         expect(response.interaction.request.kind).toBe('animal-reorg')
-        const placed = session.resolveChoice(0, 'confirm', { zones: [{ id: 'house', zoneType: 'house', animalType: 'horse', animalCount: 1 }] })
+        const placed = session.resolveChoice(0, 'confirm', { zones: [{ id: 'house:1-0', zoneType: 'house', animalType: 'horse', animalCount: 1 }] })
         expect(placed.ok, placed.error).toBe(true)
-        expect(placed.state.players[0]!.houseAnimalCount).toBe(1)
+        expect(Object.values(placed.state.players[0]!.houseAnimals).length).toBe(1)
       }
     }
   })

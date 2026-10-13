@@ -112,7 +112,7 @@ const driveToCompletion = (
   if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'ui.interactionAnimalReorg') {
     const p = resp.state.players[0]!
     const zones: AnimalZone[] = [
-      { id: 'house', zoneType: 'house', animalType: null, animalCount: 0, capacity: 1 },
+      { id: 'house:1-0', zoneType: 'house', animalType: null, animalCount: 0, capacity: 1 },
       ...p.pastures.map((pasture) => ({
         id: pasture.id,
         zoneType: 'pasture' as const,
@@ -241,7 +241,7 @@ describe('E053_BoarSpear session - exchange-based PIG -> 4 FOOD', () => {
       .toBe('ui.interactionAnimalReorg')
 
     resp = session.resolveChoice(0, 'confirm', [
-      { id: 'house', zoneType: 'house', animalType: 'boar', animalCount: 1 },
+      { id: 'house:1-0', zoneType: 'house', animalType: 'boar', animalCount: 1 },
       { id: `card:${C148_ID}`, zoneType: 'card', animalType: 'boar', animalCount: 1 },
     ] as unknown as Record<string, unknown>)
 
@@ -249,8 +249,8 @@ describe('E053_BoarSpear session - exchange-based PIG -> 4 FOOD', () => {
     const after = resp.state.players[0]!
     expect(after.resources.food).toBe(4)
     expect(after.resources.boar).toBe(1)
-    expect(after.houseAnimalType).toBeNull()
-    expect(after.houseAnimalCount).toBe(0)
+    expect((Object.values(after.houseAnimals)[0] ?? null)).toBeNull()
+    expect(Object.values(after.houseAnimals).length).toBe(0)
     expect(after.cardStates?.[C148_ID]?.counters?.held).toBe(1)
   })
 
@@ -299,7 +299,7 @@ describe('E053_BoarSpear session - exchange-based PIG -> 4 FOOD', () => {
     let resp = session.takeAction(0, 'pig-market')
     expect(resp.ok).toBe(true)
     resp = session.resolveChoice(0, 'confirm', [
-      { id: 'house', zoneType: 'house', animalType: 'boar', animalCount: 1 },
+      { id: 'house:1-0', zoneType: 'house', animalType: 'boar', animalCount: 1 },
       c148BoarZone(1),
     ] as unknown as Record<string, unknown>)
 
@@ -307,8 +307,8 @@ describe('E053_BoarSpear session - exchange-based PIG -> 4 FOOD', () => {
     const after = resp.state.players[0]!
     expect(after.resources.food).toBe(0)
     expect(after.resources.boar).toBe(2)
-    expect(after.houseAnimalType).toBe('boar')
-    expect(after.houseAnimalCount).toBe(1)
+    expect((Object.values(after.houseAnimals)[0] ?? null)).toBe('boar')
+    expect(Object.values(after.houseAnimals).length).toBe(1)
     expect(after.cardStates?.[C148_ID]?.counters?.held).toBe(1)
   })
 
@@ -343,7 +343,7 @@ describe('E053_BoarSpear session - exchange-based PIG -> 4 FOOD', () => {
       .toBe('ui.interactionAnimalReorg')
 
     resp = session.resolveChoice(0, 'confirm', [
-      { id: 'house', zoneType: 'house', animalType: 'boar', animalCount: 1 },
+      { id: 'house:1-0', zoneType: 'house', animalType: 'boar', animalCount: 1 },
       c148BoarZone(1),
     ] as unknown as Record<string, unknown>)
 
@@ -351,8 +351,8 @@ describe('E053_BoarSpear session - exchange-based PIG -> 4 FOOD', () => {
     const after = resp.state.players[0]!
     expect(after.resources.food).toBe(4)
     expect(after.resources.boar).toBe(1)
-    expect(after.houseAnimalType).toBeNull()
-    expect(after.houseAnimalCount).toBe(0)
+    expect((Object.values(after.houseAnimals)[0] ?? null)).toBeNull()
+    expect(Object.values(after.houseAnimals).length).toBe(0)
     expect(after.cardStates?.[C148_ID]?.counters?.held).toBe(1)
   })
 

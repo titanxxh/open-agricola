@@ -79,8 +79,7 @@ describe('M084 Bog Pony session', () => {
     const state = session.getState().state
     const player = state.players[0]!
     player.resources = fullResources({ horse: 1, fuel: 0 })
-    player.houseAnimalType = 'horse'
-    player.houseAnimalCount = 1
+    player.houseAnimals = Object.fromEntries(player.roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, 'horse']));
     session.loadState(state)
 
     expect(enterActiveInteraction(session)).toContain(ANYTIME_ID)
@@ -90,8 +89,8 @@ describe('M084 Bog Pony session', () => {
     const updated = resp.state.players[0]!
     expect(updated.resources.fuel).toBe(2)
     expect(updated.resources.horse).toBe(1)
-    expect(updated.houseAnimalType).toBe('horse')
-    expect(updated.houseAnimalCount).toBe(1)
+    expect((Object.values(updated.houseAnimals)[0] ?? null)).toBe('horse')
+    expect(Object.values(updated.houseAnimals).length).toBe(1)
     expect(updated.cardStates[CARD_ID]?.extraData?.lyingHorseCount).toBe(1)
     for (const viewer of [updated.id, resp.state.players[1]!.id, null]) {
       expect(session.buildSyncPayload(resp, viewer).state.players[0]!.cardStatePresentation[CARD_ID]?.animalMarkers)

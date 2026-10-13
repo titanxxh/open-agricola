@@ -54,7 +54,7 @@ const createPlayer = (id = 'p1', minorPlayed: string[] = []): PlayerState =>
     stableTiles: [],
     improvements: [], minorHand: [], minorPlayed,
     occupationHand: [], occupationPlayed: [],
-    houseAnimalType: null, houseAnimalCount: 0, stableAnimals: {},
+    houseAnimals: {}, stableAnimals: {},
     pastures: [], fenceSegments: [],
     majorEffects: { wellRounds: 0 }, startPlayer: false,
     activeModifiers: [],

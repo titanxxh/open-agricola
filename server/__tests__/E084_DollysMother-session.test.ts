@@ -46,8 +46,7 @@ const setup = ({
     player.pastures = []
     player.stableTiles = []
     player.stableAnimals = {}
-    player.houseAnimalType = null
-    player.houseAnimalCount = 0
+    player.houseAnimals = {};
     setWorkersAtHome(state, player, index === 0 ? 2 : 0)
   })
   const player = state.players[0]!
@@ -66,8 +65,7 @@ const setup = ({
     }]
   } else if (sheep + boar + cattle === 1) {
     const animalType = sheep > 0 ? 'sheep' : boar > 0 ? 'boar' : 'cattle'
-    player.houseAnimalType = animalType
-    player.houseAnimalCount = 1
+    player.houseAnimals = Object.fromEntries(player.roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, animalType]));
   }
   const sheepMarket = state.actionSpaces.find((space) => space.id === 'sheep-market')
   if (sheepMarket) sheepMarket.resources.sheep = 1
@@ -134,7 +132,7 @@ describe("E084 Dolly's Mother parity", () => {
     if (pending.interaction.stateId !== 'wait' || pending.interaction.request.kind !== 'animal-reorg') return
     const cardZone = pending.interaction.request.zones.find((zone) => zone.id === `card:${CARD_ID}`)
     expect(cardZone).toMatchObject({ capacity: 1, allowedAnimalType: 'sheep' })
-    const house = pending.interaction.request.zones.find((zone) => zone.id === 'house')
+    const house = pending.interaction.request.zones.find((zone) => zone.zoneType === 'house')
     expect(house).toBeDefined()
     const response = session.resolveChoice(0, 'confirm', {
       zones: [

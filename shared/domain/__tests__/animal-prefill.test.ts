@@ -55,8 +55,8 @@ describe('fixed-layout animal prefill', () => {
     const { state, player } = setup()
     player.resources.boar = 3
     const next = prefillAnimalZones(state, player, [
-      zone('a', 2, { zoneType: 'card', cardId: '__test', exclusiveCardZoneLimit: 1 }),
-      zone('b', 2, { zoneType: 'card', cardId: '__test', exclusiveCardZoneLimit: 1 }),
+      zone('a', 2, { zoneType: 'card', cardId: '__test', occupiedZoneLimit: 1 }),
+      zone('b', 2, { zoneType: 'card', cardId: '__test', occupiedZoneLimit: 1 }),
     ])
     expect(next.map((z) => z.animalCount)).toEqual([2, 0])
   })
@@ -65,7 +65,7 @@ describe('fixed-layout animal prefill', () => {
     const { state, player } = setup()
     player.resources.boar = 2
     const current = [
-      zone('a', 0, { zoneType: 'card', cardId: '__test', exclusiveCardZoneLimit: 0 }),
+      zone('a', 0, { zoneType: 'card', cardId: '__test', occupiedZoneLimit: 0 }),
       zone('b', 2, { zoneType: 'card', cardId: '__test' }),
     ]
     expect(prefillAnimalZones(state, player, current)).toEqual(current)
@@ -75,8 +75,8 @@ describe('fixed-layout animal prefill', () => {
     const { state, player } = setup()
     player.resources.boar = 2
     const next = prefillAnimalZones(state, player, [
-      zone('a', 1, { zoneType: 'card', cardId: '__test', ownerPlayerId: 'p1', exclusiveCardZoneLimit: 1 }),
-      zone('b', 1, { zoneType: 'card', cardId: '__test', ownerPlayerId: 'p2', exclusiveCardZoneLimit: 1 }),
+      zone('a', 1, { zoneType: 'card', cardId: '__test', ownerPlayerId: 'p1', occupiedZoneLimit: 1 }),
+      zone('b', 1, { zoneType: 'card', cardId: '__test', ownerPlayerId: 'p2', occupiedZoneLimit: 1 }),
     ])
     expect(next.map((z) => z.animalCount)).toEqual([1, 1])
   })
@@ -107,9 +107,9 @@ describe('fixed-layout animal prefill', () => {
     const { state, player } = setup()
     player.resources.sheep = 1
     expect(buildAnimalReorgRequest(state, player, false)).toMatchObject({
-      prefill: false, zones: [expect.objectContaining({ id: 'house', animalCount: 0 })],
+      prefill: false, zones: [expect.objectContaining({ id: 'house:2-0', animalCount: 0 }), expect.objectContaining({ id: 'house:1-0', animalCount: 0 })],
     })
-    expect(buildAnimalReorgRequest(state, player).zones[0]).toMatchObject({ id: 'house', animalType: 'sheep', animalCount: 1 })
-    expect(player.houseAnimalCount).toBe(0)
+    expect(buildAnimalReorgRequest(state, player).zones[0]).toMatchObject({ id: 'house:2-0', animalType: 'sheep', animalCount: 1 })
+    expect(Object.values(player.houseAnimals).length).toBe(0)
   })
 })

@@ -56,7 +56,7 @@ describe('after-stables built count — B85 counts as a built stable (#185)', ()
   it('A43 (fires on ≥1 built stable) triggers for a B85 solo build', () => {
     const session = setup({
       minorPlayed: ['A043_FarmyardManure'],
-      houseAnimalCount: 1,
+      houseAnimals: { '1-0': 'sheep' },
     } as Partial<PlayerState>)
     enterStableSelect(session)
     const commit = session.commitSelectionChoice(0, { farmHand: FARM_HAND_TILE })

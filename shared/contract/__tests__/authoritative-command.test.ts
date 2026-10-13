@@ -28,7 +28,7 @@ describe('authoritativeCommandKey', () => {
 
   it('normalizes animal-reorganization zones without reordering other choices', () => {
     const zones = [
-      { id: 'house', animalType: 'sheep', animalCount: 1 },
+      { id: 'house:1-0', animalType: 'sheep', animalCount: 1 },
       { id: 'pasture-0', animalType: null, animalCount: 0 },
     ]
 

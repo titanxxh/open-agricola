@@ -371,8 +371,7 @@ describe('harvest session flow', () => {
     playerA.minorPlayed.push('M081_PeatBoat')
     playerA.resources.sheep = 1
     playerA.resources.fuel = 2
-    playerA.houseAnimalType = 'sheep'
-    playerA.houseAnimalCount = 1
+    playerA.houseAnimals = Object.fromEntries(playerA.roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, 'sheep']));
     session.loadState(state)
     const pending = skipPostReapAnytime(session, session.performRoundEnd())
     expect(pending.interaction).toMatchObject({ stateId: 'wait', request: {
@@ -398,8 +397,7 @@ describe('harvest session flow', () => {
     playerA.minorPlayed.push('M081_PeatBoat')
     playerA.resources.fuel = 2
     playerA.resources.sheep = placed
-    playerA.houseAnimalType = placed ? 'sheep' : null
-    playerA.houseAnimalCount = placed
+    playerA.houseAnimals = Object.fromEntries(playerA.roomTiles.slice(0, placed).map(tile => [`${tile.row}-${tile.col}`, placed ? 'sheep' : null]));
     session.loadState(state)
     const pending = skipPostReapAnytime(session, session.performRoundEnd())
     expect(pending.interaction).toMatchObject({ stateId: 'wait', request: {

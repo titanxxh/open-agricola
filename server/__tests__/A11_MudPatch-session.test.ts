@@ -41,8 +41,7 @@ const setup = ({
     ...position,
     stacks: index < emptyFields ? [] : [{ kind: 'grain' as const, remaining: 2 }],
   }))
-  player.houseAnimalType = null
-  player.houseAnimalCount = 0
+  player.houseAnimals = {};
   player.stableAnimals = {}
   player.pastures = []
   const opponent = state.players[1]!
@@ -123,7 +122,7 @@ describe('A011 Mud Patch parity', () => {
     expect(mudPatchZone(response)).toMatchObject({ capacity: 1, allowedAnimalType: 'boar' })
 
     response = session.resolveChoice(0, 'confirm', [
-      { id: 'house', zoneType: 'house', animalType: 'boar', animalCount: 1 },
+      { id: 'house:1-0', zoneType: 'house', animalType: 'boar', animalCount: 1 },
       { id: `card:${CARD_ID}`, zoneType: 'card', animalType: 'boar', animalCount: 1 },
     ] as unknown as Record<string, unknown>)
 
@@ -137,7 +136,7 @@ describe('A011 Mud Patch parity', () => {
     expect(mudPatchZone(response)).toMatchObject({ capacity: 1, allowedAnimalType: 'boar' })
 
     response = session.resolveChoice(0, 'confirm', [
-      { id: 'house', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
+      { id: 'house:1-0', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
     ] as unknown as Record<string, unknown>)
 
     expect(response.ok, response.error).toBe(true)

@@ -124,8 +124,7 @@ test.describe('FarmSelect Interactions End-to-End Tests', () => {
     }
     const player = state.players[0];
     Object.assign(player.resources, { wood: 2, reed: 0, sheep: 2, boar: 0, cattle: 0 });
-    player.houseAnimalType = null;
-    player.houseAnimalCount = 0;
+    player.houseAnimals = {};
     player.stableTiles = [];
     player.stableAnimals = {};
     player.pastures = [{

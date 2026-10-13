@@ -7,7 +7,7 @@ import { markAllWorkersUsed } from '../../shared/domain/player'
 import { createWorkSession } from './_helpers/session-fixtures'
 
 const CARD = '__test_reorganize_host__'
-const SHEEP_IN_HOUSE = { zones: [{ id: 'house', zoneType: 'house', animalType: 'sheep', animalCount: 1 }] }
+const SHEEP_IN_HOUSE = { zones: [{ id: 'house:1-0', zoneType: 'house', animalType: 'sheep', animalCount: 1 }] }
 
 type Reaction = { actionId: string; phase: string; sourceCard?: string; space?: string; result?: string }
 
@@ -60,7 +60,7 @@ const reorganizeGrantedSheep = (session: GameSession, reactions: Reaction[], res
   expect(waiting(response)).toEqual({ kind: 'animal-reorg', playerIndex: 0 })
   // The host ran its before phase once; the sub-flow leaf does not repeat it.
   expect(reactions).toEqual([{ actionId: 'reorganize', phase: 'before', ...HOST, result: undefined }])
-  expect(response.state.players[0]).toMatchObject({ houseAnimalCount: 0 })
+  expect(response.state.players[0]).toMatchObject({ houseAnimals: {} })
   expect(response.state.players[0]!.resources.sheep).toBe(1)
   expect(logs(response, 'log.placeFarmer')).toHaveLength(1)
   expect(logs(response, 'log.farmAnimalMoved')).toEqual([])
@@ -77,7 +77,7 @@ const reorganizeGrantedSheep = (session: GameSession, reactions: Reaction[], res
     { actionId: 'reorganize', phase: 'immediatelyAfter', ...HOST, result: 'ok' },
     { actionId: 'reorganize', phase: 'after', ...HOST, result: 'ok' },
   ])
-  expect(submitted.state.players[0]).toMatchObject({ houseAnimalType: 'sheep', houseAnimalCount: 1 })
+  expect(submitted.state.players[0]).toMatchObject({ houseAnimals: { '1-0': 'sheep' }, })
   expect(submitted.state.players[0]!.resources).toMatchObject({ sheep: 1, wood: 0 })
   expect(logs(submitted, 'log.placeFarmer')).toHaveLength(1)
   expect(logs(submitted, 'log.farmAnimalMoved')).toHaveLength(1)
@@ -143,8 +143,7 @@ describe('an action that hands its animal reorganization to the sub-flow', () =>
       const player = state.players[0]!
       player.minorPlayed = [CARD]
       player.resources = { ...player.resources, sheep: 1 }
-      player.houseAnimalType = 'sheep'
-      player.houseAnimalCount = 1
+      player.houseAnimals = Object.fromEntries(player.roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, 'sheep']));
     } })
     const reactions: Reaction[] = []
     session.withCtx(() => {
@@ -161,7 +160,7 @@ describe('an action that hands its animal reorganization to the sub-flow', () =>
     expect(waiting(enforced)).toEqual({ kind: 'animal-reorg', playerIndex: 0 })
     // One sheep cannot breed; the card still requires a final reorganization.
     expect(enforced.state.harvestBreedSummary?.[enforced.state.players[0]!.id]).toEqual({ resources: {}, animalTypes: 0, animalCount: 0 })
-    expect(enforced.state.players[0]).toMatchObject({ houseAnimalType: 'sheep', houseAnimalCount: 1 })
+    expect(enforced.state.players[0]).toMatchObject({ houseAnimals: { '1-0': 'sheep' }, })
     expect(enforced.state.gameOver).toBe(false)
     expect(logs(enforced, 'log.farmAnimalMoved')).toEqual([])
     expect(logs(enforced, 'log.gameOver')).toEqual([])
@@ -187,7 +186,7 @@ describe('an action that hands its animal reorganization to the sub-flow', () =>
       { actionId: 'breed', phase: 'immediatelyAfter', sourceCard: 'harvest', space: breedBefore!.space, result: 'ok' },
       { actionId: 'breed', phase: 'after', sourceCard: 'harvest', space: breedBefore!.space, result: 'ok' },
     ])
-    expect(finished.state.players[0]).toMatchObject({ houseAnimalType: 'sheep', houseAnimalCount: 1 })
+    expect(finished.state.players[0]).toMatchObject({ houseAnimals: { '1-0': 'sheep' }, })
     expect(logs(finished, 'log.farmAnimalMoved')).toHaveLength(1)
     expect(logs(finished, 'log.gameOver')).toHaveLength(1)
     expect(total(finished)).toBe(baseline)
@@ -219,7 +218,7 @@ describe('an action that hands its animal reorganization to the sub-flow', () =>
       { actionId: 'reorganize', phase: 'immediatelyAfter', sourceCard: undefined, space: '__subflow:reorganize', result: 'ok' },
       { actionId: 'reorganize', phase: 'after', sourceCard: undefined, space: '__subflow:reorganize', result: 'ok' },
     ])
-    expect(placed.state.players[0]).toMatchObject({ houseAnimalType: 'sheep', houseAnimalCount: 1 })
+    expect(placed.state.players[0]).toMatchObject({ houseAnimals: { '1-0': 'sheep' }, })
     expect(logs(placed, 'log.farmAnimalMoved')).toHaveLength(1)
     expect(total(placed)).toBe(withSheep)
   })

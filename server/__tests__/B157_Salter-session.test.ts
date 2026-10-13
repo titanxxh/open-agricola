@@ -333,8 +333,7 @@ describe('B157 Salter parity', () => {
       }
       player.pastures = []
       player.stableAnimals = {}
-      player.houseAnimalType = null
-      player.houseAnimalCount = 0
+      player.houseAnimals = {};
     })
     const owner = state.players[0]!
     owner.occupationHand = played ? [FILLER] : [CARD_ID]
@@ -353,8 +352,7 @@ describe('B157 Salter parity', () => {
       owner.stableAnimals['1-1'] = 'boar'
     }
     if ((farm.cattle ?? 0) > 0) {
-      owner.houseAnimalType = 'cattle'
-      owner.houseAnimalCount = farm.cattle!
+      owner.houseAnimals = Object.fromEntries(owner.roomTiles.slice(0, farm.cattle!).map(tile => [`${tile.row}-${tile.col}`, 'cattle']));
     }
     session.loadState(state)
     return session
@@ -381,7 +379,7 @@ describe('B157 Salter parity', () => {
       .reduce((sum, pasture) => sum + pasture.animalCount, 0)
     if (type === 'boar') return Object.values(player.stableAnimals)
       .filter((animal) => animal === 'boar').length
-    return player.houseAnimalType === 'cattle' ? player.houseAnimalCount : 0
+    return (Object.values(player.houseAnimals)[0] ?? null) === 'cattle' ? Object.values(player.houseAnimals).length : 0
   }
 
   for (const { scenario, animal, rounds } of [

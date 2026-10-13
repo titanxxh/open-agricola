@@ -39,7 +39,7 @@ const createPlayer = (id = 'p1', name = 'P1'): PlayerState =>
     rooms: 2, houseType: 'wood',
     fields: [], roomTiles: [], stableTiles: [],
     improvements: [], minorHand: [], minorPlayed: [],
-    occupationHand: [], occupationPlayed: [],houseAnimalType: null, houseAnimalCount: 0, stableAnimals: {},
+    occupationHand: [], occupationPlayed: [],houseAnimals: {}, stableAnimals: {},
     pastures: [], fenceSegments: [],
     majorEffects: { wellRounds: 0 }, startPlayer: false,
     activeModifiers: [], cardStates: {},
@@ -171,8 +171,8 @@ describe('priority plan implementations', () => {
     const afterListener = findListener('B34-special-food-after-collect')
     const player = createPlayer()
     player.minorPlayed = ['B034_SpecialFood']
-    player.houseAnimalType = 'sheep'
-    player.houseAnimalCount = 1
+    player.roomTiles = [{ row: 1, col: 0 }, { row: 2, col: 0 }]
+    player.houseAnimals = Object.fromEntries(player.roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, 'sheep']));
     player.cardStates = {
       ...(player.cardStates ?? {}),
       B034_SpecialFood: {
@@ -195,7 +195,7 @@ describe('priority plan implementations', () => {
       state: createState(player),
       player: {
         ...player,
-        houseAnimalCount: 2,
+        houseAnimals: { '1-0': 'sheep', '2-0': 'sheep' },
       },
       space: createSpace('sheep-market'),
       actionId: 'collect',

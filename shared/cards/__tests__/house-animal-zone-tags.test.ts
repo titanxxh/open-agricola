@@ -27,7 +27,7 @@ const createPlayer = (overrides: Partial<PlayerState> = {}): PlayerState =>
     stableTiles: [],
     improvements: [], minorHand: [], minorPlayed: [],
     occupationHand: [], occupationPlayed: [],
-    houseAnimalType: null, houseAnimalCount: 0, stableAnimals: {},
+    houseAnimals: {}, stableAnimals: {},
     pastures: [], fenceSegments: [],
     majorEffects: { wellRounds: 0 }, startPlayer: false,
     activeModifiers: [], cardStates: {},
@@ -40,7 +40,7 @@ const createState = (player: PlayerState): GameState =>
 describe('house animal zone tags', () => {
   it('marks the normal house zone as a house animal zone', () => {
     const player = createPlayer()
-    const house = computeAnimalZones(player, createState(player)).find((z) => z.id === 'house')
+    const house = computeAnimalZones(player, createState(player)).find((z) => z.zoneType === 'house')
 
     expect(house).toMatchObject({ zoneType: 'house', houseAnimalZone: true })
     expect(isHouseAnimalZone(house!)).toBe(true)
@@ -75,7 +75,7 @@ describe('house animal zone tags', () => {
 
     expect(playerHasCardCapability(player, 'blocksHouseAnimalZones')).toBe(true)
     expect(zones.some(isHouseAnimalZone)).toBe(false)
-    expect(zones.some((z) => z.id === 'house')).toBe(false)
+    expect(zones.some((z) => z.zoneType === 'house')).toBe(false)
     expect(zones.some((z) => z.id === 'card:D148_DomesticianExpert')).toBe(false)
   })
 

@@ -105,11 +105,11 @@ describe('D011_LawnFertilizer session', () => {
 
     response = session.resolveChoice(0, 'confirm', [
       { id: 'p1', zoneType: 'pasture', animalType: 'boar', animalCount: 4 },
-      { id: 'house', zoneType: 'house', animalType: 'boar', animalCount: 1 },
+      { id: 'house:1-0', zoneType: 'house', animalType: 'boar', animalCount: 1 },
     ] as unknown as Record<string, unknown>)
     expect(response.ok).toBe(true)
     expect(response.state.players[0]!.pastures[0]!.animalCount).toBe(4)
-    expect(response.state.players[0]!.houseAnimalCount).toBe(1)
+    expect(Object.values(response.state.players[0]!.houseAnimals).length).toBe(1)
   })
 
   it('D011 S4 Drinking Trough raises a Lawn Fertilizer size-one pasture to five', () => {
@@ -139,10 +139,10 @@ describe('D011_LawnFertilizer session', () => {
 
     response = session.resolveChoice(0, 'confirm', [
       { id: 'p1', zoneType: 'pasture', animalType: 'boar', animalCount: 2 },
-      { id: 'house', zoneType: 'house', animalType: 'boar', animalCount: 1 },
+      { id: 'house:1-0', zoneType: 'house', animalType: 'boar', animalCount: 1 },
     ] as unknown as Record<string, unknown>)
     expect(response.ok).toBe(true)
     expect(response.state.players[0]!.pastures[0]!.animalCount).toBe(2)
-    expect(response.state.players[0]!.houseAnimalCount).toBe(1)
+    expect(Object.values(response.state.players[0]!.houseAnimals).length).toBe(1)
   })
 })

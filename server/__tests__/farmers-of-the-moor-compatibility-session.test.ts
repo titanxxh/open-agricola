@@ -667,8 +667,7 @@ describe('Cross expansions batch 4 Seasons and Moor harvest audit', () => {
     auditPastures(session.state.players[0]!, [{ col: 0, size: 2, animal: 'horse', count: mode === 'house' ? 2 : 4 }])
     auditPastures(session.state.players[1]!, [{ col: 0, size: 2, animal: 'horse', count: 2 }])
     session.state.players[0]!.resources.cattle = 1
-    session.state.players[0]!.houseAnimalType = 'cattle'
-    session.state.players[0]!.houseAnimalCount = 1
+    session.state.players[0]!.houseAnimals = Object.fromEntries(session.state.players[0]!.roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, 'cattle']));
     if (mode === 'cook') auditOwnMajor(session, 'Major_Moor_Cookhouse1')
     const before = auditClone(session.state.players)
     expect(session.takeAction(0, 'season-spring-animal-and-fruit').ok).toBe(true)
@@ -693,8 +692,7 @@ describe('Cross expansions batch 4 animal and terrain boundaries', () => {
       const player = session.state.players[0]!
       auditPastures(player, [{ col: 0, size: 2, animal: 'horse', count: 4 }, ...(mode === 'house' ? [{ col: 2, animal, count: 1 }] : [])])
       const resident = animal === 'sheep' ? 'cattle' : 'sheep'
-      player.houseAnimalType = resident
-      player.houseAnimalCount = 1
+      player.houseAnimals = Object.fromEntries(player.roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, resident]));
       player.resources[resident] = 1
       session.state.players.forEach((entry) => { entry.resources.fuel = 4 })
       auditOwnMajor(session, 'Major_Fireplace1')
@@ -1039,8 +1037,7 @@ describe('Cross expansions batch 4 triple-expansion restoration audit', () => {
     let session = auditSetup({ mother: 'PR04', otherMother: 'PR06', season: 'summer', moor: true })
     auditPastures(session.state.players[0]!, [{ col: 0, animal: 'horse', count: 1 }])
     if (mode === 'release') {
-      session.state.players[0]!.houseAnimalType = 'sheep'
-      session.state.players[0]!.houseAnimalCount = 1
+      session.state.players[0]!.houseAnimals = Object.fromEntries(session.state.players[0]!.roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, 'sheep']));
       session.state.players[0]!.resources.sheep = 1
     }
     auditEnterRound(session, 7, 'summer')
@@ -1051,7 +1048,7 @@ describe('Cross expansions batch 4 triple-expansion restoration audit', () => {
     const before = auditClone(session.state)
     const zones = [
       { id: 'pen-0', zoneType: 'pasture', animalType: 'horse', animalCount: 1 },
-      { id: 'house', zoneType: 'house', animalType: mode === 'house' ? 'boar' : 'sheep', animalCount: 1 },
+      { id: 'house:1-0', zoneType: 'house', animalType: mode === 'house' ? 'boar' : 'sheep', animalCount: 1 },
     ]
     expect(session.resolveChoice(1, 'confirm', { zones }).ok).toBe(false)
     expect(auditClone(session.state)).toEqual(before)

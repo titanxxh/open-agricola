@@ -158,8 +158,7 @@ describe('Seasons batch 3 spring audit', () => {
   it.each(['release', 'cook'] as const)('spring newborns can be handled by %s without another breeding or field phase', (mode) => {
     let session = auditSpring()
     auditPen(session.state.players[0]!, 4)
-    session.state.players[0]!.houseAnimalType = 'cattle'
-    session.state.players[0]!.houseAnimalCount = session.state.players[0]!.resources.cattle = 1
+    session.state.players[0]!.houseAnimals = Object.fromEntries(session.state.players[0]!.roomTiles.slice(0, session.state.players[0]!.resources.cattle = 1).map(tile => [`${tile.row}-${tile.col}`, 'cattle']));
     if (mode === 'cook') {
       session.state.players[0]!.improvements = ['Major_Fireplace1']
       session.state.availableMajorImprovements = session.state.availableMajorImprovements.filter((id) => id !== 'Major_Fireplace1')
@@ -178,7 +177,7 @@ describe('Seasons batch 3 spring audit', () => {
     if (response.interaction.stateId === 'wait' && response.interaction.request.kind === 'animal-reorg') {
       expect(session.resolveChoice(0, 'confirm', { zones: [
         { id: 'pen', zoneType: 'pasture', animalType: 'sheep', animalCount: 4 },
-        { id: 'house', zoneType: 'house', animalType: 'cattle', animalCount: 1 },
+        { id: 'house:1-0', zoneType: 'house', animalType: 'cattle', animalCount: 1 },
       ] }).ok).toBe(true)
     }
     expect(session.state.players[0]!.resources).toEqual({ ...before.players[0]!.resources, food: mode === 'cook' ? 52 : 50 })

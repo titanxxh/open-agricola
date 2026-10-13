@@ -14,7 +14,7 @@ const mkPlayer = (overrides: Partial<PlayerState> = {}): PlayerState => ({
   workers: [], rooms: 1, houseType: 'wood', fields: [], roomTiles: [], stableTiles: [],
   improvements: [], minorHand: [], minorPlayed: [], occupationHand: [], occupationPlayed: [],
   extraOccupationsFromCards: [], playedCards: [],
-  houseAnimalType: null, houseAnimalCount: 0, stableAnimals: {}, pastures: [], fenceSegments: [],
+  houseAnimals: {}, stableAnimals: {}, pastures: [], fenceSegments: [],
   majorEffects: { wellRounds: 0 }, startPlayer: false, activeModifiers: [], cardStates: {},
   stats: {} as never,
   ...overrides,

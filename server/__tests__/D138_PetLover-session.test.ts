@@ -42,8 +42,7 @@ const setup = ({
     player.minorPlayed = []
     player.occupationPlayed = []
     player.cardStates = {}
-    player.houseAnimalType = null
-    player.houseAnimalCount = 0
+    player.houseAnimals = {};
     player.stableAnimals = {}
     player.pastures = [{
       id: `pasture-${index}`, size: 1, tiles: [{ row: 0, col: 1 }], stables: 0,

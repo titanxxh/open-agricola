@@ -28,7 +28,7 @@ const createPlayer = (): PlayerState =>
     rooms: 2, houseType: 'wood',
     fields: [], fences: 0, roomTiles: [], stableTiles: [],
     improvements: [], minorHand: [], minorPlayed: [],
-    occupationHand: [], occupationPlayed: ['A097_Freshman'],houseAnimalType: null, houseAnimalCount: 0, stableAnimals: {},
+    occupationHand: [], occupationPlayed: ['A097_Freshman'],houseAnimals: {}, stableAnimals: {},
     pastures: [], fenceSegments: [],
     majorEffects: { wellRounds: 0 }, startPlayer: false,
     activeModifiers: [], cardStates: {},

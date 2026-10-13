@@ -91,8 +91,7 @@ test('D159 public multi-player sale supports cooking and a chosen buyer', async 
   game.players[1].improvements = ['Major_Fireplace1']
   game.players[1].resources.food = 1
   game.players[1].resources.sheep = 1
-  game.players[1].houseAnimalType = 'sheep'
-  game.players[1].houseAnimalCount = 1
+  game.players[1].houseAnimals = Object.fromEntries(game.players[1].roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, 'sheep']));
   await sendDebugCommand(pages[0]!, { type: 'loadGame', state: game, requestId: 'audit-setup' })
   const sale = pages[0]!.locator('[data-anytime-action-id="D159-reed-seller-anytime"]')
   await expect(sale).toContainText('Reed Seller')

@@ -76,10 +76,10 @@ const CARD_IMPL = { effect: { id: CARD_ID,
     player.minorPlayed = ['CUSTOM_ExecutorCard']
     player.improvements = ['Major_Fireplace1']; player.resources.sheep = 1
     player.resources.wood = 1; player.resources.grain = 1
-    player.houseAnimalType = 'sheep'; player.houseAnimalCount = 1
+    player.houseAnimals = Object.fromEntries(player.roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, 'sheep']));
     if (kind === 'pay') {
       player.resources.sheep = 2
-      player.houseAnimalType = null; player.houseAnimalCount = 0
+      player.houseAnimals = {};
       player.pastures = [{ id: 'payment-sheep', size: 1, tiles: [{ row: 0, col: 2 }],
         stables: 0, animalType: 'sheep', animalCount: 2 }]
     }
@@ -697,7 +697,7 @@ const CARD_IMPL = {
 
     const zones = session.withCtx(() => computeAnimalZones(player, state))
 
-    expect(zones.filter((zone) => zone.id === 'house')).toHaveLength(1)
+    expect(zones.filter((zone) => zone.zoneType === 'house')).toHaveLength(1)
     expect(zones.filter((zone) => zone.id === 'custom-zone')).toEqual([expect.objectContaining({
       ownerPlayerId: player.id,
       capacity: state.round,

@@ -36,8 +36,7 @@ const setup = ({
     }
     player.pastures = []
     player.stableAnimals = {}
-    player.houseAnimalType = null
-    player.houseAnimalCount = 0
+    player.houseAnimals = {};
   })
   const owner = state.players[0]!
   owner.occupationHand = played ? [FILLER] : [CARD_ID, 'A125_Priest']

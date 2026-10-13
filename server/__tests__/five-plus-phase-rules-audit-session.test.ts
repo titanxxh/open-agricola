@@ -105,8 +105,7 @@ describe('Five-plus phase printed-rule audit', () => {
   it.each([2, 3, 4, 5, 6])('B172 Cattle Caregiver rewards %i actual cattle-owning players after round start', (count) => {
     const session = setup('B172_CattleCaregiver')
     for (const player of session.state.players.slice(0, count)) {
-      player.houseAnimalType = 'cattle'
-      player.houseAnimalCount = 1
+      player.houseAnimals = Object.fromEntries(player.roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, 'cattle']));
       player.resources.cattle = 1
     }
     const response = finishConfirms(session, session.performRoundEnd())

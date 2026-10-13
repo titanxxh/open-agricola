@@ -114,7 +114,7 @@ describe('opaque actions use executable operation data', () => {
     player.minorPlayed = []
     player.improvements = ['Major_Fireplace1']
     player.resources.boar = 1
-    player.houseAnimalType = 'boar'; player.houseAnimalCount = 1
+    player.houseAnimals = Object.fromEntries(player.roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, 'boar']));
     session.loadState(state)
     const before = JSON.stringify(session.state)
     const exchange = session.getState().interaction.anytimeActions.find(action => action.id === 'exchange')!
@@ -236,7 +236,7 @@ describe('opaque actions use executable operation data', () => {
     const state = session.getState().state
     const player = state.players[0]!
     player.resources.horse = 1
-    player.houseAnimalType = 'horse'; player.houseAnimalCount = 1
+    player.houseAnimals = Object.fromEntries(player.roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, 'horse']));
     session.loadState(state)
     const action = preview(session, card)
     expect(action.effects).toContainEqual({ kind: 'animalPose', animal: 'horse', amount: 1, pose: 'lying', resourcesGained: { fuel: 2 } })
@@ -262,7 +262,7 @@ describe('opaque actions use executable operation data', () => {
     const state = session.getState().state
     state.round = 13
     const player = state.players[0]!
-    player.resources.sheep = 2; player.houseAnimalType = 'sheep'; player.houseAnimalCount = 1
+    player.resources.sheep = 2; player.houseAnimals = Object.fromEntries(player.roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, 'sheep']));
     player.stableTiles = [{ row: 0, col: 2 }]; player.stableAnimals = { '0-2': 'sheep' }
     session.loadState(state)
     const action = preview(session, card)

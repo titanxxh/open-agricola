@@ -243,11 +243,11 @@ describe('D148 Domestician Expert parity', () => {
     expect(rejected.state).toEqual(pending.state)
 
     const response = session.resolveChoice(0, 'confirm', {
-      zones: [{ id: 'house', zoneType: 'house', animalType: 'boar', animalCount: 1 }],
+      zones: [{ id: 'house:1-0', zoneType: 'house', animalType: 'boar', animalCount: 1 }],
     })
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources.boar).toBe(1)
-    expect(response.state.players[0]!.houseAnimalCount).toBe(1)
+    expect(Object.values(response.state.players[0]!.houseAnimals).length).toBe(1)
   })
 
   it('D148 S5: Milking Place removes the Domestician Expert room-border zone', () => {

@@ -32,7 +32,7 @@ const setup = ({ cardId, played = true, playerCount = 2, round = 5, resources = 
   state.players.forEach((player, index) => {
     setWorkersAtHome(state, player, index === 0 ? 2 : 0)
     player.minorHand = [FILLER]; player.occupationHand = [FILLER]; player.minorPlayed = []; player.occupationPlayed = []; player.improvements = []; player.cardStates = {}
-    player.fields = []; player.pastures = []; player.stableTiles = []; player.fenceSegments = []; player.houseAnimalType = null; player.houseAnimalCount = 0; player.stableAnimals = {}
+    player.fields = []; player.pastures = []; player.stableTiles = []; player.fenceSegments = []; player.houseAnimals = {}; player.stableAnimals = {}
     player.resources = { ...player.resources, wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 }
   })
   const owner = state.players[0]!; owner.occupationHand = played ? [FILLER] : [cardId]; owner.occupationPlayed = played ? [cardId] : []; Object.assign(owner.resources, resources)
@@ -175,7 +175,7 @@ describe('C131 Private Teacher parity', () => {
 
 describe('C134 Cow Prince parity', () => {
   it('C134 S1: Cow Prince is played as the first occupation', () => expect(playOccupation(setup({ cardId: 'C134_CowPrince', played: false, playerCount: 3 }), 'C134_CowPrince').state.players[0]!.occupationPlayed).toContain('C134_CowPrince'))
-  it('C134 S2: two cattle held in two house rooms score two points', () => { const s = setup({ cardId: 'C134_CowPrince', playerCount: 3, round: 14 }); Object.assign(s.state.players[0]!, { houseAnimalType: 'cattle', houseAnimalCount: 2 }); s.loadState(s.state); expect(bonus(s.getState(), 'C134_CowPrince')).toBe(2) })
+  it('C134 S2: two cattle held in two house rooms score two points', () => { const s = setup({ cardId: 'C134_CowPrince', playerCount: 3, round: 14 }); Object.assign(s.state.players[0]!, { houseAnimals: Object.fromEntries(s.state.players[0]!.roomTiles.map(tile => [`${tile.row}-${tile.col}`, 'cattle'])) }); s.loadState(s.state); expect(bonus(s.getState(), 'C134_CowPrince')).toBe(2) })
   it('C134 S3: two cattle spread across a two-space pasture score two points', () => { const s = setup({ cardId: 'C134_CowPrince', playerCount: 3, round: 14 }); Object.assign(s.state.players[0]!, { resources: { ...s.state.players[0]!.resources, cattle: 2 }, pastures: [{ id: 'p', size: 2, tiles: [{ row: 0, col: 2 }, { row: 0, col: 3 }], stables: 0, animalType: 'cattle', animalCount: 2 }] }); s.loadState(s.state); expect(bonus(s.getState(), 'C134_CowPrince')).toBe(2) })
 })
 

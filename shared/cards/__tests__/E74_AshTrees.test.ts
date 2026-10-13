@@ -29,7 +29,7 @@ const createPlayer = (): PlayerState =>
     fields: [{ row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 1 }] }, { row: 0, col: 1, stacks: [{ kind: 'grain', remaining: 1 }] }],
     roomTiles: [], stableTiles: [],
     improvements: [], minorHand: [], minorPlayed: ['E074_AshTrees'],
-    occupationHand: [], occupationPlayed: [],houseAnimalType: null, houseAnimalCount: 0, stableAnimals: {},
+    occupationHand: [], occupationPlayed: [],houseAnimals: {}, stableAnimals: {},
     pastures: [], fenceSegments: [],
     majorEffects: { wellRounds: 0 }, startPlayer: false,
     cardStates: { E074_AshTrees: { counters: { fences: 4 } } },

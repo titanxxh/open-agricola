@@ -34,8 +34,7 @@ const setup = ({
     player.pastures = []
     player.stableTiles = []
     player.stableAnimals = {}
-    player.houseAnimalType = null
-    player.houseAnimalCount = 0
+    player.houseAnimals = {};
     player.resources = {
       ...player.resources, wood: 0, clay: 0, reed: 0, stone: 0, food: 20, grain: 0,
       vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
@@ -57,8 +56,7 @@ const setup = ({
     },
   ]
   if (owner.resources.cattle > 0) {
-    owner.houseAnimalType = 'cattle'
-    owner.houseAnimalCount = owner.resources.cattle
+    owner.houseAnimals = Object.fromEntries(owner.roomTiles.slice(0, owner.resources.cattle).map(tile => [`${tile.row}-${tile.col}`, 'cattle']));
   }
   if (played) state.players.forEach((player) => markAllWorkersUsed(state, player))
   session.loadState(state)

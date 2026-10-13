@@ -47,8 +47,7 @@ const setup = ({
     player.pastures = []
     player.stableTiles = []
     player.fenceSegments = []
-    player.houseAnimalType = null
-    player.houseAnimalCount = 0
+    player.houseAnimals = {};
     player.stableAnimals = {}
     player.resources = {
       ...player.resources,

@@ -116,8 +116,7 @@ describe('A153 Pig Owner parity', () => {
       animalType: 'boar',
       animalCount: Math.min(pigs, 4),
     }] : []
-    player.houseAnimalType = pigs >= 5 ? 'boar' : null
-    player.houseAnimalCount = pigs >= 5 ? 1 : 0
+    player.houseAnimals = Object.fromEntries(player.roomTiles.slice(0, pigs >= 5 ? 1 : 0).map(tile => [`${tile.row}-${tile.col}`, pigs >= 5 ? 'boar' : null]));
     player.stableAnimals = {}
     player.resources.boar = pigs
     session.loadState(state)

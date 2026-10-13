@@ -61,8 +61,7 @@ describe('B039_Loom — onHarvestFieldPhase uses on-board sheep (not reserve)', 
     player.pastures = [
       { id: 'pa-1', size: 3, tiles: [], stables: 0, animalType: 'sheep', animalCount: 5 },
     ]
-    player.houseAnimalType = 'sheep'
-    player.houseAnimalCount = 1
+    player.houseAnimals = Object.fromEntries(player.roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, 'sheep']));
     player.stableAnimals = { 's-1': 'sheep' }
     player.resources.sheep = 7
     const flow = runCardEffectHook(state, player, 'B039_Loom', 'onHarvestFieldPhase')

@@ -76,7 +76,7 @@ const useSheepMarket = (session: GameSession, actor = 0) => {
   ) {
     const zones = actor === 0
       ? [{ id: 'p1', zoneType: 'pasture', animalType: 'sheep', animalCount: 1 }]
-      : [{ id: 'house', zoneType: 'house', animalType: 'sheep', animalCount: 1 }]
+      : [{ id: 'house:1-0', zoneType: 'house', animalType: 'sheep', animalCount: 1 }]
     response = session.resolveChoice(actor, 'confirm', zones as unknown as Record<string, unknown>)
   }
   return resolveTriggerIfPresent(session, response, CARD_ID)

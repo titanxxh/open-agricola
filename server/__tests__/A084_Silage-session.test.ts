@@ -106,8 +106,7 @@ const roundSession = ({
     },
   ]
   player.stableTiles = [{ row: 1, col: 2 }, { row: 1, col: 3 }]
-  player.houseAnimalType = null
-  player.houseAnimalCount = 0
+  player.houseAnimals = {};
   player.stableAnimals = {}
   session.loadState(state)
   return session

@@ -130,7 +130,7 @@ describe('D036_BreedRegistry session', () => {
     expect(resp.ok).toBe(true)
     if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'ui.interactionAnimalReorg') {
       resp = session.resolveChoice(0, 'confirm', [
-        { id: 'house', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
+        { id: 'house:1-0', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
       ])
     }
 
@@ -238,8 +238,7 @@ describe('D036_BreedRegistry session', () => {
     const session = new GameSession(42)
     const state = session.getState().state
     const player = state.players[0]!
-    player.houseAnimalType = 'sheep'
-    player.houseAnimalCount = 1
+    player.houseAnimals = Object.fromEntries(player.roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, 'sheep']));
 
     expect(D036_BreedRegistry_impl.prerequisiteCheck?.(player, state)).toBe(false)
   })
@@ -281,8 +280,7 @@ describe('D036 Breed Registry parity', () => {
       player.cardStates = {}
       player.pastures = []
       player.stableTiles = []
-      player.houseAnimalType = null
-      player.houseAnimalCount = 0
+      player.houseAnimals = {};
       Object.assign(player.resources, {
         wood: 0, clay: 0, reed: 0, stone: 0, food: 20, grain: 0, vegetable: 0,
         sheep: 0, boar: 0, cattle: 0, begging: 0,
@@ -299,8 +297,7 @@ describe('D036 Breed Registry parity', () => {
     owner.minorPlayed = played ? [CARD_ID] : []
     if (sheep > 0) {
       owner.resources.sheep = sheep
-      owner.houseAnimalType = 'sheep'
-      owner.houseAnimalCount = sheep
+      owner.houseAnimals = Object.fromEntries(owner.roomTiles.slice(0, sheep).map(tile => [`${tile.row}-${tile.col}`, 'sheep']));
     }
     if (fireplace) {
       owner.improvements = ['Major_Fireplace1']
@@ -424,7 +421,7 @@ describe('D036 Breed Registry parity', () => {
     let response = playMinor(session, FEED_PELLETS)
     if (response.interaction.stateId === 'wait' && response.interaction.request.kind === 'animal-reorg') {
       response = session.resolveChoice(0, 'confirm', [
-        { id: 'house', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
+        { id: 'house:1-0', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
       ])
     }
 

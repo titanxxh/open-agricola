@@ -52,8 +52,7 @@ const setup = ({ cardId, played = true, playerCount = 4, round = 5, actor = 0, r
     p.pastures = []
     p.stableTiles = []
     p.fenceSegments = []
-    p.houseAnimalType = null
-    p.houseAnimalCount = 0
+    p.houseAnimals = {};
     p.stableAnimals = {}
     p.resources = {
       ...p.resources, wood: 0, clay: 0, reed: 0, stone: 0,

@@ -40,8 +40,7 @@ const createPlayer = (overrides: Partial<PlayerState> = {}): PlayerState => ({
   minorHand: [],
   minorPlayed: [],
   occupationHand: [],
-  occupationPlayed: [],houseAnimalType: null,
-  houseAnimalCount: 0,
+  occupationPlayed: [],houseAnimals: {},
   stableAnimals: {},
   pastures: [],
   fenceSegments: [],
@@ -199,8 +198,8 @@ describe('Collect action card listeners integration', () => {
     const engine = new Engine({ tree, registry, hooks, log })
     
     const player = createPlayer({
-      houseAnimalType: 'sheep',
-      houseAnimalCount: 1,
+      houseAnimals: { '1-0': 'sheep' },
+      roomTiles: [{ row: 1, col: 0 }, { row: 2, col: 0 }],
       rooms: 2,
     })
     const space = createSpace('sheep-market', { resources: { sheep: 1, boar: 0, cattle: 0, wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0, vegetable: 0, begging: 0 } })

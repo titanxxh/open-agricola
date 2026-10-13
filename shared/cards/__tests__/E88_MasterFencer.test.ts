@@ -16,7 +16,7 @@ const createPlayer = (): PlayerState =>
     familySize: 2, workersAvailable: 2, rooms: 2, houseType: 'stone',
     fields: [], roomTiles: [], stableTiles: [],
     improvements: [], minorHand: [], minorPlayed: [],
-    occupationHand: [], occupationPlayed: [CARD_ID], houseAnimalType: null, houseAnimalCount: 0, stableAnimals: {},
+    occupationHand: [], occupationPlayed: [CARD_ID], houseAnimals: {}, stableAnimals: {},
     newbornCount: 0, pastures: [], fenceSegments: [],
     majorEffects: { wellRounds: 0 }, startPlayer: false,
     cardStates: {},

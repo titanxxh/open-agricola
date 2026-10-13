@@ -8,7 +8,7 @@ import {
 } from '../../shared/actions/effects/fencing.ts'
 
 type AnimalAwareFarmState = PlayerFarmState &
-  Pick<PlayerState, 'houseAnimalType' | 'houseAnimalCount' | 'stableAnimals' | 'cardStates'>
+  Pick<PlayerState, 'houseAnimals' | 'stableAnimals' | 'cardStates'>
 
 const createPlayer = (): PlayerFarmState => ({
   id: 'p1',
@@ -694,8 +694,7 @@ describe('validateFenceSelection — generic fence policy', () => {
   it('does not duplicate a house animal into a new pasture', () => {
     const player = createPlayer() as AnimalAwareFarmState
     player.resources.boar = 1
-    player.houseAnimalType = 'boar'
-    player.houseAnimalCount = 1
+    player.houseAnimals = Object.fromEntries(player.roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, 'boar']));
     player.stableAnimals = {}
 
     const result = validateFenceSelection(player, edgesForTile(0, 1))
@@ -704,8 +703,8 @@ describe('validateFenceSelection — generic fence policy', () => {
     if (result.ok) {
       expect(result.player.pastures[0]?.animalType).toBeNull()
       expect(result.player.pastures[0]?.animalCount).toBe(0)
-      expect(result.player.houseAnimalType).toBe('boar')
-      expect(result.player.houseAnimalCount).toBe(1)
+      expect((Object.values(result.player.houseAnimals)[0] ?? null)).toBe('boar')
+      expect(Object.values(result.player.houseAnimals).length).toBe(1)
       expect(result.player.resources.boar).toBe(1)
     }
   })
@@ -713,8 +712,7 @@ describe('validateFenceSelection — generic fence policy', () => {
   it('does not duplicate a loose stable animal into a new pasture', () => {
     const player = createPlayer() as AnimalAwareFarmState
     player.resources.sheep = 1
-    player.houseAnimalType = null
-    player.houseAnimalCount = 0
+    player.houseAnimals = {};
     player.stableTiles = [{ row: 2, col: 4 }]
     player.stableAnimals = { '2-4': 'sheep' }
 
@@ -732,8 +730,7 @@ describe('validateFenceSelection — generic fence policy', () => {
   it('does not duplicate an extraData-held card animal into a new pasture', () => {
     const player = createPlayer() as AnimalAwareFarmState
     player.resources.cattle = 1
-    player.houseAnimalType = null
-    player.houseAnimalCount = 0
+    player.houseAnimals = {};
     player.stableAnimals = {}
     player.cardStates = {
       D148_DomesticianExpert: { extraData: { held: 1, animalType: 'cattle' } },
@@ -753,8 +750,7 @@ describe('validateFenceSelection — generic fence policy', () => {
   it('does not duplicate a C148-held boar into a new pasture', () => {
     const player = createPlayer() as AnimalAwareFarmState
     player.resources.boar = 1
-    player.houseAnimalType = null
-    player.houseAnimalCount = 0
+    player.houseAnimals = {};
     player.stableAnimals = {}
     player.cardStates = {
       C148_MudWallower: { counters: { counter: 0, held: 1 } },
@@ -774,8 +770,7 @@ describe('validateFenceSelection — generic fence policy', () => {
   it('does not reserve more boars for C148 than are actually on the card', () => {
     const player = createPlayer() as AnimalAwareFarmState
     player.resources.boar = 2
-    player.houseAnimalType = null
-    player.houseAnimalCount = 0
+    player.houseAnimals = {};
     player.stableAnimals = {}
     player.pastures = [
       { id: 'old-pasture', tiles: [{ row: 2, col: 1 }], animalType: 'boar', animalCount: 1 },

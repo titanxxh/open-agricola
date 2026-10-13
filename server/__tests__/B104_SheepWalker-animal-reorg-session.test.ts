@@ -22,8 +22,7 @@ const setup = (placed = 1, played = true) => {
       player.improvements = []
       player.cardStates = {}
       player.pastures = []
-      player.houseAnimalType = null
-      player.houseAnimalCount = 0
+      player.houseAnimals = {};
       Object.assign(player.resources, { sheep: 0, boar: 0, cattle: 0, stone: 0, vegetable: 0, food: 0 })
     }
     const player = state.players[0]!
@@ -31,8 +30,7 @@ const setup = (placed = 1, played = true) => {
     player.improvements = ['Major_Fireplace1']
     player.resources.sheep = placed
     if (placed === 1) {
-      player.houseAnimalType = 'sheep'
-      player.houseAnimalCount = 1
+      player.houseAnimals = Object.fromEntries(player.roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, 'sheep']));
     }
     const pastured = placed === 1 ? 0 : placed
     player.pastures = [{
@@ -79,14 +77,14 @@ describe('B104 placed-sheep exchanges during animal reorganization', () => {
     const original = snapshot(session.takeAction(0, 'sheep-market'))
     const host = session.peekEnginePendingEnvelope()?.hostNodeId
     expect(original.state.players[0]!.resources.sheep).toBe(2)
-    expect(original.state.players[0]!.houseAnimalCount).toBe(1)
+    expect(Object.values(original.state.players[0]!.houseAnimals).length).toBe(1)
     const opened = session.takeAnytimeAction(0, 'exchange')
     expect(sheepWalkerOptions(opened).map(option => option.value.split(':')[2])).toEqual(['1', '1', '1'])
     const exchanged = session.resolveChoice(0, `bulk:${recipe(opened, resource)}=1`)
     expectOriginalReorg(session, exchanged, host, original)
     expect(exchanged.state.players[0]!.resources).toMatchObject({ sheep: 1, [resource]: 1 })
     expect(exchanged.state.players[0]!.pastures[0]!.animalCount).toBe(0)
-    expect(exchanged.state.players[0]!.houseAnimalCount).toBe(0)
+    expect(Object.values(exchanged.state.players[0]!.houseAnimals).length).toBe(0)
     expect(exchanged.state.events.filter(event => event.type === 'resource.exchanged')).toEqual([
       expect.objectContaining({ exchangeSource: B104, times: 1, paid: { sheep: 1 }, gained: { [resource]: 1 } }),
     ])
@@ -95,13 +93,13 @@ describe('B104 placed-sheep exchanges during animal reorganization', () => {
     }))
     const completed = session.resolveChoice(0, 'confirm', { zones: [
       { id: 'sheep-pasture', zoneType: 'pasture', animalType: 'sheep', animalCount: 1 },
-      ...(resource === 'boar' ? [{ id: 'house', zoneType: 'house', animalType: 'boar', animalCount: 1 }] : []),
+      ...(resource === 'boar' ? [{ id: 'house:1-0', zoneType: 'house', animalType: 'boar', animalCount: 1 }] : []),
     ] })
     expect(completed.ok, completed.error).toBe(true)
     expect(completed.interaction.stateId === 'wait' && completed.interaction.request.kind).toBe('confirm-next-player')
     expect(completed.state.players[0]!.resources).toMatchObject({ sheep: 1, [resource]: 1 })
     expect(completed.state.players[0]!.pastures[0]!.animalCount).toBe(1)
-    expect(completed.state.players[0]!.houseAnimalCount).toBe(resource === 'boar' ? 1 : 0)
+    expect(Object.values(completed.state.players[0]!.houseAnimals).length).toBe(resource === 'boar' ? 1 : 0)
     expect(completed.state.events.filter(event => event.type === 'resource.exchanged')).toHaveLength(1)
   })
 

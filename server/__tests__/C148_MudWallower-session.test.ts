@@ -90,7 +90,7 @@ const createPlayer = (id = 'p1'): PlayerState =>
     rooms: 2, houseType: 'wood',
     fields: [], fences: 0, roomTiles: [], stableTiles: [],
     improvements: [], minorHand: [], minorPlayed: [],
-    occupationHand: [], occupationPlayed: [CARD_ID],houseAnimalType: null, houseAnimalCount: 0, stableAnimals: {},
+    occupationHand: [], occupationPlayed: [CARD_ID],houseAnimals: {}, stableAnimals: {},
     pastures: [], fenceSegments: [],
     majorEffects: { wellRounds: 0 }, startPlayer: false,
     activeModifiers: [], cardStates: {},
@@ -426,15 +426,14 @@ describe('C148 Mud Wallower public session', () => {
     })
 
     response = session.resolveChoice(0, 'confirm', [
-      { id: 'house', zoneType: 'house', animalType: 'boar', animalCount: 1 },
+      { id: 'house:1-0', zoneType: 'house', animalType: 'boar', animalCount: 1 },
       { id: `card:${CARD_ID}`, zoneType: 'card', animalType: 'boar', animalCount: 2 },
     ] as unknown as Record<string, unknown>)
 
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources.boar).toBe(3)
     expect(response.state.players[0]!).toMatchObject({
-      houseAnimalType: 'boar',
-      houseAnimalCount: 1,
+      houseAnimals: { '1-0': 'boar' },
     })
     expect(response.state.players[0]!.cardStates[CARD_ID]?.counters?.held).toBe(2)
   })

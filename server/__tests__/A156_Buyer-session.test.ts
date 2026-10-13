@@ -143,7 +143,7 @@ describe('A156_Buyer session', () => {
     if (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
       expect(resp.interaction.playerIndex).toBe(0)
       resp = session.resolveChoice(0, 'confirm', [
-        { id: 'house', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
+        { id: 'house:1-0', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
       ])
     }
 
@@ -220,8 +220,7 @@ describe('A156 Buyer parity', () => {
         ...player.resources, wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0,
         vegetable: 0, sheep: 0, boar: 0, cattle: 0,
       }
-      player.houseAnimalType = null
-      player.houseAnimalCount = 0
+      player.houseAnimals = {};
       player.pastures = []
       player.stableAnimals = {}
     })

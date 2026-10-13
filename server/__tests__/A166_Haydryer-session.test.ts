@@ -26,8 +26,7 @@ const setup = ({ played = true, pastures = 1, food = 10, round = 4 } = {}) => {
   player.occupationPlayed = played ? [CARD_ID] : []
   player.resources.food = food
   player.resources.cattle = 0
-  player.houseAnimalType = null
-  player.houseAnimalCount = 0
+  player.houseAnimals = {};
   player.stableAnimals = {}
   player.pastures = Array.from({ length: pastures }, (_, index) => ({
     id: `haydryer-pasture-${index}`,
@@ -95,7 +94,7 @@ describe('A166 Haydryer parity', () => {
       response = placeCattle(session, response, pastures)
       const player = response.state.players[0]!
       expect(player.resources.food, `${pastures} pastures after feeding`).toBe(10 - (4 - pastures) - 4)
-      expect(player.houseAnimalCount + player.pastures.reduce((sum, pasture) =>
+      expect(Object.values(player.houseAnimals).length + player.pastures.reduce((sum, pasture) =>
         sum + pasture.animalCount, 0)).toBe(1)
     }
   })

@@ -53,8 +53,7 @@ describe('E022 Guest Room supply placements', () => {
     const player = session.state.players[0]!
     player.resources.food = 1
     player.resources.sheep = 1
-    player.houseAnimalType = 'sheep'
-    player.houseAnimalCount = 1
+    player.houseAnimals = Object.fromEntries(player.roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, 'sheep']));
     player.improvements = ['Major_Fireplace1']
     expect(buy(session, 1).interaction.request).toMatchObject({ availableByResource: { food: 1 } })
     let response = session.takeAnytimeAction(0, 'exchange')

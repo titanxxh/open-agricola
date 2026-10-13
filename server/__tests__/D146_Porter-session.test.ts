@@ -151,7 +151,7 @@ describe('D146_Porter session', () => {
     // Handle animalReorg for sheep
     if (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
       resp = session.resolveChoice(0, 'confirm', [
-        { id: 'house', zoneType: 'house', animalType: 'sheep', animalCount: 4 },
+        { id: 'house:1-0', zoneType: 'house', animalType: 'sheep', animalCount: 4 },
       ])
     }
 

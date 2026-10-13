@@ -311,8 +311,7 @@ describe('C009 Automatic Water Trough parity', () => {
   const trough = (capacity: boolean) => {
     const session = setupMinor({ cardId: 'C009_AutomaticWaterTrough', resources: { wood: 1, food: 2 } })
     const player = session.state.players[0]!
-    player.houseAnimalType = capacity ? null : 'sheep'
-    player.houseAnimalCount = capacity ? 0 : 1
+    player.houseAnimals = Object.fromEntries(player.roomTiles.slice(0, capacity ? 0 : 1).map(tile => [`${tile.row}-${tile.col}`, capacity ? null : 'sheep']));
     player.resources.sheep = capacity ? 0 : 1
     session.loadState(session.state)
     return session

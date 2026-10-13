@@ -31,7 +31,7 @@ const createPlayer = (fields: Field[] = []): PlayerState =>
     fields, fences: 0, roomTiles: [], stableTiles: [],
     improvements: [], minorHand: [], minorPlayed: [],
     occupationHand: [], occupationPlayed: [],
-    houseAnimalType: null, houseAnimalCount: 0, stableAnimals: {},
+    houseAnimals: {}, stableAnimals: {},
     pastures: [], fenceSegments: [],
     majorEffects: { wellRounds: 0 }, startPlayer: false,
   }) as unknown as PlayerState
