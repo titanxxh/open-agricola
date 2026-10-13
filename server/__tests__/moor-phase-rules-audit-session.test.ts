@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { setupMoorAudit, playMoorAuditMinor, advanceMoorAuditToRound, startMoorAuditFeeding, acceptMoorAuditChoice } from './_helpers/moor-rules-audit'
 import { markAllWorkersUsed } from '../../shared/domain/player'
 import { getAllTilePositions } from '../../shared/domain/farm'
+import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 
 describe('Moor delayed and harvest printed-rule audit', () => {
   it('M079 offers the fourth printed delay from round four and delivers six fuel in round fourteen', () => {
@@ -102,10 +103,17 @@ describe('Moor delayed and harvest printed-rule audit', () => {
     expect(response.state.players[0]!.farmTerrain).toEqual([])
     expect(response.state.futureMeeples).toEqual([expect.objectContaining({ cardId: 'M048_ForestSwamp', round: 9, resources: { forest: 1 } })])
     response = advanceMoorAuditToRound(session, 9)
-    expect(response.interaction.sourceCard).toBe('M048_ForestSwamp')
-    if (mode === 'decline') response = session.resolveChoice(0, '__skip__')
+    if (response.interaction.stateId === 'wait' && response.interaction.request.kind === 'select-trigger') {
+      expect(response.interaction.request.options).toContainEqual(expect.objectContaining({ sourceCard: 'M048_ForestSwamp' }))
+      response = mode === 'decline' ? session.resolveChoice(0, '__pass__')
+        : resolveTriggerIfPresent(session, response, 'M048_ForestSwamp')
+    } else {
+      expect(response.interaction.sourceCard).toBe('M048_ForestSwamp')
+      if (mode === 'decline') response = session.resolveChoice(0, '__skip__')
+    }
+    if (mode === 'decline') expect(response.ok, response.error).toBe(true)
     else {
-      response = acceptMoorAuditChoice(session, response)
+      if (response.interaction.request.kind === 'choice') response = acceptMoorAuditChoice(session, response)
       expect(response.interaction.request.selection?.kind).toBe('farm-position')
       const before = structuredClone(response.state.players[0])
       const rejected = session.commitSelectionChoice(0, { positions: [response.state.players[0]!.roomTiles[0]!] })
