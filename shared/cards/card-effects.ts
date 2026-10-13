@@ -151,6 +151,8 @@ type FlowEffectHandler = (
 ) => ActionFlow | void
 export type FlowEffectContext = {
   transactionEvents?: readonly import('../contract/events').GameEvent[]
+  /** The action space or card that supplied this particular purchase. */
+  purchaseActionCardId?: string
   triggerActionId?: string
   roundPreparation?: RoundPreparationContext
   reportProtectedObservation?: (observation: ProtectedObservation) => void

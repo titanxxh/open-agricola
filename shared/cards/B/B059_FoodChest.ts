@@ -6,9 +6,11 @@ const CARD_ID = 'B059_FoodChest'
 
 const cardImpl = {
   effect: {
-  id: CARD_ID,
-  onBuy: (_state, _player) => gainLeaf(CARD_ID, { food: 2 }),
-},
+    id: CARD_ID,
+    onBuy: (_state, _player, _payment, context) => gainLeaf(CARD_ID, {
+      food: context?.purchaseActionCardId === 'major-improvement' ? 4 : 2,
+    }),
+  },
   reaches: [] as readonly string[],
 } satisfies CardImpl
 

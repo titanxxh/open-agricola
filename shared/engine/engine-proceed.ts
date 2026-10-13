@@ -1133,7 +1133,11 @@ export function engineProceed(
     }
     if (node.expandFlow && action.flow) {
       const flow = mergeContextIntoFlow(action.flow,
-        { ...actionContext, checkedReplaceAction: false }, replaceSourceCard)
+        {
+          ...actionContext, checkedReplaceAction: false,
+          ...(context.state.actionSpaces.some(space => space.id === replacedActionId)
+            ? { purchaseActionCardId: replacedActionId } : {}),
+        }, replaceSourceCard)
       const optionId = typeof actionContext?.optionId === 'string' ? actionContext.optionId : undefined
       const expanded = stampOwner(buildFlowNode(int, flow, context.player.id,
         optionId, node.expandFlowIdStyle), context.player.id)
