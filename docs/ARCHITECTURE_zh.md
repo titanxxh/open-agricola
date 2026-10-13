@@ -998,7 +998,7 @@ OA-vs-the reference design notes:
 
 - Reorganize is a system-driven sub-flow in OA (not a player-triggerable anytime) — the policy never produces a `'reorganize'` entry to filter.
 - `postReapAnytimeWindow` 是 `onHarvest` 完成后、喂食状态计算前的通用开放窗口。它只查询普通 anytime registry / listener，不含卡牌 ID 分支；每次嵌套 flow 完成后重新计算能力，并跳过没有可执行能力的玩家。
-- `futureActionAnytimeWindow` 是到期资源完成真实 `receive` transaction 后、未来行动构造可行性前的窄化标准 `exchange` 窗口。它只对拥有到期 action token 的玩家开放，排除卡牌来源的 anytime 能力，并按实时状态重算且不含卡牌 ID 分支。
+- 准备阶段反应树在次序选择或当前支付条件需要时，将标准 `exchange` 与已捕获的可选来源、预约机会放在同一窗口。兑换包含谷物和蔬菜的基础转换，读取实时状态，可在执行前补足已取得资格的来源所需费用。准备阶段排除无关的卡牌 anytime 能力；无需拥有到期 action token，也不强制先领取再反应。
 - 喂养按收获顺序逐玩家结算。队列只保存玩家序号，不预扣全员食物；轮到该玩家才扣食。`foodUsed` 记录已付款，`remaining` 记录未付需求。合法嵌套 anytime 结束后恢复同一 pending host，刷新兑换目录及动物可用量，不重复预扣；只有玩家的合法喂养机会结束才判断乞讨。已经吃饱且没有收获兑换的玩家不增加确认步骤。
 - 普通 anytime 查询与鉴权使用当前 pending 节点的实际归属者；活动的 provisional continuation 保留原有 frame owner 辅助行动窗口及 guard 策略。阶段 synthetic host 与插入其中的真实选择分开处理，跨玩家确认及受保护观察沿用原有边界。
 - 官方 Card Effect 可声明只读 `computeResourceCommitments(state, owner)`，从卡内状态派生参与者必须保有的资源。Session 聚合并发承诺，若命令破坏承诺则在发布前恢复命令检查点。这不预扣款、不在 PaymentSolver 锁资，也不放宽 Continuation Guard；卡牌在一次原子成交中解除承诺并交换双方资源，见 ADR-0019。
