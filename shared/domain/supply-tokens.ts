@@ -43,18 +43,26 @@ const getQueuedFutureStableCount = (
 export const getReservedFutureStableCount = (state: GameState, player: PlayerState): number =>
   getQueuedFutureStableCount(state, player)
 
+export const findMatureFutureStableEntry = (
+  state: GameState,
+  player: PlayerState,
+  futureMeepleId?: string,
+) => futureMeepleId ? (state.futureMeeples ?? []).find(entry => entry.id === futureMeepleId
+  && entry.playerId === player.id && entry.round === state.round && (entry.resources.stable ?? 0) > 0) : undefined
+
 export const getReservedActionSpaceStableCount = (player: PlayerState): number =>
   getCardReservedSupplyCount(player, 'stable')
 
 export const getStableSupplyLimit = (player: PlayerState): number =>
   Math.max(0, MAX_STABLE_PIECES - readConsumedSupplyTokenCount(player, 'stable'))
 
-export const getAvailableStableSupplyCount = (state: GameState, player: PlayerState): number =>
+export const getAvailableStableSupplyCount = (state: GameState, player: PlayerState, futureMeepleId?: string): number =>
   Math.max(
     0,
     getStableSupplyLimit(player)
       - getOrdinaryStableCount(player)
       - getReservedFutureStableCount(state, player)
+      + (findMatureFutureStableEntry(state, player, futureMeepleId)?.resources.stable ?? 0)
       - getReservedActionSpaceStableCount(player)
       - getStandingSpecialStableCount(player),
   )
