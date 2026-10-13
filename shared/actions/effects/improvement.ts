@@ -3,7 +3,7 @@ import { payAction } from './pay'
 import { getMinorImprovement } from '../../cards/registry-display'
 import { CardPurchasePayment, PaymentSolver } from '../payment'
 import type { CardPurchasePreview } from '../payment'
-import { getMajorCard } from '../../cards/major'
+import { getMajorCard, majorCardDefinitions } from '../../cards/major'
 import { meetsCardPrerequisites } from '../../cards/helpers/prerequisites'
 import { collectComputeChoiceCandidates } from '../../cards/card-listeners'
 import { isMajorCardId } from '../../cards/helpers/card-type'
@@ -14,6 +14,8 @@ import {
   buildMinorImprovementOptions,
   buildPlayableMinorOptions,
   canAffordInjectedImprovement,
+  canPlayMajor,
+  canPlayMinor,
   getMajorImprovementPreviewCostDetailed,
   getMinorImprovementPreviewCostDetailed,
   isMajorImprovementPlayable,
@@ -475,6 +477,25 @@ export const improvementAction: ActionDefinition = {
   },
   roundAvailable: 1,
   gainPerRound: {},
+  canBeOfferedByPlayer: (state, player, context) => {
+    const types = readImprovementTypes(context)
+    const allowedPurchases = readAllowedPurchases(context?.params)
+    const trueAction = readTrueAction(context?.params, context?.actionContext)
+    if (types.includes('major') && majorCardDefinitions.some(card => canPlayMajor(state, card.id, allowedPurchases))) return true
+    if (player.minorHand.some(id => canPlayMinor(state, player, id, types, allowedPurchases, trueAction))) return true
+    if (!types.includes('minor')) return false
+    return collectComputeChoiceCandidates(
+      state, player, 'improvement',
+      { ...(context?.actionContext ?? {}), types, ...(trueAction === false ? { trueAction: false } : {}) }, context?.sourceCard,
+    ).some(option => {
+      if (option.disabled || !isAllowedPurchase(allowedPurchases, option.value)) return false
+      const candidate = parseImprovementChoice(option.value)
+      if (candidate.kind === 'major') return canPlayMajor(state, candidate.id, allowedPurchases)
+      const card = getMinorImprovement(candidate.id)
+      return !!card && isMinorImprovementEligibleForAction(card, types, trueAction)
+        && meetsCardPrerequisites(player, card, state.round, state)
+    })
+  },
   canBeExecutedByPlayer: (state, player, context) => {
     const exactCost = improvementExactCost(context)
     const types = readImprovementTypes(context)

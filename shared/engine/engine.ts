@@ -677,16 +677,20 @@ export class Engine {
       : buildFlowNode(internals, flow))
     if (!ctx) flowNodes.forEach(enforceCompositeContinuationMandatory)
     const nextUnresolved = this.tree.nextUnresolved()
-    if (!ctx && (nextUnresolved instanceof OrNode || nextUnresolved instanceof XorNode)
+    if (!ctx && nextUnresolved
+      && (nextUnresolved instanceof OrNode || nextUnresolved instanceof XorNode
+        || (nextUnresolved.optional === true && nextUnresolved.optionalActive === false))
       && nextUnresolved.requiresExplicitChoice === true
       && nextUnresolved.getPending() !== null) {
       nextUnresolved.clearPending()
-      nextUnresolved.emittedChoices = []
-      nextUnresolved.emittedRequest = undefined
-      nextUnresolved.emittedPromptKey = undefined
-      nextUnresolved.emittedPromptParams = undefined
-      nextUnresolved.pendingContextSnapshot = undefined
-      nextUnresolved.pendingActionId = undefined
+      if (nextUnresolved instanceof OrNode || nextUnresolved instanceof XorNode) {
+        nextUnresolved.emittedChoices = []
+        nextUnresolved.emittedRequest = undefined
+        nextUnresolved.emittedPromptKey = undefined
+        nextUnresolved.emittedPromptParams = undefined
+        nextUnresolved.pendingContextSnapshot = undefined
+        nextUnresolved.pendingActionId = undefined
+      }
       if (this._pendingNodeIdRef.value === nextUnresolved.id) this._pendingNodeIdRef.value = null
     }
     if (ctx && nextUnresolved) {
