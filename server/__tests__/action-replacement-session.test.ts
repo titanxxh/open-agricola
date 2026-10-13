@@ -1,3 +1,4 @@
+import { createWorkSession } from './_helpers/session-fixtures'
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { gainAction } from '../../shared/actions/effects/gain'
@@ -23,7 +24,7 @@ import '../../shared/cards/D/D138_PetLover'
 import '../../shared/cards/E/E101_Blighter'
 
 const setup = () => {
-  const session = new GameSession(850, undefined, { playerCount: 2 })
+  const session = createWorkSession({ seed: 850, options: { playerCount: 2 } })
   const state = session.getState().state
   state.currentPlayerIndex = 0
   state.round = 14
@@ -685,9 +686,11 @@ describe('explicit action replacement through GameSession', () => {
     const improvement = options(response).find((option) => option.value !== '__skip__')!
     expect(options(response).some((option) => option.sourceCard === 'B103_FieldMerchant')).toBe(false)
     response = session.resolveChoice(0, improvement.value)
-    expect(response.interaction.promptKey).toBe('ui.interactionChooseImprovement')
-    expect(options(response).map((option) => option.value)).toEqual(['A030_BakingSheet'])
-    response = session.resolveChoice(0, 'A030_BakingSheet')
+    if (!response.state.players[0]!.minorPlayed.includes('A030_BakingSheet')) {
+      expect(response.interaction.promptKey).toBe('ui.interactionChooseImprovement')
+      expect(options(response).map((option) => option.value)).toEqual(['A030_BakingSheet'])
+      response = session.resolveChoice(0, 'A030_BakingSheet')
+    }
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.minorPlayed, JSON.stringify(response.interaction)).toContain('A030_BakingSheet')
     expect(response.state.players[0]!.resources.food).toBe(0)

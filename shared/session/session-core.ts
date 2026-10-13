@@ -170,6 +170,7 @@ import {
 import { rebuildActiveModifiers } from '../session/serialization.ts'
 import { clearAllLinkedSpaceBlocks, findActionSpaceById, removeWorkerRef } from '../domain/space.ts'
 import { buildLivePlaceTerrainFlow } from '../moor/terrain-flow.ts'
+import { hasDueScheduledOffers } from '../actions/effects/internal/scheduled-offers'
 import {
   computeAnytimePolicy,
   type AnytimePolicy,
@@ -3053,7 +3054,7 @@ export class GameCore {
     const flows: ActionFlow[] = ordinary.length ? [receive(ordinary)] : []
     for (const entry of entries) {
       if (!ordinary.includes(entry) && (hasGoods(entry) || entry.roomType)) {
-        flows.push({ ...receive([entry]), optional: !!entry.actionContext?.resourceCondition })
+        flows.push(receive([entry]))
       }
       const actionContext = { ...entry.actionContext, trueAction: false }
       for (const action of [
@@ -3082,7 +3083,7 @@ export class GameCore {
     if (!player) return null
     const due = hook === 'onRoundStart' ? this.state.futureMeeples.filter(entry => entry.round === this.state.round && entry.playerId === player.id) : []
     const timedSources = sourceCardIds.filter(cardId => getCardEffect(cardId)?.timedRules?.some(rule => rule.at.phase === hook && rule.body.kind === 'optional'))
-    return due.length || timedSources.length ? {
+    return due.length || timedSources.length || (hook === 'onRoundStart' && hasDueScheduledOffers(this.state, player)) ? {
       type: 'leaf', actionId: 'complete-preparation', targetPlayerId: player.id,
       params: { futureMeepleIds: due.map(entry => entry.id), hook, timedSources },
     } : null

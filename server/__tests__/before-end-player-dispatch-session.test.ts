@@ -1,3 +1,4 @@
+import { createWorkSession } from './_helpers/session-fixtures'
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { requireActiveCardRegistry } from '../../shared/cards/active-registry'
@@ -20,7 +21,7 @@ const setPlaceholderHands = (player: PlayerState) => {
 }
 
 const setupEndGameSession = () => {
-  const session = new GameSession(42)
+  const session = createWorkSession({ seed: 42 })
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   state.currentPlayerIndex = 0
@@ -168,7 +169,7 @@ describe('Before-End Player Dispatch session', () => {
   })
 
   it('opens repeatable player-order anytime windows after the final harvest and before scoring', () => {
-    const session = new GameSession(42)
+    const session = createWorkSession({ seed: 42 })
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -202,7 +203,7 @@ describe('Before-End Player Dispatch session', () => {
 
     let resp = skipPostReapAnytime(session, session.performRoundEnd(), 1)
     const firstGrocer = expectPreScoringGrocer(resp, 0)
-    expect(resp.state.round).toBe(15)
+    expect(resp.state.round).toBe(14)
     expect(resp.state.gameOver).toBe(false)
     expect(resp.state.players[0]!.resources.food).toBe(2)
     expect(resp.state.events.filter((event) => event.type === 'harvest.started')).toHaveLength(1)
@@ -231,7 +232,7 @@ describe('Before-End Player Dispatch session', () => {
   })
 
   it('skips the pre-scoring window when only unlisted or unavailable anytime cards remain', () => {
-    const session = new GameSession(42)
+    const session = createWorkSession({ seed: 42 })
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0

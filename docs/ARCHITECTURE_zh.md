@@ -833,7 +833,7 @@ Harvest outcome summary 是本次 Harvest 的事实，不是中间日志缓存�
 
 每个准备窗口冻结自己的起始玩家顺时针顺序。各玩家真正进入窗口时，Stage Dispatch 根据当时持牌、手牌 hook 和纯 `stageEligibility` 查询构造固定的 `activate-card-effect` 来源树。它不提前冻结所有玩家，不调用 handler 来筛选当时付不起的来源。Handler、费用和可执行性在 activation 被选择时从实时状态重算；例如石屋 Plow Driver 可以先领计划食物再支付。购买、传牌、随时行动、pending 恢复和撤销继续同一树，完成来源不重放，新购牌只参加之后开启的窗口。当前来源离场时遵守通用持牌检查，明确保留的定时义务继续执行。
 
-每名玩家的 StartOfTurn 树把回合开始 activation、计划领取、付款门控 offer 和计划行动放入同一 `ParallelNode(mode='trigger-select')`。普通到期货物按玩家合并为一次内部 `receive`，各 entry 保留 `sourceCardId`；Receive listener 不隐式触发 Gain listener。依赖领取完成的后续奖励保留顺序依赖，只有实际领取后才提交 `futureMeeple.resolved`。`field` / `stable` / `forest` / `moor` 仍展开为既有耕田、免费畜栏与地形行动，必要的标准兑换机会按实时状态重建；不另跑先全部领取、再全部行动、最后扫描卡牌的旧链。
+每名玩家的 StartOfTurn 树把回合开始 activation、计划领取、付款门控 offer 和计划行动放入同一 `ParallelNode(mode='trigger-select')`。普通到期货物按玩家合并为一次内部 `receive`，各 entry 保留 `sourceCardId`；Receive listener 不隐式触发 Gain listener。依赖领取完成的后续奖励保留顺序依赖，只有实际领取后才提交 `futureMeeple.resolved`。`field` / `stable` / `forest` / `moor` 仍展开为既有耕田、免费畜栏与地形行动。必要的标准兑换机会按实时状态重建，准备阶段包含谷物和蔬菜的基础兑换。到期畜栏记录只在建造时抵扣自身预留组件；成功建造扣减预留，窗口结束释放剩余数量。预约地形的候选位置在选项、请求和提交边界都从当前农场推导。窗口收尾消费拒绝或无法执行的可选定时领取，不再触发一次 Receive。不另跑先全部领取、再全部行动、最后扫描卡牌的旧链。
 
 累积格补充完成、进入 StartOfTurn 前冻结本轮 `roundFirstPlayerId`。随后发生的起始玩家标记转移影响下一轮工作顺序；每个阶段窗口的玩家顺序是独立的 continuation。工作入口与 Roman Pot 等消费者使用冻结工作顺序。若 before-work 放人已耗尽起始玩家，入口沿同一工作顺序找首个仍可行动的玩家；所有人实际用完工人时进入正常 all-workers-placed 级联。准备窗口、领取与累积格补充在恢复时均不重复。四个新增阶段 hook 是原生 Card Effect 扩展，不新增 Action Hook phase，也不自动加入 Workshop 能力白名单；自定义能力仍由既有契约和执行准入测试开放。
 
@@ -849,7 +849,7 @@ Harvest field 三个阶段 hook（`onStartHarvestFieldPhase` / `onHarvestFieldPh
 
 准备阶段窗口通过固定 activation 树与完整 typed stage continuation 恢复，不依赖会变化的已打出牌数组索引；窗口上下文、玩家顺序和树 cursor 一起保留。其他尚未迁入 reaction dispatch 的串行阶段仍使用 `resumeAfterCardId` 辅助其索引恢复，不能把这个旧 anchor 机制用于准备窗口来源发现。
 
-未来回合的一次性 optional offer 不应塞进 `futureMeeples` 资源 token。`scheduled-offer` internal action 读取 `player.cardStates[cardId].extraData.scheduledOffers`，offer 记录 `dueRound`、`kind`、cost、目标 special action 或 animal、`consumed` / `consumedRound`；`onRoundStart` 通过 `scheduledOffersRoundStartFlow()` 把到期 offer 交给 engine。执行时先消费 token，再按当前状态决定是否弹 choice；拒绝、资源不足或目标不可执行都不会保留 token。M056 通过该 action 复用 Cut Peat special action card 的可用性、费用、market / opponent face-up 和翻面规则；M131 通过同一模型购买预约动物后显式进入 `reorganize`。
+未来回合的一次性 optional offer 不应塞进 `futureMeeples` 资源 token。`scheduled-offer` internal action 读取 `player.cardStates[cardId].extraData.scheduledOffers`，offer 记录 `dueRound`、`kind`、cost、目标 special action 或 animal、`consumed` / `consumedRound`；`onRoundStart` 通过 `scheduledOffersRoundStartFlow()` 把到期 offer 交给 engine。只有存在到期 offer 时，来源才取得资格。选项准入和付款读取实时状态，所以起初付不起的机会可以在同一窗口兑换后使用。创建或恢复请求不消费 offer；付款或目标应用成功才消费。拒绝或窗口结束时，未使用的到期 offer 一并过期。M056 通过该 action 复用 Cut Peat special action card 的可用性、费用、market / opponent face-up 和翻面规则；M131 通过同一模型购买预约动物后显式进入 `reorganize`。
 
 可执行说明使用 `ChoiceDescriptionPreview`。描述树保留顺序、互斥与多选分支、并行次序、可选性以及规则执行玩家。`Engine.describe()` 读取执行 flow，不推进 cursor，也不执行行动。`Engine.describeFlow()` 描述独立计划，不构造执行引擎或日志存储。原本不透明的原生行动通过纯 `ActionDefinition.flowFactory` 接收仅含数据的 `ActionFlowPlanningContext`，真实执行调用同一个工厂。四季行动和卡牌行动格复用此契约。卡牌行动格计划将每个 leaf 绑定到实际行动格，保留显式跨玩家转移，并声明本玩家从棋盘获得资源的来源。领取事件和资源统计遵循该来源；资源监听器观察实际产生资源的 leaf，避免外层行动对同一事件重复计数。基础说明注册普通、internal 和 ad-hoc 行动，排除所有玩家修正，并保留各执行玩家的分支。资源领取和选择说明与执行复用目标及选择计划。随时行动、选择项、棋盘规则和定时效果详情使用同一个渲染器。卡牌正文继续人工维护。棋盘基础费用排除玩家修正；当前交互选项使用 Interaction Player 和后端支付求解器，保留数量上限和替代支付来源。烤面包选项由后端提供实际兑换比例及数量上限。造房、建马厩数量，翻修目标、职业目标和设施购买均使用 PaymentSolver 的实际路径，包括资源提供者、退回卡牌、原支付路径身份及购买结果。显式 exact cost 同时作用于候选准入和真实付款。闲置时的私密 anytime 预览只发给当前操作玩家；浏览公共农场保留操作身份和草稿，同时隐藏私密操作。
 

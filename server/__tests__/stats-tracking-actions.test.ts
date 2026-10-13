@@ -1,3 +1,4 @@
+import { createOpeningSession, createWorkSession } from './_helpers/session-fixtures'
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
@@ -42,40 +43,36 @@ describe('PlayerStats action tracking', () => {
   })
 
   it('incFirstPlayer fires when first-player rotates each year', () => {
-    const session = new GameSession(undefined, undefined, { playerCount: 2 })
-    stabilizeRandomHands(session.state.players)
+    const session = createWorkSession()
     const state = session.getState().state
     // simulate p2 having taken the "set first player" effect during round 1.
     // We move start-player marker over so when round 2 begins, p2 receives +1.
     setStartPlayer(state, state.players[1]!)
-    state.round = 2
-    state.roundFirstPlayerId = state.players[1]!.id
+    state.players.forEach(player => setWorkersAtHome(state, player, 0))
     session.loadState(state)
-
-    // invoke the round-start path directly (private method on GameCore).
-    const core = session as unknown as { continueBeforeStartOfTurn: () => void }
-    core.continueBeforeStartOfTurn()
-
-    const after = session.getState().state
+    const response = session.performRoundEnd()
+    expect(response.ok, response.error).toBe(true)
+    const after = response.state
+    expect(after.round).toBe(2)
+    expect(after.roundFirstPlayerId).toBe(after.players[1]!.id)
     expect(after.players[1]!.stats.firstPlayerCount).toBe(1)
     // p1 should still hold its initial 1 from being starting first player
     expect(after.players[0]!.stats.firstPlayerCount).toBe(1)
   })
 
   it('incFirstPlayer is not double-counted on round 1 init', () => {
-    const session = new GameSession(undefined, undefined, { playerCount: 2 })
-    stabilizeRandomHands(session.state.players)
-    // p1 was starting first player → starts at 1.
-    // Calling continueBeforeStartOfTurn while round===1 must not bump it.
-    const core = session as unknown as { continueBeforeStartOfTurn: () => void }
-    core.continueBeforeStartOfTurn()
+    const session = createOpeningSession({ seed: 42, options: { deckIds: ['A'] }, expected: {
+      phase: 'playing', roundPhase: 'work', interaction: { stateId: 'idle' },
+    } })
+    session.getState()
     const after = session.getState().state
+    expect(after.round).toBe(1)
     expect(after.players[0]!.stats.firstPlayerCount).toBe(1)
     expect(after.players[1]!.stats.firstPlayerCount).toBe(0)
   })
 
   it('totalRoomsBuilt increments when a room is constructed via farm-expansion', () => {
-    const session = new GameSession(42)
+    const session = createWorkSession({ seed: 42 })
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.currentPlayerIndex = 0
@@ -114,7 +111,7 @@ describe('PlayerStats action tracking', () => {
   })
 
   it('totalOccupationBuilt increments when an occupation is played', () => {
-    const session = new GameSession(42)
+    const session = createWorkSession({ seed: 42 })
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -150,7 +147,7 @@ describe('PlayerStats action tracking', () => {
   })
 
   it('totalMajorBuilt increments when a major improvement is played', () => {
-    const session = new GameSession(42)
+    const session = createWorkSession({ seed: 42 })
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

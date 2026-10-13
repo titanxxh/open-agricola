@@ -108,6 +108,7 @@ describe('effects architecture guard', () => {
       'build-farmhand-room',
       'collect',
       'complete-parent-father',
+      'complete-preparation',
       'construct',
       'consume-card-counter',
       'discard-card-stack',

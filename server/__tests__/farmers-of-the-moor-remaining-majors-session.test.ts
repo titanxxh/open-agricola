@@ -1,3 +1,4 @@
+import { createWorkSession } from './_helpers/session-fixtures'
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
@@ -28,11 +29,11 @@ const prepareMajorPurchaseSession = (
   cardId: string,
   resources = { wood: 10, clay: 10, reed: 10, stone: 10, food: 0 },
 ) => {
-  const session = new GameSession(62, undefined, {
+  const session = createWorkSession({ seed: 62, options: {
     playerCount: 2,
     enableFarmersOfTheMoor: true,
     allowIncompleteFarmersOfTheMoorMinorDeal: true,
-  })
+  } })
   prepareHands(session)
   const player = session.state.players[0]!
   player.resources = { ...player.resources, ...resources }
@@ -84,11 +85,11 @@ const performRoundEndThroughReorganize = (session: GameSession) => {
 
 describe('Farmers of the Moor remaining major improvements', () => {
   it('Peat Charcoal Kiln increases Cut Peat fuel and scores fuel reserves', () => {
-    const noHorseSession = new GameSession(63, undefined, {
+    const noHorseSession = createWorkSession({ seed: 63, options: {
       playerCount: 2,
       enableFarmersOfTheMoor: true,
       allowIncompleteFarmersOfTheMoorMinorDeal: true,
-    })
+    } })
     const noHorsePlayer = noHorseSession.state.players[0]!
     noHorsePlayer.improvements = ['Major_Moor_PeatCharcoalKiln']
     const noHorseMoor = noHorsePlayer.farmTerrain!.find((tile) => tile.kind === 'moor')!
@@ -96,11 +97,11 @@ describe('Farmers of the Moor remaining major improvements', () => {
     expect(noHorseSession.takeSpecialAction(0, findCardFor(noHorseSession, 'cut-peat').id, 'cut-peat', { tile: noHorseMoor }).ok).toBe(true)
     expect(noHorsePlayer.resources.fuel).toBe(4)
 
-    const horseSession = new GameSession(64, undefined, {
+    const horseSession = createWorkSession({ seed: 64, options: {
       playerCount: 2,
       enableFarmersOfTheMoor: true,
       allowIncompleteFarmersOfTheMoorMinorDeal: true,
-    })
+    } })
     const horsePlayer = horseSession.state.players[0]!
     horsePlayer.improvements = ['Major_Moor_PeatCharcoalKiln']
     horsePlayer.resources.horse = 1
@@ -115,11 +116,11 @@ describe('Farmers of the Moor remaining major improvements', () => {
   })
 
   it('Foresters Lodge increases Fell Trees wood and scores visible forests', () => {
-    const session = new GameSession(65, undefined, {
+    const session = createWorkSession({ seed: 65, options: {
       playerCount: 2,
       enableFarmersOfTheMoor: true,
       allowIncompleteFarmersOfTheMoorMinorDeal: true,
-    })
+    } })
     const player = session.state.players[0]!
     player.improvements = ['Major_Moor_ForestersLodge']
     const forest = player.farmTerrain!.find((tile) => tile.kind === 'forest')!
@@ -128,11 +129,11 @@ describe('Farmers of the Moor remaining major improvements', () => {
     expect(player.resources.wood).toBe(3)
     expect(cardBonusVp(session.state)).toBe(4)
 
-    const horseSession = new GameSession(66, undefined, {
+    const horseSession = createWorkSession({ seed: 66, options: {
       playerCount: 2,
       enableFarmersOfTheMoor: true,
       allowIncompleteFarmersOfTheMoorMinorDeal: true,
-    })
+    } })
     const horsePlayer = horseSession.state.players[0]!
     horsePlayer.improvements = ['Major_Moor_ForestersLodge']
     horsePlayer.resources.horse = 1
@@ -199,11 +200,11 @@ describe('Farmers of the Moor remaining major improvements', () => {
     expect(scheduled.every((entry) => entry.resources.food === 1)).toBe(true)
     expect(scheduled.every((entry) => entry.actionContext?.resourceCondition)).toBe(true)
 
-    const blockedSession = new GameSession(67, undefined, {
+    const blockedSession = createWorkSession({ seed: 67, options: {
       playerCount: 2,
       enableFarmersOfTheMoor: true,
       allowIncompleteFarmersOfTheMoorMinorDeal: true,
-    })
+    } })
     const blockedPlayer = blockedSession.state.players[0]!
     blockedSession.state.round = 3
     blockedSession.state.futureMeeples = [{
@@ -225,11 +226,11 @@ describe('Farmers of the Moor remaining major improvements', () => {
     expect(blockedPlayer.resources.food).toBe(foodBefore)
     expect(blockedSession.state.futureMeeples).toEqual([])
 
-    const paidSession = new GameSession(68, undefined, {
+    const paidSession = createWorkSession({ seed: 68, options: {
       playerCount: 2,
       enableFarmersOfTheMoor: true,
       allowIncompleteFarmersOfTheMoorMinorDeal: true,
-    })
+    } })
     const paidPlayer = paidSession.state.players[0]!
     paidSession.state.round = 3
     paidSession.state.futureMeeples = [{
@@ -254,11 +255,11 @@ describe('Farmers of the Moor remaining major improvements', () => {
   })
 
   it('Riding Stables onBuy does nothing after round 14', () => {
-    const session = new GameSession(69, undefined, {
+    const session = createWorkSession({ seed: 69, options: {
       playerCount: 2,
       enableFarmersOfTheMoor: true,
       allowIncompleteFarmersOfTheMoorMinorDeal: true,
-    })
+    } })
     session.state.round = 14
     const player = session.state.players[0]!
 

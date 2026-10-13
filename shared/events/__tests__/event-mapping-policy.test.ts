@@ -353,6 +353,7 @@ describe('event mapping policy', () => {
       'server/__tests__/passing-mechanism-session.test.ts',
       'server/__tests__/passing-mechanism-onbuy.test.ts',
       'server/__tests__/pasture-derived-state-session.test.ts',
+      'server/__tests__/scheduled-terrain-session.test.ts',
       'shared/events/__tests__/public-event-presentation.test.ts',
       'client/app/__tests__/public-event-notifications.test.ts',
       'client/app/__tests__/GameContainerApi.ws.test.ts',
