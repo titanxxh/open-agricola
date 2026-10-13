@@ -833,7 +833,7 @@ Harvest outcome summary 是本次 Harvest 的事实，不是中间日志缓存�
 
 每个准备窗口冻结自己的起始玩家顺时针顺序。各玩家真正进入窗口时，Stage Dispatch 根据当时持牌、手牌 hook 和纯 `stageEligibility` 查询构造固定的 `activate-card-effect` 来源树。它不提前冻结所有玩家，不调用 handler 来筛选当时付不起的来源。Handler、费用和可执行性在 activation 被选择时从实时状态重算；例如石屋 Plow Driver 可以先领计划食物再支付。购买、传牌、随时行动、pending 恢复和撤销继续同一树，完成来源不重放，新购牌只参加之后开启的窗口。当前来源离场时遵守通用持牌检查，明确保留的定时义务继续执行。
 
-准备阶段预览递归检查整棵 flow 的可选节点，据此保留兑换机会。必选来源内部有可选分支时，来源根仍为必选；可选购买不能让玩家跳过必领奖励。独立购买使用既有 OR 分支。组合节点的 `ActionFlow.requiresExplicitChoice` 投影既有 request 标记，并随 cursor 恢复和克隆保留。当当前只能选择完成时，购买窗口仍等待玩家决定，允许通过实时兑换支付下一项，避免 Session 自动选择完成。插入 anytime 时清除尚未选择分支的 OR/XOR 请求，恢复后由同一宿主按实时资源重算分支，已完成分支仍保持完成。OR 全部分支完成时仍自动结束。该标记属于原生扩展，在 Workshop flow 准入中保持关闭。
+准备阶段预览递归检查整棵 flow 的可选节点，据此保留兑换机会。必选来源内部有可选分支时，来源根仍为必选；可选购买不能让玩家跳过必领奖励。独立购买使用既有 OR 分支。组合节点的 `ActionFlow.requiresExplicitChoice` 投影既有 request 标记，并随 cursor 恢复和克隆保留。当当前只能选择完成时，购买窗口仍等待玩家决定，允许通过实时兑换支付下一项，避免 Session 自动选择完成。对于声明该标记的组合节点，插入 anytime 时清除尚未选择分支的 OR/XOR 请求，恢复后由同一宿主按实时资源重算分支，已完成分支仍保持完成。未声明标记的既有选择保留已发出的请求和付款恢复语义。OR 全部分支完成时仍自动结束。该标记属于原生扩展，在 Workshop flow 准入中保持关闭。
 
 每名玩家的 StartOfTurn 树把回合开始 activation、计划领取、付款门控 offer 和计划行动放入同一 `ParallelNode(mode='trigger-select')`。普通到期货物按玩家合并为一次内部 `receive`，各 entry 保留 `sourceCardId`；Receive listener 不隐式触发 Gain listener。依赖领取完成的后续奖励保留顺序依赖，只有实际领取后才提交 `futureMeeple.resolved`。`field` / `stable` / `forest` / `moor` 仍展开为既有耕田、免费畜栏与地形行动。必要的标准兑换机会按实时状态重建，准备阶段包含谷物和蔬菜的基础兑换。到期畜栏记录只在建造时抵扣自身预留组件；成功建造扣减预留，窗口结束释放剩余数量。预约地形的候选位置在选项、请求和提交边界都从当前农场推导。窗口收尾消费拒绝或无法执行的可选定时领取，不再触发一次 Receive。不另跑先全部领取、再全部行动、最后扫描卡牌的旧链。
 
