@@ -104,7 +104,8 @@ describe('B165_GameProvider session', () => {
 
     const player = resp.state.players[0]!
     expect(player.resources.boar).toBe(1)
-    expect(fieldCounts(player)).toEqual([0])
+    expect(fieldCounts(player)).toEqual([1])
+    expect(resp.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'animal-reorg' } })
   })
 
   it('lets player discard grain from one Card Field', () => {
@@ -130,8 +131,9 @@ describe('B165_GameProvider session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.resources.boar).toBe(1)
     expect(resp.state.players[0]!.cardStates.B113_PatchCaregiver?.extraData?.cardFieldStacks).toEqual([
-      { crop: 'grain', remaining: 1 },
+      { crop: 'grain', remaining: 2 },
     ])
+    expect(resp.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'animal-reorg' } })
   })
 
   it('B165 S5: rejects exactly 2 selected grain fields without mutating grain or boar', () => {
@@ -166,7 +168,8 @@ describe('B165_GameProvider session', () => {
 
     const player = resp.state.players[0]!
     expect(player.resources.boar).toBe(2)
-    expect(fieldCounts(player)).toEqual([0, 0, 0])
+    expect(fieldCounts(player)).toEqual([1, 1, 1])
+    expect(resp.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'animal-reorg' } })
   })
 
   it('B165 S4: selecting 4 grain fields gains 3 boars', () => {
@@ -187,7 +190,8 @@ describe('B165_GameProvider session', () => {
 
     expect(resp.ok, resp.error).toBe(true)
     expect(resp.state.players[0]!.resources.boar).toBe(3)
-    expect(fieldCounts(resp.state.players[0]!)).toEqual([0, 0, 0, 0])
+    expect(fieldCounts(resp.state.players[0]!)).toEqual([1, 1, 1, 1])
+    expect(resp.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'animal-reorg' } })
   })
 
   it('B165 S6: without a grain field Game Provider is not offered', () => {

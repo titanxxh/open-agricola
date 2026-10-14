@@ -2,6 +2,7 @@ import { defineOccupationCard } from '../card-source'
 import { registerSelectionEffect } from '../../actions/helpers/selection-effect-registry'
 import type { CardImpl } from '../registry'
 import { getLogicalFields, mutateLogicalFields } from '../helpers/card-field'
+import { gainLeaf } from '../helpers/pay-gain-node'
 import { parsePositionKey, positionKey } from '../../domain/farm'
 
 const CARD_ID = 'B165_GameProvider'
@@ -26,8 +27,8 @@ registerSelectionEffect('discard-grain-for-pigs', ({ state, player, positions, e
   }
   const grainsRemoved = selectedFields.length
   const pigs = grainsRemoved >= 4 ? 3 : grainsRemoved >= 3 ? 2 : grainsRemoved >= 1 ? 1 : 0
-  player.resources.boar = (player.resources.boar ?? 0) + pigs
-  return flows.length > 0 ? { type: 'parallel', children: flows } : undefined
+  const gain = gainLeaf(CARD_ID, { boar: pigs })
+  return flows.length > 0 ? { type: 'seq', children: [{ type: 'parallel', children: flows }, gain] } : gain
 })
 
 const cardImpl = {
