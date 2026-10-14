@@ -1,4 +1,6 @@
 import { defineMinorCard } from '../card-source'
+import { isActionDoableInFlowContext } from '../../actions/flow'
+import { getActionDefinition } from '../../actions/index'
 import { payLeaf } from '../helpers/pay-gain-node'
 import { jumpLeaf } from '../helpers/jump-leaf'
 import type { CardImpl } from '../registry'
@@ -8,15 +10,27 @@ const CARD_ID = 'D018_SteamPlow'
 const cardImpl = {
   effect: {
   id: CARD_ID,
-  onStartReturnHome: (_state, player) => {
+  onStartReturnHome: (state, player) => {
     // Check player can afford the cost
     if ((player.resources.wood ?? 0) < 2 || (player.resources.food ?? 0) < 1) return
+    const targetSpaceId = 'farmland'
+    const targetSpace = state.actionSpaces.find(space => space.id === targetSpaceId)
+    if (!targetSpace || !isActionDoableInFlowContext({
+      actionId: targetSpaceId,
+      action: targetSpace,
+      state,
+      player,
+      space: targetSpace,
+      sourceCard: CARD_ID,
+      actionContext: { viaCardJump: true, sourceCard: CARD_ID, targetSpaceId },
+      resolveAction: getActionDefinition,
+    })) return
     return {
       type: 'seq',
       optional: true,
       children: [
         payLeaf({ cardId: CARD_ID, cost: { wood: 2, food: 1 } }),
-        jumpLeaf({ sourceCard: CARD_ID, targetSpaceId: 'farmland' }),
+        jumpLeaf({ sourceCard: CARD_ID, targetSpaceId }),
       ],
     }
   },
