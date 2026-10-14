@@ -70,12 +70,12 @@ it('Changeover restricted to one of two eligible fields grants no Seaweed grain'
   expect(response.state.players[0]!.fields.map(field => field.stacks)).toEqual([[{ kind: 'vegetable', remaining: 2 }], []])
 })
 
-it('a selected-field scope covering the only eligible field remains unconditional', () => {
+it('Changeover fixed selected-field authorization remains restricted with only one eligible field', () => {
   const session = make(false)
   changeover(session)
   const response = finish(session, session.commitSelectionChoice(0, { crops: [{ row: 0, col: 0, crop: 'vegetable' }] }))
   expect(response.ok, response.error).toBe(true)
-  expect(response.state.players[0]!.resources).toMatchObject({ grain: 2, vegetable: 0 })
+  expect(response.state.players[0]!.resources).toMatchObject({ grain: 1, vegetable: 0 })
 })
 
 it.each([{ played: true, actor: 0, grain: 1 }, { played: false, actor: 0, grain: 0 }, { played: true, actor: 1, grain: 0 }])(
