@@ -950,7 +950,7 @@ OA 对齐规则：
 - **room** (`construct.ts`)：`room-payment.ts` 展开"每间房"费用变体，并把本次 `computeCosts` 的 `costTrades` / `costBonuses` / `paymentResourceProviders` 附加到 construct `ComplexCost`；farm selection 的 `maxSelections` 也使用同一 adjusted construct cost。多解时二轮 `pay:room:*` prompt finalize；doability 同时检查支付上限和 reachable room selection；direct cancel 由通用 protected-action guard 拒绝。
 - **stable / plow** (`stables.ts` / `plow.ts`)：typed flat payment 解析。
 - **fence** (`fencing.ts`)：校验选边/来源/连通/封闭区域，得 `newEdges` 后计算 wood（考虑 `freeFences` / `extraWood` / fence-cost-unification 的 farm-choice computeCosts Pass #2），并把该 pass 的 trades/bonuses/paymentResourceProviders/paymentBudget 传入 `pay:fence:*` payment；多解 `pay:fence:*` 二轮 prompt。
-- **sow** (`sow.ts`)：validate + finalize（无 payment combo），含 extra-field card effect（`getPermittedExtraSowableFields` + `handleSowExtraField`）。`maxSelections` 按 Logical Field 计数，`maxSeedSelections` 独立限制提交的作物 slot 数，包括同一 Card Field 的多个 slot。行动作物许可与田的 `allowedCrops` 在候选展示和权威提交时都取交集；行动不能放宽田自身的播种许可。`isUnconditionalSow` 对照普通 Sow 的田及作物许可，当前种子库存不决定行动是否受限。
+- **sow** (`sow.ts`)：validate + finalize（无 payment combo），含 extra-field card effect（`getPermittedExtraSowableFields` + `handleSowExtraField`）。`maxSelections` 按 Logical Field 计数，`maxSeedSelections` 独立限制提交的作物 slot 数，包括同一 Card Field 的多个 slot。行动作物许可与田的 `allowedCrops` 在候选展示和权威提交时都取交集；行动不能放宽田自身的播种许可。`isUnconditionalSow` 保留指定田授权等行动本身的限制，即使当前只有一块 eligible 田。其他权限比较对照普通 Sow，当前种子库存不决定行动是否受限。
 
 farmType 第一轮 payload 形态：`fence: {edges, palisadeEdges, extraWood, fenceSources?}` / `room: {rooms}` / `stable: {stables}` / `plow: {tile}` / `sow: {crops}`。WS `{type:'choice', value:'confirm', payload}` 经 `resolveChoice` 透传；二轮时由 `extraData.actionContextWrite: {farmPayload}` 持久化到 `pending.actionContext.farmPayload`，二轮 prompt 解析时 ActionDef 从 `ctx.actionContext.farmPayload` 读回。
 
@@ -994,11 +994,13 @@ Nested anytime flows are injected ahead of the current pending tree. Parent pend
 
 每个 anytime 入口都在引擎 sequence 内运行，以能力入口 ID 和发起玩家标识。默认情况下，该 sequence 已开始且尚未结束时，`buildAnytimeEntries()` 会跨全部引擎 frame 排除同一玩家的同一入口；直接命令也使用该过滤结果。其他能力（包括同一卡牌的不同能力）仍按普通窗口策略判断。sequence 覆盖 before 效果、支付、主体收益、嵌套选择、动物整理和后置响应，主体收益完成不会解除限制。完成或显式跳过后解除限制，私有游标恢复与撤销保留这一生命周期。窗口中尚未选中的入口不受此限制。费用不足且没有其他合法 anytime 的续行进入既有 blocked / undo 路径。
 
-系统 `ActionDefinition` 与卡牌 `CardListenerRegistration` 都支持 `allowAnytimeReentry?: boolean`。只有 `true` 豁免活动入口限制；窗口策略、归属与操作者检查、费用、使用次数、配方禁用与 continuation guard 仍全部生效。当前仅系统 `exchange` 开启。因此，exchange 引发的动物整理期间可以再次通过 exchange 烹饪，B104 配方仅能支付当前已安置的羊；exchange／bake 选择、heating 和下一玩家确认期间仍禁止 exchange。喂养支持包含跨玩家选择的嵌套 anytime flow，结束后恢复同一笔尚未支付的喂养余额。新增卡牌例外必须有合法、可达的使用场景及原生 Session 结算和恢复证据，人工测试 listener 只能证明引擎契约。这是设计时要求，不是运行时穷举预检；ADR-0015 当前步骤准入规则保持不变。
+系统 `ActionDefinition` 与卡牌 `CardListenerRegistration` 都支持 `allowAnytimeReentry?: boolean`。只有 `true` 豁免活动入口限制；窗口策略、归属与操作者检查、费用、使用次数、配方禁用与 continuation guard 仍全部生效。当前仅系统 `exchange` 开启。因此，在普通收获繁殖阶段以外，exchange 引发的动物整理期间可以再次通过 exchange 烹饪，B104 配方仅能支付当前已安置的羊；exchange／bake 选择、heating 和下一玩家确认期间仍禁止 exchange。喂养支持包含跨玩家选择的嵌套 anytime flow，结束后恢复同一笔尚未支付的喂养余额。新增卡牌例外必须有合法、可达的使用场景及原生 Session 结算和恢复证据，人工测试 listener 只能证明引擎契约。这是设计时要求，不是运行时穷举预检；ADR-0015 当前步骤准入规则保持不变。
 
 同一 Anytime Ability 的商品或目标选项共享入口与限制。D124 和 M126 各提供一个卡牌 anytime 入口，具体选项在内部选择。每次发动结算一件商品或一组兑换；多个选项时先选择，再扣资源或使用标记，只有一个合法选项时沿用普通单选执行行为。反悔使用现有撤销及其可用性边界，不增加取消按钮或批量交互。D124 保留商品不得重复及原有时机规则，M126 保留四枚共享使用标记及原有时机规则。普通 XOR 在嵌套行动后仍保留原候选列表，实际付款使用当前资源；选项变得付不起时沿用既有 blocked / undo 行为。
 
 若 anytime flow 的终止 reaction 必须等整个 injected sequence 完成后才运行，可在最后一个 leaf 上写入 `INJECTED_ANYTIME_COMPLETION_CONTEXT_KEY`。completion listener 必须同时看到该 marker 与引擎添加的 injected-anytime marker，因此空栈顶层 anytime action 不会被误判为 suspended-flow completion。
+
+普通收获 `roundPhase === 'breeding'` 期间，动物换食物的烹饪配方不可用，直接选择及 bulk 权威提交都拒绝。该阶段规则同时保护父母动物和新生儿。全部喂食结束 hook 完成后才进入繁殖阶段并发送 `harvest.phaseStarted`；进入收获结束 hook 前恢复 `harvest`，两端新增动物的合法烹饪窗口保留。非烹饪动物兑换、喂食阶段烹饪及 D167 等繁殖阶段以外的新增动物即时烹饪继续可用。配方身份和嵌套重整续接保持一致，不新增动物计数或卡牌 ID 特判。
 
 一次兑换提交可以包含多种配方及各自的正整数次数，作为一个 Exchange Batch 结算。后端在任何支付或收益前校验所有配方索引和次数；非法条目使整批拒绝，资源和交互保持不变。合法整数请求继续按顺序结算，并按实时额度截断数量。如果整批结束后存在新获得且未安置的动物，且来源交互本身不是动物整理，exchange 通过 `internalChildren.afterHostListeners` 安排 `reorganize`，完成后再恢复被暂停的父交互。`CardExchange.blockedAnytimeInteractionKinds` 会复制到各条 `Trade`；系统 anytime 入口将来源请求类型保存在 `actionContext.anytimeInteractionKind`，统一用于准入、候选构造及提交校验（包括 bulk）。被禁用的配方保留 trade 索引，但不提供可执行选项。B104 用三条声明 `fromFarmyard`、`anytime` / `harvest` 的配方替代独立 listener；动物整理期间，包括最后繁殖后的整理，也可支付当前有效动物区中已安置的羊。待安置动物和未确认预填不提供支付额度，每笔支付都会扣减实时安置余额。从动物整理发起兑换时刷新并恢复原 pending host，不新增另一层整理。B104 沿用包括到期行动准备在内的默认 exchange 窗口，不提供专属计分前机会。
 
