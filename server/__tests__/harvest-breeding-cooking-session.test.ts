@@ -189,6 +189,50 @@ const CARD_IMPL = { effect: { id: CARD_ID, onEndHarvest: () => ({ type: 'leaf', 
     expect(advance(session, 'finished').state.round).toBe(5)
   })
 
+  it('starts breeding only after the end-feeding animal gain is cooked and housed', () => {
+    const id = 'CUSTOM_EndFeedingSheep'
+    const compiled = validateAndCompileCustomCode(`
+const CARD_ID = '${id}'
+const CARD_DEF = MinorImprovement({ id: CARD_ID, name: 'End Feeding Sheep' })
+const CARD_IMPL = { effect: { id: CARD_ID, onEndHarvestFeedingPhase: () => ({ type: 'leaf', actionId: 'gain', sourceCard: CARD_ID, params: { sheep: 1 } }) } }
+`, id)
+    if (!compiled.valid) throw new Error(compiled.errors.join('\n'))
+    const card: CustomCardData = { cardType: 'minor', cardJson: { id, name: 'End Feeding Sheep', deck: 'CUSTOM', number: 0, desc: [] }, compiledCode: compiled.compiledCode, codeManifest: compiled.manifest }
+    const session = setup('sheep', 4, false, [card])
+    const pending = advance(session)
+    expect(pending.state.roundPhase).toBe('feeding')
+    expect(pending.state.completedFeedingPhases).toBe(1)
+    expect(pending.state.players[0]!.resources.sheep).toBe(3)
+    expect(pending.state.events.filter(event => event.type === 'harvest.phaseStarted' && event.harvestPhase === 'breeding')).toEqual([])
+    const opened = ok(session.takeAnytimeAction(0, 'exchange'))
+    const recipe = cookingOptions(opened)[0]!
+    expect(recipe).toBeDefined()
+    const cooked = ok(session.resolveChoice(0, `bulk:${recipe.value.split(':')[1]}=1`))
+    expect(cooked.state.players[0]!.resources).toMatchObject({ sheep: 2, food: 98 })
+    const ordinaryBreed = ok(session.resolveChoice(0, 'confirm', { zones: [{ id: 'parents', zoneType: 'pasture', animalType: 'sheep', animalCount: 2 }] }))
+    expect(ordinaryBreed.state.roundPhase).toBe('breeding')
+    expect(ordinaryBreed.state.completedFeedingPhases).toBe(1)
+    expect(ordinaryBreed.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'animal-reorg' } })
+    expect(ordinaryBreed.state.players[0]!.resources.sheep).toBe(3)
+    const events = ordinaryBreed.state.events
+    const gainIndex = events.findIndex(event => event.type === 'resource.moved' && event.sourceCardId === id && event.resources.sheep === 1)
+    const cookingIndex = events.findIndex(event => event.type === 'resource.exchanged' && event.paid.sheep === 1)
+    const breedingIndex = events.findIndex(event => event.type === 'harvest.phaseStarted' && event.harvestPhase === 'breeding')
+    expect(gainIndex).toBeGreaterThan(-1)
+    expect(cookingIndex).toBeGreaterThan(gainIndex)
+    expect(breedingIndex).toBeGreaterThan(cookingIndex)
+    expect(events.filter(event => event.type === 'harvest.phaseStarted' && event.harvestPhase === 'breeding')).toHaveLength(1)
+    expect(events.filter(event => event.type === 'resource.paid' && event.paymentFor === 'feeding' && event.actorPlayerId === ordinaryBreed.state.players[0]!.id)).toHaveLength(1)
+    const breedMenu = ok(session.takeAnytimeAction(0, 'exchange'))
+    expect(cookingOptions(breedMenu)).toEqual([])
+    ok(session.resolveChoice(0, 'cancel'))
+    ok(session.resolveChoice(0, 'confirm', { zones: [{ id: 'parents', zoneType: 'pasture', animalType: 'sheep', animalCount: 3 }] }))
+    const completed = advance(session, 'finished')
+    expect(completed.state.round).toBe(5)
+    expect(completed.state.completedFeedingPhases).toBe(1)
+    expect(completed.state.players[0]!.resources).toMatchObject({ sheep: 3, food: 98 })
+  })
+
   it('still cooks an animal received from a work-phase action before housing it', () => {
     const session = setup('sheep', 5)
     const pending = ok(session.takeAction(0, 'sheep-market'))
