@@ -5,6 +5,7 @@ import type { CardImpl } from '../registry'
 const CARD_ID = 'C003_CarriageTrip'
 
 const cardImpl = {
+  prerequisiteCheck: (player, state) => !!state && workersAvailable(state, player) > 0,
   effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
