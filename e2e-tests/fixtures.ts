@@ -67,10 +67,12 @@ export async function finishHotseatOpening(page: Page) {
   const skip = page.locator('.interaction-bar').getByRole('button', { name: /^(Skip|跳过|Do not use Elder|不使用长者)$/ })
   const confirm = page.getByRole('button', { name: /^(Confirm switch|确认切换)$/ })
   const forest = page.locator('[data-action-id="forest"] button:enabled').first()
+  const choice = page.locator('.interaction-bar [data-choice-value]:enabled').first()
   const nextStep = async () => {
     if (await handoff.isVisible()) return 'handoff'
     if (await skip.isVisible()) return 'skip'
     if (await confirm.isVisible()) return 'confirm'
+    if (await choice.isVisible()) return 'choice'
     return await forest.isVisible() ? 'work' : 'waiting'
   }
   for (let step = 0; step < 12; step++) {
@@ -78,9 +80,11 @@ export async function finishHotseatOpening(page: Page) {
     const next = await nextStep()
     if (next === 'work') return
     if (next === 'waiting') continue
-    const control = next === 'handoff' ? handoff.getByRole('button') : next === 'skip' ? skip : confirm
+    const control = next === 'handoff' ? handoff.getByRole('button')
+      : next === 'skip' ? skip : next === 'confirm' ? confirm : choice
+    const value = await control.getAttribute('data-choice-value')
     await control.click()
-    await expect(control).toBeHidden()
+    await expect(value === null ? control : page.locator('.interaction-bar').locator(`[data-choice-value="${value}"]`)).toBeHidden()
   }
   throw new Error('Hotseat opening did not reach the work phase')
 }
