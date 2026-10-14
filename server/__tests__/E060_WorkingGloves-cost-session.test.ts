@@ -79,6 +79,13 @@ describe('Working Gloves occupation cost substitution', () => {
     if (!played || played.type !== 'card.played') throw new Error('Expected a committed occupation event')
     expect(played.payment?.resources).toEqual({ wood: 1 })
     expect(played.payment?.bonusSources).toEqual([CARD])
+    expect(response.state.log).toContainEqual(expect.objectContaining({
+      key: 'log.playOccupation', playerId: response.state.players[0]!.id,
+      params: expect.objectContaining({ occupations: OCCUPATION, costResources: { wood: 1 }, bonusSources: [CARD] }),
+    }))
+    expect(response.state.players[0]!.cardStates[CARD]?.extraData?.resourceStats).toMatchObject({
+      paid: { wood: 1 }, saved: { food: 1 },
+    })
   })
   it('keeps ordinary food payment independent, rejects an invalid choice, and restores candidate payment after undo', () => {
     const session = setup('wood', 1)
@@ -97,6 +104,11 @@ describe('Working Gloves occupation cost substitution', () => {
     const event = paid.state.events.find(event => event.type === 'card.played' && event.cardId === OCCUPATION)
     if (!event || event.type !== 'card.played') throw new Error('Expected played occupation')
     expect(event.payment?.bonusSources ?? []).toEqual([])
+    expect(paid.state.log).toContainEqual(expect.objectContaining({
+      key: 'log.playOccupation', playerId: paid.state.players[0]!.id,
+      params: expect.objectContaining({ occupations: OCCUPATION, costResources: { food: 1 } }),
+    }))
+    expect(paid.state.players[0]!.cardStates[CARD]?.extraData?.resourceStats).toBeUndefined()
     const undone = session.undoAction()
     expect(undone.ok, undone.error).toBe(true)
     expect(undone.state.players[0]!.resources).toMatchObject({ food: 1, wood: 1 })
