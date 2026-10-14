@@ -1,9 +1,65 @@
 import { expect, test } from '@playwright/test'
 import { createWorkSession } from '../server/__tests__/_helpers/session-fixtures'
-import type { ActionChoiceOption } from '../shared/contract/types'
+import type { ActionChoiceOption, SessionResponse } from '../shared/contract/types'
 import { serializeState } from '../shared/session/serialization'
 import type { SerializedGameState } from '../shared/session/serialization'
 import { BACKEND_URL } from './fixtures'
+
+test('Rod Collection previews points for wood beyond the four printed exceptions', async ({ page, request }) => {
+  const fresh = await request.post(`${BACKEND_URL}/api/game/new-sandbox`, { data: { seed: 38052, playerCount: 2, customCardIds: [] } })
+  expect(fresh.ok()).toBe(true)
+  const { state }: { state: SerializedGameState } = await fresh.json()
+  for (const player of state.players) {
+    player.minorHand = ['__test_placeholder__']
+    player.occupationHand = ['__test_placeholder__']
+  }
+  const owner = state.players[0]!
+  owner.minorPlayed = ['E038_RodCollection']
+  owner.occupationPlayed = ['A110_Roughcaster', 'A125_Priest', 'C123_Freemason']
+  owner.resources.wood = 2
+  owner.cardStates.E038_RodCollection = { extraData: { woodCount: 12 } }
+  expect((await request.post(`${BACKEND_URL}/api/game/load`, { data: { state } })).ok()).toBe(true)
+  const action: SessionResponse = await (await request.post(`${BACKEND_URL}/api/game/action`, { data: { playerIndex: 0, spaceId: 'fishing' } })).json()
+  expect(action.ok, action.error).toBe(true)
+  await page.goto('/?page=game&player=p1&embedded=1&devMode=1')
+  const scores = page.locator('.interaction-bar [data-card-score]')
+  await expect(scores).toHaveCount(2)
+  await expect(scores.nth(0)).toHaveAttribute('data-card-score', '1')
+  await expect(scores.nth(1)).toHaveAttribute('data-card-score', '2')
+  const committed = page.waitForResponse(response => response.url().endsWith('/api/game/choice'))
+  await page.locator('.interaction-bar button').filter({ has: page.locator('[data-card-score="1"]') }).click()
+  const result: SessionResponse = await (await committed).json()
+  expect(result.ok, result.error).toBe(true)
+  expect(result.state.players[0]!.resources.wood).toBe(1)
+})
+
+test('Cubbyhole payment choices show the shared reed cost', async ({ page, request }) => {
+  const fresh = await request.post(`${BACKEND_URL}/api/game/new-sandbox`, { data: { seed: 52052, playerCount: 2, customCardIds: [] } })
+  expect(fresh.ok()).toBe(true)
+  const { state }: { state: SerializedGameState } = await fresh.json()
+  for (const player of state.players) {
+    player.minorHand = ['__test_placeholder__']
+    player.occupationHand = ['__test_placeholder__']
+  }
+  state.players[0]!.minorHand = ['E052_Cubbyhole']
+  Object.assign(state.players[0]!.resources, { wood: 1, clay: 1, reed: 1 })
+  expect((await request.post(`${BACKEND_URL}/api/game/load`, { data: { state } })).ok()).toBe(true)
+  const started: SessionResponse = await (await request.post(`${BACKEND_URL}/api/game/action`, { data: { playerIndex: 0, spaceId: 'meeting-place' } })).json()
+  if (started.interaction.stateId !== 'wait') throw new Error('Expected improvement choice')
+  const branch = started.interaction.request.options?.find(option => option.value.startsWith('action-improvement-'))
+  if (!branch) throw new Error('Expected minor improvement branch')
+  const offered: SessionResponse = await (await request.post(`${BACKEND_URL}/api/game/choice`, { data: { playerIndex: 0, value: branch.value } })).json()
+  expect(offered.interaction).toMatchObject({ stateId: 'wait', promptKey: 'prompt.selectPayment' })
+  await page.goto('/?page=game&player=p1&embedded=1&devMode=1')
+  const payments = page.locator('.interaction-bar button').filter({ has: page.locator('[data-resource="reed"][data-amount="1"]') })
+  await expect(payments).toHaveCount(2)
+  const committed = page.waitForResponse(response => response.url().endsWith('/api/game/choice'))
+  await payments.filter({ has: page.locator('[data-resource="wood"][data-amount="1"]') }).click()
+  const result: SessionResponse = await (await committed).json()
+  expect(result.ok, result.error).toBe(true)
+  expect(result.state.players[0]!.minorPlayed).toContain('E052_Cubbyhole')
+  expect(result.state.players[0]!.resources).toMatchObject({ wood: 0, clay: 1, reed: 0 })
+})
 
 for (const scenario of [{ locale: 'en', width: 1440 }, { locale: 'zh', width: 390 }] as const) {
   for (const target of ['farm', 'card'] as const) {

@@ -11892,10 +11892,12 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     ],
     "altCosts": [
       {
-        "wood": 1
+        "wood": 1,
+        "reed": 1
       },
       {
-        "clay": 1
+        "clay": 1,
+        "reed": 1
       }
     ],
     "vp": 1,

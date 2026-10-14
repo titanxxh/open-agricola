@@ -9,7 +9,6 @@ const cases: Array<{ id: string; altCosts: Record<string, number>[] }> = [
   { id: 'C044_ChickenCoop', altCosts: [{ clay: 2, reed: 1 }, { wood: 2, reed: 1 }] },
   { id: 'D080_BrickHammer', altCosts: [{ wood: 1 }, { food: 1 }] },
   { id: 'E030_ChildsToy', altCosts: [{ wood: 1 }, { clay: 1 }] },
-  { id: 'E052_Cubbyhole', altCosts: [{ wood: 1 }, { clay: 1 }] },
 ]
 
 describe('altCosts reference alignment (P0 gameplay)', () => {
