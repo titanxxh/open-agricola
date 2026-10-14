@@ -13,7 +13,7 @@ const listener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['sow'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!isUnconditionalSow(context.actionContext)) return
+    if (!isUnconditionalSow(context.actionContext, context.player)) return
     if (context.state.round < 11) {
       return { flow: gainLeaf(CARD_ID, { grain: 1 }), sourceCard: CARD_ID }
     } else {

@@ -21,8 +21,27 @@ export const canSow = (player: PlayerState) =>
   getEmptyFields(player).length > 0 &&
   (player.resources.grain > 0 || player.resources.vegetable > 0)
 
-export const isUnconditionalSow = (actionContext?: Record<string, unknown>) =>
-  actionContext?.maxSelections === undefined && actionContext?.cropType === undefined
+/** An unconditional Sow keeps the usual field, crop and stack permissions.
+ * Seed availability does not change whether the action itself is restricted. */
+export const isUnconditionalSow = (
+  actionContext?: Record<string, unknown>,
+  player?: PlayerState,
+): boolean => {
+  if (actionContext?.maxSelections !== undefined || actionContext?.cropType !== undefined) return false
+  if (!player) return actionContext?.allowedFields !== 'fromSelectedFields'
+    && !(Array.isArray(actionContext?.excludedFields) && actionContext.excludedFields.length > 0)
+  const permissionPlayer = {
+    ...player,
+    resources: { ...player.resources, grain: 1, vegetable: 1, wood: 1, stone: 1 },
+  }
+  const usual = buildSowFarmInteraction(permissionPlayer)
+  const constrained = buildSowFarmInteraction(permissionPlayer, actionContext)
+  if (usual.farmType !== 'sow' || constrained.farmType !== 'sow') return false
+  return usual.selectableFields.every(field => {
+    const permitted = constrained.selectableFields.find(candidate => positionKey(candidate.tile) === positionKey(field.tile))
+    return permitted !== undefined && field.allowedCrops.every(crop => permitted.allowedCrops.includes(crop))
+  })
+}
 
 export const sowCrop = (
   player: PlayerState,

@@ -36,7 +36,7 @@ const computeReplaceListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!isOwnersActiveWorkTurn(context)) return
     if (context.actionContext?.checkedReplaceAction === true) return
-    if (!isUnconditionalSow(context.actionContext)) return
+    if (!isUnconditionalSow(context.actionContext, context.player)) return
     if (workersAvailable(context.state, context.player) <= 0) return
     const constraints = context.state.actionSpaces
       .filter((space) => !isMeetingPlace(space))
@@ -73,7 +73,7 @@ const isDoableListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!isOwnersWorkTurnPreview(context)) return
     if (context.actionContext?.checkedReplaceAction === true) return
-    if (!isUnconditionalSow(context.actionContext)) return
+    if (!isUnconditionalSow(context.actionContext, context.player)) return
     if (canSow(context.player)) return
     if (workersAvailable(context.state, context.player) <= 0) return
     return { doable: true }

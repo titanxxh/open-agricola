@@ -13,7 +13,7 @@ const listener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['sow'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!isUnconditionalSow(context.actionContext)) return
+    if (!isUnconditionalSow(context.actionContext, context.player)) return
     const sowedVegetable = (context.actionEvents ?? context.transactionEvents).some(
       (event) => event.type === 'farm.sown' && (event as Pick<FarmSownEvent, 'sows'>).sows.some((sow) =>
         sow.location.kind === 'field' &&
