@@ -3351,6 +3351,7 @@ export class GameCore {
   }
 
   private continueEndHarvestEffects(playerIndex = 0, cardIndex = 0): SessionResponse {
+    this.state.roundPhase = 'harvest'
     if (this.stageDispatch.continueStageHook('onEndHarvest', playerIndex, cardIndex)) {
       return this.respond()
     }
