@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { type GameSession } from '../game/authoritative-session'
 import { createWorkSession } from './_helpers/session-fixtures'
-import { playOccupation } from './_helpers/batch07-card-play'
+import { playOccupation } from './_helpers/card-regression-session'
 import { confirmNextPlayer } from './_helpers/pending-confirms'
 import { isCardFlagged } from '../../shared/cards/helpers/card-state'
 
@@ -34,6 +34,14 @@ describe('C085_DenBuilder session', () => {
     const resp = session.takeAction(0, 'farmland')
     expect(resp.ok).toBe(true)
     return resp
+  }
+
+  const rejectAnytime = (session: GameSession) => {
+    const before = session.getState()
+    const expected = JSON.stringify({player:before.state.players[0],interaction:before.interaction})
+    const denied = session.takeAnytimeAction(0,'C85-den-builder-anytime')
+    expect(denied.ok).toBe(false)
+    expect(JSON.stringify({player:denied.state.players[0],interaction:denied.interaction})).toBe(expected)
   }
 
   it('available in clay house: pays grain+food and grants capacity without a physical room', () => {
@@ -81,6 +89,7 @@ describe('C085_DenBuilder session', () => {
 
     const anytimeIds = resp.interaction.anytimeActions.map((a) => a.id)
     expect(anytimeIds).not.toContain('C85-den-builder-anytime')
+    rejectAnytime(session)
   })
 
   it('NOT available after flagged (one-time)', () => {
@@ -94,6 +103,7 @@ describe('C085_DenBuilder session', () => {
     // Should no longer be available
     const anytimeIds = resp1.interaction.anytimeActions.map((a) => a.id)
     expect(anytimeIds).not.toContain('C85-den-builder-anytime')
+    rejectAnytime(session)
   })
 
   it('NOT available without enough grain', () => {
@@ -102,6 +112,7 @@ describe('C085_DenBuilder session', () => {
 
     const anytimeIds = resp.interaction.anytimeActions.map((a) => a.id)
     expect(anytimeIds).not.toContain('C85-den-builder-anytime')
+    rejectAnytime(session)
   })
 
   it('NOT available without enough food', () => {
@@ -110,5 +121,6 @@ describe('C085_DenBuilder session', () => {
 
     const anytimeIds = resp.interaction.anytimeActions.map((a) => a.id)
     expect(anytimeIds).not.toContain('C85-den-builder-anytime')
+    rejectAnytime(session)
   })
 })

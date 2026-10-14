@@ -49,6 +49,18 @@ describe('E138 counts owned placed farm animals exactly once', () => {
     const reward = playOccupation(session,CARD)
     expect(reward.ok,reward.error).toBe(true)
     expect(reward.state.players[0]!.resources.sheep).toBe(8)
+    if (reward.interaction.stateId !== 'wait' || reward.interaction.request.kind !== 'animal-reorg') throw new Error('Expected animal placement')
+    const zones = reward.interaction.request.zones.map(zone => ({
+      ...zone,
+      animalType: 'sheep',
+      animalCount: zone.id === 'livestock' ? 6 : ['house:1-0','stable:0-3'].includes(zone.id) ? 1 : 0,
+    }))
+    const placed = session.resolveChoice(0,'confirm',{zones})
+    expect(placed.ok,placed.error).toBe(true)
+    expect(placed.state.players[0]!.resources.sheep).toBe(8)
+    expect(placed.state.players[0]!.pastures[0]!.animalCount).toBe(6)
+    expect(Object.values(placed.state.players[0]!.houseAnimals)).toEqual(['sheep'])
+    expect(Object.values(placed.state.players[0]!.stableAnimals)).toEqual(['sheep'])
     session.dispose()
   })
 

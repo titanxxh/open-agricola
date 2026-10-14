@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { createPlayerActionSpaces } from '../../shared/cards/player-action-space'
-import { markAllWorkersUsed } from '../../shared/domain/player'
 import { createWorkSession } from './_helpers/session-fixtures'
+import { sessionOptions } from './_helpers/card-regression-session'
 import { confirmNextPlayer } from './_helpers/pending-confirms'
 
 import '../../shared/cards/C/C039_StudioBoat'
@@ -31,8 +31,8 @@ const openMinorPrompt = (session: GameSession) => {
   let response = session.takeAction(0, 'meeting-place')
   expect(response.ok, response.error).toBe(true)
   if (response.interaction.stateId !== 'wait') return response
-  if (response.interaction.request.options?.some((option) => option.value === CARD_ID)) return response
-  const improvement = response.interaction.request.options?.find((option) =>
+  if (sessionOptions(response).some((option) => option.value === CARD_ID)) return response
+  const improvement = sessionOptions(response).find((option) =>
     option.value.startsWith('action-improvement-'),
   )
   if (improvement) response = session.resolveChoice(0, improvement.value)
@@ -40,7 +40,7 @@ const openMinorPrompt = (session: GameSession) => {
 }
 
 const cardOption = (response: SessionResponse) => response.interaction.stateId === 'wait'
-  ? response.interaction.request.options?.find((option) => option.value === CARD_ID)
+  ? sessionOptions(response).find((option) => option.value === CARD_ID)
   : undefined
 
 const playMinor = (session: GameSession) => {
@@ -51,11 +51,32 @@ const playMinor = (session: GameSession) => {
   return session.resolveChoice(0, option!.value)
 }
 
-const bonusTotal = (response: SessionResponse) => response.scores[0]!.categories
+const bonusTotal = (response: SessionResponse) => response.scores![0]!.categories
   .filter(category => category.key === 'cardBonusVp')
   .flatMap(category => category.entries)
   .filter(entry => entry.type === 'bonus' && entry.cardId === CARD_ID)
   .reduce((sum,entry) => sum + entry.score,0)
+
+const nextNaturalRound = (session: GameSession) => {
+  let r = session.getState()
+  for (let n = 0; n < 30; n++) {
+    expect(r.ok,r.error).toBe(true)
+    if (r.state.round === 2) {
+      if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player') r = confirmNextPlayer(session)
+      return r
+    }
+    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player') {
+      r = confirmNextPlayer(session)
+      continue
+    }
+    if (r.interaction.stateId !== 'idle') throw new Error(JSON.stringify(r.interaction))
+    const actor = r.state.currentPlayerIndex
+    const space = ['forest','reed-bank','grain-seeds','clay-pit','day-laborer','fishing'].find(id => session.getActionAvailability(actor)[id])
+    if (!space) throw new Error('No legal filler')
+    r = session.takeAction(actor,space)
+  }
+  throw new Error('Natural second round missing')
+}
 
 describe('C039 Studio Boat session', () => {
   it('C039 S1: a three-player owner needs one occupation, pays one wood, and creates an all-access action space', () => {
@@ -86,11 +107,7 @@ describe('C039 Studio Boat session', () => {
     { playerCount: 3, actorIndex: 1, ownerBonusVp: 0 },
   ] satisfies Array<{ playerCount: 2 | 3; actorIndex: number; ownerBonusVp: number }>)('C039 S2: $playerCount-player use by actor $actorIndex scores exactly $ownerBonusVp owner bonus VP', ({ playerCount, actorIndex, ownerBonusVp }) => {
     const session = setup(playerCount, true, actorIndex)
-    const beforeRound = session.getState().state
-    beforeRound.players.forEach((player) => markAllWorkersUsed(beforeRound, player))
-    session.loadState(beforeRound)
-
-    const nextRound = session.performRoundEnd()
+    const nextRound = nextNaturalRound(session)
     expect(nextRound.ok, nextRound.error).toBe(true)
     expect(nextRound.state.actionSpaces.find((space) => space.id === CARD_ID)?.resources.food).toBe(1)
     const foodBefore = nextRound.state.players[actorIndex]!.resources.food

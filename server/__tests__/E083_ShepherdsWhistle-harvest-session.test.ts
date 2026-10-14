@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { GameSession, SessionResponse } from '../game/authoritative-session'
+import type { GameSession } from '../game/authoritative-session'
 import { createWorkSession } from './_helpers/session-fixtures'
 import { confirmNextPlayer } from './_helpers/pending-confirms'
 
@@ -38,6 +38,7 @@ const harvest = (session: GameSession, mode: 'accept' | 'decline' | 'unchanged')
       r = session.takeAction(actor,space)
       continue
     }
+    if (i.stateId !== 'wait') throw new Error('Unexpected game end before harvest completed')
     const q = i.request
     if (q.kind === 'confirm-next-player') r = confirmNextPlayer(session)
     else if (q.kind === 'confirm-player-switch') r = session.resolveChoice(q.fromPlayerIndex,'confirm')

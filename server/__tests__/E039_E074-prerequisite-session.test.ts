@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import type { GameState } from '../../shared/contract/types'
 import { createWorkSession } from './_helpers/session-fixtures'
-import { playMinor, sessionOptions } from './_helpers/batch07-card-play'
+import { playMinor, sessionOptions } from './_helpers/card-regression-session'
 
 // GameSession is the agreed seam: real purchases, rejected requests, then a legal choice.
 const setup = (card: string, configure: (state: GameState) => void) => createWorkSession({
   seed: 1159,
   configure: state => {
+    state.round = 8
     state.players.forEach(player => {
       player.minorHand = ['__test_placeholder__']
       player.occupationHand = ['__test_placeholder__']
@@ -31,7 +32,7 @@ describe('printed animal and planted-field purchase prerequisites', () => {
       expect(offered.state.players[0]!.resources.wood).toBe(0)
     } else {
       expect(offered.state.players[0]!.minorPlayed).not.toContain('E039_Paintbrush')
-      expect(sessionOptions(offered).some(option => option.value === 'E039_Paintbrush' && !option.disabled)).toBe(false)
+      expect(sessionOptions(offered).some(option => option.value === 'E039_Paintbrush' && !('disabled' in option && option.disabled))).toBe(false)
       const before = JSON.stringify({ player: offered.state.players[0], interaction: offered.interaction })
       const bad = session.resolveChoice(0, 'E039_Paintbrush')
       expect(bad.ok).toBe(false)
@@ -64,6 +65,25 @@ describe('printed animal and planted-field purchase prerequisites', () => {
       const control = session.resolveChoice(0, 'B004_WoodPile')
       expect(control.ok, JSON.stringify({error:control.error,interaction:control.interaction,played:control.state.players[0]!.minorPlayed})).toBe(true)
       expect(control.state.players[0]!.cardStates.E074_AshTrees?.counters?.fences ?? 0).toBe(0)
+    }
+    session.dispose()
+  })
+
+  it.each([0,1])('three Rock Garden slots plus %i ordinary planted fields count logical fields', ordinary => {
+    const session = setup('E074_AshTrees', state => {
+      const p = state.players[0]!
+      p.minorPlayed = ['E080_RockGarden']
+      p.cardStates.E080_RockGarden = {extraData:{cardFieldStacks:[
+        {crop:'stone',remaining:2},{crop:'stone',remaining:2},{crop:'stone',remaining:2},
+      ]}}
+      if (ordinary) p.fields = [{row:0,col:1,stacks:[{kind:'grain',remaining:2}]}]
+    })
+    const r = playMinor(session,'E074_AshTrees')
+    expect(r.state.players[0]!.minorPlayed.includes('E074_AshTrees')).toBe(ordinary === 1)
+    if (!ordinary) {
+      expect(sessionOptions(r).some(o => o.value === 'E074_AshTrees' && !('disabled' in o && o.disabled))).toBe(false)
+      expect(session.resolveChoice(0,'E074_AshTrees').ok).toBe(false)
+      expect(session.resolveChoice(0,'B004_WoodPile').ok).toBe(true)
     }
     session.dispose()
   })
