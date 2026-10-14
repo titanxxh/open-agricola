@@ -37,6 +37,8 @@ const afterImprovementListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['improvement'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (context.result?.type !== 'ok' && context.result?.type !== 'flow') return
+    if (context.result.extraData?.playedFromHand !== true) return
     const flow = takeWoodFlow(context.player)
     if (!flow) return
     return {
