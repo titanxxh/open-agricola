@@ -25,7 +25,7 @@ OA 不愿引入 topo（ADR 0003 已拒），但落地过程中出现了两处数
 2. **强制饱和过滤**：每个转换声明局部语义 `mandatory`（强制，参考实现"costs N less"）或 optional（玩家可选，参考实现"can pay X instead"）。闭包结果集只保留"饱和候选"——不存在仍可应用的 mandatory 转换；未饱和候选仅作为中间节点继续派生。这保证 mandatory 链任意序收敛到与 参考实现相同的终态集，超集只来自 optional 分支（真正的玩家选择权，参考实现同样全保留）。
 3. **fixed-price 卡不需要特殊声明**：A27 / E27 / C95 / E109 这类固定价是"不依赖输入的 optional 转换"，闭包对每个候选产出同一 fixed 行、去重后唯一，折扣自然作用其上。`order: 100` 与任何 `kind` 字段都不需要。
 4. **删除全部 order 字段**：`CardListenerRegistration.order`、`TradeModifier.order`，以及 `engine-utils.ts` trailing-listener 排序中的 `order` 兜底（删除后成死代码）。
-5. **双轨保持**（尊重 ADR 0003）：card-purchase candidate pipeline 与 action `computeCosts` 聚合仍是两条路径；闭包核作为共享内部实现分别接入 `resolveCardCostWithModifiersDetailed`（替代串行 fold）与 `buildUnitCostOptions`（替代 order 排序链），不把 candidate pipeline 推广到其他 action path。
+5. **双轨保持**（尊重 ADR 0003）：card-purchase candidate pipeline 与 action `computeCosts` 聚合仍是两条路径；闭包核作为共享内部实现分别接入 `resolveCardCostWithModifiersDetailed`（替代串行 fold）与 `buildUnitCostOptions`（替代 order 排序链）。职业费用是下方 2026-10-14 amendment 明确批准的扩展，其余 action path 不因此扩展。
 6. **确定性**：闭包遍历按固定的 source id 排序做 tie-break（仅保证可重现与 attribution 稳定，不是卡牌语义偏序，卡牌作者不感知）。
 7. **parity 验收标准**：参考实现 combinations 集合 ⊆ OA 候选集合；纯 mandatory 场景集合严格相等；对修改器注册顺序做排列洗牌，输出集合不变。
 
@@ -80,3 +80,9 @@ OA 曾把 B155 这类"用行动格资源支付成本"表达为 `Trade.sideEffect
 - **自动推导依赖边再 topo**：拒。仍是顺序模型，循环依赖需报错，表达力不超过闭包。
 - **mandatory 单独预处理阶段 + optional 闭包**：拒。两类语义分支引擎复杂度更高，且 mandatory 转换与 optional 转换交错派生的场景（折扣作用于可选替换产物）仍需闭包，饱和过滤统一表达更简。
 - **保留中间态 + domination 剪枝**：拒。ADR 0003 已决定候选层不做 Pareto / domination 剪枝，重新引入会破坏该边界且剪枝规则难以无序化表达。
+
+## 2026-10-14 amendment: occupation candidates use the existing closure
+
+Status: implemented after maintainer approval. See [ADR 0003's occupation-cost amendment](0003-card-purchase-compute-card-costs-candidates.md#2026-10-14-amendment-occupation-cost-substitution) and [#1168](https://github.com/titanxxh/open-agricola/issues/1168).
+
+Occupation-fee substitutions use the existing candidate closure and its per-card use limits. They do not retain a parallel trade encoding of the same ability. Preview, admission and committed payment must use the same candidate and attribution. A cost substitution does not grant inventory goods, and unused coverage does not become food. Other action costs remain outside this scope. Occupation payment retains candidate metadata through its internal pay child; admission, option previews and committed receipts share the candidate cost. Coverage and its limits are recorded in ADR 0003.

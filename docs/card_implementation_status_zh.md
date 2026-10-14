@@ -14,6 +14,9 @@
 
 | 优先级 | 范围 | 待处理事项 |
 |---|---|---|
+| 待规则证据 | `E038_RodCollection` [#1165](https://github.com/titanxxh/open-agricola/issues/1165) | 保留原实现；第 13 根存木应计 8 还是 9 奖励分，需确认有限例外或周期扣分。 |
+| 待规则证据 | `E052_Cubbyhole` [#1167](https://github.com/titanxxh/open-agricola/issues/1167) | 保留原实现；两种替代费用是否共同包含 1 芦苇，需官方费用图。 |
+| 已暂缓 | `C131_PrivateTeacher` [#1175](https://github.com/titanxxh/open-agricola/issues/1175) | 本次不修改；新职业能否在同一次 Grain Seeds 立即触发仍待规则确认。 |
 
 ## 3. 已接受差异
 
@@ -114,7 +117,7 @@
 | 卡牌支付凭据 | `CardPayment`、`PaymentInfo.publicPayment`、`resource.paid.paymentId`、`card.played.payment`、`log-mapper.ts` | 通用职业与改良购买提交保留所属宿主付款的准确资源、bonus 来源和返还卡，免费打牌也携带明确的空凭据。展示不会借用另一张牌的付款，凭据跨 packet/page 仍可用。回归证据包括合法两人 Session 行动及 mapper relation 测试（Issue #1105）。 |
 | Cost Attribution / hover stats | `CardResourceStats`、`trackSourceCardPaymentStats`、`recordCardCostAttribution()`、`recordActionCostAttribution()`、`collectFarmChoiceCostAdjustments()`、`beforeHostListeners`、ADR 0003 | 成本变化卡牌的 saved / paid 展示必须走 Cost Attribution；card-purchase selected candidate 写入每个 source card 自己的 saved / paid delta；construct / fencing / stables / plow 的 action `computeCosts` 必须显式声明 attribution，并由 host action 按实际 before / after delta 与 clamp 写入统计；farm-choice commit 必须保留 payload-aware attribution。construct / fencing / stables 的 mandatory payment 必须在 trailing card reaction 前结算，listener 不能先花掉仍欠 host action 的资源。不要因为 pay leaf 携带 `sourceCard` 就把整笔 action / card-purchase 支付记成该卡 PAID。 |
 | Printed improvement base cost helpers | `getPrintedImprovementResourceCost()`、`getPrintedImprovementCostCandidates()`、D80/E54/E146/E156 | 静态消费者可读取 minor / major definition 候选；需要上下文的消费者优先读取 active registry 的动态 `getBaseCosts()`（如 B36），再回退到静态 `cost`、minor `altCosts` 或 major complex `fee` / `fees`。候选始终独立，不读取实际付款。 |
-| Card-purchase ComputeCardCosts candidate pipeline | `resolveCardCostWithModifiersDetailed()`、`deriveCardCostCandidate` + `cardCostCandidateMandatory`、`CardImpl.getBaseCosts()`、`PaymentSolver.discountCardCostCandidate()`、ADR 0003、ADR 0004 | 购买 major / minor improvement 的新成本变形走 Cost Candidate List；A20/B36 这类动态基础费用在 pipeline 前产出 base candidates；卡牌只声明单候选转换，遍历 / 去重 / 饱和过滤由候选闭包负责（`CardListenerRegistration.order` 已删除，禁止重新引入顺序字段）；普通折扣天然保留原候选，后续 payment dominance 再隐藏严格劣势支付项；`cardCostCandidateMandatory` 只用于固定价 / replacement 这类必须隐藏原 candidate 的语义（如 A27），不可用于 A75 这类普通折扣；折到 0 的资源键省略；候选 metadata 不写入资源 map 或通用 `PaymentSolution`，由 PaymentSolver payment receipt 合并到现有 `sourceCards`，并在支付选定后把 Cost Attribution 写入 Card Resource Stats；生产卡牌通过 `PaymentSolver` 使用 candidate helper，不直接 import `payment/internal/*`。 |
+| Card / occupation ComputeCardCosts candidate pipeline | `resolveCardCostWithModifiersDetailed()`、`deriveCardCostCandidate` + `cardCostCandidateMandatory`、`CardImpl.getBaseCosts()`、`PaymentSolver.discountCardCostCandidate()`、ADR 0003、ADR 0004 | 购买 major / minor improvement 及职业费用的成本变形走 Cost Candidate List；A20/B36 这类动态基础费用在 pipeline 前产出 base candidates；卡牌只声明单候选转换，遍历 / 去重 / 饱和过滤由候选闭包负责（`CardListenerRegistration.order` 已删除，禁止重新引入顺序字段）；普通折扣天然保留原候选，后续 payment dominance 再隐藏严格劣势支付项；`cardCostCandidateMandatory` 只用于固定价 / replacement 这类必须隐藏原 candidate 的语义（如 A27），不可用于 A75 这类普通折扣；折到 0 的资源键省略；候选 metadata 不写入资源 map 或通用 `PaymentSolution`，由 PaymentSolver payment receipt 合并到现有 `sourceCards`，并在支付选定后把 Cost Attribution 写入 Card Resource Stats；生产卡牌通过 `PaymentSolver` 使用 candidate helper，不直接 import `payment/internal/*`。 |
 | FoM 跨玩家 marker / 传牌小改良 | `publicCardMarkers` helper、`pass-minor-card-to-left` internal action、`card.passed` provenance、FarmBoard player summary marker | 跨玩家公开 marker 写入目标玩家 `cardStates[sourceCard].extraData.publicCardMarkers`，计分进入 `cardBonusVp`，UI 只扩展原有玩家摘要显示；传牌必须走 internal action 移除原打出区和 cardState、给目标玩家私有 handChanged，并用 `card.passed` 事件触发后续 listener。 |
 | Payment resource removal / bonus choices / unit cost alternatives | `CostResourceRemovalModifier`、`Trade.groupMin/groupMax`、`Bonus.capDiscountAtCost`、`Bonus.trackChoiceIndex`、`Bonus.choiceAffectsState`、`ensureCardModifiers()`、C14、A16、C56、C88、D88 | “不再需要某费用资源”会从 `fee` / `fees` / `unitFee` 删除资源键，并在后续 bonus 后维持约束。per-unit alternative 在 bonus 前经候选闭包处理：C56 只替换一个纯木 stable row 并记录实际替换量，stable farm-choice 保留 `{unitFee, nb}` 并追加 payload-aware adjustments，C88 用精确 grouped-use bounds 折扣对应 stable row。modifier 安装保留声明的重复次数，因此 D88 对每种印刷费用提供两次独立机会，并可在任一 alternative 后组合且不依赖 modifier 顺序。只有会影响状态的 bonus choice 才设置 `choiceAffectsState`。 |
 | 按房间建造与屋内动物持久化 | `A086_AnimalTamer`、`A143_Stonecutter`、`C134_CowPrince`、`room-payment.ts`、`reorganize.ts` | 牌面写明“每间房”的建造折扣使用 `scope:'unit'`，对每个选中房间分别生效；一次性的翻修折扣仍使用 action bonus。动物重整把各真实房间的安置写入 `houseAnimals`，各 holder 容量为一并遵守共享的全屋占用限制；按占用房间计分的卡牌从这些安置推导实际占用房间数。 |
@@ -195,6 +198,8 @@ Gain 来源区分显式资源参数和行动格配置的基础收益。C168 在�
 ## 6. 基础设施待办
 
 每行 `altCosts` 都是完整基础费用候选，须包含各替代方案共有的费用。折扣和替代付款仍走通用支付管线。卡内奖励分公式保留牌文列出的有限例外，与印刷卡牌分分开；存储预览复用同一计分回调。Session 回归验证实际费用、转换后的支付及后续计分边界，无需新增通用扩展点。
+
+2026-10-14 negative-test 中方案已明确的 19 项 issue 已按原有扩展点修复；规则待确认的三项保留在 §2。阶段动物处置在弹出父阶段前嵌套既有重整流程，费用替代复用成本候选并保留支付归因，手牌来源在卡牌承诺前冻结。农田、动物与住房数量继续从权威位置或既有容量查询派生。回归以相邻公开 Session 测试为准，不把旧错误行为或审计归档导入 production。
 
 当前规则修复可复用已有卡牌局部 hook 和动态前置检查，无需新增扩展点。付款前的独立资源兑换使用显式 pay/gain flow：收益进入库存，后续 host 付款保留自身实际支付的资源明细。非法特殊畜栏提交复用可恢复选择失败；强制续行的 blocked 仍遵循 ADR 0015。
 
