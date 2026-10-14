@@ -230,7 +230,8 @@ describe('C085 Den Builder parity', () => {
     const response = session.takeAnytimeAction(0, 'C85-den-builder-anytime')
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources).toMatchObject({ grain: 0, food: 0 })
-    expect(response.state.players[0]!.rooms).toBe(3)
+    expect(response.state.players[0]!.rooms).toBe(2)
+    expect(response.state.players[0]!.roomTiles).toHaveLength(2)
     expect(isCardFlagged(response.state.players[0]!, 'C085_DenBuilder')).toBe(true)
   })
 
