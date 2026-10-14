@@ -4,7 +4,7 @@
 
 > [`card_implementation_status.md`](card_implementation_status.md) is canonical. This file has a maintained Chinese mirror at [`card_implementation_status_zh.md`](card_implementation_status_zh.md).
 
-> Generated and last updated on 2026-10-14. This file replaces `docs/card_desc_audit.md`, `docs/card_progress.md`, `docs/master-plan.md`, and `docs/bad-smell.md`. The sole the reference reference is the reference implementation.
+> Generated and last updated on 2026-10-15. This file replaces `docs/card_desc_audit.md`, `docs/card_progress.md`, `docs/master-plan.md`, and `docs/bad-smell.md`. Rule authority comes from publisher card text and printed icons, official rulings, and recorded maintainer decisions. Reference code is implementation evidence.
 
 ## 2. Open issues by priority
 
@@ -238,6 +238,7 @@ If you discover a new mechanism that needs to span multiple cards in the future,
 
 ## 8. The reference anti-patterns: do not copy
 
+- Do not treat imported prerequisite metadata as rule authority. Verify prerequisites against publisher card text, printed icons, and official rulings. A field unused by the reference runtime can become an active restriction under OA's generic validation.
 - Do not approximate reveal or work-start reactions with a mixed round-start scan, restore preparation by zone index, or filter valid sources by current affordability during discovery.
 - Do not infer purchase provenance from the first placement space, outer frame or last worker. A newly granted purchase retains its own node identity.
 

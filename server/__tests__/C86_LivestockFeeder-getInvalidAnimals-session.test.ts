@@ -103,7 +103,7 @@ const sowLastGrain = (session: GameSession) => {
 }
 
 describe('C086 Livestock Feeder parity', () => {
-  it('C086 S1: playing Livestock Feeder after its two required occupations costs one food and gains one grain', () => {
+  it('C086 S1: playing Livestock Feeder after two earlier occupations costs one food and gains one grain', () => {
     const session = setup({ played: false, grain: 0 })
     session.state.players[0]!.occupationPlayed = ['A125_Priest', 'A127_SeasonalWorker']
     let response = session.takeAction(0, 'lessons')
@@ -117,14 +117,6 @@ describe('C086 Livestock Feeder parity', () => {
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.occupationPlayed).toContain(CARD_ID)
     expect(response.state.players[0]!.resources).toMatchObject({ food: 19, grain: 1 })
-  })
-
-  it('does not bypass the declared occupation prerequisite', () => {
-    const session = setup({ played: false, grain: 0 })
-    const before = session.getState()
-    const response = session.takeAction(0, 'lessons')
-    expect(response.ok).toBe(false)
-    expect(response.state).toEqual(before.state)
   })
 
   it('C086 S2: two grain let Livestock Feeder hold two animals of different types', () => {
