@@ -31,8 +31,29 @@ const listener: CardListenerRegistration = {
   },
 }
 
+const collectFood: CardListenerRegistration = {
+  id: 'D101-sugar-baker-before-space-use',
+  cardIds: [CARD_ID],
+  phases: ['before'],
+  actions: ['place-farmer'],
+  scope: 'any',
+  handler: context => {
+    if (context.space?.id !== 'grain-utilization' || (context.space.resources.food ?? 0) <= 0) return
+    return {
+      flow: {
+        type: 'leaf',
+        actionId: 'collect',
+        sourceCard: CARD_ID,
+        targetPlayerId: (context.triggerPlayer ?? context.player).id,
+        actionContext: { spaceId: 'grain-utilization', resourceTypes: ['food'] },
+      },
+      sourceCard: CARD_ID,
+    }
+  },
+}
+
 const cardImpl = {
-  listeners: [listener],
+  listeners: [collectFood, listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
 
