@@ -1,14 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game/authoritative-session'
-import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
+import type { GameSession } from '../game/authoritative-session'
+import { createWorkSession } from './_helpers/session-fixtures'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { getPastureCapacity } from '../../shared/domain/pasture'
-import { readCardExtraData } from '../../shared/cards/helpers/card-state'
-import { recordActionSnapshot } from '../../shared/cards/helpers/action-snapshot'
 import { E053_BoarSpear_impl } from '../../shared/cards/E/E053_BoarSpear'
 import { executeCardListener } from '../../shared/cards/card-listeners'
-import { specialEffectAction } from '../../shared/actions/effects/special-effect'
-import type { ActionFlow, GameState, PlayerState } from '../../shared/contract/types'
 import type { DraftGameEvent } from '../../shared/contract/events'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 
@@ -33,27 +29,6 @@ const moved = (
   ...overrides,
 })
 
-const executeSpecialEffectLeaves = (
-  flow: ActionFlow | undefined,
-  state: GameState,
-  player: PlayerState,
-) => {
-  if (!flow) return
-  if (flow.type === 'seq') {
-    flow.children.forEach((child) => executeSpecialEffectLeaves(child, state, player))
-    return
-  }
-  if (flow.type !== 'leaf' || flow.actionId !== 'special-effect') return
-  specialEffectAction.execute({
-    state,
-    player,
-    space: { id: 'test' } as never,
-    params: flow.params,
-    sourceCard: flow.sourceCard,
-    actionContext: flow.actionContext,
-  })
-}
-
 type AnimalZone = {
   id: string
   zoneType: 'pasture' | 'house' | 'stable' | 'card'
@@ -64,12 +39,15 @@ type AnimalZone = {
 }
 
 const setup = (opts?: { boar?: number; food?: number; withE85?: boolean }) => {
-  const session = new GameSession(42)
-  stabilizeRandomHands(session.state.players)
+  const session = createWorkSession({ seed: 42, options: { playerCount: 4 }, configure(state) {
+    for (const player of state.players) {
+      player.minorHand = ['__test_placeholder__']
+      player.occupationHand = ['__test_placeholder__']
+    }
+  } })
   const state = session.getState().state
-  state.players = state.players.slice(0, 2)
   state.currentPlayerIndex = 0
-  state.round = 5
+  state.round = 14
   state.roundPhase = 'work'
 
   const player = state.players[0]!
@@ -128,7 +106,7 @@ const driveToCompletion = (
   while (safety-- > 0 && resp.interaction.stateId === 'wait') {
     const opts = (resp.interaction.request.options ?? []) as { value: string; sourceCard?: string }[]
     if (acceptE53Trade) {
-      // Accept E53 SEQ optional and pick trade
+      // Accept E53 optional and pick trade
       const e53Trade = opts.find((o) => o.value.startsWith('trade:'))
       if (e53Trade) {
         resp = session.resolveChoice(0, e53Trade.value)
@@ -356,42 +334,11 @@ describe('E053_BoarSpear session - exchange-based PIG -> 4 FOOD', () => {
     expect(after.cardStates?.[C148_ID]?.counters?.held).toBe(1)
   })
 
-  it('per-action once via actionToken: same token does not re-trigger', () => {
-    const { state } = setup({ food: 0 })
-    const player = state.players[0]!
-    player.id = 'p1'
-    recordActionSnapshot(player, 99)
-
-    const listener = E053_BoarSpear_impl.listeners[0]!
-    const ctx = {
-      state,
-      player,
-      actionId: 'gain',
-      phase: 'after',
-      result: { type: 'ok' },
-      transactionEvents: [moved()],
-      space: state.actionSpaces[0],
-    }
-
-    const result1 = executeCardListener(listener, ctx as never)
-    expect(result1).toBeDefined()
-    executeSpecialEffectLeaves(result1?.flow, state, player)
-    expect(readCardExtraData<number>(player, CARD_ID, 'E53UsedActionToken')).toBe(99)
-
-    const result2 = executeCardListener(listener, ctx as never)
-    expect(result2).toBeUndefined()
-
-    recordActionSnapshot(player, 100)
-    const result3 = executeCardListener(listener, ctx as never)
-    expect(result3).toBeDefined()
-  })
-
   it('does not fire during breeding phase', () => {
     const { state } = setup({ food: 0 })
     const player = state.players[0]!
     player.id = 'p1'
     state.roundPhase = 'breeding'
-    recordActionSnapshot(player, 200)
 
     const listener = E053_BoarSpear_impl.listeners[0]!
     const ctx = {
@@ -401,36 +348,17 @@ describe('E053_BoarSpear session - exchange-based PIG -> 4 FOOD', () => {
       phase: 'after',
       result: { type: 'ok' },
       transactionEvents: [moved()],
+      actionEvents: [moved()],
       space: state.actionSpaces[0],
     }
 
     expect(executeCardListener(listener, ctx as never)).toBeUndefined()
   })
 
-  it('does not fire without an action token even when boar moved to the player', () => {
+  it('does not infer a new acquisition from transaction or global events without host action events', () => {
     const { state } = setup({ food: 0 })
     const player = state.players[0]!
     player.id = 'p1'
-
-    const listener = E053_BoarSpear_impl.listeners[0]!
-    const ctx = {
-      state,
-      player,
-      actionId: 'gain',
-      phase: 'after',
-      result: { type: 'ok' },
-      transactionEvents: [moved()],
-      space: state.actionSpaces[0],
-    }
-
-    expect(executeCardListener(listener, ctx as never)).toBeUndefined()
-  })
-
-  it('does not read prior global state events when current transaction has no boar moves', () => {
-    const { state } = setup({ food: 0 })
-    const player = state.players[0]!
-    player.id = 'p1'
-    recordActionSnapshot(player, 201)
     state.events = [
       { type: 'worker.placed', actorPlayerId: 'p1', workerId: 'w1', spaceId: 'pig-market' } as never,
       moved() as never,
@@ -443,7 +371,7 @@ describe('E053_BoarSpear session - exchange-based PIG -> 4 FOOD', () => {
       actionId: 'gain',
       phase: 'after',
       result: { type: 'ok', resourcesGained: { boar: 1 } },
-      transactionEvents: [],
+      transactionEvents: [moved()],
       space: state.actionSpaces[0],
     }
 

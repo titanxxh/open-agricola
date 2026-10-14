@@ -1,8 +1,6 @@
 import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { readCardExtraData } from '../helpers/card-state'
-import { readActionSnapshotToken } from '../helpers/action-snapshot'
 import { sumResourceMovedToPlayer } from '../helpers/event-provenance'
 import type { Resource } from '../../contract/types'
 import type { DraftGameEvent, ResourceExchangedEvent, ResourceMovedEvent } from '../../contract/events'
@@ -10,8 +8,6 @@ import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E053_BoarSpear'
 const TRACKED_ACTIONS = ['gain', 'collect', 'receive', 'exchange'] as const
-
-const USED_TOKEN_KEY = 'E53UsedActionToken'
 
 type QueryableResourceExchangedEvent = ResourceExchangedEvent | DraftGameEvent<'resource.exchanged'>
 type QueryableResourceMovedEvent = ResourceMovedEvent | DraftGameEvent<'resource.moved'>
@@ -25,8 +21,8 @@ const sumResourceExchangedToPlayer = (
   context: CardListenerContext,
   resource: keyof Resource,
 ): number => {
-  const events = context.actionEvents ?? context.transactionEvents
-  return (events ?? []).reduce((total, event) => {
+  const events = context.actionEvents ?? []
+  return events.reduce((total, event) => {
     if (!isResourceExchangedEvent(event)) return total
     const amount = event.gained[resource] ?? 0
     if (amount <= 0 || event.gainedTo.kind !== 'player' || event.gainedTo.playerId !== context.player.id) return total
@@ -35,7 +31,7 @@ const sumResourceExchangedToPlayer = (
 }
 
 const countObtainedBoar = (context: CardListenerContext): number => {
-  const events = context.actionEvents ?? context.transactionEvents
+  const events = context.actionEvents ?? []
   return sumResourceMovedToPlayer(events, 'boar', context.player.id) +
     sumResourceExchangedToPlayer(context, 'boar')
 }
@@ -76,11 +72,11 @@ const isNonCardBoarMovedToPlayer = (
       !event.exchangeSource
 
 const animalPaymentPreference = (context: CardListenerContext) => {
-  const events = context.actionEvents ?? context.transactionEvents
-  if ((events ?? []).some((event) => isNonCardBoarMovedToPlayer(event, context.player.id))) {
+  const events = context.actionEvents ?? []
+  if (events.some((event) => isNonCardBoarMovedToPlayer(event, context.player.id))) {
     return { animal: 'boar' as const, avoid: [{ kind: 'cardCounter' as const, counterKey: 'held' }] }
   }
-  const sources = (events ?? [])
+  const sources = events
     .map((event) => boarCounterSource(event, context.player.id))
     .filter((source): source is { kind: 'cardCounter'; cardId: string; counterKey: 'held' } => source !== null)
   if (sources.length > 0) {
@@ -102,33 +98,17 @@ const obtainListener: CardListenerRegistration = {
 
     if (context.state.roundPhase === 'breeding') return
 
-    const token = readActionSnapshotToken(context.player)
-    if (token === undefined) return
-    const used = readCardExtraData<number>(context.player, CARD_ID, USED_TOKEN_KEY)
-    if (used === token) return
-
     return {
       flow: {
-        type: 'seq',
-        children: [
-          {
-            type: 'leaf',
-            actionId: 'special-effect',
-            sourceCard: CARD_ID,
-            params: { kind: 'set-extra-data', key: USED_TOKEN_KEY, value: token },
-          },
-          {
-            type: 'leaf',
-            actionId: 'exchange',
-            optional: true,
-            sourceCard: CARD_ID,
-            actionContext: {
-              tradeIds: ['E053_BoarSpear'],
-              maxTradeTimesBySourceId: { [CARD_ID]: obtainedBoar },
-              animalPaymentPreference: animalPaymentPreference(context),
-            },
-          },
-        ],
+        type: 'leaf',
+        actionId: 'exchange',
+        optional: true,
+        sourceCard: CARD_ID,
+        actionContext: {
+          tradeIds: [CARD_ID],
+          maxTradeTimesBySourceId: { [CARD_ID]: obtainedBoar },
+          animalPaymentPreference: animalPaymentPreference(context),
+        },
       },
       sourceCard: CARD_ID,
     }
@@ -151,10 +131,8 @@ export const E053_BoarSpear = defineMinorCard({
     vp: 1,
     cost: { wood: 1, stone: 1 },
     exchanges: [
-        // Sprint 6b: Aligned to the reference — listener-only. The trade is invocable only
-        // via the `obtainListener` SEQ above (which dispatches `exchange` with
-        // `tradeIds: ['E053_BoarSpear']`); it is intentionally NOT surfaced in the
-        // anytime cookery window (`triggers: []`).
+        // Only the acquisition listener can open this trade; it is unavailable
+        // in the ordinary anytime cookery window.
         { from: { boar: 1 }, to: { food: 4 }, sourceId: CARD_ID, triggers: [] },
       ],
   },
