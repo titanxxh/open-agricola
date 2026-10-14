@@ -106,9 +106,11 @@ describe('E137-E145 parity', () => {
   })
   it('E138 S1: before round twelve Livestock Expert doubles one chosen animal type', () => {
     const s = setup({ cardId: 'E138_LivestockExpert', played: false, playerCount: 3, round: 11, resources: { sheep: 2 } })
-    s.state.players[0]!.pastures = [{ id: 'sheep', tiles: [{ row: 1, col: 0 }, { row: 1, col: 1 }], animalType: 'sheep', animalCount: 2 }]
-    s.state.players[0]!.stableTiles = [{ row: 1, col: 0 }]
+    s.state.players[0]!.pastures = [{ id: 'sheep', tiles: [{ row: 0, col: 1 }, { row: 0, col: 2 }], animalType: 'sheep', animalCount: 2 }]
+    s.state.players[0]!.stableTiles = [{ row: 0, col: 1 }]
+    s.state.players[0]!.fenceSegments = ['H-0-1','H-0-2','H-1-1','H-1-2','V-0-1','V-0-3'].map(edge => ({edge,type:'fence',source:{kind:'own',ownerPlayerId:s.state.players[0]!.id}}))
     let r = playOccupation(s, 'E138_LivestockExpert')
+    expect(r.state.players[0]!.resources.sheep + r.state.players[0]!.resources.boar + r.state.players[0]!.resources.cattle).toBe(4)
     if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'animal-reorg') {
       const zones = structuredClone(r.interaction.request.zones)
       const pasture = zones.find((zone) => zone.id === 'sheep')!
@@ -124,9 +126,11 @@ describe('E137-E145 parity', () => {
   })
   it.each([{ scenario: 'S3', animal: 'boar' as const }, { scenario: 'S4', animal: 'cattle' as const }])('E138 $scenario: Livestock Expert may double existing $animal', ({ animal }) => {
     const s = setup({ cardId: 'E138_LivestockExpert', played: false, playerCount: 3, round: 11, resources: { [animal]: 2 } })
-    s.state.players[0]!.pastures = [{ id: animal, tiles: [{ row: 1, col: 0 }, { row: 1, col: 1 }], animalType: animal, animalCount: 2 }]
-    s.state.players[0]!.stableTiles = [{ row: 1, col: 0 }]
+    s.state.players[0]!.pastures = [{ id: animal, tiles: [{ row: 0, col: 1 }, { row: 0, col: 2 }], animalType: animal, animalCount: 2 }]
+    s.state.players[0]!.stableTiles = [{ row: 0, col: 1 }]
+    s.state.players[0]!.fenceSegments = ['H-0-1','H-0-2','H-1-1','H-1-2','V-0-1','V-0-3'].map(edge => ({edge,type:'fence',source:{kind:'own',ownerPlayerId:s.state.players[0]!.id}}))
     let r = playOccupation(s, 'E138_LivestockExpert')
+    expect(r.state.players[0]!.resources.sheep + r.state.players[0]!.resources.boar + r.state.players[0]!.resources.cattle).toBe(4)
     if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'animal-reorg') {
       const zones = structuredClone(r.interaction.request.zones)
       const pasture = zones.find((zone) => zone.id === animal)!
