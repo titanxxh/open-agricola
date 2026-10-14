@@ -1,5 +1,5 @@
 import { defineMinorCard } from '../card-source'
-import type { ActionDefinition, ActionFlow } from '../../contract/types'
+import type { ActionDefinition, ActionFlow, CropStack } from '../../contract/types'
 import { fieldTotalRemaining } from '../../domain/field'
 import { registerAdHocAction } from '../../actions/helpers/ad-hoc-action-registry'
 import { registerHarvestCountModifier } from '../../actions/helpers/harvest-count-registry'
@@ -14,6 +14,9 @@ const FULL_REAP_POSITION_KEY = 'fullReapPosition'
 
 const fieldKey = (row: number, col: number) => `${row}-${col}`
 
+const hasOnlyCrops = (stacks: readonly Readonly<CropStack>[]) =>
+  stacks.every(stack => stack.kind === 'grain' || stack.kind === 'vegetable')
+
 const scytheHarvestFieldAction: ActionDefinition = {
   id: HARVEST_ACTION_ID,
   nameKey: 'actions.scythe-harvest-field.name',
@@ -24,7 +27,7 @@ const scytheHarvestFieldAction: ActionDefinition = {
   execute: ({ player, params }) => {
     const fieldId = params?.fieldId as string | undefined
     const field = getLogicalFields(player).find((candidate) => candidate.id === fieldId)
-    if (!field || field.stacks.reduce((sum, stack) => sum + stack.remaining, 0) < 2) {
+    if (!field || !hasOnlyCrops(field.stacks) || field.stacks.reduce((sum, stack) => sum + stack.remaining, 0) < 2) {
       return { type: 'fail', errorKey: 'log.actionFail' }
     }
     const slot = [...field.slots].reverse().find((candidate) => candidate.stack)
@@ -42,7 +45,7 @@ registerHarvestCountModifier(CARD_ID, ({ player, field, logicalField }) => {
   const selectedField = logicalField
     ? logicalField.slots.some((slot) => selected === fieldKey(slot.tile.row, slot.tile.col))
     : selected === fieldKey(field.row, field.col)
-  if (!selectedField) return
+  if (!selectedField || !hasOnlyCrops(field.stacks)) return
   return {
     override: fieldTotalRemaining(field),
     sources: [CARD_ID],
@@ -56,7 +59,7 @@ const cardImpl = {
     id: CARD_ID,
     onStartHarvestFieldPhase: (_state, player) => {
       const harvestable = getLogicalFields(player)
-        .filter((field) => field.stacks.reduce((sum, stack) => sum + stack.remaining, 0) >= 2)
+        .filter((field) => hasOnlyCrops(field.stacks) && field.stacks.reduce((sum, stack) => sum + stack.remaining, 0) >= 2)
       if (harvestable.length === 0) return
       const children: ActionFlow[] = harvestable.map((field) => {
         return {
