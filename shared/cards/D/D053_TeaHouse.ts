@@ -12,6 +12,7 @@ const anytimeListener: CardListenerRegistration = {
   id: 'D53-tea-house-anytime',
   cardIds: [CARD_ID],
   phases: ['anytime' as ActionHookPhase],
+  replacesTurn: true,
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (isCardFlagged(context.player, CARD_ID)) return
     // Only available when player has placed exactly 1 farmer this round

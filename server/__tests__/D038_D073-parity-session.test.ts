@@ -4,6 +4,7 @@ import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player
 import { getRoundPersonPlacementDetails } from '../../shared/cards/helpers/round-placement'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
+import { confirmNextPlayer } from './_helpers/pending-confirms'
 import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
 
 import '../../shared/cards/D/D038_MilkingStool'
@@ -223,15 +224,27 @@ describe('D053 Tea House parity', () => {
     expect(response.state.players[0]!.minorPlayed).not.toContain('D053_TeaHouse')
   })
 
-  it('D053 S3: after the first placement Tea House may skip the second turn for one food', () => {
+  it('D053 S3: Tea House replaces the second-person opportunity for one food', () => {
     const session = setup({ cardId: 'D053_TeaHouse', round: 6 })
+    const opponentId = session.state.players[1]!.id
+    session.state.actionSpaces.forEach(space => {
+      space.takenBy = space.takenBy.filter(worker => worker.playerId !== opponentId)
+    })
+    session.loadState(session.state)
     let response = session.takeAction(0, 'day-laborer')
     expect(getRoundPersonPlacementDetails(response.state.players[0]!)).toHaveLength(1)
+    response = confirmNextPlayer(session)
+    expect(response.state.currentPlayerIndex).toBe(1)
+    expect(session.takeAction(1, 'forest').ok).toBe(true)
+    response = confirmNextPlayer(session)
+    expect(response.interaction.stateId).toBe('idle')
     expect(response.interaction.anytimeActions.map((action) => action.id)).toContain('D53-tea-house-anytime')
     response = session.takeAnytimeAction(0, 'D53-tea-house-anytime')
     expect(response.state.players[0]!.resources.food).toBe(3)
     expect(response.state.players[0]!.cardStates.D053_TeaHouse?.flagged).toBe(true)
     expect(getRoundPersonPlacementDetails(response.state.players[0]!)).toHaveLength(1)
+    expect(session.takeAction(0, 'reed-bank').ok).toBe(false)
+    expect(confirmNextPlayer(session).state.currentPlayerIndex).toBe(1)
   })
 })
 
