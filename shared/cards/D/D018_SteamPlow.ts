@@ -1,5 +1,6 @@
 import { defineMinorCard } from '../card-source'
 import { payLeaf } from '../helpers/pay-gain-node'
+import { jumpLeaf } from '../helpers/jump-leaf'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D018_SteamPlow'
@@ -15,7 +16,7 @@ const cardImpl = {
       optional: true,
       children: [
         payLeaf({ cardId: CARD_ID, cost: { wood: 2, food: 1 } }),
-        { type: 'leaf', actionId: 'plow', sourceCard: CARD_ID },
+        jumpLeaf({ sourceCard: CARD_ID, targetSpaceId: 'farmland' }),
       ],
     }
   },
