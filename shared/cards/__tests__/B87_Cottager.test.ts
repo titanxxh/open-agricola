@@ -25,7 +25,7 @@ describe('B087_Cottager', () => {
 
     expect(result?.sourceCard).toBe(CARD_ID)
     expect(construct.actionId).toBe('construct')
-    expect(construct.actionContext).toEqual({ max: 1, trueAction: false })
+    expect(construct.actionContext).toEqual({ maxRooms: 1, trueAction: false })
     expect(renovation.actionId).toBe('renovate-house')
     expect(renovation.actionContext).toBeUndefined()
   })
