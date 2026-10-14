@@ -659,7 +659,9 @@ Hook 不进 `ActionDefinition`，由 `hooks.ts` 显式注册（卡牌文件内�
 - `Bonus.choiceAffectsState` —— 标记该 choice identity 会被 after-pay 等 listener 消费并改变状态；只有这类方案禁止互相 dominance pruning。E123 需要该标记，B145/D88 这类无状态 replacement 不需要。
 - `bonuses[].conditions?: Record<string, number>` —— `applyCostModifiers` 把 BonusModifier.conditions 透传到生成的 Bonus，enumerate 用 `evaluateConditions(player, conditions, nb)` 重新评估 nb-aware 约束（如 C013_WoodSlideHammer `minNumRooms: 5`）。
 
-**Card-purchase ComputeCardCosts candidate pipeline（候选闭包，ADR 0004）**：major / minor improvement 购买成本在进入 payment solver 前先规范化成 Cost Candidate List，再对全部 `deriveCardCostCandidate` 转换求候选闭包（`candidate-closure.ts` `closeCandidates()`）：不动点枚举 + Mandatory Saturation 过滤，结果与 listener 注册顺序 / 命名无关（`CardListenerRegistration.order` 已删除，禁止重新引入顺序字段）。卡牌只声明单候选转换（candidate → candidate(s) | null）和 `cardCostCandidateMandatory` 标志：optional（参考实现 "can pay instead"）天然保留原候选；mandatory（参考实现 "costs less" / 替换语义）经饱和过滤隐藏仍可被强制转换的行。fixed-price 卡是"不依赖输入的 optional / mandatory 转换"，闭包去重后只产出一行，无需任何先行声明。折扣 clamp 到 0 后资源键从 candidate 资源 map 中省略。Candidate metadata 只记录 `sources` / `originalFeeIndex` / Cost Attribution（dedupe key 中 sources 视为无序集合）；闭包输出后每个 resources + originalFeeIndex 组只保留一条代表行（sources 最少 → key 字典序，ADR 0004 Amendment），支付选定后由 improvement payment glue 写入 option `sourceCards`、`resource.paid.bonusSources` 和 Card Resource Stats（单候选行默认使用 index 0 metadata）。
+**Card / occupation ComputeCardCosts candidate pipeline（候选闭包，ADR 0004）**：major / minor improvement 购买成本和职业费用在进入 payment solver 前先规范化成 Cost Candidate List，再对全部 `deriveCardCostCandidate` 转换求候选闭包（`candidate-closure.ts` `closeCandidates()`）：不动点枚举 + Mandatory Saturation 过滤，结果与 listener 注册顺序 / 命名无关（`CardListenerRegistration.order` 已删除，禁止重新引入顺序字段）。卡牌只声明单候选转换（candidate → candidate(s) | null）和 `cardCostCandidateMandatory` 标志：optional（参考实现 "can pay instead"）天然保留原候选；mandatory（参考实现 "costs less" / 替换语义）经饱和过滤隐藏仍可被强制转换的行。fixed-price 卡是"不依赖输入的 optional / mandatory 转换"，闭包去重后只产出一行，无需任何先行声明。折扣 clamp 到 0 后资源键从 candidate 资源 map 中省略。Candidate metadata 只记录 `sources` / `originalFeeIndex` / Cost Attribution（dedupe key 中 sources 视为无序集合）；闭包输出后每个 resources + originalFeeIndex 组只保留一条代表行（sources 最少 → key 字典序，ADR 0004 Amendment），支付选定后由 improvement / occupation payment glue 写入 option `sourceCards`、`resource.paid.bonusSources` 和 Card Resource Stats（单候选行默认使用 index 0 metadata）。
+
+职业费用按 ADR 0003/0004 的批准扩展复用候选闭包。E060 用一份建材替代至多两份应付食物，剩余替代额度不产生食物；免费职业不收建材。候选来源与成本归因从预览保留到内部 pay child 和实际 receipt，旧 trade 表达已删除。
 
 **统一管线阶段顺序（固定领域规则，非卡牌偏序）**：基础候选（fee/fees/unitFee + getBaseCosts 动态候选）→ cost-type modifier 的结构化资源删除 → 候选闭包（card-purchase deriveCardCostCandidate / unit-trade 转换）→ action-scope trades 组合枚举 → bonuses（含 capped / choices，必须最后求值，因折扣以最终成本为上界）→ card-provided payment resources 覆盖成本 → cards → 生成可支付方案 → paymentBudget 过滤最终实付资源 → Pareto + 排序。
 
@@ -673,7 +675,7 @@ Hook 不进 `ActionDefinition`，由 `hooks.ts` 显式注册（卡牌文件内�
 
 | scope | 应用位置 | max 默认 | 典型用例 |
 |---|---|---|---|
-| `action` | 玩家资源池（每个 trade 独立到 `max`） | `?? 1` | A028_ForestSchool（lessons cost）、A088_HedgeKeeper（fencing 全部 3 段一次换）、E060_WorkingGloves（grouped exchange，未来加 groupMax）|
+| `action` | 玩家资源池（每个 trade 独立到 `max`） | `?? 1` | A028_ForestSchool（lessons cost）、A088_HedgeKeeper（fencing 全部 3 段一次换）|
 | `unit` | 每个 unit cost row，经候选闭包展开（无顺序字段） | `?? 1`（每个 row）| A123_FrameBuilder（每间房一次 wood-for-clay/stone）、A016_RammedClay（每段 fence clay-for-wood）、C056_FeedFence（至多一座纯木 stable）、C088_CarpentersApprentice（恰好折扣指定数量的 stable）|
 
 scope:'unit' MUST NOT 携带 `conditions.minNumRooms`（per-unit 没有 min-unit 阈值）；`validateTradeModifier` 在 `applyCostModifiers` 入口处强制此不变量。
@@ -793,7 +795,11 @@ Card listener 区域默认只匹配已打出卡：`zones` 省略等价于 `['pla
 
 `purchaseActionCardId` 保存本次购买节点由哪个行动格或卡牌提供。展开目标行动格 flow 时记录目标格身份；卡牌直接授予的新购买使用该卡自己的来源，不继承父购买身份。`improvement` 构造内部子流程时将来源快照传入本次 `onBuy` activation，支付 pending、恢复与撤销保留该值。它独立于 `sourceCard` 日志归因、`costActionCardId` 成本查询和用格统计。B059 直接 Major 购买或 Minstrel 展开 Major 得 4 食物；Merchant 新授予的第二买，包括 Minstrel→Major→Merchant，均得 2。奖励仍由卡牌自己的 `onBuy` 返回。
 
+`improvement` 在修改手牌前冻结 `result.extraData.playedFromHand`，并保留到支付完成与 `onBuy` 返回 flow 结束。它表示本次牌的物理来源；minor / major 身份和购入行动来源各自保留。D118 只根据该事实奖励从手牌打出的卡，不把公共大设施当作手牌。
+
 ### 7.6 阶段型 Hook（按触发顺序）
+
+阶段 flow 完成时，Session 在 `completeFrameIfStage` 弹出并续接之前检查未处置动物。存在此类动物时，保留已完成的父阶段 frame，嵌套既有 `reorganize`，处理后恢复原 `stageResume`。检查当前终态，不能只依赖一次 driver 调用中的资源 delta，因为外部 choice callback 可能已执行 gain。普通繁殖阶段保留 `harvest-breed` 约束；其他阶段使用普通动物处理，允许合法即时烹饪或弃置，不要求先住房。重整子流完成时不再次嵌套自己。单选自动执行获得动物时同样保留父流程，并在嵌套前提交资源事件，保证尾部奖励和原阶段或行动续接不丢失。
 
 ```
 准备阶段: onBeforeStartOfTurn → 增轮 / action.revealed → onAfterRevealAction → onPreparation
@@ -944,7 +950,7 @@ OA 对齐规则：
 - **room** (`construct.ts`)：`room-payment.ts` 展开"每间房"费用变体，并把本次 `computeCosts` 的 `costTrades` / `costBonuses` / `paymentResourceProviders` 附加到 construct `ComplexCost`；farm selection 的 `maxSelections` 也使用同一 adjusted construct cost。多解时二轮 `pay:room:*` prompt finalize；doability 同时检查支付上限和 reachable room selection；direct cancel 由通用 protected-action guard 拒绝。
 - **stable / plow** (`stables.ts` / `plow.ts`)：typed flat payment 解析。
 - **fence** (`fencing.ts`)：校验选边/来源/连通/封闭区域，得 `newEdges` 后计算 wood（考虑 `freeFences` / `extraWood` / fence-cost-unification 的 farm-choice computeCosts Pass #2），并把该 pass 的 trades/bonuses/paymentResourceProviders/paymentBudget 传入 `pay:fence:*` payment；多解 `pay:fence:*` 二轮 prompt。
-- **sow** (`sow.ts`)：validate + finalize（无 payment combo），含 extra-field card effect（`getPermittedExtraSowableFields` + `handleSowExtraField`）。
+- **sow** (`sow.ts`)：validate + finalize（无 payment combo），含 extra-field card effect（`getPermittedExtraSowableFields` + `handleSowExtraField`）。`maxSelections` 按 Logical Field 计数，`maxSeedSelections` 独立限制提交的作物 slot 数，包括同一 Card Field 的多个 slot。行动作物许可与田的 `allowedCrops` 在候选展示和权威提交时都取交集；行动不能放宽田自身的播种许可。`isUnconditionalSow` 对照普通 Sow 的田及作物许可，当前种子库存不决定行动是否受限。
 
 farmType 第一轮 payload 形态：`fence: {edges, palisadeEdges, extraWood, fenceSources?}` / `room: {rooms}` / `stable: {stables}` / `plow: {tile}` / `sow: {crops}`。WS `{type:'choice', value:'confirm', payload}` 经 `resolveChoice` 透传；二轮时由 `extraData.actionContextWrite: {farmPayload}` 持久化到 `pending.actionContext.farmPayload`，二轮 prompt 解析时 ActionDef 从 `ctx.actionContext.farmPayload` 读回。
 

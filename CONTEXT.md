@@ -517,15 +517,23 @@ _Avoid_: Payment Source、PlayerState.resources、真实资源兑换、成本候
 _Avoid_: Card-Provided Payment Resource、库存资源、成本折扣、段数上限
 
 **ComputeCardCosts**:
-购买 major / minor improvement 时对当前卡牌成本候选执行的卡牌成本变形语义。它包括拥有 `computeCosts.improvement` listener 的卡，也包括先选支付路径再把该路径送入同一成本变形语义的卡。
-_Avoid_: 建房、翻修、围栏等非卡牌购买成本
+购买 major / minor improvement 或支付职业费用时，对当前成本候选执行的卡牌成本变形语义。先选择支付路径的效果也保留该路径的成本身份。
+_Avoid_: 自动包含建房、翻修、围栏成本、真实资源兑换
+
+**Occupation Cost（职业费用）**:
+从手牌打出职业时，由行动格或授予该机会的卡牌规定的费用；职业牌本身印刷的额外费用是另一项费用。
+_Avoid_: 职业牌自身费用、购买设施费用
+
+**Cost Substitution（费用替代）**:
+规则允许用指定支付资源替代应付费用的全部或一部分。未用完的替代额度不产生库存商品。
+_Avoid_: Trade、获得食物、把剩余替代额度当作找零
 
 **Cost Candidate（成本候选行）**:
 一次支付中可选的 exact fee 候选，例如“付 2 wood”或“付 1 food”。它表示可选成本本身，不表示把一种资源兑换成另一种资源。
 _Avoid_: Trade、资源兑换、支付替换器
 
 **Cost Candidate List（成本候选列表）**:
-购买卡牌时当前可支付成本候选行的集合。ComputeCardCosts 读取并返回这个列表；卡牌效果可以保留原候选、追加新候选、修改候选或替换候选。
+购买设施或支付职业费用时，当前可支付成本候选行的集合。卡牌效果可以保留原候选、追加新候选、修改候选或替换候选。
 _Avoid_: 单个 flat cost、PaymentSolution 列表、已枚举支付方案
 
 **Candidate Closure（候选闭包）**:

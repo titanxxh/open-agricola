@@ -12,7 +12,7 @@ OA 当前卡牌购买成本通过 `computeCosts.improvement` listener 聚合 `{ 
 3. 参考实现没有 OA 旧的 `preserveOriginal` 字段；append candidate 本身就是保留原候选。OA 已删除 `preserveOriginal` / `preservedOriginalFor` 和相关 Pareto 剪枝，后续不应重新引入同类概念。
 4. 参考实现对 card-purchase cost 的拓扑排序存在于 `PlayerCards::applyEffects()`，但当前 OA 不希望为此引入开发者多处声明顺序的 topo 机制。
 
-这个问题只存在于购买 major / minor improvement 的卡牌成本路径。Construct、renovation、fence、stables、plow、occupation 等其他 `computeCosts` action path 仍使用现有通用 payment 机制。
+初始决策仅覆盖购买 major / minor improvement 的卡牌成本路径。职业费用的范围由下方 2026-10-14 amendment 扩展；Construct、renovation、fence、stables、plow 等路径不因此扩展。
 
 ## Decision
 
@@ -50,3 +50,17 @@ OA 当前卡牌购买成本通过 `computeCosts.improvement` listener 聚合 `{ 
 - **把 candidate pipeline 扩展到所有 `computeCosts` action path**：拒。范围过大，会同时影响 construct、renovation、fence、stables、plow、occupation，和本次 card-purchase parity 目标不匹配。
 - **把 candidate sources / attribution 写入通用 `PaymentSolution`**：拒。`PaymentSolution` 是所有支付路径共用类型；candidate metadata 仅属于 card-purchase preview/payment glue，应在 improvement payment builder 中合并到现有 `sourceCards`，并在支付选定后写入 Card Resource Stats。
 - **重新引入 `preserveOriginal` 或 domination 例外**：拒。参考实现 append candidate 语义天然保留原候选；OA 已决定不再用 Pareto 剪枝表达这件事。
+
+## 2026-10-14 amendment: occupation cost substitution
+
+Status: implemented after maintainer approval. Tracking: [#1168](https://github.com/titanxxh/open-agricola/issues/1168).
+
+Occupation costs now belong to the approved scope of the existing cost-candidate mechanism. At `dab1c514526b11c2ddc90fe5f424a1d17d288bdd`, the occupation preview already reaches `resolveCardCostWithModifiersDetailed`, but the occupation caller drops candidate sources and attribution. Technical reachability alone did not satisfy the original ADR boundary or prove a complete repair.
+
+E060 Working Gloves replaces up to two food of an occupation cost with one building resource. This changes the amount owed; it does not exchange a material for two food or produce change. The selected design derives optional candidates from the payable occupation fee and preserves ordinary food payment. A zero fee consumes no material. A one-food fee permits one material without granting food. A four-food fee still requires one material and two food.
+
+The implementation removes E060's old grouped trade modifiers, retains the existing per-card use limit, and carries the same candidate identity, sources and attribution from admission and preview into actual payment. An in-memory diagnostic showed that retaining the old trades permits a second application at a four-food fee. It did not run a repaired GameSession and is not acceptance evidence.
+
+This amendment does not extend the pipeline to construction, renovation, fencing, stables or plowing. It does not redefine payment-only virtual resources or change generic negative-payment rejection. Costs printed on an occupation and the occupation fee remain distinct rule concepts.
+
+The rejected alternative adds partial-cover behavior to payment trades or inventory-backed virtual providers. It would change a broader payment contract to express a cost substitution already representable by candidates. Public cost-preview tests cover fees zero through four, all four building resources, and composition with Forest School for the remaining food. Native Session tests cover the actual free, one-food and two-food Lessons fees, every building resource for a one-food fee, ordinary food choices, attribution, invalid choices, admission failure and undo/replay. They do not invent ordinary Lessons actions with three-food or four-food fees.
