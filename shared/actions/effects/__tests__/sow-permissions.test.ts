@@ -1,6 +1,7 @@
 import { expect, it } from 'vitest'
 import { createInitialState } from '../../../session/state-bootstrap'
 import { isUnconditionalSow } from '../sow'
+import '../../../cards/D/D075_WoodField'
 
 function player() {
   const player = createInitialState(42, { playerCount: 2 }).players[0]!
@@ -32,4 +33,31 @@ it('seed budgets and crop whitelist reductions restrict Sow without relying on r
   expect(isUnconditionalSow({ maxSeedSelections: 1 }, owner)).toBe(false)
   expect(isUnconditionalSow({ allowedCrops: ['grain'] }, owner)).toBe(false)
   expect(isUnconditionalSow({ allowedCrops: ['grain', 'vegetable'] }, owner)).toBe(true)
+})
+
+// #1160: action permissions exist before D017 can create a field. The public
+// predicate is checked directly; its paid continuation has a Session regression.
+it.each([
+  { allowedCrops: ['grain'], expected: false },
+  { allowedCrops: ['vegetable'], expected: false },
+  { allowedCrops: ['wood'], expected: false },
+  { allowedCrops: [], expected: false },
+  { allowedCrops: ['grain', 'vegetable'], expected: true },
+  { allowedCrops: ['grain', 'vegetable', 'wood', 'stone'], expected: true },
+])('classifies allowed crops $allowedCrops before any field exists', ({ allowedCrops, expected }) => {
+  const owner = player()
+  owner.minorPlayed = []
+  owner.fields = []
+  expect(isUnconditionalSow({ allowedCrops }, owner)).toBe(expected)
+  expect(isUnconditionalSow({ allowedCrops })).toBe(expected)
+})
+
+it('keeps the usual Wood Field permission while distinguishing an action crop limit', () => {
+  const owner = player()
+  owner.fields = []
+  owner.minorPlayed = ['D075_WoodField']
+  expect(isUnconditionalSow(undefined, owner)).toBe(true)
+  expect(isUnconditionalSow({ allowedCrops: ['wood'] }, owner)).toBe(false)
+  expect(isUnconditionalSow({ allowedCrops: ['grain', 'vegetable'] }, owner)).toBe(false)
+  expect(isUnconditionalSow({ allowedCrops: ['grain', 'vegetable', 'wood'] }, owner)).toBe(true)
 })
