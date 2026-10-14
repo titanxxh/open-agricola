@@ -7,6 +7,7 @@ import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/s
 import { Scoring } from '../../shared/domain'
 import type { InteractionRequest, InteractionState, PlayerState } from '../../shared/contract/types'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
+import { createWorkSession } from './_helpers/session-fixtures'
 
 import '../../shared/cards/C/C135_Constable'
 import '../../shared/cards/D/D132_HideFarmer'
@@ -96,7 +97,7 @@ const setupEndGameSession = (opts: {
   p0FireplaceSheep?: number
   p1FireplaceSheep?: number
 } = {}) => {
-  const session = new GameSession(42, undefined, { playerCount: 2 })
+  const session = createWorkSession({ seed: 42, options: { playerCount: 3 } })
   const state = session.getState().state
   state.currentPlayerIndex = 0
   state.round = 14
@@ -131,11 +132,15 @@ const setupEndGameSession = (opts: {
   if ((opts.p0FireplaceSheep ?? 0) > 0) {
     p0.improvements.push('Major_Fireplace1')
     p0.resources.sheep = opts.p0FireplaceSheep!
+    const room = p0.roomTiles[0]!
+    p0.houseAnimals = { [`${room.row}-${room.col}`]: 'sheep' }
     state.availableMajorImprovements = state.availableMajorImprovements.filter((id) => id !== 'Major_Fireplace1')
   }
   if ((opts.p1FireplaceSheep ?? 0) > 0) {
     p1.improvements.push('Major_Fireplace2')
     p1.resources.sheep = opts.p1FireplaceSheep!
+    const room = p1.roomTiles[0]!
+    p1.houseAnimals = { [`${room.row}-${room.col}`]: 'sheep' }
     state.availableMajorImprovements = state.availableMajorImprovements.filter((id) => id !== 'Major_Fireplace2')
   }
   session.loadState(state)
@@ -370,11 +375,14 @@ describe('D132_HideFarmer session', () => {
     expect(resp.ok).toBe(true)
 
     const p1Optional = expectD132Optional(resp, 1)
+    expect(Object.values(resp.state.players[1]!.houseAnimals)).toEqual(['sheep'])
     expect(p1Optional.anytimeActions.map((a) => a.id)).toContain('exchange')
     resp = session.takeAnytimeAction(1, 'exchange')
     expect(resp.ok).toBe(true)
     resp = session.resolveChoice(1, 'bulk:0=1')
     expect(resp.ok).toBe(true)
+    expect(resp.state.players[1]!.resources).toMatchObject({ sheep: 0, food: 2 })
+    expect(Object.values(resp.state.players[1]!.houseAnimals)).toEqual([])
     expectD132Optional(resp, 1)
     resp = acceptD132(session, resp, 1)
     const quantity = expectD132Quantity(resp, 1)

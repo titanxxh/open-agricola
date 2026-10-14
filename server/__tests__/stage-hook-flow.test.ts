@@ -746,44 +746,52 @@ describe('stage hook flows', () => {
   })
 
   it('does not let D167 non-harvest breeding write D115 harvest breeding summary', () => {
-    const session = createWorkSession({ seed: 42 })
-    stabilizeRandomHands(session.state.players)
-    const state = session.getState().state
-    state.players = state.players.slice(0, 2)
-    state.round = 1
-    state.players.forEach((player) => {
-      markAllWorkersUsed(state, player)
-    })
+    const session = createWorkSession({ seed: 42, options: { playerCount: 4 }, configure(state) {
+      state.round = 1
+      state.players.forEach(player => {
+        markAllWorkersUsed(state, player)
+        player.resources.food = 20
+      })
+      const player = state.players[0]!
+      player.occupationPlayed = ['D167_PureBreeder', 'D115_FodderPlanter']
+      player.resources.grain = 1
+      player.resources.sheep = 2
+      player.fields = [{ row: 0, col: 0, stacks: [] }]
+      player.pastures = [{ id: 'p1', tiles: [{ row: 0, col: 1 }], animalType: 'sheep', animalCount: 2 }]
+      player.stableTiles = [{ row: 0, col: 1 }]
+      player.fenceSegments = ['H-0-1', 'H-1-1', 'V-0-1', 'V-0-2'].map(edge => ({
+        edge, type: 'fence', source: { kind: 'own', ownerPlayerId: player.id },
+      }))
+    } })
+    try {
+      let resp = session.performRoundEnd()
+      expect(resp.ok, resp.error).toBe(true)
+      expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
+        .toBe('ui.interactionFlowSelect')
 
-    const player = state.players[0]!
-    player.occupationPlayed.push('D167_PureBreeder', 'D115_FodderPlanter')
-    player.resources.food = 10
-    player.resources.grain = 1
-    player.resources.sheep = 2
-    player.fields = [{ row: 0, col: 0, stacks: [] }]
-    player.pastures = [
-      {
-        id: 'p1',
-        size: 3,
-        tiles: [{ row: 0, col: 0 }, { row: 0, col: 1 }, { row: 1, col: 0 }],
-        stables: 0,
-        animalType: 'sheep',
-        animalCount: 2,
-      },
-    ]
+      resp = chooseFirstOption(session, 0)
+      expect(resp.ok, resp.error).toBe(true)
+      expect(resp.state.players[0]!.resources.sheep).toBe(3)
+      expect(resp.state.players[0]!.pastures[0]!.animalCount).toBe(2)
+      expect(resp.state.harvestBreedSummary).toBeUndefined()
+      expect(resp.state.round).toBe(1)
+      expect(resp.interaction).toMatchObject({ stateId: 'wait', playerIndex: 0, request: { kind: 'animal-reorg' } })
+      if (resp.interaction.stateId !== 'wait' || resp.interaction.request.kind !== 'animal-reorg') throw new Error('Expected Pure Breeder animal placement')
+      const zones = resp.interaction.request.zones.map(zone => ({
+        ...zone, animalType: zone.id === 'p1' ? 'sheep' : null, animalCount: zone.id === 'p1' ? 3 : 0,
+      }))
+      resp = session.resolveChoice(0, 'confirm', { zones })
 
-    session.loadState(state)
-    let resp = session.performRoundEnd()
-    expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
-      .toBe('ui.interactionFlowSelect')
-
-    resp = chooseFirstOption(session, 0)
-
-    expect(resp.state.players[0]!.resources.sheep).toBe(3)
-    expect(resp.state.harvestBreedSummary).toBeUndefined()
-    expect(resp.interaction.stateId).toBe('idle')
-    expect(resp.state.round).toBe(2)
-    expect(resp.state.roundPhase).toBe('work')
-    expect(resp.state.players[0]!.fields).toEqual([{ row: 0, col: 0, stacks: [] }])
+      expect(resp.ok, resp.error).toBe(true)
+      expect(resp.state.harvestBreedSummary).toBeUndefined()
+      expect(resp.interaction.stateId).toBe('idle')
+      expect(resp.state.round).toBe(2)
+      expect(resp.state.roundPhase).toBe('work')
+      expect(resp.state.players[0]!.resources).toMatchObject({ sheep: 3, grain: 1 })
+      expect(resp.state.players[0]!.pastures[0]!.animalCount).toBe(3)
+      expect(resp.state.players[0]!.fields).toEqual([{ row: 0, col: 0, stacks: [] }])
+      expect(resp.state.events.filter(event => event.type === 'resource.moved' && event.sourceCardId === 'D167_PureBreeder' && event.resources.sheep === 1)).toHaveLength(1)
+      expect(resp.state.events.filter(event => event.type === 'harvest.phaseStarted' && event.harvestPhase === 'breeding')).toEqual([])
+    } finally { session.dispose() }
   })
 })

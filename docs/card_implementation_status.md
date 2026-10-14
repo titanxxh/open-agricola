@@ -14,8 +14,6 @@ The 26 remaining card fixes from [Issue #848](https://github.com/titanxxh/open-a
 
 | Priority | Scope | Open work |
 |---|---|---|
-| Rule evidence pending | `E038_RodCollection` [#1165](https://github.com/titanxxh/open-agricola/issues/1165) | Retain implementation pending confirmation of finite exceptions versus periodic scoring, yielding 8 or 9 bonus VP at the thirteenth stored wood. |
-| Rule evidence pending | `E052_Cubbyhole` [#1167](https://github.com/titanxxh/open-agricola/issues/1167) | Retain implementation until an official cost image establishes whether both alternative costs include one reed. |
 | Deferred by maintainer | `C131_PrivateTeacher` [#1175](https://github.com/titanxxh/open-agricola/issues/1175) | Leave unchanged while same-Grain-Seeds activation of a newly played occupation remains unconfirmed. |
 
 ## 3. Accepted differences
@@ -200,7 +198,7 @@ Gain provenance distinguishes explicit resource parameters from the action space
 
 Each `altCosts` row is a complete base-cost candidate, including any fee shared by all alternatives. Discounts and substitute payments still use the common payment pipeline. Card-local bonus formulas preserve finite printed exceptions and remain separate from printed card VP; storage previews reuse the same scoring callback. Session regressions verify actual fees, transformed payments and later bonus boundaries without adding a shared extension point.
 
-The 19 negative-test issues with agreed repair boundaries are fixed on 2026-10-14 using existing extension points; the three unresolved rule questions remain in §2. Stage animal handling nests the existing reorganization flow before releasing its parent. Cost substitution reuses candidates and payment attribution. Hand origin is frozen before card commitment. Fields, animals and housing continue to use authoritative geometry or existing capacity queries. Adjacent public Session regressions define aligned behavior; historic wrong expectations and audit archives are not production dependencies.
+The 19 negative-test issues with agreed repair boundaries are fixed on 2026-10-14 using existing extension points; C131 remains deferred in §2; E038 and E052 were resolved independently on main. Stage animal handling nests the existing reorganization flow before releasing its parent. Cost substitution reuses candidates and payment attribution. Hand origin is frozen before card commitment. Fields, animals and housing continue to use authoritative geometry or existing capacity queries. Adjacent public Session regressions define aligned behavior; historic wrong expectations and audit archives are not production dependencies.
 
 The existing card-local hooks and dynamic prerequisite checks cover the current rule fixes without a new extension point. Independent resource exchanges before a payment use explicit pay/gain flows: their income enters inventory, and the subsequent host payment retains its own gross resource receipt. Invalid special-stable submissions reuse recoverable selection failures; mandatory continuation blocking remains governed by ADR 0015.
 
