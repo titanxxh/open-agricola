@@ -1,42 +1,30 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
-import { getCardEffect } from '../../shared/cards/card-effects'
 import { createPlayerActionSpaces } from '../../shared/cards/player-action-space'
 import { markAllWorkersUsed } from '../../shared/domain/player'
-import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
+import { createWorkSession } from './_helpers/session-fixtures'
+import { confirmNextPlayer } from './_helpers/pending-confirms'
 
 import '../../shared/cards/C/C039_StudioBoat'
 
 const CARD_ID = 'C039_StudioBoat'
-const FIXED_HANDS = [
-  { occupation: '__c039_occupation_p1__', minor: CARD_ID },
-  { occupation: '__c039_occupation_p2__', minor: '__c039_minor_p2__' },
-  { occupation: '__c039_occupation_p3__', minor: '__c039_minor_p3__' },
-  { occupation: '__c039_occupation_p4__', minor: '__c039_minor_p4__' },
-]
 
-const setup = (playerCount: 3 | 4, played = false, startPlayerIndex = 0) => {
-  const session = new GameSession(39, undefined, { playerCount })
-  stabilizeRandomHands(session.state.players)
-  const state = session.getState().state
-  state.currentPlayerIndex = startPlayerIndex
-  state.round = 1
-  state.roundPhase = 'work'
-  state.players.forEach((player, index) => {
-    player.startPlayer = index === startPlayerIndex
-    player.occupationHand = [FIXED_HANDS[index]!.occupation]
-    player.minorHand = [FIXED_HANDS[index]!.minor]
-  })
-  const owner = state.players[0]!
-  owner.occupationPlayed = [FIXED_HANDS[0]!.occupation]
-  owner.resources.wood = 1
-  if (played) {
-    owner.minorHand = ['__c039_minor_p1__']
-    owner.minorPlayed = [CARD_ID]
-    state.actionSpaces.push(...createPlayerActionSpaces(state))
-  }
-  session.loadState(state)
-  return session
+const setup = (playerCount: 2 | 3 | 4, played = false, startPlayerIndex = 0) => {
+  return createWorkSession({seed:39, options:{playerCount}, configure:state => {
+    state.currentPlayerIndex = startPlayerIndex
+    state.players.forEach((player,index) => {
+      player.startPlayer = index === startPlayerIndex
+      player.occupationHand = ['__test_placeholder__']
+      player.minorHand = index === 0 && !played ? [CARD_ID] : ['__test_placeholder__']
+    })
+    const owner = state.players[0]!
+    owner.occupationPlayed = ['A125_Priest']
+    owner.resources.wood = 1
+    if (played) {
+      owner.minorPlayed = [CARD_ID]
+      state.actionSpaces.push(...createPlayerActionSpaces(state))
+    }
+  }})
 }
 
 const openMinorPrompt = (session: GameSession) => {
@@ -63,37 +51,11 @@ const playMinor = (session: GameSession) => {
   return session.resolveChoice(0, option!.value)
 }
 
-describe('C039_StudioBoat — computeBonusScore wiring', () => {
-  it('exposes computeBonusScore on the effect', () => {
-    const effect = getCardEffect(CARD_ID)
-    expect(effect).toBeDefined()
-    expect(effect!.computeBonusScore).toBeDefined()
-  })
-
-  it('returns the bonusVp counter accumulated on cardStates', () => {
-    const session = setup(3, true)
-    const state = session.getState().state
-    const player = state.players[0]!
-    player.cardStates = player.cardStates ?? {}
-    player.cardStates[CARD_ID] = { counters: { bonusVp: 4 } }
-    session.loadState(state)
-
-    const effect = getCardEffect(CARD_ID)
-    const score = effect!.computeBonusScore!(state, player, { reserved: {} })
-    expect(score).toBe(4)
-  })
-
-  it('returns 0 when no counter is set', () => {
-    const session = setup(3, true)
-    const state = session.getState().state
-    const player = state.players[0]!
-    session.loadState(state)
-
-    const effect = getCardEffect(CARD_ID)
-    const score = effect!.computeBonusScore!(state, player, { reserved: {} })
-    expect(score).toBe(0)
-  })
-})
+const bonusTotal = (response: SessionResponse) => response.scores[0]!.categories
+  .filter(category => category.key === 'cardBonusVp')
+  .flatMap(category => category.entries)
+  .filter(entry => entry.type === 'bonus' && entry.cardId === CARD_ID)
+  .reduce((sum,entry) => sum + entry.score,0)
 
 describe('C039 Studio Boat session', () => {
   it('C039 S1: a three-player owner needs one occupation, pays one wood, and creates an all-access action space', () => {
@@ -118,10 +80,12 @@ describe('C039 Studio Boat session', () => {
   })
 
   it.each([
-    { actorIndex: 0, ownerBonusVp: 1 },
-    { actorIndex: 1, ownerBonusVp: 0 },
-  ])('C039 S2: the three-player space accumulates food and actor $actorIndex leaves owner at $ownerBonusVp bonus VP', ({ actorIndex, ownerBonusVp }) => {
-    const session = setup(3, true, actorIndex)
+    { playerCount: 2, actorIndex: 0, ownerBonusVp: 1 },
+    { playerCount: 2, actorIndex: 1, ownerBonusVp: 0 },
+    { playerCount: 3, actorIndex: 0, ownerBonusVp: 1 },
+    { playerCount: 3, actorIndex: 1, ownerBonusVp: 0 },
+  ] satisfies Array<{ playerCount: 2 | 3; actorIndex: number; ownerBonusVp: number }>)('C039 S2: $playerCount-player use by actor $actorIndex scores exactly $ownerBonusVp owner bonus VP', ({ playerCount, actorIndex, ownerBonusVp }) => {
+    const session = setup(playerCount, true, actorIndex)
     const beforeRound = session.getState().state
     beforeRound.players.forEach((player) => markAllWorkersUsed(beforeRound, player))
     session.loadState(beforeRound)
@@ -137,5 +101,23 @@ describe('C039 Studio Boat session', () => {
     expect(response.state.players[actorIndex]!.resources.food).toBe(foodBefore + 1)
     expect(response.state.actionSpaces.find((space) => space.id === CARD_ID)?.resources.food).toBe(0)
     expect(response.state.players[0]!.cardStates[CARD_ID]?.counters?.bonusVp ?? 0).toBe(ownerBonusVp)
+    expect(bonusTotal(response)).toBe(ownerBonusVp)
+  })
+
+  it('C039 S3: real four-player purchase and owner Traveling Players give one public bonus point', () => {
+    const session = setup(4)
+    const bought = playMinor(session)
+    expect(bought.ok, bought.error).toBe(true)
+    expect(bought.state.actionSpaces.some(space => space.id === CARD_ID)).toBe(false)
+    for (const [actor,space] of [[1,'forest'],[2,'reed-bank'],[3,'grain-seeds']] satisfies Array<[number,string]>) {
+      confirmNextPlayer(session)
+      const response = session.takeAction(actor,space)
+      expect(response.ok,response.error).toBe(true)
+    }
+    confirmNextPlayer(session)
+    const response = session.takeAction(0,'traveling-players')
+    expect(response.ok,response.error).toBe(true)
+    expect(response.state.players[0]!.cardStates[CARD_ID]?.counters?.bonusVp).toBe(1)
+    expect(bonusTotal(response)).toBe(1)
   })
 })
