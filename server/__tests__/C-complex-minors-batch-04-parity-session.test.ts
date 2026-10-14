@@ -1,8 +1,9 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
-import { familySize, markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
+import { createWorkSession } from './_helpers/session-fixtures'
+import { familySize, markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome, workersAvailable } from '../../shared/domain/player'
 import type { GameState, Resource } from '../../shared/contract/types'
 
 import '../../shared/cards/C/C003_CarriageTrip'
@@ -124,34 +125,141 @@ const prepareRoundEnd = (session: GameSession) => {
 }
 
 describe('C003 Carriage Trip parity', () => {
-  it('C003 S1: with another person available may place that person immediately', () => {
-    const session = setupMinor({ cardId: 'C003_CarriageTrip' })
-    let response = chooseNonSkip(session, playMinor(session, 'C003_CarriageTrip'))
+  const sessions: GameSession[] = []
+  afterEach(() => sessions.splice(0).forEach((session) => session.dispose()))
+
+  const setupTrip = () => {
+    const session = createWorkSession({
+      seed: 4242,
+      options: { playerCount: 2 },
+      configure(state) {
+        state.round = 8
+        state.players[0]!.minorHand = ['C003_CarriageTrip', 'B004_WoodPile', 'A006_StorageBarn']
+        for (const player of state.players) {
+          Object.assign(player.resources, { food: 10, wood: 0, clay: 0, reed: 0, stone: 0, grain: 0, vegetable: 0 })
+        }
+      },
+    })
+    sessions.push(session)
+    return session
+  }
+
+  const tripMenu = (session: GameSession) => {
+    let response = session.takeAction(0, 'meeting-place')
+    expect(response.ok, response.error).toBe(true)
     expect(response.interaction.stateId).toBe('wait')
-    if (response.interaction.stateId !== 'wait') return
+    if (response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'choice') {
+      throw new Error('expected Meeting Place choice')
+    }
+    const action = response.interaction.request.options.find((option) => option.value.startsWith('action-improvement-'))
+    if (action) response = session.resolveChoice(0, action.value)
+    expect(response.ok, response.error).toBe(true)
+    return response
+  }
+
+  it('C003 S1: with another person available may place that person immediately', () => {
+    const session = setupTrip()
+    const initial = session.getState()
+    const workersBefore = initial.state.players[0]!.workers.map((worker) => worker.id)
+    const spacesBefore = JSON.stringify(initial.state.actionSpaces)
+    const resourcesBefore = JSON.stringify(initial.state.players[0]!.resources)
+    const logBefore = JSON.stringify(initial.state.log)
+    const scoresBefore = JSON.stringify(initial.scores)
+    const menu = tripMenu(session)
+    expect(workersAvailable(menu.state, menu.state.players[0]!)).toBe(1)
+    const bought = session.resolveChoice(0, 'C003_CarriageTrip')
+    expect(bought.ok, bought.error).toBe(true)
+    let response = chooseNonSkip(session, bought)
+    expect(response.ok, response.error).toBe(true)
+    if (response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'choice') {
+      throw new Error('expected extra person placement choice')
+    }
     expect(response.interaction.promptKey).toBe('ui.interactionPlaceFarmerExtra')
-    expect(response.interaction.request.options?.map((option) => option.value)).toContain('forest')
+    expect(response.interaction.request.options.map((option) => option.value)).toContain('forest')
     response = session.resolveChoice(0, 'forest')
-    expect(response.state.actionSpaces.find((space) => space.id === 'forest')?.takenBy).toHaveLength(1)
+    expect(response.ok, response.error).toBe(true)
+    const first = response.state.actionSpaces.find((space) => space.id === 'meeting-place')!.takenBy
+    const extra = response.state.actionSpaces.find((space) => space.id === 'forest')!.takenBy
+    expect(first).toHaveLength(1)
+    expect(extra).toHaveLength(1)
+    expect(first[0]!.workerId).not.toBe(extra[0]!.workerId)
+    expect(response.state.players[0]!.workers.map((worker) => worker.id)).toEqual(workersBefore)
+    expect(workersAvailable(response.state, response.state.players[0]!)).toBe(0)
+    expect(response.state.players[0]!.resources.wood).toBe(3)
+    expect(response.state.players[0]!.minorHand).not.toContain('C003_CarriageTrip')
+    expect(response.state.players[0]!.minorPlayed).not.toContain('C003_CarriageTrip')
     expect(response.state.players[1]!.minorHand).toContain('C003_CarriageTrip')
+    expect(response.state.events.filter((event) => event.type === 'card.passed' && event.cardId === 'C003_CarriageTrip')).toHaveLength(1)
+    expect(JSON.stringify(response.scores)).toBe(scoresBefore)
+
+    const undone = session.undoAction()
+    expect(undone.ok, undone.error).toBe(true)
+    expect(JSON.stringify(undone.state.actionSpaces)).toBe(spacesBefore)
+    expect(JSON.stringify(undone.state.players[0]!.resources)).toBe(resourcesBefore)
+    expect(JSON.stringify(undone.state.log)).toBe(logBefore)
+    expect(JSON.stringify(undone.scores)).toBe(scoresBefore)
+    expect(undone.state.players[0]!.workers.map((worker) => worker.id)).toEqual(workersBefore)
+    expect(workersAvailable(undone.state, undone.state.players[0]!)).toBe(2)
+    expect(undone.state.players[0]!.minorHand).toContain('C003_CarriageTrip')
+    expect(undone.state.players[1]!.minorHand).not.toContain('C003_CarriageTrip')
+
+    tripMenu(session)
+    chooseNonSkip(session, session.resolveChoice(0, 'C003_CarriageTrip'))
+    const replayed = session.resolveChoice(0, 'forest')
+    expect(replayed.ok, replayed.error).toBe(true)
+    expect(replayed.state.players[0]!.resources.wood).toBe(3)
+    expect(replayed.state.players[0]!.workers.map((worker) => worker.id)).toEqual(workersBefore)
+    expect(workersAvailable(replayed.state, replayed.state.players[0]!)).toBe(0)
+    expect(replayed.state.players[1]!.minorHand.filter((card) => card === 'C003_CarriageTrip')).toHaveLength(1)
   })
 
   it('C003 S2: extra placement may be declined while the card still passes', () => {
-    const session = setupMinor({ cardId: 'C003_CarriageTrip' })
-    const response = playMinor(session, 'C003_CarriageTrip')
-    expect(response.interaction.stateId).toBe('wait')
-    if (response.interaction.stateId !== 'wait') return
+    const session = setupTrip()
+    tripMenu(session)
+    const response = session.resolveChoice(0, 'C003_CarriageTrip')
+    expect(response.ok, response.error).toBe(true)
+    expect(workersAvailable(response.state, response.state.players[0]!)).toBe(1)
     const skipped = session.resolveChoice(0, '__skip__')
+    expect(skipped.ok, skipped.error).toBe(true)
     expect(skipped.state.players[1]!.minorHand).toContain('C003_CarriageTrip')
+    expect(skipped.state.players[0]!.minorHand).not.toContain('C003_CarriageTrip')
+    expect(skipped.state.players[0]!.resources).toMatchObject({ wood: 0, food: 10 })
+    expect(workersAvailable(skipped.state, skipped.state.players[0]!)).toBe(1)
+    expect(skipped.state.events.filter((event) => event.type === 'card.passed' && event.cardId === 'C003_CarriageTrip')).toHaveLength(1)
     expect(skipped.state.actionSpaces.filter((space) => space.takenBy.some((worker) => worker.playerId === skipped.state.players[0]!.id))).toHaveLength(1)
   })
 
-  it('C003 S3: no remaining person keeps Carriage Trip unavailable', () => {
-    const session = setupMinor({ cardId: 'C003_CarriageTrip' })
-    setActiveWorkerCount(session.state.players[0]!, 1)
-    markAllWorkersUsed(session.state, session.state.players[0]!)
-    session.loadState(session.state)
-    expect(cardIsOffered(session, 'C003_CarriageTrip')).toBe(false)
+  it('C003 S3: the last person may enter Meeting Place but cannot buy Carriage Trip', () => {
+    const session = setupTrip()
+    const forest = session.takeAction(0, 'forest')
+    expect(forest.ok, forest.error).toBe(true)
+    expect(forest.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'confirm-next-player' } })
+    expect(session.resolveChoice(1, 'confirm').ok).toBe(true)
+    const clay = session.takeAction(1, 'clay-pit')
+    expect(clay.ok, clay.error).toBe(true)
+    expect(clay.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'confirm-next-player' } })
+    expect(session.resolveChoice(0, 'confirm').ok).toBe(true)
+
+    const menu = tripMenu(session)
+    expect(workersAvailable(menu.state, menu.state.players[0]!)).toBe(0)
+    if (menu.interaction.stateId !== 'wait' || menu.interaction.request.kind !== 'choice') {
+      throw new Error('expected minor purchase choice')
+    }
+    expect(menu.interaction.request.options.map((option) => option.value)).not.toContain('C003_CarriageTrip')
+    const before = JSON.stringify({ state: menu.state, interaction: menu.interaction, scores: menu.scores })
+    const rejected = session.resolveChoice(0, 'C003_CarriageTrip')
+    expect(rejected.ok).toBe(false)
+    expect(JSON.stringify({ state: rejected.state, interaction: rejected.interaction, scores: rejected.scores })).toBe(before)
+    expect(rejected.state.players[0]!.minorHand).toContain('C003_CarriageTrip')
+    expect(rejected.state.players[1]!.minorHand).not.toContain('C003_CarriageTrip')
+
+    const woodBefore = rejected.state.players[0]!.resources.wood
+    const alternative = session.resolveChoice(0, 'B004_WoodPile')
+    expect(alternative.ok, alternative.error).toBe(true)
+    expect(alternative.state.players[0]!.resources.wood).toBe(woodBefore + 1)
+    expect(alternative.state.players[0]!.minorHand).toContain('C003_CarriageTrip')
+    expect(alternative.state.players[1]!.minorHand).not.toContain('C003_CarriageTrip')
+    expect(workersAvailable(alternative.state, alternative.state.players[0]!)).toBe(0)
   })
 })
 
