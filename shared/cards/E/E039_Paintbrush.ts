@@ -5,6 +5,7 @@ import type { CardImpl } from '../registry'
 const CARD_ID = 'E039_Paintbrush'
 
 const cardImpl = {
+  prerequisiteCheck: (player) => player.resources.boar >= 1,
   effect: {
   id: CARD_ID,
   onHarvestFeedingPhase: (_state, player) => {
