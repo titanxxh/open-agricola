@@ -32,8 +32,10 @@ for (const food of [0, 20]) {
     await page.goto('/?page=game&player=p1&embedded=1&devMode=1')
     const lessons = page.locator('[data-action-id="lessons"] button').first()
     await expect(lessons).toBeEnabled()
+    const started = page.waitForResponse(response => response.url().endsWith('/api/game/action'))
     await lessons.click()
-    const pending: SessionResponse = await (await request.get(`${BACKEND_URL}/api/game/state`)).json()
+    const pending: SessionResponse = await (await started).json()
+    expect(pending.ok).toBe(true)
     expect(pending.state.players[0]!.resources).toMatchObject({ food, wood: 1 })
     if (pending.interaction.stateId !== 'wait' || pending.interaction.request.kind !== 'choice') {
       throw new Error('Expected the Paper Maker exchange choice')
