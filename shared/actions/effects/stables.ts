@@ -343,7 +343,7 @@ const finalizeStables = (
   let specialSourceCardId: string | undefined
   if (farmHand) {
     const applied = applySpecialStableAt(ctx.state, nextPlayer, farmHand)
-    if (!applied) return { type: 'fail', errorKey: 'log.buildStableFail' }
+    if (!applied) return { type: 'fail', errorKey: 'log.buildStableFail', recoverable: true }
     specialSourceCardId = applied.sourceCardId
   }
   applyPlayerMutation(ctx.player, nextPlayer)

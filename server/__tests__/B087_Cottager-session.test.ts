@@ -1,7 +1,7 @@
-import { describe, expect, it } from 'vitest'
-import { GameSession, type SessionResponse } from '../game/authoritative-session'
-import { setWorkersAtHome } from '../../shared/domain/player'
-import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
+import assert from 'node:assert/strict'
+import { afterEach, describe, expect, it } from 'vitest'
+import type { GameSession, SessionResponse } from '../game/authoritative-session'
+import { createWorkSession } from './_helpers/session-fixtures'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 import type { Resource } from '../../shared/contract/types'
 
@@ -9,31 +9,32 @@ import '../../shared/cards/B/B087_Cottager'
 
 const CARD_ID = 'B087_Cottager'
 const FILLER = '__test_placeholder__'
+const sessions: GameSession[] = []
+afterEach(() => sessions.splice(0).forEach((session) => session.dispose()))
 
 const setup = ({
   played = true, houseType = 'wood', resources = {},
 }: { played?: boolean; houseType?: 'wood' | 'clay'; resources?: Partial<Resource> } = {}) => {
-  const session = new GameSession(5487, undefined, { playerCount: 2 })
-  stabilizeRandomHands(session.state.players)
-  const state = session.getState().state
-  state.currentPlayerIndex = 0
-  state.round = 5
-  state.roundPhase = 'work'
-  state.players.forEach((player) => {
-    setWorkersAtHome(state, player, 2)
-    player.minorHand = [FILLER]
-    player.occupationHand = [FILLER]
-    player.resources.food = 20
+  const session = createWorkSession({
+    seed: 5487,
+    configure(state) {
+      state.round = 5
+      for (const player of state.players) {
+        player.minorHand = [FILLER]
+        player.occupationHand = [FILLER]
+        player.resources.food = 20
+      }
+      const owner = state.players[0]!
+      owner.occupationHand = played ? [FILLER] : [CARD_ID]
+      owner.occupationPlayed = played ? [CARD_ID] : []
+      owner.houseType = houseType
+      owner.resources = {
+        ...owner.resources,
+        wood: 0, clay: 0, reed: 0, stone: 0, food: 0, ...resources,
+      }
+    },
   })
-  const owner = state.players[0]!
-  owner.occupationHand = played ? [FILLER] : [CARD_ID]
-  owner.occupationPlayed = played ? [CARD_ID] : []
-  owner.houseType = houseType
-  owner.resources = {
-    ...owner.resources,
-    wood: 0, clay: 0, reed: 0, stone: 0, food: 0, ...resources,
-  }
-  session.loadState(state)
+  sessions.push(session)
   return session
 }
 
@@ -81,6 +82,42 @@ describe('B087 Cottager parity', () => {
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.rooms).toBe(3)
     expect(response.state.players[0]!.resources).toMatchObject({ wood: 0, reed: 0, food: 2 })
+  })
+
+  it('caps Cottager at one room with resources for two and preserves selection after rejecting two rooms', () => {
+    const session = setup({ resources: { wood: 10, reed: 4 } })
+    const pending = chooseBranch(session, enterCottager(session), 'actions.construct.name')
+    assert.ok(pending.interaction.stateId === 'wait' && pending.interaction.request.kind === 'farm-select')
+    assert.equal(pending.interaction.request.farm.farmType, 'room')
+    const before = JSON.stringify({ state: pending.state, interaction: pending.interaction, scores: pending.scores })
+    const rejected = session.commitSelectionChoice(0, { rooms: [{ row: 1, col: 1 }, { row: 2, col: 1 }] })
+
+    expect(rejected.ok).toBe(false)
+    expect(pending.interaction.request.farm.maxSelections).toBe(1)
+    expect(JSON.stringify({ state: rejected.state, interaction: rejected.interaction, scores: rejected.scores })).toBe(before)
+
+    const built = session.commitSelectionChoice(0, { rooms: [{ row: 1, col: 1 }] })
+    expect(built.ok, built.error).toBe(true)
+    expect(built.state.players[0]!.rooms).toBe(3)
+    expect(built.state.players[0]!.resources).toMatchObject({ wood: 5, reed: 2, food: 2 })
+    expect(built.state.events.filter((event) => event.type === 'farm.roomBuilt')).toHaveLength(1)
+    expect(built.state.log).toEqual(expect.arrayContaining([
+      expect.objectContaining({ key: 'log.actionDetail', params: expect.objectContaining({ detailParts: expect.objectContaining({ effects: { buildRoom: 1 } }) }) }),
+    ]))
+  })
+
+  it('leaves ordinary Farm Expansion able to build two rooms', () => {
+    const session = setup({ played: false, resources: { wood: 10, reed: 4 } })
+    const pending = chooseBranch(session, session.takeAction(0, 'farm-expansion'), 'actions.construct.name')
+    assert.ok(pending.interaction.stateId === 'wait' && pending.interaction.request.kind === 'farm-select')
+    assert.equal(pending.interaction.request.farm.farmType, 'room')
+    expect(pending.interaction.request.farm.maxSelections).toBe(2)
+
+    const built = session.commitSelectionChoice(0, { rooms: [{ row: 1, col: 1 }, { row: 2, col: 1 }] })
+    expect(built.ok, built.error).toBe(true)
+    expect(built.state.players[0]!.rooms).toBe(4)
+    expect(built.state.players[0]!.resources).toMatchObject({ wood: 0, reed: 0 })
+    expect(built.state.events.filter((event) => event.type === 'farm.roomBuilt')).toHaveLength(1)
   })
 
   it('B087 S3: the renovation branch pays its selected cost and can be undone', () => {
