@@ -36,6 +36,11 @@ type ShapeCheck = {
 }
 
 const allowedContextResultUses = {
+  'shared/cards/D/D118_Bonehead.ts': {
+    reason: 'reads frozen physical hand origin from a successful improvement result, not resource facts',
+    expectedContextResultReferences: 3,
+    expectedResultPaths: ['extraData', 'extraData.playedFromHand', 'type'],
+  },
   'shared/cards/M/M053_ForestHut.ts': {
     reason: 'reads selectedPositions from a successful choice result',
     expectedContextResultReferences: 3,
@@ -479,11 +484,11 @@ function stringLiteralText(expression: ts.Expression): string | undefined {
   return undefined
 }
 
-function hasResultStringComparison(
+function hasResultLiteralComparison(
   sourceFile: ts.SourceFile,
   path: string,
   operatorKind: ts.SyntaxKind,
-  value: string,
+  value: string | boolean,
 ): boolean {
   const aliases = collectAliases(sourceFile)
   let found = false
@@ -491,7 +496,10 @@ function hasResultStringComparison(
   forEachNode(sourceFile, (node) => {
     if (!ts.isBinaryExpression(node) || node.operatorToken.kind !== operatorKind) return
     const leftPath = resultPathFor(node.left, aliases)?.join('.')
-    if (leftPath === path && stringLiteralText(node.right) === value) found = true
+    const right = unwrapExpression(node.right)
+    const matches = typeof value === 'string' ? stringLiteralText(right) === value
+      : right.kind === (value ? ts.SyntaxKind.TrueKeyword : ts.SyntaxKind.FalseKeyword)
+    if (leftPath === path && matches) found = true
   })
 
   return found
@@ -511,31 +519,37 @@ function hasCallWithStringArg(sourceFile: ts.SourceFile, functionName: string, v
 }
 
 const requiredShapeChecks = {
+  'shared/cards/D/D118_Bonehead.ts': [{
+    label: 'requires successful hand-play provenance',
+    check: sourceFile => hasResultLiteralComparison(sourceFile, 'type', ts.SyntaxKind.ExclamationEqualsEqualsToken, 'ok')
+      && hasResultLiteralComparison(sourceFile, 'type', ts.SyntaxKind.ExclamationEqualsEqualsToken, 'flow')
+      && hasResultLiteralComparison(sourceFile, 'extraData.playedFromHand', ts.SyntaxKind.ExclamationEqualsEqualsToken, true),
+  }],
   'shared/cards/M/M053_ForestHut.ts': [{
     label: 'excludes failed selection results',
-    check: (sourceFile) => hasResultStringComparison(sourceFile, 'type', ts.SyntaxKind.ExclamationEqualsEqualsToken, 'fail'),
+    check: (sourceFile) => hasResultLiteralComparison(sourceFile, 'type', ts.SyntaxKind.ExclamationEqualsEqualsToken, 'fail'),
   }],
   'shared/cards/M/M059_NaturesFertilizer.ts': [{
     label: 'excludes failed selection results',
-    check: (sourceFile) => hasResultStringComparison(sourceFile, 'type', ts.SyntaxKind.ExclamationEqualsEqualsToken, 'fail'),
+    check: (sourceFile) => hasResultLiteralComparison(sourceFile, 'type', ts.SyntaxKind.ExclamationEqualsEqualsToken, 'fail'),
   }],
   'shared/cards/A/A094_LazySowman.ts': [
     {
       label: 'guards request type',
       check: (sourceFile) =>
-        hasResultStringComparison(sourceFile, 'type', ts.SyntaxKind.ExclamationEqualsEqualsToken, 'request'),
+        hasResultLiteralComparison(sourceFile, 'type', ts.SyntaxKind.ExclamationEqualsEqualsToken, 'request'),
     },
     {
       label: 'guards choice request kind',
       check: (sourceFile) =>
-        hasResultStringComparison(sourceFile, 'request.kind', ts.SyntaxKind.ExclamationEqualsEqualsToken, 'choice'),
+        hasResultLiteralComparison(sourceFile, 'request.kind', ts.SyntaxKind.ExclamationEqualsEqualsToken, 'choice'),
     },
   ],
   'shared/cards/C/C148_MudWallower.ts': [
     {
       label: 'guards ok result',
       check: (sourceFile) =>
-        hasResultStringComparison(sourceFile, 'type', ts.SyntaxKind.ExclamationEqualsEqualsToken, 'ok'),
+        hasResultLiteralComparison(sourceFile, 'type', ts.SyntaxKind.ExclamationEqualsEqualsToken, 'ok'),
     },
     {
       label: 'uses boar payment provenance',

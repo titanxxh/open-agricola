@@ -351,6 +351,7 @@ describe('event mapping policy', () => {
       'shared/cards/M/M093_FarmhandsQuarters.ts',
       'server/__tests__/M027_M093_M102_moor-cross-player-markers-session.test.ts',
       'server/__tests__/passing-mechanism-session.test.ts',
+      'server/__tests__/D118-hand-origin-session.test.ts',
       'server/__tests__/passing-mechanism-onbuy.test.ts',
       'server/__tests__/pasture-derived-state-session.test.ts',
       'server/__tests__/scheduled-terrain-session.test.ts',
