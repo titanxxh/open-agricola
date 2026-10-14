@@ -4721,6 +4721,11 @@ export class GameCore {
     if (this.stageDispatch.continueStageHook('onEndHarvestFeedingPhase', playerIndex, cardIndex)) {
       return this.respond()
     }
+    this.state.roundPhase = 'breeding'
+    appendImmediateEvents(this.state, [{
+      type: 'harvest.phaseStarted',
+      harvestPhase: 'breeding',
+    }])
     const harvestOrder = this.getHarvestPlayerIndices()
     this.state.harvestBreedSummary = {}
     this.state.harvestBreedPlacement = {}

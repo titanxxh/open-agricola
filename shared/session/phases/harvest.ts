@@ -48,16 +48,10 @@ export const startHarvest = (core: GameCore): SessionResponse => {
 }
 
 /**
- * Enter the breeding phase: mark `state.roundPhase = 'breeding'`, then
- * trampoline into the breed-phase continuation chain on GameCore.
+ * Finish feeding and run its end-phase hooks before entering breeding.
  */
 export const startBreedPhase = (core: GameCore): SessionResponse => {
   core.state.completedFeedingPhases += 1
-  core.state.roundPhase = 'breeding'
-  appendImmediateEvents(core.state, [{
-    type: 'harvest.phaseStarted',
-    harvestPhase: 'breeding',
-  }])
   return core.invokeAfterFeedingPhase()
 }
 
