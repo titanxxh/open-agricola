@@ -1,26 +1,32 @@
 import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game/authoritative-session'
-import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
+import { type GameSession } from '../game/authoritative-session'
+import { createWorkSession } from './_helpers/session-fixtures'
+import { playOccupation } from './_helpers/batch07-card-play'
+import { confirmNextPlayer } from './_helpers/pending-confirms'
 import { isCardFlagged } from '../../shared/cards/helpers/card-state'
 
 import '../../shared/cards/C/C085_DenBuilder'
 
 describe('C085_DenBuilder session', () => {
   const setup = (options?: { houseType?: 'wood' | 'clay' | 'stone'; grain?: number; food?: number }) => {
-    const session = new GameSession(42)
-    stabilizeRandomHands(session.state.players)
-    const state = session.getState().state
-    state.players = state.players.slice(0, 2)
-    state.currentPlayerIndex = 0
-    state.round = 1
-
-    const player = state.players[0]!
-    player.occupationHand.push('C085_DenBuilder')
-    player.houseType = options?.houseType ?? 'clay'
-    player.resources.grain = options?.grain ?? 2
-    player.resources.food = options?.food ?? 5
-    session.loadState(state)
-    session.devPlayCard(0, 'C085_DenBuilder')
+    const session = createWorkSession({seed: 85, configure: state => {
+      state.round = 8
+      state.players.forEach(player => {
+        player.minorHand = ['__test_placeholder__']
+        player.occupationHand = ['__test_placeholder__']
+      })
+      const player = state.players[0]!
+      player.occupationHand = ['C085_DenBuilder']
+      player.houseType = options?.houseType ?? 'clay'
+      player.resources.grain = options?.grain ?? 2
+      player.resources.food = options?.food ?? 5
+    }})
+    const bought = playOccupation(session, 'C085_DenBuilder')
+    expect(bought.ok, bought.error).toBe(true)
+    expect(bought.state.players[0]!.occupationPlayed).toContain('C085_DenBuilder')
+    confirmNextPlayer(session)
+    expect(session.takeAction(1,'forest').ok).toBe(true)
+    confirmNextPlayer(session)
     return session
   }
 
@@ -30,7 +36,7 @@ describe('C085_DenBuilder session', () => {
     return resp
   }
 
-  it('available in clay house: pays grain+food, rooms increment, card flagged', () => {
+  it('available in clay house: pays grain+food and grants capacity without a physical room', () => {
     const session = setup({ houseType: 'clay', grain: 2, food: 5 })
     const state = session.getState().state
     const initialRooms = state.players[0]!.rooms
@@ -43,23 +49,37 @@ describe('C085_DenBuilder session', () => {
     const updatedPlayer = resp.state.players[0]!
     expect(updatedPlayer.resources.grain).toBe(1) // 2 - 1
     expect(updatedPlayer.resources.food).toBe(3)  // 5 - 2
-    expect(updatedPlayer.rooms).toBe(initialRooms + 1)
+    expect(updatedPlayer.rooms).toBe(initialRooms)
+    expect(updatedPlayer.roomTiles).toHaveLength(2)
     expect(isCardFlagged(updatedPlayer, 'C085_DenBuilder')).toBe(true)
   })
 
-  it('available in stone house', () => {
-    const session = setup({ houseType: 'stone', grain: 2, food: 5 })
-    const resp = enterActiveInteraction(session)
-
-    const anytimeIds = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
-    expect(anytimeIds).toContain('C85-den-builder-anytime')
+  it.each(['clay','stone'] satisfies Array<'clay' | 'stone'>)('a paid %s-house card permits real growth but leaves two room tiles', houseType => {
+    const session = setup({houseType,grain:2,food:5})
+    enterActiveInteraction(session)
+    const used = session.takeAnytimeAction(0,'C85-den-builder-anytime')
+    expect(used.ok,used.error).toBe(true)
+    expect(used.state.players[0]!.rooms).toBe(2)
+    expect(used.state.players[0]!.roomTiles).toHaveLength(2)
+    const plowed = session.commitSelectionChoice(0,{tile:{row:0,col:1}})
+    expect(plowed.ok,plowed.error).toBe(true)
+    confirmNextPlayer(session)
+    expect(session.takeAction(1,'grain-seeds').ok).toBe(true)
+    confirmNextPlayer(session)
+    const grown = session.takeAction(0,'wish-children')
+    expect(grown.ok,grown.error).toBe(true)
+    expect(grown.state.players[0]!.workers.filter(worker => worker.isActive)).toHaveLength(3)
+    expect(grown.state.players[0]!.rooms).toBe(2)
+    expect(grown.state.players[0]!.roomTiles).toHaveLength(2)
+    expect(grown.state.players[0]!.workers).toHaveLength(5)
+    session.dispose()
   })
 
   it('NOT available in wood house', () => {
     const session = setup({ houseType: 'wood', grain: 2, food: 5 })
     const resp = enterActiveInteraction(session)
 
-    const anytimeIds = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
+    const anytimeIds = resp.interaction.anytimeActions.map((a) => a.id)
     expect(anytimeIds).not.toContain('C85-den-builder-anytime')
   })
 
@@ -72,7 +92,7 @@ describe('C085_DenBuilder session', () => {
     expect(resp1.ok).toBe(true)
 
     // Should no longer be available
-    const anytimeIds = resp1.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
+    const anytimeIds = resp1.interaction.anytimeActions.map((a) => a.id)
     expect(anytimeIds).not.toContain('C85-den-builder-anytime')
   })
 
@@ -80,7 +100,7 @@ describe('C085_DenBuilder session', () => {
     const session = setup({ houseType: 'clay', grain: 0, food: 5 })
     const resp = enterActiveInteraction(session)
 
-    const anytimeIds = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
+    const anytimeIds = resp.interaction.anytimeActions.map((a) => a.id)
     expect(anytimeIds).not.toContain('C85-den-builder-anytime')
   })
 
@@ -88,7 +108,7 @@ describe('C085_DenBuilder session', () => {
     const session = setup({ houseType: 'clay', grain: 2, food: 1 })
     const resp = enterActiveInteraction(session)
 
-    const anytimeIds = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
+    const anytimeIds = resp.interaction.anytimeActions.map((a) => a.id)
     expect(anytimeIds).not.toContain('C85-den-builder-anytime')
   })
 })

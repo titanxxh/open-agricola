@@ -19,7 +19,6 @@ const anytimeListener: CardListenerRegistration = {
         type: 'seq',
         children: [
           payLeaf({ cardId: CARD_ID, cost: { grain: 1, food: 2 } }),
-          { type: 'leaf', actionId: 'build-farmhand-room', sourceCard: CARD_ID },
           { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: true } },
         ],
       },
@@ -29,6 +28,10 @@ const anytimeListener: CardListenerRegistration = {
 }
 
 const cardImpl = {
+  effect: {
+    id: CARD_ID,
+    computeExtraRoomCapacity: (player) => isCardFlagged(player, CARD_ID) ? 1 : 0,
+  },
   listeners: [anytimeListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
