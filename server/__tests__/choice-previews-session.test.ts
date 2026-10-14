@@ -165,6 +165,7 @@ describe('authoritative choice previews', () => {
   })
   it.each([
     [0, 0, 1], [1, 1, 2], [2, 1, 1], [3, 0, 1], [4, 1, 2], [5, 1, 1], [6, 0, 1],
+    [9, 0, 1], [10, 1, 2], [12, 1, 2], [15, 1, 2],
   ])('uses Rod Collection nonlinear scoring from stored wood %i', (woodCount, oneWoodDelta, twoWoodDelta) => {
     const session = setup('E038_RodCollection', 5)
     const player = session.state.players[0]!

@@ -52,7 +52,7 @@ export const E052_Cubbyhole = defineMinorCard({
     number: 52,
     category: "FOOD",
     desc: ["For each room that you add to your house, place 1 <FOOD> from the general supply on this card. At the start of each feeding phase, you get <FOOD> equal to the amount on this card."],
-    altCosts: [{ wood: 1 }, { clay: 1 }],
+    altCosts: [{ wood: 1, reed: 1 }, { clay: 1, reed: 1 }],
     vp: 1,
   },
   presentation: { counters: ['food'] },

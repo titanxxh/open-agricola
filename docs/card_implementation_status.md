@@ -195,6 +195,8 @@ Gain provenance distinguishes explicit resource parameters from the action space
 
 ## 6. Infrastructure backlog
 
+Each `altCosts` row is a complete base-cost candidate, including any fee shared by all alternatives. Discounts and substitute payments still use the common payment pipeline. Card-local bonus formulas preserve finite printed exceptions and remain separate from printed card VP; storage previews reuse the same scoring callback. Session regressions verify actual fees, transformed payments and later bonus boundaries without adding a shared extension point.
+
 The existing card-local hooks and dynamic prerequisite checks cover the current rule fixes without a new extension point. Independent resource exchanges before a payment use explicit pay/gain flows: their income enters inventory, and the subsequent host payment retains its own gross resource receipt. Invalid special-stable submissions reuse recoverable selection failures; mandatory continuation blocking remains governed by ADR 0015.
 
 The reusable contracts for #1145–#1150 are recorded in §5 and Architecture §5.3/§6.4/§7.6: fixed preparation sources, dynamic action-directory synchronization and purchase-node provenance. New native hooks do not automatically extend the Workshop allowlist. Scoring continues to derive current in-play facts: `getPlayerCookeryCards()` includes major and minor cookeries, excludes ovens and does not duplicate dual identity. Housing expiry and permanent supply removal likewise reuse existing queries and person identities rather than parallel counters.
