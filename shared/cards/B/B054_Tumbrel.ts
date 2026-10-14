@@ -20,7 +20,7 @@ const listener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['sow'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!isUnconditionalSow(context.actionContext)) return
+    if (!isUnconditionalSow(context.actionContext, context.player)) return
     const stableCount = getStableCountForCards(context.player)
     if (stableCount <= 0) return
     return { flow: gainLeaf(CARD_ID, { food: stableCount }), sourceCard: CARD_ID }

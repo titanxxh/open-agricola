@@ -22,7 +22,7 @@ const beforeSowListener: CardListenerRegistration = {
   phases: ['before' as ActionHookPhase],
   actions: ['sow'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!isUnconditionalSow(context.actionContext)) return
+    if (!isUnconditionalSow(context.actionContext, context.player)) return
     return {
       flow: {
         type: 'seq',
@@ -45,7 +45,7 @@ const isDoableListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.doable) return
     if (context.actionContext?.skipBeforeTriggers === true) return
-    if (!isUnconditionalSow(context.actionContext)) return
+    if (!isUnconditionalSow(context.actionContext, context.player)) return
     // Player can plow to create an empty field, making sow possible
     if (context.player.resources.food < 3) return
     return { doable: true }

@@ -13,7 +13,7 @@ const beforeSowListener: CardListenerRegistration = {
   phases: ['before' as ActionHookPhase],
   actions: ['sow'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!isUnconditionalSow(context.actionContext)) return
+    if (!isUnconditionalSow(context.actionContext, context.player)) return
     return { flow: gainLeaf(CARD_ID, { grain: 1 }), sourceCard: CARD_ID }
   },
 }
@@ -26,7 +26,7 @@ const isDoableListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.doable) return
     if (context.actionContext?.skipBeforeTriggers === true) return
-    if (!isUnconditionalSow(context.actionContext)) return
+    if (!isUnconditionalSow(context.actionContext, context.player)) return
     if (canSow(context.player)) return
     if (!getLogicalFields(context.player).some((field) => field.stacks.length === 0)) return
     return { doable: true }

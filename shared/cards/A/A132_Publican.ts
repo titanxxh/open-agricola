@@ -28,7 +28,7 @@ const beforeSowListener: CardListenerRegistration = {
   phases: ['before' as ActionHookPhase],
   scope: 'opponent',
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!isUnconditionalSow(context.actionContext)) return
+    if (!isUnconditionalSow(context.actionContext, context.player)) return
     if (!canSowReceivedGrain(context)) return
     if ((context.ownerPlayer?.resources.grain ?? 0) < 1) return
     const triggerPlayerId = context.triggerPlayer?.id ?? context.player.id
@@ -65,7 +65,7 @@ const isDoableListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.doable) return
     if (context.actionContext?.skipBeforeTriggers === true) return
-    if (!isUnconditionalSow(context.actionContext)) return
+    if (!isUnconditionalSow(context.actionContext, context.player)) return
     if (!canSowReceivedGrain(context)) return
     if ((context.ownerPlayer?.resources.grain ?? 0) < 1) return
     return { doable: true }
