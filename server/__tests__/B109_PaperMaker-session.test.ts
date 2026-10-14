@@ -246,19 +246,59 @@ describe('B109 Paper Maker parity', () => {
     expect(response.state.events.filter(event => event.type === 'resource.moved' && event.sourceCardId === CARD_ID)).toHaveLength(1)
   })
 
-  it('runs alongside another before income without turning either income into a discount', () => {
+  it.each([CARD_ID, 'D049_Bookshelf'])('selects both before sources with %s first and derives them again after undo', first => {
     const session = setup({ occupations: 3 })
     const state = session.getState().state
     state.players[0]!.minorPlayed = ['D049_Bookshelf']
     session.loadState(state)
-    let response = choosePaperMaker(session, session.takeAction(0, 'lessons'), true)
-    response = resolveTriggerIfPresent(session, response, 'D049_Bookshelf')
-    response = completeOccupation(session, response)
-    expect(response.state.players[0]!.resources).toMatchObject({ food: 5, wood: 0 })
-    expect(response.state.events.filter(event => event.type === 'resource.moved' && event.sourceCardId === CARD_ID)).toHaveLength(1)
-    expect(response.state.events).toEqual(expect.arrayContaining([
-      expect.objectContaining({ type: 'resource.paid', paymentFor: 'occupation', resources: { food: 1 } }),
-    ]))
+    const second = first === CARD_ID ? 'D049_Bookshelf' : CARD_ID
+    const sources = (response: SessionResponse) => {
+      expect(response.ok, response.error).toBe(true)
+      if (response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'select-trigger') {
+        throw new Error(`Expected before source selection: ${JSON.stringify(response.interaction)}`)
+      }
+      expect(response.interaction.promptKey).toBe('ui.interactionSelectTrigger')
+      return response.interaction.request.options.flatMap(option => option.sourceCard ? [option.sourceCard] : [])
+    }
+    const finishInOrder = (pending: SessionResponse) => {
+      expect(sources(pending)).toEqual([CARD_ID, 'D049_Bookshelf'])
+      expect(pending.state.players[0]!.resources).toMatchObject({ food: 0, wood: 1 })
+      let response = choose(session, pending, first)
+      if (first === CARD_ID) response = choosePaperMaker(session, response, true)
+      expect(response.state.players[0]!.resources).toMatchObject({ food: 3, wood: first === CARD_ID ? 0 : 1 })
+      expect(response.state.players[0]!.occupationHand).toContain(TARGET)
+      expect(sources(response)).toEqual([second])
+      response = choose(session, response, second)
+      if (second === CARD_ID) response = choosePaperMaker(session, response, true)
+      expect(response.state.players[0]!.resources).toMatchObject({ food: 6, wood: 0 })
+      response = completeOccupation(session, response)
+      expect(response.state.players[0]!.resources).toMatchObject({ food: 5, wood: 0 })
+      const gains = response.state.events.filter(event => event.type === 'resource.moved'
+        && (event.sourceCardId === CARD_ID || event.sourceCardId === 'D049_Bookshelf'))
+      expect(gains).toEqual([
+        expect.objectContaining({ sourceCardId: first, resources: { food: 3 } }),
+        expect.objectContaining({ sourceCardId: second, resources: { food: 3 } }),
+      ])
+      expect(response.state.events.filter(event => event.type === 'resource.paid')).toEqual([
+        expect.objectContaining({ sourceCardId: CARD_ID, paymentFor: 'cardEffect', resources: { wood: 1 } }),
+        expect.objectContaining({ sourceCardId: TARGET, paymentFor: 'occupation', resources: { food: 1 } }),
+      ])
+      expect(response.state.log.filter(entry => entry.key === 'log.cardEffectGain')).toEqual(expect.arrayContaining([
+        expect.objectContaining({ params: expect.objectContaining({ cardId: CARD_ID, gain: { food: 3 } }) }),
+        expect.objectContaining({ params: expect.objectContaining({ cardId: 'D049_Bookshelf', gain: { food: 3 } }) }),
+      ]))
+      return response
+    }
+    finishInOrder(session.takeAction(0, 'lessons'))
+    const undone = session.undoAction()
+    expect(undone.ok, undone.error).toBe(true)
+    expect(undone.interaction.stateId).toBe('idle')
+    expect(undone.state.players[0]!.resources).toMatchObject({ food: 0, wood: 1 })
+    expect(undone.state.players[0]!.occupationHand).toContain(TARGET)
+    expect(undone.state.players[0]!.occupationPlayed).toHaveLength(3)
+    expect(undone.state.events.some(event => event.type === 'resource.moved'
+      && (event.sourceCardId === CARD_ID || event.sourceCardId === 'D049_Bookshelf'))).toBe(false)
+    finishInOrder(session.takeAction(0, 'lessons'))
   })
 
   it('resumes the exchange after a nested anytime action and counts each occupation only once', () => {
