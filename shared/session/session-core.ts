@@ -3906,11 +3906,10 @@ export class GameCore {
             }
             if (this.getAnimalCount(player) > this.getAnimalCount(before)) {
               const pIdx = effectivePlayerIndex
-              // Match previous behavior: this is a fall-through reorganize
-              // detour from auto-resolved choice — the parent frame is
-              // discarded (no resume) before the sub-flow starts.
-              this.engineStack.pop()
-              this.startReorganizeSubFlow(pIdx, 'anytime')
+              frame.engine.flushEventTransaction({ state: this.state, player, space })
+              this.flushEngineLog()
+              this.startReorganizeSubFlow(pIdx,
+                frame.stageResume?.hook === 'onBreedPhase' ? 'harvest-breed' : 'anytime')
               return
             }
             break
