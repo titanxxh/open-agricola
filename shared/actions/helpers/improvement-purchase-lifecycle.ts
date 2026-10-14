@@ -168,7 +168,7 @@ export const commitImprovementPurchaseLifecycle = ({
       sourceCardId: improvementId,
     })
   }
-  return attachImprovementPayment({ type: 'ok' }, improvementId, costResources, paymentInfo.returnedCardId)
+  return attachImprovementPayment({ type: 'ok', extraData: { playedFromHand: wasMinorInHand } }, improvementId, costResources, paymentInfo.returnedCardId)
 }
 
 export const finalizeDirectImprovementPurchaseLifecycle = ({
@@ -188,7 +188,7 @@ export const finalizeDirectImprovementPurchaseLifecycle = ({
   const activation = activateCardEffect(state, player, improvementId, 'onBuy', paymentInfo)
   if (activation.type === 'flow') {
     return attachImprovementPayment(
-      activation,
+      { ...activation, extraData: { ...activation.extraData, ...committed.extraData } },
       improvementId,
       paymentInfo.resourcesPaid ?? {},
       paymentInfo.returnedCardId,
