@@ -6,13 +6,14 @@ import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E154_Margrave'
 const renovateListener: CardListenerRegistration = {
-  id: 'E154-margrave-opponent-renovate',
+  id: 'E154-margrave-renovate',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
   actions: ['renovate-house'],
-  scope: 'opponent',
+  scope: 'any',
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (context.player.houseType !== 'stone') return
+    const owner = context.ownerPlayer ?? context.effectPlayer ?? context.player
+    if (owner.houseType !== 'stone') return
     return { flow: gainLeaf(CARD_ID, { food: 2 }), sourceCard: CARD_ID }
   },
 }
