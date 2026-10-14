@@ -13,7 +13,7 @@ const cardImpl = {
       type: 'seq',
       optional: true,
       children: [
-        { type: 'leaf', actionId: 'sow', params: { max: 1 }, sourceCard: CARD_ID },
+        { type: 'leaf', actionId: 'sow', actionContext: { minSelections: 1, maxSelections: 1, maxSeedSelections: 1, allowedCrops: ['grain', 'vegetable'] }, sourceCard: CARD_ID },
       ],
     }
   },

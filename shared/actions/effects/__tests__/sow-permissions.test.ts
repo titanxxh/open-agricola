@@ -25,3 +25,11 @@ it('field-count and crop-type limits do restrict the ordinary Sow action', () =>
   expect(isUnconditionalSow({ maxSelections: 1 }, player())).toBe(false)
   expect(isUnconditionalSow({ cropType: 'grain' }, player())).toBe(false)
 })
+
+it('seed budgets and crop whitelist reductions restrict Sow without relying on remaining empty fields', () => {
+  const owner = player()
+  owner.fields = [{ row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 3 }] }]
+  expect(isUnconditionalSow({ maxSeedSelections: 1 }, owner)).toBe(false)
+  expect(isUnconditionalSow({ allowedCrops: ['grain'] }, owner)).toBe(false)
+  expect(isUnconditionalSow({ allowedCrops: ['grain', 'vegetable'] }, owner)).toBe(true)
+})

@@ -1167,6 +1167,8 @@ export type InteractionRequest = (
             }[]
             minSelections?: number
             maxSelections?: number
+            /** Maximum seed placements, independently of logical-field groups. */
+            maxSeedSelections?: number
           }
         | {
             farmType: 'fence'
@@ -1302,6 +1304,8 @@ export type InteractionFarmSelection =
       }[]
       minSelections?: number
       maxSelections?: number
+      /** Maximum seed placements, independently of logical-field groups. */
+      maxSeedSelections?: number
     }
 
 export type FarmPositionSelectionTarget = FarmTilePosition & {

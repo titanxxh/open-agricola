@@ -127,6 +127,8 @@ export const useFarmSelectionDraftPresentation = ({
     farmInteraction?.farmType === 'stable' ? farmInteraction.maxSelections : 0
   const maxSowSelections =
     farmInteraction?.farmType === 'sow' ? farmInteraction.maxSelections : undefined
+  const maxSowSeedSelections =
+    farmInteraction?.farmType === 'sow' ? farmInteraction.maxSeedSelections : undefined
   const maxPositionSelections =
     selectionInteraction?.kind === 'farm-position'
       ? selectionInteraction.maxSelections
@@ -385,7 +387,7 @@ export const useFarmSelectionDraftPresentation = ({
     togglePlowTile: (tile: FarmTilePosition) =>
       farmDraft.togglePlowTile(tile, positionKey),
     updateSowSelection: (tile: FarmTilePosition, value: string) =>
-      farmDraft.updateSowSelection(tile, value, maxSowSelections, positionKey, groupKeyByTile),
+      farmDraft.updateSowSelection(tile, value, maxSowSelections, positionKey, groupKeyByTile, maxSowSeedSelections),
     togglePositionSelection: (tile: FarmTilePosition) =>
       farmDraft.togglePositionSelection(
         tile,
@@ -402,6 +404,7 @@ export const useFarmSelectionDraftPresentation = ({
     maxPositionSelections,
     maxRoomSelections,
     maxSowSelections,
+    maxSowSeedSelections,
     maxStableSelections,
     positionGroupKeyByTile,
   ])
