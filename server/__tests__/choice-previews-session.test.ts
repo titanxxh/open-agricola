@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { createWorkSession } from './_helpers/session-fixtures'
 import { serializeSessionSnapshot, serializeState } from '../../shared/session/serialization'
 import { markAllWorkersUsed } from '../../shared/domain/player'
 import type { ActionChoiceOption, ChoiceDescriptionPreview, ChoiceEffectPreview, SessionResponse } from '../../shared/contract/types'
@@ -104,24 +105,40 @@ describe('authoritative choice previews', () => {
     expect(resolved.state.players[0]!.fields[0]!.stacks).toHaveLength(0)
     expect(resolved.state.players[0]!.fields[1]!.stacks).toEqual([{ kind: 'grain', remaining: 2 }])
   })
-  it('binds both Wood Field slots to one whole-field Scythe choice', () => {
-    const session = setup('E073_Scythe', 4)
-    const player = session.state.players[0]!
-    player.minorPlayed = ['E073_Scythe', 'D075_WoodField']
-    player.cardStates.D075_WoodField = { extraData: { cardFieldStacks: [{ crop: 'wood', remaining: 3 }, { crop: 'wood', remaining: 2 }] } }
-    session.state.players.forEach((candidate) => markAllWorkersUsed(session.state, candidate))
-    const response = session.performRoundEnd()
-    const option = choices(response).find((choice) => choice.target?.kind === 'logical-field')!
-    expect(option.target).toMatchObject({ kind: 'logical-field', fieldId: 'card:D075_WoodField', playerId: player.id, resources: { wood: 5 }, positions: [
-      { sourceCard: 'D075_WoodField', cardFieldSlot: 0 }, { sourceCard: 'D075_WoodField', cardFieldSlot: 1 },
-    ] })
-    const before = JSON.stringify(session.state)
-    session.getState()
-    expect(JSON.stringify(session.state)).toBe(before)
-    const resolved = session.resolveChoice(0, option.value)
-    expect(resolved.ok).toBe(true)
-    expect(resolved.state.players[0]!.resources.wood).toBe(25)
-    expect(resolved.state.players[0]!.cardStates.D075_WoodField?.extraData?.cardFieldStacks).toEqual([null, null])
+  it('offers a whole crop field to Scythe while both Wood Field slots harvest normally', () => {
+    const session = createWorkSession({ seed: 409, configure(state) {
+      state.round = 4
+      state.players.forEach(player => {
+        markAllWorkersUsed(state, player)
+        player.resources.food = 20
+      })
+      const player = state.players[0]!
+      player.minorPlayed = ['E073_Scythe', 'D075_WoodField']
+      player.occupationPlayed = ['A100_Curator']
+      player.resources.wood = 20
+      player.fields = [{ row: 0, col: 2, stacks: [{ kind: 'grain', remaining: 3 }] }]
+      player.cardStates.D075_WoodField = { extraData: { cardFieldStacks: [{ crop: 'wood', remaining: 3 }, { crop: 'wood', remaining: 2 }] } }
+    } })
+    try {
+      const player = session.state.players[0]!
+      const response = session.performRoundEnd()
+      const options = choices(response).filter(option => option.value !== '__skip__')
+      expect(options).toHaveLength(1)
+      const option = options[0]!
+      expect(option.target).toMatchObject({ kind: 'logical-field', fieldId: 'farmyard:0:2', playerId: player.id, resources: { grain: 3 }, positions: [{ row: 0, col: 2 }] })
+      expect(choices(response).some(choice => choice.target?.kind === 'logical-field' && choice.target.fieldId === 'card:D075_WoodField')).toBe(false)
+      const before = JSON.stringify(session.state)
+      session.getState()
+      expect(JSON.stringify(session.state)).toBe(before)
+      const resolved = session.resolveChoice(0, option.value)
+      expect(resolved.ok, resolved.error).toBe(true)
+      expect(resolved.state.players[0]!.resources).toMatchObject({ wood: 22, grain: 3 })
+      expect(resolved.state.players[0]!.fields[0]!.stacks).toEqual([])
+      expect(resolved.state.players[0]!.cardStates.D075_WoodField?.extraData?.cardFieldStacks).toEqual([
+        { crop: 'wood', remaining: 2 }, { crop: 'wood', remaining: 1 },
+      ])
+      expect(resolved.state.round).toBe(5)
+    } finally { session.dispose() }
   })
   it('restores choice previews without changing the executable future queue', () => {
     const session = setup('M079_PeatSled', 1, true)

@@ -372,12 +372,13 @@ const setupRound14 = (sheep: number) => {
   player.resources.wood = 1
   player.pastures = [{
     id: 'sheep-pasture',
-    size: 2,
     tiles: [{ row: 0, col: 0 }, { row: 0, col: 1 }],
-    stables: 0,
     animalType: 'sheep',
     animalCount: sheep,
   }]
+  player.fenceSegments = ['H-0-0', 'H-0-1', 'H-1-0', 'H-1-1', 'V-0-0', 'V-0-2'].map(edge => ({
+    edge, type: 'fence', source: { kind: 'own', ownerPlayerId: player.id },
+  }))
   state.players[1]!.startPlayer = false
   setActiveWorkerCount(state.players[1]!, 0)
   session.loadState(state)
@@ -423,10 +424,11 @@ describe('B104 Sheep Walker anytime timing', () => {
     }))
   })
 
-  it('offers placed-sheep recipes during final breeding reorganization alongside cooking', () => {
+  it('offers placed-sheep non-food recipes during final breeding reorganization without cooking', () => {
     const session = setupRound14(2)
     const state = session.getState().state
     state.players[0]!.improvements = ['Major_Fireplace1']
+    state.availableMajorImprovements = state.availableMajorImprovements.filter(id => id !== 'Major_Fireplace1')
     session.loadState(state)
     const before = snapshot(passFeed(session))
     expect(before.interaction.stateId === 'wait' && before.interaction.request.kind).toBe('animal-reorg')
@@ -436,14 +438,22 @@ describe('B104 Sheep Walker anytime timing', () => {
       throw new Error('expected exchange choice')
     }
     expect(choice.interaction.request.options.filter((option) => option.sourceCard === B104)).toHaveLength(3)
-    const cooking = choice.interaction.request.options.find((option) => option.sourceCard === 'Major_Fireplace1')!
-    expect(cooking).toBeDefined()
-    const response = session.resolveChoice(0, `bulk:${cooking.value.split(':')[1]}=1`)
+    expect(choice.interaction.request.options.some((option) => option.sourceCard === 'Major_Fireplace1')).toBe(false)
+    const response = session.resolveChoice(0, `bulk:${exchangeOption(choice, 'stone').value.split(':')[1]}=1`)
     expect(response.ok, response.error).toBe(true)
-    expect(response.state.players[0]!.resources.sheep).toBe(before.state.players[0]!.resources.sheep - 1)
-    expect(response.state.players[0]!.resources.food).toBe(before.state.players[0]!.resources.food + 2)
+    expect(before.state.players[0]!.resources.sheep).toBe(3)
+    expect(response.state.players[0]!.resources).toMatchObject({ sheep: 2, stone: 1, food: 8 })
     expect(response.interaction.stateId === 'wait' && response.interaction.request.kind).toBe('animal-reorg')
     expect(response.interaction.stateId === 'wait' && response.interaction.playerIndex).toBe(0)
+    const housed = session.resolveChoice(0, 'confirm', {
+      zones: [{ id: 'sheep-pasture', zoneType: 'pasture', animalType: 'sheep', animalCount: 2 }],
+    })
+    expect(housed.ok, housed.error).toBe(true)
+    expect(housed.state.players[0]!.pastures[0]!.animalCount).toBe(2)
+    const scored = session.resolveChoice(0, '__skip__')
+    expect(scored.ok, scored.error).toBe(true)
+    expect(scored.state.gameOver).toBe(true)
+    expect(scored.scores).toHaveLength(2)
   })
 
   it('uses only the default exchange windows and retains Emissary before scoring', () => {

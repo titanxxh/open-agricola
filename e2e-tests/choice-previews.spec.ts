@@ -77,8 +77,9 @@ for (const scenario of [{ locale: 'en', width: 1440 }, { locale: 'zh', width: 39
         for (const worker of player.workers.filter((candidate) => candidate.isActive)) state.actionSpaces[0]!.takenBy.push({ playerId: player.id, workerId: worker.id })
       }
       const owner = state.players[0]!
-      owner.minorPlayed = ['E073_Scythe', 'D075_WoodField']
+      owner.minorPlayed = ['E073_Scythe', 'D025_WitchesDanceFloor', 'D075_WoodField']
       owner.fields = [{ row: 0, col: 2, stacks: [{ kind: 'grain', remaining: 3 }] }]
+      owner.cardStates.D025_WitchesDanceFloor = { extraData: { cardFieldStacks: [{ crop: 'grain', remaining: 4 }] } }
       owner.cardStates.D075_WoodField = { extraData: { cardFieldStacks: [{ crop: 'wood', remaining: 3 }, { crop: 'wood', remaining: 2 }] } }
       expect((await request.post(`${BACKEND_URL}/api/game/load`, { data: { state } })).ok()).toBe(true)
       expect((await request.post(`${BACKEND_URL}/api/game/round-end`)).ok()).toBe(true)
@@ -86,12 +87,15 @@ for (const scenario of [{ locale: 'en', width: 1440 }, { locale: 'zh', width: 39
       const farm = page.locator('[data-farm-tile-player="p1"][data-farm-tile-key="0-2"]')
       await expect(farm).toHaveClass(/position-selectable/)
       // The crop strip is a visible sibling of the card anchor, independent of hover.
-      const cardSlots = page.locator('.played-card-slot').filter({ has: page.locator('[data-card-anchor="D075_WoodField"]') }).locator('.card-field-selection')
-      await expect(cardSlots).toHaveCount(2)
+      const cardSlots = page.locator('.played-card-slot').filter({ has: page.locator('[data-card-anchor="D025_WitchesDanceFloor"]') }).locator('.card-field-selection')
+      const woodSlots = page.locator('.played-card-slot').filter({ has: page.locator('[data-card-anchor="D075_WoodField"]') }).locator('.card-field-selection')
+      await expect(cardSlots).toHaveCount(1)
+      await expect(woodSlots).toHaveCount(0)
       await page.reload()
-      await expect(cardSlots).toHaveCount(2)
+      await expect(cardSlots).toHaveCount(1)
+      await expect(woodSlots).toHaveCount(0)
       await page.locator('[data-farm-tile-player="p1"][data-farm-tile-key="1-1"]').click()
-      await expect(cardSlots).toHaveCount(2)
+      await expect(cardSlots).toHaveCount(1)
       const unchanged = await (await request.get(`${BACKEND_URL}/api/game/state`)).json()
       expect(unchanged.state.players[0].fields[0].stacks[0].remaining).toBe(3)
       const selected = page.waitForResponse((response) => response.url().endsWith('/api/game/choice'))
@@ -100,12 +104,13 @@ for (const scenario of [{ locale: 'en', width: 1440 }, { locale: 'zh', width: 39
       const result = await (await selected).json()
       expect(result.ok, JSON.stringify(result)).toBe(true)
       if (target === 'card') {
-        expect(result.state.players[0].cardStatePresentation.D075_WoodField.cropLayers).toEqual([])
+        expect(result.state.players[0].cardStatePresentation.D025_WitchesDanceFloor.cropLayers).toEqual([])
         expect(result.state.players[0].fields[0].stacks[0].remaining).toBe(2)
       } else {
         expect(result.state.players[0].fields[0].stacks).toEqual([])
-        expect(result.state.players[0].cardStatePresentation.D075_WoodField.cropLayers.map((layer: { stack: { remaining: number } }) => layer.stack.remaining)).toEqual([2, 1])
+        expect(result.state.players[0].cardStatePresentation.D025_WitchesDanceFloor.cropLayers.map((layer: { stack: { remaining: number } }) => layer.stack.remaining)).toEqual([3])
       }
+      expect(result.state.players[0].cardStatePresentation.D075_WoodField.cropLayers.map((layer: { stack: { remaining: number } }) => layer.stack.remaining)).toEqual([2, 1])
       await expect(cardSlots).toHaveCount(0)
       await page.screenshot({ path: `output/playwright/choice-${target}-field-${scenario.locale}.png` })
     })
