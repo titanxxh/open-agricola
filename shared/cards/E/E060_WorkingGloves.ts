@@ -1,21 +1,9 @@
-import type { TradeModifier } from '../../contract/types'
+import { PaymentSolver } from '../../actions/payment'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { defineMinorCard } from '../card-source'
 
 const CARD_ID = 'E060_WorkingGloves'
-const GROUP_ID = `${CARD_ID}:occupation-food-replacement`
 const buildingResources = ['wood', 'clay', 'reed', 'stone'] as const
-
-const modifiers: TradeModifier[] = buildingResources.map((res) => ({
-  type: 'trade',
-  cardId: CARD_ID,
-  appliesTo: ['occupation'],
-  from: { [res]: 1 },
-  to: { food: 2 },
-  max: 1,
-  groupId: GROUP_ID,
-  groupMax: 1,
-}))
 
 export const E060_WorkingGloves = defineMinorCard({
   meta: {
@@ -34,7 +22,21 @@ export const E060_WorkingGloves = defineMinorCard({
       id: CARD_ID,
       onBuy: () => gainLeaf(CARD_ID, { food: 1 }),
     },
-    modifiers,
+    listeners: [{
+      id: 'E60-working-gloves-occupation-cost',
+      cardIds: [CARD_ID],
+      phases: ['computeCosts'],
+      actions: ['occupation'],
+      deriveCardCostCandidate: (_context, candidate) => {
+        if (candidate.sources.includes(CARD_ID)) return null
+        const discounted = PaymentSolver.discountCardCostCandidate(candidate, CARD_ID, { food: 2 })
+        if (!discounted) return null
+        return buildingResources.map(material => PaymentSolver.addCardCostCandidateAttribution({
+          ...discounted,
+          resources: { ...discounted.resources, [material]: (discounted.resources[material] ?? 0) + 1 },
+        }, CARD_ID, { paid: { [material]: 1 } }))
+      },
+    }],
     reaches: [] as readonly string[],
   },
 })

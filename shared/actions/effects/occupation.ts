@@ -369,7 +369,7 @@ export const collectOccupationActionPaymentOptions = (
   reserveResources?: Partial<Resource>,
 ): PaymentSolution[] => {
   const normalizedCost = resolveOccupationActionPaymentCost(state, player, occupationId, cost, actionCardId)
-  return computeOccupationPaymentOptions(state, player, occupationId, normalizedCost, actionCardId, reserveResources)
+  return computeOccupationPaymentOptions(state, player, occupationId, normalizedCost.cost, actionCardId, reserveResources)
 }
 
 const computeOccupationPaymentOptions = (
@@ -399,17 +399,21 @@ const resolveOccupationActionPaymentCost = (
   occupationId: string,
   baseCost: Partial<Resource>,
   actionCardId?: string,
-): ComplexCost => {
-  const resolvedCost = PaymentSolver.resolveCardPreviewCostByProvider(
+) => {
+  const resolved = PaymentSolver.resolveCardPreviewCostDetailedByProvider(
     state,
     player,
     'occupation',
     occupationId,
     () => baseCost,
     actionCardId,
-  ) ?? baseCost
-  // Every occupation payment uses the same solver path, including modifier trades.
-  return PaymentSolver.isComplexCost(resolvedCost) ? resolvedCost : { fee: resolvedCost }
+  )
+  const cost = resolved?.cost ?? baseCost
+  const normalizedCost: ComplexCost = PaymentSolver.isComplexCost(cost) ? cost : { fee: cost }
+  return {
+    ...resolved,
+    cost: normalizedCost,
+  }
 }
 
 const describeOccupationActionPayment = (
@@ -420,9 +424,12 @@ const describeOccupationActionPayment = (
   actionCardId?: string,
   reserveResources?: Partial<Resource>,
 ): ChoiceEffectPreview | undefined => {
-  const cost = resolveOccupationActionPaymentCost(state, player, occupationId, baseCost, actionCardId)
+  const { cost, candidateMetadataByFeeIndex } = resolveOccupationActionPaymentCost(state, player, occupationId, baseCost, actionCardId)
   const previews = computeOccupationPaymentOptions(state, player, occupationId, cost, actionCardId, reserveResources)
-    .map(solution => describePaymentEffectPreview(solution, false, { paymentResourceProviders: cost.paymentResourceProviders }))
+    .map(solution => describePaymentEffectPreview(solution, false, {
+      paymentResourceProviders: cost.paymentResourceProviders,
+      extraSourcesForSolution: current => current.cardUsed ? [] : candidateMetadataByFeeIndex?.[current.feeIndex ?? 0]?.sources ?? [],
+    }))
   if (previews.length === 0) return undefined
   if (previews.length === 1) return previews[0]
   return { kind: 'rule', description: { kind: 'group', operator: 'xor', separator: ' / ', parts: previews.map(effectPreview => ({ kind: 'action', showLabel: false, labelKey: 'actions.pay.name', effectPreview })) } }
@@ -451,12 +458,13 @@ const readOccupationCommitData = (
 }
 
 const buildOccupationPayChild = (
-  cost: ComplexCost,
+  payment: ReturnType<typeof resolveOccupationActionPaymentCost>,
   occupationId: string,
   actionContext: Record<string, unknown> | undefined,
   reserveResources: Partial<Resource> | undefined,
 ): InternalActionChild => buildInternalPayChild({
-  cost,
+  cost: payment.cost,
+  candidateMetadataByFeeIndex: payment.candidateMetadataByFeeIndex,
   costType: 'occupation',
   optionPrefix: `pay:occupation:${occupationId}`,
   sourceCard: occupationId,
@@ -468,13 +476,13 @@ const buildOccupationPayChild = (
 })
 
 const buildOccupationInternalChildren = (
-  cost: ComplexCost,
+  payment: ReturnType<typeof resolveOccupationActionPaymentCost>,
   occupationId: string,
   actionContext: Record<string, unknown> | undefined,
   reserveResources: Partial<Resource> | undefined,
 ): InternalActionChildren => ({
   beforeHostListeners: [
-    buildOccupationPayChild(cost, occupationId, actionContext, reserveResources),
+    buildOccupationPayChild(payment, occupationId, actionContext, reserveResources),
   ],
   afterHostCommitListeners: [
     {

@@ -1,143 +1,94 @@
+import type { ActionChoiceOption } from '../../shared/contract/types'
 import { type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import '../../shared/cards/A/A116_WoodCutter'
 import '../../shared/cards/A/A002_ShiftingCultivation'
 
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { computePaymentOptionsForTest } from '../../shared/actions/payment/__tests__/test-helpers'
-import type { PaymentSolution } from '../../shared/contract/types'
+import { PaymentSolver } from '../../shared/actions/payment'
+import { createWorkSession } from './_helpers/session-fixtures'
 import '../../shared/cards/E/E060_WorkingGloves'
 
 const CARD_ID = 'E060_WorkingGloves'
 
-describe('E060_WorkingGloves session — trade-style modifier on occupation cost', () => {
-  const setup = () => {
-    const session = new GameSession(42)
-    const state = session.getState().state
-    state.players = state.players.slice(0, 2)
-    state.currentPlayerIndex = 0
-    state.round = 5
-    const player = state.players[0]!
-    player.minorPlayed.push(CARD_ID)
-    player.resources = {
-      ...player.resources,
-      wood: 1,
-      clay: 1,
-      stone: 1,
-      reed: 1,
-      food: 4,
-    }
-    session.loadState(state)
-    // After loadState normalizes, fetch the canonical player reference.
-    const live = session.getState().state.players[0]!
-    return { session, state, player: live }
+const sessions: GameSession[] = []
+afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+
+// Public cost previews cover fees not offered by an ordinary Lessons action;
+// committed payment and action admission are covered by Session tests below.
+describe('E060 Working Gloves cost candidates', () => {
+  const setup = (food = 4) => {
+    const session = createWorkSession({ configure(state) {
+      const owner = state.players[0]!
+      owner.minorPlayed = [CARD_ID]
+      Object.assign(owner.resources, { wood: 1, clay: 1, reed: 1, stone: 1, food })
+    } })
+    sessions.push(session)
+    return session.getState().state
   }
 
-  const e60TradeTimes = (solution: PaymentSolution) =>
-    solution.tradesUsed.reduce(
-      (sum, entry) => sum + (entry.trade.sourceId === CARD_ID ? entry.times : 0),
-      0,
+  const options = (foodFee: number, availableFood = 4) => {
+    const state = setup(availableFood)
+    const resolved = PaymentSolver.resolveCardPreviewCostDetailedByProvider(
+      state, state.players[0]!, 'occupation', 'A116_WoodCutter', () => ({ food: foodFee }), 'lessons',
     )
+    if (!resolved) throw new Error('Expected an occupation cost')
+    const cost = PaymentSolver.isComplexCost(resolved.cost) ? resolved.cost : { fee: resolved.cost }
+    const context = { actionId: 'occupation', costType: 'occupation' as const,
+      candidateMetadataByFeeIndex: resolved.candidateMetadataByFeeIndex }
+    return { solutions: PaymentSolver.computeOptions(state, 0, cost, context),
+      previews: PaymentSolver.describeOptions(state, 0, cost, context) }
+  }
 
-  it('player.activeModifiers contains 4 trade modifiers for occupation cost', () => {
-    const { player } = setup()
-    const e60Mods = player.activeModifiers.filter((m) => m.cardId === CARD_ID)
-    expect(e60Mods.length).toBe(4)
-    expect(e60Mods.every((m) => m.type === 'trade')).toBe(true)
-    expect(e60Mods.every((m) => m.appliesTo.includes('occupation'))).toBe(true)
-    const fromKeys = e60Mods.map((m) => m.type === 'trade' ? Object.keys(m.from)[0] : '').sort()
-    expect(fromKeys).toEqual(['clay', 'reed', 'stone', 'wood'])
-  })
-
-  it('cost-pipeline emits ≥5 PaymentSolution paths (base + 4 trade alternatives)', () => {
-    const { player } = setup()
-    // Simulate playing an occupation with cost { food: 2 }.
-    const solutions = computePaymentOptionsForTest(
-      player,
-      { fee: { food: 2 } },
-      'occupation',
-    )
-    expect(solutions.length).toBeGreaterThanOrEqual(5)
-    // Base solution: pay food:2.
-    const base = solutions.find(
-      (s) =>
-        (s.resourcesPaid.food ?? 0) === 2 &&
-        (s.resourcesPaid.wood ?? 0) === 0 &&
-        (s.resourcesPaid.clay ?? 0) === 0 &&
-        (s.resourcesPaid.stone ?? 0) === 0 &&
-        (s.resourcesPaid.reed ?? 0) === 0,
-    )
-    expect(base).toBeDefined()
-    // Each building resource trade alternative: pay 1 of that resource, 0 food.
-    for (const res of ['wood', 'clay', 'stone', 'reed'] as const) {
-      const tradeSol = solutions.find(
-        (s) =>
-          (s.resourcesPaid.food ?? 0) === 0 &&
-          (s.resourcesPaid[res] ?? 0) === 1,
-      )
-      expect(tradeSol, `trade alt for ${res}`).toBeDefined()
+  it.each([[1, 0], [2, 0], [3, 1], [4, 2]])('fee %i substitutes at most two food, leaving %i food payable', (fee, remainder) => {
+    const { solutions } = options(fee)
+    expect(solutions.some(solution => solution.resourcesPaid.food === fee)).toBe(true)
+    for (const material of ['wood', 'clay', 'reed', 'stone'] as const) {
+      expect(solutions.some(solution => solution.resourcesPaid[material] === 1 &&
+        (solution.resourcesPaid.food ?? 0) === remainder)).toBe(true)
     }
   })
 
-  it('does not affect non-occupation cost types', () => {
-    const { player } = setup()
-    // Renovation cost: pay 2 clay + 1 reed. The 4 occupation trades must not
-    // appear because their appliesTo doesn't include 'renovation'.
-    const solutions = computePaymentOptionsForTest(
-      player,
-      { fee: { clay: 1, reed: 1 } },
-      'renovation',
-    )
-    // All solutions should pay the literal cost (or be limited by what's
-    // available). No solution should pay 0 clay + 0 reed via E60 trade.
-    const e60TradeUsed = solutions.find((s) =>
-      s.tradesUsed.some((t) => t.trade.sourceId === CARD_ID && t.times > 0),
-    )
-    expect(e60TradeUsed).toBeUndefined()
+  it('offers a free fee without charging a material', () => {
+    const { solutions } = options(0, 0)
+    expect(solutions).toHaveLength(1)
+    expect(Object.values(solutions[0]!.resourcesPaid).every(amount => amount === 0)).toBe(true)
   })
 
-  it('does not allow two building resources to replace 4 food in one occupation payment', () => {
-    const { player } = setup()
-    player.resources = {
-      ...player.resources,
-      wood: 1,
-      clay: 1,
-      reed: 0,
-      stone: 0,
-      food: 0,
-    }
-
-    const solutions = computePaymentOptionsForTest(
-      player,
-      { fee: { food: 4 } },
-      'occupation',
-    )
-
-    expect(solutions).toEqual([])
+  it('does not substitute twice for a four-food fee', () => {
+    expect(options(4, 0).solutions).toEqual([])
   })
 
-  it('allows one building resource replacement when the remaining food is paid', () => {
-    const { player } = setup()
-    player.resources = {
-      ...player.resources,
-      wood: 1,
-      clay: 1,
-      reed: 0,
-      stone: 0,
-      food: 2,
-    }
+  it('combines a single substitution with Forest School for the remaining food', () => {
+    const state = setup(0)
+    const owner = state.players[0]!
+    owner.minorPlayed.push('A028_ForestSchool')
+    Object.assign(owner.resources, { wood: 2, clay: 1 })
+    // Reload derives the other card's ordinary occupation payment modifier.
+    const session = sessions.at(-1)!
+    session.loadState(state)
+    const live = session.getState().state
+    const resolved = PaymentSolver.resolveCardPreviewCostDetailedByProvider(live, live.players[0]!, 'occupation', 'A116_WoodCutter', () => ({ food: 4 }))
+    if (!resolved) throw new Error('Expected cost candidates')
+    const previews = PaymentSolver.describeOptions(live, 0, resolved.cost, {
+      actionId: 'occupation', costType: 'occupation', candidateMetadataByFeeIndex: resolved.candidateMetadataByFeeIndex,
+    })
+    expect(previews.some(preview => preview.effectPreview?.kind === 'payment' &&
+      preview.effectPreview.resourcesPaid?.clay === 1 && preview.effectPreview.resourcesPaid.wood === 2 &&
+      preview.effectPreview.sourceCards?.includes(CARD_ID) && preview.effectPreview.sourceCards.includes('A028_ForestSchool'))).toBe(true)
+  })
 
-    const solutions = computePaymentOptionsForTest(
-      player,
-      { fee: { food: 4 } },
-      'occupation',
-    )
-
-    expect(solutions.length).toBeGreaterThan(0)
-    expect(solutions.every((s) => e60TradeTimes(s) <= 1)).toBe(true)
-    expect(solutions.some((s) => e60TradeTimes(s) === 1 && (s.resourcesPaid.food ?? 0) === 2)).toBe(true)
+  it('attributes only material candidate previews to Working Gloves', () => {
+    const { previews } = options(1)
+    const paid = previews.map(preview => preview.effectPreview)
+    const material = paid.find(preview => preview?.kind === 'payment' && preview.resourcesPaid?.wood === 1)
+    const ordinary = paid.find(preview => preview?.kind === 'payment' && preview.resourcesPaid?.food === 1)
+    expect(material).toMatchObject({ kind: 'payment', resourcesPaid: { wood: 1 }, sourceCards: [CARD_ID] })
+    expect(ordinary).toMatchObject({ kind: 'payment', resourcesPaid: { food: 1 } })
+    if (!ordinary || ordinary.kind !== 'payment') throw new Error('Expected ordinary payment preview')
+    expect(ordinary.sourceCards ?? []).toEqual([])
   })
 })
 
@@ -183,10 +134,11 @@ describe('E060 Working Gloves parity', () => {
     owner.resources.food = 0
     Object.assign(owner.resources, resources)
     session.loadState(state)
+    sessions.push(session)
     return session
   }
 
-  const options = (response: SessionResponse) => response.interaction.stateId === 'wait'
+  const options = (response: SessionResponse): ActionChoiceOption[] => response.interaction.stateId === 'wait' && 'options' in response.interaction.request
     ? response.interaction.request.options ?? []
     : []
 
@@ -208,7 +160,7 @@ describe('E060 Working Gloves parity', () => {
 
   const occupationPayment = (
     session: GameSession,
-    choose: (resources: Record<string, number>) => boolean,
+    choose: (resources: Partial<Record<string, number>>) => boolean,
   ) => {
     let response = session.takeAction(0, 'lessons-3')
     expect(response.ok, response.error).toBe(true)
@@ -223,10 +175,11 @@ describe('E060 Working Gloves parity', () => {
       stateId: 'wait', promptKey: 'prompt.selectPayment', request: { kind: 'choice' },
     })
     const payment = options(response).find((option) => {
-      const paid = option.labelParams?.resourcesPaid as Record<string, number> | undefined
-      return paid ? choose(paid) : false
+      const preview = option.effectPreview
+      return preview?.kind === 'payment' && preview.resourcesPaid ? choose(preview.resourcesPaid) : false
     })
     expect(payment, JSON.stringify(response.interaction)).toBeDefined()
+    if (response.interaction.stateId !== 'wait') throw new Error('Expected payment choice')
     response = session.resolveChoice(response.interaction.playerIndex, payment!.value)
     return response
   }
