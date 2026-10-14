@@ -9,7 +9,7 @@ const cardImpl = {
   id: CARD_ID,
   onBuy: (state, _player) => {
     const roundsLeft = 14 - state.round
-    if (roundsLeft <= 0) return
+    if (roundsLeft < 0) return
     return {
       type: 'seq' as const,
       optional: true,
