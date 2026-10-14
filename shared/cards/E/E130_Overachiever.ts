@@ -4,6 +4,7 @@ import type { ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E130_Overachiever'
+const WISH_SPACES = new Set(['wish-children', 'urgent-wish-children', 'modest-wish-children-56'])
 const DISCOUNT_RESOURCES = [
   'wood', 'clay', 'stone', 'reed', 'food', 'grain', 'vegetable',
   'sheep', 'boar', 'cattle',
@@ -14,7 +15,8 @@ const beforeWishChildrenListener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   phases: ['before'],
   actions: ['family-growth'],
-  handler: (_context: CardListenerContext): ActionHookResult | void => {
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (!WISH_SPACES.has(context.space?.id ?? '')) return
     return {
       flow: {
         type: 'leaf',
