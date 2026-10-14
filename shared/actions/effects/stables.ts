@@ -483,6 +483,11 @@ export const stablesAction: ActionDefinition = {
       }
       const placementError = stables.length > 0 ? validateStablePlacement(ctx, stables) : undefined
       if (placementError?.type === 'fail') return { ...placementError, recoverable: true }
+      if (farmHand && !collectSpecialStablePositions(ctx.state, ctx.player).some(({ position }) =>
+        position.row === farmHand.row && position.col === farmHand.col,
+      )) {
+        return { type: 'fail', errorKey: 'log.buildStableFail', recoverable: true }
+      }
       const costResolution = resolveStableTotalCostWithDiscount(
         ctx.state,
         ctx.player,

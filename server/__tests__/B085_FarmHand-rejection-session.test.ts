@@ -122,20 +122,33 @@ describe('B085 Farm Hand rejected selections', () => {
     expect(getExtraRoomCapacity(built.state.players[0]!)).toBe(0)
   })
 
-  it('settles a legal centre once through the selected alternative stable payment', () => {
+  it.each([false, true])('rejects an illegal centre before alternative payments and retries legally without undo, mixed=%s', (mixed) => {
     const session = setup((player) => {
+      player.resources.wood = mixed ? 4 : 2
       player.resources.clay = 2
       player.activeModifiers = [{
         type: 'trade', cardId: 'Test_Stable_Clay', appliesTo: ['stables'],
         from: { clay: 2 }, to: { wood: 2 }, max: 1,
       }]
     })
-    enterStableSelection(session)
-    const payment = session.commitSelectionChoice(0, { farmHand: CENTER })
+    const pending = enterStableSelection(session)
+    assert.ok(pending.interaction.stateId === 'wait' && pending.interaction.request.kind === 'farm-select')
+    assert.equal(pending.interaction.request.farm.farmType, 'stable')
+    const ordinary = pending.interaction.request.farm.selectableTiles[0]
+    assert.ok(ordinary)
+    const stables = mixed ? [ordinary] : []
+    const farmBefore = ruleSnapshot(pending)
+    const rejected = session.commitSelectionChoice(0, { stables, farmHand: { row: 2, col: 4 } })
+    expect(rejected.ok).toBe(false)
+    expect(rejected.error).toBe('log.buildStableFail')
+    expect(ruleSnapshot(rejected)).toBe(farmBefore)
+
+    const payment = session.commitSelectionChoice(0, { stables, farmHand: CENTER })
     expect(payment.ok, payment.error).toBe(true)
     assert.ok(payment.interaction.stateId === 'wait' && payment.interaction.request.kind === 'choice')
     expect(payment.interaction.promptKey).toBe('prompt.selectPayment')
-    expect(payment.state.players[0]!.resources).toMatchObject({ wood: 2, clay: 2 })
+    expect(payment.state.players[0]!.resources).toMatchObject({ wood: mixed ? 4 : 2, clay: 2 })
+    expect(payment.state.players[0]!.stableTiles).toEqual([])
     expect(payment.state.players[0]!.cardStates[CARD_ID]).toBeUndefined()
     expect(payment.state.events.filter((event) => event.type === 'farm.stableBuilt')).toHaveLength(0)
     const before = ruleSnapshot(payment)
@@ -151,7 +164,8 @@ describe('B085 Farm Hand rejected selections', () => {
     expect(built.ok, built.error).toBe(true)
     expect(built.state.players[0]!.resources).toMatchObject({ wood: 2, clay: 0 })
     expect(built.state.players[0]!.cardStates[CARD_ID]).toMatchObject({ flagged: true, extraData: { position: CENTER } })
-    expect(getAvailableStableSupplyCount(built.state, built.state.players[0]!)).toBe(3)
+    expect(getAvailableStableSupplyCount(built.state, built.state.players[0]!)).toBe(mixed ? 2 : 3)
+    expect(built.state.players[0]!.stableTiles).toEqual(stables)
     expect(built.state.events.filter((event) => event.type === 'farm.stableBuilt')).toHaveLength(1)
     expect(built.state.events.filter((event) => event.type === 'resource.paid' && event.paymentFor === 'stables')).toHaveLength(1)
   })
