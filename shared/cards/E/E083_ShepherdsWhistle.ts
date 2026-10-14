@@ -63,7 +63,7 @@ const cardImpl = {
         children: [
           {
             type: 'leaf',
-            actionId: 'anytime-reorg',
+            actionId: 'reorganize',
             sourceCard: CARD_ID,
           },
           {
