@@ -41,7 +41,6 @@ export const C086_LivestockFeeder = defineOccupationCard({
     desc: ["When you play this card, you immediately get 1 <GRAIN>. This card can hold 1 animal of any type for each <GRAIN> in your supply."],
     cost: {},
     animalHolder: true,
-    occupationPrerequisites: {"min":2},
     players: "1+",
   },
   impl: cardImpl,

@@ -62,6 +62,31 @@ for (const card of [
   })
 }
 
+for (const priorOccupations of [0, 1]) {
+  test(`C086 can be selected after ${priorOccupations} earlier occupations and stays played after reload`, async ({ page, request }) => {
+    const cardId = 'C086_LivestockFeeder'
+    await openScenario(page, request, state => {
+      const player = state.players[0]!
+      player.occupationPlayed = priorOccupations ? ['A116_WoodCutter'] : []
+      player.occupationHand = [cardId, 'A110_Roughcaster', 'A125_Priest']
+      player.resources.food = 2
+      player.resources.grain = 0
+    })
+    await page.locator('[data-action-id="lessons"] button').first().click()
+    const occupation = page.locator(`.interaction-bar [data-choice-value="${cardId}"]`)
+    await expect(occupation).toBeEnabled()
+    await expect(occupation).toContainText('Livestock Feeder')
+    const committed = page.waitForResponse(response => response.url().endsWith('/api/game/choice'))
+    await occupation.click()
+    const response = await (await committed).json()
+    expect(response.ok, JSON.stringify(response)).toBe(true)
+    expect(response.state.players[0].occupationPlayed).toContain(cardId)
+    await page.reload()
+    await expect(page.locator('.played-card-slot').filter({ has: page.locator(`[data-card-anchor="${cardId}"]`) })).toBeVisible()
+    await expect(page.locator('.interaction-bar').getByRole('button', { name: 'Confirm switch' })).toBeVisible()
+  })
+}
+
 test('Pioneer before resources unlock a purchase and survive reloading the pending choice', async ({ page, request }) => {
   await openScenario(page, request, (state) => {
     state.round = 4

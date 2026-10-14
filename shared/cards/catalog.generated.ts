@@ -6838,9 +6838,6 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     ],
     "cost": {},
     "animalHolder": true,
-    "occupationPrerequisites": {
-      "min": 2
-    },
     "players": "1+",
     "kind": "occupation"
   },

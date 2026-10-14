@@ -4,7 +4,7 @@
 
 > 本文是 [`card_implementation_status.md`](card_implementation_status.md) 的中文镜像；英文版是规范文档。
 
-> 生成/更新日期：2026-10-14。本文件替代 `docs/card_desc_audit.md`、`docs/card_progress.md`、`docs/master-plan.md`、`docs/bad-smell.md`。参考实现唯一基准：`参考实现`。
+> 生成/更新日期：2026-10-15。本文件替代 `docs/card_desc_audit.md`、`docs/card_progress.md`、`docs/master-plan.md`、`docs/bad-smell.md`。规则权威为出版社卡牌文字和印刷图标、官方裁定及已记录的维护者决定。参考代码仅作实现对照。
 
 ## 2. 问题优先汇总
 
@@ -237,6 +237,7 @@ Issue #893 补充不改变固定槽身份的 Card Field 作物分层；播种提
 
 ## 8. 参考实现坏味道：不要照抄
 
+- 不把导入的前置条件元数据当作规则权威。前置条件以出版社卡牌文字、印刷图标和官方裁定为准。参考实现运行时未使用的字段，在 OA 通用校验中可能成为实际限制。
 - 不用混合开轮扫描近似揭牌或开工反应；不靠牌区索引恢复准备窗口，不在来源发现时按当前支付能力删掉合法反应。
 - 不从最初放人格、外层 frame 或最后一个工人反推购买来源；新授予的购买必须保留自己的节点身份。
 
