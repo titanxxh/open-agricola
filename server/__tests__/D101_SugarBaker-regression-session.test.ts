@@ -55,6 +55,41 @@ function take(session: GameSession, space: string, pay = false) {
 }
 function pile(response: SessionResponse) { return response.state.actionSpaces.find(space => space.id === 'grain-utilization')!.resources.food }
 function bonus(response: SessionResponse) { return response.state.players[0]!.cardStates[CARD]?.counters?.bonusVp ?? 0 }
+function assertPublicBonus(response: SessionResponse, playerIndex: number, score: number) {
+  const summary = response.scores?.[playerIndex]
+  expect(summary, 'Missing public player score').toBeDefined()
+  if (!summary) throw new Error('Missing public player score')
+  const category = summary.categories.find(category => category.key === 'cardBonusVp')
+  expect(category?.total ?? 0).toBe(score)
+  if (score === 1) expect(category!.entries).toEqual(expect.arrayContaining([
+    expect.objectContaining({ type: 'bonus', cardId: CARD, score: 1 }),
+  ]))
+}
+function assertOneOwnerPayment(response: SessionResponse) {
+  const owner = response.state.players[0]!
+  const paid = response.state.events.filter(event => event.type === 'resource.paid' && event.sourceCardId === CARD)
+  expect(paid).toHaveLength(1)
+  expect(paid[0]).toMatchObject({ actorPlayerId: owner.id, resources: { food: 1 } })
+  const rows = response.state.log.filter(row => row.key === 'log.cardEffectPay' && row.params?.cardId === CARD)
+  expect(rows).toHaveLength(1)
+  expect(rows[0]).toMatchObject({ playerId: owner.id, params: { cardId: CARD, cost: { food: 1 } } })
+}
+function assertFoodVisitor(response: SessionResponse, playerIndex: number, food: number) {
+  const visitor = response.state.players[playerIndex]!
+  const collected = response.state.events.filter(event => event.type === 'resource.moved'
+    && event.reason === 'collect' && event.from.kind === 'actionSpace' && event.from.spaceId === 'grain-utilization')
+  expect(collected).toHaveLength(1)
+  expect(collected[0]).toMatchObject({
+    actorPlayerId: visitor.id, resources: { food },
+    from: { kind: 'actionSpace', spaceId: 'grain-utilization' },
+    to: { kind: 'player', playerId: visitor.id },
+  })
+  expect(response.state.log).toEqual(expect.arrayContaining([
+    expect.objectContaining({ key: 'log.actionDetail', playerId: visitor.id,
+      params: expect.objectContaining({ detailParts: expect.objectContaining({ gains: { food } }) }) }),
+  ]))
+}
+
 
 it('the next round opponent Sow visitor collects the paid food without another owner purchase', () => {
   const session = make()
@@ -62,6 +97,8 @@ it('the next round opponent Sow visitor collects the paid food without another o
   expect(pile(response)).toBe(1)
   expect(bonus(response)).toBe(1)
   expect(response.state.players[0]!.resources.food).toBe(19)
+  assertPublicBonus(response, 0, 1)
+  assertOneOwnerPayment(response)
   next(session, response)
   response = take(session, 'forest')
   next(session, response)
@@ -76,6 +113,10 @@ it('the next round opponent Sow visitor collects the paid food without another o
   expect(response.state.players[1]!.resources.food).toBe(21)
   expect(pile(response)).toBe(0)
   expect(bonus(response)).toBe(1)
+  assertFoodVisitor(response, 1, 1)
+  assertOneOwnerPayment(response)
+  assertPublicBonus(response, 0, 1)
+  assertPublicBonus(response, 1, 0)
 })
 
 it('an opponent collects only food while unrelated goods remain on the space', () => {
@@ -86,6 +127,9 @@ it('an opponent collects only food while unrelated goods remain on the space', (
   expect(response.state.players[0]!.resources.food).toBe(20)
   expect(response.state.actionSpaces.find(space => space.id === 'grain-utilization')!.resources).toMatchObject({ food: 0, wood: 3 })
   expect(bonus(response)).toBe(0)
+  assertFoodVisitor(response, 1, 2)
+  assertPublicBonus(response, 0, 0)
+  assertPublicBonus(response, 1, 0)
 })
 
 it('the owner collects earlier food before paying for one new bonus', () => {
@@ -93,6 +137,9 @@ it('the owner collects earlier food before paying for one new bonus', () => {
   expect(response.state.players[0]!.resources.food).toBe(20)
   expect(pile(response)).toBe(1)
   expect(bonus(response)).toBe(1)
+  assertFoodVisitor(response, 0, 1)
+  assertOneOwnerPayment(response)
+  assertPublicBonus(response, 0, 1)
 })
 
 it('holding Sugar Baker does not collect or offer its payment', () => {
