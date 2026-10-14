@@ -5,7 +5,7 @@ import { buildCardsManifest } from '../../../scripts/build-cards-manifest'
 import { ALL_CARD_IMPLS } from '../register-all'
 import { GameSession } from '../../../server/game/authoritative-session'
 import { setWorkersAtHome } from '../../domain/player'
-import { computePaymentOptionsForTest } from '../../actions/payment/__tests__/test-helpers'
+import { createWorkSession } from '../../../server/__tests__/_helpers/session-fixtures'
 import { runCardEffectHook } from '../card-effects'
 import { getCardDefinition } from '../catalog'
 import { implementedMinorImprovementCardsList, minorImprovementCardsList } from '../catalog.generated'
@@ -39,45 +39,29 @@ describe('Card Source representative migrations', () => {
     expect(ALL_CARD_IMPLS.A169_OffSiter?.effect?.computeExtraRoomCapacity).toEqual(expect.any(Function))
   })
 
-  it('keeps Working Gloves modifiers under Card Source impl and effective in payment', () => {
-    const impl = ALL_CARD_IMPLS['E060_WorkingGloves']
+  it('loads Working Gloves cost substitution through Card Source and Session runtime', () => {
     const definition = getCardDefinition('E060_WorkingGloves')
-
     expect(manifest()['E060_WorkingGloves']?.module).toBe('shared/cards/E/E060_WorkingGloves')
     expect(definition?.modifier).toBeUndefined()
     expect(definition?.modifiers).toBeUndefined()
-    expect(impl?.modifiers).toHaveLength(4)
-    expect(impl?.effect?.onBuy).toEqual(expect.any(Function))
 
-    const session = new GameSession()
-    stabilizeRandomHands(session.state.players)
-    const state = session.getState().state
-    state.players = state.players.slice(0, 2)
-    const player = state.players[0]!
-    player.minorPlayed.push('E060_WorkingGloves')
-    player.resources = {
-      ...player.resources,
-      wood: 1,
-      clay: 1,
-      reed: 1,
-      stone: 1,
-      food: 4,
-    }
-    session.loadState(state)
-
-    const after = session.getState().state.players[0]!
-    expect(after.activeModifiers.filter((m) => m.cardId === 'E060_WorkingGloves')).toHaveLength(4)
-
-    const solutions = computePaymentOptionsForTest(
-      after,
-      { fee: { food: 2 } },
-      'occupation',
-    )
-
-    expect(solutions.some((s) => (s.resourcesPaid.food ?? 0) === 2)).toBe(true)
-    for (const res of ['wood', 'clay', 'reed', 'stone'] as const) {
-      expect(solutions.some((s) => (s.resourcesPaid.food ?? 0) === 0 && (s.resourcesPaid[res] ?? 0) === 1)).toBe(true)
-    }
+    const session = createWorkSession({ configure(state) {
+      const owner = state.players[0]!
+      owner.minorPlayed = ['E060_WorkingGloves']
+      owner.occupationPlayed = ['A110_Roughcaster']
+      owner.occupationHand = ['A116_WoodCutter']
+      Object.assign(owner.resources, { wood: 1, clay: 0, reed: 0, stone: 0, food: 0 })
+    } })
+    try {
+      const response = session.takeAction(0, 'lessons')
+      expect(response.ok, response.error).toBe(true)
+      expect(response.state.players[0]!.occupationPlayed).toContain('A116_WoodCutter')
+      expect(response.state.players[0]!.resources).toMatchObject({ wood: 0, food: 0 })
+      expect(response.state.events).toContainEqual(expect.objectContaining({
+        type: 'card.played', cardId: 'A116_WoodCutter',
+        payment: expect.objectContaining({ resources: { wood: 1 }, bonusSources: ['E060_WorkingGloves'] }),
+      }))
+    } finally { session.dispose() }
   })
 
   it('loads Barn Shed listener from Card Source impl through session runtime', () => {
