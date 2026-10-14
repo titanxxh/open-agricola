@@ -3,6 +3,9 @@ import type { GameState, PlayerState } from '../../shared/contract/types'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { createWorkSession } from './_helpers/session-fixtures'
 import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/serialization'
+import { validateAndCompileCustomCode } from '../custom-code/engine'
+import type { CustomCardData } from '../../shared/cards/session-card-context'
+import { playMinor } from './_helpers/card-regression-session'
 
 const sessions: GameSession[] = []
 afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
@@ -79,6 +82,24 @@ function house(session: GameSession, response: SessionResponse, animal: 'sheep' 
     animalType: zone.id === 'p1' ? animal : null, animalCount: zone.id === 'p1' ? count : 0,
   }))
   return ok(session.resolveChoice(ownerIndex, 'confirm', { zones }))
+}
+
+
+function singleChoiceAnimalCard(cardId: string, hook: 'onAfterRoundEnd' | 'onBuy'): CustomCardData {
+  const compiled = validateAndCompileCustomCode(`
+const CARD_ID = '${cardId}'
+const CARD_DEF = MinorImprovement({ id: CARD_ID, name: 'Single Choice Stage Animals' })
+const CARD_IMPL = { effect: { id: CARD_ID,
+  ${hook}: (_state, player) => player.cardStates[CARD_ID]?.flagged ? undefined : ({ type: 'seq', children: [
+    { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: true } },
+    { type: 'xor', children: [{ type: 'leaf', actionId: 'gain', sourceCard: CARD_ID, params: { sheep: 1 } }] },
+    { type: 'leaf', actionId: 'gain', sourceCard: CARD_ID, params: { food: 2 } }
+  ] })
+} }
+`, cardId)
+  if (!compiled.valid) throw new Error(compiled.errors.join('\n'))
+  return { cardType: 'minor', cardJson: { id: cardId, name: 'Single Choice Stage Animals', deck: 'CUSTOM', number: 0, desc: [] },
+    compiledCode: compiled.compiledCode, codeManifest: compiled.manifest }
 }
 
 describe('Stage animal gains settle before continuation', () => {
@@ -193,4 +214,40 @@ describe('Stage animal gains settle before continuation', () => {
     expect(completed.state.players[1]!.pastures[0]!.animalCount).toBe(3)
     expect(completed.state.players[0]!.resources.sheep).toBe(0)
   })
+  it('retains the stage and trailing reward after an automatically resolved single animal choice', () => {
+    const cardId = 'CUSTOM_SingleChoiceStageAnimals'
+    const session = createWorkSession({ seed: 1158, customCards: [singleChoiceAnimalCard(cardId, 'onAfterRoundEnd')], configure(state) {
+      state.round = 5
+      state.players.forEach(player => { player.resources.food = 100 })
+      state.players[0]!.minorPlayed = [cardId]
+      pasture(state.players[0]!)
+    } })
+    sessions.push(session)
+    const pending = drive(session, 'animal-reorg', 6)
+    expect(pending.state.players[0]!.resources.sheep).toBe(1)
+    house(session, pending, 'sheep', 1)
+    const completed = drive(session, 'round', 6)
+    expect(completed.state.players[0]!.pastures[0]!.animalCount).toBe(1)
+    expect(completed.state.events.filter(event => event.type === 'resource.moved' && event.sourceCardId === cardId && event.resources.food === 2)).toHaveLength(1)
+  })
+
+  it('retains an ordinary onBuy continuation after the same single animal choice', () => {
+    const cardId = 'CUSTOM_SingleChoiceOnBuyAnimals'
+    const session = createWorkSession({ seed: 1158, customCards: [singleChoiceAnimalCard(cardId, 'onBuy')], configure(state) {
+      state.round = 5
+      state.players[0]!.minorHand = [cardId]
+      state.players[0]!.resources.food = 100
+      pasture(state.players[0]!)
+    } })
+    sessions.push(session)
+    const pending = ok(playMinor(session, cardId))
+    expect(pending.state.players[0]!.minorPlayed).toContain(cardId)
+    expect(pending.state.players[0]!.resources.sheep).toBe(1)
+    const completed = house(session, pending, 'sheep', 1)
+    expect(completed.state.players[0]!.resources).toMatchObject({ sheep: 1, food: 102 })
+    expect(completed.state.players[0]!.pastures[0]!.animalCount).toBe(1)
+    expect(completed.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'confirm-next-player' } })
+    expect(completed.state.events.filter(event => event.type === 'resource.moved' && event.sourceCardId === cardId && event.resources.food === 2)).toHaveLength(1)
+  })
+
 })
