@@ -3711,6 +3711,16 @@ export class GameCore {
         if (step.type === 'done') this.engineStack.clearDeferredPlayerSwitch()
         const isActionEngine = frame.source.kind === 'action'
         const ownerIdx = frame.ownerPlayerIndex
+        if (frame.stageResume && frame.stageResume.hook !== 'onReorganizeComplete') {
+          const animalOwnerIndex = this.state.players.findIndex(candidate => this.hasPendingAnimals(candidate))
+          if (animalOwnerIndex !== -1) {
+            // Keep the completed stage frame until animal handling resumes it.
+            // A choice callback may have gained animals before this driver ran.
+            this.startReorganizeSubFlow(animalOwnerIndex,
+              frame.stageResume.hook === 'onBreedPhase' ? 'harvest-breed' : 'anytime')
+            return
+          }
+        }
         if (this.stageDispatch.completeFrameIfStage(frame)) return
         if (isActionEngine && this.runPlaceFarmerAfterHooks(frameOwnerPlayer, space)) {
           // The frame's engine/source were replaced in-place; loop again with
