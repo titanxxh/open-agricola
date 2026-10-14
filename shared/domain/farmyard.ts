@@ -205,6 +205,8 @@ export type SowValidationResult<T extends PlayerFarmState = PlayerFarmState> =
 type SowValidationOptions = {
   /** Selection cap, counted by LOGICAL GROUP (extra-field same groupKey merges to 1). */
   maxSelections?: number
+  /** Seed cap, counted by distinct sowing slots rather than logical fields. */
+  maxSeedSelections?: number
   /** Minimum selected logical fields. Defaults to 1 to preserve ordinary sow validation. */
   minSelections?: number
   allowedFieldKeys?: ReadonlySet<string>
@@ -588,6 +590,9 @@ export const validateSowSelection = <T extends PlayerFarmState>(
     typeof options.maxSelections === 'number' &&
     usedGroups.size > Math.max(0, Math.floor(options.maxSelections))
   ) {
+    return { ok: false, error: { code: 'INVALID_POSITION' } }
+  }
+  if (typeof options.maxSeedSelections === 'number' && used.size > Math.max(0, Math.floor(options.maxSeedSelections))) {
     return { ok: false, error: { code: 'INVALID_POSITION' } }
   }
   const minSelections = typeof options.minSelections === 'number'

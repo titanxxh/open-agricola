@@ -181,6 +181,7 @@ export const useFarmSelection = () => {
     maxSowSelections: number | undefined,
     positionKey: (tile: FarmTilePosition) => string,
     groupKeyByTile: Map<string, string | undefined> = new Map(),
+    maxSeedSelections?: number,
   ) => {
     const key = positionKey(tile)
     setPendingSowSelections((prev) => {
@@ -198,6 +199,7 @@ export const useFarmSelection = () => {
         return prev
       }
       const alreadySelected = Object.prototype.hasOwnProperty.call(prev, key)
+      if (!alreadySelected && typeof maxSeedSelections === 'number' && Object.keys(prev).length >= maxSeedSelections) return prev
       if (
         !alreadySelected &&
         typeof maxSowSelections === 'number' &&

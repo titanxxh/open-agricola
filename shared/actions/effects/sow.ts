@@ -8,7 +8,7 @@ import type {
 import { fieldIsEmpty } from '../../domain/field'
 import { positionKey } from '../../domain/farm'
 import { playerBoard, type SowSelection } from '../../domain'
-import { buildSowFarmInteraction, getAllowedSelectedFieldKeys } from '../../domain/farmyard-interaction'
+import { buildSowFarmInteraction, getAllowedSelectedFieldKeys, permittedSowCrops } from '../../domain/farmyard-interaction'
 import { handleSowExtraField } from '../../cards/card-effects'
 import { getLogicalFields, mutateLogicalFields } from '../../cards/helpers/card-field'
 
@@ -27,9 +27,14 @@ export const isUnconditionalSow = (
   actionContext?: Record<string, unknown>,
   player?: PlayerState,
 ): boolean => {
-  if (actionContext?.maxSelections !== undefined || actionContext?.cropType !== undefined) return false
+  if (actionContext?.maxSelections !== undefined || actionContext?.maxSeedSelections !== undefined || actionContext?.cropType !== undefined) return false
   if (!player) return actionContext?.allowedFields !== 'fromSelectedFields'
     && !(Array.isArray(actionContext?.excludedFields) && actionContext.excludedFields.length > 0)
+  if (getLogicalFields(player).some(field => {
+    const usualCrops = field.allowedCrops ?? ['grain', 'vegetable']
+    const permitted = permittedSowCrops(usualCrops, actionContext)
+    return usualCrops.some(crop => !permitted.includes(crop))
+  })) return false
   const permissionPlayer = {
     ...player,
     resources: { ...player.resources, grain: 1, vegetable: 1, wood: 1, stone: 1 },
@@ -92,7 +97,7 @@ export const validateSow = (
   const board = playerBoard(ctx.state, idx)
   const extraFields = board.farmInteraction.permittedExtraSowableFields(ctx.actionContext)
   const extraAllowedCrops = new Map(
-    extraFields.map((field) => [positionKey(field.tile), field.allowedCrops] as const),
+    extraFields.map((field) => [positionKey(field.tile), permittedSowCrops(field.allowedCrops, ctx.actionContext)] as const),
   )
   const extraGroupKeys = new Map(
     extraFields
@@ -101,23 +106,12 @@ export const validateSow = (
       )
       .map((field) => [positionKey(field.tile), field.groupKey] as const),
   )
-  // §2.5 P0 修正: normal field 物理只支持 grain/vegetable stack. 当 cropType
-  // ∈ {wood,stone} 时 normal field 必须拒绝 (否则 validateSow 通过但
-  // updatedFields 不 push stack 也不扣资源, silent gap).
-  const ctxCropType =
-    typeof ctx.actionContext?.cropType === 'string'
-      ? (ctx.actionContext.cropType as SowSelection['crop'])
-      : undefined
-  const normalFieldAllowedCrops: SowSelection['crop'][] | undefined =
-    ctxCropType === 'grain' || ctxCropType === 'vegetable'
-      ? [ctxCropType]
-      : ctxCropType === 'wood' || ctxCropType === 'stone'
-        ? []
-        : undefined
+  const normalFieldAllowedCrops = permittedSowCrops(['grain', 'vegetable'], ctx.actionContext)
   const validated = board.farmyard.canSow(
     { fields: crops },
     {
       maxSelections,
+      maxSeedSelections: typeof ctx.actionContext?.maxSeedSelections === 'number' ? ctx.actionContext.maxSeedSelections : undefined,
       minSelections,
       allowedFieldKeys,
       excludedFields,

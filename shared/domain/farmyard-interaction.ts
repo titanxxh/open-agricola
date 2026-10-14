@@ -223,6 +223,15 @@ export const getPermittedExtraSowableFields = (
   })
 }
 
+/** The action's crop permissions intersect each field's usual permissions. */
+export const permittedSowCrops = (
+  usual: readonly SowSelection['crop'][],
+  actionContext?: Record<string, unknown>,
+): SowSelection['crop'][] => usual.filter(crop =>
+  (actionContext?.cropType === undefined || actionContext.cropType === crop)
+  && (!Array.isArray(actionContext?.allowedCrops) || actionContext.allowedCrops.includes(crop)),
+)
+
 export const buildSowFarmInteraction = (
   player: PlayerState,
   actionContext?: Record<string, unknown>,
@@ -230,16 +239,7 @@ export const buildSowFarmInteraction = (
   const normalized = normalizePlayerFarm(player)
   const excludedKeys = getExcludedFieldKeys(actionContext)
   const allowedKeys = getAllowedSelectedFieldKeys(player, actionContext)
-  const ctxCropType =
-    typeof actionContext?.cropType === 'string'
-      ? (actionContext.cropType as SowSelection['crop'])
-      : undefined
-  const normalAllowed: readonly SowSelection['crop'][] =
-    ctxCropType === 'grain' || ctxCropType === 'vegetable'
-      ? [ctxCropType]
-      : ctxCropType === 'wood' || ctxCropType === 'stone'
-        ? []
-        : DEFAULT_NORMAL_FIELD_CROPS
+  const normalAllowed = permittedSowCrops(DEFAULT_NORMAL_FIELD_CROPS, actionContext)
 
   const selectableFields: {
     tile: FarmTilePosition
@@ -266,9 +266,8 @@ export const buildSowFarmInteraction = (
   })
   const extraFields = getPermittedExtraSowableFields(player, actionContext)
   for (const extra of extraFields) {
-    const filteredCrops = extra.allowedCrops.filter((crop) => {
+    const filteredCrops = permittedSowCrops(extra.allowedCrops, actionContext).filter((crop) => {
       if ((normalized.resources[crop] ?? 0) <= 0) return false
-      if (ctxCropType !== undefined && crop !== ctxCropType) return false
       return true
     })
     if (filteredCrops.length === 0) continue
@@ -292,7 +291,10 @@ export const buildSowFarmInteraction = (
     typeof actionContext?.minSelections === 'number'
       ? Math.max(0, Math.floor(actionContext.minSelections))
       : undefined
-  return { farmType: 'sow', selectableFields, minSelections, maxSelections }
+  const maxSeedSelections = typeof actionContext?.maxSeedSelections === 'number'
+    ? Math.max(0, Math.floor(actionContext.maxSeedSelections))
+    : undefined
+  return { farmType: 'sow', selectableFields: maxSeedSelections === 0 ? [] : selectableFields, minSelections, maxSelections, maxSeedSelections }
 }
 
 export const buildFarmPositionSelectionInteraction = (
