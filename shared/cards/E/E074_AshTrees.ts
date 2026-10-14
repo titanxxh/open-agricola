@@ -3,6 +3,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { initCardState } from '../__stubs__/helpers'
 import { writeCardInfobox } from '../helpers/card-state'
+import { getLogicalFields } from '../helpers/card-field'
 import { getTotalPastureCells, maxPastureCells, minimumFenceSegments } from '../../actions/effects/fencing'
 import { getOwnOrdinaryFenceCount } from '../../domain/fence-segments'
 import {
@@ -97,6 +98,7 @@ const afterFenceListener: CardListenerRegistration = {
 }
 
 const cardImpl = {
+  prerequisiteCheck: (player) => getLogicalFields(player).filter(field => field.stacks.length > 0).length >= 2,
   listeners: [isDoableListener, beforeFenceListener, afterFenceListener],
   effect: {
   id: CARD_ID,
