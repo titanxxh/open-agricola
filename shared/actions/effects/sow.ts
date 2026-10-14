@@ -29,6 +29,8 @@ export const isUnconditionalSow = (
 ): boolean => {
   if (actionContext?.maxSelections !== undefined || actionContext?.maxSeedSelections !== undefined || actionContext?.cropType !== undefined
     || actionContext?.allowedFields === 'fromSelectedFields') return false
+  const ordinaryCrops = permittedSowCrops(['grain', 'vegetable'], actionContext)
+  if (!ordinaryCrops.includes('grain') || !ordinaryCrops.includes('vegetable')) return false
   if (!player) return !(Array.isArray(actionContext?.excludedFields) && actionContext.excludedFields.length > 0)
   if (getLogicalFields(player).some(field => {
     const usualCrops = field.allowedCrops ?? ['grain', 'vegetable']
