@@ -189,7 +189,10 @@ describe('C003 Carriage Trip parity', () => {
     expect(response.state.players[0]!.minorHand).not.toContain('C003_CarriageTrip')
     expect(response.state.players[0]!.minorPlayed).not.toContain('C003_CarriageTrip')
     expect(response.state.players[1]!.minorHand).toContain('C003_CarriageTrip')
-    expect(response.state.events.filter((event) => event.type === 'card.passed' && event.cardId === 'C003_CarriageTrip')).toHaveLength(1)
+    expect(response.state.events.filter((event) => 'fromPlayerId' in event
+      && event.cardId === 'C003_CarriageTrip'
+      && event.fromPlayerId === response.state.players[0]!.id
+      && event.toPlayerId === response.state.players[1]!.id)).toHaveLength(1)
     expect(JSON.stringify(response.scores)).toBe(scoresBefore)
 
     const undone = session.undoAction()
@@ -225,7 +228,10 @@ describe('C003 Carriage Trip parity', () => {
     expect(skipped.state.players[0]!.minorHand).not.toContain('C003_CarriageTrip')
     expect(skipped.state.players[0]!.resources).toMatchObject({ wood: 0, food: 10 })
     expect(workersAvailable(skipped.state, skipped.state.players[0]!)).toBe(1)
-    expect(skipped.state.events.filter((event) => event.type === 'card.passed' && event.cardId === 'C003_CarriageTrip')).toHaveLength(1)
+    expect(skipped.state.events.filter((event) => 'fromPlayerId' in event
+      && event.cardId === 'C003_CarriageTrip'
+      && event.fromPlayerId === skipped.state.players[0]!.id
+      && event.toPlayerId === skipped.state.players[1]!.id)).toHaveLength(1)
     expect(skipped.state.actionSpaces.filter((space) => space.takenBy.some((worker) => worker.playerId === skipped.state.players[0]!.id))).toHaveLength(1)
   })
 
