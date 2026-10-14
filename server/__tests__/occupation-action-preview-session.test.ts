@@ -37,38 +37,56 @@ const paymentPreviews = (effect?: ChoiceEffectPreview): Extract<ChoiceEffectPrev
 }
 
 describe('occupation fees come from the actual payment plan', () => {
-  it('shows Paper Maker wood payment in both action and card choice, then pays exactly that wood', () => {
+  it('shows Paper Maker as a before exchange, followed by the actual food payment preview', () => {
     const session = setup(0, 1, [target, other])
     const before = JSON.stringify(session.state)
-    for (let attempt = 0; attempt < 3; attempt++) expect(preview(session)).toMatchObject({ kind: 'action', effectPreview: { kind: 'payment', resourcesPaid: { wood: 1, food: 0 }, sourceCards: ['B109_PaperMaker'] } })
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const description = preview(session)
+      expect(description).toMatchObject({ kind: 'action', labelKey: 'actions.lessons.name' })
+      if (description?.kind !== 'action') throw new Error('Missing occupation action description')
+      expect(description.effectPreview).toBeUndefined()
+    }
     expect(JSON.stringify(session.state)).toBe(before)
     const opening = session.takeAction(0, 'lessons')
     expect(opening.interaction.stateId).toBe('wait')
-    if (opening.interaction.stateId !== 'wait') throw new Error('Missing occupation choice')
-    expect(opening.interaction.request.options?.find(option => option.value === target)?.descriptionPreview).toMatchObject({ kind: 'action', labelKey: `occupations.${target}.name`, effectPreview: { kind: 'payment', resourcesPaid: { wood: 1, food: 0 } } })
+    if (opening.interaction.stateId !== 'wait' || opening.interaction.request.kind !== 'choice') throw new Error('Missing before exchange')
+    const exchange = opening.interaction.request.options?.find(option => option.labelKey === 'ui.interactionResourceExchange')
+    expect(exchange?.effectPreview).toEqual({ kind: 'resourceExchange', resourcesPaid: { wood: 1 }, resourcesGained: { food: 1 } })
+    if (!exchange) throw new Error('Missing Paper Maker exchange')
+    const supplied = session.resolveChoice(0, exchange.value)
+    expect(supplied.ok, supplied.error).toBe(true)
+    expect(supplied.state.players[0]!.resources).toMatchObject({ food: 1, wood: 0 })
+    if (supplied.interaction.stateId !== 'wait' || supplied.interaction.request.kind !== 'choice') throw new Error('Missing occupation choice')
+    expect(supplied.interaction.request.options?.find(option => option.value === target)?.descriptionPreview).toMatchObject({
+      kind: 'action', labelKey: `occupations.${target}.name`, effectPreview: { kind: 'payment', resourcesPaid: { food: 1 } },
+    })
     const response = session.resolveChoice(0, target)
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.occupationPlayed).toContain(target)
     expect(response.state.players[0]!.resources).toMatchObject({ food: 0, wood: 0 })
-    expect(response.state.events.some(event => event.type === 'resource.paid' && event.resources.wood === 1 && event.bonusSources?.includes('B109_PaperMaker'))).toBe(true)
+    expect(response.state.events).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: 'resource.paid', sourceCardId: 'B109_PaperMaker', paymentFor: 'cardEffect', resources: { wood: 1 } }),
+      expect.objectContaining({ type: 'resource.paid', sourceCardId: target, paymentFor: 'occupation', resources: { food: 1 } }),
+    ]))
     expect(response.state.log.length).toBeGreaterThan(0)
     expect(response.scores).toBeDefined()
   })
-  it('retains both affordable food and wood payment choices instead of selecting a guessed price', () => {
+  it('keeps the optional exchange separate from the occupation food fee', () => {
     const session = setup(1, 1)
     const description = preview(session)
     if (description?.kind !== 'action') throw new Error('Missing occupation action description')
     const payments = paymentPreviews(description.effectPreview)
-    expect(payments).toHaveLength(2)
-    expect(payments.map(payment => ({ food: payment.resourcesPaid.food ?? 0, wood: payment.resourcesPaid.wood ?? 0 }))).toEqual(expect.arrayContaining([{ food: 1, wood: 0 }, { food: 0, wood: 1 }]))
+    expect(payments).toHaveLength(1)
+    expect(payments[0]).toMatchObject({ resourcesPaid: { food: 1 } })
     const waiting = session.takeAction(0, 'lessons')
-    expect(waiting.interaction.stateId).toBe('wait')
-    if (waiting.interaction.stateId !== 'wait') throw new Error('Missing payment choice')
-    expect(waiting.interaction.promptKey).toBe('prompt.selectPayment')
-    const food = waiting.interaction.request.options?.find(option => option.effectPreview?.kind === 'payment' && option.effectPreview.resourcesPaid.food === 1)
-    if (!food) throw new Error('Missing food payment')
-    const response = session.resolveChoice(0, food.value)
+    if (waiting.interaction.stateId !== 'wait' || waiting.interaction.request.kind !== 'choice') throw new Error('Missing optional exchange')
+    expect(waiting.interaction.sourceCard).toBe('B109_PaperMaker')
+    expect(waiting.interaction.request.options?.some(option => option.labelKey === 'ui.interactionResourceExchange')).toBe(true)
+    const skip = waiting.interaction.request.options?.find(option => option.value === '__skip__')
+    if (!skip) throw new Error('Missing option to decline Paper Maker')
+    const response = session.resolveChoice(0, skip.value)
     expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.occupationPlayed).toContain(target)
     expect(response.state.players[0]!.resources).toMatchObject({ food: 0, wood: 1 })
     expect(response.state.events.some(event => event.type === 'resource.paid' && event.resources.food === 1)).toBe(true)
   })

@@ -1,32 +1,32 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
+import { payGainFlow } from '../helpers/pay-gain-node'
 
 const CARD_ID = 'B109_PaperMaker'
-const computeCostsListener: CardListenerRegistration = {
-  id: 'B109-paper-maker-compute-costs-occupation',
+const beforeOccupationListener: CardListenerRegistration = {
+  id: 'B109-paper-maker-before-occupation',
   cardIds: [CARD_ID],
-  phases: ['computeCosts' as ActionHookPhase],
+  phases: ['before'],
   actions: ['occupation'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const occupationCount = context.player.occupationPlayed.length
     if (occupationCount <= 0) return
     return {
-      trades: [{
-        from: { wood: 1 },
-        to: { food: occupationCount },
-        max: 1,
-        source: CARD_ID,
-        sourceId: CARD_ID,
-      }],
+      flow: payGainFlow({
+        cardId: CARD_ID,
+        cost: { wood: 1 },
+        gain: { food: occupationCount },
+        choiceLabelKey: 'ui.interactionResourceExchange',
+      }),
       sourceCard: CARD_ID,
     }
   },
 }
 
 const cardImpl = {
-  listeners: [computeCostsListener],
+  listeners: [beforeOccupationListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
 
