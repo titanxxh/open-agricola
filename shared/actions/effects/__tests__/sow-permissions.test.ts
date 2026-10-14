@@ -12,10 +12,10 @@ function player() {
 it('a selected field subset is restricted even without seeds in the supply', () => {
   expect(isUnconditionalSow({ allowedFields: 'fromSelectedFields', sourceCard: 'D071_Changeover' }, player())).toBe(false)
 })
-it('a selected set covering all eligible fields retains the usual permissions', () => {
+it('fixed selected-field authorization stays restricted even when its selected set covers all eligible fields', () => {
   const owner = player()
   owner.cardStates.D071_Changeover = { extraData: { selectedPositions: ['0-0', '0-1'] } }
-  expect(isUnconditionalSow({ allowedFields: 'fromSelectedFields', sourceCard: 'D071_Changeover' }, owner)).toBe(true)
+  expect(isUnconditionalSow({ allowedFields: 'fromSelectedFields', sourceCard: 'D071_Changeover' }, owner)).toBe(false)
 })
 it('empty exclusions and source attribution do not restrict Sow, while excluding an eligible field does', () => {
   expect(isUnconditionalSow({ excludedFields: [], sourceCard: 'D071_Changeover' }, player())).toBe(true)
