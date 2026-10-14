@@ -52,7 +52,7 @@ describe('E083_ShepherdsWhistle session — reorganize fallback', () => {
     expect(seq.optional).toBe(true)
     expect(seq.children.length).toBe(2)
     const reorgChild = seq.children[0] as Extract<ActionFlow, { type: 'leaf' }>
-    expect(reorgChild.actionId).toBe('anytime-reorg')
+    expect(reorgChild.actionId).toBe('reorganize')
     const checkChild = seq.children[1] as Extract<ActionFlow, { type: 'leaf' }>
     expect(checkChild.actionId).toBe('card_E083_ShepherdsWhistle_post-reorg-check')
   })
