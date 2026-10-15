@@ -616,7 +616,7 @@ type ActionDefinition = {
 
 `descriptionKey` 保留行动格印刷文本。可选的 `rulesKey` 指向独立本地化的补充裁定或实现限制，不影响行动合法性或执行。
 
-Hook 不进 `ActionDefinition`，由 `hooks.ts` 显式注册（卡牌文件内部）。
+Hook 不进 `ActionDefinition`。通用变体规则显式注册到当前 Core 的 `ActionHookRegistry`；卡牌行动监听使用 Card Listener。
 
 `getBaseChoiceOptions` opt-in 选项流：base + `computeChoiceCandidates` 注入 → 按 `value` 去重 → `costPreview.canExecute` 过滤 → 0 候选 fail / 1 直跳 `resolveChoice` / ≥2 标准 prompt。当前消费者：`renovate-house` + `A087_Conservator`。与传统 `execute()→choice→computeArgs.extraOptions` 路径互斥。`renovate-house` 的 card-authored exact/free cost 通过 `actionContext.exactCost` 表达，和 construct / stables / plow 的 参考实现 `formatCost` 语义一致。 普通叶子和 OR/XOR 内选中的叶子共用此管线，包括按 selectedOption 重算费用；Silage 的粮食来源选择也复用该入口。
 
@@ -704,11 +704,11 @@ D015_ClaySupports clay→reed trade 仅当 `houseTypeClay > 0` 时生效；A123_
 
 ### 7.5 Hook 系统：行动生命周期 phase（10 个）
 
-**#1188 已确认设计，尚未实现。** 每个 `GameCore` 独占通用 ActionHook 注册表。分发、flow 可执行性以及费用和其他查询 helper 显式接收该注册表，不读取进程级默认 ActionHook 集合。农场预校验成为 `GameCore` 公共查询，由 HTTP、服务端 worker 和本地沙盒适配器共同调用。
+每个 `GameCore` 通过只读字段 `actionHooks` 独立持有 `ActionHookRegistry`。`HookDispatcher`、flow 可用性、费用预览和直接规则 helper 显式接收该注册表，不再存在进程级 ActionHook 默认值或缓存的 flow dispatcher。`GameCore.validateFarmChoice()` 为完整查询绑定卡牌环境；HTTP、服务端 worker 和本地沙盒适配器共用这个入口。
 
 `CardRegistry` 不再发布持久的进程级默认值。卡牌规则 helper 继续通过 `withCtx` 临时绑定会话环境，本次不将其 API 迁移为显式 runtime 参数。未绑定卡牌环境时，查询明确失败。显式空注册表或卡牌没有 effect，仍是合法的空结果。
 
-加载状态、恢复 cursor 和 undo 保留同一 Core 的规则注册表。新建 Core，包括 worker 重建，按官方、变体和自定义卡牌定义建立自己的注册表。注册表与可执行 handler 是运行时依赖，不进入游戏状态或 cursor。临时卡牌环境在嵌套调用和异常结束后恢复原环境。
+加载状态、恢复 cursor 和 undo 保留同一 Core 的规则注册表。新建 Core，包括 worker 重建，按官方、变体和自定义卡牌定义建立自己的注册表。注册表与可执行 handler 是运行时依赖，不进入游戏状态或 cursor。临时卡牌环境在嵌套调用和异常结束后恢复原环境。 `rehydrateState()` 只还原数据，不查询规则；所属 Core 随后在自身卡牌环境内恢复行动定义和 modifier。服务端与浏览器自定义代码适配器在调用卡牌代码前，从 listener 和 effect 参数中移除 `actionHooks`。
 
 ```
 isDoable                 改变行动可执行性
@@ -1096,7 +1096,7 @@ export const A123_FrameBuilder = defineOccupationCard({
 | 文件 | 作用 |
 |---|---|
 | `shared/cards/catalog.generated.ts` | 从 Card Source 生成 `allCardSources`、`minorImprovementCards`、`occupationCards`、`implemented*`、`ALL_CARD_IMPLS` |
-| `shared/cards/active-registry.ts` | `CardRegistry` 单例 |
+| `shared/cards/active-registry.ts` | 同步临时 `CardRegistry` 作用域，无持久默认值 |
 | `shared/cards/registry.ts` | `CardRegistry` 类（loadByIds / unload） |
 | `shared/cards/custom-registry.ts` | server / sandbox 的 `CUSTOM_*` runtime impl + session context / effects / listeners / modifiers |
 | `shared/cards/custom-card-metadata.ts` | 前端 `CUSTOM_*` Card Display、art URL、O 编号 |

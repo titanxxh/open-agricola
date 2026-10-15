@@ -621,7 +621,7 @@ type ActionDefinition = {
 
 `descriptionKey` preserves the printed action-space text. Optional `rulesKey` points to separate localized supplemental rulings or implementation limits and has no effect on action legality or execution.
 
-Hooks are not part of `ActionDefinition`; card files register them explicitly through `hooks.ts`.
+Hooks are not part of `ActionDefinition`. Generic variant rules register with the current Core's `ActionHookRegistry`; card action reactions use Card Listeners.
 
 The opt-in `getBaseChoiceOptions` path takes base options, injects `computeChoiceCandidates` results, deduplicates by `value`, and filters with `costPreview.canExecute`. Zero candidates fail, one candidate jumps directly to `resolveChoice`, and two or more candidates create the standard prompt. Ordinary leaves and leaves selected inside OR/XOR share this pipeline, including selected-option cost recomputation. Consumers include `renovate-house`, `A087_Conservator`, and Silage grain-source choices. This path is mutually exclusive with the traditional `execute() -> choice -> computeArgs.extraOptions` path. Card-authored exact or free renovation costs use `actionContext.exactCost`, matching the reference `formatCost` semantics for construct, stables, and plow.
 
@@ -709,11 +709,11 @@ D015 Clay Supports' clay-to-reed trade applies only when `houseTypeClay > 0`. A1
 
 ### 7.5 Hook system: 10 action-lifecycle phases
 
-**Approved design for #1188, implementation pending.** Each `GameCore` owns an independent generic ActionHook registry. Dispatch, flow availability, and cost/query helpers receive that registry explicitly. They do not consult a process-wide action-hook default. Farm-choice prevalidation becomes a public `GameCore` query shared by the HTTP, server-worker, and local-sandbox adapters.
+Each `GameCore` owns an independent `ActionHookRegistry` through its readonly `actionHooks` field. `HookDispatcher`, flow availability, cost previews, and direct rule helpers receive that registry explicitly. There is no process-wide ActionHook default or cached flow dispatcher. `GameCore.validateFarmChoice()` binds the complete card environment for the query; the HTTP, server-worker, and local-sandbox adapters call this same entry point.
 
-`CardRegistry` stops publishing a persistent process-wide default. Card-rule helpers retain temporary session binding through `withCtx`; their APIs do not migrate to explicit runtime parameters in this change. A lookup without a bound card environment fails explicitly. An explicitly empty registry or a card without an effect remains a valid empty result.
+`CardRegistry` has no persistent process-wide default. Card-rule helpers retain temporary session binding through `withCtx`; their APIs do not migrate to explicit runtime parameters in this change. A lookup without a bound card environment fails explicitly. An explicitly empty registry or a card without an effect remains a valid empty result.
 
-State loading, cursor restoration, and undo retain the same Core's rule registries. A new Core, including a reconstructed worker, builds its own registries from the official, variant, and custom-card definitions. Registries and executable handlers are runtime dependencies, not game-state or cursor data. Temporary card bindings restore the previous environment after nested calls and exceptions.
+State loading, cursor restoration, and undo retain the same Core's rule registries. A new Core, including a reconstructed worker, builds its own registries from the official, variant, and custom-card definitions. Registries and executable handlers are runtime dependencies, not game-state or cursor data. Temporary card bindings restore the previous environment after nested calls and exceptions. `rehydrateState()` decodes data without looking up rules. The owning Core then restores action definitions and modifiers inside its card environment. Server and browser custom-code adapters remove `actionHooks` from listener and effect arguments before invoking untrusted code.
 
 ```text
 isDoable                 change whether an action is executable
@@ -1117,7 +1117,7 @@ Hotseat and both sandbox executors initialize unnamed seats with the same `Playe
 | File | Role |
 |---|---|
 | `shared/cards/catalog.generated.ts` | Generates `allCardSources`, `minorImprovementCards`, `occupationCards`, `implemented*`, and `ALL_CARD_IMPLS` from Card Sources |
-| `shared/cards/active-registry.ts` | `CardRegistry` singleton |
+| `shared/cards/active-registry.ts` | Temporary synchronous `CardRegistry` scope; no persistent default |
 | `shared/cards/registry.ts` | `CardRegistry` class with `loadByIds` and `unload` |
 | `shared/cards/custom-registry.ts` | Server and sandbox runtime implementation, session context, effects, listeners, and modifiers for `CUSTOM_*` cards |
 | `shared/cards/custom-card-metadata.ts` | Frontend `CUSTOM_*` Card Display, artwork URL, and O number |
