@@ -4,7 +4,6 @@ import type { CardListenerContext, CardListenerScope } from '../cards/card-liste
 import type {
   CardEffectField,
   HandCardEffectHook,
-  PaymentInfo,
 } from '../cards/card-effects'
 import type { SandboxEffectMetadata, SandboxListenerData } from './sandbox-declarations'
 
@@ -32,7 +31,8 @@ export type CustomCodeEffectInvocation = {
   hook: CardEffectField
   state: GameState
   player: PlayerState
-  paymentInfo?: PaymentInfo
+  /** The third positional argument; its type depends on the effect hook. */
+  paymentInfo?: unknown
   /** The fourth and later positional arguments, for the hooks that document them. */
   extraArgs?: unknown[]
 }

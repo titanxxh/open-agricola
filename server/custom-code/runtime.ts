@@ -1,5 +1,4 @@
 import type { CardEffect } from '../../shared/cards/card-effects.ts'
-import type { PaymentInfo } from '../../shared/cards/card-effects.ts'
 import type { CardListenerContext } from '../../shared/cards/card-listeners.ts'
 import type { GameState, PlayerState } from '../../shared/contract/types.ts'
 import { requireActiveCardRegistry } from '../../shared/cards/active-registry.ts'
@@ -23,11 +22,11 @@ export const registerExecutorBackedCustomCard = (cardData: CustomCardData): void
     ;(effect as Record<string, unknown>)[hook] = (
       state: GameState,
       player: PlayerState,
-      paymentInfo?: PaymentInfo,
+      thirdArgument?: unknown,
       ...rest: unknown[]
     ) => {
-      let sandboxArgument = paymentInfo
-      if (sandboxArgument && 'actionHooks' in sandboxArgument) {
+      let sandboxArgument = thirdArgument
+      if (sandboxArgument !== null && typeof sandboxArgument === 'object' && 'actionHooks' in sandboxArgument) {
         const { actionHooks: _actionHooks, ...data } = sandboxArgument
         sandboxArgument = data
       }
@@ -38,7 +37,7 @@ export const registerExecutorBackedCustomCard = (cardData: CustomCardData): void
         state,
         player,
         paymentInfo: sandboxArgument,
-        extraArgs: extraHookArguments(hook, [state, player, paymentInfo, ...rest]),
+        extraArgs: extraHookArguments(hook, [state, player, thirdArgument, ...rest]),
       })
       if (!response.ok) {
         const warning = `Custom card ${cardId} hook "${hook}" failed: ${response.error}`
