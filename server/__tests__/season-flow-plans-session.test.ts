@@ -36,8 +36,8 @@ describe('explicit seasonal action planning', () => {
     if (!space.flowFactory) throw new Error('Missing seasonal executable factory')
     const before = JSON.stringify(state)
     for (let attempt = 0; attempt < 3; attempt++) {
-      const base = session.withCtx(() => space.flowFactory?.({ state, player, space, previewMode: 'base' }))
-      const current = session.withCtx(() => space.flowFactory?.({ state, player, space }))
+      const base = session.withCtx(() => space.flowFactory?.({ actionHooks: session.actionHooks, state, player, space, previewMode: 'base' }))
+      const current = session.withCtx(() => space.flowFactory?.({ actionHooks: session.actionHooks, state, player, space }))
       if (season === 'winter') expect(base).toMatchObject({ type: 'seq', children: [
         { actionId: 'pay', params: { wood: 2, food: 5 } },
         { actionId: 'family-growth', actionContext: { skipRoomCheck: true } },
@@ -103,7 +103,7 @@ describe('explicit seasonal action planning', () => {
     session.loadState(state)
     const sale = createInternalActionDefinitions(() => undefined).find(action => action.id === 'season-summer-sell-grain')
     if (!sale?.flowFactory) throw new Error('Missing executable grain-sale factory')
-    expect(sale.flowFactory({ state: session.state, player: session.state.players[0]!, space: session.state.actionSpaces[0]! })).toMatchObject({
+    expect(sale.flowFactory({ actionHooks: session.actionHooks, state: session.state, player: session.state.players[0]!, space: session.state.actionSpaces[0]! })).toMatchObject({
       type: 'seq', children: [{ actionId: 'pay', params: { cost: { grain: 1 } } }, { actionId: 'gain', params: { food: 4 } }],
     })
     const response = choose(session, session.takeAction(0, actions.summer), 'actions.season-summer-farmers-market.option-sell-grain')

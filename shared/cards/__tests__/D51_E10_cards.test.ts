@@ -1,3 +1,9 @@
+import { ActionHookRegistry } from '../../actions/hooks'
+import { beforeEach as beforeEachActionHooks } from 'vitest'
+
+let actionHooks: ActionHookRegistry
+beforeEachActionHooks(() => { actionHooks = new ActionHookRegistry() })
+
 import { moveFarmerToSpaceAction } from '../../actions/effects/internal/move-farmer-to-space'
 import { describe, expect, it } from 'vitest'
 import { getCardEffect } from '../card-effects'
@@ -144,6 +150,7 @@ describe('move-farmer-to-space action', () => {
     const occupied = createSpace('plow', { takenBy: [{ playerId: 'p2', workerId: '1' }] })
     const state = createState([player], [source, available, occupied])
     const result = moveFarmerToSpaceAction.execute({
+      actionHooks,
       state, player, space: source,
       params: { excludeSpaceId: 'D051_Archway' },
     } as unknown as ActionExecutionContext)
@@ -160,6 +167,7 @@ describe('move-farmer-to-space action', () => {
     const occupied = createSpace('plow', { takenBy: [{ playerId: 'p2', workerId: '1' }] })
     const state = createState([player], [source, occupied])
     const result = moveFarmerToSpaceAction.execute({
+      actionHooks,
       state, player, space: source,
       params: { excludeSpaceId: 'D051_Archway' },
     } as unknown as ActionExecutionContext)
@@ -173,6 +181,7 @@ describe('move-farmer-to-space action', () => {
     const lessons = createSpace('lessons', { takenBy: [{ playerId: 'p2', workerId: '1' }] })
     const state = createState([player], [source, lessons])
     const result = moveFarmerToSpaceAction.execute({
+      actionHooks,
       state, player, space: source,
       params: { excludeSpaceId: 'D051_Archway' },
     } as unknown as ActionExecutionContext)
@@ -188,7 +197,7 @@ describe('move-farmer-to-space action', () => {
     const target = createSpace('day-laborer')
     const state = createState([player], [source, target])
     const result = moveFarmerToSpaceAction.resolveChoice!(
-      { state, player, space: source, params: { excludeSpaceId: 'farmland' } } as unknown as ActionExecutionContext,
+      { actionHooks, state, player, space: source, params: { excludeSpaceId: 'farmland' } } as unknown as ActionExecutionContext,
       'day-laborer',
     )
     expect(result.type).toBe('flow')
@@ -214,7 +223,7 @@ describe('move-farmer-to-space action', () => {
     const player = createPlayer()
     const state = createState([player], [])
     const result = moveFarmerToSpaceAction.resolveChoice!(
-      { state, player, space: createSpace('source') } as unknown as ActionExecutionContext,
+      { actionHooks, state, player, space: createSpace('source') } as unknown as ActionExecutionContext,
       'nonexistent',
     )
     expect(result.type).toBe('fail')

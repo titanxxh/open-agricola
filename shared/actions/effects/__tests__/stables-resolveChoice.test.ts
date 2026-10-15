@@ -1,3 +1,9 @@
+import { ActionHookRegistry } from '../../hooks'
+import { beforeEach as beforeEachActionHooks } from 'vitest'
+
+let actionHooks: ActionHookRegistry
+beforeEachActionHooks(() => { actionHooks = new ActionHookRegistry() })
+
 import { describe, expect, it } from 'vitest'
 import { stablesAction } from '../stables'
 import { readCardResourceStats } from '../../../cards/helpers/card-state'
@@ -53,6 +59,7 @@ const makeCtx = (
   } as unknown as PlayerState
   const state = { players: [player] } as unknown as GameState
   return {
+    actionHooks,
     state,
     player,
     space: dummySpace,
@@ -71,7 +78,7 @@ describe('stablesAction.resolveChoice', () => {
       } as Partial<PlayerState>,
     })
 
-    expect(stablesAction.canBeExecutedByPlayer(ctx.state, ctx.player)).toBe(false)
+    expect(stablesAction.canBeExecutedByPlayer(ctx.state, ctx.player, { actionHooks })).toBe(false)
   })
 
   it('caps stable selection max by dynamic reserve', () => {
@@ -353,6 +360,7 @@ describe('stablesAction.resolveChoice', () => {
     })
     expect(
       stablesAction.canBeExecutedByPlayer(ctx.state, ctx.player, {
+        actionHooks,
         actionContext: { exactCost: { max: 1 } },
       }),
     ).toBe(false)
@@ -377,6 +385,7 @@ describe('stablesAction.resolveChoice', () => {
     })
     expect(
       stablesAction.canBeExecutedByPlayer(ctx.state, ctx.player, {
+        actionHooks,
         actionContext: { exactCost: { max: 1 } },
       }),
     ).toBe(true)
@@ -402,6 +411,7 @@ describe('stablesAction.resolveChoice', () => {
     })
     expect(
       stablesAction.canBeExecutedByPlayer(ctx.state, ctx.player, {
+        actionHooks,
         actionContext: {
           exactCost: { wood: 0 },
           max: 1,

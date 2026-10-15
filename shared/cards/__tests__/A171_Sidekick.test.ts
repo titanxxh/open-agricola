@@ -38,6 +38,7 @@ const setupContext = (options: {
   target.canBeExecutedByPlayer = () => options.targetExecutable ?? true
   const space = state.actionSpaces.find((candidate) => candidate.id === (options.currentSpaceId ?? 'pig-market'))!
   return {
+    actionHooks: session.actionHooks,
     state,
     player: owner,
     ownerPlayer: owner,

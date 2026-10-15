@@ -1,3 +1,9 @@
+import { ActionHookRegistry } from '../../actions/hooks'
+import { beforeEach as beforeEachActionHooks } from 'vitest'
+
+let actionHooks: ActionHookRegistry
+beforeEachActionHooks(() => { actionHooks = new ActionHookRegistry() })
+
 import { describe, expect, it } from 'vitest'
 import { collectComputeCostsForFarmChoice, collectFarmChoiceCostAdjustments } from '../card-listeners'
 import type { GameState, PlayerState } from '../../contract/types'
@@ -20,7 +26,7 @@ describe('collectComputeCostsForFarmChoice', () => {
   it('aggregates wood delta from E16 BriarHedge listener (Pass #2 with 2 border edges)', () => {
     const player = makePlayer({ minorPlayed: ['E016_BriarHedge'] })
     const state = makeState(player)
-    const result = collectComputeCostsForFarmChoice(state, player, 'fence', {
+    const result = collectComputeCostsForFarmChoice(actionHooks, state, player, 'fence', {
       newFenceEdges: ['H-0-0', 'H-0-1'],
       newPalisadeEdges: [],
     })
@@ -30,7 +36,7 @@ describe('collectComputeCostsForFarmChoice', () => {
   it('returns empty object when no listeners match', () => {
     const player = makePlayer()
     const state = makeState(player)
-    const result = collectComputeCostsForFarmChoice(state, player, 'fence', {
+    const result = collectComputeCostsForFarmChoice(actionHooks, state, player, 'fence', {
       newFenceEdges: [],
       newPalisadeEdges: [],
     })
@@ -40,7 +46,7 @@ describe('collectComputeCostsForFarmChoice', () => {
   it('aggregates trades and bonuses for farm-choice settlement', () => {
     const player = makePlayer({ minorPlayed: ['D082_HuntingTrophy'] })
     const state = makeState(player)
-    const result = collectFarmChoiceCostAdjustments(
+    const result = collectFarmChoiceCostAdjustments(actionHooks,
       state,
       player,
       'fence',

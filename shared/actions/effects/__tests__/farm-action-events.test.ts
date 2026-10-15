@@ -1,3 +1,9 @@
+import { ActionHookRegistry } from '../../hooks'
+import { beforeEach as beforeEachActionHooks } from 'vitest'
+
+let actionHooks: ActionHookRegistry
+beforeEachActionHooks(() => { actionHooks = new ActionHookRegistry() })
+
 import { describe, expect, it } from 'vitest'
 import { sowAction } from '../sow'
 import { plowAction } from '../plow'
@@ -96,6 +102,7 @@ const context = (
   events: DraftGameEvent[],
   state: Partial<GameState> = {},
 ): ActionMutationContext => ({
+  actionHooks,
   state: {
     players: [p],
     actionSpaces: [space(actionId)],
@@ -245,6 +252,7 @@ describe('farm action events', () => {
       log: [],
     } as GameState
     expect(placeFarmerAction.resolveChoice!({
+      actionHooks,
       state: placeState,
       player: placePlayer,
       space: placeState.actionSpaces[0]!,
@@ -259,6 +267,7 @@ describe('farm action events', () => {
     const firstPlayerEvents: DraftGameEvent[] = []
     const firstPlayer = player({ id: 'p2' })
     expect(setFirstPlayerAction.execute({
+      actionHooks,
       state: {
         players: [player({ id: 'p1', startPlayer: true }), firstPlayer],
         actionSpaces: [],
@@ -287,6 +296,7 @@ describe('farm action events', () => {
       },
     }
     expect(renovateHouseAction.completeInternalChildren!({
+      actionHooks,
       state: { players: [renovatePlayer], actionSpaces: [], log: [] } as GameState,
       player: renovatePlayer,
       space: space('renovate-house'),

@@ -26,7 +26,7 @@ describe('computeAllowedPlacementSpaces', () => {
     const session = new GameSession(undefined, undefined, { playerCount: 2 })
     const { state } = session.getState()
     const player = state.players[0]!
-    const result = computeAllowedPlacementSpaces(state, player)
+    const result = computeAllowedPlacementSpaces(state, player, { actionHooks: session.actionHooks })
     expect(result.length).toBeGreaterThan(0)
     for (const entry of result) {
       expect(entry.allowOccupied).toBe(false)
@@ -42,7 +42,7 @@ describe('computeAllowedPlacementSpaces', () => {
     session.loadState(st)
     const { state } = session.getState()
     const player = state.players[0]!
-    const result = computeAllowedPlacementSpaces(state, player)
+    const result = computeAllowedPlacementSpaces(state, player, { actionHooks: session.actionHooks })
     expect(result.some(e => e.spaceId === 'day-laborer')).toBe(false)
   })
 
@@ -56,7 +56,7 @@ describe('computeAllowedPlacementSpaces', () => {
 
     const { state } = session.getState()
     const player = state.players[0]!
-    const result = computeAllowedPlacementSpaces(state, player)
+    const result = computeAllowedPlacementSpaces(state, player, { actionHooks: session.actionHooks })
     const entry = result.find(e => e.spaceId === 'day-laborer')
     expect(entry).toBeDefined()
     expect(entry!.allowOccupied).toBe(false)
@@ -80,7 +80,7 @@ describe('computeAllowedPlacementSpaces', () => {
 
     const { state } = session.getState()
     const player = state.players[0]!
-    const result = computeAllowedPlacementSpaces(state, player)
+    const result = computeAllowedPlacementSpaces(state, player, { actionHooks: session.actionHooks })
     const entry = result.find(e => e.spaceId === 'day-laborer')
     expect(entry).toBeDefined()
     expect(entry!.allowOccupied).toBe(true)
@@ -99,7 +99,7 @@ describe('computeAllowedPlacementSpaces', () => {
 
     const { state } = session.getState()
     const player = state.players[0]!
-    const result = computeAllowedPlacementSpaces(state, player)
+    const result = computeAllowedPlacementSpaces(state, player, { actionHooks: session.actionHooks })
     const entries = result.filter(e => e.spaceId === 'day-laborer')
     expect(entries.length).toBe(1)
     expect(entries[0]!.allowOccupied).toBe(false)
@@ -118,7 +118,7 @@ describe('computeAllowedPlacementSpaces', () => {
 
     const { state } = session.getState()
     const player = state.players[0]!
-    const result = computeAllowedPlacementSpaces(state, player)
+    const result = computeAllowedPlacementSpaces(state, player, { actionHooks: session.actionHooks })
     expect(result.some(e => e.spaceId === 'does-not-exist')).toBe(false)
   })
 })

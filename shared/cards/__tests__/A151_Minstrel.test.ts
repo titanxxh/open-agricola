@@ -1,3 +1,9 @@
+import { ActionHookRegistry } from '../../actions/hooks'
+import { beforeEach as beforeEachActionHooks } from 'vitest'
+
+let actionHooks: ActionHookRegistry
+beforeEachActionHooks(() => { actionHooks = new ActionHookRegistry() })
+
 import { describe, expect, it } from 'vitest'
 import { runCardEffectHook } from '../card-effects'
 import type { GameState, PlayerState, ActionSpace , ActionFlow } from '../../contract/types'
@@ -63,7 +69,7 @@ describe('A151_Minstrel', () => {
   it('returns jumpLeaf for major-improvement when exactly 1 stage-1 space is unoccupied', () => {
     const player = createPlayer()
     const state = createState(player)
-    const flow = runCardEffectHook(state, player, CARD_ID, 'onStartReturnHome')
+    const flow = runCardEffectHook(state, player, CARD_ID, 'onStartReturnHome', undefined, { actionHooks })
     expect(flow).not.toBeNull()
     const seq = flow as Extract<ActionFlow, { type: 'seq' }>
     expect(seq.type).toBe('seq')
@@ -85,7 +91,7 @@ describe('A151_Minstrel', () => {
     const fencingSpace = state.actionSpaces.find((s) => s.id === 'fencing')!
     fencingSpace.takenBy = []
 
-    const flow = runCardEffectHook(state, player, CARD_ID, 'onStartReturnHome')
+    const flow = runCardEffectHook(state, player, CARD_ID, 'onStartReturnHome', undefined, { actionHooks })
     expect(flow).toBeNull()
   })
 
@@ -96,7 +102,7 @@ describe('A151_Minstrel', () => {
     const majorSpace = state.actionSpaces.find((s) => s.id === 'major-improvement')!
     majorSpace.takenBy = [{ playerId: 'p2', workerId: '1' }]
 
-    const flow = runCardEffectHook(state, player, CARD_ID, 'onStartReturnHome')
+    const flow = runCardEffectHook(state, player, CARD_ID, 'onStartReturnHome', undefined, { actionHooks })
     expect(flow).toBeNull()
   })
 
@@ -109,7 +115,7 @@ describe('A151_Minstrel', () => {
     const majorSpace = state.actionSpaces.find((s) => s.id === 'major-improvement')!
     majorSpace.takenBy = [{ playerId: 'p2', workerId: '1' }]
 
-    const flow = runCardEffectHook(state, player, CARD_ID, 'onStartReturnHome')
+    const flow = runCardEffectHook(state, player, CARD_ID, 'onStartReturnHome', undefined, { actionHooks })
     expect(flow).not.toBeNull()
     const seq = flow as Extract<ActionFlow, { type: 'seq' }>
     expect(seq.type).toBe('seq')

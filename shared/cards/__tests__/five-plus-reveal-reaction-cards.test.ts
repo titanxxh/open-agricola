@@ -49,7 +49,7 @@ describe('5+ reveal and reaction occupation cards', () => {
     state.roundActionOrder[2] = 'pig-market'
     const owner = state.players[0]!
 
-    const flow = runCardEffectHook(state, owner, 'B170_CorralBuilder', 'onAfterRevealAction', undefined, { roundPreparation: { kind: 'after-reveal', revealedAction: { actionId: state.roundActionOrder[state.round - 1]!, roundSlot: state.round } } })
+    const flow = runCardEffectHook(state, owner, 'B170_CorralBuilder', 'onAfterRevealAction', undefined, { actionHooks: session.actionHooks, roundPreparation: { kind: 'after-reveal', revealedAction: { actionId: state.roundActionOrder[state.round - 1]!, roundSlot: state.round } } })
 
     expect(flow).toMatchObject({
       type: 'leaf',
@@ -74,7 +74,7 @@ describe('5+ reveal and reaction occupation cards', () => {
     state.roundActionOrder[3] = 'cattle-market'
     let owner = state.players[0]!
 
-    expect(runCardEffectHook(state, owner, 'B170_CorralBuilder', 'onAfterRevealAction', undefined, { roundPreparation: { kind: 'after-reveal', revealedAction: { actionId: state.roundActionOrder[state.round - 1]!, roundSlot: state.round } } })).toMatchObject({
+    expect(runCardEffectHook(state, owner, 'B170_CorralBuilder', 'onAfterRevealAction', undefined, { actionHooks: cattle.actionHooks, roundPreparation: { kind: 'after-reveal', revealedAction: { actionId: state.roundActionOrder[state.round - 1]!, roundSlot: state.round } } })).toMatchObject({
       actionId: 'fence',
       sourceCard: 'B170_CorralBuilder',
     })
@@ -85,7 +85,7 @@ describe('5+ reveal and reaction occupation cards', () => {
     state.roundActionOrder[2] = 'vegetable-seeds'
     owner = state.players[0]!
 
-    expect(runCardEffectHook(state, owner, 'B170_CorralBuilder', 'onAfterRevealAction', undefined, { roundPreparation: { kind: 'after-reveal', revealedAction: { actionId: state.roundActionOrder[state.round - 1]!, roundSlot: state.round } } })).toBeNull()
+    expect(runCardEffectHook(state, owner, 'B170_CorralBuilder', 'onAfterRevealAction', undefined, { actionHooks: other.actionHooks, roundPreparation: { kind: 'after-reveal', revealedAction: { actionId: state.roundActionOrder[state.round - 1]!, roundSlot: state.round } } })).toBeNull()
   })
 
   it('B170 Corral Builder does not trigger when no one-space pasture can be fenced', () => {
@@ -99,7 +99,7 @@ describe('5+ reveal and reaction occupation cards', () => {
     owner.rooms = 2
     owner.fields = allTiles.slice(2).map((tile) => ({ row: tile.row, col: tile.col, stacks: [] }))
 
-    expect(runCardEffectHook(state, owner, 'B170_CorralBuilder', 'onAfterRevealAction', undefined, { roundPreparation: { kind: 'after-reveal', revealedAction: { actionId: state.roundActionOrder[state.round - 1]!, roundSlot: state.round } } })).toBeNull()
+    expect(runCardEffectHook(state, owner, 'B170_CorralBuilder', 'onAfterRevealAction', undefined, { actionHooks: session.actionHooks, roundPreparation: { kind: 'after-reveal', revealedAction: { actionId: state.roundActionOrder[state.round - 1]!, roundSlot: state.round } } })).toBeNull()
   })
 
   it('B175 Field Overseer gives only the highest reached reward for other players harvested grain fields', () => {
@@ -112,7 +112,7 @@ describe('5+ reveal and reaction occupation cards', () => {
       [state.players[2]!.id]: reapSummary(4),
     }
 
-    const flow = runCardEffectHook(state, owner, 'B175_FieldOverseer', 'onEndHarvestFieldPhase')
+    const flow = runCardEffectHook(state, owner, 'B175_FieldOverseer', 'onEndHarvestFieldPhase', undefined, { actionHooks: session.actionHooks })
 
     expect(flow).toMatchObject({
       type: 'leaf',
@@ -131,17 +131,17 @@ describe('5+ reveal and reaction occupation cards', () => {
       [state.players[1]!.id]: reapSummary(3),
     }
 
-    expect(runCardEffectHook(state, owner, 'B175_FieldOverseer', 'onEndHarvestFieldPhase')).toMatchObject({
+    expect(runCardEffectHook(state, owner, 'B175_FieldOverseer', 'onEndHarvestFieldPhase', undefined, { actionHooks: session.actionHooks })).toMatchObject({
       params: { food: 1 },
     })
 
     state.harvestReapSummary[state.players[1]!.id] = reapSummary(4)
-    expect(runCardEffectHook(state, owner, 'B175_FieldOverseer', 'onEndHarvestFieldPhase')).toMatchObject({
+    expect(runCardEffectHook(state, owner, 'B175_FieldOverseer', 'onEndHarvestFieldPhase', undefined, { actionHooks: session.actionHooks })).toMatchObject({
       params: { grain: 1 },
     })
 
     state.harvestReapSummary[state.players[1]!.id] = reapSummary(2)
-    expect(runCardEffectHook(state, owner, 'B175_FieldOverseer', 'onEndHarvestFieldPhase')).toBeNull()
+    expect(runCardEffectHook(state, owner, 'B175_FieldOverseer', 'onEndHarvestFieldPhase', undefined, { actionHooks: session.actionHooks })).toBeNull()
   })
 
   it('B179 Wild Boar Hunter offers 1 wood for 1 boar before return home when 3 wood spaces are occupied', () => {
@@ -153,7 +153,7 @@ describe('5+ reveal and reaction occupation cards', () => {
     const owner = state.players[0]!
     owner.resources.wood = 1
 
-    const flow = runCardEffectHook(state, owner, 'B179_WildBoarHunter', 'onBeforeReturnHome')
+    const flow = runCardEffectHook(state, owner, 'B179_WildBoarHunter', 'onBeforeReturnHome', undefined, { actionHooks: session.actionHooks })
 
     expect(flow).toMatchObject({
       type: 'seq',
@@ -173,14 +173,14 @@ describe('5+ reveal and reaction occupation cards', () => {
     let owner = state.players[0]!
     owner.resources.wood = 1
 
-    expect(runCardEffectHook(state, owner, 'B179_WildBoarHunter', 'onBeforeReturnHome')).toBeNull()
+    expect(runCardEffectHook(state, owner, 'B179_WildBoarHunter', 'onBeforeReturnHome', undefined, { actionHooks: session.actionHooks })).toBeNull()
 
     occupySpace(session, 'grove-56')
     state = session.getState().state
     owner = state.players[0]!
     owner.resources.wood = 0
 
-    expect(runCardEffectHook(state, owner, 'B179_WildBoarHunter', 'onBeforeReturnHome')).toBeNull()
+    expect(runCardEffectHook(state, owner, 'B179_WildBoarHunter', 'onBeforeReturnHome', undefined, { actionHooks: session.actionHooks })).toBeNull()
   })
 
   it('C170 Amateur Fencer offers a free one-space pasture on play only when the owner has no pastures', () => {
@@ -188,7 +188,7 @@ describe('5+ reveal and reaction occupation cards', () => {
     const state = session.getState().state
     const owner = state.players[0]!
 
-    expect(runCardEffectHook(state, owner, 'C170_AmateurFencer', 'onBuy')).toMatchObject({
+    expect(runCardEffectHook(state, owner, 'C170_AmateurFencer', 'onBuy', undefined, { actionHooks: session.actionHooks })).toMatchObject({
       type: 'leaf',
       actionId: 'fence',
       sourceCard: 'C170_AmateurFencer',
@@ -203,7 +203,7 @@ describe('5+ reveal and reaction occupation cards', () => {
     })
 
     owner.pastures = [{ cells: [{ row: 0, col: 0 }], stable: false, animals: {} }]
-    expect(runCardEffectHook(state, owner, 'C170_AmateurFencer', 'onBuy')).toBeNull()
+    expect(runCardEffectHook(state, owner, 'C170_AmateurFencer', 'onBuy', undefined, { actionHooks: session.actionHooks })).toBeNull()
   })
 
   it('C173 Top-Outer collects all food from Traveling Players 5/6 after House Building 5/6 is used', () => {
@@ -215,6 +215,7 @@ describe('5+ reveal and reaction occupation cards', () => {
     traveling.resources.food = 4
 
     const result = executeCardListener(listener('C173-top-outer-after-house-building-56'), {
+      actionHooks: session.actionHooks,
       state,
       player: owner,
       ownerPlayer: owner,
@@ -243,6 +244,7 @@ describe('5+ reveal and reaction occupation cards', () => {
     traveling.resources.food = 4
 
     const [result] = runCardListeners({
+      actionHooks: session.actionHooks,
       state,
       player: opponent,
       triggerPlayer: opponent,
@@ -268,6 +270,7 @@ describe('5+ reveal and reaction occupation cards', () => {
 
     const topOuter = listener('C173-top-outer-after-house-building-56')
     expect(executeCardListener(topOuter, {
+      actionHooks: session.actionHooks,
       state,
       player: owner,
       ownerPlayer: owner,
@@ -279,6 +282,7 @@ describe('5+ reveal and reaction occupation cards', () => {
 
     traveling.resources.food = 3
     expect(executeCardListener(topOuter, {
+      actionHooks: session.actionHooks,
       state,
       player: owner,
       ownerPlayer: owner,
@@ -299,6 +303,7 @@ describe('5+ reveal and reaction occupation cards', () => {
     const hollow = state.actionSpaces.find((space) => space.id === 'hollow-56')!
 
     const clayResult = executeCardListener(listener('C169-fast-mason-after-clay-stone-collect'), {
+      actionHooks: session.actionHooks,
       state,
       player: owner,
       ownerPlayer: owner,
@@ -327,6 +332,7 @@ describe('5+ reveal and reaction occupation cards', () => {
     owner.resources.stone = 2
     const quarry = state.actionSpaces.find((space) => space.id === 'eastern-quarry')!
     const stoneResult = executeCardListener(listener('C169-fast-mason-after-clay-stone-collect'), {
+      actionHooks: session.actionHooks,
       state,
       player: owner,
       ownerPlayer: owner,
@@ -361,6 +367,7 @@ describe('5+ reveal and reaction occupation cards', () => {
     const quarry = state.actionSpaces.find((space) => space.id === 'eastern-quarry')!
 
     expect(executeCardListener(fastMason, {
+      actionHooks: session.actionHooks,
       state,
       player: owner,
       ownerPlayer: owner,
@@ -377,6 +384,7 @@ describe('5+ reveal and reaction occupation cards', () => {
     } as unknown as CardListenerContext)).toBeUndefined()
 
     expect(executeCardListener(fastMason, {
+      actionHooks: session.actionHooks,
       state,
       player: owner,
       ownerPlayer: owner,
@@ -395,6 +403,7 @@ describe('5+ reveal and reaction occupation cards', () => {
     owner.houseType = 'wood'
     owner.resources.stone = 2
     expect(executeCardListener(fastMason, {
+      actionHooks: session.actionHooks,
       state,
       player: owner,
       ownerPlayer: owner,
@@ -420,6 +429,7 @@ describe('5+ reveal and reaction occupation cards', () => {
     const space = state.actionSpaces.find((candidate) => candidate.id === 'house-redevelopment')!
 
     const result = executeCardListener(listener('D175-countryman-after-action-space-renovation'), {
+      actionHooks: session.actionHooks,
       state,
       player: owner,
       ownerPlayer: owner,
@@ -460,6 +470,7 @@ describe('5+ reveal and reaction occupation cards', () => {
     const greenhouse = state.actionSpaces.find((candidate) => candidate.id === 'B171_GreenhouseBuilder')!
 
     const [result] = runCardListeners({
+      actionHooks: session.actionHooks,
       state,
       player: opponent,
       triggerPlayer: opponent,
@@ -485,6 +496,7 @@ describe('5+ reveal and reaction occupation cards', () => {
     const countryman = listener('D175-countryman-after-action-space-renovation')
 
     expect(executeCardListener(countryman, {
+      actionHooks: session.actionHooks,
       state,
       player: owner,
       ownerPlayer: owner,
@@ -496,6 +508,7 @@ describe('5+ reveal and reaction occupation cards', () => {
 
     owner.fields = []
     expect(executeCardListener(countryman, {
+      actionHooks: session.actionHooks,
       state,
       player: owner,
       ownerPlayer: owner,
@@ -509,6 +522,7 @@ describe('5+ reveal and reaction occupation cards', () => {
     owner.fields = [{ row: 0, col: 0, stacks: [] }]
     owner.resources.grain = 1
     expect(executeCardListener(countryman, {
+      actionHooks: session.actionHooks,
       state,
       player: owner,
       ownerPlayer: owner,

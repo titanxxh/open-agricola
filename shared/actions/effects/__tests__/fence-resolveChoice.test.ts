@@ -1,3 +1,9 @@
+import { ActionHookRegistry } from '../../hooks'
+import { beforeEach as beforeEachActionHooks } from 'vitest'
+
+let actionHooks: ActionHookRegistry
+beforeEachActionHooks(() => { actionHooks = new ActionHookRegistry() })
+
 import { describe, expect, it } from 'vitest'
 import '../../../cards/B/B030_WoodPalisades'
 import { fenceAction } from '../fencing'
@@ -141,6 +147,7 @@ const makeCtx = (
     currentPlayerIndex: 0,
   } as unknown as GameState
   return {
+    actionHooks,
     state,
     player,
     space: dummySpace,

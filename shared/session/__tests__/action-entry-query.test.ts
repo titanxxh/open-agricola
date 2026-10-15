@@ -1,3 +1,9 @@
+import { ActionHookRegistry } from '../../actions/hooks'
+import { beforeEach as beforeEachActionHooks } from 'vitest'
+
+let actionHooks: ActionHookRegistry
+beforeEachActionHooks(() => { actionHooks = new ActionHookRegistry() })
+
 import { describe, expect, it } from 'vitest'
 import { computeAllowedPlacementSpaces } from '../../actions/helpers/placement-availability'
 import { createInitialState } from '../state-bootstrap'
@@ -19,11 +25,11 @@ describe('computeActionEntryAvailability', () => {
     }
 
     const options = { isActionDoable: (_space: import('../../contract/types').ActionSpace, baseDoable: () => boolean) => baseDoable() }
-    computeAllowedPlacementSpaces(state, player, options)
+    computeAllowedPlacementSpaces(state, player, { actionHooks, ...options })
     const callsPerPlacementScan = calls
     calls = 0
 
-    computeActionEntryAvailability(state, player, options)
+    computeActionEntryAvailability(state, player, { actionHooks, ...options })
 
     expect(callsPerPlacementScan).toBeGreaterThan(0)
     expect(calls).toBe(callsPerPlacementScan)

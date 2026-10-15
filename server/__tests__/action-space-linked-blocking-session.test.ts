@@ -83,6 +83,7 @@ describe('5/6 linked action-space blocking', () => {
     const allowed = computeAllowedPlacementSpaces(
       session.getState().state,
       session.getState().state.players[1]!,
+      { actionHooks: session.actionHooks },
     )
     expect(allowed.map((entry) => entry.spaceId)).not.toContain('lessons-56-2f')
     expect(session.getActionAvailability(1)['lessons-56-2f']).toBe(false)
