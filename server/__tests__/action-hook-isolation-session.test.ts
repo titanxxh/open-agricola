@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { serializeSessionSnapshot, rehydrateState } from '../../shared/session/serialization'
+import { computeAllowedPlacementSpaces } from '../../shared/actions/helpers/placement-availability'
+import { ActionHookRegistry } from '../../shared/actions/hooks'
 import { createWorkSession } from './_helpers/session-fixtures'
 
 const sessions: GameSession[] = []
@@ -16,6 +18,20 @@ const game = (season?: 'winter' | 'summer') => {
 }
 
 describe('per-session action rules', () => {
+  it('requires the query dependency while allowing an explicitly empty registry', () => {
+    const session = game()
+    const player = session.state.players[0]!
+    expect(() => session.withCtx(() => computeAllowedPlacementSpaces(session.state, player)))
+      .toThrow('ActionHookRegistry is required')
+    const placements = session.withCtx(() => computeAllowedPlacementSpaces(session.state, player, { actionHooks: new ActionHookRegistry() }))
+    expect(placements.map(entry => entry.spaceId)).toContain('fishing')
+    session.actionHooks.clear()
+    const food = player.resources.food
+    const response = session.takeAction(0, 'fishing')
+    expect(response.ok).toBe(true)
+    expect(response.state.players[0]!.resources.food).toBe(food + 3)
+  })
+
   it('keeps a session veto when another two-player game is created', () => {
     const a = game()
     a.actionHooks.register({ id: 'test:fishing', actions: ['fishing'], phases: ['isDoable'], handler: () => ({ doable: false }) })

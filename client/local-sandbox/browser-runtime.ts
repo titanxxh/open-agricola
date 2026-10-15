@@ -32,13 +32,18 @@ export const registerBrowserBackedCustomCard = (cardData: CustomCardData): void 
       paymentInfo?: PaymentInfo,
       ...rest: unknown[]
     ) => {
+      let sandboxArgument = paymentInfo
+      if (sandboxArgument && 'actionHooks' in sandboxArgument) {
+        const { actionHooks: _actionHooks, ...data } = sandboxArgument
+        sandboxArgument = data
+      }
       const response = invokeCustomCodeEffectLocal({
         compiledCode,
         cardId,
         hook,
         state,
         player,
-        paymentInfo,
+        paymentInfo: sandboxArgument,
         extraArgs: extraHookArguments(hook, [state, player, paymentInfo, ...rest]),
       })
       if (!response.ok) {

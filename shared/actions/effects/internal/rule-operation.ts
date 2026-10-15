@@ -14,6 +14,7 @@ export const ruleOperationAction: ActionDefinition = {
       case 'move-worker-from-space': {
         const flow = planMoveWorkerFromSpace(match.body.operation, { state, player, sourceCard: options?.sourceCard })
         return !!flow && moveFarmerToSpaceAction.canBeExecutedByPlayer(state, player, {
+          actionHooks: options?.actionHooks,
           sourceCard: flow.sourceCard, params: flow.params, actionContext: flow.actionContext,
         })
       }
