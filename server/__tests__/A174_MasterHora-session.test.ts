@@ -111,6 +111,7 @@ describe('A174 Master Hora', () => {
     const host = state.actionSpaces.find((space) => space.id === 'day-laborer')!
 
     const result = placeFarmerAction.resolveChoice!({
+      actionHooks: session.actionHooks,
       state,
       player,
       space: host,

@@ -480,6 +480,7 @@ describe('B149 Open Air Farmer session', () => {
     expect(getAvailableStableSupplyCount(state, player)).toBe(1)
 
     const stableResult = stablesAction.execute({
+      actionHooks: session.actionHooks,
       state,
       player,
       space: stableSpace,
