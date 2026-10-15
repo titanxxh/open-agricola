@@ -118,7 +118,8 @@ describe('D022 Work Permit parity', () => {
   })
 
   it('D022 S2: every building resource unit contributes one round without being consumed', () => {
-    const response = play(setupPurchase({ wood: 1, clay: 2, reed: 1 }))
+    const session = setupPurchase({ wood: 1, clay: 2, reed: 1 })
+    const response = play(session)
 
     expect(response.ok, response.error).toBe(true)
     expect(workPermitRounds(session, response)).toEqual([9])
@@ -128,7 +129,8 @@ describe('D022 Work Permit parity', () => {
   })
 
   it('D022 S3: without a building resource Work Permit is unavailable and pays nothing', () => {
-    const response = enterMinor(setupPurchase({ wood: 0 }))
+    const session = setupPurchase({ wood: 0 })
+    const response = enterMinor(session)
 
     expect(offered(response)).toBe(false)
     expect(response.state.players[0]!.minorHand).toContain(CARD_ID)
@@ -146,7 +148,8 @@ describe('D022 Work Permit parity', () => {
   })
 
   it('D022 S5: a target after round fourteen still plays and pays but schedules no person', () => {
-    const response = play(setupPurchase({ round: 13, wood: 1, clay: 1 }))
+    const session = setupPurchase({ round: 13, wood: 1, clay: 1 })
+    const response = play(session)
 
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.minorPlayed).toContain(CARD_ID)
@@ -194,7 +197,8 @@ describe('D022 Work Permit parity', () => {
   })
 
   it('D022 S8: before the target round Work Permit offers no extra placement', () => {
-    const response = setupDue({ wood: 1, clay: 1 }).performRoundEnd()
+    const session = setupDue({ wood: 1, clay: 1 })
+    const response = session.performRoundEnd()
 
     expect(response.state.round).toBe(6)
     expect(response.interaction.stateId !== 'wait' || response.interaction.sourceCard !== CARD_ID).toBe(true)

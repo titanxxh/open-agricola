@@ -103,7 +103,7 @@ describe('E105 Pioneer before placement action', () => {
       const state = session.state
       const player = state.players[0]!
       const before = snapshotResponse(session.getState())
-      const available = (actionContext?: Record<string, unknown>) => computeAllowedPlacementSpaces(state, player, { actionContext })
+      const available = (actionContext?: Record<string, unknown>) => computeAllowedPlacementSpaces(state, player, { actionHooks: session.actionHooks, actionContext })
         .some((entry) => entry.spaceId === 'major-improvement')
       expect(available()).toBe(true)
       expect(available({ skipBeforeTriggers: true })).toBe(false)
