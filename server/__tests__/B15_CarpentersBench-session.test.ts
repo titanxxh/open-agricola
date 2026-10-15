@@ -51,6 +51,7 @@ const directContext = (
 }
 
 const fenceLeaf = (flow: ActionFlow | undefined) => {
+  if (flow?.type === 'leaf') return flow.actionId === 'fence' ? flow : undefined
   if (flow?.type !== 'seq') return undefined
   return flow.children.find((child) => child.type === 'leaf' && child.actionId === 'fence')
 }
