@@ -720,6 +720,8 @@ anytime                  额外注册的 anytime 行动
 
 围栏提交还必须记录 `newlyEnclosedPastureTiles: { playerId, row, col }[]`，取提交前后牧场坐标集合的差。它表示未围住的格子变为牧场，与未使用变为使用的格子及变化的牧场组件（`newPastures`）分别记录。因此首次围住未围栏马厩会记录其格子，分割已有牧场则为空。C179 只读取原宿主捕获的行动事件中的这一事实，并按受影响玩家过滤，不再保存行动前的牧场缓存。
 
+`farm.spacesUsed` 为地形放置及封锁状态变更记录同一所属玩家坐标事实。`selection` leaf 只在同步 selection effect 执行前后捕获使用状态与原有格范围；`special-effect` leaf 只在添加农场格状态前后捕获使用状态。只有成功的 unused→used 变化才发出事实。初始即覆盖地形的新增扩建格、覆盖地形替换、不封锁的物资标记及未变化的封锁均不计入；快照不会跨 leaf 或延伸到后续响应。C048 沿用宿主提交时持牌检查和 Turn 凭据消费这些事实。A040 扩展地形／封锁响应前，需要另行解决原始黏土放置的位置归属；这些原生单格入口达不到 A073 的两格门槛。
+
 `getActionNewlyUsedTiles(context)` 只读取宿主已捕获 `actionEvents` 中的已提交几何事件，按效果玩家 ID 过滤并去重坐标，不回退到更宽的 transaction 或 Turn 范围。嵌套宿主各自保留事实，延后的外层响应不会再次消费内层变更。A040 剩余黏土等持续牌上库存仍由本牌状态保存，每次行动的几何事实不再使用临时牌状态缓存。提交时的卡牌准入继续采用已冻结的 listener 集合和 `triggerSnapshot`；新增几何事实不会让之后响应中新打出的卡追溯响应旧事件。
 
 卡牌 listener 通过 `CardListenerContext.transactionEvents` 和 `eventQuery` 读取当前 action frame 的事件。普通 listener 看到的是已经 emit 的当前 frame 事件；`trade-applied` 这类合成 listener 可以读取当前 exchange 的 `DraftGameEvent`，但不能依赖尚未提交的全局 `state.events`。listener handler 必须是 state-pure flow builder；包括本卡 `cardStates[cardId]` 在内的所有状态修改都通过返回 flow/leaf 进入 engine。trigger-select preview 在克隆 state/player 上执行 card listener，并且只根据返回结果判定该 activation 是否可选；listener 写 preview clone 属于纯度违规（见 §7.7 listener 纯度门禁）。只有 stage card-effect handler 仍可通过可检测的 clone 修改建立适用性。真实写入只在玩家选择 activation 后发生。

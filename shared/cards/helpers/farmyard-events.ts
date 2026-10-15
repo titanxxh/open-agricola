@@ -8,7 +8,8 @@ export const getActionNewlyUsedTiles = (context: Pick<CardListenerContext, 'acti
   for (const event of context.actionEvents ?? []) {
     if (!('schemaVersion' in event)) continue
     if (event.type !== 'farm.fieldPlowed' && event.type !== 'farm.roomBuilt'
-      && event.type !== 'farm.stableBuilt' && event.type !== 'farm.fenceBuilt') continue
+      && event.type !== 'farm.stableBuilt' && event.type !== 'farm.fenceBuilt'
+      && event.type !== 'farm.spacesUsed') continue
     for (const tile of event.newlyUsedTiles) {
       if (tile.playerId === context.player.id) tiles.set(positionKey(tile), { ...tile })
     }

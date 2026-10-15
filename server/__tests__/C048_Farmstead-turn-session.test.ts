@@ -64,6 +64,14 @@ function meetingMinor(session: GameSession, response = session.takeAction(0, 'me
   expect(response.state.players[0]!.minorPlayed).toContain(CARD)
   return response
 }
+function moorMinor(session: GameSession, card: string) {
+  let response = session.takeAction(0, 'meeting-place')
+  expect(response.ok, response.error).toBe(true)
+  const improvement = options(response).find(option => option.value.startsWith('action-improvement-'))
+  if (improvement) response = choose(session, response, improvement.value)
+  if (options(response).some(option => option.value === card)) response = choose(session, response, card)
+  return response
+}
 function nextTurn(session: GameSession) {
   let response = session.resolveChoice(0, 'confirm')
   expect(response.ok, response.error).toBe(true)
@@ -377,6 +385,138 @@ describe('C048 Farmstead at the true Turn end', () => {
     expect(readActionSnapshotToken(response.state.players[0]!)).toBeUndefined()
   })
 
+
+  it.each([
+    'M017_Reforestation',
+    'M042_DeepPlow',
+    'M066_LandParcel',
+    'M064_FamilyBurialPlot',
+  ])('rewards a previously unused space made used by %s at the true Turn end', card => {
+    const session = createWorkSession({ options: { enableFarmersOfTheMoor: true, allowIncompleteFarmersOfTheMoorMinorDeal: true }, configure: state => {
+      state.round = 10
+      const player = state.players[0]!
+      player.farmTerrain = []
+      player.minorPlayed = [CARD]
+      player.minorHand = [card]
+      player.occupationPlayed = [STOCK]
+      player.houseType = 'stone'
+      player.improvements = card === 'M066_LandParcel' ? [] : ['Major_Fireplace1', 'Major_Fireplace2', 'Major_Joinery']
+      Object.assign(player.resources, { wood: card === 'M042_DeepPlow' ? 3 : 0, clay: 0, reed: 0, stone: 1, food: 2 })
+      state.availableMajorImprovements = state.availableMajorImprovements.filter(id => !player.improvements.includes(id))
+    } })
+    sessions.push(session)
+    let response = moorMinor(session, card)
+    if (response.interaction.stateId === 'wait' && response.interaction.promptKey === 'ui.interactionOptionalAction') response = accept(session, response)
+    expect(response.interaction.stateId === 'wait' && response.interaction.request.selection?.kind, JSON.stringify(response.interaction)).toBe('farm-position')
+    expect(response.state.players[0]!.resources.food).toBe(2)
+    const live = restore(session)
+    response = live.commitSelectionChoice(0, { positions: [{ row: 1, col: 3 }] })
+    expect(response.ok, response.error).toBe(true)
+    const player = response.state.players[0]!
+    if (card === 'M064_FamilyBurialPlot') expect(player.farmyardSpaceStates).toContainEqual(expect.objectContaining({ spaceKey: '1-3', blocksPlacement: true }))
+    else expect(player.farmTerrain).toContainEqual({ row: 1, col: 3, kind: card === 'M042_DeepPlow' ? 'moor' : 'forest' })
+    expect(player.resources.food).toBe(3)
+    expect(player.cardStates[CARD]?.extraData?.rewardedTurnToken).toBe(player.cardStates[CARD]?.extraData?.qualifiedTurnToken)
+    expect(response.state.events.filter(event => event.type === 'farm.spacesUsed')).toMatchObject([
+      { sourceCardId: card, newlyUsedTiles: [{ playerId: player.id, row: 1, col: 3 }] },
+    ])
+    expect(response.interaction.stateId === 'wait' && response.interaction.request.kind).toBe('confirm-next-player')
+    const undone = live.undoAction()
+    expect(undone.ok, undone.error).toBe(true)
+    expect(undone.state.players[0]!.resources.food).toBe(2)
+    expect(undone.state.events.filter(event => event.type === 'farm.spacesUsed')).toHaveLength(0)
+    response = moorMinor(live, card)
+    if (response.interaction.stateId === 'wait' && response.interaction.promptKey === 'ui.interactionOptionalAction') response = accept(live, response)
+    const redone = live.commitSelectionChoice(0, { positions: [{ row: 1, col: 3 }] })
+    expect(redone.ok, redone.error).toBe(true)
+    expect(redone.state.players[0]!.resources.food).toBe(3)
+    expect(redone.state.events.filter(event => event.type === 'farm.spacesUsed')).toHaveLength(1)
+  })
+
+  it.each(['accept', 'skip', 'covered'] as const)('uses only actual new blocking usage from Moor Archaeology: %s', mode => {
+    const session = createWorkSession({ options: { enableFarmersOfTheMoor: true, allowIncompleteFarmersOfTheMoorMinorDeal: true }, configure: state => {
+      state.round = 10
+      const player = state.players[0]!
+      player.minorPlayed = [CARD, 'M070_MoorArchaeology']
+      player.occupationPlayed = [STOCK]
+      player.houseType = 'clay'
+      player.resources.food = 2
+      player.farmTerrain = [{ row: 0, col: 3, kind: 'moor', ...(mode === 'covered' ? { covered: 'forest' } : {}) }]
+    } })
+    sessions.push(session)
+    const special = session.state.farmersOfTheMoor!.specialActionCards.find(card => card.actions.includes('cut-peat'))!
+    let response = session.takeSpecialAction(0, special.id, 'cut-peat', { tile: { row: 0, col: 3 } })
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources.food).toBe(2)
+    const live = restore(session)
+    if (mode !== 'covered') {
+      expect(response.interaction.stateId === 'wait' && response.interaction.promptKey).toBe('ui.interactionOptionalAction')
+      response = mode === 'accept' ? accept(live, live.getState()) : choose(live, live.getState(), '__skip__')
+    } else response = live.getState()
+    const player = response.state.players[0]!
+    expect(player.resources.food).toBe(mode === 'accept' ? 3 : 2)
+    expect(response.state.events.filter(event => event.type === 'farm.spacesUsed')).toHaveLength(mode === 'accept' ? 1 : 0)
+    if (mode === 'accept') {
+      expect(player.farmyardSpaceStates).toContainEqual(expect.objectContaining({ spaceKey: '0-3', blocksPlacement: true }))
+      expect(response.state.events).toContainEqual(expect.objectContaining({ type: 'farm.spacesUsed', sourceCardId: 'M070_MoorArchaeology', newlyUsedTiles: [{ playerId: player.id, row: 0, col: 3 }] }))
+      expect(live.undoAction().state.players[0]!.resources.food).toBe(2)
+      const repeated = live.takeSpecialAction(0, special.id, 'cut-peat', { tile: { row: 0, col: 3 } })
+      expect(accept(live, repeated).state.players[0]!.resources.food).toBe(3)
+    } else expect(player.farmyardSpaceStates ?? []).toEqual([])
+  })
+
+  it.each(['M051_MoorEnclosures', 'M064_FamilyBurialPlot'])('does not qualify initial extension terrain or a skipped tombstone: %s', card => {
+    const session = createWorkSession({ options: { enableFarmersOfTheMoor: true, allowIncompleteFarmersOfTheMoorMinorDeal: true }, configure: state => {
+      state.round = 10
+      const player = state.players[0]!
+      player.minorPlayed = [CARD]
+      player.minorHand = [card]
+      player.occupationPlayed = [STOCK]
+      player.houseType = card === 'M051_MoorEnclosures' ? 'clay' : 'stone'
+      player.farmTerrain = []
+      Object.assign(player.resources, { stone: 1, food: 2 })
+    } })
+    sessions.push(session)
+    let response = moorMinor(session, card)
+    if (card === 'M064_FamilyBurialPlot') response = choose(session, response, '__skip__')
+    else {
+      response = session.commitSelectionChoice(0, { positions: [{ row: -1, col: 0 }, { row: -1, col: 1 }] })
+      expect(response.state.players[0]!.farmTerrain).toEqual([{ row: -1, col: 0, kind: 'moor' }, { row: -1, col: 1, kind: 'moor' }])
+      expect(response.state.players[0]!.farmyardExtensions).toHaveLength(1)
+    }
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources.food).toBe(2)
+    expect(response.state.players[0]!.cardStates[CARD]?.extraData?.qualifiedTurnToken).toBeUndefined()
+    expect(response.state.events.filter(event => event.type === 'farm.spacesUsed')).toEqual([])
+  })
+
+  it('does not invent unused-to-used qualification while cleared Nature Reserve terrain becomes pasture', () => {
+    const card = 'M021_PeatCuttingExpedition'
+    const session = createWorkSession({ options: { enableFarmersOfTheMoor: true, allowIncompleteFarmersOfTheMoorMinorDeal: true }, configure: state => {
+      state.round = 10
+      const player = state.players[0]!
+      player.minorPlayed = [CARD, 'M038_NatureReserve']
+      player.minorHand = [card]
+      player.occupationPlayed = [STOCK]
+      player.resources.food = 6
+      player.farmTerrain = [{ row: 0, col: 1, kind: 'moor' }]
+      player.fenceSegments = ['H-0-0', 'H-1-0', 'V-0-0', 'V-0-1', 'H-0-1', 'H-1-1', 'V-0-2']
+        .map(edge => ({ edge, type: 'fence', source: { kind: 'own', ownerPlayerId: player.id } }))
+      player.pastures = [{ id: 'old', tiles: [{ row: 0, col: 0 }], animalType: null, animalCount: 0 }]
+      player.cardStates.M038_NatureReserve = { extraData: { natureReserveTiles: [{ row: 0, col: 1 }] } }
+    } })
+    sessions.push(session)
+    let response = moorMinor(session, card)
+    expect(response.interaction.stateId === 'wait' && response.interaction.request.selection?.kind).toBe('farm-position')
+    response = session.commitSelectionChoice(0, { positions: [{ row: 0, col: 1 }] })
+    expect(response.ok, response.error).toBe(true)
+    if (options(response).some(option => option.value === 'M038_NatureReserve')) response = choose(session, response, 'M038_NatureReserve')
+    expect(response.state.players[0]!.pastures).toHaveLength(2)
+    expect(response.state.players[0]!.farmTerrain).toEqual([])
+    expect(response.state.players[0]!.resources).toMatchObject({ food: 2, fuel: 2 })
+    expect(response.state.players[0]!.cardStates[CARD]?.extraData?.qualifiedTurnToken).toBeUndefined()
+    expect(response.state.events.filter(event => event.type === 'farm.spacesUsed')).toEqual([])
+  })
 
   it.each([
     { card: 'M062_HearthBrush', major: 'Major_Moor_TiledOven', resource: 'clay', buy: true },

@@ -309,9 +309,15 @@ export const specialEffectAction: ActionDefinition = {
           targetPlayerId: target.id,
         })
         return { type: 'ok' }
-      case 'add-farmyard-space-state':
+      case 'add-farmyard-space-state': {
+        const usedBefore = getUsedFarmyardTileKeys(target)
         addFarmyardSpaceState(target, p.state, eventSink)
+        const newlyUsedTiles = getNewlyUsedFarmyardTiles(target, usedBefore)
+        if (newlyUsedTiles.length > 0) {
+          eventSink?.emit<'farm.spacesUsed'>({ type: 'farm.spacesUsed', sourceCardId: sourceCard, newlyUsedTiles })
+        }
         return { type: 'ok' }
+      }
       case 'claim-farmyard-goods-tokens': {
         const gained = claimFarmyardGoodsTokens(target, sourceCard)
         if (Object.keys(gained).length > 0) {

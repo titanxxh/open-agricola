@@ -95,6 +95,27 @@ const setupExtraTurnPlayer = (over: {
 }
 
 describe('specialEffectAction — mutation dispatcher', () => {
+  it.each(['unused', 'terrain', 'nonblocking'] as const)('records only an existing unused space newly blocked: %s', scenario => {
+    const player = makePlayer()
+    if (scenario === 'terrain') player.farmTerrain = [{ row: 1, col: 3, kind: 'moor' }]
+    const events: DraftGameEvent[] = []
+    const context = makeCtx(player, {
+      kind: 'add-farmyard-space-state',
+      state: {
+        spaceKey: '1-3', sourceCardId: 'TEST_CARD', kind: 'blocked-farmyard-space',
+        ...(scenario === 'nonblocking' ? {} : { blocksPlacement: true }),
+      },
+    }, 'TEST_CARD')
+    context.eventSink = makeEventSink(events)
+    expect(specialEffectAction.execute(context).type).toBe('ok')
+    expect(events.filter(event => event.type === 'farm.spacesUsed')).toEqual(scenario === 'unused' ? [
+      { type: 'farm.spacesUsed', sourceCardId: 'TEST_CARD', newlyUsedTiles: [{ playerId: 'p1', row: 1, col: 3 }] },
+    ] : [])
+    events.length = 0
+    expect(specialEffectAction.execute(context).type).toBe('ok')
+    expect(events.filter(event => event.type === 'farm.spacesUsed')).toEqual([])
+  })
+
   it('increment-extra-data: adds to existing counter, init from 0', () => {
     const player = makePlayer()
     let result = specialEffectAction.execute(
