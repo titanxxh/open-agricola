@@ -450,6 +450,8 @@ API：`push / pop / current / depth / peekPendingEnvelope / peekPendingHost / to
 
 `EngineStackCursor` 序列化到 `PersistedSessionSnapshot.sessionCursor.engineStackCursor`。恢复路径为 `engine.snapshot()` → 各 concrete node cursor restore 重建节点树并定位 pending host / traversal state；公共和 Replay 使用的 `SerializedGameState.engineStack` 始终为空。
 
+普通撤销历史同样保存独立的 `EngineStackCursor`，包含所有父帧、帧身份、子流程原因、阶段续行点、延迟切换玩家和提交撤销边界。`undoStep()` 与 `undoAction()` 重建完整栈，不自动推进，也不会把嵌套帧改成顶层帧。历史游标保持私有，并像命令 checkpoint 一样经过 JSON 快照往返。因此，在动物整理中撤销并重做 anytime 行动后，仍能完成原来的阶段。
+
 收获后窗口在 `SubFlowReason` 和 `PendingSyntheticKind` 中都使用 `post-reap-anytime`，因此 Session 能区分它的根 choice 与嵌套卡牌 choice，而不需要单卡分支。
 
 `SubFlowKind` ∈ { `choice` / `animal-reorg` / `confirm-next-player` / `confirm-player-switch` / `feed` / `farm-select` / `selection` / `card-draft` }。
