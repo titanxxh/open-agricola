@@ -26,7 +26,6 @@ import {
   fieldHasCrop,
   fieldPopIfDepleted,
 } from '../../domain/field'
-import { clearPendingFenceBonus } from '../../cards/helpers/pending-fence-bonus'
 import { removeFutureMeeples } from './internal/future-meeples'
 import { findFirstNewborn, findPlayerById } from '../../domain/player'
 import { findActionSpaceById, removeWorkerRef } from '../../domain/space'
@@ -86,7 +85,6 @@ export type SpecialEffectParams =
   | { kind: 'claim-field-goods-tokens'; positions?: Array<{ row: number; col: number }> }
   | { kind: 'grow-field-and-non-field-crops' }
   | { kind: 'consume-supply-token'; key: SupplyTokenKey; amount?: number }
-  | { kind: 'clear-pending-fence-bonus' }
   | { kind: 'consume-pending-extra-turns' }
   | { kind: 'remove-future-meeples'; rounds?: number[] }
   | { kind: 'promote-first-newborn' }
@@ -387,10 +385,6 @@ export const specialEffectAction: ActionDefinition = {
         })
         return { type: 'ok' }
       }
-      case 'clear-pending-fence-bonus':
-        clearPendingFenceBonus(target)
-        emitCardStateChanged(eventSink, sourceCard, target, 'pendingFenceBonus')
-        return { type: 'ok' }
       case 'consume-pending-extra-turns': {
         if (!state) return { type: 'fail', errorKey: 'log.specialEffectFail' }
         const consumed = consumePendingExtraTurns(state, target)

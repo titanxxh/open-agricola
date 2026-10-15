@@ -258,15 +258,14 @@ export const recordCardCostAttribution = (
   }
 }
 
-export const recordActionCostAttribution = (
-  player: PlayerState,
+export const resolveActionCostAttribution = (
   attribution: ActionCostAttribution[] | undefined,
   baseCost: Partial<Resource>,
   finalCost: Partial<Resource>,
   multiplier = 1,
 ) => {
-  if (!attribution?.length) return []
-  const sources = new Set<string>()
+  const resolved: CostAttributionBySource = {}
+  if (!attribution?.length) return resolved
   const remainingSaved: Partial<Resource> = {}
   const remainingPaid: Partial<Resource> = {}
   attribution.forEach((entry) => {
@@ -298,16 +297,30 @@ export const recordActionCostAttribution = (
         remainingPaid[resourceKey] = Math.max(0, (remainingPaid[resourceKey] ?? 0) - amount)
       }
     })
-    addCardResourceSaved(player, entry.sourceCard, saved)
-    addCardResourcePaid(player, entry.sourceCard, paid)
     if (
       Object.values(saved).some(value => (value ?? 0) > 0)
       || Object.values(paid).some(value => (value ?? 0) > 0)
     ) {
-      sources.add(entry.sourceCard)
+      const previous = resolved[entry.sourceCard]
+      resolved[entry.sourceCard] = {
+        saved: mergeResources(previous?.saved, saved),
+        paid: mergeResources(previous?.paid, paid),
+      }
     }
   })
-  return [...sources]
+  return resolved
+}
+
+export const recordActionCostAttribution = (
+  player: PlayerState,
+  attribution: ActionCostAttribution[] | undefined,
+  baseCost: Partial<Resource>,
+  finalCost: Partial<Resource>,
+  multiplier = 1,
+) => {
+  const resolved = resolveActionCostAttribution(attribution, baseCost, finalCost, multiplier)
+  recordCardCostAttribution(player, resolved)
+  return Object.keys(resolved)
 }
 
 export const getCardStack = (player: PlayerState, cardId: string): string[] =>

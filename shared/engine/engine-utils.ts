@@ -396,6 +396,30 @@ export function stampContinuationParentHost(node: EngineNode, hostNodeId: string
   for (const child of getNodeChildren(node)) stampContinuationParentHost(child, hostNodeId)
 }
 
+export function applyBeforeHostContributions(
+  int: EngineInternals,
+  node: ActionNode | undefined,
+  result: ActionExecutionResult,
+): ActionExecutionResult {
+  if (result.type !== 'ok' || !result.beforeHostContributions?.length) return result
+  const host = node?.continuationParentHostNodeId
+    ? int.tree.findNodeById(node.continuationParentHostNodeId)
+    : undefined
+  if (!(host instanceof ActionNode) || host.bodyStarted) {
+    return { type: 'fail', errorKey: 'log.actionFail' }
+  }
+  for (const { key, sourceCard, value } of result.beforeHostContributions) {
+    const previous = host.actionContext?.[key]
+    const contributions = previous && typeof previous === 'object' && !Array.isArray(previous)
+      ? previous : {}
+    host.actionContext = {
+      ...host.actionContext,
+      [key]: { ...contributions, [sourceCard]: value },
+    }
+  }
+  return result
+}
+
 export function stampBeforeHostNode(node: EngineNode, hostNodeId: string): void {
   if (isActivateCardActionNode(node)) node.params.beforeHostNodeId = hostNodeId
   for (const child of getNodeChildren(node)) stampBeforeHostNode(child, hostNodeId)
@@ -722,7 +746,6 @@ const specialEffectDescriptionLabelKey = (node: ActionNode): string | null | und
     case 'pop-card-stack-top':
     case 'swap-improvement-with-board':
     case 'return-card-to-board':
-    case 'clear-pending-fence-bonus':
     case 'consume-pending-extra-turns':
     case 'remove-future-meeples':
     case 'promote-first-newborn':

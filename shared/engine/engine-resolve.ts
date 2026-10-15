@@ -26,6 +26,7 @@ import { mergeContinuationEvents } from './continuation-events'
 import { evaluateTriggerSelect, type TriggerSelectEvaluationOptions } from './trigger-select'
 import {
   applyDefaultSourceCardToFlow,
+  applyBeforeHostContributions,
   applyInteractionRequest,
   buildPhaseTrailingNodes,
   buildChoiceExecutionContext,
@@ -641,7 +642,7 @@ export function engineResolveChoice(
       let completedEvents: GameEvent[] = []
       child.bodyStarted = true
       child.beforeAnytimeAvailable = false
-      const result = maybeBuildChoiceCandidates(
+      const result = applyBeforeHostContributions(int, child, maybeBuildChoiceCandidates(
         int,
         { ...executionContext, ...currentEventReadContext(int) },
         action,
@@ -651,7 +652,7 @@ export function engineResolveChoice(
         ...executionContext,
         completedTransactionEvents: currentEventReadContext(int).transactionEvents,
         eventSink: eventBuffer.sink,
-      })
+      }))
       if (result.type === 'fail') {
         eventFrame.rollback()
         setEngineBlockedPending(int, child.id, actionId)
@@ -1000,13 +1001,13 @@ export function engineResolveChoice(
       sourceCardId: executionContext.sourceCard,
     })
     const eventBuffer = createBufferedEventSink()
-    result = withInjectedAnytimeResultFlag(
+    result = applyBeforeHostContributions(int, pendingActionNode ?? undefined, withInjectedAnytimeResultFlag(
       committedAction.resolveChoice({
         ...executionContext,
         eventSink: eventBuffer.sink,
       }, choice, payload),
       executionContext.actionContext,
-    )
+    ))
     const contextWritePatch =
       'extraData' in result && result.extraData && typeof result.extraData === 'object'
         ? (result.extraData.actionContextWrite as Record<string, unknown> | undefined)

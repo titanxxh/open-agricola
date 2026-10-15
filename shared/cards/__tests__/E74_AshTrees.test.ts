@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { getRegisteredCardListeners, executeCardListener } from '../card-listeners'
 import { getCardEffect } from '../card-effects'
-import { readPendingFenceBonus, storePendingFenceBonus } from '../helpers/pending-fence-bonus'
 import { specialEffectAction } from '../../actions/effects/special-effect'
 import type { ActionFlow, ActionSpace, GameState, PlayerState } from '../../contract/types'
 import { setFencesForTest } from './__fixtures__/fence'
@@ -119,8 +118,8 @@ describe('E074_AshTrees', () => {
     expect(result.flow.children).toHaveLength(4)
     expect(result.flow.children[0]).toMatchObject({
       type: 'leaf',
-      actionId: 'reserve-fence-bonus',
-      params: { freeFences: 1 },
+      actionId: 'reserve-fence-supply',
+      params: { selectedCount: 1 },
     })
   })
 
@@ -170,15 +169,9 @@ describe('E074_AshTrees', () => {
     expect(JSON.stringify(player.cardStates)).toBe(before)
   })
 
-  it('clears reserved free fences after fencing finishes', () => {
+  it('refreshes the remaining fence infobox after fencing finishes', () => {
     const listener = findListener('E74-ash-trees-after-fence')
     const player = createPlayer()
-    storePendingFenceBonus(player, {
-      sourceCard: 'E074_AshTrees',
-      counterKey: 'fences',
-      freeFences: 2,
-    })
-
     const state = createState(player)
     const result = executeCardListener(listener!, {
       state,
@@ -191,6 +184,6 @@ describe('E074_AshTrees', () => {
     } as unknown as CardListenerContext)
     executeSpecialEffectLeaves(result?.flow, state, player)
 
-    expect(readPendingFenceBonus(player)).toBeUndefined()
+    expect(player.cardStates.E074_AshTrees?.infobox).toBe('4 / 5')
   })
 })

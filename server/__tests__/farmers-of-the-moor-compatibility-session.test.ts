@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { createWorkSession } from './_helpers/session-fixtures'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
-import { storePendingFenceBonus } from '../../shared/cards/helpers/pending-fence-bonus'
+import { descriptionEffects } from './_helpers/choice-description'
 import {
   markAllWorkersUsed,
   setActiveWorkerCount,
@@ -1192,15 +1192,17 @@ describe('Farmers of the Moor compatibility regressions', () => {
     const session = setupFarmersOfTheMoorSeason('spring')
     const player = session.state.players[0]!
     player.resources.wood = 1
-    storePendingFenceBonus(player, {
-      sourceCard: 'TestFenceBonus',
-      counterKey: 'fences',
-      freeFences: 3,
-    })
+    player.minorPlayed.push('E074_AshTrees')
+    player.cardStates.E074_AshTrees = { counters: { fences: 3 } }
 
     expect(availableIds(session)).toContain('fencing')
     let resp = session.takeAction(0, 'fencing')
     expect(resp.ok).toBe(true)
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected Ash choice')
+    const reserve = resp.interaction.request.options.find(option => descriptionEffects(option.descriptionPreview)
+      .some(effect => effect.kind === 'fenceReserve' && effect.amount === 3))
+    if (!reserve) throw new Error('missing Ash choice')
+    resp = session.resolveChoice(0, reserve.value)
     const tile = firstEmptyFarmyardTile(player)
     resp = session.commitSelectionChoice(0, {
       edges: oneCellFences(tile.row, tile.col),

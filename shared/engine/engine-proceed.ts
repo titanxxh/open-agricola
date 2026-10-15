@@ -33,6 +33,7 @@ import { incCardUsed } from '../cards/helpers/card-state'
 import type { EngineInternals } from './engine-internals'
 import {
   applyDefaultSourceCardToFlow,
+  applyBeforeHostContributions,
   applyInteractionRequest,
   buildPhaseTrailingNodes,
   buildFollowUpNodes,
@@ -1253,7 +1254,8 @@ export function engineProceed(
       completedTransactionEvents: currentEventReadContext(int).transactionEvents,
       eventSink: eventBuffer.sink,
     })
-    const result = withInjectedAnytimeResultFlag(rawResult, executionContext.actionContext)
+    const result = applyBeforeHostContributions(int, node,
+      withInjectedAnytimeResultFlag(rawResult, executionContext.actionContext))
     let completedEvents: GameEvent[] = []
     if (result.type === 'fail') {
       eventFrame.rollback()

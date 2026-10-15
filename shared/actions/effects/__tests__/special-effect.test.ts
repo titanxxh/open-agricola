@@ -6,7 +6,6 @@ import {
   readCardInfobox,
   isCardFlagged,
 } from '../../../cards/helpers/card-state'
-import { storePendingFenceBonus } from '../../../cards/helpers/pending-fence-bonus'
 import { hasPendingExtraTurn } from '../../../cards/card-effects'
 import { A092_AdoptiveParents } from '../../../cards/A/A092_AdoptiveParents'
 import { setActiveWorkerCount, setWorkersAtHome } from '../../../domain/player'
@@ -345,30 +344,6 @@ describe('specialEffectAction — mutation dispatcher', () => {
         cardId: CARD_ID,
         text: 'used 3x',
         targetPlayerId: player.id,
-      }),
-    ])
-  })
-
-  it('clear-pending-fence-bonus: clears state and emits a public state event', () => {
-    const player = makePlayer()
-    const events: DraftGameEvent[] = []
-    storePendingFenceBonus(player, {
-      sourceCard: CARD_ID,
-      counterKey: 'freeFences',
-      freeFences: 2,
-    })
-
-    const result = specialEffectAction.execute({
-      ...makeCtx(player, { kind: 'clear-pending-fence-bonus' }, CARD_ID),
-      eventSink: makeEventSink(events),
-    })
-
-    expect(result.type).toBe('ok')
-    expect(player.cardStates.__pendingFenceBonus__?.extraData).toBeUndefined()
-    expect(events).toEqual([
-      expect.objectContaining({
-        type: 'card.stateChanged',
-        key: 'pendingFenceBonus',
       }),
     ])
   })

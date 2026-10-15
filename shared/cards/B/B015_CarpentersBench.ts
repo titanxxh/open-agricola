@@ -27,36 +27,23 @@ const afterCollectListener: CardListenerRegistration = {
 
     return {
       flow: {
-        type: 'seq',
+        type: 'leaf',
         optional: true,
-        children: [
-          {
-            type: 'leaf',
-            actionId: 'reserve-fence-bonus',
-            sourceCard: CARD_ID,
-            params: {
-              freeFences: 1,
-              counterKey: 'benchFreeFences',
-            },
+        actionId: 'fence',
+        sourceCard: CARD_ID,
+        actionContext: {
+          trueAction: false,
+          fenceCostDiscounts: [{ sourceCard: CARD_ID, fenceCount: 1 }],
+          fencePolicy: {
+            allowedSegmentTypes: ['fence'],
+            segmentBounds: { total: { min: 1 } },
+            newPastureBounds: { count: { min: 1, max: 1 } },
+            costPolicy: { fence: { wood: 1 } },
+            paymentBudget: { wood: n },
+            cancelPolicy: 'forbidCancel',
+            promptHintKey: 'ui.interactionCarpentersBenchFenceHint',
           },
-          {
-            type: 'leaf',
-            actionId: 'fence',
-            sourceCard: CARD_ID,
-            actionContext: {
-              trueAction: false,
-              fencePolicy: {
-                allowedSegmentTypes: ['fence'],
-                segmentBounds: { total: { min: 1 } },
-                newPastureBounds: { count: { min: 1, max: 1 } },
-                costPolicy: { fence: { wood: 1 } },
-                paymentBudget: { wood: n },
-                cancelPolicy: 'forbidCancel',
-                promptHintKey: 'ui.interactionCarpentersBenchFenceHint',
-              },
-            },
-          },
-        ],
+        },
       },
       sourceCard: CARD_ID,
     }

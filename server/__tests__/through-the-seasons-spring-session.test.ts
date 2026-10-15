@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
-import { storePendingFenceBonus } from '../../shared/cards/helpers/pending-fence-bonus'
+import { descriptionEffects } from './_helpers/choice-description'
 import { markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
 import { emptyResources } from '../../shared/session/state-bootstrap'
 import { serializeSessionSnapshot, rehydrateState } from '../../shared/session/serialization'
@@ -484,14 +484,16 @@ describe('Through the Seasons Spring rules', () => {
     const session = setupSpring()
     const player = session.state.players[0]!
     player.resources.wood = 1
-    storePendingFenceBonus(player, {
-      sourceCard: 'TestFenceBonus',
-      counterKey: 'fences',
-      freeFences: 3,
-    })
+    player.minorPlayed.push('E074_AshTrees')
+    player.cardStates.E074_AshTrees = { counters: { fences: 3 } }
 
     let resp = session.takeAction(0, 'fencing')
     expect(resp.ok).toBe(true)
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected Ash choice')
+    const reserve = resp.interaction.request.options.find(option => descriptionEffects(option.descriptionPreview)
+      .some(effect => effect.kind === 'fenceReserve' && effect.amount === 3))
+    if (!reserve) throw new Error('missing Ash choice')
+    resp = session.resolveChoice(0, reserve.value)
     resp = session.commitSelectionChoice(0, {
       edges: oneCellFences(0, 0),
       extraWood: 0,

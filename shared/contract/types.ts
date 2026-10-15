@@ -948,8 +948,15 @@ export type InternalActionChildren = {
   afterHostListeners?: InternalActionChild[]
 }
 
+/** A before reaction contributes to its original host, keyed by source. */
+export type BeforeHostContextContribution = {
+  key: string
+  sourceCard: string
+  value: Record<string, unknown>
+}
+
 export type ActionExecutionResult =
-  | { type: 'ok'; resourcesGained?: Partial<Resource>; resourcesPaid?: PaymentResourceMap; extraData?: Record<string, unknown>; internalChildren?: InternalActionChildren }
+  | { type: 'ok'; resourcesGained?: Partial<Resource>; resourcesPaid?: PaymentResourceMap; extraData?: Record<string, unknown>; internalChildren?: InternalActionChildren; beforeHostContributions?: BeforeHostContextContribution[] }
   | { type: 'request'; request: InteractionRequest; promptKey?: PromptKey; promptParams?: Record<string, unknown>; sourceCard?: string; extraData?: Record<string, unknown> }
   | { type: 'fail'; errorKey: string; recoverable?: boolean }
   | { type: 'flow'; flow: ActionFlow; extraData?: Record<string, unknown> }

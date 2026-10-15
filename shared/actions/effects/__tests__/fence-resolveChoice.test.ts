@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import '../../../cards/B/B030_WoodPalisades'
 import { fenceAction } from '../fencing'
-import { storePendingFenceBonus } from '../../../cards/helpers/pending-fence-bonus'
 import { getOwnOrdinaryFenceReserveCount } from '../../../domain/supply-tokens'
 import { SessionCardContext, withSessionContext } from '../../../cards/session-card-context'
 import type { CardListenerRegistration } from '../../../cards/card-listeners'
@@ -796,7 +795,7 @@ describe('fenceAction.resolveChoice', () => {
     expect(result.type).toBe('fail')
   })
 
-  it('pendingFreeFences reduces wood cost', () => {
+  it('action-local discount reduces wood cost', () => {
     const ctx = makeCtx({
       player: {
         resources: {
@@ -813,11 +812,9 @@ describe('fenceAction.resolveChoice', () => {
         },
       },
     })
-    storePendingFenceBonus(ctx.player, {
-      sourceCard: 'TestFenceBonus',
-      counterKey: 'fences',
-      freeFences: 4,
-    })
+    ctx.actionContext = { ...ctx.actionContext,
+      fenceCostDiscounts: [{ sourceCard: 'TestFenceDiscount', fenceCount: 4 }],
+    }
     const result = fenceAction.resolveChoice!(ctx, 'confirm', {
       edges: edgesForTile(0, 0),
       palisadeEdges: [],
@@ -851,7 +848,7 @@ describe('fenceAction.resolveChoice', () => {
     expect(ctx.player.resources.wood).toBe(4)
   })
 
-  it('applies the fence payment budget after pending free fences reduce payment', () => {
+  it('applies the fence payment budget after action-local discounts reduce payment', () => {
     const ctx = makeCtx({
       actionContext: {
         fencePolicy: {
@@ -862,11 +859,9 @@ describe('fenceAction.resolveChoice', () => {
         },
       },
     })
-    storePendingFenceBonus(ctx.player, {
-      sourceCard: 'TestFenceBonus',
-      counterKey: 'fences',
-      freeFences: 1,
-    })
+    ctx.actionContext = { ...ctx.actionContext,
+      fenceCostDiscounts: [{ sourceCard: 'TestFenceDiscount', fenceCount: 1 }],
+    }
 
     const result = fenceAction.resolveChoice!(ctx, 'confirm', {
       edges: edgesForTile(0, 0),
@@ -945,11 +940,9 @@ describe('fenceAction.resolveChoice', () => {
         cardStates: { E074_AshTrees: { counters: { fences: 4 } } },
       },
     })
-    storePendingFenceBonus(ctx.player, {
-      sourceCard: 'E074_AshTrees',
-      counterKey: 'fences',
-      freeFences: 4,
-    })
+    ctx.actionContext = { ...ctx.actionContext, fenceSupplyReservations: {
+      E074_AshTrees: { counterKey: 'fences', selectedCount: 4 },
+    } }
 
     const result = fenceAction.resolveChoice!(ctx, 'confirm', {
       edges: build,

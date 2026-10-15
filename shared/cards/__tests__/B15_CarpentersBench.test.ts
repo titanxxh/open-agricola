@@ -1,6 +1,7 @@
+import assert from 'node:assert/strict'
 import { describe, expect, it } from 'vitest'
 import { getRegisteredCardListeners, executeCardListener } from '../card-listeners'
-import type { GameState, PlayerState, ActionSpace , ActionFlow } from '../../contract/types'
+import type { GameState, PlayerState, ActionSpace } from '../../contract/types'
 import type { DraftGameEvent } from '../../contract/events'
 
 import '../B/B015_CarpentersBench'
@@ -85,20 +86,14 @@ describe('B015_CarpentersBench', () => {
       actionEvents: [woodMoved(3, player.id)],
     })
     expect(result).toBeDefined()
-    const flow = result!.flow as Extract<ActionFlow, { type: 'seq' }>
-    expect(flow.type).toBe('seq')
-    expect(flow.optional).toBe(true)
-    const reserveLeaf = flow.children[0] as Extract<ActionFlow, { type: 'leaf' }>
-    expect(reserveLeaf).toMatchObject({
-      actionId: 'reserve-fence-bonus',
-      sourceCard: CARD_ID,
-      params: { freeFences: 1, counterKey: 'benchFreeFences' },
-    })
-    const fenceLeaf = flow.children[1] as Extract<ActionFlow, { type: 'leaf' }>
+    assert.ok(result?.flow?.type === 'leaf')
+    const fenceLeaf = result.flow
+    expect(fenceLeaf.optional).toBe(true)
     expect(fenceLeaf.actionId).toBe('fence')
     expect(fenceLeaf.sourceCard).toBe(CARD_ID)
     expect(fenceLeaf.actionContext).toMatchObject({
       trueAction: false,
+      fenceCostDiscounts: [{ sourceCard: CARD_ID, fenceCount: 1 }],
       fencePolicy: {
         allowedSegmentTypes: ['fence'],
         segmentBounds: { total: { min: 1 } },
@@ -134,8 +129,8 @@ describe('B015_CarpentersBench', () => {
       actionEvents: [woodMoved(1, player.id)],
     })
     expect(result).toBeDefined()
-    const flow = result!.flow as Extract<ActionFlow, { type: 'seq' }>
-    const fenceLeaf = flow.children[1] as Extract<ActionFlow, { type: 'leaf' }>
+    assert.ok(result?.flow?.type === 'leaf')
+    const fenceLeaf = result.flow
     expect(fenceLeaf.actionContext).toMatchObject({
       fencePolicy: {
         paymentBudget: { wood: 1 },
