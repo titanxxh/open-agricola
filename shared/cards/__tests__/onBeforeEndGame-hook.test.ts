@@ -1,3 +1,7 @@
+import { installOfficialCardRegistry } from './card-environment'
+
+installOfficialCardRegistry()
+
 import { describe, expect, it } from 'vitest'
 import { runBeforeEndGameHooks } from '../card-effects'
 import '../B/B133_VillagePeasant'

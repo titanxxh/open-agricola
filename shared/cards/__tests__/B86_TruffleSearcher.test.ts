@@ -1,3 +1,7 @@
+import { installOfficialCardRegistry } from './card-environment'
+
+installOfficialCardRegistry()
+
 import { describe, it, expect } from 'vitest'
 import { GameSession } from '../../../server/game/authoritative-session'
 import { computeAnimalZones } from '../../domain/animal-zones'

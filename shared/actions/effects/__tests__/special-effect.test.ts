@@ -1,3 +1,7 @@
+import { installOfficialCardRegistry } from '../../../cards/__tests__/card-environment'
+
+installOfficialCardRegistry()
+
 import { describe, it, expect } from 'vitest'
 import { specialEffectAction } from '../special-effect'
 import { GameSession } from '../../../../server/game/authoritative-session'

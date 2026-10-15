@@ -18,13 +18,8 @@ import type { FatherParentCardId, MotherParentCardId } from '../parents/types'
 import type { PublicEventCancellation } from '../contract/protocol/game'
 import type { EngineStackCursor } from '../engine'
 import type { SessionPrivateCursor, StateWithCursor } from './session-core'
-import { createActionSpaces } from '../actions'
-import { normalizeState } from '../session/state-bootstrap'
 import { ensureCardModifiers } from '../cards/card-modifiers'
-import { createPlayerActionSpaces } from '../cards/player-action-space'
-import { normalizeBlockedBy, normalizeTakenBy } from '../domain/space'
 import { collectLockedFarmTileKeys, collectBuiltSpecialStables, type BuiltSpecialStable } from '../cards/card-effects'
-import { createSeasonActionSpaces } from '../seasons/action-spaces'
 import { computeAnimalZones, type AnimalZone } from '../domain/animal-zones'
 import { getPastureSize, getPastureStableCount, type Pasture as PastureView } from '../domain/pasture'
 
@@ -306,10 +301,6 @@ export const rehydrateState = (
   const persisted = 'state' in input && 'frame' in input && 'sessionCursor' in input ? input : null
   if (persisted) importRecoveryCatalog(persisted)
   const raw = captureStateWithHistory((persisted?.state ?? input) as SerializedGameState)
-  const templates = [
-    ...createActionSpaces(raw.players?.length),
-    ...(raw.enableThroughTheSeasons ? createSeasonActionSpaces(raw.players?.length) : []),
-  ]
   const { engineStack: _engineStack, players, ...rest } = raw
   // Strip snapshot-only display projections so they never
   // leaks into the authoritative `PlayerState` domain shape.
@@ -330,31 +321,10 @@ export const rehydrateState = (
       ...player
     }) => player),
   }
-  const restored = rebuildActiveModifiers(normalizeState(rawWithoutCursor as unknown as GameState))
-  restored.actionSpaces = templates.map((template) => {
-    const saved = raw.actionSpaces?.find((s) => s.id === template.id)
-    return {
-      ...template,
-      resources: saved?.resources ?? template.resources,
-      takenBy: normalizeTakenBy(saved?.takenBy),
-      blockedBy: normalizeBlockedBy(saved?.blockedBy),
-      exclusiveUse: saved?.exclusiveUse,
-    }
-  })
-  // Append PlayerActionCard dynamic spaces
-  const playerActionSpaces = createPlayerActionSpaces(restored)
-  for (const pas of playerActionSpaces) {
-    const saved = raw.actionSpaces?.find((s) => s.id === pas.id)
-    if (saved) {
-      pas.resources = saved.resources ?? pas.resources
-      pas.takenBy = normalizeTakenBy(saved.takenBy)
-      pas.blockedBy = normalizeBlockedBy(saved.blockedBy)
-      pas.exclusiveUse = saved.exclusiveUse
-    }
-    restored.actionSpaces.push(pas)
-  }
+  // Decode data before a Core exists. Rule-dependent normalization and
+  // modifier reconstruction run only after that Core registers its cards.
   return {
-    state: restored,
+    state: rawWithoutCursor as unknown as GameState,
     ...(persisted ? { sessionCursor: persisted.sessionCursor } : {}),
   }
 }

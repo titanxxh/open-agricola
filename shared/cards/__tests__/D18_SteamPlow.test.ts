@@ -1,3 +1,7 @@
+import { installOfficialCardRegistry } from './card-environment'
+
+installOfficialCardRegistry()
+
 import { expect, it } from 'vitest'
 import { runCardEffectHook } from '../card-effects'
 import { createInitialState } from '../../session/state-bootstrap'

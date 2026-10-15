@@ -1,3 +1,7 @@
+import { installOfficialCardRegistry } from './card-environment'
+
+installOfficialCardRegistry()
+
 import { describe, expect, it } from 'vitest'
 import './setup-register-all'
 import { runCardEffectHook } from '../card-effects'

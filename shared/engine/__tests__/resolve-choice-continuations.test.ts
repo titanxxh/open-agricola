@@ -1,3 +1,7 @@
+import { installOfficialCardRegistry } from '../../cards/__tests__/card-environment'
+
+installOfficialCardRegistry()
+
 import { describe, expect, it } from 'vitest'
 import type { ActionDefinition, ActionExecutionResult } from '../../contract/types'
 import type { CardListenerRegistration } from '../../cards/card-listeners'

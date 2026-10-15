@@ -1,4 +1,8 @@
 // @vitest-environment jsdom
+import { installOfficialCardRegistry } from '../../../shared/cards/__tests__/card-environment'
+
+installOfficialCardRegistry()
+
 import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import '@testing-library/jest-dom/vitest'
@@ -39,7 +43,7 @@ class GameSocket {
   static readonly OPEN = 1
   static latest: GameSocket
   static hotseat = true
-  static payload = workPayload()
+  static payload: GameSyncPayload
   static version = 1
   static sent: Array<Record<string, unknown>> = []
   readonly readyState = GameSocket.OPEN

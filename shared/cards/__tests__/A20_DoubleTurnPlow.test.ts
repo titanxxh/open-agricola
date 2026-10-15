@@ -1,3 +1,7 @@
+import { installOfficialCardRegistry } from './card-environment'
+
+installOfficialCardRegistry()
+
 import { describe, expect, it } from 'vitest'
 import { getCardEffect, runCardEffectHook } from '../card-effects'
 import type { GameState, PlayerState, ActionFlow } from '../../contract/types'

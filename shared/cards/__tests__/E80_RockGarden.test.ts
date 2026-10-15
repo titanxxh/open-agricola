@@ -1,3 +1,7 @@
+import { installOfficialCardRegistry } from './card-environment'
+
+installOfficialCardRegistry()
+
 import { describe, it, expect } from 'vitest'
 import { E080_RockGarden_impl } from '../E/E080_RockGarden'
 import type { PlayerState } from '../../contract/types'

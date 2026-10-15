@@ -1,3 +1,7 @@
+import { installOfficialCardRegistry } from '../../../../cards/__tests__/card-environment'
+
+installOfficialCardRegistry()
+
 import { describe, it, expect, beforeEach } from 'vitest'
 import {
   payResources,

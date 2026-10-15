@@ -1,3 +1,4 @@
+import { GameSession } from '../../../server/game/authoritative-session'
 import { describe, expect, it } from 'vitest'
 import { EngineStack } from '../../engine'
 import type { GameEvent } from '../../contract/events'
@@ -427,16 +428,18 @@ describe('event state bootstrap', () => {
     } as unknown as GameState
 
     const normalized = normalizeState(raw)
-    const rehydrated = rehydrateState({
+    const session = new GameSession(rehydrateState({
       ...raw,
       actionSpaces: [],
       engineStack: { frames: [] },
-    } as never).state
+    } as never))
+    const rehydrated = session.getState().state
 
     expect(normalized.events).toEqual([makeEvent(1)])
     expect(normalized.nextEventSeq).toBe(3)
     expect(rehydrated.events).toEqual([makeEvent(1)])
     expect(rehydrated.nextEventSeq).toBe(3)
+    session.dispose()
   })
 
   it('preserves event state through serialize and rehydrate JSON roundtrip', () => {

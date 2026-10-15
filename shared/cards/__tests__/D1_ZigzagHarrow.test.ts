@@ -1,3 +1,7 @@
+import { installOfficialCardRegistry } from './card-environment'
+
+installOfficialCardRegistry()
+
 import { describe, expect, it } from 'vitest'
 import { computeZigzagCandidates } from '../D/D001_ZigzagHarrow'
 import { getRegisteredMinorImprovement } from '../registry-display'

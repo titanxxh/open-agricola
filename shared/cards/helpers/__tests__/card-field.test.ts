@@ -1,3 +1,7 @@
+import { installOfficialCardRegistry } from '../../__tests__/card-environment'
+
+installOfficialCardRegistry()
+
 import { describe, expect, it } from 'vitest'
 import type { GameState, PlayerState } from '../../../contract/types'
 import type { DraftGameEvent, EventSink } from '../../../contract/events'

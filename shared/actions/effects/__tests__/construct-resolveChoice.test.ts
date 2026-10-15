@@ -1,3 +1,7 @@
+import { installOfficialCardRegistry } from '../../../cards/__tests__/card-environment'
+
+installOfficialCardRegistry()
+
 import { describe, expect, it } from 'vitest'
 import '../../../cards/B/B038_FutureBuildingSite'
 import { readCardResourceStats } from '../../../cards/helpers/card-state'

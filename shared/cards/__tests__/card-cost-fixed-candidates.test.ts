@@ -1,3 +1,7 @@
+import { installOfficialCardRegistry } from './card-environment'
+
+installOfficialCardRegistry()
+
 import { afterEach, describe, expect, it } from 'vitest'
 import type { ComplexCost, GameState, PaymentResourceMap, PaymentSolution, PlayerState, Resource } from '../../contract/types'
 import { requireActiveCardRegistry } from '../active-registry'

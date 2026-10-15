@@ -1,3 +1,7 @@
+import { installOfficialCardRegistry } from './card-environment'
+
+installOfficialCardRegistry()
+
 import { describe, it, expect } from 'vitest'
 import { executeCardListener, getRegisteredCardListeners, runCardListeners } from '../card-listeners'
 import { readCardExtraData, readCardInfobox } from '../helpers/card-state'

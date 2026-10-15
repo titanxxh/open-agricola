@@ -1,3 +1,7 @@
+import { installOfficialCardRegistry } from '../../../cards/__tests__/card-environment'
+
+installOfficialCardRegistry()
+
 import { execFileSync } from 'node:child_process'
 import { describe, it, expect, afterEach } from 'vitest'
 import { GameSession } from '../../../../server/game/authoritative-session'

@@ -1,3 +1,5 @@
+import { afterEach } from 'vitest'
+import { setActiveCardRegistry } from '../active-registry'
 import { ensureCatalogLookupsInstalled } from '../install-catalog-lookups'
 import { guardCardImplListeners } from './listener-purity-guard'
 
@@ -9,3 +11,6 @@ const { ALL_CARD_IMPLS } = await import('../register-all')
 // executeCardListener, so guard the registered functions themselves.
 guardCardImplListeners(ALL_CARD_IMPLS)
 
+
+// Explicit test environments must not leak into the next test.
+afterEach(() => setActiveCardRegistry(null))

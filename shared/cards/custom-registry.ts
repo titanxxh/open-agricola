@@ -11,7 +11,7 @@
  * catalog.ts lookup functions fall back to this registry when
  * the id starts with "CUSTOM_".
  */
-import { getActiveCardRegistry } from './active-registry.ts'
+import { getActiveCardRegistry, requireActiveCardRegistry } from './active-registry.ts'
 import type { CardRegistry } from './registry.ts'
 import { getCurrentSessionContext, type CustomCardData } from './session-card-context.ts'
 import type { CardDefinition } from '../contract/cards'
@@ -61,16 +61,10 @@ export function registerCustomCard(
   // resolves the same data as built-in occupation/minor cards. Custom cards
   // are not part of the catalog arrays passed to syncModifiersFromCatalog,
   // so this runtime injection is the dedicated path for them.
-  const active = getActiveCardRegistry()
-  if (active) {
-    const { id, modifier, modifiers } = data.cardJson as LegacyCardJson
-    const allMods = [
-      ...(modifiers ?? []),
-      ...(modifier ? [modifier] : []),
-    ]
-    if (allMods.length > 0) {
-      active.setModifiersForCard(id, allMods)
-    }
+  const { id, modifier, modifiers } = data.cardJson
+  const allMods = [...(modifiers ?? []), ...(modifier ? [modifier] : [])]
+  if (allMods.length > 0) {
+    requireActiveCardRegistry('registerCustomCard').setModifiersForCard(id, allMods)
   }
 
   const sessionCtx = getCurrentSessionContext()

@@ -68,4 +68,15 @@ describe('custom-registry modifier injection', () => {
     )
     expect(getActiveCardRegistry()?.getModifiers('CUSTOM_NoMod') ?? []).toEqual([])
   })
+
+  it('rejects modifier registration without a rule environment instead of dropping it', () => {
+    setActiveCardRegistry(null)
+    expect(() => registerCustomCard({
+      cardType: 'minor',
+      cardJson: {
+        ...baseCardJson('CUSTOM_MissingEnvironment'),
+        modifier: { type: 'bonus', cardId: 'CUSTOM_MissingEnvironment', appliesTo: ['occupation'], discount: { food: 1 } },
+      },
+    }, { allowGlobal: true })).toThrow('no active CardRegistry')
+  })
 })

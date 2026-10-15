@@ -346,6 +346,9 @@ export const normalizeState = (raw: GameState): GameState => {
   for (const stored of raw.actionSpaces ?? []) {
     if (knownIds.has(stored.id)) continue
     if (allBaseActionIds.has(stored.id) || seasonActionIds.includes(stored.id)) continue
+    // Unknown serialized spaces have no rule definition to reconstruct. Live
+    // caller-added spaces retain their definitions and can still be registered.
+    if (typeof stored.canBeExecutedByPlayer !== 'function' || typeof stored.execute !== 'function') continue
     actionSpaces.push({
       ...stored,
       takenBy: normalizeTakenBy(stored.takenBy),

@@ -1,3 +1,7 @@
+import { installOfficialCardRegistry } from '../../../cards/__tests__/card-environment'
+
+installOfficialCardRegistry()
+
 import { describe, expect, it } from 'vitest'
 import type { ActionDefinition, ActionExecutionContext, ActionSpace, GameState, PlayerState } from '../../../contract/types'
 import { CardRegistry } from '../../../cards/registry'

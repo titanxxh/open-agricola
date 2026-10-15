@@ -1,3 +1,7 @@
+import { installOfficialCardRegistry } from './card-environment'
+
+installOfficialCardRegistry()
+
 import { describe, expect, it } from 'vitest'
 import type { FarmTilePosition, PlayerState } from '../../contract/types'
 import { collectBuiltSpecialStables } from '../card-effects'

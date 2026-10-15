@@ -1,3 +1,7 @@
+import { installOfficialCardRegistry } from './card-environment'
+
+installOfficialCardRegistry()
+
 import { describe, expect, it } from 'vitest'
 import { meetsCardPrerequisites } from '../helpers/prerequisites'
 import { getRegisteredMinorImprovement } from '../registry-display'

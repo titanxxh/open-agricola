@@ -3,6 +3,9 @@ import { beforeEach as beforeEachActionHooks } from 'vitest'
 
 let actionHooks: ActionHookRegistry
 beforeEachActionHooks(() => { actionHooks = new ActionHookRegistry() })
+import { installOfficialCardRegistry } from './card-environment'
+
+installOfficialCardRegistry()
 
 import { moveFarmerToSpaceAction } from '../../actions/effects/internal/move-farmer-to-space'
 import { describe, expect, it } from 'vitest'

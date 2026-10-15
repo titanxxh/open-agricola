@@ -1,3 +1,7 @@
+import { installOfficialCardRegistry } from '../../../../cards/__tests__/card-environment'
+
+installOfficialCardRegistry()
+
 import { describe, expect, it, beforeEach, afterEach } from 'vitest'
 import { getRegisteredCardListeners, type CardListenerRegistration } from '../../../../cards/card-listeners'
 import { discountCardCostCandidate } from '../card-cost-candidates'

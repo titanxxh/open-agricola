@@ -1,3 +1,7 @@
+import { installOfficialCardRegistry } from './card-environment'
+
+installOfficialCardRegistry()
+
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { reap } from '../../actions/effects/reap'
 import {

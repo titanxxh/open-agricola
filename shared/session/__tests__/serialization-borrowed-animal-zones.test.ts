@@ -1,3 +1,7 @@
+import { installOfficialCardRegistry } from '../../cards/__tests__/card-environment'
+
+installOfficialCardRegistry()
+
 import '../../cards/__tests__/setup-register-all'
 
 import { afterEach, describe, expect, it, vi } from 'vitest'

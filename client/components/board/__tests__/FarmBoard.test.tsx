@@ -1,4 +1,8 @@
 // @vitest-environment jsdom
+import { installOfficialCardRegistry } from '../../../../shared/cards/__tests__/card-environment'
+
+installOfficialCardRegistry()
+
 
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
