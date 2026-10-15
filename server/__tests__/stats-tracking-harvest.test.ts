@@ -26,7 +26,7 @@ describe('PlayerStats harvest tracking', () => {
     // Enter from continueHarvestFieldStart so harvestReapSummary is initialized
     // (continueHarvestReap now relies on entries pre-allocated in field-start).
     const core = session as unknown as { continueHarvestFieldStart: () => void }
-    core.continueHarvestFieldStart()
+    session.withCtx(() => core.continueHarvestFieldStart())
 
     const after = session.getState().state.players[0]!
     expect(after.stats.harvestedGrain).toBe(2)
@@ -46,7 +46,7 @@ describe('PlayerStats harvest tracking', () => {
     session.loadState(state)
 
     const core = session as unknown as { continueHarvestFieldStart: () => void }
-    core.continueHarvestFieldStart()
+    session.withCtx(() => core.continueHarvestFieldStart())
 
     const after = session.getState().state.players[0]!
     expect(after.stats.harvestedVegetable).toBe(1)
@@ -80,7 +80,7 @@ describe('PlayerStats harvest tracking', () => {
       continueAfterReapEffects: () => void
     }
     core.continueAfterReapEffects = () => undefined
-    core.continueHarvestReap()
+    session.withCtx(() => core.continueHarvestReap())
 
     expect(session.getState().state.harvestReapSummary![player.id]!.harvestedCrops).toEqual([
       { row: 0, col: 0, crop: 'grain', amount: 1, sources: ['base'] },

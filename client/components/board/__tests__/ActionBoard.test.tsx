@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { ActionHookRegistry } from '../../../../shared/actions/hooks'
 import { installOfficialCardRegistry } from '../../../../shared/cards/__tests__/card-environment'
 
 installOfficialCardRegistry()
@@ -131,7 +132,7 @@ describe('ActionBoard', () => {
       ...createAction('sheep-market', 'actions.sheep-market.name'),
       exclusiveUse: { playerId: 'p1', sourceCardId: 'B023_FinalScenario', untilRound: 14 },
     }
-    const effects = [first, second].flatMap(player => collectScheduledEffectPreviews({ ...createInitialState(6069), futureMeeples: [{ id: 'fm', cardId: 'A074_StableTree', playerId: 'p2', round: 3, actionId: 'sheep-market', resources: { wood: 1 } }] }, player).map(effect => ({ ...effect, playerId: player.id })))
+    const effects = [first, second].flatMap(player => collectScheduledEffectPreviews({ ...createInitialState(6069), futureMeeples: [{ id: 'fm', cardId: 'A074_StableTree', playerId: 'p2', round: 3, actionId: 'sheep-market', resources: { wood: 1 } }] }, player, new ActionHookRegistry()).map(effect => ({ ...effect, playerId: player.id })))
     const html = renderToStaticMarkup(
       <ActionBoard locale="zh"
         scheduledEffects={effects}
@@ -620,7 +621,7 @@ describe('ActionBoard', () => {
         currentPlayer={playerA}
         players={[playerA, playerB]}
         futureMeeples={futureMeeples}
-        scheduledEffects={[playerA, playerB].flatMap(player => collectScheduledEffectPreviews({ ...createInitialState(6069), futureMeeples }, player).map(effect => ({ ...effect, playerId: player.id })))}
+        scheduledEffects={[playerA, playerB].flatMap(player => collectScheduledEffectPreviews({ ...createInitialState(6069), futureMeeples }, player, new ActionHookRegistry()).map(effect => ({ ...effect, playerId: player.id })))}
         canTakeAction={() => true}
         takeAction={() => {}}
         currentRound={3}
@@ -660,7 +661,7 @@ describe('ActionBoard', () => {
         currentPlayer={playerA}
         players={[playerA, playerB]}
         futureMeeples={futureMeeples}
-        scheduledEffects={[playerA, playerB].flatMap(player => collectScheduledEffectPreviews({ ...createInitialState(6069), futureMeeples }, player).map(effect => ({ ...effect, playerId: player.id })))}
+        scheduledEffects={[playerA, playerB].flatMap(player => collectScheduledEffectPreviews({ ...createInitialState(6069), futureMeeples }, player, new ActionHookRegistry()).map(effect => ({ ...effect, playerId: player.id })))}
         canTakeAction={() => true}
         takeAction={() => {}}
         currentRound={3}
@@ -721,7 +722,7 @@ describe('ActionBoard', () => {
         currentPlayer={playerA}
         players={[playerA, playerB]}
         futureMeeples={futureMeeples}
-        scheduledEffects={[playerA, playerB].flatMap(player => collectScheduledEffectPreviews({ ...createInitialState(6069), futureMeeples }, player).map(effect => ({ ...effect, playerId: player.id })))}
+        scheduledEffects={[playerA, playerB].flatMap(player => collectScheduledEffectPreviews({ ...createInitialState(6069), futureMeeples }, player, new ActionHookRegistry()).map(effect => ({ ...effect, playerId: player.id })))}
         canTakeAction={() => false}
         takeAction={() => {}}
         currentRound={1}

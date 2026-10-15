@@ -1,3 +1,5 @@
+import { withActiveRegistry } from '../../shared/cards/active-registry'
+import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
 import { describe, expect, it } from 'vitest'
 import {
   bakeBread,
@@ -19,7 +21,7 @@ describe('PlayerStats conversion tracking', () => {
     player.resources = { ...player.resources, grain: 2 }
     session.loadState(state)
 
-    bakeBread(player, 'Major_Fireplace1', 2)
+    session.withCtx(() => bakeBread(player, 'Major_Fireplace1', 2))
     expect(player.stats.resourcesConverted.grain).toBe(2)
     // Fireplace1 bake rate is 2 → 2 grain → 4 food
     expect(player.stats.foodFromConversion.grain).toBe(4)
@@ -43,7 +45,7 @@ describe('PlayerStats conversion tracking', () => {
     } as unknown as PlayerState
 
     const trade: Trade = { from: { sheep: 1 }, to: { food: 2 }, sourceId: 'Major_Fireplace1' }
-    applyTrade(player, trade, 1)
+    withActiveRegistry(createOfficialCardRegistry(), () => applyTrade(player, trade, 1))
     expect(player.resources.sheep).toBe(0)
     expect(player.resources.food).toBe(2)
   })

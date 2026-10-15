@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
-import { computeScores } from '../../shared/domain/scoring'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/B/B068_Beanfield'
@@ -65,7 +64,8 @@ const sowBeanfield = (session: GameSession, crop: 'grain' | 'vegetable') => {
 
 const printedVp = (response: SessionResponse) => {
   const player = response.state.players[0]!
-  const score = computeScores(response.state).find((summary) => summary.playerId === player.id)!
+  if (!response.scores) throw new Error('Expected authoritative scores')
+  const score = response.scores.find((summary) => summary.playerId === player.id)!
   return score.categories.find((category) => category.key === 'cards')!.entries
     .find((entry) => 'cardId' in entry && entry.cardId === BEANFIELD)?.score
 }

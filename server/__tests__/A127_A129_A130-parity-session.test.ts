@@ -106,7 +106,7 @@ describe('A127 Lodger parity', () => {
     })
     session.loadState(state)
     expect(session.state.players).toHaveLength(2)
-    const preview = session.withCtx(() => collectScheduledEffectPreviews(session.state, session.state.players[0]!))
+    const preview = session.withCtx(() => collectScheduledEffectPreviews(session.state, session.state.players[0]!, session.actionHooks))
       .find(entry => entry.sourceCard === 'A127_Lodger')
     expect(preview?.description.kind).toBe('conditional')
     if (preview?.description.kind !== 'conditional') throw new Error('Missing room activation condition')

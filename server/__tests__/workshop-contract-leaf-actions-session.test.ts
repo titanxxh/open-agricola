@@ -87,7 +87,7 @@ describe('Workshop Capability Contract leaf actions', () => {
       extraData: { note: { a: 1 }, total: 3 },
       privateData: { secret: 'owner only' },
     })
-    const bonus = computeScores(response.state)[0]!.categories.find(category => category.key === 'cardBonusVp')!
+    const bonus = session.withCtx(() => computeScores(response.state))[0]!.categories.find(category => category.key === 'cardBonusVp')!
     expect(bonus.total).toBe(1)
     expect(bonus.entries).toContainEqual(expect.objectContaining({ cardId: CARD_ID, score: 1 }))
 

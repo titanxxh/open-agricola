@@ -24,7 +24,7 @@ describe('activated plans describe and execute the same obligations', () => {
     } })
     sessions.push(session)
     const before = JSON.stringify(session.state)
-    expect(collectScheduledEffectPreviews(session.state, session.state.players[0]!)).toEqual([{
+    expect(session.withCtx(() => collectScheduledEffectPreviews(session.state, session.state.players[0]!, session.actionHooks))).toEqual([{
       round: 7, sourceCard: 'A081_InterimStorage', timing: 'onRoundStart', count: 1,
       description: { kind: 'action', showLabel: false, labelKey: 'actions.special-effect.name', effectPreview: {
         kind: 'ruleOperation', operation: { kind: 'take-stored-resources', resources: { wood: 2, clay: 1, reed: 0 }, takeAll: true },
@@ -37,7 +37,7 @@ describe('activated plans describe and execute the same obligations', () => {
     expect(response.state.players[0]!.resources).toMatchObject({ wood: 2, clay: 1 })
     expect(response.state.players[0]!.cardStates.A081_InterimStorage?.counters).toMatchObject({ wood: 0, clay: 0 })
     expect(response.state.events.filter(event => event.type === 'card.stackChanged' && event.cardId === 'A081_InterimStorage')).toHaveLength(2)
-    expect(collectScheduledEffectPreviews(session.state, session.state.players[0]!)).toEqual([])
+    expect(session.withCtx(() => collectScheduledEffectPreviews(session.state, session.state.players[0]!, session.actionHooks))).toEqual([])
     expect(response.interaction.stateId).toBe('idle')
   })
   it('keeps action-space deposits separate from player gains and hides internal refund and skip-state keys', () => {
@@ -54,7 +54,7 @@ describe('activated plans describe and execute the same obligations', () => {
     } })
     sessions.push(session)
     const before = JSON.stringify(session.state)
-    const views = collectScheduledEffectPreviews(session.state, session.state.players[0]!)
+    const views = session.withCtx(() => collectScheduledEffectPreviews(session.state, session.state.players[0]!, session.actionHooks))
     expect(views.find(entry => entry.sourceCard === 'C051_FishingNet')?.description).toMatchObject({ effectPreview: { kind: 'ruleOperation', operation: { kind: 'put-on-action-space', spaceId: 'fishing', spaceNameKey: 'actions.fishing.name', resources: { food: 2 } } } })
     expect(views.find(entry => entry.sourceCard === 'D074_RoyalWood')?.description).toMatchObject({ effectPreview: { kind: 'ruleOperation', operation: { resource: 'wood', paidAmount: 5, amount: 2, divisor: 2 } } })
     expect(views.find(entry => entry.sourceCard === 'D134_OysterEater')?.description).toMatchObject({ effectPreview: { kind: 'ruleOperation', operation: { kind: 'skip-next-turns', count: 2 } } })

@@ -38,7 +38,7 @@ describe('placement consistency: takeAction vs computeAllowedPlacementSpaces', (
 
     // Check helper
     const { state } = session.getState()
-    const allowed = computeAllowedPlacementSpaces(state, state.players[0]!, { actionHooks: session.actionHooks })
+    const allowed = session.withCtx(() => computeAllowedPlacementSpaces(state, state.players[0]!, { actionHooks: session.actionHooks }))
     const entry = allowed.find((a) => a.spaceId === 'urgent-wish-children')
     expect(entry).toBeDefined()
     expect(entry!.allowOccupied).toBe(true)
@@ -76,7 +76,7 @@ describe('placement consistency: takeAction vs computeAllowedPlacementSpaces', (
     session.loadState(st)
 
     const { state } = session.getState()
-    const allowed = computeAllowedPlacementSpaces(state, state.players[0]!, { actionHooks: session.actionHooks })
+    const allowed = session.withCtx(() => computeAllowedPlacementSpaces(state, state.players[0]!, { actionHooks: session.actionHooks }))
     expect(allowed.some((a) => a.spaceId === 'urgent-wish-children')).toBe(false)
 
     const resp = session.takeAction(0, 'urgent-wish-children')

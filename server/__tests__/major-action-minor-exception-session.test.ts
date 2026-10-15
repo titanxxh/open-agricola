@@ -126,7 +126,7 @@ describe('major action purchase eligibility', () => {
     expect(owner.minorPlayed).toContain(SHED)
     expect(owner.improvements).not.toContain(SHED)
     expect(bought.state.availableMajorImprovements).not.toContain(SHED)
-    expect(getExtraRoomCapacity(owner)).toBe(1)
+    expect(session.withCtx(() => getExtraRoomCapacity(owner))).toBe(1)
     expect(canRenovate(owner)).toBe(false)
     expect(bought.state.events.find((event) => event.type === 'card.played' && event.cardId === SHED)).toMatchObject({
       cardType: 'minor',

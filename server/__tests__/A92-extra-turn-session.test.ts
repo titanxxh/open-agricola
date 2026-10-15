@@ -180,7 +180,7 @@ describe('A92 AdoptiveParents — extra-turn (capability B)', () => {
     expect(played.ok).toBe(true)
     expect(played.state.players[0]!.occupationPlayed).toContain(A92)
     expect(newbornCount(played.state.players[0]!)).toBe(1)
-    expect(hasPendingExtraTurn(played.state, played.state.players[0]!)).toBe(true)
+    expect(session.withCtx(() => hasPendingExtraTurn(played.state, played.state.players[0]!))).toBe(true)
 
     drainConfirms(session, played)
     const opponentAction = session.takeAction(1, placeableSpaces(session)[0]!)
@@ -200,7 +200,7 @@ describe('A92 AdoptiveParents — extra-turn (capability B)', () => {
     const session = setupRotation()
     const pre = session.getState()
     expect(workersAvailable(pre.state, pre.state.players[0]!)).toBe(0)
-    expect(hasPendingExtraTurn(pre.state, pre.state.players[0]!)).toBe(true)
+    expect(session.withCtx(() => hasPendingExtraTurn(pre.state, pre.state.players[0]!))).toBe(true)
 
     const r = driveToP0ExtraTurn(session)
     expect(session.getState().state.currentPlayerIndex).toBe(0)
@@ -235,7 +235,7 @@ describe('A92 AdoptiveParents — extra-turn (capability B)', () => {
     expect(placed.ok).toBe(true)
     const after = session.getState()
     expect(workersAvailable(after.state, after.state.players[0]!)).toBe(0)
-    expect(hasPendingExtraTurn(after.state, after.state.players[0]!)).toBe(false)
+    expect(session.withCtx(() => hasPendingExtraTurn(after.state, after.state.players[0]!))).toBe(false)
   })
 
   it('A092 S5: two newborns can each be promoted for one food in the same round', () => {
@@ -248,7 +248,7 @@ describe('A92 AdoptiveParents — extra-turn (capability B)', () => {
     const afterUse = session.getState()
     expect(afterUse.state.players[0]!.resources.food).toBe(2)
     expect(newbornCount(afterUse.state.players[0]!)).toBe(1)
-    expect(hasPendingExtraTurn(afterUse.state, afterUse.state.players[0]!)).toBe(true)
+    expect(session.withCtx(() => hasPendingExtraTurn(afterUse.state, afterUse.state.players[0]!))).toBe(true)
     expect(session.getState().state.currentPlayerIndex).toBe(0)
 
     const firstPlaced = session.resolveChoice(0, placeableSpaces(session)[0]!)
@@ -280,7 +280,7 @@ describe('A92 AdoptiveParents — extra-turn (capability B)', () => {
     expect(after.state.players[0]!.cardStates?.[A92]?.extraData?.forfeitedThisRound).toBe(true)
     // Offspring still parked but no longer offered.
     expect(newbornCount(after.state.players[0]!)).toBe(1)
-    expect(hasPendingExtraTurn(after.state, after.state.players[0]!)).toBe(false)
+    expect(session.withCtx(() => hasPendingExtraTurn(after.state, after.state.players[0]!))).toBe(false)
   })
 
   it('ROUND CLOSE: forfeiting the last extra turn ends the round (no early end, no loop)', () => {
@@ -291,7 +291,7 @@ describe('A92 AdoptiveParents — extra-turn (capability B)', () => {
     expect(forfeited.ok).toBe(true)
 
     const after = drainConfirms(session, forfeited)
-    expect(hasPendingExtraTurn(after.state, after.state.players[0]!)).toBe(false)
+    expect(session.withCtx(() => hasPendingExtraTurn(after.state, after.state.players[0]!))).toBe(false)
     // No player owed a worker or extra turn → work phase completed, round advanced.
     expect(after.state.round).toBe(2)
   })
@@ -310,7 +310,7 @@ describe('A92 AdoptiveParents — extra-turn (capability B)', () => {
 
     const start = session.getState()
     expect(newbornCount(start.state.players[0]!)).toBe(0)
-    expect(hasPendingExtraTurn(start.state, start.state.players[0]!)).toBe(false)
+    expect(session.withCtx(() => hasPendingExtraTurn(start.state, start.state.players[0]!))).toBe(false)
 
     const taken = session.takeAction(1, placeableSpaces(session)[0]!)
     expect(taken.ok).toBe(true)
@@ -321,7 +321,7 @@ describe('A92 AdoptiveParents — extra-turn (capability B)', () => {
     const noFood = setupRotation({ food: 0, p1Workers: 2 })
     const snap = noFood.getState()
     expect(newbornCount(snap.state.players[0]!)).toBe(1)
-    expect(hasPendingExtraTurn(snap.state, snap.state.players[0]!)).toBe(false)
+    expect(noFood.withCtx(() => hasPendingExtraTurn(snap.state, snap.state.players[0]!))).toBe(false)
     const noFoodAction = noFood.takeAction(1, placeableSpaces(noFood)[0]!)
     expect(noFoodAction.ok).toBe(true)
     const afterNoFood = drainConfirms(noFood, noFoodAction)
@@ -361,7 +361,7 @@ describe('A92 AdoptiveParents — extra-turn (capability B)', () => {
   it('NOT TRIGGERED: already forfeited this round → not offered', () => {
     const session = setupRotation({ forfeited: true })
     const snap = session.getState()
-    expect(hasPendingExtraTurn(snap.state, snap.state.players[0]!)).toBe(false)
+    expect(session.withCtx(() => hasPendingExtraTurn(snap.state, snap.state.players[0]!))).toBe(false)
   })
 
   it('NOT TRIGGERED: A92 on the opponent does not affect this player', () => {
@@ -371,19 +371,19 @@ describe('A92 AdoptiveParents — extra-turn (capability B)', () => {
     st.players[1]!.resources.food = 5
     session.loadState(st)
     const snap = session.getState()
-    expect(hasPendingExtraTurn(snap.state, snap.state.players[0]!)).toBe(false)
-    expect(hasPendingExtraTurn(snap.state, snap.state.players[1]!)).toBe(false)
+    expect(session.withCtx(() => hasPendingExtraTurn(snap.state, snap.state.players[0]!))).toBe(false)
+    expect(session.withCtx(() => hasPendingExtraTurn(snap.state, snap.state.players[1]!))).toBe(false)
   })
 
   it('CROSS-ROUND: forfeitedThisRound gates this round, clears for the next', () => {
     const session = setupRotation({ forfeited: true })
     const before = session.getState()
     expect(before.state.players[0]!.cardStates?.[A92]?.extraData?.forfeitedThisRound).toBe(true)
-    expect(hasPendingExtraTurn(before.state, before.state.players[0]!)).toBe(false)
+    expect(session.withCtx(() => hasPendingExtraTurn(before.state, before.state.players[0]!))).toBe(false)
 
     // onRoundStart clears the flag; availability returns (offspring + food remain).
     const player = before.state.players[0]!
     player.cardStates![A92]!.extraData!.forfeitedThisRound = false
-    expect(hasPendingExtraTurn(before.state, player)).toBe(true)
+    expect(session.withCtx(() => hasPendingExtraTurn(before.state, player))).toBe(true)
   })
 })

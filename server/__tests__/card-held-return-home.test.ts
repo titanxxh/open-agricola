@@ -16,7 +16,7 @@ describe('GameSession return-home releases card-held workers', () => {
     session.loadState(state)
 
     // Directly invoke the return-home path (private method, acceptable in tests)
-    ;(session as unknown as { continueReturnHomeHooks: () => void }).continueReturnHomeHooks()
+    ;session.withCtx(() => (session as unknown as { continueReturnHomeHooks: () => void }).continueReturnHomeHooks())
 
     const afterState = session.getState().state
     expect(getWorkerHeldOnCard(afterState.players[0]!, 'C022_BasketChair')).toBeUndefined()
@@ -35,7 +35,7 @@ describe('GameSession return-home releases card-held workers', () => {
     cs.extraData = { ...(cs.extraData ?? {}), someCounter: 42 }
 
     session.loadState(state)
-    ;(session as unknown as { continueReturnHomeHooks: () => void }).continueReturnHomeHooks()
+    ;session.withCtx(() => (session as unknown as { continueReturnHomeHooks: () => void }).continueReturnHomeHooks())
 
     const afterState = session.getState().state
     // heldWorkerId must be gone

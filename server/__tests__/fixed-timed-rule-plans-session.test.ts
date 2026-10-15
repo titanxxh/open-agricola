@@ -27,7 +27,7 @@ describe('fixed scheduled rules share execution and descriptions', () => {
     const session = setup(cardId)
     const before = JSON.stringify(session.state)
     for (let attempt = 0; attempt < 3; attempt++) {
-      const entries = collectScheduledEffectPreviews(session.state, session.state.players[0]!).filter(entry => entry.sourceCard === cardId)
+      const entries = session.withCtx(() => collectScheduledEffectPreviews(session.state, session.state.players[0]!, session.actionHooks)).filter(entry => entry.sourceCard === cardId)
       expect(entries.map(entry => entry.round)).toEqual(rounds)
       expect(entries.every(entry => entry.count === 1 && entry.timing !== undefined)).toBe(true)
     }
@@ -35,7 +35,7 @@ describe('fixed scheduled rules share execution and descriptions', () => {
   })
   it('a current target round retains later phases, and past dates are absent', () => {
     const session = setup('A058_AsparagusKnife', 10)
-    expect(collectScheduledEffectPreviews(session.state, session.state.players[0]!).map(entry => entry.round)).toEqual([10, 12])
+    expect(session.withCtx(() => collectScheduledEffectPreviews(session.state, session.state.players[0]!, session.actionHooks)).map(entry => entry.round)).toEqual([10, 12])
   })
   it.each([13, 14])('Workbench actually receives materials during the round %i field phase', round => {
     const session = setup('M128_Workbench', round, state => state.players.forEach(player => markAllWorkersUsed(state, player)))

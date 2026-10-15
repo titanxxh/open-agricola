@@ -365,12 +365,12 @@ describe('GameSession.submitDraftPick — validation and retry paths', () => {
     const roundOnePick = firstPick(session, 'p2')
     const advanced = session.submitDraftPick('p2', roundOnePick)
     expect(advanced.state.draft!.round).toBe(2)
-    const advancedState = serializeState(advanced.state, { engineStack: session.getEngineStack() })
+    const advancedState = session.withCtx(() => serializeState(advanced.state, { actionHooks: session.actionHooks, engineStack: session.getEngineStack() }))
 
     const roundOneRetry = session.submitDraftPick('p2', roundOnePick)
 
     expect(roundOneRetry.ok).toBe(true)
-    expect(serializeState(roundOneRetry.state, { engineStack: session.getEngineStack() })).toEqual(advancedState)
+    expect(session.withCtx(() => serializeState(roundOneRetry.state, { actionHooks: session.actionHooks, engineStack: session.getEngineStack() }))).toEqual(advancedState)
     expect(roundOneRetry.state.players[1]!.stats.draftHistory).toHaveLength(2)
 
     let finalPick = roundOnePick
@@ -379,13 +379,13 @@ describe('GameSession.submitDraftPick — validation and retry paths', () => {
       finalPick = firstPick(session, 'p2')
       session.submitDraftPick('p2', finalPick)
     }
-    const finishedState = serializeState(session.getState().state, { engineStack: session.getEngineStack() })
+    const finishedState = session.withCtx(() => serializeState(session.getState().state, { actionHooks: session.actionHooks, engineStack: session.getEngineStack() }))
     const historyLength = finishedState.players[1]!.stats.draftHistory.length
 
     const finalRetry = session.submitDraftPick('p2', finalPick)
 
     expect(finalRetry.ok).toBe(true)
-    expect(serializeState(finalRetry.state, { engineStack: session.getEngineStack() })).toEqual(finishedState)
+    expect(session.withCtx(() => serializeState(finalRetry.state, { actionHooks: session.actionHooks, engineStack: session.getEngineStack() }))).toEqual(finishedState)
     expect(finalRetry.state.players[1]!.stats.draftHistory).toHaveLength(historyLength)
   })
 
@@ -431,7 +431,7 @@ describe('GameSession — draft persistence (serialize → rehydrate)', () => {
     expect(live.phase).toBe('draft')
     expect(live.draft!.round).toBe(2)
 
-    const serialized = serializeState(live, { engineStack: session.getEngineStack() })
+    const serialized = session.withCtx(() => serializeState(live, { actionHooks: session.actionHooks, engineStack: session.getEngineStack() }))
     const json = JSON.parse(JSON.stringify(serialized))
     expect(json.phase).toBe('draft')
     expect(json.draft).toBeTruthy()

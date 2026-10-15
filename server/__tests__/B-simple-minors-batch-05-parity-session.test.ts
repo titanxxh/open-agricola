@@ -2,7 +2,6 @@ import { createWorkSession } from './_helpers/session-fixtures'
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
-import { computeScores } from '../../shared/domain/scoring'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import type { GameState, Resource } from '../../shared/contract/types'
 
@@ -94,7 +93,8 @@ const futureRounds = (state: GameState, cardId: CardId, resource: keyof Resource
 
 const printedVp = (response: SessionResponse, cardId: CardId) => {
   const player = response.state.players[0]!
-  const score = computeScores(response.state).find((summary) => summary.playerId === player.id)!
+  if (!response.scores) throw new Error('Expected authoritative scores')
+  const score = response.scores.find((summary) => summary.playerId === player.id)!
   const cards = score.categories.find((category) => category.key === 'cards')!
   return cards.entries.find((entry) => 'cardId' in entry && entry.cardId === cardId)?.score
 }

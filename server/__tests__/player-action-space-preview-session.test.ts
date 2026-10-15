@@ -26,9 +26,7 @@ import '../../shared/cards/E/E047_SyrupTap'
 import '../../shared/cards/E/E118_KindlingGatherer'
 import '../../shared/cards/C/C042_RavenousHunger'
 
-const actionHooks = new ActionHookRegistry()
 
-import { ActionHookRegistry } from '../../shared/actions/hooks'
 
 const sessions: GameSession[] = []
 afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
@@ -50,8 +48,8 @@ const preview = (session: GameSession, card: string, actorIndex: number): Choice
   for (const action of [...session.state.actionSpaces, ...createInternalActionDefinitions(id => registry.get(id)), ...getAllAdHocActions()]) registry.register(action)
   const space = session.state.actionSpaces.find(candidate => candidate.id === card)!
   const player = session.state.players[actorIndex]!
-  return Engine.fromAction(card, { registry, hooks: new HookDispatcher(actionHooks), log: new LogStore() }, player.id)
-    .describe({ state: session.state, player, space })
+  return session.withCtx(() => Engine.fromAction(card, { registry, hooks: new HookDispatcher(session.actionHooks), log: new LogStore() }, player.id)
+    .describe({ state: session.state, player, space }))
 }
 const effects = (description: ChoiceDescriptionPreview | undefined): ChoiceEffectPreview[] => {
   if (!description) return []
@@ -280,7 +278,7 @@ describe('player action spaces share runtime plans with full previews', () => {
       kind: 'resourceSetSelection', choices: ['wood', 'clay', 'reed', 'stone', 'food', 'grain', 'vegetable', 'sheep', 'boar', 'cattle'],
       minDistinct: 7, maxDistinct: 7, resourcesPerChoice: 1, extraGain: { begging: 1 },
     })
-    const base = serializeState(session.state, {}).actionSpaces.find(space => space.id === 'C104_Collector')?.baseDescriptionPreview
+    const base = session.withCtx(() => serializeState(session.state, { actionHooks: session.actionHooks,})).actionSpaces.find(space => space.id === 'C104_Collector')?.baseDescriptionPreview
     expect(effects(base)).toContainEqual({
       kind: 'resourceSetSelection', choices: ['wood', 'clay', 'reed', 'stone', 'food', 'grain', 'vegetable', 'sheep', 'boar', 'cattle'],
       minDistinct: 6, maxDistinct: 9, quantitiesByUse: [6, 7, 8, 9], resourcesPerChoice: 1, extraGain: { begging: 1 },
@@ -315,7 +313,7 @@ describe('player action spaces share runtime plans with full previews', () => {
     expect(description).toContain('"boar":1')
     expect(description).toContain('"cattle":1')
     expect(description).not.toContain('renovate-house')
-    const base = serializeState(session.state, {}).actionSpaces.find(space => space.id === 'D023_PioneeringSpirit')?.baseDescriptionPreview
+    const base = session.withCtx(() => serializeState(session.state, { actionHooks: session.actionHooks,})).actionSpaces.find(space => space.id === 'D023_PioneeringSpirit')?.baseDescriptionPreview
     expect(JSON.stringify(base)).toContain('ui.ruleRoundRange')
     expect(JSON.stringify(base)).toContain('"start":3,"end":5')
     expect(JSON.stringify(base)).toContain('"start":6,"end":8')
