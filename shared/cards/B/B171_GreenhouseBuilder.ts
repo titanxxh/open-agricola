@@ -2,7 +2,7 @@ import type { ActionHookRegistry } from '../../actions/hooks'
 import { defineOccupationCard } from '../card-source'
 import { canStartFencing } from '../../actions/effects/fencing'
 import { buildRenovationPlan } from '../../actions/effects/renovation'
-import type { ActionFlow, GameState, PlayerState } from '../../contract/types'
+import type { ActionFlow, ActionFlowPlanningContext, GameState, PlayerState } from '../../contract/types'
 import { createPlayerActionSpaces, registerPlayerActionSpace, definePlayerActionSpaceFlow } from '../player-action-space'
 import { wrapOptional } from '../../actions/flow'
 import type { CardImpl } from '../registry'
@@ -15,13 +15,14 @@ const revealedActionIds = (state: GameState): Set<string> =>
 const canRenovate = (player: PlayerState) =>
   buildRenovationPlan(player, 'clay') !== null || buildRenovationPlan(player, 'stone') !== null
 
-const greenhouseBranches = (actionHooks: ActionHookRegistry | undefined, state: GameState, player: PlayerState): ActionFlow[] => {
+const greenhouseBranches = (actionHooks: ActionHookRegistry | undefined, state: GameState, player: PlayerState, previewMode?: ActionFlowPlanningContext['previewMode']): ActionFlow[] => {
+  const base = previewMode === 'base'
   const revealed = revealedActionIds(state)
   const branches: ActionFlow[] = []
-  if (revealed.has('fencing') && canStartFencing(actionHooks, state, player)) {
+  if (base || (revealed.has('fencing') && canStartFencing(actionHooks, state, player))) {
     branches.push({ type: 'leaf', actionId: 'fence', sourceCard: CARD_ID, choiceLabelKey: 'actions.fencing.name' })
   }
-  if (revealed.has('house-redevelopment') && canRenovate(player)) {
+  if (base || (revealed.has('house-redevelopment') && canRenovate(player))) {
     branches.push({
       type: 'seq',
       sourceCard: CARD_ID,
@@ -32,7 +33,7 @@ const greenhouseBranches = (actionHooks: ActionHookRegistry | undefined, state: 
       ],
     })
   }
-  if (revealed.has('vegetable-seeds')) {
+  if (base || revealed.has('vegetable-seeds')) {
     branches.push({
       type: 'leaf',
       actionId: 'gain',
@@ -54,7 +55,7 @@ registerPlayerActionSpace({
     strictCanExecute: true,
     canBeExecutedByPlayer: (state, player, context) =>
       player.id === ownerId && greenhouseBranches(context?.actionHooks, state, player).length > 0,
-    flowFactory: ({ state, player, actionHooks }) => ({ type: 'xor', children: greenhouseBranches(actionHooks, state, player) }),
+    flowFactory: ({ state, player, actionHooks, previewMode }) => ({ type: 'xor', children: greenhouseBranches(actionHooks, state, player, previewMode) }),
   }),
 })
 

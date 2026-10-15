@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { createWorkSession } from './_helpers/session-fixtures'
+import { serializeSessionSnapshot } from '../../shared/session/serialization'
+import '../../shared/cards/B/B171_GreenhouseBuilder'
 import '../../shared/cards/C/C094_StableCleaner'
 import '../../shared/cards/D/D106_WhiskyDistiller'
 
@@ -7,6 +9,37 @@ const sessions: ReturnType<typeof createWorkSession>[] = []
 afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
 
 describe('authoritative base rules and current actor prices', () => {
+  it('snapshots Greenhouse Builder base branches while current fencing keeps the session price', () => {
+    const session = createWorkSession({ configure: state => {
+      state.round = 1
+      state.roundActionOrder = state.roundActionOrder.map(() => null)
+      state.roundActionOrder[0] = 'fencing'
+      state.players[0]!.occupationPlayed = ['B171_GreenhouseBuilder']
+      state.players[0]!.resources.wood = 4
+    } })
+    sessions.push(session)
+    const before = JSON.stringify(session.state)
+    const snapshot = serializeSessionSnapshot(session.state, session)
+    const base = snapshot.frame.actionSpaces.find(space => space.id === 'B171_GreenhouseBuilder')?.baseDescriptionPreview
+    expect(base).toMatchObject({ kind: 'action', effectPreview: { kind: 'rule', description: {
+      kind: 'group', operator: 'xor', parts: [
+        { labelKey: 'actions.fencing.name', parts: [{ effectPreview: { kind: 'fencePlan', segments: [{ kind: 'fence', woodCost: 1 }] } }] },
+        { labelKey: 'actions.house-redevelopment.name' },
+        { labelKey: 'actions.vegetable-seeds.name', effectPreview: { kind: 'resourceExchange', resourcesGained: { vegetable: 1 } } },
+      ],
+    } } })
+    expect(JSON.stringify(session.state)).toBe(before)
+    expect(session.getAvailableActions(0).map(entry => entry.spaceId)).toContain('B171_GreenhouseBuilder')
+    session.state.players[0]!.resources.wood = 0
+    expect(session.getAvailableActions(0).map(entry => entry.spaceId)).not.toContain('B171_GreenhouseBuilder')
+    session.actionHooks.register({ id: 'test:free-fence', actions: ['fence'], phases: ['computeCosts'], handler: () => ({ costs: { wood: -4 } }) })
+    expect(session.getAvailableActions(0).map(entry => entry.spaceId)).toContain('B171_GreenhouseBuilder')
+    expect(serializeSessionSnapshot(session.state, session).frame.actionSpaces.find(space => space.id === 'B171_GreenhouseBuilder')?.baseDescriptionPreview).toEqual(base)
+    const offered = session.takeAction(0, 'B171_GreenhouseBuilder')
+    expect(offered.ok, offered.error).toBe(true)
+    expect(offered.interaction).toMatchObject({ stateId: 'wait', playerIndex: 0, request: { kind: 'farm-select', farm: { farmType: 'fence' } } })
+  })
+
   it.each([0, 1, 2])('Lessons 4 keeps its base fee schedule and charges the actual fee after %i occupations', played => {
     // This fee schedule belongs to the four-player board; all other scenarios use two players.
     const session = createWorkSession({ seed: 6024, options: { playerCount: 4 }, configure: state => {
