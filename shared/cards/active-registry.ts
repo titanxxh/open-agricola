@@ -1,21 +1,6 @@
 /**
- * Module-scoped reference to the "currently active" CardRegistry.
- *
- * The engine is synchronous, so a single module-level variable is sufficient
- * (no AsyncLocalStorage needed). Every card-lookup / registration helper in
- * `card-listeners.ts` / `card-effects.ts` reads this pointer and operates on
- * the registry it points to.
- *
- * Lifecycle:
- *   - `GameCore` constructor builds a fresh `CardRegistry` loaded with
- *     `ALL_CARD_IMPLS` and publishes it here.
- *   - Test setup (`shared/cards/__tests__/setup-register-all.ts`) publishes a
- *     shared default registry pre-loaded with `ALL_CARD_IMPLS` so any test
- *     that reads listeners/effects without constructing a `GameSession` still
- *     sees every card's implementation.
- *   - Tests that want an empty slate publish a fresh registry via
- *     `setActiveCardRegistry(new CardRegistry())`, or scope the reset with
- *     `removeListenersWhere` / `removeEffectsWhere`.
+ * Synchronous rule environment selected temporarily by a Session or an explicit
+ * rule caller. Sessions own their registries; no process default is published.
  */
 import { CardRegistry } from './registry'
 
@@ -33,8 +18,8 @@ export function getActiveCardRegistry(): CardRegistry | null {
 export function requireActiveCardRegistry(context: string): CardRegistry {
   if (!active) {
     throw new Error(
-      `${context}: no active CardRegistry. Construct a GameSession, ` +
-      `or call setActiveCardRegistry(new CardRegistry()).`,
+      `${context}: no active CardRegistry. Run the rule query inside ` +
+      `session.withCtx(...) or withActiveRegistry(registry, ...).`,
     )
   }
   return active

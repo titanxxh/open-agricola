@@ -1,5 +1,5 @@
 import type { CostModifier, PlayerState } from '../contract/types'
-import { getActiveCardRegistry } from './active-registry'
+import { requireActiveCardRegistry } from './active-registry'
 
 /**
  * Card modifier lookup. Reads from per-session active CardRegistry.
@@ -7,7 +7,7 @@ import { getActiveCardRegistry } from './active-registry'
  * custom-registry adds custom-card modifiers at runtime.
  */
 export const getCardModifiers = (cardId: string): CostModifier[] => {
-  return getActiveCardRegistry()?.getModifiers(cardId) ?? []
+  return requireActiveCardRegistry('getCardModifiers').getModifiers(cardId)
 }
 
 export const ensureCardModifiers = (player: PlayerState, cardId: string): void => {

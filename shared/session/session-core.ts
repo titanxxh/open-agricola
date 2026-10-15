@@ -94,7 +94,7 @@ import { type CustomCardData, SessionCardContext, withSessionContext } from '../
 import { validateFarmChoice, type FarmChoiceType, type FarmChoiceValidation } from './farm-choice-validation.ts'
 import { assertSandboxListenerPhases } from '../custom-code/sandbox-listener-phases.ts'
 import { CardRegistry, type CardImpl } from '../cards/registry.ts'
-import { getActiveCardRegistry, setActiveCardRegistry, withActiveRegistry } from '../cards/active-registry.ts'
+import { withActiveRegistry } from '../cards/active-registry.ts'
 import { ensureCatalogLookupsInstalled } from '../cards/install-catalog-lookups.ts'
 import { ALL_CARD_IMPLS } from '../cards/register-all.ts'
 import { allOccupationCards, allMinorImprovementCards } from '../cards/catalog.ts'
@@ -535,9 +535,8 @@ export interface GameCoreOptions {
   /**
    * Optional pre-built per-session card registry. When omitted, `GameCore`
    * constructs a new `CardRegistry` and populates it from `ALL_CARD_IMPLS`.
-   * The registry is published via `setActiveCardRegistry` so that any global
-   * `registerCardListener` / `registerCardEffect` calls issued later (e.g.
-   * custom-code cards at runtime) forward into this session's registry.
+   * Rule execution and registration bind this registry temporarily through
+   * `withCtx`; constructing a Core never publishes a default environment.
    */
   cardRegistry?: CardRegistry
 }
@@ -908,8 +907,7 @@ export class GameCore {
       onReorganizeComplete: (stageResume) => { this.continueAfterSubFlow(stageResume) },
     })
 
-    // Build or accept a per-session card registry, then publish it as the
-    // active registry for legacy helper/test injection. Official entries are
+    // Build or accept a per-session card registry. Official entries are
     // protected from broad remove* cleanup; test/custom entries remain mutable.
     if (options.cardRegistry) {
       this.cardRegistry = options.cardRegistry
@@ -927,18 +925,12 @@ export class GameCore {
     // Register majors as effect bundles so getCardEffect resolves them after
     // the older getMajorCardEffect path is removed.
     this.cardRegistry.registerEffects(majorCardDefinitions, { protected: true })
-    setActiveCardRegistry(this.cardRegistry)
-    queueMicrotask(() => {
-      if (getActiveCardRegistry() === this.cardRegistry) {
-        setActiveCardRegistry(this.cardRegistry.clone())
-      }
-    })
 
     // Register custom workshop cards into a per-session context (sandbox mode)
     if (customCards && customCards.length > 0) {
       this.sessionCardContext = new SessionCardContext(this.cardWarnings)
-      withSessionContext(this.sessionCardContext, () => {
-        for (const cardData of customCards!) {
+      this.withCtx(() => {
+        for (const cardData of customCards) {
           try {
             registerCustomCard(cardData)
             this.registerCustomCardImpl(cardData)
@@ -953,21 +945,22 @@ export class GameCore {
 
     if (stateOrSeed && typeof stateOrSeed === 'object') {
       if (isStateWithCursor(stateOrSeed)) {
-        this.state = normalizeState(stateOrSeed.state)
+        this.state = this.withCtx(() => rebuildActiveModifiers(normalizeState(stateOrSeed.state)))
         this.syncDynamicActionSpaces()
-        if (stateOrSeed.sessionCursor) this.restoreSessionPrivateCursor(stateOrSeed.sessionCursor)
+        const cursor = stateOrSeed.sessionCursor
+        if (cursor) this.withCtx(() => this.restoreSessionPrivateCursor(cursor))
         return
       }
-      this.state = normalizeState(stateOrSeed)
+      this.state = this.withCtx(() => rebuildActiveModifiers(normalizeState(stateOrSeed)))
     } else {
       const seed = typeof stateOrSeed === 'number' ? stateOrSeed : undefined
-      const extraMinorIds = withSessionContext(this.sessionCardContext, () => getCustomMinorImprovementIds())
-      const extraOccupationIds = withSessionContext(this.sessionCardContext, () => getCustomOccupationIds())
-      this.state = createInitialState(seed, {
+      const extraMinorIds = this.withCtx(() => getCustomMinorImprovementIds())
+      const extraOccupationIds = this.withCtx(() => getCustomOccupationIds())
+      this.state = this.withCtx(() => createInitialState(seed, {
         ...initialStateOptions,
         extraMinorIds,
         extraOccupationIds,
-      }, [], 'defer')
+      }, [], 'defer'))
     }
     this.syncDynamicActionSpaces()
     if (isFreshState) this.withCtx(() => this.startFirstRoundAfterSetup())

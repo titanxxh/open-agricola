@@ -7,7 +7,7 @@ import { majorCardDefinitions, getMajorCard } from '../../cards/major'
 import { meetsCardPrerequisites } from '../../cards/helpers/prerequisites'
 import { isFireplaceIdentityCard, isMajorCardId } from '../../cards/helpers/card-type'
 import type { ImprovementType } from '../effects/improvement'
-import { getActiveCardRegistry } from '../../cards/active-registry'
+import { requireActiveCardRegistry } from '../../cards/active-registry'
 import {
   getAvailableMajorImprovementIds,
   isMajorImprovementAvailable,
@@ -126,7 +126,7 @@ export const getPrintedImprovementCostCandidates = (
   player: PlayerState,
   improvementId: string,
 ): PaymentResourceMap[] => {
-  const dynamicCost = getActiveCardRegistry()?.getBaseCosts(improvementId)?.({
+  const dynamicCost = requireActiveCardRegistry('getPrintedImprovementCostCandidates').getBaseCosts(improvementId)?.({
     state,
     player,
     cardId: improvementId,
@@ -149,7 +149,7 @@ export const getMinorImprovementEffectiveCost = (
   improvement: ResolvedMinorImprovement,
   actionCardId?: string,
 ) => {
-  const getBaseCosts = getActiveCardRegistry()?.getBaseCosts(improvement.id)
+  const getBaseCosts = requireActiveCardRegistry('getMinorImprovementEffectiveCost').getBaseCosts(improvement.id)
   const dynamicBaseCost = getBaseCosts?.({
     state,
     player,
