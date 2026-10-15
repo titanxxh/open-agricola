@@ -193,29 +193,6 @@ export class StageDispatch {
     return false
   }
 
-  continueSinglePlayerStageHook(
-    hook: StageCardEffectHook,
-    playerIndex: number,
-    cardIndex = 0,
-    extra?: StageResumeState['extra'],
-  ): boolean {
-    const player = this.state.players[playerIndex]
-    if (!player) return false
-    const cards = this.getPlayerEffectCardIds(player)
-    for (let currentCardIndex = cardIndex; currentCardIndex < cards.length; currentCardIndex += 1) {
-      const cardId = cards[currentCardIndex]
-      if (!cardId) continue
-      const flow = runCardEffectHook(this.state, player, cardId, hook, undefined, {
-        triggerActionId: extra?.triggerActionId ?? undefined,
-        reportProtectedObservation: (observation) => this.host.reportProtectedObservation(observation),
-      })
-      if (!flow) continue
-      this.startFlow(flow, hook, playerIndex, currentCardIndex + 1, playerIndex, extra)
-      return true
-    }
-    return false
-  }
-
   continueBeforeEndGamePlayerDispatch(playerIndex = 0): boolean {
     for (let currentPlayerIndex = playerIndex; currentPlayerIndex < this.state.players.length; currentPlayerIndex += 1) {
       const children = this.collectBeforeEndGameActivationFlows(currentPlayerIndex)

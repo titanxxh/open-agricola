@@ -1,86 +1,50 @@
 import { defineMinorCard } from '../card-source'
-import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { CardListenerRegistration } from '../card-listeners'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { readCardExtraData } from '../helpers/card-state'
-import type { PlayerState } from '../../contract/types'
+import { readActionSnapshotToken } from '../helpers/action-snapshot-state'
+import { getActionNewlyUsedTiles } from '../helpers/farmyard-events'
+import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
-import { getFarmyardFields } from '../helpers/card-field'
 
 const CARD_ID = 'C048_Farmstead'
-const countUsedTiles = (player: PlayerState): number => {
-  const used = new Set<string>()
-  for (const tile of player.roomTiles) used.add(`${tile.row},${tile.col}`)
-  for (const field of getFarmyardFields(player)) used.add(`${field.row},${field.col}`)
-  for (const tile of player.stableTiles) used.add(`${tile.row},${tile.col}`)
-  for (const pasture of player.pastures) {
-    for (const tile of pasture.tiles ?? []) used.add(`${tile.row},${tile.col}`)
-  }
-  return used.size
-}
+const turnReceipt = (key: string, token: number): ActionFlow => ({
+  type: 'leaf',
+  actionId: 'special-effect',
+  sourceCard: CARD_ID,
+  params: { kind: 'set-extra-data', key, value: token },
+})
 
-const beforeListener: CardListenerRegistration = {
-  id: 'C48-farmstead-before-place-farmer',
+const qualification: CardListenerRegistration = {
+  id: 'C48-farmstead-qualify',
   cardIds: [CARD_ID],
-  phases: ['before' as ActionHookPhase],
-  actions: ['place-farmer'],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    return {
-      flow: {
-        type: 'leaf',
-        actionId: 'special-effect',
-        sourceCard: CARD_ID,
-        params: {
-          kind: 'set-extra-data',
-          key: 'usedTilesBefore',
-          value: countUsedTiles(context.player),
-        },
-      },
-      sourceCard: CARD_ID,
-    }
-  },
-}
-
-const afterListener: CardListenerRegistration = {
-  id: 'C48-farmstead-after-place-farmer',
-  cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
-  actions: ['place-farmer'],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    const before = readCardExtraData<number>(context.player, CARD_ID, 'usedTilesBefore')
-    if (before === undefined) return
-    const after = countUsedTiles(context.player)
-    if (after > before) {
-      return {
-        flow: {
-          type: 'seq',
-          children: [
-            {
-              type: 'leaf',
-              actionId: 'special-effect',
-              sourceCard: CARD_ID,
-              params: { kind: 'set-extra-data', key: 'usedTilesBefore', value: undefined },
-            },
-            gainLeaf(CARD_ID, { food: 1 }),
-          ],
-        },
-        sourceCard: CARD_ID,
-      }
-    }
-    return {
-      flow: {
-        type: 'leaf',
-        actionId: 'special-effect',
-        sourceCard: CARD_ID,
-        params: { kind: 'set-extra-data', key: 'usedTilesBefore', value: undefined },
-      },
-      sourceCard: CARD_ID,
-    }
+  phases: ['after'],
+  actions: ['plow', 'construct', 'stables', 'fence'],
+  handler: context => {
+    const token = readActionSnapshotToken(context.player)
+    if (token === undefined) return
+    if (!context.triggerSnapshot?.players[context.player.id]?.played.includes(CARD_ID)) return
+    if (readCardExtraData(context.player, CARD_ID, 'qualifiedTurnToken') === token
+      || readCardExtraData(context.player, CARD_ID, 'rewardedTurnToken') === token) return
+    if (getActionNewlyUsedTiles(context).length === 0) return
+    return { flow: turnReceipt('qualifiedTurnToken', token), sourceCard: CARD_ID }
   },
 }
 
 const cardImpl = {
-  listeners: [beforeListener, afterListener],
+  listeners: [qualification],
+  effect: {
+    id: CARD_ID,
+    onEndTurn: (_state, player) => {
+      const token = readActionSnapshotToken(player)
+      if (token === undefined || readCardExtraData(player, CARD_ID, 'qualifiedTurnToken') !== token
+        || readCardExtraData(player, CARD_ID, 'rewardedTurnToken') === token) return
+      return {
+        type: 'seq',
+        children: [turnReceipt('rewardedTurnToken', token), gainLeaf(CARD_ID, { food: 1 })],
+      }
+    },
+  },
   reaches: [] as readonly string[],
 } satisfies CardImpl
 

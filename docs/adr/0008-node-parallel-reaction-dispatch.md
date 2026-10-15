@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-07-02
-- Amended: 2026-10-14
+- Amended: 2026-10-16
 
 ## Context
 
@@ -50,6 +50,8 @@ Issues #1096 and #1099–#1102 separate card activation from completion reaction
 
 8. Round preparation uses the same activation model under #1145, with distinct `onAfterRevealAction`, `onPreparation`, `onEndPreparation` and `onWorkStart` hooks. `onRoundStart` means BGA StartOfTurn. BeforeStart runs before incrementing and receives `nextRound`; reveal context records the actual action and slot. Each window freezes its own player order, then captures each player's eligible sources only on that player's entry. Native `stageEligibility` is a pure source-qualification query, separate from live handler/payment preview. The fixed source tree survives purchase, passing, anytime, pending restoration and undo; new cards join later windows rather than the active tree.
 9. StartOfTurn combines that player's scheduled receipts, offers, actions and card activations in one trigger-select tree. Receipt-dependent bonuses retain executable dependencies and resolved facts follow actual receipt. Source discovery never drops a stone-house Plow Driver merely because food is currently zero, or treats Cob's grain payment as source qualification. Accumulation follows Preparation, work order freezes before StartOfTurn, and the native hook vocabulary does not automatically expand Workshop support. First-round setup uses the same preparation chain and accumulates once; work-state loading does not reenter it.
+
+10. Turn-end reactions use the same fixed-source activation model under #1199. Ordinary rotation and card movement share source discovery, including explicitly retained timed obligations. Discovery captures every end-turn source, including a currently unqualified or unaffordable source; live cloned preview decides applicability and mandatory/optional status after each selected child. One total source expands directly; multiple sources keep the full frozen tree. Selected completion never rescans played zones, and newly played cards join later windows. A card may record qualification and reward receipts against the existing active Turn identity, but cannot infer a past host's eligibility from current card ownership. The multi-source selector explicitly opens its own anytime window; returning from a detour refreshes only its unselected menu, preserving source identity and completed children. Permission remains local to the current waiting node and does not extend to nested payments or unrelated stages.
 
 ## Consequences
 

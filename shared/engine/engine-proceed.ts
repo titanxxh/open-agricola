@@ -1063,7 +1063,7 @@ export function engineProceed(
       }
       const promptKey = 'ui.interactionSelectTrigger' as import('../contract/prompt-keys').PromptKey
       const request: InteractionRequest = stepResult.request.kind === 'select-trigger'
-        ? { ...stepResult.request, options }
+        ? { ...stepResult.request, options, anytimeWindow: node.anytimeWindow }
         : stepResult.request
       const contextSnapshot = triggerSelectContextSnapshot(context)
       node.setPending({
