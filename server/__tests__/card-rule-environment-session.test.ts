@@ -7,7 +7,7 @@ import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites
 import { CardRegistry } from '../../shared/cards/registry'
 import { getMinorImprovementEffectiveCost, getPrintedImprovementCostCandidates } from '../../shared/actions/helpers/improvement-helpers'
 import { getCardDefinition } from '../../shared/cards/catalog'
-import type { CustomCardData } from '../../shared/cards/session-card-context'
+import { getCurrentSessionContext, type CustomCardData } from '../../shared/cards/session-card-context'
 import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/serialization'
 import { GameSession } from '../game/authoritative-session'
 import { validateAndCompileCustomCode } from '../custom-code/engine'
@@ -108,5 +108,101 @@ describe('Session card rule environment', () => {
     expect(response.state.players[0]!.resources).toMatchObject({ food: 8, grain: 2, wood: 3 })
     expect(restored.cardWarnings).toEqual([])
     restored.dispose()
+  })
+
+  it.each([false, true])('isolates matching custom IDs through payment, undo and load, reversed=%s', reversed => {
+    const cards = [customCard(1, 2), customCard(2, 4)]
+    const creationOrder = reversed ? [1, 0] : [0, 1]
+    const sessions = new Map(creationOrder.map(index => [index, configuredSession(cards[index]!)]))
+    const first = sessions.get(0)!, second = sessions.get(1)!
+    try {
+      const initial = JSON.parse(JSON.stringify(serializeSessionSnapshot(first.state, first)))
+      const beforeQueries = JSON.stringify([first.state, second.state])
+      for (const session of [first, second, first]) {
+        expect(session.getAvailableActions(0).map(action => action.spaceId)).toContain('forest')
+        session.getActionAvailability(0)
+      }
+      expect(JSON.stringify([first.state, second.state])).toBe(beforeQueries)
+
+      for (const session of [first, second]) {
+        const pending = session.takeAction(0, 'forest')
+        expect(pending.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'choice' } })
+      }
+      const firstPaid = first.resolveChoice(0, 'A102_Grocer')
+      expect(firstPaid.ok, firstPaid.error).toBe(true)
+      expect(firstPaid.state.players[0]!.resources).toMatchObject({ food: 8, grain: 2, wood: 3 })
+      const secondPaid = second.resolveChoice(0, 'A102_Grocer')
+      expect(secondPaid.ok, secondPaid.error).toBe(true)
+      expect(secondPaid.state.players[0]!.resources).toMatchObject({ food: 9, grain: 4, wood: 3 })
+
+      second.dispose()
+      const undone = first.undoAction()
+      expect(undone.ok, undone.error).toBe(true)
+      expect(undone.state.players[0]!.resources).toMatchObject({ food: 10, grain: 0, wood: 0 })
+      expect(first.takeAction(0, 'forest').ok).toBe(true)
+      expect(first.resolveChoice(0, 'A102_Grocer').state.players[0]!.resources)
+        .toMatchObject({ food: 8, grain: 2, wood: 3 })
+
+      expect(first.loadState(rehydrateState(initial)).ok).toBe(true)
+      expect(first.takeAction(0, 'forest').ok).toBe(true)
+      expect(first.resolveChoice(0, 'A102_Grocer').state.players[0]!.resources)
+        .toMatchObject({ food: 8, grain: 2, wood: 3 })
+      expect(first.cardWarnings).toEqual([])
+      expect(getActiveCardRegistry()).toBeNull()
+    } finally {
+      first.dispose()
+      second.dispose()
+    }
+  })
+
+  it('restores a Workshop pending choice and settles payment and reward only once', () => {
+    const card = customCard(1, 2)
+    const original = configuredSession(card)
+    const pending = original.takeAction(0, 'forest')
+    expect(pending.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'choice' } })
+    const restored = new GameSession(rehydrateState(JSON.parse(JSON.stringify(
+      serializeSessionSnapshot(pending.state, original),
+    ))), [card])
+    try {
+      expect(restored.getState().interaction).toMatchObject({ stateId: 'wait', request: { kind: 'choice' } })
+      const completed = restored.resolveChoice(0, 'A102_Grocer')
+      expect(completed.ok, completed.error).toBe(true)
+      expect(completed.state.players[0]!.resources).toMatchObject({ food: 8, grain: 2, wood: 3 })
+      expect(completed.state.events.filter(event => event.type === 'resource.moved' && event.resources.grain === 2))
+        .toHaveLength(1)
+      const duplicate = restored.resolveChoice(0, 'A102_Grocer')
+      expect(duplicate.ok).toBe(false)
+      expect(duplicate.state.players[0]!.resources).toMatchObject({ food: 8, grain: 2, wood: 3 })
+      expect(original.getState().state.players[0]!.resources).toMatchObject({ food: 10, grain: 0, wood: 3 })
+      expect(getActiveCardRegistry()).toBeNull()
+    } finally {
+      original.dispose()
+      restored.dispose()
+    }
+  })
+
+  it('restores both rule registries and Workshop overlays after nesting and exceptions', () => {
+    const first = configuredSession(customCard(1, 2)), second = configuredSession(customCard(2, 4))
+    try {
+      first.withCtx(() => {
+        const firstOverlay = getCurrentSessionContext()
+        expect(getCardModifiers(CARD_ID)[0]).toMatchObject({ discount: { food: 1 } })
+        expect(() => second.withCtx(() => {
+          expect(getCurrentSessionContext()).not.toBe(firstOverlay)
+          expect(getCardModifiers(CARD_ID)[0]).toMatchObject({ discount: { food: 2 } })
+          throw new Error('inner rule failure')
+        })).toThrow('inner rule failure')
+        expect(getCurrentSessionContext()).toBe(firstOverlay)
+        expect(getCardModifiers(CARD_ID)[0]).toMatchObject({ discount: { food: 1 } })
+      })
+      expect(getCurrentSessionContext()).toBeNull()
+      expect(getActiveCardRegistry()).toBeNull()
+      expect(first.takeAction(0, 'forest').ok).toBe(true)
+      expect(first.resolveChoice(0, 'A102_Grocer').state.players[0]!.resources)
+        .toMatchObject({ food: 8, grain: 2, wood: 3 })
+    } finally {
+      first.dispose()
+      second.dispose()
+    }
   })
 })
