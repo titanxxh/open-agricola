@@ -706,7 +706,7 @@ D015_ClaySupports clay→reed trade 仅当 `houseTypeClay > 0` 时生效；A123_
 
 每个 `GameCore` 通过只读字段 `actionHooks` 独立持有 `ActionHookRegistry`。`HookDispatcher`、flow 可用性、费用预览和直接规则 helper 显式接收该注册表，不再存在进程级 ActionHook 默认值或缓存的 flow dispatcher。`GameCore.validateFarmChoice()` 为完整查询绑定卡牌环境；HTTP、服务端 worker 和本地沙盒适配器共用这个入口。
 
-`CardRegistry` 不再发布持久的进程级默认值。卡牌规则 helper 继续通过 `withCtx` 临时绑定会话环境，本次不将其 API 迁移为显式 runtime 参数。未绑定卡牌环境时，查询明确失败。显式空注册表或卡牌没有 effect，仍是合法的空结果。
+`CardRegistry` 不再发布持久的进程级默认值。卡牌 effect、listener 和 modifier 查询继续通过 `withCtx` 同步临时绑定会话环境。确实查询通用 ActionHook 的 native 回调链通过 `FlowEffectContext` 携带所属的 `actionHooks`，包含额外回合查询；卡牌注册表仍使用临时绑定。未绑定卡牌环境时，查询明确失败。显式空注册表或卡牌没有 effect，仍是合法的空结果。
 
 加载状态、恢复 cursor 和 undo 保留同一 Core 的规则注册表。新建 Core，包括 worker 重建，按官方、变体和自定义卡牌定义建立自己的注册表。注册表与可执行 handler 是运行时依赖，不进入游戏状态或 cursor。临时卡牌环境在嵌套调用和异常结束后恢复原环境。 `rehydrateState()` 只还原数据，不查询规则；所属 Core 随后在自身卡牌环境内恢复行动定义和 modifier。服务端与浏览器自定义代码适配器在调用卡牌代码前，从 listener 和 effect 参数中移除 `actionHooks`。
 
