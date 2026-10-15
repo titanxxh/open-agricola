@@ -677,19 +677,22 @@ export class Engine {
       : buildFlowNode(internals, flow))
     if (!ctx) flowNodes.forEach(enforceCompositeContinuationMandatory)
     const nextUnresolved = this.tree.nextUnresolved()
-    if (!ctx && nextUnresolved
-      && (nextUnresolved instanceof OrNode || nextUnresolved instanceof XorNode
-        || (nextUnresolved.optional === true && nextUnresolved.optionalActive === false))
-      && nextUnresolved.requiresExplicitChoice === true
-      && nextUnresolved.getPending() !== null) {
+    const refreshTriggerSelection = nextUnresolved instanceof ParallelNode
+      && nextUnresolved.mode === 'trigger-select' && nextUnresolved.selectedChildId === null
+    if (!ctx && nextUnresolved && nextUnresolved.getPending() !== null
+      && (refreshTriggerSelection || (nextUnresolved.requiresExplicitChoice === true
+        && (nextUnresolved instanceof OrNode || nextUnresolved instanceof XorNode
+          || (nextUnresolved.optional === true && nextUnresolved.optionalActive === false))))) {
       nextUnresolved.clearPending()
-      if (nextUnresolved instanceof OrNode || nextUnresolved instanceof XorNode) {
+      if (nextUnresolved instanceof OrNode || nextUnresolved instanceof XorNode || nextUnresolved instanceof ParallelNode) {
         nextUnresolved.emittedChoices = []
         nextUnresolved.emittedRequest = undefined
         nextUnresolved.emittedPromptKey = undefined
         nextUnresolved.emittedPromptParams = undefined
-        nextUnresolved.pendingContextSnapshot = undefined
-        nextUnresolved.pendingActionId = undefined
+        if (!(nextUnresolved instanceof ParallelNode)) {
+          nextUnresolved.pendingContextSnapshot = undefined
+          nextUnresolved.pendingActionId = undefined
+        }
       }
       if (this._pendingNodeIdRef.value === nextUnresolved.id) this._pendingNodeIdRef.value = null
     }

@@ -82,6 +82,7 @@ import {
   incResourceConverted,
 } from '../session/stats.ts'
 import { getMinorImprovement } from '../cards/registry-display.ts'
+import { buildEndTurnReactionFlow } from '../cards/helpers/end-turn-reactions'
 import { endTurnScope, readActionSnapshotExtraData } from '../cards/helpers/action-snapshot.ts'
 import { returnSupplyWorkers } from '../domain/supply-workers.ts'
 import {
@@ -766,7 +767,7 @@ export class GameCore {
   invokeFinalizeRound(): void { this.finalizeRound() }
   /** @internal Round phase — onEndTurn stage hook trampoline. */
   invokeEndTurnHooks(playerIndex: number, triggerActionId?: string | null): SessionResponse {
-    return this.withCtx(() => this.continueEndTurnHooks(playerIndex, 0, triggerActionId))
+    return this.withCtx(() => this.continueEndTurnHooks(playerIndex, triggerActionId))
   }
   /** @internal Harvest phase — read the harvestRounds set (for returning-home decision). */
   isHarvestRound(round: number): boolean { return harvestRounds.includes(round) }
@@ -881,11 +882,7 @@ export class GameCore {
         this.continueStartHarvestFeedingPhase(stageResume.playerIndex, stageResume.cardIndex)
       },
       onEndTurn: (stageResume) => {
-        this.continueEndTurnHooks(
-          stageResume.playerIndex,
-          stageResume.cardIndex,
-          stageResume.extra?.triggerActionId ?? null,
-        )
+        this.finishCompletedActionTurn(stageResume.playerIndex)
       },
       onBeforeReturnHome: (stageResume) => { this.continueBeforeReturnHomeHooks(stageResume.playerIndex, stageResume.cardIndex) },
       onReturnHome: (stageResume) => { this.continueReturnHomeHooks(stageResume.playerIndex, stageResume.cardIndex) },
@@ -3056,11 +3053,12 @@ export class GameCore {
 
   private continueEndTurnHooks(
     playerIndex: number,
-    cardIndex = 0,
     triggerActionId?: string | null,
   ): SessionResponse {
-    const extra = triggerActionId ? { triggerActionId } : undefined
-    if (this.stageDispatch.continueSinglePlayerStageHook('onEndTurn', playerIndex, cardIndex, extra)) {
+    const player = this.state.players[playerIndex]
+    const flow = player && buildEndTurnReactionFlow(this.state, player, triggerActionId)
+    if (flow) {
+      this.stageDispatch.startFlow(flow, 'onEndTurn', playerIndex, 0)
       return this.respond()
     }
     return this.finishCompletedActionTurn(playerIndex)
@@ -3697,7 +3695,7 @@ export class GameCore {
           const triggerActionId = this.endTurnTriggerActionId(frame)
           this.finalizeActionLog(frameOwnerPlayer)
           this.engineStack.pop()
-          this.continueEndTurnHooks(ownerIndexLocal, 0, triggerActionId)
+          this.continueEndTurnHooks(ownerIndexLocal, triggerActionId)
           return
         }
         this.finalizeActionLog(frameOwnerPlayer)

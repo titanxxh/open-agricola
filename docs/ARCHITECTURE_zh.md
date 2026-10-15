@@ -813,6 +813,11 @@ Card listener 区域默认只匹配已打出卡：`zones` 省略等价于 `['pla
 
 ### 7.6 阶段型 Hook（按触发顺序）
 
+普通轮转和卡牌授予的独立 Turn 共用一棵固定的 `onEndTurn` 来源树。`buildEndTurnReactionFlow()` 收集当时持有和明确保留的所有回合结束来源，不按当前 flag 或支付能力过滤。总来源只有一个时直接展开；多个来源，包括暂时不适用的来源，保留在 `ParallelNode(mode='trigger-select')` 中。每次选择后通过实时克隆状态预览重算资格、支付和 mandatory/pass 状态。已完成来源保持 resolved；窗口中新打出的卡只参加后续窗口。所有已选择的嵌套 flow 和必要动物重整完成后，窗口只关闭一次当前 Turn Scope，不再次扫描打出区。
+
+C048 只在已捕获的几何宿主提交时已有本牌、自身 `actionEvents` 含新增使用格且 Turn Scope 有效时记录 `qualifiedTurnToken`。回合结束 flow 在获得食物前先记录 `rewardedTurnToken`。多个 Rule Action 共用这些凭据；下一 Turn 使用新身份，不能领取过期资格。不再使用 placement 前后的几何缓存，也不强制新增最后领奖的 phase。
+
+
 阶段 flow 完成时，Session 在 `completeFrameIfStage` 弹出并续接之前检查未处置动物。存在此类动物时，保留已完成的父阶段 frame，嵌套既有 `reorganize`，处理后恢复原 `stageResume`。检查当前终态，不能只依赖一次 driver 调用中的资源 delta，因为外部 choice callback 可能已执行 gain。普通繁殖阶段保留 `harvest-breed` 约束；其他阶段使用普通动物处理，允许合法即时烹饪或弃置，不要求先住房。重整子流完成时不再次嵌套自己。单选自动执行获得动物时同样保留父流程，并在嵌套前提交资源事件，保证尾部奖励和原阶段或行动续接不丢失。
 
 ```
@@ -991,6 +996,9 @@ C1 Overhaul 只计数、回收、重建 own ordinary fences：onBuy 先用 `cons
 ---
 
 ## Anytime Window Policy
+
+多来源的 Turn 结束选择器在自身节点显式声明开放的 `anytimeWindow`，trigger-select request 保留该声明。插入 anytime 时只清除尚未选择子效果的 trigger-select 菜单，返回后重新预览同一组固定 child，已完成 child 保持完成。这不把权限授予子付款或选择、单来源阶段 flow、兄弟节点或其他阶段；每个当前等待节点仍遵守自身权限合同。
+
 
 当前 pending 交互中的卡牌 anytime 可用项，由 `shared/session/anytime-policy.ts` 的 `computeAnytimePolicy()` 在每次 `buildInteraction()` 中计算；前端不导入该规则查询。
 

@@ -239,3 +239,74 @@ test('one farm cell with multiple authoritative options requires an explicit act
   expect(result.ok, JSON.stringify(result)).toBe(true)
   expect(result.state.players[0].farmTerrain).toHaveLength(0)
 })
+
+for (const first of ['C048_Farmstead', 'B027_Toolbox']) {
+  test(`Turn-end sources keep their order and one Farmstead reward across reload, first=${first}`, async ({ page, request }) => {
+    const farmstead = 'C048_Farmstead'
+    const toolbox = 'B027_Toolbox'
+    expect((await request.post(`${BACKEND_URL}/api/game/new-sandbox`, {
+      data: { seed: 42, playerCount: 2, customCardIds: [] },
+    })).ok()).toBe(true)
+    const fixture = createWorkSession({ configure: state => {
+      state.round = 10
+      const owner = state.players[0]!
+      owner.minorPlayed = [farmstead, toolbox]
+      owner.occupationPlayed = ['A116_WoodCutter']
+      Object.assign(owner.resources, { wood: 8, stone: 2, reed: 0, food: 2 })
+    } })
+    try {
+      expect((await request.post(`${BACKEND_URL}/api/game/load`, {
+        data: { state: fixture.withCtx(() => serializeState(fixture.state, {})) },
+      })).ok()).toBe(true)
+    } finally { fixture.dispose() }
+    const chooseApi = async (value: string): Promise<SessionResponse> =>
+      (await request.post(`${BACKEND_URL}/api/game/choice`, { data: { playerIndex: 0, value } })).json()
+    const started: SessionResponse = await (await request.post(`${BACKEND_URL}/api/game/action`, {
+      data: { playerIndex: 0, spaceId: 'farm-expansion' },
+    })).json()
+    expect(started.ok, started.error).toBe(true)
+    let response: SessionResponse = await (await request.post(`${BACKEND_URL}/api/game/commit-selection`, {
+      data: { playerIndex: 0, payload: { stables: [{ row: 0, col: 0 }] } },
+    })).json()
+    for (let guard = 0; guard < 4; guard++) {
+      if (response.state.players[0]!.cardStates[farmstead]?.extraData?.qualifiedTurnToken !== undefined
+        && response.state.players[0]!.cardStates[toolbox]?.flagged) break
+      const offered = response.interaction.stateId === 'wait' ? response.interaction.request.options ?? [] : []
+      const activation = offered.find(option => option.value === farmstead || option.value === toolbox)
+      if (!activation) throw new Error(`Expected construction reaction: ${JSON.stringify(response.interaction)}`)
+      response = await chooseApi(activation.value)
+      expect(response.ok, response.error).toBe(true)
+    }
+    expect(response.state.players[0]!.resources.food).toBe(2)
+    expect(response.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'select-trigger' } })
+    await page.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'en'))
+    await page.goto('/?page=game&player=p1&embedded=1&devMode=1')
+    const choice = (value: string) => page.locator(`.interaction-bar [data-choice-value="${value}"]`)
+    const chooseUi = async (value: string): Promise<SessionResponse> => {
+      const received = page.waitForResponse(result => result.url().endsWith('/api/game/choice'))
+      await expect(choice(value)).toBeEnabled()
+      await choice(value).click()
+      const next: SessionResponse = await (await received).json()
+      expect(next.ok, next.error).toBe(true)
+      return next
+    }
+    await expect(choice(farmstead)).toBeVisible()
+    await expect(choice(toolbox)).toBeVisible()
+    response = await chooseUi(first)
+    if (first === toolbox) response = await chooseUi('__skip__')
+    const second = first === farmstead ? toolbox : farmstead
+    await page.reload()
+    await expect(choice(first)).toHaveCount(0)
+    await expect(choice(second)).toBeEnabled()
+    response = await chooseUi(second)
+    if (second === toolbox) response = await chooseUi('__skip__')
+    expect(response.state.players[0]!.resources.food).toBe(3)
+    expect(response.state.events.filter(event => event.type === 'resource.moved'
+      && event.sourceCardId === farmstead && event.resources.food === 1)).toHaveLength(1)
+    expect(response.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'confirm-next-player' } })
+    await page.reload()
+    await expect(page.locator('.interaction-bar').getByRole('button', { name: 'Confirm switch' })).toBeVisible()
+    const restored: SessionResponse = await (await request.get(`${BACKEND_URL}/api/game/state`)).json()
+    expect(restored.state.players[0]!.resources.food).toBe(3)
+  })
+}

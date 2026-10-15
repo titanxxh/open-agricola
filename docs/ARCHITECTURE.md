@@ -823,6 +823,11 @@ The trigger-select pass gate uses the previewed result. An explicitly mandatory 
 
 ### 7.6 Stage hooks in trigger order
 
+`onEndTurn` uses one frozen source tree for ordinary rotation and card-driven independent Turns. `buildEndTurnReactionFlow()` captures all currently held and explicitly retained end-turn sources without filtering their current flags or affordability. A single total source expands directly; multiple sources, including temporarily inactive ones, remain in `ParallelNode(mode='trigger-select')`. Live cloned-state preview determines applicability, payment and mandatory/pass state after each selection. A completed source stays resolved; a card played inside the window joins only later windows. Window completion closes the current Turn Scope once, after every selected nested flow and required animal reorganization finishes, without scanning the played-card list again.
+
+C048 records `qualifiedTurnToken` only when its captured geometry host committed with the card already played, its own `actionEvents` contain newly used cells, and a Turn Scope is active. Its end-turn flow records `rewardedTurnToken` before gaining food. Multiple Rule Actions share those receipts; a later Turn has a new identity and cannot consume an expired qualification. No placement before/after geometry cache or forced final reward phase is needed.
+
+
 At stage-flow completion, Session checks unsettled animals before `completeFrameIfStage` pops and resumes the frame. It retains the completed parent stage and nests the existing `reorganize` flow; settlement then resumes the same `stageResume`. This checks current animal state because an external choice callback may have executed a gain before the driver takes its delta snapshot. Ordinary breeding retains `harvest-breed` constraints. Other stages use ordinary animal handling, allowing legal immediate cooking or disposal without requiring housing first. Reorganization completion does not nest another copy of itself. Automatically resolved single-option animal gains also retain their parent and flush its resource events before the detour, so trailing rewards and the original stage or action continuation survive.
 
 ```text
@@ -1012,6 +1017,9 @@ C1 Overhaul counts, returns, and rebuilds only the player's own ordinary fences.
 ---
 
 ## Anytime Window Policy
+
+The multi-source Turn-end selector explicitly declares its own open `anytimeWindow`; trigger-select requests preserve that node declaration. A detour clears the pending menu of an unselected trigger-select node so the same frozen children are previewed again on return, while resolved children stay resolved. This does not confer permission on child payment/choice waits, single-source stage flows, siblings or other stages; each current waiting node retains its own permission contract.
+
 
 `computeAnytimePolicy()` in `shared/session/anytime-policy.ts` computes card-listener anytime availability once per `buildInteraction()`. Clients never import this rule query.
 
