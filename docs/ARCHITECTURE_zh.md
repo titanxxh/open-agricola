@@ -704,6 +704,12 @@ D015_ClaySupports clay→reed trade 仅当 `houseTypeClay > 0` 时生效；A123_
 
 ### 7.5 Hook 系统：行动生命周期 phase（10 个）
 
+**#1188 已确认设计，尚未实现。** 每个 `GameCore` 独占通用 ActionHook 注册表。分发、flow 可执行性以及费用和其他查询 helper 显式接收该注册表，不读取进程级默认 ActionHook 集合。农场预校验成为 `GameCore` 公共查询，由 HTTP、服务端 worker 和本地沙盒适配器共同调用。
+
+`CardRegistry` 不再发布持久的进程级默认值。卡牌规则 helper 继续通过 `withCtx` 临时绑定会话环境，本次不将其 API 迁移为显式 runtime 参数。未绑定卡牌环境时，查询明确失败。显式空注册表或卡牌没有 effect，仍是合法的空结果。
+
+加载状态、恢复 cursor 和 undo 保留同一 Core 的规则注册表。新建 Core，包括 worker 重建，按官方、变体和自定义卡牌定义建立自己的注册表。注册表与可执行 handler 是运行时依赖，不进入游戏状态或 cursor。临时卡牌环境在嵌套调用和异常结束后恢复原环境。
+
 ```
 isDoable                 改变行动可执行性
 computeReplace           整张行动替换
