@@ -625,6 +625,7 @@ export class Engine {
           ?? cloneSnapshotValue(space)
         const transactionEvents = cloneSnapshotValue(this.events.currentTransactionEvents())
         const context = player ? {
+          actionHooks: this.hooks.actionHooks,
           state: clonedState,
           player,
           space: clonedSpace,

@@ -1225,7 +1225,7 @@ export const isActionStrictlyDoableWithoutBeforeTriggers = (
   const action = int.registry.get(actionId)
   if (!action) return false
   return isActionDoableInFlowContext({
-    ...context, actionId, action,
+    ...context, actionHooks: int.hooks.actionHooks, actionId, action,
     actionContext: { ...context.actionContext, skipBeforeTriggers: true },
     resolveAction: actionId => int.registry.get(actionId),
   })
