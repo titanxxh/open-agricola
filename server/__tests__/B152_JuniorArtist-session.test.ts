@@ -84,6 +84,7 @@ describe('B152_JuniorArtist session', () => {
       (l) => l.id === 'B152-junior-artist-after-place-farmer',
     )!
     const result = executeCardListener(listener, {
+      actionHooks: session.actionHooks,
       state: s,
       player: s.players[0]!,
       space,
@@ -120,6 +121,7 @@ describe('B152_JuniorArtist session', () => {
       (l) => l.id === 'B152-junior-artist-after-place-farmer',
     )!
     const result = executeCardListener(listener, {
+      actionHooks: session.actionHooks,
       state: s,
       player: s.players[0]!,
       space,
@@ -159,6 +161,7 @@ describe('B152_JuniorArtist session', () => {
       (l) => l.id === 'B152-junior-artist-after-place-farmer',
     )!
     const result = executeCardListener(listener, {
+      actionHooks: session.actionHooks,
       state: s,
       player: s.players[0]!,
       space,
@@ -197,6 +200,7 @@ describe('B152_JuniorArtist session', () => {
       (l) => l.id === 'B152-junior-artist-after-place-farmer',
     )!
     const result = executeCardListener(listener, {
+      actionHooks: session.actionHooks,
       state: s,
       player: s.players[0]!,
       space,
@@ -242,6 +246,7 @@ describe('B152_JuniorArtist session', () => {
       (l) => l.id === 'B152-junior-artist-after-place-farmer',
     )!
     const result = executeCardListener(listener, {
+      actionHooks: session.actionHooks,
       state: post,
       player: post.players[0]!,
       space,

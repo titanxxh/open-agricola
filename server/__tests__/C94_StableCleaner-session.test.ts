@@ -111,6 +111,7 @@ describe('C094_StableCleaner — exact cost 1 wood + 1 food', () => {
     player.supplyTokensConsumed = consumedStables > 0 ? { stable: consumedStables } : {}
     session.loadState(state)
     return {
+      actionHooks: session.actionHooks,
       state,
       player,
       actionId: 'stables',
