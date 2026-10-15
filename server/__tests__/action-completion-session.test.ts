@@ -202,7 +202,7 @@ describe('action admission and blocked recovery through public Session commands'
     expect(session.getActionAvailability(0).forest).toBe(false)
     expect(session.takeAction(0, 'forest').ok).toBe(false)
     expect(forest.takenBy).toEqual([])
-    expect(first.canBeExecutedByPlayer.call(forest, session.state, session.state.players[0]!, { params })).toBe(false)
+    expect(first.canBeExecutedByPlayer.call(forest, session.state, session.state.players[0]!, { actionHooks: session.actionHooks, params })).toBe(false)
   })
 
   it.each([false, true])('keeps a legal alternative when the replacement ID is unavailable, nested=%s', (nested) => {

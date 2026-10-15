@@ -1,3 +1,9 @@
+import { ActionHookRegistry } from '../../actions/hooks'
+import { beforeEach as beforeEachActionHooks } from 'vitest'
+
+let actionHooks: ActionHookRegistry
+beforeEachActionHooks(() => { actionHooks = new ActionHookRegistry() })
+
 import { describe, expect, it } from 'vitest'
 import { executeCardListener, getRegisteredCardListeners } from '../card-listeners'
 import { getCardEffect, runCardEffectHook } from '../card-effects'
@@ -166,6 +172,7 @@ const context = (
   actor: PlayerState,
   overrides: Partial<ListenerContextInput> = {},
 ): ListenerContextInput => ({
+  actionHooks,
   state: gameState,
   player: actor,
   space: space('test-space'),
@@ -242,7 +249,7 @@ describe('formatCost migrated card flows', () => {
       occupationPlayed: ['B089_Groom'],
     })
     const gameState = state(actor)
-    const flow = runCardEffectHook(gameState, actor, 'B089_Groom', 'onRoundStart')
+    const flow = runCardEffectHook(gameState, actor, 'B089_Groom', 'onRoundStart', undefined, { actionHooks })
     const leaf = expectLeaf(flow, 'stables')
     expect(leaf.actionContext).toMatchObject({ max: 1, exactCost: { wood: 1, max: 1 } })
     expectNoLegacyCostFields(leaf)
@@ -254,7 +261,7 @@ describe('formatCost migrated card flows', () => {
       occupationPlayed: ['C089_StableMaster'],
     })
     const gameState = state(actor)
-    const flow = runCardEffectHook(gameState, actor, 'C089_StableMaster', 'onBuy')
+    const flow = runCardEffectHook(gameState, actor, 'C089_StableMaster', 'onBuy', undefined, { actionHooks })
     const leaf = expectLeaf(flow, 'stables')
     expect(leaf.actionContext).toMatchObject({ max: 1, exactCost: { wood: 1 }, trueAction: false })
     expectNoLegacyCostFields(leaf)

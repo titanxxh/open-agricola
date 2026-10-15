@@ -20,6 +20,7 @@ const makeCtx = (params: Record<string, unknown>): ActionExecutionContext => {
   const market = state.actionSpaces.find((space) => space.id === 'resource-market-4')!
   market.takenBy = [{ playerId: other.id, workerId: '1' }]
   return {
+    actionHooks: session.actionHooks,
     state,
     player,
     space: state.actionSpaces[0] as ActionSpace,

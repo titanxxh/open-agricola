@@ -1,3 +1,9 @@
+import { ActionHookRegistry } from '../../actions/hooks'
+import { beforeEach as beforeEachActionHooks } from 'vitest'
+
+let actionHooks: ActionHookRegistry
+beforeEachActionHooks(() => { actionHooks = new ActionHookRegistry() })
+
 import { describe, expect, it } from 'vitest'
 import type { ActionSpace, GameState, PlayerState } from '../../contract/types'
 import type { CardListenerContext } from '../card-listeners'
@@ -85,6 +91,7 @@ const makeContext = (
   extra: Partial<CardListenerContext> = {},
 ): CardListenerContext =>
   ({
+    actionHooks,
     state: createState(player),
     player,
     space: createSpace(spaceId),

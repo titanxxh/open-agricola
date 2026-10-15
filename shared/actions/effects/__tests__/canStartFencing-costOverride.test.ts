@@ -1,3 +1,9 @@
+import { ActionHookRegistry } from '../../hooks'
+import { beforeEach as beforeEachActionHooks } from 'vitest'
+
+let actionHooks: ActionHookRegistry
+beforeEachActionHooks(() => { actionHooks = new ActionHookRegistry() })
+
 import { getFarmyardEdgeIds, getFarmyardTilePositions } from '../../../domain/farm'
 import { describe, expect, it } from 'vitest'
 import { canStartFencing, fenceAction } from '../fencing'
@@ -108,11 +114,11 @@ describe('canStartFencing with costOverride', () => {
       },
     })
     withActiveRegistry(registry, () => {
-      expect(canStartFencing(fakeState, player)).toBe(false)
+      expect(canStartFencing(actionHooks, fakeState, player)).toBe(false)
       expect(observed).toEqual(expected)
       surcharge = 0
       player.resources.wood = 15
-      expect(canStartFencing(fakeState, player)).toBe(available.length > 0)
+      expect(canStartFencing(actionHooks, fakeState, player)).toBe(available.length > 0)
     })
   })
 
@@ -123,8 +129,8 @@ describe('canStartFencing with costOverride', () => {
         grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
       },
     })
-    expect(canStartFencing(fakeState, player)).toBe(false)
-    expect(canStartFencing(fakeState, player, { wood: -3 })).toBe(true)
+    expect(canStartFencing(actionHooks, fakeState, player)).toBe(false)
+    expect(canStartFencing(actionHooks, fakeState, player, { wood: -3 })).toBe(true)
   })
 
   it('treats undefined override the same as zero override', () => {
@@ -134,18 +140,18 @@ describe('canStartFencing with costOverride', () => {
         grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
       },
     })
-    expect(canStartFencing(fakeState, player)).toBe(true)
-    expect(canStartFencing(fakeState, player, undefined)).toBe(true)
-    expect(canStartFencing(fakeState, player, { wood: 0 })).toBe(true)
+    expect(canStartFencing(actionHooks, fakeState, player)).toBe(true)
+    expect(canStartFencing(actionHooks, fakeState, player, undefined)).toBe(true)
+    expect(canStartFencing(actionHooks, fakeState, player, { wood: 0 })).toBe(true)
   })
 
   it('allows policy-driven free rebuild below the normal action minimum', () => {
     const player = createPlayer({
       fenceSegments: createOrdinaryFenceSegments(12),
     })
-    expect(canStartFencing(fakeState, player)).toBe(false)
+    expect(canStartFencing(actionHooks, fakeState, player)).toBe(false)
     expect(
-      canStartFencing(fakeState, player, undefined, {
+      canStartFencing(actionHooks, fakeState, player, undefined, {
         fencePolicy: {
           segmentBounds: { fence: { min: 2 } },
           costPolicy: { fence: { wood: 0 } },
@@ -158,7 +164,7 @@ describe('canStartFencing with costOverride', () => {
     const player = createPlayer()
 
     expect(
-      canStartFencing(fakeState, player, undefined, {
+      canStartFencing(actionHooks, fakeState, player, undefined, {
         fencePolicy: {
           segmentBounds: { total: { max: 3 } },
           costPolicy: { fence: { wood: 0 } },
@@ -179,8 +185,8 @@ describe('canStartFencing with costOverride', () => {
         costPolicy: { fence: { wood: 1 } },
       },
     }
-    expect(canStartFencing(fakeState, player, undefined, actionContext)).toBe(false)
-    expect(canStartFencing(fakeState, player, { wood: -4 }, actionContext)).toBe(true)
+    expect(canStartFencing(actionHooks, fakeState, player, undefined, actionContext)).toBe(false)
+    expect(canStartFencing(actionHooks, fakeState, player, { wood: -4 }, actionContext)).toBe(true)
   })
 
   it('rejects insufficient supply when no existing fence can help close an area', () => {
@@ -189,7 +195,7 @@ describe('canStartFencing with costOverride', () => {
     })
 
     expect(
-      canStartFencing(fakeState, player, undefined, {
+      canStartFencing(actionHooks, fakeState, player, undefined, {
         fencePolicy: {
           segmentBounds: { total: { max: 3 } },
           costPolicy: { fence: { wood: 0 } },
@@ -203,7 +209,7 @@ describe('canStartFencing with costOverride', () => {
       fenceSegments: [],
     })
     expect(
-      canStartFencing(fakeState, player, undefined, {
+      canStartFencing(actionHooks, fakeState, player, undefined, {
         segmentBounds: { fence: { min: 2 } },
         costPolicy: { fence: { wood: 0 } },
       }),
@@ -214,9 +220,10 @@ describe('canStartFencing with costOverride', () => {
     const player = createPlayer({
       fenceSegments: createOrdinaryFenceSegments(12),
     })
-    expect(fenceAction.canBeExecutedByPlayer(fakeState, player)).toBe(false)
+    expect(fenceAction.canBeExecutedByPlayer(fakeState, player, { actionHooks })).toBe(false)
     expect(
       fenceAction.canBeExecutedByPlayer(fakeState, player, {
+        actionHooks,
         actionContext: {
           fencePolicy: {
             segmentBounds: { fence: { min: 2 } },
@@ -232,6 +239,7 @@ describe('canStartFencing with costOverride', () => {
       fenceSegments: createOrdinaryFenceSegments(12),
     })
     const context = {
+      actionHooks,
       state: fakeState,
       player,
       actionContext: {
@@ -256,7 +264,7 @@ describe('canStartFencing with costOverride', () => {
       ],
     })
     expect(
-      canStartFencing(fakeState, player, undefined, {
+      canStartFencing(actionHooks, fakeState, player, undefined, {
         fencePolicy: {
           sourcePolicy: 'ownOnly',
           segmentBounds: { fence: { min: 2 } },
@@ -276,7 +284,7 @@ describe('canStartFencing with costOverride', () => {
       supplyTokensConsumed: { fence: 12 },
     })
     expect(
-      canStartFencing(fakeState, player, undefined, {
+      canStartFencing(actionHooks, fakeState, player, undefined, {
         fencePolicy: {
           sourcePolicy: 'ownOnly',
           segmentBounds: { total: { max: 6 } },
@@ -296,7 +304,7 @@ describe('canStartFencing with costOverride', () => {
       supplyTokensConsumed: { fence: 13 },
     })
     expect(
-      canStartFencing(fakeState, player, undefined, {
+      canStartFencing(actionHooks, fakeState, player, undefined, {
         fencePolicy: {
           sourcePolicy: 'ownOnly',
           segmentBounds: { total: { max: 6 } },
@@ -324,6 +332,7 @@ describe('canStartFencing with costOverride', () => {
     ]
     const state = { ...fakeState, players: [player] }
     const context = {
+      actionHooks,
       state,
       player,
       space: { id: 'farm-redevelopment' },

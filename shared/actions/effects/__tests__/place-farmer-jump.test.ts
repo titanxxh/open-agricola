@@ -19,7 +19,7 @@ const buildState = () => {
 
 describe('place-farmer effect viaCardJump branch', () => {
   it('moves worker from current space to targetSpace and bumps placedFarmers', () => {
-    const { state, player } = buildState()
+    const { session, state, player } = buildState()
     const fromSpace = state.actionSpaces.find(s => s.id === 'grain-utilization')!
     const targetSpace = state.actionSpaces.find(s => s.id === 'fencing')!
     addWorkerRef(fromSpace, player.id, '1')
@@ -32,6 +32,7 @@ describe('place-farmer effect viaCardJump branch', () => {
       targetSpaceId: 'fencing',
     }
     const result = placeFarmerAction.execute({
+      actionHooks: session.actionHooks,
       state,
       player,
       space: fromSpace,
@@ -65,7 +66,7 @@ describe('place-farmer effect viaCardJump branch', () => {
   })
 
   it('appends to existing jumpChain when nested', () => {
-    const { state, player } = buildState()
+    const { session, state, player } = buildState()
     const fromSpace = state.actionSpaces.find(s => s.id === 'grain-utilization')!
     addWorkerRef(fromSpace, player.id, '1')
 
@@ -76,13 +77,14 @@ describe('place-farmer effect viaCardJump branch', () => {
       targetSpaceId: 'fencing',
       jumpChain: ['A129_Swagman'],
     }
-    placeFarmerAction.execute({ state, player, space: fromSpace, actionContext })
+    placeFarmerAction.execute({ actionHooks: session.actionHooks, state, player, space: fromSpace, actionContext })
     expect(actionContext.jumpChain).toEqual(['A129_Swagman', 'B130_FullPeasant'])
   })
 
   it('fails when workerId is not on any space', () => {
-    const { state, player } = buildState()
+    const { session, state, player } = buildState()
     const result = placeFarmerAction.execute({
+      actionHooks: session.actionHooks,
       state,
       player,
       space: state.actionSpaces[0]!,
@@ -97,10 +99,11 @@ describe('place-farmer effect viaCardJump branch', () => {
   })
 
   it('fails when targetSpaceId does not exist', () => {
-    const { state, player } = buildState()
+    const { session, state, player } = buildState()
     const fromSpace = state.actionSpaces.find(s => s.id === 'grain-utilization')!
     addWorkerRef(fromSpace, player.id, '1')
     const result = placeFarmerAction.execute({
+      actionHooks: session.actionHooks,
       state,
       player,
       space: fromSpace,
@@ -115,13 +118,14 @@ describe('place-farmer effect viaCardJump branch', () => {
   })
 
   it('fails when targetSpace is not in computeAllowedPlacementSpaces (e.g. occupied)', () => {
-    const { state, player } = buildState()
+    const { session, state, player } = buildState()
     const fromSpace = state.actionSpaces.find(s => s.id === 'grain-utilization')!
     const targetSpace = state.actionSpaces.find(s => s.id === 'fencing')!
     addWorkerRef(fromSpace, player.id, '1')
     addWorkerRef(targetSpace, state.players[1]!.id, '1')
 
     const result = placeFarmerAction.execute({
+      actionHooks: session.actionHooks,
       state,
       player,
       space: fromSpace,
@@ -137,12 +141,13 @@ describe('place-farmer effect viaCardJump branch', () => {
   })
 
   it('does not consume family pool (worker count unchanged)', () => {
-    const { state, player } = buildState()
+    const { session, state, player } = buildState()
     const fromSpace = state.actionSpaces.find(s => s.id === 'grain-utilization')!
     addWorkerRef(fromSpace, player.id, '1')
     const activeBefore = player.workers.filter(w => w.isActive).length
 
     placeFarmerAction.execute({
+      actionHooks: session.actionHooks,
       state,
       player,
       space: fromSpace,

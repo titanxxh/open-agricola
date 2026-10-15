@@ -1,3 +1,9 @@
+import { ActionHookRegistry } from '../../actions/hooks'
+import { beforeEach as beforeEachActionHooks } from 'vitest'
+
+let actionHooks: ActionHookRegistry
+beforeEachActionHooks(() => { actionHooks = new ActionHookRegistry() })
+
 import { describe, expect, it } from 'vitest'
 import { getRegisteredCardListeners, executeCardListener } from '../card-listeners'
 import type { ActionSpace, GameState, PlayerState } from '../../contract/types'
@@ -73,7 +79,7 @@ describe('A097_Freshman', () => {
     const player = createPlayer()
     player.occupationHand = ['A123_FrameBuilder']
 
-    expect(grainUtilization.canBeExecutedByPlayer(createState(player), player)).toBe(true)
+    expect(grainUtilization.canBeExecutedByPlayer(createState(player), player, { actionHooks })).toBe(true)
   })
 
   it('returns a committed replacement flow that flags card and plays occupation for free', () => {
@@ -82,6 +88,7 @@ describe('A097_Freshman', () => {
     player.occupationHand = ['A123_FrameBuilder']
 
     const result = executeCardListener(listener!, {
+      actionHooks,
       state: createState(player),
       player,
       space: createSpace('grain-utilization'),
@@ -116,6 +123,7 @@ describe('A097_Freshman', () => {
     expect(doableListener).toBeDefined()
 
     const result = executeCardListener(resetListener!, {
+      actionHooks,
       state: createState(player),
       player,
       space: createSpace('place-farmer'),
@@ -138,6 +146,7 @@ describe('A097_Freshman', () => {
     player.occupationHand = ['A123_FrameBuilder']
 
     const result = playOccupationAction.execute({
+      actionHooks,
       state: createState(player),
       player,
       space: createSpace('lessons'),
@@ -151,6 +160,7 @@ describe('A097_Freshman', () => {
 
     const resolved = playOccupationAction.resolveChoice!(
       {
+        actionHooks,
         state: createState(player),
         player,
         space: createSpace('lessons'),

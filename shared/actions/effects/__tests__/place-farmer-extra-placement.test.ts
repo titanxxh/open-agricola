@@ -30,6 +30,7 @@ const makeCtx = (
     ['forest', 'sheep-market', 'farmland'].includes(space.id))
   const player = state.players[0]!
   return {
+    actionHooks: session.actionHooks,
     state,
     player,
     space: state.actionSpaces.find(space => space.id === 'forest')!,

@@ -211,7 +211,7 @@ describe('Through the Seasons setup', () => {
     const restored = rehydrateState(JSON.parse(JSON.stringify(serialized))).state
 
     expect(restored.actionSpaces.filter((space) => Object.values(seasonActionIds).includes(space.id))).toHaveLength(4)
-    expect(restored.actionSpaces.find((space) => space.id === seasonActionIds.summer)?.canBeExecutedByPlayer(restored, restored.players[0]!)).toBe(true)
+    expect(restored.actionSpaces.find((space) => space.id === seasonActionIds.summer)?.canBeExecutedByPlayer(restored, restored.players[0]!, { actionHooks: session.actionHooks })).toBe(true)
   })
 
   it('applies the starting season preparation adjustment during setup', () => {
