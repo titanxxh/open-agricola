@@ -1,3 +1,7 @@
+import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
+
+installOfficialCardRegistry()
+
 import { afterEach, describe, expect, it } from 'vitest'
 import { clearCustomCards, registerCustomCard, type CustomCardData } from '../../shared/cards/custom-registry.ts'
 import { executeCardListener, getMatchingListeners } from '../../shared/cards/card-listeners.ts'

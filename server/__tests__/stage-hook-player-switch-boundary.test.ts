@@ -38,8 +38,8 @@ const setupSession = () => {
   state.players[0]!.occupationPlayed = [P0_CARD]
   state.players[1]!.occupationPlayed = [P1_CARD]
   session.loadState(state)
-  requireActiveCardRegistry('stage hook player switch boundary test').setEffect(choiceEffect(P0_CARD))
-  requireActiveCardRegistry('stage hook player switch boundary test').setEffect(choiceEffect(P1_CARD))
+  session.withCtx(() => requireActiveCardRegistry('stage hook player switch boundary test').setEffect(choiceEffect(P0_CARD)))
+  session.withCtx(() => requireActiveCardRegistry('stage hook player switch boundary test').setEffect(choiceEffect(P1_CARD)))
   return session
 }
 

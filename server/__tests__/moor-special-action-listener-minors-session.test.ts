@@ -1,3 +1,7 @@
+import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
+
+installOfficialCardRegistry()
+
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { GameSession } from '../game/authoritative-session'
@@ -37,12 +41,15 @@ const baseResources = (): Resource => ({
   horse: 0,
 })
 
+const sessions: GameSession[] = []
+
 const setup = (playerCount = 2, round = 5) => {
   const session = new GameSession(380, undefined, {
     playerCount,
     enableFarmersOfTheMoor: true,
     allowIncompleteFarmersOfTheMoorMinorDeal: true,
   })
+  sessions.push(session)
   const state = session.state
   state.currentPlayerIndex = 0
   state.round = round
@@ -123,10 +130,7 @@ const executeGainLeaf = (flow: ActionFlow | null, session: GameSession, player: 
 }
 
 afterEach(() => {
-  requireActiveCardRegistry('moor-special-action-test-cleanup')
-    .removeListenersWhere((listener) =>
-      listener.id === TEST_BEFORE_LISTENER_ID ||
-      listener.id === TEST_PLACE_FARMER_LISTENER_ID)
+  sessions.splice(0).forEach(session => session.dispose())
 })
 
 describe('FoM special action listener minors', () => {
@@ -179,8 +183,8 @@ describe('FoM special action listener minors', () => {
         }
       },
     }
-    requireActiveCardRegistry('moor-special-action-test').registerListener(beforeProbe)
-    requireActiveCardRegistry('moor-special-action-test').registerListener(placeFarmerProbe)
+    session.withCtx(() => requireActiveCardRegistry('moor-special-action-test').registerListener(beforeProbe))
+    session.withCtx(() => requireActiveCardRegistry('moor-special-action-test').registerListener(placeFarmerProbe))
     session.loadState(session.state)
 
     const resp = takeSpecial(session, 'cut-peat')

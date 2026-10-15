@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
-import { getActiveCardRegistry, requireActiveCardRegistry, setActiveCardRegistry } from '../../shared/cards/active-registry'
+import { requireActiveCardRegistry } from '../../shared/cards/active-registry'
 import { readCardExtraData } from '../../shared/cards/helpers/card-state'
 import type { CardListenerRegistration } from '../../shared/cards/card-listeners'
 
@@ -67,9 +67,8 @@ const gainProbe: CardListenerRegistration = {
 
 describe('future receive round-start resources', () => {
   const setup = () => {
-    const outerRegistry = getActiveCardRegistry()
     const session = new GameSession(42)
-    const registry = requireActiveCardRegistry('future receive test')
+    const registry = session.withCtx(() => requireActiveCardRegistry('future receive test'))
     registry.registerListener(receiveProbe)
     registry.registerListener(gainProbe)
     const state = session.getState().state
@@ -107,11 +106,11 @@ describe('future receive round-start resources', () => {
     ]
 
     session.loadState(state)
-    return { session, outerRegistry }
+    return { session }
   }
 
   it('batches same-player same-round resources as one receive transaction without gain dispatch', () => {
-    const { session, outerRegistry } = setup()
+    const { session } = setup()
     try {
       const resp = session.performRoundEnd()
       const playerA = resp.state.players[0]!
@@ -125,7 +124,7 @@ describe('future receive round-start resources', () => {
       })
       expect(readCardExtraData(playerA, GAIN_CARD, 'gainTriggered')).toBeUndefined()
     } finally {
-      setActiveCardRegistry(outerRegistry)
+      session.dispose()
     }
   })
 })

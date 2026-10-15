@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
-import { getActiveCardRegistry, requireActiveCardRegistry, setActiveCardRegistry } from '../../shared/cards/active-registry'
+import { requireActiveCardRegistry } from '../../shared/cards/active-registry'
 import { readCardExtraData } from '../../shared/cards/helpers/card-state'
 import type { CardListenerRegistration } from '../../shared/cards/card-listeners'
 import '../../shared/cards/C/C059_SchnappsDistillery'
@@ -33,10 +33,9 @@ const handFeedConversionListener: CardListenerRegistration = {
 
 describe('harvest feed conversion card listener dispatch', () => {
   const setup = () => {
-    const outerRegistry = getActiveCardRegistry()
     const session = new GameSession(42)
-    requireActiveCardRegistry('harvest feed conversion listener test')
-      .registerListener(handFeedConversionListener)
+    session.withCtx(() => requireActiveCardRegistry('harvest feed conversion listener test')
+      .registerListener(handFeedConversionListener))
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 4
@@ -60,11 +59,11 @@ describe('harvest feed conversion card listener dispatch', () => {
     setActiveWorkerCount(playerB, 0)
 
     session.loadState(state)
-    return { session, outerRegistry }
+    return { session }
   }
 
   it('dispatches conversion events to hand-zone listeners', () => {
-    const { session, outerRegistry } = setup()
+    const { session } = setup()
     try {
       let resp = session.performRoundEnd()
       if (!(resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed')) {
@@ -89,7 +88,7 @@ describe('harvest feed conversion card listener dispatch', () => {
         && !Object.hasOwn(event, 'value'),
       )).toBe(true)
     } finally {
-      setActiveCardRegistry(outerRegistry)
+      session.dispose()
     }
   })
 })

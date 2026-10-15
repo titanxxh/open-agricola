@@ -1,3 +1,7 @@
+import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
+
+installOfficialCardRegistry()
+
 import type { EventSink } from '../../shared/contract/events'
 import { describe, expect, it } from 'vitest'
 

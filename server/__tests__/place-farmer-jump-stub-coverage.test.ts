@@ -57,8 +57,12 @@ const driveAccepts = (
   return resp
 }
 
+const sessions: GameSession[] = []
+afterEach(() => { sessions.splice(0).forEach(session => session.dispose()) })
+
 const setup2P = (...occupations: string[]) => {
   const session = new GameSession(42)
+  sessions.push(session)
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
@@ -99,8 +103,8 @@ describe('A->B->A indirect cycle - jumpChain self-check terminates on second hop
   const STUB_ID = '__test_jump_back_card__'
   const LISTENER_ID = 'stub-jump-back-listener'
 
-  const registerJumpBackListener = () => {
-    const registry = requireActiveCardRegistry('stub-jump-test')
+  const registerJumpBackListener = (session: GameSession) => {
+    const registry = session.withCtx(() => requireActiveCardRegistry('stub-jump-test'))
     registry.registerListener({
       id: LISTENER_ID,
       cardIds: [STUB_ID],
@@ -124,15 +128,9 @@ describe('A->B->A indirect cycle - jumpChain self-check terminates on second hop
     })
   }
 
-  afterEach(() => {
-    requireActiveCardRegistry('stub-jump-test').removeListenersWhere(
-      (l) => l.id === LISTENER_ID,
-    )
-  })
-
   it('A129 -> stub -> A129 chain bounces back to farm-expansion and terminates by jumpChain self-check', () => {
     const { session, state } = setup2P('A129_Swagman')
-    registerJumpBackListener()
+    registerJumpBackListener(session)
     state.players[0]!.occupationPlayed.push(STUB_ID)
     session.loadState(state)
 
@@ -160,8 +158,8 @@ describe('cascade dispatch - third-party place-farmer after listener fires on ju
   const STUB_OBS_ID = '__test_grain_seeds_observer__'
   const LISTENER_ID = 'stub-grain-seeds-observer-listener'
 
-  const registerObserverListener = () => {
-    const registry = requireActiveCardRegistry('stub-cascade-test')
+  const registerObserverListener = (session: GameSession) => {
+    const registry = session.withCtx(() => requireActiveCardRegistry('stub-cascade-test'))
     registry.registerListener({
       id: LISTENER_ID,
       cardIds: [STUB_OBS_ID],
@@ -177,15 +175,9 @@ describe('cascade dispatch - third-party place-farmer after listener fires on ju
     })
   }
 
-  afterEach(() => {
-    requireActiveCardRegistry('stub-cascade-test').removeListenersWhere(
-      (l) => l.id === LISTENER_ID,
-    )
-  })
-
   it('observer fires when player directly places on grain-seeds (sanity)', () => {
     const { session, state } = setup2P()
-    registerObserverListener()
+    registerObserverListener(session)
     state.players[0]!.occupationPlayed.push(STUB_OBS_ID)
     session.loadState(state)
     const foodBefore = state.players[0]!.resources.food
@@ -197,7 +189,7 @@ describe('cascade dispatch - third-party place-farmer after listener fires on ju
 
   it('observer fires exactly once on the jump destination', () => {
     const { session, state } = setup2P('A129_Swagman')
-    registerObserverListener()
+    registerObserverListener(session)
     state.players[0]!.occupationPlayed.push(STUB_OBS_ID)
     session.loadState(state)
     const foodBefore = state.players[0]!.resources.food

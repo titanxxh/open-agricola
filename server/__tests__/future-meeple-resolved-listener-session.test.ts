@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
-import { getActiveCardRegistry, requireActiveCardRegistry, setActiveCardRegistry } from '../../shared/cards/active-registry'
+import { requireActiveCardRegistry } from '../../shared/cards/active-registry'
 import { readCardExtraData } from '../../shared/cards/helpers/card-state'
 import type { CardListenerRegistration } from '../../shared/cards/card-listeners'
 
@@ -32,10 +32,9 @@ const handFutureMeepleListener: CardListenerRegistration = {
 
 describe('future meeple resolved card listener dispatch', () => {
   const setup = () => {
-    const outerRegistry = getActiveCardRegistry()
     const session = new GameSession(42)
-    requireActiveCardRegistry('future meeple listener test')
-      .registerListener(handFutureMeepleListener)
+    session.withCtx(() => requireActiveCardRegistry('future meeple listener test')
+      .registerListener(handFutureMeepleListener))
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 1
@@ -64,11 +63,11 @@ describe('future meeple resolved card listener dispatch', () => {
     setActiveWorkerCount(playerB, 0)
 
     session.loadState(state)
-    return { session, outerRegistry }
+    return { session }
   }
 
   it('dispatches resolved future meeple events to hand-zone listeners', () => {
-    const { session, outerRegistry } = setup()
+    const { session } = setup()
     try {
       let resp = session.performRoundEnd()
       if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'animal-reorg') {
@@ -84,7 +83,7 @@ describe('future meeple resolved card listener dispatch', () => {
         && !Object.hasOwn(event, 'value'),
       )).toBe(true)
     } finally {
-      setActiveCardRegistry(outerRegistry)
+      session.dispose()
     }
   })
 })

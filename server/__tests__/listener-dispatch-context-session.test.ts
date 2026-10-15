@@ -51,7 +51,7 @@ describe('lazy listener dispatch context', () => {
       },
     }
 
-    requireActiveCardRegistry('lazy-listener-context').registerListener(listener)
+    session.withCtx(() => requireActiveCardRegistry('lazy-listener-context').registerListener(listener))
     const forest = state.actionSpaces.find((space) => space.id === 'forest')!
     forest.resources.wood = 1
     session.loadState(state)

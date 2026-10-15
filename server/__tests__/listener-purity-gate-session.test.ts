@@ -31,7 +31,7 @@ const startTwoPlayerForestGame = (cardId: string, listener: CardListenerRegistra
   owner.minorPlayed.push(cardId)
   owner.resources.food = 2
   owner.resources.wood = 0
-  requireActiveCardRegistry('listener-purity-gate').registerListener(listener)
+  session.withCtx(() => requireActiveCardRegistry('listener-purity-gate').registerListener(listener))
   const forest = state.actionSpaces.find((space) => space.id === 'forest')!
   forest.resources.wood = 3
   session.loadState(state)

@@ -1,3 +1,7 @@
+import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
+
+installOfficialCardRegistry()
+
 import { type SessionResponse } from '../game/authoritative-session'
 import '../../shared/cards/A/A125_Priest'
 

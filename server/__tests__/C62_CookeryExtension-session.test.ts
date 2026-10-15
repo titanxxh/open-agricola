@@ -1,3 +1,7 @@
+import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
+
+installOfficialCardRegistry()
+
 import { describe, it, expect } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getExchangesInWindow } from '../../shared/actions/effects/exchange'
