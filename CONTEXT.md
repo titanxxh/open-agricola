@@ -718,7 +718,7 @@ _Avoid_: Exact Future Target、把缺失后缀堆到最后一轮
 _Avoid_: 展开整个 Action Space、模拟放置工人、继承行动格附带选择
 
 **Action Hook**:
-行动生命周期扩展点，如 `isDoable`、`computeReplace`、`computeCosts`、`before`、`immediatelyAfter`、`after`、`anytime`。通常由卡牌注册；行动完成后的反应属于 `immediatelyAfter` 或 `after`，不另设 `during` 阶段。
+行动生命周期扩展点，如 `isDoable`、`computeReplace`、`computeCosts`、`before`、`immediatelyAfter`、`after`、`anytime`。通用 Action Hook 由每个 `GameCore` 独立持有的 `ActionHookRegistry` 注册，调用方显式传递该依赖；卡牌的行动监听通过 Card Listener 绑定到该局的 CardRegistry。行动完成后的反应属于 `immediatelyAfter` 或 `after`，不另设 `during` 阶段。
 _Avoid_: 前端规则补丁、核心路径单卡 if-else
 
 **Card Effect Hook**:

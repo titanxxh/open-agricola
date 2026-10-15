@@ -153,6 +153,8 @@ From lightest to heaviest:
 
 ### 5.2 Preparing State
 
+Session public commands and queries bind their own rules. When a test injects a card effect or listener into a Session, register it inside `session.withCtx(() => ...)` so it belongs to that Session. Direct behavior tests that read official card rules explicitly call `installOfficialCardRegistry()` from `shared/cards/__tests__/card-environment.ts` at file scope; this fixture installs a fresh registry before each test and restores the prior environment afterward. Tests for a missing environment must omit this fixture. Direct generic ActionHook calls receive a test-owned `ActionHookRegistry`, or `session.actionHooks` when exercising that Session. Never install a process-wide rule default in test setup.
+
 Use `server/__tests__/_helpers/session-fixtures.ts` for new Session scenarios. Both helpers default to two players and dispose the Session if their initial assertions fail; the caller disposes successful Sessions after use.
 
 | Helper | Contract |

@@ -157,6 +157,8 @@ Session 卡牌测试优先使用后端边界驱动。房间规则主链路走 We
 
 ### 5.2 状态准备方式
 
+Session 的公开命令和查询自行绑定规则。测试向 Session 注入卡牌 effect 或 listener 时，在 `session.withCtx(() => ...)` 内注册，使其归属该 Session。需要读取官方卡牌规则的直接行为测试，在文件作用域显式调用 `shared/cards/__tests__/card-environment.ts` 的 `installOfficialCardRegistry()`；夹具每项测试前安装独立注册表，结束后恢复原环境。验证缺少环境的测试不得使用该夹具。直接调用通用 ActionHook 时传入测试自有的 `ActionHookRegistry`，验证某个 Session 时则传入 `session.actionHooks`。测试 setup 不得安装进程级规则默认值。
+
 新 Session 场景使用 `server/__tests__/_helpers/session-fixtures.ts`。两个 helper 均默认 2 人，初始断言失败会释放 Session；成功返回的 Session 由调用方在使用后释放。
 
 | Helper | 契约 |
