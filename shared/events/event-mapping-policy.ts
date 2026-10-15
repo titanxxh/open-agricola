@@ -127,6 +127,13 @@ export const publicEventMappingPolicy = {
     resourceAnimation: silent(noAnimation),
     replay: 'replayable',
   },
+  'farm.spacesUsed': {
+    log: silent('committed usage facts accompany the source action without an additional log row'),
+    notification: silent('usage qualification is a rule fact rather than an additional notification'),
+    highlight: silent('source actions present their own farm changes'),
+    resourceAnimation: silent(noAnimation),
+    replay: 'replayable',
+  },
   'farm.fenceConsumed': {
     log: mapped(),
     notification: silent('fence consumption is represented by log only'),

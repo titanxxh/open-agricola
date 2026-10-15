@@ -122,6 +122,11 @@ export type FarmCropRemovedEvent = GameEventBase<'farm.cropRemoved'> & {
 
 export type FarmyardTileUsage = { playerId: string; row: number; col: number }
 
+/** Existing farmyard spaces made used by a terrain or space-state mutation. */
+export type FarmSpacesUsedEvent = GameEventBase<'farm.spacesUsed'> & {
+  newlyUsedTiles: FarmyardTileUsage[]
+}
+
 export type FarmFieldPlowedEvent = GameEventBase<'farm.fieldPlowed'> & {
   /** Tiles made used by this mutation, captured before its trailing reactions. */
   newlyUsedTiles: FarmyardTileUsage[]
@@ -430,6 +435,7 @@ export type GameEvent =
   | FarmCropAddedEvent
   | FarmCropRemovedEvent
   | FarmFieldPlowedEvent
+  | FarmSpacesUsedEvent
   | FarmRoomBuiltEvent
   | FarmRenovatedEvent
   | FarmStableBuiltEvent

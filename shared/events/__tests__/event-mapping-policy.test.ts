@@ -35,6 +35,7 @@ const expectedPublicEventTypes = [
   'farm.renovated',
   'farm.roomBuilt',
   'farm.sown',
+  'farm.spacesUsed',
   'farm.stableBuilt',
   'futureMeeple.queued',
   'futureMeeple.removed',
@@ -276,6 +277,18 @@ const publicEventFixtureMatrix: Partial<PublicEventFixtureMatrix> = {
 } satisfies Partial<PublicEventFixtureMatrix>
 
 describe('event mapping policy', () => {
+  it('preserves committed farmyard usage in replay without duplicate presentation', () => {
+    const event: GameEvent = {
+      ...base, type: 'farm.spacesUsed', sourceCardId: 'M064_FamilyBurialPlot',
+      newlyUsedTiles: [{ playerId: 'p1', row: 1, col: 3 }],
+    }
+    expect(isPublicEventReplayable(event)).toBe(true)
+    expect(eventsToLogEntries([event], { playerNames: { p1: 'P1' } })).toEqual([])
+    for (const surface of ['log', 'notification', 'highlight', 'resourceAnimation'] as const) {
+      expect(publicEventMappingPolicy[event.type][surface].mode).toBe('silent')
+    }
+  })
+
   it('covers every current public event type', () => {
     expect(noMissingPublicEventTypes).toEqual({})
     expect(Object.keys(publicEventMappingPolicy).sort()).toEqual([...expectedPublicEventTypes].sort())

@@ -32,6 +32,7 @@ const eventKeysByType: Record<string, readonly string[]> = {
   'farm.cropAdded': ['crops', 'reason'],
   'farm.cropRemoved': ['crops', 'reason'],
   'farm.fieldPlowed': ['fields', 'newlyUsedTiles'],
+  'farm.spacesUsed': ['newlyUsedTiles'],
   'farm.roomBuilt': ['rooms', 'newlyUsedTiles'],
   'farm.renovated': ['playerId', 'from', 'to', 'rooms'],
   'farm.stableBuilt': ['stables', 'newlyUsedTiles'],
@@ -455,6 +456,9 @@ const assertKnownEventDetails = (type: string, event: Record<string, unknown>): 
       assertStringField(event.from, 'from')
       assertStringField(event.to, 'to')
       assertBoardPositions(event.rooms, 'rooms', ['row', 'col'])
+      return
+    case 'farm.spacesUsed':
+      assertBoardPositions(event.newlyUsedTiles, 'newlyUsedTiles', ['playerId', 'row', 'col'])
       return
     case 'farm.stableBuilt':
       assertBoardPositions(event.newlyUsedTiles, 'newlyUsedTiles', ['playerId', 'row', 'col'])

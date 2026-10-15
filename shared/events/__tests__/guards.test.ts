@@ -155,6 +155,7 @@ describe('event guards', () => {
   })
 
   it.each([
+    { type: 'farm.spacesUsed' },
     { type: 'farm.fieldPlowed', fields: [] },
     { type: 'farm.roomBuilt', rooms: [] },
     { type: 'farm.stableBuilt', stables: [] },

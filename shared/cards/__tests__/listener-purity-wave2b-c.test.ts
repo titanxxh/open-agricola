@@ -430,7 +430,7 @@ describe('listener purity wave 2b/c', () => {
     })
   })
 
-  it('C48 Farmstead qualifies committed host usage for the active Turn by flow only', () => {
+  it.each(['stables', 'selection', 'special-effect'])('C48 Farmstead qualifies committed %s usage for the active Turn by flow only', actionId => {
     const p = player('C048_Farmstead', {
       stableTiles: [{ row: 1, col: 1 }],
       cardStates: {
@@ -440,12 +440,16 @@ describe('listener purity wave 2b/c', () => {
     })
     const game = state([p])
     const used = [{ playerId: p.id, row: 1, col: 1 }]
-    const built: GameEvent = {
+    const stable: GameEvent = {
       schemaVersion: 1, type: 'farm.stableBuilt', id: 'built', seq: 1, round: 3, phase: 'work', visibility: 'public',
       actorPlayerId: p.id, newlyUsedTiles: used, stables: used,
     }
+    const built: GameEvent = actionId === 'stables' ? stable : {
+      schemaVersion: 1, type: 'farm.spacesUsed', id: 'used', seq: 1, round: 3, phase: 'work', visibility: 'public',
+      actorPlayerId: p.id, newlyUsedTiles: used,
+    }
     const qualifiedContext = context(p, {
-      state: game, actionId: 'stables', actionEvents: [built], triggerSnapshot: createTriggerSnapshot(game),
+      state: game, actionId, actionEvents: [built], triggerSnapshot: createTriggerSnapshot(game),
     })
     const listener = listenerById(C048_Farmstead_impl.listeners, 'C48-farmstead-qualify')
     const before = stateSnapshot(game)
@@ -482,7 +486,7 @@ describe('listener purity wave 2b/c', () => {
       const current = state([owner])
       const unchanged = stateSnapshot(current)
       expect(listener.handler(context(owner, {
-        state: current, actionId: 'stables', actionEvents: [built], triggerSnapshot: qualifiedContext.triggerSnapshot,
+        state: current, actionId, actionEvents: [built], triggerSnapshot: qualifiedContext.triggerSnapshot,
       }))).toBeUndefined()
       expectUnchanged(unchanged, current)
     }
