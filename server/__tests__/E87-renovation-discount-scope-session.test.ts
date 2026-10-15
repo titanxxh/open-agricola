@@ -247,6 +247,25 @@ describe('E087 renovation discount ownership', () => {
       && JSON.stringify(entry.params?.detailParts).includes('renovate'))).toHaveLength(2)
   })
 
+  it.each(['none', 'before-undo', 'after-undo'])('continues the complete round after nested undo and redo with %s restoration', restoration => {
+    let session = setup({ nested: true })
+    choosePayment(session, beginPayment(session), { clay: 2, reed: 0 })
+    const nested = ok(session.takeAnytimeAction(0, TROWEL_ANYTIME))
+    expect(wait(nested).request.kind).toBe('animal-reorg')
+    if (restoration === 'before-undo') session = restore(session)
+    const undone = ok(session.undoStep())
+    expect(wait(undone).request.kind).toBe('animal-reorg')
+    expect(undone.state.players[0]).toMatchObject({ houseType: 'clay', resources: { stone: 2, food: 22, sheep: 2 } })
+    expect(paidEvents(undone)).toHaveLength(1)
+    if (restoration === 'after-undo') session = restore(session)
+    const final = finishAnimals(session, ok(session.takeAnytimeAction(0, TROWEL_ANYTIME)))
+    expect(final.state.round).toBe(8)
+    expect(final.state.roundPhase).toBe('work')
+    expect(final.state.players[0]).toMatchObject({ houseType: 'stone', resources: { stone: 0, food: 20, sheep: 4 } })
+    expect(paidEvents(final)).toHaveLength(2)
+    expect(final.state.events.filter(event => event.type === 'farm.renovated')).toHaveLength(2)
+  })
+
   it('restores a different discount choice when undo returns from nested Trowel through the parent payment', () => {
     const original = setup({ nested: true })
     choosePayment(original, beginPayment(original), { clay: 2, reed: 0 })

@@ -455,6 +455,8 @@ Its API is `push`, `pop`, `current`, `depth`, `peekPendingEnvelope`, `peekPendin
 
 `EngineStackCursor` is serialized into `PersistedSessionSnapshot.sessionCursor.engineStackCursor`. Restoration uses `engine.snapshot()` and each concrete node's cursor restoration to rebuild the tree and locate pending hosts and traversal state; public and Replay `SerializedGameState.engineStack` remains empty.
 
+Ordinary undo history also stores a detached `EngineStackCursor`, including every parent frame, frame identity, subflow reason, stage continuation, deferred player switch and resolve boundary. `undoStep()` and `undoAction()` rebuild the complete stack without advancing it; they do not replace a nested frame with a top-level frame. History cursors remain private and survive the same JSON snapshot round-trip as command checkpoints. This preserves stage completion when an anytime action is undone and repeated inside animal reorganization.
+
 The post-Reap window uses `post-reap-anytime` in both `SubFlowReason` and `PendingSyntheticKind`, so Session can distinguish its root choice from nested card choices without a card-specific branch.
 
 `SubFlowKind` is one of `choice`, `animal-reorg`, `confirm-next-player`, `confirm-player-switch`, `feed`, `farm-select`, `selection`, or `card-draft`.

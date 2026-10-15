@@ -313,13 +313,7 @@ export type HistoryEntry = {
    * compact instead of cloning the deprecated union.
    */
   hadChoicePending: boolean
-  activeSpaceId: string | null
-  activePlayerIndex: number | null
-  frameId: string | null
-  engineSnapshot: ReturnType<Engine['snapshot']> | null
-  engineSource: EngineSource | null
-  stageResume: StageResumeState | null
-  deferredPlayerSwitch: EngineFrame['deferredPlayerSwitch']
+  engineStackCursor: EngineStackCursor
   turnOwnerPlayerIndex: number | null
   actionStart: boolean
   undoBoundary?: boolean
@@ -2643,7 +2637,6 @@ export class GameCore {
     if (this.state.pendingUndoBoundary) {
       this.state.pendingUndoBoundary = false
     }
-    const frame = this.engineStack.current()
     const entry: HistoryEntry = {
       state: captureStateWithHistory(this.state),
       // Task 10/11: the previous GameCore pending field is gone; derive the
@@ -2651,17 +2644,7 @@ export class GameCore {
       // HistoryEntry pending snapshot down to a single boolean — `undoStep()`
       // only consults the 'choice' discriminator (see `canRestorePriorChoice`).
       hadChoicePending: this.currentIsChoicePending(),
-      activeSpaceId: this.activeSpaceId,
-      activePlayerIndex: this.activePlayerIndex,
-      frameId: frame?.frameId ?? null,
-      engineSnapshot: this.engine?.snapshot() ?? null,
-      engineSource: this.engineSource
-        ? JSON.parse(JSON.stringify(this.engineSource)) as EngineSource
-        : null,
-      stageResume: this.stageResume ? { ...this.stageResume } : null,
-      deferredPlayerSwitch: frame?.deferredPlayerSwitch
-        ? { ...frame.deferredPlayerSwitch }
-        : null,
+      engineStackCursor: structuredClone(this.engineStack.toCursor()),
       turnOwnerPlayerIndex: this.turnOwnerPlayerIndex,
       actionStart,
       undoBoundary: effectiveBoundary,
@@ -2680,40 +2663,11 @@ export class GameCore {
     // branch. Live pending/interaction shape is rederived from
     // the pending envelope after the stack is restored below.
     this.turnOwnerPlayerIndex = entry.turnOwnerPlayerIndex
-    this.engineStack.clear()
-    const source = entry.engineSource
-      ? JSON.parse(JSON.stringify(entry.engineSource)) as EngineSource
-      : null
-    // pushHistory invariant: when there's a live frame on the stack, all of
-    // (engineSource, activeSpaceId, activePlayerIndex) come off the same
-    // frame and are non-null together; when the stack is empty, all three
-    // are null. So `source` is a sufficient gate — the previous extra
-    // null-checks on activeSpaceId/activePlayerIndex were defensive but
-    // redundant. Use a non-null assertion on the two synced fields.
-    if (source) {
-      const engine = this.createEngineFromSource(source, entry.activePlayerIndex!)
-      if (entry.engineSnapshot) {
-        engine.restore(entry.engineSnapshot)
-      }
-      this.engineStack.push({
-        frameId: entry.frameId ?? undefined,
-        engine,
-        source,
-        ownerPlayerIndex: entry.activePlayerIndex!,
-        spaceId: entry.activeSpaceId!,
-        stageResume: entry.stageResume ? { ...entry.stageResume } : null,
-        deferredPlayerSwitch: entry.deferredPlayerSwitch
-          ? { ...entry.deferredPlayerSwitch }
-          : null,
-        // Restore-from-history frames default to 'top-level' because the
-        // HistoryEntry schema does not persist a sub-flow `reason`. Cursor-
-        // based serialize/rehydrate (Task 8) round-trips reason through
-        // `EngineFrameCursor.reason`; the in-memory undo path is independent
-        // and only ever rebuilds top-level frames here. See
-        // `docs/sprint-S1-spec.md` D-a for the persisted form.
-        reason: 'top-level',
-      })
-    }
+    this.engineStack = EngineStack.fromCursor(structuredClone(entry.engineStackCursor), (source, snapshot, frame) => {
+      const engine = this.createEngineFromSource(source, frame.ownerPlayerIndex)
+      engine.restore(snapshot)
+      return engine
+    })
   }
 
   private restorePendingExtraTurnAfterUndo(): void {
@@ -5485,11 +5439,12 @@ export class GameCore {
     const farmPrompt = isPlainChoiceOrFarmSelect ? this.isFarmPromptKey(view.promptKey) : null
     if (isPlainChoiceOrFarmSelect && farmPrompt && interactionFrame) {
       const entry = this.history[this.history.length - 1]
+      const priorFrame = entry?.engineStackCursor.frames.at(-1)
       const canRestorePriorChoice =
         !!entry &&
         entry.undoBoundary !== true &&
-        entry.activeSpaceId === this.activeSpaceId &&
-        entry.activePlayerIndex === this.activePlayerIndex &&
+        priorFrame?.spaceId === this.activeSpaceId &&
+        priorFrame.ownerPlayerIndex === this.activePlayerIndex &&
         entry.hadChoicePending
       if (canRestorePriorChoice) {
         const beforeEvents = [...this.state.events]
