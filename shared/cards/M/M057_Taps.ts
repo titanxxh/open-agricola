@@ -1,3 +1,4 @@
+import type { ActionHookRegistry } from '../../actions/hooks'
 import { defineMinorCard } from '../card-source'
 import type { ActionFlow, GameState, PlayerState } from '../../contract/types'
 import { MOOR_SPECIAL_ACTION_CHOICE_ACTION_ID, hasMoorSpecialActionChoice } from '../../moor/special-action-flow'
@@ -12,12 +13,12 @@ const ACTION_CONTEXT = { mode: 'take-card-action' }
 const isUsed = (player: PlayerState): boolean =>
   readCardExtraData<boolean>(player, CARD_ID, USED_KEY) === true
 
-const tapsAvailable = (state: GameState, player: PlayerState): boolean =>
+const tapsAvailable = (state: GameState, player: PlayerState, actionHooks?: ActionHookRegistry): boolean =>
   state.enableFarmersOfTheMoor === true &&
   state.roundPhase === 'work' &&
   workersAvailable(state, player) <= 0 &&
   !isUsed(player) &&
-  hasMoorSpecialActionChoice(state, player, ACTION_CONTEXT)
+  hasMoorSpecialActionChoice(state, player, ACTION_CONTEXT, actionHooks)
 
 const buildExtraTurnFlow = (): ActionFlow => ({
   type: 'seq',
@@ -40,12 +41,12 @@ const buildExtraTurnFlow = (): ActionFlow => ({
 const cardImpl = {
   effect: {
     id: CARD_ID,
-    contributeExtraTurn: (state: GameState, player: PlayerState): ActionFlow | void => {
-      if (!tapsAvailable(state, player)) return
+    contributeExtraTurn: (state, player, context): ActionFlow | void => {
+      if (!tapsAvailable(state, player, context?.actionHooks)) return
       return buildExtraTurnFlow()
     },
-    countExtraTurns: (state: GameState, player: PlayerState): number =>
-      tapsAvailable(state, player) ? 1 : 0,
+    countExtraTurns: (state, player, context): number =>
+      tapsAvailable(state, player, context?.actionHooks) ? 1 : 0,
     onWorkStart: (_state, player) => {
       if (isUsed(player)) return { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID,
         params: { kind: 'set-extra-data', key: USED_KEY, value: false } }

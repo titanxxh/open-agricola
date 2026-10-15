@@ -8,12 +8,12 @@ export const activateExtraTurnAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
-  execute: ({ state, player, params }) => {
+  execute: ({ state, player, params, actionHooks }) => {
     const cardId = params?.cardId
     if (typeof cardId !== 'string') {
       return { type: 'fail', errorKey: 'log.cardEffectFail' }
     }
-    const flow = getCardEffect(cardId)?.contributeExtraTurn?.(state, player)
+    const flow = getCardEffect(cardId)?.contributeExtraTurn?.(state, player, { actionHooks })
     if (flow) return { type: 'flow', flow }
     return { type: 'fail', errorKey: 'log.cardEffectFail' }
   },

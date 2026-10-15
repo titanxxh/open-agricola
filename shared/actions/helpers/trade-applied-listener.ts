@@ -1,3 +1,4 @@
+import type { ActionHookRegistry } from '../hooks'
 import type { ActionSpace, GameState, PlayerState, Resource } from '../../contract/types'
 import type { DraftGameEvent, EventSink } from '../../contract/events'
 import type { Trade } from '../../contract/types'
@@ -12,12 +13,14 @@ export const dispatchTradeAppliedListener = (
   eventSink?: EventSink,
   transactionEvents: readonly DraftGameEvent[] = [],
   preResources?: Partial<Resource>,
+  actionHooks?: ActionHookRegistry,
 ): void => {
   if (times <= 0) return
   const sourceId = trade.sourceId ?? trade.source ?? null
   if (!sourceId) return
   const space = {} as ActionSpace
   const results = runCardListeners({
+    actionHooks,
     state,
     player,
     space,

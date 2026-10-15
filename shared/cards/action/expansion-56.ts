@@ -3,16 +3,16 @@ import { createAccumulatingAction } from '../../actions/factories/accumulate'
 import { createGainAction } from '../../actions/factories/gain'
 import { collectAccumulatedResources, hasCollectableResources } from '../../actions/effects/collect'
 import { gainResources } from '../../actions/effects/gain'
-import type { ActionDefinition, GameState, PlayerState } from '../../contract/types'
+import type { ActionDefinition } from '../../contract/types'
 import { hasPlayableOccupationChoice } from '../../actions/effects/occupation'
 import { isMajorImprovementPlayable, isMinorImprovementPlayable } from '../../actions/effects/improvement'
 import { getAvailableMajorImprovementIds } from '../major/supply'
 import { createRoundImprovementFlow, describeRoundImprovementPlan, improvementTypesForRound, type RoundImprovementPlan } from '../../actions/plans/round-improvement'
 import { createFirstMissingResourceFlow, describeFirstMissingResourcePlan, firstMissingResource, type FirstMissingResourcePlan } from '../../actions/plans/first-missing-resource'
 
-const canPlayOccupationWithFood = (spaceId: string, food: number) =>
-  (state: Parameters<ActionDefinition['canBeExecutedByPlayer']>[0], player: Parameters<ActionDefinition['canBeExecutedByPlayer']>[1]) =>
-    player.resources.food >= food && hasPlayableOccupationChoice(state, player, spaceId)
+const canPlayOccupationWithFood = (spaceId: string, food: number): ActionDefinition['canBeExecutedByPlayer'] =>
+  (state, player, context) =>
+    player.resources.food >= food && hasPlayableOccupationChoice(state, player, spaceId, undefined, context?.actionHooks)
 
 export const lessons56TwoFood: ActionDefinition = {
   id: 'lessons-56-2f',
@@ -50,9 +50,9 @@ export const lessons56Variable: ActionDefinition = {
   gainPerRound: {},
   players: [5, 6],
   linkedGroupId: 'lessons-modest-children-56',
-  canBeExecutedByPlayer: (state, player) =>
+  canBeExecutedByPlayer: (state, player, context) =>
     player.resources.food >= (player.occupationPlayed.length < 2 ? 1 : 2) &&
-    hasPlayableOccupationChoice(state, player, 'lessons-56-variable'),
+    hasPlayableOccupationChoice(state, player, 'lessons-56-variable', undefined, context?.actionHooks),
   execute: () => ({ type: 'ok' }),
   flow: {
     type: 'seq',
@@ -266,10 +266,11 @@ const IMPROVEMENT_ROUNDS = [
   { from: 5, types: ['major', 'minor'] },
 ] as const satisfies RoundImprovementPlan
 
-const canPlayImprovement56 = (state: GameState, player: PlayerState) => {
+const canPlayImprovement56: ActionDefinition['canBeExecutedByPlayer'] = (state, player, context) => {
+  const actionHooks = context?.actionHooks
   const types = improvementTypesForRound(state.round, IMPROVEMENT_ROUNDS)
-  return types.includes('minor') && player.minorHand.some(id => isMinorImprovementPlayable(state, player, id, 'improvement', undefined, types))
-    || types.includes('major') && getAvailableMajorImprovementIds(state).some(id => isMajorImprovementPlayable(state, player, id))
+  return types.includes('minor') && player.minorHand.some(id => isMinorImprovementPlayable(state, player, id, 'improvement', undefined, types, undefined, actionHooks))
+    || types.includes('major') && getAvailableMajorImprovementIds(state).some(id => isMajorImprovementPlayable(state, player, id, undefined, undefined, actionHooks))
 }
 
 export const corral6: ActionDefinition = {

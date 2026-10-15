@@ -1,3 +1,4 @@
+import type { ActionHookRegistry } from '../hooks'
 import type { ActionFlow, ActionSpace, GameState, PlayerState } from '../../contract/types'
 import type { EventSink } from '../../contract/events'
 import { runCardListeners } from '../../cards/card-listeners'
@@ -22,11 +23,13 @@ export const dispatchReapListener = (
   amount: number,
   _eventSink?: EventSink,
   options: ReapListenerOptions = {},
+  actionHooks?: ActionHookRegistry,
 ): ActionFlow | undefined => {
   if (amount <= 0) return
   const trigger = options.trigger ?? defaultReapTrigger()
   const space = {} as ActionSpace
   const context = {
+    actionHooks,
     state,
     player,
     space,

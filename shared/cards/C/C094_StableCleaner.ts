@@ -15,6 +15,7 @@ const STABLES_CONTEXT = { exactCost: { wood: 1, food: 1 }, trueAction: false }
 const collectStablesCostDelta = (context: CardListenerContext): Partial<Resource> => {
   const results = runCardListeners({
     ...context,
+    actionHooks: context.actionHooks,
     actionId: 'stables',
     phase: 'computeCosts',
     actionContext: STABLES_CONTEXT,

@@ -1,5 +1,5 @@
 import type { ActionChoiceOption, ActionSpace, GameState, PlayerState, Resource } from '../../contract/types'
-import type { CardListenerContextInput } from '../../cards/card-listeners'
+import type { CardListenerDispatchInput } from '../../cards/card-listeners'
 import { canSpaceAcceptWorker, filterActionSpacesByIds, findActionSpaceById, isSpaceBlocked } from '../../domain/space'
 import { canMoorWorkerEnterSpace } from '../../moor/heating'
 import { getMatchingListeners, executeCardListener, listenerOwnerOptions } from '../../cards/card-listeners'
@@ -15,7 +15,7 @@ export type AllowedPlacement = {
   option?: ActionChoiceOption
 }
 
-type PlacementContextOverrides = Partial<CardListenerContextInput> & {
+type PlacementContextOverrides = Partial<CardListenerDispatchInput> & {
   ignoreWorkerAvailability?: boolean
   isActionDoable?: (space: ActionSpace, baseDoable: () => boolean) => boolean
 }
@@ -122,8 +122,9 @@ export function computeAllowedPlacementSpaces(
     actionContext: contextOverrides.actionContext,
     result,
   })
-  const listenerContext: CardListenerContextInput = {
+  const listenerContext: CardListenerDispatchInput = {
     ...contextOverrides,
+    actionHooks: contextOverrides.actionHooks,
     state,
     player,
     space: createPlaceFarmerVirtualSpace(),

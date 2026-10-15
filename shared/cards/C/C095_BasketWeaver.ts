@@ -28,8 +28,8 @@ const computeCostsListener: CardListenerRegistration = {
 const cardImpl = {
   effect: {
     id: CARD_ID,
-    onBuy: (state, player) => {
-      if (!isMajorImprovementPlayable(state, player, TARGET_MAJOR, CARD_ID)) return
+    onBuy: (state, player, _payment, context) => {
+      if (!isMajorImprovementPlayable(state, player, TARGET_MAJOR, CARD_ID, undefined, context?.actionHooks)) return
       return {
         type: 'leaf',
         actionId: 'improvement',

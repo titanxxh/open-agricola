@@ -22,7 +22,7 @@ const cardImpl = {
         context.player,
         CARD_ID,
         (context.extraData?.occupationBaseCost ?? {}) as Partial<Resource>,
-        context.actionCardId,
+        context.actionCardId, undefined, context?.actionHooks
       )
       return options.some((option) => context.player.resources.food - (option.resourcesPaid.food ?? 0) >= food)
         ? { reserveResources: { food } }

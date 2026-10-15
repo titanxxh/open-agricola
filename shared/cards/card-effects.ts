@@ -1,6 +1,7 @@
 import { retainedTimedRuleHook, retainedTimedTurnSkip, timedRuleSources, timedExtraTurnFlow } from './timed-rule-obligations'
 import { flowCardEffectHooks, type CardEffectHook, type FlowCardEffectHook, type RoundPreparationHook, type RoundPreparationContext } from '../contract/card-effect-hooks'
 import type { TimedRule } from '../contract/rule-plans'
+import type { ActionHookRegistry } from '../actions/hooks'
 import type { ActionFlow, FarmTilePosition, GameState, InteractionRequest, PaymentResourceMap, PlayerState, ProtectedObservation, Resource, ResourceKey } from '../contract/types'
 import type { Pasture } from '../domain/pasture'
 import type { PurchaseOutcomeRule } from '../contract/rule-plans'
@@ -150,7 +151,7 @@ type FlowEffectHandler = (
   ctx?: FlowEffectContext,
 ) => ActionFlow | void
 export type FlowEffectContext = {
-  actionHooks?: import('../actions/hooks').ActionHookRegistry
+  actionHooks?: ActionHookRegistry
   transactionEvents?: readonly import('../contract/events').GameEvent[]
   /** The action space or card that supplied this particular purchase. */
   purchaseActionCardId?: string
@@ -236,8 +237,8 @@ export type CardEffect = {
    * expanded directly, multiple providers are offered as one-shot
    * trigger-select activations.
    */
-  contributeExtraTurn?: (state: GameState, player: PlayerState) => ActionFlow | void
-  countExtraTurns?: (state: GameState, player: PlayerState) => number
+  contributeExtraTurn?: (state: GameState, player: PlayerState, ctx?: FlowEffectContext) => ActionFlow | void
+  countExtraTurns?: (state: GameState, player: PlayerState, ctx?: FlowEffectContext) => number
   extraTurnBeforeWorkers?: boolean
   onBeforeWork?: FlowEffectHandler
   onAfterRevealAction?: FlowEffectHandler
@@ -756,12 +757,13 @@ const extraTurnCountForCard = (
   state: GameState,
   player: PlayerState,
   effect: CardEffect,
+  actionHooks?: ActionHookRegistry,
 ): number => {
   if (effect.countExtraTurns) {
-    const rawCount = effect.countExtraTurns(state, player)
+    const rawCount = effect.countExtraTurns(state, player, { actionHooks })
     return Number.isFinite(rawCount) ? Math.max(0, Math.floor(rawCount)) : 0
   }
-  return effect.contributeExtraTurn?.(state, player) ? 1 : 0
+  return effect.contributeExtraTurn?.(state, player, { actionHooks }) ? 1 : 0
 }
 
 const extraTurnCounter = (
@@ -772,19 +774,20 @@ const extraTurnCounter = (
 export const collectExtraTurnContributions = (
   state: GameState,
   player: PlayerState,
+  actionHooks?: ActionHookRegistry,
 ): ExtraTurnContribution[] => {
   const contributions: ExtraTurnContribution[] = []
   for (const cardId of extraTurnCardIds(player)) {
     const effect = getCardEffect(cardId)
     if (!effect?.contributeExtraTurn) continue
     try {
-      const count = extraTurnCountForCard(state, player, effect)
+      const count = extraTurnCountForCard(state, player, effect, actionHooks)
       const skipped =
         extraTurnCounter(player._extraTurnSkipCountsByCard, cardId) +
         extraTurnCounter(player._extraTurnConsumedCountsByCard, cardId)
       const remaining = Math.max(0, count - skipped)
       if (remaining <= 0) continue
-      const flow = effect.contributeExtraTurn(state, player)
+      const flow = effect.contributeExtraTurn(state, player, { actionHooks })
       if (flow) {
         contributions.push({ cardId, ownerPlayerId: player.id, count: remaining, flow })
       }
@@ -823,8 +826,9 @@ export const collectExtraTurnFlow = (
   state: GameState,
   player: PlayerState,
   withWorkers = false,
+  actionHooks?: ActionHookRegistry,
 ): { flow: ActionFlow; cardId?: string } | null => {
-  const contributions = collectExtraTurnContributions(state, player)
+  const contributions = collectExtraTurnContributions(state, player, actionHooks)
     .filter((entry) => !withWorkers || getCardEffect(entry.cardId)?.extraTurnBeforeWorkers === true)
   if (contributions.length === 0) return null
   if (withWorkers) {
@@ -856,13 +860,13 @@ export const collectExtraTurnFlow = (
   }
 }
 
-export const countPendingExtraTurns = (state: GameState, player: PlayerState): number => {
-  return collectExtraTurnContributions(state, player)
+export const countPendingExtraTurns = (state: GameState, player: PlayerState, actionHooks?: ActionHookRegistry): number => {
+  return collectExtraTurnContributions(state, player, actionHooks)
     .reduce((sum, contribution) => sum + contribution.count, 0)
 }
 
-export const consumePendingExtraTurns = (state: GameState, player: PlayerState): number => {
-  const contributions = collectExtraTurnContributions(state, player)
+export const consumePendingExtraTurns = (state: GameState, player: PlayerState, actionHooks?: ActionHookRegistry): number => {
+  const contributions = collectExtraTurnContributions(state, player, actionHooks)
   const consumed = contributions.reduce((sum, contribution) => sum + contribution.count, 0)
   if (consumed <= 0) return 0
   const next = { ...(player._extraTurnConsumedCountsByCard ?? {}) }
@@ -873,8 +877,8 @@ export const consumePendingExtraTurns = (state: GameState, player: PlayerState):
   return consumed
 }
 
-export const skipPendingExtraTurn = (state: GameState, player: PlayerState): boolean => {
-  const contribution = collectExtraTurnContributions(state, player)[0]
+export const skipPendingExtraTurn = (state: GameState, player: PlayerState, actionHooks?: ActionHookRegistry): boolean => {
+  const contribution = collectExtraTurnContributions(state, player, actionHooks)[0]
   if (!contribution) return false
   player._extraTurnSkipCountsByCard = {
     ...(player._extraTurnSkipCountsByCard ?? {}),
@@ -890,8 +894,8 @@ export const skipPendingExtraTurn = (state: GameState, player: PlayerState): boo
  * an out-of-workers player (and to avoid ending the round prematurely) when an
  * extra turn is still pending.
  */
-export const hasPendingExtraTurn = (state: GameState, player: PlayerState): boolean =>
-  collectExtraTurnContributions(state, player).length > 0
+export const hasPendingExtraTurn = (state: GameState, player: PlayerState, actionHooks?: ActionHookRegistry): boolean =>
+  collectExtraTurnContributions(state, player, actionHooks).length > 0
 
 export const getExtraRoomCapacity = (player: PlayerState): number => {
   const allCards = [

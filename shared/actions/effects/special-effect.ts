@@ -199,7 +199,7 @@ export const specialEffectAction: ActionDefinition = {
     const operation = readCardStorageOperation(params)
     return sourceCard && operation ? previewCardStorageOperation(state, resolveActionTargetPlayer(state, player, actionContext), sourceCard, operation) : undefined
   },
-  execute: ({ state, player, sourceCard, params, actionContext, eventSink }) => {
+  execute: ({ state, player, sourceCard, params, actionContext, eventSink, actionHooks }) => {
     if (!sourceCard) return { type: 'fail', errorKey: 'log.specialEffectFail' }
     const p = params as SpecialEffectParams | undefined
     if (!p || typeof p !== 'object' || !('kind' in p)) {
@@ -403,7 +403,7 @@ export const specialEffectAction: ActionDefinition = {
       }
       case 'consume-pending-extra-turns': {
         if (!state) return { type: 'fail', errorKey: 'log.specialEffectFail' }
-        const consumed = consumePendingExtraTurns(state, target)
+        const consumed = consumePendingExtraTurns(state, target, actionHooks)
         if (consumed > 0) {
           eventSink?.emit<'card.triggered'>({
             type: 'card.triggered',

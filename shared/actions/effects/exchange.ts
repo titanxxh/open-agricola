@@ -1,3 +1,4 @@
+import type { ActionHookRegistry } from '../hooks'
 import type {
   ActionChoiceOption,
   ActionDefinition,
@@ -142,6 +143,7 @@ const resolveBatchExchange = (
   batch: { cardId: string; maxTotal: number; requireAtLeastOne?: boolean },
   payload: ResourceBatchExchangePayload,
   eventSink?: EventSink,
+  actionHooks?: ActionHookRegistry,
 ): ActionExecutionResult => {
   const discard = payload.discard ?? {}
   const receive = payload.receive ?? {}
@@ -196,6 +198,7 @@ const resolveBatchExchange = (
     eventSink,
     [event],
     preResources,
+    actionHooks,
   )
   trackWorkPhaseBuildingResources(state, player.id, gained)
   return { type: 'ok', resourcesPaid: paid, resourcesGained: gained }
@@ -404,6 +407,7 @@ type ResolvedFeedExchange = FeedExchangeCatalogEntry & {
 export const getFeedExchangeCatalog = (
   player: PlayerState,
   state: GameState,
+  actionHooks?: ActionHookRegistry,
 ): ResolvedFeedExchange[] => {
   const entries: ResolvedFeedExchange[] = []
   basicConversionExchanges.forEach((exchange, exchangeIndex) => {
@@ -440,7 +444,7 @@ export const getFeedExchangeCatalog = (
     })
   }
   const nextIndexBySource = new Map<string, number>()
-  for (const trade of collectComputeExchanges(state, player, 'harvest')) {
+  for (const trade of collectComputeExchanges(state, player, 'harvest', actionHooks)) {
     const sourceId = trade.sourceId ?? trade.source
     if (!sourceId) continue
     const exchangeIndex = nextIndexBySource.get(sourceId) ?? 0
@@ -472,6 +476,7 @@ export const getExchangesInWindow = (
   player: PlayerState,
   window: ExchangeWindow,
   state?: GameState,
+  actionHooks?: ActionHookRegistry,
 ): Trade[] => {
   const out: Trade[] = []
   for (const cardId of playedCardIds(player)) {
@@ -482,7 +487,7 @@ export const getExchangesInWindow = (
     }
   }
   if (state) {
-    out.push(...collectComputeExchanges(state, player, window))
+    out.push(...collectComputeExchanges(state, player, window, actionHooks))
   }
   return out
 }
@@ -508,8 +513,8 @@ export const getExchangesByTradeIds = (
   return out
 }
 
-const getPlayerCookeryTrades = (player: PlayerState, state?: GameState): Trade[] =>
-  getExchangesInWindow(player, 'anytime', state)
+const getPlayerCookeryTrades = (player: PlayerState, state?: GameState, actionHooks?: ActionHookRegistry): Trade[] =>
+  getExchangesInWindow(player, 'anytime', state, actionHooks)
 
 const isTradeAllowed = (trade: Trade, state: GameState | undefined, actionContext?: Record<string, unknown>): boolean => {
   const interactionKind = actionContext?.anytimeInteractionKind as InteractionRequest['kind'] | undefined
@@ -554,10 +559,11 @@ const buildExchangeOptions = (
   state?: GameState,
   maxTradeTimesBySourceId?: Record<string, number>,
   actionContext?: Record<string, unknown>,
+  actionHooks?: ActionHookRegistry,
 ): { options: ActionChoiceOption[]; trades: Trade[] } => {
   // Anytime cookery first; if tradeIds provided, merge listener-driven trades
   // (these may have empty triggers, e.g. E53 BoarSpear).
-  const trades: Trade[] = getPlayerCookeryTrades(player, state)
+  const trades: Trade[] = getPlayerCookeryTrades(player, state, actionHooks)
   if (actionContext?.includeBasicConversions === true) {
     trades.push(...basicConversionExchanges.map(exchange => exchangeToTrade(exchange, BASIC_CONVERSION_SOURCE_ID)))
   }
@@ -600,6 +606,7 @@ const resolveExchangeChoice = (
   choice: string,
   actionContext?: Record<string, unknown>,
   eventSink?: EventSink,
+  actionHooks?: ActionHookRegistry,
 ): ActionExecutionResult => {
   if (choice === 'cancel') {
     return { type: 'ok' }
@@ -610,7 +617,7 @@ const resolveExchangeChoice = (
     ? actionContext.harvestExchangeRound
     : undefined
   const animalPaymentPreference = readAnimalPaymentPreference(actionContext)
-  const { trades } = buildExchangeOptions(player, tradeIds, state, maxTradeTimesBySourceId, actionContext)
+  const { trades } = buildExchangeOptions(player, tradeIds, state, maxTradeTimesBySourceId, actionContext, actionHooks)
   if (choice.startsWith('bulk:')) {
     const payload = choice.replace('bulk:', '').trim()
     if (!payload) return { type: 'ok' }
@@ -657,6 +664,7 @@ const resolveExchangeChoice = (
           eventSink,
           exchangeEvent ? [exchangeEvent] : [],
           preResources,
+          actionHooks,
         )
         if (harvestExchangeRound !== undefined && trade.max !== undefined && trade.sourceId) {
           recordHarvestExchangeUses(player, trade.sourceId, harvestExchangeRound, times)
@@ -706,6 +714,7 @@ const resolveExchangeChoice = (
         eventSink,
         exchangeEvent ? [exchangeEvent] : [],
         preResources,
+        actionHooks,
       )
       if (harvestExchangeRound !== undefined && trade.max !== undefined && trade.sourceId) {
         recordHarvestExchangeUses(player, trade.sourceId, harvestExchangeRound, times)
@@ -731,7 +740,7 @@ export const anytimeExchangeAction: ActionDefinition = {
   descriptionKey: 'actions.exchange.description',
   roundAvailable: 1,
   gainPerRound: {},
-  previewEffect: ({ state, player, actionContext }) => {
+  previewEffect: ({ state, player, actionContext, actionHooks }) => {
     const batch = actionContext?.batchExchange
     if (batch && typeof batch === 'object' && 'maxTotal' in batch && typeof batch.maxTotal === 'number') {
       const available = batchExchangeAvailability(player, batch.maxTotal)
@@ -743,7 +752,7 @@ export const anytimeExchangeAction: ActionDefinition = {
       : { kind: 'exchangeCatalog', choices: [] }
     const rawIds = actionContext?.tradeIds
     const ids = Array.isArray(rawIds) && rawIds.every((id): id is string => typeof id === 'string') ? rawIds : undefined
-    const { options, trades } = buildExchangeOptions(player, ids, state, readMaxTradeTimesBySourceId(actionContext), actionContext)
+    const { options, trades } = buildExchangeOptions(player, ids, state, readMaxTradeTimesBySourceId(actionContext), actionContext, actionHooks)
     return { kind: 'exchangeCatalog', choices: options.flatMap(option => {
       const match = /^trade:(\d+):(\d+)$/.exec(option.value)
       const trade = match ? trades[Number(match[1])] : undefined
@@ -761,10 +770,10 @@ export const anytimeExchangeAction: ActionDefinition = {
     if (directTrade) return isTradeAllowed(directTrade, state, ctx?.actionContext) && canAffordTrade(player, directTrade, 1, state)
     const tradeIds = (ctx?.actionContext as { tradeIds?: string[] } | undefined)?.tradeIds
     const maxTradeTimesBySourceId = readMaxTradeTimesBySourceId(ctx?.actionContext)
-    return buildExchangeOptions(player, tradeIds, state, maxTradeTimesBySourceId, ctx?.actionContext)
+    return buildExchangeOptions(player, tradeIds, state, maxTradeTimesBySourceId, ctx?.actionContext, ctx?.actionHooks)
       .options.some((option) => option.value !== 'cancel')
   },
-  execute: ({ state, player, actionContext, eventSink }) => {
+  execute: ({ state, player, actionContext, eventSink, actionHooks }) => {
     const batch = actionContext?.batchExchange as
       | { cardId: string; maxTotal: number; promptKey?: PromptKey; requireAtLeastOne?: boolean }
       | undefined
@@ -811,6 +820,7 @@ export const anytimeExchangeAction: ActionDefinition = {
         eventSink,
         exchangeEvent ? [exchangeEvent] : [],
         preResources,
+        actionHooks,
       )
       const gained = scaleResources(directTrade.to, 1)
       const paid = scaleResources(directTrade.from, 1)
@@ -819,7 +829,7 @@ export const anytimeExchangeAction: ActionDefinition = {
     }
     const filterIds = actionContext?.tradeIds as string[] | undefined
     const maxTradeTimesBySourceId = readMaxTradeTimesBySourceId(actionContext)
-    const { options: allOptions } = buildExchangeOptions(player, filterIds, state, maxTradeTimesBySourceId, actionContext)
+    const { options: allOptions } = buildExchangeOptions(player, filterIds, state, maxTradeTimesBySourceId, actionContext, actionHooks)
     const filtered = filterIds && filterIds.length > 0
       ? allOptions.filter((opt) => {
           if (opt.value === 'cancel') return true
@@ -838,15 +848,15 @@ export const anytimeExchangeAction: ActionDefinition = {
       promptKey: 'ui.interactionExchangeChoice',
     }
   },
-  resolveChoice: ({ state, player, actionContext, eventSink }, choice, payload) => {
+  resolveChoice: ({ state, player, actionContext, eventSink, actionHooks }, choice, payload) => {
     const batch = actionContext?.batchExchange as
       | { cardId: string; maxTotal: number; requireAtLeastOne?: boolean }
       | undefined
     const batchPayload = payload?.resourceBatchExchange as ResourceBatchExchangePayload | undefined
     if (batch && batchPayload) {
-      return resolveBatchExchange(state, player, batch, batchPayload, eventSink)
+      return resolveBatchExchange(state, player, batch, batchPayload, eventSink, actionHooks)
     }
-    const result = resolveExchangeChoice(state, player, choice, actionContext, eventSink)
+    const result = resolveExchangeChoice(state, player, choice, actionContext, eventSink, actionHooks)
     if (result.type === 'ok' && actionContext?.anytimeInteractionKind !== 'animal-reorg') {
       const placed = getPlacedAnimalsByType(player, state)
       if (animalKeysForState(state).some((key) =>

@@ -76,11 +76,11 @@ const cardImpl = {
   prerequisiteCheck: (player) => player.resources.boar >= 1,
   effect: {
     id: CARD_ID,
-    onBuy: (state, player) => ({
+    onBuy: (state, player, _payment, context) => ({
       type: 'xor',
       children: [
         { ...payLeaf({ cardId: CARD_ID, cost: { boar: 1 } }), optionId: 'return-boar' },
-        ...getExchangesInWindow(player, 'anytime', state).filter((trade) =>
+        ...getExchangesInWindow(player, 'anytime', state, context?.actionHooks).filter((trade) =>
           trade.from.boar === 1 && Object.keys(trade.from).length === 1 && (trade.to.food ?? 0) > 0 &&
           getCardDefinitionById(trade.sourceId ?? '')?.isCookery,
         ).map((trade) => ({

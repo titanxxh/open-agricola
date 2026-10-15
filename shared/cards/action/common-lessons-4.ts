@@ -8,8 +8,8 @@ export const lessons4: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   players: [4],
-  canBeExecutedByPlayer: (state, player) =>
-    hasPlayableOccupationChoice(state, player, 'lessons-4'),
+  canBeExecutedByPlayer: (state, player, context) =>
+    hasPlayableOccupationChoice(state, player, 'lessons-4', undefined, context?.actionHooks),
   execute: () => ({ type: 'ok' }),
   flow: {
     type: 'seq',

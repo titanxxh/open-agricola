@@ -1,3 +1,4 @@
+import type { ActionHookRegistry } from '../../hooks'
 /**
  * Preview-cost family: resolveCardCostWithModifiers,
  * canAffordCardPreviewCostByProvider, payCardPreviewCostByProvider,
@@ -60,8 +61,9 @@ export const resolveCardCostWithModifiersDetailed = (
   cardId: string,
   baseCost: PaymentResourceMap | ComplexCost,
   actionCardId?: string,
+  actionHooks?: ActionHookRegistry,
 ): ResolvedCardCostWithMetadata => {
-  const context = buildCardCostListenerContext(state, player, actionId)
+  const context = buildCardCostListenerContext(state, player, actionId, actionHooks)
   const matched = getMatchingListeners(context)
   const collectedBonuses: Bonus[] = []
   const collectedTrades: Trade[] = []
@@ -209,6 +211,7 @@ export const resolveCardCostWithModifiers = (
   cardId: string,
   baseCost: PaymentResourceMap | ComplexCost,
   actionCardId?: string,
+  actionHooks?: ActionHookRegistry,
 ): PaymentResourceMap | ComplexCost =>
   resolveCardCostWithModifiersDetailed(
     state,
@@ -217,6 +220,7 @@ export const resolveCardCostWithModifiers = (
     cardId,
     baseCost,
     actionCardId,
+    actionHooks,
   ).cost
 
 const resolveCardPreviewCost = (
@@ -226,6 +230,7 @@ const resolveCardPreviewCost = (
   cardId: string,
   baseCost: PaymentResourceMap | ComplexCost | null | undefined,
   actionCardId?: string,
+  actionHooks?: ActionHookRegistry,
 ): PaymentResourceMap | ComplexCost | null => {
   if (!baseCost) return null
   return resolveCardCostWithModifiers(
@@ -235,6 +240,7 @@ const resolveCardPreviewCost = (
     cardId,
     baseCost,
     actionCardId,
+    actionHooks,
   )
 }
 
@@ -245,6 +251,7 @@ const resolveCardPreviewCostDetailed = (
   cardId: string,
   baseCost: PaymentResourceMap | ComplexCost | null | undefined,
   actionCardId?: string,
+  actionHooks?: ActionHookRegistry,
 ): ResolvedCardCostWithMetadata | null => {
   if (!baseCost) return null
   return resolveCardCostWithModifiersDetailed(
@@ -254,6 +261,7 @@ const resolveCardPreviewCostDetailed = (
     cardId,
     baseCost,
     actionCardId,
+    actionHooks,
   )
 }
 
@@ -264,6 +272,7 @@ export const resolveCardPreviewCostByProvider = (
   cardId: string,
   getBaseCost: () => PaymentResourceMap | ComplexCost | null | undefined,
   actionCardId?: string,
+  actionHooks?: ActionHookRegistry,
 ) =>
   resolveCardPreviewCost(
     state,
@@ -272,6 +281,7 @@ export const resolveCardPreviewCostByProvider = (
     cardId,
     getBaseCost(),
     actionCardId,
+    actionHooks,
   )
 
 export const resolveCardPreviewCostDetailedByProvider = (
@@ -281,6 +291,7 @@ export const resolveCardPreviewCostDetailedByProvider = (
   cardId: string,
   getBaseCost: () => PaymentResourceMap | ComplexCost | null | undefined,
   actionCardId?: string,
+  actionHooks?: ActionHookRegistry,
 ) =>
   resolveCardPreviewCostDetailed(
     state,
@@ -289,6 +300,7 @@ export const resolveCardPreviewCostDetailedByProvider = (
     cardId,
     getBaseCost(),
     actionCardId,
+    actionHooks,
   )
 
 const canAffordCardPreviewCost = (
@@ -299,6 +311,7 @@ const canAffordCardPreviewCost = (
   baseCost: PaymentResourceMap | ComplexCost | null | undefined,
   actionCardId?: string,
   costType?: CostModifierType,
+  actionHooks?: ActionHookRegistry,
 ) =>
   (() => {
     const previewCost = resolveCardPreviewCost(
@@ -308,6 +321,7 @@ const canAffordCardPreviewCost = (
       cardId,
       baseCost,
       actionCardId,
+      actionHooks,
     )
     if (!previewCost) return false
     if (!isComplexCost(previewCost)) {
@@ -324,6 +338,7 @@ export const canAffordCardPreviewCostByProvider = (
   getBaseCost: () => PaymentResourceMap | ComplexCost | null | undefined,
   actionCardId?: string,
   costType?: CostModifierType,
+  actionHooks?: ActionHookRegistry,
 ) =>
   canAffordCardPreviewCost(
     state,
@@ -333,6 +348,7 @@ export const canAffordCardPreviewCostByProvider = (
     getBaseCost(),
     actionCardId,
     costType,
+    actionHooks,
   )
 
 const payCardPreviewCost = (
@@ -343,6 +359,7 @@ const payCardPreviewCost = (
   baseCost: PaymentResourceMap | ComplexCost | null | undefined,
   actionCardId?: string,
   costType?: CostModifierType,
+  actionHooks?: ActionHookRegistry,
 ) => {
   const previewCost = resolveCardPreviewCost(
     state,
@@ -351,6 +368,7 @@ const payCardPreviewCost = (
     cardId,
     baseCost,
     actionCardId,
+    actionHooks,
   )
   if (previewCost === null) return false
   if (!isComplexCost(previewCost)) {
@@ -380,6 +398,7 @@ export const payCardPreviewCostByProvider = (
   getBaseCost: () => PaymentResourceMap | ComplexCost | null | undefined,
   actionCardId?: string,
   costType?: CostModifierType,
+  actionHooks?: ActionHookRegistry,
 ) =>
   payCardPreviewCost(
     state,
@@ -389,6 +408,7 @@ export const payCardPreviewCostByProvider = (
     getBaseCost(),
     actionCardId,
     costType,
+    actionHooks,
   )
 
 export const resolveActionPreviewCost = (

@@ -1,3 +1,4 @@
+import type { ActionHookRegistry } from '../hooks'
 import type {
   ActionExecutionResult,
   CardCostCandidateMetadata,
@@ -122,6 +123,7 @@ const resolvePreviewCostByProvider = (
   cardId: string,
   getBaseCost: () => PaymentResourceMap | ComplexCost | null | undefined,
   actionCardId?: string,
+  actionHooks?: ActionHookRegistry,
 ): CardPurchasePreview | null =>
   PaymentSolver.resolveCardPreviewCostDetailedByProvider(
     state,
@@ -130,6 +132,7 @@ const resolvePreviewCostByProvider = (
     cardId,
     getBaseCost,
     actionCardId,
+    actionHooks,
   )
 
 const buildPayParams = (

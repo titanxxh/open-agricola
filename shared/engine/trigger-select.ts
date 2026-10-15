@@ -9,7 +9,7 @@ import {
   executeCardListener,
   getListenerById,
   type CardListenerContext,
-  type CardListenerContextInput,
+  type CardListenerDispatchInput,
 } from '../cards/card-listeners'
 import { previewActivateCardEffect } from '../actions/effects/internal/activate-card-effect'
 import {
@@ -99,7 +99,7 @@ const previewContextForChild = (
   child: ActivateCardActionNode,
   context: TriggerSelectContext,
 ): {
-  listenerContext: CardListenerContextInput
+  listenerContext: CardListenerDispatchInput
   previewState: ActionExecutionContext['state']
   effectPlayer: PlayerState
   ownerPlayerId?: string

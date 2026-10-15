@@ -1,3 +1,4 @@
+import type { ActionHookRegistry } from '../../hooks'
 import type {
   ActionChoiceOption,
   ActionDefinition,
@@ -162,12 +163,13 @@ const moorSpecialActionOptions = (
   player: PlayerState,
   playerIndex: number,
   offer: Extract<ScheduledOffer, { kind: 'moor-special-action' }>,
+  actionHooks?: ActionHookRegistry,
 ): ActionChoiceOption[] =>
   (state.farmersOfTheMoor?.specialActionCards ?? [])
     .filter((card) => card.actions.includes(offer.actionId))
     .flatMap((card) =>
       payloadsForAction(player, offer.actionId).flatMap((payload) => {
-        const validation = validateMoorSpecialAction(state, playerIndex, card.id, offer.actionId, payload)
+        const validation = validateMoorSpecialAction(state, playerIndex, card.id, offer.actionId, payload, actionHooks)
         if (!validation.ok) return []
         const tile = payload.tile
         return [{
@@ -238,11 +240,11 @@ const parseAnimalChoice = (choice: string): AnimalKey | null => {
     : null
 }
 
-const currentOfferOptions = (state: GameState, player: PlayerState, offer: ScheduledOffer): ActionChoiceOption[] => {
+const currentOfferOptions = (state: GameState, player: PlayerState, offer: ScheduledOffer, actionHooks?: ActionHookRegistry): ActionChoiceOption[] => {
   const playerIndex = state.players.findIndex(candidate => candidate.id === player.id)
   if (playerIndex < 0) return []
   return offer.kind === 'moor-special-action'
-    ? moorSpecialActionOptions(state, player, playerIndex, offer)
+    ? moorSpecialActionOptions(state, player, playerIndex, offer, actionHooks)
     : offer.kind === 'animal-purchase' ? animalPurchaseOptions(player, offer) : resourcePurchaseOptions(player, offer)
 }
 
@@ -267,9 +269,9 @@ export const scheduledOfferAction: ActionDefinition = {
     const cardId = typeof context?.params?.cardId === 'string' ? context.params.cardId : context?.sourceCard
     if (!cardId) return false
     const offer = getDueScheduledOffers(state, player, cardId).find(offer => offer.id === context?.params?.offerId)
-    return !!offer && currentOfferOptions(state, player, offer).length > 0
+    return !!offer && currentOfferOptions(state, player, offer, context?.actionHooks).length > 0
   },
-  execute: ({ state, player, params, sourceCard }) => {
+  execute: ({ state, player, params, sourceCard, actionHooks }) => {
     const cardId = typeof params?.cardId === 'string' ? params.cardId : sourceCard
     const offerId = typeof params?.offerId === 'string' ? params.offerId : undefined
     if (!cardId || !offerId) return { type: 'ok' }
@@ -279,7 +281,7 @@ export const scheduledOfferAction: ActionDefinition = {
     }
     const offer = getDueScheduledOffers(state, player, cardId).find(offer => offer.id === offerId)
     if (!offer) return { type: 'fail', errorKey: 'scheduled offer unavailable', recoverable: true }
-    const options = currentOfferOptions(state, player, offer)
+    const options = currentOfferOptions(state, player, offer, actionHooks)
     if (!options.length) return { type: 'fail', errorKey: 'scheduled offer unavailable', recoverable: true }
     return {
       type: 'request',
@@ -294,7 +296,7 @@ export const scheduledOfferAction: ActionDefinition = {
       sourceCard: cardId,
     }
   },
-  resolveChoice: ({ state, player, sourceCard, params }, choice) => {
+  resolveChoice: ({ state, player, sourceCard, params, actionHooks }, choice) => {
     const cardId = typeof params?.cardId === 'string' ? params.cardId : sourceCard
     if (!cardId) return { type: 'fail', errorKey: 'scheduled offer unavailable', recoverable: true }
     const offer = getDueScheduledOffers(state, player, cardId).find(offer => offer.id === params?.offerId)
@@ -303,7 +305,7 @@ export const scheduledOfferAction: ActionDefinition = {
       markOfferConsumed(state, player, cardId, offer.id)
       return { type: 'ok' }
     }
-    if (!currentOfferOptions(state, player, offer).some(option => option.value === choice)) {
+    if (!currentOfferOptions(state, player, offer, actionHooks).some(option => option.value === choice)) {
       return { type: 'fail', errorKey: 'scheduled offer unavailable', recoverable: true }
     }
 
@@ -322,7 +324,7 @@ export const scheduledOfferAction: ActionDefinition = {
         playerIndex,
         moorChoice.cardId,
         moorChoice.actionId,
-        moorChoice.payload,
+        moorChoice.payload, actionHooks
       )
       if (!validation.ok) return { type: 'fail', errorKey: validation.error }
       return {

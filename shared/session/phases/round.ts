@@ -1,3 +1,4 @@
+import type { ActionHookRegistry } from '../../actions/hooks'
 /**
  * Round-phase mixin extracted from GameCore (S2 Task 10).
  *
@@ -44,10 +45,11 @@ export const nextSeatedPlayerIdx = (
   players: PlayerState[],
   current: number,
   direction: 1 | -1 = 1,
-): number => walkSeats(state, players, current, direction, 1)
+  actionHooks?: ActionHookRegistry,
+): number => walkSeats(state, players, current, direction, 1, actionHooks)
 
-const canTakeRotationTurn = (state: GameState, candidate: PlayerState | undefined): boolean =>
-  candidate !== undefined && (workersAvailable(state, candidate) > 0 || hasPendingExtraTurn(state, candidate))
+const canTakeRotationTurn = (state: GameState, candidate: PlayerState | undefined, actionHooks?: ActionHookRegistry): boolean =>
+  candidate !== undefined && (workersAvailable(state, candidate) > 0 || hasPendingExtraTurn(state, candidate, actionHooks))
 
 const walkSeats = (
   state: GameState,
@@ -55,11 +57,12 @@ const walkSeats = (
   current: number,
   direction: 1 | -1,
   firstOffset: 0 | 1,
+  actionHooks?: ActionHookRegistry,
 ): number => {
   const count = players.length
   for (let off = firstOffset; off <= count; off++) {
     const idx = (((current + off * direction) % count) + count) % count
-    if (canTakeRotationTurn(state, players[idx])) return idx
+    if (canTakeRotationTurn(state, players[idx], actionHooks)) return idx
   }
   return current
 }
@@ -77,20 +80,20 @@ const roundWorkOrderStartIdx = (state: GameState): number => {
  * the work phase and the walk restarts backwards from `current` itself, so the
  * last seat of the forward pass places again immediately (reference behaviour).
  */
-export const nextWorkRotationIdx = (state: GameState, current: number): number => {
+export const nextWorkRotationIdx = (state: GameState, current: number, actionHooks?: ActionHookRegistry): number => {
   const snake = state.enableSnakeOpening && state.round === 1 && state.roundPhase === 'work'
     ? state.snakeOpening
     : null
-  if (!snake) return nextSeatedPlayerIdx(state, state.players, current)
-  if (snake.reversed) return nextSeatedPlayerIdx(state, state.players, current, -1)
+  if (!snake) return nextSeatedPlayerIdx(state, state.players, current, undefined, actionHooks)
+  if (snake.reversed) return nextSeatedPlayerIdx(state, state.players, current, -1, actionHooks)
   const count = state.players.length
-  const next = nextSeatedPlayerIdx(state, state.players, current)
+  const next = nextSeatedPlayerIdx(state, state.players, current, undefined, actionHooks)
   const stepsToNext = ((next - current + count) % count) || count
   const stepsToStart = ((roundWorkOrderStartIdx(state) - current + count) % count) || count
   if (stepsToNext < stepsToStart) return next
   snake.reversed = true
   appendImmediateEvents(state, [{ type: 'snakeOpening.reversed' }])
-  return walkSeats(state, state.players, current, -1, 0)
+  return walkSeats(state, state.players, current, -1, 0, actionHooks)
 }
 
 /**
@@ -101,8 +104,8 @@ export const nextWorkRotationIdx = (state: GameState, current: number): number =
  * turn keeps the round open instead of ending it prematurely. Mirrors the
  * extra-turn gating applied to `nextSeatedPlayerIdx` and the rotation skip loop.
  */
-export const roundWorkComplete = (state: GameState): boolean =>
-  state.players.every((p) => workersAvailable(state, p) <= 0 && !hasPendingExtraTurn(state, p))
+export const roundWorkComplete = (state: GameState, actionHooks?: ActionHookRegistry): boolean =>
+  state.players.every((p) => workersAvailable(state, p) <= 0 && !hasPendingExtraTurn(state, p, actionHooks))
 
 const combineFlows = (flows: ActionFlow[]): ActionFlow | undefined => {
   if (flows.length === 0) return undefined
@@ -116,7 +119,7 @@ export const startPendingExtraTurnIfAny = (core: GameCore): boolean => {
   if (hasPendingOrdinaryCardDrawChoice(state)) return false
   const current = state.players[state.currentPlayerIndex]
   if (!current || state.roundPhase !== 'work' || state.gameOver || state.phase !== 'playing') return false
-  const extra = collectExtraTurnFlow(state, current, workersAvailable(state, current) > 0)
+  const extra = collectExtraTurnFlow(state, current, workersAvailable(state, current) > 0, core.actionHooks)
   if (!extra) return false
   if (state.enableFarmersOfTheMoor && hasHealthyWorkerAtHome(state, current) && extra.flow.type === 'xor' && !extra.cardId) {
     extra.flow.children.push({
@@ -227,7 +230,7 @@ export const takeSpecialAction = (
   playerIndex: number,
   cardId: string,
   actionId: MoorSpecialActionId,
-  payload?: MoorSpecialActionPayload,
+  payload?: MoorSpecialActionPayload
 ): SessionResponse => {
   const state = core.state
   if (state.gameOver) return core.emitResponse(false, 'game is over')
@@ -246,7 +249,7 @@ export const takeSpecialAction = (
   if (!player || !hasHealthyWorkerAtHome(state, player)) {
     return core.emitResponse(false, 'no healthy workers available')
   }
-  const validation = validateMoorSpecialAction(state, playerIndex, cardId, actionId, payload)
+  const validation = validateMoorSpecialAction(state, playerIndex, cardId, actionId, payload, core.actionHooks)
   if (!validation.ok) return core.emitResponse(false, validation.error)
 
   core.appendHistory(true)
@@ -434,8 +437,8 @@ export const continueAfterReorganizeRoundEnd = (
   }
   const player = core.state.players[playerIndex]!
   core.invokeFinalizeActionLog(player)
-  if (!roundWorkComplete(core.state)) {
-    const next = nextWorkRotationIdx(core.state, core.state.currentPlayerIndex)
+  if (!roundWorkComplete(core.state, core.actionHooks)) {
+    const next = nextWorkRotationIdx(core.state, core.state.currentPlayerIndex, core.actionHooks)
     startConfirmNextPlayer(core, playerIndex, next)
   }
 }
@@ -463,7 +466,7 @@ export const finalizeActionLog = (core: GameCore, player: PlayerState): void => 
  */
 export const performRoundEnd = (core: GameCore): SessionResponse => {
   const state = core.state
-  if (!roundWorkComplete(state)) return core.emitResponse(false, 'not all workers used')
+  if (!roundWorkComplete(state, core.actionHooks)) return core.emitResponse(false, 'not all workers used')
   if (core.peekEnginePendingEnvelope()) return core.emitResponse(false, 'pending action exists')
 
   const pendingAnimal = state.players.findIndex((p) => core.hasPendingAnimalsCheck(p))
@@ -509,8 +512,8 @@ export const finishCompletedActionTurn = (
   endTurnScope(player)
   core.setTurnOwner(null)
   core.clearEngineStack()
-  if (!roundWorkComplete(core.state)) {
-    const next = nextWorkRotationIdx(core.state, core.state.currentPlayerIndex)
+  if (!roundWorkComplete(core.state, core.actionHooks)) {
+    const next = nextWorkRotationIdx(core.state, core.state.currentPlayerIndex, core.actionHooks)
     startConfirmNextPlayer(core, playerIndex, next)
   } else {
     const startIdx = computeStartPlayerIdx(core.state)
@@ -636,14 +639,14 @@ export const handleConfirmNextPlayerResolved = (
   // guarantee termination if every player is asked to skip.
   let safety = state.players.length
   while (safety-- > 0) {
-    if (roundWorkComplete(state)) break
+    if (roundWorkComplete(state, core.actionHooks)) break
     const current = state.players[state.currentPlayerIndex]
     if (!current) break
     // A 0-worker player is normally skipped — unless a card owes them an extra
     // turn (e.g. A92 AdoptiveParents), in which case the rotation stops on them
     // so the contributed flow can be offered below.
-    if (workersAvailable(state, current) <= 0 && !hasPendingExtraTurn(state, current)) {
-      const next = nextWorkRotationIdx(state, state.currentPlayerIndex)
+    if (workersAvailable(state, current) <= 0 && !hasPendingExtraTurn(state, current, core.actionHooks)) {
+      const next = nextWorkRotationIdx(state, state.currentPlayerIndex, core.actionHooks)
       if (next === state.currentPlayerIndex) break
       state.currentPlayerIndex = next
       continue
@@ -654,17 +657,17 @@ export const handleConfirmNextPlayerResolved = (
     // consume exactly one extra-turn opportunity.
     const skippedExtraTurn =
       workersAvailable(state, current) <= 0 &&
-      collectExtraTurnFlow(state, current) !== null
+      collectExtraTurnFlow(state, current, undefined, core.actionHooks) !== null
     if (!shouldSkipPlayerTurn(state, current)) break
     if (skippedExtraTurn) {
-      skipPendingExtraTurn(state, current)
+      skipPendingExtraTurn(state, current, core.actionHooks)
     }
     appendImmediateEvents(state, [{
       type: 'turn.skipped',
       playerId: current.id,
       reason: 'cardEffect',
     }], { actorPlayerId: current.id })
-    const next = nextWorkRotationIdx(state, state.currentPlayerIndex)
+    const next = nextWorkRotationIdx(state, state.currentPlayerIndex, core.actionHooks)
     if (next === state.currentPlayerIndex) {
       if (skippedExtraTurn) {
         safety = Math.max(safety, 1)
@@ -686,7 +689,7 @@ export const handleConfirmNextPlayerResolved = (
   // whose extra turn was consumed by a mandatory skip above no longer reports
   // that consumed opportunity as pending, so `roundWorkComplete` (here and the
   // re-check in performRoundEnd) can complete the round.
-  if (roundWorkComplete(state)) {
+  if (roundWorkComplete(state, core.actionHooks)) {
     return core.invokeAllWorkersPlacedHooks()
   }
 

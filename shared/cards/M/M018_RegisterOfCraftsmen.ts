@@ -23,9 +23,9 @@ const cardImpl = {
   listeners: [costListener],
   effect: {
     id: CARD_ID,
-    onBuy: (state, player) => {
+    onBuy: (state, player, _payment, context) => {
       const allowedPurchases = TARGETS.filter((id) =>
-        isMajorImprovementPlayable(state, player, id, CARD_ID, [...TARGETS]),
+        isMajorImprovementPlayable(state, player, id, CARD_ID, [...TARGETS], context?.actionHooks),
       )
       if (allowedPurchases.length === 0) return
       return {

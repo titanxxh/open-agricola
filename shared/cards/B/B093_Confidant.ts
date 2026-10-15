@@ -27,7 +27,7 @@ const canAffordMinimumSchedule = (context: CardListenerContext) => {
     context.player,
     CARD_ID,
     baseCost,
-    context.actionCardId,
+    context.actionCardId, undefined, context?.actionHooks
   )
   const currentFood = context.player.resources.food ?? 0
   return options.some((option) =>
@@ -44,7 +44,7 @@ const minimumScheduleListener: CardListenerRegistration = {
       if (
         isLessonsSpaceId(context.actionId) &&
         context.player.occupationHand.includes(CARD_ID) &&
-        !hasPlayableOccupationChoice(context.state, context.player, context.actionId)
+        !hasPlayableOccupationChoice(context.state, context.player, context.actionId, undefined, context?.actionHooks)
       ) {
         return { doable: false }
       }
