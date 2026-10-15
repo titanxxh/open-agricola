@@ -1,3 +1,4 @@
+import { getUsedFarmyardTileKeys, getNewlyUsedFarmyardTiles } from '../domain/farmyard-usage'
 import type { ActionFlow, ActionSpace, FarmTilePosition, Field, GameState, PlayerState, Resource } from '../contract/types'
 import type { EventSink } from '../contract/events'
 import { positionKey } from '../domain/farm'
@@ -212,9 +213,11 @@ const executeMoorSpecialActionEffect = (
     terrainCleared = removed.cleared
   } else if (plan.terrain?.operation === 'replace-with-field') {
     if (!plan.terrain.tile) return { ok: false, error: 'terrain unavailable' }
+    const previousUsed = getUsedFarmyardTileKeys(player)
     const result = replaceTerrainWithField(player, plan.terrain.tile, plan.terrain.from)
     if (!result.ok) return { ok: false, error: 'terrain unavailable' }
     eventSink?.emit<'farm.fieldPlowed'>({
+      newlyUsedTiles: getNewlyUsedFarmyardTiles(player, previousUsed),
       type: 'farm.fieldPlowed', actorPlayerId: player.id, sourceActionId: actionId,
       fields: [{ playerId: player.id, row: plan.terrain.tile.row, col: plan.terrain.tile.col }],
     })

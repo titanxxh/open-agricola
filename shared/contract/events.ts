@@ -120,11 +120,17 @@ export type FarmCropRemovedEvent = GameEventBase<'farm.cropRemoved'> & {
   reason: 'harvest' | 'reap' | 'pay' | 'cardEffect' | 'discard'
 }
 
+export type FarmyardTileUsage = { playerId: string; row: number; col: number }
+
 export type FarmFieldPlowedEvent = GameEventBase<'farm.fieldPlowed'> & {
+  /** Tiles made used by this mutation, captured before its trailing reactions. */
+  newlyUsedTiles: FarmyardTileUsage[]
   fields: Array<{ playerId: string; row: number; col: number }>
 }
 
 export type FarmRoomBuiltEvent = GameEventBase<'farm.roomBuilt'> & {
+  /** Tiles made used by this mutation, captured before its trailing reactions. */
+  newlyUsedTiles: FarmyardTileUsage[]
   rooms: Array<{ playerId: string; row: number; col: number; type: PlayerState['houseType'] }>
 }
 
@@ -136,6 +142,8 @@ export type FarmRenovatedEvent = GameEventBase<'farm.renovated'> & {
 }
 
 export type FarmStableBuiltEvent = GameEventBase<'farm.stableBuilt'> & {
+  /** Tiles made used by this mutation, captured before its trailing reactions. */
+  newlyUsedTiles: FarmyardTileUsage[]
   stables: Array<{
     playerId: string
     row: number
@@ -146,6 +154,8 @@ export type FarmStableBuiltEvent = GameEventBase<'farm.stableBuilt'> & {
 }
 
 export type FarmFenceBuiltEvent = GameEventBase<'farm.fenceBuilt'> & {
+  /** Tiles made used by this mutation, captured before its trailing reactions. */
+  newlyUsedTiles: FarmyardTileUsage[]
   fences: unknown[]
   newFenceEdges?: string[]
   newPastures?: Array<{ tiles?: unknown[] }>

@@ -1,3 +1,4 @@
+import { getUsedFarmyardTileKeys, getNewlyUsedFarmyardTiles } from '../../domain/farmyard-usage'
 import type {
   ActionAvailabilityContext,
   ActionCostPreview,
@@ -212,6 +213,7 @@ const finalizeRoom = (
   )
   if (!baseCost) return { type: 'fail', errorKey: 'log.buildRoomFail' }
 
+  const previousUsed = getUsedFarmyardTileKeys(ctx.player)
   const nextPlayer = JSON.parse(JSON.stringify(ctx.player)) as PlayerState
   nextPlayer.roomTiles = [...nextPlayer.roomTiles, ...rooms]
   nextPlayer.rooms = nextPlayer.rooms + rooms.length
@@ -229,6 +231,7 @@ const finalizeRoom = (
   incRoomsBuilt(ctx.player, rooms.length)
   ctx.eventSink?.emit<'farm.roomBuilt'>({
     type: 'farm.roomBuilt',
+    newlyUsedTiles: getNewlyUsedFarmyardTiles(ctx.player, previousUsed),
     rooms: rooms.map((room) => ({
       playerId: ctx.player.id,
       row: room.row,

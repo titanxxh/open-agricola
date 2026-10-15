@@ -1,3 +1,4 @@
+import { getUsedFarmyardTileKeys, getNewlyUsedFarmyardTiles } from '../../domain/farmyard-usage'
 import { resolveActionTargetPlayer } from '../helpers/target-player'
 import { applyCardStorageOperation, previewCardStorageOperation, readCardStorageOperation } from '../card-storage'
 import type {
@@ -625,9 +626,11 @@ export const specialEffectAction: ActionDefinition = {
         if (!state || getAvailableStableSupplyCount(state, target) <= 0) return { type: 'ok' }
         const tile = getNextEmptyTileForPlayer(target)
         if (!tile) return { type: 'ok' }
+        const previousUsed = getUsedFarmyardTileKeys(target)
         target.stableTiles.push(tile)
         eventSink?.emit<'farm.stableBuilt'>({
           type: 'farm.stableBuilt',
+          newlyUsedTiles: getNewlyUsedFarmyardTiles(target, previousUsed),
           sourceCardId: sourceCard,
           stables: [{ playerId: target.id, row: tile.row, col: tile.col }],
         })

@@ -131,6 +131,7 @@ describe('Farmers of the Moor special actions', () => {
       actorPlayerId: slashPlayer.id,
       sourceActionId: 'slash-and-burn',
       fields: [{ playerId: slashPlayer.id, row: slashForest.row, col: slashForest.col }],
+      newlyUsedTiles: [],
     }))
     expect(actionDetailFor(slashSession, 'slash-and-burn')).toEqual(expect.objectContaining({
       params: expect.objectContaining({

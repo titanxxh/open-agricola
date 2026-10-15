@@ -31,11 +31,11 @@ const eventKeysByType: Record<string, readonly string[]> = {
   'farm.sown': ['sows', 'placementOnly'],
   'farm.cropAdded': ['crops', 'reason'],
   'farm.cropRemoved': ['crops', 'reason'],
-  'farm.fieldPlowed': ['fields'],
-  'farm.roomBuilt': ['rooms'],
+  'farm.fieldPlowed': ['fields', 'newlyUsedTiles'],
+  'farm.roomBuilt': ['rooms', 'newlyUsedTiles'],
   'farm.renovated': ['playerId', 'from', 'to', 'rooms'],
-  'farm.stableBuilt': ['stables'],
-  'farm.fenceBuilt': ['fences', 'newFenceEdges', 'newPastures'],
+  'farm.stableBuilt': ['stables', 'newlyUsedTiles'],
+  'farm.fenceBuilt': ['fences', 'newFenceEdges', 'newPastures', 'newlyUsedTiles'],
   'farm.fenceConsumed': ['count', 'reason'],
   'farm.animalMoved': ['animals', 'from', 'to', 'newlyPlacedOnFarmyard'],
   'farm.animalDiscarded': ['animals', 'reason'],
@@ -443,9 +443,11 @@ const assertKnownEventDetails = (type: string, event: Record<string, unknown>): 
       })
       return
     case 'farm.fieldPlowed':
+      assertBoardPositions(event.newlyUsedTiles, 'newlyUsedTiles', ['playerId', 'row', 'col'])
       assertBoardPositions(event.fields, 'fields', ['playerId', 'row', 'col'])
       return
     case 'farm.roomBuilt':
+      assertBoardPositions(event.newlyUsedTiles, 'newlyUsedTiles', ['playerId', 'row', 'col'])
       assertBoardPositions(event.rooms, 'rooms', ['playerId', 'row', 'col', 'type'])
       return
     case 'farm.renovated':
@@ -455,9 +457,11 @@ const assertKnownEventDetails = (type: string, event: Record<string, unknown>): 
       assertBoardPositions(event.rooms, 'rooms', ['row', 'col'])
       return
     case 'farm.stableBuilt':
+      assertBoardPositions(event.newlyUsedTiles, 'newlyUsedTiles', ['playerId', 'row', 'col'])
       assertStableBuiltPositions(event.stables, 'stables')
       return
     case 'farm.fenceBuilt':
+      assertBoardPositions(event.newlyUsedTiles, 'newlyUsedTiles', ['playerId', 'row', 'col'])
       if (!Array.isArray(event.fences)) throw new Error('GameEvent fences must be an array')
       if (event.newFenceEdges !== undefined) assertStringArray(event.newFenceEdges, 'newFenceEdges')
       if (event.newPastures !== undefined) assertFencePastures(event.newPastures, 'newPastures')

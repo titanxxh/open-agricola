@@ -1,3 +1,4 @@
+import { getUsedFarmyardTileKeys, getNewlyUsedFarmyardTiles } from '../../domain/farmyard-usage'
 import type {
   ActionAvailabilityContext,
   ActionCostPreview,
@@ -209,6 +210,7 @@ const finalizePlow = (
   if (payment.type !== 'selected') {
     return { type: 'fail', errorKey: 'log.action', recoverable: payment.type === 'fail' && payment.recoverable === true }
   }
+  const previousUsed = getUsedFarmyardTileKeys(ctx.player)
   const nextPlayer = JSON.parse(JSON.stringify(validated.player)) as PlayerState
   PaymentSolver.executeResolvedTypedFlatPayment(nextPlayer, payment, 'plow', ctx.state)
   applyPlayerMutation(ctx.player, nextPlayer)
@@ -223,6 +225,7 @@ const finalizePlow = (
   }
   ctx.eventSink?.emit<'farm.fieldPlowed'>({
     type: 'farm.fieldPlowed',
+    newlyUsedTiles: getNewlyUsedFarmyardTiles(ctx.player, previousUsed),
     fields: [{ playerId: ctx.player.id, row: tile.row, col: tile.col }],
   })
   return {
