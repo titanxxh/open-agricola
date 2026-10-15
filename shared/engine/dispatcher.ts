@@ -171,6 +171,7 @@ export class HookDispatcher {
     const actionResults = this.actionHooks.run({ ...context, actionHooks: this.actionHooks, phase: 'computeChoiceCandidates' })
     const listenerContext = {
       ...context,
+      actionHooks: this.actionHooks,
       phase: 'computeChoiceCandidates' as const,
     }
     const matched = getMatchingListeners(listenerContext)
