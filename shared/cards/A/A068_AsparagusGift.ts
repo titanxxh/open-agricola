@@ -2,35 +2,10 @@ import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { readCardExtraData } from '../helpers/card-state'
-import { getFenceCount } from '../../actions/effects/fencing'
 import type { CardImpl } from '../registry'
 import { getLogicalFields } from '../helpers/card-field'
 
 const CARD_ID = 'A068_AsparagusGift'
-const FENCES_BEFORE_KEY = 'fencesBefore'
-
-const beforeListener: CardListenerRegistration = {
-  id: 'A68-asparagus-gift-before-fencing',
-  cardIds: [CARD_ID],
-  phases: ['before' as ActionHookPhase],
-  actions: ['fence'],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    return {
-      flow: {
-        type: 'leaf',
-        actionId: 'special-effect',
-        sourceCard: CARD_ID,
-        params: {
-          kind: 'set-extra-data',
-          key: FENCES_BEFORE_KEY,
-          value: getFenceCount(context.player),
-        },
-      },
-      sourceCard: CARD_ID,
-    }
-  },
-}
 
 const afterListener: CardListenerRegistration = {
   id: 'A68-asparagus-gift-after-fencing',
@@ -38,15 +13,18 @@ const afterListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['fence'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    const fencesBefore = readCardExtraData<number>(context.player, CARD_ID, FENCES_BEFORE_KEY) ?? 0
-    const fencesBuilt = getFenceCount(context.player) - fencesBefore
+    const fencesBuilt = (context.actionEvents ?? []).reduce((total, event) => {
+      if (!('schemaVersion' in event) || event.type !== 'farm.fenceBuilt'
+        || (event.targetPlayerId ?? event.actorPlayerId) !== context.player.id) return total
+      return total + (event.newFenceEdges?.length ?? 0)
+    }, 0)
     if (fencesBuilt < context.state.round) return
     return { flow: gainLeaf(CARD_ID, { vegetable: 1 }), sourceCard: CARD_ID }
   },
 }
 
 const cardImpl = {
-  listeners: [beforeListener, afterListener],
+  listeners: [afterListener],
   prerequisiteCheck: (player) => getLogicalFields(player).some((field) => field.stacks.length === 0),
   reaches: [] as readonly string[],
 } satisfies CardImpl

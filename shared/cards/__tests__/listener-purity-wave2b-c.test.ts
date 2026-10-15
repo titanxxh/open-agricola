@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { guardedListener } from './listener-purity-guard'
 import type { ActionFlow, ActionSpace, GameState, PlayerState, Resource } from '../../contract/types'
-import type { DraftGameEvent } from '../../contract/events'
+import type { DraftGameEvent, GameEvent } from '../../contract/events'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import { A068_AsparagusGift_impl } from '../A/A068_AsparagusGift'
 import { A073_AgriculturalFertilizers_impl } from '../A/A073_AgriculturalFertilizers'
@@ -269,23 +269,36 @@ describe('listener purity wave 2b/c', () => {
     ])
   })
 
-  it('A68 AsparagusGift before-fencing snapshots fence count by flow only', () => {
-    const p = player('A068_AsparagusGift', {
-      fenceSegments: [{ type: 'fence', from: { row: 0, col: 0 }, to: { row: 0, col: 1 } }],
-    })
-    const game = state([p])
+  it('A68 AsparagusGift builds a reward from committed host events without mutating state', () => {
+    const p = player('A068_AsparagusGift')
+    const game = state([p], { round: 4 })
     const before = stateSnapshot(game)
-
-    const result = listenerById(A068_AsparagusGift_impl.listeners, 'A68-asparagus-gift-before-fencing')
-      .handler(context(p, { state: game, actionId: 'fence', phase: 'before' }))
+    const edges = ['H-0-0', 'H-1-0', 'V-0-0', 'V-0-1']
+    const built: GameEvent = {
+      schemaVersion: 1, type: 'farm.fenceBuilt', id: 'built', seq: 1, round: 4, phase: 'work', visibility: 'public',
+      actorPlayerId: p.id, fences: edges.map(edge => ({ edge, type: 'fence' })), newlyUsedTiles: [], newFenceEdges: edges,
+    }
+    const result = listenerById(A068_AsparagusGift_impl.listeners, 'A68-asparagus-gift-after-fencing')
+      .handler(context(p, { state: game, actionId: 'fence', phase: 'after', actionEvents: [built] }))
 
     expectUnchanged(before, game)
     expect(result?.flow).toMatchObject({
       type: 'leaf',
-      actionId: 'special-effect',
+      actionId: 'gain',
       sourceCard: 'A068_AsparagusGift',
-      params: { kind: 'set-extra-data', key: 'fencesBefore' },
+      params: { vegetable: 1 },
     })
+    for (const events of [
+      { actionEvents: [{ ...built, actorPlayerId: 'other' }] },
+      { actionEvents: [{ ...built, targetPlayerId: 'other' }] },
+      { actionEvents: [], transactionEvents: [built] },
+      { actionEvents: undefined, transactionEvents: [built] },
+    ]) {
+      const unrelated = listenerById(A068_AsparagusGift_impl.listeners, 'A68-asparagus-gift-after-fencing')
+        .handler(context(p, { state: game, actionId: 'fence', phase: 'after', ...events }))
+      expect(unrelated).toBeUndefined()
+    }
+    expectUnchanged(before, game)
   })
 
   it('A73 AgriculturalFertilizers before-action snapshots used spaces by flow only', () => {
