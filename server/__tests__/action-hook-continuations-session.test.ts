@@ -9,6 +9,30 @@ const sessions: ReturnType<typeof createWorkSession>[] = []
 afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
 
 describe('owning action rules in before continuations', () => {
+  it('snapshots a reserved worker construction using the owning session price', () => {
+    const cardId = '__scheduled_room__'
+    const session = createWorkSession({ configure: state => {
+      const player = state.players[0]!
+      player.minorPlayed = [cardId]
+      player.resources.wood = 10
+      player.resources.reed = 2
+      player.workers[4]!.supplyUse = { sourceCard: cardId, disposition: 'return-to-supply', status: 'reserved', returnRound: state.round }
+    } })
+    sessions.push(session)
+    session.withCtx(() => requireActiveCardRegistry('scheduled construction test').setEffect({
+      id: cardId, contributeExtraTurn: () => ({ type: 'leaf', actionId: 'construct', sourceCard: cardId }),
+    }))
+    session.actionHooks.register({ id: 'test:scheduled-construction-price', actions: ['construct'], phases: ['computeCosts'], handler: () => ({ costs: { wood: 1 } }) })
+    const before = JSON.stringify(session.state)
+    const snapshot = serializeSessionSnapshot(session.state, session)
+    const payment = snapshot.frame.players[0]!.scheduledEffects.find(entry => entry.sourceCard === cardId && entry.timing === 'contributeExtraTurn')
+    expect(payment?.description).toMatchObject({ kind: 'action', effectPreview: { kind: 'actionCosts', options: [
+      { amount: 1, paymentOptions: [{ kind: 'payment', resourcesPaid: { wood: 6, reed: 2 } }] },
+    ] } })
+    expect(JSON.stringify(session.state)).toBe(before)
+    expect(session.buildSyncPayload(session.getState(), session.state.players[0]!.id).state.players[0]!.scheduledEffects).toEqual(snapshot.frame.players[0]!.scheduledEffects)
+  })
+
   it('resumes two fencing before reactions through a real Session snapshot', () => {
     const cards = ['__before_fence_a__', '__before_fence_b__']
     const session = createWorkSession({ configure: state => {

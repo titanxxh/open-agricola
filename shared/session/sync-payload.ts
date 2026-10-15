@@ -33,7 +33,7 @@ export function buildSyncPayload(
   windowed = false,
   historyNameProjection: HistoryNameProjection = 'session',
 ): GameSyncPayload {
-  const ctx = { engineStack: core.getEngineStack() }
+  const ctx = { actionHooks: core.actionHooks, engineStack: core.getEngineStack() }
   const defs = core.getCustomCardDefs()
   const canonicalState = serializedState ?? core.withCtx(() => serializeState(resp.state, ctx))
   if (mode !== 'debug') describeHistory(canonicalState)
