@@ -147,6 +147,7 @@ describe('event guards', () => {
       ...baseEvent,
       type: 'farm.fenceBuilt',
       newlyUsedTiles: [],
+      newlyEnclosedPastureTiles: [],
       fences: [{ edge: 'H-0-0', type: 'fence' }],
       newFenceEdges: ['H-0-0'],
       newPastures: [{ tiles: [{ row: 0, col: 0 }] }],
@@ -157,7 +158,7 @@ describe('event guards', () => {
     { type: 'farm.fieldPlowed', fields: [] },
     { type: 'farm.roomBuilt', rooms: [] },
     { type: 'farm.stableBuilt', stables: [] },
-    { type: 'farm.fenceBuilt', fences: [] },
+    { type: 'farm.fenceBuilt', fences: [], newlyEnclosedPastureTiles: [] },
   ])('requires owned geometry facts for $type', payload => {
     const event = { ...baseEvent, ...payload }
     expect(() => assertKnownGameEventShape(event)).toThrow(/newlyUsedTiles/)
@@ -165,6 +166,19 @@ describe('event guards', () => {
     expect(() => assertKnownGameEventShape({ ...event, newlyUsedTiles: [{ playerId: 'p1', row: 0, col: 1 }] })).not.toThrow()
     for (const malformed of [[{ row: 0, col: 1 }], [{ playerId: 'p1', row: '0', col: 1 }], [{ playerId: 'p1', row: 0, col: 1, extra: true }]]) {
       expect(() => assertKnownGameEventShape({ ...event, newlyUsedTiles: malformed })).toThrow(/newlyUsedTiles/)
+    }
+  })
+
+  it('requires owned newly enclosed pasture tiles separately from newly used tiles', () => {
+    const event = { ...baseEvent, type: 'farm.fenceBuilt', fences: [], newlyUsedTiles: [] }
+    expect(() => assertKnownGameEventShape(event)).toThrow(/newlyEnclosedPastureTiles/)
+    for (const newlyEnclosedPastureTiles of [[], [{ playerId: 'p1', row: 0, col: 0 }]]) {
+      expect(() => assertKnownGameEventShape({ ...event, newlyEnclosedPastureTiles })).not.toThrow()
+    }
+    for (const malformed of [null, [{ row: 0, col: 0 }], [{ playerId: 'p1', row: 0, col: '0' }],
+      [{ playerId: 'p1', row: 0, col: 0, extra: true }]]) {
+      expect(() => assertKnownGameEventShape({ ...event, newlyEnclosedPastureTiles: malformed }))
+        .toThrow(/newlyEnclosedPastureTiles/)
     }
   })
 

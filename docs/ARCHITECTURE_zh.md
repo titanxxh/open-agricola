@@ -718,6 +718,8 @@ anytime                  额外注册的 anytime 行动
 
 农场变更事件 `farm.fieldPlowed`、`farm.roomBuilt`、`farm.stableBuilt` 和 `farm.fenceBuilt` 必须包含 `newlyUsedTiles: { playerId, row, col }[]`。每个生产入口在成功变更前取得权威已使用格集合，并在变更后、尾随响应前立即记录集合差。已使用格包括房间、田地、马厩、牧场格、地形和被封锁的农场格。因此，在已有牧场或田地建马厩、分割牧场和地形转为田地的新增使用格均为空。普通建造、特殊马厩、直接建马厩和 Moor 入口遵守同一合同。必填事实经事件校验，并由事件投影、pending 快照和 Replay 保留；消费者不能从响应执行时的版图重新推算差值。
 
+围栏提交还必须记录 `newlyEnclosedPastureTiles: { playerId, row, col }[]`，取提交前后牧场坐标集合的差。它表示未围住的格子变为牧场，与未使用变为使用的格子及变化的牧场组件（`newPastures`）分别记录。因此首次围住未围栏马厩会记录其格子，分割已有牧场则为空。C179 只读取原宿主捕获的行动事件中的这一事实，并按受影响玩家过滤，不再保存行动前的牧场缓存。
+
 `getActionNewlyUsedTiles(context)` 只读取宿主已捕获 `actionEvents` 中的已提交几何事件，按效果玩家 ID 过滤并去重坐标，不回退到更宽的 transaction 或 Turn 范围。嵌套宿主各自保留事实，延后的外层响应不会再次消费内层变更。A040 剩余黏土等持续牌上库存仍由本牌状态保存，每次行动的几何事实不再使用临时牌状态缓存。提交时的卡牌准入继续采用已冻结的 listener 集合和 `triggerSnapshot`；新增几何事实不会让之后响应中新打出的卡追溯响应旧事件。
 
 卡牌 listener 通过 `CardListenerContext.transactionEvents` 和 `eventQuery` 读取当前 action frame 的事件。普通 listener 看到的是已经 emit 的当前 frame 事件；`trade-applied` 这类合成 listener 可以读取当前 exchange 的 `DraftGameEvent`，但不能依赖尚未提交的全局 `state.events`。listener handler 必须是 state-pure flow builder；包括本卡 `cardStates[cardId]` 在内的所有状态修改都通过返回 flow/leaf 进入 engine。trigger-select preview 在克隆 state/player 上执行 card listener，并且只根据返回结果判定该 activation 是否可选；listener 写 preview clone 属于纯度违规（见 §7.7 listener 纯度门禁）。只有 stage card-effect handler 仍可通过可检测的 clone 修改建立适用性。真实写入只在玩家选择 activation 后发生。
