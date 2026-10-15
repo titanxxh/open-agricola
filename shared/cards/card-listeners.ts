@@ -3,7 +3,7 @@ import { getCardEffect } from './card-effects'
 import type { ActionCostAttribution, ActionExecutionContext, ActionExecutionResult, ActionFlow, ActionSpace, Bonus, CardCostCandidate, CardProvidedPaymentResourceProvider, GameState, InteractionRequest, PlayerState, Resource, Trade } from '../contract/types'
 import { requireActionHookRegistry, type ActionHookRegistry, type ActionHookContext, type ActionHookPhase, type ActionHookResult } from '../actions/hooks'
 import { getCurrentSessionContext } from './session-card-context'
-import { getActiveCardRegistry } from './active-registry'
+import { requireActiveCardRegistry } from './active-registry'
 import { exchangeToTrade } from '../actions/helpers/trades'
 import type { DraftGameEvent, GameEvent } from '../contract/events'
 import { createEventQuery, type EventQuery } from '../events/query'
@@ -127,8 +127,7 @@ export const invokeCardCostCandidateTransform = (
 }
 
 export const getRegisteredCardListeners = (): CardListenerRegistration[] => {
-  const active = getActiveCardRegistry()
-  return active ? active.getAllListeners() : []
+  return requireActiveCardRegistry('getRegisteredCardListeners').getAllListeners()
 }
 
 const DEFAULT_LISTENER_ZONES: readonly CardListenerZone[] = ['played']
@@ -195,8 +194,7 @@ const listenerCardIds = (context: CardListenerContext): string[] => [
 ]
 
 const getBaseListeners = (context?: CardListenerContext): CardListenerRegistration[] => {
-  const active = getActiveCardRegistry()
-  if (!active) return []
+  const active = requireActiveCardRegistry('getBaseListeners')
   return context
     ? active.getCandidateListeners(listenerCardIds(context))
     : active.getAllListeners()
@@ -484,6 +482,7 @@ const retainedTimedListener = (cardId: string, phase: 'afterReceive' | 'afterCol
 })
 
 export const getListenerById = (listenerId: string): CardListenerRegistration | undefined => {
+  const active = requireActiveCardRegistry('getListenerById')
   if (listenerId.startsWith('activated-timed:')) {
     const offset = listenerId.indexOf(':', 'activated-timed:'.length)
     const phase = listenerId.slice('activated-timed:'.length, offset)
@@ -498,8 +497,7 @@ export const getListenerById = (listenerId: string): CardListenerRegistration | 
     const custom = sessionCtx.customListeners.find((l) => l.id === listenerId)
     if (custom) return custom
   }
-  const active = getActiveCardRegistry()
-  return active?.getAllListeners().find((l) => l.id === listenerId)
+  return active.getAllListeners().find((l) => l.id === listenerId)
 }
 
 /**

@@ -9,7 +9,7 @@ import type { PrivateGameEvent } from '../contract/private-events'
 import type { CardRuleContributions, CardStatePresentation } from '../contract/card-state'
 import type { AnimalZone, PlayerScoreSummary, ScoreCategoryResult } from '../domain'
 import { getCurrentSessionContext } from './session-card-context'
-import { getActiveCardRegistry } from './active-registry'
+import { requireActiveCardRegistry } from './active-registry'
 import { positionKey } from '../domain/farm'
 import { getPlacementBlockedFarmyardSpaceKeys } from '../domain/farmyard-space-states'
 import { ALL_ANIMAL_KEYS, type AnimalKey } from '../contract/animals'
@@ -368,11 +368,11 @@ export type CardEffect = {
 }
 
 export const getCardEffect = (id: string): CardEffect | null => {
+  const active = requireActiveCardRegistry('getCardEffect')
   const sessionCtx = getCurrentSessionContext()
   const custom = sessionCtx?.customEffects.get(id)
   if (custom) return custom
-  const active = getActiveCardRegistry()
-  return active?.getEffect(id) ?? null
+  return active.getEffect(id) ?? null
 }
 
 export const resourceCommitmentsSatisfied = (state: GameState): boolean => {

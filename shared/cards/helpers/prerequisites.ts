@@ -4,7 +4,7 @@ import { getRegisteredMinorImprovement } from '../registry-display'
 import { getMajorCard } from '../major'
 import { collectCardsAs } from './card-type'
 import { countUnusedFarmyardSpaces } from '../../domain/farm'
-import { getActiveCardRegistry } from '../active-registry'
+import { requireActiveCardRegistry } from '../active-registry'
 import type { AnimalKey } from '../../contract/animals'
 import { getFarmyardFields, getLogicalFields } from './card-field'
 
@@ -204,6 +204,7 @@ export const meetsCardPrerequisites = (
   round?: number,
   state?: GameState,
 ) => {
+  const registry = requireActiveCardRegistry('meetsCardPrerequisites')
   if (card.maxRound !== undefined && round !== undefined && round > card.maxRound) {
     return false
   }
@@ -214,8 +215,7 @@ export const meetsCardPrerequisites = (
     return false
   }
   // Inline prerequisite check (registered on CardImpl) wins over declarative parser.
-  const registry = getActiveCardRegistry()
-  const inline = registry?.getPrerequisiteCheck(card.id)
+  const inline = registry.getPrerequisiteCheck(card.id)
   if (inline) return inline(player, state)
   return meetsTextPrerequisite(player, card.prerequisite)
 }
