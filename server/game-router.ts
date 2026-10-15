@@ -5,7 +5,7 @@ import { RoomOwnershipError } from './game/room-directory'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { GameSession } from './game/authoritative-session.ts'
 import type { SowSelection } from '../shared/domain/index.ts'
-import { validateFarmChoice, type FarmChoiceType } from '../shared/session/farm-choice-validation.ts'
+import type { FarmChoiceType, FarmChoiceValidation } from '../shared/session/farm-choice-validation.ts'
 import type { FarmTilePosition } from '../shared/contract/types.ts'
 import type { MoorSpecialActionId } from '../shared/moor/types.ts'
 import { getDb } from './db.ts'
@@ -621,12 +621,11 @@ const handleAuthorizedGameRoute = async (
     const executor = sessionExecutors.get((await getSessionKey(req)))
     try {
       const validation = executor
-        ? await executor.query<ReturnType<typeof validateFarmChoice>>(
+        ? await executor.query<FarmChoiceValidation>(
           'validateFarmChoice',
           [body.type, body.playerId, body.payload],
         )
-        : validateFarmChoice(
-          session.withCtx(() => session.getStateForRead()),
+        : session.validateFarmChoice(
           body.type,
           body.playerId,
           body.payload,

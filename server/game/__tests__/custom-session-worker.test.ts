@@ -4,6 +4,7 @@ import { snapshotToRoom } from '../room'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { CustomCardData } from '../../../shared/cards/session-card-context.ts'
 import { validateAndCompileCustomCode } from '../../custom-code/engine.ts'
+import { createWorkSession } from '../../__tests__/_helpers/session-fixtures'
 import {
   buildSessionSyncPayload,
   createIsolatedGameSession,
@@ -69,6 +70,45 @@ afterEach(() => {
 })
 
 describe('custom session executor', () => {
+  it('validates both worker sessions with their own farm restrictions without changing their snapshots', async () => {
+    const make = (locked: boolean) => {
+      const prepared = createWorkSession({ configure: state => {
+        if (locked) {
+          state.players[0]!.minorPlayed = ['B038_FutureBuildingSite']
+          state.players[0]!.cardStates.B038_FutureBuildingSite = {
+            extraData: { locked: [{ row: 0, col: 0 }] },
+          }
+        }
+      } })
+      const created = createIsolatedGameSession(prepared.state, [card('CUSTOM_FarmValidation')])
+      prepared.dispose()
+      if (!created.executor) throw new Error('Expected an executable session worker')
+      executors.push(created.executor)
+      return { session: created.session, executor: created.executor }
+    }
+    const locked = make(true), ordinary = make(false)
+    try {
+      for (const { executor } of [locked, ordinary]) {
+        const response = await executor.execute('getState', [])
+        expect(response.ok, response.error).toBe(true)
+        expect(response.state.players).toHaveLength(2)
+        expect(response.interaction.stateId).toBe('idle')
+      }
+      const before = [locked, ordinary].map(({ executor }) => JSON.stringify(executor.serializedStateForPersistence()))
+      expect(await locked.executor.query('validateFarmChoice', ['plow', 'p1', { tile: { row: 0, col: 0 } }]))
+        .toEqual({ valid: false, error: 'LOCKED' })
+      expect(await ordinary.executor.query('validateFarmChoice', ['plow', 'p1', { tile: { row: 0, col: 0 } }]))
+        .toEqual({ valid: true, error: null })
+      expect(await locked.executor.query('validateFarmChoice', ['plow', 'p1', { tile: { row: 0, col: 1 } }]))
+        .toEqual({ valid: true, error: null })
+      expect([locked, ordinary].map(({ executor }) => JSON.stringify(executor.serializedStateForPersistence())))
+        .toEqual(before)
+    } finally {
+      locked.session.dispose()
+      ordinary.session.dispose()
+    }
+  })
+
   it('keeps cached Worker payloads authoritative while projecting current Room names', async () => {
     const { session, executor } = setup(card('CUSTOM_HistoryNames'))
     session.state.players.forEach(player => { player.name = 'Recorded name' })
