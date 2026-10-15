@@ -76,6 +76,47 @@ afterEach(() => {
 })
 
 describe('browser executor parity with server executor', () => {
+  it.each(['server', 'browser'] as const)('passes a real choice string to the %s custom-card effect', runtime => {
+    const source = `
+const CARD_ID = 'CUSTOM_ParityCard'
+const CARD_DEF = MinorImprovement({ id: CARD_ID, name: 'Parity Card' })
+const CARD_IMPL = {
+  effect: { id: CARD_ID, resolveChoice: (_state: any, _player: any, choice: string) => {
+    if (choice !== 'two') throw new Error('choice argument changed')
+    return gainLeaf(CARD_ID, { food: 2 })
+  } },
+  listeners: [{ cardIds: [CARD_ID], actions: ['collect'], phases: ['after'], handler: () => ({
+    flow: { type: 'leaf', actionId: 'emit-choice', sourceCard: CARD_ID, params: {
+      options: [{ value: 'two', labelKey: 'Take two food' }, { value: 'none', labelKey: 'Take nothing' }]
+    } }
+  }) }],
+}
+`
+    const compiled = validateAndCompileCustomCode(source, 'CUSTOM_ParityCard')
+    expect(compiled.valid).toBe(true)
+    if (!compiled.valid) throw new Error(compiled.errors.join('; '))
+    const state = createInitialState(42, { playerCount: 2 })
+    for (const player of state.players) {
+      player.minorHand = ['__test_placeholder__']
+      player.occupationHand = ['__test_placeholder__']
+    }
+    state.players[0]!.minorPlayed = ['CUSTOM_ParityCard']
+    const customCards = [cardDataFrom(compiled.compiledCode, compiled.manifest)]
+    const core = runtime === 'server'
+      ? new GameSession(state, customCards)
+      : new GameCore({ stateOrSeed: state, customCards, registerCustomCardImpl: registerBrowserBackedCustomCard })
+    try {
+      const food = core.state.players[0]!.resources.food
+      const offered = core.takeAction(0, 'forest')
+      expect(offered.ok, offered.error).toBe(true)
+      expect(offered.interaction).toMatchObject({ stateId: 'wait', playerIndex: 0, request: { kind: 'choice' } })
+      const chosen = core.resolveChoice(0, 'two')
+      expect(chosen.ok, chosen.error).toBe(true)
+      expect(chosen.state.players[0]!.resources.food).toBe(food + 2)
+      expect(core.cardWarnings).toEqual([])
+    } finally { core.dispose() }
+  })
+
   it.each(['server', 'browser'] as const)('keeps host action rules out of the real %s custom-card invocation', runtime => {
     const source = `
 const CARD_ID = 'CUSTOM_ParityCard'
