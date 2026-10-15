@@ -20,7 +20,7 @@ describe('A151_Minstrel session — viaCardJump worker-less', () => {
   }
 
   it('returns optional jumpLeaf seq when exactly 1 stage-1 space is unoccupied', () => {
-    const { state, owner } = setup4P()
+    const { session, state, owner } = setup4P()
 
     // Mark only sheep-market unoccupied; occupy other stage-1 spaces.
     const sheep = state.actionSpaces.find((s) => s.id === 'sheep-market')!
@@ -40,7 +40,7 @@ describe('A151_Minstrel session — viaCardJump worker-less', () => {
     state.roundActionOrder[3] = 'major-improvement'
     state.round = 4
 
-    const flow = runCardEffectHook(state, owner, CARD_ID, 'onStartReturnHome')
+    const flow = runCardEffectHook(state, owner, CARD_ID, 'onStartReturnHome', undefined, { actionHooks: session.actionHooks })
     expect(flow).not.toBeNull()
     const seq = flow as Extract<ActionFlow, { type: 'seq' }>
     expect(seq.type).toBe('seq')
@@ -57,7 +57,7 @@ describe('A151_Minstrel session — viaCardJump worker-less', () => {
   })
 
   it('returns null when 0 stage-1 spaces are unoccupied', () => {
-    const { state, owner } = setup4P()
+    const { session, state, owner } = setup4P()
 
     for (const id of ['sheep-market', 'grain-utilization', 'fencing', 'major-improvement']) {
       const space = state.actionSpaces.find((s) => s.id === id)!
@@ -70,12 +70,12 @@ describe('A151_Minstrel session — viaCardJump worker-less', () => {
     state.roundActionOrder[3] = 'major-improvement'
     state.round = 4
 
-    const flow = runCardEffectHook(state, owner, CARD_ID, 'onStartReturnHome')
+    const flow = runCardEffectHook(state, owner, CARD_ID, 'onStartReturnHome', undefined, { actionHooks: session.actionHooks })
     expect(flow).toBeNull()
   })
 
   it('returns null when 2+ stage-1 spaces are unoccupied', () => {
-    const { state, owner } = setup4P()
+    const { session, state, owner } = setup4P()
 
     for (const id of ['sheep-market', 'grain-utilization', 'fencing', 'major-improvement']) {
       const space = state.actionSpaces.find((s) => s.id === id)!
@@ -88,12 +88,12 @@ describe('A151_Minstrel session — viaCardJump worker-less', () => {
     state.roundActionOrder[3] = 'major-improvement'
     state.round = 4
 
-    const flow = runCardEffectHook(state, owner, CARD_ID, 'onStartReturnHome')
+    const flow = runCardEffectHook(state, owner, CARD_ID, 'onStartReturnHome', undefined, { actionHooks: session.actionHooks })
     expect(flow).toBeNull()
   })
 
   it('returns null when stage-1 spaces have not opened yet (round before posIndex)', () => {
-    const { state, owner } = setup4P()
+    const { session, state, owner } = setup4P()
 
     const sheep = state.actionSpaces.find((s) => s.id === 'sheep-market')!
     sheep.takenBy = []
@@ -102,12 +102,12 @@ describe('A151_Minstrel session — viaCardJump worker-less', () => {
     state.roundActionOrder[4] = 'sheep-market'
     state.round = 4
 
-    const flow = runCardEffectHook(state, owner, CARD_ID, 'onStartReturnHome')
+    const flow = runCardEffectHook(state, owner, CARD_ID, 'onStartReturnHome', undefined, { actionHooks: session.actionHooks })
     expect(flow).toBeNull()
   })
 
   it('returns null when the only unoccupied stage-one space is not executable', () => {
-    const { state, owner } = setup4P()
+    const { session, state, owner } = setup4P()
 
     const fence = state.actionSpaces.find((s) => s.id === 'fencing')!
     fence.takenBy = []
@@ -122,7 +122,7 @@ describe('A151_Minstrel session — viaCardJump worker-less', () => {
     state.roundActionOrder[3] = 'major-improvement'
     state.round = 4
 
-    const flow = runCardEffectHook(state, owner, CARD_ID, 'onStartReturnHome')
+    const flow = runCardEffectHook(state, owner, CARD_ID, 'onStartReturnHome', undefined, { actionHooks: session.actionHooks })
     expect(flow).toBeNull()
   })
 })
@@ -166,7 +166,7 @@ describe('A151 Minstrel authoritative return-home flow', () => {
     const session = setupReturnHome()
     const workersBefore = structuredClone(session.state.players[0]!.workers)
     expect(
-      runCardEffectHook(session.state, session.state.players[0]!, CARD_ID, 'onStartReturnHome'),
+      runCardEffectHook(session.state, session.state.players[0]!, CARD_ID, 'onStartReturnHome', undefined, { actionHooks: session.actionHooks }),
     ).not.toBeNull()
     let response = session.performRoundEnd()
 

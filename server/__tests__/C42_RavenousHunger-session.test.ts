@@ -1,3 +1,9 @@
+import { ActionHookRegistry } from '../../shared/actions/hooks'
+import { beforeEach as beforeEachActionHooks } from 'vitest'
+
+let actionHooks: ActionHookRegistry
+beforeEachActionHooks(() => { actionHooks = new ActionHookRegistry() })
+
 import { createWorkSession } from './_helpers/session-fixtures'
 import { describe, expect, it } from 'vitest'
 import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
@@ -231,6 +237,7 @@ describe('C042_RavenousHunger', () => {
     state.actionSpaces = [createSpace('forest', { wood: 3 })]
 
     const result = executeCardListener(listener!, {
+      actionHooks,
       state, player, space: createSpace('vegetable-seeds'),
       actionId: 'place-farmer', phase: 'after',
     } as unknown as CardListenerContext)
@@ -254,6 +261,7 @@ describe('C042_RavenousHunger', () => {
     state.actionSpaces = [forest, createSpace('fishing', { food: 1 }), createSpace('farmland')]
 
     const result = executeCardListener(listener!, {
+      actionHooks,
       state, player, space: createSpace('vegetable-seeds'),
       actionId: 'place-farmer', phase: 'after',
     } as unknown as CardListenerContext)
@@ -272,6 +280,7 @@ describe('C042_RavenousHunger', () => {
     const state = createState(player)
 
     const result = executeCardListener(listener!, {
+      actionHooks,
       state, player, space: createSpace('grain-seeds'),
       actionId: 'place-farmer', phase: 'after',
     } as unknown as CardListenerContext)
@@ -288,6 +297,7 @@ describe('C042_RavenousHunger', () => {
     markAllWorkersUsed(state, player)
 
     const result = executeCardListener(listener!, {
+      actionHooks,
       state, player, space: createSpace('vegetable-seeds'),
       actionId: 'place-farmer', phase: 'after',
     } as unknown as CardListenerContext)
@@ -305,6 +315,7 @@ describe('C042_RavenousHunger', () => {
     forest.resources.clay = 4
 
     const result = executeCardListener(listener!, {
+      actionHooks,
       state, player, space: forest,
       actionId: 'place-farmer', phase: 'after', sourceCard: CARD_ID,
       result: { type: 'ok' },
@@ -322,6 +333,7 @@ describe('C042_RavenousHunger', () => {
     const state = createState(player)
 
     const result = executeCardListener(listener!, {
+      actionHooks,
       state, player, space: createSpace('forest', { wood: 3 }),
       actionId: 'place-farmer', phase: 'after',
       result: { type: 'ok' },

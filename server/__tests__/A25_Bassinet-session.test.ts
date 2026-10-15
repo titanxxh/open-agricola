@@ -135,7 +135,7 @@ describe('A025_Bassinet session', () => {
     session.loadState(state)
 
     const loaded = session.getState().state
-    expect(computeAllowedPlacementSpaces(loaded, loaded.players[1]!)
+    expect(computeAllowedPlacementSpaces(loaded, loaded.players[1]!, { actionHooks: session.actionHooks })
       .some((entry) => entry.spaceId === 'farmland')).toBe(false)
   })
 

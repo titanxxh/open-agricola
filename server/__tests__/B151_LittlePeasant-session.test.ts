@@ -111,7 +111,7 @@ describe('B151_LittlePeasant session', () => {
 
     session.loadState(state)
     const loaded = session.getState().state
-    const allowed = computeAllowedPlacementSpaces(loaded, loaded.players[0]!)
+    const allowed = computeAllowedPlacementSpaces(loaded, loaded.players[0]!, { actionHooks: session.actionHooks })
 
     expect(allowed).toEqual(
       expect.arrayContaining([{ spaceId: 'forest', allowOccupied: true, option: expect.any(Object) }]),

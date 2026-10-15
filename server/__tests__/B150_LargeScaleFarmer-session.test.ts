@@ -176,6 +176,7 @@ describe('B150_LargeScaleFarmer session', () => {
       (l) => l.id === 'B150-large-scale-farmer-after-place-farmer',
     )!
     const result = executeCardListener(listener, {
+      actionHooks: session.actionHooks,
       state: s,
       player: s.players[0]!,
       space: placedSpace,
@@ -197,6 +198,7 @@ describe('B150_LargeScaleFarmer session', () => {
       (l) => l.id === 'B150-large-scale-farmer-after-place-farmer',
     )!
     const result = executeCardListener(listener, {
+      actionHooks: session.actionHooks,
       state: s,
       player: s.players[0]!,
       space: placedSpace,
@@ -219,6 +221,7 @@ describe('B150_LargeScaleFarmer session', () => {
       (l) => l.id === 'B150-large-scale-farmer-after-place-farmer',
     )!
     const result = executeCardListener(listener, {
+      actionHooks: session.actionHooks,
       state: s,
       player: s.players[0]!,
       space: placedSpace,

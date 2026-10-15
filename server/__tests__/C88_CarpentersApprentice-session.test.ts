@@ -1,3 +1,9 @@
+import { ActionHookRegistry } from '../../shared/actions/hooks'
+import { beforeEach as beforeEachActionHooks } from 'vitest'
+
+let actionHooks: ActionHookRegistry
+beforeEachActionHooks(() => { actionHooks = new ActionHookRegistry() })
+
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -119,6 +125,7 @@ const fenceCostWood = (player: PlayerState, newFenceEdges: string[]): number => 
   )
   if (!listener) throw new Error('C88 fenceCostListener (computeCosts/fence) not registered')
   const ctx = {
+    actionHooks,
     state: {} as GameState,
     player,
     space: {} as never,
@@ -145,6 +152,7 @@ const stablesDiscount = (player: PlayerState, stableCount = 1): number => {
   )
   if (!stableListener) return 0
   const ctx = {
+    actionHooks,
     state: {} as GameState,
     player,
     space: {} as never,
@@ -317,6 +325,7 @@ const fenceDoable = (player: PlayerState, state = {} as GameState): boolean => {
   )
   if (!listener) throw new Error('C88 fenceIsDoableListener (isDoable/fence) not registered')
   const ctx = {
+    actionHooks,
     state,
     player,
     space: {} as never,
@@ -389,7 +398,7 @@ describe('C88 — fence 折扣经 collectComputeCostsForFarmChoice 聚合', () =
     const state = session.getState().state
     const player = makeFencePlayer(12)
     state.players[0] = player
-    const result = collectComputeCostsForFarmChoice(
+    const result = collectComputeCostsForFarmChoice(session.actionHooks,
       state,
       player,
       'fence',
@@ -403,7 +412,7 @@ describe('C88 — fence 折扣经 collectComputeCostsForFarmChoice 聚合', () =
     const state = session.getState().state
     const player = makeFencePlayer(0)
     state.players[0] = player
-    const result = collectComputeCostsForFarmChoice(
+    const result = collectComputeCostsForFarmChoice(session.actionHooks,
       state,
       player,
       'fence',
