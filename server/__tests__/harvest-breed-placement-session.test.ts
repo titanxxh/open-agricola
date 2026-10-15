@@ -1,27 +1,39 @@
+import assert from 'node:assert/strict'
 import { afterEach, describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
-import type { PlayerState } from '../../shared/contract/types'
-import { markAllWorkersUsed } from '../../shared/domain/player'
+import type { GameState, PlayerState } from '../../shared/contract/types'
+import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/serialization'
 import { createWorkSession } from './_helpers/session-fixtures'
 import { descriptionEffects } from './_helpers/choice-description'
-import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
+
+function prepareHarvest(state: GameState) {
+  state.round = 4
+  const spaces = state.actionSpaces.filter(space => space.roundAvailable === 1)
+  let placement = 0
+  for (const player of state.players) {
+    player.resources.food = 20
+    for (const worker of player.workers.filter(worker => worker.isActive)) {
+      const space = spaces[placement++]
+      assert.ok(space, 'Every active worker needs a real revealed action space')
+      space.takenBy.push({ playerId: player.id, workerId: worker.id })
+    }
+  }
+}
 
 const setup = (cardId: string, sheep = 2) => {
-  const session = new GameSession(829, undefined, { playerCount: cardId === 'E134_Omnifarmer' ? 3 : 2 })
-  const state = session.getState().state
-  stabilizeRandomHands(state.players)
-  state.round = 4
-  for (const player of state.players) {
-    markAllWorkersUsed(state, player)
-    player.resources.food = 20
-  }
-  const player = state.players[0]!
-  if (cardId === 'C071_Slurry') player.minorPlayed = [cardId]
-  else player.occupationPlayed = [cardId]
-  Object.assign(player.resources, { sheep, boar: 2, grain: 2 })
-  player.fields = [{ row: 0, col: 1, stacks: [] }, { row: 0, col: 2, stacks: [] }]
-  preparePastures(player, sheep)
-  session.loadState(state)
+  const session = createWorkSession({
+    seed: 829,
+    options: { playerCount: cardId === 'E134_Omnifarmer' ? 3 : 2 },
+    configure(state) {
+      prepareHarvest(state)
+      const player = state.players[0]!
+      if (cardId === 'C071_Slurry') player.minorPlayed = [cardId]
+      else player.occupationPlayed = [cardId]
+      Object.assign(player.resources, { sheep, boar: 2, grain: 2 })
+      player.fields = [{ row: 0, col: 1, stacks: [] }, { row: 0, col: 2, stacks: [] }]
+      preparePastures(player, sheep)
+    },
+  })
   omnifarmerSessions.push(session)
   return session
 }
@@ -43,14 +55,15 @@ function choices(response: SessionResponse) {
 }
 
 const omnifarmerSessions: GameSession[] = []
+const restore = (session: GameSession) => {
+  const restored = new GameSession(rehydrateState(JSON.parse(JSON.stringify(serializeSessionSnapshot(session.state, session)))))
+  omnifarmerSessions.push(restored)
+  return restored
+}
 afterEach(() => omnifarmerSessions.splice(0).forEach(session => session.dispose()))
 const setupOmnifarmer = () => {
   const session = createWorkSession({ seed: 829, options: { playerCount: 3 }, configure: state => {
-    state.round = 4
-    for (const player of state.players) {
-      markAllWorkersUsed(state, player)
-      player.resources.food = 20
-    }
+    prepareHarvest(state)
     const player = state.players[0]!
     player.occupationPlayed = ['E134_Omnifarmer']
     Object.assign(player.resources, { sheep: 2, boar: 2 })
@@ -230,8 +243,40 @@ describe('harvest rewards count placed newborn animals', () => {
     expect(response.state.harvestBreedSummary?.[response.state.players[0]!.id]).toEqual({ resources: { sheep: 1 }, animalTypes: 1, animalCount: 1 })
   })
 
-  it('uses the modified parent threshold and restores the unsettled result on undo', () => {
-    const session = setup('D115_FodderPlanter', 1)
+  it("keeps another player's harvest breeding event after restoring and discarding newborns", () => {
+    let session = setup('D115_FodderPlanter', 1)
+    const state = session.getState().state
+    state.players[0]!.minorPlayed = ['E084_DollysMother']
+    const opponent = state.players[1]!
+    Object.assign(opponent.resources, { sheep: 2, boar: 2 })
+    preparePastures(opponent, 2)
+    session.loadState(state)
+    expect(session.performRoundEnd().interaction).toMatchObject({ stateId: 'wait', playerIndex: 0, request: { kind: 'animal-reorg' } })
+    session = restore(session)
+    let response = arrange(session, 1, 2)
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.harvestBreedSummary?.[response.state.players[0]!.id]).toEqual({ resources: {}, animalTypes: 0, animalCount: 0 })
+    expect(response.interaction).toMatchObject({ stateId: 'wait', playerIndex: 1, request: { kind: 'animal-reorg' } })
+    response = session.resolveChoice(1, 'confirm', { zones: [
+      { id: 'sheep', zoneType: 'pasture', animalType: 'sheep', animalCount: 3 },
+      { id: 'boar', zoneType: 'pasture', animalType: 'boar', animalCount: 3 },
+    ] })
+    expect(response.ok, response.error).toBe(true)
+    const bred = response.state.events.filter(event => event.type === 'farm.animalBred')
+    expect(bred.map(event => ({ playerId: event.targetPlayerId ?? event.actorPlayerId, animals: event.animals }))).toEqual([
+      { playerId: response.state.players[0]!.id, animals: {} },
+      { playerId: response.state.players[1]!.id, animals: { sheep: 1, boar: 1 } },
+    ])
+    expect(response.state.players[0]!.resources).toMatchObject({ sheep: 1, boar: 2, grain: 2 })
+    expect(response.state.players[1]!.resources).toMatchObject({ sheep: 3, boar: 3 })
+    expect(response.state.harvestBreedSummary).toBeUndefined()
+    expect(response.state.round).toBe(5)
+    expect(response.state.roundPhase).toBe('work')
+    expect(response.interaction.stateId).toBe('idle')
+  })
+
+  it.each(['live', 'restore-before-undo', 'restore-after-undo'] as const)('uses the modified parent threshold and restores the unsettled result on undo: %s', restoreAt => {
+    let session = setup('D115_FodderPlanter', 1)
     const state = session.getState().state
     state.players[0]!.minorPlayed = ['E084_DollysMother']
     session.loadState(state)
@@ -239,12 +284,21 @@ describe('harvest rewards count placed newborn animals', () => {
     const summary = structuredClone(pending.state.harvestBreedSummary)
     let response = arrange(session, 2, 2)
     expect(response.state.harvestBreedSummary?.[response.state.players[0]!.id]).toEqual({ resources: { sheep: 1 }, animalTypes: 1, animalCount: 1 })
+    if (restoreAt === 'restore-before-undo') session = restore(session)
     response = session.undoStep()
     expect(response.ok, response.error).toBe(true)
     expect(response.state.harvestBreedSummary).toEqual(summary)
     expect(response.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'animal-reorg' } })
+    if (restoreAt === 'restore-after-undo') session = restore(session)
     response = arrange(session, 1, 2)
     expect(response.ok, response.error).toBe(true)
-    expect(response.state.harvestBreedSummary?.[response.state.players[0]!.id]).toEqual({ resources: {}, animalTypes: 0, animalCount: 0 })
+    expect(response.state.harvestBreedSummary).toBeUndefined()
+    expect(response.state.events.filter(event => event.type === 'farm.animalBred' && event.actorPlayerId === response.state.players[0]!.id).map(event => event.animals)).toEqual([{}])
+    expect(response.state.players[0]!.resources).toMatchObject({ sheep: 1, boar: 2, grain: 2 })
+    expect(response.state.players[0]!.fields.every(field => field.stacks.length === 0)).toBe(true)
+    expect(response.state.round).toBe(5)
+    expect(response.state.roundPhase).toBe('work')
+    expect(response.interaction.stateId).toBe('idle')
+    expect(response.state.actionSpaces.every(space => space.takenBy.length === 0)).toBe(true)
   })
 })
