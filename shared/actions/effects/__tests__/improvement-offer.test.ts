@@ -1,3 +1,7 @@
+import { installOfficialCardRegistry } from '../../../cards/__tests__/card-environment'
+
+installOfficialCardRegistry()
+
 import { describe, expect, it } from 'vitest'
 import type { ActionExecutionContext } from '../../../contract/types'
 import { createInitialState, emptyResources } from '../../../session/state-bootstrap'

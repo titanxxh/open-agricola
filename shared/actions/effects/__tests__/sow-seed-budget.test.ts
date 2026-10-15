@@ -1,3 +1,7 @@
+import { installOfficialCardRegistry } from '../../../cards/__tests__/card-environment'
+
+installOfficialCardRegistry()
+
 import { afterEach, expect, it } from 'vitest'
 import type { GameSession } from '../../../../server/game/authoritative-session'
 import { createWorkSession } from '../../../../server/__tests__/_helpers/session-fixtures'

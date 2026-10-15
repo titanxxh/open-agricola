@@ -1,3 +1,7 @@
+import { installOfficialCardRegistry } from '../../../cards/__tests__/card-environment'
+
+installOfficialCardRegistry()
+
 import { expect, it } from 'vitest'
 import { createInitialState } from '../../../session/state-bootstrap'
 import { isUnconditionalSow } from '../sow'

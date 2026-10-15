@@ -1,3 +1,7 @@
+import { installOfficialCardRegistry } from './card-environment'
+
+installOfficialCardRegistry()
+
 import { describe, expect, it } from 'vitest'
 import { guardedListener } from './listener-purity-guard'
 import type { ActionFlow, ActionSpace, GameState, PlayerState, Resource } from '../../contract/types'

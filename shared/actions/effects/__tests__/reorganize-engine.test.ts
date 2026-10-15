@@ -1,3 +1,7 @@
+import { installOfficialCardRegistry } from '../../../cards/__tests__/card-environment'
+
+installOfficialCardRegistry()
+
 import { afterEach, describe, it, expect } from 'vitest'
 import { reorganizeAction } from '../reorganize'
 import { breedAction } from '../breed'

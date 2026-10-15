@@ -1,3 +1,7 @@
+import { installOfficialCardRegistry } from '../shared/cards/__tests__/card-environment'
+
+installOfficialCardRegistry()
+
 import { describe, expect, it } from 'vitest'
 import { serializeState, rehydrateState } from '../shared/session/serialization'
 import { createInitialState } from '../shared/session/state-bootstrap'
@@ -86,13 +90,12 @@ describe('shared/session/serialization', () => {
   })
 
   describe('rehydrateState', () => {
-    it('restores function fields on action spaces', () => {
+    it('lets a Core restore executable action spaces from decoded data', () => {
       const serialized = serializeState(state, emptyCtx())
-      const { state: restored } = rehydrateState(serialized)
-      for (const space of restored.actionSpaces) {
-        expect(typeof space.canBeExecutedByPlayer).toBe('function')
-        expect(typeof space.execute).toBe('function')
-      }
+      const session = new GameSession(rehydrateState(serialized))
+      expect(session.getAvailableActions(0).map(action => action.spaceId)).toContain('forest')
+      expect(session.takeAction(0, 'forest').ok).toBe(true)
+      session.dispose()
     })
 
     it('preserves resources and takenBy from serialized data', () => {
@@ -130,7 +133,7 @@ describe('shared/session/serialization', () => {
       }
     })
 
-    it('rebuilds missing activeModifiers from played cards', () => {
+    it('lets a Core rebuild missing activeModifiers from played cards', () => {
       const modified = createInitialState(42)
       const player = modified.players[0]!
       player.minorPlayed.push('A014_CarpentersHammer')
@@ -139,11 +142,13 @@ describe('shared/session/serialization', () => {
       const serialized = serializeState(modified, emptyCtx())
       serialized.players[0]!.activeModifiers = []
 
-      const { state: restored } = rehydrateState(serialized)
+      const session = new GameSession(rehydrateState(serialized))
+      const restored = session.getState().state
       expect(getCardModifiers('A014_CarpentersHammer')).not.toHaveLength(0)
       expect(restored.players[0]!.activeModifiers).toEqual(
         getCardModifiers('A014_CarpentersHammer'),
       )
+      session.dispose()
     })
 
     it('loadState also rebuilds missing activeModifiers for room expansion limits', () => {

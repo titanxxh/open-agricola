@@ -1,3 +1,7 @@
+import { installOfficialCardRegistry } from '../../cards/__tests__/card-environment'
+
+installOfficialCardRegistry()
+
 /**
  * D25 WitchesDanceFloor — scoring integration tests
  *

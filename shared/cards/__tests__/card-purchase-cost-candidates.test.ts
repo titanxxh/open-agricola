@@ -1,3 +1,7 @@
+import { installOfficialCardRegistry } from './card-environment'
+
+installOfficialCardRegistry()
+
 import { describe, expect, it } from 'vitest'
 import type { ComplexCost, CostAttributionBySource, GameState, PlayerState } from '../../contract/types'
 import { PaymentSolver } from '../../actions/payment'

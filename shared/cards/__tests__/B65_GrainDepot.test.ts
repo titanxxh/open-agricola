@@ -1,3 +1,7 @@
+import { installOfficialCardRegistry } from './card-environment'
+
+installOfficialCardRegistry()
+
 import { afterEach, describe, expect, it } from 'vitest'
 import { GameSession } from '../../../server/game/authoritative-session'
 import type { PlayerState } from '../../contract/types'
@@ -117,7 +121,7 @@ describe('B65 Grain Depot', () => {
         }
       },
     }
-    requireActiveCardRegistry('B065_GrainDepot.test').registerListener(hook)
+    session.withCtx(() => requireActiveCardRegistry('B065_GrainDepot.test').registerListener(hook))
 
     const liveState = session.getState().state
     const player = liveState.players[0]!

@@ -1,3 +1,7 @@
+import { installOfficialCardRegistry } from '../../__tests__/card-environment'
+
+installOfficialCardRegistry()
+
 import { describe, expect, it, beforeEach, afterEach } from 'vitest'
 import { CardRegistry } from '../../registry'
 import { setActiveCardRegistry, getActiveCardRegistry } from '../../active-registry'
@@ -64,10 +68,10 @@ describe('meetsCardPrerequisites inline routing', () => {
     expect(meetsCardPrerequisites(buildPlayer(), card, 1, buildState(1))).toBe(true)
   })
 
-  it('falls back to declarative parser when active registry is null', () => {
+  it('rejects a missing registry before applying declarative prerequisites', () => {
     setActiveCardRegistry(null)
     const card = { id: 'X1_Test', prerequisite: 'No Occupations' }
-    expect(meetsCardPrerequisites(buildPlayer(), card, 1, buildState(1))).toBe(true)
+    expect(() => meetsCardPrerequisites(buildPlayer(), card, 1, buildState(1))).toThrow('no active CardRegistry')
   })
 })
 

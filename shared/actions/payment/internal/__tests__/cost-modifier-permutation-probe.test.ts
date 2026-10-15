@@ -1,3 +1,7 @@
+import { installOfficialCardRegistry } from '../../../../cards/__tests__/card-environment'
+
+installOfficialCardRegistry()
+
 /**
  * Permutation-invariance property suite for cost modifiers (ADR 0004).
  *

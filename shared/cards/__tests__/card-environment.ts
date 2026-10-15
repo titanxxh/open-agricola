@@ -15,7 +15,7 @@ officialRules.registerEffects(majorCardDefinitions, { protected: true })
 export const createOfficialCardRegistry = (): CardRegistry => officialRules.clone()
 
 /** Opt a direct-rule suite into its own fresh environment for each test. */
-export function useOfficialCardRegistry(): void {
+export function installOfficialCardRegistry(): void {
   beforeEach(() => {
     const previous = getActiveCardRegistry()
     setActiveCardRegistry(createOfficialCardRegistry())

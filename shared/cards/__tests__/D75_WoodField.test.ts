@@ -1,3 +1,7 @@
+import { installOfficialCardRegistry } from './card-environment'
+
+installOfficialCardRegistry()
+
 import { describe, it, expect } from 'vitest'
 import { D075_WoodField_impl } from '../D/D075_WoodField'
 import type { PlayerState } from '../../contract/types'

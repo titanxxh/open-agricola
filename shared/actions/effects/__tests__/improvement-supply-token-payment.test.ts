@@ -1,3 +1,7 @@
+import { installOfficialCardRegistry } from '../../../cards/__tests__/card-environment'
+
+installOfficialCardRegistry()
+
 import { beforeEach, describe, expect, it } from 'vitest'
 import type { GameState, PlayerState } from '../../../contract/types'
 import { clearCustomCards, registerCustomCard } from '../../../cards/custom-registry'

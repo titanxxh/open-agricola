@@ -1,10 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { getCardEffect } from '../card-effects'
 import type { GameState, PlayerState, Pasture } from '../../contract/types'
 
 import { A038_WoolBlankets_impl } from '../A/A038_WoolBlankets'
-
-const CARD_ID = 'A038_WoolBlankets'
 
 const createPlayer = (overrides?: Partial<PlayerState>): PlayerState =>
   ({
@@ -72,7 +69,7 @@ describe('A038_WoolBlankets prerequisite (5 Sheep)', () => {
 })
 
 describe('A038_WoolBlankets bonus VP', () => {
-  const effect = getCardEffect(CARD_ID)!
+  const effect = A038_WoolBlankets_impl.effect
 
   it('awards 3 bonus VP for wooden house', () => {
     const player = createPlayer({ houseType: 'wood' })

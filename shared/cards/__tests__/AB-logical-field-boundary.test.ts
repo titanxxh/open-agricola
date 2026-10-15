@@ -1,3 +1,7 @@
+import { installOfficialCardRegistry } from './card-environment'
+
+installOfficialCardRegistry()
+
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../../../server/game/authoritative-session'
 import { getAdHocAction } from '../../actions/helpers/ad-hoc-action-registry'

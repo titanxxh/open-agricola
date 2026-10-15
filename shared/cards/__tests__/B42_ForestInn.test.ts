@@ -1,3 +1,7 @@
+import { installOfficialCardRegistry } from './card-environment'
+
+installOfficialCardRegistry()
+
 import { describe, expect, it } from 'vitest'
 import { B042_ForestInn } from '../../cards/B/B042_ForestInn'
 import { meetsCardPrerequisites } from '../helpers/prerequisites'

@@ -1,3 +1,7 @@
+import { installOfficialCardRegistry } from '../../cards/__tests__/card-environment'
+
+installOfficialCardRegistry()
+
 import { describe, expect, it } from 'vitest'
 import type { ActionDefinition } from '../../contract/types'
 import { placeFarmerAction } from '../../actions/effects/place-farmer'

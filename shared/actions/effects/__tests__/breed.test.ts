@@ -1,3 +1,7 @@
+import { installOfficialCardRegistry } from '../../../cards/__tests__/card-environment'
+
+installOfficialCardRegistry()
+
 import { describe, it, expect } from 'vitest'
 import type { GameState, PlayerState, Pasture } from '../../../contract/types'
 import { breed } from '../breed'

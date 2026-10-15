@@ -1,3 +1,7 @@
+import { installOfficialCardRegistry } from '../../cards/__tests__/card-environment'
+
+installOfficialCardRegistry()
+
 import { describe, expect, it } from 'vitest'
 import type { GameEvent, PublicEventArchiveCanceledPacket, PublicEventArchiveCommittedPacket } from '../../contract/events'
 import { getHistoryRecordIdentity, registerHistoryRecordIdentity } from '../../projections/history-record-identity'

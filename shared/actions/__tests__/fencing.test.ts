@@ -1,4 +1,8 @@
 import { ActionHookRegistry } from '../hooks'
+import { installOfficialCardRegistry } from '../../cards/__tests__/card-environment'
+
+installOfficialCardRegistry()
+
 import { describe, expect, it } from 'vitest'
 import { A088_HedgeKeeper } from '../../cards/A/A088_HedgeKeeper'
 import {

@@ -1,3 +1,7 @@
+import { installOfficialCardRegistry } from './card-environment'
+
+installOfficialCardRegistry()
+
 import { describe, expect, it } from 'vitest'
 import { buildStableFarmInteraction } from '../../domain/farmyard-interaction'
 import { getCardEffect } from '../card-effects'

@@ -1,7 +1,12 @@
+import { installOfficialCardRegistry } from '../shared/cards/__tests__/card-environment'
+
+installOfficialCardRegistry()
+
 import { describe, expect, it } from 'vitest'
 import { serializeState, rehydrateState } from '../shared/session/serialization'
 import type { GameSyncPayload } from '../shared/contract/protocol/game'
 import { createInitialState } from '../shared/session/state-bootstrap'
+import { GameSession } from '../server/game/authoritative-session'
 import { EngineStack } from '../shared/engine'
 
 const emptyCtx = () => ({ engineStack: new EngineStack() })
@@ -29,15 +34,16 @@ describe('game sync pipeline (applySnapshot path)', () => {
     }
   }
 
-  it('rehydrates a snapshot payload into a functional GameState', () => {
+  it('decodes a snapshot payload before its Session rebuilds the rules', () => {
     const payload = buildPayload()
     const { state } = rehydrateState(payload.state)
     expect(state.round).toBe(1)
     expect(state.players.length).toBe(2)
-    for (const space of state.actionSpaces) {
-      expect(typeof space.canBeExecutedByPlayer).toBe('function')
-      expect(typeof space.execute).toBe('function')
-    }
+    const session = new GameSession({ state })
+    const response = session.takeAction(0, 'forest')
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources.wood).toBe(3)
+    session.dispose()
   })
 
   it('preserves interaction state through the pipeline', () => {

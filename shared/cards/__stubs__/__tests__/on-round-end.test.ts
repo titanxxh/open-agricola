@@ -19,7 +19,7 @@ describe('Stub_OnRoundEnd mechanism', () => {
   it('onRoundEnd fires when round finalizes', () => {
     const session = new GameSession()
     stabilizeRandomHands(session.state.players)
-    registerStubCards()
+    session.withCtx(() => registerStubCards())
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -42,7 +42,7 @@ describe('Stub_OnRoundEnd mechanism', () => {
   it('runs onRoundEnd returned flow before advancing the round', () => {
     const session = new GameSession()
     stabilizeRandomHands(session.state.players)
-    registerStubCards()
+    session.withCtx(() => registerStubCards())
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0

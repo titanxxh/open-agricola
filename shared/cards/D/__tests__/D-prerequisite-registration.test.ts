@@ -1,3 +1,7 @@
+import { installOfficialCardRegistry } from '../../__tests__/card-environment'
+
+installOfficialCardRegistry()
+
 import { describe, expect, it } from 'vitest'
 import { meetsCardPrerequisites } from '../../helpers/prerequisites'
 import type { GameState, PlayerState, Field } from '../../../contract/types'

@@ -1,3 +1,7 @@
+import { installOfficialCardRegistry } from '../../cards/__tests__/card-environment'
+
+installOfficialCardRegistry()
+
 import { afterEach, describe, it, expect } from 'vitest'
 import { GameSession } from '../../../server/game/authoritative-session.ts'
 import type { GameState, PlayerState } from '../../contract/types.ts'
