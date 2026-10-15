@@ -945,13 +945,13 @@ export class GameCore {
 
     if (stateOrSeed && typeof stateOrSeed === 'object') {
       if (isStateWithCursor(stateOrSeed)) {
-        this.state = this.withCtx(() => rebuildActiveModifiers(normalizeState(stateOrSeed.state)))
+        this.state = this.withCtx(() => rebuildActiveModifiers(normalizeState(stateOrSeed.state, id => this.registry.get(id))))
         this.syncDynamicActionSpaces()
         const cursor = stateOrSeed.sessionCursor
         if (cursor) this.withCtx(() => this.restoreSessionPrivateCursor(cursor))
         return
       }
-      this.state = this.withCtx(() => rebuildActiveModifiers(normalizeState(stateOrSeed)))
+      this.state = this.withCtx(() => rebuildActiveModifiers(normalizeState(stateOrSeed, id => this.registry.get(id))))
     } else {
       const seed = typeof stateOrSeed === 'number' ? stateOrSeed : undefined
       const extraMinorIds = this.withCtx(() => getCustomMinorImprovementIds())
@@ -2650,7 +2650,7 @@ export class GameCore {
   }
 
   private restoreHistory(entry: HistoryEntry) {
-    this.state = preservePlayerDisplayNames(this.state, cloneStateWithHistory(entry.state))
+    this.state = preservePlayerDisplayNames(this.state, cloneStateWithHistory(entry.state, id => this.registry.get(id)))
     // Task 10/11: the previous GameCore pending field was deleted from
     // `GameState`. S2 Task 13.6 collapsed the HistoryEntry pending snapshot to a single boolean
     // (`hadChoicePending`) consumed by `undoStep()`'s `canRestorePriorChoice`
@@ -4864,7 +4864,7 @@ export class GameCore {
     } else {
       nextState = raw as GameState
     }
-    this.state = rebuildActiveModifiers(normalizeState(nextState))
+    this.state = rebuildActiveModifiers(normalizeState(nextState, id => this.registry.get(id)))
     this.syncDynamicActionSpaces()
     this.engineStack.clear()
     this.history = []

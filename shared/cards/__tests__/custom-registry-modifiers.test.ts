@@ -2,7 +2,7 @@ import { describe, expect, it, beforeEach } from 'vitest'
 import './setup-register-all'
 import { CardRegistry } from '../registry'
 import { setActiveCardRegistry, getActiveCardRegistry } from '../active-registry'
-import { registerCustomCard } from '../custom-registry'
+import { registerCustomCard, getCustomMinorImprovement } from '../custom-registry'
 import type { CostModifier } from '../../contract/types'
 import type { CardDefinition } from '../../contract/cards'
 
@@ -78,5 +78,12 @@ describe('custom-registry modifier injection', () => {
         modifier: { type: 'bonus', cardId: 'CUSTOM_MissingEnvironment', appliesTo: ['occupation'], discount: { food: 1 } },
       },
     }, { allowGlobal: true })).toThrow('no active CardRegistry')
+  })
+
+  it('keeps explicit display-only metadata registration available without rule execution', () => {
+    setActiveCardRegistry(null)
+    registerCustomCard({ cardType: 'minor', cardJson: baseCardJson('CUSTOM_DisplayOnly') }, { allowGlobal: true })
+    expect(getCustomMinorImprovement('CUSTOM_DisplayOnly')?.name).toBe('CUSTOM_DisplayOnly')
+    expect(getActiveCardRegistry()).toBeNull()
   })
 })

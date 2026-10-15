@@ -1,12 +1,11 @@
 /**
  * Per-session overlay registry for custom (workshop) cards.
  *
- * Official cards live in the global registries (card-effects.ts, card-listeners.ts)
- * and are immutable after startup. Custom cards need per-session isolation so that
- * concurrent sandbox games don't bleed into each other.
+ * Each Core owns its official CardRegistry and, when needed, this Workshop
+ * overlay. Custom cards remain isolated between concurrent sandbox games.
  *
- * Design: "union mount" — lookup functions check the current session context first,
- * then fall back to the global registry. This avoids changing 100+ card module files.
+ * Lookups require the temporary CardRegistry environment, check its active
+ * Workshop overlay first, then consult that Core's base registry.
  *
  * Since the game engine is fully synchronous, we use a simple module-level variable
  * (withSessionContext / getCurrentSessionContext) rather than AsyncLocalStorage.

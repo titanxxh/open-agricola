@@ -1,3 +1,7 @@
+import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
+
+installOfficialCardRegistry()
+
 import type { ActionChoiceOption } from '../../shared/contract/types'
 import { type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'

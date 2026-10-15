@@ -1,3 +1,7 @@
+import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
+
+installOfficialCardRegistry()
+
 import { createTestDatabase } from './_helpers/postgres'
 import { PostgresRoomPersistence } from '../game/persistence/postgres-adapter'
 import { describe, expect, it } from 'vitest'
