@@ -1,3 +1,4 @@
+import type { ActionHookRegistry } from '../hooks'
 import type { ComplexCost, ExactCost, GameState, PaymentResourceMap, PlayerState, ResourceKey } from '../../contract/types'
 import type { PaymentInfo } from '../../cards/card-effects'
 import { getMinorImprovement } from '../../cards/registry-display'
@@ -256,6 +257,7 @@ export const getMajorImprovementPreviewCost = (
   player: PlayerState,
   improvementId: string,
   actionCardId?: string,
+  actionHooks?: ActionHookRegistry,
 ) => {
   return CardPurchasePayment.resolvePreviewCostByProvider(
     state,
@@ -264,6 +266,7 @@ export const getMajorImprovementPreviewCost = (
     improvementId,
     () => getMajorCard(improvementId)?.cost ?? null,
     actionCardId,
+    actionHooks,
   )?.cost ?? null
 }
 
@@ -273,6 +276,7 @@ export const getMajorImprovementPreviewCostDetailed = (
   improvementId: string,
   actionCardId?: string,
   exactCost?: ExactCost,
+  actionHooks?: ActionHookRegistry,
 ): ResolvedCardCostWithMetadata | null => {
   return CardPurchasePayment.resolvePreviewCostByProvider(
     state,
@@ -281,6 +285,7 @@ export const getMajorImprovementPreviewCostDetailed = (
     improvementId,
     () => exactImprovementCost(getMajorCard(improvementId)?.cost ?? null, exactCost),
     actionCardId,
+    actionHooks,
   )
 }
 
@@ -297,6 +302,7 @@ export const getMinorImprovementPreviewCost = (
   player: PlayerState,
   improvementId: string,
   actionCardId?: string,
+  actionHooks?: ActionHookRegistry,
 ) => {
   const improvement = getMinorImprovement(improvementId)
   if (!improvement) return null
@@ -307,6 +313,7 @@ export const getMinorImprovementPreviewCost = (
     improvementId,
     () => getMinorImprovementEffectiveCost(state, player, improvement, actionCardId),
     actionCardId,
+    actionHooks,
   )
   return attachRequiredReturnCards(previewCost?.cost ?? null, improvement.returnCards)
 }
@@ -317,6 +324,7 @@ export const getMinorImprovementPreviewCostDetailed = (
   improvementId: string,
   actionCardId?: string,
   exactCost?: ExactCost,
+  actionHooks?: ActionHookRegistry,
 ): ResolvedCardCostWithMetadata | null => {
   const improvement = getMinorImprovement(improvementId)
   if (!improvement) return null
@@ -327,6 +335,7 @@ export const getMinorImprovementPreviewCostDetailed = (
     improvementId,
     () => exactImprovementCost(getMinorImprovementEffectiveCost(state, player, improvement, actionCardId), exactCost),
     actionCardId,
+    actionHooks,
   )
   if (!previewCost) return null
   return {
@@ -341,8 +350,9 @@ export const canAffordMajorImprovement = (
   improvementId: string,
   actionCardId?: string,
   exactCost?: ExactCost,
+  actionHooks?: ActionHookRegistry,
 ) => {
-  const previewCost = getMajorImprovementPreviewCostDetailed(state, player, improvementId, actionCardId, exactCost)
+  const previewCost = getMajorImprovementPreviewCostDetailed(state, player, improvementId, actionCardId, exactCost, actionHooks)
   if (!previewCost) return false
   const rawIndex = state.players.indexOf(player)
   return CardPurchasePayment.hasPaymentOption({
@@ -361,9 +371,10 @@ export const isMajorImprovementPlayable = (
   improvementId: string,
   actionCardId = 'improvement',
   allowedPurchases?: string[],
+  actionHooks?: ActionHookRegistry,
 ) => {
   if (!canPlayMajor(state, improvementId, allowedPurchases)) return false
-  return canAffordMajorImprovement(state, player, improvementId, actionCardId)
+  return canAffordMajorImprovement(state, player, improvementId, actionCardId, undefined, actionHooks)
 }
 
 export const canAffordMinorImprovement = (
@@ -372,6 +383,7 @@ export const canAffordMinorImprovement = (
   improvement: ResolvedMinorImprovement,
   actionCardId?: string,
   exactCost?: ExactCost,
+  actionHooks?: ActionHookRegistry,
 ) => {
   const previewCost = getMinorImprovementPreviewCostDetailed(
     state,
@@ -379,6 +391,7 @@ export const canAffordMinorImprovement = (
     improvement.id,
     actionCardId,
     exactCost,
+    actionHooks,
   )
   if (!previewCost) return false
   const rawIndex = state.players.indexOf(player)
@@ -400,6 +413,7 @@ export const isMinorImprovementPlayable = (
   allowedPurchases?: string[],
   types?: readonly ImprovementType[],
   trueAction?: boolean,
+  actionHooks?: ActionHookRegistry,
 ) => {
   const improvement = getMinorImprovement(improvementId)
   if (!improvement || !player.minorHand.includes(improvement.id)) return false
@@ -408,7 +422,7 @@ export const isMinorImprovementPlayable = (
   }
   if (!meetsCardPrerequisites(player, improvement, state.round, state)) return false
   if (!isMinorImprovementEligibleForAction(improvement, types, trueAction)) return false
-  return canAffordMinorImprovement(state, player, improvement, actionCardId)
+  return canAffordMinorImprovement(state, player, improvement, actionCardId, undefined, actionHooks)
 }
 
 export const buildPlayableMinorOptions = (
@@ -418,6 +432,7 @@ export const buildPlayableMinorOptions = (
   types?: readonly ImprovementType[],
   exactCost?: ExactCost,
   trueAction?: boolean,
+  actionHooks?: ActionHookRegistry,
 ) =>
   player.minorHand
     .map((id) => getMinorImprovement(id))
@@ -428,7 +443,7 @@ export const buildPlayableMinorOptions = (
     .filter((improvement) => meetsCardPrerequisites(player, improvement, state.round, state))
     .filter((improvement) => isMinorImprovementEligibleForAction(improvement, types, trueAction))
     .filter((improvement) =>
-      canAffordMinorImprovement(state, player, improvement, actionCardId, exactCost),
+      canAffordMinorImprovement(state, player, improvement, actionCardId, exactCost, actionHooks),
     )
     .map((improvement) => ({
       value: improvement.id,
@@ -441,6 +456,7 @@ export const buildMajorImprovementOptions = (
   actionCardId = 'improvement',
   allowedPurchases?: string[],
   exactCost?: ExactCost,
+  actionHooks?: ActionHookRegistry,
 ) =>
   majorCardDefinitions
     .filter((improvement) => isMajorImprovementAvailable(state, improvement.id))
@@ -448,7 +464,7 @@ export const buildMajorImprovementOptions = (
       !allowedPurchases || allowedPurchases.includes(improvement.id),
     )
     .filter((improvement) =>
-      canAffordMajorImprovement(state, player, improvement.id, actionCardId, exactCost),
+      canAffordMajorImprovement(state, player, improvement.id, actionCardId, exactCost, actionHooks),
     )
     .map((improvement) => ({
       value: improvement.id,
@@ -463,6 +479,7 @@ export const buildMinorImprovementOptions = (
   types?: readonly ImprovementType[],
   exactCost?: ExactCost,
   trueAction?: boolean,
+  actionHooks?: ActionHookRegistry,
 ) =>
   player.minorHand
     .map((id) => getMinorImprovement(id))
@@ -476,7 +493,7 @@ export const buildMinorImprovementOptions = (
     )
     .filter((improvement) => isMinorImprovementEligibleForAction(improvement, types, trueAction))
     .filter((improvement) =>
-      canAffordMinorImprovement(state, player, improvement, actionCardId, exactCost),
+      canAffordMinorImprovement(state, player, improvement, actionCardId, exactCost, actionHooks),
     )
     .map((improvement) => ({
       value: improvement.id,
@@ -489,22 +506,23 @@ export const canAffordInjectedImprovement = (
   rawValue: string,
   actionCardId = 'minor-improvement',
   exactCost?: ExactCost,
+  actionHooks?: ActionHookRegistry,
 ): boolean => {
   const parsed = parseImprovementChoice(rawValue)
   if (parsed.kind === 'major') {
-    return canAffordMajorImprovement(state, player, parsed.id, actionCardId, exactCost)
+    return canAffordMajorImprovement(state, player, parsed.id, actionCardId, exactCost, actionHooks)
   }
   if (parsed.kind === 'minor') {
     const minor = getMinorImprovement(parsed.id)
     if (!minor) return false
-    return canAffordMinorImprovement(state, player, minor, actionCardId, exactCost)
+    return canAffordMinorImprovement(state, player, minor, actionCardId, exactCost, actionHooks)
   }
   if (isMajorCardId(parsed.id)) {
-    return canAffordMajorImprovement(state, player, parsed.id, actionCardId, exactCost)
+    return canAffordMajorImprovement(state, player, parsed.id, actionCardId, exactCost, actionHooks)
   }
   const minor = getMinorImprovement(parsed.id)
   if (minor) {
-    return canAffordMinorImprovement(state, player, minor, actionCardId, exactCost)
+    return canAffordMinorImprovement(state, player, minor, actionCardId, exactCost, actionHooks)
   }
   return false
 }

@@ -41,7 +41,7 @@ const cardImpl = {
       if (ctx?.triggerActionId !== 'place-farmer') return
       const playedRound = readCardExtraData<number>(player, CARD_ID, 'playedRound')
       if (playedRound === undefined || state.round <= playedRound) return
-      if (!isMajorImprovementPlayable(state, player, TARGET, CARD_ID, [TARGET])) return
+      if (!isMajorImprovementPlayable(state, player, TARGET, CARD_ID, [TARGET], ctx?.actionHooks)) return
       return buildPurchaseFlow()
     },
     computeBonusScore: (_state, player) =>

@@ -9,7 +9,7 @@ const CARD_ID = 'A097_Freshman'
 const canReplaceBake = (context: CardListenerContext) =>
   !context.actionContext?.checkedReplaceAction &&
   !isCardFlagged(context.player, CARD_ID) &&
-  hasPlayableOccupationChoice(context.state, context.player, context.space.id, { exactCost: {} })
+  hasPlayableOccupationChoice(context.state, context.player, context.space.id, { exactCost: {} }, context?.actionHooks)
 const computeReplaceListener: CardListenerRegistration = {
   id: 'A97-freshman-replace-bake',
   cardIds: [CARD_ID],

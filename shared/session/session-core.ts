@@ -1794,7 +1794,7 @@ export class GameCore {
       foodUsed,
       feedQueue,
       player ? this.getHarvestExchangeLimits(player) : undefined,
-      player ? getFeedExchangeCatalog(player, this.state).map(({ trade: _trade, window: _window, ...entry }) => entry) : undefined,
+      player ? getFeedExchangeCatalog(player, this.state, this.actionHooks).map(({ trade: _trade, window: _window, ...entry }) => entry) : undefined,
     )
   }
   private startPostReapAnytimeSubFlow(playerIndex: number): void {
@@ -1893,7 +1893,7 @@ export class GameCore {
   }
 
   private hasAnyHarvestExchange(player: PlayerState) {
-    const harvestExchange = getExchangesInWindow(player, 'harvest', this.state).some((trade) => {
+    const harvestExchange = getExchangesInWindow(player, 'harvest', this.state, this.actionHooks).some((trade) => {
       const sourceId = trade.sourceId ?? trade.source
       return !!sourceId
         && getRemainingHarvestExchangeUses(player, sourceId, trade.max, this.state.round) > 0
@@ -1901,14 +1901,14 @@ export class GameCore {
           || player.minorPlayed.includes(sourceId)
           || player.occupationPlayed.includes(sourceId))
     })
-    return harvestExchange || getExchangesInWindow(player, 'anytime', this.state).some((trade) =>
+    return harvestExchange || getExchangesInWindow(player, 'anytime', this.state, this.actionHooks).some((trade) =>
       canAffordTrade(player, trade, 1, this.state),
     )
   }
 
   private getHarvestExchangeLimits(player: PlayerState): Record<string, number> {
     const limits: Record<string, number> = {}
-    for (const trade of getExchangesInWindow(player, 'harvest', this.state)) {
+    for (const trade of getExchangesInWindow(player, 'harvest', this.state, this.actionHooks)) {
       const sourceId = trade.sourceId ?? trade.source
       if (!sourceId || (trade.max === undefined && !trade.fromFarmyard)) continue
       const remaining = getRemainingHarvestExchangeUses(player, sourceId, trade.max, this.state.round)
@@ -1954,7 +1954,7 @@ export class GameCore {
 
     const sourceIds: string[] = []
     const maxTradeTimesBySourceId: Record<string, number> = {}
-    for (const trade of getExchangesInWindow(player, 'harvest', this.state)) {
+    for (const trade of getExchangesInWindow(player, 'harvest', this.state, this.actionHooks)) {
       const sourceId = trade.sourceId ?? trade.source
       if (!sourceId || !canAffordTrade(player, trade, 1, this.state)) continue
       if (!Object.entries(trade.to).some(([resource, amount]) =>
@@ -2293,7 +2293,7 @@ export class GameCore {
     }
     if (preparationWindow) return anytimeEntries
     // Card-sourced anytime actions via CardListener phases:['anytime']
-    const anytimeContext: import('../cards/card-listeners').CardListenerContextInput = {
+    const anytimeContext: import('../cards/card-listeners').CardListenerDispatchInput = {
       actionHooks: this.actionHooks, state: this.state,
       player,
       space,
@@ -2361,7 +2361,7 @@ export class GameCore {
     if (request.kind === 'feed' && player) {
       return {
         ...request,
-        exchangeCatalog: getFeedExchangeCatalog(player, this.state).map(({ trade: _trade, window: _window, ...entry }) => entry),
+        exchangeCatalog: getFeedExchangeCatalog(player, this.state, this.actionHooks).map(({ trade: _trade, window: _window, ...entry }) => entry),
         maxTradeTimesBySourceId: this.getHarvestExchangeLimits(player),
         placedAnimals: getPlacedAnimalsByType(player, this.state),
       }
@@ -3159,7 +3159,7 @@ export class GameCore {
         return
       }
       const reapEvents: DraftGameEvent[] = []
-      const result = reap(this.state, player, captureEventSink(reapEvents))
+      const result = reap(this.state, player, captureEventSink(reapEvents), undefined, this.actionHooks)
       appendImmediateEvents(this.state, reapEvents, {
         actorPlayerId: player.id,
         sourceActionId: 'reap',
@@ -3455,7 +3455,7 @@ export class GameCore {
     if (this.state.snakeOpening) this.state.snakeOpening.reversed = false
     this.state.roundPhase = 'work'
     appendImmediateEvents(this.state, [{ type: 'work.started' }])
-    const workComplete = roundPhase.roundWorkComplete(this.state)
+    const workComplete = roundPhase.roundWorkComplete(this.state, this.actionHooks)
     let roundStartedSeq = -1
     for (const event of this.state.events) {
       if (event.type === 'round.started') roundStartedSeq = event.seq
@@ -3468,7 +3468,7 @@ export class GameCore {
       this.state.currentPlayerIndex = roundPhase.nextSeatedPlayerIdx(
         this.state,
         this.state.players,
-        previousIdx,
+        previousIdx, undefined, this.actionHooks
       )
     }
     this.engineStack.clear()
@@ -4027,12 +4027,12 @@ export class GameCore {
 
     player.occupationHand.forEach((occupationId) => {
       result[`occupation:${occupationId}`] = occupationCosts.some(({ spaceId, cost }) =>
-        isOccupationPlayable(this.state, player, occupationId, cost, spaceId),
+        isOccupationPlayable(this.state, player, occupationId, cost, spaceId, this.actionHooks),
       )
     })
 
     player.minorHand.forEach((improvementId) => {
-      const basePlayable = isMinorImprovementPlayable(this.state, player, improvementId)
+      const basePlayable = isMinorImprovementPlayable(this.state, player, improvementId, undefined, undefined, undefined, undefined, this.actionHooks)
       const improvement = getMinorImprovement(improvementId) ?? undefined
       result[`minor:${improvementId}`] =
         (canUseMinorImprovement &&
@@ -4050,7 +4050,7 @@ export class GameCore {
           this.state,
           player,
           improvementId,
-          'improvement-any',
+          'improvement-any', undefined, this.actionHooks
         )
     })
 
@@ -4383,7 +4383,7 @@ export class GameCore {
     const player = this.state.players[playerIndex]
     if (!player) return this.respond(false, 'invalid player')
 
-    const currentCatalog = getFeedExchangeCatalog(player, this.state)
+    const currentCatalog = getFeedExchangeCatalog(player, this.state, this.actionHooks)
     const offeredCatalog = feedRequest.exchangeCatalog ?? []
     const lookupExchange = (
       sourceId: string,
@@ -4592,7 +4592,7 @@ export class GameCore {
   /** S2 Task 10 part 7: thin delegator — body lives in `phases/round.ts`. */
   performRoundEnd(): SessionResponse {
     return this.runAuthoritativeCommand('performRoundEnd', null, {}, () => {
-      if (!roundPhase.roundWorkComplete(this.state)) return this.respond(false, 'not all workers used')
+      if (!roundPhase.roundWorkComplete(this.state, this.actionHooks)) return this.respond(false, 'not all workers used')
       if (this.peekEnginePendingEnvelope()) return this.respond(false, 'pending action exists')
       return this.continueAllWorkersPlacedHooks()
     })

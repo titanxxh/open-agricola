@@ -1,3 +1,4 @@
+import type { ActionHookRegistry } from '../hooks'
 import type { ActionDefinition, ActionExecutionResult, ActionFlow, GameState, HarvestReapSummary, PlayerState } from '../../contract/types'
 import type { EventSink } from '../../contract/events'
 import { fieldTopStack } from '../../domain/field'
@@ -81,6 +82,7 @@ export const reap = (
   player: PlayerState,
   eventSink?: EventSink,
   options: ReapOptions = {},
+  actionHooks?: ActionHookRegistry,
 ): ActionExecutionResult & { reapSummary: HarvestReapSummary; reactionFlow?: ActionFlow } => {
   const trigger = options.trigger ?? defaultReapTrigger()
   const reapSummary: HarvestReapSummary = {
@@ -242,7 +244,7 @@ export const reap = (
   for (const crop of ['grain', 'vegetable', 'wood', 'stone'] as const) {
     const amount = reapedCropAmounts[crop] ?? 0
     if (amount > 0) {
-      appendReactionFlow(dispatchReapListener(state, player, crop, amount, eventSink, options))
+      appendReactionFlow(dispatchReapListener(state, player, crop, amount, eventSink, options, actionHooks))
     }
   }
   for (const ownerCallback of ownerCallbacks) {
@@ -293,13 +295,13 @@ export const reapAction: ActionDefinition = {
   gainPerRound: {},
   canBeExecutedByPlayer: (_state, player) =>
     getLogicalFields(player).some((field) => field.stacks.length > 0),
-  execute: ({ state, player, sourceCard, actionContext, eventSink }) => {
+  execute: ({ state, player, sourceCard, actionContext, eventSink, actionHooks }) => {
     const trigger = readActionTrigger(actionContext, sourceCard)
     if (!reapAction.canBeExecutedByPlayer(state, player, { sourceCard, actionContext })) {
       return { type: 'fail', errorKey: 'log.action' }
     }
 
-    const result = reap(state, player, eventSink, { trigger, sourceCard })
+    const result = reap(state, player, eventSink, { trigger, sourceCard }, actionHooks)
     const reactionChildren: ActionFlow[] = []
     appendFlowChildren(reactionChildren, result.reactionFlow)
 

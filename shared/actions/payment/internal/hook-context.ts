@@ -1,3 +1,4 @@
+import type { ActionHookRegistry } from '../../hooks'
 /**
  * Card-cost hook firing context: buildCardCostListenerContext + helpers.
  * Glue between PaymentSolver and the card hook system (computeCosts phase).
@@ -8,13 +9,14 @@
  */
 
 import type { ActionSpace, GameState, PlayerState, Resource } from '../../../contract/types'
-import type { CardListenerContextInput } from '../../../cards/card-listeners'
+import type { CardListenerDispatchInput } from '../../../cards/card-listeners'
 
 export const buildCardCostListenerContext = (
   state: GameState,
   player: PlayerState,
   actionId: string,
-): CardListenerContextInput => {
+  actionHooks?: ActionHookRegistry,
+): CardListenerDispatchInput => {
   const emptySpace: ActionSpace = {
     id: '',
     nameKey: '',
@@ -28,6 +30,7 @@ export const buildCardCostListenerContext = (
   }
 
   return {
+    actionHooks,
     state,
     player,
     space: emptySpace,

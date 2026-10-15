@@ -1,4 +1,5 @@
 import { getUsedFarmyardTileKeys, getNewlyUsedFarmyardTiles } from '../domain/farmyard-usage'
+import type { ActionHookRegistry } from '../actions/hooks'
 import type { ActionFlow, ActionSpace, FarmTilePosition, Field, GameState, PlayerState, Resource } from '../contract/types'
 import type { EventSink } from '../contract/events'
 import { positionKey } from '../domain/farm'
@@ -69,8 +70,10 @@ const canExecuteImprovementFlow = (
   state: GameState,
   player: PlayerState,
   types: readonly ('major' | 'minor')[],
+  actionHooks?: ActionHookRegistry,
 ): boolean =>
   improvementAction.canBeExecutedByPlayer(state, player, {
+    actionHooks,
     actionContext: { types: [...types] },
   })
 
@@ -122,6 +125,7 @@ export const validateMoorSpecialAction = (
   cardId: string,
   actionId: MoorSpecialActionId,
   payload: MoorSpecialActionPayload = {},
+  actionHooks?: ActionHookRegistry,
 ): { ok: true } | { ok: false; error: string } => {
   const player = state.players[playerIndex]
   const farmersOfTheMoor = state.farmersOfTheMoor
@@ -141,7 +145,7 @@ export const validateMoorSpecialAction = (
     return { ok: false, error: 'not enough fuel' }
   }
 
-  return validateMoorSpecialActionEffect(state, playerIndex, actionId, payload)
+  return validateMoorSpecialActionEffect(state, playerIndex, actionId, payload, actionHooks)
 }
 
 export const validateMoorSpecialActionEffect = (
@@ -149,6 +153,7 @@ export const validateMoorSpecialActionEffect = (
   playerIndex: number,
   actionId: MoorSpecialActionId,
   payload: MoorSpecialActionPayload = {},
+  actionHooks?: ActionHookRegistry,
 ): { ok: true } | { ok: false; error: string } => {
   if (isMoorTerrainAction(actionId)) {
     return validateMoorTerrainActionEffect(state, playerIndex, actionId, payload)
@@ -161,12 +166,12 @@ export const validateMoorSpecialActionEffect = (
     case 'horse-market':
       break
     case 'black-market':
-      if (!canExecuteImprovementFlow(state, player, ['minor'])) {
+      if (!canExecuteImprovementFlow(state, player, ['minor'], actionHooks)) {
         return { ok: false, error: 'special action unavailable' }
       }
       break
     case 'illicit-work':
-      if (!canExecuteImprovementFlow(state, player, ['major'])) {
+      if (!canExecuteImprovementFlow(state, player, ['major'], actionHooks)) {
         return { ok: false, error: 'special action unavailable' }
       }
       break
@@ -247,8 +252,9 @@ export const applyMoorSpecialActionEffect = (
   actionId: MoorSpecialActionId,
   payload: MoorSpecialActionPayload = {},
   eventSink?: EventSink,
+  actionHooks?: ActionHookRegistry,
 ): MoorSpecialActionResult => {
-  const validation = validateMoorSpecialActionEffect(state, playerIndex, actionId, payload)
+  const validation = validateMoorSpecialActionEffect(state, playerIndex, actionId, payload, actionHooks)
   if (!validation.ok) return validation
   return executeMoorSpecialActionEffect(state, playerIndex, actionId, payload, eventSink)
 }
@@ -260,8 +266,9 @@ export const applyMoorSpecialAction = (
   actionId: MoorSpecialActionId,
   payload: MoorSpecialActionPayload = {},
   eventSink?: EventSink,
+  actionHooks?: ActionHookRegistry,
 ): MoorSpecialActionResult => {
-  const validation = validateMoorSpecialAction(state, playerIndex, cardId, actionId, payload)
+  const validation = validateMoorSpecialAction(state, playerIndex, cardId, actionId, payload, actionHooks)
   if (!validation.ok) return validation
   const player = state.players[playerIndex]!
   const card = state.farmersOfTheMoor!.specialActionCards.find((candidate) => candidate.id === cardId)!

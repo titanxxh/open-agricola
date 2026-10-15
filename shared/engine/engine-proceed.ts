@@ -27,7 +27,6 @@ import type { EngineNode, EngineStepResult } from './types'
 import {
   executeCardListener,
   getListenerById,
-  type CardListenerContext,
 } from '../cards/card-listeners'
 import { incCardUsed } from '../cards/helpers/card-state'
 import type { EngineInternals } from './engine-internals'
@@ -627,7 +626,7 @@ const executeActivateCardAction = (
   }
   if (params.countCardUse !== undefined) event.countCardUse = params.countCardUse
   const eventReadContext = eventReadContextForActivation(int, params)
-  const listenerContext: CardListenerContext = {
+  const listenerContext = {
     actionHooks: int.hooks.actionHooks,
     state: context.state,
     player: triggerPlayer,

@@ -171,7 +171,7 @@ export const canStartBefore = (
     state.actionSpaces = state.actionSpaces.map((space, index) => ({ ...context.state.actionSpaces[index], ...space }))
     const player = state.players.find((candidate) => candidate.id === context.player.id)!
     const space = state.actionSpaces.find((candidate) => candidate.id === context.space.id) ?? context.space
-    const result = executeCardListener(entry.registration, { ...context, state, player, space, actionId, phase: 'before' }, listenerOwnerOptions(entry))
+    const result = executeCardListener(entry.registration, { ...context, actionHooks: context.actionHooks, state, player, space, actionId, phase: 'before' }, listenerOwnerOptions(entry))
     if (!result?.flow) return false
     const owner = state.players.find((candidate) => candidate.id === entry.ownerPlayerId) ?? player
     return evaluateFlowDoable({ ...result.flow, optional: false }, {
@@ -246,7 +246,7 @@ export const isActionVetoedInFlowContext = (context: FlowDoableContext & { actio
   if (!canAccessActionSpace(context.actionId, context)) return true
   const actionHookDoable = requireActionHookRegistry(context.actionHooks).applyIsDoableDetailed(context, true)
   if (actionHookDoable.vetoed) return true
-  const listenerContext = { ...context, phase: 'isDoable' as const, doable: actionHookDoable.doable }
+  const listenerContext = { ...context, actionHooks: context.actionHooks, phase: 'isDoable' as const, doable: actionHookDoable.doable }
   return getMatchingListeners(listenerContext).some((entry) =>
     executeCardListener(entry.registration, listenerContext, listenerOwnerOptions(entry))?.doable === false)
 }

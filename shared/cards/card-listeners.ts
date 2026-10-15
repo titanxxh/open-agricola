@@ -38,6 +38,8 @@ export type CardListenerContextInput =
   Omit<CardListenerContext, 'transactionEvents' | 'actionEvents' | 'eventQuery'> &
   Partial<Pick<CardListenerContext, 'transactionEvents' | 'actionEvents' | 'eventQuery'>>
 
+export type CardListenerDispatchInput = CardListenerContextInput & { actionHooks: ActionHookRegistry | undefined }
+
 export type CardListenerScope = 'player' | 'opponent' | 'any'
 export type CardListenerZone = 'played' | 'hand'
 export type CardListenerOwnerZone = CardListenerZone | 'activated'
@@ -234,7 +236,7 @@ const stampFlowOwner = (flow: ActionFlow, ownerPlayerId: string): ActionFlow =>
   flow.targetPlayerId ? flow : { ...flow, targetPlayerId: ownerPlayerId }
 
 export const runCardListeners = (
-  context: CardListenerContextInput,
+  context: CardListenerDispatchInput,
   listeners?: readonly CardListenerRegistration[],
   options: RunCardListenersOptions = {},
 ) => {
@@ -312,7 +314,7 @@ const resolveOwnerPlayer = (
 
 export const buildCardListenerContext = (
   registration: CardListenerRegistration,
-  context: CardListenerContextInput,
+  context: CardListenerDispatchInput,
   owner?: string | CardListenerOwnerOptions,
 ): CardListenerContext => {
   const baseContext = normalizeCardListenerContext(context)
@@ -406,7 +408,7 @@ export const getMatchingListeners = (
 
 export const executeCardListener = (
   registration: CardListenerRegistration,
-  context: CardListenerContextInput,
+  context: CardListenerDispatchInput,
   options?: CardListenerOwnerOptions,
 ): ActionHookResult | undefined => {
   const handler = registration.handler
@@ -516,8 +518,10 @@ export const collectComputeChoiceCandidates = (
   actionId: string,
   actionContext?: Record<string, unknown>,
   sourceCard?: string,
+  actionHooks?: ActionHookRegistry,
 ): import('../contract/types').ActionChoiceOption[] => {
-  const baseCtx: CardListenerContextInput = {
+  const baseCtx: CardListenerDispatchInput = {
+    actionHooks,
     state,
     player,
     space: makeDummySpace(actionId),
@@ -551,8 +555,10 @@ export const collectComputeExchanges = (
   state: GameState,
   player: PlayerState,
   window: string,
+  actionHooks?: ActionHookRegistry,
 ): Trade[] => {
-  const baseCtx: CardListenerContextInput = {
+  const baseCtx: CardListenerDispatchInput = {
+    actionHooks,
     state,
     player,
     space: makeDummySpace('compute-exchanges'),
@@ -605,7 +611,7 @@ export const collectFarmChoiceCostAdjustments = (
   params: Record<string, unknown>,
   space?: ActionSpace,
 ): FarmChoiceCostAdjustments => {
-  const ctx: ActionHookContext = {
+  const ctx: ActionHookContext & Pick<CardListenerDispatchInput, 'actionHooks'> = {
     actionHooks,
     state,
     player,

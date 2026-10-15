@@ -61,7 +61,7 @@ export const collectScheduledEffectPreviews = (state: GameState, player: PlayerS
       const effect = getCardEffect(use.sourceCard)
       const ownsSource = [...player.minorPlayed, ...player.occupationPlayed, ...player.improvements].includes(use.sourceCard)
       const describedByTimedRule = effect?.timedRules?.some(rule => rule.at.phase === 'contributeExtraTurn')
-      const flow = ownsSource && !describedByTimedRule ? effect?.contributeExtraTurn?.(state, player) : undefined
+      const flow = ownsSource && !describedByTimedRule ? effect?.contributeExtraTurn?.(state, player, { actionHooks }) : undefined
       const space = state.actionSpaces[0]
       if (flow && space) {
         const registry = new ActionRegistry()
