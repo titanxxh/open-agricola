@@ -1,3 +1,4 @@
+import type { ActionHookRegistry } from '../../hooks'
 import type { ActionDefinition, ActionFlow, ActionSpace, GameState, PlayerState } from '../../../contract/types'
 import { recordRoundPlacement } from '../../../cards/helpers/round-placement'
 import { collectBeforePlacementFlows, getMatchingListeners, type MatchedCardListener } from '../../../cards/card-listeners'
@@ -52,6 +53,7 @@ const activatePlacementListenerFlow = (
 })
 
 const canTargetSpace = (
+  actionHooks: ActionHookRegistry | undefined,
   state: GameState,
   player: PlayerState,
   space: ActionSpace,
@@ -60,9 +62,9 @@ const canTargetSpace = (
   if (!canEnterSpace(space, player, state)) return false
   if (isSpaceBlocked(space)) return false
   if (!allowOccupied && isSpaceOccupied(space)) return false
-  if (!space.canBeExecutedByPlayer(state, player)) return false
+  if (!space.canBeExecutedByPlayer(state, player, { actionHooks })) return false
   return isPlacementActionDoableInFlowContext({
-    state, player, space, action: space, actionId: space.id,
+    actionHooks, state, player, space, action: space, actionId: space.id,
     resolveAction: actionId => findActionSpaceById(state, actionId) ?? getActionDefinition(actionId),
   })
 }
@@ -74,14 +76,14 @@ export const placeFarmerOnSpaceAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: (state, player) => workersAvailable(state, player) > 0,
-  execute: ({ state, player, params, sourceCard, actionContext, eventSink }) => {
+  execute: ({ actionHooks, state, player, params, sourceCard, actionContext, eventSink }) => {
     const targetSpaceId = typeof params?.spaceId === 'string' ? params.spaceId : undefined
     if (!targetSpaceId) return { type: 'fail', errorKey: 'log.placeFarmerFail' }
     const targetSpace = findActionSpaceById(state, targetSpaceId)
     if (!targetSpace) return { type: 'fail', errorKey: 'log.placeFarmerFail' }
 
     const allowOccupied = params?.allowOccupied === true
-    if (!canTargetSpace(state, player, targetSpace, allowOccupied)) {
+    if (!canTargetSpace(actionHooks, state, player, targetSpace, allowOccupied)) {
       return { type: 'fail', errorKey: 'log.placeFarmerFail' }
     }
 
@@ -121,7 +123,7 @@ export const placeFarmerOnSpaceAction: ActionDefinition = {
       sourceCard: cardId,
       actionContext: targetActionContext,
     }
-    const beforeFlows = collectBeforePlacementFlows(state, player, targetSpace, targetActionContext)
+    const beforeFlows = collectBeforePlacementFlows(actionHooks, state, player, targetSpace, targetActionContext)
     const afterFlows = collectAfterPlacementFlows(state, player, targetSpace, targetActionContext)
     if (beforeFlows.length === 0 && afterFlows.length === 0) {
       return { type: 'flow', flow: targetLeaf, extraData: { actionContextWrite } }

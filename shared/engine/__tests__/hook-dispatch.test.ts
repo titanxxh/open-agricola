@@ -14,7 +14,7 @@ import { EngineTree } from '../tree'
 import { HookDispatcher } from '../dispatcher'
 import { LogStore } from '../log-store'
 import { ActionNode } from '../nodes'
-import { clearActionHooks, registerActionHook } from '../../actions/hooks'
+import { ActionHookRegistry } from '../../actions/hooks'
 import {
   deriveCanBeExecutedByFlow,
   initializeFlowDerivedCanBeExecutedByPlayer,
@@ -22,6 +22,9 @@ import {
 import { constructAction } from '../../actions/effects/construct'
 import { plowAction } from '../../actions/effects/plow'
 import { stablesAction } from '../../actions/effects/stables'
+
+const actionHooks = new ActionHookRegistry()
+
 
 const createPlayer = (id = 'p1', name = 'P1'): PlayerState =>
   ({
@@ -96,7 +99,7 @@ const drainEngine = (
 
 describe('Hook dispatch merge order', () => {
   beforeEach(() => {
-    clearActionHooks()
+    actionHooks.clear()
     setActiveCardRegistry(new CardRegistry())
   })
 
@@ -125,7 +128,7 @@ describe('Hook dispatch merge order', () => {
     } as GameState
     const clone = vi.spyOn(globalThis, 'structuredClone')
 
-    const doable = new HookDispatcher().applyIsDoable({
+    const doable = new HookDispatcher(actionHooks).applyIsDoable({
       state,
       player,
       space: createSpace(action),
@@ -141,7 +144,7 @@ describe('Hook dispatch merge order', () => {
     const player = createPlayer()
     player.minorPlayed = ['card-A']
 
-    registerActionHook({
+    actionHooks.register({
       id: 'action-hook',
       actions: ['test-action'],
       phases: ['after'],
@@ -183,7 +186,7 @@ describe('Hook dispatch merge order', () => {
     const engine = new Engine({
       tree: new EngineTree(new ActionNode('a', 'test-action')),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     let step = engine.proceed({ state, player, space })
@@ -195,7 +198,7 @@ describe('Hook dispatch merge order', () => {
   })
 
   it('does not let a card opt-in override an action hook veto', () => {
-    registerActionHook({
+    actionHooks.register({
       id: 'aaa-veto',
       actions: ['test-action'],
       phases: ['isDoable'],
@@ -219,7 +222,7 @@ describe('Hook dispatch merge order', () => {
       gameSeed: 1, availableMajorImprovements: [],
       futureMeeples: [], pendingFutureMeeples: [], gameOver: false,
     } as GameState
-    const dispatcher = new HookDispatcher()
+    const dispatcher = new HookDispatcher(actionHooks)
 
     const doable = dispatcher.applyIsDoable({
       state,
@@ -257,7 +260,7 @@ describe('Hook dispatch merge order', () => {
       gameSeed: 1, availableMajorImprovements: [],
       futureMeeples: [], pendingFutureMeeples: [], gameOver: false,
     } as GameState
-    const dispatcher = new HookDispatcher()
+    const dispatcher = new HookDispatcher(actionHooks)
 
     const doable = dispatcher.applyIsDoable({
       state,
@@ -270,7 +273,7 @@ describe('Hook dispatch merge order', () => {
   })
 
   it('does not let a flow-derived child opt-in override a child veto', () => {
-    registerActionHook({
+    actionHooks.register({
       id: 'aaa-child-veto',
       actions: ['child-action'],
       phases: ['isDoable'],
@@ -310,7 +313,7 @@ describe('Hook dispatch merge order', () => {
       futureMeeples: [], pendingFutureMeeples: [], gameOver: false,
     } as GameState
 
-    const doable = parentAction.canBeExecutedByPlayer.call(createSpace(parentAction), state, player)
+    const doable = parentAction.canBeExecutedByPlayer.call(createSpace(parentAction), state, player, { actionHooks })
 
     expect(doable).toBe(false)
   })
@@ -353,19 +356,19 @@ describe('Hook dispatch merge order', () => {
       futureMeeples: [], pendingFutureMeeples: [], gameOver: false,
     } as GameState
 
-    expect(parentAction.canBeExecutedByPlayer.call(createSpace(parentAction), state, player)).toBe(true)
+    expect(parentAction.canBeExecutedByPlayer.call(createSpace(parentAction), state, player, { actionHooks })).toBe(true)
     expect(parentAction.canBeExecutedByPlayer.call(
       createSpace(parentAction),
       state,
       player,
-      { actionContext: { skipBeforeTriggers: true } } as CanBeExecutedByPlayerContext,
+      { actionHooks, actionContext: { skipBeforeTriggers: true } } as CanBeExecutedByPlayerContext,
     )).toBe(false)
   })
 })
 
 describe('Card listener scope filtering', () => {
   beforeEach(() => {
-    clearActionHooks()
+    actionHooks.clear()
     setActiveCardRegistry(new CardRegistry())
   })
 
@@ -402,7 +405,7 @@ describe('Card listener scope filtering', () => {
     const engine1 = new Engine({
       tree: new EngineTree(new ActionNode('a', 'test-action')),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     let step1 = engine1.proceed({ state, player: p1, space })
@@ -415,7 +418,7 @@ describe('Card listener scope filtering', () => {
     const engine2 = new Engine({
       tree: new EngineTree(new ActionNode('b', 'test-action')),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     let step2 = engine2.proceed({ state, player: p2, space })
@@ -458,7 +461,7 @@ describe('Card listener scope filtering', () => {
     const engine = new Engine({
       tree: new EngineTree(new ActionNode('a', 'test-action')),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     drainEngine(engine, state, p1, space)
@@ -480,7 +483,7 @@ describe('Card listener scope filtering', () => {
     const engine2 = new Engine({
       tree: new EngineTree(new ActionNode('b', 'test-action')),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     drainEngine(engine2, state, p2, space)
@@ -520,7 +523,7 @@ describe('Card listener scope filtering', () => {
     const engine1 = new Engine({
       tree: new EngineTree(new ActionNode('a', 'test-action')),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     let step1 = engine1.proceed({ state, player: p1, space })
@@ -532,7 +535,7 @@ describe('Card listener scope filtering', () => {
     const engine2 = new Engine({
       tree: new EngineTree(new ActionNode('b', 'test-action')),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     let step2 = engine2.proceed({ state, player: p2, space })
@@ -545,19 +548,19 @@ describe('Card listener scope filtering', () => {
 
 describe('Multiple hooks overriding doable', () => {
   beforeEach(() => {
-    clearActionHooks()
+    actionHooks.clear()
     setActiveCardRegistry(new CardRegistry())
   })
 
   it('does not let a later hook opt-in override an earlier hook veto', () => {
-    registerActionHook({
+    actionHooks.register({
       id: 'block-it',
       actions: ['test-action'],
       phases: ['isDoable'],
       order: 1,
       handler: () => ({ doable: false }),
     })
-    registerActionHook({
+    actionHooks.register({
       id: 'allow-it',
       actions: ['test-action'],
       phases: ['isDoable'],
@@ -581,7 +584,7 @@ describe('Multiple hooks overriding doable', () => {
     const engine = new Engine({
       tree: new EngineTree(new ActionNode('a', 'test-action')),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     const result = engine.proceed({ state, player, space })
@@ -591,12 +594,12 @@ describe('Multiple hooks overriding doable', () => {
 
 describe('Cost preview doable', () => {
   beforeEach(() => {
-    clearActionHooks()
+    actionHooks.clear()
     setActiveCardRegistry(new CardRegistry())
   })
 
   it('construct can become doable after computeCosts discount', () => {
-    registerActionHook({
+    actionHooks.register({
       id: 'construct-discount',
       actions: ['construct'],
       phases: ['computeCosts'],
@@ -614,7 +617,7 @@ describe('Cost preview doable', () => {
       gameSeed: 1, availableMajorImprovements: [],
       futureMeeples: [], pendingFutureMeeples: [], gameOver: false,
     } as GameState
-    const dispatcher = new HookDispatcher()
+    const dispatcher = new HookDispatcher(actionHooks)
 
     const doable = dispatcher.applyIsDoable({
       state,
@@ -627,7 +630,7 @@ describe('Cost preview doable', () => {
   })
 
   it('plow becomes not doable when computeCosts adds a food surcharge', () => {
-    registerActionHook({
+    actionHooks.register({
       id: 'plow-food-cost',
       actions: ['plow'],
       phases: ['computeCosts'],
@@ -643,7 +646,7 @@ describe('Cost preview doable', () => {
       gameSeed: 1, availableMajorImprovements: [],
       futureMeeples: [], pendingFutureMeeples: [], gameOver: false,
     } as GameState
-    const dispatcher = new HookDispatcher()
+    const dispatcher = new HookDispatcher(actionHooks)
 
     const doable = dispatcher.applyIsDoable({
       state,
@@ -656,7 +659,7 @@ describe('Cost preview doable', () => {
   })
 
   it('stables still respects structural limits even with discounts', () => {
-    registerActionHook({
+    actionHooks.register({
       id: 'stable-discount',
       actions: ['stables'],
       phases: ['computeCosts'],
@@ -673,7 +676,7 @@ describe('Cost preview doable', () => {
       gameSeed: 1, availableMajorImprovements: [],
       futureMeeples: [], pendingFutureMeeples: [], gameOver: false,
     } as GameState
-    const dispatcher = new HookDispatcher()
+    const dispatcher = new HookDispatcher(actionHooks)
 
     const doable = dispatcher.applyIsDoable({
       state,

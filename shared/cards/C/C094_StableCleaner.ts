@@ -39,6 +39,7 @@ const canBuildCleanerStable = (context: CardListenerContext) => {
   const costDelta = collectStablesCostDelta(context)
   return stablesAction.costPreview?.canExecute?.(
     {
+      actionHooks: context.actionHooks,
       state: context.state,
       player: context.player,
       space: context.space,

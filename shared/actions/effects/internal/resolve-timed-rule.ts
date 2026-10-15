@@ -31,7 +31,7 @@ export const createResolveTimedRuleAction = (resolveAction: FlowActionResolver):
     if (!rule || !cardId) return false
     if (!roundPreparationHooks.some(hook => hook === rule.at.phase)) return true
     return evaluateFlowDoable({ ...compileRuleBody(cardId, rule.key, rule.body), optional: false }, {
-      state, player, space: context?.space ?? state.actionSpaces[0]!,
+      actionHooks: context?.actionHooks, state, player, space: context?.space ?? state.actionSpaces[0]!,
     }, resolveAction)
   },
 })

@@ -1,4 +1,4 @@
-import { registerActionHook } from '../actions/hooks'
+import type { ActionHookRegistry } from '../actions/hooks'
 import { stablesAction } from '../actions/effects/stables'
 import { PaymentSolver } from '../actions/payment'
 import {
@@ -10,8 +10,8 @@ import { isThroughTheSeasonsSeason } from './rules'
 
 const SUMMER_DAY_LABORER_USED_KEY = 'throughTheSeasonsSummerDayLaborerUsed'
 
-export const registerThroughTheSeasonsHooks = (): void => {
-  registerActionHook({
+export const registerThroughTheSeasonsHooks = (actionHooks: ActionHookRegistry): void => {
+  actionHooks.register({
     id: 'through-the-seasons:winter-fishing-round-limit',
     actions: ['fishing'],
     phases: ['isDoable'],
@@ -22,7 +22,7 @@ export const registerThroughTheSeasonsHooks = (): void => {
     },
   })
 
-  registerActionHook({
+  actionHooks.register({
     id: 'through-the-seasons:winter-plow-food-cost',
     actions: ['plow'],
     phases: ['computeCosts'],
@@ -32,7 +32,7 @@ export const registerThroughTheSeasonsHooks = (): void => {
     },
   })
 
-  registerActionHook({
+  actionHooks.register({
     id: 'through-the-seasons:winter-farmland-food-gate',
     actions: ['farmland'],
     phases: ['isDoable'],
@@ -43,7 +43,7 @@ export const registerThroughTheSeasonsHooks = (): void => {
     },
   })
 
-  registerActionHook({
+  actionHooks.register({
     id: 'through-the-seasons:summer-day-laborer-grain',
     actions: ['gain'],
     phases: ['after'],
@@ -59,7 +59,7 @@ export const registerThroughTheSeasonsHooks = (): void => {
     },
   })
 
-  registerActionHook({
+  actionHooks.register({
     id: 'through-the-seasons:summer-room-stables',
     actions: ['construct'],
     phases: ['after'],
@@ -75,7 +75,7 @@ export const registerThroughTheSeasonsHooks = (): void => {
         max: builtRooms.length,
         trueAction: false,
       }
-      if (!stablesAction.canBeExecutedByPlayer(context.state, context.player, { actionContext })) return
+      if (!stablesAction.canBeExecutedByPlayer(context.state, context.player, { actionHooks: context.actionHooks, actionContext })) return
       return {
         flow: {
           type: 'leaf',

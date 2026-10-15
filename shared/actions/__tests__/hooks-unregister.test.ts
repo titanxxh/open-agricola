@@ -1,57 +1,55 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import {
-  registerActionHook,
-  unregisterActionHook,
-  clearActionHooks,
-  getRegisteredActionHooks,
-} from '../hooks'
+import { ActionHookRegistry } from '../hooks'
+
+const actionHooks = new ActionHookRegistry()
+
 
 describe('unregisterActionHook', () => {
   beforeEach(() => {
-    clearActionHooks()
+    actionHooks.clear()
   })
 
   it('removes a hook by id', () => {
-    registerActionHook({
+    actionHooks.register({
       id: 'test-hook-1',
       phases: ['after'],
       handler: () => undefined,
     })
-    registerActionHook({
+    actionHooks.register({
       id: 'test-hook-2',
       phases: ['after'],
       handler: () => undefined,
     })
-    expect(getRegisteredActionHooks()).toHaveLength(2)
+    expect(actionHooks.getRegistered()).toHaveLength(2)
 
-    unregisterActionHook('test-hook-1')
+    actionHooks.unregister('test-hook-1')
 
-    const remaining = getRegisteredActionHooks()
+    const remaining = actionHooks.getRegistered()
     expect(remaining).toHaveLength(1)
     expect(remaining[0]!.id).toBe('test-hook-2')
   })
 
   it('is a no-op when id is not found', () => {
-    registerActionHook({
+    actionHooks.register({
       id: 'test-hook-x',
       phases: ['after'],
       handler: () => undefined,
     })
-    expect(getRegisteredActionHooks()).toHaveLength(1)
+    expect(actionHooks.getRegistered()).toHaveLength(1)
 
-    expect(() => unregisterActionHook('does-not-exist')).not.toThrow()
+    expect(() => actionHooks.unregister('does-not-exist')).not.toThrow()
 
-    expect(getRegisteredActionHooks()).toHaveLength(1)
+    expect(actionHooks.getRegistered()).toHaveLength(1)
   })
 
   it('removes only the first match if multiple registered with same id (defensive)', () => {
-    registerActionHook({ id: 'dup', phases: ['after'], handler: () => undefined })
-    registerActionHook({ id: 'dup', phases: ['after'], handler: () => undefined })
-    expect(getRegisteredActionHooks()).toHaveLength(2)
+    actionHooks.register({ id: 'dup', phases: ['after'], handler: () => undefined })
+    actionHooks.register({ id: 'dup', phases: ['after'], handler: () => undefined })
+    expect(actionHooks.getRegistered()).toHaveLength(2)
 
-    unregisterActionHook('dup')
+    actionHooks.unregister('dup')
 
-    expect(getRegisteredActionHooks()).toHaveLength(1)
-    expect(getRegisteredActionHooks()[0]!.id).toBe('dup')
+    expect(actionHooks.getRegistered()).toHaveLength(1)
+    expect(actionHooks.getRegistered()[0]!.id).toBe('dup')
   })
 })

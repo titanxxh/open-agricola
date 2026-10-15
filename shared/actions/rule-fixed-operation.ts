@@ -123,7 +123,7 @@ export const executeFixedRuleOperation = (operation: RuleFixedOperation, context
         allowedSegmentTypes: ['fence'], sourcePolicy: { kind: 'borrowed', donorCaps },
         segmentBounds: { fence: { min: 1, max }, total: { min: 1, max } }, costPolicy: { fence: { wood: 0 } }, cancelPolicy: 'forbidCancel',
       } }
-      if (!max || !canStartFencing(state, player, undefined, actionContext)) return { type: 'ok' }
+      if (!max || !canStartFencing(context.actionHooks, state, player, undefined, actionContext)) return { type: 'ok' }
       return { type: 'flow', flow: { type: 'leaf', actionId: 'fence', sourceCard, optional: true, actionContext } }
     }
     case 'bounded-exchange': {

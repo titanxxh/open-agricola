@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import type { ActionDefinition, ActionSpace, Resource } from '../../shared/contract/types'
-import { clearActionHooks, registerActionHook } from '../../shared/actions/hooks'
+
 
 const emptyResources = (): Resource => ({
   wood: 0,
@@ -19,7 +19,6 @@ const emptyResources = (): Resource => ({
 
 describe('action detail events', () => {
   afterEach(() => {
-    clearActionHooks()
   })
 
   it('records legacy action detail deltas as public events and UI log entries', () => {
@@ -225,7 +224,7 @@ describe('action detail events', () => {
     } as ActionSpace)
     session.loadState(state)
     let observed = false
-    registerActionHook({
+    session.actionHooks.register({
       id: 'test-after-farm-select-pre-prompt-events',
       actions: [action.id],
       phases: ['after'],

@@ -1,3 +1,4 @@
+import { ActionHookRegistry } from '../hooks'
 import { describe, expect, it } from 'vitest'
 import { A088_HedgeKeeper } from '../../cards/A/A088_HedgeKeeper'
 import {
@@ -45,7 +46,7 @@ describe('fencing pasture', () => {
     const player = createPlayer()
     player.resources.wood = 1
     player.activeModifiers = [hedgeKeeperModifier]
-    expect(canStartFencing(fakeState, player)).toBe(true)
+    expect(canStartFencing(new ActionHookRegistry(), fakeState, player)).toBe(true)
   })
 
   it('allows minimum-pasture fencing with Hedge Keeper discount (canStartFencing path)', () => {
@@ -56,6 +57,6 @@ describe('fencing pasture', () => {
     const player = createPlayer()
     player.resources.wood = 1
     player.activeModifiers = [hedgeKeeperModifier]
-    expect(canStartFencing(fakeState, player)).toBe(true)
+    expect(canStartFencing(new ActionHookRegistry(), fakeState, player)).toBe(true)
   })
 })

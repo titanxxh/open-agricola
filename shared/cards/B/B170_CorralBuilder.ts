@@ -33,7 +33,7 @@ const cardImpl = {
     },
     onAfterRevealAction: (state, player, ctx) => {
       if (ctx?.roundPreparation?.kind !== 'after-reveal' || !REVEAL_SPACES.has(ctx.roundPreparation.revealedAction?.actionId ?? '')) return
-      if (!canStartFencing(state, player, undefined, ONE_SPACE_PASTURE_CONTEXT)) return
+      if (!canStartFencing(ctx?.actionHooks, state, player, undefined, ONE_SPACE_PASTURE_CONTEXT)) return
       return oneSpacePastureFlow()
     },
   },

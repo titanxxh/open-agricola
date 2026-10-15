@@ -13,7 +13,10 @@ import { EngineTree } from '../tree'
 import { HookDispatcher } from '../dispatcher'
 import { LogStore } from '../log-store'
 import { ActionNode, SequenceNode } from '../nodes'
-import { clearActionHooks, registerActionHook } from '../../actions/hooks'
+import { ActionHookRegistry } from '../../actions/hooks'
+
+const actionHooks = new ActionHookRegistry()
+
 
 const createState = () =>
   ({
@@ -98,7 +101,7 @@ const buildEngine = (actions: ActionDefinition[], hostActionId: string) => {
   return new Engine({
     tree: new EngineTree(root),
     registry,
-    hooks: new HookDispatcher(),
+    hooks: new HookDispatcher(actionHooks),
     log: new LogStore(),
   })
 }
@@ -117,7 +120,7 @@ const runUntilDone = (
 
 describe('engine internal children', () => {
   beforeEach(() => {
-    clearActionHooks()
+    actionHooks.clear()
     setActiveCardRegistry(new CardRegistry())
   })
 
@@ -168,7 +171,7 @@ describe('engine internal children', () => {
         return { type: 'ok' }
       },
     }
-    registerActionHook({
+    actionHooks.register({
       id: 'host-before-after',
       actions: ['host-before-slot'],
       phases: ['after'],
@@ -246,7 +249,7 @@ describe('engine internal children', () => {
         return { type: 'ok' }
       },
     }
-    registerActionHook({
+    actionHooks.register({
       id: 'host-commit-after',
       actions: ['host-commit-slot'],
       phases: ['after'],
@@ -350,7 +353,7 @@ describe('engine internal children', () => {
         return { type: 'ok' }
       },
     }
-    registerActionHook({
+    actionHooks.register({
       id: 'host-commit-flow-after',
       actions: ['host-commit-flow-slot'],
       phases: ['after'],
@@ -429,7 +432,7 @@ describe('engine internal children', () => {
         return { type: 'ok', resourcesPaid: { food: 2 } }
       },
     }
-    registerActionHook({
+    actionHooks.register({
       id: 'host-after-after',
       actions: ['host-after-slot'],
       phases: ['after'],
@@ -514,7 +517,7 @@ describe('engine internal children', () => {
         return { type: 'ok' }
       },
     }
-    registerActionHook({
+    actionHooks.register({
       id: 'host-before-after',
       actions: ['host-before-slot'],
       phases: ['after'],
@@ -606,7 +609,7 @@ describe('engine internal children', () => {
         return { type: 'ok', resourcesPaid: { food: 2 } }
       },
     }
-    registerActionHook({
+    actionHooks.register({
       id: 'host-finalizer-after',
       actions: ['host-finalizer-slot'],
       phases: ['after'],
@@ -872,7 +875,7 @@ describe('engine internal children', () => {
         return { type: 'ok' }
       },
     }
-    registerActionHook({
+    actionHooks.register({
       id: 'host-nested-before-fail-after',
       actions: ['host-nested-before-fail-slot'],
       phases: ['after'],
@@ -940,7 +943,7 @@ describe('engine internal children', () => {
         return { type: 'ok', resourcesPaid: { food: 1 } }
       },
     }
-    registerActionHook({
+    actionHooks.register({
       id: 'host-before-after-events',
       actions: ['host-before-slot'],
       phases: ['after'],
@@ -1018,7 +1021,7 @@ describe('engine internal children', () => {
         return { type: 'ok' }
       },
     }
-    registerActionHook({
+    actionHooks.register({
       id: 'host-before-fail-after',
       actions: ['host-before-fail-slot'],
       phases: ['after'],
@@ -1085,7 +1088,7 @@ describe('engine internal children', () => {
         return { type: 'ok', resourcesPaid: { food: 1 } }
       },
     }
-    registerActionHook({
+    actionHooks.register({
       id: 'host-choice-after',
       actions: ['host-choice-slot'],
       phases: ['after'],

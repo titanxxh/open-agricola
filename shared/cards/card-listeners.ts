@@ -1,7 +1,7 @@
 import { timedRuleSources, timedEventFlow } from './timed-rule-obligations'
 import { getCardEffect } from './card-effects'
 import type { ActionCostAttribution, ActionExecutionContext, ActionExecutionResult, ActionFlow, ActionSpace, Bonus, CardCostCandidate, CardProvidedPaymentResourceProvider, GameState, InteractionRequest, PlayerState, Resource, Trade } from '../contract/types'
-import { runActionHooks, type ActionHookContext, type ActionHookPhase, type ActionHookResult } from '../actions/hooks'
+import { requireActionHookRegistry, type ActionHookRegistry, type ActionHookContext, type ActionHookPhase, type ActionHookResult } from '../actions/hooks'
 import { getCurrentSessionContext } from './session-card-context'
 import { getActiveCardRegistry } from './active-registry'
 import { exchangeToTrade } from '../actions/helpers/trades'
@@ -428,6 +428,7 @@ export const executeCardListener = (
 }
 
 const collectBeforeSpaceFlows = (
+  actionHooks: ActionHookRegistry | undefined,
   state: GameState,
   player: PlayerState,
   space: ActionSpace,
@@ -438,6 +439,7 @@ const collectBeforeSpaceFlows = (
   const flows: ActionFlow[] = []
   for (const actionId of [space.id, 'place-farmer']) {
     const context = {
+      actionHooks,
       state,
       player,
       space,
@@ -458,18 +460,20 @@ const collectBeforeSpaceFlows = (
 }
 
 export const collectBeforePlacementFlows = (
+  actionHooks: ActionHookRegistry | undefined,
   state: GameState,
   player: PlayerState,
   space: ActionSpace,
   actionContext?: Record<string, unknown>,
-): ActionFlow[] => collectBeforeSpaceFlows(state, player, space, actionContext, true)
+): ActionFlow[] => collectBeforeSpaceFlows(actionHooks, state, player, space, actionContext, true)
 
 export const collectBeforeActionSpaceUseFlows = (
+  actionHooks: ActionHookRegistry | undefined,
   state: GameState,
   player: PlayerState,
   space: ActionSpace,
   actionContext?: Record<string, unknown>,
-): ActionFlow[] => collectBeforeSpaceFlows(state, player, space, actionContext, false)
+): ActionFlow[] => collectBeforeSpaceFlows(actionHooks, state, player, space, actionContext, false)
 
 const retainedTimedListener = (cardId: string, phase: 'afterReceive' | 'afterCollect', rules: readonly import('../contract/rule-plans').TimedRule[]): CardListenerRegistration => ({
   id: `activated-timed:${phase}:${cardId}`, cardIds: [cardId], actions: [phase === 'afterReceive' ? 'receive' : 'collect'], phases: ['after'], mandatory: true,
@@ -596,6 +600,7 @@ export type FarmChoiceCostAdjustments = {
 }
 
 export const collectFarmChoiceCostAdjustments = (
+  actionHooks: ActionHookRegistry,
   state: GameState,
   player: PlayerState,
   actionId: string,
@@ -603,6 +608,7 @@ export const collectFarmChoiceCostAdjustments = (
   space?: ActionSpace,
 ): FarmChoiceCostAdjustments => {
   const ctx: ActionHookContext = {
+    actionHooks,
     state,
     player,
     space: space ?? makeDummySpace(actionId),
@@ -636,7 +642,7 @@ export const collectFarmChoiceCostAdjustments = (
       aggregated.paymentResourceProviders.push(...result.paymentResourceProviders)
     }
   }
-  runActionHooks(ctx).forEach(mergeResult)
+  requireActionHookRegistry(actionHooks).run(ctx).forEach(mergeResult)
   for (const entry of getMatchingListeners(ctx)) {
     const result = executeCardListener(entry.registration, ctx, listenerOwnerOptions(entry))
     if (result) mergeResult(result)
@@ -645,10 +651,11 @@ export const collectFarmChoiceCostAdjustments = (
 }
 
 export const collectComputeCostsForFarmChoice = (
+  actionHooks: ActionHookRegistry,
   state: GameState,
   player: PlayerState,
   actionId: string,
   params: Record<string, unknown>,
   space?: ActionSpace,
 ): Partial<Resource> =>
-  collectFarmChoiceCostAdjustments(state, player, actionId, params, space).costs
+  collectFarmChoiceCostAdjustments(actionHooks, state, player, actionId, params, space).costs

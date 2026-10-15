@@ -1,3 +1,4 @@
+import type { ActionHookRegistry } from '../actions/hooks'
 import type { RuleOperationPreview } from './rule-operation-previews'
 import type { PromptKey } from './prompt-keys'
 import type { EventSink, GameEvent, PublicEventArchivePacket } from './events'
@@ -686,6 +687,8 @@ export type GameState = {
 }
 
 export type CanBeExecutedByPlayerContext = {
+  /** Session-owned runtime dependency; never part of action metadata or snapshots. */
+  actionHooks?: ActionHookRegistry
   params?: Record<string, unknown>
   space?: ActionSpace
   /**
@@ -716,6 +719,8 @@ export type ActionContext = Record<string, unknown> & {
 }
 
 export type ActionAvailabilityContext = {
+  /** Session-owned runtime dependency; never part of action metadata or snapshots. */
+  actionHooks?: ActionHookRegistry
   state: GameState
   player: PlayerState
   space?: ActionSpace
@@ -731,6 +736,8 @@ export type ProtectedObservation = {
 }
 
 export type ActionExecutionContext = {
+  /** Session-owned runtime dependency; never part of action metadata or snapshots. */
+  actionHooks?: ActionHookRegistry
   completedTransactionEvents?: readonly GameEvent[]
   previewMode?: 'base'
   state: GameState
@@ -750,7 +757,7 @@ export type ActionExecutionContext = {
 
 /** Explicit pure planning input. Planning cannot emit events or protected observations. */
 export type ActionFlowPlanningContext = Pick<ActionExecutionContext,
-  'state' | 'player' | 'space' | 'params' | 'sourceCard' | 'actionContext' | 'previewMode'
+  'actionHooks' | 'state' | 'player' | 'space' | 'params' | 'sourceCard' | 'actionContext' | 'previewMode'
   | 'costs' | 'costTrades' | 'costBonuses' | 'paymentResourceProviders' | 'costAttribution'>
 
 export type ActionMutationContext = ActionExecutionContext & {

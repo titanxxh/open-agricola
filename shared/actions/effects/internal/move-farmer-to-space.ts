@@ -1,3 +1,4 @@
+import type { ActionHookRegistry } from '../../hooks'
 import type { ActionDefinition, ActionFlow, ActionSpace, GameState, PlayerState } from '../../../contract/types'
 import { collectBeforeActionSpaceUseFlows } from '../../../cards/card-listeners'
 import {
@@ -51,13 +52,14 @@ const findMoveSource = (
 }
 
 const selectableSpaces = (
+  actionHooks: ActionHookRegistry | undefined,
   state: GameState,
   player: PlayerState,
   sourceCard: string | undefined,
   actionContext: Record<string, unknown> | undefined,
   sourceSpaceId: string | undefined,
 ): ActionSpace[] => {
-  const allowed = computeAllowedPlacementSpaces(state, player, {
+  const allowed = computeAllowedPlacementSpaces(state, player, { actionHooks,
     sourceCard,
     actionContext,
     ignoreWorkerAvailability: true,
@@ -77,9 +79,9 @@ export const moveFarmerToSpaceAction: ActionDefinition = {
     const sourceSpaceId = readString(actionContext?.moveFarmerSourceSpaceId)
     const workerId = readString(actionContext?.moveFarmerWorkerId)
     if (!findMoveSource(state, player, undefined, sourceSpaceId, workerId)) return false
-    return selectableSpaces(state, player, context?.sourceCard, actionContext, sourceSpaceId).length > 0
+    return selectableSpaces(context?.actionHooks, state, player, context?.sourceCard, actionContext, sourceSpaceId).length > 0
   },
-  execute: ({ state, player, params, sourceCard, actionContext }) => {
+  execute: ({ actionHooks, state, player, params, sourceCard, actionContext }) => {
     const sourceSpaceId = readString(actionContext?.moveFarmerSourceSpaceId)
       ?? readString(params?.excludeSpaceId)
     const workerId = readString(actionContext?.moveFarmerWorkerId)
@@ -87,7 +89,7 @@ export const moveFarmerToSpaceAction: ActionDefinition = {
     if (!findMoveSource(state, player, undefined, sourceSpaceId, workerId)) {
       return { type: 'fail', errorKey: 'log.actionFail' }
     }
-    const spaces = selectableSpaces(state, player, sourceCard, actionContext, sourceSpaceId)
+    const spaces = selectableSpaces(actionHooks, state, player, sourceCard, actionContext, sourceSpaceId)
     if (spaces.length === 0) return { type: 'fail', errorKey: 'log.actionFail' }
     return {
       type: 'request',
@@ -98,14 +100,14 @@ export const moveFarmerToSpaceAction: ActionDefinition = {
       promptKey: 'ui.interactionMoveFarmerToSpace',
     }
   },
-  resolveChoice: ({ state, player, space, params, sourceCard, actionContext, eventSink }, choice) => {
+  resolveChoice: ({ actionHooks, state, player, space, params, sourceCard, actionContext, eventSink }, choice) => {
     const targetSpace = findActionSpaceById(state, choice)
     if (!targetSpace) return { type: 'fail', errorKey: 'log.actionFail' }
     const sourceSpaceId = readString(actionContext?.moveFarmerSourceSpaceId)
       ?? readString(params?.excludeSpaceId)
     const workerId = readString(actionContext?.moveFarmerWorkerId)
       ?? readString(params?.workerId)
-    const allowed = computeAllowedPlacementSpaces(state, player, { sourceCard, actionContext, ignoreWorkerAvailability: true })
+    const allowed = computeAllowedPlacementSpaces(state, player, { actionHooks, sourceCard, actionContext, ignoreWorkerAvailability: true })
     if (!isSelectableSpace(targetSpace, sourceSpaceId, allowed)) {
       return { type: 'fail', errorKey: 'log.actionFail' }
     }
@@ -127,7 +129,7 @@ export const moveFarmerToSpaceAction: ActionDefinition = {
 
     const targetActionContext = { ...resetComputeReplaceGuards(actionContext), targetSpaceId: targetSpace.id }
     if (actionContext) actionContext.targetSpaceId = targetSpace.id
-    const beforeFlows = collectBeforeActionSpaceUseFlows(state, player, targetSpace, targetActionContext)
+    const beforeFlows = collectBeforeActionSpaceUseFlows(actionHooks, state, player, targetSpace, targetActionContext)
     const targetFlow: ActionFlow = {
       type: 'leaf',
       actionId: targetSpace.id,

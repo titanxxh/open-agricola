@@ -13,7 +13,10 @@ import { EngineTree } from '../tree'
 import { HookDispatcher } from '../dispatcher'
 import { LogStore } from '../log-store'
 import { ActionNode, SequenceNode, XorNode } from '../nodes'
-import { clearActionHooks, registerActionHook } from '../../actions/hooks'
+import { ActionHookRegistry } from '../../actions/hooks'
+
+const actionHooks = new ActionHookRegistry()
+
 
 const createState = (): GameState =>
   ({
@@ -126,7 +129,7 @@ const registerFoodSensitiveCost = (
   options: { onlyWhenPendingCommit?: boolean } = {},
   phases?: string[],
 ) => {
-  registerActionHook({
+  actionHooks.register({
     id: `food-sensitive-cost-${actionId}`,
     actions: [actionId],
     phases: ['computeCosts'],
@@ -161,7 +164,7 @@ const runUntil = (
 
 describe('Engine pipeline phase order', () => {
   beforeEach(() => {
-    clearActionHooks()
+    actionHooks.clear()
     setActiveCardRegistry(new CardRegistry())
   })
 
@@ -180,7 +183,7 @@ describe('Engine pipeline phase order', () => {
       },
     }
 
-    registerActionHook({
+    actionHooks.register({
       id: 'track-phases',
       actions: ['test-action'],
       phases: ['isDoable', 'computeReplace', 'computeCosts', 'computeArgs', 'before', 'immediatelyAfter', 'after'],
@@ -195,7 +198,7 @@ describe('Engine pipeline phase order', () => {
     const engine = new Engine({
       tree: new EngineTree(new ActionNode('a', 'test-action')),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     const state = createState()
@@ -235,7 +238,7 @@ describe('Engine pipeline phase order', () => {
       resolveChoice: () => ({ type: 'ok' }),
     }
 
-    registerActionHook({
+    actionHooks.register({
       id: 'track-phases',
       actions: ['choice-action'],
       phases: ['isDoable', 'computeReplace', 'computeCosts', 'computeArgs', 'before', 'immediatelyAfter', 'after'],
@@ -254,7 +257,7 @@ describe('Engine pipeline phase order', () => {
         ]),
       ),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     const state = createState()
@@ -289,7 +292,7 @@ describe('Engine pipeline phase order', () => {
       },
     }
 
-    registerActionHook({
+    actionHooks.register({
       id: 'discount',
       actions: ['cost-action'],
       phases: ['computeCosts'],
@@ -301,7 +304,7 @@ describe('Engine pipeline phase order', () => {
     const engine = new Engine({
       tree: new EngineTree(new ActionNode('a', 'cost-action')),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     const state = createState()
@@ -329,7 +332,7 @@ describe('Engine pipeline phase order', () => {
       resolveChoice: () => ({ type: 'ok' }),
     }
 
-    registerActionHook({
+    actionHooks.register({
       id: 'extra-args',
       actions: ['args-action'],
       phases: ['computeArgs'],
@@ -347,7 +350,7 @@ describe('Engine pipeline phase order', () => {
         ]),
       ),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     const state = createState()
@@ -389,7 +392,7 @@ describe('Engine pipeline phase order', () => {
       },
     }
 
-    registerActionHook({
+    actionHooks.register({
       id: 'immediate-flow',
       actions: ['main'],
       phases: ['immediatelyAfter'],
@@ -404,7 +407,7 @@ describe('Engine pipeline phase order', () => {
     const engine = new Engine({
       tree: new EngineTree(new ActionNode('a', 'main')),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     const state = createState()
@@ -443,7 +446,7 @@ describe('Engine pipeline phase order', () => {
     const engine = new Engine({
       tree: new EngineTree(new ActionNode('a', action.id)),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     const state = createState()
@@ -488,7 +491,7 @@ describe('Engine pipeline phase order', () => {
     const engine = new Engine({
       tree: new EngineTree(new XorNode('xor', [new ActionNode('a', action.id)])),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     const state = createState()
@@ -540,7 +543,7 @@ describe('Engine pipeline phase order', () => {
       },
     }
 
-    registerActionHook({
+    actionHooks.register({
       id: 'pending-compute-replace',
       actions: [action.id],
       phases: ['computeReplace'],
@@ -560,7 +563,7 @@ describe('Engine pipeline phase order', () => {
     const engine = new Engine({
       tree: new EngineTree(new ActionNode('a', action.id)),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     const state = createState()
@@ -619,7 +622,7 @@ describe('Engine pipeline phase order', () => {
       },
     }
 
-    registerActionHook({
+    actionHooks.register({
       id: 'cancel-compute-replace',
       actions: [action.id],
       phases: ['computeReplace'],
@@ -631,7 +634,7 @@ describe('Engine pipeline phase order', () => {
         return {}
       },
     })
-    registerActionHook({
+    actionHooks.register({
       id: 'cancel-compute-costs',
       actions: [action.id],
       phases: ['computeCosts'],
@@ -649,7 +652,7 @@ describe('Engine pipeline phase order', () => {
     const engine = new Engine({
       tree: new EngineTree(new ActionNode('a', action.id)),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     const state = createState()
@@ -694,7 +697,7 @@ describe('Engine pipeline phase order', () => {
       },
     }
 
-    registerActionHook({
+    actionHooks.register({
       id: 'track-protected-cancel-phases',
       actions: [action.id],
       phases: ['before', 'immediatelyAfter', 'after'],
@@ -709,7 +712,7 @@ describe('Engine pipeline phase order', () => {
     const engine = new Engine({
       tree: new EngineTree(new ActionNode('a', action.id)),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     const state = createState()
@@ -806,7 +809,7 @@ describe('Engine pipeline phase order', () => {
     const engine = new Engine({
       tree: new EngineTree(new ActionNode('a', action.id)),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     const state = createState()

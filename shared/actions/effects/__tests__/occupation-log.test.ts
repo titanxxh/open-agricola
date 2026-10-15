@@ -12,13 +12,16 @@ import { ActionNode, SequenceNode } from '../../../engine/nodes'
 import { ActionRegistry } from '../../../engine/registry'
 import { internalActionDefinitions } from '../../index'
 import { playOccupation, playOccupationAction } from '../occupation'
-import { clearActionHooks, registerActionHook } from '../../hooks'
+import { ActionHookRegistry } from '../../hooks'
 import { readCardResourceStats } from '../../../cards/helpers/card-state'
 import '../../../cards/A/A085_Homekeeper'
 import '../../../cards/B/B093_Confidant'
 import '../../../cards/C/C107_Baker'
 import '../../../cards/C/C116_FurnitureMaker'
 import '../../../cards/A/A123_FrameBuilder'
+
+const actionHooks = new ActionHookRegistry()
+
 
 const FLOW_CARD_ID = 'C107_Baker'
 const OK_CARD_ID = 'A085_Homekeeper'
@@ -109,7 +112,7 @@ const buildEngine = (
       new ActionNode(`action-${hostActionId}`, hostActionId, sourceCard, params),
     ])),
     registry,
-    hooks: new HookDispatcher(),
+    hooks: new HookDispatcher(actionHooks),
     log: new LogStore(),
   })
 }
@@ -318,7 +321,7 @@ describe('occupation play result', () => {
     setActiveCardRegistry(registry)
     const afterCalls: string[] = []
     const privateEvents: unknown[] = []
-    registerActionHook({
+    actionHooks.register({
       id: 'test-after-occupation-failed-pay',
       actions: ['occupation'],
       phases: ['after'],
@@ -382,7 +385,7 @@ describe('occupation play result', () => {
       expect(readCardResourceStats(player, GRANT_SOURCE_CARD_ID)).toBeUndefined()
       expect(player.cardStates[GRANT_SOURCE_CARD_ID]).toBeUndefined()
     } finally {
-      clearActionHooks()
+      actionHooks.clear()
       setActiveCardRegistry(previousRegistry)
     }
   })

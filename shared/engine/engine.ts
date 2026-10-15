@@ -58,6 +58,7 @@ type EngineDeps = {
 }
 
 type EngineContext = {
+  actionHooks?: ActionExecutionContext['actionHooks']
   state: GameState
   player: PlayerState
   space: ActionSpace
@@ -331,7 +332,7 @@ export class Engine {
   }
 
   describe(context: ActionExecutionContext): ChoiceDescriptionPreview | undefined {
-    return getNodeDescriptionPreview(this.tree.root, this.registry, context)
+    return getNodeDescriptionPreview(this.tree.root, this.registry, { ...context, actionHooks: this.hooks.actionHooks })
   }
 
   static describeFlow(flow: ActionFlow, registry: ActionRegistry, context: ActionExecutionContext): ChoiceDescriptionPreview | undefined {
@@ -889,7 +890,7 @@ export class Engine {
   }
 
   proceed(context: EngineContext): EngineStepResult {
-    return engineProceed(this._internals(), context)
+    return engineProceed(this._internals(), { ...context, actionHooks: this.hooks.actionHooks })
   }
 
   /**
@@ -902,6 +903,7 @@ export class Engine {
     context: EngineContext,
     payload?: Record<string, unknown>,
   ): ActionExecutionResult {
+    context = { ...context, actionHooks: this.hooks.actionHooks }
     const pending = this.peekPendingEnvelope()
     if (pending?.syntheticKind === 'before-action-anytime') {
       if (choice !== 'continue') return { type: 'fail', errorKey: 'log.action', recoverable: true }

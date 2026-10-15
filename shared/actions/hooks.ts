@@ -100,8 +100,6 @@ export type ActionHookRegistration = {
   handler: ActionHookHandler
 }
 
-const actionHooks: ActionHookRegistration[] = []
-
 /** Production invokes hooks directly; tests may protect query inputs. */
 export type ActionHookInvocationInterceptor = (
   registration: ActionHookRegistration,
@@ -115,46 +113,6 @@ export const setActionHookInvocationInterceptor = (interceptor: ActionHookInvoca
   invocationInterceptor = interceptor
 }
 
-export const registerActionHook = (registration: ActionHookRegistration) => {
-  actionHooks.push(registration)
-}
-
-export const clearActionHooks = () => {
-  actionHooks.length = 0
-}
-
-export const unregisterActionHook = (id: string): void => {
-  const idx = actionHooks.findIndex((h) => h.id === id)
-  if (idx >= 0) actionHooks.splice(idx, 1)
-}
-
-export const getRegisteredActionHooks = () => [...actionHooks]
-
-const matchesHook = (
-  registration: ActionHookRegistration,
-  context: ActionHookContext,
-) => {
-  if (registration.actions && !registration.actions.includes(context.actionId)) {
-    return false
-  }
-  if (registration.phases && !registration.phases.includes(context.phase)) {
-    return false
-  }
-  return true
-}
-
-const getOrderedHooks = (context: ActionHookContext) =>
-  actionHooks
-    .filter((registration) => matchesHook(registration, context))
-    .sort((left, right) => {
-      const leftOrder = left.order ?? 0
-      const rightOrder = right.order ?? 0
-      if (leftOrder !== rightOrder) {
-        return leftOrder - rightOrder
-      }
-      return left.id.localeCompare(right.id)
-    })
-
 const normalizeActionHookContext = (
   context: ActionHookContextInput,
 ): ActionHookContext => {
@@ -166,79 +124,81 @@ const normalizeActionHookContext = (
   }
 }
 
-export const hasMatchingActionHooks = (context: ActionHookContextInput): boolean => {
-  const hookContext = normalizeActionHookContext(context)
-  return actionHooks.some((registration) => matchesHook(registration, hookContext))
-}
+export class ActionHookRegistry {
+  private readonly registrations: ActionHookRegistration[] = []
 
-export const runActionHooks = (context: ActionHookContextInput) => {
-  const hookContext = normalizeActionHookContext(context)
-  const results: ActionHookResult[] = []
-  getOrderedHooks(hookContext).forEach((registration) => {
-    const result = invocationInterceptor
-      ? invocationInterceptor(registration, hookContext, registration.handler)
-      : registration.handler(hookContext)
-    if (result) {
-      results.push(result)
-    }
-  })
-  return results
-}
-
-export const applyIsDoableHooksDetailed = (
-  context: Omit<ActionHookContextInput, 'phase' | 'doable'>,
-  initialDoable: boolean,
-) => {
-  let doable = initialDoable
-  let vetoed = false
-  const hookContext = normalizeActionHookContext({
-    ...context,
-    phase: 'isDoable',
-    doable,
-  })
-  for (const registration of getOrderedHooks(hookContext)) {
-    const result = registration.handler({
-      ...hookContext,
-      doable,
-    })
-    if (result?.doable === false) {
-      doable = false
-      vetoed = true
-    } else if (result?.doable === true && !vetoed) {
-      doable = true
-    }
+  register(registration: ActionHookRegistration): void { this.registrations.push(registration) }
+  clear(): void { this.registrations.length = 0 }
+  unregister(id: string): void {
+    const index = this.registrations.findIndex(registration => registration.id === id)
+    if (index >= 0) this.registrations.splice(index, 1)
   }
-  return { doable, vetoed }
-}
+  getRegistered(): ActionHookRegistration[] { return [...this.registrations] }
+  clone(): ActionHookRegistry {
+    const registry = new ActionHookRegistry()
+    this.registrations.forEach(registration => registry.register({ ...registration,
+      ...(registration.actions ? { actions: [...registration.actions] } : {}),
+      ...(registration.phases ? { phases: [...registration.phases] } : {}),
+    }))
+    return registry
+  }
 
-export const applyIsDoableHooks = (
-  context: Omit<ActionHookContextInput, 'phase' | 'doable'>,
-  initialDoable: boolean,
-) => applyIsDoableHooksDetailed(context, initialDoable).doable
+  private ordered(context: ActionHookContext): ActionHookRegistration[] {
+    return this.registrations.filter(registration =>
+      (!registration.actions || registration.actions.includes(context.actionId)) &&
+      (!registration.phases || registration.phases.includes(context.phase)))
+      .sort((left, right) => (left.order ?? 0) - (right.order ?? 0) || left.id.localeCompare(right.id))
+  }
 
-export const applyComputeReplaceHooks = (
-  context: Omit<ActionHookContextInput, 'phase'>,
-) => {
-  let actionId = context.actionId
-  const seen = new Set<string>()
-  while (!seen.has(actionId)) {
-    seen.add(actionId)
-    let replaced = false
-    const hookContext = normalizeActionHookContext({
-      ...context,
-      actionId,
-      phase: 'computeReplace',
-    })
-    getOrderedHooks(hookContext).forEach((registration) => {
-      const result = registration.handler(hookContext)
-      if (typeof result?.actionId === 'string' && result.actionId !== actionId) {
-        actionId = result.actionId
-        replaced = true
+  hasMatching(context: ActionHookContextInput): boolean {
+    return this.ordered(normalizeActionHookContext(context)).length > 0
+  }
+
+  run(context: ActionHookContextInput): ActionHookResult[] {
+    const normalized = { ...normalizeActionHookContext(context), actionHooks: this }
+    const results: ActionHookResult[] = []
+    for (const registration of this.ordered(normalized)) {
+      const result = invocationInterceptor
+        ? invocationInterceptor(registration, normalized, registration.handler)
+        : registration.handler(normalized)
+      if (result) results.push(result)
+    }
+    return results
+  }
+
+  applyIsDoableDetailed(context: Omit<ActionHookContextInput, 'phase' | 'doable'>, initialDoable: boolean) {
+    let doable = initialDoable
+    let vetoed = false
+    const normalized = normalizeActionHookContext({ ...context, actionHooks: this, phase: 'isDoable', doable })
+    for (const registration of this.ordered(normalized)) {
+      const result = registration.handler({ ...normalized, doable })
+      if (result?.doable === false) { doable = false; vetoed = true }
+      else if (result?.doable === true && !vetoed) doable = true
+    }
+    return { doable, vetoed }
+  }
+
+  applyComputeReplace(context: Omit<ActionHookContextInput, 'phase'>): string {
+    let actionId = context.actionId
+    const seen = new Set<string>()
+    while (!seen.has(actionId)) {
+      seen.add(actionId)
+      let replaced = false
+      const normalized = normalizeActionHookContext({ ...context, actionHooks: this, actionId, phase: 'computeReplace' })
+      for (const registration of this.ordered(normalized)) {
+        const result = registration.handler(normalized)
+        if (typeof result?.actionId === 'string' && result.actionId !== actionId) {
+          actionId = result.actionId
+          replaced = true
+        }
       }
-    })
-    if (!replaced) {
-      break
+      if (!replaced) break
     }
+    return actionId
   }
-  return actionId
+}
+
+export const requireActionHookRegistry = (registry: ActionHookRegistry | undefined): ActionHookRegistry => {
+  if (!registry) throw new Error('ActionHookRegistry is required for this rule query')
+  return registry
 }

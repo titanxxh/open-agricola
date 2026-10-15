@@ -7,11 +7,15 @@ import { HookDispatcher } from '../dispatcher'
 import { LogStore } from '../log-store'
 import { ActionNode } from '../nodes'
 
+const actionHooks = new ActionHookRegistry()
+
+import { ActionHookRegistry } from '../../actions/hooks'
+
 const makeEngine = () =>
   new Engine({
     tree: new EngineTree(new ActionNode('action-noop', 'noop')),
     registry: new ActionRegistry(),
-    hooks: new HookDispatcher(),
+    hooks: new HookDispatcher(actionHooks),
     log: new LogStore(),
   })
 

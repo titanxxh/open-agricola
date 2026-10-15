@@ -46,7 +46,7 @@ const computeArgsListener: CardListenerRegistration = {
     const space = context.state.actionSpaces.find((s) => s.id === 'urgent-wish-children')
     if (!space) return
     if (!checkCondition(context.state, context.player, space)) return
-    if (!space.canBeExecutedByPlayer(context.state, context.player)) return
+    if (!space.canBeExecutedByPlayer(context.state, context.player, { actionHooks: context.actionHooks })) return
     const extraOptions: ActionChoiceOption[] = [
       {
         value: `${OCCUPIED_SPACE_CHOICE_PREFIX}urgent-wish-children`,

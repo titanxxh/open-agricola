@@ -3,13 +3,16 @@ import { GameSession } from '../../../../server/game/authoritative-session'
 import { registerStubCards, clearStubCards } from '../index'
 import { CARD_ID as ON_ROUND_END_ID } from '../Stub_OnRoundEnd'
 import { CARD_ID as ON_ROUND_END_FLOW_ID } from '../Stub_OnRoundEndFlow'
-import { clearActionHooks } from '../../../actions/hooks'
+import { ActionHookRegistry } from '../../../actions/hooks'
 import { markAllWorkersUsed } from '../../../domain/player'
 import { stabilizeRandomHands } from '../../../../server/__tests__/_helpers/stabilize-random-hands'
 
+const actionHooks = new ActionHookRegistry()
+
+
 describe('Stub_OnRoundEnd mechanism', () => {
   beforeEach(() => {
-    clearActionHooks()
+    actionHooks.clear()
     clearStubCards()
   })
 

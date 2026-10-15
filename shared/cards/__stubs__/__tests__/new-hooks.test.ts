@@ -11,9 +11,12 @@ import { CARD_ID as START_HARVEST_ID } from '../Stub_StartHarvest'
 import { CARD_ID as HARVEST_FIELD_ID } from '../Stub_HarvestFieldPhase'
 import { CARD_ID as HARVEST_FEEDING_ID } from '../Stub_HarvestFeedingPhase'
 import { CARD_ID as END_HARVEST_ID } from '../Stub_EndHarvest'
-import { clearActionHooks } from '../../../actions/hooks'
+import { ActionHookRegistry } from '../../../actions/hooks'
 import { markAllWorkersUsed } from '../../../domain/player'
 import { stabilizeRandomHands } from '../../../../server/__tests__/_helpers/stabilize-random-hands'
+
+const actionHooks = new ActionHookRegistry()
+
 
 const harvestRounds = [4, 7, 9, 11, 13, 14]
 
@@ -72,7 +75,7 @@ function resolveSourceCardChoice(
 
 describe('New hook stubs - ReturnHome sub-phases', () => {
   beforeEach(() => {
-    clearActionHooks()
+    actionHooks.clear()
     clearStubCards()
   })
 
@@ -104,7 +107,7 @@ describe('New hook stubs - ReturnHome sub-phases', () => {
 
 describe('New hook stubs - AfterRoundEnd', () => {
   beforeEach(() => {
-    clearActionHooks()
+    actionHooks.clear()
     clearStubCards()
   })
 
@@ -119,7 +122,7 @@ describe('New hook stubs - AfterRoundEnd', () => {
 
 describe('New hook stubs - Harvest sub-phases', () => {
   beforeEach(() => {
-    clearActionHooks()
+    actionHooks.clear()
     clearStubCards()
   })
 

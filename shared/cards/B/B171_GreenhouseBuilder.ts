@@ -1,3 +1,4 @@
+import type { ActionHookRegistry } from '../../actions/hooks'
 import { defineOccupationCard } from '../card-source'
 import { canStartFencing } from '../../actions/effects/fencing'
 import { buildRenovationPlan } from '../../actions/effects/renovation'
@@ -14,10 +15,10 @@ const revealedActionIds = (state: GameState): Set<string> =>
 const canRenovate = (player: PlayerState) =>
   buildRenovationPlan(player, 'clay') !== null || buildRenovationPlan(player, 'stone') !== null
 
-const greenhouseBranches = (state: GameState, player: PlayerState): ActionFlow[] => {
+const greenhouseBranches = (actionHooks: ActionHookRegistry | undefined, state: GameState, player: PlayerState): ActionFlow[] => {
   const revealed = revealedActionIds(state)
   const branches: ActionFlow[] = []
-  if (revealed.has('fencing') && canStartFencing(state, player)) {
+  if (revealed.has('fencing') && canStartFencing(actionHooks, state, player)) {
     branches.push({ type: 'leaf', actionId: 'fence', sourceCard: CARD_ID, choiceLabelKey: 'actions.fencing.name' })
   }
   if (revealed.has('house-redevelopment') && canRenovate(player)) {
@@ -51,9 +52,9 @@ registerPlayerActionSpace({
     nameKey: `cards.${CARD_ID}.name`,
     descriptionKey: `cards.${CARD_ID}.desc`,
     strictCanExecute: true,
-    canBeExecutedByPlayer: (state, player) =>
-      player.id === ownerId && greenhouseBranches(state, player).length > 0,
-    flowFactory: ({ state, player }) => ({ type: 'xor', children: greenhouseBranches(state, player) }),
+    canBeExecutedByPlayer: (state, player, context) =>
+      player.id === ownerId && greenhouseBranches(context?.actionHooks, state, player).length > 0,
+    flowFactory: ({ state, player, actionHooks }) => ({ type: 'xor', children: greenhouseBranches(actionHooks, state, player) }),
   }),
 })
 

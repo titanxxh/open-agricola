@@ -44,7 +44,7 @@ import {
 import { getAllAdHocActions } from '../actions/helpers/ad-hoc-action-registry.ts'
 import { validateSelectionEffect } from '../actions/helpers/selection-effect-registry.ts'
 import {
-  clearActionHooks,
+  ActionHookRegistry,
 } from '../actions/hooks.ts'
 import { finalizeDraft } from '../draft/draft-manager.ts'
 import type { DraftPickPayload } from '../draft/types.ts'
@@ -702,7 +702,7 @@ export class GameCore {
   }
   applyIsDoableCheck(player: PlayerState, space: ActionSpace, baseDoable: () => boolean): boolean {
     return isPlacementActionDoableInFlowContext({
-      actionId: space.id, action: space, state: this.state, player, space, baseDoable,
+      actionHooks: this.actionHooks, actionId: space.id, action: space, state: this.state, player, space, baseDoable,
       resolveAction: (actionId) => this.registry.get(actionId),
     })
   }
@@ -803,6 +803,7 @@ export class GameCore {
   }
 
   private registry: ActionRegistry
+  readonly actionHooks = new ActionHookRegistry()
   private hookDispatcher: HookDispatcher
   private engineLog: LogStore
   private stageDispatch: StageDispatch
@@ -831,11 +832,11 @@ export class GameCore {
     seasonActionDefinitions.forEach((a) => this.registry.register(a))
     internalActionDefinitions.forEach((a) => this.registry.register(a))
     getAllAdHocActions().forEach((a) => this.registry.register(a))
-    clearActionHooks()
-    registerThroughTheSeasonsHooks()
-    this.hookDispatcher = new HookDispatcher()
+    registerThroughTheSeasonsHooks(this.actionHooks)
+    this.hookDispatcher = new HookDispatcher(this.actionHooks)
     this.engineLog = new LogStore()
     this.stageDispatch = new StageDispatch({
+      actionHooks: this.actionHooks,
       getState: () => this.state,
       createFlowEngine: (flow, ownerPlayerIndex) => this.createFlowEngine(flow, ownerPlayerIndex),
       pushEngineFrame: (frame) => this.pushEngineFrame(frame),
@@ -853,7 +854,7 @@ export class GameCore {
       getRoundStartScheduleFlows: (playerIndex) => this.buildRoundStartScheduleFlows(playerIndex),
       getPreparationCompletionFlow: (hook, playerIndex, sourceCardIds) => this.buildPreparationCompletionFlow(hook, playerIndex, sourceCardIds),
       canStartFlow: (flow, playerIndex) => evaluateFlowDoable(flow, {
-        state: this.state, player: this.state.players[playerIndex]!,
+        actionHooks: this.actionHooks, state: this.state, player: this.state.players[playerIndex]!,
         space: this.state.actionSpaces[0]!,
       }, id => this.registry.getRequired(id)),
     }, {
@@ -1361,7 +1362,7 @@ export class GameCore {
     frame.engine.setEngineBlockedPending(host.id, actionId)
     const player = this.state.players[this.effectiveOwnerIndexForFrame(frame, host.id)]!
     const space = this.getSpaceById(frame.spaceId) ?? this.createSyntheticSpace(frame.spaceId)
-    frame.engine.flushEventTransaction({ state: this.state, player, space })
+    frame.engine.flushEventTransaction({ actionHooks: this.actionHooks, state: this.state, player, space })
     this.flushEngineLog()
     return true
   }
@@ -1606,6 +1607,7 @@ export class GameCore {
 
   /** Dispose of session resources. Call when replacing or removing a session. */
   dispose(): void {
+    this.actionHooks.clear()
     this.sessionCardContext?.dispose()
     this.sessionCardContext = null
   }
@@ -1639,7 +1641,7 @@ export class GameCore {
     space: ActionSpace,
   ): boolean {
     const context = {
-      state: this.state,
+      actionHooks: this.actionHooks, state: this.state,
       player,
       space,
       actionId: 'place-farmer',
@@ -2282,9 +2284,9 @@ export class GameCore {
       if (activeIds.has(action.id) && action.allowAnytimeReentry !== true) continue
       if (action.idleOnly && (this.engineStack.depth() > 0 || options.nestedWindow)) continue
       const doable = this.hookDispatcher.applyIsDoable(
-        { state: this.state, player, space, actionId: action.id, actionContext },
+        { actionHooks: this.actionHooks, state: this.state, player, space, actionId: action.id, actionContext },
         action,
-        action.canBeExecutedByPlayer(this.state, player, { actionContext }),
+        action.canBeExecutedByPlayer(this.state, player, { actionHooks: this.actionHooks, actionContext }),
       )
       if (!doable) continue
       anytimeEntries.push({
@@ -2299,7 +2301,7 @@ export class GameCore {
     if (preparationWindow) return anytimeEntries
     // Card-sourced anytime actions via CardListener phases:['anytime']
     const anytimeContext: import('../cards/card-listeners').CardListenerContextInput = {
-      state: this.state,
+      actionHooks: this.actionHooks, state: this.state,
       player,
       space,
       actionId: 'anytime',
@@ -2320,7 +2322,7 @@ export class GameCore {
       if (!result?.flow) continue
       if (!evaluateFlowDoable(
         { ...result.flow, optional: false },
-        { state: this.state, player, space },
+        { actionHooks: this.actionHooks, state: this.state, player, space },
         (actionId) => this.registry.get(actionId),
       )) continue
       // anytime listeners are queried during build (idempotent peek), not
@@ -2342,7 +2344,7 @@ export class GameCore {
       descriptor: {
         ...descriptor,
         descriptionPreview: this.createFlowEngine(flow, this.state.players.indexOf(player)).describe({
-          state: this.state, player, space,
+          actionHooks: this.actionHooks, state: this.state, player, space,
           sourceCard: descriptor.sourceCard, actionContext: pendingActionContext,
         }),
       },
@@ -2600,7 +2602,7 @@ export class GameCore {
 
   private buildEngineExecutionContext(player: PlayerState, space: ActionSpace) {
     return {
-      state: this.state,
+      actionHooks: this.actionHooks, state: this.state,
       player,
       space,
       continuationOwnerPlayerId: this.currentFrameOwnerPlayerId(player.id),
@@ -2972,7 +2974,7 @@ export class GameCore {
     const frame = this.engineStack.current()
     const space = frame?.spaceId ? this.getSpaceById(frame.spaceId) : undefined
     if (frame && space) {
-      frame.engine.flushEventTransaction({ state: this.state, player, space })
+      frame.engine.flushEventTransaction({ actionHooks: this.actionHooks, state: this.state, player, space })
       this.flushEngineLog()
     }
     player._activeActionBonusSources = []
@@ -3632,14 +3634,14 @@ export class GameCore {
       if (step.type === 'blocked' && step.mandatory === true) {
         if (this.markProvisionalHostBlocked(frame, step.nodeId)) return
         if (this.buildAnytimeEntries().length > 0 && frame.engine.offerBeforeAnytimeWindow(step.nodeId)) {
-          frame.engine.flushEventTransaction({ state: this.state, player, space })
+          frame.engine.flushEventTransaction({ actionHooks: this.actionHooks, state: this.state, player, space })
           this.flushEngineLog()
           return
         }
         this.engineStack.clearDeferredPlayerSwitch()
         const pendingSet = frame.engine.setEngineBlockedPending(step.nodeId, step.actionId ?? space.id)
         if (!pendingSet) throw new Error(`missing mandatory blocked engine node: ${step.nodeId}`)
-        frame.engine.flushEventTransaction({ state: this.state, player, space })
+        frame.engine.flushEventTransaction({ actionHooks: this.actionHooks, state: this.state, player, space })
         this.flushEngineLog()
         return
       }
@@ -3658,7 +3660,7 @@ export class GameCore {
             toPlayerIndex: returnTarget.playerIndex,
             returnPlayerStack: returnTarget.returnPlayerStack,
           })
-          frame.engine.flushEventTransaction({ state: this.state, player, space })
+          frame.engine.flushEventTransaction({ actionHooks: this.actionHooks, state: this.state, player, space })
           this.flushEngineLog()
           this.startConfirmPlayerSwitch(visiblePlayerIndex, returnTarget.playerIndex)
           return
@@ -3755,7 +3757,7 @@ export class GameCore {
             frame.reason === 'post-reap-anytime' &&
             this.engineStack.peekPendingView()?.syntheticKind === 'post-reap-anytime'
           ) {
-            frame.engine.flushEventTransaction({ state: this.state, player, space })
+            frame.engine.flushEventTransaction({ actionHooks: this.actionHooks, state: this.state, player, space })
             this.flushEngineLog()
             if (this.buildAnytimeEntries().length === 0) {
               const ownerPlayerIndex = frame.ownerPlayerIndex
@@ -3791,7 +3793,7 @@ export class GameCore {
         }
         if (frame.deferredPlayerSwitch && !frame.deferredPlayerSwitch.confirmed) {
           const { fromPlayerIndex, toPlayerIndex } = frame.deferredPlayerSwitch
-          frame.engine.flushEventTransaction({ state: this.state, player, space })
+          frame.engine.flushEventTransaction({ actionHooks: this.actionHooks, state: this.state, player, space })
           this.flushEngineLog()
           this.startConfirmPlayerSwitch(fromPlayerIndex, toPlayerIndex)
           return
@@ -3801,7 +3803,7 @@ export class GameCore {
           hostRequestKind === 'selection' ||
           !!this.isSelectionPromptKey(pendingView?.promptKey)
         ) {
-          frame.engine.flushEventTransaction({ state: this.state, player, space })
+          frame.engine.flushEventTransaction({ actionHooks: this.actionHooks, state: this.state, player, space })
           this.flushEngineLog()
           return
         }
@@ -3861,7 +3863,7 @@ export class GameCore {
             }
             if (this.getAnimalCount(player) > this.getAnimalCount(before)) {
               const pIdx = effectivePlayerIndex
-              frame.engine.flushEventTransaction({ state: this.state, player, space })
+              frame.engine.flushEventTransaction({ actionHooks: this.actionHooks, state: this.state, player, space })
               this.flushEngineLog()
               this.startReorganizeSubFlow(pIdx,
                 frame.stageResume?.hook === 'onBreedPhase' ? 'harvest-breed' : 'anytime')
@@ -3875,7 +3877,7 @@ export class GameCore {
         // is the canonical source of the pending interaction (Task 10).
         // Yield to the client; `buildInteraction()` derives the response
         // shape from the pending envelope.
-        frame.engine.flushEventTransaction({ state: this.state, player, space })
+        frame.engine.flushEventTransaction({ actionHooks: this.actionHooks, state: this.state, player, space })
         this.flushEngineLog()
         return
       }
@@ -3914,7 +3916,7 @@ export class GameCore {
 
       if (this.getAnimalCount(player) > this.getAnimalCount(before)) {
         const pIdx = effectivePlayerIndex
-        frame.engine.flushEventTransaction({ state: this.state, player, space })
+        frame.engine.flushEventTransaction({ actionHooks: this.actionHooks, state: this.state, player, space })
         this.flushEngineLog()
         // Parent frame stays on the stack; reorganize sub-flow is pushed on
         // top. When it completes, StageDispatch resumes onReorganizeComplete
@@ -3939,11 +3941,12 @@ export class GameCore {
    * base unavailability does not masquerade as a listener veto.
    */
   private listenersVetoIsDoable(player: PlayerState, space: ActionSpace): boolean {
-    return isActionVetoedInFlowContext({ state: this.state, player, space, actionId: space.id })
+    return isActionVetoedInFlowContext({ actionHooks: this.actionHooks, state: this.state, player, space, actionId: space.id })
   }
 
   private isActionSpaceAvailableToPlayer(player: PlayerState, space: ActionSpace): boolean {
     return canProjectActionEntry(this.state, player, space, {
+      actionHooks: this.actionHooks,
       isActionDoable: (entry, baseDoable) => this.applyIsDoableCheck(player, entry, baseDoable),
     })
   }
@@ -3979,6 +3982,7 @@ export class GameCore {
     const player = this.state.players[playerIndex]
     if (!player) return {}
     const availability = computeActionEntryAvailability(this.state, player, {
+      actionHooks: this.actionHooks,
       isActionDoable: (space, baseDoable) => this.applyIsDoableCheck(player, space, baseDoable),
     })
     for (const spaceId of Object.keys(availability)) {
@@ -4335,7 +4339,7 @@ export class GameCore {
   ): void {
     const space = this.createSyntheticSpace('harvest-feed-conversion')
     const results = runCardListeners({
-      state: this.state,
+      actionHooks: this.actionHooks, state: this.state,
       player,
       space,
       actionId: 'harvest-feed-conversion',
@@ -4352,8 +4356,7 @@ export class GameCore {
       actorPlayerId: player.id,
       sourceActionId: 'harvest-feed-conversion',
     })
-    executeImmediateSpecialEffectFlows({
-      state: this.state,
+    executeImmediateSpecialEffectFlows({ state: this.state,
       player,
       space,
       eventSink: frame.sink,
@@ -5181,8 +5184,7 @@ export class GameCore {
 
     // farm-position (default)
     const positions = payload.positions ?? []
-    const validation = validateFarmPositionCommit({
-      state: this.state,
+    const validation = validateFarmPositionCommit({ state: this.state,
       player,
       positions,
       actionContext: interactionContext,
@@ -5379,7 +5381,7 @@ export class GameCore {
     }
     ensureCardModifiers(player, cardId)
     // Trigger onBuy hook (creates PlayerActionCard action spaces, etc.)
-    runCardEffectHook(this.state, player, cardId, 'onBuy', undefined, {
+    runCardEffectHook(this.state, player, cardId, 'onBuy', undefined, { actionHooks: this.actionHooks,
       reportProtectedObservation: (observation) => this.reportProtectedObservation(observation),
     })
     this.syncDynamicActionSpaces()

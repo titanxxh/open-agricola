@@ -16,9 +16,9 @@ registerPlayerActionSpace({
     nameKey: `cards.${CARD_ID}.name`,
     descriptionKey: `cards.${CARD_ID}.desc`,
     strictCanExecute: true,
-    canBeExecutedByPlayer: (state, player) => {
+    canBeExecutedByPlayer: (state, player, context) => {
       if (player.id !== ownerId && (player.resources.food ?? 0) < 1) return false
-      return canStartFencing(state, player, undefined, FOLD_BUILDER_FENCE_CONTEXT)
+      return canStartFencing(context?.actionHooks, state, player, undefined, FOLD_BUILDER_FENCE_CONTEXT)
     },
     flowFactory: ({ player }) => ({ type: 'seq', children: [
       ...(player.id !== ownerId ? [{ type: 'leaf' as const, actionId: 'gain', sourceCard: CARD_ID,

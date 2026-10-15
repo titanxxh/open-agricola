@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import { GameSession } from '../game/authoritative-session'
 import { gainAction } from '../../shared/actions/effects/gain'
-import { registerActionHook, unregisterActionHook } from '../../shared/actions/hooks'
+
 import { requireActiveCardRegistry } from '../../shared/cards/active-registry'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 import type { CardListenerRegistration } from '../../shared/cards/card-listeners'
@@ -123,7 +123,6 @@ const executeGainLeaf = (flow: ActionFlow | null, session: GameSession, player: 
 }
 
 afterEach(() => {
-  unregisterActionHook(TEST_ACTION_HOOK_ID)
   requireActiveCardRegistry('moor-special-action-test-cleanup')
     .removeListenersWhere((listener) =>
       listener.id === TEST_BEFORE_LISTENER_ID ||
@@ -139,7 +138,7 @@ describe('FoM special action listener minors', () => {
     player.roomTiles = [{ row: 0, col: 0 }, { row: 0, col: 1 }, { row: 0, col: 2 }]
     let beforeListenerCalls = 0
     let actionHookCalls = 0
-    registerActionHook({
+    session.actionHooks.register({
       id: TEST_ACTION_HOOK_ID,
       actions: ['cut-peat'],
       phases: ['after'],

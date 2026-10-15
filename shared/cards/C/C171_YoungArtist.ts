@@ -40,11 +40,11 @@ const drawMinorBranch = (): ActionFlow => ({
 const cardImpl = {
   effect: {
     id: CARD_ID,
-    onStartReturnHome: (state, player) => {
+    onStartReturnHome: (state, player, context) => {
       if (player.resources.food < 1) return
       const children: ActionFlow[] = []
       const canAffordMinorAfterFee = evaluateWithReservedResources(state, player, { food: 1 }, (nextState, nextPlayer) =>
-        improvementAction.canBeExecutedByPlayer(nextState, nextPlayer, {
+        improvementAction.canBeExecutedByPlayer(nextState, nextPlayer, { actionHooks: context?.actionHooks,
           sourceCard: CARD_ID,
           actionContext: MINOR_ACTION_CONTEXT,
         }),

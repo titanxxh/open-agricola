@@ -21,7 +21,7 @@ const listener: CardListenerRegistration = {
     if ((owner.resources.food ?? 0) < 1) return
     const woodTaken = sumActionSpaceMovedToTriggerPlayerFromSpace(context, 'wood')
     if (woodTaken < 4) return
-    if (!plowAction.canBeExecutedByPlayer(context.state, owner)) return
+    if (!plowAction.canBeExecutedByPlayer(context.state, owner, { actionHooks: context.actionHooks })) return
     return {
       ...payThenActionFlow({
         cardId: CARD_ID,

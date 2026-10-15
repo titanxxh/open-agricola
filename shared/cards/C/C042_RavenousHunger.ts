@@ -9,7 +9,7 @@ import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C042_RavenousHunger'
 const accumulationSpaceIds = (context: CardListenerContext) =>
-  computeAllowedPlacementSpaces(context.state, context.player, { sourceCard: CARD_ID })
+  computeAllowedPlacementSpaces(context.state, context.player, { actionHooks: context.actionHooks, sourceCard: CARD_ID })
     .map((placement) => context.state.actionSpaces.find((space) => space.id === placement.spaceId))
     .filter((space): space is ActionSpace =>
       !!space && Object.values(space.gainPerRound).some((amount) => (amount ?? 0) > 0),

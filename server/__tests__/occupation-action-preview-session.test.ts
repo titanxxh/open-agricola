@@ -6,6 +6,10 @@ import { ensureCardModifiers } from '../../shared/cards/card-modifiers'
 import { requireActiveCardRegistry } from '../../shared/cards/active-registry'
 import type { ChoiceEffectPreview } from '../../shared/contract/types'
 
+const actionHooks = new ActionHookRegistry()
+
+import { ActionHookRegistry } from '../../shared/actions/hooks'
+
 const sessions: ReturnType<typeof createWorkSession>[] = []
 afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
 const target = 'A123_FrameBuilder'
@@ -26,7 +30,7 @@ const preview = (session: ReturnType<typeof createWorkSession>, params?: Record<
   const space = state.actionSpaces.find(candidate => candidate.id === 'lessons')!
   const registry = new ActionRegistry()
   for (const definition of [...state.actionSpaces, ...createInternalActionDefinitions(id => registry.get(id))]) registry.register(definition)
-  return Engine.fromFlow({ type: 'leaf', actionId: 'occupation', params }, { registry, hooks: new HookDispatcher(), log: new LogStore() }, player.id)
+  return Engine.fromFlow({ type: 'leaf', actionId: 'occupation', params }, { registry, hooks: new HookDispatcher(actionHooks), log: new LogStore() }, player.id)
     .describe({ state, player, space, previewMode: base ? 'base' : undefined })
 })
 const paymentPreviews = (effect?: ChoiceEffectPreview): Extract<ChoiceEffectPreview, { kind: 'payment' }>[] => {

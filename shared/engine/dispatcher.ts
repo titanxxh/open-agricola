@@ -5,12 +5,7 @@ import type {
   ActionFlow,
 } from '../contract/types'
 import type { ActionHookResult } from '../actions/hooks'
-import {
-  applyComputeReplaceHooks,
-  applyIsDoableHooksDetailed,
-  hasMatchingActionHooks,
-  runActionHooks,
-} from '../actions/hooks'
+import { type ActionHookRegistry, requireActionHookRegistry } from '../actions/hooks'
 import {
   executeCardListener,
   getMatchingListeners,
@@ -41,10 +36,14 @@ export type ComputeReplaceResult = {
 }
 
 export class HookDispatcher {
+  readonly actionHooks: ActionHookRegistry
+
+  constructor(actionHooks: ActionHookRegistry) { this.actionHooks = requireActionHookRegistry(actionHooks) }
+
   private previewComputeCosts(context: ActionExecutionContext & { actionId: string }) {
     const computeContext = { ...context, phase: 'computeCosts' as const }
     if (
-      !hasMatchingActionHooks(computeContext) &&
+      !this.actionHooks.hasMatching(computeContext) &&
       getMatchingListeners(computeContext).length === 0
     ) {
       return []
@@ -62,7 +61,7 @@ export class HookDispatcher {
     if (preview.isStructurallyPossible && !preview.isStructurallyPossible(context)) {
       return false
     }
-    const previewContext = { ...context }
+    const previewContext = { ...context, actionHooks: this.actionHooks }
     applyComputeCostResults(previewContext, this.previewComputeCosts(context))
     const costOverride = previewContext.costs ?? {}
     if (preview.canExecute) {
@@ -76,12 +75,12 @@ export class HookDispatcher {
     if (context.actionContext?.checkedReplaceAction === true || areListenerPhasesHostOwned(context.actionContext)) {
       return { actionId: context.actionId, alternatives: [], sourceCard: context.sourceCard }
     }
-    let actionId = applyComputeReplaceHooks(context)
+    let actionId = this.actionHooks.applyComputeReplace({ ...context, actionHooks: this.actionHooks })
     const alternatives: ComputeReplaceResult['alternatives'] = []
     let sourceCard = context.sourceCard
     const inheritedListenerIds = getSkipComputeReplaceListenerIds(context.actionContext)
     const skippedListenerIds = new Set(inheritedListenerIds)
-    const listenerContext = { ...context, phase: 'computeReplace' as const }
+    const listenerContext = { ...context, actionHooks: this.actionHooks, phase: 'computeReplace' as const }
     const matched = getMatchingListeners(listenerContext)
     for (const entry of matched) {
       if (skippedListenerIds.has(entry.registration.id)) continue
@@ -120,10 +119,10 @@ export class HookDispatcher {
     originalAllowed: boolean | (() => boolean) = () => action.originalActionCondition?.(context) ?? true,
   ) {
     let doable = this.applyCostPreviewDoable(context, action, initialDoable)
-    const actionHookDoable = applyIsDoableHooksDetailed(context, doable)
+    const actionHookDoable = this.actionHooks.applyIsDoableDetailed({ ...context, actionHooks: this.actionHooks }, doable)
     doable = actionHookDoable.doable
     let vetoed = actionHookDoable.vetoed
-    const listenerContext = { ...context, phase: 'isDoable' as const, doable }
+    const listenerContext = { ...context, actionHooks: this.actionHooks, phase: 'isDoable' as const, doable }
     const matched = getMatchingListeners(listenerContext)
     for (const entry of matched) {
       const result = executeCardListener(entry.registration, listenerContext, listenerOwnerOptions(entry))
@@ -139,8 +138,8 @@ export class HookDispatcher {
   }
 
   computeCosts(context: ActionExecutionContext & { actionId: string }) {
-    const actionResults = runActionHooks({ ...context, phase: 'computeCosts' })
-    const listenerContext = { ...context, phase: 'computeCosts' as const }
+    const actionResults = this.actionHooks.run({ ...context, actionHooks: this.actionHooks, phase: 'computeCosts' })
+    const listenerContext = { ...context, actionHooks: this.actionHooks, phase: 'computeCosts' as const }
     const matched = getMatchingListeners(listenerContext)
     const listenerResults: ActionHookResult[] = []
     for (const entry of matched) {
@@ -155,8 +154,8 @@ export class HookDispatcher {
     result: ActionExecutionResult,
   ) {
     if (context.actionId === 'place-farmer') return []
-    const actionResults = runActionHooks({ ...context, phase: 'computeArgs', result })
-    const listenerContext = { ...context, phase: 'computeArgs' as const, result }
+    const actionResults = this.actionHooks.run({ ...context, actionHooks: this.actionHooks, phase: 'computeArgs', result })
+    const listenerContext = { ...context, actionHooks: this.actionHooks, phase: 'computeArgs' as const, result }
     const matched = getMatchingListeners(listenerContext)
     const listenerResults: ActionHookResult[] = []
     for (const entry of matched) {
@@ -169,7 +168,7 @@ export class HookDispatcher {
   computeChoiceCandidates(
     context: ActionExecutionContext & { actionId: string },
   ) {
-    const actionResults = runActionHooks({ ...context, phase: 'computeChoiceCandidates' })
+    const actionResults = this.actionHooks.run({ ...context, actionHooks: this.actionHooks, phase: 'computeChoiceCandidates' })
     const listenerContext = {
       ...context,
       phase: 'computeChoiceCandidates' as const,
@@ -194,10 +193,10 @@ export class HookDispatcher {
     if (areListenerPhasesHostOwned(context.actionContext)) return noEffectPhase()
     const suppressed = new Set(getSuppressedBeforeListenerIds(context.actionContext))
     return {
-      actionHookResults: runActionHooks({ ...context, phase: 'before' }),
+      actionHookResults: this.actionHooks.run({ ...context, actionHooks: this.actionHooks, phase: 'before' }),
       matchedListeners: context.actionId === 'place-farmer'
         ? []
-        : getMatchingListeners({ ...context, phase: 'before' })
+        : getMatchingListeners({ ...context, actionHooks: this.actionHooks, phase: 'before' })
           .filter((entry) => !suppressed.has(entry.registration.id)),
     }
   }
@@ -209,8 +208,8 @@ export class HookDispatcher {
   ): EffectPhaseResult {
     if (areListenerPhasesHostOwned(context.actionContext)) return noEffectPhase()
     return {
-      actionHookResults: runActionHooks({ ...context, phase: 'immediatelyAfter', result, choice }),
-      matchedListeners: getMatchingListeners({ ...context, phase: 'immediatelyAfter', result, choice }),
+      actionHookResults: this.actionHooks.run({ ...context, actionHooks: this.actionHooks, phase: 'immediatelyAfter', result, choice }),
+      matchedListeners: getMatchingListeners({ ...context, actionHooks: this.actionHooks, phase: 'immediatelyAfter', result, choice }),
     }
   }
 
@@ -221,8 +220,8 @@ export class HookDispatcher {
   ): EffectPhaseResult {
     if (areListenerPhasesHostOwned(context.actionContext)) return noEffectPhase()
     return {
-      actionHookResults: runActionHooks({ ...context, phase: 'after', result, choice }),
-      matchedListeners: getMatchingListeners({ ...context, phase: 'after', result, choice }),
+      actionHookResults: this.actionHooks.run({ ...context, actionHooks: this.actionHooks, phase: 'after', result, choice }),
+      matchedListeners: getMatchingListeners({ ...context, actionHooks: this.actionHooks, phase: 'after', result, choice }),
     }
   }
 }

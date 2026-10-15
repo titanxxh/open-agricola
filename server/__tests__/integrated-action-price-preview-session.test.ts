@@ -8,6 +8,10 @@ import { Engine, ActionRegistry, HookDispatcher, LogStore } from '../../shared/e
 import { createInternalActionDefinitions } from '../../shared/actions/internal-actions'
 import type { ActionFlow, ChoiceDescriptionPreview, ChoiceEffectPreview, SessionResponse } from '../../shared/contract/types'
 
+const actionHooks = new ActionHookRegistry()
+
+import { ActionHookRegistry } from '../../shared/actions/hooks'
+
 const sessions: ReturnType<typeof createWorkSession>[] = []
 afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
 const setup = (configure?: Parameters<typeof createWorkSession>[0]['configure']) => {
@@ -29,7 +33,7 @@ const describeFlow = (session: ReturnType<typeof createWorkSession>, flow: Actio
   const state = session.state
   const registry = new ActionRegistry()
   for (const definition of [...state.actionSpaces, ...createInternalActionDefinitions(id => registry.get(id))]) registry.register(definition)
-  return Engine.fromFlow(flow, { registry, hooks: new HookDispatcher(), log: new LogStore() }, state.players[0]!.id)
+  return Engine.fromFlow(flow, { registry, hooks: new HookDispatcher(actionHooks), log: new LogStore() }, state.players[0]!.id)
     .describe({ state, player: state.players[0]!, space: state.actionSpaces.find(space => space.id === 'meeting-place')! })
 })
 const enterCardPurchase = (session: ReturnType<typeof createWorkSession>) => {

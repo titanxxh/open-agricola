@@ -4,7 +4,7 @@ import { canSpaceAcceptWorker, filterActionSpacesByIds, findActionSpaceById, isS
 import { canMoorWorkerEnterSpace } from '../../moor/heating'
 import { getMatchingListeners, executeCardListener, listenerOwnerOptions } from '../../cards/card-listeners'
 import { resetComputeReplaceGuards } from '../../engine/replace-guard'
-import { runActionHooks } from '../hooks'
+import { requireActionHookRegistry } from '../hooks'
 import { isPlacementActionDoableInFlowContext } from '../flow'
 import { getActionDefinition } from '../action-definition-lookup'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from './placement-constants'
@@ -67,6 +67,7 @@ const canExecutePlacementSpace = (
       state,
       player,
       {
+        actionHooks: contextOverrides.actionHooks,
         sourceCard: contextOverrides.sourceCard,
         actionContext,
       },
@@ -74,6 +75,7 @@ const canExecutePlacementSpace = (
     return contextOverrides.isActionDoable(space, baseDoable)
   }
   return isPlacementActionDoableInFlowContext({
+    actionHooks: contextOverrides.actionHooks,
     actionId: space.id,
     action: space,
     state,
@@ -108,7 +110,7 @@ export function computeAllowedPlacementSpaces(
     type: 'request' as const,
     request: { kind: 'choice' as const, options: baseOptions },
   }
-  const actionResults = runActionHooks({
+  const actionResults = requireActionHookRegistry(contextOverrides.actionHooks).run({
     state,
     player,
     space: createPlaceFarmerVirtualSpace(),

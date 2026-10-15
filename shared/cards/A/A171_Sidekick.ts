@@ -40,6 +40,7 @@ const canPlaceOnLeftTarget = (context: CardListenerContext, targetSpaceId: strin
   if (isSpaceOccupied(targetSpace)) return false
   return evaluateWithReservedResources(context.state, owner, { food: 1 }, (state, player) => {
     return isActionDoableInFlowContext({
+      actionHooks: context?.actionHooks,
       actionId: targetSpace.id,
       action: targetSpace,
       state,

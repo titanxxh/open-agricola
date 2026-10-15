@@ -19,6 +19,10 @@ import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 import '../../shared/cards/E/E123_ResourceHoarder'
 import { C014_StrawThatchedRoof } from '../../shared/cards/C/C014_StrawThatchedRoof'
 
+const actionHooks = new ActionHookRegistry()
+
+import { ActionHookRegistry } from '../../shared/actions/hooks'
+
 const CARD_ID = 'E123_ResourceHoarder'
 const C014_ID = 'C014_StrawThatchedRoof'
 
@@ -92,7 +96,7 @@ const payWithEngine = (
       optionPrefix: 'pay:e123',
     })),
     registry,
-    hooks: new HookDispatcher(),
+    hooks: new HookDispatcher(actionHooks),
     log: new LogStore(),
   })
   const space = createSpace('pay')

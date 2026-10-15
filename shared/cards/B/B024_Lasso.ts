@@ -19,7 +19,7 @@ const listener: CardListenerRegistration = {
     if (isCardFlagged(context.player, CARD_ID)) return
     if (workersAvailable(context.state, context.player) <= 0) return
     const usedMarket = MARKET_SPACES.includes(context.space?.id ?? '')
-    const allowed = computeAllowedPlacementSpaces(context.state, context.player, { sourceCard: CARD_ID })
+    const allowed = computeAllowedPlacementSpaces(context.state, context.player, { actionHooks: context.actionHooks, sourceCard: CARD_ID })
     const constraints = usedMarket
       ? allowed.map((placement) => placement.spaceId)
       : allowed

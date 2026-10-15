@@ -1,30 +1,29 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { actionDefinitions } from '../index'
-import { actionHookPhases } from '../hooks'
+import { ActionHookRegistry, actionHookPhases } from '../hooks'
 import { buildHookMatrix } from '../hook-matrix'
-import {
-  clearActionHooks,
-  registerActionHook,
-  type ActionHookRegistration,
-} from '../hooks'
+import { type ActionHookRegistration } from '../hooks'
 import { type CardListenerRegistration } from '../../cards/card-listeners'
 import { CardRegistry } from '../../../shared/cards/registry'
 import { setActiveCardRegistry, requireActiveCardRegistry } from '../../../shared/cards/active-registry'
 
+const actionHooks = new ActionHookRegistry()
+
+
 describe('hook matrix', () => {
   beforeEach(() => {
-    clearActionHooks()
+    actionHooks.clear()
     setActiveCardRegistry(new CardRegistry())
   })
 
   it('collects phases from action hooks only', () => {
-    registerActionHook({
+    actionHooks.register({
       id: 'test-before-after',
       actions: ['day-laborer'],
       phases: ['before', 'after'],
       handler: () => undefined,
     })
-    const matrix = buildHookMatrix(actionDefinitions)
+    const matrix = buildHookMatrix(actionDefinitions, actionHooks.getRegistered())
     const dayLaborer = matrix.find((entry) => entry.actionId === 'day-laborer')
     expect(dayLaborer?.phases).toEqual(['before', 'after'])
   })
@@ -36,13 +35,13 @@ describe('hook matrix', () => {
       phases: ['computeArgs'],
       handler: () => undefined,
     })
-    const matrix = buildHookMatrix(actionDefinitions)
+    const matrix = buildHookMatrix(actionDefinitions, actionHooks.getRegistered())
     const dayLaborer = matrix.find((entry) => entry.actionId === 'day-laborer')
     expect(dayLaborer?.phases).toEqual(['computeArgs'])
   })
 
   it('does not default to full phase coverage', () => {
-    const matrix = buildHookMatrix(actionDefinitions)
+    const matrix = buildHookMatrix(actionDefinitions, actionHooks.getRegistered())
     const dayLaborer = matrix.find((entry) => entry.actionId === 'day-laborer')
     expect(dayLaborer?.phases).toEqual([])
     expect(dayLaborer?.phases).not.toEqual(actionHookPhases)
@@ -61,27 +60,27 @@ describe('hook matrix', () => {
       phases: ['after'],
       handler: () => undefined,
     }
-    registerActionHook(hook)
+    actionHooks.register(hook)
     requireActiveCardRegistry('hook-matrix').registerListener(listener)
-    const withHooks = buildHookMatrix(actionDefinitions)
+    const withHooks = buildHookMatrix(actionDefinitions, actionHooks.getRegistered())
     const beforeClear = withHooks.find((entry) => entry.actionId === 'day-laborer')
     expect(beforeClear?.phases).toEqual(['before', 'after'])
 
-    clearActionHooks()
+    actionHooks.clear()
     setActiveCardRegistry(new CardRegistry())
-    const withoutHooks = buildHookMatrix(actionDefinitions)
+    const withoutHooks = buildHookMatrix(actionDefinitions, actionHooks.getRegistered())
     const afterClear = withoutHooks.find((entry) => entry.actionId === 'day-laborer')
     expect(afterClear?.phases).toEqual([])
   })
 
   it('keeps deterministic phase order', () => {
-    registerActionHook({
+    actionHooks.register({
       id: 'order-z',
       actions: ['day-laborer'],
       phases: ['after'],
       handler: () => undefined,
     })
-    registerActionHook({
+    actionHooks.register({
       id: 'order-a',
       actions: ['day-laborer'],
       phases: ['before'],
@@ -93,7 +92,7 @@ describe('hook matrix', () => {
       phases: ['computeArgs'],
       handler: () => undefined,
     })
-    const matrix = buildHookMatrix(actionDefinitions)
+    const matrix = buildHookMatrix(actionDefinitions, actionHooks.getRegistered())
     const dayLaborer = matrix.find((entry) => entry.actionId === 'day-laborer')
     expect(dayLaborer?.phases).toEqual(['before', 'after', 'computeArgs'])
   })

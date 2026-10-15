@@ -78,6 +78,7 @@ import { findActionSpaceById } from '../domain/space'
 import { findPlayerById } from '../domain/player'
 
 type EngineContext = {
+  actionHooks?: ActionExecutionContext['actionHooks']
   state: ActionExecutionContext['state']
   player: ActionExecutionContext['player']
   space: ActionExecutionContext['space']
@@ -255,7 +256,7 @@ const triggerSelectEvaluationOptions = (
   context: ActionExecutionContext,
   node: ParallelNode,
 ): TriggerSelectEvaluationOptions => ({
-  canStartFlow: (flow, flowContext) => evaluateFlowDoable(flow, flowContext, (actionId) => int.registry.getRequired(actionId)),
+  canStartFlow: (flow, flowContext) => evaluateFlowDoable(flow, { ...flowContext, actionHooks: int.hooks.actionHooks }, (actionId) => int.registry.getRequired(actionId)),
   canStartNode: (child, childContext) => canStartNode(int, childContext, child),
   canContinueWithoutTriggers: (actionId, resources) => {
     const hostContext = getBeforeContinuationContext(int, context, node, actionId)
@@ -272,7 +273,7 @@ const triggerSelectEvaluationOptions = (
     if (!action) return false
     const scopedContext = withResourcePreview(hostContext, resources)
     return isActionDoableInFlowContext({
-      ...scopedContext, ...currentEventReadContext(int), actionId: hostContext.actionId, action,
+      ...scopedContext, actionHooks: int.hooks.actionHooks, ...currentEventReadContext(int), actionId: hostContext.actionId, action,
       actionContext: { ...scopedContext.actionContext, skipBeforeTriggers: true },
       resolveAction: actionId => int.registry.get(actionId),
     })
@@ -511,6 +512,7 @@ const buildOptionalPrompt = (
   }
   const actionContext = actionContextForNode(actionNode, int)
   const executionContext: ActionExecutionContext = {
+    actionHooks: int.hooks.actionHooks,
     state: context.state,
     player: context.player,
     space: resolveExecutionSpace(context.state, context.space, actionContext),
@@ -626,6 +628,7 @@ const executeActivateCardAction = (
   if (params.countCardUse !== undefined) event.countCardUse = params.countCardUse
   const eventReadContext = eventReadContextForActivation(int, params)
   const listenerContext: CardListenerContext = {
+    actionHooks: int.hooks.actionHooks,
     state: context.state,
     player: triggerPlayer,
     triggerPlayer,
@@ -711,6 +714,7 @@ const executeDeferredHostAction = (
   }
   const actionContext = actionContextForNode(node, int)
   const executionContext: ActionExecutionContext = {
+    actionHooks: int.hooks.actionHooks,
     state: context.state,
     player: context.player,
     space: resolveExecutionSpace(context.state, context.space, actionContext),
@@ -926,6 +930,7 @@ export function engineProceed(
       .map((entry) => {
         const actionContext = actionContextForNode(entry.actionNode, int)
         const executionContext: ActionExecutionContext = {
+    actionHooks: int.hooks.actionHooks,
           state: context.state,
           player: context.player,
           space: resolveExecutionSpace(context.state, context.space, actionContext),
@@ -1145,6 +1150,7 @@ export function engineProceed(
       return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
     }
     const executionContext: ActionExecutionContext = {
+    actionHooks: int.hooks.actionHooks,
       state: context.state,
       player: context.player,
       space: resolveExecutionSpace(context.state, context.space, actionContext),
@@ -1180,7 +1186,7 @@ export function engineProceed(
     const doabilityEventReadContext = currentEventReadContext(int)
     const doabilityActionContext = { ...executionContext.actionContext, checkedReplaceAction: true }
     const doable = isActionDoableInFlowContext({
-      ...executionContext, ...doabilityEventReadContext, actionId: replacedActionId, action,
+      ...executionContext, actionHooks: int.hooks.actionHooks, ...doabilityEventReadContext, actionId: replacedActionId, action,
       actionContext: { ...doabilityActionContext, skipBeforeTriggers: true },
       resolveAction: actionId => int.registry.get(actionId),
     })

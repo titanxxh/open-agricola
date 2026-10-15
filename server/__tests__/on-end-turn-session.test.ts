@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { clearActionHooks } from '../../shared/actions/hooks'
+
 import { incCounter } from '../../shared/cards/__stubs__/helpers'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/A/A128_RiparianBuilder'
@@ -22,7 +22,6 @@ const registerCounterEffect = () => {
 
 describe('onEndTurn session', () => {
   beforeEach(() => {
-    clearActionHooks()
   })
 
   it('fires before confirmNextPlayer on a normal worker placement turn', () => {

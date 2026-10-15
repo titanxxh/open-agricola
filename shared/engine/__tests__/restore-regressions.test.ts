@@ -6,10 +6,14 @@ import { HookDispatcher } from '../dispatcher'
 import { LogStore } from '../log-store'
 import { ActionNode } from '../nodes'
 
+const actionHooks = new ActionHookRegistry()
+
+import { ActionHookRegistry } from '../../actions/hooks'
+
 const buildEngine = (root = new ActionNode('initial-root', 'noop')) => new Engine({
   tree: new EngineTree(root),
   registry: new ActionRegistry(),
-  hooks: new HookDispatcher(),
+  hooks: new HookDispatcher(actionHooks),
   log: new LogStore(),
 })
 

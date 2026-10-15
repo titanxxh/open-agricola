@@ -2,7 +2,6 @@ import type { ActionDefinition } from '../contract/types'
 import { actionHookPhases } from './hooks'
 import type { ActionHookPhase, ActionHookRegistration } from './hooks'
 import type { CardListenerRegistration } from '../cards/card-listeners'
-import { getRegisteredActionHooks } from './hooks'
 import { getRegisteredCardListeners } from '../cards/card-listeners'
 
 export type HookMatrixEntry = {
@@ -29,7 +28,7 @@ const collectPhases = (
 
 export const buildHookMatrix = (
   actions: ActionDefinition[],
-  actionHooks: ActionHookRegistration[] = getRegisteredActionHooks(),
+  actionHooks: ActionHookRegistration[],
   cardListeners: CardListenerRegistration[] = getRegisteredCardListeners(),
 ): HookMatrixEntry[] =>
   actions.map((action) => ({

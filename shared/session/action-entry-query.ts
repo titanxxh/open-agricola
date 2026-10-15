@@ -1,3 +1,4 @@
+import type { ActionHookRegistry } from '../actions/hooks'
 import type { ActionSpace, GameState, PlayerState } from '../contract/types'
 import { canEnterSpace, canUseExclusiveSpace, computeAllowedPlacementSpaces } from '../actions/helpers/placement-availability'
 import { addLinkedSpaceBlocks, addWorkerRef, isSpaceBlocked, isSpaceOccupied } from '../domain/space'
@@ -9,11 +10,13 @@ import { canMoorWorkerEnterSpace } from '../moor/heating'
 import { isThroughTheSeasonsSeason } from '../seasons/rules'
 
 type ActionEntryQueryOptions = {
+  actionHooks: ActionHookRegistry
   vetoesAction?: (space: ActionSpace) => boolean
   isActionDoable?: (space: ActionSpace, baseDoable: () => boolean) => boolean
 }
 
 type ActionEntryAvailabilityOptions = {
+  actionHooks: ActionHookRegistry
   isActionDoable: (space: ActionSpace, baseDoable: () => boolean) => boolean
 }
 
@@ -41,23 +44,23 @@ export const canEnterActionSpace = (
   state: GameState,
   player: PlayerState,
   space: ActionSpace,
-  options: ActionEntryQueryOptions = {},
+  options: ActionEntryQueryOptions,
 ): boolean => {
   if (isSpaceBlocked(space)) return false
   if (!canUseExclusiveSpace(space, player, state)) return false
   if (space.strictCanExecute || options.isActionDoable) {
-    const baseDoable = () => space.canBeExecutedByPlayer(state, player)
+    const baseDoable = () => space.canBeExecutedByPlayer(state, player, { actionHooks: options.actionHooks })
     if (!(options.isActionDoable?.(space, baseDoable) ?? baseDoable())) return false
   }
   if (
     space.id === 'fencing' &&
     isThroughTheSeasonsSeason(state, 'spring') &&
-    !space.canBeExecutedByPlayer(state, player)
+    !space.canBeExecutedByPlayer(state, player, { actionHooks: options.actionHooks })
   ) {
     return false
   }
   if (isSpaceOccupied(space)) {
-    const allowed = computeAllowedPlacementSpaces(state, player)
+    const allowed = computeAllowedPlacementSpaces(state, player, { actionHooks: options.actionHooks })
     if (!allowed.some((entry) => entry.spaceId === space.id)) return false
   }
   if (options.isActionDoable) return true
@@ -74,10 +77,10 @@ export const canProjectActionEntry = (
   if (!canMoorWorkerEnterSpace(state, player, space.id)) return false
   if (isSpaceBlocked(space)) return false
   if (isSpaceOccupied(space)) {
-    const allowed = computeAllowedPlacementSpaces(state, player)
+    const allowed = computeAllowedPlacementSpaces(state, player, { actionHooks: options.actionHooks })
     if (!allowed.some((entry) => entry.spaceId === space.id)) return false
   }
-  return options.isActionDoable(space, () => space.canBeExecutedByPlayer(state, player))
+  return options.isActionDoable(space, () => space.canBeExecutedByPlayer(state, player, { actionHooks: options.actionHooks }))
 }
 
 export const computeActionEntryAvailability = (
@@ -87,7 +90,7 @@ export const computeActionEntryAvailability = (
 ): Record<string, boolean> => {
   const allowedPlacementSpaceIds = new Set(
     computeAllowedPlacementSpaces(state, player, {
-      isActionDoable: options.isActionDoable,
+      actionHooks: options.actionHooks,      isActionDoable: options.isActionDoable,
     }).map((entry) => entry.spaceId),
   )
   return Object.fromEntries(

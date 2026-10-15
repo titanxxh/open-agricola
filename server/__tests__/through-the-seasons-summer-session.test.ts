@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { registerActionHook, unregisterActionHook } from '../../shared/actions/hooks'
+
 import { registerAdHocAction } from '../../shared/actions/helpers/ad-hoc-action-registry'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
@@ -499,7 +499,7 @@ describe('Through the Seasons Summer rules', () => {
       execute: ({ player }) => { player.resources.food += 1; return { type: 'ok' } },
     })
     const session = setupSummer()
-    registerActionHook({ id, actions: ['bake-bread'], phases: ['computeReplace'], handler: () => ({ actionId: id }) })
+    session.actionHooks.register({ id, actions: ['bake-bread'], phases: ['computeReplace'], handler: () => ({ actionId: id }) })
     try {
       fillFarmyardWithFields(session)
       const player = session.state.players[0]!
@@ -512,7 +512,7 @@ describe('Through the Seasons Summer rules', () => {
       expect(response.ok).toBe(true)
       expect(response.state.players[0]!.resources.food).toBe(food + 1)
       expect(response.interaction).toEqual(session.getState().interaction)
-    } finally { unregisterActionHook(id); session.dispose() }
+    } finally { session.actionHooks.unregister(id); session.dispose() }
   })
 
   it('adds one grain to Day Laborer in Summer', () => {
