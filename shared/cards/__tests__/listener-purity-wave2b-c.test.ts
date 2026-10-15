@@ -21,6 +21,8 @@ import { E053_BoarSpear_impl } from '../E/E053_BoarSpear'
 import { E074_AshTrees_impl } from '../E/E074_AshTrees'
 import { E085_MasterTanner_impl } from '../E/E085_MasterTanner'
 import { E148_Lazybones_impl } from '../E/E148_Lazybones'
+import { ACTION_SNAPSHOT_CARD_ID } from '../helpers/action-snapshot-state'
+import { createTriggerSnapshot } from '../helpers/trigger-snapshot'
 
 const TARGETS = [
   'A068_AsparagusGift',
@@ -428,42 +430,97 @@ describe('listener purity wave 2b/c', () => {
     })
   })
 
-  it('C48 Farmstead before-place-farmer snapshots used tiles by flow only', () => {
-    const p = player('C048_Farmstead', { roomTiles: [{ row: 0, col: 0 }] })
-    const game = state([p])
-    const before = stateSnapshot(game)
-
-    const result = listenerById(C048_Farmstead_impl.listeners, 'C48-farmstead-before-place-farmer')
-      .handler(context(p, { state: game, actionId: 'place-farmer', phase: 'before' }))
-
-    expectUnchanged(before, game)
-    expect(result?.flow).toMatchObject({
-      type: 'leaf',
-      actionId: 'special-effect',
-      sourceCard: 'C048_Farmstead',
-      params: { kind: 'set-extra-data', key: 'usedTilesBefore' },
+  it('C48 Farmstead qualifies committed host usage for the active Turn by flow only', () => {
+    const p = player('C048_Farmstead', {
+      stableTiles: [{ row: 1, col: 1 }],
+      cardStates: {
+        C048_Farmstead: {},
+        [ACTION_SNAPSHOT_CARD_ID]: { extraData: { token: 7 } },
+      },
     })
+    const game = state([p])
+    const used = [{ playerId: p.id, row: 1, col: 1 }]
+    const built: GameEvent = {
+      schemaVersion: 1, type: 'farm.stableBuilt', id: 'built', seq: 1, round: 3, phase: 'work', visibility: 'public',
+      actorPlayerId: p.id, newlyUsedTiles: used, stables: used,
+    }
+    const qualifiedContext = context(p, {
+      state: game, actionId: 'stables', actionEvents: [built], triggerSnapshot: createTriggerSnapshot(game),
+    })
+    const listener = listenerById(C048_Farmstead_impl.listeners, 'C48-farmstead-qualify')
+    const before = stateSnapshot(game)
+    const expected = {
+      flow: {
+        type: 'leaf', actionId: 'special-effect', sourceCard: 'C048_Farmstead',
+        params: { kind: 'set-extra-data', key: 'qualifiedTurnToken', value: 7 },
+      },
+      sourceCard: 'C048_Farmstead',
+    }
+
+    expect(listener.handler(qualifiedContext)).toEqual(expected)
+    expect(listener.handler(qualifiedContext)).toEqual(expected)
+    expectUnchanged(before, game)
+
+    for (const overrides of [
+      { actionEvents: [{ ...built, newlyUsedTiles: [] }] },
+      { actionEvents: [{ ...built, newlyUsedTiles: [{ playerId: 'other', row: 1, col: 1 }] }] },
+      { actionEvents: [], transactionEvents: [built] },
+      { actionEvents: undefined, transactionEvents: [built] },
+      { triggerSnapshot: undefined },
+      { triggerSnapshot: createTriggerSnapshot({ players: [{ ...p, minorPlayed: [] }] }) },
+    ]) {
+      expect(listener.handler({ ...qualifiedContext, ...overrides })).toBeUndefined()
+      expectUnchanged(before, game)
+    }
+
+    for (const cardStates of [
+      { C048_Farmstead: {} },
+      { ...p.cardStates, C048_Farmstead: { extraData: { qualifiedTurnToken: 7 } } },
+      { ...p.cardStates, C048_Farmstead: { extraData: { rewardedTurnToken: 7 } } },
+    ]) {
+      const owner = { ...p, cardStates }
+      const current = state([owner])
+      const unchanged = stateSnapshot(current)
+      expect(listener.handler(context(owner, {
+        state: current, actionId: 'stables', actionEvents: [built], triggerSnapshot: qualifiedContext.triggerSnapshot,
+      }))).toBeUndefined()
+      expectUnchanged(unchanged, current)
+    }
   })
 
-  it('C48 Farmstead after-place-farmer clears snapshot through flow before reward', () => {
+  it('C48 Farmstead records the active Turn reward before gaining food by flow only', () => {
     const p = player('C048_Farmstead', {
-      roomTiles: [{ row: 0, col: 0 }, { row: 0, col: 1 }],
-      cardStates: { C048_Farmstead: { extraData: { usedTilesBefore: 1 } } },
+      cardStates: {
+        C048_Farmstead: { extraData: { qualifiedTurnToken: 7 } },
+        [ACTION_SNAPSHOT_CARD_ID]: { extraData: { token: 7 } },
+      },
     })
     const game = state([p])
     const before = stateSnapshot(game)
-
-    const result = listenerById(C048_Farmstead_impl.listeners, 'C48-farmstead-after-place-farmer')
-      .handler(context(p, { state: game, actionId: 'place-farmer', phase: 'after' }))
-
-    expectUnchanged(before, game)
-    expect(result?.flow).toMatchObject({
+    const expected = {
       type: 'seq',
       children: [
-        { type: 'leaf', actionId: 'special-effect', sourceCard: 'C048_Farmstead', params: { kind: 'set-extra-data', key: 'usedTilesBefore', value: undefined } },
+        { type: 'leaf', actionId: 'special-effect', sourceCard: 'C048_Farmstead', params: { kind: 'set-extra-data', key: 'rewardedTurnToken', value: 7 } },
         { type: 'leaf', actionId: 'gain', sourceCard: 'C048_Farmstead', params: { food: 1 } },
       ],
-    })
+    }
+
+    expect(C048_Farmstead_impl.effect.onEndTurn(game, p)).toEqual(expected)
+    expect(C048_Farmstead_impl.effect.onEndTurn(game, p)).toEqual(expected)
+    expectUnchanged(before, game)
+
+    for (const cardStates of [
+      { C048_Farmstead: { extraData: { qualifiedTurnToken: 7 } } },
+      { ...p.cardStates, C048_Farmstead: {} },
+      { ...p.cardStates, C048_Farmstead: { extraData: { qualifiedTurnToken: 6 } } },
+      { ...p.cardStates, C048_Farmstead: { extraData: { qualifiedTurnToken: 7, rewardedTurnToken: 7 } } },
+    ]) {
+      const owner = { ...p, cardStates }
+      const current = state([owner])
+      const unchanged = stateSnapshot(current)
+      expect(C048_Farmstead_impl.effect.onEndTurn(current, owner)).toBeUndefined()
+      expectUnchanged(unchanged, current)
+    }
   })
 
   it('C53 GypsysCrock trade-applied increments cooked counter by flow only', () => {
