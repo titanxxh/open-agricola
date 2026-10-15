@@ -134,14 +134,6 @@ export class ActionHookRegistry {
     if (index >= 0) this.registrations.splice(index, 1)
   }
   getRegistered(): ActionHookRegistration[] { return [...this.registrations] }
-  clone(): ActionHookRegistry {
-    const registry = new ActionHookRegistry()
-    this.registrations.forEach(registration => registry.register({ ...registration,
-      ...(registration.actions ? { actions: [...registration.actions] } : {}),
-      ...(registration.phases ? { phases: [...registration.phases] } : {}),
-    }))
-    return registry
-  }
 
   private ordered(context: ActionHookContext): ActionHookRegistration[] {
     return this.registrations.filter(registration =>
