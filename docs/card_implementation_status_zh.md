@@ -123,6 +123,7 @@
 | 本次翻修的独立优惠 | `ActionContext.costBonuses`、`discounted-action`、翻修成本组装 | 授予的翻修在自己的 leaf 上携带可序列化且有来源的 `Bonus[]`。准入、预览与内部付款按实时房间数，将其与成本 hook 合并。独立嵌套翻修保留自己的成本，不使用临时玩家 modifier 或 install/uninstall 行动。 |
 | Card-provided payment resources | `ComplexCost.paymentResourceProviders`、`PaymentSolution.paymentResourceCovers`、`B155_ArtTeacher`、ADR 0004 | 卡牌可在 `computeCosts` 内声明 payment-only 虚拟资源；provider 在卡牌内部定义可用量、覆盖比例和消费来源。虚拟资源不进入成本候选行或 `PlayerState.resources`，但会出现在 payment option / `resourcesPaid`；使用 provider 的 payment option 必须把 provider `sourceCard` 合入 `sourceCards` 以区分卡牌效果路径，并由 executor 消耗来源状态。枚举与消耗共用同一个实时背书检查，按行动格资源池累加需求；带 provider 的成本不使用支付方案缓存；该缓存的 key 也包含 bonus 条件会读取的房间数和房屋类型。 |
 | Payment budgets | `ComplexCost.paymentBudget`、`fencePolicy.paymentBudget`、`B015_CarpentersBench` | 对最终 `PaymentSolution.resourcesPaid` 做资源上限过滤；不提供资源、不改变 cost row、不作为 `segmentBounds`。fencing 中用于 B15 这类“只能使用本次资源”的规则，必须在 free fence / computeCosts / payment solver 之后检查，禁止用 collected+1 段数上限替代。 |
+| 行动级围栏贡献 | `beforeHostContributions`、`fenceCostDiscounts`、`fenceSupplyReservations`、B015 / E074 | before reaction 按来源写回原宿主。木材折扣不增加实体；卡上供给由玩家明确选取，只消耗本次新建普通围栏对应的实体。准入、预览、付款、undo 和私有 cursor 恢复读取同一宿主上下文。付款来源记录实际省木，实体消耗归供给卡。 |
 | 支付资源池保留量 | `ComplexCost.resourceReserve`、`filterPaymentSolutionsByReserve()`、`B018_GrasslandHarrow` | 过滤支付后指定资源池总量低于声明值的最终方案；不改变成本候选或支付执行。 |
 | Candidate Closure（候选闭包，ADR 0004） | `candidate-closure.ts` `closeCandidates()`、`buildUnitCostOptions()` 闭包接入、`cost-modifier-permutation-probe.test.ts` | unit trade（D15/B145/A123 等）不再声明 `order`，`Trade.order` / `TradeModifier.order` 已删除；可达 cost row 集合由闭包求不动点产出，与修改器注册顺序无关；mandatory 饱和过滤保证强制折扣链任意序收敛；新增 cost 转换只声明局部语义（替换什么、mandatory 与否、maxUses），禁止重新引入任何顺序字段。 |
 | Action reaction listener dispatch | `CardListenerRegistration`、`buildPhaseTrailingNodes()`、`resolveTriggerSelectChild()`、`evaluateFlowDoable()`、`pnpm run check:card-impl-boundaries` | `before` / `immediatelyAfter` / `after` reaction listener 按 owner 与 phase 进入 `trigger-select`；单 child 可直接展开，compute/query listener 继续串行聚合。所有 handler 仍须保持 state-pure flow builder，状态修改由返回的 ActionFlow leaf 执行。边界门禁用 source AST 检查同文件跨卡 ID，并从解析后的 `ALL_CARD_IMPLS` 获取真实 listener 清单；它拒绝 trailing handler 直接读取实时已打出卡牌长度，以及所有 handler 与 `deriveCardCostCandidate` 中对 context 状态的显式写入（仅跟踪同函数别名）。listener purity 另由测试 setup 安装的运行时 guard（`shared/cards/__tests__/listener-purity-guard.ts`）执行：向 listener 提供深层只读 Proxy，任何写入或返回 live 引用都失败（见 `docs/ARCHITECTURE.md` §7.7）；两者都不跟踪跨文件数据流。触发选项复用当前步骤准入；pass gate 保留当前 host 和资源结果预览，不驱动后续 Engine。结构暂不适用的 child 会在 sibling 改变状态后重新评估。 实际使用行动格的 before-use 资格共用匹配／owner／去重：放人和 jump 使用 `collectBeforePlacementFlows`，工人移动使用 `collectBeforeActionSpaceUseFlows`。`requiresNewPlacement: true` 区分仅新放人触发的规则和使用行动格的规则，无需按卡 ID 或移动事件推断。绑定使用行动格的已有动物条件在这个使用边界读取 `getAssignedAnimalsByType(player, state)`，包括卡牌区和寄养区中实际归属该玩家的动物；标准 gain 先于目标 collect／替换及其 reaction 菜单结算。后来烹饪不撤回奖励，使用行动格之前烹饪掉最后同类动物则不满足资格；从另一格 partial collect 不属于再次使用行动格。资格直接推导，不保存快照或持久标记。 |
@@ -198,6 +199,8 @@ Gain 来源区分显式资源参数和行动格配置的基础收益。C168 在�
 ## 6. 基础设施待办
 
 提交时的农场使用状态事实（#1195）是响应新增使用格的共享基础设施，详见 §5 与 Architecture §7。四类几何事件记录同一权威集合差，卡牌读取已捕获的宿主行动事件，不再使用每次行动的牌状态计数。A040 只保留牌上剩余黏土库存。
+
+#1193 通过分开行动级折扣与选中的卡上供给，修复 B015 / E074 来源覆盖及多造实体。Session 覆盖明确跳过、库存上限、超量选择、palisade、支付选择、触发顺序、嵌套围栏、anytime、恢复和 undo；旧共享 pending 槽及 reserve / clear API 已删除。
 
 每行 `altCosts` 都是完整基础费用候选，须包含各替代方案共有的费用。折扣和替代付款仍走通用支付管线。卡内奖励分公式保留牌文列出的有限例外，与印刷卡牌分分开；存储预览复用同一计分回调。Session 回归验证实际费用、转换后的支付及后续计分边界，无需新增通用扩展点。
 
@@ -307,7 +310,8 @@ Hook 归属由 `ALL_CARD_IMPLS` 派生，不在此镜像一份会漂移的副本
 | `A177_Middleman` | 已接受差异 | 参考实现 implemented=false；OA 作为 5+ 扩展产品实现。打出时在当前 meeple-symbol extension spaces 放置 owner-only 1 stone + 1 food 附件；owner 后续精确使用该行动格时领取并清除该格附件，linked partner 不隐式领取，非 owner 不领取也不消耗；前端仅渲染后端序列化的附件资源和 owner hover 文本。 |
 | `A180_AnimalBrander` | 已接受差异 | 参考实现 implemented=false；OA 作为 5+ 扩展产品实现。animal-market-56 各原动物分支在本地 flow 表达；owner 选择具体分支并完成原结果后，可选额外付 1 food 重放同一 option。允许用原行动所得食物支付重复费用，零食物羊分支可最终得到二羊一食；cattle 分支本地 pay/gain，不再注册独立 action；接受后总付 3 food 得 2 cattle，跳过则只保留原结果。 |
 | `B010_Caravan` | 已接受差异 | 参考实现 banned，但 OA 按产品策略保留 |
-| `B015_CarpentersBench` | 已接受差异 | 参考实现 banned，但 OA 按产品策略保留；参考实现 `formatCost([WOOD => 1])` / `max` / `benchWood` 通过 `reserve-fence-bonus` + nested `fencePolicy` 表达：只建普通 fence、恰好 1 个新牧场、1 段免费，并用 `paymentBudget: { wood: collectedWood }` 限制最终实付普通 wood；通过 `fencePolicy.promptHintKey` 给前端提示“只能 1 个新牧场”；不注册全局 `fencing` 折扣，避免和 E16/C16 等 `computeCosts.fence` 再次叠加；不再用 `collectedWood + 1` 段数上限裁剪合法形状。 |
+| `B015_CarpentersBench` | 已接受差异 | 参考实现 banned，但 OA 按产品策略保留。本牌授予的 fence 行动声明一次木材折扣、恰好一个新牧场且只建普通围栏；`paymentBudget: { wood: collectedWood }` 在其他合法费用效果之后约束最终实付，只能使用此次拿取的木材。不提供围栏实体，不安装全局折扣；`fencePolicy.promptHintKey` 提示一个牧场的限制。 |
+| `E074_AshTrees` | 已接受差异 | OA 保留明确选择卡上围栏数量。跳过后普通库存不足时拒绝提交，不自动补用卡上库存。选中的实体独立于 B015 折扣：选四建四扣四，选五建四也只扣四。 |
 | `B021_HayloftBarn` | 已接受差异 | 参考实现 banned，但 OA 按产品策略保留；通过 resource exchange 获得的 grain 已由 provenance helper 触发；空卡 family-growth 使用 `hasInactiveWorkerInSupply`，不会在仅剩 removed worker 时暴露生人 flow |
 | `B022_WalkingBoots` | 已接受差异 | 参考实现 banned，但 OA 按产品策略保留；临时 from-supply worker 归还时标记 `removedFromSupply`，后续 family-growth supply 与玩家面板家庭成员上限都不再计入该 token |
 | `B056_Brook` | 已接受差异 | schema-up prerequisite / isBuyable metadata 差异 |

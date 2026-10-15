@@ -411,6 +411,10 @@ shared/engine/
 
 listener activation 是 internal action leaf：`ActionNode(actionId='activate-card')`，params 携 `{ listenerId, cardId, phase, actionId, event, ownerPlayerId, ownerCardZone, triggerPlayerId }`。`event` 保留触发 action 的 `actionContext`（包括 `targetSpaceId`），activation 执行时用该 context 解析 listener 的真实 `space`。它 bypass 普通 public action pipeline，只执行 listener body 并把返回 flow / follow-up actions 插入 engine。
 
+`before` reaction leaf 可以返回 `ok.beforeHostContributions`：按命名空间和来源卡分别保存 JSON 值。引擎使用已有的 `continuationParentHostNodeId`，把每项贡献写回尚未开始执行的原宿主 `actionContext`；leaf 不能指定任意宿主，没有有效 before 宿主时失败。同一来源再次写入会替换本来源的贡献，不会追加。贡献随宿主一起进入 pending、私有 cursor 恢复和 undo，不自动传给独立授予或嵌套的行动。
+
+围栏把 `fenceCostDiscounts`（只减木材费用）和 `fenceSupplyReservations`（明确选取的卡上普通围栏实体）分开。准入、预览和付款读取同一宿主上下文与实时库存；只有选中的实体增加可用数量。提交最多消耗本次新建普通围栏数对应的卡上实体，费用折扣和 palisade 不改变这个消耗。实际费用归因同时用于付款预览与 `resource.paid.bonusSources`；实体消耗的 `farm.fenceConsumed.sourceCardId` 指向供给卡，即使围栏行动由另一张卡授予。无需玩家级 pending 围栏槽或 after reaction 清理。
+
 `BaseNode` 提供共享 metadata / pending / cursor round-trip；具体 traversal 由 `EngineTree` 和五种 node 实现。
 
 ### 5.3 Engine 公共 API
@@ -913,7 +917,7 @@ OA 对齐规则：
 
 **2026-05-13 Wave2b/c 落地规则：listener 内的 cardState / structural mutation 也必须通过 action leaf 执行。** 本轮把 A68 / A73 / A92 / B18 / B34 / B76 / C48 / C53 / C88 / C93 / C130 / C150 / D36 / D56 / D74 / D158 / E53 / E74 / E85 / E148 的剩余 handler mutation 迁出：
 
-- `special-effect` 扩展为 listener-purity 的通用 mutation dispatcher：`clear-pending-fence-bonus`、`consume-pending-extra-turns`、`remove-future-meeples`、`promote-first-newborn`、`add-resource-to-space`、`build-stable-on-first-empty-tile`、`record-scoring-reserve-bonus`、`add-farmyard-space-state`、`claim-farmyard-goods-tokens`、`claim-field-goods-tokens`、`grow-field-and-non-field-crops`、`consume-supply-token`。`record-scoring-reserve-bonus` 只记录终局 Scoring Reserve 与 bonus VP，不扣真实资源；target 由 server-side `actionContext.targetPlayerId` 解析，reserved 只校验非负整数 real resource 与不超过 `target.resources - 已选 Scoring Reserve`。shared scoring 卡牌可随该记录写入 `cardType`，让非持卡 target player 的 score entry 仍保留来源卡牌归类。
+- `special-effect` 扩展为 listener-purity 的通用 mutation dispatcher：`consume-pending-extra-turns`、`remove-future-meeples`、`promote-first-newborn`、`add-resource-to-space`、`build-stable-on-first-empty-tile`、`record-scoring-reserve-bonus`、`add-farmyard-space-state`、`claim-farmyard-goods-tokens`、`claim-field-goods-tokens`、`grow-field-and-non-field-crops`、`consume-supply-token`。`record-scoring-reserve-bonus` 只记录终局 Scoring Reserve 与 bonus VP，不扣真实资源；target 由 server-side `actionContext.targetPlayerId` 解析，reserved 只校验非负整数 real resource 与不超过 `target.resources - 已选 Scoring Reserve`。shared scoring 卡牌可随该记录写入 `cardType`，让非持卡 target player 的 score entry 仍保留来源卡牌归类。
 - B18 这类 future-meeple 写入走 lazy flow；after-pay listener 不再立即 queue。
 - C93 / C130 对 action space 的资源写入返回 `special-effect.add-resource-to-space`，额外放人仍保持 optional。
 - E148 opponent-scope listener 用 owner-targeted `special-effect` 更新 reserved action spaces / stable；"无空地但需要移除 marker" 这种无收益状态同步可返回 `countCardUse: false`，避免把纯清理计入卡牌 used stats。

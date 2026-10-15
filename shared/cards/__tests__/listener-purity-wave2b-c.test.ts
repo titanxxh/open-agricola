@@ -3,7 +3,6 @@ import { guardedListener } from './listener-purity-guard'
 import type { ActionFlow, ActionSpace, GameState, PlayerState, Resource } from '../../contract/types'
 import type { DraftGameEvent } from '../../contract/events'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
-import { storePendingFenceBonus } from '../helpers/pending-fence-bonus'
 import { A068_AsparagusGift_impl } from '../A/A068_AsparagusGift'
 import { A073_AgriculturalFertilizers_impl } from '../A/A073_AgriculturalFertilizers'
 import { A092_AdoptiveParents_impl } from '../A/A092_AdoptiveParents'
@@ -815,11 +814,10 @@ describe('listener purity wave 2b/c', () => {
     expect(result?.flow).toBeDefined()
   })
 
-  it('E74 AshTrees after-fence clears pending bonus and refreshes infobox by flow only', () => {
+  it('E74 AshTrees after-fence refreshes infobox by flow only', () => {
     const p = player('E074_AshTrees', {
       cardStates: { E074_AshTrees: { counters: { fences: 3 }, infobox: 'stale' } },
     })
-    storePendingFenceBonus(p, { sourceCard: 'E074_AshTrees', counterKey: 'fences', freeFences: 2 })
     const game = state([p])
     const before = stateSnapshot(game)
 
@@ -828,11 +826,8 @@ describe('listener purity wave 2b/c', () => {
 
     expectUnchanged(before, game)
     expect(result?.flow).toMatchObject({
-      type: 'seq',
-      children: [
-        { type: 'leaf', actionId: 'special-effect', sourceCard: 'E074_AshTrees', params: { kind: 'clear-pending-fence-bonus' } },
-        { type: 'leaf', actionId: 'special-effect', sourceCard: 'E074_AshTrees', params: { kind: 'set-infobox', text: '3 / 5' } },
-      ],
+      type: 'leaf', actionId: 'special-effect', sourceCard: 'E074_AshTrees',
+      params: { kind: 'set-infobox', text: '3 / 5' },
     })
   })
 

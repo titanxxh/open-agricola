@@ -39,6 +39,7 @@ export const resolveTypedFlatPaymentSelection = (
   failure: ActionExecutionResult,
   costType?: CostModifierType,
   state?: GameState,
+  extraSources: readonly string[] = [],
 ): TypedFlatPaymentSelection => {
   const complex: ComplexCost = isComplexCost(baseCost)
     ? baseCost
@@ -52,6 +53,7 @@ export const resolveTypedFlatPaymentSelection = (
     {
       costType,
       state,
+      extraSourcesForSolution: () => extraSources,
     },
   )
 }

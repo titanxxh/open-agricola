@@ -142,7 +142,7 @@ describe('effects architecture guard', () => {
       'renovate-house',
       'reorganize',
       'repeat-action',
-      'reserve-fence-bonus',
+      'reserve-fence-supply',
       'resolve-timed-rule',
       'return-to-space',
       'rule-condition',

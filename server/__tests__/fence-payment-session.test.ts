@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { storePendingFenceBonus } from '../../shared/cards/helpers/pending-fence-bonus'
+import { descriptionEffects } from './_helpers/choice-description'
 import type { PlayerState } from '../../shared/contract/types.ts'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
@@ -45,11 +45,8 @@ describe('fence payment session', () => {
     }
     player.activeModifiers = [...fenceTradeModifiers]
     player.occupationPlayed.push('E108_BlackberryFarmer')
-    storePendingFenceBonus(player, {
-      sourceCard: 'TestFenceBonus',
-      counterKey: 'fences',
-      freeFences: 2,
-    })
+    player.minorPlayed.push('E074_AshTrees')
+    player.cardStates.E074_AshTrees = { counters: { fences: 2 } }
 
     session.loadState(state)
     return session
@@ -60,6 +57,11 @@ describe('fence payment session', () => {
 
     let resp = session.takeAction(0, 'fencing')
     expect(resp.ok).toBe(true)
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected Ash choice')
+    const reserve = resp.interaction.request.options.find(option => descriptionEffects(option.descriptionPreview)
+      .some(effect => effect.kind === 'fenceReserve' && effect.amount === 2))
+    if (!reserve) throw new Error('missing Ash choice')
+    resp = session.resolveChoice(0, reserve.value)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.request.farm.farmType).toBe('fence')
@@ -83,6 +85,13 @@ describe('fence payment session', () => {
     expect(resp.state.players[0]!.resources.clay).toBe(2)
     expect(resp.state.players[0]!.resources.stone).toBe(0)
     expect(resp.state.players[0]!.fenceSegments).toHaveLength(4)
+
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'select-trigger') {
+      const reaction = resp.interaction.request.options.find(option => !option.value.startsWith('__') && !option.disabled)
+      if (!reaction) throw new Error('missing completed-fence reaction')
+      resp = session.resolveChoice(0, reaction.value)
+      expect(resp.ok).toBe(true)
+    }
 
     const fenceBuiltIndex = resp.state.events.findIndex((event) => event.type === 'farm.fenceBuilt')
     const afterFencingIndex = resp.state.events.findIndex(
