@@ -76,6 +76,56 @@ afterEach(() => {
 })
 
 describe('browser executor parity with server executor', () => {
+  it.each(['server', 'browser'] as const)('keeps host action rules out of the real %s custom-card invocation', runtime => {
+    const source = `
+const CARD_ID = 'CUSTOM_ParityCard'
+const CARD_DEF = MinorImprovement({ id: CARD_ID, name: 'Parity Card' })
+const CARD_IMPL = {
+  effect: { id: CARD_ID, onReturnHome: (_state: any, _player: any, context: any) => {
+    if (context && 'actionHooks' in context) throw new Error('host runtime escaped into effect')
+    return gainLeaf(CARD_ID, { food: 2 })
+  } },
+  listeners: [{ cardIds: [CARD_ID], actions: ['collect'], phases: ['after'], handler: (context: any) => {
+    if ('actionHooks' in context) throw new Error('host runtime escaped into listener')
+    return { flow: gainLeaf(CARD_ID, { grain: 1 }) }
+  } }],
+}
+`
+    const compiled = validateAndCompileCustomCode(source, 'CUSTOM_ParityCard')
+    expect(compiled.valid).toBe(true)
+    if (!compiled.valid) throw new Error(compiled.errors.join('; '))
+    const state = createInitialState(42, { playerCount: 2 })
+    for (const player of state.players) {
+      player.minorHand = ['__test_placeholder__']
+      player.occupationHand = ['__test_placeholder__']
+    }
+    state.players[0]!.minorPlayed = ['CUSTOM_ParityCard']
+    const customCards = [cardDataFrom(compiled.compiledCode, compiled.manifest)]
+    const core = runtime === 'server'
+      ? new GameSession(state, customCards)
+      : new GameCore({ stateOrSeed: state, customCards, registerCustomCardImpl: registerBrowserBackedCustomCard })
+    try {
+      const settle = (response: ReturnType<GameCore['getState']>) => {
+        for (let step = 0; step < 8 && response.interaction.stateId === 'wait' && ['confirm-next-player', 'confirm-player-switch'].includes(response.interaction.request.kind); step++) {
+          response = core.resolveChoice(response.interaction.playerIndex, 'confirm')
+          expect(response.ok).toBe(true)
+        }
+        return response
+      }
+      const grain = core.state.players[0]!.resources.grain
+      const collected = settle(core.takeAction(0, 'forest'))
+      expect(collected.ok).toBe(true)
+      expect(collected.state.players[0]!.resources.grain).toBe(grain + 1)
+      expect(settle(core.takeAction(1, 'clay-pit')).ok).toBe(true)
+      expect(settle(core.takeAction(0, 'reed-bank')).ok).toBe(true)
+      const food = core.state.players[0]!.resources.food
+      const returned = settle(core.takeAction(1, 'fishing'))
+      expect(returned.ok).toBe(true)
+      expect(returned.state.players[0]!.resources.food).toBe(food + 2)
+      expect(core.cardWarnings).toEqual([])
+    } finally { core.dispose() }
+  })
+
   it('produces an identical validate/compile result', () => {
     const server = validateAndCompileCustomCode(CARD_SOURCE, 'CUSTOM_ParityCard')
     const local = validateAndCompileCustomCodeLocal(CARD_SOURCE, 'CUSTOM_ParityCard')
