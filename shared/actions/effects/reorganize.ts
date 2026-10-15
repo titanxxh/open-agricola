@@ -435,7 +435,13 @@ export const reorganizeAction: ActionDefinition = {
           delete placement.minimums[animal]
         }
       }
-      ctx.state.events = ctx.state.events.map(event => event.type === 'farm.animalBred' && event.animals === previousResources
+      const recentEvents = [...ctx.state.events].reverse()
+      const breedingPhase = recentEvents.find(event => event.type === 'harvest.phaseStarted'
+        && event.harvestPhase === 'breeding' && event.round === ctx.state.round)
+      const breedingEventId = breedingPhase && recentEvents.find(event => event.type === 'farm.animalBred'
+        && event.source === 'harvest' && event.round === ctx.state.round && event.seq > breedingPhase.seq
+        && (event.targetPlayerId ?? event.actorPlayerId) === ctx.player.id)?.id
+      ctx.state.events = ctx.state.events.map(event => event.type === 'farm.animalBred' && event.id === breedingEventId
         ? copyHistoryRecordIdentity(event, { ...event, animals: { ...summary.resources } }) : event)
       placement.animalCounts = after
       summary.animalTypes = Object.keys(summary.resources).length

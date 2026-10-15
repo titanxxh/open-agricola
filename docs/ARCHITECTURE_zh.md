@@ -1231,7 +1231,7 @@ shared/domain/
 
 `computePastureCapacityModifiers(player, state)` 返回 pasture capacity modifier 列表，由 `computeAnimalZones` 在创建 pasture zone 时统一应用。modifier 分 `replacement` / `additive` 两类：先按打出顺序应用全部 replacement，再按打出顺序应用全部 additive；因此 D011_LawnFertilizer 这类 size-one pasture replacement 总是在 A012_DrinkingTrough / B072_LoveforAgriculture 这类 additive 前生效，不需要卡牌之间互读 id 或 scratch marker。没有 modifier 时 pasture 容量仍是 `size * 2 * 2^stables`。
 
-Animal Reorg Prefill（动物重整自动补位）由 `shared/domain/animal-reorg.ts` 为行动请求和实时交互投影统一生成。`prefillAnimalZones()` 固定已有有效安置，在兼容剩余空间中搜索最多可补入的待安置动物，同数量结果使用稳定顺序。容量、混养、卡牌校验、互斥区域和必空组复用容纳搜索的约束；容纳查询仍允许全局重排。已有布局本身非法时交给玩家手动修正。补位不写入真实安置、不弃养、不触发安置或繁殖奖励；确认仍是严格原子结算边界。明确的手动流程可通过 `actionContext.prefill=false` 关闭补位，并以 `InteractionRequest.prefill=false` 保留该意图；被动流程默认补位。前端用服务端草稿初始化，在相同快照下保留手动编辑，动物库存或区域元数据变化时刷新草稿。
+Animal Reorg Prefill（动物重整自动补位）由 `shared/domain/animal-reorg.ts` 为行动请求和实时交互投影统一生成。`prefillAnimalZones()` 固定已有有效安置，在兼容剩余空间中搜索最多可补入的待安置动物，同数量结果使用稳定顺序。容量、混养、卡牌校验、互斥区域和必空组复用容纳搜索的约束；容纳查询仍允许全局重排。已有布局本身非法时交给玩家手动修正。补位不写入真实安置、不弃养、不触发安置或繁殖奖励；确认仍是严格原子结算边界。收获新生动物结算在当前 `harvest.phaseStarted` 繁殖阶段标记之后，按受影响玩家和收获来源定位繁殖事件，再按事件 ID 替换。每名参与玩家在该收获流程中只有一个繁殖叶子；早先收获、其他玩家及卡牌私有繁殖均不受影响，JSON 恢复和撤销不依赖对象引用共享。明确的手动流程可通过 `actionContext.prefill=false` 关闭补位，并以 `InteractionRequest.prefill=false` 保留该意图；被动流程默认补位。前端用服务端草稿初始化，在相同快照下保留手动编辑，动物库存或区域元数据变化时刷新草稿。
 
 每个真实 `roomTiles` 位置对应容量 1 的房间动物容纳区（`house:<positionKey>`）。`PlayerState.houseAnimals` 是唯一可写的逐房安置；`roomAnimalZones` 仅为序列化展示投影，加载时剥离。共享 `occupancyGroup` 与 `occupiedZoneLimit` 约束房间或卡牌多个区域的占用数。普通房间组最多占用一间；A086 修改组限制，不改变各房间容量。容纳搜索、固定布局预填、最终提交与前端草稿检查复用纯 `shared/contract/animal-zone-occupancy.ts` 分组查询。建房增加容纳区，翻修保留坐标身份。支付与住房查询从房间映射派生动物；带房养标记的卡牌边界区仍独立。详见 ADR 0026。
 
