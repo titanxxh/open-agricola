@@ -1,3 +1,7 @@
+import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
+
+installOfficialCardRegistry()
+
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { D092_ChildOmbudsman_impl } from '../../shared/cards/D/D092_ChildOmbudsman'

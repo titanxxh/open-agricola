@@ -29,7 +29,7 @@ import {
 } from '../cards/catalog'
 import { initDraftState, initStagedDraftState } from '../draft/draft-manager'
 import type { DraftPool, DraftStageSpec } from '../draft/types'
-import type { ActionSpace, Field, GameState, OrdinaryCardDecks, PlayerState } from '../contract/types'
+import type { ActionDefinition, ActionSpace, Field, GameState, OrdinaryCardDecks, PlayerState } from '../contract/types'
 import { createPlayerActionSpaces } from '../cards/player-action-space'
 import { normalizeFarmyardSpaceStates } from '../domain/farmyard-space-states'
 import { normalizeBlockedBy, normalizeTakenBy } from '../domain/space'
@@ -271,7 +271,9 @@ const normalizeOrdinaryCardDecks = (
   return createFallbackOrdinaryCardDecks(players, seed, raw.draft ?? null, raw.enableCommunityDeck ?? false)
 }
 
-export const normalizeState = (raw: GameState): GameState => {
+type ActionDefinitionLookup = (id: string) => ActionDefinition | undefined
+
+export const normalizeState = (raw: GameState, getActionDefinition?: ActionDefinitionLookup): GameState => {
   const seed = resolveSeed(raw.gameSeed)
   const enableFarmersOfTheMoor = raw.enableFarmersOfTheMoor === true
   const farmersOfTheMoor = enableFarmersOfTheMoor
@@ -346,11 +348,16 @@ export const normalizeState = (raw: GameState): GameState => {
   for (const stored of raw.actionSpaces ?? []) {
     if (knownIds.has(stored.id)) continue
     if (allBaseActionIds.has(stored.id) || seasonActionIds.includes(stored.id)) continue
-    // Unknown serialized spaces have no rule definition to reconstruct. Live
-    // caller-added spaces retain their definitions and can still be registered.
-    if (typeof stored.canBeExecutedByPlayer !== 'function' || typeof stored.execute !== 'function') continue
+    // Same-Core history can recover caller-added definitions from its existing
+    // ActionRegistry. A new Core cannot execute unknown serialized space data.
+    const definition = typeof stored.canBeExecutedByPlayer === 'function' && typeof stored.execute === 'function'
+      ? stored : getActionDefinition?.(stored.id)
+    if (!definition) continue
     actionSpaces.push({
+      ...definition,
       ...stored,
+      canBeExecutedByPlayer: definition.canBeExecutedByPlayer,
+      execute: definition.execute,
       takenBy: normalizeTakenBy(stored.takenBy),
       blockedBy: normalizeBlockedBy(stored.blockedBy),
     } as ActionSpace)
@@ -616,7 +623,8 @@ export const normalizeState = (raw: GameState): GameState => {
 }
 
 /** Undo snapshots copy core fields and share immutable history versions. */
-export const cloneStateWithHistory = (state: GameState): GameState => normalizeState(captureStateWithHistory(state))
+export const cloneStateWithHistory = (state: GameState, getActionDefinition?: ActionDefinitionLookup): GameState =>
+  normalizeState(captureStateWithHistory(state), getActionDefinition)
 
 export const cloneState = (state: GameState): GameState => {
   let raw: GameState

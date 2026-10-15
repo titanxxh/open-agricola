@@ -2,9 +2,8 @@ import { compileTimedRuleHooks } from '../actions/timed-rules'
 /**
  * CardRegistry — per-session, injectable card registration container.
  *
- * Replaces the current module-level global registries in `card-listeners.ts` /
- * `card-effects.ts` / `card-modifiers.ts`. PR-1 creates the class; PR-2 wires
- * GameCore to use it; PR-3 deletes the legacy global layer.
+ * Holds the rules read by card listeners, effects, modifiers, prerequisite
+ * checks and dynamic costs inside the Core's temporary rule environment.
  *
  * Design:
  * - Each session (multiplayer room or local sandbox) owns one registry

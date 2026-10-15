@@ -1,3 +1,7 @@
+import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
+
+installOfficialCardRegistry()
+
 import { createWorkSession } from './_helpers/session-fixtures'
 import { collectScheduledEffectPreviews } from '../../shared/actions/scheduled-effect-preview'
 import { chooseSupplyWorkerTurn, takeNormalWorkerTurn } from './_helpers/supply-worker-turn'

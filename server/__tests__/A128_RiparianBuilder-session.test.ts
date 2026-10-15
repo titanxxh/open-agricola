@@ -11,7 +11,8 @@ import { setWorkersAtHome } from '../../shared/domain/player'
 import { readCardResourceStats } from '../../shared/cards/helpers/card-state'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 import '../../shared/cards/A/A128_RiparianBuilder'
-import '../../shared/cards/__stubs__/Stub_Construct_TrueAction'
+import { listener as trueActionListener } from '../../shared/cards/__stubs__/Stub_Construct_TrueAction'
+import { requireActiveCardRegistry } from '../../shared/cards/active-registry'
 
 const CARD_ID = 'A128_RiparianBuilder'
 
@@ -228,6 +229,7 @@ describe('A128_RiparianBuilder session', () => {
     const session = setup()
     const state = session.getState().state
     state.players[0]!.occupationPlayed.push('Stub_Construct_TrueAction')
+    session.withCtx(() => requireActiveCardRegistry('A128 trueAction test').registerListener(trueActionListener))
     session.loadState(state)
 
     let resp = session.takeAction(1, 'reed-bank')

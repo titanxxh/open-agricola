@@ -1,5 +1,4 @@
 import type { CardListenerRegistration } from '../card-listeners'
-import { requireActiveCardRegistry } from '../active-registry'
 import { incCounter } from './helpers'
 
 const CARD_ID = 'Stub_Construct_TrueAction'
@@ -14,5 +13,3 @@ export const listener: CardListenerRegistration = {
     incCounter(context.player, CARD_ID, 'observedCount')
   },
 }
-
-requireActiveCardRegistry('Stub_Construct_TrueAction').registerListener(listener)

@@ -11,11 +11,14 @@ import { getCurrentSessionContext, type CustomCardData } from '../../shared/card
 import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/serialization'
 import { GameSession } from '../game/authoritative-session'
 import { validateAndCompileCustomCode } from '../custom-code/engine'
+import { createIsolatedGameSession } from '../game/custom-session-executor'
+import { handleLocalSandboxRequest, LocalSandboxCore } from '../../client/local-sandbox/worker-core'
+import { LOCAL_SANDBOX_SCHEMA_VERSION } from '../../client/local-sandbox/protocol'
 import { createWorkSession } from './_helpers/session-fixtures'
 
 const CARD_ID = 'CUSTOM_SessionRuleEnvironment'
 const customCard = (discount: number, reward: number): CustomCardData => {
-  const compiled = validateAndCompileCustomCode(`
+  const source = `
 const CARD_ID = '${CARD_ID}'
 const CARD_DEF = MinorImprovement({ id: CARD_ID, name: 'Session Rule Environment' })
 const CARD_IMPL = { listeners: [{ cardIds: [CARD_ID], actions: ['collect'], phases: ['after'],
@@ -23,7 +26,8 @@ const CARD_IMPL = { listeners: [{ cardIds: [CARD_ID], actions: ['collect'], phas
     { type: 'leaf', actionId: 'occupation', sourceCard: CARD_ID, params: { exactCost: { food: 3 } } },
     gainLeaf(CARD_ID, { grain: ${reward} }),
   ] } }) }] }
-`, CARD_ID)
+`
+  const compiled = validateAndCompileCustomCode(source, CARD_ID)
   if (!compiled.valid) throw new Error(compiled.errors.join('\n'))
   return {
     cardType: 'minor',
@@ -31,6 +35,7 @@ const CARD_IMPL = { listeners: [{ cardIds: [CARD_ID], actions: ['collect'], phas
       modifier: { type: 'bonus', cardId: CARD_ID, appliesTo: ['occupation'], discount: { food: discount } } },
     compiledCode: compiled.compiledCode,
     codeManifest: compiled.manifest,
+    effectCode: source,
   }
 }
 
@@ -80,13 +85,16 @@ describe('Session card rule environment', () => {
     ]
     for (const lookup of lookups) expect(lookup).toThrow('no active CardRegistry')
 
-    withActiveRegistry(new CardRegistry(), () => {
+    const registry = new CardRegistry()
+    registry.loadImpl(card.id, { prerequisiteCheck: () => true })
+    withActiveRegistry(registry, () => {
       expect(getCardEffect(card.id)).toBeNull()
       expect(getRegisteredCardListeners()).toEqual([])
       expect(getListenerById('missing-listener')).toBeUndefined()
       expect(getCardModifiers(card.id)).toEqual([])
       expect(meetsCardPrerequisites(player, card, state.round, state)).toBe(true)
       expect(getMinorImprovementEffectiveCost(state, player, card)).toEqual({ wood: 2 })
+      expect(getPrintedImprovementCostCandidates(state, player, 'Major_Fireplace1')).toEqual([{ clay: 2 }])
     })
     expect(getCardDefinition('B038_FutureBuildingSite')?.name).toBeDefined()
     expect(getActiveCardRegistry()).toBeNull()
@@ -203,6 +211,97 @@ describe('Session card rule environment', () => {
     } finally {
       first.dispose()
       second.dispose()
+    }
+  })
+
+  it('rebuilds a server worker from retained rules and completes its pending payment', async () => {
+    const card = customCard(1, 2)
+    const original = configuredSession(card)
+    expect(original.takeAction(0, 'forest').ok).toBe(true)
+    const snapshot = JSON.parse(JSON.stringify(serializeSessionSnapshot(original.state, original)))
+    original.dispose()
+    const worker = createIsolatedGameSession(rehydrateState(snapshot), [card])
+    if (!worker.executor) throw new Error('Expected an executable Session worker')
+    try {
+      const completed = await worker.executor.execute('resolveChoice', [0, 'A102_Grocer'])
+      expect(completed.ok, completed.error).toBe(true)
+      expect(completed.state.players[0]!.resources).toMatchObject({ food: 8, grain: 2, wood: 3 })
+      expect(completed.state.events.filter(event => event.type === 'resource.moved' && event.resources.grain === 2))
+        .toHaveLength(1)
+      const duplicate = await worker.executor.execute('resolveChoice', [0, 'A102_Grocer'])
+      expect(duplicate.ok).toBe(false)
+      expect(duplicate.state.players[0]!.resources).toMatchObject({ food: 8, grain: 2, wood: 3 })
+      expect(getActiveCardRegistry()).toBeNull()
+    } finally {
+      worker.executor.dispose()
+      worker.session.dispose()
+    }
+  })
+
+  it('restores the browser sandbox protocol without borrowing server card rules', () => {
+    const card = customCard(1, 2)
+    const original = configuredSession(card)
+    expect(original.takeAction(0, 'forest').ok).toBe(true)
+    const serializedState = JSON.parse(JSON.stringify(serializeSessionSnapshot(original.state, original)))
+    original.dispose()
+    const browser = new LocalSandboxCore()
+    const viewer = { viewerPlayerId: null, mode: 'debug' } satisfies import('../../client/local-sandbox/protocol').ViewerSpec
+    const restored = handleLocalSandboxRequest(browser, {
+      kind: 'restore', id: 1, viewer,
+      persisted: { schemaVersion: LOCAL_SANDBOX_SCHEMA_VERSION, serializedState,
+        config: { playerCount: 2, seed: 42, cards: [{ cardType: card.cardType, cardJson: card.cardJson, source: card.effectCode ?? null }] } },
+    })
+    if (restored.kind !== 'result' || !restored.ok || !('payload' in restored)) {
+      throw new Error(`Browser restore failed: ${JSON.stringify(restored)}`)
+    }
+    expect(restored.payload.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'choice' } })
+    const completed = handleLocalSandboxRequest(browser, {
+      kind: 'call', id: 2, viewer, method: 'resolveChoice', args: [0, 'A102_Grocer'],
+    })
+    if (completed.kind !== 'result' || !completed.ok || !('payload' in completed)) {
+      throw new Error(`Browser settlement failed: ${JSON.stringify(completed)}`)
+    }
+    expect(completed.payload.ok, completed.payload.error).toBe(true)
+    expect(completed.payload.state.players[0]!.resources).toMatchObject({ food: 8, grain: 2, wood: 3 })
+    expect(completed.payload.cardWarnings ?? []).toEqual([])
+    expect(getCurrentSessionContext()).toBeNull()
+    expect(getActiveCardRegistry()).toBeNull()
+  })
+
+  it('reconstructs known rule spaces while preserving live caller definitions and saved occupancy', () => {
+    const original = createWorkSession({ options: { enableThroughTheSeasons: true }, configure: state => {
+      state.players[0]!.minorPlayed = ['B042_ForestInn']
+      const forest = state.actionSpaces.find(space => space.id === 'forest')!
+      forest.resources = { wood: 7 }
+      forest.takenBy = [{ playerId: 'p2', workerId: '1' }]
+      state.actionSpaces.push({ ...forest, id: '__test_live_space', takenBy: [] })
+    } })
+    try {
+      const cardSpace = original.state.actionSpaces.find(space => space.id === 'B042_ForestInn')!
+      cardSpace.resources = { food: 4 }
+      cardSpace.takenBy = [{ playerId: 'p1', workerId: '1' }]
+      const initialIds = original.state.actionSpaces.map(space => space.id).filter(id => id !== '__test_live_space')
+      expect(original.getAvailableActions(0).map(action => action.spaceId)).toContain('__test_live_space')
+      original.restoreStateSnapshot(original.state)
+      expect(original.getAvailableActions(0).map(action => action.spaceId)).toContain('__test_live_space')
+      expect(original.takeAction(0, '__test_live_space').ok).toBe(true)
+      expect(original.undoAction().ok).toBe(true)
+      expect(original.getAvailableActions(0).map(action => action.spaceId)).toContain('__test_live_space')
+
+      const restored = new GameSession(rehydrateState(JSON.parse(JSON.stringify(serializeSessionSnapshot(original.state, original)))))
+      try {
+        expect(restored.state.actionSpaces.map(space => space.id)).toEqual(initialIds)
+        expect(restored.state.actionSpaces.find(space => space.id === 'forest'))
+          .toMatchObject({ resources: { wood: 7 }, takenBy: [{ playerId: 'p2', workerId: '1' }] })
+        expect(restored.state.actionSpaces.find(space => space.id === 'B042_ForestInn'))
+          .toMatchObject({ resources: { food: 4 }, takenBy: [{ playerId: 'p1', workerId: '1' }] })
+        expect(restored.getAvailableActions(0).map(action => action.spaceId)).not.toContain('forest')
+        expect(getActiveCardRegistry()).toBeNull()
+      } finally {
+        restored.dispose()
+      }
+    } finally {
+      original.dispose()
     }
   })
 })
