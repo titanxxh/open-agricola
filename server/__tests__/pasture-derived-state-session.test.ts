@@ -105,7 +105,7 @@ const acceptStable = (session: GameSession, tiles = [TILE]) => {
 
 const expectPasture = (session: GameSession, response: SessionResponse, capacity: number, stableScore: number) => {
   const player = session.state.players[0]!
-  expect(computeAnimalZones(player, session.state).find(zone => zone.id === PASTURE_ID))
+  expect(session.withCtx(() => computeAnimalZones(player, session.state)).find(zone => zone.id === PASTURE_ID))
     .toMatchObject({ capacity, animalType: 'sheep', animalCount: 2 })
   expect(response.pastureCapacities?.[player.id]?.[PASTURE_ID]).toBe(capacity)
   expect(response.scores?.find(score => score.playerId === player.id)?.categories.find(category => category.key === 'stables')?.total)
@@ -190,7 +190,7 @@ describe('pasture facts stay derived across authoritative commands', () => {
       expect(response.ok, response.error).toBe(true)
       expectPasture(session, response, 4, 1)
       const before = JSON.stringify(session.state)
-      const snapshot = serializeState(session.state, {})
+      const snapshot = session.withCtx(() => serializeState(session.state, { actionHooks: session.actionHooks,}))
       expect(snapshot.players[0]!.pastures[0]).toMatchObject({ size: 1, stables: 1 })
       expect(JSON.stringify(session.state)).toBe(before)
       const restored = new GameSession(snapshot)
@@ -224,7 +224,7 @@ describe('pasture facts stay derived across authoritative commands', () => {
       const before = JSON.stringify(session.state)
       session.getState()
       session.getState()
-      serializeState(session.state, {})
+      session.withCtx(() => serializeState(session.state, { actionHooks: session.actionHooks,}))
       expect(JSON.stringify(session.state)).toBe(before)
     } finally { session.dispose() }
   })

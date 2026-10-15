@@ -226,7 +226,7 @@ const auditClaim = (session: GameSession, father: FatherParentCardId, tier: numb
 const auditStableTotal = (session: GameSession) => {
   const player = session.state.players[0]!
   const reserved = session.state.futureMeeples.filter((entry) => entry.playerId === player.id).reduce((sum, entry) => sum + (entry.resources.stable ?? 0), 0)
-  return getAvailableStableSupplyCount(session.state, player) + player.stableTiles.length + reserved + (player.supplyTokensConsumed?.stable ?? 0)
+  return session.withCtx(() => getAvailableStableSupplyCount(session.state, player)) + player.stableTiles.length + reserved + (player.supplyTokensConsumed?.stable ?? 0)
 }
 
 const auditPastures = (player: PlayerState, entries: Array<{ col: number; size?: number; animal: 'sheep' | 'boar' | 'cattle' | 'horse'; count: number }>) => {
@@ -308,7 +308,7 @@ describe('Cross expansions batch 4 parent reward sequencing audit', () => {
     let session = auditSetup({ mother: 'PR01', season: 'summer' })
     session.state.players[0]!.stableTiles = [{ row: 0, col: 0 }, { row: 0, col: 1 }]
     Object.assign(session.state.players[0]!.resources, { wood: 10, reed: 4 })
-    expect(getAvailableStableSupplyCount(session.state, session.state.players[0]!)).toBe(1)
+    expect(session.withCtx(() => getAvailableStableSupplyCount(session.state, session.state.players[0]!))).toBe(1)
     expect(auditStableTotal(session)).toBe(4)
     expect(session.takeAction(0, 'farm-expansion').ok).toBe(true)
     if (session.getState().interaction.request.kind === 'choice') auditChoose(session, 'actions.construct.name')
@@ -322,7 +322,7 @@ describe('Cross expansions batch 4 parent reward sequencing audit', () => {
     expect(session.commitSelectionChoice(0, { stables: [selectable[0]!] }).ok).toBe(true)
     auditSettle(session)
     expect(session.state.players[0]!.stableTiles).toHaveLength(3)
-    expect(getAvailableStableSupplyCount(session.state, session.state.players[0]!)).toBe(0)
+    expect(session.withCtx(() => getAvailableStableSupplyCount(session.state, session.state.players[0]!))).toBe(0)
     expect(auditStableTotal(session)).toBe(4)
     expect(session.state.futureMeeples.filter((entry) => entry.cardId === 'PR01')).toHaveLength(1)
     auditEnterRound(session, 2, 'autumn')

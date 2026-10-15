@@ -43,7 +43,7 @@ describe('E140 actual next-round collection window', () => {
     const session = setup()
     expect(session.state.players[0]!.cardStates[CARD_ID]?.extraData?.triggerRound).toBe(2)
     const before = JSON.stringify(session.state)
-    const view = collectScheduledEffectPreviews(session.state, session.state.players[0]!).find(entry => entry.sourceCard === CARD_ID)
+    const view = session.withCtx(() => collectScheduledEffectPreviews(session.state, session.state.players[0]!, session.actionHooks)).find(entry => entry.sourceCard === CARD_ID)
     expect(view).toMatchObject({ round: 2, timing: 'afterCollect', description: { effectPreview: { kind: 'ruleOperation', operation: { kind: 'gain-per-building-resource-collected', resource: 'food', perBuildingResource: 1 } } } })
     expect(JSON.stringify(session.state)).toBe(before)
   })
@@ -54,7 +54,7 @@ describe('E140 actual next-round collection window', () => {
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources).toMatchObject({ wood: 2, clay: 1, food: 3 })
     expect(response.state.events.some(event => event.type === 'resource.moved' && event.sourceCardId === CARD_ID && event.resources.food === 3)).toBe(true)
-    expect(collectScheduledEffectPreviews(session.state, session.state.players[0]!).filter(entry => entry.sourceCard === CARD_ID)).toHaveLength(1)
+    expect(session.withCtx(() => collectScheduledEffectPreviews(session.state, session.state.players[0]!, session.actionHooks)).filter(entry => entry.sourceCard === CARD_ID)).toHaveLength(1)
   })
   it.each([1, 3])('does not pay outside its activated round (%i)', round => {
     const session = setup()

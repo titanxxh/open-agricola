@@ -154,7 +154,7 @@ describe('D099 Earthenware Potter parity', () => {
     const session = setup({ played: false, round: purchaseRound, clay: 2 })
     const played = playEarthenwarePotter(session)
     expect(played.ok, played.error).toBe(true)
-    const preview = session.withCtx(() => collectScheduledEffectPreviews(session.state, session.state.players[0]!))
+    const preview = session.withCtx(() => collectScheduledEffectPreviews(session.state, session.state.players[0]!, session.actionHooks))
       .find(entry => entry.sourceCard === CARD_ID)
     expect(preview?.description).toEqual({
       kind: 'conditional', condition: { kind: 'purchased-by-round', round: 4, fact: 'purchaseRound' },

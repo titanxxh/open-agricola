@@ -33,7 +33,7 @@ describe('C155 authoritative timed reward', () => {
   it('describes the future occupancy formula without mutating state, then counts distinct round action spaces at return home', () => {
     const session = setup()
     const before = JSON.stringify(session.state)
-    expect(collectScheduledEffectPreviews(session.state, session.state.players[0]!).find(entry => entry.sourceCard === CARD_ID))
+    expect(session.withCtx(() => collectScheduledEffectPreviews(session.state, session.state.players[0]!, session.actionHooks)).find(entry => entry.sourceCard === CARD_ID))
       .toMatchObject({ round: 5, timing: 'onStartReturnHome', description: { effectPreview: { kind: 'formulaGain', resources: { food: { kind: 'occupied-round-spaces' } } } } })
     expect(JSON.stringify(session.state)).toBe(before)
     const response = session.performRoundEnd()
@@ -46,7 +46,7 @@ describe('C155 authoritative timed reward', () => {
   })
   it('does not pay in a later round or promise another payout after consumption', () => {
     const session = setup(4)
-    expect(collectScheduledEffectPreviews(session.state, session.state.players[0]!).filter(entry => entry.sourceCard === CARD_ID)).toEqual([])
+    expect(session.withCtx(() => collectScheduledEffectPreviews(session.state, session.state.players[0]!, session.actionHooks)).filter(entry => entry.sourceCard === CARD_ID)).toEqual([])
     const response = session.performRoundEnd()
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources.food).toBe(30)

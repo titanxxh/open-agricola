@@ -1,3 +1,5 @@
+import { withActiveRegistry } from '../../shared/cards/active-registry'
+import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
 /**
  * D025_WitchesDanceFloor — stats counting for multi-identity card.
  *
@@ -79,14 +81,7 @@ describe('D25 stats: multi-identity counting', () => {
     expect(player.stats.totalMinorBuilt).toBe(0)
     expect(player.stats.totalOccupationBuilt).toBe(0)
 
-    const result = playMinorImprovement(
-      state,
-      player,
-      'D025_WitchesDanceFloor',
-      undefined,
-      undefined,
-      'minorAction',
-    )
+    const result = withActiveRegistry(createOfficialCardRegistry(), () => playMinorImprovement(state, player, 'D025_WitchesDanceFloor', undefined, undefined, 'minorAction'))
 
     // Skip if unrelated infra prevents the play (degenerate setup).
     if (result.type !== 'ok' && result.type !== 'flow') {

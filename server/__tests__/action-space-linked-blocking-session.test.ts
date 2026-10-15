@@ -80,11 +80,7 @@ describe('5/6 linked action-space blocking', () => {
     state.currentPlayerIndex = 1
     session.loadState(state)
 
-    const allowed = computeAllowedPlacementSpaces(
-      session.getState().state,
-      session.getState().state.players[1]!,
-      { actionHooks: session.actionHooks },
-    )
+    const allowed = session.withCtx(() => computeAllowedPlacementSpaces(session.getState().state, session.getState().state.players[1]!, { actionHooks: session.actionHooks }))
     expect(allowed.map((entry) => entry.spaceId)).not.toContain('lessons-56-2f')
     expect(session.getActionAvailability(1)['lessons-56-2f']).toBe(false)
 
@@ -96,7 +92,7 @@ describe('5/6 linked action-space blocking', () => {
     const session = setup()
     session.takeAction(0, 'copse-56')
 
-    const serialized = serializeState(session.getState().state, { engineStack: session.getEngineStack() })
+    const serialized = session.withCtx(() => serializeState(session.getState().state, { actionHooks: session.actionHooks, engineStack: session.getEngineStack() }))
     const restored = rehydrateState(JSON.parse(JSON.stringify(serialized))).state
 
     expect(restored.actionSpaces.find((candidate) => candidate.id === 'lessons-56-2f')?.blockedBy).toEqual([
@@ -108,7 +104,7 @@ describe('5/6 linked action-space blocking', () => {
     const session = setup()
     session.takeAction(0, 'copse-56')
 
-    ;(session as unknown as { continueReturnHomeHooks: () => void }).continueReturnHomeHooks()
+    ;session.withCtx(() => (session as unknown as { continueReturnHomeHooks: () => void }).continueReturnHomeHooks())
 
     expect(space(session, 'copse-56').takenBy).toEqual([])
     expect(space(session, 'lessons-56-2f').blockedBy).toEqual([])

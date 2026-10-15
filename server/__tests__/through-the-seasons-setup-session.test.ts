@@ -205,13 +205,14 @@ describe('Through the Seasons setup', () => {
       enableThroughTheSeasons: true,
     } as never)
     setSeason(session, 'summer')
-    const serialized = serializeState(session.getState().state, {
+    const serialized = session.withCtx(() => serializeState(session.getState().state, { actionHooks: session.actionHooks,
       engineStack: session.getEngineStack(),
-    })
-    const restored = rehydrateState(JSON.parse(JSON.stringify(serialized))).state
-
-    expect(restored.actionSpaces.filter((space) => Object.values(seasonActionIds).includes(space.id))).toHaveLength(4)
-    expect(restored.actionSpaces.find((space) => space.id === seasonActionIds.summer)?.canBeExecutedByPlayer(restored, restored.players[0]!, { actionHooks: session.actionHooks })).toBe(true)
+    }))
+    const reloaded = new GameSession(rehydrateState(JSON.parse(JSON.stringify(serialized))))
+    try {
+      expect(reloaded.state.actionSpaces.filter((space) => Object.values(seasonActionIds).includes(space.id))).toHaveLength(4)
+      expect(reloaded.getAvailableActions(0).map(space => space.spaceId)).toContain(seasonActionIds.summer)
+    } finally { reloaded.dispose() }
   })
 
   it('applies the starting season preparation adjustment during setup', () => {

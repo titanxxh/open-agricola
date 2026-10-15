@@ -358,7 +358,7 @@ export function autoAdvanceRoundEnd(
   // so a completed harvest never starts another round. Otherwise resume a
   // pending interaction or start round-end, rejecting unsuccessful commands.
   let resp: SessionResponse = opts.initialResponse ?? (session.peekEnginePendingEnvelope()
-    ? session.emitResponse()
+    ? session.withCtx(() => session.emitResponse())
     : session.performRoundEnd())
   while (iter++ < max) {
     if (!resp.ok) throw new Error(`Round-end command failed: ${resp.error ?? "unknown error"}`)

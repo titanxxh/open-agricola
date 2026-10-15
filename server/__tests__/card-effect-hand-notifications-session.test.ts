@@ -133,7 +133,7 @@ describe('card effect hand notification response plumbing', () => {
     const playerId = session.getState().state.players[0]!.id
     const event = handChangedEvent(playerId, ['A001_TestCard'])
 
-    const resp = session.emitResponse(true, undefined, [event])
+    const resp = session.withCtx(() => session.emitResponse(true, undefined, [event]))
 
     expect(resp.privateEvents).toEqual([event])
     expect(resp.state.events).not.toEqual(expect.arrayContaining([event]))
@@ -146,8 +146,8 @@ describe('card effect hand notification response plumbing', () => {
 
     responseEmitter(session).emitResponsePrivateEvent(event)
 
-    const first = session.emitResponse()
-    const second = session.emitResponse()
+    const first = session.withCtx(() => session.emitResponse())
+    const second = session.withCtx(() => session.emitResponse())
 
     expect(first.privateEvents).toEqual([event])
     expect(second.privateEvents).toBeUndefined()
@@ -161,8 +161,8 @@ describe('card effect hand notification response plumbing', () => {
 
     responseEmitter(session).emitResponsePrivateEvent(event)
 
-    const failed = session.emitResponse(false, 'private event source failed')
-    const next = session.emitResponse()
+    const failed = session.withCtx(() => session.emitResponse(false, 'private event source failed'))
+    const next = session.withCtx(() => session.emitResponse())
 
     expect(failed.privateEvents).toBeUndefined()
     expect(next.privateEvents).toBeUndefined()
@@ -187,7 +187,7 @@ describe('card effect hand notification events', () => {
       } as ActionExecutionContext,
       `occ:${TEST_OCCUPATION_ID}`,
     )
-    const resp = session.emitResponse(result.type !== 'fail')
+    const resp = session.withCtx(() => session.emitResponse(result.type !== 'fail'))
 
     expect(result.type).toBe('ok')
     expect(resp.state.players[0]!.occupationHand).not.toContain(TEST_OCCUPATION_ID)
@@ -218,7 +218,7 @@ describe('card effect hand notification events', () => {
       } as ActionExecutionContext,
       `min:${A006_MINOR_ID}`,
     )
-    const resp = session.emitResponse(result.type !== 'fail')
+    const resp = session.withCtx(() => session.emitResponse(result.type !== 'fail'))
 
     expect(result.type).toBe('ok')
     expect(resp.state.players[0]!.minorHand).not.toContain(A006_MINOR_ID)

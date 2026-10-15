@@ -140,7 +140,7 @@ describe('Snake Opening variant', () => {
     placeAndConfirm(session, 1, 'clay-pit')
     expect(session.state.snakeOpening).toEqual({ reversed: true })
 
-    const serialized = serializeState(session.getState().state, { engineStack: new EngineStack() })
+    const serialized = session.withCtx(() => serializeState(session.getState().state, { actionHooks: session.actionHooks, engineStack: new EngineStack() }))
     expect(serialized.enableSnakeOpening).toBe(true)
     expect(serialized.snakeOpening).toEqual({ reversed: true })
     const restored = rehydrateState(JSON.parse(JSON.stringify(serialized))).state

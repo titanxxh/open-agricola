@@ -126,15 +126,12 @@ describe('after-stables built count — B85 counts as a built stable (#185)', ()
       occupationPlayed: ['B085_FarmHand', 'D166_StableMilker'],
     } as Partial<PlayerState>)
     enterStableSelect(session)
-    const capacityBefore = getTotalAnimalCapacity(
-      session.getState().state.players[0]!,
-      session.getState().state,
-    )
+    const capacityBefore = session.withCtx(() => getTotalAnimalCapacity(session.getState().state.players[0]!, session.getState().state))
     const commit = session.commitSelectionChoice(0, { farmHand: FARM_HAND_TILE })
     expect(commit.ok).toBe(true)
 
     const after = commit.state.players[0]!
     // B85 solo build adds no animal capacity (still the same as before).
-    expect(getTotalAnimalCapacity(after, commit.state)).toBe(capacityBefore)
+    expect(session.withCtx(() => getTotalAnimalCapacity(after, commit.state))).toBe(capacityBefore)
   })
 })

@@ -88,13 +88,13 @@ describe('duplicate building coordinates', () => {
 
     expect(rejected.ok).toBe(false)
     expect(snapshot(rejected)).toEqual(before)
-    expect(getAvailableStableSupplyCount(rejected.state, rejected.state.players[0]!)).toBe(4)
+    expect(session.withCtx(() => getAvailableStableSupplyCount(rejected.state, rejected.state.players[0]!))).toBe(4)
     const retried = session.commitSelectionChoice(0, { stables: [A] })
     expect(retried.ok, retried.error).toBe(true)
     expect(retried.state.players[0]!.resources).toMatchObject({ wood: 9, food: 9 })
     expect(retried.state.players[0]!.stableTiles).toEqual([A])
     expect(retried.state.players[0]!.cardStates[CLEANER]?.flagged).toBe(false)
-    expect(getAvailableStableSupplyCount(retried.state, retried.state.players[0]!)).toBe(3)
+    expect(session.withCtx(() => getAvailableStableSupplyCount(retried.state, retried.state.players[0]!))).toBe(3)
   })
 
   it.each(duplicateLayouts)('rejects $name Hammer room targets without changing the pending action, then charges the two-room discount once', ({ positions }) => {
@@ -137,7 +137,7 @@ describe('duplicate building coordinates', () => {
       } else {
         expect(retried.state.players[0]!.resources).toMatchObject({ wood: 18, food: 20 })
         expect(retried.state.players[0]!.stableTiles).toEqual([A])
-        expect(getAvailableStableSupplyCount(retried.state, retried.state.players[0]!)).toBe(3)
+        expect(session.withCtx(() => getAvailableStableSupplyCount(retried.state, retried.state.players[0]!))).toBe(3)
       }
     })
   }
@@ -151,7 +151,7 @@ describe('duplicate building coordinates', () => {
     expect(response.state.players[0]!.stableTiles).toEqual([A, B])
     expect(response.state.players[0]!.resources).toMatchObject({ wood: 8, food: 8 })
     expect(response.state.players[0]!.cardStates[CLEANER]?.flagged).toBe(false)
-    expect(getAvailableStableSupplyCount(response.state, response.state.players[0]!)).toBe(2)
+    expect(session.withCtx(() => getAvailableStableSupplyCount(response.state, response.state.players[0]!))).toBe(2)
     expect(response.state.events.filter((event) => event.type === 'farm.stableBuilt')).toHaveLength(1)
     expect(response.state.events.find((event) => event.type === 'farm.stableBuilt')).toMatchObject({
       stables: [A, B],

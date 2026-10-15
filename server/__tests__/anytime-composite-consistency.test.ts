@@ -49,9 +49,9 @@ describe('anytime — composite pending policy/UI consistency', () => {
     expect((interaction.request.options ?? []).length).toBeGreaterThan(0)
 
     // Server-side view from listAnytimeEntries (used by takeAnytimeAction policy check)
-    const serverEntries = (session as unknown as {
+    const serverEntries = session.withCtx(() => (session as unknown as {
       listAnytimeEntries: () => Array<{ descriptor: { id: string } }>
-    }).listAnytimeEntries()
+    }).listAnytimeEntries())
     const serverIds = serverEntries.map((e) => e.descriptor.id).sort()
     const uiIds = interaction.anytimeActions.map((a) => a.id).sort()
 
@@ -59,9 +59,9 @@ describe('anytime — composite pending policy/UI consistency', () => {
     expect(serverIds).toEqual(uiIds)
 
     // Policy snapshot inspection (via @internal accessor)
-    const policySnap = (session as unknown as {
+    const policySnap = session.withCtx(() => (session as unknown as {
       computeAnytimePolicySnapshot: () => { allowed: boolean; blockedIds?: ReadonlyArray<string>; reason?: string }
-    }).computeAnytimePolicySnapshot()
+    }).computeAnytimePolicySnapshot())
     expect(policySnap.allowed).toBe(true)
     // C115's xor doesn't trigger exchange/bake-bread/reorg blocks, so blockedIds is []
     expect(policySnap.blockedIds).toEqual([])

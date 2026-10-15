@@ -32,15 +32,15 @@ describe('complete activated schedule collection through fresh two-player sessio
       const worker = reserveSupplyWorker(owner, M053)!
       owner.cardStates[M053] = { extraData: { temporaryWorkerId: worker.id, boundForest: { row: 0, col: 0 } } }
     } }))
-    expect(collectScheduledEffectPreviews(session.state, session.state.players[0]!)).toEqual([])
+    expect(session.withCtx(() => collectScheduledEffectPreviews(session.state, session.state.players[0]!, session.actionHooks))).toEqual([])
     const special = session.state.farmersOfTheMoor!.specialActionCards.find(card => card.actions.includes('fell-trees'))!
     const removed = session.takeSpecialAction(0, special.id, 'fell-trees', { tile: { row: 0, col: 0 } })
     expect(removed.ok, removed.error).toBe(true)
     const before = JSON.stringify(session.state)
-    const planned = collectScheduledEffectPreviews(session.state, session.state.players[0]!)
+    const planned = session.withCtx(() => collectScheduledEffectPreviews(session.state, session.state.players[0]!, session.actionHooks))
     expect(planned.map(entry => entry.timing).sort()).toEqual(['afterBeforeReturnHomeHooks', 'contributeExtraTurn'])
     expect(JSON.stringify(planned)).not.toMatch(/temporaryWorkerId|boundForest|set-flag/)
-    expect(JSON.stringify(collectScheduledEffectPreviews(session.state, session.state.players[0]!))).toBe(JSON.stringify(planned))
+    expect(JSON.stringify(session.withCtx(() => collectScheduledEffectPreviews(session.state, session.state.players[0]!, session.actionHooks)))).toBe(JSON.stringify(planned))
     expect(JSON.stringify(session.state)).toBe(before)
     expect(confirmNextPlayer(session).ok).toBe(true)
     expect(session.takeAction(1, 'day-laborer').ok).toBe(true)
@@ -50,7 +50,7 @@ describe('complete activated schedule collection through fresh two-player sessio
     expect(placed.ok, placed.error).toBe(true)
     expect(familySize(placed.state.players[0]!)).toBe(2)
     expect(placed.state.players[0]!.workers.find(worker => worker.supplyUse?.sourceCard === M053)?.supplyUse).toMatchObject({ status: 'temporary', returnRound: 5 })
-    expect(collectScheduledEffectPreviews(session.state, session.state.players[0]!).map(entry => entry.timing)).toEqual(['afterBeforeReturnHomeHooks'])
+    expect(session.withCtx(() => collectScheduledEffectPreviews(session.state, session.state.players[0]!, session.actionHooks)).map(entry => entry.timing)).toEqual(['afterBeforeReturnHomeHooks'])
     const ending = session.getState().state
     ending.players.forEach(player => markAllWorkersUsed(ending, player))
     session.loadState(ending)
@@ -58,7 +58,7 @@ describe('complete activated schedule collection through fresh two-player sessio
     expect(returned.ok, returned.error).toBe(true)
     expect(returned.state.round).toBe(6)
     expect(returned.state.players[0]!.workers.some(worker => worker.supplyUse?.sourceCard === M053)).toBe(false)
-    expect(collectScheduledEffectPreviews(session.state, session.state.players[0]!)).toEqual([])
+    expect(session.withCtx(() => collectScheduledEffectPreviews(session.state, session.state.players[0]!, session.actionHooks))).toEqual([])
     expect(returned.state.events.some(event => event.type === 'worker.returned' && event.to === 'supply')).toBe(true)
   })
   it('retains original-owner stored obligations, exposes a bounded window formula, and keeps hidden hand identities out of action plans', () => {
@@ -76,12 +76,12 @@ describe('complete activated schedule collection through fresh two-player sessio
     } }))
     const before = JSON.stringify(session.state)
     const owner = session.state.players[0]!
-    const plans = collectScheduledEffectPreviews(session.state, owner)
+    const plans = session.withCtx(() => collectScheduledEffectPreviews(session.state, owner, session.actionHooks))
     expect(plans.map(plan => [plan.sourceCard, plan.round, plan.timing])).toEqual([
       ['A081_InterimStorage', 7, 'onRoundStart'], ['E140_Carter', 7, 'afterCollect'], ['E028_Bookmark', 9, 'onRoundStart'],
     ])
     expect(plans[1]?.description).toMatchObject({ effectPreview: { kind: 'ruleOperation', operation: { kind: 'gain-per-building-resource-collected', resource: 'food', perBuildingResource: 1 } } })
-    const spectator = serializeStateForPlayer(session.state, {}, null)
+    const spectator = session.withCtx(() => serializeStateForPlayer(session.state, null, { actionHooks: session.actionHooks }))
     expect(spectator.players[0]!.scheduledEffects).toEqual(plans)
     expect(JSON.stringify(spectator.players[0]!.scheduledEffects)).not.toContain('__private_occupation__')
     expect(JSON.stringify(session.state)).toBe(before)
@@ -89,7 +89,7 @@ describe('complete activated schedule collection through fresh two-player sessio
     expect(matured.ok, matured.error).toBe(true)
     expect(matured.state.players[0]!.resources.wood).toBe(2)
     expect(matured.state.players[1]!.resources.wood).toBe(0)
-    expect(collectScheduledEffectPreviews(session.state, session.state.players[0]!).some(plan => plan.sourceCard === 'A081_InterimStorage')).toBe(false)
+    expect(session.withCtx(() => collectScheduledEffectPreviews(session.state, session.state.players[0]!, session.actionHooks)).some(plan => plan.sourceCard === 'A081_InterimStorage')).toBe(false)
   })
   it('projects temporary room expiry without its private state key and executes the same expiry', () => {
     const session = tracked(createWorkSession({ seed: 8127, configure: state => {
@@ -100,7 +100,7 @@ describe('complete activated schedule collection through fresh two-player sessio
       setActiveWorkerCount(owner, 3)
       state.players.forEach(player => { player.resources.food = 30; markAllWorkersUsed(state, player) })
     } }))
-    const plan = collectScheduledEffectPreviews(session.state, session.state.players[0]!)[0]
+    const plan = session.withCtx(() => collectScheduledEffectPreviews(session.state, session.state.players[0]!, session.actionHooks))[0]
     expect(plan?.description).toEqual({ kind: 'conditional', condition: { kind: 'extra-room-active', fact: 'hasRoom' }, body: {
       kind: 'action', showLabel: false, labelKey: 'actions.special-effect.name', effectPreview: {
         kind: 'ruleOperation', operation: { kind: 'expire-extra-room', removeUnhousedWorker: true },
@@ -110,7 +110,7 @@ describe('complete activated schedule collection through fresh two-player sessio
     expect(ending.ok, ending.error).toBe(true)
     expect(familySize(ending.state.players[0]!)).toBe(2)
     expect(ending.state.players[0]!.cardStates.A127_Lodger?.extraData?.hasRoom).toBe(false)
-    expect(collectScheduledEffectPreviews(session.state, session.state.players[0]!)).toEqual([])
+    expect(session.withCtx(() => collectScheduledEffectPreviews(session.state, session.state.players[0]!, session.actionHooks))).toEqual([])
   })
   it('uses the exclusive action-space expiry actual onRoundStart stage', () => {
     const session = tracked(createWorkSession({ seed: 8023, configure: state => {
@@ -121,11 +121,11 @@ describe('complete activated schedule collection through fresh two-player sessio
       const space = state.actionSpaces[0]!
       space.exclusiveUse = { playerId: owner.id, sourceCardId: 'B023_FinalScenario', untilRound: 14 }
     } }))
-    expect(collectScheduledEffectPreviews(session.state, session.state.players[0]!)[0]).toMatchObject({ round: 14, timing: 'onRoundStart' })
+    expect(session.withCtx(() => collectScheduledEffectPreviews(session.state, session.state.players[0]!, session.actionHooks))[0]).toMatchObject({ round: 14, timing: 'onRoundStart' })
     const ending = session.performRoundEnd()
     expect(ending.ok, ending.error).toBe(true)
     expect(ending.state.round).toBe(14)
     expect(ending.state.actionSpaces[0]!.exclusiveUse).toBeUndefined()
-    expect(collectScheduledEffectPreviews(session.state, session.state.players[0]!)).toEqual([])
+    expect(session.withCtx(() => collectScheduledEffectPreviews(session.state, session.state.players[0]!, session.actionHooks))).toEqual([])
   })
 })

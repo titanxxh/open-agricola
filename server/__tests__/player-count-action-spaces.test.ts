@@ -285,7 +285,8 @@ describe('normalizeState preserves player-count filtering', () => {
       takenBy: [],
     })
 
-    const restored = normalizeState(serialized)
+    const restored = normalizeState(serialized, id => id === '__test-worker-sink__'
+      ? { ...original.actionSpaces[0]!, id: '__test-worker-sink__' } : undefined)
     expect(restored.actionSpaces.some((space) => space.id === '__test-worker-sink__')).toBe(true)
   })
 })
