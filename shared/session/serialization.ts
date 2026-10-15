@@ -22,6 +22,7 @@ import { ensureCardModifiers } from '../cards/card-modifiers'
 import { collectLockedFarmTileKeys, collectBuiltSpecialStables, type BuiltSpecialStable } from '../cards/card-effects'
 import { computeAnimalZones, type AnimalZone } from '../domain/animal-zones'
 import { getPastureSize, getPastureStableCount, type Pasture as PastureView } from '../domain/pasture'
+import type { ActionHookRegistry } from '../actions/hooks'
 
 import { canTakeVisibleMoorSpecialAction, isMoorSpecialActionCardUsableByPlayer } from '../moor/special-action-availability'
 import type { MoorSpecialActionId } from '../moor/types'
@@ -85,6 +86,7 @@ export type SerializedGameState = Omit<
 }
 
 export type SerializeStateContext = {
+  actionHooks?: ActionHookRegistry
   engineStack?: unknown
 }
 
@@ -100,6 +102,7 @@ export type PersistedSessionSnapshot = {
 }
 
 export type SessionCursorSource = {
+  readonly actionHooks: ActionHookRegistry
   withCtx<T>(fn: () => T): T
   createSessionPrivateCursor(): SessionPrivateCursor
 }
@@ -173,6 +176,7 @@ type SerializedPlayerDisplayFields = Omit<SerializedPlayerState, keyof PlayerSta
 const serializePlayerDisplayFields = (
   state: GameState,
   player: PlayerState,
+  actionHooks: ActionHookRegistry | undefined,
 ): SerializedPlayerDisplayFields => {
   const moorSpecialActionAvailability = Object.fromEntries((state.farmersOfTheMoor?.specialActionCards ?? []).map(card => [
     card.id, {
@@ -200,13 +204,13 @@ const serializePlayerDisplayFields = (
     farmCardAnimalZones: collectFarmCardAnimalZones(zones),
     borrowedPlayedCardAnimalZones: collectBorrowedPlayedCardAnimalZones(zones),
     pastureCapacities: collectPastureCapacities(zones),
-    scheduledEffects: collectScheduledEffectPreviews(state, player),
+    scheduledEffects: collectScheduledEffectPreviews(state, player, actionHooks),
   }
 }
 
 export const serializeState = (
   state: GameState,
-  _ctx: SerializeStateContext,
+  ctx: SerializeStateContext,
 ): SerializedGameState => {
   const { actionSpaces, players, ...rest } = state
   const describeBaseAction = createBaseActionDescriber(state)
@@ -215,7 +219,7 @@ export const serializeState = (
     roundStartSnapshot: null,
     players: players.map((player) => ({
       ...player,
-      ...serializePlayerDisplayFields(state, player),
+      ...serializePlayerDisplayFields(state, player, ctx.actionHooks),
     })),
     actionSpaces: actionSpaces.map(
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -239,7 +243,7 @@ export const serializeSessionSnapshot = (
   const captured = captureStateWithHistory(state)
   freezeSnapshotCore(captured)
   const displays = session.withCtx(() => JSON.parse(JSON.stringify(
-    state.players.map(player => serializePlayerDisplayFields(state, player)),
+    state.players.map(player => serializePlayerDisplayFields(state, player, session.actionHooks)),
   )) as SerializedPlayerDisplayFields[])
   const { actionSpaces, players, ...rest } = captured
   const baseDescriptions = session.withCtx(() => {

@@ -9,6 +9,7 @@ import { describeRuleBody } from './rule-description'
 import type { ChoiceDescriptionPreview, GameState, PlayerState, ScheduledEffectPreview } from '../contract/types'
 import { describeFutureSchedule } from './future-schedule'
 import { describeScheduledOffers, readScheduledOffers } from './effects/internal/scheduled-offers'
+import type { ActionHookRegistry } from './hooks'
 
 const canonical = (value: unknown): unknown => {
   if (Array.isArray(value)) return value.map(canonical)
@@ -20,7 +21,7 @@ const canonical = (value: unknown): unknown => {
 }
 
 /** Group presentation only; each authoritative entry still executes independently. */
-export const collectScheduledEffectPreviews = (state: GameState, player: PlayerState): ScheduledEffectPreview[] => {
+export const collectScheduledEffectPreviews = (state: GameState, player: PlayerState, actionHooks: ActionHookRegistry | undefined): ScheduledEffectPreview[] => {
   const groups = new Map<string, ScheduledEffectPreview>()
   const add = (round: number, sourceCard: string, description: ChoiceDescriptionPreview, timing?: ScheduledEffectPreview['timing']) => {
     const key = JSON.stringify(canonical({ round, sourceCard, description, timing }))
@@ -47,7 +48,7 @@ export const collectScheduledEffectPreviews = (state: GameState, player: PlayerS
     for (const occurrence of timedRuleOccurrences(state, player, cardId, rules)) {
       const space = state.actionSpaces[0]
       if (!space) continue
-      add(occurrence.round, cardId, describeRuleBody(occurrence.rule.body, { state, player, space, sourceCard: cardId }), occurrence.rule.at.phase)
+      add(occurrence.round, cardId, describeRuleBody(occurrence.rule.body, { actionHooks, state, player, space, sourceCard: cardId }), occurrence.rule.at.phase)
     }
   }
   const operation = (round: number, cardId: string, effectPreview: Extract<import('../contract/types').ChoiceEffectPreview, { kind: 'timedOperation' }>, timing?: ScheduledEffectPreview['timing']) =>
@@ -65,7 +66,7 @@ export const collectScheduledEffectPreviews = (state: GameState, player: PlayerS
       if (flow && space) {
         const registry = new ActionRegistry()
         for (const action of [...state.actionSpaces, ...createInternalActionDefinitions(actionId => registry.get(actionId))]) registry.register(action)
-        const description = Engine.describeFlow(flow, registry, { state, player, space, sourceCard: use.sourceCard })
+        const description = Engine.describeFlow(flow, registry, { actionHooks, state, player, space, sourceCard: use.sourceCard })
         if (description) add(state.round, use.sourceCard, description, 'contributeExtraTurn')
       }
     }
