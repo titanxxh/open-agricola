@@ -1,4 +1,4 @@
-import type { ActionDefinition, ActionExecutionContext, ActionMutationContext, ActionFlow, BonusModifier } from '../contract/types'
+import type { ActionDefinition, ActionExecutionContext, ActionMutationContext, ActionFlow } from '../contract/types'
 import type { RuleFixedOperation } from '../contract/rule-fixed-operations'
 import { getLogicalFields, mutateLogicalFields } from '../cards/helpers/card-field'
 import { readCardExtraData, writeCardExtraData } from '../cards/helpers/card-state'
@@ -11,7 +11,10 @@ import { parsePositionKey } from '../domain/farm'
 import { registerSelectionEffect } from './helpers/selection-effect-registry'
 import { evaluateRuleAmount } from './rule-queries'
 import { gainLeaf, payLeaf } from '../cards/helpers/pay-gain-node'
-import { canRenovate } from './effects/renovation'
+import { renovateHouseAction } from './effects/renovation'
+import { isActionDoableInFlowContext } from './flow'
+import { getActionDefinition } from './action-definition-lookup'
+import { sourcedMandatoryBonusChoices } from '../cards/helpers/renovation-cost'
 import { breedLeaf } from './effects/breed'
 import { canAccommodateAllAnimals } from '../domain/animal-zones'
 import { canStartFencing } from './effects/fencing'
@@ -34,16 +37,20 @@ registerSelectionEffect('rule-take-field-crop', ({ state, player, positions, sou
   }
 })
 
-export const ruleDiscountModifier = (cardId: string, operation: Extract<RuleFixedOperation, { kind: 'discounted-action' }>): BonusModifier => ({
-  type: 'bonus', cardId, appliesTo: ['renovation'], optional: false,
-  choices: operation.discounts.map(discount => ({ discount: { ...discount }, sources: [cardId] })),
+const discountedActionLeaf = (sourceCard: string, operation: Extract<RuleFixedOperation, { kind: 'discounted-action' }>): Extract<ActionFlow, { type: 'leaf' }> => ({
+  type: 'leaf', actionId: operation.actionId, sourceCard,
+  actionContext: { costBonuses: [sourcedMandatoryBonusChoices(sourceCard, operation.discounts.map(discount => ({ ...discount })))] },
 })
 
-export const canExecuteFixedRuleOperation = (operation: RuleFixedOperation, context: Pick<ActionExecutionContext, 'state' | 'player' | 'sourceCard'>): boolean => {
+export const canExecuteFixedRuleOperation = (operation: RuleFixedOperation, context: Pick<ActionExecutionContext, 'state' | 'player' | 'sourceCard'> & Partial<Pick<ActionExecutionContext, 'space'>>): boolean => {
   const { state, player, sourceCard } = context
   switch (operation.kind) {
     case 'collect-board-resources': return state.actionSpaces.some(space => operation.resources.some(resource => (space.resources[resource] ?? 0) > 0))
-    case 'discounted-action': return !!sourceCard && canRenovate({ ...player, activeModifiers: [...player.activeModifiers.filter(modifier => modifier.cardId !== sourceCard), ruleDiscountModifier(sourceCard, operation)] })
+    case 'discounted-action': {
+      if (!sourceCard || !context.space) return false
+      const leaf = discountedActionLeaf(sourceCard, operation)
+      return isActionDoableInFlowContext({ ...context, space: context.space, ...leaf, action: renovateHouseAction, resolveAction: getActionDefinition })
+    }
     case 'each-space-worker': return state.actionSpaces.some(space => space.id === operation.spaceId && space.takenBy.some(worker => worker.playerId === player.id && !isSyntheticLinkedOccupancy(worker)))
     default: return true
   }
@@ -106,12 +113,7 @@ export const executeFixedRuleOperation = (operation: RuleFixedOperation, context
     }
     case 'discounted-action': {
       if (player.houseType === 'stone') return { type: 'ok' }
-      const binding = context.params
-      return { type: 'flow', flow: { type: 'seq', optional: true, children: [
-        { type: 'leaf', actionId: 'rule-discount', sourceCard, params: { ...binding, install: true } },
-        { type: 'leaf', actionId: operation.actionId, sourceCard },
-        { type: 'leaf', actionId: 'rule-discount', sourceCard, params: { ...binding, install: false } },
-      ] } }
+      return { type: 'flow', flow: { ...discountedActionLeaf(sourceCard, operation), optional: true } }
     }
     case 'borrow-fences': {
       const donorCaps: Record<string, number> = {}

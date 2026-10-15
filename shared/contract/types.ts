@@ -519,7 +519,7 @@ export type FutureMeeple = {
   actionId: string | null
   resources: FutureMeepleResourceMap
   roomType?: FutureMeepleRoomType
-  actionContext?: Record<string, unknown>
+  actionContext?: ActionContext
 }
 
 export type ScheduledEffectPreview = {
@@ -551,7 +551,7 @@ export type FutureMeepleRequest =
       startRound: number
       count: number
       resources: FutureMeepleResourceMap
-      actionContext?: Record<string, unknown>
+      actionContext?: ActionContext
     }
   | {
       cardId: string
@@ -561,7 +561,7 @@ export type FutureMeepleRequest =
         round: number
         resources?: FutureMeepleResourceMap
         roomType?: FutureMeepleRoomType
-        actionContext?: Record<string, unknown>
+        actionContext?: ActionContext
       }[]
     }
 
@@ -700,7 +700,7 @@ export type CanBeExecutedByPlayerContext = {
    * listener-only exchange). Sprint 6b: forwarded so doable checks see the
    * same metadata the engine will pass to `execute()`.
    */
-  actionContext?: Record<string, unknown>
+  actionContext?: ActionContext
 }
 
 export type CanBeExecutedByPlayer = (
@@ -709,12 +709,19 @@ export type CanBeExecutedByPlayer = (
   context?: CanBeExecutedByPlayerContext,
 ) => boolean
 
+/** Serializable inputs owned by one action invocation. */
+export type ActionContext = Record<string, unknown> & {
+  /** Renovation bonuses supplied by this invocation, separate from computeCosts results. */
+  costBonuses?: Bonus[]
+}
+
 export type ActionAvailabilityContext = {
   state: GameState
   player: PlayerState
   space?: ActionSpace
   params?: Record<string, unknown>
   sourceCard?: string
+  actionContext?: ActionContext
 }
 
 export type ProtectedObservation = {
@@ -736,7 +743,7 @@ export type ActionExecutionContext = {
   costAttribution?: ActionCostAttribution[]
   params?: Record<string, unknown>
   sourceCard?: string
-  actionContext?: Record<string, unknown>
+  actionContext?: ActionContext
   emitPrivateEvent?: (event: PrivateGameEvent) => void
   reportProtectedObservation?: (observation: ProtectedObservation) => void
 }
@@ -930,7 +937,7 @@ export type InternalActionChild = {
   actionId: string
   params?: Record<string, unknown>
   sourceCard?: string
-  actionContext?: Record<string, unknown>
+  actionContext?: ActionContext
   resultKey?: string
   paymentInfoFrom?: string
 }
@@ -957,7 +964,7 @@ export type ActionFlow = (
       promptKey?: PromptKey
       params?: Record<string, unknown>
       sourceCard?: string
-      actionContext?: Record<string, unknown>
+      actionContext?: ActionContext
       optionId?: string
       choiceLabelKey?: string
       choiceLabelParams?: Record<string, unknown>

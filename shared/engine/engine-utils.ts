@@ -641,7 +641,6 @@ const collectMandatoryActionNodes = (node: EngineNode): ActionNode[] => {
 }
 
 const isBookkeepingAction = (node: ActionNode): boolean =>
-  node.actionId === 'rule-discount' ||
   node.actionId === 'push-to-card-stack' ||
   (node.actionId === 'special-effect' && ['set-infobox', 'increment-extra-data', 'set-extra-data', 'increment-counter', 'set-counter', 'set-flag'].includes(String(node.params?.kind)))
 

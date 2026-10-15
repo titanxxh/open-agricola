@@ -1,5 +1,4 @@
 import type {
-  ActionAvailabilityContext,
   ActionChoiceOption,
   ActionCostPreview,
   ActionDefinition,
@@ -39,17 +38,11 @@ type RenovationCostAdjustments = {
 }
 
 const readRenovationCostAdjustments = (
-  context: unknown,
+  context: Pick<ActionExecutionContext, 'costTrades' | 'costBonuses' | 'paymentResourceProviders' | 'actionContext'>,
 ): RenovationCostAdjustments | undefined => {
-  if (!context || typeof context !== 'object') return undefined
-  const raw = context as {
-    costTrades?: ActionExecutionContext['costTrades']
-    costBonuses?: ActionExecutionContext['costBonuses']
-    paymentResourceProviders?: ActionExecutionContext['paymentResourceProviders']
-  }
-  const trades = raw.costTrades ?? []
-  const bonuses = raw.costBonuses ?? []
-  const paymentResourceProviders = raw.paymentResourceProviders ?? []
+  const trades = context.costTrades ?? []
+  const bonuses = [...(context.actionContext?.costBonuses ?? []), ...(context.costBonuses ?? [])]
+  const paymentResourceProviders = context.paymentResourceProviders ?? []
   if (trades.length === 0 && bonuses.length === 0 && paymentResourceProviders.length === 0) {
     return undefined
   }
@@ -231,7 +224,7 @@ const renovateHouseCostPreview: ActionCostPreview = {
     const { player, params } = context
     const plan = planForContext(player, params)
     if (!plan) return false
-    const actionContext = (context as { actionContext?: Record<string, unknown> }).actionContext
+    const { actionContext } = context
     const cost = resolveRenovationActionCost(
       plan.cost,
       actionContext,
@@ -244,7 +237,7 @@ const renovateHouseCostPreview: ActionCostPreview = {
     const { player, params } = context
     const plan = planForContext(player, params)
     if (!plan) return {}
-    const actionContext = (context as { actionContext?: Record<string, unknown> }).actionContext
+    const { actionContext } = context
     const exactCost = PaymentSolver.readExactCost(actionContext)
     if (exactCost) return PaymentSolver.resolveUnitCostWithDelta({}, exactCost, undefined, 1) ?? {}
     return flattenRenovationCost(plan.cost)
@@ -293,9 +286,7 @@ export const renovateHouseAction: ActionDefinition = {
   canBeExecutedByPlayer: (state, player, opts) =>
     canExecuteWithCostPreview(
       renovateHouseCostPreview,
-      { state, player, actionContext: opts?.actionContext } as ActionAvailabilityContext & {
-        actionContext?: Record<string, unknown>
-      },
+      { state, player, actionContext: opts?.actionContext },
     ),
   costPreview: renovateHouseCostPreview,
   getBaseChoiceOptions: ({ player }) => baseRenovationOptions(player),

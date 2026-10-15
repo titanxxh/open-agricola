@@ -1,5 +1,4 @@
 import { ruleOperationAction } from './effects/internal/rule-operation'
-import { ruleDiscountAction } from './effects/internal/rule-discount'
 import { createResolveTimedRuleAction } from './effects/internal/resolve-timed-rule'
 import { ruleConditionAction } from './effects/internal/rule-condition'
 import { ruleGainAction } from './effects/internal/rule-gain'
@@ -70,7 +69,6 @@ export const createInternalActionDefinitions = (resolveAction: FlowActionResolve
   ruleConditionAction,
   ruleGainAction,
   ruleOperationAction,
-  ruleDiscountAction,
   gainAction,
   receiveAction,
   bonusWoodAction,
