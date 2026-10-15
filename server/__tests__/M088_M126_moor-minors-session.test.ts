@@ -1,10 +1,13 @@
+import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
+
+installOfficialCardRegistry()
+
 import { descriptionEffects } from './_helpers/choice-description'
 import { describe, expect, it } from 'vitest'
 
 import { GameSession } from '../game/authoritative-session'
 import { gainAction } from '../../shared/actions/effects/gain'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
-import { setActiveCardRegistry } from '../../shared/cards/active-registry'
 import { setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
 import { getCardStack } from '../../shared/cards/helpers/card-state'
 import type { ActionFlow, ActionSpace, PlayerState, Resource } from '../../shared/contract/types'
@@ -43,7 +46,6 @@ const actionIds = (interaction: SessionInteraction) =>
   interaction.anytimeActions.map((action: AnytimeAction) => action.id)
 
 const setup = (cards: string[] = []) => {
-  setActiveCardRegistry(null)
   const session = new GameSession(376, undefined, {
     playerCount: 2,
     enableFarmersOfTheMoor: true,

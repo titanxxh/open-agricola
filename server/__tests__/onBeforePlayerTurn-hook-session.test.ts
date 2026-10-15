@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach, afterEach } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getActiveCardRegistry } from '../../shared/cards/active-registry'
 import type { CardEffect } from '../../shared/cards/card-effects'
@@ -8,27 +8,18 @@ import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 const TEST_CARD = '__TEST_skipTurn__'
 
 describe('onBeforePlayerTurn hook (game-core skip-turn dispatch)', () => {
-  let removedAfter = false
+  const sessions: GameSession[] = []
+  afterEach(() => { sessions.splice(0).forEach(session => session.dispose()) })
 
-  beforeEach(() => {
-    removedAfter = false
-  })
-
-  afterEach(() => {
-    if (!removedAfter) {
-      const reg = getActiveCardRegistry()
-      reg?.removeEffectsWhere((id) => id === TEST_CARD)
-    }
-  })
-
-  const installSkipOnceCard = (effect: Partial<CardEffect>) => {
+  const installSkipOnceCard = (session: GameSession, effect: Partial<CardEffect>) => session.withCtx(() => {
     const reg = getActiveCardRegistry()
     if (!reg) throw new Error('no active registry')
     reg.setEffect({ id: TEST_CARD, ...effect })
-  }
+  })
 
   it('skips a player whose card returns { skipTurn: true } and advances to next eligible player', () => {
     const session = new GameSession(42)
+    sessions.push(session)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -37,7 +28,7 @@ describe('onBeforePlayerTurn hook (game-core skip-turn dispatch)', () => {
     const p1 = state.players[1]!
     p1.occupationPlayed.push(TEST_CARD)
     let calls = 0
-    installSkipOnceCard({
+    installSkipOnceCard(session, {
       onBeforePlayerTurn: (_s, _p) => {
         calls += 1
         if (calls === 1) return { skipTurn: true }
@@ -61,6 +52,7 @@ describe('onBeforePlayerTurn hook (game-core skip-turn dispatch)', () => {
 
   it('does not skip a player when handler returns void', () => {
     const session = new GameSession(42)
+    sessions.push(session)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -68,7 +60,7 @@ describe('onBeforePlayerTurn hook (game-core skip-turn dispatch)', () => {
 
     const p1 = state.players[1]!
     p1.occupationPlayed.push(TEST_CARD)
-    installSkipOnceCard({
+    installSkipOnceCard(session, {
       onBeforePlayerTurn: () => undefined,
     })
 
@@ -83,6 +75,7 @@ describe('onBeforePlayerTurn hook (game-core skip-turn dispatch)', () => {
 
   it('does not treat ActionFlow-shaped returns as stage flow', () => {
     const session = new GameSession(42)
+    sessions.push(session)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -91,7 +84,7 @@ describe('onBeforePlayerTurn hook (game-core skip-turn dispatch)', () => {
     const p1 = state.players[1]!
     p1.resources.food = 0
     p1.occupationPlayed.push(TEST_CARD)
-    installSkipOnceCard({
+    installSkipOnceCard(session, {
       onBeforePlayerTurn: () => ({
         type: 'leaf',
         actionId: 'gain',
@@ -112,6 +105,7 @@ describe('onBeforePlayerTurn hook (game-core skip-turn dispatch)', () => {
 
   it('caps consecutive skips at players.length to avoid infinite loop', () => {
     const session = new GameSession(42)
+    sessions.push(session)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -120,7 +114,7 @@ describe('onBeforePlayerTurn hook (game-core skip-turn dispatch)', () => {
     state.players[0]!.occupationPlayed.push(TEST_CARD)
     state.players[1]!.occupationPlayed.push(TEST_CARD)
     let calls = 0
-    installSkipOnceCard({
+    installSkipOnceCard(session, {
       onBeforePlayerTurn: () => {
         calls += 1
         return { skipTurn: true }

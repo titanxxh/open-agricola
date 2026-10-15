@@ -61,8 +61,8 @@ const setupEndGameSession = () => {
       player.resources.vegetable += 1
     },
   }
-  requireActiveCardRegistry('before-end player dispatch test').setEffect(sharedEffect)
-  requireActiveCardRegistry('before-end player dispatch test').setEffect(ownerEffect)
+  session.withCtx(() => requireActiveCardRegistry('before-end player dispatch test').setEffect(sharedEffect))
+  session.withCtx(() => requireActiveCardRegistry('before-end player dispatch test').setEffect(ownerEffect))
 
   return session
 }
@@ -150,7 +150,7 @@ describe('Before-End Player Dispatch session', () => {
         return undefined
       },
     }
-    requireActiveCardRegistry('before-end player dispatch preview test').setEffect(effect)
+    session.withCtx(() => requireActiveCardRegistry('before-end player dispatch preview test').setEffect(effect))
 
     let resp = session.invokeAfterRoundEnd()
 
@@ -191,7 +191,7 @@ describe('Before-End Player Dispatch session', () => {
     pushToCardStack(state.players[0]!, GROCER, ['wood', 'vegetable'])
     pushToCardStack(state.players[1]!, GROCER, ['reed'])
     session.loadState(state)
-    requireActiveCardRegistry('pre-scoring window test').setEffect({
+    session.withCtx(() => requireActiveCardRegistry('pre-scoring window test').setEffect({
       id: GRANT_CARD,
       onBeforeEndGame: () => ({
         type: 'leaf',
@@ -199,7 +199,7 @@ describe('Before-End Player Dispatch session', () => {
         sourceCard: GRANT_CARD,
         params: { food: 2 },
       }),
-    })
+    }))
 
     let resp = skipPostReapAnytime(session, session.performRoundEnd(), 1)
     const firstGrocer = expectPreScoringGrocer(resp, 0)

@@ -1,3 +1,7 @@
+import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
+
+installOfficialCardRegistry()
+
 import { setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/D/D056_FatstockStretcher'
 import '../../shared/cards/D/D062_BeerTap'

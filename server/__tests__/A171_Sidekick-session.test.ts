@@ -220,7 +220,7 @@ describe('A171 Sidekick session', () => {
       extraOccupations: [STUB_ID],
       roundActionOrder: ['vegetable-seeds', 'eastern-quarry'],
     })
-    const registry = requireActiveCardRegistry('sidekick-after-target-state')
+    const registry = session.withCtx(() => requireActiveCardRegistry('sidekick-after-target-state'))
     registry.registerListener({
       id: LISTENER_ID,
       cardIds: [STUB_ID],

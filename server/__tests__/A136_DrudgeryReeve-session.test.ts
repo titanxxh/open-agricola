@@ -149,7 +149,7 @@ describe('A136_DrudgeryReeve before-end shared scoring', () => {
     expect(undoAction.ok ? '' : undoAction.error).toBe('game is over')
     expect(undoAction.state.gameOver).toBe(true)
 
-    const scores = computeScores(resp.state)
+    const scores = session.withCtx(() => computeScores(resp.state))
     const p2Bonus = scores[1]!.categories.find((category) => category.key === 'cardBonusVp')
     expect(p2Bonus).toEqual(expect.objectContaining({
       total: 5,
@@ -203,7 +203,7 @@ describe('A136_DrudgeryReeve before-end shared scoring', () => {
       beforeEndGameMandatory: true,
     }
     const session = setupEndGameSession()
-    requireActiveCardRegistry('A136 before-end recompute test').setEffect(effect)
+    session.withCtx(() => requireActiveCardRegistry('A136 before-end recompute test').setEffect(effect))
     const state = session.getState().state
     state.players[0]!.occupationPlayed = [RESERVE_FIRST_CARD, CARD_ID]
     setBuildingResources(state.players[0]!, 3)

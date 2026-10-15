@@ -1,3 +1,7 @@
+import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
+
+installOfficialCardRegistry()
+
 /**
  * D025_WitchesDanceFloor — comprehensive session-level integration tests.
  *

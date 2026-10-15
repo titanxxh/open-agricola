@@ -1,3 +1,7 @@
+import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
+
+installOfficialCardRegistry()
+
 /**
  * Smoke test for CardEffect.resolveChoice hook + GameSession dispatch.
  *
@@ -80,7 +84,7 @@ const makeSession = () => {
   }
   const session = new GameSession(undefined, undefined, { playerCount: 4 })
   stabilizeRandomHands(session.state.players)
-  requireActiveCardRegistry('card-effect-resolve-choice').setEffect(effect)
+  session.withCtx(() => requireActiveCardRegistry('card-effect-resolve-choice').setEffect(effect))
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   state.currentPlayerIndex = 0

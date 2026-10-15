@@ -1,3 +1,7 @@
+import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
+
+installOfficialCardRegistry()
+
 import { describe, expect, it } from 'vitest'
 import { constructAction } from '../../shared/actions/effects/construct.ts'
 import type { ActionExecutionContext, ActionSpace, GameState, PlayerState } from '../../shared/contract/types.ts'

@@ -1,3 +1,7 @@
+import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
+
+installOfficialCardRegistry()
+
 /**
  * A3 PaperKnife session tests — the reference alignment (Task 4.1).
  *

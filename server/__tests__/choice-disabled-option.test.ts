@@ -56,10 +56,10 @@ beforeEach(() => {
 const makeSession = () => {
   const session = new GameSession(undefined, undefined, { playerCount: 4 })
   stabilizeRandomHands(session.state.players)
-  requireActiveCardRegistry('choice-disabled-option').setEffect({
+  session.withCtx(() => requireActiveCardRegistry('choice-disabled-option').setEffect({
     id: TEST_CARD_ID,
     onBuy: () => buildTestOnBuyFlow(),
-  })
+  }))
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   state.currentPlayerIndex = 0

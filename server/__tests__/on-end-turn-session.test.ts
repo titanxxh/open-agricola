@@ -10,14 +10,14 @@ import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 const TEST_END_TURN_CARD = 'TEST_OnEndTurnCounter'
 
-const registerCounterEffect = () => {
-  requireActiveCardRegistry('on-end-turn-session').setEffect({
+const registerCounterEffect = (session: GameSession) => {
+  session.withCtx(() => requireActiveCardRegistry('on-end-turn-session').setEffect({
     id: TEST_END_TURN_CARD,
     onEndTurn: (_state, player) => {
       if (!player.minorPlayed.includes(TEST_END_TURN_CARD)) return
       incCounter(player, TEST_END_TURN_CARD, 'observedCount')
     },
-  } as any)
+  } as any))
 }
 
 describe('onEndTurn session', () => {
@@ -27,7 +27,7 @@ describe('onEndTurn session', () => {
   it('fires before confirmNextPlayer on a normal worker placement turn', () => {
     const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
-    registerCounterEffect()
+    registerCounterEffect(session)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -47,7 +47,7 @@ describe('onEndTurn session', () => {
   it('does not fire during an intermediate confirmPlayerSwitch', () => {
     const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
-    registerCounterEffect()
+    registerCounterEffect(session)
     const state = session.getState().state
     state.players = state.players.slice(0, 3)
     state.currentPlayerIndex = 1
@@ -91,7 +91,7 @@ describe('onEndTurn session', () => {
   it('waits until action-scoped animal reorg resolves', () => {
     const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
-    registerCounterEffect()
+    registerCounterEffect(session)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0

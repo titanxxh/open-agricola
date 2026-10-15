@@ -1,3 +1,7 @@
+import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
+
+installOfficialCardRegistry()
+
 import { describe, expect, it } from 'vitest'
 import type { GameSession } from '../game/authoritative-session'
 import { createWorkSession } from './_helpers/session-fixtures'

@@ -1,3 +1,7 @@
+import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
+
+installOfficialCardRegistry()
+
 import { describe, expect, it } from 'vitest'
 import { C109_SchnappsDistiller } from '../../shared/cards/C/C109_SchnappsDistiller'
 import { getExchangesInWindow } from '../../shared/actions/effects/exchange'

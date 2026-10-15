@@ -1,3 +1,7 @@
+import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
+
+installOfficialCardRegistry()
+
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -6,7 +10,7 @@ import {
   getRegisteredCardListeners,
   type CardListenerContext,
 } from '../../shared/cards/card-listeners'
-import { getActiveCardRegistry, setActiveCardRegistry } from '../../shared/cards/active-registry'
+import { getActiveCardRegistry } from '../../shared/cards/active-registry'
 
 import '../../shared/cards/C/C052_HuntsmansHat'
 import type { ActionExecutionResult, ActionFlow } from '../../shared/contract/types'
@@ -87,9 +91,8 @@ describe('C052_HuntsmansHat server session', () => {
     pigMarket.resources.boar = 2
 
     session.loadState(state)
-    const activeBackup = getActiveCardRegistry()?.clone() ?? null
     try {
-      getActiveCardRegistry()?.removeListenersWhere((listener) => listener.id === LISTENER_ID)
+      session.withCtx(() => getActiveCardRegistry()?.removeListenersWhere((listener) => listener.id === LISTENER_ID))
       let resp = session.takeAction(0, 'pig-market')
       expect(resp.ok).toBe(true)
       if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'ui.interactionAnimalReorg') {
@@ -99,7 +102,7 @@ describe('C052_HuntsmansHat server session', () => {
       }
       expect(resp.state.players[0]!.resources.food).toBe(2)
     } finally {
-      setActiveCardRegistry(activeBackup)
+      session.dispose()
     }
   })
 })

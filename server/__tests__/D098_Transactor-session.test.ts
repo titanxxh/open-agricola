@@ -198,7 +198,7 @@ describe('D098 Transactor final-harvest choice', () => {
         optional: true,
       }),
     }
-    requireActiveCardRegistry('D098 undo test').setEffect(followUpEffect)
+    session.withCtx(() => requireActiveCardRegistry('D098 undo test').setEffect(followUpEffect))
     session.state.players[0]!.occupationPlayed.push(FOLLOW_UP_CARD)
     session.loadState(session.state)
     const offered = session.performRoundEnd()

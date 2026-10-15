@@ -1,3 +1,7 @@
+import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
+
+installOfficialCardRegistry()
+
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import { describe, expect, it } from 'vitest'

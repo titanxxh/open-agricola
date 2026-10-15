@@ -102,8 +102,8 @@ describe('Before-Harvest reaction dispatch', () => {
     session.state.players[0]!.startPlayer = false
     session.state.players[0]!.occupationPlayed = [`${OPTIONAL}-p0`]
     session.state.players[1]!.occupationPlayed = [`${OPTIONAL}-p1`]
-    requireActiveCardRegistry('before-harvest order test').setEffect(optionalEffect(`${OPTIONAL}-p0`))
-    requireActiveCardRegistry('before-harvest order test').setEffect(optionalEffect(`${OPTIONAL}-p1`))
+    session.withCtx(() => requireActiveCardRegistry('before-harvest order test').setEffect(optionalEffect(`${OPTIONAL}-p0`)))
+    session.withCtx(() => requireActiveCardRegistry('before-harvest order test').setEffect(optionalEffect(`${OPTIONAL}-p1`)))
     session.loadState(session.state)
 
     const response = session.performRoundEnd()
@@ -120,8 +120,8 @@ describe('Before-Harvest reaction dispatch', () => {
     session.state.players[1]!.occupationPlayed = [`${OPTIONAL}-p1`]
     session.state.players[2]!.occupationPlayed = [`${OPTIONAL}-p2`]
     for (const suffix of ['p0', 'p1', 'p2']) {
-      requireActiveCardRegistry('before-harvest frozen order test')
-        .setEffect(optionalEffect(`${OPTIONAL}-${suffix}`))
+      session.withCtx(() => requireActiveCardRegistry('before-harvest frozen order test')
+        .setEffect(optionalEffect(`${OPTIONAL}-${suffix}`)))
     }
     session.loadState(session.state)
 
@@ -145,8 +145,8 @@ describe('Before-Harvest reaction dispatch', () => {
     session.state.players[1]!.occupationPlayed = [`${OPTIONAL}-p1`]
     session.state.players[2]!.occupationPlayed = [`${OPTIONAL}-p2`]
     for (const suffix of ['p0', 'p1', 'p2']) {
-      requireActiveCardRegistry('before-harvest serialized order test')
-        .setEffect(optionalEffect(`${OPTIONAL}-${suffix}`))
+      session.withCtx(() => requireActiveCardRegistry('before-harvest serialized order test')
+        .setEffect(optionalEffect(`${OPTIONAL}-${suffix}`)))
     }
     session.loadState(session.state)
 
@@ -156,8 +156,8 @@ describe('Before-Harvest reaction dispatch', () => {
     const snapshot = serializeSessionSnapshot(session.state, session)
     const restored = new GameSession(rehydrateState(JSON.parse(JSON.stringify(snapshot))))
     for (const suffix of ['p0', 'p1', 'p2']) {
-      requireActiveCardRegistry('before-harvest restored order test')
-        .setEffect(optionalEffect(`${OPTIONAL}-${suffix}`))
+      restored.withCtx(() => requireActiveCardRegistry('before-harvest restored order test')
+        .setEffect(optionalEffect(`${OPTIONAL}-${suffix}`)))
     }
 
     let response = restored.resolveChoice(1, '__skip__')
@@ -171,8 +171,8 @@ describe('Before-Harvest reaction dispatch', () => {
     const session = setupRoundFour(2)
     const player = session.state.players[0]!
     player.occupationPlayed = [OPTIONAL, MANDATORY]
-    requireActiveCardRegistry('before-harvest trigger-select test').setEffect(optionalEffect(OPTIONAL))
-    requireActiveCardRegistry('before-harvest trigger-select test').setEffect(mandatoryEffect)
+    session.withCtx(() => requireActiveCardRegistry('before-harvest trigger-select test').setEffect(optionalEffect(OPTIONAL)))
+    session.withCtx(() => requireActiveCardRegistry('before-harvest trigger-select test').setEffect(mandatoryEffect))
     session.loadState(session.state)
 
     const response = session.performRoundEnd()
@@ -203,8 +203,8 @@ describe('Before-Harvest reaction dispatch', () => {
     const player = session.state.players[0]!
     player.resources.food = 0
     player.occupationPlayed = [MANDATORY, DYNAMIC_OPTIONAL]
-    requireActiveCardRegistry('before-harvest live mandatory test').setEffect(mandatoryEffect)
-    requireActiveCardRegistry('before-harvest live mandatory test').setEffect({
+    session.withCtx(() => requireActiveCardRegistry('before-harvest live mandatory test').setEffect(mandatoryEffect))
+    session.withCtx(() => requireActiveCardRegistry('before-harvest live mandatory test').setEffect({
       id: DYNAMIC_OPTIONAL,
       onBeforeHarvest: (_state, target) => {
         if (target.resources.food < 1) return
@@ -216,7 +216,7 @@ describe('Before-Harvest reaction dispatch', () => {
           optional: true,
         }
       },
-    })
+    }))
     session.loadState(session.state)
 
     let response = session.performRoundEnd()
@@ -246,7 +246,7 @@ describe('Before-Harvest reaction dispatch', () => {
     const player = session.state.players[0]!
     player.occupationPlayed = [OPTIONAL]
     writeCardExtraData(player, 'TEST_HarvestSkip', SKIP_HARVEST_ROUND_KEY, 4)
-    requireActiveCardRegistry('before-harvest skip test').setEffect(optionalEffect(OPTIONAL))
+    session.withCtx(() => requireActiveCardRegistry('before-harvest skip test').setEffect(optionalEffect(OPTIONAL)))
     session.loadState(session.state)
 
     const response = session.performRoundEnd()
