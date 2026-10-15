@@ -14,10 +14,9 @@ import type {
   Trade,
 } from '../shared/contract/types'
 import { CardPurchasePayment, PaymentSolver } from '../shared/actions/payment'
-import { buildRenovationPlan } from '../shared/actions/effects/renovation'
+import { buildRenovationPlan, renovateHouseAction } from '../shared/actions/effects/renovation'
 import { resolveTimedRuleAction } from '../shared/actions/effects/internal/resolve-timed-rule'
 import { ruleOperationAction } from '../shared/actions/effects/internal/rule-operation'
-import { ruleDiscountAction } from '../shared/actions/effects/internal/rule-discount'
 import { getActiveCardRegistry } from '../shared/cards/active-registry'
 import { getCardModifiers } from '../shared/cards/card-modifiers'
 import { runCardListeners } from '../shared/cards/card-listeners'
@@ -270,7 +269,7 @@ const actionScenarios: ActionScenario[] = [
   { name: 'D81 roof ladder reed discount', kind: 'renovation', cards: [play('D081_RoofLadder')], houseType: 'wood', targetHouseType: 'clay', rooms: 3 },
   { name: 'D88 millwright renovation bonuses', kind: 'renovation', cards: [play('D088_Millwright')], houseType: 'wood', targetHouseType: 'stone', rooms: 3 },
   { name: 'E123 renovation top resource choices', kind: 'renovation', cards: [play('E123_ResourceHoarder')], houseType: 'wood', targetHouseType: 'stone', rooms: 3 },
-  { name: 'E87 master renovator flagged choices', kind: 'renovation', cards: [play('E087_MasterRenovator')], houseType: 'wood', targetHouseType: 'stone', rooms: 3, round: 7 },
+  { name: 'E87 master renovator flagged choices', kind: 'renovation', cards: [play('E087_MasterRenovator')], sourceCard: 'E087_MasterRenovator', houseType: 'clay', targetHouseType: 'stone', rooms: 3, round: 9 },
   { name: 'A16 rammed clay fence trade', kind: 'fencing', cards: [play('A016_RammedClay')] },
   { name: 'A88 hedge keeper free fences', kind: 'fencing', cards: [play('A088_HedgeKeeper')] },
   { name: 'B15 carpenters bench constrained free fence', kind: 'fencing', cards: [play('B015_CarpentersBench')], pendingFenceBonus: { sourceCard: 'B015_CarpentersBench', freeFences: 1 } },
@@ -553,38 +552,33 @@ const playScenarioCards = (player: PlayerState, state: GameState, scenario: Scen
   for (const cardId of scenario.flaggedCards ?? []) {
     player.cardStates[cardId] = { ...(player.cardStates[cardId] ?? {}), flagged: true }
   }
-  if (scenario.cards.some((card) => card.id === 'E087_MasterRenovator')) {
-    const hookFlow = getActiveCardRegistry()?.getEffect('E087_MasterRenovator')?.onStartReturnHome?.(state, player)
-    if (hookFlow?.type !== 'seq' || hookFlow.children.length !== 1) {
-      throw new Error(`${scenario.name}: expected one due timed renovation rule`)
-    }
-    const due = hookFlow.children[0]!
-    if (due.type !== 'leaf' || due.actionId !== resolveTimedRuleAction.id) {
-      throw new Error(`${scenario.name}: expected a compiled timed-rule leaf`)
-    }
-    const context = { state, player, space: createSpace('renovate-house') }
-    const resolved = resolveTimedRuleAction.execute({
-      ...context, sourceCard: due.sourceCard, params: due.params, actionContext: due.actionContext,
-    })
-    if (resolved.type !== 'flow' || resolved.flow.type !== 'leaf'
-      || resolved.flow.actionId !== ruleOperationAction.id) {
-      throw new Error(`${scenario.name}: expected the timed renovation operation`)
-    }
-    const operation = resolved.flow
-    const planned = ruleOperationAction.execute({
-      ...context, sourceCard: operation.sourceCard, params: operation.params, actionContext: operation.actionContext,
-    })
-    if (planned.type !== 'flow' || planned.flow.type !== 'seq') {
-      throw new Error(`${scenario.name}: expected the discounted-action sequence`)
-    }
-    const install = planned.flow.children[0]
-    if (install?.type !== 'leaf' || install.actionId !== ruleDiscountAction.id || install.params?.install !== true) {
-      throw new Error(`${scenario.name}: expected the discount installation leaf`)
-    }
-    expect(ruleDiscountAction.execute({
-      ...context, sourceCard: install.sourceCard, params: install.params, actionContext: install.actionContext,
-    }), scenario.name).toEqual({ type: 'ok' })
+}
+
+const timedRenovationInput = (player: PlayerState, state: GameState, scenario: ActionScenario) => {
+  const hookFlow = getActiveCardRegistry()?.getEffect('E087_MasterRenovator')?.onStartReturnHome?.(state, player)
+  if (hookFlow?.type !== 'seq' || hookFlow.children.length !== 1) {
+    throw new Error(`${scenario.name}: expected one due timed renovation rule`)
   }
+  const due = hookFlow.children[0]!
+  if (due.type !== 'leaf' || due.actionId !== resolveTimedRuleAction.id) {
+    throw new Error(`${scenario.name}: expected a compiled timed-rule leaf`)
+  }
+  const context = { state, player, space: createSpace('renovate-house') }
+  const resolved = resolveTimedRuleAction.execute({
+    ...context, sourceCard: due.sourceCard, params: due.params, actionContext: due.actionContext,
+  })
+  if (resolved.type !== 'flow' || resolved.flow.type !== 'leaf'
+    || resolved.flow.actionId !== ruleOperationAction.id) {
+    throw new Error(`${scenario.name}: expected the timed renovation operation`)
+  }
+  const operation = resolved.flow
+  const planned = ruleOperationAction.execute({
+    ...context, sourceCard: operation.sourceCard, params: operation.params, actionContext: operation.actionContext,
+  })
+  if (planned.type !== 'flow' || planned.flow.type !== 'leaf' || planned.flow.actionId !== 'renovate-house') {
+    throw new Error(`${scenario.name}: expected the granted renovation`)
+  }
+  return planned.flow
 }
 
 const setupScenarioPlayer = (scenario: Scenario, resources = richResources) => {
@@ -719,6 +713,25 @@ const oaCardPurchaseOptions = (scenario: CardPurchaseScenario): PaymentOption[] 
 
 const oaActionOptions = (scenario: ActionScenario): PaymentOption[] => {
   const { player, state } = setupScenarioPlayer(scenario)
+  if (scenario.cards.some(card => card.id === 'E087_MasterRenovator')) {
+    const leaf = timedRenovationInput(player, state, scenario)
+    const adjustments = collectActionAdjustments(scenario, state, player)
+    const preview = renovateHouseAction.previewEffect?.({
+      state, player, space: createSpace('renovate-house'),
+      sourceCard: leaf.sourceCard, actionContext: leaf.actionContext,
+      params: { selectedOption: scenario.targetHouseType },
+      costs: adjustments.costs, costBonuses: adjustments.bonuses, costTrades: adjustments.trades,
+    })
+    if (preview?.kind !== 'rule' || preview.description.kind !== 'group') {
+      throw new Error(`${scenario.name}: expected renovation payment previews`)
+    }
+    return uniqueSortedOptions(preview.description.parts.map(part => {
+      if (part.kind !== 'action' || part.effectPreview?.kind !== 'payment') {
+        throw new Error(`${scenario.name}: expected a payment preview`)
+      }
+      return { resources: normalizeResources(part.effectPreview.resourcesPaid ?? {}), sources: part.effectPreview.sourceCards ?? [] }
+    }))
+  }
   const cost = actionCost(scenario, state, player)
   const solutions = PaymentSolver.computeOptions(state, 0, cost, {
     actionId: scenario.kind,

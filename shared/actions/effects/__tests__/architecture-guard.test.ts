@@ -146,7 +146,6 @@ describe('effects architecture guard', () => {
       'resolve-timed-rule',
       'return-to-space',
       'rule-condition',
-      'rule-discount',
       'rule-gain',
       'rule-operation',
       'schedule-offers',

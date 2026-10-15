@@ -689,6 +689,8 @@ scope:'unit' MUST NOT 携带 `conditions.minNumRooms`（per-unit 没有 min-unit
 
 **Renovation 对齐**（`shared/actions/effects/renovation.ts`）：`buildRenovationPlan` 直接返回 `ComplexCost`（`fees:[{reed:1}], unitFee:{[material]:1}, nb:player.rooms`）。`computeCosts` hook 的 `costs` 通过 `mergeRenovationCost` 落到 `fees[0]`；`trades` / `bonuses` / `paymentResourceProviders` 经 `executionContext.costTrades` / `costBonuses` / `paymentResourceProviders` 追加到本次 payment child。`canAffordTypedFlatCost` / `payTypedFlatCost` / `payTypedFlatCostDetailed`（`typed-flat.ts`）接受 `Partial<Resource> | ComplexCost`，统一走 `computeAllBuyableCombinations` 单管线（之前的 `resolveSimpleTradeAdjustedCost` 已删除）。
 
+授予的翻修可在其 leaf 的 `actionContext.costBonuses` 中携带可序列化 `Bonus[]`。翻修准入、效果预览及宿主的内部付款通过同一成本组装入口，将本次 bonus 与 `computeCosts` 结果合并，并读取实时目标与房间数。`discounted-action` 规则操作使用该输入，先检查非 optional leaf，再提供可选行动，不临时安装玩家 modifier。pending/cursor 恢复保留 leaf 输入与付款成本；独立反应或 anytime 翻修有自己的 leaf，不继承授予行动的 bonus。优惠来源保留在付款选项及 `resource.paid.bonusSources`。该扩展属于现有翻修行动成本路径，不进入卡牌购买 candidate pipeline。
+
 D015_ClaySupports clay→reed trade 仅当 `houseTypeClay > 0` 时生效；A123_FrameBuilder 的 construct 拆成两个 `scope:'unit'` TradeModifier（wood→clay / wood→stone），用 `houseTypeClay` / `houseTypeStone` 锁定方向；B145_BrushwoodCollector construct 用 `replaceUpTo` 覆盖 1/2 reed 行。Renovation 的 mandatory 折扣走 `Bonus.optional=false`；B128_Plumber 等 target-sensitive listener 从 `params.selectedOption` 读取本次目标材质后返回 sourced mandatory bonus choices。
 
 ### 7.5 Hook 系统：行动生命周期 phase（10 个）
