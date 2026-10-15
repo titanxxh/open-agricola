@@ -12,7 +12,7 @@ import { executeCardListener, getListenerById } from '../../shared/cards/card-li
 import { readActionSnapshotToken } from '../../shared/cards/helpers/action-snapshot'
 import type { ActionDefinition, ActionSpace } from '../../shared/contract/types'
 import type { SessionResponse } from '../../shared/session/session-core'
-import { registerActionHook, unregisterActionHook } from '../../shared/actions/hooks'
+
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../shared/actions/helpers/placement-constants'
 import '../../shared/cards/A/A092_AdoptiveParents'
 import '../../shared/cards/D/D134_OysterEater'
@@ -408,7 +408,7 @@ describe('A92 P2 fixes', () => {
       failingSpace.takenBy = [{ playerId: p0.id, workerId: oldWorker.id }]
       session.loadState(state)
 
-      registerActionHook({
+      session.actionHooks.register({
         id: 'test-a92-allow-occupied-failing-space',
         actions: ['place-farmer'],
         phases: ['computeArgs'],
@@ -439,7 +439,7 @@ describe('A92 P2 fixes', () => {
           expect.arrayContaining([{ playerId: p0.id, workerId: promotedWorker.id }]),
         )
       } finally {
-        unregisterActionHook('test-a92-allow-occupied-failing-space')
+        session.actionHooks.unregister('test-a92-allow-occupied-failing-space')
       }
     })
 

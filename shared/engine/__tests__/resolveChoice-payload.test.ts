@@ -13,7 +13,10 @@ import { EngineTree } from '../tree'
 import { HookDispatcher } from '../dispatcher'
 import { LogStore } from '../log-store'
 import { ActionNode, SequenceNode } from '../nodes'
-import { clearActionHooks } from '../../actions/hooks'
+import { ActionHookRegistry } from '../../actions/hooks'
+
+const actionHooks = new ActionHookRegistry()
+
 
 const createState = () =>
   ({
@@ -98,14 +101,14 @@ const buildEngine = (action: ActionDefinition) => {
   return new Engine({
     tree: new EngineTree(root),
     registry,
-    hooks: new HookDispatcher(),
+    hooks: new HookDispatcher(actionHooks),
     log: new LogStore(),
   })
 }
 
 describe('engine resolveChoice payload', () => {
   beforeEach(() => {
-    clearActionHooks()
+    actionHooks.clear()
     setActiveCardRegistry(new CardRegistry())
   })
 

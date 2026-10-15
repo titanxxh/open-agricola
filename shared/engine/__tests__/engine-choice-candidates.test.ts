@@ -14,7 +14,10 @@ import { EngineTree } from '../tree'
 import { HookDispatcher } from '../dispatcher'
 import { LogStore } from '../log-store'
 import { ActionNode, SequenceNode, OrNode, XorNode } from '../nodes'
-import { clearActionHooks } from '../../actions/hooks'
+import { ActionHookRegistry } from '../../actions/hooks'
+
+const actionHooks = new ActionHookRegistry()
+
 
 const createState = () =>
   ({
@@ -71,7 +74,7 @@ const buildEngine = (action: ActionDefinition, withChoice = true) => {
   const engine = new Engine({
     tree: new EngineTree(root),
     registry,
-    hooks: new HookDispatcher(),
+    hooks: new HookDispatcher(actionHooks),
     log,
   })
   return { engine, log }
@@ -102,7 +105,7 @@ const buildOptInAction = (
 
 describe('Engine — getBaseChoiceOptions opt-in flow', () => {
   beforeEach(() => {
-    clearActionHooks()
+    actionHooks.clear()
     setActiveCardRegistry(new CardRegistry())
   })
 
@@ -127,7 +130,7 @@ describe('Engine — getBaseChoiceOptions opt-in flow', () => {
         tree: new EngineTree(new Composite('root', [
           new ActionNode('selected', action.id), new ActionNode('alternative', 'alternative'),
         ])),
-        registry, hooks: new HookDispatcher(), log: new LogStore(),
+        registry, hooks: new HookDispatcher(actionHooks), log: new LogStore(),
       })
       const context = { state: createState(), player: createPlayer(), space: createSpace(action) }
       expect(engine.proceed(context).type).toBe('choice')

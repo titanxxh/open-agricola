@@ -1,3 +1,4 @@
+import { ActionHookRegistry } from '../hooks'
 import { describe, expect, it } from 'vitest'
 import { evaluateFlowDoable } from '../flow'
 import { familyGrowthAction } from '../effects/family-growth'
@@ -24,7 +25,7 @@ describe('replacement flow admission', () => {
     })
     const doable = withActiveRegistry(registry, () => evaluateFlowDoable(
       { type: 'leaf', actionId: 'family-growth' },
-      { state, player, space },
+      { state, player, space, actionHooks: new ActionHookRegistry() },
       (id) => id === 'family-growth' ? familyGrowthAction : undefined,
     ))
     expect(doable).toBe(skipRoomCheck)

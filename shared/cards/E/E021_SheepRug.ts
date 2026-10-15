@@ -33,7 +33,7 @@ const computeArgsListener: CardListenerRegistration = {
       if (!space) continue
       if (!isSpaceOccupied(space)) continue
       if (countNonNewbornPeople(context.state, space) > 1) continue
-      if (!space.canBeExecutedByPlayer(context.state, context.player)) continue
+      if (!space.canBeExecutedByPlayer(context.state, context.player, { actionHooks: context.actionHooks })) continue
       extraOptions.push({
         value: `${OCCUPIED_SPACE_CHOICE_PREFIX}${spaceId}`,
         labelKey: space.nameKey,

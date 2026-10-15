@@ -10,7 +10,10 @@ import { LogStore } from '../log-store'
 import { actionDefinitions } from '../../actions'
 import { internalActionDefinitions } from '../../actions/index'
 import type { ActionSpace, GameState, PlayerState } from '../../contract/types'
-import { clearActionHooks, registerActionHook } from '../../actions/hooks'
+import { ActionHookRegistry } from '../../actions/hooks'
+
+const actionHooks = new ActionHookRegistry()
+
 
 const createPlayer = (): PlayerState => ({
   id: 'p1',
@@ -88,12 +91,12 @@ const createState = (space: ActionSpace, player: PlayerState): GameState => ({
 
 describe('engine follow-up actions', () => {
   beforeEach(() => {
-    clearActionHooks()
+    actionHooks.clear()
     setActiveCardRegistry(new CardRegistry())
   })
 
   it('inserts follow-up actions after hooks', () => {
-    registerActionHook({
+    actionHooks.register({
       id: 'after-day-laborer-bonus',
       actions: ['day-laborer'],
       phases: ['after'],
@@ -103,7 +106,7 @@ describe('engine follow-up actions', () => {
     const registry = new ActionRegistry()
     actionDefinitions.forEach((action) => registry.register(action))
     internalActionDefinitions.forEach((action) => registry.register(action))
-    const hooks = new HookDispatcher()
+    const hooks = new HookDispatcher(actionHooks)
     const log = new LogStore()
     const tree = new EngineTree(new ActionNode('action-day-laborer', 'day-laborer'))
     const engine = new Engine({ tree, registry, hooks, log })
@@ -138,7 +141,7 @@ describe('engine follow-up actions', () => {
       ...actionA,
       id: 'test-c',
     }
-    registerActionHook({
+    actionHooks.register({
       id: 'after-test-a',
       actions: ['test-a'],
       phases: ['after'],
@@ -156,7 +159,7 @@ describe('engine follow-up actions', () => {
     const engine = new Engine({
       tree,
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     const player = createPlayer()
@@ -189,7 +192,7 @@ describe('engine follow-up actions', () => {
       ...actionA,
       id: 'optional-b',
     }
-    registerActionHook({
+    actionHooks.register({
       id: 'after-optional-a',
       actions: ['optional-a'],
       phases: ['after'],
@@ -206,7 +209,7 @@ describe('engine follow-up actions', () => {
     const engine = new Engine({
       tree,
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     const player = createPlayer()
@@ -237,7 +240,7 @@ describe('engine follow-up actions', () => {
       ...actionA,
       id: 'root-b',
     }
-    registerActionHook({
+    actionHooks.register({
       id: 'after-root-a',
       actions: ['root-a'],
       phases: ['after'],
@@ -251,7 +254,7 @@ describe('engine follow-up actions', () => {
     const engine = new Engine({
       tree,
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     const player = createPlayer()
@@ -290,7 +293,7 @@ describe('engine follow-up actions', () => {
       },
     }
 
-    registerActionHook({
+    actionHooks.register({
       id: 'after-flow-main',
       actions: ['flow-main'],
       phases: ['after'],
@@ -306,7 +309,7 @@ describe('engine follow-up actions', () => {
     const engine = new Engine({
       tree,
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     const player = createPlayer()
@@ -352,7 +355,7 @@ describe('engine follow-up actions', () => {
       },
     }
 
-    registerActionHook({
+    actionHooks.register({
       id: 'after-resolve-flow',
       actions: ['resolve-flow-main'],
       phases: ['after'],
@@ -372,7 +375,7 @@ describe('engine follow-up actions', () => {
     const engine = new Engine({
       tree,
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     const player = createPlayer()

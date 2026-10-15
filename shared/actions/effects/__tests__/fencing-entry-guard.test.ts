@@ -1,3 +1,4 @@
+import { ActionHookRegistry } from '../../hooks'
 import { describe, expect, it } from 'vitest'
 import '../../../cards/B/B038_FutureBuildingSite'
 import { canStartFencing, maxFences } from '../fencing'
@@ -40,7 +41,7 @@ describe('canStartFencing entry-guard', () => {
       wood: 0, clay: 0, reed: 0, stone: 0, food: 0,
       grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
     } })
-    expect(canStartFencing(fakeState, player)).toBe(false)
+    expect(canStartFencing(new ActionHookRegistry(), fakeState, player)).toBe(false)
   })
 
   it('returns true when override.wood discount allows free fences (simulates dispatcher listener output)', () => {
@@ -50,7 +51,7 @@ describe('canStartFencing entry-guard', () => {
         grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
       },
     })
-    expect(canStartFencing(fakeState, player, { wood: -4 })).toBe(true)
+    expect(canStartFencing(new ActionHookRegistry(), fakeState, player, { wood: -4 })).toBe(true)
   })
 
   it('returns false when fence cap is already reached even with override discount', () => {
@@ -65,7 +66,7 @@ describe('canStartFencing entry-guard', () => {
       minorPlayed: ['E016_BriarHedge'],
       fenceSegments,
     })
-    expect(canStartFencing(fakeState, player, { wood: -4 })).toBe(false)
+    expect(canStartFencing(new ActionHookRegistry(), fakeState, player, { wood: -4 })).toBe(false)
   })
 
   it('returns true when player has 4+ wood and no card discount', () => {
@@ -73,7 +74,7 @@ describe('canStartFencing entry-guard', () => {
       wood: 4, clay: 0, reed: 0, stone: 0, food: 0,
       grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
     } })
-    expect(canStartFencing(fakeState, player)).toBe(true)
+    expect(canStartFencing(new ActionHookRegistry(), fakeState, player)).toBe(true)
   })
 
   it('returns false when policy and locked tiles leave no legal fence commit', () => {
@@ -103,7 +104,7 @@ describe('canStartFencing entry-guard', () => {
     const state = { actionSpaces: [], players: [player] } as unknown as GameState
 
     expect(
-      canStartFencing(state, player, undefined, {
+      canStartFencing(new ActionHookRegistry(), state, player, undefined, {
         fencePolicy: {
           segmentBounds: { total: { min: 6, max: 6 } },
           newPastureBounds: {
@@ -135,7 +136,7 @@ describe('canStartFencing entry-guard', () => {
     const state = { actionSpaces: [], players: [player] } as unknown as GameState
 
     expect(
-      canStartFencing(state, player, undefined, {
+      canStartFencing(new ActionHookRegistry(), state, player, undefined, {
         fencePolicy: {
           costPolicy: { fence: { wood: 1 } },
         },
@@ -165,6 +166,6 @@ describe('canStartFencing entry-guard', () => {
       resources: { ...player.resources, wood: 14 },
     } as PlayerState
 
-    expect(canStartFencing(state, previewPlayer)).toBe(false)
+    expect(canStartFencing(new ActionHookRegistry(), state, previewPlayer)).toBe(false)
   })
 })

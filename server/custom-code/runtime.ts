@@ -67,11 +67,12 @@ export const registerExecutorBackedCustomCard = (cardData: CustomCardData): void
       scope: listener.scope,
       ...registeredListenerData(listener),
       handler: (context: CardListenerContext) => {
+        const { actionHooks: _actionHooks, ...sandboxContext } = context
         const response = invokeCustomCodeListenerSync({
           compiledCode,
           cardId,
           registrationId: listener.registrationId,
-          context,
+          context: sandboxContext,
         })
         if (!response.ok) {
           const warning = `Custom card ${cardId} listener "${listener.registrationId}" failed: ${response.error}`

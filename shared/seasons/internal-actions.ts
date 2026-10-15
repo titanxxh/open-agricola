@@ -1,3 +1,4 @@
+import type { ActionHookRegistry } from '../actions/hooks'
 import type { ActionDefinition, ActionFlow, ActionFlowPlanningContext, ActionSpace, Resource } from '../contract/types'
 import { bakeBreadAction } from '../actions/effects/bake-bread'
 import { isActionDoableInFlowContext, type FlowActionResolver } from '../actions/flow'
@@ -82,10 +83,12 @@ export const summerBreadOrSellFlow = (
   space: ActionSpace,
   resolveAction: FlowActionResolver,
   previewMode?: ActionFlowPlanningContext['previewMode'],
+  actionHooks?: ActionHookRegistry,
 ): ActionFlow | undefined => {
   const children: ActionFlow[] = []
   if (
     previewMode === 'base' || isActionDoableInFlowContext({
+      actionHooks,
       actionId: bakeBreadAction.id,
       action: bakeBreadAction,
       state,
@@ -108,16 +111,16 @@ export const summerBreadOrSellFlow = (
 }
 
 export const createSummerBreadOrSellAction = (resolveAction: FlowActionResolver): ActionDefinition => {
-  const flowFactory = ({ state, player, space, previewMode }: ActionFlowPlanningContext) =>
-    summerBreadOrSellFlow(state, player, space, resolveAction, previewMode)
+  const flowFactory = ({ state, player, space, previewMode, actionHooks }: ActionFlowPlanningContext) =>
+    summerBreadOrSellFlow(state, player, space, resolveAction, previewMode, actionHooks)
   const action: ActionDefinition = {
     id: 'season-summer-bread-or-sell',
     nameKey: 'actions.season-summer-farmers-market.option-bread-or-sell',
     descriptionKey: 'actions.season-summer-farmers-market.option-bread-or-sell',
     roundAvailable: 1,
     gainPerRound: {},
-    canBeExecutedByPlayer: function (this: ActionDefinition | ActionSpace, state, player) {
-      return summerBreadOrSellFlow(state, player, breadOrSellHostSpace(this, action), resolveAction) !== undefined
+    canBeExecutedByPlayer: function (this: ActionDefinition | ActionSpace, state, player, context) {
+      return summerBreadOrSellFlow(state, player, breadOrSellHostSpace(this, action), resolveAction, undefined, context?.actionHooks) !== undefined
     },
     flowFactory,
     execute: context => {

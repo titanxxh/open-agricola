@@ -138,6 +138,7 @@ const previewContextForChild = (
     previewState,
     effectPlayer,
     listenerContext: {
+      actionHooks: context.actionHooks,
       state: previewState,
       player: triggerPlayer,
       triggerPlayer,
@@ -177,6 +178,7 @@ export const previewActivateCardEffectChild = (
       child.params,
       child.actionContext,
       context.transactionEvents?.filter((event): event is GameEvent => 'schemaVersion' in event),
+      context.actionHooks,
     ),
   }
 }

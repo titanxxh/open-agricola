@@ -27,6 +27,7 @@ const anytimeListener: CardListenerRegistration = {
     if (context.player.houseType !== 'clay') return
     const renovation = getActionDefinition('renovate-house')
     if (!renovation || !isActionDoableInFlowContext({
+      actionHooks: context?.actionHooks,
       actionId: renovation.id,
       action: renovation,
       state: context.state,

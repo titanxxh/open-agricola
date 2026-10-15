@@ -140,6 +140,7 @@ const anytimeListener: CardListenerRegistration = {
     if (!canMoorWorkerEnterSpace(context.state, context.player, space.id)) return
     if (!evaluateWithReservedResources(context.state, context.player, { grain: 1 }, (state, player) =>
       isPlacementActionDoableInFlowContext({
+      actionHooks: context?.actionHooks,
         state, player, space, action: space, actionId: space.id, sourceCard: CARD_ID,
         resolveAction: (actionId) => findActionSpaceById(state, actionId) ?? getActionDefinition(actionId),
       }),

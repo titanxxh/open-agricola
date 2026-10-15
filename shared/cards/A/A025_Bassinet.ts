@@ -36,7 +36,7 @@ const computeArgsListener: CardListenerRegistration = {
     if (countPeopleOnSpace(context.state, targetId) !== 1) return
     const space = context.state.actionSpaces.find((s) => s.id === targetId)
     if (!space) return
-    if (!space.canBeExecutedByPlayer(context.state, context.player)) return
+    if (!space.canBeExecutedByPlayer(context.state, context.player, { actionHooks: context.actionHooks })) return
     const extraOptions: ActionChoiceOption[] = [
       { value: `${OCCUPIED_SPACE_CHOICE_PREFIX}${targetId}`, labelKey: space.nameKey },
     ]

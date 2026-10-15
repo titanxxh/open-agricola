@@ -11,7 +11,7 @@ import { EngineTree } from '../../../engine/tree'
 import { HookDispatcher } from '../../../engine/dispatcher'
 import { LogStore } from '../../../engine/log-store'
 import { ActionNode, SequenceNode } from '../../../engine/nodes'
-import { clearActionHooks } from '../../../actions/hooks'
+import { ActionHookRegistry } from '../../../actions/hooks'
 import { registerStubCards, clearStubCards } from '../index'
 import { readObservation } from '../helpers'
 import { CARD_ID as IMMEDIATELY_AFTER_ID } from '../Stub_ImmediatelyAfter_GainFlow'
@@ -25,6 +25,9 @@ import { runReturnHomeHooks } from '../../card-effects'
 import { internalActionDefinitions } from '../../../actions/index'
 import { getFenceCount } from '../../../actions/effects/fencing'
 import { requireActiveCardRegistry } from '../../active-registry'
+
+const actionHooks = new ActionHookRegistry()
+
 
 const gainAction = internalActionDefinitions.find(a => a.id === 'gain')!
 const specialEffectAction = internalActionDefinitions.find(a => a.id === 'special-effect')!
@@ -192,7 +195,7 @@ const buildEngine = (action: ActionDefinition) => {
     const engine = new Engine({
       tree: new EngineTree(new ActionNode('a', action.id)),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log,
     })
     return { engine, log, space: createSpace(action, spaceId) }
@@ -201,7 +204,7 @@ const buildEngine = (action: ActionDefinition) => {
 
 describe('Stub card: Stub_ImmediatelyAfter_GainFlow', () => {
   beforeEach(() => {
-    clearActionHooks()
+    actionHooks.clear()
     clearStubCards()
     registerStubCards()
   })
@@ -236,7 +239,7 @@ describe('Stub card: Stub_ImmediatelyAfter_GainFlow', () => {
 
 describe('Stub card: Stub_ComputeCosts_BuildDiscount', () => {
   beforeEach(() => {
-    clearActionHooks()
+    actionHooks.clear()
     clearStubCards()
     registerStubCards()
   })
@@ -273,7 +276,7 @@ describe('Stub card: Stub_ComputeCosts_BuildDiscount', () => {
 
 describe('Stub card: Stub_After_GainFlow', () => {
   beforeEach(() => {
-    clearActionHooks()
+    actionHooks.clear()
     clearStubCards()
     registerStubCards()
   })
@@ -309,7 +312,7 @@ describe('Stub card: Stub_After_GainFlow', () => {
 
 describe('Stub card: Stub_ComputeArgs_ExtraOption', () => {
   beforeEach(() => {
-    clearActionHooks()
+    actionHooks.clear()
     clearStubCards()
     registerStubCards()
   })
@@ -328,7 +331,7 @@ describe('Stub card: Stub_ComputeArgs_ExtraOption', () => {
         ]),
       ),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log,
     })
     const space = createSpace(action)
@@ -345,7 +348,7 @@ describe('Stub card: Stub_ComputeArgs_ExtraOption', () => {
 
 describe('Stub card: Stub_IsDoable_Override', () => {
   beforeEach(() => {
-    clearActionHooks()
+    actionHooks.clear()
     clearStubCards()
     registerStubCards()
   })
@@ -383,7 +386,7 @@ describe('Stub card: Stub_IsDoable_Override', () => {
 
 describe('Stub card: Stub_OnReturnHome_Accumulate', () => {
   beforeEach(() => {
-    clearActionHooks()
+    actionHooks.clear()
     clearStubCards()
     registerStubCards()
   })
@@ -413,7 +416,7 @@ describe('Stub card: Stub_OnReturnHome_Accumulate', () => {
 
 describe('Stub card: Stub_Scope_Opponent', () => {
   beforeEach(() => {
-    clearActionHooks()
+    actionHooks.clear()
     clearStubCards()
     registerStubCards()
   })
@@ -454,7 +457,7 @@ describe('Stub card: Stub_AfterAction_OptionalConstruct', () => {
   const OPTIONAL_CONSTRUCT_ID = 'Stub_AfterAction_OptionalConstruct'
 
   beforeEach(() => {
-    clearActionHooks()
+    actionHooks.clear()
     clearStubCards()
     registerStubCards()
   })
@@ -473,7 +476,7 @@ describe('Stub card: Stub_AfterAction_OptionalConstruct', () => {
     const engine = new Engine({
       tree: new EngineTree(new ActionNode('a', 'plow')),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     const space = createSpace(plowAction)
@@ -504,7 +507,7 @@ describe('Stub card: Stub_AfterAction_OptionalConstruct', () => {
     const engine = new Engine({
       tree: new EngineTree(new ActionNode('a', 'plow')),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     const space = createSpace(plowAction)
@@ -527,7 +530,7 @@ describe('Stub card: Stub_CardStorage_ConsumeFence', () => {
   const STORAGE_ID = 'Stub_CardStorage_ConsumeFence'
 
   beforeEach(() => {
-    clearActionHooks()
+    actionHooks.clear()
     clearStubCards()
     registerStubCards()
   })
@@ -559,7 +562,7 @@ describe('Stub card: Stub_CardStorage_ConsumeFence', () => {
     const engine = new Engine({
       tree: new EngineTree(new ActionNode('a', 'fence')),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     const space = createSpace(fenceAction)
@@ -601,7 +604,7 @@ describe('Stub card: Stub_CardStorage_ConsumeFence', () => {
     const engine = new Engine({
       tree: new EngineTree(new ActionNode('a', 'fence')),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     const space = createSpace(fenceAction)
@@ -618,7 +621,7 @@ describe('Stub card: Stub_ComputeReplace_Decline', () => {
   const DECLINE_ID = 'Stub_ComputeReplace_Decline'
 
   beforeEach(() => {
-    clearActionHooks()
+    actionHooks.clear()
     clearStubCards()
     registerStubCards()
   })
@@ -646,7 +649,7 @@ describe('Stub card: Stub_ComputeReplace_Decline', () => {
     const engine = new Engine({
       tree: new EngineTree(new ActionNode('a', 'sow')),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     const space = createSpace(sowAction)
@@ -691,7 +694,7 @@ describe('Stub card: Stub_ComputeReplace_Decline', () => {
     const engine = new Engine({
       tree: new EngineTree(new ActionNode('a', 'sow')),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     const space = createSpace(sowAction)

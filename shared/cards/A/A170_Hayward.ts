@@ -11,7 +11,7 @@ const anytimeListener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   phases: ['anytime' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!canStartFencing(context.state, context.player)) return
+    if (!canStartFencing(context.actionHooks, context.state, context.player)) return
     return {
       flow: {
         type: 'leaf',

@@ -13,7 +13,10 @@ import { EngineTree } from '../tree'
 import { HookDispatcher } from '../dispatcher'
 import { LogStore } from '../log-store'
 import { ActionNode, SequenceNode } from '../nodes'
-import { clearActionHooks } from '../../actions/hooks'
+import { ActionHookRegistry } from '../../actions/hooks'
+
+const actionHooks = new ActionHookRegistry()
+
 
 const createState = () =>
   ({
@@ -102,14 +105,14 @@ const buildEngine = (action: ActionDefinition, withChoice: boolean) => {
   return new Engine({
     tree: new EngineTree(root),
     registry,
-    hooks: new HookDispatcher(),
+    hooks: new HookDispatcher(actionHooks),
     log: new LogStore(),
   })
 }
 
 describe('Engine tree flow', () => {
   beforeEach(() => {
-    clearActionHooks()
+    actionHooks.clear()
     setActiveCardRegistry(new CardRegistry())
   })
 
@@ -242,7 +245,7 @@ describe('Engine tree flow', () => {
     const engine = new Engine({
       tree: new EngineTree(node),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     const state = createState()
@@ -290,13 +293,13 @@ describe('Engine tree flow', () => {
     const original = new Engine({
       tree: new EngineTree(node),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     const restored = new Engine({
       tree: new EngineTree(new ActionNode('action-restore-pending', action.id)),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     restored.restore(original.snapshot())

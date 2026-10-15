@@ -18,7 +18,7 @@ const canFollow = (context: CardListenerContext): boolean => {
   if (workersAvailable(context.state, owner) <= 0) return false
   if (!canEnterSpace(space, owner, context.state)) return false
   if (isSpaceBlocked(space)) return false
-  return space.canBeExecutedByPlayer(context.state, owner)
+  return space.canBeExecutedByPlayer(context.state, owner, { actionHooks: context.actionHooks })
 }
 
 const listener: CardListenerRegistration = {

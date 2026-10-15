@@ -1,6 +1,6 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { registerActionHook, unregisterActionHook } from '../../shared/actions/hooks'
+
 import { ListenerPurityViolationError } from '../../shared/cards/__tests__/listener-purity-guard'
 import { serializeSessionSnapshot } from '../../shared/session/serialization'
 
@@ -19,23 +19,22 @@ const setup = () => {
 }
 
 describe('cost preview query purity in a two-player Session', () => {
-  afterEach(() => unregisterActionHook(HOOK_ID))
 
   it('rejects a generic cost hook writing another player through a state alias', () => {
     const session = setup()
     const before = JSON.stringify(session.getState().state)
-    registerActionHook({ id: HOOK_ID, actions: ['construct'], phases: ['computeCosts'], handler: context => {
+    session.actionHooks.register({ id: HOOK_ID, actions: ['construct'], phases: ['computeCosts'], handler: context => {
       context.state.players[1]!.resources.food += 1
       return { costs: { wood: -1 } }
     } })
     expect(() => session.getActionAvailability(0)).toThrow(ListenerPurityViolationError)
-    unregisterActionHook(HOOK_ID)
+    session.actionHooks.unregister(HOOK_ID)
     expect(JSON.stringify(session.getState().state)).toBe(before)
   })
 
   it('repeated pure previews preserve the cursor and charge the same discounted room cost', () => {
     const session = setup()
-    registerActionHook({ id: HOOK_ID, actions: ['construct'], phases: ['computeCosts'], handler: () => ({ costs: { wood: -1 } }) })
+    session.actionHooks.register({ id: HOOK_ID, actions: ['construct'], phases: ['computeCosts'], handler: () => ({ costs: { wood: -1 } }) })
     const before = serializeSessionSnapshot(session.state, session)
     const availability = session.getActionAvailability(0)
     for (let index = 0; index < 3; index++) expect(session.getActionAvailability(0)).toEqual(availability)

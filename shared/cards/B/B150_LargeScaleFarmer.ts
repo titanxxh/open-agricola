@@ -25,7 +25,7 @@ const listener: CardListenerRegistration = {
     const targetSpaceId = TRIGGER_PAIRS[fromSpaceId]
     if (!targetSpaceId) return
 
-    const allowed = computeAllowedPlacementSpaces(context.state, context.player)
+    const allowed = computeAllowedPlacementSpaces(context.state, context.player, { actionHooks: context.actionHooks })
     if (!allowed.some(a => a.spaceId === targetSpaceId)) return
 
     if ((context.player.resources.food ?? 0) < 1) return

@@ -24,7 +24,7 @@ const listener: CardListenerRegistration = {
     const myRef = context.space?.takenBy.find(t => t.playerId === context.player.id)
     if (!myRef) return
 
-    const allowed = computeAllowedPlacementSpaces(context.state, context.player)
+    const allowed = computeAllowedPlacementSpaces(context.state, context.player, { actionHooks: context.actionHooks })
     const candidates: ActionFlow[] = CANDIDATE_TARGETS
       .filter(targetSpaceId => allowed.some(a => a.spaceId === targetSpaceId))
       .map(targetSpaceId => jumpLeaf({

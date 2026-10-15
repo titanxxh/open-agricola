@@ -7,11 +7,14 @@ import { Engine } from '../engine'
 import { HookDispatcher } from '../dispatcher'
 import { LogStore } from '../log-store'
 import { ActionNode } from '../nodes'
-import { clearActionHooks } from '../../actions/hooks'
+import { ActionHookRegistry } from '../../actions/hooks'
 import { mkActionSpace } from '../../cards/__tests__/fixtures'
 
+const actionHooks = new ActionHookRegistry()
+
+
 beforeEach(() => {
-  clearActionHooks()
+  actionHooks.clear()
   setActiveCardRegistry(new CardRegistry())
 })
 
@@ -32,7 +35,7 @@ describe('optional node active', () => {
       canBeExecutedByPlayer: () => true,
       execute: () => ({ type: 'ok' }),
     })
-    const hooks = new HookDispatcher()
+    const hooks = new HookDispatcher(actionHooks)
     const log = new LogStore()
     const engine = new Engine({ tree, registry, hooks, log })
 

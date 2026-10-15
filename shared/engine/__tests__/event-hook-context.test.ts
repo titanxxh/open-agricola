@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import type { ActionDefinition } from '../../contract/types'
-import { clearActionHooks, registerActionHook } from '../../actions/hooks'
+import { ActionHookRegistry } from '../../actions/hooks'
 import { gainAction } from '../../actions/effects/gain'
 import type { CardListenerRegistration } from '../../cards/card-listeners'
 import { withActiveRegistry } from '../../cards/active-registry'
@@ -13,6 +13,9 @@ import {
   makeEventTestState,
 } from './event-test-helpers'
 import type { GameEvent } from '../../contract/events'
+
+const actionHooks = new ActionHookRegistry()
+
 
 const action = (
   id: string,
@@ -63,7 +66,7 @@ const historicalMoveEvent: GameEvent = {
 
 describe('engine hook event context', () => {
   afterEach(() => {
-    clearActionHooks()
+    actionHooks.clear()
   })
 
   it('exposes current transaction events to action after hooks without eventSink', () => {
@@ -75,11 +78,11 @@ describe('engine hook event context', () => {
     state.events = [historicalMoveEvent]
     state.nextEventSeq = 100
     const player = state.players[0]!
-    const { engine } = makeEventTestEngine([exchange])
+    const { engine } = makeEventTestEngine([exchange], undefined, actionHooks)
     const space = asActionSpace(exchange)
     let observed = false
 
-    registerActionHook({
+    actionHooks.register({
       id: 'test-action-after-event-query',
       actions: [exchange.id],
       phases: ['after'],
@@ -114,16 +117,14 @@ describe('engine hook event context', () => {
     })
     const state = makeEventTestState()
     const player = state.players[0]!
-    const { engine } = makeEventTestEngine(
-      [first, second],
-      new SequenceNode('action-events-root', [
+    const { engine } = makeEventTestEngine([first, second], new SequenceNode('action-events-root', [
         new ActionNode('action-events-first-node', first.id),
         new ActionNode('action-events-second-node', second.id),
-      ]),
+      ]), actionHooks
     )
     let observed = false
 
-    registerActionHook({
+    actionHooks.register({
       id: 'test-action-events-after',
       actions: [second.id],
       phases: ['after'],
@@ -181,12 +182,10 @@ describe('engine hook event context', () => {
         }))
       },
     })
-    const { engine } = makeEventTestEngine(
-      [before, wrapper, child],
-      new SequenceNode('wrapper-flow-root', [
+    const { engine } = makeEventTestEngine([before, wrapper, child], new SequenceNode('wrapper-flow-root', [
         new ActionNode('wrapper-flow-before-node', before.id),
         new ActionNode('wrapper-flow-parent-node', wrapper.id),
-      ]),
+      ]), actionHooks
     )
 
     withActiveRegistry(registry, () => {
@@ -208,7 +207,7 @@ describe('engine hook event context', () => {
     player.improvements.push('Test_Event_Query_Card')
     state.events = [historicalMoveEvent]
     state.nextEventSeq = 100
-    const { engine } = makeEventTestEngine([exchange])
+    const { engine } = makeEventTestEngine([exchange], undefined, actionHooks)
     const space = asActionSpace(exchange)
     const registry = new CardRegistry()
     let observed = false
@@ -264,14 +263,12 @@ describe('engine hook event context', () => {
         }
       },
     })
-    const { engine } = makeEventTestEngine(
-      [exchange, fallback, replaceTarget],
-      new SequenceNode('choice-preview-root', [
+    const { engine } = makeEventTestEngine([exchange, fallback, replaceTarget], new SequenceNode('choice-preview-root', [
         new ActionNode('choice-preview-exchange-node', exchange.id),
         new OrNode('choice-preview-or', [
           new ActionNode('choice-preview-target-node', replaceTarget.id),
         ]),
-      ]),
+      ]), actionHooks
     )
 
     withActiveRegistry(registry, () => {
@@ -333,7 +330,7 @@ describe('engine hook event context', () => {
         }
       },
     })
-    const setup = makeEventTestEngine([exchange, fallback, blocked, gainAction])
+    const setup = makeEventTestEngine([exchange, fallback, blocked, gainAction], undefined, actionHooks)
     const [triggerSelect] = buildPhaseTrailingNodes(
       setup.engine._internals(),
       [
@@ -346,13 +343,11 @@ describe('engine hook event context', () => {
       {},
       player.id,
     )
-    const { engine } = makeEventTestEngine(
-      [exchange, fallback, blocked, gainAction],
-      new SequenceNode('trigger-preview-root', [
+    const { engine } = makeEventTestEngine([exchange, fallback, blocked, gainAction], new SequenceNode('trigger-preview-root', [
         new ActionNode('trigger-preview-exchange-node', exchange.id),
         triggerSelect!,
         new ActionNode('trigger-preview-blocked-node', blocked.id),
-      ]),
+      ]), actionHooks
     )
 
     withActiveRegistry(registry, () => {

@@ -46,7 +46,7 @@ const farmRedevFenceIsDoableListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.doable) return
     if (!isFarmRedev(context)) return
-    if (!canStartFencing(context.state, context.player, { wood: -3 })) return
+    if (!canStartFencing(context.actionHooks, context.state, context.player, { wood: -3 })) return
     return { doable: true }
   },
 }

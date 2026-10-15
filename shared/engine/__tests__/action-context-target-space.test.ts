@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { collectAction } from '../../actions/effects/collect'
 import { placeFarmerAction } from '../../actions/effects/place-farmer'
-import { clearActionHooks, registerActionHook } from '../../actions/hooks'
+import { ActionHookRegistry } from '../../actions/hooks'
 import type { ActionSpace, Resource } from '../../contract/types'
 import { setWorkersAtHome } from '../../domain/player'
 import { createInitialPlayerStats } from '../../session/stats'
@@ -12,6 +12,9 @@ import {
   makeEventTestPlayer,
   makeEventTestState,
 } from './event-test-helpers'
+
+const actionHooks = new ActionHookRegistry()
+
 
 const resources = (values: Partial<Resource> = {}): Resource => ({
   wood: 0,
@@ -41,7 +44,7 @@ const hostSpace = (): ActionSpace => ({
 })
 
 describe('actionContext targetSpaceId execution', () => {
-  afterEach(() => clearActionHooks())
+  afterEach(() => actionHooks.clear())
 
   it('uses selected place-farmer target as context.space for place-farmer after hooks', () => {
     const player = makeEventTestPlayer()
@@ -56,7 +59,7 @@ describe('actionContext targetSpaceId execution', () => {
     setWorkersAtHome(state, player, 1)
     let afterSpaceId: string | undefined
 
-    registerActionHook({
+    actionHooks.register({
       id: 'target-space-after-place-farmer',
       actions: ['place-farmer'],
       phases: ['after'],
@@ -65,9 +68,7 @@ describe('actionContext targetSpaceId execution', () => {
       },
     })
 
-    const { engine } = makeEventTestEngine(
-      [placeFarmerAction],
-      new ActionNode('extra-place-farmer', 'place-farmer'),
+    const { engine } = makeEventTestEngine([placeFarmerAction], new ActionNode('extra-place-farmer', 'place-farmer'), actionHooks
     )
 
     const prompt = engine.proceed({ state, player, space: host })
@@ -95,7 +96,7 @@ describe('actionContext targetSpaceId execution', () => {
     state.actionSpaces = [host, forest]
     let afterSpaceId: string | undefined
 
-    registerActionHook({
+    actionHooks.register({
       id: 'target-space-after-collect',
       actions: ['collect'],
       phases: ['after'],
@@ -104,9 +105,7 @@ describe('actionContext targetSpaceId execution', () => {
       },
     })
 
-    const { engine } = makeEventTestEngine(
-      [collectAction],
-      new ActionNode(
+    const { engine } = makeEventTestEngine([collectAction], new ActionNode(
         'collect-from-target',
         'collect',
         undefined,
@@ -114,7 +113,7 @@ describe('actionContext targetSpaceId execution', () => {
         undefined,
         undefined,
         { targetSpaceId: 'forest' },
-      ),
+      ), actionHooks
     )
 
     const result = engine.proceed({ state, player, space: host })
@@ -141,7 +140,7 @@ describe('actionContext targetSpaceId execution', () => {
     state.actionSpaces = [host, forest]
     let replaceSpaceId: string | undefined
 
-    registerActionHook({
+    actionHooks.register({
       id: 'target-space-compute-replace-collect',
       actions: ['collect'],
       phases: ['computeReplace'],
@@ -150,9 +149,7 @@ describe('actionContext targetSpaceId execution', () => {
       },
     })
 
-    const { engine } = makeEventTestEngine(
-      [collectAction],
-      new ActionNode(
+    const { engine } = makeEventTestEngine([collectAction], new ActionNode(
         'collect-from-target',
         'collect',
         undefined,
@@ -160,7 +157,7 @@ describe('actionContext targetSpaceId execution', () => {
         undefined,
         undefined,
         { targetSpaceId: 'forest' },
-      ),
+      ), actionHooks
     )
 
     const result = engine.proceed({ state, player, space: host })

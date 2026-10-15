@@ -17,6 +17,10 @@ import {
   redactInteractionForViewer,
 } from '../interaction-state-adapter'
 
+const actionHooks = new ActionHookRegistry()
+
+import { ActionHookRegistry } from '../../actions/hooks'
+
 const pendingStack = (
   request: InteractionRequest = { kind: 'confirm-next-player', nextPlayerIndex: 1 },
   promptKey = 'ui.confirmNextPlayer',
@@ -36,7 +40,7 @@ const pendingStack = (
     engine: new Engine({
       tree: new EngineTree(root),
       registry: new ActionRegistry(),
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     }),
     source: { kind: 'flow', flow },
@@ -64,7 +68,7 @@ const selectionPendingStack = (): EngineStack => {
     engine: new Engine({
       tree: new EngineTree(root),
       registry: new ActionRegistry(),
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     }),
     source: { kind: 'flow', flow },

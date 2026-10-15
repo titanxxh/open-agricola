@@ -180,6 +180,7 @@ export const takeAction = (
   const space = findActionSpaceById(state, spaceId)
   if (!space) return core.emitResponse(false, 'space unavailable')
   if (!canEnterActionSpace(state, player, space, {
+    actionHooks: core.actionHooks,
     vetoesAction: (entry) => core.listenersVetoIsDoableCheck(player, entry),
     isActionDoable: (entry, baseDoable) =>
       core.applyIsDoableCheck(player, entry, baseDoable),
@@ -208,7 +209,7 @@ export const takeAction = (
     reason: 'top-level',
   })
 
-  const beforeFlows = collectBeforePlacementFlows(state, player, space)
+  const beforeFlows = collectBeforePlacementFlows(core.actionHooks, state, player, space)
   if (beforeFlows.length > 0) {
     core.peekEngineFrame()?.engine.injectBeforeFlows(beforeFlows, { state, player, space })
     core.flushEngineLogPublic()
@@ -258,6 +259,7 @@ export const takeSpecialAction = (
   const space = createMoorSpecialActionSpace(actionId)
   const listenerExtraData = { specialActionCardId: cardId, payload }
   const beforeFlows = runCardListeners({
+    actionHooks: core.actionHooks,
     state,
     player,
     space,

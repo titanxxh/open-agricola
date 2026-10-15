@@ -27,9 +27,9 @@ const oneSpacePastureFlow = (): ActionFlow => ({
 const cardImpl = {
   effect: {
     id: CARD_ID,
-    onBuy: (state: GameState, player: PlayerState) => {
+    onBuy: (state: GameState, player: PlayerState, _payment, context) => {
       if (player.pastures.length > 0) return
-      if (!canStartFencing(state, player, undefined, ONE_SPACE_PASTURE_CONTEXT)) return
+      if (!canStartFencing(context?.actionHooks, state, player, undefined, ONE_SPACE_PASTURE_CONTEXT)) return
       return oneSpacePastureFlow()
     },
   },

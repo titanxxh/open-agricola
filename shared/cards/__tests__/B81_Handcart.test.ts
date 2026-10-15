@@ -11,6 +11,10 @@ import { EngineTree } from '../../engine/tree'
 
 import '../B/B081_Handcart'
 
+const actionHooks = new ActionHookRegistry()
+
+import { ActionHookRegistry } from '../../actions/hooks'
+
 const CARD_ID = 'B081_Handcart'
 
 const createPlayer = (id = 'p1'): PlayerState =>
@@ -83,7 +87,7 @@ const executeFlowLeaf = (state: GameState, player: PlayerState, flow: ActionFlow
       flow.effectPreview,
     )),
     registry,
-    hooks: new HookDispatcher(),
+    hooks: new HookDispatcher(actionHooks),
     log: new LogStore(),
   })
   const space = state.actionSpaces.find((entry) => entry.id === 'wood-accumulation')!

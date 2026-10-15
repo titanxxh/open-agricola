@@ -36,13 +36,15 @@ const jsonSnapshot = (state: GameState, player: PlayerState): string =>
   JSON.stringify({ state, player })
 
 const readFlowEffectContext = (
+  actionHooks: FlowEffectContext['actionHooks'],
   params?: Record<string, unknown>,
   reportProtectedObservation?: FlowEffectContext['reportProtectedObservation'],
   transactionEvents?: FlowEffectContext['transactionEvents'],
 ): FlowEffectContext | undefined =>
-  typeof params?.triggerActionId === 'string' || typeof params?.purchaseActionCardId === 'string'
+  actionHooks || typeof params?.triggerActionId === 'string' || typeof params?.purchaseActionCardId === 'string'
     || params?.roundPreparation || reportProtectedObservation || transactionEvents
     ? {
+        actionHooks,
         ...(typeof params?.purchaseActionCardId === 'string'
           ? { purchaseActionCardId: params.purchaseActionCardId }
           : {}),
@@ -74,6 +76,7 @@ export const previewActivateCardEffect = (
   params?: Record<string, unknown>,
   actionContext?: Record<string, unknown>,
   transactionEvents?: FlowEffectContext['transactionEvents'],
+  actionHooks?: FlowEffectContext['actionHooks'],
 ): ActionHookResult | undefined => {
   const cardId = params?.cardId
   const hook = params?.hook
@@ -87,7 +90,7 @@ export const previewActivateCardEffect = (
     cardId,
     hook as FlowCardEffectHook,
     undefined,
-    readFlowEffectContext(params, undefined, transactionEvents),
+    readFlowEffectContext(actionHooks, params, undefined, transactionEvents),
   )
   const mutated = !flow && jsonSnapshot(state, effectPlayer) !== before
   if (!flow && !mutated) return undefined
@@ -112,7 +115,7 @@ export const activateCardEffectAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
-  execute: ({ state, player, params, actionContext, reportProtectedObservation, completedTransactionEvents }) => {
+  execute: ({ actionHooks, state, player, params, actionContext, reportProtectedObservation, completedTransactionEvents }) => {
     const cardId = params?.cardId
     const hook = params?.hook
     if (typeof cardId !== 'string' || typeof hook !== 'string') {
@@ -129,7 +132,7 @@ export const activateCardEffectAction: ActionDefinition = {
       cardId,
       hook as FlowCardEffectHook,
       paymentInfo,
-      readFlowEffectContext(params, reportProtectedObservation, completedTransactionEvents),
+      readFlowEffectContext(actionHooks, params, reportProtectedObservation, completedTransactionEvents),
     )
   },
 }

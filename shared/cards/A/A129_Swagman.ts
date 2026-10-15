@@ -34,7 +34,7 @@ const listener: CardListenerRegistration = {
     const actionContext = {
       ...context.actionContext, viaCardJump: true, sourceCard: CARD_ID, workerId, targetSpaceId,
     }
-    const allowed = computeAllowedPlacementSpaces(context.state, context.player, {
+    const allowed = computeAllowedPlacementSpaces(context.state, context.player, { actionHooks: context.actionHooks,
       sourceCard: CARD_ID, actionContext, ignoreWorkerAvailability: true,
     })
     if (!allowed.some(a => a.spaceId === targetSpaceId)) return

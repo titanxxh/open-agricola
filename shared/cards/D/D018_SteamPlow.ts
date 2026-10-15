@@ -10,12 +10,13 @@ const CARD_ID = 'D018_SteamPlow'
 const cardImpl = {
   effect: {
   id: CARD_ID,
-  onStartReturnHome: (state, player) => {
+  onStartReturnHome: (state, player, context) => {
     // Check player can afford the cost
     if ((player.resources.wood ?? 0) < 2 || (player.resources.food ?? 0) < 1) return
     const targetSpaceId = 'farmland'
     const targetSpace = state.actionSpaces.find(space => space.id === targetSpaceId)
     if (!targetSpace || !isActionDoableInFlowContext({
+      actionHooks: context?.actionHooks,
       actionId: targetSpaceId,
       action: targetSpace,
       state,

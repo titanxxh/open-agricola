@@ -22,7 +22,7 @@ const lessonsComputeArgsListener: CardListenerRegistration = {
       .filter((space) =>
         isLessonsSpaceId(space.id) &&
         isSpaceOccupied(space) &&
-        space.canBeExecutedByPlayer(context.state, context.player),
+        space.canBeExecutedByPlayer(context.state, context.player, { actionHooks: context.actionHooks }),
       )
       .map((space) => ({
         value: `${OCCUPIED_SPACE_CHOICE_PREFIX}${space.id}`,

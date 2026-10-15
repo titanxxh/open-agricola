@@ -110,7 +110,7 @@ export const placeFarmerAction: ActionDefinition = {
     const target = state.actionSpaces.find((space) => space.id === (actionContext?.targetSpaceId ?? fixedTarget))
     return target ? { kind: 'actionSpace', spaceId: target.id, nameKey: target.nameKey } : undefined
   },
-  execute: ({ state, player, sourceCard, actionContext, eventSink }) => {
+  execute: ({ actionHooks, state, player, sourceCard, actionContext, eventSink }) => {
     // viaCardJump branch (Sprint 5 mech-A): move farmer + return flow leaf so
     // the engine runs the second placement through the standard ActionNode path.
     if (actionContext?.viaCardJump) {
@@ -140,7 +140,7 @@ export const placeFarmerAction: ActionDefinition = {
       // Reachability check only applies to worker mode (worker-less is invoked
       // by cards that have already verified the space is unoccupied / valid).
       if (!isWorkerless) {
-        const allowed = computeAllowedPlacementSpaces(state, player, { sourceCard, actionContext, ignoreWorkerAvailability: true })
+        const allowed = computeAllowedPlacementSpaces(state, player, { actionHooks, sourceCard, actionContext, ignoreWorkerAvailability: true })
         if (!allowed.some(a => a.spaceId === targetSpaceId)) {
           return { type: 'fail', errorKey: 'log.placeFarmerFail' }
         }
@@ -181,7 +181,7 @@ export const placeFarmerAction: ActionDefinition = {
         sourceCard,
         actionContext: resetComputeReplaceGuards(actionContext),
       }
-      const beforeFlows = collectBeforeActionSpaceUseFlows(state, player, targetSpace, resetComputeReplaceGuards(actionContext))
+      const beforeFlows = collectBeforeActionSpaceUseFlows(actionHooks, state, player, targetSpace, resetComputeReplaceGuards(actionContext))
       if (beforeFlows.length > 0) {
         return {
           type: 'flow',
@@ -206,7 +206,7 @@ export const placeFarmerAction: ActionDefinition = {
         returnRound: state.round,
       }
     }
-    let allowed = computeAllowedPlacementSpaces(state, player, {
+    let allowed = computeAllowedPlacementSpaces(state, player, { actionHooks,
       sourceCard,
       actionContext,
       ignoreWorkerAvailability: temporarySupplyWorker !== undefined,
@@ -240,7 +240,7 @@ export const placeFarmerAction: ActionDefinition = {
       promptKey: 'ui.interactionPlaceFarmerExtra',
     }
   },
-  resolveChoice: ({ state, player, sourceCard, actionContext, eventSink }, choice) => {
+  resolveChoice: ({ actionHooks, state, player, sourceCard, actionContext, eventSink }, choice) => {
     const allowOccupied = choice.startsWith(OCCUPIED_SPACE_CHOICE_PREFIX)
     const targetSpaceId = allowOccupied
       ? choice.slice(OCCUPIED_SPACE_CHOICE_PREFIX.length)
@@ -252,7 +252,7 @@ export const placeFarmerAction: ActionDefinition = {
     if (actionContext?.workerSource !== undefined && !temporarySupplyWorker) {
       return { type: 'fail', errorKey: 'log.placeFarmerFail' }
     }
-    let allowed = computeAllowedPlacementSpaces(state, player, {
+    let allowed = computeAllowedPlacementSpaces(state, player, { actionHooks,
       sourceCard,
       actionContext,
       ignoreWorkerAvailability: temporarySupplyWorker !== undefined,
@@ -296,7 +296,7 @@ export const placeFarmerAction: ActionDefinition = {
       sourceCard,
       actionContext: targetActionContext,
     }
-    const beforeFlows = collectBeforePlacementFlows(state, player, targetSpace, targetActionContext)
+    const beforeFlows = collectBeforePlacementFlows(actionHooks, state, player, targetSpace, targetActionContext)
     if (beforeFlows.length > 0) {
       return {
         type: 'flow',

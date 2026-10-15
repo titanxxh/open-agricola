@@ -25,13 +25,16 @@ import {
   SequenceNode,
   XorNode,
 } from '../nodes'
-import { clearActionHooks, registerActionHook } from '../../actions/hooks'
+import { ActionHookRegistry } from '../../actions/hooks'
 import {
   buildPhaseTrailingNodes,
   getNodeDescriptionPreview,
   stampBeforeHostNode,
 } from '../engine-utils'
 import type { CardListenerContext, MatchedCardListener } from '../../cards/card-listeners'
+
+const actionHooks = new ActionHookRegistry()
+
 
 const createState = () =>
   ({
@@ -111,7 +114,7 @@ const createSpace = (action: ActionDefinition): ActionSpace => ({
 
 describe('Engine flow nodes', () => {
   beforeEach(() => {
-    clearActionHooks()
+    actionHooks.clear()
   setActiveCardRegistry(new CardRegistry())
   })
 
@@ -155,7 +158,7 @@ describe('Engine flow nodes', () => {
     const engine = new Engine({
       tree: new EngineTree(new ActionNode('trigger', triggerAction.id)),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
 
@@ -186,7 +189,7 @@ describe('Engine flow nodes', () => {
     const engine = new Engine({
       tree: new EngineTree(new ActionNode('trigger', 'gain')),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     const matched: MatchedCardListener[] = [
@@ -250,7 +253,7 @@ describe('Engine flow nodes', () => {
       ...action,
       id: 'strict-probe-replacement',
     }
-    registerActionHook({
+    actionHooks.register({
       id: 'strict-probe-replace',
       actions: [action.id],
       phases: ['computeReplace'],
@@ -275,7 +278,7 @@ describe('Engine flow nodes', () => {
     const engine = new Engine({
       tree: new EngineTree(node),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
 
@@ -333,7 +336,7 @@ describe('Engine flow nodes', () => {
     const engine = new Engine({
       tree: new EngineTree(node),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
 
@@ -350,7 +353,7 @@ describe('Engine flow nodes', () => {
     const engine = new Engine({
       tree: new EngineTree(new ActionNode('trigger', 'gain')),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     const matched: MatchedCardListener[] = [
@@ -394,7 +397,7 @@ describe('Engine flow nodes', () => {
     const engine = new Engine({
       tree: new EngineTree(new ActionNode('trigger', 'gain')),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     const matched: MatchedCardListener[] = [
@@ -448,7 +451,7 @@ describe('Engine flow nodes', () => {
     const engine = new Engine({
       tree: new EngineTree(new ActionNode('trigger', 'gain')),
       registry: new ActionRegistry(),
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     const nodes = buildPhaseTrailingNodes(
@@ -483,7 +486,7 @@ describe('Engine flow nodes', () => {
     const engine = new Engine({
       tree: new EngineTree(new ActionNode('trigger', 'gain')),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     const matched: MatchedCardListener[] = [
@@ -537,7 +540,7 @@ describe('Engine flow nodes', () => {
     const engine = new Engine({
       tree: new EngineTree(new ActionNode('trigger', 'gain')),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     const matched: MatchedCardListener[] = [
@@ -650,7 +653,7 @@ describe('Engine flow nodes', () => {
     const engine = new Engine({
       tree: new EngineTree(triggerSelect),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
 
@@ -689,7 +692,7 @@ describe('Engine flow nodes', () => {
     const engineForNodes = new Engine({
       tree: new EngineTree(new ActionNode('trigger', 'gain')),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     const nodes = buildPhaseTrailingNodes(
@@ -709,7 +712,7 @@ describe('Engine flow nodes', () => {
     const engine = new Engine({
       tree: new EngineTree(triggerSelect),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     const context = { state, player: p1, space: createSpace(gainAction) }
@@ -774,7 +777,7 @@ describe('Engine flow nodes', () => {
     const engine = new Engine({
       tree: new EngineTree(new ActionNode('trigger', triggerAction.id)),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     const playerForNextNode = () => {
@@ -853,7 +856,7 @@ describe('Engine flow nodes', () => {
     const engine = new Engine({
       tree: new EngineTree(new ActionNode('trigger', triggerAction.id)),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     const context = () => ({ state, player: p1, space })
@@ -938,7 +941,7 @@ describe('Engine flow nodes', () => {
     const engine = new Engine({
       tree: new EngineTree(new ActionNode('trigger', triggerAction.id)),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     const context = () => ({ state, player: p1, space })
@@ -1011,7 +1014,7 @@ describe('Engine flow nodes', () => {
     const engine = new Engine({
       tree: new EngineTree(new ActionNode('trigger', triggerAction.id)),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     const context = () => ({ state, player: p1, space })
@@ -1028,7 +1031,7 @@ describe('Engine flow nodes', () => {
     const restored = new Engine({
       tree: new EngineTree(new ActionNode('dummy', triggerAction.id)),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     restored.restore(engine.snapshot())
@@ -1088,7 +1091,7 @@ describe('Engine flow nodes', () => {
     const engine = new Engine({
       tree: new EngineTree(new ActionNode('trigger', triggerAction.id)),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
 
@@ -1143,7 +1146,7 @@ describe('Engine flow nodes', () => {
     const engine = new Engine({
       tree: new EngineTree(root),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     const state = createState()
@@ -1197,7 +1200,7 @@ describe('Engine flow nodes', () => {
     const engine = new Engine({
       tree: new EngineTree(root),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     const state = createState()
@@ -1249,7 +1252,7 @@ describe('Engine flow nodes', () => {
     const engine = new Engine({
       tree: new EngineTree(root),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     const state = createState()
@@ -1288,7 +1291,7 @@ describe('Engine flow nodes', () => {
     const engine = new Engine({
       tree: new EngineTree(root),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     const state = createState()
@@ -1339,7 +1342,7 @@ describe('Engine flow nodes', () => {
     const engine = new Engine({
       tree: new EngineTree(root),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     const state = createState()
@@ -1379,7 +1382,7 @@ describe('Engine flow nodes', () => {
     const engine = new Engine({
       tree: new EngineTree(root),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     const state = createState()
@@ -1428,13 +1431,13 @@ describe('Engine flow nodes', () => {
         return { type: 'ok' }
       },
     }
-    registerActionHook({
+    actionHooks.register({
       id: 'replace-a-to-b',
       actions: ['a'],
       phases: ['computeReplace'],
       handler: () => ({ actionId: 'b' }),
     })
-    registerActionHook({
+    actionHooks.register({
       id: 'replace-b-to-c',
       actions: ['b'],
       phases: ['computeReplace'],
@@ -1447,7 +1450,7 @@ describe('Engine flow nodes', () => {
     const engine = new Engine({
       tree: new EngineTree(new ActionNode('action-a', 'a')),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     const state = createState()
@@ -1484,13 +1487,13 @@ describe('Engine flow nodes', () => {
         return { type: 'ok' }
       },
     }
-    registerActionHook({
+    actionHooks.register({
       id: 'replace-a-to-b',
       actions: ['a'],
       phases: ['computeReplace'],
       handler: () => ({ actionId: 'b' }),
     })
-    registerActionHook({
+    actionHooks.register({
       id: 'replace-c-to-a',
       actions: ['c'],
       phases: ['computeReplace'],
@@ -1502,7 +1505,7 @@ describe('Engine flow nodes', () => {
     const engine = new Engine({
       tree: new EngineTree(new ActionNode('action-a', 'a')),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     const state = createState()
@@ -1532,7 +1535,7 @@ describe('Engine flow nodes', () => {
       canBeExecutedByPlayer: () => false,
       execute: () => ({ type: 'ok' }),
     }
-    registerActionHook({
+    actionHooks.register({
       id: 'replace-a-to-blocked',
       actions: ['a'],
       phases: ['computeReplace'],
@@ -1544,7 +1547,7 @@ describe('Engine flow nodes', () => {
     const engine = new Engine({
       tree: new EngineTree(new ActionNode('action-a', 'a')),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     const state = createState()
@@ -1602,7 +1605,7 @@ describe('Engine flow nodes', () => {
     const engine = new Engine({
       tree: new EngineTree(new ActionNode('action-original', 'original')),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     const state = createState()
@@ -1699,7 +1702,7 @@ describe('Engine flow nodes', () => {
     const makeEngine = () => new Engine({
       tree: new EngineTree(new ActionNode('action-multi-replace-original', original.id)),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
 
@@ -1804,7 +1807,7 @@ describe('Engine flow nodes', () => {
     const engine = new Engine({
       tree: new EngineTree(new ActionNode('action-sow', 'sow')),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     const state = createState()
@@ -1887,7 +1890,7 @@ describe('Engine flow nodes', () => {
     const engine = new Engine({
       tree: new EngineTree(new ActionNode('action-replacement-continuation-original', original.id)),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     const state = createState()
@@ -1965,7 +1968,7 @@ describe('Engine flow nodes', () => {
         new ActionNode('action-sow', 'sow'),
       ], 'ui.interactionCultivationSelect')),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     const state = createState()
@@ -2002,7 +2005,7 @@ describe('Engine flow nodes', () => {
     const engine = new Engine({
       tree: new EngineTree(optional),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     const state = createState()
@@ -2037,7 +2040,7 @@ describe('Engine flow nodes', () => {
     const engine = new Engine({
       tree: new EngineTree(optional),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     const state = createState()
@@ -2079,7 +2082,7 @@ describe('Engine flow nodes', () => {
     const engine = new Engine({
       tree: new EngineTree(optional),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     const state = createState()
@@ -2122,7 +2125,7 @@ describe('Engine flow nodes', () => {
     const engine = new Engine({
       tree: new EngineTree(optional),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     const state = createState()
@@ -2168,7 +2171,7 @@ describe('Engine flow nodes', () => {
     const engine = new Engine({
       tree: new EngineTree(optional),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     const state = createState()
@@ -2212,7 +2215,7 @@ describe('Engine flow nodes', () => {
     const engine = new Engine({
       tree: new EngineTree(root),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     const state = createState()
@@ -2250,7 +2253,7 @@ describe('Engine flow nodes', () => {
     const engine = new Engine({
       tree: new EngineTree(root),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     const state = createState()
@@ -2282,7 +2285,7 @@ describe('Engine flow nodes', () => {
     const engine = new Engine({
       tree: new EngineTree(root),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     const state = createState()
@@ -2317,7 +2320,7 @@ describe('Engine flow nodes', () => {
     const engine = new Engine({
       tree: new EngineTree(root),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     const state = createState()
@@ -2363,7 +2366,7 @@ describe('Engine flow nodes', () => {
     const engine = new Engine({
       tree: new EngineTree(optional),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     const first = engine.proceed({
@@ -2411,7 +2414,7 @@ describe('Engine flow nodes', () => {
     const engine = new Engine({
       tree: new EngineTree(root),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     const state = createState()
@@ -2463,7 +2466,7 @@ describe('Engine flow nodes', () => {
     const engine = new Engine({
       tree: new EngineTree(or),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     const state = createState()
@@ -2506,7 +2509,7 @@ describe('Engine flow nodes', () => {
     const engine = new Engine({
       tree: new EngineTree(xor),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     const state = createState()
@@ -2556,7 +2559,7 @@ describe('Engine flow nodes', () => {
     const engine = new Engine({
       tree: new EngineTree(xor),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     const state = createState()
@@ -2597,7 +2600,7 @@ describe('Engine flow nodes', () => {
     const engine = new Engine({
       tree: new EngineTree(sequence),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     const state = createState()
@@ -2633,7 +2636,7 @@ describe('Engine flow nodes', () => {
     const engine = new Engine({
       tree: new EngineTree(node),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     const state = createState()

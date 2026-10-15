@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { requireActiveCardRegistry } from '../../shared/cards/active-registry'
-import { registerActionHook, unregisterActionHook } from '../../shared/actions/hooks'
+
 import { jumpLeaf } from '../../shared/cards/helpers/jump-leaf'
 import { gainLeaf } from '../../shared/cards/helpers/pay-gain-node'
 import '../../shared/cards/A/A129_Swagman'
@@ -227,7 +227,7 @@ describe('ReplaceHook parity - computeReplace fires on jump second placement', (
     // setup2P() calls `new GameSession()` which clears all global action hooks
     // (game-core.ts:284). Register stubs AFTER session construction.
     const { session: directSession } = setup2P('A129_Swagman')
-    registerActionHook({
+    directSession.actionHooks.register({
       id: 'stub-replace-grain-seeds-direct',
       phases: ['computeReplace'],
       actions: ['gain'],
@@ -240,12 +240,12 @@ describe('ReplaceHook parity - computeReplace fires on jump second placement', (
     try {
       driveAccepts(directSession, directSession.takeAction(0, 'grain-seeds'))
     } finally {
-      unregisterActionHook('stub-replace-grain-seeds-direct')
+      directSession.actionHooks.unregister('stub-replace-grain-seeds-direct')
     }
     expect(firedDirect).toBe(true)
 
     const { session: jumpSession } = setup2P('A129_Swagman')
-    registerActionHook({
+    jumpSession.actionHooks.register({
       id: 'stub-replace-grain-seeds-jump',
       phases: ['computeReplace'],
       actions: ['gain'],
@@ -259,7 +259,7 @@ describe('ReplaceHook parity - computeReplace fires on jump second placement', (
     try {
       driveAccepts(jumpSession, jumpSession.takeAction(0, 'farm-expansion'))
     } finally {
-      unregisterActionHook('stub-replace-grain-seeds-jump')
+      jumpSession.actionHooks.unregister('stub-replace-grain-seeds-jump')
     }
     expect(firedJump).toBe(true)
   })

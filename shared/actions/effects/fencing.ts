@@ -51,7 +51,7 @@ import {
 import { findPlayerById } from '../../domain/player'
 import { collectLockedFarmTileKeys } from '../../cards/card-effects'
 import { buildFenceFarmInteraction } from '../../domain/farmyard-interaction'
-import { hasMatchingActionHooks } from '../hooks'
+import { requireActionHookRegistry, type ActionHookRegistry } from '../hooks'
 import { getMatchingListeners, collectFarmChoiceCostAdjustments } from '../../cards/card-listeners'
 import { playerCanBuildPalisades } from '../../cards/helpers/card-type'
 import { recordActionCostAttribution, resolveActionCostAttribution } from '../../cards/helpers/card-state'
@@ -397,6 +397,7 @@ export const getTotalPastureCells = (player: PlayerState) =>
   player.pastures.reduce((sum, pasture) => sum + getPastureSize(pasture), 0)
 
 export const canStartFencing = (
+  actionHooks: ActionHookRegistry | undefined,
   state: GameState,
   player: PlayerState,
   costOverride?: Partial<Resource>,
@@ -409,7 +410,7 @@ export const canStartFencing = (
     farm: buildFenceFarmInteraction(player, space.id, actionContext),
     options: [{ value: 'confirm', labelKey: 'ui.interactionFenceConfirm' }],
   }
-  return !affordableFencePlans({ state, player, space, actionContext }, request, costOverride).next().done
+  return !affordableFencePlans({ actionHooks, state, player, space, actionContext }, request, costOverride).next().done
 }
 
 type FencePayload = {
@@ -438,6 +439,7 @@ const positiveResources = (resources: Partial<Resource>): Partial<Resource> => {
 }
 
 const computeFenceCostAdjustment = (
+  actionHooks: ActionHookRegistry,
   state: GameState,
   player: PlayerState,
   newFenceEdges: string[],
@@ -456,6 +458,7 @@ const computeFenceCostAdjustment = (
 } => {
   const contributedFreeFences = selectedFenceSupplyCount(player, actionContext) + fenceCostDiscountCount(actionContext)
   const fenceOverride = collectFarmChoiceCostAdjustments(
+    actionHooks,
     state,
     player,
     'fence',
@@ -566,6 +569,7 @@ const finalizeFence = (
     (e) => !existingEdgeIds.has(e),
   )
   const costAdjustment = computeFenceCostAdjustment(
+    requireActionHookRegistry(ctx.actionHooks),
     ctx.state,
     normalized,
     newFenceEdgesPreview,
@@ -741,7 +745,7 @@ function* affordableFencePlans(
   const maxFence = !policy.allowedSegmentTypes || policy.allowedSegmentTypes.includes('fence') ? capacity : 0
   const maxPalisade = Math.min(border.length, policy.segmentBounds?.palisade?.max ?? border.length)
   const costContext = { state, player, space, actionId: 'fence', phase: 'computeCosts' as const }
-  const globalCosts = hasMatchingActionHooks(costContext)
+  const globalCosts = requireActionHookRegistry(context.actionHooks).hasMatching(costContext)
   const costListeners = getMatchingListeners(costContext)
   const geometryCosts = globalCosts || costListeners.length > 0
   const monotoneCosts = !globalCosts && costListeners.every((entry) => entry.registration.monotoneFenceCost === true)
@@ -771,7 +775,7 @@ function* affordableFencePlans(
   let minimalAffordable = false
   const board = boardForPlayer(state, player)
   function* submit(edges: string[], palisadeEdges: string[], fenceSources?: Record<string, string>): Generator<FencePayload> {
-    const adjustment = computeFenceCostAdjustment(state, player, edges, palisadeEdges, space, policy, context.actionContext)
+    const adjustment = computeFenceCostAdjustment(requireActionHookRegistry(context.actionHooks), state, player, edges, palisadeEdges, space, policy, context.actionContext)
     if (costOverride) {
       adjustment.freeFences += Math.max(0, -(costOverride.wood ?? 0))
       adjustment.extraWood += Math.max(0, costOverride.wood ?? 0)
@@ -834,7 +838,7 @@ function* affordableFencePlans(
       for (const requiredPalisades of selectionSubsets(requiredBorder, 0, maxPalisade)) {
         const requiredFence = required.filter((edge) => !requiredPalisades.includes(edge))
         if (geometryCosts && monotoneCosts) {
-          const adjustment = computeFenceCostAdjustment(state, player, requiredFence, requiredPalisades, space, policy, context.actionContext)
+          const adjustment = computeFenceCostAdjustment(requireActionHookRegistry(context.actionHooks), state, player, requiredFence, requiredPalisades, space, policy, context.actionContext)
           if (costOverride) {
             adjustment.freeFences += Math.max(0, -(costOverride.wood ?? 0))
             adjustment.extraWood += Math.max(0, costOverride.wood ?? 0)
@@ -865,11 +869,12 @@ export const fenceAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: (state, player, context) =>
-    canStartFencing(state, player, undefined, context?.actionContext),
+    canStartFencing(context?.actionHooks, state, player, undefined, context?.actionContext),
   costPreview: {
     getBaseCost: () => ({ wood: minimumFenceSegments }),
     canExecute: (ctx, costOverride) =>
       canStartFencing(
+        ctx.actionHooks,
         ctx.state,
         ctx.player,
         costOverride,
@@ -974,6 +979,7 @@ export const fenceAction: ActionDefinition = {
         (e) => !existingEdgeIds.has(e),
       )
       const costAdjustment = computeFenceCostAdjustment(
+        requireActionHookRegistry(ctx.actionHooks),
         ctx.state,
         normalized,
         newFenceEdgesPreview,

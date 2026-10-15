@@ -5,12 +5,15 @@ import { createActionSpaces } from '../../actions'
 import { HookDispatcher } from '../dispatcher'
 import { executeCardListener } from '../../cards/card-listeners'
 import type { CardListenerContext } from '../../cards/card-listeners'
-import type { ActionHookPhase } from '../../actions/hooks'
+import { ActionHookRegistry, ActionHookPhase } from '../../actions/hooks'
 import type { Resource } from '../../contract/types'
 
 import { markAllWorkersUsed, setWorkersAtHome, workersAvailable } from '../../domain/player'
 import { CardRegistry } from '../../../shared/cards/registry'
 import { setActiveCardRegistry, requireActiveCardRegistry } from '../../../shared/cards/active-registry'
+
+const actionHooks = new ActionHookRegistry()
+
 const createState = (overrides: Partial<GameState> = {}): GameState => ({
   round: 1,
   currentPlayerIndex: 0,
@@ -96,7 +99,7 @@ describe('PlaceFarmer card integration', () => {
 
   beforeEach(() => {
     setActiveCardRegistry(new CardRegistry())
-    dispatcher = new HookDispatcher()
+    dispatcher = new HookDispatcher(actionHooks)
     state = createState()
     player = createPlayer()
     state.players = [player]

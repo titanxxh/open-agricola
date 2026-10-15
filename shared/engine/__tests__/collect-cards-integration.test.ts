@@ -10,8 +10,11 @@ import { LogStore } from '../log-store'
 import { actionDefinitions } from '../../actions'
 import { internalActionDefinitions } from '../../actions/index'
 import type { ActionSpace, GameState, PlayerState } from '../../contract/types'
-import { clearActionHooks, registerActionHook } from '../../actions/hooks'
+import { ActionHookRegistry } from '../../actions/hooks'
 import type { CardListenerContext } from '../../cards/card-listeners'
+
+const actionHooks = new ActionHookRegistry()
+
 
 const createPlayer = (overrides: Partial<PlayerState> = {}): PlayerState => ({
   id: 'p1',
@@ -92,7 +95,7 @@ const createState = (space: ActionSpace, player: PlayerState): GameState => ({
 
 describe('Collect action card listeners integration', () => {
   beforeEach(() => {
-    clearActionHooks()
+    actionHooks.clear()
     setActiveCardRegistry(new CardRegistry())
   })
 
@@ -121,7 +124,7 @@ describe('Collect action card listeners integration', () => {
     actionDefinitions.forEach((action) => registry.register(action))
     internalActionDefinitions.forEach((action) => registry.register(action))
     
-    const hooks = new HookDispatcher()
+    const hooks = new HookDispatcher(actionHooks)
     const log = new LogStore()
     
     const tree = new EngineTree(new ActionNode('action-collect', 'collect'))
@@ -156,7 +159,7 @@ describe('Collect action card listeners integration', () => {
     actionDefinitions.forEach((action) => registry.register(action))
     internalActionDefinitions.forEach((action) => registry.register(action))
     
-    const hooks = new HookDispatcher()
+    const hooks = new HookDispatcher(actionHooks)
     const log = new LogStore()
     
     const tree = new EngineTree(new ActionNode('action-collect', 'collect'))
@@ -191,7 +194,7 @@ describe('Collect action card listeners integration', () => {
     actionDefinitions.forEach((action) => registry.register(action))
     internalActionDefinitions.forEach((action) => registry.register(action))
     
-    const hooks = new HookDispatcher()
+    const hooks = new HookDispatcher(actionHooks)
     const log = new LogStore()
     
     const tree = new EngineTree(new ActionNode('action-collect', 'collect'))
@@ -230,7 +233,7 @@ describe('Collect action card listeners integration', () => {
     actionDefinitions.forEach((action) => registry.register(action))
     internalActionDefinitions.forEach((action) => registry.register(action))
     
-    const hooks = new HookDispatcher()
+    const hooks = new HookDispatcher(actionHooks)
     const log = new LogStore()
     
     const tree = new EngineTree(new ActionNode('action-gain', 'gain'))
@@ -277,7 +280,7 @@ describe('Collect action card listeners integration', () => {
     actionDefinitions.forEach((action) => registry.register(action))
     internalActionDefinitions.forEach((action) => registry.register(action))
     
-    const hooks = new HookDispatcher()
+    const hooks = new HookDispatcher(actionHooks)
     const log = new LogStore()
     
     const tree = new EngineTree(new ActionNode('action-gain', 'gain'))

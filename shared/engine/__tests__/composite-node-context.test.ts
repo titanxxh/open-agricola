@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import type { GameState, PlayerState } from '../../contract/types'
-import { clearActionHooks } from '../../actions/hooks'
+import { ActionHookRegistry } from '../../actions/hooks'
 import { setActiveCardRegistry } from '../../cards/active-registry'
 import { CardRegistry } from '../../cards/registry'
 import { mkActionSpace } from '../../cards/__tests__/fixtures'
@@ -10,6 +10,9 @@ import { Engine } from '../engine'
 import { HookDispatcher } from '../dispatcher'
 import { LogStore } from '../log-store'
 import { ActionNode, XorNode } from '../nodes'
+
+const actionHooks = new ActionHookRegistry()
+
 
 const createPlayer = (): PlayerState => ({
   id: 'p1',
@@ -56,7 +59,7 @@ const createState = (player: PlayerState): GameState => ({
 } as GameState)
 
 beforeEach(() => {
-  clearActionHooks()
+  actionHooks.clear()
   setActiveCardRegistry(new CardRegistry())
 })
 
@@ -87,7 +90,7 @@ describe('composite node actionContext', () => {
     const engine = new Engine({
       tree: new EngineTree(new XorNode('xor-root', [actionNode])),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
 

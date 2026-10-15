@@ -78,7 +78,7 @@ const fenceIsDoableListener: CardListenerRegistration = {
     if (wood < neededToReach12) return
     if (before >= 12) {
       const remainingFreeFences = buildLimit - before
-      if (!canStartFencing(context.state, player, undefined, {
+      if (!canStartFencing(context.actionHooks, context.state, player, undefined, {
         fencePolicy: {
           allowedSegmentTypes: ['fence'],
           segmentBounds: {
@@ -95,7 +95,7 @@ const fenceIsDoableListener: CardListenerRegistration = {
       ...player,
       resources: { ...player.resources, wood: wood + freeFences },
     }
-    if (!canStartFencing(context.state, previewPlayer)) return
+    if (!canStartFencing(context.actionHooks, context.state, previewPlayer)) return
     return { doable: true }
   },
 }

@@ -61,6 +61,7 @@ export type StageResumeState = {
 export type StageCardEffectHook = Extract<StageResumeState['hook'], FlowCardEffectHook>
 
 export type StageDispatchHost = {
+  actionHooks: import('../actions/hooks').ActionHookRegistry
   getState(): GameState
   createFlowEngine(flow: ActionFlow, ownerPlayerIndex?: number): Engine
   pushEngineFrame(frame: EngineFrame): void
@@ -179,7 +180,7 @@ export class StageDispatch {
       for (let currentCardIndex = startCardIndex; currentCardIndex < cards.length; currentCardIndex += 1) {
         const cardId = cards[currentCardIndex]
         if (!cardId) continue
-        const flow = runCardEffectHook(this.state, player, cardId, hook, undefined, {
+        const flow = runCardEffectHook(this.state, player, cardId, hook, undefined, { actionHooks: this.host.actionHooks,
           reportProtectedObservation: (observation) => this.host.reportProtectedObservation(observation),
         })
         if (!flow) continue
@@ -372,7 +373,7 @@ export class StageDispatch {
     const previewPlayer = previewState.players.find((entry) => entry.id === player.id)
     if (!previewPlayer) return undefined
     const before = JSON.stringify({ state: previewState, player: previewPlayer })
-    const flow = runCardEffectHook(previewState, previewPlayer, cardId, hook, undefined, { roundPreparation })
+    const flow = runCardEffectHook(previewState, previewPlayer, cardId, hook, undefined, { actionHooks: this.host.actionHooks, roundPreparation })
     return {
       flow,
       applicable: flow !== null || JSON.stringify({ state: previewState, player: previewPlayer }) !== before,

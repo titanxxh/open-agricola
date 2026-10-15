@@ -24,6 +24,10 @@ import '../../cards/D/D042_EducationBonus'
 import '../../cards/E/E089_Stallwright'
 import '../../cards/E/E097_Beneficiary'
 
+const actionHooks = new ActionHookRegistry()
+
+import { ActionHookRegistry } from '../../actions/hooks'
+
 ensureCatalogLookupsInstalled()
 
 const action = (
@@ -191,7 +195,7 @@ describe('trailing trigger snapshots', () => {
     const restored = new Engine({
       tree: new EngineTree(new ActionNode('dummy', trigger.id)),
       registry: engine._internals().registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     restored.restore(snapshot)

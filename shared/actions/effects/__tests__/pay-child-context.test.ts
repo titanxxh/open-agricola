@@ -16,6 +16,10 @@ import { ActionNode, SequenceNode } from '../../../engine/nodes'
 import { ActionRegistry } from '../../../engine/registry'
 import { internalActionDefinitions } from '../../index'
 
+const actionHooks = new ActionHookRegistry()
+
+import { ActionHookRegistry } from '../../hooks'
+
 const CARD_ID = 'B065_GrainDepot'
 
 const createState = () =>
@@ -103,7 +107,7 @@ const buildEngine = (actions: ActionDefinition[], hostActionId: string) => {
   return new Engine({
     tree: new EngineTree(root),
     registry,
-    hooks: new HookDispatcher(),
+    hooks: new HookDispatcher(actionHooks),
     log: new LogStore(),
   })
 }

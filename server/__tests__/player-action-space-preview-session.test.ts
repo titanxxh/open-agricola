@@ -26,6 +26,10 @@ import '../../shared/cards/E/E047_SyrupTap'
 import '../../shared/cards/E/E118_KindlingGatherer'
 import '../../shared/cards/C/C042_RavenousHunger'
 
+const actionHooks = new ActionHookRegistry()
+
+import { ActionHookRegistry } from '../../shared/actions/hooks'
+
 const sessions: GameSession[] = []
 afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
 const setup = (card: string, actorIndex = 0, round = 6, configure?: (state: GameState) => void) => {
@@ -46,7 +50,7 @@ const preview = (session: GameSession, card: string, actorIndex: number): Choice
   for (const action of [...session.state.actionSpaces, ...createInternalActionDefinitions(id => registry.get(id)), ...getAllAdHocActions()]) registry.register(action)
   const space = session.state.actionSpaces.find(candidate => candidate.id === card)!
   const player = session.state.players[actorIndex]!
-  return Engine.fromAction(card, { registry, hooks: new HookDispatcher(), log: new LogStore() }, player.id)
+  return Engine.fromAction(card, { registry, hooks: new HookDispatcher(actionHooks), log: new LogStore() }, player.id)
     .describe({ state: session.state, player, space })
 }
 const effects = (description: ChoiceDescriptionPreview | undefined): ChoiceEffectPreview[] => {

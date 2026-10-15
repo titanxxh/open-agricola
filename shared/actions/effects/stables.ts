@@ -1,4 +1,5 @@
 import { getUsedFarmyardTileKeys, getNewlyUsedFarmyardTiles } from '../../domain/farmyard-usage'
+import { requireActionHookRegistry, type ActionHookRegistry } from '../hooks'
 import type {
   ActionCostAttribution,
   ActionAvailabilityContext,
@@ -179,6 +180,7 @@ type StableCostResolution = {
 }
 
 const resolveStableTotalCostWithDiscount = (
+  actionHooks: ActionHookRegistry,
   state: GameState,
   player: PlayerState,
   actionContext: Record<string, unknown> | undefined,
@@ -189,7 +191,7 @@ const resolveStableTotalCostWithDiscount = (
   const actionCost = resolveStableTotalCost(actionContext, costs, totalUnits)
   const unitCost = resolveStableTotalCost(actionContext, costs, 1)
   if (!baseCost || !actionCost || !unitCost) return null
-  const adjustments = collectFarmChoiceCostAdjustments(state, player, 'stables', {
+  const adjustments = collectFarmChoiceCostAdjustments(actionHooks, state, player, 'stables', {
     stableCount: totalUnits,
     stableUnitCost: unitCost,
   })
@@ -217,6 +219,7 @@ const resolveStableTotalCostWithDiscount = (
 }
 
 const buildStableFarmSelection = (
+  actionHooks: ActionHookRegistry,
   state: GameState,
   player: PlayerState,
   actionContext: Record<string, unknown> | undefined,
@@ -236,7 +239,7 @@ const buildStableFarmSelection = (
   // first unaffordable count terminates the scan.
   let affordableMax = 0
   for (let count = 1; count <= selectionMax; count += 1) {
-    const resolution = resolveStableTotalCostWithDiscount(state, player, actionContext, costs, count)
+    const resolution = resolveStableTotalCostWithDiscount(requireActionHookRegistry(actionHooks), state, player, actionContext, costs, count)
     if (!resolution) break
     if (!PaymentSolver.canAffordTypedFlatCost(player, resolution.paymentCost, 'stables', state)) break
     affordableMax = count
@@ -267,6 +270,7 @@ const canExecuteStableCostPreview = (
 ) => {
   if (!isStableStructurallyPossible(context)) return false
   const farm = buildStableFarmSelection(
+    requireActionHookRegistry(context.actionHooks),
     context.state,
     context.player,
     readStableActionContext(context),
@@ -320,6 +324,7 @@ const finalizeStables = (
   const placementError = stables.length > 0 ? validateStablePlacement(ctx, stables) : undefined
   if (placementError?.type === 'fail') return { ...placementError, recoverable: true }
   const costResolution = resolveStableTotalCostWithDiscount(
+    requireActionHookRegistry(ctx.actionHooks),
     ctx.state,
     ctx.player,
     ctx.actionContext,
@@ -417,25 +422,25 @@ export const stablesAction: ActionDefinition = {
   canBeExecutedByPlayer: (state, player, opts) =>
     canExecuteWithCostPreview(
       stablesCostPreview,
-      { state, player, actionContext: opts?.actionContext } as StableAvailabilityContext,
+      { state, player, actionHooks: opts?.actionHooks, actionContext: opts?.actionContext } as StableAvailabilityContext,
       readStableCostDelta(opts?.actionContext, undefined),
   ),
   costPreview: stablesCostPreview,
-  previewEffect: ({ state, player, actionContext, costs, previewMode }) => {
+  previewEffect: ({ state, player, actionContext, costs, previewMode, actionHooks }) => {
     if (previewMode === 'base') return { kind: 'unitCost', unit: 'stable' as const, actionNameKey: 'actions.stables.name', resourcesPaid: stablesCostPreview.getBaseCost({ state, player, params: { actionContext } }) }
 
-    const selection = buildStableFarmSelection(state, player, actionContext, costs)
+    const selection = buildStableFarmSelection(requireActionHookRegistry(actionHooks), state, player, actionContext, costs)
     if (selection.farmType !== 'stable') return undefined
     return { kind: 'actionCosts', actionNameKey: 'actions.stables.name',
       options: Array.from({ length: selection.maxSelections }, (_, index) => {
-        const resolution = resolveStableTotalCostWithDiscount(state, player, actionContext, costs, index + 1)
+        const resolution = resolveStableTotalCostWithDiscount(requireActionHookRegistry(actionHooks), state, player, actionContext, costs, index + 1)
         const solutions = resolution ? PaymentSolver.computeOptions(state, state.players.indexOf(player), resolution.paymentCost, { actionId: 'stables', costType: 'stables' }) : []
         return { amount: index + 1, paymentOptions: solutions.map(solution => describePaymentEffectPreview(solution, false, { paymentResourceProviders: resolution?.paymentCost.paymentResourceProviders })) }
       }),
     }
   },
-  execute: ({ state, player, costs, actionContext }): ActionExecutionResult => {
-    const farm = buildStableFarmSelection(state, player, actionContext, costs)
+  execute: ({ state, player, costs, actionContext, actionHooks }): ActionExecutionResult => {
+    const farm = buildStableFarmSelection(requireActionHookRegistry(actionHooks), state, player, actionContext, costs)
     return {
       type: 'request',
       request: {
@@ -492,6 +497,7 @@ export const stablesAction: ActionDefinition = {
         return { type: 'fail', errorKey: 'log.buildStableFail', recoverable: true }
       }
       const costResolution = resolveStableTotalCostWithDiscount(
+        requireActionHookRegistry(ctx.actionHooks),
         ctx.state,
         ctx.player,
         ctx.actionContext,

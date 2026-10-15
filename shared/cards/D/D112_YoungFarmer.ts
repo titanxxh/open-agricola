@@ -48,7 +48,7 @@ const computeArgsListener: CardListenerRegistration = {
     if (!majorSpace) return
     // Only add if the space is occupied (if empty, it's already available normally)
     if (!isSpaceOccupied(majorSpace)) return
-    if (!majorSpace.canBeExecutedByPlayer(context.state, context.player)) return
+    if (!majorSpace.canBeExecutedByPlayer(context.state, context.player, { actionHooks: context.actionHooks })) return
     const extraOptions: ActionChoiceOption[] = [
       {
         value: `${OCCUPIED_SPACE_CHOICE_PREFIX}major-improvement`,

@@ -1,3 +1,4 @@
+import { requireActionHookRegistry } from '../actions/hooks'
 import { resolveActionTargetPlayer } from '../actions/helpers/target-player'
 import { evaluateFlowDoable, isActionDoableInFlowContext, type FlowDoableContext } from '../actions/flow'
 import { previewActivateCardEffectChild } from './trigger-select'
@@ -247,6 +248,7 @@ export function setEngineBlockedPending(int: EngineInternals, nodeId: string, ac
 }
 
 export function canStartNode(int: EngineInternals, context: FlowDoableContext, node: EngineNode): boolean {
+  context = { ...context, actionHooks: int.hooks.actionHooks }
   const player = context.state.players.find((entry) => entry.id === node.ownerPlayerId) ?? context.player
   if (node instanceof ActionNode) {
     const actionId = node.resolvedReplacement?.actionId ?? node.actionId
@@ -585,7 +587,7 @@ export function getActionEffectPreview(node: ActionNode, registry?: ActionRegist
       actionContext: { ...context.actionContext, ...node.actionContext },
     }
     if (definition?.costPreview && context.previewMode !== 'base') applyComputeCostResults(previewContext,
-      new HookDispatcher().computeCosts({ ...previewContext, actionId: node.actionId }))
+      new HookDispatcher(requireActionHookRegistry(context.actionHooks)).computeCosts({ ...previewContext, actionId: node.actionId }))
     if (context.previewMode === 'base' && definition?.costPreview?.dependsOnHouseType) {
       const price = definition.costPreview
       const parts: ChoiceDescriptionPreview[] = (['wood', 'clay', 'stone'] as const).flatMap(houseType => {

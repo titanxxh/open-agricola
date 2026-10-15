@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import type { ActionDefinition, ActionFlow } from '../../shared/contract/types'
 import type { CardListenerRegistration } from '../../shared/cards/card-listeners'
@@ -7,7 +7,7 @@ import { setWorkersAtHome } from '../../shared/domain/player'
 import { payAction } from '../../shared/actions/effects/pay'
 import type { ActionRegistry } from '../../shared/engine/registry'
 import { deriveCanBeExecutedByFlow, initializeFlowDerivedCanBeExecutedByPlayer } from '../../shared/actions/flow'
-import { registerActionHook, unregisterActionHook } from '../../shared/actions/hooks'
+
 
 const setup = (flow: ActionFlow, food = 0) => {
   const session = new GameSession(830, undefined, { playerCount: 2 })
@@ -55,7 +55,6 @@ const finishChoices = (session: GameSession, response: SessionResponse): Session
 const pay = (food: number): ActionFlow => ({ type: 'leaf', actionId: '__completion_pay__', params: { cost: { food } } })
 
 describe('action admission and blocked recovery through public Session commands', () => {
-  afterEach(() => unregisterActionHook('__review_replace__'))
 
   it.each(['or', 'xor', 'choice'] as const)('retains prior gain events when a sole mandatory %s step fails', (type) => {
     const { session, registry } = setup({ type: 'seq', children: [
@@ -214,7 +213,7 @@ describe('action admission and blocked recovery through public Session commands'
     registry.register({ ...registry.get('__review_original__')!, id: '__review_unavailable__', canBeExecutedByPlayer: () => false })
     forest.canBeExecutedByPlayer = deriveCanBeExecutedByFlow()
     initializeFlowDerivedCanBeExecutedByPlayer(forest, (id) => registry.get(id))
-    registerActionHook({
+    session.actionHooks.register({
       id: '__review_replace__', actions: ['__review_original__'], phases: ['computeReplace'],
       handler: () => ({ actionId: '__review_unavailable__' }),
     })

@@ -72,7 +72,7 @@ const isDoableListener: CardListenerRegistration = {
       ...context.state,
       players: context.state.players.map((entry) => entry.id === player.id ? player : entry),
     }
-    if (context.space.canBeExecutedByPlayer.call(context.space, state, player, {
+    if (context.space.canBeExecutedByPlayer.call(context.space, state, player, { actionHooks: context.actionHooks,
       sourceCard: context.sourceCard,
       actionContext: context.actionContext,
     })) {

@@ -252,7 +252,7 @@ describe('Through the Seasons Winter rules', () => {
     const session = setupWinter(11)
     spaceOf(session, 'fishing').resources.food = 3
 
-    const placements = computeAllowedPlacementSpaces(session.state, session.state.players[0]!)
+    const placements = computeAllowedPlacementSpaces(session.state, session.state.players[0]!, { actionHooks: session.actionHooks })
 
     expect(placements.map((entry) => entry.spaceId)).not.toContain('fishing')
   })

@@ -11,7 +11,7 @@ const CONVERSION_ACTION_CONTEXT = { maxRooms: 1, exactCost: {}, trueAction: fals
 const canConvert = (context: CardListenerContext) =>
   context.player.houseType === 'wood' &&
   context.player.minorPlayed.includes(CARD_ID) &&
-  constructAction.canBeExecutedByPlayer?.(context.state, context.player, {
+  constructAction.canBeExecutedByPlayer?.(context.state, context.player, { actionHooks: context.actionHooks,
     actionContext: CONVERSION_ACTION_CONTEXT,
   }) === true
 

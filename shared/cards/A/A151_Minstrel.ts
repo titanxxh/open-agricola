@@ -30,7 +30,7 @@ const STAGE_1_ACTIONS = [
 const cardImpl = {
   effect: {
     id: CARD_ID,
-    onStartReturnHome: (state, _player) => {
+    onStartReturnHome: (state, _player, context) => {
       const occupied = new Set(getReturnHomePlacements(state).map((entry) => entry.spaceId))
       const unoccupied: string[] = []
       for (const actionId of STAGE_1_ACTIONS) {
@@ -47,6 +47,7 @@ const cardImpl = {
       const targetSpaceId = unoccupied[0]!
       const targetSpace = state.actionSpaces.find((space) => space.id === targetSpaceId)
       if (!targetSpace || !isActionDoableInFlowContext({
+      actionHooks: context?.actionHooks,
         actionId: targetSpaceId,
         action: targetSpace,
         state,

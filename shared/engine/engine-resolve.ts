@@ -60,6 +60,7 @@ import { applyComputeCostResults } from './compute-cost-results'
 import { findActionSpaceById } from '../domain/space'
 
 type EngineContext = {
+  actionHooks?: ActionExecutionContext['actionHooks']
   state: ActionExecutionContext['state']
   player: ActionExecutionContext['player']
   space: ActionExecutionContext['space']
@@ -191,7 +192,7 @@ const triggerSelectEvaluationOptions = (
   context: ActionExecutionContext,
   node: ParallelNode,
 ): TriggerSelectEvaluationOptions => ({
-  canStartFlow: (flow, flowContext) => evaluateFlowDoable(flow, flowContext, (actionId) => int.registry.getRequired(actionId)),
+  canStartFlow: (flow, flowContext) => evaluateFlowDoable(flow, { ...flowContext, actionHooks: int.hooks.actionHooks }, (actionId) => int.registry.getRequired(actionId)),
   canStartNode: (child, childContext) => canStartNode(int, childContext, child),
   canContinueWithoutTriggers: (actionId, resources) => {
     const hostContext = getBeforeContinuationContext(int, context, node, actionId)
@@ -208,7 +209,7 @@ const triggerSelectEvaluationOptions = (
     if (!action) return false
     const scopedContext = withResourcePreview(hostContext, resources)
     return isActionDoableInFlowContext({
-      ...scopedContext, ...currentEventReadContext(int), actionId: hostContext.actionId, action,
+      ...scopedContext, actionHooks: int.hooks.actionHooks, ...currentEventReadContext(int), actionId: hostContext.actionId, action,
       actionContext: { ...scopedContext.actionContext, skipBeforeTriggers: true },
       resolveAction: actionId => int.registry.get(actionId),
     })
@@ -529,6 +530,7 @@ export function engineResolveChoice(
       }
       const actionContext = actionContextForNode(child, int)
       const executionContext: ActionExecutionContext = {
+    actionHooks: int.hooks.actionHooks,
         state: context.state,
         player: context.player,
         space: resolveExecutionSpace(context.state, context.space, actionContext),
@@ -600,7 +602,7 @@ export function engineResolveChoice(
       }
       const doabilityActionContext = { ...executionContext.actionContext, checkedReplaceAction: true }
       const doable = isActionDoableInFlowContext({
-        ...executionContext, ...currentEventReadContext(int), actionId, action,
+        ...executionContext, actionHooks: int.hooks.actionHooks, ...currentEventReadContext(int), actionId, action,
         actionContext: { ...doabilityActionContext, skipBeforeTriggers: true },
         resolveAction: actionId => int.registry.get(actionId),
       })
@@ -879,6 +881,7 @@ export function engineResolveChoice(
     context,
     pendingCursor?.contextSnapshot as Parameters<typeof buildChoiceExecutionContext>[1],
   )
+  executionContext.actionHooks = int.hooks.actionHooks
   executionContext.params = {
     ...(executionContext.params ?? {}),
     selectedOption: choice,
@@ -944,7 +947,7 @@ export function engineResolveChoice(
     }
     const doabilityActionContext = { ...executionContext.actionContext, checkedReplaceAction: true }
     const doable = isActionDoableInFlowContext({
-      ...executionContext, ...pendingEventReadContext(), actionId: committedActionId, action: committedAction,
+      ...executionContext, actionHooks: int.hooks.actionHooks, ...pendingEventReadContext(), actionId: committedActionId, action: committedAction,
       actionContext: { ...doabilityActionContext, skipBeforeTriggers: true },
       resolveAction: actionId => int.registry.get(actionId),
     })

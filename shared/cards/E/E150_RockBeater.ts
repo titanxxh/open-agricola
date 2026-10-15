@@ -29,7 +29,7 @@ const computeArgsListener: CardListenerRegistration = {
     const space = context.state.actionSpaces.find((s) => s.id === 'resource-market-4')
     // Only add when occupied by another player
     if (!space || !isSpaceOccupied(space) || spaceHasPlayer(space, context.player.id)) return
-    if (!space.canBeExecutedByPlayer(context.state, context.player)) return
+    if (!space.canBeExecutedByPlayer(context.state, context.player, { actionHooks: context.actionHooks })) return
     const extraOptions: ActionChoiceOption[] = [
       {
         value: `${OCCUPIED_SPACE_CHOICE_PREFIX}resource-market-4`,

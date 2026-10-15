@@ -6,12 +6,15 @@ import { EngineTree } from '../../../engine/tree'
 import { HookDispatcher } from '../../../engine/dispatcher'
 import { LogStore } from '../../../engine/log-store'
 import { ActionNode } from '../../../engine/nodes'
-import { clearActionHooks } from '../../../actions/hooks'
+import { ActionHookRegistry } from '../../../actions/hooks'
 import { registerStubCards, clearStubCards } from '../index'
 import { readObservation } from '../helpers'
 import { CARD_ID } from '../Stub_PayGainVp'
 import { internalActionDefinitions } from '../../../actions/index'
 import { computeScores } from '../../../domain/scoring'
+
+const actionHooks = new ActionHookRegistry()
+
 
 const gainAction = internalActionDefinitions.find(a => a.id === 'gain')!
 const payResourcesAction = internalActionDefinitions.find(a => a.id === 'pay')!
@@ -70,7 +73,7 @@ const createSpace = (action: ActionDefinition): ActionSpace => ({
 
 describe('Stub_PayGainVp mechanism', () => {
   beforeEach(() => {
-    clearActionHooks()
+    actionHooks.clear()
     clearStubCards()
     registerStubCards()
   })
@@ -87,7 +90,7 @@ describe('Stub_PayGainVp mechanism', () => {
     const engine = new Engine({
       tree: new EngineTree(new ActionNode('a', 'renovate-house')),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     const space = createSpace(renovate)
@@ -144,7 +147,7 @@ describe('Stub_PayGainVp mechanism', () => {
     const engine = new Engine({
       tree: new EngineTree(new ActionNode('a', 'renovate-house')),
       registry,
-      hooks: new HookDispatcher(),
+      hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
     })
     const space = createSpace(renovate)

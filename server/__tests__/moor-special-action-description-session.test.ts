@@ -6,6 +6,10 @@ import { createInternalActionDefinitions } from '../../shared/actions/internal-a
 import type { ChoiceDescriptionPreview, ChoiceEffectPreview, GameState } from '../../shared/contract/types'
 import type { MoorSpecialActionId } from '../../shared/moor/types'
 
+const actionHooks = new ActionHookRegistry()
+
+import { ActionHookRegistry } from '../../shared/actions/hooks'
+
 const sessions: ReturnType<typeof createWorkSession>[] = []
 afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
 const source = '__test_MoorMenu__'
@@ -31,7 +35,7 @@ const describeApply = (session: ReturnType<typeof createWorkSession>, actionId: 
   const state = session.state
   const registry = new ActionRegistry()
   for (const definition of [...state.actionSpaces, ...createInternalActionDefinitions(id => registry.get(id))]) registry.register(definition)
-  return Engine.fromFlow({ type: 'leaf', actionId: 'moor-special-action-apply', params: { cardId, actionId, payload: tile ? { tile } : {} } }, { registry, hooks: new HookDispatcher(), log: new LogStore() }, state.players[0]!.id)
+  return Engine.fromFlow({ type: 'leaf', actionId: 'moor-special-action-apply', params: { cardId, actionId, payload: tile ? { tile } : {} } }, { registry, hooks: new HookDispatcher(actionHooks), log: new LogStore() }, state.players[0]!.id)
     .describe({ state, player: state.players[0]!, space: state.actionSpaces[0]! })
 })
 const cardFor = (session: ReturnType<typeof createWorkSession>, actionId: MoorSpecialActionId) => {

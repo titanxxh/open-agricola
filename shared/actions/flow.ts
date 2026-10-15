@@ -8,7 +8,7 @@ import type {
   GameState,
   Resource,
 } from '../contract/types'
-import { applyIsDoableHooksDetailed, type ActionHookContext } from './hooks'
+import { requireActionHookRegistry, type ActionHookContext } from './hooks'
 import { HookDispatcher } from '../engine/dispatcher'
 import { getMatchingListeners, executeCardListener, listenerOwnerOptions } from '../cards/card-listeners'
 import { getSuppressedBeforeListenerIds, suppressBeforeListeners } from '../engine/action-context-flags'
@@ -17,8 +17,6 @@ import { getPlayerActionSpaceConfig } from '../cards/player-action-space'
 
 const deferredFlowDoableFns = new WeakSet<CanBeExecutedByPlayer>()
 const flowDerivedDoableFns = new WeakMap<CanBeExecutedByPlayer, FlowActionResolver | undefined>()
-let flowHookDispatcher: HookDispatcher | undefined
-const getFlowHookDispatcher = () => flowHookDispatcher ??= new HookDispatcher()
 
 const emptyResources: Resource = {
   wood: 0,
@@ -45,6 +43,7 @@ const canAccessActionSpace = (actionId: string, context: FlowDoableContext): boo
   || context.player.occupationPlayed.includes(actionId)
 
 const childCanBeExecutedContext = (context: FlowDoableContext): CanBeExecutedByPlayerContext => ({
+  actionHooks: context.actionHooks,
   sourceCard: context.sourceCard,
   actionContext: context.actionContext,
   params: context.params,
@@ -110,7 +109,7 @@ const applyChildActionDoable = (
     ? action.canBeExecutedByPlayer.call(context.space, context.state, context.player, childCanBeExecutedContext(context))
     : undefined
   if (strictDoable === false) return false
-  const hooks = getFlowHookDispatcher()
+  const hooks = new HookDispatcher(requireActionHookRegistry(context.actionHooks))
   const replacement = hooks.applyComputeReplace({ ...context, actionId })
   const canStartAlternative = () => replacement.alternatives.some((alternative) => evaluateFlowDoable(alternative.flow, {
     ...context,
@@ -245,7 +244,7 @@ export const isActionDoableInFlowContext = (
 
 export const isActionVetoedInFlowContext = (context: FlowDoableContext & { actionId: string }): boolean => {
   if (!canAccessActionSpace(context.actionId, context)) return true
-  const actionHookDoable = applyIsDoableHooksDetailed(context, true)
+  const actionHookDoable = requireActionHookRegistry(context.actionHooks).applyIsDoableDetailed(context, true)
   if (actionHookDoable.vetoed) return true
   const listenerContext = { ...context, phase: 'isDoable' as const, doable: actionHookDoable.doable }
   return getMatchingListeners(listenerContext).some((entry) =>
@@ -262,7 +261,7 @@ export const isPlacementActionDoableInFlowContext = (
       childCanBeExecutedContext(context)))) return false
   if (isActionDoableInFlowContext(args)) return true
   if (action.originalActionCondition?.(context) === false) return false
-  return getFlowHookDispatcher().applyIsDoable(context, action, false, () =>
+  return new HookDispatcher(requireActionHookRegistry(context.actionHooks)).applyIsDoable(context, action, false, () =>
     canStartBefore('place-farmer', context, resolveAction))
 }
 
@@ -284,6 +283,7 @@ export const initializeFlowDerivedCanBeExecutedByPlayer = (
     return evaluateFlowDoable(
       action.flow!,
       {
+        actionHooks: context?.actionHooks,
         state,
         player,
         space,

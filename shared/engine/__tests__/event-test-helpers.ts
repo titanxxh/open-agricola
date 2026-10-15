@@ -1,3 +1,4 @@
+import { ActionHookRegistry } from '../../actions/hooks'
 import type { ActionDefinition, ActionSpace, GameState, PlayerState } from '../../contract/types'
 import { HookDispatcher } from '../dispatcher'
 import { Engine } from '../engine'
@@ -100,6 +101,7 @@ export const asActionSpace = (action: ActionDefinition): ActionSpace => ({
 export const makeEventTestEngine = (
   actions: ActionDefinition[],
   root = new ActionNode(`action-${actions[0]!.id}`, actions[0]!.id),
+  actionHooks = new ActionHookRegistry(),
 ) => {
   const registry = new ActionRegistry()
   actions.forEach((action) => registry.register(action))
@@ -107,7 +109,7 @@ export const makeEventTestEngine = (
   const engine = new Engine({
     tree: new EngineTree(root),
     registry,
-    hooks: new HookDispatcher(),
+    hooks: new HookDispatcher(actionHooks),
     log,
   })
   return { engine, log, registry }
