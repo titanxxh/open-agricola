@@ -91,6 +91,7 @@ import {
   getCustomOccupationIds,
 } from '../cards/custom-registry.ts'
 import { type CustomCardData, SessionCardContext, withSessionContext } from '../cards/session-card-context.ts'
+import { validateFarmChoice, type FarmChoiceType, type FarmChoiceValidation } from './farm-choice-validation.ts'
 import { assertSandboxListenerPhases } from '../custom-code/sandbox-listener-phases.ts'
 import { CardRegistry, type CardImpl } from '../cards/registry.ts'
 import { getActiveCardRegistry, setActiveCardRegistry, withActiveRegistry } from '../cards/active-registry.ts'
@@ -4882,6 +4883,14 @@ export class GameCore {
 
   getStateForRead(): Readonly<GameState> {
     return this.state
+  }
+
+  validateFarmChoice(
+    type: FarmChoiceType,
+    playerId: string,
+    payload: Record<string, unknown>,
+  ): FarmChoiceValidation {
+    return this.withCtx(() => validateFarmChoice(this.state, type, playerId, payload))
   }
 
   private continueAfterResolvedFarmChoice(playerIndex: number): SessionResponse {

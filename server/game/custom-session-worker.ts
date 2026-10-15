@@ -10,10 +10,7 @@ import {
 } from '../../shared/session/serialization.ts'
 import { GameSession, type SessionResponse } from './authoritative-session.ts'
 import type { CustomSessionMethod } from './custom-session-executor.ts'
-import {
-  validateFarmChoice,
-  type FarmChoiceType,
-} from '../../shared/session/farm-choice-validation.ts'
+import type { FarmChoiceType } from '../../shared/session/farm-choice-validation.ts'
 
 type Request = {
   id: number
@@ -75,7 +72,7 @@ const dispatch = (method: CustomSessionMethod, args: unknown[]): { response: Ses
     const [type, playerId, payload] = args as [FarmChoiceType, string, Record<string, unknown>]
     return {
       response: session.getState(),
-      raw: validateFarmChoice(session.getStateForRead(), type, playerId, payload),
+      raw: session.validateFarmChoice(type, playerId, payload),
     }
   }
   const fn = (session as unknown as Record<string, unknown>)[method]

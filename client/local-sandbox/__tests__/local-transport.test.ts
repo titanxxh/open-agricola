@@ -2,10 +2,60 @@ import { describe, expect, it } from 'vitest'
 import { LocalGameTransport } from '../local-transport.ts'
 import type { GameSyncPayload } from '../../../shared/contract/protocol/game.ts'
 import { FakeWorker } from './fake-worker.ts'
+import { getActiveCardRegistry, setActiveCardRegistry } from '../../../shared/cards/active-registry'
+import { CardRegistry } from '../../../shared/cards/registry'
+import type { PersistedLocalGame } from '../protocol'
 
 const CONFIG = { cards: [], playerCount: 2, seed: 42 }
 
 describe('LocalGameTransport', () => {
+  it('keeps farm restrictions session-bound through the sandbox worker protocol', async () => {
+    const persisted: PersistedLocalGame[][] = [[], []]
+    const transports = persisted.map(snapshots => new LocalGameTransport({
+      cards: [], playerCount: 2, seed: 42, deckIds: ['A'],
+    }, { workerFactory: () => new FakeWorker(), onPersist: snapshot => snapshots.push(snapshot) }))
+    const [locked, ordinary] = transports
+    if (!locked || !ordinary) throw new Error('Expected two local transports')
+    const previous = getActiveCardRegistry()
+    try {
+      for (const transport of transports) {
+        const initial = await transport.start()
+        const state = initial.state
+        for (const player of state.players) {
+          player.minorHand = ['__test_placeholder__']
+          player.occupationHand = ['__test_placeholder__']
+        }
+        if (transport === locked) {
+          state.players[0]!.minorPlayed = ['B038_FutureBuildingSite']
+          state.players[0]!.cardStates.B038_FutureBuildingSite = {
+            extraData: { locked: [{ row: 0, col: 0 }] },
+          }
+        }
+        const loaded = await transport.loadGame(state)
+        expect(loaded.ok).toBe(true)
+        expect(loaded.state.players).toHaveLength(2)
+        expect(loaded.interaction.stateId).toBe('idle')
+      }
+      const before = persisted.map(snapshots => JSON.stringify(snapshots.at(-1)))
+      for (const ambient of [null, new CardRegistry()]) {
+        setActiveCardRegistry(ambient)
+        expect(await locked.validateFarmChoice('plow', 'p1', { tile: { row: 0, col: 0 } }))
+          .toEqual({ valid: false, error: 'LOCKED' })
+        expect(await ordinary.validateFarmChoice('plow', 'p1', { tile: { row: 0, col: 0 } }))
+          .toEqual({ valid: true, error: null })
+        expect(await locked.validateFarmChoice('plow', 'p1', { tile: { row: 0, col: 1 } }))
+          .toEqual({ valid: true, error: null })
+        expect(getActiveCardRegistry()).toBe(ambient)
+      }
+      await locked.getState()
+      await ordinary.getState()
+      expect(persisted.map(snapshots => JSON.stringify(snapshots.at(-1)))).toEqual(before)
+    } finally {
+      transports.forEach(transport => transport.destroy())
+      setActiveCardRegistry(previous)
+    }
+  })
+
   it('starts a game and dispatches calls through the worker', async () => {
     const transport = new LocalGameTransport(CONFIG, { workerFactory: () => new FakeWorker() })
     const snapshots: GameSyncPayload[] = []

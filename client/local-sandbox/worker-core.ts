@@ -24,10 +24,9 @@ import {
 } from '../../shared/session/state-bootstrap.ts'
 import type { CustomCardData } from '../../shared/cards/session-card-context.ts'
 import type { GameSyncPayload } from '../../shared/contract/protocol/game.ts'
-import {
-  validateFarmChoice,
-  type FarmChoiceType,
-  type FarmChoiceValidation,
+import type {
+  FarmChoiceType,
+  FarmChoiceValidation,
 } from '../../shared/session/farm-choice-validation.ts'
 import { registerBrowserBackedCustomCard } from './browser-runtime.ts'
 import { validateAndCompileCustomCodeLocal } from './browser-executor.ts'
@@ -136,8 +135,7 @@ export class LocalSandboxCore {
   }
 
   validateFarmChoice(type: FarmChoiceType, playerId: string, payload: Record<string, unknown>): FarmChoiceValidation {
-    const core = this.requireCore()
-    return core.withCtx(() => validateFarmChoice(core.getStateForRead(), type, playerId, payload))
+    return this.requireCore().validateFarmChoice(type, playerId, payload)
   }
 
   private dispatch(core: GameCore, method: string, args: unknown[]): SessionResponse {

@@ -1,7 +1,7 @@
 /**
- * Farm-choice pre-validation shared by the HTTP `/api/game/validate` endpoint
- * and the browser-local sandbox worker. Runs the farmyard validators against
- * the normalized player view, mirroring the historical router behavior.
+ * Farm-choice pre-validation implementation for the GameCore public query.
+ * The caller binds the session rules before running the farmyard validators
+ * against the normalized player view.
  */
 import { playerBoard, type SowSelection, normalizePlayerFarm } from '../domain/index.ts'
 import { playerCanBuildPalisades } from '../cards/helpers/card-type.ts'
