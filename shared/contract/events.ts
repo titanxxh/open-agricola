@@ -156,6 +156,8 @@ export type FarmStableBuiltEvent = GameEventBase<'farm.stableBuilt'> & {
 export type FarmFenceBuiltEvent = GameEventBase<'farm.fenceBuilt'> & {
   /** Tiles made used by this mutation, captured before its trailing reactions. */
   newlyUsedTiles: FarmyardTileUsage[]
+  /** Tiles changed from unenclosed to pasture by this mutation. */
+  newlyEnclosedPastureTiles: FarmyardTileUsage[]
   fences: unknown[]
   newFenceEdges?: string[]
   newPastures?: Array<{ tiles?: unknown[] }>

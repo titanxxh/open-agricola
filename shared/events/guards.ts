@@ -35,7 +35,7 @@ const eventKeysByType: Record<string, readonly string[]> = {
   'farm.roomBuilt': ['rooms', 'newlyUsedTiles'],
   'farm.renovated': ['playerId', 'from', 'to', 'rooms'],
   'farm.stableBuilt': ['stables', 'newlyUsedTiles'],
-  'farm.fenceBuilt': ['fences', 'newFenceEdges', 'newPastures', 'newlyUsedTiles'],
+  'farm.fenceBuilt': ['fences', 'newFenceEdges', 'newPastures', 'newlyUsedTiles', 'newlyEnclosedPastureTiles'],
   'farm.fenceConsumed': ['count', 'reason'],
   'farm.animalMoved': ['animals', 'from', 'to', 'newlyPlacedOnFarmyard'],
   'farm.animalDiscarded': ['animals', 'reason'],
@@ -462,6 +462,7 @@ const assertKnownEventDetails = (type: string, event: Record<string, unknown>): 
       return
     case 'farm.fenceBuilt':
       assertBoardPositions(event.newlyUsedTiles, 'newlyUsedTiles', ['playerId', 'row', 'col'])
+      assertBoardPositions(event.newlyEnclosedPastureTiles, 'newlyEnclosedPastureTiles', ['playerId', 'row', 'col'])
       if (!Array.isArray(event.fences)) throw new Error('GameEvent fences must be an array')
       if (event.newFenceEdges !== undefined) assertStringArray(event.newFenceEdges, 'newFenceEdges')
       if (event.newPastures !== undefined) assertFencePastures(event.newPastures, 'newPastures')

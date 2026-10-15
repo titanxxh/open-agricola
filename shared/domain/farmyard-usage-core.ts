@@ -56,3 +56,10 @@ export const getNewlyUsedFarmyardTiles = (player: PlayerState, previousUsed: Rea
     .filter(tile => used.has(positionKey(tile)) && !previousUsed.has(positionKey(tile)))
     .map(tile => ({ playerId: player.id, row: tile.row, col: tile.col }))
 }
+
+export const getNewlyEnclosedPastureTiles = (player: PlayerState, previousPasture: ReadonlySet<string>) => {
+  const pasture = getPastureTileKeys(player)
+  return getFarmyardTilePositions(player)
+    .filter(tile => pasture.has(positionKey(tile)) && !previousPasture.has(positionKey(tile)))
+    .map(tile => ({ playerId: player.id, row: tile.row, col: tile.col }))
+}

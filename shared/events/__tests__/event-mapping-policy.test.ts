@@ -223,12 +223,12 @@ const publicEventFixtureMatrix: Partial<PublicEventFixtureMatrix> = {
   },
   'farm.fenceBuilt': {
     log: {
-      mapped: { ...base, type: 'farm.fenceBuilt', newlyUsedTiles: [], fences: [{ type: 'fence', edge: 'h-0-0' }] },
-      silent: { ...base, id: 'fence-no-count', seq: 2, type: 'farm.fenceBuilt', newlyUsedTiles: [], fences: [{ type: 'marker', edge: 'h-0-0' }] },
+      mapped: { ...base, type: 'farm.fenceBuilt', newlyUsedTiles: [], newlyEnclosedPastureTiles: [], fences: [{ type: 'fence', edge: 'h-0-0' }] },
+      silent: { ...base, id: 'fence-no-count', seq: 2, type: 'farm.fenceBuilt', newlyUsedTiles: [], newlyEnclosedPastureTiles: [], fences: [{ type: 'marker', edge: 'h-0-0' }] },
     },
     highlight: {
-      mapped: { ...base, type: 'farm.fenceBuilt', newlyUsedTiles: [], fences: [], newFenceEdges: ['h-0-0'] },
-      silent: { ...base, id: 'fence-no-owner', seq: 2, actorPlayerId: undefined, type: 'farm.fenceBuilt', newlyUsedTiles: [], fences: [], newFenceEdges: ['h-0-0'] },
+      mapped: { ...base, type: 'farm.fenceBuilt', newlyUsedTiles: [], newlyEnclosedPastureTiles: [], fences: [], newFenceEdges: ['h-0-0'] },
+      silent: { ...base, id: 'fence-no-owner', seq: 2, actorPlayerId: undefined, type: 'farm.fenceBuilt', newlyUsedTiles: [], newlyEnclosedPastureTiles: [], fences: [], newFenceEdges: ['h-0-0'] },
     },
   },
   'farm.animalBred': {
