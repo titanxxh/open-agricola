@@ -708,6 +708,10 @@ anytime                  额外注册的 anytime 行动
 
 事件事务由 engine 的 `EventStore` 管理：public action / internal leaf 开始时建立 frame，action 成功推进后补齐 `schemaVersion/id/seq/round/phase/visibility` 并提交到 `state.events`，同时追加 `publicEvents.committed` archive packet；失败、取消、rollback 或 optional skip 不追加事件。提交时会按当前 `state.nextEventSeq` 重新定序，避免父 action pending 期间其他子流程先提交事件后产生重复 `seq`。提交前会校验公开性、JSON 安全、大小上限和已知 event type/字段；恢复 pending/engine snapshot 时也会校验事务内事件，避免把未完成 frame 的非法事件写回。
 
+农场变更事件 `farm.fieldPlowed`、`farm.roomBuilt`、`farm.stableBuilt` 和 `farm.fenceBuilt` 必须包含 `newlyUsedTiles: { playerId, row, col }[]`。每个生产入口在成功变更前取得权威已使用格集合，并在变更后、尾随响应前立即记录集合差。已使用格包括房间、田地、马厩、牧场格、地形和被封锁的农场格。因此，在已有牧场或田地建马厩、分割牧场和地形转为田地的新增使用格均为空。普通建造、特殊马厩、直接建马厩和 Moor 入口遵守同一合同。必填事实经事件校验，并由事件投影、pending 快照和 Replay 保留；消费者不能从响应执行时的版图重新推算差值。
+
+`getActionNewlyUsedTiles(context)` 只读取宿主已捕获 `actionEvents` 中的已提交几何事件，按效果玩家 ID 过滤并去重坐标，不回退到更宽的 transaction 或 Turn 范围。嵌套宿主各自保留事实，延后的外层响应不会再次消费内层变更。A040 剩余黏土等持续牌上库存仍由本牌状态保存，每次行动的几何事实不再使用临时牌状态缓存。提交时的卡牌准入继续采用已冻结的 listener 集合和 `triggerSnapshot`；新增几何事实不会让之后响应中新打出的卡追溯响应旧事件。
+
 卡牌 listener 通过 `CardListenerContext.transactionEvents` 和 `eventQuery` 读取当前 action frame 的事件。普通 listener 看到的是已经 emit 的当前 frame 事件；`trade-applied` 这类合成 listener 可以读取当前 exchange 的 `DraftGameEvent`，但不能依赖尚未提交的全局 `state.events`。listener handler 必须是 state-pure flow builder；包括本卡 `cardStates[cardId]` 在内的所有状态修改都通过返回 flow/leaf 进入 engine。trigger-select preview 在克隆 state/player 上执行 card listener，并且只根据返回结果判定该 activation 是否可选；listener 写 preview clone 属于纯度违规（见 §7.7 listener 纯度门禁）。只有 stage card-effect handler 仍可通过可检测的 clone 修改建立适用性。真实写入只在玩家选择 activation 后发生。
 
 通用 `ActionNode('place-farmer')` 启动时不会分发卡牌 `before` listener，因为此时目标行动格尚未确定。目标选定后，所有放人路径都会以该目标作为 `context.space`，同时分发 `before / <target-space-id>` 和 `before / place-farmer`，对同时匹配两个身份的 listener 去重，然后展开目标 action flow 并级联目标放人的 `after` listener。普通顶层放人、可选目标或固定目标的额外放人、以及卡牌跳转共用这个目标已知边界。因此 A174 这类监听扩展行动格 ID 的卡牌和 D090 这类监听放人生命周期的卡牌会看到相同的目标行动格上下文。

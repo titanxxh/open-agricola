@@ -1104,7 +1104,7 @@ describe('specialEffectAction — mutation dispatcher', () => {
       expect.objectContaining({ type: 'worker.promoted', playerId: player.id, workerId: '1', from: 'newborn', to: 'adult' }),
       expect.objectContaining({ type: 'farm.fenceConsumed', count: 1, reason: 'cardEffect' }),
       expect.objectContaining({ type: 'action.accumulated', spaceId: 'forest', resources: { wood: 2 } }),
-      expect.objectContaining({ type: 'farm.stableBuilt', stables: [expect.objectContaining({ playerId: player.id })] }),
+      expect.objectContaining({ type: 'farm.stableBuilt', newlyUsedTiles: [{ playerId: player.id, row: 0, col: 0 }], stables: [expect.objectContaining({ playerId: player.id })] }),
     ])
   })
 

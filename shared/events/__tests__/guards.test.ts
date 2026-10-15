@@ -146,10 +146,26 @@ describe('event guards', () => {
     expect(() => assertKnownGameEventShape({
       ...baseEvent,
       type: 'farm.fenceBuilt',
+      newlyUsedTiles: [],
       fences: [{ edge: 'H-0-0', type: 'fence' }],
       newFenceEdges: ['H-0-0'],
       newPastures: [{ tiles: [{ row: 0, col: 0 }] }],
     })).not.toThrow()
+  })
+
+  it.each([
+    { type: 'farm.fieldPlowed', fields: [] },
+    { type: 'farm.roomBuilt', rooms: [] },
+    { type: 'farm.stableBuilt', stables: [] },
+    { type: 'farm.fenceBuilt', fences: [] },
+  ])('requires owned geometry facts for $type', payload => {
+    const event = { ...baseEvent, ...payload }
+    expect(() => assertKnownGameEventShape(event)).toThrow(/newlyUsedTiles/)
+    expect(() => assertKnownGameEventShape({ ...event, newlyUsedTiles: [] })).not.toThrow()
+    expect(() => assertKnownGameEventShape({ ...event, newlyUsedTiles: [{ playerId: 'p1', row: 0, col: 1 }] })).not.toThrow()
+    for (const malformed of [[{ row: 0, col: 1 }], [{ playerId: 'p1', row: '0', col: 1 }], [{ playerId: 'p1', row: 0, col: 1, extra: true }]]) {
+      expect(() => assertKnownGameEventShape({ ...event, newlyUsedTiles: malformed })).toThrow(/newlyUsedTiles/)
+    }
   })
 
   it('accepts supply tokens in resource paid events', () => {

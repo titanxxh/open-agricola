@@ -1,3 +1,4 @@
+import { getUsedFarmyardTileKeys, getNewlyUsedFarmyardTiles } from '../../domain/farmyard-usage'
 import type {
   ActionCostAttribution,
   ActionAvailabilityContext,
@@ -338,6 +339,7 @@ const finalizeStables = (
   if (payment.type !== 'selected') {
     return { type: 'fail', errorKey: 'log.buildStableFail', recoverable: payment.type === 'fail' && payment.recoverable === true }
   }
+  const previousUsed = getUsedFarmyardTileKeys(ctx.player)
   const nextPlayer = JSON.parse(JSON.stringify(ctx.player)) as PlayerState
   nextPlayer.stableTiles = [...nextPlayer.stableTiles, ...stables]
   let specialSourceCardId: string | undefined
@@ -383,6 +385,7 @@ const finalizeStables = (
   }
   ctx.eventSink?.emit<'farm.stableBuilt'>({
     type: 'farm.stableBuilt',
+    newlyUsedTiles: getNewlyUsedFarmyardTiles(ctx.player, previousUsed),
     sourceActionId: ctx.space.id,
     stables: stableItems,
   })

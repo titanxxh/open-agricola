@@ -199,14 +199,14 @@ const publicEventFixtureMatrix: Partial<PublicEventFixtureMatrix> = {
   },
   'farm.fieldPlowed': {
     highlight: {
-      mapped: { ...base, type: 'farm.fieldPlowed', fields: [{ playerId: 'p1', row: 1, col: 1 }] },
-      silent: { ...base, id: 'plowed-empty', seq: 2, type: 'farm.fieldPlowed', fields: [] },
+      mapped: { ...base, type: 'farm.fieldPlowed', newlyUsedTiles: [], fields: [{ playerId: 'p1', row: 1, col: 1 }] },
+      silent: { ...base, id: 'plowed-empty', seq: 2, type: 'farm.fieldPlowed', newlyUsedTiles: [], fields: [] },
     },
   },
   'farm.roomBuilt': {
     highlight: {
-      mapped: { ...base, type: 'farm.roomBuilt', rooms: [{ playerId: 'p1', row: 1, col: 1, type: 'wood' }] },
-      silent: { ...base, id: 'room-empty', seq: 2, type: 'farm.roomBuilt', rooms: [] },
+      mapped: { ...base, type: 'farm.roomBuilt', newlyUsedTiles: [], rooms: [{ playerId: 'p1', row: 1, col: 1, type: 'wood' }] },
+      silent: { ...base, id: 'room-empty', seq: 2, type: 'farm.roomBuilt', newlyUsedTiles: [], rooms: [] },
     },
   },
   'farm.renovated': {
@@ -217,18 +217,18 @@ const publicEventFixtureMatrix: Partial<PublicEventFixtureMatrix> = {
   },
   'farm.stableBuilt': {
     highlight: {
-      mapped: { ...base, type: 'farm.stableBuilt', stables: [{ playerId: 'p1', row: 1, col: 1 }] },
-      silent: { ...base, id: 'stable-empty', seq: 2, type: 'farm.stableBuilt', stables: [] },
+      mapped: { ...base, type: 'farm.stableBuilt', newlyUsedTiles: [], stables: [{ playerId: 'p1', row: 1, col: 1 }] },
+      silent: { ...base, id: 'stable-empty', seq: 2, type: 'farm.stableBuilt', newlyUsedTiles: [], stables: [] },
     },
   },
   'farm.fenceBuilt': {
     log: {
-      mapped: { ...base, type: 'farm.fenceBuilt', fences: [{ type: 'fence', edge: 'h-0-0' }] },
-      silent: { ...base, id: 'fence-no-count', seq: 2, type: 'farm.fenceBuilt', fences: [{ type: 'marker', edge: 'h-0-0' }] },
+      mapped: { ...base, type: 'farm.fenceBuilt', newlyUsedTiles: [], fences: [{ type: 'fence', edge: 'h-0-0' }] },
+      silent: { ...base, id: 'fence-no-count', seq: 2, type: 'farm.fenceBuilt', newlyUsedTiles: [], fences: [{ type: 'marker', edge: 'h-0-0' }] },
     },
     highlight: {
-      mapped: { ...base, type: 'farm.fenceBuilt', fences: [], newFenceEdges: ['h-0-0'] },
-      silent: { ...base, id: 'fence-no-owner', seq: 2, actorPlayerId: undefined, type: 'farm.fenceBuilt', fences: [], newFenceEdges: ['h-0-0'] },
+      mapped: { ...base, type: 'farm.fenceBuilt', newlyUsedTiles: [], fences: [], newFenceEdges: ['h-0-0'] },
+      silent: { ...base, id: 'fence-no-owner', seq: 2, actorPlayerId: undefined, type: 'farm.fenceBuilt', newlyUsedTiles: [], fences: [], newFenceEdges: ['h-0-0'] },
     },
   },
   'farm.animalBred': {

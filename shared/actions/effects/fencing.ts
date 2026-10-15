@@ -1,3 +1,4 @@
+import { getUsedFarmyardTileKeys, getNewlyUsedFarmyardTiles } from '../../domain/farmyard-usage'
 import type {
   ActionCostAttribution,
   ActionDefinition,
@@ -621,6 +622,7 @@ const finalizeFence = (
   if (payment.type !== 'selected') {
     return { type: 'fail', errorKey: 'log.fencingFail', recoverable: payment.type === 'fail' && payment.recoverable === true }
   }
+  const previousUsed = getUsedFarmyardTileKeys(ctx.player)
   const nextPlayer = JSON.parse(JSON.stringify(validated.player)) as PlayerState
   const consumed = isBorrowedFenceSourcePolicy(currentPolicy.sourcePolicy)
     ? undefined
@@ -658,6 +660,7 @@ const finalizeFence = (
   if (builtFences.length > 0) {
     ctx.eventSink?.emit<'farm.fenceBuilt'>({
       type: 'farm.fenceBuilt',
+      newlyUsedTiles: getNewlyUsedFarmyardTiles(ctx.player, previousUsed),
       fences: builtFences,
       newFenceEdges: validated.newFenceEdges,
       newPastures: validated.newPastures,

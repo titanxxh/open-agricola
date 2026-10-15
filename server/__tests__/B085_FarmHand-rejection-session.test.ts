@@ -65,6 +65,7 @@ describe('B085 Farm Hand rejected selections', () => {
     expect(getAvailableStableSupplyCount(built.state, player)).toBe(3)
     expect(computeAnimalZones(player, built.state).filter((zone) => zone.zoneType === 'stable')).toEqual([])
     expect(built.state.events.filter((event) => event.type === 'farm.stableBuilt')).toHaveLength(1)
+    expect(built.state.events.find(event => event.type === 'farm.stableBuilt')).toMatchObject({ newlyUsedTiles: [] })
     expect(built.state.log).toEqual(expect.arrayContaining([
       expect.objectContaining({ key: 'log.actionDetail', params: expect.objectContaining({ detailParts: expect.objectContaining({ effects: { buildStables: 1 } }) }) }),
     ]))

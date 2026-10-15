@@ -107,6 +107,7 @@
 | 无人物的行动格使用 | `place-farmer.actionContext.viaCardJump`、`isActionDoableInFlowContext()`、A151 | 卡牌可在不创建、放置或消耗人物的情况下执行完整行动格 flow。卡牌先按实时状态校验目标，随后仍由引擎统一处理 replacement、费用、listener、pending 与权威提交。 |
 | Granted Rule Action | `family-growth`、A021/A093/B092/C021/D010、ADR 0018 | 卡牌授予规则动作时直接调用该动作。授予 Family Growth 不等于展开整个 Wish for Children 行动格，因此不会附带放置工人或可选小发展。 |
 | 普通围栏计数与事件语义 | `FenceSegment.type`、`getFenceCount()`、`farm.fenceBuilt.newFenceEdges`、`hasOrdinaryFenceBuiltEvent()`、E001/B027/D089 | 印刷 `<FENCE>` 的数量和触发只计算普通 `type='fence'` segment，包括农场上的借用普通围栏，但排除 Wood Palisades。确实关心任意围地 segment 或农场物件的消费者可继续读取广义 `farm.fenceBuilt.fences` 事件字段。 |
+| 提交时的新增使用农场格 | `farm.*Built.newlyUsedTiles`、`farm.fieldPlowed.newlyUsedTiles`、`getNewlyUsedFarmyardTiles()`、`getActionNewlyUsedTiles()`、A040 | 四类变更事件在提交时记录权威 unused→used 坐标，特殊与 Moor 入口同样遵守。尾随卡牌只消费自身宿主的行动事件；嵌套、pending 恢复与撤销无需临时几何状态。地形、被封锁格和原有使用格共用领域使用状态查询。 |
 | Metadata 审计覆盖需要随字段演进同步 | `STABLE` cost 和 `passing` 已覆盖；当前 literal mismatch 为 0 | 新增 metadata 字段时同步加 fixture，避免统计口径回退。 |
 | 后端权威的 action / pending 合同 | `allowedCommands`、typed request、`commitSelection`、`engine-resolve` protected cancel、`resolveEngineChoice`、bare improvement choice ids | 新增交互必须显式暴露 command / options 并由后端校验；major/minor improvement choice value 使用裸 `cardId`，旧 `major:` / `minor:` 只作为 parser 兼容输入，支付 option 保留 `pay:*` 命名空间；不要恢复 encoded choice shortcut、old pending cursor 或前端裁定规则。 |
 | 有数量上限的选项多选 | `ChoiceMultiSelect`、`emit-choice`、`pending-validation`、`action-space-tokens`、`InteractionBar` | 独立候选及当前最小/最大数量取代组合选项列表。通用后端校验在调用卡牌 hook 前检查候选、禁用状态、唯一性和数量，前端只收集本地草稿。E148 在当前可用 stable supply 内最多预留四个行动格，支持空选和动态刷新。 |
@@ -194,6 +195,8 @@
 Gain 来源区分显式资源参数和行动格配置的基础收益。C168 在卡内复用这一既有区分（#1125），保留额外奖励，以及其他卡牌授予的真实日工行动。4 人 Session 回归覆盖接受、拒绝、支付、动物安置、Farmers of the Moor 组合和撤销重试，不新增触发标记。
 
 ## 6. 基础设施待办
+
+提交时的农场使用状态事实（#1195）是响应新增使用格的共享基础设施，详见 §5 与 Architecture §7。四类几何事件记录同一权威集合差，卡牌读取已捕获的宿主行动事件，不再使用每次行动的牌状态计数。A040 只保留牌上剩余黏土库存。
 
 每行 `altCosts` 都是完整基础费用候选，须包含各替代方案共有的费用。折扣和替代付款仍走通用支付管线。卡内奖励分公式保留牌文列出的有限例外，与印刷卡牌分分开；存储预览复用同一计分回调。Session 回归验证实际费用、转换后的支付及后续计分边界，无需新增通用扩展点。
 

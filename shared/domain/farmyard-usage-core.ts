@@ -49,3 +49,10 @@ export const getUnusedFarmyardTilePositions = (player: PlayerState) => {
 
 export const hasNoUnusedFarmyardSpaces = (player: PlayerState) =>
   countUnusedFarmyardSpaces(player) === 0
+
+export const getNewlyUsedFarmyardTiles = (player: PlayerState, previousUsed: ReadonlySet<string>) => {
+  const used = getUsedFarmyardTileKeys(player)
+  return getFarmyardTilePositions(player)
+    .filter(tile => used.has(positionKey(tile)) && !previousUsed.has(positionKey(tile)))
+    .map(tile => ({ playerId: player.id, row: tile.row, col: tile.col }))
+}
