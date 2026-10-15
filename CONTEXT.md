@@ -17,7 +17,7 @@ _Avoid_: client 直接 import `shared/session`、`shared/engine`、卡牌实现
 _Avoid_: WebSocket 连接层
 
 **GameSession**:
-服务端唯一游戏命令入口和 `GameState` owner。状态修改可由它驱动的 `GameCore` 和 action leaf 执行；HTTP、WebSocket 和 session 测试都必须通过该权威边界驱动规则。
+服务端唯一游戏命令入口、对局规则查询边界和 `GameState` owner，负责为规则查询与结算绑定同一局的状态和完整规则集合。HTTP、WebSocket 和 session 测试通过该权威边界驱动规则，状态修改可由它驱动的 `GameCore` 和 action leaf 执行。
 _Avoid_: React session、本地 UI store、把唯一写入者理解为只有一个源文件可以赋值
 
 **GameState**:

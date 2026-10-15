@@ -709,6 +709,12 @@ D015 Clay Supports' clay-to-reed trade applies only when `houseTypeClay > 0`. A1
 
 ### 7.5 Hook system: 10 action-lifecycle phases
 
+**Approved design for #1188, implementation pending.** Each `GameCore` owns an independent generic ActionHook registry. Dispatch, flow availability, and cost/query helpers receive that registry explicitly. They do not consult a process-wide action-hook default. Farm-choice prevalidation becomes a public `GameCore` query shared by the HTTP, server-worker, and local-sandbox adapters.
+
+`CardRegistry` stops publishing a persistent process-wide default. Card-rule helpers retain temporary session binding through `withCtx`; their APIs do not migrate to explicit runtime parameters in this change. A lookup without a bound card environment fails explicitly. An explicitly empty registry or a card without an effect remains a valid empty result.
+
+State loading, cursor restoration, and undo retain the same Core's rule registries. A new Core, including a reconstructed worker, builds its own registries from the official, variant, and custom-card definitions. Registries and executable handlers are runtime dependencies, not game-state or cursor data. Temporary card bindings restore the previous environment after nested calls and exceptions.
+
 ```text
 isDoable                 change whether an action is executable
 computeReplace           replace an entire action
