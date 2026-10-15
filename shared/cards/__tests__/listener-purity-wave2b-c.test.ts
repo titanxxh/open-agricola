@@ -301,7 +301,7 @@ describe('listener purity wave 2b/c', () => {
     expectUnchanged(before, game)
   })
 
-  it('A73 AgriculturalFertilizers before-action snapshots used spaces by flow only', () => {
+  it('A73 AgriculturalFertilizers derives Sow from committed host usage without mutating state', () => {
     const p = player('A073_AgriculturalFertilizers', {
       roomTiles: [{ row: 0, col: 0 }],
       fields: [{ row: 0, col: 1, stacks: [] }],
@@ -309,17 +309,32 @@ describe('listener purity wave 2b/c', () => {
     })
     const game = state([p])
     const before = stateSnapshot(game)
-
-    const result = listenerById(A073_AgriculturalFertilizers_impl.listeners, 'A73-agri-fert-before')
-      .handler(context(p, { state: game, actionId: 'construct', phase: 'before' }))
+    const used = [{ playerId: p.id, row: 1, col: 1 }, { playerId: p.id, row: 1, col: 2 }]
+    const built: GameEvent = {
+      schemaVersion: 1, type: 'farm.roomBuilt', id: 'built', seq: 1, round: 1, phase: 'work', visibility: 'public',
+      actorPlayerId: p.id, newlyUsedTiles: used, rooms: used.map(tile => ({ ...tile, type: 'wood' })),
+    }
+    const result = listenerById(A073_AgriculturalFertilizers_impl.listeners, 'A73-agri-fert-after')
+      .handler(context(p, { state: game, actionId: 'construct', phase: 'after', actionEvents: [built] }))
 
     expectUnchanged(before, game)
     expect(result?.flow).toMatchObject({
       type: 'leaf',
-      actionId: 'special-effect',
+      actionId: 'sow',
+      optional: true,
       sourceCard: 'A073_AgriculturalFertilizers',
-      params: { kind: 'set-extra-data', key: 'spacesBefore', value: 3 },
     })
+    for (const events of [
+      { actionEvents: [{ ...built, newlyUsedTiles: used.map(tile => ({ ...tile, playerId: 'other' })) }] },
+      { actionEvents: [{ ...built, newlyUsedTiles: [used[0]!] }] },
+      { actionEvents: [], transactionEvents: [built] },
+      { actionEvents: undefined, transactionEvents: [built] },
+    ]) {
+      const unrelated = listenerById(A073_AgriculturalFertilizers_impl.listeners, 'A73-agri-fert-after')
+        .handler(context(p, { state: game, actionId: 'construct', phase: 'after', ...events }))
+      expect(unrelated).toBeUndefined()
+    }
+    expectUnchanged(before, game)
   })
 
   // A92 was migrated to the reference pull model: a single anytime grow-only listener

@@ -104,8 +104,11 @@ describe('A073_AgriculturalFertilizers session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
 
-    const stables = resp.interaction.request.options!.find((option) => option.labelKey === 'actions.stables.name')!
-    resp = session.resolveChoice(0, stables.value)
+    if (resp.interaction.request.kind === 'choice') {
+      const stables = resp.interaction.request.options!.find((option) => option.labelKey === 'actions.stables.name')
+      expect(stables).toBeDefined()
+      resp = session.resolveChoice(0, stables!.value)
+    }
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.request.farm.farmType).toBe('stable')
