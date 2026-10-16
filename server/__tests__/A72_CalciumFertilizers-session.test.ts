@@ -443,6 +443,27 @@ describe('A072_CalciumFertilizers session', () => {
 
 describe("A072 command boundaries", () => {
   const CALCIUM = 'A072_CalciumFertilizers'
+  function confirmed(r: SessionResponse, actor = 0) {
+    assert.equal(r.ok, true, r.error)
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, actor)
+    assert.equal(r.state.currentPlayerIndex, actor)
+    assert.equal(r.interaction.request.nextPlayerIndex, 1 - actor)
+    return r
+  }
+  function idle(r: SessionResponse) {
+    assert.equal(r.ok, true, r.error)
+    assert.equal(r.interaction.stateId, 'idle', JSON.stringify(r.interaction))
+    assert.equal(r.state.currentPlayerIndex, 0)
+    assert.equal(r.state.roundPhase, 'work')
+    return r
+  }
+  function restoredInteraction(s: GameSession, r: SessionResponse, expected: string) {
+    assert.equal(JSON.stringify(r.interaction), expected)
+    assert.equal(JSON.stringify(s.getState().interaction), expected)
+    assert.equal(r.state.currentPlayerIndex, 0)
+    assert.equal(s.getState().state.currentPlayerIndex, 0)
+  }
   function ok(r: SessionResponse) {
     assert.equal(r.ok, true, r.error)
     return r
@@ -486,28 +507,33 @@ describe("A072 command boundaries", () => {
     return r
   }
   function buy(s: GameSession, card: string) {
+    // Each legal fixture has one playable minor, automatically selected after this entry.
     const r = buyMenu(s)
-    if (!r.state.players[0]!.minorHand.includes(card))
-      return r
-    assert.ok(choices(r).some(o => o.value === card && !o.disabled))
-    return ok(s.resolveChoice(0, card))
+    assert.equal(r.state.players[0]!.minorHand.includes(card), false)
+    if (card === CALCIUM) assert.ok(r.state.players[0]!.minorPlayed.includes(card))
+    else {
+      assert.equal(card, 'B006_ExcursiontotheQuarry')
+      assert.ok(r.state.players[1]!.minorHand.includes(card))
+    }
+    return confirmed(r)
   }
   function deny(s: GameSession, card: string) {
     const r = buyMenu(s)
     assert.ok(!r.state.players[0]!.minorPlayed.includes(card))
     assertRejectedUnchanged(s, () => s.resolveChoice(0, card))
+    confirmed(s.getState())
   }
   function ready(s: GameSession, actor: number) {
     let r = s.getState()
     if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
-      r = confirmNext(s, r)
+      r = confirmNext(s, confirmed(r, 1 - actor))
     assert.equal(r.interaction.stateId, 'idle', JSON.stringify(r.interaction))
     assert.equal(r.state.currentPlayerIndex, actor)
     return r
   }
   function turn(s: GameSession, actor: number, space: string) {
     ready(s, actor)
-    return ok(s.takeAction(actor, space))
+    return confirmed(ok(s.takeAction(actor, space)), actor)
   }
   function fields(state: GameState, crops: Array<{
     kind: 'grain' | 'vegetable'
@@ -592,11 +618,15 @@ describe("A072 command boundaries", () => {
     assert.equal(r.state.players[0]!.resources.food, 38)
   })
   it("actual quarry undo restores crops supply worker pile logs and score before one retry", () => {
-    const s = calcium(), before = undoRuleSnapshot(s.getState())
+    const s = calcium()
+    const initial = idle(s.getState())
+    const beforeInteraction = JSON.stringify(initial.interaction)
+    const before = undoRuleSnapshot(initial)
     turn(s, 0, 'eastern-quarry')
     const undone = s.undoAction()
     sessionEvidence.record('A072-N5-undo', { before: JSON.parse(before), response: undone })
     assertUndoRestored(before, undone)
+    restoredInteraction(s, undone, beforeInteraction)
     const r = turn(s, 0, 'eastern-quarry')
     assert.deepEqual(board(r), [3, 2, 0])
     assert.equal(r.state.players[0]!.resources.stone, 1)
