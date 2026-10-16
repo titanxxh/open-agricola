@@ -90,6 +90,50 @@ const createFixture = () => {
   return { checkout, output, write, git, cli, fixtureManifest }
 }
 
+it.each([
+  { caller: 'unset', actual: 0, expectedExit: 1 },
+  { caller: '0', actual: 0, expectedExit: 1 },
+  { caller: 'unset', actual: 1, expectedExit: 0 },
+  { caller: '0', actual: 1, expectedExit: 0 },
+])('uses the strict expected oracle with caller RAW=$caller and actual=$actual', ({ caller, actual, expectedExit }) => {
+  const { checkout, output, write, git, cli, fixtureManifest } = createFixture()
+  write('server/__tests__/_helpers/negative-rule-audit.ts', `import assert from 'node:assert/strict'
+export function assertRuleOutcome<T>(actual: T, expected: T, known?: { id: string; observed: T }): void {
+  if (!known || process.env.AGRICOLA_NEGATIVE_RAW === '1') {
+    assert.deepEqual(actual, expected, known?.id)
+    return
+  }
+  assert.deepEqual(actual, known.observed, known.id + ': observed failure changed; reclassify')
+  assert.notDeepEqual(actual, expected, known.id + ': rule now passes; remove expected failure')
+}
+`)
+  const source = `import { describe, it } from 'vitest'
+import { assertRuleOutcome } from './_helpers/negative-rule-audit'
+describe('grain rules', () => {
+  it('N1 rejects excess payment', () => assertRuleOutcome(${actual}, 1, { id: 'known-rule-gap', observed: 0 }))
+})
+`
+  write('server/__tests__/ae-negative-example.test.ts', source)
+  git('add', 'server/__tests__/ae-negative-example.test.ts', 'server/__tests__/_helpers/negative-rule-audit.ts')
+  git('-c', 'user.name=Migration test', '-c', 'user.email=migration@example.invalid', 'commit', '--quiet', '--no-gpg-sign', '-m', 'known observed rule fixture')
+  fixtureManifest.source.commit = git('rev-parse', 'HEAD')
+  fixtureManifest.files[0].sha256 = createHash('sha256').update(source).digest('hex')
+  write('cases.json', JSON.stringify(fixtureManifest))
+  const prepared = cli('prepare')
+  expect(prepared.status, prepared.stderr).toBe(0)
+  const environment = { ...process.env }
+  if (caller === 'unset') delete environment.AGRICOLA_NEGATIVE_RAW
+  else environment.AGRICOLA_NEGATIVE_RAW = caller
+  const verified = spawnSync(process.execPath, ['scripts/audit-migration.mjs', 'verify', '--manifest', path.join(checkout, 'cases.json'), '--output', output], { cwd: checkout, encoding: 'utf8', env: environment })
+  expect(verified.status, `${verified.stderr}\n${verified.stdout}`).toBe(expectedExit)
+  const summary = JSON.parse(verified.stdout)
+  expect(summary).toMatchObject({ rawMode: 'strict-expected', typesExit: 0, fileInventoryExit: 0, tests: 1, passed: expectedExit === 0 ? 1 : 0, failed: expectedExit, coveredSourceCases: expectedExit === 0 ? 1 : 0, unresolvedSourceCases: expectedExit })
+  expect(JSON.parse(fs.readFileSync(path.join(output, 'summary.json'), 'utf8'))).toEqual(summary)
+  const behavior = JSON.parse(fs.readFileSync(path.join(output, 'behavior.json'), 'utf8'))
+  expect(behavior.testResults[0].assertionResults[0].status).toBe(expectedExit === 0 ? 'passed' : 'failed')
+  if (expectedExit === 1) expect(behavior.testResults[0].assertionResults[0].failureMessages.join('\n')).toContain('known-rule-gap')
+}, 30000)
+
 it('rejects an external-looking output whose existing ancestor links into Git', () => {
   const { checkout, output, cli } = createFixture()
   const link = path.join(path.dirname(output), 'checkout-link')

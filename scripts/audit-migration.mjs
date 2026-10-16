@@ -295,11 +295,11 @@ function verify(output) {
   assertCandidate()
   const types = command(candidate, ['exec', 'tsc', '-p', 'tsconfig.migration.json', '--pretty', 'false'], path.join(output, 'types.log'))
   const files = command(candidate, ['exec', 'tsc', '-p', 'tsconfig.migration.json', '--listFilesOnly', '--pretty', 'false'], path.join(output, 'included-files.log'))
-  const behavior = command(candidate, ['exec', 'vitest', 'run', '--config', 'vitest.migration.config.ts', '--reporter=json', `--outputFile=${path.join(output, 'behavior.json')}`], path.join(output, 'behavior.log'), { AGRICOLA_NEGATIVE_ARTIFACT_DIR: path.join(output, 'scenario-evidence'), AGRICOLA_NEGATIVE_OUTPUT_DIR: path.join(output, 'scenario-evidence'), AGRICOLA_TEST_EVIDENCE_DIR: path.join(output, 'native-evidence') })
+  const behavior = command(candidate, ['exec', 'vitest', 'run', '--config', 'vitest.migration.config.ts', '--reporter=json', `--outputFile=${path.join(output, 'behavior.json')}`], path.join(output, 'behavior.log'), { AGRICOLA_NEGATIVE_RAW: '1', AGRICOLA_NEGATIVE_ARTIFACT_DIR: path.join(output, 'scenario-evidence'), AGRICOLA_NEGATIVE_OUTPUT_DIR: path.join(output, 'scenario-evidence'), AGRICOLA_TEST_EVIDENCE_DIR: path.join(output, 'native-evidence') })
   assertCandidate()
   const included = new Set(fs.readFileSync(path.join(output, 'included-files.log'), 'utf8').split(/\r?\n/).map(file => path.resolve(file)))
   const missingTypeRoots = [...assembly.remainingFiles, ...assembly.nativeFiles].filter(file => !included.has(path.join(candidate, file)))
-  const summary = { typesExit: types, fileInventoryExit: files, behaviorExit: behavior, missingTypeRoots, includedTypeRoots: assembly.remainingFiles.length + assembly.nativeFiles.length - missingTypeRoots.length }
+  const summary = { rawMode: 'strict-expected', typesExit: types, fileInventoryExit: files, behaviorExit: behavior, missingTypeRoots, includedTypeRoots: assembly.remainingFiles.length + assembly.nativeFiles.length - missingTypeRoots.length }
   const behaviorFile = path.join(output, 'behavior.json')
   if (fs.existsSync(behaviorFile)) {
     const report = JSON.parse(fs.readFileSync(behaviorFile, 'utf8'))
