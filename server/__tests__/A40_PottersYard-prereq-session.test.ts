@@ -1,14 +1,15 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { createWorkSession } from './_helpers/session-fixtures'
 import { A040_PottersYard } from '../../shared/cards/A/A040_PottersYard'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 import { getAllTilePositions } from '../../shared/domain/farm'
+import { createScenarioEvidence } from './_helpers/scenario-evidence'
 
-const sessions: ReturnType<typeof createWorkSession>[] = []
-afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+const sessionEvidence = createScenarioEvidence(import.meta.url)
+
 const setup = () => {
-  const session = createWorkSession()
-  sessions.push(session)
+  const session = sessionEvidence.track(createWorkSession())
+
   return session
 }
 

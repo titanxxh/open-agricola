@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { createWorkSession } from './_helpers/session-fixtures'
 import { serializeSessionSnapshot, serializeState, rehydrateState } from '../../shared/session/serialization'
@@ -9,17 +9,32 @@ import { computeAnimalZones, buildCardAnimalZoneId } from '../../shared/domain/a
 import { getWorkPhaseBuildingResources } from '../../shared/session/work-phase-resources'
 import { addFarmyardExtension } from '../../shared/domain/farmyard-extensions'
 import { Scoring } from '../../shared/domain/scoring'
-import type { MoorSpecialActionId } from '../../shared/moor/types'
-import type { GameState } from '../../shared/contract/types'
+import { type MoorSpecialActionId } from '../../shared/moor/types'
+import { type GameState, type PlayerState } from '../../shared/contract/types'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged, confirmNext, undoRuleSnapshot, getChoiceOptions } from './_helpers/session-assertions'
+import { createScenarioEvidence } from './_helpers/scenario-evidence'
+import { expectWait } from './_helpers/trigger-select'
+
+const sessionEvidence = createScenarioEvidence(import.meta.url)
 
 const CARD = 'A040_PottersYard'
-const sessions: GameSession[] = []
-afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+
 const original = ['0-3', '0-4', '1-4', '2-3', '2-4']
+
 const tokens = (state: GameState, index = 0) => (state.players[index]!.farmyardSpaceStates ?? [])
   .filter(token => token.sourceCardId === CARD && token.kind === 'farmyard-goods-token')
+
 const keys = (state: GameState, index = 0) => tokens(state, index).map(token => token.spaceKey).sort()
-const options = (response: SessionResponse) => response.interaction.stateId === 'wait' ? response.interaction.request.options ?? [] : []
+
+const options = (response: SessionResponse) => response.interaction.stateId === 'wait' ? getChoiceOptions(response) ?? [] : []
+
+function selection(response: SessionResponse) {
+  const request = expectWait(response).interaction.request
+  assert.ok(request.kind === 'selection', JSON.stringify(request))
+  return request.selection
+}
+
 function choose(session: GameSession, response: SessionResponse, value: string) {
   const option = options(response).find(option => option.value === value)
   if (value !== 'confirm') expect(option, JSON.stringify(response.interaction)).toBeDefined()
@@ -29,18 +44,20 @@ function choose(session: GameSession, response: SessionResponse, value: string) 
   expect(next.ok, next.error).toBe(true)
   return next
 }
+
 function setup(configure?: (state: GameState) => void, moor = true) {
-  const session = createWorkSession({ options: { enableFarmersOfTheMoor: moor, allowIncompleteFarmersOfTheMoorMinorDeal: true }, configure: state => {
+  const session = sessionEvidence.track(createWorkSession({ options: { enableFarmersOfTheMoor: moor, allowIncompleteFarmersOfTheMoorMinorDeal: true }, configure: state => {
     state.round = 3
     const player = state.players[0]!
     player.minorHand = [CARD, '__test_placeholder__']
     Object.assign(player.resources, { wood: 20, reed: 10, clay: 0, stone: 20, food: 20, fuel: 20 })
     if (!moor) player.fields = [0, 1, 2].flatMap(row => [3, 4].map(col => ({ row, col, stacks: [] })))
     configure?.(state)
-  } })
-  sessions.push(session)
+  } }))
+
   return session
 }
+
 function play(session: GameSession, card = CARD, space = 'major-improvement') {
   let response = session.takeAction(0, space)
   expect(response.ok, response.error).toBe(true)
@@ -51,6 +68,7 @@ function play(session: GameSession, card = CARD, space = 'major-improvement') {
   else expect(response.state.players[0]!.minorPlayed).toContain(card)
   return response
 }
+
 function nextTurn(session: GameSession, response: SessionResponse, opponentSpace = 'day-laborer') {
   expect(response.interaction.stateId === 'wait' && response.interaction.request.kind).toBe('confirm-next-player')
   response = choose(session, response, 'confirm')
@@ -62,26 +80,31 @@ function nextTurn(session: GameSession, response: SessionResponse, opponentSpace
   expect(response.state.currentPlayerIndex).toBe(0)
   return response
 }
+
 function restore(session: GameSession) {
-  const restored = new GameSession(rehydrateState(JSON.parse(JSON.stringify(serializeSessionSnapshot(session.state, session)))))
-  sessions.push(restored)
+  const restored = sessionEvidence.track(new GameSession(rehydrateState(JSON.parse(JSON.stringify(serializeSessionSnapshot(session.state, session))))))
+
   return restored
 }
+
 function skipExchange(session: GameSession, response: SessionResponse) {
   if (options(response).some(option => option.value === CARD)) response = choose(session, response, CARD)
   if (options(response).some(option => option.value === '__skip__')) response = choose(session, response, '__skip__')
   return response
 }
+
 function exchangeWindow(session: GameSession, response: SessionResponse) {
   for (let count = 0; count < 4 && options(response).some(option => option.value === CARD); count++) response = choose(session, response, CARD)
   expect(options(response).some(option => option.value === '__skip__'), JSON.stringify(response.interaction)).toBe(true)
   return response
 }
+
 function accept(session: GameSession, response: SessionResponse) {
   const option = options(response).find(option => !option.disabled && !option.value.startsWith('__'))
   if (!option) throw new Error(`Expected an enabled offer: ${JSON.stringify(response.interaction)}`)
   return choose(session, response, option.value)
 }
+
 function special(session: GameSession, action: MoorSpecialActionId, tile: { row: number; col: number }) {
   const card = session.state.farmersOfTheMoor!.specialActionCards.find(card => card.actions.includes(action))
   expect(card).toBeDefined()
@@ -89,6 +112,7 @@ function special(session: GameSession, action: MoorSpecialActionId, tile: { row:
   expect(response.ok, response.error).toBe(true)
   return response
 }
+
 function threeWorkers(state: GameState) {
   const player = state.players[0]!
   player.rooms = 3
@@ -97,8 +121,6 @@ function threeWorkers(state: GameState) {
   setWorkersAtHome(state, player, 3)
 }
 
-// Approved seams: actual paid card play, authoritative farm mutations, committed
-// events, source-owned goods, persisted pending, undo, and public presentation.
 describe('A040 original clay positions', () => {
   it('does not replenish clay when Lumber Pile returns a stable and fencing reuses the same space', () => {
     const session = setup(state => {
@@ -121,7 +143,7 @@ describe('A040 original clay positions', () => {
     const buildStable = options(response).find(option => option.labelKey === 'actions.stables.name')
     expect(buildStable).toBeDefined()
     response = choose(session, response, buildStable!.value)
-    expect(response.interaction.request.kind).toBe('farm-select')
+    expect(expectWait(response).interaction.request.kind).toBe('farm-select')
     response = session.commitSelectionChoice(0, { stables: [{ row: 0, col: 2 }] })
     expect(response.ok, response.error).toBe(true)
     response = skipExchange(session, exchangeWindow(session, response))
@@ -133,7 +155,7 @@ describe('A040 original clay positions', () => {
     response = play(session, 'E076_LumberPile', 'meeting-place')
     expect(response.state.players[0]!.resources.wood).toBe(17)
     response = accept(session, response)
-    expect(response.interaction.request.selection?.kind).toBe('farm-position')
+    expect(selection(response).kind).toBe('farm-position')
     response = session.commitSelectionChoice(0, { positions: [{ row: 0, col: 2 }] })
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.stableTiles).toEqual([])
@@ -145,7 +167,7 @@ describe('A040 original clay positions', () => {
     expect(response.ok, response.error).toBe(true)
     response = session.commitSelectionChoice(0, { edges: ['H-0-2', 'H-1-2', 'V-0-2', 'V-0-3'] })
     expect(response.ok, response.error).toBe(true)
-    expect(response.interaction.request.kind).toBe('confirm-next-player')
+    expect(expectWait(response).interaction.request.kind).toBe('confirm-next-player')
     expect(response.state.players[0]!.pastures.map(pasture => pasture.tiles)).toEqual([[{ row: 0, col: 2 }]])
     expect(response.state.players[0]!.resources).toMatchObject({ wood: 16, clay: 1, food: 20 })
     expect(keys(response.state)).toEqual(remainingPositions)
@@ -169,12 +191,12 @@ describe('A040 original clay positions', () => {
     expect(response.ok, response.error).toBe(true)
     expect(options(response).filter(option => [CARD, 'M096_FallowLand'].includes(option.value))).toHaveLength(2)
     response = choose(session, response, first)
-    for (let step = 0; step < 8 && response.interaction.request.kind !== 'confirm-next-player'; step++) {
-      if (options(response).some(option => option.value === '__skip__') && response.interaction.request.kind !== 'select-trigger') response = choose(session, response, '__skip__')
+    for (let step = 0; step < 8 && expectWait(response).interaction.request.kind !== 'confirm-next-player'; step++) {
+      if (options(response).some(option => option.value === '__skip__') && expectWait(response).interaction.request.kind !== 'select-trigger') response = choose(session, response, '__skip__')
       else if (options(response).some(option => option.value === 'M096_FallowLand')) response = choose(session, response, 'M096_FallowLand')
       else response = choose(session, response, CARD)
     }
-    expect(response.interaction.request.kind).toBe('confirm-next-player')
+    expect(expectWait(response).interaction.request.kind).toBe('confirm-next-player')
     expect(response.state.players[0]!.resources).toMatchObject({ clay: 1, food: 21 })
     expect(response.state.players[0]!.farmyardSpaceStates?.filter(token => token.spaceKey === '0-3')).toEqual([])
     expect(JSON.stringify(response.state.players[1])).toEqual(opponent)
@@ -213,7 +235,7 @@ describe('A040 original clay positions', () => {
     expect(plowed.ok, plowed.error).toBe(true)
     expect(keys(plowed.state)).toEqual(original)
     expect(plowed.state.players[0]!.resources.clay).toBe(0)
-    expect(plowed.interaction.request.kind).toBe('confirm-next-player')
+    expect(expectWait(plowed).interaction.request.kind).toBe('confirm-next-player')
   })
 
   it('offers Wolf its matching top clay after actual token receipt', () => {
@@ -231,9 +253,10 @@ describe('A040 original clay positions', () => {
     response = accept(session, response)
     expect(response.state.players[0]!.cardStates.E103_Wolf?.stack).toEqual([])
     expect(response.state.players[0]!.resources).toMatchObject({ clay: 2, boar: 1 })
-    expect(response.interaction.request.kind).toBe('animal-reorg')
-    if (response.interaction.request.kind !== 'animal-reorg') throw new Error('Expected Wolf animal settlement')
-    response = session.resolveChoice(0, 'confirm', { zones: response.interaction.request.zones })
+    expect(expectWait(response).interaction.request.kind).toBe('animal-reorg')
+    const animalRequest = expectWait(response).interaction.request
+    assert.ok(animalRequest.kind === 'animal-reorg', 'Expected Wolf animal settlement')
+    response = session.resolveChoice(0, 'confirm', { zones: animalRequest.zones })
     expect(response.ok, response.error).toBe(true)
     response = exchangeWindow(session, response)
     response = skipExchange(session, response)
@@ -250,8 +273,8 @@ describe('A040 original clay positions', () => {
     })
     nextTurn(session, play(session))
     let response = play(session, card, 'meeting-place')
-    if (response.interaction.promptKey === 'ui.interactionOptionalAction') response = accept(session, response)
-    expect(response.interaction.request.selection?.kind).toBe('farm-position')
+    if (expectWait(response).interaction.promptKey === 'ui.interactionOptionalAction') response = accept(session, response)
+    expect(selection(response).kind).toBe('farm-position')
     const rejected = session.commitSelectionChoice(0, { positions: [{ row: 0, col: 2 }] })
     expect(rejected.ok).toBe(false)
     expect(keys(rejected.state)).toEqual(original)
@@ -302,7 +325,7 @@ describe('A040 original clay positions', () => {
     })
     nextTurn(session, play(session))
     let response = play(session, 'M047_BogForest', 'meeting-place')
-    expect(response.interaction.request.selection?.kind).toBe('farm-position')
+    expect(selection(response).kind).toBe('farm-position')
     response = session.commitSelectionChoice(0, { positions: [{ row: 0, col: 2 }] })
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.farmTerrain).toContainEqual({ row: 0, col: 2, kind: 'forest', covered: 'moor' })
@@ -322,7 +345,7 @@ describe('A040 original clay positions', () => {
     })
     nextTurn(session, play(session))
     let response = play(session, 'M017_Reforestation', 'meeting-place')
-    expect(response.interaction.request.selection?.kind).toBe('farm-position')
+    expect(selection(response).kind).toBe('farm-position')
     response = session.commitSelectionChoice(0, { positions: [{ row: 0, col: 4 }] })
     response = exchangeWindow(session, response)
     expect(response.state.players[0]!.resources.clay).toBe(1)
@@ -334,7 +357,7 @@ describe('A040 original clay positions', () => {
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources.clay).toBe(1)
     expect(keys(response.state)).toEqual(['1-4', '2-3', '2-4'])
-    expect(response.interaction.request.kind).toBe('confirm-next-player')
+    expect(expectWait(response).interaction.request.kind).toBe('confirm-next-player')
   })
 
   it.each(['M050_FarmExtension', 'M051_MoorEnclosures'])('initializes clay only on unused spaces of a preexisting %s extension', card => {
@@ -365,7 +388,7 @@ describe('A040 original clay positions', () => {
     })
     nextTurn(session, play(session))
     let response = play(session, card, 'meeting-place')
-    expect(response.interaction.request.selection?.kind).toBe('farm-position')
+    expect(selection(response).kind).toBe('farm-position')
     response = session.commitSelectionChoice(0, { positions: [{ row: -1, col: 0 }, { row: -1, col: 1 }] })
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources.clay).toBe(0)
@@ -377,7 +400,7 @@ describe('A040 original clay positions', () => {
     expect(response.ok, response.error).toBe(true)
     expect(keys(response.state)).toEqual(['0-4', '1-4', '2-3', '2-4'])
     expect(response.state.players[0]!.resources.clay).toBe(0)
-    expect(response.interaction.request.kind).toBe('confirm-next-player')
+    expect(expectWait(response).interaction.request.kind).toBe('confirm-next-player')
   })
 
   it('counts actual claimed clay once toward Claypipe seven-building-resource return-home reward', () => {
@@ -473,7 +496,7 @@ describe('A040 original clay positions', () => {
     const mode = options(response).find(option => option.labelKey === `actions.${action}.name`)
     if (mode) response = choose(session, response, mode.value)
     expect(response.ok, response.error).toBe(true)
-    expect(response.interaction.request.kind).toBe('farm-select')
+    expect(expectWait(response).interaction.request.kind).toBe('farm-select')
     const tile = action === 'plow' ? { row: 0, col: 2 } : { row: 0, col: 0 }
     response = session.commitSelectionChoice(0, action === 'plow' ? { tile } : action === 'construct' ? { rooms: [tile] } : action === 'stables' ? { stables: [tile] } : { edges: ['H-0-0', 'H-1-0', 'V-0-0', 'V-0-1'] })
     expect(response.ok, response.error).toBe(true)
@@ -574,7 +597,7 @@ describe('A040 original clay positions', () => {
     expect(keys(response.state)).toEqual(original)
     const placements = response.state.events.filter(event => event.type === 'resource.moved' && event.sourceCardId === CARD && event.to.kind === 'field')
     expect(placements).toHaveLength(5)
-    expect(placements.map(event => event.to.kind === 'field' ? `${event.to.row}-${event.to.col}` : '')).toEqual(original)
+    expect(placements.flatMap(event => event.type === 'resource.moved' && event.to.kind === 'field' ? [`${event.to.row}-${event.to.col}`] : [])).toEqual(original)
     for (const event of placements) expect(event).toMatchObject({ resources: { clay: 1 }, from: { kind: 'supply' }, reason: 'cardEffect' })
     for (const viewer of [response.state.players[0]!.id, response.state.players[1]!.id, null]) {
       expect(session.buildSyncPayload(response, viewer).state.players[0]!.farmyardSpaceStates).toEqual(response.state.players[0]!.farmyardSpaceStates)
@@ -603,5 +626,227 @@ describe('A040 original clay positions', () => {
     expect(keys(response.state)).toEqual(original)
     expect(response.interaction.stateId === 'wait' && response.interaction.request.kind).toBe('confirm-next-player')
     expect(response.state.events.filter(event => event.type === 'resource.moved' && event.sourceCardId === CARD && event.to.kind === 'player')).toEqual([])
+  })
+})
+
+describe("A040 command boundaries", () => {
+  const A040 = 'A040_PottersYard'
+  const tile = { row: 1, col: 1 }, pair = [tile, { row: 2, col: 1 }]
+  const edges = ['H-1-1', 'H-2-1', 'V-1-1', 'V-1-2']
+  const fieldTiles = [0, 1, 2, 3, 4].map(col => ({ row: 0, col })).concat({ row: 1, col: 4 })
+
+  function ok(r: SessionResponse) {
+    assert.equal(r.ok, true, r.error)
+    return r
+  }
+  function opts(r: SessionResponse) {
+    return r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice' ? getChoiceOptions(r) : []
+  }
+  function choose(s: GameSession, r: SessionResponse, predicate: (o: {
+    value: string
+    labelKey?: string
+    sourceCard?: string
+  }) => boolean) {
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice', JSON.stringify(r.interaction))
+    const o = opts(r).find(predicate)
+    assert.ok(o, JSON.stringify(r.interaction))
+    return ok(s.resolveChoice(r.interaction.playerIndex, o.value))
+  }
+  function ready(s: GameSession, actor: number) {
+    let r = s.getState()
+    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
+      r = confirmNext(s, r)
+    assert.equal(r.interaction.stateId, 'idle', JSON.stringify(r.interaction))
+    assert.equal(r.state.currentPlayerIndex, actor)
+    return r
+  }
+  function turn(s: GameSession, actor: number, space: string) {
+    ready(s, actor)
+    return ok(s.takeAction(actor, space))
+  }
+  function minor(s: GameSession, card: string) {
+    let r = turn(s, 0, 'meeting-place')
+    if (!opts(r).some(o => o.value === card) && opts(r).some(o => o.value.startsWith('action-improvement-')))
+      r = choose(s, r, o => o.value.startsWith('action-improvement-'))
+    return r
+  }
+  function buy(s: GameSession, card: string) {
+    const r = minor(s, card)
+    return r.state.players[0]!.minorPlayed.includes(card) ? r : choose(s, r, o => o.value === card)
+  }
+  function denied(s: GameSession, card: string) {
+    const r = minor(s, card)
+    assert.equal(opts(r).some(o => o.value === card && !o.disabled), false)
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, card))
+    assert.ok(s.getState().state.players[0]!.minorHand.includes(card))
+  }
+  function purchasedCardUndo(before: string, after: SessionResponse) {
+    assert.equal(after.ok, true, after.error)
+    const normalize = (snapshot: string) => JSON.parse(snapshot, (key, value: unknown) => key === 'playedCards' ? undefined : value)
+    assert.deepEqual(normalize(undoRuleSnapshot(after)), normalize(before))
+    const packet = after.state.publicEventArchive.at(-1)
+    assert.ok(packet?.type === 'publicEvents.canceled' && packet.reason === 'undoAction')
+  }
+  function remaining(r: SessionResponse) {
+    return (r.state.players[0]!.farmyardSpaceStates ?? []).filter(token => token.sourceCardId === A040 && token.kind === 'farmyard-goods-token').reduce((sum, token) => sum + (token.resources?.clay ?? 0), 0)
+  }
+  function potter({ fields = 6, used = 'none', resources = { wood: 1, reed: 1 } }: {
+    fields?: number
+    used?: 'none' | 'stable' | 'pasture'
+    resources?: Partial<PlayerState['resources']>
+  } = {}) {
+    return sessionEvidence.track(createWorkSession({ seed: 724, configure: state => {
+        state.round = 14
+        state.availableMajorImprovements = []
+        for (const player of state.players) {
+          player.minorHand = ['__test_placeholder__']
+          player.occupationHand = ['__test_placeholder__']
+          player.minorPlayed = []
+          player.occupationPlayed = []
+          player.improvements = []
+          player.cardStates = {}
+          player.rooms = 2
+          player.roomTiles = [{ row: 1, col: 0 }, { row: 2, col: 0 }]
+          player.fields = []
+          player.stableTiles = []
+          player.pastures = []
+          player.fenceSegments = []
+          Object.assign(player.resources, { wood: 0, clay: 0, reed: 0, stone: 0, food: 40, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0 })
+        }
+        const owner = state.players[0]!
+        owner.minorHand = [A040, '__test_placeholder__']
+        owner.fields = fieldTiles.slice(0, fields).map(position => ({ ...position, stacks: [] }))
+        if (used === 'stable')
+          owner.stableTiles = [tile]
+        if (used === 'pasture') {
+          owner.pastures = [{ id: 'existing', tiles: [tile], animalType: null, animalCount: 0 }]
+          owner.fenceSegments = edges.map(edge => ({ edge, type: 'fence', source: { kind: 'own', ownerPlayerId: owner.id } }))
+        }
+        Object.assign(owner.resources, resources)
+        state.actionSpaces.find(space => space.id === 'forest')!.resources.wood = 3
+      } }))
+  }
+  function boughtPotter(s: GameSession, opponentPlow = false) {
+    const r = buy(s, A040)
+    assert.equal(remaining(r), 7)
+    if (opponentPlow) {
+      turn(s, 1, 'farmland')
+      ok(s.commitSelectionChoice(1, { tile: { row: 0, col: 0 } }))
+    }
+    else
+      turn(s, 1, 'forest')
+    return s
+  }
+  function farm(s: GameSession, type: 'construct' | 'stables') {
+    let r = turn(s, 0, 'farm-expansion')
+    if (opts(r).length)
+      r = choose(s, r, o => o.value.includes(type))
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'farm-select', JSON.stringify(r.interaction))
+    return r
+  }
+  function finish(s: GameSession, r: SessionResponse) {
+    for (let n = 0; n < 3 && opts(r).some(o => o.value === '__skip__'); n++)
+      r = ok(s.resolveChoice(r.interaction.stateId === 'wait' ? r.interaction.playerIndex : 0, '__skip__'))
+    return r
+  }
+  function exchange(s: GameSession, r: SessionResponse, partial = false) {
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.sourceCard, A040)
+    if (partial)
+      assert.equal(r.state.players[0]!.resources.clay, 2)
+    const choices = opts(r).filter(option => !option.disabled && option.effectPreview?.kind === 'resourceExchange' && option.effectPreview.resourcesPaid?.clay === 1 && option.effectPreview.resourcesGained?.food === 2)
+    assert.equal(choices.length, 1, JSON.stringify(r.interaction))
+    return finish(s, ok(s.resolveChoice(0, choices[0]!.value)))
+  }
+  function plow(s: GameSession) {
+    return ok(s.commitSelectionChoice(0, { tile }))
+  }
+  it("eight unused spaces or fee shortage reject before seven-space onBuy control", () => {
+    denied(potter({ fields: 5 }), A040)
+    denied(potter({ resources: { wood: 0, reed: 1 } }), A040)
+    denied(potter({ resources: { wood: 1, reed: 0 } }), A040)
+    const r = buy(potter(), A040)
+    assert.equal(remaining(r), 7)
+    assert.equal(r.state.players[0]!.resources.clay, 0)
+    assert.equal(r.state.players[0]!.resources.wood, 0)
+    assert.equal(r.state.players[0]!.resources.reed, 0)
+  })
+  it("new field collects one clay after invalid room target and may decline exchange", () => {
+    const s = boughtPotter(potter())
+    turn(s, 0, 'farmland')
+    assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { tile: { row: 1, col: 0 } }))
+    const r = finish(s, plow(s))
+    assert.equal(r.state.players[0]!.fields.length, 7)
+    assert.equal(r.state.players[0]!.resources.clay, 1)
+    assert.equal(r.state.players[0]!.resources.food, 40)
+    assert.equal(remaining(r), 6)
+  })
+  it("new stable exchanges exactly one collected clay for two food once", () => {
+    const s = boughtPotter(potter({ resources: { wood: 3, reed: 1 } }))
+    farm(s, 'stables')
+    const pending = ok(s.commitSelectionChoice(0, { stables: [tile] }))
+    const old = opts(pending).find(o => o.value !== '__skip__')
+    assert.ok(old)
+    const r = exchange(s, pending)
+    assert.equal(r.state.players[0]!.stableTiles.length, 1)
+    assert.equal(r.state.players[0]!.resources.wood, 0)
+    assert.equal(r.state.players[0]!.resources.clay, 0)
+    assert.equal(r.state.players[0]!.resources.food, 42)
+    assert.equal(remaining(r), 6)
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, old.value))
+  })
+  it("two new rooms collect two clay and permit a one-clay partial exchange", () => {
+    const s = boughtPotter(potter({ resources: { wood: 11, reed: 5 } }))
+    farm(s, 'construct')
+    const r = exchange(s, ok(s.commitSelectionChoice(0, { rooms: pair })), true)
+    assert.equal(r.state.players[0]!.rooms, 4)
+    assert.equal(r.state.players[0]!.resources.wood, 0)
+    assert.equal(r.state.players[0]!.resources.reed, 0)
+    assert.equal(r.state.players[0]!.resources.clay, 1)
+    assert.equal(r.state.players[0]!.resources.food, 42)
+    assert.equal(remaining(r), 5)
+  })
+  it("new pasture collects clay while opponent plow does not consume holder supply", () => {
+    const s = boughtPotter(potter({ resources: { wood: 5, reed: 1 } }), true)
+    assert.equal(remaining(s.getState()), 7)
+    assert.equal(s.getState().state.players[1]!.resources.clay, 0)
+    turn(s, 0, 'fencing')
+    const r = finish(s, ok(s.commitSelectionChoice(0, { edges, extraWood: 0 })))
+    assert.equal(r.state.players[0]!.pastures.flatMap(p => p.tiles).length, 1)
+    assert.equal(r.state.players[0]!.resources.wood, 0)
+    assert.equal(r.state.players[0]!.resources.clay, 1)
+    assert.equal(r.state.players[0]!.resources.food, 40)
+    assert.equal(remaining(r), 6)
+  })
+  it("stable in pasture and fencing an existing stable collect no second clay", () => {
+    for (const used of ['pasture', 'stable'] satisfies ('pasture' | 'stable')[]) {
+      const s = boughtPotter(potter({ fields: 5, used, resources: { wood: used === 'pasture' ? 3 : 5, reed: 1 } }))
+      let r: SessionResponse
+      if (used === 'pasture') {
+        farm(s, 'stables')
+        r = finish(s, ok(s.commitSelectionChoice(0, { stables: [tile] })))
+      }
+      else {
+        turn(s, 0, 'fencing')
+        r = finish(s, ok(s.commitSelectionChoice(0, { edges, extraWood: 0 })))
+      }
+      assert.equal(r.state.players[0]!.resources.clay, 0)
+      assert.equal(r.state.players[0]!.resources.food, 40)
+      assert.equal(remaining(r), 7)
+    }
+  })
+  it("undo restores newly used tile and clay before replay without exchange", () => {
+    const s = boughtPotter(potter())
+    ready(s, 0)
+    const before = undoRuleSnapshot(s.getState())
+    turn(s, 0, 'farmland')
+    exchange(s, plow(s))
+    purchasedCardUndo(before, s.undoAction())
+    turn(s, 0, 'farmland')
+    const r = finish(s, plow(s))
+    assert.equal(r.state.players[0]!.fields.length, 7)
+    assert.equal(r.state.players[0]!.resources.clay, 1)
+    assert.equal(r.state.players[0]!.resources.food, 40)
+    assert.equal(remaining(r), 6)
   })
 })
