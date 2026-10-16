@@ -188,18 +188,18 @@ describe('A040 original clay positions', () => {
       player.fields = [0, 1, 2].flatMap(row => [0, 1, 2, 3, 4].map(col => ({ row, col, stacks: [] })))
         .filter(tile => !(tile.row === 0 && tile.col === 2) && !player.roomTiles.some(room => room.row === tile.row && room.col === tile.col))
     }, false)
-    const emptyBefore = Scoring.breakdown(session.state, 0).categories.find(category => category.key === 'empty')?.total
+    const emptyBefore = session.withCtx(() => Scoring.breakdown(session.state, 0)).categories.find(category => category.key === 'empty')?.total
     let response = play(session)
     expect(keys(response.state)).toEqual(['0-2'])
-    expect(Scoring.breakdown(response.state, 0).categories.find(category => category.key === 'empty')?.total).toBe(emptyBefore)
+    expect(session.withCtx(() => Scoring.breakdown(response.state, 0)).categories.find(category => category.key === 'empty')?.total).toBe(emptyBefore)
     expect(emptyBefore).toBe(-1)
     nextTurn(session, response)
     session.takeAction(0, 'farmland')
     response = session.commitSelectionChoice(0, { tile: { row: 0, col: 2 } })
     response = skipExchange(session, exchangeWindow(session, response))
     expect(keys(response.state)).toEqual([])
-    expect(serializeState(response.state, {}).players[0]!.cardStatePresentation[CARD]?.resourceGroups).toEqual([])
-    expect(Scoring.breakdown(response.state, 0).categories.find(category => category.key === 'empty')?.total).toBe(0)
+    expect(session.withCtx(() => serializeState(response.state, { actionHooks: session.actionHooks })).players[0]!.cardStatePresentation[CARD]?.resourceGroups).toEqual([])
+    expect(session.withCtx(() => Scoring.breakdown(response.state, 0)).categories.find(category => category.key === 'empty')?.total).toBe(0)
   })
 
   it('never borrows original unused-space clay after a starting forest is cleared and plowed', () => {
@@ -448,7 +448,7 @@ describe('A040 original clay positions', () => {
     const response = play(session)
     expect(keys(response.state)).toEqual(['0-0', '0-1', '0-2', '1-1', '1-2', '2-1', '2-2'])
     expect([...getUsedFarmyardTileKeys(response.state.players[0]!)].sort()).toEqual(before)
-    if (card === 'M035_HorseTrough') expect(computeAnimalZones(response.state.players[0]!, response.state)).toContainEqual(expect.objectContaining({ farmPosition: { row: 0, col: 0 }, animalCount: 1 }))
+    if (card === 'M035_HorseTrough') expect(session.withCtx(() => computeAnimalZones(response.state.players[0]!, response.state))).toContainEqual(expect.objectContaining({ farmPosition: { row: 0, col: 0 }, animalCount: 1 }))
   })
 
   it('does not mistake an eight-space farm with a temporarily blocked non-field crop for seven unused spaces', () => {
@@ -549,7 +549,7 @@ describe('A040 original clay positions', () => {
     expect(keys(response.state)).toEqual(['0-4', '1-4', '2-3', '2-4'])
     expect(readCardResourceStats(response.state.players[0]!, CARD)?.gained).toEqual({ clay: 1 })
     expect(response.state.players[0]!.stats?.resourcesFromCards.clay).toBe(1)
-    expect(serializeState(response.state, {}).players[0]!.cardStatePresentation[CARD]?.resourceGroups).toEqual([{ clay: 4 }])
+    expect(session.withCtx(() => serializeState(response.state, { actionHooks: session.actionHooks })).players[0]!.cardStatePresentation[CARD]?.resourceGroups).toEqual([{ clay: 4 }])
     session = restore(session)
     response = exchange ? accept(session, session.getState()) : choose(session, session.getState(), '__skip__')
     expect(response.state.players[0]!.resources).toMatchObject({ clay: exchange ? 0 : 1, food: exchange ? 22 : 20 })
