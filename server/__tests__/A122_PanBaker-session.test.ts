@@ -281,6 +281,72 @@ describe("A122 command boundaries", () => {
     assert.equal(basic.state.currentPlayerIndex, 0)
     assert.equal(basic.state.players[0]!.resources.clay, 0)
     assert.equal(basic.state.players[0]!.resources.wood, 0)
+    const cultivationSession = setup()
+    const cultivationResources = {
+      wood: 0, clay: 0, reed: 0, stone: 0, food: 40, grain: 2,
+      vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
+    }
+    const cultivationStart = turn(cultivationSession, 0, 'cultivation')
+    assert.ok(cultivationStart.interaction.stateId === 'wait' && cultivationStart.interaction.request.kind === 'choice')
+    assert.equal(cultivationStart.interaction.spaceId, 'cultivation')
+    assert.equal(cultivationStart.interaction.promptKey, 'ui.interactionCultivationSelect')
+    assert.equal(cultivationStart.interaction.playerIndex, 0)
+    assert.equal(cultivationStart.state.currentPlayerIndex, 0)
+    assert.deepEqual(cultivationStart.state.players[0]!.resources, cultivationResources)
+    assert.deepEqual(getChoiceOptions(cultivationStart).map(option => ({ label: option.labelKey, disabled: option.disabled ?? false })), [
+      { label: 'actions.plow.name', disabled: false },
+      { label: 'actions.sow.name', disabled: false },
+    ])
+    const plowOption = getChoiceOptions(cultivationStart).find(option => option.labelKey === 'actions.plow.name')
+    assert.ok(plowOption && !plowOption.disabled)
+    const plowPending = ok(cultivationSession.resolveChoice(0, plowOption.value))
+    assert.ok(plowPending.interaction.stateId === 'wait' && plowPending.interaction.request.kind === 'farm-select'
+      && plowPending.interaction.request.farm.farmType === 'plow')
+    assert.equal(plowPending.interaction.spaceId, 'cultivation')
+    assert.equal(plowPending.interaction.playerIndex, 0)
+    assert.equal(plowPending.state.currentPlayerIndex, 0)
+    assert.ok(plowPending.interaction.request.farm.selectableTiles.some(tile => tile.row === 0 && tile.col === 3))
+    const plowed = ok(cultivationSession.commitSelectionChoice(0, { tile: { row: 0, col: 3 } }))
+    assert.ok(plowed.interaction.stateId === 'wait' && plowed.interaction.request.kind === 'choice')
+    assert.equal(plowed.interaction.spaceId, 'cultivation')
+    assert.equal(plowed.interaction.promptKey, 'ui.interactionCultivationSelect')
+    assert.equal(plowed.interaction.playerIndex, 0)
+    assert.equal(plowed.state.currentPlayerIndex, 0)
+    assert.deepEqual(plowed.state.players[0]!.resources, cultivationResources)
+    assert.deepEqual(plowed.state.players[0]!.fields, [
+      { row: 0, col: 1, stacks: [] }, { row: 0, col: 2, stacks: [] }, { row: 0, col: 3, stacks: [] },
+    ])
+    assert.deepEqual(getChoiceOptions(plowed).map(option => ({ label: option.labelKey, disabled: option.disabled ?? false })), [
+      { label: 'actions.sow.name', disabled: false },
+      { label: 'ui.interactionFlowDone', disabled: false },
+    ])
+    const sowOption = getChoiceOptions(plowed).find(option => option.labelKey === 'actions.sow.name')
+    assert.ok(sowOption && !sowOption.disabled)
+    const cultivationSow = ok(cultivationSession.resolveChoice(0, sowOption.value))
+    assert.ok(cultivationSow.interaction.stateId === 'wait' && cultivationSow.interaction.request.kind === 'farm-select'
+      && cultivationSow.interaction.request.farm.farmType === 'sow')
+    assert.equal(cultivationSow.interaction.spaceId, 'cultivation')
+    assert.equal(cultivationSow.interaction.playerIndex, 0)
+    assert.equal(cultivationSow.state.currentPlayerIndex, 0)
+    assert.deepEqual(cultivationSow.state.players[0]!.resources, cultivationResources)
+    assert.deepEqual(cultivationSow.interaction.request.farm.selectableFields, [
+      { tile: { row: 0, col: 1 }, allowedCrops: ['grain'] },
+      { tile: { row: 0, col: 2 }, allowedCrops: ['grain'] },
+      { tile: { row: 0, col: 3 }, allowedCrops: ['grain'] },
+    ])
+    const cultivated = ok(cultivationSession.commitSelectionChoice(0, { crops: [{ row: 0, col: 3, crop: 'grain' }] }))
+    assert.ok(cultivated.interaction.stateId === 'wait')
+    assert.deepEqual(cultivated.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(cultivated.interaction.playerIndex, 0)
+    assert.equal(cultivated.state.currentPlayerIndex, 0)
+    assert.deepEqual(cultivated.state.players[0]!.resources, { ...cultivationResources, grain: 1 })
+    assert.deepEqual(cultivated.state.players[0]!.fields, [
+      { row: 0, col: 1, stacks: [] }, { row: 0, col: 2, stacks: [] },
+      { row: 0, col: 3, stacks: [{ kind: 'grain', remaining: 3 }] },
+    ])
+    assert.deepEqual(cultivated.state.actionSpaces.find(space => space.id === 'cultivation')!.takenBy, [
+      { playerId: 'p1', workerId: '1' },
+    ])
     const handS = setup(undefined, false)
     sow(handS, turn(handS, 0, 'grain-utilization'))
     const hand = ok(handS.commitSelectionChoice(0, { crops: [{ row: 0, col: 1, crop: 'grain' }] }))
@@ -309,7 +375,7 @@ describe("A122 command boundaries", () => {
     })
     assert.equal(pending.interaction.playerIndex, 1)
     assert.equal(pending.state.currentPlayerIndex, 1)
-    sessionEvidence.record('A122-N3', { basic, hand, pending })
+    sessionEvidence.record('A122-N3', { basic, cultivationStart, plowPending, plowed, cultivationSow, cultivated, hand, pending })
   })
   it("incoming bonus attempt blocks with retained resources and explicit undo removes them", () => {
     const s = setup(state => {
