@@ -42,6 +42,7 @@ describe('E074_AshTrees session flow', () => {
     const listener = getRegisteredCardListeners().find((entry) => entry.id === 'E74-ash-trees-isdoable-fence')
     expect(listener).toBeDefined()
     const direct = executeCardListener(listener!, {
+      actionHooks: session.actionHooks,
       state: session.getState().state,
       player: session.getState().state.players[0]!,
       space: session.getState().state.actionSpaces.find((space) => space.id === 'fencing')!,

@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest'
 import { getRegisteredCardListeners, executeCardListener } from '../card-listeners'
 import { getCardEffect } from '../card-effects'
 import { specialEffectAction } from '../../actions/effects/special-effect'
+import { ActionHookRegistry } from '../../actions/hooks'
 import type { ActionFlow, ActionSpace, GameState, PlayerState } from '../../contract/types'
 import { setFencesForTest } from './__fixtures__/fence'
 
@@ -133,6 +134,7 @@ describe('E074_AshTrees', () => {
     player.resources.wood = 0
 
     const result = executeCardListener(listener!, {
+      actionHooks: new ActionHookRegistry(),
       state: createState(player),
       player,
       space: createSpace('fence'),

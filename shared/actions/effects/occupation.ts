@@ -134,7 +134,7 @@ export const playOccupation = (
   ensureCardModifiers(player, occupation.id)
   // Trigger onBuy hook — if it returns a flow, propagate it to the engine
   if (state) {
-    const activation = activateCardEffect(state, player, occupation.id, 'onBuy')
+    const activation = activateCardEffect(state, player, occupation.id, 'onBuy', undefined, { actionHooks })
     if (activation.type === 'flow') {
       return activation
     }
