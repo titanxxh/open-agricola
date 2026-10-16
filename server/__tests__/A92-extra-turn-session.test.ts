@@ -386,22 +386,28 @@ describe("A092 command boundaries", () => {
     return getChoiceOptions(r)
   }
   function choose(s: GameSession, r: SessionResponse, accept = true, actor = 0) {
-    const selected = options(r).filter(o => accept ? o.value !== '__skip__' && o.value !== '__done__' && !o.disabled : o.value === '__skip__' && !o.disabled)
-    assert.equal(selected.length, 1, JSON.stringify(r.interaction))
-    const option = selected[0]
-    assert(option, JSON.stringify(r.interaction))
-    return record('choice', ok(s.resolveChoice(actor, option.value)))
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.sourceCard, BED)
+    assert.equal(r.interaction.promptKey, 'ui.interactionOptionalAction')
+    assert.equal(r.interaction.playerIndex, actor)
+    assert.equal(r.state.currentPlayerIndex, actor)
+    const payments = options(r).filter(option => option.value !== '__skip__' && !option.disabled)
+    assert.equal(payments.length, 1)
+    const payment = payments[0]!
+    assert.equal(payment.sourceCard, BED)
+    assert.equal(payment.labelKey, 'actions.pay.name')
+    assert.ok(payment.effectPreview?.kind === 'payment')
+    assert.deepEqual(payment.effectPreview.resourcesPaid, { wood: 1, grain: 1 })
+    assert.equal(options(r).length, 2)
+    assert.ok(options(r).some(option => option.value === '__skip__' && !option.disabled))
+    return record('choice', ok(s.resolveChoice(actor, accept ? payment.value : '__skip__')))
   }
-  function finish(s: GameSession, r: SessionResponse, actor = 0) {
-    for (let n = 0; n < 5 && r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice'; n++) {
-      const skips = getChoiceOptions(r).filter(o => o.value === '__skip__' || o.value === '__done__')
-      assert.equal(skips.length, 1, JSON.stringify(r.interaction))
-      const skip = skips[0]
-      assert(skip, JSON.stringify(r.interaction))
-      r = record('finish-optional', ok(s.resolveChoice(actor, skip.value)))
-    }
+  function finish(r: SessionResponse, actor = 0) {
+    ok(r)
     assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
     assert.equal(r.interaction.playerIndex, actor)
+    assert.equal(r.interaction.request.nextPlayerIndex, 1 - actor)
+    assert.equal(r.state.currentPlayerIndex, actor)
     return r
   }
   function assertPlacements(r: SessionResponse, expected: ReturnType<typeof getRoundPlacementDetails>, parked: ReturnType<typeof getRoundPlacementDetails> = []) {
@@ -424,15 +430,27 @@ describe("A092 command boundaries", () => {
     let r = s.getState()
     if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
       r = record('confirm', confirmNext(s, r))
+    assert.equal(r.interaction.stateId, 'idle', JSON.stringify(r.interaction))
     assert.equal(r.state.currentPlayerIndex, actor)
     return r
   }
   function turn(s: GameSession, actor: number, space: string) {
     ready(s, actor)
-    return record(`take:${space}`, ok(s.takeAction(actor, space)))
+    const response = record(`take:${space}`, ok(s.takeAction(actor, space)))
+    return space === 'wish-children' || space === 'farm-expansion' ? response : finish(response, actor)
   }
   function growth(s: GameSession) {
-    return finish(s, turn(s, 0, 'wish-children'))
+    const pending = turn(s, 0, 'wish-children')
+    assert.ok(pending.interaction.stateId === 'wait' && pending.interaction.request.kind === 'choice', JSON.stringify(pending.interaction))
+    assert.equal(pending.interaction.sourceCard, undefined)
+    assert.equal(pending.interaction.promptKey, 'ui.interactionOptionalAction')
+    assert.equal(pending.interaction.playerIndex, 0)
+    assert.equal(pending.state.currentPlayerIndex, 0)
+    const improvement = options(pending).filter(option => option.value !== '__skip__' && !option.disabled)
+    assert.equal(improvement.length, 1)
+    assert.equal(improvement[0]!.labelKey, 'actions.improvement.name')
+    assert.ok(options(pending).some(option => option.value === '__skip__' && !option.disabled))
+    return finish(record('decline-minor', ok(s.resolveChoice(0, '__skip__'))))
   }
   function values(r: SessionResponse) {
     const p = r.state.players[0]!
@@ -446,13 +464,16 @@ describe("A092 command boundaries", () => {
       r = record('construct-branch', ok(s.resolveChoice(actor, c.value)))
     }
     assert(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'farm-select', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.request.farm.farmType, stable ? 'stable' : 'room')
+    assert.equal(r.interaction.playerIndex, actor)
+    assert.equal(r.state.currentPlayerIndex, actor)
     return record('construct', ok(s.commitSelectionChoice(actor, stable ? { rooms: [], stables: tiles } : { rooms: tiles, stables: [] })))
   }
   function bed(s: GameSession, tiles = [rooms[2]!], accept = true) {
     let r = build(s, tiles)
     assert.ok(r.interaction.stateId === 'wait' && r.interaction.sourceCard === BED, JSON.stringify(r.interaction))
     r = choose(s, r, accept)
-    return finish(s, r)
+    return finish(r)
   }
   it("real newborn promotion pays one food and preserves opponent alternation", () => {
     const s = setup({ roomCount: 3, resources: { food: 1 } })
@@ -488,9 +509,20 @@ describe("A092 command boundaries", () => {
   })
   it("no newborn means no activation or food payment", () => {
     const s = setup({ roomCount: 3, resources: { food: 1 } })
-    record('no-child', assertRejectedUnchanged(s, () => s.takeAnytimeAction(0, ANY)))
+    const rejected = record('no-child', assertRejectedUnchanged(s, () => s.takeAnytimeAction(0, ANY)))
+    assert.equal(rejected.interaction.stateId, 'idle')
+    assert.equal(rejected.state.currentPlayerIndex, 0)
     assert.equal(values(s.getState()).food, 1)
   })
+  function placementOffer(r: SessionResponse, space: string) {
+    ok(r)
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.sourceCard, PARENTS)
+    assert.equal(r.interaction.promptKey, 'ui.interactionPlaceFarmerExtra')
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
+    assert.ok(options(r).some(option => option.value === space && !option.disabled))
+  }
   function lastOrdinary(s: GameSession) {
     growth(s)
     turn(s, 1, 'forest')
@@ -498,25 +530,49 @@ describe("A092 command boundaries", () => {
     const last = turn(s, 1, 'clay-pit')
     return record('extra-turn-offer', confirmNext(s, last))
   }
-  function nextRound(s: GameSession, r: SessionResponse) {
-    for (let i = 0; i < 8 && (r.state.round === 7 || r.state.roundPhase === 'preparation'); i++) {
-      r = passPreparationExchanges(s, r)
-      if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
-        r = record('round-confirm', confirmNext(s, r))
-      else
-        break
+  function nextRound(s: GameSession, r: SessionResponse, expected: 'exchange' | 'idle') {
+    assertConfirmation(r, 0, 0)
+    let next = record('round-confirm', ok(confirmNext(s, r)))
+    if (expected === 'exchange') {
+      assert.equal(next.state.round, 7)
+      assert.equal(next.state.roundPhase, 'preparation')
+      assert.ok(next.interaction.stateId === 'wait' && next.interaction.request.kind === 'select-trigger', JSON.stringify(next.interaction))
+      assert.equal(next.interaction.playerIndex, 0)
+      assert.equal(next.interaction.spaceId, '__stage:onBeforeStartOfTurn')
+      assert.equal(next.state.currentPlayerIndex, 0)
+      assert.ok(next.interaction.request.options.every(option => !option.disabled))
+      assert.deepEqual(next.interaction.request.options.map(option => option.labelKey), ['actions.exchange.name', 'ui.interactionSelectTriggerPass'])
+      next = passPreparationExchanges(s, next)
     }
-    assert.equal(r.state.round, 8)
-    assert.equal(r.state.roundPhase, 'work')
-    return r
+    assert.equal(next.state.round, 8)
+    assert.equal(next.state.roundPhase, 'work')
+    assert.equal(next.interaction.stateId, 'idle', JSON.stringify(next.interaction))
+    assert.equal(next.state.currentPlayerIndex, 0)
+    return next
+  }
+  function extraOffer(r: SessionResponse) {
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.sourceCard, PARENTS)
+    assert.equal(r.interaction.promptKey, 'ui.interactionFlowSelect')
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
+    const candidates = options(r)
+    assert.equal(candidates.length, 2)
+    assert.ok(candidates.every(option => !option.disabled && option.sourceCard === PARENTS))
+    const use = candidates.find(option => option.labelKey === 'actions.pay.name')
+    const decline = candidates.find(option => option.labelKey === 'actions.special-effect.name')
+    assert.ok(use?.effectPreview?.kind === 'payment')
+    assert.deepEqual(use.effectPreview.resourcesPaid, { food: 1 })
+    assert.ok(decline?.descriptionPreview?.kind === 'action')
+    assert.equal(decline.descriptionPreview.labelKey, 'actions.special-effect.emit-card-triggered.declined.name')
+    return { use, decline }
   }
   it("last-worker activation feeds an adult and records the native extra-turn seam", () => {
     const s = setup({ roomCount: 3, resources: { food: 20 } })
     const offer = lastOrdinary(s)
     assert.equal(newbornCount(s.state.players[0]!), 1)
     assert.equal(workersAvailable(s.state, s.state.players[0]!), 0)
-    const use = options(offer)[0]
-    assert(use)
+    const { use } = extraOffer(offer)
     record('nested-anytime', assertRejectedUnchanged(s, () => s.takeAnytimeAction(0, ANY)))
     record('wrong-extra-responder', assertRejectedUnchanged(s, () => s.resolveChoice(1, use.value)))
     let r = record('extra-use', ok(s.resolveChoice(0, use.value)))
@@ -527,6 +583,7 @@ describe("A092 command boundaries", () => {
     assert.equal(r.interaction.playerIndex, 0)
     assert.equal(r.interaction.promptKey, 'ui.interactionPlaceFarmerExtra')
     assertPlacements(r, [{ spaceId: 'wish-children', workerId: '1' }, { spaceId: 'reed-bank', workerId: '2' }])
+    placementOffer(r, 'grain-seeds')
     record('occupied-extra-target', assertRejectedUnchanged(s, () => s.resolveChoice(0, 'forest')))
     r = record('extra-placement', ok(s.resolveChoice(0, 'grain-seeds')))
     assert.equal(values(r).grain, 1)
@@ -534,21 +591,20 @@ describe("A092 command boundaries", () => {
     assertPlacements(r, [{ spaceId: 'wish-children', workerId: '1' }, { spaceId: 'reed-bank', workerId: '2' }, { spaceId: 'grain-seeds', workerId: '3' }])
     assertConfirmation(r, 0, 0)
     record('stale-extra-use', assertRejectedUnchanged(s, () => s.resolveChoice(0, use.value)))
-    r = nextRound(s, r)
+    r = nextRound(s, r, 'exchange')
     assert.equal(values(r).food, 13)
     assert.equal(values(r).family, 3)
   })
   it("declining a real birth preserves newborn feeding and records the forfeit seam", () => {
     const s = setup({ roomCount: 3, resources: { food: 20 } })
     const offer = lastOrdinary(s)
-    const decline = options(offer)[1]
-    assert(decline)
+    const { decline } = extraOffer(offer)
     const r = record('extra-forfeit', ok(s.resolveChoice(0, decline.value)))
     assert.equal(values(r).food, 20)
     assert.equal(values(r).newborns, 1)
     assertPlacements(r, [{ spaceId: 'wish-children', workerId: '1' }, { spaceId: 'reed-bank', workerId: '2' }], [{ spaceId: 'wish-children', workerId: '3' }])
     assertConfirmation(r, 0, 0)
-    const next = nextRound(s, r)
+    const next = nextRound(s, r, 'idle')
     assert.equal(values(next).food, 15)
     assert.equal(next.state.players[0]!.cardStates[PARENTS]?.extraData?.forfeitedThisRound, false)
   })
@@ -561,8 +617,7 @@ describe("A092 command boundaries", () => {
     assert.equal(newbornCount(s.state.players[0]!), 2)
     let r = record('two-child-offer', confirmNext(s, turn(s, 1, 'clay-pit')))
     for (const space of ['grain-seeds', 'day-laborer']) {
-      const use = options(r)[0]
-      assert(use)
+      const { use } = extraOffer(r)
       const promoted = record('two-child-use', ok(s.resolveChoice(0, use.value)))
       assert.equal(values(promoted).food, space === 'grain-seeds' ? 29 : 28)
       assert.equal(values(promoted).newborns, space === 'grain-seeds' ? 1 : 0)
@@ -570,6 +625,7 @@ describe("A092 command boundaries", () => {
       assert.ok(promoted.interaction.stateId === 'wait')
       assert.equal(promoted.interaction.playerIndex, 0)
       assert.equal(promoted.interaction.promptKey, 'ui.interactionPlaceFarmerExtra')
+      placementOffer(promoted, space)
       r = record(`two-child-place:${space}`, ok(s.resolveChoice(0, space)))
       if (space === 'grain-seeds') {
         assertPlacements(r, [{ spaceId: 'wish-children', workerId: '1' }, { spaceId: 'farm-expansion', workerId: '2' }, { spaceId: 'grain-seeds', workerId: '3' }], [{ spaceId: 'farm-expansion', workerId: '4' }])
@@ -583,18 +639,27 @@ describe("A092 command boundaries", () => {
     assert.equal(values(r).food, 30)
     assert.equal(values(r).newborns, 0)
     assert.equal(values(r).family, 4)
-    r = nextRound(s, r)
+    r = nextRound(s, r, 'exchange')
     assert.equal(values(r).food, 22)
     assert.equal(values(r).grain, 1)
   })
   it("whole real growth and paid promotion undo restores the birth and payment before one retry", () => {
     const s = setup({ roomCount: 3, resources: { food: 1 } })
     const before = undoRuleSnapshot(s.getState())
+    const interactionBefore = structuredClone(s.getState().interaction)
     growth(s)
     record('undo-test-promote', ok(s.takeAnytimeAction(0, ANY)))
-    assertUndoRestored(before, record('undo-parents', s.undoAction()))
+    const undone = record('undo-parents', s.undoAction())
+    assertUndoRestored(before, undone)
+    assertUndoRestored(before, s.getState())
+    assert.deepEqual(undone.interaction, interactionBefore)
+    assert.deepEqual(s.getState().interaction, interactionBefore)
+    assert.equal(undone.interaction.stateId, 'idle')
+    assert.equal(undone.state.currentPlayerIndex, 0)
+    assert.equal(s.getState().state.currentPlayerIndex, 0)
     growth(s)
     const r = record('retry-promote', ok(s.takeAnytimeAction(0, ANY)))
+    assertConfirmation(r, 0, 1)
     assert.equal(values(r).food, 0)
     assert.equal(values(r).newborns, 0)
     assert.equal(values(r).family, 3)
