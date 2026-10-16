@@ -165,7 +165,7 @@ describe('E024 Ambition parity', () => {
     state.roundActionOrder[4] = 'western-quarry'
     session.loadState(state)
 
-    let response = session.continueBeforeStartOfTurn()
+    let response = session.withCtx(() => session.continueBeforeStartOfTurn())
     response = resolveTriggerIfPresent(session, response, TASK_ARTISAN)
     expect(response.state.players[0]!.resources.wood).toBe(11)
     response = enterOptionalImprovement(session, response)

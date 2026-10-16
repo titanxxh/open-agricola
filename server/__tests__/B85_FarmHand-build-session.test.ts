@@ -255,7 +255,7 @@ describe('B85 FarmHand — build through Build Stables farm-select', () => {
     if (farm?.farmType !== 'stable') return
     expect(farm.farmHandPositions).toEqual([FARM_HAND_TILE])
 
-    const baseSelection = playerBoard(resp.state, 0).farmInteraction.selectableTiles('stable', {})
+    const baseSelection = session.withCtx(() => playerBoard(resp.state, 0).farmInteraction.selectableTiles('stable', {}))
     expect(
       (baseSelection as { farmHandPositions?: unknown }).farmHandPositions,
     ).toBeUndefined()
@@ -300,13 +300,13 @@ describe('B85 FarmHand — return-stable lifecycle (#187)', () => {
     const { session: ruleSession, state, player } = buildFarmHand()
     const supplyBefore = ruleSession.withCtx(() => getAvailableStableSupplyCount(state, player))
 
-    const flow = runSelectionEffect('lumber-pile-return-stables', {
+    const flow = ruleSession.withCtx(() => runSelectionEffect('lumber-pile-return-stables', {
       player,
       positions: [positionStr],
       cards: [],
       sourceCard: 'E076_LumberPile',
       state,
-    })
+    }))
 
     expect(flow).toBeUndefined()
     expect(readFarmHandPosition(player)).toBeUndefined()
@@ -320,13 +320,13 @@ describe('B85 FarmHand — return-stable lifecycle (#187)', () => {
     const { session: ruleSession, state, player } = buildFarmHand()
     const supplyBefore = ruleSession.withCtx(() => getAvailableStableSupplyCount(state, player))
 
-    const flow = runSelectionEffect('sample-stable-maker-return', {
+    const flow = ruleSession.withCtx(() => runSelectionEffect('sample-stable-maker-return', {
       player,
       positions: [positionStr],
       cards: [],
       sourceCard: 'D102_SampleStableMaker',
       state,
-    })
+    }))
 
     expect(flow).toBeUndefined()
     expect(readFarmHandPosition(player)).toBeUndefined()
@@ -339,13 +339,13 @@ describe('B85 FarmHand — return-stable lifecycle (#187)', () => {
     const { session: ruleSession, state, player } = buildFarmHand()
     const capacityBefore = ruleSession.withCtx(() => getTotalAnimalCapacity(player, state))
 
-    const flow = runSelectionEffect('lumber-pile-return-stables', {
+    const flow = ruleSession.withCtx(() => runSelectionEffect('lumber-pile-return-stables', {
       player,
       positions: [positionStr],
       cards: [],
       sourceCard: 'E076_LumberPile',
       state,
-    })
+    }))
 
     expect(flow).toBeUndefined()
     const zones = ruleSession.withCtx(() => computeAnimalZones(player, state))
@@ -416,13 +416,13 @@ describe('B85 FarmHand — snapshot specialStables display field', () => {
     expect(commit.ok).toBe(true)
 
     const player = commit.state.players[0]!
-    runSelectionEffect('lumber-pile-return-stables', {
+    session.withCtx(() => runSelectionEffect('lumber-pile-return-stables', {
       player,
       positions: [positionKey(FARM_HAND_TILE)],
       cards: [],
       sourceCard: 'E076_LumberPile',
       state: commit.state,
-    })
+    }))
 
     const view = serializeFor(session, commit.state, player.id)
     expect(view.players[0]!.specialStables).toEqual([])

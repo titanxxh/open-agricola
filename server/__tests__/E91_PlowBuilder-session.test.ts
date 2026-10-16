@@ -234,13 +234,13 @@ describe('E091_PlowBuilder session', () => {
   ])('does not inject Joinery into a card-derived improvement flow', (actionContext, sourceCard) => {
     const session = setupMinorImprovement()
     const state = session.getState().state
-    const extras = collectComputeChoiceCandidates(
+    const extras = session.withCtx(() => collectComputeChoiceCandidates(
       state,
       state.players[0]!,
       'improvement',
       actionContext,
-      sourceCard,
-    )
+      sourceCard, session.actionHooks,
+    ))
 
     expect(extras.map((option) => option.value)).not.toContain('Major_Joinery')
   })

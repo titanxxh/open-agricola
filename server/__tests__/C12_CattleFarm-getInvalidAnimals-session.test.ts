@@ -41,7 +41,7 @@ describe('C012_CattleFarm getInvalidAnimals', () => {
     const zone = session.withCtx(() => computeAnimalZones(player)).find(z => z.id === `card:C012_CattleFarm`)!
     zone.animalType = 'cattle'
     zone.animalCount = 2
-    expect(computeInvalidAnimalsForZone(state, player, zone)).toEqual([])
+    expect(session.withCtx(() => computeInvalidAnimalsForZone(state, player, zone))).toEqual([])
   })
 
   it('flags excess cattle beyond pasture count', () => {
@@ -53,7 +53,7 @@ describe('C012_CattleFarm getInvalidAnimals', () => {
     zone.capacity = 3
     zone.animalType = 'cattle'
     zone.animalCount = 3
-    const invalid = computeInvalidAnimalsForZone(state, player, zone)
+    const invalid = session.withCtx(() => computeInvalidAnimalsForZone(state, player, zone))
     expect(invalid.length).toBe(2)
     expect(invalid.every(m => m.type === 'cattle')).toBe(true)
   })

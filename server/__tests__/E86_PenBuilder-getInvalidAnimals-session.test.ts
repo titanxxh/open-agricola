@@ -35,6 +35,6 @@ describe('E086_PenBuilder getInvalidAnimals', () => {
     const zone = session.withCtx(() => computeAnimalZones(player)).find(z => z.id === `card:E086_PenBuilder`)!
     zone.animalType = 'cattle'
     zone.animalCount = 4
-    expect(computeInvalidAnimalsForZone(state, player, zone)).toEqual([])
+    expect(session.withCtx(() => computeInvalidAnimalsForZone(state, player, zone))).toEqual([])
   })
 })

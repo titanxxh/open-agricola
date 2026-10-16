@@ -46,6 +46,6 @@ describe('E011_PettingZoo getInvalidAnimals', () => {
     const zone = session.withCtx(() => computeAnimalZones(player)).find(z => z.id === `card:E011_PettingZoo`)!
     zone.animalType = 'sheep'
     zone.animalCount = 1
-    expect(computeInvalidAnimalsForZone(state, player, zone)).toEqual([])
+    expect(session.withCtx(() => computeInvalidAnimalsForZone(state, player, zone))).toEqual([])
   })
 })

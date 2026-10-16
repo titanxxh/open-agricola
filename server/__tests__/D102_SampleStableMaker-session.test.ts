@@ -89,6 +89,7 @@ describe('D102_SampleStableMaker card effect', () => {
   })
 
   it('selection-effect removes exactly 1 stable and grants 1 wood, 1 grain, 1 food', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     const player = createOwner()
     player.stableTiles = [
       { row: 0, col: 0 }, { row: 1, col: 0 },
@@ -98,11 +99,11 @@ describe('D102_SampleStableMaker card effect', () => {
       grain: player.resources.grain,
       food: player.resources.food,
     }
-    runSelectionEffect(FIELD_EFFECT, {
+    withActiveRegistry(ruleRegistry, () => runSelectionEffect(FIELD_EFFECT, {
       player,
       positions: ['0-0'],
       sourceCard: CARD_ID,
-    })
+    }))
     expect(player.stableTiles).toHaveLength(1)
     expect(player.stableTiles[0]).toEqual({ row: 1, col: 0 })
     expect(player.resources.wood).toBe(initial.wood + 1)
@@ -111,6 +112,7 @@ describe('D102_SampleStableMaker card effect', () => {
   })
 
   it('selection-effect does nothing when no selection is made', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     const player = createOwner()
     player.stableTiles = [{ row: 0, col: 0 }]
     const initial = {
@@ -118,11 +120,11 @@ describe('D102_SampleStableMaker card effect', () => {
       grain: player.resources.grain,
       food: player.resources.food,
     }
-    runSelectionEffect(FIELD_EFFECT, {
+    withActiveRegistry(ruleRegistry, () => runSelectionEffect(FIELD_EFFECT, {
       player,
       positions: [],
       sourceCard: CARD_ID,
-    })
+    }))
     expect(player.stableTiles).toHaveLength(1)
     expect(player.resources.wood).toBe(initial.wood)
     expect(player.resources.grain).toBe(initial.grain)
@@ -162,11 +164,11 @@ describe('D102_SampleStableMaker card effect', () => {
       food: player.resources.food,
     }
     expect(withActiveRegistry(ruleRegistry, () => getExtraRoomCapacity(player))).toBe(1)
-    runSelectionEffect(FIELD_EFFECT, {
+    withActiveRegistry(ruleRegistry, () => runSelectionEffect(FIELD_EFFECT, {
       player,
       positions: ['2-1'],
       sourceCard: CARD_ID,
-    })
+    }))
     // FarmHand tile cleared from cardStates, but `flagged` stays true so
     // the player cannot rebuild it.
     expect(player.cardStates!.B085_FarmHand!.extraData?.position).toBeUndefined()
@@ -196,13 +198,13 @@ describe('D102_SampleStableMaker card effect', () => {
     const state = createState([player])
     expect(withActiveRegistry(ruleRegistry, () => getAvailableStableSupplyCount(state, player))).toBe(0)
 
-    runSelectionEffect(FIELD_EFFECT, {
+    withActiveRegistry(ruleRegistry, () => runSelectionEffect(FIELD_EFFECT, {
       player,
       positions: ['2-1'],
       sourceCard: CARD_ID,
       state,
       cards: [],
-    })
+    }))
 
     expect(withActiveRegistry(ruleRegistry, () => getAvailableStableSupplyCount(state, player))).toBe(1)
   })

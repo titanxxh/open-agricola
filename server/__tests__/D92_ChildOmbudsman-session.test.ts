@@ -31,6 +31,7 @@ describe('D92 Child Ombudsman — listener', () => {
     const { session: ruleSession, state, player } = makeCtx(4, 3, 2)
     const handler = D092_ChildOmbudsman_impl.listeners[0]!.handler
     const ctx = {
+      actionHooks: ruleSession.actionHooks,
       state,
       player,
       actionId: 'place-farmer',
@@ -43,6 +44,7 @@ describe('D92 Child Ombudsman — listener', () => {
     const { session: ruleSession, state, player } = makeCtx(5, 2, 2)
     const handler = D092_ChildOmbudsman_impl.listeners[0]!.handler
     const ctx = {
+      actionHooks: ruleSession.actionHooks,
       state,
       player,
       actionId: 'place-farmer',
@@ -52,9 +54,10 @@ describe('D92 Child Ombudsman — listener', () => {
   })
 
   it('offers SEQ optional with [special-effect, family-growth] in round 5 with free room', () => {
-    const { state, player } = makeCtx(5, 3, 2)
+    const { session: ruleSession, state, player } = makeCtx(5, 3, 2)
     const handler = D092_ChildOmbudsman_impl.listeners[0]!.handler
     const ctx = {
+      actionHooks: ruleSession.actionHooks,
       state,
       player,
       actionId: 'place-farmer',
@@ -84,10 +87,11 @@ describe('D92 Child Ombudsman — listener', () => {
   })
 
   it('listener handler does NOT mutate negativeScore directly (engine-mediated)', () => {
-    const { state, player } = makeCtx(5, 3, 2)
+    const { session: ruleSession, state, player } = makeCtx(5, 3, 2)
     const handler = D092_ChildOmbudsman_impl.listeners[0]!.handler
     const before = readCardExtraData<number>(player, CARD_ID, 'negativeScore') ?? 0
     ruleSession.withCtx(() => handler({
+      actionHooks: ruleSession.actionHooks,
       state,
       player,
       actionId: 'place-farmer',
@@ -98,15 +102,15 @@ describe('D92 Child Ombudsman — listener', () => {
   })
 
   it('computeBonusScore: returns -negativeScore (post-mutation total)', () => {
-    const { state, player } = makeCtx(5, 3, 2)
+    const { session: ruleSession, state, player } = makeCtx(5, 3, 2)
     writeCardExtraData(player, CARD_ID, 'negativeScore', 6)
     const compute = D092_ChildOmbudsman_impl.effect.computeBonusScore!
-    expect(compute(state, player)).toBe(-6)
+    expect(ruleSession.withCtx(() => compute(state, player))).toBe(-6)
   })
 
   it('computeBonusScore: 0 when no mutation has happened', () => {
-    const { state, player } = makeCtx(5, 3, 2)
+    const { session: ruleSession, state, player } = makeCtx(5, 3, 2)
     const compute = D092_ChildOmbudsman_impl.effect.computeBonusScore!
-    expect(Math.abs(compute(state, player))).toBe(0)
+    expect(Math.abs(ruleSession.withCtx(() => compute(state, player)))).toBe(0)
   })
 })

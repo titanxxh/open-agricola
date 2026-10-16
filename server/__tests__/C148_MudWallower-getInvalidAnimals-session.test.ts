@@ -40,6 +40,6 @@ describe('C148_MudWallower getInvalidAnimals', () => {
     const zone = session.withCtx(() => computeAnimalZones(player)).find(z => z.id === `card:C148_MudWallower`)!
     zone.animalType = 'boar'
     zone.animalCount = 2
-    expect(computeInvalidAnimalsForZone(state, player, zone)).toEqual([])
+    expect(session.withCtx(() => computeInvalidAnimalsForZone(state, player, zone))).toEqual([])
   })
 })

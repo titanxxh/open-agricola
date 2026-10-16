@@ -1,3 +1,4 @@
+import type { ActionHookRegistry } from '../../hooks'
 import type { GameState, PlayerState, PaymentResourceMap, ComplexCost, CostModifierType } from '../../../contract/types'
 import { PaymentSolver, type Cost } from '..'
 
@@ -34,6 +35,7 @@ export const resolveCardCostDetailedForTest = (
   cardId: string,
   baseCost: PaymentResourceMap | ComplexCost,
   actionCardId?: string,
+  actionHooks?: ActionHookRegistry,
 ) =>
   PaymentSolver.resolveCardPreviewCostDetailedByProvider(
     state,
@@ -42,6 +44,7 @@ export const resolveCardCostDetailedForTest = (
     cardId,
     () => baseCost,
     actionCardId,
+    actionHooks,
   )
 
 export const resolveCardCostForTest = (
@@ -51,6 +54,7 @@ export const resolveCardCostForTest = (
   cardId: string,
   baseCost: PaymentResourceMap | ComplexCost,
   actionCardId?: string,
+  actionHooks?: ActionHookRegistry,
 ) =>
   resolveCardCostDetailedForTest(
     state,
@@ -59,4 +63,5 @@ export const resolveCardCostForTest = (
     cardId,
     baseCost,
     actionCardId,
+    actionHooks,
   ).cost

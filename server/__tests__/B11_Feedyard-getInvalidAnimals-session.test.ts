@@ -41,7 +41,7 @@ describe('B011_Feedyard getInvalidAnimals', () => {
     const zone = session.withCtx(() => computeAnimalZones(player)).find(z => z.id === `card:B011_Feedyard`)!
     zone.animalType = 'sheep'
     zone.animalCount = 2
-    expect(computeInvalidAnimalsForZone(state, player, zone)).toEqual([])
+    expect(session.withCtx(() => computeInvalidAnimalsForZone(state, player, zone))).toEqual([])
   })
 
   it('flags excess beyond pasture count', () => {
@@ -52,7 +52,7 @@ describe('B011_Feedyard getInvalidAnimals', () => {
     zone.capacity = 3
     zone.animalType = 'boar'
     zone.animalCount = 3
-    const invalid = computeInvalidAnimalsForZone(state, player, zone)
+    const invalid = session.withCtx(() => computeInvalidAnimalsForZone(state, player, zone))
     expect(invalid.length).toBe(2)
   })
 })
