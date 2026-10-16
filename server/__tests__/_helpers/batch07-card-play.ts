@@ -2,12 +2,11 @@ import type { GameSession, SessionResponse } from '../../game/authoritative-sess
 import { setWorkersAtHome } from '../../../shared/domain/player'
 import { resolveTriggerIfPresent } from './trigger-select'
 import { createWorkSession } from './session-fixtures'
+import { getChoiceOptions } from './session-assertions'
 
 const FILLER = '__test_placeholder__'
 
-export const sessionOptions = (response: SessionResponse) => response.interaction.stateId === 'wait'
-  ? response.interaction.request.options ?? []
-  : []
+export const sessionOptions = (response: SessionResponse) => getChoiceOptions(response)
 
 export const setupMinorSession = ({
   cardId, resources, improvements = [], minorPlayed = [], houseType = 'wood',

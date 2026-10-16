@@ -17,6 +17,10 @@ import assert from 'node:assert/strict'
 import { assertRejectedUnchanged, assertUndoRestored, undoRuleSnapshot, getChoiceOptions, expectTileFarmSelection, expectFarmSelection, confirmNext, passPreparationExchanges } from './_helpers/session-assertions'
 import { createScenarioEvidence } from './_helpers/scenario-evidence'
 import { getOwnOrdinaryFenceReserveCount } from '../../shared/domain/supply-tokens'
+
+import { getLogicalFields } from '../../shared/cards/helpers/card-field'
+import { buildLogPresentationPlan } from '../../shared/events/log-mapper'
+
 const sessionEvidence = createScenarioEvidence(import.meta.url)
 type CardId = 'A006_StorageBarn'
   | 'A007_GardenersKnife'
@@ -1224,5 +1228,256 @@ describe("A047 command boundaries", () => {
       assert.deepEqual(rounds(r), expected)
       assert.equal(r.state.players[0]!.fenceSegments.length, 4)
     }
+  })
+})
+
+describe('A007 command boundaries', () => {
+  const CARD_ID = 'A007_GardenersKnife'
+  const ROTATION = 'E070_CropRotationField',
+    WAGE = 'B007_Wage',
+    COMPANION = 'A016_RammedClay'
+  function ok(r: SessionResponse) {
+    assert.equal(r.ok, true, r.error)
+    return r
+  }
+  function setup(
+    resources: Partial<Resource> = {},
+    configure: (state: GameState) => void = () => {},
+  ) {
+    const s = sessionEvidence.track(
+      createWorkSession({
+        seed: 4242,
+        options: { playerCount: 2 },
+        configure(state) {
+          state.round = 5
+          state.availableMajorImprovements = []
+          for (const p of state.players) {
+            p.minorHand = ['__test_placeholder__']
+            p.occupationHand = ['__test_placeholder__']
+            p.minorPlayed = []
+            p.occupationPlayed = []
+            Object.assign(p.resources, {
+              food: 40,
+              wood: 0,
+              clay: 0,
+              reed: 0,
+              stone: 0,
+              grain: 0,
+              vegetable: 0,
+            })
+            assert.equal(p.workers.length, 5)
+            assert.equal(p.workers.filter((w) => w.isActive).length, 2)
+          }
+          const p = state.players[0]!
+          p.minorHand = [CARD_ID, WAGE, COMPANION]
+          Object.assign(p.resources, resources)
+          configure(state)
+        },
+      }),
+    )
+    return s
+  }
+  function options(r: SessionResponse) {
+    assert.ok(
+      r.interaction.stateId === 'wait' &&
+        r.interaction.request.kind === 'choice',
+      JSON.stringify(r.interaction),
+    )
+    return getChoiceOptions(r)
+  }
+  function menu(s: GameSession) {
+    let r = ok(s.takeAction(0, 'meeting-place'))
+    const action = options(r).find((o) =>
+      o.value.startsWith('action-improvement-'),
+    )
+    if (action) r = ok(s.resolveChoice(0, action.value))
+    return r
+  }
+  function buy(s: GameSession, card: string) {
+    const r = menu(s)
+    assert.ok(options(r).some((o) => o.value === card && !o.disabled))
+    return ok(s.resolveChoice(0, card))
+  }
+  function passed(r: SessionResponse, card: string) {
+    assert.equal(r.state.players[0]!.minorHand.includes(card), false)
+    assert.equal(r.state.players[0]!.minorPlayed.includes(card), false)
+    assert.equal(
+      r.state.players[1]!.minorHand.filter((id) => id === card).length,
+      1,
+    )
+    assert.equal(r.state.players[1]!.minorPlayed.includes(card), false)
+    const events = r.state.events.filter(
+      (e) =>
+        'fromPlayerId' in e &&
+        'toPlayerId' in e &&
+        'cardId' in e &&
+        e.cardId === card,
+    )
+    assert.equal(events.length, 1)
+    const event = events[0]
+    assert.ok(
+      event &&
+        'fromPlayerId' in event &&
+        'toPlayerId' in event &&
+        'cardId' in event,
+    )
+    assert.equal(event.cardId, card)
+    assert.equal(event.fromPlayerId, r.state.players[0]!.id)
+    assert.equal(event.toPlayerId, r.state.players[1]!.id)
+    const rows = buildLogPresentationPlan(r.state.events, {
+      playerNames: {},
+    }).rows.filter(
+      (row) =>
+        row.logEntry.key === 'log.cardPassed' &&
+        row.logEntry.params?.cardId === card,
+    )
+    assert.equal(rows.length, 1)
+    const row = rows[0]
+    assert.ok(row)
+    assert.deepEqual(row.sourceEventRef, {
+      id: event.id,
+      seq: event.seq,
+      type: event.type,
+    })
+    assert.equal(row.logEntry.playerRefs?.fromPlayer, event.fromPlayerId)
+    assert.equal(row.logEntry.playerRefs?.toPlayer, event.toPlayerId)
+  }
+  function deny(s: GameSession, card: string) {
+    const r = menu(s)
+    assert.equal(
+      options(r).some((o) => o.value === card && !o.disabled),
+      false,
+    )
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, card))
+    const beforeFood = r.state.players[0]!.resources.food
+    const retry = ok(s.resolveChoice(0, WAGE))
+    assert.equal(retry.state.players[0]!.resources.food, beforeFood + 2)
+    assert.equal(retry.state.players[0]!.minorHand.includes(card), true)
+  }
+  function fields(
+    p: PlayerState,
+    crops: Array<['grain' | 'vegetable' | null, number]>,
+  ) {
+    const places = [
+      { row: 0, col: 1 },
+      { row: 0, col: 2 },
+      { row: 0, col: 3 },
+      { row: 0, col: 4 },
+      { row: 1, col: 1 },
+    ]
+    p.fields = crops.map(([kind, remaining], i) => {
+      const tile = places[i]
+      assert.ok(tile)
+      return { ...tile, stacks: kind ? [{ kind, remaining }] : [] }
+    })
+  }
+  function goods(r: SessionResponse, actor = 0) {
+    const p = r.state.players[actor]!
+    return {
+      food: p.resources.food,
+      wood: p.resources.wood,
+      clay: p.resources.clay,
+      grain: p.resources.grain,
+    }
+  }
+  it('one wood payment must precede any immediate field rewards', () => {
+    const s = setup({}, (state) =>
+      fields(state.players[0]!, [
+        ['grain', 3],
+        ['vegetable', 2],
+      ]),
+    )
+    deny(s, CARD_ID)
+    assert.equal(s.getState().state.players[0]!.resources.grain, 0)
+  })
+  it('one grain and one vegetable field give their separate literal goods', () => {
+    const r = buy(
+      setup({ wood: 1 }, (state) =>
+        fields(state.players[0]!, [
+          ['grain', 3],
+          ['vegetable', 2],
+        ]),
+      ),
+      CARD_ID,
+    )
+    assert.deepEqual(goods(r), { food: 41, wood: 0, clay: 0, grain: 1 })
+    passed(r, CARD_ID)
+  })
+  it('several crop units still count distinct fields once each', () => {
+    const r = buy(
+      setup({ wood: 1 }, (state) =>
+        fields(state.players[0]!, [
+          ['grain', 3],
+          ['grain', 2],
+          ['grain', 1],
+          ['vegetable', 2],
+          ['vegetable', 1],
+        ]),
+      ),
+      CARD_ID,
+    )
+    assert.deepEqual(goods(r), { food: 43, wood: 0, clay: 0, grain: 2 })
+    passed(r, CARD_ID)
+  })
+  it('empty fields provide neither grain field nor vegetable field reward', () => {
+    const r = buy(
+      setup({ wood: 1 }, (state) =>
+        fields(state.players[0]!, [
+          [null, 0],
+          [null, 0],
+        ]),
+      ),
+      CARD_ID,
+    )
+    assert.deepEqual(goods(r), { food: 40, wood: 0, clay: 0, grain: 0 })
+    passed(r, CARD_ID)
+  })
+  it('buyer fields determine reward before left passing', () => {
+    const s = setup({ wood: 1 }, (state) => {
+      fields(state.players[0]!, [['grain', 3]])
+      fields(state.players[1]!, [
+        ['vegetable', 2],
+        ['vegetable', 1],
+      ])
+    })
+    const r = buy(s, CARD_ID)
+    assert.deepEqual(goods(r), { food: 41, wood: 0, clay: 0, grain: 0 })
+    assert.deepEqual(goods(r, 1), { food: 40, wood: 0, clay: 0, grain: 0 })
+    passed(r, CARD_ID)
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, CARD_ID))
+  })
+  it('Card Field grain contributes one logical field if independently applicable', () => {
+    const s = setup({ wood: 1 }, (state) => {
+      const p = state.players[0]!
+      p.minorPlayed = [ROTATION]
+      p.occupationPlayed = ['A111_WallBuilder']
+      fields(p, [[null, 0]])
+      p.cardStates[ROTATION] = {
+        extraData: { cardFieldStacks: [{ crop: 'grain', remaining: 2 }] },
+      }
+    })
+    assert.equal(
+      getLogicalFields(s.getState().state.players[0]!).filter(
+        (f) => f.sourceCard === ROTATION,
+      ).length,
+      1,
+    )
+    const r = buy(s, CARD_ID)
+    assert.deepEqual(goods(r), { food: 41, wood: 0, clay: 0, grain: 0 })
+    passed(r, CARD_ID)
+  })
+  it('whole passing purchase undo restores board goods and both hands', () => {
+    const s = setup({ wood: 1 }, (state) =>
+      fields(state.players[0]!, [
+        ['grain', 3],
+        ['vegetable', 2],
+      ]),
+    )
+    const before = undoRuleSnapshot(s.getState())
+    passed(buy(s, CARD_ID), CARD_ID)
+    assertUndoRestored(before, s.undoAction())
+    const r = buy(s, CARD_ID)
+    assert.deepEqual(goods(r), { food: 41, wood: 0, clay: 0, grain: 1 })
+    passed(r, CARD_ID)
   })
 })

@@ -1,36 +1,31 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { type GameSession, type SessionResponse } from '../game/authoritative-session'
 import { createWorkSession } from './_helpers/session-fixtures'
 import { markAllWorkersUsed } from '../../shared/domain/player'
-import type { GameState } from '../../shared/contract/types'
+import { type GameState, type PlayerState, type Resource } from '../../shared/contract/types'
+import { countRoomAnimals } from '../../shared/domain/animals'
+import assert from 'node:assert/strict'
+import { type ZoneAssignment } from '../../shared/actions/effects/reorganize'
+import { getOwnOrdinaryFenceReserveCount } from '../../shared/domain/supply-tokens'
+import { assertRejectedUnchanged, assertUndoRestored, confirmNext, undoRuleSnapshot, getChoiceOptions } from './_helpers/session-assertions'
+import { createScenarioEvidence } from './_helpers/scenario-evidence'
 
-/**
- * Confirmed PR1144 regressions use public Session commands because replacement,
- * reaction choices and partial collection must preserve the complete host action.
- * New seed-42 work games start in round 8 with fixed placeholder hands, no
- * occupied spaces, real rooms and one sheep in the two-tile pasture at 0-3/0-4.
- * Player 0 owns Feeding Dish, food 20, grain/reed 0. Sheep Market has one sheep;
- * Reed Bank has three reed. The pass case uses two players. Printed D138/A137
- * restrictions require three players for those cases. Other players have no cards.
- * Resolve actual reaction/replacement choices and confirm animal placement;
- * assert resources, source events, pending completion, logs and literal scores.
- * Accepted timing: automatic grain at actual market use, before collect choices.
- * Lasso covers both orders of two real placements. Minstrel uses the sole empty
- * stage-one market in a four-player return-home phase without a new worker.
- * Straw Hat moves an existing Farmland worker to the market in round 6; inspect
- * the resulting animal-reorg boundary before unrelated harvest processing.
- */
+const sessionEvidence = createScenarioEvidence(import.meta.url)
+
 const DISH = 'A066_FeedingDish'
+
 const PET_LOVER = 'D138_PetLover'
+
 const RIVERINE = 'A137_RiverineShepherd'
+
 const LASSO = 'B024_Lasso'
+
 const MINSTREL = 'A151_Minstrel'
+
 const STRAW_HAT = 'E010_StrawHat'
-const sessions: GameSession[] = []
-afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
 
 function setup(cards: string[], playerCount = 2, configure?: (state: GameState) => void) {
-  const session = createWorkSession({
+  const session = sessionEvidence.track(createWorkSession({
     seed: 42,
     options: { playerCount },
     configure(state) {
@@ -55,8 +50,8 @@ function setup(cards: string[], playerCount = 2, configure?: (state: GameState) 
       state.actionSpaces.find(space => space.id === 'forest')!.resources.wood = 3
       configure?.(state)
     },
-  })
-  sessions.push(session)
+  }))
+
   expect(session.getState().interaction.stateId).toBe('idle')
   return session
 }
@@ -230,11 +225,11 @@ describe('A066 Feeding Dish rewards actual animal-market use', () => {
     const offered = session.performRoundEnd()
     expect(offered.ok, offered.error).toBe(true)
     if (offered.interaction.stateId !== 'wait' || offered.interaction.request.kind !== 'choice') throw new Error('Expected Straw Hat choice')
-    const move = offered.interaction.request.options.find(option => option.labelKey === 'actions.move-farmer-to-space.name')!
+    const move = getChoiceOptions(offered).find(option => option.labelKey === 'actions.move-farmer-to-space.name')!
     const target = session.resolveChoice(0, move.value)
     expect(target.ok, target.error).toBe(true)
     if (target.interaction.stateId !== 'wait' || target.interaction.request.kind !== 'choice') throw new Error('Expected move target')
-    expect(target.interaction.request.options.some(option => option.value === 'sheep-market' && !('disabled' in option && option.disabled === true))).toBe(true)
+    expect(getChoiceOptions(target).some(option => option.value === 'sheep-market' && !('disabled' in option && option.disabled === true))).toBe(true)
     const response = session.resolveChoice(0, 'sheep-market')
     expect(response.ok, response.error).toBe(true)
     expect(response.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'animal-reorg' } })
@@ -243,5 +238,322 @@ describe('A066 Feeding Dish rewards actual animal-market use', () => {
     expect(response.state.actionSpaces.find(space => space.id === 'sheep-market')!.takenBy).toEqual([worker])
     expect(response.scores?.[0]?.categories.find(category => category.key === 'sheeps')).toMatchObject({ quantity: 2, total: 1 })
     expect(response.state.log.some(entry => entry.key === 'log.reorganizeFail')).toBe(false)
+  })
+})
+
+describe('A066 command boundaries', () => {
+  const CARD_ID = 'A066_FeedingDish'
+  type Animal = 'sheep' | 'boar' | 'cattle'
+  const spaces = {
+    sheep: 'sheep-market',
+    boar: 'pig-market',
+    cattle: 'cattle-market',
+  }
+  function save(name: string, value: unknown) {
+    sessionEvidence.record(name, value)
+  }
+  function ok(r: SessionResponse) {
+    assert.equal(r.ok, true, r.error)
+    return r
+  }
+  function setup(
+    {
+      round = 14,
+      played = true,
+      resources = {},
+    }: { round?: number; played?: boolean; resources?: Partial<Resource> } = {},
+    configure: (state: GameState) => void = () => {},
+  ) {
+    const s = sessionEvidence.track(
+      createWorkSession({
+        seed: 4242,
+        options: { playerCount: 2 },
+        configure(state) {
+          state.round = round
+          state.availableMajorImprovements = []
+          for (const p of state.players)
+            Object.assign(p.resources, {
+              food: 40,
+              wood: 0,
+              clay: 0,
+              reed: 0,
+              stone: 0,
+              grain: 0,
+              vegetable: 0,
+              sheep: 0,
+              boar: 0,
+              cattle: 0,
+            })
+          const p = state.players[0]!
+          p.minorHand = played
+            ? ['__test_placeholder__']
+            : [CARD_ID, '__test_placeholder__']
+          p.minorPlayed = played ? [CARD_ID] : []
+          Object.assign(p.resources, resources)
+          configure(state)
+        },
+      }),
+    )
+    s.withCtx(() => {
+      for (const p of s.state.players)
+        assert.equal(
+          getOwnOrdinaryFenceReserveCount(p),
+          15 - p.fenceSegments.length,
+        )
+    })
+    return s
+  }
+  function options(r: SessionResponse) {
+    assert.ok(
+      r.interaction.stateId === 'wait' &&
+        r.interaction.request.kind === 'choice',
+      JSON.stringify(r.interaction),
+    )
+    return getChoiceOptions(r)
+  }
+  function buyMenu(s: GameSession) {
+    let r = ok(s.takeAction(0, 'meeting-place'))
+    if (
+      r.interaction.stateId === 'wait' &&
+      r.interaction.request.kind === 'choice'
+    ) {
+      const entry = getChoiceOptions(r).find((o) =>
+        o.value.startsWith('action-improvement-'),
+      )
+      if (entry) r = ok(s.resolveChoice(0, entry.value))
+    }
+    return r
+  }
+  function buy(s: GameSession, card: string) {
+    const r = buyMenu(s)
+    if (!r.state.players[0]!.minorHand.includes(card)) return r
+    assert.ok(options(r).some((o) => o.value === card && !o.disabled))
+    return ok(s.resolveChoice(0, card))
+  }
+  function deny(s: GameSession, card: string) {
+    const r = buyMenu(s)
+    assert.ok(!r.state.players[0]!.minorPlayed.includes(card))
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, card))
+  }
+  function ready(s: GameSession, actor: number) {
+    let r = s.getState()
+    if (
+      r.interaction.stateId === 'wait' &&
+      r.interaction.request.kind === 'confirm-next-player'
+    )
+      r = confirmNext(s, r)
+    assert.equal(r.interaction.stateId, 'idle', JSON.stringify(r.interaction))
+    assert.equal(r.state.currentPlayerIndex, actor)
+    return r
+  }
+  let nativeSequence = 0
+  function turn(s: GameSession, actor: number, space: string) {
+    ready(s, actor)
+    const before = s.getState(),
+      r = ok(s.takeAction(actor, space))
+    save(`native-${++nativeSequence}`, {
+      command: 'takeAction',
+      actor,
+      space,
+      before,
+      response: r,
+    })
+    return r
+  }
+  const one = ['H-0-1', 'H-1-1', 'V-0-1', 'V-0-2']
+  function fences(p: PlayerState, edges: string[]) {
+    p.fenceSegments = edges.map((edge) => ({
+      edge,
+      type: 'fence',
+      source: { kind: 'own', ownerPlayerId: p.id },
+    }))
+  }
+  function house(p: PlayerState, animal: Animal, prior: number) {
+    fences(p, one)
+    p.stableTiles = [{ row: 0, col: 1 }]
+    p.pastures = [
+      {
+        id: `dish-${p.id}`,
+        tiles: [{ row: 0, col: 1 }],
+        animalType: prior ? animal : null,
+        animalCount: prior,
+      },
+    ]
+    p.resources[animal] = prior
+  }
+  function market(
+    animal: Animal = 'sheep',
+    prior = 0,
+    gain = 1,
+    played = true,
+    configure: (state: GameState) => void = () => {},
+  ) {
+    const s = setup({ played }, (state) => {
+      house(state.players[0]!, animal, prior)
+      house(state.players[1]!, animal, 0)
+      state.actionSpaces.find((a) => a.id === spaces[animal])!.resources[
+        animal
+      ] = gain
+      configure(state)
+    })
+    const p = s.getState().state.players[0]!
+    assert.equal(p.resources[animal], prior)
+    assert.equal(p.pastures[0]!.animalCount, prior)
+    assert.equal(
+      s.getState().state.actionSpaces.find((a) => a.id === spaces[animal])!
+        .resources[animal],
+      gain,
+    )
+    return s
+  }
+  function settle(s: GameSession, r: SessionResponse, actor = 0) {
+    for (let n = 0; n < 10 && r.interaction.stateId === 'wait'; n++) {
+      if (r.interaction.request.kind === 'select-trigger') {
+        const o = getChoiceOptions(r).find((o) => o.value !== '__skip__')
+        assert.ok(o)
+        r = ok(s.resolveChoice(r.interaction.playerIndex, o.value))
+        continue
+      }
+      if (r.interaction.request.kind !== 'animal-reorg') break
+      const p = r.state.players[actor]!,
+        zones: ZoneAssignment[] = []
+      for (const animal of ['sheep', 'boar', 'cattle'] satisfies Animal[])
+        if (p.resources[animal]) {
+          if (p.houseAnimals['2-0'] === animal && countRoomAnimals(p))
+            zones.push({
+              id: 'house:2-0',
+              zoneType: 'house',
+              animalType: animal,
+              animalCount: countRoomAnimals(p),
+            })
+          else
+            zones.push({
+              id: `dish-${p.id}`,
+              zoneType: 'pasture',
+              animalType: animal,
+              animalCount: p.resources[animal],
+            })
+        }
+      r = ok(s.resolveChoice(actor, 'confirm', { zones }))
+    }
+    assert.ok(
+      r.interaction.stateId === 'wait' &&
+        r.interaction.request.kind === 'confirm-next-player',
+      JSON.stringify(r.interaction),
+    )
+    return r
+  }
+  function collect(s: GameSession, animal: Animal, actor = 0) {
+    return settle(s, turn(s, actor, spaces[animal]), actor)
+  }
+  function first(animal: Animal, id: string) {
+    const s = market(animal)
+    const r = collect(s, animal)
+    assert.equal(r.state.players[0]!.resources[animal], 1)
+    assert.equal(r.state.players[0]!.pastures[0]!.animalCount, 1)
+    save(id, r)
+    assert.deepEqual(
+      { grain: r.state.players[0]!.resources.grain },
+      { grain: 0 },
+    )
+  }
+  it('actual purchase costs one wood and does not award grain', () => {
+    deny(setup({ played: false }), CARD_ID)
+    const r = buy(setup({ played: false, resources: { wood: 1 } }), CARD_ID)
+    assert.equal(r.state.players[0]!.resources.wood, 0)
+    assert.equal(r.state.players[0]!.resources.grain, 0)
+    assert.ok(r.state.players[0]!.minorPlayed.includes(CARD_ID))
+  })
+  it('a preexisting animal grants one grain for a multiple animal collection', () => {
+    for (const animal of ['sheep', 'boar', 'cattle'] satisfies Animal[]) {
+      const r = collect(market(animal, 1, 3), animal)
+      assert.equal(r.state.players[0]!.resources[animal], 4)
+      assert.equal(r.state.players[0]!.pastures[0]!.animalCount, 4)
+      assert.equal(r.state.players[0]!.resources.grain, 1)
+      assert.equal(
+        r.state.log.filter(
+          (e) => e.key === 'log.cardTriggered' && e.params?.cardId === CARD_ID,
+        ).length,
+        1,
+      )
+    }
+  })
+  it('first sheep from the space is not a preexisting animal', () =>
+    first('sheep', 'A066-N3'))
+  it('first boar from the space is not a preexisting animal', () =>
+    first('boar', 'A066-N4'))
+  it('first cattle from the space is not a preexisting animal', () =>
+    first('cattle', 'A066-N5'))
+  it('an animal of a different type does not qualify', () => {
+    const s = market('boar', 0, 1, true, (state) => {
+      const p = state.players[0]!
+      p.resources.sheep = 1
+      p.houseAnimals = { '2-0': 'sheep' }
+    })
+    const r = collect(s, 'boar')
+    assert.equal(r.state.players[0]!.resources.sheep, 1)
+    assert.equal(r.state.players[0]!.resources.boar, 1)
+    save('A066-N6', r)
+    assert.deepEqual(
+      { grain: r.state.players[0]!.resources.grain },
+      { grain: 0 },
+    )
+  })
+  it('animal received by playing Mud Patch is not a market use', () => {
+    const s = market('boar', 0, 1, true, (state) => {
+      state.players[0]!.minorHand = ['A011_MudPatch']
+      state.players[0]!.fields = [{ row: 0, col: 0, stacks: [] }]
+    })
+    const r = settle(s, buy(s, 'A011_MudPatch'))
+    assert.equal(r.state.players[0]!.resources.boar, 1)
+    assert.equal(r.state.players[0]!.resources.grain, 0)
+  })
+  it('opponent use and unplayed owner do not award owner grain', () => {
+    const s = market('sheep', 1)
+    turn(s, 0, 'forest')
+    let r = collect(s, 'sheep', 1)
+    assert.equal(r.state.players[0]!.resources.grain, 0)
+    assert.equal(r.state.players[1]!.resources.grain, 0)
+    r = collect(market('sheep', 1, 1, false), 'sheep')
+    assert.equal(r.state.players[0]!.resources.sheep, 2)
+    assert.equal(r.state.players[0]!.resources.grain, 0)
+  })
+  function cook(s: GameSession) {
+    const r = ok(s.takeAnytimeAction(0, 'exchange'))
+    const o = options(r).find(
+      (o) =>
+        o.effectPreview?.kind === 'resourceExchange' &&
+        o.effectPreview.resourcesPaid?.sheep === 1,
+    )
+    assert.ok(o)
+    assert.ok(o.value.startsWith('trade:'))
+    return ok(s.resolveChoice(0, `bulk:${o.value.split(':')[1]}=1`))
+  }
+  it('cooking away the prior animal removes qualification', () => {
+    const s = market('sheep', 1, 1, true, (state) => {
+      state.players[0]!.improvements = ['Major_Fireplace1']
+    })
+    let r = cook(s)
+    assert.equal(r.state.players[0]!.resources.sheep, 0)
+    assert.equal(r.state.players[0]!.pastures[0]!.animalCount, 0)
+    assert.equal(r.state.players[0]!.resources.food, 42)
+    r = collect(s, 'sheep')
+    assert.equal(r.state.players[0]!.resources.sheep, 1)
+    save('A066-N9', r)
+    assert.deepEqual(
+      { grain: r.state.players[0]!.resources.grain },
+      { grain: 0 },
+    )
+  })
+  it('actual market undo restores acquisition and permits one legal retry', () => {
+    const s = market('sheep', 1)
+    const before = undoRuleSnapshot(s.getState())
+    const r = collect(s, 'sheep')
+    assert.equal(r.state.players[0]!.resources.grain, 1)
+    assertUndoRestored(before, s.undoAction())
+    const retry = collect(s, 'sheep')
+    assert.equal(retry.state.players[0]!.resources.sheep, 2)
+    assert.equal(retry.state.players[0]!.resources.grain, 1)
+    save('A066-N10-undo-retry', retry)
   })
 })
