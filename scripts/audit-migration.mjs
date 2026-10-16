@@ -69,6 +69,23 @@ function adaptSource(file, source) {
   return source
 }
 
+function sourceInventory(candidate) {
+  const found = []
+  const scan = directory => {
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      if (entry.name === 'node_modules' || entry.name === '.git') continue
+      const file = path.join(directory, entry.name)
+      if (entry.isDirectory()) scan(file)
+      else if (entry.isFile() && /\.(?:[cm]?[jt]sx?|json)$/.test(entry.name)) found.push(path.relative(candidate, file).split(path.sep).join('/'))
+    }
+  }
+  scan(candidate)
+  const ignored = spawnSync('git', ['check-ignore', '--no-index', '-z', '--stdin'], { cwd: root, input: `${found.join('\0')}\0`, encoding: 'utf8' })
+  if (ignored.status !== 0 && ignored.status !== 1) fail(`cannot inspect source inventory: ${ignored.stderr}`)
+  const excluded = new Set(ignored.stdout.split('\0').filter(Boolean))
+  return found.filter(file => !excluded.has(file)).sort()
+}
+
 function prepare(manifest, output) {
   if (!output || !path.isAbsolute(output)) fail('--output must be an absolute path outside the checkout')
   const commonGit = path.resolve(root, git('rev-parse', '--git-common-dir').toString().trim())
@@ -117,7 +134,7 @@ function prepare(manifest, output) {
   const covered = [...new Set([...tracked, ...remainingFiles, helper, 'vitest.migration.config.ts', 'tsconfig.migration.json'])].filter(file => fs.existsSync(path.join(candidate, file)) && fs.statSync(path.join(candidate, file)).isFile()).sort()
   const candidateFingerprints = covered.map(file => [file, digest(fs.readFileSync(path.join(candidate, file)))])
   json(path.join(output, 'cases.json'), manifest)
-  json(path.join(output, 'assembly.json'), { candidateCommit: git('rev-parse', 'HEAD').toString().trim(), candidateFingerprint: digest(JSON.stringify(fingerprints)), candidateFiles: fingerprints, assembledFiles: candidateFingerprints, assembledFingerprint: digest(JSON.stringify(candidateFingerprints)), source: manifest.source, sourceFiles: sourceDigests, remainingFiles, nativeFiles, remainingCases: titles.length, createdAt: new Date().toISOString() })
+  json(path.join(output, 'assembly.json'), { candidateCommit: git('rev-parse', 'HEAD').toString().trim(), candidateFingerprint: digest(JSON.stringify(fingerprints)), candidateFiles: fingerprints, assembledFiles: candidateFingerprints, assembledFingerprint: digest(JSON.stringify(candidateFingerprints)), sourceInventory: sourceInventory(candidate), source: manifest.source, sourceFiles: sourceDigests, remainingFiles, nativeFiles, remainingCases: titles.length, createdAt: new Date().toISOString() })
   return { candidate, remainingFiles: remainingFiles.length, nativeFiles: nativeFiles.length, remainingCases: titles.length }
 }
 
@@ -132,6 +149,7 @@ function verify(output) {
   if (!fs.existsSync(path.join(output, 'assembly.json'))) fail('run prepare before verify')
   const assembly = JSON.parse(fs.readFileSync(path.join(output, 'assembly.json'), 'utf8'))
   const assertCandidate = () => {
+    if (JSON.stringify(sourceInventory(candidate)) !== JSON.stringify(assembly.sourceInventory)) fail('candidate source inventory changed since assembly')
     for (const [file, expected] of assembly.assembledFiles) if (!fs.existsSync(path.join(candidate, file)) || digest(fs.readFileSync(path.join(candidate, file))) !== expected) fail(`candidate changed since assembly: ${file}`)
   }
   assertCandidate()
