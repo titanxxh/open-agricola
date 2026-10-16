@@ -108,13 +108,13 @@ describe("B019 command boundaries", () => {
   const WHEEL = 'A018_WheelPlow'
   const MOLD = 'B019_MoldboardPlow'
   function ok(r: SessionResponse) { assert.equal(r.ok, true, r.error); return r; }
-  function setup({ card = WHEEL, round = 1, played = true, occupations = 2, resources = {}, lastPlot = false, existingField = false }: {
+  function setup({ card = WHEEL, round = 1, played = true, occupations = 2, resources = {}, freePlots, existingField = false }: {
     card?: string
     round?: number
     played?: boolean
     occupations?: number
     resources?: Partial<PlayerState['resources']>
-    lastPlot?: boolean
+    freePlots?: 1 | 2
     existingField?: boolean
   } = {}) {
     const s = sessionEvidence.track(createWorkSession({ seed: 42, configure: state => {
@@ -130,15 +130,15 @@ describe("B019 command boundaries", () => {
         Object.assign(p.resources, resources)
         if (existingField)
           p.fields = [{ row: 0, col: 1, stacks: [] }]
-        if (lastPlot) {
+        if (freePlots !== undefined) {
           p.fields = []
           for (let row = 0; row < 3; row++)
             for (let col = 0; col < 5; col++) {
-              if (p.roomTiles.some(t => t.row === row && t.col === col) || (row === 0 && col === 4))
+              if (p.roomTiles.some(t => t.row === row && t.col === col) || (row === 0 && col >= 5 - freePlots))
                 continue
               p.fields.push({ row, col, stacks: [] })
             }
-          assert.equal(p.fields.length, 12)
+          assert.equal(p.fields.length, 13 - freePlots)
         }
       } }))
     assert.equal(s.getState().interaction.stateId, 'idle')
@@ -258,7 +258,7 @@ describe("B019 command boundaries", () => {
     finished(r)
   })
   it("last normal field preserves both declined bonus tiles", () => {
-    const s = setup({ card: MOLD, lastPlot: true })
+    const s = setup({ card: MOLD, freePlots: 1 })
     const r = plow(s, turn(s, 0, 'farmland'), { row: 0, col: 4 })
     finished(r)
     assertRejectedUnchanged(s, () => s.resolveChoice(0, MOLD))
@@ -266,10 +266,14 @@ describe("B019 command boundaries", () => {
     assert.equal(stack(r), 2)
     finished(r)
   })
-  it("final plot bonus-first and normal-first paths complete without phantom fields", () => {
-    const s = setup({ card: MOLD, lastPlot: true })
+  it("normal Farmland plow uses the final plot and preserves both stored fields", () => {
+    const s = setup({ card: MOLD, freePlots: 1 })
     const normal = turn(s, 0, 'farmland')
+    assert.ok(normal.interaction.stateId === 'wait' && normal.interaction.request.kind === 'farm-select')
+    assert.equal(expectFarmSelection(normal).farmType, 'plow')
+    assert.equal(fields(normal), 12)
     assert.notEqual(normal.interaction.stateId === 'wait' ? normal.interaction.sourceCard : undefined, MOLD)
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, MOLD))
     const r = plow(s, normal, { row: 0, col: 4 })
     finished(r)
     assertRejectedUnchanged(s, () => s.resolveChoice(0, MOLD))
@@ -277,4 +281,36 @@ describe("B019 command boundaries", () => {
     assert.equal(stack(r), 2)
     finished(r)
   })
+  it("bonus after normal Farmland uses the final remaining plot and one stored field", () => {
+    const s = setup({ card: MOLD, freePlots: 2 })
+    const normal = turn(s, 0, 'farmland')
+    assert.ok(normal.interaction.stateId === 'wait' && normal.interaction.request.kind === 'farm-select')
+    assert.notEqual(normal.interaction.sourceCard, MOLD)
+    assert.equal(fields(normal), 11)
+    const afterNormal = ok(s.commitSelectionChoice(0, { tile: { row: 0, col: 4 } }))
+    assert.equal(fields(afterNormal), 12)
+    assert.equal(stack(afterNormal), 2)
+    assert.ok(afterNormal.interaction.stateId === 'wait' && afterNormal.interaction.request.kind === 'select-trigger')
+    assert.equal(getChoiceOptions(afterNormal).filter(option => option.value === MOLD && !option.disabled).length, 1)
+    const offered = ok(s.resolveChoice(0, MOLD))
+    assert.ok(offered.interaction.stateId === 'wait' && offered.interaction.request.kind === 'choice')
+    assert.equal(offered.interaction.sourceCard, MOLD)
+    const accepted = getChoiceOptions(offered).filter(option => option.value !== '__skip__' && !option.disabled)
+    assert.equal(accepted.length, 1)
+    const option = accepted[0]
+    assert.ok(option)
+    const bonus = ok(s.resolveChoice(0, option.value))
+    assert.ok(bonus.interaction.stateId === 'wait' && bonus.interaction.request.kind === 'farm-select')
+    assert.equal(bonus.interaction.sourceCard, MOLD)
+    assert.equal(expectFarmSelection(bonus).farmType, 'plow')
+    assert.deepEqual(expectTileFarmSelection(bonus, 'plow').selectableTiles, [{ row: 0, col: 3 }])
+    const done = ok(s.commitSelectionChoice(0, { tile: { row: 0, col: 3 } }))
+    assert.equal(fields(done), 13)
+    assert.equal(new Set(done.state.players[0]!.fields.map(tile => `${tile.row},${tile.col}`)).size, 13)
+    assert.equal(stack(done), 1)
+    finished(done)
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, MOLD))
+    assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { tile: { row: 0, col: 3 } }))
+  })
+
 })
