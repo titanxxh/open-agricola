@@ -16,12 +16,12 @@ const sessionEvidence = createScenarioEvidence(import.meta.url)
 
 describe('A131 Craft Teacher through Session', () => {
   it('plays two occupations for free after Joinery', () => {
-    const session = setupOccupationSession({
+    const session = sessionEvidence.track(setupOccupationSession({
       cardId: 'A131_CraftTeacher',
       playerCount: 3,
       played: ['A131_CraftTeacher'],
       hand: ['A116_WoodCutter', 'A125_Priest'],
-    })
+    }))
     Object.assign(session.state.players[0]!.resources, { wood: 2, stone: 2 })
     session.state.availableMajorImprovements = ['Major_Joinery']
     session.loadState(session.state)

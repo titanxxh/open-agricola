@@ -172,7 +172,7 @@ describe('A122 Pan Baker parity', () => {
     if (actor === 1) {
       const opponent = state.players[1]!
       opponent.resources.grain = 1
-      opponent.fields = [{ row: 1, col: 0, stacks: [] }]
+      opponent.fields = [{ row: 0, col: 1, stacks: [] }]
     }
     session.loadState(state)
     return session
@@ -186,7 +186,10 @@ describe('A122 Pan Baker parity', () => {
   })
 
   it('A122 S4: an opponent using Grain Utilization grants the owner no resources', () => {
-    const response = setup({ actor: 1 }).takeAction(1, 'grain-utilization')
+    const session = setup({ actor: 1 })
+    expect(session.getState().state.players[1]!.roomTiles).toEqual([{ row: 2, col: 0 }, { row: 1, col: 0 }])
+    expect(session.getState().state.players[1]!.fields).toEqual([{ row: 0, col: 1, stacks: [] }])
+    const response = session.takeAction(1, 'grain-utilization')
 
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources).toMatchObject({ wood: 0, clay: 0 })
