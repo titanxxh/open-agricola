@@ -3,14 +3,23 @@ import { GameSession, type SessionResponse } from '../game/authoritative-session
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { resolveNonSkipChoice, resolveSkipChoice, resolveTriggerIfPresent } from './_helpers/trigger-select'
-
 import '../../shared/cards/A/A023_StoneCompany'
 import '../../shared/cards/A/A057_MilkingParlor'
 import '../../shared/cards/E/E047_SyrupTap'
+import assert from 'node:assert/strict'
+import { type PlayerState } from '../../shared/contract/types'
+import { createWorkSession } from './_helpers/session-fixtures'
+import { assertRejectedUnchanged, assertUndoRestored, confirmNext, undoRuleSnapshot , getChoiceOptions } from './_helpers/session-assertions'
+import { createScenarioEvidence } from './_helpers/scenario-evidence'
+
+const sessionEvidence = createScenarioEvidence(import.meta.url)
 
 const CARD_ID = 'A023_StoneCompany'
+
 const STONE_MINOR = 'E047_SyrupTap'
+
 const STONE_FREE_MINOR = 'A057_MilkingParlor'
+
 const FILLER = '__test_placeholder__'
 
 const setup = ({
@@ -24,7 +33,7 @@ const setup = ({
   availableMajors?: string[]
   played?: boolean
 } = {}) => {
-  const session = new GameSession(5023, undefined, { playerCount: 2 })
+  const session = sessionEvidence.track(createWorkSession({ seed: 5023, options: { playerCount: 2 } }))
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.currentPlayerIndex = 0
@@ -63,8 +72,8 @@ const openMinorPrompt = (session: GameSession) => {
   let response = session.takeAction(0, 'major-improvement')
   expect(response.ok, response.error).toBe(true)
   if (response.interaction.stateId !== 'wait') return response
-  if (response.interaction.request.options?.some((option) => option.value === CARD_ID)) return response
-  const improvement = response.interaction.request.options?.find((option) =>
+  if (getChoiceOptions(response)?.some((option) => option.value === CARD_ID)) return response
+  const improvement = getChoiceOptions(response)?.find((option) =>
     option.value.startsWith('action-improvement-'))
   if (improvement) response = session.resolveChoice(0, improvement.value)
   return response
@@ -73,7 +82,7 @@ const openMinorPrompt = (session: GameSession) => {
 const playStoneCompany = (session: GameSession) => {
   const response = openMinorPrompt(session)
   if (response.interaction.stateId !== 'wait') return response
-  const card = response.interaction.request.options?.find((option) => option.value === CARD_ID)
+  const card = getChoiceOptions(response)?.find((option) => option.value === CARD_ID)
   expect(card).toBeDefined()
   return session.resolveChoice(0, card!.value)
 }
@@ -89,8 +98,8 @@ const enterStoneCompanyImprovement = (
   if (
     response.interaction.stateId === 'wait'
     && response.interaction.request.kind === 'choice'
-    && response.interaction.request.options?.some((option) => option.value === '__skip__')
-    && !response.interaction.request.options?.some((option) =>
+    && getChoiceOptions(response)?.some((option) => option.value === '__skip__')
+    && !getChoiceOptions(response)?.some((option) =>
       option.value === STONE_MINOR || option.value === STONE_FREE_MINOR)
   ) response = resolveNonSkipChoice(session, response)
   expect(response.interaction.stateId).toBe('wait')
@@ -98,7 +107,7 @@ const enterStoneCompanyImprovement = (
 }
 
 const optionValues = (response: SessionResponse) => response.interaction.stateId === 'wait'
-  ? response.interaction.request.options?.map((option) => option.value) ?? []
+  ? getChoiceOptions(response)?.map((option) => option.value) ?? []
   : []
 
 describe('A023 Stone Company parity', () => {
@@ -139,7 +148,7 @@ describe('A023 Stone Company parity', () => {
   })
 
   it('A023 S5: collecting stone outside a Quarry does not offer an improvement', () => {
-    const session = new GameSession(5023, undefined, { playerCount: 4 })
+    const session = sessionEvidence.track(createWorkSession({ seed: 5023, options: { playerCount: 4 } }))
     const state = session.getState().state
     stabilizeRandomHands(state.players)
     state.currentPlayerIndex = 0
@@ -206,5 +215,167 @@ describe('A023 Stone Company parity', () => {
       response.state.players[0]!.minorPlayed.includes(STONE_FREE_MINOR)
       || optionValues(response).includes(STONE_FREE_MINOR),
     ).toBe(false)
+  })
+})
+
+describe("A023 command boundaries", () => {
+  const A023 = 'A023_StoneCompany'
+  const TAP = 'E047_SyrupTap', PARLOR = 'B013_CarpentersParlor', FREE = 'A057_MilkingParlor'
+  function setup({ played = true, players = 2, hand = [], occupations = [], resources = {}, opponent = {}, opponentHand = [] }: {
+    played?: boolean
+    players?: number
+    hand?: string[]
+    occupations?: string[]
+    resources?: Partial<PlayerState['resources']>
+    opponent?: Partial<PlayerState['resources']>
+    opponentHand?: string[]
+  } = {}) {
+    return sessionEvidence.track(createWorkSession({ seed: 624, options: { playerCount: players }, configure: state => {
+        state.round = 14
+        state.availableMajorImprovements = []
+        for (const player of state.players) {
+          player.minorHand = ['__test_placeholder__']
+          player.occupationHand = ['__test_placeholder__']
+          Object.assign(player.resources, { wood: 0, clay: 0, reed: 0, stone: 0, food: 40, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0 })
+        }
+        const player = state.players[0]!
+        player.minorPlayed = played ? [A023] : []
+        player.minorHand = [...(played ? [] : [A023]), ...hand]
+        if (!player.minorHand.length)
+          player.minorHand = ['__test_placeholder__']
+        player.occupationPlayed = occupations
+        Object.assign(player.resources, resources)
+        Object.assign(state.players[1]!.resources, opponent)
+        if (opponentHand.length)
+          state.players[1]!.minorHand = opponentHand
+        for (const id of ['western-quarry', 'eastern-quarry'])
+          state.actionSpaces.find(space => space.id === id)!.resources.stone = 1
+        state.actionSpaces.find(space => space.id === 'forest')!.resources.wood = 3
+      } }))
+  }
+  function ok(r: SessionResponse) {
+    assert.equal(r.ok, true, r.error)
+    return r
+  }
+  function opts(r: SessionResponse) {
+    return r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice' ? getChoiceOptions(r) : []
+  }
+  function choose(s: GameSession, r: SessionResponse, predicate: (o: {
+    value: string
+    labelKey?: string
+    sourceCard?: string
+  }) => boolean) {
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice', JSON.stringify(r.interaction))
+    const o = opts(r).find(predicate)
+    assert.ok(o, JSON.stringify(r.interaction))
+    return ok(s.resolveChoice(r.interaction.playerIndex, o.value))
+  }
+  function ready(s: GameSession, actor: number) {
+    let r = s.getState()
+    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
+      r = confirmNext(s, r)
+    assert.equal(r.interaction.stateId, 'idle', JSON.stringify(r.interaction))
+    assert.equal(r.state.currentPlayerIndex, actor)
+    return r
+  }
+  function turn(s: GameSession, actor: number, space: string) {
+    ready(s, actor)
+    return ok(s.takeAction(actor, space))
+  }
+  function minor(s: GameSession, card: string) {
+    let r = turn(s, 0, 'meeting-place')
+    if (!opts(r).some(o => o.value === card) && opts(r).some(o => o.value.startsWith('action-improvement-')))
+      r = choose(s, r, o => o.value.startsWith('action-improvement-'))
+    return r
+  }
+  function buy(s: GameSession, card: string) {
+    const r = minor(s, card)
+    return r.state.players[0]!.minorPlayed.includes(card) ? r : choose(s, r, o => o.value === card)
+  }
+  function denied(s: GameSession, card: string) {
+    const r = minor(s, card)
+    assert.equal(opts(r).some(o => o.value === card && !o.disabled), false)
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, card))
+    assert.ok(r.state.players[0]!.minorHand.includes(card))
+  }
+  function quarry(s: GameSession, id = 'western-quarry') {
+    return turn(s, 0, id)
+  }
+  function acceptCompany(s: GameSession, response: SessionResponse) {
+    assert.ok(response.interaction.stateId === 'wait' && response.interaction.request.kind === 'choice', JSON.stringify(response.interaction))
+    assert.equal(response.interaction.sourceCard, A023)
+    const accepts = opts(response).filter(option => option.value !== '__skip__' && !option.disabled)
+    assert.equal(accepts.length, 1, JSON.stringify(response.interaction))
+    return ok(s.resolveChoice(0, accepts[0]!.value))
+  }
+  function improvement(s: GameSession, response: SessionResponse, card = TAP) {
+    let current = acceptCompany(s, response)
+    if (!current.state.players[0]!.minorPlayed.includes(card))
+      current = choose(s, current, option => option.value === card)
+    return current
+  }
+  it("clay or reed fee shortage rejects forged purchase before exact-cost control", () => {
+    for (const resources of [{ clay: 1, reed: 1 }, { clay: 2, reed: 0 }])
+      denied(setup({ played: false, resources }), A023)
+    const s = setup({ played: false, resources: { clay: 2, reed: 1 } })
+    const r = buy(s, A023)
+    assert.ok(r.state.players[0]!.minorPlayed.includes(A023))
+    assert.equal(r.state.players[0]!.resources.clay, 0)
+    assert.equal(r.state.players[0]!.resources.reed, 0)
+  })
+  it("Stonecutter purchase must still actually spend one stone at Quarry", () => {
+    // Stonecutter is available from three players.
+    const s = setup({ players: 3, hand: [TAP], occupations: ['A143_Stonecutter'], resources: { wood: 2 } })
+    const r = improvement(s, quarry(s))
+    assert.ok(r.state.players[0]!.minorPlayed.includes(TAP))
+    assert.equal(r.state.players[0]!.resources.wood, 1)
+    assert.equal(r.state.players[0]!.resources.stone, 0)
+  })
+  it("stone-free card is absent and forged native purchase rejects before legal retry", () => {
+    const s = setup({ hand: [TAP, PARLOR, FREE], resources: { wood: 3 } })
+    const r = acceptCompany(s, quarry(s))
+    assert.equal(opts(r).some(o => o.value === FREE && !o.disabled), false)
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, FREE))
+    const done = choose(s, s.getState(), o => o.value === TAP)
+    assert.equal(done.state.players[0]!.resources.wood, 2)
+    assert.equal(done.state.players[0]!.resources.stone, 0)
+    assert.ok(done.state.players[0]!.minorHand.includes(FREE))
+  })
+  it("no affordable stone-paying improvement leaves no accepting branch", () => {
+    const s = setup({ hand: [TAP] })
+    const r = quarry(s)
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.state.players[0]!.resources.stone, 1)
+    assert.ok(r.state.players[0]!.minorHand.includes(TAP))
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, TAP))
+  })
+  it("decline undo and stale purchase cannot duplicate Quarry improvement", () => {
+    const s = setup({ hand: [TAP], resources: { wood: 2 } })
+    const before = undoRuleSnapshot(s.getState())
+    quarry(s)
+    ok(s.resolveChoice(0, '__skip__'))
+    assert.equal(s.getState().state.players[0]!.resources.stone, 1)
+    assert.ok(s.getState().state.players[0]!.minorHand.includes(TAP))
+    assertUndoRestored(before, s.undoAction())
+    const r = improvement(s, quarry(s))
+    assert.equal(r.state.players[0]!.resources.stone, 0)
+    assert.equal(r.state.players[0]!.resources.wood, 1)
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, TAP))
+    assert.equal(r.scores?.length, 2)
+  })
+  it("nonquarry stone and opponent Quarry do not grant owner improvement", () => {
+    // The non-Quarry Resource Market exists only in the four-player action pool.
+    const market = setup({ players: 4, hand: [TAP], resources: { wood: 2 } })
+    const non = turn(market, 0, 'resource-market-4')
+    assert.equal(non.state.players[0]!.resources.stone, 1)
+    assert.ok(non.state.players[0]!.minorHand.includes(TAP))
+    assert.equal(non.state.players[0]!.minorPlayed.includes(TAP), false)
+    const s = setup({ hand: [TAP], opponentHand: [PARLOR], resources: { wood: 2 }, opponent: { wood: 2 } })
+    turn(s, 0, 'forest')
+    const r = turn(s, 1, 'western-quarry')
+    assert.ok(r.state.players[0]!.minorHand.includes(TAP))
+    assert.ok(r.state.players[1]!.minorHand.includes(PARLOR))
+    assert.equal(r.state.players[1]!.resources.stone, 1)
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
   })
 })
