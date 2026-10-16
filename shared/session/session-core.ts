@@ -4058,14 +4058,16 @@ export class GameCore {
   }
 
   getPastureCapacities(): Record<string, Record<string, number>> {
-    const result: Record<string, Record<string, number>> = {}
-    this.state.players.forEach((player, idx) => {
-      const zones = playerBoard(this.state, idx).animals.zones()
-      result[player.id] = Object.fromEntries(
-        zones.filter((z) => z.zoneType === 'pasture').map((z) => [z.id, z.capacity]),
-      )
+    return this.withCtx(() => {
+      const result: Record<string, Record<string, number>> = {}
+      this.state.players.forEach((player, idx) => {
+        const zones = playerBoard(this.state, idx).animals.zones()
+        result[player.id] = Object.fromEntries(
+          zones.filter((z) => z.zoneType === 'pasture').map((z) => [z.id, z.capacity]),
+        )
+      })
+      return result
     })
-    return result
   }
 
   takeAction(playerIndex: number, spaceId: string): SessionResponse {

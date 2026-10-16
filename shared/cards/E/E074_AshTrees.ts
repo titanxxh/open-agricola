@@ -21,7 +21,7 @@ const isDoableListener: CardListenerRegistration = {
     if (context.actionContext?.skipBeforeTriggers === true) return
     const stored = context.player.cardStates?.[CARD_ID]?.counters?.fences ?? 0
     if (stored <= 0) return
-    return { doable: canStartFencing(context.state, context.player, undefined, {
+    return { doable: canStartFencing(context.actionHooks, context.state, context.player, undefined, {
       ...context.actionContext,
       fenceSupplyReservations: { [CARD_ID]: { counterKey: 'fences', selectedCount: stored } },
     }) }

@@ -560,7 +560,7 @@ export const improvementAction: ActionDefinition = {
       return { type: 'fail', errorKey: 'log.improvementFail' }
     }
     if (!isAllowedPurchase(readAllowedPurchases(params), choice)
-      || !meetsMinimumPayment(state, player, choice, { sourceCard, space, params, actionContext })) {
+      || !meetsMinimumPayment(state, player, choice, { actionHooks, sourceCard, space, params, actionContext })) {
       return { type: 'fail', errorKey: 'log.improvementFail' }
     }
     const internalChildren = buildImprovementInternalChildren(
