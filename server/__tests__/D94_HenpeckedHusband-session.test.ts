@@ -131,6 +131,7 @@ const finishFarmExpansion = (
     if (!choice) break
     response = session.resolveChoice(response.interaction.playerIndex, choice.value)
   }
+  expect(response.interaction).toMatchObject({ stateId: 'wait', playerIndex: 0, request: { kind: 'confirm-next-player' } })
   return response
 }
 
@@ -345,7 +346,10 @@ describe('D094 rule boundaries', () => {
     assert.equal(r.state.players[0]!.resources.reed, 8)
     assert.equal(occupants(r, 'farm-expansion').length, 1)
     assert.equal(r.state.events.filter(e => e.type === 'card.triggered' && e.sourceCardId === D094).length, 1)
-    assertUndoRestored(before, s.undoAction())
+    const undone = s.undoAction()
+    assertUndoRestored(before, undone)
+    assert.equal(undone.interaction.stateId, 'idle')
+    assert.equal(undone.state.currentPlayerIndex, 0)
     const retried = finishFarm(s, 'room')
     assert.equal(retried.state.players[0]!.rooms, 3)
     assert.equal(firstAt(retried, 'forest', first), false)

@@ -724,11 +724,18 @@ describe('B027 rule boundaries', () => {
     assert.equal(r.state.players[0]!.stableTiles.length, 1)
     assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
     assertRejectedUnchanged(s, () => s.resolveChoice(0, 'Major_Pottery'))
-    assertUndoRestored(before, s.undoAction())
+    const undone = s.undoAction()
+    assertUndoRestored(before, undone)
+    assert.equal(undone.interaction.stateId, 'idle')
+    assert.equal(undone.state.currentPlayerIndex, 0)
     toolboxMajors(s, buildFarm(s, 'stable'))
     const retry = ok(s.resolveChoice(0, 'Major_Basket'))
     assert.equal(retry.state.players[0]!.stableTiles.length, 1)
     assert.deepEqual(retry.state.players[0]!.improvements, ['Major_Basket'])
+
+    assert.ok(retry.interaction.stateId === 'wait' && retry.interaction.request.kind === 'confirm-next-player', JSON.stringify(retry.interaction))
+    assert.equal(retry.interaction.playerIndex, 0)
+    assert.equal(retry.state.currentPlayerIndex, 0)
   })
 
   it("room and stable in one real turn offer only one major purchase", () => {
@@ -787,5 +794,9 @@ describe('B027 rule boundaries', () => {
     assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
     const next = turn(s, 0, 'day-laborer')
     assert.deepEqual(next.state.players[0]!.improvements, [])
+
+    assert.ok(next.interaction.stateId === 'wait' && next.interaction.request.kind === 'confirm-next-player', JSON.stringify(next.interaction))
+    assert.equal(next.interaction.playerIndex, 0)
+    assert.equal(next.state.currentPlayerIndex, 0)
   })
 })

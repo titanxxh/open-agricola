@@ -378,6 +378,9 @@ describe('E146 rule boundaries', () => {
     assert.equal(r.ok, true, r.error)
     assert.deepEqual(resellerObserved(r), before)
     assert.ok(r.state.players[0]!.minorPlayed.includes('E047_SyrupTap'))
+    assert.equal(wait(r).request.kind, 'choice')
+    assert.equal(wait(r).sourceCard, RESELLER)
+    assert.equal(wait(r).playerIndex, 0)
     const retry = acceptRefund(s, r).r
     assert.deepEqual(resellerObserved(retry), { wood: 1, stone: 1, clay: 1, used: true })
     assert.equal(wait(retry).request.kind, 'confirm-next-player')

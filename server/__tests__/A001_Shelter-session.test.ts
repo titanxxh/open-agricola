@@ -166,7 +166,12 @@ describe('A001 rule boundaries', () => {
     const before = undoRuleSnapshot(session.getState())
     let response = accept(session, play(session, 'A001_Shelter'))
     const tile = { row: 0, col: 2 }
-    assert.equal(requireWait(response).request.kind, 'farm-select')
+    const selection = requireWait(response)
+    assert.ok(selection.request.kind === 'farm-select' && selection.request.farm.farmType === 'stable')
+    assert.equal(selection.playerIndex, 0)
+    assert.ok(selection.request.farm.selectableTiles.some(candidate => candidate.row === tile.row && candidate.col === tile.col))
+    assert(response.state.players[1]!.minorHand.includes('A001_Shelter'))
+    assertRejectedUnchanged(session, () => session.commitSelectionChoice(1, { stables: [tile] }))
     for (const stables of [[tile, tile], [{ row: 1, col: 2 }], [response.state.players[0]!.roomTiles[0]!]]) {
       assertRejectedUnchanged(session, () => session.commitSelectionChoice(0, { stables }))
     }
@@ -176,8 +181,24 @@ describe('A001 rule boundaries', () => {
     assert.equal(response.state.players[0]!.resources.wood, 0)
     assert(response.state.players[1]!.minorHand.includes('A001_Shelter'))
     assert.equal(response.state.players[0]!.minorPlayed.includes('A001_Shelter'), false)
+    assert.ok(response.interaction.stateId === 'wait' && response.interaction.request.kind === 'confirm-next-player', JSON.stringify(response.interaction))
+    assert.equal(response.interaction.playerIndex, 0)
+    assert.equal(response.state.currentPlayerIndex, 0)
     assertRejectedUnchanged(session, () => session.commitSelectionChoice(0, { stables: [tile] }))
-    assertUndoRestored(before, session.undoAction())
+    const undone = session.undoAction()
+    assertUndoRestored(before, undone)
+    assert.equal(undone.interaction.stateId, 'idle')
+    assert.equal(undone.state.currentPlayerIndex, 0)
+
+    accept(session, play(session, 'A001_Shelter'))
+    const retry = session.commitSelectionChoice(0, { stables: [tile] })
+    assert.equal(retry.ok, true, retry.error)
+    assert.deepEqual(retry.state.players[0]!.stableTiles, [tile])
+    assert.equal(retry.state.players[0]!.resources.wood, 0)
+    assert(retry.state.players[1]!.minorHand.includes('A001_Shelter'))
+    assert.ok(retry.interaction.stateId === 'wait' && retry.interaction.request.kind === 'confirm-next-player', JSON.stringify(retry.interaction))
+    assert.equal(retry.interaction.playerIndex, 0)
+    assert.equal(retry.state.currentPlayerIndex, 0)
   })
 
   it("Shelter cannot build a fifth stable when all four pieces are used", () => {

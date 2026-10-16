@@ -244,7 +244,10 @@ describe('E151 rule boundaries', () => {
     assert.ok(r.scores)
     assert.equal(r.scores.length, 4)
     assert.ok(r.state.events.some(e => e.type === 'card.triggered' && e.sourceCardId === E151))
-    assertUndoRestored(before, s.undoAction())
+    const undone = s.undoAction()
+    assertUndoRestored(before, undone)
+    assert.equal(undone.interaction.stateId, 'idle')
+    assert.equal(undone.state.currentPlayerIndex, 0)
     const retry = nurseGrowth(s).r
     assert.deepEqual(nurseTotals(retry), { family: 3, sheep: 1, boar: 1, cattle: 1, food: 0, used: true })
   })
@@ -256,6 +259,10 @@ describe('E151 rule boundaries', () => {
     assert.equal(familySize(r.state.players[0]!), 2)
     assert.equal(r.state.players[0]!.resources.grain, 1)
     assert.equal(nurseTotals(r).used, false)
+
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
   })
 
   it("a real prior use never bypasses room again next round", () => {
@@ -269,6 +276,10 @@ describe('E151 rule boundaries', () => {
     assert.equal(nurseTotals(r).used, true)
     assert.equal(familySize(r.state.players[0]!), 3)
     assert.equal(r.state.players[0]!.resources.grain, 2)
+
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
   })
 
 

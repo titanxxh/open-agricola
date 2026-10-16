@@ -567,13 +567,22 @@ describe('A003 rule boundaries', () => {
     assert.equal(player.resources.wood, 0)
     assert(response.state.players[1]!.minorHand.includes('A003_PaperKnife'))
     assertRejectedUnchanged(session, () => session.commitSelectionChoice(0, { cardIds: selected }))
+
+    assert.ok(response.interaction.stateId === 'wait' && response.interaction.request.kind === 'confirm-next-player', JSON.stringify(response.interaction))
+    assert.equal(response.interaction.playerIndex, 0)
+    assert.equal(response.state.currentPlayerIndex, 0)
   })
 
   it("Paper Knife must reject selecting the same occupation three times", () => {
     const session = setup('A003_PaperKnife', state => { state.players[0]!.resources.wood = 1 })
     play(session, 'A003_PaperKnife')
     assertRejectedUnchanged(session, () => session.commitSelectionChoice(0, { cardIds: [occupations[0]!, occupations[0]!, occupations[0]!] }))
-    assert.equal(session.commitSelectionChoice(0, { cardIds: occupations.slice(0, 3) }).ok, true)
+    const retry = session.commitSelectionChoice(0, { cardIds: occupations.slice(0, 3) })
+    const continuation = requireWait(retry)
+    assert.equal(continuation.request.kind, 'choice')
+    assert.equal(continuation.playerIndex, 0)
+    assert.equal(continuation.sourceCard, 'A003_PaperKnife')
+    assert.equal(choices(retry).filter(option => !['skip', '__skip__'].includes(option.value)).length, 1)
   })
 
   it("Paper Knife must reject three occupations belonging to the other player", () => {
@@ -584,6 +593,11 @@ describe('A003 rule boundaries', () => {
     })
     play(session, 'A003_PaperKnife')
     assertRejectedUnchanged(session, () => session.commitSelectionChoice(0, { cardIds: foreign }))
-    assert.equal(session.commitSelectionChoice(0, { cardIds: occupations.slice(0, 3) }).ok, true)
+    const retry = session.commitSelectionChoice(0, { cardIds: occupations.slice(0, 3) })
+    const continuation = requireWait(retry)
+    assert.equal(continuation.request.kind, 'choice')
+    assert.equal(continuation.playerIndex, 0)
+    assert.equal(continuation.sourceCard, 'A003_PaperKnife')
+    assert.equal(choices(retry).filter(option => !['skip', '__skip__'].includes(option.value)).length, 1)
   })
 })

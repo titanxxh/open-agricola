@@ -56,8 +56,20 @@ describe('A002 Shifting Cultivation parity', () => {
     response = session.commitSelectionChoice(0, { tile })
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.fields).toEqual([{ ...tile, stacks: [] }])
+    expect(response.interaction).toMatchObject({ stateId: 'wait', playerIndex: 0, request: { kind: 'confirm-next-player' } })
     assertRejectedUnchanged(session, () => session.commitSelectionChoice(0, { tile }))
-    assertUndoRestored(before, session.undoAction())
+    const undone = session.undoAction()
+    assertUndoRestored(before, undone)
+    expect(undone.interaction.stateId).toBe('idle')
+    expect(undone.state.currentPlayerIndex).toBe(0)
+
+    acceptPlow(session, playMinor(session))
+    const retry = session.commitSelectionChoice(0, { tile })
+    expect(retry.ok, retry.error).toBe(true)
+    expect(retry.state.players[0]!.fields).toEqual([{ ...tile, stacks: [] }])
+    expect(retry.state.players[0]!.resources.food).toBe(0)
+    expect(retry.state.players[1]!.minorHand).toContain(CARD_ID)
+    expect(retry.interaction).toMatchObject({ stateId: 'wait', playerIndex: 0, request: { kind: 'confirm-next-player' } })
   })
 
   it('A002 S2: paid optional plow can be declined after the card passes', () => {

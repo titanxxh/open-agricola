@@ -183,6 +183,11 @@ describe('D127 rule boundaries', () => {
     const final = ok(s.resolveChoice(0, major.value))
     assert(final.state.players[0]!.improvements.includes('Major_Fireplace1'))
     assert.equal(final.state.players[0]!.resources.clay, 0)
+
+    assert.equal(wait(final).request.kind, 'choice')
+    assert.equal(wait(final).promptKey, 'ui.interactionFlowSelect')
+    assert.deepEqual(options(final).filter(option => option.value !== '__done__').map(option => option.labelKey).sort(), ['actions.construct.name', 'actions.day-laborer.name'])
+    assert.equal(wait(final).playerIndex, 0)
   })
 
   it("Major Improvement must reject an actual minor purchase", () => {
@@ -197,6 +202,11 @@ describe('D127 rule boundaries', () => {
     assert(retry.state.players[0]!.minorHand.includes('A002_ShiftingCultivation'))
     assert.equal(retry.state.players[0]!.resources.clay, 0)
     assert.equal(retry.state.players[0]!.resources.food, 2)
+
+    assert.equal(wait(retry).request.kind, 'choice')
+    assert.equal(wait(retry).promptKey, 'ui.interactionFlowSelect')
+    assert.deepEqual(options(retry).filter(option => option.value !== '__done__').map(option => option.labelKey).sort(), ['actions.construct.name', 'actions.day-laborer.name'])
+    assert.equal(wait(retry).playerIndex, 0)
   })
 
   it("ties and a nonowner with fewer rooms cannot use the private space", () => {
@@ -224,10 +234,20 @@ describe('D127 rule boundaries', () => {
     assert.equal(r.state.players[0]!.resources.food, 4)
     assert(!options(r).some(o => o.value === day.value))
     assertRejectedUnchanged(s, () => s.resolveChoice(0, day.value))
-    ok(s.resolveChoice(0, '__done__'))
-    assertUndoRestored(before, s.undoAction())
+    const completed = ok(s.resolveChoice(0, '__done__'))
+    assert.ok(completed.interaction.stateId === 'wait' && completed.interaction.request.kind === 'confirm-next-player')
+    assert.equal(completed.interaction.playerIndex, 0)
+    const undone = s.undoAction()
+    assertUndoRestored(before, undone)
+    assert.equal(undone.interaction.stateId, 'idle')
+    assert.equal(undone.state.currentPlayerIndex, 0)
     const retry = branch(s, ok(s.takeAction(0, HARDWORKER)), 'day-laborer')
     assert.equal(retry.state.players[0]!.resources.food, 4)
+
+    assert.equal(wait(retry).request.kind, 'choice')
+    assert.equal(wait(retry).promptKey, 'ui.interactionFlowSelect')
+    assert.equal(wait(retry).sourceCard, HARDWORKER)
+    assert.equal(wait(retry).playerIndex, 0)
   })
 
   it("building to a room tie still completes all three accepted subactions exactly once", () => {

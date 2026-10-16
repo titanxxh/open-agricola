@@ -397,6 +397,8 @@ describe('C1 Overhaul session', () => {
     expect(getFenceCount(player)).toBe(16)
     expect(getPalisadeCount(player)).toBe(1)
     expect(player.resources.wood).toBe(0)
+
+    expect(maxOk.interaction).toMatchObject({ stateId: 'wait', playerIndex: 0, request: { kind: 'confirm-next-player' } })
   })
 
   it('caps rebuild at dynamic own ordinary build limit after consumed fence supply', () => {
@@ -538,7 +540,23 @@ describe('C001 rule boundaries', () => {
     assert.equal(r.state.players[0]!.resources.wood, 0)
     assert.equal(r.state.players[0]!.resources.sheep, 2)
     assert(r.state.players[1]!.minorHand.includes(OVERHAUL))
-    assertUndoRestored(before, s.undoAction())
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
+    const undone = s.undoAction()
+    assertUndoRestored(before, undone)
+    assert.equal(undone.interaction.stateId, 'idle')
+    assert.equal(undone.state.currentPlayerIndex, 0)
+
+    play(s)
+    const retry = ok(s.commitSelectionChoice(0, { edges: one, palisadeEdges: [], extraWood: 0 }))
+    assert.equal(retry.state.players[0]!.fenceSegments.length, 4)
+    assert.equal(retry.state.players[0]!.resources.wood, 0)
+    assert.equal(retry.state.players[0]!.resources.sheep, 2)
+    assert(retry.state.players[1]!.minorHand.includes(OVERHAUL))
+    assert.ok(retry.interaction.stateId === 'wait' && retry.interaction.request.kind === 'confirm-next-player', JSON.stringify(retry.interaction))
+    assert.equal(retry.interaction.playerIndex, 0)
+    assert.equal(retry.state.currentPlayerIndex, 0)
   })
 
   it("valid four-edge enclosure cannot replace seven returned fences", () => {
@@ -548,5 +566,9 @@ describe('C001 rule boundaries', () => {
     const r = ok(s.commitSelectionChoice(0, { edges: two, palisadeEdges: [], extraWood: 0 }))
     assert.equal(r.state.players[0]!.fenceSegments.length, 7)
     assert.equal(r.state.players[0]!.resources.wood, 0)
+
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
   })
 })
