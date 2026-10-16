@@ -88,6 +88,14 @@ describe('A005 command boundaries', () => {
   const CARD_ID = 'A005_ClayEmbankment'
   const WAGE = 'B007_Wage',
     COMPANION = 'A016_RammedClay'
+  function confirmed(r: SessionResponse, actor = 0) {
+    assert.equal(r.ok, true, r.error)
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, actor)
+    assert.equal(r.state.currentPlayerIndex, actor)
+    assert.equal(r.interaction.request.nextPlayerIndex, 1 - actor)
+    return r
+  }
   function ok(r: SessionResponse) {
     assert.equal(r.ok, true, r.error)
     return r
@@ -148,7 +156,7 @@ describe('A005 command boundaries', () => {
   function buy(s: GameSession, card: string) {
     const r = menu(s)
     assert.ok(options(r).some((o) => o.value === card && !o.disabled))
-    return ok(s.resolveChoice(0, card))
+    return confirmed(ok(s.resolveChoice(0, card)))
   }
   function passed(r: SessionResponse, card: string) {
     assert.equal(r.state.players[0]!.minorHand.includes(card), false)
@@ -202,7 +210,7 @@ describe('A005 command boundaries', () => {
     )
     assertRejectedUnchanged(s, () => s.resolveChoice(0, card))
     const beforeFood = r.state.players[0]!.resources.food
-    const retry = ok(s.resolveChoice(0, WAGE))
+    const retry = confirmed(ok(s.resolveChoice(0, WAGE)))
     assert.equal(retry.state.players[0]!.resources.food, beforeFood + 2)
     assert.equal(retry.state.players[0]!.minorHand.includes(card), true)
   }
@@ -224,7 +232,7 @@ describe('A005 command boundaries', () => {
       r = confirmNext(s, r)
     assert.equal(r.interaction.stateId, 'idle')
     assert.equal(r.state.currentPlayerIndex, actor)
-    return ok(s.takeAction(actor, action))
+    return confirmed(ok(s.takeAction(actor, action)), actor)
   }
   it('zero food purchase is denied before legitimate same prompt retry', () => {
     const s = setup({ food: 0, clay: 4 })
@@ -293,9 +301,18 @@ describe('A005 command boundaries', () => {
   })
   it('actual whole passing undo restores clay payment and both card hands', () => {
     const s = setup({ food: 1, clay: 4 })
-    const before = undoRuleSnapshot(s.getState())
+    const initial = s.getState()
+    assert.equal(initial.interaction.stateId, 'idle')
+    assert.equal(initial.state.currentPlayerIndex, 0)
+    const beforeInteraction = JSON.stringify(initial.interaction)
+    const before = undoRuleSnapshot(initial)
     passed(buy(s, CARD_ID), CARD_ID)
-    assertUndoRestored(before, s.undoAction())
+    const restored = s.undoAction()
+    assertUndoRestored(before, restored)
+    assert.equal(JSON.stringify(restored.interaction), beforeInteraction)
+    assert.equal(JSON.stringify(s.getState().interaction), beforeInteraction)
+    assert.equal(restored.state.currentPlayerIndex, 0)
+    assert.equal(s.getState().state.currentPlayerIndex, 0)
     const r = buy(s, CARD_ID)
     assert.deepEqual(goods(r), { food: 0, wood: 0, clay: 6, grain: 0 })
     passed(r, CARD_ID)
