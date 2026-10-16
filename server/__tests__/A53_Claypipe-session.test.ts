@@ -178,6 +178,9 @@ describe("A053 command boundaries", () => {
       const gain = gains[0]!
       assert.ok(gain.type === 'resource.moved')
       assert.deepEqual(gain.resources, { wood: 1 })
+      assert.ok(result.interaction.stateId === 'wait' && result.interaction.request.kind === 'confirm-next-player', JSON.stringify(result.interaction))
+      assert.equal(result.interaction.playerIndex, 0)
+      assert.equal(result.state.currentPlayerIndex, 0)
       return result
     }
     const events = result.state.events.filter(e => e.type === 'card.played' && e.cardId === card)
@@ -186,6 +189,9 @@ describe("A053 command boundaries", () => {
     assert.ok(event.type === 'card.played')
     assert.equal(event.actorPlayerId, result.state.players[0]!.id)
     assert.deepEqual(event.payment?.resources ?? {}, card === BOAT ? { wood: 1, reed: 1 } : card === PIPE ? { clay: 1 } : {})
+    assert.ok(result.interaction.stateId === 'wait' && result.interaction.request.kind === 'confirm-next-player', JSON.stringify(result.interaction))
+    assert.equal(result.interaction.playerIndex, 0)
+    assert.equal(result.state.currentPlayerIndex, 0)
     return result
   }
   function values(r: SessionResponse, actor = 0) { return r.state.players[actor]!.resources; }
@@ -202,8 +208,12 @@ describe("A053 command boundaries", () => {
   function retryFree(s: GameSession, card: string) { const r = enter(s); assert.equal(offered(r, card), false); assertRejectedUnchanged(s, () => s.resolveChoice(0, card)); return buy(s, r, 'A054_Credit'); }
   function barn(s: GameSession) { return buy(s, enter(s), 'A006_StorageBarn'); }
   function addBarn(state: GameState) { state.players[0]!.minorHand.push('A006_StorageBarn'); state.players[0]!.improvements = ['Major_Joinery']; }
-  function endAfterFirst(s: GameSession, ownerSpace = 'grain-seeds') { turn(s, 1, 'fishing'); turn(s, 0, ownerSpace); const r = confirmNext(s, turn(s, 1, 'reed-bank')); assert.equal(r.state.round, 6); assert.equal(r.state.roundPhase, 'work'); assert.equal(r.interaction.stateId, 'idle'); return r; }
-  function endAfterSecond(s: GameSession) { const r = confirmNext(s, turn(s, 1, 'reed-bank')); assert.equal(r.state.round, 6); assert.equal(r.state.roundPhase, 'work'); return r; }
+  function endAfterFirst(s: GameSession, ownerSpace = 'grain-seeds') { turn(s, 1, 'fishing'); turn(s, 0, ownerSpace); const r = confirmNext(s, turn(s, 1, 'reed-bank')); assert.equal(r.state.round, 6); assert.equal(r.state.roundPhase, 'work'); assert.equal(r.interaction.stateId, 'idle'); assert.equal(r.interaction.stateId, 'idle')
+    assert.equal(r.state.currentPlayerIndex, 0)
+    return r }
+  function endAfterSecond(s: GameSession) { const r = confirmNext(s, turn(s, 1, 'reed-bank')); assert.equal(r.state.round, 6); assert.equal(r.state.roundPhase, 'work'); assert.equal(r.interaction.stateId, 'idle')
+    assert.equal(r.state.currentPlayerIndex, 0)
+    return r }
   function assertReset(r: SessionResponse) { assert.equal(r.state.players[0]!.cardStates[PIPE]?.infobox, '0 / 7'); }
   it("actual one clay purchase initializes a zero work phase total", () => { const s = setup({ played: false, resources: { clay: 1 } }); const r = buy(s, enter(s), PIPE); assert.equal(values(r).clay, 0); assertReset(r); return { clay: 0, counter: '0 / 7', cardPlayed: true }; })
   it("zero clay rejects a forged purchase before a legal retry", () => { const s = setup({ played: false }); const r = retryFree(s, PIPE); assert.equal(values(r).clay, 0); assert.equal(r.state.players[0]!.minorHand.includes(PIPE), true); return { clay: 0, cardInHand: true }; })
@@ -216,6 +226,9 @@ describe("A053 command boundaries", () => {
   it("six accumulated wood plus Storage Barn wood count as seven actual gains", () => { const s = setup({ forest: 6, configure: addBarn }); turn(s, 0, 'forest'); turn(s, 1, 'fishing'); barn(s); const r = endAfterSecond(s); assert.equal(values(r).wood, 7); assert.equal(values(r).food, 22); bonus(r, PIPE, 2); return { wood: 7, food: 22 }; })
   it("opponent gains do not contribute to the owner threshold", () => { const s = setup({ forest: 7 }); turn(s, 0, 'grain-seeds'); turn(s, 1, 'forest'); turn(s, 0, 'day-laborer'); const r = endAfterSecond(s); assert.equal(values(r).food, 22); assert.equal(values(r, 1).food, 20); assert.equal(values(r, 1).wood, 7); bonus(r, PIPE, 0); return { ownerFood: 22, opponentFood: 20, opponentWood: 7 }; })
   it("seven wood gained while Claypipe stays in hand grant no bonus", () => { const s = setup({ played: false, forest: 7 }); turn(s, 0, 'forest'); const r = endAfterFirst(s); assert.equal(values(r).wood, 7); assert.equal(values(r).food, 20); bonus(r, PIPE, 0); return { wood: 7, food: 20 }; })
-  it("a second natural work phase resets prior gains and does not pay twice", () => { const s = setup({ forest: 7 }); turn(s, 0, 'forest'); const first = endAfterFirst(s); assert.equal(values(first).food, 22); const initialBonuses = first.state.events.filter(e => e.type === 'resource.moved' && e.sourceCardId === PIPE).length; assert.equal(initialBonuses, 1); turn(s, 0, 'grain-seeds'); turn(s, 1, 'forest'); turn(s, 0, 'day-laborer'); const r = confirmNext(s, turn(s, 1, 'reed-bank')); assert.equal(r.state.round, 7); assert.equal(values(r).food, 24); assertReset(r); assert.equal(r.state.events.filter(e => e.type === 'resource.moved' && e.sourceCardId === PIPE).length, initialBonuses); return { round: 7, food: 24 }; })
-  it("undo restores the actual gain ledger before a single returning home bonus", () => { const s = setup({ forest: 7 }); const before = undoRuleSnapshot(s.getState()); turn(s, 0, 'forest'); assertUndoRestored(before, s.undoAction()); const retried = turn(s, 0, 'forest'); assert.deepEqual(retried.state.workPhaseObtainedResources[retried.state.players[0]!.id], { wood: 7 }); const r = endAfterFirst(s); assert.equal(values(r).food, 22); bonus(r, PIPE, 2); return { oaRestored: true, retryFood: 22 }; })
+  it("a second natural work phase resets prior gains and does not pay twice", () => { const s = setup({ forest: 7 }); turn(s, 0, 'forest'); const first = endAfterFirst(s); assert.equal(values(first).food, 22); const initialBonuses = first.state.events.filter(e => e.type === 'resource.moved' && e.sourceCardId === PIPE).length; assert.equal(initialBonuses, 1); turn(s, 0, 'grain-seeds'); turn(s, 1, 'forest'); turn(s, 0, 'day-laborer'); const r = confirmNext(s, turn(s, 1, 'reed-bank'));
+    assert.equal(r.interaction.stateId, 'idle')
+    assert.equal(r.state.currentPlayerIndex, 0)
+     assert.equal(r.state.round, 7); assert.equal(values(r).food, 24); assertReset(r); assert.equal(r.state.events.filter(e => e.type === 'resource.moved' && e.sourceCardId === PIPE).length, initialBonuses); return { round: 7, food: 24 }; })
+  it("undo restores the actual gain ledger before a single returning home bonus", () => { const s = setup({ forest: 7 }); const beforeInteraction = JSON.stringify(s.getState().interaction); assert.equal(s.getState().interaction.stateId, 'idle'); const before = undoRuleSnapshot(s.getState()); turn(s, 0, 'forest'); const restored = s.undoAction(); assertUndoRestored(before, restored); assert.equal(JSON.stringify(restored.interaction), beforeInteraction); assert.equal(restored.state.currentPlayerIndex, 0); const retried = turn(s, 0, 'forest'); assert.deepEqual(retried.state.workPhaseObtainedResources[retried.state.players[0]!.id], { wood: 7 }); const r = endAfterFirst(s); assert.equal(values(r).food, 22); bonus(r, PIPE, 2); return { oaRestored: true, retryFood: 22 }; })
 })

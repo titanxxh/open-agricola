@@ -192,6 +192,9 @@ describe("A052 command boundaries", () => {
       const gain = gains[0]!
       assert.ok(gain.type === 'resource.moved')
       assert.deepEqual(gain.resources, { wood: 1 })
+      assert.ok(result.interaction.stateId === 'wait' && result.interaction.request.kind === 'confirm-next-player', JSON.stringify(result.interaction))
+      assert.equal(result.interaction.playerIndex, 0)
+      assert.equal(result.state.currentPlayerIndex, 0)
       return result
     }
     const events = result.state.events.filter(e => e.type === 'card.played' && e.cardId === card)
@@ -200,6 +203,9 @@ describe("A052 command boundaries", () => {
     assert.ok(event.type === 'card.played')
     assert.equal(event.actorPlayerId, result.state.players[0]!.id)
     assert.deepEqual(event.payment?.resources ?? {}, card === AXE ? { wood: 1 } : {})
+    assert.ok(result.interaction.stateId === 'wait' && result.interaction.request.kind === 'confirm-next-player', JSON.stringify(result.interaction))
+    assert.equal(result.interaction.playerIndex, 0)
+    assert.equal(result.state.currentPlayerIndex, 0)
     return result
   }
   function values(r: SessionResponse, actor = 0) { return r.state.players[actor]!.resources; }
@@ -219,14 +225,41 @@ describe("A052 command boundaries", () => {
   it("round seven permits the actual one wood purchase", () => { const s = setup({ played: false, round: 7, resources: { wood: 1 } }); const r = buy(s, enter(s), AXE); assert.equal(values(r).wood, 0); assert.equal(values(r).food, 20); bonus(r, AXE, 0); return { wood: 0, cardPlayed: true }; })
   it("round six rejects a forged early purchase before a legal retry", () => { const s = setup({ played: false, round: 6, resources: { wood: 1 } }); const r = retryFree(s, AXE); assert.equal(values(r).wood, 1); assert.equal(r.state.players[0]!.minorHand.includes(AXE), true); return { round: 6, wood: 1, cardInHand: true }; })
   it("zero wood rejects a forged purchase in round seven before a legal retry", () => { const s = setup({ played: false, round: 7 }); const r = retryFree(s, AXE); assert.equal(values(r).wood, 0); assert.equal(r.state.players[0]!.minorHand.includes(AXE), true); return { round: 7, wood: 0, cardInHand: true }; })
-  it("Forest with one market pig grants exactly two food", () => { const r = turn(setup({ round: 10 }), 0, 'forest'); assert.equal(values(r).wood, 3); assert.equal(values(r).food, 22); bonus(r, AXE, 2); return { wood: 3, food: 22, marketPigs: 1 }; })
-  it("zero market pigs prevent the Forest food bonus", () => { const r = turn(setup({ round: 10, pigs: 0 }), 0, 'forest'); assert.equal(values(r).wood, 3); assert.equal(values(r).food, 20); bonus(r, AXE, 0); return { wood: 3, food: 20, marketPigs: 0 }; })
-  it("two market pigs still grant only two food", () => { const r = turn(setup({ round: 10, pigs: 2 }), 0, 'forest'); assert.equal(values(r).wood, 3); assert.equal(values(r).food, 22); bonus(r, AXE, 2); return { wood: 3, food: 22, marketPigs: 2 }; })
-  it("Day Laborer is not a wood accumulation space", () => { const r = turn(setup({ round: 10 }), 0, 'day-laborer'); assert.equal(values(r).food, 22); assert.equal(values(r).wood, 0); bonus(r, AXE, 0); return { food: 22, wood: 0 }; })
+  it("Forest with one market pig grants exactly two food", () => { const r = turn(setup({ round: 10 }), 0, 'forest');
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
+     assert.equal(values(r).wood, 3); assert.equal(values(r).food, 22); bonus(r, AXE, 2); return { wood: 3, food: 22, marketPigs: 1 }; })
+  it("zero market pigs prevent the Forest food bonus", () => { const r = turn(setup({ round: 10, pigs: 0 }), 0, 'forest');
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
+     assert.equal(values(r).wood, 3); assert.equal(values(r).food, 20); bonus(r, AXE, 0); return { wood: 3, food: 20, marketPigs: 0 }; })
+  it("two market pigs still grant only two food", () => { const r = turn(setup({ round: 10, pigs: 2 }), 0, 'forest');
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
+     assert.equal(values(r).wood, 3); assert.equal(values(r).food, 22); bonus(r, AXE, 2); return { wood: 3, food: 22, marketPigs: 2 }; })
+  it("Day Laborer is not a wood accumulation space", () => { const r = turn(setup({ round: 10 }), 0, 'day-laborer');
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
+     assert.equal(values(r).food, 22); assert.equal(values(r).wood, 0); bonus(r, AXE, 0); return { food: 22, wood: 0 }; })
   it("Storage Barn wood from a real Joinery gives no accumulation bonus", () => { const s = setup({ round: 10, configure: addBarn }); const r = barn(s); assert.equal(values(r).wood, 1); assert.equal(values(r).food, 20); bonus(r, AXE, 0); return { wood: 1, food: 20 }; })
-  it("opponent Forest cannot grant owner or opponent food from the owner card", () => { const s = setup({ round: 10 }); turn(s, 0, 'grain-seeds'); const r = turn(s, 1, 'forest'); assert.equal(values(r).food, 20); assert.equal(values(r, 1).food, 20); assert.equal(values(r, 1).wood, 3); bonus(r, AXE, 0); return { ownerFood: 20, opponentFood: 20, opponentWood: 3 }; })
-  it("Forest while the card is in hand gives no food bonus", () => { const r = turn(setup({ round: 10, played: false }), 0, 'forest'); assert.equal(values(r).wood, 3); assert.equal(values(r).food, 20); bonus(r, AXE, 0); return { wood: 3, food: 20 }; })
-  it("empty Forest rejects even with a pig on the market", () => { const s = setup({ round: 10, forest: 0 }); const r = assertEmptyAccumulationRejected(s, 0, 'forest'); assert.equal(values(r).wood, 0); assert.equal(values(r).food, 20); bonus(r, AXE, 0); return { emptyEntryRejected: true, supplementalFood: 0 }; })
+  it("opponent Forest cannot grant owner or opponent food from the owner card", () => { const s = setup({ round: 10 }); turn(s, 0, 'grain-seeds'); const r = turn(s, 1, 'forest');
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, 1)
+    assert.equal(r.state.currentPlayerIndex, 1)
+     assert.equal(values(r).food, 20); assert.equal(values(r, 1).food, 20); assert.equal(values(r, 1).wood, 3); bonus(r, AXE, 0); return { ownerFood: 20, opponentFood: 20, opponentWood: 3 }; })
+  it("Forest while the card is in hand gives no food bonus", () => { const r = turn(setup({ round: 10, played: false }), 0, 'forest');
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
+     assert.equal(values(r).wood, 3); assert.equal(values(r).food, 20); bonus(r, AXE, 0); return { wood: 3, food: 20 }; })
+  it("empty Forest rejects even with a pig on the market", () => { const s = setup({ round: 10, forest: 0 }); const r = assertEmptyAccumulationRejected(s, 0, 'forest');
+    assert.equal(r.interaction.stateId, 'idle')
+    assert.equal(r.state.currentPlayerIndex, 0)
+     assert.equal(values(r).wood, 0); assert.equal(values(r).food, 20); bonus(r, AXE, 0); return { emptyEntryRejected: true, supplementalFood: 0 }; })
   it("a real Pig Market clearance removes the condition before owner Forest", () => {
     const s = setup({ round: 10 })
     turn(s, 0, 'grain-seeds')
@@ -240,7 +273,14 @@ describe("A052 command boundaries", () => {
     assert.equal(values(r).wood, 3)
     assert.equal(values(r).food, 20)
     bonus(r, AXE, 0)
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
     return { wood: 3, food: 20, marketPigs: 0, opponentHousedPigs: 1 }
   })
-  it("occupied Forest rejects a repeated request before a legal retry", () => { const s = setup({ round: 10 }); turn(s, 0, 'forest'); turn(s, 1, 'grain-seeds'); ready(s, 0); assertRejectedUnchanged(s, () => s.takeAction(0, 'forest')); const r = turn(s, 0, 'clay-pit'); assert.equal(values(r).wood, 3); assert.equal(values(r).food, 22); return { wood: 3, food: 22 }; })
+  it("occupied Forest rejects a repeated request before a legal retry", () => { const s = setup({ round: 10 }); turn(s, 0, 'forest'); turn(s, 1, 'grain-seeds'); ready(s, 0); assertRejectedUnchanged(s, () => s.takeAction(0, 'forest')); const r = turn(s, 0, 'clay-pit');
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
+     assert.equal(values(r).wood, 3); assert.equal(values(r).food, 22); return { wood: 3, food: 22 }; })
 })

@@ -773,9 +773,18 @@ describe("A049 command boundaries", () => {
   function buy(s: GameSession, card: string, space = 'meeting-place') {
     const r = buyMenu(s, space)
     if (!r.state.players[0]!.minorHand.includes(card))
-      return r
+      {
+        assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+        assert.equal(r.interaction.playerIndex, 0)
+        assert.equal(r.state.currentPlayerIndex, 0)
+        return r
+      }
     assert.ok(options(r).some(o => o.value === card && !('disabled' in o && o.disabled)))
-    return ok(s.resolveChoice(0, card))
+    const completedResponse = ok(s.resolveChoice(0, card))
+    assert.ok(completedResponse.interaction.stateId === 'wait' && completedResponse.interaction.request.kind === 'confirm-next-player', JSON.stringify(completedResponse.interaction))
+    assert.equal(completedResponse.interaction.playerIndex, 0)
+    assert.equal(completedResponse.state.currentPlayerIndex, 0)
+    return completedResponse
   }
   function deny(s: GameSession, card: string) { const r = buyMenu(s); assert.ok(!r.state.players[0]!.minorPlayed.includes(card)); assertRejectedUnchanged(s, () => s.resolveChoice(0, card)); }
   function ready(s: GameSession, actor: number) {
@@ -799,7 +808,10 @@ describe("A049 command boundaries", () => {
     }
     turn(s, 1, otherFirst)
     turn(s, 0, ownSecond)
-    return passPreparationExchanges(s, confirmNext(s, turn(s, 1, otherSecond)))
+    const completedResponse = passPreparationExchanges(s, confirmNext(s, turn(s, 1, otherSecond)))
+    assert.equal(completedResponse.interaction.stateId, 'idle')
+    assert.equal(completedResponse.state.currentPlayerIndex, 0)
+    return completedResponse
   }
   it("actual Nest Site purchase requires one occupation and one food", () => {
     deny(setup({ occupations: 0 }), NEST)
@@ -814,6 +826,8 @@ describe("A049 command boundaries", () => {
     turn(s, 1, 'forest')
     turn(s, 0, 'grain-seeds')
     let r = passPreparationExchanges(s, confirmNext(s, turn(s, 1, 'clay-pit')))
+    assert.equal(r.interaction.stateId, 'idle')
+    assert.equal(r.state.currentPlayerIndex, 0)
     assert.equal(r.state.round, 6)
     assert.deepEqual([...food(r), bank(r)], [40, 40, 2])
     r = finish(s, 'meeting-place')
@@ -824,6 +838,8 @@ describe("A049 command boundaries", () => {
     turn(s, 1, 'forest')
     turn(s, 0, 'grain-seeds')
     r = passPreparationExchanges(s, confirmNext(s, turn(s, 1, 'clay-pit')))
+    assert.equal(r.interaction.stateId, 'idle')
+    assert.equal(r.state.currentPlayerIndex, 0)
     assert.equal(r.state.round, 8)
     assert.deepEqual([...food(r), bank(r)], [37, 36, 1])
   })
@@ -833,6 +849,8 @@ describe("A049 command boundaries", () => {
     turn(s, 1, 'reed-bank')
     turn(s, 0, 'grain-seeds')
     let r = passPreparationExchanges(s, confirmNext(s, turn(s, 1, 'clay-pit')))
+    assert.equal(r.interaction.stateId, 'idle')
+    assert.equal(r.state.currentPlayerIndex, 0)
     assert.equal(r.state.round, 6)
     assert.deepEqual([...food(r), bank(r)], [39, 40, 1])
     assert.equal(r.state.players[1]!.resources.reed, 1)
@@ -847,10 +865,10 @@ describe("A049 command boundaries", () => {
     assert.deepEqual(food(r), [42, 40])
     assert.equal(bank(r), 2)
     const s = nest()
-    const before = undoRuleSnapshot(s.getState())
+    const beforeInteraction = JSON.stringify(s.getState().interaction); assert.equal(s.getState().interaction.stateId, 'idle'); const before = undoRuleSnapshot(s.getState())
     buy(s, NEST)
     assertRejectedUnchanged(s, () => s.resolveChoice(0, NEST))
-    assertUndoRestored(before, s.undoAction())
+    const restored = s.undoAction(); assertUndoRestored(before, restored); assert.equal(JSON.stringify(restored.interaction), beforeInteraction); assert.equal(restored.state.currentPlayerIndex, 0)
     assert.equal(buy(s, NEST).state.players[0]!.resources.food, 39)
   })
 })

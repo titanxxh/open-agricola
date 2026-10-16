@@ -432,14 +432,25 @@ describe("A048 command boundaries", () => {
       assert.ok(o, JSON.stringify(r.interaction))
       r = ok(s.resolveChoice(r.interaction.playerIndex, o.value))
     }
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
     return r
   }
   function goods(r: SessionResponse) { return [r.state.players[0]!.resources.wood, r.state.players[0]!.resources.food]; }
   function forest(initial: number, gain = 3, played = true) { return setup(HORSE, { played, resources: { wood: initial } }, state => { state.actionSpaces.find(a => a.id === 'forest')!.resources.wood = gain; }); }
-  it("actual printed one wood purchase cannot trigger without obtained wood", () => { deny(setup(HORSE), HORSE); const r = buy(setup(HORSE, { resources: { wood: 7 } }), HORSE); assert.deepEqual(goods(r), [6, 40]); })
+  it("actual printed one wood purchase cannot trigger without obtained wood", () => { deny(setup(HORSE), HORSE); const r = buy(setup(HORSE, { resources: { wood: 7 } }), HORSE);
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
+     assert.deepEqual(goods(r), [6, 40]); })
   it("actual Forest reaches four five six with optional accept and decline", () => {
     const low = forest(1)
-    assert.deepEqual(goods(turn(low, 0, 'forest')), [4, 40])
+    const lowResult = turn(low, 0, 'forest')
+    assert.ok(lowResult.interaction.stateId === 'wait' && lowResult.interaction.request.kind === 'confirm-next-player', JSON.stringify(lowResult.interaction))
+    assert.equal(lowResult.interaction.playerIndex, 0)
+    assert.equal(lowResult.state.currentPlayerIndex, 0)
+    assert.deepEqual(goods(lowResult), [4, 40])
     for (const initial of [2, 3])
       for (const accept of [true, false]) {
         const s = forest(initial)
@@ -456,12 +467,24 @@ describe("A048 command boundaries", () => {
     }
   })
   it("one large ten wood obtain causes only one exchange", () => { const s = forest(0, 10); assert.deepEqual(goods(cardFlow(s, turn(s, 0, 'forest'), HORSE)), [9, 43]); })
-  it("large owner stock without new wood and opponent wood do not trigger", () => { const s = forest(8); let r = turn(s, 0, 'grain-seeds'); assert.deepEqual(goods(r), [8, 40]); r = turn(s, 1, 'forest'); assert.deepEqual(goods(r), [8, 40]); assert.equal(r.state.players[1]!.resources.wood, 3); })
+  it("large owner stock without new wood and opponent wood do not trigger", () => { const s = forest(8); let r = turn(s, 0, 'grain-seeds');
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
+     assert.deepEqual(goods(r), [8, 40]); r = turn(s, 1, 'forest');
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, 1)
+    assert.equal(r.state.currentPlayerIndex, 1)
+     assert.deepEqual(goods(r), [8, 40]); assert.equal(r.state.players[1]!.resources.wood, 3); })
   it("real Baseboards purchase wood gain triggers away from accumulation space", () => { const s = setup(BASE, { resources: { wood: 5 } }, state => { state.players[0]!.minorPlayed = [HORSE]; }); const r = cardFlow(s, buy(s, BASE), HORSE); assert.deepEqual(goods(r), [6, 41]); assert.ok(!r.state.players[0]!.minorHand.includes(BASE)); })
-  it("actual fencing wood payment cannot trigger or recurse", () => { const s = forest(9); const r = turn(s, 0, 'fencing'); assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'farm-select'); const after = ok(s.commitSelectionChoice(0, { edges: ['H-0-1', 'H-1-1', 'V-0-1', 'V-0-2'] })); assert.deepEqual(goods(after), [5, 40]); assert.equal(after.state.players[0]!.fenceSegments.length, 4); })
+  it("actual fencing wood payment cannot trigger or recurse", () => { const s = forest(9); const r = turn(s, 0, 'fencing'); assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'farm-select'); const after = ok(s.commitSelectionChoice(0, { edges: ['H-0-1', 'H-1-1', 'V-0-1', 'V-0-2'] }));
+    assert.ok(after.interaction.stateId === 'wait' && after.interaction.request.kind === 'confirm-next-player', JSON.stringify(after.interaction))
+    assert.equal(after.interaction.playerIndex, 0)
+    assert.equal(after.state.currentPlayerIndex, 0)
+     assert.deepEqual(goods(after), [5, 40]); assert.equal(after.state.players[0]!.fenceSegments.length, 4); })
   it("invalid wrong actor stale exchange and whole obtain undo allow one retry", () => {
     const s = forest(2)
-    const before = undoRuleSnapshot(s.getState())
+    const beforeInteraction = JSON.stringify(s.getState().interaction); assert.equal(s.getState().interaction.stateId, 'idle'); const before = undoRuleSnapshot(s.getState())
     let r = turn(s, 0, 'forest')
     if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'select-trigger')
       r = choose(s, r, o => o.value === HORSE)
@@ -472,7 +495,10 @@ describe("A048 command boundaries", () => {
     r = ok(s.resolveChoice(0, choice.value))
     assert.deepEqual(goods(r), [4, 43])
     assertRejectedUnchanged(s, () => s.resolveChoice(0, choice.value))
-    assertUndoRestored(before, s.undoAction())
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
+    const restored = s.undoAction(); assertUndoRestored(before, restored); assert.equal(JSON.stringify(restored.interaction), beforeInteraction); assert.equal(restored.state.currentPlayerIndex, 0)
     assert.deepEqual(goods(cardFlow(s, turn(s, 0, 'forest'), HORSE)), [4, 43])
   })
 })

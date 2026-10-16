@@ -237,9 +237,18 @@ describe("A058 command boundaries", () => {
   function buy(s: GameSession, card: string, space = 'meeting-place') {
     const r = buyMenu(s, space)
     if (!r.state.players[0]!.minorHand.includes(card))
-      return r
+      {
+        assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+        assert.equal(r.interaction.playerIndex, 0)
+        assert.equal(r.state.currentPlayerIndex, 0)
+        return r
+      }
     assert.ok(options(r).some(o => o.value === card && !('disabled' in o && o.disabled)))
-    return ok(s.resolveChoice(0, card))
+    const completedResponse = ok(s.resolveChoice(0, card))
+    assert.ok(completedResponse.interaction.stateId === 'wait' && completedResponse.interaction.request.kind === 'confirm-next-player', JSON.stringify(completedResponse.interaction))
+    assert.equal(completedResponse.interaction.playerIndex, 0)
+    assert.equal(completedResponse.state.currentPlayerIndex, 0)
+    return completedResponse
   }
   function deny(s: GameSession, card: string) { const r = buyMenu(s); assert.ok(!r.state.players[0]!.minorPlayed.includes(card)); assertRejectedUnchanged(s, () => s.resolveChoice(0, card)); }
   function bonus(r: SessionResponse) { const value = r.state.players[0]!.cardStates[KNIFE]?.counters?.bonusVp ?? 0; assert.ok(r.scores); assert.ok(r.scores[0]); assert.equal(r.scores[0].categories.find(c => c.key === 'cardBonusVp')?.entries.find(e => e.type === 'bonus' && e.cardId === KNIFE)?.score ?? 0, value); return value; }
@@ -282,9 +291,18 @@ describe("A059 command boundaries", () => {
   function buy(s: GameSession, card: string, space = 'meeting-place') {
     const r = buyMenu(s, space)
     if (!r.state.players[0]!.minorHand.includes(card))
-      return r
+      {
+        assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+        assert.equal(r.interaction.playerIndex, 0)
+        assert.equal(r.state.currentPlayerIndex, 0)
+        return r
+      }
     assert.ok(options(r).some(o => o.value === card && !('disabled' in o && o.disabled)))
-    return ok(s.resolveChoice(0, card))
+    const completedResponse = ok(s.resolveChoice(0, card))
+    assert.ok(completedResponse.interaction.stateId === 'wait' && completedResponse.interaction.request.kind === 'confirm-next-player', JSON.stringify(completedResponse.interaction))
+    assert.equal(completedResponse.interaction.playerIndex, 0)
+    assert.equal(completedResponse.state.currentPlayerIndex, 0)
+    return completedResponse
   }
   function deny(s: GameSession, card: string) { const r = buyMenu(s); assert.ok(!r.state.players[0]!.minorPlayed.includes(card)); assertRejectedUnchanged(s, () => s.resolveChoice(0, card)); }
   function ready(s: GameSession, actor: number) {
@@ -313,6 +331,8 @@ describe("A059 command boundaries", () => {
       assert.ok(o, JSON.stringify(r.interaction))
       r = ok(s.resolveChoice(r.interaction.playerIndex, o.value))
     }
+    assert.equal(r.interaction.stateId, 'idle')
+    assert.equal(r.state.currentPlayerIndex, 0)
     return r
   }
   function fields(state: GameState, crop: 'vegetable' | 'grain', amounts: number[], owner = 0) { state.players[owner]!.fields = amounts.map((remaining, i) => ({ row: 0, col: 1 + i, stacks: remaining > 0 ? [{ kind: crop, remaining }] : [] })); }
@@ -322,7 +342,10 @@ describe("A059 command boundaries", () => {
   function potato(vegetable = 2, amounts = [2], configure: (state: GameState) => void = () => { }) { return phase(4, amounts, vegetable, true, configure); }
   function potatoResult(r: SessionResponse) { return [r.state.players[0]!.resources.vegetable, r.state.players[0]!.resources.food]; }
   it("actual printed one wood purchase cannot exchange existing vegetable stock", () => { deny(setup(), RIDGER); const r = buy(setup({ resources: { wood: 1, vegetable: 4 } }), RIDGER); assert.equal(r.state.players[0]!.resources.wood, 0); assert.deepEqual(potatoResult(r), [4, 40]); })
-  it("real ordinary harvest to two gives none and to three may exchange one", () => { const low = potato(1); assert.deepEqual(potatoResult(end(low)), [2, 36]); const s = potato(2); const r = cardFlow(s, end(s), RIDGER); assert.deepEqual(potatoResult(r), [2, 42]); assert.deepEqual(remaining(r), [1]); })
+  it("real ordinary harvest to two gives none and to three may exchange one", () => { const low = potato(1); const lowResult = end(low)
+    assert.equal(lowResult.interaction.stateId, 'idle')
+    assert.equal(lowResult.state.currentPlayerIndex, 0)
+    assert.deepEqual(potatoResult(lowResult), [2, 36]); const s = potato(2); const r = cardFlow(s, end(s), RIDGER); assert.deepEqual(potatoResult(r), [2, 42]); assert.deepEqual(remaining(r), [1]); })
   it("real ordinary harvest to four and five automatically exchanges one", () => {
     for (const before of [3, 4]) {
       const s = potato(before)
@@ -334,10 +357,14 @@ describe("A059 command boundaries", () => {
   it("own grain only harvest and real opponent vegetable harvest do not trigger owner", () => {
     const grain = potato(4, [], state => fields(state, 'grain', [2]))
     let r = end(grain)
+    assert.equal(r.interaction.stateId, 'idle')
+    assert.equal(r.state.currentPlayerIndex, 0)
     assert.deepEqual(potatoResult(r), [4, 36])
     assert.deepEqual(remaining(r), [1])
     const s = potato(4, [], state => fields(state, 'vegetable', [2], 1))
     r = end(s)
+    assert.equal(r.interaction.stateId, 'idle')
+    assert.equal(r.state.currentPlayerIndex, 0)
     assert.deepEqual(potatoResult(r), [4, 36])
     assert.equal(r.state.players[1]!.resources.vegetable, 1)
   })
@@ -346,6 +373,9 @@ describe("A059 command boundaries", () => {
   it("harvest boundary rejects step undo unchanged before one legal exchange retry", () => {
     const s = potato(2)
     const pending = end(s)
+    assert.ok(pending.interaction.stateId === 'wait' && pending.interaction.request.kind === 'choice', JSON.stringify(pending.interaction))
+    assert.equal(pending.interaction.playerIndex, 0)
+    assert.equal(pending.state.currentPlayerIndex, 0)
     assert.ok(pending.interaction.stateId === 'wait' && pending.interaction.sourceCard === RIDGER)
     assert.deepEqual(potatoResult(pending), [3, 40])
     const undone = assertRejectedUnchanged(s, () => s.undoStep())
