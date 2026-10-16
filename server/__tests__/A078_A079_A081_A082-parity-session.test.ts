@@ -843,10 +843,16 @@ describe("A081 command boundaries", () => {
   }
   function buy(s: GameSession, card: string) {
     const r = buyMenu(s)
-    if (!r.state.players[0]!.minorHand.includes(card))
-      return r
+    if (!r.state.players[0]!.minorHand.includes(card)) {
+      assert.ok(r.state.players[0]!.minorPlayed.includes(card))
+      return complete(r)
+    }
     assert.ok(choices(r).some(o => o.value === card && !o.disabled))
-    return ok(s.resolveChoice(0, card))
+    return complete(ok(s.resolveChoice(0, card)))
+  }
+  function complete(r: SessionResponse) {
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    return r
   }
   function ready(s: GameSession, actor: number) {
     let r = s.getState()
@@ -864,7 +870,10 @@ describe("A081 command boundaries", () => {
     turn(s, 0, 'grain-seeds')
     turn(s, 1, 'forest')
     turn(s, 0, 'day-laborer')
-    return confirmNext(s, turn(s, 1, 'clay-pit'))
+    const next = confirmNext(s, turn(s, 1, 'clay-pit'))
+    assert.equal(next.interaction.stateId, 'idle', JSON.stringify(next.interaction))
+    assert.equal(next.state.roundPhase, 'work')
+    return next
   }
   function flow(s: GameSession, r: SessionResponse, card: string, accept = true) {
     for (let n = 0; n < 8 && r.interaction.stateId === 'wait'; n++) {
@@ -884,7 +893,7 @@ describe("A081 command boundaries", () => {
       assert.ok(o, JSON.stringify(r.interaction))
       r = ok(s.resolveChoice(r.interaction.playerIndex, o.value))
     }
-    return r
+    return complete(r)
   }
   function storage(r: SessionResponse) {
     const c = r.state.players[0]!.cardStates[STORE]?.counters
@@ -909,7 +918,7 @@ describe("A081 command boundaries", () => {
     ]>)
       for (const amount of [2, 5]) {
         const s = store(14, state => stock(state, space, resource, amount))
-        const r = turn(s, 0, space)
+        const r = complete(turn(s, 0, space))
         assert.equal(r.state.players[0]!.resources[resource], amount)
         assert.equal(storage(r)[stored], 1)
         assert.equal(r.state.players[0]!.resources[stored], 0)
@@ -918,12 +927,12 @@ describe("A081 command boundaries", () => {
   })
   it("opponent wood space unplayed and card gain do not store owner goods", () => {
     const s = store()
-    turn(s, 0, 'forest')
+    complete(turn(s, 0, 'forest'))
     assert.deepEqual(storage(s.getState()), { wood: 0, clay: 0, reed: 0 })
-    turn(s, 1, 'clay-pit')
+    complete(turn(s, 1, 'clay-pit'))
     assert.deepEqual(storage(s.getState()), { wood: 0, clay: 0, reed: 0 })
     const u = setup(STORE, { played: false })
-    turn(u, 0, 'clay-pit')
+    complete(turn(u, 0, 'clay-pit'))
     assert.deepEqual(storage(u.getState()), { wood: 0, clay: 0, reed: 0 })
     const g = setup('A016_RammedClay', { played: false }, state => state.players[0]!.minorPlayed = [STORE])
     const r = buy(g, 'A016_RammedClay')
@@ -965,7 +974,7 @@ describe("A081 command boundaries", () => {
     }
     const s = store(6)
     end(s)
-    const r = turn(s, 0, 'clay-pit')
+    const r = complete(turn(s, 0, 'clay-pit'))
     assert.equal(r.state.round, 7)
     assert.deepEqual(storage(r), { wood: 1, clay: 0, reed: 0 })
     assert.equal(r.state.players[0]!.resources.wood, 0)
@@ -1003,7 +1012,7 @@ describe("A081 command boundaries", () => {
     const undone = s.undoAction()
     sessionEvidence.record('A081-N7-undo', { before: JSON.parse(before), undone })
     assertUndoRestored(before, undone)
-    const r = turn(s, 0, 'clay-pit')
+    const r = complete(turn(s, 0, 'clay-pit'))
     assert.deepEqual(storage(r), { wood: 1, clay: 0, reed: 0 })
     assert.equal(r.state.players[0]!.resources.clay, 2)
     sessionEvidence.record('A081-N7-retry', r)
@@ -1058,8 +1067,10 @@ describe("A082 command boundaries", () => {
   }
   function buy(s: GameSession, card: string) {
     const r = buyMenu(s)
-    if (!r.state.players[0]!.minorHand.includes(card))
+    if (!r.state.players[0]!.minorHand.includes(card)) {
+      assert.ok(r.state.players[0]!.minorPlayed.includes(card))
       return r
+    }
     assert.ok(choices(r).some(o => o.value === card && !o.disabled))
     return ok(s.resolveChoice(0, card))
   }
@@ -1067,6 +1078,10 @@ describe("A082 command boundaries", () => {
     const r = buyMenu(s)
     assert.ok(!r.state.players[0]!.minorPlayed.includes(card))
     assertRejectedUnchanged(s, () => s.resolveChoice(0, card))
+  }
+  function complete(r: SessionResponse) {
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    return r
   }
   function ready(s: GameSession, actor: number) {
     let r = s.getState()
@@ -1081,6 +1096,7 @@ describe("A082 command boundaries", () => {
     return ok(s.takeAction(actor, space))
   }
   function flow(s: GameSession, r: SessionResponse, card: string, accept = true) {
+    assert.ok(r.interaction.stateId === 'wait' && ['choice', 'select-trigger'].includes(r.interaction.request.kind), JSON.stringify(r.interaction))
     for (let n = 0; n < 8 && r.interaction.stateId === 'wait'; n++) {
       const request = r.interaction.request
       if (request.kind === 'select-trigger') {
@@ -1098,7 +1114,7 @@ describe("A082 command boundaries", () => {
       assert.ok(o, JSON.stringify(r.interaction))
       r = ok(s.resolveChoice(r.interaction.playerIndex, o.value))
     }
-    return r
+    return complete(r)
   }
   function stock(state: GameState, space: string, resource: keyof Resource, amount: number) {
     state.actionSpaces.find(s => s.id === space)!.resources[resource] = amount
@@ -1122,7 +1138,8 @@ describe("A082 command boundaries", () => {
     const zero = certificate({ played: false, food: 0 })
     deny(zero, CERT)
     const one = certificate({ played: false, food: 1 })
-    const r = buy(one, CERT)
+    const r = flow(one, buy(one, CERT), CERT, false)
+    assert.equal(r.state.players[0]!.resources.wood, 0)
     assert.ok(r.state.players[0]!.minorPlayed.includes(CERT))
     assert.equal(r.state.players[0]!.resources.food, 0)
     sessionEvidence.record('A082-N1-fee-observation', { printedCSVFoodCost: null, zero: zero.getState(), one: r, observationOnly: true })
@@ -1130,7 +1147,7 @@ describe("A082 command boundaries", () => {
   })
   it("real three four and five resource sources respect threshold and optional single take", () => {
     const low = certificate({ forest: 3 })
-    let r = turn(low, 0, 'grain-seeds')
+    let r = complete(turn(low, 0, 'grain-seeds'))
     assert.equal(r.state.players[0]!.resources.wood, 0)
     for (const forest of [4, 5])
       for (const accept of [true, false]) {
@@ -1151,7 +1168,7 @@ describe("A082 command boundaries", () => {
     assertRejectedUnchanged(s, () => s.resolveChoice(0, 'nonexistent-source'))
     const clay = choices(s.getState()).find(o => o.labelParams?.spaceId === 'clay-pit')
     assert.ok(clay)
-    const after = ok(s.resolveChoice(0, clay.value))
+    const after = complete(ok(s.resolveChoice(0, clay.value)))
     assert.equal(after.state.players[0]!.resources.clay, 1)
     assert.equal(after.state.players[0]!.resources.wood, 0)
     assert.equal(after.state.actionSpaces.find(a => a.id === 'forest')!.resources.wood + after.state.actionSpaces.find(a => a.id === 'clay-pit')!.resources.clay, 7)
@@ -1171,12 +1188,12 @@ describe("A082 command boundaries", () => {
   it("opponent unplayed and collecting the entire eligible source do not award owner a partial bonus", () => {
     const s = certificate()
     flow(s, turn(s, 0, 'grain-seeds'), CERT, false)
-    const r = turn(s, 1, 'day-laborer')
+    const r = complete(turn(s, 1, 'day-laborer'))
     assert.equal(r.state.players[0]!.resources.wood, 0)
     const u = certificate({ played: false })
-    assert.equal(turn(u, 0, 'grain-seeds').state.players[0]!.resources.wood, 0)
+    assert.equal(complete(turn(u, 0, 'grain-seeds')).state.players[0]!.resources.wood, 0)
     const same = certificate()
-    const full = turn(same, 0, 'forest')
+    const full = complete(turn(same, 0, 'forest'))
     assert.equal(full.state.players[0]!.resources.wood, 4)
     assert.equal(full.state.actionSpaces.find(a => a.id === 'forest')!.resources.wood, 0)
   })

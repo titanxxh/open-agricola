@@ -219,6 +219,8 @@ describe("A085 command boundaries", () => {
       assert(skip, JSON.stringify(r.interaction))
       r = record('finish-optional', ok(s.resolveChoice(actor, skip.value)))
     }
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, actor)
     return r
   }
   function ready(s: GameSession, actor: number) {
@@ -257,6 +259,9 @@ describe("A085 command boundaries", () => {
   function denyGrowth(s: GameSession) {
     record('rejected-growth', assertRejectedUnchanged(s, () => s.takeAction(0, 'wish-children')))
     assert.equal(newbornCount(s.state.players[0]!), 0)
+    const retry = turn(s, 0, 'day-laborer')
+    assert.equal(values(retry).food, 32)
+    assert.ok(retry.interaction.stateId === 'wait' && retry.interaction.request.kind === 'confirm-next-player', JSON.stringify(retry.interaction))
   }
   it("clay room with orthogonal field and pasture permits a real third newborn", () => {
     const s = setup({ house: 'clay' }, geometry)

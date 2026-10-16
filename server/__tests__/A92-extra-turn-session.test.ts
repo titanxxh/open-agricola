@@ -9,6 +9,7 @@ import { type GameState, type Resource } from '../../shared/contract/types'
 import { createWorkSession } from './_helpers/session-fixtures'
 import { assertRejectedUnchanged, assertUndoRestored, confirmNext, passPreparationExchanges, undoRuleSnapshot, getChoiceOptions } from './_helpers/session-assertions'
 import { createScenarioEvidence } from './_helpers/scenario-evidence'
+import { getRoundPlacementDetails } from '../../shared/cards/helpers/round-placement'
 const sessionEvidence = createScenarioEvidence(import.meta.url)
 const A92 = 'A092_AdoptiveParents'
 const placeholderHands = (state: {
@@ -399,7 +400,25 @@ describe("A092 command boundaries", () => {
       assert(skip, JSON.stringify(r.interaction))
       r = record('finish-optional', ok(s.resolveChoice(actor, skip.value)))
     }
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, actor)
     return r
+  }
+  function assertPlacements(r: SessionResponse, expected: ReturnType<typeof getRoundPlacementDetails>, parked: ReturnType<typeof getRoundPlacementDetails> = []) {
+    const player = r.state.players[0]!
+    assert.deepEqual(getRoundPlacementDetails(player), expected)
+    const physical = r.state.actionSpaces.flatMap(space => space.takenBy
+      .filter(worker => worker.playerId === player.id)
+      .map(worker => ({ spaceId: space.id, workerId: worker.workerId })))
+    const byWorker = (a: { workerId: string }, b: { workerId: string }) => a.workerId.localeCompare(b.workerId)
+    assert.deepEqual(physical.sort(byWorker), [...expected, ...parked].sort(byWorker))
+    assert.deepEqual(player.workers.map(worker => worker.id), ['1', '2', '3', '4', '5'])
+  }
+  function assertConfirmation(r: SessionResponse, actor: number, nextActor: number) {
+    assert.equal(r.state.currentPlayerIndex, actor)
+    assert.ok(r.interaction.stateId === 'wait', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, actor)
+    assert.deepEqual(r.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: nextActor })
   }
   function ready(s: GameSession, actor: number) {
     let r = s.getState()
@@ -443,6 +462,9 @@ describe("A092 command boundaries", () => {
     assert.equal(values(r).food, 0)
     assert.equal(values(r).family, 3)
     assert.equal(values(r).newborns, 0)
+    assert.deepEqual(r.state.players[0]!.workers.find(worker => worker.id === '3'), { id: '3', isActive: true, isNewborn: false })
+    assertPlacements(r, [{ spaceId: 'wish-children', workerId: '1' }])
+    assertConfirmation(r, 0, 1)
     ready(s, 1)
     assert.equal(workersAvailable(s.state, s.state.players[0]!), 2)
     turn(s, 1, 'forest')
@@ -500,10 +522,17 @@ describe("A092 command boundaries", () => {
     let r = record('extra-use', ok(s.resolveChoice(0, use.value)))
     assert.equal(values(r).food, 19)
     assert.equal(values(r).newborns, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
+    assert.ok(r.interaction.stateId === 'wait')
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.interaction.promptKey, 'ui.interactionPlaceFarmerExtra')
+    assertPlacements(r, [{ spaceId: 'wish-children', workerId: '1' }, { spaceId: 'reed-bank', workerId: '2' }])
     record('occupied-extra-target', assertRejectedUnchanged(s, () => s.resolveChoice(0, 'forest')))
     r = record('extra-placement', ok(s.resolveChoice(0, 'grain-seeds')))
     assert.equal(values(r).grain, 1)
     assert.equal(workersAvailable(s.state, s.state.players[0]!), 0)
+    assertPlacements(r, [{ spaceId: 'wish-children', workerId: '1' }, { spaceId: 'reed-bank', workerId: '2' }, { spaceId: 'grain-seeds', workerId: '3' }])
+    assertConfirmation(r, 0, 0)
     record('stale-extra-use', assertRejectedUnchanged(s, () => s.resolveChoice(0, use.value)))
     r = nextRound(s, r)
     assert.equal(values(r).food, 13)
@@ -517,6 +546,8 @@ describe("A092 command boundaries", () => {
     const r = record('extra-forfeit', ok(s.resolveChoice(0, decline.value)))
     assert.equal(values(r).food, 20)
     assert.equal(values(r).newborns, 1)
+    assertPlacements(r, [{ spaceId: 'wish-children', workerId: '1' }, { spaceId: 'reed-bank', workerId: '2' }], [{ spaceId: 'wish-children', workerId: '3' }])
+    assertConfirmation(r, 0, 0)
     const next = nextRound(s, r)
     assert.equal(values(next).food, 15)
     assert.equal(next.state.players[0]!.cardStates[PARENTS]?.extraData?.forfeitedThisRound, false)
@@ -535,7 +566,17 @@ describe("A092 command boundaries", () => {
       const promoted = record('two-child-use', ok(s.resolveChoice(0, use.value)))
       assert.equal(values(promoted).food, space === 'grain-seeds' ? 29 : 28)
       assert.equal(values(promoted).newborns, space === 'grain-seeds' ? 1 : 0)
+      assert.equal(promoted.state.currentPlayerIndex, 0)
+      assert.ok(promoted.interaction.stateId === 'wait')
+      assert.equal(promoted.interaction.playerIndex, 0)
+      assert.equal(promoted.interaction.promptKey, 'ui.interactionPlaceFarmerExtra')
       r = record(`two-child-place:${space}`, ok(s.resolveChoice(0, space)))
+      if (space === 'grain-seeds') {
+        assertPlacements(r, [{ spaceId: 'wish-children', workerId: '1' }, { spaceId: 'farm-expansion', workerId: '2' }, { spaceId: 'grain-seeds', workerId: '3' }], [{ spaceId: 'farm-expansion', workerId: '4' }])
+      } else {
+        assertPlacements(r, [{ spaceId: 'wish-children', workerId: '1' }, { spaceId: 'farm-expansion', workerId: '2' }, { spaceId: 'grain-seeds', workerId: '3' }, { spaceId: 'day-laborer', workerId: '4' }])
+      }
+      assertConfirmation(r, 0, 0)
       if (space === 'grain-seeds')
         r = record('second-child-offer', confirmNext(s, r))
     }

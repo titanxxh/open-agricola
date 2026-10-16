@@ -372,6 +372,8 @@ describe("A084 command boundaries", () => {
       r = record('Silage-payment', ok(s.resolveChoice(0, source)))
     }
     const result = settle(s, r)
+    assert.equal(result.interaction.stateId, 'idle')
+    assert.equal(result.state.roundPhase, 'work')
     silageAccepted.set(result, species.value)
     return result
   }
@@ -395,6 +397,8 @@ describe("A084 command boundaries", () => {
     s = silage()
     complete(s)
     r = record('Silage-decline', ok(s.resolveChoice(0, '__skip__')))
+    assert.equal(r.interaction.stateId, 'idle')
+    assert.equal(r.state.round, 6)
     assert.equal(r.state.players[0]!.resources.sheep, 2)
     assert.equal(r.state.players[0]!.resources.grain, 1)
   })
@@ -413,6 +417,7 @@ describe("A084 command boundaries", () => {
     record('Silage-invalid-reserve', assertRejectedUnchanged(s, () => s.resolveChoice(0, 'reserve')))
     record('Silage-other-actor', assertRejectedUnchanged(s, () => s.resolveChoice(1, field.value)))
     r = settle(s, record('Silage-field-pay', ok(s.resolveChoice(0, field.value))))
+    assert.equal(r.interaction.stateId, 'idle')
     assert.equal(r.state.players[0]!.fields[0]!.stacks[0]!.remaining, 2)
     assert.equal(r.state.players[0]!.fields[1]!.stacks[0]!.remaining, 3)
     assert.equal(r.state.players[1]!.fields[0]!.stacks[0]!.remaining, 1)
@@ -436,6 +441,7 @@ describe("A084 command boundaries", () => {
       assert.equal(r.state.players[0]!.resources.sheep, config.sheep ?? 2)
       assert.equal(r.state.players[0]!.resources.grain, config.resources?.grain ?? 1)
       assert.equal(r.state.round, 6)
+      assert.equal(r.interaction.stateId, 'idle')
     }
   })
   it("real harvest has only ordinary breeding and no Silage grain payment", () => {
@@ -443,6 +449,7 @@ describe("A084 command boundaries", () => {
     let r = complete(s)
     r = next(s, settle(s, r))
     assert.equal(r.state.round, 5)
+    assert.equal(r.interaction.stateId, 'idle')
     assert.equal(r.state.players[0]!.resources.sheep, 3)
     assert.equal(r.state.players[0]!.resources.grain, 1)
   })
@@ -455,7 +462,7 @@ describe("A084 command boundaries", () => {
     assert.equal(r.state.players[0]!.resources.grain, 0)
     assert.equal(r.state.players[0]!.resources.sheep, 4)
   })
-  it("purchase undo retry and actual return phase undo eligibility", () => {
+  it("purchase undo retries while completed return home breeding rejects both undo commands", () => {
     let s = silage({ played: false })
     const before = undoRuleSnapshot(s.getState())
     buy(s, SILAGE)
@@ -470,5 +477,7 @@ describe("A084 command boundaries", () => {
     assert.equal(undo.error, 'no history to undo')
     assert.equal(undo.state.players[0]!.resources.grain, 0)
     assert.equal(undo.state.players[0]!.resources.sheep, 3)
+    const wholeUndo = record('Silage-phase-whole-undo', assertRejectedUnchanged(s, () => s.undoAction()))
+    assert.equal(wholeUndo.error, 'no action snapshot')
   })
 })
