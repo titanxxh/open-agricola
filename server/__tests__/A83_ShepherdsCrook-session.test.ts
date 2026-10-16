@@ -163,9 +163,9 @@ describe("A083 command boundaries", () => {
   function buy(s: GameSession, card: string) {
     const r = buyMenu(s)
     if (r.state.players[0]!.minorPlayed.includes(card))
-      return r
+      return complete(r)
     assert.ok(options(r).some(o => o.value === card && !('disabled' in o && o.disabled)))
-    return record(`buy:${card}`, ok(s.resolveChoice(0, card)))
+    return complete(record(`buy:${card}`, ok(s.resolveChoice(0, card))))
   }
   function deny(s: GameSession, card: string) {
     let r = buyMenu(s)
@@ -175,6 +175,10 @@ describe("A083 command boundaries", () => {
     const food = r.state.players[0]!.resources.food
     r = ok(s.resolveChoice(0, 'B007_Wage'))
     assert.equal(r.state.players[0]!.resources.food, food + 2)
+    return complete(r)
+  }
+  function complete(r: SessionResponse) {
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
     return r
   }
   function ready(s: GameSession, actor: number) {
@@ -199,7 +203,7 @@ describe("A083 command boundaries", () => {
   function settle(s: GameSession, r: SessionResponse) {
     if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'animal-reorg')
       r = record('reorg-default', ok(s.resolveChoice(r.interaction.playerIndex, 'confirm', { zones: r.interaction.request.zones })))
-    return r
+    return complete(r)
   }
   function fence(s: GameSession, edges: string[], actor = 0) {
     const r = turn(s, actor, 'fencing')
@@ -229,7 +233,7 @@ describe("A083 command boundaries", () => {
       p.fenceSegments = old.map(edge => ({ edge, type: 'fence', source: { kind: 'own', ownerPlayerId: p.id } }))
       p.pastures = [{ id: 'old', tiles: [{ row: 0, col: 1 }, { row: 0, col: 2 }, { row: 1, col: 1 }, { row: 1, col: 2 }], animalType: null, animalCount: 0 }]
     })
-    const r = fence(s, extra)
+    const r = complete(fence(s, extra))
     assert.equal(r.state.players[0]!.resources.sheep, 0)
     assert.equal(r.state.players[0]!.pastures.length, 2)
   })
@@ -240,20 +244,20 @@ describe("A083 command boundaries", () => {
     const q = animalMenu(r)
     const zones = q.zones.filter(z => z.zoneType === 'pasture').map(z => ({ ...z, animalType: 'sheep', animalCount: 2 }))
     assert.equal(zones.length, 2)
-    r = record('two-pasture-housing', ok(s.resolveChoice(0, 'confirm', { zones })))
+    r = complete(record('two-pasture-housing', ok(s.resolveChoice(0, 'confirm', { zones }))))
     assert.equal(r.state.players[0]!.resources.sheep, 4)
     assert.equal(r.state.players[0]!.fenceSegments.length, 14)
     assert.equal(gainCount(r, CROOK), 1)
   })
   it("unplayed and opponent fences exclude holder reward", () => {
     let s = setup({ played: false, resources: { wood: 8 } })
-    let r = fence(s, rect(0, 1, 2, 2))
+    let r = complete(fence(s, rect(0, 1, 2, 2)))
     assert.equal(r.state.players[0]!.resources.sheep, 0)
     s = setup({}, state => {
       state.players[1]!.resources.wood = 8
     })
     turn(s, 0, 'reed-bank')
-    r = fence(s, rect(0, 1, 2, 2), 1)
+    r = complete(fence(s, rect(0, 1, 2, 2), 1))
     assert.equal(r.state.players[0]!.resources.sheep, 0)
     assert.equal(r.state.players[1]!.resources.sheep, 0)
   })

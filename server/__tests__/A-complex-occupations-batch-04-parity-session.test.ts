@@ -566,12 +566,15 @@ describe("A093 command boundaries", () => {
   }
   function finish(s: GameSession, r: SessionResponse, actor = 0) {
     for (let n = 0; n < 5 && r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice'; n++) {
+      assert.equal(getChoiceOptions(r).some(option => option.sourceCard === BED), false)
       const skips = getChoiceOptions(r).filter(o => o.value === '__skip__' || o.value === '__done__')
       assert.equal(skips.length, 1, JSON.stringify(r.interaction))
       const skip = skips[0]
       assert(skip, JSON.stringify(r.interaction))
       r = record('finish-optional', ok(s.resolveChoice(actor, skip.value)))
     }
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, actor)
     return r
   }
   function ready(s: GameSession, actor: number) {
@@ -632,10 +635,40 @@ describe("A093 command boundaries", () => {
     const r = bed(s, [rooms[2]!], false)
     assert.deepEqual(values(r), { rooms: 3, family: 2, newborns: 0, wood: 1, reed: 0, grain: 1, food: 30 })
   })
-  it("five physical active family members prevent a sixth birth and extra charge", () => {
+  it("five active family members can decline while accepted payment blocks growth until explicit undo", () => {
+    const declined = setup({ roomCount: 5, people: 5, resources: { wood: 6, reed: 2, grain: 1 } })
+    const originalResult = bed(declined, [rooms[5]!], false)
+    assert.deepEqual(values(originalResult), { rooms: 6, family: 5, newborns: 0, wood: 1, reed: 0, grain: 1, food: 30 })
+
     const s = setup({ roomCount: 5, people: 5, resources: { wood: 6, reed: 2, grain: 1 } })
-    const r = finish(s, build(s, [rooms[5]!]))
-    assert.deepEqual(values(r), { rooms: 6, family: 5, newborns: 0, wood: 1, reed: 0, grain: 1, food: 30 })
+    const before = undoRuleSnapshot(s.getState())
+    const offered = build(s, [rooms[5]!])
+    const offerState = undoRuleSnapshot(offered)
+    const offerInteraction = JSON.stringify(offered.interaction)
+    const pay = options(offered).filter(option => option.sourceCard === BED && option.labelKey === 'actions.pay.name' && !option.disabled)
+    assert.equal(pay.length, 1)
+    assert.ok(pay[0]!.effectPreview?.kind === 'payment')
+    assert.deepEqual(pay[0]!.effectPreview.resourcesPaid, { wood: 1, grain: 1 })
+    const blocked = choose(s, offered)
+    assert.deepEqual(values(blocked), { rooms: 6, family: 5, newborns: 0, wood: 0, reed: 0, grain: 0, food: 30 })
+    assert.ok(blocked.interaction.stateId === 'wait' && blocked.interaction.request.kind === 'engine-blocked', JSON.stringify(blocked.interaction))
+    assert.equal(blocked.interaction.request.actionId, 'family-growth')
+    assert.deepEqual(blocked.interaction.allowedCommands, ['undoStep', 'undoAction'])
+    assert.deepEqual(blocked.state.players[0]!.workers, [
+      { id: '1', isActive: true, isNewborn: false },
+      { id: '2', isActive: true, isNewborn: false },
+      { id: '3', isActive: true, isNewborn: false },
+      { id: '4', isActive: true, isNewborn: false },
+      { id: '5', isActive: true, isNewborn: false },
+    ])
+    const step = record('full-family-payment-undo-step', ok(s.undoStep()))
+    assert.deepEqual(JSON.parse(undoRuleSnapshot(step)), JSON.parse(offerState))
+    assert.equal(JSON.stringify(step.interaction), offerInteraction)
+    assert.equal(step.state.publicEventArchive.at(-1)?.type, 'publicEvents.canceled')
+    assertUndoRestored(before, record('full-family-build-undo-action', s.undoAction()))
+    assert.equal(s.getState().interaction.stateId, 'idle')
+    const retried = bed(s, [rooms[5]!], false)
+    assert.deepEqual(values(retried), { rooms: 6, family: 5, newborns: 0, wood: 1, reed: 0, grain: 1, food: 30 })
   })
   it("card in hand does not reward actual room construction", () => {
     const s = setup({ played: false, resources: { wood: 6, reed: 2, grain: 1 } })
