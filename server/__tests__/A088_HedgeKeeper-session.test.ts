@@ -185,8 +185,12 @@ describe("A088 command boundaries", () => {
     artifact('place', { space, actor, response: r })
     return r
   }
-  function complete(r: SessionResponse) {
+  function complete(r: SessionResponse, actor: number) {
     assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, actor)
+    assert.equal(r.interaction.request.nextPlayerIndex, 1 - actor)
+    assert.equal(r.state.currentPlayerIndex, actor)
+    assert.equal(r.state.roundPhase, 'work')
     return r
   }
   function lessons(s: GameSession, card: string) {
@@ -198,11 +202,11 @@ describe("A088 command boundaries", () => {
     if (r.interaction.stateId === 'wait' && r.interaction.promptKey === 'prompt.selectPayment')
       r = ok(s.resolveChoice(0, opts(r).find(o => o.value !== 'cancel')!.value))
     assert.ok(r.state.players[0]!.occupationPlayed.includes(card))
-    return complete(r)
+    return complete(r, 0)
   }
   function denyHost(s: GameSession, space: string) {
     assertRejectedUnchanged(s, () => s.takeAction(0, space))
-    complete(turn(s, 0, 'day-laborer'))
+    complete(turn(s, 0, 'day-laborer'), 0)
     return { hostRejected: true, legalRetryCompleted: true }
   }
   const FOUR = ['H-0-1', 'H-1-1', 'V-0-1', 'V-0-2'], SIX = ['H-0-1', 'H-0-2', 'H-1-1', 'H-1-2', 'V-0-1', 'V-0-3']
@@ -231,7 +235,7 @@ describe("A088 command boundaries", () => {
     return r
   }
   function fenceCommit(s: GameSession, edges: string[]) {
-    return complete(ok(s.commitSelectionChoice(0, { edges, palisadeEdges: [], extraWood: 0 })))
+    return complete(ok(s.commitSelectionChoice(0, { edges, palisadeEdges: [], extraWood: 0 })), 0)
   }
   function fence(s: GameSession, edges = FOUR) {
     fenceEntry(s)
@@ -350,8 +354,14 @@ describe("A088 command boundaries", () => {
   it("actual discounted fence undo probes full restoration before one retry", () => {
     const s = setup({ resources: { wood: 1 } })
     const before = undoRuleSnapshot(s.getState())
+    const interactionBeforeWholeUndo = structuredClone(s.getState().interaction)
     fence(s)
-    assertUndoRestored(before, s.undoAction())
+    const wholeUndoResponse1 = s.undoAction()
+    assertUndoRestored(before, wholeUndoResponse1)
+    assert.deepEqual(wholeUndoResponse1.interaction, interactionBeforeWholeUndo)
+    assert.deepEqual(s.getState().interaction, interactionBeforeWholeUndo)
+    assert.equal(wholeUndoResponse1.state.currentPlayerIndex, 0)
+    assert.equal(s.getState().state.currentPlayerIndex, 0)
     const r = fence(s)
     assert.equal(res(r).wood, 0)
     assert.equal(r.state.players[0]!.fenceSegments.length, 4)
@@ -361,9 +371,9 @@ describe("A088 command boundaries", () => {
     const s = setup({ configure(state) {
         state.players[1]!.resources.wood = 4
       } })
-    complete(turn(s, 0, 'day-laborer'))
+    complete(turn(s, 0, 'day-laborer'), 0)
     turn(s, 1, 'fencing')
-    const r = complete(ok(s.commitSelectionChoice(1, { edges: FOUR, palisadeEdges: [], extraWood: 0 })))
+    const r = complete(ok(s.commitSelectionChoice(1, { edges: FOUR, palisadeEdges: [], extraWood: 0 })), 1)
     assert.equal(res(r, 1).wood, 0)
     assert.equal(r.state.players[1]!.fenceSegments.length, 4)
     assert.equal(r.state.players[0]!.fenceSegments.length, 0)

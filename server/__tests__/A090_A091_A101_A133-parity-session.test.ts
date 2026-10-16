@@ -278,8 +278,12 @@ describe("A090 command boundaries", () => {
     artifact('place', { space, actor, response: r })
     return r
   }
-  function complete(r: SessionResponse) {
+  function complete(r: SessionResponse, actor: number) {
     assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, actor)
+    assert.equal(r.interaction.request.nextPlayerIndex, 1 - actor)
+    assert.equal(r.state.currentPlayerIndex, actor)
+    assert.equal(r.state.roundPhase, 'work')
     return r
   }
   function lessons(s: GameSession, card: string) {
@@ -291,39 +295,58 @@ describe("A090 command boundaries", () => {
     if (r.interaction.stateId === 'wait' && r.interaction.promptKey === 'prompt.selectPayment')
       r = ok(s.resolveChoice(0, opts(r).find(o => o.value !== 'cancel')!.value))
     assert.ok(r.state.players[0]!.occupationPlayed.includes(card))
-    return complete(r)
+    return complete(r, 0)
   }
   function denyHost(s: GameSession, space: string) {
     assertRejectedUnchanged(s, () => s.takeAction(0, space))
-    complete(turn(s, 0, 'day-laborer'))
+    complete(turn(s, 0, 'day-laborer'), 0)
     return { hostRejected: true, legalRetryCompleted: true }
   }
   function fields(r: SessionResponse, actor = 0) {
     return r.state.players[actor]!.fields.length
   }
   function workEnd(s: GameSession) {
-    turn(s, 0, 'forest')
-    turn(s, 1, 'grain-seeds')
-    turn(s, 0, 'clay-pit')
-    return confirmNext(s, turn(s, 1, 'reed-bank'))
+    complete(turn(s, 0, 'forest'), 0)
+    complete(turn(s, 1, 'grain-seeds'), 1)
+    complete(turn(s, 0, 'clay-pit'), 0)
+    return confirmNext(s, complete(turn(s, 1, 'reed-bank'), 1))
   }
   function driverChoice(r: SessionResponse) {
     return r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice' && r.interaction.sourceCard === DRIVER
   }
-  function acceptDriver(s: GameSession, r: SessionResponse) {
-    assert.equal(driverChoice(r), true, JSON.stringify(r.interaction))
-    r = ok(s.resolveChoice(0, opts(r).find(o => o.value !== '__skip__')!.value))
-    if (r.interaction.stateId === 'wait' && r.interaction.promptKey === 'prompt.selectPayment')
-      r = ok(s.resolveChoice(0, opts(r).find(o => o.value !== 'cancel')!.value))
-    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'farm-select' && r.interaction.request.farm.farmType === 'plow', JSON.stringify(r.interaction))
+  function workReady(r: SessionResponse, round: number) {
+    assert.equal(r.interaction.stateId, 'idle')
+    assert.equal(r.state.roundPhase, 'work')
+    assert.equal(r.state.round, round)
+    assert.equal(r.state.currentPlayerIndex, 0)
     return r
   }
-  function driverPlow(s: GameSession, r: SessionResponse, col = 1) {
+  function driverOffer(r: SessionResponse) {
+    assert.equal(driverChoice(r), true, JSON.stringify(r.interaction))
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice')
+    assert.equal(r.interaction.sourceCard, DRIVER)
+    assert.equal(r.interaction.promptKey, 'ui.interactionOptionalAction')
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
+    assert.equal(r.state.roundPhase, 'preparation')
+    const choices = opts(r).filter(option => option.value !== '__skip__' && !option.disabled)
+    assert.equal(choices.length, 1)
+    assert.ok(opts(r).some(option => option.value === '__skip__' && !option.disabled))
+    return choices[0]!
+  }
+  function acceptDriver(s: GameSession, r: SessionResponse) {
+    r = ok(s.resolveChoice(0, driverOffer(r).value))
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'farm-select' && r.interaction.request.farm.farmType === 'plow', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
+    return r
+  }
+  function driverPlow(s: GameSession, r: SessionResponse, round: number, col = 1) {
     acceptDriver(s, r)
     const plowed = ok(s.commitSelectionChoice(0, { tile: { row: 0, col } }))
     assert.equal(plowed.interaction.stateId, 'idle')
     assert.equal(plowed.state.roundPhase, 'work')
-    return plowed
+    return workReady(plowed, round)
   }
   it("real first and later Lessons pay zero and one food without an immediate ability", () => {
     for (const prior of [0, 1]) {
@@ -340,7 +363,7 @@ describe("A090 command boundaries", () => {
   })
   it("a natural stone house round start pays one food and plows exactly one field", () => {
     const s = setup({ round: 5, house: 'stone', resources: { food: 1 } })
-    const r = driverPlow(s, workEnd(s))
+    const r = driverPlow(s, workEnd(s), 6)
     assert.equal(r.state.round, 6)
     assert.equal(res(r).food, 0)
     assert.equal(fields(r), 1)
@@ -351,7 +374,7 @@ describe("A090 command boundaries", () => {
     const s = setup({ round: 5, house: 'stone', resources: { food: 1 } })
     const r = workEnd(s)
     assert.equal(driverChoice(r), true)
-    const end = ok(s.resolveChoice(0, '__skip__'))
+    const end = workReady(ok(s.resolveChoice(0, '__skip__')), 6)
     assert.equal(end.state.round, 6)
     assert.equal(end.interaction.stateId, 'idle')
     assert.equal(res(end).food, 1)
@@ -361,7 +384,7 @@ describe("A090 command boundaries", () => {
   it("wooden and clay houses cannot gain the stone house round start effect", () => {
     for (const house of ['wood', 'clay'] satisfies PlayerState['houseType'][]) {
       const s = setup({ round: 5, house, resources: { food: 1 } })
-      const r = workEnd(s)
+      const r = workReady(workEnd(s), 6)
       assert.equal(driverChoice(r), false)
       assert.equal(r.state.round, 6)
       assert.equal(r.interaction.stateId, 'idle')
@@ -372,7 +395,7 @@ describe("A090 command boundaries", () => {
   })
   it("Plow Driver in hand cannot plow the owner stone farm at round start", () => {
     const s = setup({ round: 5, house: 'stone', played: false, resources: { food: 1 } })
-    const r = workEnd(s)
+    const r = workReady(workEnd(s), 6)
     assert.equal(driverChoice(r), false)
     assert.equal(r.state.round, 6)
     assert.equal(r.interaction.stateId, 'idle')
@@ -382,7 +405,7 @@ describe("A090 command boundaries", () => {
   })
   it("only the opponent Plow Driver cannot plow the owner stone farm at round start", () => {
     const s = setup({ round: 5, house: 'stone', opponent: true, resources: { food: 1 } })
-    const r = workEnd(s)
+    const r = workReady(workEnd(s), 6)
     assert.equal(driverChoice(r), false)
     assert.equal(r.state.round, 6)
     assert.equal(r.interaction.stateId, 'idle')
@@ -392,7 +415,7 @@ describe("A090 command boundaries", () => {
   })
   it("zero food at a natural round start cannot accept the paid plow effect", () => {
     const s = setup({ round: 5, house: 'stone' })
-    const r = workEnd(s)
+    const r = workReady(workEnd(s), 6)
     assert.equal(driverChoice(r), false)
     assert.equal(r.state.round, 6)
     assert.equal(r.interaction.stateId, 'idle')
@@ -407,8 +430,7 @@ describe("A090 command boundaries", () => {
     let r = workEnd(s)
     assert.equal(fields(r), 13)
     artifact('full-farm-before', { response: r })
-    if (driverChoice(r))
-      r = ok(s.resolveChoice(0, opts(r).find(o => o.value !== '__skip__')!.value))
+    r = ok(s.resolveChoice(0, driverOffer(r).value))
     artifact('full-farm-after', { response: r })
     assert.equal(fields(r), 13)
     assert.equal(res(r).food, 0)
@@ -423,17 +445,17 @@ describe("A090 command boundaries", () => {
     assert.equal(res(r).food, 0)
     for (const tile of [{ row: 1, col: 0 }, { row: 0, col: 1 }, { row: 3, col: 0 }])
       assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { tile }))
-    r = ok(s.commitSelectionChoice(0, { tile: { row: 0, col: 2 } }))
+    r = workReady(ok(s.commitSelectionChoice(0, { tile: { row: 0, col: 2 } })), 6)
     assert.equal(res(r).food, 0)
     assert.equal(fields(r), 2)
     return { foodPaid: 1, illegalTargetsRejected: true, fields: 2 }
   })
   it("consecutive natural round starts charge once for each actual field", () => {
     const s = setup({ round: 5, house: 'stone', resources: { food: 2 } })
-    let r = driverPlow(s, workEnd(s))
+    let r = driverPlow(s, workEnd(s), 6)
     assert.equal(res(r).food, 1)
     assert.equal(fields(r), 1)
-    r = driverPlow(s, workEnd(s), 2)
+    r = driverPlow(s, workEnd(s), 7, 2)
     assert.equal(r.state.round, 7)
     assert.equal(res(r).food, 0)
     assert.equal(fields(r), 2)
@@ -441,7 +463,7 @@ describe("A090 command boundaries", () => {
   })
   it("completed natural round start plowing rejects undo without changing the paid field", () => {
     const s = setup({ round: 5, house: 'stone', resources: { food: 1 } })
-    const plowed = driverPlow(s, workEnd(s))
+    const plowed = driverPlow(s, workEnd(s), 6)
     assert.equal(plowed.state.round, 6)
     assert.equal(plowed.state.roundPhase, 'work')
     assert.equal(plowed.interaction.stateId, 'idle')
@@ -461,7 +483,7 @@ describe("A090 command boundaries", () => {
         state.players[1]!.houseType = 'stone'
         state.players[1]!.resources.food = 1
       } })
-    const r = workEnd(s)
+    const r = workReady(workEnd(s), 6)
     assert.equal(driverChoice(r), false)
     assert.equal(r.state.round, 6)
     assert.equal(r.interaction.stateId, 'idle')
@@ -510,8 +532,12 @@ describe("A091 command boundaries", () => {
     }
     return s
   }
-  function complete(r: SessionResponse) {
+  function complete(r: SessionResponse, actor: number) {
     assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, actor)
+    assert.equal(r.interaction.request.nextPlayerIndex, 1 - actor)
+    assert.equal(r.state.currentPlayerIndex, actor)
+    assert.equal(r.state.roundPhase, 'work')
     return r
   }
   function ready(s: GameSession, actor: number) {
@@ -527,27 +553,18 @@ describe("A091 command boundaries", () => {
     return ok(s.takeAction(actor, space))
   }
   function flow(s: GameSession, r: SessionResponse, card: string, accept = true) {
-    assert.ok(r.interaction.stateId === 'wait' && ['choice', 'select-trigger'].includes(r.interaction.request.kind), JSON.stringify(r.interaction))
-    for (let n = 0; n < 8 && r.interaction.stateId === 'wait'; n++) {
-      const request = r.interaction.request
-      if (request.kind === 'select-trigger') {
-        const o = request.options.find(o => o.value === card)
-        assert.ok(o, JSON.stringify(r.interaction))
-        r = ok(s.resolveChoice(r.interaction.playerIndex, o.value))
-        continue
-      }
-      if (request.kind !== 'choice')
-        break
-      assert.equal(r.interaction.sourceCard, card)
-      const selected = request.options.filter(o => accept ? o.value !== '__skip__' && !o.disabled : o.value === '__skip__' && !o.disabled)
-      assert.equal(selected.length, 1, JSON.stringify(r.interaction))
-      const o = selected[0]
-      assert.ok(o, JSON.stringify(r.interaction))
-      r = ok(s.resolveChoice(r.interaction.playerIndex, o.value))
-    }
-    if (!accept)
-      return complete(r)
-    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'farm-select', JSON.stringify(r.interaction))
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.sourceCard, card)
+    assert.equal(r.interaction.promptKey, 'ui.interactionOptionalAction')
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
+    const selected = getChoiceOptions(r).filter(option => accept ? option.value !== '__skip__' && !option.disabled : option.value === '__skip__' && !option.disabled)
+    assert.equal(selected.length, 1, JSON.stringify(r.interaction))
+    r = ok(s.resolveChoice(0, selected[0]!.value))
+    if (!accept) return complete(r, 0)
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'farm-select' && r.interaction.request.farm.farmType === 'plow', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
     return r
   }
   function stock(state: GameState, space: string, resource: keyof Resource, amount: number) {
@@ -570,12 +587,13 @@ describe("A091 command boundaries", () => {
     if (r.state.players[0]!.occupationHand.includes(CULT))
       r = ok(s.resolveChoice(0, CULT))
     assert.ok(r.state.players[0]!.occupationPlayed.includes(CULT))
-    return complete(r)
+    return complete(r, 0)
   }
+  
   function plow(s: GameSession, r: SessionResponse, tile = { row: 0, col: 1 }) {
     r = flow(s, r, CULT)
     assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'farm-select', JSON.stringify(r.interaction))
-    return complete(ok(s.commitSelectionChoice(0, { tile })))
+    return complete(ok(s.commitSelectionChoice(0, { tile })), 0)
   }
   function farm(state: GameState, count: number) {
     const cells = Array.from({ length: 15 }, (_, i) => ({ row: Math.floor(i / 5), col: i % 5 })).filter(t => !(t.col === 0 && t.row > 0))
@@ -604,7 +622,7 @@ describe("A091 command boundaries", () => {
     assert.equal(declined.state.players[0]!.resources.wood, 3)
     assert.equal(declined.state.players[0]!.fields.length, 0)
     const poor = cultivator({ food: 2 })
-    const p = complete(turn(poor, 0, 'forest'))
+    const p = complete(turn(poor, 0, 'forest'), 0)
     assert.equal(p.state.players[0]!.resources.food, 2)
     assert.equal(p.state.players[0]!.resources.wood, 3)
     assert.equal(p.state.players[0]!.fields.length, 0)
@@ -617,7 +635,7 @@ describe("A091 command boundaries", () => {
     for (const tile of [{ row: 1, col: 0 }, { row: 0, col: 1 }, { row: 2, col: 4 }, { row: 99, col: 99 }])
       assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { tile }))
     assertRejectedUnchanged(s, () => s.commitSelectionChoice(1, { tile: { row: 0, col: 2 } }))
-    const after = complete(ok(s.commitSelectionChoice(0, { tile: { row: 0, col: 2 } })))
+    const after = complete(ok(s.commitSelectionChoice(0, { tile: { row: 0, col: 2 } })), 0)
     assert.equal(after.state.players[0]!.fields.length, 2)
     assert.equal(after.state.players[0]!.resources.food, 0)
     assert.equal(after.state.players[0]!.resources.wood, 3)
@@ -627,10 +645,17 @@ describe("A091 command boundaries", () => {
   it("accepted full farm payment blocks until whole undo and one empty cell permits the last plow", () => {
     const full = cultivator({}, state => farm(state, 13))
     const before = undoRuleSnapshot(full.getState())
+    const interactionBeforeWholeUndo = structuredClone(full.getState().interaction)
     const pending = turn(full, 0, 'forest')
     sessionEvidence.record('A091-N4-full-farm-pending', pending)
-    const offered = pending.interaction.stateId === 'wait' && pending.interaction.request.kind === 'choice' ? getChoiceOptions(pending).find(o => o.value !== '__skip__' && !o.disabled) : undefined
-    const executed = offered ? full.resolveChoice(0, offered.value) : pending
+    assert.ok(pending.interaction.stateId === 'wait' && pending.interaction.request.kind === 'choice')
+    assert.equal(pending.interaction.sourceCard, CULT)
+    assert.equal(pending.interaction.playerIndex, 0)
+    const offeredOptions = getChoiceOptions(pending).filter(option => option.value !== '__skip__' && !option.disabled)
+    assert.equal(offeredOptions.length, 1)
+    const offered = offeredOptions[0]!
+    const executed = ok(full.resolveChoice(0, offered.value))
+    assert.ok(executed.interaction.stateId === 'wait' && executed.interaction.request.kind === 'engine-blocked' && executed.interaction.request.actionId === 'plow', JSON.stringify(executed.interaction))
     sessionEvidence.record('A091-N4-full-farm-executed', executed)
     const last = cultivator({}, state => farm(state, 12))
     const a = plow(last, turn(last, 0, 'forest'), { row: 2, col: 4 })
@@ -638,11 +663,15 @@ describe("A091 command boundaries", () => {
     assert.equal(a.state.players[0]!.resources.food, 0)
     assert.equal(a.state.players[0]!.resources.wood, 3)
     sessionEvidence.record('A091-N4-last-cell-control', a)
-    const actual = { offered: Boolean(offered), commandOk: executed.ok, food: executed.state.players[0]!.resources.food, wood: executed.state.players[0]!.resources.wood, fields: executed.state.players[0]!.fields.length, pendingKind: executed.interaction.stateId === 'wait' ? executed.interaction.request.kind : executed.interaction.stateId }
+    const actual = { offered: Boolean(offered), commandOk: executed.ok, food: executed.state.players[0]!.resources.food, wood: executed.state.players[0]!.resources.wood, fields: executed.state.players[0]!.fields.length, pendingKind: executed.interaction.request.kind }
     sessionEvidence.record('A091-N4-outcome', actual)
     const undone = full.undoAction()
     sessionEvidence.record('A091-N4-blocked-undo', { before: JSON.parse(before), undone })
     assertUndoRestored(before, undone)
+    assert.deepEqual(undone.interaction, interactionBeforeWholeUndo)
+    assert.deepEqual(full.getState().interaction, interactionBeforeWholeUndo)
+    assert.equal(undone.state.currentPlayerIndex, 0)
+    assert.equal(full.getState().state.currentPlayerIndex, 0)
     const declined = flow(full, turn(full, 0, 'forest'), CULT, false)
     assert.equal(declined.state.players[0]!.resources.food, 3)
     assert.equal(declined.state.players[0]!.resources.wood, 3)
@@ -652,13 +681,13 @@ describe("A091 command boundaries", () => {
   })
   it("non wood opponent and unplayed Forest use do not create an owner plow", () => {
     const s = cultivator()
-    const c = complete(turn(s, 0, 'clay-pit'))
+    const c = complete(turn(s, 0, 'clay-pit'), 0)
     assert.equal(c.state.players[0]!.fields.length, 0)
-    const r = complete(turn(s, 1, 'forest'))
+    const r = complete(turn(s, 1, 'forest'), 1)
     assert.equal(r.state.players[0]!.resources.food, 3)
     assert.equal(r.state.players[0]!.fields.length, 0)
     const u = cultivator({ played: false })
-    const a = complete(turn(u, 0, 'forest'))
+    const a = complete(turn(u, 0, 'forest'), 0)
     assert.equal(a.state.players[0]!.fields.length, 0)
     assert.equal(a.state.players[0]!.resources.food, 3)
   })
@@ -679,10 +708,15 @@ describe("A091 command boundaries", () => {
   })
   it("actual paid plow undo restores payment field worker pile logs and score before one retry", () => {
     const s = cultivator(), before = undoRuleSnapshot(s.getState())
+    const interactionBeforeWholeUndo = structuredClone(s.getState().interaction)
     plow(s, turn(s, 0, 'forest'))
     const undone = s.undoAction()
     sessionEvidence.record('A091-N7-undo', { before: JSON.parse(before), undone })
     assertUndoRestored(before, undone)
+    assert.deepEqual(undone.interaction, interactionBeforeWholeUndo)
+    assert.deepEqual(s.getState().interaction, interactionBeforeWholeUndo)
+    assert.equal(undone.state.currentPlayerIndex, 0)
+    assert.equal(s.getState().state.currentPlayerIndex, 0)
     const r = plow(s, turn(s, 0, 'forest'))
     assert.equal(r.state.players[0]!.resources.food, 0)
     assert.equal(r.state.players[0]!.resources.wood, 3)

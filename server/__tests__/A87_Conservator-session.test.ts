@@ -443,8 +443,12 @@ describe("A087 command boundaries", () => {
     artifact('place', { space, actor, response: r })
     return r
   }
-  function complete(r: SessionResponse) {
+  function complete(r: SessionResponse, actor: number) {
     assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, actor)
+    assert.equal(r.interaction.request.nextPlayerIndex, 1 - actor)
+    assert.equal(r.state.currentPlayerIndex, actor)
+    assert.equal(r.state.roundPhase, 'work')
     return r
   }
   function lessons(s: GameSession, card: string) {
@@ -456,27 +460,36 @@ describe("A087 command boundaries", () => {
     if (r.interaction.stateId === 'wait' && r.interaction.promptKey === 'prompt.selectPayment')
       r = ok(s.resolveChoice(0, opts(r).find(o => o.value !== 'cancel')!.value))
     assert.ok(r.state.players[0]!.occupationPlayed.includes(card))
-    return complete(r)
+    return complete(r, 0)
   }
   function renoEntry(s: GameSession) {
     return turn(s, 0, 'house-redevelopment')
   }
-  function renoFinish(s: GameSession, r: SessionResponse, target: 'clay' | 'stone') {
+  function renoFinish(s: GameSession, r: SessionResponse, target: 'clay' | 'stone', improvementOffered: boolean) {
     if (r.interaction.stateId === 'wait' && r.interaction.promptKey === 'ui.interactionChooseRenovationTarget')
       r = ok(s.resolveChoice(0, target))
     if (r.interaction.stateId === 'wait' && r.interaction.promptKey === 'prompt.selectPayment')
       r = ok(s.resolveChoice(0, opts(r).find(o => o.value !== 'cancel')!.value))
-    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice' && opts(r).some(o => o.value === '__skip__'))
+    if (improvementOffered) {
+      assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice', JSON.stringify(r.interaction))
+      assert.equal(r.interaction.promptKey, 'ui.interactionOptionalAction')
+      assert.equal(r.interaction.sourceCard, undefined)
+      assert.equal(r.interaction.playerIndex, 0)
+      assert.equal(r.state.currentPlayerIndex, 0)
+      const improvements = opts(r).filter(option => option.labelKey === 'actions.improvement.name' && !option.disabled)
+      assert.equal(improvements.length, 1)
+      assert.ok(opts(r).some(option => option.value === '__skip__' && !option.disabled))
       r = ok(s.resolveChoice(0, '__skip__'))
+    }
     assert.equal(r.state.players[0]!.houseType, target)
-    return complete(r)
+    return complete(r, 0)
   }
-  function renovate(s: GameSession, target: 'clay' | 'stone' = 'stone') {
-    return renoFinish(s, renoEntry(s), target)
+  function renovate(s: GameSession, target: 'clay' | 'stone', improvementOffered: boolean) {
+    return renoFinish(s, renoEntry(s), target, improvementOffered)
   }
   function denyHost(s: GameSession, space: string) {
     assertRejectedUnchanged(s, () => s.takeAction(0, space))
-    complete(turn(s, 0, 'day-laborer'))
+    complete(turn(s, 0, 'day-laborer'), 0)
     return { hostRejected: true, legalRetryCompleted: true }
   }
   function fields(r: SessionResponse, actor = 0) {
@@ -496,14 +509,14 @@ describe("A087 command boundaries", () => {
     return denyHost(setup({ played: false, occupations: 1 }), 'lessons')
   })
   it("direct stone renovation pays two stone and one roof reed with wood 0", () => {
-    const r = renovate(setup({ resources: { stone: 2, reed: 1, wood: 0 } }))
+    const r = renovate(setup({ resources: { stone: 2, reed: 1, wood: 0 } }), 'stone', false)
     assert.equal(res(r).stone, 0)
     assert.equal(res(r).reed, 0)
     assert.equal(res(r).wood, 0)
     return { house: 'stone', stonePaid: 2, reedPaid: 1, wood: 0 }
   })
   it("direct stone renovation pays two stone and one roof reed with wood 1", () => {
-    const r = renovate(setup({ resources: { stone: 2, reed: 1, wood: 1 } }))
+    const r = renovate(setup({ resources: { stone: 2, reed: 1, wood: 1 } }), 'stone', false)
     assert.equal(res(r).stone, 0)
     assert.equal(res(r).reed, 0)
     assert.equal(res(r).wood, 1)
@@ -520,21 +533,21 @@ describe("A087 command boundaries", () => {
     const r = renoEntry(s)
     assertRejectedUnchanged(s, () => s.resolveChoice(1, 'clay'))
     assertRejectedUnchanged(s, () => s.resolveChoice(0, 'wood'))
-    const end = renoFinish(s, r, 'clay')
+    const end = renoFinish(s, r, 'clay', false)
     assert.equal(res(end).clay, 0)
     assert.equal(res(end).stone, 2)
     assert.equal(res(end).reed, 0)
     return { invalidTargetRejected: true, house: 'clay', stone: 2, clay: 0, reed: 0 }
   })
   it("both affordable paths permit choosing stone while preserving the other material", () => {
-    const r = renovate(setup({ resources: { clay: 2, stone: 2, reed: 1 } }), 'stone')
+    const r = renovate(setup({ resources: { clay: 2, stone: 2, reed: 1 } }), 'stone', true)
     assert.equal(res(r).stone, 0)
     assert.equal(res(r).clay, 2)
     assert.equal(res(r).reed, 0)
     return { house: 'stone', paidMaterial: 2, reedPaid: 1, otherMaterial: 2 }
   })
   it("both affordable paths permit choosing clay while preserving the other material", () => {
-    const r = renovate(setup({ resources: { clay: 2, stone: 2, reed: 1 } }), 'clay')
+    const r = renovate(setup({ resources: { clay: 2, stone: 2, reed: 1 } }), 'clay', false)
     assert.equal(res(r).clay, 0)
     assert.equal(res(r).stone, 2)
     assert.equal(res(r).reed, 0)
@@ -547,7 +560,7 @@ describe("A087 command boundaries", () => {
     return denyHost(setup({ opponent: true, resources: { stone: 2, reed: 1 } }), 'house-redevelopment')
   })
   it("a clay house uses ordinary stone renovation with one roof reed", () => {
-    const r = renovate(setup({ house: 'clay', resources: { stone: 2, reed: 1 } }))
+    const r = renovate(setup({ house: 'clay', resources: { stone: 2, reed: 1 } }), 'stone', false)
     assert.equal(res(r).stone, 0)
     assert.equal(res(r).reed, 0)
     return { house: 'stone', stonePaid: 2, reedPaid: 1 }
@@ -556,7 +569,7 @@ describe("A087 command boundaries", () => {
     return denyHost(setup({ house: 'stone', resources: { stone: 3, reed: 1 } }), 'house-redevelopment')
   })
   it("three connected rooms pay three stone and one flat roof reed", () => {
-    const r = renovate(setup({ rooms: 3, resources: { stone: 3, reed: 1 } }))
+    const r = renovate(setup({ rooms: 3, resources: { stone: 3, reed: 1 } }), 'stone', false)
     assert.equal(res(r).stone, 0)
     assert.equal(res(r).reed, 0)
     assert.equal(r.state.players[0]!.rooms, 3)
@@ -565,9 +578,15 @@ describe("A087 command boundaries", () => {
   it("actual renovation undo probes full restoration before a real retry", () => {
     const s = setup({ resources: { stone: 2, reed: 1 } })
     const before = undoRuleSnapshot(s.getState())
-    renovate(s)
-    assertUndoRestored(before, s.undoAction())
-    const r = renovate(s)
+    const interactionBeforeWholeUndo = structuredClone(s.getState().interaction)
+    renovate(s, 'stone', false)
+    const wholeUndoResponse1 = s.undoAction()
+    assertUndoRestored(before, wholeUndoResponse1)
+    assert.deepEqual(wholeUndoResponse1.interaction, interactionBeforeWholeUndo)
+    assert.deepEqual(s.getState().interaction, interactionBeforeWholeUndo)
+    assert.equal(wholeUndoResponse1.state.currentPlayerIndex, 0)
+    assert.equal(s.getState().state.currentPlayerIndex, 0)
+    const r = renovate(s, 'stone', false)
     assert.equal(res(r).stone, 0)
     assert.equal(res(r).reed, 0)
     return { restored: true, retryHouse: 'stone', retryStone: 0, retryReed: 0 }
@@ -576,10 +595,10 @@ describe("A087 command boundaries", () => {
     const s = setup({ configure(state) {
         Object.assign(state.players[1]!.resources, { stone: 2, reed: 1 })
       } })
-    complete(turn(s, 0, 'day-laborer'))
+    complete(turn(s, 0, 'day-laborer'), 0)
     ready(s, 1)
     assertRejectedUnchanged(s, () => s.takeAction(1, 'house-redevelopment'))
-    const r = complete(turn(s, 1, 'grain-seeds'))
+    const r = complete(turn(s, 1, 'grain-seeds'), 1)
     assert.equal(r.state.players[1]!.houseType, 'wood')
     assert.equal(res(r, 1).stone, 2)
     assert.equal(res(r, 1).reed, 1)
