@@ -1,14 +1,22 @@
 import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game/authoritative-session'
+import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
-
 import '../../shared/cards/A/A043_FarmyardManure'
+import assert from 'node:assert/strict'
+import { type GameState, type PlayerState } from '../../shared/contract/types'
+import { createWorkSession } from './_helpers/session-fixtures'
+import { assertRejectedUnchanged, assertUndoRestored, confirmNext, undoRuleSnapshot, getChoiceOptions, expectTileFarmSelection } from './_helpers/session-assertions'
+import { getAvailableStableSupplyCount } from '../../shared/domain/supply-tokens'
+import { markAllWorkersUsed } from '../../shared/domain/player'
+import { createScenarioEvidence } from './_helpers/scenario-evidence'
+
+const sessionEvidence = createScenarioEvidence(import.meta.url)
 
 const CARD_ID = 'A043_FarmyardManure'
 
 describe('A043_FarmyardManure session', () => {
   const setup = () => {
-    const session = new GameSession(42)
+    const session = sessionEvidence.track(createWorkSession({ seed: 42 }))
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -31,11 +39,9 @@ describe('A043_FarmyardManure session', () => {
     expect(resp.ok).toBe(true)
     // With wood only (no reed), farm-expansion auto-selects stables → farmSelect.
     expect(resp.interaction.stateId).toBe('wait')
-    if (resp.interaction.stateId !== 'wait') return
-    expect(resp.interaction.request.farm.farmType).toBe('stable')
-    if (resp.interaction.request.farm.farmType !== 'stable') return
+    const farm = expectTileFarmSelection(resp, 'stable')
 
-    const stable = resp.interaction.request.farm.selectableTiles[0]!
+    const stable = farm.selectableTiles[0]!
     resp = session.commitSelectionChoice(0, { stables: [stable] })
     expect(resp.ok).toBe(true)
 
@@ -57,10 +63,9 @@ describe('A043_FarmyardManure session', () => {
 
     let resp = session.takeAction(0, 'farm-expansion')
     expect(resp.ok).toBe(true)
-    if (resp.interaction.stateId !== 'wait') return
-    if (resp.interaction.request.farm.farmType !== 'stable') return
+    const farm = expectTileFarmSelection(resp, 'stable')
 
-    const [t1, t2] = resp.interaction.request.farm.selectableTiles
+    const [t1, t2] = farm.selectableTiles
     resp = session.commitSelectionChoice(0, { stables: [t1!, t2!] })
     expect(resp.ok).toBe(true)
 
@@ -70,7 +75,7 @@ describe('A043_FarmyardManure session', () => {
   })
 
   it('does not trigger when card is not played', () => {
-    const session = new GameSession(42)
+    const session = sessionEvidence.track(createWorkSession({ seed: 42 }))
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -83,13 +88,272 @@ describe('A043_FarmyardManure session', () => {
 
     let resp = session.takeAction(0, 'farm-expansion')
     expect(resp.ok).toBe(true)
-    if (resp.interaction.stateId !== 'wait') return
-    if (resp.interaction.request.farm.farmType !== 'stable') return
+    const farm = expectTileFarmSelection(resp, 'stable')
 
-    const stable = resp.interaction.request.farm.selectableTiles[0]!
+    const stable = farm.selectableTiles[0]!
     resp = session.commitSelectionChoice(0, { stables: [stable] })
     expect(resp.ok).toBe(true)
     const entries = resp.state.futureMeeples.filter((e) => e.cardId === CARD_ID)
     expect(entries).toHaveLength(0)
+  })
+})
+
+describe("A043 command boundaries", () => {
+  const MANURE = 'A043_FarmyardManure'
+  function setup({ played = true, round = 5, resources = {}, configure = () => {
+  } }: {
+    played?: boolean
+    round?: number
+    resources?: Partial<PlayerState['resources']>
+    configure?: (state: GameState) => void
+  } = {}) {
+    const s = sessionEvidence.track(createWorkSession({ seed: 4242, configure(state) {
+        state.round = round
+        state.players.forEach(p => {
+          p.minorHand = ['B007_Wage', 'A054_Credit']
+          p.occupationHand = ['__test_placeholder__']
+          p.minorPlayed = []
+          p.occupationPlayed = []
+          Object.assign(p.resources, { wood: 0, clay: 0, reed: 0, stone: 0, food: 20, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0 })
+        })
+        const p = state.players[0]!
+        if (played)
+          p.minorPlayed = [MANURE]
+        else
+          p.minorHand.push(MANURE)
+        Object.assign(p.resources, resources)
+        configure(state)
+      } }))
+    return s
+  }
+  function pet(state: GameState, actor = 0) {
+    const p = state.players[actor]!
+    p.houseAnimals = { '2-0': 'sheep' }
+    p.resources.sheep = 1
+  }
+  function ok(r: SessionResponse) {
+    assert.equal(r.ok, true, r.error)
+    return r
+  }
+  function choices(r: SessionResponse): import('../../shared/contract/types').ActionChoiceOption[] {
+    ok(r)
+    assert.ok(r.interaction.stateId === 'wait' && (r.interaction.request.kind === 'choice' || r.interaction.request.kind === 'select-trigger'), JSON.stringify(r.interaction))
+    return getChoiceOptions(r)
+  }
+  function ready(s: GameSession, actor: number) {
+    let r = s.getState()
+    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
+      r = confirmNext(s, r)
+    assert.equal(r.interaction.stateId, 'idle', JSON.stringify(r.interaction))
+    assert.equal(r.state.currentPlayerIndex, actor)
+    return r
+  }
+  function turn(s: GameSession, actor: number, space: string) {
+    ready(s, actor)
+    return ok(s.takeAction(actor, space))
+  }
+  function enter(s: GameSession) {
+    let r = turn(s, 0, 'meeting-place')
+    const branch = choices(r).find(o => o.value.startsWith('action-improvement-'))
+    if (branch)
+      r = ok(s.resolveChoice(0, branch.value))
+    return r
+  }
+  function offered(r: SessionResponse, card: string) {
+    return choices(r).some(o => o.value === card && !o.disabled)
+  }
+  function buy(s: GameSession, r: SessionResponse, card: string) {
+    assert.equal(offered(r, card), true)
+    const result = ok(s.resolveChoice(0, card))
+    assert.equal(result.state.players[0]!.minorPlayed.includes(card), true)
+    assert.equal(result.state.players[0]!.minorHand.includes(card), false)
+    const events = result.state.events.filter(e => e.type === 'card.played' && e.cardId === card)
+    assert.equal(events.length, 1)
+    const event = events[0]!
+    assert.ok(event.type === 'card.played')
+    assert.equal(event.actorPlayerId, result.state.players[0]!.id)
+    assert.deepEqual(event.payment?.resources ?? {}, {})
+    return result
+  }
+  function future(r: SessionResponse, card: string) {
+    return r.state.futureMeeples.filter(m => m.cardId === card && m.playerId === r.state.players[0]!.id).flatMap(m => {
+      assert.deepEqual(m.resources, { food: 1 })
+      return [m.round]
+    }).sort((a, b) => a - b)
+  }
+  function stableSelect(s: GameSession, actor = 0) {
+    let r = turn(s, actor, 'farm-expansion')
+    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice') {
+      const option = choices(r).find(o => o.value.includes('stables'))
+      assert.ok(option)
+      r = ok(s.resolveChoice(actor, option.value))
+    }
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'farm-select' && r.interaction.request.farm.farmType === 'stable', JSON.stringify(r.interaction))
+    return r
+  }
+  function build(s: GameSession, count: number, actor = 0) {
+    const r = stableSelect(s, actor)
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'farm-select' && r.interaction.request.farm.farmType === 'stable')
+    const tiles = r.interaction.request.farm.selectableTiles.slice(0, count)
+    assert.equal(tiles.length, count)
+    const built = ok(s.commitSelectionChoice(actor, { stables: tiles }))
+    assert.equal(built.state.players[actor]!.stableTiles.length, count)
+    assert.equal(built.state.players[actor]!.resources.wood, 0)
+    return built
+  }
+  function room(s: GameSession) {
+    let r = turn(s, 0, 'farm-expansion')
+    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice') {
+      const option = choices(r).find(o => o.value.includes('construct'))
+      assert.ok(option)
+      r = ok(s.resolveChoice(0, option.value))
+    }
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'farm-select' && r.interaction.request.farm.farmType === 'room', JSON.stringify(r.interaction))
+    return r
+  }
+  function nextRound(s: GameSession) {
+    turn(s, 1, 'forest')
+    turn(s, 0, 'grain-seeds')
+    const end = turn(s, 1, 'clay-pit')
+    const r = confirmNext(s, end)
+    assert.equal(r.state.round, 6)
+    assert.equal(r.state.roundPhase, 'work')
+    return r
+  }
+  it("an owned accommodated animal permits the actual free purchase without a stable bonus", () => {
+    const s = setup({ played: false, configure: pet })
+    const r = buy(s, enter(s), MANURE)
+    assert.deepEqual(future(r, MANURE), [])
+    assert.equal(r.state.players[0]!.resources.sheep, 1)
+  })
+  it("no owned animal or only an opponent animal rejects purchase before a legal retry", () => {
+    for (const other of [false, true]) {
+      const s = setup({ played: false, configure(state) {
+          if (other)
+            pet(state, 1)
+        } })
+      const r = enter(s)
+      assert.equal(offered(r, MANURE), false)
+      assertRejectedUnchanged(s, () => s.resolveChoice(0, MANURE))
+      const done = buy(s, r, 'A054_Credit')
+      assert.deepEqual(future(done, MANURE), [])
+    }
+  })
+  it("one paid stable schedules one food on each of the next three rounds", () => {
+    const s = setup({ resources: { wood: 2 } })
+    const r = build(s, 1)
+    assert.deepEqual(future(r, MANURE), [6, 7, 8])
+    assert.equal(r.state.players[0]!.resources.food, 20)
+  })
+  it("two stables in one turn still schedule only three food", () => {
+    const s = setup({ resources: { wood: 4 } })
+    const r = build(s, 2)
+    assert.deepEqual(future(r, MANURE), [6, 7, 8])
+    assert.equal(s.withCtx(() => getAvailableStableSupplyCount(r.state, r.state.players[0]!)), 2)
+  })
+  it("four stables consume the finite four piece supply and still schedule only three food", () => {
+    const s = setup({ resources: { wood: 8 } })
+    assert.equal(s.withCtx(() => getAvailableStableSupplyCount(s.getState().state, s.getState().state.players[0]!)), 4)
+    const r = build(s, 4)
+    assert.deepEqual(future(r, MANURE), [6, 7, 8])
+    assert.equal(s.withCtx(() => getAvailableStableSupplyCount(r.state, r.state.players[0]!)), 0)
+  })
+  it("one wood cannot pay for a stable or create a food schedule", () => {
+    const s = setup({ resources: { wood: 1 } })
+    assertRejectedUnchanged(s, () => s.takeAction(0, 'farm-expansion'))
+    const r = turn(s, 0, 'grain-seeds')
+    assert.equal(r.state.players[0]!.stableTiles.length, 0)
+    assert.equal(r.state.players[0]!.resources.wood, 1)
+    assert.deepEqual(future(r, MANURE), [])
+  })
+  it("exhausted stable supply offers rooms alone and permits a legal room retry", () => {
+    const s = setup({ resources: { wood: 10, reed: 2 }, configure(state) {
+        state.players[0]!.stableTiles = [{ row: 0, col: 1 }, { row: 0, col: 2 }, { row: 0, col: 3 }, { row: 0, col: 4 }]
+      } })
+    assert.equal(s.withCtx(() => getAvailableStableSupplyCount(s.getState().state, s.getState().state.players[0]!)), 0)
+    room(s)
+    assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { rooms: [], stables: [{ row: 1, col: 1 }] }))
+    const r = ok(s.commitSelectionChoice(0, { rooms: [{ row: 0, col: 0 }], stables: [] }))
+    assert.equal(r.state.players[0]!.stableTiles.length, 4)
+    assert.equal(r.state.players[0]!.rooms, 3)
+    assert.equal(r.state.players[0]!.resources.wood, 5)
+    assert.deepEqual(future(r, MANURE), [])
+  })
+  it("a completed room construction with no stable schedules no food", () => {
+    const s = setup({ resources: { wood: 5, reed: 2 } })
+    room(s)
+    const r = ok(s.commitSelectionChoice(0, { rooms: [{ row: 0, col: 0 }], stables: [] }))
+    assert.equal(r.state.players[0]!.rooms, 3)
+    assert.equal(r.state.players[0]!.stableTiles.length, 0)
+    assert.deepEqual(future(r, MANURE), [])
+  })
+  it("an opponent stable build cannot schedule owner food", () => {
+    const s = setup({ configure(state) {
+        state.players[1]!.resources.wood = 2
+      } })
+    turn(s, 0, 'grain-seeds')
+    const r = build(s, 1, 1)
+    assert.deepEqual(future(r, MANURE), [])
+    assert.equal(r.state.players[0]!.stableTiles.length, 0)
+  })
+  it("a stable built while the card remains in hand creates no schedule", () => {
+    const s = setup({ played: false, resources: { wood: 2 } })
+    const r = build(s, 1)
+    assert.deepEqual(future(r, MANURE), [])
+    assert.equal(r.state.players[0]!.minorHand.includes(MANURE), true)
+  })
+  it("round thirteen and fourteen schedule only reachable future rounds", () => {
+    for (const { round, expected } of [{ round: 13, expected: [14] }, { round: 14, expected: [] }]) {
+      const s = setup({ round, resources: { wood: 2 } })
+      const r = build(s, 1)
+      assert.deepEqual(future(r, MANURE), expected)
+    }
+  })
+  it("a natural next round delivers exactly one scheduled food once to the owner", () => {
+    const s = setup({ resources: { wood: 2 } })
+    build(s, 1)
+    const r = nextRound(s)
+    assert.equal(r.state.players[0]!.resources.food, 21)
+    assert.equal(r.state.players[1]!.resources.food, 20)
+    assert.deepEqual(future(r, MANURE), [7, 8])
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, '__forged_collect_again__'))
+  })
+  it("a controlled off turn free Stable Planner stable does not trigger food", () => {
+    const s = setup({ configure(state) {
+        state.players.forEach(p => markAllWorkersUsed(state, p))
+        state.players[0]!.occupationPlayed = ['A089_StablePlanner']
+        state.futureMeeples = [{ id: 'controlled-stable-planner-reservation', cardId: 'A089_StablePlanner', playerId: state.players[0]!.id, round: 6, actionId: null, resources: { stable: 1 } }]
+      } })
+    let r = ok(s.performRoundEnd())
+    const option = choices(r).find(o => o.value !== '__skip__')
+    assert.ok(option)
+    r = ok(s.resolveChoice(0, option.value))
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'farm-select' && r.interaction.request.farm.farmType === 'stable')
+    const tile = r.interaction.request.farm.selectableTiles[0]
+    assert.ok(tile)
+    r = ok(s.commitSelectionChoice(0, { stables: [tile] }))
+    assert.equal(r.state.players[0]!.stableTiles.length, 1)
+    assert.equal(r.state.players[0]!.resources.wood, 0)
+    assert.deepEqual(future(r, MANURE), [])
+  })
+  it("undo after stable payment restores the public rule snapshot only where exposed", () => {
+    const s = setup({ resources: { wood: 2 } })
+    const before = undoRuleSnapshot(s.getState())
+    const r = build(s, 1)
+    assert.deepEqual(future(r, MANURE), [6, 7, 8])
+    assertUndoRestored(before, s.undoAction())
+    const retry = build(s, 1)
+    assert.deepEqual(future(retry, MANURE), [6, 7, 8])
+  })
+  it("an empty Farm Expansion with no stables available cannot consume a worker turn", () => {
+    const s = setup({ resources: { wood: 10, reed: 2 }, configure(state) {
+        state.players[0]!.stableTiles = [{ row: 0, col: 1 }, { row: 0, col: 2 }, { row: 0, col: 3 }, { row: 0, col: 4 }]
+      } })
+    room(s)
+    assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { rooms: [], stables: [] }))
+    const r = ok(s.commitSelectionChoice(0, { rooms: [{ row: 0, col: 0 }], stables: [] }))
+    assert.equal(r.state.players[0]!.rooms, 3)
+    assert.equal(r.state.players[0]!.stableTiles.length, 4)
+    assert.deepEqual(future(r, MANURE), [])
   })
 })

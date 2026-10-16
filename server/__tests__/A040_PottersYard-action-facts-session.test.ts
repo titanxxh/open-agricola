@@ -1,31 +1,41 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { getChoiceOptions } from './_helpers/session-assertions'
+import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { createWorkSession } from './_helpers/session-fixtures'
 import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/serialization'
-import type { FarmyardSpaceState, GameState, PlayerState } from '../../shared/contract/types'
+import { type FarmyardSpaceState, type GameState, type PlayerState } from '../../shared/contract/types'
 import { encodeReplayFrame, decodeReplayFrame } from '../game/replay-codec'
+import { createScenarioEvidence } from './_helpers/scenario-evidence'
 
-const sessions: GameSession[] = []
-afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+const sessionEvidence = createScenarioEvidence(import.meta.url)
 
 const CARD = 'A040_PottersYard'
+
 const STOCK = 'B094_StockProtector'
+
 const BENCH = 'B015_CarpentersBench'
+
 const originalClayKeys = ['0-0', '0-1', '0-2', '1-1', '1-2', '2-1', '2-2']
+
 const clayTokens = (keys: string[]): FarmyardSpaceState[] => keys.map(spaceKey => ({
   spaceKey, sourceCardId: CARD, kind: 'farmyard-goods-token',
   resources: { clay: 1 }, claimPolicy: 'when-no-longer-unused',
 }))
+
 const remainingClayKeys = (player: PlayerState) => (player.farmyardSpaceStates ?? [])
   .filter(token => token.sourceCardId === CARD && token.kind === 'farmyard-goods-token')
   .map(token => token.spaceKey).sort()
+
 const outerTwo = ['H-0-0', 'H-0-1', 'H-1-0', 'H-1-1', 'V-0-0', 'V-0-2']
+
 const innerOne = ['H-0-2', 'H-1-2', 'V-0-3']
+
 const outerOne = ['H-0-0', 'H-1-0', 'V-0-0', 'V-0-1']
+
 const innerTwo = ['H-0-1', 'H-0-2', 'H-1-1', 'H-1-2', 'V-0-3']
 
 const options = (response: SessionResponse) => response.interaction.stateId === 'wait'
-  ? response.interaction.request.options ?? [] : []
+  ? getChoiceOptions(response) ?? [] : []
 
 function choose(session: GameSession, response: SessionResponse, value: string): SessionResponse {
   const option = options(response).find(entry => entry.value === value)
@@ -63,7 +73,7 @@ function skipExchange(session: GameSession, response: SessionResponse): SessionR
 }
 
 function setup(configure?: (state: GameState) => void) {
-  const session = createWorkSession({ configure: state => {
+  const session = sessionEvidence.track(createWorkSession({ configure: state => {
     state.round = 4
     const player = state.players[0]!
     player.minorPlayed = [CARD, BENCH]
@@ -76,8 +86,8 @@ function setup(configure?: (state: GameState) => void) {
     player.farmyardSpaceStates = clayTokens(originalClayKeys)
     state.actionSpaces.find(space => space.id === 'forest')!.resources.wood = 3
     configure?.(state)
-  } })
-  sessions.push(session)
+  } }))
+
   return session
 }
 
@@ -85,8 +95,8 @@ function restore(session: GameSession) {
   const snapshot = JSON.parse(JSON.stringify(serializeSessionSnapshot(session.state, session)))
   const encoded = encodeReplayFrame({ frame: snapshot, previousFrame: null, stepNo: 0, previousCheckpointStepNo: 0 })
   expect(decodeReplayFrame(null, encoded)).toEqual(snapshot)
-  const restored = new GameSession(rehydrateState(snapshot))
-  sessions.push(restored)
+  const restored = sessionEvidence.track(new GameSession(rehydrateState(snapshot)))
+
   expect(restored.state.events.slice(0, session.state.events.length)).toEqual(session.state.events)
   expect(restored.state.log).toEqual(expect.arrayContaining(session.state.log))
   return restored
@@ -109,12 +119,12 @@ const farmFacts = (state: GameState) => {
     clayTokens: player.farmyardSpaceStates?.filter(token => token.sourceCardId === CARD),
   }
 }
+
 const stableFacts = (input: unknown) => JSON.parse(JSON.stringify(input,
   (key, value: unknown) => key === 'occurrenceId' || key === 'paymentId' ? undefined : value))
+
 const eventFacts = (state: GameState) => stableFacts(state.events)
 
-// Generic commit-time geometry, with A040 as the first consumer. These real
-// two-player sessions cover payments, nested actions, persisted waits and undo.
 describe('A040 host action geometry', () => {
   it.each([
     { outer: 2, cardFirst: false, restoreAt: 'outer' },
@@ -238,8 +248,9 @@ describe('A040 host action geometry', () => {
       if (mode === 'exhausted') player.farmyardSpaceStates = []
     })
     const remaining = remainingClayKeys(session.state.players[0]!)
-    let response = session.takeAction(0, mode === 'pasture-division' ? 'fencing' : 'farm-expansion')
-    response = session.commitSelectionChoice(0, mode === 'pasture-division' ? { edges: ['V-0-1'] }
+    const begun = session.takeAction(0, mode === 'pasture-division' ? 'fencing' : 'farm-expansion')
+    expect(begun.ok, begun.error).toBe(true)
+    const response = session.commitSelectionChoice(0, mode === 'pasture-division' ? { edges: ['V-0-1'] }
       : mode === 'special-stable' ? { farmHand: { row: 0, col: 2 } } : { stables: [{ row: 0, col: 0 }] })
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources).toMatchObject({ clay: 0, food: 20 })
@@ -252,7 +263,7 @@ describe('A040 host action geometry', () => {
   })
 
   it('places clay only on authoritative unused spaces, excluding terrain and blocked cells', () => {
-    const session = createWorkSession({ options: { enableFarmersOfTheMoor: true, allowIncompleteFarmersOfTheMoorMinorDeal: true }, configure: state => {
+    const session = sessionEvidence.track(createWorkSession({ options: { enableFarmersOfTheMoor: true, allowIncompleteFarmersOfTheMoorMinorDeal: true }, configure: state => {
       state.round = 4
       const player = state.players[0]!
       player.minorHand = [CARD]
@@ -260,8 +271,8 @@ describe('A040 host action geometry', () => {
       player.farmTerrain = [{ row: 0, col: 1, kind: 'forest' }]
       player.farmyardSpaceStates = [{ spaceKey: '0-2', kind: 'blocked-farmyard-space', sourceCardId: '__test_blocker__', blocksPlacement: true }]
       Object.assign(player.resources, { wood: 20, reed: 1, food: 20 })
-    } })
-    sessions.push(session)
+    } }))
+
     let response = session.takeAction(0, 'major-improvement')
     if (options(response).some(option => option.value === CARD)) response = choose(session, response, CARD)
     expect(response.ok, response.error).toBe(true)

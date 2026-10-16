@@ -10,10 +10,11 @@ import '../../shared/cards/A/A036_FacadesCarving'
 import '../../shared/cards/A/A038_WoolBlankets'
 import '../../shared/cards/A/A039_Chapel'
 import assert from 'node:assert/strict'
-import { type GameState, type Resource, type FarmTilePosition } from '../../shared/contract/types'
+import { type GameState, type Resource, type FarmTilePosition, type PlayerState } from '../../shared/contract/types'
 import { createWorkSession } from './_helpers/session-fixtures'
-import { assertRejectedUnchanged, assertUndoRestored, confirmNext, undoRuleSnapshot , getChoiceOptions } from './_helpers/session-assertions'
+import { assertRejectedUnchanged, assertUndoRestored, confirmNext, undoRuleSnapshot, getChoiceOptions } from './_helpers/session-assertions'
 import { createScenarioEvidence } from './_helpers/scenario-evidence'
+import { countRoomAnimals } from '../../shared/domain/animals'
 
 const sessionEvidence = createScenarioEvidence(import.meta.url)
 
@@ -578,5 +579,322 @@ describe("A032 command boundaries", () => {
     const undone = s.undoAction()
     assertUndoRestored(before, undone)
     assert.equal(JSON.stringify(undone.interaction), beforeInteraction)
+  })
+})
+
+describe("A038 command boundaries", () => {
+  const WOOL = 'A038_WoolBlankets'
+  function ok(r: SessionResponse) {
+    assert.equal(r.ok, true, r.error)
+    return r
+  }
+  function setup({ played = true, round = 14, resources = {} }: {
+    played?: boolean
+    round?: number
+    resources?: Partial<Resource>
+  } = {}, configure: (state: GameState) => void = () => {
+  }) {
+    const s = sessionEvidence.track(createWorkSession({ seed: 4242, configure(state) {
+        state.round = round
+        for (const p of state.players) {
+          p.minorHand = ['__test_placeholder__']
+          p.occupationHand = ['__test_placeholder__']
+          p.minorPlayed = []
+          p.occupationPlayed = []
+          p.improvements = []
+          Object.assign(p.resources, { wood: 0, clay: 0, reed: 0, stone: 0, grain: 0, vegetable: 0, sheep: 0, food: 20 })
+        }
+        const p = state.players[0]!
+        p.minorHand = played ? ['__test_placeholder__'] : [WOOL, '__test_placeholder__']
+        p.minorPlayed = played ? [WOOL] : []
+        Object.assign(p.resources, resources)
+        configure(state)
+        const owned = state.players.flatMap(p => p.improvements)
+        state.availableMajorImprovements = state.availableMajorImprovements.filter(id => !owned.includes(id))
+      } }))
+    return s
+  }
+  function options(r: SessionResponse) {
+    ok(r)
+    assert(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice', JSON.stringify(r.interaction))
+    return getChoiceOptions(r)
+  }
+  function buy(s: GameSession) {
+    let r = ok(s.takeAction(0, 'meeting-place'))
+    for (let i = 0; i < 3 && !r.state.players[0]!.minorPlayed.includes(WOOL); i++) {
+      const candidate = options(r).find(o => o.value === WOOL) ?? options(r).find(o => o.value.startsWith('action-improvement-'))
+      assert(candidate && !candidate.disabled, JSON.stringify(r.interaction))
+      r = ok(s.resolveChoice(0, candidate.value))
+    }
+    assert(r.state.players[0]!.minorPlayed.includes(WOOL))
+    return r
+  }
+  function denied(s: GameSession) {
+    let r = ok(s.takeAction(0, 'meeting-place'))
+    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice') {
+      const c = getChoiceOptions(r).find(o => o.value.startsWith('action-improvement-'))
+      if (c)
+        r = ok(s.resolveChoice(0, c.value))
+    }
+    assert(!r.state.players[0]!.minorPlayed.includes(WOOL))
+    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice')
+      assert(!getChoiceOptions(r).some(o => o.value === WOOL && !o.disabled))
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, WOOL))
+  }
+  function bonus(r: SessionResponse, owner = 0) {
+    assert(r.scores)
+    return r.scores[owner]!.categories.find(c => c.key === 'cardBonusVp')?.entries.find(e => e.type === 'bonus' && e.cardId === WOOL)?.score ?? 0
+  }
+  function renovate(s: GameSession, actor = 0, space = 'house-redevelopment', target = 'clay') {
+    let r = ok(s.takeAction(actor, space))
+    if (r.interaction.stateId === 'wait' && r.interaction.promptKey === 'ui.interactionChooseRenovationTarget')
+      r = ok(s.resolveChoice(actor, target))
+    return r
+  }
+  function housing(state: GameState, sheep: number, owner = 0, mixed = false) {
+    const p = state.players[owner]!
+    p.resources.sheep = sheep
+    p.pastures = [{ id: `wool-${owner}`, tiles: [{ row: 0, col: 1 }, { row: 0, col: 2 }], animalType: 'sheep', animalCount: mixed ? Math.min(sheep, 3) : sheep }]
+    p.fenceSegments = ['H-0-1', 'H-0-2', 'H-1-1', 'H-1-2', 'V-0-1', 'V-0-3'].map(edge => ({ edge, type: 'fence', source: { kind: 'own', ownerPlayerId: p.id } }))
+    p.stableTiles = mixed ? [{ row: 0, col: 3 }] : [{ row: 0, col: 1 }]
+    p.houseAnimals = mixed && sheep > 3 ? { '2-0': 'sheep' } : {}
+    p.stableAnimals = mixed && sheep > 4 ? { '0-3': 'sheep' } : {}
+  }
+  function wool({ sheep = 5, played = false, mixed = false } = {}, configure: (state: GameState) => void = () => {
+  }) {
+    return setup({ played }, state => {
+      housing(state, sheep, 0, mixed)
+      configure(state)
+    })
+  }
+  it("four sheep reject forged purchase and five legally housed sheep buy for free once", () => {
+    denied(wool({ sheep: 4 }))
+    const s = wool()
+    const r = buy(s)
+    assert.equal(r.state.players[0]!.resources.sheep, 5)
+    assert.equal(r.state.players[0]!.resources.food, 20)
+    assert.equal(bonus(r), 3)
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, WOOL))
+  })
+  it("pasture house and loose stable sheep jointly meet the exact five threshold", () => {
+    const s = wool({ mixed: true })
+    const r = buy(s)
+    assert.equal(r.state.players[0]!.pastures[0]!.animalCount, 3)
+    assert.equal(countRoomAnimals(r.state.players[0]!), 1)
+    assert.equal(Object.values(r.state.players[0]!.stableAnimals ?? {}).filter(x => x === 'sheep').length, 1)
+    assert.equal(bonus(r), 3)
+  })
+  it("opponent sheep and controlled unallocated supply cannot satisfy owner board prerequisite", () => {
+    denied(wool({ sheep: 0 }, state => housing(state, 5, 1)))
+    denied(wool({ sheep: 0 }, state => {
+      state.players[0]!.resources.sheep = 5
+    }))
+  })
+  it("literal wooden clay stone bonuses are stable under repeated score reads", () => {
+    for (const [house, expected] of [['wood', 3], ['clay', 2], ['stone', 0]] as const) {
+      const s = wool({ played: true }, state => {
+        state.players[0]!.houseType = house
+      })
+      assert.equal(bonus(s.getState()), expected)
+      assert.equal(bonus(s.getState()), expected)
+    }
+  })
+  it("card in hand and only opponent played card grant no owner bonus", () => {
+    assert.equal(bonus(wool().getState()), 0)
+    const s = wool({}, state => {
+      state.players[0]!.minorHand = ['__test_placeholder__']
+      state.players[1]!.minorPlayed = [WOOL]
+      housing(state, 5, 1)
+    })
+    assert.equal(bonus(s.getState()), 0)
+    assert.equal(bonus(s.getState(), 1), 3)
+  })
+  it("actual cooking removes sheep without revoking card then actual renovation reduces bonus", () => {
+    const s = wool({ played: true }, state => {
+      state.players[0]!.improvements = ['Major_Fireplace1']
+      Object.assign(state.players[0]!.resources, { clay: 2, reed: 1 })
+    })
+    const menu = ok(s.takeAnytimeAction(0, 'exchange'))
+    const c = options(menu).find(o => o.effectPreview?.kind === 'resourceExchange' && o.effectPreview.resourcesPaid?.sheep === 5)
+    assert(c, JSON.stringify(menu.interaction))
+    assert(c.value.startsWith('trade:'))
+    const cooked = ok(s.resolveChoice(0, `bulk:${c.value.split(':')[1]}=5`))
+    assert.equal(cooked.state.players[0]!.resources.sheep, 0)
+    assert.equal(cooked.state.players[0]!.resources.food, 30)
+    assert.equal(bonus(cooked), 3)
+    const r = renovate(s)
+    assert.equal(r.state.players[0]!.houseType, 'clay')
+    assert.equal(bonus(r), 2)
+  })
+  it("actual free purchase and renovation each support whole action undo and retry", () => {
+    const s = wool()
+    const before = undoRuleSnapshot(s.getState())
+    assert.equal(bonus(buy(s)), 3)
+    assertUndoRestored(before, s.undoAction())
+    assert.equal(bonus(buy(s)), 3)
+    const reno = wool({ played: true }, state => Object.assign(state.players[0]!.resources, { clay: 2, reed: 1 }))
+    const snapshot = undoRuleSnapshot(reno.getState())
+    assert.equal(bonus(renovate(reno)), 2)
+    assertUndoRestored(snapshot, reno.undoAction())
+    assert.equal(bonus(renovate(reno)), 2)
+  })
+})
+
+describe("A039 command boundaries", () => {
+  const A039 = 'A039_Chapel'
+  const occupations = ['A125_Priest', 'A124_Knapper']
+  function setup({ played = true, resources = {}, opponent = {}, occ = occupations }: {
+    played?: boolean
+    resources?: Partial<PlayerState['resources']>
+    opponent?: Partial<PlayerState['resources']>
+    occ?: string[]
+  } = {}) {
+    return sessionEvidence.track(createWorkSession({ seed: 724, configure: state => {
+        state.round = 14
+        state.availableMajorImprovements = []
+        for (const player of state.players) {
+          player.minorHand = ['__test_placeholder__']
+          player.occupationHand = ['__test_placeholder__']
+          player.minorPlayed = []
+          player.occupationPlayed = []
+          player.improvements = []
+          player.cardStates = {}
+          player.rooms = 2
+          player.roomTiles = [{ row: 1, col: 0 }, { row: 2, col: 0 }]
+          player.fields = []
+          player.stableTiles = []
+          player.pastures = []
+          player.fenceSegments = []
+          Object.assign(player.resources, { wood: 0, clay: 0, reed: 0, stone: 0, food: 40, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0 })
+        }
+        const owner = state.players[0]!
+        owner.minorPlayed = played ? [A039] : []
+        owner.minorHand = played ? ['__test_placeholder__'] : [A039, '__test_placeholder__']
+        owner.occupationPlayed = occ
+        Object.assign(owner.resources, resources)
+        Object.assign(state.players[1]!.resources, opponent)
+        state.actionSpaces.find(space => space.id === 'forest')!.resources.wood = 3
+      } }))
+  }
+  function ok(r: SessionResponse) {
+    assert.equal(r.ok, true, r.error)
+    return r
+  }
+  function opts(r: SessionResponse) {
+    return r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice' ? getChoiceOptions(r) : []
+  }
+  function choose(s: GameSession, r: SessionResponse, predicate: (o: {
+    value: string
+    labelKey?: string
+    sourceCard?: string
+  }) => boolean) {
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice', JSON.stringify(r.interaction))
+    const o = opts(r).find(predicate)
+    assert.ok(o, JSON.stringify(r.interaction))
+    return ok(s.resolveChoice(r.interaction.playerIndex, o.value))
+  }
+  function ready(s: GameSession, actor: number) {
+    let r = s.getState()
+    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
+      r = confirmNext(s, r)
+    assert.equal(r.interaction.stateId, 'idle', JSON.stringify(r.interaction))
+    assert.equal(r.state.currentPlayerIndex, actor)
+    return r
+  }
+  function turn(s: GameSession, actor: number, space: string) {
+    ready(s, actor)
+    return ok(s.takeAction(actor, space))
+  }
+  function minor(s: GameSession, card: string) {
+    let r = turn(s, 0, 'meeting-place')
+    if (!opts(r).some(o => o.value === card) && opts(r).some(o => o.value.startsWith('action-improvement-')))
+      r = choose(s, r, o => o.value.startsWith('action-improvement-'))
+    return r
+  }
+  function buy(s: GameSession, card: string) {
+    const r = minor(s, card)
+    return r.state.players[0]!.minorPlayed.includes(card) ? r : choose(s, r, o => o.value === card)
+  }
+  function denied(s: GameSession, card: string) {
+    const r = minor(s, card)
+    assert.equal(opts(r).some(o => o.value === card && !o.disabled), false)
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, card))
+    assert.ok(s.getState().state.players[0]!.minorHand.includes(card))
+  }
+  function bonus(r: SessionResponse, actor = 0) {
+    assert.ok(r.scores)
+    return r.scores[actor]!.categories.find(c => c.key === 'cardBonusVp')?.entries.find(e => e.type === 'bonus' && e.cardId === A039)?.score ?? 0
+  }
+  function chapelUndo(before: string, after: SessionResponse) {
+    assert.equal(after.ok, true, after.error)
+    const normalize = (snapshot: string) => JSON.parse(snapshot, (key, value: unknown) => key === 'blockedBy' && Array.isArray(value) && value.length === 0 ? undefined : value)
+    assert.deepEqual(normalize(undoRuleSnapshot(after)), normalize(before))
+    const packet = after.state.publicEventArchive.at(-1)
+    assert.ok(packet?.type === 'publicEvents.canceled' && packet.reason === 'undoAction')
+  }
+  function occupants(r: SessionResponse) {
+    return r.state.actionSpaces.find(a => a.id === A039)!.takenBy.length
+  }
+  it("fee or occupation shortage rejects forged card before exact-cost public space", () => {
+    for (const config of [{ resources: { wood: 2, clay: 2 } }, { resources: { wood: 3, clay: 1 } }, { resources: { wood: 3, clay: 2 }, occ: occupations.slice(0, 1) }])
+      denied(setup({ played: false, ...config }), A039)
+    const r = buy(setup({ played: false, resources: { wood: 3, clay: 2 } }), A039)
+    assert.equal(r.state.players[0]!.resources.wood, 0)
+    assert.equal(r.state.players[0]!.resources.clay, 0)
+    assert.equal(r.state.actionSpaces.filter(a => a.id === A039).length, 1)
+    assert.equal(bonus(r), 0)
+  })
+  it("zero-grain owner uses Chapel free and occupied replay cannot score again", () => {
+    const s = setup()
+    const r = turn(s, 0, A039)
+    assert.equal(bonus(r), 3)
+    assert.equal(r.state.players[0]!.resources.grain, 0)
+    assert.equal(occupants(r), 1)
+    assertRejectedUnchanged(s, () => s.takeAction(0, A039))
+    turn(s, 1, 'forest')
+    ready(s, 0)
+    assertRejectedUnchanged(s, () => s.takeAction(0, A039))
+    turn(s, 0, 'grain-seeds')
+    assert.equal(bonus(s.getState()), 3)
+  })
+  it("guest pays one grain to owner and receives exactly three bonus points", () => {
+    const s = setup({ opponent: { grain: 1 } })
+    turn(s, 0, 'forest')
+    ready(s, 1)
+    assertRejectedUnchanged(s, () => s.takeAction(0, A039))
+    const r = turn(s, 1, A039)
+    assert.equal(r.state.players[0]!.resources.grain, 1)
+    assert.equal(r.state.players[1]!.resources.grain, 0)
+    assert.equal(bonus(r), 0)
+    assert.equal(bonus(r, 1), 3)
+    assert.equal(occupants(r), 1)
+    assertRejectedUnchanged(s, () => s.takeAction(1, A039))
+  })
+  it("zero-grain guest is atomically denied before legal ordinary retry", () => {
+    const s = setup()
+    turn(s, 0, 'forest')
+    ready(s, 1)
+    assertRejectedUnchanged(s, () => s.takeAction(1, A039))
+    const r = turn(s, 1, 'grain-seeds')
+    assert.equal(r.state.players[1]!.resources.grain, 1)
+    assert.equal(bonus(r, 1), 0)
+    assert.equal(occupants(r), 0)
+  })
+  it("undo restores owner use and guest transfer before a single replay award", () => {
+    const owner = setup()
+    const before = undoRuleSnapshot(owner.getState())
+    turn(owner, 0, A039)
+    chapelUndo(before, owner.undoAction())
+    assert.equal(bonus(turn(owner, 0, A039)), 3)
+    const s = setup({ opponent: { grain: 1 } })
+    turn(s, 0, 'forest')
+    ready(s, 1)
+    const guestBefore = undoRuleSnapshot(s.getState())
+    turn(s, 1, A039)
+    chapelUndo(guestBefore, s.undoAction())
+    const r = turn(s, 1, A039)
+    assert.equal(bonus(r, 1), 3)
+    assert.equal(r.state.players[0]!.resources.grain, 1)
+    assert.equal(r.state.players[1]!.resources.grain, 0)
   })
 })
