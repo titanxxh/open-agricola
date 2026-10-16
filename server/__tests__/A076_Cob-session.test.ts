@@ -295,5 +295,8 @@ describe("A076 command boundaries", () => {
     const undone = record('undo-cob-phase', assertRejectedUnchanged(s, () => s.undoStep()))
     assert.equal(undone.error, 'no history to undo')
     assert.deepEqual(resources(undone), { clay: 3, grain: 0, food: 43 })
+    const undoneAction = record('undo-cob-phase-action', assertRejectedUnchanged(s, () => s.undoAction()))
+    assert.equal(undoneAction.error, 'no action snapshot')
+    assert.deepEqual(resources(undoneAction), { clay: 3, grain: 0, food: 43 })
   })
 })
