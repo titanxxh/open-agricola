@@ -174,7 +174,11 @@ describe("A054 command boundaries", () => {
       r = choose(s, r, o => o.value.startsWith('action-improvement-'))
     return r
   }
-  function buy(s: GameSession, card: string) { const r = minorMenu(s, card); return r.state.players[0]!.minorPlayed.includes(card) ? r : choose(s, r, o => o.value === card); }
+  function buy(s: GameSession, card: string) { const r = minorMenu(s, card); const completedResponse = r.state.players[0]!.minorPlayed.includes(card) ? r : choose(s, r, o => o.value === card)
+    assert.ok(completedResponse.interaction.stateId === 'wait' && completedResponse.interaction.request.kind === 'confirm-next-player', JSON.stringify(completedResponse.interaction))
+    assert.equal(completedResponse.interaction.playerIndex, 0)
+    assert.equal(completedResponse.state.currentPlayerIndex, 0)
+    return completedResponse }
   function deny(s: GameSession, card: string) { const r = minorMenu(s, card); assert.ok(opts(r).some(o => o.value === WAGE && !('disabled' in o && o.disabled)), JSON.stringify(r.interaction)); assert.equal(opts(r).some(o => o.value === card && !('disabled' in o && o.disabled)), false); assertRejectedUnchanged(s, () => s.resolveChoice(0, card)); assert.equal(s.getState().state.players[0]!.minorPlayed.includes(card), false); const food = r.state.players[0]!.resources.food; const retry = ok(s.resolveChoice(0, WAGE)); resource(retry, 'food', food + 2); assert.equal(retry.state.players[0]!.minorPlayed.includes(card), false); }
   function resource(r: SessionResponse, key: 'food' | 'wood' | 'begging', value: number, actor = 0) { assert.equal(r.state.players[actor]!.resources[key], value); }
   function endWork(s: GameSession) { turn(s, 0, 'forest'); turn(s, 1, 'clay-pit'); turn(s, 0, 'grain-seeds'); return confirmNext(s, turn(s, 1, 'reed-bank')); }
@@ -186,7 +190,10 @@ describe("A054 command boundaries", () => {
     assert.ok(payment)
     return payment
   }
-  function repay(s: GameSession, r: SessionResponse) { return ok(s.resolveChoice(0, repaymentOption(r).value)); }
+  function repay(s: GameSession, r: SessionResponse) { const completedResponse = ok(s.resolveChoice(0, repaymentOption(r).value))
+    assert.equal(completedResponse.interaction.stateId, 'idle')
+    assert.equal(completedResponse.state.currentPlayerIndex, 0)
+    return completedResponse }
   function finishHarvest(s: GameSession, r: SessionResponse) {
     for (let n = 0; n < 8 && r.interaction.stateId === 'wait'; n++) {
       const request = r.interaction.request
@@ -201,6 +208,8 @@ describe("A054 command boundaries", () => {
       else
         assert.fail(JSON.stringify(r.interaction))
     }
+    assert.equal(r.interaction.stateId, 'idle')
+    assert.equal(r.state.currentPlayerIndex, 0)
     return r
   }
   it("occupation four rejects forged Credit before zero and three occupation controls", () => {
@@ -213,16 +222,19 @@ describe("A054 command boundaries", () => {
   })
   it("actual onBuy gives five food once and undo restores card before replay", () => {
     const s = setup({ played: false, occupations: OCC.slice(0, 3), resources: { food: 0 } })
-    const before = undoRuleSnapshot(s.getState())
+    const beforeInteraction = JSON.stringify(s.getState().interaction); assert.equal(s.getState().interaction.stateId, 'idle'); const before = undoRuleSnapshot(s.getState())
     const r = buy(s, CREDIT)
     resource(r, 'food', 5)
     assertRejectedUnchanged(s, () => s.resolveChoice(0, CREDIT))
-    assertUndoRestored(before, s.undoAction())
+    const restored = s.undoAction(); assertUndoRestored(before, restored); assert.equal(JSON.stringify(restored.interaction), beforeInteraction); assert.equal(restored.state.currentPlayerIndex, 0)
     resource(buy(s, CREDIT), 'food', 5)
   })
   it("real nonharvest end requires one repayment and rejects skip actor and replay", () => {
     const s = setup({ round: 1, resources: { food: 1 } })
     const r = endWork(s)
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
     assert.ok(r.interaction.stateId === 'wait' && r.interaction.sourceCard === CREDIT)
     assert.equal(opts(r).some(o => o.value === '__skip__' && !('disabled' in o && o.disabled)), false)
     assertRejectedUnchanged(s, () => s.resolveChoice(0, '__skip__'))
@@ -240,6 +252,8 @@ describe("A054 command boundaries", () => {
     for (const noCard of [false, true]) {
       const s = setup({ round: 1, noCard, resources: { food: 0 } })
       const r = endWork(s)
+      assert.equal(r.interaction.stateId, 'idle')
+      assert.equal(r.state.currentPlayerIndex, 0)
       assert.equal(r.state.round, 2)
       resource(r, 'food', 0)
       resource(r, 'begging', noCard ? 0 : 1)

@@ -159,9 +159,18 @@ describe("A057 command boundaries", () => {
   function buy(s: GameSession, card: string, space = 'meeting-place') {
     const r = buyMenu(s, space)
     if (!r.state.players[0]!.minorHand.includes(card))
-      return r
+      {
+        assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+        assert.equal(r.interaction.playerIndex, 0)
+        assert.equal(r.state.currentPlayerIndex, 0)
+        return r
+      }
     assert.ok(options(r).some(o => o.value === card && !('disabled' in o && o.disabled)))
-    return ok(s.resolveChoice(0, card))
+    const completedResponse = ok(s.resolveChoice(0, card))
+    assert.ok(completedResponse.interaction.stateId === 'wait' && completedResponse.interaction.request.kind === 'confirm-next-player', JSON.stringify(completedResponse.interaction))
+    assert.equal(completedResponse.interaction.playerIndex, 0)
+    assert.equal(completedResponse.state.currentPlayerIndex, 0)
+    return completedResponse
   }
   function deny(s: GameSession, card: string) { const r = buyMenu(s); assert.ok(!r.state.players[0]!.minorPlayed.includes(card)); assertRejectedUnchanged(s, () => s.resolveChoice(0, card)); }
   function ready(s: GameSession, actor: number) {
@@ -233,7 +242,10 @@ describe("A057 command boundaries", () => {
     const exchange = getChoiceOptions(r).find(o => o.effectPreview?.kind === 'resourceExchange' && o.effectPreview.resourcesPaid?.sheep === amount)
     assert.ok(exchange, JSON.stringify(r.interaction))
     assert.ok(exchange.value.startsWith('trade:'))
-    return ok(s.resolveChoice(0, `bulk:${exchange.value.split(':')[1]}=${amount}`))
+    const completedResponse = ok(s.resolveChoice(0, `bulk:${exchange.value.split(':')[1]}=${amount}`))
+    assert.equal(completedResponse.interaction.stateId, 'idle')
+    assert.equal(completedResponse.state.currentPlayerIndex, 0)
+    return completedResponse
   }
   it("combined sheep and cattle bonus is immediate and later real cooking cannot claw it back", () => {
     const s = parlor({ sheep: 4, cattle: 3, fireplace: true })
@@ -254,12 +266,12 @@ describe("A057 command boundaries", () => {
   })
   it("whole purchase undo restores bonus wood and printed point before stale safe retry", () => {
     const s = parlor({ sheep: 1, cattle: 1 })
-    const before = undoRuleSnapshot(s.getState())
+    const beforeInteraction = JSON.stringify(s.getState().interaction); assert.equal(s.getState().interaction.stateId, 'idle'); const before = undoRuleSnapshot(s.getState())
     let r = buy(s, PARLOR)
     assert.equal(r.state.players[0]!.resources.food, 44)
     assert.equal(printed(r), 1)
     assertRejectedUnchanged(s, () => s.resolveChoice(0, PARLOR))
-    assertUndoRestored(before, s.undoAction())
+    const restored = s.undoAction(); assertUndoRestored(before, restored); assert.equal(JSON.stringify(restored.interaction), beforeInteraction); assert.equal(restored.state.currentPlayerIndex, 0)
     r = buy(s, PARLOR)
     assert.equal(r.state.players[0]!.resources.food, 44)
     assert.equal(printed(r), 1)

@@ -223,11 +223,17 @@ describe("A050 command boundaries", () => {
       r = ok(s.resolveChoice(actor, 'confirm', { zones: assignments }))
     }
     assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, actor)
+    assert.equal(r.state.currentPlayerIndex, actor)
     return r
   }
   it("actual Milk Jug purchase pays one clay without immediate food", () => {
     deny(setup({ resources: { clay: 0 } }), MILK)
     const r = buy(milk(), MILK)
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
     assert.equal(r.state.players[0]!.resources.clay, 0)
     assert.deepEqual(food(r), [40, 40])
   })
@@ -268,10 +274,10 @@ describe("A050 command boundaries", () => {
   })
   it("whole Cattle Market action undo and retry restores both recipients and housed cow", () => {
     const s = milk({ played: true })
-    const before = undoRuleSnapshot(s.getState())
+    const beforeInteraction = JSON.stringify(s.getState().interaction); assert.equal(s.getState().interaction.stateId, 'idle'); const before = undoRuleSnapshot(s.getState())
     let r = settle(s, turn(s, 0, 'cattle-market'), 0)
     assert.deepEqual(food(r), [43, 41])
-    assertUndoRestored(before, s.undoAction())
+    const restored = s.undoAction(); assertUndoRestored(before, restored); assert.equal(JSON.stringify(restored.interaction), beforeInteraction); assert.equal(restored.state.currentPlayerIndex, 0)
     r = settle(s, turn(s, 0, 'cattle-market'), 0)
     assert.deepEqual(food(r), [43, 41])
     assert.equal(r.state.players[0]!.resources.cattle, 1)

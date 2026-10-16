@@ -9,7 +9,7 @@ import { expectWait } from './_helpers/trigger-select'
 import { choose, restoreSession, snapshotResponse } from './_helpers/card-play-lifecycle'
 import assert from 'node:assert/strict'
 import { type PlayerState } from '../../shared/contract/types'
-import { assertRejectedUnchanged, confirmNext, undoRuleSnapshot, getChoiceOptions } from './_helpers/session-assertions'
+import { assertRejectedUnchanged, assertUndoRestored, confirmNext, undoRuleSnapshot, getChoiceOptions } from './_helpers/session-assertions'
 import { createScenarioEvidence } from './_helpers/scenario-evidence'
 const sessionEvidence = createScenarioEvidence(import.meta.url)
 describe('A055_JunkRoom session log dedupe', () => {
@@ -357,7 +357,11 @@ describe("A055 command boundaries", () => {
       r = choose(s, r, o => o.value.startsWith('action-improvement-'))
     return r
   }
-  function buy(s: GameSession, card: string) { const r = minorMenu(s, card); return r.state.players[0]!.minorPlayed.includes(card) ? r : choose(s, r, o => o.value === card); }
+  function buy(s: GameSession, card: string) { const r = minorMenu(s, card); const completedResponse = r.state.players[0]!.minorPlayed.includes(card) ? r : choose(s, r, o => o.value === card)
+    assert.ok(completedResponse.interaction.stateId === 'wait' && completedResponse.interaction.request.kind === 'confirm-next-player', JSON.stringify(completedResponse.interaction))
+    assert.equal(completedResponse.interaction.playerIndex, 0)
+    assert.equal(completedResponse.state.currentPlayerIndex, 0)
+    return completedResponse }
   function deny(s: GameSession, card: string) { const r = minorMenu(s, card); assert.ok(opts(r).some(o => o.value === WAGE && !('disabled' in o && o.disabled)), JSON.stringify(r.interaction)); assert.equal(opts(r).some(o => o.value === card && !('disabled' in o && o.disabled)), false); assertRejectedUnchanged(s, () => s.resolveChoice(0, card)); assert.equal(s.getState().state.players[0]!.minorPlayed.includes(card), false); const food = r.state.players[0]!.resources.food; const retry = ok(s.resolveChoice(0, WAGE)); resource(retry, 'food', food + 2); assert.equal(retry.state.players[0]!.minorPlayed.includes(card), false); }
   function improve(s: GameSession, card: string, actor = 0) {
     let r = turn(s, actor, 'major-improvement')
@@ -384,7 +388,6 @@ describe("A055 command boundaries", () => {
       r = accept(s, r)
     return r
   }
-  function purchaseUndo(before: string, r: SessionResponse) { ok(r); const norm = (v: string) => JSON.parse(v, (key, value: unknown) => key === 'playedCards' ? undefined : value); assert.deepEqual(norm(undoRuleSnapshot(r)), norm(before)); const packet = r.state.publicEventArchive.at(-1); assert.ok(packet?.type === 'publicEvents.canceled' && packet.reason === 'undoAction'); }
   it("missing wood or clay rejects before exact self reward once", () => {
     for (const resources of [{ wood: 0, clay: 1, food: 0 }, { wood: 1, clay: 0, food: 0 }])
       deny(junk({ played: false, resources }), JUNK)
@@ -397,6 +400,9 @@ describe("A055 command boundaries", () => {
   it("actual later minor gives one food and stale purchase cannot repeat reward", () => {
     const s = junk({ hand: [BUCK], resources: { wood: 1, food: 0 } })
     const r = improve(s, BUCK)
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
     resource(r, 'wood', 0)
     resource(r, 'food', 1)
     assert.equal(gainCount(r, JUNK), 1)
@@ -405,6 +411,9 @@ describe("A055 command boundaries", () => {
   it("actual major purchase rewards owner once compared with no-card control", () => {
     for (const noCard of [false, true]) {
       const r = improve(junk({ noCard, resources: { clay: 2, food: 0 } }), 'Major_Fireplace1')
+      assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+      assert.equal(r.interaction.playerIndex, 0)
+      assert.equal(r.state.currentPlayerIndex, 0)
       assert.equal(r.state.players[0]!.resources.clay, 0)
       resource(r, 'food', noCard ? 0 : 1)
       assert.ok(r.state.players[0]!.improvements.includes('Major_Fireplace1'))
@@ -414,24 +423,41 @@ describe("A055 command boundaries", () => {
     const skip = junk({ hand: [BUCK], resources: { wood: 1, food: 0 } })
     const offer = turn(skip, 0, 'meeting-place')
     assert.ok(opts(offer).some(o => o.value === '__skip__'))
-    resource(ok(skip.resolveChoice(0, '__skip__')), 'food', 0)
+    const declined = ok(skip.resolveChoice(0, '__skip__'))
+    assert.ok(declined.interaction.stateId === 'wait' && declined.interaction.request.kind === 'confirm-next-player', JSON.stringify(declined.interaction))
+    assert.equal(declined.interaction.playerIndex, 0)
+    assert.equal(declined.state.currentPlayerIndex, 0)
+    resource(declined, 'food', 0)
     const s = junk({ opponentHand: [BUCK], opponent: { wood: 1, food: 0 } })
-    turn(s, 0, 'forest')
+    const unrelated = turn(s, 0, 'forest')
+    assert.ok(unrelated.interaction.stateId === 'wait' && unrelated.interaction.request.kind === 'confirm-next-player', JSON.stringify(unrelated.interaction))
+    assert.equal(unrelated.interaction.playerIndex, 0)
+    assert.equal(unrelated.state.currentPlayerIndex, 0)
     const r = improve(s, BUCK, 1)
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, 1)
+    assert.equal(r.state.currentPlayerIndex, 1)
     resource(r, 'food', 0)
     resource(r, 'food', 0, 1)
     assert.ok(r.state.players[1]!.minorPlayed.includes(BUCK))
-    resource(turn(junk(), 0, 'day-laborer'), 'food', 2)
+    const day = turn(junk(), 0, 'day-laborer')
+    assert.ok(day.interaction.stateId === 'wait' && day.interaction.request.kind === 'confirm-next-player', JSON.stringify(day.interaction))
+    assert.equal(day.interaction.playerIndex, 0)
+    assert.equal(day.state.currentPlayerIndex, 0)
+    resource(day, 'food', 2)
   })
   it("self and later purchase undo restore fee and one replay reward", () => {
     for (const played of [false, true]) {
       const s = junk({ played, hand: played ? [BUCK] : [], resources: { wood: 1, clay: played ? 0 : 1, food: 0 } })
-      const before = undoRuleSnapshot(s.getState())
+      const beforeInteraction = JSON.stringify(s.getState().interaction); assert.equal(s.getState().interaction.stateId, 'idle'); const before = undoRuleSnapshot(s.getState())
       const card = played ? BUCK : JUNK
       const r = buy(s, card)
       resource(r, 'food', 1)
       assert.equal(gainCount(r, JUNK), 1)
-      purchaseUndo(before, s.undoAction())
+      const restored = s.undoAction()
+      assertUndoRestored(before, restored)
+      assert.equal(JSON.stringify(restored.interaction), beforeInteraction)
+      assert.equal(restored.state.currentPlayerIndex, 0)
       const replay = buy(s, card)
       resource(replay, 'food', 1)
       assert.equal(gainCount(replay, JUNK), 1)
@@ -442,10 +468,13 @@ describe("A055 command boundaries", () => {
       const s = junk({ extra: [UPHOLSTERY], hand: [BUCK], resources: { wood: 1, reed: 1, food: 0 } })
       const initial = improve(s, BUCK)
       assert.ok(initial.interaction.stateId === 'wait' && initial.interaction.request.kind === 'select-trigger')
+      const initialInteraction = JSON.stringify(initial.interaction)
       assertRejectedUnchanged(s, () => s.resolveChoice(1, first))
       const chosen = ok(s.resolveChoice(0, first))
       resource(chosen, 'food', first === JUNK ? 1 : 0)
       const undone = ok(s.undoStep())
+      assert.equal(JSON.stringify(undone.interaction), initialInteraction)
+      assert.equal(undone.state.currentPlayerIndex, 0)
       assert.ok(undone.interaction.stateId === 'wait' && undone.interaction.request.kind === 'select-trigger')
       assert.deepEqual(opts(undone).filter(o => [JUNK, UPHOLSTERY].includes(o.value)).map(o => o.value).sort(), [JUNK, UPHOLSTERY].sort())
       resource(undone, 'food', 0)
@@ -453,6 +482,9 @@ describe("A055 command boundaries", () => {
       const second = first === JUNK ? UPHOLSTERY : JUNK
       assertRejectedUnchanged(s, () => s.resolveChoice(0, first))
       r = source(s, r, second)
+      assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+      assert.equal(r.interaction.playerIndex, 0)
+      assert.equal(r.state.currentPlayerIndex, 0)
       resource(r, 'food', 1)
       assert.equal(r.state.players[0]!.resources.reed, 0)
       assert.equal(r.state.players[0]!.cardStates[UPHOLSTERY]?.counters?.reed, 1)
