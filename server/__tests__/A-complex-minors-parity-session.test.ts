@@ -3,8 +3,7 @@ import { GameSession, type SessionResponse } from '../game/authoritative-session
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { familySize, markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
 import { getAllTilePositions } from '../../shared/domain/farm'
-import { readCardExtraData, writeCardExtraData } from '../../shared/cards/helpers/card-state'
-import type { GameState, PlayerState, Resource } from '../../shared/contract/types'
+import type { FarmyardSpaceState, GameState, PlayerState, Resource } from '../../shared/contract/types'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 
 import '../../shared/cards/A/A010_WoodenShed'
@@ -340,15 +339,24 @@ const setupPottersYard = (usedSpaces: number, played = false) => {
   return session
 }
 
+const pottersYardClay = (keys: string[]): FarmyardSpaceState[] => keys.map(spaceKey => ({
+  spaceKey, sourceCardId: 'A040_PottersYard', kind: 'farmyard-goods-token',
+  resources: { clay: 1 }, claimPolicy: 'when-no-longer-unused',
+}))
+const pottersYardTokens = (player: PlayerState) => player.farmyardSpaceStates
+  ?.filter(token => token.sourceCardId === 'A040_PottersYard') ?? []
+const sevenClayKeys = ['1-2', '1-3', '1-4', '2-1', '2-2', '2-3', '2-4']
+const sixClayKeys = ['1-3', '1-4', '2-1', '2-2', '2-3', '2-4']
+
 const pottersYardPlow = () => {
   const session = setupPottersYard(8, true)
-  writeCardExtraData(session.state.players[0]!, 'A040_PottersYard', 'clayRemaining', 7)
+  session.state.players[0]!.farmyardSpaceStates = pottersYardClay(sevenClayKeys)
   session.loadState(session.state)
   let response = session.takeAction(0, 'farmland')
   expect(response.interaction.stateId).toBe('wait')
   if (response.interaction.stateId !== 'wait') throw new Error('expected plow selection')
   const tile = response.interaction.request.farm.selectableTiles[0]
-  expect(tile).toBeDefined()
+  expect(tile).toEqual({ row: 1, col: 2 })
   response = session.commitSelectionChoice(0, { tile })
   response = resolveTriggerIfPresent(session, response, 'A040_PottersYard')
   return { session, response }
@@ -361,7 +369,7 @@ describe('A040 Potters Yard parity', () => {
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.minorPlayed).toContain('A040_PottersYard')
     expect(response.state.players[0]!.resources).toMatchObject({ wood: 0, reed: 0 })
-    expect(readCardExtraData(response.state.players[0]!, 'A040_PottersYard', 'clayRemaining')).toBe(7)
+    expect(pottersYardTokens(response.state.players[0]!)).toEqual(pottersYardClay(sevenClayKeys))
   })
 
   it('A040 S2: more than seven unused spaces keeps Potters Yard unavailable', () => {
@@ -373,7 +381,7 @@ describe('A040 Potters Yard parity', () => {
     const response = chooseNonSkip(session, offered, 'A040_PottersYard')
 
     expect(response.state.players[0]!.resources).toMatchObject({ clay: 0, food: 2 })
-    expect(readCardExtraData(response.state.players[0]!, 'A040_PottersYard', 'clayRemaining')).toBe(6)
+    expect(pottersYardTokens(response.state.players[0]!)).toEqual(pottersYardClay(sixClayKeys))
   })
 
   it('A040 S4: declining the exchange keeps the collected clay', () => {
@@ -381,7 +389,7 @@ describe('A040 Potters Yard parity', () => {
     const response = skipChoice(session, offered, 'A040_PottersYard')
 
     expect(response.state.players[0]!.resources).toMatchObject({ clay: 1, food: 0 })
-    expect(readCardExtraData(response.state.players[0]!, 'A040_PottersYard', 'clayRemaining')).toBe(6)
+    expect(pottersYardTokens(response.state.players[0]!)).toEqual(pottersYardClay(sixClayKeys))
   })
 })
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
-import { readCardResourceStats, writeCardExtraData } from '../../shared/cards/helpers/card-state'
+import { readCardResourceStats } from '../../shared/cards/helpers/card-state'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
@@ -26,7 +26,10 @@ const setupPlowMaker = (food: number, withPottersYard = false) => {
   player.resources = { ...player.resources, food, clay: 0 }
   if (withPottersYard) {
     player.minorPlayed.push(POTTERS_YARD_ID)
-    writeCardExtraData(player, POTTERS_YARD_ID, 'clayRemaining', 2)
+    player.farmyardSpaceStates = ['0-0', '0-1'].map(spaceKey => ({
+      spaceKey, sourceCardId: POTTERS_YARD_ID, kind: 'farmyard-goods-token',
+      resources: { clay: 1 }, claimPolicy: 'when-no-longer-unused',
+    }))
   }
   session.loadState(state)
   return session
@@ -226,12 +229,14 @@ describe('C37 Dwelling Mound session', () => {
     expect(response.interaction.stateId).toBe('wait')
     if (response.interaction.stateId !== 'wait') throw new Error('expected first plow')
     const firstTile = response.interaction.request.farm?.selectableTiles[0]
-    expect(firstTile).toBeDefined()
+    expect(firstTile).toEqual({ row: 0, col: 0 })
 
     response = session.commitSelectionChoice(0, { tile: firstTile })
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources).toMatchObject({ food: 0, clay: 1 })
     expect(response.state.players[0]!.fields).toHaveLength(1)
+    expect(response.state.players[0]!.farmyardSpaceStates?.filter(token => token.sourceCardId === POTTERS_YARD_ID)
+      .map(token => token.spaceKey)).toEqual(['0-1'])
     expect(response.interaction.stateId).toBe('wait')
     if (response.interaction.stateId !== 'wait') throw new Error("expected Potter's Yard choice")
     const exchange = response.interaction.request.options?.find(
@@ -246,12 +251,13 @@ describe('C37 Dwelling Mound session', () => {
     expect(response.interaction.stateId).toBe('wait')
     if (response.interaction.stateId !== 'wait') throw new Error('expected second plow')
     const secondTile = response.interaction.request.farm?.selectableTiles[0]
-    expect(secondTile).toBeDefined()
+    expect(secondTile).toEqual({ row: 0, col: 1 })
 
     response = session.commitSelectionChoice(0, { tile: secondTile })
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources).toMatchObject({ food: 1, clay: 1 })
     expect(response.state.players[0]!.fields).toHaveLength(2)
+    expect(response.state.players[0]!.farmyardSpaceStates?.filter(token => token.sourceCardId === POTTERS_YARD_ID)).toEqual([])
     expect(readCardResourceStats(response.state.players[0]!, CARD_ID)?.paid).toEqual({ food: 2 })
     expect(readCardResourceStats(response.state.players[0]!, PLOW_MAKER_ID)?.paid).toEqual({ food: 1 })
     expect(readCardResourceStats(response.state.players[0]!, POTTERS_YARD_ID)?.gained)

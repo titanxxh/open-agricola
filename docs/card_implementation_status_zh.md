@@ -4,7 +4,7 @@
 
 > 本文是 [`card_implementation_status.md`](card_implementation_status.md) 的中文镜像；英文版是规范文档。
 
-> 生成/更新日期：2026-10-15。本文件替代 `docs/card_desc_audit.md`、`docs/card_progress.md`、`docs/master-plan.md`、`docs/bad-smell.md`。规则权威为出版社卡牌文字和印刷图标、官方裁定及已记录的维护者决定。参考代码仅作实现对照。
+> 生成/更新日期：2026-10-16。本文件替代 `docs/card_desc_audit.md`、`docs/card_progress.md`、`docs/master-plan.md`、`docs/bad-smell.md`。规则权威为出版社卡牌文字和印刷图标、官方裁定及已记录的维护者决定。参考代码仅作实现对照。
 
 ## 2. 问题优先汇总
 
@@ -15,7 +15,6 @@
 | 优先级 | 范围 | 待处理事项 |
 |---|---|---|
 | 已暂缓 | `C131_PrivateTeacher` [#1175](https://github.com/titanxxh/open-agricola/issues/1175) | 本次不修改；新职业能否在同一次 Grain Seeds 立即触发仍待规则确认。 |
-| 需独立设计 | `A040_PottersYard` [#1203](https://github.com/titanxxh/open-agricola/issues/1203) | 记录打牌时各 unused 格上的原始黏土归属，避免清空原始地形后再使用该格时，从其他格借走 `clayRemaining`。#1195 只移除临时行动快照；此位置缺陷仍未修复。 |
 
 ## 3. 已接受差异
 
@@ -108,7 +107,8 @@
 | 无人物的行动格使用 | `place-farmer.actionContext.viaCardJump`、`isActionDoableInFlowContext()`、A151 | 卡牌可在不创建、放置或消耗人物的情况下执行完整行动格 flow。卡牌先按实时状态校验目标，随后仍由引擎统一处理 replacement、费用、listener、pending 与权威提交。 |
 | Granted Rule Action | `family-growth`、A021/A093/B092/C021/D010、ADR 0018 | 卡牌授予规则动作时直接调用该动作。授予 Family Growth 不等于展开整个 Wish for Children 行动格，因此不会附带放置工人或可选小发展。 |
 | 普通围栏计数与事件语义 | `FenceSegment.type`、`getFenceCount()`、`farm.fenceBuilt.newFenceEdges`、`hasOrdinaryFenceBuiltEvent()`、E001/B027/D089/A068 | 印刷 `<FENCE>` 的数量和触发只计算普通 `type='fence'` segment，包括农场上的借用普通围栏，但排除 Wood Palisades。单次行动奖励只读取受影响玩家已提交的宿主 `actionEvents`；各行动在嵌套前后保留自身计数，无需 before 计数缓存。确实关心任意围地 segment 或农场物件的消费者可继续读取广义 `farm.fenceBuilt.fences` 事件字段。 |
-| 提交时的新增使用农场格 | `farm.*Built.newlyUsedTiles`、`farm.fieldPlowed.newlyUsedTiles`、`farm.spacesUsed`、`getNewlyUsedFarmyardTiles()`、`getActionNewlyUsedTiles()`、A040/A073/C048 | 四类几何事件及 selection／封锁状态提交在变更后立即记录权威 unused→used 坐标。新增扩建格的初始地形不算原有 unused 格。卡牌只消费宿主已提交事件；C048 同样覆盖地形放置及封锁格，沿用提交时持牌资格及每 Turn 一次凭据。A040 原始黏土的位置归属仍需独立建模，本轮不扩大其触发入口；原生地形／封锁入口每宿主最多变更一个原有格，不满足 A073 的两格门槛。 |
+| 提交时的新增使用农场格 | `farm.*Built.newlyUsedTiles`、`farm.fieldPlowed.newlyUsedTiles`、`farm.spacesUsed`、`getNewlyUsedFarmyardTiles()`、`getActionNewlyUsedTiles()`、A040/A073/C048 | 四类几何事件、定时房间领取及 selection／封锁状态提交在变更后立即记录权威 unused→used 坐标。新增扩建格的初始地形不算原有 unused 格。卡牌只消费宿主已提交事件；C048 同样覆盖地形放置及封锁格，沿用提交时持牌资格及每 Turn 一次凭据。原生地形／封锁入口每宿主最多变更一个原有格，不满足 A073 的两格门槛。 |
+| 农场格物资的归属与领取 | `farmyardSpaceStates`、`claim-farmyard-goods-tokens`、A040/M092/M096 | 每份未领取物资由来源和坐标确定。领取可传入已提交的用格坐标，只原子消费匹配来源的标记；省略坐标仍按当前使用状态领取该来源的全部可领取标记。A040 只在打牌时 unused 的格上放黏土，兑换只依据该宿主实际领取的黏土。临时放置限制不使格子 used；清空、再用或新增格均不补货。公开剩余量从标记派生。 |
 | 提交时的新围牧场格 | `farm.fenceBuilt.newlyEnclosedPastureTiles`、`getNewlyEnclosedPastureTiles()`、C179 | 围栏提交记录本次从未围住变为牧场的所属玩家坐标。首次围住未围栏马厩符合条件；分割已有牧场虽改变组件，但没有新围格。C179 只消费受影响玩家的宿主事实，每次围栏最多一次，无需可变快照。 |
 | Metadata 审计覆盖需要随字段演进同步 | `STABLE` cost 和 `passing` 已覆盖；当前 literal mismatch 为 0 | 新增 metadata 字段时同步加 fixture，避免统计口径回退。 |
 | 后端权威的 action / pending 合同 | `allowedCommands`、typed request、`commitSelection`、`engine-resolve` protected cancel、`resolveEngineChoice`、bare improvement choice ids | 新增交互必须显式暴露 command / options 并由后端校验；major/minor improvement choice value 使用裸 `cardId`，旧 `major:` / `minor:` 只作为 parser 兼容输入，支付 option 保留 `pay:*` 命名空间；不要恢复 encoded choice shortcut、old pending cursor 或前端裁定规则。 |
@@ -205,7 +205,7 @@ Gain 来源区分显式资源参数和行动格配置的基础收益。C168 在�
 
 回合结束响应（#1199）在普通轮转与卡牌授予的独立 Turn 之间共用固定来源发现。动态资格与支付、选择器自己的显式 anytime 权限和本卡 Turn 凭据取代串行重扫与 placement 几何缓存。详见 §5 和 Architecture §6.5/§7.6/Anytime Window Policy。
 
-提交时的农场使用状态事实（#1195）是响应新增使用格的共享基础设施，详见 §5 与 Architecture §7。四类几何事件以及 `farm.spacesUsed` 覆盖原有农场格的真实变更；后者由 selection 同步变更与添加封锁状态提交产生，不把新增版图的初始地形算成 unused→used。卡牌只读取已捕获宿主事实，C048 保留提交时持牌检查及 Turn 凭据。A040 暂时保留剩余黏土标量库存，原始格位置归属缺口独立跟踪于 [#1203](https://github.com/titanxxh/open-agricola/issues/1203)。
+提交时的农场使用状态事实（#1195）是响应新增使用格的共享基础设施，详见 §5 与 Architecture §7。四类几何事件以及 `farm.spacesUsed` 覆盖原有农场格的真实变更；后者由 selection 同步变更与添加封锁状态提交产生，不把新增版图的初始地形算成 unused→used。定时房间领取只在成功建房后发出既有建房事实。卡牌只读取已捕获宿主事实，C048 保留提交时持牌检查及 Turn 凭据。农场格物资领取支持可选坐标过滤，原始物资归属可随嵌套响应、pending 恢复及 undo 保留，无需第二份剩余计数状态（#1203）。
 
 #1193 通过分开行动级折扣与选中的卡上供给，修复 B015 / E074 来源覆盖及多造实体。Session 覆盖明确跳过、库存上限、超量选择、palisade、支付选择、触发顺序、嵌套围栏、anytime、恢复和 undo；旧共享 pending 槽及 reserve / clear API 已删除。
 

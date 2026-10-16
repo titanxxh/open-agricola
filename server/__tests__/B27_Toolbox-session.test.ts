@@ -116,7 +116,10 @@ describe('B27 Toolbox session', () => {
     const player = state.players[0]!
     player.occupationPlayed.push('C094_StableCleaner')
     player.minorPlayed.push(POTTERS_YARD_ID)
-    writeCardExtraData(player, POTTERS_YARD_ID, 'clayRemaining', 1)
+    player.farmyardSpaceStates = [{
+      spaceKey: '0-0', sourceCardId: POTTERS_YARD_ID, kind: 'farmyard-goods-token',
+      resources: { clay: 1 }, claimPolicy: 'when-no-longer-unused',
+    }]
     session.loadState(state)
 
     let resp = session.takeAction(0, 'grain-seeds')
@@ -131,6 +134,7 @@ describe('B27 Toolbox session', () => {
     expect(resp.interaction.request.kind).toBe('farm-select')
 
     const firstStable = resp.interaction.request.farm.selectableTiles[0]!
+    expect(firstStable).toEqual({ row: 0, col: 0 })
     resp = session.commitSelectionChoice(0, { stables: [firstStable] })
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.resources.wood).toBe(19)
@@ -150,16 +154,37 @@ describe('B27 Toolbox session', () => {
     expect(pottersYard).toBeDefined()
     resp = session.resolveChoice(0, pottersYard!.value)
     expect(resp.state.players[0]!.resources.clay).toBe(21)
+    expect(resp.state.players[0]!.farmyardSpaceStates?.filter(token => token.sourceCardId === POTTERS_YARD_ID)).toEqual([])
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.promptKey).not.toBe('ui.interactionToolboxImprovement')
+
+    expect(resp.interaction.request.kind).toBe('select-trigger')
+    expect(resp.interaction.request.options?.filter(option => !option.value.startsWith('__'))
+      .map(option => option.sourceCard)).toEqual([POTTERS_YARD_ID])
+    const exchange = resp.interaction.request.options?.find((option) => option.sourceCard === POTTERS_YARD_ID)
+    expect(exchange).toBeDefined()
+    resp = session.resolveChoice(0, exchange!.value)
+    expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.promptKey).not.toBe('ui.interactionToolboxImprovement')
 
     const skipPottersYard = resp.interaction.request.options?.find((option) => option.value === '__skip__')
-    expect(skipPottersYard).toBeDefined()
+    expect(skipPottersYard, JSON.stringify(resp.interaction)).toBeDefined()
     resp = session.resolveChoice(0, skipPottersYard!.value)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    expect(resp.interaction.promptKey).toBe('ui.interactionToolboxImprovement')
+    expect(resp.interaction.request.kind).toBe('select-trigger')
+    expect(resp.interaction.request.options?.filter(option => !option.value.startsWith('__'))
+      .map(option => option.sourceCard)).toEqual([CARD_ID])
+    const toolboxWindow = resp.interaction.request.options?.find(option => option.sourceCard === CARD_ID)
+    expect(toolboxWindow).toBeDefined()
+    resp = session.resolveChoice(0, toolboxWindow!.value)
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.promptKey, JSON.stringify(resp.interaction)).toBe('ui.interactionToolboxImprovement')
 
     const skip = resp.interaction.request.options?.find((option) => option.value === '__skip__')
     expect(skip).toBeDefined()

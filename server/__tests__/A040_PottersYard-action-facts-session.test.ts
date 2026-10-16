@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { createWorkSession } from './_helpers/session-fixtures'
 import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/serialization'
-import type { GameState } from '../../shared/contract/types'
+import type { FarmyardSpaceState, GameState, PlayerState } from '../../shared/contract/types'
 import { encodeReplayFrame, decodeReplayFrame } from '../game/replay-codec'
 
 const sessions: GameSession[] = []
@@ -11,6 +11,14 @@ afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
 const CARD = 'A040_PottersYard'
 const STOCK = 'B094_StockProtector'
 const BENCH = 'B015_CarpentersBench'
+const originalClayKeys = ['0-0', '0-1', '0-2', '1-1', '1-2', '2-1', '2-2']
+const clayTokens = (keys: string[]): FarmyardSpaceState[] => keys.map(spaceKey => ({
+  spaceKey, sourceCardId: CARD, kind: 'farmyard-goods-token',
+  resources: { clay: 1 }, claimPolicy: 'when-no-longer-unused',
+}))
+const remainingClayKeys = (player: PlayerState) => (player.farmyardSpaceStates ?? [])
+  .filter(token => token.sourceCardId === CARD && token.kind === 'farmyard-goods-token')
+  .map(token => token.spaceKey).sort()
 const outerTwo = ['H-0-0', 'H-0-1', 'H-1-0', 'H-1-1', 'V-0-0', 'V-0-2']
 const innerOne = ['H-0-2', 'H-1-2', 'V-0-3']
 const outerOne = ['H-0-0', 'H-1-0', 'V-0-0', 'V-0-1']
@@ -64,7 +72,8 @@ function setup(configure?: (state: GameState) => void) {
     player.resources.food = 20
     player.resources.clay = 0
     player.fields = [0, 1, 2].flatMap(row => [3, 4].map(col => ({ row, col, stacks: [] })))
-    player.cardStates[CARD] = { extraData: { clayRemaining: 7 } }
+    // A040 was legally played before these actions; each listed space still owns its clay.
+    player.farmyardSpaceStates = clayTokens(originalClayKeys)
     state.actionSpaces.find(space => space.id === 'forest')!.resources.wood = 3
     configure?.(state)
   } })
@@ -97,7 +106,7 @@ const farmFacts = (state: GameState) => {
   return {
     resources: player.resources, rooms: player.roomTiles, fields: player.fields,
     stables: player.stableTiles, pastures: player.pastures, fences: player.fenceSegments,
-    clayRemaining: player.cardStates[CARD]?.extraData?.clayRemaining,
+    clayTokens: player.farmyardSpaceStates?.filter(token => token.sourceCardId === CARD),
   }
 }
 const stableFacts = (input: unknown) => JSON.parse(JSON.stringify(input,
@@ -118,7 +127,7 @@ describe('A040 host action geometry', () => {
       const opponent = state.players[1]!
       opponent.minorPlayed = [CARD]
       opponent.fields = state.players[0]!.fields.map(field => ({ ...field, stacks: [] }))
-      opponent.cardStates[CARD] = { extraData: { clayRemaining: 7 } }
+      opponent.farmyardSpaceStates = clayTokens(originalClayKeys)
     })
     const initial = JSON.parse(JSON.stringify(session.state))
     const replayStart = JSON.parse(JSON.stringify(serializeSessionSnapshot(session.state, session).frame))
@@ -143,7 +152,7 @@ describe('A040 host action geometry', () => {
     }
     response = finish(session, response)
     expect(response.state.players[0]!.resources.clay).toBe(3)
-    expect(response.state.players[0]!.cardStates[CARD]?.extraData?.clayRemaining).toBe(4)
+    expect(remainingClayKeys(response.state.players[0]!)).toEqual(['1-1', '1-2', '2-1', '2-2'])
     const mutations = response.state.events.filter(event => event.type === 'farm.fenceBuilt')
     expect(mutations.map(event => event.newlyUsedTiles.length)).toEqual([outer, 3 - outer])
     expect(mutations.flatMap(event => event.newlyUsedTiles)).toEqual([0, 1, 2].map(col => ({ playerId: response.state.players[0]!.id, row: 0, col })))
@@ -194,12 +203,14 @@ describe('A040 host action geometry', () => {
     expect(response.ok, response.error).toBe(true)
     if (options(response).some(option => option.value === CARD)) response = choose(session, response, CARD)
     expect(response.state.players[0]!.resources.clay).toBe(1)
-    expect(response.state.players[0]!.cardStates[CARD]?.extraData?.clayRemaining).toBe(6)
+    expect(remainingClayKeys(response.state.players[0]!)).toEqual(action === 'plow'
+      ? ['0-0', '0-1', '1-1', '1-2', '2-1', '2-2']
+      : ['0-1', '0-2', '1-1', '1-2', '2-1', '2-2'])
     const eventType = action === 'plow' ? 'farm.fieldPlowed' : action === 'construct' ? 'farm.roomBuilt' : 'farm.stableBuilt'
-    expect(response.state.events.find(event => event.type === eventType)).toMatchObject({ newlyUsedTiles: [{ playerId: response.state.players[0]!.id, ...tile }] })
     const beforeExchange = JSON.parse(JSON.stringify(response.state))
     response = accept(session, response)
     expect(response.state.players[0]!.resources).toMatchObject({ clay: 0, food: 22 })
+    expect(response.state.events.find(event => event.type === eventType)).toMatchObject({ newlyUsedTiles: [{ playerId: response.state.players[0]!.id, ...tile }] })
     expect(response.state.events).toContainEqual(expect.objectContaining({ type: 'resource.paid', sourceCardId: CARD, resources: { clay: 1 } }))
     response = session.undoStep()
     expect(response.ok, response.error).toBe(true)
@@ -218,21 +229,21 @@ describe('A040 host action geometry', () => {
       if (mode === 'pasture-stable' || mode === 'pasture-division') {
         player.pastures = [{ id: 'existing', tiles: [{ row: 0, col: 0 }, { row: 0, col: 1 }], animalType: null, animalCount: 0 }]
         player.fenceSegments = outerTwo.map(edge => ({ edge, type: 'fence', source: { kind: 'own', ownerPlayerId: player.id } }))
-        player.cardStates[CARD] = { extraData: { clayRemaining: 5 } }
+        player.farmyardSpaceStates = clayTokens(['0-2', '1-1', '1-2', '2-1', '2-2'])
       }
       if (mode === 'special-stable') {
         player.fields.push(...[0, 1].map(row => ({ row, col: 2, stacks: [] })))
-        player.cardStates[CARD] = { extraData: { clayRemaining: 5 } }
+        player.farmyardSpaceStates = clayTokens(['0-0', '0-1', '1-1', '2-1', '2-2'])
       }
-      if (mode === 'exhausted') player.cardStates[CARD] = { extraData: { clayRemaining: 0 } }
+      if (mode === 'exhausted') player.farmyardSpaceStates = []
     })
-    const remaining = session.state.players[0]!.cardStates[CARD]?.extraData?.clayRemaining
+    const remaining = remainingClayKeys(session.state.players[0]!)
     let response = session.takeAction(0, mode === 'pasture-division' ? 'fencing' : 'farm-expansion')
     response = session.commitSelectionChoice(0, mode === 'pasture-division' ? { edges: ['V-0-1'] }
       : mode === 'special-stable' ? { farmHand: { row: 0, col: 2 } } : { stables: [{ row: 0, col: 0 }] })
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources).toMatchObject({ clay: 0, food: 20 })
-    expect(response.state.players[0]!.cardStates[CARD]?.extraData?.clayRemaining).toBe(remaining)
+    expect(remainingClayKeys(response.state.players[0]!)).toEqual(remaining)
     expect(options(response).some(option => option.value === CARD)).toBe(false)
     const mutations = response.state.events.filter(event => event.type === 'farm.stableBuilt' || event.type === 'farm.fenceBuilt')
     expect(mutations).toHaveLength(1)
@@ -255,7 +266,8 @@ describe('A040 host action geometry', () => {
     if (options(response).some(option => option.value === CARD)) response = choose(session, response, CARD)
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.minorPlayed).toContain(CARD)
-    expect(response.state.players[0]!.cardStates[CARD]?.extraData?.clayRemaining).toBe(5)
+    expect(response.state.players[0]!.farmyardSpaceStates?.filter(token => token.sourceCardId === CARD))
+      .toEqual(clayTokens(['0-0', '1-1', '1-2', '2-1', '2-2']))
     expect(response.state.players[0]!.resources).toMatchObject({ wood: 19, reed: 0 })
   })
 
