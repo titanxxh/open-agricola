@@ -214,14 +214,20 @@ describe("A043 command boundaries", () => {
     assert.equal(built.state.players[actor]!.resources.wood, 0)
     return confirmed(built, actor)
   }
-  function room(s: GameSession) {
+  function room(s: GameSession, { stablesAvailable }: { stablesAvailable: boolean }) {
     let r = turn(s, 0, 'farm-expansion')
-    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice') {
-      const option = choices(r).find(o => o.value.includes('construct'))
+    if (stablesAvailable) {
+      assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice', JSON.stringify(r.interaction))
+      const options = choices(r)
+      assert.deepEqual(options.map(option => option.labelKey).sort(), ['actions.construct.name', 'actions.stables.name'])
+      assert.ok(options.every(option => !option.disabled))
+      const option = options.find(option => option.labelKey === 'actions.construct.name')
       assert.ok(option)
       r = ok(s.resolveChoice(0, option.value))
     }
     assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'farm-select' && r.interaction.request.farm.farmType === 'room', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
     return r
   }
   function nextRound(s: GameSession) {
@@ -284,7 +290,7 @@ describe("A043 command boundaries", () => {
         state.players[0]!.stableTiles = [{ row: 0, col: 1 }, { row: 0, col: 2 }, { row: 0, col: 3 }, { row: 0, col: 4 }]
       } })
     assert.equal(s.withCtx(() => getAvailableStableSupplyCount(s.getState().state, s.getState().state.players[0]!)), 0)
-    room(s)
+    room(s, { stablesAvailable: false })
     assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { rooms: [], stables: [{ row: 1, col: 1 }] }))
     const r = confirmed(ok(s.commitSelectionChoice(0, { rooms: [{ row: 0, col: 0 }], stables: [] })))
     assert.equal(r.state.players[0]!.stableTiles.length, 4)
@@ -294,7 +300,7 @@ describe("A043 command boundaries", () => {
   })
   it("a completed room construction with no stable schedules no food", () => {
     const s = setup({ resources: { wood: 5, reed: 2 } })
-    room(s)
+    room(s, { stablesAvailable: true })
     const r = confirmed(ok(s.commitSelectionChoice(0, { rooms: [{ row: 0, col: 0 }], stables: [] })))
     assert.equal(r.state.players[0]!.rooms, 3)
     assert.equal(r.state.players[0]!.stableTiles.length, 0)
@@ -368,7 +374,7 @@ describe("A043 command boundaries", () => {
     const s = setup({ resources: { wood: 10, reed: 2 }, configure(state) {
         state.players[0]!.stableTiles = [{ row: 0, col: 1 }, { row: 0, col: 2 }, { row: 0, col: 3 }, { row: 0, col: 4 }]
       } })
-    room(s)
+    room(s, { stablesAvailable: false })
     assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { rooms: [], stables: [] }))
     const r = confirmed(ok(s.commitSelectionChoice(0, { rooms: [{ row: 0, col: 0 }], stables: [] })))
     assert.equal(r.state.players[0]!.rooms, 3)
