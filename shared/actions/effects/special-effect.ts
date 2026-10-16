@@ -19,7 +19,9 @@ import {
   writeCardExtraData,
   writePrivateCardData,
   popFromCardStack,
+  addCardResourceGained,
 } from '../../cards/helpers/card-state'
+import { addResourcesFromCards } from '../../session/stats'
 import { initCardState } from '../../cards/__stubs__/helpers'
 import {
   fieldFindStackOfKind,
@@ -81,7 +83,7 @@ export type SpecialEffectParams =
   | { kind: 'set-flag'; flag: boolean }
   | { kind: 'set-infobox'; text: string }
   | { kind: 'add-farmyard-space-state'; state: FarmyardSpaceState }
-  | { kind: 'claim-farmyard-goods-tokens' }
+  | { kind: 'claim-farmyard-goods-tokens'; positions?: Array<{ row: number; col: number }> }
   | { kind: 'claim-field-goods-tokens'; positions?: Array<{ row: number; col: number }> }
   | { kind: 'grow-field-and-non-field-crops' }
   | { kind: 'consume-supply-token'; key: SupplyTokenKey; amount?: number }
@@ -319,8 +321,14 @@ export const specialEffectAction: ActionDefinition = {
         return { type: 'ok' }
       }
       case 'claim-farmyard-goods-tokens': {
-        const gained = claimFarmyardGoodsTokens(target, sourceCard)
+        if (p.positions !== undefined && (!Array.isArray(p.positions)
+          || p.positions.some(position => !position || !Number.isInteger(position.row) || !Number.isInteger(position.col)))) {
+          return { type: 'fail', errorKey: 'log.specialEffectFail' }
+        }
+        const gained = claimFarmyardGoodsTokens(target, sourceCard, p.positions)
         if (Object.keys(gained).length > 0) {
+          addResourcesFromCards(target, gained)
+          addCardResourceGained(target, sourceCard, gained)
           eventSink?.emit<'resource.moved'>({
             type: 'resource.moved',
             resources: gained,
