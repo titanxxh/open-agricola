@@ -6,7 +6,7 @@ import '../../shared/cards/A/A116_WoodCutter'
 import assert from 'node:assert/strict'
 import { type GameState } from '../../shared/contract/types'
 import { createWorkSession } from './_helpers/session-fixtures'
-import { assertEmptyAccumulationRejected, assertRejectedUnchanged, confirmNext } from './_helpers/session-assertions'
+import { assertEmptyAccumulationRejected, assertRejectedUnchanged, assertUndoRestored, confirmNext, undoRuleSnapshot } from './_helpers/session-assertions'
 import { createScenarioEvidence } from './_helpers/scenario-evidence'
 
 const sessionEvidence = createScenarioEvidence(import.meta.url)
@@ -148,6 +148,14 @@ describe("A116 command boundaries", () => {
       const r = amount === 0 ? assertEmptyAccumulationRejected(s, 0, 'forest') : turn(s, 0, 'forest')
       assert.equal(r.state.players[0]!.resources.wood, expectedWood)
       assert.equal(r.state.actionSpaces.find(a => a.id === 'forest')!.resources.wood, 0)
+      if (amount === 0) {
+        assert.equal(r.interaction.stateId, 'idle')
+      } else {
+        assert.ok(r.interaction.stateId === 'wait')
+        assert.deepEqual(r.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+        assert.equal(r.interaction.playerIndex, 0)
+      }
+      assert.equal(r.state.currentPlayerIndex, 0)
       sessionEvidence.record(`A116-N1-${amount}`, r)
     }
   })
@@ -160,6 +168,10 @@ describe("A116 command boundaries", () => {
       const s = setup(undefined, played)
       const r = turn(s, 0, space)
       assert.equal(r.state.players[0]!.resources.wood, expectedWood)
+      assert.ok(r.interaction.stateId === 'wait')
+      assert.deepEqual(r.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+      assert.equal(r.interaction.playerIndex, 0)
+      assert.equal(r.state.currentPlayerIndex, 0)
       sessionEvidence.record(`A116-N2-${space}`, r)
     }
     const s = setup()
@@ -167,18 +179,34 @@ describe("A116 command boundaries", () => {
     const r = turn(s, 1, 'forest')
     assert.equal(r.state.players[0]!.resources.wood, 0)
     assert.equal(r.state.players[1]!.resources.wood, 3)
+    assert.ok(r.interaction.stateId === 'wait')
+    assert.deepEqual(r.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 0 })
+    assert.equal(r.interaction.playerIndex, 1)
+    assert.equal(r.state.currentPlayerIndex, 1)
     sessionEvidence.record('A116-N2-opponent', r)
   })
   it("occupied source and invalid actor cannot gain and undo restores source once", () => {
     const s = setup()
+    const before = s.getState()
+    const beforeRules = undoRuleSnapshot(before)
     const first = turn(s, 0, 'forest')
     assertRejectedUnchanged(s, () => s.takeAction(0, 'forest'))
     const undone = ok(s.undoAction())
+    assertUndoRestored(beforeRules, undone)
+    assert.deepEqual(undone.interaction, before.interaction)
+    assert.equal(undone.interaction.stateId, 'idle')
+    assert.equal(undone.state.currentPlayerIndex, 0)
     assert.equal(undone.state.players[0]!.resources.wood, 0)
     assert.equal(undone.state.actionSpaces.find(a => a.id === 'forest')!.resources.wood, 3)
     assertRejectedUnchanged(s, () => s.takeAction(1, 'forest'))
     const retry = turn(s, 0, 'forest')
     assert.equal(retry.state.players[0]!.resources.wood, 4)
+    for (const response of [first, retry]) {
+      assert.ok(response.interaction.stateId === 'wait')
+      assert.deepEqual(response.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+      assert.equal(response.interaction.playerIndex, 0)
+      assert.equal(response.state.currentPlayerIndex, 0)
+    }
     sessionEvidence.record('A116-N3', { first, undone, retry })
   })
 })
