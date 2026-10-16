@@ -34,6 +34,20 @@ pnpm verify status
 
 这些记录用于核对本地检查范围，**不会缓存或跳过检查**；不代表被忽略的环境文件、外部服务状态或远端 CI 已验证。每个模式保留最近一次记录，失败不会沿用上次成功。提交或 rebase 后文件内容及运行环境完全相同可保持 current，但仍遵守每次 push 前的检查要求。push 后必须等待相关 Actions 结束，并区分实际成功、失败与 skipped。
 
+## Audit 场景迁移的联合验收
+
+迁移清单固定原始 279 个文件、3,252 个动态用例的身份；每个已承接场景必须指出原生测试文件及完整用例名，使用既有测试去重时还要说明相同的边界。普通 main 检查只读取小型清单，不要求维护者本地保留 audit 分支。迁移期间的联合验收从本地保留的精简源提交组装剩余场景，不把编号套件导入 main：
+
+```bash
+node scripts/audit-migration.mjs check
+node scripts/audit-migration.mjs prepare --output /absolute/path/outside-repository/run-unique
+node scripts/audit-migration.mjs verify --output /absolute/path/outside-repository/run-unique
+```
+
+`prepare` 要求依赖已安装且本地可读取清单指定的源提交。它保存候选源码指纹、逐文件来源摘要和清单副本，输出目录必须是新的 Git 外目录。`verify` 在这份封存源码上运行已迁原生文件与剩余原始场景，核对每个原始职责确实通过，并严格检查联合范围与实际传递 helper；编译器纳入文件另存清单，缺少任何指定根文件也会失败。修改候选内容后必须重新组装，不能沿用旧身份。C131 的本地预期是当前实现 `0`；历史预期 `1` 及规则讨论保留在来源元数据中。
+
+尚未迁移的旧场景会保留其原有完整快照写法，证据按本次运行、源文件和场景隔离保存在 Git 外。迁入原生测试后，成功仅留摘要，完整证据只用于失败或显式诊断。联合验收不能替代最终源码的 prepush 与完整 CI。
+
 ## 本机全量 CI
 
 本机执行普通 CI 与 CI Full 的并集；`pnpm test` 已覆盖 fast + slow，无需再重复 `pnpm test:fast`：

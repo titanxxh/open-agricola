@@ -8,7 +8,9 @@ export const takeNormalWorkerTurn = (session: GameSession, spaceId: string): Ses
   }
   expect(response.interaction.stateId).toBe('wait')
   if (response.interaction.stateId !== 'wait') return response
-  const ordinary = response.interaction.request.options?.find((option) => option.labelKey === 'actions.place-farmer.name')
+  const request = response.interaction.request
+  if (request.kind !== 'choice' && request.kind !== 'select-trigger') throw new Error(`Expected worker choice, got ${request.kind}`)
+  const ordinary = request.options.find((option) => option.labelKey === 'actions.place-farmer.name')
   if (ordinary) response = session.resolveChoice(response.interaction.playerIndex, ordinary.value)
   expect(response.interaction.stateId).toBe('wait')
   if (response.interaction.stateId !== 'wait') return response
@@ -22,7 +24,9 @@ export const chooseSupplyWorkerTurn = (session: GameSession, cardId: string): Se
     expect(response.interaction.stateId).toBe('wait')
     if (response.interaction.stateId !== 'wait') return response
     if (response.interaction.promptKey === 'ui.interactionPlaceFarmerExtra') return response
-    const options = response.interaction.request.options ?? []
+    const request = response.interaction.request
+    if (request.kind !== 'choice' && request.kind !== 'select-trigger') throw new Error(`Expected supply worker choice, got ${request.kind}`)
+    const options = request.options
     const option = options.find((entry) => entry.sourceCard === cardId && entry.labelKey !== 'ui.interactionDecline')
       ?? options.find((entry) => entry.labelKey === 'ui.interactionUseAbility')
     expect(option, JSON.stringify(response.interaction)).toBeDefined()
