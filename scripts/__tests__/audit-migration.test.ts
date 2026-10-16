@@ -14,7 +14,7 @@ const run = (manifest: unknown) => {
   fs.writeFileSync(file, JSON.stringify(manifest))
   return spawnSync(process.execPath, ['scripts/audit-migration.mjs', 'check', '--manifest', file], { encoding: 'utf8' })
 }
-const manifest = (cases: unknown[]) => ({ version: 1, source: { commit: 'fafd4f51b02357855d6895e173a521256ea6741e', files: 1, cases: cases.length }, files: [{ file: 'ae-negative-example.test.ts', sha256: 'a'.repeat(64), cases }] })
+const manifest = (cases: unknown[], nativeScope: { file: string; reason: string }[] = []) => ({ version: 1, nativeScope, source: { commit: 'fafd4f51b02357855d6895e173a521256ea6741e', files: 1, cases: cases.length }, files: [{ file: 'ae-negative-example.test.ts', sha256: 'a'.repeat(64), cases }] })
 
 it('validates remaining cases without requiring the local audit branch', () => {
   const result = run(manifest([{ title: 'card N1 rejects invalid payment', batch: 'M01', status: 'remaining' }]))
@@ -316,4 +316,67 @@ it('fails closed instead of partially pruning dynamic registrations', () => {
   const prepared = cli('prepare')
   expect(prepared.status).toBe(1)
   expect(prepared.stderr).toContain('unsupported partial registration')
+})
+
+
+it('checks and executes additional native scope without inventing a source mapping', () => {
+  const { checkout, output, write, cli, fixtureManifest } = createFixture()
+  fs.unlinkSync(path.join(checkout, 'server/__tests__/ae-negative-example.test.ts'))
+  fs.unlinkSync(path.join(checkout, 'server/__tests__/_helpers/negative-rule-audit.ts'))
+  const file = 'server/__tests__/scope-payment.test.ts'
+  fixtureManifest.nativeScope = [{ file, reason: 'Keep the existing sibling payment regression in the strict gate.' }]
+  write('cases.json', JSON.stringify(fixtureManifest))
+  write(file, "import { it, expect } from 'vitest'\nconst payment: number = 'invalid'\nit('additional native payment', () => expect(payment).toBe(1))\n")
+  const failed = cli('check-native')
+  expect(failed.status).toBe(1)
+  expect(`${failed.stdout}\n${failed.stderr}`).toContain('TS2322')
+  write(file, "import { it, expect } from 'vitest'\nconst payment: number = 1\nit('additional native payment', () => expect(payment).toBe(1))\n")
+  const passed = cli('check-native')
+  expect(passed.status, passed.stderr).toBe(0)
+  expect(JSON.parse(passed.stdout)).toMatchObject({ nativeFiles: [file], missingTypeRoots: [], typesExit: 0 })
+  const prepared = cli('prepare')
+  expect(prepared.status, prepared.stderr).toBe(0)
+  const verified = cli('verify')
+  expect(verified.status, `${verified.stdout}\n${verified.stderr}`).toBe(0)
+  expect(JSON.parse(verified.stdout)).toMatchObject({ tests: 2, passed: 2, pending: 0, includedTypeRoots: 2, coveredSourceCases: 1 })
+  const report = JSON.parse(fs.readFileSync(path.join(output, 'behavior.json'), 'utf8'))
+  expect(report.testResults.flatMap((suite: { assertionResults: { fullName: string; status: string }[] }) => suite.assertionResults))
+    .toContainEqual(expect.objectContaining({ fullName: 'additional native payment', status: 'passed' }))
+}, 30000)
+
+it.each([
+  [{ file: '../outside.test.ts', reason: 'outside' }],
+  [{ file: '/tmp/outside.test.ts', reason: 'absolute' }],
+  [{ file: 'server/__tests__/../scope.test.ts', reason: 'parent traversal' }],
+  [{ file: 'server//__tests__/A59_PotatoRidger-session.test.ts', reason: 'noncanonical alias' }],
+  [{ file: 'server/__tests__/missing-scope.test.ts', reason: 'missing' }],
+  [{ file: 'server/__tests__/A59_PotatoRidger-session.test.ts', reason: '  ' }],
+  [
+    { file: 'server/__tests__/A59_PotatoRidger-session.test.ts', reason: 'first' },
+    { file: 'server/__tests__/A59_PotatoRidger-session.test.ts', reason: 'duplicate' },
+  ],
+].map(scope => ({ scope })))('rejects invalid additional native scope: %j', ({ scope }) => {
+  const result = run({ ...manifest([{ title: 'original case', batch: 'M01', status: 'remaining' }]), nativeScope: scope })
+  expect(result.status).toBe(1)
+  expect(result.stderr).toContain('nativeScope')
+})
+
+
+it.each([{ scope: null }, { scope: 42 }, { scope: [null] }])('rejects malformed additional native scope: %j', ({ scope }) => {
+  const result = run({ ...manifest([{ title: 'original case', batch: 'M01', status: 'remaining' }]), nativeScope: scope })
+  expect(result.status).toBe(1)
+  expect(result.stderr).toContain('nativeScope')
+})
+
+it('rejects additional native scope symlinks that leave the checkout', () => {
+  const { checkout, write, cli, fixtureManifest } = createFixture()
+  const external = path.join(path.dirname(checkout), 'external.test.ts')
+  fs.writeFileSync(external, "import { it, expect } from 'vitest'\nit('outside', () => expect(1).toBe(1))\n")
+  const file = 'server/__tests__/external-scope.test.ts'
+  fs.symlinkSync(external, path.join(checkout, file))
+  fixtureManifest.nativeScope = [{ file, reason: 'This path must remain inside the checkout.' }]
+  write('cases.json', JSON.stringify(fixtureManifest))
+  const result = cli('check')
+  expect(result.status).toBe(1)
+  expect(result.stderr).toContain('nativeScope file escapes checkout')
 })
