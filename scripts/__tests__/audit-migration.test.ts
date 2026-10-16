@@ -313,6 +313,25 @@ const createSnapshotFixture = () => {
   return fixture
 }
 
+it('binds the snapshot compiler to its checkout when the CLI caller is outside', () => {
+  const { checkout, write, cli } = createSnapshotFixture()
+  const file = 'server/__tests__/native-snapshot.test.ts'
+  write(file, "import { it } from 'vitest'; import { cloneState } from '../../shared/session/state-bootstrap'; it('preserves the snapshot rule', () => cloneState({ value: 1 }))")
+  const input = fs.readFileSync(path.join(checkout, file), 'utf8')
+  const inside = cli('check-native')
+  expect(inside.status).toBe(1)
+  expect(inside.stderr).toContain('Normalizing test snapshot: server/__tests__/native-snapshot.test.ts')
+  const outside = () => spawnSync(process.execPath, [path.join(checkout, 'scripts/audit-migration.mjs'), 'check-native', '--manifest', path.join(checkout, 'cases.json')], { cwd: path.dirname(checkout), encoding: 'utf8' })
+  const rejected = outside()
+  expect(rejected.status).toBe(1)
+  expect(rejected.stderr).toContain('Normalizing test snapshot: server/__tests__/native-snapshot.test.ts')
+  expect(fs.readFileSync(path.join(checkout, file), 'utf8')).toBe(input)
+  write('shared/session/history-streams.ts', 'export const captureStateWithHistory = <T>(state: T): T => state')
+  write(file, "import { it } from 'vitest'; import { captureStateWithHistory } from '../../shared/session/history-streams'; it('preserves the snapshot rule', () => captureStateWithHistory({ value: 1 }))")
+  const pure = outside()
+  expect(pure.status, pure.stderr).toBe(0)
+}, 30000)
+
 it('checks the actual loadState receiver in the native compiler Program', () => {
   const { write, cli } = createSnapshotFixture()
   const imports = "import { it } from 'vitest'\nimport { cloneState } from '../../shared/session/state-bootstrap'\n"
