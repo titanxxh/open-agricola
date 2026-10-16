@@ -929,6 +929,14 @@ describe("A107 command boundaries", () => {
             const response = count === 0 ? assertEmptyAccumulationRejected(s, 0, 'forest') : turn(s, 0, 'forest');
             assert.equal(response.state.players[0]!.resources.food, 40);
             assert.equal(response.state.players[0]!.resources.wood, count);
+            if (count === 0) {
+                assert.equal(response.interaction.stateId, 'idle');
+            } else {
+                assert.ok(response.interaction.stateId === 'wait');
+                assert.deepEqual(response.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 });
+                assert.equal(response.interaction.playerIndex, 0);
+            }
+            assert.equal(response.state.currentPlayerIndex, 0);
             save(`A107-N2-${count}`, response);
         }
         const food = turn(setup(state => state.actionSpaces.find(s => s.id === 'fishing')!.resources.food = 5), 0, 'fishing');
