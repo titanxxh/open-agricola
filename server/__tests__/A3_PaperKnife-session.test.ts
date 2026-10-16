@@ -1,88 +1,39 @@
+import { createInitialState } from '../../shared/session/state-bootstrap'
 import { withActiveRegistry } from '../../shared/cards/active-registry'
 import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-/**
- * A3 PaperKnife session tests — the reference alignment (Task 4.1).
- *
- * This file contains two sets of tests:
- *
- * 1. Unit-level prerequisite + onBuy tests (legacy, against the simplified impl —
- *    some will be updated / removed once Task 4.2 rewrites A3).
- *
- * 2. Session-level behavioral tests (new, TDD — FAILING against the current simplified
- *    impl, intended to pass after Task 4.2 rewrites A3).
- *
- * Target behavior per spec §2.1:
- *   onBuy → emit a pending 'selection' (interaction.stateId='selection') with:
- *     { kind: 'occupation-hand', selectableCards: player.occupationHand, min=3, max=3,
- *       selectionEffect: 'paper-knife-random-play' }
- *   commitSelectionChoice({ cardIds }) → selection effect fires:
- *     • rollAndCacheCardPick → caches pick in cardStates[CARD_ID].privateData.pick
- *     • state.pendingUndoBoundary = true
- *     • returns occupation leaf { exactCost: {}, allowedCards: [pick] }
- *   occupation prompt offers the revealed card or decline
- *
- * Current (simplified) impl: directly mutates occupationHand → occupationPlayed in onBuy,
- * never emits a selection pending, and skips the played occupation's onBuy.
- * Most session-tier tests below FAIL against the current impl.
- *
- * OCC_A = 'A116_WoodCutter'   — cost: {}, no onBuy side-effect (clean leaf)
- * OCC_B = 'A117_WoodCarrier'  — cost: {}, onBuy grants 1 wood per improvement (observable)
- * OCC_C = 'A118_Treegardener' — cost: {}, no onBuy side-effect (clean leaf)
- * OCC_D = 'A119_FirewoodCollector' — cost: {}, no onBuy side-effect (clean leaf)
- */
-
 import { describe, expect, it } from 'vitest'
 import { getCardEffect } from '../../shared/cards/card-effects'
-import { A003_PaperKnife_impl } from '../../shared/cards/A/A003_PaperKnife'
+import { A003_PaperKnife_impl, A003_PaperKnife } from '../../shared/cards/A/A003_PaperKnife'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
-import type { GameState, PlayerState } from '../../shared/contract/types'
-import { GameSession } from '../game/authoritative-session'
+import { type GameState, type PlayerState } from '../../shared/contract/types'
+import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome, setActiveWorkerCount } from '../../shared/domain/player'
-
-import '../../shared/cards/A/A003_PaperKnife'
-import { A003_PaperKnife } from '../../shared/cards/A/A003_PaperKnife'
 import '../../shared/cards/A/A116_WoodCutter'
 import '../../shared/cards/A/A117_WoodCarrier'
 import '../../shared/cards/A/A118_Treegardener'
 import '../../shared/cards/A/A119_FirewoodCollector'
-import type { ActionFlow } from '../../shared/contract/types'
+import assert from 'node:assert/strict'
+import { createWorkSession } from './_helpers/session-fixtures'
+import { assertRejectedUnchanged, getChoiceOptions } from './_helpers/session-assertions'
+import { createScenarioEvidence } from './_helpers/scenario-evidence'
+
+const evidence = createScenarioEvidence(import.meta.url)
 
 const CARD_ID = 'A003_PaperKnife'
 
-const createPlayer = (id = 'p1'): PlayerState =>
-  ({
-    id, name: id, color: 'red',
-    resources: {
-      wood: 0, clay: 0, reed: 0, stone: 0, food: 0,
-      grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
-    },
-    workers: [
-      { id: '1', isActive: true, isNewborn: false },
-      { id: '2', isActive: true, isNewborn: false },
-      { id: '3', isActive: false, isNewborn: false },
-      { id: '4', isActive: false, isNewborn: false },
-      { id: '5', isActive: false, isNewborn: false },
-    ],
-    rooms: 2, houseType: 'wood' as const,
-    fields: [], fences: 0, roomTiles: [{ row: 0, col: 0 }, { row: 1, col: 0 }],
-    stableTiles: [],
-    improvements: [], minorHand: [], minorPlayed: [],
-    occupationHand: [], occupationPlayed: [],houseAnimals: {}, stableAnimals: {},
-    pastures: [], fenceSegments: [],
-    majorEffects: { wellRounds: 0 }, startPlayer: false,
-    activeModifiers: [],
-    cardStates: {},
-  }) as unknown as PlayerState
+const createPlayer = (id = 'p1'): PlayerState => {
+  const player = createInitialState(1, { playerCount: 2 }).players[0]!
+  player.id = id
+  player.name = id
+  player.minorHand = []
+  player.occupationHand = []
+  Object.assign(player.resources, { wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 })
+  return player
+}
 
-const createState = (players: PlayerState[]): GameState =>
-  ({
-    round: 1, currentPlayerIndex: 0, players,
-    actionSpaces: [], log: [],
-    roundActionOrder: Array.from({ length: 14 }).map(() => null),
-    gameSeed: 1, availableMajorImprovements: [],
-    futureMeeples: [], pendingFutureMeeples: [],
-    gameOver: false, workPhaseObtainedResources: {},
-  }) as unknown as GameState
+const createState = (players: PlayerState[]): GameState => ({
+  ...createInitialState(1, { playerCount: 2 }), players,
+})
 
 describe('A003_PaperKnife prerequisite', () => {
   it('registers "3 Occupations In Hand" as a custom prerequisite', () => {
@@ -135,15 +86,16 @@ describe('A003_PaperKnife onBuy', () => {
     const effect = withActiveRegistry(ruleRegistry, () => getCardEffect(CARD_ID))
     const flow = withActiveRegistry(ruleRegistry, () => effect!.onBuy!(state, player))
     expect(flow).toBeDefined()
-    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).type).toBe('leaf')
-    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('selection')
+    assert.ok(flow?.type === 'leaf')
+    expect(flow.actionId).toBe('selection')
 
     // Hand must NOT be mutated by onBuy — mutation happens downstream via occupation
     expect(player.occupationPlayed).toHaveLength(0)
     expect(player.occupationHand).toHaveLength(3)
 
     // actionContext must carry occupation-hand selection params
-    const ctx = (flow as Extract<ActionFlow, { type: 'leaf' }>).actionContext
+    const ctx = flow.actionContext
+    assert.ok(ctx)
     expect(ctx.selectionKind).toBe('occupation-hand')
     expect(ctx.minSelections).toBe(3)
     expect(ctx.maxSelections).toBe(3)
@@ -176,9 +128,9 @@ describe('A003_PaperKnife onBuy', () => {
     const flowA = withActiveRegistry(ruleRegistry, () => effect.onBuy!(stateA, a))
     const flowB = withActiveRegistry(ruleRegistry, () => effect.onBuy!(stateB, b))
     // Both should produce identical selectableCards (same hand)
-    expect((flowA as Extract<ActionFlow, { type: 'leaf' }>).actionContext.selectableCards).toEqual(
-      (flowB as Extract<ActionFlow, { type: 'leaf' }>).actionContext.selectableCards,
-    )
+    assert.ok(flowA?.type === 'leaf' && flowB?.type === 'leaf')
+    expect(flowA.actionContext?.selectableCards).toEqual(['A009_SheepFarmer', 'A124_Knapper', 'A027_OvenSite'])
+    expect(flowB.actionContext?.selectableCards).toEqual(['A009_SheepFarmer', 'A124_Knapper', 'A027_OvenSite'])
   })
 })
 
@@ -198,7 +150,7 @@ const OCC_D = 'A119_FirewoodCollector'
  */
 const makeSession = (opts: { wood?: number; gameSeed?: number; occHand?: string[] } = {}) => {
   const { wood = 1, gameSeed = 42, occHand = [OCC_A, OCC_B, OCC_C, OCC_D] } = opts
-  const session = new GameSession(gameSeed, undefined, { playerCount: 2 })
+  const session = evidence.track(createWorkSession({ seed: gameSeed, options: { playerCount: 2 } }))
   const state = session.getState().state
   state.currentPlayerIndex = 0
   state.round = 1
@@ -234,7 +186,7 @@ const playA3 = (session: GameSession) => {
   expect(mpResp.ok).toBe(true)
   expect(mpResp.interaction.stateId).toBe('wait')
   if (mpResp.interaction.stateId !== 'wait') return mpResp
-  const improvementOption = mpResp.interaction.request.options?.find(
+  const improvementOption = getChoiceOptions(mpResp)?.find(
     (option) => option.value.startsWith('action-improvement-'),
   )
   let cardPrompt = mpResp
@@ -244,10 +196,10 @@ const playA3 = (session: GameSession) => {
   }
   expect(cardPrompt.interaction.stateId).toBe('wait')
   if (cardPrompt.interaction.stateId !== 'wait') return cardPrompt
-  if (cardPrompt.interaction.request.selection?.kind === 'occupation-hand') {
+  if (cardPrompt.interaction.request.kind === 'selection' && cardPrompt.interaction.request.selection.kind === 'occupation-hand') {
     return cardPrompt
   }
-  const cardOption = cardPrompt.interaction.request.options?.find(
+  const cardOption = getChoiceOptions(cardPrompt)?.find(
     (option) => option.value === SESSION_CARD_ID,
   )
   expect(cardOption).toBeDefined()
@@ -267,7 +219,9 @@ describe('A003_PaperKnife session-tier: flow', () => {
     // TARGET: interaction.stateId must be 'selection', not 'choice' or 'idle'
     expect(resp.interaction.stateId).toBe('wait')
 
-    const interaction = resp.interaction as Extract<InteractionState, { stateId: 'wait' }>
+    const interaction = resp.interaction
+    assert.ok(interaction.stateId === 'wait' && interaction.request.kind === 'selection'
+      && interaction.request.selection.kind === 'occupation-hand')
     // kind must be occupation-hand
     expect(interaction.request.selection?.kind).toBe('occupation-hand')
     // selectableCards must be the player's full occupation hand in order
@@ -310,11 +264,11 @@ describe('A003_PaperKnife session-tier: flow', () => {
     expect(commitResp.interaction.stateId).toBe('wait')
     if (commitResp.interaction.stateId !== 'wait') return
     const p0 = commitResp.state.players[0]!
-    const pick = p0.cardStates?.[SESSION_CARD_ID]?.privateData?.pick as string | undefined
+    const pick = p0.cardStates?.[SESSION_CARD_ID]?.privateData?.pick
     expect(pick).toBeDefined()
-    const acceptOption = commitResp.interaction.request.options?.find((option) => option.value !== '__skip__')
+    const acceptOption = getChoiceOptions(commitResp)?.find((option) => option.value !== '__skip__')
     expect(acceptOption?.sourceCard).toBe(SESSION_CARD_ID)
-    expect(commitResp.interaction.request.options?.some((option) => option.value === '__skip__')).toBe(true)
+    expect(getChoiceOptions(commitResp)?.some((option) => option.value === '__skip__')).toBe(true)
     expect(p0.occupationPlayed).toEqual([])
     expect(p0.occupationHand).toEqual([OCC_A, OCC_B, OCC_C, OCC_D])
 
@@ -370,7 +324,7 @@ describe('A003_PaperKnife session-tier: flow', () => {
     expect(pick).toBe(expected.state.players[0]!.cardStates[SESSION_CARD_ID]?.privateData?.pick)
     expect(valid).toContain(pick)
     expect(response.interaction.stateId).toBe('wait')
-    const accept = response.interaction.request!.options!.find(option => option.value !== '__skip__')!
+    const accept = getChoiceOptions(response).find(option => option.value !== '__skip__')!
     const played = session.resolveChoice(0, accept.value)
     expect(played.ok, played.error).toBe(true)
     expect(played.state.players[0]!.occupationPlayed).toEqual([pick])
@@ -387,15 +341,15 @@ describe('A003_PaperKnife session-tier: flow', () => {
 
     expect(resp.ok).toBe(true)
     const player = resp.state.players[0]!
-    const pick = player.cardStates?.[SESSION_CARD_ID]?.privateData?.pick as string | undefined
+    const pick = player.cardStates?.[SESSION_CARD_ID]?.privateData?.pick
     expect(pick).toBeDefined()
     expect(player.occupationPlayed).toEqual([])
     expect(player.occupationHand).toEqual([OCC_A, OCC_B, OCC_C, OCC_D])
     expect(player.resources.food).toBe(3)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    expect(resp.interaction.request.options?.find((option) => option.value !== '__skip__')?.sourceCard).toBe(SESSION_CARD_ID)
-    expect(resp.interaction.request.options?.some((option) => option.value === '__skip__')).toBe(true)
+    expect(getChoiceOptions(resp)?.find((option) => option.value !== '__skip__')?.sourceCard).toBe(SESSION_CARD_ID)
+    expect(getChoiceOptions(resp)?.some((option) => option.value === '__skip__')).toBe(true)
 
     const declined = session.resolveChoice(0, '__skip__')
     expect(declined.ok).toBe(true)
@@ -481,7 +435,7 @@ describe('A003_PaperKnife session-tier: flow', () => {
     expect(blocked.interaction.stateId).toBe('wait')
     if (blocked.interaction.stateId !== 'wait') return
     expect(blocked.interaction.request.kind).toBe('confirm-next-player')
-    expect(blocked.interaction.request.options ?? []).toEqual([])
+    expect(getChoiceOptions(blocked) ?? []).toEqual([])
     expect(blocked.state.players[0]!.minorHand).toContain(SESSION_CARD_ID)
     expect(blocked.state.players[1]!.minorHand).not.toContain(SESSION_CARD_ID)
     expect(blocked.state.players[0]!.resources.wood).toBe(1)
@@ -496,7 +450,8 @@ describe('A003_PaperKnife session-tier: flow', () => {
     expect(retry.ok).toBe(true)
     expect(retry.interaction.stateId).toBe('wait')
     if (retry.interaction.stateId !== 'wait') return
-    expect(retry.interaction.request.selection?.kind).toBe('occupation-hand')
+    assert.ok(retry.interaction.request.kind === 'selection')
+    expect(retry.interaction.request.selection.kind).toBe('occupation-hand')
   })
 
   // ---------------------------------------------------------------------------
@@ -532,9 +487,9 @@ describe('A003_PaperKnife session-tier: flow', () => {
 
     expect(commitResp.interaction.stateId).toBe('wait')
     if (commitResp.interaction.stateId !== 'wait') return
-    const pick = commitResp.state.players[0]!.cardStates?.[SESSION_CARD_ID]?.privateData?.pick as string | undefined
+    const pick = commitResp.state.players[0]!.cardStates?.[SESSION_CARD_ID]?.privateData?.pick
     expect(pick).toBeDefined()
-    const acceptOption = commitResp.interaction.request.options?.find((option) => option.value !== '__skip__')
+    const acceptOption = getChoiceOptions(commitResp)?.find((option) => option.value !== '__skip__')
     expect(acceptOption).toBeDefined()
     const acceptResp = session.resolveChoice(0, acceptOption!.value)
     expect(acceptResp.ok).toBe(true)
@@ -552,23 +507,96 @@ describe('A003_PaperKnife session-tier: flow', () => {
     }
   })
 
-  // ---------------------------------------------------------------------------
-  // Case 7: Occupation with unpayable additional cost (skipped — not applicable)
-  // ---------------------------------------------------------------------------
-  it.skip('case 7: occupation with unpayable additionalCost (not applicable with exactCost: {})', () => {
-    // TODO (to revisit in Task 4.2 if needed):
-    //
-    // A3's selectionEffect inserts a occupation leaf with exactCost: {}.
-    // In the current occupation action, exactCost completely replaces the
-    // occupation's cost — there is no "additionalCost" field that survives the override.
-    // Therefore, every A3-played occupation is free, regardless of its base cost.
-    //
-    // The reference spec §6 item 3: "the reference likely fails the play silently, leaving the occupation in
-    // hand, when the occupation cost is unpayable." With exactCost: {} this
-    // scenario cannot arise in our engine — the occupation is always affordable.
-    //
-    // If a future "additionalCost" concept is added to occupations (independent of
-    // exactCost), this test should be re-enabled and a suitable occupation used.
-    // Until then, the scenario is untestable without modifying the type system.
+
+})
+
+describe('A003 rule boundaries', () => {
+
+  const occupations = ['A116_WoodCutter', 'A118_Treegardener', 'A119_FirewoodCollector', 'A103_Portmonger']
+
+  function setup(card: string, configure: (state: GameState) => void = () => { }) {
+    return evidence.track(createWorkSession({
+      configure(state) {
+        state.players[0]!.minorHand = [card]
+        state.players[0]!.occupationHand = [...occupations]
+        for (const player of state.players) {
+          player.resources.wood = 0
+          player.resources.food = 0
+        }
+        configure?.(state)
+      }
+    }))
+  }
+
+  function requireWait(response: SessionResponse) {
+    assert.equal(response.ok, true, response.error)
+    assert(response.interaction.stateId === 'wait')
+    return response.interaction
+  }
+
+  function play(session: ReturnType<typeof setup>, card: string) {
+    let response = session.takeAction(0, 'meeting-place')
+    requireWait(response)
+    if (!response.state.players[0]!.minorHand.includes(card))
+      return response
+    if (!choices(response).some(option => option.value === card)) {
+      const improvement = choices(response).find(option => option.value.startsWith('action-improvement-'))
+      assert(improvement)
+      response = session.resolveChoice(0, improvement.value)
+      if (!response.state.players[0]!.minorHand.includes(card))
+        return response
+      requireWait(response)
+    }
+    assert(choices(response).some(option => option.value === card))
+    return session.resolveChoice(0, card)
+  }
+
+  function choices(response: SessionResponse) {
+    const request = requireWait(response).request
+    assert(request.kind === 'choice')
+    return request.options
+  }
+
+  function accept(session: ReturnType<typeof setup>, response: SessionResponse) {
+    const candidates = choices(response).filter(candidate => !['skip', '__skip__'].includes(candidate.value))
+    assert.equal(candidates.length, 1, JSON.stringify(response.interaction))
+    return session.resolveChoice(0, candidates[0]!.value)
+  }
+
+  it("Paper Knife must reject four occupations and legally play one selected card without food", () => {
+    const session = setup('A003_PaperKnife', state => { state.players[0]!.resources.wood = 1 })
+    play(session, 'A003_PaperKnife')
+    const selected = occupations.slice(0, 3)
+    assertRejectedUnchanged(session, () => session.commitSelectionChoice(0, { cardIds: occupations }))
+    const selectedResponse = session.commitSelectionChoice(0, { cardIds: selected })
+    const response = accept(session, selectedResponse)
+    assert.equal(response.ok, true, response.error)
+    const player = response.state.players[0]!
+    assert.equal(player.occupationPlayed.length, 1)
+    assert(selected.includes(player.occupationPlayed[0]!))
+    assert(player.occupationHand.includes(occupations[3]!))
+    assert.equal(player.occupationHand.length, 3)
+    assert.equal(player.resources.food, 0)
+    assert.equal(player.resources.wood, 0)
+    assert(response.state.players[1]!.minorHand.includes('A003_PaperKnife'))
+    assertRejectedUnchanged(session, () => session.commitSelectionChoice(0, { cardIds: selected }))
+  })
+
+  it("Paper Knife must reject selecting the same occupation three times", () => {
+    const session = setup('A003_PaperKnife', state => { state.players[0]!.resources.wood = 1 })
+    play(session, 'A003_PaperKnife')
+    assertRejectedUnchanged(session, () => session.commitSelectionChoice(0, { cardIds: [occupations[0]!, occupations[0]!, occupations[0]!] }))
+    assert.equal(session.commitSelectionChoice(0, { cardIds: occupations.slice(0, 3) }).ok, true)
+  })
+
+  it("Paper Knife must reject three occupations belonging to the other player", () => {
+    const foreign = ['A117_WoodCarrier', 'B116_Shoreforester', 'C109_SchnappsDistiller']
+    const session = setup('A003_PaperKnife', state => {
+      state.players[0]!.resources.wood = 1
+      state.players[1]!.occupationHand = [...foreign]
+    })
+    play(session, 'A003_PaperKnife')
+    assertRejectedUnchanged(session, () => session.commitSelectionChoice(0, { cardIds: foreign }))
+    assert.equal(session.commitSelectionChoice(0, { cardIds: occupations.slice(0, 3) }).ok, true)
   })
 })

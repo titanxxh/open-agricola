@@ -1,16 +1,16 @@
-import type { GameSession as SessionRuleOwner } from '../game/authoritative-session'
+import { type GameSession as SessionRuleOwner, GameSession, type SessionResponse } from '../game/authoritative-session'
 import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
-import {
-  executeCardListener,
-  getRegisteredCardListeners,
-  type CardListenerContext,
-} from '../../shared/cards/card-listeners'
-
+import { executeCardListener, getRegisteredCardListeners, type CardListenerDispatchInput } from '../../shared/cards/card-listeners'
 import '../../shared/cards/C/C094_StableCleaner'
 import '../../shared/cards/C/C088_CarpentersApprentice'
-import type { ActionFlow } from '../../shared/contract/types'
+
+import assert from 'node:assert/strict'
+import { createWorkSession } from './_helpers/session-fixtures'
+import { assertRejectedUnchanged, expectFarmSelection, expectTileFarmSelection } from './_helpers/session-assertions'
+import { createScenarioEvidence } from './_helpers/scenario-evidence'
+
+const evidence = createScenarioEvidence(import.meta.url)
 
 const CARD_ID = 'C094_StableCleaner'
 const LISTENER_ID = 'C94-stable-cleaner-anytime'
@@ -19,7 +19,7 @@ const findListener = (ruleOwner: SessionRuleOwner, id: string) =>
   ruleOwner.withCtx(() => getRegisteredCardListeners()).find((l) => l.id === id)
 
 const setupParity = ({ inHand = false, wood = 0, food = 0 } = {}) => {
-  const session = new GameSession(42)
+  const session = evidence.track(createWorkSession({ seed: 42 }))
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
@@ -47,9 +47,9 @@ describe('C094 Stable Cleaner parity', () => {
 
     const selection = session.takeAnytimeAction(0, LISTENER_ID)
     expect(selection.interaction.stateId).toBe('wait')
-    if (selection.interaction.stateId !== 'wait' || selection.interaction.request.farm.farmType !== 'stable') return
+    if (selection.interaction.stateId !== 'wait' || expectFarmSelection(selection).farmType !== 'stable') return
     const response = session.commitSelectionChoice(0, {
-      stables: selection.interaction.request.farm.selectableTiles.slice(0, 2),
+      stables: expectTileFarmSelection(selection, 'stable').selectableTiles.slice(0, 2),
     })
 
     expect(response.ok, response.error).toBe(true)
@@ -70,10 +70,10 @@ describe('C094 Stable Cleaner parity', () => {
     session.takeAction(0, 'farmland')
     const selection = session.takeAnytimeAction(0, LISTENER_ID)
     expect(selection.interaction.stateId).toBe('wait')
-    if (selection.interaction.stateId !== 'wait' || selection.interaction.request.farm.farmType !== 'stable') return
+    if (selection.interaction.stateId !== 'wait' || expectFarmSelection(selection).farmType !== 'stable') return
 
     const response = session.commitSelectionChoice(0, {
-      stables: [selection.interaction.request.farm.selectableTiles[0]!],
+      stables: [expectTileFarmSelection(selection, 'stable').selectableTiles[0]!],
     })
 
     expect(response.ok, response.error).toBe(true)
@@ -94,7 +94,7 @@ describe('C094_StableCleaner — exact cost 1 wood + 1 food', () => {
     stableTilesLength = 0,
     consumedStables = 0,
   ) => {
-    const session = new GameSession(42)
+    const session = evidence.track(createWorkSession({ seed: 42 }))
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -111,13 +111,16 @@ describe('C094_StableCleaner — exact cost 1 wood + 1 food', () => {
     }))
     player.supplyTokensConsumed = consumedStables > 0 ? { stable: consumedStables } : {}
     session.loadState(state)
-    return { session, context: {
-      actionHooks: session.actionHooks,
-      state,
-      player,
-      actionId: 'stables',
-      phase: 'anytime' as const,
-    } as unknown as CardListenerContext }
+    return {
+      session, context: {
+        actionHooks: session.actionHooks,
+        space: state.actionSpaces.find(space => space.id === 'farm-expansion')!,
+        state,
+        player,
+        actionId: 'stables',
+        phase: 'anytime',
+      } satisfies CardListenerDispatchInput
+    }
   }
 
   it('emits stables flow with exactCost { wood:1, food:1 } when player has 1 wood + 1 food', () => {
@@ -128,14 +131,14 @@ describe('C094_StableCleaner — exact cost 1 wood + 1 food', () => {
     expect(listener).toBeDefined()
     const result = session.withCtx(() => executeCardListener(listener!, ctx))
     expect(result?.flow).toBeDefined()
-    const seq = result!.flow as Extract<ActionFlow, { type: 'seq' }>
-    expect(seq.type).toBe('seq')
+    const seq = result?.flow
+    assert.ok(seq?.type === 'seq')
 
     const stablesLeaf = seq.children.find(
       (c) => c.type === 'leaf' && c.actionId === 'stables',
-    ) as Extract<ActionFlow, { type: 'leaf' }> | undefined
-    expect(stablesLeaf).toBeDefined()
-    expect(stablesLeaf!.actionContext).toBeDefined()
+    )
+    assert.ok(stablesLeaf?.type === 'leaf')
+    expect(stablesLeaf.actionContext).toBeDefined()
     expect(stablesLeaf!.actionContext!.exactCost).toEqual({ wood: 1, food: 1 })
     expect(stablesLeaf!.actionContext!.costOverride).toBeUndefined()
     expect(stablesLeaf!.actionContext!.trueAction).toBe(false)
@@ -184,7 +187,7 @@ describe('C094_StableCleaner — exact cost 1 wood + 1 food', () => {
   })
 
   it('anytime stable can be built with C88 discount and no wood', () => {
-    const session = new GameSession(42)
+    const session = evidence.track(createWorkSession({ seed: 42 }))
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -214,5 +217,95 @@ describe('C094_StableCleaner — exact cost 1 wood + 1 food', () => {
     expect(built.state.players[0]!.resources.wood).toBe(0)
     expect(built.state.players[0]!.resources.food).toBe(0)
     expect(built.state.players[0]!.stableTiles).toHaveLength(3)
+  })
+})
+
+describe('C094 rule boundaries', () => {
+
+  function wait(response: SessionResponse) {
+    assert.equal(response.ok, true, response.error)
+    assert.ok(response.interaction.stateId === 'wait', JSON.stringify(response.interaction))
+    return response.interaction
+  }
+
+  const CLEANER = 'C094_StableCleaner'
+
+  function cleaner({ wood = 2, food = 2, played = true, supply = 4 } = {}) {
+    return evidence.track(createWorkSession({
+      seed: 2094, configure(state) {
+        const p = state.players[0]!
+        p.occupationPlayed = played ? [CLEANER] : []
+        Object.assign(p.resources, { wood, food })
+        p.stableTiles = [{ row: 0, col: 2 }, { row: 0, col: 3 }, { row: 0, col: 4 }, { row: 1, col: 2 }].slice(0, 4 - supply)
+      }
+    }))
+  }
+
+  const cleanerObserved = (r: SessionResponse) => ({ wood: r.state.players[0]!.resources.wood, food: r.state.players[0]!.resources.food, stables: r.state.players[0]!.stableTiles.length, workers: r.state.actionSpaces.reduce((n, space) => n + space.takenBy.filter(w => w.playerId === r.state.players[0]!.id).length, 0) })
+
+  function enterCleaner(s: GameSession) {
+    const r = s.takeAnytimeAction(0, 'C94-stable-cleaner-anytime')
+    assert.equal(wait(r).request.kind, 'farm-select')
+    return r
+  }
+
+  it("builds in two completed activations for one wood and food each without a person", () => {
+    const s = cleaner()
+    enterCleaner(s)
+    assertRejectedUnchanged(s, () => s.takeAnytimeAction(0, 'C94-stable-cleaner-anytime'))
+    let r = s.commitSelectionChoice(0, { stables: [{ row: 0, col: 2 }] })
+    assert.equal(r.ok, true, r.error)
+    assert.deepEqual(cleanerObserved(r), { wood: 1, food: 1, stables: 1, workers: 0 })
+    enterCleaner(s)
+    r = s.commitSelectionChoice(0, { stables: [{ row: 0, col: 3 }] })
+    assert.equal(r.ok, true, r.error)
+    assert.deepEqual(cleanerObserved(r), { wood: 0, food: 0, stables: 2, workers: 0 })
+    assertRejectedUnchanged(s, () => s.takeAnytimeAction(0, 'C94-stable-cleaner-anytime'))
+  })
+
+  it("missing payment unplayed card and exhausted supply cannot activate", () => {
+    for (const settings of [{ wood: 0 }, { food: 0 }, { played: false }, { supply: 0 }]) {
+      const s = cleaner(settings)
+      assertRejectedUnchanged(s, () => s.takeAnytimeAction(0, 'C94-stable-cleaner-anytime'))
+    }
+  })
+
+  it("illegal stable targets reject before a legal retry", () => {
+    const s = cleaner()
+    enterCleaner(s)
+    for (const stables of [[s.state.players[0]!.roomTiles[0]!], [{ row: 99, col: 99 }]])
+      assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { stables }))
+    const r = s.commitSelectionChoice(0, { stables: [{ row: 0, col: 2 }] })
+    assert.equal(r.ok, true, r.error)
+    assert.deepEqual(cleanerObserved(r), { wood: 1, food: 1, stables: 1, workers: 0 })
+  })
+
+  it("an unaffordable two-stable plan rejects before paying for one", () => {
+    const s = cleaner({ wood: 1, food: 1 })
+    enterCleaner(s)
+    assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { stables: [{ row: 0, col: 2 }, { row: 0, col: 3 }] }))
+    const r = s.commitSelectionChoice(0, { stables: [{ row: 0, col: 2 }] })
+    assert.equal(r.ok, true, r.error)
+    assert.deepEqual(cleanerObserved(r), { wood: 0, food: 0, stables: 1, workers: 0 })
+  })
+
+  it("undo restores stable payment and permits a different legal target", () => {
+    const s = cleaner()
+    enterCleaner(s)
+    assert.equal(s.commitSelectionChoice(0, { stables: [{ row: 0, col: 2 }] }).ok, true)
+    const undone = s.undoStep()
+    assert.equal(undone.ok, true, undone.error)
+    assert.deepEqual(cleanerObserved(undone), { wood: 2, food: 2, stables: 0, workers: 0 })
+    const r = s.commitSelectionChoice(0, { stables: [{ row: 0, col: 3 }] })
+    assert.equal(r.ok, true, r.error)
+    assert.deepEqual(cleanerObserved(r), { wood: 1, food: 1, stables: 1, workers: 0 })
+  })
+
+  it("duplicate stable positions must reject without paying or consuming supply", () => {
+    const s = cleaner()
+    enterCleaner(s)
+    const r = s.commitSelectionChoice(0, { stables: [{ row: 0, col: 2 }, { row: 0, col: 2 }] })
+    const actual = { ok: r.ok, ...cleanerObserved(r), uniquePositions: new Set(r.state.players[0]!.stableTiles.map(t => `${t.row},${t.col}`)).size }
+    assert.deepEqual(actual, { ok: false, wood: 2, food: 2, stables: 0, workers: 0, uniquePositions: 0 })
   })
 })

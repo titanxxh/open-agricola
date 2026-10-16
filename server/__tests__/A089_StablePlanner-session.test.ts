@@ -4,13 +4,20 @@ import { GameSession, type SessionResponse } from '../game/authoritative-session
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import '../../shared/cards/A/A089_StablePlanner'
+import assert from 'node:assert/strict'
+import { type PlayerState } from '../../shared/contract/types'
+import { assertRejectedUnchanged, assertUndoRestored, confirmNext, undoRuleSnapshot, getChoiceOptions, expectFarmSelection, expectTileFarmSelection } from './_helpers/session-assertions'
+import { getAvailableStableSupplyCount } from '../../shared/domain/supply-tokens'
+import { createScenarioEvidence } from './_helpers/scenario-evidence'
+
+const evidence = createScenarioEvidence(import.meta.url)
 
 const CARD_ID = 'A089_StablePlanner'
 
 const FILLER = '__test_placeholder__'
 
 const setup = ({ round = 2, reserveStables = 4 }: { round?: number; reserveStables?: number } = {}) => {
-  const session = createWorkSession({ seed: 6089 + round, options: { playerCount: 2 } })
+  const session = evidence.track(createWorkSession({ seed: 6089 + round, options: { playerCount: 2 } }))
   const state = session.getState().state
   stabilizeRandomHands(state.players)
   state.currentPlayerIndex = 0
@@ -41,7 +48,7 @@ const playOccupation = (session: GameSession) => {
   const response = session.takeAction(0, 'lessons')
   if (!response.state.players[0]!.occupationHand.includes(CARD_ID)) return response
   if (response.interaction.stateId !== 'wait') return response
-  const option = response.interaction.request.options?.find((candidate) => candidate.value === CARD_ID)
+  const option = getChoiceOptions(response)?.find((candidate) => candidate.value === CARD_ID)
   expect(option).toBeDefined()
   return session.resolveChoice(response.interaction.playerIndex, option!.value)
 }
@@ -49,10 +56,10 @@ const playOccupation = (session: GameSession) => {
 const chooseSchedule = (session: GameSession, response: SessionResponse, count: number) => {
   expect(response.interaction.stateId).toBe('wait')
   if (response.interaction.stateId !== 'wait') return response
-  const option = response.interaction.request.options?.find((candidate) => {
+  const option = getChoiceOptions(response)?.find((candidate) => {
     return candidate.value !== '__skip__'
       && candidate.labelParams?.count === count
-  }) ?? response.interaction.request.options?.filter((candidate) => candidate.value !== '__skip__')[count - 1]
+  }) ?? getChoiceOptions(response)?.filter((candidate) => candidate.value !== '__skip__')[count - 1]
   expect(option).toBeDefined()
   return session.resolveChoice(response.interaction.playerIndex, option!.value)
 }
@@ -90,7 +97,7 @@ describe('A089 Stable Planner parity', () => {
     const played = playOccupation(session)
     expect(played.interaction.stateId).toBe('wait')
     if (played.interaction.stateId !== 'wait') return
-    expect(played.interaction.request.options?.filter((option) => option.value !== '__skip__')).toHaveLength(2)
+    expect(getChoiceOptions(played)?.filter((option) => option.value !== '__skip__')).toHaveLength(2)
 
     const response = chooseSchedule(session, played, 2)
 
@@ -121,14 +128,14 @@ describe('A089 Stable Planner parity', () => {
       stateId: 'wait', request: { kind: 'select-trigger' },
     })
     if (response.interaction.stateId !== 'wait') return
-    const accept = response.interaction.request.options?.find((option) => !option.disabled && option.sourceCard === CARD_ID)
+    const accept = getChoiceOptions(response)?.find((option) => !option.disabled && option.sourceCard === CARD_ID)
     expect(accept).toBeDefined()
     response = session.resolveChoice(response.interaction.playerIndex, accept!.value)
     expect(response.interaction).toMatchObject({
       stateId: 'wait', promptKey: 'ui.interactionStableSelect',
     })
     if (response.interaction.stateId !== 'wait') return
-    const stable = response.interaction.request.farm.selectableTiles[0]
+    const stable = expectTileFarmSelection(response, 'stable').selectableTiles[0]
     expect(stable).toBeDefined()
     response = session.commitSelectionChoice(response.interaction.playerIndex, { stables: [stable!] })
 
@@ -136,5 +143,176 @@ describe('A089 Stable Planner parity', () => {
     expect(response.state.players[0]!.stableTiles).toHaveLength(1)
     expect(response.state.players[0]!.resources.wood).toBe(0)
     expect(scheduledRounds(response)).toEqual([])
+  })
+})
+
+describe('A089 rule boundaries', () => {
+
+  const A089 = 'A089_StablePlanner'
+
+  const D102 = 'D102_SampleStableMaker'
+
+  const B027 = 'B027_Toolbox'
+
+  function ok(r: SessionResponse) { assert.equal(r.ok, true, r.error); return r }
+
+  function setup({ card = A089, round = 1, stableCount = 0, toolbox = false, resources = {} }: {
+    card?: string
+    round?: number
+    stableCount?: number
+    toolbox?: boolean
+    resources?: Partial<PlayerState['resources']>
+  } = {}) {
+    const s = evidence.track(createWorkSession({
+      seed: 42, configure: state => {
+        state.round = round
+        state.players.forEach(p => { p.resources.food = 40 })
+        const p = state.players[0]!
+        p.occupationHand = card === A089 ? [A089] : ['__test_placeholder__']
+        p.occupationPlayed = card === D102 ? [D102] : []
+        p.minorPlayed = toolbox || card === B027 ? [B027] : []
+        if (card === D102) {
+          p.minorHand = ['D076_SocialBenefits']
+          p.resources.reed = 1
+        }
+        Object.assign(p.resources, resources)
+        p.stableTiles = Array.from({ length: stableCount }, (_, col) => ({ row: 0, col: col + 1 }))
+      }
+    }))
+    return s
+  }
+
+  function choose(s: GameSession, r: SessionResponse, predicate: (o: {
+    value: string
+    labelKey?: string
+    sourceCard?: string
+  }) => boolean) {
+    assert.ok(r.interaction.stateId === 'wait' && (r.interaction.request.kind === 'choice' || r.interaction.request.kind === 'select-trigger'), JSON.stringify(r.interaction))
+    const option = getChoiceOptions(r).find(predicate)
+    assert.ok(option, JSON.stringify(r.interaction))
+    return ok(s.resolveChoice(r.interaction.playerIndex, option.value))
+  }
+
+  function ready(s: GameSession, actor: number) {
+    let r = s.getState()
+    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
+      r = confirmNext(s, r)
+    assert.equal(r.interaction.stateId, 'idle', JSON.stringify(r.interaction))
+    assert.equal(r.state.currentPlayerIndex, actor)
+    return r
+  }
+
+  function turn(s: GameSession, actor: number, space: string) { ready(s, actor); return ok(s.takeAction(actor, space)) }
+
+  function playPlanner(s: GameSession) {
+    const r = ok(s.takeAction(0, 'lessons'))
+    assert.ok(r.state.players[0]!.occupationPlayed.includes(A089))
+    return r
+  }
+
+  function schedule(session: GameSession, response: SessionResponse, count: number) {
+    const interaction = response.interaction
+    assert.ok(interaction.stateId === 'wait' && interaction.request.kind === 'choice')
+    const options = getChoiceOptions(response).filter(option => option.sourceCard === A089
+      && option.effectPreview?.kind === 'futureSchedule' && option.effectPreview.entries.length === count)
+    assert.equal(options.length, 1, JSON.stringify(interaction))
+    return ok(session.resolveChoice(0, options[0]!.value))
+  }
+
+  function futureRounds(r: SessionResponse) {
+    return r.state.futureMeeples.filter(m => m.cardId === A089 && m.resources.stable === 1).map(m => m.round).sort((a, b) => a - b)
+  }
+
+  function reachDue(s: GameSession) {
+    schedule(s, playPlanner(s), 1)
+    turn(s, 1, 'forest')
+    turn(s, 0, 'reed-bank')
+    const first = turn(s, 1, 'clay-pit')
+    let r = confirmNext(s, first)
+    assert.equal(r.state.round, 2)
+    for (const round of [2, 3]) {
+      assert.equal(r.state.players[0]!.stableTiles.length, 0)
+      assert.deepEqual(futureRounds(r), [4])
+      turn(s, 0, 'grain-seeds')
+      turn(s, 1, 'forest')
+      turn(s, 0, 'day-laborer')
+      r = confirmNext(s, turn(s, 1, 'clay-pit'))
+      assert.equal(r.state.round, round + 1)
+    }
+    assert.equal(r.state.players[0]!.resources.wood, 0)
+    r = choose(s, r, o => o.sourceCard === A089 || o.value === A089)
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'farm-select' && expectFarmSelection(r).farmType === 'stable')
+    return r
+  }
+
+  it("reservation respects finite supply and undo restores scheduled tokens", () => {
+    const s = setup({ stableCount: 2 })
+    const before = undoRuleSnapshot(s.getState())
+    const offer = playPlanner(s)
+    assert.ok(offer.interaction.stateId === 'wait' && offer.interaction.request.kind === 'choice')
+    assert.equal(getChoiceOptions(offer).filter(o => o.value !== '__skip__').length, 2)
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, '__A089_forbidden_three__'))
+    const r = schedule(s, s.getState(), 2)
+    assert.deepEqual(futureRounds(r), [4, 7])
+    assert.equal(s.withCtx(() => getAvailableStableSupplyCount(r.state, r.state.players[0]!)), 0)
+    assert.equal(r.state.players[0]!.stableTiles.length, 2)
+    assertUndoRestored(before, s.undoAction())
+    const retry = schedule(s, playPlanner(s), 2)
+    assert.deepEqual(futureRounds(retry), [4, 7])
+    assert.ok(retry.scores && retry.scores.length === 2)
+  })
+
+  it("round eleven preserves only real round fourteen target", () => {
+    const s = setup({ round: 11 })
+    const offer = playPlanner(s)
+    assert.ok(offer.interaction.stateId === 'wait' && offer.interaction.request.kind === 'choice')
+    assert.equal(getChoiceOptions(offer).filter(o => o.value !== '__skip__').length, 1)
+    const r = schedule(s, offer, 1)
+    assert.deepEqual(futureRounds(r), [14])
+    assert.equal(s.withCtx(() => getAvailableStableSupplyCount(r.state, r.state.players[0]!)), 3)
+  })
+
+  it("round twelve invents no future stable and preserves all supply", () => {
+    const s = setup({ round: 12 })
+    const r = playPlanner(s)
+    assert.deepEqual(futureRounds(r), [])
+    assert.equal(s.withCtx(() => getAvailableStableSupplyCount(r.state, r.state.players[0]!)), 4)
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
+  })
+
+  it("actual due round builds free after rejecting occupied room tile", () => {
+    const s = setup()
+    const r = reachDue(s)
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'farm-select' && expectFarmSelection(r).farmType === 'stable')
+    const tile = expectTileFarmSelection(r, 'stable').selectableTiles[0]!
+    assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { stables: [{ row: 1, col: 0 }] }))
+    const built = ok(s.commitSelectionChoice(0, { stables: [tile] }))
+    assert.equal(built.state.players[0]!.stableTiles.length, 1)
+    assert.equal(built.state.players[0]!.resources.wood, 0)
+    assert.deepEqual(futureRounds(built), [])
+    assert.equal(s.withCtx(() => getAvailableStableSupplyCount(built.state, built.state.players[0]!)), 3)
+    assert.ok(built.state.log.some(l => l.key === 'log.cardTriggered' || l.key === 'log.cardEffectGain' || l.key === 'log.actionDetail'))
+  })
+
+  it("duplicate due stable coordinate cannot create two pieces", () => {
+    const s = setup()
+    const r = reachDue(s)
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'farm-select' && expectFarmSelection(r).farmType === 'stable')
+    const tile = expectTileFarmSelection(r, 'stable').selectableTiles[0]!
+    const before = undoRuleSnapshot(s.getState())
+    const duplicate = s.commitSelectionChoice(0, { stables: [tile, tile] })
+    const outcome = { accepted: duplicate.ok, pieces: duplicate.state.players[0]!.stableTiles.length }
+    assert.equal(duplicate.ok, false)
+    assert.equal(undoRuleSnapshot(duplicate), before)
+    assert.equal(ok(s.commitSelectionChoice(0, { stables: [tile] })).state.players[0]!.stableTiles.length, 1)
+    assert.deepEqual(outcome, { accepted: false, pieces: 0 })
+  })
+
+  it("full reserve schedules all three exact targets without duplicate tokens", () => {
+    const s = setup()
+    const r = schedule(s, playPlanner(s), 3)
+    assert.deepEqual(futureRounds(r), [4, 7, 10])
+    assert.equal(s.withCtx(() => getAvailableStableSupplyCount(r.state, r.state.players[0]!)), 1)
+    assert.equal(r.state.players[0]!.stableTiles.length, 0)
   })
 })

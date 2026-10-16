@@ -1,18 +1,23 @@
-import { setWorkersAtHome } from '../../shared/domain/player'
-
+import { setWorkersAtHome, markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
-import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
-import type { ActionChoiceOption, Resource } from '../../shared/contract/types'
+import { type ActionChoiceOption, type Resource, type GameState } from '../../shared/contract/types'
 import '../../shared/cards/B/B021_HayloftBarn'
 import '../../shared/cards/E/E142_Smuggler'
+import assert from 'node:assert/strict'
+import { createWorkSession } from './_helpers/session-fixtures'
+import { assertRejectedUnchanged, getChoiceOptions } from './_helpers/session-assertions'
+import { createPlayerActionSpaces } from '../../shared/cards/player-action-space'
+import { createScenarioEvidence } from './_helpers/scenario-evidence'
+
+const evidence = createScenarioEvidence(import.meta.url)
 
 const CARD_ID = 'E142_Smuggler'
 const HAYLOFT_BARN = 'B021_HayloftBarn'
 
 const setup = () => {
-  const session = new GameSession(42, undefined, { playerCount: 2 })
+  const session = evidence.track(createWorkSession({ seed: 42, options: { playerCount: 2 } }))
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.round = 4
@@ -45,7 +50,7 @@ const exchangeOption = (
 ): ActionChoiceOption => {
   expect(resp.interaction.stateId).toBe('wait')
   if (resp.interaction.stateId !== 'wait') throw new Error('expected Smuggler choice')
-  const option = resp.interaction.request.options?.find((entry) =>
+  const option = getChoiceOptions(resp)?.find((entry) =>
     entry.sourceCard === CARD_ID
     && entry.effectPreview?.kind === 'resourceExchange'
     && JSON.stringify(entry.effectPreview.resourcesPaid) === JSON.stringify(resourcesPaid)
@@ -103,7 +108,7 @@ describe('E142 Smuggler parity', () => {
     grain?: number
     stone?: number
   } = {}) => {
-    const session = new GameSession(6142, undefined, { playerCount: 3 })
+    const session = evidence.track(createWorkSession({ seed: 6142, options: { playerCount: 3 } }))
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.currentPlayerIndex = 0
@@ -133,7 +138,7 @@ describe('E142 Smuggler parity', () => {
   }
 
   const options = (response: SessionResponse) => response.interaction.stateId === 'wait'
-    ? response.interaction.request.options ?? []
+    ? getChoiceOptions(response) ?? []
     : []
 
   const exchangeOption = (
@@ -174,5 +179,127 @@ describe('E142 Smuggler parity', () => {
     const response = setup().performRoundEnd()
 
     expect(response.state.players[0]!.resources).toMatchObject({ wood: 0, grain: 0, stone: 0 })
+  })
+})
+
+describe('E142 rule boundaries', () => {
+
+  const SMUGGLER = 'E142_Smuggler', OVERHAUL = 'C001_Overhaul', HARDWORKER = 'D127_HardworkingMan'
+
+  function setup(card: string, configure: (state: GameState) => void = () => { }) {
+    const session = evidence.track(createWorkSession({
+      seed: 4242, options: { playerCount: card === OVERHAUL ? 2 : 3 }, configure(state) {
+        state.round = 4
+        for (const p of state.players)
+          Object.assign(p.resources, { wood: 0, clay: 0, reed: 0, stone: 0, grain: 0, vegetable: 0, food: 20 })
+        const owner = state.players[0]!
+        if (card === OVERHAUL) {
+          owner.minorHand = [card]
+          owner.occupationPlayed = ['A116_WoodCutter', 'A103_Portmonger']
+          owner.resources.wood = 1
+        }
+        else
+          owner.occupationPlayed = [card]
+        configure(state)
+        if (card === HARDWORKER)
+          state.actionSpaces.push(...createPlayerActionSpaces(state))
+      }
+    }))
+    return session
+  }
+
+  function ok(r: SessionResponse) { assert.equal(r.ok, true, r.error); return r }
+
+  function wait(r: SessionResponse) { ok(r); assert(r.interaction.stateId === 'wait'); return r.interaction }
+
+  function options(r: SessionResponse) { const request = wait(r).request; assert(request.kind === 'choice'); return request.options }
+
+  function harvest(wood: number, grain: number) {
+    const s = setup(SMUGGLER, state => {
+      state.players[0]!.resources.wood = wood
+      state.players[0]!.resources.grain = grain
+      for (const p of state.players)
+        markAllWorkersUsed(state, p)
+    })
+    return { s, r: ok(s.performRoundEnd()) }
+  }
+
+  function trade(r: SessionResponse, paid: Partial<Resource>, gained: Partial<Resource>) {
+    const choice = options(r).find(o => o.sourceCard === SMUGGLER
+      && o.effectPreview?.kind === 'resourceExchange'
+      && JSON.stringify(o.effectPreview.resourcesPaid) === JSON.stringify(paid)
+      && JSON.stringify(o.effectPreview.resourcesGained) === JSON.stringify(gained))
+    assert(choice, JSON.stringify(r.interaction))
+    return choice.value
+  }
+
+  function stocks(r: SessionResponse) {
+    const p = r.state.players[0]!
+    return {
+      wood: p.resources.wood, grain: p.resources.grain, stone: p.resources.stone,
+      exchanges: r.state.events.filter(e => e.type === 'resource.exchanged' && e.exchangeSource === SMUGGLER).length
+    }
+  }
+
+  it("unaffordable first branch and wrong actor are rejected before a legal wood-to-stone chain", () => {
+    const control = harvest(0, 1)
+    const unavailable = trade(control.r, { grain: 1 }, { stone: 1 })
+    const { s, r } = harvest(1, 0)
+    assert(!options(r).some(o => o.value === unavailable))
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, unavailable))
+    const first = trade(r, { wood: 1 }, { grain: 1 })
+    assertRejectedUnchanged(s, () => s.resolveChoice(1, first))
+    const step = ok(s.resolveChoice(0, first))
+    assert.deepEqual(stocks(step), { wood: 0, grain: 1, stone: 0, exchanges: 1 })
+    const final = ok(s.resolveChoice(0, trade(step, { grain: 1 }, { stone: 1 })))
+    assert.deepEqual(stocks(final), { wood: 0, grain: 0, stone: 1, exchanges: 2 })
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, first))
+  })
+
+  it("two identical exchanges consume two goods and a stale third request cannot spend another", () => {
+    const { s, r } = harvest(3, 0)
+    const first = trade(r, { wood: 1 }, { grain: 1 })
+    const second = ok(s.resolveChoice(0, first))
+    const final = ok(s.resolveChoice(0, trade(second, { wood: 1 }, { grain: 1 })))
+    assert.deepEqual(stocks(final), { wood: 1, grain: 2, stone: 0, exchanges: 2 })
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, first))
+  })
+
+  it("declining one or both stages never invents a good or expands the remaining quota", () => {
+    for (const exchangeSecond of [false, true]) {
+      const { s, r } = harvest(1, 0)
+      assert.equal(wait(r).sourceCard, SMUGGLER)
+      const second = ok(s.resolveChoice(0, '__skip__'))
+      const final = ok(s.resolveChoice(0, exchangeSecond ? trade(second, { wood: 1 }, { grain: 1 }) : '__skip__'))
+      assert.deepEqual(stocks(final), { wood: exchangeSecond ? 0 : 1, grain: exchangeSecond ? 1 : 0, stone: 0, exchanges: exchangeSecond ? 1 : 0 })
+    }
+  })
+
+  it("exchanges cannot be requested from the ordinary work phase", () => {
+    const s = setup(SMUGGLER, state => { state.players[0]!.resources.wood = 1 })
+    const control = harvest(1, 0)
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, trade(control.r, { wood: 1 }, { grain: 1 })))
+    assert.deepEqual(stocks(s.getState()), { wood: 1, grain: 0, stone: 0, exchanges: 0 })
+    ok(s.takeAction(0, 'grain-seeds'))
+    assert.equal(s.state.players[0]!.resources.grain, 1)
+  })
+
+  it("a later controlled harvest restores exactly two exchanges", () => {
+    const { s, r } = harvest(4, 0)
+    let next = ok(s.resolveChoice(0, trade(r, { wood: 1 }, { grain: 1 })))
+    next = ok(s.resolveChoice(0, trade(next, { wood: 1 }, { grain: 1 })))
+    assert.deepEqual(stocks(next), { wood: 2, grain: 2, stone: 0, exchanges: 2 })
+    assert.equal(next.state.round, 5)
+    for (const round of [5, 6, 7]) {
+      assert.equal(s.state.round, round)
+      for (const p of s.state.players)
+        markAllWorkersUsed(s.state, p)
+      next = ok(s.performRoundEnd())
+    }
+    next = ok(s.resolveChoice(0, trade(next, { wood: 1 }, { grain: 1 })))
+    const second = trade(next, { wood: 1 }, { grain: 1 })
+    next = ok(s.resolveChoice(0, second))
+    assert.deepEqual(stocks(next), { wood: 0, grain: 4, stone: 0, exchanges: 4 })
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, second))
   })
 })

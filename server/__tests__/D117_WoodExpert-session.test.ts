@@ -1,9 +1,17 @@
+import type { ActionChoiceOption } from '../../shared/contract/types'
 import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game/authoritative-session'
+import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/D/D117_WoodExpert'
 import '../../shared/cards/B/B081_Handcart'
 import '../../shared/cards/B/B043_Chophouse'
+import assert from 'node:assert/strict'
+import { type Resource } from '../../shared/contract/types'
+import { createWorkSession } from './_helpers/session-fixtures'
+import { assertRejectedUnchanged, getChoiceOptions } from './_helpers/session-assertions'
+import { createScenarioEvidence } from './_helpers/scenario-evidence'
+
+const evidence = createScenarioEvidence(import.meta.url)
 
 const CARD_ID = 'D117_WoodExpert'
 
@@ -13,7 +21,7 @@ const setup = (opts?: {
   clay?: number
   minor?: string
 }) => {
-  const session = new GameSession(/* seed */ 1)
+  const session = evidence.track(createWorkSession({ seed: 1 }))
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   state.currentPlayerIndex = 0
@@ -31,10 +39,8 @@ const setup = (opts?: {
   if (!player.occupationPlayed.includes(CARD_ID)) {
     player.occupationPlayed.push(CARD_ID)
   }
-  if (opts?.minor && !player.minorHand.includes(opts.minor)) {
-    player.minorHand.push(opts.minor)
-  }
-  state.players[1]!.workersAvailable = 2
+  player.minorHand = opts?.minor ? [opts.minor] : ['__test_placeholder__']
+  setWorkersAtHome(state, state.players[1]!, 2)
 
   const majorImprovement = state.actionSpaces.find((space) => space.id === 'major-improvement')
   if (!majorImprovement) throw new Error('major-improvement missing')
@@ -49,9 +55,13 @@ const chooseMinor = (
   response: ReturnType<GameSession['takeAction']>,
   cardId: string,
 ) => {
+  if (response.state.players[0]!.minorPlayed.includes(cardId)) return response
+  if (response.interaction.stateId === 'wait' && response.interaction.promptKey === 'prompt.selectPayment') return response
   expect(response.interaction.stateId).toBe('wait')
   if (response.interaction.stateId !== 'wait') return response
-  const option = response.interaction.request.options?.find((entry) => entry.value === cardId)
+  const branch = getChoiceOptions(response).find(entry => entry.value.startsWith('action-improvement-'))
+  if (branch) response = session.resolveChoice(0, branch.value)
+  const option = getChoiceOptions(response).find((entry) => entry.value === cardId)
   expect(option).toBeDefined()
   return session.resolveChoice(0, option!.value)
 }
@@ -66,7 +76,7 @@ describe('D117_WoodExpert session — card-purchase cost candidates', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.promptKey).toBe('prompt.selectPayment')
-    expect(resp.interaction.request.options?.length).toBeGreaterThanOrEqual(2)
+    expect(getChoiceOptions(resp)?.length).toBeGreaterThanOrEqual(2)
   })
 
   it('cost wood minor + food=10 wood=0 → only trade affordable, auto-select', () => {
@@ -96,7 +106,7 @@ describe('D117_WoodExpert session — card-purchase cost candidates', () => {
     resp = chooseMinor(session, resp, 'B081_Handcart')
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    expect(resp.interaction.request.options?.length).toBeGreaterThanOrEqual(2)
+    expect(getChoiceOptions(resp)?.length).toBeGreaterThanOrEqual(2)
   })
 
   it('altCosts minor (B43 Chophouse altCosts:[{wood:2},{clay:2}]) → wood-base + D117 candidate + clay-base', () => {
@@ -108,20 +118,18 @@ describe('D117_WoodExpert session — card-purchase cost candidates', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.promptKey).toBe('prompt.selectPayment')
-    expect(resp.interaction.request.options?.length).toBeGreaterThanOrEqual(3)
-    const getPaid = (o: typeof resp.interaction.request.options[number]) =>
-      (o.labelParams as Record<string, unknown> | undefined)?.resourcesPaid as
-        | Record<string, number>
-        | undefined
-    const woodBase = resp.interaction.request.options?.find((o) => {
+    expect(getChoiceOptions(resp)?.length).toBeGreaterThanOrEqual(3)
+    const getPaid = (option: ActionChoiceOption) => option.effectPreview?.kind === 'payment'
+      ? option.effectPreview.resourcesPaid : undefined
+    const woodBase = getChoiceOptions(resp)?.find((o) => {
       const paid = getPaid(o)
       return !!paid && (paid.wood ?? 0) === 2 && (paid.clay ?? 0) === 0 && (paid.food ?? 0) === 0
     })
-    const woodTrade = resp.interaction.request.options?.find((o) => {
+    const woodTrade = getChoiceOptions(resp)?.find((o) => {
       const paid = getPaid(o)
       return !!paid && (paid.wood ?? 0) === 0 && (paid.clay ?? 0) === 0 && (paid.food ?? 0) === 1
     })
-    const clayBase = resp.interaction.request.options?.find((o) => {
+    const clayBase = getChoiceOptions(resp)?.find((o) => {
       const paid = getPaid(o)
       return !!paid && (paid.wood ?? 0) === 0 && (paid.clay ?? 0) === 2 && (paid.food ?? 0) === 0
     })
@@ -139,20 +147,148 @@ describe('D117_WoodExpert session — card-purchase cost candidates', () => {
     resp = chooseMinor(session, resp, 'B043_Chophouse')
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    expect(resp.interaction.request.options?.length).toBeGreaterThanOrEqual(2)
-    const getPaid = (o: typeof resp.interaction.request.options[number]) =>
-      (o.labelParams as Record<string, unknown> | undefined)?.resourcesPaid as
-        | Record<string, number>
-        | undefined
-    const woodBase = resp.interaction.request.options?.find((o) => {
+    expect(getChoiceOptions(resp)?.length).toBeGreaterThanOrEqual(2)
+    const getPaid = (option: ActionChoiceOption) => option.effectPreview?.kind === 'payment'
+      ? option.effectPreview.resourcesPaid : undefined
+    const woodBase = getChoiceOptions(resp)?.find((o) => {
       const paid = getPaid(o)
       return !!paid && (paid.wood ?? 0) === 2 && (paid.clay ?? 0) === 0 && (paid.food ?? 0) === 0
     })
-    const woodTrade = resp.interaction.request.options?.find((o) => {
+    const woodTrade = getChoiceOptions(resp)?.find((o) => {
       const paid = getPaid(o)
       return !!paid && (paid.wood ?? 0) === 0 && (paid.clay ?? 0) === 0 && (paid.food ?? 0) === 1
     })
     expect(woodBase).toBeDefined()
     expect(woodTrade).toBeDefined()
+  })
+})
+
+describe('D117 rule boundaries', () => {
+
+  function options(r: SessionResponse) {
+    assert.equal(r.ok, true, r.error)
+    assert.ok(r.interaction.stateId === 'wait', JSON.stringify(r.interaction))
+    const request = r.interaction.request
+    assert.ok(request.kind === 'choice', JSON.stringify(request))
+    return request.options
+  }
+
+  function enterImprovement(s: GameSession, actor = 0, space = 'meeting-place') {
+    let r = s.takeAction(actor, space)
+    const branch = options(r).find(o => o.value.startsWith('action-improvement-'))
+    if (branch)
+      r = s.resolveChoice(actor, branch.value)
+    return r
+  }
+
+  function chooseCard(s: GameSession, r: SessionResponse, card: string, actor = 0) {
+    assert.ok(options(r).some(o => o.value === card), JSON.stringify(r.interaction))
+    return s.resolveChoice(actor, card)
+  }
+
+  function woodExpert(resources: Partial<Resource> = {}, played = true) {
+    return evidence.track(createWorkSession({
+      seed: 3117, configure(state) {
+        state.round = 14
+        const p = state.players[0]!
+        p.occupationPlayed = played ? ['D117_WoodExpert'] : []
+        p.occupationHand = played ? ['__test_placeholder__'] : ['D117_WoodExpert', 'A116_WoodCutter']
+        p.minorHand = ['D033_SummerHouse', 'B081_Handcart', 'E047_SyrupTap', 'B007_Wage']
+        Object.assign(p.resources, { wood: 0, clay: 0, stone: 0, food: 0, ...resources })
+      }
+    }))
+  }
+
+  const costObserved = (r: SessionResponse) => ({ wood: r.state.players[0]!.resources.wood, stone: r.state.players[0]!.resources.stone, food: r.state.players[0]!.resources.food, built: r.state.players[0]!.minorPlayed.includes('D033_SummerHouse') })
+
+  it("first Lessons grants exactly two wood only on actual play", () => {
+    const s = woodExpert({}, false)
+    let r = s.takeAction(0, 'lessons')
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, 'missing-occupation'))
+    r = chooseCard(s, r, 'D117_WoodExpert')
+    assert.equal(r.ok, true, r.error)
+    assert.equal(r.state.players[0]!.resources.wood, 2)
+    assert.deepEqual(r.state.players[0]!.occupationPlayed, ['D117_WoodExpert'])
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, 'D117_WoodExpert'))
+  })
+
+  it("one food replaces exactly two of three wood and preserves stone payment", () => {
+    const s = woodExpert({ wood: 1, food: 1, stone: 1 })
+    const r = chooseCard(s, enterImprovement(s), 'D033_SummerHouse')
+    assert.equal(r.ok, true, r.error)
+    assert.deepEqual(costObserved(r), { wood: 0, stone: 0, food: 0, built: true })
+  })
+
+  it("discount cap rejects zero wood for a three wood card before free retry", () => {
+    const s = woodExpert({ food: 1, stone: 1 })
+    const r = enterImprovement(s)
+    assert.equal(options(r).some(o => o.value === 'D033_SummerHouse'), false)
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, 'D033_SummerHouse'))
+    const retry = chooseCard(s, r, 'B007_Wage')
+    assert.deepEqual(costObserved(retry), { wood: 0, stone: 1, food: 3, built: false })
+  })
+
+  it("missing stone cannot be replaced by food before a legal free retry", () => {
+    const s = woodExpert({ food: 1 })
+    const r = enterImprovement(s)
+    assert.equal(options(r).some(o => o.value === 'E047_SyrupTap'), false)
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, 'E047_SyrupTap'))
+    const retry = chooseCard(s, r, 'B007_Wage')
+    assert.equal(retry.state.players[0]!.resources.food, 3)
+    assert.equal(retry.state.players[0]!.resources.stone, 0)
+    assert.equal(retry.state.players[0]!.minorPlayed.includes('E047_SyrupTap'), false)
+  })
+
+  it("original wood payment and smaller optional food payment both remain legal", () => {
+    for (const resources of [{ wood: 1 }, { food: 1 }]) {
+      const s = woodExpert(resources)
+      const r = chooseCard(s, enterImprovement(s), 'B081_Handcart')
+      assert.equal(r.ok, true, r.error)
+      assert.deepEqual([r.state.players[0]!.resources.wood, r.state.players[0]!.resources.food], [0, 0])
+      assert.ok(r.state.players[0]!.minorPlayed.includes('B081_Handcart'))
+    }
+  })
+
+  it("clay only Fireplace never adds a food fee", () => {
+    const s = woodExpert({ clay: 2, food: 1 })
+    const r = chooseCard(s, enterImprovement(s, 0, 'major-improvement'), 'Major_Fireplace1')
+    assert.equal(r.ok, true, r.error)
+    assert.deepEqual([r.state.players[0]!.resources.clay, r.state.players[0]!.resources.food], [0, 1])
+  })
+
+  it("undo restores all discounted cost components before legal retry", () => {
+    const s = woodExpert({ wood: 1, food: 1, stone: 1 })
+    chooseCard(s, enterImprovement(s), 'D033_SummerHouse')
+    const undone = s.undoAction()
+    assert.equal(undone.ok, true, undone.error)
+    assert.deepEqual(costObserved(undone), { wood: 1, stone: 1, food: 1, built: false })
+    assert.equal(undone.state.actionSpaces.flatMap(space => space.takenBy).filter(worker => worker.playerId === undone.state.players[0]!.id).length, 0)
+    const retry = chooseCard(s, enterImprovement(s), 'D033_SummerHouse')
+    assert.deepEqual(costObserved(retry), { wood: 0, stone: 0, food: 0, built: true })
+  })
+
+  it("stable construction still costs two wood and cannot use the food replacement", () => {
+    for (const wood of [1, 2]) {
+      const s = woodExpert({ wood, food: 1 })
+      if (wood === 1) {
+        assertRejectedUnchanged(s, () => s.takeAction(0, 'farm-expansion'))
+        assert.equal(s.getState().state.players[0]!.resources.food, 1)
+      }
+      else {
+        const entered = s.takeAction(0, 'farm-expansion')
+        assert.equal(entered.ok, true, entered.error)
+        const r = s.commitSelectionChoice(0, { stables: [{ row: 0, col: 2 }] })
+        assert.equal(r.ok, true, r.error)
+        assert.deepEqual([r.state.players[0]!.resources.wood, r.state.players[0]!.resources.food, r.state.players[0]!.stableTiles.length], [0, 1, 1])
+      }
+    }
+  })
+
+  it("major Joinery wood cost is fully replaced while its stone cost remains", () => {
+    const s = woodExpert({ food: 1, stone: 2 })
+    const r = chooseCard(s, enterImprovement(s, 0, 'major-improvement'), 'Major_Joinery')
+    assert.equal(r.ok, true, r.error)
+    assert.deepEqual([r.state.players[0]!.resources.wood, r.state.players[0]!.resources.food, r.state.players[0]!.resources.stone], [0, 0, 0])
+    assert.ok(r.state.players[0]!.improvements.includes('Major_Joinery'))
   })
 })

@@ -1,11 +1,16 @@
-import { type SessionResponse } from '../game/authoritative-session'
+import type { PlayerState } from '../../shared/contract/types'
+import { type SessionResponse, GameSession } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
-
 import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game/authoritative-session'
 import '../../shared/cards/B/B157_Salter'
 import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/serialization'
+import assert from 'node:assert/strict'
+import { createWorkSession } from './_helpers/session-fixtures'
+import { assertRejectedUnchanged, getChoiceOptions } from './_helpers/session-assertions'
+import { createScenarioEvidence } from './_helpers/scenario-evidence'
+
+const evidence = createScenarioEvidence(import.meta.url)
 
 const CARD_ID = 'B157_Salter'
 const placeholder = ['__test_placeholder__']
@@ -13,11 +18,11 @@ const placeholder = ['__test_placeholder__']
 // 直接 mutate state（参考 A010_WoodenShed-session.test.ts:13-19 现有模式，不调 loadState）
 const setup = (options?: {
   resources?: Partial<{ sheep: number; boar: number; cattle: number; food: number }>
-  pastures?: Array<{ id:string; size:number; tiles:{row:number;col:number}[]; stables:number; animalType:'sheep'|'boar'|'cattle'|null; animalCount:number }>
-  stableAnimals?: Record<string, 'sheep'|'boar'|'cattle'|null>
+  pastures?: PlayerState['pastures']
+  stableAnimals?: Record<string, 'sheep' | 'boar' | 'cattle' | null>
   round?: number
 }) => {
-  const session = new GameSession(8157, undefined, { playerCount: 2 })
+  const session = evidence.track(createWorkSession({ seed: 8157, options: { playerCount: 2 } }))
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   state.currentPlayerIndex = 0
@@ -41,23 +46,29 @@ const setup = (options?: {
   return session
 }
 
+function quantityRequest(response: SessionResponse) {
+  const interaction = response.interaction
+  assert.ok(interaction.stateId === 'wait' && interaction.request.kind === 'resource-quantity-select')
+  return interaction.request
+}
+
 describe('B157_Salter session', () => {
   it('keeps horses outside the salting catalog and rejects them without blocking the selection', () => {
     const session = setup({
       resources: { sheep: 2 },
-      pastures: [{ id: 'sheep', size: 1, tiles: [{ row: 0, col: 1 }], stables: 0, animalType: 'sheep', animalCount: 2 }],
+      pastures: [{ id: 'sheep', tiles: [{ row: 0, col: 1 }], animalType: 'sheep', animalCount: 2 }],
     })
     session.state.enableFarmersOfTheMoor = true
     const player = session.state.players[0]!
     player.resources.horse = 1
-    player.pastures.push({ id: 'horse', size: 1, tiles: [{ row: 0, col: 2 }], stables: 0, animalType: 'horse', animalCount: 1 })
+    player.pastures.push({ id: 'horse', tiles: [{ row: 0, col: 2 }], animalType: 'horse', animalCount: 1 })
     let response = session.takeAnytimeAction(0, 'B157-salter-anytime')
     expect(response.ok, response.error).toBe(true)
-    expect(response.interaction.request.availableByResource).toEqual({ sheep: 2, boar: 0, cattle: 0 })
+    expect(quantityRequest(response).availableByResource).toEqual({ sheep: 2, boar: 0, cattle: 0 })
     const before = structuredClone(response.state.players)
     response = session.commitSelectionChoice(0, { resourceCounts: { horse: 1 } })
     expect(response.ok).toBe(false)
-    expect(response.interaction.request.kind).toBe('resource-quantity-select')
+    expect(quantityRequest(response).kind).toBe('resource-quantity-select')
     expect(response.state.players).toEqual(before)
     expect(response.state.futureMeeples).toEqual([])
     response = session.commitSelectionChoice(0, { resourceCounts: { sheep: 1 } })
@@ -68,36 +79,36 @@ describe('B157_Salter session', () => {
   it.each([1, 2])('refreshes animal quantities after cooking %i sheep and rejects stale counts without blocking', (cooked) => {
     let session = setup({
       resources: { sheep: 2, food: 0 },
-      pastures: [{ id: 'sheep', size: 2, tiles: [{ row: 0, col: 1 }, { row: 0, col: 2 }], stables: 0, animalType: 'sheep', animalCount: 2 }],
+      pastures: [{ id: 'sheep', tiles: [{ row: 0, col: 1 }, { row: 0, col: 2 }], animalType: 'sheep', animalCount: 2 }],
     })
     session.state.players[0]!.improvements = ['Major_Fireplace1']
     let response = session.takeAnytimeAction(0, 'B157-salter-anytime')
-    expect(response.interaction.request).toMatchObject({ kind: 'resource-quantity-select', availableByResource: { sheep: 2 } })
+    expect(quantityRequest(response)).toMatchObject({ kind: 'resource-quantity-select', availableByResource: { sheep: 2 } })
     response = session.takeAnytimeAction(0, 'exchange')
     expect(response.ok, response.error).toBe(true)
-    const cooking = response.interaction.request.options.find((option) =>
+    const cooking = getChoiceOptions(response).find((option) =>
       option.effectPreview?.kind === 'resourceExchange' && (option.effectPreview.resourcesPaid?.sheep ?? 0) > 0)!
     response = session.resolveChoice(0, `bulk:${cooking.value.split(':')[1]}=${cooked}`)
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources).toMatchObject({ sheep: 2 - cooked, food: 2 * cooked })
-    expect(response.interaction.request).toMatchObject({ kind: 'resource-quantity-select', availableByResource: { sheep: 2 - cooked } })
-    session = new GameSession(rehydrateState(JSON.parse(JSON.stringify(serializeSessionSnapshot(session.state, session)))))
+    expect(quantityRequest(response)).toMatchObject({ kind: 'resource-quantity-select', availableByResource: { sheep: 2 - cooked } })
+    session = evidence.track(new GameSession(rehydrateState(JSON.parse(JSON.stringify(serializeSessionSnapshot(session.state, session))))))
     const restored = session.getState()
     const before = structuredClone({ players: restored.state.players, futureMeeples: restored.state.futureMeeples, scores: restored.scores })
     response = session.commitSelectionChoice(0, { resourceCounts: { sheep: 2, boar: 0, cattle: 0 } })
     expect(response.ok).toBe(false)
     expect(response.interaction.stateId).toBe('wait')
-    expect(response.interaction.request.kind).toBe('resource-quantity-select')
+    expect(quantityRequest(response).kind).toBe('resource-quantity-select')
     expect(response.state.players).toEqual(before.players)
     expect(response.state.futureMeeples).toEqual(before.futureMeeples)
     expect(response.scores).toEqual(before.scores)
     if (cooked === 2) {
-      response = session.undoStep(0)
+      response = session.undoStep()
       expect(response.ok, response.error).toBe(true)
       expect(response.state.players[0]!.resources).toMatchObject({ sheep: 2, food: 0 })
       response = session.resolveChoice(0, 'cancel')
       expect(response.ok, response.error).toBe(true)
-      expect(response.interaction.request).toMatchObject({ kind: 'resource-quantity-select', availableByResource: { sheep: 2 } })
+      expect(quantityRequest(response)).toMatchObject({ kind: 'resource-quantity-select', availableByResource: { sheep: 2 } })
       return
     }
     response = session.commitSelectionChoice(0, { resourceCounts: { sheep: 1, boar: 0, cattle: 0 } })
@@ -111,7 +122,7 @@ describe('B157_Salter session', () => {
   it('多只触发: pending interaction kind=resource-quantity-select', () => {
     const session = setup({
       resources: { sheep: 2, cattle: 1 },
-      pastures: [{ id:'p1',size:2,tiles:[{row:2,col:0}],stables:0,animalType:'sheep',animalCount:2 }],
+      pastures: [{ id: 'p1', tiles: [{ row: 2, col: 0 }], animalType: 'sheep', animalCount: 2 }],
       stableAnimals: { '2-1': 'cattle' },
       round: 3,
     })
@@ -121,7 +132,7 @@ describe('B157_Salter session', () => {
     if (resp.interaction.stateId === 'wait') {
       expect(resp.interaction.request.kind).toBe('resource-quantity-select')
       if (resp.interaction.request.kind === 'resource-quantity-select') {
-        expect(resp.interaction.request.availableByResource).toEqual({ sheep:2, boar:0, cattle:1 })
+        expect(resp.interaction.request.availableByResource).toEqual({ sheep: 2, boar: 0, cattle: 1 })
       }
     }
   })
@@ -129,7 +140,7 @@ describe('B157_Salter session', () => {
   it('cancel from multi-pick returns to idle without salting animals', () => {
     const session = setup({
       resources: { sheep: 2 },
-      pastures: [{ id:'p1',size:2,tiles:[{row:2,col:0}],stables:0,animalType:'sheep',animalCount:2 }],
+      pastures: [{ id: 'p1', tiles: [{ row: 2, col: 0 }], animalType: 'sheep', animalCount: 2 }],
       round: 3,
     })
     session.takeAnytimeAction(0, 'B157-salter-anytime')
@@ -146,12 +157,12 @@ describe('B157_Salter session', () => {
   it('commit {sheep:2,cattle:1}: 扣 board + 入 futureMeeples', () => {
     const session = setup({
       resources: { sheep: 2, cattle: 1 },
-      pastures: [{ id:'p1',size:2,tiles:[{row:2,col:0}],stables:0,animalType:'sheep',animalCount:2 }],
+      pastures: [{ id: 'p1', tiles: [{ row: 2, col: 0 }], animalType: 'sheep', animalCount: 2 }],
       stableAnimals: { '2-1': 'cattle' },
       round: 3,
     })
     session.takeAnytimeAction(0, 'B157-salter-anytime')
-    const resp = session.commitSelectionChoice(0, { resourceCounts: { sheep:2, boar:0, cattle:1 } })
+    const resp = session.commitSelectionChoice(0, { resourceCounts: { sheep: 2, boar: 0, cattle: 1 } })
     expect(resp.ok).toBe(true)
     const p = resp.state.players[0]!
     expect(p.resources.sheep).toBe(0)
@@ -163,43 +174,43 @@ describe('B157_Salter session', () => {
     const fms = resp.state.futureMeeples
     const sheepRounds = fms.filter((e) => e.resources.food === 2).map((e) => e.round).sort((a, b) => a - b)
     const cattleRounds = fms.filter((e) => e.resources.food === 1).map((e) => e.round).sort((a, b) => a - b)
-    expect(sheepRounds).toEqual([4,5,6])
-    expect(cattleRounds).toEqual([4,5,6,7,8,9,10])
-	    const log = resp.state.log.find((entry) => entry.key === 'log.salterFutureFood')
-	    expect(log?.params).toMatchObject({
-	      player: p.name,
-	      cardId: CARD_ID,
-	      animals: '2 sheep, 1 cattle',
-	      sheep: 2,
+    expect(sheepRounds).toEqual([4, 5, 6])
+    expect(cattleRounds).toEqual([4, 5, 6, 7, 8, 9, 10])
+    const log = resp.state.log.find((entry) => entry.key === 'log.salterFutureFood')
+    expect(log?.params).toMatchObject({
+      player: p.name,
+      cardId: CARD_ID,
+      animals: '2 sheep, 1 cattle',
+      sheep: 2,
       boar: 0,
       cattle: 1,
       futureFood: 13,
-	      schedule: '2 food in rounds 4-6; 1 food in rounds 4-10',
-	    })
-	    const queuedEvents = resp.state.events.filter((event) => event.type === 'futureMeeple.queued')
-	    expect(queuedEvents).toHaveLength(2)
-	    expect(queuedEvents.filter((event) => 'sourceSummary' in event)).toHaveLength(1)
-	    expect(queuedEvents).toEqual(expect.arrayContaining([
-	      expect.objectContaining({
-	        type: 'futureMeeple.queued',
-	        cardId: CARD_ID,
-	        playerId: p.id,
-	        sourceSummary: expect.objectContaining({
-	          key: 'log.salterFutureFood',
-	          params: expect.objectContaining({
-	            cardId: CARD_ID,
-	            animals: '2 sheep, 1 cattle',
-	            futureFood: 13,
-	          }),
-	        }),
-	      }),
-	    ]))
-	  })
+      schedule: '2 food in rounds 4-6; 1 food in rounds 4-10',
+    })
+    const queuedEvents = resp.state.events.filter((event) => event.type === 'futureMeeple.queued')
+    expect(queuedEvents).toHaveLength(2)
+    expect(queuedEvents.filter((event) => 'sourceSummary' in event)).toHaveLength(1)
+    expect(queuedEvents).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'futureMeeple.queued',
+        cardId: CARD_ID,
+        playerId: p.id,
+        sourceSummary: expect.objectContaining({
+          key: 'log.salterFutureFood',
+          params: expect.objectContaining({
+            cardId: CARD_ID,
+            animals: '2 sheep, 1 cattle',
+            futureFood: 13,
+          }),
+        }),
+      }),
+    ]))
+  })
 
   it('Negative: reserve>0 不触发', () => {
     const session = setup({
       resources: { sheep: 3 },
-      pastures: [{ id:'p1',size:1,tiles:[{row:2,col:0}],stables:0,animalType:'sheep',animalCount:1 }],
+      pastures: [{ id: 'p1', tiles: [{ row: 2, col: 0 }], animalType: 'sheep', animalCount: 1 }],
       round: 3,
     })
     const resp = session.takeAnytimeAction(0, 'B157-salter-anytime')
@@ -209,7 +220,7 @@ describe('B157_Salter session', () => {
   it('Negative: round=14 不触发', () => {
     const session = setup({
       resources: { sheep: 1 },
-      pastures: [{ id:'p1',size:1,tiles:[{row:2,col:0}],stables:0,animalType:'sheep',animalCount:1 }],
+      pastures: [{ id: 'p1', tiles: [{ row: 2, col: 0 }], animalType: 'sheep', animalCount: 1 }],
       round: 14,
     })
     const resp = session.takeAnytimeAction(0, 'B157-salter-anytime')
@@ -219,7 +230,7 @@ describe('B157_Salter session', () => {
   it('单只 fast path: 不弹 panel, 直接 ok', () => {
     const session = setup({
       resources: { sheep: 1 },
-      pastures: [{ id:'p1',size:1,tiles:[{row:2,col:0}],stables:0,animalType:'sheep',animalCount:1 }],
+      pastures: [{ id: 'p1', tiles: [{ row: 2, col: 0 }], animalType: 'sheep', animalCount: 1 }],
       round: 3,
     })
     const resp = session.takeAnytimeAction(0, 'B157-salter-anytime')
@@ -228,52 +239,52 @@ describe('B157_Salter session', () => {
     expect(p.resources.sheep).toBe(0)
     expect(p.pastures[0].animalCount).toBe(0)
     const fms = resp.state.futureMeeples
-    expect(fms.map((e) => e.round).sort((a, b) => a - b)).toEqual([4,5,6])
-	    const log = resp.state.log.find((entry) => entry.key === 'log.salterFutureFood')
-	    expect(log?.params).toMatchObject({
-	      player: p.name,
-	      cardId: CARD_ID,
-	      animals: '1 sheep',
+    expect(fms.map((e) => e.round).sort((a, b) => a - b)).toEqual([4, 5, 6])
+    const log = resp.state.log.find((entry) => entry.key === 'log.salterFutureFood')
+    expect(log?.params).toMatchObject({
+      player: p.name,
+      cardId: CARD_ID,
+      animals: '1 sheep',
       sheep: 1,
       boar: 0,
       cattle: 0,
-	      futureFood: 3,
-	      schedule: '1 food in rounds 4-6',
-	    })
-	    expect(resp.state.events).toEqual(expect.arrayContaining([
-	      expect.objectContaining({
-	        type: 'futureMeeple.queued',
-	        cardId: CARD_ID,
-	        playerId: p.id,
-	        sourceSummary: expect.objectContaining({
-	          key: 'log.salterFutureFood',
-	        }),
-	      }),
-	    ]))
-	  })
+      futureFood: 3,
+      schedule: '1 food in rounds 4-6',
+    })
+    expect(resp.state.events).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'futureMeeple.queued',
+        cardId: CARD_ID,
+        playerId: p.id,
+        sourceSummary: expect.objectContaining({
+          key: 'log.salterFutureFood',
+        }),
+      }),
+    ]))
+  })
 
   it('commit {0,0,0}: 退回 invalid', () => {
     const session = setup({
       resources: { sheep: 2 },
-      pastures: [{ id:'p1',size:2,tiles:[{row:2,col:0}],stables:0,animalType:'sheep',animalCount:2 }],
+      pastures: [{ id: 'p1', tiles: [{ row: 2, col: 0 }], animalType: 'sheep', animalCount: 2 }],
       round: 3,
     })
     session.takeAnytimeAction(0, 'B157-salter-anytime')
-    const resp = session.commitSelectionChoice(0, { resourceCounts: { sheep:0, boar:0, cattle:0 } })
+    const resp = session.commitSelectionChoice(0, { resourceCounts: { sheep: 0, boar: 0, cattle: 0 } })
     expect(resp.ok).toBe(false)
   })
 
   it('commit over-board: pre-validate fail 后 pending 保留, 可重试合法 counts', () => {
     const session = setup({
       resources: { sheep: 2 },
-      pastures: [{ id:'p1',size:2,tiles:[{row:2,col:0}],stables:0,animalType:'sheep',animalCount:2 }],
+      pastures: [{ id: 'p1', tiles: [{ row: 2, col: 0 }], animalType: 'sheep', animalCount: 2 }],
       round: 3,
     })
     const open = session.takeAnytimeAction(0, 'B157-salter-anytime')
     expect(open.ok).toBe(true)
     expect(open.interaction.stateId).toBe('wait')
     // over-board commit: counts.sheep=99 > onBoard.sheep=2
-    const bad = session.commitSelectionChoice(0, { resourceCounts: { sheep:99, boar:0, cattle:0 } })
+    const bad = session.commitSelectionChoice(0, { resourceCounts: { sheep: 99, boar: 0, cattle: 0 } })
     expect(bad.ok).toBe(false)
     // pending envelope 仍保留（玩家可以再次提交）
     expect(bad.interaction.stateId).toBe('wait')
@@ -281,7 +292,7 @@ describe('B157_Salter session', () => {
       expect(bad.interaction.request.kind).toBe('resource-quantity-select')
     }
     // 重试合法 counts → success
-    const good = session.commitSelectionChoice(0, { resourceCounts: { sheep:2, boar:0, cattle:0 } })
+    const good = session.commitSelectionChoice(0, { resourceCounts: { sheep: 2, boar: 0, cattle: 0 } })
     expect(good.ok).toBe(true)
     const p = good.state.players[0]!
     expect(p.resources.sheep).toBe(0)
@@ -291,7 +302,7 @@ describe('B157_Salter session', () => {
   it('clampRound: round=13 sheep → futureMeeples 只剩 round 14 一条', () => {
     const session = setup({
       resources: { sheep: 1 },
-      pastures: [{ id:'p1',size:1,tiles:[{row:2,col:0}],stables:0,animalType:'sheep',animalCount:1 }],
+      pastures: [{ id: 'p1', tiles: [{ row: 2, col: 0 }], animalType: 'sheep', animalCount: 1 }],
       round: 13,
     })
     const resp = session.takeAnytimeAction(0, 'B157-salter-anytime')  // single fast path
@@ -299,6 +310,9 @@ describe('B157_Salter session', () => {
     const fms = resp.state.futureMeeples
     expect(fms.length).toBe(1)
     expect(fms[0].round).toBe(14)
+    expect(fms[0].resources).toEqual({ food: 1 })
+    expect(resp.state.players[0]!.resources).toMatchObject({ sheep: 0, food: 5 })
+    expect(resp.state.players[0]!.pastures[0]!.animalCount).toBe(0)
   })
 })
 
@@ -314,7 +328,7 @@ describe('B157 Salter parity', () => {
   const setup = ({
     played = true, farm = {}, reserve = {}, round = 5,
   }: { played?: boolean; farm?: AnimalCounts; reserve?: AnimalCounts; round?: number } = {}) => {
-    const session = new GameSession(6157 + round, undefined, { playerCount: 4 })
+    const session = evidence.track(createWorkSession({ seed: 6157 + round, options: { playerCount: 4 } }))
     const state = session.getState().state
     stabilizeRandomHands(state.players)
     state.currentPlayerIndex = 0
@@ -333,7 +347,7 @@ describe('B157 Salter parity', () => {
       }
       player.pastures = []
       player.stableAnimals = {}
-      player.houseAnimals = {};
+      player.houseAnimals = {}
     })
     const owner = state.players[0]!
     owner.occupationHand = played ? [FILLER] : [CARD_ID]
@@ -343,7 +357,7 @@ describe('B157 Salter parity', () => {
     owner.resources.cattle = (farm.cattle ?? 0) + (reserve.cattle ?? 0)
     if ((farm.sheep ?? 0) > 0) {
       owner.pastures.push({
-        id: 'salter-sheep-pasture', size: 2, tiles: [{ row: 1, col: 0 }], stables: 1,
+        id: 'salter-sheep-pasture', tiles: [{ row: 1, col: 0 }],
         animalType: 'sheep', animalCount: farm.sheep!,
       })
     }
@@ -352,7 +366,7 @@ describe('B157 Salter parity', () => {
       owner.stableAnimals['1-1'] = 'boar'
     }
     if ((farm.cattle ?? 0) > 0) {
-      owner.houseAnimals = Object.fromEntries(owner.roomTiles.slice(0, farm.cattle!).map(tile => [`${tile.row}-${tile.col}`, 'cattle']));
+      owner.houseAnimals = Object.fromEntries(owner.roomTiles.slice(0, farm.cattle!).map(tile => [`${tile.row}-${tile.col}`, 'cattle']))
     }
     session.loadState(state)
     return session
@@ -407,10 +421,14 @@ describe('B157 Salter parity', () => {
   })
 
   it('B157 S12: the first scheduled food is received at the start of the next round', () => {
-    const session = setup({ farm: { sheep: 1 }, round: 5 })
+    const session = setup({ farm: { sheep: 2 }, round: 5 })
     enterInteraction(session)
-    const salted = session.takeAnytimeAction(0, ANYTIME_ID)
-    expect(expandedFutureFoodRounds(salted)).toEqual([6, 7, 8])
+    const offered = session.takeAnytimeAction(0, ANYTIME_ID)
+    quantityRequest(offered)
+    const salted = session.commitSelectionChoice(0, { resourceCounts: { sheep: 2 } })
+    expect(salted.ok, salted.error).toBe(true)
+    expect(salted.state.players[0]!.resources.food).toBe(20)
+    expect(expandedFutureFoodRounds(salted)).toEqual([6, 6, 7, 7, 8, 8])
     const state = session.getState().state
     state.players.forEach((player) => markAllWorkersUsed(state, player))
     session.loadState(state)
@@ -419,7 +437,97 @@ describe('B157 Salter parity', () => {
 
     expect(response.ok, response.error).toBe(true)
     expect(response.state.round).toBe(6)
-    expect(response.state.players[0]!.resources.food).toBe(21)
-    expect(expandedFutureFoodRounds(response)).toEqual([7, 8])
+    expect(response.state.players[0]!.resources.food).toBe(22)
+    expect(expandedFutureFoodRounds(response)).toEqual([7, 7, 8, 8])
+  })
+})
+
+describe('B157 rule boundaries', () => {
+
+  const SALTER = 'B157_Salter'
+
+  function salter({ round = 5, sheep = 2, played = true, reserveBoar = 0, farmBoar = 0, farmCattle = 0, allWorkersUsed = false } = {}) {
+    return evidence.track(createWorkSession({
+      seed: 2157, options: { playerCount: 4 }, configure(state) {
+        state.round = round
+        const owner = state.players[0]!
+        owner.occupationPlayed = played ? [SALTER] : []
+        Object.assign(owner.resources, { sheep, boar: reserveBoar + farmBoar, cattle: farmCattle, food: 20 })
+        owner.pastures = [{ id: 'sheep-pasture', tiles: [{ row: 0, col: 2 }], animalType: sheep ? 'sheep' : null, animalCount: sheep }]
+        if (farmBoar)
+          owner.pastures.push({ id: 'boar-pasture', tiles: [{ row: 0, col: 3 }], animalType: 'boar', animalCount: farmBoar })
+        if (farmCattle)
+          owner.pastures.push({ id: 'cattle-pasture', tiles: [{ row: 0, col: 4 }], animalType: 'cattle', animalCount: farmCattle })
+        if (allWorkersUsed)
+          state.players.forEach(p => markAllWorkersUsed(state, p))
+      }
+    }))
+  }
+
+  function wait(response: SessionResponse) {
+    assert.equal(response.ok, true, response.error)
+    assert.ok(response.interaction.stateId === 'wait', JSON.stringify(response.interaction))
+    return response.interaction
+  }
+
+  function salterChoice(session: GameSession) {
+    const r = session.takeAnytimeAction(0, 'B157-salter-anytime')
+    assert.equal(wait(r).request.kind, 'resource-quantity-select')
+    return r
+  }
+
+  const future = (r: SessionResponse) => r.state.futureMeeples.filter(m => m.cardId === SALTER).flatMap(m => Array.from({ length: m.resources.food ?? 0 }, () => m.round)).sort((a, b) => a - b)
+
+  const salterObserved = (r: SessionResponse) => ({ sheep: r.state.players[0]!.resources.sheep, food: r.state.players[0]!.resources.food, farmSheep: r.state.players[0]!.pastures[0]!.animalCount, rounds: future(r) })
+
+  it("rejects zero negative fractional and excess counts then salts one farm sheep", () => {
+    const s = salter()
+    salterChoice(s)
+    for (const sheep of [0, -1, 1.5, 3])
+      assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { resourceCounts: { sheep } }))
+    const r = s.commitSelectionChoice(0, { resourceCounts: { sheep: 1 } })
+    assert.equal(r.ok, true, r.error)
+    assert.deepEqual(salterObserved(r), { sheep: 1, food: 20, farmSheep: 1, rounds: [6, 7, 8] })
+    assert.ok(r.state.log.some(log => log.key === 'log.salterFutureFood'))
+  })
+
+  it("repeated salting consumes only remaining sheep and never pays early", () => {
+    const s = salter()
+    salterChoice(s)
+    assert.equal(s.commitSelectionChoice(0, { resourceCounts: { sheep: 1 } }).ok, true)
+    const r = s.takeAnytimeAction(0, 'B157-salter-anytime')
+    assert.deepEqual(salterObserved(r), { sheep: 0, food: 20, farmSheep: 0, rounds: [6, 6, 7, 7, 8, 8] })
+    assertRejectedUnchanged(s, () => s.takeAnytimeAction(0, 'B157-salter-anytime'))
+  })
+
+  it("undo restores farm animals and schedule before a legal retry", () => {
+    const s = salter()
+    salterChoice(s)
+    assert.equal(s.commitSelectionChoice(0, { resourceCounts: { sheep: 1 } }).ok, true)
+    const r = s.undoStep()
+    assert.equal(r.ok, true, r.error)
+    assert.deepEqual(salterObserved(r), { sheep: 2, food: 20, farmSheep: 2, rounds: [] })
+    assert.equal(wait(r).request.kind, 'resource-quantity-select')
+    const retry = s.commitSelectionChoice(0, { resourceCounts: { sheep: 2 } })
+    assert.deepEqual(salterObserved(retry), { sheep: 0, food: 20, farmSheep: 0, rounds: [6, 6, 7, 7, 8, 8] })
+  })
+
+  it("unplayed no-farm pending-reserve and final-round abilities are unavailable", () => {
+    for (const settings of [{ played: false }, { sheep: 0 }, { reserveBoar: 1 }, { round: 14 }]) {
+      const s = salter(settings)
+      assert.equal(s.getState().interaction.anytimeActions.some(a => a.id === 'B157-salter-anytime'), false)
+      assertRejectedUnchanged(s, () => s.takeAnytimeAction(0, 'B157-salter-anytime'))
+      assert.deepEqual(future(s.getState()), [])
+    }
+  })
+
+  it("each salted animal type retains its own three five or seven round duration", () => {
+    const s = salter({ farmBoar: 1, farmCattle: 1 })
+    salterChoice(s)
+    const r = s.commitSelectionChoice(0, { resourceCounts: { sheep: 2, boar: 1, cattle: 1 } })
+    assert.equal(r.ok, true, r.error)
+    assert.deepEqual([r.state.players[0]!.resources.sheep, r.state.players[0]!.resources.boar, r.state.players[0]!.resources.cattle], [0, 0, 0])
+    assert.equal(r.state.players[0]!.resources.food, 20)
+    assert.deepEqual(future(r), [6, 6, 6, 6, 7, 7, 7, 7, 8, 8, 8, 8, 9, 9, 10, 10, 11, 12])
   })
 })

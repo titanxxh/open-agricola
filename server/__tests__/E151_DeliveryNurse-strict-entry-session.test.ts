@@ -1,16 +1,21 @@
+import { createWorkSession } from './_helpers/session-fixtures'
+import { createScenarioEvidence } from './_helpers/scenario-evidence'
+import { getChoiceOptions, assertRejectedUnchanged } from './_helpers/session-assertions'
 import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game/authoritative-session'
+
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
-import { familySize, setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
-import { runCardListeners, type CardListenerContext } from '../../shared/cards/card-listeners'
+import { familySize, setActiveWorkerCount, setWorkersAtHome, workersAvailable } from '../../shared/domain/player'
+import { runCardListeners, type CardListenerDispatchInput } from '../../shared/cards/card-listeners'
 
 import '../../shared/cards/E/E151_DeliveryNurse'
 import '../../shared/cards/B/B092_LittleStickKnitter'
 
+const evidence = createScenarioEvidence(import.meta.url)
+
 const CARD_ID = 'E151_DeliveryNurse'
 
 const setupDeliveryNurse = (activeWorkerCount = 2) => {
-  const session = new GameSession(151, undefined, { playerCount: 4 })
+  const session = evidence.track(createWorkSession({ seed: 151, options: { playerCount: 4 } }))
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.round = 14
@@ -38,8 +43,8 @@ describe('E151 Delivery Nurse strict action entry', () => {
     const offered = session.takeAction(0, 'wish-children')
     expect(familySize(offered.state.players[0]!)).toBe(2)
     expect(offered.state.players[0]!.cardStates[CARD_ID]?.flagged).not.toBe(true)
-    expect(offered.interaction.request.options).toHaveLength(1)
-    const replacement = offered.interaction.request.options!.find((option) => option.sourceCard === CARD_ID)!
+    expect(getChoiceOptions(offered)).toHaveLength(1)
+    const replacement = getChoiceOptions(offered)!.find((option) => option.sourceCard === CARD_ID)!
     const response = session.resolveChoice(0, replacement.value)
 
     expect(response.ok, response.error).toBe(true)
@@ -60,8 +65,8 @@ describe('E151 Delivery Nurse strict action entry', () => {
       player,
       space: sheepMarket,
       actionId: 'family-growth',
-      phase: 'isDoable',
-    } as CardListenerContext))
+      phase: 'isDoable', actionHooks: session.actionHooks,
+    } satisfies CardListenerDispatchInput))
 
     expect(results).toEqual([])
   })
@@ -70,9 +75,13 @@ describe('E151 Delivery Nurse strict action entry', () => {
     const session = setupDeliveryNurse(5)
 
     expect(session.getState().actionAvailability?.['wish-children']).toBe(false)
-    const response = session.takeAction(0, 'wish-children')
+    assertRejectedUnchanged(session, () => session.takeAction(0, 'wish-children'))
+    const response = session.takeAction(0, 'grain-seeds')
 
-    expect(response.ok).toBe(false)
+    expect(response.ok, response.error).toBe(true)
+    expect(familySize(response.state.players[0]!)).toBe(5)
+    expect(workersAvailable(response.state, response.state.players[0]!)).toBe(4)
+    expect(response.state.players[0]!.resources.grain).toBe(1)
     expect(response.error).toBe('space unavailable')
     expect(response.state.actionSpaces.find((space) => space.id === 'wish-children')?.takenBy).toEqual([])
     expect(response.state.players[0]!.cardStates[CARD_ID]?.flagged).not.toBe(true)
