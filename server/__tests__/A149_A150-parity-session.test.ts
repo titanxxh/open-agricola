@@ -13,9 +13,14 @@ import { createScenarioEvidence } from './_helpers/scenario-evidence'
 
 const sessionEvidence = createScenarioEvidence(import.meta.url)
 
-function assertTurnFinished(response: SessionResponse) {
+function assertTurnFinished(response: SessionResponse, actor: number) {
   assert.equal(response.ok, true, response.error)
-  assert.ok(response.interaction.stateId === 'wait' && response.interaction.request.kind === 'confirm-next-player', JSON.stringify(response.interaction))
+  assert.equal(response.state.players.length, 4)
+  assert.ok(response.interaction.stateId === 'wait', JSON.stringify(response.interaction))
+  assert.deepEqual(response.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: (actor + 1) % 4 })
+  assert.equal(response.interaction.playerIndex, actor)
+  assert.equal(response.state.currentPlayerIndex, actor)
+  assert.equal(response.state.roundPhase, 'work')
 }
 
 const FILLER = '__test_placeholder__'
@@ -169,22 +174,26 @@ describe("A149 command boundaries", () => {
       } }))
     return s
   }
-  const beforeAction = new WeakMap<GameSession, string>()
+  const beforeAction = new WeakMap<GameSession, { rules: string; interaction: string; actor: number }>()
   function turn(s: GameSession, actor: number, space: string) {
     let r = s.getState()
     if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
       r = confirmNext(s, r)
     assert.equal(r.interaction.stateId, 'idle')
     assert.equal(r.state.currentPlayerIndex, actor)
-    beforeAction.set(s, undoRuleSnapshot(s.getState()))
+    beforeAction.set(s, { rules: undoRuleSnapshot(r), interaction: JSON.stringify(r.interaction), actor })
     return ok(s.takeAction(actor, space))
   }
   function undo(s: GameSession) {
     const before = beforeAction.get(s)
     assert.ok(before)
     const undone = s.undoAction()
-    assertUndoRestored(before, undone)
-    assertUndoRestored(before, s.getState())
+    assertUndoRestored(before.rules, undone)
+    assertUndoRestored(before.rules, s.getState())
+    assert.equal(JSON.stringify(undone.interaction), before.interaction)
+    assert.equal(JSON.stringify(s.getState().interaction), before.interaction)
+    assert.equal(undone.interaction.stateId, 'idle')
+    assert.equal(undone.state.currentPlayerIndex, before.actor)
     return undone
   }
   function drive(s: GameSession, r: SessionResponse, kind: 'room' | 'stable' | 'fence' | null = 'room') {
@@ -211,7 +220,7 @@ describe("A149 command boundaries", () => {
       else
         assert.fail(JSON.stringify(i))
     }
-    assert.ok(r.interaction.stateId === 'idle' || (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player'), JSON.stringify(r.interaction))
+    assertTurnFinished(r, 0)
     return r
   }
   function artist(wood: number, reed: number, played = true) {
@@ -246,7 +255,7 @@ describe("A149 command boundaries", () => {
     assertRejectedUnchanged(ordinary, () => ordinary.commitSelectionChoice(0, { rooms: [{ row: 1, col: 1 }] }))
     const hs = artist(5, 1, false)
     const hand = turn(hs, 0, 'traveling-players')
-    assertTurnFinished(hand)
+    assertTurnFinished(hand, 0)
     assert.equal(hand.state.players[0]!.rooms, 2)
     assert.equal(hand.state.players[0]!.resources.reed, 1)
     save('A149-N2', hand)
@@ -258,13 +267,13 @@ describe("A149 command boundaries", () => {
     assert.equal(declined.state.players[0]!.resources.wood, 5)
     const ps = artist(4, 1)
     const poor = turn(ps, 0, 'traveling-players')
-    assertTurnFinished(poor)
+    assertTurnFinished(poor, 0)
     assertRejectedUnchanged(ps, () => ps.commitSelectionChoice(0, { rooms: [{ row: 1, col: 1 }] }))
     assert.equal(poor.state.players[0]!.rooms, 2)
     const otherS = artist(5, 1)
     turn(otherS, 0, 'day-laborer')
     const other = turn(otherS, 1, 'traveling-players')
-    assertTurnFinished(other)
+    assertTurnFinished(other, 1)
     assert.equal(other.state.players[0]!.rooms, 2)
     save('A149-N3', { declined, poor, other })
   })

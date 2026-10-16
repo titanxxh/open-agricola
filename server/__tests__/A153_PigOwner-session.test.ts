@@ -190,20 +190,19 @@ describe("A153 command boundaries", () => {
     assert.equal(r.state.currentPlayerIndex, actor)
     return ok(s.takeAction(actor, space))
   }
-  function finish(s: GameSession, r: SessionResponse, accept = true) {
+  function finish(s: GameSession, r: SessionResponse) {
     for (let n = 0; n < 18 && r.interaction.stateId === 'wait' && r.interaction.request.kind !== 'confirm-next-player'; n++) {
       const i = r.interaction
       if (i.request.kind === 'animal-reorg')
         r = ok(s.resolveChoice(i.playerIndex, 'confirm', { zones: i.request.zones }))
-      else if (i.request.kind === 'choice' || i.request.kind === 'select-trigger') {
-        const o = i.request.options.find(o => accept ? o.value !== '__skip__' && o.value !== '__done__' : o.value === '__skip__' || o.value === '__done__')
-        assert.ok(o, JSON.stringify(i))
-        r = ok(s.resolveChoice(i.playerIndex, o.value))
-      }
       else
         assert.fail(JSON.stringify(i))
     }
-    assert.ok(r.interaction.stateId === 'idle' || (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player'), JSON.stringify(r.interaction))
+    assert.ok(r.interaction.stateId === 'wait', JSON.stringify(r.interaction))
+    assert.deepEqual(r.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
+    assert.equal(r.state.roundPhase, 'work')
     return r
   }
   function pig(count: number, played = true) {
@@ -230,7 +229,7 @@ describe("A153 command boundaries", () => {
     const s = pig(5)
     const entered = finish(s, turn(s, 0, 'day-laborer'))
     assert.ok(entered.interaction.anytimeActions.some(a => a.id === ANY))
-    const r = ok(s.takeAnytimeAction(0, ANY))
+    const r = finish(s, ok(s.takeAnytimeAction(0, ANY)))
     assert.equal(points(r), 3)
     assert.equal(isCardFlagged(r.state.players[0]!, PIG), true)
     assert.equal(r.state.players[0]!.resources.boar, 5)
@@ -244,7 +243,7 @@ describe("A153 command boundaries", () => {
     const s = pig(5)
     finish(s, turn(s, 0, 'day-laborer'))
     assertRejectedUnchanged(s, () => s.takeAnytimeAction(1, ANY))
-    const r = ok(s.takeAnytimeAction(0, ANY))
+    const r = finish(s, ok(s.takeAnytimeAction(0, ANY)))
     assert.equal(points(r), 3)
     save('A153-N3', { hand, r })
   })

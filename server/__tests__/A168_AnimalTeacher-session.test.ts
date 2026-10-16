@@ -14,9 +14,14 @@ import { createScenarioEvidence } from './_helpers/scenario-evidence'
 
 const sessionEvidence = createScenarioEvidence(import.meta.url)
 
-function assertTurnFinished(response: SessionResponse) {
+function assertTurnFinished(response: SessionResponse, actor: number) {
   assert.equal(response.ok, true, response.error)
-  assert.ok(response.interaction.stateId === 'wait' && response.interaction.request.kind === 'confirm-next-player', JSON.stringify(response.interaction))
+  assert.equal(response.state.players.length, 4)
+  assert.ok(response.interaction.stateId === 'wait', JSON.stringify(response.interaction))
+  assert.deepEqual(response.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: (actor + 1) % 4 })
+  assert.equal(response.interaction.playerIndex, actor)
+  assert.equal(response.state.currentPlayerIndex, actor)
+  assert.equal(response.state.roundPhase, 'work')
 }
 
 const CARD_ID = 'A168_AnimalTeacher'
@@ -228,18 +233,21 @@ describe("A168 command boundaries", () => {
         r = ok(s.resolveChoice(i.playerIndex, 'confirm', { zones: i.request.zones }))
       else {
         if (i.request.kind === 'select-trigger') {
-          const trigger = i.request.options[0]
-          assert.ok(trigger)
+          const triggers = i.request.options.filter(option => option.sourceCard === CARD && !option.disabled)
+          assert.equal(triggers.length, 1, JSON.stringify(i))
+          const trigger = triggers[0]!
           r = ok(s.resolveChoice(i.playerIndex, trigger.value))
           continue
         }
         assert.ok(i.request.kind === 'choice', JSON.stringify(i))
+        assert.equal(i.sourceCard, CARD)
+        assert.equal(i.playerIndex, 0)
         const o = i.request.options.find(o => accept ? !o.disabled && o.value !== '__skip__' && o.value !== '__done__' && (!crop || descriptionEffects(o.descriptionPreview).some(e => (e.kind === 'resourceBundle' && e.resources[crop] === 1) || (e.kind === 'resourceExchange' && e.resourcesGained?.[crop] === 1))) : o.value === '__skip__' || o.value === '__done__')
         assert.ok(o, JSON.stringify(i))
         r = ok(s.resolveChoice(i.playerIndex, o.value))
       }
     }
-    assert.ok(r.interaction.stateId === 'idle' || (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player'), JSON.stringify(r.interaction))
+    assertTurnFinished(r, 0)
     return r
   }
   function material(r: SessionResponse, actor = 0) {
@@ -318,8 +326,8 @@ describe("A168 command boundaries", () => {
     if (other.interaction.stateId === 'wait' && other.interaction.request.kind === 'choice')
       other = ok(os.resolveChoice(1, 'A114_SeasonalWorker'))
     assert.ok(other.state.players[1]!.occupationPlayed.includes('A114_SeasonalWorker'))
-    for (const response of [unrelated, hand, other])
-      assertTurnFinished(response)
+    for (const [response, actor] of [[unrelated, 0], [hand, 0], [other, 1]] as const)
+      assertTurnFinished(response, actor)
     assert.equal(material(other).sheep, 0)
     save('A168-N3', { unrelated, hand, other })
   })

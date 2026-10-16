@@ -288,13 +288,29 @@ describe("A151 command boundaries", () => {
     assert.ok(r.interaction.stateId === 'idle' || (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player'), JSON.stringify(r.interaction))
     return r
   }
-  function end(s: GameSession, spaces: string[], acceptCard = false) {
+  function end(s: GameSession, spaces: string[], acceptCard = false, expectOffer = true) {
     let r = s.getState()
     for (const [n, space] of spaces.entries())
       r = drive(s, turn(s, n % 4, space))
     assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
     const pending = confirmNext(s, r)
+    if (expectOffer) {
+      assert.ok(pending.interaction.stateId === 'wait' && pending.interaction.request.kind === 'choice', JSON.stringify(pending.interaction))
+      assert.equal(pending.interaction.sourceCard, CARD)
+      assert.equal(pending.interaction.playerIndex, 0)
+      assert.ok(pending.interaction.request.options.some(option => option.sourceCard === CARD && !option.disabled && option.value !== '__skip__'))
+    }
+    else {
+      assert.equal(pending.interaction.stateId, 'idle', JSON.stringify(pending.interaction))
+      assert.equal(pending.state.round, 6)
+      assert.equal(pending.state.roundPhase, 'work')
+      assert.equal(pending.state.currentPlayerIndex, 0)
+    }
     const done = drive(s, pending, acceptCard)
+    assert.equal(done.interaction.stateId, 'idle', JSON.stringify(done.interaction))
+    assert.equal(done.state.currentPlayerIndex, 0)
+    assert.equal(done.state.roundPhase, 'work')
+    assert.equal(done.state.round, 6)
     return { pending, r: done }
   }
   const EIGHT = ['day-laborer', 'fencing', 'major-improvement', 'grain-utilization', 'forest', 'reed-bank', 'clay-pit', 'fishing']
@@ -314,7 +330,7 @@ describe("A151 command boundaries", () => {
   it("decline and hand leave vacant sheep accumulation untouched until next refill", () => {
     for (const played of [true, false]) {
       const s = setup(played)
-      const { pending, r } = end(s, EIGHT, false)
+      const { pending, r } = end(s, EIGHT, false, played)
       assert.equal(r.state.players[0]!.resources.sheep, 0)
       assert.equal(r.state.actionSpaces.find(a => a.id === 'sheep-market')!.resources.sheep, 2)
       save(`A151-N2-${played}`, { pending, r })
@@ -323,7 +339,7 @@ describe("A151 command boundaries", () => {
   it("zero and two vacant stage one spaces cannot offer extra action", () => {
     for (const spaces of [['sheep-market', 'fencing', 'major-improvement', 'grain-utilization', 'forest', 'reed-bank', 'clay-pit', 'fishing'], ['day-laborer', 'fencing', 'major-improvement', 'traveling-players', 'forest', 'reed-bank', 'clay-pit', 'fishing']]) {
       const s = setup()
-      const { pending, r } = end(s, spaces, true)
+      const { pending, r } = end(s, spaces, true, false)
       assert.equal(r.state.players[0]!.resources.sheep, spaces[0] === 'sheep-market' ? 1 : 0)
       assert.ok(pending.interaction.stateId !== 'wait' || pending.interaction.sourceCard !== CARD)
       save(`A151-N3-${spaces[0]}`, { pending, r })
@@ -332,7 +348,7 @@ describe("A151 command boundaries", () => {
   it("sole unaffordable major target cannot offer unpaid action or stale return use", () => {
     const s = setup(true, state => state.players[0]!.resources.clay = 0)
     const spaces = ['day-laborer', 'fencing', 'sheep-market', 'grain-utilization', 'forest', 'reed-bank', 'grove', 'fishing']
-    const { pending, r } = end(s, spaces, true)
+    const { pending, r } = end(s, spaces, true, false)
     assert.ok(pending.interaction.stateId !== 'wait' || pending.interaction.sourceCard !== CARD)
     assert.equal(r.state.players[0]!.improvements.length, 0)
     assertRejectedUnchanged(s, () => s.resolveChoice(0, 'reuse-return-home'))

@@ -12,9 +12,14 @@ import { createScenarioEvidence } from './_helpers/scenario-evidence'
 
 const sessionEvidence = createScenarioEvidence(import.meta.url)
 
-function assertTurnFinished(response: SessionResponse) {
+function assertTurnFinished(response: SessionResponse, actor: number) {
   assert.equal(response.ok, true, response.error)
-  assert.ok(response.interaction.stateId === 'wait' && response.interaction.request.kind === 'confirm-next-player', JSON.stringify(response.interaction))
+  assert.equal(response.state.players.length, 4)
+  assert.ok(response.interaction.stateId === 'wait', JSON.stringify(response.interaction))
+  assert.deepEqual(response.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: (actor + 1) % 4 })
+  assert.equal(response.interaction.playerIndex, actor)
+  assert.equal(response.state.currentPlayerIndex, actor)
+  assert.equal(response.state.roundPhase, 'work')
 }
 
 describe('A150_Stagehand session', () => {
@@ -207,7 +212,7 @@ describe("A150 command boundaries", () => {
       else
         assert.fail(JSON.stringify(i))
     }
-    assert.ok(r.interaction.stateId === 'idle' || (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player'), JSON.stringify(r.interaction))
+    assertTurnFinished(r, 1)
     return r
   }
   function stage(wood = 10, played = true) {
@@ -239,23 +244,23 @@ describe("A150 command boundaries", () => {
     assert.equal(decline.state.players[0]!.rooms, 2)
     assert.equal(decline.state.players[0]!.resources.wood, 10)
     const own = turn(stage(), 0, 'traveling-players')
-    assertTurnFinished(own)
+    assertTurnFinished(own, 0)
     assert.equal(own.state.players[0]!.rooms, 2)
     const hs = stage(10, false)
     const hand = offer(hs)
-    assertTurnFinished(hand)
+    assertTurnFinished(hand, 1)
     assert.equal(hand.state.players[0]!.rooms, 2)
     const us = stage()
     turn(us, 0, 'day-laborer')
     const unrelated = turn(us, 1, 'fishing')
-    assertTurnFinished(unrelated)
+    assertTurnFinished(unrelated, 1)
     assert.equal(unrelated.state.players[0]!.rooms, 2)
     save('A150-N2', { decline, own, hand, unrelated })
   })
   it("poor owner cannot select unpaid construction and stale choice cannot repeat", () => {
     const ps = stage(0)
     const poor = offer(ps)
-    assertTurnFinished(poor)
+    assertTurnFinished(poor, 1)
     assertRejectedUnchanged(ps, () => ps.commitSelectionChoice(0, { rooms: [{ row: 1, col: 1 }] }))
     assert.equal(poor.state.players[0]!.rooms, 2)
     assert.equal(poor.state.players[0]!.stableTiles.length, 0)

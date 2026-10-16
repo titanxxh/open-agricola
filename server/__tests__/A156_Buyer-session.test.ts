@@ -13,9 +13,14 @@ import { createScenarioEvidence } from './_helpers/scenario-evidence'
 
 const sessionEvidence = createScenarioEvidence(import.meta.url)
 
-function assertTurnFinished(response: SessionResponse) {
+function assertTurnFinished(response: SessionResponse, actor: number) {
   assert.equal(response.ok, true, response.error)
-  assert.ok(response.interaction.stateId === 'wait' && response.interaction.request.kind === 'confirm-next-player', JSON.stringify(response.interaction))
+  assert.equal(response.state.players.length, 4)
+  assert.ok(response.interaction.stateId === 'wait', JSON.stringify(response.interaction))
+  assert.deepEqual(response.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: (actor + 1) % 4 })
+  assert.equal(response.interaction.playerIndex, actor)
+  assert.equal(response.state.currentPlayerIndex, actor)
+  assert.equal(response.state.roundPhase, 'work')
 }
 
 describe('A156_Buyer session', () => {
@@ -330,22 +335,25 @@ describe("A156 command boundaries", () => {
         r = ok(s.resolveChoice(i.playerIndex, 'confirm', { zones: i.request.zones }))
       else {
         if (i.request.kind === 'select-trigger') {
-          const trigger = i.request.options[0]
-          assert.ok(trigger)
+          const triggers = i.request.options.filter(option => option.sourceCard === BUYER && !option.disabled)
+          assert.equal(triggers.length, 1, JSON.stringify(i))
+          const trigger = triggers[0]!
           r = ok(s.resolveChoice(i.playerIndex, trigger.value))
           continue
         }
         assert.ok(i.request.kind === 'choice', JSON.stringify(i))
+        assert.equal(i.sourceCard, BUYER)
+        assert.equal(i.playerIndex, 0)
         const o = i.request.options.find(o => accept ? !o.disabled && o.value !== '__skip__' && o.value !== '__done__' : o.value === '__skip__' || o.value === '__done__')
         assert.ok(o, JSON.stringify(i))
         r = ok(s.resolveChoice(i.playerIndex, o.value))
       }
     }
-    assert.ok(r.interaction.stateId === 'idle' || (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player'), JSON.stringify(r.interaction))
+    assertTurnFinished(r, 1)
     return r
   }
   function offer(s: GameSession, space: string) {
-    finish(s, turn(s, 0, 'day-laborer'))
+    assertTurnFinished(turn(s, 0, 'day-laborer'), 0)
     return turn(s, 1, space)
   }
   function material(r: SessionResponse, actor = 0) {
@@ -382,20 +390,20 @@ describe("A156 command boundaries", () => {
     const poor = setup({ food: 0 })
     turn(poor, 0, 'grain-seeds')
     const denied = turn(poor, 1, 'reed-bank')
-    assertTurnFinished(denied)
+    assertTurnFinished(denied, 1)
     assert.equal(material(denied).food, 0)
     assert.equal(material(denied).reed, 0)
     for (const played of [false, true]) {
       const s = setup({ food: 1 }, played)
-      const r = played ? turn(s, 0, 'reed-bank') : finish(s, offer(s, 'reed-bank'))
+      const r = played ? turn(s, 0, 'reed-bank') : offer(s, 'reed-bank')
       assert.equal(material(r).food, played ? 1 : 3)
       assert.equal(material(r, 1).food, 20)
-      assertTurnFinished(r)
+      assertTurnFinished(r, played ? 0 : 1)
       save(`A156-N2-${played}`, r)
     }
     const unrelatedSession = setup({ food: 1 }, true, state => state.actionSpaces.find(space => space.id === 'forest')!.resources.wood = 3)
     const unrelated = offer(unrelatedSession, 'forest')
-    assertTurnFinished(unrelated)
+    assertTurnFinished(unrelated, 1)
     assert.equal(material(unrelated).food, 3)
     assert.equal(material(unrelated).wood, 0)
     assert.equal(material(unrelated, 1).food, 20)
@@ -404,8 +412,10 @@ describe("A156 command boundaries", () => {
   })
   it("empty opponent pile rejects without a food transfer or general supply good", () => {
     const s = setup({ food: 1 }, true, state => pile(state, 'reed-bank', 'reed', 0))
-    finish(s, turn(s, 0, 'day-laborer'))
+    assertTurnFinished(turn(s, 0, 'day-laborer'), 0)
     const r = assertEmptyAccumulationRejected(s, 1, 'reed-bank')
+    assert.equal(r.interaction.stateId, 'idle')
+    assert.equal(r.state.currentPlayerIndex, 1)
     assert.equal(material(r).reed, 0)
     assert.equal(material(r).food, 3)
     assert.equal(material(r, 1).reed, 0)
@@ -419,7 +429,7 @@ describe("A156 command boundaries", () => {
       pending = ok(s.resolveChoice(pending.interaction.request.fromPlayerIndex, 'confirm'))
     assert.ok(pending.interaction.stateId === 'wait' && pending.interaction.request.kind === 'choice')
     assertRejectedUnchanged(s, () => s.resolveChoice(0, 'buy-five'))
-    const c = getChoiceOptions(pending).find(o => o.value !== '__skip__')
+    const c = getChoiceOptions(pending).find(o => !o.disabled && o.sourceCard === BUYER && o.value !== '__skip__' && o.value !== '__done__')
     assert.ok(c)
     assertRejectedUnchanged(s, () => s.resolveChoice(1, c.value))
     const r = finish(s, pending)

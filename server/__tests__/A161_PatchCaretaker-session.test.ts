@@ -11,9 +11,14 @@ import { createScenarioEvidence } from './_helpers/scenario-evidence'
 
 const sessionEvidence = createScenarioEvidence(import.meta.url)
 
-function assertTurnFinished(response: SessionResponse) {
+function assertTurnFinished(response: SessionResponse, actor: number) {
   assert.equal(response.ok, true, response.error)
-  assert.ok(response.interaction.stateId === 'wait' && response.interaction.request.kind === 'confirm-next-player', JSON.stringify(response.interaction))
+  assert.equal(response.state.players.length, 4)
+  assert.ok(response.interaction.stateId === 'wait', JSON.stringify(response.interaction))
+  assert.deepEqual(response.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: (actor + 1) % 4 })
+  assert.equal(response.interaction.playerIndex, actor)
+  assert.equal(response.state.currentPlayerIndex, actor)
+  assert.equal(response.state.roundPhase, 'work')
 }
 
 const CARD_ID = 'A161_PatchCaretaker'
@@ -152,22 +157,28 @@ describe("A161 command boundaries", () => {
     assert.equal(s.getState().state.players.length, players)
     return s
   }
-  const beforeAction = new WeakMap<GameSession, string>()
+  const beforeAction = new WeakMap<GameSession, { rules: string; interaction: string; actor: number }>()
   function turn(s: GameSession, actor: number, space: string) {
     let r = s.getState()
     if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
       r = confirmNext(s, r)
     assert.equal(r.interaction.stateId, 'idle')
     assert.equal(r.state.currentPlayerIndex, actor)
-    beforeAction.set(s, undoRuleSnapshot(s.getState()))
-    return ok(s.takeAction(actor, space))
+    beforeAction.set(s, { rules: undoRuleSnapshot(r), interaction: JSON.stringify(r.interaction), actor })
+    const result = ok(s.takeAction(actor, space))
+    assertTurnFinished(result, actor)
+    return result
   }
   function undo(s: GameSession) {
     const before = beforeAction.get(s)
     assert.ok(before)
     const undone = s.undoAction()
-    assertUndoRestored(before, undone)
-    assertUndoRestored(before, s.getState())
+    assertUndoRestored(before.rules, undone)
+    assertUndoRestored(before.rules, s.getState())
+    assert.equal(JSON.stringify(undone.interaction), before.interaction)
+    assert.equal(JSON.stringify(s.getState().interaction), before.interaction)
+    assert.equal(undone.interaction.stateId, 'idle')
+    assert.equal(undone.state.currentPlayerIndex, before.actor)
     return undone
   }
   function patch(first: string, second: string, played = true, empty = false) {
@@ -217,7 +228,7 @@ describe("A161 command boundaries", () => {
         turn(s, actor, space)
       const r = turn(s, 0, second)
       assert.equal(r.state.players[0]!.resources.vegetable, 0)
-      assertTurnFinished(r)
+      assertTurnFinished(r, 0)
       save(`A161-N2-${first}-${played}`, { initial, r })
     }
   })
@@ -229,7 +240,7 @@ describe("A161 command boundaries", () => {
     turn(s, 3, 'fishing')
     const r = turn(s, 0, 'grove')
     assert.equal(r.state.players[0]!.resources.vegetable, 0)
-    assertTurnFinished(r)
+    assertTurnFinished(r, 0)
     save('A161-N3', { opponent, r })
   })
   it("whole second action undo restores vegetable and one retry grants only once", () => {
@@ -239,6 +250,17 @@ describe("A161 command boundaries", () => {
     assert.equal(undone.state.players[0]!.resources.vegetable, 0)
     const retry = turn(s, 0, 'grove')
     assert.equal(retry.state.players[0]!.resources.vegetable, 1)
-    save('A161-N4', { r, undone, retry })
+    const occupied = setup()
+    turn(occupied, 0, 'forest')
+    for (const [actor, space] of [[1, 'grove'], [2, 'clay-pit'], [3, 'reed-bank']] as const)
+      turn(occupied, actor, space)
+    const ready = confirmNext(occupied, occupied.getState())
+    assert.equal(ready.interaction.stateId, 'idle')
+    assert.equal(ready.state.currentPlayerIndex, 0)
+    assertRejectedUnchanged(occupied, () => occupied.takeAction(0, 'grove'))
+    const legal = turn(occupied, 0, 'day-laborer')
+    assert.equal(legal.state.players[0]!.resources.food, 42)
+    assert.equal(legal.state.players[0]!.resources.vegetable, 0)
+    save('A161-N4', { r, undone, retry, legal })
   })
 })

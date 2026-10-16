@@ -20,9 +20,14 @@ import { assertRejectedUnchanged, confirmNext, getChoiceOptions } from './_helpe
 
 const sessionEvidence = createScenarioEvidence(import.meta.url)
 
-function assertTurnFinished(response: SessionResponse) {
+function assertTurnFinished(response: SessionResponse, actor: number) {
   assert.equal(response.ok, true, response.error)
-  assert.ok(response.interaction.stateId === 'wait' && response.interaction.request.kind === 'confirm-next-player', JSON.stringify(response.interaction))
+  assert.equal(response.state.players.length, 4)
+  assert.ok(response.interaction.stateId === 'wait', JSON.stringify(response.interaction))
+  assert.deepEqual(response.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: (actor + 1) % 4 })
+  assert.equal(response.interaction.playerIndex, actor)
+  assert.equal(response.state.currentPlayerIndex, actor)
+  assert.equal(response.state.roundPhase, 'work')
 }
 
 const FILLER = '__test_placeholder__'
@@ -298,22 +303,28 @@ describe("A155 command boundaries", () => {
     assert.ok(a, space)
     a.resources[resource] = count
   }
-  const beforeAction = new WeakMap<GameSession, string>()
+  const beforeAction = new WeakMap<GameSession, { rules: string; interaction: string; actor: number }>()
   function turn(s: GameSession, actor: number, space: string) {
     let r = s.getState()
     if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
       r = confirmNext(s, r)
     assert.equal(r.interaction.stateId, 'idle')
     assert.equal(r.state.currentPlayerIndex, actor)
-    beforeAction.set(s, undoRuleSnapshot(s.getState()))
-    return ok(s.takeAction(actor, space))
+    beforeAction.set(s, { rules: undoRuleSnapshot(r), interaction: JSON.stringify(r.interaction), actor })
+    const result = ok(s.takeAction(actor, space))
+    assertTurnFinished(result, actor)
+    return result
   }
   function undo(s: GameSession) {
     const before = beforeAction.get(s)
     assert.ok(before)
     const undone = s.undoAction()
-    assertUndoRestored(before, undone)
-    assertUndoRestored(before, s.getState())
+    assertUndoRestored(before.rules, undone)
+    assertUndoRestored(before.rules, s.getState())
+    assert.equal(JSON.stringify(undone.interaction), before.interaction)
+    assert.equal(JSON.stringify(s.getState().interaction), before.interaction)
+    assert.equal(undone.interaction.stateId, 'idle')
+    assert.equal(undone.state.currentPlayerIndex, before.actor)
     return undone
   }
   it("empty Traveling Players rejects while nonempty piles add one wood and grain", () => {
@@ -323,6 +334,10 @@ describe("A155 command boundaries", () => {
       assert.equal(r.state.players[0]!.resources.food, 40 + count)
       assert.equal(r.state.players[0]!.resources.wood, count === 0 ? 0 : 1)
       assert.equal(r.state.players[0]!.resources.grain, count === 0 ? 0 : 1)
+      if (count === 0) {
+        assert.equal(r.interaction.stateId, 'idle')
+        assert.equal(r.state.currentPlayerIndex, 0)
+      }
       save(`A155-N1-${count}`, r)
     }
   })
@@ -331,7 +346,7 @@ describe("A155 command boundaries", () => {
       const r = turn(setup(), 0, space)
       assert.equal(r.state.players[0]!.resources.wood, 0)
       assert.equal(r.state.players[0]!.resources.grain, 0)
-      assertTurnFinished(r)
+      assertTurnFinished(r, 0)
       save(`A155-N2-${space}`, r)
     }
   })
@@ -344,8 +359,8 @@ describe("A155 command boundaries", () => {
     assert.equal(other.state.players[0]!.resources.wood, 0)
     assert.equal(other.state.players[0]!.resources.grain, 0)
     assert.equal(other.state.players[1]!.resources.wood, 0)
-    assertTurnFinished(hand)
-    assertTurnFinished(other)
+    assertTurnFinished(hand, 0)
+    assertTurnFinished(other, 1)
     save('A155-N3', { hand, other })
   })
   it("invalid repeated input and whole undo preserve exactly one retry reward", () => {
@@ -359,7 +374,19 @@ describe("A155 command boundaries", () => {
     const retry = turn(s, 0, 'traveling-players')
     assert.equal(retry.state.players[0]!.resources.wood, 1)
     assert.equal(retry.state.players[0]!.resources.grain, 1)
-    save('A155-N4', { first, undone, retry })
+    const occupied = setup(state => pile(state, 'traveling-players', 'food', 2))
+    turn(occupied, 0, 'traveling-players')
+    for (const [actor, space] of [[1, 'grain-seeds'], [2, 'clay-pit'], [3, 'reed-bank']] as const)
+      turn(occupied, actor, space)
+    const ready = confirmNext(occupied, occupied.getState())
+    assert.equal(ready.interaction.stateId, 'idle')
+    assert.equal(ready.state.currentPlayerIndex, 0)
+    assertRejectedUnchanged(occupied, () => occupied.takeAction(0, 'traveling-players'))
+    const legal = turn(occupied, 0, 'day-laborer')
+    assert.equal(legal.state.players[0]!.resources.food, 44)
+    assert.equal(legal.state.players[0]!.resources.wood, 1)
+    assert.equal(legal.state.players[0]!.resources.grain, 1)
+    save('A155-N4', { first, undone, retry, legal })
   })
 })
 
@@ -386,22 +413,26 @@ describe("A163 command boundaries", () => {
     assert.equal(s.getState().state.players.length, players)
     return s
   }
-  const beforeAction = new WeakMap<GameSession, string>()
+  const beforeAction = new WeakMap<GameSession, { rules: string; interaction: string; actor: number }>()
   function turn(s: GameSession, actor: number, space: string) {
     let r = s.getState()
     if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
       r = confirmNext(s, r)
     assert.equal(r.interaction.stateId, 'idle')
     assert.equal(r.state.currentPlayerIndex, actor)
-    beforeAction.set(s, undoRuleSnapshot(s.getState()))
+    beforeAction.set(s, { rules: undoRuleSnapshot(r), interaction: JSON.stringify(r.interaction), actor })
     return ok(s.takeAction(actor, space))
   }
   function undo(s: GameSession) {
     const before = beforeAction.get(s)
     assert.ok(before)
     const undone = s.undoAction()
-    assertUndoRestored(before, undone)
-    assertUndoRestored(before, s.getState())
+    assertUndoRestored(before.rules, undone)
+    assertUndoRestored(before.rules, s.getState())
+    assert.equal(JSON.stringify(undone.interaction), before.interaction)
+    assert.equal(JSON.stringify(s.getState().interaction), before.interaction)
+    assert.equal(undone.interaction.stateId, 'idle')
+    assert.equal(undone.state.currentPlayerIndex, before.actor)
     return undone
   }
   const FILLER = ['grain-seeds', 'day-laborer', 'forest', 'clay-pit', 'reed-bank', 'fishing', 'grove', 'hollow-4', 'copse', 'traveling-players', 'western-quarry', 'eastern-quarry', 'vegetable-seeds', 'sheep-market', 'pig-market', 'cattle-market']
@@ -427,7 +458,7 @@ describe("A163 command boundaries", () => {
       let r = turn(s, actor, space)
       if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'animal-reorg')
         r = ok(s.resolveChoice(actor, 'confirm', { zones: r.interaction.request.zones }))
-      assertTurnFinished(r)
+      assertTurnFinished(r, actor)
     }
     return s
   }
@@ -439,6 +470,8 @@ describe("A163 command boundaries", () => {
       for (const type of ['wood', 'clay', 'reed', 'stone'] as const)
         assert.equal(a.state.players[0]!.resources[type] - b.state.players[0]!.resources[type], type === target ? 1 : 0)
       assert.equal(getRoundPersonPlacementOrder(a.state.players[0]!).length, ordinal)
+      assertTurnFinished(a, 0)
+      assertTurnFinished(b, 0)
       save(`A163-N1-${ordinal}`, { a, b })
     }
   })
@@ -451,9 +484,9 @@ describe("A163 command boundaries", () => {
     const r = turn(s, 1, 'resource-market-4')
     assert.equal(r.state.players[0]!.resources.wood, 0)
     assert.equal(r.state.players[0]!.resources.clay, 0)
-    assertTurnFinished(a)
-    assertTurnFinished(b)
-    assertTurnFinished(r)
+    assertTurnFinished(a, 0)
+    assertTurnFinished(b, 0)
+    assertTurnFinished(r, 1)
     save('A163-N2', { a, b, r })
   })
   it("occupied market rejects and whole undo restores material before one retry", () => {
@@ -465,7 +498,20 @@ describe("A163 command boundaries", () => {
       assert.equal(undone.state.players[0]!.resources[type], 0)
     const retry = turn(s, 0, 'resource-market-4')
     assert.deepEqual(retry.state.players[0]!.resources, r.state.players[0]!.resources)
-    save('A163-N3', { r, undone, retry })
+    assertTurnFinished(retry, 0)
+    const occupied = beforeExpert(1)
+    assertTurnFinished(turn(occupied, 0, 'resource-market-4'), 0)
+    for (const [actor, space] of [[1, 'grain-seeds'], [2, 'clay-pit'], [3, 'reed-bank']] as const)
+      assertTurnFinished(turn(occupied, actor, space), actor)
+    const ready = confirmNext(occupied, occupied.getState())
+    assert.equal(ready.interaction.stateId, 'idle')
+    assert.equal(ready.state.currentPlayerIndex, 0)
+    assertRejectedUnchanged(occupied, () => occupied.takeAction(0, 'resource-market-4'))
+    const legal = turn(occupied, 0, 'day-laborer')
+    assertTurnFinished(legal, 0)
+    assert.equal(legal.state.players[0]!.resources.food, 43)
+    assert.deepEqual((['wood', 'clay', 'reed', 'stone'] as const).map(type => legal.state.players[0]!.resources[type]), [1, 0, 1, 1])
+    save('A163-N3', { r, undone, retry, legal })
   })
 })
 

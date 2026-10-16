@@ -154,22 +154,26 @@ describe("A143 command boundaries", () => {
       } }))
     return s
   }
-  const beforeAction = new WeakMap<GameSession, string>()
+  const beforeAction = new WeakMap<GameSession, { rules: string; interaction: string; actor: number }>()
   function turn(s: GameSession, actor: number, space: string) {
     let r = s.getState()
     if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
       r = confirmNext(s, r)
     assert.equal(r.interaction.stateId, 'idle')
     assert.equal(r.state.currentPlayerIndex, actor)
-    beforeAction.set(s, undoRuleSnapshot(s.getState()))
+    beforeAction.set(s, { rules: undoRuleSnapshot(r), interaction: JSON.stringify(r.interaction), actor })
     return ok(s.takeAction(actor, space))
   }
   function undo(s: GameSession) {
     const before = beforeAction.get(s)
     assert.ok(before)
     const undone = s.undoAction()
-    assertUndoRestored(before, undone)
-    assertUndoRestored(before, s.getState())
+    assertUndoRestored(before.rules, undone)
+    assertUndoRestored(before.rules, s.getState())
+    assert.equal(JSON.stringify(undone.interaction), before.interaction)
+    assert.equal(JSON.stringify(s.getState().interaction), before.interaction)
+    assert.equal(undone.interaction.stateId, 'idle')
+    assert.equal(undone.state.currentPlayerIndex, before.actor)
     return undone
   }
   function drive(s: GameSession, r: SessionResponse, kind: 'room' | 'stable' | 'fence' | null = 'room') {
@@ -196,7 +200,11 @@ describe("A143 command boundaries", () => {
       else
         assert.fail(JSON.stringify(i))
     }
-    assert.ok(r.interaction.stateId === 'idle' || (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player'), JSON.stringify(r.interaction))
+    assert.ok(r.interaction.stateId === 'wait', JSON.stringify(r.interaction))
+    assert.deepEqual(r.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
+    assert.equal(r.state.roundPhase, 'work')
     return r
   }
   function buy(s: GameSession, card: string) {
@@ -207,6 +215,12 @@ describe("A143 command boundaries", () => {
       assert.ok(o, JSON.stringify(r.interaction))
       r = ok(s.resolveChoice(r.interaction.playerIndex, o.value))
     }
+    assert.ok(r.state.players[0]!.improvements.includes(card))
+    assert.ok(r.interaction.stateId === 'wait', JSON.stringify(r.interaction))
+    assert.deepEqual(r.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
+    assert.equal(r.state.roundPhase, 'work')
     return r
   }
   it("actual major purchases reduce stone by one while zero stone Fireplace cannot grant stone", () => {
