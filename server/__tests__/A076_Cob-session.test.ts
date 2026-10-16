@@ -242,7 +242,8 @@ describe("A076 command boundaries", () => {
   }
   function exchange(s: GameSession, r: SessionResponse, accept = true) {
     cobOffer(r)
-    return roundStarted(choose(s, r, option => accept ? option.value !== '__skip__' : option.value === '__skip__'), r.state.round)
+    const expectedRound = r.state.round
+    return roundStarted(choose(s, r, option => accept ? option.value !== '__skip__' : option.value === '__skip__'), expectedRound)
   }
   it("one food purchase has no immediate exchange and zero food rejects", () => {
     deny(setup({ resources: { food: 0, clay: 1, grain: 2 } }), COB)
