@@ -45,7 +45,7 @@ Work Placement Chronology 中真正放下一名人员的先后顺序。同一人
 _Avoid_: 原始行动使用历史、不同人员身份计数、Round Work Order
 
 **Rule Audit Lead（规则审计线索）**:
-来自上游提交、issue 描述或静态代码阅读的待验证规则风险；必须先在当前 `main` 复现可观察错误，才能升级为 Rule Alignment Gap 或 Rule Flow Defect。
+来自上游提交、issue 描述或静态代码阅读的待验证规则风险；必须先在当前 `main` 复现可观察错误，才能升级为 Rule Alignment Gap 或 Rule Flow Defect。对已复现但语义尚未确认的行为差异，维护者可以保留当前行为并暂缓规则对齐。
 _Avoid_: 已确认缺陷、直接修复依据
 
 **Rule Alignment Gap（规则对齐缺口）**:

@@ -482,6 +482,22 @@ Not every card needs all three layers, but every card must meet these minimums:
 - Direct behavior or Session tests cover rule correctness; static gates cover mechanical constraints.
 - Rendering or E2E tests cover complex UI interactions.
 
+### 9.1 Audit migration target
+
+Migrate audit scenarios into the existing per-card and shared-mechanism Session tests in batches. Submit each cohesive card or mechanism batch as an independently reviewable PR. Main receives the integrated tests and their required helpers and gates, without first importing the entire numbered audit suite.
+
+Keep a small migration inventory with the source audit commit, each old scenario ID, and its destination test. When an existing test already covers a scenario, identify that test and verify that it retains the scenario's assertions. Preserve distinct rejection, payment, pending, undo, and retry behavior. Delete migrated scenarios and unused helpers from the migration source in the same batch. Test counts alone do not prove coverage.
+
+Keep the remaining audit scenarios in a local migration workspace. For each batch, use the candidate PR's production code and native tests, then add only the unmigrated audit scenarios. Validate that combined source and attach the results to the batch PR. After the batch merges, update to current main before preparing the next batch. Main CI checks files present in that PR and must not depend on an unmerged audit branch. Preserve the original audit evidence outside Git. Track newly confirmed production defects in separate issues.
+
+Repair type errors in the audit tests and the helpers they use before migration. Each batch must type-check all remaining audit tests, all migrated destination files, and their transitive helpers. Main's type-check scope includes the migrated files and their transitive dependencies. Record the actual included files, and replace deleted source paths with their destination paths. Covered test responsibilities must not disappear through exclusions. Unrelated legacy server-test type debt is a separate effort. Connect the shared gate through the existing architecture checks.
+
+For C131 N3, use the current OA result of vegetable `0` as the regression expectation. Preserve the earlier vegetable `1` comparison in the deferred rule discussion ([#1175](https://github.com/titanxxh/open-agricola/issues/1175), [#1181](https://github.com/titanxxh/open-agricola/issues/1181)). That comparison does not establish an official ruling or require a production change as part of this test migration.
+
+Successful tests retain a short result summary. Save scenario evidence on assertion failure or when an explicit diagnostic run requests it. Separate evidence by run, test file, and scenario, and keep full snapshots outside Git. Verify this policy with an intentional failure in a disposable test and a parallel run that checks for artifact collisions.
+
+Use `pnpm verify focus` while migrating. Check which Vitest project owns each destination file, since shared-mechanism filenames may belong to fast rather than slow. Complete each batch with the current-source checks required by [CI Checks](operations/ci-checks.md), including `pnpm verify prepush`, the migration type checks, and the combined audit and migrated tests. At completion, remove the independent audit normal/RAW modes and their expected-versus-observed assertion switch. The integrated tests use ordinary assertions and the existing `pnpm test`, `pnpm test:slow`, and `pnpm verify focus` entrypoints, without a separate audit workflow.
+
 ## 10. Minimal Example
 
 Replace all placeholders with real values in an actual test description.
