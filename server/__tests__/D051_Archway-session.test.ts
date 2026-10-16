@@ -299,18 +299,31 @@ describe('D051 rule boundaries', () => {
   it("insufficient clay or an occupation cannot bypass printing; legal payment grants four points", () => {
     for (const occupation of [false, true]) {
       const s = setup(D, 3, state => {
+        state.players[0]!.minorHand.push('B007_Wage', 'A002_ShiftingCultivation')
         state.players[0]!.resources.clay = occupation ? 2 : 1; if (occupation)
           state.players[0]!.occupationPlayed.push('A116_WoodCutter')
       }, false)
       const r = buyMinor(s, D)
       assert.equal(r.state.players[0]!.minorPlayed.includes(D), false)
       assert.equal(r.state.players[0]!.resources.clay, occupation ? 2 : 1)
+      assert.equal(wait(r).request.kind, 'choice')
+      assert.deepEqual(new Set(getChoiceOptions(r).map(choice => choice.value)), new Set(['B007_Wage', 'A002_ShiftingCultivation']))
+      assertRejectedUnchanged(s, () => s.resolveChoice(0, D))
+      const retry = s.resolveChoice(0, 'B007_Wage')
+      assert.equal(retry.ok, true, retry.error)
+      assert.equal(retry.state.players[0]!.resources.food, 22)
+      assert.equal(retry.state.players[0]!.resources.clay, occupation ? 2 : 1)
+      assert.equal(retry.state.players[0]!.minorPlayed.includes(D), false)
+      assert.equal(retry.state.actionSpaces.some(space => space.id === D), false)
+      assert.ok(retry.state.players[1]!.minorHand.includes('B007_Wage'))
+      assert.equal(wait(retry).request.kind, 'confirm-next-player')
     }
     const s = setup(D, 3, state => { state.players[0]!.resources.clay = 2 }, false)
     const scores = s.getState().scores
     assert.ok(scores)
     const before = scores[0]!.total
     const r = buyMinor(s, D)
+    assert.equal(r.state.players[0]!.minorPlayed.includes(D), true)
     assert.ok(r.scores)
     assert.equal(r.state.players[0]!.resources.clay, 0)
     assert.equal(r.scores[0]!.total, before + 4)
@@ -336,6 +349,7 @@ describe('D051 rule boundaries', () => {
     const i = wait(r)
     assert.equal(i.promptKey, 'ui.interactionMoveFarmerToSpace')
     const source = r.state.actionSpaces.find(x => x.id === D)!.takenBy[0]!
+    const workers = structuredClone(r.state.players[0]!.workers)
     const events = r.state.events.filter(x => x.type === 'worker.placed').length
     assertRejectedUnchanged(s, () => s.resolveChoice(1, 'day-laborer'))
     r = s.resolveChoice(0, 'day-laborer')
@@ -345,6 +359,8 @@ describe('D051 rule boundaries', () => {
     assert.equal(r.state.players[0]!.workers.filter(w => w.isActive).length, 2)
     assert.ok(r.state.events.some(x => x.type === 'worker.placed' && x.workerId === source.workerId && x.spaceId === 'day-laborer'))
     assert.equal(r.state.events.filter(x => x.type === 'worker.placed').length, events + 1)
+    assertReturnedMove(r, source.workerId, 'day-laborer')
+    assert.deepEqual(r.state.players[0]!.workers, workers)
     assertRejectedUnchanged(s, () => s.resolveChoice(0, 'day-laborer'))
   })
 
@@ -354,6 +370,7 @@ describe('D051 rule boundaries', () => {
     r = s.resolveChoice(0, option(r, o => o.value !== '__skip__'))
     const move = wait(r)
     assert.ok(move.request.kind === 'choice')
+    const source = r.state.actionSpaces.find(space => space.id === D)!.takenBy[0]!
     assert.equal(getChoiceOptions({ interaction: move })?.some(o => o.value === 'day-laborer'), false)
     assertRejectedUnchanged(s, () => s.resolveChoice(0, 'day-laborer'))
     r = s.resolveChoice(0, 'grain-seeds')
@@ -361,7 +378,31 @@ describe('D051 rule boundaries', () => {
     assert.equal(r.state.players[0]!.resources.grain, 1)
     assert.equal(r.state.players[0]!.resources.food, 21)
     assert.equal(r.state.round, 4)
+    assertReturnedMove(r, source.workerId, 'grain-seeds')
   })
+
+  function assertReturnedMove(r: SessionResponse, workerId: string, destination: string) {
+    const ownerId = r.state.players[0]!.id
+    const placements = r.state.events.filter(event => event.type === 'worker.placed')
+    assert.equal(placements.length, 5)
+    const original = placements.find(event => event.spaceId === D && event.workerId === workerId && event.actorPlayerId === ownerId)
+    assert.ok(original)
+    const moved = placements.filter(event => event.viaCardId === D)
+    assert.equal(moved.length, 1)
+    assert.deepEqual({ worker: moved[0]!.workerId, player: moved[0]!.actorPlayerId, space: moved[0]!.spaceId, round: moved[0]!.round, phase: moved[0]!.phase }, { worker: workerId, player: ownerId, space: destination, round: 3, phase: 'returning-home' })
+    const returned = r.state.events.find(event => event.type === 'worker.returned')
+    assert.ok(returned?.type === 'worker.returned')
+    assert.equal(returned.workers.length, 4)
+    assert.equal(returned.workers.filter(worker => worker.playerId === ownerId && worker.workerId === workerId).length, 1)
+    assert.equal(new Set(returned.workers.map(worker => `${worker.playerId}:${worker.workerId}`)).size, 4)
+    const nextRound = r.state.events.find(event => event.type === 'round.started' && event.round === 4)
+    assert.ok(nextRound)
+    assert.ok(original.seq < moved[0]!.seq && moved[0]!.seq < returned.seq && returned.seq < nextRound.seq)
+    assert.deepEqual(r.state.actionSpaces.find(space => space.id === D)!.takenBy, [])
+    assert.deepEqual(r.state.actionSpaces.find(space => space.id === destination)!.takenBy, [])
+    assert.equal(r.interaction.stateId, 'idle')
+    assert.equal(r.state.currentPlayerIndex, 0)
+  }
 
   it("undo of actual paid card restores clay card score and placement", () => {
     const s = setup(D, 3, state => { state.players[0]!.resources.clay = 2 }, false)

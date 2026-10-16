@@ -301,12 +301,16 @@ describe('D102 rule boundaries', () => {
     const s = setup({ card: D102, round: 5, stableCount: 2 })
     const r = returnSelection(s)
     const baseline = makerGoods(r)
-    const bad = s.commitSelectionChoice(0, { positions: [{ row: 0, col: 4 }] })
+    const supply = () => s.withCtx(() => getAvailableStableSupplyCount(s.state, s.state.players[0]!))
+    assert.equal(supply(), 2)
+    const bad = assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { positions: [{ row: 0, col: 4 }] }))
     const outcome = { accepted: bad.ok, ...makerGoods(bad) }
     assert.equal(bad.ok, false)
     assert.deepEqual(makerGoods(bad), baseline)
+    assert.equal(supply(), 2)
     const good = ok(s.commitSelectionChoice(0, { positions: [{ row: 0, col: 1 }] }))
     assert.deepEqual(makerGoods(good), { stables: 1, wood: 1, grain: 2, food: 41 })
+    assert.equal(supply(), 3)
     assert.deepEqual(outcome, { accepted: false, stables: 2, wood: 0, grain: 1, food: 40 })
   })
 
@@ -324,6 +328,7 @@ describe('D102 rule boundaries', () => {
     const r = choose(s, returnWindow(s), o => o.value === '__skip__')
     assert.deepEqual(makerGoods(r), { stables: 2, wood: 0, grain: 1, food: 40 })
     assert.equal(r.state.round, 6)
+    assert.equal(r.interaction.stateId, 'idle')
   })
 
   it("no built stable offers no return-home exchange", () => {

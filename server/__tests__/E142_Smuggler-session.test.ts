@@ -244,6 +244,8 @@ describe('E142 rule boundaries', () => {
     assert.deepEqual(stocks(step), { wood: 0, grain: 1, stone: 0, exchanges: 1 })
     const final = ok(s.resolveChoice(0, trade(step, { grain: 1 }, { stone: 1 })))
     assert.deepEqual(stocks(final), { wood: 0, grain: 0, stone: 1, exchanges: 2 })
+    assert.equal(final.interaction.stateId, 'idle')
+    assert.equal(final.state.round, 5)
     assertRejectedUnchanged(s, () => s.resolveChoice(0, first))
   })
 
@@ -253,19 +255,28 @@ describe('E142 rule boundaries', () => {
     const second = ok(s.resolveChoice(0, first))
     const final = ok(s.resolveChoice(0, trade(second, { wood: 1 }, { grain: 1 })))
     assert.deepEqual(stocks(final), { wood: 1, grain: 2, stone: 0, exchanges: 2 })
+    assert.equal(final.interaction.stateId, 'idle')
+    assert.equal(final.state.round, 5)
     assertRejectedUnchanged(s, () => s.resolveChoice(0, first))
   })
 
   it("declining one or both stages never invents a good or expands the remaining quota", () => {
-    for (const { exchangeSecond, expected } of [
-      { exchangeSecond: false, expected: { wood: 1, grain: 0, stone: 0, exchanges: 0 } },
-      { exchangeSecond: true, expected: { wood: 0, grain: 1, stone: 0, exchanges: 1 } },
+    for (const { exchangeFirst, exchangeSecond, afterFirst, expected } of [
+      { exchangeFirst: false, exchangeSecond: false, afterFirst: { wood: 1, grain: 0, stone: 0, exchanges: 0 }, expected: { wood: 1, grain: 0, stone: 0, exchanges: 0 } },
+      { exchangeFirst: false, exchangeSecond: true, afterFirst: { wood: 1, grain: 0, stone: 0, exchanges: 0 }, expected: { wood: 0, grain: 1, stone: 0, exchanges: 1 } },
+      { exchangeFirst: true, exchangeSecond: false, afterFirst: { wood: 0, grain: 1, stone: 0, exchanges: 1 }, expected: { wood: 0, grain: 1, stone: 0, exchanges: 1 } },
     ]) {
       const { s, r } = harvest(1, 0)
       assert.equal(wait(r).sourceCard, SMUGGLER)
-      const second = ok(s.resolveChoice(0, '__skip__'))
+      const second = ok(s.resolveChoice(0, exchangeFirst ? trade(r, { wood: 1 }, { grain: 1 }) : '__skip__'))
+      assert.deepEqual(stocks(second), afterFirst)
+      assert.equal(wait(second).sourceCard, SMUGGLER)
+      assert.ok(options(second).some(option => option.value === '__skip__'))
       const final = ok(s.resolveChoice(0, exchangeSecond ? trade(second, { wood: 1 }, { grain: 1 }) : '__skip__'))
       assert.deepEqual(stocks(final), expected)
+      assert.equal(final.interaction.stateId, 'idle')
+      assert.equal(final.state.round, 5)
+      assert.equal(final.state.currentPlayerIndex, 0)
     }
   })
 
@@ -284,6 +295,7 @@ describe('E142 rule boundaries', () => {
     next = ok(s.resolveChoice(0, trade(next, { wood: 1 }, { grain: 1 })))
     assert.deepEqual(stocks(next), { wood: 2, grain: 2, stone: 0, exchanges: 2 })
     assert.equal(next.state.round, 5)
+    assert.equal(next.interaction.stateId, 'idle')
     for (const round of [5, 6, 7]) {
       assert.equal(s.state.round, round)
       for (const p of s.state.players)
@@ -294,6 +306,8 @@ describe('E142 rule boundaries', () => {
     const second = trade(next, { wood: 1 }, { grain: 1 })
     next = ok(s.resolveChoice(0, second))
     assert.deepEqual(stocks(next), { wood: 0, grain: 4, stone: 0, exchanges: 4 })
+    assert.equal(next.interaction.stateId, 'idle')
+    assert.equal(next.state.round, 8)
     assertRejectedUnchanged(s, () => s.resolveChoice(0, second))
   })
 })

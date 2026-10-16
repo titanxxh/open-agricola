@@ -289,5 +289,6 @@ describe('B018 rule boundaries', () => {
     assert.equal(r.state.round, 2)
     assert.equal(r.state.players[0]!.fields.length, 0)
     assert.deepEqual(r.state.futureMeeples, [])
+    assert.equal(r.interaction.stateId, 'idle')
   })
 })

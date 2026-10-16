@@ -52,12 +52,22 @@ describe('E156 rule boundaries', () => {
 
   const clayObserved = (r: SessionResponse) => ({ ownerFood: r.state.players[0]!.resources.food, ownerClay: r.state.players[0]!.resources.clay, actorWood: r.state.players[1]!.resources.wood, built: r.state.players[1]!.minorPlayed.includes('E030_ChildsToy') })
 
+  function assertConfirmation(r: SessionResponse, actor: number, next: number) {
+    assert.equal(r.ok, true, r.error)
+    assert.ok(r.interaction.stateId === 'wait')
+    assert.equal(r.interaction.playerIndex, actor)
+    assert.ok(r.interaction.request.kind === 'confirm-next-player')
+    assert.equal(r.interaction.request.nextPlayerIndex, next)
+    assert.equal(r.state.currentPlayerIndex, actor)
+  }
+
   function finishForeign(s: GameSession, initial: SessionResponse) {
     let r = initial
     if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-player-switch') {
       r = s.resolveChoice(r.interaction.playerIndex, 'confirm')
       assert.equal(r.ok, true, r.error)
     }
+    assertConfirmation(r, 1, 2)
     return r
   }
 
@@ -75,6 +85,7 @@ describe('E156 rule boundaries', () => {
     assert.equal(r.ok, true, r.error)
     assert.deepEqual([r.state.players[0]!.resources.food, r.state.players[0]!.resources.clay], [0, 0])
     assert.ok(r.state.players[0]!.minorPlayed.includes('E030_ChildsToy'))
+    assertConfirmation(r, 0, 1)
   })
 
   it("opponents non clay improvement does not reward the owner", () => {
@@ -84,6 +95,7 @@ describe('E156 rule boundaries', () => {
     assert.equal(r.ok, true, r.error)
     assert.deepEqual([r.state.players[0]!.resources.food, r.state.players[0]!.resources.clay], [0, 0])
     assert.ok(r.state.players[1]!.minorPlayed.includes('E047_SyrupTap'))
+    assertConfirmation(r, 1, 2)
   })
 
   it("rejected unpaid printed clay purchase leaves no reward before free retry", () => {
@@ -95,6 +107,7 @@ describe('E156 rule boundaries', () => {
     const retry = chooseCard(s, r, 'B007_Wage', 1)
     assert.deepEqual(clayObserved(retry), { ownerFood: 0, ownerClay: 0, actorWood: 0, built: false })
     assert.equal(retry.state.players[1]!.resources.food, 2)
+    assertConfirmation(retry, 1, 2)
   })
 
   it("stale repeated opponent purchase cannot award the owner twice", () => {
