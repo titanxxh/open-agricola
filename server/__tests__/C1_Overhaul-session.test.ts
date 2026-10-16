@@ -11,7 +11,6 @@ import '../../shared/cards/E/E108_BlackberryFarmer'
 import assert from 'node:assert/strict'
 import { createWorkSession } from './_helpers/session-fixtures'
 import { assertRejectedUnchanged, assertUndoRestored, undoRuleSnapshot, getChoiceOptions, expectFarmSelection } from './_helpers/session-assertions'
-import { createPlayerActionSpaces } from '../../shared/cards/player-action-space'
 import { createScenarioEvidence } from './_helpers/scenario-evidence'
 
 const evidence = createScenarioEvidence(import.meta.url)
@@ -478,33 +477,11 @@ describe('C1 Overhaul session', () => {
 
 describe('C001 rule boundaries', () => {
 
-  const OVERHAUL = 'C001_Overhaul', HARDWORKER = 'D127_HardworkingMan'
+  const OVERHAUL = 'C001_Overhaul'
 
   const one = ['H-0-1', 'H-1-1', 'V-0-1', 'V-0-2']
 
   const two = [...one, 'H-0-2', 'H-1-2', 'V-0-3']
-
-  function setup(card: string, configure: (state: GameState) => void = () => { }) {
-    const session = evidence.track(createWorkSession({
-      seed: 4242, options: { playerCount: card === OVERHAUL ? 2 : 3 }, configure(state) {
-        state.round = 4
-        for (const p of state.players)
-          Object.assign(p.resources, { wood: 0, clay: 0, reed: 0, stone: 0, grain: 0, vegetable: 0, food: 20 })
-        const owner = state.players[0]!
-        if (card === OVERHAUL) {
-          owner.minorHand = [card]
-          owner.occupationPlayed = ['A116_WoodCutter', 'A103_Portmonger']
-          owner.resources.wood = 1
-        }
-        else
-          owner.occupationPlayed = [card]
-        configure(state)
-        if (card === HARDWORKER)
-          state.actionSpaces.push(...createPlayerActionSpaces(state))
-      }
-    }))
-    return session
-  }
 
   function ok(r: SessionResponse) { assert.equal(r.ok, true, r.error); return r }
 
@@ -512,36 +489,44 @@ describe('C001 rule boundaries', () => {
 
   function options(r: SessionResponse) { const request = wait(r).request; assert(request.kind === 'choice'); return request.options }
 
-  function play(s: GameSession, card: string) {
+  function play(s: GameSession) {
     let r = ok(s.takeAction(0, 'meeting-place'))
-    if (!r.state.players[0]!.minorHand.includes(card))
+    if (!r.state.players[0]!.minorHand.includes(OVERHAUL))
       return r
     const improvement = options(r).find(o => o.value.startsWith('action-improvement-'))
     if (improvement)
       r = ok(s.resolveChoice(0, improvement.value))
-    if (r.state.players[0]!.minorHand.includes(card))
-      r = ok(s.resolveChoice(0, card))
+    if (r.state.players[0]!.minorHand.includes(OVERHAUL))
+      r = ok(s.resolveChoice(0, OVERHAUL))
     return r
   }
 
   function fenceSetup(edges = one, animals = false) {
-    return setup(OVERHAUL, state => {
-      const p = state.players[0]!
-      p.fenceSegments = edges.map(edge => ({ edge, type: 'fence', source: { kind: 'own', ownerPlayerId: p.id } }))
-      p.pastures = [{ id: 'one', tiles: [{ row: 0, col: 1 }], animalType: animals ? 'sheep' : null, animalCount: animals ? 2 : 0 }]
-      if (edges.length === 7)
-        p.pastures.push({ id: 'two', tiles: [{ row: 0, col: 2 }], animalType: null, animalCount: 0 })
-      if (edges.length === 13)
-        for (const col of [2, 3, 4])
-          p.pastures.push({ id: `pasture-${col}`, tiles: [{ row: 0, col }], animalType: null, animalCount: 0 })
-      p.resources.sheep = animals ? 2 : 0
-    })
+    return evidence.track(createWorkSession({
+      seed: 4242, options: { playerCount: 2 }, configure(state) {
+        state.round = 4
+        for (const player of state.players)
+          Object.assign(player.resources, { wood: 0, clay: 0, reed: 0, stone: 0, grain: 0, vegetable: 0, food: 20 })
+        const owner = state.players[0]!
+        owner.minorHand = [OVERHAUL]
+        owner.occupationPlayed = ['A116_WoodCutter', 'A103_Portmonger']
+        owner.resources.wood = 1
+        owner.fenceSegments = edges.map(edge => ({ edge, type: 'fence', source: { kind: 'own', ownerPlayerId: owner.id } }))
+        owner.pastures = [{ id: 'one', tiles: [{ row: 0, col: 1 }], animalType: animals ? 'sheep' : null, animalCount: animals ? 2 : 0 }]
+        if (edges.length === 7)
+          owner.pastures.push({ id: 'two', tiles: [{ row: 0, col: 2 }], animalType: null, animalCount: 0 })
+        if (edges.length === 13)
+          for (const col of [2, 3, 4])
+            owner.pastures.push({ id: `pasture-${col}`, tiles: [{ row: 0, col }], animalType: null, animalCount: 0 })
+        owner.resources.sheep = animals ? 2 : 0
+      }
+    }))
   }
 
   it("raze cannot be canceled or add four fences and legal reconstruction keeps animals", () => {
     const s = fenceSetup(one, true)
     const before = undoRuleSnapshot(s.getState())
-    let r = play(s, OVERHAUL)
+    let r = play(s)
     assert.equal(wait(r).request.kind, 'farm-select')
     assert.equal(r.state.players[0]!.fenceSegments.length, 0)
     assert.equal(r.state.players[0]!.resources.sheep, 2)
@@ -558,7 +543,7 @@ describe('C001 rule boundaries', () => {
 
   it("valid four-edge enclosure cannot replace seven returned fences", () => {
     const s = fenceSetup(two)
-    play(s, OVERHAUL)
+    play(s)
     assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { edges: one, palisadeEdges: [], extraWood: 0 }))
     const r = ok(s.commitSelectionChoice(0, { edges: two, palisadeEdges: [], extraWood: 0 }))
     assert.equal(r.state.players[0]!.fenceSegments.length, 7)

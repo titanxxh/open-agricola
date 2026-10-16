@@ -139,29 +139,7 @@ describe('D127_HardworkingMan session', () => {
 
 describe('D127 rule boundaries', () => {
 
-  const OVERHAUL = 'C001_Overhaul', HARDWORKER = 'D127_HardworkingMan'
-
-  function setup(card: string, configure: (state: GameState) => void = () => { }) {
-    const session = evidence.track(createWorkSession({
-      seed: 4242, options: { playerCount: card === OVERHAUL ? 2 : 3 }, configure(state) {
-        state.round = 4
-        for (const p of state.players)
-          Object.assign(p.resources, { wood: 0, clay: 0, reed: 0, stone: 0, grain: 0, vegetable: 0, food: 20 })
-        const owner = state.players[0]!
-        if (card === OVERHAUL) {
-          owner.minorHand = [card]
-          owner.occupationPlayed = ['A116_WoodCutter', 'A103_Portmonger']
-          owner.resources.wood = 1
-        }
-        else
-          owner.occupationPlayed = [card]
-        configure(state)
-        if (card === HARDWORKER)
-          state.actionSpaces.push(...createPlayerActionSpaces(state))
-      }
-    }))
-    return session
-  }
+  const HARDWORKER = 'D127_HardworkingMan'
 
   function ok(r: SessionResponse) { assert.equal(r.ok, true, r.error); return r }
 
@@ -176,15 +154,23 @@ describe('D127 rule boundaries', () => {
   }
 
   function hardworking(configure: (state: GameState) => void = () => { }) {
-    return setup(HARDWORKER, state => {
-      for (const p of state.players.slice(1)) {
-        p.rooms = 3
-        p.roomTiles.push({ row: 1, col: 1 })
+    return evidence.track(createWorkSession({
+      seed: 4242, options: { playerCount: 3 }, configure(state) {
+        state.round = 4
+        for (const player of state.players)
+          Object.assign(player.resources, { wood: 0, clay: 0, reed: 0, stone: 0, grain: 0, vegetable: 0, food: 20 })
+        const owner = state.players[0]!
+        owner.occupationPlayed = [HARDWORKER]
+        for (const opponent of state.players.slice(1)) {
+          opponent.rooms = 3
+          opponent.roomTiles.push({ row: 1, col: 1 })
+        }
+        Object.assign(owner.resources, { wood: 5, reed: 2, clay: 2, food: 2 })
+        owner.minorHand = ['A002_ShiftingCultivation']
+        configure(state)
+        state.actionSpaces.push(...createPlayerActionSpaces(state))
       }
-      Object.assign(state.players[0]!.resources, { wood: 5, reed: 2, clay: 2, food: 2 })
-      state.players[0]!.minorHand = ['A002_ShiftingCultivation']
-      configure(state)
-    })
+    }))
   }
 
   it("Major Improvement must not offer or allow a minor improvement", () => {
