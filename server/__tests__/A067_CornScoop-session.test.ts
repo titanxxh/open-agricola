@@ -99,6 +99,14 @@ describe('A067 command boundaries', () => {
   function save(name: string, value: unknown) {
     sessionEvidence.record(name, value)
   }
+  function confirmed(r: SessionResponse, actor = 0) {
+    assert.equal(r.ok, true, r.error)
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, actor)
+    assert.equal(r.state.currentPlayerIndex, actor)
+    assert.equal(r.interaction.request.nextPlayerIndex, 1 - actor)
+    return r
+  }
   function ok(r: SessionResponse) {
     assert.equal(r.ok, true, r.error)
     return r
@@ -173,15 +181,17 @@ describe('A067 command boundaries', () => {
     return r
   }
   function buy(s: GameSession, card: string) {
+    // These fixtures have one playable minor, selected automatically after the improvement entry.
     const r = buyMenu(s)
-    if (!r.state.players[0]!.minorHand.includes(card)) return r
-    assert.ok(options(r).some((o) => o.value === card && !o.disabled))
-    return ok(s.resolveChoice(0, card))
+    assert.ok(r.state.players[0]!.minorPlayed.includes(card))
+    assert.equal(r.state.players[0]!.minorHand.includes(card), false)
+    return confirmed(r)
   }
   function deny(s: GameSession, card: string) {
     const r = buyMenu(s)
     assert.ok(!r.state.players[0]!.minorPlayed.includes(card))
     assertRejectedUnchanged(s, () => s.resolveChoice(0, card))
+    confirmed(s.getState())
   }
   function ready(s: GameSession, actor: number) {
     let r = s.getState()
@@ -189,7 +199,7 @@ describe('A067 command boundaries', () => {
       r.interaction.stateId === 'wait' &&
       r.interaction.request.kind === 'confirm-next-player'
     )
-      r = confirmNext(s, r)
+      r = confirmNext(s, confirmed(r, 1 - actor))
     assert.equal(r.interaction.stateId, 'idle', JSON.stringify(r.interaction))
     assert.equal(r.state.currentPlayerIndex, actor)
     return r
@@ -206,6 +216,7 @@ describe('A067 command boundaries', () => {
       before,
       response: r,
     })
+    if (['forest', 'grain-seeds', 'clay-pit'].includes(space)) confirmed(r, actor)
     return r
   }
   const one = ['H-0-1', 'H-1-1', 'V-0-1', 'V-0-2']
@@ -255,41 +266,29 @@ describe('A067 command boundaries', () => {
     return s
   }
   function settle(s: GameSession, r: SessionResponse, actor = 0) {
-    for (let n = 0; n < 10 && r.interaction.stateId === 'wait'; n++) {
-      if (r.interaction.request.kind === 'select-trigger') {
-        const o = getChoiceOptions(r).find((o) => o.value !== '__skip__')
-        assert.ok(o)
-        r = ok(s.resolveChoice(r.interaction.playerIndex, o.value))
-        continue
-      }
-      if (r.interaction.request.kind !== 'animal-reorg') break
-      const p = r.state.players[actor]!,
-        zones: ZoneAssignment[] = []
-      for (const animal of ['sheep', 'boar', 'cattle'] satisfies Animal[])
-        if (p.resources[animal]) {
-          if (p.houseAnimals['2-0'] === animal && countRoomAnimals(p))
-            zones.push({
-              id: 'house:2-0',
-              zoneType: 'house',
-              animalType: animal,
-              animalCount: countRoomAnimals(p),
-            })
-          else
-            zones.push({
-              id: `dish-${p.id}`,
-              zoneType: 'pasture',
-              animalType: animal,
-              animalCount: p.resources[animal],
-            })
-        }
-      r = ok(s.resolveChoice(actor, 'confirm', { zones }))
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'animal-reorg', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, actor)
+    assert.equal(r.state.currentPlayerIndex, actor)
+  const p = r.state.players[actor]!,
+    zones: ZoneAssignment[] = []
+  for (const animal of ['sheep', 'boar', 'cattle'] satisfies Animal[])
+    if (p.resources[animal]) {
+      if (p.houseAnimals['2-0'] === animal && countRoomAnimals(p))
+        zones.push({
+          id: 'house:2-0',
+          zoneType: 'house',
+          animalType: animal,
+          animalCount: countRoomAnimals(p),
+        })
+      else
+        zones.push({
+          id: `dish-${p.id}`,
+          zoneType: 'pasture',
+          animalType: animal,
+          animalCount: p.resources[animal],
+        })
     }
-    assert.ok(
-      r.interaction.stateId === 'wait' &&
-        r.interaction.request.kind === 'confirm-next-player',
-      JSON.stringify(r.interaction),
-    )
-    return r
+    return confirmed(ok(s.resolveChoice(actor, 'confirm', { zones })), actor)
   }
   function collect(s: GameSession, animal: Animal, actor = 0) {
     return settle(s, turn(s, actor, spaces[animal]), actor)
@@ -344,9 +343,18 @@ describe('A067 command boundaries', () => {
   })
   it('actual Grain Seeds undo and retry do not duplicate the extra grain', () => {
     const s = setup(CARD_ID),
-      before = undoRuleSnapshot(s.getState())
+      initial = s.getState()
+    assert.equal(initial.interaction.stateId, 'idle')
+    assert.equal(initial.state.currentPlayerIndex, 0)
+    const beforeInteraction = JSON.stringify(initial.interaction)
+    const before = undoRuleSnapshot(initial)
     turn(s, 0, 'grain-seeds')
-    assertUndoRestored(before, s.undoAction())
+    const restored = s.undoAction()
+    assertUndoRestored(before, restored)
+    assert.equal(JSON.stringify(restored.interaction), beforeInteraction)
+    assert.equal(JSON.stringify(s.getState().interaction), beforeInteraction)
+    assert.equal(restored.state.currentPlayerIndex, 0)
+    assert.equal(s.getState().state.currentPlayerIndex, 0)
     assert.equal(turn(s, 0, 'grain-seeds').state.players[0]!.resources.grain, 2)
     save('A067-N6-undo-retry', s.getState())
   })
