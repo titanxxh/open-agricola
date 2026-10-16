@@ -182,6 +182,7 @@ const playMajorImprovement = (
   }
   const paymentInfo = resolvedPayment.paymentInfo
   return finalizeDirectImprovementPurchaseLifecycle({
+    actionHooks,
     state,
     player,
     kind: 'major',
@@ -241,6 +242,7 @@ export const playMinorImprovement = (
   }
   const paymentInfo = resolvedPayment.paymentInfo
   return finalizeDirectImprovementPurchaseLifecycle({
+    actionHooks,
     state,
     player,
     kind: 'minor',
