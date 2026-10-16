@@ -6,7 +6,7 @@ import assert from 'node:assert/strict'
 import { type GameState, type PlayerState } from '../../shared/contract/types'
 import { type GameSession, type SessionResponse } from '../game/authoritative-session'
 import { createWorkSession } from './_helpers/session-fixtures'
-import { assertRejectedUnchanged, confirmNext, undoRuleSnapshot, getChoiceOptions } from './_helpers/session-assertions'
+import { assertRejectedUnchanged, confirmNext, getChoiceOptions } from './_helpers/session-assertions'
 import { takeMajorImprovementFromSupply } from '../../shared/cards/major/supply'
 import { readCardResourceStats } from '../../shared/cards/helpers/card-state'
 import { createScenarioEvidence } from './_helpers/scenario-evidence'
@@ -463,41 +463,25 @@ describe('A061 command boundaries', () => {
       foodAfterFeeding: 18,
     })
   })
-  it('undo of a Fan harvest choice restores the actual post-field rule scope only if exposed', () => {
+  it('completed Fan harvest conversion rejects step undo without changing state', () => {
     const { s, r } = fanHarvest()
     assert.equal(fanChoice(r), true)
-    const before = undoRuleSnapshot(r)
     const next = ok(
       s.resolveChoice(0, opts(r).find((o) => o.value !== '__skip__')!.value),
     )
     assert.equal(values(next).grain, 0)
     assert.equal(values(next).food, 18)
     assert.equal(cardFood(next, CARD_ID), 2)
-    const undone = s.undoStep()
-    if (!undone.ok) {
-      assert.equal(undone.error, 'no history to undo')
-      assert.equal(values(undone).food, 18)
-      return void sessionEvidence.record('observed outcome', {
-        restored: false,
-        undoError: undone.error,
-        scope: 'actual undoStep rejected',
-        actualFood: 18,
-      })
-    }
-    assert.deepEqual(JSON.parse(undoRuleSnapshot(undone)), JSON.parse(before))
-    assert.equal(fanChoice(undone), true)
-    const retried = ok(
-      s.resolveChoice(
-        0,
-        opts(undone).find((o) => o.value !== '__skip__')!.value,
-      ),
-    )
-    assert.equal(values(retried).grain, 0)
-    assert.equal(values(retried).food, 18)
-    assert.equal(cardFood(retried, CARD_ID), 2)
-    return void sessionEvidence.record('observed outcome', {
-      restored: true,
-      singleRetryPaidGrain: 1,
+    const undone = assertRejectedUnchanged(s, () => s.undoStep())
+    assert.equal(undone.error, 'no history to undo')
+    assert.equal(values(undone).grain, 0)
+    assert.equal(values(undone).food, 18)
+    assert.equal(cardFood(undone, CARD_ID), 2)
+    sessionEvidence.record('step undo rejected', {
+      undoError: undone.error,
+      grain: 0,
+      food: 18,
+      fanFood: 2,
     })
   })
 })
