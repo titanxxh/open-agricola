@@ -427,24 +427,20 @@ describe("A090 command boundaries", () => {
     assert.equal(fields(r), 2)
     return { round: 7, foodPaid: 2, fields: 2, roundActivations: 2 }
   })
-  it("actual round start effect undo probes eligibility and retries only the available scope", () => {
+  it("completed natural round start plowing rejects undo without changing the paid field", () => {
     const s = setup({ round: 5, house: 'stone', resources: { food: 1 } })
-    const initial = workEnd(s)
-    const before = undoRuleSnapshot(initial)
-    driverPlow(s, initial)
-    const undone = s.undoStep()
-    artifact('driver-undo', { before: JSON.parse(before), after: undone })
-    if (!undone.ok) {
-      assert.equal(undone.error, 'no history to undo')
-      assert.equal(res(undone).food, 0)
-      assert.equal(fields(undone), 1)
-      return { restored: false, undoError: undone.error, food: 0, fields: 1, retryScope: 'no retry after unavailable undo' }
-    }
-    assert.deepEqual(JSON.parse(undoRuleSnapshot(undone)), JSON.parse(before))
-    const retry = driverPlow(s, undone)
-    assert.equal(res(retry).food, 0)
-    assert.equal(fields(retry), 1)
-    return { restored: true, food: 0, fields: 1, retryScope: 'restored effect scope' }
+    const plowed = driverPlow(s, workEnd(s))
+    assert.equal(plowed.state.round, 6)
+    assert.equal(plowed.state.roundPhase, 'work')
+    assert.equal(plowed.interaction.stateId, 'idle')
+    assert.equal(res(plowed).food, 0)
+    assert.deepEqual(plowed.state.players[0]!.fields, [{ row: 0, col: 1, stacks: [] }])
+    const undone = assertRejectedUnchanged(s, () => s.undoStep())
+    assert.equal(undone.error, 'no history to undo')
+    assert.equal(res(undone).food, 0)
+    assert.equal(fields(undone), 1)
+    artifact('driver-undo', { before: plowed, after: undone })
+    return { restored: false, undoError: undone.error, food: 0, fields: 1 }
   })
   it("a stone opponent cannot use the wooden owner Plow Driver at a natural round start", () => {
     const s = setup({ round: 5, resources: { food: 1 }, configure(state) {
