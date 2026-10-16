@@ -227,3 +227,49 @@ it('checks native targets and their helpers without reading the original audit c
   expect(artifact.status).toBe(1)
   expect(artifact.stderr).toContain('Keep scenario evidence outside Git')
 }, 30000)
+
+it('physically removes migrated registrations from a partial source group', () => {
+  const { output, write, git, cli, fixtureManifest } = createFixture()
+  const source = "import { it, expect } from 'vitest'\nfunction movedPayment() { return 2 }\nit('moved payment', () => expect(movedPayment()).toBe(2))\nit('remaining payment', () => expect(3).toBe(3))\n"
+  write('server/__tests__/ae-negative-example.test.ts', source)
+  write('server/__tests__/native-payment.test.ts', "import { it, expect } from 'vitest'\nit('native payment', () => expect(2).toBe(2))\n")
+  git('add', '.')
+  git('-c', 'user.name=Migration test', '-c', 'user.email=migration@example.invalid', 'commit', '--quiet', '--no-gpg-sign', '-m', 'partial source fixture')
+  fixtureManifest.source.commit = git('rev-parse', 'HEAD')
+  fixtureManifest.source.cases = 2
+  fixtureManifest.files[0].sha256 = createHash('sha256').update(source).digest('hex')
+  fixtureManifest.files[0].cases = [
+    { title: 'moved payment', batch: 'M01', status: 'migrated', targetFile: 'server/__tests__/native-payment.test.ts', targetTitle: 'native payment' },
+    { title: 'remaining payment', batch: 'M01', status: 'remaining' },
+  ]
+  write('cases.json', JSON.stringify(fixtureManifest))
+  const prepared = cli('prepare')
+  expect(prepared.status, prepared.stderr).toBe(0)
+  const candidate = fs.readFileSync(path.join(output, 'candidate/server/__tests__/ae-negative-example.test.ts'), 'utf8')
+  expect(candidate).not.toContain('moved payment')
+  expect(candidate).not.toContain('function movedPayment')
+  expect(candidate).toContain('remaining payment')
+  const verified = cli('verify')
+  expect(verified.status, `${verified.stdout}\n${verified.stderr}`).toBe(0)
+  expect(JSON.parse(verified.stdout)).toMatchObject({ tests: 2, passed: 2, pending: 0, coveredSourceCases: 2 })
+}, 30000)
+
+it('fails closed instead of partially pruning dynamic registrations', () => {
+  const { write, git, cli, fixtureManifest } = createFixture()
+  const source = "import { it, expect } from 'vitest'\nconst title = 'moved payment'\nit(title, () => expect(2).toBe(2))\nit('remaining payment', () => expect(3).toBe(3))\n"
+  write('server/__tests__/ae-negative-example.test.ts', source)
+  write('server/__tests__/native-payment.test.ts', "import { it, expect } from 'vitest'\nit('native payment', () => expect(2).toBe(2))\n")
+  git('add', '.')
+  git('-c', 'user.name=Migration test', '-c', 'user.email=migration@example.invalid', 'commit', '--quiet', '--no-gpg-sign', '-m', 'dynamic source fixture')
+  fixtureManifest.source.commit = git('rev-parse', 'HEAD')
+  fixtureManifest.source.cases = 2
+  fixtureManifest.files[0].sha256 = createHash('sha256').update(source).digest('hex')
+  fixtureManifest.files[0].cases = [
+    { title: 'moved payment', batch: 'M01', status: 'migrated', targetFile: 'server/__tests__/native-payment.test.ts', targetTitle: 'native payment' },
+    { title: 'remaining payment', batch: 'M01', status: 'remaining' },
+  ]
+  write('cases.json', JSON.stringify(fixtureManifest))
+  const prepared = cli('prepare')
+  expect(prepared.status).toBe(1)
+  expect(prepared.stderr).toContain('unsupported partial registration')
+})

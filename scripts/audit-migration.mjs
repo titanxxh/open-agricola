@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
 import crypto from 'node:crypto'
+import ts from 'typescript'
 import { execFileSync, spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 
@@ -86,6 +87,76 @@ function replaceOnce(source, before, after, file) {
   return source.replace(before, after)
 }
 
+function pruneMigratedCases(group, source) {
+  if (group.cases.every(item => item.status === 'remaining')) return source
+  const parsed = ts.createSourceFile(group.file, source, ts.ScriptTarget.Latest, true)
+  if (parsed.parseDiagnostics.length) fail(`cannot parse partial source: ${group.file}`)
+  const tests = new Set(), suites = new Set()
+  for (const statement of parsed.statements) {
+    if (!ts.isImportDeclaration(statement) || statement.moduleSpecifier.text !== 'vitest') continue
+    const bindings = statement.importClause?.namedBindings
+    if (!bindings || !ts.isNamedImports(bindings)) continue
+    for (const binding of bindings.elements) {
+      const name = binding.propertyName?.text ?? binding.name.text
+      if (name === 'it' || name === 'test') tests.add(binding.name.text)
+      if (name === 'describe') suites.add(binding.name.text)
+    }
+  }
+  const declarations = new Map()
+  const callee = expression => ts.isIdentifier(expression) ? expression.text
+    : ts.isPropertyAccessExpression(expression) || ts.isCallExpression(expression) ? callee(expression.expression) : undefined
+  const unsupported = node => {
+    if (ts.isCallExpression(node) && (tests.has(callee(node.expression)) || suites.has(callee(node.expression)))) fail(`unsupported partial registration in ${group.file}`)
+    ts.forEachChild(node, unsupported)
+  }
+  const collect = (statements, ancestors = []) => {
+    for (const statement of statements) {
+      const call = ts.isExpressionStatement(statement) && ts.isCallExpression(statement.expression) ? statement.expression : undefined
+      if (call && ts.isIdentifier(call.expression) && (tests.has(call.expression.text) || suites.has(call.expression.text))) {
+        const title = call.arguments[0], body = call.arguments[1]
+        if (!title || !ts.isStringLiteralLike(title) || !body || (!ts.isArrowFunction(body) && !ts.isFunctionExpression(body))) fail(`unsupported partial registration in ${group.file}`)
+        if (suites.has(call.expression.text)) {
+          if (!ts.isBlock(body.body)) fail(`unsupported partial suite in ${group.file}`)
+          collect(body.body.statements, [...ancestors, title.text])
+        } else {
+          const identity = [...ancestors, title.text].join(' ')
+          if (declarations.has(identity)) fail(`ambiguous partial registration in ${group.file}: ${identity}`)
+          declarations.set(identity, statement)
+          unsupported(body)
+        }
+      } else unsupported(statement)
+    }
+  }
+  collect(parsed.statements)
+  const expected = new Set(group.cases.map(item => item.title))
+  if (declarations.size !== expected.size || [...declarations.keys()].some(title => !expected.has(title))) fail(`partial source identities do not match manifest: ${group.file}`)
+  const removed = new Set(group.cases.filter(item => item.status !== 'remaining').map(item => declarations.get(item.title)))
+  const functions = new Map(parsed.statements.filter(ts.isFunctionDeclaration).filter(node => node.name).map(node => [node.name.text, node]))
+  const candidates = new Set()
+  const dependencies = node => {
+    if (ts.isIdentifier(node) && functions.has(node.text) && !candidates.has(node.text)) {
+      candidates.add(node.text)
+      ts.forEachChild(functions.get(node.text), dependencies)
+    }
+    ts.forEachChild(node, dependencies)
+  }
+  for (const statement of removed) dependencies(statement)
+  let changed = true
+  while (changed) {
+    changed = false
+    const used = new Set()
+    const references = node => {
+      if (removed.has(node)) return
+      if (ts.isIdentifier(node) && !(ts.isFunctionDeclaration(node.parent) && node.parent.name === node)) used.add(node.text)
+      ts.forEachChild(node, references)
+    }
+    references(parsed)
+    for (const name of candidates) if (!used.has(name) && !removed.has(functions.get(name))) { removed.add(functions.get(name)); changed = true }
+  }
+  for (const node of [...removed].sort((a, b) => b.pos - a.pos)) source = source.slice(0, node.getStart(parsed)) + source.slice(node.end)
+  return source
+}
+
 function adaptSource(file, source) {
   const evidenceDirectory = "(process.env.AGRICOLA_NEGATIVE_ARTIFACT_DIR ?? 'output/ae-negative')"
   if (file === 'ae-negative-05-building-session.test.ts') {
@@ -102,9 +173,6 @@ function adaptSource(file, source) {
   if (file === 'ae-negative-39-native-session.test.ts') {
     source = replaceOnce(source, 'GameState, PlayerState, Resource', 'ActionChoiceOption, GameState, PlayerState, Resource', file)
     source = replaceOnce(source, "function opts(r: SessionResponse) { return r.interaction.stateId === 'wait' && 'options' in r.interaction.request ? r.interaction.request.options ?? [] : []; }", "function opts(r: SessionResponse): ActionChoiceOption[] { const i = r.interaction; return i.stateId === 'wait' && (i.request.kind === 'choice' || i.request.kind === 'select-trigger') ? i.request.options : []; }", file)
-  }
-  if (file === 'ae-negative-51-family-session.test.ts') {
-    source = replaceOnce(source, "assertRuleOutcome(r.state.players[0]!.resources.vegetable, 1, { id: 'OA-C131-N3-new-occupation-grain-trigger', observed: 0 })", 'assertRuleOutcome(r.state.players[0]!.resources.vegetable, 0)', file)
   }
   source = source.replaceAll('process.env.AGRICOLA_NEGATIVE_ARTIFACT_DIR', `(process.env.AGRICOLA_NEGATIVE_ARTIFACT_DIR && process.env.AGRICOLA_NEGATIVE_ARTIFACT_DIR + '/${file}')`)
   source = source.replaceAll('process.env.AGRICOLA_NEGATIVE_OUTPUT_DIR', `(process.env.AGRICOLA_NEGATIVE_OUTPUT_DIR && process.env.AGRICOLA_NEGATIVE_OUTPUT_DIR + '/${file}')`)
@@ -167,7 +235,7 @@ function prepare(manifest, output) {
     sourceDigests.push([file, digest(bytes)])
     if (!group.cases.some(item => item.status === 'remaining')) continue
     remainingFiles.push(file)
-    write(path.join(candidate, file), adaptSource(group.file, bytes.toString()))
+    write(path.join(candidate, file), adaptSource(group.file, pruneMigratedCases(group, bytes.toString())))
   }
   const helper = 'server/__tests__/_helpers/negative-rule-audit.ts'
   const helperBytes = git('show', `${manifest.source.commit}:${helper}`)
