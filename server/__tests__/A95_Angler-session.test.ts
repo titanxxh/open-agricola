@@ -5,7 +5,7 @@ import { type DraftGameEvent } from '../../shared/contract/events'
 import { A095_Angler_impl } from '../../shared/cards/A/A095_Angler'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
-import { resolveTriggerIfPresent } from './_helpers/trigger-select'
+import { resolveTriggerIfPresent , expectWait } from './_helpers/trigger-select'
 import '../../shared/cards/A/A031_DebtSecurity'
 import assert from 'node:assert/strict'
 import { type ActionChoiceOption, type GameState } from '../../shared/contract/types'
@@ -225,13 +225,13 @@ describe("A095 command boundaries", () => {
     }
     function ready(session: GameSession, actor: number) {
         let response = session.getState();
-        if (response.interaction.stateId === 'wait' && response.interaction.request.kind === 'confirm-next-player')
+        if (response.interaction.stateId === 'wait' && expectWait(response).interaction.request.kind === 'confirm-next-player')
             response = confirmNext(session, response);
         assert.equal(response.interaction.stateId, 'idle', JSON.stringify(response.interaction));
         assert.equal(response.state.currentPlayerIndex, actor);
     }
     function turn(session: GameSession, actor: number, space: string) { ready(session, actor); return ok(session.takeAction(actor, space)); }
-    function options(response: SessionResponse): ActionChoiceOption[] { assert.ok(response.interaction.stateId === 'wait' && response.interaction.request.kind === 'choice', JSON.stringify(response.interaction)); return getChoiceOptions(response); }
+    function options(response: SessionResponse): ActionChoiceOption[] { assert.ok(response.interaction.stateId === 'wait' && expectWait(response).interaction.request.kind === 'choice', JSON.stringify(response.interaction)); return getChoiceOptions(response); }
     function accept(session: GameSession, response: SessionResponse) { assert.ok(response.interaction.stateId === 'wait'); assert.equal(response.interaction.sourceCard, ANGLER); const choices = options(response).filter(o => o.sourceCard === ANGLER); assert.equal(choices.length, 1); const choice = choices[0]!; assert.equal(choice.disabled ?? false, false); return ok(session.resolveChoice(response.interaction.playerIndex, choice.value)); }
     function angler(amount = 2, food = 2, played = true) { return setupAngler(state => { state.actionSpaces.find(s => s.id === 'fishing')!.resources.food = amount; state.players[0]!.resources.food = food; state.players[0]!.minorHand = [DEBT]; }, 5, played); }
     it("original one and two food allow minor with ordinary two food cost", () => {
@@ -252,18 +252,24 @@ describe("A095 command boundaries", () => {
         const response = ok(session.resolveChoice(0, '__skip__'));
         assert.equal(response.state.players[0]!.resources.food, 4);
         assert.ok(response.state.players[0]!.minorHand.includes(DEBT));
+        assert.ok(response.interaction.stateId === 'wait');
+        assert.deepEqual(response.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 });
+        assert.equal(response.state.currentPlayerIndex, 0);
         save('A095-N2-decline', response);
         const poor = angler(1, 0);
         const denied = turn(poor, 0, 'fishing');
         assert.equal(denied.state.players[0]!.resources.food, 1);
         assert.ok(!denied.state.players[0]!.minorPlayed.includes(DEBT));
         assertRejectedUnchanged(poor, () => poor.resolveChoice(0, DEBT));
+        assert.ok(denied.interaction.stateId === 'wait');
+        assert.deepEqual(denied.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 });
+        assert.equal(denied.state.currentPlayerIndex, 0);
         save('A095-N2-poor', denied);
     });
     it("three food nonFishing unplayed and actual opponent cannot trigger owner", () => {
         for (const [session, space] of [[angler(3), 'fishing'], [angler(), 'day-laborer'], [angler(2, 2, false), 'fishing']] as const) {
             const response = turn(session, 0, space);
-            assert.equal(response.interaction.stateId === 'wait' ? response.interaction.request.kind : '', 'confirm-next-player');
+            assert.equal(response.interaction.stateId === 'wait' ? expectWait(response).interaction.request.kind : '', 'confirm-next-player');
             assert.ok(response.state.players[0]!.minorHand.includes(DEBT));
             save(`A095-N3-${space}-${response.state.players[0]!.resources.food}`, response);
         }
@@ -272,6 +278,9 @@ describe("A095 command boundaries", () => {
         const response = turn(session, 1, 'fishing');
         assert.ok(response.state.players[0]!.minorHand.includes(DEBT));
         assert.equal(response.state.players[1]!.resources.food, 42);
+        assert.ok(response.interaction.stateId === 'wait');
+        assert.deepEqual(response.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 0 });
+        assert.equal(response.state.currentPlayerIndex, 1);
         save('A095-N3-opponent', response);
     });
 });

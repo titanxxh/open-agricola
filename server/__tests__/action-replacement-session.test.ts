@@ -1,13 +1,14 @@
+import { payAction } from '../../shared/actions/effects/pay'
+import { emptyResources } from '../../shared/session/state-bootstrap'
+import { expectWait } from './_helpers/trigger-select'
 import { createWorkSession } from './_helpers/session-fixtures'
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { gainAction } from '../../shared/actions/effects/gain'
 import { requireActiveCardRegistry } from '../../shared/cards/active-registry'
-import type { CardListenerRegistration } from '../../shared/cards/card-listeners'
-import type { ActionDefinition, ActionFlow } from '../../shared/contract/types'
-import type { ActionRegistry } from '../../shared/engine/registry'
+import { type CardListenerRegistration } from '../../shared/cards/card-listeners'
+import { type ActionDefinition, type ActionSpace, type ActionFlow, type ActionChoiceOption, type GameState } from '../../shared/contract/types'
 import { setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
-
 import '../../shared/cards/C/C140_PackagingArtist'
 import '../../shared/cards/A/A030_BakingSheet'
 import '../../shared/cards/E/E092_FieldDoctor'
@@ -22,9 +23,14 @@ import '../../shared/cards/B/B025_BreadPaddle'
 import '../../shared/cards/B/B097_Scholar'
 import '../../shared/cards/D/D138_PetLover'
 import '../../shared/cards/E/E101_Blighter'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged, confirmNext, passPreparationExchanges , getChoiceOptions } from './_helpers/session-assertions'
+import { createScenarioEvidence } from './_helpers/scenario-evidence'
+
+const sessionEvidence = createScenarioEvidence(import.meta.url)
 
 const setup = () => {
-  const session = createWorkSession({ seed: 850, options: { playerCount: 2 } })
+  const session = sessionEvidence.track(createWorkSession({ seed: 850, options: { playerCount: 2 } }))
   const state = session.getState().state
   state.currentPlayerIndex = 0
   state.round = 14
@@ -39,9 +45,7 @@ const setup = () => {
     player.cardStates = {}
     player.fields = []
     player.pastures = []
-    for (const key of Object.keys(player.resources) as Array<keyof typeof player.resources>) {
-      player.resources[key] = 0
-    }
+    player.resources = { ...emptyResources }
     setActiveWorkerCount(player, 2)
     setWorkersAtHome(state, player, 2)
   })
@@ -55,8 +59,8 @@ const setup = () => {
 const options = (response: SessionResponse) => {
   expect(response.ok, response.error).toBe(true)
   expect(response.interaction.stateId).toBe('wait')
-  expect(response.interaction.request.kind).toBe('choice')
-  return response.interaction.request.options ?? []
+  expect(expectWait(response).interaction.request.kind).toBe('choice')
+  return getChoiceOptions(response) ?? []
 }
 
 const registerListener = (session: GameSession, listener: CardListenerRegistration) => {
@@ -64,20 +68,26 @@ const registerListener = (session: GameSession, listener: CardListenerRegistrati
   session.withCtx(() => requireActiveCardRegistry('replacement session test').registerListener(listener))
 }
 
-const customOpportunity = (session: GameSession, flow: ActionFlow) => {
-  const registry = (session as unknown as { registry: ActionRegistry }).registry
-  const action: ActionDefinition = { ...registry.get('forest')!, flow, canBeExecutedByPlayer: () => true }
-  registry.register(action)
-  Object.assign(session.state.actionSpaces.find((space) => space.id === 'forest')!, action, { takenBy: [] })
-  return registry
+const DYNAMIC_HOST_ID = '__test_replacement_host__'
+const registerDynamicAction = (session: GameSession, action: ActionDefinition) => {
+  assert.equal(session.state.actionSpaces.some(space => space.id === action.id), false)
+  session.state.actionSpaces.push({ ...action, resources: { ...emptyResources }, takenBy: [] } satisfies ActionSpace)
 }
+const customOpportunity = (session: GameSession, flow: ActionFlow) => {
+  registerDynamicAction(session, { id: DYNAMIC_HOST_ID, nameKey: 'actions.forest.name', descriptionKey: 'actions.forest.description',
+    roundAvailable: 1, gainPerRound: {}, canBeExecutedByPlayer: () => true, flow,
+    execute: () => { throw new Error('The dynamic host must execute its declared flow') } })
+  return DYNAMIC_HOST_ID
+}
+
+
 
 describe('explicit action replacement through GameSession', () => {
   it('blocks a frozen host when only a new replacement becomes doable during before', () => {
     const session = setup()
     const actionId = '__frozen_host__'
-    const registry = customOpportunity(session, { type: 'leaf', actionId, params: { wood: 1 } })
-    registry.register({ ...gainAction, id: actionId, canBeExecutedByPlayer: (_state, player) => player.resources.food >= 2 })
+    const hostId = customOpportunity(session, { type: 'leaf', actionId, params: { wood: 1 } })
+    registerDynamicAction(session, { ...gainAction, id: actionId, canBeExecutedByPlayer: (_state, player) => player.resources.food >= 2 })
     registerListener(session, {
       id: '__late_doability__', cardIds: ['__late_doability__'], actions: [actionId], phases: ['computeReplace', 'isDoable'],
       handler: (context) => {
@@ -91,21 +101,21 @@ describe('explicit action replacement through GameSession', () => {
       id: '__host_before__', cardIds: ['__host_before__'], actions: [actionId], phases: ['before'], mandatory: true,
       handler: () => ({ flow: { type: 'leaf', actionId: 'gain', params: { food: 1 } } }),
     })
-    const response = session.takeAction(0, 'forest')
+    const response = session.takeAction(0, hostId)
     expect(response.ok, response.error).toBe(true)
-    expect(response.interaction.request.kind).toBe('engine-blocked')
+    expect(expectWait(response).interaction.request.kind).toBe('engine-blocked')
     expect(response.state.players[0]!.resources).toMatchObject({ food: 1, wood: 0, vegetable: 0 })
-    const undone = session.undoAction(0)
+    const undone = session.undoAction()
     expect(undone.ok, undone.error).toBe(true)
     expect(undone.state.players[0]!.resources).toMatchObject({ food: 0, wood: 0, vegetable: 0 })
-    expect(undone.state.actionSpaces.find((space) => space.id === 'forest')!.takenBy).toEqual([])
+    expect(undone.state.actionSpaces.find((space) => space.id === hostId)!.takenBy).toEqual([])
   })
 
   it('cannot skip an enabling before trigger using a replacement that appeared after selection', () => {
     const session = setup()
     const actionId = '__strict_payment__'
-    const registry = customOpportunity(session, { type: 'leaf', actionId, params: { cost: { food: 2 } } })
-    registry.register({ ...registry.get('pay')!, id: actionId, canBeExecutedByPlayer: (_state, player) => player.resources.food >= 2 })
+    const hostId = customOpportunity(session, { type: 'leaf', actionId, params: { cost: { food: 2 } } })
+    registerDynamicAction(session, { ...payAction, id: actionId, canBeExecutedByPlayer: (_state, player) => player.resources.food >= 2 })
     registerListener(session, {
       id: '__late_replacement__', cardIds: ['__late_replacement__'], actions: [actionId], phases: ['computeReplace'],
       handler: ({ player }) => player.resources.food > 0 ? {
@@ -118,22 +128,22 @@ describe('explicit action replacement through GameSession', () => {
         handler: () => ({ flow: { type: 'leaf', actionId: 'gain', params: { food: 1 } } }),
       })
     }
-    const offered = session.takeAction(0, 'forest')
-    expect(offered.interaction.request.kind).toBe('select-trigger')
+    const offered = session.takeAction(0, hostId)
+    expect(expectWait(offered).interaction.request.kind).toBe('select-trigger')
     const pending = session.resolveChoice(0, '__first_food__')
     expect(pending.state.players[0]!.resources.food).toBe(1)
-    expect(pending.interaction.request.options.find((option) => option.value === '__pass__')?.disabled, JSON.stringify(pending.interaction)).toBe(true)
+    expect(getChoiceOptions(pending).find((option) => option.value === '__pass__')?.disabled, JSON.stringify(pending.interaction)).toBe(true)
     expect(session.resolveChoice(0, '__pass__').ok).toBe(false)
     const response = session.resolveChoice(0, '__second_food__')
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources).toMatchObject({ food: 0, wood: 0 })
-    expect(response.interaction.request.kind).toBe('confirm-next-player')
+    expect(expectWait(response).interaction.request.kind).toBe('confirm-next-player')
   })
 
   it('does not guard a frozen payment using a newly available replacement', () => {
     const session = setup()
     const player = session.state.players[0]!
-    customOpportunity(session, { type: 'leaf', actionId: 'pay', params: { cost: { food: 2 } } })
+    const hostId = customOpportunity(session, { type: 'leaf', actionId: 'pay', params: { cost: { food: 2 } } })
     registerListener(session, {
       id: '__late_replacement__', cardIds: ['__late_replacement__'], actions: ['pay'], phases: ['computeReplace'],
       handler: ({ player }) => player.resources.food > 0 ? {
@@ -148,28 +158,28 @@ describe('explicit action replacement through GameSession', () => {
         { type: 'leaf', actionId: 'gain', optional: true, params: { wood: 1, recipientPlayerId: player.id } },
       ] } }),
     }))
-    let response = session.takeAction(0, 'forest')
+    let response = session.takeAction(0, hostId)
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources).toMatchObject({ food: 1, wood: 0 })
     expect(session.createSessionPrivateCursor().provisionalContinuationScopes.map((scope) => scope.guarded)).toEqual([false])
     response = session.resolveChoice(0, 'confirm')
-    expect(response.interaction.playerIndex).toBe(1)
+    expect(expectWait(response).interaction.playerIndex).toBe(1)
     response = session.resolveChoice(1, '__skip__')
     expect(response.ok, response.error).toBe(true)
   })
 
   it.each([false, true])('keeps source labels and producer guards through nested replacements, decline=%s', (decline) => {
     const session = setup()
-    customOpportunity(session, { type: 'leaf', actionId: 'gain', params: { wood: 10 } })
+    const hostId = customOpportunity(session, { type: 'leaf', actionId: 'gain', params: { wood: 10 } })
     for (const [source, resource] of [['__source_A__', 'food'], ['__source_B__', 'reed']] as const) {
       registerListener(session, {
         id: source, cardIds: [source], actions: ['gain'], phases: ['computeReplace'],
         handler: () => ({ decline: true, alternativeFlow: { type: 'leaf', actionId: 'gain', params: { [resource]: 1 } } }),
       })
     }
-    const offered = session.takeAction(0, 'forest')
+    const offered = session.takeAction(0, hostId)
     expect(options(offered).filter((option) => option.sourceCard).map((option) => ({
-      source: option.sourceCard, gain: option.effectPreview?.resourcesGained,
+      source: option.sourceCard, gain: option.effectPreview?.kind === 'resourceExchange' ? option.effectPreview.resourcesGained : undefined,
     }))).toEqual([
       { source: '__source_A__', gain: { food: 1 } },
       { source: '__source_B__', gain: { reed: 1 } },
@@ -183,12 +193,12 @@ describe('explicit action replacement through GameSession', () => {
     const response = session.resolveChoice(0, selected.value)
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources).toMatchObject({ food: decline ? 0 : 1, reed: decline ? 1 : 0, wood: 0 })
-    expect(response.interaction.request.kind).toBe('confirm-next-player')
+    expect(expectWait(response).interaction.request.kind).toBe('confirm-next-player')
   })
 
   it('keeps the replacement producer distinct from its internal XOR sources after restore', () => {
     const session = setup()
-    customOpportunity(session, { type: 'leaf', actionId: 'gain', params: { wood: 10 } })
+    const hostId = customOpportunity(session, { type: 'leaf', actionId: 'gain', params: { wood: 10 } })
     registerListener(session, {
       id: '__producer__', cardIds: ['__producer__'], actions: ['gain'], phases: ['computeReplace'],
       handler: () => ({ decline: true, alternativeFlow: {
@@ -198,13 +208,13 @@ describe('explicit action replacement through GameSession', () => {
         ],
       } }),
     })
-    const offered = session.takeAction(0, 'forest')
+    const offered = session.takeAction(0, hostId)
     expect(options(offered).map((option) => option.sourceCard).filter(Boolean)).toEqual(['__producer__'])
     const cursor = session.createSessionPrivateCursor()
     session.loadState(JSON.parse(JSON.stringify(session.state)))
     session.restoreSessionPrivateCursor(cursor)
     const selected = session.resolveChoice(0, options(session.getState()).find((option) => option.sourceCard === '__producer__')!.value)
-    expect(selected.interaction.promptKey).toBe('ui.interactionFieldMerchantChoose')
+    expect(expectWait(selected).interaction.promptKey).toBe('ui.interactionFieldMerchantChoose')
     expect(options(selected).every((option) => option.sourceCard === '__internal_source__')).toBe(true)
     const response = session.resolveChoice(0, options(selected)[0]!.value)
     expect(response.state.players[0]!.resources).toMatchObject({ food: 1, reed: 0, wood: 0 })
@@ -264,9 +274,9 @@ describe('explicit action replacement through GameSession', () => {
     expect(options(offered)).toHaveLength(1)
     expect(offered.state.players[0]!.resources[resource]).toBe(0)
     const selected = session.resolveChoice(0, options(offered)[0]!.value)
-    expect(selected.interaction.promptKey).toBe('ui.interactionFieldMerchantChoose')
+    expect(expectWait(selected).interaction.promptKey).toBe('ui.interactionFieldMerchantChoose')
     expect(options(selected)).toHaveLength(2)
-    const gain = options(selected).find((option) => option.effectPreview?.resourcesGained?.[resource] === 1)!
+    const gain = options(selected).find((option) => option.effectPreview?.kind === 'resourceExchange' && option.effectPreview.resourcesGained?.[resource] === 1)!
     const response = session.resolveChoice(0, gain.value)
     expect(response.state.players[0]!.resources).toMatchObject({ food: 0, vegetable: 0, [resource]: 1 })
   })
@@ -348,12 +358,12 @@ describe('explicit action replacement through GameSession', () => {
 
   it.each([false, true])('freezes the selected action before its before trigger and internal pending, decline=%s', (decline) => {
     const session = setup()
-    const registry = customOpportunity(session, { type: 'leaf', actionId: '__replacement_original__', params: { food: 10 } })
-    registry.register({ ...gainAction, id: '__replacement_original__' })
-    registry.register({
+    const hostId = customOpportunity(session, { type: 'leaf', actionId: '__replacement_original__', params: { food: 10 } })
+    registerDynamicAction(session, { ...gainAction, id: '__replacement_original__' })
+    registerDynamicAction(session, {
       ...gainAction, id: '__replacement_choice__',
       execute: () => ({ type: 'request', promptKey: 'ui.interactionFieldMerchantChoose', request: {
-        kind: 'choice', options: [{ value: 'grain', label: 'Grain' }, { value: 'vegetable', label: 'Vegetable' }],
+        kind: 'choice', options: [{ value: 'grain', labelKey: 'resources.grain' }, { value: 'vegetable', labelKey: 'resources.vegetable' }],
       } }),
       resolveChoice: (context, choice) => gainAction.execute({ ...context, params: { [choice]: 1 } }),
     })
@@ -372,7 +382,7 @@ describe('explicit action replacement through GameSession', () => {
         handler: () => ({ flow: { type: 'leaf', actionId: 'gain', params: { [resource]: 1 } } }),
       })
     }
-    const offered = session.takeAction(0, 'forest')
+    const offered = session.takeAction(0, hostId)
     expect(options(offered)).toHaveLength(2)
     expect(offered.state.players[0]!.resources).toMatchObject({ food: 0, wood: 0 })
     const selected = options(offered).find((option) => decline
@@ -386,7 +396,7 @@ describe('explicit action replacement through GameSession', () => {
       response = session.resolveChoice(0, 'grain')
       expect(response.ok, response.error).toBe(true)
       expect(response.state.players[0]!.resources).toMatchObject({ food: 1, wood: 0, grain: 2, vegetable: 0 })
-      expect(response.interaction.request.kind).toBe('confirm-next-player')
+      expect(expectWait(response).interaction.request.kind).toBe('confirm-next-player')
     }
     expect(response.state.events.filter((event) => event.type === 'resource.moved'
       && event.resources[decline ? 'wood' : 'food'] === 1)).toHaveLength(1)
@@ -404,13 +414,13 @@ describe('explicit action replacement through GameSession', () => {
     let response = session.takeAction(0, 'grain-utilization')
     let previousReplacement: string | undefined
     for (const target of ['cultivation', 'day-laborer']) {
-      if (response.interaction.promptKey !== 'ui.interactionSelectReplacement') {
+      if (expectWait(response).interaction.promptKey !== 'ui.interactionSelectReplacement') {
         const sow = options(response).find((option) => option.labelKey === 'ui.interactionActionOrReplace'
           || option.labelKey === 'actions.sow.name')!
         expect(sow, JSON.stringify(response.interaction)).toBeDefined()
         response = session.resolveChoice(0, sow.value)
       }
-      expect(response.interaction.promptKey).toBe('ui.interactionSelectReplacement')
+      expect(expectWait(response).interaction.promptKey).toBe('ui.interactionSelectReplacement')
       const replacement = options(response).find((option) => option.sourceCard === 'A094_LazySowman')!
       expect(replacement).toBeDefined()
       const choices = options(response)
@@ -428,7 +438,7 @@ describe('explicit action replacement through GameSession', () => {
       }
       response = session.resolveChoice(0, replacement.value)
       expect(response.state.players[0]!.resources.food).toBe(0)
-      response = session.undoStep(0)
+      response = session.undoStep()
       expect(options(response)).toEqual(choices)
       expect(JSON.stringify(session.state)).toBe(JSON.stringify(JSON.parse(before).state))
       response = session.resolveChoice(0, replacement.value)
@@ -452,7 +462,7 @@ describe('explicit action replacement through GameSession', () => {
   it.each(['undoStep', 'undoAction'] as const)('preserves mandatory replacement payments across reconnect and %s', (undo) => {
     const session = setup()
     session.state.players[0]!.resources.food = 1
-    customOpportunity(session, { type: 'leaf', actionId: 'gain', params: { wood: 1 } })
+    const hostId = customOpportunity(session, { type: 'leaf', actionId: 'gain', params: { wood: 1 } })
     registerListener(session, {
       id: '__pay_replacement__', cardIds: ['__pay_replacement__'], actions: ['gain'], phases: ['computeReplace'],
       handler: () => ({ decline: true, alternativeFlow: { type: 'seq', children: [
@@ -460,28 +470,28 @@ describe('explicit action replacement through GameSession', () => {
         { type: 'leaf', actionId: 'pay', params: { cost: { food: 1 } } },
       ] } }),
     })
-    const offered = session.takeAction(0, 'forest')
+    const offered = session.takeAction(0, hostId)
     expect(offered.state.players[0]!.resources.food).toBe(1)
     const branch = options(offered).find((option) => option.sourceCard === '__pay_replacement__')!
     let response = session.resolveChoice(0, branch.value)
-    expect(response.interaction.request.kind).toBe('engine-blocked')
+    expect(expectWait(response).interaction.request.kind).toBe('engine-blocked')
     expect(response.state.players[0]!.resources).toMatchObject({ food: 0, wood: 0 })
     const state = JSON.parse(JSON.stringify(session.state))
     const cursor = session.createSessionPrivateCursor()
     session.loadState(state)
     session.restoreSessionPrivateCursor(cursor)
-    expect(session.getState().interaction.request.kind).toBe('engine-blocked')
+    expect(expectWait(session.getState()).interaction.request.kind).toBe('engine-blocked')
     expect(session.getState().state.players[0]!.resources.food).toBe(0)
-    response = session[undo](0)
+    response = session[undo]()
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources).toMatchObject({ food: 1, wood: 0 })
-    if (undo === 'undoStep') expect(response.interaction.promptKey).toBe('ui.interactionSelectReplacement')
-    else expect(response.state.actionSpaces.find((space) => space.id === 'forest')!.takenBy).toEqual([])
+    if (undo === 'undoStep') expect(expectWait(response).interaction.promptKey).toBe('ui.interactionSelectReplacement')
+    else expect(response.state.actionSpaces.find((space) => space.id === hostId)!.takenBy).toEqual([])
   })
 
   it('retains an explicitly optional child between required replacement effects', () => {
     const session = setup()
-    customOpportunity(session, { type: 'leaf', actionId: 'gain', params: { wood: 10 } })
+    const hostId = customOpportunity(session, { type: 'leaf', actionId: 'gain', params: { wood: 10 } })
     registerListener(session, {
       id: '__optional_replacement__', cardIds: ['__optional_replacement__'], actions: ['gain'], phases: ['computeReplace'],
       handler: () => ({ decline: true, alternativeFlow: { type: 'seq', children: [
@@ -490,7 +500,7 @@ describe('explicit action replacement through GameSession', () => {
         { type: 'leaf', actionId: 'gain', params: { reed: 1 } },
       ] } }),
     })
-    const offered = session.takeAction(0, 'forest')
+    const offered = session.takeAction(0, hostId)
     const branch = options(offered).find((option) => option.sourceCard === '__optional_replacement__')!
     const selected = session.resolveChoice(0, branch.value)
     expect(options(selected).some((option) => option.value === '__skip__')).toBe(true)
@@ -520,20 +530,20 @@ describe('explicit action replacement through GameSession', () => {
     expect(options(session.getState())).toEqual(choices)
     expect(session.getState().state.players[0]!.resources).toMatchObject({ grain: 1, food: 0 })
     const decline = choices.find((option) => option.labelKey === 'ui.interactionDoNotReplace')!
-    expect(session.resolveChoice(0, decline.value).interaction.request.kind).toBe('confirm-next-player')
+    expect(expectWait(session.resolveChoice(0, decline.value)).interaction.request.kind).toBe('confirm-next-player')
   })
 
   it.each(['leaf', 'xor'] as const)('preserves a custom replacement target player and space for a root %s', (kind) => {
     const session = setup()
-    const registry = customOpportunity(session, { type: 'leaf', actionId: '__source_gain__', params: { food: 10 } })
-    registry.register({ ...gainAction, id: '__source_gain__' })
+    const hostId = customOpportunity(session, { type: 'leaf', actionId: '__source_gain__', params: { food: 10 } })
+    registerDynamicAction(session, { ...gainAction, id: '__source_gain__' })
     const executed: unknown[] = []
-    registry.register({ ...gainAction, execute: (context) => {
+    registerDynamicAction(session, { ...gainAction, id: '__observed_replacement_gain__', execute: (context) => {
       executed.push({ playerId: context.player.id, spaceId: context.space.id, sourceCard: context.sourceCard, trueAction: context.actionContext?.trueAction })
       return gainAction.execute(context)
     } })
     const targetId = session.state.players[1]!.id
-    const child: ActionFlow = { type: 'leaf', actionId: 'gain', params: { wood: 1 }, actionContext: { targetSpaceId: 'day-laborer', trueAction: false } }
+    const child: ActionFlow = { type: 'leaf', actionId: '__observed_replacement_gain__', params: { wood: 1 }, actionContext: { targetSpaceId: 'day-laborer', trueAction: false } }
     registerListener(session, {
       id: '__target_replacement__', cardIds: ['__target_replacement__'], actions: ['__source_gain__'], phases: ['computeReplace'],
       handler: () => ({ decline: true, alternativeFlow: kind === 'leaf'
@@ -542,16 +552,16 @@ describe('explicit action replacement through GameSession', () => {
           { ...child, params: { reed: 1 } },
         ] } }),
     })
-    const offered = session.takeAction(0, 'forest')
-    expect(offered.interaction.playerIndex).toBe(0)
+    const offered = session.takeAction(0, hostId)
+    expect(expectWait(offered).interaction.playerIndex).toBe(0)
     expect(offered.state.players[1]!.resources.wood).toBe(0)
     const replacement = options(offered).find((option) => option.sourceCard === '__target_replacement__')!
     let response = session.resolveChoice(0, replacement.value)
-    if (response.interaction.request.kind === 'confirm-player-switch') response = session.resolveChoice(0, 'confirm')
+    if (expectWait(response).interaction.request.kind === 'confirm-player-switch') response = session.resolveChoice(0, 'confirm')
     if (kind === 'xor') {
-      expect(response.interaction.playerIndex).toBe(1)
-      expect(response.interaction.promptKey).toBe('ui.interactionFieldMerchantChoose')
-      const gain = options(response).find((option) => option.effectPreview?.resourcesGained?.wood === 1)!
+      expect(expectWait(response).interaction.playerIndex).toBe(1)
+      expect(expectWait(response).interaction.promptKey).toBe('ui.interactionFieldMerchantChoose')
+      const gain = options(response).find((option) => option.effectPreview?.kind === 'resourceExchange' && option.effectPreview.resourcesGained?.wood === 1)!
       response = session.resolveChoice(1, gain.value)
     }
     expect(response.ok, response.error).toBe(true)
@@ -589,17 +599,17 @@ describe('explicit action replacement through GameSession', () => {
     const selected = session.resolveChoice(0, source.value)
     expect(options(selected).map((option) => option.value)).toEqual(expect.arrayContaining(['A114_SeasonalWorker', 'A116_WoodCutter']))
     let response = session.resolveChoice(0, 'A114_SeasonalWorker')
-    expect(response.interaction.request.kind).toBe('select-trigger')
-    const breadPaddle = response.interaction.request.options!.find((option) => option.sourceCard === 'B025_BreadPaddle')
-    expect(breadPaddle?.disabled ?? true).toBe(true)
-    if (breadPaddle) response = session.resolveChoice(0, '__pass__')
-    expect(response.interaction.request.options!.find((option) => option.sourceCard === 'A097_Freshman')).toBeDefined()
+    expect(expectWait(response).interaction.request.kind).toBe('select-trigger')
+    const breadPaddle = getChoiceOptions(response)!.find((option) => option.sourceCard === 'B025_BreadPaddle')
+    expect(breadPaddle).toBeUndefined()
+    expect(getChoiceOptions(response).find(option => option.value === '__pass__')?.disabled).toBe(true)
+    expect(getChoiceOptions(response)!.find((option) => option.sourceCard === 'A097_Freshman')).toBeDefined()
     response = session.resolveChoice(0, 'A097_Freshman')
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.occupationPlayed).toContain('A114_SeasonalWorker')
     expect(response.state.players[0]!.occupationHand).toContain('A116_WoodCutter')
     expect(response.state.players[0]!.resources.food).toBe(0)
-    expect(response.interaction.request.kind, JSON.stringify(response.interaction)).toBe('confirm-next-player')
+    expect(expectWait(response).interaction.request.kind, JSON.stringify(response.interaction)).toBe('confirm-next-player')
   })
 
   it.each(['E092_FieldDoctor', 'E151_DeliveryNurse'])('offers both no-room growth sources and consumes only %s', (chosen) => {
@@ -609,9 +619,7 @@ describe('explicit action replacement through GameSession', () => {
     player.roomTiles = [{ row: 1, col: 0 }, { row: 2, col: 0 }]
     player.fields = [[0, 0], [0, 1], [1, 1], [2, 1]].map(([row, col]) => ({ row, col, stacks: [] }))
     Object.assign(player.resources, { sheep: 1, boar: 1, cattle: 1 })
-    player.pastures = [{ row: 0, col: 2 }, { row: 0, col: 4 }, { row: 2, col: 4 }].map((tile, index) => ({
-      id: `pasture-${index}`, tiles: [tile], size: 1, stables: 0, animalType: (['sheep', 'boar', 'cattle'] as const)[index]!, animalCount: 1,
-    }))
+    player.pastures = [{ row: 0, col: 2 }, { row: 0, col: 4 }, { row: 2, col: 4 }].map((tile, index) => ({ id: `pasture-${index}`, tiles: [tile], animalType: (['sheep', 'boar', 'cattle'] as const)[index]!, animalCount: 1 }))
     const offered = session.takeAction(0, 'wish-children')
     expect(options(offered).map((option) => option.sourceCard).sort()).toEqual(['E092_FieldDoctor', 'E151_DeliveryNurse'])
     expect(offered.state.players[0]!.workers.filter((worker) => worker.isActive)).toHaveLength(2)
@@ -632,14 +640,14 @@ describe('explicit action replacement through GameSession', () => {
     player.occupationPlayed = ['D138_PetLover']
     player.resources.grain = 0
     player.improvements = []
-    player.pastures = [{ id: 'pasture-0', tiles: [{ row: 0, col: 2 }], size: 1, stables: 0, animalType: null, animalCount: 0 }]
+    player.pastures = [{ id: 'pasture-0', tiles: [{ row: 0, col: 2 }], animalType: null, animalCount: 0 }]
     session.state.actionSpaces.find((space) => space.id === 'sheep-market')!.resources.sheep = 1
     const offered = session.takeAction(0, 'sheep-market')
     expect(options(offered)).toHaveLength(2)
     expect(offered.state.players[0]!.resources.sheep).toBe(0)
     const selected = options(offered).find((option) => replace ? option.sourceCard === 'D138_PetLover' : option.labelKey === 'ui.interactionDoNotReplace')!
     let response = session.resolveChoice(0, selected.value)
-    if (response.interaction.request.kind === 'animal-reorg') {
+    if (expectWait(response).interaction.request.kind === 'animal-reorg') {
       response = session.resolveChoice(0, 'confirm', { zones: [{ id: 'pasture-0', zoneType: 'pasture', animalType: 'sheep', animalCount: 1 }] })
     }
     expect(response.ok, response.error).toBe(true)
@@ -649,8 +657,8 @@ describe('explicit action replacement through GameSession', () => {
 
   it('offers a replacement whose mandatory before can fund its current payment', () => {
     const session = setup()
-    const registry = customOpportunity(session, { type: 'leaf', actionId: '__original_food__', params: { food: 10 } })
-    registry.register({ ...gainAction, id: '__original_food__' })
+    const hostId = customOpportunity(session, { type: 'leaf', actionId: '__original_food__', params: { food: 10 } })
+    registerDynamicAction(session, { ...gainAction, id: '__original_food__' })
     registerListener(session, {
       id: '__enabling_replace__', cardIds: ['__enabling_replace__'], actions: ['__original_food__'], phases: ['computeReplace'],
       handler: () => ({ decline: true, alternativeFlow: { type: 'leaf', actionId: 'pay', params: { cost: { food: 1 } } } }),
@@ -659,13 +667,13 @@ describe('explicit action replacement through GameSession', () => {
       id: '__enabling_before__', cardIds: ['__enabling_before__'], actions: ['pay'], phases: ['before'], mandatory: true,
       handler: () => ({ flow: { type: 'leaf', actionId: 'gain', params: { food: 1 } } }),
     })
-    const offered = session.takeAction(0, 'forest')
+    const offered = session.takeAction(0, hostId)
     expect(offered.state.players[0]!.resources.food).toBe(0)
     const replacement = options(offered).find((option) => option.sourceCard === '__enabling_replace__')!
     expect(replacement).toBeDefined()
     const response = session.resolveChoice(0, replacement.value)
     expect(response.ok, response.error).toBe(true)
-    expect(response.interaction.request.kind).toBe('confirm-next-player')
+    expect(expectWait(response).interaction.request.kind).toBe('confirm-next-player')
     expect(response.state.players[0]!.resources.food).toBe(0)
     expect(response.state.events.filter((event) => event.type === 'resource.paid' && event.resources.food === 1)).toHaveLength(1)
   })
@@ -682,12 +690,12 @@ describe('explicit action replacement through GameSession', () => {
     player.minorHand = ['A030_BakingSheet']
     let response = session.performRoundEnd()
     expect(response.state.round).toBe(6)
-    if (response.interaction.request.kind === 'select-trigger') response = session.resolveChoice(0, 'B097_Scholar')
+    if (expectWait(response).interaction.request.kind === 'select-trigger') response = session.resolveChoice(0, 'B097_Scholar')
     const improvement = options(response).find((option) => option.value !== '__skip__')!
     expect(options(response).some((option) => option.sourceCard === 'B103_FieldMerchant')).toBe(false)
     response = session.resolveChoice(0, improvement.value)
     if (!response.state.players[0]!.minorPlayed.includes('A030_BakingSheet')) {
-      expect(response.interaction.promptKey).toBe('ui.interactionChooseImprovement')
+      expect(expectWait(response).interaction.promptKey).toBe('ui.interactionChooseImprovement')
       expect(options(response).map((option) => option.value)).toEqual(['A030_BakingSheet'])
       response = session.resolveChoice(0, 'A030_BakingSheet')
     }
@@ -697,3 +705,73 @@ describe('explicit action replacement through GameSession', () => {
   })
 
 })
+
+describe("A097 command boundaries", () => {
+    const FRESH = 'A097_Freshman';
+    const OCC = 'A114_SeasonalWorker';
+    function save(id: string, value: unknown) {
+        sessionEvidence.record(id, value);
+    }
+    function ok(response: SessionResponse) { assert.equal(response.ok, true, response.error); return response; }
+    function setup(configure: (state: GameState) => void = () => { }, round = 14, played = true) {
+        const session = sessionEvidence.track(createWorkSession({ seed: 4242, configure(state) {
+                state.round = round;
+                for (const player of state.players)
+                    Object.assign(player.resources, { food: 40, wood: 0, clay: 0, reed: 0, stone: 0, grain: 0, vegetable: 0 });
+                state.players[0]!.occupationPlayed = played ? [FRESH] : [];
+                state.players[0]!.occupationHand = played ? ['__test_placeholder__'] : [FRESH];
+                configure(state);
+            } }));
+        return session;
+    }
+    function ready(session: GameSession, actor: number) {
+        let response = session.getState();
+        if (response.interaction.stateId === 'wait' && expectWait(response).interaction.request.kind === 'confirm-next-player')
+            response = confirmNext(session, response);
+        assert.equal(response.interaction.stateId, 'idle', JSON.stringify(response.interaction));
+        assert.equal(response.state.currentPlayerIndex, actor);
+    }
+    function turn(session: GameSession, actor: number, space: string) { ready(session, actor); return ok(session.takeAction(actor, space)); }
+    function options(response: SessionResponse): ActionChoiceOption[] { assert.ok(response.interaction.stateId === 'wait', JSON.stringify(response.interaction)); assert.ok('options' in expectWait(response).interaction.request); return getChoiceOptions(response)!; }
+    function replacement(session: GameSession, response: SessionResponse, card: string) { const choice = options(response).find(o => o.sourceCard === card); assert.ok(choice, JSON.stringify(response.interaction)); return ok(session.resolveChoice(0, choice.value)); }
+    it("grainless Bake replacement plays occupation free and rejects other actor and unknown card", () => {
+        const session = setup(state => { state.players[0]!.occupationHand = [OCC, 'A116_WoodCutter']; state.players[0]!.resources.food = 0; });
+        let response = replacement(session, turn(session, 0, 'grain-utilization'), FRESH);
+        assertRejectedUnchanged(session, () => session.resolveChoice(1, OCC));
+        assertRejectedUnchanged(session, () => session.resolveChoice(0, 'does-not-exist'));
+        response = ok(session.resolveChoice(0, OCC));
+        assert.equal(response.state.players[0]!.resources.food, 0);
+        assert.ok(response.state.players[0]!.occupationPlayed.includes(OCC));
+        assert.ok(response.state.players[0]!.occupationHand.includes('A116_WoodCutter'));
+        save('A097-N1', response);
+    });
+    it("no playable occupation or unplayed Freshman cannot make grainless space available", () => {
+        for (const session of [setup(), setup(state => state.players[0]!.occupationHand = [OCC], 14, false)]) {
+            assert.equal(session.getActionAvailability(0)['grain-utilization'], false);
+            const response = assertRejectedUnchanged(session, () => session.takeAction(0, 'grain-utilization'));
+            save(`A097-N2-${response.state.players[0]!.occupationPlayed.length}`, response);
+        }
+    });
+    it("Bread Paddle cannot reuse Freshman within the same placement", () => {
+        const session = setup(state => { state.players[0]!.occupationHand = [OCC, 'A116_WoodCutter']; state.players[0]!.minorPlayed = ['B025_BreadPaddle']; state.players[0]!.resources.food = 0; });
+        let response = replacement(session, turn(session, 0, 'grain-utilization'), FRESH);
+        response = ok(session.resolveChoice(0, OCC));
+        assert.equal(response.interaction.stateId === 'wait' ? expectWait(response).interaction.request.kind : '', 'select-trigger');
+        const paddle = options(response).find(o => o.sourceCard === 'B025_BreadPaddle');
+        assert.equal(paddle, undefined);
+        assert.equal(options(response).find(option => option.value === '__pass__')?.disabled, true);
+        save('A097-N3-before-remaining-trigger', response);
+        response = ok(session.resolveChoice(0, FRESH));
+        assert.ok(response.state.players[0]!.occupationHand.includes('A116_WoodCutter'));
+        assert.equal(response.state.players[0]!.resources.food, 0);
+        assert.equal(response.interaction.stateId === 'wait' ? expectWait(response).interaction.request.kind : '', 'confirm-next-player');
+        save('A097-N3', response);
+    });
+    it("Blighter veto cannot be bypassed by a free occupation replacement", () => {
+        const session = setup(state => { state.players[0]!.occupationPlayed.push('E101_Blighter'); state.players[0]!.occupationHand = [OCC]; });
+        assert.equal(session.getActionAvailability(0)['grain-utilization'], false);
+        const response = assertRejectedUnchanged(session, () => session.takeAction(0, 'grain-utilization'));
+        assert.ok(response.state.players[0]!.occupationHand.includes(OCC));
+        save('A097-N4', response);
+    });
+});

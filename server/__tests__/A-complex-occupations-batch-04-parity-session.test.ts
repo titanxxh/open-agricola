@@ -1,12 +1,13 @@
-import { expectFarmSelection, expectTileFarmSelection } from './_helpers/session-assertions'
+import { takeMajorImprovementFromSupply } from '../../shared/cards/major/supply'
+import { expectFarmSelection, expectTileFarmSelection , assertEmptyAccumulationRejected } from './_helpers/session-assertions'
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { familySize, markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome, workersAvailable, newbornCount } from '../../shared/domain/player'
 import { getCardStack, readCardResourceStats } from '../../shared/cards/helpers/card-state'
 import { recordRoundPlacement } from '../../shared/cards/helpers/round-placement'
-import { resolveTriggerIfPresent } from './_helpers/trigger-select'
-import { type Resource, type GameState } from '../../shared/contract/types'
+import { resolveTriggerIfPresent , expectWait } from './_helpers/trigger-select'
+import { type Resource, type GameState , type FarmTilePosition } from '../../shared/contract/types'
 import '../../shared/cards/A/A085_Homekeeper'
 import '../../shared/cards/A/A093_BedMaker'
 import '../../shared/cards/A/A094_LazySowman'
@@ -762,3 +763,256 @@ describe("A093 command boundaries", () => {
     assert.equal(values(r).grain, 0)
   })
 })
+
+describe("A098 command boundaries", () => {
+    const ARCH = 'A098_StableArchitect';
+    function save(id: string, value: unknown) {
+        sessionEvidence.record(id, value);
+    }
+    function ok(response: SessionResponse) { assert.equal(response.ok, true, response.error); return response; }
+    function setup(configure: (state: GameState) => void = () => { }, played = true, owner = 0) {
+        const session = sessionEvidence.track(createWorkSession({ seed: 4242, configure(state) {
+                state.round = 14;
+                for (const player of state.players)
+                    Object.assign(player.resources, { food: 40, wood: 15, clay: 5, reed: 0, stone: 0, grain: 0, vegetable: 0 });
+                const player = state.players[owner]!;
+                player.occupationPlayed = played ? [ARCH] : [];
+                player.occupationHand = played ? ['__test_placeholder__'] : [ARCH];
+                configure(state);
+                for (const player of state.players)
+                    for (const card of player.improvements)
+                        takeMajorImprovementFromSupply(state, card);
+            } }));
+        assert.equal(session.getState().state.players.length, 2);
+        return session;
+    }
+    function bonus(response: SessionResponse, card: string, owner = 0) {
+        assert.ok(response.scores);
+        return response.scores[owner]!.categories.find(category => category.key === 'cardBonusVp')?.entries
+            .filter(entry => entry.type === 'bonus' && entry.cardId === card).reduce((sum, entry) => sum + entry.score, 0) ?? 0;
+    }
+    function pasture(state: GameState, tiles: FarmTilePosition[], owner = 0) {
+        const player = state.players[owner]!;
+        player.pastures.push({ id: `pasture-${player.pastures.length}`, tiles, animalType: null, animalCount: 0 });
+        const edges = new Set<string>();
+        for (const { row, col } of tiles)
+            for (const edge of [`H-${row}-${col}`, `H-${row + 1}-${col}`, `V-${row}-${col}`, `V-${row}-${col + 1}`]) {
+                if (edges.has(edge))
+                    edges.delete(edge);
+                else
+                    edges.add(edge);
+            }
+        for (const edge of edges)
+            if (!player.fenceSegments.some(segment => segment.edge === edge))
+                player.fenceSegments.push({ edge, type: 'fence', source: { kind: 'own', ownerPlayerId: player.id } });
+    }
+    function choices(response: SessionResponse) {
+        assert.ok(response.interaction.stateId === 'wait' && expectWait(response).interaction.request.kind === 'choice', JSON.stringify(response.interaction));
+        return getChoiceOptions(response);
+    }
+    it("zero through four own unfenced stables score one each on repeated reads", () => {
+        for (const count of [0, 1, 2, 3, 4]) {
+            const session = setup(state => state.players[0]!.stableTiles = Array.from({ length: count }, (_, col) => ({ row: 0, col: col + 1 })));
+            const response = session.getState();
+            assert.equal(bonus(response, ARCH), count);
+            assert.equal(bonus(session.getState(), ARCH), count);
+            save(`A098-N1-${count}`, response);
+        }
+    });
+    it("fenced stable is excluded while another unfenced stable counts", () => {
+        const session = setup(state => { state.players[0]!.stableTiles = [{ row: 0, col: 1 }, { row: 0, col: 2 }]; pasture(state, [{ row: 0, col: 1 }]); });
+        const response = session.getState();
+        assert.equal(bonus(response, ARCH), 1);
+        save('A098-N2', response);
+    });
+    it("card in hand and opponent ownership cannot score owner stables", () => {
+        const configure = (state: GameState) => { state.players[0]!.stableTiles = [{ row: 0, col: 1 }]; state.players[1]!.stableTiles = [{ row: 0, col: 1 }, { row: 0, col: 2 }]; };
+        assert.equal(bonus(setup(configure, false).getState(), ARCH), 0);
+        const response = setup(configure, true, 1).getState();
+        assert.equal(bonus(response, ARCH), 0);
+        assert.equal(bonus(response, ARCH, 1), 2);
+        save('A098-N3', response);
+    });
+    it("real stable construction changes score and invalid target preserves pending", () => {
+        const session = setup();
+        let response = ok(session.takeAction(0, 'farm-expansion'));
+        if (response.interaction.stateId === 'wait' && expectWait(response).interaction.request.kind === 'choice') {
+            const option = choices(response).find(option => option.labelKey === 'actions.stables.name');
+            assert.ok(option);
+            response = ok(session.resolveChoice(0, option.value));
+        }
+        assert.ok(response.interaction.stateId === 'wait' && expectWait(response).interaction.request.kind === 'farm-select');
+        assertRejectedUnchanged(session, () => session.commitSelectionChoice(0, { stables: [{ row: 1, col: 0 }] }));
+        response = ok(session.commitSelectionChoice(0, { stables: [{ row: 0, col: 1 }] }));
+        assert.equal(response.state.players[0]!.stableTiles.length, 1);
+        assert.equal(response.state.players[0]!.resources.wood, 13);
+        assert.equal(bonus(response, ARCH), 1);
+        save('A098-N4', response);
+    });
+    it("real fencing stops stable bonus and public undo restores it before retry", () => {
+        const session = setup(state => state.players[0]!.stableTiles = [{ row: 0, col: 1 }]);
+        const before = session.getState();
+        assert.equal(bonus(before, ARCH), 1);
+        const edges = ['H-0-1', 'H-1-1', 'V-0-1', 'V-0-2'];
+        function fence() { ok(session.takeAction(0, 'fencing')); return ok(session.commitSelectionChoice(0, { edges, extraWood: 0 })); }
+        const response = fence();
+        assert.equal(bonus(response, ARCH), 0);
+        assert.equal(response.state.players[0]!.resources.wood, 11);
+        const undone = ok(session.undoAction());
+        assert.equal(bonus(undone, ARCH), 1);
+        assert.deepEqual(undone.state.players[0]!.stableTiles, before.state.players[0]!.stableTiles);
+        assert.equal(undone.state.players[0]!.fenceSegments.length, 0);
+        assert.equal(undone.state.players[0]!.resources.wood, 15);
+        assert.equal(bonus(fence(), ARCH), 0);
+        save('A098-N5', { response, undone });
+    });
+});
+
+describe("A107 command boundaries", () => {
+    const CATCH = 'A107_Catcher';
+    function save(id: string, value: unknown) {
+        sessionEvidence.record(id, value);
+    }
+    function ok(response: SessionResponse) { assert.equal(response.ok, true, response.error); return response; }
+    function setup(configure: (state: GameState) => void = () => { }, played = true) {
+        const session = sessionEvidence.track(createWorkSession({ seed: 4242, configure(state) {
+                state.round = 5;
+                for (const player of state.players)
+                    Object.assign(player.resources, { food: 40, wood: 0, clay: 0, reed: 0, stone: 0, grain: 0, vegetable: 0 });
+                state.players[0]!.occupationPlayed = played ? [CATCH] : [];
+                state.players[0]!.occupationHand = played ? ['__test_placeholder__'] : [CATCH];
+                configure(state);
+            } }));
+        return session;
+    }
+    function ready(session: GameSession, actor: number) {
+        let response = session.getState();
+        if (response.interaction.stateId === 'wait' && expectWait(response).interaction.request.kind === 'confirm-next-player')
+            response = confirmNext(session, response);
+        assert.equal(response.interaction.stateId, 'idle', JSON.stringify(response.interaction));
+        assert.equal(response.state.currentPlayerIndex, actor);
+    }
+    function turn(session: GameSession, actor: number, space: string) { ready(session, actor); return ok(session.takeAction(actor, space)); }
+    it("actual first and second placements read original five and four resource piles", () => {
+        const session = setup(state => {
+            state.actionSpaces.find(s => s.id === 'forest')!.resources.wood = 5;
+            state.actionSpaces.find(s => s.id === 'clay-pit')!.resources.clay = 4;
+        });
+        let response = turn(session, 0, 'forest');
+        assert.equal(response.state.players[0]!.resources.food, 41);
+        assert.equal(response.state.players[0]!.resources.wood, 5);
+        turn(session, 1, 'grain-seeds');
+        response = turn(session, 0, 'clay-pit');
+        assert.equal(response.state.players[0]!.resources.food, 42);
+        assert.equal(response.state.players[0]!.resources.clay, 4);
+        save('A107-N1', response);
+    });
+    it("wrong count and nonbuilding food pile do not award Catcher food", () => {
+        for (const count of [0, 3, 4, 6]) {
+            const s = setup(state => state.actionSpaces.find(a => a.id === 'forest')!.resources.wood = count);
+            const response = count === 0 ? assertEmptyAccumulationRejected(s, 0, 'forest') : turn(s, 0, 'forest');
+            assert.equal(response.state.players[0]!.resources.food, 40);
+            assert.equal(response.state.players[0]!.resources.wood, count);
+            save(`A107-N2-${count}`, response);
+        }
+        const food = turn(setup(state => state.actionSpaces.find(s => s.id === 'fishing')!.resources.food = 5), 0, 'fishing');
+        assert.equal(food.state.players[0]!.resources.food, 45);
+        assert.ok(food.interaction.stateId === 'wait');
+        assert.deepEqual(food.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 });
+        assert.equal(food.state.currentPlayerIndex, 0);
+        save('A107-N2-food', food);
+    });
+    it("actual opponent collection and card in hand cannot reward owner", () => {
+        const config = (state: GameState) => state.actionSpaces.find(s => s.id === 'forest')!.resources.wood = 5;
+        const unplayed = turn(setup(config, false), 0, 'forest');
+        assert.equal(unplayed.state.players[0]!.resources.food, 40);
+        const session = setup(config);
+        turn(session, 0, 'grain-seeds');
+        const response = turn(session, 1, 'forest');
+        assert.equal(response.state.players[0]!.resources.food, 40);
+        assert.equal(response.state.players[1]!.resources.food, 40);
+        assert.equal(response.state.players[1]!.resources.wood, 5);
+        assert.ok(unplayed.interaction.stateId === 'wait');
+        assert.deepEqual(unplayed.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 });
+        assert.equal(unplayed.state.currentPlayerIndex, 0);
+        assert.ok(response.interaction.stateId === 'wait');
+        assert.deepEqual(response.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 0 });
+        assert.equal(response.state.currentPlayerIndex, 1);
+        save('A107-N3', { response, unplayed });
+    });
+    it("whole action undo restores pile order and food before exactly one retry", () => {
+        const session = setup(state => state.actionSpaces.find(s => s.id === 'forest')!.resources.wood = 5);
+        const response = turn(session, 0, 'forest');
+        assert.equal(response.state.players[0]!.resources.food, 41);
+        const undone = ok(session.undoAction());
+        assert.equal(undone.state.players[0]!.resources.food, 40);
+        assert.equal(undone.state.players[0]!.resources.wood, 0);
+        assert.equal(undone.state.actionSpaces.find(s => s.id === 'forest')!.resources.wood, 5);
+        const retry = turn(session, 0, 'forest');
+        assert.equal(retry.state.players[0]!.resources.food, 41);
+        save('A107-N4', { response, undone, retry });
+    });
+    it("third person after actual growth uses three building resources once", () => {
+        const session = setup(state => {
+            state.round = 7;
+            state.players[0]!.roomTiles.push({ row: 0, col: 0 });
+            state.players[0]!.rooms = 3;
+            state.actionSpaces.find(s => s.id === 'forest')!.resources.wood = 0;
+        });
+        let response = turn(session, 0, 'wish-children');
+        if (response.interaction.stateId === 'wait' && expectWait(response).interaction.request.kind === 'choice') {
+            const skip = getChoiceOptions(response).find(o => o.value === '__skip__');
+            assert.ok(skip);
+            response = ok(session.resolveChoice(0, skip.value));
+        }
+        assert.equal(response.state.players[0]!.workers.filter(w => w.isActive).length, 3);
+        assert.deepEqual(response.state.players[0]!.workers.filter(worker => worker.isActive), [
+            { id: '1', isActive: true, isNewborn: false },
+            { id: '2', isActive: true, isNewborn: false },
+            { id: '3', isActive: true, isNewborn: true },
+        ]);
+        assert.deepEqual(response.state.actionSpaces.find(space => space.id === 'wish-children')!.takenBy, [{ playerId: 'p1', workerId: '1' }, { playerId: 'p1', workerId: '3' }]);
+        assert.equal(workersAvailable(response.state, response.state.players[0]!), 1);
+        assert.equal(response.state.currentPlayerIndex, 0);
+        save('A107-N5-after-growth', response);
+        turn(session, 1, 'reed-bank');
+        turn(session, 0, 'day-laborer');
+        response = confirmNext(session, turn(session, 1, 'clay-pit'));
+        for (let n = 0; n < 15 && response.interaction.stateId === 'wait'; n++) {
+            const interaction = response.interaction;
+            if (interaction.request.kind === 'feed')
+                response = ok(session.resolveChoice(interaction.playerIndex, 'confirm', { selections: [] }));
+            else if (interaction.request.kind === 'confirm-player-switch')
+                response = ok(session.resolveChoice(interaction.request.toPlayerIndex, 'confirm'));
+            else
+                assert.fail(JSON.stringify(interaction));
+        }
+        assert.equal(response.state.round, 8);
+        assert.equal(response.interaction.stateId, 'idle');
+        assert.equal(response.state.roundPhase, 'work');
+        assert.equal(response.state.currentPlayerIndex, 0);
+        assert.equal(workersAvailable(response.state, response.state.players[0]!), 3);
+        assert.deepEqual(response.state.players[0]!.workers.filter(worker => worker.isActive), [
+            { id: '1', isActive: true, isNewborn: false },
+            { id: '2', isActive: true, isNewborn: false },
+            { id: '3', isActive: true, isNewborn: false },
+        ]);
+        save('A107-N5-next-work', response);
+        const before = response.state.players[0]!.resources.food;
+        turn(session, 0, 'grain-seeds');
+        turn(session, 1, 'reed-bank');
+        turn(session, 0, 'day-laborer');
+        turn(session, 1, 'clay-pit');
+        response = turn(session, 0, 'forest');
+        assert.equal(response.state.players[0]!.resources.wood, 3);
+        assert.equal(response.state.players[0]!.resources.food, before + 3);
+        assert.deepEqual(response.state.actionSpaces.find(space => space.id === 'grain-seeds')!.takenBy, [{ playerId: 'p1', workerId: '1' }]);
+        assert.deepEqual(response.state.actionSpaces.find(space => space.id === 'day-laborer')!.takenBy, [{ playerId: 'p1', workerId: '2' }]);
+        assert.deepEqual(response.state.actionSpaces.find(space => space.id === 'forest')!.takenBy, [{ playerId: 'p1', workerId: '3' }]);
+        assert.equal(workersAvailable(response.state, response.state.players[0]!), 0);
+        assert.ok(response.interaction.stateId === 'wait');
+        assert.deepEqual(response.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 0 });
+        assert.equal(response.state.currentPlayerIndex, 0);
+        save('A107-N5', response);
+    });
+});

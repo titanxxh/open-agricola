@@ -1,24 +1,42 @@
-import { type SessionResponse } from '../game/authoritative-session'
+import { expectWait } from './_helpers/trigger-select'
+import { type SessionResponse, GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
-
 import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game/authoritative-session'
 import { E001_PoleBarns } from '../../shared/cards/E/E001_PoleBarns'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
-import type { FenceSegment } from '../../shared/contract/types'
+import { type FenceSegment, type GameState } from '../../shared/contract/types'
+import assert from 'node:assert/strict'
+import { createWorkSession } from './_helpers/session-fixtures'
+import { assertRejectedUnchanged, getChoiceOptions, expectTileFarmSelection } from './_helpers/session-assertions'
+import { createScenarioEvidence } from './_helpers/scenario-evidence'
+
+const sessionEvidence = createScenarioEvidence(import.meta.url)
+
+const poleFenceEdges = ['H-0-1', 'H-0-2', 'H-0-3', 'H-2-1', 'H-2-2', 'H-2-3', 'V-0-1', 'V-1-1', 'V-0-4', 'V-1-4', 'V-0-2', 'V-1-2', 'V-0-3', 'V-1-3', 'H-1-1']
+const preparePoleFarm = (player: GameState['players'][number], ordinaryFences = 15, palisades = 0) => {
+  assert.ok(ordinaryFences + palisades === 14 || ordinaryFences + palisades === 15)
+  player.fenceSegments = [
+    ...poleFenceEdges.slice(0, ordinaryFences).map((edge): FenceSegment => ({ edge, type: 'fence' })),
+    ...poleFenceEdges.slice(ordinaryFences, ordinaryFences + palisades).map((edge): FenceSegment => ({ edge, type: 'palisade' })),
+  ]
+  const tiles = ordinaryFences + palisades === 15
+    ? [[{ row: 0, col: 1 }], [{ row: 1, col: 1 }], [{ row: 0, col: 2 }, { row: 1, col: 2 }], [{ row: 0, col: 3 }, { row: 1, col: 3 }]]
+    : [[{ row: 0, col: 1 }, { row: 1, col: 1 }], [{ row: 0, col: 2 }, { row: 1, col: 2 }], [{ row: 0, col: 3 }, { row: 1, col: 3 }]]
+  player.pastures = tiles.map((tiles, index) => ({ id: `pole-${index}`, tiles, animalType: null, animalCount: 0 }))
+}
 
 describe('E001_PoleBarns prerequisite', () => {
   it('blocks when player has fewer than 15 fence segments on board', () => {
-    const session = new GameSession(42)
+    const session = sessionEvidence.track(createWorkSession({ seed: 42 }))
     const state = session.getState().state
     const player = state.players[0]!
-    player.fenceSegments = []
+    preparePoleFarm(player, 14, 1)
     expect(session.withCtx(() => meetsCardPrerequisites(player, E001_PoleBarns, state.round, state))).toBe(false)
   })
 
   it('does not count Wood Palisades toward the 15-fence prerequisite', () => {
-    const session = new GameSession(42)
+    const session = sessionEvidence.track(createWorkSession({ seed: 42 }))
     const state = session.getState().state
     const player = state.players[0]!
     player.fenceSegments = [
@@ -32,13 +50,10 @@ describe('E001_PoleBarns prerequisite', () => {
   })
 
   it('allows when player has 15 fence segments on board', () => {
-    const session = new GameSession(42)
+    const session = sessionEvidence.track(createWorkSession({ seed: 42 }))
     const state = session.getState().state
     const player = state.players[0]!
-    player.fenceSegments = Array.from({ length: 15 }, (_, i): FenceSegment => ({
-      edge: `H-0-${i}`,
-      type: 'fence',
-    }))
+    preparePoleFarm(player)
     expect(session.withCtx(() => meetsCardPrerequisites(player, E001_PoleBarns, state.round, state))).toBe(true)
   })
 })
@@ -51,7 +66,7 @@ describe('E001 Pole Barns parity', () => {
   const setup = ({
     ordinaryFences = 15, palisades = 0, stablesOnBoard = 0,
   } = {}) => {
-    const session = new GameSession(6001, undefined, { playerCount: 2 })
+    const session = sessionEvidence.track(createWorkSession({ seed: 6001, options: { playerCount: 2 } }))
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.currentPlayerIndex = 0
@@ -77,14 +92,7 @@ describe('E001 Pole Barns parity', () => {
     })
     const owner = state.players[0]!
     owner.minorHand = [CARD_ID]
-    owner.fenceSegments = [
-      ...Array.from({ length: ordinaryFences }, (_, index): FenceSegment => ({
-        edge: `test-fence-${index}`, type: 'fence',
-      })),
-      ...Array.from({ length: palisades }, (_, index): FenceSegment => ({
-        edge: `test-palisade-${index}`, type: 'palisade',
-      })),
-    ]
+    preparePoleFarm(owner, ordinaryFences, palisades)
     owner.stableTiles = Array.from({ length: stablesOnBoard }, (_, index) => ({
       row: 2, col: index + 2,
     }))
@@ -93,7 +101,7 @@ describe('E001 Pole Barns parity', () => {
   }
 
   const options = (response: SessionResponse) => response.interaction.stateId === 'wait'
-    ? response.interaction.request.options ?? []
+    ? getChoiceOptions(response) ?? []
     : []
 
   const enterMinor = (session: GameSession) => {
@@ -147,7 +155,7 @@ describe('E001 Pole Barns parity', () => {
       stateId: 'wait', request: { kind: 'farm-select', farm: { farmType: 'stable' } },
     })
     if (response.interaction.stateId !== 'wait') return
-    const stables = response.interaction.request.farm.selectableTiles.slice(0, 3)
+    const stables = expectTileFarmSelection(response, 'stable').selectableTiles.slice(0, 3)
     expect(stables).toHaveLength(3)
 
     response = session.commitSelectionChoice(response.interaction.playerIndex, { stables })
@@ -163,7 +171,7 @@ describe('E001 Pole Barns parity', () => {
     const offered = play(session)
     expect(options(offered).some((option) => option.value === '__skip__')).toBe(true)
 
-    const response = session.resolveChoice(offered.interaction.playerIndex, '__skip__')
+    const response = session.resolveChoice(expectWait(offered).interaction.playerIndex, '__skip__')
 
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources.wood).toBe(0)
@@ -178,8 +186,10 @@ describe('E001 Pole Barns parity', () => {
       stateId: 'wait', request: { kind: 'farm-select', farm: { farmType: 'stable' } },
     })
     if (response.interaction.stateId !== 'wait') return
-    expect(response.interaction.request.farm.maxSelections).toBe(1)
-    const stable = response.interaction.request.farm.selectableTiles[0]!
+    const farm = expectTileFarmSelection(response, 'stable')
+    assert.ok(farm.farmType === 'stable')
+    expect(farm.maxSelections).toBe(1)
+    const stable = farm.selectableTiles[0]!
 
     response = session.commitSelectionChoice(response.interaction.playerIndex, { stables: [stable] })
 
@@ -187,3 +197,100 @@ describe('E001 Pole Barns parity', () => {
     expect(response.state.players[0]!.stableTiles).toHaveLength(4)
   })
 })
+
+describe("E001 command boundaries", () => {
+    const POLE = 'E001_PoleBarns';
+    function save(id: string, value: unknown) {
+        sessionEvidence.record(id, value);
+    }
+    function ok(r: SessionResponse) { assert.equal(r.ok, true, r.error); return r; }
+    function setup(wood: number, configure: (state: GameState) => void = () => { }) {
+        const session = sessionEvidence.track(createWorkSession({ seed: 4242, configure(state) {
+                state.round = 14;
+                for (const p of state.players)
+                    Object.assign(p.resources, { food: 40, wood: 0, clay: 0, reed: 0, stone: 0, grain: 0, vegetable: 0 });
+                state.players[0]!.resources.wood = wood;
+                state.players[0]!.minorHand = [POLE, 'A030_BakingSheet', 'A016_RammedClay'];
+                configure(state);
+            } }));
+        return session;
+    }
+    function enterMinor(session: GameSession) {
+        let r = ok(session.takeAction(0, 'meeting-place'));
+        assert.ok(r.interaction.stateId === 'wait' && expectWait(r).interaction.request.kind === 'choice');
+        const action = getChoiceOptions(r).find(o => o.value.startsWith('action-improvement-'));
+        assert.ok(action, JSON.stringify(r.interaction));
+        r = ok(session.resolveChoice(0, action.value));
+        return r;
+    }
+    function buy(session: GameSession, card: string) {
+        let r = enterMinor(session);
+        if (r.state.players[0]!.minorHand.includes(card)) {
+            assert.ok(r.interaction.stateId === 'wait' && expectWait(r).interaction.request.kind === 'choice', JSON.stringify(r.interaction));
+            const option = getChoiceOptions(r).find(o => o.value === card);
+            assert.ok(option, JSON.stringify(r.interaction));
+            r = ok(session.resolveChoice(0, option.value));
+        }
+        assert(r.state.players[1]!.minorHand.includes(card));
+        return r;
+    }
+    function optional(session: GameSession, r: SessionResponse, accept: boolean) {
+        assert.ok(r.interaction.stateId === 'wait' && expectWait(r).interaction.request.kind === 'choice', JSON.stringify(r.interaction));
+        const option = getChoiceOptions(r).find(o => accept ? o.sourceCard === POLE && o.labelKey === 'actions.stables.name' : o.value === '__skip__');
+        assert.ok(option);
+        return ok(session.resolveChoice(0, option.value));
+    }
+    function pole(state: GameState, count = 15, actor = 0) { preparePoleFarm(state.players[actor]!, count); }
+    it("fifteen own fences and two wood allow up to three free stables and passing", () => {
+        const session = setup(2, state => pole(state));
+        let pending = buy(session, POLE);
+        pending = optional(session, pending, true);
+        assert.ok(pending.interaction.stateId === 'wait' && expectWait(pending).interaction.request.kind === 'farm-select');
+        const r = ok(session.commitSelectionChoice(0, { stables: [{ row: 0, col: 1 }, { row: 0, col: 2 }, { row: 0, col: 3 }] }));
+        assert.equal(r.state.players[0]!.stableTiles.length, 3);
+        assert.equal(r.state.players[0]!.resources.wood, 0);
+        assert.equal(r.state.players[0]!.fenceSegments.length, 15);
+        assert(r.state.players[1]!.minorHand.includes(POLE));
+        save('E001-N1', r);
+    });
+    it("fourteen fences opponent fences and insufficient card wood cannot buy", () => {
+        for (const [count, actor, wood] of [[14, 0, 2], [15, 1, 2], [15, 0, 1]]) {
+            const session = setup(wood!, state => pole(state, count, actor));
+            const r = enterMinor(session);
+            assert.ok(r.interaction.stateId === 'wait' && expectWait(r).interaction.request.kind === 'choice', JSON.stringify(r.interaction));
+            assert(!getChoiceOptions(r).some(o => o.value === POLE && !o.disabled));
+            assertRejectedUnchanged(session, () => session.resolveChoice(0, POLE));
+            const legal = ok(session.resolveChoice(0, 'A030_BakingSheet'));
+            assert.equal(legal.state.players[0]!.resources.wood, wood);
+            assert.equal(legal.state.players[0]!.stableTiles.length, 0);
+            save(`E001-N2-${count}-${actor}-${wood}`, legal);
+        }
+    });
+    it("illegal four targets bad tiles and stock overflow reject before remaining legal stable", () => {
+        const session = setup(2, state => { pole(state); state.players[0]!.stableTiles = [{ row: 2, col: 1 }, { row: 2, col: 2 }, { row: 2, col: 3 }]; });
+        let pending = buy(session, POLE);
+        pending = optional(session, pending, true);
+        for (const stables of [[{ row: 0, col: 1 }, { row: 0, col: 2 }], [{ row: 1, col: 0 }], [{ row: 99, col: 99 }], [{ row: 2, col: 1 }]])
+            assertRejectedUnchanged(session, () => session.commitSelectionChoice(0, { stables }));
+        const r = ok(session.commitSelectionChoice(0, { stables: [{ row: 0, col: 1 }] }));
+        assert.equal(r.state.players[0]!.stableTiles.length, 4);
+        assert.equal(r.state.players[0]!.resources.wood, 0);
+        save('E001-N3', r);
+    });
+    it("decline and whole undo preserve fences and restore stable cost and passing", () => {
+        const session = setup(2, state => pole(state));
+        const pending = buy(session, POLE);
+        const r = optional(session, pending, false);
+        assert.equal(r.state.players[0]!.stableTiles.length, 0);
+        assert.equal(r.state.players[0]!.resources.wood, 0);
+        const undone = ok(session.undoAction());
+        assert.equal(undone.state.players[0]!.resources.wood, 2);
+        assert.equal(undone.state.players[0]!.fenceSegments.length, 15);
+        assert(undone.state.players[0]!.minorHand.includes(POLE));
+        assert(!undone.state.players[1]!.minorHand.includes(POLE));
+        assert.ok(r.interaction.stateId === 'wait');
+        assert.deepEqual(r.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 });
+        assert.equal(r.state.currentPlayerIndex, 0);
+        save('E001-N4', { r, undone });
+    });
+});
