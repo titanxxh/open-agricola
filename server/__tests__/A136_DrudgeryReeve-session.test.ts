@@ -1,3 +1,4 @@
+import { captureStateWithHistory } from '../../shared/session/history-streams'
 import { assertUndoRestored, undoRuleSnapshot } from './_helpers/session-assertions'
 import { setWorkersAtHome, markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -439,7 +440,13 @@ describe("A136 command boundaries", () => {
           r = ok(s.resolveChoice(0, CARD))
         return r
       }
-      const beforeUndo = s.getState()
+      const observedBeforeUndo = s.getState()
+      const beforeUndo = {
+        ...observedBeforeUndo,
+        state: captureStateWithHistory(observedBeforeUndo.state),
+        interaction: structuredClone(observedBeforeUndo.interaction),
+        scores: structuredClone(observedBeforeUndo.scores),
+      }
       const beforeRules = undoRuleSnapshot(beforeUndo)
       const first = play()
       assert.ok(first.interaction.stateId === 'wait')
@@ -447,8 +454,13 @@ describe("A136 command boundaries", () => {
       assert.equal(first.interaction.playerIndex, 0)
       assert.equal(first.state.currentPlayerIndex, 0)
       assert.equal(first.state.players[0]!.resources.wood, wood)
+      assert.ok(first.state.players[0]!.occupationPlayed.includes(CARD))
       const undone = ok(s.undoAction())
       assertUndoRestored(beforeRules, undone)
+      const liveAfterUndo = s.getState()
+      assertUndoRestored(beforeRules, liveAfterUndo)
+      assert.deepEqual(liveAfterUndo.interaction, beforeUndo.interaction)
+      assert.equal(liveAfterUndo.state.currentPlayerIndex, 0)
       assert.deepEqual(undone.interaction, beforeUndo.interaction)
       assert.equal(undone.interaction.stateId, 'idle')
       assert.equal(undone.state.currentPlayerIndex, 0)

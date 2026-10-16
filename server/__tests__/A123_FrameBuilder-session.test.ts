@@ -1,3 +1,4 @@
+import { captureStateWithHistory } from '../../shared/session/history-streams'
 import { assertUndoRestored, undoRuleSnapshot } from './_helpers/session-assertions'
 import type { ActionChoiceOption } from '../../shared/contract/types'
 import { describe, expect, it } from 'vitest'
@@ -297,7 +298,13 @@ describe("A123 command boundaries", () => {
       state.players[0]!.houseType = 'clay'
       Object.assign(state.players[0]!.resources, { wood: 1, clay: 3, reed: 2 })
     })
-    const beforeUndo = s.getState()
+    const observedBeforeUndo = s.getState()
+    const beforeUndo = {
+      ...observedBeforeUndo,
+      state: captureStateWithHistory(observedBeforeUndo.state),
+      interaction: structuredClone(observedBeforeUndo.interaction),
+      scores: structuredClone(observedBeforeUndo.scores),
+    }
     const beforeRules = undoRuleSnapshot(beforeUndo)
     startBuild(s)
     assertRejectedUnchanged(s, () => s.commitSelectionChoice(1, { rooms: [{ row: 1, col: 1 }] }))
@@ -307,8 +314,15 @@ describe("A123 command boundaries", () => {
     assert.deepEqual(first.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
     assert.equal(first.interaction.playerIndex, 0)
     assert.equal(first.state.currentPlayerIndex, 0)
+    assert.equal(first.state.players[0]!.rooms, 3)
+    assert.ok(first.state.players[0]!.roomTiles.some(tile => tile.row === 1 && tile.col === 1))
+    assert.deepEqual({ wood: first.state.players[0]!.resources.wood, clay: first.state.players[0]!.resources.clay, reed: first.state.players[0]!.resources.reed }, { wood: 0, clay: 0, reed: 0 })
     const undone = ok(s.undoAction())
     assertUndoRestored(beforeRules, undone)
+    const liveAfterUndo = s.getState()
+    assertUndoRestored(beforeRules, liveAfterUndo)
+    assert.deepEqual(liveAfterUndo.interaction, beforeUndo.interaction)
+    assert.equal(liveAfterUndo.state.currentPlayerIndex, 0)
     assert.deepEqual(undone.interaction, beforeUndo.interaction)
     assert.equal(undone.interaction.stateId, 'idle')
     assert.equal(undone.state.currentPlayerIndex, 0)

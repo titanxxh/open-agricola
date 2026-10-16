@@ -1,3 +1,4 @@
+import { captureStateWithHistory } from '../../shared/session/history-streams'
 import { assertUndoRestored, undoRuleSnapshot } from './_helpers/session-assertions'
 import { describe, expect, it } from 'vitest'
 import { type GameSession, type SessionResponse } from '../game/authoritative-session'
@@ -313,7 +314,13 @@ describe("A137 command boundaries", () => {
   })
   it("invalid choice rejects and whole undo returns source and animals before retry", () => {
     const s = shepherd(4)
-    const beforeUndo = s.getState()
+    const observedBeforeUndo = s.getState()
+    const beforeUndo = {
+      ...observedBeforeUndo,
+      state: captureStateWithHistory(observedBeforeUndo.state),
+      interaction: structuredClone(observedBeforeUndo.interaction),
+      scores: structuredClone(observedBeforeUndo.scores),
+    }
     const beforeRules = undoRuleSnapshot(beforeUndo)
     const pending = settleAnimals(s, turn(s, 0, 'sheep-market'))
     assert.ok(pending.interaction.stateId === 'wait' && pending.interaction.request.kind === 'choice')
@@ -324,8 +331,15 @@ describe("A137 command boundaries", () => {
     assert.deepEqual(first.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
     assert.equal(first.interaction.playerIndex, 0)
     assert.equal(first.state.currentPlayerIndex, 0)
+    assert.equal(first.state.players[0]!.resources.sheep, 1)
+    assert.equal(first.state.players[0]!.resources.reed, 1)
+    assert.equal(first.state.actionSpaces.find(space => space.id === 'reed-bank')!.resources.reed, 3)
     const undone = ok(s.undoAction())
     assertUndoRestored(beforeRules, undone)
+    const liveAfterUndo = s.getState()
+    assertUndoRestored(beforeRules, liveAfterUndo)
+    assert.deepEqual(liveAfterUndo.interaction, beforeUndo.interaction)
+    assert.equal(liveAfterUndo.state.currentPlayerIndex, 0)
     assert.deepEqual(undone.interaction, beforeUndo.interaction)
     assert.equal(undone.interaction.stateId, 'idle')
     assert.equal(undone.state.currentPlayerIndex, 0)

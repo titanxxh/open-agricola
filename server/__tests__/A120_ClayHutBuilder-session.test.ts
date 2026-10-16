@@ -1,3 +1,4 @@
+import { captureStateWithHistory } from '../../shared/session/history-streams'
 import { assertUndoRestored, undoRuleSnapshot } from './_helpers/session-assertions'
 import { describe, expect, it } from 'vitest'
 import { type GameSession, type SessionResponse } from '../game/authoritative-session'
@@ -307,13 +308,17 @@ describe("A120 command boundaries", () => {
     }
   })
   it("hand opponent and rejected renovation cannot leave owner schedule and undo resets flag", () => {
-    const hand = renovation(setup(undefined, false, 14))
+    const hand = renovation(setup(undefined, false, 5))
     assert.ok(hand.interaction.stateId === 'wait')
     assert.deepEqual(hand.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
     assert.equal(hand.interaction.playerIndex, 0)
     assert.equal(hand.state.currentPlayerIndex, 0)
     assert.deepEqual(schedule(hand), [])
-    const otherS = setup(undefined, true, 14)
+    assert.equal(hand.state.players[0]!.houseType, 'clay')
+    assert.equal(hand.state.players[0]!.resources.clay, 8)
+    assert.equal(hand.state.players[0]!.resources.reed, 3)
+    assert.equal(isCardFlagged(hand.state.players[0]!, CLAY), false)
+    const otherS = setup(undefined, true, 5)
     turn(otherS, 0, 'grain-seeds')
     const other = renovation(otherS, 1)
     assert.ok(other.interaction.stateId === 'wait')
@@ -321,24 +326,48 @@ describe("A120 command boundaries", () => {
     assert.equal(other.interaction.playerIndex, 1)
     assert.equal(other.state.currentPlayerIndex, 1)
     assert.deepEqual(schedule(other), [])
+    assert.equal(other.state.players[1]!.houseType, 'clay')
+    assert.equal(other.state.players[1]!.resources.clay, 8)
+    assert.equal(other.state.players[1]!.resources.reed, 3)
+    assert.equal(other.state.players[0]!.houseType, 'wood')
+    assert.equal(other.state.players[0]!.resources.clay, 10)
+    assert.equal(other.state.players[0]!.resources.reed, 4)
+    assert.equal(isCardFlagged(other.state.players[0]!, CLAY), false)
+    assert.equal(isCardFlagged(other.state.players[1]!, CLAY), false)
     const poor = setup(state => state.players[0]!.resources.reed = 0)
     assertRejectedUnchanged(poor, () => poor.takeAction(0, 'house-redevelopment'))
     assert.deepEqual(schedule(poor.getState()), [])
     const s = setup()
-    const beforeUndo = s.getState()
+    const observedBeforeUndo = s.getState()
+    const beforeUndo = {
+      ...observedBeforeUndo,
+      state: captureStateWithHistory(observedBeforeUndo.state),
+      interaction: structuredClone(observedBeforeUndo.interaction),
+      scores: structuredClone(observedBeforeUndo.scores),
+    }
     const beforeRules = undoRuleSnapshot(beforeUndo)
     const first = renovation(s)
     assert.ok(first.interaction.stateId === 'wait')
     assert.deepEqual(first.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
     assert.equal(first.interaction.playerIndex, 0)
     assert.equal(first.state.currentPlayerIndex, 0)
+    assert.equal(first.state.players[0]!.houseType, 'clay')
+    assert.equal(first.state.players[0]!.resources.clay, 8)
+    assert.equal(first.state.players[0]!.resources.reed, 3)
+    assert.equal(isCardFlagged(first.state.players[0]!, CLAY), true)
+    assert.deepEqual(schedule(first), [[6, 2, 'p1'], [7, 2, 'p1'], [8, 2, 'p1'], [9, 2, 'p1'], [10, 2, 'p1']])
     const undone = ok(s.undoAction())
     assertUndoRestored(beforeRules, undone)
+    const liveAfterUndo = s.getState()
+    assertUndoRestored(beforeRules, liveAfterUndo)
+    assert.deepEqual(liveAfterUndo.interaction, beforeUndo.interaction)
+    assert.equal(liveAfterUndo.state.currentPlayerIndex, 0)
     assert.deepEqual(undone.interaction, beforeUndo.interaction)
     assert.equal(undone.interaction.stateId, 'idle')
     assert.equal(undone.state.currentPlayerIndex, 0)
     assert.deepEqual(schedule(undone), [])
     assert.equal(undone.state.players[0]!.houseType, 'wood')
+    assert.equal(isCardFlagged(undone.state.players[0]!, CLAY), false)
     const retry = renovation(s)
     assert.ok(retry.interaction.stateId === 'wait')
     assert.deepEqual(retry.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })

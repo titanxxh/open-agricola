@@ -1319,15 +1319,44 @@ describe("A118 command boundaries", () => {
     }
   })
   it("zero food allows only free wood and one food cannot buy two", () => {
+    const richS = setup([], state => state.players[0]!.resources.food = 2)
+    const richPending = end(richS)
+    assert.ok(richPending.interaction.stateId === 'wait' && richPending.interaction.request.kind === 'choice')
+    assert.equal(richPending.interaction.sourceCard, TREE)
+    assert.equal(richPending.interaction.playerIndex, 0)
+    assert.equal(richPending.state.currentPlayerIndex, 0)
+    const twoWood = getChoiceOptions(richPending).find(option => !option.disabled && option.effectPreview?.kind === 'resourceExchange' && option.effectPreview.resourcesPaid?.food === 2)
+    assert.ok(twoWood)
+    assert.deepEqual(twoWood.effectPreview, { kind: 'resourceExchange', resourcesPaid: { food: 2 }, resourcesGained: { wood: 2 } })
+    const rich = harvest(richS, richPending, 2)
+    assert.equal(rich.state.players[0]!.resources.wood, 6)
+    assert.equal(rich.state.players[0]!.resources.food, 0)
+    assert.equal(rich.state.players[0]!.resources.begging, 4)
     for (const available of [0, 1]) {
       const s = setup([], state => state.players[0]!.resources.food = available)
-      const r = harvest(s, end(s), available, available > 0)
+      const pending = end(s)
+      if (available === 1) {
+        assert.ok(pending.interaction.stateId === 'wait' && pending.interaction.request.kind === 'choice')
+        assert.equal(pending.interaction.sourceCard, TREE)
+        assert.equal(pending.interaction.playerIndex, 0)
+        assert.equal(pending.state.currentPlayerIndex, 0)
+        assert.deepEqual(getChoiceOptions(pending).map(option => ({
+          preview: option.effectPreview ?? null,
+          disabled: option.disabled === true,
+          skip: option.value === '__skip__',
+        })), [
+          { preview: { kind: 'resourceExchange', resourcesPaid: { food: 1 }, resourcesGained: { wood: 1 } }, disabled: false, skip: false },
+          { preview: null, disabled: false, skip: true },
+        ])
+        assertRejectedUnchanged(s, () => s.resolveChoice(0, twoWood.value))
+      }
+      const r = harvest(s, pending, available, available > 0)
       assert.equal(r.state.players[0]!.resources.wood, 4 + available)
       assert.equal(r.state.players[0]!.resources.food, 0)
       assert.equal(r.state.players[0]!.resources.begging, 4)
       assert.equal(r.interaction.stateId, 'idle')
       assert.equal(r.state.currentPlayerIndex, 0)
-      sessionEvidence.record(`A118-N2-${available}`, r)
+      sessionEvidence.record(`A118-N2-${available}`, { richPending, rich, pending, r })
     }
   })
   it("nonharvest unplayed and opponent field phase cannot give owner wood", () => {
@@ -1474,7 +1503,13 @@ describe("A119 command boundaries", () => {
   })
   it("whole Farmland undo removes field and wood then one retry", () => {
     const s = setup()
-    const beforeUndo = s.getState()
+    const observedBeforeUndo = s.getState()
+    const beforeUndo = {
+      ...observedBeforeUndo,
+      state: captureStateWithHistory(observedBeforeUndo.state),
+      interaction: structuredClone(observedBeforeUndo.interaction),
+      scores: structuredClone(observedBeforeUndo.scores),
+    }
     const beforeRules = undoRuleSnapshot(beforeUndo)
     turn(s, 0, 'farmland')
     const first = ok(s.commitSelectionChoice(0, { tile: { row: 0, col: 1 } }))
@@ -1482,8 +1517,14 @@ describe("A119 command boundaries", () => {
     assert.deepEqual(first.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
     assert.equal(first.interaction.playerIndex, 0)
     assert.equal(first.state.currentPlayerIndex, 0)
+    assert.equal(first.state.players[0]!.resources.wood, 1)
+    assert.deepEqual(first.state.players[0]!.fields, [{ row: 0, col: 1, stacks: [] }])
     const undone = ok(s.undoAction())
     assertUndoRestored(beforeRules, undone)
+    const liveAfterUndo = s.getState()
+    assertUndoRestored(beforeRules, liveAfterUndo)
+    assert.deepEqual(liveAfterUndo.interaction, beforeUndo.interaction)
+    assert.equal(liveAfterUndo.state.currentPlayerIndex, 0)
     assert.deepEqual(undone.interaction, beforeUndo.interaction)
     assert.equal(undone.interaction.stateId, 'idle')
     assert.equal(undone.state.currentPlayerIndex, 0)

@@ -1,3 +1,4 @@
+import { captureStateWithHistory } from '../../shared/session/history-streams'
 import { assertUndoRestored, undoRuleSnapshot } from './_helpers/session-assertions'
 import { describe, expect, it } from 'vitest'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
@@ -195,7 +196,13 @@ describe("A131 command boundaries", () => {
   })
   it("invalid occupation wrong actor and whole action undo restore workshop and free plays", () => {
     const s = setup(state => state.players[0]!.resources.food = 0)
-    const beforeUndo = s.getState()
+    const observedBeforeUndo = s.getState()
+    const beforeUndo = {
+      ...observedBeforeUndo,
+      state: captureStateWithHistory(observedBeforeUndo.state),
+      interaction: structuredClone(observedBeforeUndo.interaction),
+      scores: structuredClone(observedBeforeUndo.scores),
+    }
     const beforeRules = undoRuleSnapshot(beforeUndo)
     let pending = buyMajor(s, 'Major_Joinery')
     assert.ok(pending.interaction.stateId === 'wait' && pending.interaction.request.kind === 'choice')
@@ -214,8 +221,15 @@ describe("A131 command boundaries", () => {
     assert.deepEqual(first.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
     assert.equal(first.interaction.playerIndex, 0)
     assert.equal(first.state.currentPlayerIndex, 0)
+    assert.deepEqual([...first.state.players[0]!.occupationPlayed].sort(), [CRAFT, 'A110_Roughcaster', 'A114_SeasonalWorker'].sort())
+    assert.ok(first.state.players[0]!.improvements.includes('Major_Joinery'))
+    assert.equal(first.state.players[0]!.resources.food, 0)
     const undone = ok(s.undoAction())
     assertUndoRestored(beforeRules, undone)
+    const liveAfterUndo = s.getState()
+    assertUndoRestored(beforeRules, liveAfterUndo)
+    assert.deepEqual(liveAfterUndo.interaction, beforeUndo.interaction)
+    assert.equal(liveAfterUndo.state.currentPlayerIndex, 0)
     assert.deepEqual(undone.interaction, beforeUndo.interaction)
     assert.equal(undone.interaction.stateId, 'idle')
     assert.equal(undone.state.currentPlayerIndex, 0)

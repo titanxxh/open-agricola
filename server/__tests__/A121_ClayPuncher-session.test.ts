@@ -1,3 +1,4 @@
+import { captureStateWithHistory } from '../../shared/session/history-streams'
 import { assertUndoRestored, undoRuleSnapshot } from './_helpers/session-assertions'
 import { describe, expect, it } from 'vitest'
 import { type GameSession, type SessionResponse } from '../game/authoritative-session'
@@ -236,7 +237,13 @@ describe("A121 command boundaries", () => {
     assert.equal(legalOtherSpace.state.currentPlayerIndex, 1)
     assert.equal(legalOtherSpace.state.players[1]!.resources.grain, 1)
     const s = setup()
-    const beforeUndo = s.getState()
+    const observedBeforeUndo = s.getState()
+    const beforeUndo = {
+      ...observedBeforeUndo,
+      state: captureStateWithHistory(observedBeforeUndo.state),
+      interaction: structuredClone(observedBeforeUndo.interaction),
+      scores: structuredClone(observedBeforeUndo.scores),
+    }
     const beforeRules = undoRuleSnapshot(beforeUndo)
     assertRejectedUnchanged(s, () => s.takeAction(1, 'clay-pit'))
     const first = turn(s, 0, 'clay-pit')
@@ -245,8 +252,14 @@ describe("A121 command boundaries", () => {
     assert.equal(first.interaction.playerIndex, 0)
     assert.equal(first.state.currentPlayerIndex, 0)
     assertRejectedUnchanged(s, () => s.takeAction(0, 'clay-pit'))
+    assert.equal(first.state.players[0]!.resources.clay, 2)
+    assert.equal(first.state.actionSpaces.find(space => space.id === 'clay-pit')!.resources.clay, 0)
     const undone = ok(s.undoAction())
     assertUndoRestored(beforeRules, undone)
+    const liveAfterUndo = s.getState()
+    assertUndoRestored(beforeRules, liveAfterUndo)
+    assert.deepEqual(liveAfterUndo.interaction, beforeUndo.interaction)
+    assert.equal(liveAfterUndo.state.currentPlayerIndex, 0)
     assert.deepEqual(undone.interaction, beforeUndo.interaction)
     assert.equal(undone.interaction.stateId, 'idle')
     assert.equal(undone.state.currentPlayerIndex, 0)
