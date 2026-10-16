@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { createWorkSession } from './_helpers/session-fixtures'
-import { serializeSessionSnapshot, rehydrateState } from '../../shared/session/serialization'
+import { serializeSessionSnapshot, serializeState, rehydrateState } from '../../shared/session/serialization'
 import { getUsedFarmyardTileKeys } from '../../shared/domain/farmyard-usage'
 import { readCardResourceStats } from '../../shared/cards/helpers/card-state'
 import type { GameState } from '../../shared/contract/types'
@@ -65,10 +65,83 @@ function skipExchange(session: GameSession, response: SessionResponse) {
   if (options(response).some(option => option.value === '__skip__')) response = choose(session, response, '__skip__')
   return response
 }
+function exchangeWindow(session: GameSession, response: SessionResponse) {
+  for (let count = 0; count < 4 && options(response).some(option => option.value === CARD); count++) response = choose(session, response, CARD)
+  expect(options(response).some(option => option.value === '__skip__'), JSON.stringify(response.interaction)).toBe(true)
+  return response
+}
+function accept(session: GameSession, response: SessionResponse) {
+  const option = options(response).find(option => !option.disabled && !option.value.startsWith('__'))
+  if (!option) throw new Error(`Expected an enabled offer: ${JSON.stringify(response.interaction)}`)
+  return choose(session, response, option.value)
+}
 
 // Approved seams: actual paid card play, authoritative farm mutations, committed
 // events, source-owned goods, persisted pending, undo, and public presentation.
 describe('A040 original clay positions', () => {
+  it.each(['stone', 'wood'] as const)('claims a scheduled room at the real round start only for %s house', houseType => {
+    const session = setup(state => {
+      state.round = 11
+      const player = state.players[0]!
+      player.houseType = houseType
+      player.minorPlayed = ['B014_Hawktower']
+      state.players[1]!.resources.food = 50
+      state.futureMeeples.push({ id: 'hawktower-12', cardId: 'B014_Hawktower', playerId: player.id,
+        round: 12, actionId: null, resources: {}, roomType: 'stone' })
+    }, false)
+    let response = nextTurn(session, play(session))
+    response = session.takeAction(0, 'forest')
+    expect(response.ok, response.error).toBe(true)
+    response = choose(session, response, 'confirm')
+    response = session.takeAction(1, 'clay-pit')
+    expect(response.ok, response.error).toBe(true)
+    response = choose(session, response, 'confirm')
+    for (let step = 0; step < 20 && response.interaction.stateId === 'wait'; step++) {
+      const request = response.interaction.request
+      if (request.kind === 'feed') response = session.resolveChoice(response.interaction.playerIndex, 'confirm', { selections: [] })
+      else if (options(response).some(option => option.value === CARD)) response = choose(session, response, CARD)
+      else if (options(response).some(option => option.value === '__skip__')) response = choose(session, response, '__skip__')
+      else throw new Error(`Unexpected round interaction: ${JSON.stringify(response.interaction)}`)
+      expect(response.ok, response.error).toBe(true)
+    }
+    expect(response.state.round).toBe(12)
+    expect(response.state.roundPhase).toBe('work')
+    expect(response.state.players[0]!.rooms).toBe(houseType === 'stone' ? 3 : 2)
+    expect(response.state.players[0]!.resources.clay).toBe(houseType === 'stone' ? 1 : 0)
+    expect(keys(response.state)).toHaveLength(houseType === 'stone' ? 6 : 7)
+    expect(response.state.events.filter(event => event.type === 'farm.roomBuilt')).toHaveLength(houseType === 'stone' ? 1 : 0)
+  })
+
+  it.each([true, false])('claims the original clay exactly once with exchange=%s, restoration and undo', exchange => {
+    let session = setup()
+    let response = nextTurn(session, play(session))
+    response = session.takeAction(0, 'farmland')
+    expect(response.ok, response.error).toBe(true)
+    session = restore(session)
+    response = session.commitSelectionChoice(0, { tile: { row: 0, col: 3 } })
+    response = exchangeWindow(session, response)
+    expect(response.state.players[0]!.resources.clay).toBe(1)
+    expect(keys(response.state)).toEqual(['0-4', '1-4', '2-3', '2-4'])
+    expect(readCardResourceStats(response.state.players[0]!, CARD)?.gained).toEqual({ clay: 1 })
+    expect(response.state.players[0]!.stats?.resourcesFromCards.clay).toBe(1)
+    expect(serializeState(response.state, {}).players[0]!.cardStatePresentation[CARD]?.resourceGroups).toEqual([{ clay: 4 }])
+    session = restore(session)
+    response = exchange ? accept(session, session.getState()) : choose(session, session.getState(), '__skip__')
+    expect(response.state.players[0]!.resources).toMatchObject({ clay: exchange ? 0 : 1, food: exchange ? 22 : 20 })
+    expect(readCardResourceStats(response.state.players[0]!, CARD)?.gained).toEqual(exchange ? { clay: 1, food: 2 } : { clay: 1 })
+    expect(response.state.events.filter(event => event.type === 'resource.moved' && event.sourceCardId === CARD && event.to.kind === 'player' && event.resources.clay === 1)).toHaveLength(1)
+    response = session.undoAction()
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources.clay).toBe(0)
+    expect(keys(response.state)).toEqual(original)
+    session.takeAction(0, 'farmland')
+    response = session.commitSelectionChoice(0, { tile: { row: 0, col: 3 } })
+    response = exchangeWindow(session, response)
+    expect(response.state.players[0]!.resources.clay).toBe(1)
+    expect(keys(response.state)).toHaveLength(4)
+    skipExchange(session, response)
+  })
+
   it('places clay on exactly five unused spaces in the real Moor starting farm', () => {
     const session = setup()
     const response = play(session)

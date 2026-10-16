@@ -37,11 +37,24 @@ registerAdHocAction({
   },
 })
 
-const collect: CardListenerRegistration = {
-  id: 'A40-potters-yard-collect',
+const after: CardListenerRegistration = {
+  id: 'A40-potters-yard-after',
   cardIds: [CARD_ID],
   phases: ['after'],
   handler: context => {
+    if (context.sourceCard === CARD_ID && context.params?.kind === 'claim-farmyard-goods-tokens') {
+      const clay = sumResourceMovedToPlayer(context.actionEvents?.filter(event => 'schemaVersion' in event), 'clay', context.player.id,
+        event => event.sourceCardId === CARD_ID && event.from.kind === 'card' && event.from.cardId === CARD_ID)
+      if (clay <= 0) return
+      const children: ActionFlow[] = []
+      for (let count = clay; count > 0; count--) {
+        children.push({ type: 'seq', children: [
+          payLeaf({ cardId: CARD_ID, cost: { clay: count } }),
+          gainLeaf(CARD_ID, { food: 2 * count }),
+        ] })
+      }
+      return { sourceCard: CARD_ID, flow: { type: 'xor', optional: true, children } }
+    }
     if (!context.triggerSnapshot?.players[context.player.id]?.played.includes(CARD_ID)) return
     const positions = getActionNewlyUsedTiles(context)
     if (!hasClaimableFarmyardGoodsTokens(context.player, CARD_ID, positions)) return
@@ -53,29 +66,8 @@ const collect: CardListenerRegistration = {
   },
 }
 
-const exchange: CardListenerRegistration = {
-  id: 'A40-potters-yard-exchange',
-  cardIds: [CARD_ID],
-  actions: ['special-effect'],
-  phases: ['after'],
-  handler: context => {
-    if (context.sourceCard !== CARD_ID || context.params?.kind !== 'claim-farmyard-goods-tokens') return
-    const clay = sumResourceMovedToPlayer(context.actionEvents?.filter(event => 'schemaVersion' in event), 'clay', context.player.id,
-      event => event.sourceCardId === CARD_ID && event.from.kind === 'card' && event.from.cardId === CARD_ID)
-    if (clay <= 0) return
-    const children: ActionFlow[] = []
-    for (let count = clay; count > 0; count--) {
-      children.push({ type: 'seq', children: [
-        payLeaf({ cardId: CARD_ID, cost: { clay: count } }),
-        gainLeaf(CARD_ID, { food: 2 * count }),
-      ] })
-    }
-    return { sourceCard: CARD_ID, flow: { type: 'xor', optional: true, children } }
-  },
-}
-
 const cardImpl = {
-  listeners: [collect, exchange],
+  listeners: [after],
   effect: {
     id: CARD_ID,
     onBuy: () => ({ type: 'leaf', actionId: PLACE_CLAY, sourceCard: CARD_ID }),
