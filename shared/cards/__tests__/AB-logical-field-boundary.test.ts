@@ -3,6 +3,8 @@ import { GameSession } from '../../../server/game/authoritative-session'
 import { getAdHocAction } from '../../actions/helpers/ad-hoc-action-registry'
 import { runSelectionEffect } from '../../actions/helpers/selection-effect-registry'
 import type { PlayerState } from '../../contract/types'
+import type { DraftGameEvent } from '../../contract/events'
+import { getCardEffect } from '../card-effects'
 import { readCardExtraData } from '../helpers/card-state'
 import { A007_GardenersKnife_impl } from '../A/A007_GardenersKnife'
 import { A011_MudPatch_impl } from '../A/A011_MudPatch'
@@ -163,7 +165,6 @@ describe('A/B Farmyard Field consumers', () => {
 
     const zones: never[] = []
     A011_MudPatch_impl.effect.onComputeAnimalZones!(player, zones, state)
-    A040_PottersYard_impl.effect.onBuy!(state, player)
     const plowListener = A144_Sequestrator_impl.listeners!.find((listener) => listener.id.includes('after-plow'))!
     const lieutenant = B159_LieutenantGeneral_impl.listeners![0]!
 
@@ -171,10 +172,35 @@ describe('A/B Farmyard Field consumers', () => {
     expect(A072_CalciumFertilizers_impl.prerequisiteCheck!(player)).toBe(true)
     expect(A085_Homekeeper_impl.effect.computeExtraRoomCapacity!(player)).toBe(0)
     expect(getFarmHandCandidates(player)).toEqual([])
-    expect(readCardExtraData<number>(player, 'A040_PottersYard', 'clayRemaining')).toBe(13)
     expect(plowListener.handler!({ state, player, actionId: 'plow', phase: 'after' } as never)).toBeUndefined()
     expect(lieutenant.handler!({ state, player, triggerPlayer: player, actionId: 'plow', phase: 'after' } as never)).toBeUndefined()
     expect(A031_DebtSecurity_impl.effect.computeBonusScore!(state, player)).toBe(0)
     expect(B031_PotteryYard_impl.effect.computeBonusScore!(state, player)).toBe(2)
+  })
+
+  it('places A040 clay on seven unused Farmyard spaces without counting a Card Field as geometry', () => {
+    const { state, player } = setup()
+    setCardField(player, 'B113_PatchCaregiver', [null], 'occupation')
+    player.fields = [0, 1, 2].flatMap(row => [3, 4].map(col => ({ row, col, stacks: [] })))
+    player.minorPlayed.push('A040_PottersYard')
+    expect(A040_PottersYard_impl.prerequisiteCheck!(player)).toBe(true)
+    const flow = getCardEffect('A040_PottersYard')!.onBuy!(state, player)
+    if (!flow || flow.type !== 'leaf') throw new Error('Expected A040 placement action')
+    const action = getAdHocAction(flow.actionId)
+    if (!action) throw new Error(`Missing placement action ${flow.actionId}`)
+    const events: DraftGameEvent[] = []
+
+    expect(action.execute({
+      state, player, space: state.actionSpaces[0]!, params: flow.params, sourceCard: flow.sourceCard,
+      eventSink: { emit: event => events.push(event), emitMany: emitted => events.push(...emitted) },
+    }).type).toBe('ok')
+
+    expect(player.farmyardSpaceStates).toEqual(['0-0', '0-1', '0-2', '1-1', '1-2', '2-1', '2-2'].map(spaceKey => ({
+      spaceKey, sourceCardId: 'A040_PottersYard', kind: 'farmyard-goods-token',
+      resources: { clay: 1 }, claimPolicy: 'when-no-longer-unused',
+    })))
+    expect(player.resources.clay).toBe(0)
+    expect(player.cardStates.B113_PatchCaregiver?.extraData?.cardFieldStacks).toEqual([null])
+    expect(events.filter(event => event.type === 'resource.moved')).toHaveLength(7)
   })
 })
