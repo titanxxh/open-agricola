@@ -1,4 +1,4 @@
-import type { ActionHookResult } from '../../hooks'
+import type { ActionHookRegistry, ActionHookResult } from '../../hooks'
 import type { ActionFlow, ActionSpace, GameState, PlayerState } from '../../../contract/types'
 import type { EventSink } from '../../../contract/events'
 import { specialEffectAction } from '../special-effect'
@@ -8,6 +8,7 @@ import { noopEventSink } from '../../../events/noop'
 type ImmediateSpecialEffectInput = ActionHookResult | ActionFlow | undefined | void
 
 type ExecuteImmediateSpecialEffectFlowsArgs = {
+  actionHooks: ActionHookRegistry
   state: GameState
   player: PlayerState
   space: ActionSpace
@@ -25,6 +26,7 @@ const flowFromInput = (input: ImmediateSpecialEffectInput): ActionFlow | undefin
 }
 
 const executeFlow = (
+  actionHooks: ActionHookRegistry,
   state: GameState,
   player: PlayerState,
   space: ActionSpace,
@@ -37,6 +39,7 @@ const executeFlow = (
     const action = flow.actionId === 'special-effect' ? specialEffectAction : flow.actionId === 'gain' ? gainAction : undefined
     if (!action) return
     action.execute({
+      actionHooks,
       state,
       player,
       space,
@@ -49,11 +52,12 @@ const executeFlow = (
   }
 
   if (flow.type === 'seq' || flow.type === 'parallel') {
-    flow.children.forEach((child) => executeFlow(state, player, space, eventSink, child))
+    flow.children.forEach((child) => executeFlow(actionHooks, state, player, space, eventSink, child))
   }
 }
 
 export const executeImmediateSpecialEffectFlows = ({
+  actionHooks,
   state,
   player,
   space,
@@ -63,6 +67,6 @@ export const executeImmediateSpecialEffectFlows = ({
   if (!results) return
   const inputs = Array.isArray(results) ? results : [results]
   inputs.forEach((input) => {
-    executeFlow(state, player, space, eventSink, flowFromInput(input))
+    executeFlow(actionHooks, state, player, space, eventSink, flowFromInput(input))
   })
 }

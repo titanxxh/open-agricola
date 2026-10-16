@@ -4351,7 +4351,7 @@ export class GameCore {
       actorPlayerId: player.id,
       sourceActionId: 'harvest-feed-conversion',
     })
-    executeImmediateSpecialEffectFlows({ state: this.state,
+    executeImmediateSpecialEffectFlows({ actionHooks: this.actionHooks, state: this.state,
       player,
       space,
       eventSink: frame.sink,

@@ -253,14 +253,15 @@ describe('Moor Batch 1 scoring, cookery, and exchange minors', () => {
       )
     expect(cattleTradeIndex).toBeGreaterThanOrEqual(0)
 
-    const result = anytimeExchangeAction.resolveChoice!(
+    const result = session.withCtx(() => anytimeExchangeAction.resolveChoice!(
       {
+        actionHooks: session.actionHooks,
         state: session.state,
         player,
         space: { id: 'exchange' } as ActionSpace,
       } as ActionMutationContext,
       `trade:${cattleTradeIndex}:2`,
-    )
+    ))
 
     expect(result.type).toBe('ok')
     expect(bonusVp(session.state)).toBe(2)
