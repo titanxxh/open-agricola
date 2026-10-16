@@ -637,7 +637,7 @@ export const cloneState = (state: GameState): GameState => {
   } else {
     raw = JSON.parse(JSON.stringify(state)) as GameState
   }
-  return normalizeState(raw)
+  return normalizeState(raw, id => state.actionSpaces.find(space => space.id === id))
 }
 
 /** Snake Opening is a multiplayer variant: a single seat has nothing to reverse and keeps the standard 2 food. */
