@@ -4,6 +4,7 @@ import { addCardResourceGained } from '../../cards/helpers/card-state'
 import { addResourcesFromCards } from '../../session/stats'
 import { extendedResourceKeyList } from '../../contract/state-constants'
 import { tryAddRoomTile } from '../../domain/farmyard'
+import { getUsedFarmyardTileKeys, getNewlyUsedFarmyardTiles } from '../../domain/farmyard-usage'
 
 type FutureReceiveEntry = {
   cardId: string
@@ -78,7 +79,18 @@ export const receiveAction: ActionDefinition = {
     const scheduledEntries = scheduled.map(entry => {
       const conditionMet = canReceiveScheduledEntry(player, entry.actionContext?.resourceCondition)
       const resources = conditionMet ? positiveResources(entry.resources) : {}
-      if (entry.roomType && player.houseType === entry.roomType) tryAddRoomTile(player, entry.roomType)
+      if (entry.roomType && player.houseType === entry.roomType) {
+        const roomType = entry.roomType
+        const usedBefore = getUsedFarmyardTileKeys(player)
+        const roomCount = player.roomTiles.length
+        if (tryAddRoomTile(player, entry.roomType)) {
+          eventSink?.emit<'farm.roomBuilt'>({
+            type: 'farm.roomBuilt', sourceCardId: entry.cardId, targetPlayerId: player.id,
+            rooms: player.roomTiles.slice(roomCount).map(tile => ({ playerId: player.id, ...tile, type: roomType })),
+            newlyUsedTiles: getNewlyUsedFarmyardTiles(player, usedBefore),
+          })
+        }
+      }
       eventSink?.emit<'futureMeeple.resolved'>({
         type: 'futureMeeple.resolved', playerId: player.id, cardId: entry.cardId,
         sourceCardId: entry.cardId,
