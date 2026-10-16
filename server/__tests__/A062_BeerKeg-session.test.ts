@@ -297,25 +297,30 @@ describe('A062 command boundaries', () => {
       assertRejectedUnchanged(s, () => s.resolveChoice(0, issued.value))
     })
   it('unaffordable and invalid exchange reject before one grain retry', () => {
+    // Capture real issued choices at an affordable feeding prompt before replaying them below.
+    const affordable = setup({ resources: { grain: 3, food: 1 } })
+    const richOffer = beerOffer(endWork(affordable))
+    const issued = getChoiceOptions(richOffer).filter(option => !option.disabled
+      && [2, 3].includes(amountPaid(richOffer, option.value, 'grain') ?? 0))
+    assert.deepEqual(issued.map(option => amountPaid(richOffer, option.value, 'grain')), [2, 3])
+    save('A062-N5-affordable-issued', richOffer)
     const s = setup({ resources: { grain: 1, food: 1 } })
     const r = endWork(s)
     save('A062-N5-offer', r)
-    assert.ok(
-      r.interaction.stateId === 'wait' &&
-        r.interaction.request.kind === 'choice',
-    )
-    const enabled = getChoiceOptions(r)
-      .filter(
-        (o) => !o.disabled && amountPaid(r, o.value, 'grain') !== undefined,
-      )
-      .map((o) => amountPaid(r, o.value, 'grain'))
-    assert.deepEqual(enabled, [1])
-    for (const o of getChoiceOptions(r).filter(
-      (o) =>
-        amountPaid(r, o.value, 'grain') === 2 ||
-        amountPaid(r, o.value, 'grain') === 3,
-    ))
-      assertRejectedUnchanged(s, () => s.resolveChoice(0, o.value))
+    const choices = getChoiceOptions(beerOffer(r))
+    assert.equal(choices.length, 2)
+    assert.ok(choices.every(option => !option.disabled))
+    assert.deepEqual(choices.map(option => {
+      if (option.value === '__skip__') {
+        assert.equal(option.effectPreview, undefined)
+        return { kind: 'skip' }
+      }
+      const preview = option.effectPreview
+      assert.ok(preview?.kind === 'resourceExchange')
+      return { kind: 'exchange', paid: preview.resourcesPaid, gained: preview.resourcesGained, bonus: preview.bonusVp ?? 0 }
+    }), [{ kind: 'exchange', paid: { grain: 1 }, gained: { food: 3 }, bonus: 0 }, { kind: 'skip' }])
+    for (const option of issued)
+      assertRejectedUnchanged(s, () => s.resolveChoice(0, option.value))
     assertRejectedUnchanged(s, () => s.resolveChoice(0, '999'))
     const done = roundStarted(beer(s, r, 1), 5)
     resource(done, 'food', 0)

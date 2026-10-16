@@ -297,6 +297,17 @@ describe('A064 command boundaries', () => {
       r.interaction.stateId === 'wait' &&
         r.interaction.request.kind === 'choice',
     )
+    assert.equal(r.interaction.sourceCard, CARD_ID)
+    assert.equal(r.interaction.promptKey, 'prompt.selectPayment')
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
+    const payments = getChoiceOptions(r).filter(option => !option.disabled).map(option => {
+      const preview = option.effectPreview
+      assert.ok(preview?.kind === 'payment')
+      assert.ok(preview.resourcesPaid)
+      return Object.fromEntries(Object.entries(preview.resourcesPaid).filter(([, amount]) => amount !== 0))
+    }).sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right)))
+    assert.deepEqual(payments, [{ wood: 1, clay: 4 }, { wood: 1, stone: 2 }])
     save('A064-N2-payment', r)
     assertRejectedUnchanged(s, () => s.resolveChoice(0, '999'))
     r = confirmed(choose(s, r, (o) => {
