@@ -7,12 +7,15 @@
 const FENCE_RE = /```(?:typescript|ts)\s*\n([\s\S]*?)```/gi
 
 export class ExtractError extends Error {
+  readonly response: string
+
   constructor(
     message: string,
-    public readonly response: string,
+    response: string,
   ) {
     super(message)
     this.name = 'ExtractError'
+    this.response = response
   }
 }
 
