@@ -1,3 +1,4 @@
+import { captureStateWithHistory } from '../../shared/session/history-streams'
 import { assertUndoRestored, undoRuleSnapshot } from './_helpers/session-assertions'
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
@@ -325,7 +326,13 @@ describe("A134 command boundaries", () => {
   }
   it("real Lessons purchase grants exactly one wood one clay and undo restores both", () => {
     const s = setup(undefined, false)
-    const beforeUndo = s.getState()
+    const observedBeforeUndo = s.getState()
+    const beforeUndo = {
+      ...observedBeforeUndo,
+      state: captureStateWithHistory(observedBeforeUndo.state),
+      interaction: structuredClone(observedBeforeUndo.interaction),
+      scores: structuredClone(observedBeforeUndo.scores),
+    }
     const beforeRules = undoRuleSnapshot(beforeUndo)
     const first = play(s, FULL)
     assert.ok(first.interaction.stateId === 'wait')
@@ -336,6 +343,10 @@ describe("A134 command boundaries", () => {
     assert.equal(first.state.players[0]!.resources.clay, 1)
     const undone = ok(s.undoAction())
     assertUndoRestored(beforeRules, undone)
+    const liveAfterUndo = s.getState()
+    assertUndoRestored(beforeRules, liveAfterUndo)
+    assert.deepEqual(liveAfterUndo.interaction, beforeUndo.interaction)
+    assert.equal(liveAfterUndo.state.currentPlayerIndex, 0)
     assert.deepEqual(undone.interaction, beforeUndo.interaction)
     assert.equal(undone.interaction.stateId, 'idle')
     assert.equal(undone.state.currentPlayerIndex, 0)
@@ -594,7 +605,13 @@ describe("A140 command boundaries", () => {
     assert.equal(legalOtherSpace.state.currentPlayerIndex, 1)
     assert.equal(legalOtherSpace.state.players[1]!.resources.grain, 1)
     const s = shovel(2, 4)
-    const beforeUndo = s.getState()
+    const observedBeforeUndo = s.getState()
+    const beforeUndo = {
+      ...observedBeforeUndo,
+      state: captureStateWithHistory(observedBeforeUndo.state),
+      interaction: structuredClone(observedBeforeUndo.interaction),
+      scores: structuredClone(observedBeforeUndo.scores),
+    }
     const beforeRules = undoRuleSnapshot(beforeUndo)
     const first = turn(s, 0, 'clay-pit')
     assert.ok(first.interaction.stateId === 'wait')
@@ -602,8 +619,15 @@ describe("A140 command boundaries", () => {
     assert.equal(first.interaction.playerIndex, 0)
     assert.equal(first.state.currentPlayerIndex, 0)
     assertRejectedUnchanged(s, () => s.takeAction(0, 'clay-pit'))
+    assert.equal(first.state.players[0]!.resources.clay, 2)
+    assert.equal(first.state.players[0]!.resources.food, 44)
+    assert.equal(first.state.actionSpaces.find(space => space.id === 'clay-pit')!.resources.clay, 0)
     const undone = ok(s.undoAction())
     assertUndoRestored(beforeRules, undone)
+    const liveAfterUndo = s.getState()
+    assertUndoRestored(beforeRules, liveAfterUndo)
+    assert.deepEqual(liveAfterUndo.interaction, beforeUndo.interaction)
+    assert.equal(liveAfterUndo.state.currentPlayerIndex, 0)
     assert.deepEqual(undone.interaction, beforeUndo.interaction)
     assert.equal(undone.interaction.stateId, 'idle')
     assert.equal(undone.state.currentPlayerIndex, 0)

@@ -1,3 +1,4 @@
+import { captureStateWithHistory } from '../../shared/session/history-streams'
 import { takeMajorImprovementFromSupply } from '../../shared/cards/major/supply'
 import { expectWait } from './_helpers/trigger-select'
 import { expectTileFarmSelection } from './_helpers/session-assertions'
@@ -804,7 +805,13 @@ describe("A133 command boundaries", () => {
       }
       return r
     }
-    const beforeUndo = s.getState()
+    const observedBeforeUndo = s.getState()
+    const beforeUndo = {
+      ...observedBeforeUndo,
+      state: captureStateWithHistory(observedBeforeUndo.state),
+      interaction: structuredClone(observedBeforeUndo.interaction),
+      scores: structuredClone(observedBeforeUndo.scores),
+    }
     const beforeRules = undoRuleSnapshot(beforeUndo)
     const first = buy()
     assert.ok(first.interaction.stateId === 'wait')
@@ -814,6 +821,10 @@ describe("A133 command boundaries", () => {
     assert.equal(bonus(first, BRAG), 2)
     const undone = ok(s.undoAction())
     assertUndoRestored(beforeRules, undone)
+    const liveAfterUndo = s.getState()
+    assertUndoRestored(beforeRules, liveAfterUndo)
+    assert.deepEqual(liveAfterUndo.interaction, beforeUndo.interaction)
+    assert.equal(liveAfterUndo.state.currentPlayerIndex, 0)
     assert.deepEqual(undone.interaction, beforeUndo.interaction)
     assert.equal(undone.interaction.stateId, 'idle')
     assert.equal(undone.state.currentPlayerIndex, 0)

@@ -1,3 +1,4 @@
+import { captureStateWithHistory } from '../../shared/session/history-streams'
 import { assertUndoRestored, undoRuleSnapshot } from './_helpers/session-assertions'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { describe, expect, it } from 'vitest'
@@ -307,7 +308,13 @@ describe("A124 command boundaries", () => {
     assert.equal(legalOtherSpace.state.currentPlayerIndex, 1)
     assert.equal(legalOtherSpace.state.players[1]!.resources.grain, 1)
     const s = knapper(true, 1)
-    const beforeUndo = s.getState()
+    const observedBeforeUndo = s.getState()
+    const beforeUndo = {
+      ...observedBeforeUndo,
+      state: captureStateWithHistory(observedBeforeUndo.state),
+      interaction: structuredClone(observedBeforeUndo.interaction),
+      scores: structuredClone(observedBeforeUndo.scores),
+    }
     const beforeRules = undoRuleSnapshot(beforeUndo)
     const first = turn(s, 0, 'western-quarry')
     assert.ok(first.interaction.stateId === 'wait')
@@ -315,8 +322,14 @@ describe("A124 command boundaries", () => {
     assert.equal(first.interaction.playerIndex, 0)
     assert.equal(first.state.currentPlayerIndex, 0)
     assertRejectedUnchanged(s, () => s.takeAction(0, 'western-quarry'))
+    assert.equal(first.state.players[0]!.resources.stone, 2)
+    assert.equal(first.state.actionSpaces.find(space => space.id === 'western-quarry')!.resources.stone, 0)
     const undone = ok(s.undoAction())
     assertUndoRestored(beforeRules, undone)
+    const liveAfterUndo = s.getState()
+    assertUndoRestored(beforeRules, liveAfterUndo)
+    assert.deepEqual(liveAfterUndo.interaction, beforeUndo.interaction)
+    assert.equal(liveAfterUndo.state.currentPlayerIndex, 0)
     assert.deepEqual(undone.interaction, beforeUndo.interaction)
     assert.equal(undone.interaction.stateId, 'idle')
     assert.equal(undone.state.currentPlayerIndex, 0)

@@ -1,3 +1,4 @@
+import { captureStateWithHistory } from '../../shared/session/history-streams'
 import { describe, expect, it } from 'vitest'
 import { type GameSession, type SessionResponse } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -198,12 +199,24 @@ describe("A116 command boundaries", () => {
     assert.equal(legalOtherSpace.state.currentPlayerIndex, 1)
     assert.equal(legalOtherSpace.state.players[1]!.resources.grain, 1)
     const s = setup()
-    const before = s.getState()
+    const observedBeforeUndo = s.getState()
+    const before = {
+      ...observedBeforeUndo,
+      state: captureStateWithHistory(observedBeforeUndo.state),
+      interaction: structuredClone(observedBeforeUndo.interaction),
+      scores: structuredClone(observedBeforeUndo.scores),
+    }
     const beforeRules = undoRuleSnapshot(before)
     const first = turn(s, 0, 'forest')
     assertRejectedUnchanged(s, () => s.takeAction(0, 'forest'))
+    assert.equal(first.state.players[0]!.resources.wood, 4)
+    assert.equal(first.state.actionSpaces.find(space => space.id === 'forest')!.resources.wood, 0)
     const undone = ok(s.undoAction())
     assertUndoRestored(beforeRules, undone)
+    const liveAfterUndo = s.getState()
+    assertUndoRestored(beforeRules, liveAfterUndo)
+    assert.deepEqual(liveAfterUndo.interaction, before.interaction)
+    assert.equal(liveAfterUndo.state.currentPlayerIndex, 0)
     assert.deepEqual(undone.interaction, before.interaction)
     assert.equal(undone.interaction.stateId, 'idle')
     assert.equal(undone.state.currentPlayerIndex, 0)

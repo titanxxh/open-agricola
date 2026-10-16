@@ -1,3 +1,4 @@
+import { captureStateWithHistory } from '../../shared/session/history-streams'
 import { assertUndoRestored, undoRuleSnapshot } from './_helpers/session-assertions'
 import { type SessionResponse, type GameSession } from '../game/authoritative-session'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
@@ -8,7 +9,7 @@ import '../../shared/cards/A/A139_HollowWarden'
 import assert from 'node:assert/strict'
 import { type GameState } from '../../shared/contract/types'
 import { createWorkSession } from './_helpers/session-fixtures'
-import { assertRejectedUnchanged, getChoiceOptions } from './_helpers/session-assertions'
+import { assertRejectedUnchanged, confirmNext, getChoiceOptions } from './_helpers/session-assertions'
 import { createScenarioEvidence } from './_helpers/scenario-evidence'
 
 const sessionEvidence = createScenarioEvidence(import.meta.url)
@@ -349,18 +350,55 @@ describe("A139 command boundaries", () => {
 
       sessionEvidence.record(`A139-N3-${space}-${played}`, r)
     }
+    const foreignS = setup(state => {
+      const hollow = state.actionSpaces.find(space => space.id === 'hollow')
+      assert.ok(hollow)
+      hollow.resources.clay = 3
+    })
+    const ownerTurn = ok(foreignS.takeAction(0, 'grain-seeds'))
+    assert.ok(ownerTurn.interaction.stateId === 'wait')
+    assert.deepEqual(ownerTurn.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(ownerTurn.interaction.playerIndex, 0)
+    const ready = confirmNext(foreignS, ownerTurn)
+    assert.equal(ready.interaction.stateId, 'idle')
+    assert.equal(ready.state.currentPlayerIndex, 1)
+    assert.equal(ready.state.players[0]!.resources.food, 40)
+    const foreign = ok(foreignS.takeAction(1, 'hollow'))
+    assert.ok(foreign.interaction.stateId === 'wait')
+    assert.deepEqual(foreign.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 2 })
+    assert.equal(foreign.interaction.playerIndex, 1)
+    assert.equal(foreign.state.currentPlayerIndex, 1)
+    assert.equal(foreign.state.players[0]!.resources.food, 40)
+    assert.equal(foreign.state.players[0]!.resources.clay, 10)
+    assert.equal(foreign.state.players[1]!.resources.food, 40)
+    assert.equal(foreign.state.players[1]!.resources.clay, 13)
+    assert.equal(foreign.state.actionSpaces.find(space => space.id === 'hollow')!.resources.clay, 0)
+    sessionEvidence.record('A139-N3-foreign', { ready, foreign })
   })
   it("whole purchase undo restores occupation and clay before one fireplace retry", () => {
     const s = setup(state => state.players[0]!.resources.clay = 2, false)
-    const beforeUndo = s.getState()
+    const observedBeforeUndo = s.getState()
+    const beforeUndo = {
+      ...observedBeforeUndo,
+      state: captureStateWithHistory(observedBeforeUndo.state),
+      interaction: structuredClone(observedBeforeUndo.interaction),
+      scores: structuredClone(observedBeforeUndo.scores),
+    }
     const beforeRules = undoRuleSnapshot(beforeUndo)
     const first = fireplace(s, playWarden(s), 'Major_Fireplace1')
     assert.ok(first.interaction.stateId === 'wait')
     assert.deepEqual(first.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
     assert.equal(first.interaction.playerIndex, 0)
     assert.equal(first.state.currentPlayerIndex, 0)
+    assert.deepEqual(first.state.players[0]!.improvements, ['Major_Fireplace1'])
+    assert.ok(first.state.players[0]!.occupationPlayed.includes(WARDEN))
+    assert.equal(first.state.players[0]!.resources.clay, 0)
     const undone = ok(s.undoAction())
     assertUndoRestored(beforeRules, undone)
+    const liveAfterUndo = s.getState()
+    assertUndoRestored(beforeRules, liveAfterUndo)
+    assert.deepEqual(liveAfterUndo.interaction, beforeUndo.interaction)
+    assert.equal(liveAfterUndo.state.currentPlayerIndex, 0)
     assert.deepEqual(undone.interaction, beforeUndo.interaction)
     assert.equal(undone.interaction.stateId, 'idle')
     assert.equal(undone.state.currentPlayerIndex, 0)
