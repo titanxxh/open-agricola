@@ -20,6 +20,20 @@ function readManifest(file, targetRoot = root) {
   const manifest = JSON.parse(fs.readFileSync(file, 'utf8'))
   if (manifest.version !== 1 || !manifest.source || !Array.isArray(manifest.files)) fail('unsupported migration manifest')
   if (!/^[a-f0-9]{40}$/.test(manifest.source.commit)) fail('source commit must be a full SHA')
+  const nativeScope = manifest.nativeScope === undefined ? [] : manifest.nativeScope
+  if (!Array.isArray(nativeScope)) fail('nativeScope must be an array')
+  const scopeFiles = new Set()
+  for (const entry of nativeScope) {
+    const file = entry?.file
+    if (!safeRelative(file) || file.includes('\\') || path.posix.normalize(file) !== file || !file.startsWith('server/') || !file.endsWith('.test.ts')) fail('nativeScope requires a canonical server test path')
+    if (typeof entry.reason !== 'string' || !entry.reason.trim()) fail(`nativeScope requires a nonempty reason: ${file}`)
+    if (scopeFiles.has(file)) fail(`duplicate nativeScope file: ${file}`)
+    scopeFiles.add(file)
+    const full = path.join(targetRoot, file)
+    if (!fs.existsSync(full) || !fs.statSync(full).isFile()) fail(`nativeScope file missing: ${file}`)
+    const relative = path.relative(fs.realpathSync(targetRoot), fs.realpathSync(full))
+    if (relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) fail(`nativeScope file escapes checkout: ${file}`)
+  }
   const identities = new Set()
   const sourceFiles = new Set()
   const migratedTargets = new Set()
@@ -56,8 +70,15 @@ function readManifest(file, targetRoot = root) {
   return { manifest, summary: { sourceFiles: sourceFiles.size, sourceCases: identities.size, remaining, resolved } }
 }
 
+function nativeFilesFor(manifest) {
+  return [...new Set([
+    ...manifest.files.flatMap(group => group.cases.filter(item => item.status !== 'remaining').map(item => item.targetFile)),
+    ...(manifest.nativeScope ?? []).map(entry => entry.file),
+  ])].sort()
+}
+
 function checkNative(manifest) {
-  const nativeFiles = [...new Set(manifest.files.flatMap(group => group.cases.filter(item => item.status !== 'remaining').map(item => item.targetFile)))].sort()
+  const nativeFiles = nativeFilesFor(manifest)
   const permittedAuditDocs = new Set(['README.md', 'audit/final-conclusions.json', 'audit/source-provenance.json'])
   const names = git('ls-files', '--cached', '--others', '--exclude-standard', '-z').toString().split('\0').filter(Boolean)
   for (const name of names) {
@@ -242,7 +263,7 @@ function prepare(manifest, output) {
   if (manifest.source.helperSha256 && digest(helperBytes) !== manifest.source.helperSha256) fail('source helper digest mismatch')
   sourceDigests.push([helper, digest(helperBytes)])
   write(path.join(candidate, helper), helperBytes)
-  const nativeFiles = [...new Set(manifest.files.flatMap(group => group.cases.filter(item => item.status !== 'remaining').map(item => item.targetFile)))].sort()
+  const nativeFiles = nativeFilesFor(manifest)
   const titles = manifest.files.flatMap(group => group.cases.filter(item => item.status === 'remaining').map(item => { const prefix = (item.ancestors ?? []).join(' '); return prefix ? `${item.ancestors.join(' > ')} > ${item.title.slice(prefix.length + 1)}` : item.title }))
   const escaped = titles.map(title => title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
   const setupFiles = ['./shared/cards/__tests__/setup-register-all.ts', './shared/cards/__tests__/setup-listener-purity.ts']
