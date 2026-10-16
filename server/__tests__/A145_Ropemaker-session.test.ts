@@ -116,7 +116,7 @@ describe("A145 command boundaries", () => {
     assert.equal(r.state.currentPlayerIndex, actor)
     return ok(s.takeAction(actor, space))
   }
-  function finish(s: GameSession, r: SessionResponse, occupation: string | null = null) {
+  function finish(s: GameSession, r: SessionResponse) {
     for (let n = 0; n < 24 && r.interaction.stateId === 'wait' && r.interaction.request.kind !== 'confirm-next-player'; n++) {
       const i = r.interaction
       if (i.request.kind === 'confirm-player-switch')
@@ -132,17 +132,15 @@ describe("A145 command boundaries", () => {
           r = ok(s.resolveChoice(i.playerIndex, other.value))
           continue
         }
-        assert.ok(i.request.kind === 'choice' || i.request.kind === 'select-trigger', JSON.stringify(i))
-        const o = i.request.options.find(o => occupation ? o.value === occupation : o.value === '__skip__' || o.value === '__done__') ?? (occupation ? i.request.options.find(o => o.value !== '__skip__' && o.value !== '__done__') : undefined)
-        assert.ok(o, JSON.stringify(i))
-        r = ok(s.resolveChoice(i.playerIndex, o.value))
+        assert.fail(JSON.stringify(i))
       }
     }
     assert.ok(r.interaction.stateId === 'idle' || (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player'), JSON.stringify(r.interaction))
     return r
   }
-  function end(s: GameSession, spaces: string[], occupation: string | null = null) {
+  function end(s: GameSession, spaces: string[]) {
     let r = s.getState()
+    const nextRound = r.state.round + 1
     for (const [n, space] of spaces.entries()) {
       const actor = n % r.state.players.length
       r = turn(s, actor, space)
@@ -152,7 +150,13 @@ describe("A145 command boundaries", () => {
     if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
       r = confirmNext(s, r)
     save('before-phase-choice', r)
-    return { pending: r, r: finish(s, r, occupation) }
+    const pending = r
+    const done = finish(s, r)
+    assert.equal(done.interaction.stateId, 'idle', JSON.stringify(done.interaction))
+    assert.equal(done.state.currentPlayerIndex, 0)
+    assert.equal(done.state.roundPhase, 'work')
+    assert.equal(done.state.round, nextRound)
+    return { pending, r: done }
   }
   const ROPE_SIX = ['grain-seeds', 'day-laborer', 'forest', 'grove', 'clay-pit', 'fishing']
   it("first natural harvest adds one reed only after feeding while ordinary return home adds none", () => {

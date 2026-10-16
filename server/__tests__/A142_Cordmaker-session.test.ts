@@ -169,6 +169,13 @@ describe('A142 command boundaries', () => {
     assert.equal(result.ok, true, result.error)
     return result
   }
+  const complete = (response: SessionResponse, actor: 0 | 1) => {
+    assert.ok(response.interaction.stateId === 'wait', JSON.stringify(response.interaction))
+    assert.deepEqual(response.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: actor + 1 })
+    assert.equal(response.interaction.playerIndex, actor)
+    assert.equal(response.state.currentPlayerIndex, actor)
+    assert.equal(response.state.roundPhase, 'work')
+  }
   it('own Reed Bank two or three gives one grain or paid vegetable exactly once', () => {
     for (const [reed, crop, grain, vegetable, food] of [
       [2, 'grain', 1, 0, 2], [3, 'grain', 1, 0, 2],
@@ -177,19 +184,19 @@ describe('A142 command boundaries', () => {
       const session = setup({ reed, food: 2 })
       const response = chooseReward(session, turn(session, 0, 'reed-bank'), crop)
       expect(response.state.players[0]!.resources).toMatchObject({ reed, grain, vegetable, food })
-      assert.ok(response.interaction.stateId === 'wait'
-        && response.interaction.request.kind === 'confirm-next-player')
+      complete(response, 0)
     }
   })
   it('Reed Bank zero or one and hand cannot trigger crop reward', () => {
     const empty = setup({ reed: 0, food: 40 })
-    assertEmptyAccumulationRejected(empty, 0, 'reed-bank')
+    const rejected = assertEmptyAccumulationRejected(empty, 0, 'reed-bank')
+    assert.equal(rejected.interaction.stateId, 'idle')
+    assert.equal(rejected.state.currentPlayerIndex, 0)
     for (const params of [{ reed: 1, food: 40 }, { reed: 3, food: 40, played: false }]) {
       const session = setup(params)
       const response = turn(session, 0, 'reed-bank')
       expect(response.state.players[0]!.resources).toMatchObject({ reed: params.reed, grain: 0, vegetable: 0, food: 40 })
-      assert.ok(response.interaction.stateId === 'wait'
-        && response.interaction.request.kind === 'confirm-next-player')
+      complete(response, 0)
     }
   })
   it('actual opponent Reed Bank rewards only owner and decline keeps crops', () => {
@@ -202,6 +209,9 @@ describe('A142 command boundaries', () => {
       assert.ok(response.interaction.stateId === 'wait' && response.interaction.request.kind === 'choice')
       assert.equal(response.interaction.playerIndex, 0)
       assert.equal(response.interaction.sourceCard, CARD_ID)
+      const enabled = getChoiceOptions(response).find(option => !option.disabled && option.value !== '__skip__')
+      assert.ok(enabled)
+      assertRejectedUnchanged(session, () => session.resolveChoice(1, enabled.value))
       if (crop)
         response = chooseReward(session, response, crop)
       else {
@@ -209,6 +219,15 @@ describe('A142 command boundaries', () => {
         assert.ok(decline && !decline.disabled)
         response = session.resolveChoice(0, decline.value)
         assert.equal(response.ok, true, response.error)
+      }
+      if (crop)
+        complete(response, 1)
+      else {
+        assert.ok(response.interaction.stateId === 'wait')
+        assert.deepEqual(response.interaction.request, { kind: 'confirm-player-switch', fromPlayerIndex: 0, toPlayerIndex: 1 })
+        assert.equal(response.interaction.playerIndex, 0)
+        assert.equal(response.state.currentPlayerIndex, 1)
+        assert.equal(response.state.roundPhase, 'work')
       }
       expect(response.state.players[1]!.resources).toMatchObject({ reed: 2, grain: 0, vegetable: 0, food: 0 })
       expect(response.state.players[0]!.resources).toMatchObject({ grain, vegetable, food })
@@ -218,21 +237,27 @@ describe('A142 command boundaries', () => {
     const session = setup({ food: 1 })
     const response = turn(session, 0, 'reed-bank')
     expect(response.state.players[0]!.resources).toMatchObject({ food: 1, reed: 2, grain: 1, vegetable: 0 })
-    assert.ok(response.interaction.stateId === 'wait'
-      && response.interaction.request.kind === 'confirm-next-player')
+    complete(response, 0)
     assertRejectedUnchanged(session, () => session.resolveChoice(1, 'vegetable'))
     assertRejectedUnchanged(session, () => session.resolveChoice(0, 'unpaid-vegetable'))
   })
   it('whole own action undo restores payment crop and Reed Bank before retry', () => {
     const session = setup({ food: 2 })
+    const beforeInteraction = JSON.stringify(session.getState().interaction)
     const before = undoRuleSnapshot(session.getState())
     const first = chooseReward(session, turn(session, 0, 'reed-bank'), 'vegetable')
+    complete(first, 0)
     expect(first.state.players[0]!.resources).toMatchObject({ food: 0, reed: 2, vegetable: 1 })
     assertRejectedUnchanged(session, () => session.resolveChoice(0, 'vegetable'))
     const undone = session.undoAction()
     assertUndoRestored(before, undone)
     assertUndoRestored(before, session.getState())
+    assert.equal(JSON.stringify(undone.interaction), beforeInteraction)
+    assert.equal(JSON.stringify(session.getState().interaction), beforeInteraction)
+    assert.equal(undone.interaction.stateId, 'idle')
+    assert.equal(undone.state.currentPlayerIndex, 0)
     const retry = chooseReward(session, turn(session, 0, 'reed-bank'), 'grain')
+    complete(retry, 0)
     expect(retry.state.players[0]!.resources).toMatchObject({ food: 2, reed: 2, grain: 1, vegetable: 0 })
   })
 })

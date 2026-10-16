@@ -13,9 +13,14 @@ import { createScenarioEvidence } from './_helpers/scenario-evidence'
 
 const sessionEvidence = createScenarioEvidence(import.meta.url)
 
-function assertTurnFinished(response: SessionResponse) {
+function assertTurnFinished(response: SessionResponse, actor: number) {
   assert.equal(response.ok, true, response.error)
-  assert.ok(response.interaction.stateId === 'wait' && response.interaction.request.kind === 'confirm-next-player', JSON.stringify(response.interaction))
+  assert.equal(response.state.players.length, 4)
+  assert.ok(response.interaction.stateId === 'wait', JSON.stringify(response.interaction))
+  assert.deepEqual(response.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: (actor + 1) % 4 })
+  assert.equal(response.interaction.playerIndex, actor)
+  assert.equal(response.state.currentPlayerIndex, actor)
+  assert.equal(response.state.roundPhase, 'work')
 }
 
 const CARD_ID = 'A160_Lutenist'
@@ -179,22 +184,25 @@ describe("A160 command boundaries", () => {
         r = ok(s.resolveChoice(i.playerIndex, 'confirm', { zones: i.request.zones }))
       else {
         if (i.request.kind === 'select-trigger') {
-          const trigger = i.request.options[0]
-          assert.ok(trigger)
+          const triggers = i.request.options.filter(option => option.sourceCard === LUTE && !option.disabled)
+          assert.equal(triggers.length, 1, JSON.stringify(i))
+          const trigger = triggers[0]!
           r = ok(s.resolveChoice(i.playerIndex, trigger.value))
           continue
         }
         assert.ok(i.request.kind === 'choice', JSON.stringify(i))
+        assert.equal(i.sourceCard, LUTE)
+        assert.equal(i.playerIndex, 0)
         const o = i.request.options.find(o => accept ? !o.disabled && o.value !== '__skip__' && o.value !== '__done__' : o.value === '__skip__' || o.value === '__done__')
         assert.ok(o, JSON.stringify(i))
         r = ok(s.resolveChoice(i.playerIndex, o.value))
       }
     }
-    assert.ok(r.interaction.stateId === 'idle' || (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player'), JSON.stringify(r.interaction))
+    assertTurnFinished(r, 1)
     return r
   }
   function offer(s: GameSession, space: string) {
-    finish(s, turn(s, 0, 'day-laborer'))
+    assertTurnFinished(turn(s, 0, 'day-laborer'), 0)
     return turn(s, 1, space)
   }
   function material(r: SessionResponse, actor = 0) {
@@ -219,7 +227,7 @@ describe("A160 command boundaries", () => {
       turn(s, 0, 'grain-seeds')
       const pending = turn(s, 1, 'traveling-players')
       if (food === 0)
-        assertTurnFinished(pending)
+        assertTurnFinished(pending, 1)
       const r = finish(s, pending, false)
       assert.equal(material(r).food, food + 1)
       assert.equal(material(r).wood, 1)
@@ -230,10 +238,10 @@ describe("A160 command boundaries", () => {
   it("hand own and unrelated opponent cannot grant mandatory owner goods", () => {
     for (const [played, own, space] of [[false, false, 'traveling-players'], [true, true, 'traveling-players'], [true, false, 'fishing']] as const) {
       const s = setup({}, played)
-      const r = own ? turn(s, 0, space) : finish(s, offer(s, space))
+      const r = own ? turn(s, 0, space) : offer(s, space)
       assert.equal(material(r).wood, 0)
       assert.equal(material(r).vegetable, 0)
-      assertTurnFinished(r)
+      assertTurnFinished(r, own ? 0 : 1)
       save(`A160-N3-${played}-${own}`, r)
     }
   })

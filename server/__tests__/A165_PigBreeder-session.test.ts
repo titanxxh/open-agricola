@@ -102,12 +102,15 @@ describe("A165 command boundaries", () => {
         r = ok(s.resolveChoice(i.playerIndex, 'confirm', { zones: i.request.zones }))
       else {
         if (i.request.kind === 'select-trigger') {
-          const trigger = i.request.options[0]
-          assert.ok(trigger)
+          const triggers = i.request.options.filter(option => option.sourceCard === PIG && !option.disabled)
+          assert.equal(triggers.length, 1, JSON.stringify(i))
+          const trigger = triggers[0]!
           r = ok(s.resolveChoice(i.playerIndex, trigger.value))
           continue
         }
         assert.ok(i.request.kind === 'choice', JSON.stringify(i))
+        assert.equal(i.sourceCard, PIG)
+        assert.equal(i.playerIndex, 0)
         const o = i.request.options.find(o => accept ? !o.disabled && o.value !== '__skip__' && o.value !== '__done__' : o.value === '__skip__' || o.value === '__done__') ?? (accept ? i.request.options.find(o => !o.disabled && o.value !== '__skip__' && o.value !== '__done__') : undefined)
         assert.ok(o, JSON.stringify(i))
         r = ok(s.resolveChoice(i.playerIndex, o.value))
@@ -141,6 +144,7 @@ describe("A165 command boundaries", () => {
   }
   function end(s: GameSession, accept = true) {
     let r = s.getState()
+    const nextRound = r.state.round + 1
     for (const [n, space] of EIGHT.entries()) {
       r = turn(s, n % 4, space)
       if (n < EIGHT.length - 1)
@@ -149,7 +153,12 @@ describe("A165 command boundaries", () => {
     if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
       r = confirmNext(s, r)
     const pending = r
-    return { pending, r: finish(s, r, accept) }
+    const done = finish(s, r, accept)
+    assert.equal(done.interaction.stateId, 'idle', JSON.stringify(done.interaction))
+    assert.equal(done.state.currentPlayerIndex, 0)
+    assert.equal(done.state.roundPhase, 'work')
+    assert.equal(done.state.round, nextRound)
+    return { pending, r: done }
   }
   it("playing through actual Lessons immediately gains one pig and housing", () => {
     const s = setup({ food: 2 }, false)
@@ -157,6 +166,11 @@ describe("A165 command boundaries", () => {
     if (!pending.state.players[0]!.occupationPlayed.includes(PIG))
       pending = ok(s.resolveChoice(0, PIG))
     const r = finish(s, pending)
+    assert.ok(r.interaction.stateId === 'wait', JSON.stringify(r.interaction))
+    assert.deepEqual(r.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
+    assert.equal(r.state.roundPhase, 'work')
     assert.ok(r.state.players[0]!.occupationPlayed.includes(PIG))
     assert.equal(material(r).boar, 1)
     assert.equal(material(r).sheep, 0)

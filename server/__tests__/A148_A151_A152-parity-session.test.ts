@@ -239,6 +239,10 @@ describe("A148 command boundaries", () => {
       assert.equal(z.capacity, cap)
       const done = ok(s.resolveChoice(0, 'confirm', { zones: [{ ...z, animalType: 'sheep', animalCount: cap }] }))
       assert.equal(done.state.players[0]!.resources.sheep, cap)
+      assert.ok(done.interaction.stateId === 'wait', JSON.stringify(done.interaction))
+      assert.deepEqual(done.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+      assert.equal(done.interaction.playerIndex, 0)
+      assert.equal(done.state.currentPlayerIndex, 0)
       save(`A148-N1-${cap}`, { r, done })
     }
   })
@@ -257,6 +261,10 @@ describe("A148 command boundaries", () => {
     assertRejectedUnchanged(s, () => s.resolveChoice(0, 'confirm', { zones: [{ ...z, id: 'card:unknown', animalCount: 1 }] }))
     const done = ok(s.resolveChoice(0, 'confirm', { zones: [{ ...z, animalCount: 2 }] }))
     assert.equal(done.state.players[0]!.resources.sheep, 2)
+    assert.ok(done.interaction.stateId === 'wait', JSON.stringify(done.interaction))
+    assert.deepEqual(done.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(done.interaction.playerIndex, 0)
+    assert.equal(done.state.currentPlayerIndex, 0)
     save('A148-N3', done)
   })
 })
@@ -316,8 +324,9 @@ describe("A152 command boundaries", () => {
     assert.ok(r.interaction.stateId === 'idle' || (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player'), JSON.stringify(r.interaction))
     return r
   }
-  function end(s: GameSession, spaces: string[], occupation: string | null = null) {
+  function end(s: GameSession, spaces: string[], occupation: string | null = null, expectOffer = true) {
     let r = s.getState()
+    const nextRound = r.state.round + 1
     for (const [n, space] of spaces.entries()) {
       const actor = n % r.state.players.length
       r = turn(s, actor, space)
@@ -327,7 +336,24 @@ describe("A152 command boundaries", () => {
     if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
       r = confirmNext(s, r)
     save('before-phase-choice', r)
-    return { pending: r, r: finish(s, r, occupation) }
+    const pending = r
+    if (expectOffer) {
+      assert.ok(pending.interaction.stateId === 'wait', JSON.stringify(pending.interaction))
+      assert.equal(pending.interaction.sourceCard, STUDENT)
+      assert.equal(pending.interaction.playerIndex, 0)
+    }
+    else {
+      assert.equal(pending.interaction.stateId, 'idle', JSON.stringify(pending.interaction))
+      assert.equal(pending.state.round, nextRound)
+      assert.equal(pending.state.roundPhase, 'work')
+      assert.equal(pending.state.currentPlayerIndex, 0)
+    }
+    const done = finish(s, r, occupation)
+    assert.equal(done.interaction.stateId, 'idle', JSON.stringify(done.interaction))
+    assert.equal(done.state.currentPlayerIndex, 0)
+    assert.equal(done.state.roundPhase, 'work')
+    assert.equal(done.state.round, nextRound)
+    return { pending, r: done }
   }
   const EIGHT = ['grain-seeds', 'day-laborer', 'forest', 'reed-bank', 'clay-pit', 'fishing', 'hollow-4', 'traveling-players']
   it("no returning Lessons person permits exactly one occupation for one food", () => {
@@ -343,7 +369,7 @@ describe("A152 command boundaries", () => {
     const declined = end(setup(), EIGHT).r
     assert.equal(declined.state.players[0]!.occupationPlayed.length, 1)
     assert.equal(declined.state.players[0]!.resources.food, 60)
-    const poor = end(setup(5, state => state.players[0]!.resources.food = 0), EIGHT).r
+    const poor = end(setup(5, state => state.players[0]!.resources.food = 0), EIGHT, null, false).r
     assert.equal(poor.state.players[0]!.occupationPlayed.length, 1)
     save('A152-N2', { declined, poor })
   })
@@ -351,7 +377,7 @@ describe("A152 command boundaries", () => {
     const s = setup(5, state => state.players[1]!.occupationHand = ['A110_Roughcaster'])
     const spaces = [...EIGHT]
     spaces[1] = 'lessons'
-    const { r } = end(s, spaces)
+    const { r } = end(s, spaces, null, false)
     assert.deepEqual(r.state.players[0]!.occupationPlayed, [STUDENT])
     assert.equal(r.state.players[0]!.resources.food, 60)
     save('A152-N3', r)

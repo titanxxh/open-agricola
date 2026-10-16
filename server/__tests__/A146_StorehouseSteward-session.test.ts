@@ -15,9 +15,14 @@ import { createScenarioEvidence } from './_helpers/scenario-evidence'
 
 const sessionEvidence = createScenarioEvidence(import.meta.url)
 
-function assertTurnFinished(response: SessionResponse) {
+function assertTurnFinished(response: SessionResponse, actor: number) {
   assert.equal(response.ok, true, response.error)
-  assert.ok(response.interaction.stateId === 'wait' && response.interaction.request.kind === 'confirm-next-player', JSON.stringify(response.interaction))
+  assert.equal(response.state.players.length, 4)
+  assert.ok(response.interaction.stateId === 'wait', JSON.stringify(response.interaction))
+  assert.deepEqual(response.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: (actor + 1) % 4 })
+  assert.equal(response.interaction.playerIndex, actor)
+  assert.equal(response.state.currentPlayerIndex, actor)
+  assert.equal(response.state.roundPhase, 'work')
 }
 
 const CARD_ID = 'A146_StorehouseSteward'
@@ -156,24 +161,28 @@ describe("A146 command boundaries", () => {
     assert.ok(a, space)
     a.resources[resource] = count
   }
-  const beforeAction = new WeakMap<GameSession, string>()
+  const beforeAction = new WeakMap<GameSession, { rules: string; interaction: string; actor: number }>()
   function turn(s: GameSession, actor: number, space: string) {
     let r = s.getState()
     if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
       r = confirmNext(s, r)
     assert.equal(r.interaction.stateId, 'idle')
     assert.equal(r.state.currentPlayerIndex, actor)
-    beforeAction.set(s, undoRuleSnapshot(s.getState()))
+    beforeAction.set(s, { rules: undoRuleSnapshot(r), interaction: JSON.stringify(r.interaction), actor })
     const result = ok(s.takeAction(actor, space))
-    assertTurnFinished(result)
+    assertTurnFinished(result, actor)
     return result
   }
   function undo(s: GameSession) {
     const before = beforeAction.get(s)
     assert.ok(before)
     const undone = s.undoAction()
-    assertUndoRestored(before, undone)
-    assertUndoRestored(before, s.getState())
+    assertUndoRestored(before.rules, undone)
+    assertUndoRestored(before.rules, s.getState())
+    assert.equal(JSON.stringify(undone.interaction), before.interaction)
+    assert.equal(JSON.stringify(s.getState().interaction), before.interaction)
+    assert.equal(undone.interaction.stateId, 'idle')
+    assert.equal(undone.state.currentPlayerIndex, before.actor)
     return undone
   }
   function res(r: SessionResponse) {
@@ -195,6 +204,10 @@ describe("A146 command boundaries", () => {
       const s = setup(state => pile(state, 'fishing', 'food', count))
       const r = count === 0 ? assertEmptyAccumulationRejected(s, 0, 'fishing') : turn(s, 0, 'fishing')
       assert.deepEqual(res(r), [0, 0, 0, 0])
+      if (count === 0) {
+        assert.equal(r.interaction.stateId, 'idle')
+        assert.equal(r.state.currentPlayerIndex, 0)
+      }
       assert.equal(r.state.players[0]!.resources.food, 40 + count)
       save(`A146-N2-${count}`, r)
     }
@@ -226,6 +239,17 @@ describe("A146 command boundaries", () => {
     assert.equal(undone.state.actionSpaces.find(a => a.id === 'fishing')!.resources.food, 2)
     const retry = turn(s, 0, 'fishing')
     assert.deepEqual(res(retry), [1, 0, 0, 0])
-    save('A146-N5', { first, undone, retry })
+    const occupied = setup(state => pile(state, 'fishing', 'food', 2))
+    turn(occupied, 0, 'fishing')
+    for (const [actor, space] of [[1, 'grain-seeds'], [2, 'clay-pit'], [3, 'reed-bank']] as const)
+      turn(occupied, actor, space)
+    const ready = confirmNext(occupied, occupied.getState())
+    assert.equal(ready.interaction.stateId, 'idle')
+    assert.equal(ready.state.currentPlayerIndex, 0)
+    assertRejectedUnchanged(occupied, () => occupied.takeAction(0, 'fishing'))
+    const legal = turn(occupied, 0, 'day-laborer')
+    assert.equal(legal.state.players[0]!.resources.food, 44)
+    assert.deepEqual(res(legal), [1, 0, 0, 0])
+    save('A146-N5', { first, undone, retry, legal })
   })
 })

@@ -12,9 +12,14 @@ import { createScenarioEvidence } from './_helpers/scenario-evidence'
 
 const sessionEvidence = createScenarioEvidence(import.meta.url)
 
-function assertTurnFinished(response: SessionResponse) {
+function assertTurnFinished(response: SessionResponse, actor: number) {
   assert.equal(response.ok, true, response.error)
-  assert.ok(response.interaction.stateId === 'wait' && response.interaction.request.kind === 'confirm-next-player', JSON.stringify(response.interaction))
+  assert.equal(response.state.players.length, 4)
+  assert.ok(response.interaction.stateId === 'wait', JSON.stringify(response.interaction))
+  assert.deepEqual(response.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: (actor + 1) % 4 })
+  assert.equal(response.interaction.playerIndex, actor)
+  assert.equal(response.state.currentPlayerIndex, actor)
+  assert.equal(response.state.roundPhase, 'work')
 }
 
 const CARD_ID = 'A164_WoodWorker'
@@ -187,25 +192,29 @@ describe("A164 command boundaries", () => {
       } }))
     return s
   }
-  const beforeAction = new WeakMap<GameSession, string>()
+  const beforeAction = new WeakMap<GameSession, { rules: string; interaction: string; actor: number }>()
   function turn(s: GameSession, actor: number, space: string) {
     let r = s.getState()
     if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
       r = confirmNext(s, r)
     assert.equal(r.interaction.stateId, 'idle')
     assert.equal(r.state.currentPlayerIndex, actor)
-    beforeAction.set(s, undoRuleSnapshot(s.getState()))
+    beforeAction.set(s, { rules: undoRuleSnapshot(r), interaction: JSON.stringify(r.interaction), actor })
     return ok(s.takeAction(actor, space))
   }
   function undo(s: GameSession) {
     const before = beforeAction.get(s)
     assert.ok(before)
     const undone = s.undoAction()
-    assertUndoRestored(before, undone)
-    assertUndoRestored(before, s.getState())
+    assertUndoRestored(before.rules, undone)
+    assertUndoRestored(before.rules, s.getState())
+    assert.equal(JSON.stringify(undone.interaction), before.interaction)
+    assert.equal(JSON.stringify(s.getState().interaction), before.interaction)
+    assert.equal(undone.interaction.stateId, 'idle')
+    assert.equal(undone.state.currentPlayerIndex, before.actor)
     return undone
   }
-  function finish(s: GameSession, r: SessionResponse, accept = true) {
+  function finish(s: GameSession, r: SessionResponse, accept = true, actor = 0) {
     for (let n = 0; n < 24 && r.interaction.stateId === 'wait' && r.interaction.request.kind !== 'confirm-next-player'; n++) {
       const i = r.interaction
       if (i.request.kind === 'confirm-player-switch')
@@ -214,18 +223,21 @@ describe("A164 command boundaries", () => {
         r = ok(s.resolveChoice(i.playerIndex, 'confirm', { zones: i.request.zones }))
       else {
         if (i.request.kind === 'select-trigger') {
-          const trigger = i.request.options[0]
-          assert.ok(trigger)
+          const triggers = i.request.options.filter(option => option.sourceCard === CARD && !option.disabled)
+          assert.equal(triggers.length, 1, JSON.stringify(i))
+          const trigger = triggers[0]!
           r = ok(s.resolveChoice(i.playerIndex, trigger.value))
           continue
         }
         assert.ok(i.request.kind === 'choice', JSON.stringify(i))
+        assert.equal(i.sourceCard, CARD)
+        assert.equal(i.playerIndex, 0)
         const o = i.request.options.find(o => accept ? !o.disabled && o.value !== '__skip__' && o.value !== '__done__' : o.value === '__skip__' || o.value === '__done__') ?? (accept ? i.request.options.find(o => !o.disabled && o.value !== '__skip__' && o.value !== '__done__') : undefined)
         assert.ok(o, JSON.stringify(i))
         r = ok(s.resolveChoice(i.playerIndex, o.value))
       }
     }
-    assert.ok(r.interaction.stateId === 'idle' || (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player'), JSON.stringify(r.interaction))
+    assertTurnFinished(r, actor)
     return r
   }
   function offer(s: GameSession, space: string) {
@@ -260,6 +272,8 @@ describe("A164 command boundaries", () => {
     for (const wood of [0, 1]) {
       const s = setup({ wood }, true, state => state.actionSpaces.find(a => a.id === 'forest')!.resources.wood = 0)
       const r = assertEmptyAccumulationRejected(s, 0, 'forest')
+      assert.equal(r.interaction.stateId, 'idle')
+      assert.equal(r.state.currentPlayerIndex, 0)
       assert.equal(material(r).wood, wood)
       assert.equal(material(r).sheep, 0)
       assert.equal(r.state.actionSpaces.find(a => a.id === 'forest')!.resources.wood, 0)
@@ -273,10 +287,10 @@ describe("A164 command boundaries", () => {
     assert.equal(material(decline).sheep, 0)
     for (const [played, own, space] of [[false, true, 'forest'], [true, false, 'forest'], [true, true, 'clay-pit']] as const) {
       const s = setup({ wood: 1 }, played)
-      const r = own ? finish(s, turn(s, 0, space)) : finish(s, offer(s, space))
+      const r = own ? turn(s, 0, space) : offer(s, space)
       assert.equal(material(r).sheep, 0)
       assert.equal(r.state.actionSpaces.find(a => a.id === space)!.resources.wood ?? 0, 0)
-      assertTurnFinished(r)
+      assertTurnFinished(r, own ? 0 : 1)
       save(`A164-N3-${played}-${own}-${space}`, r)
     }
     save('A164-N3', decline)

@@ -197,12 +197,15 @@ describe("A166 command boundaries", () => {
         r = ok(s.resolveChoice(i.playerIndex, 'confirm', { zones: i.request.zones }))
       else {
         if (i.request.kind === 'select-trigger') {
-          const trigger = i.request.options[0]
-          assert.ok(trigger)
+          const triggers = i.request.options.filter(option => option.sourceCard === HAY && !option.disabled)
+          assert.equal(triggers.length, 1, JSON.stringify(i))
+          const trigger = triggers[0]!
           r = ok(s.resolveChoice(i.playerIndex, trigger.value))
           continue
         }
         assert.ok(i.request.kind === 'choice', JSON.stringify(i))
+        assert.equal(i.sourceCard, HAY)
+        assert.equal(i.playerIndex, 0)
         const o = i.request.options.find(o => accept ? !o.disabled && o.value !== '__skip__' && o.value !== '__done__' : o.value === '__skip__' || o.value === '__done__') ?? (accept ? i.request.options.find(o => !o.disabled && o.value !== '__skip__' && o.value !== '__done__') : undefined)
         assert.ok(o, JSON.stringify(i))
         r = ok(s.resolveChoice(i.playerIndex, o.value))
@@ -236,6 +239,7 @@ describe("A166 command boundaries", () => {
   }
   function end(s: GameSession, accept = true, noHaydryerOffer = false) {
     let r = s.getState()
+    const nextRound = r.state.round + 1
     for (const [n, space] of EIGHT.entries()) {
       r = turn(s, n % 4, space)
       if (n < EIGHT.length - 1)
@@ -244,7 +248,12 @@ describe("A166 command boundaries", () => {
     if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
       r = confirmNext(s, r)
     const pending = r
-    return { pending, r: finish(s, r, accept, noHaydryerOffer) }
+    const done = finish(s, r, accept, noHaydryerOffer)
+    assert.equal(done.interaction.stateId, 'idle', JSON.stringify(done.interaction))
+    assert.equal(done.state.currentPlayerIndex, 0)
+    assert.equal(done.state.roundPhase, 'work')
+    assert.equal(done.state.round, nextRound)
+    return { pending, r: done }
   }
   it("natural harvest charges four minus pasture count food for one cattle", () => {
     for (const count of [0, 1, 3]) {
@@ -258,7 +267,10 @@ describe("A166 command boundaries", () => {
     }
   })
   it("decline unaffordable hand and nonharvest cannot grant cattle", () => {
-    const declined = end(phaseSetup(4, 1), false).r
+    const { pending: declineOffer, r: declined } = end(phaseSetup(4, 1), false)
+    assert.ok(declineOffer.interaction.stateId === 'wait')
+    assert.equal(declineOffer.interaction.sourceCard, HAY)
+    assert.equal(declineOffer.interaction.playerIndex, 0)
     assert.equal(material(declined).cattle, 0)
     const poor = end(phaseSetup(4, 1, 0, true, 0), false, true).r
     assert.equal(poor.state.round, 5)

@@ -70,13 +70,14 @@ it('a real Forest Tallyman purchase makes its private space executable without l
   expect(purchase.state.players[0]!.occupationPlayed).toContain(cardId)
   expect(purchase.state.actionSpaces.find(space => space.id === cardId)?.takenBy).toEqual([])
   ready(session)
-  expectRejectedUnchanged(session, () => session.takeAction(1, cardId))
+  assertRejectedUnchanged(session, () => session.takeAction(1, cardId))
   take(session, 1, 'forest')
   take(session, 2, 'clay-pit')
   take(session, 3, 'fishing')
 
   ready(session)
   const beforeResponse = session.getState()
+  const beforeInteraction = JSON.stringify(beforeResponse.interaction)
   sessionEvidence.record('before private action', beforeResponse)
   // #1258: undo materializes these two known defaults after a public card purchase.
   expect(beforeResponse.state.players[0]!.playedCards).toEqual([])
@@ -96,15 +97,24 @@ it('a real Forest Tallyman purchase makes its private space executable without l
   expect(used.state.players[0]!.resources).toMatchObject({ wood: 3, clay: 2 })
   expect(used.state.actionSpaces.find(space => space.id === cardId)?.takenBy).toHaveLength(1)
   expect(used.state.events.some(event => event.type === 'resource.moved' && event.sourceCardId === cardId)).toBe(true)
+  expect(used.interaction).toMatchObject({ stateId: 'wait', playerIndex: 0, request: { kind: 'confirm-next-player', nextPlayerIndex: 1 } })
+  expect(used.state.currentPlayerIndex).toBe(0)
   const undone = session.undoAction()
   sessionEvidence.record('after private action undo', undone)
   expect(undone.state.players[0]!.playedCards).toEqual(['occupation:A162_ForestTallyman'])
   expect(undone.state.actionSpaces.find(space => space.id === cardId)?.blockedBy).toEqual([])
   assertUndoRestored(before, undone)
   assertUndoRestored(before, session.getState())
+  expect(JSON.stringify(undone.interaction)).toBe(beforeInteraction)
+  expect(JSON.stringify(session.getState().interaction)).toBe(beforeInteraction)
+  expect(undone.interaction.stateId).toBe('idle')
+  expect(undone.state.currentPlayerIndex).toBe(0)
   expect(undone.state.players[0]!.resources).toMatchObject({ wood: 0, clay: 0 })
   expect(undone.state.actionSpaces.find(space => space.id === cardId)?.takenBy).toEqual([])
-  expect(take(session, 0, cardId).state.players[0]!.resources).toMatchObject({ wood: 3, clay: 2 })
+  const retried = take(session, 0, cardId)
+  expect(retried.state.players[0]!.resources).toMatchObject({ wood: 3, clay: 2 })
+  expect(retried.interaction).toMatchObject({ stateId: 'wait', playerIndex: 0, request: { kind: 'confirm-next-player', nextPlayerIndex: 1 } })
+  expect(retried.state.currentPlayerIndex).toBe(0)
 })
 
 it.each(['none', 'forest', 'clay'] as const)('a purchased Forest Tallyman remains unavailable with %s occupancy', mode => {
@@ -115,8 +125,11 @@ it.each(['none', 'forest', 'clay'] as const)('a purchased Forest Tallyman remain
   take(session, 3, 'fishing')
   ready(session)
   expect(session.getActionAvailability(0)[FOREST_TALLYMAN]).toBe(false)
-  expectRejectedUnchanged(session, () => session.takeAction(0, FOREST_TALLYMAN))
-  expect(take(session, 0, 'day-laborer').ok).toBe(true)
+  assertRejectedUnchanged(session, () => session.takeAction(0, FOREST_TALLYMAN))
+  const retried = take(session, 0, 'day-laborer')
+  expect(retried.state.players[0]!.resources).toMatchObject({ food: 42, wood: 0, clay: 0 })
+  expect(retried.interaction).toMatchObject({ stateId: 'wait', playerIndex: 0, request: { kind: 'confirm-next-player', nextPlayerIndex: 1 } })
+  expect(retried.state.currentPlayerIndex).toBe(0)
 })
 
 function flowHostSession(flow: ActionFlow): GameSession {
@@ -153,12 +166,6 @@ function ruleOutcome(response: SessionResponse) {
   })
 }
 
-function expectRejectedUnchanged(session: GameSession, command: () => SessionResponse): void {
-  const before = ruleOutcome(session.getState())
-  const response = command()
-  expect(response.ok).toBe(false)
-  expect(ruleOutcome(response)).toEqual(before)
-}
 
 it('a missing executable definition fails internally and rolls back the worker and earlier effects', () => {
   const session = flowHostSession({ type: 'leaf', actionId: 'card_test_unregistered_leaf' })
@@ -261,8 +268,8 @@ it.each([[5, 2], [7, 4], [9, 7]])('a purchased Forest Inn charges its guest once
   expect(entered.state.players[0]!.resources.food).toBe(101)
   expect(entered.state.players[1]!.resources.food).toBe(wood === 5 ? 2 : 0)
   if (wood > 5) {
-    expectRejectedUnchanged(session, () => session.resolveChoice(0, 'invalid'))
-    expectRejectedUnchanged(session, () => session.resolveChoice(1, 'invalid'))
+    assertRejectedUnchanged(session, () => session.resolveChoice(0, 'invalid'))
+    assertRejectedUnchanged(session, () => session.resolveChoice(1, 'invalid'))
     const restored = sessionEvidence.track(new GameSession({ state: cloneState(session.state), sessionCursor: session.createSessionPrivateCursor() }))
 
     const restoredResponse = restored.getState()
@@ -283,7 +290,7 @@ it.each([[5, 2], [7, 4], [9, 7]])('a purchased Forest Inn charges its guest once
   expect(retried.state.players[0]!.resources.food).toBe(101)
   expect(retried.state.players[1]!.resources).toMatchObject({ wood: 8, food })
   ready(session)
-  expectRejectedUnchanged(session, () => session.takeAction(0, FOREST_INN))
+  assertRejectedUnchanged(session, () => session.takeAction(0, FOREST_INN))
 })
 
 it('undoing a Forest Inn purchase removes access and rebuying enables its action again', () => {
@@ -293,7 +300,7 @@ it('undoing a Forest Inn purchase removes access and rebuying enables its action
   expect(undone.ok, undone.error).toBe(true)
   expect(undone.state.actionSpaces.some(space => space.id === FOREST_INN)).toBe(false)
   expect(undone.state.players[0]!.resources).toMatchObject({ clay: 1, reed: 1 })
-  expectRejectedUnchanged(session, () => session.takeAction(0, FOREST_INN))
+  assertRejectedUnchanged(session, () => session.takeAction(0, FOREST_INN))
   buyForestInn(session)
   take(session, 1, 'day-laborer')
   expect(take(session, 0, FOREST_INN).state.players[0]!.resources).toMatchObject({ wood: 8, food: 102 })
@@ -306,7 +313,7 @@ it.each(['guest-food', 'guest-wood', 'owner-wood'] as const)('Forest Inn rejects
   if (actor === 0) take(session, 1, 'day-laborer')
   ready(session)
   expect(session.getActionAvailability(actor)[FOREST_INN]).toBe(false)
-  expectRejectedUnchanged(session, () => session.takeAction(actor, FOREST_INN))
+  assertRejectedUnchanged(session, () => session.takeAction(actor, FOREST_INN))
   expect(take(session, actor, 'grain-seeds').state.players[actor]!.resources.grain).toBe(1)
 })
 
@@ -447,4 +454,8 @@ it('Forest Tallyman hand, another player, and an occupied private space reject w
   expect(session.getActionAvailability(0)[FOREST_TALLYMAN]).toBe(false)
   assertRejectedUnchanged(session, () => session.takeAction(0, FOREST_TALLYMAN))
   expect(session.getState().state.players[0]!.resources).toMatchObject({ wood: 3, clay: 2 })
+  const retried = take(session, 0, 'vegetable-seeds')
+  expect(retried.state.players[0]!.resources).toMatchObject({ wood: 3, clay: 2, vegetable: 1 })
+  expect(retried.interaction).toMatchObject({ stateId: 'wait', playerIndex: 0, request: { kind: 'confirm-next-player', nextPlayerIndex: 0 } })
+  expect(retried.state.currentPlayerIndex).toBe(0)
 })
