@@ -498,7 +498,13 @@ describe("A096 command boundaries", () => {
     }
     function turn(session: GameSession, actor: number, space: string) { ready(session, actor); return ok(session.takeAction(actor, space)); }
     function options(response: SessionResponse): ActionChoiceOption[] { assert.ok(response.interaction.stateId === 'wait', JSON.stringify(response.interaction)); assert.ok('options' in expectWait(response).interaction.request); return getChoiceOptions(response)!; }
-    function accept(session: GameSession, response: SessionResponse) { assert.ok(response.interaction.stateId === 'wait'); const choice = options(response).find(o => !('disabled' in o && o.disabled) && o.value !== '__skip__'); assert.ok(choice); return ok(session.resolveChoice(response.interaction.playerIndex, choice.value)); }
+    function accept(session: GameSession, response: SessionResponse) {
+        assert.ok(response.interaction.stateId === 'wait');
+        assert.equal(response.interaction.sourceCard, ARTISAN);
+        const matching = options(response).filter(option => option.sourceCard === ARTISAN && !option.disabled);
+        assert.equal(matching.length, 1, JSON.stringify(response.interaction));
+        return ok(session.resolveChoice(response.interaction.playerIndex, matching[0]!.value));
+    }
     function reveal(session: GameSession) {
         turn(session, 0, 'grain-seeds');
         turn(session, 1, 'reed-bank');

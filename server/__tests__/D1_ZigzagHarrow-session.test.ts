@@ -172,8 +172,10 @@ describe("D001 command boundaries", () => {
     }
     function optional(session: GameSession, r: SessionResponse, accept: boolean) {
         assert.ok(r.interaction.stateId === 'wait' && expectWait(r).interaction.request.kind === 'choice', JSON.stringify(r.interaction));
-        const option = getChoiceOptions(r).find(o => accept ? o.value !== '__skip__' : o.value === '__skip__');
-        assert.ok(option);
+        assert.equal(r.interaction.sourceCard, ZIG);
+        const matching = getChoiceOptions(r).filter(option => accept ? option.sourceCard === ZIG && !option.disabled : option.value === '__skip__');
+        assert.equal(matching.length, 1, JSON.stringify(r.interaction));
+        const option = matching[0]!;
         return ok(session.resolveChoice(0, option.value));
     }
     function zigzag(state: GameState) { state.players[0]!.fields = [{ row: 0, col: 2, stacks: [] }, { row: 0, col: 3, stacks: [] }, { row: 1, col: 3, stacks: [] }]; }
