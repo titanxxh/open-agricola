@@ -296,7 +296,13 @@ describe("A122 command boundaries", () => {
     assert.equal(pending.state.players[0]!.resources.wood, 0)
 
     assert.ok(pending.interaction.stateId === 'wait' && pending.interaction.request.kind === 'farm-select')
-    assert.deepEqual(pending.interaction.request.farm, { farmType: 'sow', selectableFields: [{ tile: { row: 0, col: 1 }, allowedCrops: ['grain'] }] })
+    assert.deepEqual(pending.interaction.request.farm, {
+      farmType: 'sow',
+      maxSeedSelections: undefined,
+      maxSelections: undefined,
+      minSelections: undefined,
+      selectableFields: [{ tile: { row: 0, col: 1 }, allowedCrops: ['grain'] }],
+    })
     assert.equal(pending.interaction.playerIndex, 1)
     assert.equal(pending.state.currentPlayerIndex, 1)
     sessionEvidence.record('A122-N3', { basic, hand, pending })
