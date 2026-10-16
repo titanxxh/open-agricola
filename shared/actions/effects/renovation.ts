@@ -286,7 +286,7 @@ export const renovateHouseAction: ActionDefinition = {
   canBeExecutedByPlayer: (state, player, opts) =>
     canExecuteWithCostPreview(
       renovateHouseCostPreview,
-      { state, player, actionContext: opts?.actionContext },
+      { actionHooks: opts?.actionHooks, state, player, actionContext: opts?.actionContext },
     ),
   costPreview: renovateHouseCostPreview,
   getBaseChoiceOptions: ({ player }) => baseRenovationOptions(player),

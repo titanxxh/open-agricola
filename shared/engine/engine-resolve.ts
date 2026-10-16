@@ -60,7 +60,7 @@ import { applyComputeCostResults } from './compute-cost-results'
 import { findActionSpaceById } from '../domain/space'
 
 type EngineContext = {
-  actionHooks?: ActionExecutionContext['actionHooks']
+  actionHooks: ActionExecutionContext['actionHooks']
   state: ActionExecutionContext['state']
   player: ActionExecutionContext['player']
   space: ActionExecutionContext['space']

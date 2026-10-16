@@ -433,12 +433,14 @@ const afterSpecialActionListenersLeaf = (
 })
 
 const snapshotAfterSpecialActionListeners = (
+  actionHooks: ActionHookRegistry | undefined,
   state: GameState,
   player: PlayerState,
   actionId: MoorSpecialActionId,
   payload: MoorSpecialActionPayload,
 ): AfterSpecialActionListenerSnapshot[] =>
   getMatchingListeners({
+    actionHooks,
     state,
     player,
     space: createMoorSpecialActionSpace(actionId),
@@ -462,7 +464,7 @@ const runAfterSpecialActionListeners = (
   actionHooks?: ActionHookRegistry,
 ) => {
   if (result.followUpFlow) {
-    const snapshots = snapshotAfterSpecialActionListeners(state, player, actionId, payload)
+    const snapshots = snapshotAfterSpecialActionListeners(actionHooks, state, player, actionId, payload)
     return combineFlows([
       result.followUpFlow,
       afterSpecialActionListenersLeaf(actionId, payload, result.terrainCleared, snapshots),

@@ -344,7 +344,7 @@ export const payAction: ActionDefinition = {
   // time landing on the `selected` branch and actually mutating resources.
   // Without this hook the engine's fallthrough would return `{type:'ok'}`
   // without paying, leaving host action completion running on un-paid state.
-  resolveChoice: ({ player, params, sourceCard, state, eventSink }, choice) => {
+  resolveChoice: ({ actionHooks, player, params, sourceCard, state, eventSink }, choice) => {
     const p = normalizePayParams(params)
     if (!p?.cost) return { type: 'fail', errorKey: 'log.payFail' }
     const optionPrefix = p.optionPrefix ?? 'pay:generic'
@@ -356,6 +356,7 @@ export const payAction: ActionDefinition = {
     if (!PaymentSolver.isComplexCost(p.cost) && p.costType) {
       if (!choiceLooksLikePayment) {
         return payAction.execute({
+          actionHooks,
           player,
           params,
           sourceCard,
@@ -398,6 +399,7 @@ export const payAction: ActionDefinition = {
     // UX and keeping legacy D83-style upper-flow tests compatible.
     if (!choiceLooksLikePayment) {
       return payAction.execute({
+        actionHooks,
         player,
         params,
         sourceCard,

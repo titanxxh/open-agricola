@@ -217,10 +217,12 @@ const autumnVegetableLeaf = (): ActionFlow => ({
 const autumnThanksgivingFlow = (
   state: Parameters<ActionDefinition['canBeExecutedByPlayer']>[0],
   player: Parameters<ActionDefinition['canBeExecutedByPlayer']>[1],
-  previewMode?: ActionFlowPlanningContext['previewMode'],
+  previewMode: ActionFlowPlanningContext['previewMode'],
+  actionHooks: ActionFlowPlanningContext['actionHooks'],
 ): ActionFlow => {
   const children: ActionFlow[] = []
   if (previewMode === 'base' || reapAction.canBeExecutedByPlayer(state, player, {
+    actionHooks,
     actionContext: { trigger: { phase: 'private-field-phase' } },
   })) {
     children.push(autumnPrivateFieldLeaf())
@@ -232,8 +234,8 @@ const autumnThanksgivingFlow = (
   }
 }
 
-const autumnFlowFactory = ({ state, player, previewMode }: ActionFlowPlanningContext): ActionFlow =>
-  autumnThanksgivingFlow(state, player, previewMode)
+const autumnFlowFactory = ({ state, player, previewMode, actionHooks }: ActionFlowPlanningContext): ActionFlow =>
+  autumnThanksgivingFlow(state, player, previewMode, actionHooks)
 
 const winterSourceCard = 'through-the-seasons:winter'
 

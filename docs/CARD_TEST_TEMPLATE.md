@@ -153,7 +153,11 @@ From lightest to heaviest:
 
 ### 5.2 Preparing State
 
-Session public commands and queries bind their own rules. When a test injects a card effect or listener into a Session, register it inside `session.withCtx(() => ...)` so it belongs to that Session. Direct behavior tests that read official card rules explicitly call `installOfficialCardRegistry()` from `shared/cards/__tests__/card-environment.ts` at file scope; this fixture installs a fresh registry before each test and restores the prior environment afterward. Tests for a missing environment must omit this fixture. Direct generic ActionHook calls receive a test-owned `ActionHookRegistry`, or `session.actionHooks` when exercising that Session. Never install a process-wide rule default in test setup.
+Session public commands and queries bind their own rules. Do not wrap a Session scenario or its whole file in an official-card registry fixture: that hides public entries which fail to bind their own owner. When a test directly queries rules for a Session, wrap only that query in `session.withCtx(() => ...)`. Register injected effects and listeners in that same owner scope.
+
+Standalone direct behavior tests that read official card rules explicitly call `installOfficialCardRegistry()` from `shared/cards/__tests__/card-environment.ts`; this fixture installs a fresh registry before each test and restores the prior environment afterward. In a mixed suite, scope an official registry only around standalone direct queries. Tests for a missing environment must omit the fixture. Never install a process-wide rule default in test setup.
+
+Action execution and query context objects must explicitly include `actionHooks`. Use `session.actionHooks` when exercising that Session, or a test-owned `ActionHookRegistry` for standalone generic rules. Pure calls that do not query generic rules may explicitly use `actionHooks: undefined`; this is not a fallback for rule consumers. The field does not replace the temporary card environment.
 
 Use `server/__tests__/_helpers/session-fixtures.ts` for new Session scenarios. Both helpers default to two players and dispose the Session if their initial assertions fail; the caller disposes successful Sessions after use.
 

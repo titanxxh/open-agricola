@@ -744,7 +744,7 @@ function* affordableFencePlans(
     ? selectable.filter((edge) => isFarmyardBorderEdge(player, edge)) : []
   const maxFence = !policy.allowedSegmentTypes || policy.allowedSegmentTypes.includes('fence') ? capacity : 0
   const maxPalisade = Math.min(border.length, policy.segmentBounds?.palisade?.max ?? border.length)
-  const costContext = { state, player, space, actionId: 'fence', phase: 'computeCosts' as const }
+  const costContext = { actionHooks: context.actionHooks, state, player, space, actionId: 'fence', phase: 'computeCosts' as const }
   const globalCosts = requireActionHookRegistry(context.actionHooks).hasMatching(costContext)
   const costListeners = getMatchingListeners(costContext)
   const geometryCosts = globalCosts || costListeners.length > 0

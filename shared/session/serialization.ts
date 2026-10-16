@@ -86,7 +86,7 @@ export type SerializedGameState = Omit<
 }
 
 export type SerializeStateContext = {
-  actionHooks?: ActionHookRegistry
+  actionHooks: ActionHookRegistry | undefined
   engineStack?: unknown
 }
 

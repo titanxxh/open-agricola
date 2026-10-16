@@ -77,7 +77,7 @@ import { findActionSpaceById } from '../domain/space'
 import { findPlayerById } from '../domain/player'
 
 type EngineContext = {
-  actionHooks?: ActionExecutionContext['actionHooks']
+  actionHooks: ActionExecutionContext['actionHooks']
   state: ActionExecutionContext['state']
   player: ActionExecutionContext['player']
   space: ActionExecutionContext['space']
