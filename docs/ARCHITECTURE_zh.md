@@ -153,6 +153,8 @@ ESLint 三层强制（`eslint.config.js`）：
 
 `actionSpaces[*].takenBy` 是 `WorkerRef[]`。普通 ref 只包含 `playerId` / `workerId`；卡牌创建的联动占格可额外写 `synthetic: { kind: 'linked-occupancy', sourceCard, linkedWorkerId }`，让后续清理按行动格 state 上的语义 metadata 判断，而不是跨读外卡 id。
 
+`spend-worker` 将 Card-held Person 记录在非交互的 `card-worker:<sourceCard>` 占位格中。其 WorkerRef 是权威放置事实，可用工人查询、undo 和恢复必须保留它，直到正常归家清理。创建、直接状态规范化和 JSON 快照恢复共用 `shared/domain/card-worker-space.ts` 的纯工厂。恢复仅识别保留前缀及非空完整来源 ID，从代码重建不可执行定义并恢复占位，不接受快照回调或任意未知可执行格。来源卡不再位于已打出区，也不会使已放置的人员重新可用。
+
 `workPhaseObtainedResources` 服务于"前一工作阶段获得资源"类卡（A53 等），回家阶段结算后清空。
 
 `completedFeedingPhases` 在 `shared/session/phases/harvest.ts` 的 feeding phase 结束时 `+= 1`，等价于 参考实现 Globals 同款全局计数；A148/B86 等"按已完成收获 +1 容量"卡牌从此字段读取，避免再走 per-card post-play counter。

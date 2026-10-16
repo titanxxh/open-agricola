@@ -2,36 +2,13 @@ import type { ActionDefinition, ActionSpace, GameState } from '../../../contract
 import { recordRoundPlacement } from '../../../cards/helpers/round-placement'
 import { smallestAvailableWorker, workersAvailable } from '../../../domain/player'
 import { addWorkerRef, findActionSpaceById } from '../../../domain/space'
-
-const emptyResources = () => ({
-  wood: 0,
-  clay: 0,
-  reed: 0,
-  stone: 0,
-  food: 0,
-  grain: 0,
-  vegetable: 0,
-  sheep: 0,
-  boar: 0,
-  cattle: 0,
-  begging: 0,
-})
+import { createCardWorkerSpace } from '../../../domain/card-worker-space'
 
 const ensureCardPseudoSpace = (state: GameState, cardId: string): ActionSpace => {
   const spaceId = `card-worker:${cardId}`
   const existing = findActionSpaceById(state, spaceId)
   if (existing) return existing
-  const space: ActionSpace = {
-    id: spaceId,
-    nameKey: `cards.${cardId}.name`,
-    descriptionKey: `cards.${cardId}.description`,
-    roundAvailable: 1,
-    gainPerRound: {},
-    canBeExecutedByPlayer: () => false,
-    execute: () => ({ type: 'ok' }),
-    resources: emptyResources(),
-    takenBy: [],
-  }
+  const space = createCardWorkerSpace(cardId)
   state.actionSpaces.push(space)
   return space
 }

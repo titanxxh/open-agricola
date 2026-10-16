@@ -204,6 +204,8 @@ Gain provenance distinguishes explicit resource parameters from the action space
 
 ## 6. Infrastructure backlog
 
+Issue #1205 fixes recovery of card-held people through the shared `card-worker:<sourceCard>` holder factory. Direct loads and JSON/new-Session or PostgreSQL room recovery preserve occupancy and derived worker availability; the holder remains nonexecutable and normal return-home cleanup releases the person. Two-player Session regressions also cover undo/retry, colon-containing source IDs, declined effects and unknown-space rejection. No D103-specific recovery branch or duplicate worker counter is introduced.
+
 Issue #1201 fixes empty accumulation-space admission and C127 skipping its mandatory individual cost. Bonuses do not authorize an empty space, including Riverbank Forest's fixed reed; actual stock of a different good and explicitly legal replacements remain valid. C127 permits begging for a food shortfall and pauses for confirmation so existing legal conversions can be used first; ordinary Occupation Cost remains separate. Session assertions cover atomic rejection, payment/begging, growth, recovery and undo. Historical audit RAW counts remain unchanged.
 
 Issue #1197 removes C179's before-action pasture cache. Five-player Session regressions cover nested subdivision in both reaction orders, multiple new pastures, existing unfenced stables, animal housing and scoring, projection/Replay, pending recovery and undo/redo.
