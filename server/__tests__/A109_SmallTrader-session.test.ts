@@ -165,7 +165,19 @@ describe("A109 command boundaries", () => {
       }
       throw new Error(`The explicit purchase did not finish for ${card}`)
     }
-    it("literal major or minor paid hand purchase rewards three food exactly once", () => { const s = setup(); const r = select(s, enter(s, 'major-improvement'), PAID); assert(r.state.players[0]!.minorPlayed.includes(PAID)); assert.equal(r.state.players[0]!.resources.food, 43); assert.equal(r.state.players[0]!.resources.wood, 0); assertRejectedUnchanged(s, () => s.resolveChoice(0, PAID)); save('A109-N1', r); });
+    it("literal major or minor paid hand purchase rewards three food exactly once", () => {
+        const s = setup();
+        const r = select(s, enter(s, 'major-improvement'), PAID);
+        assert(r.state.players[0]!.minorPlayed.includes(PAID));
+        assert.equal(r.state.players[0]!.resources.food, 43);
+        assert.equal(r.state.players[0]!.resources.wood, 0);
+        assertRejectedUnchanged(s, () => s.resolveChoice(0, PAID));
+        assert.ok(r.interaction.stateId === 'wait');
+        assert.deepEqual(r.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 });
+        assert.equal(r.interaction.playerIndex, 0);
+        assert.equal(r.state.currentPlayerIndex, 0);
+        save('A109-N1', r);
+    });
     it("board major and minor only Meeting Place do not grant trader food", () => { for (const [space, card] of [['major-improvement', MAJOR], ['meeting-place', MINOR]]) {
         const s = setup();
         const r = select(s, enter(s, space!), card!);
@@ -177,8 +189,20 @@ describe("A109 command boundaries", () => {
         assert.equal(r.state.currentPlayerIndex, 0);
         save(`A109-N2-${space}`, r);
     } });
-    it("unaffordable wrong actor and invalid purchase reject before legal hand reward", () => { const s = setup(state => state.players[0]!.resources.wood = 0); const pending = enter(s, 'major-improvement'); for (const [actor, card] of [[0, PAID], [1, MINOR], [0, '__invented_card__']] as const)
-        assertRejectedUnchanged(s, () => s.resolveChoice(actor, card)); const r = select(s, pending, MINOR); assert.equal(r.state.players[0]!.resources.food, 43); assert.equal(r.state.players[0]!.resources.wood, 0); save('A109-N3', r); });
+    it("unaffordable wrong actor and invalid purchase reject before legal hand reward", () => {
+        const s = setup(state => state.players[0]!.resources.wood = 0);
+        const pending = enter(s, 'major-improvement');
+        for (const [actor, card] of [[0, PAID], [1, MINOR], [0, '__invented_card__']] as const)
+        assertRejectedUnchanged(s, () => s.resolveChoice(actor, card));
+        const r = select(s, pending, MINOR);
+        assert.equal(r.state.players[0]!.resources.food, 43);
+        assert.equal(r.state.players[0]!.resources.wood, 0);
+        assert.ok(r.interaction.stateId === 'wait');
+        assert.deepEqual(r.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 });
+        assert.equal(r.interaction.playerIndex, 0);
+        assert.equal(r.state.currentPlayerIndex, 0);
+        save('A109-N3', r);
+    });
     it("card granted major or minor rewards but optional decline does not", () => { for (const accept of [true, false]) {
         const s = setup(state => { state.players[0]!.minorPlayed = ['A023_StoneCompany']; state.players[0]!.minorHand = ['E047_SyrupTap']; state.actionSpaces.find(a => a.id === 'western-quarry')!.resources.stone = 1; });
         let r = ok(s.takeAction(0, 'western-quarry'));
@@ -205,5 +229,28 @@ describe("A109 command boundaries", () => {
         assert.deepEqual(r.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 0 });
         assert.equal(r.state.currentPlayerIndex, 1);
         save('A109-N5', { r, unplayed }); });
-    it("whole action undo restores cost card and reward before exactly one retry", () => { const s = setup(); const bought = select(s, enter(s, 'major-improvement'), PAID); const undone = ok(s.undoAction()); assert.equal(undone.state.players[0]!.resources.food, 40); assert.equal(undone.state.players[0]!.resources.wood, 1); assert(undone.state.players[0]!.minorHand.includes(PAID)); const r = select(s, enter(s, 'major-improvement'), PAID); assert.equal(r.state.players[0]!.resources.food, 43); assert.equal(r.state.players[0]!.resources.wood, 0); save('A109-N6', { bought, undone, r }); });
+    it("whole action undo restores cost card and reward before exactly one retry", () => {
+        const s = setup();
+        const undoInteraction = JSON.stringify(s.getState().interaction);
+        const bought = select(s, enter(s, 'major-improvement'), PAID);
+        const undone = ok(s.undoAction());
+        assert.equal(JSON.stringify(undone.interaction), undoInteraction);
+        assert.equal(undone.interaction.stateId, 'idle');
+        assert.equal(undone.state.currentPlayerIndex, 0);
+        assert.equal(undone.state.players[0]!.resources.food, 40);
+        assert.equal(undone.state.players[0]!.resources.wood, 1);
+        assert(undone.state.players[0]!.minorHand.includes(PAID));
+        const r = select(s, enter(s, 'major-improvement'), PAID);
+        assert.equal(r.state.players[0]!.resources.food, 43);
+        assert.equal(r.state.players[0]!.resources.wood, 0);
+        assert.ok(bought.interaction.stateId === 'wait');
+        assert.deepEqual(bought.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 });
+        assert.equal(bought.interaction.playerIndex, 0);
+        assert.equal(bought.state.currentPlayerIndex, 0);
+        assert.ok(r.interaction.stateId === 'wait');
+        assert.deepEqual(r.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 });
+        assert.equal(r.interaction.playerIndex, 0);
+        assert.equal(r.state.currentPlayerIndex, 0);
+        save('A109-N6', { bought, undone, r });
+    });
 });

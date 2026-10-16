@@ -243,6 +243,10 @@ describe("A095 command boundaries", () => {
             assert.ok(response.state.players[0]!.minorPlayed.includes(DEBT));
             assert.equal(response.state.players[0]!.resources.food, amount);
             assert.equal(response.state.actionSpaces.find(s => s.id === 'fishing')!.resources.food, 0);
+            assert.ok(response.interaction.stateId === 'wait');
+            assert.deepEqual(response.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 });
+            assert.equal(response.interaction.playerIndex, 0);
+            assert.equal(response.state.currentPlayerIndex, 0);
             save(`A095-N1-${amount}`, response);
         }
     });

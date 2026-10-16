@@ -189,6 +189,10 @@ describe("D001 command boundaries", () => {
         assert.equal(r.state.players[0]!.fields.length, 4);
         assert.equal(r.state.players[0]!.resources.wood, 0);
         assert(r.state.players[1]!.minorHand.includes(ZIG));
+        assert.ok(r.interaction.stateId === 'wait');
+        assert.deepEqual(r.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 });
+        assert.equal(r.interaction.playerIndex, 0);
+        assert.equal(r.state.currentPlayerIndex, 0);
         save('D001-N1', r);
     });
     it("straight fewer and missing L shaped fields cannot pay or plow", () => {
@@ -201,6 +205,10 @@ describe("D001 command boundaries", () => {
             const legal = ok(session.resolveChoice(0, 'A030_BakingSheet'));
             assert.equal(legal.state.players[0]!.fields.length, fields.length);
             assert.equal(legal.state.players[0]!.resources.wood, 1);
+            assert.ok(legal.interaction.stateId === 'wait');
+            assert.deepEqual(legal.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 });
+            assert.equal(legal.interaction.playerIndex, 0);
+            assert.equal(legal.state.currentPlayerIndex, 0);
             save(`D001-N2-${fields.length}`, legal);
         }
     });
@@ -214,6 +222,10 @@ describe("D001 command boundaries", () => {
         assertRejectedUnchanged(session, () => session.commitSelectionChoice(1, { tile: tiles[0] }));
         const legal = ok(session.commitSelectionChoice(0, { tile: tiles[0] }));
         assert.equal(legal.state.players[0]!.fields.length, 4);
+        assert.ok(legal.interaction.stateId === 'wait');
+        assert.deepEqual(legal.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 });
+        assert.equal(legal.interaction.playerIndex, 0);
+        assert.equal(legal.state.currentPlayerIndex, 0);
         save('D001-N3', legal);
     });
     it("optional decline plows none and whole undo restores field wood and passing", () => {
@@ -222,10 +234,14 @@ describe("D001 command boundaries", () => {
         assert.equal(declined.state.players[0]!.fields.length, 3);
         assert.equal(declined.state.players[0]!.resources.wood, 0);
         const session = setup(1, zigzag);
+        const undoInteraction = JSON.stringify(session.getState().interaction);
         const pending = optional(session, buy(session, ZIG), true);
         assert.equal(expectTileFarmSelection(pending, 'plow').farmType, 'plow');
         const r = ok(session.commitSelectionChoice(0, { tile: expectTileFarmSelection(pending, 'plow').selectableTiles[0] }));
         const undone = ok(session.undoAction());
+        assert.equal(JSON.stringify(undone.interaction), undoInteraction);
+        assert.equal(undone.interaction.stateId, 'idle');
+        assert.equal(undone.state.currentPlayerIndex, 0);
         assert.equal(undone.state.players[0]!.fields.length, 3);
         assert.equal(undone.state.players[0]!.resources.wood, 1);
         assert(undone.state.players[0]!.minorHand.includes(ZIG));
@@ -233,6 +249,10 @@ describe("D001 command boundaries", () => {
         assert.ok(declined.interaction.stateId === 'wait');
         assert.deepEqual(declined.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 });
         assert.equal(declined.state.currentPlayerIndex, 0);
+        assert.ok(r.interaction.stateId === 'wait');
+        assert.deepEqual(r.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 });
+        assert.equal(r.interaction.playerIndex, 0);
+        assert.equal(r.state.currentPlayerIndex, 0);
         save('D001-N4', { r, undone, declined });
     });
 });

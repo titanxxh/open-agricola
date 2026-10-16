@@ -228,6 +228,10 @@ describe("A110 command boundaries", () => {
             assert.equal(r.state.players[0]!.resources.food, material === 'clay' ? 43 : 40);
             assert.equal(r.state.players[0]!.resources.reed, 3);
             assert.equal(r.state.players[0]!.resources[material === 'clay' ? 'stone' : 'clay'], 8);
+            assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice');
+            assert.deepEqual(getChoiceOptions(r).map(option => option.labelKey), ['actions.improvement.name', 'ui.interactionOptionalSkip']);
+            assert.equal(r.interaction.playerIndex, 0);
+            assert.equal(r.state.currentPlayerIndex, 0);
             save(`A110-N2-${material}`, r);
         }
     });
@@ -245,6 +249,10 @@ describe("A110 command boundaries", () => {
         const legal = ok(session.commitSelectionChoice(0, { rooms: [{ row: 1, col: 1 }] }));
         assert.equal(legal.state.players[0]!.resources.food, 43);
         assert.equal(legal.state.players[0]!.resources.clay, 0);
+        assert.ok(legal.interaction.stateId === 'wait' && legal.interaction.request.kind === 'choice');
+        assert.deepEqual(getChoiceOptions(legal).map(option => option.labelKey), ['actions.stables.name', 'ui.interactionFlowDone']);
+        assert.equal(legal.interaction.playerIndex, 0);
+        assert.equal(legal.state.currentPlayerIndex, 0);
         save('A110-N3', legal);
     });
     it("opponent unplayed and undo cannot leave an extra owner construction reward", () => {
@@ -256,11 +264,27 @@ describe("A110 command boundaries", () => {
         assert.equal(other.state.players[0]!.resources.food, 40);
         assert.equal(other.state.players[1]!.resources.food, 40);
         const session = setup(state => state.players[0]!.houseType = 'clay');
+        const undoInteraction = JSON.stringify(session.getState().interaction);
         const r = build(session, 1);
         const undone = ok(session.undoAction());
+        assert.equal(JSON.stringify(undone.interaction), undoInteraction);
+        assert.equal(undone.interaction.stateId, 'idle');
+        assert.equal(undone.state.currentPlayerIndex, 0);
         assert.equal(undone.state.players[0]!.resources.food, 40);
         assert.equal(undone.state.players[0]!.resources.clay, 10);
         assert.equal(undone.state.players[0]!.rooms, 2);
+        assert.ok(r.interaction.stateId === 'wait');
+        assert.deepEqual(r.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 });
+        assert.equal(r.interaction.playerIndex, 0);
+        assert.equal(r.state.currentPlayerIndex, 0);
+        assert.ok(unplayed.interaction.stateId === 'wait');
+        assert.deepEqual(unplayed.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 });
+        assert.equal(unplayed.interaction.playerIndex, 0);
+        assert.equal(unplayed.state.currentPlayerIndex, 0);
+        assert.ok(other.interaction.stateId === 'wait');
+        assert.deepEqual(other.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 0 });
+        assert.equal(other.interaction.playerIndex, 1);
+        assert.equal(other.state.currentPlayerIndex, 1);
         save('A110-N4', { r, undone, other, unplayed });
     });
 });

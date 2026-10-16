@@ -847,10 +847,15 @@ describe("A098 command boundaries", () => {
         assert.equal(response.state.players[0]!.stableTiles.length, 1);
         assert.equal(response.state.players[0]!.resources.wood, 13);
         assert.equal(bonus(response, ARCH), 1);
+        assert.ok(response.interaction.stateId === 'wait');
+        assert.deepEqual(response.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 });
+        assert.equal(response.interaction.playerIndex, 0);
+        assert.equal(response.state.currentPlayerIndex, 0);
         save('A098-N4', response);
     });
     it("real fencing stops stable bonus and public undo restores it before retry", () => {
         const session = setup(state => state.players[0]!.stableTiles = [{ row: 0, col: 1 }]);
+        const undoInteraction = JSON.stringify(session.getState().interaction);
         const before = session.getState();
         assert.equal(bonus(before, ARCH), 1);
         const edges = ['H-0-1', 'H-1-1', 'V-0-1', 'V-0-2'];
@@ -859,11 +864,18 @@ describe("A098 command boundaries", () => {
         assert.equal(bonus(response, ARCH), 0);
         assert.equal(response.state.players[0]!.resources.wood, 11);
         const undone = ok(session.undoAction());
+        assert.equal(JSON.stringify(undone.interaction), undoInteraction);
+        assert.equal(undone.interaction.stateId, 'idle');
+        assert.equal(undone.state.currentPlayerIndex, 0);
         assert.equal(bonus(undone, ARCH), 1);
         assert.deepEqual(undone.state.players[0]!.stableTiles, before.state.players[0]!.stableTiles);
         assert.equal(undone.state.players[0]!.fenceSegments.length, 0);
         assert.equal(undone.state.players[0]!.resources.wood, 15);
         assert.equal(bonus(fence(), ARCH), 0);
+        assert.ok(response.interaction.stateId === 'wait');
+        assert.deepEqual(response.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 });
+        assert.equal(response.interaction.playerIndex, 0);
+        assert.equal(response.state.currentPlayerIndex, 0);
         save('A098-N5', { response, undone });
     });
 });
@@ -905,6 +917,10 @@ describe("A107 command boundaries", () => {
         response = turn(session, 0, 'clay-pit');
         assert.equal(response.state.players[0]!.resources.food, 42);
         assert.equal(response.state.players[0]!.resources.clay, 4);
+        assert.ok(response.interaction.stateId === 'wait');
+        assert.deepEqual(response.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 });
+        assert.equal(response.interaction.playerIndex, 0);
+        assert.equal(response.state.currentPlayerIndex, 0);
         save('A107-N1', response);
     });
     it("wrong count and nonbuilding food pile do not award Catcher food", () => {
@@ -942,14 +958,26 @@ describe("A107 command boundaries", () => {
     });
     it("whole action undo restores pile order and food before exactly one retry", () => {
         const session = setup(state => state.actionSpaces.find(s => s.id === 'forest')!.resources.wood = 5);
+        const undoInteraction = JSON.stringify(session.getState().interaction);
         const response = turn(session, 0, 'forest');
         assert.equal(response.state.players[0]!.resources.food, 41);
         const undone = ok(session.undoAction());
+        assert.equal(JSON.stringify(undone.interaction), undoInteraction);
+        assert.equal(undone.interaction.stateId, 'idle');
+        assert.equal(undone.state.currentPlayerIndex, 0);
         assert.equal(undone.state.players[0]!.resources.food, 40);
         assert.equal(undone.state.players[0]!.resources.wood, 0);
         assert.equal(undone.state.actionSpaces.find(s => s.id === 'forest')!.resources.wood, 5);
         const retry = turn(session, 0, 'forest');
         assert.equal(retry.state.players[0]!.resources.food, 41);
+        assert.ok(response.interaction.stateId === 'wait');
+        assert.deepEqual(response.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 });
+        assert.equal(response.interaction.playerIndex, 0);
+        assert.equal(response.state.currentPlayerIndex, 0);
+        assert.ok(retry.interaction.stateId === 'wait');
+        assert.deepEqual(retry.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 });
+        assert.equal(retry.interaction.playerIndex, 0);
+        assert.equal(retry.state.currentPlayerIndex, 0);
         save('A107-N4', { response, undone, retry });
     });
     it("third person after actual growth uses three building resources once", () => {

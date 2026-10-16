@@ -743,6 +743,10 @@ describe("A097 command boundaries", () => {
         assert.equal(response.state.players[0]!.resources.food, 0);
         assert.ok(response.state.players[0]!.occupationPlayed.includes(OCC));
         assert.ok(response.state.players[0]!.occupationHand.includes('A116_WoodCutter'));
+        assert.ok(response.interaction.stateId === 'wait');
+        assert.deepEqual(response.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 });
+        assert.equal(response.interaction.playerIndex, 0);
+        assert.equal(response.state.currentPlayerIndex, 0);
         save('A097-N1', response);
     });
     it("no playable occupation or unplayed Freshman cannot make grainless space available", () => {

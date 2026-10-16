@@ -149,6 +149,10 @@ describe("A105 command boundaries", () => {
         assert.equal(response.state.players[0]!.fields.length, 1);
         assert.equal(response.state.players[0]!.resources.clay, 1);
         assert.equal(response.state.players[0]!.resources.food, 41);
+        assert.ok(response.interaction.stateId === 'wait');
+        assert.deepEqual(response.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 });
+        assert.equal(response.interaction.playerIndex, 0);
+        assert.equal(response.state.currentPlayerIndex, 0);
         save('A105-N1', response);
     });
     it("room outside farm wrong actor and duplicate target reject before legal plow", () => {
@@ -160,6 +164,10 @@ describe("A105 command boundaries", () => {
         const response = ok(session.commitSelectionChoice(0, { tile: { row: 0, col: 1 } }));
         assertRejectedUnchanged(session, () => session.commitSelectionChoice(0, { tile: { row: 0, col: 1 } }));
         assert.equal(response.state.players[0]!.resources.clay, 1);
+        assert.ok(response.interaction.stateId === 'wait');
+        assert.deepEqual(response.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 });
+        assert.equal(response.interaction.playerIndex, 0);
+        assert.equal(response.state.currentPlayerIndex, 0);
         save('A105-N2', response);
     });
     it("nonplow opponent and unplayed plow do not grant owner reward", () => {
@@ -190,6 +198,7 @@ describe("A105 command boundaries", () => {
     it("three real Wheel Plow fields each award clay and food and undo restores all", () => {
         for (const first of [BARROW, 'A018_WheelPlow']) {
             const session = setup(state => state.players[0]!.minorPlayed = ['A018_WheelPlow']);
+            const undoInteraction = JSON.stringify(session.getState().interaction);
             let response = turn(session, 0, 'farmland');
             for (let n = 0; n < 3; n++) {
                 response = plowTriggers(session, response, first);
@@ -201,9 +210,16 @@ describe("A105 command boundaries", () => {
             assert.equal(response.state.players[0]!.resources.clay, 3);
             assert.equal(response.state.players[0]!.resources.food, 43);
             const undone = ok(session.undoAction());
+            assert.equal(JSON.stringify(undone.interaction), undoInteraction);
+            assert.equal(undone.interaction.stateId, 'idle');
+            assert.equal(undone.state.currentPlayerIndex, 0);
             assert.equal(undone.state.players[0]!.fields.length, 0);
             assert.equal(undone.state.players[0]!.resources.clay, 0);
             assert.equal(undone.state.players[0]!.resources.food, 40);
+            assert.ok(response.interaction.stateId === 'wait');
+            assert.deepEqual(response.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 });
+            assert.equal(response.interaction.playerIndex, 0);
+            assert.equal(response.state.currentPlayerIndex, 0);
             save(`A105-N4-${first}`, { response, undone });
         }
     });
