@@ -230,8 +230,12 @@ describe("A086 command boundaries", () => {
     assert.ok(r.interaction.stateId === 'wait')
     return record(`resolveChoice:${o.value}`, ok(s.resolveChoice(r.interaction.playerIndex, o.value)))
   }
-  function complete(r: SessionResponse) {
+  function complete(r: SessionResponse, actor: number) {
     assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, actor)
+    assert.equal(r.interaction.request.nextPlayerIndex, 1 - actor)
+    assert.equal(r.state.currentPlayerIndex, actor)
+    assert.equal(r.state.roundPhase, 'work')
     return r
   }
   function ready(s: GameSession, actor: number) {
@@ -268,14 +272,17 @@ describe("A086 command boundaries", () => {
     const choice = choiceOptions(r).find(o => o.effectPreview?.kind === 'resourceExchange' && o.effectPreview.resourcesGained?.[type] === 1)
     assert.ok(choice, JSON.stringify(r.interaction))
     r = record(`Tamer-${type}`, ok(s.resolveChoice(0, choice.value)))
-    return { r: complete(r), choice: choice.value }
+    return { r: complete(r, 0), choice: choice.value }
   }
-  function house(s: GameSession, r: SessionResponse, count: number, type: 'sheep' | 'boar' = 'sheep') {
+  function house(s: GameSession, r: SessionResponse, actor: number, count: number, type: 'sheep' | 'boar' = 'sheep') {
     const q = animalMenu(r)
+    assert.ok(r.interaction.stateId === 'wait')
+    assert.equal(r.interaction.playerIndex, actor)
+    assert.equal(r.state.currentPlayerIndex, actor)
     const rooms = q.zones.filter(z => z.zoneType === 'house')
     assert.ok(rooms.length >= count)
     const zones = rooms.slice(0, count).map(z => ({ ...z, animalType: type, animalCount: 1 }))
-    return complete(record('Tamer-house', ok(s.resolveChoice(r.interaction.stateId === 'wait' ? r.interaction.playerIndex : 0, 'confirm', { zones }))))
+    return complete(record('Tamer-house', ok(s.resolveChoice(actor, 'confirm', { zones }))), actor)
   }
   it("real Lessons wood grain exclusive reward with stale replay", () => {
     for (const type of ['wood', 'grain'] as const) {
@@ -296,7 +303,7 @@ describe("A086 command boundaries", () => {
     assert.equal(zone.capacity, 1)
     assert.equal(animalMenu(r).zones.filter(z => z.zoneType === 'house').length, 2)
     record('Tamer-overcapacity', assertRejectedUnchanged(s, () => s.resolveChoice(0, 'confirm', { zones: [{ ...zone, animalType: 'sheep', animalCount: 3 }] })))
-    r = house(s, r, 2)
+    r = house(s, r, 0, 2)
     assert.equal(r.state.players[0]!.resources.sheep, 2)
     assert.equal(countRoomAnimals(r.state.players[0]!), 2)
   })
@@ -309,7 +316,7 @@ describe("A086 command boundaries", () => {
     const r = turn(s, 0, 'pig-market')
     const rooms = animalMenu(r).zones.filter(z => z.zoneType === 'house')
     assert.equal(rooms.length, 2)
-    const response = complete(record('Tamer-mixed-house', ok(s.resolveChoice(0, 'confirm', { zones: rooms.map((z, index) => ({ ...z, animalType: index === 0 ? 'sheep' : 'boar', animalCount: 1 })) }))))
+    const response = complete(record('Tamer-mixed-house', ok(s.resolveChoice(0, 'confirm', { zones: rooms.map((z, index) => ({ ...z, animalType: index === 0 ? 'sheep' : 'boar', animalCount: 1 })) }))), 0)
     assert.equal(response.state.players[0]!.resources.sheep, 1)
     assert.equal(response.state.players[0]!.resources.boar, 1)
     assert.deepEqual(Object.values(response.state.players[0]!.houseAnimals).sort(), ['boar', 'sheep'])
@@ -321,10 +328,9 @@ describe("A086 command boundaries", () => {
       r = choose(s, r, o => o.labelKey === 'actions.construct.name')
     assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'farm-select')
     r = record('Tamer-build-third-room', ok(s.commitSelectionChoice(0, { rooms: [{ row: 0, col: 0 }] })))
-    while (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice' && getChoiceOptions(r).some(o => o.value === '__skip__'))
-      r = record('skip-stables', ok(s.resolveChoice(0, '__skip__')))
+    complete(r, 0)
     turn(s, 1, 'forest')
-    r = house(s, turn(s, 0, 'sheep-market'), 3)
+    r = house(s, turn(s, 0, 'sheep-market'), 0, 3)
     assert.equal(r.state.players[0]!.rooms, 3)
     assert.equal(r.state.players[0]!.resources.sheep, 3)
     assert.equal(r.state.players[0]!.workers.filter(w => w.isActive).length, 2)
@@ -337,7 +343,7 @@ describe("A086 command boundaries", () => {
     assert.equal(ordinary.capacity, 1)
     record('unplayed-two-room-overflow', assertRejectedUnchanged(s, () => s.resolveChoice(0, 'confirm', { zones: animalMenu(r).zones.filter(z => z.zoneType === 'house').map(z => ({ ...z, animalType: 'sheep', animalCount: 1 })) })))
     record('unplayed-house-overflow', assertRejectedUnchanged(s, () => s.resolveChoice(0, 'confirm', { zones: [{ ...ordinary, animalType: 'sheep', animalCount: 2 }] })))
-    r = house(s, r, 1)
+    r = house(s, r, 0, 1)
     assert.equal(r.state.players[0]!.resources.sheep, 1)
     s = tamer()
     turn(s, 0, 'reed-bank')
@@ -347,7 +353,7 @@ describe("A086 command boundaries", () => {
     assert.equal(other.capacity, 1)
     record('opponent-two-room-overflow', assertRejectedUnchanged(s, () => s.resolveChoice(1, 'confirm', { zones: animalMenu(r).zones.filter(z => z.zoneType === 'house').map(z => ({ ...z, animalType: 'sheep', animalCount: 1 })) })))
     record('opponent-house-overflow', assertRejectedUnchanged(s, () => s.resolveChoice(1, 'confirm', { zones: [{ ...other, animalType: 'sheep', animalCount: 2 }] })))
-    r = house(s, r, 1)
+    r = house(s, r, 1, 1)
     assert.equal(r.state.players[1]!.resources.sheep, 1)
     assert.equal(r.state.players[0]!.resources.sheep, 0)
   })
@@ -358,21 +364,33 @@ describe("A086 command boundaries", () => {
     assert.ok(zone)
     record('Tamer-bad-zone', assertRejectedUnchanged(s, () => s.resolveChoice(0, 'confirm', { zones: [{ ...zone, id: 'house-other', animalType: 'sheep', animalCount: 2 }] })))
     record('Tamer-duplicate-zone', assertRejectedUnchanged(s, () => s.resolveChoice(0, 'confirm', { zones: [{ ...zone, animalType: 'sheep', animalCount: 1 }, { ...zone, animalType: 'sheep', animalCount: 1 }] })))
-    r = house(s, r, 2)
+    r = house(s, r, 0, 2)
     assert.equal(r.state.players[0]!.resources.sheep, 2)
   })
   it("real Lessons and animal use undo strict projection with retry", () => {
     let s = tamer({ played: false })
     let before = undoRuleSnapshot(s.getState())
+    let interactionBeforeWholeUndo = structuredClone(s.getState().interaction)
     playTamer(s)
-    assertUndoRestored(before, record('Tamer-Lessons-undo', s.undoAction()))
+    const wholeUndoResponse1 = record('Tamer-Lessons-undo', s.undoAction())
+    assertUndoRestored(before, wholeUndoResponse1)
+    assert.deepEqual(wholeUndoResponse1.interaction, interactionBeforeWholeUndo)
+    assert.deepEqual(s.getState().interaction, interactionBeforeWholeUndo)
+    assert.equal(wholeUndoResponse1.state.currentPlayerIndex, 0)
+    assert.equal(s.getState().state.currentPlayerIndex, 0)
     let r = playTamer(s).r
     assert.equal(r.state.players[0]!.resources.wood, 1)
     s = tamer()
     before = undoRuleSnapshot(s.getState())
-    house(s, turn(s, 0, 'sheep-market'), 2)
-    assertUndoRestored(before, record('Tamer-animal-undo', s.undoAction()))
-    r = house(s, turn(s, 0, 'sheep-market'), 2)
+    interactionBeforeWholeUndo = structuredClone(s.getState().interaction)
+    house(s, turn(s, 0, 'sheep-market'), 0, 2)
+    const wholeUndoResponse2 = record('Tamer-animal-undo', s.undoAction())
+    assertUndoRestored(before, wholeUndoResponse2)
+    assert.deepEqual(wholeUndoResponse2.interaction, interactionBeforeWholeUndo)
+    assert.deepEqual(s.getState().interaction, interactionBeforeWholeUndo)
+    assert.equal(wholeUndoResponse2.state.currentPlayerIndex, 0)
+    assert.equal(s.getState().state.currentPlayerIndex, 0)
+    r = house(s, turn(s, 0, 'sheep-market'), 0, 2)
     assert.equal(r.state.players[0]!.resources.sheep, 2)
   })
 })
