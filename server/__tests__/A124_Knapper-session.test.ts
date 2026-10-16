@@ -1,16 +1,21 @@
 import { setWorkersAtHome } from '../../shared/domain/player'
-
 import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game/authoritative-session'
+import { type GameSession, type SessionResponse } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
-
 import '../../shared/cards/A/A124_Knapper'
+import assert from 'node:assert/strict'
+import { type GameState } from '../../shared/contract/types'
+import { createWorkSession } from './_helpers/session-fixtures'
+import { assertEmptyAccumulationRejected, assertRejectedUnchanged, confirmNext } from './_helpers/session-assertions'
+import { createScenarioEvidence } from './_helpers/scenario-evidence'
+
+const sessionEvidence = createScenarioEvidence(import.meta.url)
 
 const CARD_ID = 'A124_Knapper'
 
 describe('A124_Knapper session', () => {
   const setupForRound = (round: number, revealedSpaceId: string) => {
-    const session = new GameSession(42)
+    const session = sessionEvidence.track(createWorkSession({ seed: 42 }))
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -76,7 +81,7 @@ describe('A124_Knapper session', () => {
   })
 
   it('does not trigger when card is not played', () => {
-    const session = new GameSession(42)
+    const session = sessionEvidence.track(createWorkSession({ seed: 42 }))
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -104,7 +109,7 @@ describe('A124 Knapper parity', () => {
   const FILLER = '__test_placeholder__'
 
   const setup = ({ played = true }: { played?: boolean } = {}) => {
-    const session = new GameSession(6124, undefined, { playerCount: 2 })
+    const session = sessionEvidence.track(createWorkSession({ seed: 6124, options: { playerCount: 2 } }))
     const state = session.getState().state
     stabilizeRandomHands(state.players)
     state.currentPlayerIndex = 0
@@ -153,7 +158,6 @@ describe('A124 Knapper parity', () => {
     expect(response.state).toEqual(before.state)
     expect(response.interaction).toEqual(before.interaction)
     expect(response.state.players[0]!.resources).toMatchObject({ stone: 0, boar: 0 })
-    session.dispose()
   })
 
   it('A124 S3: using the round-six Vegetable Seeds gains exactly one stone', () => {
@@ -174,7 +178,6 @@ describe('A124 Knapper parity', () => {
     expect(response.state).toEqual(before.state)
     expect(response.interaction).toEqual(before.interaction)
     expect(response.state.players[0]!.resources.stone).toBe(0)
-    session.dispose()
   })
 
   it('A124 S5: round-eight and basic action spaces grant no Knapper stone', () => {
@@ -185,5 +188,95 @@ describe('A124 Knapper parity', () => {
     const basic = setup().takeAction(0, 'day-laborer')
     expect(basic.ok, basic.error).toBe(true)
     expect(basic.state.players[0]!.resources.stone).toBe(0)
+  })
+})
+
+describe("A124 command boundaries", () => {
+  const KNAP = 'A124_Knapper'
+  function ok(r: SessionResponse) {
+    assert.equal(r.ok, true, r.error)
+    return r
+  }
+  function setup(configure: (state: GameState) => void = () => {
+  }, played = true, round = 14) {
+    const s = sessionEvidence.track(createWorkSession({ seed: 4242, configure(state) {
+        state.round = round
+        for (const p of state.players)
+          Object.assign(p.resources, { food: 40, wood: 0, clay: 0, reed: 0, stone: 0, grain: 0, vegetable: 0 })
+        state.players[0]!.occupationPlayed = played ? [KNAP] : []
+        state.players[0]!.occupationHand = played ? ['A110_Roughcaster'] : [KNAP, 'A110_Roughcaster']
+        configure(state)
+      } }))
+    return s
+  }
+  function turn(s: GameSession, actor: number, space: string) {
+    let r = s.getState()
+    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
+      r = confirmNext(s, r)
+    assert.equal(r.interaction.stateId, 'idle')
+    assert.equal(r.state.currentPlayerIndex, actor)
+    return ok(s.takeAction(actor, space))
+  }
+  function knapper(played = true, stone = 0) {
+    return setup(state => {
+      state.roundActionOrder = state.roundActionOrder.map(() => null)
+      state.roundActionOrder[4] = 'pig-market'
+      state.roundActionOrder[5] = 'vegetable-seeds'
+      state.roundActionOrder[6] = 'western-quarry'
+      state.roundActionOrder[7] = 'cattle-market'
+      for (const id of ['pig-market', 'vegetable-seeds', 'western-quarry', 'cattle-market'])
+        state.actionSpaces.find(a => a.id === id)!.roundAvailable = 1
+      state.actionSpaces.find(a => a.id === 'pig-market')!.resources.boar = 0
+      state.actionSpaces.find(a => a.id === 'western-quarry')!.resources.stone = stone
+      state.actionSpaces.find(a => a.id === 'cattle-market')!.resources.cattle = 1
+    }, played)
+  }
+  it("assigned round five and seven empty accumulation rejects before any stone bonus", () => {
+    for (const space of ['pig-market', 'western-quarry']) {
+      const s = knapper()
+      const r = assertEmptyAccumulationRejected(s, 0, space)
+      assert.equal(r.state.players[0]!.resources.stone, 0)
+      assert.equal(r.state.players[0]!.resources.boar, 0)
+      sessionEvidence.record(`A124-N1-${space}`, r)
+    }
+  })
+  it("round six vegetable gives stone once and later current round remains eligible", () => {
+    const s = knapper()
+    const r = turn(s, 0, 'vegetable-seeds')
+    assert.equal(r.state.round, 14)
+    assert.equal(r.state.players[0]!.resources.stone, 1)
+    assert.equal(r.state.players[0]!.resources.vegetable, 1)
+    sessionEvidence.record('A124-N2', r)
+  })
+  it("basic and round eight assigned action cannot grant stone", () => {
+    for (const space of ['day-laborer', 'cattle-market']) {
+      const r = turn(knapper(), 0, space)
+      assert.equal(r.state.players[0]!.resources.stone, 0)
+      sessionEvidence.record(`A124-N3-${space}`, r)
+    }
+  })
+  it("unplayed empty source and actual opponent cannot use owner stone bonus", () => {
+    const hand = knapper(false)
+    const handUse = assertEmptyAccumulationRejected(hand, 0, 'western-quarry')
+    assert.equal(handUse.state.players[0]!.resources.stone, 0)
+    sessionEvidence.record('A124-N4-empty-use', { handUse, emptyEntryRejected: true })
+    const s = knapper()
+    turn(s, 0, 'grain-seeds')
+    const r = turn(s, 1, 'vegetable-seeds')
+    assert.equal(r.state.players[0]!.resources.stone, 0)
+    assert.equal(r.state.players[1]!.resources.stone, 0)
+    assert.equal(r.state.players[1]!.resources.vegetable, 1)
+    sessionEvidence.record('A124-N4', r)
+  })
+  it("whole action undo and stale occupied source cannot duplicate stone", () => {
+    const s = knapper(true, 1)
+    const first = turn(s, 0, 'western-quarry')
+    assertRejectedUnchanged(s, () => s.takeAction(0, 'western-quarry'))
+    const undone = ok(s.undoAction())
+    assert.equal(undone.state.players[0]!.resources.stone, 0)
+    assert.equal(undone.state.actionSpaces.find(a => a.id === 'western-quarry')!.resources.stone, 1)
+    const retry = turn(s, 0, 'western-quarry')
+    assert.equal(retry.state.players[0]!.resources.stone, 2)
+    sessionEvidence.record('A124-N5', { first, undone, retry })
   })
 })

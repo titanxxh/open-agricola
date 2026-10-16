@@ -1,15 +1,20 @@
 import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game/authoritative-session'
+import { type GameSession, type SessionResponse } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { createPlayerActionSpaces } from '../../shared/cards/player-action-space'
 import { markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
-import type { GameState, Resource } from '../../shared/contract/types'
-
+import { type GameState, type Resource } from '../../shared/contract/types'
 import '../../shared/cards/A/A125_Priest'
 import '../../shared/cards/A/A141_TurnipFarmer'
 import '../../shared/cards/A/A157_Bohemian'
 import '../../shared/cards/A/A162_ForestTallyman'
 import '../../shared/cards/A/A165_PigBreeder'
+import assert from 'node:assert/strict'
+import { createWorkSession } from './_helpers/session-fixtures'
+import { assertRejectedUnchanged, confirmNext, getChoiceOptions } from './_helpers/session-assertions'
+import { createScenarioEvidence } from './_helpers/scenario-evidence'
+
+const sessionEvidence = createScenarioEvidence(import.meta.url)
 
 type CardId =
   | 'A125_Priest'
@@ -31,7 +36,7 @@ const setupOccupation = (cardId: CardId, {
   round?: number
   resources?: Partial<Resource>
 } = {}) => {
-  const session = new GameSession(4042, undefined, { playerCount })
+  const session = sessionEvidence.track(createWorkSession({ seed: 4042, options: { playerCount } }))
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.currentPlayerIndex = 0
@@ -58,7 +63,7 @@ const setupOccupation = (cardId: CardId, {
 const playOccupation = (session: GameSession, cardId: CardId) => {
   let response = session.takeAction(0, 'lessons')
   if (response.interaction.stateId !== 'wait') return response
-  const option = response.interaction.request.options?.find((candidate) => candidate.value === cardId)
+  const option = getChoiceOptions(response)?.find((candidate) => candidate.value === cardId)
   if (option) response = session.resolveChoice(0, option.value)
   return response
 }
@@ -217,25 +222,21 @@ const setupPigBreederRound = ({ round = 12, boar = 2, capacity = true } = {}) =>
   const player = state.players[0]!
   player.resources.boar = boar
   player.resources.sheep = capacity ? 0 : 1
-  player.houseAnimals = Object.fromEntries(player.roomTiles.slice(0, capacity ? 0 : 1).map(tile => [`${tile.row}-${tile.col}`, capacity ? null : 'sheep']));
+  player.houseAnimals = Object.fromEntries(player.roomTiles.slice(0, capacity ? 0 : 1).map(tile => [`${tile.row}-${tile.col}`, 'sheep']));
   player.stableAnimals = {}
   player.pastures = capacity
     ? [{
-        id: 'boar-pasture',
-        size: 2,
-        tiles: [{ row: 0, col: 1 }, { row: 0, col: 2 }],
-        stables: 0,
-        animalType: 'boar',
-        animalCount: boar,
-      }]
+    id: 'boar-pasture',
+    tiles: [{ row: 0, col: 1 }, { row: 0, col: 2 }],
+    animalType: 'boar',
+    animalCount: boar
+}]
     : [{
-        id: 'boar-pasture',
-        size: 1,
-        tiles: [{ row: 0, col: 1 }],
-        stables: 0,
-        animalType: 'boar',
-        animalCount: boar,
-      }]
+    id: 'boar-pasture',
+    tiles: [{ row: 0, col: 1 }],
+    animalType: 'boar',
+    animalCount: boar
+}]
   session.loadState(state)
   return session
 }
@@ -282,5 +283,88 @@ describe('A165 Pig Breeder parity', () => {
 
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources.boar).toBe(2)
+  })
+})
+
+describe("A125 command boundaries", () => {
+  const PRIEST = 'A125_Priest'
+  function ok(r: SessionResponse) {
+    assert.equal(r.ok, true, r.error)
+    return r
+  }
+  function setup(configure: (state: GameState) => void = () => {
+  }) {
+    const s = sessionEvidence.track(createWorkSession({ seed: 4242, configure(state) {
+        state.round = 14
+        for (const p of state.players)
+          Object.assign(p.resources, { wood: 0, clay: 0, reed: 0, stone: 0, grain: 0, vegetable: 0, food: 40 })
+        state.players[0]!.occupationHand = [PRIEST, 'A110_Roughcaster']
+        configure(state)
+      } }))
+    return s
+  }
+  function play(s: GameSession, card: string) {
+    let r = ok(s.takeAction(0, 'lessons'))
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice')
+    assertRejectedUnchanged(s, () => s.resolveChoice(1, card))
+    r = ok(s.resolveChoice(0, card))
+    assert(r.state.players[0]!.occupationPlayed.includes(card))
+    assert(r.state.log.length > 0)
+    return r
+  }
+  function material(state: GameState, type: 'wood' | 'clay' | 'stone', rooms = 2) {
+    const p = state.players[0]!
+    p.houseType = type
+    for (let n = 2; n < rooms; n++)
+      p.roomTiles.push({ row: n - 2, col: 0 })
+    p.rooms = rooms
+  }
+  it("exactly two clay rooms at actual purchase give three clay two reed two stone", () => {
+    const s = setup(state => material(state, 'clay'))
+    const r = play(s, PRIEST)
+    assert.equal(r.state.players[0]!.resources.clay, 3)
+    assert.equal(r.state.players[0]!.resources.reed, 2)
+    assert.equal(r.state.players[0]!.resources.stone, 2)
+    assert.equal(r.state.players[0]!.resources.food, 40)
+    sessionEvidence.record('A125-N1', r)
+  })
+  it("wood stone and three clay rooms fail the exact house predicate", () => {
+    for (const [type, rooms] of [['wood', 2], ['stone', 2], ['clay', 3]] as const) {
+      const s = setup(state => material(state, type, rooms))
+      const r = play(s, PRIEST)
+      assert.deepEqual((['clay', 'reed', 'stone'] satisfies Array<'clay' | 'reed' | 'stone'>).map(k => r.state.players[0]!.resources[k]), [0, 0, 0])
+      sessionEvidence.record(`A125-N2-${type}-${rooms}`, r)
+    }
+  })
+  it("opponent two clay rooms and later owner renovation cannot apply retroactively", () => {
+    const s = setup(state => {
+      state.players[1]!.houseType = 'clay'
+      state.players[0]!.resources.clay = 2
+      state.players[0]!.resources.reed = 1
+    })
+    const first = play(s, PRIEST)
+    assert.equal(first.state.players[0]!.resources.clay, 2)
+    assert.equal(first.state.players[1]!.resources.clay, 0)
+    confirmNext(s, first)
+    confirmNext(s, ok(s.takeAction(1, 'grain-seeds')))
+    let r = ok(s.takeAction(0, 'house-redevelopment'))
+    if (r.interaction.stateId === 'wait' && r.interaction.promptKey === 'ui.interactionChooseRenovationTarget')
+      r = ok(s.resolveChoice(0, 'clay'))
+    assert.equal(r.state.players[0]!.houseType, 'clay')
+    assert.equal(r.state.players[0]!.resources.clay, 0)
+    assert.equal(r.state.players[0]!.resources.reed, 0)
+    assert.equal(r.state.players[0]!.resources.stone, 0)
+    sessionEvidence.record('A125-N3', { first, r })
+  })
+  it("invalid choice and undo cannot retain a duplicate purchase reward", () => {
+    const s = setup(state => material(state, 'clay'))
+    const first = play(s, PRIEST)
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, PRIEST))
+    const undone = ok(s.undoAction())
+    assert.deepEqual((['clay', 'reed', 'stone'] satisfies Array<'clay' | 'reed' | 'stone'>).map(k => undone.state.players[0]!.resources[k]), [0, 0, 0])
+    assert(undone.state.players[0]!.occupationHand.includes(PRIEST))
+    const retry = play(s, PRIEST)
+    assert.equal(retry.state.players[0]!.resources.clay, 3)
+    sessionEvidence.record('A125-N4', { first, undone, retry })
   })
 })
