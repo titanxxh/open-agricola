@@ -21,12 +21,12 @@ import type {
 } from '../../../contract/types'
 
 const dummySpace: ActionSpace = { id: 'farm-expansion', type: 'farm-expansion' } as unknown as ActionSpace
+const COST_HOOK = 'test:stable-cost-contribution'
 
 const makeCtx = (
   opts: {
     player?: Partial<PlayerState>
     actionContext?: Record<string, unknown>
-    costs?: Partial<Resource>
     sourceCard?: string
   } = {},
 ): ActionExecutionContext => {
@@ -67,7 +67,6 @@ const makeCtx = (
     player,
     space: dummySpace,
     actionContext: opts.actionContext,
-    costs: opts.costs,
     sourceCard: opts.sourceCard,
   } as ActionExecutionContext
 }
@@ -325,6 +324,7 @@ describe('stablesAction.resolveChoice', () => {
   })
 
   it('applies computeCosts delta after exact stable unit cost', () => {
+    actionHooks.register({ id: COST_HOOK, actions: ['stables'], phases: ['computeCosts'], handler: () => ({ costs: { food: 1 } }) })
     const tile: FarmTilePosition = { row: 0, col: 0 }
     const ctx = makeCtx({
       player: {
@@ -341,7 +341,6 @@ describe('stablesAction.resolveChoice', () => {
           cattle: 0,
         } as Resource,
       },
-      costs: { food: 1 },
       actionContext: { exactCost: { wood: 1 } },
     })
     const result = stablesAction.resolveChoice!(ctx, 'confirm', { stables: [tile] })
@@ -461,6 +460,7 @@ describe('stablesAction.resolveChoice', () => {
   })
 
   it('costPreview canExecute applies computeCosts delta after exactCost', () => {
+    actionHooks.register({ id: COST_HOOK, actions: ['stables'], phases: ['computeCosts'], handler: () => ({ costs: { food: 1 } }) })
     const ctx = makeCtx({
       player: {
         resources: {
@@ -479,7 +479,7 @@ describe('stablesAction.resolveChoice', () => {
       actionContext: { exactCost: { wood: 0 } },
     })
     const previewContext = ctx as ActionAvailabilityContext & { actionContext?: Record<string, unknown> }
-    expect(stablesAction.costPreview?.canExecute?.(previewContext, { food: 1 })).toBe(false)
+    expect(stablesAction.costPreview?.canExecute?.(previewContext)).toBe(false)
   })
 
   it('costPreview treats empty computeCosts as absent for legacy costOverride', () => {

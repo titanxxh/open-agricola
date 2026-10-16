@@ -28,7 +28,7 @@ describe('exact cost helpers', () => {
     expect(resolveExactUnitCost({ wood: 1, max: 1 }, 2)).toBeNull()
   })
 
-  it('applies computeCosts delta after exact base and before scaling', () => {
+  it('applies a per-unit delta after exact base and before scaling', () => {
     expect(resolveUnitCostWithDelta({ wood: 2 }, { wood: 1 }, { food: 1 }, 2)).toEqual({
       wood: 2,
       food: 2,

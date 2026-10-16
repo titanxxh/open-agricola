@@ -41,13 +41,12 @@
 
 简洁度比较要先排除 参考实现坏味道：如果 参考实现通过 `Actions/*`、`Core/*`、`Models/*` 等主路径，或其他卡牌文件里的显式 cardId 分支来补某张卡的行为，这张卡不进入简洁度比较。参考实现 `implemented=false` 的卡没有可比实现，直接跳过且不在本节列出。
 
-剔除 参考实现坏味道和未实现项后，当前 OA/参考实现 > 1.5 且可公平比较的卡牌剩 7 张：
+剔除 参考实现坏味道和未实现项后，当前 OA/参考实现 > 1.5 且可公平比较的卡牌剩 6 张：
 
 | 卡牌 | 参考实现 | OA | 比例 | 原因 / 后续判断 |
 |---|---:|---:|---:|---|
 | `B093_Confidant` | 59 | 132 | 2.24 | 参考实现用 `FOODPLUS` future meeple + `getPostReceiveBonus()` 隐式串起返还 food 后的 sow/fence；OA 还要显式处理职业支付时的 `reserveResources`、lessons doability、future meeple resolved provenance、防重复 `lastResolvedRound`、以及 1 wood fence policy。可等 future meeple 支持 post-receive bonus 后再简化。 |
 | `C150_ParrotBreeder` | 67 | 147 | 2.19 | 保持卡内闭环：预留 1 谷物后检查唯一目标，再通过现有回合替换流程支付并执行受约束的放人。右邻目标按实际放人时序追踪，包含搬迁，不依赖 after listener 的结算顺序。Session 回归覆盖准入、支付、复制、撤销和轮转（#1117）。 |
-| `C094_StableCleaner` | 42 | 78 | 1.86 | 参考实现直接返回 fixed-cost `STABLES` flow；OA 在暴露 anytime 前要 probe `stables` 的 cost modifier / affordability，并显式包 flag、`trueAction:false`、固定 cost context 和执行后清理。若 anytime action 可统一内建 affordability probe，可再降。 |
 | `B157_Salter` | 104 | 177 | 1.70 | 参考实现的 `payNode` / `argsSalt` / `actSalt` 承担动物选择与支付；OA 需要自定义 `resource-quantity-select` ad-hoc action、校验动物必须来自农场且 reserve 为空、从 board 扣动物、单动物快捷路径、future food schedule 和日志。参考实现本身也长，优先级低。 |
 | `A130_MummysBoy` | 53 | 90 | 1.70 | 参考实现依赖 `Globals::getPlacedFarmers()` / `Farmers` manager 直接找到第 2 个农夫位置并注入 dummy action；OA 需要用 placement order、occupied-space option、meeting-place 过滤、once-per-round flag 和 start-turn 清理显式实现。和 C150 同类，除非抽 occupied action helper，否则保持卡内闭环。 |
 | `B156_StorehouseKeeper` | 29 | 44 | 1.52 | 参考实现用 `isActionCardEvent('ResourceMarket')` + `gainNode` XOR；OA 需要显式列出 resource-market 变体并包 listener / typed flow。低边界项，只有出现更多 action-space alias 卡时才值得抽 helper。 |
@@ -202,6 +201,8 @@
 Gain 来源区分显式资源参数和行动格配置的基础收益。C168 在卡内复用这一既有区分（#1125），保留额外奖励，以及其他卡牌授予的真实日工行动。4 人 Session 回归覆盖接受、拒绝、支付、动物安置、Farmers of the Moor 组合和撤销重试，不新增触发标记。
 
 ## 6. 基础设施待办
+
+Issue #1204 使厩舍费用在同一支付方案中只计入一次完整的 payload-aware `computeCosts` 贡献。整次费用与声明的逐座价格分开，准入、当前预览和实际支付对一座或多座厩舍保持一致。保留 C088 的数量相关优惠及逐座替代支付；C094 直接复用共享可用性检查，删除卡内预先聚合。Session 回归覆盖预算边界、折扣、精确或覆盖单价、来源限定费用、归因、只读预览、恢复与 undo。
 
 Issue #1205 通过共用的 `card-worker:<sourceCard>` 占位工厂修复卡上人员恢复。直接加载、JSON/新 Session 和 PostgreSQL 房间恢复均保留占位及派生的可用工人数；占位格不可执行，人员只在正常归家时释放。两人 Session 回归同时覆盖 undo/重试、含冒号的来源 ID、放弃效果和拒绝未知格，不新增 D103 专用恢复分支或重复工人数计数。
 

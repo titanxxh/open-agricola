@@ -592,8 +592,8 @@ const makeDummySpace = (actionId: string): ActionSpace => ({
  * E16 BriarHedge sees `params.newFenceEdges`).
  *
  * Mirrors `HookDispatcher.computeCosts` but aggregates results into a
- * `Partial<Resource>` and accepts an optional `space` (defaults to a dummy
- * placeholder — listeners must not read `ctx.space`).
+ * `Partial<Resource>`. Callers can preserve the invocation's space, source
+ * and action context while supplying the selected farm payload.
  */
 export type FarmChoiceCostAdjustments = {
   costs: Partial<Resource>
@@ -610,8 +610,10 @@ export const collectFarmChoiceCostAdjustments = (
   actionId: string,
   params: Record<string, unknown>,
   space?: ActionSpace,
+  invocation?: Pick<ActionExecutionContext, 'sourceCard' | 'actionContext'>,
 ): FarmChoiceCostAdjustments => {
   const ctx: ActionHookContext & Pick<CardListenerDispatchInput, 'actionHooks'> = {
+    ...invocation,
     actionHooks,
     state,
     player,
