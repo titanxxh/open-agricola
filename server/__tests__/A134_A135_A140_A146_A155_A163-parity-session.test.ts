@@ -33,7 +33,7 @@ const setup = ({
   round?: number
   resources?: Record<string, number>
 }) => {
-  const session = sessionEvidence.track(sessionEvidence.track(sessionEvidence.track(new GameSession(7134 + round, undefined, { playerCount }))))
+  const session = sessionEvidence.track(new GameSession(7134 + round, undefined, { playerCount }))
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.currentPlayerIndex = 0
