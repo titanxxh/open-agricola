@@ -8,6 +8,7 @@ const architectureChecks = [
   'pnpm run lint',
   'pnpm run check:test-project-coverage',
   'pnpm run check:test-rule-environments',
+  'pnpm run check:session-test-types',
   'pnpm run check:direct-session-log',
   'pnpm run check:effects-file-list',
   'pnpm run check:generated-cards-sync',
@@ -43,6 +44,7 @@ describe('canonical architecture verification wiring', () => {
       'shared/cards/__tests__/listener-purity-guard.test.ts',
       'server/__tests__/listener-purity-gate-session.test.ts',
       'scripts/__tests__/check-test-rule-environments.test.ts',
+      'scripts/__tests__/scenario-evidence.test.ts',
     ]
     expect(pkg.scripts['check:architecture-tests']?.split(' ')).toEqual(['vitest', 'run', ...architectureTests])
     for (const file of architectureTests) expect(fs.existsSync(path.join(repoRoot, file))).toBe(true)

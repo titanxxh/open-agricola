@@ -21,7 +21,9 @@
     "scripts/__tests__/check-direct-session-log.test.ts",
     "scripts/__tests__/check-effects-file-list.test.ts",
     "scripts/__tests__/check-no-dsl.test.ts",
-    "scripts/__tests__/check-test-rule-environments.test.ts"
+    "scripts/__tests__/check-test-rule-environments.test.ts",
+    "scripts/__tests__/scenario-evidence.test.ts",
+    "scripts/__tests__/audit-migration.test.ts"
   ],
   "exclude": []
 }

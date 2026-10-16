@@ -1,14 +1,15 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import type { GameSession, SessionResponse } from '../game/authoritative-session'
 import { createWorkSession } from './_helpers/session-fixtures'
+import { createScenarioEvidence } from './_helpers/scenario-evidence'
+import { assertRejectedUnchanged, assertUndoRestored, undoRuleSnapshot } from './_helpers/session-assertions'
 import type { GameState } from '../../shared/contract/types'
 import { markAllWorkersUsed } from '../../shared/domain/player'
 import { createPlayerActionSpaces } from '../../shared/cards/player-action-space'
 
 const CARD_ID = 'B026_AgrarianFences'
 const FENCE_EDGES = ['H-2-4', 'H-3-4', 'V-2-4', 'V-2-5']
-const sessions: GameSession[] = []
-afterEach(() => sessions.splice(0).forEach((session) => session.dispose()))
+const evidence = createScenarioEvidence(import.meta.url)
 
 // Confirmed Session seam: replacement chooses a whole two-action plan before
 // any subaction. The plan itself owns the one-fence/two-action limits (#1124).
@@ -30,7 +31,7 @@ const farmSelection = (response: SessionResponse) => {
 }
 
 const setup = (configure?: (state: GameState) => void) => {
-  const session = createWorkSession({ configure: (state) => {
+  const session = evidence.track(createWorkSession({ configure: (state) => {
     state.round = 5
     const player = state.players[0]!
     player.minorPlayed = [CARD_ID]
@@ -38,8 +39,7 @@ const setup = (configure?: (state: GameState) => void) => {
     Object.assign(player.resources, { wood: 8, grain: 2, food: 20 })
     player.fields = [{ row: 0, col: 2, stacks: [] }]
     configure?.(state)
-  } })
-  sessions.push(session)
+  } }))
   return session
 }
 
@@ -93,10 +93,15 @@ describe('B026 Agrarian Fences whole-action replacement', () => {
     expect(replacement).toBeDefined()
     response = session.resolveChoice(0, replacement!.value)
     response = choose(session, response, 'ui.interactionAgrarianFencesSowAndFence')
-    response = choose(session, response, 'actions.fencing.name')
+    const fenceChoice = choiceOptions(response).find(option => option.labelKey === 'actions.fencing.name')
+    if (!fenceChoice) throw new Error('Expected the issued fencing choice')
+    expect(choiceOptions(response).map(option => option.labelKey)).toEqual(['actions.fencing.name', 'actions.sow.name'])
+    response = session.resolveChoice(0, fenceChoice.value)
     expect(farmSelection(response)?.farmType).toBe('fence')
     response = session.commitSelectionChoice(0, { edges: FENCE_EDGES, palisadeEdges: [], extraWood: 0 })
     expect(response.ok, response.error).toBe(true)
+    expect(choiceOptions(response).map(option => option.labelKey)).toEqual(['actions.sow.name', 'ui.interactionFlowDone'])
+    assertRejectedUnchanged(session, () => session.resolveChoice(0, fenceChoice.value))
     response = choose(session, response, 'actions.sow.name')
     expect(farmSelection(response)?.farmType).toBe('sow')
     response = session.commitSelectionChoice(0, { crops: [{ row: 0, col: 2, crop: 'grain' }] })
@@ -105,7 +110,7 @@ describe('B026 Agrarian Fences whole-action replacement', () => {
     expect(response.state.players[0]!.fields[0]!.stacks).toEqual([{ kind: 'grain', remaining: 3 }])
     expect(response.state.players[0]!.fenceSegments).toHaveLength(4)
     expect(waiting(response).request.kind).toBe('confirm-next-player')
-    expect(session.commitSelectionChoice(0, { edges: ['H-2-3', 'H-3-3', 'V-2-3'] }).ok).toBe(false)
+    assertRejectedUnchanged(session, () => session.commitSelectionChoice(0, { edges: ['H-2-3', 'H-3-3', 'V-2-3'] }))
     expect(response.scores).toHaveLength(2)
     expect(response.state.log.length).toBeGreaterThan(0)
   })
@@ -164,6 +169,40 @@ describe('B026 Agrarian Fences whole-action replacement', () => {
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources.wood).toBe(0)
     expect(waiting(response).request.kind).toBe('confirm-next-player')
+  })
+
+  it('rejects an unaffordable seven-edge fence, undoes the placement, and retries with sowing', () => {
+    const session = setup(state => {
+      state.round = 14
+      Object.assign(state.players[0]!.resources, { wood: 4, food: 0 })
+    })
+    const before = undoRuleSnapshot(session.getState())
+    let response = selectPlan(session, session.takeAction(0, 'grain-utilization'), 'sow')
+    response = choose(session, response, 'actions.fencing.name')
+    expect(farmSelection(response)?.farmType).toBe('fence')
+    evidence.record('before rejected seven-edge fence', response)
+    const rejected = assertRejectedUnchanged(session, () => session.commitSelectionChoice(0, {
+      edges: [...FENCE_EDGES, 'H-2-3', 'H-3-3', 'V-2-3'], palisadeEdges: [], extraWood: 0,
+    }))
+    expect(farmSelection(rejected)?.farmType).toBe('fence')
+    response = session.undoAction()
+    assertUndoRestored(before, response)
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 4, grain: 2, food: 0 })
+    expect(response.state.players[0]!.fenceSegments).toHaveLength(0)
+    expect(response.state.actionSpaces.find(space => space.id === 'grain-utilization')!.takenBy).toHaveLength(0)
+    response = selectPlan(session, session.takeAction(0, 'grain-utilization'), 'original')
+    response = perform(session, response, 'sow')
+    expect(response.state.players[0]!.fields[0]!.stacks).toEqual([{ kind: 'grain', remaining: 3 }])
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 4, grain: 1, food: 0 })
+    expect(response.state.players[0]!.fenceSegments).toHaveLength(0)
+    const done = choiceOptions(response).find(option => option.value === '__done__')
+    if (!done) throw new Error('Expected the original plan to allow finishing after sowing')
+    response = session.resolveChoice(0, done.value)
+    expect(response.ok, response.error).toBe(true)
+    expect(waiting(response).request.kind).toBe('confirm-next-player')
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 4, grain: 1, food: 0 })
+    expect(response.scores).toHaveLength(2)
+    expect(response.state.log.length).toBeGreaterThan(0)
   })
 
   it('restores the plan choice on Undo Step and the whole placement on Undo Action', () => {
