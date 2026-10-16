@@ -1,4 +1,5 @@
 import type { ActionHookRegistry } from '../../hooks'
+import { createInitialState } from '../../../session/state-bootstrap'
 import type { GameState, PlayerState, PaymentResourceMap, ComplexCost, CostModifierType } from '../../../contract/types'
 import { PaymentSolver, type Cost } from '..'
 
@@ -8,7 +9,7 @@ export const stateWithPaymentPlayer = (player: PlayerState, state?: GameState): 
     return { state, playerIndex: index >= 0 ? index : 0 }
   }
   return {
-    state: { players: [player] } as GameState,
+    state: { ...createInitialState(42, { playerCount: 2 }), players: [player] },
     playerIndex: 0,
   }
 }
@@ -55,8 +56,8 @@ export const resolveCardCostForTest = (
   baseCost: PaymentResourceMap | ComplexCost,
   actionCardId?: string,
   actionHooks?: ActionHookRegistry,
-) =>
-  resolveCardCostDetailedForTest(
+) => {
+  const result = resolveCardCostDetailedForTest(
     state,
     player,
     actionId,
@@ -64,4 +65,7 @@ export const resolveCardCostForTest = (
     baseCost,
     actionCardId,
     actionHooks,
-  ).cost
+  )
+  if (result === null) throw new Error(`No test cost resolved for ${cardId} on ${actionId}`)
+  return result.cost
+}
