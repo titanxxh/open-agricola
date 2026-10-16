@@ -279,6 +279,12 @@ describe("A167 command boundaries", () => {
   it("whole construction undo restores animal payment and finite structures before retry", () => {
     const s = farm('wood')
     const r = build(s, turn(s, 0, 'farm-expansion'), 'room')
+    assert.equal(r.state.players[0]!.rooms, 3)
+    assert.equal(r.state.players[0]!.roomTiles.length, 3)
+    assert.equal(r.state.players[0]!.stableTiles.length, 1)
+    assert.equal(r.state.players[0]!.resources.sheep, 1)
+    assert.equal(r.state.players[0]!.resources.wood, 0)
+    assert.equal(r.state.players[0]!.resources.reed, 0)
     const undone = undo(s)
     assert.equal(undone.state.players[0]!.rooms, 2)
     assert.equal(undone.state.players[0]!.stableTiles.length, 0)

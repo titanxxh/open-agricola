@@ -229,6 +229,7 @@ describe("A143 command boundaries", () => {
       const r = buy(s, major)
       assert.ok(r.state.players[0]!.improvements.includes(major))
       assert.equal(r.state.players[0]!.resources.stone, 0)
+      assert.deepEqual(r.state.players[0]!.resources, { wood: 0, clay: 0, reed: 0, stone: 0, food: 40, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 })
       save(`A143-N1-${major}`, r)
     }
   })

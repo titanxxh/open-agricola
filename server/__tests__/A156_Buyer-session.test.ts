@@ -374,7 +374,14 @@ describe("A156 command boundaries", () => {
         prepareHousing(state)
         pile(state, space, type, 1)
       })
+      const expected = s.getState().state.players.map(player => ({ ...player.resources }))
+      expected[0]!.food += 1
+      expected[0]![type] += 1
+      expected[1]!.food += 1
+      expected[1]![type] += 1
       const pending = offer(s, space), r = finish(s, pending)
+      assert.deepEqual(r.state.players.map(player => player.resources), expected)
+      assert.deepEqual(s.getState().state.players.map(player => player.resources), expected)
       assert.equal(material(r).food, 2)
       assert.equal(material(r, 1).food, 21)
       assert.equal(material(r)[type], 1)
@@ -424,6 +431,12 @@ describe("A156 command boundaries", () => {
   })
   it("invalid wrong actor and stale commands cannot transfer food twice", () => {
     const s = setup({ food: 1 })
+    const expected = s.getState().state.players.map(player => ({ ...player.resources }))
+    const pileReed = s.getState().state.actionSpaces.find(space => space.id === 'reed-bank')!.resources.reed ?? 0
+    expected[0]!.food += 1
+    expected[0]!.reed += 1
+    expected[1]!.food += 1
+    expected[1]!.reed += pileReed
     let pending = offer(s, 'reed-bank')
     while (pending.interaction.stateId === 'wait' && pending.interaction.request.kind === 'confirm-player-switch')
       pending = ok(s.resolveChoice(pending.interaction.request.fromPlayerIndex, 'confirm'))
@@ -433,6 +446,8 @@ describe("A156 command boundaries", () => {
     assert.ok(c)
     assertRejectedUnchanged(s, () => s.resolveChoice(1, c.value))
     const r = finish(s, pending)
+    assert.deepEqual(r.state.players.map(player => player.resources), expected)
+    assert.deepEqual(s.getState().state.players.map(player => player.resources), expected)
     assertRejectedUnchanged(s, () => s.resolveChoice(0, c.value))
     assert.equal(material(r).reed, 1)
     assert.equal(material(r, 1).food, 21)

@@ -280,6 +280,11 @@ describe("A149 command boundaries", () => {
   it("whole discounted build undo restores room cost and pile before retry", () => {
     const s = artist(5, 1)
     const first = drive(s, turn(s, 0, 'traveling-players'))
+    assert.equal(first.state.players[0]!.rooms, 3)
+    assert.ok(first.state.players[0]!.roomTiles.some(tile => tile.row === 1 && tile.col === 1))
+    assert.equal(first.state.players[0]!.resources.wood, 0)
+    assert.equal(first.state.players[0]!.resources.reed, 0)
+    assert.equal(first.state.players[0]!.resources.food, 42)
     const undone = undo(s)
     assert.equal(undone.state.players[0]!.rooms, 2)
     assert.equal(undone.state.players[0]!.resources.wood, 5)
