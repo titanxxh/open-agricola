@@ -625,6 +625,8 @@ describe('E010 rule boundaries', () => {
     assert.equal(r.state.players[0]!.resources.food, 21)
     assert.equal(r.state.round, 4)
     assert.equal(r.state.players[0]!.workers.filter(w => w.isActive).length, 2)
+    assert.equal(r.interaction.stateId, 'idle')
+    assert.equal(r.state.currentPlayerIndex, 0)
     assertRejectedUnchanged(s, () => s.resolveChoice(0, food))
   })
 
@@ -639,14 +641,44 @@ describe('E010 rule boundaries', () => {
   it("actual Farmland move gives two food without another worker or rotation", () => {
     const s = setup(E)
     let r = endWork(s, 'farmland')
+    const owner = r.state.players[0]!
+    const sourceWorkers = r.state.actionSpaces.find(space => space.id === 'farmland')!.takenBy
+    assert.equal(sourceWorkers.length, 1)
+    const source = sourceWorkers[0]!
+    assert.equal(source.playerId, owner.id)
+    const workers = structuredClone(owner.workers)
+    const originalPlacement = r.state.events.find(event => event.type === 'worker.placed'
+      && event.actorPlayerId === owner.id && event.workerId === source.workerId && event.spaceId === 'farmland')
+    assert.ok(originalPlacement)
     r = s.resolveChoice(0, option(r, o => o.labelKey === 'actions.move-farmer-to-space.name'))
-    wait(r)
+    const move = wait(r)
+    assert.equal(move.playerIndex, 0)
+    assert.equal(move.promptKey, 'ui.interactionMoveFarmerToSpace')
+    assert.equal(r.state.currentPlayerIndex, 0)
     assertRejectedUnchanged(s, () => s.resolveChoice(1, 'day-laborer'))
     r = s.resolveChoice(0, 'day-laborer')
     assert.equal(r.ok, true, r.error)
     assert.equal(r.state.players[0]!.resources.food, 22)
     assert.equal(r.state.round, 4)
     assert.equal(r.state.players[0]!.workers.filter(w => w.isActive).length, 2)
+    assert.deepEqual(r.state.players[0]!.workers, workers)
+    const placements = r.state.events.filter(event => event.type === 'worker.placed')
+    assert.equal(placements.length, 5)
+    const moved = placements.filter(event => event.viaCardId === E)
+    assert.equal(moved.length, 1)
+    assert.deepEqual({ worker: moved[0]!.workerId, player: moved[0]!.actorPlayerId, space: moved[0]!.spaceId, round: moved[0]!.round, phase: moved[0]!.phase }, { worker: source.workerId, player: owner.id, space: 'day-laborer', round: 3, phase: 'returning-home' })
+    const returned = r.state.events.find(event => event.type === 'worker.returned')
+    assert.ok(returned?.type === 'worker.returned')
+    assert.equal(returned.workers.length, 4)
+    assert.equal(returned.workers.filter(worker => worker.playerId === owner.id && worker.workerId === source.workerId).length, 1)
+    assert.equal(new Set(returned.workers.map(worker => `${worker.playerId}:${worker.workerId}`)).size, 4)
+    const nextRound = r.state.events.find(event => event.type === 'round.started' && event.round === 4)
+    assert.ok(nextRound)
+    assert.ok(originalPlacement.seq < moved[0]!.seq && moved[0]!.seq < returned.seq && returned.seq < nextRound.seq)
+    assert.deepEqual(r.state.actionSpaces.find(space => space.id === 'farmland')!.takenBy, [])
+    assert.deepEqual(r.state.actionSpaces.find(space => space.id === 'day-laborer')!.takenBy, [])
+    assert.equal(r.interaction.stateId, 'idle')
+    assert.equal(r.state.currentPlayerIndex, 0)
     assertRejectedUnchanged(s, () => s.resolveChoice(0, 'day-laborer'))
   })
 
@@ -665,6 +697,8 @@ describe('E010 rule boundaries', () => {
     assert.equal(r.ok, true, r.error)
     assert.equal(r.state.players[0]!.resources.food, 21)
     assert.equal(r.state.round, 7)
+    assert.equal(r.interaction.stateId, 'idle')
+    assert.equal(r.state.currentPlayerIndex, 0)
   })
 
   it("opponents Farmland person cannot grant the owner a food choice", () => {

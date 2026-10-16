@@ -353,6 +353,7 @@ describe('E146 rule boundaries', () => {
     assert.ok(wood)
     r = s.resolveChoice(0, wood.value)
     assert.deepEqual(resellerObserved(r), { wood: 1, stone: 0, clay: 0, used: true })
+    assert.equal(wait(r).request.kind, 'confirm-next-player')
   })
 
   it("free and excluded component costs preserve the later refund opportunity", () => {
@@ -364,6 +365,7 @@ describe('E146 rule boundaries', () => {
       rotateToOwner(s, r)
       const accepted = acceptRefund(s, playMinor(s, 'E047_SyrupTap', 'major-improvement')).r
       assert.deepEqual(resellerObserved(accepted), { wood: 1, stone: 1, clay: 1, used: true })
+      assert.equal(wait(accepted).request.kind, 'confirm-next-player')
     }
   })
 
@@ -376,7 +378,9 @@ describe('E146 rule boundaries', () => {
     assert.equal(r.ok, true, r.error)
     assert.deepEqual(resellerObserved(r), before)
     assert.ok(r.state.players[0]!.minorPlayed.includes('E047_SyrupTap'))
-    assert.deepEqual(resellerObserved(acceptRefund(s, r).r), { wood: 1, stone: 1, clay: 1, used: true })
+    const retry = acceptRefund(s, r).r
+    assert.deepEqual(resellerObserved(retry), { wood: 1, stone: 1, clay: 1, used: true })
+    assert.equal(wait(retry).request.kind, 'confirm-next-player')
   })
 
   it("an unpaid improvement cannot create a refund and a free legal retry preserves the use", () => {
@@ -399,6 +403,8 @@ describe('E146 rule boundaries', () => {
     const s = reseller({ stone: 0, discounted: true })
     const built = playMinor(s, 'E047_SyrupTap')
     assert.deepEqual(resellerObserved(built), { wood: 0, stone: 0, clay: 1, used: false })
-    assert.deepEqual(resellerObserved(acceptRefund(s, built).r), { wood: 1, stone: 1, clay: 1, used: true })
+    const refunded = acceptRefund(s, built).r
+    assert.deepEqual(resellerObserved(refunded), { wood: 1, stone: 1, clay: 1, used: true })
+    assert.equal(wait(refunded).request.kind, 'confirm-next-player')
   })
 })

@@ -246,6 +246,7 @@ describe('D127 rule boundaries', () => {
     assert.equal(r.state.players[0]!.resources.food, 4)
     assert.equal(r.state.players[0]!.resources.clay, 0)
     assert(r.state.players[0]!.improvements.includes('Major_Fireplace1'))
+    assert.equal(wait(r).request.kind, 'confirm-next-player')
     assertRejectedUnchanged(s, () => s.resolveChoice(0, major.value))
   })
 })

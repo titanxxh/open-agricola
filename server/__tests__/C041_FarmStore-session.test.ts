@@ -53,6 +53,7 @@ describe('C041 rule boundaries', () => {
     assert.ok(choice, JSON.stringify(r.interaction))
     const selected = s.resolveChoice(0, choice.value)
     assert.equal(selected.ok, true, selected.error)
+    assert.equal(selected.interaction.stateId, 'idle')
     return { r: selected, value: choice.value }
   }
 
@@ -76,6 +77,7 @@ describe('C041 rule boundaries', () => {
     const r = s.resolveChoice(0, '__skip__')
     assert.equal(r.ok, true, r.error)
     assert.deepEqual(storeObserved(r), { food: 1, vegetable: 0, wood: 0, clay: 0, reed: 0, stone: 0 })
+    assert.equal(r.interaction.stateId, 'idle')
   })
 
   it("no food after feeding skips the exchange without free goods", () => {
@@ -111,6 +113,9 @@ describe('C041 rule boundaries', () => {
     const s = farmStore()
     const r = exchange(s, storeChoice(s, s.performRoundEnd()), { vegetable: 1 }).r
     assert.deepEqual(storeObserved(r), { food: 0, vegetable: 1, wood: 0, clay: 0, reed: 0, stone: 0 })
-    assertRejectedUnchanged(s, () => s.undoStep())
+    const step = assertRejectedUnchanged(s, () => s.undoStep())
+    assert.equal(step.error, 'no history to undo')
+    const action = assertRejectedUnchanged(s, () => s.undoAction())
+    assert.equal(action.error, 'no action snapshot')
   })
 })

@@ -6,7 +6,7 @@ import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import '../../shared/cards/A/A089_StablePlanner'
 import assert from 'node:assert/strict'
 import { type PlayerState } from '../../shared/contract/types'
-import { assertRejectedUnchanged, assertUndoRestored, confirmNext, undoRuleSnapshot, getChoiceOptions, expectFarmSelection, expectTileFarmSelection } from './_helpers/session-assertions'
+import { assertRejectedUnchanged, assertUndoRestored, confirmNext, undoRuleSnapshot, getChoiceOptions, expectFarmSelection, expectTileFarmSelection, passPreparationExchanges } from './_helpers/session-assertions'
 import { getAvailableStableSupplyCount } from '../../shared/domain/supply-tokens'
 import { createScenarioEvidence } from './_helpers/scenario-evidence'
 
@@ -270,6 +270,7 @@ describe('A089 rule boundaries', () => {
     const r = schedule(s, offer, 1)
     assert.deepEqual(futureRounds(r), [14])
     assert.equal(s.withCtx(() => getAvailableStableSupplyCount(r.state, r.state.players[0]!)), 3)
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
   })
 
   it("round twelve invents no future stable and preserves all supply", () => {
@@ -292,6 +293,7 @@ describe('A089 rule boundaries', () => {
     assert.deepEqual(futureRounds(built), [])
     assert.equal(s.withCtx(() => getAvailableStableSupplyCount(built.state, built.state.players[0]!)), 3)
     assert.ok(built.state.log.some(l => l.key === 'log.cardTriggered' || l.key === 'log.cardEffectGain' || l.key === 'log.actionDetail'))
+    assert.equal(passPreparationExchanges(s, built).interaction.stateId, 'idle')
   })
 
   it("duplicate due stable coordinate cannot create two pieces", () => {
@@ -299,13 +301,21 @@ describe('A089 rule boundaries', () => {
     const r = reachDue(s)
     assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'farm-select' && expectFarmSelection(r).farmType === 'stable')
     const tile = expectTileFarmSelection(r, 'stable').selectableTiles[0]!
-    const before = undoRuleSnapshot(s.getState())
-    const duplicate = s.commitSelectionChoice(0, { stables: [tile, tile] })
+    const supply = () => s.withCtx(() => getAvailableStableSupplyCount(s.state, s.state.players[0]!))
+    assert.equal(supply(), 3)
+    const duplicate = assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { stables: [tile, tile] }))
     const outcome = { accepted: duplicate.ok, pieces: duplicate.state.players[0]!.stableTiles.length }
     assert.equal(duplicate.ok, false)
-    assert.equal(undoRuleSnapshot(duplicate), before)
-    assert.equal(ok(s.commitSelectionChoice(0, { stables: [tile] })).state.players[0]!.stableTiles.length, 1)
+    assert.deepEqual(futureRounds(duplicate), [4])
+    assert.equal(supply(), 3)
+    const retry = ok(s.commitSelectionChoice(0, { stables: [tile] }))
+    assert.equal(retry.state.players[0]!.stableTiles.length, 1)
+    assert.equal(retry.state.players[0]!.resources.wood, 0)
+    assert.deepEqual(futureRounds(retry), [])
+    assert.equal(supply(), 3)
     assert.deepEqual(outcome, { accepted: false, pieces: 0 })
+    assert.deepEqual(retry.state.players[0]!.stableTiles, [tile])
+    assert.equal(passPreparationExchanges(s, retry).interaction.stateId, 'idle')
   })
 
   it("full reserve schedules all three exact targets without duplicate tokens", () => {
@@ -314,5 +324,6 @@ describe('A089 rule boundaries', () => {
     assert.deepEqual(futureRounds(r), [4, 7, 10])
     assert.equal(s.withCtx(() => getAvailableStableSupplyCount(r.state, r.state.players[0]!)), 1)
     assert.equal(r.state.players[0]!.stableTiles.length, 0)
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
   })
 })

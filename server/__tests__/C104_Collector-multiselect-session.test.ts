@@ -199,12 +199,14 @@ describe('C104 rule boundaries', () => {
     for (const value of ['wood,clay,reed,stone,food', 'wood,clay,reed,stone,food,wood', 'wood,clay,reed,stone,food,grain,vegetable']) {
       const before = JSON.stringify(r.state.players[0]!.resources)
       const unchanged = JSON.stringify({ log: r.state.log, scores: r.scores })
+      const publicBefore = JSON.stringify({ state: r.state, interaction: r.interaction, scores: r.scores })
       r = s.resolveChoice(0, value)
       assert.equal(r.ok, true, r.error)
       wait(r)
       assert.equal(ownerUsed(r), 0)
       assert.equal(JSON.stringify(r.state.players[0]!.resources), before)
       assert.equal(JSON.stringify({ log: r.state.log, scores: r.scores }), unchanged)
+      assert.equal(JSON.stringify({ state: r.state, interaction: r.interaction, scores: r.scores }), publicBefore)
     }
     assertRejectedUnchanged(s, () => s.resolveChoice(1, 'wood,clay,reed,stone,food,grain'))
     r = s.resolveChoice(0, 'wood,clay,reed,stone,food,grain')
@@ -215,6 +217,7 @@ describe('C104 rule boundaries', () => {
     assert.ok(r.scores)
     assert.equal(r.scores[0]!.categories.find(c => c.key === 'beggings')!.total, -3)
     assert.equal(r.scores[0]!.categories.find(c => c.key === 'grains')!.total, 1)
+    assert.equal(wait(r).request.kind, 'confirm-next-player')
     assertRejectedUnchanged(s, () => s.resolveChoice(0, 'wood,clay,reed,stone,food,grain'))
   })
 
@@ -229,11 +232,13 @@ describe('C104 rule boundaries', () => {
 
   it("a begging marker is not a sixth different good and cannot grant an extra penalty", () => {
     const s = setup(C)
-    place(s, 0, C)
+    const pending = place(s, 0, C)
+    const before = JSON.stringify({ state: pending.state, interaction: pending.interaction, scores: pending.scores })
     const r = s.resolveChoice(0, 'wood,clay,reed,stone,food,begging')
     assert.equal(r.ok, true, r.error)
     assert.deepEqual({ used: ownerUsed(r), wood: r.state.players[0]!.resources.wood, begging: r.state.players[0]!.resources.begging }, { used: 0, wood: 0, begging: 0 })
     wait(r)
+    assert.equal(JSON.stringify({ state: r.state, interaction: r.interaction, scores: r.scores }), before)
   })
 
   it("undo of six-good use restores gains begging count card counter and worker", () => {
@@ -256,11 +261,14 @@ describe('C104 rule boundaries', () => {
       let r = place(s, 0, C)
       const i = wait(r)
       assert.equal(i.promptParams?.needed, needed)
+      const before = JSON.stringify({ state: r.state, interaction: r.interaction, scores: r.scores })
       r = s.resolveChoice(0, 'wood,clay,reed,stone,food,grain')
+      assert.equal(r.ok, true, r.error)
       wait(r)
       assert.equal(ownerUsed(r), used)
       assert.equal(r.state.players[0]!.resources.begging, 0)
       assert.equal(r.state.players[0]!.resources.wood, 0)
+      assert.equal(JSON.stringify({ state: r.state, interaction: r.interaction, scores: r.scores }), before)
     }
   })
 })

@@ -257,10 +257,12 @@ describe('C094 rule boundaries', () => {
     let r = s.commitSelectionChoice(0, { stables: [{ row: 0, col: 2 }] })
     assert.equal(r.ok, true, r.error)
     assert.deepEqual(cleanerObserved(r), { wood: 1, food: 1, stables: 1, workers: 0 })
+    assert.equal(r.interaction.stateId, 'idle')
     enterCleaner(s)
     r = s.commitSelectionChoice(0, { stables: [{ row: 0, col: 3 }] })
     assert.equal(r.ok, true, r.error)
     assert.deepEqual(cleanerObserved(r), { wood: 0, food: 0, stables: 2, workers: 0 })
+    assert.equal(r.interaction.stateId, 'idle')
     assertRejectedUnchanged(s, () => s.takeAnytimeAction(0, 'C94-stable-cleaner-anytime'))
   })
 
@@ -279,6 +281,7 @@ describe('C094 rule boundaries', () => {
     const r = s.commitSelectionChoice(0, { stables: [{ row: 0, col: 2 }] })
     assert.equal(r.ok, true, r.error)
     assert.deepEqual(cleanerObserved(r), { wood: 1, food: 1, stables: 1, workers: 0 })
+    assert.equal(r.interaction.stateId, 'idle')
   })
 
   it("an unaffordable two-stable plan rejects before paying for one", () => {
@@ -288,6 +291,7 @@ describe('C094 rule boundaries', () => {
     const r = s.commitSelectionChoice(0, { stables: [{ row: 0, col: 2 }] })
     assert.equal(r.ok, true, r.error)
     assert.deepEqual(cleanerObserved(r), { wood: 0, food: 0, stables: 1, workers: 0 })
+    assert.equal(r.interaction.stateId, 'idle')
   })
 
   it("undo restores stable payment and permits a different legal target", () => {
@@ -300,6 +304,7 @@ describe('C094 rule boundaries', () => {
     const r = s.commitSelectionChoice(0, { stables: [{ row: 0, col: 3 }] })
     assert.equal(r.ok, true, r.error)
     assert.deepEqual(cleanerObserved(r), { wood: 1, food: 1, stables: 1, workers: 0 })
+    assert.equal(r.interaction.stateId, 'idle')
   })
 
   it("duplicate stable positions must reject without paying or consuming supply", () => {
@@ -316,5 +321,6 @@ describe('C094 rule boundaries', () => {
     assert.deepEqual(cleanerObserved(retry), { wood: 1, food: 1, stables: 1, workers: 0 })
     assert.deepEqual(retry.state.players[0]!.stableTiles, [{ row: 0, col: 2 }])
     assert.equal(supply(), 3)
+    assert.equal(retry.interaction.stateId, 'idle')
   })
 })

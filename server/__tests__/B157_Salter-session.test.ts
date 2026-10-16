@@ -7,7 +7,7 @@ import '../../shared/cards/B/B157_Salter'
 import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/serialization'
 import assert from 'node:assert/strict'
 import { createWorkSession } from './_helpers/session-fixtures'
-import { assertRejectedUnchanged, getChoiceOptions } from './_helpers/session-assertions'
+import { assertRejectedUnchanged, confirmNext, getChoiceOptions } from './_helpers/session-assertions'
 import { createScenarioEvidence } from './_helpers/scenario-evidence'
 
 const evidence = createScenarioEvidence(import.meta.url)
@@ -302,7 +302,7 @@ describe('B157_Salter session', () => {
   it('clampRound: round=13 sheep → futureMeeples 只剩 round 14 一条', () => {
     const session = setup({
       resources: { sheep: 1 },
-      pastures: [{ id: 'p1', tiles: [{ row: 2, col: 0 }], animalType: 'sheep', animalCount: 1 }],
+      pastures: [{ id: 'p1', tiles: [{ row: 0, col: 4 }], animalType: 'sheep', animalCount: 1 }],
       round: 13,
     })
     const resp = session.takeAnytimeAction(0, 'B157-salter-anytime')  // single fast path
@@ -313,6 +313,7 @@ describe('B157_Salter session', () => {
     expect(fms[0].resources).toEqual({ food: 1 })
     expect(resp.state.players[0]!.resources).toMatchObject({ sheep: 0, food: 5 })
     expect(resp.state.players[0]!.pastures[0]!.animalCount).toBe(0)
+    expect(resp.interaction.stateId).toBe('idle')
   })
 })
 
@@ -357,7 +358,7 @@ describe('B157 Salter parity', () => {
     owner.resources.cattle = (farm.cattle ?? 0) + (reserve.cattle ?? 0)
     if ((farm.sheep ?? 0) > 0) {
       owner.pastures.push({
-        id: 'salter-sheep-pasture', tiles: [{ row: 1, col: 0 }],
+        id: 'salter-sheep-pasture', tiles: [{ row: 0, col: 4 }],
         animalType: 'sheep', animalCount: farm.sheep!,
       })
     }
@@ -422,13 +423,25 @@ describe('B157 Salter parity', () => {
 
   it('B157 S12: the first scheduled food is received at the start of the next round', () => {
     const session = setup({ farm: { sheep: 2 }, round: 5 })
-    enterInteraction(session)
+    const farmland = enterInteraction(session)
+    assert.ok(farmland.interaction.stateId === 'wait' && farmland.interaction.request.kind === 'farm-select')
+    expect(farmland.interaction.request.farm.farmType).toBe('plow')
     const offered = session.takeAnytimeAction(0, ANYTIME_ID)
     quantityRequest(offered)
     const salted = session.commitSelectionChoice(0, { resourceCounts: { sheep: 2 } })
     expect(salted.ok, salted.error).toBe(true)
     expect(salted.state.players[0]!.resources.food).toBe(20)
     expect(expandedFutureFoodRounds(salted)).toEqual([6, 6, 7, 7, 8, 8])
+    assert.ok(salted.interaction.stateId === 'wait')
+    expect(salted.interaction.playerIndex).toBe(0)
+    expect(salted.interaction.spaceId).toBe('farmland')
+    expect(salted.interaction.request).toEqual(farmland.interaction.request)
+    const plowed = session.commitSelectionChoice(0, { tile: { row: 0, col: 0 } })
+    expect(plowed.ok, plowed.error).toBe(true)
+    expect(plowed.state.players[0]!.fields).toEqual([{ row: 0, col: 0, stacks: [] }])
+    const ready = confirmNext(session, plowed)
+    expect(ready.state.currentPlayerIndex).toBe(1)
+    expect(ready.interaction.stateId).toBe('idle')
     const state = session.getState().state
     state.players.forEach((player) => markAllWorkersUsed(state, player))
     session.loadState(state)
@@ -488,6 +501,7 @@ describe('B157 rule boundaries', () => {
     const r = s.commitSelectionChoice(0, { resourceCounts: { sheep: 1 } })
     assert.equal(r.ok, true, r.error)
     assert.deepEqual(salterObserved(r), { sheep: 1, food: 20, farmSheep: 1, rounds: [6, 7, 8] })
+    assert.equal(r.interaction.stateId, 'idle')
     assert.ok(r.state.log.some(log => log.key === 'log.salterFutureFood'))
   })
 
@@ -497,6 +511,7 @@ describe('B157 rule boundaries', () => {
     assert.equal(s.commitSelectionChoice(0, { resourceCounts: { sheep: 1 } }).ok, true)
     const r = s.takeAnytimeAction(0, 'B157-salter-anytime')
     assert.deepEqual(salterObserved(r), { sheep: 0, food: 20, farmSheep: 0, rounds: [6, 6, 7, 7, 8, 8] })
+    assert.equal(r.interaction.stateId, 'idle')
     assertRejectedUnchanged(s, () => s.takeAnytimeAction(0, 'B157-salter-anytime'))
   })
 
@@ -510,6 +525,7 @@ describe('B157 rule boundaries', () => {
     assert.equal(wait(r).request.kind, 'resource-quantity-select')
     const retry = s.commitSelectionChoice(0, { resourceCounts: { sheep: 2 } })
     assert.deepEqual(salterObserved(retry), { sheep: 0, food: 20, farmSheep: 0, rounds: [6, 6, 7, 7, 8, 8] })
+    assert.equal(retry.interaction.stateId, 'idle')
   })
 
   it("unplayed no-farm pending-reserve and final-round abilities are unavailable", () => {
@@ -529,5 +545,6 @@ describe('B157 rule boundaries', () => {
     assert.deepEqual([r.state.players[0]!.resources.sheep, r.state.players[0]!.resources.boar, r.state.players[0]!.resources.cattle], [0, 0, 0])
     assert.equal(r.state.players[0]!.resources.food, 20)
     assert.deepEqual(future(r), [6, 6, 6, 6, 7, 7, 7, 7, 8, 8, 8, 8, 9, 9, 10, 10, 11, 12])
+    assert.equal(r.interaction.stateId, 'idle')
   })
 })
