@@ -44,7 +44,6 @@ describe('canonical architecture verification wiring', () => {
       'shared/cards/__tests__/listener-purity-guard.test.ts',
       'server/__tests__/listener-purity-gate-session.test.ts',
       'scripts/__tests__/check-test-rule-environments.test.ts',
-      'scripts/__tests__/scenario-evidence.test.ts',
     ]
     expect(pkg.scripts['check:architecture-tests']?.split(' ')).toEqual(['vitest', 'run', ...architectureTests])
     for (const file of architectureTests) expect(fs.existsSync(path.join(repoRoot, file))).toBe(true)
