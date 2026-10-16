@@ -497,6 +497,22 @@ const resp = session.takeAction(X, 'ACTION_ID')
 - 规则正确性由直接行为或 Session 测试覆盖，机械规则另有静态门禁
 - 复杂 UI 交互有渲染或 E2E 覆盖
 
+### 9.1 审计用例迁移目标
+
+将审计场景分批迁入现有的单卡和通用机制 Session 测试。每个围绕卡牌或机制划分的批次，提交为可独立审查的 PR。main 接收归并后的测试及其需要的 helper 和门禁，不先整体导入按编号组织的旧 audit 套件。
+
+维护一份小型迁移清单，记录源 audit 提交、每个旧场景 ID 和目标测试。已有测试覆盖某个场景时，注明该测试，并核对它保留了场景的断言。保留不同的拒绝、支付、pending、撤销和重试行为。同一批次从迁移源中删除已迁场景和不再使用的 helper。用例数量不能单独证明覆盖完整。
+
+剩余 audit 场景保留在本地迁移工作区。每批以候选 PR 的生产代码和 native 测试为基础，只叠加尚未迁移的 audit 场景。验收这份联合源码，并把结果附在该批 PR 中。该批合入后，同步当前 main，再准备下一批。main CI 检查该 PR 中存在的文件，不依赖未合入的 audit 分支。原始 audit 证据保存在 Git 外。新确认的生产缺陷单独建 issue 跟踪。
+
+迁移前修复 audit 测试及其使用的 helper 中的类型错误。每批类型检查覆盖全部剩余 audit 测试、全部已迁入的目标文件及其传递依赖的 helper。main 的类型检查范围包含已迁文件及其传递依赖。记录实际纳入检查的文件，删除旧路径时以目标路径替换。不能通过排除文件丢掉已覆盖的测试职责。其他旧 server 测试的类型债单独处理。共享门禁接入现有架构检查。
+
+C131 N3 以当前 OA 的蔬菜 `0` 作为回归预期。此前蔬菜 `1` 的对照保留在暂缓的规则讨论中（[#1175](https://github.com/titanxxh/open-agricola/issues/1175)、[#1181](https://github.com/titanxxh/open-agricola/issues/1181)）。该对照不构成官方裁定，也不要求在这次测试迁移中修改生产行为。
+
+成功用例只保留简短结果。断言失败或显式诊断运行请求时，才保存场景证据。按运行批次、测试文件和场景隔离证据，完整快照保存在 Git 外。用一个临时测试的主动失败验证留证，再通过并行运行检查产物是否覆盖。
+
+迁移调试使用 `pnpm verify focus`。检查每个目标文件所属的 Vitest project，通用机制文件名可能属于 fast，而不是 slow。每批按 [CI Checks](operations/ci-checks.md) 在最终源码上完成所需检查，包括 `pnpm verify prepush`、迁移类型检查，以及剩余 audit 和已迁测试的联合验收。全部迁完后，删除独立的 audit normal/RAW 模式及其 expected/observed 断言切换。归并后的测试使用普通断言和现有的 `pnpm test`、`pnpm test:slow`、`pnpm verify focus` 入口，不另建 audit workflow。
+
 ## 10. 一个最小示例
 
 下面给一个最小化模板示例，实际写测试说明时请把占位符替换成真实内容。
