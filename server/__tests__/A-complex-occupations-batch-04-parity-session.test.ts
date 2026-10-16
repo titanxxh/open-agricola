@@ -1,13 +1,12 @@
+import { expectFarmSelection, expectTileFarmSelection } from './_helpers/session-assertions'
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
-import { familySize, markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome, workersAvailable } from '../../shared/domain/player'
-import { getCardStack } from '../../shared/cards/helpers/card-state'
-import { readCardResourceStats } from '../../shared/cards/helpers/card-state'
+import { familySize, markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome, workersAvailable, newbornCount } from '../../shared/domain/player'
+import { getCardStack, readCardResourceStats } from '../../shared/cards/helpers/card-state'
 import { recordRoundPlacement } from '../../shared/cards/helpers/round-placement'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
-import type { Resource } from '../../shared/contract/types'
-
+import { type Resource, type GameState } from '../../shared/contract/types'
 import '../../shared/cards/A/A085_Homekeeper'
 import '../../shared/cards/A/A093_BedMaker'
 import '../../shared/cards/A/A094_LazySowman'
@@ -19,18 +18,28 @@ import '../../shared/cards/A/A115_ChiefForester'
 import '../../shared/cards/A/A118_Treegardener'
 import '../../shared/cards/A/A119_FirewoodCollector'
 import '../../shared/cards/A/A147_AnimalDealer'
-
+import assert from 'node:assert/strict'
+import { createWorkSession } from './_helpers/session-fixtures'
+import { assertRejectedUnchanged, assertUndoRestored, confirmNext, passPreparationExchanges, undoRuleSnapshot, getChoiceOptions } from './_helpers/session-assertions'
+import { createScenarioEvidence } from './_helpers/scenario-evidence'
+const sessionEvidence = createScenarioEvidence(import.meta.url)
 type CardId =
   | 'A085_Homekeeper' | 'A093_BedMaker' | 'A094_LazySowman' | 'A098_StableArchitect'
   | 'A102_Grocer' | 'A107_Catcher' | 'A112_ScytheWorker' | 'A115_ChiefForester'
   | 'A118_Treegardener' | 'A119_FirewoodCollector' | 'A147_AnimalDealer'
-
+function expectSowSelection(response: SessionResponse) {
+  const farm = expectFarmSelection(response)
+  assert.ok(farm.farmType === 'sow')
+  return farm
+}
 const FILLER = '__test_placeholder__'
-
-const setupOccupation = (cardId: CardId, {
-  playerCount = 2, played = false, round = 14, resources = {},
-}: { playerCount?: number; played?: boolean; round?: number; resources?: Partial<Resource> } = {}) => {
-  const session = new GameSession(4043, undefined, { playerCount })
+const setupOccupation = (cardId: CardId, { playerCount = 2, played = false, round = 14, resources = {}, }: {
+  playerCount?: number
+  played?: boolean
+  round?: number
+  resources?: Partial<Resource>
+} = {}) => {
+  const session = sessionEvidence.track(createWorkSession({ seed: 4043, options: { playerCount } }))
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.currentPlayerIndex = 0
@@ -53,43 +62,38 @@ const setupOccupation = (cardId: CardId, {
   session.loadState(state)
   return session
 }
-
 const playOccupation = (session: GameSession, cardId: CardId) => {
   let response = session.takeAction(0, 'lessons')
   if (response.interaction.stateId !== 'wait') return response
-  const option = response.interaction.request.options?.find((candidate) => candidate.value === cardId)
+  const option = getChoiceOptions(response)?.find((candidate) => candidate.value === cardId)
   if (option) response = session.resolveChoice(0, option.value)
   return response
 }
-
 const chooseNonSkip = (session: GameSession, response: SessionResponse, sourceCard?: string) => {
   let current = sourceCard ? resolveTriggerIfPresent(session, response, sourceCard) : response
   expect(current.interaction.stateId).toBe('wait')
   if (current.interaction.stateId !== 'wait') throw new Error('expected choice')
-  const option = current.interaction.request.options?.find((candidate) => candidate.value !== '__skip__')
+  const option = getChoiceOptions(current)?.find((candidate) => candidate.value !== '__skip__')
   expect(option).toBeDefined()
   current = session.resolveChoice(current.interaction.playerIndex, option!.value)
   return current
 }
-
 const skipChoice = (session: GameSession, response: SessionResponse, sourceCard?: string) => {
   const current = sourceCard ? resolveTriggerIfPresent(session, response, sourceCard) : response
   expect(current.interaction.stateId).toBe('wait')
   if (current.interaction.stateId !== 'wait') throw new Error('expected choice')
   return session.resolveChoice(current.interaction.playerIndex, '__skip__')
 }
-
 const openRoomSelection = (session: GameSession) => {
   let response = session.takeAction(0, 'farm-expansion')
   if (response.interaction.stateId === 'wait') {
-    const construct = response.interaction.request.options?.find((option) => option.labelKey === 'actions.construct.name')
+    const construct = getChoiceOptions(response)?.find((option) => option.labelKey === 'actions.construct.name')
     if (construct) response = session.resolveChoice(0, construct.value)
   }
   expect(response.interaction.stateId).toBe('wait')
   if (response.interaction.stateId !== 'wait') throw new Error('expected room selection')
   return response
 }
-
 const prepareHarvest = (session: GameSession, round = 4) => {
   const state = session.getState().state
   state.round = round
@@ -103,9 +107,11 @@ const prepareHarvest = (session: GameSession, round = 4) => {
   })
   session.loadState(state)
 }
-
 describe('A085 Homekeeper parity', () => {
-  const setup = ({ houseType = 'clay', qualifying = true }: { houseType?: 'wood' | 'clay'; qualifying?: boolean } = {}) => {
+  const setup = ({ houseType = 'clay', qualifying = true }: {
+    houseType?: 'wood' | 'clay'
+    qualifying?: boolean
+  } = {}) => {
     const session = setupOccupation('A085_Homekeeper', { played: true, round: 3 })
     const state = session.getState().state
     state.roundActionOrder = state.roundActionOrder.map((id) => id === 'wish-children' ? null : id)
@@ -118,32 +124,29 @@ describe('A085 Homekeeper parity', () => {
     player.rooms = 2
     setActiveWorkerCount(player, 2)
     setWorkersAtHome(state, player, 2)
-    player.roomTiles = [{ row: 0, col: 0 }, { row: 2, col: 2 }]
-    player.fields = [{ row: 0, col: 1, stacks: [] }]
+    player.roomTiles = [{ row: 1, col: 0 }, { row: 2, col: 0 }]
+    player.fields = [{ row: 0, col: 0, stacks: [] }]
     player.pastures = qualifying ? [{
-      id: 'p1', size: 1, tiles: [{ row: 1, col: 0 }], stables: 0, animalType: null, animalCount: 0,
-    }] : []
+        id: 'p1', tiles: [{ row: 1, col: 1 }], animalType: null, animalCount: 0
+      }] : []
+    player.fenceSegments = qualifying ? ['H-1-1', 'H-2-1', 'V-1-1', 'V-1-2'].map(edge => ({ edge, type: 'fence', source: { kind: 'own', ownerPlayerId: player.id } })) : []
     session.loadState(state)
     return session
   }
-
   it('A085 S1: a clay room adjacent to both a field and pasture provides one family space', () => {
     const response = setup().takeAction(0, 'wish-children')
     expect(response.ok, response.error).toBe(true)
     expect(familySize(response.state.players[0]!)).toBe(3)
   })
-
   it('A085 S2: a wood room provides no Homekeeper family space', () => {
     const response = setup({ houseType: 'wood' }).takeAction(0, 'wish-children')
     expect(familySize(response.state.players[0]!)).toBe(2)
   })
-
   it('A085 S3: missing pasture adjacency provides no Homekeeper family space', () => {
     const response = setup({ qualifying: false }).takeAction(0, 'wish-children')
     expect(familySize(response.state.players[0]!)).toBe(2)
   })
 })
-
 describe('A093 Bed Maker parity', () => {
   const buildRoom = (grain: number) => {
     const session = setupOccupation('A093_BedMaker', {
@@ -151,11 +154,10 @@ describe('A093 Bed Maker parity', () => {
     })
     const selection = openRoomSelection(session)
     if (selection.interaction.stateId !== 'wait') throw new Error('expected room selection')
-    const room = selection.interaction.request.farm.selectableTiles[0]
+    const room = expectTileFarmSelection(selection, 'room').selectableTiles[0]
     const response = session.commitSelectionChoice(0, { rooms: [room!] })
     return { session, response }
   }
-
   it('A093 S1: paying one wood and one grain after a room completes the extra family growth', () => {
     const { session, response: offered } = buildRoom(1)
     const response = chooseNonSkip(session, offered, 'A093_BedMaker')
@@ -163,7 +165,6 @@ describe('A093 Bed Maker parity', () => {
     expect(response.state.players[0]!.resources).toMatchObject({ wood: 0, grain: 0 })
     expect(familySize(response.state.players[0]!)).toBe(3)
   })
-
   it('A093 S2: declining Bed Maker after building preserves its wood and grain', () => {
     const { session, response: offered } = buildRoom(1)
     const response = skipChoice(session, offered, 'A093_BedMaker')
@@ -171,7 +172,6 @@ describe('A093 Bed Maker parity', () => {
     expect(response.state.players[0]!.resources).toMatchObject({ wood: 1, grain: 1 })
     expect(familySize(response.state.players[0]!)).toBe(2)
   })
-
   it('A093 S3: lacking grain suppresses the Bed Maker offer in OA', () => {
     const { response } = buildRoom(0)
     expect(response.interaction.stateId === 'wait' ? response.interaction.sourceCard : undefined)
@@ -179,7 +179,6 @@ describe('A093 Bed Maker parity', () => {
     expect(response.state.players[0]!.resources.wood).toBe(1)
   })
 })
-
 describe('A094 Lazy Sowman parity', () => {
   const setup = ({ grain = 0, workers = 2 }: { grain?: number; workers?: number } = {}) => {
     const session = setupOccupation('A094_LazySowman', { played: true, round: 14 })
@@ -195,69 +194,65 @@ describe('A094 Lazy Sowman parity', () => {
     session.loadState(state)
     return session
   }
-
   it('A094 S1: declining an unavailable unconditional sow can place the remaining person on an occupied space', () => {
     const session = setup()
     let response = session.takeAction(0, 'grain-utilization')
     expect(response.interaction.stateId).toBe('wait')
     if (response.interaction.stateId !== 'wait') throw new Error('expected replacement choice')
-    const replacement = response.interaction.request.options.find((option) => option.sourceCard === 'A094_LazySowman')!
+    const replacement = getChoiceOptions(response).find((option) => option.sourceCard === 'A094_LazySowman')!
     response = session.resolveChoice(0, replacement.value)
-    const place = response.interaction.request.options.find((option) => option.value !== '__skip__')!
+    const place = getChoiceOptions(response).find((option) => option.value !== '__skip__')!
     response = session.resolveChoice(0, place.value)
-    expect(response.interaction.request.options?.map((option) => option.value)).toContain('allow-occupied:day-laborer')
-
+    expect(getChoiceOptions(response)?.map((option) => option.value)).toContain('allow-occupied:day-laborer')
     response = session.resolveChoice(0, 'allow-occupied:day-laborer')
-
     expect(response.ok, response.error).toBe(true)
     expect(workersAvailable(response.state, response.state.players[0]!)).toBe(0)
     expect(response.state.players[0]!.resources.food).toBe(2)
   })
-
   it('A094 S2: with no remaining person, declining sow grants no extra placement', () => {
     const response = setup({ workers: 1 }).takeAction(0, 'grain-utilization')
     expect(response.interaction.stateId === 'wait' ? response.interaction.promptKey : undefined)
       .not.toBe('ui.interactionPlaceFarmerExtra')
   })
-
   it('A094 S3: choosing to sow normally does not grant an extra placement', () => {
     const session = setup({ grain: 1 })
     let response = session.takeAction(0, 'grain-utilization')
     if (response.interaction.stateId !== 'wait') throw new Error('expected choice')
-    const sow = response.interaction.request.options?.find((option) => option.labelKey === 'ui.interactionDoNotReplace')
+    const sow = getChoiceOptions(response)?.find((option) => option.labelKey === 'ui.interactionDoNotReplace')
     expect(sow).toBeDefined()
     response = session.resolveChoice(0, sow!.value)
     if (response.interaction.stateId !== 'wait') throw new Error('expected sow selection')
-    const field = response.interaction.request.farm.selectableFields[0]
+    const field = expectSowSelection(response).selectableFields[0]
     response = session.commitSelectionChoice(0, { crops: [{ ...field!.tile, crop: 'grain' }] })
-
     expect(response.ok, response.error).toBe(true)
     expect(workersAvailable(response.state, response.state.players[0]!)).toBe(1)
   })
 })
-
 describe('A098 Stable Architect parity', () => {
   it('A098 S1: each unfenced stable scores one bonus point', () => {
     const session = setupOccupation('A098_StableArchitect', { played: true })
     session.state.players[0]!.stableTiles = [{ row: 0, col: 1 }, { row: 1, col: 1 }]
     session.loadState(session.state)
-    const category = session.getState().scores[0]!.categories.find((entry) => entry.key === 'cardBonusVp')
+    const scored = session.getState()
+    assert.ok(scored.scores)
+    const category = scored.scores[0]!.categories.find((entry) => entry.key === 'cardBonusVp')
     expect(category?.entries).toContainEqual(expect.objectContaining({ cardId: 'A098_StableArchitect', score: 2 }))
   })
-
   it('A098 S2: a stable inside a pasture scores no Stable Architect point', () => {
     const session = setupOccupation('A098_StableArchitect', { played: true })
     const player = session.state.players[0]!
     player.stableTiles = [{ row: 0, col: 1 }]
     player.pastures = [{
-      id: 'p1', size: 1, tiles: [{ row: 0, col: 1 }], stables: 1, animalType: null, animalCount: 0,
-    }]
+        id: 'p1', tiles: [{ row: 0, col: 1 }], animalType: null, animalCount: 0
+      }]
+    player.fenceSegments = ['H-0-1', 'H-1-1', 'V-0-1', 'V-0-2'].map(edge => ({ edge, type: 'fence', source: { kind: 'own', ownerPlayerId: player.id } }))
     session.loadState(session.state)
-    const category = session.getState().scores[0]!.categories.find((entry) => entry.key === 'cardBonusVp')
+    const scored = session.getState()
+    assert.ok(scored.scores)
+    const category = scored.scores[0]!.categories.find((entry) => entry.key === 'cardBonusVp')
     expect(category?.entries.some((entry) => 'cardId' in entry && entry.cardId === 'A098_StableArchitect') ?? false).toBe(false)
   })
 })
-
 describe('A102 Grocer parity', () => {
   const setup = (food: number) => {
     const session = setupOccupation('A102_Grocer', { resources: { food } })
@@ -293,7 +288,6 @@ describe('A102 Grocer parity', () => {
     expect(response.interaction.anytimeActions.map((action) => action.id)).not.toContain('A102-grocer-anytime')
   })
 })
-
 describe('A107 Catcher parity', () => {
   for (const [placement, resources] of [[1, 5], [2, 4], [3, 3]] as const) {
     it(`A107 S${placement}: placement ${placement} on exactly ${resources} building resources grants one food`, () => {
@@ -323,7 +317,6 @@ describe('A107 Catcher parity', () => {
     expect(response.state.players[0]!.resources.food).toBe(0)
   })
 })
-
 describe('A112 Scythe Worker parity', () => {
   const harvest = (grain: number, accept: boolean) => {
     const session = setupOccupation('A112_ScytheWorker', { played: true, round: 4 })
@@ -357,7 +350,6 @@ describe('A112 Scythe Worker parity', () => {
     expect(response.state.players[0]!.resources.grain).toBe(1)
   })
 })
-
 describe('A115 Chief Forester parity', () => {
   const setup = (actionId: 'forest' | 'clay-pit') => {
     const session = setupOccupation('A115_ChiefForester', { played: true, resources: { grain: 1 } })
@@ -368,29 +360,25 @@ describe('A115 Chief Forester parity', () => {
     session.loadState(session.state)
     return session
   }
-
   it('A115 S1: using a wood accumulation space offers a sow for exactly one field', () => {
     const session = setup('forest')
     let response = chooseNonSkip(session, session.takeAction(0, 'forest'), 'A115_ChiefForester')
     if (response.interaction.stateId !== 'wait') throw new Error('expected sow selection')
-    const field = response.interaction.request.farm.selectableFields[0]
+    const field = expectSowSelection(response).selectableFields[0]
     response = session.commitSelectionChoice(0, { crops: [{ ...field!.tile, crop: 'grain' }] })
     expect(response.state.players[0]!.resources).toMatchObject({ wood: 3, grain: 0 })
   })
-
   it('A115 S2: the Chief Forester sow can be declined', () => {
     const session = setup('forest')
     const response = skipChoice(session, session.takeAction(0, 'forest'), 'A115_ChiefForester')
     expect(response.state.players[0]!.resources).toMatchObject({ wood: 3, grain: 1 })
   })
-
   it('A115 S3: a non-wood accumulation space grants no sow', () => {
     const response = setup('clay-pit').takeAction(0, 'clay-pit')
     expect(response.state.players[0]!.resources).toMatchObject({ clay: 3, grain: 1 })
     expect(response.interaction.stateId === 'wait' ? response.interaction.sourceCard : undefined).not.toBe('A115_ChiefForester')
   })
 })
-
 describe('A118 Treegardener parity', () => {
   const harvest = (food: number) => {
     const session = setupOccupation('A118_Treegardener', { played: true, round: 4 })
@@ -399,17 +387,15 @@ describe('A118 Treegardener parity', () => {
     session.loadState(session.state)
     return { session, response: session.performRoundEnd() }
   }
-
   it('A118 S1: field phase grants one wood and paying two food buys two more wood', () => {
     const { session, response: offered } = harvest(2)
     let response = resolveTriggerIfPresent(session, offered, 'A118_Treegardener')
     if (response.interaction.stateId !== 'wait') throw new Error('expected purchase choice')
-    const twoWood = response.interaction.request.options?.find((option) => option.effectPreview?.resourcesPaid?.food === 2)
+    const twoWood = getChoiceOptions(response)?.find((option) => option.effectPreview?.kind === 'resourceExchange' && option.effectPreview.resourcesPaid?.food === 2)
     expect(twoWood).toBeDefined()
     response = session.resolveChoice(0, twoWood!.value)
     expect(response.state.players[0]!.resources).toMatchObject({ food: 0, wood: 3 })
   })
-
   it('A118 S2: declining the purchase still gains the free wood', () => {
     const { session, response: offered } = harvest(2)
     const response = skipChoice(session, offered, 'A118_Treegardener')
@@ -419,46 +405,43 @@ describe('A118 Treegardener parity', () => {
       gained: { wood: 1 },
     })
   })
-
   it('A118 S3: no food still grants one free wood without a purchase', () => {
     const { response } = harvest(0)
     expect(response.state.players[0]!.resources).toMatchObject({ food: 0, wood: 1 })
   })
 })
-
 describe('A119 Firewood Collector parity', () => {
   const finishAction = (session: GameSession, actionId: string) => {
     let response = session.takeAction(0, actionId)
     if (response.interaction.stateId !== 'wait') return response
     if (response.interaction.request.kind === 'farm-select') {
-      if (response.interaction.request.farm.farmType === 'plow') {
-        const tile = response.interaction.request.farm.selectableTiles[0]
+      if (expectFarmSelection(response).farmType === 'plow') {
+        const tile = expectTileFarmSelection(response, 'plow').selectableTiles[0]
         return session.commitSelectionChoice(0, { tile })
       }
-      if (response.interaction.request.farm.farmType === 'sow') {
-        const field = response.interaction.request.farm.selectableFields[0]
+      if (expectFarmSelection(response).farmType === 'sow') {
+        const field = expectSowSelection(response).selectableFields[0]
         return session.commitSelectionChoice(0, { crops: [{ ...field!.tile, crop: 'grain' }] })
       }
     }
-    const sow = response.interaction.request.options?.find((option) => option.labelKey === 'ui.interactionDoNotReplace')
-    const plow = response.interaction.request.options?.find((option) => option.labelKey === 'actions.plow.name')
+    const sow = getChoiceOptions(response)?.find((option) => option.labelKey === 'ui.interactionDoNotReplace')
+    const plow = getChoiceOptions(response)?.find((option) => option.labelKey === 'actions.plow.name')
     const option = actionId === 'grain-utilization' ? sow : plow
     if (!option) return response
     response = session.resolveChoice(0, option.value)
     if (response.interaction.stateId !== 'wait') return response
-    if (response.interaction.request.farm.farmType === 'sow') {
-      const field = response.interaction.request.farm.selectableFields[0]
+    if (expectFarmSelection(response).farmType === 'sow') {
+      const field = expectSowSelection(response).selectableFields[0]
       return session.commitSelectionChoice(0, { crops: [{ ...field!.tile, crop: 'grain' }] })
     }
-    const tile = response.interaction.request.farm.selectableTiles[0]
+    const tile = expectTileFarmSelection(response, 'plow').selectableTiles[0]
     response = session.commitSelectionChoice(0, { tile })
     if (response.interaction.stateId === 'wait') {
-      const done = response.interaction.request.options?.find((option) => option.value === '__done__')
+      const done = getChoiceOptions(response)?.find((option) => option.value === '__done__')
       if (done) response = session.resolveChoice(0, done.value)
     }
     return response
   }
-
   for (const [scenario, actionId] of [
     ['S1', 'farmland'], ['S2', 'grain-seeds'], ['S3', 'grain-utilization'], ['S4', 'cultivation'],
   ] as const) {
@@ -471,26 +454,24 @@ describe('A119 Firewood Collector parity', () => {
       expect(response.state.players[0]!.resources.wood).toBe(1)
     })
   }
-
   it('A119 S5: using Day Laborer grants no Firewood Collector wood', () => {
     const response = setupOccupation('A119_FirewoodCollector', { played: true }).takeAction(0, 'day-laborer')
     expect(response.state.players[0]!.resources).toMatchObject({ food: 2, wood: 0 })
   })
 })
-
 describe('A147 Animal Dealer parity', () => {
   const setup = (food: number) => {
     const session = setupOccupation('A147_AnimalDealer', { playerCount: 3, played: true, resources: { food } })
     const player = session.state.players[0]!
     player.pastures = [{
-      id: 'animal-pasture', size: 2, tiles: [{ row: 0, col: 1 }, { row: 0, col: 2 }],
-      stables: 0, animalType: null, animalCount: 0,
-    }]
+        id: 'animal-pasture', tiles: [{ row: 0, col: 1 }, { row: 0, col: 2 }],
+        animalType: null, animalCount: 0
+      }]
+    player.fenceSegments = ['H-0-1', 'H-0-2', 'H-1-1', 'H-1-2', 'V-0-1', 'V-0-3'].map(edge => ({ edge, type: 'fence', source: { kind: 'own', ownerPlayerId: player.id } }))
     session.state.actionSpaces.find((space) => space.id === 'sheep-market')!.resources.sheep = 1
     session.loadState(session.state)
     return session
   }
-
   const useSheepMarket = (session: GameSession, accept: boolean) => {
     let response = session.takeAction(0, 'sheep-market')
     while (response.interaction.stateId === 'wait' && response.interaction.request.kind === 'animal-reorg') {
@@ -510,17 +491,14 @@ describe('A147 Animal Dealer parity', () => {
     }
     return response
   }
-
   it('A147 S1: Sheep Market may pay one food for one additional sheep', () => {
     const response = useSheepMarket(setup(1), true)
     expect(response.state.players[0]!.resources).toMatchObject({ food: 0, sheep: 2 })
   })
-
   it('A147 S2: declining Animal Dealer keeps the food and only collects the market sheep', () => {
     const response = useSheepMarket(setup(1), false)
     expect(response.state.players[0]!.resources).toMatchObject({ food: 1, sheep: 1 })
   })
-
   it('A147 S3: no food grants no additional animal', () => {
     const session = setup(0)
     let response = session.takeAction(0, 'sheep-market')
@@ -529,5 +507,191 @@ describe('A147 Animal Dealer parity', () => {
       response = session.resolveChoice(0, 'confirm', { zones: [{ ...pasture!, animalType: 'sheep', animalCount: 1 }] })
     }
     expect(response.state.players[0]!.resources).toMatchObject({ food: 0, sheep: 1 })
+  })
+})
+describe("A093 command boundaries", () => {
+  const BED = 'A093_BedMaker'
+  const WAGE = 'B007_Wage'
+  function record(name: string, response: SessionResponse) {
+    sessionEvidence.record(name, response)
+    return response
+  }
+  function ok(r: SessionResponse) {
+    assert.equal(r.ok, true, r.error)
+    return r
+  }
+  const rooms = [{ row: 1, col: 0 }, { row: 2, col: 0 }, { row: 1, col: 1 }, { row: 2, col: 1 }, { row: 1, col: 2 }, { row: 2, col: 2 }]
+  type Options = {
+    played?: boolean
+    roomCount?: number
+    people?: number
+    house?: 'wood' | 'clay' | 'stone'
+    round?: number
+    resources?: Partial<Resource>
+  }
+  function setup({ played = true, roomCount = 2, people = 2, house = 'wood', round = 7, resources = {} }: Options = {}, configure: (state: GameState) => void = () => {
+  }) {
+    const s = sessionEvidence.track(createWorkSession({ seed: 4242, options: { playerCount: 2 }, configure(state) {
+        state.round = round
+        for (const p of state.players) {
+          p.minorHand = [WAGE]
+          p.occupationHand = ['A111_WallBuilder']
+          Object.assign(p.resources, { food: 30, wood: 0, clay: 0, reed: 0, stone: 0, grain: 0, vegetable: 0 })
+        }
+        const p = state.players[0]!
+        p.occupationPlayed = played ? ["A093_BedMaker"] : []
+        p.occupationHand = played ? ['A111_WallBuilder'] : ["A093_BedMaker", 'A111_WallBuilder']
+        p.rooms = roomCount
+        p.roomTiles = rooms.slice(0, roomCount).map(t => ({ ...t }))
+        p.houseType = house
+        setActiveWorkerCount(p, people)
+        Object.assign(p.resources, resources)
+        configure(state)
+      } }))
+    for (const p of s.state.players)
+      assert.equal(p.workers.length, 5)
+    return s
+  }
+  function options(r: SessionResponse) {
+    ok(r)
+    assert(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice', JSON.stringify(r.interaction))
+    return getChoiceOptions(r)
+  }
+  function choose(s: GameSession, r: SessionResponse, accept = true, actor = 0) {
+    const selected = options(r).filter(o => accept ? o.value !== '__skip__' && o.value !== '__done__' && !o.disabled : o.value === '__skip__' && !o.disabled)
+    assert.equal(selected.length, 1, JSON.stringify(r.interaction))
+    const option = selected[0]
+    assert(option, JSON.stringify(r.interaction))
+    return record('choice', ok(s.resolveChoice(actor, option.value)))
+  }
+  function finish(s: GameSession, r: SessionResponse, actor = 0) {
+    for (let n = 0; n < 5 && r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice'; n++) {
+      const skips = getChoiceOptions(r).filter(o => o.value === '__skip__' || o.value === '__done__')
+      assert.equal(skips.length, 1, JSON.stringify(r.interaction))
+      const skip = skips[0]
+      assert(skip, JSON.stringify(r.interaction))
+      r = record('finish-optional', ok(s.resolveChoice(actor, skip.value)))
+    }
+    return r
+  }
+  function ready(s: GameSession, actor: number) {
+    let r = s.getState()
+    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
+      r = record('confirm', confirmNext(s, r))
+    assert.equal(r.state.currentPlayerIndex, actor)
+    return r
+  }
+  function turn(s: GameSession, actor: number, space: string) {
+    ready(s, actor)
+    return record(`take:${space}`, ok(s.takeAction(actor, space)))
+  }
+  function values(r: SessionResponse) {
+    const p = r.state.players[0]!
+    return { rooms: p.rooms, family: familySize(p), newborns: newbornCount(p), wood: p.resources.wood, reed: p.resources.reed, grain: p.resources.grain, food: p.resources.food }
+  }
+  function build(s: GameSession, tiles = [rooms[2]!], actor = 0, stable = false) {
+    let r = turn(s, actor, 'farm-expansion')
+    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice') {
+      const c = getChoiceOptions(r).find(o => o.labelKey === 'actions.construct.name')
+      assert(c, JSON.stringify(r.interaction))
+      r = record('construct-branch', ok(s.resolveChoice(actor, c.value)))
+    }
+    assert(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'farm-select', JSON.stringify(r.interaction))
+    return record('construct', ok(s.commitSelectionChoice(actor, stable ? { rooms: [], stables: tiles } : { rooms: tiles, stables: [] })))
+  }
+  function bed(s: GameSession, tiles = [rooms[2]!], accept = true) {
+    let r = build(s, tiles)
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.sourceCard === BED, JSON.stringify(r.interaction))
+    r = choose(s, r, accept)
+    return finish(s, r)
+  }
+  it("actual room payment then one wood and grain grants one newborn without a minor purchase", () => {
+    const s = setup({ resources: { wood: 6, reed: 2, grain: 1 } })
+    const r = bed(s)
+    assert.deepEqual(values(r), { rooms: 3, family: 3, newborns: 1, wood: 0, reed: 0, grain: 0, food: 30 })
+    assert(r.state.players[0]!.minorHand.includes(WAGE))
+  })
+  it("no grain preserves remaining wood and cannot create a child", () => {
+    const s = setup({ resources: { wood: 6, reed: 2 } })
+    const r = finish(s, build(s))
+    assert.deepEqual(values(r), { rooms: 3, family: 2, newborns: 0, wood: 1, reed: 0, grain: 0, food: 30 })
+  })
+  it("no wood after room construction preserves grain and creates no child", () => {
+    const s = setup({ resources: { wood: 5, reed: 2, grain: 1 } })
+    const r = finish(s, build(s))
+    assert.deepEqual(values(r), { rooms: 3, family: 2, newborns: 0, wood: 0, reed: 0, grain: 1, food: 30 })
+  })
+  it("two rooms in one actual action grant exactly one growth and one extra fee", () => {
+    const s = setup({ resources: { wood: 11, reed: 4, grain: 1 } })
+    const r = bed(s, [rooms[2]!, rooms[3]!])
+    assert.deepEqual(values(r), { rooms: 4, family: 3, newborns: 1, wood: 0, reed: 0, grain: 0, food: 30 })
+    assert(r.state.players[0]!.minorHand.includes(WAGE))
+  })
+  it("declining keeps the new room and both extra-fee resources", () => {
+    const s = setup({ resources: { wood: 6, reed: 2, grain: 1 } })
+    const r = bed(s, [rooms[2]!], false)
+    assert.deepEqual(values(r), { rooms: 3, family: 2, newborns: 0, wood: 1, reed: 0, grain: 1, food: 30 })
+  })
+  it("five physical active family members prevent a sixth birth and extra charge", () => {
+    const s = setup({ roomCount: 5, people: 5, resources: { wood: 6, reed: 2, grain: 1 } })
+    const r = finish(s, build(s, [rooms[5]!]))
+    assert.deepEqual(values(r), { rooms: 6, family: 5, newborns: 0, wood: 1, reed: 0, grain: 1, food: 30 })
+  })
+  it("card in hand does not reward actual room construction", () => {
+    const s = setup({ played: false, resources: { wood: 6, reed: 2, grain: 1 } })
+    const r = finish(s, build(s))
+    assert.deepEqual(values(r), { rooms: 3, family: 2, newborns: 0, wood: 1, reed: 0, grain: 1, food: 30 })
+  })
+  it("real opponent construction cannot spend owner fee or give owner a child", () => {
+    const s = setup({ resources: { wood: 1, grain: 1 } }, st => Object.assign(st.players[1]!.resources, { wood: 5, reed: 2 }))
+    turn(s, 0, 'grain-seeds')
+    const r = finish(s, build(s, [rooms[2]!], 1), 1)
+    assert.equal(r.state.players[1]!.rooms, 3)
+    assert.equal(values(r).family, 2)
+    assert.equal(values(r).wood, 1)
+    assert.equal(values(r).grain, 2)
+  })
+  it("stable-only construction does not grant growth or spend its fee", () => {
+    const s = setup({ resources: { wood: 3, grain: 1 } })
+    const r = finish(s, build(s, [{ row: 0, col: 1 }], 0, true))
+    assert.equal(r.state.players[0]!.stableTiles.length, 1)
+    assert.equal(values(r).family, 2)
+    assert.equal(values(r).wood, 1)
+    assert.equal(values(r).grain, 1)
+  })
+  it("whole build fee and newborn undo restores all state before an exact retry", () => {
+    const s = setup({ resources: { wood: 6, reed: 2, grain: 1 } })
+    const before = undoRuleSnapshot(s.getState())
+    bed(s)
+    assertUndoRestored(before, record('undo-bedmaker', s.undoAction()))
+    const r = bed(s)
+    assert.equal(values(r).family, 3)
+    assert.equal(values(r).wood, 0)
+    record('stale-bed', assertRejectedUnchanged(s, () => s.resolveChoice(0, 'family-growth')))
+  })
+  function nextRound(s: GameSession, r: SessionResponse) {
+    for (let i = 0; i < 8 && (r.state.round === 7 || r.state.roundPhase === 'preparation'); i++) {
+      r = passPreparationExchanges(s, r)
+      if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
+        r = record('round-confirm', confirmNext(s, r))
+      else
+        break
+    }
+    assert.equal(r.state.round, 8)
+    assert.equal(r.state.roundPhase, 'work')
+    return r
+  }
+  it("a different room build after a natural next round offers growth again after an earlier decline", () => {
+    const s = setup({ resources: { wood: 11, reed: 4, grain: 1 } })
+    bed(s, [rooms[2]!], false)
+    turn(s, 1, 'forest')
+    turn(s, 0, 'reed-bank')
+    nextRound(s, turn(s, 1, 'clay-pit'))
+    const r = bed(s, [rooms[3]!])
+    assert.equal(values(r).rooms, 4)
+    assert.equal(values(r).family, 3)
+    assert.equal(values(r).newborns, 1)
+    assert.equal(values(r).wood, 0)
+    assert.equal(values(r).grain, 0)
   })
 })
