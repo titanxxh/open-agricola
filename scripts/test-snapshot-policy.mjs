@@ -10,76 +10,89 @@ const usedByRestore = (node, isRestoreBoundary) => {
   return false
 }
 
-export function normalizingSnapshotViolations(source, file) {
-  const filename = path.resolve(file)
-  const parsed = ts.createSourceFile(filename, source, ts.ScriptTarget.Latest, true)
-  const imports = parsed.statements.filter(node => ts.isImportDeclaration(node)
-    && /(?:^|\/)state-bootstrap(?:\.[cm]?[jt]s)?$/.test(node.moduleSpecifier.text)
-    && !node.importClause?.isTypeOnly)
-  if (!imports.length) return []
-  const options = { noResolve: true, noLib: true }
-  const host = ts.createCompilerHost(options)
-  host.getSourceFile = name => path.resolve(name) === filename ? parsed : undefined
-  host.fileExists = name => path.resolve(name) === filename
-  host.readFile = name => path.resolve(name) === filename ? source : undefined
-  const checker = ts.createProgram([filename], options, host).getTypeChecker()
-  const constructors = new Set()
-  for (const declaration of parsed.statements) {
-    if (!ts.isImportDeclaration(declaration) || declaration.importClause?.isTypeOnly
-      || !/(?:^|\/)(?:authoritative-session|session-core)(?:\.[cm]?[jt]s)?$/.test(declaration.moduleSpecifier.text)) continue
-    const bindings = declaration.importClause?.namedBindings
-    if (bindings && ts.isNamedImports(bindings)) {
-      for (const binding of bindings.elements) {
-        if (!binding.isTypeOnly && ['GameSession', 'SessionCore'].includes(binding.propertyName?.text ?? binding.name.text)) {
-          constructors.add(checker.getSymbolAtLocation(binding.name))
-        }
-      }
-    }
+export function normalizingSnapshotViolations(source, file, program) {
+  if (!program) throw new Error('Snapshot policy requires an explicit TypeScript Program')
+  const parsed = program.getSourceFile(path.resolve(file))
+  if (!parsed) throw new Error(`Snapshot policy source is absent from the compiler Program: ${file}`)
+  if (parsed.text !== source) throw new Error(`Snapshot policy source differs from the compiler Program: ${file}`)
+  const checker = program.getTypeChecker()
+  const canonical = symbol => symbol && (symbol.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol)
+  const exported = (module, name) => {
+    const declaration = program.getSourceFile(path.join(program.getCurrentDirectory(), module))
+    const symbol = declaration && checker.getSymbolAtLocation(declaration)
+    return symbol && canonical(checker.getExportsOfModule(symbol).find(item => item.name === name))
   }
-  const isRestoreBoundary = node =>
-    (ts.isNewExpression(node) && ts.isIdentifier(node.expression)
-      && constructors.has(checker.getSymbolAtLocation(node.expression)))
-    || (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)
-      && node.expression.name.text === 'loadState')
-  const named = new Map()
-  const namespaces = new Set()
-  for (const declaration of imports) {
-    const bindings = declaration.importClause?.namedBindings
-    if (bindings && ts.isNamespaceImport(bindings)) namespaces.add(checker.getSymbolAtLocation(bindings.name))
-    else if (bindings && ts.isNamedImports(bindings)) {
-      for (const binding of bindings.elements) {
-        const helper = binding.propertyName?.text ?? binding.name.text
-        if (!binding.isTypeOnly && normalizingHelpers.has(helper)) named.set(checker.getSymbolAtLocation(binding.name), helper)
-      }
-    }
+  const normalizers = new Map([...normalizingHelpers].flatMap(name => {
+    const symbol = exported('shared/session/state-bootstrap.ts', name)
+    return symbol ? [[symbol, name]] : []
+  }))
+  const sessionClasses = new Set([
+    exported('server/game/authoritative-session.ts', 'GameSession'),
+    exported('shared/session/session-core.ts', 'GameCore'),
+  ].filter(Boolean))
+  const subject = exported('server/__tests__/_helpers/normalization-subject.ts', 'normalizationSubject')
+  const symbolAt = node => canonical(ts.isShorthandPropertyAssignment(node.parent)
+    ? checker.getShorthandAssignmentValueSymbol(node.parent) : checker.getSymbolAtLocation(node))
+  const isSession = (type, seen = new Set()) => {
+    if (type.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown) || seen.has(type)) return false
+    if (type.isUnion()) return type.types.every(member => isSession(member, new Set(seen)))
+    if (type.isIntersection()) return type.types.some(member => isSession(member, new Set(seen)))
+    if (sessionClasses.has(canonical(type.getSymbol()))) return true
+    seen.add(type)
+    return (type.getBaseTypes?.() ?? []).some(base => isSession(base, seen))
   }
+  const isRestoreBoundary = node => {
+    if (ts.isNewExpression(node)) return isSession(checker.getTypeAtLocation(node))
+    if (!ts.isCallExpression(node) || !ts.isPropertyAccessExpression(node.expression)
+      || node.expression.name.text !== 'loadState') return false
+    const receiver = checker.getTypeAtLocation(node.expression.expression)
+    const method = symbolAt(node.expression.name)
+    return isSession(receiver) && method?.declarations?.some(declaration =>
+      ts.isMethodDeclaration(declaration) && sessionClasses.has(canonical(checker.getSymbolAtLocation(declaration.parent.name))))
+  }
+  const isSubjectArgument = node => subject && ts.isCallExpression(node.parent)
+    && node.parent.arguments[0] === node && symbolAt(node.parent.expression) === subject
+  const isNormalizingNamespace = symbol => symbol && (symbol.flags & ts.SymbolFlags.Module)
+    && checker.getExportsOfModule(symbol).some(item => normalizers.has(canonical(item)))
   const violations = []
   function visit(node) {
-    if (ts.isImportDeclaration(node) || ts.isTypeNode(node)) return
+    if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node) || ts.isTypeNode(node)) return
     let helper
-    if (ts.isIdentifier(node)) {
-      const symbol = ts.isShorthandPropertyAssignment(node.parent)
-        ? checker.getShorthandAssignmentValueSymbol(node.parent)
-        : checker.getSymbolAtLocation(node)
-      helper = named.get(symbol)
-      if (namespaces.has(symbol)) {
+    if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword) {
+      const module = checker.getAwaitedType(checker.getTypeAtLocation(node))?.getSymbol()
+      let use = node
+      let awaited = false
+      while (ts.isAwaitExpression(use.parent) || ts.isParenthesizedExpression(use.parent)) {
+        if (ts.isAwaitExpression(use.parent)) awaited = true
+        use = use.parent
+      }
+      const directMember = awaited && (ts.isPropertyAccessExpression(use.parent) && use.parent.expression === use
+        || ts.isElementAccessExpression(use.parent) && use.parent.expression === use && ts.isStringLiteralLike(use.parent.argumentExpression))
+      if (isNormalizingNamespace(canonical(module)) && !directMember) helper = 'state-bootstrap namespace'
+    }
+    else if (ts.isIdentifier(node)) {
+      // The enclosing member access reports its symbol once.
+      if (ts.isPropertyAccessExpression(node.parent) && node.parent.name === node
+        || ts.isBindingElement(node.parent) && node.parent.propertyName === node) return
+      const symbol = symbolAt(node)
+      helper = normalizers.get(symbol)
+      if (isNormalizingNamespace(symbol)) {
         const member = node.parent
         if (!(ts.isPropertyAccessExpression(member) && member.expression === node)
           && !(ts.isElementAccessExpression(member) && member.expression === node
             && ts.isStringLiteralLike(member.argumentExpression))) helper = 'state-bootstrap namespace'
       }
     }
-    else if (ts.isPropertyAccessExpression(node) && normalizingHelpers.has(node.name.text)
-      && namespaces.has(checker.getSymbolAtLocation(node.expression))) helper = node.name.text
-    else if (ts.isElementAccessExpression(node) && ts.isStringLiteralLike(node.argumentExpression)
-      && normalizingHelpers.has(node.argumentExpression.text)
-      && namespaces.has(checker.getSymbolAtLocation(node.expression))) helper = node.argumentExpression.text
-    if (helper && !usedByRestore(node, isRestoreBoundary)) {
+    else if (ts.isPropertyAccessExpression(node)) helper = normalizers.get(symbolAt(node))
+    else if (ts.isElementAccessExpression(node) && ts.isStringLiteralLike(node.argumentExpression)) {
+      helper = normalizers.get(canonical(checker.getTypeAtLocation(node.expression).getProperty(node.argumentExpression.text)))
+    }
+    if (helper && !isSubjectArgument(node) && !usedByRestore(node, isRestoreBoundary)) {
       const { line, character } = parsed.getLineAndCharacterOfPosition(node.getStart(parsed))
       violations.push({ file, line: line + 1, column: character + 1, helper,
         message: helper === 'state-bootstrap namespace'
           ? 'Import individual state-bootstrap helpers instead of passing, destructuring, or dynamically indexing the namespace; use captureStateWithHistory for observations.'
-          : `${helper} normalizes state; use captureStateWithHistory for observations. Keep normalization inside an explicit GameSession constructor or loadState call.` })
+          : `${helper} normalizes state; use captureStateWithHistory for observations. Keep normalization inside a real Session constructor or loadState call, or mark the normalizer itself with normalizationSubject.` })
     }
     ts.forEachChild(node, visit)
   }

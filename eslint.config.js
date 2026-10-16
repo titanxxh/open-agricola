@@ -11,7 +11,7 @@ export default defineConfig([
   // `output/` is git-ignored and holds run artifacts, including model-generated card sources.
   globalIgnores(['dist', 'output/**', '**/.build/**', '.worktree/**', '.scratch/**', '.gitnexus/**', 'scripts/__tests__/fixtures/**', 'public/**']),
   {
-    files: ['**/*.{ts,tsx}'],
+    files: ['**/*.{ts,tsx,mts,cts}'],
     extends: [
       js.configs.recommended,
       tseslint.configs.recommended,

@@ -299,6 +299,75 @@ it('rejects normalizing observation copies in actual transitive helpers', () => 
   expect(accepted.status, accepted.stderr).toBe(0)
 }, 30000)
 
+const createSnapshotFixture = () => {
+  const fixture = createFixture()
+  fs.rmSync(path.join(fixture.checkout, 'server/__tests__/ae-negative-example.test.ts'))
+  fs.rmSync(path.join(fixture.checkout, 'server/__tests__/_helpers/negative-rule-audit.ts'))
+  fixture.write('shared/session/state-bootstrap.ts', 'export const cloneState = <T>(state: T): T => state; export const normalizeState = <T>(state: T): T => state')
+  fixture.write('shared/session/session-core.ts', 'export class GameCore { loadState(state: unknown) { return state } }')
+  fixture.write('server/game/authoritative-session.ts', "import { GameCore } from '../../shared/session/session-core'; export class GameSession extends GameCore {}")
+  fixture.write('server/__tests__/_helpers/normalization-subject.ts', fs.readFileSync('server/__tests__/_helpers/normalization-subject.ts', 'utf8'))
+  const nativeManifest = manifest([{ title: 'source snapshot', batch: 'M01', status: 'migrated', targetFile: 'server/__tests__/native-snapshot.test.ts', targetTitle: 'preserves the snapshot rule' }])
+  nativeManifest.source.commit = fixture.fixtureManifest.source.commit
+  fixture.write('cases.json', JSON.stringify(nativeManifest))
+  return fixture
+}
+
+it('checks the actual loadState receiver in the native compiler Program', () => {
+  const { write, cli } = createSnapshotFixture()
+  const imports = "import { it } from 'vitest'\nimport { cloneState } from '../../shared/session/state-bootstrap'\n"
+  write('server/__tests__/native-snapshot.test.ts', imports + "const recorder = { loadState(value: unknown) { return value } }; it('preserves the snapshot rule', () => recorder.loadState(cloneState({ value: 1 })))")
+  const rejected = cli('check-native')
+  expect(rejected.status).toBe(1)
+  expect(rejected.stderr).toContain('Normalizing test snapshot: server/__tests__/native-snapshot.test.ts')
+  write('server/__tests__/native-snapshot.test.ts', imports + "import { GameSession as Session } from '../game/authoritative-session'; const session = new Session(); it('preserves the snapshot rule', () => session.loadState(cloneState({ value: 1 })))")
+  const restored = cli('check-native')
+  expect(restored.status, restored.stderr).toBe(0)
+}, 30000)
+
+it('rejects observations imported through actual transitive normalizer re-exports', () => {
+  const { write, cli } = createSnapshotFixture()
+  write('server/__tests__/_helpers/barrel.ts', "export { copied as copy } from './normalizer'")
+  write('server/__tests__/_helpers/normalizer.ts', "export { cloneState as copied } from '../../../shared/session/state-bootstrap'")
+  write('server/__tests__/native-snapshot.test.ts', "import { it } from 'vitest'; import { copy } from './_helpers/barrel'; it('preserves the snapshot rule', () => copy({ value: 1 }))")
+  const rejected = cli('check-native')
+  expect(rejected.status).toBe(1)
+  expect(rejected.stderr).toContain('Normalizing test snapshot: server/__tests__/native-snapshot.test.ts')
+  write('shared/session/history-streams.ts', 'export const captureStateWithHistory = <T>(state: T): T => state')
+  write('server/__tests__/_helpers/normalizer.ts', "export { captureStateWithHistory as copied } from '../../../shared/session/history-streams'")
+  const pure = cli('check-native')
+  expect(pure.status, pure.stderr).toBe(0)
+}, 30000)
+
+it('rejects a normalizer namespace escaping through an actual dynamic import', () => {
+  const { write, cli } = createSnapshotFixture()
+  write('server/__tests__/native-snapshot.test.ts', "import { it } from 'vitest'; it('preserves the snapshot rule', async () => { const { cloneState: copy } = await import('../../shared/session/state-bootstrap'); return copy({ value: 1 }) })")
+  const rejected = cli('check-native')
+  expect(rejected.status).toBe(1)
+  expect(rejected.stderr).toContain('Normalizing test snapshot: server/__tests__/native-snapshot.test.ts')
+  expect(rejected.stderr).toContain('state-bootstrap helpers')
+  write('shared/session/history-streams.ts', 'export const captureStateWithHistory = <T>(state: T): T => state')
+  write('server/__tests__/native-snapshot.test.ts', "import { it } from 'vitest'; it('preserves the snapshot rule', async () => { const { captureStateWithHistory: copy } = await import('../../shared/session/history-streams'); return copy({ value: 1 }) })")
+  const pure = cli('check-native')
+  expect(pure.status, pure.stderr).toBe(0)
+}, 30000)
+
+it('requires an explicit normalization subject without exempting observation arguments', () => {
+  const { write, cli } = createSnapshotFixture()
+  const imports = "import { it } from 'vitest'; import { normalizeState, cloneState } from '../../shared/session/state-bootstrap'; import { normalizationSubject as subject } from './_helpers/normalization-subject'; "
+  write('server/__tests__/native-snapshot.test.ts', imports + "it('preserves the snapshot rule', () => normalizeState({ value: 1 }))")
+  const unmarked = cli('check-native')
+  expect(unmarked.status).toBe(1)
+  expect(unmarked.stderr).toContain('Normalizing test snapshot: server/__tests__/native-snapshot.test.ts')
+  write('server/__tests__/native-snapshot.test.ts', imports + "it('preserves the snapshot rule', () => subject(normalizeState, { value: 1 }))")
+  const marked = cli('check-native')
+  expect(marked.status, marked.stderr).toBe(0)
+  write('server/__tests__/native-snapshot.test.ts', imports + "it('preserves the snapshot rule', () => subject(normalizeState, cloneState({ value: 1 })))")
+  const observation = cli('check-native')
+  expect(observation.status).toBe(1)
+  expect(observation.stderr).toContain('cloneState normalizes state')
+}, 30000)
+
 it('physically removes migrated registrations from a partial source group', () => {
   const { output, write, git, cli, fixtureManifest } = createFixture()
   const source = "import { it, expect } from 'vitest'\nfunction movedPayment() { return 2 }\nit('moved payment', () => expect(movedPayment()).toBe(2))\nit('remaining payment', () => expect(3).toBe(3))\n"
