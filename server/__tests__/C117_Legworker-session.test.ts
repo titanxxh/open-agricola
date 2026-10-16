@@ -37,8 +37,8 @@ const setupParity = ({ played = true } = {}) => {
   player.occupationPlayed = played ? [CARD_ID] : []
   const forest = state.actionSpaces.find((space) => space.id === 'forest')!
   const clayPit = state.actionSpaces.find((space) => space.id === 'clay-pit')!
-  forest.resources = { ...forest.resources, wood: 0 }
-  clayPit.resources = { ...clayPit.resources, clay: 0 }
+  forest.resources = { ...forest.resources, wood: 1 }
+  clayPit.resources = { ...clayPit.resources, clay: 1 }
   session.loadState(state)
   return session
 }
@@ -163,14 +163,14 @@ describe('C117_Legworker session', () => {
     expect(response.state.players[0]!.resources.food).toBe(0)
   })
 
-  it('C117 S2: using an empty Forest adjacent to your Grain Seeds worker gains one wood', () => {
+  it('C117 S2: using a stocked Forest adjacent to your Grain Seeds worker gains one extra wood', () => {
     const session = setupParity()
     occupy(session, 0, 'grain-seeds')
 
     const response = session.takeAction(0, 'forest')
 
     expect(response.ok, response.error).toBe(true)
-    expect(response.state.players[0]!.resources.wood).toBe(1)
+    expect(response.state.players[0]!.resources.wood).toBe(2)
     expect(response.state.actionSpaces.find((space) => space.id === 'forest')!.takenBy).toHaveLength(1)
   })
 
@@ -181,7 +181,7 @@ describe('C117_Legworker session', () => {
     const response = session.takeAction(0, 'forest')
 
     expect(response.ok, response.error).toBe(true)
-    expect(response.state.players[0]!.resources.wood).toBe(0)
+    expect(response.state.players[0]!.resources.wood).toBe(1)
   })
 
   it('C117 S4: your worker on nonadjacent Day Laborer does not grant wood at Forest', () => {
@@ -191,7 +191,7 @@ describe('C117_Legworker session', () => {
     const response = session.takeAction(0, 'forest')
 
     expect(response.ok, response.error).toBe(true)
-    expect(response.state.players[0]!.resources.wood).toBe(0)
+    expect(response.state.players[0]!.resources.wood).toBe(1)
   })
 
   it('C117 S5: round-space adjacency is resolved through the current action-card layout', () => {
@@ -203,7 +203,7 @@ describe('C117_Legworker session', () => {
     const response = session.takeAction(0, 'forest')
 
     expect(response.ok, response.error).toBe(true)
-    expect(response.state.players[0]!.resources.wood).toBe(1)
+    expect(response.state.players[0]!.resources.wood).toBe(2)
   })
 
   it('C117 S6: Forest and Clay Pit are mutually adjacent for Legworker', () => {
@@ -213,10 +213,10 @@ describe('C117_Legworker session', () => {
     const response = session.takeAction(0, 'clay-pit')
 
     expect(response.ok, response.error).toBe(true)
-    expect(response.state.players[0]!.resources).toMatchObject({ wood: 1, clay: 0 })
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 1, clay: 1 })
   })
 
-  it('C117 S7: without Legworker the same empty adjacent placement grants no wood', () => {
+  it('C117 S7: without Legworker the same stocked adjacent placement grants no extra wood', () => {
     const session = setupParity({ played: false })
     const state = session.getState().state
     state.players[0]!.occupationHand = [FILLER]
@@ -226,7 +226,18 @@ describe('C117_Legworker session', () => {
     const response = session.takeAction(0, 'forest')
 
     expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources.wood).toBe(1)
+  })
+
+  it('C117 S8: an adjacent worker does not authorize an empty Forest', () => {
+    const session = setupParity()
+    occupy(session, 0, 'grain-seeds')
+    session.state.actionSpaces.find(space => space.id === 'forest')!.resources.wood = 0
+    const response = session.takeAction(0, 'forest')
+    expect(response.ok).toBe(false)
+    expect(response.interaction.stateId).toBe('idle')
     expect(response.state.players[0]!.resources.wood).toBe(0)
+    expect(response.state.actionSpaces.find(space => space.id === 'forest')!.takenBy).toEqual([])
   })
 
 })

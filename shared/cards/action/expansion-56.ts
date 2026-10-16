@@ -1,7 +1,7 @@
 import { deriveCanBeExecutedByFlow } from '../../actions/flow'
 import { createAccumulatingAction } from '../../actions/factories/accumulate'
 import { createGainAction } from '../../actions/factories/gain'
-import { collectAccumulatedResources } from '../../actions/effects/collect'
+import { collectAccumulatedResources, hasCollectableResources } from '../../actions/effects/collect'
 import { gainResources } from '../../actions/effects/gain'
 import type { ActionDefinition, GameState, PlayerState } from '../../contract/types'
 import { hasPlayableOccupationChoice } from '../../actions/effects/occupation'
@@ -113,6 +113,7 @@ export const riverbankForest56: ActionDefinition = {
   gainPerRound: { wood: 1 },
   players: [5, 6],
   canBeExecutedByPlayer: () => true,
+  originalActionCondition: context => hasCollectableResources({ ...context, actionContext: undefined }),
   execute: ({ player, space }) => {
     collectAccumulatedResources(player, space)
     gainResources(player, { reed: 1 })

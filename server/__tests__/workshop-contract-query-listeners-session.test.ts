@@ -125,15 +125,15 @@ describe('Workshop Capability Contract query listeners', () => {
   it('computeArgs: lets the owner place a worker on the occupied space the listener names', () => {
     const session = start(`actions: ['place-farmer'], phases: ['computeArgs'],
       handler: () => ({ sourceCard: CARD_ID, extraOptions: [
-        { value: 'allow-occupied:forest', labelKey: 'actions.forest.name', sourceCard: CARD_ID }] })`,
+        { value: 'allow-occupied:grain-seeds', labelKey: 'actions.grain-seeds.name', sourceCard: CARD_ID }] })`,
     { workers: [2, 2], configure: (state) => { state.currentPlayerIndex = 1 } })
 
-    expect(session.takeAction(1, 'forest').ok).toBe(true)
+    expect(session.takeAction(1, 'grain-seeds').ok).toBe(true)
     confirmNextPlayer(session)
-    const shared = session.takeAction(0, 'forest')
+    const shared = session.takeAction(0, 'grain-seeds')
 
     expect(shared.ok).toBe(true)
-    expect(shared.state.actionSpaces.find(space => space.id === 'forest')!.takenBy.map(ref => ref.playerId))
+    expect(shared.state.actionSpaces.find(space => space.id === 'grain-seeds')!.takenBy.map(ref => ref.playerId))
       .toEqual(shared.state.players.map(player => player.id).reverse())
 
     // Any other occupied space stays closed.

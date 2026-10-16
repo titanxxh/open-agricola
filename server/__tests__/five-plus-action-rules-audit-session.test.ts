@@ -63,6 +63,8 @@ describe('Five-plus action printed-rule audit', () => {
     const session = setup(cardId)
     const spaces: Record<string, string> = { A175_HollowGardener: 'hollow-56', A179_MountainShepherd: 'western-quarry', B174_RiverbankGardener: 'riverbank-forest-56', B180_GameTeaser: 'fishing' }
     session.state.currentPlayerIndex = 1
+    const target = session.state.actionSpaces.find(space => space.id === spaces[cardId])!
+    Object.assign(target.resources, target.gainPerRound)
     const before = structuredClone(session.state.players[0]!.resources)
     const response = session.takeAction(1, spaces[cardId]!)
     expect(response.ok).toBe(true)

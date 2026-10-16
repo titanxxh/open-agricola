@@ -23,6 +23,7 @@ import { anytimeExchangeAction } from './effects/exchange'
 import { placeFarmerAction } from './effects/place-farmer'
 import { setFirstPlayerAction } from './effects/first-player'
 import { payAction } from './effects/pay'
+import { individualFoodCostAction } from './effects/individual-food-cost'
 import { returnToSpaceAction } from './effects/internal/return-to-space'
 import { bonusVpAction } from './effects/bonus-vp'
 import { breedAction } from './effects/breed'
@@ -86,6 +87,7 @@ export const createInternalActionDefinitions = (resolveAction: FlowActionResolve
   reorganizeAction,
   anytimeExchangeAction,
   payAction,
+  individualFoodCostAction,
   returnToSpaceAction,
   bonusVpAction,
   breedAction,

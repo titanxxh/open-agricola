@@ -97,7 +97,7 @@ describe('C039 Studio Boat session', () => {
     expect(response.state.players[0]!.minorPlayed).toContain(CARD_ID)
     expect(response.state.players[0]!.resources.wood).toBe(0)
     expect(response.state.actionSpaces.find((space) => space.id === CARD_ID)).toBeDefined()
-    expect(session.getActionAvailability(1)[CARD_ID]).toBe(true)
+    expect(session.getActionAvailability(1)[CARD_ID]).toBe(false)
   })
 
   it.each([

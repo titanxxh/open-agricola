@@ -16,6 +16,7 @@ export const ALLOWED_EFFECT_FILES = [
   'first-player.ts',
   'gain.ts',
   'improvement.ts',
+  'individual-food-cost.ts',
   'occupation.ts',
   'pay.ts',
   'place-farmer.ts',

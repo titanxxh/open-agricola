@@ -121,6 +121,7 @@ describe('effects architecture guard', () => {
       'future-meeples',
       'gain',
       'improvement',
+      'individual-food-cost',
       'lie-animal',
       'moor-special-action-after-listeners',
       'moor-special-action-apply',

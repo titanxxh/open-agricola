@@ -310,28 +310,37 @@ describe('E053_BoarSpear session - exchange-based PIG -> 4 FOOD', () => {
     }
     player.resources.boar = 1
     const pigMarket = state.actionSpaces.find((s) => s.id === 'pig-market')
-    if (pigMarket) pigMarket.resources.boar = 0
+    if (pigMarket) pigMarket.resources.boar = 1
+    player.pastures = [{ id: 'boar-pasture', size: 1, tiles: [{ row: 2, col: 2 }], stables: 0, animalType: 'boar', animalCount: 0 }]
     session.loadState(state)
 
     let resp = session.takeAction(0, 'pig-market')
     expect(resp.ok).toBe(true)
-    resp = resolveTriggerIfPresent(session, resp, B137_ID)
-    resp = resolveTriggerIfPresent(session, resp, C148_ID)
-    expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
-      .toBe('ui.interactionAnimalReorg')
-
-    resp = session.resolveChoice(0, 'confirm', [
-      { id: 'house:1-0', zoneType: 'house', animalType: 'boar', animalCount: 1 },
-      c148BoarZone(1),
-    ] as unknown as Record<string, unknown>)
-
+    const placeUnheldBoar = () => {
+      expect(resp.state.players[0]!.resources.boar).toBe(2)
+      if (resp.interaction.stateId !== 'wait' || resp.interaction.request.kind !== 'animal-reorg') {
+        throw new Error('Expected placement for one newly acquired boar')
+      }
+      resp = session.resolveChoice(0, 'confirm', { zones: resp.interaction.request.zones.map(zone => {
+        const animalCount = zone.id === 'boar-pasture' || zone.id === `card:${C148_ID}` ? 1 : 0
+        return { ...zone, animalType: animalCount > 0 ? 'boar' : null, animalCount }
+      }) })
+      expect(resp.ok, resp.error).toBe(true)
+    }
+    placeUnheldBoar()
+    resp = driveToCompletion(session, resp, /* acceptE53Trade */ true)
+    expect(resp.state.players[0]!.resources.food).toBe(4)
+    placeUnheldBoar()
     resp = driveToCompletion(session, resp, /* acceptE53Trade */ true)
     const after = resp.state.players[0]!
-    expect(after.resources.food).toBe(4)
+    expect(resp.ok, resp.error).toBe(true)
+    expect(after.resources.food).toBe(8)
     expect(after.resources.boar).toBe(1)
     expect((Object.values(after.houseAnimals)[0] ?? null)).toBeNull()
     expect(Object.values(after.houseAnimals).length).toBe(0)
     expect(after.cardStates?.[C148_ID]?.counters?.held).toBe(1)
+    expect(resp.state.events.filter(event => event.type === 'resource.moved' && event.sourceCardId === B137_ID))
+      .toEqual([expect.objectContaining({ resources: { boar: 1 } })])
   })
 
   it('does not fire during breeding phase', () => {

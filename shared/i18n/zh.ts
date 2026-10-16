@@ -336,6 +336,7 @@ export const zh = {
     interactionFarmSelectConfirm: '确认',
     interactionFarmSelectCancel: '取消',
     interactionBeforeAnytime: '可以先使用随时行动，再尝试继续。',
+    interactionIndividualFoodCost: '结算职业牌的个人食物费用。可以先转换食物；不足部分获得乞讨标记。',
     interactionContinue: '继续',
     interactionEngineBlocked: '这个强制行动无法继续。请撤销并选择其他路径。',
     interactionConfirmSwitch: '确认切换',

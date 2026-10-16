@@ -336,6 +336,7 @@ export const en = {
     interactionFarmSelectConfirm: 'Confirm',
     interactionFarmSelectCancel: 'Cancel',
     interactionBeforeAnytime: 'You can use an anytime action before trying to continue.',
+    interactionIndividualFoodCost: 'Pay this occupation’s individual food cost. You can convert goods first; take begging markers for any shortfall.',
     interactionContinue: 'Continue',
     interactionEngineBlocked: 'This required action cannot continue. Undo to choose a different path.',
     interactionConfirmSwitch: 'Confirm switch',

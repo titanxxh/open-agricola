@@ -1183,49 +1183,6 @@ const withResourcePreviewForContinuation = (
   }
 }
 
-const canStartFlowWithoutBeforeTriggers = (
-  int: EngineInternals,
-  context: ActionExecutionContext,
-  flow: ActionFlow,
-): boolean => {
-  if (flow.optional === true) return true
-
-  if (flow.type === 'leaf') {
-    const action = int.registry.get(flow.actionId)
-    if (!action) return false
-    const sourceCard = flow.sourceCard ?? context.sourceCard
-    const actionContext = {
-      ...(context.actionContext ?? {}),
-      ...(flow.actionContext ?? {}),
-      skipBeforeTriggers: true,
-      checkedReplaceAction: true,
-    }
-    const doable = action.canBeExecutedByPlayer(
-      context.state,
-      context.player,
-      {
-        params: flow.params,
-        space: context.space,
-        sourceCard,
-        actionContext,
-      },
-    )
-    return int.hooks.applyIsDoable(
-      { ...context, params: flow.params, actionId: flow.actionId, sourceCard, actionContext },
-      action,
-      doable,
-    )
-  }
-
-  if (flow.children.length === 0) return true
-  if (flow.type === 'seq') {
-    return canStartFlowWithoutBeforeTriggers(int, context, flow.children[0]!)
-  }
-  return flow.children.some((child) =>
-    canStartFlowWithoutBeforeTriggers(int, context, child),
-  )
-}
-
 export function getBeforeContinuationContext(
   int: EngineInternals,
   context: ActionExecutionContext,
@@ -1254,36 +1211,8 @@ export const canActionContinueWithoutBeforeTriggers = (
   actionId: string,
   resources?: Resource,
 ): boolean => {
-  const action = int.registry.get(actionId)
-  if (!action) return false
   const scopedContext = withResourcePreviewForContinuation(context, resources)
-  const actionContext = {
-    ...(scopedContext.actionContext ?? {}),
-    skipBeforeTriggers: true,
-  }
-  const direct = action.canBeExecutedByPlayer(
-    scopedContext.state,
-    scopedContext.player,
-    {
-      params: scopedContext.params,
-      space: scopedContext.space,
-      sourceCard: scopedContext.sourceCard,
-      actionContext,
-    },
-  )
-  if (direct) return true
-
-  const replaceResult = int.hooks.applyComputeReplace({
-    ...scopedContext,
-    actionId,
-    actionContext,
-  })
-  return replaceResult.alternatives.some((alternative) =>
-    canStartFlowWithoutBeforeTriggers(
-      int,
-      scopedContext,
-      applyDefaultSourceCardToFlow(alternative.flow, alternative.sourceCard),
-    ))
+  return isActionStrictlyDoableWithoutBeforeTriggers(int, scopedContext, actionId)
 }
 
 export const isActionStrictlyDoableWithoutBeforeTriggers = (
@@ -1291,36 +1220,13 @@ export const isActionStrictlyDoableWithoutBeforeTriggers = (
   context: ActionExecutionContext & Partial<Pick<ActionHookContext, 'transactionEvents' | 'eventQuery'>>,
   actionId: string,
 ): boolean => {
-  const actionContext = {
-    ...(context.actionContext ?? {}),
-    skipBeforeTriggers: true,
-  }
-  const strictContext = { ...context, actionContext, actionId }
-  const replaceResult = int.hooks.applyComputeReplace(strictContext)
-  const action = int.registry.get(replaceResult.actionId)
+  const action = int.registry.get(actionId)
   if (!action) return false
-  const replacedContext = {
-    ...strictContext,
-    actionId: replaceResult.actionId,
-    sourceCard: replaceResult.sourceCard ?? context.sourceCard,
-  }
-  const direct = int.hooks.applyIsDoable(
-    replacedContext,
-    action,
-    action.canBeExecutedByPlayer(context.state, context.player, {
-      params: replacedContext.params,
-      space: replacedContext.space,
-      sourceCard: replacedContext.sourceCard,
-      actionContext,
-    }),
-  )
-  if (direct) return true
-  return replaceResult.alternatives.some((alternative) =>
-    canStartFlowWithoutBeforeTriggers(
-      int,
-      context,
-      applyDefaultSourceCardToFlow(alternative.flow, alternative.sourceCard),
-    ))
+  return isActionDoableInFlowContext({
+    ...context, actionId, action,
+    actionContext: { ...context.actionContext, skipBeforeTriggers: true },
+    resolveAction: actionId => int.registry.get(actionId),
+  })
 }
 
 /**

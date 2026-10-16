@@ -1038,6 +1038,7 @@ export class GameCore {
           const definition = this.registry.get(space.id)
           if (!definition) continue
           space.canBeExecutedByPlayer ??= definition.canBeExecutedByPlayer
+          space.originalActionCondition ??= definition.originalActionCondition
           space.execute ??= definition.execute
           space.resolveChoice ??= definition.resolveChoice
           space.flow ??= definition.flow

@@ -29,9 +29,9 @@ const setup = ({
   state.availableMajorImprovements = []
   state.actionSpaces.forEach((space) => {
     space.takenBy = []
-    if (space.id === 'sheep-market') space.resources.sheep = 0
-    if (space.id === 'pig-market') space.resources.boar = 0
-    if (space.id === 'cattle-market') space.resources.cattle = 0
+    if (space.id === 'sheep-market') space.resources.sheep = 1
+    if (space.id === 'pig-market') space.resources.boar = 1
+    if (space.id === 'cattle-market') space.resources.cattle = 1
   })
   state.players.forEach((player, index) => {
     setActiveWorkerCount(player, index === actor ? ordinal : 2)
@@ -88,8 +88,23 @@ const playFirCutter = (session: GameSession) => {
   return settleFirCutter(session, response)
 }
 
-const useSpace = (session: GameSession, actor: number, spaceId: string) =>
-  settleFirCutter(session, session.takeAction(actor, spaceId))
+const useSpace = (session: GameSession, actor: number, spaceId: string) => {
+  let response = settleFirCutter(session, session.takeAction(actor, spaceId))
+  if (response.interaction.stateId === 'wait' && response.interaction.request.kind === 'animal-reorg') {
+    const player = response.state.players[actor]!
+    const animal = player.resources.sheep > 0 ? 'sheep' : player.resources.boar > 0 ? 'boar' : 'cattle'
+    const zones = response.interaction.request.zones
+    const house = zones.find(zone => zone.zoneType === 'house')
+    expect(house).toBeDefined()
+    response = session.resolveChoice(actor, 'confirm', { zones: zones.map(zone => ({
+      ...zone,
+      animalType: zone.id === house!.id ? animal : null,
+      animalCount: zone.id === house!.id ? 1 : 0,
+    })) })
+    response = settleFirCutter(session, response)
+  }
+  return response
+}
 
 describe('E116 Fir Cutter parity', () => {
   it('E116 S1: playing Fir Cutter immediately gains one food', () => {
@@ -123,16 +138,18 @@ describe('E116 Fir Cutter parity', () => {
     })
   }
 
-  it('E116 S7: a non-animal accumulation space grants no wood', () => {
+  it('E116 S7: collecting Forest wood grants no Fir Cutter bonus', () => {
     const session = setup()
     const state = session.getState().state
-    state.actionSpaces.find((space) => space.id === 'forest')!.resources.wood = 0
+    state.actionSpaces.find((space) => space.id === 'forest')!.resources.wood = 1
     session.loadState(state)
 
     const response = useSpace(session, 0, 'forest')
 
     expect(response.ok, response.error).toBe(true)
-    expect(response.state.players[0]!.resources.wood).toBe(0)
+    expect(response.state.players[0]!.resources.wood).toBe(1)
+    expect(response.state.events.filter(event =>
+      event.type === 'resource.moved' && event.sourceCardId === CARD_ID)).toEqual([])
   })
 
   it('E116 S8: an opponent using an animal market grants the Fir Cutter owner no wood', () => {
