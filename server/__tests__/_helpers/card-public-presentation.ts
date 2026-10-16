@@ -13,7 +13,7 @@ export const expectPublicCardGoods = (session: GameSession, cardId: string, good
     expect(player.cardStatePresentation[cardId]).toMatchObject(goods)
     expect(player.cardStates[cardId]).toBeUndefined()
   }
-  const frame = session.withCtx(() => serializeState(session.state, {}))
+  const frame = session.withCtx(() => serializeState(session.state, { actionHooks: session.actionHooks }))
   for (const perspective of ['p1', 'p2', 'open'] as const) {
     expect(frameForPerspective(frame, perspective).players[0]!.cardStatePresentation[cardId]).toMatchObject(goods)
   }

@@ -1,11 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
-import { resolveTriggerIfPresent } from './_helpers/trigger-select'
+import { resolveTriggerIfPresent , expectWait } from './_helpers/trigger-select'
 import { familySize, markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
 import { getCardStack, readCardExtraData, writeCardExtraData } from '../../shared/cards/helpers/card-state'
-import type { GameState, Resource } from '../../shared/contract/types'
-
+import { type GameState, type Resource } from '../../shared/contract/types'
 import '../../shared/cards/B/B001_UpscaleLifestyle'
 import '../../shared/cards/B/B009_BeatingRod'
 import '../../shared/cards/B/B021_HayloftBarn'
@@ -14,6 +13,12 @@ import '../../shared/cards/B/B043_Chophouse'
 import '../../shared/cards/B/B067_HandTruck'
 import '../../shared/cards/B/B075_WoodWorkshop'
 import '../../shared/cards/B/B083_MuddyPuddles'
+import assert from 'node:assert/strict'
+import { createWorkSession } from './_helpers/session-fixtures'
+import { assertRejectedUnchanged , getChoiceOptions } from './_helpers/session-assertions'
+import { createScenarioEvidence } from './_helpers/scenario-evidence'
+
+const sessionEvidence = createScenarioEvidence(import.meta.url)
 
 type CardId =
   | 'B001_UpscaleLifestyle'
@@ -27,6 +32,7 @@ type CardId =
   | 'C013_WoodSlideHammer'
 
 const FILLER = '__test_placeholder__'
+
 const OCCUPATIONS = ['A116_WoodCutter', 'B121_Geologist', 'C123_Freemason']
 
 const setupMinor = ({
@@ -38,7 +44,7 @@ const setupMinor = ({
   occupations?: number
   played?: boolean
 }) => {
-  const session = new GameSession(4045, undefined, { playerCount: 2 })
+  const session = sessionEvidence.track(createWorkSession({ seed: 4045, options: { playerCount: 2 } }))
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.currentPlayerIndex = 0
@@ -70,7 +76,7 @@ const setupMinor = ({
 const enterImprovementChoice = (session: GameSession) => {
   let response = session.takeAction(0, 'major-improvement')
   if (response.interaction.stateId !== 'wait') return response
-  const option = response.interaction.request.options?.find((candidate) => {
+  const option = getChoiceOptions(response)?.find((candidate) => {
     return candidate.value.startsWith('action-improvement-')
   })
   if (option) response = session.resolveChoice(0, option.value)
@@ -81,7 +87,7 @@ const playMinor = (session: GameSession, cardId: CardId) => {
   let response = enterImprovementChoice(session)
   if (!response.state.players[0]!.minorHand.includes(cardId)) return response
   if (response.interaction.stateId !== 'wait') return response
-  const option = response.interaction.request.options?.find((candidate) => candidate.value === cardId)
+  const option = getChoiceOptions(response)?.find((candidate) => candidate.value === cardId)
   if (option) response = session.resolveChoice(0, option.value)
   return response
 }
@@ -90,14 +96,14 @@ const cardIsOffered = (session: GameSession, cardId: CardId) => {
   const response = enterImprovementChoice(session)
   if (!response.state.players[0]!.minorHand.includes(cardId)) return true
   if (response.interaction.stateId !== 'wait') return false
-  return response.interaction.request.options?.some((candidate) => candidate.value === cardId) ?? false
+  return getChoiceOptions(response)?.some((candidate) => candidate.value === cardId) ?? false
 }
 
 const resolveNonSkip = (session: GameSession, response: SessionResponse, sourceCard?: string) => {
   const current = sourceCard ? resolveTriggerIfPresent(session, response, sourceCard) : response
   expect(current.interaction.stateId).toBe('wait')
   if (current.interaction.stateId !== 'wait') throw new Error('expected choice')
-  const option = current.interaction.request.options?.find((candidate) => candidate.value !== '__skip__')
+  const option = getChoiceOptions(current)?.find((candidate) => candidate.value !== '__skip__')
   expect(option).toBeDefined()
   return session.resolveChoice(current.interaction.playerIndex, option!.value)
 }
@@ -106,7 +112,7 @@ const resolveSkip = (session: GameSession, response: SessionResponse, sourceCard
   const current = sourceCard ? resolveTriggerIfPresent(session, response, sourceCard) : response
   expect(current.interaction.stateId).toBe('wait')
   if (current.interaction.stateId !== 'wait') throw new Error('expected choice')
-  const option = current.interaction.request.options?.find((candidate) => candidate.value === '__skip__')
+  const option = getChoiceOptions(current)?.find((candidate) => candidate.value === '__skip__')
   expect(option).toBeDefined()
   return session.resolveChoice(current.interaction.playerIndex, option!.value)
 }
@@ -149,7 +155,7 @@ describe('B009 Beating Rod parity', () => {
     let response = playMinor(session, 'B009_BeatingRod')
     expect(response.interaction.stateId).toBe('wait')
     if (response.interaction.stateId !== 'wait') throw new Error('expected Beating Rod choice')
-    const options = response.interaction.request.options?.filter((option) => option.value !== '__skip__') ?? []
+    const options = getChoiceOptions(response)?.filter((option) => option.value !== '__skip__') ?? []
     expect(options).toHaveLength(2)
     response = session.resolveChoice(0, options[branch]!.value)
     return response
@@ -402,3 +408,112 @@ describe('B083 Muddy Puddles parity', () => {
     expect(anytime.map((action) => action.id)).not.toContain('B83-muddy-puddles-anytime')
   })
 })
+
+describe("B001 command boundaries", () => {
+    const LIFE = 'B001_UpscaleLifestyle';
+    function save(id: string, value: unknown) {
+        sessionEvidence.record(id, value);
+    }
+    function ok(r: SessionResponse) { assert.equal(r.ok, true, r.error); return r; }
+    function setup(wood: number, configure: (state: GameState) => void = () => { }) {
+        const session = sessionEvidence.track(createWorkSession({ seed: 4242, configure(state) {
+                state.round = 14;
+                for (const p of state.players)
+                    Object.assign(p.resources, { food: 40, wood: 0, clay: 0, reed: 0, stone: 0, grain: 0, vegetable: 0 });
+                state.players[0]!.resources.wood = wood;
+                state.players[0]!.minorHand = [LIFE, 'A030_BakingSheet', 'A016_RammedClay'];
+                configure(state);
+            } }));
+        return session;
+    }
+    function enterMinor(session: GameSession) {
+        let r = ok(session.takeAction(0, 'meeting-place'));
+        assert.ok(r.interaction.stateId === 'wait' && expectWait(r).interaction.request.kind === 'choice');
+        const action = getChoiceOptions(r).find(o => o.value.startsWith('action-improvement-'));
+        assert.ok(action, JSON.stringify(r.interaction));
+        r = ok(session.resolveChoice(0, action.value));
+        return r;
+    }
+    function buy(session: GameSession, card: string) {
+        let r = enterMinor(session);
+        if (r.state.players[0]!.minorHand.includes(card)) {
+            assert.ok(r.interaction.stateId === 'wait' && expectWait(r).interaction.request.kind === 'choice', JSON.stringify(r.interaction));
+            const option = getChoiceOptions(r).find(o => o.value === card);
+            assert.ok(option, JSON.stringify(r.interaction));
+            r = ok(session.resolveChoice(0, option.value));
+        }
+        assert(r.state.players[1]!.minorHand.includes(card));
+        return r;
+    }
+    function optional(session: GameSession, r: SessionResponse, accept: boolean) {
+        assert.ok(r.interaction.stateId === 'wait' && expectWait(r).interaction.request.kind === 'choice', JSON.stringify(r.interaction));
+        const option = getChoiceOptions(r).find(o => accept ? o.value !== '__skip__' : o.value === '__skip__');
+        assert.ok(option);
+        return ok(session.resolveChoice(0, option.value));
+    }
+    it("paid passing card grants five clay and normal renovation pays two clay one reed", () => {
+        const session = setup(3, state => state.players[0]!.resources.reed = 1);
+        let r = optional(session, buy(session, LIFE), true);
+        if (r.interaction.stateId === 'wait' && expectWait(r).interaction.request.kind === 'choice')
+            r = ok(session.resolveChoice(0, 'clay'));
+        assert.equal(r.state.players[0]!.houseType, 'clay');
+        assert.equal(r.state.players[0]!.resources.wood, 0);
+        assert.equal(r.state.players[0]!.resources.clay, 3);
+        assert.equal(r.state.players[0]!.resources.reed, 0);
+        save('B001-N1', r);
+    });
+    it("declining renovation retains five clay and missing reed cannot create free renovation", () => {
+        const session = setup(3, state => state.players[0]!.resources.reed = 1);
+        const declined = optional(session, buy(session, LIFE), false);
+        assert.equal(declined.state.players[0]!.houseType, 'wood');
+        assert.equal(declined.state.players[0]!.resources.clay, 5);
+        assert.equal(declined.state.players[0]!.resources.reed, 1);
+        const noReed = buy(setup(3), LIFE);
+        assert.equal(noReed.state.players[0]!.houseType, 'wood');
+        assert.equal(noReed.state.players[0]!.resources.clay, 5);
+        assert.ok(declined.interaction.stateId === 'wait');
+        assert.deepEqual(declined.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 });
+        assert.equal(declined.state.currentPlayerIndex, 0);
+        assert.ok(noReed.interaction.stateId === 'wait');
+        assert.deepEqual(noReed.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 });
+        assert.equal(noReed.state.currentPlayerIndex, 0);
+        save('B001-N2', { declined, noReed });
+    });
+    it("insufficient card wood and invalid actor cannot gain or pass before legal alternative", () => {
+        const session = setup(2);
+        const r = enterMinor(session);
+        assert.ok(r.interaction.stateId === 'wait' && expectWait(r).interaction.request.kind === 'choice', JSON.stringify(r.interaction));
+        assert(!getChoiceOptions(r).some(o => o.value === LIFE && !o.disabled));
+        assertRejectedUnchanged(session, () => session.resolveChoice(0, LIFE));
+        assertRejectedUnchanged(session, () => session.resolveChoice(1, 'A030_BakingSheet'));
+        const legal = ok(session.resolveChoice(0, 'A030_BakingSheet'));
+        assert.equal(legal.state.players[0]!.resources.clay, 0);
+        assert.equal(legal.state.players[0]!.resources.wood, 2);
+        assert(legal.state.players[0]!.minorHand.includes(LIFE));
+        save('B001-N3', legal);
+    });
+    it("whole renovation undo restores payment reward house and passing", () => {
+        const session = setup(3, state => state.players[0]!.resources.reed = 1);
+        let r = optional(session, buy(session, LIFE), true);
+        if (r.interaction.stateId === 'wait' && expectWait(r).interaction.request.kind === 'choice')
+            r = ok(session.resolveChoice(0, 'clay'));
+        const undone = ok(session.undoAction());
+        assert.equal(undone.state.players[0]!.houseType, 'wood');
+        assert.equal(undone.state.players[0]!.resources.wood, 3);
+        assert.equal(undone.state.players[0]!.resources.clay, 0);
+        assert.equal(undone.state.players[0]!.resources.reed, 1);
+        assert(undone.state.players[0]!.minorHand.includes(LIFE));
+        assert(!undone.state.players[1]!.minorHand.includes(LIFE));
+        save('B001-N4', { r, undone });
+    });
+    it("stone house keeps five clay without further renovation or stale duplicate reward", () => {
+        const session = setup(3, state => { state.players[0]!.houseType = 'stone'; state.players[0]!.resources.reed = 1; });
+        const r = buy(session, LIFE);
+        assert.equal(r.state.players[0]!.houseType, 'stone');
+        assert.equal(r.state.players[0]!.resources.clay, 5);
+        assert.equal(r.state.players[0]!.resources.reed, 1);
+        assertRejectedUnchanged(session, () => session.resolveChoice(0, LIFE));
+        assert.equal(session.getState().state.players[0]!.resources.clay, 5);
+        save('B001-N5', r);
+    });
+});
