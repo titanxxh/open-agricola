@@ -164,6 +164,10 @@ describe("A108 command boundaries", () => {
         assert.equal(response.state.players[0]!.resources.food, 42);
         assert.equal(response.state.actionSpaces.find(s => s.id === 'forest')!.resources.wood, 1);
         assert.equal(response.state.actionSpaces.find(s => s.id === 'clay-pit')!.resources.wood ?? 0, 0);
+        assert.ok(response.interaction.stateId === 'wait');
+        assert.deepEqual(response.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 });
+        assert.equal(response.interaction.playerIndex, 0);
+        assert.equal(response.state.currentPlayerIndex, 0);
         save('A108-N1', response);
     });
     it("decline and no wood cannot grant food or return nonexistent wood", () => {
@@ -218,6 +222,7 @@ describe("A108 command boundaries", () => {
     });
     it("invalid actor value and stale exchange reject and undo restores exact source", () => {
         const session = setup();
+        const undoInteraction = JSON.stringify(session.getState().interaction);
         const pending = turn(session, 0, 'forest');
         const option = choice(pending).find(o => o.sourceCard === MUSH && o.value !== '__skip__');
         assert.ok(option);
@@ -227,12 +232,23 @@ describe("A108 command boundaries", () => {
         assertRejectedUnchanged(session, () => session.resolveChoice(0, option.value));
         assert.equal(response.state.players[0]!.resources.food, 42);
         const undone = ok(session.undoAction());
+        assert.equal(JSON.stringify(undone.interaction), undoInteraction);
+        assert.equal(undone.interaction.stateId, 'idle');
+        assert.equal(undone.state.currentPlayerIndex, 0);
         assert.equal(undone.state.players[0]!.resources.food, 40);
         assert.equal(undone.state.players[0]!.resources.wood, 0);
         assert.equal(undone.state.actionSpaces.find(s => s.id === 'forest')!.resources.wood, 3);
         const retry = accept(session, turn(session, 0, 'forest'));
         assert.equal(retry.state.players[0]!.resources.food, 42);
         assert.equal(retry.state.actionSpaces.find(s => s.id === 'forest')!.resources.wood, 1);
+        assert.ok(response.interaction.stateId === 'wait');
+        assert.deepEqual(response.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 });
+        assert.equal(response.interaction.playerIndex, 0);
+        assert.equal(response.state.currentPlayerIndex, 0);
+        assert.ok(retry.interaction.stateId === 'wait');
+        assert.deepEqual(retry.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 });
+        assert.equal(retry.interaction.playerIndex, 0);
+        assert.equal(retry.state.currentPlayerIndex, 0);
         save('A108-N5', { response, undone, retry });
     });
 });

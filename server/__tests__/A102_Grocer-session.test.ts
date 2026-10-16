@@ -207,6 +207,10 @@ describe("A102 command boundaries", () => {
         const response = buyGrocer(session);
         assert.deepEqual(getCardStack(response.state.players[0]!, GROCER), ['vegetable', 'reed', 'clay', 'vegetable', 'stone', 'reed', 'grain', 'wood']);
         assert.equal(response.state.players[0]!.resources.food, 8);
+        assert.ok(response.interaction.stateId === 'wait');
+        assert.deepEqual(response.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 });
+        assert.equal(response.interaction.playerIndex, 0);
+        assert.equal(response.state.currentPlayerIndex, 0);
         save('A102-N1', response);
     });
     it("eight actual top purchases each pay one food and drain in the printed order", () => {
@@ -219,6 +223,10 @@ describe("A102 command boundaries", () => {
             assert.equal(response.state.players[0]!.resources[resource], before + 1);
             assert.equal(response.state.players[0]!.resources.food, 7 - i);
             assert.equal(getCardStack(response.state.players[0]!, GROCER).length, 7 - i);
+            assert.ok(response.interaction.stateId === 'wait' && response.interaction.request.kind === 'farm-select');
+            assert.equal(response.interaction.request.farm.farmType, 'plow');
+            assert.equal(response.interaction.playerIndex, 0);
+            assert.equal(response.state.currentPlayerIndex, 0);
             save(`A102-N2-${i}`, response);
         }
         assertRejectedUnchanged(session, () => session.takeAnytimeAction(0, 'A102-grocer-anytime'));
@@ -234,6 +242,10 @@ describe("A102 command boundaries", () => {
         assert.equal(response.state.players[0]!.resources.wood, 1);
         assert.equal(response.state.players[0]!.resources.food, 0);
         assertRejectedUnchanged(session, () => session.takeAnytimeAction(0, 'A102-grocer-anytime'));
+        assert.ok(response.interaction.stateId === 'wait' && response.interaction.request.kind === 'farm-select');
+        assert.equal(response.interaction.request.farm.farmType, 'plow');
+        assert.equal(response.interaction.playerIndex, 0);
+        assert.equal(response.state.currentPlayerIndex, 0);
         save('A102-N3', response);
     });
     it("wrong player and nonexistent purchase cannot spend or take stack goods", () => {
@@ -244,14 +256,25 @@ describe("A102 command boundaries", () => {
         const response = take(session);
         assert.equal(response.state.players[0]!.resources.vegetable, 0);
         assert.equal(response.state.players[0]!.resources.wood, 1);
+        assert.ok(response.interaction.stateId === 'wait' && response.interaction.request.kind === 'farm-select');
+        assert.equal(response.interaction.request.farm.farmType, 'plow');
+        assert.equal(response.interaction.playerIndex, 0);
+        assert.equal(response.state.currentPlayerIndex, 0);
         save('A102-N4', response);
     });
     it("whole action undo restores purchased stack top and food before one retry", () => {
         const session = grocer();
-        const pending = enterGrocer(session);
+        buyGrocer(session);
+        turn(session, 1, 'grain-seeds');
+        ready(session, 0);
+        const undoInteraction = JSON.stringify(session.getState().interaction);
+        const pending = turn(session, 0, 'farmland');
         take(session);
         take(session);
         const undone = ok(session.undoAction());
+        assert.equal(JSON.stringify(undone.interaction), undoInteraction);
+        assert.equal(undone.interaction.stateId, 'idle');
+        assert.equal(undone.state.currentPlayerIndex, 0);
         assert.equal(undone.state.players[0]!.resources.food, 8);
         assert.equal(getCardStack(undone.state.players[0]!, GROCER).length, 8);
         assert.equal(undone.state.players[0]!.resources.wood, 0);
@@ -260,6 +283,10 @@ describe("A102 command boundaries", () => {
         const response = take(session);
         assert.equal(response.state.players[0]!.resources.food, 7);
         assert.equal(response.state.players[0]!.resources.wood, 1);
+        assert.ok(response.interaction.stateId === 'wait' && response.interaction.request.kind === 'farm-select');
+        assert.equal(response.interaction.request.farm.farmType, 'plow');
+        assert.equal(response.interaction.playerIndex, 0);
+        assert.equal(response.state.currentPlayerIndex, 0);
         save('A102-N5', { pending, undone, response });
     });
 });

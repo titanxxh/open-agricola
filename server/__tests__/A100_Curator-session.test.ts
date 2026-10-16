@@ -219,6 +219,8 @@ describe("A100 command boundaries", () => {
         assert.equal(response.state.players[0]!.resources.food, 19);
         assert.equal(bonus(response), 1);
         assert.equal(response.state.round, 4);
+        assert.equal(response.interaction.stateId, 'idle');
+        assert.equal(response.state.currentPlayerIndex, 0);
         save('A100-N1', response);
     });
     it("declining preserves the food and gives no point", () => {
@@ -263,6 +265,8 @@ describe("A100 command boundaries", () => {
         assertRejectedUnchanged(session, () => session.resolveChoice(0, option.value));
         assert.equal(bonus(response), 1);
         assert.equal(response.state.players[0]!.resources.food, 19);
+        assert.equal(response.interaction.stateId, 'idle');
+        assert.equal(response.state.currentPlayerIndex, 0);
         save('A100-N5', response);
     });
 });

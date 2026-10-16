@@ -216,6 +216,7 @@ describe("A101 command boundaries", () => {
     });
     it("real major purchase pays printed cost and undo removes only its cooking bonus", () => {
         const session = setup();
+        const undoInteraction = JSON.stringify(session.getState().interaction);
         let response = ok(session.takeAction(0, 'major-improvement'));
         if (response.interaction.stateId === 'wait' && expectWait(response).interaction.request.kind === 'choice') {
             const option = choices(response).find(option => option.value.startsWith('action-improvement-'));
@@ -228,8 +229,15 @@ describe("A101 command boundaries", () => {
         assert.equal(response.state.players[0]!.resources.clay, 3);
         assert.equal(bonus(response, COOK), 1);
         const undone = ok(session.undoAction());
+        assert.equal(JSON.stringify(undone.interaction), undoInteraction);
+        assert.equal(undone.interaction.stateId, 'idle');
+        assert.equal(undone.state.currentPlayerIndex, 0);
         assert.equal(undone.state.players[0]!.resources.clay, 5);
         assert.equal(bonus(undone, COOK), 0);
+        assert.ok(response.interaction.stateId === 'wait');
+        assert.deepEqual(response.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 });
+        assert.equal(response.interaction.playerIndex, 0);
+        assert.equal(response.state.currentPlayerIndex, 0);
         save('A101-N5', { response, undone });
     });
     it("repeated score reads cannot duplicate cooking points or mutate rule state", () => {
@@ -262,6 +270,10 @@ describe("A101 command boundaries", () => {
         assert.equal(response.state.players[0]!.improvements.includes('Major_Fireplace1'), false);
         assert.equal(response.state.players[0]!.resources.food, 40);
         const actual = { bonus: bonus(response, COOK), orientalPlayed: true, returnedFireplace: true };
+        assert.ok(response.interaction.stateId === 'wait');
+        assert.deepEqual(response.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 });
+        assert.equal(response.interaction.playerIndex, 0);
+        assert.equal(response.state.currentPlayerIndex, 0);
         save('A101-N7', { actual, response });
         assert.deepEqual(actual, { bonus: 1, orientalPlayed: true, returnedFireplace: true });
     });

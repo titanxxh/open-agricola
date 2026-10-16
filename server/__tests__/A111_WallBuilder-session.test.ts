@@ -270,10 +270,18 @@ describe("A111 command boundaries", () => {
             const r = build(setup(), count);
             assert.deepEqual(schedule(r).map(e => [e.round, e.food]), [[6, 1], [7, 1], [8, 1], [9, 1]]);
             assert.equal(r.state.players[0]!.resources.food, 40);
+            assert.ok(r.interaction.stateId === 'wait');
+            assert.deepEqual(r.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 });
+            assert.equal(r.interaction.playerIndex, 0);
+            assert.equal(r.state.currentPlayerIndex, 0);
             save(`A111-N1-${count}`, r);
         }
         const stable = build(setup(), 1, 0, true);
         assert.deepEqual(schedule(stable), []);
+        assert.ok(stable.interaction.stateId === 'wait');
+        assert.deepEqual(stable.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 });
+        assert.equal(stable.interaction.playerIndex, 0);
+        assert.equal(stable.state.currentPlayerIndex, 0);
         save('A111-N1-stable', stable);
     });
     it("natural rounds deliver to the owner once and consume each scheduled food", () => {
@@ -304,6 +312,10 @@ describe("A111 command boundaries", () => {
             const r = build(setup(undefined, true, round), 1);
             assert.deepEqual(schedule(r).map(e => e.round), round === 12 ? [13, 14] : []);
             assert.equal(r.state.players[0]!.resources.food, 40);
+            assert.ok(r.interaction.stateId === 'wait');
+            assert.deepEqual(r.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 });
+            assert.equal(r.interaction.playerIndex, 0);
+            assert.equal(r.state.currentPlayerIndex, 0);
             save(`A111-N3-${round}`, r);
         }
     });
@@ -322,6 +334,7 @@ describe("A111 command boundaries", () => {
         assert.equal(other.state.currentPlayerIndex, 1);
         save('A111-N4-opponent', other);
         const session = setup();
+        const undoInteraction = JSON.stringify(session.getState().interaction);
         turn(session, 0, 'farm-expansion');
         let r = session.getState();
         if (r.interaction.stateId === 'wait' && expectWait(r).interaction.request.kind === 'choice') {
@@ -333,9 +346,16 @@ describe("A111 command boundaries", () => {
         assert.deepEqual(schedule(session.getState()), []);
         r = ok(session.commitSelectionChoice(0, { rooms: [{ row: 1, col: 1 }] }));
         const undone = ok(session.undoAction());
+        assert.equal(JSON.stringify(undone.interaction), undoInteraction);
+        assert.equal(undone.interaction.stateId, 'idle');
+        assert.equal(undone.state.currentPlayerIndex, 0);
         assert.deepEqual(schedule(undone), []);
         assert.equal(undone.state.players[0]!.rooms, 2);
         assert.equal(undone.state.players[0]!.resources.wood, 10);
+        assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice');
+        assert.deepEqual(getChoiceOptions(r).map(option => option.labelKey), ['actions.stables.name', 'ui.interactionFlowDone']);
+        assert.equal(r.interaction.playerIndex, 0);
+        assert.equal(r.state.currentPlayerIndex, 0);
         save('A111-N4', { r, undone, unplayed });
     });
 });

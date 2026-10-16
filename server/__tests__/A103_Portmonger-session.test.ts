@@ -134,6 +134,10 @@ describe("A103 command boundaries", () => {
             assert.equal(response.state.players[0]!.resources[resource], 1);
             assert.equal(response.state.players[0]!.resources.food, 40 + amount);
             assert.equal(response.state.actionSpaces.find(s => s.id === 'fishing')!.resources.food, 0);
+            assert.ok(response.interaction.stateId === 'wait');
+            assert.deepEqual(response.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 });
+            assert.equal(response.interaction.playerIndex, 0);
+            assert.equal(response.state.currentPlayerIndex, 0);
             save(`A103-N1-${amount}`, response);
         }
     });
@@ -171,9 +175,13 @@ describe("A103 command boundaries", () => {
     });
     it("occupied source rejects and whole undo restores pile and exactly one bonus", () => {
         const session = setup(state => state.actionSpaces.find(s => s.id === 'fishing')!.resources.food = 2);
+        const undoInteraction = JSON.stringify(session.getState().interaction);
         let response = turn(session, 0, 'fishing');
         assert.equal(response.state.players[0]!.resources.grain, 1);
         const undone = ok(session.undoAction());
+        assert.equal(JSON.stringify(undone.interaction), undoInteraction);
+        assert.equal(undone.interaction.stateId, 'idle');
+        assert.equal(undone.state.currentPlayerIndex, 0);
         assert.equal(undone.state.players[0]!.resources.grain, 0);
         assert.equal(undone.state.players[0]!.resources.food, 40);
         assert.equal(undone.state.actionSpaces.find(s => s.id === 'fishing')!.resources.food, 2);
@@ -182,6 +190,10 @@ describe("A103 command boundaries", () => {
         ready(session, 0);
         assertRejectedUnchanged(session, () => session.takeAction(0, 'fishing'));
         assert.equal(session.getState().state.players[0]!.resources.grain, 1);
+        assert.ok(response.interaction.stateId === 'wait');
+        assert.deepEqual(response.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 });
+        assert.equal(response.interaction.playerIndex, 0);
+        assert.equal(response.state.currentPlayerIndex, 0);
         save('A103-N4', { response, undone });
     });
 });

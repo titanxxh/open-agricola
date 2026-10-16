@@ -159,15 +159,23 @@ describe("A099 command boundaries", () => {
     });
     it("real three tile pasture scores two and whole action undo removes the bonus", () => {
         const session = setup();
+        const undoInteraction = JSON.stringify(session.getState().interaction);
         ok(session.takeAction(0, 'fencing'));
         const edges = ['H-0-1', 'H-0-2', 'H-0-3', 'H-1-1', 'H-1-2', 'H-1-3', 'V-0-1', 'V-0-4'];
         const response = ok(session.commitSelectionChoice(0, { edges, extraWood: 0 }));
         assert.equal(bonus(response, GRAZER), 2);
         assert.equal(response.state.players[0]!.resources.wood, 7);
         const undone = ok(session.undoAction());
+        assert.equal(JSON.stringify(undone.interaction), undoInteraction);
+        assert.equal(undone.interaction.stateId, 'idle');
+        assert.equal(undone.state.currentPlayerIndex, 0);
         assert.equal(bonus(undone, GRAZER), 0);
         assert.equal(undone.state.players[0]!.pastures.length, 0);
         assert.equal(undone.state.players[0]!.resources.wood, 15);
+        assert.ok(response.interaction.stateId === 'wait');
+        assert.deepEqual(response.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 });
+        assert.equal(response.interaction.playerIndex, 0);
+        assert.equal(response.state.currentPlayerIndex, 0);
         save('A099-N4', { response, undone });
     });
 });

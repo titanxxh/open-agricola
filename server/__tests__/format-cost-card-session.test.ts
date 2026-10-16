@@ -745,6 +745,10 @@ describe("C002 command boundaries", () => {
         assert.equal(r.state.players[0]!.resources.wood, 0);
         assert.deepEqual(r.state.players[0]!.stableTiles, [{ row: 0, col: 1 }]);
         assert(r.state.players[1]!.minorHand.includes(STABLE));
+        assert.ok(r.interaction.stateId === 'wait');
+        assert.deepEqual(r.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 });
+        assert.equal(r.interaction.playerIndex, 0);
+        assert.equal(r.state.currentPlayerIndex, 0);
         save('C002-N1', r);
     });
     it("mandatory single stable rejects cancel multiple targets bad tiles and wrong actor then retries", () => {
@@ -756,6 +760,10 @@ describe("C002 command boundaries", () => {
         const r = ok(session.commitSelectionChoice(0, { stables: [{ row: 0, col: 1 }] }));
         assert.equal(r.state.players[0]!.stableTiles.length, 1);
         assert.equal(r.state.players[0]!.resources.wood, 0);
+        assert.ok(r.interaction.stateId === 'wait');
+        assert.deepEqual(r.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 });
+        assert.equal(r.interaction.playerIndex, 0);
+        assert.equal(r.state.currentPlayerIndex, 0);
         save('C002-N2', r);
     });
     it("zero wood cannot buy and whole undo restores stable payment and hand", () => {
@@ -764,13 +772,21 @@ describe("C002 command boundaries", () => {
         assertRejectedUnchanged(poor, () => poor.resolveChoice(0, STABLE));
         assert.equal(poor.getState().state.players[0]!.stableTiles.length, 0);
         const session = setup(1);
+        const undoInteraction = JSON.stringify(session.getState().interaction);
         buy(session, STABLE);
         const r = ok(session.commitSelectionChoice(0, { stables: [{ row: 0, col: 1 }] }));
         const undone = ok(session.undoAction());
+        assert.equal(JSON.stringify(undone.interaction), undoInteraction);
+        assert.equal(undone.interaction.stateId, 'idle');
+        assert.equal(undone.state.currentPlayerIndex, 0);
         assert.equal(undone.state.players[0]!.resources.wood, 1);
         assert.equal(undone.state.players[0]!.stableTiles.length, 0);
         assert(undone.state.players[0]!.minorHand.includes(STABLE));
         assert(!undone.state.players[1]!.minorHand.includes(STABLE));
+        assert.ok(r.interaction.stateId === 'wait');
+        assert.deepEqual(r.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 });
+        assert.equal(r.interaction.playerIndex, 0);
+        assert.equal(r.state.currentPlayerIndex, 0);
         save('C002-N3', { r, undone });
     });
     it("finite four stable supply cannot produce a fifth stable", () => {

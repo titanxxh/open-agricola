@@ -462,6 +462,10 @@ describe("B001 command boundaries", () => {
         assert.equal(r.state.players[0]!.resources.wood, 0);
         assert.equal(r.state.players[0]!.resources.clay, 3);
         assert.equal(r.state.players[0]!.resources.reed, 0);
+        assert.ok(r.interaction.stateId === 'wait');
+        assert.deepEqual(r.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 });
+        assert.equal(r.interaction.playerIndex, 0);
+        assert.equal(r.state.currentPlayerIndex, 0);
         save('B001-N1', r);
     });
     it("declining renovation retains five clay and missing reed cannot create free renovation", () => {
@@ -492,20 +496,32 @@ describe("B001 command boundaries", () => {
         assert.equal(legal.state.players[0]!.resources.clay, 0);
         assert.equal(legal.state.players[0]!.resources.wood, 2);
         assert(legal.state.players[0]!.minorHand.includes(LIFE));
+        assert.ok(legal.interaction.stateId === 'wait');
+        assert.deepEqual(legal.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 });
+        assert.equal(legal.interaction.playerIndex, 0);
+        assert.equal(legal.state.currentPlayerIndex, 0);
         save('B001-N3', legal);
     });
     it("whole renovation undo restores payment reward house and passing", () => {
         const session = setup(3, state => state.players[0]!.resources.reed = 1);
+        const undoInteraction = JSON.stringify(session.getState().interaction);
         let r = optional(session, buy(session, LIFE), true);
         if (r.interaction.stateId === 'wait' && expectWait(r).interaction.request.kind === 'choice')
             r = ok(session.resolveChoice(0, 'clay'));
         const undone = ok(session.undoAction());
+        assert.equal(JSON.stringify(undone.interaction), undoInteraction);
+        assert.equal(undone.interaction.stateId, 'idle');
+        assert.equal(undone.state.currentPlayerIndex, 0);
         assert.equal(undone.state.players[0]!.houseType, 'wood');
         assert.equal(undone.state.players[0]!.resources.wood, 3);
         assert.equal(undone.state.players[0]!.resources.clay, 0);
         assert.equal(undone.state.players[0]!.resources.reed, 1);
         assert(undone.state.players[0]!.minorHand.includes(LIFE));
         assert(!undone.state.players[1]!.minorHand.includes(LIFE));
+        assert.ok(r.interaction.stateId === 'wait');
+        assert.deepEqual(r.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 });
+        assert.equal(r.interaction.playerIndex, 0);
+        assert.equal(r.state.currentPlayerIndex, 0);
         save('B001-N4', { r, undone });
     });
     it("stone house keeps five clay without further renovation or stale duplicate reward", () => {
@@ -516,6 +532,10 @@ describe("B001 command boundaries", () => {
         assert.equal(r.state.players[0]!.resources.reed, 1);
         assertRejectedUnchanged(session, () => session.resolveChoice(0, LIFE));
         assert.equal(session.getState().state.players[0]!.resources.clay, 5);
+        assert.ok(r.interaction.stateId === 'wait');
+        assert.deepEqual(r.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 });
+        assert.equal(r.interaction.playerIndex, 0);
+        assert.equal(r.state.currentPlayerIndex, 0);
         save('B001-N5', r);
     });
 });

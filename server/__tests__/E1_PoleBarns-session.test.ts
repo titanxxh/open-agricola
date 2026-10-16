@@ -251,6 +251,10 @@ describe("E001 command boundaries", () => {
         assert.equal(r.state.players[0]!.resources.wood, 0);
         assert.equal(r.state.players[0]!.fenceSegments.length, 15);
         assert(r.state.players[1]!.minorHand.includes(POLE));
+        assert.ok(r.interaction.stateId === 'wait');
+        assert.deepEqual(r.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 });
+        assert.equal(r.interaction.playerIndex, 0);
+        assert.equal(r.state.currentPlayerIndex, 0);
         save('E001-N1', r);
     });
     it("fourteen fences opponent fences and insufficient card wood cannot buy", () => {
@@ -263,6 +267,10 @@ describe("E001 command boundaries", () => {
             const legal = ok(session.resolveChoice(0, 'A030_BakingSheet'));
             assert.equal(legal.state.players[0]!.resources.wood, wood);
             assert.equal(legal.state.players[0]!.stableTiles.length, 0);
+            assert.ok(legal.interaction.stateId === 'wait');
+            assert.deepEqual(legal.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 });
+            assert.equal(legal.interaction.playerIndex, 0);
+            assert.equal(legal.state.currentPlayerIndex, 0);
             save(`E001-N2-${count}-${actor}-${wood}`, legal);
         }
     });
@@ -275,15 +283,23 @@ describe("E001 command boundaries", () => {
         const r = ok(session.commitSelectionChoice(0, { stables: [{ row: 0, col: 1 }] }));
         assert.equal(r.state.players[0]!.stableTiles.length, 4);
         assert.equal(r.state.players[0]!.resources.wood, 0);
+        assert.ok(r.interaction.stateId === 'wait');
+        assert.deepEqual(r.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 });
+        assert.equal(r.interaction.playerIndex, 0);
+        assert.equal(r.state.currentPlayerIndex, 0);
         save('E001-N3', r);
     });
     it("decline and whole undo preserve fences and restore stable cost and passing", () => {
         const session = setup(2, state => pole(state));
+        const undoInteraction = JSON.stringify(session.getState().interaction);
         const pending = buy(session, POLE);
         const r = optional(session, pending, false);
         assert.equal(r.state.players[0]!.stableTiles.length, 0);
         assert.equal(r.state.players[0]!.resources.wood, 0);
         const undone = ok(session.undoAction());
+        assert.equal(JSON.stringify(undone.interaction), undoInteraction);
+        assert.equal(undone.interaction.stateId, 'idle');
+        assert.equal(undone.state.currentPlayerIndex, 0);
         assert.equal(undone.state.players[0]!.resources.wood, 2);
         assert.equal(undone.state.players[0]!.fenceSegments.length, 15);
         assert(undone.state.players[0]!.minorHand.includes(POLE));
