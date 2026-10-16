@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../../cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, it, expect } from 'vitest'
 import { GameSession } from '../../../../server/game/authoritative-session'
 import { placeFarmerAction } from '../place-farmer'
@@ -35,13 +31,13 @@ describe('place-farmer effect viaCardJump branch', () => {
       workerId: '1',
       targetSpaceId: 'fencing',
     }
-    const result = placeFarmerAction.execute({
+    const result = session.withCtx(() => placeFarmerAction.execute({
       actionHooks: session.actionHooks,
       state,
       player,
       space: fromSpace,
       actionContext,
-    })
+    }))
 
     expect(fromSpace.takenBy).toEqual([])
     expect(targetSpace.takenBy).toEqual([{ playerId: player.id, workerId: '1' }])
@@ -81,13 +77,13 @@ describe('place-farmer effect viaCardJump branch', () => {
       targetSpaceId: 'fencing',
       jumpChain: ['A129_Swagman'],
     }
-    placeFarmerAction.execute({ actionHooks: session.actionHooks, state, player, space: fromSpace, actionContext })
+    session.withCtx(() => placeFarmerAction.execute({ actionHooks: session.actionHooks, state, player, space: fromSpace, actionContext }))
     expect(actionContext.jumpChain).toEqual(['A129_Swagman', 'B130_FullPeasant'])
   })
 
   it('fails when workerId is not on any space', () => {
     const { session, state, player } = buildState()
-    const result = placeFarmerAction.execute({
+    const result = session.withCtx(() => placeFarmerAction.execute({
       actionHooks: session.actionHooks,
       state,
       player,
@@ -98,7 +94,7 @@ describe('place-farmer effect viaCardJump branch', () => {
         workerId: '99',
         targetSpaceId: 'fencing',
       },
-    })
+    }))
     expect(result.type).toBe('fail')
   })
 
@@ -106,7 +102,7 @@ describe('place-farmer effect viaCardJump branch', () => {
     const { session, state, player } = buildState()
     const fromSpace = state.actionSpaces.find(s => s.id === 'grain-utilization')!
     addWorkerRef(fromSpace, player.id, '1')
-    const result = placeFarmerAction.execute({
+    const result = session.withCtx(() => placeFarmerAction.execute({
       actionHooks: session.actionHooks,
       state,
       player,
@@ -117,7 +113,7 @@ describe('place-farmer effect viaCardJump branch', () => {
         workerId: '1',
         targetSpaceId: 'no-such-space',
       },
-    })
+    }))
     expect(result.type).toBe('fail')
   })
 
@@ -128,7 +124,7 @@ describe('place-farmer effect viaCardJump branch', () => {
     addWorkerRef(fromSpace, player.id, '1')
     addWorkerRef(targetSpace, state.players[1]!.id, '1')
 
-    const result = placeFarmerAction.execute({
+    const result = session.withCtx(() => placeFarmerAction.execute({
       actionHooks: session.actionHooks,
       state,
       player,
@@ -139,7 +135,7 @@ describe('place-farmer effect viaCardJump branch', () => {
         workerId: '1',
         targetSpaceId: 'fencing',
       },
-    })
+    }))
     expect(result.type).toBe('fail')
     expect(fromSpace.takenBy).toEqual([{ playerId: player.id, workerId: '1' }])
   })
@@ -150,7 +146,7 @@ describe('place-farmer effect viaCardJump branch', () => {
     addWorkerRef(fromSpace, player.id, '1')
     const activeBefore = player.workers.filter(w => w.isActive).length
 
-    placeFarmerAction.execute({
+    session.withCtx(() => placeFarmerAction.execute({
       actionHooks: session.actionHooks,
       state,
       player,
@@ -161,7 +157,7 @@ describe('place-farmer effect viaCardJump branch', () => {
         workerId: '1',
         targetSpaceId: 'fencing',
       },
-    })
+    }))
     expect(player.workers.filter(w => w.isActive).length).toBe(activeBefore)
   })
 })

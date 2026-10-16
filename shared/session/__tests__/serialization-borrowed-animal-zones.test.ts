@@ -1,7 +1,6 @@
-import { installOfficialCardRegistry } from '../../cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
+import type { ActionHookRegistry } from '../../actions/hooks'
+import { withActiveRegistry } from '../../cards/active-registry'
+import { createOfficialCardRegistry } from '../../cards/__tests__/card-environment'
 import '../../cards/__tests__/setup-register-all'
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -12,12 +11,13 @@ import { EngineStack } from '../../engine'
 import { createInitialState } from '../state-bootstrap'
 import { serializeSessionSnapshot, serializeState, serializeStateForPlayer } from '../serialization'
 
-const emptyCtx = () => ({ engineStack: new EngineStack() })
+const emptyCtx = (actionHooks: ActionHookRegistry | undefined) => ({ actionHooks, engineStack: new EngineStack() })
 
 afterEach(() => vi.restoreAllMocks())
 
 describe('borrowed played-card animal zones serialization', () => {
   it('projects M033 borrowed animal zones for non-owner player snapshots', () => {
+    const registry = createOfficialCardRegistry()
     const state = createInitialState(33033, {
       playerCount: 2,
       enableFarmersOfTheMoor: true,
@@ -30,7 +30,7 @@ describe('borrowed played-card animal zones serialization', () => {
     owner.minorPlayed = ['M033_NightPasture']
     owner.cardStates = { M033_NightPasture: { extraData: {} } }
 
-    const serialized = serializeState(state, emptyCtx())
+    const serialized = withActiveRegistry(registry, () => serializeState(state, emptyCtx(undefined)))
 
     expect(serialized.players[0]!.borrowedPlayedCardAnimalZones).toEqual([])
     expect(serialized.players[1]!.borrowedPlayedCardAnimalZones).toEqual([
@@ -49,13 +49,14 @@ describe('borrowed played-card animal zones serialization', () => {
       },
     ])
 
-    const viewerSnapshot = serializeStateForPlayer(state, viewer.id, emptyCtx())
+    const viewerSnapshot = withActiveRegistry(registry, () => serializeStateForPlayer(state, viewer.id, emptyCtx(undefined)))
     expect(viewerSnapshot.players[1]!.borrowedPlayedCardAnimalZones).toEqual(
       serialized.players[1]!.borrowedPlayedCardAnimalZones,
     )
   })
 
   it('projects owned played-card animal zones for owner snapshots', () => {
+    const registry = createOfficialCardRegistry()
     const state = createInitialState(33034, {
       playerCount: 2,
       enableFarmersOfTheMoor: true,
@@ -65,7 +66,7 @@ describe('borrowed played-card animal zones serialization', () => {
     owner.minorPlayed = ['M033_NightPasture']
     owner.cardStates = { M033_NightPasture: { extraData: {} } }
 
-    const serialized = serializeState(state, emptyCtx())
+    const serialized = withActiveRegistry(registry, () => serializeState(state, emptyCtx(undefined)))
 
     expect(serialized.players[0]!.playedCardAnimalZones).toEqual([
       {
@@ -84,6 +85,7 @@ describe('borrowed played-card animal zones serialization', () => {
   })
 
   it('projects empty farm-position card animal zones for owner snapshots', () => {
+    const registry = createOfficialCardRegistry()
     const state = createInitialState(33035, {
       playerCount: 2,
       enableFarmersOfTheMoor: true,
@@ -92,7 +94,7 @@ describe('borrowed played-card animal zones serialization', () => {
     const player = state.players[0]!
     player.minorPlayed = ['M035_HorseTrough']
 
-    const serialized = serializeState(state, emptyCtx())
+    const serialized = withActiveRegistry(registry, () => serializeState(state, emptyCtx(undefined)))
     const farmZones = serialized.players[0]!.farmCardAnimalZones
 
     expect(farmZones).toEqual(
@@ -135,7 +137,7 @@ describe('borrowed played-card animal zones serialization', () => {
       const sharedQuery = vi.spyOn(effect, 'onComputeSharedAnimalZones')
       const snapshot = () => mode === 'persistence'
         ? serializeSessionSnapshot(session.state, session).frame
-        : session.withCtx(() => serializeStateForPlayer(session.state, viewer.id, emptyCtx()))
+        : session.withCtx(() => serializeStateForPlayer(session.state, viewer.id, emptyCtx(session.actionHooks)))
       const before = JSON.stringify(session.state)
 
       const first = snapshot()

@@ -1,7 +1,4 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
+import type { GameSession as SessionRuleOwner } from '../game/authoritative-session'
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { runCardEffectHook, getCardEffect } from '../../shared/cards/card-effects'
@@ -26,7 +23,7 @@ describe('B039_Loom — onHarvestFieldPhase uses on-board sheep (not reserve)', 
     const player = state.players[0]!
     player.resources.sheep = 5 // all in reserve
     // pastures / house / stable empty
-    const flow = runCardEffectHook(state, player, 'B039_Loom', 'onHarvestFieldPhase')
+    const flow = session.withCtx(() => runCardEffectHook(state, player, 'B039_Loom', 'onHarvestFieldPhase'))
     expect(flow).toBeNull()
   })
 
@@ -38,7 +35,7 @@ describe('B039_Loom — onHarvestFieldPhase uses on-board sheep (not reserve)', 
       { id: 'pa-1', size: 1, tiles: [], stables: 0, animalType: 'sheep', animalCount: 1 },
     ]
     player.resources.sheep = 1
-    const flow = runCardEffectHook(state, player, 'B039_Loom', 'onHarvestFieldPhase')
+    const flow = session.withCtx(() => runCardEffectHook(state, player, 'B039_Loom', 'onHarvestFieldPhase'))
     expect(flow).not.toBeNull()
     const leaf = flow as Extract<ActionFlow, { type: 'leaf' }>
     expect(leaf.actionId).toBe('gain')
@@ -53,7 +50,7 @@ describe('B039_Loom — onHarvestFieldPhase uses on-board sheep (not reserve)', 
       { id: 'pa-1', size: 2, tiles: [], stables: 1, animalType: 'sheep', animalCount: 4 },
     ]
     player.resources.sheep = 4
-    const flow = runCardEffectHook(state, player, 'B039_Loom', 'onHarvestFieldPhase')
+    const flow = session.withCtx(() => runCardEffectHook(state, player, 'B039_Loom', 'onHarvestFieldPhase'))
     const leaf = flow as Extract<ActionFlow, { type: 'leaf' }>
     expect(leaf.params).toEqual({ food: 2 })
   })
@@ -68,7 +65,7 @@ describe('B039_Loom — onHarvestFieldPhase uses on-board sheep (not reserve)', 
     player.houseAnimals = Object.fromEntries(player.roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, 'sheep']));
     player.stableAnimals = { 's-1': 'sheep' }
     player.resources.sheep = 7
-    const flow = runCardEffectHook(state, player, 'B039_Loom', 'onHarvestFieldPhase')
+    const flow = session.withCtx(() => runCardEffectHook(state, player, 'B039_Loom', 'onHarvestFieldPhase'))
     const leaf = flow as Extract<ActionFlow, { type: 'leaf' }>
     expect(leaf.params).toEqual({ food: 3 })
   })
@@ -81,7 +78,7 @@ describe('B039_Loom — onHarvestFieldPhase uses on-board sheep (not reserve)', 
       { id: 'pa-1', size: 1, tiles: [], stables: 0, animalType: 'sheep', animalCount: 3 },
     ]
     player.resources.sheep = 8
-    const flow = runCardEffectHook(state, player, 'B039_Loom', 'onHarvestFieldPhase')
+    const flow = session.withCtx(() => runCardEffectHook(state, player, 'B039_Loom', 'onHarvestFieldPhase'))
     const leaf = flow as Extract<ActionFlow, { type: 'leaf' }>
     expect(leaf.params).toEqual({ food: 1 })
   })
@@ -109,7 +106,7 @@ describe('B039_Loom — onHarvestFieldPhase uses on-board sheep (not reserve)', 
       },
     }
 
-    const flow = runCardEffectHook(state, player, 'B039_Loom', 'onHarvestFieldPhase')
+    const flow = session.withCtx(() => runCardEffectHook(state, player, 'B039_Loom', 'onHarvestFieldPhase'))
 
     const leaf = flow as Extract<ActionFlow, { type: 'leaf' }>
     expect(leaf.params).toEqual({ food: 2 })
@@ -117,10 +114,10 @@ describe('B039_Loom — onHarvestFieldPhase uses on-board sheep (not reserve)', 
 })
 
 describe('B039_Loom — computeBonusScore uses on-board sheep', () => {
-  const score = (state: ReturnType<GameSession['getState']>['state'], player: ReturnType<GameSession['getState']>['state']['players'][number]) => {
-    const effect = getCardEffect('B039_Loom')
+  const score = (ruleOwner: SessionRuleOwner, state: ReturnType<GameSession['getState']>['state'], player: ReturnType<GameSession['getState']>['state']['players'][number]) => {
+    const effect = ruleOwner.withCtx(() => getCardEffect('B039_Loom'))
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return effect!.computeBonusScore!(state, player, undefined as any)
+    return ruleOwner.withCtx(() => effect!.computeBonusScore!(state, player, undefined as any))
   }
 
   it('reserve only 6 sheep: 0 VP', () => {
@@ -128,7 +125,7 @@ describe('B039_Loom — computeBonusScore uses on-board sheep', () => {
     const state = session.getState().state
     const player = state.players[0]!
     player.resources.sheep = 6
-    expect(score(state, player)).toBe(0)
+    expect(score(session, state, player)).toBe(0)
   })
 
   it('6 sheep on board: 2 VP', () => {
@@ -138,7 +135,7 @@ describe('B039_Loom — computeBonusScore uses on-board sheep', () => {
     player.pastures = [
       { id: 'pa-1', size: 3, tiles: [], stables: 0, animalType: 'sheep', animalCount: 6 },
     ]
-    expect(score(state, player)).toBe(2)
+    expect(score(session, state, player)).toBe(2)
   })
 
   it('counts sheep hosted on another player Night Pasture', () => {
@@ -165,6 +162,6 @@ describe('B039_Loom — computeBonusScore uses on-board sheep', () => {
       },
     }
 
-    expect(score(state, player)).toBe(1)
+    expect(score(session, state, player)).toBe(1)
   })
 })

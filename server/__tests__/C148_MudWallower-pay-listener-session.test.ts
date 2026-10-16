@@ -1,7 +1,6 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
+import { CardRegistry as TestCardRegistry } from '../../shared/cards/registry'
+import { withActiveRegistry } from '../../shared/cards/active-registry'
+import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -70,11 +69,15 @@ const createPayBoarSpace = (boar: number): ActionSpace =>
     },
   }) as ActionSpace
 
-const findListener = (id: string) => getRegisteredCardListeners().find((l) => l.id === id)
+const findListener = (ruleOwner: TestCardRegistry, id: string) => {
+  const lookupRule1 = () => getRegisteredCardListeners().find((l) => l.id === id)
+  return withActiveRegistry(ruleOwner, lookupRule1)
+}
 
 describe('C148 MudWallower — after-pay sync listener', () => {
   it('listener registered with actions:[pay] and after phase', () => {
-    const listener = findListener('C148-mud-wallower-after-pay-sync')
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry, 'C148-mud-wallower-after-pay-sync')
     expect(listener).toBeDefined()
     expect(listener!.actions).toEqual(['pay'])
     expect(listener!.phases).toEqual(['after'])
@@ -82,7 +85,8 @@ describe('C148 MudWallower — after-pay sync listener', () => {
   })
 
   it('returns held-downward sync flow when boar pay drains player below cap', () => {
-    const listener = findListener('C148-mud-wallower-after-pay-sync')!
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry, 'C148-mud-wallower-after-pay-sync')!
     const player = createPlayer()
     player.cardStates = { [CARD_ID]: { counters: { counter: 0, held: 2 } } }
     // Player paid 1 boar (e.g. cooking): now has 1 boar, but cap is 2
@@ -91,14 +95,14 @@ describe('C148 MudWallower — after-pay sync listener', () => {
     const payResult = { type: 'ok' as const }
     expect('resourcesPaid' in payResult).toBe(false)
     expect('extraData' in payResult).toBe(false)
-    const result = executeCardListener(listener, {
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener, {
       state, player,
       space: createSpace('cooking'),
       actionId: 'pay', phase: 'after',
       sourceCard: undefined,
       result: payResult,
       transactionEvents: [paidEvent({ boar: 1 })],
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
     expect(result?.flow).toEqual({
       type: 'leaf',
       actionId: 'special-effect',
@@ -109,20 +113,21 @@ describe('C148 MudWallower — after-pay sync listener', () => {
   })
 
   it('returns held sync-to-zero flow when boar pay drains all pigs', () => {
-    const listener = findListener('C148-mud-wallower-after-pay-sync')!
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry, 'C148-mud-wallower-after-pay-sync')!
     const player = createPlayer()
     player.cardStates = { [CARD_ID]: { counters: { counter: 0, held: 2 } } }
     player.resources.boar = 0
     const state = createState(player)
     const payResult = { type: 'ok' as const }
-    const result = executeCardListener(listener, {
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener, {
       state, player,
       space: createSpace('begging-card-pay'),
       actionId: 'pay', phase: 'after',
       sourceCard: undefined,
       result: payResult,
       transactionEvents: [paidEvent({ boar: 2 })],
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
     expect(result?.flow).toEqual({
       type: 'leaf',
       actionId: 'special-effect',
@@ -205,12 +210,13 @@ describe('C148 MudWallower — after-pay sync listener', () => {
   })
 
   it('does not sync when no boar paid (e.g. wood/food only payment)', () => {
-    const listener = findListener('C148-mud-wallower-after-pay-sync')!
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry, 'C148-mud-wallower-after-pay-sync')!
     const player = createPlayer()
     player.cardStates = { [CARD_ID]: { counters: { counter: 0, held: 2 } } }
     player.resources.boar = 1
     const state = createState(player)
-    const result = executeCardListener(listener, {
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener, {
       state, player,
       space: createSpace('improvement'),
       actionId: 'pay', phase: 'after',
@@ -218,48 +224,51 @@ describe('C148 MudWallower — after-pay sync listener', () => {
       result: { type: 'ok' },
       transactionEvents: [paidEvent({ boar: 1 }), paidEvent({ wood: 2, clay: 1 })],
       actionEvents: [paidEvent({ wood: 2, clay: 1 })],
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
     expect(result).toBeUndefined()
     expect(player.cardStates![CARD_ID]!.counters!.held).toBe(2)
   })
 
   it('does not raise held upward when player has more boar than cap (cap stays permanent)', () => {
-    const listener = findListener('C148-mud-wallower-after-pay-sync')!
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry, 'C148-mud-wallower-after-pay-sync')!
     const player = createPlayer()
     player.cardStates = { [CARD_ID]: { counters: { counter: 0, held: 1 } } }
     // boar pay happens but player still has 3 boar after — cap should NOT grow
     player.resources.boar = 3
     const state = createState(player)
-    executeCardListener(listener, {
+    withActiveRegistry(ruleRegistry, () => executeCardListener(listener, {
       state, player,
       space: createSpace('cooking'),
       actionId: 'pay', phase: 'after',
       sourceCard: undefined,
       result: { type: 'ok' },
       transactionEvents: [paidEvent({ boar: 1 })],
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
     expect(player.cardStates![CARD_ID]!.counters!.held).toBe(1)
   })
 
   it('no-op when result is not ok', () => {
-    const listener = findListener('C148-mud-wallower-after-pay-sync')!
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry, 'C148-mud-wallower-after-pay-sync')!
     const player = createPlayer()
     player.cardStates = { [CARD_ID]: { counters: { counter: 0, held: 2 } } }
     player.resources.boar = 0
     const state = createState(player)
-    executeCardListener(listener, {
+    withActiveRegistry(ruleRegistry, () => executeCardListener(listener, {
       state, player,
       space: createSpace('cooking'),
       actionId: 'pay', phase: 'after',
       sourceCard: undefined,
       result: { type: 'fail', errorKey: 'log.payFail' },
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
     // listener should not even attempt a sync since the pay failed
     expect(player.cardStates![CARD_ID]!.counters!.held).toBe(2)
   })
 
   it('no-op when player does not own the card', () => {
-    const listener = findListener('C148-mud-wallower-after-pay-sync')!
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry, 'C148-mud-wallower-after-pay-sync')!
     const player = createPlayer()
     // Strip C148 from occupationPlayed and cardStates
     player.occupationPlayed = []
@@ -268,14 +277,14 @@ describe('C148 MudWallower — after-pay sync listener', () => {
     const state = createState(player)
     // This listener should still be a safe no-op (no counters to mutate)
     expect(() => {
-      executeCardListener(listener, {
+      withActiveRegistry(ruleRegistry, () => executeCardListener(listener, {
         state, player,
         space: createSpace('cooking'),
         actionId: 'pay', phase: 'after',
         sourceCard: undefined,
         result: { type: 'ok' },
         transactionEvents: [paidEvent({ boar: 1 })],
-      } as unknown as CardListenerContext)
+      } as unknown as CardListenerContext))
     }).not.toThrow()
   })
 })

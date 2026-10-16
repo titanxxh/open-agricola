@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import {
@@ -33,7 +29,7 @@ describe('C148_MudWallower getInvalidAnimals', () => {
   it('zone push carries cardId for hook dispatch', () => {
     const session = setup(2)
     const player = session.getState().state.players[0]!
-    const zone = computeAnimalZones(player).find(z => z.id === `card:C148_MudWallower`)!
+    const zone = session.withCtx(() => computeAnimalZones(player)).find(z => z.id === `card:C148_MudWallower`)!
     expect(zone.cardId).toBe('C148_MudWallower')
   })
 
@@ -41,7 +37,7 @@ describe('C148_MudWallower getInvalidAnimals', () => {
     const session = setup(2)
     const state = session.getState().state
     const player = state.players[0]!
-    const zone = computeAnimalZones(player).find(z => z.id === `card:C148_MudWallower`)!
+    const zone = session.withCtx(() => computeAnimalZones(player)).find(z => z.id === `card:C148_MudWallower`)!
     zone.animalType = 'boar'
     zone.animalCount = 2
     expect(computeInvalidAnimalsForZone(state, player, zone)).toEqual([])

@@ -1,7 +1,4 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
+import type { GameSession as SessionRuleOwner } from '../game/authoritative-session'
 import type { ActionChoiceOption } from '../../shared/contract/types'
 import { type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
@@ -142,22 +139,22 @@ describe('E060 Working Gloves parity', () => {
     return session
   }
 
-  const options = (response: SessionResponse): ActionChoiceOption[] => response.interaction.stateId === 'wait' && 'options' in response.interaction.request
+  const options = (ruleOwner: SessionRuleOwner, response: SessionResponse): ActionChoiceOption[] => response.interaction.stateId === 'wait' && 'options' in response.interaction.request
     ? response.interaction.request.options ?? []
     : []
 
   const playMinor = (session: GameSession, cardId = CARD_ID) => {
     let response = session.takeAction(0, 'meeting-place')
     if (response.interaction.stateId !== 'wait') return response
-    if (!options(response).some((option) => option.value === cardId)) {
-      const improvement = options(response).find((option) =>
+    if (!options(session, response).some((option) => option.value === cardId)) {
+      const improvement = options(session, response).find((option) =>
         option.value.startsWith('action-improvement-'))
       if (improvement) {
         response = session.resolveChoice(response.interaction.playerIndex, improvement.value)
       }
     }
     if (response.interaction.stateId !== 'wait') return response
-    const card = options(response).find((option) => option.value === cardId)
+    const card = options(session, response).find((option) => option.value === cardId)
     if (card) response = session.resolveChoice(response.interaction.playerIndex, card.value)
     return response
   }
@@ -169,7 +166,7 @@ describe('E060 Working Gloves parity', () => {
     let response = session.takeAction(0, 'lessons-3')
     expect(response.ok, response.error).toBe(true)
     if (response.interaction.stateId === 'wait') {
-      const occupation = options(response).find((option) => option.value === OCCUPATION_ID)
+      const occupation = options(session, response).find((option) => option.value === OCCUPATION_ID)
       if (occupation) {
         response = session.resolveChoice(response.interaction.playerIndex, occupation.value)
       }
@@ -178,7 +175,7 @@ describe('E060 Working Gloves parity', () => {
     expect(response.interaction).toMatchObject({
       stateId: 'wait', promptKey: 'prompt.selectPayment', request: { kind: 'choice' },
     })
-    const payment = options(response).find((option) => {
+    const payment = options(session, response).find((option) => {
       const preview = option.effectPreview
       return preview?.kind === 'payment' && preview.resourcesPaid ? choose(preview.resourcesPaid) : false
     })

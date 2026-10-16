@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from './card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -120,7 +116,7 @@ describe('Card Source representative migrations', () => {
     const state = session.getState().state
     state.round = 1
     const player = state.players[0]!
-    const flow = runCardEffectHook(state, player, 'Major_Well', 'onBuy')
+    const flow = session.withCtx(() => runCardEffectHook(state, player, 'Major_Well', 'onBuy'))
 
     expect(flow).toMatchObject({ type: 'leaf', actionId: 'future-meeples', params: { __queuedFutureMeepleRequest: { cardId: 'Major_Well' } } })
     expect(state.pendingFutureMeeples).toEqual([

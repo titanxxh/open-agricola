@@ -1,7 +1,5 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
+import { withActiveRegistry } from '../../shared/cards/active-registry'
+import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import type { PlayerState } from '../../shared/contract/types.ts'
@@ -225,6 +223,7 @@ describe('farm interaction builders', () => {
   })
 
   it('limits sow selectable fields using maxSelections and exclusions', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     const player = createPlayer()
     player.resources.grain = 3
     player.fields = [
@@ -233,10 +232,10 @@ describe('farm interaction builders', () => {
       { row: 1, col: 0, stacks: [] },
     ]
 
-    const interaction = buildSowFarmInteraction(player, {
+    const interaction = withActiveRegistry(ruleRegistry, () => buildSowFarmInteraction(player, {
       maxSelections: 2,
       excludedFields: [{ row: 0, col: 1 }],
-    })
+    }))
 
     expect(interaction.farmType).toBe('sow')
     if (interaction.farmType !== 'sow') return

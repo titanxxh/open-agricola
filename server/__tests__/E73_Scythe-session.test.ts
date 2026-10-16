@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { afterEach, describe, expect, it } from 'vitest'
 import type { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
@@ -48,8 +44,8 @@ describe('E073_Scythe session — token model + reap full stack', () => {
     ]
     session.loadState(state)
 
-    const effect = getCardEffect(CARD_ID)!
-    const flow = effect.onStartHarvestFieldPhase!(state, player)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))!
+    const flow = session.withCtx(() => effect.onStartHarvestFieldPhase!(state, player))
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('xor')
     const xor = flow as Extract<ActionFlow, { type: 'xor' }>
@@ -66,8 +62,8 @@ describe('E073_Scythe session — token model + reap full stack', () => {
     ]
     session.loadState(state)
 
-    const effect = getCardEffect(CARD_ID)!
-    const flow = effect.onStartHarvestFieldPhase!(state, player)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))!
+    const flow = session.withCtx(() => effect.onStartHarvestFieldPhase!(state, player))
     expect(flow).toBeUndefined()
   })
 
@@ -82,8 +78,8 @@ describe('E073_Scythe session — token model + reap full stack', () => {
     ]
     session.loadState(state)
 
-    const effect = getCardEffect(CARD_ID)!
-    const flow = effect.onStartHarvestFieldPhase!(state, player)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))!
+    const flow = session.withCtx(() => effect.onStartHarvestFieldPhase!(state, player))
 
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('xor')
@@ -99,8 +95,8 @@ describe('E073_Scythe session — token model + reap full stack', () => {
     player.fields = []
     session.loadState(state)
 
-    const effect = getCardEffect(CARD_ID)!
-    const flow = effect.onStartHarvestFieldPhase!(state, player)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))!
+    const flow = session.withCtx(() => effect.onStartHarvestFieldPhase!(state, player))
     expect(flow).toBeUndefined()
   })
 
@@ -119,8 +115,8 @@ describe('E073_Scythe session — token model + reap full stack', () => {
     player.resources.vegetable = 0
     session.loadState(state)
 
-    const effect = getCardEffect(CARD_ID)!
-    const flow = effect.onStartHarvestFieldPhase!(state, player)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))!
+    const flow = session.withCtx(() => effect.onStartHarvestFieldPhase!(state, player))
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('xor')
     const xor = flow as Extract<ActionFlow, { type: 'xor' }>
@@ -131,12 +127,12 @@ describe('E073_Scythe session — token model + reap full stack', () => {
     expect(firstChild.params).toEqual({ fieldId: 'farmyard:0:0' })
 
     const adHoc = getAdHocAction('card_E073_Scythe_harvest-field')!
-    const result = adHoc.execute({
+    const result = session.withCtx(() => adHoc.execute({
       state,
       player,
       params: { fieldId: 'farmyard:0:0' },
       sourceCard: CARD_ID,
-    } as Parameters<typeof adHoc.execute>[0])
+    } as Parameters<typeof adHoc.execute>[0]))
 
     expect(result.type).toBe('ok')
     expect(player.resources.grain).toBe(0)
@@ -146,7 +142,7 @@ describe('E073_Scythe session — token model + reap full stack', () => {
       { kind: 'vegetable', remaining: 1 },
     ])
 
-    const reapResult = reap(state, player)
+    const reapResult = session.withCtx(() => reap(state, player))
 
     expect(player.resources.grain).toBe(2)
     expect(player.resources.vegetable).toBe(1)
@@ -174,12 +170,12 @@ describe('E073_Scythe session — token model + reap full stack', () => {
     session.loadState(state)
 
     const adHoc = getAdHocAction('card_E073_Scythe_harvest-field')!
-    const result = adHoc.execute({
+    const result = session.withCtx(() => adHoc.execute({
       state,
       player,
       params: { fieldId: 'farmyard:0:0' },
       sourceCard: CARD_ID,
-    } as Parameters<typeof adHoc.execute>[0])
+    } as Parameters<typeof adHoc.execute>[0]))
 
     expect(result.type).toBe('ok')
     expect(player.resources.grain).toBe(0)
@@ -206,16 +202,16 @@ describe('E073_Scythe session — token model + reap full stack', () => {
     session.loadState(state)
 
     const adHoc = getAdHocAction('card_E073_Scythe_harvest-field')!
-    const result = adHoc.execute({
+    const result = session.withCtx(() => adHoc.execute({
       state,
       player,
       params: { fieldId: 'farmyard:0:0' },
       sourceCard: CARD_ID,
-    } as Parameters<typeof adHoc.execute>[0])
+    } as Parameters<typeof adHoc.execute>[0]))
 
     expect(result.type).toBe('ok')
 
-    reap(state, player)
+    session.withCtx(() => reap(state, player))
 
     expect(player.resources.grain).toBe(2)
     expect(player.resources.vegetable).toBe(1)
@@ -237,20 +233,20 @@ describe('E073_Scythe session — token model + reap full stack', () => {
     session.loadState(state)
 
     const adHoc = getAdHocAction('card_E073_Scythe_harvest-field')!
-    adHoc.execute({
+    session.withCtx(() => adHoc.execute({
       state,
       player,
       params: { fieldId: 'farmyard:0:0' },
       sourceCard: CARD_ID,
-    } as Parameters<typeof adHoc.execute>[0])
+    } as Parameters<typeof adHoc.execute>[0]))
 
-    reap(state, player)
+    session.withCtx(() => reap(state, player))
 
     expect(player.resources.grain).toBe(1)
     expect(player.resources.vegetable).toBe(1)
     expect(player.fields[0]!.stacks.length).toBe(0)
 
-    reap(state, player)
+    session.withCtx(() => reap(state, player))
     expect(player.resources.grain).toBe(1)
     expect(player.resources.vegetable).toBe(1)
   })
@@ -320,7 +316,7 @@ describe('E073_Scythe session — token model + reap full stack', () => {
     }
     session.loadState(state)
 
-    const reapResult = reap(state, player)
+    const reapResult = session.withCtx(() => reap(state, player))
 
     expect(player.resources.grain).toBe(3)
     expect(player.resources.vegetable).toBe(1)
@@ -343,18 +339,18 @@ describe('E073_Scythe session — token model + reap full stack', () => {
     }
     session.loadState(state)
 
-    reap(state, player)
+    session.withCtx(() => reap(state, player))
 
     expect(player.cardStates[CARD_ID]?.extraData?.fullReapPosition).toBe('0-0')
 
-    const cleanup = getCardEffect(CARD_ID)!.onEndHarvest!(state, player) as Extract<ActionFlow, { type: 'leaf' }>
-    const result = specialEffectAction.execute({
+    const cleanup = session.withCtx(() => session.withCtx(() => getCardEffect(CARD_ID))!.onEndHarvest!(state, player)) as Extract<ActionFlow, { type: 'leaf' }>
+    const result = session.withCtx(() => specialEffectAction.execute({
       state,
       player,
       params: cleanup.params,
       sourceCard: CARD_ID,
       space: { id: 'special-effect' } as ActionSpace,
-    } as Parameters<typeof specialEffectAction.execute>[0])
+    } as Parameters<typeof specialEffectAction.execute>[0]))
 
     expect(result.type).toBe('ok')
     expect(player.cardStates[CARD_ID]?.extraData?.fullReapPosition).toBeUndefined()

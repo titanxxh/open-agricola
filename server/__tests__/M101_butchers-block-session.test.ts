@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
@@ -141,7 +137,7 @@ describe('M101 Butcher\'s Block', () => {
       const state = session.getState().state
       const player = state.players[0]!
 
-      expect(meetsCardPrerequisites(player, M101_ButchersBlock, round, state)).toBe(false)
+      expect(session.withCtx(() => meetsCardPrerequisites(player, M101_ButchersBlock, round, state))).toBe(false)
       expect(session.getCardAvailability(0)[`minor:${CARD_ID}`]).toBe(false)
     }
   })

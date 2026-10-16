@@ -1,7 +1,7 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
+import { withActiveRegistry } from '../../shared/cards/active-registry'
+import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
+import type { CardRegistry } from '../../shared/cards/registry'
+import { ActionHookRegistry } from '../../shared/actions/hooks'
 import { describe, expect, it } from 'vitest'
 import { executeCardListener, getRegisteredCardListeners, type CardListenerContext } from '../../shared/cards/card-listeners'
 import type { ActionSpace, ComplexCost, GameState, PlayerState } from '../../shared/contract/types'
@@ -98,18 +98,20 @@ const makePlayerWithWorkers = (id: string, count: number): PlayerState => {
 
 const space = { id: 'improvement' } as ActionSpace
 
-const findListener = (id: string) => {
-  const listener = getRegisteredCardListeners().find((entry) => entry.id === id)
+const findListener = (registry: CardRegistry, id: string) => {
+  const listener = withActiveRegistry(registry, () => getRegisteredCardListeners().find((entry) => entry.id === id))
   expect(listener, `listener not registered: ${id}`).toBeDefined()
   return listener!
 }
 
 const runAfterImprovement = (
+  registry: CardRegistry,
   listenerId: string,
   builtCardId: string,
   player: PlayerState,
   state: GameState,
-) => executeCardListener(findListener(listenerId), {
+) => withActiveRegistry(registry, () => executeCardListener(findListener(registry, listenerId), {
+  actionHooks: undefined,
   state,
   player,
   space,
@@ -117,14 +119,16 @@ const runAfterImprovement = (
   phase: 'after',
   choice: `minor:${builtCardId}`,
   result: { type: 'ok' },
-} as CardListenerContext)
+} as CardListenerContext))
 
 const runAfterPay = (
+  registry: CardRegistry,
   builtCardId: string,
   costType: 'major-improvement' | 'minor-improvement',
   player: PlayerState,
   state: GameState,
-) => executeCardListener(findListener('E54-contraband-after-pay'), {
+) => withActiveRegistry(registry, () => executeCardListener(findListener(registry, 'E54-contraband-after-pay'), {
+  actionHooks: undefined,
   state,
   player,
   space,
@@ -132,41 +136,45 @@ const runAfterPay = (
   phase: 'after',
   sourceCard: builtCardId,
   costType,
-} as CardListenerContext)
+} as CardListenerContext))
 
 const runImmediatelyAfterImprovement = (
+  registry: CardRegistry,
   builtCardId: string,
   kind: 'major' | 'minor',
   player: PlayerState,
   state: GameState,
-) => executeCardListener(findListener('E146-reseller-immediately-after-improvement'), {
+) => withActiveRegistry(registry, () => executeCardListener(findListener(registry, 'E146-reseller-immediately-after-improvement'), {
+  actionHooks: undefined,
   state,
   player,
   space,
   actionId: 'improvement',
   phase: 'immediatelyAfter',
   choice: `${kind}:${builtCardId}`,
-} as CardListenerContext)
+} as CardListenerContext))
 
 describe('printed improvement cost listeners', () => {
   it('reads dynamic and alternative printed cost candidates without combining them', () => {
+    const registry = createOfficialCardRegistry()
     const player = makePlayerWithWorkers('p1', 3)
     const state = makeState([player])
 
-    expect(getPrintedImprovementCostCandidates(state, player, 'B036_Bottles')).toEqual([
+    expect(withActiveRegistry(registry, () => getPrintedImprovementCostCandidates(state, player, 'B036_Bottles'))).toEqual([
       { clay: 3, food: 3 },
     ])
-    expect(getPrintedImprovementCostCandidates(state, player, 'E030_ChildsToy')).toEqual([
+    expect(withActiveRegistry(registry, () => getPrintedImprovementCostCandidates(state, player, 'E030_ChildsToy'))).toEqual([
       { wood: 1 },
       { clay: 1 },
     ])
   })
 
   it('E54 and E146 use Bottles dynamic printed cost', () => {
+    const registry = createOfficialCardRegistry()
     const player = makePlayerWithWorkers('p1', 3)
     const state = makeState([player])
 
-    expect(runAfterPay('B036_Bottles', 'minor-improvement', player, state)?.flow).toMatchObject({
+    expect(runAfterPay(registry, 'B036_Bottles', 'minor-improvement', player, state)?.flow).toMatchObject({
       type: 'xor',
       optional: true,
       children: [{
@@ -177,7 +185,7 @@ describe('printed improvement cost listeners', () => {
         ],
       }],
     })
-    expect(runImmediatelyAfterImprovement('B036_Bottles', 'minor', player, state)?.flow).toMatchObject({
+    expect(runImmediatelyAfterImprovement(registry, 'B036_Bottles', 'minor', player, state)?.flow).toMatchObject({
       type: 'seq',
       optional: true,
       children: [
@@ -188,11 +196,13 @@ describe('printed improvement cost listeners', () => {
   })
 
   it('E156 detects Bottles dynamic clay cost for the triggering player', () => {
+    const registry = createOfficialCardRegistry()
     const trigger = makePlayerWithWorkers('p1', 3)
     const owner = makePlayer('p2')
     owner.occupationPlayed = ['E156_ClaypitOwner']
 
     expect(runAfterImprovement(
+      registry,
       'E156-claypit-owner-opponent-improvement-clay',
       'B036_Bottles',
       trigger,
@@ -206,10 +216,11 @@ describe('printed improvement cost listeners', () => {
   })
 
   it('E54 and E146 read major improvement printed costs', () => {
+    const registry = createOfficialCardRegistry()
     const player = makePlayer('p1')
     const state = makeState([player])
 
-    expect(runAfterPay('Major_Fireplace1', 'major-improvement', player, state)?.flow).toMatchObject({
+    expect(runAfterPay(registry, 'Major_Fireplace1', 'major-improvement', player, state)?.flow).toMatchObject({
       type: 'xor',
       children: [{
         type: 'seq',
@@ -219,7 +230,7 @@ describe('printed improvement cost listeners', () => {
         ],
       }],
     })
-    expect(runImmediatelyAfterImprovement('Major_Fireplace1', 'major', player, state)?.flow).toMatchObject({
+    expect(runImmediatelyAfterImprovement(registry, 'Major_Fireplace1', 'major', player, state)?.flow).toMatchObject({
       type: 'seq',
       children: [
         { type: 'leaf', actionId: 'special-effect', params: { kind: 'set-flag', flag: true } },
@@ -229,9 +240,11 @@ describe('printed improvement cost listeners', () => {
   })
 
   it('D80 ignores its own non-clay altCosts when checking printed clay cost', () => {
+    const registry = createOfficialCardRegistry()
     const player = makePlayer('p1')
     player.minorPlayed = ['D080_BrickHammer']
     const result = runAfterImprovement(
+      registry,
       'D80-brick-hammer-after-improvement',
       'D080_BrickHammer',
       player,
@@ -242,9 +255,11 @@ describe('printed improvement cost listeners', () => {
   })
 
   it('D80 does not add clay from cost and altCosts together', () => {
+    const registry = createOfficialCardRegistry()
     const player = makePlayer('p1')
     player.minorPlayed = ['D080_BrickHammer']
     const result = runAfterImprovement(
+      registry,
       'D80-brick-hammer-after-improvement',
       'CUSTOM_D080_NoSummedClay',
       player,
@@ -255,10 +270,12 @@ describe('printed improvement cost listeners', () => {
   })
 
   it('E156 detects clay in minor altCosts', () => {
+    const registry = createOfficialCardRegistry()
     const trigger = makePlayer('p1')
     const owner = makePlayer('p2')
     owner.occupationPlayed = ['E156_ClaypitOwner']
     const result = runAfterImprovement(
+      registry,
       'E156-claypit-owner-opponent-improvement-clay',
       'E030_ChildsToy',
       trigger,
@@ -274,13 +291,14 @@ describe('printed improvement cost listeners', () => {
   })
 
   it('D117 discounts improvements with wood only in minor altCosts', () => {
+    const registry = createOfficialCardRegistry()
     const player = makePlayer('p1')
     player.occupationPlayed = ['D117_WoodExpert']
-    const result = getMinorImprovementPreviewCostDetailed(
+    const result = withActiveRegistry(registry, () => getMinorImprovementPreviewCostDetailed(
       makeState([player]),
       player,
-      'E030_ChildsToy',
-    )
+      'E030_ChildsToy', undefined, undefined, new ActionHookRegistry(),
+    ))
 
     expect(PaymentSolver.isComplexCost(result?.cost)).toBe(true)
     const fees = (result?.cost as ComplexCost).fees ?? []

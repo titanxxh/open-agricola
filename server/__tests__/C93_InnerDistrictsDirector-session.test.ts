@@ -1,7 +1,6 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
+import { CardRegistry as TestCardRegistry } from '../../shared/cards/registry'
+import { withActiveRegistry } from '../../shared/cards/active-registry'
+import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
 import { describe, expect, it } from 'vitest'
 import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 import type { GameState, PlayerState, ActionSpace } from '../../shared/contract/types'
@@ -61,7 +60,10 @@ const createState = (player: PlayerState): GameState => {
   } as GameState
 }
 
-const findListener = (id: string) => getRegisteredCardListeners().find(l => l.id === id)
+const findListener = (ruleOwner: TestCardRegistry, id: string) => {
+  const lookupRule1 = () => getRegisteredCardListeners().find(l => l.id === id)
+  return withActiveRegistry(ruleOwner, lookupRule1)
+}
 
 const FILLER = '__test_placeholder__'
 
@@ -127,7 +129,8 @@ const playerWorkersOn = (response: ReturnType<GameSession['takeAction']>, spaceI
 
 describe('C093_InnerDistrictsDirector', () => {
   it('returns a special-effect flow that places 1 stone on clay-pit when using forest', () => {
-    const listener = findListener('C93-inner-districts-director-after-place-farmer')
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry, 'C93-inner-districts-director-after-place-farmer')
     expect(listener).toBeDefined()
 
     const player = createPlayer()
@@ -137,10 +140,10 @@ describe('C093_InnerDistrictsDirector', () => {
 
     expect(clayPitSpace.resources.stone).toBe(0)
 
-    const result = executeCardListener(listener!, {
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener!, {
       state, player, space: forestSpace,
       actionId: 'place-farmer', phase: 'after',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     // Listener stays pure; the returned special-effect leaf performs the mutation.
     expect(clayPitSpace.resources.stone).toBe(0)
@@ -156,18 +159,19 @@ describe('C093_InnerDistrictsDirector', () => {
     })
     expect(children[1]).toMatchObject({ actionId: 'place-farmer', optional: true })
 
-    specialEffectAction.execute({
+    withActiveRegistry(ruleRegistry, () => specialEffectAction.execute({
       state,
       player,
       space: forestSpace,
       sourceCard: CARD_ID,
       params: (children[0] as Extract<ActionFlow, { type: 'leaf' }>).params,
-    })
+    }))
     expect(clayPitSpace.resources.stone).toBe(1)
   })
 
   it('returns a special-effect flow that places 1 stone on forest when using clay-pit', () => {
-    const listener = findListener('C93-inner-districts-director-after-place-farmer')
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry, 'C93-inner-districts-director-after-place-farmer')
     expect(listener).toBeDefined()
 
     const player = createPlayer()
@@ -177,10 +181,10 @@ describe('C093_InnerDistrictsDirector', () => {
 
     expect(forestSpace.resources.stone).toBe(0)
 
-    const result = executeCardListener(listener!, {
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener!, {
       state, player, space: clayPitSpace,
       actionId: 'place-farmer', phase: 'after',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(forestSpace.resources.stone).toBe(0)
     expect(result?.flow?.type).toBe('seq')
@@ -196,17 +200,18 @@ describe('C093_InnerDistrictsDirector', () => {
   })
 
   it('returns only the add-resource leaf when no workers are available', () => {
-    const listener = findListener('C93-inner-districts-director-after-place-farmer')
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry, 'C93-inner-districts-director-after-place-farmer')
     expect(listener).toBeDefined()
 
     const player = createPlayer()
     const state = createState(player)
     markAllWorkersUsed(state, player)
 
-    const result = executeCardListener(listener!, {
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener!, {
       state, player, space: state.actionSpaces.find(s => s.id === 'forest')!,
       actionId: 'place-farmer', phase: 'after',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result?.flow?.type).toBe('seq')
     const flow = result!.flow as Extract<ActionFlow, { type: 'seq' }>
@@ -223,16 +228,17 @@ describe('C093_InnerDistrictsDirector', () => {
   })
 
   it('does not trigger on unrelated spaces', () => {
-    const listener = findListener('C93-inner-districts-director-after-place-farmer')
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry, 'C93-inner-districts-director-after-place-farmer')
     expect(listener).toBeDefined()
 
     const player = createPlayer()
     const state = createState(player)
 
-    const result = executeCardListener(listener!, {
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener!, {
       state, player, space: createSpace('farmland'),
       actionId: 'place-farmer', phase: 'after',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeUndefined()
   })

@@ -1,7 +1,6 @@
-import { installOfficialCardRegistry } from '../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
+import type { ActionHookRegistry } from '../shared/actions/hooks'
+import { withActiveRegistry } from '../shared/cards/active-registry'
+import { createOfficialCardRegistry } from '../shared/cards/__tests__/card-environment'
 import { describe, expect, it } from 'vitest'
 import { serializeState, rehydrateState } from '../shared/session/serialization'
 import { createInitialState } from '../shared/session/state-bootstrap'
@@ -9,14 +8,15 @@ import { getCardModifiers } from '../shared/cards/card-modifiers'
 import { GameSession } from '../server/game/authoritative-session'
 import { EngineStack } from '../shared/engine'
 
-const emptyCtx = () => ({ engineStack: new EngineStack() })
+const emptyCtx = (actionHooks: ActionHookRegistry | undefined) => ({ actionHooks, engineStack: new EngineStack() })
 
 describe('shared/session/serialization', () => {
   const state = createInitialState(42)
 
   describe('serializeState', () => {
     it('strips function fields from action spaces', () => {
-      const serialized = serializeState(state, emptyCtx())
+    const registry = createOfficialCardRegistry()
+      const serialized = withActiveRegistry(registry, () => serializeState(state, emptyCtx(undefined)))
       for (const space of serialized.actionSpaces) {
         const record = space as Record<string, unknown>
         expect(record.canBeExecutedByPlayer).toBeUndefined()
@@ -27,7 +27,8 @@ describe('shared/session/serialization', () => {
     })
 
     it('preserves non-function fields on action spaces', () => {
-      const serialized = serializeState(state, emptyCtx())
+    const registry = createOfficialCardRegistry()
+      const serialized = withActiveRegistry(registry, () => serializeState(state, emptyCtx(undefined)))
       for (const space of serialized.actionSpaces) {
         expect(space.id).toBeDefined()
         expect(space.nameKey).toBeDefined()
@@ -37,13 +38,15 @@ describe('shared/session/serialization', () => {
     })
 
     it('sets roundStartSnapshot to null', () => {
+    const registry = createOfficialCardRegistry()
       const stateWithSnapshot = { ...state, roundStartSnapshot: state }
-      const serialized = serializeState(stateWithSnapshot, emptyCtx())
+      const serialized = withActiveRegistry(registry, () => serializeState(stateWithSnapshot, emptyCtx(undefined)))
       expect(serialized.roundStartSnapshot).toBeNull()
     })
 
     it('preserves game data fields', () => {
-      const serialized = serializeState(state, emptyCtx())
+    const registry = createOfficialCardRegistry()
+      const serialized = withActiveRegistry(registry, () => serializeState(state, emptyCtx(undefined)))
       expect(serialized.round).toBe(state.round)
       expect(serialized.currentPlayerIndex).toBe(state.currentPlayerIndex)
       // Serialized players match the domain players plus snapshot-only display
@@ -82,7 +85,8 @@ describe('shared/session/serialization', () => {
     })
 
     it('produces JSON-safe output', () => {
-      const serialized = serializeState(state, emptyCtx())
+    const registry = createOfficialCardRegistry()
+      const serialized = withActiveRegistry(registry, () => serializeState(state, emptyCtx(undefined)))
       const json = JSON.stringify(serialized)
       const parsed = JSON.parse(json)
       expect(parsed.actionSpaces.length).toBe(serialized.actionSpaces.length)
@@ -91,7 +95,8 @@ describe('shared/session/serialization', () => {
 
   describe('rehydrateState', () => {
     it('lets a Core restore executable action spaces from decoded data', () => {
-      const serialized = serializeState(state, emptyCtx())
+    const registry = createOfficialCardRegistry()
+      const serialized = withActiveRegistry(registry, () => serializeState(state, emptyCtx(undefined)))
       const session = new GameSession(rehydrateState(serialized))
       expect(session.getAvailableActions(0).map(action => action.spaceId)).toContain('forest')
       expect(session.takeAction(0, 'forest').ok).toBe(true)
@@ -99,13 +104,14 @@ describe('shared/session/serialization', () => {
     })
 
     it('preserves resources and takenBy from serialized data', () => {
+    const registry = createOfficialCardRegistry()
       const modified = { ...state }
       const space = modified.actionSpaces.find((s) => s.gainPerRound.wood)
       if (space) {
         space.resources.wood = 99
         space.takenBy = [{ playerId: 'p1', workerId: '1' }]
       }
-      const serialized = serializeState(modified, emptyCtx())
+      const serialized = withActiveRegistry(registry, () => serializeState(modified, emptyCtx(undefined)))
       const { state: restored } = rehydrateState(serialized)
       if (space) {
         const restoredSpace = restored.actionSpaces.find((s) => s.id === space.id)
@@ -115,7 +121,8 @@ describe('shared/session/serialization', () => {
     })
 
     it('round-trips correctly', () => {
-      const serialized = serializeState(state, emptyCtx())
+    const registry = createOfficialCardRegistry()
+      const serialized = withActiveRegistry(registry, () => serializeState(state, emptyCtx(undefined)))
       const { state: restored } = rehydrateState(serialized)
       expect(restored.round).toBe(state.round)
       expect(restored.players.length).toBe(state.players.length)
@@ -123,9 +130,10 @@ describe('shared/session/serialization', () => {
     })
 
     it('keeps player-count action spaces filtered after round-trip', () => {
+    const registry = createOfficialCardRegistry()
       for (const playerCount of [2, 3, 4] as const) {
         const original = createInitialState(42, { playerCount })
-        const serialized = serializeState(original, emptyCtx())
+        const serialized = withActiveRegistry(registry, () => serializeState(original, emptyCtx(undefined)))
         const { state: restored } = rehydrateState(serialized)
         const originalIds = original.actionSpaces.map((space) => space.id).sort()
         const restoredIds = restored.actionSpaces.map((space) => space.id).sort()
@@ -134,24 +142,26 @@ describe('shared/session/serialization', () => {
     })
 
     it('lets a Core rebuild missing activeModifiers from played cards', () => {
+    const registry = createOfficialCardRegistry()
       const modified = createInitialState(42)
       const player = modified.players[0]!
       player.minorPlayed.push('A014_CarpentersHammer')
       player.activeModifiers = []
 
-      const serialized = serializeState(modified, emptyCtx())
+      const serialized = withActiveRegistry(registry, () => serializeState(modified, emptyCtx(undefined)))
       serialized.players[0]!.activeModifiers = []
 
       const session = new GameSession(rehydrateState(serialized))
       const restored = session.getState().state
-      expect(getCardModifiers('A014_CarpentersHammer')).not.toHaveLength(0)
+      expect(session.withCtx(() => getCardModifiers('A014_CarpentersHammer'))).not.toHaveLength(0)
       expect(restored.players[0]!.activeModifiers).toEqual(
-        getCardModifiers('A014_CarpentersHammer'),
+        session.withCtx(() => getCardModifiers('A014_CarpentersHammer')),
       )
       session.dispose()
     })
 
     it('loadState also rebuilds missing activeModifiers for room expansion limits', () => {
+    const registry = createOfficialCardRegistry()
       const modified = createInitialState(42)
       const player = modified.players[0]!
       player.resources = {
@@ -162,7 +172,7 @@ describe('shared/session/serialization', () => {
       player.minorPlayed.push('A014_CarpentersHammer')
       player.activeModifiers = []
 
-      const serialized = serializeState(modified, emptyCtx())
+      const serialized = withActiveRegistry(registry, () => serializeState(modified, emptyCtx(undefined)))
       serialized.players[0]!.activeModifiers = []
 
       const session = new GameSession(42)

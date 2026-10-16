@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { computeScores } from '../../shared/domain/scoring'
@@ -72,21 +68,22 @@ const play = (session: GameSession) => {
 const offered = (response: SessionResponse) => response.interaction.stateId === 'wait'
   && (response.interaction.request.options?.some((candidate) => candidate.value === CARD_ID) ?? false)
 
-const printedVp = (response: SessionResponse) => {
+const printedVp = (session: GameSession, response: SessionResponse) => {
   const player = response.state.players[0]!
-  const score = computeScores(response.state).find((summary) => summary.playerId === player.id)!
+  const score = session.withCtx(() => computeScores(response.state)).find((summary) => summary.playerId === player.id)!
   const cards = score.categories.find((category) => category.key === 'cards')!
   return cards.entries.find((entry) => 'cardId' in entry && entry.cardId === CARD_ID)?.score
 }
 
 describe('C050 Stable Yard parity', () => {
   it('C050 S1: three stables and three pastures play Stable Yard and grant food for rounds six through fourteen', () => {
-    const response = play(setup())
+    const session = setup()
+    const response = play(session)
 
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.minorPlayed).toContain(CARD_ID)
     expect(response.state.players[0]!.resources.food).toBe(9)
-    expect(printedVp(response)).toBe(1)
+    expect(printedVp(session, response)).toBe(1)
   })
 
   it('C050 S2: two stables and three pastures cannot play Stable Yard', () => {

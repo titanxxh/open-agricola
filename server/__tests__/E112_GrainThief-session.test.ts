@@ -1,7 +1,5 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
+import { withActiveRegistry } from '../../shared/cards/active-registry'
+import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
 import { createWorkSession } from './_helpers/session-fixtures'
 import { describe, expect, it } from 'vitest'
 import type { GameSession } from '../game/authoritative-session'
@@ -158,7 +156,8 @@ describe('E112_GrainThief harvest timing', () => {
   })
 
   it('start field phase offers optional selection for grain fields and does not reap or gain immediately', () => {
-    const effect = getCardEffect(CARD_ID)
+    const ruleRegistry = createOfficialCardRegistry()
+    const effect = withActiveRegistry(ruleRegistry, () => getCardEffect(CARD_ID))
     expect(effect).toBeDefined()
     const player = makePlayer()
     player.fields = [
@@ -167,7 +166,7 @@ describe('E112_GrainThief harvest timing', () => {
       makeField(0, 2, [{ kind: 'grain', remaining: 1 }]),
     ]
 
-    const flow = effect!.onStartHarvestFieldPhase?.({ players: [player] } as never, player)
+    const flow = withActiveRegistry(ruleRegistry, () => effect!.onStartHarvestFieldPhase?.({ players: [player] } as never, player))
 
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('seq')

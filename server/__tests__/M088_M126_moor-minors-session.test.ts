@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { descriptionEffects } from './_helpers/choice-description'
 import { describe, expect, it } from 'vitest'
 
@@ -102,13 +98,13 @@ const acceptOptional = (
 const executeGainLeaf = (flow: ActionFlow | null, session: GameSession, player: PlayerState) => {
   expect(flow).toMatchObject({ type: 'leaf', actionId: 'gain' })
   if (!flow || flow.type !== 'leaf') throw new Error('expected gain leaf')
-  gainAction.execute({
+  session.withCtx(() => gainAction.execute({
     state: session.state,
     player,
     space: { id: 'test' } as ActionSpace,
     params: flow.params,
     sourceCard: flow.sourceCard,
-  })
+  }))
 }
 
 describe('Moor Batch 1 counter and phase-listener minors', () => {
@@ -119,13 +115,13 @@ describe('Moor Batch 1 counter and phase-listener minors', () => {
       { row: 0, col: 1, kind: 'moor' },
     ]
 
-    executeGainLeaf(runCardEffectHook(session.state, player, 'M088_PeatIron', 'onHarvest'), session, player)
+    executeGainLeaf(session.withCtx(() => runCardEffectHook(session.state, player, 'M088_PeatIron', 'onHarvest')), session, player)
 
     expect(player.resources.fuel).toBe(1)
 
     const low = setup(['M088_PeatIron'])
     low.player.farmTerrain = [{ row: 0, col: 0, kind: 'moor' }]
-    expect(runCardEffectHook(low.session.state, low.player, 'M088_PeatIron', 'onHarvest')).toBeNull()
+    expect(session.withCtx(() => runCardEffectHook(low.session.state, low.player, 'M088_PeatIron', 'onHarvest'))).toBeNull()
   })
 
   it('M089 Birthing House rewards family growth with and without room', () => {

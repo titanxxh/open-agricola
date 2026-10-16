@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
@@ -30,8 +26,8 @@ describe('E083_ShepherdsWhistle session — reorganize fallback', () => {
     player.stableAnimals = {}
     session.loadState(state)
 
-    const effect = getCardEffect(CARD_ID)!
-    const flow = effect.onEndHarvestFeedingPhase!(state, player)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))!
+    const flow = session.withCtx(() => effect.onEndHarvestFeedingPhase!(state, player))
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('leaf')
     const leaf = flow as Extract<ActionFlow, { type: 'leaf' }>
@@ -48,8 +44,8 @@ describe('E083_ShepherdsWhistle session — reorganize fallback', () => {
     player.stableAnimals = { '0-0': 'sheep' }
     session.loadState(state)
 
-    const effect = getCardEffect(CARD_ID)!
-    const flow = effect.onEndHarvestFeedingPhase!(state, player)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))!
+    const flow = session.withCtx(() => effect.onEndHarvestFeedingPhase!(state, player))
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('seq')
     const seq = flow as Extract<ActionFlow, { type: 'seq' }>
@@ -69,8 +65,8 @@ describe('E083_ShepherdsWhistle session — reorganize fallback', () => {
     player.stableAnimals = {}
     session.loadState(state)
 
-    const effect = getCardEffect(CARD_ID)!
-    const flow = effect.onEndHarvestFeedingPhase!(state, player)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))!
+    const flow = session.withCtx(() => effect.onEndHarvestFeedingPhase!(state, player))
     expect(flow).toBeUndefined()
   })
 
@@ -87,12 +83,12 @@ describe('E083_ShepherdsWhistle session — reorganize fallback', () => {
     session.loadState(state)
 
     const adHoc = getAdHocAction('card_E083_ShepherdsWhistle_post-reorg-check')!
-    const result = adHoc.execute({
+    const result = session.withCtx(() => adHoc.execute({
       state,
       player,
       params: undefined,
       sourceCard: CARD_ID,
-    } as Parameters<typeof adHoc.execute>[0])
+    } as Parameters<typeof adHoc.execute>[0]))
 
     expect(result.type).toBe('flow')
     const r = result as Extract<typeof result, { type: 'flow' }>
@@ -110,12 +106,12 @@ describe('E083_ShepherdsWhistle session — reorganize fallback', () => {
     session.loadState(state)
 
     const adHoc = getAdHocAction('card_E083_ShepherdsWhistle_post-reorg-check')!
-    const result = adHoc.execute({
+    const result = session.withCtx(() => adHoc.execute({
       state,
       player,
       params: undefined,
       sourceCard: CARD_ID,
-    } as Parameters<typeof adHoc.execute>[0])
+    } as Parameters<typeof adHoc.execute>[0]))
 
     expect(result.type).toBe('ok')
   })

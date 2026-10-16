@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 
@@ -335,7 +331,7 @@ describe('E091_PlowBuilder session', () => {
     writeCardExtraData(player, CARD_ID, 'usedJoinery', true)
     session.loadState(state)
 
-    runCardEffectHook(state, player, CARD_ID, 'onAfterHarvest')
+    session.withCtx(() => runCardEffectHook(state, player, CARD_ID, 'onAfterHarvest'))
     expect(player.cardStates?.[CARD_ID]?.flagged).toBe(false)
     expect(readCardExtraData<boolean>(player, CARD_ID, 'usedJoinery')).toBe(false)
   })

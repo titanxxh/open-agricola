@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import assert from 'node:assert/strict'
 import { afterEach, describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
@@ -65,9 +61,9 @@ describe('B085 Farm Hand rejected selections', () => {
     expect(player.resources.wood).toBe(0)
     expect(player.cardStates[CARD_ID]).toMatchObject({ flagged: true, extraData: { position: CENTER } })
     expect(player.stableTiles).toEqual([])
-    expect(getExtraRoomCapacity(player)).toBe(1)
-    expect(getAvailableStableSupplyCount(built.state, player)).toBe(3)
-    expect(computeAnimalZones(player, built.state).filter((zone) => zone.zoneType === 'stable')).toEqual([])
+    expect(session.withCtx(() => getExtraRoomCapacity(player))).toBe(1)
+    expect(session.withCtx(() => getAvailableStableSupplyCount(built.state, player))).toBe(3)
+    expect(session.withCtx(() => computeAnimalZones(player, built.state)).filter((zone) => zone.zoneType === 'stable')).toEqual([])
     expect(built.state.events.filter((event) => event.type === 'farm.stableBuilt')).toHaveLength(1)
     expect(built.state.events.find(event => event.type === 'farm.stableBuilt')).toMatchObject({ newlyUsedTiles: [] })
     expect(built.state.log).toEqual(expect.arrayContaining([
@@ -77,7 +73,7 @@ describe('B085 Farm Hand rejected selections', () => {
     expect(undone.ok, undone.error).toBe(true)
     expect(undone.state.players[0]!.resources.wood).toBe(2)
     expect(undone.state.players[0]!.cardStates[CARD_ID]).toBeUndefined()
-    expect(getAvailableStableSupplyCount(undone.state, undone.state.players[0]!)).toBe(4)
+    expect(session.withCtx(() => getAvailableStableSupplyCount(undone.state, undone.state.players[0]!))).toBe(4)
   })
   it('rejects a mixed ordinary and illegal special stable atomically and allows an ordinary stable retry', () => {
     const session = setup((player) => { player.resources.wood = 4 })
@@ -100,7 +96,7 @@ describe('B085 Farm Hand rejected selections', () => {
     expect(built.ok, built.error).toBe(true)
     expect(built.state.players[0]!.stableTiles).toEqual([ordinary])
     expect(built.state.players[0]!.resources.wood).toBe(2)
-    expect(getExtraRoomCapacity(built.state.players[0]!)).toBe(0)
+    expect(session.withCtx(() => getExtraRoomCapacity(built.state.players[0]!))).toBe(0)
     expect(built.state.players[0]!.cardStates[CARD_ID]).toBeUndefined()
     expect(built.state.events.filter((event) => event.type === 'farm.stableBuilt')).toHaveLength(1)
   })
@@ -124,7 +120,7 @@ describe('B085 Farm Hand rejected selections', () => {
     const built = session.commitSelectionChoice(0, { stables: [ordinary] })
     expect(built.ok, built.error).toBe(true)
     expect(built.state.players[0]!.stableTiles).toEqual([ordinary])
-    expect(getExtraRoomCapacity(built.state.players[0]!)).toBe(0)
+    expect(session.withCtx(() => getExtraRoomCapacity(built.state.players[0]!))).toBe(0)
   })
 
   it.each([false, true])('rejects an illegal centre before alternative payments and retries legally without undo, mixed=%s', (mixed) => {
@@ -169,7 +165,7 @@ describe('B085 Farm Hand rejected selections', () => {
     expect(built.ok, built.error).toBe(true)
     expect(built.state.players[0]!.resources).toMatchObject({ wood: 2, clay: 0 })
     expect(built.state.players[0]!.cardStates[CARD_ID]).toMatchObject({ flagged: true, extraData: { position: CENTER } })
-    expect(getAvailableStableSupplyCount(built.state, built.state.players[0]!)).toBe(mixed ? 2 : 3)
+    expect(session.withCtx(() => getAvailableStableSupplyCount(built.state, built.state.players[0]!))).toBe(mixed ? 2 : 3)
     expect(built.state.players[0]!.stableTiles).toEqual(stables)
     expect(built.state.events.filter((event) => event.type === 'farm.stableBuilt')).toHaveLength(1)
     expect(built.state.events.filter((event) => event.type === 'resource.paid' && event.paymentFor === 'stables')).toHaveLength(1)

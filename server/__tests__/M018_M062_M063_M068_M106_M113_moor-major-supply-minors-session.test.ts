@@ -1,7 +1,4 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
+import type { GameSession as SessionRuleOwner } from '../game/authoritative-session'
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
@@ -91,8 +88,11 @@ const choosePaymentIfNeeded = (session: GameSession, playerIndex = 0) => {
   return resp
 }
 
-const bonusVp = (state: GameState, playerIndex = 0) =>
-  Scoring.breakdown(state, playerIndex).categories.find((category) => category.key === 'cardBonusVp')?.total ?? 0
+const bonusVp = (ruleOwner: SessionRuleOwner, state: GameState, playerIndex = 0) =>
+  {
+  const lookupRule1 = () => Scoring.breakdown(state, playerIndex).categories.find((category) => category.key === 'cardBonusVp')?.total ?? 0
+  return ruleOwner.withCtx(lookupRule1)
+}
 
 const actionIds = (flow: ActionFlow | null | undefined): string[] => {
   if (!flow) return []
@@ -155,25 +155,25 @@ describe('Moor major-supply and upgrade minors', () => {
     })
     expect(resp.state.availableMajorImprovements).toContain('Major_Moor_TiledOven')
 
-    expect(runCardEffectHook(resp.state, resp.state.players[0]!, 'M062_HearthBrush', 'onEndTurn')).toBeNull()
+    expect(session.withCtx(() => runCardEffectHook(resp.state, resp.state.players[0]!, 'M062_HearthBrush', 'onEndTurn'))).toBeNull()
     resp.state.round = 6
-    expect(runCardEffectHook(resp.state, resp.state.players[0]!, 'M062_HearthBrush', 'onEndTurn')).toBeNull()
-    expect(runCardEffectHook(
+    expect(session.withCtx(() => runCardEffectHook(resp.state, resp.state.players[0]!, 'M062_HearthBrush', 'onEndTurn'))).toBeNull()
+    expect(session.withCtx(() => runCardEffectHook(
       resp.state,
       resp.state.players[0]!,
       'M062_HearthBrush',
       'onEndTurn',
       undefined,
       { triggerActionId: 'cut-peat' },
-    )).toBeNull()
-    const flow = runCardEffectHook(
+    ))).toBeNull()
+    const flow = session.withCtx(() => runCardEffectHook(
       resp.state,
       resp.state.players[0]!,
       'M062_HearthBrush',
       'onEndTurn',
       undefined,
       { triggerActionId: 'place-farmer' },
-    )
+    ))
     expect(actionIds(flow)).toEqual(['improvement'])
 
     resp.state.players[0]!.resources = fullResources({ reed: 1, clay: 2, stone: 1 })
@@ -186,7 +186,7 @@ describe('Moor major-supply and upgrade minors', () => {
       .toBe('M062_HearthBrush')
 
     resp.state.players[0]!.resources = fullResources()
-    expect(runCardEffectHook(resp.state, resp.state.players[0]!, 'M062_HearthBrush', 'onEndTurn')).toBeNull()
+    expect(session.withCtx(() => runCardEffectHook(resp.state, resp.state.players[0]!, 'M062_HearthBrush', 'onEndTurn'))).toBeNull()
   })
 
   it('M062 does not offer hidden Tiled Oven before it is moved to the supply top', () => {
@@ -196,14 +196,14 @@ describe('Moor major-supply and upgrade minors', () => {
     player.resources = fullResources({ reed: 1, clay: 2, stone: 1 })
     writeCardExtraData(player, 'M062_HearthBrush', 'playedRound', 4)
 
-    const flow = runCardEffectHook(
+    const flow = session.withCtx(() => runCardEffectHook(
       session.state,
       player,
       'M062_HearthBrush',
       'onEndTurn',
       undefined,
       { triggerActionId: 'place-farmer' },
-    )
+    ))
 
     expect(flow).toBeNull()
   })
@@ -225,19 +225,19 @@ describe('Moor major-supply and upgrade minors', () => {
     const owner = resp.state.players[0]!
     resp.state.round = 6
     owner.resources = fullResources({ wood: 2, stone: 4 })
-    expect(runCardEffectHook(resp.state, owner, 'M063_PastoralLetter', 'onEndTurn')).toBeNull()
-    expect(runCardEffectHook(
+    expect(session.withCtx(() => runCardEffectHook(resp.state, owner, 'M063_PastoralLetter', 'onEndTurn'))).toBeNull()
+    expect(session.withCtx(() => runCardEffectHook(
       resp.state,
       owner,
       'M063_PastoralLetter',
       'onEndTurn',
       undefined,
       { triggerActionId: 'place-farmer' },
-    )).not.toBeNull()
+    ))).not.toBeNull()
 
     owner.minorPlayed.push('M068_Church')
     owner.improvements.push('Major_Moor_VillageChurch')
-    expect(bonusVp(resp.state)).toBe(2)
+    expect(bonusVp(session, resp.state)).toBe(2)
   })
 
   it('M068 upgrades Village Church, gains 2 food, and offers returning-home fuel for VP', () => {
@@ -255,7 +255,7 @@ describe('Moor major-supply and upgrade minors', () => {
     expect(stackFor(resp.state, 'well').cardIds).not.toContain('Major_Moor_VillageChurch')
     expect(resp.state.players[0]!.minorPlayed).toContain('M068_Church')
     expect(resp.state.players[0]!.resources.food).toBe(2)
-    expect(actionIds(runCardEffectHook(resp.state, resp.state.players[0]!, 'M068_Church', 'onStartReturnHome')))
+    expect(actionIds(session.withCtx(() => runCardEffectHook(resp.state, resp.state.players[0]!, 'M068_Church', 'onStartReturnHome'))))
       .toEqual(['pay', 'bonus-vp'])
   })
 
@@ -264,7 +264,7 @@ describe('Moor major-supply and upgrade minors', () => {
     const player = session.state.players[0]!
     player.resources = fullResources({ fuel: 1 })
 
-    expect(meetsCardPrerequisites(player, M068_Church, session.state.round, session.state)).toBe(false)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, M068_Church, session.state.round, session.state))).toBe(false)
     player.minorHand = ['M068_Church']
     session.loadState(session.state)
     const resp = session.takeAction(0, 'meeting-place')
@@ -291,7 +291,7 @@ describe('Moor major-supply and upgrade minors', () => {
       cardIds: ['Major_Fireplace2', 'Major_Moor_HorseSlaughterhouse2'],
     })
 
-    const trades = getExchangesInWindow(player, 'anytime', session.state)
+    const trades = session.withCtx(() => getExchangesInWindow(player, 'anytime', session.state))
     expect(trades).toEqual(expect.arrayContaining([
       expect.objectContaining({ from: { horse: 1 }, to: { food: 2 }, sourceId: 'M106_HorseButchery' }),
       expect.objectContaining({ from: { horse: 2 }, to: { food: 5 }, sourceId: 'M106_HorseButchery' }),
@@ -309,24 +309,24 @@ describe('Moor major-supply and upgrade minors', () => {
     const session = setup()
     const player = session.state.players[0]!
     player.houseType = 'wood'
-    expect(meetsCardPrerequisites(player, M113_LivingHistoryMuseum, session.state.round, session.state)).toBe(false)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, M113_LivingHistoryMuseum, session.state.round, session.state))).toBe(false)
 
     player.houseType = 'clay'
-    expect(meetsCardPrerequisites(player, M113_LivingHistoryMuseum, session.state.round, session.state)).toBe(true)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, M113_LivingHistoryMuseum, session.state.round, session.state))).toBe(true)
     player.minorPlayed = ['M113_LivingHistoryMuseum']
 
-    const tiled = getMajorImprovementPreviewCostDetailed(
+    const tiled = session.withCtx(() => getMajorImprovementPreviewCostDetailed(
       session.state,
       player,
       'Major_Moor_TiledOven',
       'major-improvement',
-    )?.cost as { fees?: Array<Record<string, number>> }
-    const riding = getMajorImprovementPreviewCostDetailed(
+    ))?.cost as { fees?: Array<Record<string, number>> }
+    const riding = session.withCtx(() => getMajorImprovementPreviewCostDetailed(
       session.state,
       player,
       'Major_Moor_RidingStables',
       'major-improvement',
-    )?.cost as { fees?: Array<Record<string, number>> }
+    ))?.cost as { fees?: Array<Record<string, number>> }
 
     expect(tiled.fees).toContainEqual({ clay: 2 })
     expect(riding.fees).toContainEqual({ wood: 1, clay: 1, reed: 1 })

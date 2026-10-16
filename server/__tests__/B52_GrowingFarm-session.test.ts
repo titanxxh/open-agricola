@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { B052_GrowingFarm } from '../../shared/cards/B/B052_GrowingFarm'
@@ -21,7 +17,7 @@ describe('B052_GrowingFarm prerequisite', () => {
       size: 2,
       stables: 0,
     }]
-    expect(meetsCardPrerequisites(player, B052_GrowingFarm, state.round, state)).toBe(false)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, B052_GrowingFarm, state.round, state))).toBe(false)
   })
 
   it('allows when covered pasture zones >= round - 1', () => {
@@ -42,6 +38,6 @@ describe('B052_GrowingFarm prerequisite', () => {
       size: 4,
       stables: 0,
     }]
-    expect(meetsCardPrerequisites(player, B052_GrowingFarm, state.round, state)).toBe(true)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, B052_GrowingFarm, state.round, state))).toBe(true)
   })
 })

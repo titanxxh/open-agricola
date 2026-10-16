@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import {
@@ -34,7 +30,7 @@ describe('B011_Feedyard getInvalidAnimals', () => {
   it('zone push carries cardId', () => {
     const session = setup(2)
     const player = session.getState().state.players[0]!
-    const zone = computeAnimalZones(player).find(z => z.id === `card:B011_Feedyard`)!
+    const zone = session.withCtx(() => computeAnimalZones(player)).find(z => z.id === `card:B011_Feedyard`)!
     expect(zone.cardId).toBe('B011_Feedyard')
   })
 
@@ -42,7 +38,7 @@ describe('B011_Feedyard getInvalidAnimals', () => {
     const session = setup(2)
     const state = session.getState().state
     const player = state.players[0]!
-    const zone = computeAnimalZones(player).find(z => z.id === `card:B011_Feedyard`)!
+    const zone = session.withCtx(() => computeAnimalZones(player)).find(z => z.id === `card:B011_Feedyard`)!
     zone.animalType = 'sheep'
     zone.animalCount = 2
     expect(computeInvalidAnimalsForZone(state, player, zone)).toEqual([])
@@ -52,7 +48,7 @@ describe('B011_Feedyard getInvalidAnimals', () => {
     const session = setup(1)
     const state = session.getState().state
     const player = state.players[0]!
-    const zone = computeAnimalZones(player).find(z => z.id === `card:B011_Feedyard`)!
+    const zone = session.withCtx(() => computeAnimalZones(player)).find(z => z.id === `card:B011_Feedyard`)!
     zone.capacity = 3
     zone.animalType = 'boar'
     zone.animalCount = 3

@@ -1,7 +1,4 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
+import type { GameSession as SessionRuleOwner } from '../game/authoritative-session'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { GameSession } from '../game/authoritative-session'
 import { createWorkSession } from './_helpers/session-fixtures'
@@ -25,8 +22,11 @@ import '../../shared/cards/D/D051_Archway'
 const CARD_ID = 'E118_KindlingGatherer'
 const LISTENER_ID = 'E118-kindling-gatherer-after-action-space-food'
 
-const findListener = (id: string) =>
-  getRegisteredCardListeners().find((listener) => listener.id === id)
+const findListener = (ruleOwner: SessionRuleOwner, id: string) =>
+  {
+  const lookupRule1 = () => getRegisteredCardListeners().find((listener) => listener.id === id)
+  return ruleOwner.withCtx(lookupRule1)
+}
 
 const moved = (
   resources: Partial<Resource>,
@@ -66,7 +66,7 @@ const actionSpace = (id: string): ActionSpace => ({
   takenBy: [],
 } as unknown as ActionSpace)
 
-const runListener = (
+const runListener = (ruleOwner: SessionRuleOwner,
   listenerId: string,
   actionId: string,
   spaceId: string,
@@ -74,11 +74,11 @@ const runListener = (
   resourcesGained?: Partial<Resource>,
   actionEvents: readonly DraftGameEvent<'resource.moved'>[] = events,
 ): ActionFlow | undefined => {
-  const listener = findListener(listenerId)
+  const listener = findListener(ruleOwner, listenerId)
   expect(listener).toBeDefined()
-  const { state, player } = setup()
+  const { session: ruleSession, state, player } = setup()
   const space = state.actionSpaces.find((entry) => entry.id === spaceId) ?? actionSpace(spaceId)
-  return executeCardListener(listener!, {
+  return ruleSession.withCtx(() => executeCardListener(listener!, {
     state,
     player,
     triggerPlayer: player,
@@ -89,7 +89,7 @@ const runListener = (
     result: resourcesGained ? { type: 'ok', resourcesGained } : { type: 'ok' },
     transactionEvents: events,
     actionEvents,
-  } as unknown as CardListenerContext)?.flow
+  } as unknown as CardListenerContext))?.flow
 }
 
 const expectWoodFlow = (flow: ActionFlow | undefined) => {
@@ -201,7 +201,7 @@ describe('E118_KindlingGatherer action-space provenance', () => {
   })
 
   it('collect grants wood for food moved from an action space to the trigger player', () => {
-    const { player } = setup()
+    const { session: ruleSession, player } = setup()
     const events = [moved({ food: 2 }, player.id, { kind: 'actionSpace', spaceId: 'fishing' })]
     expect(events).toEqual(expect.arrayContaining([
       expect.objectContaining({
@@ -210,13 +210,13 @@ describe('E118_KindlingGatherer action-space provenance', () => {
         to: expect.objectContaining({ kind: 'player', playerId: player.id }),
       }),
     ]))
-    const flow = runListener(LISTENER_ID, 'collect', 'fishing', events)
+    const flow = runListener(ruleSession, LISTENER_ID, 'collect', 'fishing', events)
 
     expectWoodFlow(flow)
   })
 
   it('gain grants wood for food moved from an action space to the trigger player', () => {
-    const { player } = setup()
+    const { session: ruleSession, player } = setup()
     const events = [moved({ food: 2 }, player.id, { kind: 'supply' }, 'gain')]
     expect(events).toEqual(expect.arrayContaining([
       expect.objectContaining({
@@ -225,43 +225,43 @@ describe('E118_KindlingGatherer action-space provenance', () => {
         to: expect.objectContaining({ kind: 'player', playerId: player.id }),
       }),
     ]))
-    const flow = runListener(LISTENER_ID, 'gain', 'day-laborer', events)
+    const flow = runListener(ruleSession, LISTENER_ID, 'gain', 'day-laborer', events)
 
     expectWoodFlow(flow)
   })
 
   it('does not grant wood for same-resource supply or card moves', () => {
-    const { player } = setup()
+    const { session: ruleSession, player } = setup()
 
-    expect(runListener(
+    expect(runListener(ruleSession,
       LISTENER_ID,
       'gain',
       'resource-market-4',
       [moved({ food: 1 }, player.id, { kind: 'supply' })],
       { food: 1 },
     )).toBeUndefined()
-    expect(runListener(
+    expect(runListener(ruleSession,
       LISTENER_ID,
       'gain',
       'resource-market-4',
       [moved({ food: 1 }, player.id, { kind: 'card', playerId: player.id, cardId: 'Test_Source' })],
       { food: 1 },
     )).toBeUndefined()
-    expect(runListener(
+    expect(runListener(ruleSession,
       LISTENER_ID,
       'collect',
       'fishing',
       [moved({ food: 2 }, player.id, { kind: 'supply' })],
       { food: 2 },
     )).toBeUndefined()
-    expect(runListener(
+    expect(runListener(ruleSession,
       LISTENER_ID,
       'collect',
       'fishing',
       [moved({ food: 2 }, player.id, { kind: 'card', playerId: player.id, cardId: 'Test_Source' })],
       { food: 2 },
     )).toBeUndefined()
-    expect(runListener(
+    expect(runListener(ruleSession,
       LISTENER_ID,
       'gain',
       'day-laborer',
@@ -271,20 +271,20 @@ describe('E118_KindlingGatherer action-space provenance', () => {
   })
 
   it('does not register a second reward on a place-farmer ancestor carrying the same food receipt', () => {
-    const { state, player } = setup()
+    const { session: ruleSession, state, player } = setup()
     const events = [moved({ food: 3 }, player.id, { kind: 'actionSpace', spaceId: 'C039_StudioBoat' })]
-    expect(getMatchingListeners({
+    expect(ruleSession.withCtx(() => getMatchingListeners({
       state, player, space: actionSpace('C039_StudioBoat'), actionId: 'place-farmer', phase: 'after',
       transactionEvents: events, actionEvents: events,
-    }).filter(entry => entry.registration.id === LISTENER_ID)).toEqual([])
+    })).filter(entry => entry.registration.id === LISTENER_ID)).toEqual([])
   })
 
   it('does not replay stale action-space food from an earlier transaction frame during card gain follow-up', () => {
-    const { player } = setup()
+    const { session: ruleSession, player } = setup()
     const staleFood = moved({ food: 2 }, player.id, { kind: 'actionSpace', spaceId: 'fishing' })
     const currentWood = moved({ wood: 1 }, player.id, { kind: 'card', playerId: player.id, cardId: CARD_ID })
 
-    expect(runListener(
+    expect(runListener(ruleSession,
       LISTENER_ID,
       'gain',
       'gain',

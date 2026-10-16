@@ -1,7 +1,5 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
+import { withActiveRegistry } from '../../shared/cards/active-registry'
+import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
 import type { EventSink } from '../../shared/contract/events'
 import { describe, expect, it } from 'vitest'
 
@@ -152,22 +150,24 @@ const createState = (players: PlayerState[]): GameState =>
 
 describe('C146 — multi-select pairs (onBuy)', () => {
   it('n=0 (no improvements built): onBuy is a no-op', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     const player = createPlayer()
     player.minorPlayed = []
     player.improvements = []
     const state = createState([player])
 
-    const flow = runCardEffectHook(state, player, CARD_ID, 'onBuy')
+    const flow = withActiveRegistry(ruleRegistry, () => runCardEffectHook(state, player, CARD_ID, 'onBuy'))
     expect(flow).toBeNull()
   })
 
   it('n=6 (>=6 improvements): auto-stores all 6 pairs without emitting choice', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     const player = createPlayer()
     // 8 improvements clamps to 6
     player.minorPlayed = Array.from({ length: 8 }, (_, i) => `FAKE_MINOR_${i}`)
     const state = createState([player])
 
-    const flow = runCardEffectHook(state, player, CARD_ID, 'onBuy')
+    const flow = withActiveRegistry(ruleRegistry, () => runCardEffectHook(state, player, CARD_ID, 'onBuy'))
     expect(flow).not.toBeNull()
     const leaf = flow as Extract<ActionFlow, { type: 'leaf' }>
     expect(leaf.type).toBe('leaf')
@@ -176,13 +176,13 @@ describe('C146 — multi-select pairs (onBuy)', () => {
 
     const def = getActionDefinition(CHOOSE_PAIRS_ACTION_ID)
     expect(def).toBeDefined()
-    const result = def!.execute({
+    const result = withActiveRegistry(ruleRegistry, () => def!.execute({
       state,
       player,
       space: createSpace(CHOOSE_PAIRS_ACTION_ID),
       params: {},
       eventSink,
-    } as unknown as ActionExecutionContext)
+    } as unknown as ActionExecutionContext))
 
     expect(result.type).toBe('ok')
     expect(player.resources.wood).toBe(0)
@@ -193,6 +193,7 @@ describe('C146 — multi-select pairs (onBuy)', () => {
   })
 
   it('n=3: emits choice with needed=3, accepts WC,CS,RS and stores pairs', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     const player = createPlayer()
     player.minorPlayed = ['M1', 'M2', 'M3']
     const state = createState([player])
@@ -206,7 +207,7 @@ describe('C146 — multi-select pairs (onBuy)', () => {
       eventSink,
     } as unknown as ActionExecutionContext
 
-    const initial = def.execute(ctx)
+    const initial = withActiveRegistry(ruleRegistry, () => def.execute(ctx))
     expect(initial.type).toBe('request')
     if (initial.type !== 'request') return
     expect(initial.request.kind).toBe('choice')
@@ -219,7 +220,7 @@ describe('C146 — multi-select pairs (onBuy)', () => {
       'WC', 'WR', 'WS', 'CR', 'CS', 'RS',
     ])
 
-    const resolved = def.resolveChoice!(ctx, 'WC,CS,RS')
+    const resolved = withActiveRegistry(ruleRegistry, () => def.resolveChoice!(ctx, 'WC,CS,RS'))
     expect(resolved.type).toBe('ok')
     expect(player.resources.wood).toBe(0)
     expect(player.resources.clay).toBe(0)
@@ -229,6 +230,7 @@ describe('C146 — multi-select pairs (onBuy)', () => {
   })
 
   it('n=3 with insufficient selections (WC only): re-emits same choice', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     const player = createPlayer()
     player.minorPlayed = ['M1', 'M2', 'M3']
     const state = createState([player])
@@ -242,7 +244,7 @@ describe('C146 — multi-select pairs (onBuy)', () => {
       eventSink,
     } as unknown as ActionExecutionContext
 
-    const reEmit = def.resolveChoice!(ctx, 'WC')
+    const reEmit = withActiveRegistry(ruleRegistry, () => def.resolveChoice!(ctx, 'WC'))
     expect(reEmit.type).toBe('request')
     if (reEmit.type !== 'request') return
     expect(reEmit.request.kind).toBe('choice')
@@ -256,6 +258,7 @@ describe('C146 — multi-select pairs (onBuy)', () => {
   })
 
   it('n=3: duplicate selections collapse and re-emit when unique count is short', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     const player = createPlayer()
     player.minorPlayed = ['M1', 'M2', 'M3']
     const state = createState([player])
@@ -269,7 +272,7 @@ describe('C146 — multi-select pairs (onBuy)', () => {
       eventSink,
     } as unknown as ActionExecutionContext
 
-    const reEmit = def.resolveChoice!(ctx, 'WC,WC,WC')
+    const reEmit = withActiveRegistry(ruleRegistry, () => def.resolveChoice!(ctx, 'WC,WC,WC'))
     expect(reEmit.type).toBe('request')
     if (reEmit.type !== 'request') return
     expect(reEmit.request.kind).toBe('choice')
@@ -464,8 +467,8 @@ describe('C146 — multi-select pairs (onBuy)', () => {
     const state = session.getState().state
     const owner = state.players[0]!
     const actor = state.players[1]!
-    const listener = getRegisteredCardListeners().find((entry) => entry.id === 'C146-workshop-assistant-after-opponent-renovation')!
-    const result = executeCardListener(listener, {
+    const listener = session.withCtx(() => getRegisteredCardListeners()).find((entry) => entry.id === 'C146-workshop-assistant-after-opponent-renovation')!
+    const result = session.withCtx(() => executeCardListener(listener, {
       state,
       player: actor,
       ownerPlayer: owner,
@@ -474,7 +477,7 @@ describe('C146 — multi-select pairs (onBuy)', () => {
       phase: 'after',
       sourceCard: 'B001_UpscaleLifestyle',
       transactionEvents: [],
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
     expect(result?.sourceCard).toBe(CARD_ID)
     expect(result?.flow).toBeDefined()
   })
@@ -541,12 +544,12 @@ describe('C146 — multi-select pairs (onBuy)', () => {
     session.loadState(state)
 
     const def = getActionDefinition('card_C146_WorkshopAssistant_takePair')!
-    const result = def.execute({
+    const result = session.withCtx(() => def.execute({
       state,
       player: owner,
       space: createSpace('card_C146_WorkshopAssistant_takePair'),
       params: { pair: 'WR' },
-    } as unknown as ActionExecutionContext)
+    } as unknown as ActionExecutionContext))
 
     expect(result.type).toBe('fail')
     expect(owner.resources).toMatchObject({ wood: 3, clay: 4, reed: 5, stone: 6 })

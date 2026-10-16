@@ -1,7 +1,6 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
+import { CardRegistry as TestCardRegistry } from '../../shared/cards/registry'
+import { withActiveRegistry } from '../../shared/cards/active-registry'
+import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
 import { describe, expect, it } from 'vitest'
 import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 import type { DraftGameEvent } from '../../shared/contract/events'
@@ -67,8 +66,11 @@ const createSpace = (id: string): ActionSpace =>
     takenBy: [],
   }) as ActionSpace
 
-const findListener = (id: string) =>
-  getRegisteredCardListeners().find((l) => l.id === id)
+const findListener = (ruleOwner: TestCardRegistry, id: string) =>
+  {
+  const lookupRule1 = () => getRegisteredCardListeners().find((l) => l.id === id)
+  return withActiveRegistry(ruleOwner, lookupRule1)
+}
 
 const moved = (
   resources: DraftGameEvent<'resource.moved'>['resources'],
@@ -84,14 +86,15 @@ const moved = (
 
 describe('C163_MaterialDeliveryman', () => {
   it('gives 1 wood when any player collects exactly 5 goods', () => {
-    const listener = findListener('C163-material-deliveryman-any-collect')
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry, 'C163-material-deliveryman-any-collect')
     expect(listener).toBeDefined()
 
     const owner = createPlayer('p1')
     owner.occupationPlayed.push(CARD_ID)
     const trigger = createPlayer('p2')
 
-    const result = executeCardListener(listener!, {
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener!, {
       state: createState(owner, trigger),
       player: trigger,
       ownerPlayer: owner,
@@ -101,7 +104,7 @@ describe('C163_MaterialDeliveryman', () => {
       phase: 'after',
       result: { type: 'ok' },
       transactionEvents: [moved({ wood: 5 }, trigger.id)],
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeDefined()
     expect(result!.flow!.type).toBe('leaf')
@@ -110,12 +113,13 @@ describe('C163_MaterialDeliveryman', () => {
   })
 
   it('gives 1 clay when any player collects exactly 6 goods', () => {
-    const listener = findListener('C163-material-deliveryman-any-collect')!
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry, 'C163-material-deliveryman-any-collect')!
     const owner = createPlayer('p1')
     owner.occupationPlayed.push(CARD_ID)
     const trigger = createPlayer('p2')
 
-    const result = executeCardListener(listener, {
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener, {
       state: createState(owner, trigger),
       player: trigger,
       ownerPlayer: owner,
@@ -125,19 +129,20 @@ describe('C163_MaterialDeliveryman', () => {
       phase: 'after',
       result: { type: 'ok' },
       transactionEvents: [moved({ wood: 6 }, trigger.id)],
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeDefined()
     expect((result!.flow as Extract<ActionFlow, { type: 'leaf' }>).params).toEqual({ clay: 1 })
   })
 
   it('gives 1 reed when any player collects exactly 7 goods', () => {
-    const listener = findListener('C163-material-deliveryman-any-collect')!
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry, 'C163-material-deliveryman-any-collect')!
     const owner = createPlayer('p1')
     owner.occupationPlayed.push(CARD_ID)
     const trigger = createPlayer('p2')
 
-    const result = executeCardListener(listener, {
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener, {
       state: createState(owner, trigger),
       player: trigger,
       ownerPlayer: owner,
@@ -147,19 +152,20 @@ describe('C163_MaterialDeliveryman', () => {
       phase: 'after',
       result: { type: 'ok' },
       transactionEvents: [moved({ wood: 7 }, trigger.id)],
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeDefined()
     expect((result!.flow as Extract<ActionFlow, { type: 'leaf' }>).params).toEqual({ reed: 1 })
   })
 
   it('gives 1 stone when any player collects 8+ goods', () => {
-    const listener = findListener('C163-material-deliveryman-any-collect')!
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry, 'C163-material-deliveryman-any-collect')!
     const owner = createPlayer('p1')
     owner.occupationPlayed.push(CARD_ID)
     const trigger = createPlayer('p2')
 
-    const result = executeCardListener(listener, {
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener, {
       state: createState(owner, trigger),
       player: trigger,
       ownerPlayer: owner,
@@ -169,19 +175,20 @@ describe('C163_MaterialDeliveryman', () => {
       phase: 'after',
       result: { type: 'ok' },
       transactionEvents: [moved({ wood: 8 }, trigger.id)],
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeDefined()
     expect((result!.flow as Extract<ActionFlow, { type: 'leaf' }>).params).toEqual({ stone: 1 })
   })
 
   it('gives 1 stone when any player collects 10 goods (mixed resources)', () => {
-    const listener = findListener('C163-material-deliveryman-any-collect')!
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry, 'C163-material-deliveryman-any-collect')!
     const owner = createPlayer('p1')
     owner.occupationPlayed.push(CARD_ID)
     const trigger = createPlayer('p2')
 
-    const result = executeCardListener(listener, {
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener, {
       state: createState(owner, trigger),
       player: trigger,
       ownerPlayer: owner,
@@ -191,19 +198,20 @@ describe('C163_MaterialDeliveryman', () => {
       phase: 'after',
       result: { type: 'ok' },
       transactionEvents: [moved({ wood: 3, clay: 3, reed: 2, stone: 2 }, trigger.id, { kind: 'actionSpace', spaceId: 'resource-market-4' })],
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeDefined()
     expect((result!.flow as Extract<ActionFlow, { type: 'leaf' }>).params).toEqual({ stone: 1 })
   })
 
   it('does not trigger when total goods < 5', () => {
-    const listener = findListener('C163-material-deliveryman-any-collect')!
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry, 'C163-material-deliveryman-any-collect')!
     const owner = createPlayer('p1')
     owner.occupationPlayed.push(CARD_ID)
     const trigger = createPlayer('p2')
 
-    const result = executeCardListener(listener, {
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener, {
       state: createState(owner, trigger),
       player: trigger,
       ownerPlayer: owner,
@@ -213,18 +221,19 @@ describe('C163_MaterialDeliveryman', () => {
       phase: 'after',
       result: { type: 'ok', resourcesGained: { wood: 4 } },
       transactionEvents: [moved({ wood: 4 }, trigger.id)],
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeUndefined()
   })
 
   it('does not trigger when result has no resourcesGained', () => {
-    const listener = findListener('C163-material-deliveryman-any-collect')!
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry, 'C163-material-deliveryman-any-collect')!
     const owner = createPlayer('p1')
     owner.occupationPlayed.push(CARD_ID)
     const trigger = createPlayer('p2')
 
-    const result = executeCardListener(listener, {
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener, {
       state: createState(owner, trigger),
       player: trigger,
       ownerPlayer: owner,
@@ -233,18 +242,19 @@ describe('C163_MaterialDeliveryman', () => {
       actionId: 'collect',
       phase: 'after',
       result: { type: 'ok' },
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeUndefined()
   })
 
   it('does not trigger for supply/cardEffect goods even when result reports 5+ goods', () => {
-    const listener = findListener('C163-material-deliveryman-any-collect')!
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry, 'C163-material-deliveryman-any-collect')!
     const owner = createPlayer('p1')
     owner.occupationPlayed.push(CARD_ID)
     const trigger = createPlayer('p2')
 
-    const result = executeCardListener(listener, {
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener, {
       state: createState(owner, trigger),
       player: trigger,
       ownerPlayer: owner,
@@ -254,18 +264,19 @@ describe('C163_MaterialDeliveryman', () => {
       phase: 'after',
       result: { type: 'ok', resourcesGained: { wood: 5 } },
       transactionEvents: [moved({ wood: 5 }, trigger.id, { kind: 'supply' })],
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeUndefined()
   })
 
   it('ignores stale transaction goods when actionEvents has no current threshold', () => {
-    const listener = findListener('C163-material-deliveryman-any-collect')!
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry, 'C163-material-deliveryman-any-collect')!
     const owner = createPlayer('p1')
     owner.occupationPlayed.push(CARD_ID)
     const trigger = createPlayer('p2')
 
-    const result = executeCardListener(listener, {
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener, {
       state: createState(owner, trigger),
       player: trigger,
       ownerPlayer: owner,
@@ -276,7 +287,7 @@ describe('C163_MaterialDeliveryman', () => {
       result: { type: 'ok', resourcesGained: { wood: 5 } },
       transactionEvents: [moved({ wood: 5 }, trigger.id)],
       actionEvents: [moved({ wood: 4 }, trigger.id)],
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeUndefined()
   })

@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import { describe, expect, it } from 'vitest'
@@ -201,8 +197,8 @@ const acceptD132 = (session: GameSession, resp: SessionResponse, playerIndex = 0
 const commitHiddenFood = (session: GameSession, playerIndex: number, food: number) =>
   session.commitSelectionChoice(playerIndex, { resourceCounts: { food } })
 
-const getCategory = (resp: SessionResponse, playerIndex: number, key: string) =>
-  Scoring.breakdown(resp.state, playerIndex).categories.find((c) => c.key === key)
+const getCategory = (session: GameSession, resp: SessionResponse, playerIndex: number, key: string) =>
+  session.withCtx(() => Scoring.breakdown(resp.state, playerIndex)).categories.find((c) => c.key === key)
 
 describe('D132_HideFarmer session', () => {
   it('offers optional before end game and hides selected unused spaces', () => {
@@ -221,9 +217,9 @@ describe('D132_HideFarmer session', () => {
     expect(resp.state.gameOver).toBe(true)
     expect(resp.state.players[0]!.resources.food).toBe(0)
     expect(resp.state.players[0]!.cardStates[CARD_ID]?.extraData?.hiddenSpaces).toBe(2)
-    expect(getCategory(resp, 0, 'empty')?.quantity).toBe(1)
-    expect(getCategory(resp, 0, 'empty')?.total).toBe(-1)
-    expect(getCategory(resp, 0, 'cardBonusVp')).toBeUndefined()
+    expect(getCategory(session, resp, 0, 'empty')?.quantity).toBe(1)
+    expect(getCategory(session, resp, 0, 'empty')?.total).toBe(-1)
+    expect(getCategory(session, resp, 0, 'cardBonusVp')).toBeUndefined()
   })
 
   it('distinguishes optional skip from accepting and choosing zero', () => {
@@ -235,7 +231,7 @@ describe('D132_HideFarmer session', () => {
     expect(resp.state.gameOver).toBe(true)
     expect(resp.state.players[0]!.resources.food).toBe(2)
     expect(resp.state.players[0]!.cardStates[CARD_ID]?.extraData?.hiddenSpaces).not.toEqual(expect.any(Number))
-    expect(getCategory(resp, 0, 'empty')?.quantity).toBe(2)
+    expect(getCategory(skipSession, resp, 0, 'empty')?.quantity).toBe(2)
 
     const zeroSession = setupEndGameSession({ p0Food: 2, p0Empty: 2 })
     resp = startBeforeEndGame(zeroSession)
@@ -245,7 +241,7 @@ describe('D132_HideFarmer session', () => {
     expect(resp.state.gameOver).toBe(true)
     expect(resp.state.players[0]!.resources.food).toBe(2)
     expect(resp.state.players[0]!.cardStates[CARD_ID]?.extraData?.hiddenSpaces).toBe(0)
-    expect(getCategory(resp, 0, 'empty')?.quantity).toBe(2)
+    expect(getCategory(zeroSession, resp, 0, 'empty')?.quantity).toBe(2)
   })
 
   it('rejects invalid quantity without clearing the D132 quantity pending', () => {
@@ -302,7 +298,7 @@ describe('D132_HideFarmer session', () => {
       expect(finished.ok).toBe(true)
       expect(finished.state.players[0]!.resources.food).toBe(0)
       expect(finished.state.players[0]!.cardStates[CARD_ID]?.extraData?.hiddenSpaces).toBe(2)
-      expect(getCategory(finished, 0, 'empty')).toMatchObject({ quantity: 0, total: 0 })
+      expect(getCategory(target, finished, 0, 'empty')).toMatchObject({ quantity: 0, total: 0 })
     }
   })
 
@@ -348,12 +344,13 @@ describe('D132_HideFarmer session', () => {
     }
     session.loadState(state)
 
-    const category = Scoring.breakdown(session.getState().state, 0).categories.find(
+    const scoringState = session.getState().state
+    const category = session.withCtx(() => Scoring.breakdown(scoringState, 0)).categories.find(
       (c) => c.key === 'empty',
     )
     expect(category?.quantity).toBe(2)
     expect(category?.total).toBe(-2)
-    expect(Scoring.breakdown(session.getState().state, 0).total).not.toBeNaN()
+    expect(session.withCtx(() => Scoring.breakdown(scoringState, 0)).total).not.toBeNaN()
   })
 
   it('continues to player 1 and allows player 1 anytime before choosing D132', () => {
@@ -413,8 +410,8 @@ describe('D132_HideFarmer session', () => {
     resp = acceptD132(session, resp, 0)
     resp = commitHiddenFood(session, 0, 2)
     expect(resp.ok).toBe(true)
-    expect(getCategory(resp, 0, 'empty')?.total).toBe(0)
-    expect(getCategory(resp, 0, 'cardBonusVp')?.total).toBe(3)
+    expect(getCategory(session, resp, 0, 'empty')?.total).toBe(0)
+    expect(getCategory(session, resp, 0, 'cardBonusVp')?.total).toBe(3)
   })
 })
 

@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -62,9 +58,9 @@ describe('E058_LunchtimeBeer onStartHarvest flow shape', () => {
     player.minorPlayed.push(CARD_ID)
     session.loadState(state)
 
-    const effect = getCardEffect(CARD_ID)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
     expect(effect).toBeDefined()
-    const flow = effect!.onStartHarvest!(state, player) as Extract<ActionFlow, { type: 'seq' }>
+    const flow = session.withCtx(() => effect!.onStartHarvest!(state, player)) as Extract<ActionFlow, { type: 'seq' }>
     expect(flow.type).toBe('seq')
     expect(flow.optional).toBe(true)
     expect(flow.children).toHaveLength(2)
@@ -95,8 +91,8 @@ describe('E058_LunchtimeBeer onStartHarvest flow shape', () => {
     player.minorPlayed.push(CARD_ID)
     session.loadState(state)
 
-    const effect = getCardEffect(CARD_ID)!
-    const flow = effect.onStartHarvest!(state, player) as Extract<ActionFlow, { type: 'seq' }>
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))!
+    const flow = session.withCtx(() => effect.onStartHarvest!(state, player)) as Extract<ActionFlow, { type: 'seq' }>
     const specialLeaf = flow.children[1] as Extract<ActionFlow, { type: 'leaf' }>
     expect((specialLeaf.params as { value: unknown }).value).toBe(7)
   })

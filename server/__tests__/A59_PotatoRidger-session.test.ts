@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -62,7 +58,7 @@ describe('A059_PotatoRidger session', () => {
       [player.id]: { resources: { vegetable: 1 }, grainFields: 0, vegetableFields: 1 },
     }
 
-    const flow = runCardEffectHook(state, player, CARD_ID, 'onAfterReap')
+    const flow = session.withCtx(() => runCardEffectHook(state, player, CARD_ID, 'onAfterReap'))
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('seq')
     expect((flow as Extract<ActionFlow, { type: 'leaf' }>).optional).toBe(true) // 3 veg = optional
@@ -81,7 +77,7 @@ describe('A059_PotatoRidger session', () => {
       [player.id]: { resources: { vegetable: 1 }, grainFields: 0, vegetableFields: 1 },
     }
 
-    const flow = runCardEffectHook(state, player, CARD_ID, 'onAfterReap')
+    const flow = session.withCtx(() => runCardEffectHook(state, player, CARD_ID, 'onAfterReap'))
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('seq')
     expect((flow as Extract<ActionFlow, { type: 'leaf' }>).optional).toBe(false) // 4 veg = mandatory
@@ -100,7 +96,7 @@ describe('A059_PotatoRidger session', () => {
       [player.id]: { resources: { vegetable: 1 }, grainFields: 0, vegetableFields: 1 },
     }
 
-    const flow = runCardEffectHook(state, player, CARD_ID, 'onAfterReap')
+    const flow = session.withCtx(() => runCardEffectHook(state, player, CARD_ID, 'onAfterReap'))
     expect(flow).toBeNull()
   })
 
@@ -117,7 +113,7 @@ describe('A059_PotatoRidger session', () => {
       [player.id]: { resources: {}, grainFields: 0, vegetableFields: 0 },
     }
 
-    const flow = runCardEffectHook(state, player, CARD_ID, 'onAfterReap')
+    const flow = session.withCtx(() => runCardEffectHook(state, player, CARD_ID, 'onAfterReap'))
     expect(flow).toBeNull()
   })
 

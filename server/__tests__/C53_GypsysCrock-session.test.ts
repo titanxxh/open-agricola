@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 
@@ -17,25 +13,26 @@ import { CardRegistry } from '../../shared/cards/registry'
 import '../../shared/cards/C/C053_GypsysCrock'
 
 describe('C053_GypsysCrock session', () => {
-  const executeSpecialEffectLeaves = (
+  const executeSpecialEffectLeaves = (ruleOwner: GameSession,
     flow: ActionFlow | undefined,
     state: GameState,
     player: PlayerState,
   ) => {
     if (!flow) return
     if (flow.type === 'seq') {
-      flow.children.forEach((child) => executeSpecialEffectLeaves(child, state, player))
+      flow.children.forEach((child) => executeSpecialEffectLeaves(ruleOwner, child, state, player))
       return
     }
     if (flow.type !== 'leaf' || flow.actionId !== 'special-effect') return
-    specialEffectAction.execute({
+    ruleOwner.withCtx(() => specialEffectAction.execute({
+      actionHooks: ruleOwner.actionHooks,
       state,
       player,
       space: { id: 'test' } as never,
       params: flow.params,
       sourceCard: flow.sourceCard,
       actionContext: flow.actionContext,
-    })
+    }))
   }
 
   const setup = () => {
@@ -97,7 +94,7 @@ describe('C053_GypsysCrock session', () => {
   it('uses the session card registry even when another test swaps the active registry', () => {
     const session = setup()
     enterActiveInteraction(session)
-    const previousRegistry = getActiveCardRegistry()
+    const previousRegistry = session.withCtx(() => getActiveCardRegistry())
     setActiveCardRegistry(new CardRegistry())
 
     try {
@@ -220,15 +217,15 @@ describe('C053_GypsysCrock session', () => {
     // Synthesize the trade-applied event for a non-cooking source twice (so
     // we'd cross the pair threshold if the filter were broken).
     const fire = (sourceId: string, times: number) => {
-      const results = runCardListeners({
+      const results = session.withCtx(() => runCardListeners({
         state,
         player,
         space: { id: 'test' } as never,
         actionId: 'trade-applied',
         phase: 'immediatelyAfter',
         extraData: { sourceId, times },
-      })
-      results.forEach((result) => executeSpecialEffectLeaves(result.flow, state, player))
+      }))
+      results.forEach((result) => executeSpecialEffectLeaves(session, result.flow, state, player))
     }
     fire('E064_SimpleOven', 2)
     // C53 counter must remain 0 (non-cooking source filtered out).

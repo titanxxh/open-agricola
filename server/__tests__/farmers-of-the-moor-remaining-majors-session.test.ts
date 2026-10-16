@@ -1,7 +1,4 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
+import type { GameSession as SessionRuleOwner } from '../game/authoritative-session'
 import { createWorkSession } from './_helpers/session-fixtures'
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
@@ -26,8 +23,8 @@ const prepareHands = (session: GameSession) => {
   }
 }
 
-const cardBonusVp = (state: GameState, playerIndex = 0) =>
-  Scoring.breakdown(state, playerIndex).categories.find((category) => category.key === 'cardBonusVp')?.total ?? 0
+const cardBonusVp = (ruleOwner: SessionRuleOwner, state: GameState, playerIndex = 0) =>
+  ruleOwner.withCtx(() => Scoring.breakdown(state, playerIndex)).categories.find((category) => category.key === 'cardBonusVp')?.total ?? 0
 
 const prepareMajorPurchaseSession = (
   cardId: string,
@@ -113,10 +110,10 @@ describe('Farmers of the Moor remaining major improvements', () => {
 
     expect(horseSession.takeSpecialAction(0, findCardFor(horseSession, 'cut-peat').id, 'cut-peat', { tile: horseMoor }).ok).toBe(true)
     expect(horsePlayer.resources.fuel).toBe(5)
-    expect(cardBonusVp(horseSession.state)).toBe(2)
+    expect(cardBonusVp(horseSession, horseSession.state)).toBe(2)
 
     horsePlayer.resources.fuel = 3
-    expect(cardBonusVp(horseSession.state)).toBe(1)
+    expect(cardBonusVp(horseSession, horseSession.state)).toBe(1)
   })
 
   it('Foresters Lodge increases Fell Trees wood and scores visible forests', () => {
@@ -131,7 +128,7 @@ describe('Farmers of the Moor remaining major improvements', () => {
 
     expect(session.takeSpecialAction(0, findCardFor(session, 'fell-trees').id, 'fell-trees', { tile: forest }).ok).toBe(true)
     expect(player.resources.wood).toBe(3)
-    expect(cardBonusVp(session.state)).toBe(4)
+    expect(cardBonusVp(session, session.state)).toBe(4)
 
     const horseSession = createWorkSession({ seed: 66, options: {
       playerCount: 2,
@@ -166,12 +163,12 @@ describe('Farmers of the Moor remaining major improvements', () => {
     const joinerySession = prepareMajorPurchaseSession('Major_Joinery')
     const player = joinerySession.state.players[0]!
     player.improvements = ['Major_Moor_MuseumOfTheMoors']
-    const cost = getMajorImprovementPreviewCostDetailed(
+    const cost = joinerySession.withCtx(() => getMajorImprovementPreviewCostDetailed(
       joinerySession.state,
       player,
       'Major_Joinery',
       'major-improvement',
-    )?.cost as { fees?: Array<Record<string, number>> } | undefined
+    ))?.cost as { fees?: Array<Record<string, number>> } | undefined
     expect(cost?.fees).toContainEqual({ wood: 1, stone: 2 })
     expect(cost?.fees).not.toContainEqual({ wood: 2, stone: 1 })
 
@@ -267,6 +264,6 @@ describe('Farmers of the Moor remaining major improvements', () => {
     session.state.round = 14
     const player = session.state.players[0]!
 
-    expect(runCardEffectHook(session.state, player, 'Major_Moor_RidingStables', 'onBuy')).toBeNull()
+    expect(session.withCtx(() => runCardEffectHook(session.state, player, 'Major_Moor_RidingStables', 'onBuy'))).toBeNull()
   })
 })

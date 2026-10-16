@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -35,7 +31,7 @@ describe('E143_Hewer session', () => {
     const clayPit = updatedState.actionSpaces.find(s => s.id === 'clay-pit')
     if (clayPit) clayPit.takenBy = []
 
-    const flow = runCardEffectHook(updatedState, updatedPlayer, CARD_ID, 'onBeforeReturnHome')
+    const flow = session.withCtx(() => runCardEffectHook(updatedState, updatedPlayer, CARD_ID, 'onBeforeReturnHome'))
     expect(flow).not.toBeNull()
     expect(flow!.type).toBe('leaf')
     expect((flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('gain')
@@ -58,7 +54,7 @@ describe('E143_Hewer session', () => {
     const updatedState = session.getState().state
     const updatedPlayer = updatedState.players[0]!
 
-    const flow = runCardEffectHook(updatedState, updatedPlayer, CARD_ID, 'onBeforeReturnHome')
+    const flow = session.withCtx(() => runCardEffectHook(updatedState, updatedPlayer, CARD_ID, 'onBeforeReturnHome'))
     expect(flow).toBeNull()
   })
 
@@ -81,7 +77,7 @@ describe('E143_Hewer session', () => {
     const clayPit = updatedState.actionSpaces.find(s => s.id === 'clay-pit')
     if (clayPit) clayPit.takenBy = [{ playerId: 'p2', workerId: '1' }]
 
-    const flow = runCardEffectHook(updatedState, updatedPlayer, CARD_ID, 'onBeforeReturnHome')
+    const flow = session.withCtx(() => runCardEffectHook(updatedState, updatedPlayer, CARD_ID, 'onBeforeReturnHome'))
     expect(flow).toBeNull()
   })
 })

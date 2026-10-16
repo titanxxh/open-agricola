@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { createWorkSession } from './_helpers/session-fixtures'
 import { type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
@@ -38,7 +34,7 @@ describe('B089_Groom session', () => {
     const state = session.getState().state
     const player = state.players[0]!
 
-    const flow = runCardEffectHook(state, player, 'B089_Groom', 'onBuy')
+    const flow = session.withCtx(() => runCardEffectHook(state, player, 'B089_Groom', 'onBuy'))
     expect(flow).not.toBeNull()
     expect(flow!.type).toBe('leaf')
     const leaf = flow as Extract<ActionFlow, { type: 'leaf' }>
@@ -52,7 +48,7 @@ describe('B089_Groom session', () => {
     const player = state.players[0]!
     player.resources.wood = 3 // enough for stable
 
-    const flow = runCardEffectHook(state, player, 'B089_Groom', 'onRoundStart')
+    const flow = session.withCtx(() => runCardEffectHook(state, player, 'B089_Groom', 'onRoundStart'))
     expect(flow).not.toBeNull()
     expect(flow!.type).toBe('leaf')
     const leaf = flow as Extract<ActionFlow, { type: 'leaf' }>
@@ -69,7 +65,7 @@ describe('B089_Groom session', () => {
     const player = state.players[0]!
     player.resources.wood = 0
 
-    const flow = runCardEffectHook(state, player, 'B089_Groom', 'onRoundStart')
+    const flow = session.withCtx(() => runCardEffectHook(state, player, 'B089_Groom', 'onRoundStart'))
     // The reference does not block at trigger time — payability is checked when player
     // chooses to act. Effect must still emit the leaf.
     expect(flow).not.toBeNull()
@@ -85,7 +81,7 @@ describe('B089_Groom session', () => {
     const player = state.players[0]!
     player.resources.wood = 3
 
-    const flow = runCardEffectHook(state, player, 'B089_Groom', 'onRoundStart')
+    const flow = session.withCtx(() => runCardEffectHook(state, player, 'B089_Groom', 'onRoundStart'))
     expect(flow).toBeNull()
   })
 
@@ -95,7 +91,7 @@ describe('B089_Groom session', () => {
     const player = state.players[0]!
     player.resources.wood = 3
 
-    const flow = runCardEffectHook(state, player, 'B089_Groom', 'onRoundStart')
+    const flow = session.withCtx(() => runCardEffectHook(state, player, 'B089_Groom', 'onRoundStart'))
     expect(flow).toBeNull()
   })
 })

@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from './card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import './setup-register-all'
 import { GameSession } from '../../../server/game/authoritative-session'
@@ -55,15 +51,15 @@ describe('5+ player action space occupations', () => {
     expect(config?.access).toBe('owner')
     const [space] = createPlayerActionSpaces(state)
     expect(space?.id).toBe('B171_GreenhouseBuilder')
-    expect(space?.canBeExecutedByPlayer(state, owner, { actionHooks: session.actionHooks })).toBe(true)
-    expect(space?.canBeExecutedByPlayer(state, other, { actionHooks: session.actionHooks })).toBe(false)
+    expect(session.withCtx(() => space?.canBeExecutedByPlayer(state, owner, { actionHooks: session.actionHooks }))).toBe(true)
+    expect(session.withCtx(() => space?.canBeExecutedByPlayer(state, other, { actionHooks: session.actionHooks }))).toBe(false)
 
-    const result = config!.createDefinition(owner.id).execute({
+    const result = session.withCtx(() => config!.createDefinition(owner.id).execute({
       actionHooks: session.actionHooks,
       state,
       player: owner,
       space,
-    } as unknown as ActionExecutionContext)
+    } as unknown as ActionExecutionContext))
 
     expect(result.type).toBe('flow')
     if (result.type !== 'flow') return
@@ -79,17 +75,17 @@ describe('5+ player action space occupations', () => {
     const space = createPlayerActionSpaces(state).find((candidate) => candidate.id === 'B171_GreenhouseBuilder')!
     const definition = getPlayerActionSpaceConfig('B171_GreenhouseBuilder')!.createDefinition(owner.id)
 
-    expect(definition.canBeExecutedByPlayer(state, owner, { actionHooks: session.actionHooks })).toBe(false)
+    expect(session.withCtx(() => definition.canBeExecutedByPlayer(state, owner, { actionHooks: session.actionHooks }))).toBe(false)
 
     state.roundActionOrder[0] = 'fencing'
     owner.resources.wood = 4
-    expect(definition.canBeExecutedByPlayer(state, owner, { actionHooks: session.actionHooks })).toBe(true)
-    const result = definition.execute({
+    expect(session.withCtx(() => definition.canBeExecutedByPlayer(state, owner, { actionHooks: session.actionHooks }))).toBe(true)
+    const result = session.withCtx(() => definition.execute({
       actionHooks: session.actionHooks,
       state,
       player: owner,
       space,
-    } as unknown as ActionExecutionContext)
+    } as unknown as ActionExecutionContext))
 
     expect(result.type).toBe('flow')
     if (result.type !== 'flow') return
@@ -105,11 +101,11 @@ describe('5+ player action space occupations', () => {
     const owner = state.players[0]!
     const definition = getPlayerActionSpaceConfig('B171_GreenhouseBuilder')!.createDefinition(owner.id)
 
-    expect(definition.canBeExecutedByPlayer(state, owner, { actionHooks: session.actionHooks })).toBe(false)
+    expect(session.withCtx(() => definition.canBeExecutedByPlayer(state, owner, { actionHooks: session.actionHooks }))).toBe(false)
 
     state.roundActionOrder[0] = 'fencing'
     owner.resources.wood = 0
-    expect(definition.canBeExecutedByPlayer(state, owner, { actionHooks: session.actionHooks })).toBe(false)
+    expect(session.withCtx(() => definition.canBeExecutedByPlayer(state, owner, { actionHooks: session.actionHooks }))).toBe(false)
   })
 
   it('D170 Fold Builder owner uses it without self-payment and non-owner needs food plus legal fencing', () => {
@@ -124,19 +120,19 @@ describe('5+ player action space occupations', () => {
     const space = createPlayerActionSpaces(state).find((candidate) => candidate.id === 'D170_FoldBuilder')!
     const definition = getPlayerActionSpaceConfig('D170_FoldBuilder')!.createDefinition(owner.id)
 
-    expect(definition.canBeExecutedByPlayer(state, owner, { actionHooks: session.actionHooks })).toBe(true)
-    expect(definition.canBeExecutedByPlayer(state, user, { actionHooks: session.actionHooks })).toBe(false)
+    expect(session.withCtx(() => definition.canBeExecutedByPlayer(state, owner, { actionHooks: session.actionHooks }))).toBe(true)
+    expect(session.withCtx(() => definition.canBeExecutedByPlayer(state, user, { actionHooks: session.actionHooks }))).toBe(false)
 
     user.resources.food = 1
     user.resources.wood = 0
-    expect(definition.canBeExecutedByPlayer(state, user, { actionHooks: session.actionHooks })).toBe(false)
+    expect(session.withCtx(() => definition.canBeExecutedByPlayer(state, user, { actionHooks: session.actionHooks }))).toBe(false)
 
-    const ownerResult = definition.execute({
+    const ownerResult = session.withCtx(() => definition.execute({
       actionHooks: session.actionHooks,
       state,
       player: owner,
       space,
-    } as unknown as ActionExecutionContext)
+    } as unknown as ActionExecutionContext))
     expect(owner.resources.food).toBe(2)
     expect(ownerResult.type).toBe('flow')
   })
@@ -173,15 +169,15 @@ describe('5+ player action space occupations', () => {
     const other = state.players[1]!
     const definition = getPlayerActionSpaceConfig('D179_Bullcatcher')!.createDefinition(owner.id)
 
-    expect(definition.canBeExecutedByPlayer(state, owner, { actionHooks: session.actionHooks })).toBe(false)
+    expect(session.withCtx(() => definition.canBeExecutedByPlayer(state, owner, { actionHooks: session.actionHooks }))).toBe(false)
     occupyRoundSlot(state, 3, other.id)
-    expect(definition.canBeExecutedByPlayer(state, owner, { actionHooks: session.actionHooks })).toBe(false)
+    expect(session.withCtx(() => definition.canBeExecutedByPlayer(state, owner, { actionHooks: session.actionHooks }))).toBe(false)
     occupyRoundSlot(state, 6, other.id)
-    expect(definition.canBeExecutedByPlayer(state, owner, { actionHooks: session.actionHooks })).toBe(true)
-    expect(definition.canBeExecutedByPlayer(state, other, { actionHooks: session.actionHooks })).toBe(false)
+    expect(session.withCtx(() => definition.canBeExecutedByPlayer(state, owner, { actionHooks: session.actionHooks }))).toBe(true)
+    expect(session.withCtx(() => definition.canBeExecutedByPlayer(state, other, { actionHooks: session.actionHooks }))).toBe(false)
 
     setWorkersAtHome(state, owner, 0)
-    expect(definition.canBeExecutedByPlayer(state, owner, { actionHooks: session.actionHooks })).toBe(true)
+    expect(session.withCtx(() => definition.canBeExecutedByPlayer(state, owner, { actionHooks: session.actionHooks }))).toBe(true)
     session.loadState(state)
     expect(session.takeAction(0, 'D179_Bullcatcher').ok).toBe(false)
   })

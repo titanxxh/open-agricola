@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
@@ -20,9 +16,9 @@ describe('D084_FeedPellets session', () => {
     const player = state.players[0]!
     session.loadState(state)
 
-    const effect = getCardEffect(CARD_ID)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
     expect(effect).toBeDefined()
-    const flow = effect!.onBuy!(state, player)
+    const flow = session.withCtx(() => effect!.onBuy!(state, player))
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('leaf')
     expect((flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('gain')
@@ -41,8 +37,8 @@ describe('D084_FeedPellets session', () => {
 
     session.loadState(state)
 
-    const effect = getCardEffect(CARD_ID)
-    const flow = effect!.onHarvestFeedingPhase!(state, player)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
+    const flow = session.withCtx(() => effect!.onHarvestFeedingPhase!(state, player))
     expect(flow).toBeDefined()
     // Only sheep owned → single seq (not xor)
     expect(flow!.type).toBe('seq')
@@ -62,8 +58,8 @@ describe('D084_FeedPellets session', () => {
 
     session.loadState(state)
 
-    const effect = getCardEffect(CARD_ID)
-    const flow = effect!.onHarvestFeedingPhase!(state, player)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
+    const flow = session.withCtx(() => effect!.onHarvestFeedingPhase!(state, player))
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('xor')
     expect((flow as Extract<ActionFlow, { type: 'leaf' }>).optional).toBe(true)
@@ -82,8 +78,8 @@ describe('D084_FeedPellets session', () => {
 
     session.loadState(state)
 
-    const effect = getCardEffect(CARD_ID)
-    const flow = effect!.onHarvestFeedingPhase!(state, player)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
+    const flow = session.withCtx(() => effect!.onHarvestFeedingPhase!(state, player))
     expect(flow).toBeUndefined()
   })
 
@@ -101,8 +97,8 @@ describe('D084_FeedPellets session', () => {
 
     session.loadState(state)
 
-    const effect = getCardEffect(CARD_ID)
-    const flow = effect!.onHarvestFeedingPhase!(state, player)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
+    const flow = session.withCtx(() => effect!.onHarvestFeedingPhase!(state, player))
     expect(flow).toBeUndefined()
   })
 

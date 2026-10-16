@@ -1,7 +1,6 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
+import { CardRegistry as TestCardRegistry } from '../../shared/cards/registry'
+import { withActiveRegistry } from '../../shared/cards/active-registry'
+import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { executeCardListener, getRegisteredCardListeners, type CardListenerContext } from '../../shared/cards/card-listeners'
@@ -110,8 +109,11 @@ const createSpace = (id: string): ActionSpace =>
     takenBy: [],
   }) as ActionSpace
 
-const findListener = (id: string) =>
-  getRegisteredCardListeners().find((listener) => listener.id === id)
+const findListener = (ruleOwner: TestCardRegistry, id: string) =>
+  {
+  const lookupRule1 = () => getRegisteredCardListeners().find((listener) => listener.id === id)
+  return withActiveRegistry(ruleOwner, lookupRule1)
+}
 
 const playedMajor = (
   cardId = COOKING_HEARTH_ID,
@@ -193,7 +195,8 @@ describe('A041_VegetableSlicer improvement listener', () => {
   })
 
   it('gains 2 wood and 1 vegetable when Fireplace becomes Cooking Hearth', () => {
-    const listener = findListener('A41-vegetable-slicer-after-improvement')
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry, 'A41-vegetable-slicer-after-improvement')
     expect(listener).toBeDefined()
 
     const player = createPlayer()
@@ -205,7 +208,7 @@ describe('A041_VegetableSlicer improvement listener', () => {
 
     expect(result.type).toBe('ok')
     const actionEvents = [paidForImprovement(FIREPLACE_ID), playedMajor()]
-    const hookResult = executeCardListener(listener!, {
+    const hookResult = withActiveRegistry(ruleRegistry, () => executeCardListener(listener!, {
       state,
       player,
       space: createSpace('improvement'),
@@ -215,7 +218,7 @@ describe('A041_VegetableSlicer improvement listener', () => {
       result: { type: 'ok' },
       transactionEvents: actionEvents,
       actionEvents,
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(player.improvements).toContain(COOKING_HEARTH_ID)
     expect(player.improvements).not.toContain(FIREPLACE_ID)
@@ -228,7 +231,8 @@ describe('A041_VegetableSlicer improvement listener', () => {
   })
 
   it('gains 2 wood and 1 vegetable when duplicate Fireplace becomes duplicate Cooking Hearth', () => {
-    const listener = findListener('A41-vegetable-slicer-after-improvement')
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry, 'A41-vegetable-slicer-after-improvement')
     expect(listener).toBeDefined()
 
     const player = createPlayer()
@@ -237,7 +241,7 @@ describe('A041_VegetableSlicer improvement listener', () => {
 
     const state = createState(player)
     const actionEvents = [paidForImprovement(FIREPLACE3_ID), playedMajor(COOKING_HEARTH3_ID)]
-    const hookResult = executeCardListener(listener!, {
+    const hookResult = withActiveRegistry(ruleRegistry, () => executeCardListener(listener!, {
       state,
       player,
       space: createSpace('improvement'),
@@ -247,7 +251,7 @@ describe('A041_VegetableSlicer improvement listener', () => {
       result: { type: 'ok' },
       transactionEvents: actionEvents,
       actionEvents,
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(hookResult?.flow).toMatchObject({
       type: 'leaf',
@@ -258,7 +262,8 @@ describe('A041_VegetableSlicer improvement listener', () => {
   })
 
   it('does not trigger on a pure clay Cooking Hearth purchase', () => {
-    const listener = findListener('A41-vegetable-slicer-after-improvement')
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry, 'A41-vegetable-slicer-after-improvement')
     expect(listener).toBeDefined()
 
     const player = createPlayer()
@@ -270,7 +275,7 @@ describe('A041_VegetableSlicer improvement listener', () => {
 
     expect(result.type).toBe('ok')
     const actionEvents = [paidForImprovement(), playedMajor()]
-    const hookResult = executeCardListener(listener!, {
+    const hookResult = withActiveRegistry(ruleRegistry, () => executeCardListener(listener!, {
       state,
       player,
       space: createSpace('improvement'),
@@ -280,14 +285,15 @@ describe('A041_VegetableSlicer improvement listener', () => {
       result,
       transactionEvents: actionEvents,
       actionEvents,
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(player.improvements).toContain(COOKING_HEARTH_ID)
     expect(hookResult).toBeUndefined()
   })
 
   it('ignores legacy improvementPayment extraData when returned-card event is missing', () => {
-    const listener = findListener('A41-vegetable-slicer-after-improvement')
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry, 'A41-vegetable-slicer-after-improvement')
     expect(listener).toBeDefined()
 
     const player = createPlayer()
@@ -304,7 +310,7 @@ describe('A041_VegetableSlicer improvement listener', () => {
       },
     } as ActionExecutionResult
 
-    const hookResult = executeCardListener(listener!, {
+    const hookResult = withActiveRegistry(ruleRegistry, () => executeCardListener(listener!, {
       state,
       player,
       space: createSpace('improvement'),
@@ -314,7 +320,7 @@ describe('A041_VegetableSlicer improvement listener', () => {
       result,
       transactionEvents: actionEvents,
       actionEvents,
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(hookResult).toBeUndefined()
   })

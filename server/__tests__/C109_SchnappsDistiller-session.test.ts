@@ -1,7 +1,5 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
+import { withActiveRegistry } from '../../shared/cards/active-registry'
+import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
 import { describe, expect, it } from 'vitest'
 import { C109_SchnappsDistiller } from '../../shared/cards/C/C109_SchnappsDistiller'
 import { getExchangesInWindow } from '../../shared/actions/effects/exchange'
@@ -212,8 +210,9 @@ describe('C109_SchnappsDistiller — metadata exchange', () => {
   })
 
   it('appears in harvest window for player who played it', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     const player = makePlayer({ occupationPlayed: [CARD_ID] })
-    const trades = getExchangesInWindow(player, 'harvest')
+    const trades = withActiveRegistry(ruleRegistry, () => getExchangesInWindow(player, 'harvest'))
     expect(trades).toHaveLength(1)
     expect(trades[0]!.from.vegetable).toBe(1)
     expect(trades[0]!.to.food).toBe(5)
@@ -221,8 +220,9 @@ describe('C109_SchnappsDistiller — metadata exchange', () => {
   })
 
   it('not visible in anytime window (harvest-only)', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     const player = makePlayer({ occupationPlayed: [CARD_ID] })
-    const trades = getExchangesInWindow(player, 'anytime')
+    const trades = withActiveRegistry(ruleRegistry, () => getExchangesInWindow(player, 'anytime'))
     expect(trades).toHaveLength(0)
   })
 })

@@ -159,7 +159,7 @@ Session 卡牌测试优先使用后端边界驱动。房间规则主链路走 We
 
 Session 的公开命令和查询自行绑定规则。不要为 Session 场景或整个文件安装官方卡牌注册表夹具，否则会掩盖公开入口未自行绑定 owner 的问题。测试直接查询某个 Session 的规则时，只对该查询使用 `session.withCtx(() => ...)`。注入 effect 和 listener 也在同一 owner 作用域内注册。
 
-读取官方卡牌规则的独立直接行为测试，显式调用 `shared/cards/__tests__/card-environment.ts` 的 `installOfficialCardRegistry()`；夹具每项测试前安装独立注册表，结束后恢复原环境。混合测试文件只在独立直接查询周围绑定官方注册表。验证缺少环境的测试不得使用夹具。测试 setup 不得安装进程级规则默认值。
+读取官方卡牌规则的独立直接行为测试，显式调用 `shared/cards/__tests__/card-environment.ts` 的 `installOfficialCardRegistry()`；夹具每项测试前安装独立注册表，结束后恢复原环境。混合测试文件只在独立直接查询周围绑定官方注册表。验证缺少环境的测试不得使用夹具。测试 setup 不得安装进程级规则默认值。 `pnpm check:test-rule-environments` 拒绝 server 或混合 Session 测试中的整文件注册表夹具、生命周期 hook 发布非空注册表，以及显式 async 临时 scope。此静态门禁不能证明任意 helper 别名或 thenable 的 owner 传播。
 
 行动执行与查询上下文对象必须显式包含 `actionHooks`。验证某个 Session 时传入 `session.actionHooks`，独立通用规则测试使用测试自有的 `ActionHookRegistry`。不查询通用规则的纯调用可显式填写 `actionHooks: undefined`，不能把它当作规则消费者的回退值。该字段不替代临时卡牌环境。
 

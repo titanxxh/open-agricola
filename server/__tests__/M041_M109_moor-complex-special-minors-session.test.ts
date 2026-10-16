@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 
 import { GameSession } from '../game/authoritative-session'
@@ -134,9 +130,9 @@ const usedRound = (player: PlayerState, cardId: string) =>
 describe('Moor complex special-action minors', () => {
   it('M041 Cattle Collar gates on round 8 and cattle before offering extra plow', () => {
     const prereq = setup([], 7)
-    expect(meetsCardPrerequisites(prereq.player, M041_CattleCollar, 7, prereq.state)).toBe(false)
+    expect(prereq.session.withCtx(() => meetsCardPrerequisites(prereq.player, M041_CattleCollar, 7, prereq.state))).toBe(false)
     prereq.state.round = 8
-    expect(meetsCardPrerequisites(prereq.player, M041_CattleCollar, 8, prereq.state)).toBe(true)
+    expect(prereq.session.withCtx(() => meetsCardPrerequisites(prereq.player, M041_CattleCollar, 8, prereq.state))).toBe(true)
 
     const { session, player } = setup(['M041_CattleCollar'], 8)
     player.resources.cattle = 1
@@ -221,7 +217,9 @@ describe('Moor complex special-action minors', () => {
   })
 
   it('M058 Peat Fertilizer checks two fields only when played', () => {
-    expect(meetsCardPrerequisites(setup([], 8).player, M058_PeatFertilizer, 8, setup([], 8).state)).toBe(false)
+    const prerequisitePlayer = setup([], 8)
+    const prerequisiteState = setup([], 8)
+    expect(prerequisitePlayer.session.withCtx(() => meetsCardPrerequisites(prerequisitePlayer.player, M058_PeatFertilizer, 8, prerequisiteState.state))).toBe(false)
 
     const { session, player } = setup(['M058_PeatFertilizer'])
     player.fields = [{ row: 0, col: 1, stacks: [] }, { row: 0, col: 2, stacks: [] }]
@@ -281,9 +279,9 @@ describe('Moor complex special-action minors', () => {
 
   it('M060 Sowing Machine offers Sow after any special action only with 2 horses after resolution', () => {
     const prereq = setup([], 8)
-    expect(meetsCardPrerequisites(prereq.player, M060_SowingMachine, 8, prereq.state)).toBe(false)
+    expect(prereq.session.withCtx(() => meetsCardPrerequisites(prereq.player, M060_SowingMachine, 8, prereq.state))).toBe(false)
     prereq.player.resources.horse = 1
-    expect(meetsCardPrerequisites(prereq.player, M060_SowingMachine, 8, prereq.state)).toBe(true)
+    expect(prereq.session.withCtx(() => meetsCardPrerequisites(prereq.player, M060_SowingMachine, 8, prereq.state))).toBe(true)
 
     const { session, player } = setup(['M060_SowingMachine'])
     player.resources.horse = 2

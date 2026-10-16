@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { createWorkSession } from './_helpers/session-fixtures'
 
@@ -148,7 +144,7 @@ describe('C025_SteamMachine session', () => {
   it('skipping Bake Bread still consumes a pending extra turn', () => {
     const session = setup({ extraTurnNewborns: 1, food: 1 })
     const before = session.getState()
-    expect(hasPendingExtraTurn(before.state, before.state.players[0]!)).toBe(true)
+    expect(session.withCtx(() => hasPendingExtraTurn(before.state, before.state.players[0]!))).toBe(true)
 
     let resp = takeForest(session)
     expect(resp.interaction.stateId).toBe('wait')
@@ -156,7 +152,7 @@ describe('C025_SteamMachine session', () => {
 
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!._extraTurnConsumedCountsByCard).toEqual({ [A92]: 1 })
-    expect(hasPendingExtraTurn(resp.state, resp.state.players[0]!)).toBe(false)
+    expect(session.withCtx(() => hasPendingExtraTurn(resp.state, resp.state.players[0]!))).toBe(false)
     expect(c25ConsumeEvents(resp)).toHaveLength(1)
   })
 
@@ -177,7 +173,7 @@ describe('C025_SteamMachine session', () => {
     expect(resp.state.players[0]!.resources.grain).toBe(0)
     expect(resp.state.players[0]!.resources.food).toBe(3)
     expect(resp.state.players[0]!._extraTurnConsumedCountsByCard).toEqual({ [A92]: 1 })
-    expect(hasPendingExtraTurn(resp.state, resp.state.players[0]!)).toBe(false)
+    expect(session.withCtx(() => hasPendingExtraTurn(resp.state, resp.state.players[0]!))).toBe(false)
     expect(c25ConsumeEvents(resp)).toHaveLength(1)
   })
 
@@ -190,14 +186,14 @@ describe('C025_SteamMachine session', () => {
 
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!._extraTurnConsumedCountsByCard).toEqual({ [A92]: 2 })
-    expect(hasPendingExtraTurn(resp.state, resp.state.players[0]!)).toBe(false)
+    expect(session.withCtx(() => hasPendingExtraTurn(resp.state, resp.state.players[0]!))).toBe(false)
     expect(c25ConsumeEvents(resp)).toHaveLength(1)
   })
 
   it('does not consume or emit when the extra turn is unaffordable', () => {
     const session = setup({ extraTurnNewborns: 1, food: 0 })
     const before = session.getState()
-    expect(hasPendingExtraTurn(before.state, before.state.players[0]!)).toBe(false)
+    expect(session.withCtx(() => hasPendingExtraTurn(before.state, before.state.players[0]!))).toBe(false)
 
     let resp = takeForest(session)
     expect(resp.interaction.stateId).toBe('wait')

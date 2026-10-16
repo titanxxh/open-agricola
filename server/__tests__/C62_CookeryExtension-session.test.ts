@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, it, expect } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getExchangesInWindow } from '../../shared/actions/effects/exchange'
@@ -52,7 +48,7 @@ describe('C62 CookeryExtension', () => {
     seedCookery(state, FIREPLACE1)
     session.loadState(state)
     const p1 = state.players[0]!
-    const trades = getExchangesInWindow(p1, 'harvest', state)
+    const trades = session.withCtx(() => getExchangesInWindow(p1, 'harvest', state))
     const derived = trades.filter((t) => t.sourceId?.startsWith(`${C62}::`))
     expect(derived).toContainEqual(
       expect.objectContaining({
@@ -73,7 +69,7 @@ describe('C62 CookeryExtension', () => {
 
     p1.cardStates![C62]!.extraData!.usedCookeryIds = [FIREPLACE1]
 
-    const trades = getExchangesInWindow(p1, 'harvest', state)
+    const trades = session.withCtx(() => getExchangesInWindow(p1, 'harvest', state))
     const derivedFromFireplace = trades.filter(
       (t) => t.sourceId === `${C62}::${FIREPLACE1}`,
     )
@@ -88,12 +84,12 @@ describe('C62 CookeryExtension', () => {
     session.loadState(state)
     const p1 = state.players[0]!
 
-    let trades = getExchangesInWindow(p1, 'harvest', state)
+    let trades = session.withCtx(() => getExchangesInWindow(p1, 'harvest', state))
     expect(trades.some((t) => t.sourceId === `${C62}::${FIREPLACE1}`)).toBe(true)
     expect(trades.some((t) => t.sourceId === `${C62}::${COOKING_HEARTH1}`)).toBe(true)
 
     p1.cardStates![C62]!.extraData!.usedCookeryIds = [FIREPLACE1]
-    trades = getExchangesInWindow(p1, 'harvest', state)
+    trades = session.withCtx(() => getExchangesInWindow(p1, 'harvest', state))
     expect(trades.some((t) => t.sourceId === `${C62}::${FIREPLACE1}`)).toBe(false)
     expect(trades.some((t) => t.sourceId === `${C62}::${COOKING_HEARTH1}`)).toBe(true)
   })
@@ -104,7 +100,7 @@ describe('C62 CookeryExtension', () => {
     seedCookery(state, FIREPLACE1)
     session.loadState(state)
     const p1 = state.players[0]!
-    const trades = getExchangesInWindow(p1, 'harvest', state)
+    const trades = session.withCtx(() => getExchangesInWindow(p1, 'harvest', state))
     const grainDerived = trades.filter(
       (t) => t.sourceId?.startsWith(`${C62}::`) && t.from?.grain !== undefined,
     )
@@ -117,8 +113,8 @@ describe('C62 CookeryExtension', () => {
     seedCookery(state, FIREPLACE1)
     session.loadState(state)
     const p1 = state.players[0]!
-    const anytime = getExchangesInWindow(p1, 'anytime', state)
-    const bakeBread = getExchangesInWindow(p1, 'bake-bread', state)
+    const anytime = session.withCtx(() => getExchangesInWindow(p1, 'anytime', state))
+    const bakeBread = session.withCtx(() => getExchangesInWindow(p1, 'bake-bread', state))
     expect(anytime.some((t) => t.sourceId?.startsWith(`${C62}::`))).toBe(false)
     expect(bakeBread.some((t) => t.sourceId?.startsWith(`${C62}::`))).toBe(false)
   })
@@ -134,7 +130,7 @@ describe('C62 CookeryExtension', () => {
     const impl = (
       await import('../../shared/cards/C/C062_CookeryExtension')
     ).C062_CookeryExtension_impl
-    impl.effect!.onStartHarvest!(state, p1)
+    session.withCtx(() => impl.effect!.onStartHarvest!(state, p1))
     expect(p1.cardStates![C62]!.extraData!.usedCookeryIds).toEqual([])
   })
 
@@ -143,7 +139,7 @@ describe('C62 CookeryExtension', () => {
     seedC62(state)
     session.loadState(state)
     const p1 = state.players[0]!
-    const trades = getExchangesInWindow(p1, 'harvest', state)
+    const trades = session.withCtx(() => getExchangesInWindow(p1, 'harvest', state))
     const derived = trades.filter((t) => t.sourceId?.startsWith(`${C62}::`))
     expect(derived).toHaveLength(0)
   })
@@ -154,7 +150,7 @@ describe('C62 CookeryExtension', () => {
     seedCookery(state, FIREPLACE1)
     session.loadState(state)
     const p1 = state.players[0]!
-    const anytime = getExchangesInWindow(p1, 'anytime', state)
+    const anytime = session.withCtx(() => getExchangesInWindow(p1, 'anytime', state))
     const fireplaceVeg = anytime.find(
       (t) => t.sourceId === FIREPLACE1 && t.from?.vegetable === 1,
     )

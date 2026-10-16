@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getExtraRoomCapacity } from '../../shared/cards/card-effects'
@@ -28,7 +24,7 @@ describe('A010_WoodenShed session', () => {
     const state = session.getState().state
     const player = state.players[0]!
     expect(player.houseType).toBe('wood')
-    expect(meetsCardPrerequisites(player, A010_WoodenShed, state.round, state)).toBe(true)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, A010_WoodenShed, state.round, state))).toBe(true)
   })
 
   it('prerequisite fails when house is clay', () => {
@@ -36,16 +32,16 @@ describe('A010_WoodenShed session', () => {
     const state = session.getState().state
     const player = state.players[0]!
     player.houseType = 'clay'
-    expect(meetsCardPrerequisites(player, A010_WoodenShed, state.round, state)).toBe(false)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, A010_WoodenShed, state.round, state))).toBe(false)
   })
 
   it('adds +1 extra room capacity when played', () => {
     const session = setup()
     const state = session.getState().state
     const player = state.players[0]!
-    expect(getExtraRoomCapacity(player)).toBe(0)
+    expect(session.withCtx(() => getExtraRoomCapacity(player))).toBe(0)
     player.minorPlayed.push(CARD_ID)
-    expect(getExtraRoomCapacity(player)).toBe(1)
+    expect(session.withCtx(() => getExtraRoomCapacity(player))).toBe(1)
   })
 
   it('blocks direct renovation planning when played', () => {
@@ -71,7 +67,7 @@ describe('A010_WoodenShed session', () => {
       const player = state.players[0]!
       player.minorHand.push(CARD_ID)
       givePayResources(player)
-      expect(isMinorImprovementPlayable(state, player, CARD_ID, 'improvement', undefined, ['minor'])).toBe(false)
+      expect(session.withCtx(() => isMinorImprovementPlayable(state, player, CARD_ID, 'improvement', undefined, ['minor']))).toBe(false)
     })
 
     it('is playable through the improvement-any (Major Improvement) action space', () => {
@@ -80,7 +76,7 @@ describe('A010_WoodenShed session', () => {
       const player = state.players[0]!
       player.minorHand.push(CARD_ID)
       givePayResources(player)
-      expect(isMinorImprovementPlayable(state, player, CARD_ID, 'improvement-any')).toBe(true)
+      expect(session.withCtx(() => isMinorImprovementPlayable(state, player, CARD_ID, 'improvement-any'))).toBe(true)
     })
 
     it('playMinorImprovement(actionCardId="minor-improvement") fails for A10', () => {

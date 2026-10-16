@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
@@ -44,7 +40,7 @@ describe('C135_Constable — onBuy gain wood by remaining rounds', () => {
     const session = setup(1)
     const state = session.getState().state
     const player = state.players[0]!
-    const flow = runCardEffectHook(state, player, 'C135_Constable', 'onBuy')
+    const flow = session.withCtx(() => runCardEffectHook(state, player, 'C135_Constable', 'onBuy'))
     expect(flow).not.toBeNull()
     expect(flow!.type).toBe('leaf')
     const leaf = flow as Extract<ActionFlow, { type: 'leaf' }>
@@ -56,7 +52,7 @@ describe('C135_Constable — onBuy gain wood by remaining rounds', () => {
     const session = setup(11)
     const state = session.getState().state
     const player = state.players[0]!
-    const flow = runCardEffectHook(state, player, 'C135_Constable', 'onBuy')
+    const flow = session.withCtx(() => runCardEffectHook(state, player, 'C135_Constable', 'onBuy'))
     expect(flow).not.toBeNull()
     const leaf = flow as Extract<ActionFlow, { type: 'leaf' }>
     expect(leaf.actionId).toBe('gain')
@@ -67,7 +63,7 @@ describe('C135_Constable — onBuy gain wood by remaining rounds', () => {
     const session = setup(13)
     const state = session.getState().state
     const player = state.players[0]!
-    const flow = runCardEffectHook(state, player, 'C135_Constable', 'onBuy')
+    const flow = session.withCtx(() => runCardEffectHook(state, player, 'C135_Constable', 'onBuy'))
     expect(flow).not.toBeNull()
     const leaf = flow as Extract<ActionFlow, { type: 'leaf' }>
     expect(leaf.params).toEqual({ wood: 1 })
@@ -77,7 +73,7 @@ describe('C135_Constable — onBuy gain wood by remaining rounds', () => {
     const session = setup(14)
     const state = session.getState().state
     const player = state.players[0]!
-    const flow = runCardEffectHook(state, player, 'C135_Constable', 'onBuy')
+    const flow = session.withCtx(() => runCardEffectHook(state, player, 'C135_Constable', 'onBuy'))
     expect(flow).toBeNull()
   })
 
@@ -85,7 +81,7 @@ describe('C135_Constable — onBuy gain wood by remaining rounds', () => {
     const session = setup(6)
     const state = session.getState().state
     const player = state.players[0]!
-    const flow = runCardEffectHook(state, player, 'C135_Constable', 'onBuy')
+    const flow = session.withCtx(() => runCardEffectHook(state, player, 'C135_Constable', 'onBuy'))
     expect(flow).not.toBeNull()
     const leaf = flow as Extract<ActionFlow, { type: 'leaf' }>
     expect(leaf.params).toEqual({ wood: 3 })
@@ -148,7 +144,7 @@ describe('C135_Constable — shared scoring', () => {
     })
     state.players[2]!.resources.begging = 1
 
-    const scores = computeScores(state)
+    const scores = session.withCtx(() => computeScores(state))
     const bonus = (index: number) => scores[index]!.categories
       .find((category) => category.key === 'cardBonusVp')?.entries
       .find((entry) => entry.type === 'bonus' && entry.cardId === 'C135_Constable')?.score ?? 0
@@ -183,7 +179,7 @@ describe('C135_Constable — shared scoring', () => {
     state.players[1]!.improvements.push('Major_Well')
     state.players[1]!.minorPlayed.push('B040_BreweryPond')
 
-    const scores = computeScores(state)
+    const scores = session.withCtx(() => computeScores(state))
     const cardEntries = scores[1]!.categories.find((category) => category.key === 'cards')!.entries
     expect(cardEntries.map((entry) => entry.score)).toEqual(expect.arrayContaining([4, -1]))
     const constableBonus = scores[1]!.categories

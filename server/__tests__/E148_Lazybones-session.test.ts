@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -52,7 +48,7 @@ describe('E148_Lazybones session', () => {
     expect(response.ok, response.error).toBe(true)
     expect(response.interaction.sourceCard).not.toBe(CARD_ID)
     expect(response.state.players[0]!.cardStates[CARD_ID]?.extraData?.reservedActionSpaces).toEqual(selected)
-    expect(getAvailableStableSupplyCount(response.state, response.state.players[0]!)).toBe(0)
+    expect(session.withCtx(() => getAvailableStableSupplyCount(response.state, response.state.players[0]!))).toBe(0)
     expect(response.state.players[0]!.stableTiles).toEqual([])
     expect(response.state.players[0]!.resources).toEqual(offered.state.players[0]!.resources)
     expect(response.scores).toEqual(offered.scores)
@@ -72,7 +68,7 @@ describe('E148_Lazybones session', () => {
     expect(response.ok, response.error).toBe(true)
     expect(response.interaction.sourceCard).not.toBe(CARD_ID)
     expect(response.state.players[0]!.cardStates[CARD_ID]?.extraData?.reservedActionSpaces).toBeUndefined()
-    expect(getAvailableStableSupplyCount(response.state, response.state.players[0]!)).toBe(4)
+    expect(session.withCtx(() => getAvailableStableSupplyCount(response.state, response.state.players[0]!))).toBe(4)
     expect(response.state.players[0]!.resources).toEqual(offered.state.players[0]!.resources)
     expect(response.scores).toEqual(offered.scores)
   })
@@ -100,7 +96,7 @@ describe('E148_Lazybones session', () => {
       stateId: 'wait', sourceCard: CARD_ID,
       request: { kind: 'choice', multiSelect: { maxSelections: 2 } },
     })
-    expect(getAvailableStableSupplyCount(undone.state, undone.state.players[0]!)).toBe(2)
+    expect(session.withCtx(() => getAvailableStableSupplyCount(undone.state, undone.state.players[0]!))).toBe(2)
     expect(undone.state.players[0]!.cardStates[CARD_ID]?.extraData?.reservedActionSpaces).toBeUndefined()
     const accepted = session.resolveChoice(0, 'lazybones:day-laborer')
     expect(accepted.ok, accepted.error).toBe(true)
@@ -151,12 +147,12 @@ describe('E148_Lazybones session', () => {
     response = session.commitSelectionChoice(0, { stables: tiles })
     expect(response.ok, response.error).toBe(true)
     if (built === 4) {
-      expect(getAvailableStableSupplyCount(response.state, response.state.players[0]!)).toBe(0)
+      expect(session.withCtx(() => getAvailableStableSupplyCount(response.state, response.state.players[0]!))).toBe(0)
       expect(response.state.players[0]!.cardStates[CARD_ID]?.extraData?.reservedActionSpaces).toBeUndefined()
       expect(response.interaction.sourceCard).not.toBe(CARD_ID)
       return
     }
-    expect(getAvailableStableSupplyCount(response.state, response.state.players[0]!)).toBe(3)
+    expect(session.withCtx(() => getAvailableStableSupplyCount(response.state, response.state.players[0]!))).toBe(3)
     expect(response.interaction.request).toMatchObject({ multiSelect: { maxSelections: 3 } })
     expect(response.interaction.request.options.map((option) => option.value)).toEqual(TRIGGER_SPACES)
     const before = structuredClone(response.state.players)
@@ -215,10 +211,10 @@ describe('E148_Lazybones session', () => {
     const state = session.getState().state
     const owner = state.players[0]!
     owner.stableTiles = [{ row: 0, col: 0 }, { row: 0, col: 1 }]
-    const reserveBefore = getAvailableStableSupplyCount(state, owner)
+    const reserveBefore = session.withCtx(() => getAvailableStableSupplyCount(state, owner))
 
-    const effect = getCardEffect(CARD_ID)!
-    const flow = effect.onBuy!(state, owner)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))!
+    const flow = session.withCtx(() => effect.onBuy!(state, owner))
 
     expect(flow?.type).toBe('leaf')
     const leaf = flow as Extract<ActionFlow, { type: 'leaf' }>
@@ -228,10 +224,10 @@ describe('E148_Lazybones session', () => {
     expect(options.map((option) => option.value)).toEqual(TRIGGER_SPACES)
     expect(leaf.params?.multiSelect).toEqual({ valuePrefix: CHOICE_PREFIX, minSelections: 0, maxSelections: 2 })
 
-    effect.resolveChoice!(state, owner, CHOICE_PREFIX)
+    session.withCtx(() => effect.resolveChoice!(state, owner, CHOICE_PREFIX))
 
     expect(owner.cardStates?.[CARD_ID]?.extraData?.reservedActionSpaces).toBeUndefined()
-    expect(getAvailableStableSupplyCount(state, owner)).toBe(reserveBefore)
+    expect(session.withCtx(() => getAvailableStableSupplyCount(state, owner))).toBe(reserveBefore)
   })
 
   it('onBuy returns nothing if dynamic reserve is empty', () => {
@@ -245,7 +241,7 @@ describe('E148_Lazybones session', () => {
       { row: 0, col: 2 }, { row: 0, col: 3 },
     ]
 
-    const flow = getCardEffect(CARD_ID)!.onBuy!(state, owner)
+    const flow = session.withCtx(() => session.withCtx(() => getCardEffect(CARD_ID))!.onBuy!(state, owner))
 
     expect(flow).toBeUndefined()
   })

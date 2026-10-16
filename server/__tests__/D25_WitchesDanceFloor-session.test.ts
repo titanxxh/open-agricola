@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 /**
  * D025_WitchesDanceFloor — comprehensive session-level integration tests.
  *
@@ -67,7 +63,7 @@ describe('D025_WitchesDanceFloor session', () => {
       player.minorPlayed.push(CARD_ID)
 
       expect(
-        meetsCardPrerequisites(player, { prerequisite: '2 Fields' }, state.round, state),
+        session.withCtx(() => meetsCardPrerequisites(player, { prerequisite: '2 Fields' }, state.round, state)),
       ).toBe(true)
     })
 
@@ -79,7 +75,7 @@ describe('D025_WitchesDanceFloor session', () => {
       player.minorPlayed.push(CARD_ID)
 
       expect(
-        meetsCardPrerequisites(player, { prerequisite: '2 Fields' }, state.round, state),
+        session.withCtx(() => meetsCardPrerequisites(player, { prerequisite: '2 Fields' }, state.round, state)),
       ).toBe(false)
     })
   })
@@ -107,7 +103,7 @@ describe('D025_WitchesDanceFloor session', () => {
       player.extraOccupationsFromCards = [CARD_ID]
 
       expect(
-        meetsCardPrerequisites(player, { prerequisite: '3 Occupations' }, state.round, state),
+        session.withCtx(() => meetsCardPrerequisites(player, { prerequisite: '3 Occupations' }, state.round, state)),
       ).toBe(true)
     })
 
@@ -119,7 +115,7 @@ describe('D025_WitchesDanceFloor session', () => {
       player.extraOccupationsFromCards = []
 
       expect(
-        meetsCardPrerequisites(player, { prerequisite: '3 Occupations' }, state.round, state),
+        session.withCtx(() => meetsCardPrerequisites(player, { prerequisite: '3 Occupations' }, state.round, state)),
       ).toBe(false)
     })
   })
@@ -173,7 +169,7 @@ describe('D025_WitchesDanceFloor session', () => {
       player.fields = [] // no real fields
       player.minorPlayed.push(CARD_ID)
 
-      const extras = computeExtraSowableFields(player)
+      const extras = session.withCtx(() => computeExtraSowableFields(player))
       const d25Field = extras.find((f) => f.sourceCard === CARD_ID)
       expect(d25Field).toBeDefined()
       expect(d25Field?.tile).toEqual({ row: -1, col: 4025 })
@@ -186,7 +182,7 @@ describe('D025_WitchesDanceFloor session', () => {
       const state = session.getState().state
       const player = state.players[0]!
 
-      const extras = computeExtraSowableFields(player)
+      const extras = session.withCtx(() => computeExtraSowableFields(player))
       const d25Field = extras.find((f) => f.sourceCard === CARD_ID)
       expect(d25Field).toBeUndefined()
     })
@@ -201,7 +197,7 @@ describe('D025_WitchesDanceFloor session', () => {
       if (!player.cardStates[CARD_ID]) player.cardStates[CARD_ID] = {}
       player.cardStates[CARD_ID].extraData = { cardFieldStacks: [{ crop: 'grain', remaining: 3 }] }
 
-      const extras = computeExtraSowableFields(player)
+      const extras = session.withCtx(() => computeExtraSowableFields(player))
       const d25Field = extras.find((f) => f.sourceCard === CARD_ID)
       expect(d25Field).toBeUndefined()
     })
@@ -213,9 +209,9 @@ describe('D025_WitchesDanceFloor session', () => {
       player.minorPlayed.push(CARD_ID)
       player.resources.grain = 1
 
-      const effect = getCardEffect(CARD_ID)
+      const effect = session.withCtx(() => getCardEffect(CARD_ID))
       expect(effect).toBeDefined()
-      const handled = effect!.onSowExtraField!(player, { row: -1, col: 4025 }, 'grain')
+      const handled = session.withCtx(() => effect!.onSowExtraField!(player, { row: -1, col: 4025 }, 'grain'))
       expect(handled).toBe(true)
 
       expect(player.resources.grain).toBe(0)
@@ -232,8 +228,8 @@ describe('D025_WitchesDanceFloor session', () => {
       player.minorPlayed.push(CARD_ID)
       player.resources.vegetable = 1
 
-      const effect = getCardEffect(CARD_ID)!
-      const handled = effect.onSowExtraField!(player, { row: -1, col: 4025 }, 'vegetable')
+      const effect = session.withCtx(() => getCardEffect(CARD_ID))!
+      const handled = session.withCtx(() => effect.onSowExtraField!(player, { row: -1, col: 4025 }, 'vegetable'))
       expect(handled).toBe(true)
 
       expect(player.resources.vegetable).toBe(0)
@@ -250,8 +246,8 @@ describe('D025_WitchesDanceFloor session', () => {
       player.minorPlayed.push(CARD_ID)
       player.resources.grain = 1
 
-      const effect = getCardEffect(CARD_ID)!
-      const handled = effect.onSowExtraField!(player, { row: 0, col: 0 }, 'grain')
+      const effect = session.withCtx(() => getCardEffect(CARD_ID))!
+      const handled = session.withCtx(() => effect.onSowExtraField!(player, { row: 0, col: 0 }, 'grain'))
       expect(handled).toBe(false)
     })
   })
@@ -268,7 +264,7 @@ describe('D025_WitchesDanceFloor session', () => {
       if (!player.cardStates[CARD_ID]) player.cardStates[CARD_ID] = {}
       player.cardStates[CARD_ID].extraData = { cardFieldStacks: [{ crop: 'grain', remaining: 3 }] }
 
-      reap(state, player)
+      session.withCtx(() => reap(state, player))
 
       expect(player.resources.grain).toBe(1)
       const stacks = player.cardStates[CARD_ID]?.extraData?.cardFieldStacks as
@@ -291,7 +287,7 @@ describe('D025_WitchesDanceFloor session', () => {
       player.cardStates[CARD_ID].extraData = { cardFieldStacks: [{ crop: 'vegetable', remaining: 2 }] }
 
       // First harvest
-      reap(state, player)
+      session.withCtx(() => reap(state, player))
       expect(player.resources.vegetable).toBe(1)
       const afterFirst = player.cardStates[CARD_ID]?.extraData?.cardFieldStacks as
         | { crop: string; remaining: number }[]
@@ -299,7 +295,7 @@ describe('D025_WitchesDanceFloor session', () => {
       expect(afterFirst).toEqual([{ crop: 'vegetable', remaining: 1 }])
 
       // Second harvest
-      reap(state, player)
+      session.withCtx(() => reap(state, player))
       expect(player.resources.vegetable).toBe(2)
       const afterSecond = player.cardStates[CARD_ID]?.extraData?.cardFieldStacks
       expect(afterSecond).toEqual([null])
@@ -387,7 +383,7 @@ describe('D025_WitchesDanceFloor session', () => {
       if (!state.availableMajorImprovements.includes('Major_CookingHearth1')) {
         state.availableMajorImprovements.push('Major_CookingHearth1')
       }
-      expect(isMajorImprovementPlayable(state, player, 'Major_CookingHearth1')).toBe(true)
+      expect(session.withCtx(() => isMajorImprovementPlayable(state, player, 'Major_CookingHearth1'))).toBe(true)
     })
   })
 
@@ -412,7 +408,8 @@ describe('D025_WitchesDanceFloor session', () => {
       player.playedCards.push(`minor:${CARD_ID}`)
       session.loadState(state)
 
-      const summaries = computeScores(session.getState().state)
+      const scoringState = session.getState().state
+      const summaries = session.withCtx(() => computeScores(scoringState))
       const p0Summary = summaries[0]!
       const fieldsCat = p0Summary.categories.find((c) => c.key === 'fields')
       expect(fieldsCat).toBeDefined()
@@ -431,7 +428,8 @@ describe('D025_WitchesDanceFloor session', () => {
       player.playedCards.push(`minor:${CARD_ID}`)
       session.loadState(state)
 
-      const summaries = computeScores(session.getState().state)
+      const scoringState = session.getState().state
+      const summaries = session.withCtx(() => computeScores(scoringState))
       const p0Summary = summaries[0]!
       const cardsCat = p0Summary.categories.find((c) => c.key === 'cards')
       expect(cardsCat).toBeDefined()

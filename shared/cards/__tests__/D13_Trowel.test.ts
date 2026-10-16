@@ -1,7 +1,6 @@
-import { installOfficialCardRegistry } from './card-environment'
-
-installOfficialCardRegistry()
-
+import { withActiveRegistry } from '../active-registry'
+import { createOfficialCardRegistry } from './card-environment'
+import type { CardRegistry } from '../registry'
 import { describe, expect, it } from 'vitest'
 import { getRegisteredCardListeners, executeCardListener } from '../card-listeners'
 import type { CardListenerContext } from '../card-listeners'
@@ -12,8 +11,8 @@ import '../D/D013_Trowel'
 
 const CARD_ID = 'D013_Trowel'
 
-const findListener = (id: string) =>
-  getRegisteredCardListeners().find((l) => l.id === id)
+const findListener = (registry: CardRegistry, id: string) =>
+  withActiveRegistry(registry, () => getRegisteredCardListeners().find((l) => l.id === id))
 
 const baseResources = () => ({
   wood: 0, clay: 0, reed: 0, stone: 0, food: 0,
@@ -51,16 +50,18 @@ const createState = (...players: PlayerState[]): GameState =>
 
 describe('D013_Trowel listener wiring', () => {
   it('anytime listener emits a renovate-house leaf with params.selectedOption=stone', () => {
-    const listener = findListener('D13-trowel-anytime')
+    const registry = createOfficialCardRegistry()
+    const listener = findListener(registry, 'D13-trowel-anytime')
     expect(listener).toBeDefined()
     const player = createPlayer({ houseType: 'wood' })
     const state = createState(player)
-    const result = executeCardListener(listener!, {
+    const result = withActiveRegistry(registry, () => executeCardListener(listener!, {
+      actionHooks: undefined,
       state,
       player,
       actionId: 'anytime',
       phase: 'anytime',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
     expect(result?.flow).toBeDefined()
     expect(result!.flow!.type).toBe('leaf')
     if (result!.flow!.type !== 'leaf') return
@@ -70,94 +71,106 @@ describe('D013_Trowel listener wiring', () => {
   })
 
   it('anytime listener is silent when houseType is already stone', () => {
-    const listener = findListener('D13-trowel-anytime')!
+    const registry = createOfficialCardRegistry()
+    const listener = findListener(registry, 'D13-trowel-anytime')!
     const player = createPlayer({ houseType: 'stone' })
     const state = createState(player)
-    const result = executeCardListener(listener, {
+    const result = withActiveRegistry(registry, () => executeCardListener(listener, {
+      actionHooks: undefined,
       state,
       player,
       actionId: 'anytime',
       phase: 'anytime',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
     expect(result).toBeUndefined()
   })
 
   it('computeChoiceCandidates injects stone target on a wood house when sourceCard matches', () => {
-    const listener = findListener('D13-trowel-add-stone-renovation-target')
+    const registry = createOfficialCardRegistry()
+    const listener = findListener(registry, 'D13-trowel-add-stone-renovation-target')
     expect(listener).toBeDefined()
     const player = createPlayer({ houseType: 'wood' })
     const state = createState(player)
-    const result = executeCardListener(listener!, {
+    const result = withActiveRegistry(registry, () => executeCardListener(listener!, {
+      actionHooks: undefined,
       state,
       player,
       actionId: 'renovate-house',
       phase: 'computeChoiceCandidates',
       sourceCard: CARD_ID,
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
     expect(result?.extraOptions?.[0]?.value).toBe('stone')
     expect(result?.extraOptions?.[0]?.sourceCard).toBe(CARD_ID)
   })
 
   it('computeChoiceCandidates is silent without D13 sourceCard', () => {
-    const listener = findListener('D13-trowel-add-stone-renovation-target')!
+    const registry = createOfficialCardRegistry()
+    const listener = findListener(registry, 'D13-trowel-add-stone-renovation-target')!
     const player = createPlayer({ houseType: 'wood' })
     const state = createState(player)
-    const result = executeCardListener(listener, {
+    const result = withActiveRegistry(registry, () => executeCardListener(listener, {
+      actionHooks: undefined,
       state,
       player,
       actionId: 'renovate-house',
       phase: 'computeChoiceCandidates',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
     expect(result).toBeUndefined()
   })
 
   it('computeCosts on wood + selectedOption=stone returns the food/reed delta', () => {
-    const listener = findListener('D13-trowel-compute-costs-renovation')
+    const registry = createOfficialCardRegistry()
+    const listener = findListener(registry, 'D13-trowel-compute-costs-renovation')
     expect(listener).toBeDefined()
     const player = createPlayer({ houseType: 'wood', rooms: 2 })
     const state = createState(player)
-    const result = executeCardListener(listener!, {
+    const result = withActiveRegistry(registry, () => executeCardListener(listener!, {
+      actionHooks: undefined,
       state,
       player,
       actionId: 'renovate-house',
       phase: 'computeCosts',
       sourceCard: CARD_ID,
       params: { selectedOption: 'stone' },
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
     expect(result?.bonuses).toEqual([
       { discount: { food: -2, reed: -1 }, optional: false, sources: [CARD_ID] },
     ])
   })
 
   it('computeCosts on clay + selectedOption=stone waives the reed fee', () => {
-    const listener = findListener('D13-trowel-compute-costs-renovation')!
+    const registry = createOfficialCardRegistry()
+    const listener = findListener(registry, 'D13-trowel-compute-costs-renovation')!
     const player = createPlayer({ houseType: 'clay', rooms: 2 })
     const state = createState(player)
-    const result = executeCardListener(listener, {
+    const result = withActiveRegistry(registry, () => executeCardListener(listener, {
+      actionHooks: undefined,
       state,
       player,
       actionId: 'renovate-house',
       phase: 'computeCosts',
       sourceCard: CARD_ID,
       params: { selectedOption: 'stone' },
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
     expect(result?.bonuses).toEqual([
       { discount: { reed: 1 }, optional: false, sources: [CARD_ID] },
     ])
   })
 
   it('computeCosts on selectedOption=clay returns a prohibitive cost (filters the clay option out)', () => {
-    const listener = findListener('D13-trowel-compute-costs-renovation')!
+    const registry = createOfficialCardRegistry()
+    const listener = findListener(registry, 'D13-trowel-compute-costs-renovation')!
     const player = createPlayer({ houseType: 'wood', rooms: 2 })
     const state = createState(player)
-    const result = executeCardListener(listener, {
+    const result = withActiveRegistry(registry, () => executeCardListener(listener, {
+      actionHooks: undefined,
       state,
       player,
       actionId: 'renovate-house',
       phase: 'computeCosts',
       sourceCard: CARD_ID,
       params: { selectedOption: 'clay' },
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
     expect(result?.costs).toBeDefined()
     const clayCost = (result!.costs!.clay ?? 0)
     const reedCost = (result!.costs!.reed ?? 0)
@@ -166,16 +179,18 @@ describe('D013_Trowel listener wiring', () => {
   })
 
   it('computeCosts is silent without D13 sourceCard', () => {
-    const listener = findListener('D13-trowel-compute-costs-renovation')!
+    const registry = createOfficialCardRegistry()
+    const listener = findListener(registry, 'D13-trowel-compute-costs-renovation')!
     const player = createPlayer({ houseType: 'wood', rooms: 2 })
     const state = createState(player)
-    const result = executeCardListener(listener, {
+    const result = withActiveRegistry(registry, () => executeCardListener(listener, {
+      actionHooks: undefined,
       state,
       player,
       actionId: 'renovate-house',
       phase: 'computeCosts',
       params: { selectedOption: 'stone' },
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
     expect(result).toBeUndefined()
   })
 })

@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { E043_BarnCats } from '../../shared/cards/E/E043_BarnCats'
@@ -13,7 +9,7 @@ describe('E043_BarnCats prerequisite', () => {
     const state = session.getState().state
     const player = state.players[0]!
     player.stableTiles = []
-    expect(meetsCardPrerequisites(player, E043_BarnCats, state.round, state)).toBe(false)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, E043_BarnCats, state.round, state))).toBe(false)
   })
 
   it('allows when player has at least 1 stable', () => {
@@ -21,7 +17,7 @@ describe('E043_BarnCats prerequisite', () => {
     const state = session.getState().state
     const player = state.players[0]!
     player.stableTiles = [{ row: 0, col: 4 }]
-    expect(meetsCardPrerequisites(player, E043_BarnCats, state.round, state)).toBe(true)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, E043_BarnCats, state.round, state))).toBe(true)
   })
 
   it('allows when the only stable is the B85 FarmHand stable (card-facing count)', () => {
@@ -33,6 +29,6 @@ describe('E043_BarnCats prerequisite', () => {
     player.cardStates = {
       B085_FarmHand: { extraData: { position: { row: 0, col: 0 } } },
     }
-    expect(meetsCardPrerequisites(player, E043_BarnCats, state.round, state)).toBe(true)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, E043_BarnCats, state.round, state))).toBe(true)
   })
 })

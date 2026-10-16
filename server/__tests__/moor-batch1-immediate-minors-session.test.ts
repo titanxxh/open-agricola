@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
@@ -110,8 +106,8 @@ const playMinor = (session: GameSession, cardId: string, expectGain = true) => {
   return resp
 }
 
-const bonusVp = (state: GameState, playerIndex = 0) =>
-  Scoring.breakdown(state, playerIndex).categories.find((category) => category.key === 'cardBonusVp')?.total ?? 0
+const bonusVp = (session: GameSession, state: GameState, playerIndex = 0) =>
+  session.withCtx(() => Scoring.breakdown(state, playerIndex)).categories.find((category) => category.key === 'cardBonusVp')?.total ?? 0
 
 describe('Moor Batch 1 immediate resource minors', () => {
   it('M019 Lawn Turf gives fuel from unused spaces and requires 4 improvements', () => {
@@ -121,7 +117,7 @@ describe('Moor Batch 1 immediate resource minors', () => {
     player.improvements = ['Major_Well', 'Major_Joinery']
     player.minorPlayed = ['A001_Shelter', 'A002_PieceOfLand']
     fillToUnused(player, 7)
-    expect(meetsCardPrerequisites(player, M019_LawnTurf, session.state.round, session.state)).toBe(true)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, M019_LawnTurf, session.state.round, session.state))).toBe(true)
 
     const resp = playMinor(session, 'M019_LawnTurf')
 
@@ -131,7 +127,7 @@ describe('Moor Batch 1 immediate resource minors', () => {
     const blockedPlayer = blocked.state.players[0]!
     blockedPlayer.improvements = ['Major_Well']
     blockedPlayer.minorPlayed = ['A001_Shelter', 'A002_PieceOfLand']
-    expect(meetsCardPrerequisites(blockedPlayer, M019_LawnTurf, blocked.state.round, blocked.state)).toBe(false)
+    expect(blocked.withCtx(() => meetsCardPrerequisites(blockedPlayer, M019_LawnTurf, blocked.state.round, blocked.state))).toBe(false)
   })
 
   it('M020 Peat Pellets gives one fuel per visible moor and requires a major', () => {
@@ -147,7 +143,7 @@ describe('Moor Batch 1 immediate resource minors', () => {
 
     const blocked = setup()
     blocked.state.players[0]!.minorHand = ['M020_PeatPellets']
-    expect(meetsCardPrerequisites(blocked.state.players[0]!, M020_PeatPellets, blocked.state.round, blocked.state)).toBe(false)
+    expect(blocked.withCtx(() => meetsCardPrerequisites(blocked.state.players[0]!, M020_PeatPellets, blocked.state.round, blocked.state))).toBe(false)
   })
 
   it('M022 Ecological Niche rewards unique animals, crops, forests, and moors only without ties', () => {
@@ -236,7 +232,7 @@ describe('Moor Batch 1 immediate resource minors', () => {
     player.resources.food = 1
     player.stableTiles = [{ row: 0, col: 0 }]
     fillToUnused(player, 10)
-    expect(meetsCardPrerequisites(player, M025_HouseholdInventory, session.state.round, session.state)).toBe(true)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, M025_HouseholdInventory, session.state.round, session.state))).toBe(true)
 
     const resp = playMinor(session, 'M025_HouseholdInventory')
 
@@ -250,7 +246,7 @@ describe('Moor Batch 1 immediate resource minors', () => {
     })
 
     const blocked = setup()
-    expect(meetsCardPrerequisites(blocked.state.players[0]!, M025_HouseholdInventory, blocked.state.round, blocked.state)).toBe(false)
+    expect(blocked.withCtx(() => meetsCardPrerequisites(blocked.state.players[0]!, M025_HouseholdInventory, blocked.state.round, blocked.state))).toBe(false)
   })
 
   it('M026 Chimney Hood gives the best one-grain bake yield without spending grain', () => {
@@ -301,7 +297,7 @@ describe('Moor Batch 1 immediate resource minors', () => {
     player.minorHand = ['M029_Tinker']
     player.resources.food = 1
     player.improvements = ['Major_Well', 'Major_ClayOven', 'Major_Pottery']
-    expect(meetsCardPrerequisites(player, M029_Tinker, session.state.round, session.state)).toBe(true)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, M029_Tinker, session.state.round, session.state))).toBe(true)
 
     const resp = playMinor(session, 'M029_Tinker')
 
@@ -316,7 +312,7 @@ describe('Moor Batch 1 immediate resource minors', () => {
     blocked.state.players[0]!.improvements = ['Major_Well', 'Major_ClayOven', 'Major_StoneOven']
     blocked.state.players[0]!.minorHand = ['M029_Tinker']
     blocked.state.players[0]!.resources.food = 1
-    expect(meetsCardPrerequisites(blocked.state.players[0]!, M029_Tinker, blocked.state.round, blocked.state)).toBe(true)
+    expect(blocked.withCtx(() => meetsCardPrerequisites(blocked.state.players[0]!, M029_Tinker, blocked.state.round, blocked.state))).toBe(true)
 
     const noReward = playMinor(blocked, 'M029_Tinker', false)
     expect(noReward.state.players[0]!.resources).toMatchObject({
@@ -338,16 +334,16 @@ describe('Moor Batch 1 immediate resource minors', () => {
       terrain(0, 2, 'forest'),
       terrain(0, 3, 'forest'),
     ]
-    expect(meetsCardPrerequisites(player, M065_FireBrigade, session.state.round, session.state)).toBe(true)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, M065_FireBrigade, session.state.round, session.state))).toBe(true)
 
     const resp = playMinor(session, 'M065_FireBrigade')
 
     expect(resp.state.players[0]!.resources.food).toBe(6)
-    expect(bonusVp(resp.state)).toBe(3)
+    expect(bonusVp(session, resp.state)).toBe(3)
 
     const blocked = setup()
     blocked.state.players[0]!.resources = { ...baseResources(), food: 4, fuel: 3 }
-    expect(meetsCardPrerequisites(blocked.state.players[0]!, M065_FireBrigade, blocked.state.round, blocked.state)).toBe(false)
+    expect(blocked.withCtx(() => meetsCardPrerequisites(blocked.state.players[0]!, M065_FireBrigade, blocked.state.round, blocked.state))).toBe(false)
   })
 
   it('M080 Advance Payment gives all printed resources once', () => {
@@ -377,7 +373,7 @@ describe('Moor Batch 1 immediate resource minors', () => {
     player.minorPlayed = ['A001_Shelter']
     player.stableTiles = [{ row: 0, col: 0 }]
     other.pastures = [pasture([{ row: 0, col: 1 }])]
-    expect(meetsCardPrerequisites(player, M100_Pheromones, session.state.round, session.state)).toBe(true)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, M100_Pheromones, session.state.round, session.state))).toBe(true)
 
     const resp = playMinor(session, 'M100_Pheromones')
 
@@ -387,6 +383,6 @@ describe('Moor Batch 1 immediate resource minors', () => {
     const blocked = setup()
     blocked.state.players[0]!.improvements = ['Major_Well', 'Major_Joinery']
     blocked.state.players[0]!.minorPlayed = ['A001_Shelter']
-    expect(meetsCardPrerequisites(blocked.state.players[0]!, M100_Pheromones, blocked.state.round, blocked.state)).toBe(false)
+    expect(blocked.withCtx(() => meetsCardPrerequisites(blocked.state.players[0]!, M100_Pheromones, blocked.state.round, blocked.state))).toBe(false)
   })
 })

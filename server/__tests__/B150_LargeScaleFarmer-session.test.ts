@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -176,17 +172,17 @@ describe('B150_LargeScaleFarmer session', () => {
     const s = session.getState().state
     const placedSpace = s.actionSpaces.find((x) => x.id === 'major-improvement')!
     placedSpace.takenBy = [{ playerId: s.players[0]!.id, workerId: '1' }]
-    const listener = getRegisteredCardListeners().find(
+    const listener = session.withCtx(() => getRegisteredCardListeners()).find(
       (l) => l.id === 'B150-large-scale-farmer-after-place-farmer',
     )!
-    const result = executeCardListener(listener, {
+    const result = session.withCtx(() => executeCardListener(listener, {
       actionHooks: session.actionHooks,
       state: s,
       player: s.players[0]!,
       space: placedSpace,
       actionId: 'place-farmer',
       phase: 'after',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
     expect(result).toBeUndefined()
   })
 
@@ -198,17 +194,17 @@ describe('B150_LargeScaleFarmer session', () => {
     const s = session.getState().state
     const placedSpace = s.actionSpaces.find((x) => x.id === 'major-improvement')!
     placedSpace.takenBy = [{ playerId: s.players[0]!.id, workerId: '1' }]
-    const listener = getRegisteredCardListeners().find(
+    const listener = session.withCtx(() => getRegisteredCardListeners()).find(
       (l) => l.id === 'B150-large-scale-farmer-after-place-farmer',
     )!
-    const result = executeCardListener(listener, {
+    const result = session.withCtx(() => executeCardListener(listener, {
       actionHooks: session.actionHooks,
       state: s,
       player: s.players[0]!,
       space: placedSpace,
       actionId: 'place-farmer',
       phase: 'after',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
     expect(result).toBeUndefined()
   })
 
@@ -221,17 +217,17 @@ describe('B150_LargeScaleFarmer session', () => {
     const s = session.getState().state
     const placedSpace = s.actionSpaces.find((x) => x.id === 'major-improvement')!
     placedSpace.takenBy = [{ playerId: s.players[0]!.id, workerId: '1' }]
-    const listener = getRegisteredCardListeners().find(
+    const listener = session.withCtx(() => getRegisteredCardListeners()).find(
       (l) => l.id === 'B150-large-scale-farmer-after-place-farmer',
     )!
-    const result = executeCardListener(listener, {
+    const result = session.withCtx(() => executeCardListener(listener, {
       actionHooks: session.actionHooks,
       state: s,
       player: s.players[0]!,
       space: placedSpace,
       actionId: 'place-farmer',
       phase: 'after',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
     expect(result).toBeDefined()
     expect(result!.sourceCard).toBe(CARD_ID)
     const flow = result!.flow as Extract<ActionFlow, { type: 'seq' }>

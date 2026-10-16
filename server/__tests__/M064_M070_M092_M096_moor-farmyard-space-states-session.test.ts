@@ -1,7 +1,4 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
+import type { GameSession as SessionRuleOwner } from '../game/authoritative-session'
 import { describe, expect, it } from 'vitest'
 
 import { GameSession } from '../game/authoritative-session'
@@ -116,8 +113,8 @@ const skipOptionalAction = (
   return session.resolveChoice(resp.interaction.playerIndex ?? 0, '__skip__')
 }
 
-const cardBonusVp = (state: GameState) =>
-  Scoring.breakdown(state, 0).categories.find((category) => category.key === 'cardBonusVp')?.total ?? 0
+const cardBonusVp = (ruleOwner: SessionRuleOwner, state: GameState) =>
+  ruleOwner.withCtx(() => Scoring.breakdown(state, 0)).categories.find((category) => category.key === 'cardBonusVp')?.total ?? 0
 
 const setupPlayed = (
   cardIds: string[],
@@ -209,7 +206,7 @@ describe('Moor farmyard space states', () => {
       blocksPlacement: true,
     })
     expect(getUsedFarmyardTileKeys(player)).toContain(positionKey(target))
-    expect(cardBonusVp(resp.state)).toBe(1)
+    expect(cardBonusVp(session, resp.state)).toBe(1)
   })
 
   it('M064 can skip placing the optional tombstone', () => {
@@ -219,7 +216,7 @@ describe('Moor farmyard space states', () => {
 
     expect(resp.ok).toBe(true)
     expect(player.farmyardSpaceStates ?? []).toEqual([])
-    expect(cardBonusVp(resp.state)).toBe(0)
+    expect(cardBonusVp(session, resp.state)).toBe(0)
   })
 
   it('M070 can spend a fence after Cut Peat to block and score the emptied space', () => {
@@ -239,7 +236,7 @@ describe('Moor farmyard space states', () => {
     })
     expect(player.supplyTokensConsumed?.fence).toBe(1)
     expect(getUsedFarmyardTileKeys(player)).toContain(positionKey(target))
-    expect(cardBonusVp(resp.state)).toBe(1)
+    expect(cardBonusVp(session, resp.state)).toBe(1)
   })
 
   it('M092 stores fuel and food on the emptied peat space until that space is used', () => {

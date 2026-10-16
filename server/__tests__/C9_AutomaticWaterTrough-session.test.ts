@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
@@ -30,9 +26,9 @@ describe('C009_AutomaticWaterTrough session', () => {
     player.stableAnimals = {}
     session.loadState(state)
 
-    const effect = getCardEffect(CARD_ID)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
     expect(effect).toBeDefined()
-    const flow = effect!.onBuy!(state, player)
+    const flow = session.withCtx(() => effect!.onBuy!(state, player))
     expect(flow).toBeUndefined()
   })
 
@@ -47,8 +43,8 @@ describe('C009_AutomaticWaterTrough session', () => {
     player.houseAnimals = {};
     session.loadState(state)
 
-    const effect = getCardEffect(CARD_ID)
-    const flow = effect!.onBuy!(state, player) as ActionFlow
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
+    const flow = session.withCtx(() => effect!.onBuy!(state, player)) as ActionFlow
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('xor')
     const xor = flow as Extract<ActionFlow, { type: 'xor' }>
@@ -72,8 +68,8 @@ describe('C009_AutomaticWaterTrough session', () => {
     player.resources.sheep = 1
     session.loadState(state)
 
-    const effect = getCardEffect(CARD_ID)
-    const flow = effect!.onBuy!(state, player)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
+    const flow = session.withCtx(() => effect!.onBuy!(state, player))
     expect(flow).toBeUndefined()
   })
 
@@ -99,8 +95,8 @@ describe('C009_AutomaticWaterTrough session', () => {
     player.houseAnimals = Object.fromEntries(player.roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, 'boar']));
     session.loadState(state)
 
-    const effect = getCardEffect(CARD_ID)
-    const flow = effect!.onBuy!(state, player) as ActionFlow
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
+    const flow = session.withCtx(() => effect!.onBuy!(state, player)) as ActionFlow
     expect(flow).toBeDefined()
     expect(flow.type).toBe('xor')
     const xor = flow as Extract<ActionFlow, { type: 'xor' }>

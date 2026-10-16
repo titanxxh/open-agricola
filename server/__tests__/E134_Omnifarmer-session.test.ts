@@ -1,7 +1,5 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
+import { withActiveRegistry } from '../../shared/cards/active-registry'
+import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
 import { type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
 
@@ -69,11 +67,12 @@ describe('E134_Omnifarmer session', () => {
       [['grain', 'vegetable', 'sheep', 'boar'], 7],
       [['grain', 'vegetable', 'sheep', 'boar', 'cattle'], 9],
     ])('scores stored goods %#', (stored, expected) => {
+    const ruleRegistry = createOfficialCardRegistry()
       const player = createPlayer()
       player.occupationPlayed = [CARD_ID]
       setStored(player, stored)
 
-      const [result] = computeScores(createState(player))
+      const [result] = withActiveRegistry(ruleRegistry, () => computeScores(createState(player)))
       const bonusCat = result.categories.find(c => c.key === 'cardBonusVp')
       expect(bonusCat?.total ?? 0).toBe(expected)
     })

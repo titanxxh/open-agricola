@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
@@ -59,9 +55,9 @@ const playMinor = (session: GameSession): SessionResponse => {
   return response
 }
 
-const printedVp = (response: SessionResponse) => {
+const printedVp = (session: GameSession, response: SessionResponse) => {
   const player = response.state.players[0]!
-  return computeScores(response.state).find((summary) => summary.playerId === player.id)!
+  return session.withCtx(() => computeScores(response.state)).find((summary) => summary.playerId === player.id)!
     .categories.find((category) => category.key === 'cards')!.entries
     .find((entry) => 'cardId' in entry && entry.cardId === CARD_ID)?.score
 }
@@ -79,11 +75,12 @@ const takeSpace = (session: GameSession, playerIndex: number, spaceId: string) =
 
 describe('B040 Brewery Pond parity', () => {
   it('B040 S1: two occupations allow playing Brewery Pond for minus one point', () => {
-    const response = playMinor(setup())
+    const session = setup()
+    const response = playMinor(session)
 
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.minorPlayed).toContain(CARD_ID)
-    expect(printedVp(response)).toBe(-1)
+    expect(printedVp(session, response)).toBe(-1)
   })
 
   it('B040 S2: fewer than two occupations keep Brewery Pond unavailable', () => {

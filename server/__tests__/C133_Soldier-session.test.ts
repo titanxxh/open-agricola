@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import '../../shared/cards/C/C133_Soldier'
@@ -120,7 +116,7 @@ describe('C133_Soldier before-end scoring choice', () => {
     expect(resp.state.gameOver).toBe(true)
     expect(resp.interaction.stateId).toBe('gameover')
 
-    const [score] = computeScores(resp.state)
+    const [score] = session.withCtx(() => computeScores(resp.state))
     expect(score!.categories.find((category) => category.key === 'cardBonusVp')).toEqual(
       expect.objectContaining({
         total: 1,
@@ -158,7 +154,7 @@ describe('C133_Soldier before-end scoring choice', () => {
     expect(resp.state.players[0]!.resources.stone).toBe(2)
     expect(resp.state.gameOver).toBe(true)
 
-    const [score] = computeScores(resp.state)
+    const [score] = session.withCtx(() => computeScores(resp.state))
     expect(score!.categories.find((category) => category.key === 'cardBonusVp')).toBeUndefined()
   })
 
@@ -230,7 +226,7 @@ describe('C133_Soldier before-end scoring choice', () => {
     })
     expect(resp.state.gameOver).toBe(true)
 
-    const [score] = computeScores(resp.state)
+    const [score] = session.withCtx(() => computeScores(resp.state))
     expect(score!.categories.find((category) => category.key === 'cardBonusVp')).toEqual(
       expect.objectContaining({
         total: 4,
@@ -308,16 +304,17 @@ describe('C133 Soldier parity', () => {
     return session
   }
 
-  const cardBonusEntries = (response: SessionResponse) =>
-    computeScores(response.state)[0]!.categories
+  const cardBonusEntries = (session: GameSession, response: SessionResponse) =>
+    session.withCtx(() => computeScores(response.state))[0]!.categories
       .find((category) => category.key === 'cardBonusVp')?.entries ?? []
 
   it('C133 S5: without a complete wood and stone pair Soldier gives no scoring choice', () => {
-    const response = setup({ wood: 3, stone: 0 }).invokeAfterRoundEnd()
+    const session = setup({ wood: 3, stone: 0 })
+    const response = session.invokeAfterRoundEnd()
 
     expect(response.ok, response.error).toBe(true)
     expect(response.state.gameOver).toBe(true)
     expect(response.interaction.stateId).toBe('gameover')
-    expect(cardBonusEntries(response).some((entry) => entry.cardId === CARD_ID)).toBe(false)
+    expect(cardBonusEntries(session, response).some((entry) => entry.cardId === CARD_ID)).toBe(false)
   })
 })

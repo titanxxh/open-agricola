@@ -1,7 +1,5 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
+import { withActiveRegistry } from '../../shared/cards/active-registry'
+import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -62,8 +60,9 @@ describe('C105_BasketCarrier — reverse trade metadata', () => {
   })
 
   it('appears in harvest window', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     const player = makePlayer({ occupationPlayed: [CARD_ID] })
-    const trades = getExchangesInWindow(player, 'harvest')
+    const trades = withActiveRegistry(ruleRegistry, () => getExchangesInWindow(player, 'harvest'))
     expect(trades).toHaveLength(1)
     expect(trades[0]!.from.food).toBe(2)
   })

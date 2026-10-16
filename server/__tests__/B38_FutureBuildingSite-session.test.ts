@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { getFarmyardTilePositions } from '../../shared/domain/farm'
@@ -66,7 +62,7 @@ const setup = (opts: { withCard?: boolean; locked?: FarmTilePosition[] } = {}) =
 
 const vpForCards = (session: GameSession) => {
   const state = session.getState().state
-  const scores = computeScores(state)
+  const scores = session.withCtx(() => computeScores(state))
   const summary = scores.find((s) => s.playerId === state.players[0]!.id)!
   return summary.categories.find((c) => c.key === 'cards')?.total ?? 0
 }
@@ -280,7 +276,7 @@ describe('B38 FutureBuildingSite — session', () => {
 
     // More precisely, check the entry
     const state = session.getState().state
-    const scores = computeScores(state)
+    const scores = session.withCtx(() => computeScores(state))
     const summary = scores.find((s) => s.playerId === state.players[0]!.id)!
     const cardsCat = summary.categories.find((c) => c.key === 'cards')!
     const b38Entry = cardsCat.entries.find(
@@ -296,7 +292,7 @@ describe('B38 FutureBuildingSite — session', () => {
       const state = session.getState().state
       state.round = 5
       const player = state.players[0]!
-      expect(meetsCardPrerequisites(player, B038_FutureBuildingSite, state.round, state)).toBe(false)
+      expect(session.withCtx(() => meetsCardPrerequisites(player, B038_FutureBuildingSite, state.round, state))).toBe(false)
     })
 
     it('allows when round <= 4', () => {
@@ -304,7 +300,7 @@ describe('B38 FutureBuildingSite — session', () => {
       const state = session.getState().state
       state.round = 4
       const player = state.players[0]!
-      expect(meetsCardPrerequisites(player, B038_FutureBuildingSite, state.round, state)).toBe(true)
+      expect(session.withCtx(() => meetsCardPrerequisites(player, B038_FutureBuildingSite, state.round, state))).toBe(true)
     })
   })
 })
@@ -387,20 +383,21 @@ describe('B038 Future Building Site parity', () => {
   const storedLocked = (response: SessionResponse): FarmTilePosition[] =>
     response.state.players[0]!.cardStates?.[CARD_ID]?.extraData?.locked as FarmTilePosition[] ?? []
 
-  const cardScore = (response: SessionResponse) => {
+  const cardScore = (session: GameSession, response: SessionResponse) => {
     const player = response.state.players[0]!
-    const summary = computeScores(response.state).find((entry) => entry.playerId === player.id)!
+    const summary = session.withCtx(() => computeScores(response.state)).find((entry) => entry.playerId === player.id)!
     const cards = summary.categories.find((category) => category.key === 'cards')!
     return cards.entries.find((entry) => 'cardId' in entry && entry.cardId === CARD_ID)?.score ?? 0
   }
 
   it('B038 S1: round four plays Future Building Site, locks adjacent empty spaces, and scores three points', () => {
-    const response = playMinor(setup({ played: false }))
+    const session = setup({ played: false })
+    const response = playMinor(session)
 
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.minorPlayed).toContain(CARD_ID)
     expect(new Set(storedLocked(response).map(positionKey))).toEqual(new Set(LOCKED.map(positionKey)))
-    expect(cardScore(response)).toBe(3)
+    expect(cardScore(session, response)).toBe(3)
   })
 
   it('B038 S8: after every non-locked farm space is used, a formerly locked space can be plowed', () => {

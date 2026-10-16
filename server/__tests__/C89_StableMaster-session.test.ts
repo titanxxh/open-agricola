@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 
@@ -40,7 +36,7 @@ describe('C089_StableMaster session', () => {
     player.stableTiles.push({ row: 0, col: 2 })
     // No pastures covering this tile, so it's unfenced
 
-    const zones = computeAnimalZones(player)
+    const zones = session.withCtx(() => computeAnimalZones(player))
     const stableZone = zones.find(z => z.zoneType === 'stable')
     expect(stableZone).toBeDefined()
     expect(stableZone!.capacity).toBe(3) // 1 + 2
@@ -55,7 +51,7 @@ describe('C089_StableMaster session', () => {
     player.stableTiles.push({ row: 0, col: 2 })
     player.stableTiles.push({ row: 0, col: 3 })
 
-    const zones = computeAnimalZones(player)
+    const zones = session.withCtx(() => computeAnimalZones(player))
     const stableZones = zones.filter(z => z.zoneType === 'stable')
     expect(stableZones.length).toBe(2)
 
@@ -71,7 +67,7 @@ describe('C089_StableMaster session', () => {
     const player = state.players[0]!
 
     // No stables at all
-    const zones = computeAnimalZones(player)
+    const zones = session.withCtx(() => computeAnimalZones(player))
     const stableZones = zones.filter(z => z.zoneType === 'stable')
     expect(stableZones.length).toBe(0)
   })
@@ -88,7 +84,7 @@ describe('C089_StableMaster session', () => {
     player.stableTiles.push({ row: 0, col: 2 })
     session.loadState(state)
 
-    const zones = computeAnimalZones(player)
+    const zones = session.withCtx(() => computeAnimalZones(player))
     const stableZone = zones.find(z => z.zoneType === 'stable')
     expect(stableZone).toBeDefined()
     expect(stableZone!.capacity).toBe(1) // default, no bonus
@@ -106,7 +102,7 @@ describe('C089_StableMaster session', () => {
     player.resources.wood = 1
     session.loadState(state)
 
-    const flow = runCardEffectHook(state, player, 'C089_StableMaster', 'onBuy')
+    const flow = session.withCtx(() => runCardEffectHook(state, player, 'C089_StableMaster', 'onBuy'))
     expect(flow).not.toBeNull()
     const leaf = flow as Extract<ActionFlow, { type: 'leaf' }>
     expect(leaf.type).toBe('leaf')
@@ -135,7 +131,7 @@ describe('C089_StableMaster session', () => {
     player.resources.wood = 5
     session.loadState(state)
 
-    const flow = runCardEffectHook(state, player, 'C089_StableMaster', 'onBuy')
+    const flow = session.withCtx(() => runCardEffectHook(state, player, 'C089_StableMaster', 'onBuy'))
     expect(flow).toBeNull()
   })
 
@@ -152,7 +148,7 @@ describe('C089_StableMaster session', () => {
     player.supplyTokensConsumed = { stable: 4 }
     session.loadState(state)
 
-    const flow = runCardEffectHook(state, player, 'C089_StableMaster', 'onBuy')
+    const flow = session.withCtx(() => runCardEffectHook(state, player, 'C089_StableMaster', 'onBuy'))
     expect(flow).toBeNull()
   })
 
@@ -170,7 +166,7 @@ describe('C089_StableMaster session', () => {
     player.resources.wood = 0
     session.loadState(state)
 
-    const flow = runCardEffectHook(state, player, 'C089_StableMaster', 'onBuy')
+    const flow = session.withCtx(() => runCardEffectHook(state, player, 'C089_StableMaster', 'onBuy'))
     expect(flow).not.toBeNull()
   })
 

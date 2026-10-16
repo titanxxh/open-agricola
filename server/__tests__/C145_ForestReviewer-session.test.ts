@@ -1,7 +1,6 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
+import { CardRegistry as TestCardRegistry } from '../../shared/cards/registry'
+import { withActiveRegistry } from '../../shared/cards/active-registry'
+import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
 import { describe, expect, it } from 'vitest'
 import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 import type { ActionSpace, GameState, PlayerState } from '../../shared/contract/types'
@@ -80,12 +79,16 @@ const createState = (players: PlayerState[], actionSpaces: ActionSpace[]): GameS
     workPhaseObtainedResources: {},
   }) as GameState
 
-const findListener = (id: string) =>
-  getRegisteredCardListeners().find((l) => l.id === id)
+const findListener = (ruleOwner: TestCardRegistry, id: string) =>
+  {
+  const lookupRule1 = () => getRegisteredCardListeners().find((l) => l.id === id)
+  return withActiveRegistry(ruleOwner, lookupRule1)
+}
 
 describe('C145_ForestReviewer', () => {
   it('owner gets 1 reed when grove is used and forest is occupied', () => {
-    const listener = findListener('C145-forest-reviewer-any-place-farmer')
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry, 'C145-forest-reviewer-any-place-farmer')
     expect(listener).toBeDefined()
 
     const owner = createPlayer('p1')
@@ -97,7 +100,7 @@ describe('C145_ForestReviewer', () => {
 
     const state = createState([owner, trigger], [forestSpace, groveSpace])
 
-    const result = executeCardListener(listener!, {
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener!, {
       state,
       player: trigger,
       ownerPlayer: owner,
@@ -106,7 +109,7 @@ describe('C145_ForestReviewer', () => {
       actionId: 'place-farmer',
       phase: 'after',
       result: { type: 'ok' },
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeDefined()
     expect(result!.flow!.type).toBe('leaf')
@@ -115,7 +118,8 @@ describe('C145_ForestReviewer', () => {
   })
 
   it('owner gets 1 reed when forest is used and grove is occupied', () => {
-    const listener = findListener('C145-forest-reviewer-any-place-farmer')!
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry, 'C145-forest-reviewer-any-place-farmer')!
 
     const owner = createPlayer('p1')
     owner.occupationPlayed.push(CARD_ID)
@@ -126,7 +130,7 @@ describe('C145_ForestReviewer', () => {
 
     const state = createState([owner, trigger], [forestSpace, groveSpace])
 
-    const result = executeCardListener(listener, {
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener, {
       state,
       player: trigger,
       ownerPlayer: owner,
@@ -135,7 +139,7 @@ describe('C145_ForestReviewer', () => {
       actionId: 'place-farmer',
       phase: 'after',
       result: { type: 'ok' },
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeDefined()
     expect(result!.flow!.type).toBe('leaf')
@@ -143,7 +147,8 @@ describe('C145_ForestReviewer', () => {
   })
 
   it('does not trigger when grove is used and forest is NOT occupied', () => {
-    const listener = findListener('C145-forest-reviewer-any-place-farmer')!
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry, 'C145-forest-reviewer-any-place-farmer')!
 
     const owner = createPlayer('p1')
     owner.occupationPlayed.push(CARD_ID)
@@ -154,7 +159,7 @@ describe('C145_ForestReviewer', () => {
 
     const state = createState([owner, trigger], [forestSpace, groveSpace])
 
-    const result = executeCardListener(listener, {
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener, {
       state,
       player: trigger,
       ownerPlayer: owner,
@@ -163,13 +168,14 @@ describe('C145_ForestReviewer', () => {
       actionId: 'place-farmer',
       phase: 'after',
       result: { type: 'ok' },
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeUndefined()
   })
 
   it('does not trigger on non-wood spaces', () => {
-    const listener = findListener('C145-forest-reviewer-any-place-farmer')!
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry, 'C145-forest-reviewer-any-place-farmer')!
 
     const owner = createPlayer('p1')
     owner.occupationPlayed.push(CARD_ID)
@@ -186,7 +192,7 @@ describe('C145_ForestReviewer', () => {
       takenBy: [],
     })
 
-    const result = executeCardListener(listener, {
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener, {
       state,
       player: trigger,
       ownerPlayer: owner,
@@ -195,13 +201,14 @@ describe('C145_ForestReviewer', () => {
       actionId: 'place-farmer',
       phase: 'after',
       result: { type: 'ok' },
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeUndefined()
   })
 
   it('does not trigger when paired space does not exist', () => {
-    const listener = findListener('C145-forest-reviewer-any-place-farmer')!
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry, 'C145-forest-reviewer-any-place-farmer')!
 
     const owner = createPlayer('p1')
     owner.occupationPlayed.push(CARD_ID)
@@ -211,7 +218,7 @@ describe('C145_ForestReviewer', () => {
     // State has no forest space (e.g. 2-player game with only grove)
     const state = createState([owner, trigger], [groveSpace])
 
-    const result = executeCardListener(listener, {
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener, {
       state,
       player: trigger,
       ownerPlayer: owner,
@@ -220,7 +227,7 @@ describe('C145_ForestReviewer', () => {
       actionId: 'place-farmer',
       phase: 'after',
       result: { type: 'ok' },
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeUndefined()
   })

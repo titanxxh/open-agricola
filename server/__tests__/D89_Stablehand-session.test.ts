@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -33,17 +29,17 @@ const setup = () => {
   state.players = state.players.slice(0, 2)
   const player = state.players[0]!
   player.occupationPlayed.push(CARD_ID)
-  const listener = getRegisteredCardListeners().find((entry) => entry.id === 'D89-stablehand-after-fencing')
+  const listener = session.withCtx(() => getRegisteredCardListeners()).find((entry) => entry.id === 'D89-stablehand-after-fencing')
   expect(listener).toBeDefined()
-  return { state, player, listener: listener! }
+  return { session: session, state, player, listener: listener! }
 }
 
 describe('D089_Stablehand fence provenance', () => {
   it('offers one optional stable after a new pasture fence event', () => {
-    const { state, player, listener } = setup()
+    const { session: ruleSession, state, player, listener } = setup()
     const actionEvents = [fenceBuilt([{ tiles: [{ row: 0, col: 0 }] }])]
 
-    const result = executeCardListener(listener, {
+    const result = ruleSession.withCtx(() => executeCardListener(listener, {
       state,
       player,
       space: state.actionSpaces.find((entry) => entry.id === 'fencing')!,
@@ -52,7 +48,7 @@ describe('D089_Stablehand fence provenance', () => {
       result: { type: 'ok' },
       transactionEvents: actionEvents,
       actionEvents,
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result?.flow).toMatchObject({
       type: 'leaf',
@@ -64,10 +60,10 @@ describe('D089_Stablehand fence provenance', () => {
   })
 
   it('offers one optional stable after building an ordinary fence without a new pasture', () => {
-    const { state, player, listener } = setup()
+    const { session: ruleSession, state, player, listener } = setup()
     const actionEvents = [fenceBuilt([])]
 
-    const result = executeCardListener(listener, {
+    const result = ruleSession.withCtx(() => executeCardListener(listener, {
       state,
       player,
       space: state.actionSpaces.find((entry) => entry.id === 'fencing')!,
@@ -76,7 +72,7 @@ describe('D089_Stablehand fence provenance', () => {
       result: { type: 'ok' },
       transactionEvents: actionEvents,
       actionEvents,
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result?.flow).toMatchObject({
       type: 'leaf',
@@ -87,10 +83,10 @@ describe('D089_Stablehand fence provenance', () => {
   })
 
   it('ignores Wood Palisades even when they enclose a new pasture', () => {
-    const { state, player, listener } = setup()
+    const { session: ruleSession, state, player, listener } = setup()
     const actionEvents = [fenceBuilt([{ tiles: [{ row: 0, col: 0 }] }], 'palisade')]
 
-    const result = executeCardListener(listener, {
+    const result = ruleSession.withCtx(() => executeCardListener(listener, {
       state,
       player,
       space: state.actionSpaces.find((entry) => entry.id === 'fencing')!,
@@ -99,7 +95,7 @@ describe('D089_Stablehand fence provenance', () => {
       result: { type: 'ok' },
       transactionEvents: actionEvents,
       actionEvents,
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeUndefined()
   })

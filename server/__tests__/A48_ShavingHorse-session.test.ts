@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -74,7 +70,7 @@ const exchanged = (
 const directContext = (
   actionId: 'gain' | 'exchange',
   transactionEvents: DraftGameEvent[],
-): CardListenerContext => {
+): { session: GameSession; context: CardListenerContext } => {
   const session = new GameSession(42)
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
@@ -83,7 +79,8 @@ const directContext = (
   player.id = 'p1'
   player.minorPlayed.push(CARD_ID)
   player.resources.wood = 5
-  return {
+  return { session, context: {
+    actionHooks: session.actionHooks,
     state,
     player,
     space: state.actionSpaces.find((space) => space.id === 'forest')!,
@@ -92,7 +89,7 @@ const directContext = (
     transactionEvents,
     actionEvents: transactionEvents,
     result: { type: 'ok', resourcesGained: { wood: 1 } },
-  } as unknown as CardListenerContext
+  } as unknown as CardListenerContext }
 }
 
 const resolveShavingHorseTriggerIfPresent = (
@@ -178,29 +175,29 @@ describe('A048_ShavingHorse session', () => {
   })
 
   it('uses resource.moved events to offer exchange even without result gains', () => {
-    const ctx = directContext('gain', [moved()])
+    const { session: ruleSession1, context: ctx } = directContext('gain', [moved()])
     ctx.result = { type: 'ok' }
 
-    const result = executeCardListener(AFTER_OBTAIN, ctx)
+    const result = ruleSession1.withCtx(() => executeCardListener(AFTER_OBTAIN, ctx))
 
     expect(result?.flow?.type).toBe('seq')
     expect(result?.flow?.optional).toBe(true)
   })
 
   it('uses resource.exchanged events to offer exchange even without result gains', () => {
-    const ctx = directContext('exchange', [exchanged()])
+    const { session: ruleSession2, context: ctx } = directContext('exchange', [exchanged()])
     ctx.result = { type: 'ok' }
 
-    const result = executeCardListener(AFTER_EXCHANGE, ctx)
+    const result = ruleSession2.withCtx(() => executeCardListener(AFTER_EXCHANGE, ctx))
 
     expect(result?.flow?.type).toBe('seq')
     expect(result?.flow?.optional).toBe(true)
   })
 
   it('does not trigger without a current wood event even when result reports wood', () => {
-    const ctx = directContext('gain', [])
+    const { session: ruleSession3, context: ctx } = directContext('gain', [])
 
-    const result = executeCardListener(AFTER_OBTAIN, ctx)
+    const result = ruleSession3.withCtx(() => executeCardListener(AFTER_OBTAIN, ctx))
 
     expect(result).toBeUndefined()
   })

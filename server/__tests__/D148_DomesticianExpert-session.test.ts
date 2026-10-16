@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 
@@ -41,7 +37,7 @@ describe('D148_DomesticianExpert session', () => {
     const state = session.getState().state
     const player = state.players[0]!
 
-    const zones = computeAnimalZones(player)
+    const zones = session.withCtx(() => computeAnimalZones(player))
     const cardZone = zones.find(z => z.id === 'card:D148_DomesticianExpert')
     expect(cardZone).toBeDefined()
     expect(cardZone!.zoneType).toBe('card')
@@ -55,7 +51,7 @@ describe('D148_DomesticianExpert session', () => {
     const state = session.getState().state
     const player = state.players[0]!
 
-    const zones = computeAnimalZones(player)
+    const zones = session.withCtx(() => computeAnimalZones(player))
     const cardZone = zones.find(z => z.id === 'card:D148_DomesticianExpert')
     expect(cardZone).toBeDefined()
     expect(cardZone!.capacity).toBe(4)
@@ -66,7 +62,7 @@ describe('D148_DomesticianExpert session', () => {
     const state = session.getState().state
     const player = state.players[0]!
 
-    const zones = computeAnimalZones(player)
+    const zones = session.withCtx(() => computeAnimalZones(player))
     const cardZone = zones.find(z => z.id === 'card:D148_DomesticianExpert')
     expect(cardZone).toBeDefined()
     expect(cardZone!.animalType).toBe('sheep')
@@ -122,7 +118,7 @@ describe('D148_DomesticianExpert session', () => {
     // Default rooms: (2,0) and (1,0) — vertically adjacent
     expect(player.roomTiles.length).toBe(2)
 
-    const zones = computeAnimalZones(player)
+    const zones = session.withCtx(() => computeAnimalZones(player))
     const cardZone = zones.find(z => z.id === 'card:D148_DomesticianExpert')
     expect(cardZone).toBeDefined()
     expect(cardZone!.capacity).toBe(2)
@@ -133,7 +129,7 @@ describe('D148_DomesticianExpert session', () => {
     const state = session.getState().state
     const player = state.players[0]!
 
-    const zones = computeAnimalZones(player)
+    const zones = session.withCtx(() => computeAnimalZones(player))
     const cardZone = zones.find(z => z.id === 'card:D148_DomesticianExpert')
     expect(cardZone).toBeUndefined()
   })
@@ -147,7 +143,7 @@ describe('D148_DomesticianExpert session', () => {
     player.minorPlayed.push('D012_MilkingPlace')
     session.loadState(state)
 
-    const zones = computeAnimalZones(state.players[0]!)
+    const zones = session.withCtx(() => computeAnimalZones(state.players[0]!))
     expect(zones.find(z => z.id === 'card:D148_DomesticianExpert')).toBeUndefined()
     // D12 also strips the house zone
     expect(zones.find(z => z.zoneType === 'house')).toBeUndefined()

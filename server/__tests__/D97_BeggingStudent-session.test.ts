@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -28,10 +24,10 @@ describe('D097_BeggingStudent session', () => {
 
     session.loadState(state)
 
-    const effect = getCardEffect(CARD_ID)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
     expect(effect).toBeDefined()
     // onBuy mutates player directly (returns void/undefined)
-    effect!.onBuy!(state, player)
+    session.withCtx(() => effect!.onBuy!(state, player))
     expect(player.resources.begging).toBe(beggingBefore + 1)
   })
 
@@ -47,9 +43,9 @@ describe('D097_BeggingStudent session', () => {
 
     session.loadState(state)
 
-    const effect = getCardEffect(CARD_ID)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
     expect(effect).toBeDefined()
-    const flow = effect!.onStartHarvest!(state, player)
+    const flow = session.withCtx(() => effect!.onStartHarvest!(state, player))
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('seq')
     expect((flow as Extract<ActionFlow, { type: 'leaf' }>).optional).toBe(true)
@@ -72,8 +68,8 @@ describe('D097_BeggingStudent session', () => {
 
     session.loadState(state)
 
-    const effect = getCardEffect(CARD_ID)
-    const flow = effect!.onStartHarvest!(state, player)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
+    const flow = session.withCtx(() => effect!.onStartHarvest!(state, player))
     expect(flow).toBeUndefined()
   })
 

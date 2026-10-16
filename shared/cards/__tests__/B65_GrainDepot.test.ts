@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from './card-environment'
-
-installOfficialCardRegistry()
-
 import { afterEach, describe, expect, it } from 'vitest'
 import { GameSession } from '../../../server/game/authoritative-session'
 import type { PlayerState } from '../../contract/types'
@@ -23,13 +19,12 @@ const setWorkersAtHome = (player: PlayerState, count: number) => {
 }
 
 describe('B65 Grain Depot', () => {
-  afterEach(() => {
-    requireActiveCardRegistry('B065_GrainDepot.test')
-      .removeListenersWhere((listener) => listener.id === 'hook-free-grain-depot')
-  })
+  const sessions: GameSession[] = []
+  afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
 
   it('uses the selected improvement payment feeIndex for onBuy future grain', () => {
     const session = new GameSession(1)
+    sessions.push(session)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -98,6 +93,7 @@ describe('B65 Grain Depot', () => {
 
   it('uses the original clay path for future grain after a derived payment candidate is selected', () => {
     const session = new GameSession(1)
+    sessions.push(session)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0

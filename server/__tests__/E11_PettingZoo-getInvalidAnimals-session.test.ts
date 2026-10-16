@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import {
@@ -39,7 +35,7 @@ describe('E011_PettingZoo getInvalidAnimals', () => {
   it('zone push carries cardId when adjacency holds', () => {
     const session = setup()
     const player = session.getState().state.players[0]!
-    const zone = computeAnimalZones(player).find(z => z.id === `card:E011_PettingZoo`)!
+    const zone = session.withCtx(() => computeAnimalZones(player)).find(z => z.id === `card:E011_PettingZoo`)!
     expect(zone.cardId).toBe('E011_PettingZoo')
   })
 
@@ -47,7 +43,7 @@ describe('E011_PettingZoo getInvalidAnimals', () => {
     const session = setup()
     const state = session.getState().state
     const player = state.players[0]!
-    const zone = computeAnimalZones(player).find(z => z.id === `card:E011_PettingZoo`)!
+    const zone = session.withCtx(() => computeAnimalZones(player)).find(z => z.id === `card:E011_PettingZoo`)!
     zone.animalType = 'sheep'
     zone.animalCount = 1
     expect(computeInvalidAnimalsForZone(state, player, zone)).toEqual([])

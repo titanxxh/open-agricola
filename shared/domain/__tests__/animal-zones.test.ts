@@ -1,8 +1,6 @@
-import { installOfficialCardRegistry } from '../../cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
-import { afterEach, describe, it, expect } from 'vitest'
+import { withActiveRegistry } from '../../cards/active-registry'
+import { createOfficialCardRegistry } from '../../cards/__tests__/card-environment'
+import { describe, it, expect } from 'vitest'
 import { GameSession } from '../../../server/game/authoritative-session.ts'
 import type { GameState, PlayerState } from '../../contract/types.ts'
 import { getActiveCardRegistry } from '../../cards/active-registry.ts'
@@ -39,10 +37,6 @@ const playerWithPasture = (overrides: Partial<PlayerState> = {}): PlayerState =>
   return player
 }
 
-afterEach(() => {
-  getActiveCardRegistry()?.removeEffectsWhere((id) => id === TEST_CARD)
-})
-
 describe('AnimalZones', () => {
   it('computes Night Pasture hosted zones for card owner and animal owners', () => {
     const session = new GameSession(17033, undefined, {
@@ -58,8 +52,8 @@ describe('AnimalZones', () => {
     const ownerZoneId = `card:${NIGHT_PASTURE}:owner:${owner.id}:animalOwner:${owner.id}`
     const guestZoneId = `card:${NIGHT_PASTURE}:owner:${owner.id}:animalOwner:${guest.id}`
 
-    const ownerZone = computeAnimalZones(owner, state).find((zone) => zone.id === ownerZoneId)
-    const guestZone = computeAnimalZones(guest, state).find((zone) => zone.id === guestZoneId)
+    const ownerZone = session.withCtx(() => computeAnimalZones(owner, state)).find((zone) => zone.id === ownerZoneId)
+    const guestZone = session.withCtx(() => computeAnimalZones(guest, state)).find((zone) => zone.id === guestZoneId)
 
     expect(ownerZone).toMatchObject({
       id: ownerZoneId,
@@ -112,7 +106,7 @@ describe('AnimalZones', () => {
       },
     }
 
-    const guestZone = computeAnimalZones(guest, state).find((zone) => zone.id === guestZoneId)
+    const guestZone = session.withCtx(() => computeAnimalZones(guest, state)).find((zone) => zone.id === guestZoneId)
 
     expect(guestZone).toMatchObject({
       animalType: 'boar',
@@ -160,7 +154,7 @@ describe('AnimalZones', () => {
       },
     }
 
-    applyAnimalPayment(guest, state, 'sheep', 1)
+    session.withCtx(() => applyAnimalPayment(guest, state, 'sheep', 1))
 
     const storage = owner.cardStates[NIGHT_PASTURE]!.extraData!.animalCountsByZone as Record<string, {
       animalCounts?: unknown
@@ -185,15 +179,16 @@ describe('AnimalZones', () => {
     guest.stableTiles = []
     guest.houseAnimals = Object.fromEntries(guest.roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, 'sheep']));
 
-    expect(canAccommodateAnimalTotals(state, guest, { sheep: 1, boar: 1 })).toBe(true)
+    expect(session.withCtx(() => canAccommodateAnimalTotals(state, guest, { sheep: 1, boar: 1 }))).toBe(true)
   })
 
   it('checks final totals against ordinary single-type pasture rules', () => {
+    const registry = createOfficialCardRegistry()
     const state = { players: [] } as unknown as GameState
     const player = playerWithPasture({ minorPlayed: ['D012_MilkingPlace'] })
 
-    expect(canAccommodateAnimalTotals(state, player, { sheep: 2 })).toBe(true)
-    expect(canAccommodateAnimalTotals(state, player, { sheep: 1, boar: 1 })).toBe(false)
+    expect(withActiveRegistry(registry, () => canAccommodateAnimalTotals(state, player, { sheep: 2 }))).toBe(true)
+    expect(withActiveRegistry(registry, () => canAccommodateAnimalTotals(state, player, { sheep: 1, boar: 1 }))).toBe(false)
   })
 
   it('requires every tagged empty-zone group to retain an empty member', () => {
@@ -211,6 +206,7 @@ describe('AnimalZones', () => {
   })
 
   it('checks required empty-zone groups at the accommodation solver terminal', () => {
+    const registry = createOfficialCardRegistry()
     const state = { players: [] } as unknown as GameState
     const player = playerWithPasture({
       minorPlayed: ['D012_MilkingPlace', TEST_CARD],
@@ -233,7 +229,7 @@ describe('AnimalZones', () => {
         },
       ],
     })
-    const reg = getActiveCardRegistry()
+    const reg = registry
     if (!reg) throw new Error('no active registry')
     reg.setEffect({
       id: TEST_CARD,
@@ -244,8 +240,8 @@ describe('AnimalZones', () => {
       },
     })
 
-    expect(canAccommodateAnimalTotals(state, player, { sheep: 2 })).toBe(true)
-    expect(canAccommodateAnimalTotals(state, player, { sheep: 2, boar: 2 })).toBe(false)
+    expect(withActiveRegistry(registry, () => canAccommodateAnimalTotals(state, player, { sheep: 2 }))).toBe(true)
+    expect(withActiveRegistry(registry, () => canAccommodateAnimalTotals(state, player, { sheep: 2, boar: 2 }))).toBe(false)
   })
 
   it('checks add-only animals against final totals', () => {
@@ -253,11 +249,12 @@ describe('AnimalZones', () => {
     const session = new GameSession()
     const player = session.getState().state.players[0]
 
-    expect(canAccommodateAllAnimals(state, player, ['sheep'])).toBe(true)
-    expect(canAccommodateAllAnimals(state, player, ['sheep', 'boar'])).toBe(false)
+    expect(session.withCtx(() => canAccommodateAllAnimals(state, player, ['sheep']))).toBe(true)
+    expect(session.withCtx(() => canAccommodateAllAnimals(state, player, ['sheep', 'boar']))).toBe(false)
   })
 
   it('counts M084 lying horses against their visible animal space', () => {
+    const registry = createOfficialCardRegistry()
     const state = { players: [], enableFarmersOfTheMoor: true } as unknown as GameState
     const player = playerWithPasture({
       pastures: [],
@@ -271,14 +268,15 @@ describe('AnimalZones', () => {
     })
     player.resources.horse = 1
 
-    expect(canAccommodateAllAnimals(state, player, ['sheep'])).toBe(false)
-    expect(canAccommodateAnimalTotals(state, player, { horse: 1, sheep: 1 })).toBe(false)
+    expect(withActiveRegistry(registry, () => canAccommodateAllAnimals(state, player, ['sheep']))).toBe(false)
+    expect(withActiveRegistry(registry, () => canAccommodateAnimalTotals(state, player, { horse: 1, sheep: 1 }))).toBe(false)
   })
 
   it('allows mixed animals only in explicitly mixed card zones', () => {
+    const registry = createOfficialCardRegistry()
     const state = { players: [] } as unknown as GameState
     const player = playerWithPasture({ minorPlayed: ['D012_MilkingPlace', TEST_CARD], pastures: [] })
-    const reg = getActiveCardRegistry()
+    const reg = registry
     if (!reg) throw new Error('no active registry')
     reg.setEffect({
       id: TEST_CARD,
@@ -293,13 +291,14 @@ describe('AnimalZones', () => {
       ],
     })
 
-    expect(canAccommodateAnimalTotals(state, player, { sheep: 1, boar: 1 })).toBe(true)
+    expect(withActiveRegistry(registry, () => canAccommodateAnimalTotals(state, player, { sheep: 1, boar: 1 }))).toBe(true)
   })
 
   it('preserves fixed animal type on card zones when checking final totals', () => {
+    const registry = createOfficialCardRegistry()
     const state = { players: [] } as unknown as GameState
     const player = playerWithPasture({ occupationPlayed: [TEST_CARD], minorPlayed: ['D012_MilkingPlace'], pastures: [] })
-    const reg = getActiveCardRegistry()
+    const reg = registry
     if (!reg) throw new Error('no active registry')
     reg.setEffect({
       id: TEST_CARD,
@@ -315,11 +314,12 @@ describe('AnimalZones', () => {
       ],
     })
 
-    expect(canAccommodateAnimalTotals(state, player, { sheep: 2 })).toBe(true)
-    expect(canAccommodateAnimalTotals(state, player, { boar: 1 })).toBe(false)
+    expect(withActiveRegistry(registry, () => canAccommodateAnimalTotals(state, player, { sheep: 2 }))).toBe(true)
+    expect(withActiveRegistry(registry, () => canAccommodateAnimalTotals(state, player, { boar: 1 }))).toBe(false)
   })
 
   it('does not freeze flexible card zones to their current animal type', () => {
+    const registry = createOfficialCardRegistry()
     const state = { players: [] } as unknown as GameState
     const player = playerWithPasture({
       occupationPlayed: [TEST_CARD],
@@ -334,7 +334,7 @@ describe('AnimalZones', () => {
       },
     })
     player.resources.sheep = 3
-    const reg = getActiveCardRegistry()
+    const reg = registry
     if (!reg) throw new Error('no active registry')
     reg.setEffect({
       id: TEST_CARD,
@@ -349,13 +349,14 @@ describe('AnimalZones', () => {
       ],
     })
 
-    expect(canAccommodateAnimalTotals(state, player, { boar: 3 })).toBe(true)
+    expect(withActiveRegistry(registry, () => canAccommodateAnimalTotals(state, player, { boar: 3 }))).toBe(true)
   })
 
   it('attaches the source card id to card zones added by a card effect', () => {
+    const registry = createOfficialCardRegistry()
     const state = { players: [] } as unknown as GameState
     const player = playerWithPasture({ occupationPlayed: [TEST_CARD] })
-    const reg = getActiveCardRegistry()
+    const reg = registry
     if (!reg) throw new Error('no active registry')
     reg.setEffect({
       id: TEST_CARD,
@@ -369,12 +370,13 @@ describe('AnimalZones', () => {
         } as AnimalZone)
       },
     })
-    const cardZone = computeAnimalZones(player, state).find((zone) => zone.id === `card:${TEST_CARD}`)
+    const cardZone = withActiveRegistry(registry, () => computeAnimalZones(player, state)).find((zone) => zone.id === `card:${TEST_CARD}`)
 
     expect(cardZone?.cardId).toBe(TEST_CARD)
   })
 
   it('memoizes equivalent work-zone states for impossible final totals', () => {
+    const registry = createOfficialCardRegistry()
     const state = { players: [], enableFarmersOfTheMoor: true } as unknown as GameState
     const player = playerWithPasture({ minorPlayed: ['D012_MilkingPlace'] })
     player.resources.sheep = 8
@@ -391,14 +393,15 @@ describe('AnimalZones', () => {
     }))
 
     const start = Date.now()
-    expect(canAccommodateAnimalTotals(state, player, { sheep: 7, boar: 7 })).toBe(false)
+    expect(withActiveRegistry(registry, () => canAccommodateAnimalTotals(state, player, { sheep: 7, boar: 7 }))).toBe(false)
     expect(Date.now() - start).toBeLessThan(1000)
   })
 
   it('rejects assignments blocked by card-zone validation', () => {
+    const registry = createOfficialCardRegistry()
     const state = { players: [] } as unknown as GameState
     const player = playerWithPasture({ minorPlayed: ['D012_MilkingPlace', TEST_CARD], pastures: [] })
-    const reg = getActiveCardRegistry()
+    const reg = registry
     if (!reg) throw new Error('no active registry')
     reg.setEffect({
       id: TEST_CARD,
@@ -415,13 +418,14 @@ describe('AnimalZones', () => {
         meeples.filter((meeple) => meeple.type === 'boar'),
     })
 
-    expect(canAccommodateAnimalTotals(state, player, { sheep: 1, boar: 1 })).toBe(false)
+    expect(withActiveRegistry(registry, () => canAccommodateAnimalTotals(state, player, { sheep: 1, boar: 1 }))).toBe(false)
   })
 
   it('enforces exclusive card-zone limits when checking final totals', () => {
+    const registry = createOfficialCardRegistry()
     const state = { players: [], enableFarmersOfTheMoor: true } as unknown as GameState
     const player = playerWithPasture({ minorPlayed: [TEST_CARD], pastures: [] })
-    const reg = getActiveCardRegistry()
+    const reg = registry
     if (!reg) throw new Error('no active registry')
     reg.setEffect({
       id: TEST_CARD,
@@ -445,16 +449,16 @@ describe('AnimalZones', () => {
       ],
     })
 
-    expect(canAccommodateAnimalTotals(state, player, { horse: 3 })).toBe(true)
-    expect(canAccommodateAnimalTotals(state, player, { horse: 4 })).toBe(false)
+    expect(withActiveRegistry(registry, () => canAccommodateAnimalTotals(state, player, { horse: 3 }))).toBe(true)
+    expect(withActiveRegistry(registry, () => canAccommodateAnimalTotals(state, player, { horse: 4 }))).toBe(false)
   })
 
   it('gates horse accommodation on Farmers of the Moor', () => {
     const session = new GameSession()
     const player = session.getState().state.players[0]
 
-    expect(canAccommodateAnimalTotals({ players: [] } as unknown as GameState, player, { horse: 1 })).toBe(false)
-    expect(canAccommodateAnimalTotals({ players: [], enableFarmersOfTheMoor: true } as unknown as GameState, player, { horse: 1 })).toBe(true)
+    expect(session.withCtx(() => canAccommodateAnimalTotals({ players: [] } as unknown as GameState, player, { horse: 1 }))).toBe(false)
+    expect(session.withCtx(() => canAccommodateAnimalTotals({ players: [], enableFarmersOfTheMoor: true } as unknown as GameState, player, { horse: 1 }))).toBe(true)
   })
 
   it('zones() returns at least the house zone on initial state', () => {
@@ -518,7 +522,7 @@ describe('AnimalZones', () => {
     player.resources.cattle = 0
 
     const board = playerBoard(state, 0)
-    board.animals.enforceCapacity()
+    session.withCtx(() => board.animals.enforceCapacity())
 
     // Pasture (cap 2) + house (cap 1) = 3 sheep retained.
     expect(player.resources.sheep).toBe(3)
@@ -541,7 +545,7 @@ describe('AnimalZones', () => {
       M084_BogPony: { extraData: { lyingHorseCount: 1 } },
     }
 
-    playerBoard(state, 0).animals.enforceCapacity()
+    session.withCtx(() => playerBoard(state, 0).animals.enforceCapacity())
 
     expect(player.resources.horse).toBe(1)
     expect((Object.values(player.houseAnimals)[0] ?? null)).toBe('horse')
@@ -562,7 +566,7 @@ describe('AnimalZones', () => {
       M084_BogPony: { extraData: { lyingHorseCount: 1 } },
     }
 
-    playerBoard(state, 0).animals.enforceCapacity()
+    session.withCtx(() => playerBoard(state, 0).animals.enforceCapacity())
 
     expect(player.resources.sheep).toBe(0)
     expect(player.resources.horse).toBe(1)
@@ -585,7 +589,7 @@ describe('AnimalZones', () => {
       M084_BogPony: { extraData: { lyingHorseCount: 1 } },
     }
 
-    playerBoard(state, 0).animals.enforceCapacity()
+    session.withCtx(() => playerBoard(state, 0).animals.enforceCapacity())
 
     expect(player.resources.sheep).toBe(1)
     expect(player.resources.horse).toBe(0)
@@ -615,7 +619,7 @@ describe('AnimalZones', () => {
       M084_BogPony: { extraData: { lyingHorseCount: 1 } },
     }
 
-    playerBoard(state, 0).animals.enforceCapacity()
+    session.withCtx(() => playerBoard(state, 0).animals.enforceCapacity())
 
     expect(player.resources.horse).toBe(1)
     expect((Object.values(player.houseAnimals)[0] ?? null)).toBeNull()
@@ -666,7 +670,7 @@ describe('AnimalZones', () => {
       },
     }
 
-    playerBoard(state, 0).animals.enforceCapacity()
+    session.withCtx(() => playerBoard(state, 0).animals.enforceCapacity())
 
     expect(owner.cardStates[NIGHT_PASTURE]?.extraData?.animalCountsByZone).toMatchObject({
       [ownerZoneId]: {
@@ -731,7 +735,7 @@ describe('AnimalZones', () => {
       },
     }
 
-    playerBoard(state, 1).animals.enforceCapacity()
+    session.withCtx(() => playerBoard(state, 1).animals.enforceCapacity())
 
     const guestZones = guest.cardStates[NIGHT_PASTURE]?.extraData?.animalCountsByZone as Record<string, unknown>
     const ownerZones = owner.cardStates[NIGHT_PASTURE]?.extraData?.animalCountsByZone as Record<string, unknown>
@@ -752,7 +756,7 @@ describe('AnimalZones', () => {
       C148_MudWallower: { counters: { counter: 0, held: 1 } },
     }
 
-    playerBoard(state, 0).animals.enforceCapacity()
+    session.withCtx(() => playerBoard(state, 0).animals.enforceCapacity())
 
     expect(player.resources.boar).toBe(1)
     expect((Object.values(player.houseAnimals)[0] ?? null)).toBeNull()
@@ -760,17 +764,17 @@ describe('AnimalZones', () => {
     expect(player.cardStates.C148_MudWallower?.extraData).toBeUndefined()
     expect(getAssignedAnimalsByType(player).boar).toBe(0)
 
-    applyAnimalPayment(player, state, 'boar', 1)
+    session.withCtx(() => applyAnimalPayment(player, state, 'boar', 1))
 
     expect(player.resources.boar).toBe(0)
     expect(player.cardStates.C148_MudWallower?.counters?.held).toBe(0)
   })
 
   it('enforceCapacity clears stale keyed card-zone storage when no active zones remain', () => {
-    const reg = getActiveCardRegistry()
+    const session = new GameSession()
+    const reg = session.withCtx(() => getActiveCardRegistry())
     if (!reg) throw new Error('no active registry')
     reg.setEffect({ id: TEST_CARD, onComputeAnimalZones: () => [] })
-    const session = new GameSession()
     const state = session.getState().state
     const player = state.players[0]
     player.resources.sheep = 1
@@ -787,7 +791,7 @@ describe('AnimalZones', () => {
       },
     }
 
-    playerBoard(state, 0).animals.enforceCapacity()
+    session.withCtx(() => playerBoard(state, 0).animals.enforceCapacity())
 
     expect((Object.values(player.houseAnimals)[0] ?? null)).toBe('sheep')
     expect(Object.values(player.houseAnimals).length).toBe(1)
@@ -807,13 +811,13 @@ describe('AnimalZones', () => {
       C148_MudWallower: { counters: { counter: 0, held: 1 } },
     }
 
-    playerBoard(state, 0).animals.enforceCapacity()
+    session.withCtx(() => playerBoard(state, 0).animals.enforceCapacity())
 
     expect(player.resources.boar).toBe(2)
     expect((Object.values(player.houseAnimals)[0] ?? null)).toBe('boar')
     expect(Object.values(player.houseAnimals).length).toBe(1)
     expect(player.cardStates.C148_MudWallower?.extraData).toBeUndefined()
-    const c148Zone = computeAnimalZones(player, state).find((zone) => zone.cardId === 'C148_MudWallower')
+    const c148Zone = session.withCtx(() => computeAnimalZones(player, state)).find((zone) => zone.cardId === 'C148_MudWallower')
     expect(c148Zone?.animalCount).toBe(1)
   })
 })

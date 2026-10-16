@@ -1,7 +1,6 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
+import { CardRegistry as TestCardRegistry } from '../../shared/cards/registry'
+import { withActiveRegistry } from '../../shared/cards/active-registry'
+import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
 import { describe, expect, it } from 'vitest'
 import {
   getRegisteredCardListeners,
@@ -87,12 +86,16 @@ const createState = (players: PlayerState[], spaces: ActionSpace[]): GameState =
     gameOver: false, workPhaseObtainedResources: {},
   }) as GameState
 
-const findListener = () =>
-  getRegisteredCardListeners().find((l) => l.id === LISTENER_ID)
+const findListener = (ruleOwner: TestCardRegistry) =>
+  {
+  const lookupRule1 = () => getRegisteredCardListeners().find((l) => l.id === LISTENER_ID)
+  return withActiveRegistry(ruleOwner, lookupRule1)
+}
 
 describe('C039_StudioBoat — traveling-players bonus VP listener', () => {
   it('is registered with the expected shape', () => {
-    const listener = findListener()
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry)
     expect(listener).toBeDefined()
     expect(listener!.cardIds).toEqual([CARD_ID])
     expect(listener!.actions).toContain('place-farmer')
@@ -102,18 +105,19 @@ describe('C039_StudioBoat — traveling-players bonus VP listener', () => {
   })
 
   it('returns a bonus-vp flow leaf when the actor places on traveling-players', () => {
-    const listener = findListener()!
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry)!
     const owner = createPlayer('p1', [CARD_ID])
     const travelingPlayers = createSpace('traveling-players')
     const state = createState([owner], [travelingPlayers])
 
-    const result = executeCardListener(listener, {
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener, {
       state,
       player: owner,
       space: travelingPlayers,
       actionId: 'place-farmer',
       phase: 'after',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeDefined()
     expect(result!.sourceCard).toBe(CARD_ID)
@@ -125,34 +129,36 @@ describe('C039_StudioBoat — traveling-players bonus VP listener', () => {
   })
 
   it('returns void when the placement is on a different space', () => {
-    const listener = findListener()!
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry)!
     const owner = createPlayer('p1', [CARD_ID])
     const otherSpace = createSpace('fishing')
     const state = createState([owner], [otherSpace])
 
-    const result = executeCardListener(listener, {
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener, {
       state,
       player: owner,
       space: otherSpace,
       actionId: 'place-farmer',
       phase: 'after',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeUndefined()
   })
 
   it('returns void when there is no space on the context', () => {
-    const listener = findListener()!
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry)!
     const owner = createPlayer('p1', [CARD_ID])
     const state = createState([owner], [])
 
-    const result = executeCardListener(listener, {
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener, {
       state,
       player: owner,
       space: undefined,
       actionId: 'place-farmer',
       phase: 'after',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeUndefined()
   })

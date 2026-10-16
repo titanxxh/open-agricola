@@ -1,7 +1,4 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
+import type { GameSession as SessionRuleOwner } from '../game/authoritative-session'
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { PaymentSolver } from '../../shared/actions/payment'
@@ -22,8 +19,8 @@ import '../../shared/cards/B/B131_Equipper'
 const CARD_ID = 'C027_Blueprint'
 const ROUTING_LISTENER_ID = 'C27-blueprint-compute-choice-candidates'
 
-const findListener = (id: string) =>
-  getRegisteredCardListeners().find((l) => l.id === id)
+const findListener = (ruleOwner: SessionRuleOwner, id: string) =>
+  ruleOwner.withCtx(() => getRegisteredCardListeners()).find((l) => l.id === id)
 
 /**
  * C27 Blueprint — verify-only.
@@ -167,16 +164,16 @@ describe('C027_Blueprint session — minor-improvement routing for 3 majors', ()
 
   it('listener injects 3 allowed majors when player owns C27', () => {
     const { state, player } = setupWithResources()
-    const listener = findListener(ROUTING_LISTENER_ID)
+    const listener = findListener(ruleSession, ROUTING_LISTENER_ID)
     expect(listener).toBeDefined()
 
-    const result = executeCardListener(listener!, {
+    const result = ruleSession.withCtx(() => executeCardListener(listener!, {
       state,
       player,
       actionId: 'improvement',
       params: { types: ['minor'] },
       phase: 'computeChoiceCandidates',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result?.extraOptions).toBeDefined()
     const values = (result!.extraOptions ?? []).map((o) => o.value).sort()
@@ -189,32 +186,32 @@ describe('C027_Blueprint session — minor-improvement routing for 3 majors', ()
   })
 
   it('listener returns nothing when player does not own C27', () => {
-    const { state, player } = setupWithResources({ playC27: false })
-    const listener = findListener(ROUTING_LISTENER_ID)!
+    const { session: ruleSession, state, player } = setupWithResources({ playC27: false })
+    const listener = findListener(ruleSession, ROUTING_LISTENER_ID)!
 
-    const result = executeCardListener(listener, {
+    const result = ruleSession.withCtx(() => executeCardListener(listener, {
       state,
       player,
       actionId: 'improvement',
       params: { types: ['minor'] },
       phase: 'computeChoiceCandidates',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeUndefined()
   })
 
   it('listener filters out majors that are not on the supply', () => {
-    const { state, player } = setupWithResources()
+    const { session: ruleSession, state, player } = setupWithResources()
     state.availableMajorImprovements = ['Major_Fireplace1', 'Major_Well']
-    const listener = findListener(ROUTING_LISTENER_ID)!
+    const listener = findListener(ruleSession, ROUTING_LISTENER_ID)!
 
-    const result = executeCardListener(listener, {
+    const result = ruleSession.withCtx(() => executeCardListener(listener, {
       state,
       player,
       actionId: 'improvement',
       params: { types: ['minor'] },
       phase: 'computeChoiceCandidates',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeUndefined()
   })

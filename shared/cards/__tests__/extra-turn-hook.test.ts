@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from './card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, it, expect } from 'vitest'
 import { GameSession } from '../../../server/game/authoritative-session'
 import { setActiveWorkerCount, setWorkersAtHome } from '../../domain/player'
@@ -72,41 +68,41 @@ const setupA92Player = (over: {
   placeholderHands(state)
   session.loadState(state)
   const loaded = session.getState().state
-  return { state: loaded, player: loaded.players[0]! }
+  return { session: session, state: loaded, player: loaded.players[0]! }
 }
 
 describe('extra-turn extension point (isolation)', () => {
   it('true when holding A92 + has offspring + not forfeited (+ can afford)', () => {
-    const { state, player } = setupA92Player()
-    expect(hasPendingExtraTurn(state, player)).toBe(true)
-    const collected = collectExtraTurnFlow(state, player)
+    const { session: ruleSession, state, player } = setupA92Player()
+    expect(ruleSession.withCtx(() => hasPendingExtraTurn(state, player))).toBe(true)
+    const collected = ruleSession.withCtx(() => collectExtraTurnFlow(state, player))
     expect(collected?.cardId).toBe(A92)
     expect(collected?.flow.type).toBe('xor')
   })
 
   it('void when the card is not played', () => {
-    const { state, player } = setupA92Player({ played: false })
-    expect(hasPendingExtraTurn(state, player)).toBe(false)
+    const { session: ruleSession, state, player } = setupA92Player({ played: false })
+    expect(ruleSession.withCtx(() => hasPendingExtraTurn(state, player))).toBe(false)
   })
 
   it('void when there is no offspring', () => {
-    const { state, player } = setupA92Player({ newborns: 0 })
-    expect(hasPendingExtraTurn(state, player)).toBe(false)
+    const { session: ruleSession, state, player } = setupA92Player({ newborns: 0 })
+    expect(ruleSession.withCtx(() => hasPendingExtraTurn(state, player))).toBe(false)
   })
 
   it('void when already forfeited this round', () => {
-    const { state, player } = setupA92Player({ forfeited: true })
-    expect(hasPendingExtraTurn(state, player)).toBe(false)
+    const { session: ruleSession, state, player } = setupA92Player({ forfeited: true })
+    expect(ruleSession.withCtx(() => hasPendingExtraTurn(state, player))).toBe(false)
   })
 
   it('void when food is insufficient to pay the cost', () => {
-    const { state, player } = setupA92Player({ food: 0 })
-    expect(hasPendingExtraTurn(state, player)).toBe(false)
+    const { session: ruleSession, state, player } = setupA92Player({ food: 0 })
+    expect(ruleSession.withCtx(() => hasPendingExtraTurn(state, player))).toBe(false)
   })
 
   it('XOR exposes exactly two branches (use, forfeit) addressed by index', () => {
-    const { state, player } = setupA92Player()
-    const flow = collectExtraTurnFlow(state, player)?.flow
+    const { session: ruleSession, state, player } = setupA92Player()
+    const flow = ruleSession.withCtx(() => collectExtraTurnFlow(state, player))?.flow
     expect(flow?.type).toBe('xor')
     const branches = (flow && flow.type === 'xor' ? flow.children : []) as Array<{
       choiceLabelKey?: string
@@ -117,8 +113,8 @@ describe('extra-turn extension point (isolation)', () => {
   })
 
   it('collects multiple providers as a one-shot trigger selection', () => {
-    const { state, player } = setupA92Player()
-    requireActiveCardRegistry('extra turn multi-provider test').setEffect({
+    const { session: ruleSession, state, player } = setupA92Player()
+    ruleSession.withCtx(() => requireActiveCardRegistry('extra turn multi-provider test')).setEffect({
       id: TEST_EXTRA,
       contributeExtraTurn: () => ({
         type: 'leaf',
@@ -130,7 +126,7 @@ describe('extra-turn extension point (isolation)', () => {
     })
     player.minorPlayed.push(TEST_EXTRA)
 
-    const collected = collectExtraTurnFlow(state, player)
+    const collected = ruleSession.withCtx(() => collectExtraTurnFlow(state, player))
 
     expect(collected?.cardId).toBeUndefined()
     expect(collected?.flow.type).toBe('parallel')
@@ -141,8 +137,8 @@ describe('extra-turn extension point (isolation)', () => {
   })
 
   it('fails stale provider activation instead of silently consuming the provider prompt', () => {
-    const { state, player } = setupA92Player()
-    requireActiveCardRegistry('extra turn stale-provider test').setEffect({
+    const { session: ruleSession, state, player } = setupA92Player()
+    ruleSession.withCtx(() => requireActiveCardRegistry('extra turn stale-provider test')).setEffect({
       id: TEST_EXTRA,
       contributeExtraTurn: (_state, currentPlayer) => currentPlayer.resources.wood === 0
         ? {
@@ -155,56 +151,56 @@ describe('extra-turn extension point (isolation)', () => {
       countExtraTurns: () => 1,
     })
     player.minorPlayed.push(TEST_EXTRA)
-    expect(collectExtraTurnFlow(state, player)?.flow.type).toBe('parallel')
+    expect(ruleSession.withCtx(() => collectExtraTurnFlow(state, player))?.flow.type).toBe('parallel')
 
     player.resources.wood = 1
-    const result = activateExtraTurnAction.execute({
+    const result = ruleSession.withCtx(() => activateExtraTurnAction.execute({
       state,
       player,
       params: { cardId: TEST_EXTRA },
-    } as Parameters<typeof activateExtraTurnAction.execute>[0])
+    } as Parameters<typeof activateExtraTurnAction.execute>[0]))
 
     expect(result.type).toBe('fail')
   })
 
   it('counts remaining opportunities after skipped and forced consumed counters', () => {
-    const { state, player } = setupA92Player({ newborns: 2, food: 2 })
+    const { session: ruleSession, state, player } = setupA92Player({ newborns: 2, food: 2 })
 
-    expect(countPendingExtraTurns(state, player)).toBe(2)
+    expect(ruleSession.withCtx(() => countPendingExtraTurns(state, player))).toBe(2)
     player._extraTurnSkipCountsByCard = { [A92]: 1 }
-    expect(countPendingExtraTurns(state, player)).toBe(1)
+    expect(ruleSession.withCtx(() => countPendingExtraTurns(state, player))).toBe(1)
     player._extraTurnConsumedCountsByCard = { [A92]: 1 }
-    expect(countPendingExtraTurns(state, player)).toBe(0)
-    expect(hasPendingExtraTurn(state, player)).toBe(false)
+    expect(ruleSession.withCtx(() => countPendingExtraTurns(state, player))).toBe(0)
+    expect(ruleSession.withCtx(() => hasPendingExtraTurn(state, player))).toBe(false)
   })
 
   it('consumePendingExtraTurns records all remaining forced consumption', () => {
-    const { state, player } = setupA92Player({ newborns: 2, food: 2 })
+    const { session: ruleSession, state, player } = setupA92Player({ newborns: 2, food: 2 })
 
-    const consumed = consumePendingExtraTurns(state, player)
+    const consumed = ruleSession.withCtx(() => consumePendingExtraTurns(state, player))
 
     expect(consumed).toBe(2)
     expect(player._extraTurnConsumedCountsByCard).toEqual({ [A92]: 2 })
-    expect(countPendingExtraTurns(state, player)).toBe(0)
-    expect(collectExtraTurnFlow(state, player)).toBeNull()
+    expect(ruleSession.withCtx(() => countPendingExtraTurns(state, player))).toBe(0)
+    expect(ruleSession.withCtx(() => collectExtraTurnFlow(state, player))).toBeNull()
   })
 
   it('consumePendingExtraTurns respects already skipped opportunities', () => {
-    const { state, player } = setupA92Player({ newborns: 2, food: 2 })
+    const { session: ruleSession, state, player } = setupA92Player({ newborns: 2, food: 2 })
     player._extraTurnSkipCountsByCard = { [A92]: 1 }
 
-    const consumed = consumePendingExtraTurns(state, player)
+    const consumed = ruleSession.withCtx(() => consumePendingExtraTurns(state, player))
 
     expect(consumed).toBe(1)
     expect(player._extraTurnConsumedCountsByCard).toEqual({ [A92]: 1 })
-    expect(countPendingExtraTurns(state, player)).toBe(0)
-    expect(collectExtraTurnFlow(state, player)).toBeNull()
+    expect(ruleSession.withCtx(() => countPendingExtraTurns(state, player))).toBe(0)
+    expect(ruleSession.withCtx(() => collectExtraTurnFlow(state, player))).toBeNull()
   })
 
   it('consumePendingExtraTurns silently no-ops when nothing is pending', () => {
-    const { state, player } = setupA92Player({ food: 0 })
+    const { session: ruleSession, state, player } = setupA92Player({ food: 0 })
 
-    expect(consumePendingExtraTurns(state, player)).toBe(0)
+    expect(ruleSession.withCtx(() => consumePendingExtraTurns(state, player))).toBe(0)
     expect(player._extraTurnConsumedCountsByCard).toBeUndefined()
   })
 })

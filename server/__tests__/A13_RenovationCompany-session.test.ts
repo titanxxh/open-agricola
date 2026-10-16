@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -17,7 +13,7 @@ describe('A013_RenovationCompany prerequisite', () => {
     const state = session.getState().state
     const player = state.players[0]!
     player.houseType = 'clay'
-    expect(meetsCardPrerequisites(player, A013_RenovationCompany, state.round, state)).toBe(false)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, A013_RenovationCompany, state.round, state))).toBe(false)
   })
 
   it('allows when in wooden house with exactly 2 rooms', () => {
@@ -26,7 +22,7 @@ describe('A013_RenovationCompany prerequisite', () => {
     const player = state.players[0]!
     player.houseType = 'wood'
     player.rooms = 2
-    expect(meetsCardPrerequisites(player, A013_RenovationCompany, state.round, state)).toBe(true)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, A013_RenovationCompany, state.round, state))).toBe(true)
   })
 })
 

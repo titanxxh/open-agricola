@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { type SessionResponse } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
@@ -19,7 +15,7 @@ describe('B033_Mantlepiece prerequisite', () => {
     const state = session.getState().state
     const player = state.players[0]!
     player.houseType = 'wood'
-    expect(meetsCardPrerequisites(player, B033_Mantlepiece, state.round, state)).toBe(false)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, B033_Mantlepiece, state.round, state))).toBe(false)
   })
 
   it('allows when player lives in a clay house', () => {
@@ -27,7 +23,7 @@ describe('B033_Mantlepiece prerequisite', () => {
     const state = session.getState().state
     const player = state.players[0]!
     player.houseType = 'clay'
-    expect(meetsCardPrerequisites(player, B033_Mantlepiece, state.round, state)).toBe(true)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, B033_Mantlepiece, state.round, state))).toBe(true)
   })
 
   it('allows when player lives in a stone house', () => {
@@ -35,7 +31,7 @@ describe('B033_Mantlepiece prerequisite', () => {
     const state = session.getState().state
     const player = state.players[0]!
     player.houseType = 'stone'
-    expect(meetsCardPrerequisites(player, B033_Mantlepiece, state.round, state)).toBe(true)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, B033_Mantlepiece, state.round, state))).toBe(true)
   })
 
   it('rejects renovation before placing a worker once Mantlepiece is played', () => {

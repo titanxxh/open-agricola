@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { D092_ChildOmbudsman_impl } from '../../shared/cards/D/D092_ChildOmbudsman'
@@ -27,12 +23,12 @@ const makeCtx = (round: number, rooms: number, family: number) => {
   player.occupationPlayed.push(CARD_ID)
   setActiveWorkerCount(player, family)
   setNewbornCount(player, 0)
-  return { state, player }
+  return { session: session, state, player }
 }
 
 describe('D92 Child Ombudsman — listener', () => {
   it('does not offer SEQ in round 4 (round < 5)', () => {
-    const { state, player } = makeCtx(4, 3, 2)
+    const { session: ruleSession, state, player } = makeCtx(4, 3, 2)
     const handler = D092_ChildOmbudsman_impl.listeners[0]!.handler
     const ctx = {
       state,
@@ -40,11 +36,11 @@ describe('D92 Child Ombudsman — listener', () => {
       actionId: 'place-farmer',
       phase: 'after' as ActionHookPhase,
     } as unknown as CardListenerContext
-    expect(handler(ctx)).toBeUndefined()
+    expect(ruleSession.withCtx(() => handler(ctx))).toBeUndefined()
   })
 
   it('does not offer SEQ when no free room (rooms === familySize)', () => {
-    const { state, player } = makeCtx(5, 2, 2)
+    const { session: ruleSession, state, player } = makeCtx(5, 2, 2)
     const handler = D092_ChildOmbudsman_impl.listeners[0]!.handler
     const ctx = {
       state,
@@ -52,7 +48,7 @@ describe('D92 Child Ombudsman — listener', () => {
       actionId: 'place-farmer',
       phase: 'after' as ActionHookPhase,
     } as unknown as CardListenerContext
-    expect(handler(ctx)).toBeUndefined()
+    expect(ruleSession.withCtx(() => handler(ctx))).toBeUndefined()
   })
 
   it('offers SEQ optional with [special-effect, family-growth] in round 5 with free room', () => {
@@ -64,7 +60,7 @@ describe('D92 Child Ombudsman — listener', () => {
       actionId: 'place-farmer',
       phase: 'after' as ActionHookPhase,
     } as unknown as CardListenerContext
-    const result = handler(ctx) as ActionHookResult | undefined
+    const result = ruleSession.withCtx(() => handler(ctx)) as ActionHookResult | undefined
     expect(result).toBeTruthy()
     expect(result?.sourceCard).toBe(CARD_ID)
     const flow = result?.flow as {
@@ -91,12 +87,12 @@ describe('D92 Child Ombudsman — listener', () => {
     const { state, player } = makeCtx(5, 3, 2)
     const handler = D092_ChildOmbudsman_impl.listeners[0]!.handler
     const before = readCardExtraData<number>(player, CARD_ID, 'negativeScore') ?? 0
-    handler({
+    ruleSession.withCtx(() => handler({
       state,
       player,
       actionId: 'place-farmer',
       phase: 'after' as ActionHookPhase,
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
     const after = readCardExtraData<number>(player, CARD_ID, 'negativeScore') ?? 0
     expect(after).toBe(before) // unchanged: mutation only happens via special-effect leaf
   })

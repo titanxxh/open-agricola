@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
@@ -47,13 +43,13 @@ const setup = (stabledCounts: [number, number]) => {
   player.stableTiles = [{ row: 0, col: 0 }, { row: 0, col: 2 }]
   session.loadState(state)
   const loadedState = session.getState().state
-  return { state: loadedState, player: loadedState.players[0]! }
+  return { session: session, state: loadedState, player: loadedState.players[0]! }
 }
 
 describe('E033_BeaverColony animal zones', () => {
   it('groups every stabled pasture without changing capacity', () => {
-    const { state, player } = setup([1, 0])
-    const pastures = computeAnimalZones(player, state).filter((zone) => zone.zoneType === 'pasture')
+    const { session: ruleSession, state, player } = setup([1, 0])
+    const pastures = ruleSession.withCtx(() => computeAnimalZones(player, state)).filter((zone) => zone.zoneType === 'pasture')
     const groupId = pastures[0]!.requiredEmptyZoneGroupIds?.[0]
 
     expect(groupId).toBeTypeOf('string')
@@ -66,13 +62,13 @@ describe('E033_BeaverColony animal zones', () => {
 
   it('requires a mandatory reorganization only while every stabled pasture is occupied', () => {
     const occupied = setup([1, 1])
-    expect(getCardEffect(CARD_ID)!.onBuy!(occupied.state, occupied.player)).toMatchObject({
+    expect(occupied.session.withCtx(() => getCardEffect(CARD_ID)!.onBuy!(occupied.state, occupied.player))).toMatchObject({
       type: 'leaf',
       actionId: 'reorganize',
       sourceCard: CARD_ID,
     })
 
     const alreadyValid = setup([1, 0])
-    expect(getCardEffect(CARD_ID)!.onBuy!(alreadyValid.state, alreadyValid.player)).toBeUndefined()
+    expect(alreadyValid.session.withCtx(() => getCardEffect(CARD_ID)!.onBuy!(alreadyValid.state, alreadyValid.player))).toBeUndefined()
   })
 })

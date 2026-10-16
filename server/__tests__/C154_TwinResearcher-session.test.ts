@@ -1,7 +1,4 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
+import type { GameSession as SessionRuleOwner } from '../game/authoritative-session'
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { executeCardListener, getRegisteredCardListeners, type CardListenerContext } from '../../shared/cards/card-listeners'
@@ -12,8 +9,8 @@ import '../../shared/cards/C/C154_TwinResearcher'
 
 const CARD_ID = 'C154_TwinResearcher'
 
-const findListener = (id: string) =>
-  getRegisteredCardListeners().find((l) => l.id === id)
+const findListener = (ruleOwner: SessionRuleOwner, id: string) =>
+  ruleOwner.withCtx(() => getRegisteredCardListeners()).find((l) => l.id === id)
 
 const setResource = (space: ActionSpace, key: string, value: number) => {
   space.resources[key] = value
@@ -31,10 +28,11 @@ const ensureAccumulationSpace = (state: GameState, id: string, resource: string,
 
 describe('C154_TwinResearcher session', () => {
   it('offers pay-gain (1 food -> 1 score) when forest and grove have equal wood', () => {
-    const listener = findListener('C154-twin-researcher-before-place-farmer')!
-    expect(listener).toBeDefined()
+
 
     const session = new GameSession(undefined, undefined, { playerCount: 4 })
+    const listener = findListener(session, 'C154-twin-researcher-before-place-farmer')!
+    expect(listener).toBeDefined()
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
@@ -47,13 +45,13 @@ describe('C154_TwinResearcher session', () => {
     setResource(grove, 'wood', 3)
     session.loadState(state)
 
-    const result = executeCardListener(listener, {
+    const result = session.withCtx(() => executeCardListener(listener, {
       state,
       player,
       space: forest,
       actionId: 'place-farmer',
       phase: 'before',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
     expect(result).toBeDefined()
     // Expect a pay-gain flow (sequence with pay-resources then bonus-vp)
     const flow = result!.flow as Extract<ActionFlow, { type: 'seq' }>
@@ -65,8 +63,9 @@ describe('C154_TwinResearcher session', () => {
   })
 
   it('does not trigger when counts differ', () => {
-    const listener = findListener('C154-twin-researcher-before-place-farmer')!
+
     const session = new GameSession(undefined, undefined, { playerCount: 4 })
+    const listener = findListener(session, 'C154-twin-researcher-before-place-farmer')!
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
@@ -79,19 +78,20 @@ describe('C154_TwinResearcher session', () => {
     setResource(grove, 'wood', 5)
     session.loadState(state)
 
-    const result = executeCardListener(listener, {
+    const result = session.withCtx(() => executeCardListener(listener, {
       state,
       player,
       space: forest,
       actionId: 'place-farmer',
       phase: 'before',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
     expect(result).toBeUndefined()
   })
 
   it('triggers on clay-pit when it matches hollow-4', () => {
-    const listener = findListener('C154-twin-researcher-before-place-farmer')!
+
     const session = new GameSession(undefined, undefined, { playerCount: 4 })
+    const listener = findListener(session, 'C154-twin-researcher-before-place-farmer')!
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
@@ -105,19 +105,20 @@ describe('C154_TwinResearcher session', () => {
     setResource(hollow4, 'clay', 2)
     session.loadState(state)
 
-    const result = executeCardListener(listener, {
+    const result = session.withCtx(() => executeCardListener(listener, {
       state,
       player,
       space: clayPit,
       actionId: 'place-farmer',
       phase: 'before',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
     expect(result).toBeDefined()
   })
 
   it('does not trigger on non-pair spaces', () => {
-    const listener = findListener('C154-twin-researcher-before-place-farmer')!
+
     const session = new GameSession(undefined, undefined, { playerCount: 4 })
+    const listener = findListener(session, 'C154-twin-researcher-before-place-farmer')!
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
@@ -126,19 +127,20 @@ describe('C154_TwinResearcher session', () => {
     session.loadState(state)
 
     const farmland = state.actionSpaces.find((s) => s.id === 'farmland')!
-    const result = executeCardListener(listener, {
+    const result = session.withCtx(() => executeCardListener(listener, {
       state,
       player,
       space: farmland,
       actionId: 'place-farmer',
       phase: 'before',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
     expect(result).toBeUndefined()
   })
 
   it('does not trigger when player has no food', () => {
-    const listener = findListener('C154-twin-researcher-before-place-farmer')!
+
     const session = new GameSession(undefined, undefined, { playerCount: 4 })
+    const listener = findListener(session, 'C154-twin-researcher-before-place-farmer')!
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
@@ -151,19 +153,20 @@ describe('C154_TwinResearcher session', () => {
     setResource(grove, 'wood', 3)
     session.loadState(state)
 
-    const result = executeCardListener(listener, {
+    const result = session.withCtx(() => executeCardListener(listener, {
       state,
       player,
       space: forest,
       actionId: 'place-farmer',
       phase: 'before',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
     expect(result).toBeUndefined()
   })
 
   it('triggers on hollow when it matches clay-pit', () => {
-    const listener = findListener('C154-twin-researcher-before-place-farmer')!
+
     const session = new GameSession(undefined, undefined, { playerCount: 2 })
+    const listener = findListener(session, 'C154-twin-researcher-before-place-farmer')!
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
@@ -173,20 +176,21 @@ describe('C154_TwinResearcher session', () => {
     ensureAccumulationSpace(state, 'clay-pit', 'clay', 2)
     const hollow = ensureAccumulationSpace(state, 'hollow', 'clay', 2)
 
-    const result = executeCardListener(listener, {
+    const result = session.withCtx(() => executeCardListener(listener, {
       state,
       player,
       space: hollow,
       actionId: 'place-farmer',
       phase: 'before',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeDefined()
   })
 
   it('triggers on copse-add when it matches forest or grove', () => {
-    const listener = findListener('C154-twin-researcher-before-place-farmer')!
+
     const session = new GameSession(undefined, undefined, { playerCount: 2 })
+    const listener = findListener(session, 'C154-twin-researcher-before-place-farmer')!
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
@@ -197,24 +201,24 @@ describe('C154_TwinResearcher session', () => {
     const grove = ensureAccumulationSpace(state, 'grove', 'wood', 5)
     const copseAdd = ensureAccumulationSpace(state, 'copse-add', 'wood', 4)
 
-    let result = executeCardListener(listener, {
+    let result = session.withCtx(() => executeCardListener(listener, {
       state,
       player,
       space: copseAdd,
       actionId: 'place-farmer',
       phase: 'before',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
     expect(result).toBeDefined()
 
     setResource(forest, 'wood', 5)
     setResource(grove, 'wood', 4)
-    result = executeCardListener(listener, {
+    result = session.withCtx(() => executeCardListener(listener, {
       state,
       player,
       space: copseAdd,
       actionId: 'place-farmer',
       phase: 'before',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
     expect(result).toBeDefined()
   })
 })

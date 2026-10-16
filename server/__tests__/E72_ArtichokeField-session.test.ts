@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 
@@ -63,7 +59,7 @@ describe('E072_ArtichokeField session', () => {
       const session = setup({ grain: 1 })
       const state = session.getState().state
       const player = state.players[0]!
-      const extras = computeExtraSowableFields(player)
+      const extras = session.withCtx(() => computeExtraSowableFields(player))
       expect(extras.length).toBe(1)
       expect(extras[0].tile).toEqual({ row: ROW, col: COL })
       expect(extras[0].allowedCrops).toContain('grain')
@@ -79,7 +75,7 @@ describe('E072_ArtichokeField session', () => {
       player.cardStates[CARD_ID] = {
         extraData: { cardFieldStacks: [{ crop: 'grain', remaining: 3 }] },
       }
-      const extras = computeExtraSowableFields(player)
+      const extras = session.withCtx(() => computeExtraSowableFields(player))
       expect(extras.length).toBe(0)
     })
   })
@@ -223,7 +219,7 @@ describe('E072_ArtichokeField session', () => {
 
       // Drive 4 harvests — last one is a no-op once remaining=0.
       for (let i = 0; i < 4; i++) {
-        reap(state, player)
+        session.withCtx(() => reap(state, player))
       }
       expect(player.resources.grain).toBe(3)
       expect(player.resources.food).toBe(3)
@@ -243,7 +239,7 @@ describe('E072_ArtichokeField session', () => {
       session.loadState(state)
 
       for (let i = 0; i < 3; i++) {
-        reap(state, player)
+        session.withCtx(() => reap(state, player))
       }
       expect(player.resources.vegetable).toBe(2)
       expect(player.resources.food).toBe(2)
@@ -259,7 +255,7 @@ describe('E072_ArtichokeField session', () => {
       // No stacks set — empty card field.
       session.loadState(state)
 
-      reap(state, player)
+      session.withCtx(() => reap(state, player))
       expect(player.resources.food).toBe(0)
     })
 
@@ -275,7 +271,7 @@ describe('E072_ArtichokeField session', () => {
 
       const foodBefore = player.resources.food
       const vegBefore = player.resources.vegetable
-      reap(state, player)
+      session.withCtx(() => reap(state, player))
       expect(player.resources.vegetable).toBe(vegBefore + 1)
       expect(player.resources.food).toBe(foodBefore + 1)
     })

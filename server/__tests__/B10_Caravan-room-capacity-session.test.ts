@@ -1,7 +1,5 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
+import { withActiveRegistry } from '../../shared/cards/active-registry'
+import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
@@ -15,7 +13,8 @@ const CARD_ID = 'B010_Caravan'
 
 describe('B010_Caravan — provides room for 1 person via computeExtraRoomCapacity', () => {
   it('exposes computeExtraRoomCapacity on the effect', () => {
-    const effect = getCardEffect(CARD_ID)
+    const ruleRegistry = createOfficialCardRegistry()
+    const effect = withActiveRegistry(ruleRegistry, () => getCardEffect(CARD_ID))
     expect(effect).toBeDefined()
     expect(effect!.computeExtraRoomCapacity).toBeDefined()
   })
@@ -28,8 +27,8 @@ describe('B010_Caravan — provides room for 1 person via computeExtraRoomCapaci
     player.minorPlayed.push(CARD_ID)
     session.loadState(state)
 
-    const effect = getCardEffect(CARD_ID)
-    expect(effect!.computeExtraRoomCapacity!(player)).toBe(1)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
+    expect(session.withCtx(() => effect!.computeExtraRoomCapacity!(player))).toBe(1)
   })
 
   it('returns 0 when the card is not played', () => {
@@ -39,8 +38,8 @@ describe('B010_Caravan — provides room for 1 person via computeExtraRoomCapaci
     const player = state.players[0]!
     session.loadState(state)
 
-    const effect = getCardEffect(CARD_ID)
-    expect(effect!.computeExtraRoomCapacity!(player)).toBe(0)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
+    expect(session.withCtx(() => effect!.computeExtraRoomCapacity!(player))).toBe(0)
   })
 })
 

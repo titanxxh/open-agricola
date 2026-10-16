@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import {
@@ -28,7 +24,7 @@ describe('E086_PenBuilder getInvalidAnimals', () => {
   it('zone push carries cardId', () => {
     const session = setup(2)
     const player = session.getState().state.players[0]!
-    const zone = computeAnimalZones(player).find(z => z.id === `card:E086_PenBuilder`)!
+    const zone = session.withCtx(() => computeAnimalZones(player)).find(z => z.id === `card:E086_PenBuilder`)!
     expect(zone.cardId).toBe('E086_PenBuilder')
   })
 
@@ -36,7 +32,7 @@ describe('E086_PenBuilder getInvalidAnimals', () => {
     const session = setup(2)
     const state = session.getState().state
     const player = state.players[0]!
-    const zone = computeAnimalZones(player).find(z => z.id === `card:E086_PenBuilder`)!
+    const zone = session.withCtx(() => computeAnimalZones(player)).find(z => z.id === `card:E086_PenBuilder`)!
     zone.animalType = 'cattle'
     zone.animalCount = 4
     expect(computeInvalidAnimalsForZone(state, player, zone)).toEqual([])

@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 
 import { GameSession } from '../game/authoritative-session'
@@ -287,7 +283,7 @@ describe('M034/M035 Farmers of the Moor animal zones', () => {
     )
     session.loadState(state)
 
-    expect(session.hasPendingAnimalsCheck(session.state.players[0]!)).toBe(true)
+    expect(session.withCtx(() => session.hasPendingAnimalsCheck(session.state.players[0]!))).toBe(true)
   })
 
   it('M034 visible zone storage is not double-counted when another animal is gained', () => {
@@ -318,7 +314,7 @@ describe('M034/M035 Farmers of the Moor animal zones', () => {
     state.players[0]!.resources.boar = 1
     session.loadState(state)
 
-    expect(session.hasPendingAnimalsCheck(session.state.players[0]!)).toBe(true)
+    expect(session.withCtx(() => session.hasPendingAnimalsCheck(session.state.players[0]!))).toBe(true)
   })
 
   it('M035 creates horse capacity only on unused spaces adjacent to the house and keeps the space unused', () => {

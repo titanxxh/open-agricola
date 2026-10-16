@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { executeCardListener, getRegisteredCardListeners, type CardListenerContext } from '../../shared/cards/card-listeners'
@@ -332,18 +328,18 @@ describe('D024 Brotherly Love session', () => {
     const dayLaborer = state.actionSpaces.find((space) => space.id === 'day-laborer')!
     addWorkerRef(dayLaborer, player.id, temporaryWorker.id)
     recordRoundPlacement(player, dayLaborer.id, temporaryWorker.id)
-    const listener = getRegisteredCardListeners().find(
+    const listener = session.withCtx(() => getRegisteredCardListeners()).find(
       (entry) => entry.id === 'D24-brotherly-love-after-place-farmer',
     )!
 
-    const result = executeCardListener(listener, {
+    const result = session.withCtx(() => executeCardListener(listener, {
       state,
       player,
       space: dayLaborer,
       actionId: 'place-farmer',
       phase: 'after',
       actionContext: { temporaryFromSupply: true, placedWorkerId: temporaryWorker.id },
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeDefined()
     const flow = result!.flow as Extract<ActionFlow, { type: 'leaf' }>
@@ -362,18 +358,18 @@ describe('D024 Brotherly Love session', () => {
     removeWorkerRef(dayLaborer, player.id, '3')
     addWorkerRef(grainSeeds, player.id, '3')
     recordRoundPlacement(player, grainSeeds.id, '3', true)
-    const listener = getRegisteredCardListeners().find(
+    const listener = session.withCtx(() => getRegisteredCardListeners()).find(
       (entry) => entry.id === 'D24-brotherly-love-after-place-farmer',
     )!
 
-    const result = executeCardListener(listener, {
+    const result = session.withCtx(() => executeCardListener(listener, {
       state,
       player,
       space: grainSeeds,
       actionId: 'place-farmer',
       phase: 'after',
       actionContext: { viaCardJump: true, workerId: '3', targetSpaceId: grainSeeds.id },
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeUndefined()
   })

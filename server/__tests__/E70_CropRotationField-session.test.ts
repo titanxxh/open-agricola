@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -147,7 +143,7 @@ describe('E070_CropRotationField session', () => {
       const state = session.getState().state
       const player = state.players[0]!
 
-      const extraFields = computeExtraSowableFields(player)
+      const extraFields = session.withCtx(() => computeExtraSowableFields(player))
       const cardField = extraFields.find(
         (f) => f.tile.row === -1 && f.tile.col === 5070,
       )
@@ -165,7 +161,7 @@ describe('E070_CropRotationField session', () => {
       const state = session.getState().state
       const player = state.players[0]!
 
-      const extraFields = computeExtraSowableFields(player)
+      const extraFields = session.withCtx(() => computeExtraSowableFields(player))
       const cardField = extraFields.find(
         (f) => f.tile.row === -1 && f.tile.col === 5070,
       )
@@ -230,10 +226,10 @@ describe('E070_CropRotationField session', () => {
       const player = session.getState().state.players[0]!
       writeCardExtraData(player, CARD_ID, 'selectedPositions', ['-1-5070'])
 
-      const interaction = buildSowFarmInteraction(player, {
+      const interaction = session.withCtx(() => buildSowFarmInteraction(player, {
         allowedFields: 'fromSelectedFields',
         sourceCard: CARD_ID,
-      })
+      }))
 
       expect(interaction.farmType).toBe('sow')
       if (interaction.farmType !== 'sow') {

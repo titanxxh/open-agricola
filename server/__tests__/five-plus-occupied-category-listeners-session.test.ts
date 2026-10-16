@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { recordRoundPlacement, resetRoundPlacements } from '../../shared/cards/helpers/round-placement'
@@ -138,8 +134,8 @@ describe('5+ occupied category listener cards', () => {
     const owner = state.players[0]!
     recordRoundPlacement(owner, 'forest', 'extra-forest-use')
     const forest = state.actionSpaces.find((space) => space.id === 'forest')!
-    const listener = getRegisteredCardListeners().find((entry) => entry.id === 'D176-woodshacker-after-wood')!
-    const result = executeCardListener(listener, {
+    const listener = session.withCtx(() => getRegisteredCardListeners()).find((entry) => entry.id === 'D176-woodshacker-after-wood')!
+    const result = session.withCtx(() => executeCardListener(listener, {
       state,
       player: owner,
       ownerPlayer: owner,
@@ -147,7 +143,7 @@ describe('5+ occupied category listener cards', () => {
       space: forest,
       actionId: 'place-farmer',
       phase: 'after',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result?.flow).toMatchObject({
       actionId: 'gain',

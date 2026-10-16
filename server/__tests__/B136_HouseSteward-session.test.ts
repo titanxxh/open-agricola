@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 
 import { GameSession } from '../game/authoritative-session'
@@ -80,7 +76,7 @@ describe('B136_HouseSteward session', () => {
     state.players[1]!.rooms = 4
     state.players[2]!.rooms = 4
 
-    const scores = computeScores(state)
+    const scores = session.withCtx(() => computeScores(state))
     const byPlayerId = new Map(scores.map((entry) => [entry.playerId, entry]))
 
     expect(
@@ -102,7 +98,7 @@ describe('B136_HouseSteward session', () => {
     state.players[1]!.rooms = 4
     state.players[2]!.rooms = 4
 
-    const scores = computeScores(state)
+    const scores = session.withCtx(() => computeScores(state))
 
     expect(
       scores.some((entry) =>

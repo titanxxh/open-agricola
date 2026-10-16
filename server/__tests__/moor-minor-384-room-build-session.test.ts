@@ -1,7 +1,4 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
+import type { GameSession as SessionRuleOwner } from '../game/authoritative-session'
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import {
@@ -115,8 +112,8 @@ const selectStables = (session: GameSession, resp: SessionResponse, count: numbe
   })
 }
 
-const listenerById = (id: string) => {
-  const listener = getRegisteredCardListeners().find((entry) => entry.id === id)
+const listenerById = (ruleOwner: SessionRuleOwner, id: string) => {
+  const listener = ruleOwner.withCtx(() => getRegisteredCardListeners()).find((entry) => entry.id === id)
   expect(listener).toBeDefined()
   return listener!
 }
@@ -167,9 +164,9 @@ describe('M036 Peat Moss', () => {
   it('requires no visible moors', () => {
     const session = setup()
     const player = session.state.players[0]!
-    expect(meetsCardPrerequisites(player, M036_PeatMoss, 1, session.state)).toBe(true)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, M036_PeatMoss, 1, session.state))).toBe(true)
     player.farmTerrain = [{ row: 0, col: 0, kind: 'moor' }]
-    expect(meetsCardPrerequisites(player, M036_PeatMoss, 1, session.state)).toBe(false)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, M036_PeatMoss, 1, session.state))).toBe(false)
   })
 
   it('builds a wooden room for 3 wood and 1 reed', () => {
@@ -213,13 +210,13 @@ describe('M037 Building Plan', () => {
     const state = session.state
     const player = state.players[0]!
     player.minorPlayed = ['M037_BuildingPlan']
-    recordActionSnapshot(player, 1)
+    session.withCtx(() => recordActionSnapshot(player, 1))
     player.roomTiles.push({ row: 0, col: 1 })
-    const oneRoom = executeCardListener(listenerById('M037-building-plan-after-construct'), context('M037_BuildingPlan', 'construct', player, state))
+    const oneRoom = session.withCtx(() => executeCardListener(listenerById(session, 'M037-building-plan-after-construct'), context('M037_BuildingPlan', 'construct', player, state)))
     expect(oneRoom).toBeUndefined()
 
     player.roomTiles.push({ row: 0, col: 2 })
-    const twoRooms = executeCardListener(listenerById('M037-building-plan-after-construct'), context('M037_BuildingPlan', 'construct', player, state))
+    const twoRooms = session.withCtx(() => executeCardListener(listenerById(session, 'M037-building-plan-after-construct'), context('M037_BuildingPlan', 'construct', player, state)))
     expect(twoRooms?.flow).toMatchObject({
       type: 'leaf',
       actionId: 'stables',
@@ -257,10 +254,10 @@ describe('M061 Hay Wagon', () => {
     player.minorPlayed = ['M061_HayWagon']
     const events = [moved('wood', 3)]
 
-    const result = executeCardListener(listenerById('M061-hay-wagon-after-collect'), context('M061_HayWagon', 'collect', player, state, {
+    const result = session.withCtx(() => executeCardListener(listenerById(session, 'M061-hay-wagon-after-collect'), context('M061_HayWagon', 'collect', player, state, {
       actionEvents: events,
       transactionEvents: events,
-    }))
+    })))
 
     expect(result?.flow).toMatchObject({ type: 'xor', optional: true })
     expect(actionIds(result?.flow)).toEqual(['construct', 'renovate-house'])
@@ -279,10 +276,10 @@ describe('M061 Hay Wagon', () => {
     player.minorPlayed = ['M061_HayWagon']
     const events = [moved('wood', 2), moved('reed', 1)]
 
-    const result = executeCardListener(listenerById('M061-hay-wagon-after-collect'), context('M061_HayWagon', 'collect', player, state, {
+    const result = session.withCtx(() => executeCardListener(listenerById(session, 'M061-hay-wagon-after-collect'), context('M061_HayWagon', 'collect', player, state, {
       actionEvents: events,
       transactionEvents: events,
-    }))
+    })))
 
     expect(result).toBeUndefined()
   })
@@ -315,10 +312,10 @@ describe('M091 Routine Work', () => {
     const session = setup()
     const player = session.state.players[0]!
 
-    expect(meetsCardPrerequisites(player, { id: 'M091_RoutineWork', prerequisite: 'No Improvements' }, session.state.round, session.state)).toBe(true)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, { id: 'M091_RoutineWork', prerequisite: 'No Improvements' }, session.state.round, session.state))).toBe(true)
 
     player.minorPlayed = ['A001_Shelter']
-    expect(meetsCardPrerequisites(player, { id: 'M091_RoutineWork', prerequisite: 'No Improvements' }, session.state.round, session.state)).toBe(false)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, { id: 'M091_RoutineWork', prerequisite: 'No Improvements' }, session.state.round, session.state))).toBe(false)
   })
 
   it('marks craft buildings used from resource.exchanged exchangeSource', () => {
@@ -330,10 +327,10 @@ describe('M091 Routine Work', () => {
     player.minorPlayed = ['M091_RoutineWork']
     const events = [exchanged('Major_Joinery')]
 
-    const result = executeCardListener(listenerById('M091-routine-work-after-exchange'), context('M091_RoutineWork', 'exchange', player, state, {
+    const result = session.withCtx(() => executeCardListener(listenerById(session, 'M091-routine-work-after-exchange'), context('M091_RoutineWork', 'exchange', player, state, {
       actionEvents: events,
       transactionEvents: events,
-    }))
+    })))
 
     expect(result?.flow).toMatchObject({
       type: 'leaf',
@@ -352,14 +349,14 @@ describe('M091 Routine Work', () => {
     player.minorPlayed = ['M091_RoutineWork']
     const events = [exchanged('Major_Moor_FurnitureStall')]
 
-    const exchangeResult = executeCardListener(listenerById('M091-routine-work-after-exchange'), context('M091_RoutineWork', 'exchange', player, state, {
+    const exchangeResult = session.withCtx(() => executeCardListener(listenerById(session, 'M091-routine-work-after-exchange'), context('M091_RoutineWork', 'exchange', player, state, {
       actionEvents: events,
       transactionEvents: events,
-    }))
-    const tradeAppliedResult = executeCardListener(listenerById('M091-routine-work-trade-applied'), context('M091_RoutineWork', 'trade-applied', player, state, {
+    })))
+    const tradeAppliedResult = session.withCtx(() => executeCardListener(listenerById(session, 'M091-routine-work-trade-applied'), context('M091_RoutineWork', 'trade-applied', player, state, {
       phase: 'immediatelyAfter',
       extraData: { sourceId: 'Major_Moor_FurnitureStall' },
-    }))
+    })))
 
     expect(exchangeResult).toBeUndefined()
     expect(tradeAppliedResult).toBeUndefined()
@@ -373,7 +370,7 @@ describe('M091 Routine Work', () => {
     player.improvements = ['Major_Joinery', 'Major_Pottery', 'Major_Basket']
     writeCardExtraData(player, 'M091_RoutineWork', 'usedCraftBuildingIds', ['Major_Joinery'])
 
-    const flow = getCardEffect('M091_RoutineWork')?.onEndHarvestFeedingPhase?.(state, player)
+    const flow = session.withCtx(() => session.withCtx(() => getCardEffect('M091_RoutineWork'))?.onEndHarvestFeedingPhase?.(state, player))
 
     expect(flow?.type).toBe('seq')
     const seq = flow as Extract<ActionFlow, { type: 'seq' }>
@@ -398,7 +395,7 @@ describe('M091 Routine Work', () => {
     player.improvements = ['Major_Joinery', 'Major_Pottery']
     writeCardExtraData(player, 'M091_RoutineWork', 'usedCraftBuildingIds', ['Major_Joinery', 'Major_Pottery'])
 
-    const flow = getCardEffect('M091_RoutineWork')?.onEndHarvestFeedingPhase?.(state, player)
+    const flow = session.withCtx(() => session.withCtx(() => getCardEffect('M091_RoutineWork'))?.onEndHarvestFeedingPhase?.(state, player))
 
     expect(flow).toBeUndefined()
   })
@@ -410,7 +407,7 @@ describe('M091 Routine Work', () => {
     player.minorPlayed = ['M091_RoutineWork']
     player.improvements = ['Major_Moor_FurnitureStall', 'Major_Moor_CeramicsStall', 'Major_Moor_BasketStall']
 
-    const flow = getCardEffect('M091_RoutineWork')?.onEndHarvestFeedingPhase?.(state, player)
+    const flow = session.withCtx(() => session.withCtx(() => getCardEffect('M091_RoutineWork'))?.onEndHarvestFeedingPhase?.(state, player))
 
     expect(flow).toBeUndefined()
   })

@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { familySize, markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
@@ -53,8 +49,8 @@ const bonus = (r: SessionResponse, id: string) => r.scores[0]!.categories.find((
 describe('E012 Animal Bedding parity', () => {
   it('E012 S1: one grain field allows Animal Bedding to be played', () => { const s = setup({ cardId: 'E012_AnimalBedding', played: false }); s.state.players[0]!.fields = [{ row: 1, col: 0, stacks: [{ kind: 'grain', remaining: 1 }] }]; s.loadState(s.state); expect(playMinor(s, 'E012_AnimalBedding').state.players[0]!.minorPlayed).toContain('E012_AnimalBedding') })
   it('E012 S2: without a grain field Animal Bedding is unavailable', () => expect(playMinor(setup({ cardId: 'E012_AnimalBedding', played: false }), 'E012_AnimalBedding').state.players[0]!.minorPlayed).not.toContain('E012_AnimalBedding'))
-  it('E012 S3: an unfenced stable can hold two animals with Animal Bedding', () => { const s = setup({ cardId: 'E012_AnimalBedding' }); s.state.players[0]!.stableTiles = [{ row: 2, col: 2 }]; s.loadState(s.state); expect(computeAnimalZones(s.state.players[0]!, s.state).find((z) => z.zoneType === 'stable')?.capacity).toBe(2) })
-  it('E012 S4: a stabled one-cell pasture can hold six animals', () => { const s = setup({ cardId: 'E012_AnimalBedding' }); s.state.players[0]!.pastures = [{ id: 'p', size: 1, tiles: [{ row: 2, col: 2 }], stables: 1, animalType: null, animalCount: 0 }]; s.state.players[0]!.stableTiles = [{ row: 2, col: 2 }]; s.loadState(s.state); expect(computeAnimalZones(s.state.players[0]!, s.state).find((z) => z.zoneType === 'pasture')?.capacity).toBe(6) })
+  it('E012 S3: an unfenced stable can hold two animals with Animal Bedding', () => { const s = setup({ cardId: 'E012_AnimalBedding' }); s.state.players[0]!.stableTiles = [{ row: 2, col: 2 }]; s.loadState(s.state); expect(s.withCtx(() => computeAnimalZones(s.state.players[0]!, s.state)).find((z) => z.zoneType === 'stable')?.capacity).toBe(2) })
+  it('E012 S4: a stabled one-cell pasture can hold six animals', () => { const s = setup({ cardId: 'E012_AnimalBedding' }); s.state.players[0]!.pastures = [{ id: 'p', size: 1, tiles: [{ row: 2, col: 2 }], stables: 1, animalType: null, animalCount: 0 }]; s.state.players[0]!.stableTiles = [{ row: 2, col: 2 }]; s.loadState(s.state); expect(s.withCtx(() => computeAnimalZones(s.state.players[0]!, s.state)).find((z) => z.zoneType === 'pasture')?.capacity).toBe(6) })
 })
 
 describe('E017 Skimmer Plow parity', () => {

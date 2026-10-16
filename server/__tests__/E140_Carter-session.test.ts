@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { afterEach, describe, expect, it } from 'vitest'
 import { createWorkSession } from './_helpers/session-fixtures'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'

@@ -1,12 +1,3 @@
-import { ActionHookRegistry } from '../../shared/actions/hooks'
-import { beforeEach as beforeEachActionHooks } from 'vitest'
-
-let actionHooks: ActionHookRegistry
-beforeEachActionHooks(() => { actionHooks = new ActionHookRegistry() })
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -18,6 +9,8 @@ import { readCardResourceStats } from '../../shared/cards/helpers/card-state'
 
 import '../../shared/cards/C/C088_CarpentersApprentice'
 import '../../shared/cards/B/B030_WoodPalisades'
+
+type OwnedPlayer = { session: GameSession; player: PlayerState }
 
 const CARD_ID = 'C088_CarpentersApprentice'
 
@@ -100,7 +93,7 @@ describe('C088 Carpenter\'s Apprentice parity', () => {
   })
 })
 
-const makeFencePlayer = (fenceCount: number, wood = 0): PlayerState => {
+const makeFencePlayer = (fenceCount: number, wood = 0): OwnedPlayer => {
   const session = new GameSession(42)
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
@@ -116,11 +109,11 @@ const makeFencePlayer = (fenceCount: number, wood = 0): PlayerState => {
     type: 'fence' as const,
   }))
   p.resources.wood = wood
-  return p
+  return { session, player: p }
 }
 
-const fenceCostWood = (player: PlayerState, newFenceEdges: string[]): number => {
-  const listener = getRegisteredCardListeners().find(
+const fenceCostWood = ({ session, player }: OwnedPlayer, newFenceEdges: string[]): number => {
+  const listener = session.withCtx(() => getRegisteredCardListeners()).find(
     (l) =>
       l.cardIds?.includes('C088_CarpentersApprentice') &&
       l.actions?.includes('fence') &&
@@ -128,7 +121,7 @@ const fenceCostWood = (player: PlayerState, newFenceEdges: string[]): number => 
   )
   if (!listener) throw new Error('C88 fenceCostListener (computeCosts/fence) not registered')
   const ctx = {
-    actionHooks,
+    actionHooks: session.actionHooks,
     state: {} as GameState,
     player,
     space: {} as never,
@@ -136,7 +129,7 @@ const fenceCostWood = (player: PlayerState, newFenceEdges: string[]): number => 
     phase: 'computeCosts',
     params: { newFenceEdges },
   } as unknown as CardListenerContext
-  const result = listener.handler(ctx)
+  const result = session.withCtx(() => listener.handler(ctx))
   if (!result || typeof result !== 'object') return 0
   return (result as { costs?: { wood?: number } }).costs?.wood ?? 0
 }
@@ -144,8 +137,8 @@ const fenceCostWood = (player: PlayerState, newFenceEdges: string[]): number => 
 const fenceEdges = (n: number): string[] =>
   Array.from({ length: n }, (_, i) => `new-edge-${i}`)
 
-const stablesDiscount = (player: PlayerState, stableCount = 1): number => {
-  const listeners = getRegisteredCardListeners().filter((l) =>
+const stablesDiscount = ({ session, player }: OwnedPlayer, stableCount = 1): number => {
+  const listeners = session.withCtx(() => getRegisteredCardListeners()).filter((l) =>
     l.cardIds?.includes('C088_CarpentersApprentice'),
   )
   const stableListener = listeners.find(
@@ -155,7 +148,7 @@ const stablesDiscount = (player: PlayerState, stableCount = 1): number => {
   )
   if (!stableListener) return 0
   const ctx = {
-    actionHooks,
+    actionHooks: session.actionHooks,
     state: {} as GameState,
     player,
     space: {} as never,
@@ -163,7 +156,7 @@ const stablesDiscount = (player: PlayerState, stableCount = 1): number => {
     phase: 'computeCosts',
     params: { stableCount, stableUnitCost: { wood: 2 } },
   } as unknown as CardListenerContext
-  const result = stableListener.handler(ctx)
+  const result = session.withCtx(() => stableListener.handler(ctx))
   if (!result || typeof result !== 'object') return 0
   const minimumUses = (result as { trades?: { groupMin?: number }[] }).trades?.[0]?.groupMin
   return -(minimumUses ?? 0)
@@ -234,7 +227,7 @@ describe('C88 Carpenter\'s Apprentice — session w/ palisades', () => {
   })
 
   describe('stables-cost listener cap (3rd & 4th stables only)', () => {
-    const makePlayer = (stables: number, farmHand = false): PlayerState => {
+    const makePlayer = (stables: number, farmHand = false): OwnedPlayer => {
       const session = new GameSession(42)
       stabilizeRandomHands(session.state.players)
       const state = session.getState().state
@@ -248,7 +241,7 @@ describe('C88 Carpenter\'s Apprentice — session w/ palisades', () => {
           B085_FarmHand: { extraData: { position: { row: 2, col: 2 } } },
         }
       }
-      return p
+      return { session, player: p }
     }
 
     it('0 stables built → no discount on next stable (1st)', () => {
@@ -301,9 +294,10 @@ describe('C88 — fenceCostListener 区间公式(第 13-15 个 fence 免费)', (
     expect(fenceCostWood(makeFencePlayer(12), fenceEdges(3))).toBe(-3)
   })
   it('consumed fence supply removes the 15th fence from the free interval', () => {
-    const player = makeFencePlayer(12)
+    const fixture = makeFencePlayer(12)
+    const { player } = fixture
     player.supplyTokensConsumed = { fence: 1 }
-    expect(fenceCostWood(player, fenceEdges(3))).toBe(-2)
+    expect(fenceCostWood(fixture, fenceEdges(3))).toBe(-2)
   })
   it('before 13,造 2 个(第 14/15)→ -2', () => {
     expect(fenceCostWood(makeFencePlayer(13), fenceEdges(2))).toBe(-2)
@@ -319,8 +313,8 @@ describe('C88 — fenceCostListener 区间公式(第 13-15 个 fence 免费)', (
   })
 })
 
-const fenceDoable = (player: PlayerState, state = {} as GameState): boolean => {
-  const listener = getRegisteredCardListeners().find(
+const fenceDoable = ({ session, player }: OwnedPlayer, state = {} as GameState): boolean => {
+  const listener = session.withCtx(() => getRegisteredCardListeners()).find(
     (l) =>
       l.cardIds?.includes('C088_CarpentersApprentice') &&
       l.actions?.includes('fence') &&
@@ -328,7 +322,7 @@ const fenceDoable = (player: PlayerState, state = {} as GameState): boolean => {
   )
   if (!listener) throw new Error('C88 fenceIsDoableListener (isDoable/fence) not registered')
   const ctx = {
-    actionHooks,
+    actionHooks: session.actionHooks,
     state,
     player,
     space: {} as never,
@@ -336,7 +330,7 @@ const fenceDoable = (player: PlayerState, state = {} as GameState): boolean => {
     phase: 'isDoable',
     doable: false,
   } as unknown as CardListenerContext
-  const result = listener.handler(ctx)
+  const result = session.withCtx(() => listener.handler(ctx))
   return (result as { doable?: boolean } | void)?.doable === true
 }
 
@@ -370,7 +364,7 @@ describe('C88 — fenceIsDoableListener 精确 reference doability', () => {
       'V-0-1', 'V-1-1', 'V-2-1', 'V-0-5',
     ].map((edge) => ({ edge, type: 'fence' as const }))
 
-    expect(fenceDoable(player, state)).toBe(false)
+    expect(fenceDoable({ session, player }, state)).toBe(false)
   })
   it('before 10,wood 1 → 不 doable(自费撑不到第 12 个)', () => {
     expect(fenceDoable(makeFencePlayer(10, 1))).toBe(false)
@@ -388,9 +382,10 @@ describe('C88 — fenceIsDoableListener 精确 reference doability', () => {
     expect(fenceDoable(makeFencePlayer(15, 0))).toBe(false)
   })
   it('consumed fence supply makes the dynamic 14th fence the cap', () => {
-    const player = makeFencePlayer(14, 0)
+    const fixture = makeFencePlayer(14, 0)
+    const { player } = fixture
     player.supplyTokensConsumed = { fence: 1 }
-    expect(fenceDoable(player)).toBe(false)
+    expect(fenceDoable(fixture)).toBe(false)
   })
 })
 
@@ -399,28 +394,30 @@ describe('C88 — fence 折扣经 collectComputeCostsForFarmChoice 聚合', () =
     const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
-    const player = makeFencePlayer(12)
+    const fixture = makeFencePlayer(12)
+    const { player } = fixture
     state.players[0] = player
-    const result = collectComputeCostsForFarmChoice(session.actionHooks,
+    const result = session.withCtx(() => collectComputeCostsForFarmChoice(session.actionHooks,
       state,
       player,
       'fence',
       { newFenceEdges: fenceEdges(3) },
-    )
+    ))
     expect(result.wood).toBe(-3)
   })
   it('before 0,造 2 个 → 聚合无 wood 折扣', () => {
     const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
-    const player = makeFencePlayer(0)
+    const fixture = makeFencePlayer(0)
+    const { player } = fixture
     state.players[0] = player
-    const result = collectComputeCostsForFarmChoice(session.actionHooks,
+    const result = session.withCtx(() => collectComputeCostsForFarmChoice(session.actionHooks,
       state,
       player,
       'fence',
       { newFenceEdges: fenceEdges(2) },
-    )
+    ))
     expect(result.wood ?? 0).toBe(0)
   })
 })

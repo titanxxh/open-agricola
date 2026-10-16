@@ -1,7 +1,4 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
+import type { GameSession as SessionRuleOwner } from '../game/authoritative-session'
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { executeCardListener, getRegisteredCardListeners, type CardListenerContext } from '../../shared/cards/card-listeners'
@@ -16,8 +13,8 @@ import type { ActionFlow } from '../../shared/contract/types'
 const CARD_ID = 'C117_Legworker'
 const FILLER = '__test_placeholder__'
 
-const findListener = (id: string) =>
-  getRegisteredCardListeners().find((l) => l.id === id)
+const findListener = (ruleOwner: SessionRuleOwner, id: string) =>
+  ruleOwner.withCtx(() => getRegisteredCardListeners()).find((l) => l.id === id)
 
 const setupParity = ({ played = true } = {}) => {
   const session = new GameSession(5117, undefined, { playerCount: 2 })
@@ -107,9 +104,11 @@ describe('C117_Legworker session', () => {
   })
 
   it('after-place-farmer gains 1 wood when adjacent to own worker', () => {
-    const listener = findListener('C117-legworker-after-place-farmer')!
-    expect(listener).toBeDefined()
+
+
     const session = new GameSession(42)
+    const listener = findListener(session, 'C117-legworker-after-place-farmer')!
+    expect(listener).toBeDefined()
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
@@ -120,13 +119,13 @@ describe('C117_Legworker session', () => {
     session.loadState(state)
 
     const farmland = state.actionSpaces.find((s) => s.id === 'farmland')!
-    const result = executeCardListener(listener, {
+    const result = session.withCtx(() => executeCardListener(listener, {
       state,
       player,
       space: farmland,
       actionId: 'place-farmer',
       phase: 'after',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
     expect(result).toBeDefined()
     const leaf = result!.flow as Extract<ActionFlow, { type: 'leaf' }>
     expect(leaf.actionId).toBe('gain')
@@ -135,8 +134,9 @@ describe('C117_Legworker session', () => {
   })
 
   it('does not trigger when no adjacent worker', () => {
-    const listener = findListener('C117-legworker-after-place-farmer')!
+
     const session = new GameSession(42)
+    const listener = findListener(session, 'C117-legworker-after-place-farmer')!
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
@@ -144,13 +144,13 @@ describe('C117_Legworker session', () => {
     session.loadState(state)
 
     const farmland = state.actionSpaces.find((s) => s.id === 'farmland')!
-    const result = executeCardListener(listener, {
+    const result = session.withCtx(() => executeCardListener(listener, {
       state,
       player,
       space: farmland,
       actionId: 'place-farmer',
       phase: 'after',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
     expect(result).toBeUndefined()
   })
 

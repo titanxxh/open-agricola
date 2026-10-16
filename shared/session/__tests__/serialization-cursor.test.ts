@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../../../server/game/authoritative-session'
 import { setWorkersAtHome } from '../../domain/player'

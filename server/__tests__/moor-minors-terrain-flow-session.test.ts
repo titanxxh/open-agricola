@@ -1,7 +1,4 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
+import type { GameSession as SessionRuleOwner } from '../game/authoritative-session'
 import { describe, expect, it } from 'vitest'
 
 import { GameSession } from '../game/authoritative-session'
@@ -132,8 +129,8 @@ const commitTerrain = (
   })
 }
 
-const cardBonusVp = (state: GameState) =>
-  Scoring.breakdown(state, 0).categories.find((category) => category.key === 'cardBonusVp')?.total ?? 0
+const cardBonusVp = (ruleOwner: SessionRuleOwner, state: GameState) =>
+  ruleOwner.withCtx(() => Scoring.breakdown(state, 0)).categories.find((category) => category.key === 'cardBonusVp')?.total ?? 0
 
 const fillFarmForUnused = (player: PlayerState, unused: number) => {
   const all = getAllTilePositions()
@@ -250,37 +247,37 @@ describe('Farmers of the Moor terrain minor cards', () => {
     expect(resp.state.players[0]!.farmTerrain).toContainEqual({ ...target, kind: 'forest' })
 
     fillFarmForUnused(resp.state.players[0]!, 1)
-    expect(cardBonusVp(resp.state)).toBe(2)
+    expect(cardBonusVp(session, resp.state)).toBe(2)
     fillFarmForUnused(resp.state.players[0]!, 2)
-    expect(cardBonusVp(resp.state)).toBe(-1)
+    expect(cardBonusVp(session, resp.state)).toBe(-1)
     fillFarmForUnused(resp.state.players[0]!, 3)
-    expect(cardBonusVp(resp.state)).toBe(-3)
+    expect(cardBonusVp(session, resp.state)).toBe(-3)
   })
 
   it('adds custom prerequisites for terrain-count minor cards', () => {
     const session = setup('M040_MoorFire')
     const player = session.state.players[0]!
     player.farmTerrain = [{ ...terrain.moorA }]
-    expect(meetsCardPrerequisites(player, M040_MoorFire, session.state.round, session.state)).toBe(false)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, M040_MoorFire, session.state.round, session.state))).toBe(false)
     player.farmTerrain = [{ ...terrain.moorA }, { ...terrain.moorB }]
-    expect(meetsCardPrerequisites(player, M040_MoorFire, session.state.round, session.state)).toBe(true)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, M040_MoorFire, session.state.round, session.state))).toBe(true)
 
     player.farmTerrain = [{ ...terrain.forestA }, { ...terrain.forestB }, { ...terrain.forestC }]
-    expect(meetsCardPrerequisites(player, M016_ClearFelling, session.state.round, session.state)).toBe(true)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, M016_ClearFelling, session.state.round, session.state))).toBe(true)
     player.farmTerrain.push({ row: 2, col: 3, kind: 'forest' })
-    expect(meetsCardPrerequisites(player, M016_ClearFelling, session.state.round, session.state)).toBe(false)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, M016_ClearFelling, session.state.round, session.state))).toBe(false)
 
     player.improvements = ['Major_Well', 'Major_Joinery', 'Major_Pottery']
-    expect(meetsCardPrerequisites(player, M017_Reforestation, session.state.round, session.state)).toBe(true)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, M017_Reforestation, session.state.round, session.state))).toBe(true)
     player.improvements = ['Major_Well', 'Major_Joinery', 'Major_Pottery']
     player.minorPlayed = []
-    expect(meetsCardPrerequisites(player, M042_DeepPlow, session.state.round, session.state)).toBe(true)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, M042_DeepPlow, session.state.round, session.state))).toBe(true)
     player.improvements = ['Major_Well']
     player.minorPlayed = []
-    expect(meetsCardPrerequisites(player, M042_DeepPlow, session.state.round, session.state)).toBe(false)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, M042_DeepPlow, session.state.round, session.state))).toBe(false)
     player.improvements = ['Major_Well', 'Major_Joinery']
     player.minorPlayed = ['A037_Bucksaw']
-    expect(meetsCardPrerequisites(player, M066_LandParcel, session.state.round, session.state)).toBe(false)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, M066_LandParcel, session.state.round, session.state))).toBe(false)
 
     expect(M015_PeatBurnOff.implemented).toBe(true)
     expect(M021_PeatCuttingExpedition.implemented).toBe(true)

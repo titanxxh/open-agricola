@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import type { GameSession } from '../game/authoritative-session'
 import { createWorkSession } from './_helpers/session-fixtures'
@@ -348,7 +344,7 @@ describe('E053_BoarSpear session - exchange-based PIG -> 4 FOOD', () => {
   })
 
   it('does not fire during breeding phase', () => {
-    const { state } = setup({ food: 0 })
+    const { session: ruleSession, state } = setup({ food: 0 })
     const player = state.players[0]!
     player.id = 'p1'
     state.roundPhase = 'breeding'
@@ -365,11 +361,11 @@ describe('E053_BoarSpear session - exchange-based PIG -> 4 FOOD', () => {
       space: state.actionSpaces[0],
     }
 
-    expect(executeCardListener(listener, ctx as never)).toBeUndefined()
+    expect(ruleSession.withCtx(() => executeCardListener(listener, ctx as never))).toBeUndefined()
   })
 
   it('does not infer a new acquisition from transaction or global events without host action events', () => {
-    const { state } = setup({ food: 0 })
+    const { session: ruleSession, state } = setup({ food: 0 })
     const player = state.players[0]!
     player.id = 'p1'
     state.events = [
@@ -388,7 +384,7 @@ describe('E053_BoarSpear session - exchange-based PIG -> 4 FOOD', () => {
       space: state.actionSpaces[0],
     }
 
-    expect(executeCardListener(listener, ctx as never)).toBeUndefined()
+    expect(ruleSession.withCtx(() => executeCardListener(listener, ctx as never))).toBeUndefined()
   })
 
   it('coupling with E85 MasterTanner: exchange dispatch fires E85 listeners', () => {

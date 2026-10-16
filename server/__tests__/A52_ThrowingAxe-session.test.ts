@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -17,7 +13,7 @@ describe('A052_ThrowingAxe prerequisite', () => {
     const state = session.getState().state
     state.round = 6
     const player = state.players[0]!
-    expect(meetsCardPrerequisites(player, A052_ThrowingAxe, state.round, state)).toBe(false)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, A052_ThrowingAxe, state.round, state))).toBe(false)
   })
 
   it('allows when round >= 7', () => {
@@ -25,7 +21,7 @@ describe('A052_ThrowingAxe prerequisite', () => {
     const state = session.getState().state
     state.round = 7
     const player = state.players[0]!
-    expect(meetsCardPrerequisites(player, A052_ThrowingAxe, state.round, state)).toBe(true)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, A052_ThrowingAxe, state.round, state))).toBe(true)
   })
 })
 

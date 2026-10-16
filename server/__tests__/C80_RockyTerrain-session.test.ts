@@ -1,7 +1,6 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
+import { CardRegistry as TestCardRegistry } from '../../shared/cards/registry'
+import { withActiveRegistry } from '../../shared/cards/active-registry'
+import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -64,7 +63,10 @@ const createSpace = (id: string): ActionSpace =>
     takenBy: [],
   }) as ActionSpace
 
-const findListener = (id: string) => getRegisteredCardListeners().find(l => l.id === id)
+const findListener = (ruleOwner: TestCardRegistry, id: string) => {
+  const lookupRule1 = () => getRegisteredCardListeners().find(l => l.id === id)
+  return withActiveRegistry(ruleOwner, lookupRule1)
+}
 
 const expectPayGainStoneForFood = (result: { flow?: ActionFlow } | undefined) => {
   expect(result).toBeDefined()
@@ -252,33 +254,35 @@ describe('C080 Rocky Terrain parity session', () => {
 describe('C080_RockyTerrain', () => {
   describe('plow trigger', () => {
     it('returns pay-gain flow after plow when player has food', () => {
-      const listener = findListener('C80-rocky-terrain-after-plow')
+    const ruleRegistry = createOfficialCardRegistry()
+      const listener = findListener(ruleRegistry, 'C80-rocky-terrain-after-plow')
       expect(listener).toBeDefined()
 
       const player = createPlayer()
       player.resources.food = 3
       const state = createState(player)
 
-      const result = executeCardListener(listener!, {
+      const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener!, {
         state, player, space: createSpace('plow'),
         actionId: 'plow', phase: 'after',
-      } as unknown as CardListenerContext)
+      } as unknown as CardListenerContext))
 
       expectPayGainStoneForFood(result)
     })
 
     it('does not trigger plow flow when player has no food', () => {
-      const listener = findListener('C80-rocky-terrain-after-plow')
+    const ruleRegistry = createOfficialCardRegistry()
+      const listener = findListener(ruleRegistry, 'C80-rocky-terrain-after-plow')
       expect(listener).toBeDefined()
 
       const player = createPlayer()
       player.resources.food = 0
       const state = createState(player)
 
-      const result = executeCardListener(listener!, {
+      const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener!, {
         state, player, space: createSpace('plow'),
         actionId: 'plow', phase: 'after',
-      } as unknown as CardListenerContext)
+      } as unknown as CardListenerContext))
 
       expect(result).toBeUndefined()
     })
@@ -286,78 +290,83 @@ describe('C080_RockyTerrain', () => {
 
   describe('improvement field-card trigger (reference onPlayerAfterImprovement)', () => {
     it('triggers when a minor field card (B68 Beanfield) is built', () => {
-      const listener = findListener('C80-rocky-terrain-after-improvement-field')
+    const ruleRegistry = createOfficialCardRegistry()
+      const listener = findListener(ruleRegistry, 'C80-rocky-terrain-after-improvement-field')
       expect(listener).toBeDefined()
 
       const player = createPlayer()
       player.resources.food = 2
       const state = createState(player)
 
-      const result = executeCardListener(listener!, {
+      const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener!, {
         state, player, space: createSpace('improvement'),
         actionId: 'improvement', phase: 'after',
         choice: 'minor:B068_Beanfield',
-      } as unknown as CardListenerContext)
+      } as unknown as CardListenerContext))
 
       expectPayGainStoneForFood(result)
     })
 
     it('triggers when E70 CropRotationField is built', () => {
-      const listener = findListener('C80-rocky-terrain-after-improvement-field')
+    const ruleRegistry = createOfficialCardRegistry()
+      const listener = findListener(ruleRegistry, 'C80-rocky-terrain-after-improvement-field')
       const player = createPlayer()
       player.resources.food = 1
       const state = createState(player)
 
-      const result = executeCardListener(listener!, {
+      const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener!, {
         state, player, space: createSpace('improvement'),
         actionId: 'improvement', phase: 'after',
         choice: 'minor:E070_CropRotationField',
-      } as unknown as CardListenerContext)
+      } as unknown as CardListenerContext))
 
       expectPayGainStoneForFood(result)
     })
 
     it('does not trigger when a non-field minor improvement is built', () => {
-      const listener = findListener('C80-rocky-terrain-after-improvement-field')
+    const ruleRegistry = createOfficialCardRegistry()
+      const listener = findListener(ruleRegistry, 'C80-rocky-terrain-after-improvement-field')
       const player = createPlayer()
       player.resources.food = 5
       const state = createState(player)
 
-      const result = executeCardListener(listener!, {
+      const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener!, {
         state, player, space: createSpace('improvement'),
         actionId: 'improvement', phase: 'after',
         choice: 'minor:E054_Contraband',
-      } as unknown as CardListenerContext)
+      } as unknown as CardListenerContext))
 
       expect(result).toBeUndefined()
     })
 
     it('does not trigger when player has no food (even on field card)', () => {
-      const listener = findListener('C80-rocky-terrain-after-improvement-field')
+    const ruleRegistry = createOfficialCardRegistry()
+      const listener = findListener(ruleRegistry, 'C80-rocky-terrain-after-improvement-field')
       const player = createPlayer()
       player.resources.food = 0
       const state = createState(player)
 
-      const result = executeCardListener(listener!, {
+      const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener!, {
         state, player, space: createSpace('improvement'),
         actionId: 'improvement', phase: 'after',
         choice: 'minor:B068_Beanfield',
-      } as unknown as CardListenerContext)
+      } as unknown as CardListenerContext))
 
       expect(result).toBeUndefined()
     })
 
     it('triggers on D75 Wood Field stub (isField=true even though impl deferred)', () => {
-      const listener = findListener('C80-rocky-terrain-after-improvement-field')
+    const ruleRegistry = createOfficialCardRegistry()
+      const listener = findListener(ruleRegistry, 'C80-rocky-terrain-after-improvement-field')
       const player = createPlayer()
       player.resources.food = 1
       const state = createState(player)
 
-      const result = executeCardListener(listener!, {
+      const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener!, {
         state, player, space: createSpace('improvement'),
         actionId: 'improvement', phase: 'after',
         choice: 'minor:D075_WoodField',
-      } as unknown as CardListenerContext)
+      } as unknown as CardListenerContext))
 
       expectPayGainStoneForFood(result)
     })
@@ -365,48 +374,51 @@ describe('C080_RockyTerrain', () => {
 
   describe('occupation field-card trigger (reference onPlayerAfterOccupation)', () => {
     it('triggers when a field occupation (B113 PatchCaregiver) is played', () => {
-      const listener = findListener('C80-rocky-terrain-after-occupation-field')
+    const ruleRegistry = createOfficialCardRegistry()
+      const listener = findListener(ruleRegistry, 'C80-rocky-terrain-after-occupation-field')
       expect(listener).toBeDefined()
 
       const player = createPlayer()
       player.resources.food = 2
       const state = createState(player)
 
-      const result = executeCardListener(listener!, {
+      const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener!, {
         state, player, space: createSpace('lessons'),
         actionId: 'occupation', phase: 'after',
         choice: 'B113_PatchCaregiver',
-      } as unknown as CardListenerContext)
+      } as unknown as CardListenerContext))
 
       expectPayGainStoneForFood(result)
     })
 
     it('does not trigger when a non-field occupation is played', () => {
-      const listener = findListener('C80-rocky-terrain-after-occupation-field')
+    const ruleRegistry = createOfficialCardRegistry()
+      const listener = findListener(ruleRegistry, 'C80-rocky-terrain-after-occupation-field')
       const player = createPlayer()
       player.resources.food = 5
       const state = createState(player)
 
-      const result = executeCardListener(listener!, {
+      const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener!, {
         state, player, space: createSpace('lessons'),
         actionId: 'occupation', phase: 'after',
         choice: 'E051_WhaleOil',
-      } as unknown as CardListenerContext)
+      } as unknown as CardListenerContext))
 
       expect(result).toBeUndefined()
     })
 
     it('does not trigger when player has no food (even on field occupation)', () => {
-      const listener = findListener('C80-rocky-terrain-after-occupation-field')
+    const ruleRegistry = createOfficialCardRegistry()
+      const listener = findListener(ruleRegistry, 'C80-rocky-terrain-after-occupation-field')
       const player = createPlayer()
       player.resources.food = 0
       const state = createState(player)
 
-      const result = executeCardListener(listener!, {
+      const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener!, {
         state, player, space: createSpace('lessons'),
         actionId: 'occupation', phase: 'after',
         choice: 'B113_PatchCaregiver',
-      } as unknown as CardListenerContext)
+      } as unknown as CardListenerContext))
 
       expect(result).toBeUndefined()
     })

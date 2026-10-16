@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -30,7 +26,7 @@ describe('B148_PetBroker session', () => {
     const state = session.getState().state
     const player = state.players[0]!
 
-    const zones = computeAnimalZones(player)
+    const zones = session.withCtx(() => computeAnimalZones(player))
     const cardZone = zones.find(z => z.id === 'card:B148_PetBroker')
     expect(cardZone).toBeDefined()
     expect(cardZone!.zoneType).toBe('card')
@@ -49,7 +45,7 @@ describe('B148_PetBroker session', () => {
 
     const updatedState = session.getState().state
     const updatedPlayer = updatedState.players[0]!
-    const zones = computeAnimalZones(updatedPlayer)
+    const zones = session.withCtx(() => computeAnimalZones(updatedPlayer))
     const cardZone = zones.find(z => z.id === 'card:B148_PetBroker')
     expect(cardZone).toBeDefined()
     expect(cardZone!.capacity).toBe(2)
@@ -60,7 +56,7 @@ describe('B148_PetBroker session', () => {
     const state = session.getState().state
     const player = state.players[0]!
 
-    const zones = computeAnimalZones(player)
+    const zones = session.withCtx(() => computeAnimalZones(player))
     const cardZone = zones.find(z => z.id === 'card:B148_PetBroker')
     expect(cardZone).toBeDefined()
     expect(cardZone!.animalType).toBe('sheep')
@@ -90,7 +86,7 @@ describe('B148_PetBroker session', () => {
     expect(resp.state.players[0]!.resources.sheep).toBe(1)
     expect(resp.state.players[0]!.resources.boar).toBe(0)
 
-    const zones = computeAnimalZones(resp.state.players[0]!, resp.state)
+    const zones = session.withCtx(() => computeAnimalZones(resp.state.players[0]!, resp.state))
     const cardZone = zones.find(z => z.id === 'card:B148_PetBroker')
     expect(cardZone?.cardId).toBe('B148_PetBroker')
     expect(cardZone?.animalType).toBe('sheep')

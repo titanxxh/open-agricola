@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 
@@ -34,7 +30,7 @@ const moved = (
 const directContext = (
   transactionEvents: DraftGameEvent<'resource.moved'>[],
   actionEvents = transactionEvents,
-): CardListenerContext => {
+): { session: GameSession; context: CardListenerContext } => {
   const session = new GameSession(42)
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
@@ -42,7 +38,8 @@ const directContext = (
   const player = state.players[0]!
   player.id = 'p1'
   player.minorPlayed.push(CARD_ID)
-  return {
+  return { session, context: {
+    actionHooks: session.actionHooks,
     state,
     player,
     space: { id: 'forest', gainPerRound: { wood: 1 } },
@@ -51,7 +48,7 @@ const directContext = (
     transactionEvents,
     actionEvents,
     result: { type: 'ok', resourcesGained: { wood: 3 } },
-  } as unknown as CardListenerContext
+  } as unknown as CardListenerContext }
 }
 
 const fenceLeaf = (flow: ActionFlow | undefined) => {
@@ -62,10 +59,10 @@ const fenceLeaf = (flow: ActionFlow | undefined) => {
 
 describe('B015_CarpentersBench session', () => {
   it('opens fence option with benchWood from action-space wood events', () => {
-    const ctx = directContext([moved()])
+    const { session: ruleSession1, context: ctx } = directContext([moved()])
     ctx.result = { type: 'ok' }
 
-    const result = executeCardListener(LISTENER, ctx)
+    const result = ruleSession1.withCtx(() => executeCardListener(LISTENER, ctx))
     const leaf = fenceLeaf(result?.flow)
 
     expect(leaf).toMatchObject({
@@ -89,28 +86,28 @@ describe('B015_CarpentersBench session', () => {
   })
 
   it('does not trigger for supply/cardEffect wood even when result reports wood', () => {
-    const ctx = directContext([moved({
+    const { session: ruleSession2, context: ctx } = directContext([moved({
       from: { kind: 'supply' },
       reason: 'cardEffect',
     })])
 
-    const result = executeCardListener(LISTENER, ctx)
+    const result = ruleSession2.withCtx(() => executeCardListener(LISTENER, ctx))
 
     expect(result).toBeUndefined()
   })
 
   it('does not trigger without a current wood event', () => {
-    const ctx = directContext([])
+    const { session: ruleSession3, context: ctx } = directContext([])
 
-    const result = executeCardListener(LISTENER, ctx)
+    const result = ruleSession3.withCtx(() => executeCardListener(LISTENER, ctx))
 
     expect(result).toBeUndefined()
   })
 
   it('ignores stale transaction wood when actionEvents has no current wood', () => {
-    const ctx = directContext([moved()], [])
+    const { session: ruleSession4, context: ctx } = directContext([moved()], [])
 
-    const result = executeCardListener(LISTENER, ctx)
+    const result = ruleSession4.withCtx(() => executeCardListener(LISTENER, ctx))
 
     expect(result).toBeUndefined()
   })

@@ -1,7 +1,5 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
+import { withActiveRegistry } from '../../shared/cards/active-registry'
+import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
@@ -64,32 +62,33 @@ const fireListener = (
   spaceId: string = 'lessons',
 ) => {
   const s = session.getState().state
-  const listener = getRegisteredCardListeners().find((l) => l.id === LISTENER_ID)
+  const listener = session.withCtx(() => getRegisteredCardListeners()).find((l) => l.id === LISTENER_ID)
   if (!listener) throw new Error('A113 listener not registered')
   const space = s.actionSpaces.find((x) => x.id === spaceId)
   if (!space) throw new Error(`space ${spaceId} not found`)
-  const result = executeCardListener(listener, {
+  const result = session.withCtx(() => executeCardListener(listener, {
     state: s,
     player: s.players[0]!,
     space,
     actionId: 'place-farmer',
     phase: 'after',
-  } as unknown as CardListenerContext)
+  } as unknown as CardListenerContext))
   if (result?.flow?.type === 'leaf') {
-    getAdHocAction(result.flow.actionId)?.execute({
+    session.withCtx(() => getAdHocAction(result.flow.actionId)?.execute({
       state: s,
       player: s.players[0]!,
       space,
       params: result.flow.params,
       sourceCard: result.flow.sourceCard,
-    } as never)
+    } as never))
   }
   return result
 }
 
 describe('A113 Heresy Teacher session', () => {
   it('listener is registered', () => {
-    const listener = getRegisteredCardListeners().find((l) => l.id === LISTENER_ID)
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = withActiveRegistry(ruleRegistry, () => getRegisteredCardListeners()).find((l) => l.id === LISTENER_ID)
     expect(listener).toBeDefined()
   })
 
@@ -180,14 +179,14 @@ describe('A113 Heresy Teacher session', () => {
     p1.resources.vegetable = 0
 
     // Three reaps drain the grain stack.
-    reap(state, p1)
-    reap(state, p1)
-    reap(state, p1)
+    session.withCtx(() => reap(state, p1))
+    session.withCtx(() => reap(state, p1))
+    session.withCtx(() => reap(state, p1))
     expect(p1.resources.grain).toBe(3)
     expect(p1.fields[0]!.stacks).toEqual([{ kind: 'vegetable', remaining: 1 }])
 
     // Fourth reap harvests the exposed vegetable.
-    reap(state, p1)
+    session.withCtx(() => reap(state, p1))
     expect(p1.resources.vegetable).toBe(1)
     expect(p1.fields[0]!.stacks).toEqual([])
   })
@@ -218,7 +217,7 @@ describe('A113 Heresy Teacher session', () => {
     p1.resources.grain = 0
     p1.resources.vegetable = 0
 
-    const scores = computeScores(state)
+    const scores = session.withCtx(() => computeScores(state))
     const mine = scores.find((s) => s.playerId === p1.id)!
     const grains = mine.categories.find((c) => c.key === 'grains')!
     const vegetables = mine.categories.find((c) => c.key === 'vegetables')!

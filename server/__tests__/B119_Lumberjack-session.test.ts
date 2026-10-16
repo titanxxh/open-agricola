@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
@@ -23,8 +19,8 @@ describe('B119 Lumberjack — session regression (palisades excluded)', () => {
 
     const workingState = session.getState().state
     const workingPlayer = workingState.players[0]!
-    const effect = getCardEffect('B119_Lumberjack')!
-    effect.onBuy!(workingState, workingPlayer)
+    const effect = session.withCtx(() => getCardEffect('B119_Lumberjack'))!
+    session.withCtx(() => effect.onBuy!(workingState, workingPlayer))
 
     // onBuy calls queueFutureMeeplesFlow → pushes request into pendingFutureMeeples.
     const pendingForCard = workingState.pendingFutureMeeples.filter(

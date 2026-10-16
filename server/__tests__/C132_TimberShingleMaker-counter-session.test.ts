@@ -1,7 +1,6 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
+import { CardRegistry as TestCardRegistry } from '../../shared/cards/registry'
+import { withActiveRegistry } from '../../shared/cards/active-registry'
+import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
 import { describe, expect, it } from 'vitest'
 import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 import type { GameState, PlayerState, ActionSpace, ActionFlow } from '../../shared/contract/types'
@@ -49,11 +48,15 @@ const createSpace = (id: string): ActionSpace =>
     takenBy: [],
   }) as ActionSpace
 
-const findListener = (id: string) => getRegisteredCardListeners().find(l => l.id === id)
+const findListener = (ruleOwner: TestCardRegistry, id: string) => {
+  const lookupRule1 = () => getRegisteredCardListeners().find(l => l.id === id)
+  return withActiveRegistry(ruleOwner, lookupRule1)
+}
 
 describe('C132_TimberShingleMaker — XOR child writes woodPlaced counter', () => {
   it('each XOR child SEQ ends with a special-effect increment-counter writing woodPlaced', () => {
-    const listener = findListener(LISTENER_ID)
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry, LISTENER_ID)
     expect(listener).toBeDefined()
 
     const player = createPlayer()
@@ -61,10 +64,10 @@ describe('C132_TimberShingleMaker — XOR child writes woodPlaced counter', () =
     player.resources.wood = 5
     const state = createState(player)
 
-    const result = executeCardListener(listener!, {
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener!, {
       state, player, space: createSpace('renovate-house'),
       actionId: 'renovate-house', phase: 'after',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeDefined()
     const xor = result!.flow as Extract<ActionFlow, { type: 'xor' }>

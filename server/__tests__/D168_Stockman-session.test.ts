@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getRegisteredCardListeners, executeCardListener } from '../../shared/cards/card-listeners'
@@ -24,7 +20,7 @@ describe('D168_Stockman session', () => {
     const space = state.actionSpaces.find((s) => s.id === 'farm-expansion')!
     session.loadState(state)
 
-    const listener = getRegisteredCardListeners().find(
+    const listener = session.withCtx(() => getRegisteredCardListeners()).find(
       (reg) => reg.id === 'D168-stockman-after-stables',
     )!
     const context: CardListenerContext = {
@@ -35,7 +31,7 @@ describe('D168_Stockman session', () => {
       phase: 'after',
       result: { type: 'ok' },
     }
-    return executeCardListener(listener, context)
+    return session.withCtx(() => executeCardListener(listener, context))
   }
 
   it('counts the B85 FarmHand stable when locating the ordinal stable (card-facing count)', () => {

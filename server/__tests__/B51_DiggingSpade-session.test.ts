@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -83,7 +79,7 @@ describe('B051_DiggingSpade session', () => {
       const state = session.getState().state
       state.round = 6
       const player = state.players[0]!
-      expect(meetsCardPrerequisites(player, B051_DiggingSpade, state.round, state)).toBe(false)
+      expect(session.withCtx(() => meetsCardPrerequisites(player, B051_DiggingSpade, state.round, state))).toBe(false)
     })
 
     it('allows when round >= 7', () => {
@@ -92,7 +88,7 @@ describe('B051_DiggingSpade session', () => {
       const state = session.getState().state
       state.round = 7
       const player = state.players[0]!
-      expect(meetsCardPrerequisites(player, B051_DiggingSpade, state.round, state)).toBe(true)
+      expect(session.withCtx(() => meetsCardPrerequisites(player, B051_DiggingSpade, state.round, state))).toBe(true)
     })
   })
 })

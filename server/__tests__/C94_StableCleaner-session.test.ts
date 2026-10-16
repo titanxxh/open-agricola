@@ -1,7 +1,4 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
+import type { GameSession as SessionRuleOwner } from '../game/authoritative-session'
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -18,8 +15,8 @@ import type { ActionFlow } from '../../shared/contract/types'
 const CARD_ID = 'C094_StableCleaner'
 const LISTENER_ID = 'C94-stable-cleaner-anytime'
 
-const findListener = (id: string) =>
-  getRegisteredCardListeners().find((l) => l.id === id)
+const findListener = (ruleOwner: SessionRuleOwner, id: string) =>
+  ruleOwner.withCtx(() => getRegisteredCardListeners()).find((l) => l.id === id)
 
 const setupParity = ({ inHand = false, wood = 0, food = 0 } = {}) => {
   const session = new GameSession(42)
@@ -114,21 +111,22 @@ describe('C094_StableCleaner — exact cost 1 wood + 1 food', () => {
     }))
     player.supplyTokensConsumed = consumedStables > 0 ? { stable: consumedStables } : {}
     session.loadState(state)
-    return {
+    return { session, context: {
       actionHooks: session.actionHooks,
       state,
       player,
       actionId: 'stables',
       phase: 'anytime' as const,
-    } as unknown as CardListenerContext
+    } as unknown as CardListenerContext }
   }
 
   it('emits stables flow with exactCost { wood:1, food:1 } when player has 1 wood + 1 food', () => {
-    const listener = findListener(LISTENER_ID)
-    expect(listener).toBeDefined()
 
-    const ctx = setupContext({ wood: 1, food: 1 })
-    const result = executeCardListener(listener!, ctx)
+
+    const { session, context: ctx } = setupContext({ wood: 1, food: 1 })
+    const listener = findListener(session, LISTENER_ID)
+    expect(listener).toBeDefined()
+    const result = session.withCtx(() => executeCardListener(listener!, ctx))
     expect(result?.flow).toBeDefined()
     const seq = result!.flow as Extract<ActionFlow, { type: 'seq' }>
     expect(seq.type).toBe('seq')
@@ -145,38 +143,43 @@ describe('C094_StableCleaner — exact cost 1 wood + 1 food', () => {
   })
 
   it('emits with no wood when a stables cost modifier covers the wood', () => {
-    const listener = findListener(LISTENER_ID)!
-    const ctx = setupContext({ wood: 0, food: 5 }, 2)
+
+    const { session, context: ctx } = setupContext({ wood: 0, food: 5 }, 2)
+    const listener = findListener(session, LISTENER_ID)!
     ctx.player.occupationPlayed.push('C088_CarpentersApprentice')
-    const result = executeCardListener(listener, ctx)
+    const result = session.withCtx(() => executeCardListener(listener, ctx))
     expect(result?.flow).toBeDefined()
   })
 
   it('does NOT emit when player lacks food (no 1 food)', () => {
-    const listener = findListener(LISTENER_ID)!
-    const ctx = setupContext({ wood: 5, food: 0 })
-    const result = executeCardListener(listener, ctx)
+
+    const { session, context: ctx } = setupContext({ wood: 5, food: 0 })
+    const listener = findListener(session, LISTENER_ID)!
+    const result = session.withCtx(() => executeCardListener(listener, ctx))
     expect(result).toBeUndefined()
   })
 
   it('does NOT emit when player already has 4 stables', () => {
-    const listener = findListener(LISTENER_ID)!
-    const ctx = setupContext({ wood: 5, food: 5 }, 4)
-    const result = executeCardListener(listener, ctx)
+
+    const { session, context: ctx } = setupContext({ wood: 5, food: 5 }, 4)
+    const listener = findListener(session, LISTENER_ID)!
+    const result = session.withCtx(() => executeCardListener(listener, ctx))
     expect(result).toBeUndefined()
   })
 
   it('does NOT emit when consumed stable tokens exhaust reserve', () => {
-    const listener = findListener(LISTENER_ID)!
-    const ctx = setupContext({ wood: 5, food: 5 }, 0, 4)
-    const result = executeCardListener(listener, ctx)
+
+    const { session, context: ctx } = setupContext({ wood: 5, food: 5 }, 0, 4)
+    const listener = findListener(session, LISTENER_ID)!
+    const result = session.withCtx(() => executeCardListener(listener, ctx))
     expect(result).toBeUndefined()
   })
 
   it('emits when player has 3 stables and resources (room for 1 more)', () => {
-    const listener = findListener(LISTENER_ID)!
-    const ctx = setupContext({ wood: 1, food: 1 }, 3)
-    const result = executeCardListener(listener, ctx)
+
+    const { session, context: ctx } = setupContext({ wood: 1, food: 1 }, 3)
+    const listener = findListener(session, LISTENER_ID)!
+    const result = session.withCtx(() => executeCardListener(listener, ctx))
     expect(result?.flow).toBeDefined()
   })
 

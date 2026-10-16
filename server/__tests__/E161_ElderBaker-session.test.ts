@@ -1,7 +1,4 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
+import type { GameSession as SessionRuleOwner } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 
 import { describe, expect, it } from 'vitest'
@@ -19,8 +16,8 @@ const CARD_ID = 'E161_ElderBaker'
 const LISTENER_ID = 'E161-elder-baker-compute-choice-candidates'
 const STONE_OVEN_ID = 'Major_StoneOven'
 
-const findListener = (id: string) =>
-  getRegisteredCardListeners().find((l) => l.id === id)
+const findListener = (ruleOwner: SessionRuleOwner, id: string) =>
+  ruleOwner.withCtx(() => getRegisteredCardListeners()).find((l) => l.id === id)
 
 const setup = (
   overrides: {
@@ -72,15 +69,15 @@ describe('E161_ElderBaker computeChoiceCandidates listener (unit)', () => {
     const session = setup()
     const state = session.getState().state
     const player = state.players[0]!
-    const listener = findListener(LISTENER_ID)
+    const listener = findListener(session, LISTENER_ID)
     expect(listener).toBeDefined()
 
-    const result = executeCardListener(listener!, {
+    const result = session.withCtx(() => executeCardListener(listener!, {
       state,
       player,
       actionId: 'improvement',
       phase: 'computeChoiceCandidates',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result?.extraOptions).toBeDefined()
     const values = result!.extraOptions!.map((o) => o.value)
@@ -92,14 +89,14 @@ describe('E161_ElderBaker computeChoiceCandidates listener (unit)', () => {
     const session = setup({ playE161: false })
     const state = session.getState().state
     const player = state.players[0]!
-    const listener = findListener(LISTENER_ID)!
+    const listener = findListener(session, LISTENER_ID)!
 
-    const result = executeCardListener(listener, {
+    const result = session.withCtx(() => executeCardListener(listener, {
       state,
       player,
       actionId: 'improvement',
       phase: 'computeChoiceCandidates',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeUndefined()
   })
@@ -110,14 +107,14 @@ describe('E161_ElderBaker computeChoiceCandidates listener (unit)', () => {
     })
     const state = session.getState().state
     const player = state.players[0]!
-    const listener = findListener(LISTENER_ID)!
+    const listener = findListener(session, LISTENER_ID)!
 
-    const result = executeCardListener(listener, {
+    const result = session.withCtx(() => executeCardListener(listener, {
       state,
       player,
       actionId: 'improvement',
       phase: 'computeChoiceCandidates',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeUndefined()
   })

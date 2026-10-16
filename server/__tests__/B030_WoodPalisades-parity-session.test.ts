@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -70,7 +66,7 @@ describe('B030 Wood Palisades parity', () => {
     expect(player.resources.wood).toBe(0)
     expect(getFenceCount(player)).toBe(2)
     expect(getPalisadeCount(player)).toBe(2)
-    const score = computeScores(response.state).find((entry) => entry.playerId === player.id)!
+    const score = session.withCtx(() => computeScores(response.state)).find((entry) => entry.playerId === player.id)!
     expect(score.categories.find((category) => category.key === 'cardBonusVp')?.total).toBe(2)
   })
 

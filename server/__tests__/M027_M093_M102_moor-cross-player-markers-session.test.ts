@@ -1,7 +1,4 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
+import type { GameSession as SessionRuleOwner } from '../game/authoritative-session'
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import type { ActionFlow, GameState, Resource, SessionResponse } from '../../shared/contract/types'
@@ -108,8 +105,11 @@ const driveMinorPurchase = (
   return resp
 }
 
-const cardBonusVp = (state: GameState, playerIndex: number) =>
-  Scoring.breakdown(state, playerIndex).categories.find((category) => category.key === 'cardBonusVp')
+const cardBonusVp = (ruleOwner: SessionRuleOwner, state: GameState, playerIndex: number) =>
+  {
+  const lookupRule1 = () => Scoring.breakdown(state, playerIndex).categories.find((category) => category.key === 'cardBonusVp')
+  return ruleOwner.withCtx(lookupRule1)
+}
 
 const nonZeroResources = (value: unknown) => {
   const resources = value as Partial<Resource>
@@ -158,7 +158,7 @@ describe('FoM M027/M093/M102 cross-player markers and transfers', () => {
         sourcePlayerId: owner.id,
       },
     ])
-    expect(cardBonusVp(resp.state, 1)).toEqual(expect.objectContaining({
+    expect(cardBonusVp(session, resp.state, 1)).toEqual(expect.objectContaining({
       total: -1,
       entries: [expect.objectContaining({ cardId: M027, score: -1 })],
     }))
@@ -169,7 +169,7 @@ describe('FoM M027/M093/M102 cross-player markers and transfers', () => {
     const state = session.getState().state
     const owner = state.players[0]!
 
-    const flow = getCardEffect(M027)?.onBuy?.(state, owner)
+    const flow = session.withCtx(() => getCardEffect(M027)?.onBuy?.(state, owner))
 
     expect(actionIds(flow)).toEqual(['gain'])
     expect(owner.cardStates?.[M027]?.extraData?.publicCardMarkers).toBeUndefined()
@@ -215,26 +215,26 @@ describe('FoM M027/M093/M102 cross-player markers and transfers', () => {
     const owner = nonRightState.players[0]!
     const source = nonRightState.players[1]!
     owner.minorPlayed = [M093]
-    const result = runCardListeners({
+    const result = nonRightSession.withCtx(() => runCardListeners({
       state: nonRightState,
       player: source,
       actionId: 'improvement',
       phase: 'after',
       transactionEvents: [cardPassed(source.id, owner.id)],
-    })
+    }))
     expect(result.flatMap((entry) => actionIds(entry.flow))).toEqual([])
 
     const soloSession = setup(1)
     const soloState = soloSession.getState().state
     const solo = soloState.players[0]!
     solo.minorPlayed = [M093]
-    const soloResult = runCardListeners({
+    const soloResult = soloSession.withCtx(() => runCardListeners({
       state: soloState,
       player: solo,
       actionId: 'pass-minor-card-to-left',
       phase: 'after',
       transactionEvents: [cardPassed(solo.id, solo.id)],
-    })
+    }))
     expect(soloResult.flatMap((entry) => actionIds(entry.flow))).toEqual([])
   })
 
@@ -327,12 +327,12 @@ describe('FoM M027/M093/M102 cross-player markers and transfers', () => {
     player.minorHand = [PLACEHOLDER]
     player.cardStates = { [M102]: { extraData: { stale: true } } }
 
-    const result = passMinorCardToLeftAction.execute({
+    const result = session.withCtx(() => passMinorCardToLeftAction.execute({
       state,
       player,
       params: { cardId: M102 },
       sourceCard: M102,
-    } as never)
+    } as never))
     expect(result).toEqual({ type: 'ok' })
     expect(player.minorPlayed).not.toContain(M102)
     expect(player.minorHand).not.toContain(M102)

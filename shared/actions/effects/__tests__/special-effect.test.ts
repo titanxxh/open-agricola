@@ -1,7 +1,5 @@
-import { installOfficialCardRegistry } from '../../../cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
+import { withActiveRegistry } from '../../../cards/active-registry'
+import { createOfficialCardRegistry } from '../../../cards/__tests__/card-environment'
 import { describe, it, expect } from 'vitest'
 import { specialEffectAction } from '../special-effect'
 import { GameSession } from '../../../../server/game/authoritative-session'
@@ -95,11 +93,12 @@ const setupExtraTurnPlayer = (over: {
   placeholderHands(state)
   session.loadState(state)
   const loaded = session.getState().state
-  return { state: loaded, player: loaded.players[0]! }
+  return { session: session, state: loaded, player: loaded.players[0]! }
 }
 
 describe('specialEffectAction — mutation dispatcher', () => {
   it.each(['unused', 'terrain', 'nonblocking'] as const)('records only an existing unused space newly blocked: %s', scenario => {
+    const ruleRegistry = createOfficialCardRegistry()
     const player = makePlayer()
     if (scenario === 'terrain') player.farmTerrain = [{ row: 1, col: 3, kind: 'moor' }]
     const events: DraftGameEvent[] = []
@@ -111,50 +110,53 @@ describe('specialEffectAction — mutation dispatcher', () => {
       },
     }, 'TEST_CARD')
     context.eventSink = makeEventSink(events)
-    expect(specialEffectAction.execute(context).type).toBe('ok')
+    expect(withActiveRegistry(ruleRegistry, () => specialEffectAction.execute(context)).type).toBe('ok')
     expect(events.filter(event => event.type === 'farm.spacesUsed')).toEqual(scenario === 'unused' ? [
       { type: 'farm.spacesUsed', sourceCardId: 'TEST_CARD', newlyUsedTiles: [{ playerId: 'p1', row: 1, col: 3 }] },
     ] : [])
     events.length = 0
-    expect(specialEffectAction.execute(context).type).toBe('ok')
+    expect(withActiveRegistry(ruleRegistry, () => specialEffectAction.execute(context)).type).toBe('ok')
     expect(events.filter(event => event.type === 'farm.spacesUsed')).toEqual([])
   })
 
   it('increment-extra-data: adds to existing counter, init from 0', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     const player = makePlayer()
-    let result = specialEffectAction.execute(
+    let result = withActiveRegistry(ruleRegistry, () => specialEffectAction.execute(
       makeCtx(player, { kind: 'increment-extra-data', key: 'foo', amount: 5 }, CARD_ID),
-    )
+    ))
     expect(result.type).toBe('ok')
     expect(readCardExtraData<number>(player, CARD_ID, 'foo')).toBe(5)
 
-    result = specialEffectAction.execute(
+    result = withActiveRegistry(ruleRegistry, () => specialEffectAction.execute(
       makeCtx(player, { kind: 'increment-extra-data', key: 'foo', amount: 3 }, CARD_ID),
-    )
+    ))
     expect(result.type).toBe('ok')
     expect(readCardExtraData<number>(player, CARD_ID, 'foo')).toBe(8)
   })
 
   it('set-extra-data: overwrites value with arbitrary payload', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     const player = makePlayer()
-    specialEffectAction.execute(
+    withActiveRegistry(ruleRegistry, () => specialEffectAction.execute(
       makeCtx(player, { kind: 'set-extra-data', key: 'foo', value: 'hello' }, CARD_ID),
-    )
+    ))
     expect(readCardExtraData(player, CARD_ID, 'foo')).toBe('hello')
-    specialEffectAction.execute(
+    withActiveRegistry(ruleRegistry, () => specialEffectAction.execute(
       makeCtx(player, { kind: 'set-extra-data', key: 'foo', value: { nested: 1 } }, CARD_ID),
-    )
+    ))
     expect(readCardExtraData(player, CARD_ID, 'foo')).toEqual({ nested: 1 })
   })
 
   it('record-scoring-reserve-bonus: records selected scoring reserve on the target player without spending resources', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     const actor = makePlayer()
     const target = { ...makePlayer(), id: 'p2', name: 'P2', cardStates: {} }
     target.resources.wood = 3
     target.resources.clay = 1
     const state = { players: [actor, target] } as GameState
 
-    const result = specialEffectAction.execute({
+    const result = withActiveRegistry(ruleRegistry, () => specialEffectAction.execute({
       ...makeCtx(actor, {
         kind: 'record-scoring-reserve-bonus',
         reserved: { wood: 2, clay: 1 },
@@ -162,7 +164,7 @@ describe('specialEffectAction — mutation dispatcher', () => {
         cardType: 'occupation',
       }, CARD_ID, state),
       actionContext: { targetPlayerId: target.id },
-    })
+    }))
 
     expect(result.type).toBe('ok')
     expect(readCardExtraData(target, CARD_ID, 'scoringReserveBonus')).toEqual({
@@ -176,6 +178,7 @@ describe('specialEffectAction — mutation dispatcher', () => {
   })
 
   it('record-scoring-reserve-bonus: rejects reserve above remaining resources after existing scoring reserve', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     const player = makePlayer()
     player.resources.wood = 3
     player.cardStates = {
@@ -189,51 +192,53 @@ describe('specialEffectAction — mutation dispatcher', () => {
       },
     }
 
-    const result = specialEffectAction.execute(
+    const result = withActiveRegistry(ruleRegistry, () => specialEffectAction.execute(
       makeCtx(player, {
         kind: 'record-scoring-reserve-bonus',
         reserved: { wood: 2 },
         score: 3,
       }, CARD_ID, { players: [player] } as GameState),
-    )
+    ))
 
     expect(result.type).toBe('fail')
     expect(readCardExtraData(player, CARD_ID, 'scoringReserveBonus')).toBeUndefined()
   })
 
   it('record-scoring-reserve-bonus: writes no scoring state for empty reserve with zero score', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     const player = makePlayer()
 
-    const result = specialEffectAction.execute(
+    const result = withActiveRegistry(ruleRegistry, () => specialEffectAction.execute(
       makeCtx(player, {
         kind: 'record-scoring-reserve-bonus',
         reserved: {},
         score: 0,
       }, CARD_ID, { players: [player] } as GameState),
-    )
+    ))
 
     expect(result.type).toBe('ok')
     expect(player.cardStates).toEqual({})
   })
 
   it('record-scoring-reserve-bonus: rejects negative or fractional reserve amounts', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     const player = makePlayer()
     player.resources.wood = 3
 
-    const negative = specialEffectAction.execute(
+    const negative = withActiveRegistry(ruleRegistry, () => specialEffectAction.execute(
       makeCtx(player, {
         kind: 'record-scoring-reserve-bonus',
         reserved: { wood: -1 },
         score: 1,
       }, CARD_ID, { players: [player] } as GameState),
-    )
-    const fractional = specialEffectAction.execute(
+    ))
+    const fractional = withActiveRegistry(ruleRegistry, () => specialEffectAction.execute(
       makeCtx(player, {
         kind: 'record-scoring-reserve-bonus',
         reserved: { wood: 1.5 },
         score: 1,
       }, CARD_ID, { players: [player] } as GameState),
-    )
+    ))
 
     expect(negative.type).toBe('fail')
     expect(fractional.type).toBe('fail')
@@ -241,33 +246,35 @@ describe('specialEffectAction — mutation dispatcher', () => {
   })
 
   it('record-scoring-reserve-bonus: rejects invalid card type attribution', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     const player = makePlayer()
     player.resources.wood = 3
 
-    const result = specialEffectAction.execute(
+    const result = withActiveRegistry(ruleRegistry, () => specialEffectAction.execute(
       makeCtx(player, {
         kind: 'record-scoring-reserve-bonus',
         reserved: { wood: 1 },
         score: 1,
         cardType: 'event',
       }, CARD_ID, { players: [player] } as GameState),
-    )
+    ))
 
     expect(result.type).toBe('fail')
     expect(readCardExtraData(player, CARD_ID, 'scoringReserveBonus')).toBeUndefined()
   })
 
   it('record-scoring-reserve-bonus: accepts real resource kinds chosen by the source card flow', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     const player = makePlayer()
     player.resources.sheep = 2
 
-    const result = specialEffectAction.execute(
+    const result = withActiveRegistry(ruleRegistry, () => specialEffectAction.execute(
       makeCtx(player, {
         kind: 'record-scoring-reserve-bonus',
         reserved: { sheep: 1 },
         score: 1,
       }, CARD_ID, { players: [player] } as GameState),
-    )
+    ))
 
     expect(result.type).toBe('ok')
     expect(readCardExtraData(player, CARD_ID, 'scoringReserveBonus')).toEqual({
@@ -277,16 +284,17 @@ describe('specialEffectAction — mutation dispatcher', () => {
   })
 
   it('set-extra-data: emits metadata without internal values', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     const player = makePlayer()
     const events: DraftGameEvent[] = []
-    specialEffectAction.execute({
+    withActiveRegistry(ruleRegistry, () => specialEffectAction.execute({
       ...makeCtx(player, { kind: 'set-extra-data', key: 'foo', value: 'hello' }, CARD_ID),
       eventSink: makeEventSink(events),
-    })
-    specialEffectAction.execute({
+    }))
+    withActiveRegistry(ruleRegistry, () => specialEffectAction.execute({
       ...makeCtx(player, { kind: 'set-extra-data', key: 'foo', value: { privateHand: ['E1'] } }, CARD_ID),
       eventSink: makeEventSink(events),
-    })
+    }))
 
     expect(events).toEqual([
       expect.objectContaining({
@@ -302,26 +310,27 @@ describe('specialEffectAction — mutation dispatcher', () => {
   })
 
   it('emits card state events for public counter and flag mutations', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     const player = makePlayer()
     const events: DraftGameEvent[] = []
     const eventSink = makeEventSink(events)
 
-    specialEffectAction.execute({
+    withActiveRegistry(ruleRegistry, () => specialEffectAction.execute({
       ...makeCtx(player, { kind: 'increment-extra-data', key: 'foo', amount: 5 }, CARD_ID),
       eventSink,
-    })
-    specialEffectAction.execute({
+    }))
+    withActiveRegistry(ruleRegistry, () => specialEffectAction.execute({
       ...makeCtx(player, { kind: 'increment-counter', key: 'uses', amount: 2 }, CARD_ID),
       eventSink,
-    })
-    specialEffectAction.execute({
+    }))
+    withActiveRegistry(ruleRegistry, () => specialEffectAction.execute({
       ...makeCtx(player, { kind: 'set-counter', key: 'uses', value: 4 }, CARD_ID),
       eventSink,
-    })
-    specialEffectAction.execute({
+    }))
+    withActiveRegistry(ruleRegistry, () => specialEffectAction.execute({
       ...makeCtx(player, { kind: 'set-flag', flag: true }, CARD_ID),
       eventSink,
-    })
+    }))
 
     expect(events).toEqual([
       expect.objectContaining({ type: 'card.stateChanged', key: 'foo' }),
@@ -334,33 +343,36 @@ describe('specialEffectAction — mutation dispatcher', () => {
   })
 
   it('set-flag: toggles card flag both ways', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     const player = makePlayer()
-    specialEffectAction.execute(
+    withActiveRegistry(ruleRegistry, () => specialEffectAction.execute(
       makeCtx(player, { kind: 'set-flag', flag: true }, CARD_ID),
-    )
+    ))
     expect(isCardFlagged(player, CARD_ID)).toBe(true)
-    specialEffectAction.execute(
+    withActiveRegistry(ruleRegistry, () => specialEffectAction.execute(
       makeCtx(player, { kind: 'set-flag', flag: false }, CARD_ID),
-    )
+    ))
     expect(isCardFlagged(player, CARD_ID)).toBe(false)
   })
 
   it('set-infobox: writes display text to card', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     const player = makePlayer()
-    specialEffectAction.execute(
+    withActiveRegistry(ruleRegistry, () => specialEffectAction.execute(
       makeCtx(player, { kind: 'set-infobox', text: 'used 3x' }, CARD_ID),
-    )
+    ))
     expect(readCardInfobox(player, CARD_ID)).toBe('used 3x')
   })
 
   it('set-infobox: emits a public card infobox event', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     const player = makePlayer()
     const events: DraftGameEvent[] = []
 
-    const result = specialEffectAction.execute({
+    const result = withActiveRegistry(ruleRegistry, () => specialEffectAction.execute({
       ...makeCtx(player, { kind: 'set-infobox', text: 'used 3x' }, CARD_ID),
       eventSink: makeEventSink(events),
-    })
+    }))
 
     expect(result.type).toBe('ok')
     expect(events).toEqual([
@@ -374,13 +386,13 @@ describe('specialEffectAction — mutation dispatcher', () => {
   })
 
   it('consume-pending-extra-turns: no-ops silently when no opportunity is pending', () => {
-    const { state, player } = setupExtraTurnPlayer({ food: 0 })
+    const { session: ruleSession, state, player } = setupExtraTurnPlayer({ food: 0 })
     const events: DraftGameEvent[] = []
 
-    const result = specialEffectAction.execute({
+    const result = ruleSession.withCtx(() => specialEffectAction.execute({
       ...makeCtx(player, { kind: 'consume-pending-extra-turns' }, CARD_ID, state),
       eventSink: makeEventSink(events),
-    })
+    }))
 
     expect(result.type).toBe('ok')
     expect(player._extraTurnConsumedCountsByCard).toBeUndefined()
@@ -388,17 +400,17 @@ describe('specialEffectAction — mutation dispatcher', () => {
   })
 
   it('consume-pending-extra-turns: consumes all pending opportunities and emits the source card trigger once', () => {
-    const { state, player } = setupExtraTurnPlayer({ newborns: 2, food: 2 })
+    const { session: ruleSession, state, player } = setupExtraTurnPlayer({ newborns: 2, food: 2 })
     const events: DraftGameEvent[] = []
 
-    const result = specialEffectAction.execute({
+    const result = ruleSession.withCtx(() => specialEffectAction.execute({
       ...makeCtx(player, { kind: 'consume-pending-extra-turns' }, CARD_ID, state),
       eventSink: makeEventSink(events),
-    })
+    }))
 
     expect(result.type).toBe('ok')
     expect(player._extraTurnConsumedCountsByCard).toEqual({ [A092_AdoptiveParents.id]: 2 })
-    expect(hasPendingExtraTurn(state, player)).toBe(false)
+    expect(ruleSession.withCtx(() => hasPendingExtraTurn(state, player))).toBe(false)
     expect(events).toEqual([
       expect.objectContaining({
         type: 'card.triggered',
@@ -409,44 +421,47 @@ describe('specialEffectAction — mutation dispatcher', () => {
   })
 
   it('consume-pending-extra-turns: consumes only opportunities not already skipped', () => {
-    const { state, player } = setupExtraTurnPlayer({ newborns: 2, food: 2 })
+    const { session: ruleSession, state, player } = setupExtraTurnPlayer({ newborns: 2, food: 2 })
     const events: DraftGameEvent[] = []
     player._extraTurnSkipCountsByCard = { [A092_AdoptiveParents.id]: 1 }
 
-    const result = specialEffectAction.execute({
+    const result = ruleSession.withCtx(() => specialEffectAction.execute({
       ...makeCtx(player, { kind: 'consume-pending-extra-turns' }, CARD_ID, state),
       eventSink: makeEventSink(events),
-    })
+    }))
 
     expect(result.type).toBe('ok')
     expect(player._extraTurnConsumedCountsByCard).toEqual({ [A092_AdoptiveParents.id]: 1 })
-    expect(hasPendingExtraTurn(state, player)).toBe(false)
+    expect(ruleSession.withCtx(() => hasPendingExtraTurn(state, player))).toBe(false)
     expect(events).toHaveLength(1)
   })
 
   it('set-counter: writes counter exactly to the provided non-negative value', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     const player = makePlayer()
 
-    const result = specialEffectAction.execute(
+    const result = withActiveRegistry(ruleRegistry, () => specialEffectAction.execute(
       makeCtx(player, { kind: 'set-counter', key: 'uses', value: 4 }, CARD_ID),
-    )
+    ))
 
     expect(result.type).toBe('ok')
     expect(player.cardStates[CARD_ID]?.counters?.uses).toBe(4)
   })
 
   it('set-counter: clamps negative values to 0', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     const player = makePlayer()
 
-    const result = specialEffectAction.execute(
+    const result = withActiveRegistry(ruleRegistry, () => specialEffectAction.execute(
       makeCtx(player, { kind: 'set-counter', key: 'uses', value: -2 }, CARD_ID),
-    )
+    ))
 
     expect(result.type).toBe('ok')
     expect(player.cardStates[CARD_ID]?.counters?.uses).toBe(0)
   })
 
   it('pop-card-stack-top: removes stack top without granting the resource', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     const player = makePlayer()
     const events: DraftGameEvent[] = []
     player.resources.wood = 1
@@ -454,10 +469,10 @@ describe('specialEffectAction — mutation dispatcher', () => {
       stack: ['clay', 'wood'],
     }
 
-    const result = specialEffectAction.execute({
+    const result = withActiveRegistry(ruleRegistry, () => specialEffectAction.execute({
       ...makeCtx(player, { kind: 'pop-card-stack-top' }, CARD_ID),
       eventSink: makeEventSink(events),
-    })
+    }))
 
     expect(result.type).toBe('ok')
     expect(player.cardStates[CARD_ID]?.stack).toEqual(['clay'])
@@ -475,6 +490,7 @@ describe('specialEffectAction — mutation dispatcher', () => {
   })
 
   it('swap-improvement-with-board: swaps player improvement with available board improvement', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     const player = makePlayer()
     const events: DraftGameEvent[] = []
     player.improvements = ['major-from', 'minor-1']
@@ -483,7 +499,7 @@ describe('specialEffectAction — mutation dispatcher', () => {
       availableMajorImprovements: ['major-to', 'major-other'],
     } as unknown as GameState
 
-    const result = specialEffectAction.execute({
+    const result = withActiveRegistry(ruleRegistry, () => specialEffectAction.execute({
       ...makeCtx(
         player,
         { kind: 'swap-improvement-with-board', from: 'major-from', to: 'major-to' },
@@ -491,7 +507,7 @@ describe('specialEffectAction — mutation dispatcher', () => {
         state,
       ),
       eventSink: makeEventSink(events),
-    })
+    }))
 
     expect(result.type).toBe('ok')
     expect(player.improvements).toEqual(['major-to', 'minor-1'])
@@ -507,6 +523,7 @@ describe('specialEffectAction — mutation dispatcher', () => {
   })
 
   it('swap-improvement-with-board: no-ops when player already has target improvement', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     const player = makePlayer()
     player.improvements = ['major-from', 'major-to', 'minor-1']
     const state = {
@@ -514,14 +531,14 @@ describe('specialEffectAction — mutation dispatcher', () => {
       availableMajorImprovements: ['major-to', 'major-other'],
     } as unknown as GameState
 
-    const result = specialEffectAction.execute(
+    const result = withActiveRegistry(ruleRegistry, () => specialEffectAction.execute(
       makeCtx(
         player,
         { kind: 'swap-improvement-with-board', from: 'major-from', to: 'major-to' },
         CARD_ID,
         state,
       ),
-    )
+    ))
 
     expect(result.type).toBe('ok')
     expect(player.improvements).toEqual(['major-from', 'major-to', 'minor-1'])
@@ -529,6 +546,7 @@ describe('specialEffectAction — mutation dispatcher', () => {
   })
 
   it('swap-improvement-with-board: removes board target without duplicating board source', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     const player = makePlayer()
     player.improvements = ['major-from', 'minor-1']
     const state = {
@@ -536,14 +554,14 @@ describe('specialEffectAction — mutation dispatcher', () => {
       availableMajorImprovements: ['major-to', 'major-from', 'major-other'],
     } as unknown as GameState
 
-    const result = specialEffectAction.execute(
+    const result = withActiveRegistry(ruleRegistry, () => specialEffectAction.execute(
       makeCtx(
         player,
         { kind: 'swap-improvement-with-board', from: 'major-from', to: 'major-to' },
         CARD_ID,
         state,
       ),
-    )
+    ))
 
     expect(result.type).toBe('ok')
     expect(player.improvements).toEqual(['major-to', 'minor-1'])
@@ -551,6 +569,7 @@ describe('specialEffectAction — mutation dispatcher', () => {
   })
 
   it('swap-improvement-with-board: no-ops when player lacks from or board lacks to', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     const player = makePlayer()
     player.improvements = ['major-from']
     const state = {
@@ -558,46 +577,48 @@ describe('specialEffectAction — mutation dispatcher', () => {
       availableMajorImprovements: ['major-to'],
     } as unknown as GameState
 
-    const missingPlayerCard = specialEffectAction.execute(
+    const missingPlayerCard = withActiveRegistry(ruleRegistry, () => specialEffectAction.execute(
       makeCtx(
         player,
         { kind: 'swap-improvement-with-board', from: 'missing', to: 'major-to' },
         CARD_ID,
         state,
       ),
-    )
+    ))
     expect(missingPlayerCard.type).toBe('ok')
     expect(player.improvements).toEqual(['major-from'])
     expect(state.availableMajorImprovements).toEqual(['major-to'])
 
-    const missingBoardCard = specialEffectAction.execute(
+    const missingBoardCard = withActiveRegistry(ruleRegistry, () => specialEffectAction.execute(
       makeCtx(
         player,
         { kind: 'swap-improvement-with-board', from: 'major-from', to: 'missing' },
         CARD_ID,
         state,
       ),
-    )
+    ))
     expect(missingBoardCard.type).toBe('ok')
     expect(player.improvements).toEqual(['major-from'])
     expect(state.availableMajorImprovements).toEqual(['major-to'])
   })
 
   it('swap-improvement-with-board: fails when state is missing', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     const player = makePlayer()
     player.improvements = ['major-from']
 
-    const result = specialEffectAction.execute({
+    const result = withActiveRegistry(ruleRegistry, () => specialEffectAction.execute({
       player,
       space: { id: 'special-effect' } as ActionSpace,
       sourceCard: CARD_ID,
       params: { kind: 'swap-improvement-with-board', from: 'major-from', to: 'major-to' },
-    } as ActionExecutionContext)
+    } as ActionExecutionContext))
 
     expect(result.type).toBe('fail')
   })
 
   it('return-card-to-board: removes a played improvement and returns major cards to the board', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     const player = makePlayer()
     const events: DraftGameEvent[] = []
     player.improvements = ['Major_ClayOven', 'Major_StoneOven']
@@ -606,7 +627,7 @@ describe('specialEffectAction — mutation dispatcher', () => {
       availableMajorImprovements: [],
     } as unknown as GameState
 
-    const result = specialEffectAction.execute({
+    const result = withActiveRegistry(ruleRegistry, () => specialEffectAction.execute({
       ...makeCtx(
         player,
         { kind: 'return-card-to-board', cardId: 'Major_StoneOven' },
@@ -614,7 +635,7 @@ describe('specialEffectAction — mutation dispatcher', () => {
         state,
       ),
       eventSink: makeEventSink(events),
-    })
+    }))
 
     expect(result.type).toBe('ok')
     expect(player.improvements).toEqual(['Major_ClayOven'])
@@ -629,65 +650,70 @@ describe('specialEffectAction — mutation dispatcher', () => {
   })
 
   it('fails when sourceCard missing', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     const player = makePlayer()
-    const result = specialEffectAction.execute(
+    const result = withActiveRegistry(ruleRegistry, () => specialEffectAction.execute(
       makeCtx(player, { kind: 'set-flag', flag: true }, undefined),
-    )
+    ))
     expect(result.type).toBe('fail')
   })
 
   it('fails when params missing or malformed', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     const player = makePlayer()
-    expect(specialEffectAction.execute(makeCtx(player, undefined, CARD_ID)).type).toBe('fail')
-    expect(specialEffectAction.execute(makeCtx(player, { foo: 1 }, CARD_ID)).type).toBe('fail')
+    expect(withActiveRegistry(ruleRegistry, () => specialEffectAction.execute(makeCtx(player, undefined, CARD_ID))).type).toBe('fail')
+    expect(withActiveRegistry(ruleRegistry, () => specialEffectAction.execute(makeCtx(player, { foo: 1 }, CARD_ID))).type).toBe('fail')
   })
 
   it('targetPlayerId routes mutation to specified player', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     const p1 = makePlayer()
     const p2 = makePlayer()
     p2.id = 'p2'
     const state = { players: [p1, p2] } as unknown as GameState
 
     // Default: mutation goes to context.player (p1)
-    specialEffectAction.execute({
+    withActiveRegistry(ruleRegistry, () => specialEffectAction.execute({
       state,
       player: p1,
       space: { id: 'special-effect' } as ActionSpace,
       sourceCard: CARD_ID,
       params: { kind: 'increment-extra-data', key: 'foo', amount: 5 },
-    })
+    }))
     expect(readCardExtraData<number>(p1, CARD_ID, 'foo')).toBe(5)
     expect(readCardExtraData<number>(p2, CARD_ID, 'foo')).toBeUndefined()
 
     // With targetPlayerId='p2', mutation goes to p2
-    specialEffectAction.execute({
+    withActiveRegistry(ruleRegistry, () => specialEffectAction.execute({
       state,
       player: p1,
       space: { id: 'special-effect' } as ActionSpace,
       sourceCard: CARD_ID,
       params: { kind: 'increment-extra-data', key: 'foo', amount: 7 },
       actionContext: { targetPlayerId: 'p2' },
-    })
+    }))
     expect(readCardExtraData<number>(p1, CARD_ID, 'foo')).toBe(5)
     expect(readCardExtraData<number>(p2, CARD_ID, 'foo')).toBe(7)
   })
 
   it('targetPlayerId falls back to actor when player id not found', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     const p1 = makePlayer()
     const state = { players: [p1] } as unknown as GameState
-    specialEffectAction.execute({
+    withActiveRegistry(ruleRegistry, () => specialEffectAction.execute({
       state,
       player: p1,
       space: { id: 'special-effect' } as ActionSpace,
       sourceCard: CARD_ID,
       params: { kind: 'set-flag', flag: true },
       actionContext: { targetPlayerId: 'nonexistent' },
-    })
+    }))
     expect(isCardFlagged(p1, CARD_ID)).toBe(true)
   })
 
   describe('remove-field-crops', () => {
     it('remove-field-crop: decrements the first matching crop field and emits a crop event', () => {
+    const ruleRegistry = createOfficialCardRegistry()
       const player = makePlayer()
       const events: DraftGameEvent[] = []
       player.fields = [
@@ -695,10 +721,10 @@ describe('specialEffectAction — mutation dispatcher', () => {
         { row: 0, col: 1, stacks: [{ kind: 'grain', remaining: 2 }] },
       ]
 
-      const result = specialEffectAction.execute({
+      const result = withActiveRegistry(ruleRegistry, () => specialEffectAction.execute({
         ...makeCtx(player, { kind: 'remove-field-crop', crop: 'grain' }, CARD_ID),
         eventSink: makeEventSink(events),
-      })
+      }))
 
       expect(result.type).toBe('ok')
       expect(player.fields[0]!.stacks).toEqual([{ kind: 'grain', remaining: 1 }])
@@ -715,6 +741,7 @@ describe('specialEffectAction — mutation dispatcher', () => {
     })
 
     it('decrements two selected crop fields', () => {
+    const ruleRegistry = createOfficialCardRegistry()
       const player = makePlayer()
       const events: DraftGameEvent[] = []
       player.fields = [
@@ -723,7 +750,7 @@ describe('specialEffectAction — mutation dispatcher', () => {
         { row: 1, col: 0, stacks: [{ kind: 'vegetable', remaining: 2 }] },
       ]
 
-      const result = specialEffectAction.execute({
+      const result = withActiveRegistry(ruleRegistry, () => specialEffectAction.execute({
         ...makeCtx(
           player,
           {
@@ -737,7 +764,7 @@ describe('specialEffectAction — mutation dispatcher', () => {
           CARD_ID,
         ),
         eventSink: makeEventSink(events),
-      })
+      }))
 
       expect(result.type).toBe('ok')
       expect(player.fields[0]!.stacks).toEqual([{ kind: 'grain', remaining: 1 }])
@@ -756,6 +783,7 @@ describe('specialEffectAction — mutation dispatcher', () => {
     })
 
     it('decrements a selected Card Field through the Logical Field boundary', () => {
+    const ruleRegistry = createOfficialCardRegistry()
       const player = makePlayer()
       const events: DraftGameEvent[] = []
       player.occupationPlayed = ['B113_PatchCaregiver']
@@ -763,14 +791,14 @@ describe('specialEffectAction — mutation dispatcher', () => {
         extraData: { cardFieldStacks: [{ crop: 'grain', remaining: 3 }] },
       }
 
-      const result = specialEffectAction.execute({
+      const result = withActiveRegistry(ruleRegistry, () => specialEffectAction.execute({
         ...makeCtx(
           player,
           { kind: 'remove-field-crops', crop: 'grain', positions: [{ row: -1, col: 2113 }] },
           CARD_ID,
         ),
         eventSink: makeEventSink(events),
-      })
+      }))
 
       expect(result.type).toBe('ok')
       expect(player.cardStates.B113_PatchCaregiver?.extraData?.cardFieldStacks).toEqual([
@@ -790,6 +818,7 @@ describe('specialEffectAction — mutation dispatcher', () => {
     })
 
     it('fails atomically when any selected field is not a valid source', () => {
+    const ruleRegistry = createOfficialCardRegistry()
       const player = makePlayer()
       player.fields = [
         { row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 2 }] },
@@ -803,7 +832,7 @@ describe('specialEffectAction — mutation dispatcher', () => {
         },
       ]
 
-      const result = specialEffectAction.execute(
+      const result = withActiveRegistry(ruleRegistry, () => specialEffectAction.execute(
         makeCtx(
           player,
           {
@@ -816,7 +845,7 @@ describe('specialEffectAction — mutation dispatcher', () => {
           },
           CARD_ID,
         ),
-      )
+      ))
 
       expect(result).toEqual({ type: 'fail', errorKey: 'log.specialEffectFail' })
       expect(player.fields[0]!.stacks).toEqual([{ kind: 'grain', remaining: 2 }])
@@ -827,13 +856,14 @@ describe('specialEffectAction — mutation dispatcher', () => {
     })
 
     it('fails atomically when positions include a duplicate coordinate', () => {
+    const ruleRegistry = createOfficialCardRegistry()
       const player = makePlayer()
       player.fields = [
         { row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 2 }] },
         { row: 0, col: 1, stacks: [{ kind: 'grain', remaining: 2 }] },
       ]
 
-      const result = specialEffectAction.execute(
+      const result = withActiveRegistry(ruleRegistry, () => specialEffectAction.execute(
         makeCtx(
           player,
           {
@@ -846,7 +876,7 @@ describe('specialEffectAction — mutation dispatcher', () => {
           },
           CARD_ID,
         ),
-      )
+      ))
 
       expect(result).toEqual({ type: 'fail', errorKey: 'log.specialEffectFail' })
       expect(player.fields[0]!.stacks).toEqual([{ kind: 'grain', remaining: 2 }])
@@ -854,6 +884,7 @@ describe('specialEffectAction — mutation dispatcher', () => {
     })
 
     it('fails atomically when positions include null or malformed entries', () => {
+    const ruleRegistry = createOfficialCardRegistry()
       for (const invalidPosition of [null, { row: 0 }]) {
         const player = makePlayer()
         player.fields = [
@@ -861,7 +892,7 @@ describe('specialEffectAction — mutation dispatcher', () => {
           { row: 0, col: 1, stacks: [{ kind: 'grain', remaining: 2 }] },
         ]
 
-        const result = specialEffectAction.execute(
+        const result = withActiveRegistry(ruleRegistry, () => specialEffectAction.execute(
           makeCtx(
             player,
             {
@@ -871,7 +902,7 @@ describe('specialEffectAction — mutation dispatcher', () => {
             },
             CARD_ID,
           ),
-        )
+        ))
 
         expect(result).toEqual({ type: 'fail', errorKey: 'log.specialEffectFail' })
         expect(player.fields[0]!.stacks).toEqual([{ kind: 'grain', remaining: 2 }])
@@ -881,13 +912,14 @@ describe('specialEffectAction — mutation dispatcher', () => {
   })
 
   it('failed special-effect emits no events', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     const player = makePlayer()
     const events: DraftGameEvent[] = []
 
-    const result = specialEffectAction.execute({
+    const result = withActiveRegistry(ruleRegistry, () => specialEffectAction.execute({
       ...makeCtx(player, { kind: 'consume-fence', count: 1 }, CARD_ID),
       eventSink: makeEventSink(events),
-    })
+    }))
 
     expect(result.type).toBe('fail')
     expect(events).toEqual([])
@@ -895,6 +927,7 @@ describe('specialEffectAction — mutation dispatcher', () => {
 
   describe('consume-fence', () => {
     it('removes only own ordinary fences when sourcePolicy is ownOnly', () => {
+    const ruleRegistry = createOfficialCardRegistry()
       const player = makePlayer()
       player.fenceSegments = [
         { edge: 'H-0-0', type: 'fence' },
@@ -903,13 +936,13 @@ describe('specialEffectAction — mutation dispatcher', () => {
         { edge: 'H-0-3', type: 'fence', source: { kind: 'own', ownerPlayerId: player.id } },
       ]
 
-      const result = specialEffectAction.execute(
+      const result = withActiveRegistry(ruleRegistry, () => specialEffectAction.execute(
         makeCtx(
           player,
           { kind: 'consume-fence', count: 2, segmentType: 'fence', sourcePolicy: 'ownOnly' },
           CARD_ID,
         ),
-      )
+      ))
 
       expect(result.type).toBe('ok')
       expect(player.fenceSegments).toEqual([
@@ -919,6 +952,7 @@ describe('specialEffectAction — mutation dispatcher', () => {
     })
 
     it('fails atomically when ownOnly has fewer matching own ordinary fences than requested', () => {
+    const ruleRegistry = createOfficialCardRegistry()
       const player = makePlayer()
       player.fenceSegments = [
         { edge: 'H-0-0', type: 'fence' },
@@ -927,19 +961,20 @@ describe('specialEffectAction — mutation dispatcher', () => {
       ]
       const before = structuredClone(player.fenceSegments)
 
-      const result = specialEffectAction.execute(
+      const result = withActiveRegistry(ruleRegistry, () => specialEffectAction.execute(
         makeCtx(
           player,
           { kind: 'consume-fence', count: 2, segmentType: 'fence', sourcePolicy: 'ownOnly' },
           CARD_ID,
         ),
-      )
+      ))
 
       expect(result).toEqual({ type: 'fail', errorKey: 'log.specialEffectFail' })
       expect(player.fenceSegments).toEqual(before)
     })
 
     it('uses the target player id for ownOnly filtering when targetPlayerId routes the mutation', () => {
+    const ruleRegistry = createOfficialCardRegistry()
       const p1 = makePlayer()
       const p2 = makePlayer()
       p2.id = 'p2'
@@ -951,7 +986,7 @@ describe('specialEffectAction — mutation dispatcher', () => {
       ]
       const state = { players: [p1, p2] } as unknown as GameState
 
-      const result = specialEffectAction.execute({
+      const result = withActiveRegistry(ruleRegistry, () => specialEffectAction.execute({
         ...makeCtx(
           p1,
           { kind: 'consume-fence', count: 1, segmentType: 'fence', sourcePolicy: 'ownOnly' },
@@ -959,7 +994,7 @@ describe('specialEffectAction — mutation dispatcher', () => {
           state,
         ),
         actionContext: { targetPlayerId: p2.id },
-      })
+      }))
 
       expect(result.type).toBe('ok')
       expect(p2.fenceSegments).toEqual([
@@ -989,13 +1024,14 @@ describe('specialEffectAction — mutation dispatcher', () => {
     } as ActionSpace)
 
     it('decrements source by amount and increments destination by the same amount', () => {
+    const ruleRegistry = createOfficialCardRegistry()
       const p1 = makePlayer()
       const events: DraftGameEvent[] = []
       const fishing = makeSpace('fishing', 3)
       const tp = makeSpace('traveling-players', 1)
       const state = { actionSpaces: [fishing, tp], players: [p1] } as unknown as GameState
 
-      const result = specialEffectAction.execute({
+      const result = withActiveRegistry(ruleRegistry, () => specialEffectAction.execute({
         state,
         player: p1,
         space: { id: 'special-effect' } as ActionSpace,
@@ -1008,7 +1044,7 @@ describe('specialEffectAction — mutation dispatcher', () => {
           amount: 1,
         },
         eventSink: makeEventSink(events),
-      })
+      }))
 
       expect(result.type).toBe('ok')
       expect(fishing.resources.food).toBe(2)
@@ -1027,12 +1063,13 @@ describe('specialEffectAction — mutation dispatcher', () => {
     })
 
     it('fails when source has fewer than amount and leaves both spaces untouched', () => {
+    const ruleRegistry = createOfficialCardRegistry()
       const p1 = makePlayer()
       const fishing = makeSpace('fishing', 0)
       const tp = makeSpace('traveling-players', 5)
       const state = { actionSpaces: [fishing, tp], players: [p1] } as unknown as GameState
 
-      const result = specialEffectAction.execute({
+      const result = withActiveRegistry(ruleRegistry, () => specialEffectAction.execute({
         state,
         player: p1,
         space: { id: 'special-effect' } as ActionSpace,
@@ -1044,7 +1081,7 @@ describe('specialEffectAction — mutation dispatcher', () => {
           resource: 'food',
           amount: 1,
         },
-      })
+      }))
 
       expect(result.type).toBe('fail')
       expect(fishing.resources.food).toBe(0)
@@ -1053,6 +1090,7 @@ describe('specialEffectAction — mutation dispatcher', () => {
   })
 
   it('emits public events for future meeple removal, newborn promotion, fence use, stable build, and action accumulation', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     const player = makePlayer()
     player.workers = [
       { id: '1', isActive: true, isNewborn: true },
@@ -1078,26 +1116,26 @@ describe('specialEffectAction — mutation dispatcher', () => {
     const events: DraftGameEvent[] = []
     const eventSink = makeEventSink(events)
 
-    specialEffectAction.execute({
+    withActiveRegistry(ruleRegistry, () => specialEffectAction.execute({
       ...makeCtx(player, { kind: 'remove-future-meeples', rounds: [3] }, CARD_ID, state),
       eventSink,
-    })
-    specialEffectAction.execute({
+    }))
+    withActiveRegistry(ruleRegistry, () => specialEffectAction.execute({
       ...makeCtx(player, { kind: 'promote-first-newborn' }, CARD_ID, state),
       eventSink,
-    })
-    specialEffectAction.execute({
+    }))
+    withActiveRegistry(ruleRegistry, () => specialEffectAction.execute({
       ...makeCtx(player, { kind: 'consume-fence', count: 1 }, CARD_ID, state),
       eventSink,
-    })
-    specialEffectAction.execute({
+    }))
+    withActiveRegistry(ruleRegistry, () => specialEffectAction.execute({
       ...makeCtx(player, { kind: 'add-resource-to-space', spaceId: 'forest', resource: 'wood', amount: 2 }, CARD_ID, state),
       eventSink,
-    })
-    specialEffectAction.execute({
+    }))
+    withActiveRegistry(ruleRegistry, () => specialEffectAction.execute({
       ...makeCtx(player, { kind: 'build-stable-on-first-empty-tile' }, CARD_ID, state),
       eventSink,
-    })
+    }))
 
     expect(events).toEqual([
       expect.objectContaining({ type: 'futureMeeple.removed', playerId: player.id, cardId: CARD_ID, rounds: [3] }),
@@ -1109,6 +1147,7 @@ describe('specialEffectAction — mutation dispatcher', () => {
   })
 
   it('add-resource-to-space: emits resource accumulation for card and round-card targets', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     const player = makePlayer()
     const events: DraftGameEvent[] = []
     const eventSink = makeEventSink(events)
@@ -1117,7 +1156,7 @@ describe('specialEffectAction — mutation dispatcher', () => {
       actionSpaces: [],
     } as unknown as GameState
 
-    let result = specialEffectAction.execute({
+    let result = withActiveRegistry(ruleRegistry, () => specialEffectAction.execute({
       ...makeCtx(
         player,
         { kind: 'add-resource-to-space', target: { kind: 'card', cardId: 'D075_WoodField' }, resource: 'wood', amount: 2 },
@@ -1125,9 +1164,9 @@ describe('specialEffectAction — mutation dispatcher', () => {
         state,
       ),
       eventSink,
-    })
+    }))
     expect(result.type).toBe('ok')
-    result = specialEffectAction.execute({
+    result = withActiveRegistry(ruleRegistry, () => specialEffectAction.execute({
       ...makeCtx(
         player,
         { kind: 'add-resource-to-space', target: { kind: 'roundCard', round: 5 }, resource: 'food', amount: 1 },
@@ -1135,7 +1174,7 @@ describe('specialEffectAction — mutation dispatcher', () => {
         state,
       ),
       eventSink,
-    })
+    }))
 
     expect(result.type).toBe('ok')
     expect(player.cardStates.D075_WoodField?.counters?.wood).toBe(2)
@@ -1154,6 +1193,7 @@ describe('specialEffectAction — mutation dispatcher', () => {
   })
 
   it('plant-additional-good: adds crops to field and card-backed fields and emits crop-added', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     const player = makePlayer()
     const events: DraftGameEvent[] = []
     player.fields = [{ row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 1 }] }]
@@ -1161,7 +1201,7 @@ describe('specialEffectAction — mutation dispatcher', () => {
       extraData: { cardFieldStacks: [{ crop: 'wood', remaining: 1 }] },
     }
 
-    const result = specialEffectAction.execute({
+    const result = withActiveRegistry(ruleRegistry, () => specialEffectAction.execute({
       ...makeCtx(
         player,
         {
@@ -1174,7 +1214,7 @@ describe('specialEffectAction — mutation dispatcher', () => {
         CARD_ID,
       ),
       eventSink: makeEventSink(events),
-    })
+    }))
 
     expect(result.type).toBe('ok')
     expect(player.fields[0]!.stacks).toEqual([{ kind: 'grain', remaining: 2 }])

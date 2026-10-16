@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
@@ -28,9 +24,9 @@ describe('B061_ThreeFieldRotation session', () => {
 
     session.loadState(state)
 
-    const effect = getCardEffect(CARD_ID)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
     expect(effect).toBeDefined()
-    const flow = effect!.onStartHarvestFieldPhase!(state, player)
+    const flow = session.withCtx(() => effect!.onStartHarvestFieldPhase!(state, player))
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('leaf')
     expect((flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('gain')
@@ -52,8 +48,8 @@ describe('B061_ThreeFieldRotation session', () => {
 
     session.loadState(state)
 
-    const effect = getCardEffect(CARD_ID)
-    const flow = effect!.onStartHarvestFieldPhase!(state, player)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
+    const flow = session.withCtx(() => effect!.onStartHarvestFieldPhase!(state, player))
     expect(flow).toBeUndefined()
   })
 
@@ -72,8 +68,8 @@ describe('B061_ThreeFieldRotation session', () => {
 
     session.loadState(state)
 
-    const effect = getCardEffect(CARD_ID)
-    const flow = effect!.onStartHarvestFieldPhase!(state, player)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
+    const flow = session.withCtx(() => effect!.onStartHarvestFieldPhase!(state, player))
     expect(flow).toBeUndefined()
   })
 
@@ -92,8 +88,8 @@ describe('B061_ThreeFieldRotation session', () => {
 
     session.loadState(state)
 
-    const effect = getCardEffect(CARD_ID)
-    const flow = effect!.onStartHarvestFieldPhase!(state, player)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
+    const flow = session.withCtx(() => effect!.onStartHarvestFieldPhase!(state, player))
     expect(flow).toBeUndefined()
   })
 

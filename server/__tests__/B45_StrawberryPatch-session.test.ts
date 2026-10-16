@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { B045_StrawberryPatch } from '../../shared/cards/B/B045_StrawberryPatch'
@@ -13,7 +9,7 @@ describe('B045_StrawberryPatch prerequisite', () => {
     const state = session.getState().state
     const player = state.players[0]!
     player.fields = [{ row: 0, col: 0, stacks: [{ kind: 'vegetable', remaining: 1 }] }]
-    expect(meetsCardPrerequisites(player, B045_StrawberryPatch, state.round, state)).toBe(false)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, B045_StrawberryPatch, state.round, state))).toBe(false)
   })
 
   it('allows when player has 2 vegetable fields', () => {
@@ -24,6 +20,6 @@ describe('B045_StrawberryPatch prerequisite', () => {
       { row: 0, col: 0, stacks: [{ kind: 'vegetable', remaining: 1 }] },
       { row: 0, col: 1, stacks: [{ kind: 'vegetable', remaining: 1 }] },
     ]
-    expect(meetsCardPrerequisites(player, B045_StrawberryPatch, state.round, state)).toBe(true)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, B045_StrawberryPatch, state.round, state))).toBe(true)
   })
 })

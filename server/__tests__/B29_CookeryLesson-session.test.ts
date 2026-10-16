@@ -1,7 +1,4 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
+import type { GameSession as SessionRuleOwner } from '../game/authoritative-session'
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import {
@@ -28,16 +25,17 @@ import '../../shared/cards/B/B032_Kettle'
 const CARD_ID = 'B029_CookeryLesson'
 const OCCUPATION_ID = 'A123_FrameBuilder'
 
-const findListener = (id: string) =>
-  getRegisteredCardListeners().find((l) => l.id === id)
+const findListener = (ruleOwner: SessionRuleOwner, id: string) =>
+  ruleOwner.withCtx(() => getRegisteredCardListeners()).find((l) => l.id === id)
 
-const setActionToken = (player: PlayerState, token: number) => {
-  recordActionSnapshot(player, token)
+const setActionToken = (ruleOwner: SessionRuleOwner, player: PlayerState, token: number) => {
+  const lookupRule1 = () => recordActionSnapshot(player, token)
+  ruleOwner.withCtx(lookupRule1)
 }
 
-const runFlow = (flow: ActionFlow, state: GameState, player: PlayerState) => {
+const runFlow = (ruleOwner: GameSession, flow: ActionFlow, state: GameState, player: PlayerState) => {
   if (flow.type !== 'leaf') {
-    if ('children' in flow) flow.children.forEach((child) => runFlow(child, state, player))
+    if ('children' in flow) flow.children.forEach((child) => runFlow(ruleOwner, child, state, player))
     return
   }
   const action = flow.actionId === 'special-effect'
@@ -45,21 +43,23 @@ const runFlow = (flow: ActionFlow, state: GameState, player: PlayerState) => {
     : flow.actionId === 'bonus-vp'
       ? bonusVpAction
       : undefined
-  action?.execute({
+  ruleOwner.withCtx(() => action?.execute({
+    actionHooks: ruleOwner.actionHooks,
     state,
     player,
     params: flow.params,
     sourceCard: flow.sourceCard,
     actionContext: flow.actionContext,
-  } as never)
+  } as never))
 }
 
-const invokeListener = (
+const invokeListener = (ruleOwner: SessionRuleOwner,
   listener: NonNullable<ReturnType<typeof findListener>>,
   context: CardListenerContext,
 ) => {
-  const result = executeCardListener(listener, context)
-  if (result?.flow) runFlow(result.flow, context.state, context.player)
+  const lookupRule2 = () => executeCardListener(listener, context)
+  const result = (ruleOwner.withCtx(lookupRule2))
+  if (result?.flow) runFlow(ruleOwner, result.flow, context.state, context.player)
   return result
 }
 
@@ -173,16 +173,17 @@ describe('B029_CookeryLesson — per-action token tracking, not per-round', () =
   }
 
   it('lessons placement first, then cook in same action → 1 VP awarded on cook', () => {
-    const exchangeListener = findListener('B29-cookery-lesson-after-exchange')
-    const placeListener = findListener('B29-cookery-lesson-after-place-farmer')
+
+
+    const { session: ruleSession, state, player } = setup()
+    const exchangeListener = findListener(ruleSession, 'B29-cookery-lesson-after-exchange')
+    const placeListener = findListener(ruleSession, 'B29-cookery-lesson-after-place-farmer')
     expect(exchangeListener).toBeDefined()
     expect(placeListener).toBeDefined()
-
-    const { state, player } = setup()
-    setActionToken(player, 100)
+    setActionToken(ruleSession, player, 100)
 
     // 1) Place farmer on lessons → no VP yet (no cook stamp)
-    let result = invokeListener(placeListener!, {
+    let result = invokeListener(ruleSession, placeListener!, {
       state,
       player,
       space: mkActionSpace({ id: 'lessons' }),
@@ -194,7 +195,7 @@ describe('B029_CookeryLesson — per-action token tracking, not per-round', () =
     expect(readCardExtraData<number>(player, CARD_ID, 'lessonsActionToken')).toBe(100)
 
     // 2) anytime-exchange (cook) in same action → VP
-    result = invokeListener(exchangeListener!, {
+    result = invokeListener(ruleSession, exchangeListener!, {
       state,
       player,
       space: mkActionSpace({ id: 'anytime-exchange' }),
@@ -208,12 +209,14 @@ describe('B029_CookeryLesson — per-action token tracking, not per-round', () =
   })
 
   it('cook first, then lessons in same action → 1 VP awarded on lessons', () => {
-    const exchangeListener = findListener('B29-cookery-lesson-after-exchange')
-    const placeListener = findListener('B29-cookery-lesson-after-place-farmer')
-    const { state, player } = setup()
-    setActionToken(player, 200)
 
-    let result = invokeListener(exchangeListener!, {
+
+    const { session: ruleSession, state, player } = setup()
+    const exchangeListener = findListener(ruleSession, 'B29-cookery-lesson-after-exchange')
+    const placeListener = findListener(ruleSession, 'B29-cookery-lesson-after-place-farmer')
+    setActionToken(ruleSession, player, 200)
+
+    let result = invokeListener(ruleSession, exchangeListener!, {
       state,
       player,
       space: mkActionSpace({ id: 'anytime-exchange' }),
@@ -224,7 +227,7 @@ describe('B029_CookeryLesson — per-action token tracking, not per-round', () =
     } as CardListenerContext)
     expect(hasAction(result?.flow, 'bonus-vp')).toBe(false)
 
-    result = invokeListener(placeListener!, {
+    result = invokeListener(ruleSession, placeListener!, {
       state,
       player,
       space: mkActionSpace({ id: 'lessons-4' }),
@@ -236,12 +239,14 @@ describe('B029_CookeryLesson — per-action token tracking, not per-round', () =
   })
 
   it('cook first, then lessons-3 in same action → 1 VP awarded on lessons', () => {
-    const exchangeListener = findListener('B29-cookery-lesson-after-exchange')
-    const placeListener = findListener('B29-cookery-lesson-after-place-farmer')
-    const { state, player } = setup()
-    setActionToken(player, 201)
 
-    let result = invokeListener(exchangeListener!, {
+
+    const { session: ruleSession, state, player } = setup()
+    const exchangeListener = findListener(ruleSession, 'B29-cookery-lesson-after-exchange')
+    const placeListener = findListener(ruleSession, 'B29-cookery-lesson-after-place-farmer')
+    setActionToken(ruleSession, player, 201)
+
+    let result = invokeListener(ruleSession, exchangeListener!, {
       state,
       player,
       space: mkActionSpace({ id: 'anytime-exchange' }),
@@ -252,7 +257,7 @@ describe('B029_CookeryLesson — per-action token tracking, not per-round', () =
     } as CardListenerContext)
     expect(hasAction(result?.flow, 'bonus-vp')).toBe(false)
 
-    result = invokeListener(placeListener!, {
+    result = invokeListener(ruleSession, placeListener!, {
       state,
       player,
       space: mkActionSpace({ id: 'lessons-3' }),
@@ -264,12 +269,14 @@ describe('B029_CookeryLesson — per-action token tracking, not per-round', () =
   })
 
   it('cook in action 100, lessons in action 101 → NO VP (per-action gating)', () => {
-    const exchangeListener = findListener('B29-cookery-lesson-after-exchange')
-    const placeListener = findListener('B29-cookery-lesson-after-place-farmer')
-    const { state, player } = setup()
 
-    setActionToken(player, 100)
-    invokeListener(exchangeListener!, {
+
+    const { session: ruleSession, state, player } = setup()
+    const exchangeListener = findListener(ruleSession, 'B29-cookery-lesson-after-exchange')
+    const placeListener = findListener(ruleSession, 'B29-cookery-lesson-after-place-farmer')
+
+    setActionToken(ruleSession, player, 100)
+    invokeListener(ruleSession, exchangeListener!, {
       state,
       player,
       space: mkActionSpace({ id: 'anytime-exchange' }),
@@ -280,8 +287,8 @@ describe('B029_CookeryLesson — per-action token tracking, not per-round', () =
     } as CardListenerContext)
 
     // Action token advances → next farmer placement
-    setActionToken(player, 101)
-    const result = invokeListener(placeListener!, {
+    setActionToken(ruleSession, player, 101)
+    const result = invokeListener(ruleSession, placeListener!, {
       state,
       player,
       space: mkActionSpace({ id: 'lessons' }),
@@ -294,11 +301,12 @@ describe('B029_CookeryLesson — per-action token tracking, not per-round', () =
   })
 
   it('lessons alone (no cook) → no VP', () => {
-    const placeListener = findListener('B29-cookery-lesson-after-place-farmer')
-    const { state, player } = setup()
-    setActionToken(player, 300)
 
-    const result = invokeListener(placeListener!, {
+    const { session: ruleSession, state, player } = setup()
+    const placeListener = findListener(ruleSession, 'B29-cookery-lesson-after-place-farmer')
+    setActionToken(ruleSession, player, 300)
+
+    const result = invokeListener(ruleSession, placeListener!, {
       state,
       player,
       space: mkActionSpace({ id: 'lessons' }),
@@ -310,11 +318,12 @@ describe('B029_CookeryLesson — per-action token tracking, not per-round', () =
   })
 
   it('cook alone (no lessons) → no VP', () => {
-    const exchangeListener = findListener('B29-cookery-lesson-after-exchange')
-    const { state, player } = setup()
-    setActionToken(player, 400)
 
-    const result = invokeListener(exchangeListener!, {
+    const { session: ruleSession, state, player } = setup()
+    const exchangeListener = findListener(ruleSession, 'B29-cookery-lesson-after-exchange')
+    setActionToken(ruleSession, player, 400)
+
+    const result = invokeListener(ruleSession, exchangeListener!, {
       state,
       player,
       space: mkActionSpace({ id: 'anytime-exchange' }),
@@ -327,13 +336,15 @@ describe('B029_CookeryLesson — per-action token tracking, not per-round', () =
   })
 
   it('multiple cook calls in same action with lessons stamped → only 1 VP (USED_ACTION_TOKEN dedup)', () => {
-    const exchangeListener = findListener('B29-cookery-lesson-after-exchange')
-    const placeListener = findListener('B29-cookery-lesson-after-place-farmer')
-    const { state, player } = setup()
-    setActionToken(player, 500)
+
+
+    const { session: ruleSession, state, player } = setup()
+    const exchangeListener = findListener(ruleSession, 'B29-cookery-lesson-after-exchange')
+    const placeListener = findListener(ruleSession, 'B29-cookery-lesson-after-place-farmer')
+    setActionToken(ruleSession, player, 500)
 
     // First lessons placement (no VP yet)
-    invokeListener(placeListener!, {
+    invokeListener(ruleSession, placeListener!, {
       state,
       player,
       space: mkActionSpace({ id: 'lessons' }),
@@ -343,7 +354,7 @@ describe('B029_CookeryLesson — per-action token tracking, not per-round', () =
     } as CardListenerContext)
 
     // First cook → VP awarded, USED_ACTION_TOKEN_KEY = 500
-    let result = invokeListener(exchangeListener!, {
+    let result = invokeListener(ruleSession, exchangeListener!, {
       state,
       player,
       space: mkActionSpace({ id: 'anytime-exchange' }),
@@ -355,7 +366,7 @@ describe('B029_CookeryLesson — per-action token tracking, not per-round', () =
     expect(hasAction(result?.flow, 'bonus-vp')).toBe(true)
 
     // Second cook in same action → no VP (already used this action)
-    result = invokeListener(exchangeListener!, {
+    result = invokeListener(ruleSession, exchangeListener!, {
       state,
       player,
       space: mkActionSpace({ id: 'anytime-exchange' }),
@@ -368,11 +379,12 @@ describe('B029_CookeryLesson — per-action token tracking, not per-round', () =
   })
 
   it('does not stamp cooking for grain-to-food from a cookery source', () => {
-    const exchangeListener = findListener('B29-cookery-lesson-after-exchange')
-    const { state, player } = setup()
-    setActionToken(player, 550)
 
-    const result = invokeListener(exchangeListener!, {
+    const { session: ruleSession, state, player } = setup()
+    const exchangeListener = findListener(ruleSession, 'B29-cookery-lesson-after-exchange')
+    setActionToken(ruleSession, player, 550)
+
+    const result = invokeListener(ruleSession, exchangeListener!, {
       state,
       player,
       actionId: 'anytime-exchange',
@@ -386,12 +398,13 @@ describe('B029_CookeryLesson — per-action token tracking, not per-round', () =
   })
 
   it('does not stamp cooking for animal-to-food from a non-cookery source', () => {
-    const exchangeListener = findListener('B29-cookery-lesson-after-exchange')
-    const { state, player } = setup()
-    player.minorPlayed.push('B032_Kettle')
-    setActionToken(player, 551)
 
-    const result = invokeListener(exchangeListener!, {
+    const { session: ruleSession, state, player } = setup()
+    const exchangeListener = findListener(ruleSession, 'B29-cookery-lesson-after-exchange')
+    player.minorPlayed.push('B032_Kettle')
+    setActionToken(ruleSession, player, 551)
+
+    const result = invokeListener(ruleSession, exchangeListener!, {
       state,
       player,
       actionId: 'anytime-exchange',
@@ -405,12 +418,13 @@ describe('B029_CookeryLesson — per-action token tracking, not per-round', () =
   })
 
   it('non-lessons place-farmer does not stamp lessonsActionToken', () => {
-    const placeListener = findListener('B29-cookery-lesson-after-place-farmer')
-    const { state, player } = setup()
-    setActionToken(player, 600)
+
+    const { session: ruleSession, state, player } = setup()
+    const placeListener = findListener(ruleSession, 'B29-cookery-lesson-after-place-farmer')
+    setActionToken(ruleSession, player, 600)
     writeCardExtraData(player, CARD_ID, 'lessonsActionToken', -1)
 
-    const result = invokeListener(placeListener!, {
+    const result = invokeListener(ruleSession, placeListener!, {
       state,
       player,
       space: mkActionSpace({ id: 'forest' }),

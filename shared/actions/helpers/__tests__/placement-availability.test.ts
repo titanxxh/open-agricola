@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../../cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { execFileSync } from 'node:child_process'
 import { describe, it, expect, afterEach } from 'vitest'
 import { GameSession } from '../../../../server/game/authoritative-session'
@@ -30,7 +26,7 @@ describe('computeAllowedPlacementSpaces', () => {
     const session = new GameSession(undefined, undefined, { playerCount: 2 })
     const { state } = session.getState()
     const player = state.players[0]!
-    const result = computeAllowedPlacementSpaces(state, player, { actionHooks: session.actionHooks })
+    const result = session.withCtx(() => computeAllowedPlacementSpaces(state, player, { actionHooks: session.actionHooks }))
     expect(result.length).toBeGreaterThan(0)
     for (const entry of result) {
       expect(entry.allowOccupied).toBe(false)
@@ -46,7 +42,7 @@ describe('computeAllowedPlacementSpaces', () => {
     session.loadState(st)
     const { state } = session.getState()
     const player = state.players[0]!
-    const result = computeAllowedPlacementSpaces(state, player, { actionHooks: session.actionHooks })
+    const result = session.withCtx(() => computeAllowedPlacementSpaces(state, player, { actionHooks: session.actionHooks }))
     expect(result.some(e => e.spaceId === 'day-laborer')).toBe(false)
   })
 
@@ -60,7 +56,7 @@ describe('computeAllowedPlacementSpaces', () => {
 
     const { state } = session.getState()
     const player = state.players[0]!
-    const result = computeAllowedPlacementSpaces(state, player, { actionHooks: session.actionHooks })
+    const result = session.withCtx(() => computeAllowedPlacementSpaces(state, player, { actionHooks: session.actionHooks }))
     const entry = result.find(e => e.spaceId === 'day-laborer')
     expect(entry).toBeDefined()
     expect(entry!.allowOccupied).toBe(false)
@@ -73,7 +69,7 @@ describe('computeAllowedPlacementSpaces', () => {
     space.takenBy = [{ playerId: st.players[1]!.id, workerId: 'w1' }]
     session.loadState(st)
 
-    requireActiveCardRegistry('placement-availability').registerListener({
+    session.withCtx(() => requireActiveCardRegistry('placement-availability')).registerListener({
       id: 'CUSTOM_test-allow-day-laborer',
       phases: ['computeArgs' as ActionHookPhase],
       actions: ['place-farmer'],
@@ -84,7 +80,7 @@ describe('computeAllowedPlacementSpaces', () => {
 
     const { state } = session.getState()
     const player = state.players[0]!
-    const result = computeAllowedPlacementSpaces(state, player, { actionHooks: session.actionHooks })
+    const result = session.withCtx(() => computeAllowedPlacementSpaces(state, player, { actionHooks: session.actionHooks }))
     const entry = result.find(e => e.spaceId === 'day-laborer')
     expect(entry).toBeDefined()
     expect(entry!.allowOccupied).toBe(true)
@@ -92,7 +88,7 @@ describe('computeAllowedPlacementSpaces', () => {
 
   it('dedupes: base entry wins over extraOption for the same spaceId', () => {
     const session = new GameSession(undefined, undefined, { playerCount: 2 })
-    requireActiveCardRegistry('placement-availability').registerListener({
+    session.withCtx(() => requireActiveCardRegistry('placement-availability')).registerListener({
       id: 'CUSTOM_test-dup-day-laborer',
       phases: ['computeArgs' as ActionHookPhase],
       actions: ['place-farmer'],
@@ -103,7 +99,7 @@ describe('computeAllowedPlacementSpaces', () => {
 
     const { state } = session.getState()
     const player = state.players[0]!
-    const result = computeAllowedPlacementSpaces(state, player, { actionHooks: session.actionHooks })
+    const result = session.withCtx(() => computeAllowedPlacementSpaces(state, player, { actionHooks: session.actionHooks }))
     const entries = result.filter(e => e.spaceId === 'day-laborer')
     expect(entries.length).toBe(1)
     expect(entries[0]!.allowOccupied).toBe(false)
@@ -111,7 +107,7 @@ describe('computeAllowedPlacementSpaces', () => {
 
   it('filters extraOption spaces that do not exist', () => {
     const session = new GameSession(undefined, undefined, { playerCount: 2 })
-    requireActiveCardRegistry('placement-availability').registerListener({
+    session.withCtx(() => requireActiveCardRegistry('placement-availability')).registerListener({
       id: 'CUSTOM_test-ghost-space',
       phases: ['computeArgs' as ActionHookPhase],
       actions: ['place-farmer'],
@@ -122,7 +118,7 @@ describe('computeAllowedPlacementSpaces', () => {
 
     const { state } = session.getState()
     const player = state.players[0]!
-    const result = computeAllowedPlacementSpaces(state, player, { actionHooks: session.actionHooks })
+    const result = session.withCtx(() => computeAllowedPlacementSpaces(state, player, { actionHooks: session.actionHooks }))
     expect(result.some(e => e.spaceId === 'does-not-exist')).toBe(false)
   })
 })

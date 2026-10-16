@@ -1,7 +1,6 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
+import { CardRegistry as TestCardRegistry } from '../../shared/cards/registry'
+import { withActiveRegistry } from '../../shared/cards/active-registry'
+import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -105,8 +104,11 @@ const createSpace = (id: string): ActionSpace =>
     takenBy: [],
   }) as ActionSpace
 
-const findListener = () =>
-  getRegisteredCardListeners().find((listener) => listener.id === LISTENER_ID)
+const findListener = (ruleOwner: TestCardRegistry) =>
+  {
+  const lookupRule1 = () => getRegisteredCardListeners().find((listener) => listener.id === LISTENER_ID)
+  return withActiveRegistry(ruleOwner, lookupRule1)
+}
 
 describe('D103_CanalBoatman listener', () => {
   it('registers spend-worker as an internal action', () => {
@@ -114,18 +116,19 @@ describe('D103_CanalBoatman listener', () => {
   })
 
   it('returns optional seq after fishing with pay-resources -> spend-worker -> xor', () => {
-    const listener = findListener()
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry)
     expect(listener).toBeDefined()
 
     const player = createPlayer(1)
-    const result = executeCardListener(listener!, {
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener!, {
       state: createState(player),
       player,
       space: createSpace('fishing'),
       actionId: 'place-farmer',
       phase: 'after',
       result: { type: 'ok' },
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeDefined()
     expect(result!.flow?.type).toBe('seq')

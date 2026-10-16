@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -18,7 +14,7 @@ describe('E001_PoleBarns prerequisite', () => {
     const state = session.getState().state
     const player = state.players[0]!
     player.fenceSegments = []
-    expect(meetsCardPrerequisites(player, E001_PoleBarns, state.round, state)).toBe(false)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, E001_PoleBarns, state.round, state))).toBe(false)
   })
 
   it('does not count Wood Palisades toward the 15-fence prerequisite', () => {
@@ -32,7 +28,7 @@ describe('E001_PoleBarns prerequisite', () => {
       })),
       { edge: 'V-0-0', type: 'palisade' },
     ]
-    expect(meetsCardPrerequisites(player, E001_PoleBarns, state.round, state)).toBe(false)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, E001_PoleBarns, state.round, state))).toBe(false)
   })
 
   it('allows when player has 15 fence segments on board', () => {
@@ -43,7 +39,7 @@ describe('E001_PoleBarns prerequisite', () => {
       edge: `H-0-${i}`,
       type: 'fence',
     }))
-    expect(meetsCardPrerequisites(player, E001_PoleBarns, state.round, state)).toBe(true)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, E001_PoleBarns, state.round, state))).toBe(true)
   })
 })
 

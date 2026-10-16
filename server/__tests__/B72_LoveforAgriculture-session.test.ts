@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -393,7 +389,7 @@ describe('B072_LoveforAgriculture session', () => {
       }
 
       // Check capacity via imported computeAnimalZones
-      const zones = computeAnimalZones(player)
+      const zones = session.withCtx(() => computeAnimalZones(player))
       const pastureZone = zones.find((z: InteractionAnimalReorgZone) => z.id === 'p1')
       // Size-1 pasture normally has capacity 2, should be reduced by 1 (pastureSize)
       expect(pastureZone?.capacity).toBe(1)
@@ -429,7 +425,7 @@ describe('B072_LoveforAgriculture session', () => {
       }
 
       // Check capacity via imported computeAnimalZones
-      const zones = computeAnimalZones(player)
+      const zones = session.withCtx(() => computeAnimalZones(player))
       const pastureZone = zones.find((z: AnimalZone) => z.id === 'p1')
       // Size-2 pasture normally has capacity 4, reduced by 2
       expect(pastureZone?.capacity).toBe(2)
@@ -453,7 +449,7 @@ describe('B072_LoveforAgriculture session', () => {
       const player = state.players[0]!
 
       // Check capacity via imported computeAnimalZones
-      const zones = computeAnimalZones(player)
+      const zones = session.withCtx(() => computeAnimalZones(player))
       const pastureZone = zones.find((z: AnimalZone) => z.id === 'p1')
       expect(pastureZone?.capacity).toBe(4) // unchanged
     })

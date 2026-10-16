@@ -1,8 +1,4 @@
-import { installOfficialCardRegistry } from './card-environment'
-
-installOfficialCardRegistry()
-
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { GameSession } from '../../../server/game/authoritative-session'
 import type { ActionHookPhase } from '../../actions/hooks'
 import { setActiveWorkerCount, setWorkersAtHome } from '../../domain/player'
@@ -10,6 +6,9 @@ import { A171_Sidekick_impl } from '../A/A171_Sidekick'
 import type { CardListenerContext } from '../card-listeners'
 
 const CARD_ID = 'A171_Sidekick'
+
+const sessions: GameSession[] = []
+afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
 
 const setupContext = (options: {
   currentSpaceId?: string
@@ -22,8 +21,9 @@ const setupContext = (options: {
   targetSpaceId?: string
   actionContext?: Record<string, unknown>
   missingLeftSlot?: boolean
-} = {}): CardListenerContext => {
+} = {}): { session: GameSession; context: CardListenerContext } => {
   const session = new GameSession(42, undefined, { playerCount: 5 })
+  sessions.push(session)
   const state = session.getState().state
   state.round = options.round ?? 3
   state.roundActionOrder = state.roundActionOrder.map(() => null)
@@ -41,7 +41,7 @@ const setupContext = (options: {
   target.strictCanExecute = true
   target.canBeExecutedByPlayer = () => options.targetExecutable ?? true
   const space = state.actionSpaces.find((candidate) => candidate.id === (options.currentSpaceId ?? 'pig-market'))!
-  return {
+  return { session, context: {
     actionHooks: session.actionHooks,
     state,
     player: owner,
@@ -53,11 +53,11 @@ const setupContext = (options: {
     phase: 'after' as ActionHookPhase,
     result: { type: 'ok' },
     actionContext: options.actionContext,
-  } as CardListenerContext
+  } as CardListenerContext }
 }
 
-const run = (context: CardListenerContext = setupContext()) =>
-  A171_Sidekick_impl.listeners[0]!.handler!(context)
+const run = ({ session, context }: ReturnType<typeof setupContext> = setupContext()) =>
+  session.withCtx(() => A171_Sidekick_impl.listeners[0]!.handler!(context))
 
 describe('A171 Sidekick listener', () => {
   it('offers a pay-and-place flow for the immediately-left revealed round action card', () => {

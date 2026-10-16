@@ -1,7 +1,4 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
+import type { GameSession as SessionRuleOwner } from '../game/authoritative-session'
 import { type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -17,8 +14,8 @@ import type { ActionFlow } from '../../shared/contract/types'
 
 const CARD_ID = 'C026_Flail'
 
-const findListener = (id: string) =>
-  getRegisteredCardListeners().find((l) => l.id === id)
+const findListener = (ruleOwner: SessionRuleOwner, id: string) =>
+  ruleOwner.withCtx(() => getRegisteredCardListeners()).find((l) => l.id === id)
 
 describe('C026_Flail session', () => {
   it('onBuy grants 2 food', () => {
@@ -26,9 +23,9 @@ describe('C026_Flail session', () => {
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     session.loadState(state)
-    const effect = getCardEffect(CARD_ID)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
     expect(effect).toBeDefined()
-    const flow = effect!.onBuy!(state, state.players[0]!)
+    const flow = session.withCtx(() => effect!.onBuy!(state, state.players[0]!))
     expect(flow).toBeDefined()
     expect((flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('gain')
     expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params).toEqual({ food: 2 })
@@ -36,9 +33,11 @@ describe('C026_Flail session', () => {
   })
 
   it('after-place-farmer on farmland offers optional bake-bread', () => {
-    const listener = findListener('C26-flail-after-place-farmer')!
-    expect(listener).toBeDefined()
+
+
     const session = new GameSession(42)
+    const listener = findListener(session, 'C26-flail-after-place-farmer')!
+    expect(listener).toBeDefined()
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
@@ -46,13 +45,13 @@ describe('C026_Flail session', () => {
     session.loadState(state)
 
     const space = state.actionSpaces.find((s) => s.id === 'farmland')!
-    const result = executeCardListener(listener, {
+    const result = session.withCtx(() => executeCardListener(listener, {
       state,
       player,
       space,
       actionId: 'place-farmer',
       phase: 'after',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
     expect(result).toBeDefined()
     const leaf = result!.flow as Extract<ActionFlow, { type: 'leaf' }>
     expect(leaf.type).toBe('leaf')
@@ -62,8 +61,9 @@ describe('C026_Flail session', () => {
   })
 
   it('after-place-farmer on cultivation offers optional bake-bread', () => {
-    const listener = findListener('C26-flail-after-place-farmer')!
+
     const session = new GameSession(42)
+    const listener = findListener(session, 'C26-flail-after-place-farmer')!
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 5 // cultivation available from round 5
@@ -73,20 +73,21 @@ describe('C026_Flail session', () => {
 
     const space = state.actionSpaces.find((s) => s.id === 'cultivation')
     if (!space) return // not present in state; skip the assertion path
-    const result = executeCardListener(listener, {
+    const result = session.withCtx(() => executeCardListener(listener, {
       state,
       player,
       space,
       actionId: 'place-farmer',
       phase: 'after',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
     expect(result).toBeDefined()
     expect((result!.flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('bake-bread')
   })
 
   it('does not trigger on non-trigger spaces', () => {
-    const listener = findListener('C26-flail-after-place-farmer')!
+
     const session = new GameSession(42)
+    const listener = findListener(session, 'C26-flail-after-place-farmer')!
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
@@ -94,13 +95,13 @@ describe('C026_Flail session', () => {
     session.loadState(state)
 
     const forest = state.actionSpaces.find((s) => s.id === 'forest')!
-    const result = executeCardListener(listener, {
+    const result = session.withCtx(() => executeCardListener(listener, {
       state,
       player,
       space: forest,
       actionId: 'place-farmer',
       phase: 'after',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
     expect(result).toBeUndefined()
   })
 

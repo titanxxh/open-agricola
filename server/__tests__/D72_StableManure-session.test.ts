@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { resolveSkipChoice, resolveTriggerIfPresent } from './_helpers/trigger-select'
@@ -293,8 +289,8 @@ describe('D072_StableManure session', () => {
     }
     session.loadState(state)
 
-    const effect = getCardEffect('D072_StableManure')
-    const flow = effect!.onStartHarvestFieldPhase!(state, p)
+    const effect = session.withCtx(() => getCardEffect('D072_StableManure'))
+    const flow = session.withCtx(() => effect!.onStartHarvestFieldPhase!(state, p))
     expect(flow).toBeDefined()
   })
 

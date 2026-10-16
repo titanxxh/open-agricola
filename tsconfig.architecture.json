@@ -1,7 +1,10 @@
 {
   "extends": "./tsconfig.app.json",
   "compilerOptions": {
-    "types": ["node", "vite/client"],
+    "types": [
+      "node",
+      "vite/client"
+    ],
     "allowJs": true,
     "noUnusedLocals": false,
     "noUnusedParameters": false
@@ -17,7 +20,8 @@
     "scripts/__tests__/check-card-impl-boundaries.test.ts",
     "scripts/__tests__/check-direct-session-log.test.ts",
     "scripts/__tests__/check-effects-file-list.test.ts",
-    "scripts/__tests__/check-no-dsl.test.ts"
+    "scripts/__tests__/check-no-dsl.test.ts",
+    "scripts/__tests__/check-test-rule-environments.test.ts"
   ],
   "exclude": []
 }

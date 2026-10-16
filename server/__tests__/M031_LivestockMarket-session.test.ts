@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { M031_LivestockMarket } from '../../shared/cards/M/M031_LivestockMarket'
@@ -172,10 +168,10 @@ describe('M031_LivestockMarket session', () => {
     const player = state.players[0]!
 
     player.resources = fullResources({ sheep: 2, boar: 2 })
-    expect(meetsCardPrerequisites(player, M031_LivestockMarket, state.round, state)).toBe(false)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, M031_LivestockMarket, state.round, state))).toBe(false)
 
     player.resources = fullResources({ sheep: 2, boar: 2, cattle: 1 })
-    expect(meetsCardPrerequisites(player, M031_LivestockMarket, state.round, state)).toBe(true)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, M031_LivestockMarket, state.round, state))).toBe(true)
   })
 
   it('onBuy enumerates only exchange candidates whose final animal totals fit', () => {
@@ -186,9 +182,9 @@ describe('M031_LivestockMarket session', () => {
     player.minorPlayed.push(CARD_ID)
     session.loadState(state)
 
-    const effect = getCardEffect(CARD_ID)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
     expect(effect).not.toBeNull()
-    const flow = effect!.onBuy!(state, player) as ActionFlow
+    const flow = session.withCtx(() => effect!.onBuy!(state, player)) as ActionFlow
     expect(flow).toBeDefined()
     expect(flow.type).toBe('xor')
     expect(flow.optional).toBe(true)
@@ -268,9 +264,9 @@ describe('M031_LivestockMarket session', () => {
     player.minorPlayed.push(CARD_ID)
     session.loadState(state)
 
-    const effect = getCardEffect(CARD_ID)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
     expect(effect).not.toBeNull()
-    const flow = effect!.onBuy!(state, player) as ActionFlow
+    const flow = session.withCtx(() => effect!.onBuy!(state, player)) as ActionFlow
     expect(directTrades(flow)).not.toContainEqual({
       from: { sheep: 1, boar: 1 },
       to: { boar: 1, cattle: 1 },

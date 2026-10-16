@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -31,9 +27,9 @@ describe('C049_BeerStall session', () => {
 
     session.loadState(state)
 
-    const effect = getCardEffect(CARD_ID)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
     expect(effect).toBeDefined()
-    const flow = effect!.onHarvestFeedingPhase!(state, player)
+    const flow = session.withCtx(() => effect!.onHarvestFeedingPhase!(state, player))
     expect(flow).toBeDefined()
     // With 1 empty stable, should be a single seq
     expect(flow!.type).toBe('seq')
@@ -54,8 +50,8 @@ describe('C049_BeerStall session', () => {
 
     session.loadState(state)
 
-    const effect = getCardEffect(CARD_ID)
-    const flow = effect!.onHarvestFeedingPhase!(state, player)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
+    const flow = session.withCtx(() => effect!.onHarvestFeedingPhase!(state, player))
     expect(flow).toBeUndefined()
   })
 
@@ -81,8 +77,8 @@ describe('C049_BeerStall session', () => {
 
     session.loadState(state)
 
-    const effect = getCardEffect(CARD_ID)
-    const flow = effect!.onHarvestFeedingPhase!(state, player)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
+    const flow = session.withCtx(() => effect!.onHarvestFeedingPhase!(state, player))
     expect(flow).toBeUndefined()
   })
 
@@ -100,8 +96,8 @@ describe('C049_BeerStall session', () => {
 
     session.loadState(state)
 
-    const effect = getCardEffect(CARD_ID)
-    const flow = effect!.onHarvestFeedingPhase!(state, player)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
+    const flow = session.withCtx(() => effect!.onHarvestFeedingPhase!(state, player))
     expect(flow).toBeUndefined()
   })
 
@@ -123,8 +119,8 @@ describe('C049_BeerStall session', () => {
 
     session.loadState(state)
 
-    const effect = getCardEffect(CARD_ID)
-    const flow = effect!.onHarvestFeedingPhase!(state, player)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
+    const flow = session.withCtx(() => effect!.onHarvestFeedingPhase!(state, player))
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('seq')
   })
@@ -143,8 +139,8 @@ describe('C049_BeerStall session', () => {
 
     session.loadState(state)
 
-    const effect = getCardEffect(CARD_ID)
-    const flow = effect!.onHarvestFeedingPhase!(state, player)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
+    const flow = session.withCtx(() => effect!.onHarvestFeedingPhase!(state, player))
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('xor')
     expect((flow as Extract<ActionFlow, { type: 'leaf' }>).optional).toBe(true)
@@ -166,8 +162,8 @@ describe('C049_BeerStall session', () => {
 
     session.loadState(state)
 
-    const effect = getCardEffect(CARD_ID)
-    const flow = effect!.onHarvestFeedingPhase!(state, player)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
+    const flow = session.withCtx(() => effect!.onHarvestFeedingPhase!(state, player))
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('xor')
     // min(3 stables, 2 grain) = 2 options

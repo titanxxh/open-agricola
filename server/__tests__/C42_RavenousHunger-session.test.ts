@@ -1,12 +1,11 @@
+import { CardRegistry as TestCardRegistry } from '../../shared/cards/registry'
+import { withActiveRegistry } from '../../shared/cards/active-registry'
+import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
 import { ActionHookRegistry } from '../../shared/actions/hooks'
 import { beforeEach as beforeEachActionHooks } from 'vitest'
 
 let actionHooks: ActionHookRegistry
 beforeEachActionHooks(() => { actionHooks = new ActionHookRegistry() })
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { createWorkSession } from './_helpers/session-fixtures'
 import { describe, expect, it } from 'vitest'
 import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
@@ -70,7 +69,10 @@ const createSpace = (id: string, gainPerRound: Partial<Record<string, number>> =
     takenBy: [],
   }) as ActionSpace
 
-const findListener = (id: string) => getRegisteredCardListeners().find(l => l.id === id)
+const findListener = (ruleOwner: TestCardRegistry, id: string) => {
+  const lookupRule1 = () => getRegisteredCardListeners().find(l => l.id === id)
+  return withActiveRegistry(ruleOwner, lookupRule1)
+}
 
 const resources = (values: Partial<Resource> = {}): Resource => ({
   wood: 0,
@@ -232,18 +234,19 @@ describe('C042_RavenousHunger', () => {
   })
 
   it('after vegetable-seeds: offers one extra placement constrained to accumulation spaces', () => {
-    const listener = findListener('C42-ravenous-hunger-after-place-farmer')
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry, 'C42-ravenous-hunger-after-place-farmer')
     expect(listener).toBeDefined()
 
     const player = createPlayer()
     const state = createState(player)
     state.actionSpaces = [createSpace('forest', { wood: 3 })]
 
-    const result = executeCardListener(listener!, {
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener!, {
       actionHooks,
       state, player, space: createSpace('vegetable-seeds'),
       actionId: 'place-farmer', phase: 'after',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeDefined()
     expect(result!.flow!.type).toBe('seq')
@@ -254,7 +257,8 @@ describe('C042_RavenousHunger', () => {
   })
 
   it('after vegetable-seeds: constraints include only legal accumulation spaces', () => {
-    const listener = findListener('C42-ravenous-hunger-after-place-farmer')
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry, 'C42-ravenous-hunger-after-place-farmer')
     expect(listener).toBeDefined()
 
     const player = createPlayer()
@@ -263,11 +267,11 @@ describe('C042_RavenousHunger', () => {
     forest.takenBy = [{ playerId: 'p2', workerId: '1' }]
     state.actionSpaces = [forest, createSpace('fishing', { food: 1 }), createSpace('farmland')]
 
-    const result = executeCardListener(listener!, {
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener!, {
       actionHooks,
       state, player, space: createSpace('vegetable-seeds'),
       actionId: 'place-farmer', phase: 'after',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeDefined()
     expect(result!.flow!.type).toBe('seq')
@@ -276,40 +280,43 @@ describe('C042_RavenousHunger', () => {
   })
 
   it('does not trigger on non-vegetable-seeds spaces', () => {
-    const listener = findListener('C42-ravenous-hunger-after-place-farmer')
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry, 'C42-ravenous-hunger-after-place-farmer')
     expect(listener).toBeDefined()
 
     const player = createPlayer()
     const state = createState(player)
 
-    const result = executeCardListener(listener!, {
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener!, {
       actionHooks,
       state, player, space: createSpace('grain-seeds'),
       actionId: 'place-farmer', phase: 'after',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeUndefined()
   })
 
   it('does not trigger when no workers available', () => {
-    const listener = findListener('C42-ravenous-hunger-after-place-farmer')
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry, 'C42-ravenous-hunger-after-place-farmer')
     expect(listener).toBeDefined()
 
     const player = createPlayer()
     const state = createState(player)
     markAllWorkersUsed(state, player)
 
-    const result = executeCardListener(listener!, {
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener!, {
       actionHooks,
       state, player, space: createSpace('vegetable-seeds'),
       actionId: 'place-farmer', phase: 'after',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeUndefined()
   })
 
   it('after its extra placement: gains the printed accumulation type', () => {
-    const listener = findListener('C42-ravenous-hunger-after-place-farmer')
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry, 'C42-ravenous-hunger-after-place-farmer')
     expect(listener).toBeDefined()
 
     const player = createPlayer()
@@ -317,30 +324,31 @@ describe('C042_RavenousHunger', () => {
     const forest = createSpace('forest', { wood: 3 })
     forest.resources.clay = 4
 
-    const result = executeCardListener(listener!, {
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener!, {
       actionHooks,
       state, player, space: forest,
       actionId: 'place-farmer', phase: 'after', sourceCard: CARD_ID,
       result: { type: 'ok' },
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeDefined()
     expect(result!.flow).toMatchObject({ actionId: 'gain', params: { wood: 1 } })
   })
 
   it('does not grant the bonus after a normal placement', () => {
-    const listener = findListener('C42-ravenous-hunger-after-place-farmer')
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry, 'C42-ravenous-hunger-after-place-farmer')
     expect(listener).toBeDefined()
 
     const player = createPlayer()
     const state = createState(player)
 
-    const result = executeCardListener(listener!, {
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener!, {
       actionHooks,
       state, player, space: createSpace('forest', { wood: 3 }),
       actionId: 'place-farmer', phase: 'after',
       result: { type: 'ok' },
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeUndefined()
   })

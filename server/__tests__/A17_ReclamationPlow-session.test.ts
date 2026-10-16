@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -34,7 +30,7 @@ const moved = (
 const setupDirectContext = (
   transactionEvents: DraftGameEvent<'resource.moved'>[],
   result?: ActionExecutionResult,
-): CardListenerContext => {
+): { session: GameSession; context: CardListenerContext } => {
   const session = new GameSession(undefined, undefined, { playerCount: 2 })
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
@@ -51,7 +47,8 @@ const setupDirectContext = (
     gainPerRound: { sheep: 1 },
   }
 
-  return {
+  return { session, context: {
+    actionHooks: session.actionHooks,
     state,
     player,
     space,
@@ -59,7 +56,7 @@ const setupDirectContext = (
     phase: 'after',
     transactionEvents,
     result,
-  } as unknown as CardListenerContext
+  } as unknown as CardListenerContext }
 }
 
 describe('A017_ReclamationPlow session', () => {
@@ -198,9 +195,9 @@ describe('A017_ReclamationPlow session', () => {
   })
 
   it('uses action-space resource.moved events even when result has no resourcesGained', () => {
-    const ctx = setupDirectContext([moved()], { type: 'ok' })
+    const { session: ruleSession1, context: ctx } = setupDirectContext([moved()], { type: 'ok' })
 
-    const result = executeCardListener(LISTENER, ctx)
+    const result = ruleSession1.withCtx(() => executeCardListener(LISTENER, ctx))
 
     expect(result?.flow).toMatchObject({
       type: 'seq',
@@ -213,23 +210,23 @@ describe('A017_ReclamationPlow session', () => {
   })
 
   it('ignores non-action-space animal moves even when result claims sheep gained', () => {
-    const ctx = setupDirectContext([
+    const { session: ruleSession2, context: ctx } = setupDirectContext([
       moved({ from: { kind: 'supply' } }),
     ], { type: 'ok', resourcesGained: { sheep: 1 } })
 
-    const result = executeCardListener(LISTENER, ctx)
+    const result = ruleSession2.withCtx(() => executeCardListener(LISTENER, ctx))
 
     expect(result).toBeUndefined()
   })
 
   it('does not read prior global state events when current transaction has no animal moves', () => {
-    const ctx = setupDirectContext([], { type: 'ok', resourcesGained: { sheep: 1 } })
+    const { session: ruleSession3, context: ctx } = setupDirectContext([], { type: 'ok', resourcesGained: { sheep: 1 } })
     ctx.state.events = [
       { type: 'worker.placed', actorPlayerId: 'p1', workerId: 'w1', spaceId: 'sheep-market' } as never,
       moved() as never,
     ]
 
-    const result = executeCardListener(LISTENER, ctx)
+    const result = ruleSession3.withCtx(() => executeCardListener(LISTENER, ctx))
 
     expect(result).toBeUndefined()
   })

@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { createWorkSession } from './_helpers/session-fixtures'
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
@@ -322,13 +318,13 @@ describe('E010_StrawHat session', () => {
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
       .toBe('ui.interactionFlowSelect')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected A92 choice')
-    expect(hasPendingExtraTurn(resp.state, resp.state.players[0]!)).toBe(true)
+    expect(session.withCtx(() => hasPendingExtraTurn(resp.state, resp.state.players[0]!))).toBe(true)
 
     resp = session.resolveChoice(0, resp.interaction.request.options![0]!.value)
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
       .toBe('ui.interactionPlaceFarmerExtra')
     expect(newbornCount(resp.state.players[0]!)).toBe(0)
-    expect(hasPendingExtraTurn(resp.state, resp.state.players[0]!)).toBe(false)
+    expect(session.withCtx(() => hasPendingExtraTurn(resp.state, resp.state.players[0]!))).toBe(false)
 
     resp = session.resolveChoice(0, 'farmland')
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
@@ -359,7 +355,7 @@ describe('E010_StrawHat session', () => {
     expect(resp.state.round).toBe(4)
     expect(resp.state.players[0]!.occupationPlayed).toContain('A116_WoodCutter')
     expect(resp.state.actionSpaces.find((space) => space.id === 'farmland')!.takenBy).toEqual([])
-    expect(hasPendingExtraTurn(resp.state, resp.state.players[0]!)).toBe(false)
+    expect(session.withCtx(() => hasPendingExtraTurn(resp.state, resp.state.players[0]!))).toBe(false)
     expect(newbornCount(resp.state.players[0]!)).toBe(0)
   })
 })
@@ -380,7 +376,7 @@ const setupArchwayRoundEnd = (withAllowedTarget: boolean) => {
   setActiveWorkerCount(player, 1)
   setActiveWorkerCount(opponent, 0)
   player.resources.food = 10
-  getCardEffect(D051_ID)!.onBuy!(state, player)
+  session.withCtx(() => session.withCtx(() => getCardEffect(D051_ID))!.onBuy!(state, player))
   const archway = state.actionSpaces.find((space) => space.id === D051_ID)!
   archway.takenBy = [{ playerId: player.id, workerId: '1' }]
   state.roundActionOrder[11] = 'forest'
@@ -440,7 +436,7 @@ const setupArchwayStableTurn = (options?: {
   setActiveWorkerCount(opponent, 0)
   player.resources.food = 10
   player.resources.wood = 5
-  getCardEffect(D051_ID)!.onBuy!(state, player)
+  session.withCtx(() => session.withCtx(() => getCardEffect(D051_ID))!.onBuy!(state, player))
   state.actionSpaces.find((space) => space.id === D051_ID)!.takenBy = [
     { playerId: player.id, workerId: '1' },
   ]

@@ -1,7 +1,4 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
+import type { GameSession as SessionRuleOwner } from '../game/authoritative-session'
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -19,8 +16,11 @@ import '../../shared/cards/A/A137_RiverineShepherd'
 
 const CARD_ID = 'B034_SpecialFood'
 
-const findListener = () =>
-  getRegisteredCardListeners().find((listener) => listener.id === 'B34-special-food-after-collect')
+const findListener = (ruleOwner: SessionRuleOwner) =>
+  {
+  const lookupRule1 = () => getRegisteredCardListeners().find((listener) => listener.id === 'B34-special-food-after-collect')
+  return ruleOwner.withCtx(lookupRule1)
+}
 
 const moved = (
   resources: Partial<Resource>,
@@ -55,20 +55,20 @@ const setup = () => {
     cattle: 0,
   })
   const space = state.actionSpaces.find((entry) => entry.id === 'sheep-market')!
-  return { state, player, space }
+  return { session: session, state, player, space }
 }
 
-const runListener = (
+const runListener = (ruleOwner: SessionRuleOwner,
   events: readonly DraftGameEvent<'resource.moved'>[],
   resourcesGained?: Partial<Resource>,
   actionEvents: readonly DraftGameEvent<'resource.moved'>[] = events,
   configurePlayer?: (player: ReturnType<typeof setup>['player']) => void,
 ): ActionFlow | undefined => {
-  const listener = findListener()
+  const listener = findListener(ruleOwner)
   expect(listener).toBeDefined()
-  const { state, player, space } = setup()
+  const { session: ruleSession, state, player, space } = setup()
   configurePlayer?.(player)
-  return executeCardListener(listener!, {
+  return ruleSession.withCtx(() => executeCardListener(listener!, {
     state,
     player,
     triggerPlayer: player,
@@ -79,12 +79,12 @@ const runListener = (
     result: resourcesGained ? { type: 'ok', resourcesGained } : { type: 'ok' },
     transactionEvents: events,
     actionEvents,
-  } as unknown as CardListenerContext)?.flow
+  } as unknown as CardListenerContext))?.flow
 }
 
 describe('B034_SpecialFood action-space provenance', () => {
   it('awards bonus VP for animals moved from an action space to the trigger player', () => {
-    const { player } = setup()
+    const { session: ruleSession, player } = setup()
     const events = [moved({ sheep: 1 }, player.id)]
     expect(events).toEqual(expect.arrayContaining([
       expect.objectContaining({
@@ -93,7 +93,7 @@ describe('B034_SpecialFood action-space provenance', () => {
         to: expect.objectContaining({ kind: 'player', playerId: player.id }),
       }),
     ]))
-    const flow = runListener(events)
+    const flow = runListener(ruleSession, events)
 
     expect(flow?.type).toBe('seq')
     if (flow?.type !== 'seq') throw new Error('expected sequence flow')
@@ -101,28 +101,28 @@ describe('B034_SpecialFood action-space provenance', () => {
   })
 
   it('awards bonus VP for reed-bank style action-space animal movement provenance', () => {
-    const { player } = setup()
+    const { session: ruleSession, player } = setup()
     const events = [
       moved({ sheep: 1 }, player.id, { kind: 'actionSpace', spaceId: 'reed-bank' }),
     ]
-    const flow = runListener(events, { sheep: 1 })
+    const flow = runListener(ruleSession, events, { sheep: 1 })
     expect(flow?.type).toBe('seq')
     if (flow?.type !== 'seq') throw new Error('expected sequence flow')
     expect(flow.children.filter((child) => child.type === 'leaf' && child.actionId === 'bonus-vp')).toHaveLength(1)
   })
 
   it('does not award bonus VP for animals moved from supply or a card', () => {
-    const { player } = setup()
+    const { session: ruleSession, player } = setup()
 
-    expect(runListener([moved({ sheep: 1 }, player.id, { kind: 'supply' })], { sheep: 1 })).toBeUndefined()
-    expect(runListener([moved({ sheep: 1 }, player.id, { kind: 'card', playerId: player.id, cardId: 'Test_Source' })], { sheep: 1 })).toBeUndefined()
+    expect(runListener(ruleSession, [moved({ sheep: 1 }, player.id, { kind: 'supply' })], { sheep: 1 })).toBeUndefined()
+    expect(runListener(ruleSession, [moved({ sheep: 1 }, player.id, { kind: 'card', playerId: player.id, cardId: 'Test_Source' })], { sheep: 1 })).toBeUndefined()
   })
 
   it('counts animal-holder animals when checking whether gained animals were retained', () => {
-    const { player } = setup()
+    const { session: ruleSession, player } = setup()
     const events = [moved({ sheep: 1 }, player.id)]
 
-    const flow = runListener(events, { sheep: 1 }, events, (configured) => {
+    const flow = runListener(ruleSession, events, { sheep: 1 }, events, (configured) => {
       configured.pastures = []
       configured.cardStates = {
         ...configured.cardStates,
@@ -143,10 +143,10 @@ describe('B034_SpecialFood action-space provenance', () => {
   })
 
   it('ignores stale earlier transaction animal events when current actionEvents has no animal move', () => {
-    const { player } = setup()
+    const { session: ruleSession, player } = setup()
     const stale = moved({ sheep: 1 }, player.id)
 
-    expect(runListener([stale], undefined, [])).toBeUndefined()
+    expect(runListener(ruleSession, [stale], undefined, [])).toBeUndefined()
   })
 
   it('awards bonus VP when A137 takes an animal from the other action space', () => {

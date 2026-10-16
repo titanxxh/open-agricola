@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { placeFarmerAction } from '../../shared/actions/effects/place-farmer'
@@ -110,14 +106,14 @@ describe('A174 Master Hora', () => {
     const player = state.players[0]!
     const host = state.actionSpaces.find((space) => space.id === 'day-laborer')!
 
-    const result = placeFarmerAction.resolveChoice!({
+    const result = session.withCtx(() => placeFarmerAction.resolveChoice!({
       actionHooks: session.actionHooks,
       state,
       player,
       space: host,
       sourceCard: 'TEST_EXTRA_PLACEMENT',
       actionContext: { constraints: ['copse-56'] },
-    } as unknown as ActionExecutionContext, 'copse-56')
+    } as unknown as ActionExecutionContext, 'copse-56'))
 
     expect(result.type).toBe('flow')
     if (result.type !== 'flow') return

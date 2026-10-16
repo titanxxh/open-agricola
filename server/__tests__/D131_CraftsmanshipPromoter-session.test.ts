@@ -1,7 +1,4 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
+import type { GameSession as SessionRuleOwner } from '../game/authoritative-session'
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -18,8 +15,8 @@ import '../../shared/cards/D/D131_CraftsmanshipPromoter'
 const CARD_ID = 'D131_CraftsmanshipPromoter'
 const LISTENER_ID = 'D131-craftsmanship-promoter-compute-choice-candidates'
 
-const findListener = (id: string) =>
-  getRegisteredCardListeners().find((l) => l.id === id)
+const findListener = (ruleOwner: SessionRuleOwner, id: string) =>
+  ruleOwner.withCtx(() => getRegisteredCardListeners()).find((l) => l.id === id)
 
 const setup = (
   overrides: {
@@ -131,16 +128,16 @@ describe('D131_CraftsmanshipPromoter listener (unit)', () => {
     const session = setup()
     const state = session.getState().state
     const player = state.players[0]!
-    const listener = findListener(LISTENER_ID)
+    const listener = findListener(session, LISTENER_ID)
     expect(listener).toBeDefined()
 
-    const result = executeCardListener(listener!, {
+    const result = session.withCtx(() => executeCardListener(listener!, {
       state,
       player,
       actionId: 'improvement',
       params: { types: ['minor'] },
       phase: 'computeChoiceCandidates',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result?.extraOptions).toBeDefined()
     const values = result!.extraOptions!.map((o) => o.value).sort()
@@ -158,15 +155,15 @@ describe('D131_CraftsmanshipPromoter listener (unit)', () => {
     const session = setup({ playD131: false })
     const state = session.getState().state
     const player = state.players[0]!
-    const listener = findListener(LISTENER_ID)!
+    const listener = findListener(session, LISTENER_ID)!
 
-    const result = executeCardListener(listener, {
+    const result = session.withCtx(() => executeCardListener(listener, {
       state,
       player,
       actionId: 'improvement',
       params: { types: ['minor'] },
       phase: 'computeChoiceCandidates',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeUndefined()
   })
@@ -177,15 +174,15 @@ describe('D131_CraftsmanshipPromoter listener (unit)', () => {
     })
     const state = session.getState().state
     const player = state.players[0]!
-    const listener = findListener(LISTENER_ID)!
+    const listener = findListener(session, LISTENER_ID)!
 
-    const result = executeCardListener(listener, {
+    const result = session.withCtx(() => executeCardListener(listener, {
       state,
       player,
       actionId: 'improvement',
       params: { types: ['minor'] },
       phase: 'computeChoiceCandidates',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeUndefined()
   })

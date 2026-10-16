@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -41,9 +37,9 @@ describe('E005_NightLoot session', () => {
 
     session.loadState(state)
 
-    const effect = getCardEffect(CARD_ID)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
     expect(effect).toBeDefined()
-    const flow = effect!.onBuy!(state, player)
+    const flow = session.withCtx(() => effect!.onBuy!(state, player))
 
     if (woodSpace && claySpace) {
       expect(flow).toBeDefined()
@@ -71,8 +67,8 @@ describe('E005_NightLoot session', () => {
 
     session.loadState(state)
 
-    const effect = getCardEffect(CARD_ID)
-    const flow = effect!.onBuy!(state, player)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
+    const flow = session.withCtx(() => effect!.onBuy!(state, player))
 
     if (woodSpace) {
       expect(flow).toBeDefined()
@@ -112,8 +108,8 @@ describe('E005_NightLoot session', () => {
 
     session.loadState(state)
 
-    const effect = getCardEffect(CARD_ID)
-    const flow = effect!.onBuy!(state, player)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
+    const flow = session.withCtx(() => effect!.onBuy!(state, player))
     expect(flow).toBeUndefined()
   })
 
@@ -140,8 +136,8 @@ describe('E005_NightLoot session', () => {
 
     session.loadState(state)
 
-    const effect = getCardEffect(CARD_ID)
-    const flow = effect!.onBuy!(state, player)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
+    const flow = session.withCtx(() => effect!.onBuy!(state, player))
 
     if (woodSpace && stoneSpace) {
       expect(flow).toBeDefined()
@@ -176,8 +172,8 @@ describe('E005_NightLoot session', () => {
     if (stoneSpace) stoneSpace.resources.stone = 1
 
     session.loadState(state)
-    const effect = getCardEffect(CARD_ID)
-    const flow = effect!.onBuy!(state, player) as ActionFlow
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
+    const flow = session.withCtx(() => effect!.onBuy!(state, player)) as ActionFlow
 
     if (!woodSpace || !stoneSpace) return
     expect(flow.type).toBe('xor')

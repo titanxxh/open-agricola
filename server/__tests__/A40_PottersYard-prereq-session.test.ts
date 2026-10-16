@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { afterEach, describe, expect, it } from 'vitest'
 import { createWorkSession } from './_helpers/session-fixtures'
 import { A040_PottersYard } from '../../shared/cards/A/A040_PottersYard'
@@ -21,7 +17,7 @@ describe('A040_PottersYard prerequisite', () => {
     const session = setup()
     const state = session.getState().state
     const player = state.players[0]!
-    expect(meetsCardPrerequisites(player, A040_PottersYard, state.round, state)).toBe(false)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, A040_PottersYard, state.round, state))).toBe(false)
   })
 
   it('allows when free spaces <= 7 (e.g. 8 spaces used)', () => {
@@ -32,6 +28,6 @@ describe('A040_PottersYard prerequisite', () => {
     player.fields = []
     player.stableTiles = []
     player.pastures = []
-    expect(meetsCardPrerequisites(player, A040_PottersYard, state.round, state)).toBe(true)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, A040_PottersYard, state.round, state))).toBe(true)
   })
 })

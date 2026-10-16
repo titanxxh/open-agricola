@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -34,8 +30,8 @@ const fenceBuilt = (
 
 describe('A083_ShepherdsCrook session flow', () => {
   it('uses fence delta in listener context to grant sheep', () => {
-    expect(getRegisteredCardListeners().some((entry) => entry.id === 'A83-shepherds-crook-after-fencing')).toBe(true)
     const session = new GameSession(42)
+    expect(session.withCtx(() => getRegisteredCardListeners()).some((entry) => entry.id === 'A83-shepherds-crook-after-fencing')).toBe(true)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -79,9 +75,11 @@ describe('A083_ShepherdsCrook session flow', () => {
   })
 
   it('does not grant sheep for smaller new pasture event metadata', () => {
-    const listener = getRegisteredCardListeners().find((entry) => entry.id === 'A83-shepherds-crook-after-fencing')
-    expect(listener).toBeDefined()
+
+
     const session = new GameSession(42)
+    const listener = session.withCtx(() => getRegisteredCardListeners()).find((entry) => entry.id === 'A83-shepherds-crook-after-fencing')
+    expect(listener).toBeDefined()
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -89,7 +87,7 @@ describe('A083_ShepherdsCrook session flow', () => {
     player.minorPlayed.push('A083_ShepherdsCrook')
     const actionEvents = [fenceBuilt([{ tiles: [{ row: 0, col: 0 }] }])]
 
-    const result = executeCardListener(listener!, {
+    const result = session.withCtx(() => executeCardListener(listener!, {
       state,
       player,
       space: state.actionSpaces.find((entry) => entry.id === 'fencing')!,
@@ -98,7 +96,7 @@ describe('A083_ShepherdsCrook session flow', () => {
       result: { type: 'ok', extraData: { newPastures: [{ tiles: [{}, {}, {}, {}] }] } },
       transactionEvents: actionEvents,
       actionEvents,
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeUndefined()
   })

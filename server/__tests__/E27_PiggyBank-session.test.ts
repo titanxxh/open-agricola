@@ -1,7 +1,5 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
+import { withActiveRegistry } from '../../shared/cards/active-registry'
+import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
@@ -66,9 +64,9 @@ describe('E027_PiggyBank session', () => {
 
     session.loadState(state)
 
-    const effect = getCardEffect(CARD_ID)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
     expect(effect).toBeDefined()
-    const flow = effect!.onBeforeReturnHome!(state, player)
+    const flow = session.withCtx(() => effect!.onBeforeReturnHome!(state, player))
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('seq')
     expect((flow as Extract<ActionFlow, { type: 'leaf' }>).optional).toBe(true)
@@ -88,14 +86,15 @@ describe('E027_PiggyBank session', () => {
 
     session.loadState(state)
 
-    const effect = getCardEffect(CARD_ID)
-    const flow = effect!.onBeforeReturnHome!(state, player)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
+    const flow = session.withCtx(() => effect!.onBeforeReturnHome!(state, player))
     expect(flow).toBeUndefined()
   })
 
 
   it('anytime listener returns flow when 6+ food on card', () => {
-    const listeners = getRegisteredCardListeners()
+    const ruleRegistry = createOfficialCardRegistry()
+    const listeners = withActiveRegistry(ruleRegistry, () => getRegisteredCardListeners())
     const anytimeListener = listeners.find((l) => l.id === 'E27-piggy-bank-anytime')
     expect(anytimeListener).toBeDefined()
 
@@ -117,13 +116,14 @@ describe('E027_PiggyBank session', () => {
       actionId: 'test', phase: 'anytime',
     } as CardListenerContext
 
-    const result = executeCardListener(anytimeListener!, context)
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(anytimeListener!, context))
     expect(result).toBeDefined()
     expect(result!.flow).toBeDefined()
   })
 
   it('anytime listener returns nothing when less than 6 food on card', () => {
-    const listeners = getRegisteredCardListeners()
+    const ruleRegistry = createOfficialCardRegistry()
+    const listeners = withActiveRegistry(ruleRegistry, () => getRegisteredCardListeners())
     const anytimeListener = listeners.find((l) => l.id === 'E27-piggy-bank-anytime')
 
     const player = createPlayer('p1', {
@@ -144,12 +144,13 @@ describe('E027_PiggyBank session', () => {
       actionId: 'test', phase: 'anytime',
     } as CardListenerContext
 
-    const result = executeCardListener(anytimeListener!, context)
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(anytimeListener!, context))
     expect(result).toBeUndefined()
   })
 
   it('computeCosts listener zeroes costs when card is flagged', () => {
-    const listeners = getRegisteredCardListeners()
+    const ruleRegistry = createOfficialCardRegistry()
+    const listeners = withActiveRegistry(ruleRegistry, () => getRegisteredCardListeners())
     const costListener = listeners.find((l) => l.id === 'E27-piggy-bank-compute-costs')
     expect(costListener).toBeDefined()
 
@@ -183,7 +184,8 @@ describe('E027_PiggyBank session', () => {
   })
 
   it('computeCosts listener returns nothing when card is not flagged', () => {
-    const listeners = getRegisteredCardListeners()
+    const ruleRegistry = createOfficialCardRegistry()
+    const listeners = withActiveRegistry(ruleRegistry, () => getRegisteredCardListeners())
     const costListener = listeners.find((l) => l.id === 'E27-piggy-bank-compute-costs')
 
     const player = createPlayer('p1', {
@@ -204,7 +206,7 @@ describe('E027_PiggyBank session', () => {
       actionId: 'improvement', phase: 'computeCosts',
     } as CardListenerContext
 
-    const result = executeCardListener(costListener!, context)
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(costListener!, context))
     expect(result).toBeUndefined()
   })
 })

@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { createWorkSession } from './_helpers/session-fixtures'
 import { describe, expect, it } from 'vitest'
 import { A022_Telegram } from '../../shared/cards/A/A022_Telegram'
@@ -18,7 +14,7 @@ describe('A022_Telegram prerequisite', () => {
       edge: `H-0-${i}`,
       type: 'fence',
     }))
-    expect(meetsCardPrerequisites(player, A022_Telegram, state.round, state)).toBe(false)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, A022_Telegram, state.round, state))).toBe(false)
   })
 
   it('allows when at least one fence remains in supply', () => {
@@ -26,7 +22,7 @@ describe('A022_Telegram prerequisite', () => {
     const state = session.getState().state
     const player = state.players[0]!
     player.fenceSegments = []
-    expect(meetsCardPrerequisites(player, A022_Telegram, state.round, state)).toBe(true)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, A022_Telegram, state.round, state))).toBe(true)
   })
 
   it('blocks when all unbuilt ordinary fences are held on E74', () => {
@@ -36,7 +32,7 @@ describe('A022_Telegram prerequisite', () => {
     player.fenceSegments = []
     player.minorPlayed.push('E074_AshTrees')
     player.cardStates = { E074_AshTrees: { counters: { fences: maxFences } } }
-    expect(meetsCardPrerequisites(player, A022_Telegram, state.round, state)).toBe(false)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, A022_Telegram, state.round, state))).toBe(false)
   })
 
   it('blocks when supply fence tokens have all been consumed', () => {
@@ -45,6 +41,6 @@ describe('A022_Telegram prerequisite', () => {
     const player = state.players[0]!
     player.fenceSegments = []
     player.supplyTokensConsumed = { fence: maxFences }
-    expect(meetsCardPrerequisites(player, A022_Telegram, state.round, state)).toBe(false)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, A022_Telegram, state.round, state))).toBe(false)
   })
 })
