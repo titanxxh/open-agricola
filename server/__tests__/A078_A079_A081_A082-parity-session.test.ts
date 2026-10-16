@@ -310,6 +310,20 @@ describe("A078 command boundaries", () => {
     }
     return s
   }
+  function confirmed(r: SessionResponse, actor = 0) {
+    assert.equal(r.ok, true, r.error)
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, actor)
+    assert.equal(r.state.currentPlayerIndex, actor)
+    assert.equal(r.interaction.request.nextPlayerIndex, 1 - actor)
+    return r
+  }
+  function restoredInteraction(s: GameSession, r: SessionResponse, expected: string, actor = 0) {
+    assert.equal(JSON.stringify(r.interaction), expected)
+    assert.equal(JSON.stringify(s.getState().interaction), expected)
+    assert.equal(r.state.currentPlayerIndex, actor)
+    assert.equal(s.getState().state.currentPlayerIndex, actor)
+  }
   function ok(r: SessionResponse) {
     assert.equal(r.ok, true, r.error)
     return r
@@ -321,7 +335,7 @@ describe("A078 command boundaries", () => {
   function ready(s: GameSession, actor: number) {
     let r = s.getState()
     if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
-      r = confirmNext(s, r)
+      r = confirmNext(s, confirmed(r, 1 - actor))
     assert.equal(r.interaction.stateId, 'idle', JSON.stringify(r.interaction))
     assert.equal(r.state.currentPlayerIndex, actor)
     return r
@@ -329,6 +343,7 @@ describe("A078 command boundaries", () => {
   function turn(s: GameSession, actor: number, space: string) {
     const before = ready(s, actor), r = ok(s.takeAction(actor, space))
     sessionEvidence.record('take-action', { command: 'takeAction', actor, space, before, response: r })
+    if (['forest', 'day-laborer', 'fishing', 'eastern-quarry', 'western-quarry'].includes(space)) confirmed(r, actor)
     return r
   }
   function choose(s: GameSession, r: SessionResponse, value: string) {
@@ -351,7 +366,7 @@ describe("A078 command boundaries", () => {
     assert.ok(opts(r).some(o => o.value === card && !o.disabled))
     const bought = choose(s, r, card)
     sessionEvidence.record('actual-purchase', { before: r, card, response: bought })
-    return bought
+    return confirmed(bought)
   }
   function deny(s: GameSession, card: string) {
     const r = menu(s)
@@ -359,7 +374,7 @@ describe("A078 command boundaries", () => {
     const denied = assertRejectedUnchanged(s, () => s.resolveChoice(0, card))
     sessionEvidence.record('rejected-native-card', { before: r, card, response: denied })
     const food = r.state.players[0]!.resources.food
-    const retry = choose(s, r, WAGE)
+    const retry = confirmed(choose(s, r, WAGE))
     assert.equal(retry.state.players[0]!.resources.food - food, 2)
     assert.equal(retry.state.players[0]!.minorPlayed.includes(card), false)
     sessionEvidence.record('legal-original-pending-retry', retry)
@@ -367,12 +382,10 @@ describe("A078 command boundaries", () => {
   function gainCount(r: SessionResponse, card: string) {
     return r.state.log.filter(e => e.key === 'log.cardEffectGain' && e.params?.cardId === card).length
   }
-  function purchaseUndo(s: GameSession, before: string) {
-    const r = ok(s.undoAction())
-    const normalize = (v: string) => JSON.parse(v, (key, value: unknown) => key === 'playedCards' ? undefined : value)
-    assert.deepEqual(normalize(undoRuleSnapshot(r)), normalize(before))
-    const packet = r.state.publicEventArchive.at(-1)
-    assert.ok(packet?.type === 'publicEvents.canceled' && packet.reason === 'undoAction')
+  function purchaseUndo(s: GameSession, before: string, beforeInteraction: string) {
+    const r = s.undoAction()
+    assertUndoRestored(before, r)
+    restoredInteraction(s, r, beforeInteraction)
     sessionEvidence.record('purchase-undo', r)
   }
   function printedVp(r: SessionResponse, card: string) {
@@ -431,16 +444,26 @@ describe("A078 command boundaries", () => {
   })
   it("actual purchase and Fishing undo restore piles goods workers and point", () => {
     const purchase = canoe({ played: false, resources: { wood: 2 } })
-    const beforePurchase = undoRuleSnapshot(purchase.getState())
+    const purchaseInitial = purchase.getState()
+    assert.equal(purchaseInitial.interaction.stateId, 'idle')
+    assert.equal(purchaseInitial.state.currentPlayerIndex, 0)
+    const purchaseBeforeInteraction = JSON.stringify(purchaseInitial.interaction)
+    const beforePurchase = undoRuleSnapshot(purchaseInitial)
     const bought = buy(purchase, CANOE)
     assert.equal(printedVp(bought, CANOE), 1)
-    purchaseUndo(purchase, beforePurchase)
+    purchaseUndo(purchase, beforePurchase, purchaseBeforeInteraction)
     assert.equal(printedVp(purchase.getState(), CANOE), 0)
     assert.equal(printedVp(buy(purchase, CANOE), CANOE), 1)
     const s = canoe()
-    const before = undoRuleSnapshot(s.getState())
+    const initial = s.getState()
+    assert.equal(initial.interaction.stateId, 'idle')
+    assert.equal(initial.state.currentPlayerIndex, 0)
+    const beforeInteraction = JSON.stringify(initial.interaction)
+    const before = undoRuleSnapshot(initial)
     turn(s, 0, 'fishing')
-    assertUndoRestored(before, s.undoAction())
+    const restored = s.undoAction()
+    assertUndoRestored(before, restored)
+    restoredInteraction(s, restored, beforeInteraction)
     const r = turn(s, 0, 'fishing')
     assert.equal(r.state.players[0]!.resources.food, 43)
     assert.equal(r.state.players[0]!.resources.reed, 1)

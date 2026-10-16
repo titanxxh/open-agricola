@@ -241,6 +241,20 @@ describe("A077 command boundaries", () => {
     }
     return s
   }
+  function confirmed(r: SessionResponse, actor = 0) {
+    assert.equal(r.ok, true, r.error)
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, actor)
+    assert.equal(r.state.currentPlayerIndex, actor)
+    assert.equal(r.interaction.request.nextPlayerIndex, 1 - actor)
+    return r
+  }
+  function restoredInteraction(s: GameSession, r: SessionResponse, expected: string, actor = 0) {
+    assert.equal(JSON.stringify(r.interaction), expected)
+    assert.equal(JSON.stringify(s.getState().interaction), expected)
+    assert.equal(r.state.currentPlayerIndex, actor)
+    assert.equal(s.getState().state.currentPlayerIndex, actor)
+  }
   function ok(r: SessionResponse) {
     assert.equal(r.ok, true, r.error)
     return r
@@ -252,7 +266,7 @@ describe("A077 command boundaries", () => {
   function ready(s: GameSession, actor: number) {
     let r = s.getState()
     if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
-      r = confirmNext(s, r)
+      r = confirmNext(s, confirmed(r, 1 - actor))
     assert.equal(r.interaction.stateId, 'idle', JSON.stringify(r.interaction))
     assert.equal(r.state.currentPlayerIndex, actor)
     return r
@@ -260,6 +274,7 @@ describe("A077 command boundaries", () => {
   function turn(s: GameSession, actor: number, space: string) {
     const before = ready(s, actor), r = ok(s.takeAction(actor, space))
     sessionEvidence.record('take-action', { command: 'takeAction', actor, space, before, response: r })
+    if (['forest', 'day-laborer'].includes(space)) confirmed(r, actor)
     return r
   }
   function choose(s: GameSession, r: SessionResponse, value: string) {
@@ -282,7 +297,7 @@ describe("A077 command boundaries", () => {
     assert.ok(opts(r).some(o => o.value === card && !o.disabled))
     const bought = choose(s, r, card)
     sessionEvidence.record('actual-purchase', { before: r, card, response: bought })
-    return bought
+    return confirmed(bought)
   }
   function deny(s: GameSession, card: string) {
     const r = menu(s)
@@ -290,7 +305,7 @@ describe("A077 command boundaries", () => {
     const denied = assertRejectedUnchanged(s, () => s.resolveChoice(0, card))
     sessionEvidence.record('rejected-native-card', { before: r, card, response: denied })
     const food = r.state.players[0]!.resources.food
-    const retry = choose(s, r, WAGE)
+    const retry = confirmed(choose(s, r, WAGE))
     assert.equal(retry.state.players[0]!.resources.food - food, 2)
     assert.equal(retry.state.players[0]!.minorPlayed.includes(card), false)
     sessionEvidence.record('legal-original-pending-retry', retry)
@@ -299,25 +314,23 @@ describe("A077 command boundaries", () => {
     return r.state.log.filter(e => e.key === 'log.cardEffectGain' && e.params?.cardId === card).length
   }
   function settle(s: GameSession, r: SessionResponse, actor: number, animal: 'sheep' | 'boar' | 'cattle') {
-    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'animal-reorg') {
-      const count = r.state.players[actor]!.resources[animal]
-      const zones: ZoneAssignment[] = [{ id: `accum-${r.state.players[actor]!.id}`, zoneType: 'pasture', animalType: animal, animalCount: count }]
-      const input = r
-      r = ok(s.resolveChoice(actor, 'confirm', { zones }))
-      sessionEvidence.record('animal-reorg', { actor, zones, before: input, response: r })
-    }
-    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
-    return r
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'animal-reorg', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, actor)
+    assert.equal(r.state.currentPlayerIndex, actor)
+    const count = r.state.players[actor]!.resources[animal]
+    const zones: ZoneAssignment[] = [{ id: `accum-${r.state.players[actor]!.id}`, zoneType: 'pasture', animalType: animal, animalCount: count }]
+    const input = r
+    r = ok(s.resolveChoice(actor, 'confirm', { zones }))
+    sessionEvidence.record('animal-reorg', { actor, zones, before: input, response: r })
+    return confirmed(r, actor)
   }
   function market(s: GameSession, actor = 0, space = 'pig-market', animal: 'sheep' | 'boar' | 'cattle' = 'boar') {
     return settle(s, turn(s, actor, space), actor, animal)
   }
-  function purchaseUndo(s: GameSession, before: string) {
-    const r = ok(s.undoAction())
-    const normalize = (v: string) => JSON.parse(v, (key, value: unknown) => key === 'playedCards' ? undefined : value)
-    assert.deepEqual(normalize(undoRuleSnapshot(r)), normalize(before))
-    const packet = r.state.publicEventArchive.at(-1)
-    assert.ok(packet?.type === 'publicEvents.canceled' && packet.reason === 'undoAction')
+  function purchaseUndo(s: GameSession, before: string, beforeInteraction: string) {
+    const r = s.undoAction()
+    assertUndoRestored(before, r)
+    restoredInteraction(s, r, beforeInteraction)
     sessionEvidence.record('purchase-undo', r)
   }
   it("live purchase shortage rejects before exact fee control", () => {
@@ -375,17 +388,27 @@ describe("A077 command boundaries", () => {
   })
   it("actual purchase and both recipient undo restore before replay", () => {
     const purchase = setup({ played: false, resources: { wood: 1 } })
-    const purchaseBefore = undoRuleSnapshot(purchase.getState())
+    const purchaseInitial = purchase.getState()
+    assert.equal(purchaseInitial.interaction.stateId, 'idle')
+    assert.equal(purchaseInitial.state.currentPlayerIndex, 0)
+    const purchaseBeforeInteraction = JSON.stringify(purchaseInitial.interaction)
+    const purchaseBefore = undoRuleSnapshot(purchaseInitial)
     buy(purchase, HOD)
-    purchaseUndo(purchase, purchaseBefore)
+    purchaseUndo(purchase, purchaseBefore, purchaseBeforeInteraction)
     assert.equal(buy(purchase, HOD).state.players[0]!.resources.clay, 1)
     for (const actor of [0, 1]) {
       const s = setup({ resources: { clay: 1 } })
       if (actor === 1)
         turn(s, 0, 'forest')
-      const before = undoRuleSnapshot(ready(s, actor))
+      const initial = ready(s, actor)
+      assert.equal(initial.interaction.stateId, 'idle')
+      assert.equal(initial.state.currentPlayerIndex, actor)
+      const beforeInteraction = JSON.stringify(initial.interaction)
+      const before = undoRuleSnapshot(initial)
       market(s, actor)
-      assertUndoRestored(before, s.undoAction())
+      const restored = s.undoAction()
+      assertUndoRestored(before, restored)
+      restoredInteraction(s, restored, beforeInteraction, actor)
       const r = market(s, actor)
       assert.equal(r.state.players[0]!.resources.clay, 3)
       assert.equal(r.state.players[actor]!.resources.boar, 1)
