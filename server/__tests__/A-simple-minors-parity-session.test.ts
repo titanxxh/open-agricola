@@ -1397,6 +1397,7 @@ describe('A007 command boundaries', () => {
     )
     deny(s, CARD_ID)
     assert.equal(s.getState().state.players[0]!.resources.grain, 0)
+    assert.equal(s.getState().state.players[0]!.resources.food, 42)
   })
   it('one grain and one vegetable field give their separate literal goods', () => {
     const r = buy(
