@@ -313,9 +313,9 @@ describe("A084 command boundaries", () => {
   function buy(s: GameSession, card: string) {
     const r = buyMenu(s)
     if (r.state.players[0]!.minorPlayed.includes(card))
-      return r
+      return confirmed(r, 0)
     assert.ok(options(r).some(o => o.value === card && !('disabled' in o && o.disabled)))
-    return record(`buy:${card}`, ok(s.resolveChoice(0, card)))
+    return confirmed(record(`buy:${card}`, ok(s.resolveChoice(0, card))), 0)
   }
   function deny(s: GameSession, card: string) {
     let r = buyMenu(s)
@@ -325,7 +325,7 @@ describe("A084 command boundaries", () => {
     const food = r.state.players[0]!.resources.food
     r = ok(s.resolveChoice(0, 'B007_Wage'))
     assert.equal(r.state.players[0]!.resources.food, food + 2)
-    return r
+    return confirmed(r, 0)
   }
   function ready(s: GameSession, actor: number) {
     let r = s.getState()
@@ -342,16 +342,28 @@ describe("A084 command boundaries", () => {
   function rect(row: number, col: number, height: number, width: number) {
     return [...Array.from({ length: width }, (_, i) => `H-${row}-${col + i}`), ...Array.from({ length: width }, (_, i) => `H-${row + height}-${col + i}`), ...Array.from({ length: height }, (_, i) => `V-${row + i}-${col}`), ...Array.from({ length: height }, (_, i) => `V-${row + i}-${col + width}`)]
   }
-  function settle(s: GameSession, r: SessionResponse) {
-    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'animal-reorg')
-      r = record('reorg-default', ok(s.resolveChoice(r.interaction.playerIndex, 'confirm', { zones: r.interaction.request.zones })))
+  function confirmed(r: SessionResponse, actor: number) {
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, actor)
+    assert.equal(r.interaction.request.nextPlayerIndex, 1 - actor)
+    assert.equal(r.state.currentPlayerIndex, actor)
+    assert.equal(r.state.roundPhase, 'work')
     return r
   }
+  function settle(s: GameSession, r: SessionResponse) {
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'animal-reorg', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, 0)
+    const result = record('reorg-default', ok(s.resolveChoice(0, 'confirm', { zones: r.interaction.request.zones })))
+    assert.equal(result.interaction.stateId, 'idle')
+    assert.equal(result.state.roundPhase, 'work')
+    assert.equal(result.state.currentPlayerIndex, 0)
+    return result
+  }
   function complete(s: GameSession) {
-    turn(s, 0, 'reed-bank')
-    turn(s, 1, 'forest')
-    turn(s, 0, 'day-laborer')
-    return record('natural-return', confirmNext(s, turn(s, 1, 'clay-pit')))
+    confirmed(turn(s, 0, 'reed-bank'), 0)
+    confirmed(turn(s, 1, 'forest'), 1)
+    confirmed(turn(s, 0, 'day-laborer'), 0)
+    return record('natural-return', confirmNext(s, confirmed(turn(s, 1, 'clay-pit'), 1)))
   }
   function choiceOptions(r: SessionResponse) {
     assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice', JSON.stringify(r.interaction))
@@ -361,11 +373,21 @@ describe("A084 command boundaries", () => {
   }) {
     return setup({ round: 5, fields: 2, sheep: 2, resources: { grain: 1 }, ...options }, configure)
   }
+  function silageOffer(r: SessionResponse) {
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.sourceCard, SILAGE)
+    assert.equal(r.interaction.promptKey, 'ui.interactionSilage')
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
+    assert.equal(r.state.roundPhase, 'returning-home')
+    assert.ok(getChoiceOptions(r).some(option => option.value === '__skip__' && !option.disabled))
+    return r
+  }
   function silageBreed(s: GameSession, r: SessionResponse, type: 'sheep' | 'boar' | 'cattle' = 'sheep', source = 'reserve') {
-    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'select-trigger')
-      r = choose(s, r, o => o.sourceCard === SILAGE)
-    const species = choiceOptions(r).find(o => descriptionEffects(o.descriptionPreview).some(effect => effect.kind === 'resourceExchange' && effect.resourcesGained?.[type] === 1))
-    assert.ok(species, JSON.stringify(r.interaction))
+    silageOffer(r)
+    const speciesOptions = choiceOptions(r).filter(o => !o.disabled && descriptionEffects(o.descriptionPreview).some(effect => effect.kind === 'resourceExchange' && effect.resourcesGained?.[type] === 1))
+    assert.equal(speciesOptions.length, 1, JSON.stringify(r.interaction))
+    const species = speciesOptions[0]!
     r = record('Silage-species', ok(s.resolveChoice(0, species.value)))
     if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice') {
       assert.ok(options(r).some(o => o.value === source))
@@ -377,9 +399,11 @@ describe("A084 command boundaries", () => {
     silageAccepted.set(result, species.value)
     return result
   }
-  function next(s: GameSession, r: SessionResponse) {
-    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
-      return record('next-natural', confirmNext(s, r))
+  function next(r: SessionResponse, round: number) {
+    assert.equal(r.interaction.stateId, 'idle')
+    assert.equal(r.state.round, round)
+    assert.equal(r.state.roundPhase, 'work')
+    assert.equal(r.state.currentPlayerIndex, 0)
     return r
   }
   it("one field forged purchase rejects and two fields free purchase succeeds", () => {
@@ -395,9 +419,11 @@ describe("A084 command boundaries", () => {
     assert.equal(r.state.players[0]!.resources.sheep, 3)
     assert.equal(r.state.players[0]!.resources.grain, 0)
     s = silage()
-    complete(s)
+    silageOffer(complete(s))
     r = record('Silage-decline', ok(s.resolveChoice(0, '__skip__')))
     assert.equal(r.interaction.stateId, 'idle')
+    assert.equal(r.state.roundPhase, 'work')
+    assert.equal(r.state.currentPlayerIndex, 0)
     assert.equal(r.state.round, 6)
     assert.equal(r.state.players[0]!.resources.sheep, 2)
     assert.equal(r.state.players[0]!.resources.grain, 1)
@@ -408,7 +434,7 @@ describe("A084 command boundaries", () => {
       state.players[0]!.fields[2]!.stacks = [{ kind: 'vegetable', remaining: 2 }]
       state.players[1]!.fields = [{ row: 2, col: 1, stacks: [{ kind: 'grain', remaining: 1 }] }]
     })
-    let r = complete(s)
+    let r = silageOffer(complete(s))
     r = choose(s, r, o => o.value !== '__skip__')
     const field = options(r).find(o => o.value !== 'reserve' && o.value !== '__skip__')
     assert.ok(field)
@@ -442,12 +468,14 @@ describe("A084 command boundaries", () => {
       assert.equal(r.state.players[0]!.resources.grain, config.resources?.grain ?? 1)
       assert.equal(r.state.round, 6)
       assert.equal(r.interaction.stateId, 'idle')
+      assert.equal(r.state.roundPhase, 'work')
+      assert.equal(r.state.currentPlayerIndex, 0)
     }
   })
   it("real harvest has only ordinary breeding and no Silage grain payment", () => {
     const s = silage({ round: 4 })
     let r = complete(s)
-    r = next(s, settle(s, r))
+    r = next(settle(s, r), 5)
     assert.equal(r.state.round, 5)
     assert.equal(r.interaction.stateId, 'idle')
     assert.equal(r.state.players[0]!.resources.sheep, 3)
@@ -455,9 +483,9 @@ describe("A084 command boundaries", () => {
   })
   it("natural next nonharvest return allows one recurrence", () => {
     const s = silage({ resources: { grain: 2 } })
-    let r = next(s, silageBreed(s, complete(s)))
+    let r = next(silageBreed(s, complete(s)), 6)
     assert.equal(r.state.round, 6)
-    r = next(s, silageBreed(s, complete(s)))
+    r = next(silageBreed(s, complete(s)), 7)
     assert.equal(r.state.round, 7)
     assert.equal(r.state.players[0]!.resources.grain, 0)
     assert.equal(r.state.players[0]!.resources.sheep, 4)
@@ -465,8 +493,14 @@ describe("A084 command boundaries", () => {
   it("purchase undo retries while completed return home breeding rejects both undo commands", () => {
     let s = silage({ played: false })
     const before = undoRuleSnapshot(s.getState())
+    const interactionBeforeWholeUndo = structuredClone(s.getState().interaction)
     buy(s, SILAGE)
-    assertUndoRestored(before, record('Silage-buy-undo', s.undoAction()))
+    const wholeUndoResponse1 = record('Silage-buy-undo', s.undoAction())
+    assertUndoRestored(before, wholeUndoResponse1)
+    assert.deepEqual(wholeUndoResponse1.interaction, interactionBeforeWholeUndo)
+    assert.deepEqual(s.getState().interaction, interactionBeforeWholeUndo)
+    assert.equal(wholeUndoResponse1.state.currentPlayerIndex, 0)
+    assert.equal(s.getState().state.currentPlayerIndex, 0)
     buy(s, SILAGE)
     s = silage()
     const offer = complete(s)

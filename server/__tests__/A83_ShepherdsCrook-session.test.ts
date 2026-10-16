@@ -163,9 +163,9 @@ describe("A083 command boundaries", () => {
   function buy(s: GameSession, card: string) {
     const r = buyMenu(s)
     if (r.state.players[0]!.minorPlayed.includes(card))
-      return complete(r)
+      return complete(r, 0)
     assert.ok(options(r).some(o => o.value === card && !('disabled' in o && o.disabled)))
-    return complete(record(`buy:${card}`, ok(s.resolveChoice(0, card))))
+    return complete(record(`buy:${card}`, ok(s.resolveChoice(0, card))), 0)
   }
   function deny(s: GameSession, card: string) {
     let r = buyMenu(s)
@@ -175,10 +175,14 @@ describe("A083 command boundaries", () => {
     const food = r.state.players[0]!.resources.food
     r = ok(s.resolveChoice(0, 'B007_Wage'))
     assert.equal(r.state.players[0]!.resources.food, food + 2)
-    return complete(r)
+    return complete(r, 0)
   }
-  function complete(r: SessionResponse) {
+  function complete(r: SessionResponse, actor: number) {
     assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, actor)
+    assert.equal(r.interaction.request.nextPlayerIndex, 1 - actor)
+    assert.equal(r.state.currentPlayerIndex, actor)
+    assert.equal(r.state.roundPhase, 'work')
     return r
   }
   function ready(s: GameSession, actor: number) {
@@ -200,10 +204,14 @@ describe("A083 command boundaries", () => {
     assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'animal-reorg', JSON.stringify(r.interaction))
     return r.interaction.request
   }
-  function settle(s: GameSession, r: SessionResponse) {
-    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'animal-reorg')
-      r = record('reorg-default', ok(s.resolveChoice(r.interaction.playerIndex, 'confirm', { zones: r.interaction.request.zones })))
-    return complete(r)
+  function settle(s: GameSession, r: SessionResponse, expectedSheep: number) {
+    assert.equal(r.state.players[0]!.resources.sheep, expectedSheep)
+    if (expectedSheep > 0) {
+      assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'animal-reorg', JSON.stringify(r.interaction))
+      assert.equal(r.interaction.playerIndex, 0)
+      r = record('reorg-default', ok(s.resolveChoice(0, 'confirm', { zones: r.interaction.request.zones })))
+    }
+    return complete(r, 0)
   }
   function fence(s: GameSession, edges: string[], actor = 0) {
     const r = turn(s, actor, 'fencing')
@@ -220,7 +228,7 @@ describe("A083 command boundaries", () => {
     for (const [height, width, expected] of [[1, 3, 0], [2, 2, 2], [1, 5, 2]]) {
       const edges = rect(0, width === 5 ? 0 : 1, height!, width!)
       const s = setup({ resources: { wood: edges.length } })
-      const r = settle(s, fence(s, edges))
+      const r = settle(s, fence(s, edges), expected!)
       assert.equal(r.state.players[0]!.resources.sheep, expected)
       assert.equal(r.state.players[0]!.fenceSegments.length, edges.length)
       assert.equal(gainCount(r, CROOK), expected ? 1 : 0)
@@ -233,7 +241,7 @@ describe("A083 command boundaries", () => {
       p.fenceSegments = old.map(edge => ({ edge, type: 'fence', source: { kind: 'own', ownerPlayerId: p.id } }))
       p.pastures = [{ id: 'old', tiles: [{ row: 0, col: 1 }, { row: 0, col: 2 }, { row: 1, col: 1 }, { row: 1, col: 2 }], animalType: null, animalCount: 0 }]
     })
-    const r = complete(fence(s, extra))
+    const r = complete(fence(s, extra), 0)
     assert.equal(r.state.players[0]!.resources.sheep, 0)
     assert.equal(r.state.players[0]!.pastures.length, 2)
   })
@@ -244,20 +252,20 @@ describe("A083 command boundaries", () => {
     const q = animalMenu(r)
     const zones = q.zones.filter(z => z.zoneType === 'pasture').map(z => ({ ...z, animalType: 'sheep', animalCount: 2 }))
     assert.equal(zones.length, 2)
-    r = complete(record('two-pasture-housing', ok(s.resolveChoice(0, 'confirm', { zones }))))
+    r = complete(record('two-pasture-housing', ok(s.resolveChoice(0, 'confirm', { zones }))), 0)
     assert.equal(r.state.players[0]!.resources.sheep, 4)
     assert.equal(r.state.players[0]!.fenceSegments.length, 14)
     assert.equal(gainCount(r, CROOK), 1)
   })
   it("unplayed and opponent fences exclude holder reward", () => {
     let s = setup({ played: false, resources: { wood: 8 } })
-    let r = complete(fence(s, rect(0, 1, 2, 2)))
+    let r = complete(fence(s, rect(0, 1, 2, 2)), 0)
     assert.equal(r.state.players[0]!.resources.sheep, 0)
     s = setup({}, state => {
       state.players[1]!.resources.wood = 8
     })
     turn(s, 0, 'reed-bank')
-    r = complete(fence(s, rect(0, 1, 2, 2), 1))
+    r = complete(fence(s, rect(0, 1, 2, 2), 1), 1)
     assert.equal(r.state.players[0]!.resources.sheep, 0)
     assert.equal(r.state.players[1]!.resources.sheep, 0)
   })
@@ -266,15 +274,21 @@ describe("A083 command boundaries", () => {
     turn(s, 0, 'fencing')
     record('outside-fence', assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { edges: ['H-99-99'], extraWood: 0 })))
     record('room-fence', assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { edges: rect(1, 0, 1, 1), extraWood: 0 })))
-    const r = settle(s, record('legal-fence-retry', ok(s.commitSelectionChoice(0, { edges: rect(0, 1, 2, 2), extraWood: 0 }))))
+    const r = settle(s, record('legal-fence-retry', ok(s.commitSelectionChoice(0, { edges: rect(0, 1, 2, 2), extraWood: 0 }))), 2)
     assert.equal(r.state.players[0]!.resources.sheep, 2)
   })
   it("whole fence housing undo restores finite pieces before one retry", () => {
     const s = setup({ resources: { wood: 8 } })
     const before = undoRuleSnapshot(s.getState())
-    settle(s, fence(s, rect(0, 1, 2, 2)))
-    assertUndoRestored(before, record('undo-whole-fence', s.undoAction()))
-    const r = settle(s, fence(s, rect(0, 1, 2, 2)))
+    const interactionBeforeWholeUndo = structuredClone(s.getState().interaction)
+    settle(s, fence(s, rect(0, 1, 2, 2)), 2)
+    const wholeUndoResponse1 = record('undo-whole-fence', s.undoAction())
+    assertUndoRestored(before, wholeUndoResponse1)
+    assert.deepEqual(wholeUndoResponse1.interaction, interactionBeforeWholeUndo)
+    assert.deepEqual(s.getState().interaction, interactionBeforeWholeUndo)
+    assert.equal(wholeUndoResponse1.state.currentPlayerIndex, 0)
+    assert.equal(s.getState().state.currentPlayerIndex, 0)
+    const r = settle(s, fence(s, rect(0, 1, 2, 2)), 2)
     assert.equal(r.state.players[0]!.resources.sheep, 2)
     assert.equal(r.state.players[0]!.resources.wood, 0)
   })
