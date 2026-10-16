@@ -1,11 +1,16 @@
 import { setWorkersAtHome } from '../../shared/domain/player'
-
 import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game/authoritative-session'
+import { type GameSession, type SessionResponse } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
-
 import '../../shared/cards/A/A072_CalciumFertilizers'
 import '../../shared/cards/B/B113_PatchCaregiver'
+import assert from 'node:assert/strict'
+import { type GameState, type Resource } from '../../shared/contract/types'
+import { createWorkSession } from './_helpers/session-fixtures'
+import { assertRejectedUnchanged, assertUndoRestored, confirmNext, undoRuleSnapshot, getChoiceOptions } from './_helpers/session-assertions'
+import { createScenarioEvidence } from './_helpers/scenario-evidence'
+
+const sessionEvidence = createScenarioEvidence(import.meta.url)
 
 const CARD_ID = 'A072_CalciumFertilizers'
 
@@ -15,7 +20,7 @@ describe('A072_CalciumFertilizers session', () => {
    * Player has sown fields and quarry spaces have accumulated resources.
    */
   const setup = (round = 4) => {
-    const session = new GameSession(42)
+    const session = sessionEvidence.track(createWorkSession({ seed: 42 }))
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -275,7 +280,7 @@ describe('A072_CalciumFertilizers session', () => {
   })
 
   it('prerequisite: cannot buy if player has fields', () => {
-    const session = new GameSession(42)
+    const session = sessionEvidence.track(createWorkSession({ seed: 42 }))
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -295,18 +300,10 @@ describe('A072_CalciumFertilizers session', () => {
     const resp = session.takeAction(0, 'meeting-place')
     expect(resp.ok).toBe(true)
 
-    // A72 fails prerequisite (has field tiles), so no minor improvement is offered.
-    // The optional minor-improvement step is auto-skipped, going to confirmNextPlayer.
-    if (resp.interaction.stateId === 'wait') {
-      // If a choice is somehow presented, A72 should NOT be in the options
-      const a72Option = resp.interaction.request.options?.find(
-        (option) => option.value === CARD_ID,
-      )
-      expect(a72Option).toBeUndefined()
-    } else {
-      // Expected: the optional is auto-skipped because A72 is the only card and it fails prerequisite
-      expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
-    }
+    // The only minor fails its field prerequisite, so the optional purchase is skipped.
+    assert.ok(resp.interaction.stateId === 'wait')
+    assert.equal(resp.interaction.request.kind, 'confirm-next-player')
+    expect(getChoiceOptions(resp).some(option => option.value === CARD_ID)).toBe(false)
   })
 
   it('does not bump stone-kind stack remaining when using a quarry', () => {
@@ -334,7 +331,7 @@ describe('A072_CalciumFertilizers session', () => {
   it('prerequisite: can buy if player has no fields (prerequisite text check)', () => {
     // The "No Field Tiles" prerequisite is handled by the prerequisite system.
     // We verify the prerequisite string is correctly set on the card definition.
-    const session = new GameSession(42)
+    const session = sessionEvidence.track(createWorkSession({ seed: 42 }))
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -367,35 +364,8 @@ describe('A072_CalciumFertilizers session', () => {
 describe('A072_CalciumFertilizers session', () => {
   const CARD_ID = 'A072_CalciumFertilizers'
 
-  const setup = (round = 4) => {
-    const session = new GameSession(6072, undefined, { playerCount: 2 })
-    stabilizeRandomHands(session.state.players)
-    const state = session.getState().state
-    state.players = state.players.slice(0, 2)
-    state.currentPlayerIndex = 0
-    state.round = round
-    state.roundPhase = 'work'
-
-    const player = state.players[0]!
-    setWorkersAtHome(state, player, 2)
-    player.minorHand = ['__test_placeholder__']
-    player.occupationHand = ['__test_placeholder__']
-    player.minorPlayed.push(CARD_ID)
-    state.players[1]!.minorHand = ['__test_placeholder__']
-    state.players[1]!.occupationHand = ['__test_placeholder__']
-
-    const easternQuarry = state.actionSpaces.find((s) => s.id === 'eastern-quarry')
-    if (easternQuarry) easternQuarry.resources.stone = 2
-
-    const westernQuarry = state.actionSpaces.find((s) => s.id === 'western-quarry')
-    if (westernQuarry) westernQuarry.resources.stone = 2
-
-    session.loadState(state)
-    return session
-  }
-
   it('A072 S2: having a field tile keeps Calcium Fertilizers unavailable', () => {
-    const session = new GameSession(6172, undefined, { playerCount: 2 })
+    const session = sessionEvidence.track(createWorkSession({ seed: 6172, options: { playerCount: 2 } }))
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -421,27 +391,19 @@ describe('A072_CalciumFertilizers session', () => {
     let resp = session.takeAction(0, 'meeting-place')
     expect(resp.ok, resp.error).toBe(true)
     if (resp.interaction.stateId === 'wait'
-      && !resp.interaction.request.options?.some((option) => option.value === CARD_ID)) {
-      const improvement = resp.interaction.request.options?.find((option) =>
+      && !getChoiceOptions(resp)?.some((option) => option.value === CARD_ID)) {
+      const improvement = getChoiceOptions(resp)?.find((option) =>
         option.value.startsWith('action-improvement-'))
       if (improvement) resp = session.resolveChoice(0, improvement.value)
     }
 
-
-    if (resp.interaction.stateId === 'wait') {
-
-      const a72Option = resp.interaction.request.options?.find(
-        (option) => option.value === CARD_ID,
-      )
-      expect(a72Option).toBeUndefined()
-    } else {
-
-      expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
-    }
+    assert.ok(resp.interaction.stateId === 'wait')
+    assert.equal(resp.interaction.request.kind, 'confirm-next-player')
+    expect(getChoiceOptions(resp).some(option => option.value === CARD_ID)).toBe(false)
   })
 
   it('A072 S1: with no field tiles Calcium Fertilizers can be played for free', () => {
-    const session = new GameSession(6272, undefined, { playerCount: 2 })
+    const session = sessionEvidence.track(createWorkSession({ seed: 6272, options: { playerCount: 2 } }))
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.currentPlayerIndex = 0
@@ -462,13 +424,13 @@ describe('A072_CalciumFertilizers session', () => {
     let resp = session.takeAction(0, 'meeting-place')
     expect(resp.ok, resp.error).toBe(true)
     if (resp.state.players[0]!.minorHand.includes(CARD_ID) && resp.interaction.stateId === 'wait') {
-      if (!resp.interaction.request.options?.some((option) => option.value === CARD_ID)) {
-        const improvement = resp.interaction.request.options?.find((option) =>
+      if (!getChoiceOptions(resp)?.some((option) => option.value === CARD_ID)) {
+        const improvement = getChoiceOptions(resp)?.find((option) =>
           option.value.startsWith('action-improvement-'))
         if (improvement) resp = session.resolveChoice(0, improvement.value)
       }
       if (resp.state.players[0]!.minorHand.includes(CARD_ID) && resp.interaction.stateId === 'wait') {
-        const card = resp.interaction.request.options?.find((option) => option.value === CARD_ID)
+        const card = getChoiceOptions(resp)?.find((option) => option.value === CARD_ID)
         expect(card).toBeDefined()
         resp = session.resolveChoice(0, card!.value)
       }
@@ -476,5 +438,168 @@ describe('A072_CalciumFertilizers session', () => {
 
     expect(resp.ok, resp.error).toBe(true)
     expect(resp.state.players[0]!.minorPlayed).toContain(CARD_ID)
+  })
+})
+
+describe("A072 command boundaries", () => {
+  const CALCIUM = 'A072_CalciumFertilizers'
+  function ok(r: SessionResponse) {
+    assert.equal(r.ok, true, r.error)
+    return r
+  }
+  function setup({ played = true, round = 5, resources = {} }: {
+    played?: boolean
+    round?: number
+    resources?: Partial<Resource>
+  } = {}, configure: (state: GameState) => void = () => {
+  }) {
+    const s = sessionEvidence.track(createWorkSession({ seed: 4242, options: { playerCount: 2 }, configure(state) {
+        state.round = round
+        state.availableMajorImprovements = []
+        for (const p of state.players)
+          Object.assign(p.resources, { food: 40, wood: 0, clay: 0, reed: 0, stone: 0, grain: 0, vegetable: 0 })
+        const p = state.players[0]!
+        p.minorHand = played ? ['__test_placeholder__'] : [CALCIUM, '__test_placeholder__']
+        p.minorPlayed = played ? [CALCIUM] : []
+        Object.assign(p.resources, resources)
+        configure(state)
+      } }))
+    for (const p of s.getState().state.players) {
+      assert.equal(p.workers.length, 5)
+      assert.equal(p.workers.filter(w => w.isActive).length, 2)
+      assert.equal(p.fenceSegments.length, 0)
+      assert.equal(p.stableTiles.length, 0)
+    }
+    return s
+  }
+  function choices(r: SessionResponse) {
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice', JSON.stringify(r.interaction))
+    return getChoiceOptions(r)
+  }
+  function buyMenu(s: GameSession) {
+    let r = ok(s.takeAction(0, 'meeting-place'))
+    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice') {
+      const o = getChoiceOptions(r).find(o => o.value.startsWith('action-improvement-'))
+      if (o)
+        r = ok(s.resolveChoice(0, o.value))
+    }
+    return r
+  }
+  function buy(s: GameSession, card: string) {
+    const r = buyMenu(s)
+    if (!r.state.players[0]!.minorHand.includes(card))
+      return r
+    assert.ok(choices(r).some(o => o.value === card && !o.disabled))
+    return ok(s.resolveChoice(0, card))
+  }
+  function deny(s: GameSession, card: string) {
+    const r = buyMenu(s)
+    assert.ok(!r.state.players[0]!.minorPlayed.includes(card))
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, card))
+  }
+  function ready(s: GameSession, actor: number) {
+    let r = s.getState()
+    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
+      r = confirmNext(s, r)
+    assert.equal(r.interaction.stateId, 'idle', JSON.stringify(r.interaction))
+    assert.equal(r.state.currentPlayerIndex, actor)
+    return r
+  }
+  function turn(s: GameSession, actor: number, space: string) {
+    ready(s, actor)
+    return ok(s.takeAction(actor, space))
+  }
+  function fields(state: GameState, crops: Array<{
+    kind: 'grain' | 'vegetable'
+    remaining: number
+  } | null>, owner = 0, start = 1) {
+    state.players[owner]!.fields = crops.map((crop, i) => ({ row: 0, col: start + i, stacks: crop ? [crop] : [] }))
+  }
+  function board(r: SessionResponse, owner = 0) {
+    return r.state.players[owner]!.fields.map(f => f.stacks.reduce((n, v) => n + v.remaining, 0))
+  }
+  function cropSupply(r: SessionResponse) {
+    return { grain: r.state.players[0]!.resources.grain, vegetable: r.state.players[0]!.resources.vegetable }
+  }
+  function calcium(played = true, configure: (state: GameState) => void = () => {
+  }) {
+    return setup({ played, round: 14 }, state => {
+      fields(state, [{ kind: 'grain', remaining: 2 }, { kind: 'vegetable', remaining: 1 }, null])
+      for (const space of ['eastern-quarry', 'western-quarry'])
+        state.actionSpaces.find(s => s.id === space)!.resources.stone = 1
+      configure(state)
+    })
+  }
+  it("free purchase allows a Card Field but refuses one farmyard field tile", () => {
+    deny(setup({ played: false, round: 14 }, state => fields(state, [null])), CALCIUM)
+    const s = setup({ played: false, round: 14 }, state => {
+      state.players[0]!.minorPlayed.push('B068_Beanfield')
+      state.players[0]!.occupationPlayed = ['A125_Priest', 'A111_WallBuilder']
+      state.players[0]!.cardStates.B068_Beanfield = { extraData: { cardFieldStacks: [{ crop: 'vegetable', remaining: 2 }] } }
+    })
+    const r = buy(s, CALCIUM)
+    assert.ok(r.state.players[0]!.minorPlayed.includes(CALCIUM))
+    assert.equal(r.state.players[0]!.fields.length, 0)
+    assert.deepEqual(cropSupply(r), { grain: 0, vegetable: 0 })
+    assert.equal(r.state.players[0]!.resources.food, 40)
+  })
+  it("each real quarry grows each planted crop field once and leaves an empty field empty", () => {
+    for (const space of ['eastern-quarry', 'western-quarry']) {
+      const s = calcium()
+      const before = s.getState().scores
+      const r = turn(s, 0, space)
+      assert.deepEqual(board(r), [3, 2, 0])
+      assert.equal(r.state.players[0]!.resources.stone, 1)
+      assert.deepEqual(cropSupply(r), { grain: 0, vegetable: 0 })
+      assert.ok(before)
+      assert.ok(r.scores)
+      assert.equal(r.state.log.filter(e => e.key === 'log.farmCropAdded').length, 2)
+      sessionEvidence.record(`A072-N2-${space}`, { scoresBefore: before, response: r })
+    }
+  })
+  it("a legal vegetable Card Field grows once while Wood Field stays unchanged", () => {
+    const s = calcium(true, state => {
+      const p = state.players[0]!
+      p.minorPlayed.push('B068_Beanfield', 'D075_WoodField')
+      p.occupationPlayed = ['A125_Priest', 'A111_WallBuilder']
+      p.cardStates.B068_Beanfield = { extraData: { cardFieldStacks: [{ crop: 'vegetable', remaining: 2 }] } }
+      p.cardStates.D075_WoodField = { extraData: { cardFieldStacks: [{ crop: 'wood', remaining: 2 }, { crop: 'wood', remaining: 1 }] } }
+    })
+    const r = turn(s, 0, 'western-quarry')
+    assert.deepEqual(r.state.players[0]!.cardStates.B068_Beanfield?.extraData?.cardFieldStacks, [{ crop: 'vegetable', remaining: 3 }])
+    assert.deepEqual(r.state.players[0]!.cardStates.D075_WoodField?.extraData?.cardFieldStacks, [{ crop: 'wood', remaining: 2 }, { crop: 'wood', remaining: 1 }])
+    assert.deepEqual(board(r), [3, 2, 0])
+    sessionEvidence.record('A072-N3-card-fields', r)
+  })
+  it("unplayed owner opponent quarry and non quarry stone purchase cannot grow owner fields", () => {
+    let r = turn(calcium(false), 0, 'eastern-quarry')
+    assert.deepEqual(board(r), [2, 1, 0])
+    const s = calcium()
+    turn(s, 0, 'reed-bank')
+    r = turn(s, 1, 'eastern-quarry')
+    assert.deepEqual(board(r), [2, 1, 0])
+    assert.equal(r.state.players[1]!.resources.stone, 1)
+    const other = setup({ round: 14 }, state => {
+      const p = state.players[0]!
+      p.minorHand = ['B006_ExcursiontotheQuarry', '__test_placeholder__']
+      p.minorPlayed = [CALCIUM]
+      p.occupationPlayed = ['A125_Priest']
+      fields(state, [{ kind: 'grain', remaining: 2 }, { kind: 'vegetable', remaining: 1 }])
+    })
+    r = buy(other, 'B006_ExcursiontotheQuarry')
+    assert.deepEqual(board(r), [2, 1])
+    assert.equal(r.state.players[0]!.resources.stone, 2)
+    assert.equal(r.state.players[0]!.resources.food, 38)
+  })
+  it("actual quarry undo restores crops supply worker pile logs and score before one retry", () => {
+    const s = calcium(), before = undoRuleSnapshot(s.getState())
+    turn(s, 0, 'eastern-quarry')
+    const undone = s.undoAction()
+    sessionEvidence.record('A072-N5-undo', { before: JSON.parse(before), response: undone })
+    assertUndoRestored(before, undone)
+    const r = turn(s, 0, 'eastern-quarry')
+    assert.deepEqual(board(r), [3, 2, 0])
+    assert.equal(r.state.players[0]!.resources.stone, 1)
+    sessionEvidence.record('A072-N5-retry', r)
   })
 })

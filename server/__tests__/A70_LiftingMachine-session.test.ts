@@ -247,12 +247,12 @@ describe("A070 command boundaries", () => {
   }
   function choices(r: SessionResponse) {
     assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice', JSON.stringify(r.interaction))
-    return r.interaction.request.options
+    return getChoiceOptions(r)
   }
   function buyMenu(s: GameSession) {
     let r = ok(s.takeAction(0, 'meeting-place'))
     if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice') {
-      const o = r.interaction.request.options.find(o => o.value.startsWith('action-improvement-'))
+      const o = getChoiceOptions(r).find(o => o.value.startsWith('action-improvement-'))
       if (o)
         r = ok(s.resolveChoice(0, o.value))
     }

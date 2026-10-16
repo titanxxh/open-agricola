@@ -1,15 +1,20 @@
 import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game/authoritative-session'
+import { type GameSession, type SessionResponse } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
-
 import '../../shared/cards/A/A071_ClearingSpade'
 import '../../shared/cards/B/B068_Beanfield'
 import '../../shared/cards/C/C070_LettucePatch'
-import type { AnytimeAction } from '../../shared/contract/types';
+import { type AnytimeAction, type Field, type GameState, type Resource } from '../../shared/contract/types'
+import assert from 'node:assert/strict'
+import { createWorkSession } from './_helpers/session-fixtures'
+import { assertRejectedUnchanged, assertUndoRestored, confirmNext, undoRuleSnapshot, getChoiceOptions } from './_helpers/session-assertions'
+import { createScenarioEvidence } from './_helpers/scenario-evidence'
+
+const sessionEvidence = createScenarioEvidence(import.meta.url)
 
 describe('A071_ClearingSpade session', () => {
-  const setup = (fields?: { row: number; col: number; crop: string | null; remaining: number }[]) => {
-    const session = new GameSession(42)
+  const setup = (fields?: Field[]) => {
+    const session = sessionEvidence.track(createWorkSession({ seed: 42 }))
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -155,9 +160,9 @@ describe('A071_ClearingSpade session', () => {
     expect(resp.ok).toBe(true)
     resp = session.commitSelectionChoice(0, { positions: [{ row: -1, col: 2068 }] })
     expect(resp.ok).toBe(true)
-    expect(resp.interaction.stateId === 'wait'
-      ? resp.interaction.request.selection?.selectablePositions
-      : []).toEqual([{
+    assert.ok(resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'selection')
+    assert.ok(resp.interaction.request.selection.kind === 'farm-position')
+    expect(resp.interaction.request.selection.selectablePositions).toEqual([{
       row: -1,
       col: 3070,
       sourceCard: 'C070_LettucePatch',
@@ -173,5 +178,193 @@ describe('A071_ClearingSpade session', () => {
     expect(resp.state.players[0]!.cardStates.C070_LettucePatch?.extraData?.cardFieldStacks).toEqual([
       { crop: 'vegetable', remaining: 1 },
     ])
+  })
+})
+
+describe("A071 command boundaries", () => {
+  const SPADE = 'A071_ClearingSpade'
+  function ok(r: SessionResponse) {
+    assert.equal(r.ok, true, r.error)
+    return r
+  }
+  function setup({ played = true, round = 5, resources = {} }: {
+    played?: boolean
+    round?: number
+    resources?: Partial<Resource>
+  } = {}, configure: (state: GameState) => void = () => {
+  }) {
+    const s = sessionEvidence.track(createWorkSession({ seed: 4242, options: { playerCount: 2 }, configure(state) {
+        state.round = round
+        state.availableMajorImprovements = []
+        for (const p of state.players)
+          Object.assign(p.resources, { food: 40, wood: 0, clay: 0, reed: 0, stone: 0, grain: 0, vegetable: 0 })
+        const p = state.players[0]!
+        p.minorHand = played ? ['__test_placeholder__'] : [SPADE, '__test_placeholder__']
+        p.minorPlayed = played ? [SPADE] : []
+        Object.assign(p.resources, resources)
+        configure(state)
+      } }))
+    for (const p of s.getState().state.players) {
+      assert.equal(p.workers.length, 5)
+      assert.equal(p.workers.filter(w => w.isActive).length, 2)
+      assert.equal(p.fenceSegments.length, 0)
+      assert.equal(p.stableTiles.length, 0)
+    }
+    return s
+  }
+  function choices(r: SessionResponse) {
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice', JSON.stringify(r.interaction))
+    return getChoiceOptions(r)
+  }
+  function buyMenu(s: GameSession) {
+    let r = ok(s.takeAction(0, 'meeting-place'))
+    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice') {
+      const o = getChoiceOptions(r).find(o => o.value.startsWith('action-improvement-'))
+      if (o)
+        r = ok(s.resolveChoice(0, o.value))
+    }
+    return r
+  }
+  function buy(s: GameSession, card: string) {
+    const r = buyMenu(s)
+    if (!r.state.players[0]!.minorHand.includes(card))
+      return r
+    assert.ok(choices(r).some(o => o.value === card && !o.disabled))
+    return ok(s.resolveChoice(0, card))
+  }
+  function deny(s: GameSession, card: string) {
+    const r = buyMenu(s)
+    assert.ok(!r.state.players[0]!.minorPlayed.includes(card))
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, card))
+  }
+  function ready(s: GameSession, actor: number) {
+    let r = s.getState()
+    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
+      r = confirmNext(s, r)
+    assert.equal(r.interaction.stateId, 'idle', JSON.stringify(r.interaction))
+    assert.equal(r.state.currentPlayerIndex, actor)
+    return r
+  }
+  function turn(s: GameSession, actor: number, space: string) {
+    ready(s, actor)
+    return ok(s.takeAction(actor, space))
+  }
+  function fields(state: GameState, crops: Array<{
+    kind: 'grain' | 'vegetable'
+    remaining: number
+  } | null>, owner = 0, start = 1) {
+    state.players[owner]!.fields = crops.map((crop, i) => ({ row: 0, col: start + i, stacks: crop ? [crop] : [] }))
+  }
+  function board(r: SessionResponse, owner = 0) {
+    return r.state.players[owner]!.fields.map(f => f.stacks.reduce((n, v) => n + v.remaining, 0))
+  }
+  function selection(s: GameSession, r: SessionResponse, position = { row: 0, col: 1 }) {
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'selection', JSON.stringify(r.interaction))
+    return ok(s.commitSelectionChoice(r.interaction.playerIndex, { positions: [position] }))
+  }
+  const SPADE_ACTION = 'A71-clearing-spade-anytime'
+  function spade(crop: 'grain' | 'vegetable' = 'grain', count = 2, empty = true, configure: (state: GameState) => void = () => {
+  }) {
+    return setup({}, state => {
+      fields(state, [count ? { kind: crop, remaining: count } : null, empty ? null : { kind: 'vegetable', remaining: 1 }, null])
+      configure(state)
+    })
+  }
+  function openSpade(s: GameSession) {
+    return ok(s.takeAnytimeAction(0, SPADE_ACTION))
+  }
+  function move(s: GameSession, source = { row: 0, col: 1 }, target = { row: 0, col: 2 }) {
+    return selection(s, selection(s, openSpade(s), source), target)
+  }
+  function cropSupply(r: SessionResponse) {
+    return { grain: r.state.players[0]!.resources.grain, vegetable: r.state.players[0]!.resources.vegetable }
+  }
+  it("actual one wood purchase permits grain and vegetable transfers without spending supply", () => {
+    deny(setup({ played: false }), SPADE)
+    for (const kind of ['grain', 'vegetable'] satisfies Array<'grain' | 'vegetable'>) {
+      const s = setup({ played: false, resources: { wood: 1 } }, state => fields(state, [{ kind, remaining: 2 }, null]))
+      buy(s, SPADE)
+      const r = move(s)
+      assert.equal(r.state.players[0]!.resources.wood, 0)
+      assert.deepEqual(board(r), [1, 1])
+      assert.deepEqual(cropSupply(r), { grain: 0, vegetable: 0 })
+      sessionEvidence.record(`A071-N1-${kind}`, r)
+    }
+  })
+  it("source below two and absence of an empty target leave no legal transfer", () => {
+    for (const count of [0, 1]) {
+      const s = spade('grain', count)
+      assert.ok(!s.getState().interaction.anytimeActions.some(a => a.id === SPADE_ACTION))
+      assertRejectedUnchanged(s, () => s.takeAnytimeAction(0, SPADE_ACTION))
+    }
+    const s = setup({}, state => fields(state, [{ kind: 'grain', remaining: 2 }, { kind: 'vegetable', remaining: 1 }]))
+    assert.ok(!s.getState().interaction.anytimeActions.some(a => a.id === SPADE_ACTION))
+    assertRejectedUnchanged(s, () => s.takeAnytimeAction(0, SPADE_ACTION))
+  })
+  it("genuine source and target selectors reject planted same foreign multi and wrong actor targets", () => {
+    const s = spade('grain', 2, true, state => fields(state, [{ kind: 'grain', remaining: 2 }], 1, 4))
+    let r = openSpade(s)
+    for (const positions of [[{ row: 0, col: 2 }], [{ row: 0, col: 4 }], [{ row: 0, col: 1 }, { row: 0, col: 2 }]])
+      assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { positions }))
+    r = selection(s, r)
+    assertRejectedUnchanged(s, () => s.commitSelectionChoice(1, { positions: [{ row: 0, col: 2 }] }))
+    for (const col of [1, 4])
+      assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { positions: [{ row: 0, col }] }))
+    r = selection(s, r, { row: 0, col: 2 })
+    assert.deepEqual(board(r), [1, 1, 0])
+    assert.deepEqual(board(r, 1), [2])
+    assert.deepEqual(cropSupply(r), { grain: 0, vegetable: 0 })
+  })
+  it("two separate legal anytime transfers stop only when the source falls below two", () => {
+    const s = spade('grain', 3)
+    move(s)
+    const r = move(s, { row: 0, col: 1 }, { row: 0, col: 3 })
+    assert.deepEqual(board(r), [1, 1, 1])
+    assert.deepEqual(cropSupply(r), { grain: 0, vegetable: 0 })
+    assert.ok(!r.interaction.anytimeActions.some(a => a.id === SPADE_ACTION))
+    sessionEvidence.record('A071-N3-two-transfers', r)
+  })
+  it("wood in Wood Field is not a crop eligible for Clearing Spade", () => {
+    const s = spade('grain', 2, true, state => {
+      const p = state.players[0]!
+      p.minorPlayed.push('D075_WoodField')
+      p.occupationPlayed = ['A125_Priest']
+      p.cardStates.D075_WoodField = { extraData: { cardFieldStacks: [{ crop: 'wood', remaining: 2 }, null] } }
+    })
+    const r = openSpade(s)
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'selection')
+    const selector = r.interaction.request.selection
+    assert.ok(selector?.kind === 'farm-position')
+    const positions = selector.selectablePositions
+    sessionEvidence.record('A071-N4-source-request', r)
+    const wood = positions.find(p => p.row === -1 && p.col === 4075)
+    assert.equal(wood, undefined)
+    selection(s, selection(s, r), { row: 0, col: 2 })
+    const p = s.getState().state.players[0]!
+    const actual = { woodSourceOffered: Boolean(wood), farmWood: p.fields.flatMap(f => f.stacks).filter(v => v.kind === 'wood').reduce((n, v) => n + v.remaining, 0), woodCardStacks: p.cardStates.D075_WoodField?.extraData?.cardFieldStacks, woodSupply: p.resources.wood }
+    sessionEvidence.record('A071-N4-outcome', actual)
+    assert.deepEqual(actual, { woodSourceOffered: false, farmWood: 0, woodCardStacks: [{ crop: 'wood', remaining: 2 }, null], woodSupply: 0 })
+  })
+  it("moving a vegetable is not sowing and does not trigger Garden Hoe", () => {
+    const s = spade('vegetable', 2, true, state => state.players[0]!.minorPlayed.push('A079_GardenHoe'))
+    const r = move(s)
+    assert.deepEqual(board(r), [1, 1, 0])
+    assert.deepEqual(cropSupply(r), { grain: 0, vegetable: 0 })
+    assert.equal(r.state.players[0]!.resources.clay, 0)
+    assert.equal(r.state.players[0]!.resources.stone, 0)
+  })
+  it("actual completed transfer undo observes native capability and retries without duplicating crops", () => {
+    const s = spade()
+    const before = undoRuleSnapshot(s.getState())
+    turn(s, 0, 'farmland')
+    move(s)
+    const undone = s.undoAction()
+    sessionEvidence.record('A071-N6-undo', { before: JSON.parse(before), response: undone })
+    assertUndoRestored(before, undone)
+    turn(s, 0, 'farmland')
+    const r = move(s)
+    assert.deepEqual(board(r), [1, 1, 0])
+    assert.deepEqual(cropSupply(r), { grain: 0, vegetable: 0 })
+    sessionEvidence.record('A071-N6-retry', r)
   })
 })

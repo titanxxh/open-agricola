@@ -1,8 +1,10 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { createScenarioEvidence } from './_helpers/scenario-evidence'
+import { describe, expect, it } from 'vitest'
 import type { Field, GameState } from '../../shared/contract/types'
 import { getLogicalFields } from '../../shared/cards/helpers/card-field'
 import { createWorkSession } from './_helpers/session-fixtures'
 import type { GameSession, SessionResponse } from '../game/authoritative-session'
+const sessionEvidence = createScenarioEvidence(import.meta.url)
 
 const SPADE = 'A071_ClearingSpade'
 const WOOD = 'D075_WoodField'
@@ -15,13 +17,11 @@ const source = { row: 0, col: 2 }
 const target = { row: 0, col: 3 }
 const woodTile = { row: -1, col: 4075 }
 const stoneTile = { row: -1, col: 5080 }
-const sessions: GameSession[] = []
-afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
 
 // A071 declares its source goods; the shared move continuation retains that
 // constraint. The confirmed Session seam covers both selections and undo.
 const setup = (configure?: (state: GameState) => void) => {
-  const session = createWorkSession({ seed: 42, configure: state => {
+  const session = sessionEvidence.track(createWorkSession({ seed: 42, configure: state => {
     state.round = 5
     state.currentPlayerIndex = 0
     for (const player of state.players) {
@@ -38,8 +38,7 @@ const setup = (configure?: (state: GameState) => void) => {
     player.fields = [{ ...target, stacks: [] }]
     player.cardStates[WOOD] = { extraData: { cardFieldStacks: [{ crop: 'wood', remaining: 2 }, null] } }
     configure?.(state)
-  } })
-  sessions.push(session)
+  } }))
   const response = session.takeAction(0, 'farmland')
   expect(response.ok, response.error).toBe(true)
   expect(response.interaction).toMatchObject({ stateId: 'wait', playerIndex: 0 })
