@@ -876,6 +876,18 @@ describe("A049 command boundaries", () => {
 
 describe("A044 command boundaries", () => {
   const HUT = 'A044_PondHut'
+  function confirmed(r: SessionResponse, actor = 0) {
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, actor)
+    assert.equal(r.state.currentPlayerIndex, actor)
+    return r
+  }
+  function newRound(r: SessionResponse) {
+    assert.equal(r.interaction.stateId, 'idle', JSON.stringify(r.interaction))
+    assert.equal(r.state.currentPlayerIndex, 0)
+    assert.equal(r.state.roundPhase, 'work')
+    return r
+  }
   function ok(r: SessionResponse) {
     assert.equal(r.ok, true, r.error)
     return r
@@ -922,7 +934,7 @@ describe("A044 command boundaries", () => {
     if (r.state.players[0]!.minorPlayed.includes(HUT))
       return r
     assert.ok(options(r).some(o => o.value === HUT && !('disabled' in o && o.disabled)))
-    return ok(s.resolveChoice(0, HUT))
+    return confirmed(ok(s.resolveChoice(0, HUT)))
   }
   function deny(s: GameSession) {
     const r = buyMenu(s)
@@ -939,7 +951,8 @@ describe("A044 command boundaries", () => {
   }
   function turn(s: GameSession, actor: number, space: string) {
     ready(s, actor)
-    return ok(s.takeAction(actor, space))
+    const r = ok(s.takeAction(actor, space))
+    return ['forest', 'grain-seeds', 'reed-bank', 'clay-pit'].includes(space) ? confirmed(r, actor) : r
   }
   function rounds(r: SessionResponse) {
     const entries = r.state.futureMeeples.filter(e => e.cardId === HUT)
@@ -953,12 +966,12 @@ describe("A044 command boundaries", () => {
     if (firstRound) {
       turn(s, 1, 'forest')
       turn(s, 0, 'grain-seeds')
-      return confirmNext(s, turn(s, 1, 'clay-pit'))
+      return newRound(confirmNext(s, turn(s, 1, 'clay-pit')))
     }
     turn(s, 0, 'reed-bank')
     turn(s, 1, 'forest')
     turn(s, 0, 'grain-seeds')
-    return confirmNext(s, turn(s, 1, 'clay-pit'))
+    return newRound(confirmNext(s, turn(s, 1, 'clay-pit')))
   }
   function food(r: SessionResponse) {
     return r.state.players.map(p => p.resources.food)
@@ -978,13 +991,18 @@ describe("A044 command boundaries", () => {
   })
   it("purchase schedule survives stale rejection and whole purchase undo retry", () => {
     const s = setup({ resources: { wood: 1 } })
+    const beforeInteraction = JSON.stringify(s.getState().interaction)
+    assert.equal(s.getState().interaction.stateId, 'idle')
     const before = undoRuleSnapshot(s.getState())
     let r = buy(s)
     assert.deepEqual(rounds(r), [6, 7, 8])
     assert.equal(r.state.players[0]!.resources.food, 40)
     assert.equal(printedVp(r), 1)
     assertRejectedUnchanged(s, () => s.resolveChoice(0, HUT))
-    assertUndoRestored(before, s.undoAction())
+    const beforeRestored = s.undoAction()
+    assertUndoRestored(before, beforeRestored)
+    assert.equal(JSON.stringify(beforeRestored.interaction), beforeInteraction)
+    assert.equal(beforeRestored.state.currentPlayerIndex, 0)
     r = buy(s)
     assert.deepEqual(rounds(r), [6, 7, 8])
     assert.equal(r.state.players[0]!.resources.wood, 0)
@@ -1013,6 +1031,18 @@ describe("A044 command boundaries", () => {
 
 describe("A047 command boundaries", () => {
   const TRELLIS = 'A047_Trellises'
+  function confirmed(r: SessionResponse, actor = 0) {
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, actor)
+    assert.equal(r.state.currentPlayerIndex, actor)
+    return r
+  }
+  function newRound(r: SessionResponse) {
+    assert.equal(r.interaction.stateId, 'idle', JSON.stringify(r.interaction))
+    assert.equal(r.state.currentPlayerIndex, 0)
+    assert.equal(r.state.roundPhase, 'work')
+    return r
+  }
   function ok(r: SessionResponse) {
     assert.equal(r.ok, true, r.error)
     return r
@@ -1059,7 +1089,7 @@ describe("A047 command boundaries", () => {
     if (r.state.players[0]!.minorPlayed.includes(TRELLIS))
       return r
     assert.ok(options(r).some(o => o.value === TRELLIS && !('disabled' in o && o.disabled)))
-    return ok(s.resolveChoice(0, TRELLIS))
+    return confirmed(ok(s.resolveChoice(0, TRELLIS)))
   }
   function deny(s: GameSession) {
     const r = buyMenu(s)
@@ -1076,7 +1106,8 @@ describe("A047 command boundaries", () => {
   }
   function turn(s: GameSession, actor: number, space: string) {
     ready(s, actor)
-    return ok(s.takeAction(actor, space))
+    const r = ok(s.takeAction(actor, space))
+    return ['forest', 'grain-seeds', 'reed-bank', 'clay-pit'].includes(space) ? confirmed(r, actor) : r
   }
   function rounds(r: SessionResponse) {
     const entries = r.state.futureMeeples.filter(e => e.cardId === TRELLIS)
@@ -1090,37 +1121,22 @@ describe("A047 command boundaries", () => {
     if (firstRound) {
       turn(s, 1, 'forest')
       turn(s, 0, 'grain-seeds')
-      return confirmNext(s, turn(s, 1, 'clay-pit'))
+      return newRound(confirmNext(s, turn(s, 1, 'clay-pit')))
     }
     turn(s, 0, 'reed-bank')
     turn(s, 1, 'forest')
     turn(s, 0, 'grain-seeds')
-    return confirmNext(s, turn(s, 1, 'clay-pit'))
+    return newRound(confirmNext(s, turn(s, 1, 'clay-pit')))
   }
   function food(r: SessionResponse) {
     return r.state.players.map(p => p.resources.food)
   }
-  function terrainNormalizedSnapshot(r: SessionResponse) {
-    const players = r.state.players.map(p => {
-      if (p.farmTerrain?.length !== 0)
-        return p
-      const { farmTerrain: _emptyTerrain, ...player } = p
-      return player
-    })
-    return undoRuleSnapshot({ ...r, state: { ...r.state, players } })
-  }
-  function assertTerrainNormalizedUndo(before: string, r: SessionResponse) {
-    ok(r)
-    assert.deepEqual(JSON.parse(terrainNormalizedSnapshot(r)), JSON.parse(before))
-    const packet = r.state.publicEventArchive.at(-1)
-    assert.ok(packet?.type === 'publicEvents.canceled')
-    assert.equal(packet.reason, 'undoAction')
-  }
+
   const cellOne = ['H-0-1', 'H-1-1', 'V-0-1', 'V-0-2'], cellTwo = ['H-0-2', 'H-1-2', 'V-0-3']
   function fence(s: GameSession, edges = cellOne, actor = 0) {
     const r = turn(s, actor, 'fencing')
     assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'farm-select')
-    return ok(s.commitSelectionChoice(actor, { edges }))
+    return confirmed(ok(s.commitSelectionChoice(actor, { edges })), actor)
   }
   function fencedPurchase(s: GameSession) {
     const r = fence(s)
@@ -1141,12 +1157,28 @@ describe("A047 command boundaries", () => {
     fence(s)
     turn(s, 1, 'forest')
     ready(s, 0)
-    const before = terrainNormalizedSnapshot(s.getState())
+    const beforeInteraction = JSON.stringify(s.getState().interaction)
+    assert.equal(s.getState().interaction.stateId, 'idle')
+    const initial = s.getState()
+    assert.deepEqual(initial.state.players[0]!.farmTerrain, [])
+    // #1258: restore currently removes this player's empty terrain array.
+    const before = undoRuleSnapshot({
+      ...initial,
+      state: {
+        ...initial.state,
+        players: initial.state.players.map((player, index) => index === 0
+          ? { ...player, farmTerrain: undefined }
+          : player),
+      },
+    })
     let r = buy(s)
     assert.deepEqual(rounds(r), [6, 7, 8, 9])
     assert.equal(r.state.players[0]!.resources.wood, 0)
     assertRejectedUnchanged(s, () => s.resolveChoice(0, TRELLIS))
-    assertTerrainNormalizedUndo(before, s.undoAction())
+    const beforeRestored = s.undoAction()
+    assertUndoRestored(before, beforeRestored)
+    assert.equal(JSON.stringify(beforeRestored.interaction), beforeInteraction)
+    assert.equal(beforeRestored.state.currentPlayerIndex, 0)
     r = buy(s)
     assert.deepEqual(rounds(r), [6, 7, 8, 9])
     assert.equal(r.state.players[0]!.resources.wood, 0)
@@ -1155,7 +1187,7 @@ describe("A047 command boundaries", () => {
   it("later actual fencing does not grow locked schedule and natural food pays once to owner", () => {
     const s = setup({ resources: { wood: 8 } })
     fencedPurchase(s)
-    let r = confirmNext(s, turn(s, 1, 'clay-pit'))
+    let r = newRound(confirmNext(s, turn(s, 1, 'clay-pit')))
     assert.equal(r.state.round, 6)
     assert.deepEqual(food(r), [41, 40])
     r = fence(s, cellTwo)
@@ -1163,7 +1195,7 @@ describe("A047 command boundaries", () => {
     assert.deepEqual(rounds(r), [7, 8, 9])
     turn(s, 1, 'forest')
     turn(s, 0, 'grain-seeds')
-    r = confirmNext(s, turn(s, 1, 'clay-pit'))
+    r = newRound(confirmNext(s, turn(s, 1, 'clay-pit')))
     assert.equal(r.state.round, 7)
     assert.deepEqual(food(r), [42, 40])
     for (const [i, { expectedFood, remaining }] of [{ expectedFood: [39, 36], remaining: [9] }, { expectedFood: [40, 36], remaining: [] }, { expectedFood: [36, 32], remaining: [] }].entries()) {

@@ -398,6 +398,12 @@ describe("A041 command boundaries", () => {
         state.actionSpaces.find(space => space.id === 'forest')!.resources.wood = 3
       } }))
   }
+  function confirmed(r: SessionResponse, actor = 0) {
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, actor)
+    assert.equal(r.state.currentPlayerIndex, actor)
+    return r
+  }
   function ok(r: SessionResponse) {
     assert.equal(r.ok, true, r.error)
     return r
@@ -425,7 +431,8 @@ describe("A041 command boundaries", () => {
   }
   function turn(s: GameSession, actor: number, space: string) {
     ready(s, actor)
-    return ok(s.takeAction(actor, space))
+    const r = ok(s.takeAction(actor, space))
+    return space === 'forest' ? confirmed(r, actor) : r
   }
   function minor(s: GameSession, card: string) {
     let r = turn(s, 0, 'meeting-place')
@@ -435,7 +442,7 @@ describe("A041 command boundaries", () => {
   }
   function buy(s: GameSession, card: string) {
     const r = minor(s, card)
-    return r.state.players[0]!.minorPlayed.includes(card) ? r : choose(s, r, o => o.value === card)
+    return confirmed(r.state.players[0]!.minorPlayed.includes(card) ? r : choose(s, r, o => o.value === card))
   }
   function denied(s: GameSession, card: string) {
     const r = minor(s, card)
@@ -446,8 +453,8 @@ describe("A041 command boundaries", () => {
   function hearth(s: GameSession, actor = 0, target = 'Major_CookingHearth1') {
     const r = turn(s, actor, 'major-improvement')
     if (r.state.players[actor]!.improvements.includes(target))
-      return r
-    return choose(s, r, option => option.value === target || option.value === 'major:' + target)
+      return confirmed(r, actor)
+    return confirmed(choose(s, r, option => option.value === target || option.value === 'major:' + target), actor)
   }
   function reward(r: SessionResponse, wood: number, vegetable: number, actor = 0) {
     assert.equal(r.state.players[actor]!.resources.wood, wood)
@@ -502,9 +509,14 @@ describe("A041 command boundaries", () => {
     turn(past, 1, 'forest')
     reward(buy(past, A041), 0, 0)
     const s = setup({ fireplace: 'Major_Fireplace1' })
+    const beforeInteraction = JSON.stringify(s.getState().interaction)
+    assert.equal(s.getState().interaction.stateId, 'idle')
     const before = undoRuleSnapshot(s.getState())
     reward(hearth(s), 2, 1)
-    assertUndoRestored(before, s.undoAction())
+    const beforeRestored = s.undoAction()
+    assertUndoRestored(before, beforeRestored)
+    assert.equal(JSON.stringify(beforeRestored.interaction), beforeInteraction)
+    assert.equal(beforeRestored.state.currentPlayerIndex, 0)
     const r = hearth(s)
     assert.equal(r.state.players[0]!.improvements.includes('Major_Fireplace1'), false)
     reward(r, 2, 1)

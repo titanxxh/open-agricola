@@ -149,6 +149,12 @@ describe('A037 Bucksaw parity', () => {
 
 describe("A037 command boundaries", () => {
   const SAW = 'A037_Bucksaw'
+  function confirmed(r: SessionResponse, actor = 0) {
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, actor)
+    assert.equal(r.state.currentPlayerIndex, actor)
+    return r
+  }
   function ok(r: SessionResponse) {
     assert.equal(r.ok, true, r.error)
     return r
@@ -192,7 +198,7 @@ describe("A037 command boundaries", () => {
       r = ok(s.resolveChoice(0, candidate.value))
     }
     assert(r.state.players[0]!.minorPlayed.includes(SAW))
-    return r
+    return confirmed(r)
   }
   function denied(s: GameSession) {
     let r = ok(s.takeAction(0, 'meeting-place'))
@@ -224,13 +230,13 @@ describe("A037 command boundaries", () => {
     assert.equal(r.interaction.sourceCard, SAW)
     const enabled = options(r).filter(option => option.value !== '__skip__' && option.value !== 'skip' && !option.disabled)
     assert.equal(enabled.length, 1, JSON.stringify(r.interaction))
-    return ok(s.resolveChoice(0, enabled[0]!.value))
+    return confirmed(ok(s.resolveChoice(0, enabled[0]!.value)))
   }
   function decline(s: GameSession, r: SessionResponse) {
     r = cardMenu(s, r)
     const c = options(r).find(o => o.value === '__skip__' || o.value === 'skip')
     assert(c)
-    return ok(s.resolveChoice(0, c.value))
+    return confirmed(ok(s.resolveChoice(0, c.value)))
   }
   function saw(wood = 1, played = true, configure: (state: GameState) => void = () => {
   }) {
@@ -259,7 +265,7 @@ describe("A037 command boundaries", () => {
   })
   it("no wood gives no reward and voluntary decline preserves wood", () => {
     const none = saw(0)
-    const r = renovate(none)
+    const r = confirmed(renovate(none))
     assert.equal(r.state.players[0]!.houseType, 'clay')
     assert.equal(r.state.players[0]!.resources.grain, 0)
     assert.equal(bonus(r), 0)
@@ -272,7 +278,7 @@ describe("A037 command boundaries", () => {
   })
   it("a real owner ordinary action cannot trigger renovation reward", () => {
     const s = saw()
-    const r = ok(s.takeAction(0, 'day-laborer'))
+    const r = confirmed(ok(s.takeAction(0, 'day-laborer')))
     assert.equal(r.state.players[0]!.resources.food, 22)
     assert.equal(r.state.players[0]!.resources.wood, 1)
     assert.equal(r.state.players[0]!.resources.grain, 0)
@@ -280,8 +286,8 @@ describe("A037 command boundaries", () => {
   })
   it("actual opponent renovation cannot grant owner grain or points", () => {
     const s = saw(1, true, state => Object.assign(state.players[1]!.resources, { clay: 2, reed: 1, wood: 1 }))
-    confirmNext(s, ok(s.takeAction(0, 'day-laborer')))
-    const r = renovate(s, 1)
+    confirmNext(s, confirmed(ok(s.takeAction(0, 'day-laborer'))))
+    const r = confirmed(renovate(s, 1), 1)
     assert.equal(r.state.players[1]!.houseType, 'clay')
     assert.equal(r.state.players[1]!.resources.clay, 0)
     assert.equal(r.state.players[0]!.resources.wood, 1)
@@ -293,28 +299,29 @@ describe("A037 command boundaries", () => {
     const r = cardMenu(s, renovate(s))
     const c = options(r).find(o => o.value !== '__skip__')
     assert(c)
+    assert.notEqual(c.disabled, true)
     assertRejectedUnchanged(s, () => s.resolveChoice(1, c.value))
     assertRejectedUnchanged(s, () => s.resolveChoice(0, 'pay-two-wood'))
-    const after = ok(s.resolveChoice(0, c.value))
+    const after = confirmed(ok(s.resolveChoice(0, c.value)))
     assert.equal(bonus(after), 1)
     assertRejectedUnchanged(s, () => s.resolveChoice(0, c.value))
   })
   it("whole action undo restores wooden rooms material fee grain and point before retry", () => {
     const s = saw()
+    const beforeInteraction = JSON.stringify(s.getState().interaction)
+    assert.equal(s.getState().interaction.stateId, 'idle')
     const before = undoRuleSnapshot(s.getState())
     assert.equal(bonus(accept(s, renovate(s))), 1)
-    assertUndoRestored(before, s.undoAction())
+    const beforeRestored = s.undoAction()
+    assertUndoRestored(before, beforeRestored)
+    assert.equal(JSON.stringify(beforeRestored.interaction), beforeInteraction)
+    assert.equal(beforeRestored.state.currentPlayerIndex, 0)
     assert.equal(bonus(accept(s, renovate(s))), 1)
   })
   it("two actual renovations in one round each charge wood and award grain and point", () => {
     const s = saw(2, true, state => Object.assign(state.players[0]!.resources, { stone: 2, reed: 2 }))
     let r = accept(s, renovate(s))
     assert.equal(bonus(r), 1)
-    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice') {
-      const skip = getChoiceOptions(r).find(o => o.value === '__skip__' || o.value === 'skip')
-      assert(skip, JSON.stringify(r.interaction))
-      r = ok(s.resolveChoice(0, skip.value))
-    }
     confirmNext(s, r)
     confirmNext(s, ok(s.takeAction(1, 'day-laborer')))
     r = accept(s, renovate(s, 0, 'farm-redevelopment', 'stone'))

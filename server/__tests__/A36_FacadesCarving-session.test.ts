@@ -32,6 +32,12 @@ describe('A036_FacadesCarving prerequisite', () => {
 
 describe("A036 command boundaries", () => {
   const FACADES = 'A036_FacadesCarving'
+  function confirmed(r: SessionResponse, actor = 0) {
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, actor)
+    assert.equal(r.state.currentPlayerIndex, actor)
+    return r
+  }
   function ok(r: SessionResponse) {
     assert.equal(r.ok, true, r.error)
     return r
@@ -107,13 +113,13 @@ describe("A036 command boundaries", () => {
     assert.equal(r.interaction.sourceCard, FACADES)
     const enabled = options(r).filter(option => !option.disabled && option.effectPreview && 'resourcesPaid' in option.effectPreview && option.effectPreview.resourcesPaid?.food === amount)
     assert.equal(enabled.length, 1, JSON.stringify(r.interaction))
-    return ok(s.resolveChoice(0, enabled[0]!.value))
+    return confirmed(ok(s.resolveChoice(0, enabled[0]!.value)))
   }
   function decline(s: GameSession, r: SessionResponse) {
     r = cardMenu(s, r)
     const c = options(r).find(o => o.value === '__skip__' || o.value === 'skip')
     assert(c)
-    return ok(s.resolveChoice(0, c.value))
+    return confirmed(ok(s.resolveChoice(0, c.value)))
   }
   function facades({ wood = 8, food = 5, round = 8, played = false, reed = 1 } = {}) {
     return setup({ played, round, resources: { wood, food, clay: 2, reed } })
@@ -122,6 +128,10 @@ describe("A036 command boundaries", () => {
     denied(facades({ wood: 7 }))
     const s = facades()
     const r = buy(s)
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice')
+    assert.equal(r.interaction.sourceCard, FACADES)
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
     assert.equal(r.state.players[0]!.resources.wood, 8)
     assert.equal(r.state.players[0]!.resources.clay, 0)
     assert.equal(bonus(r), 0)
@@ -136,6 +146,7 @@ describe("A036 command boundaries", () => {
         assert.equal(menu.length, cap)
         r = accept(s, r, cap)
       }
+      confirmed(r)
       assert.equal(r.state.players[0]!.resources.food, food)
       assert.equal(r.state.players[0]!.resources.wood, round)
       assert.equal(r.state.players[0]!.resources.clay, 0)
@@ -154,7 +165,7 @@ describe("A036 command boundaries", () => {
   it("zero food and no completed harvest cannot grant free points", () => {
     for (const config of [{ food: 0, round: 8, wood: 8 }, { food: 5, round: 4, wood: 4 }]) {
       const s = facades(config)
-      const r = buy(s)
+      const r = confirmed(buy(s))
       assert.equal(r.state.players[0]!.resources.food, config.food)
       assert.equal(bonus(r), 0)
       assertRejectedUnchanged(s, () => s.resolveChoice(0, 'exchange-one-food'))
@@ -170,38 +181,44 @@ describe("A036 command boundaries", () => {
   })
   it("already played card and actual opponent ordinary action do not repeat on buy", () => {
     const s = facades({ played: true })
-    let r = ok(s.takeAction(0, 'day-laborer'))
+    let r = confirmed(ok(s.takeAction(0, 'day-laborer')))
     assert.equal(bonus(r), 0)
     confirmNext(s, r)
-    r = ok(s.takeAction(1, 'forest'))
+    r = confirmed(ok(s.takeAction(1, 'forest')), 1)
     assert.equal(r.state.players[1]!.resources.wood, 3)
     assert.equal(r.state.players[0]!.resources.food, 7)
     assert.equal(bonus(r), 0)
   })
   it("paid exchange rejects wrong actor stale replay and whole action undo retries once", () => {
     const s = facades()
+    const beforeInteraction = JSON.stringify(s.getState().interaction)
+    assert.equal(s.getState().interaction.stateId, 'idle')
     const before = undoRuleSnapshot(s.getState())
     const r = buy(s)
     const c = options(r).find(option => option.effectPreview && 'resourcesPaid' in option.effectPreview && option.effectPreview.resourcesPaid?.food === 2)
     assert(c)
+    assert.notEqual(c.disabled, true)
     assertRejectedUnchanged(s, () => s.resolveChoice(1, c.value))
-    const after = ok(s.resolveChoice(0, c.value))
+    const after = confirmed(ok(s.resolveChoice(0, c.value)))
     assert.equal(after.state.players[0]!.resources.food, 3)
     assert.equal(bonus(after), 2)
     assertRejectedUnchanged(s, () => s.resolveChoice(0, c.value))
-    assertUndoRestored(before, s.undoAction())
+    const beforeRestored = s.undoAction()
+    assertUndoRestored(before, beforeRestored)
+    assert.equal(JSON.stringify(beforeRestored.interaction), beforeInteraction)
+    assert.equal(beforeRestored.state.currentPlayerIndex, 0)
     assert.equal(bonus(accept(s, buy(s), 2)), 2)
   })
   it("two clay and zero reed permit the actual purchase", () => {
     const s = facades({ round: 4, wood: 4, reed: 0 })
-    const r = buy(s)
+    const r = confirmed(buy(s))
     const control = facades({ round: 4, wood: 4, reed: 1 })
-    assert(buy(control).state.players[0]!.minorPlayed.includes(FACADES))
+    assert(confirmed(buy(control)).state.players[0]!.minorPlayed.includes(FACADES))
     assert.deepEqual({ played: r.state.players[0]!.minorPlayed.includes(FACADES), clay: r.state.players[0]!.resources.clay, reed: r.state.players[0]!.resources.reed, wood: r.state.players[0]!.resources.wood, food: r.state.players[0]!.resources.food, bonus: bonus(r) }, { played: true, clay: 0, reed: 0, wood: 4, food: 5, bonus: 0 })
   })
   it("actual purchase consumes two clay and retains reed", () => {
     const s = facades({ round: 4, wood: 4, reed: 1 })
-    const r = buy(s)
+    const r = confirmed(buy(s))
     assert(r.state.players[0]!.minorPlayed.includes(FACADES))
     assert.deepEqual({ clay: r.state.players[0]!.resources.clay, reed: r.state.players[0]!.resources.reed, wood: r.state.players[0]!.resources.wood, food: r.state.players[0]!.resources.food, bonus: bonus(r) }, { clay: 0, reed: 1, wood: 4, food: 5, bonus: 0 })
   })

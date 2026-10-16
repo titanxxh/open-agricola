@@ -228,6 +228,18 @@ describe("A046 command boundaries", () => {
         configure(state)
       } })
   }
+  function confirmed(r: SessionResponse, actor = 0) {
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, actor)
+    assert.equal(r.state.currentPlayerIndex, actor)
+    return r
+  }
+  function newRound(r: SessionResponse) {
+    assert.equal(r.interaction.stateId, 'idle', JSON.stringify(r.interaction))
+    assert.equal(r.state.currentPlayerIndex, 0)
+    assert.equal(r.state.roundPhase, 'work')
+    return r
+  }
   function ok(r: SessionResponse) {
     assert.equal(r.ok, true, r.error)
     return r
@@ -247,7 +259,8 @@ describe("A046 command boundaries", () => {
   }
   function turn(s: GameSession, actor: number, space: string) {
     ready(s, actor)
-    return ok(s.takeAction(actor, space))
+    const r = ok(s.takeAction(actor, space))
+    return ['forest', 'grain-seeds', 'clay-pit'].includes(space) ? confirmed(r, actor) : r
   }
   function enter(s: GameSession) {
     let r = turn(s, 0, 'meeting-place')
@@ -270,7 +283,7 @@ describe("A046 command boundaries", () => {
     assert.ok(event.type === 'card.played')
     assert.equal(event.actorPlayerId, result.state.players[0]!.id)
     assert.deepEqual(event.payment?.resources ?? {}, card === KNIFE ? { wood: 1 } : {})
-    return result
+    return confirmed(result)
   }
   function printedPoint(r: SessionResponse, card: string) {
     assert.ok(r.scores)
@@ -288,7 +301,7 @@ describe("A046 command boundaries", () => {
       r = ok(s.resolveChoice(actor, 'confirm', { zones }))
     }
     assert.equal(r.state.players[actor]!.resources.sheep, discard ? 0 : count)
-    return r
+    return confirmed(r, actor)
   }
   function market(s: GameSession, actor = 0, count = 1, discard = false) {
     return settleAnimals(s, turn(s, actor, 'sheep-market'), actor, count, discard)
@@ -300,7 +313,7 @@ describe("A046 command boundaries", () => {
     const r = confirmNext(s, end)
     assert.equal(r.state.round, 6)
     assert.equal(r.state.roundPhase, 'work')
-    return r
+    return newRound(r)
   }
   it("exactly one real pasture permits paying one wood and earns one printed point", () => {
     const s = knife({ played: false, resources: { wood: 1 } })
@@ -355,6 +368,7 @@ describe("A046 command boundaries", () => {
     let r = turn(s, 0, 'cattle-market')
     if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'animal-reorg')
       r = ok(s.resolveChoice(0, 'confirm', { zones: [{ id: 'pasture-1', zoneType: 'pasture', animalType: 'cattle', animalCount: 1 }] }))
+    confirmed(r)
     assert.equal(r.state.players[0]!.resources.cattle, 1)
     assert.deepEqual(future(r, KNIFE), [])
   })

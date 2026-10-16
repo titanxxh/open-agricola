@@ -176,6 +176,12 @@ describe("A042 command boundaries", () => {
     assert.ok(action)
     action.resources[resource] = count
   }
+  function confirmed(r: SessionResponse, actor = 0) {
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, actor)
+    assert.equal(r.state.currentPlayerIndex, actor)
+    return r
+  }
   function ok(r: SessionResponse) {
     assert.equal(r.ok, true, r.error)
     return r
@@ -195,7 +201,8 @@ describe("A042 command boundaries", () => {
   }
   function turn(s: GameSession, actor: number, space: string) {
     ready(s, actor)
-    return ok(s.takeAction(actor, space))
+    const r = ok(s.takeAction(actor, space))
+    return space === 'meeting-place' ? r : confirmed(r, actor)
   }
   function enter(s: GameSession) {
     let r = turn(s, 0, 'meeting-place')
@@ -218,7 +225,7 @@ describe("A042 command boundaries", () => {
     assert.ok(event.type === 'card.played')
     assert.equal(event.actorPlayerId, result.state.players[0]!.id)
     assert.deepEqual(event.payment?.resources ?? {}, card === HUT ? { clay: 2 } : {})
-    return result
+    return confirmed(result)
   }
   function printedPoint(r: SessionResponse, card: string) {
     assert.ok(r.scores)
@@ -277,7 +284,7 @@ describe("A042 command boundaries", () => {
       } })
     const offer = enter(b)
     assert.equal(offered(offer, 'A006_StorageBarn'), true)
-    const barn = ok(b.resolveChoice(0, 'A006_StorageBarn'))
+    const barn = confirmed(ok(b.resolveChoice(0, 'A006_StorageBarn')))
     assert.deepEqual([barn.state.players[0]!.resources.wood, barn.state.players[0]!.resources.food], [1, 0])
     assert.equal(barn.state.players[1]!.minorHand.includes('A006_StorageBarn'), true)
   })

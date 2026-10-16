@@ -131,6 +131,18 @@ describe("A043 command boundaries", () => {
     p.houseAnimals = { '2-0': 'sheep' }
     p.resources.sheep = 1
   }
+  function confirmed(r: SessionResponse, actor = 0) {
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, actor)
+    assert.equal(r.state.currentPlayerIndex, actor)
+    return r
+  }
+  function newRound(r: SessionResponse) {
+    assert.equal(r.interaction.stateId, 'idle', JSON.stringify(r.interaction))
+    assert.equal(r.state.currentPlayerIndex, 0)
+    assert.equal(r.state.roundPhase, 'work')
+    return r
+  }
   function ok(r: SessionResponse) {
     assert.equal(r.ok, true, r.error)
     return r
@@ -150,7 +162,8 @@ describe("A043 command boundaries", () => {
   }
   function turn(s: GameSession, actor: number, space: string) {
     ready(s, actor)
-    return ok(s.takeAction(actor, space))
+    const r = ok(s.takeAction(actor, space))
+    return ['forest', 'grain-seeds', 'clay-pit'].includes(space) ? confirmed(r, actor) : r
   }
   function enter(s: GameSession) {
     let r = turn(s, 0, 'meeting-place')
@@ -173,7 +186,7 @@ describe("A043 command boundaries", () => {
     assert.ok(event.type === 'card.played')
     assert.equal(event.actorPlayerId, result.state.players[0]!.id)
     assert.deepEqual(event.payment?.resources ?? {}, {})
-    return result
+    return confirmed(result)
   }
   function future(r: SessionResponse, card: string) {
     return r.state.futureMeeples.filter(m => m.cardId === card && m.playerId === r.state.players[0]!.id).flatMap(m => {
@@ -199,7 +212,7 @@ describe("A043 command boundaries", () => {
     const built = ok(s.commitSelectionChoice(actor, { stables: tiles }))
     assert.equal(built.state.players[actor]!.stableTiles.length, count)
     assert.equal(built.state.players[actor]!.resources.wood, 0)
-    return built
+    return confirmed(built, actor)
   }
   function room(s: GameSession) {
     let r = turn(s, 0, 'farm-expansion')
@@ -218,7 +231,7 @@ describe("A043 command boundaries", () => {
     const r = confirmNext(s, end)
     assert.equal(r.state.round, 6)
     assert.equal(r.state.roundPhase, 'work')
-    return r
+    return newRound(r)
   }
   it("an owned accommodated animal permits the actual free purchase without a stable bonus", () => {
     const s = setup({ played: false, configure: pet })
@@ -273,7 +286,7 @@ describe("A043 command boundaries", () => {
     assert.equal(s.withCtx(() => getAvailableStableSupplyCount(s.getState().state, s.getState().state.players[0]!)), 0)
     room(s)
     assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { rooms: [], stables: [{ row: 1, col: 1 }] }))
-    const r = ok(s.commitSelectionChoice(0, { rooms: [{ row: 0, col: 0 }], stables: [] }))
+    const r = confirmed(ok(s.commitSelectionChoice(0, { rooms: [{ row: 0, col: 0 }], stables: [] })))
     assert.equal(r.state.players[0]!.stableTiles.length, 4)
     assert.equal(r.state.players[0]!.rooms, 3)
     assert.equal(r.state.players[0]!.resources.wood, 5)
@@ -282,7 +295,7 @@ describe("A043 command boundaries", () => {
   it("a completed room construction with no stable schedules no food", () => {
     const s = setup({ resources: { wood: 5, reed: 2 } })
     room(s)
-    const r = ok(s.commitSelectionChoice(0, { rooms: [{ row: 0, col: 0 }], stables: [] }))
+    const r = confirmed(ok(s.commitSelectionChoice(0, { rooms: [{ row: 0, col: 0 }], stables: [] })))
     assert.equal(r.state.players[0]!.rooms, 3)
     assert.equal(r.state.players[0]!.stableTiles.length, 0)
     assert.deepEqual(future(r, MANURE), [])
@@ -327,21 +340,27 @@ describe("A043 command boundaries", () => {
     let r = ok(s.performRoundEnd())
     const option = choices(r).find(o => o.value !== '__skip__')
     assert.ok(option)
+    assert.notEqual(option.disabled, true)
     r = ok(s.resolveChoice(0, option.value))
     assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'farm-select' && r.interaction.request.farm.farmType === 'stable')
     const tile = r.interaction.request.farm.selectableTiles[0]
     assert.ok(tile)
-    r = ok(s.commitSelectionChoice(0, { stables: [tile] }))
+    r = newRound(ok(s.commitSelectionChoice(0, { stables: [tile] })))
     assert.equal(r.state.players[0]!.stableTiles.length, 1)
     assert.equal(r.state.players[0]!.resources.wood, 0)
     assert.deepEqual(future(r, MANURE), [])
   })
   it("undo after stable payment restores the public rule snapshot only where exposed", () => {
     const s = setup({ resources: { wood: 2 } })
+    const beforeInteraction = JSON.stringify(s.getState().interaction)
+    assert.equal(s.getState().interaction.stateId, 'idle')
     const before = undoRuleSnapshot(s.getState())
     const r = build(s, 1)
     assert.deepEqual(future(r, MANURE), [6, 7, 8])
-    assertUndoRestored(before, s.undoAction())
+    const beforeRestored = s.undoAction()
+    assertUndoRestored(before, beforeRestored)
+    assert.equal(JSON.stringify(beforeRestored.interaction), beforeInteraction)
+    assert.equal(beforeRestored.state.currentPlayerIndex, 0)
     const retry = build(s, 1)
     assert.deepEqual(future(retry, MANURE), [6, 7, 8])
   })
@@ -351,7 +370,7 @@ describe("A043 command boundaries", () => {
       } })
     room(s)
     assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { rooms: [], stables: [] }))
-    const r = ok(s.commitSelectionChoice(0, { rooms: [{ row: 0, col: 0 }], stables: [] }))
+    const r = confirmed(ok(s.commitSelectionChoice(0, { rooms: [{ row: 0, col: 0 }], stables: [] })))
     assert.equal(r.state.players[0]!.rooms, 3)
     assert.equal(r.state.players[0]!.stableTiles.length, 4)
     assert.deepEqual(future(r, MANURE), [])
