@@ -584,6 +584,12 @@ describe("A032 command boundaries", () => {
 
 describe("A038 command boundaries", () => {
   const WOOL = 'A038_WoolBlankets'
+  function confirmed(r: SessionResponse, actor = 0) {
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, actor)
+    assert.equal(r.state.currentPlayerIndex, actor)
+    return r
+  }
   function ok(r: SessionResponse) {
     assert.equal(r.ok, true, r.error)
     return r
@@ -627,7 +633,7 @@ describe("A038 command boundaries", () => {
       r = ok(s.resolveChoice(0, candidate.value))
     }
     assert(r.state.players[0]!.minorPlayed.includes(WOOL))
-    return r
+    return confirmed(r)
   }
   function denied(s: GameSession) {
     let r = ok(s.takeAction(0, 'meeting-place'))
@@ -722,21 +728,39 @@ describe("A038 command boundaries", () => {
     assert.equal(cooked.state.players[0]!.resources.sheep, 0)
     assert.equal(cooked.state.players[0]!.resources.food, 30)
     assert.equal(bonus(cooked), 3)
+    assert.equal(cooked.interaction.stateId, 'idle')
+    assert.equal(cooked.state.currentPlayerIndex, 0)
     const r = renovate(s)
     assert.equal(r.state.players[0]!.houseType, 'clay')
     assert.equal(bonus(r), 2)
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice')
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
+    assert.equal(r.interaction.sourceCard, undefined)
+    assert.equal(r.interaction.promptKey, 'ui.interactionOptionalAction')
+    assert.equal(options(r).filter(option => option.labelKey === 'actions.improvement.name' && !option.disabled).length, 1)
   })
   it("actual free purchase and renovation each support whole action undo and retry", () => {
     const s = wool()
+    const beforeInteraction = JSON.stringify(s.getState().interaction)
+    assert.equal(s.getState().interaction.stateId, 'idle')
     const before = undoRuleSnapshot(s.getState())
     assert.equal(bonus(buy(s)), 3)
-    assertUndoRestored(before, s.undoAction())
+    const beforeRestored = s.undoAction()
+    assertUndoRestored(before, beforeRestored)
+    assert.equal(JSON.stringify(beforeRestored.interaction), beforeInteraction)
+    assert.equal(beforeRestored.state.currentPlayerIndex, 0)
     assert.equal(bonus(buy(s)), 3)
     const reno = wool({ played: true }, state => Object.assign(state.players[0]!.resources, { clay: 2, reed: 1 }))
+    const snapshotInteraction = JSON.stringify(reno.getState().interaction)
+    assert.equal(reno.getState().interaction.stateId, 'idle')
     const snapshot = undoRuleSnapshot(reno.getState())
-    assert.equal(bonus(renovate(reno)), 2)
-    assertUndoRestored(snapshot, reno.undoAction())
-    assert.equal(bonus(renovate(reno)), 2)
+    assert.equal(bonus(confirmed(renovate(reno))), 2)
+    const snapshotRestored = reno.undoAction()
+    assertUndoRestored(snapshot, snapshotRestored)
+    assert.equal(JSON.stringify(snapshotRestored.interaction), snapshotInteraction)
+    assert.equal(snapshotRestored.state.currentPlayerIndex, 0)
+    assert.equal(bonus(confirmed(renovate(reno))), 2)
   })
 })
 
@@ -776,6 +800,12 @@ describe("A039 command boundaries", () => {
         state.actionSpaces.find(space => space.id === 'forest')!.resources.wood = 3
       } }))
   }
+  function confirmed(r: SessionResponse, actor = 0) {
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, actor)
+    assert.equal(r.state.currentPlayerIndex, actor)
+    return r
+  }
   function ok(r: SessionResponse) {
     assert.equal(r.ok, true, r.error)
     return r
@@ -803,7 +833,8 @@ describe("A039 command boundaries", () => {
   }
   function turn(s: GameSession, actor: number, space: string) {
     ready(s, actor)
-    return ok(s.takeAction(actor, space))
+    const r = ok(s.takeAction(actor, space))
+    return space === 'meeting-place' ? r : confirmed(r, actor)
   }
   function minor(s: GameSession, card: string) {
     let r = turn(s, 0, 'meeting-place')
@@ -813,7 +844,7 @@ describe("A039 command boundaries", () => {
   }
   function buy(s: GameSession, card: string) {
     const r = minor(s, card)
-    return r.state.players[0]!.minorPlayed.includes(card) ? r : choose(s, r, o => o.value === card)
+    return confirmed(r.state.players[0]!.minorPlayed.includes(card) ? r : choose(s, r, o => o.value === card))
   }
   function denied(s: GameSession, card: string) {
     const r = minor(s, card)
@@ -825,12 +856,21 @@ describe("A039 command boundaries", () => {
     assert.ok(r.scores)
     return r.scores[actor]!.categories.find(c => c.key === 'cardBonusVp')?.entries.find(e => e.type === 'bonus' && e.cardId === A039)?.score ?? 0
   }
-  function chapelUndo(before: string, after: SessionResponse) {
-    assert.equal(after.ok, true, after.error)
-    const normalize = (snapshot: string) => JSON.parse(snapshot, (key, value: unknown) => key === 'blockedBy' && Array.isArray(value) && value.length === 0 ? undefined : value)
-    assert.deepEqual(normalize(undoRuleSnapshot(after)), normalize(before))
-    const packet = after.state.publicEventArchive.at(-1)
-    assert.ok(packet?.type === 'publicEvents.canceled' && packet.reason === 'undoAction')
+
+  function chapelRestoreSnapshot(r: SessionResponse) {
+    const chapel = r.state.actionSpaces.find(space => space.id === A039)
+    assert.ok(chapel)
+    assert.equal(chapel.blockedBy, undefined)
+    // #1258: restore currently adds only this public space's empty blocker list.
+    return undoRuleSnapshot({
+      ...r,
+      state: {
+        ...r.state,
+        actionSpaces: r.state.actionSpaces.map(space => space.id === A039
+          ? { ...space, blockedBy: [] }
+          : space),
+      },
+    })
   }
   function occupants(r: SessionResponse) {
     return r.state.actionSpaces.find(a => a.id === A039)!.takenBy.length
@@ -861,6 +901,7 @@ describe("A039 command boundaries", () => {
     const s = setup({ opponent: { grain: 1 } })
     turn(s, 0, 'forest')
     ready(s, 1)
+    assert.equal(s.getActionAvailability(1)[A039], true)
     assertRejectedUnchanged(s, () => s.takeAction(0, A039))
     const r = turn(s, 1, A039)
     assert.equal(r.state.players[0]!.resources.grain, 1)
@@ -882,16 +923,26 @@ describe("A039 command boundaries", () => {
   })
   it("undo restores owner use and guest transfer before a single replay award", () => {
     const owner = setup()
-    const before = undoRuleSnapshot(owner.getState())
+    const beforeInteraction = JSON.stringify(owner.getState().interaction)
+    assert.equal(owner.getState().interaction.stateId, 'idle')
+    const before = chapelRestoreSnapshot(owner.getState())
     turn(owner, 0, A039)
-    chapelUndo(before, owner.undoAction())
+    const beforeRestored = owner.undoAction()
+    assertUndoRestored(before, beforeRestored)
+    assert.equal(JSON.stringify(beforeRestored.interaction), beforeInteraction)
+    assert.equal(beforeRestored.state.currentPlayerIndex, 0)
     assert.equal(bonus(turn(owner, 0, A039)), 3)
     const s = setup({ opponent: { grain: 1 } })
     turn(s, 0, 'forest')
     ready(s, 1)
-    const guestBefore = undoRuleSnapshot(s.getState())
+    const guestBeforeInteraction = JSON.stringify(s.getState().interaction)
+    assert.equal(s.getState().interaction.stateId, 'idle')
+    const guestBefore = chapelRestoreSnapshot(s.getState())
     turn(s, 1, A039)
-    chapelUndo(guestBefore, s.undoAction())
+    const guestBeforeRestored = s.undoAction()
+    assertUndoRestored(guestBefore, guestBeforeRestored)
+    assert.equal(JSON.stringify(guestBeforeRestored.interaction), guestBeforeInteraction)
+    assert.equal(guestBeforeRestored.state.currentPlayerIndex, 1)
     const r = turn(s, 1, A039)
     assert.equal(bonus(r, 1), 3)
     assert.equal(r.state.players[0]!.resources.grain, 1)

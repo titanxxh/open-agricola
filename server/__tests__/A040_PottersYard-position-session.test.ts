@@ -12,7 +12,7 @@ import { Scoring } from '../../shared/domain/scoring'
 import { type MoorSpecialActionId } from '../../shared/moor/types'
 import { type GameState, type PlayerState } from '../../shared/contract/types'
 import assert from 'node:assert/strict'
-import { assertRejectedUnchanged, confirmNext, undoRuleSnapshot, getChoiceOptions } from './_helpers/session-assertions'
+import { assertRejectedUnchanged, assertUndoRestored, confirmNext, undoRuleSnapshot, getChoiceOptions } from './_helpers/session-assertions'
 import { createScenarioEvidence } from './_helpers/scenario-evidence'
 import { expectWait } from './_helpers/trigger-select'
 
@@ -635,6 +635,12 @@ describe("A040 command boundaries", () => {
   const edges = ['H-1-1', 'H-2-1', 'V-1-1', 'V-1-2']
   const fieldTiles = [0, 1, 2, 3, 4].map(col => ({ row: 0, col })).concat({ row: 1, col: 4 })
 
+  function confirmed(r: SessionResponse, actor = 0) {
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, actor)
+    assert.equal(r.state.currentPlayerIndex, actor)
+    return r
+  }
   function ok(r: SessionResponse) {
     assert.equal(r.ok, true, r.error)
     return r
@@ -672,7 +678,7 @@ describe("A040 command boundaries", () => {
   }
   function buy(s: GameSession, card: string) {
     const r = minor(s, card)
-    return r.state.players[0]!.minorPlayed.includes(card) ? r : choose(s, r, o => o.value === card)
+    return confirmed(r.state.players[0]!.minorPlayed.includes(card) ? r : choose(s, r, o => o.value === card))
   }
   function denied(s: GameSession, card: string) {
     const r = minor(s, card)
@@ -680,13 +686,7 @@ describe("A040 command boundaries", () => {
     assertRejectedUnchanged(s, () => s.resolveChoice(0, card))
     assert.ok(s.getState().state.players[0]!.minorHand.includes(card))
   }
-  function purchasedCardUndo(before: string, after: SessionResponse) {
-    assert.equal(after.ok, true, after.error)
-    const normalize = (snapshot: string) => JSON.parse(snapshot, (key, value: unknown) => key === 'playedCards' ? undefined : value)
-    assert.deepEqual(normalize(undoRuleSnapshot(after)), normalize(before))
-    const packet = after.state.publicEventArchive.at(-1)
-    assert.ok(packet?.type === 'publicEvents.canceled' && packet.reason === 'undoAction')
-  }
+
   function remaining(r: SessionResponse) {
     return (r.state.players[0]!.farmyardSpaceStates ?? []).filter(token => token.sourceCardId === A040 && token.kind === 'farmyard-goods-token').reduce((sum, token) => sum + (token.resources?.clay ?? 0), 0)
   }
@@ -731,7 +731,7 @@ describe("A040 command boundaries", () => {
     assert.equal(remaining(r), 7)
     if (opponentPlow) {
       turn(s, 1, 'farmland')
-      ok(s.commitSelectionChoice(1, { tile: { row: 0, col: 0 } }))
+      confirmed(ok(s.commitSelectionChoice(1, { tile: { row: 0, col: 0 } })), 1)
     }
     else
       turn(s, 1, 'forest')
@@ -745,13 +745,20 @@ describe("A040 command boundaries", () => {
     return r
   }
   function finish(s: GameSession, r: SessionResponse) {
-    for (let n = 0; n < 3 && opts(r).some(o => o.value === '__skip__'); n++)
-      r = ok(s.resolveChoice(r.interaction.stateId === 'wait' ? r.interaction.playerIndex : 0, '__skip__'))
-    return r
+    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice') {
+      assert.equal(r.interaction.sourceCard, A040)
+      assert.equal(r.interaction.playerIndex, 0)
+      assert.equal(r.state.currentPlayerIndex, 0)
+      assert.ok(opts(r).some(option => option.value === '__skip__' && !option.disabled))
+      r = ok(s.resolveChoice(0, '__skip__'))
+    }
+    return confirmed(r)
   }
   function exchange(s: GameSession, r: SessionResponse, partial = false) {
     assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice', JSON.stringify(r.interaction))
     assert.equal(r.interaction.sourceCard, A040)
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
     if (partial)
       assert.equal(r.state.players[0]!.resources.clay, 2)
     const choices = opts(r).filter(option => !option.disabled && option.effectPreview?.kind === 'resourceExchange' && option.effectPreview.resourcesPaid?.clay === 1 && option.effectPreview.resourcesGained?.food === 2)
@@ -787,6 +794,7 @@ describe("A040 command boundaries", () => {
     const pending = ok(s.commitSelectionChoice(0, { stables: [tile] }))
     const old = opts(pending).find(o => o.value !== '__skip__')
     assert.ok(old)
+    assert.notEqual(old.disabled, true)
     const r = exchange(s, pending)
     assert.equal(r.state.players[0]!.stableTiles.length, 1)
     assert.equal(r.state.players[0]!.resources.wood, 0)
@@ -838,10 +846,26 @@ describe("A040 command boundaries", () => {
   it("undo restores newly used tile and clay before replay without exchange", () => {
     const s = boughtPotter(potter())
     ready(s, 0)
-    const before = undoRuleSnapshot(s.getState())
+    const beforeInteraction = JSON.stringify(s.getState().interaction)
+    assert.equal(s.getState().interaction.stateId, 'idle')
+    const initial = s.getState()
+    assert.deepEqual(initial.state.players[0]!.playedCards, [])
+    // #1258: restore currently rebuilds this purchase's canonical card alias.
+    const before = undoRuleSnapshot({
+      ...initial,
+      state: {
+        ...initial.state,
+        players: initial.state.players.map((player, index) => index === 0
+          ? { ...player, playedCards: ['minor:A040_PottersYard'] }
+          : player),
+      },
+    })
     turn(s, 0, 'farmland')
     exchange(s, plow(s))
-    purchasedCardUndo(before, s.undoAction())
+    const beforeRestored = s.undoAction()
+    assertUndoRestored(before, beforeRestored)
+    assert.equal(JSON.stringify(beforeRestored.interaction), beforeInteraction)
+    assert.equal(beforeRestored.state.currentPlayerIndex, 0)
     turn(s, 0, 'farmland')
     const r = finish(s, plow(s))
     assert.equal(r.state.players[0]!.fields.length, 7)
