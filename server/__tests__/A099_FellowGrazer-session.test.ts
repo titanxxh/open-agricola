@@ -152,6 +152,17 @@ describe("A099 command boundaries", () => {
     it("own card in hand and opponent pasture do not grant owner points", () => {
         const tiles = [{ row: 0, col: 1 }, { row: 0, col: 2 }, { row: 0, col: 3 }];
         assert.equal(bonus(setup(state => pasture(state, tiles), false).getState(), GRAZER), 0);
+        const opponentPasture = setup(state => pasture(state, tiles, 1)).getState();
+        assert.deepEqual(opponentPasture.state.players.map(player => player.occupationPlayed), [[GRAZER], []]);
+        assert.deepEqual(opponentPasture.state.players.map(player => player.pastures.map(pasture => pasture.tiles)), [[], [tiles]]);
+        assert.deepEqual(opponentPasture.state.players[1]!.fenceSegments.map(segment => segment.edge).sort(), [
+            'H-0-1', 'H-0-2', 'H-0-3', 'H-1-1', 'H-1-2', 'H-1-3', 'V-0-1', 'V-0-4',
+        ]);
+        assert.equal(bonus(opponentPasture, GRAZER), 0);
+        assert.equal(bonus(opponentPasture, GRAZER, 1), 0);
+        assert.equal(opponentPasture.interaction.stateId, 'idle');
+        assert.equal(opponentPasture.state.currentPlayerIndex, 0);
+        save('A099-N3-opponent-only', opponentPasture);
         const response = setup(state => pasture(state, tiles, 1), true, 1).getState();
         assert.equal(bonus(response, GRAZER), 0);
         assert.equal(bonus(response, GRAZER, 1), 2);
