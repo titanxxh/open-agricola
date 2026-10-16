@@ -36,7 +36,24 @@ it('rejects duplicate dynamic identities and unexplained deduplication', () => {
   expect(deduplicated.stderr).toContain('requires rationale')
 })
 
-it('executes nested original cases and rejects a candidate changed after assembly', () => {
+it('checks the checked-in migration inventory in the ordinary fast suite', () => {
+  const result = spawnSync(process.execPath, ['scripts/audit-migration.mjs', 'check'], { encoding: 'utf8' })
+  expect(result.status, result.stderr).toBe(0)
+  expect(JSON.parse(result.stdout)).toMatchObject({ sourceFiles: 279, sourceCases: 3252 })
+})
+
+it('requires an explicit deduplication explanation when native targets are shared', () => {
+  const target = { batch: 'M01', status: 'migrated', targetFile: 'server/__tests__/B026_AgrarianFences-quota-session.test.ts', targetTitle: 'rejects invalid payment and retries' }
+  const first = { ...target, title: 'card N1 rejects invalid payment' }
+  const second = { ...target, title: 'card N2 allows valid retry' }
+  const duplicate = run(manifest([first, second]))
+  expect(duplicate.status).toBe(1)
+  expect(duplicate.stderr).toContain('duplicate native target requires existing-coverage and rationale')
+  const explained = run(manifest([first, { ...second, status: 'existing-coverage', rationale: 'The same native scenario asserts rejection before the successful retry.' }]))
+  expect(explained.status, explained.stderr).toBe(0)
+})
+
+const createFixture = () => {
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'audit-overlay-cli-'))
   roots.push(temporary)
   const checkout = path.join(temporary, 'checkout')
@@ -48,6 +65,7 @@ it('executes nested original cases and rejects a candidate changed after assembl
   }
   write('scripts/audit-migration.mjs', fs.readFileSync('scripts/audit-migration.mjs', 'utf8'))
   write('package.json', '{"type":"module"}')
+  write('vitest.config.ts', "import { defineConfig } from 'vitest/config'\nexport default defineConfig({ test: { projects: [{ extends: true, test: { name: 'fast-server', include: ['server/__tests__/*.test.ts'] } }] } })\n")
   write('.gitignore', 'node_modules/\n')
   write('tsconfig.server.json', JSON.stringify({ compilerOptions: { target: 'ES2023', module: 'ESNext', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true, types: ['node'] } }))
   write('shared/cards/__tests__/setup-register-all.ts', 'export {}')
@@ -69,6 +87,81 @@ it('executes nested original cases and rejects a candidate changed after assembl
   fixtureManifest.files[0].sha256 = createHash('sha256').update(source).digest('hex')
   write('cases.json', JSON.stringify(fixtureManifest))
   const cli = (command: string, runOutput = output) => spawnSync(process.execPath, ['scripts/audit-migration.mjs', command, '--manifest', path.join(checkout, 'cases.json'), '--output', runOutput], { cwd: checkout, encoding: 'utf8' })
+  return { checkout, output, write, git, cli, fixtureManifest }
+}
+
+it('rejects an external-looking output whose existing ancestor links into Git', () => {
+  const { checkout, output, cli } = createFixture()
+  const link = path.join(path.dirname(output), 'checkout-link')
+  fs.symlinkSync(checkout, link, 'dir')
+  const result = cli('prepare', path.join(link, 'nested', 'run'))
+  expect(result.status).toBe(1)
+  expect(result.stderr).toContain('overlay and evidence must be outside Git')
+  expect(fs.existsSync(path.join(checkout, 'nested'))).toBe(false)
+})
+
+it.each(['working-tree', 'HEAD'])('rejects a sealed run after the live checkout changes: %s', change => {
+  const { write, git, cli } = createFixture()
+  write('server/rules.ts', 'export const payment = 1')
+  const prepared = cli('prepare')
+  expect(prepared.status, prepared.stderr).toBe(0)
+  if (change === 'working-tree') write('server/rules.ts', 'export const payment = 2')
+  else git('-c', 'user.name=Migration test', '-c', 'user.email=migration@example.invalid', 'commit', '--quiet', '--no-gpg-sign', '--allow-empty', '-m', 'new candidate HEAD')
+  const verified = cli('verify')
+  expect(verified.status).toBe(1)
+  expect(verified.stderr).toContain('live checkout changed since assembly')
+}, 30000)
+
+it.each(['text fixture', 'ignored SQL fixture', 'symbolic link'])('rejects a new candidate input outside code/JSON: %s', addition => {
+  const { output, write, cli } = createFixture()
+  write('.gitignore', 'node_modules/\n*.sql\n')
+  const prepared = cli('prepare')
+  expect(prepared.status, prepared.stderr).toBe(0)
+  const candidate = path.join(output, 'candidate')
+  if (addition === 'symbolic link') fs.symlinkSync('package.json', path.join(candidate, 'fixture-link.txt'))
+  else fs.writeFileSync(path.join(candidate, addition === 'text fixture' ? 'payment.txt' : 'payment.sql'), 'payment changes the rule result')
+  const verified = cli('verify')
+  expect(verified.status).toBe(1)
+  expect(verified.stderr).toContain('candidate source inventory changed since assembly')
+}, 30000)
+
+it('runs native destinations with their owning projects and isolation', () => {
+  const { output, write, cli, fixtureManifest } = createFixture()
+  const executionLog = path.join(path.dirname(output), 'execution.log')
+  write('vitest.config.ts', `import { defineConfig } from 'vitest/config'
+export default defineConfig({ test: { maxWorkers: 1, fileParallelism: false, projects: [
+  { extends: true, test: { name: 'fast-server', include: ['server/__tests__/fast-*.test.ts'], setupFiles: ['./fast-setup.ts'] } },
+  { extends: true, test: { name: 'slow', include: ['server/__tests__/slow-*.test.ts'], setupFiles: ['./slow-setup.ts'], isolate: false } },
+] } })`)
+  write('fast-setup.ts', "process.env.NATIVE_OWNER = 'fast-server'")
+  write('slow-setup.ts', "process.env.NATIVE_OWNER = 'slow'")
+  write('server/__tests__/visits.ts', 'export const visits: string[] = []')
+  const destinations = ['fast-one', 'fast-two', 'slow-one', 'slow-two']
+  fixtureManifest.files[0].cases = destinations.map(name => {
+    const targetFile = `server/__tests__/${name}.test.ts`
+    const owner = name.startsWith('fast') ? 'fast-server' : 'slow'
+    write(targetFile, `import fs from 'node:fs'
+import { it, expect } from 'vitest'
+import { visits } from './visits'
+it('${name}', () => {
+  expect(process.env.NATIVE_OWNER).toBe('${owner}')
+  visits.push('${name}')
+  fs.appendFileSync(${JSON.stringify(executionLog)}, '${owner}:' + visits.length + '\\n')
+})`)
+    return { title: `original ${name}`, batch: 'M01', status: 'migrated', targetFile, targetTitle: name }
+  })
+  fixtureManifest.source.cases = destinations.length
+  write('cases.json', JSON.stringify(fixtureManifest))
+  const prepared = cli('prepare')
+  expect(prepared.status, prepared.stderr).toBe(0)
+  const verified = cli('verify')
+  expect(verified.status, `${verified.stderr}\n${verified.stdout}`).toBe(0)
+  expect(JSON.parse(verified.stdout)).toMatchObject({ passed: 4, coveredSourceCases: 4, includedTypeRoots: 4 })
+  expect(fs.readFileSync(executionLog, 'utf8').trim().split('\n').sort()).toEqual(['fast-server:1', 'fast-server:1', 'slow:1', 'slow:2'])
+}, 30000)
+
+it('executes nested original cases and rejects a candidate changed after assembly', () => {
+  const { checkout, output, cli } = createFixture()
   const internalOutput = path.join(checkout, '..artifacts')
   const internal = cli('prepare', internalOutput)
   expect.soft(internal.status).toBe(1)

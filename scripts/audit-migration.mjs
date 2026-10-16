@@ -20,6 +20,7 @@ function readManifest(file, targetRoot = root) {
   if (!/^[a-f0-9]{40}$/.test(manifest.source.commit)) fail('source commit must be a full SHA')
   const identities = new Set()
   const sourceFiles = new Set()
+  const migratedTargets = new Set()
   let remaining = 0, resolved = 0
   for (const group of manifest.files) {
     if (!safeRelative(group.file) || !group.file.startsWith('ae-negative-') || !Array.isArray(group.cases)) fail('invalid source file group')
@@ -35,6 +36,11 @@ function readManifest(file, targetRoot = root) {
       if (!['migrated', 'existing-coverage'].includes(item.status)) fail(`invalid migration status: ${item.status}`)
       if (!safeRelative(item.targetFile) || !item.targetFile.startsWith('server/') || typeof item.targetTitle !== 'string' || !item.targetTitle) fail(`${item.title}: requires targetFile and targetTitle`)
       if (item.status === 'existing-coverage' && (typeof item.rationale !== 'string' || !item.rationale.trim())) fail(`${item.title}: existing-coverage requires rationale`)
+      if (item.status === 'migrated') {
+        const target = `${item.targetFile}\0${item.targetTitle}`
+        if (migratedTargets.has(target)) fail(`${item.title}: duplicate native target requires existing-coverage and rationale`)
+        migratedTargets.add(target)
+      }
       if (!fs.existsSync(path.join(targetRoot, item.targetFile))) fail(`native target missing: ${item.targetFile}`)
       resolved++
     }
@@ -76,33 +82,43 @@ function sourceInventory(candidate) {
       if (entry.name === 'node_modules' || entry.name === '.git') continue
       const file = path.join(directory, entry.name)
       if (entry.isDirectory()) scan(file)
-      else if (entry.isFile() && /\.(?:[cm]?[jt]sx?|json)$/.test(entry.name)) found.push(path.relative(candidate, file).split(path.sep).join('/'))
+      else if (entry.isFile() || entry.isSymbolicLink()) found.push(path.relative(candidate, file).split(path.sep).join('/'))
     }
   }
   scan(candidate)
-  const ignored = spawnSync('git', ['check-ignore', '--no-index', '-z', '--stdin'], { cwd: root, input: `${found.join('\0')}\0`, encoding: 'utf8' })
-  if (ignored.status !== 0 && ignored.status !== 1) fail(`cannot inspect source inventory: ${ignored.stderr}`)
-  const excluded = new Set(ignored.stdout.split('\0').filter(Boolean))
-  return found.filter(file => !excluded.has(file)).sort()
+  return found.sort()
+}
+
+const inputDigest = file => fs.lstatSync(file).isSymbolicLink() ? digest(`symlink\0${fs.readlinkSync(file)}`) : digest(fs.readFileSync(file))
+
+function checkoutFiles() {
+  return git('ls-files', '--cached', '--others', '--exclude-standard', '-z').toString().split('\0').filter(Boolean).sort()
+    .filter(file => fs.existsSync(path.join(root, file)) && fs.statSync(path.join(root, file)).isFile())
+    .map(file => [file, digest(fs.readFileSync(path.join(root, file)))])
 }
 
 function prepare(manifest, output) {
   if (!output || !path.isAbsolute(output)) fail('--output must be an absolute path outside the checkout')
+  const suffix = []
+  let ancestor = path.resolve(output)
+  while (!fs.existsSync(ancestor)) {
+    suffix.unshift(path.basename(ancestor))
+    ancestor = path.dirname(ancestor)
+  }
+  output = path.join(fs.realpathSync(ancestor), ...suffix)
   const commonGit = path.resolve(root, git('rev-parse', '--git-common-dir').toString().trim())
   for (const checkout of [root, path.dirname(commonGit)]) {
-    const relative = path.relative(checkout, output)
+    const relative = path.relative(fs.realpathSync(checkout), output)
     const outside = relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)
     if (!outside) fail('overlay and evidence must be outside Git')
   }
   if (fs.existsSync(output)) fail('output already exists; select a fresh run directory')
   const candidate = path.join(output, 'candidate')
-  const tracked = git('ls-files', '--cached', '--others', '--exclude-standard', '-z').toString().split('\0').filter(Boolean)
-  const fingerprints = []
+  const fingerprints = checkoutFiles()
+  const tracked = fingerprints.map(([file]) => file)
   for (const file of tracked) {
     const from = path.join(root, file)
-    if (!fs.existsSync(from) || !fs.statSync(from).isFile()) continue
     const bytes = fs.readFileSync(from)
-    fingerprints.push([file, digest(bytes)])
     write(path.join(candidate, file), bytes)
   }
   fs.symlinkSync(path.join(root, 'node_modules'), path.join(candidate, 'node_modules'), 'dir')
@@ -128,12 +144,28 @@ function prepare(manifest, output) {
   const setupFiles = ['./shared/cards/__tests__/setup-register-all.ts', './shared/cards/__tests__/setup-listener-purity.ts']
   const projects = []
   if (remainingFiles.length) projects.push({ extends: true, test: { name: 'remaining', include: remainingFiles, testNamePattern: `^(?:${escaped.join('|')})$`, setupFiles, isolate: false } })
-  if (nativeFiles.length) projects.push({ extends: true, test: { name: 'native', include: nativeFiles, setupFiles, isolate: false } })
-  write(path.join(candidate, 'vitest.migration.config.ts'), `import { defineConfig } from 'vitest/config'\nexport default defineConfig(${JSON.stringify({ test: { projects } })})\n`)
+  write(path.join(candidate, 'vitest.migration.config.ts'), `import { defineConfig } from 'vitest/config'
+import { globSync } from 'glob'
+import base from './vitest.config.ts'
+const nativeFiles = ${JSON.stringify(nativeFiles)}
+const projects = ${JSON.stringify(projects)}
+const owners = new Map(nativeFiles.map(file => [file, 0]))
+if (nativeFiles.length) for (const project of base.test?.projects ?? []) {
+  if (typeof project !== 'object' || !project || !('test' in project)) throw new Error('migration requires explicit native project configuration')
+  const settings = project.test ?? {}
+  const discovered = new Set(globSync(settings.include ?? [], { cwd: import.meta.dirname, ignore: [...(base.test?.exclude ?? []), ...(settings.exclude ?? [])], nodir: true, posix: true }))
+  const include = nativeFiles.filter(file => discovered.has(file))
+  if (!include.length) continue
+  for (const file of include) owners.set(file, (owners.get(file) ?? 0) + 1)
+  projects.push({ ...project, test: { ...settings, include } })
+}
+for (const [file, count] of owners) if (count !== 1) throw new Error('native target must belong to exactly one normal test project: ' + file)
+export default defineConfig({ ...base, test: { ...base.test, projects } })
+`)
   const includes = [...remainingFiles, ...nativeFiles]
   json(path.join(candidate, 'tsconfig.migration.json'), { extends: './tsconfig.server.json', compilerOptions: { noUnusedLocals: false, noUnusedParameters: false, incremental: false }, include: includes, exclude: [] })
-  const covered = [...new Set([...tracked, ...remainingFiles, helper, 'vitest.migration.config.ts', 'tsconfig.migration.json'])].filter(file => fs.existsSync(path.join(candidate, file)) && fs.statSync(path.join(candidate, file)).isFile()).sort()
-  const candidateFingerprints = covered.map(file => [file, digest(fs.readFileSync(path.join(candidate, file)))])
+  const inventory = sourceInventory(candidate)
+  const candidateFingerprints = inventory.map(file => [file, inputDigest(path.join(candidate, file))])
   json(path.join(output, 'cases.json'), manifest)
   json(path.join(output, 'assembly.json'), { candidateCommit: git('rev-parse', 'HEAD').toString().trim(), candidateFingerprint: digest(JSON.stringify(fingerprints)), candidateFiles: fingerprints, assembledFiles: candidateFingerprints, assembledFingerprint: digest(JSON.stringify(candidateFingerprints)), sourceInventory: sourceInventory(candidate), runManifestSha256: digest(fs.readFileSync(path.join(output, 'cases.json'))), source: manifest.source, sourceFiles: sourceDigests, remainingFiles, nativeFiles, remainingCases: titles.length, createdAt: new Date().toISOString() })
   return { candidate, remainingFiles: remainingFiles.length, nativeFiles: nativeFiles.length, remainingCases: titles.length }
@@ -150,10 +182,11 @@ function verify(output) {
   if (!fs.existsSync(path.join(output, 'assembly.json'))) fail('run prepare before verify')
   const assembly = JSON.parse(fs.readFileSync(path.join(output, 'assembly.json'), 'utf8'))
   const assertCandidate = () => {
+    if (git('rev-parse', 'HEAD').toString().trim() !== assembly.candidateCommit || digest(JSON.stringify(checkoutFiles())) !== assembly.candidateFingerprint) fail('live checkout changed since assembly; prepare a fresh run')
     const runManifest = path.join(output, 'cases.json')
     if (!fs.existsSync(runManifest) || digest(fs.readFileSync(runManifest)) !== assembly.runManifestSha256) fail('run manifest changed since assembly')
     if (JSON.stringify(sourceInventory(candidate)) !== JSON.stringify(assembly.sourceInventory)) fail('candidate source inventory changed since assembly')
-    for (const [file, expected] of assembly.assembledFiles) if (!fs.existsSync(path.join(candidate, file)) || digest(fs.readFileSync(path.join(candidate, file))) !== expected) fail(`candidate changed since assembly: ${file}`)
+    for (const [file, expected] of assembly.assembledFiles) if (inputDigest(path.join(candidate, file)) !== expected) fail(`candidate changed since assembly: ${file}`)
   }
   assertCandidate()
   const types = command(candidate, ['exec', 'tsc', '-p', 'tsconfig.migration.json', '--pretty', 'false'], path.join(output, 'types.log'))
