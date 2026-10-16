@@ -244,6 +244,14 @@ describe('A060 command boundaries', () => {
     assert.equal(s.getState().state.roundPhase, 'work')
     return s
   }
+  function confirmed(r: SessionResponse, actor = 0) {
+    assert.equal(r.ok, true, r.error)
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, actor)
+    assert.equal(r.state.currentPlayerIndex, actor)
+    assert.equal(r.interaction.request.nextPlayerIndex, 1 - actor)
+    return r
+  }
   function ok(r: SessionResponse) {
     assert.equal(r.ok, true, r.error)
     return r
@@ -309,11 +317,7 @@ describe('A060 command boundaries', () => {
     }
     assert.equal(r.state.players[0]!.minorPlayed.includes(card), true)
     assert.equal(r.state.players[0]!.minorHand.includes(card), false)
-    assert.ok(
-      r.interaction.stateId === 'wait' &&
-        r.interaction.request.kind === 'confirm-next-player',
-      JSON.stringify(r.interaction),
-    )
+    confirmed(r)
     const e = r.state.events.find(
       (e) => e.type === 'card.played' && e.cardId === card,
     )
@@ -351,11 +355,14 @@ describe('A060 command boundaries', () => {
       assert.ok(option, JSON.stringify(r.interaction))
       r = ok(s.resolveChoice(actor, option.value))
     }
-    assert.ok(
-      r.interaction.stateId === 'wait' &&
-        r.interaction.request.kind === 'confirm-next-player',
-      JSON.stringify(r.interaction),
-    )
+    confirmed(r, actor)
+    return r
+  }
+  function idle(r: SessionResponse) {
+    assert.equal(r.ok, true, r.error)
+    assert.equal(r.interaction.stateId, 'idle', JSON.stringify(r.interaction))
+    assert.equal(r.state.currentPlayerIndex, 0)
+    assert.equal(r.state.roundPhase, 'work')
     return r
   }
   function cook(s: GameSession, from: 'vegetable' | 'sheep' | 'cattle') {
@@ -363,7 +370,7 @@ describe('A060 command boundaries', () => {
     const options = opts(r)
     assert.ok(options.length)
     const index = from === 'vegetable' ? 0 : from === 'sheep' ? 1 : 2
-    const result = ok(s.resolveChoice(0, `bulk:${index}=1`))
+    const result = idle(ok(s.resolveChoice(0, `bulk:${index}=1`)))
     assert.equal(values(result)[from], 0)
     return result
   }
@@ -540,7 +547,7 @@ describe('A060 command boundaries', () => {
       opts(pending).some((o) => JSON.stringify(o).includes('boar')),
       false,
     )
-    const r = ok(s.resolveChoice(0, 'bulk:0=1'))
+    const r = idle(ok(s.resolveChoice(0, 'bulk:0=1')))
     assert.equal(values(r).vegetable, 0)
     assert.equal(values(r).food, 24)
     assert.equal(values(r).boar, 1)
@@ -578,6 +585,7 @@ describe('A060 command boundaries', () => {
         .interaction.anytimeActions.some((a) => a.sourceCard === CARD_ID),
       false,
     )
+    idle(s.getState())
     assert.ok(s.getState().state.players[0]!.minorHand.includes(CARD_ID))
     return void sessionEvidence.record('observed outcome', {
       orientalCookSourceOffered: false,
@@ -586,9 +594,16 @@ describe('A060 command boundaries', () => {
   })
   it('undo restores actual replacement payment and permits one purchase retry', () => {
     const s = setup({ played: false, majors: [FIRE] })
-    const before = undoRuleSnapshot(s.getState())
+    const initial = idle(s.getState())
+    const beforeInteraction = JSON.stringify(initial.interaction)
+    const before = undoRuleSnapshot(initial)
     buy(s, CARD_ID)
-    assertUndoRestored(before, s.undoAction())
+    const restored = s.undoAction()
+    assertUndoRestored(before, restored)
+    assert.equal(JSON.stringify(restored.interaction), beforeInteraction)
+    assert.equal(JSON.stringify(s.getState().interaction), beforeInteraction)
+    assert.equal(restored.state.currentPlayerIndex, 0)
+    assert.equal(s.getState().state.currentPlayerIndex, 0)
     const r = buy(s, CARD_ID)
     assert.equal(
       r.state.players[0]!.minorPlayed.filter((c) => c === CARD_ID).length,
@@ -622,7 +637,7 @@ describe('A060 command boundaries', () => {
     assertRejectedUnchanged(s, () =>
       s.resolveChoice(0, own.value.split('~')[0] + '~foreign-unissued-payment'),
     )
-    r = ok(s.resolveChoice(0, own.value))
+    r = confirmed(ok(s.resolveChoice(0, own.value)))
     assert.ok(r.state.players[0]!.minorPlayed.includes(CARD_ID))
     assert.ok(r.state.players[0]!.improvements.includes('Major_CookingHearth1'))
     assert.ok(r.state.players[1]!.improvements.includes('Major_Fireplace2'))
