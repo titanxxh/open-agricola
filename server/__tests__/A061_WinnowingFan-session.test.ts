@@ -111,6 +111,14 @@ describe('A061 command boundaries', () => {
     assert.equal(s.getState().state.roundPhase, 'work')
     return s
   }
+  function confirmed(r: SessionResponse, actor = 0) {
+    assert.equal(r.ok, true, r.error)
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, actor)
+    assert.equal(r.state.currentPlayerIndex, actor)
+    assert.equal(r.interaction.request.nextPlayerIndex, 1 - actor)
+    return r
+  }
   function ok(r: SessionResponse) {
     assert.equal(r.ok, true, r.error)
     return r
@@ -176,11 +184,7 @@ describe('A061 command boundaries', () => {
     }
     assert.equal(r.state.players[0]!.minorPlayed.includes(card), true)
     assert.equal(r.state.players[0]!.minorHand.includes(card), false)
-    assert.ok(
-      r.interaction.stateId === 'wait' &&
-        r.interaction.request.kind === 'confirm-next-player',
-      JSON.stringify(r.interaction),
-    )
+    confirmed(r)
     const e = r.state.events.find(
       (e) => e.type === 'card.played' && e.cardId === card,
     )
@@ -221,35 +225,30 @@ describe('A061 command boundaries', () => {
       r.interaction.sourceCard === CARD_ID
     )
   }
-  function finishHarvest(s: GameSession, r: SessionResponse, accept = false) {
-    let paid = 0
-    for (let n = 0; n < 15 && r.interaction.stateId === 'wait'; n++) {
-      const i = r.interaction
-      if (fanChoice(r)) {
-        const choice = opts(r).find((o) =>
-          accept ? o.value !== '__skip__' : o.value === '__skip__',
-        )
-        assert.ok(choice)
-        r = ok(s.resolveChoice(i.playerIndex, choice.value))
-        continue
-      }
-      if (i.request.kind === 'feed') {
-        const food = values(r, i.playerIndex).food
-        r = ok(s.resolveChoice(i.playerIndex, 'confirm', { selections: [] }))
-        assert.equal(values(r, i.playerIndex).food, food - 4)
-        paid++
-        continue
-      }
-      if (i.request.kind === 'confirm-player-switch') {
-        r = ok(s.resolveChoice(i.request.toPlayerIndex, 'confirm'))
-        continue
-      }
-      assert.fail(JSON.stringify(i))
-    }
-    assert.equal(r.interaction.stateId, r.state.gameOver ? 'gameover' : 'idle')
-    assert.ok(r.state.roundPhase === 'work' || r.state.gameOver)
-    assert.ok(paid <= 2)
+  function roundStarted(r: SessionResponse, round: number) {
+    assert.equal(r.ok, true, r.error)
+    assert.equal(r.interaction.stateId, 'idle', JSON.stringify(r.interaction))
+    assert.equal(r.state.roundPhase, 'work')
+    assert.equal(r.state.gameOver, false)
+    assert.equal(r.state.currentPlayerIndex, 0)
+    assert.equal(r.state.round, round)
     return r
+  }
+  function fanOffer(r: SessionResponse) {
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.sourceCard, CARD_ID)
+    assert.equal(r.interaction.promptKey, 'ui.interactionFlowSelect')
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
+    assert.equal(r.state.roundPhase, 'field')
+    const options = opts(r)
+    const exchanges = options.filter(o => !o.disabled && o.value !== '__skip__')
+    assert.equal(exchanges.length, 1)
+    const exchange = exchanges[0]!
+    assert.equal(exchange.sourceCard, CARD_ID)
+    assert.deepEqual(exchange.effectPreview, { kind: 'resourceExchange', resourcesPaid: { grain: 1 }, resourcesGained: { food: 2 } })
+    assert.ok(options.some(o => o.value === '__skip__' && !o.disabled))
+    return exchange
   }
   function fanHarvest({
     grain = 1,
@@ -351,9 +350,9 @@ describe('A061 command boundaries', () => {
     })
   })
   it('zero grain after a real field phase supplies no Fan exchange', () => {
-    const { s, r } = fanHarvest({ grain: 0 })
+    const { r } = fanHarvest({ grain: 0 })
     assert.equal(fanChoice(r), false)
-    const end = finishHarvest(s, r)
+    const end = roundStarted(r, 5)
     assert.equal(values(end).grain, 0)
     assert.equal(values(end).food, 16)
     assert.equal(cardFood(end, CARD_ID), 0)
@@ -370,12 +369,12 @@ describe('A061 command boundaries', () => {
     assert.equal(r.state.players[0]!.fields[0]!.stacks.length, 0)
     assert.equal(fanChoice(r), true)
     const next = ok(
-      s.resolveChoice(0, opts(r).find((o) => o.value !== '__skip__')!.value),
+      s.resolveChoice(0, fanOffer(r).value),
     )
     assert.equal(values(next).grain, 0)
     assert.equal(values(next).food, 18)
     assert.equal(cardFood(next, CARD_ID), 2)
-    const end = finishHarvest(s, next, true)
+    const end = roundStarted(next, 5)
     assert.equal(values(end).food, 18)
     return void sessionEvidence.record('observed outcome', {
       grainAfterField: 1,
@@ -389,7 +388,7 @@ describe('A061 command boundaries', () => {
   it('two supplied grain still permit only one grain in one Fan activation', () => {
     const { s, r } = fanHarvest({ grain: 2 })
     assert.equal(fanChoice(r), true)
-    const end = finishHarvest(s, r, true)
+    const end = roundStarted(ok(s.resolveChoice(0, fanOffer(r).value)), 5)
     assert.equal(values(end).grain, 1)
     assert.equal(values(end).food, 18)
     assert.equal(cardFood(end, CARD_ID), 2)
@@ -403,7 +402,8 @@ describe('A061 command boundaries', () => {
   it('the optional Fan exchange can be declined without a grain conversion', () => {
     const { s, r } = fanHarvest({ grain: 2 })
     assert.equal(fanChoice(r), true)
-    const end = finishHarvest(s, r, false)
+    fanOffer(r)
+    const end = roundStarted(ok(s.resolveChoice(0, '__skip__')), 5)
     assert.equal(values(end).grain, 2)
     assert.equal(values(end).food, 16)
     assert.equal(cardFood(end, CARD_ID), 0)
@@ -415,9 +415,9 @@ describe('A061 command boundaries', () => {
     })
   })
   it('a nonharvest round completion cannot trigger Fan', () => {
-    const { s, r } = fanHarvest({ grain: 2, round: 5 })
+    const { r } = fanHarvest({ grain: 2, round: 5 })
     assert.equal(fanChoice(r), false)
-    const end = finishHarvest(s, r)
+    const end = roundStarted(r, 6)
     assert.equal(end.state.round, 6)
     assert.equal(values(end).grain, 2)
     assert.equal(values(end).food, 20)
@@ -429,9 +429,9 @@ describe('A061 command boundaries', () => {
     })
   })
   it('Fan in hand cannot convert grain after harvest fields', () => {
-    const { s, r } = fanHarvest({ grain: 1, played: false })
+    const { r } = fanHarvest({ grain: 1, played: false })
     assert.equal(fanChoice(r), false)
-    const end = finishHarvest(s, r)
+    const end = roundStarted(r, 5)
     assert.equal(values(end).grain, 1)
     assert.equal(values(end).food, 16)
     assert.ok(end.state.players[0]!.minorHand.includes(CARD_ID))
@@ -446,13 +446,18 @@ describe('A061 command boundaries', () => {
     const { s, r } = fanHarvest({ grain: 1, round: 14, mill: true })
     assert.equal(fanChoice(r), true)
     const next = ok(
-      s.resolveChoice(0, opts(r).find((o) => o.value !== '__skip__')!.value),
+      s.resolveChoice(0, fanOffer(r).value),
     )
     assert.equal(values(next).grain, 0)
     assert.equal(values(next).food, 18)
     assert.equal(cardFood(next, CARD_ID), 2)
     assert.equal(cardFood(next, MILL), 0)
-    const end = finishHarvest(s, next, true)
+    const end = next
+    assert.equal(end.interaction.stateId, 'gameover', JSON.stringify(end.interaction))
+    assert.equal(end.state.gameOver, true)
+    assert.equal(end.state.round, 14)
+    assert.equal(end.state.roundPhase, 'preparation')
+    assert.equal(end.state.currentPlayerIndex, 1)
     assert.equal(values(end).food, 18)
     return void sessionEvidence.record('observed outcome', {
       fanPaidGrain: 1,
@@ -467,11 +472,12 @@ describe('A061 command boundaries', () => {
     const { s, r } = fanHarvest()
     assert.equal(fanChoice(r), true)
     const next = ok(
-      s.resolveChoice(0, opts(r).find((o) => o.value !== '__skip__')!.value),
+      s.resolveChoice(0, fanOffer(r).value),
     )
     assert.equal(values(next).grain, 0)
     assert.equal(values(next).food, 18)
     assert.equal(cardFood(next, CARD_ID), 2)
+    roundStarted(next, 5)
     const undone = assertRejectedUnchanged(s, () => s.undoStep())
     assert.equal(undone.error, 'no history to undo')
     assert.equal(values(undone).grain, 0)
