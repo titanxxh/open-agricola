@@ -83,7 +83,7 @@ export const collectAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: (state, player, context) => !!context?.space && hasCollectableResources({
-    state, player, space: context.space, actionContext: context.actionContext,
+    actionHooks: context.actionHooks, state, player, space: context.space, actionContext: context.actionContext,
   }),
   originalActionCondition: hasCollectableResources,
   previewEffect: context => {
