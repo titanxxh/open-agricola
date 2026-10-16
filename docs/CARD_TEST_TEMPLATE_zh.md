@@ -511,6 +511,8 @@ C131 N3 以当前 OA 的蔬菜 `0` 作为回归预期。此前蔬菜 `1` 的对�
 
 成功用例只保留简短结果。断言失败或显式诊断运行请求时，才保存场景证据。按运行批次、测试文件和场景隔离证据，完整快照保存在 Git 外。用一个临时测试的主动失败验证留证，再通过并行运行检查产物是否覆盖。
 
+原生场景可在 suite 中使用 `createScenarioEvidence(import.meta.url)`。每个会话用 `track(session)` 登记，中间证据用 `record(label, value)` 在调用时冻结。helper 负责释放会话：dispose 前缓存有界现场，仅在失败时写盘，也能保留后续 teardown 失败前的现场。普通成功测试不写完整快照；`AGRICOLA_TEST_DIAGNOSTIC=1` 开启成功诊断，`AGRICOLA_TEST_EVIDENCE_DIR` 指定 Git 外目录。产物按运行、文件、场景和尝试隔离。支持文件并行，同 suite 的 concurrent 测试会被拒绝；超限省略的 checkpoint 会在证据中计数。
+
 迁移调试使用 `pnpm verify focus`。检查每个目标文件所属的 Vitest project，通用机制文件名可能属于 fast，而不是 slow。每批按 [CI Checks](operations/ci-checks.md) 在最终源码上完成所需检查，包括 `pnpm verify prepush`、迁移类型检查，以及剩余 audit 和已迁测试的联合验收。全部迁完后，删除独立的 audit normal/RAW 模式及其 expected/observed 断言切换。归并后的测试使用普通断言和现有的 `pnpm test`、`pnpm test:slow`、`pnpm verify focus` 入口，不另建 audit workflow。
 
 ## 10. 一个最小示例

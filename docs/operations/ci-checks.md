@@ -40,9 +40,12 @@ pnpm verify status
 
 ```bash
 node scripts/audit-migration.mjs check
+pnpm run check:session-test-types
 node scripts/audit-migration.mjs prepare --output /absolute/path/outside-repository/run-unique
 node scripts/audit-migration.mjs verify --output /absolute/path/outside-repository/run-unique
 ```
+
+`check:session-test-types` 已接入 `check:architecture`。迁移期间它从承接清单选取已迁原生目标，strict 检查完整目标及实际传递 helper，另存编译器纳入文件与诊断路径；不读取原始 audit 提交。源码检查拒绝重新导入编号套件、旧审计证据目录中的原始产物，以及超过 1 MiB 的目标测试或 helper。它检查当前源码，不宣称清理或验证全部 Git 历史。
 
 `prepare` 要求依赖已安装且本地可读取清单指定的源提交。它保存候选源码指纹、逐文件来源摘要和清单副本，输出目录必须是新的 Git 外目录。`verify` 在这份封存源码上运行已迁原生文件与剩余原始场景，核对每个原始职责确实通过，并严格检查联合范围与实际传递 helper；编译器纳入文件另存清单，缺少任何指定根文件也会失败。修改候选内容后必须重新组装，不能沿用旧身份。C131 的本地预期是当前实现 `0`；历史预期 `1` 及规则讨论保留在来源元数据中。
 

@@ -1,5 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import os from 'node:os'
 import crypto from 'node:crypto'
 import { execFileSync, spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
@@ -52,6 +53,32 @@ function readManifest(file, targetRoot = root) {
     if (manifest.source.commit !== origin.commit || sourceFiles.size !== origin.files || identities.size !== origin.cases || identityDigest !== origin.identitiesSha256) fail('immutable original scenario inventory changed')
   }
   return { manifest, summary: { sourceFiles: sourceFiles.size, sourceCases: identities.size, remaining, resolved } }
+}
+
+function checkNative(manifest) {
+  const nativeFiles = [...new Set(manifest.files.flatMap(group => group.cases.filter(item => item.status !== 'remaining').map(item => item.targetFile)))].sort()
+  const permittedAuditDocs = new Set(['README.md', 'audit/final-conclusions.json', 'audit/source-provenance.json'])
+  const names = git('ls-files', '--cached', '--others', '--exclude-standard', '-z').toString().split('\0').filter(Boolean)
+  for (const name of names) {
+    if (!fs.existsSync(path.join(root, name))) continue
+    if (/^server\/__tests__\/ae-negative-/.test(name) || name === 'server/__tests__/_helpers/negative-rule-audit.ts') fail(`Integrate native tests instead of importing the numbered audit suite: ${name}`)
+    const prefix = 'docs/test/ae-negative-audit/'
+    if (name.startsWith(prefix) && !permittedAuditDocs.has(name.slice(prefix.length))) fail(`Keep scenario evidence outside Git: ${name}`)
+  }
+  if (!nativeFiles.length) return { nativeFiles, typesExit: 0, missingTypeRoots: [] }
+  const output = fs.mkdtempSync(path.join(os.tmpdir(), 'oa-native-types-'))
+  const config = path.join(output, 'tsconfig.json')
+  json(config, { extends: path.join(root, 'tsconfig.server.json'), compilerOptions: { noUnusedLocals: false, noUnusedParameters: false, incremental: false, typeRoots: [path.join(root, 'node_modules/@types')] }, files: nativeFiles.map(file => path.join(root, file)), include: [], exclude: [] })
+  const typesExit = command(root, ['exec', 'tsc', '-p', config, '--noEmit', '--pretty', 'false'], path.join(output, 'types.log'))
+  if (typesExit) process.stderr.write(fs.readFileSync(path.join(output, 'types.log'), 'utf8'))
+  const fileInventoryExit = command(root, ['exec', 'tsc', '-p', config, '--listFilesOnly', '--pretty', 'false'], path.join(output, 'included-files.log'))
+  const included = new Set(fs.readFileSync(path.join(output, 'included-files.log'), 'utf8').split(/\r?\n/).filter(Boolean).map(file => path.resolve(file)))
+  const missingTypeRoots = nativeFiles.filter(file => !included.has(path.join(root, file)))
+  const ownedSources = [...included].filter(file => nativeFiles.includes(path.relative(root, file)) || file.startsWith(path.join(root, 'server/__tests__/_helpers/')))
+  for (const file of ownedSources) {
+    if (fs.statSync(file).size > 1024 * 1024) fail(`Native test source exceeds 1 MiB; keep full scenario evidence outside Git: ${path.relative(root, file)}`)
+  }
+  return { nativeFiles, typesExit, fileInventoryExit, missingTypeRoots, includedFiles: included.size, reportDirectory: output }
 }
 
 function replaceOnce(source, before, after, file) {
@@ -200,7 +227,7 @@ function verify(output) {
   assertCandidate()
   const types = command(candidate, ['exec', 'tsc', '-p', 'tsconfig.migration.json', '--pretty', 'false'], path.join(output, 'types.log'))
   const files = command(candidate, ['exec', 'tsc', '-p', 'tsconfig.migration.json', '--listFilesOnly', '--pretty', 'false'], path.join(output, 'included-files.log'))
-  const behavior = command(candidate, ['exec', 'vitest', 'run', '--config', 'vitest.migration.config.ts', '--reporter=json', `--outputFile=${path.join(output, 'behavior.json')}`], path.join(output, 'behavior.log'), { AGRICOLA_NEGATIVE_ARTIFACT_DIR: path.join(output, 'scenario-evidence'), AGRICOLA_NEGATIVE_OUTPUT_DIR: path.join(output, 'scenario-evidence') })
+  const behavior = command(candidate, ['exec', 'vitest', 'run', '--config', 'vitest.migration.config.ts', '--reporter=json', `--outputFile=${path.join(output, 'behavior.json')}`], path.join(output, 'behavior.log'), { AGRICOLA_NEGATIVE_ARTIFACT_DIR: path.join(output, 'scenario-evidence'), AGRICOLA_NEGATIVE_OUTPUT_DIR: path.join(output, 'scenario-evidence'), AGRICOLA_TEST_EVIDENCE_DIR: path.join(output, 'native-evidence') })
   assertCandidate()
   const included = new Set(fs.readFileSync(path.join(output, 'included-files.log'), 'utf8').split(/\r?\n/).map(file => path.resolve(file)))
   const missingTypeRoots = [...assembly.remainingFiles, ...assembly.nativeFiles].filter(file => !included.has(path.join(candidate, file)))
@@ -239,12 +266,17 @@ try {
   }
   const { manifest, summary } = readManifest(options.get('manifest') ?? defaultManifest)
   if (action === 'check') process.stdout.write(`${JSON.stringify(summary)}\n`)
+  else if (action === 'check-native') {
+    const result = checkNative(manifest)
+    process.stdout.write(`${JSON.stringify(result)}\n`)
+    if (result.typesExit || result.fileInventoryExit || result.missingTypeRoots.length) process.exitCode = 1
+  }
   else if (action === 'prepare') process.stdout.write(`${JSON.stringify(prepare(manifest, options.get('output')))}\n`)
   else if (action === 'verify') {
     const result = verify(options.get('output'))
     process.stdout.write(`${JSON.stringify(result)}\n`)
     if (result.typesExit || result.fileInventoryExit || result.behaviorExit || result.unresolvedSourceCases || result.missingTypeRoots.length) process.exitCode = 1
-  } else fail('usage: node scripts/audit-migration.mjs check|prepare|verify [--manifest file] [--output external-run-directory]')
+  } else fail('usage: node scripts/audit-migration.mjs check|check-native|prepare|verify [--manifest file] [--output external-run-directory]')
 } catch (error) {
   process.stderr.write(`${error instanceof Error ? error.message : error}\n`)
   process.exitCode = 1
