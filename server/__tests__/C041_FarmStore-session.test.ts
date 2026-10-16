@@ -83,7 +83,7 @@ describe('C041 rule boundaries', () => {
     const r = s.performRoundEnd()
     assert.equal(r.ok, true, r.error)
     assert.deepEqual(storeObserved(r), { food: 0, vegetable: 0, wood: 0, clay: 0, reed: 0, stone: 0 })
-    assert.ok(r.interaction.stateId !== 'wait' || r.interaction.sourceCard !== 'C041_FarmStore')
+    assert.equal(r.interaction.stateId, 'idle')
   })
 
   it("same resource twice and repeated harvest exchange reject before legal reward", () => {
@@ -103,6 +103,7 @@ describe('C041 rule boundaries', () => {
     const r = s.performRoundEnd()
     assert.equal(r.ok, true, r.error)
     assert.equal(r.state.round, 6)
+    assert.equal(r.interaction.stateId, 'idle')
     assert.deepEqual(storeObserved(r), { food: 5, vegetable: 0, wood: 0, clay: 0, reed: 0, stone: 0 })
   })
 

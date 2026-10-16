@@ -188,8 +188,15 @@ describe('D127 rule boundaries', () => {
   it("Major Improvement must reject an actual minor purchase", () => {
     const s = hardworking()
     branch(s, ok(s.takeAction(0, HARDWORKER)), 'improvement')
-    const r = s.resolveChoice(0, 'A002_ShiftingCultivation')
+    const r = assertRejectedUnchanged(s, () => s.resolveChoice(0, 'A002_ShiftingCultivation'))
     assert.deepEqual({ accepted: r.ok, passedMinor: r.state.players[1]!.minorHand.includes('A002_ShiftingCultivation'), food: r.state.players[0]!.resources.food }, { accepted: false, passedMinor: false, food: 2 })
+    const major = options(s.getState()).find(o => o.value === 'Major_Fireplace1')
+    assert(major)
+    const retry = ok(s.resolveChoice(0, major.value))
+    assert(retry.state.players[0]!.improvements.includes('Major_Fireplace1'))
+    assert(retry.state.players[0]!.minorHand.includes('A002_ShiftingCultivation'))
+    assert.equal(retry.state.players[0]!.resources.clay, 0)
+    assert.equal(retry.state.players[0]!.resources.food, 2)
   })
 
   it("ties and a nonowner with fewer rooms cannot use the private space", () => {
