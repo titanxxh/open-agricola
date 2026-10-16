@@ -216,6 +216,27 @@ describe('A070 Lifting Machine parity', () => {
 
 describe("A070 command boundaries", () => {
   const LIFT = 'A070_LiftingMachine'
+  function confirmed(r: SessionResponse, actor = 0) {
+    assert.equal(r.ok, true, r.error)
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, actor)
+    assert.equal(r.state.currentPlayerIndex, actor)
+    assert.equal(r.interaction.request.nextPlayerIndex, 1 - actor)
+    return r
+  }
+  function idle(r: SessionResponse) {
+    assert.equal(r.ok, true, r.error)
+    assert.equal(r.interaction.stateId, 'idle', JSON.stringify(r.interaction))
+    assert.equal(r.state.currentPlayerIndex, 0)
+    assert.equal(r.state.roundPhase, 'work')
+    return r
+  }
+  function restoredInteraction(s: GameSession, r: SessionResponse, expected: string) {
+    assert.equal(JSON.stringify(r.interaction), expected)
+    assert.equal(JSON.stringify(s.getState().interaction), expected)
+    assert.equal(r.state.currentPlayerIndex, 0)
+    assert.equal(s.getState().state.currentPlayerIndex, 0)
+  }
   function ok(r: SessionResponse) {
     assert.equal(r.ok, true, r.error)
     return r
@@ -259,28 +280,29 @@ describe("A070 command boundaries", () => {
     return r
   }
   function buy(s: GameSession, card: string) {
+    // Each legal fixture has one playable minor, automatically selected after this entry.
     const r = buyMenu(s)
-    if (!r.state.players[0]!.minorHand.includes(card))
-      return r
-    assert.ok(choices(r).some(o => o.value === card && !o.disabled))
-    return ok(s.resolveChoice(0, card))
+    assert.equal(r.state.players[0]!.minorHand.includes(card), false)
+    assert.ok(r.state.players[0]!.minorPlayed.includes(card))
+    return confirmed(r)
   }
   function deny(s: GameSession, card: string) {
     const r = buyMenu(s)
     assert.ok(!r.state.players[0]!.minorPlayed.includes(card))
     assertRejectedUnchanged(s, () => s.resolveChoice(0, card))
+    confirmed(s.getState())
   }
   function ready(s: GameSession, actor: number) {
     let r = s.getState()
     if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
-      r = confirmNext(s, r)
+      r = confirmNext(s, confirmed(r, 1 - actor))
     assert.equal(r.interaction.stateId, 'idle', JSON.stringify(r.interaction))
     assert.equal(r.state.currentPlayerIndex, actor)
     return r
   }
   function turn(s: GameSession, actor: number, space: string) {
     ready(s, actor)
-    return ok(s.takeAction(actor, space))
+    return confirmed(ok(s.takeAction(actor, space)), actor)
   }
   function end(s: GameSession) {
     turn(s, 0, 'reed-bank')
@@ -289,23 +311,27 @@ describe("A070 command boundaries", () => {
     return confirmNext(s, turn(s, 1, 'clay-pit'))
   }
   function flow(s: GameSession, r: SessionResponse, card: string, accept = true) {
-    for (let n = 0; n < 8 && r.interaction.stateId === 'wait'; n++) {
-      const request = r.interaction.request
-      if (request.kind === 'select-trigger') {
-        const o = request.options.find(o => o.value === card)
-        assert.ok(o, JSON.stringify(r.interaction))
-        r = ok(s.resolveChoice(r.interaction.playerIndex, o.value))
-        continue
-      }
-      if (request.kind !== 'choice')
-        break
-      assert.equal(r.interaction.sourceCard, card)
-      const candidates = request.options.filter(o => accept ? o.value !== '__skip__' && !o.disabled : o.value === '__skip__' && !o.disabled)
-      assert.equal(candidates.length, 1, JSON.stringify(r.interaction))
-      const o = candidates[0]
-      assert.ok(o, JSON.stringify(r.interaction))
-      r = ok(s.resolveChoice(r.interaction.playerIndex, o.value))
-    }
+    assert.equal(card, LIFT)
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.sourceCard, LIFT)
+    assert.equal(r.interaction.promptKey, 'ui.interactionOptionalAction')
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
+    assert.equal(r.state.roundPhase, 'returning-home')
+    const candidates = choices(r).filter(option => option.value !== '__skip__' && !option.disabled)
+    assert.equal(candidates.length, 1)
+    assert.ok(choices(r).some(option => option.value === '__skip__' && !option.disabled))
+    const next = ok(s.resolveChoice(0, accept ? candidates[0]!.value : '__skip__'))
+    if (!accept) return roundStarted(next, 6)
+    assert.ok(next.interaction.stateId === 'wait' && next.interaction.request.kind === 'selection', JSON.stringify(next.interaction))
+    assert.equal(next.interaction.sourceCard, LIFT)
+    assert.equal(next.interaction.playerIndex, 0)
+    assert.equal(next.state.currentPlayerIndex, 0)
+    return next
+  }
+  function roundStarted(r: SessionResponse, round: number) {
+    idle(r)
+    assert.equal(r.state.round, round)
     return r
   }
   function fields(state: GameState, crops: Array<{
@@ -330,7 +356,10 @@ describe("A070 command boundaries", () => {
   }
   function selection(s: GameSession, r: SessionResponse, position = { row: 0, col: 1 }) {
     assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'selection', JSON.stringify(r.interaction))
-    return ok(s.commitSelectionChoice(r.interaction.playerIndex, { positions: [position] }))
+    assert.equal(r.interaction.sourceCard, LIFT)
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
+    return roundStarted(ok(s.commitSelectionChoice(0, { positions: [position] })), 6)
   }
   function result(r: SessionResponse) {
     return { own: board(r), opponent: board(r, 1), vegetable: r.state.players[0]!.resources.vegetable, grain: r.state.players[0]!.resources.grain }
@@ -361,21 +390,21 @@ describe("A070 command boundaries", () => {
   })
   it("actual harvest round and absent own vegetables or unplayed card give no lifting move", () => {
     const harvest = lift({ round: 4 })
-    const r = end(harvest)
+    const r = roundStarted(end(harvest), 5)
     assert.deepEqual(result(r), { own: [1, 1, 0], opponent: [1], vegetable: 1, grain: 2 })
     assert.equal(r.state.players[0]!.resources.food, 36)
     const noVeg = setup({}, state => {
       fields(state, [{ kind: 'grain', remaining: 2 }, null, null])
       fields(state, [{ kind: 'vegetable', remaining: 2 }], 1)
     })
-    const n = end(noVeg)
+    const n = roundStarted(end(noVeg), 6)
     assert.equal(n.state.players[0]!.resources.vegetable, 0)
     assert.deepEqual(board(n), [2, 0, 0])
     assert.deepEqual(board(n, 1), [2])
     assert.equal(n.state.round, 6)
     assert.equal(n.state.roundPhase, 'work')
     assert.equal(n.interaction.stateId, 'idle')
-    const unplayed = end(lift({ played: false }))
+    const unplayed = roundStarted(end(lift({ played: false })), 6)
     assert.equal(unplayed.state.players[0]!.resources.vegetable, 0)
     assert.equal(unplayed.state.round, 6)
     assert.equal(unplayed.state.roundPhase, 'work')
@@ -410,11 +439,15 @@ describe("A070 command boundaries", () => {
     assert.deepEqual(result(legal), { own: [2, 0, 2, 0], opponent: [2], vegetable: 1, grain: 1 })
   })
   it("actual purchase undo restores full rule snapshot and allows legal retry", () => {
-    const s = lift({ played: false, resources: { wood: 1 } }), before = undoRuleSnapshot(s.getState())
+    const s = lift({ played: false, resources: { wood: 1 } })
+    const initial = idle(s.getState())
+    const beforeInteraction = JSON.stringify(initial.interaction)
+    const before = undoRuleSnapshot(initial)
     buy(s, LIFT)
     const undone = s.undoAction()
     sessionEvidence.record('A070-N5-undo', { before: JSON.parse(before), response: undone })
     assertUndoRestored(before, undone)
+    restoredInteraction(s, undone, beforeInteraction)
     const retry = buy(s, LIFT)
     assert.equal(retry.state.players[0]!.resources.wood, 0)
     assert.ok(retry.state.players[0]!.minorPlayed.includes(LIFT))

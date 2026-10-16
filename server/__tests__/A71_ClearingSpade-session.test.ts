@@ -183,6 +183,27 @@ describe('A071_ClearingSpade session', () => {
 
 describe("A071 command boundaries", () => {
   const SPADE = 'A071_ClearingSpade'
+  function confirmed(r: SessionResponse, actor = 0) {
+    assert.equal(r.ok, true, r.error)
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, actor)
+    assert.equal(r.state.currentPlayerIndex, actor)
+    assert.equal(r.interaction.request.nextPlayerIndex, 1 - actor)
+    return r
+  }
+  function idle(r: SessionResponse) {
+    assert.equal(r.ok, true, r.error)
+    assert.equal(r.interaction.stateId, 'idle', JSON.stringify(r.interaction))
+    assert.equal(r.state.currentPlayerIndex, 0)
+    assert.equal(r.state.roundPhase, 'work')
+    return r
+  }
+  function restoredInteraction(s: GameSession, r: SessionResponse, expected: string) {
+    assert.equal(JSON.stringify(r.interaction), expected)
+    assert.equal(JSON.stringify(s.getState().interaction), expected)
+    assert.equal(r.state.currentPlayerIndex, 0)
+    assert.equal(s.getState().state.currentPlayerIndex, 0)
+  }
   function ok(r: SessionResponse) {
     assert.equal(r.ok, true, r.error)
     return r
@@ -226,21 +247,22 @@ describe("A071 command boundaries", () => {
     return r
   }
   function buy(s: GameSession, card: string) {
+    // Each legal fixture has one playable minor, automatically selected after this entry.
     const r = buyMenu(s)
-    if (!r.state.players[0]!.minorHand.includes(card))
-      return r
-    assert.ok(choices(r).some(o => o.value === card && !o.disabled))
-    return ok(s.resolveChoice(0, card))
+    assert.equal(r.state.players[0]!.minorHand.includes(card), false)
+    assert.ok(r.state.players[0]!.minorPlayed.includes(card))
+    return confirmed(r)
   }
   function deny(s: GameSession, card: string) {
     const r = buyMenu(s)
     assert.ok(!r.state.players[0]!.minorPlayed.includes(card))
     assertRejectedUnchanged(s, () => s.resolveChoice(0, card))
+    confirmed(s.getState())
   }
   function ready(s: GameSession, actor: number) {
     let r = s.getState()
     if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
-      r = confirmNext(s, r)
+      r = confirmNext(s, confirmed(r, 1 - actor))
     assert.equal(r.interaction.stateId, 'idle', JSON.stringify(r.interaction))
     assert.equal(r.state.currentPlayerIndex, actor)
     return r
@@ -258,9 +280,25 @@ describe("A071 command boundaries", () => {
   function board(r: SessionResponse, owner = 0) {
     return r.state.players[owner]!.fields.map(f => f.stacks.reduce((n, v) => n + v.remaining, 0))
   }
+  function plowPending(r: SessionResponse) {
+    assert.equal(r.ok, true, r.error)
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'farm-select' && r.interaction.request.farm.farmType === 'plow', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.promptKey, 'ui.interactionPlowSelect')
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
+    return r
+  }
+  function resumed(r: SessionResponse, expected: 'idle' | 'confirm-next-player' | 'farm-select') {
+    if (expected === 'idle') return idle(r)
+    if (expected === 'confirm-next-player') return confirmed(r)
+    return plowPending(r)
+  }
   function selection(s: GameSession, r: SessionResponse, position = { row: 0, col: 1 }) {
     assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'selection', JSON.stringify(r.interaction))
-    return ok(s.commitSelectionChoice(r.interaction.playerIndex, { positions: [position] }))
+    assert.equal(r.interaction.sourceCard, SPADE)
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
+    return ok(s.commitSelectionChoice(0, { positions: [position] }))
   }
   const SPADE_ACTION = 'A71-clearing-spade-anytime'
   function spade(crop: 'grain' | 'vegetable' = 'grain', count = 2, empty = true, configure: (state: GameState) => void = () => {
@@ -271,10 +309,16 @@ describe("A071 command boundaries", () => {
     })
   }
   function openSpade(s: GameSession) {
-    return ok(s.takeAnytimeAction(0, SPADE_ACTION))
+    const r = ok(s.takeAnytimeAction(0, SPADE_ACTION))
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'selection', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.sourceCard, SPADE)
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
+    return r
   }
-  function move(s: GameSession, source = { row: 0, col: 1 }, target = { row: 0, col: 2 }) {
-    return selection(s, selection(s, openSpade(s), source), target)
+  function move(s: GameSession, source = { row: 0, col: 1 }, target = { row: 0, col: 2 }, expected: 'idle' | 'confirm-next-player' | 'farm-select' = 'idle') {
+    resumed(s.getState(), expected)
+    return resumed(selection(s, selection(s, openSpade(s), source), target), expected)
   }
   function cropSupply(r: SessionResponse) {
     return { grain: r.state.players[0]!.resources.grain, vegetable: r.state.players[0]!.resources.vegetable }
@@ -284,7 +328,7 @@ describe("A071 command boundaries", () => {
     for (const kind of ['grain', 'vegetable'] satisfies Array<'grain' | 'vegetable'>) {
       const s = setup({ played: false, resources: { wood: 1 } }, state => fields(state, [{ kind, remaining: 2 }, null]))
       buy(s, SPADE)
-      const r = move(s)
+      const r = move(s, { row: 0, col: 1 }, { row: 0, col: 2 }, 'confirm-next-player')
       assert.equal(r.state.players[0]!.resources.wood, 0)
       assert.deepEqual(board(r), [1, 1])
       assert.deepEqual(cropSupply(r), { grain: 0, vegetable: 0 })
@@ -310,7 +354,7 @@ describe("A071 command boundaries", () => {
     assertRejectedUnchanged(s, () => s.commitSelectionChoice(1, { positions: [{ row: 0, col: 2 }] }))
     for (const col of [1, 4])
       assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { positions: [{ row: 0, col }] }))
-    r = selection(s, r, { row: 0, col: 2 })
+    r = idle(selection(s, r, { row: 0, col: 2 }))
     assert.deepEqual(board(r), [1, 1, 0])
     assert.deepEqual(board(r, 1), [2])
     assert.deepEqual(cropSupply(r), { grain: 0, vegetable: 0 })
@@ -339,7 +383,7 @@ describe("A071 command boundaries", () => {
     sessionEvidence.record('A071-N4-source-request', r)
     const wood = positions.find(p => p.row === -1 && p.col === 4075)
     assert.equal(wood, undefined)
-    selection(s, selection(s, r), { row: 0, col: 2 })
+    idle(selection(s, selection(s, r), { row: 0, col: 2 }))
     const p = s.getState().state.players[0]!
     const actual = { woodSourceOffered: Boolean(wood), farmWood: p.fields.flatMap(f => f.stacks).filter(v => v.kind === 'wood').reduce((n, v) => n + v.remaining, 0), woodCardStacks: p.cardStates.D075_WoodField?.extraData?.cardFieldStacks, woodSupply: p.resources.wood }
     sessionEvidence.record('A071-N4-outcome', actual)
@@ -355,14 +399,17 @@ describe("A071 command boundaries", () => {
   })
   it("actual completed transfer undo observes native capability and retries without duplicating crops", () => {
     const s = spade()
-    const before = undoRuleSnapshot(s.getState())
-    turn(s, 0, 'farmland')
-    move(s)
+    const initial = idle(s.getState())
+    const beforeInteraction = JSON.stringify(initial.interaction)
+    const before = undoRuleSnapshot(initial)
+    plowPending(turn(s, 0, 'farmland'))
+    move(s, { row: 0, col: 1 }, { row: 0, col: 2 }, 'farm-select')
     const undone = s.undoAction()
     sessionEvidence.record('A071-N6-undo', { before: JSON.parse(before), response: undone })
     assertUndoRestored(before, undone)
-    turn(s, 0, 'farmland')
-    const r = move(s)
+    restoredInteraction(s, undone, beforeInteraction)
+    plowPending(turn(s, 0, 'farmland'))
+    const r = move(s, { row: 0, col: 1 }, { row: 0, col: 2 }, 'farm-select')
     assert.deepEqual(board(r), [1, 1, 0])
     assert.deepEqual(cropSupply(r), { grain: 0, vegetable: 0 })
     sessionEvidence.record('A071-N6-retry', r)
