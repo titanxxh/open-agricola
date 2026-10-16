@@ -357,6 +357,8 @@ describe("A141 command boundaries", () => {
       if (n < spaces.length - 1)
         r = finish(s, r)
     }
+    assert.equal(r.state.roundPhase, 'work')
+    assert.equal(r.state.players[0]!.resources.vegetable, 0)
     if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
       r = confirmNext(s, r)
     save('before-phase-choice', r)
@@ -479,6 +481,8 @@ describe("A157 command boundaries", () => {
       if (n < spaces.length - 1)
         r = finish(s, r)
     }
+    assert.equal(r.state.roundPhase, 'work')
+    assert.equal(r.state.players[0]!.resources.food, 60)
     if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
       r = confirmNext(s, r)
     save('before-phase-choice', r)

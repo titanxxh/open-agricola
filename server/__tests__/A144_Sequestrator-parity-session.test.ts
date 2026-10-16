@@ -282,6 +282,7 @@ describe("A144 command boundaries", () => {
       }, played)
       const r = plow(s, 0)
       assert.equal(r.state.players[0]!.resources.clay, 0)
+      assert.equal(r.state.players[0]!.resources.reed, 0)
       save(`A144-N4-${count}-${played}-${empty}`, r)
     }
   })
@@ -311,6 +312,7 @@ describe("A144 command boundaries", () => {
     const second = plow(s, 0, 'cultivation')
     assert.equal(second.state.players[0]!.fields.length, 6)
     assert.equal(second.state.players[0]!.resources.clay, 4)
+    assert.equal(second.state.players[0]!.resources.reed, 0)
     assert.deepEqual(store(second), [3, 0])
     save('A144-N6', { first, second })
   })

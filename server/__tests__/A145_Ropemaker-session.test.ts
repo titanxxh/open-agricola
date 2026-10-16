@@ -1,3 +1,4 @@
+import { captureStateWithHistory } from '../../shared/session/history-streams'
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
@@ -138,9 +139,8 @@ describe("A145 command boundaries", () => {
     assert.ok(r.interaction.stateId === 'idle' || (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player'), JSON.stringify(r.interaction))
     return r
   }
-  function end(s: GameSession, spaces: string[]) {
+  function endWork(s: GameSession, spaces: string[]) {
     let r = s.getState()
-    const nextRound = r.state.round + 1
     for (const [n, space] of spaces.entries()) {
       const actor = n % r.state.players.length
       r = turn(s, actor, space)
@@ -150,7 +150,12 @@ describe("A145 command boundaries", () => {
     if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
       r = confirmNext(s, r)
     save('before-phase-choice', r)
-    const pending = r
+    return r
+  }
+  function end(s: GameSession, spaces: string[]) {
+    const nextRound = s.getState().state.round + 1
+    const r = endWork(s, spaces)
+    const pending = { ...r, state: captureStateWithHistory(r.state), interaction: structuredClone(r.interaction), scores: structuredClone(r.scores) }
     const done = finish(s, r)
     assert.equal(done.interaction.stateId, 'idle', JSON.stringify(done.interaction))
     assert.equal(done.state.currentPlayerIndex, 0)
@@ -166,7 +171,45 @@ describe("A145 command boundaries", () => {
     const ordinary = end(setup(3), ROPE_SIX).r
     assert.equal(ordinary.state.round, 4)
     assert.equal(ordinary.state.players[0]!.resources.reed, 0)
+    const feedingSession = setup(4, state => { state.players[0]!.resources.food = 3 })
+    const pending = endWork(feedingSession, ROPE_SIX)
+    assert.ok(pending.interaction.stateId === 'wait' && pending.interaction.request.kind === 'feed', JSON.stringify(pending.interaction))
+    assert.equal(pending.interaction.promptKey, 'ui.harvestFeed')
+    assert.equal(pending.interaction.playerIndex, 0)
+    assert.equal(pending.state.currentPlayerIndex, 0)
+    assert.equal(pending.state.round, 4)
+    assert.equal(pending.state.roundPhase, 'feeding')
+    assert.equal(pending.interaction.request.remaining, 1)
+    assert.equal(pending.interaction.request.foodUsed, 3)
+    assert.deepEqual(pending.interaction, {
+      stateId: 'wait', playerIndex: 0, spaceId: '__subflow:feed', promptKey: 'ui.harvestFeed', sourceCard: undefined, promptParams: undefined,
+      request: {
+        kind: 'feed', remaining: 1, foodUsed: 3, feedQueue: [{ index: 1 }, { index: 2 }],
+        exchangeCatalog: [
+          { sourceId: '__basic__', exchangeIndex: 0, from: { grain: 1 }, to: { food: 1 }, max: undefined, fromFarmyard: undefined },
+          { sourceId: '__basic__', exchangeIndex: 1, from: { vegetable: 1 }, to: { food: 1 }, max: undefined, fromFarmyard: undefined },
+        ],
+        maxTradeTimesBySourceId: {}, placedAnimals: { sheep: 0, boar: 0, cattle: 0 },
+      },
+      allowedCommands: ['resolveChoice'], anytimeActions: [],
+    })
+    assert.equal(pending.state.players[0]!.resources.grain, 1)
+    assert.equal(pending.state.players[0]!.resources.reed, 0)
+    assert.equal(pending.state.completedFeedingPhases, 0)
+    assert.deepEqual(feedingSession.getState().interaction, pending.interaction)
+    assert.equal(feedingSession.getState().state.players[0]!.resources.reed, 0)
+    const fed = ok(feedingSession.resolveChoice(0, 'confirm', { selections: [{ sourceId: '__basic__', exchangeIndex: 0, count: 1 }] }))
+    assert.equal(fed.interaction.stateId, 'idle')
+    assert.equal(fed.state.currentPlayerIndex, 0)
+    assert.equal(fed.state.roundPhase, 'work')
+    assert.equal(fed.state.completedFeedingPhases, 1)
+    assert.equal(fed.state.players[0]!.resources.grain, 0)
+    assert.equal(fed.state.players[0]!.resources.begging, 0)
+    assert.equal(fed.state.round, 5)
+    assert.equal(fed.state.players[0]!.resources.reed, 1)
+    assert.equal(feedingSession.getState().state.players[0]!.resources.reed, 1)
     save('A145-N1', { harvest, ordinary })
+    save('A145-N1-feeding', { pending, fed })
   })
   it("repeated natural harvest grants once each and hand cannot grant reed", () => {
     const s = setup(7)
