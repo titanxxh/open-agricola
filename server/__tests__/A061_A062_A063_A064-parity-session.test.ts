@@ -362,6 +362,23 @@ describe('A063 command boundaries', () => {
     assert.equal(s.getState().state.roundPhase, 'work')
     return s
   }
+  function confirmed(r: SessionResponse, actor = 0) {
+    assert.equal(r.ok, true, r.error)
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, actor)
+    assert.equal(r.state.currentPlayerIndex, actor)
+    assert.equal(r.interaction.request.nextPlayerIndex, 1 - actor)
+    return r
+  }
+  function roundStarted(r: SessionResponse, round: number) {
+    assert.equal(r.ok, true, r.error)
+    assert.equal(r.interaction.stateId, 'idle', JSON.stringify(r.interaction))
+    assert.equal(r.state.roundPhase, 'work')
+    assert.equal(r.state.gameOver, false)
+    assert.equal(r.state.currentPlayerIndex, 0)
+    assert.equal(r.state.round, round)
+    return r
+  }
   function ok(r: SessionResponse) {
     assert.equal(r.ok, true, r.error)
     return r
@@ -383,7 +400,7 @@ describe('A063 command boundaries', () => {
       r.interaction.stateId === 'wait' &&
       r.interaction.request.kind === 'confirm-next-player'
     )
-      r = confirmNext(s, r)
+      r = confirmNext(s, confirmed(r, 1 - actor))
     assert.equal(r.interaction.stateId, 'idle', JSON.stringify(r.interaction))
     assert.equal(r.state.currentPlayerIndex, actor)
     return r
@@ -427,11 +444,7 @@ describe('A063 command boundaries', () => {
     }
     assert.equal(r.state.players[0]!.minorPlayed.includes(card), true)
     assert.equal(r.state.players[0]!.minorHand.includes(card), false)
-    assert.ok(
-      r.interaction.stateId === 'wait' &&
-        r.interaction.request.kind === 'confirm-next-player',
-      JSON.stringify(r.interaction),
-    )
+    confirmed(r)
     const e = r.state.events.find(
       (e) => e.type === 'card.played' && e.cardId === card,
     )
@@ -476,11 +489,7 @@ describe('A063 command boundaries', () => {
       assert.ok(option, JSON.stringify(r.interaction))
       r = ok(s.resolveChoice(actor, option.value))
     }
-    assert.ok(
-      r.interaction.stateId === 'wait' &&
-        r.interaction.request.kind === 'confirm-next-player',
-      JSON.stringify(r.interaction),
-    )
+    confirmed(r, actor)
     return r
   }
   function cook(s: GameSession, from: 'vegetable' | 'sheep' | 'cattle') {
@@ -489,6 +498,8 @@ describe('A063 command boundaries', () => {
     assert.ok(options.length)
     const index = from === 'vegetable' ? 0 : from === 'sheep' ? 1 : 2
     const result = ok(s.resolveChoice(0, `bulk:${index}=1`))
+    assert.equal(result.interaction.stateId, 'idle', JSON.stringify(result.interaction))
+    assert.equal(result.state.currentPlayerIndex, 0)
     assert.equal(values(result)[from], 0)
     return result
   }
@@ -497,28 +508,6 @@ describe('A063 command boundaries', () => {
     turn(s, 1, 'grain-seeds')
     turn(s, 0, 'clay-pit')
     return confirmNext(s, turn(s, 1, 'reed-bank'))
-  }
-  function finishHarvest(s: GameSession, r: SessionResponse) {
-    let paid = 0
-    for (let n = 0; n < 15 && r.interaction.stateId === 'wait'; n++) {
-      const i = r.interaction
-      if (i.request.kind === 'feed') {
-        const food = values(r, i.playerIndex).food
-        r = ok(s.resolveChoice(i.playerIndex, 'confirm', { selections: [] }))
-        assert.equal(values(r, i.playerIndex).food, food - 4)
-        paid++
-        continue
-      }
-      if (i.request.kind === 'confirm-player-switch') {
-        r = ok(s.resolveChoice(i.request.toPlayerIndex, 'confirm'))
-        continue
-      }
-      assert.fail(JSON.stringify(i))
-    }
-    assert.equal(r.interaction.stateId, r.state.gameOver ? 'gameover' : 'idle')
-    assert.ok(r.state.roundPhase === 'work' || r.state.gameOver)
-    assert.ok(paid <= 2)
-    return r
   }
   function point(r: SessionResponse, card: string, expected: number) {
     assert.ok(r.scores)
@@ -634,19 +623,13 @@ describe('A063 command boundaries', () => {
         crops: [{ row: 0, col: 1, crop: 'grain' }],
       }),
     )
-    for (
-      let n = 0;
-      n < 3 &&
-      r.interaction.stateId === 'wait' &&
-      r.interaction.request.kind === 'choice';
-      n++
-    ) {
-      const done = opts(r).find(
-        (o) => o.value === '__skip__' || o.value === '__done__',
-      )
-      assert.ok(done, JSON.stringify(r.interaction))
-      r = ok(s.resolveChoice(0, done.value))
-    }
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.promptKey, 'ui.interactionGrainUtilizationChoice')
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
+    assert.ok(opts(r).some(o => o.labelKey === 'actions.bake-bread.name' && !o.disabled))
+    assert.ok(opts(r).some(o => o.value === '__done__' && !o.disabled))
+    r = confirmed(ok(s.resolveChoice(0, '__done__')))
     assert.equal(values(r).grain, 1)
     assert.equal(values(r).food, 20)
     assert.equal(cardFood(r, CARD_ID), 0)
@@ -684,19 +667,7 @@ describe('A063 command boundaries', () => {
         crops: [{ row: 0, col: 1, crop: 'vegetable' }],
       }),
     )
-    for (
-      let n = 0;
-      n < 3 &&
-      r.interaction.stateId === 'wait' &&
-      r.interaction.request.kind === 'choice';
-      n++
-    ) {
-      const done = opts(r).find(
-        (o) => o.value === '__skip__' || o.value === '__done__',
-      )
-      assert.ok(done, JSON.stringify(r.interaction))
-      r = ok(s.resolveChoice(0, done.value))
-    }
+    confirmed(r)
     assert.equal(values(r).vegetable, 0)
     assert.equal(values(r).food, 20)
     assert.equal(cardFood(r, CARD_ID), 0)
@@ -765,7 +736,7 @@ describe('A063 command boundaries', () => {
     turn(s, 1, 'grain-seeds')
     ready(s, 0)
     assertRejectedUnchanged(s, () => s.takeAction(0, 'grain-utilization'))
-    const r = turn(s, 0, 'forest')
+    const r = confirmed(turn(s, 0, 'forest'))
     assert.equal(values(r).grain, 1)
     assert.equal(values(r).food, 25)
     assert.equal(cardFood(r, CARD_ID), 3)
@@ -778,9 +749,18 @@ describe('A063 command boundaries', () => {
   })
   it('undo restores real baked grain and Windmill bonus before one retry', () => {
     const s = setup({ majors: [FIRE], resources: { grain: 1 } })
-    const before = undoRuleSnapshot(s.getState())
+    const initial = s.getState()
+    assert.equal(initial.interaction.stateId, 'idle')
+    assert.equal(initial.state.currentPlayerIndex, 0)
+    const beforeInteraction = JSON.stringify(initial.interaction)
+    const before = undoRuleSnapshot(initial)
     bake(s)
-    assertUndoRestored(before, s.undoAction())
+    const restored = s.undoAction()
+    assertUndoRestored(before, restored)
+    assert.equal(JSON.stringify(restored.interaction), beforeInteraction)
+    assert.equal(JSON.stringify(s.getState().interaction), beforeInteraction)
+    assert.equal(restored.state.currentPlayerIndex, 0)
+    assert.equal(s.getState().state.currentPlayerIndex, 0)
     const r = bake(s)
     assert.equal(values(r).grain, 0)
     assert.equal(values(r).food, 25)
@@ -792,7 +772,7 @@ describe('A063 command boundaries', () => {
   })
   it('a natural harvest four transition reaches round five before an actual bonus bake', () => {
     const s = setup({ round: 4, majors: [FIRE], resources: { grain: 1 } })
-    const r = finishHarvest(s, workEnd(s))
+    const r = roundStarted(workEnd(s), 5)
     assert.equal(r.state.round, 5)
     assert.equal(values(r).food, 16)
     assert.equal(values(r).grain, 1)
