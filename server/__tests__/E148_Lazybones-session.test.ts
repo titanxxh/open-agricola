@@ -232,7 +232,7 @@ describe('E148_Lazybones session', () => {
     assert.ok(flow?.type === 'leaf')
     const leaf = flow
     expect(leaf.actionId).toBe('emit-choice')
-    expect(leaf.params?.options).toEqual(TRIGGER_SPACES.map(value => ({ value, labelKey: `actions.${value}.name` })))
+    expect(leaf.params?.options).toEqual(TRIGGER_SPACES.map(value => ({ value, labelKey: `actions.${value}.name`, sourceCard: CARD_ID })))
     expect(leaf.params?.multiSelect).toEqual({ valuePrefix: CHOICE_PREFIX, minSelections: 0, maxSelections: 2 })
 
     session.withCtx(() => effect.resolveChoice!(state, owner, CHOICE_PREFIX, { sourceCard: CARD_ID }))

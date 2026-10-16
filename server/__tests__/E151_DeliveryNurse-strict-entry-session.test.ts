@@ -75,14 +75,14 @@ describe('E151 Delivery Nurse strict action entry', () => {
     const session = setupDeliveryNurse(5)
 
     expect(session.getState().actionAvailability?.['wish-children']).toBe(false)
-    assertRejectedUnchanged(session, () => session.takeAction(0, 'wish-children'))
+    const rejected = assertRejectedUnchanged(session, () => session.takeAction(0, 'wish-children'))
+    expect(rejected.error).toBe('space unavailable')
     const response = session.takeAction(0, 'grain-seeds')
 
     expect(response.ok, response.error).toBe(true)
     expect(familySize(response.state.players[0]!)).toBe(5)
     expect(workersAvailable(response.state, response.state.players[0]!)).toBe(4)
     expect(response.state.players[0]!.resources.grain).toBe(1)
-    expect(response.error).toBe('space unavailable')
     expect(response.state.actionSpaces.find((space) => space.id === 'wish-children')?.takenBy).toEqual([])
     expect(response.state.players[0]!.cardStates[CARD_ID]?.flagged).not.toBe(true)
   })
