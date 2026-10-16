@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
@@ -21,9 +17,9 @@ describe('C098_CubeCutter session', () => {
 
     session.loadState(state)
 
-    const effect = getCardEffect(CARD_ID)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
     expect(effect).toBeDefined()
-    const flow = effect!.onBuy!(state, player)
+    const flow = session.withCtx(() => effect!.onBuy!(state, player))
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('leaf')
     expect((flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('gain')
@@ -43,9 +39,9 @@ describe('C098_CubeCutter session', () => {
 
     session.loadState(state)
 
-    const effect = getCardEffect(CARD_ID)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
     expect(effect).toBeDefined()
-    const flow = effect!.onHarvestFieldPhase!(state, player)
+    const flow = session.withCtx(() => effect!.onHarvestFieldPhase!(state, player))
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('seq')
     expect((flow as Extract<ActionFlow, { type: 'leaf' }>).optional).toBe(true)
@@ -74,8 +70,8 @@ describe('C098_CubeCutter session', () => {
 
     session.loadState(state)
 
-    const effect = getCardEffect(CARD_ID)
-    const flow = effect!.onHarvestFieldPhase!(state, player)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
+    const flow = session.withCtx(() => effect!.onHarvestFieldPhase!(state, player))
     expect(flow).toBeUndefined()
   })
 
@@ -92,8 +88,8 @@ describe('C098_CubeCutter session', () => {
 
     session.loadState(state)
 
-    const effect = getCardEffect(CARD_ID)
-    const flow = effect!.onHarvestFieldPhase!(state, player)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
+    const flow = session.withCtx(() => effect!.onHarvestFieldPhase!(state, player))
     expect(flow).toBeUndefined()
   })
 

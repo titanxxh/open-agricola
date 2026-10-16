@@ -1,7 +1,4 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
+import type { GameSession as SessionRuleOwner } from '../game/authoritative-session'
 import { type SessionResponse } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
@@ -23,8 +20,11 @@ import '../../shared/cards/C/C081_MaterialHub'
 
 const CARD_ID = 'C081_MaterialHub'
 
-const findCollectListener = () =>
-  getRegisteredCardListeners().find((listener) => listener.id === 'C81-material-hub-after-collect')
+const findCollectListener = (ruleOwner: SessionRuleOwner) =>
+  {
+  const lookupRule1 = () => getRegisteredCardListeners().find((listener) => listener.id === 'C81-material-hub-after-collect')
+  return ruleOwner.withCtx(lookupRule1)
+}
 
 const moved = (
   resources: Partial<Resource>,
@@ -47,18 +47,18 @@ const setupListener = () => {
   owner.minorPlayed.push(CARD_ID)
   setStoredResource(owner, CARD_ID, 'wood', 1)
   const space = state.actionSpaces.find((entry) => entry.id === 'forest')!
-  return { state, owner, trigger, space }
+  return { session: session, state, owner, trigger, space }
 }
 
-const runCollectListener = (
+const runCollectListener = (ruleOwner: SessionRuleOwner,
   events: readonly DraftGameEvent<'resource.moved'>[],
   resourcesGained?: Partial<Resource>,
   actionEvents: readonly DraftGameEvent<'resource.moved'>[] = events,
 ): ActionFlow | undefined => {
-  const listener = findCollectListener()
+  const listener = findCollectListener(ruleOwner)
   expect(listener).toBeDefined()
-  const { state, owner, trigger, space } = setupListener()
-  return executeCardListener(listener!, {
+  const { session: ruleSession, state, owner, trigger, space } = setupListener()
+  return ruleSession.withCtx(() => executeCardListener(listener!, {
     state,
     player: trigger,
     triggerPlayer: trigger,
@@ -69,7 +69,7 @@ const runCollectListener = (
     result: resourcesGained ? { type: 'ok', resourcesGained } : { type: 'ok' },
     transactionEvents: events,
     actionEvents,
-  } as unknown as CardListenerContext, { ownerPlayerId: owner.id })?.flow
+  } as unknown as CardListenerContext, { ownerPlayerId: owner.id }))?.flow
 }
 
 describe('C081_MaterialHub prerequisite', () => {
@@ -79,7 +79,7 @@ describe('C081_MaterialHub prerequisite', () => {
     const player = state.players[0]!
     player.resources.reed = 0
     player.resources.stone = 2
-    expect(meetsCardPrerequisites(player, C081_MaterialHub, state.round, state)).toBe(false)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, C081_MaterialHub, state.round, state))).toBe(false)
   })
 
   it('blocks when no stone in supply', () => {
@@ -88,7 +88,7 @@ describe('C081_MaterialHub prerequisite', () => {
     const player = state.players[0]!
     player.resources.reed = 2
     player.resources.stone = 0
-    expect(meetsCardPrerequisites(player, C081_MaterialHub, state.round, state)).toBe(false)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, C081_MaterialHub, state.round, state))).toBe(false)
   })
 
   it('allows when both reed and stone are >= 1', () => {
@@ -97,13 +97,13 @@ describe('C081_MaterialHub prerequisite', () => {
     const player = state.players[0]!
     player.resources.reed = 1
     player.resources.stone = 1
-    expect(meetsCardPrerequisites(player, C081_MaterialHub, state.round, state)).toBe(true)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, C081_MaterialHub, state.round, state))).toBe(true)
   })
 })
 
 describe('C081_MaterialHub action-space provenance', () => {
   it('releases a stored resource when the trigger player takes enough from an action space', () => {
-    const { trigger } = setupListener()
+    const { session: ruleSession, trigger } = setupListener()
     const events = [moved({ wood: 5 }, trigger.id)]
     expect(events).toEqual(expect.arrayContaining([
       expect.objectContaining({
@@ -112,7 +112,7 @@ describe('C081_MaterialHub action-space provenance', () => {
         to: expect.objectContaining({ kind: 'player', playerId: trigger.id }),
       }),
     ]))
-    const flow = runCollectListener(events)
+    const flow = runCollectListener(ruleSession, events)
 
     expect(flow?.type).toBe('seq')
     if (flow?.type !== 'seq') throw new Error('expected sequence flow')
@@ -127,18 +127,18 @@ describe('C081_MaterialHub action-space provenance', () => {
   })
 
 	  it('does not release a stored resource for same-resource supply or card moves', () => {
-    const { trigger } = setupListener()
+    const { session: ruleSession, trigger } = setupListener()
 
-    expect(runCollectListener([moved({ wood: 5 }, trigger.id, { kind: 'supply' })], { wood: 5 })).toBeUndefined()
-	    expect(runCollectListener([moved({ wood: 5 }, trigger.id, { kind: 'card', playerId: trigger.id, cardId: 'Test_Source' })], { wood: 5 })).toBeUndefined()
+    expect(runCollectListener(ruleSession, [moved({ wood: 5 }, trigger.id, { kind: 'supply' })], { wood: 5 })).toBeUndefined()
+	    expect(runCollectListener(ruleSession, [moved({ wood: 5 }, trigger.id, { kind: 'card', playerId: trigger.id, cardId: 'Test_Source' })], { wood: 5 })).toBeUndefined()
 	  })
 
 	  it('ignores stale transaction events when current actionEvents do not include the threshold', () => {
-	    const { trigger } = setupListener()
+	    const { session: ruleSession, trigger } = setupListener()
 	    const staleWood = moved({ wood: 5 }, trigger.id)
 	    const currentClay = moved({ clay: 1 }, trigger.id)
 
-	    expect(runCollectListener([staleWood, currentClay], undefined, [currentClay])).toBeUndefined()
+	    expect(runCollectListener(ruleSession, [staleWood, currentClay], undefined, [currentClay])).toBeUndefined()
 	  })
 
 	  it('lets the owner take from the card when another player collects enough from an action space', () => {

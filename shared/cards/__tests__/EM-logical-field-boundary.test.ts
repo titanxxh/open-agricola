@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from './card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../../../server/game/authoritative-session'
 import type { CardListenerContext } from '../card-listeners'
@@ -34,7 +30,7 @@ const setup = () => {
     player.fields = []
     player.cardStates = {}
   })
-  return { state, player: state.players[0]! }
+  return { session: session, state, player: state.players[0]! }
 }
 
 const setCardField = (
@@ -52,40 +48,40 @@ const setCardField = (
 
 describe('E/M Logical Field consumers', () => {
   it('uses empty Card Fields for field-count rules', () => {
-    const { state, player } = setup()
+    const { session: ruleSession, state, player } = setup()
     setCardField(player, 'B113_PatchCaregiver', null, 0, 'occupation')
     setCardField(player, 'B068_Beanfield', null)
     state.round = 7
     player.resources.grain = 1
 
-    expect(E023_Apiary_impl.effect.onBeforeReturnHome!(state, player)).toMatchObject({ type: 'seq' })
-    expect(E107_LandSurveyor_impl.effect.onHarvestFieldPhase!(state, player)).toMatchObject({ params: { food: 1 } })
-    expect(M025_HouseholdInventory_impl.prerequisiteCheck!(player)).toBe(true)
-    expect(M058_PeatFertilizer_impl.prerequisiteCheck!(player)).toBe(true)
-    expect(M058_PeatFertilizer_impl.listeners![0]!.handler!({
+    expect(ruleSession.withCtx(() => E023_Apiary_impl.effect.onBeforeReturnHome!(state, player))).toMatchObject({ type: 'seq' })
+    expect(ruleSession.withCtx(() => E107_LandSurveyor_impl.effect.onHarvestFieldPhase!(state, player))).toMatchObject({ params: { food: 1 } })
+    expect(ruleSession.withCtx(() => M025_HouseholdInventory_impl.prerequisiteCheck!(player))).toBe(true)
+    expect(ruleSession.withCtx(() => M058_PeatFertilizer_impl.prerequisiteCheck!(player))).toBe(true)
+    expect(ruleSession.withCtx(() => M058_PeatFertilizer_impl.listeners![0]!.handler!({
       state,
       player,
       actionId: 'cut-peat',
       phase: 'after',
-    } as unknown as CardListenerContext)).toMatchObject({ flow: { actionId: 'sow' } })
-    expect(M111_NoTillFarming_impl.prerequisiteCheck!(player)).toBe(true)
+    } as unknown as CardListenerContext))).toMatchObject({ flow: { actionId: 'sow' } })
+    expect(ruleSession.withCtx(() => M111_NoTillFarming_impl.prerequisiteCheck!(player))).toBe(true)
     expect(hasFarmShape(player)).toBe(true)
   })
 
   it('uses Card Field crops and rejects the wrong crop', () => {
-    const { state, player } = setup()
+    const { session: ruleSession, state, player } = setup()
     setCardField(player, 'B113_PatchCaregiver', 'grain', 2, 'occupation')
 
-    expect(E025_BumperCrop_impl.effect.onBuy!(state, player)).toMatchObject({ actionId: 'reap' })
-    expect(E117_PipeSmoker_impl.effect.onStartHarvest!(state, player)).toMatchObject({ params: { wood: 2 } })
+    expect(ruleSession.withCtx(() => E025_BumperCrop_impl.effect.onBuy!(state, player))).toMatchObject({ actionId: 'reap' })
+    expect(ruleSession.withCtx(() => E117_PipeSmoker_impl.effect.onStartHarvest!(state, player))).toMatchObject({ params: { wood: 2 } })
     expect(hasGrowingCrop(player, 'grain')).toBe(true)
     expect(hasGrowingCrop(player, 'vegetable')).toBe(false)
 
     player.cardStates.B113_PatchCaregiver = {
       extraData: { cardFieldStacks: [{ crop: 'vegetable', remaining: 2 }] },
     }
-    expect(E117_PipeSmoker_impl.effect.onStartHarvest!(state, player)).toBeUndefined()
-    expect(E135_Pickler_impl.effect.computeSharedPostScore!(state, player, [])).toEqual([
+    expect(ruleSession.withCtx(() => E117_PipeSmoker_impl.effect.onStartHarvest!(state, player))).toBeUndefined()
+    expect(ruleSession.withCtx(() => E135_Pickler_impl.effect.computeSharedPostScore!(state, player, []))).toEqual([
       { playerId: player.id, score: 3 },
     ])
   })
@@ -93,13 +89,13 @@ describe('E/M Logical Field consumers', () => {
 
 describe('E/M Farmyard Field consumers', () => {
   it('does not treat Card Fields as farmyard geometry', () => {
-    const { state, player } = setup()
+    const { session: ruleSession, state, player } = setup()
     setCardField(player, 'B113_PatchCaregiver', 'grain', 2, 'occupation')
 
     const cowPatty = E071_CowPatty_impl.listeners![0]!
     const fieldDoctor = E092_FieldDoctor_impl.listeners![0]!
-    expect(E034_LandRegister_impl.effect.computeBonusScore!(state, player)).toBe(0)
-    expect(cowPatty.handler!({
+    expect(ruleSession.withCtx(() => E034_LandRegister_impl.effect.computeBonusScore!(state, player))).toBe(0)
+    expect(ruleSession.withCtx(() => cowPatty.handler!({
       state,
       player,
       actionId: 'sow',
@@ -113,13 +109,13 @@ describe('E/M Farmyard Field consumers', () => {
         }],
       }],
       transactionEvents: [],
-    } as unknown as CardListenerContext)).toBeUndefined()
-    expect(fieldDoctor.handler!({
+    } as unknown as CardListenerContext))).toBeUndefined()
+    expect(ruleSession.withCtx(() => fieldDoctor.handler!({
       state,
       player,
       space: { id: 'wish-children' },
       actionId: 'family-growth',
       phase: 'computeReplace',
-    } as unknown as CardListenerContext)).toBeUndefined()
+    } as unknown as CardListenerContext))).toBeUndefined()
   })
 })

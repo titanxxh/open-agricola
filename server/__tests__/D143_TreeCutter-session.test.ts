@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -44,7 +40,7 @@ describe('D143_TreeCutter session', () => {
 
   const directContext = (
     transactionEvents: DraftGameEvent<'resource.moved'>[],
-  ): CardListenerContext => {
+  ): { session: GameSession; context: CardListenerContext } => {
     const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
@@ -52,7 +48,8 @@ describe('D143_TreeCutter session', () => {
     const player = state.players[0]!
     player.id = 'p1'
     player.occupationPlayed.push(CARD_ID)
-    return {
+    return { session, context: {
+    actionHooks: session.actionHooks,
       state,
       player,
       space: state.actionSpaces.find((space) => space.id === 'clay-pit')!,
@@ -61,7 +58,7 @@ describe('D143_TreeCutter session', () => {
       transactionEvents,
       actionEvents: transactionEvents,
       result: { type: 'ok', resourcesGained: { clay: 3 } },
-    } as unknown as CardListenerContext
+    } as unknown as CardListenerContext }
   }
 
   it('gains 1 wood when collecting 3+ clay from clay-pit', () => {
@@ -156,10 +153,10 @@ describe('D143_TreeCutter session', () => {
   })
 
   it('uses action-space non-wood events even without result gains', () => {
-    const ctx = directContext([moved()])
+    const { session: ruleSession1, context: ctx } = directContext([moved()])
     ctx.result = { type: 'ok' }
 
-    const result = executeCardListener(LISTENER, ctx)
+    const result = ruleSession1.withCtx(() => executeCardListener(LISTENER, ctx))
 
     expect(result?.flow).toMatchObject({
       type: 'leaf',
@@ -170,12 +167,12 @@ describe('D143_TreeCutter session', () => {
   })
 
   it('does not trigger for supply/cardEffect clay even when result reports clay', () => {
-    const ctx = directContext([moved({
+    const { session: ruleSession2, context: ctx } = directContext([moved({
       from: { kind: 'supply' },
       reason: 'cardEffect',
     })])
 
-    const result = executeCardListener(LISTENER, ctx)
+    const result = ruleSession2.withCtx(() => executeCardListener(LISTENER, ctx))
 
     expect(result).toBeUndefined()
   })

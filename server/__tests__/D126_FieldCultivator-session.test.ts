@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 
@@ -32,7 +28,7 @@ describe('D126_FieldCultivator session', () => {
     const player = state.players[0]!
     player.occupationPlayed.push(CARD_ID)
     // Simulate onBuy: push stack
-    runCardEffectHook(state, player, CARD_ID, 'onBuy')
+    session.withCtx(() => runCardEffectHook(state, player, CARD_ID, 'onBuy'))
 
     if (options?.fields) {
       player.fields = options.fields

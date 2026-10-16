@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome, workersAvailable } from '../../shared/domain/player'
@@ -477,14 +473,14 @@ describe('B149 Open Air Farmer session', () => {
 
     const state = resp.state
     const player = state.players[0]!
-    expect(getAvailableStableSupplyCount(state, player)).toBe(1)
+    expect(session.withCtx(() => getAvailableStableSupplyCount(state, player))).toBe(1)
 
-    const stableResult = stablesAction.execute({
+    const stableResult = session.withCtx(() => stablesAction.execute({
       actionHooks: session.actionHooks,
       state,
       player,
       space: stableSpace,
-    } as ActionExecutionContext)
+    } as ActionExecutionContext))
 
     expect(stableResult.type).toBe('request')
     if (stableResult.type !== 'request') return
@@ -508,7 +504,7 @@ describe('B149 Open Air Farmer session', () => {
     const updated = resp.state.players[0]!
 
     expect(updated.occupationPlayed).not.toContain(CARD_ID)
-    expect(getAvailableStableSupplyCount(resp.state, updated)).toBe(1)
+    expect(session.withCtx(() => getAvailableStableSupplyCount(resp.state, updated))).toBe(1)
     expect(updated.supplyTokensConsumed?.stable).toBeUndefined()
     expect(updated.resources.wood).toBe(2)
     expect(updated.fenceSegments).toHaveLength(0)

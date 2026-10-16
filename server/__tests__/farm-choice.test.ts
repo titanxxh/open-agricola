@@ -1,7 +1,5 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
+import { withActiveRegistry } from '../../shared/cards/active-registry'
+import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
 import { describe, expect, it } from 'vitest'
 import { constructAction } from '../../shared/actions/effects/construct.ts'
 import type { ActionExecutionContext, ActionSpace, GameState, PlayerState } from '../../shared/contract/types.ts'
@@ -64,6 +62,7 @@ const createPlayer = (): PlayerState => ({
 
 describe('farm choice', () => {
   it('pays frame builder room costs using alternate clay payment', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     const player = createPlayer()
     player.houseType = 'clay'
     player.resources.wood = 1
@@ -76,9 +75,9 @@ describe('farm choice', () => {
     if (interaction.farmType !== 'room') return
 
     // Single combo resolves immediately and schedules payment as a pay child.
-    const result = constructAction.resolveChoice!(buildRoomCtx(player), 'confirm', {
+    const result = withActiveRegistry(ruleRegistry, () => constructAction.resolveChoice!(buildRoomCtx(player), 'confirm', {
       rooms: [interaction.selectableTiles[0]!],
-    })
+    }))
 
     expect(result.type).toBe('ok')
     expect(player.resources.wood).toBe(1)
@@ -98,6 +97,7 @@ describe('farm choice', () => {
   })
 
   it('requires an explicit payment choice when multiple room payments are legal', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     const player = createPlayer()
     player.houseType = 'stone'
     player.resources.wood = 1
@@ -109,9 +109,9 @@ describe('farm choice', () => {
     expect(interaction.farmType).toBe('room')
     if (interaction.farmType !== 'room') return
 
-    const result = constructAction.resolveChoice!(buildRoomCtx(player), 'confirm', {
+    const result = withActiveRegistry(ruleRegistry, () => constructAction.resolveChoice!(buildRoomCtx(player), 'confirm', {
       rooms: [interaction.selectableTiles[0]!],
-    })
+    }))
 
     // Multi-combo: returns `request` with payment `choice` kind (engine forwards
     // it as a payment-select pending) rather than a fail.
@@ -121,6 +121,7 @@ describe('farm choice', () => {
   })
 
   it('rejects room selections above the true max buildable room count', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     const player = createPlayer()
     player.resources.wood = 8
     player.resources.reed = 2
@@ -133,9 +134,9 @@ describe('farm choice', () => {
     if (interaction.farmType !== 'room') return
     expect(interaction.maxSelections).toBe(2)
 
-    const result = constructAction.resolveChoice!(buildRoomCtx(player), 'confirm', {
+    const result = withActiveRegistry(ruleRegistry, () => constructAction.resolveChoice!(buildRoomCtx(player), 'confirm', {
       rooms: interaction.selectableTiles.slice(0, 3),
-    })
+    }))
 
     expect(result.type).toBe('fail')
   })

@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -115,7 +111,7 @@ describe('B151_LittlePeasant session', () => {
 
     session.loadState(state)
     const loaded = session.getState().state
-    const allowed = computeAllowedPlacementSpaces(loaded, loaded.players[0]!, { actionHooks: session.actionHooks })
+    const allowed = session.withCtx(() => computeAllowedPlacementSpaces(loaded, loaded.players[0]!, { actionHooks: session.actionHooks }))
 
     expect(allowed).toEqual(
       expect.arrayContaining([{ spaceId: 'forest', allowOccupied: true, option: expect.any(Object) }]),

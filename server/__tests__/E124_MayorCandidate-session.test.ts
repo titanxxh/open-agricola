@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
@@ -62,8 +58,8 @@ const playMayorCandidate = (session: GameSession) => {
   return response
 }
 
-const mayorCandidateBonus = (response: SessionResponse) =>
-  computeScores(response.state)[0]!.categories
+const mayorCandidateBonus = (session: GameSession, response: SessionResponse) =>
+  session.withCtx(() => computeScores(response.state))[0]!.categories
     .find((category) => category.key === 'cardBonusVp')?.entries
     .find((entry) => entry.type === 'bonus' && entry.cardId === CARD_ID)?.score ?? 0
 
@@ -77,21 +73,24 @@ describe('E124 Mayor Candidate parity', () => {
   })
 
   it('E124 S2: no wood or stone in reserve scores no Mayor Candidate penalty', () => {
-    expect(mayorCandidateBonus(setup({ played: true }).getState())).toBe(0)
+    const session = setup({ played: true })
+    expect(mayorCandidateBonus(session, session.getState())).toBe(0)
   })
 
   it('E124 S3: three wood and two stone in reserve score five negative points', () => {
-    const response = setup({ played: true, resources: { wood: 3, stone: 2 } }).getState()
+    const session = setup({ played: true, resources: { wood: 3, stone: 2 } })
+    const response = session.getState()
 
-    expect(mayorCandidateBonus(response)).toBe(-5)
+    expect(mayorCandidateBonus(session, response)).toBe(-5)
   })
 
   it('E124 S4: clay and reed do not add to the Mayor Candidate penalty', () => {
-    const response = setup({
+    const session = setup({
       played: true, resources: { wood: 1, stone: 2, clay: 3, reed: 4 },
-    }).getState()
+    })
+    const response = session.getState()
 
-    expect(mayorCandidateBonus(response)).toBe(-3)
+    expect(mayorCandidateBonus(session, response)).toBe(-3)
   })
 
   it('E124 S5: Pen Builder still consumes one wood despite Mayor Candidates discard prohibition', () => {

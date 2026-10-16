@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
@@ -154,9 +150,9 @@ describe('D154_ChimneySweep bonus scoring', () => {
     const state = session.getState().state
     const p1 = state.players[0]!
 
-    const effect = getCardEffect(CARD_ID)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
     expect(effect?.computeBonusScore).toBeDefined()
-    const score = effect!.computeBonusScore!(state, p1, scoreContext)
+    const score = session.withCtx(() => effect!.computeBonusScore!(state, p1, scoreContext))
     expect(score).toBe(1)
   })
 
@@ -165,7 +161,7 @@ describe('D154_ChimneySweep bonus scoring', () => {
     const state = session.getState().state
     const p1 = state.players[0]!
 
-    const score = getCardEffect(CARD_ID)!.computeBonusScore!(state, p1, scoreContext)
+    const score = session.withCtx(() => session.withCtx(() => getCardEffect(CARD_ID))!.computeBonusScore!(state, p1, scoreContext))
     expect(score).toBe(0)
   })
 
@@ -174,7 +170,7 @@ describe('D154_ChimneySweep bonus scoring', () => {
     const state = session.getState().state
     const p1 = state.players[0]!
 
-    const score = getCardEffect(CARD_ID)!.computeBonusScore!(state, p1, scoreContext)
+    const score = session.withCtx(() => session.withCtx(() => getCardEffect(CARD_ID))!.computeBonusScore!(state, p1, scoreContext))
     expect(score).toBe(0)
   })
 

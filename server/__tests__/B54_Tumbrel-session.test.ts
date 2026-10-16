@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardEffect, runCardEffectHook } from '../../shared/cards/card-effects'
@@ -22,9 +18,9 @@ describe('B054_Tumbrel session', () => {
     const player = state.players[0]!
     session.loadState(state)
 
-    const effect = getCardEffect(CARD_ID)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
     expect(effect).toBeDefined()
-    const flow = effect!.onBuy!(state, player)
+    const flow = session.withCtx(() => effect!.onBuy!(state, player))
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('leaf')
     expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params?.food).toBe(2)
@@ -44,7 +40,7 @@ describe('B054_Tumbrel session', () => {
     session.loadState(state)
 
     // Find the Tumbrel sow listener
-    const listener = getRegisteredCardListeners().find(
+    const listener = session.withCtx(() => getRegisteredCardListeners()).find(
       (reg) => reg.id === 'B54-tumbrel-after-sow',
     )
     expect(listener).toBeDefined()
@@ -58,7 +54,7 @@ describe('B054_Tumbrel session', () => {
       result: { type: 'ok' },
     }
 
-    const result = executeCardListener(listener!, context)
+    const result = session.withCtx(() => executeCardListener(listener!, context))
     expect(result).toBeDefined()
     expect(result!.flow).toBeDefined()
     expect((result!.flow as Extract<ActionFlow, { type: 'leaf' }>).params?.food).toBe(2)
@@ -76,7 +72,7 @@ describe('B054_Tumbrel session', () => {
     const space = state.actionSpaces.find((s) => s.id === 'grain-utilization')!
     session.loadState(state)
 
-    const listener = getRegisteredCardListeners().find(
+    const listener = session.withCtx(() => getRegisteredCardListeners()).find(
       (reg) => reg.id === 'B54-tumbrel-after-sow',
     )
     expect(listener).toBeDefined()
@@ -90,7 +86,7 @@ describe('B054_Tumbrel session', () => {
       result: { type: 'ok' },
     }
 
-    const result = executeCardListener(listener!, context)
+    const result = session.withCtx(() => executeCardListener(listener!, context))
     expect(result).toBeUndefined()
   })
 
@@ -111,7 +107,7 @@ describe('B054_Tumbrel session', () => {
     const space = state.actionSpaces.find((s) => s.id === 'grain-utilization')!
     session.loadState(state)
 
-    const listener = getRegisteredCardListeners().find(
+    const listener = session.withCtx(() => getRegisteredCardListeners()).find(
       (reg) => reg.id === 'B54-tumbrel-after-sow',
     )!
 
@@ -124,7 +120,7 @@ describe('B054_Tumbrel session', () => {
       result: { type: 'ok' },
     }
 
-    const result = executeCardListener(listener, context)
+    const result = session.withCtx(() => executeCardListener(listener, context))
     expect(result).toBeDefined()
     expect((result!.flow as Extract<ActionFlow, { type: 'leaf' }>).params?.food).toBe(2)
   })
@@ -141,7 +137,7 @@ describe('B054_Tumbrel session', () => {
     const space = state.actionSpaces.find((s) => s.id === 'grain-utilization')!
     session.loadState(state)
 
-    const listener = getRegisteredCardListeners().find(
+    const listener = session.withCtx(() => getRegisteredCardListeners()).find(
       (reg) => reg.id === 'B54-tumbrel-after-sow',
     )
     expect(listener).toBeDefined()
@@ -155,7 +151,7 @@ describe('B054_Tumbrel session', () => {
       result: { type: 'ok' },
     }
 
-    const result = executeCardListener(listener!, context)
+    const result = session.withCtx(() => executeCardListener(listener!, context))
     expect(result).toBeDefined()
     expect((result!.flow as Extract<ActionFlow, { type: 'leaf' }>).params?.food).toBe(3)
   })

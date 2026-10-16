@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -31,9 +27,9 @@ describe('E110_Dentist session', () => {
 
     session.loadState(state)
 
-    const effect = getCardEffect(CARD_ID)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
     expect(effect).toBeDefined()
-    const flow = effect!.onStartHarvest!(state, player)
+    const flow = session.withCtx(() => effect!.onStartHarvest!(state, player))
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('seq')
     expect(flow!.optional).toBe(true)
@@ -53,8 +49,8 @@ describe('E110_Dentist session', () => {
 
     session.loadState(state)
 
-    const effect = getCardEffect(CARD_ID)
-    const flow = effect!.onStartHarvest!(state, player)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
+    const flow = session.withCtx(() => effect!.onStartHarvest!(state, player))
     expect(flow).toBeUndefined()
   })
 
@@ -76,8 +72,8 @@ describe('E110_Dentist session', () => {
 
     session.loadState(state)
 
-    const effect = getCardEffect(CARD_ID)
-    const flow = effect!.onHarvestFeedingPhase!(state, player)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
+    const flow = session.withCtx(() => effect!.onHarvestFeedingPhase!(state, player))
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('leaf')
     // Should gain 3 food (1 per wood on card)
@@ -97,8 +93,8 @@ describe('E110_Dentist session', () => {
 
     session.loadState(state)
 
-    const effect = getCardEffect(CARD_ID)
-    const flow = effect!.onHarvestFeedingPhase!(state, player)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
+    const flow = session.withCtx(() => effect!.onHarvestFeedingPhase!(state, player))
     expect(flow).toBeUndefined()
   })
 

@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
@@ -171,7 +167,7 @@ describe('C8 PlantFertilizer session', () => {
     player.fields = [{ row: 0, col: 1, stacks: [] }]
     session.loadState(state)
 
-    const flow = runCardEffectHook(state, player, CARD_ID, 'onBuy')
+    const flow = session.withCtx(() => runCardEffectHook(state, player, CARD_ID, 'onBuy'))
     expect(flow).toBeNull()
     expect(player.fields[0]!.stacks).toEqual([])
   })
@@ -181,7 +177,7 @@ describe('C8 PlantFertilizer session', () => {
     player.fields = [{ row: 0, col: 1, stacks: [{ kind: 'grain', remaining: 1 }] }]
     session.loadState(state)
 
-    const flow = runCardEffectHook(state, player, CARD_ID, 'onBuy')
+    const flow = session.withCtx(() => runCardEffectHook(state, player, CARD_ID, 'onBuy'))
     expect(flow).not.toBeNull()
     expect(flow!.type).toBe('seq')
     expect((flow as Extract<ActionFlow, { type: 'seq' }>).optional).toBe(true)
@@ -192,7 +188,7 @@ describe('C8 PlantFertilizer session', () => {
     player.fields = [{ row: 0, col: 1, stacks: [{ kind: 'grain', remaining: 1 }] }]
     session.loadState(state)
 
-    const flow = runCardEffectHook(state, player, CARD_ID, 'onBuy')!
+    const flow = session.withCtx(() => runCardEffectHook(state, player, CARD_ID, 'onBuy'))!
     const seq = flow as Extract<ActionFlow, { type: 'seq' }>
     const leaf = seq.children[0]! as Extract<ActionFlow, { type: 'leaf' }>
 
@@ -200,13 +196,13 @@ describe('C8 PlantFertilizer session', () => {
     // does not expose a public flow runner on GameSession for tests
     // (only `takeAction` / `loadState` / `getState`); the leaf is pure
     // and synchronous, so direct execute is the honest minimal form.
-    const result = specialEffectAction.execute!({
+    const result = session.withCtx(() => specialEffectAction.execute!({
       state,
       player,
       sourceCard: leaf.sourceCard,
       params: leaf.params as Record<string, unknown>,
       space: undefined as never,
-    })
+    }))
     expect(result.type).toBe('ok')
     expect(player.fields[0]!.stacks[0]!.remaining).toBe(2)
     expect(player.resources.grain ?? 0).toBe(0)
@@ -217,7 +213,7 @@ describe('C8 PlantFertilizer session', () => {
     player.fields = [{ row: 0, col: 1, stacks: [{ kind: 'grain', remaining: 1 }] }]
     session.loadState(state)
 
-    const flow = runCardEffectHook(state, player, CARD_ID, 'onBuy')!
+    const flow = session.withCtx(() => runCardEffectHook(state, player, CARD_ID, 'onBuy'))!
     // Decline: we simply do NOT execute the leaf. The optional SEQ wrapper
     // allows the player to skip the whole effect.
     expect(player.fields[0]!.stacks[0]!.remaining).toBe(1)
@@ -237,17 +233,17 @@ describe('C8 PlantFertilizer session', () => {
     }
     session.loadState(state)
 
-    const flow = runCardEffectHook(state, player, CARD_ID, 'onBuy')!
+    const flow = session.withCtx(() => runCardEffectHook(state, player, CARD_ID, 'onBuy'))!
     const seq = flow as Extract<ActionFlow, { type: 'seq' }>
     const leaf = seq.children[0]! as Extract<ActionFlow, { type: 'leaf' }>
 
-    specialEffectAction.execute!({
+    session.withCtx(() => specialEffectAction.execute!({
       state,
       player,
       sourceCard: leaf.sourceCard,
       params: leaf.params as Record<string, unknown>,
       space: undefined as never,
-    })
+    }))
 
     expect(player.fields[0]!.stacks[0]!.remaining).toBe(2)
     const woodStacks = player.cardStates['D075_WoodField']!.extraData!['cardFieldStacks'] as Array<{ crop: string; remaining: number }>
@@ -265,7 +261,7 @@ describe('C8 PlantFertilizer session', () => {
     }
     session.loadState(state)
 
-    runCardEffectHook(state, player, CARD_ID, 'onBuy')
+    session.withCtx(() => runCardEffectHook(state, player, CARD_ID, 'onBuy'))
 
     expect(player.fields[0]!.stacks[0]!.remaining).toBe(1)
     const woodStacks = player.cardStates['D075_WoodField']!.extraData!['cardFieldStacks'] as Array<{ crop: string; remaining: number }>
@@ -285,13 +281,13 @@ describe('C8 PlantFertilizer session', () => {
     // that need impl-level access, e.g. C006_StoneClearing-session test).
     const zones: Parameters<NonNullable<typeof A011_MudPatch_impl.effect.onComputeAnimalZones>>[1] =
       []
-    A011_MudPatch_impl.effect.onComputeAnimalZones?.(player, zones, state)
+    session.withCtx(() => A011_MudPatch_impl.effect.onComputeAnimalZones?.(player, zones, state))
 
     // The single empty field stays empty (no stack injected).
     expect(player.fields[0]!.stacks).toEqual([])
 
     // C8 sees no eligible field — onBuy returns null.
-    const flow = runCardEffectHook(state, player, CARD_ID, 'onBuy')
+    const flow = session.withCtx(() => runCardEffectHook(state, player, CARD_ID, 'onBuy'))
     expect(flow).toBeNull()
   })
 })

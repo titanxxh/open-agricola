@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { familySize, markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
@@ -420,7 +416,7 @@ describe('Farmers of the Moor heating, sick workers, and Infirmary', () => {
     const player = session.state.players[0]!
     player.sickWorkerIds = ['2']
 
-    const farmers = Scoring.breakdown(session.state, 0).categories.find((category) => category.key === 'farmers')!
+    const farmers = session.withCtx(() => Scoring.breakdown(session.state, 0)).categories.find((category) => category.key === 'farmers')!
 
     expect(farmers.quantity).toBe(2)
     expect(farmers.total).toBe(4)
@@ -475,7 +471,7 @@ describe('Farmers of the Moor heating, sick workers, and Infirmary', () => {
 
     player.minorPlayed = ['M032_PeatHut']
     expect(computeHeatingRequirement(session.state, player)).toBe(3)
-    expect(getExtraRoomCapacity(player)).toBe(1)
+    expect(session.withCtx(() => getExtraRoomCapacity(player))).toBe(1)
 
     player.minorPlayed = ['M085_OvenInstallation']
     setRooms(player, 5)
@@ -490,11 +486,11 @@ describe('Farmers of the Moor heating, sick workers, and Infirmary', () => {
       animalType: 'sheep',
       animalCount: 5,
     }]
-    expect(runCardEffectHook(session.state, player, 'M086_SpinningMill', 'onHarvestFieldPhase')).toBeNull()
+    expect(session.withCtx(() => runCardEffectHook(session.state, player, 'M086_SpinningMill', 'onHarvestFieldPhase'))).toBeNull()
     expect(computeHeatingRequirement(session.state, player)).toBe(3)
 
     player.pastures[0]!.animalCount = 1
-    runCardEffectHook(session.state, player, 'M086_SpinningMill', 'onHarvestFieldPhase')
+    session.withCtx(() => runCardEffectHook(session.state, player, 'M086_SpinningMill', 'onHarvestFieldPhase'))
     expect(computeHeatingRequirement(session.state, player)).toBe(5)
   })
 
@@ -521,7 +517,7 @@ describe('Farmers of the Moor heating, sick workers, and Infirmary', () => {
       },
     }
 
-    runCardEffectHook(session.state, player, 'M086_SpinningMill', 'onHarvestFieldPhase')
+    session.withCtx(() => runCardEffectHook(session.state, player, 'M086_SpinningMill', 'onHarvestFieldPhase'))
 
     expect(player.cardStates.M086_SpinningMill?.extraData?.heatingRoomDiscount).toBe(2)
   })
@@ -531,7 +527,7 @@ describe('Farmers of the Moor heating, sick workers, and Infirmary', () => {
     const player = session.state.players[0]!
     player.minorPlayed = ['M082_Firewood']
 
-    expect(runCardEffectHook(session.state, player, 'M082_Firewood', 'onBuy')).toMatchObject({
+    expect(session.withCtx(() => runCardEffectHook(session.state, player, 'M082_Firewood', 'onBuy'))).toMatchObject({
       type: 'leaf',
       actionId: 'gain',
       params: { fuel: 1 },
@@ -640,7 +636,7 @@ describe('Farmers of the Moor heating, sick workers, and Infirmary', () => {
     player.resources.fuel = 0
     player.cardStates.M032_PeatHut = { flagged: false }
     const resources = { ...player.resources }
-    expect(getExtraRoomCapacity(player)).toBe(1)
+    expect(session.withCtx(() => getExtraRoomCapacity(player))).toBe(1)
     expect(familySize(player)).toBe(2)
 
     let resp = session.takeAction(0, 'house-redevelopment')
@@ -664,7 +660,7 @@ describe('Farmers of the Moor heating, sick workers, and Infirmary', () => {
     expect(after.resources.wood).toBe(0)
     expect(after.resources.clay).toBe(0)
     expect(after.resources.reed).toBe(0)
-    expect(getExtraRoomCapacity(after)).toBe(0)
+    expect(session.withCtx(() => getExtraRoomCapacity(after))).toBe(0)
     expect(after.resources).toEqual(resources)
     expect(familySize(after)).toBe(2)
     expect(after.cardStates.M032_PeatHut).toBeUndefined()
@@ -767,7 +763,7 @@ describe('Farmers of the Moor heating, sick workers, and Infirmary', () => {
     const player = buyResp.state.players[0]!
     expect(player.resources.food).toBe(2)
     player.resources.fuel = 1
-    const flow = runCardEffectHook(buyResp.state, player, 'Major_Moor_VillageChurch', 'onHarvest')
+    const flow = session.withCtx(() => runCardEffectHook(buyResp.state, player, 'Major_Moor_VillageChurch', 'onHarvest'))
     expect(flow).toMatchObject({
       type: 'seq',
       optional: true,
@@ -778,6 +774,6 @@ describe('Farmers of the Moor heating, sick workers, and Infirmary', () => {
     })
 
     player.resources.fuel = 0
-    expect(runCardEffectHook(buyResp.state, player, 'Major_Moor_VillageChurch', 'onHarvest')).toBeNull()
+    expect(session.withCtx(() => runCardEffectHook(buyResp.state, player, 'Major_Moor_VillageChurch', 'onHarvest'))).toBeNull()
   })
 })

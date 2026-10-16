@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { A020_DoubleTurnPlow } from '../../shared/cards/A/A020_DoubleTurnPlow'
@@ -80,7 +76,7 @@ describe('A020_DoubleTurnPlow prerequisite', () => {
     const state = session.getState().state
     state.round = 6
     const player = state.players[0]!
-    expect(meetsCardPrerequisites(player, A020_DoubleTurnPlow, state.round, state)).toBe(false)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, A020_DoubleTurnPlow, state.round, state))).toBe(false)
   })
 
   it('allows when round <= 5', () => {
@@ -88,7 +84,7 @@ describe('A020_DoubleTurnPlow prerequisite', () => {
     const state = session.getState().state
     state.round = 5
     const player = state.players[0]!
-    expect(meetsCardPrerequisites(player, A020_DoubleTurnPlow, state.round, state)).toBe(true)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, A020_DoubleTurnPlow, state.round, state))).toBe(true)
   })
 })
 

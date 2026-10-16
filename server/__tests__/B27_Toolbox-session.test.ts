@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { createWorkSession } from './_helpers/session-fixtures'
 import { type SessionResponse } from '../game/authoritative-session'
 
@@ -217,7 +213,7 @@ describe('B27 Toolbox session', () => {
     second.minorPlayed.push(CARD_ID)
     second.occupationPlayed.push('C094_StableCleaner')
     second.resources = { ...second.resources, food: 5, wood: 20, clay: 20, reed: 20, stone: 20 }
-    const previousTurnToken = recordActionSnapshot(second, 77)
+    const previousTurnToken = session.withCtx(() => recordActionSnapshot(second, 77))
     endTurnScope(second)
     writeCardExtraData(second, CARD_ID, 'windowOfferedTurnToken', previousTurnToken)
     session.loadState(state)
@@ -292,12 +288,12 @@ describe('B27 Toolbox session', () => {
     player.minorPlayed = player.minorPlayed.filter(id => id !== CARD_ID)
     player.minorHand.push(CARD_ID)
     // 模拟"本 turn 已造过 1 个房间"：先快照后增加 roomTiles
-    recordActionSnapshot(player, 1)
+    session.withCtx(() => recordActionSnapshot(player, 1))
     player.roomTiles = [...(player.roomTiles ?? []), { row: 0, col: 0 }] as typeof player.roomTiles
     session.loadState(state)
 
     // 直接调用 effect.onBuy
-    B027_Toolbox_impl.effect!.onBuy!(state, player)
+    session.withCtx(() => B027_Toolbox_impl.effect!.onBuy!(state, player))
 
     expect(isCardFlagged(player, CARD_ID)).toBe(true)
   })
@@ -308,11 +304,11 @@ describe('B27 Toolbox session', () => {
     const player = state.players[0]!
     player.minorPlayed = player.minorPlayed.filter(id => id !== CARD_ID)
     player.minorHand.push(CARD_ID)
-    recordActionSnapshot(player, 1)
+    session.withCtx(() => recordActionSnapshot(player, 1))
     player.fenceSegments = [{ edge: 'H-0-0', type: 'palisade' }]
     session.loadState(state)
 
-    B027_Toolbox_impl.effect!.onBuy!(state, player)
+    session.withCtx(() => B027_Toolbox_impl.effect!.onBuy!(state, player))
 
     expect(isCardFlagged(player, CARD_ID)).toBe(false)
   })
@@ -325,10 +321,10 @@ describe('B27 Toolbox session', () => {
     player.minorHand.push(CARD_ID)
     setCardFlag(player, CARD_ID, true)
     // 本 action 快照：什么都没造
-    recordActionSnapshot(player, 99)
+    session.withCtx(() => recordActionSnapshot(player, 99))
     session.loadState(state)
 
-    B027_Toolbox_impl.effect!.onBuy!(state, player)
+    session.withCtx(() => B027_Toolbox_impl.effect!.onBuy!(state, player))
 
     expect(isCardFlagged(player, CARD_ID)).toBe(false)
   })

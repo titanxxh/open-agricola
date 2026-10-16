@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardEffect, type BonusScoringContext } from '../../shared/cards/card-effects'
@@ -26,8 +22,8 @@ describe('D060_LargePottery computeBonusScore', () => {
     player.minorPlayed.push(CARD_ID)
     player.resources.clay = 5
     session.loadState(state)
-    const effect = getCardEffect(CARD_ID)
-    const score = effect!.computeBonusScore!(state, player, ctx)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
+    const score = session.withCtx(() => effect!.computeBonusScore!(state, player, ctx))
     expect(score).toBe(2)
   })
 
@@ -39,8 +35,8 @@ describe('D060_LargePottery computeBonusScore', () => {
     player.minorPlayed.push(CARD_ID)
     player.resources.clay = 3
     session.loadState(state)
-    const effect = getCardEffect(CARD_ID)
-    const score = effect!.computeBonusScore!(state, player, ctx)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
+    const score = session.withCtx(() => effect!.computeBonusScore!(state, player, ctx))
     expect(score).toBe(1)
   })
 
@@ -52,8 +48,8 @@ describe('D060_LargePottery computeBonusScore', () => {
     player.minorPlayed.push(CARD_ID)
     player.resources.clay = 0
     session.loadState(state)
-    const effect = getCardEffect(CARD_ID)
-    const score = effect!.computeBonusScore!(state, player, ctx)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
+    const score = session.withCtx(() => effect!.computeBonusScore!(state, player, ctx))
     expect(score).toBe(0)
   })
 
@@ -65,8 +61,8 @@ describe('D060_LargePottery computeBonusScore', () => {
     player.minorPlayed.push(CARD_ID)
     player.resources.clay = 7
     session.loadState(state)
-    const effect = getCardEffect(CARD_ID)
-    const score = effect!.computeBonusScore!(state, player, ctx)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
+    const score = session.withCtx(() => effect!.computeBonusScore!(state, player, ctx))
     expect(score).toBe(4)
   })
 })

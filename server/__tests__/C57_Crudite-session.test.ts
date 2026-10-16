@@ -1,7 +1,5 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
+import { withActiveRegistry } from '../../shared/cards/active-registry'
+import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
@@ -147,14 +145,15 @@ const selectPositions = (session: GameSession, positions: FarmTilePosition[]) =>
 
 describe('C057_Crudite', () => {
   it('onBuy offers pay 3 food for 1 vegetable when player has food', () => {
-    const effect = getCardEffect(CARD_ID)
+    const ruleRegistry = createOfficialCardRegistry()
+    const effect = withActiveRegistry(ruleRegistry, () => getCardEffect(CARD_ID))
     expect(effect).toBeDefined()
 
     const player = createPlayer()
     player.resources.food = 5
     const state = createState(player)
 
-    const flow = effect!.onBuy!(state, player)
+    const flow = withActiveRegistry(ruleRegistry, () => effect!.onBuy!(state, player))
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('seq')
     const children = (flow as Extract<ActionFlow, { type: 'seq' }>).children
@@ -165,18 +164,20 @@ describe('C057_Crudite', () => {
   })
 
   it('onBuy returns undefined when player has < 3 food', () => {
-    const effect = getCardEffect(CARD_ID)
+    const ruleRegistry = createOfficialCardRegistry()
+    const effect = withActiveRegistry(ruleRegistry, () => getCardEffect(CARD_ID))
 
     const player = createPlayer()
     player.resources.food = 2
     const state = createState(player)
 
-    const flow = effect!.onBuy!(state, player)
+    const flow = withActiveRegistry(ruleRegistry, () => effect!.onBuy!(state, player))
     expect(flow).toBeUndefined()
   })
 
   it('hook-level harvest returns optional selection and does not mutate fields', () => {
-    const effect = getCardEffect(CARD_ID)
+    const ruleRegistry = createOfficialCardRegistry()
+    const effect = withActiveRegistry(ruleRegistry, () => getCardEffect(CARD_ID))
     expect(effect).toBeDefined()
 
     const player = createPlayer()
@@ -187,7 +188,7 @@ describe('C057_Crudite', () => {
     ]
     const state = createState(player)
 
-    const flow = effect!.onStartHarvestFieldPhase!(state, player)
+    const flow = withActiveRegistry(ruleRegistry, () => effect!.onStartHarvestFieldPhase!(state, player))
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('seq')
     expect(flow!.optional).toBe(true)

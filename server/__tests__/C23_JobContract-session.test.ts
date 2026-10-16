@@ -1,7 +1,6 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
+import { CardRegistry as TestCardRegistry } from '../../shared/cards/registry'
+import { withActiveRegistry } from '../../shared/cards/active-registry'
+import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
 import { describe, expect, it } from 'vitest'
 import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 import type { GameState, PlayerState, ActionSpace , ActionFlow } from '../../shared/contract/types'
@@ -63,12 +62,16 @@ const createState = (
     gameOver: false, workPhaseObtainedResources: {},
   }) as GameState
 
-const findListener = () =>
-  getRegisteredCardListeners().find((l) => l.id === 'C23-job-contract-after-day-laborer')
+const findListener = (ruleOwner: TestCardRegistry) =>
+  {
+  const lookupRule1 = () => getRegisteredCardListeners().find((l) => l.id === 'C23-job-contract-after-day-laborer')
+  return withActiveRegistry(ruleOwner, lookupRule1)
+}
 
 describe('C023_JobContract listener', () => {
   it('is registered on place-farmer after', () => {
-    const listener = findListener()
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry)
     expect(listener).toBeDefined()
     expect(listener!.actions).toContain('place-farmer')
     expect(listener!.phases).toContain('after')
@@ -76,7 +79,8 @@ describe('C023_JobContract listener', () => {
 
 
   it('does nothing when the action is not day-laborer', () => {
-    const listener = findListener()!
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry)!
     const player = createPlayer('p1')
     player.minorPlayed.push(CARD_ID)
     player.occupationHand = ['A009_SheepFarmer']
@@ -84,16 +88,17 @@ describe('C023_JobContract listener', () => {
     const lessonsSpace = createSpace('lessons')
     const state = createState([player], [otherSpace, lessonsSpace])
 
-    const result = executeCardListener(listener, {
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener, {
       state, player, space: otherSpace, actionId: 'place-farmer', phase: 'after',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeUndefined()
     expect(lessonsSpace.takenBy).toEqual([])
   })
 
   it('does nothing when the lessons space is already occupied', () => {
-    const listener = findListener()!
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry)!
     const player = createPlayer('p1')
     player.minorPlayed.push(CARD_ID)
     player.occupationHand = ['A009_SheepFarmer']
@@ -101,25 +106,26 @@ describe('C023_JobContract listener', () => {
     const lessonsSpace = createSpace('lessons', 'p2') // taken by someone else
     const state = createState([player], [daySpace, lessonsSpace])
 
-    const result = executeCardListener(listener, {
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener, {
       state, player, space: daySpace, actionId: 'place-farmer', phase: 'after',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeUndefined()
     expect(lessonsSpace.takenBy[0]?.playerId).toBe('p2')
   })
 
   it('returns an optional flow without occupying lessons during listener dispatch', () => {
-    const listener = findListener()!
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry)!
     const player = createPlayer('p1')
     player.minorPlayed.push(CARD_ID)
     const daySpace = createSpace('day-laborer', player.id)
     const lessonsSpace = createSpace('lessons')
     const state = createState([player], [daySpace, lessonsSpace])
 
-    const result = executeCardListener(listener, {
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener, {
       state, player, space: daySpace, actionId: 'place-farmer', phase: 'after',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeDefined()
     expect(result!.flow).toBeDefined()
@@ -127,7 +133,8 @@ describe('C023_JobContract listener', () => {
   })
 
   it('places the occupancy action after the occupation leaf', () => {
-    const listener = findListener()!
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry)!
     const player = createPlayer('p1')
     player.minorPlayed.push(CARD_ID)
     player.occupationHand = ['A009_SheepFarmer']
@@ -135,9 +142,9 @@ describe('C023_JobContract listener', () => {
     const lessonsSpace = createSpace('lessons')
     const state = createState([player], [daySpace, lessonsSpace])
 
-    const result = executeCardListener(listener, {
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener, {
       state, player, space: daySpace, actionId: 'place-farmer', phase: 'after',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeDefined()
     expect(result!.flow).toBeDefined()
@@ -156,18 +163,19 @@ describe('C023_JobContract listener', () => {
   })
 
   it('occupies lessons only when the occupancy action executes', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     const player = createPlayer('p1')
     const lessonsSpace = createSpace('lessons')
     const state = createState([player], [lessonsSpace])
     const action = getAdHocAction(OCCUPY_ACTION_ID)!
 
     expect(action).toBeDefined()
-    expect(action.execute({
+    expect(withActiveRegistry(ruleRegistry, () => action.execute({
       state,
       player,
       space: lessonsSpace,
       params: { spaceId: 'lessons', linkedWorkerId: '1' },
-    } as never)).toEqual({ type: 'ok' })
+    } as never))).toEqual({ type: 'ok' })
     expect(isSyntheticLinkedOccupancy(lessonsSpace.takenBy[0], {
       sourceCard: CARD_ID,
       linkedWorkerId: '1',
@@ -175,7 +183,8 @@ describe('C023_JobContract listener', () => {
   })
 
   it('passes exactCost with 0 food when the player has no occupations played', () => {
-    const listener = findListener()!
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry)!
     const player = createPlayer('p1')
     player.minorPlayed.push(CARD_ID)
     player.occupationHand = ['A009_SheepFarmer']
@@ -185,16 +194,17 @@ describe('C023_JobContract listener', () => {
     const triggerSnapshot = createTriggerSnapshot(state)
     player.occupationPlayed.push('played-later')
 
-    const result = executeCardListener(listener, {
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener, {
       state, player, space: daySpace, actionId: 'place-farmer', phase: 'after',
       triggerSnapshot,
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
     const flow = result!.flow as Extract<ActionFlow, { type: 'seq' }>
     expect(flow.children[0].params.exactCost).toEqual({})
   })
 
   it('passes exactCost with 1 food when the player has played occupations', () => {
-    const listener = findListener()!
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry)!
     const player = createPlayer('p1')
     player.minorPlayed.push(CARD_ID)
     player.occupationHand = ['A009_SheepFarmer']
@@ -203,9 +213,9 @@ describe('C023_JobContract listener', () => {
     const lessonsSpace = createSpace('lessons')
     const state = createState([player], [daySpace, lessonsSpace])
 
-    const result = executeCardListener(listener, {
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener, {
       state, player, space: daySpace, actionId: 'place-farmer', phase: 'after',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
     const flow = result!.flow as Extract<ActionFlow, { type: 'seq' }>
     expect(flow.children[0].params.exactCost).toEqual({ food: 1 })
   })

@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 
 import { GameSession } from '../game/authoritative-session'
@@ -168,7 +164,7 @@ describe('M046/M047 covered farm terrain', () => {
     const session = setup('M046_Thicket')
     const player = session.state.players[0]!
 
-    expect(meetsCardPrerequisites(player, M046_Thicket, session.state.round, session.state)).toBe(true)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, M046_Thicket, session.state.round, session.state))).toBe(true)
     const resp = commitPositions(session, playMinor(session, 'M046_Thicket'), [forestA, forestB])
 
     expect(resp.ok).toBe(true)
@@ -188,7 +184,7 @@ describe('M046/M047 covered farm terrain', () => {
     })
     const player = session.state.players[0]!
 
-    expect(meetsCardPrerequisites(player, M046_Thicket, session.state.round, session.state)).toBe(false)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, M046_Thicket, session.state.round, session.state))).toBe(false)
   })
 
   it('M047 covers selected moors with visible forests and hides the moors', () => {
@@ -198,7 +194,7 @@ describe('M046/M047 covered farm terrain', () => {
     })
     const player = session.state.players[0]!
 
-    expect(meetsCardPrerequisites(player, M047_BogForest, session.state.round, session.state)).toBe(true)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, M047_BogForest, session.state.round, session.state))).toBe(true)
     const resp = commitPositions(session, playMinor(session, 'M047_BogForest'), [moorA, moorB])
 
     expect(resp.ok).toBe(true)

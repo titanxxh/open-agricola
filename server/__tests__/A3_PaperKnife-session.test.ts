@@ -1,7 +1,5 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
+import { withActiveRegistry } from '../../shared/cards/active-registry'
+import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
 /**
  * A3 PaperKnife session tests — the reference alignment (Task 4.1).
  *
@@ -88,38 +86,41 @@ const createState = (players: PlayerState[]): GameState =>
 
 describe('A003_PaperKnife prerequisite', () => {
   it('registers "3 Occupations In Hand" as a custom prerequisite', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     const player = createPlayer('p1')
     player.occupationHand = []
-    expect(A003_PaperKnife_impl.prerequisiteCheck!(player)).toBe(false)
+    expect(withActiveRegistry(ruleRegistry, () => A003_PaperKnife_impl.prerequisiteCheck!(player))).toBe(false)
 
     player.occupationHand = ['A1', 'A2']
-    expect(A003_PaperKnife_impl.prerequisiteCheck!(player)).toBe(false)
+    expect(withActiveRegistry(ruleRegistry, () => A003_PaperKnife_impl.prerequisiteCheck!(player))).toBe(false)
 
     player.occupationHand = ['A1', 'A2', 'A3']
-    expect(A003_PaperKnife_impl.prerequisiteCheck!(player)).toBe(true)
+    expect(withActiveRegistry(ruleRegistry, () => A003_PaperKnife_impl.prerequisiteCheck!(player))).toBe(true)
 
     player.occupationHand = ['A1', 'A2', 'A3', 'A4']
-    expect(A003_PaperKnife_impl.prerequisiteCheck!(player)).toBe(true)
+    expect(withActiveRegistry(ruleRegistry, () => A003_PaperKnife_impl.prerequisiteCheck!(player))).toBe(true)
   })
 
   it('is enforced by meetsCardPrerequisites on the card definition', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     const player = createPlayer('p1')
     player.occupationHand = ['A009_SheepFarmer', 'A124_Knapper']
-    expect(meetsCardPrerequisites(player, A003_PaperKnife)).toBe(false)
+    expect(withActiveRegistry(ruleRegistry, () => meetsCardPrerequisites(player, A003_PaperKnife))).toBe(false)
 
     player.occupationHand.push('A027_OvenSite')
-    expect(meetsCardPrerequisites(player, A003_PaperKnife)).toBe(true)
+    expect(withActiveRegistry(ruleRegistry, () => meetsCardPrerequisites(player, A003_PaperKnife))).toBe(true)
   })
 })
 
 describe('A003_PaperKnife onBuy', () => {
   it('does nothing when fewer than 3 occupations in hand', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     const player = createPlayer('p1')
     player.occupationHand = ['A009_SheepFarmer', 'A124_Knapper']
     const state = createState([player])
-    const effect = getCardEffect(CARD_ID)
+    const effect = withActiveRegistry(ruleRegistry, () => getCardEffect(CARD_ID))
     expect(effect).toBeDefined()
-    const flow = effect!.onBuy!(state, player)
+    const flow = withActiveRegistry(ruleRegistry, () => effect!.onBuy!(state, player))
     expect(flow).toBeUndefined()
     // Hand unchanged.
     expect(player.occupationHand).toEqual(['A009_SheepFarmer', 'A124_Knapper'])
@@ -127,11 +128,12 @@ describe('A003_PaperKnife onBuy', () => {
   })
 
   it('onBuy emits a selection leaf (occupation-hand, min=max=3) when ≥3 occupations in hand', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     const player = createPlayer('p1')
     player.occupationHand = ['A009_SheepFarmer', 'A124_Knapper', 'A027_OvenSite']
     const state = createState([player])
-    const effect = getCardEffect(CARD_ID)
-    const flow = effect!.onBuy!(state, player)
+    const effect = withActiveRegistry(ruleRegistry, () => getCardEffect(CARD_ID))
+    const flow = withActiveRegistry(ruleRegistry, () => effect!.onBuy!(state, player))
     expect(flow).toBeDefined()
     expect((flow as Extract<ActionFlow, { type: 'leaf' }>).type).toBe('leaf')
     expect((flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('selection')
@@ -149,12 +151,13 @@ describe('A003_PaperKnife onBuy', () => {
   })
 
   it('does not consume any resources or mutate hand in onBuy', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     const player = createPlayer('p1')
     player.occupationHand = ['A009_SheepFarmer', 'A124_Knapper', 'A027_OvenSite']
     player.resources.food = 5
     const state = createState([player])
-    const effect = getCardEffect(CARD_ID)
-    effect!.onBuy!(state, player)
+    const effect = withActiveRegistry(ruleRegistry, () => getCardEffect(CARD_ID))
+    withActiveRegistry(ruleRegistry, () => effect!.onBuy!(state, player))
     // Food untouched and hand unchanged — only a selection leaf was returned.
     expect(player.resources.food).toBe(5)
     expect(player.occupationHand).toHaveLength(3)
@@ -162,15 +165,16 @@ describe('A003_PaperKnife onBuy', () => {
   })
 
   it('onBuy selectableCards snapshot matches occupation hand at call time', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     const a = createPlayer('p1')
     const b = createPlayer('p1')
     a.occupationHand = ['A009_SheepFarmer', 'A124_Knapper', 'A027_OvenSite']
     b.occupationHand = ['A009_SheepFarmer', 'A124_Knapper', 'A027_OvenSite']
     const stateA = createState([a])
     const stateB = createState([b])
-    const effect = getCardEffect(CARD_ID)!
-    const flowA = effect.onBuy!(stateA, a)
-    const flowB = effect.onBuy!(stateB, b)
+    const effect = withActiveRegistry(ruleRegistry, () => getCardEffect(CARD_ID))!
+    const flowA = withActiveRegistry(ruleRegistry, () => effect.onBuy!(stateA, a))
+    const flowB = withActiveRegistry(ruleRegistry, () => effect.onBuy!(stateB, b))
     // Both should produce identical selectableCards (same hand)
     expect((flowA as Extract<ActionFlow, { type: 'leaf' }>).actionContext.selectableCards).toEqual(
       (flowB as Extract<ActionFlow, { type: 'leaf' }>).actionContext.selectableCards,

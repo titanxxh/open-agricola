@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -139,7 +135,7 @@ describe('A025_Bassinet session', () => {
     session.loadState(state)
 
     const loaded = session.getState().state
-    expect(computeAllowedPlacementSpaces(loaded, loaded.players[1]!, { actionHooks: session.actionHooks })
+    expect(session.withCtx(() => computeAllowedPlacementSpaces(loaded, loaded.players[1]!, { actionHooks: session.actionHooks }))
       .some((entry) => entry.spaceId === 'farmland')).toBe(false)
   })
 

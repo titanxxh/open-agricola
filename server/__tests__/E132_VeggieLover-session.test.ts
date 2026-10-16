@@ -1,7 +1,4 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
+import type { GameSession as SessionRuleOwner } from '../game/authoritative-session'
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
@@ -50,8 +47,8 @@ const expectPairChoice = (response: SessionResponse, values: string[]) => {
   expect(response.interaction.request.options?.map((option) => option.value)).toEqual(values)
 }
 
-const scoreCategory = (response: SessionResponse, key: string) =>
-  computeScores(response.state)[0]!.categories.find((category) => category.key === key)
+const scoreCategory = (ruleOwner: SessionRuleOwner, response: SessionResponse, key: string) =>
+  ruleOwner.withCtx(() => computeScores(response.state))[0]!.categories.find((category) => category.key === key)
 
 describe('E132_VeggieLover session', () => {
   it('offers optional feeding exchange when player has grain and vegetable', () => {
@@ -66,9 +63,9 @@ describe('E132_VeggieLover session', () => {
 
     session.loadState(state)
 
-    const effect = getCardEffect(CARD_ID)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
     expect(effect).toBeDefined()
-    const flow = effect!.onHarvestFeedingPhase!(state, player)
+    const flow = session.withCtx(() => effect!.onHarvestFeedingPhase!(state, player))
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('seq')
     expect((flow as Extract<ActionFlow, { type: 'seq' }>).optional).toBe(true)
@@ -86,8 +83,8 @@ describe('E132_VeggieLover session', () => {
 
     session.loadState(state)
 
-    const effect = getCardEffect(CARD_ID)
-    expect(effect!.onHarvestFeedingPhase!(state, player)).toBeUndefined()
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
+    expect(session.withCtx(() => effect!.onHarvestFeedingPhase!(state, player))).toBeUndefined()
   })
 
   it('returns undefined when player has no vegetable', () => {
@@ -102,8 +99,8 @@ describe('E132_VeggieLover session', () => {
 
     session.loadState(state)
 
-    const effect = getCardEffect(CARD_ID)
-    expect(effect!.onHarvestFeedingPhase!(state, player)).toBeUndefined()
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
+    expect(session.withCtx(() => effect!.onHarvestFeedingPhase!(state, player))).toBeUndefined()
   })
 
   it('offers zero through three pairs and truly pays the selected pair before scoring', () => {
@@ -123,9 +120,9 @@ describe('E132_VeggieLover session', () => {
     expect(resolved.state.players[0]!.resources).toMatchObject({ grain: 2, vegetable: 2 })
     expect(resolved.state.players[0]!.cardStates[CARD_ID]?.counters?.bonusVp).toBe(2)
     expect(resolved.state.players[0]!.cardStates[CARD_ID]?.extraData?.scoringReserveBonus).toBeUndefined()
-    expect(scoreCategory(resolved, 'grains')?.quantity).toBe(2)
-    expect(scoreCategory(resolved, 'vegetables')?.quantity).toBe(2)
-    expect(scoreCategory(resolved, 'cardBonusVp')?.entries).toContainEqual(
+    expect(scoreCategory(session, resolved, 'grains')?.quantity).toBe(2)
+    expect(scoreCategory(session, resolved, 'vegetables')?.quantity).toBe(2)
+    expect(scoreCategory(session, resolved, 'cardBonusVp')?.entries).toContainEqual(
       expect.objectContaining({ cardId: CARD_ID, score: 2 }),
     )
   })
@@ -144,7 +141,7 @@ describe('E132_VeggieLover session', () => {
 
     expect(resolved.state.players[0]!.resources).toMatchObject({ grain: 3, vegetable: 3 })
     expect(resolved.state.players[0]!.cardStates[CARD_ID]).toBeUndefined()
-    expect(scoreCategory(resolved, 'cardBonusVp')).toBeUndefined()
+    expect(scoreCategory(session, resolved, 'cardBonusVp')).toBeUndefined()
   })
 
   it('limits choices to crops not already committed to a Scoring Reserve', () => {

@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
 import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
@@ -64,25 +60,26 @@ const feedConverted = (
   ...overrides,
 })
 
-const executeSpecialEffectLeaves = (
+const executeSpecialEffectLeaves = (ruleOwner: GameSession,
   flow: ActionFlow | undefined,
   state: GameState,
   player: PlayerState,
 ) => {
   if (!flow) return
   if (flow.type === 'seq') {
-    flow.children.forEach((child) => executeSpecialEffectLeaves(child, state, player))
+    flow.children.forEach((child) => executeSpecialEffectLeaves(ruleOwner, child, state, player))
     return
   }
   if (flow.type !== 'leaf' || flow.actionId !== 'special-effect') return
-  specialEffectAction.execute({
+  ruleOwner.withCtx(() => specialEffectAction.execute({
+    actionHooks: ruleOwner.actionHooks,
     state,
     player,
     space: { id: 'test' } as never,
     params: flow.params,
     sourceCard: flow.sourceCard,
     actionContext: flow.actionContext,
-  })
+  }))
 }
 
 const setupDirectContext = (
@@ -93,7 +90,7 @@ const setupDirectContext = (
     | DraftGameEvent<'harvest.feedConverted'>
   >,
   result?: ActionExecutionResult,
-): CardListenerContext => {
+): { session: GameSession; context: CardListenerContext } => {
   const session = new GameSession(42)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
@@ -101,7 +98,8 @@ const setupDirectContext = (
   player.id = 'p1'
   player.minorPlayed.push(CARD_ID)
 
-  return {
+  return { session, context: {
+    actionHooks: session.actionHooks,
     state,
     player,
     space: { id: actionId === 'collect' ? 'sheep-market' : 'cooking' },
@@ -111,7 +109,7 @@ const setupDirectContext = (
     result,
     ownerPlayer: player,
     ownerCardZone: 'played',
-  } as unknown as CardListenerContext
+  } as unknown as CardListenerContext }
 }
 
 describe('D036_BreedRegistry session', () => {
@@ -142,8 +140,8 @@ describe('D036_BreedRegistry session', () => {
     expect(readCardExtraData<number>(updated, CARD_ID, 'boardSheep')).toBe(1)
     expect(readCardInfobox(updated, CARD_ID)).toBeUndefined()
 
-    const opponentView = serializeStateForPlayer(resp.state, resp.state.players[1]!.id, { engineStack: new EngineStack() })
-    const ownerView = serializeStateForPlayer(resp.state, updated.id, { engineStack: new EngineStack() })
+    const opponentView = session.withCtx(() => serializeStateForPlayer(resp.state, resp.state.players[1]!.id, { engineStack: new EngineStack() }))
+    const ownerView = session.withCtx(() => serializeStateForPlayer(resp.state, updated.id, { engineStack: new EngineStack() }))
     expect(opponentView.players[0]!.minorHand).toEqual(['?'])
     expect(opponentView.players[0]!.cardStates[CARD_ID]).toBeUndefined()
     expect(opponentView.events.some((event) =>
@@ -156,17 +154,17 @@ describe('D036_BreedRegistry session', () => {
   })
 
   it('uses action-space resource.moved events to increment boardSheep', () => {
-    const ctx = setupDirectContext('collect', [moved({ resources: { sheep: 2 } })], { type: 'ok' })
+    const { session: ruleSession1, context: ctx } = setupDirectContext('collect', [moved({ resources: { sheep: 2 } })], { type: 'ok' })
 
-    const result = executeCardListener(AFTER_SHEEP_GAIN, ctx)
-    executeSpecialEffectLeaves(result?.flow, ctx.state, ctx.player)
+    const result = ruleSession1.withCtx(() => executeCardListener(AFTER_SHEEP_GAIN, ctx))
+    executeSpecialEffectLeaves(ruleSession1, result?.flow, ctx.state, ctx.player)
 
     expect(readCardExtraData<number>(ctx.player, CARD_ID, 'boardSheep')).toBe(2)
     expect(readCardInfobox(ctx.player, CARD_ID)).toBe('2 / 2')
   })
 
   it('uses card resource.moved events to increment cardSheep', () => {
-    const ctx = setupDirectContext('gain', [
+    const { session: ruleSession2, context: ctx } = setupDirectContext('gain', [
       moved({
         resources: { sheep: 1 },
         from: { kind: 'card', playerId: 'p1', cardId: 'X_TestSheepCard' },
@@ -174,40 +172,40 @@ describe('D036_BreedRegistry session', () => {
       }),
     ], { type: 'ok' })
 
-    const result = executeCardListener(AFTER_SHEEP_GAIN, ctx)
-    executeSpecialEffectLeaves(result?.flow, ctx.state, ctx.player)
+    const result = ruleSession2.withCtx(() => executeCardListener(AFTER_SHEEP_GAIN, ctx))
+    executeSpecialEffectLeaves(ruleSession2, result?.flow, ctx.state, ctx.player)
 
     expect(readCardExtraData<number>(ctx.player, CARD_ID, 'cardSheep')).toBe(1)
     expect(readCardInfobox(ctx.player, CARD_ID)).toBe('1 / 2')
   })
 
   it('ignores non-gain sheep moves even when result claims sheep gained', () => {
-    const ctx = setupDirectContext('collect', [
+    const { session: ruleSession3, context: ctx } = setupDirectContext('collect', [
       moved({ from: { kind: 'player', playerId: 'p2' } }),
     ], { type: 'ok', resourcesGained: { sheep: 1 } })
 
-    const result = executeCardListener(AFTER_SHEEP_GAIN, ctx)
+    const result = ruleSession3.withCtx(() => executeCardListener(AFTER_SHEEP_GAIN, ctx))
 
     expect(result).toBeUndefined()
   })
 
   it('does not read prior global state events when current transaction has no sheep moves', () => {
-    const ctx = setupDirectContext('collect', [], { type: 'ok', resourcesGained: { sheep: 1 } })
+    const { session: ruleSession4, context: ctx } = setupDirectContext('collect', [], { type: 'ok', resourcesGained: { sheep: 1 } })
     ctx.state.events = [
       { type: 'worker.placed', actorPlayerId: 'p1', workerId: 'w1', spaceId: 'sheep-market' } as never,
       moved() as never,
     ]
 
-    const result = executeCardListener(AFTER_SHEEP_GAIN, ctx)
+    const result = ruleSession4.withCtx(() => executeCardListener(AFTER_SHEEP_GAIN, ctx))
 
     expect(result).toBeUndefined()
   })
 
   it('marks sheepConverted from resource.exchanged paid sheep', () => {
-    const ctx = setupDirectContext('exchange', [exchanged()], { type: 'ok' })
+    const { session: ruleSession5, context: ctx } = setupDirectContext('exchange', [exchanged()], { type: 'ok' })
 
-    const result = executeCardListener(AFTER_EXCHANGE_SHEEP_CONVERSION, ctx)
-    executeSpecialEffectLeaves(result?.flow, ctx.state, ctx.player)
+    const result = ruleSession5.withCtx(() => executeCardListener(AFTER_EXCHANGE_SHEEP_CONVERSION, ctx))
+    executeSpecialEffectLeaves(ruleSession5, result?.flow, ctx.state, ctx.player)
 
     expect(readCardExtraData<boolean>(ctx.player, CARD_ID, 'sheepConvertedToFood')).toBe(true)
   })
@@ -220,20 +218,20 @@ describe('D036_BreedRegistry session', () => {
   })
 
   it('marks sheepConverted from harvest.feedConverted sheep cost', () => {
-    const ctx = setupDirectContext('harvest-feed-conversion', [feedConverted()], { type: 'ok' })
+    const { session: ruleSession6, context: ctx } = setupDirectContext('harvest-feed-conversion', [feedConverted()], { type: 'ok' })
 
-    const result = executeCardListener(AFTER_HARVEST_SHEEP_CONVERSION, ctx)
-    executeSpecialEffectLeaves(result?.flow, ctx.state, ctx.player)
+    const result = ruleSession6.withCtx(() => executeCardListener(AFTER_HARVEST_SHEEP_CONVERSION, ctx))
+    executeSpecialEffectLeaves(ruleSession6, result?.flow, ctx.state, ctx.player)
 
     expect(readCardExtraData<boolean>(ctx.player, CARD_ID, 'sheepConvertedToFood')).toBe(true)
   })
 
   it('ignores exchange events that do not pay sheep for food', () => {
-    const ctx = setupDirectContext('exchange', [
+    const { session: ruleSession7, context: ctx } = setupDirectContext('exchange', [
       exchanged({ paid: { boar: 1 }, gained: { food: 2 } }),
     ], { type: 'ok' })
 
-    const result = executeCardListener(AFTER_EXCHANGE_SHEEP_CONVERSION, ctx)
+    const result = ruleSession7.withCtx(() => executeCardListener(AFTER_EXCHANGE_SHEEP_CONVERSION, ctx))
 
     expect(result).toBeUndefined()
   })
@@ -244,7 +242,7 @@ describe('D036_BreedRegistry session', () => {
     const player = state.players[0]!
     player.houseAnimals = Object.fromEntries(player.roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, 'sheep']));
 
-    expect(D036_BreedRegistry_impl.prerequisiteCheck?.(player, state)).toBe(false)
+    expect(session.withCtx(() => D036_BreedRegistry_impl.prerequisiteCheck?.(player, state))).toBe(false)
   })
 })
 

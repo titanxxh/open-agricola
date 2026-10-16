@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
@@ -34,7 +30,7 @@ describe('D063_Lynchet session', () => {
     }
     session.loadState(state)
 
-    const flow = runCardEffectHook(state, player, CARD_ID, 'onAfterReap')
+    const flow = session.withCtx(() => runCardEffectHook(state, player, CARD_ID, 'onAfterReap'))
     expect(flow).not.toBeNull()
     expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params?.food).toBe(2)
   })
@@ -60,7 +56,7 @@ describe('D063_Lynchet session', () => {
     }
     session.loadState(state)
 
-    const flow = runCardEffectHook(state, player, CARD_ID, 'onAfterReap')
+    const flow = session.withCtx(() => runCardEffectHook(state, player, CARD_ID, 'onAfterReap'))
     expect(flow).not.toBeNull()
     expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params?.food).toBe(1)
   })
@@ -86,7 +82,7 @@ describe('D063_Lynchet session', () => {
       { row: 3, col: 0, stacks: [] },
     ]
 
-    const result = reap(state, player)
+    const result = session.withCtx(() => reap(state, player))
     expect(result.type).toBe('ok')
     expect(result.reapSummary.harvestedPositions).toEqual([
       { row: 1, col: 0 },
@@ -96,7 +92,7 @@ describe('D063_Lynchet session', () => {
     state.harvestReapSummary = { [player.id]: result.reapSummary }
     session.loadState(state)
 
-    const flow = runCardEffectHook(state, player, CARD_ID, 'onAfterReap')
+    const flow = session.withCtx(() => runCardEffectHook(state, player, CARD_ID, 'onAfterReap'))
     expect(flow).not.toBeNull()
     expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params?.food).toBe(1)
   })
@@ -112,7 +108,7 @@ describe('D063_Lynchet session', () => {
       [player.id]: { resources: {}, grainFields: 0, vegetableFields: 0, harvestedPositions: [] },
     }
     session.loadState(state)
-    const flow = runCardEffectHook(state, player, CARD_ID, 'onAfterReap')
+    const flow = session.withCtx(() => runCardEffectHook(state, player, CARD_ID, 'onAfterReap'))
     expect(flow).toBeNull()
   })
 
@@ -132,7 +128,7 @@ describe('D063_Lynchet session', () => {
       },
     }
     session.loadState(state)
-    const flow = runCardEffectHook(state, player, CARD_ID, 'onAfterReap')
+    const flow = session.withCtx(() => runCardEffectHook(state, player, CARD_ID, 'onAfterReap'))
     expect(flow).toBeNull()
   })
 })

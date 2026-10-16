@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { createTestDatabase } from './_helpers/postgres'
 import { PostgresRoomPersistence } from '../game/persistence/postgres-adapter'
 import { describe, expect, it } from 'vitest'
@@ -632,7 +628,7 @@ describe('D014 Hammer Crusher provisional continuation', () => {
     const session = setup({ buildingTycoon: false, clay: 3, reed: 1, stone: 1 })
     registerNestedConstructHelper(session, { clay: 0, reed: 0 })
     const anytimeId = registerNoopAnytime(session)
-    expect(session.listAnytimeEntries().map((entry) => entry.descriptor.id)).toContain(anytimeId)
+    expect(session.withCtx(() => session.listAnytimeEntries()).map((entry) => entry.descriptor.id)).toContain(anytimeId)
 
     let response = session.takeAction(0, 'house-redevelopment')
     expect(response.interaction.stateId).toBe('wait')

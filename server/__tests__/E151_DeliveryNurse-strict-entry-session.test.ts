@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -59,13 +55,13 @@ describe('E151 Delivery Nurse strict action entry', () => {
     const sheepMarket = state.actionSpaces.find((space) => space.id === 'sheep-market')
     if (!sheepMarket) throw new Error('sheep-market missing')
 
-    const results = runCardListeners({
+    const results = session.withCtx(() => runCardListeners({
       state,
       player,
       space: sheepMarket,
       actionId: 'family-growth',
       phase: 'isDoable',
-    } as CardListenerContext)
+    } as CardListenerContext))
 
     expect(results).toEqual([])
   })

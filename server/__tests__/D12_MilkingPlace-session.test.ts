@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -72,7 +68,7 @@ describe('D012_MilkingPlace session', () => {
     const state = session.getState().state
     const player = state.players[0]!
 
-    const zones = computeAnimalZones(player)
+    const zones = session.withCtx(() => computeAnimalZones(player))
     const houseZone = zones.find(z => z.zoneType === 'house')
     expect(houseZone).toBeUndefined()
   })
@@ -87,7 +83,7 @@ describe('D012_MilkingPlace session', () => {
     session.loadState(state)
 
     const player = state.players[0]!
-    const zones = computeAnimalZones(player)
+    const zones = session.withCtx(() => computeAnimalZones(player))
     const houseZone = zones.find(z => z.zoneType === 'house')
     expect(houseZone).toBeDefined()
     expect(houseZone!.capacity).toBe(1)

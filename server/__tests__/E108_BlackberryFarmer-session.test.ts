@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -74,11 +70,11 @@ describe('E108 Blackberry Farmer — session (palisades excluded)', () => {
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
     player.occupationPlayed.push(CARD_ID)
-    const listener = getRegisteredCardListeners().find((entry) => entry.id === 'E108-blackberry-farmer-after-fencing')
+    const listener = session.withCtx(() => getRegisteredCardListeners()).find((entry) => entry.id === 'E108-blackberry-farmer-after-fencing')
     expect(listener).toBeDefined()
     const actionEvents = [fenceBuilt([])]
 
-    const result = executeCardListener(listener!, {
+    const result = session.withCtx(() => executeCardListener(listener!, {
       state,
       player,
       space: state.actionSpaces.find((entry) => entry.id === 'fencing')!,
@@ -87,7 +83,7 @@ describe('E108 Blackberry Farmer — session (palisades excluded)', () => {
       result: { type: 'ok', extraData: { newFenceEdges: ['H-1-0', 'V-0-1'] } },
       transactionEvents: actionEvents,
       actionEvents,
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeUndefined()
     expect(state.pendingFutureMeeples.filter((entry) => entry.cardId === CARD_ID)).toEqual([])

@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from './card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, it, expect } from 'vitest'
 import { GameSession } from '../../../server/game/authoritative-session'
 import { computeAnimalZones } from '../../domain/animal-zones'
@@ -22,7 +18,7 @@ describe('A148_Woolgrower', () => {
     core.state.completedFeedingPhases = 3
     core.state.players[0].occupationPlayed = ['A148_Woolgrower']
 
-    const zones = computeAnimalZones(core.state.players[0], core.state)
+    const zones = core.withCtx(() => computeAnimalZones(core.state.players[0], core.state))
     const z = zones.find((zz: any) => zz.cardId === 'A148_Woolgrower')
     expect(z).toBeDefined()
     expect(z!.capacity).toBe(3)
@@ -35,7 +31,7 @@ describe('A148_Woolgrower', () => {
     core.state.completedFeedingPhases = 0
     core.state.players[0].occupationPlayed = ['A148_Woolgrower']
 
-    const zones = computeAnimalZones(core.state.players[0], core.state)
+    const zones = core.withCtx(() => computeAnimalZones(core.state.players[0], core.state))
     expect(zones.find((z: any) => z.cardId === 'A148_Woolgrower')).toBeUndefined()
   })
 
@@ -45,7 +41,7 @@ describe('A148_Woolgrower', () => {
     core.state.players[0].occupationPlayed = ['A148_Woolgrower']
     core.state.players[0].cardStates = {}
 
-    const zones = computeAnimalZones(core.state.players[0], core.state)
+    const zones = core.withCtx(() => computeAnimalZones(core.state.players[0], core.state))
     const z = zones.find((zz: any) => zz.cardId === 'A148_Woolgrower')
     expect(z!.capacity).toBe(2)
   })
@@ -55,7 +51,7 @@ describe('A148_Woolgrower', () => {
     core.state.completedFeedingPhases = 4
     core.state.players[0].occupationPlayed = ['A148_Woolgrower', 'B086_TruffleSearcher']
 
-    const zones = computeAnimalZones(core.state.players[0], core.state)
+    const zones = core.withCtx(() => computeAnimalZones(core.state.players[0], core.state))
     const a148 = zones.find((z: any) => z.cardId === 'A148_Woolgrower')
     const b86 = zones.find((z: any) => z.cardId === 'B086_TruffleSearcher')
     expect(a148?.capacity).toBe(4)

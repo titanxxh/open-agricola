@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -146,7 +142,7 @@ describe('B115_TinsmithMaster session', () => {
       })
 
       const player = session.getState().state.players[0]!
-      const zones = computeAnimalZones(player)
+      const zones = session.withCtx(() => computeAnimalZones(player))
       const pastureZone = zones.find((z) => z.id === 'p1')
       // Size-1 pasture normally has capacity 2, should be 3 with card
       expect(pastureZone?.capacity).toBe(3)
@@ -172,7 +168,7 @@ describe('B115_TinsmithMaster session', () => {
       session.loadState(state)
 
       const player = session.getState().state.players[0]!
-      const zones = computeAnimalZones(player)
+      const zones = session.withCtx(() => computeAnimalZones(player))
       const pastureZone = zones.find((z) => z.id === 'p1')
       // Size-1 with 1 stable: 2 * 2^1 = 4, no bonus
       expect(pastureZone?.capacity).toBe(4)
@@ -201,7 +197,7 @@ describe('B115_TinsmithMaster session', () => {
       })
 
       const player = session.getState().state.players[0]!
-      const zones = computeAnimalZones(player)
+      const zones = session.withCtx(() => computeAnimalZones(player))
       const p1 = zones.find((z) => z.id === 'p1')
       const p2 = zones.find((z) => z.id === 'p2')
       expect(p1?.capacity).toBe(3) // 2 + 1
@@ -224,7 +220,7 @@ describe('B115_TinsmithMaster session', () => {
       })
 
       const player = session.getState().state.players[0]!
-      const zones = computeAnimalZones(player)
+      const zones = session.withCtx(() => computeAnimalZones(player))
       const pastureZone = zones.find((z) => z.id === 'p1')
       expect(pastureZone?.capacity).toBe(2) // normal capacity
     })

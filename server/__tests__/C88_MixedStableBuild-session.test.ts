@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import type { FarmTilePosition, PlayerState } from '../../shared/contract/types'
@@ -73,7 +69,7 @@ describe('C88 + B85 — mixed ordinary + FarmHand stable build', () => {
 
     const resp = enterStableSelect(session)
     if (resp.interaction.stateId !== 'wait') throw new Error('expected wait')
-    const supplyBefore = getAvailableStableSupplyCount(resp.state, resp.state.players[0]!)
+    const supplyBefore = session.withCtx(() => getAvailableStableSupplyCount(resp.state, resp.state.players[0]!))
     const woodBefore = resp.state.players[0]!.resources.wood
 
     const commit = session.commitSelectionChoice(0, {
@@ -93,7 +89,7 @@ describe('C88 + B85 — mixed ordinary + FarmHand stable build', () => {
     ])
     expect(after.cardStates?.B085_FarmHand?.extraData?.position).toEqual(FARM_HAND_TILE)
     // supply: 1 normal + 1 farmhand → -2.
-    expect(getAvailableStableSupplyCount(commit.state, after)).toBe(supplyBefore - 2)
+    expect(session.withCtx(() => getAvailableStableSupplyCount(commit.state, after))).toBe(supplyBefore - 2)
     expect(readCardResourceStats(after, 'C088_CarpentersApprentice')?.saved).toEqual({ wood: 2 })
 
     const stables = findStableBuiltStables(commit.state.events)
@@ -127,7 +123,7 @@ describe('C88 + B85 — mixed ordinary + FarmHand stable build', () => {
 
     const resp = enterStableSelect(session)
     if (resp.interaction.stateId !== 'wait') throw new Error('expected wait')
-    expect(getAvailableStableSupplyCount(resp.state, resp.state.players[0]!)).toBe(1)
+    expect(session.withCtx(() => getAvailableStableSupplyCount(resp.state, resp.state.players[0]!))).toBe(1)
     const woodBefore = resp.state.players[0]!.resources.wood
 
     const commit = session.commitSelectionChoice(0, {

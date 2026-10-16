@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { E041_MuddyWaters } from '../../shared/cards/E/E041_MuddyWaters'
@@ -15,7 +11,7 @@ describe('E041_MuddyWaters prerequisite', () => {
     player.occupationPlayed = ['o1']
     player.minorPlayed = ['m1']
     player.improvements = ['i1']
-    expect(meetsCardPrerequisites(player, E041_MuddyWaters, state.round, state)).toBe(false)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, E041_MuddyWaters, state.round, state))).toBe(false)
   })
 
   it('allows when player has 5+ played cards', () => {
@@ -25,6 +21,6 @@ describe('E041_MuddyWaters prerequisite', () => {
     player.occupationPlayed = ['o1', 'o2']
     player.minorPlayed = ['m1', 'm2']
     player.improvements = ['i1']
-    expect(meetsCardPrerequisites(player, E041_MuddyWaters, state.round, state)).toBe(true)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, E041_MuddyWaters, state.round, state))).toBe(true)
   })
 })

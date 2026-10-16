@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -99,7 +95,7 @@ describe('E080_RockGarden session', () => {
       null,
     ])
 
-    reap(resp.state, playerAfter)
+    session.withCtx(() => reap(resp.state, playerAfter))
     expect(playerAfter.resources.stone).toBe(1)
     expect(readCardExtraData(playerAfter, CARD_ID, 'cardFieldStacks')).toEqual([
       { crop: 'stone', remaining: 1 },
@@ -147,7 +143,7 @@ describe('E080_RockGarden session', () => {
       { crop: 'stone', remaining: 2 },
     ])
 
-    reap(resp.state, playerAfter)
+    session.withCtx(() => reap(resp.state, playerAfter))
     expect(playerAfter.resources.stone).toBe(3)
     expect(readCardExtraData(playerAfter, CARD_ID, 'cardFieldStacks')).toEqual([
       { crop: 'stone', remaining: 1 },
@@ -171,7 +167,7 @@ describe('E080_RockGarden session', () => {
     let total = 0
     for (let i = 0; i < 2; i++) {
       const before = player.resources.stone
-      reap(state, player)
+      session.withCtx(() => reap(state, player))
       total += player.resources.stone - before
     }
     expect(total).toBe(6)

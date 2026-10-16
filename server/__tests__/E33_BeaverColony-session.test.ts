@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
@@ -29,14 +25,15 @@ const directContext = (
   actionId: 'collect' | 'gain',
   transactionEvents: DraftGameEvent<'resource.moved'>[],
   actionEvents = transactionEvents,
-): CardListenerContext => {
+): { session: GameSession; context: CardListenerContext } => {
   const session = new GameSession(42)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   const player = state.players[0]!
   player.id = 'p1'
   player.minorPlayed.push(CARD_ID)
-  return {
+  return { session, context: {
+    actionHooks: session.actionHooks,
     state,
     player,
     space: state.actionSpaces.find((space) => space.id === 'reed-bank')!,
@@ -45,15 +42,15 @@ const directContext = (
     transactionEvents,
     actionEvents,
     result: { type: 'ok', resourcesGained: { reed: 1 } },
-  } as unknown as CardListenerContext
+  } as unknown as CardListenerContext }
 }
 
 describe('E033_BeaverColony session', () => {
   it('grants bonus VP for reed collected from an action space without result gains', () => {
-    const ctx = directContext('collect', [moved()])
+    const { session: ruleSession1, context: ctx } = directContext('collect', [moved()])
     ctx.result = { type: 'ok' }
 
-    const result = executeCardListener(AFTER_COLLECT, ctx)
+    const result = ruleSession1.withCtx(() => executeCardListener(AFTER_COLLECT, ctx))
 
     expect(result?.flow).toMatchObject({
       type: 'leaf',
@@ -64,10 +61,10 @@ describe('E033_BeaverColony session', () => {
   })
 
   it('grants bonus VP for gain action reed from a reed action space without result gains', () => {
-    const ctx = directContext('gain', [moved({ reason: 'gain' })])
+    const { session: ruleSession2, context: ctx } = directContext('gain', [moved({ reason: 'gain' })])
     ctx.result = { type: 'ok' }
 
-    const result = executeCardListener(AFTER_GAIN, ctx)
+    const result = ruleSession2.withCtx(() => executeCardListener(AFTER_GAIN, ctx))
 
     expect(result?.flow).toMatchObject({
       type: 'leaf',
@@ -78,25 +75,25 @@ describe('E033_BeaverColony session', () => {
   })
 
   it('does not trigger for non-reed events even when result reports reed', () => {
-    const ctx = directContext('collect', [moved({ resources: { wood: 1 } })])
+    const { session: ruleSession3, context: ctx } = directContext('collect', [moved({ resources: { wood: 1 } })])
 
-    const result = executeCardListener(AFTER_COLLECT, ctx)
+    const result = ruleSession3.withCtx(() => executeCardListener(AFTER_COLLECT, ctx))
 
     expect(result).toBeUndefined()
   })
 
   it('does not trigger without a current reed event', () => {
-    const ctx = directContext('collect', [])
+    const { session: ruleSession4, context: ctx } = directContext('collect', [])
 
-    const result = executeCardListener(AFTER_COLLECT, ctx)
+    const result = ruleSession4.withCtx(() => executeCardListener(AFTER_COLLECT, ctx))
 
     expect(result).toBeUndefined()
   })
 
   it('ignores stale transaction reed when actionEvents has no current reed', () => {
-    const ctx = directContext('collect', [moved()], [moved({ resources: { wood: 1 } })])
+    const { session: ruleSession5, context: ctx } = directContext('collect', [moved()], [moved({ resources: { wood: 1 } })])
 
-    const result = executeCardListener(AFTER_COLLECT, ctx)
+    const result = ruleSession5.withCtx(() => executeCardListener(AFTER_COLLECT, ctx))
 
     expect(result).toBeUndefined()
   })

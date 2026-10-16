@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getRegisteredCardListeners, executeCardListener } from '../../shared/cards/card-listeners'
@@ -47,7 +43,7 @@ describe('C056_FeedFence session', () => {
     const space = state.actionSpaces.find((s) => s.id === 'farm-expansion')!
     session.loadState(state)
 
-    const listener = getRegisteredCardListeners().find(
+    const listener = session.withCtx(() => getRegisteredCardListeners()).find(
       (reg) => reg.id === 'C56-feed-fence-after-stables',
     )!
     const context: CardListenerContext = {
@@ -58,7 +54,7 @@ describe('C056_FeedFence session', () => {
       phase: 'after',
       result: { type: 'ok' },
     }
-    return executeCardListener(listener, context)
+    return session.withCtx(() => executeCardListener(listener, context))
   }
 
   it('grants the 4th-stable bonus when the 4th stable is the B85 FarmHand stable (card-facing count)', () => {

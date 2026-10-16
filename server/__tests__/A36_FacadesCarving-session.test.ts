@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { A036_FacadesCarving } from '../../shared/cards/A/A036_FacadesCarving'
@@ -14,7 +10,7 @@ describe('A036_FacadesCarving prerequisite', () => {
     state.round = 5
     const player = state.players[0]!
     player.resources.wood = 4
-    expect(meetsCardPrerequisites(player, A036_FacadesCarving, state.round, state)).toBe(false)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, A036_FacadesCarving, state.round, state))).toBe(false)
   })
 
   it('allows when wood in supply >= current round', () => {
@@ -23,6 +19,6 @@ describe('A036_FacadesCarving prerequisite', () => {
     state.round = 5
     const player = state.players[0]!
     player.resources.wood = 5
-    expect(meetsCardPrerequisites(player, A036_FacadesCarving, state.round, state)).toBe(true)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, A036_FacadesCarving, state.round, state))).toBe(true)
   })
 })

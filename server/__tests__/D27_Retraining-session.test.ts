@@ -1,7 +1,6 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
+import { CardRegistry as TestCardRegistry } from '../../shared/cards/registry'
+import { withActiveRegistry } from '../../shared/cards/active-registry'
+import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
 import { type SessionResponse } from '../game/authoritative-session'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 
@@ -60,8 +59,11 @@ const createSpace = (id: string): ActionSpace =>
     takenBy: [],
   }) as unknown as ActionSpace
 
-const findListener = (id: string) =>
-  getRegisteredCardListeners().find((l) => l.id === id)
+const findListener = (ruleOwner: TestCardRegistry, id: string) =>
+  {
+  const lookupRule1 = () => getRegisteredCardListeners().find((l) => l.id === id)
+  return withActiveRegistry(ruleOwner, lookupRule1)
+}
 
 const setupSwapSession = () => {
   const session = new GameSession(42)
@@ -88,20 +90,22 @@ const setupSwapSession = () => {
 
 describe('D027_Retraining listeners', () => {
   it('registers both renovation-after and place-farmer-after listeners', () => {
-    expect(findListener('D27-retraining-after-renovation')).toBeDefined()
-    expect(findListener('D27-retraining-after-place-farmer')).toBeDefined()
+    const ruleRegistry = createOfficialCardRegistry()
+    expect(findListener(ruleRegistry, 'D27-retraining-after-renovation')).toBeDefined()
+    expect(findListener(ruleRegistry, 'D27-retraining-after-place-farmer')).toBeDefined()
   })
 
   it('renovation listener returns a set-flag flow without mutating immediately', () => {
-    const listener = findListener('D27-retraining-after-renovation')!
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry, 'D27-retraining-after-renovation')!
     const player = createPlayer('p1')
     player.minorPlayed.push(CARD_ID)
     const state = createState([player])
 
-    const result = executeCardListener(listener, {
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener, {
       state, player, space: createSpace('renovate-house'),
       actionId: 'renovate-house', phase: 'after',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result?.flow).toEqual({
       type: 'leaf',
@@ -114,17 +118,18 @@ describe('D027_Retraining listeners', () => {
 
 
   it('place-farmer listener offers Joinery→Pottery swap without immediate mutation', () => {
-    const listener = findListener('D27-retraining-after-place-farmer')!
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry, 'D27-retraining-after-place-farmer')!
     const player = createPlayer('p1')
     player.minorPlayed.push(CARD_ID)
     player.improvements.push('Major_Joinery')
     setCardFlag(player, CARD_ID, true)
     const state = createState([player], ['Major_Pottery'])
 
-    const result = executeCardListener(listener, {
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener, {
       state, player, space: createSpace('place-farmer'),
       actionId: 'place-farmer', phase: 'after',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeDefined()
     expect(result!.flow).toEqual({
@@ -160,17 +165,18 @@ describe('D027_Retraining listeners', () => {
   })
 
   it('place-farmer listener offers Pottery→Basket when Pottery is played', () => {
-    const listener = findListener('D27-retraining-after-place-farmer')!
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry, 'D27-retraining-after-place-farmer')!
     const player = createPlayer('p1')
     player.minorPlayed.push(CARD_ID)
     player.improvements.push('Major_Pottery')
     setCardFlag(player, CARD_ID, true)
     const state = createState([player], ['Major_Basket'])
 
-    const result = executeCardListener(listener, {
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener, {
       state, player, space: createSpace('place-farmer'),
       actionId: 'place-farmer', phase: 'after',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeDefined()
     expect(result!.flow).toEqual({
@@ -205,16 +211,17 @@ describe('D027_Retraining listeners', () => {
   })
 
   it('place-farmer listener clears the flag by flow when no swap is available', () => {
-    const listener = findListener('D27-retraining-after-place-farmer')!
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry, 'D27-retraining-after-place-farmer')!
     const player = createPlayer('p1')
     player.minorPlayed.push(CARD_ID)
     setCardFlag(player, CARD_ID, true)
     const state = createState([player], []) // no majors available
 
-    const result = executeCardListener(listener, {
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener, {
       state, player, space: createSpace('place-farmer'),
       actionId: 'place-farmer', phase: 'after',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result?.flow).toEqual({
       type: 'leaf',
@@ -226,16 +233,17 @@ describe('D027_Retraining listeners', () => {
   })
 
   it('place-farmer listener does nothing if card is not flagged', () => {
-    const listener = findListener('D27-retraining-after-place-farmer')!
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry, 'D27-retraining-after-place-farmer')!
     const player = createPlayer('p1')
     player.minorPlayed.push(CARD_ID)
     player.improvements.push('Major_Joinery')
     const state = createState([player], ['Major_Pottery'])
 
-    const result = executeCardListener(listener, {
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener, {
       state, player, space: createSpace('place-farmer'),
       actionId: 'place-farmer', phase: 'after',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeUndefined()
     expect(state.availableMajorImprovements).toContain('Major_Pottery')

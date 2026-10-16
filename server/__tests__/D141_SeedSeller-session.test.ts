@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -36,7 +32,7 @@ describe('D141_SeedSeller session', () => {
     const session = setup()
     const state = session.getState().state
     const player = state.players[0]!
-    const flow = runCardEffectHook(state, player, 'D141_SeedSeller', 'onBuy')
+    const flow = session.withCtx(() => runCardEffectHook(state, player, 'D141_SeedSeller', 'onBuy'))
     expect(flow).not.toBeNull()
     expect(flow!.type).toBe('leaf')
     expect((flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('gain')

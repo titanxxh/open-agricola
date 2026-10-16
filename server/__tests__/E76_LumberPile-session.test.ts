@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
@@ -239,7 +235,7 @@ describe('E076 Lumber Pile parity', () => {
 
   it('E076 S10: returning Farm Hand alone gains three wood and removes its room capacity', () => {
     const session = setup({ farmHand: true })
-    expect(getExtraRoomCapacity(session.state.players[0]!)).toBe(1)
+    expect(session.withCtx(() => getExtraRoomCapacity(session.state.players[0]!))).toBe(1)
     const selection = playToSelection(session)
     expectSelection(selection, 1)
 
@@ -248,6 +244,6 @@ describe('E076 Lumber Pile parity', () => {
     expect(response.ok, response.error).toBe(true)
     expect(hasFarmHand(response)).toBe(false)
     expect(response.state.players[0]!.resources.wood).toBe(3)
-    expect(getExtraRoomCapacity(response.state.players[0]!)).toBe(0)
+    expect(session.withCtx(() => getExtraRoomCapacity(response.state.players[0]!))).toBe(0)
   })
 })

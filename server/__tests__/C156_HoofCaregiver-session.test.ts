@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
@@ -34,9 +30,9 @@ describe('C156_HoofCaregiver session', () => {
     cattleMarket.resources.cattle = 2
     session.loadState(state)
 
-    const effect = getCardEffect(CARD_ID)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
     expect(effect).toBeDefined()
-    const flow = effect!.onBuy!(state, player) as ActionFlow
+    const flow = session.withCtx(() => effect!.onBuy!(state, player)) as ActionFlow
 
     // After onBuy: cattle-market has 3 cattle (2 + 1 placed)
     const cm = state.actionSpaces.find((s) => s.id === 'cattle-market')!
@@ -70,8 +66,8 @@ describe('C156_HoofCaregiver session', () => {
     cattleMarket.resources.cattle = 2
     session.loadState(state)
 
-    const effect = getCardEffect(CARD_ID)
-    const flow = effect!.onBuy!(state, player)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
+    const flow = session.withCtx(() => effect!.onBuy!(state, player))
     expect(flow).toBeUndefined()
     expect(cattleMarket.resources.cattle).toBe(2)
   })

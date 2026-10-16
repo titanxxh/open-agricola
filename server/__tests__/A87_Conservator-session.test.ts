@@ -1,7 +1,7 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
+import type { GameSession as SessionRuleOwner } from '../game/authoritative-session'
+import { CardRegistry as TestCardRegistry } from '../../shared/cards/registry'
+import { withActiveRegistry } from '../../shared/cards/active-registry'
+import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -12,8 +12,11 @@ import '../../shared/cards/A/A087_Conservator'
 
 const CARD_ID = 'A087_Conservator'
 
-const findListener = (id: string) =>
-  getRegisteredCardListeners().find((l) => l.id === id)
+const findListener = (ruleOwner: SessionRuleOwner | TestCardRegistry, id: string) =>
+  {
+  const lookupRule1 = () => getRegisteredCardListeners().find((l) => l.id === id)
+  return ruleOwner instanceof TestCardRegistry ? withActiveRegistry(ruleOwner, lookupRule1) : ruleOwner.withCtx(lookupRule1)
+}
 
 const setup = (
   overrides: {
@@ -48,15 +51,15 @@ describe('A087_Conservator computeChoiceCandidates listener', () => {
     const session = setup({ houseType: 'wood', rooms: 2 })
     const state = session.getState().state
     const player = state.players[0]!
-    const listener = findListener('A87-conservator-add-stone-renovation-target')
+    const listener = findListener(session, 'A87-conservator-add-stone-renovation-target')
     expect(listener).toBeDefined()
 
-    const result = executeCardListener(listener!, {
+    const result = session.withCtx(() => executeCardListener(listener!, {
       state,
       player,
       actionId: 'renovate-house',
       phase: 'computeChoiceCandidates',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result?.extraOptions).toEqual([
       { value: 'stone', labelKey: 'ui.interactionConservatorDirectStone', sourceCard: CARD_ID },
@@ -67,14 +70,14 @@ describe('A087_Conservator computeChoiceCandidates listener', () => {
     const session = setup({ houseType: 'clay' })
     const state = session.getState().state
     const player = state.players[0]!
-    const listener = findListener('A87-conservator-add-stone-renovation-target')!
+    const listener = findListener(session, 'A87-conservator-add-stone-renovation-target')!
 
-    const result = executeCardListener(listener, {
+    const result = session.withCtx(() => executeCardListener(listener, {
       state,
       player,
       actionId: 'renovate-house',
       phase: 'computeChoiceCandidates',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeUndefined()
   })
@@ -83,14 +86,14 @@ describe('A087_Conservator computeChoiceCandidates listener', () => {
     const session = setup({ playA87: false })
     const state = session.getState().state
     const player = state.players[0]!
-    const listener = findListener('A87-conservator-add-stone-renovation-target')!
+    const listener = findListener(session, 'A87-conservator-add-stone-renovation-target')!
 
-    const result = executeCardListener(listener, {
+    const result = session.withCtx(() => executeCardListener(listener, {
       state,
       player,
       actionId: 'renovate-house',
       phase: 'computeChoiceCandidates',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeUndefined()
   })
@@ -103,14 +106,14 @@ describe('A087_Conservator computeChoiceCandidates listener', () => {
     })
     const state = session.getState().state
     const player = state.players[0]!
-    const listener = findListener('A87-conservator-add-stone-renovation-target')!
+    const listener = findListener(session, 'A87-conservator-add-stone-renovation-target')!
 
-    const result = executeCardListener(listener, {
+    const result = session.withCtx(() => executeCardListener(listener, {
       state,
       player,
       actionId: 'renovate-house',
       phase: 'computeChoiceCandidates',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result?.extraOptions).toEqual([
       { value: 'stone', labelKey: 'ui.interactionConservatorDirectStone', sourceCard: CARD_ID },
@@ -118,7 +121,8 @@ describe('A087_Conservator computeChoiceCandidates listener', () => {
   })
 
   it('legacy computeReplace listener is gone (no XOR top-level branch)', () => {
-    expect(findListener('A87-conservator-replace-renovate-house')).toBeUndefined()
+    const ruleRegistry = createOfficialCardRegistry()
+    expect(findListener(ruleRegistry, 'A87-conservator-replace-renovate-house')).toBeUndefined()
   })
 })
 
@@ -131,16 +135,16 @@ describe('A087_Conservator isDoable listener', () => {
     })
     const state = session.getState().state
     const player = state.players[0]!
-    const listener = findListener('A87-conservator-isDoable-renovate-house')
+    const listener = findListener(session, 'A87-conservator-isDoable-renovate-house')
     expect(listener).toBeDefined()
 
-    const result = executeCardListener(listener!, {
+    const result = session.withCtx(() => executeCardListener(listener!, {
       state,
       player,
       actionId: 'renovate-house',
       phase: 'isDoable',
       doable: false,
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result?.doable).toBe(true)
   })
@@ -153,15 +157,15 @@ describe('A087_Conservator isDoable listener', () => {
     })
     const state = session.getState().state
     const player = state.players[0]!
-    const listener = findListener('A87-conservator-isDoable-renovate-house')!
+    const listener = findListener(session, 'A87-conservator-isDoable-renovate-house')!
 
-    const result = executeCardListener(listener, {
+    const result = session.withCtx(() => executeCardListener(listener, {
       state,
       player,
       actionId: 'renovate-house',
       phase: 'isDoable',
       doable: true,
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeUndefined()
   })
@@ -174,15 +178,15 @@ describe('A087_Conservator isDoable listener', () => {
     })
     const state = session.getState().state
     const player = state.players[0]!
-    const listener = findListener('A87-conservator-isDoable-renovate-house')!
+    const listener = findListener(session, 'A87-conservator-isDoable-renovate-house')!
 
-    const result = executeCardListener(listener, {
+    const result = session.withCtx(() => executeCardListener(listener, {
       state,
       player,
       actionId: 'renovate-house',
       phase: 'isDoable',
       doable: false,
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeUndefined()
   })
@@ -195,15 +199,15 @@ describe('A087_Conservator isDoable listener', () => {
     })
     const state = session.getState().state
     const player = state.players[0]!
-    const listener = findListener('A87-conservator-isDoable-renovate-house')!
+    const listener = findListener(session, 'A87-conservator-isDoable-renovate-house')!
 
-    const result = executeCardListener(listener, {
+    const result = session.withCtx(() => executeCardListener(listener, {
       state,
       player,
       actionId: 'renovate-house',
       phase: 'isDoable',
       doable: true,
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeUndefined()
   })
@@ -217,15 +221,15 @@ describe('A087_Conservator isDoable listener', () => {
     })
     const state = session.getState().state
     const player = state.players[0]!
-    const listener = findListener('A87-conservator-isDoable-renovate-house')!
+    const listener = findListener(session, 'A87-conservator-isDoable-renovate-house')!
 
-    const result = executeCardListener(listener, {
+    const result = session.withCtx(() => executeCardListener(listener, {
       state,
       player,
       actionId: 'renovate-house',
       phase: 'isDoable',
       doable: false,
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeUndefined()
   })

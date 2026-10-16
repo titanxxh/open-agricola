@@ -1,7 +1,4 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
+import type { GameSession as SessionRuleOwner } from '../game/authoritative-session'
 import { type SessionResponse } from '../game/authoritative-session'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 
@@ -23,8 +20,8 @@ import '../../shared/cards/B/B138_ForestGuardian'
 
 const CARD_ID = 'B138_ForestGuardian'
 
-const findListener = (id: string) =>
-  getRegisteredCardListeners().find((l) => l.id === id)
+const findListener = (ruleOwner: SessionRuleOwner, id: string) =>
+  ruleOwner.withCtx(() => getRegisteredCardListeners()).find((l) => l.id === id)
 
 const resolveConfirms = (session: GameSession) => {
   let resp = session.getState()
@@ -59,13 +56,14 @@ describe('B138_ForestGuardian session — opponent pays food on 5+ wood collect'
   }
 
   it('listener fires when opponent collects forest with 5+ wood, returns gain leaf with payerId', () => {
-    const listener = findListener('B138-forest-guardian-before-opponent-collect')
-    expect(listener).toBeDefined()
 
-    const { state, owner, opponent } = setup()
+
+    const { session: ruleSession, state, owner, opponent } = setup()
+    const listener = findListener(ruleSession, 'B138-forest-guardian-before-opponent-collect')
+    expect(listener).toBeDefined()
     const space = mkActionSpace({ id: 'forest', resources: { wood: 5 } })
 
-    const result = executeCardListener(listener!, {
+    const result = ruleSession.withCtx(() => executeCardListener(listener!, {
       state,
       player: opponent,
       space,
@@ -74,7 +72,7 @@ describe('B138_ForestGuardian session — opponent pays food on 5+ wood collect'
       result: { type: 'ok' },
       ownerPlayer: owner,
       triggerPlayer: opponent,
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeDefined()
     expect(result!.flow?.type).toBe('seq')
@@ -93,11 +91,12 @@ describe('B138_ForestGuardian session — opponent pays food on 5+ wood collect'
   })
 
   it('listener does NOT fire below 5 wood threshold', () => {
-    const listener = findListener('B138-forest-guardian-before-opponent-collect')
-    const { state, owner, opponent } = setup()
+
+    const { session: ruleSession, state, owner, opponent } = setup()
+    const listener = findListener(ruleSession, 'B138-forest-guardian-before-opponent-collect')
     const space = mkActionSpace({ id: 'forest', resources: { wood: 4 } })
 
-    const result = executeCardListener(listener!, {
+    const result = ruleSession.withCtx(() => executeCardListener(listener!, {
       state,
       player: opponent,
       space,
@@ -106,17 +105,18 @@ describe('B138_ForestGuardian session — opponent pays food on 5+ wood collect'
       result: { type: 'ok' },
       ownerPlayer: owner,
       triggerPlayer: opponent,
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeUndefined()
   })
 
   it('listener does NOT fire on non-wood spaces', () => {
-    const listener = findListener('B138-forest-guardian-before-opponent-collect')
-    const { state, owner, opponent } = setup()
+
+    const { session: ruleSession, state, owner, opponent } = setup()
+    const listener = findListener(ruleSession, 'B138-forest-guardian-before-opponent-collect')
     const space = mkActionSpace({ id: 'fishing', resources: { wood: 5, food: 1 } })
 
-    const result = executeCardListener(listener!, {
+    const result = ruleSession.withCtx(() => executeCardListener(listener!, {
       state,
       player: opponent,
       space,
@@ -125,20 +125,20 @@ describe('B138_ForestGuardian session — opponent pays food on 5+ wood collect'
       result: { type: 'ok' },
       ownerPlayer: owner,
       triggerPlayer: opponent,
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeUndefined()
   })
 
   it('gain leaf with payerId actually deducts opponent food and credits owner', () => {
-    const { state, owner, opponent } = setup()
+    const { session: ruleSession, state, owner, opponent } = setup()
     const space = mkActionSpace({ id: 'forest' })
 
     const ownerFoodBefore = owner.resources.food
     const opponentFoodBefore = opponent.resources.food
 
     // Simulate the leaf executing under owner context (PlayerSwitch upstream).
-    const result = gainAction.execute({
+    const result = ruleSession.withCtx(() => gainAction.execute({
       state,
       player: owner,
       space,
@@ -148,7 +148,7 @@ describe('B138_ForestGuardian session — opponent pays food on 5+ wood collect'
         payerId: opponent.id,
       },
       sourceCard: CARD_ID,
-    })
+    }))
 
     expect(result.type).toBe('ok')
     if (result.type === 'ok') {
@@ -161,11 +161,11 @@ describe('B138_ForestGuardian session — opponent pays food on 5+ wood collect'
   })
 
   it('gain payerId rejects an insufficient transfer without minting food', () => {
-    const { state, owner, opponent } = setup()
+    const { session: ruleSession, state, owner, opponent } = setup()
     opponent.resources.food = 0
     const space = mkActionSpace({ id: 'forest' })
 
-    gainAction.execute({
+    ruleSession.withCtx(() => gainAction.execute({
       state,
       player: owner,
       space,
@@ -175,7 +175,7 @@ describe('B138_ForestGuardian session — opponent pays food on 5+ wood collect'
         payerId: opponent.id,
       },
       sourceCard: CARD_ID,
-    })
+    }))
 
     expect(opponent.resources.food).toBe(0)
     expect(owner.resources.food).toBe(5)

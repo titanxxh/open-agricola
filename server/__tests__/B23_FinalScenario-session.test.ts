@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -16,7 +12,7 @@ describe('B023_FinalScenario prerequisite', () => {
     const state = session.getState().state
     state.round = 14
     const player = state.players[0]!
-    expect(meetsCardPrerequisites(player, B023_FinalScenario, state.round, state)).toBe(false)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, B023_FinalScenario, state.round, state))).toBe(false)
   })
 
   it('allows when round <= 13', () => {
@@ -25,7 +21,7 @@ describe('B023_FinalScenario prerequisite', () => {
     const state = session.getState().state
     state.round = 13
     const player = state.players[0]!
-    expect(meetsCardPrerequisites(player, B023_FinalScenario, state.round, state)).toBe(true)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, B023_FinalScenario, state.round, state))).toBe(true)
   })
 
   it('sets exclusiveUse on the round 14 action space and gates non-owner placement', () => {

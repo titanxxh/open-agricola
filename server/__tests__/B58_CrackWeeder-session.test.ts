@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -24,9 +20,9 @@ describe('B058_CrackWeeder session', () => {
     const player = state.players[0]!
     session.loadState(state)
 
-    const effect = getCardEffect(CARD_ID)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
     expect(effect).toBeDefined()
-    const flow = effect!.onBuy!(state, player)
+    const flow = session.withCtx(() => effect!.onBuy!(state, player))
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('leaf')
     expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params?.food).toBe(1)
@@ -48,7 +44,7 @@ describe('B058_CrackWeeder session', () => {
 
     session.loadState(state)
 
-    const flow = runCardEffectHook(state, player, CARD_ID, 'onAfterReap')
+    const flow = session.withCtx(() => runCardEffectHook(state, player, CARD_ID, 'onAfterReap'))
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('leaf')
     expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params?.food).toBe(2)
@@ -70,7 +66,7 @@ describe('B058_CrackWeeder session', () => {
 
     session.loadState(state)
 
-    const flow = runCardEffectHook(state, player, CARD_ID, 'onAfterReap')
+    const flow = session.withCtx(() => runCardEffectHook(state, player, CARD_ID, 'onAfterReap'))
     expect(flow).toBeNull()
   })
 

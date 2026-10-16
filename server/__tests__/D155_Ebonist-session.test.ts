@@ -1,7 +1,5 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
+import { withActiveRegistry } from '../../shared/cards/active-registry'
+import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
 import { GameSession } from '../game/authoritative-session'
 import { markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -31,14 +29,15 @@ describe('D155_Ebonist exchange metadata', () => {
   })
 
   it('is visible in the harvest window but not the anytime window', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     const player = {
       occupationPlayed: [CARD_ID],
       minorPlayed: [],
       improvements: [],
     } as unknown as PlayerState
 
-    expect(getExchangesInWindow(player, 'anytime').some((trade) => trade.sourceId === CARD_ID)).toBe(false)
-    expect(getExchangesInWindow(player, 'harvest').some((trade) => trade.sourceId === CARD_ID)).toBe(true)
+    expect(withActiveRegistry(ruleRegistry, () => getExchangesInWindow(player, 'anytime')).some((trade) => trade.sourceId === CARD_ID)).toBe(false)
+    expect(withActiveRegistry(ruleRegistry, () => getExchangesInWindow(player, 'harvest')).some((trade) => trade.sourceId === CARD_ID)).toBe(true)
   })
 })
 

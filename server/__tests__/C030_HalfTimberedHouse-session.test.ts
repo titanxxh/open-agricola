@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { computeScores } from '../../shared/domain/scoring'
@@ -79,9 +75,9 @@ const play = (session: GameSession) => {
 const offered = (response: SessionResponse) => response.interaction.stateId === 'wait'
   && (response.interaction.request.options?.some((candidate) => candidate.value === CARD_ID) ?? false)
 
-const bonusScore = (response: SessionResponse, cardId: string) => {
+const bonusScore = (session: GameSession, response: SessionResponse, cardId: string) => {
   const player = response.state.players[0]!
-  const score = computeScores(response.state).find((summary) => summary.playerId === player.id)!
+  const score = session.withCtx(() => computeScores(response.state)).find((summary) => summary.playerId === player.id)!
   const category = score.categories.find((entry) => entry.key === 'cardBonusVp')
   return category?.entries.find((entry) => 'cardId' in entry && entry.cardId === cardId)?.score ?? 0
 }
@@ -104,35 +100,40 @@ describe('C030 Half-Timbered House parity', () => {
   })
 
   it('C030 S3: a three-room stone house scores three bonus points', () => {
-    const response = setup({ played: true }).getState()
+    const session = setup({ played: true })
+    const response = session.getState()
 
-    expect(bonusScore(response, CARD_ID)).toBe(3)
+    expect(bonusScore(session, response, CARD_ID)).toBe(3)
   })
 
   it('C030 S4: a non-stone house scores no Half-Timbered House bonus', () => {
-    const response = setup({ played: true, houseType: 'clay' }).getState()
+    const session = setup({ played: true, houseType: 'clay' })
+    const response = session.getState()
 
-    expect(bonusScore(response, CARD_ID)).toBe(0)
+    expect(bonusScore(session, response, CARD_ID)).toBe(0)
   })
 
   it('C030 S5: only the higher stone-house bonus scores when Luxurious Hostel is worth four', () => {
-    const response = setup({ played: true, rooms: 3, luxuriousHostel: true }).getState()
+    const session = setup({ played: true, rooms: 3, luxuriousHostel: true })
+    const response = session.getState()
 
-    expect(bonusScore(response, CARD_ID)).toBe(0)
-    expect(bonusScore(response, HOSTEL_ID)).toBe(4)
+    expect(bonusScore(session, response, CARD_ID)).toBe(0)
+    expect(bonusScore(session, response, HOSTEL_ID)).toBe(4)
   })
 
   it('C030 S6: Half-Timbered House wins the stone-house bonus when five rooms beat Hostel', () => {
-    const response = setup({ played: true, rooms: 5, luxuriousHostel: true }).getState()
+    const session = setup({ played: true, rooms: 5, luxuriousHostel: true })
+    const response = session.getState()
 
-    expect(bonusScore(response, CARD_ID)).toBe(5)
-    expect(bonusScore(response, HOSTEL_ID)).toBe(0)
+    expect(bonusScore(session, response, CARD_ID)).toBe(5)
+    expect(bonusScore(session, response, HOSTEL_ID)).toBe(0)
   })
 
   it('C030 S7: tied four-point stone-house bonuses count only Half-Timbered House', () => {
-    const response = setup({ played: true, rooms: 4, luxuriousHostel: true }).getState()
+    const session = setup({ played: true, rooms: 4, luxuriousHostel: true })
+    const response = session.getState()
 
-    expect(bonusScore(response, CARD_ID)).toBe(4)
-    expect(bonusScore(response, HOSTEL_ID)).toBe(0)
+    expect(bonusScore(session, response, CARD_ID)).toBe(4)
+    expect(bonusScore(session, response, HOSTEL_ID)).toBe(0)
   })
 })

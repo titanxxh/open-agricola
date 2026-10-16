@@ -1,7 +1,5 @@
-import { installOfficialCardRegistry } from '../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
+import { withActiveRegistry } from '../shared/cards/active-registry'
+import { createOfficialCardRegistry } from '../shared/cards/__tests__/card-environment'
 import { describe, expect, it } from 'vitest'
 import { serializeState, rehydrateState } from '../shared/session/serialization'
 import type { GameSyncPayload } from '../shared/contract/protocol/game'
@@ -20,7 +18,7 @@ describe('game sync pipeline (applySnapshot path)', () => {
 
   function buildPayload(overrides?: Partial<GameSyncPayload>): GameSyncPayload {
     return {
-      state: serializeState(rawState, emptyCtx()),
+      state: withActiveRegistry(createOfficialCardRegistry(), () => serializeState(rawState, emptyCtx())),
       interaction: {
         stateId: 'idle',
         allowedCommands: ['takeAction', 'undoStep', 'undoAction'],
@@ -102,7 +100,7 @@ describe('game sync pipeline (applySnapshot path)', () => {
     modified.players[0]!.resources.wood = 50
     modified.players[0]!.resources.food = 100
     const payload: GameSyncPayload = {
-      state: serializeState(modified, emptyCtx()),
+      state: withActiveRegistry(createOfficialCardRegistry(), () => serializeState(modified, emptyCtx())),
       interaction: {
         stateId: 'idle',
         allowedCommands: ['takeAction', 'undoStep', 'undoAction'],
@@ -122,7 +120,7 @@ describe('game sync pipeline (applySnapshot path)', () => {
     const modified = createInitialState(42)
     const first = modified.actionSpaces[0]!
     first.takenBy = [{ playerId: 'p1', workerId: '1' }]
-    const payload = buildPayload({ state: serializeState(modified, emptyCtx()) })
+    const payload = buildPayload({ state: withActiveRegistry(createOfficialCardRegistry(), () => serializeState(modified, emptyCtx())) })
     const { state: restored } = rehydrateState(payload.state)
     const restoredSpace = restored.actionSpaces.find((s) => s.id === first.id)
     expect(restoredSpace?.takenBy).toEqual([{ playerId: 'p1', workerId: '1' }])

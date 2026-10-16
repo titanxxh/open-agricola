@@ -1,7 +1,6 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
+import { CardRegistry as TestCardRegistry } from '../../shared/cards/registry'
+import { withActiveRegistry } from '../../shared/cards/active-registry'
+import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
@@ -55,24 +54,26 @@ const createSpace = (id: string): ActionSpace => ({
 })
 
 const executeSpecialEffectLeaves = (
+  ruleOwner: TestCardRegistry,
   flow: ActionFlow | undefined,
   state: GameState,
   player: PlayerState,
 ) => {
   if (!flow) return
   if (flow.type === 'seq') {
-    flow.children.forEach((child) => executeSpecialEffectLeaves(child, state, player))
+    flow.children.forEach((child) => executeSpecialEffectLeaves(ruleOwner, child, state, player))
     return
   }
   if (flow.type !== 'leaf' || flow.actionId !== 'special-effect') return
-  specialEffectAction.execute({
+  withActiveRegistry(ruleOwner, () => specialEffectAction.execute({
+    actionHooks: undefined,
     state,
     player,
     space: createSpace('test'),
     params: flow.params,
     sourceCard: flow.sourceCard,
     actionContext: flow.actionContext,
-  })
+  }))
 }
 
 describe('E123_ResourceHoarder session', () => {
@@ -86,9 +87,9 @@ describe('E123_ResourceHoarder session', () => {
 
     session.loadState(state)
 
-    const effect = getCardEffect(CARD_ID)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
     expect(effect).toBeDefined()
-    effect!.onBuy!(state, player)
+    session.withCtx(() => effect!.onBuy!(state, player))
 
     const stack = player.cardStates?.[CARD_ID]?.stack
     expect(stack).toBeDefined()
@@ -96,7 +97,8 @@ describe('E123_ResourceHoarder session', () => {
   })
 
   it('computeCosts listener offers discount of top resource (clay)', () => {
-    const listeners = getRegisteredCardListeners()
+    const ruleRegistry = createOfficialCardRegistry()
+    const listeners = withActiveRegistry(ruleRegistry, () => getRegisteredCardListeners())
     const costListener = listeners.find((l) => l.id === 'E123-resource-hoarder-compute-costs')
     expect(costListener).toBeDefined()
 
@@ -120,7 +122,7 @@ describe('E123_ResourceHoarder session', () => {
       actionId: 'construct', phase: 'computeCosts',
     } as CardListenerContext
 
-    const result = executeCardListener(costListener!, context)
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(costListener!, context))
     expect(result).toBeDefined()
     expect(result!.bonuses).toBeDefined()
     expect(result!.bonuses).toHaveLength(1)
@@ -135,7 +137,8 @@ describe('E123_ResourceHoarder session', () => {
   })
 
   it('computeCosts listener returns nothing when stack is empty', () => {
-    const listeners = getRegisteredCardListeners()
+    const ruleRegistry = createOfficialCardRegistry()
+    const listeners = withActiveRegistry(ruleRegistry, () => getRegisteredCardListeners())
     const costListener = listeners.find((l) => l.id === 'E123-resource-hoarder-compute-costs')
 
     const player = createPlayer('p1', {
@@ -156,12 +159,13 @@ describe('E123_ResourceHoarder session', () => {
       actionId: 'construct', phase: 'computeCosts',
     } as CardListenerContext
 
-    const result = executeCardListener(costListener!, context)
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(costListener!, context))
     expect(result).toBeUndefined()
   })
 
   it('after-pay listener pops top resource from stack', () => {
-    const listeners = getRegisteredCardListeners()
+    const ruleRegistry = createOfficialCardRegistry()
+    const listeners = withActiveRegistry(ruleRegistry, () => getRegisteredCardListeners())
     const afterPayListener = listeners.find((l) => l.id === 'E123-resource-hoarder-after-pay')
     expect(afterPayListener).toBeDefined()
     expect(afterPayListener!.actions).toEqual(['pay'])
@@ -193,14 +197,15 @@ describe('E123_ResourceHoarder session', () => {
       }],
     } as CardListenerContext
 
-    executeSpecialEffectLeaves(executeCardListener(afterPayListener!, context)?.flow, state, player)
+    executeSpecialEffectLeaves(ruleRegistry, withActiveRegistry(ruleRegistry, () => executeCardListener(afterPayListener!, context))?.flow, state, player)
     expect(player.cardStates[CARD_ID]!.stack).toEqual(
       ['stone', 'clay', 'stone', 'reed', 'wood'],
     )
   })
 
   it('after-pay listener does nothing when stack is empty', () => {
-    const listeners = getRegisteredCardListeners()
+    const ruleRegistry = createOfficialCardRegistry()
+    const listeners = withActiveRegistry(ruleRegistry, () => getRegisteredCardListeners())
     const afterPayListener = listeners.find((l) => l.id === 'E123-resource-hoarder-after-pay')
 
     const player = createPlayer('p1', {
@@ -221,14 +226,15 @@ describe('E123_ResourceHoarder session', () => {
       actionId: 'construct', phase: 'after',
     } as CardListenerContext
 
-    executeCardListener(afterPayListener!, context)
+    withActiveRegistry(ruleRegistry, () => executeCardListener(afterPayListener!, context))
     expect(player.cardStates[CARD_ID]!.stack).toEqual([])
   })
 
   it('after-pay listener does NOT pop when E123 was not used in payment', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     // Bug fix: previously the after-pay listener popped unconditionally.
     // It must only pop when _activeActionBonusSources includes E123.
-    const listeners = getRegisteredCardListeners()
+    const listeners = withActiveRegistry(ruleRegistry, () => getRegisteredCardListeners())
     const afterPayListener = listeners.find((l) => l.id === 'E123-resource-hoarder-after-pay')
     expect(afterPayListener).toBeDefined()
 
@@ -254,7 +260,7 @@ describe('E123_ResourceHoarder session', () => {
       actionId: 'construct', phase: 'after',
     } as CardListenerContext
 
-    executeCardListener(afterPayListener!, context)
+    withActiveRegistry(ruleRegistry, () => executeCardListener(afterPayListener!, context))
     // Stack remains intact (no pop because E123 wasn't used)
     expect(player.cardStates[CARD_ID]!.stack).toEqual(
       ['stone', 'clay', 'stone', 'reed', 'wood', 'clay'],
@@ -262,7 +268,8 @@ describe('E123_ResourceHoarder session', () => {
   })
 
   it('after-pay listener ignores legacy construct _activeActionBonusSources path', () => {
-    const listeners = getRegisteredCardListeners()
+    const ruleRegistry = createOfficialCardRegistry()
+    const listeners = withActiveRegistry(ruleRegistry, () => getRegisteredCardListeners())
     const afterPayListener = listeners.find((l) => l.id === 'E123-resource-hoarder-after-pay')!
 
     const player = createPlayer('p1', {
@@ -286,14 +293,15 @@ describe('E123_ResourceHoarder session', () => {
       actionId: 'construct', phase: 'after',
     } as CardListenerContext
 
-    executeCardListener(afterPayListener, context)
+    withActiveRegistry(ruleRegistry, () => executeCardListener(afterPayListener, context))
     expect(player.cardStates[CARD_ID]!.stack).toEqual(
       ['stone', 'clay', 'stone', 'reed', 'wood', 'clay'],
     )
   })
 
   it('successive pops reveal deeper stack resources', () => {
-    const listeners = getRegisteredCardListeners()
+    const ruleRegistry = createOfficialCardRegistry()
+    const listeners = withActiveRegistry(ruleRegistry, () => getRegisteredCardListeners())
     const afterPayListener = listeners.find((l) => l.id === 'E123-resource-hoarder-after-pay')!
     const costListener = listeners.find((l) => l.id === 'E123-resource-hoarder-compute-costs')!
 
@@ -325,29 +333,31 @@ describe('E123_ResourceHoarder session', () => {
     } as CardListenerContext)
 
     // Top is clay (k=1 entry of N+1 choices)
-    let result = executeCardListener(costListener, mkContext('construct', 'computeCosts'))
+    let result = withActiveRegistry(ruleRegistry, () => executeCardListener(costListener, mkContext('construct', 'computeCosts')))
     expect(result!.bonuses![0]!.choices![1]!.discount).toEqual({ clay: 1 })
 
     // Pop clay
     executeSpecialEffectLeaves(
-      executeCardListener(afterPayListener, mkContext('pay', 'after', 1))?.flow,
+      ruleRegistry,
+      withActiveRegistry(ruleRegistry, () => executeCardListener(afterPayListener, mkContext('pay', 'after', 1)))?.flow,
       state,
       player,
     )
 
     // Now top is wood
-    result = executeCardListener(costListener, mkContext('construct', 'computeCosts'))
+    result = withActiveRegistry(ruleRegistry, () => executeCardListener(costListener, mkContext('construct', 'computeCosts')))
     expect(result!.bonuses![0]!.choices![1]!.discount).toEqual({ wood: 1 })
 
     // Pop wood
     executeSpecialEffectLeaves(
-      executeCardListener(afterPayListener, mkContext('pay', 'after', 1))?.flow,
+      ruleRegistry,
+      withActiveRegistry(ruleRegistry, () => executeCardListener(afterPayListener, mkContext('pay', 'after', 1)))?.flow,
       state,
       player,
     )
 
     // Now top is reed
-    result = executeCardListener(costListener, mkContext('improvement', 'computeCosts'))
+    result = withActiveRegistry(ruleRegistry, () => executeCardListener(costListener, mkContext('improvement', 'computeCosts')))
     expect(result!.bonuses![0]!.choices![1]!.discount).toEqual({ reed: 1 })
   })
 })

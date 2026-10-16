@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 
 import { GameSession } from '../game/authoritative-session'
@@ -119,7 +115,7 @@ const commitPositions = (
 }
 
 const emptyScore = (session: GameSession) =>
-  Scoring.breakdown(session.state, 0).categories.find((category) => category.key === 'empty')?.total ?? 0
+  session.withCtx(() => Scoring.breakdown(session.state, 0)).categories.find((category) => category.key === 'empty')?.total ?? 0
 
 describe('M050/M051 farmyard extension', () => {
   it('M050 adds two real farmyard coordinates and dynamic helpers see them', () => {
@@ -213,7 +209,7 @@ describe('M050/M051 farmyard extension', () => {
       { row: -1, col: 1 },
     ])).toBe(true)
 
-    const result = selectionAction.resolveChoice!(
+    const result = session.withCtx(() => selectionAction.resolveChoice!(
       {
         player,
         sourceCard: 'M051_MoorEnclosures',
@@ -236,7 +232,7 @@ describe('M050/M051 farmyard extension', () => {
       } as never,
       'confirm',
       { positions: ['-2-0', '-2-1'] },
-    )
+    ))
 
     expect(result).toEqual({
       type: 'fail',
@@ -271,10 +267,10 @@ describe('M050/M051 farmyard extension', () => {
     player.houseType = 'wood'
     session.loadState(session.state)
 
-    expect(meetsCardPrerequisites(player, M051_MoorEnclosures, session.state.round, session.state)).toBe(false)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, M051_MoorEnclosures, session.state.round, session.state))).toBe(false)
     player.houseType = 'stone'
-    expect(meetsCardPrerequisites(player, M051_MoorEnclosures, session.state.round, session.state)).toBe(true)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, M051_MoorEnclosures, session.state.round, session.state))).toBe(true)
     player.houseType = 'clay'
-    expect(meetsCardPrerequisites(player, M051_MoorEnclosures, session.state.round, session.state)).toBe(true)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, M051_MoorEnclosures, session.state.round, session.state))).toBe(true)
   })
 })

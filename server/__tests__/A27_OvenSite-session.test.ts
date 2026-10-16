@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/A/A060_OrientalFireplace'
@@ -189,7 +185,7 @@ describe('A027_OvenSite session', () => {
       const state = session.getState().state
       const player = state.players[0]!
       player.improvements = []
-      expect(meetsCardPrerequisites(player, A027_OvenSite, state.round, state)).toBe(false)
+      expect(session.withCtx(() => meetsCardPrerequisites(player, A027_OvenSite, state.round, state))).toBe(false)
     })
 
     it('allows when player owns Fireplace1 and CookingHearth1', () => {
@@ -198,7 +194,7 @@ describe('A027_OvenSite session', () => {
       const state = session.getState().state
       const player = state.players[0]!
       player.improvements = ['Major_Fireplace1', 'Major_CookingHearth1']
-      expect(meetsCardPrerequisites(player, A027_OvenSite, state.round, state)).toBe(true)
+      expect(session.withCtx(() => meetsCardPrerequisites(player, A027_OvenSite, state.round, state))).toBe(true)
     })
   })
 })

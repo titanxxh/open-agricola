@@ -1,7 +1,5 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
+import { withActiveRegistry } from '../../shared/cards/active-registry'
+import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
 import { afterEach, describe, expect, it } from 'vitest'
 import { clearCustomCards, registerCustomCard, type CustomCardData } from '../../shared/cards/custom-registry.ts'
 import { executeCardListener, getMatchingListeners } from '../../shared/cards/card-listeners.ts'
@@ -268,6 +266,7 @@ const CARD_IMPL = {
   })
 
   it('extracts hand-hook metadata for executor-backed custom cards', () => {
+    const registry = createOfficialCardRegistry()
     const result = validateAndCompileCustomCode(`
 const CARD_ID = 'CUSTOM_ExecutorCard'
 const CARD_DEF = MinorImprovement({ id: CARD_ID, name: 'Executor Card' })
@@ -288,12 +287,13 @@ const CARD_IMPL = {
 
     const cardData = makeCardData(result.compiledCode, result.manifest)
     registerCustomCard(cardData, { allowGlobal: true })
-    registerExecutorBackedCustomCard(cardData)
+    withActiveRegistry(registry, () => registerExecutorBackedCustomCard(cardData))
 
-    expect(getCardEffect('CUSTOM_ExecutorCard')).toMatchObject({ handHooks: ['onBeforeStartOfTurn'] })
+    expect(withActiveRegistry(registry, () => getCardEffect('CUSTOM_ExecutorCard'))).toMatchObject({ handHooks: ['onBeforeStartOfTurn'] })
   })
 
   it('registers only the open, well-typed metadata of an already saved manifest', () => {
+    const registry = createOfficialCardRegistry()
     const result = validateAndCompileCustomCode(`
 const CARD_ID = 'CUSTOM_ExecutorCard'
 const CARD_DEF = MinorImprovement({ id: CARD_ID, name: 'Executor Card' })
@@ -308,9 +308,9 @@ const CARD_IMPL = {
     }
     const cardData = makeCardData(result.compiledCode, { ...result.manifest, effectMetadata: savedMetadata as never })
     registerCustomCard(cardData, { allowGlobal: true })
-    registerExecutorBackedCustomCard(cardData)
+    withActiveRegistry(registry, () => registerExecutorBackedCustomCard(cardData))
 
-    const effect = getCardEffect('CUSTOM_ExecutorCard')!
+    const effect = withActiveRegistry(registry, () => getCardEffect('CUSTOM_ExecutorCard'))!
     expect(effect.handHooks).toEqual(['onBeforeStartOfTurn'])
     expect(effect.beforeEndGameScope).toBe('allPlayers')
     // The string would be read as true; an unopened key is never copied.
@@ -354,6 +354,7 @@ const CARD_IMPL = {
   })
 
   it('passes the fourth and fifth argument to the hooks that document them, and to no other hook', () => {
+    const registry = createOfficialCardRegistry()
     const result = validateAndCompileCustomCode(`
 const CARD_ID = 'CUSTOM_ExecutorCard'
 const CARD_DEF = MinorImprovement({ id: CARD_ID, name: 'Executor Card' })
@@ -372,17 +373,17 @@ const CARD_IMPL = {
     if (!result.valid) return
     const cardData = makeCardData(result.compiledCode, result.manifest)
     registerCustomCard(cardData, { allowGlobal: true })
-    registerExecutorBackedCustomCard(cardData)
+    withActiveRegistry(registry, () => registerExecutorBackedCustomCard(cardData))
     const state = createInitialState(42)
     const [owner, opponent] = state.players
-    const effect = getCardEffect('CUSTOM_ExecutorCard')!
+    const effect = withActiveRegistry(registry, () => getCardEffect('CUSTOM_ExecutorCard'))!
 
-    expect(effect.computeBreedThreshold!(state, owner!, 'sheep', { sourceCard: 'harvest' })).toBe(1)
-    expect(effect.computeBreedableAnimalCount!(state, owner!, 'sheep', 3, { sourceCard: 'harvest' })).toBe(13)
-    expect(effect.computeAnimalScoreAdjustment!(state, owner!, 'horse', { quantity: 2, baseScore: 5, categoryKey: 'horses' })).toBe(7)
-    expect(effect.onComputeSharedAnimalZones!(owner!, opponent!, [], state)).toEqual([{ id: `round-${state.round}`, zoneType: 'card', capacity: 0 }])
+    expect(withActiveRegistry(registry, () => effect.computeBreedThreshold!(state, owner!, 'sheep', { sourceCard: 'harvest' }))).toBe(1)
+    expect(withActiveRegistry(registry, () => effect.computeBreedableAnimalCount!(state, owner!, 'sheep', 3, { sourceCard: 'harvest' }))).toBe(13)
+    expect(withActiveRegistry(registry, () => effect.computeAnimalScoreAdjustment!(state, owner!, 'horse', { quantity: 2, baseScore: 5, categoryKey: 'horses' }))).toBe(7)
+    expect(withActiveRegistry(registry, () => effect.onComputeSharedAnimalZones!(owner!, opponent!, [], state))).toEqual([{ id: `round-${state.round}`, zoneType: 'card', capacity: 0 }])
     // getInvalidAnimals keeps its documented three arguments: the state is not passed.
-    expect(effect.getInvalidAnimals!(owner!, { id: 'zone' } as never, [{ type: 'sheep' }], state)).toEqual([{ type: 'sheep' }])
+    expect(withActiveRegistry(registry, () => effect.getInvalidAnimals!(owner!, { id: 'zone' } as never, [{ type: 'sheep' }], state))).toEqual([{ type: 'sheep' }])
   })
 
   it('rejects forbidden globals during validation', () => {
@@ -478,6 +479,7 @@ const CARD_IMPL = {
   })
 
   it('executes registered effect and listener through runtime proxies', () => {
+    const registry = createOfficialCardRegistry()
     const compiled = validateAndCompileCustomCode(`
 const CARD_ID = 'CUSTOM_ExecutorCard'
 const CARD_DEF = MinorImprovement({ id: CARD_ID, name: 'Executor Card' })
@@ -503,12 +505,12 @@ const CARD_IMPL = {
 
     const cardData = makeCardData(compiled.compiledCode, compiled.manifest)
     registerCustomCard(cardData, { allowGlobal: true })
-    registerExecutorBackedCustomCard(cardData)
+    withActiveRegistry(registry, () => registerExecutorBackedCustomCard(cardData))
 
     const state = createInitialState(42)
     state.players[0]!.minorPlayed.push('CUSTOM_ExecutorCard')
 
-    const effectResult = runCardEffectHook(state, state.players[0]!, 'CUSTOM_ExecutorCard', 'onReturnHome')
+    const effectResult = withActiveRegistry(registry, () => runCardEffectHook(state, state.players[0]!, 'CUSTOM_ExecutorCard', 'onReturnHome'))
     expect(effectResult).toEqual({
       type: 'leaf',
       actionId: 'gain',
@@ -517,15 +519,16 @@ const CARD_IMPL = {
     })
 
     const listenerContext = {
+      actionHooks: undefined,
       state,
       player: state.players[0]!,
       space: state.actionSpaces.find((space) => space.id === 'forest') ?? state.actionSpaces[0]!,
       actionId: 'collect',
       phase: 'after' as const,
     }
-    const matched = getMatchingListeners(listenerContext)
+    const matched = withActiveRegistry(registry, () => getMatchingListeners(listenerContext))
     expect(matched).toHaveLength(1)
-    const listenerResult = executeCardListener(matched[0]!.registration, listenerContext, { ownerPlayerId: matched[0]!.ownerPlayerId })
+    const listenerResult = withActiveRegistry(registry, () => executeCardListener(matched[0]!.registration, listenerContext, { ownerPlayerId: matched[0]!.ownerPlayerId }))
     // The listener omitted the result-level source; admission attributes the flow to its card.
     expect(listenerResult).toEqual({
       flow: {

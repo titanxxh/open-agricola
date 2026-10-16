@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { createWorkSession } from './_helpers/session-fixtures'
 import { describe, expect, it } from 'vitest'
 
@@ -172,9 +168,9 @@ describe('Moor future terrain minor cards', () => {
 
   it('M045 requires no improvements and schedules optional forests on rounds 12 and 13', () => {
     const { session, player } = setup()
-    expect(meetsCardPrerequisites(player, M045_TreeNursery, session.state.round, session.state)).toBe(true)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, M045_TreeNursery, session.state.round, session.state))).toBe(true)
     player.improvements = ['Major_Well']
-    expect(meetsCardPrerequisites(player, M045_TreeNursery, session.state.round, session.state)).toBe(false)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, M045_TreeNursery, session.state.round, session.state))).toBe(false)
     player.improvements = []
     player.resources.wood = 1
     player.minorHand = ['M045_TreeNursery']

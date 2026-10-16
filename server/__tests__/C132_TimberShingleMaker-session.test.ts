@@ -1,7 +1,6 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
+import { CardRegistry as TestCardRegistry } from '../../shared/cards/registry'
+import { withActiveRegistry } from '../../shared/cards/active-registry'
+import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -58,11 +57,15 @@ const createSpace = (id: string): ActionSpace =>
     takenBy: [],
   }) as ActionSpace
 
-const findListener = (id: string) => getRegisteredCardListeners().find(l => l.id === id)
+const findListener = (ruleOwner: TestCardRegistry, id: string) => {
+  const lookupRule1 = () => getRegisteredCardListeners().find(l => l.id === id)
+  return withActiveRegistry(ruleOwner, lookupRule1)
+}
 
 describe('C132_TimberShingleMaker', () => {
   it('after renovate to stone: offers XOR to pay 1..N wood for bonus VP', () => {
-    const listener = findListener('C132-timber-shingle-maker-after-renovate')
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry, 'C132-timber-shingle-maker-after-renovate')
     expect(listener).toBeDefined()
 
     const player = createPlayer()
@@ -70,10 +73,10 @@ describe('C132_TimberShingleMaker', () => {
     player.resources.wood = 5
     const state = createState(player)
 
-    const result = executeCardListener(listener!, {
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener!, {
       state, player, space: createSpace('renovate-house'),
       actionId: 'renovate-house', phase: 'after',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeDefined()
     expect(result!.flow!.type).toBe('xor')
@@ -95,23 +98,25 @@ describe('C132_TimberShingleMaker', () => {
   })
 
   it('does not trigger when house is not stone', () => {
-    const listener = findListener('C132-timber-shingle-maker-after-renovate')
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry, 'C132-timber-shingle-maker-after-renovate')
     expect(listener).toBeDefined()
 
     const player = createPlayer()
     player.houseType = 'clay'
     const state = createState(player)
 
-    const result = executeCardListener(listener!, {
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener!, {
       state, player, space: createSpace('renovate-house'),
       actionId: 'renovate-house', phase: 'after',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeUndefined()
   })
 
   it('limits wood to min of rooms and available wood', () => {
-    const listener = findListener('C132-timber-shingle-maker-after-renovate')
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry, 'C132-timber-shingle-maker-after-renovate')
     expect(listener).toBeDefined()
 
     const player = createPlayer()
@@ -119,10 +124,10 @@ describe('C132_TimberShingleMaker', () => {
     player.resources.wood = 2  // Only 2 wood available
     const state = createState(player)
 
-    const result = executeCardListener(listener!, {
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener!, {
       state, player, space: createSpace('renovate-house'),
       actionId: 'renovate-house', phase: 'after',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeDefined()
     const children = (result!.flow as Extract<ActionFlow, { type: 'seq' }>).children
@@ -131,7 +136,8 @@ describe('C132_TimberShingleMaker', () => {
   })
 
   it('computeBonusScore returns woodPlaced counter', () => {
-    const effect = getCardEffect(CARD_ID)
+    const ruleRegistry = createOfficialCardRegistry()
+    const effect = withActiveRegistry(ruleRegistry, () => getCardEffect(CARD_ID))
     expect(effect).toBeDefined()
     expect(effect!.computeBonusScore).toBeDefined()
 
@@ -141,16 +147,17 @@ describe('C132_TimberShingleMaker', () => {
     }
     const state = createState(player)
 
-    const score = effect!.computeBonusScore!(state, player, { reserved: {} })
+    const score = withActiveRegistry(ruleRegistry, () => effect!.computeBonusScore!(state, player, { reserved: {} }))
     expect(score).toBe(3)
   })
 
   it('computeBonusScore returns 0 when no wood placed', () => {
-    const effect = getCardEffect(CARD_ID)
+    const ruleRegistry = createOfficialCardRegistry()
+    const effect = withActiveRegistry(ruleRegistry, () => getCardEffect(CARD_ID))
     const player = createPlayer()
     const state = createState(player)
 
-    const score = effect!.computeBonusScore!(state, player, { reserved: {} })
+    const score = withActiveRegistry(ruleRegistry, () => effect!.computeBonusScore!(state, player, { reserved: {} }))
     expect(score).toBe(0)
   })
 })

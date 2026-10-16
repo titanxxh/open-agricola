@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { GameSession } from '../game/authoritative-session'
@@ -120,13 +116,13 @@ const counter = (player: PlayerState, cardId: string) =>
 const executeGainLeaf = (flow: ActionFlow | null, session: GameSession, player: PlayerState) => {
   expect(flow).toMatchObject({ type: 'leaf', actionId: 'gain' })
   if (!flow || flow.type !== 'leaf') throw new Error('expected gain leaf')
-  gainAction.execute({
+  session.withCtx(() => gainAction.execute({
     state: session.state,
     player,
     space: { id: 'test' } as ActionSpace,
     params: flow.params,
     sourceCard: flow.sourceCard,
-  })
+  }))
 }
 
 afterEach(() => {
@@ -222,7 +218,7 @@ describe('FoM special action listener minors', () => {
   it('M083 gives fuel on play, Hiring Fair special action, and Day Laborer action space', () => {
     const { session, player } = setup()
     player.minorPlayed.push('M083_CoalSeam')
-    executeGainLeaf(runCardEffectHook(session.state, player, 'M083_CoalSeam', 'onBuy'), session, player)
+    executeGainLeaf(session.withCtx(() => runCardEffectHook(session.state, player, 'M083_CoalSeam', 'onBuy')), session, player)
     expect(player.resources.fuel).toBe(1)
 
     let resp = takeSpecial(session, 'hiring-fair')
@@ -309,11 +305,11 @@ describe('FoM special action listener minors', () => {
 
     expect(resp.state.players[0]!.resources.fuel).toBe(3)
     expect(resp.state.players[0]!.resources.wood).toBe(1)
-    expect(meetsCardPrerequisites(player, M116_MoorBirchTrees, session.state.round, session.state)).toBe(false)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, M116_MoorBirchTrees, session.state.round, session.state))).toBe(false)
     player.rooms = 3
-    expect(meetsCardPrerequisites(player, M116_MoorBirchTrees, session.state.round, session.state)).toBe(true)
-    expect(meetsCardPrerequisites(player, M122_WillowBank, session.state.round, session.state)).toBe(true)
-    expect(meetsCardPrerequisites(player, M127_Wheelbarrow, session.state.round, session.state)).toBe(true)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, M116_MoorBirchTrees, session.state.round, session.state))).toBe(true)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, M122_WillowBank, session.state.round, session.state))).toBe(true)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, M127_Wheelbarrow, session.state.round, session.state))).toBe(true)
   })
 
   it('M118 offers fuel upgrade when affordable and falls back to one wood without fuel', () => {
@@ -368,7 +364,7 @@ describe('FoM special action listener minors', () => {
     const { session, player } = setup()
     player.minorPlayed.push('M121_Loam', 'A001_Shelter')
     setWorkersAtHome(session.state, player, 1)
-    expect(meetsCardPrerequisites(player, M121_Loam, session.state.round, session.state)).toBe(true)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, M121_Loam, session.state.round, session.state))).toBe(true)
 
     let resp = takeSpecial(session, 'hiring-fair')
 
@@ -383,7 +379,7 @@ describe('FoM special action listener minors', () => {
     expect(resp.state.players[0]!.resources.clay).toBe(0)
 
     const noPrereq = setup()
-    expect(meetsCardPrerequisites(noPrereq.player, M121_Loam, noPrereq.state.round, noPrereq.state)).toBe(false)
+    expect(session.withCtx(() => meetsCardPrerequisites(noPrereq.player, M121_Loam, noPrereq.state.round, noPrereq.state))).toBe(false)
   })
 
   it('M123 initializes player-count counters and stops after the quarry is empty', () => {

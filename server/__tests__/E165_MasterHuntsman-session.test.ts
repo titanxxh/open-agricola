@@ -1,7 +1,4 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
+import type { GameSession as SessionRuleOwner } from '../game/authoritative-session'
 import { afterEach, describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getRegisteredCardListeners, executeCardListener } from '../../shared/cards/card-listeners'
@@ -14,8 +11,8 @@ import { mkActionSpace } from '../../shared/cards/__tests__/fixtures'
 
 const CARD_ID = 'E165_MasterHuntsman'
 
-const findListener = (id: string) =>
-  getRegisteredCardListeners().find((l) => l.id === id)
+const findListener = (ruleOwner: SessionRuleOwner, id: string) =>
+  ruleOwner.withCtx(() => getRegisteredCardListeners()).find((l) => l.id === id)
 
 const sessions: GameSession[] = []
 afterEach(() => sessions.splice(0).forEach((session) => session.dispose()))
@@ -47,16 +44,17 @@ describe('E165_MasterHuntsman session', () => {
   })
 
   it('gains 1 boar after building a major improvement', () => {
-    const listener = findListener('E165-master-huntsman-after-major')
-    expect(listener).toBeDefined()
+
 
     const session = new GameSession(42)
+    const listener = findListener(session, 'E165-master-huntsman-after-major')
+    expect(listener).toBeDefined()
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
     player.occupationPlayed = [CARD_ID]
 
-    const result = executeCardListener(listener!, {
+    const result = session.withCtx(() => executeCardListener(listener!, {
       state,
       player,
       space: mkActionSpace({ id: 'improvement' }),
@@ -64,7 +62,7 @@ describe('E165_MasterHuntsman session', () => {
       phase: 'after',
       choice: 'major:Major_Well',
       result: { type: 'ok' },
-    } as CardListenerContext)
+    } as CardListenerContext))
 
     expect(result).toBeDefined()
     expect(result!.flow?.type).toBe('leaf')
@@ -74,16 +72,17 @@ describe('E165_MasterHuntsman session', () => {
   })
 
   it('does not trigger for minor improvement', () => {
-    const listener = findListener('E165-master-huntsman-after-major')
-    expect(listener).toBeDefined()
+
 
     const session = new GameSession(42)
+    const listener = findListener(session, 'E165-master-huntsman-after-major')
+    expect(listener).toBeDefined()
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
     player.occupationPlayed = [CARD_ID]
 
-    const result = executeCardListener(listener!, {
+    const result = session.withCtx(() => executeCardListener(listener!, {
       state,
       player,
       space: mkActionSpace({ id: 'improvement' }),
@@ -91,7 +90,7 @@ describe('E165_MasterHuntsman session', () => {
       phase: 'after',
       choice: 'minor:A055_JunkRoom',
       result: { type: 'ok' },
-    } as CardListenerContext)
+    } as CardListenerContext))
 
     expect(result).toBeUndefined()
   })

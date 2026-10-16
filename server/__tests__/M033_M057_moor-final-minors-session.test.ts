@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 
 import { GameSession } from '../game/authoritative-session'
@@ -88,8 +84,8 @@ const triggerOptionFor = (resp: SessionResponse, sourceCard: string): ActionChoi
 }
 
 const a92AnytimeIds = (session: GameSession): string[] =>
-  session
-    .listAnytimeEntries()
+  session.withCtx(() => session
+    .listAnytimeEntries())
     .filter((entry) => entry.descriptor.sourceCard === A092)
     .map((entry) => entry.descriptor.id)
 
@@ -210,7 +206,7 @@ describe('M057 Taps', () => {
       card.actions.includes('hiring-fair'))!
 
     expect(workersAvailable(session.state, player)).toBe(0)
-    expect(hasPendingExtraTurn(session.state, player)).toBe(true)
+    expect(session.withCtx(() => hasPendingExtraTurn(session.state, player))).toBe(true)
 
     const offer = driveToM057Offer(session)
     expect(session.state.currentPlayerIndex).toBe(0)
@@ -223,7 +219,7 @@ describe('M057 Taps', () => {
     expect(chosen.state.farmersOfTheMoor!.specialActionCards.find((card) => card.id === specialCard.id)!.location)
       .toEqual({ kind: 'playerFaceUp', playerId: player.id })
     expect(chosen.state.players[0]!.cardStates?.[M057]?.extraData?.usedThisRound).toBe(true)
-    expect(hasPendingExtraTurn(chosen.state, chosen.state.players[0]!)).toBe(false)
+    expect(session.withCtx(() => hasPendingExtraTurn(chosen.state, chosen.state.players[0]!))).toBe(false)
   })
 
   it('fires after-special-action listeners from the Taps extra turn', () => {
@@ -315,7 +311,7 @@ describe('M057 Taps', () => {
 
     expect(undone.ok).toBe(true)
     expect(undone.state.currentPlayerIndex).toBe(0)
-    expect(hasPendingExtraTurn(undone.state, undone.state.players[0]!)).toBe(true)
+    expect(session.withCtx(() => hasPendingExtraTurn(undone.state, undone.state.players[0]!))).toBe(true)
     expect(undone.state.players[0]!.cardStates?.[M057]?.extraData?.usedThisRound).toBeUndefined()
     expect(undone.interaction.stateId).toBe('wait')
     expect(undone.interaction.stateId === 'wait' ? undone.interaction.sourceCard : undefined).toBe(M057)

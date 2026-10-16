@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { descriptionEffects } from './_helpers/choice-description'
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
@@ -39,17 +35,18 @@ describe('E074_AshTrees session flow', () => {
     }
 
     session.loadState(state)
-    const listener = getRegisteredCardListeners().find((entry) => entry.id === 'E74-ash-trees-isdoable-fence')
+    const listener = session.withCtx(() => getRegisteredCardListeners()).find((entry) => entry.id === 'E74-ash-trees-isdoable-fence')
     expect(listener).toBeDefined()
-    const direct = executeCardListener(listener!, {
+    const currentState = session.getState().state
+    const direct = session.withCtx(() => executeCardListener(listener!, {
       actionHooks: session.actionHooks,
-      state: session.getState().state,
-      player: session.getState().state.players[0]!,
-      space: session.getState().state.actionSpaces.find((space) => space.id === 'fencing')!,
+      state: currentState,
+      player: currentState.players[0]!,
+      space: currentState.actionSpaces.find((space) => space.id === 'fencing')!,
       actionId: 'fence',
       phase: 'isDoable',
       doable: false,
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
     expect(direct?.doable).toBe(true)
 
     let resp = session.takeAction(0, 'fencing')

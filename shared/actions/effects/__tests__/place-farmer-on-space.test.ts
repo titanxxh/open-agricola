@@ -1,16 +1,16 @@
-import { installOfficialCardRegistry } from '../../../cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { GameSession } from '../../../../server/game/authoritative-session'
 import type { ActionExecutionContext, ActionSpace } from '../../../contract/types'
 import { setWorkersAtHome, workersAvailable } from '../../../domain/player'
 import { createInitialPlayerStats } from '../../../session/stats'
 import { placeFarmerOnSpaceAction } from '../internal/place-farmer-on-space'
 
-const makeCtx = (params: Record<string, unknown>): ActionExecutionContext => {
+const sessions: GameSession[] = []
+afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+
+const makeCtx = (params: Record<string, unknown>): { session: GameSession; context: ActionExecutionContext } => {
   const session = new GameSession(undefined, undefined, { playerCount: 4 })
+  sessions.push(session)
   const state = session.getState().state
   state.currentPlayerIndex = 0
   state.round = 1
@@ -23,30 +23,31 @@ const makeCtx = (params: Record<string, unknown>): ActionExecutionContext => {
   player.stats = createInitialPlayerStats({ isFirstPlayer: true })
   const market = state.actionSpaces.find((space) => space.id === 'resource-market-4')!
   market.takenBy = [{ playerId: other.id, workerId: '1' }]
-  return {
+  return { session, context: {
     actionHooks: session.actionHooks,
     state,
     player,
     space: state.actionSpaces[0] as ActionSpace,
     params,
     sourceCard: 'B178_TagAlong',
-  } as ActionExecutionContext
+  } as ActionExecutionContext }
 }
 
 describe('place-farmer-on-space internal action', () => {
   it('places an at-home worker onto an occupied target only when allowOccupied is true', () => {
-    const blocked = placeFarmerOnSpaceAction.execute(makeCtx({
+    const { session: ruleSession1, context: ruleContext1 } = makeCtx({
       spaceId: 'resource-market-4',
       sourceCard: 'B178_TagAlong',
-    }))
+    })
+    const blocked = ruleSession1.withCtx(() => placeFarmerOnSpaceAction.execute(ruleContext1))
     expect(blocked).toMatchObject({ type: 'fail', errorKey: 'log.placeFarmerFail' })
 
-    const ctx = makeCtx({
+    const { session: ruleSession2, context: ctx } = makeCtx({
       spaceId: 'resource-market-4',
       allowOccupied: true,
       sourceCard: 'B178_TagAlong',
     })
-    const result = placeFarmerOnSpaceAction.execute(ctx)
+    const result = ruleSession2.withCtx(() => placeFarmerOnSpaceAction.execute(ctx))
 
     expect(result.type).toBe('flow')
     if (result.type !== 'flow') return
@@ -71,7 +72,7 @@ describe('place-farmer-on-space internal action', () => {
       (space: ActionSpace) => { space.canBeExecutedByPlayer = () => false },
       (_space: ActionSpace, ctx: ActionExecutionContext) => { setWorkersAtHome(ctx.state, ctx.player, 0) },
     ]) {
-      const ctx = makeCtx({
+      const { session: ruleSession3, context: ctx } = makeCtx({
         spaceId: 'resource-market-4',
         allowOccupied: true,
         sourceCard: 'B178_TagAlong',
@@ -79,7 +80,7 @@ describe('place-farmer-on-space internal action', () => {
       const market = ctx.state.actionSpaces.find((space) => space.id === 'resource-market-4')!
       mutate(market, ctx)
 
-      const result = placeFarmerOnSpaceAction.execute(ctx)
+      const result = ruleSession3.withCtx(() => placeFarmerOnSpaceAction.execute(ctx))
 
       expect(result).toMatchObject({ type: 'fail', errorKey: 'log.placeFarmerFail' })
       expect(market.takenBy).toEqual([{ playerId: ctx.state.players[1]!.id, workerId: '1' }])

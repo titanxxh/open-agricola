@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
@@ -63,7 +59,7 @@ describe('E069_MelonPatch session', () => {
       const session = setup({ vegetable: 1 })
       const state = session.getState().state
       const player = state.players[0]!
-      const extras = computeExtraSowableFields(player)
+      const extras = session.withCtx(() => computeExtraSowableFields(player))
       expect(extras.length).toBe(1)
       expect(extras[0].tile).toEqual({ row: -1, col: 5069 })
       expect(extras[0].allowedCrops).toEqual(['vegetable'])
@@ -74,9 +70,9 @@ describe('E069_MelonPatch session', () => {
       const session = setup({ grain: 1 })
       const state = session.getState().state
       const player = state.players[0]!
-      const effect = getCardEffect(CARD_ID)
+      const effect = session.withCtx(() => getCardEffect(CARD_ID))
       expect(effect).toBeDefined()
-      const result = effect!.onSowExtraField!(player, { row: -1, col: 5069 }, 'grain')
+      const result = session.withCtx(() => effect!.onSowExtraField!(player, { row: -1, col: 5069 }, 'grain'))
       expect(result).toBe(false)
     })
 
@@ -87,7 +83,7 @@ describe('E069_MelonPatch session', () => {
       player.cardStates[CARD_ID] = {
         extraData: { cardFieldStacks: [{ crop: 'vegetable', remaining: 2 }] },
       }
-      const extras = computeExtraSowableFields(player)
+      const extras = session.withCtx(() => computeExtraSowableFields(player))
       expect(extras.length).toBe(0)
     })
   })
@@ -124,7 +120,7 @@ describe('E069_MelonPatch session', () => {
       session.loadState(state)
 
       const vegBefore = player.resources.vegetable
-      const flow = reap(state, player).reactionFlow
+      const flow = session.withCtx(() => reap(state, player)).reactionFlow
       expect(player.resources.vegetable).toBe(vegBefore + 1)
       // remaining was 2, now 1 — no plow since not last
       expect(flow).toBeUndefined()
@@ -141,7 +137,7 @@ describe('E069_MelonPatch session', () => {
       }
       session.loadState(state)
 
-      const flow = reap(state, player).reactionFlow
+      const flow = session.withCtx(() => reap(state, player)).reactionFlow
       expect(flow).toBeUndefined()
     })
 
@@ -155,7 +151,7 @@ describe('E069_MelonPatch session', () => {
       session.loadState(state)
 
       const vegBefore = player.resources.vegetable
-      const flow = reap(state, player).reactionFlow
+      const flow = session.withCtx(() => reap(state, player)).reactionFlow
       expect(player.resources.vegetable).toBe(vegBefore + 1)
       // Stack should be cleared
       const stacks = player.cardStates[CARD_ID]?.extraData?.cardFieldStacks as any[]

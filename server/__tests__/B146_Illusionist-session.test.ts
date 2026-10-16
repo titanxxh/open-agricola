@@ -1,7 +1,6 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
+import { CardRegistry as TestCardRegistry } from '../../shared/cards/registry'
+import { withActiveRegistry } from '../../shared/cards/active-registry'
+import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
 import { describe, expect, it } from 'vitest'
 import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 import type { ActionExecutionContext, ActionSpace, GameState, PlayerState } from '../../shared/contract/types'
@@ -84,14 +83,18 @@ const createState = (
     workPhaseObtainedResources: {},
   }) as unknown as GameState
 
-const findListener = () =>
-  getRegisteredCardListeners().find(
+const findListener = (ruleOwner: TestCardRegistry) =>
+  {
+  const lookupRule1 = () => getRegisteredCardListeners().find(
     (l) => l.id === 'B146-illusionist-before-collect',
   )
+  return withActiveRegistry(ruleOwner, lookupRule1)
+}
 
 describe('B146_Illusionist listener registration', () => {
   it('is registered on collect before (player scope)', () => {
-    const listener = findListener()
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry)
     expect(listener).toBeDefined()
     expect(listener!.actions).toContain('collect')
     expect(listener!.phases).toContain('before')
@@ -102,26 +105,28 @@ describe('B146_Illusionist listener registration', () => {
 describe('B146_Illusionist listener handler', () => {
 
   it('does nothing when hand is empty', () => {
-    const listener = findListener()!
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry)!
     const player = createPlayer('p1')
     player.occupationPlayed.push(CARD_ID)
     const forest = createSpace('forest', { wood: 3 })
     forest.takenBy = player.id
     const state = createState([player], [forest])
 
-    const result = executeCardListener(listener, {
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener, {
       state,
       player,
       space: forest,
       actionId: 'collect',
       phase: 'before',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeUndefined()
   })
 
   it('does nothing when Lantern House (C35) is played', () => {
-    const listener = findListener()!
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry)!
     const player = createPlayer('p1')
     player.occupationPlayed.push(CARD_ID)
     player.minorPlayed.push('C035_LanternHouse')
@@ -130,19 +135,20 @@ describe('B146_Illusionist listener handler', () => {
     forest.takenBy = player.id
     const state = createState([player], [forest])
 
-    const result = executeCardListener(listener, {
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener, {
       state,
       player,
       space: forest,
       actionId: 'collect',
       phase: 'before',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeUndefined()
   })
 
   it('does nothing on a non-building-resource space (food accumulation)', () => {
-    const listener = findListener()!
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry)!
     const player = createPlayer('p1')
     player.occupationPlayed.push(CARD_ID)
     player.occupationHand = ['A009_SheepFarmer']
@@ -152,19 +158,20 @@ describe('B146_Illusionist listener handler', () => {
     fishing.takenBy = player.id
     const state = createState([player], [fishing])
 
-    const result = executeCardListener(listener, {
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener, {
       state,
       player,
       space: fishing,
       actionId: 'collect',
       phase: 'before',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeUndefined()
   })
 
   it('returns optional seq [discard-from-hand, gain wood 1] for forest', () => {
-    const listener = findListener()!
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry)!
     const player = createPlayer('p1')
     player.occupationPlayed.push(CARD_ID)
     player.occupationHand = ['A009_SheepFarmer']
@@ -172,13 +179,13 @@ describe('B146_Illusionist listener handler', () => {
     forest.takenBy = player.id
     const state = createState([player], [forest])
 
-    const result = executeCardListener(listener, {
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener, {
       state,
       player,
       space: forest,
       actionId: 'collect',
       phase: 'before',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeDefined()
     const flow = result!.flow as Extract<ActionFlow, { type: 'seq' }>
@@ -193,7 +200,8 @@ describe('B146_Illusionist listener handler', () => {
   })
 
   it('still triggers when a played card does not prevent hand discard', () => {
-    const listener = findListener()!
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry)!
     const player = createPlayer('p1')
     player.occupationPlayed.push(CARD_ID)
     player.minorPlayed.push('B068_Beanfield')
@@ -202,19 +210,20 @@ describe('B146_Illusionist listener handler', () => {
     forest.takenBy = player.id
     const state = createState([player], [forest])
 
-    const result = executeCardListener(listener, {
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener, {
       state,
       player,
       space: forest,
       actionId: 'collect',
       phase: 'before',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeDefined()
   })
 
   it('picks clay when accumulating clay', () => {
-    const listener = findListener()!
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry)!
     const player = createPlayer('p1')
     player.occupationPlayed.push(CARD_ID)
     player.minorHand = ['A001_AnimalPen']
@@ -222,13 +231,13 @@ describe('B146_Illusionist listener handler', () => {
     clayPit.takenBy = player.id
     const state = createState([player], [clayPit])
 
-    const result = executeCardListener(listener, {
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener, {
       state,
       player,
       space: clayPit,
       actionId: 'collect',
       phase: 'before',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeDefined()
     const flow = result!.flow as Extract<ActionFlow, { type: 'seq' }>
@@ -236,7 +245,8 @@ describe('B146_Illusionist listener handler', () => {
   })
 
   it('picks reed when accumulating reed', () => {
-    const listener = findListener()!
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry)!
     const player = createPlayer('p1')
     player.occupationPlayed.push(CARD_ID)
     player.occupationHand = ['A009_SheepFarmer']
@@ -244,13 +254,13 @@ describe('B146_Illusionist listener handler', () => {
     reedBank.takenBy = player.id
     const state = createState([player], [reedBank])
 
-    const result = executeCardListener(listener, {
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener, {
       state,
       player,
       space: reedBank,
       actionId: 'collect',
       phase: 'before',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeDefined()
     const flow = result!.flow as Extract<ActionFlow, { type: 'seq' }>
@@ -258,7 +268,8 @@ describe('B146_Illusionist listener handler', () => {
   })
 
   it('picks stone when accumulating stone', () => {
-    const listener = findListener()!
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry)!
     const player = createPlayer('p1')
     player.occupationPlayed.push(CARD_ID)
     player.occupationHand = ['A009_SheepFarmer']
@@ -266,13 +277,13 @@ describe('B146_Illusionist listener handler', () => {
     quarry.takenBy = player.id
     const state = createState([player], [quarry])
 
-    const result = executeCardListener(listener, {
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener, {
       state,
       player,
       space: quarry,
       actionId: 'collect',
       phase: 'before',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeDefined()
     const flow = result!.flow as Extract<ActionFlow, { type: 'seq' }>
@@ -280,7 +291,8 @@ describe('B146_Illusionist listener handler', () => {
   })
 
   it('accepts minor-hand cards as discard candidates too', () => {
-    const listener = findListener()!
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry)!
     const player = createPlayer('p1')
     player.occupationPlayed.push(CARD_ID)
     player.occupationHand = []
@@ -289,13 +301,13 @@ describe('B146_Illusionist listener handler', () => {
     forest.takenBy = player.id
     const state = createState([player], [forest])
 
-    const result = executeCardListener(listener, {
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener, {
       state,
       player,
       space: forest,
       actionId: 'collect',
       phase: 'before',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeDefined()
   })
@@ -304,6 +316,7 @@ describe('B146_Illusionist listener handler', () => {
 // Direct tests of the discard-from-hand action registration (leaf payload).
 describe('discard-from-hand action', () => {
   it('is registered via internalActionDefinitions and exposes choice', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     const def = getActionDefinition(DISCARD_ACTION_ID)
     expect(def).toBeDefined()
 
@@ -313,7 +326,7 @@ describe('discard-from-hand action', () => {
 
     const forest = createSpace('forest', { wood: 3 })
     const state = createState([player], [forest])
-    const result = def!.execute({ state, player, space: forest, params: {} } as unknown as ActionExecutionContext)
+    const result = withActiveRegistry(ruleRegistry, () => def!.execute({ state, player, space: forest, params: {} } as unknown as ActionExecutionContext))
     expect(result.type).toBe('request')
     if (result.type !== 'request') return
     expect(result.request.kind).toBe('choice')
@@ -327,46 +340,49 @@ describe('discard-from-hand action', () => {
   })
 
   it('resolveChoice removes the chosen occupation from hand', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     const def = getActionDefinition(DISCARD_ACTION_ID)!
     const player = createPlayer('p1')
     player.occupationHand = ['A009_SheepFarmer', 'A124_Knapper']
 
     const forest = createSpace('forest', { wood: 3 })
     const state = createState([player], [forest])
-    const result = def.resolveChoice!(
+    const result = withActiveRegistry(ruleRegistry, () => def.resolveChoice!(
       { state, player, space: forest, params: {} } as unknown as ActionExecutionContext,
       'occ:A009_SheepFarmer',
-    )
+    ))
     expect(result.type).toBe('ok')
     expect(player.occupationHand).toEqual(['A124_Knapper'])
   })
 
   it('resolveChoice removes the chosen minor card from hand', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     const def = getActionDefinition(DISCARD_ACTION_ID)!
     const player = createPlayer('p1')
     player.minorHand = ['A001_AnimalPen', 'A002_Basket']
 
     const forest = createSpace('forest', { wood: 3 })
     const state = createState([player], [forest])
-    const result = def.resolveChoice!(
+    const result = withActiveRegistry(ruleRegistry, () => def.resolveChoice!(
       { state, player, space: forest, params: {} } as unknown as ActionExecutionContext,
       'min:A002_Basket',
-    )
+    ))
     expect(result.type).toBe('ok')
     expect(player.minorHand).toEqual(['A001_AnimalPen'])
   })
 
   it('resolveChoice fails when choice points at a card not in hand', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     const def = getActionDefinition(DISCARD_ACTION_ID)!
     const player = createPlayer('p1')
     player.occupationHand = ['A009_SheepFarmer']
 
     const forest = createSpace('forest', { wood: 3 })
     const state = createState([player], [forest])
-    const result = def.resolveChoice!(
+    const result = withActiveRegistry(ruleRegistry, () => def.resolveChoice!(
       { state, player, space: forest, params: {} } as unknown as ActionExecutionContext,
       'occ:NotInHand',
-    )
+    ))
     expect(result.type).toBe('fail')
   })
 })

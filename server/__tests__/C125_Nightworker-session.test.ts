@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
@@ -21,7 +17,7 @@ describe('C125_Nightworker session — place-farmer flow', () => {
   }
 
   it('onBeforeWork returns optional place-farmer leaf with constraints when player has 0 of a building resource', () => {
-    const { state } = setupSession()
+    const { session: ruleSession, state } = setupSession()
     const player = state.players[0]!
     player.occupationPlayed.push(CARD_ID)
     player.resources.wood = 0
@@ -38,9 +34,9 @@ describe('C125_Nightworker session — place-farmer flow', () => {
     woodSpace.resources.wood = 3
     woodSpace.takenBy = []
 
-    const effect = getCardEffect(CARD_ID)
+    const effect = ruleSession.withCtx(() => getCardEffect(CARD_ID))
     expect(effect).toBeDefined()
-    const flow = effect!.onBeforeWork!(state, player) as ActionFlow | undefined
+    const flow = ruleSession.withCtx(() => effect!.onBeforeWork!(state, player)) as ActionFlow | undefined
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('leaf')
     if (flow!.type !== 'leaf') return
@@ -53,7 +49,7 @@ describe('C125_Nightworker session — place-farmer flow', () => {
   })
 
   it('onBeforeWork returns undefined when player already has all building resource types', () => {
-    const { state } = setupSession()
+    const { session: ruleSession, state } = setupSession()
     const player = state.players[0]!
     player.occupationPlayed.push(CARD_ID)
     player.resources.wood = 1
@@ -61,12 +57,12 @@ describe('C125_Nightworker session — place-farmer flow', () => {
     player.resources.reed = 1
     player.resources.stone = 1
 
-    const flow = getCardEffect(CARD_ID)!.onBeforeWork!(state, player)
+    const flow = ruleSession.withCtx(() => ruleSession.withCtx(() => getCardEffect(CARD_ID))!.onBeforeWork!(state, player))
     expect(flow).toBeUndefined()
   })
 
   it('onBeforeWork returns undefined when no candidate accumulation space has a missing-type resource', () => {
-    const { state } = setupSession()
+    const { session: ruleSession, state } = setupSession()
     const player = state.players[0]!
     player.occupationPlayed.push(CARD_ID)
     player.resources.wood = 0
@@ -78,12 +74,12 @@ describe('C125_Nightworker session — place-farmer flow', () => {
       s.resources.wood = 0
     })
 
-    const flow = getCardEffect(CARD_ID)!.onBeforeWork!(state, player)
+    const flow = ruleSession.withCtx(() => ruleSession.withCtx(() => getCardEffect(CARD_ID))!.onBeforeWork!(state, player))
     expect(flow).toBeUndefined()
   })
 
   it('onBeforeWork skips occupied accumulation spaces (uses standard place-farmer rules)', () => {
-    const { state } = setupSession()
+    const { session: ruleSession, state } = setupSession()
     const player = state.players[0]!
     const opponent = state.players[1]!
     player.occupationPlayed.push(CARD_ID)
@@ -103,12 +99,12 @@ describe('C125_Nightworker session — place-farmer flow', () => {
     })
     expect(anyWood).toBe(true)
 
-    const flow = getCardEffect(CARD_ID)!.onBeforeWork!(state, player)
+    const flow = ruleSession.withCtx(() => ruleSession.withCtx(() => getCardEffect(CARD_ID))!.onBeforeWork!(state, player))
     expect(flow).toBeUndefined()
   })
 
   it('onBeforeWork returns undefined when player has no available worker', () => {
-    const { state } = setupSession()
+    const { session: ruleSession, state } = setupSession()
     const player = state.players[0]!
     player.occupationPlayed.push(CARD_ID)
     player.resources.wood = 0
@@ -116,7 +112,7 @@ describe('C125_Nightworker session — place-farmer flow', () => {
       w.isActive = false
     })
 
-    const flow = getCardEffect(CARD_ID)!.onBeforeWork!(state, player)
+    const flow = ruleSession.withCtx(() => ruleSession.withCtx(() => getCardEffect(CARD_ID))!.onBeforeWork!(state, player))
     expect(flow).toBeUndefined()
   })
 })

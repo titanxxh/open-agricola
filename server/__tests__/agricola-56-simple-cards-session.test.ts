@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 
 import { GameSession } from '../game/authoritative-session'
@@ -138,7 +134,7 @@ const setupLivestockSustainerSession = () => {
 const getLivestockSustainerZone = (session: GameSession) => {
   const state = session.getState().state
   const owner = state.players[0]!
-  return computeAnimalZones(owner, state).find((zone) => zone.id === 'card:B169_LivestockSustainer')
+  return session.withCtx(() => computeAnimalZones(owner, state)).find((zone) => zone.id === 'card:B169_LivestockSustainer')
 }
 
 const confirmPlayerSwitches = (
@@ -235,7 +231,7 @@ describe('Agricola 5-6 simple occupation cards', () => {
       animalType: null,
       animalCount: 0,
     })
-    expect(getTotalAnimalCapacity(owner, updatedState)).toBe(4)
+    expect(session.withCtx(() => getTotalAnimalCapacity(owner, updatedState))).toBe(4)
   })
 
   it('B169 Livestock Sustainer recomputes capacity when opposing majors leave play', () => {
@@ -290,13 +286,13 @@ describe('Agricola 5-6 simple occupation cards', () => {
     const zone = getLivestockSustainerZone(session)
     expect(zone?.animalType).toBeNull()
 
-    const effect = getCardEffect('B169_LivestockSustainer')
-    const invalid = effect?.getInvalidAnimals?.(
+    const effect = session.withCtx(() => getCardEffect('B169_LivestockSustainer'))
+    const invalid = session.withCtx(() => effect?.getInvalidAnimals?.(
       owner,
       zone!,
       [{ type: 'sheep' }, { type: 'boar' }, { type: 'cattle' }],
       updatedState,
-    )
+    ))
     expect(invalid).toEqual([])
   })
 
@@ -455,7 +451,7 @@ describe('Agricola 5-6 simple occupation cards', () => {
     expect(owner.cardStates?.B169_LivestockSustainer?.extraData).toMatchObject({
       animalCounts: { sheep: 1, boar: 1 },
     })
-    expect(session.hasPendingAnimalsCheck(owner)).toBe(true)
+    expect(session.withCtx(() => session.hasPendingAnimalsCheck(owner))).toBe(true)
   })
 
   it("A178 Carpenter's Boy gives wood for each room another player builds", () => {
@@ -814,7 +810,7 @@ describe('Agricola 5-6 simple occupation cards', () => {
     const state = session.getState().state
     const player = state.players[0]!
 
-    const flow = runCardEffectHook(state, player, 'C174_StoneCustodian', 'onBeforeReturnHome')
+    const flow = session.withCtx(() => runCardEffectHook(state, player, 'C174_StoneCustodian', 'onBeforeReturnHome'))
 
     expect(flow).toMatchObject({
       type: 'leaf',
@@ -830,7 +826,7 @@ describe('Agricola 5-6 simple occupation cards', () => {
     const state = session.getState().state
     const player = state.players[0]!
 
-    const flow = runCardEffectHook(state, player, 'C174_StoneCustodian', 'onBeforeReturnHome')
+    const flow = session.withCtx(() => runCardEffectHook(state, player, 'C174_StoneCustodian', 'onBeforeReturnHome'))
 
     expect(flow).toMatchObject({
       type: 'leaf',
@@ -849,7 +845,7 @@ describe('Agricola 5-6 simple occupation cards', () => {
     const updatedState = session.getState().state
     const player = updatedState.players[0]!
 
-    const flow = runCardEffectHook(updatedState, player, 'C174_StoneCustodian', 'onBeforeReturnHome')
+    const flow = session.withCtx(() => runCardEffectHook(updatedState, player, 'C174_StoneCustodian', 'onBeforeReturnHome'))
 
     expect(flow).toBeNull()
   })
@@ -866,7 +862,7 @@ describe('Agricola 5-6 simple occupation cards', () => {
     const state = session.getState().state
     const player = state.players[0]!
 
-    const flow = runCardEffectHook(state, player, 'B172_CattleCaregiver', 'onRoundStart')
+    const flow = session.withCtx(() => runCardEffectHook(state, player, 'B172_CattleCaregiver', 'onRoundStart'))
 
     expect(flow).toMatchObject({
       type: 'leaf',
@@ -887,7 +883,7 @@ describe('Agricola 5-6 simple occupation cards', () => {
     const updatedState = session.getState().state
     const player = updatedState.players[0]!
 
-    const flow = runCardEffectHook(updatedState, player, 'B172_CattleCaregiver', 'onRoundStart')
+    const flow = session.withCtx(() => runCardEffectHook(updatedState, player, 'B172_CattleCaregiver', 'onRoundStart'))
 
     expect(flow).toMatchObject({ type: 'leaf', params: { food: 1 } })
   })
@@ -907,7 +903,7 @@ describe('Agricola 5-6 simple occupation cards', () => {
     const updatedState = session.getState().state
     const player = updatedState.players[0]!
 
-    const flow = runCardEffectHook(updatedState, player, 'B172_CattleCaregiver', 'onRoundStart')
+    const flow = session.withCtx(() => runCardEffectHook(updatedState, player, 'B172_CattleCaregiver', 'onRoundStart'))
 
     expect(flow).toMatchObject({ type: 'leaf', params: { food: 1 } })
   })
@@ -926,7 +922,7 @@ describe('Agricola 5-6 simple occupation cards', () => {
     const updatedState = session.getState().state
     const player = updatedState.players[0]!
 
-    const flow = runCardEffectHook(updatedState, player, 'B172_CattleCaregiver', 'onRoundStart')
+    const flow = session.withCtx(() => runCardEffectHook(updatedState, player, 'B172_CattleCaregiver', 'onRoundStart'))
 
     expect(flow).toBeNull()
   })
@@ -938,7 +934,7 @@ describe('Agricola 5-6 simple occupation cards', () => {
     const state = session.getState().state
     const player = state.players[0]!
 
-    const flow = runCardEffectHook(state, player, 'A172_BoatPainter', 'onBeforeReturnHome')
+    const flow = session.withCtx(() => runCardEffectHook(state, player, 'A172_BoatPainter', 'onBeforeReturnHome'))
 
     expect(flow).toMatchObject({
       type: 'xor',
@@ -955,7 +951,7 @@ describe('Agricola 5-6 simple occupation cards', () => {
     const state = session.getState().state
     const player = state.players[0]!
 
-    const flow = runCardEffectHook(state, player, 'A172_BoatPainter', 'onBeforeReturnHome')
+    const flow = session.withCtx(() => runCardEffectHook(state, player, 'A172_BoatPainter', 'onBeforeReturnHome'))
 
     expect(flow).toBeNull()
   })
@@ -967,7 +963,7 @@ describe('Agricola 5-6 simple occupation cards', () => {
     const state = session.getState().state
     const player = state.players[0]!
 
-    const flow = runCardEffectHook(state, player, 'A172_BoatPainter', 'onBeforeReturnHome')
+    const flow = session.withCtx(() => runCardEffectHook(state, player, 'A172_BoatPainter', 'onBeforeReturnHome'))
 
     expect(flow).toMatchObject({ type: 'xor' })
   })
@@ -1034,7 +1030,7 @@ describe('Agricola 5-6 simple occupation cards', () => {
     const player = state.players[0]!
     player.resources.wood = 12
 
-    const flow = runCardEffectHook(state, player, 'A176_Wheelmaker', 'onBuy')
+    const flow = session.withCtx(() => runCardEffectHook(state, player, 'A176_Wheelmaker', 'onBuy'))
 
     expect(flow).toBeNull()
   })
@@ -1047,7 +1043,7 @@ describe('Agricola 5-6 simple occupation cards', () => {
     player.resources.wood = 12
     state.players[1]!.resources.wood = 12
 
-    const flow = runCardEffectHook(state, player, 'A176_Wheelmaker', 'onBuy')
+    const flow = session.withCtx(() => runCardEffectHook(state, player, 'A176_Wheelmaker', 'onBuy'))
 
     expect(flow).toBeNull()
   })
@@ -1075,7 +1071,7 @@ describe('Agricola 5-6 simple occupation cards', () => {
     const state = session.getState().state
     const player = state.players[0]!
 
-    const flow = runCardEffectHook(state, player, 'D177_Graduate', 'onBuy')
+    const flow = session.withCtx(() => runCardEffectHook(state, player, 'D177_Graduate', 'onBuy'))
 
     expect(flow).toBeNull()
   })

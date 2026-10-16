@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
@@ -25,9 +21,9 @@ describe('B110_Pavior session', () => {
 
     session.loadState(state)
 
-    const effect = getCardEffect(CARD_ID)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
     expect(effect).toBeDefined()
-    const flow = effect!.onEndPreparation!(state, player)
+    const flow = session.withCtx(() => effect!.onEndPreparation!(state, player))
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('leaf')
     expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params?.food).toBe(1)
@@ -46,8 +42,8 @@ describe('B110_Pavior session', () => {
 
     session.loadState(state)
 
-    const effect = getCardEffect(CARD_ID)
-    const flow = effect!.onEndPreparation!(state, player)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
+    const flow = session.withCtx(() => effect!.onEndPreparation!(state, player))
     expect(flow).toBeUndefined()
   })
 
@@ -64,8 +60,8 @@ describe('B110_Pavior session', () => {
 
     session.loadState(state)
 
-    const effect = getCardEffect(CARD_ID)
-    const flow = effect!.onEndPreparation!(state, player)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
+    const flow = session.withCtx(() => effect!.onEndPreparation!(state, player))
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('leaf')
     expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params?.vegetable).toBe(1)
@@ -84,8 +80,8 @@ describe('B110_Pavior session', () => {
 
     session.loadState(state)
 
-    const effect = getCardEffect(CARD_ID)
-    const flow = effect!.onEndPreparation!(state, player)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
+    const flow = session.withCtx(() => effect!.onEndPreparation!(state, player))
     expect(flow).toBeDefined()
     expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params?.food).toBe(1)
     expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params?.vegetable).toBeUndefined()

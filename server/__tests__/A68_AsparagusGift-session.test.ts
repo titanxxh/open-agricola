@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { setWorkersAtHome } from '../../shared/domain/player'
 
 import { describe, expect, it } from 'vitest'
@@ -88,7 +84,7 @@ describe('A68 Asparagus Gift — session', () => {
       const state = session.getState().state
       const player = state.players[0]!
       player.fields = []
-      expect(meetsCardPrerequisites(player, A068_AsparagusGift, state.round, state)).toBe(false)
+      expect(session.withCtx(() => meetsCardPrerequisites(player, A068_AsparagusGift, state.round, state))).toBe(false)
     })
 
     it('allows when player has at least one empty field', () => {
@@ -97,7 +93,7 @@ describe('A68 Asparagus Gift — session', () => {
       const state = session.getState().state
       const player = state.players[0]!
       player.fields = [{ row: 0, col: 0, stacks: [] }]
-      expect(meetsCardPrerequisites(player, A068_AsparagusGift, state.round, state)).toBe(true)
+      expect(session.withCtx(() => meetsCardPrerequisites(player, A068_AsparagusGift, state.round, state))).toBe(true)
     })
   })
 })

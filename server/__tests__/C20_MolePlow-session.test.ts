@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { C020_MolePlow } from '../../shared/cards/C/C020_MolePlow'
@@ -13,7 +9,7 @@ describe('C020_MolePlow prerequisite', () => {
     const state = session.getState().state
     state.round = 8
     const player = state.players[0]!
-    expect(meetsCardPrerequisites(player, C020_MolePlow, state.round, state)).toBe(false)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, C020_MolePlow, state.round, state))).toBe(false)
   })
 
   it('allows when round >= 9', () => {
@@ -21,6 +17,6 @@ describe('C020_MolePlow prerequisite', () => {
     const state = session.getState().state
     state.round = 9
     const player = state.players[0]!
-    expect(meetsCardPrerequisites(player, C020_MolePlow, state.round, state)).toBe(true)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, C020_MolePlow, state.round, state))).toBe(true)
   })
 })

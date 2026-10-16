@@ -1,7 +1,7 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
+import type { GameSession as SessionRuleOwner } from '../game/authoritative-session'
+import { CardRegistry as TestCardRegistry } from '../../shared/cards/registry'
+import { withActiveRegistry } from '../../shared/cards/active-registry'
+import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import {
@@ -59,18 +59,22 @@ const createSpace = (id: string): ActionSpace =>
     takenBy: [],
   }) as unknown as ActionSpace
 
-const findListenersByAction = (actionId: string) =>
-  getRegisteredCardListeners().filter(
+const findListenersByAction = (ruleOwner: SessionRuleOwner | TestCardRegistry, actionId: string) =>
+  {
+  const lookupRule1 = () => getRegisteredCardListeners().filter(
     (l) =>
       (l.cardIds ?? []).includes(CARD_ID) &&
       (l.actions ?? []).includes(actionId) &&
       (l.phases ?? []).includes('immediatelyAfter'),
   )
+  return ruleOwner instanceof TestCardRegistry ? withActiveRegistry(ruleOwner, lookupRule1) : ruleOwner.withCtx(lookupRule1)
+}
 
 describe('B132_EstateMaster — saturation flag listeners', () => {
   for (const action of ['construct', 'stables', 'fencing', 'fence', 'plow']) {
     it(`registers an immediatelyAfter listener for action=${action}`, () => {
-      const matched = findListenersByAction(action)
+    const ruleRegistry = createOfficialCardRegistry()
+      const matched = findListenersByAction(ruleRegistry, action)
       expect(matched.length).toBeGreaterThan(0)
     })
 
@@ -81,13 +85,13 @@ describe('B132_EstateMaster — saturation flag listeners', () => {
       fillFarm(player)
       session.loadState(state)
 
-      const matched = findListenersByAction(action)
+      const matched = findListenersByAction(session, action)
       expect(matched.length).toBeGreaterThan(0)
       const space = createSpace(action)
-      const result = executeCardListener(matched[0]!, {
+      const result = session.withCtx(() => executeCardListener(matched[0]!, {
         state, player, space,
         actionId: action, phase: 'immediatelyAfter',
-      } as unknown as CardListenerContext)
+      } as unknown as CardListenerContext))
 
       expect(readCardExtraData<boolean>(player, CARD_ID, 'saturated')).toBeUndefined()
       expect(result?.flow).toMatchObject({
@@ -97,14 +101,14 @@ describe('B132_EstateMaster — saturation flag listeners', () => {
         params: { kind: 'set-extra-data', key: 'saturated', value: true },
       })
       if (result?.flow?.type !== 'leaf') return
-      specialEffectAction.execute({
+      session.withCtx(() => specialEffectAction.execute({
         state,
         player,
         space,
         sourceCard: result.flow.sourceCard,
         params: result.flow.params,
         actionContext: result.flow.actionContext,
-      })
+      }))
 
       expect(readCardExtraData<boolean>(player, CARD_ID, 'saturated')).toBe(true)
     })
@@ -116,12 +120,12 @@ describe('B132_EstateMaster — saturation flag listeners', () => {
       fillFarmMinus1(player)
       session.loadState(state)
 
-      const matched = findListenersByAction(action)
+      const matched = findListenersByAction(session, action)
       expect(matched.length).toBeGreaterThan(0)
-      const result = executeCardListener(matched[0]!, {
+      const result = session.withCtx(() => executeCardListener(matched[0]!, {
         state, player, space: createSpace(action),
         actionId: action, phase: 'immediatelyAfter',
-      } as unknown as CardListenerContext)
+      } as unknown as CardListenerContext))
 
       expect(result?.flow).toBeUndefined()
       expect(readCardExtraData<boolean>(player, CARD_ID, 'saturated')).toBeUndefined()

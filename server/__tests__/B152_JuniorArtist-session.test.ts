@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -84,17 +80,17 @@ describe('B152_JuniorArtist session', () => {
     const session = setup({ withCard: true, food: 0, travelingPlayersFood: 2 })
     const s = session.getState().state
     const space = dayLaborerCtx(s)
-    const listener = getRegisteredCardListeners().find(
+    const listener = session.withCtx(() => getRegisteredCardListeners()).find(
       (l) => l.id === 'B152-junior-artist-after-place-farmer',
     )!
-    const result = executeCardListener(listener, {
+    const result = session.withCtx(() => executeCardListener(listener, {
       actionHooks: session.actionHooks,
       state: s,
       player: s.players[0]!,
       space,
       actionId: 'place-farmer',
       phase: 'after',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
     expect(result).toBeUndefined()
   })
 
@@ -121,17 +117,17 @@ describe('B152_JuniorArtist session', () => {
     })
     const s = session.getState().state
     const space = dayLaborerCtx(s)
-    const listener = getRegisteredCardListeners().find(
+    const listener = session.withCtx(() => getRegisteredCardListeners()).find(
       (l) => l.id === 'B152-junior-artist-after-place-farmer',
     )!
-    const result = executeCardListener(listener, {
+    const result = session.withCtx(() => executeCardListener(listener, {
       actionHooks: session.actionHooks,
       state: s,
       player: s.players[0]!,
       space,
       actionId: 'place-farmer',
       phase: 'after',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
     expect(result).toBeDefined()
     const flow = result!.flow as Extract<ActionFlow, { type: 'seq' }>
     expect(flow.type).toBe('seq')
@@ -161,17 +157,17 @@ describe('B152_JuniorArtist session', () => {
     })
     const s = session.getState().state
     const space = dayLaborerCtx(s)
-    const listener = getRegisteredCardListeners().find(
+    const listener = session.withCtx(() => getRegisteredCardListeners()).find(
       (l) => l.id === 'B152-junior-artist-after-place-farmer',
     )!
-    const result = executeCardListener(listener, {
+    const result = session.withCtx(() => executeCardListener(listener, {
       actionHooks: session.actionHooks,
       state: s,
       player: s.players[0]!,
       space,
       actionId: 'place-farmer',
       phase: 'after',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
     if (!result) return  // ok if reachability rejects all candidates
     const flow = result.flow as ActionFlow
     const findJumpToLessons = (node: ActionFlow): boolean => {
@@ -200,17 +196,17 @@ describe('B152_JuniorArtist session', () => {
     // Confirm lessons-4 exists in 4p (otherwise this test is meaningless)
     expect(s.actionSpaces.some((x) => x.id === 'lessons-4')).toBe(true)
     const space = dayLaborerCtx(s)
-    const listener = getRegisteredCardListeners().find(
+    const listener = session.withCtx(() => getRegisteredCardListeners()).find(
       (l) => l.id === 'B152-junior-artist-after-place-farmer',
     )!
-    const result = executeCardListener(listener, {
+    const result = session.withCtx(() => executeCardListener(listener, {
       actionHooks: session.actionHooks,
       state: s,
       player: s.players[0]!,
       space,
       actionId: 'place-farmer',
       phase: 'after',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
     expect(result).toBeDefined()
 
     const findJumpToLessons4 = (node: ActionFlow): boolean => {
@@ -246,17 +242,17 @@ describe('B152_JuniorArtist session', () => {
     const post = session.getState().state
     const space = dayLaborerCtx(post)
 
-    const listener = getRegisteredCardListeners().find(
+    const listener = session.withCtx(() => getRegisteredCardListeners()).find(
       (l) => l.id === 'B152-junior-artist-after-place-farmer',
     )!
-    const result = executeCardListener(listener, {
+    const result = session.withCtx(() => executeCardListener(listener, {
       actionHooks: session.actionHooks,
       state: post,
       player: post.players[0]!,
       space,
       actionId: 'place-farmer',
       phase: 'after',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
     expect(result).toBeUndefined()
   })
 })

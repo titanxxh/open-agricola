@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -51,7 +47,7 @@ const moved = (
 const directContext = (
   transactionEvents: DraftGameEvent<'resource.moved'>[],
   actionEvents = transactionEvents,
-): CardListenerContext => {
+): { session: GameSession; context: CardListenerContext } => {
   const session = new GameSession(42)
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
@@ -61,7 +57,8 @@ const directContext = (
   owner.id = 'p1'
   trigger.id = 'p2'
   owner.minorPlayed.push(CARD_ID)
-  return {
+  return { session, context: {
+    actionHooks: session.actionHooks,
     state,
     player: trigger,
     ownerPlayer: owner,
@@ -72,7 +69,7 @@ const directContext = (
     transactionEvents,
     actionEvents,
     result: { type: 'ok', resourcesGained: { stone: 3 } },
-  } as unknown as CardListenerContext
+  } as unknown as CardListenerContext }
 }
 
 describe('B079_Corf session', () => {
@@ -150,10 +147,10 @@ describe('B079_Corf session', () => {
   })
 
   it('uses action-space stone events for scope-any trigger even without result gains', () => {
-    const ctx = directContext([moved()])
+    const { session: ruleSession1, context: ctx } = directContext([moved()])
     ctx.result = { type: 'ok' }
 
-    const result = executeCardListener(LISTENER, ctx)
+    const result = ruleSession1.withCtx(() => executeCardListener(LISTENER, ctx))
 
     expect(result?.flow).toMatchObject({
       type: 'leaf',
@@ -164,20 +161,20 @@ describe('B079_Corf session', () => {
   })
 
   it('does not trigger for supply/cardEffect stone even when result reports stone', () => {
-    const ctx = directContext([moved({
+    const { session: ruleSession2, context: ctx } = directContext([moved({
       from: { kind: 'supply' },
       reason: 'cardEffect',
     })])
 
-    const result = executeCardListener(LISTENER, ctx)
+    const result = ruleSession2.withCtx(() => executeCardListener(LISTENER, ctx))
 
     expect(result).toBeUndefined()
   })
 
   it('ignores stale transaction stone when actionEvents has no current stone threshold', () => {
-    const ctx = directContext([moved()], [moved({ resources: { stone: 2 } })])
+    const { session: ruleSession3, context: ctx } = directContext([moved()], [moved({ resources: { stone: 2 } })])
 
-    const result = executeCardListener(LISTENER, ctx)
+    const result = ruleSession3.withCtx(() => executeCardListener(LISTENER, ctx))
 
     expect(result).toBeUndefined()
   })

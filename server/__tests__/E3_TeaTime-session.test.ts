@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -81,7 +77,7 @@ describe('E003_TeaTime session', () => {
       const player = state.players[0]!
       const space = state.actionSpaces.find((s) => s.id === 'grain-utilization')
       if (space) space.takenBy = []
-      expect(meetsCardPrerequisites(player, E003_TeaTime, state.round, state)).toBe(false)
+      expect(session.withCtx(() => meetsCardPrerequisites(player, E003_TeaTime, state.round, state))).toBe(false)
     })
 
     it('allows when own worker sits on Grain Utilization', () => {
@@ -91,7 +87,7 @@ describe('E003_TeaTime session', () => {
       const player = state.players[0]!
       const space = state.actionSpaces.find((s) => s.id === 'grain-utilization')!
       space.takenBy = [{ playerId: player.id, workerId: player.workers[0]!.id }]
-      expect(meetsCardPrerequisites(player, E003_TeaTime, state.round, state)).toBe(true)
+      expect(session.withCtx(() => meetsCardPrerequisites(player, E003_TeaTime, state.round, state))).toBe(true)
     })
   })
 })

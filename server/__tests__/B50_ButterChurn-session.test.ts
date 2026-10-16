@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
@@ -26,7 +22,7 @@ describe('B050_ButterChurn — onHarvestFieldPhase uses on-board sheep+cattle (n
     const player = state.players[0]!
     player.resources.sheep = 6
     player.resources.cattle = 4
-    const flow = runCardEffectHook(state, player, 'B050_ButterChurn', 'onHarvestFieldPhase')
+    const flow = session.withCtx(() => runCardEffectHook(state, player, 'B050_ButterChurn', 'onHarvestFieldPhase'))
     expect(flow).toBeNull()
   })
 
@@ -38,7 +34,7 @@ describe('B050_ButterChurn — onHarvestFieldPhase uses on-board sheep+cattle (n
       { id: 'pa-1', size: 2, tiles: [], stables: 0, animalType: 'sheep', animalCount: 3 },
     ]
     player.resources.sheep = 3
-    const flow = runCardEffectHook(state, player, 'B050_ButterChurn', 'onHarvestFieldPhase')
+    const flow = session.withCtx(() => runCardEffectHook(state, player, 'B050_ButterChurn', 'onHarvestFieldPhase'))
     const leaf = flow as Extract<ActionFlow, { type: 'leaf' }>
     expect(leaf.actionId).toBe('gain')
     expect(leaf.params).toEqual({ food: 1 })
@@ -52,7 +48,7 @@ describe('B050_ButterChurn — onHarvestFieldPhase uses on-board sheep+cattle (n
       { id: 'pa-1', size: 2, tiles: [], stables: 0, animalType: 'cattle', animalCount: 2 },
     ]
     player.resources.cattle = 2
-    const flow = runCardEffectHook(state, player, 'B050_ButterChurn', 'onHarvestFieldPhase')
+    const flow = session.withCtx(() => runCardEffectHook(state, player, 'B050_ButterChurn', 'onHarvestFieldPhase'))
     const leaf = flow as Extract<ActionFlow, { type: 'leaf' }>
     expect(leaf.params).toEqual({ food: 1 })
   })
@@ -67,7 +63,7 @@ describe('B050_ButterChurn — onHarvestFieldPhase uses on-board sheep+cattle (n
     ]
     player.resources.sheep = 6
     player.resources.cattle = 4
-    const flow = runCardEffectHook(state, player, 'B050_ButterChurn', 'onHarvestFieldPhase')
+    const flow = session.withCtx(() => runCardEffectHook(state, player, 'B050_ButterChurn', 'onHarvestFieldPhase'))
     const leaf = flow as Extract<ActionFlow, { type: 'leaf' }>
     expect(leaf.params).toEqual({ food: 4 })
   })
@@ -80,7 +76,7 @@ describe('B050_ButterChurn — onHarvestFieldPhase uses on-board sheep+cattle (n
       { id: 'pa-1', size: 1, tiles: [], stables: 0, animalType: 'sheep', animalCount: 3 },
     ]
     player.resources.sheep = 8
-    const flow = runCardEffectHook(state, player, 'B050_ButterChurn', 'onHarvestFieldPhase')
+    const flow = session.withCtx(() => runCardEffectHook(state, player, 'B050_ButterChurn', 'onHarvestFieldPhase'))
     const leaf = flow as Extract<ActionFlow, { type: 'leaf' }>
     expect(leaf.params).toEqual({ food: 1 })
   })
@@ -117,7 +113,7 @@ describe('B050_ButterChurn — onHarvestFieldPhase uses on-board sheep+cattle (n
       }
     })
 
-    const flow = runCardEffectHook(state, player, 'B050_ButterChurn', 'onHarvestFieldPhase')
+    const flow = session.withCtx(() => runCardEffectHook(state, player, 'B050_ButterChurn', 'onHarvestFieldPhase'))
 
     const leaf = flow as Extract<ActionFlow, { type: 'leaf' }>
     expect(leaf.params).toEqual({ food: 1 })

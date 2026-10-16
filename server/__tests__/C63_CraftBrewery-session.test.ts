@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
@@ -40,12 +36,12 @@ describe('C063_CraftBrewery session (verify-only)', () => {
     })
     session.loadState(state)
 
-    const flow = runCardEffectHook(
+    const flow = session.withCtx(() => runCardEffectHook(
       state,
       player,
       'C063_CraftBrewery',
       'onHarvestFeedingPhase',
-    )
+    ))
     expect(flow).not.toBeNull()
     const seq = flow as Extract<ActionFlow, { type: 'seq' }>
     expect(seq.type).toBe('seq')
@@ -75,14 +71,14 @@ describe('C063_CraftBrewery session (verify-only)', () => {
   })
 
   it('selects grain from a Card Field through the Logical Field mutation seam', () => {
-    const { state, player } = setup()
+    const { session: ruleSession, state, player } = setup()
     player.resources.grain = 2
     player.occupationPlayed.push('B113_PatchCaregiver')
     player.cardStates.B113_PatchCaregiver = {
       extraData: { cardFieldStacks: [{ crop: 'grain', remaining: 2 }] },
     }
 
-    const flow = runCardEffectHook(state, player, 'C063_CraftBrewery', 'onHarvestFeedingPhase')
+    const flow = ruleSession.withCtx(() => runCardEffectHook(state, player, 'C063_CraftBrewery', 'onHarvestFeedingPhase'))
     const selection = flow?.type === 'seq' ? flow.children[0] : undefined
     expect(selection).toMatchObject({
       actionContext: {
@@ -117,12 +113,12 @@ describe('C063_CraftBrewery session (verify-only)', () => {
     })
     session.loadState(state)
 
-    const flow = runCardEffectHook(
+    const flow = session.withCtx(() => runCardEffectHook(
       state,
       player,
       'C063_CraftBrewery',
       'onHarvestFeedingPhase',
-    )
+    ))
     expect(flow).toBeNull()
     // Field untouched.
     expect(player.fields[0]!.stacks[0]?.remaining).toBe(1)
@@ -139,12 +135,12 @@ describe('C063_CraftBrewery session (verify-only)', () => {
     })
     session.loadState(state)
 
-    const flow = runCardEffectHook(
+    const flow = session.withCtx(() => runCardEffectHook(
       state,
       player,
       'C063_CraftBrewery',
       'onHarvestFeedingPhase',
-    )
+    ))
     expect(flow).toBeNull()
   })
 

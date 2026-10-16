@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { createWorkSession } from './_helpers/session-fixtures'
 import { describe, it, expect } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
@@ -130,8 +126,8 @@ const driveToP0ExtraTurn = (session: GameSession): SessionResponse => {
 
 /** Anytime entries sourced from A92 (by descriptor.sourceCard). */
 const a92AnytimeIds = (session: GameSession): string[] =>
-  session
-    .listAnytimeEntries()
+  session.withCtx(() => session
+    .listAnytimeEntries())
     .filter((e) => e.descriptor.sourceCard === A92)
     .map((e) => e.descriptor.id)
 
@@ -217,24 +213,24 @@ describe('A92 P2 fixes', () => {
       p0.workers.find((worker) => worker.id === '2')!.isNewborn = false
       expect(workersAvailable(state, p0)).toBe(1)
       expect(newbornCount(p0)).toBe(1)
-      const reg = getListenerById('A92-adoptive-parents-anytime-grow')!
-      const noFrame = executeCardListener(reg, {
+      const reg = session.withCtx(() => getListenerById('A92-adoptive-parents-anytime-grow'))!
+      const noFrame = session.withCtx(() => executeCardListener(reg, {
         state,
         player: p0,
         space: state.actionSpaces[0]!,
         actionId: 'anytime',
         phase: 'anytime',
-      })
+      }))
       expect(noFrame?.flow).toBeTruthy()
       // Inside A92's own pending frame it is suppressed.
-      const inFrame = executeCardListener(reg, {
+      const inFrame = session.withCtx(() => executeCardListener(reg, {
         state,
         player: p0,
         space: state.actionSpaces[0]!,
         actionId: 'anytime',
         phase: 'anytime',
         pendingSourceCard: A92,
-      })
+      }))
       expect(inFrame).toBeUndefined()
     })
 
@@ -244,15 +240,15 @@ describe('A92 P2 fixes', () => {
       const p0 = state.players[0]!
       expect(workersAvailable(state, p0)).toBe(0)
       expect(newbornCount(p0)).toBe(1)
-      const reg = getListenerById('A92-adoptive-parents-anytime-grow')!
+      const reg = session.withCtx(() => getListenerById('A92-adoptive-parents-anytime-grow'))!
 
-      const result = executeCardListener(reg, {
+      const result = session.withCtx(() => executeCardListener(reg, {
         state,
         player: p0,
         space: state.actionSpaces[0]!,
         actionId: 'anytime',
         phase: 'anytime',
-      })
+      }))
 
       expect(result).toBeUndefined()
     })
@@ -263,7 +259,7 @@ describe('A92 P2 fixes', () => {
       const session = setupRotation({ food: 3, holdD134: true, d134Skip: 1 })
       const pre = session.getState()
       expect(workersAvailable(pre.state, pre.state.players[0]!)).toBe(0)
-      expect(hasPendingExtraTurn(pre.state, pre.state.players[0]!)).toBe(true)
+      expect(session.withCtx(() => hasPendingExtraTurn(pre.state, pre.state.players[0]!))).toBe(true)
       expect(d134Skip(pre)).toBe(1)
 
       // P1 places on a fixed non-`fishing` space: D134 OysterEater's

@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -223,7 +219,7 @@ describe('E030_ChildsToy session', () => {
       const player = state.players[0]!
       setActiveWorkerCount(player, 1)
       setNewbornCount(player, 0)
-      expect(meetsCardPrerequisites(player, E030_ChildsToy, state.round, state)).toBe(false)
+      expect(session.withCtx(() => meetsCardPrerequisites(player, E030_ChildsToy, state.round, state))).toBe(false)
     })
 
     it('blocks when one active worker is a newborn (1 adult + 1 newborn)', () => {
@@ -233,7 +229,7 @@ describe('E030_ChildsToy session', () => {
       const player = state.players[0]!
       setActiveWorkerCount(player, 2)
       setNewbornCount(player, 1)
-      expect(meetsCardPrerequisites(player, E030_ChildsToy, state.round, state)).toBe(false)
+      expect(session.withCtx(() => meetsCardPrerequisites(player, E030_ChildsToy, state.round, state))).toBe(false)
     })
 
     it('allows when player has exactly 2 adults (no newborns)', () => {
@@ -243,7 +239,7 @@ describe('E030_ChildsToy session', () => {
       const player = state.players[0]!
       setActiveWorkerCount(player, 2)
       setNewbornCount(player, 0)
-      expect(meetsCardPrerequisites(player, E030_ChildsToy, state.round, state)).toBe(true)
+      expect(session.withCtx(() => meetsCardPrerequisites(player, E030_ChildsToy, state.round, state))).toBe(true)
     })
   })
 })

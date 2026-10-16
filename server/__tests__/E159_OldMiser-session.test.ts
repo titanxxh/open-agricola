@@ -1,7 +1,5 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
+import { withActiveRegistry } from '../../shared/cards/active-registry'
+import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -199,11 +197,12 @@ describe('E159_OldMiser session', () => {
 
   describe('scoring penalty', () => {
     it('reduces farmer score by 1 per person (2 people = -2 VP)', () => {
+    const ruleRegistry = createOfficialCardRegistry()
       const player = createPlayer()
       player.occupationPlayed = [CARD_ID]
       setActiveWorkerCount(player, 2)
       const state = createState(player)
-      const [result] = computeScores(state)
+      const [result] = withActiveRegistry(ruleRegistry, () => computeScores(state))
 
       // Normal farmer score: 2 * 3 = 6
       // Post-score adjustment: -2 (1 per person)
@@ -218,11 +217,12 @@ describe('E159_OldMiser session', () => {
     })
 
     it('with 5 people, reduces by 5 VP', () => {
+    const ruleRegistry = createOfficialCardRegistry()
       const player = createPlayer()
       player.occupationPlayed = [CARD_ID]
       setActiveWorkerCount(player, 5)
       const state = createState(player)
-      const [result] = computeScores(state)
+      const [result] = withActiveRegistry(ruleRegistry, () => computeScores(state))
 
       const postScoreCat = result.categories.find((c) => c.key === 'cardBonusVp')
       expect(postScoreCat).toBeDefined()
@@ -230,10 +230,11 @@ describe('E159_OldMiser session', () => {
     })
 
     it('no penalty when card not played', () => {
+    const ruleRegistry = createOfficialCardRegistry()
       const player = createPlayer()
       setActiveWorkerCount(player, 3)
       const state = createState(player)
-      const [result] = computeScores(state)
+      const [result] = withActiveRegistry(ruleRegistry, () => computeScores(state))
 
       // No post-score card effect should be registered without the card
       const postScoreCat = result.categories.find((c) => c.key === 'cardBonusVp')

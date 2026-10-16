@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -57,7 +53,7 @@ describe('D065_GrainSieve session', () => {
       [player.id]: { resources: { grain: 3 }, grainFields: 3, vegetableFields: 0 },
     }
 
-    const flow = runCardEffectHook(state, player, CARD_ID, 'onAfterReap')
+    const flow = session.withCtx(() => runCardEffectHook(state, player, CARD_ID, 'onAfterReap'))
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('seq')
     const children = (flow as Extract<ActionFlow, { type: 'seq' }>).children
@@ -78,7 +74,7 @@ describe('D065_GrainSieve session', () => {
       [player.id]: { resources: { grain: 1 }, grainFields: 1, vegetableFields: 0 },
     }
 
-    const flow = runCardEffectHook(state, player, CARD_ID, 'onAfterReap')
+    const flow = session.withCtx(() => runCardEffectHook(state, player, CARD_ID, 'onAfterReap'))
     expect(flow).toBeNull()
   })
 
@@ -94,7 +90,7 @@ describe('D065_GrainSieve session', () => {
       [player.id]: { resources: { vegetable: 2 }, grainFields: 0, vegetableFields: 2 },
     }
 
-    const flow = runCardEffectHook(state, player, CARD_ID, 'onAfterReap')
+    const flow = session.withCtx(() => runCardEffectHook(state, player, CARD_ID, 'onAfterReap'))
     expect(flow).toBeNull()
   })
 

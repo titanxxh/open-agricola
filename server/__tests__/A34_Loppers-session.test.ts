@@ -1,7 +1,6 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
+import { CardRegistry as TestCardRegistry } from '../../shared/cards/registry'
+import { withActiveRegistry } from '../../shared/cards/active-registry'
+import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
 import { descriptionEffects } from './_helpers/choice-description'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -19,8 +18,11 @@ import '../../shared/cards/E/E074_AshTrees'
 
 const CARD_ID = 'A034_Loppers'
 
-const findListener = (id: string) =>
-  getRegisteredCardListeners().find((l) => l.id === id)
+const findListener = (ruleOwner: TestCardRegistry, id: string) =>
+  {
+  const lookupRule1 = () => getRegisteredCardListeners().find((l) => l.id === id)
+  return withActiveRegistry(ruleOwner, lookupRule1)
+}
 
 const edgesForTile = (row: number, col: number) => [
   `H-${row}-${col}`,
@@ -134,20 +136,21 @@ const createState = (...players: PlayerState[]): GameState =>
 
 describe('A34 Loppers — supply fence payment', () => {
   it('declares a wood + fence payment even when player has many palisades', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     const player = createPlayer()
     setPalisadesForTest(player, 15) // well above maxFences
     setFencesForTest(player, 0)
-    const listener = findListener('A34-loppers-after-fencing')!
+    const listener = findListener(ruleRegistry, 'A34-loppers-after-fencing')!
     const actionEvents = [fenceBuilt(['H-0-0'])]
 
-    const result = executeCardListener(listener, {
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener, {
       state: createState(player),
       player,
       actionId: 'fence',
       phase: 'after',
       transactionEvents: actionEvents,
       actionEvents,
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeDefined()
     expect(result?.flow).toBeDefined()
@@ -160,19 +163,20 @@ describe('A34 Loppers — supply fence payment', () => {
   })
 
   it('does not use built fence count as the supply availability gate', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     const player = createPlayer()
     setFencesForTest(player, 15)
-    const listener = findListener('A34-loppers-after-fencing')!
+    const listener = findListener(ruleRegistry, 'A34-loppers-after-fencing')!
     const actionEvents = [fenceBuilt(['H-0-0'])]
 
-    const result = executeCardListener(listener, {
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener, {
       state: createState(player),
       player,
       actionId: 'fence',
       phase: 'after',
       transactionEvents: actionEvents,
       actionEvents,
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeDefined()
   })
@@ -209,11 +213,12 @@ describe('A34 Loppers — supply fence payment', () => {
   })
 
   it('does not offer the exchange when the fence event has no ordinary fence edges', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     const player = createPlayer()
-    const listener = findListener('A34-loppers-after-fencing')!
+    const listener = findListener(ruleRegistry, 'A34-loppers-after-fencing')!
     const actionEvents = [fenceBuilt([])]
 
-    const result = executeCardListener(listener, {
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener, {
       state: createState(player),
       player,
       actionId: 'fence',
@@ -221,7 +226,7 @@ describe('A34 Loppers — supply fence payment', () => {
       result: { type: 'ok', extraData: { newFenceEdges: ['H-0-0'] } },
       transactionEvents: actionEvents,
       actionEvents,
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeUndefined()
   })

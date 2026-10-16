@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { playOccupationAction } from '../../shared/actions/effects/occupation'
@@ -92,14 +88,14 @@ describe('B176 Village Idiot', () => {
     player.resources.food = 0
     session.loadState(state)
 
-    const result = playOccupationAction.execute!({
+    const result = session.withCtx(() => playOccupationAction.execute!({
       state,
       player,
       space: { id: 'lessons' },
       sourceCard: 'A097_Freshman',
       params: { exactCost: {} },
       actionContext: { trueAction: false },
-    } as unknown as ActionExecutionContext)
+    } as unknown as ActionExecutionContext))
 
     expect(result.type).toBe('fail')
     expect(player.occupationPlayed).toEqual([CARD_ID])

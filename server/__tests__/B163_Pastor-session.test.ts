@@ -1,7 +1,7 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
+import type { GameSession as SessionRuleOwner } from '../game/authoritative-session'
+import { CardRegistry as TestCardRegistry } from '../../shared/cards/registry'
+import { withActiveRegistry } from '../../shared/cards/active-registry'
+import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import {
@@ -16,8 +16,11 @@ import { mkActionSpace } from '../../shared/cards/__tests__/fixtures'
 
 const CARD_ID = 'B163_Pastor'
 
-const findListener = (id: string) =>
-  getRegisteredCardListeners().find((l) => l.id === id)
+const findListener = (ruleOwner: SessionRuleOwner | TestCardRegistry, id: string) =>
+  {
+  const lookupRule1 = () => getRegisteredCardListeners().find((l) => l.id === id)
+  return ruleOwner instanceof TestCardRegistry ? withActiveRegistry(ruleOwner, lookupRule1) : ruleOwner.withCtx(lookupRule1)
+}
 
 const setupSession = () => {
   const session = new GameSession(42)
@@ -38,10 +41,10 @@ describe('B163_Pastor effect.onBuy', () => {
     owner.occupationPlayed = [CARD_ID]
     session.loadState(state)
 
-    const effect = getCardEffect(CARD_ID)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
     expect(effect?.onBuy).toBeDefined()
 
-    const flow = effect!.onBuy!(state, owner)
+    const flow = session.withCtx(() => effect!.onBuy!(state, owner))
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('seq')
     if (flow!.type === 'seq') {
@@ -66,8 +69,8 @@ describe('B163_Pastor effect.onBuy', () => {
     owner.occupationPlayed = [CARD_ID]
     session.loadState(state)
 
-    const effect = getCardEffect(CARD_ID)
-    const flow = effect!.onBuy!(state, owner)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
+    const flow = session.withCtx(() => effect!.onBuy!(state, owner))
     expect(flow).toBeUndefined()
   })
 
@@ -81,8 +84,8 @@ describe('B163_Pastor effect.onBuy', () => {
     owner.occupationPlayed = [CARD_ID]
     session.loadState(state)
 
-    const effect = getCardEffect(CARD_ID)
-    const flow = effect!.onBuy!(state, owner)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
+    const flow = session.withCtx(() => effect!.onBuy!(state, owner))
     expect(flow).toBeUndefined()
   })
 
@@ -97,23 +100,25 @@ describe('B163_Pastor effect.onBuy', () => {
     owner.cardStates = { [CARD_ID]: { flagged: true } }
     session.loadState(state)
 
-    const effect = getCardEffect(CARD_ID)
-    const flow = effect!.onBuy!(state, owner)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
+    const flow = session.withCtx(() => effect!.onBuy!(state, owner))
     expect(flow).toBeUndefined()
   })
 })
 
 describe('B163_Pastor after-construct listener (regression)', () => {
   it('listener is still registered for construct/after', () => {
-    const listener = findListener('B163-pastor-after-construct')
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry, 'B163-pastor-after-construct')
     expect(listener).toBeDefined()
     expect(listener!.actions).toEqual(['construct'])
     expect(listener!.phases).toEqual(['after'])
   })
 
   it('fires gain+flag when an opponent constructs a 2-room owner alone', () => {
-    const listener = findListener('B163-pastor-after-construct')!
+
     const session = setupSession()
+    const listener = findListener(session, 'B163-pastor-after-construct')!
     const state = session.getState().state
     const owner = state.players[0]!
     const opp = state.players[1]!
@@ -122,7 +127,7 @@ describe('B163_Pastor after-construct listener (regression)', () => {
     owner.occupationPlayed = [CARD_ID]
     session.loadState(state)
 
-    const result = executeCardListener(listener, {
+    const result = session.withCtx(() => executeCardListener(listener, {
       state,
       player: opp,
       ownerPlayer: owner,
@@ -130,7 +135,7 @@ describe('B163_Pastor after-construct listener (regression)', () => {
       actionId: 'construct',
       phase: 'after',
       result: { type: 'ok' },
-    } as CardListenerContext)
+    } as CardListenerContext))
 
     expect(result?.flow).toBeDefined()
     expect(result!.flow!.type).toBe('seq')

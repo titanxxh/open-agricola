@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { setWorkersAtHome } from '../../shared/domain/player'
 
 import { describe, expect, it } from 'vitest'
@@ -39,7 +35,7 @@ describe('C121_ClayKneader session', () => {
     const player = state.players[0]!
     player.occupationPlayed.push(CARD_ID)
 
-    const flow = runCardEffectHook(state, player, CARD_ID, 'onBuy')
+    const flow = session.withCtx(() => runCardEffectHook(state, player, CARD_ID, 'onBuy'))
     expect(flow).not.toBeNull()
     expect(flow!.type).toBe('leaf')
     expect((flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('gain')

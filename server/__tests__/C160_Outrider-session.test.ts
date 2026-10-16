@@ -1,7 +1,4 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
+import type { GameSession as SessionRuleOwner } from '../game/authoritative-session'
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { executeCardListener, getRegisteredCardListeners, type CardListenerContext } from '../../shared/cards/card-listeners'
@@ -12,15 +9,16 @@ import type { ActionFlow } from '../../shared/contract/types'
 
 const CARD_ID = 'C160_Outrider'
 
-const findListener = (id: string) =>
-  getRegisteredCardListeners().find((l) => l.id === id)
+const findListener = (ruleOwner: SessionRuleOwner, id: string) =>
+  ruleOwner.withCtx(() => getRegisteredCardListeners()).find((l) => l.id === id)
 
 describe('C160_Outrider session', () => {
   it('gains 1 grain when placing on the most recently revealed space', () => {
-    const listener = findListener('C160-outrider-before-place-farmer')!
-    expect(listener).toBeDefined()
+
 
     const session = new GameSession(42)
+    const listener = findListener(session, 'C160-outrider-before-place-farmer')!
+    expect(listener).toBeDefined()
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 5
@@ -33,13 +31,13 @@ describe('C160_Outrider session', () => {
     const cultivation = state.actionSpaces.find((s) => s.id === 'cultivation')
     if (!cultivation) return
 
-    const result = executeCardListener(listener, {
+    const result = session.withCtx(() => executeCardListener(listener, {
       state,
       player,
       space: cultivation,
       actionId: 'place-farmer',
       phase: 'before',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
     expect(result).toBeDefined()
     const leaf = result!.flow as Extract<ActionFlow, { type: 'leaf' }>
     expect(leaf.actionId).toBe('gain')
@@ -48,8 +46,9 @@ describe('C160_Outrider session', () => {
   })
 
   it('does not trigger when placing on a different action space', () => {
-    const listener = findListener('C160-outrider-before-place-farmer')!
+
     const session = new GameSession(42)
+    const listener = findListener(session, 'C160-outrider-before-place-farmer')!
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 5
@@ -59,19 +58,20 @@ describe('C160_Outrider session', () => {
     session.loadState(state)
 
     const farmland = state.actionSpaces.find((s) => s.id === 'farmland')!
-    const result = executeCardListener(listener, {
+    const result = session.withCtx(() => executeCardListener(listener, {
       state,
       player,
       space: farmland,
       actionId: 'place-farmer',
       phase: 'before',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
     expect(result).toBeUndefined()
   })
 
   it('does not trigger when roundActionOrder entry is null', () => {
-    const listener = findListener('C160-outrider-before-place-farmer')!
+
     const session = new GameSession(42)
+    const listener = findListener(session, 'C160-outrider-before-place-farmer')!
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 5
@@ -81,13 +81,13 @@ describe('C160_Outrider session', () => {
     session.loadState(state)
 
     const farmland = state.actionSpaces.find((s) => s.id === 'farmland')!
-    const result = executeCardListener(listener, {
+    const result = session.withCtx(() => executeCardListener(listener, {
       state,
       player,
       space: farmland,
       actionId: 'place-farmer',
       phase: 'before',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
     expect(result).toBeUndefined()
   })
 

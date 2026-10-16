@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
@@ -96,7 +92,7 @@ describe('E021_SheepRug session', () => {
       player.pastures = []
       player.houseAnimals = {};
       player.stableAnimals = {}
-      expect(meetsCardPrerequisites(player, E021_SheepRug, state.round, state)).toBe(false)
+      expect(session.withCtx(() => meetsCardPrerequisites(player, E021_SheepRug, state.round, state))).toBe(false)
     })
 
     it('allows when player has 4+ sheep on board (in pasture)', () => {
@@ -111,7 +107,7 @@ describe('E021_SheepRug session', () => {
         size: 2,
         stables: 0,
       }]
-      expect(meetsCardPrerequisites(player, E021_SheepRug, state.round, state)).toBe(true)
+      expect(session.withCtx(() => meetsCardPrerequisites(player, E021_SheepRug, state.round, state))).toBe(true)
     })
   })
 })

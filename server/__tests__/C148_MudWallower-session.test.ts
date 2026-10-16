@@ -1,7 +1,6 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
+import { CardRegistry as TestCardRegistry } from '../../shared/cards/registry'
+import { withActiveRegistry } from '../../shared/cards/active-registry'
+import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
 import { describe, expect, it } from 'vitest'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
@@ -49,7 +48,7 @@ describe('C148 fencing with existing card animals', () => {
     expect(after.resources.boar).toBe(total)
     expect(after.cardStates[CARD_ID]?.counters).toEqual({ held: total, counter: 0 })
     expect(after.pastures.reduce((sum, pasture) => sum + pasture.animalCount, 0)).toBe(total - 1)
-    expect(computeAnimalZones(after, response.state).find((zone) => zone.cardId === CARD_ID)?.animalCount).toBe(1)
+    expect(session.withCtx(() => computeAnimalZones(after, response.state)).find((zone) => zone.cardId === CARD_ID)?.animalCount).toBe(1)
     expect(response.interaction.stateId === 'wait' && response.interaction.request.kind).toBe('confirm-next-player')
     expect(response.state.events.some((event) => event.type === 'farm.fenceBuilt')).toBe(true)
     expect(response.state.events.some((event) => event.type === 'resource.paid' && event.resources.wood === (total === 1 ? 4 : 3))).toBe(true)
@@ -119,36 +118,41 @@ const createSpace = (id: string, gainPerRound: Partial<Record<string, number>> =
     takenBy: [],
   }) as ActionSpace
 
-const findListener = (id: string) => getRegisteredCardListeners().find(l => l.id === id)
+const findListener = (ruleOwner: TestCardRegistry, id: string) => {
+  const lookupRule1 = () => getRegisteredCardListeners().find(l => l.id === id)
+  return withActiveRegistry(ruleOwner, lookupRule1)
+}
 
 describe('C148_MudWallower', () => {
   it('onBuy initializes counter and held to 0', () => {
-    const effect = getCardEffect(CARD_ID)
+    const ruleRegistry = createOfficialCardRegistry()
+    const effect = withActiveRegistry(ruleRegistry, () => getCardEffect(CARD_ID))
     expect(effect).toBeDefined()
 
     const player = createPlayer()
     const state = createState(player)
 
-    effect!.onBuy!(state, player)
+    withActiveRegistry(ruleRegistry, () => effect!.onBuy!(state, player))
     expect(player.cardStates?.[CARD_ID]?.counters?.counter).toBe(0)
     expect(player.cardStates?.[CARD_ID]?.counters?.held).toBe(0)
     expect(player.cardStates?.[CARD_ID]?.infobox).toBe('0 / 4')
   })
 
   it('returns counter increment flow on accumulation space use', () => {
-    const listener = findListener('C148-mud-wallower-after-place-farmer')
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry, 'C148-mud-wallower-after-place-farmer')
     expect(listener).toBeDefined()
 
     const player = createPlayer()
-    const effect = getCardEffect(CARD_ID)
-    effect!.onBuy!(createState(player), player)
+    const effect = withActiveRegistry(ruleRegistry, () => getCardEffect(CARD_ID))
+    withActiveRegistry(ruleRegistry, () => effect!.onBuy!(createState(player), player))
     const state = createState(player)
 
     // Place farmer on an accumulation space (wood: 3 per round)
-    const result = executeCardListener(listener!, {
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener!, {
       state, player, space: createSpace('forest', { wood: 3 }),
       actionId: 'place-farmer', phase: 'after',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result?.flow).toEqual({
       type: 'seq',
@@ -171,12 +175,13 @@ describe('C148_MudWallower', () => {
   })
 
   it('returns reset, held increment, and pig gain flow on 4th accumulation space use', () => {
-    const listener = findListener('C148-mud-wallower-after-place-farmer')
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry, 'C148-mud-wallower-after-place-farmer')
     expect(listener).toBeDefined()
 
     const player = createPlayer()
-    const effect = getCardEffect(CARD_ID)
-    effect!.onBuy!(createState(player), player)
+    const effect = withActiveRegistry(ruleRegistry, () => getCardEffect(CARD_ID))
+    withActiveRegistry(ruleRegistry, () => effect!.onBuy!(createState(player), player))
 
     // Simulate 3 previous accumulation uses
     player.cardStates![CARD_ID]!.counters!.counter = 3
@@ -184,10 +189,10 @@ describe('C148_MudWallower', () => {
     const state = createState(player)
 
     // 4th placement
-    const result = executeCardListener(listener!, {
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener!, {
       state, player, space: createSpace('forest', { wood: 3 }),
       actionId: 'place-farmer', phase: 'after',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeDefined()
     expect(result!.flow).toEqual({
@@ -228,19 +233,20 @@ describe('C148_MudWallower', () => {
   })
 
   it('does not trigger on non-accumulation spaces', () => {
-    const listener = findListener('C148-mud-wallower-after-place-farmer')
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry, 'C148-mud-wallower-after-place-farmer')
     expect(listener).toBeDefined()
 
     const player = createPlayer()
-    const effect = getCardEffect(CARD_ID)
-    effect!.onBuy!(createState(player), player)
+    const effect = withActiveRegistry(ruleRegistry, () => getCardEffect(CARD_ID))
+    withActiveRegistry(ruleRegistry, () => effect!.onBuy!(createState(player), player))
 
     const state = createState(player)
 
-    const result = executeCardListener(listener!, {
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener!, {
       state, player, space: createSpace('farmland', {}),
       actionId: 'place-farmer', phase: 'after',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     // Counter should not increment
     expect(player.cardStates?.[CARD_ID]?.counters?.counter).toBe(0)
@@ -248,7 +254,8 @@ describe('C148_MudWallower', () => {
   })
 
   it('onComputeAnimalZones provides pig holder zone', () => {
-    const effect = getCardEffect(CARD_ID)
+    const ruleRegistry = createOfficialCardRegistry()
+    const effect = withActiveRegistry(ruleRegistry, () => getCardEffect(CARD_ID))
     expect(effect).toBeDefined()
 
     const player = createPlayer()
@@ -256,7 +263,7 @@ describe('C148_MudWallower', () => {
       [CARD_ID]: { counters: { counter: 0, held: 2 } },
     }
 
-    const zones = computeAnimalZones(player)
+    const zones = withActiveRegistry(ruleRegistry, () => computeAnimalZones(player))
     const cardZone = zones.find(z => z.id === `card:${CARD_ID}`)
     expect(cardZone).toBeDefined()
     expect(cardZone!.capacity).toBe(2)
@@ -264,7 +271,8 @@ describe('C148_MudWallower', () => {
   })
 
   it('no animal zone when held is 0', () => {
-    const effect = getCardEffect(CARD_ID)
+    const ruleRegistry = createOfficialCardRegistry()
+    const effect = withActiveRegistry(ruleRegistry, () => getCardEffect(CARD_ID))
     expect(effect).toBeDefined()
 
     const player = createPlayer()
@@ -272,13 +280,14 @@ describe('C148_MudWallower', () => {
       [CARD_ID]: { counters: { counter: 0, held: 0 } },
     }
 
-    const zones = computeAnimalZones(player)
+    const zones = withActiveRegistry(ruleRegistry, () => computeAnimalZones(player))
     const cardZone = zones.find(z => z.id === `card:${CARD_ID}`)
     expect(cardZone).toBeUndefined()
   })
 
   it('returns held-downward sync flow when player has fewer pigs than cap', () => {
-    const exchangeListener = findListener('C148-mud-wallower-after-exchange')
+    const ruleRegistry = createOfficialCardRegistry()
+    const exchangeListener = findListener(ruleRegistry, 'C148-mud-wallower-after-exchange')
     expect(exchangeListener).toBeDefined()
 
     const player = createPlayer()
@@ -290,11 +299,11 @@ describe('C148_MudWallower', () => {
 
     const state = createState(player)
 
-    const result = executeCardListener(exchangeListener!, {
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(exchangeListener!, {
       state, player,
       space: createSpace('exchange'),
       actionId: 'exchange', phase: 'after',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result?.flow).toEqual({
       type: 'leaf',
@@ -306,9 +315,10 @@ describe('C148_MudWallower', () => {
   })
 
   it('held is permanent - does not increase when pig count grows back', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     // The reference behavior: once cap is reduced, it stays reduced even if pig count
     // returns to the original level (e.g., via breeding).
-    const exchangeListener = findListener('C148-mud-wallower-after-exchange')
+    const exchangeListener = findListener(ruleRegistry, 'C148-mud-wallower-after-exchange')
     expect(exchangeListener).toBeDefined()
 
     const player = createPlayer()
@@ -320,11 +330,11 @@ describe('C148_MudWallower', () => {
 
     const state = createState(player)
 
-    executeCardListener(exchangeListener!, {
+    withActiveRegistry(ruleRegistry, () => executeCardListener(exchangeListener!, {
       state, player,
       space: createSpace('exchange'),
       actionId: 'exchange', phase: 'after',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     // held remains at 1 (no upward sync)
     expect(player.cardStates?.[CARD_ID]?.counters?.held).toBe(1)

@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -65,7 +61,7 @@ describe('E153_StoneSculptor exchange metadata', () => {
     player.resources.stone = 1
     session.loadState(state)
 
-    const trades = getExchangesInWindow(player, 'harvest')
+    const trades = session.withCtx(() => getExchangesInWindow(player, 'harvest'))
     const own = trades.find((t) => t.sourceId === CARD_ID)
     expect(own).toBeDefined()
     expect(own!.from).toEqual({ stone: 1 })
@@ -81,7 +77,7 @@ describe('E153_StoneSculptor exchange metadata', () => {
     const player = state.players[0]!
     player.occupationPlayed.push(CARD_ID)
     session.loadState(state)
-    const anytime = getExchangesInWindow(player, 'anytime')
+    const anytime = session.withCtx(() => getExchangesInWindow(player, 'anytime'))
     expect(anytime.find((t) => t.sourceId === CARD_ID)).toBeUndefined()
   })
 
@@ -95,9 +91,9 @@ describe('E153_StoneSculptor exchange metadata', () => {
       [CARD_ID]: { extraData: { bonusVpEarned: 4 } },
     }
     session.loadState(state)
-    const eff = getCardEffect(CARD_ID)
+    const eff = session.withCtx(() => getCardEffect(CARD_ID))
     expect(eff?.computeBonusScore).toBeDefined()
-    const score = eff!.computeBonusScore!(state, player, {} as never)
+    const score = session.withCtx(() => eff!.computeBonusScore!(state, player, {} as never))
     expect(score).toBe(4)
   })
 
@@ -108,8 +104,8 @@ describe('E153_StoneSculptor exchange metadata', () => {
     const player = state.players[0]!
     player.occupationPlayed.push(CARD_ID)
     session.loadState(state)
-    const eff = getCardEffect(CARD_ID)!
-    const score = eff.computeBonusScore!(state, player, {} as never)
+    const eff = session.withCtx(() => getCardEffect(CARD_ID))!
+    const score = session.withCtx(() => eff.computeBonusScore!(state, player, {} as never))
     expect(score).toBe(0)
   })
 })
@@ -225,7 +221,7 @@ describe('E153_StoneSculptor harvest integration', () => {
     const player = state.players[0]!
     // Do NOT push E153 into occupationPlayed.
     session.loadState(state)
-    const trades = getExchangesInWindow(player, 'harvest')
+    const trades = session.withCtx(() => getExchangesInWindow(player, 'harvest'))
     expect(trades.find((t) => t.sourceId === CARD_ID)).toBeUndefined()
   })
 

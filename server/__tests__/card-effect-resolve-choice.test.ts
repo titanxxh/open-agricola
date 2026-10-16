@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 /**
  * Smoke test for CardEffect.resolveChoice hook + GameSession dispatch.
  *
@@ -17,12 +13,13 @@ installOfficialCardRegistry()
 import { describe, expect, it, beforeEach, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
-import type { ResolveChoiceHandler } from '../../shared/cards/card-effects'
+import type { CardEffect, ResolveChoiceHandler } from '../../shared/cards/card-effects'
 import { Occupation } from '../../shared/cards/registry-display'
 import { registerAdHocOccupation } from '../../shared/cards/registry-runtime'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import type { ActionFlow } from '../../shared/contract/types'
-import { requireActiveCardRegistry } from '../../shared/cards/active-registry'
+import { requireActiveCardRegistry, withActiveRegistry } from '../../shared/cards/active-registry'
+import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
@@ -57,32 +54,18 @@ beforeEach(() => {
     registerAdHocOccupation(testCard)
     occupationRegistered = true
   }
-  // Register card effect with a basic onBuy (XOR choice).
-  // resolveChoice is set per-test.
-  requireActiveCardRegistry('card-effect-resolve-choice').setEffect({
-    id: TEST_CARD_ID,
-    onBuy: () => buildTestOnBuyFlow(),
-  })
 })
 
-afterEach(() => {
-  // Re-register without resolveChoice to clean up between tests.
-  requireActiveCardRegistry('card-effect-resolve-choice').setEffect({
-    id: TEST_CARD_ID,
-    onBuy: () => buildTestOnBuyFlow(),
-  })
-})
+const sessions: GameSession[] = []
+afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
 
 /**
  * Build a session with player 0 having the test card in hand and enough food
  * to play it for free (first occupation on lessons = 0 food).
  */
-const makeSession = () => {
-  const effect = getCardEffect(TEST_CARD_ID) ?? {
-    id: TEST_CARD_ID,
-    onBuy: () => buildTestOnBuyFlow(),
-  }
+const makeSession = (effect: CardEffect) => {
   const session = new GameSession(undefined, undefined, { playerCount: 4 })
+  sessions.push(session)
   stabilizeRandomHands(session.state.players)
   session.withCtx(() => requireActiveCardRegistry('card-effect-resolve-choice').setEffect(effect))
   const state = session.getState().state
@@ -101,12 +84,13 @@ const makeSession = () => {
 describe('CardEffect.resolveChoice hook', () => {
   it('getCardEffect returns the registered resolveChoice handler', () => {
     const handler: ResolveChoiceHandler = () => undefined
-    requireActiveCardRegistry('card-effect-resolve-choice').setEffect({
+    const registry = createOfficialCardRegistry()
+    registry.setEffect({
       id: TEST_CARD_ID,
       onBuy: () => buildTestOnBuyFlow(),
       resolveChoice: handler,
     })
-    const effect = getCardEffect(TEST_CARD_ID)
+    const effect = withActiveRegistry(registry, () => getCardEffect(TEST_CARD_ID))
     expect(effect?.resolveChoice).toBe(handler)
   })
 
@@ -114,15 +98,15 @@ describe('CardEffect.resolveChoice hook', () => {
     const activeSession: { current?: GameSession } = {}
     const invocations: { choice: string; ctx: { sourceCard: string } }[] = []
 
-    requireActiveCardRegistry('card-effect-resolve-choice').setEffect({
+    const effect: CardEffect = {
       id: TEST_CARD_ID,
       onBuy: () => buildTestOnBuyFlow(),
       resolveChoice: (_state, _player, choice, ctx) => {
         if (_state === activeSession.current?.state) invocations.push({ choice, ctx })
       },
-    })
+    }
 
-    const session = makeSession()
+    const session = makeSession(effect)
     activeSession.current = session
 
     // takeAction on lessons auto-resolves occupation when only one occupation
@@ -152,7 +136,7 @@ describe('CardEffect.resolveChoice hook', () => {
   it('resolveChoice handler that returns a flow causes the flow to be executed', () => {
     const BONUS_FOOD = 5
 
-    requireActiveCardRegistry('card-effect-resolve-choice').setEffect({
+    const effect: CardEffect = {
       id: TEST_CARD_ID,
       onBuy: () => buildTestOnBuyFlow(),
       resolveChoice: (): ActionFlow => ({
@@ -161,9 +145,9 @@ describe('CardEffect.resolveChoice hook', () => {
         sourceCard: TEST_CARD_ID,
         params: { food: BONUS_FOOD },
       }),
-    })
+    }
 
-    const session = makeSession()
+    const session = makeSession(effect)
 
     // lessons auto-resolves the occupation (one card in hand) → onBuy XOR
     let resp = session.takeAction(0, 'lessons')
@@ -189,7 +173,7 @@ describe('CardEffect.resolveChoice hook', () => {
   it('resolveChoice follow-up flow inherits targeted pending owner', () => {
     const BONUS_FOOD = 5
 
-    requireActiveCardRegistry('card-effect-resolve-choice').setEffect({
+    const effect: CardEffect = {
       id: TEST_CARD_ID,
       onBuy: (): ActionFlow => ({
         ...buildTestOnBuyFlow(),
@@ -201,9 +185,9 @@ describe('CardEffect.resolveChoice hook', () => {
         sourceCard: TEST_CARD_ID,
         params: { food: BONUS_FOOD },
       }),
-    })
+    }
 
-    const session = makeSession()
+    const session = makeSession(effect)
     const before = session.getState().state
     const p1FoodBefore = before.players[0]!.resources.food
     const p2FoodBefore = before.players[1]!.resources.food
@@ -234,18 +218,18 @@ describe('CardEffect.resolveChoice hook', () => {
   it('resolveChoice handler is NOT called when sourceCard does not match', () => {
     const activeSession: { current?: GameSession } = {}
     let handlerCalled = false
-    requireActiveCardRegistry('card-effect-resolve-choice').setEffect({
+    const effect: CardEffect = {
       id: TEST_CARD_ID,
       onBuy: () => buildTestOnBuyFlow(),
       resolveChoice: (state) => {
         if (state === activeSession.current?.state) handlerCalled = true
       },
-    })
+    }
 
     // Use a different session path that does not produce a pending choice with
     // sourceCard === TEST_CARD_ID.  We test this by verifying the handler is
     // never called when there is no pending choice with our sourceCard.
-    const session = makeSession()
+    const session = makeSession(effect)
     activeSession.current = session
     // day-laborer: no pending choice produced (all resources granted immediately)
     const resp = session.takeAction(0, 'day-laborer')

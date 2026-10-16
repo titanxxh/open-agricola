@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
@@ -199,7 +195,7 @@ describe('C006_StoneClearing session (reference-aligned)', () => {
     const player = state.players[0]!
     const beforeStone = player.resources.stone ?? 0
 
-    const flow = runCardEffectHook(state, player, 'C006_StoneClearing', 'onBuy')
+    const flow = session.withCtx(() => runCardEffectHook(state, player, 'C006_StoneClearing', 'onBuy'))
     // `runCardEffectHook` coerces `undefined` return to `null` (card-effects.ts:253).
     expect(flow).toBeNull()
 
@@ -216,7 +212,7 @@ describe('C006_StoneClearing session (reference-aligned)', () => {
     const state = session.getState().state
     const player = state.players[0]!
 
-    runCardEffectHook(state, player, 'C006_StoneClearing', 'onBuy')
+    session.withCtx(() => runCardEffectHook(state, player, 'C006_StoneClearing', 'onBuy'))
 
     for (const f of player.fields) {
       expect(f.stacks).toEqual([{ kind: 'stone', remaining: 1 }])
@@ -229,7 +225,7 @@ describe('C006_StoneClearing session (reference-aligned)', () => {
     const state = session.getState().state
     const player = state.players[0]!
 
-    const flow = runCardEffectHook(state, player, 'C006_StoneClearing', 'onBuy')
+    const flow = session.withCtx(() => runCardEffectHook(state, player, 'C006_StoneClearing', 'onBuy'))
     expect(flow).toBeNull()
     expect(player.fields).toEqual([])
   })
@@ -243,7 +239,7 @@ describe('C006_StoneClearing session (reference-aligned)', () => {
     const state = session.getState().state
     const player = state.players[0]!
 
-    runCardEffectHook(state, player, 'C006_StoneClearing', 'onBuy')
+    session.withCtx(() => runCardEffectHook(state, player, 'C006_StoneClearing', 'onBuy'))
 
     expect(player.fields[0]!.stacks).toEqual([{ kind: 'stone', remaining: 1 }])
     expect(player.fields[1]!.stacks).toEqual([{ kind: 'grain', remaining: 2 }])
@@ -259,10 +255,10 @@ describe('C006_StoneClearing session (reference-aligned)', () => {
     const player = state.players[0]!
     const beforeStone = player.resources.stone ?? 0
 
-    runCardEffectHook(state, player, 'C006_StoneClearing', 'onBuy')
+    session.withCtx(() => runCardEffectHook(state, player, 'C006_StoneClearing', 'onBuy'))
     expect(player.fields.every((f) => f.stacks[0]?.kind === 'stone')).toBe(true)
 
-    const result = reap(state, player)
+    const result = session.withCtx(() => reap(state, player))
     expect(result.type).toBe('ok')
     expect((player.resources.stone ?? 0) - beforeStone).toBe(2)
     expect(player.fields.every(fieldIsEmpty)).toBe(true)
@@ -283,8 +279,8 @@ describe('C006_StoneClearing session (reference-aligned)', () => {
     const beforeGrain = player.resources.grain ?? 0
     const beforeStone = player.resources.stone ?? 0
 
-    runCardEffectHook(state, player, 'C006_StoneClearing', 'onBuy')
-    const result = reap(state, player)
+    session.withCtx(() => runCardEffectHook(state, player, 'C006_StoneClearing', 'onBuy'))
+    const result = session.withCtx(() => reap(state, player))
 
     expect((player.resources.grain ?? 0) - beforeGrain).toBe(1)
     expect((player.resources.stone ?? 0) - beforeStone).toBe(2)
@@ -304,7 +300,7 @@ describe('C006_StoneClearing session (reference-aligned)', () => {
     player.cardStates.B113_PatchCaregiver = {}
     const eventCount = state.events.length
 
-    runCardEffectHook(state, player, 'C006_StoneClearing', 'onBuy')
+    session.withCtx(() => runCardEffectHook(state, player, 'C006_StoneClearing', 'onBuy'))
 
     expect(player.fields[0]?.stacks).toEqual([{ kind: 'grain', remaining: 2 }])
     expect(player.cardStates.B113_PatchCaregiver?.extraData?.cardFieldStacks).toEqual([
@@ -333,7 +329,7 @@ describe('C006_StoneClearing session (reference-aligned)', () => {
     }
     const beforeStone = player.resources.stone
 
-    runCardEffectHook(state, player, 'C006_StoneClearing', 'onBuy')
+    session.withCtx(() => runCardEffectHook(state, player, 'C006_StoneClearing', 'onBuy'))
 
     expect(player.fields[0]?.stacks).toEqual([{ kind: 'stone', remaining: 1 }])
     expect(player.cardStates.D075_WoodField.extraData?.cardFieldStacks).toEqual([
@@ -341,7 +337,7 @@ describe('C006_StoneClearing session (reference-aligned)', () => {
       null,
     ])
 
-    const result = reap(state, player)
+    const result = session.withCtx(() => reap(state, player))
     expect(player.resources.stone - beforeStone).toBe(2)
     expect(result.reapSummary.resources.stone).toBe(2)
     expect(player.cardStates.D075_WoodField.extraData?.cardFieldStacks).toEqual([null, null])
@@ -358,7 +354,7 @@ describe('C006_StoneClearing session (reference-aligned)', () => {
       },
     }
 
-    runCardEffectHook(state, player, 'C006_StoneClearing', 'onBuy')
+    session.withCtx(() => runCardEffectHook(state, player, 'C006_StoneClearing', 'onBuy'))
 
     expect(player.cardStates.D075_WoodField.extraData?.cardFieldStacks).toEqual([
       { crop: 'wood', remaining: 2 },
@@ -380,8 +376,8 @@ describe('C006_StoneClearing session (reference-aligned)', () => {
     player.resources.grain = 1
     player.resources.vegetable = 1
 
-    runCardEffectHook(state, player, 'C006_StoneClearing', 'onBuy')
-    const result = reap(state, player)
+    session.withCtx(() => runCardEffectHook(state, player, 'C006_StoneClearing', 'onBuy'))
+    const result = session.withCtx(() => reap(state, player))
 
     expect(result.reapSummary.resources.stone).toBe(1)
     expect(result.reactionFlow).toBeUndefined()
@@ -396,8 +392,8 @@ describe('C006_StoneClearing session (reference-aligned)', () => {
     player.cardStates.E072_ArtichokeField = {}
     const beforeFood = player.resources.food
 
-    runCardEffectHook(state, player, 'C006_StoneClearing', 'onBuy')
-    const result = reap(state, player)
+    session.withCtx(() => runCardEffectHook(state, player, 'C006_StoneClearing', 'onBuy'))
+    const result = session.withCtx(() => reap(state, player))
 
     expect(result.reapSummary.resources.stone).toBe(1)
     expect(player.resources.food - beforeFood).toBe(1)
@@ -422,10 +418,10 @@ describe('C006_StoneClearing cross-card integration', () => {
     ]
     session.loadState(state)
 
-    runCardEffectHook(state, player, 'C006_StoneClearing', 'onBuy')
+    session.withCtx(() => runCardEffectHook(state, player, 'C006_StoneClearing', 'onBuy'))
     expect(player.fields.every((f) => f.stacks[0]?.kind === 'stone')).toBe(true)
 
-    const result = reap(state, player)
+    const result = session.withCtx(() => reap(state, player))
     expect(result.type).toBe('ok')
 
     state.harvestReapSummary = {
@@ -433,7 +429,7 @@ describe('C006_StoneClearing cross-card integration', () => {
       [player.id]: result.reapSummary,
     }
 
-    const flow = runCardEffectHook(state, player, 'D063_Lynchet', 'onAfterReap')
+    const flow = session.withCtx(() => runCardEffectHook(state, player, 'D063_Lynchet', 'onAfterReap'))
     expect(flow).not.toBeNull()
     const leaf = flow as Extract<ActionFlow, { type: 'leaf' }>
     expect(leaf.type).toBe('leaf')
@@ -456,7 +452,7 @@ describe('C006_StoneClearing cross-card integration', () => {
 
     expect(player.fields.every(fieldIsEmpty)).toBe(true)
 
-    runCardEffectHook(state, player, 'C006_StoneClearing', 'onBuy')
+    session.withCtx(() => runCardEffectHook(state, player, 'C006_StoneClearing', 'onBuy'))
 
     expect(player.fields.every((f) => !fieldIsEmpty(f))).toBe(true)
     expect(player.fields.every((f) => f.stacks[0]?.kind === 'stone')).toBe(true)

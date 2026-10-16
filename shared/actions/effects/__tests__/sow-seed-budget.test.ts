@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../../cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { afterEach, expect, it } from 'vitest'
 import type { GameSession } from '../../../../server/game/authoritative-session'
 import { createWorkSession } from '../../../../server/__tests__/_helpers/session-fixtures'
@@ -22,13 +18,13 @@ it('a one-seed budget rejects two slots of one logical field while a field cap a
   sessions.push(session)
   const state = session.getState().state
   const player = state.players[0]!
-  const farm = buildSowFarmInteraction(player)
+  const farm = session.withCtx(() => buildSowFarmInteraction(player))
   expect(farm.farmType).toBe('sow')
   if (farm.farmType !== 'sow') throw new Error('Expected Sow permissions')
   const crops = farm.selectableFields.map(field => ({ ...field.tile, crop: 'wood' as const }))
   expect(crops).toHaveLength(2)
-  const context = { state, player, space: state.actionSpaces.find(space => space.id === 'grain-utilization')! }
-  expect(validateSow({ ...context, actionContext: { maxSelections: 1 } }, crops).validated.ok).toBe(true)
-  expect(validateSow({ ...context, actionContext: { maxSelections: 1, maxSeedSelections: 1 } }, crops).validated.ok).toBe(false)
-  expect(validateSow({ ...context, actionContext: { maxSelections: 1, maxSeedSelections: 1 } }, crops.slice(0, 1)).validated.ok).toBe(true)
+  const context = { actionHooks: session.actionHooks, state, player, space: state.actionSpaces.find(space => space.id === 'grain-utilization')! }
+  expect(session.withCtx(() => validateSow({ ...context, actionContext: { maxSelections: 1 } }, crops)).validated.ok).toBe(true)
+  expect(session.withCtx(() => validateSow({ ...context, actionContext: { maxSelections: 1, maxSeedSelections: 1 } }, crops)).validated.ok).toBe(false)
+  expect(session.withCtx(() => validateSow({ ...context, actionContext: { maxSelections: 1, maxSeedSelections: 1 } }, crops.slice(0, 1))).validated.ok).toBe(true)
 })

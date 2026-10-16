@@ -1,7 +1,4 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
+import type { GameSession as SessionRuleOwner } from '../game/authoritative-session'
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
@@ -20,8 +17,8 @@ const PAYER_INDEX = 1
 const PLAYED_OCCUPATION = 'A123_FrameBuilder'
 const NEXT_OCCUPATION = 'A153_PigOwner'
 
-const findAfterPayListener = () => {
-  const listener = getRegisteredCardListeners().find((entry) => entry.id === 'D171-senior-teacher-after-lessons-pay')
+const findAfterPayListener = (ruleOwner: SessionRuleOwner) => {
+  const listener = ruleOwner.withCtx(() => getRegisteredCardListeners()).find((entry) => entry.id === 'D171-senior-teacher-after-lessons-pay')
   if (!listener) throw new Error('D171 after-pay listener missing')
   return listener
 }
@@ -131,7 +128,7 @@ describe('D171 Senior Teacher', () => {
     const owner = state.players[OWNER_INDEX]!
     const payer = state.players[PAYER_INDEX]!
 
-    const result = executeCardListener(findAfterPayListener(), {
+    const result = session.withCtx(() => executeCardListener(findAfterPayListener(session), {
       state,
       player: payer,
       space: { id: 'day-laborer' },
@@ -143,7 +140,7 @@ describe('D171 Senior Teacher', () => {
       ownerPlayerId: owner.id,
       ownerCardId: CARD_ID,
       ownerCardZone: 'played',
-    })
+    }))
 
     expect(result).toBeUndefined()
   })

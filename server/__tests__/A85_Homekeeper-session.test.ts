@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -58,7 +54,7 @@ describe('A085_Homekeeper session', () => {
       },
     ]
 
-    expect(getExtraRoomCapacity(player)).toBe(1)
+    expect(session.withCtx(() => getExtraRoomCapacity(player))).toBe(1)
   })
 
   it('does not stack when two rooms both qualify', () => {
@@ -95,7 +91,7 @@ describe('A085_Homekeeper session', () => {
       },
     ]
 
-    expect(getExtraRoomCapacity(player)).toBe(1)
+    expect(session.withCtx(() => getExtraRoomCapacity(player))).toBe(1)
   })
 
   it('does not grant capacity when field and pasture are adjacent to different rooms', () => {
@@ -121,7 +117,7 @@ describe('A085_Homekeeper session', () => {
       },
     ]
 
-    expect(getExtraRoomCapacity(player)).toBe(0)
+    expect(session.withCtx(() => getExtraRoomCapacity(player))).toBe(0)
   })
 
   it('does not grant extra capacity in a wood house', () => {
@@ -144,7 +140,7 @@ describe('A085_Homekeeper session', () => {
       },
     ]
 
-    expect(getExtraRoomCapacity(player)).toBe(0)
+    expect(session.withCtx(() => getExtraRoomCapacity(player))).toBe(0)
   })
 
   it('makes wish-children available through GameSession when rooms equal family size but Homekeeper adds one effective room', () => {

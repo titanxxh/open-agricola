@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/D/D056_FatstockStretcher'
 import '../../shared/cards/D/D062_BeerTap'
@@ -351,7 +347,7 @@ describe('D096_Furnisher session', () => {
     const session = setup()
     const state = session.getState().state
     const player = state.players[0]!
-    const flow = runCardEffectHook(state, player, CARD_ID, 'onBuy')
+    const flow = session.withCtx(() => runCardEffectHook(state, player, CARD_ID, 'onBuy'))
     expect(flow).not.toBeNull()
     expect(flow!.type).toBe('leaf')
     expect((flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('gain')

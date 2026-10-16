@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from './card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, it, expect } from 'vitest'
 import { GameSession } from '../../../server/game/authoritative-session'
 import { computeAnimalZones } from '../../domain/animal-zones'
@@ -19,11 +15,11 @@ const setupGame = () => {
 
 describe('B086_TruffleSearcher', () => {
   it('emits a card zone with capacity = state.completedFeedingPhases', () => {
-    const { core } = setupGame()
+    const { session: ruleSession, core } = setupGame()
     core.state.completedFeedingPhases = 3
     core.state.players[0].occupationPlayed = ['B086_TruffleSearcher']
 
-    const zones = computeAnimalZones(core.state.players[0], core.state)
+    const zones = ruleSession.withCtx(() => computeAnimalZones(core.state.players[0], core.state))
     const z = zones.find((zz: any) => zz.cardId === 'B086_TruffleSearcher')
     expect(z).toBeDefined()
     expect(z!.capacity).toBe(3)
@@ -32,11 +28,11 @@ describe('B086_TruffleSearcher', () => {
   })
 
   it('emits no zone when completedFeedingPhases === 0', () => {
-    const { core } = setupGame()
+    const { session: ruleSession, core } = setupGame()
     core.state.completedFeedingPhases = 0
     core.state.players[0].occupationPlayed = ['B086_TruffleSearcher']
 
-    const zones = computeAnimalZones(core.state.players[0], core.state)
+    const zones = ruleSession.withCtx(() => computeAnimalZones(core.state.players[0], core.state))
     expect(zones.find((z: any) => z.cardId === 'B086_TruffleSearcher')).toBeUndefined()
   })
 })

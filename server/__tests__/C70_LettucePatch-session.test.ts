@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { type SessionResponse } from '../game/authoritative-session'
 import { setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
 
@@ -139,7 +135,7 @@ describe('C070_LettucePatch session', () => {
 
       session.loadState(state)
 
-      const flow = reap(state, player).reactionFlow
+      const flow = session.withCtx(() => reap(state, player)).reactionFlow
 
       // Should have harvested 1 vegetable
       expect(player.resources.vegetable).toBe(1)
@@ -235,7 +231,7 @@ describe('C070_LettucePatch session', () => {
 
       session.loadState(state)
 
-      reap(state, player)
+      session.withCtx(() => reap(state, player))
 
       // Vegetable should have been harvested
       expect(player.resources.vegetable).toBe(1)

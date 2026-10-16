@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -120,7 +116,7 @@ describe('E036_HerbalGarden session', () => {
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources.sheep).toBe(2)
     expect(response.state.players[0]!.pastures.map((pasture) => pasture.animalCount)).toEqual([2, 0])
-    expect(computeAnimalZones(response.state.players[0]!, response.state)
+    expect(session.withCtx(() => computeAnimalZones(response.state.players[0]!, response.state))
       .filter((zone) => zone.zoneType === 'pasture')
       .map((zone) => zone.capacity)).toEqual([2, 2])
   })

@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -185,7 +181,7 @@ describe('C012_CattleFarm session', () => {
     const state = session.getState().state
     const player = state.players[0]!
 
-    const zones = computeAnimalZones(player)
+    const zones = session.withCtx(() => computeAnimalZones(player))
     const cardZone = zones.find(z => z.id === 'card:C012_CattleFarm')
     expect(cardZone).toBeDefined()
     expect(cardZone!.zoneType).toBe('card')
@@ -198,7 +194,7 @@ describe('C012_CattleFarm session', () => {
     const state = session.getState().state
     const player = state.players[0]!
 
-    const zones = computeAnimalZones(player)
+    const zones = session.withCtx(() => computeAnimalZones(player))
     const cardZone = zones.find(z => z.id === 'card:C012_CattleFarm')
     expect(cardZone).toBeUndefined()
   })
@@ -208,7 +204,7 @@ describe('C012_CattleFarm session', () => {
     const state = session.getState().state
     const player = state.players[0]!
 
-    const zones = computeAnimalZones(player)
+    const zones = session.withCtx(() => computeAnimalZones(player))
     const cardZone = zones.find(z => z.id === 'card:C012_CattleFarm')
     expect(cardZone).toBeDefined()
     expect(cardZone!.capacity).toBe(4)

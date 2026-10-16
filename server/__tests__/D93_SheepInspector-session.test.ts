@@ -1,7 +1,6 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
+import { CardRegistry as TestCardRegistry } from '../../shared/cards/registry'
+import { withActiveRegistry } from '../../shared/cards/active-registry'
+import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
 import { createWorkSession } from './_helpers/session-fixtures'
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
@@ -85,12 +84,16 @@ const createState = (
     workPhaseObtainedResources: {},
   }) as unknown as GameState
 
-const findListener = () =>
-  getRegisteredCardListeners().find((l) => l.id === 'D93-sheep-inspector-after-place-farmer')
+const findListener = (ruleOwner: TestCardRegistry) =>
+  {
+  const lookupRule1 = () => getRegisteredCardListeners().find((l) => l.id === 'D93-sheep-inspector-after-place-farmer')
+  return withActiveRegistry(ruleOwner, lookupRule1)
+}
 
 describe('D093_SheepInspector listener', () => {
   it('is registered on place-farmer after (player scope)', () => {
-    const listener = findListener()
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry)
     expect(listener).toBeDefined()
     expect(listener!.actions).toContain('place-farmer')
     expect(listener!.phases).toContain('after')
@@ -99,7 +102,8 @@ describe('D093_SheepInspector listener', () => {
 
 
   it('does nothing when already flagged this work phase', () => {
-    const listener = findListener()!
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry)!
     const player = createPlayer('p1')
     player.occupationPlayed.push(CARD_ID)
     setCardFlag(player, CARD_ID, true)
@@ -108,19 +112,20 @@ describe('D093_SheepInspector listener', () => {
     const justPlaced = createSpace('clay-pit', player.id)
     const state = createState([player], [forest, justPlaced])
 
-    const result = executeCardListener(listener, {
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener, {
       state,
       player,
       space: justPlaced,
       actionId: 'place-farmer',
       phase: 'after',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeUndefined()
   })
 
   it('does nothing if no other placed worker exists', () => {
-    const listener = findListener()!
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry)!
     const player = createPlayer('p1')
     player.occupationPlayed.push(CARD_ID)
 
@@ -128,19 +133,20 @@ describe('D093_SheepInspector listener', () => {
     const opponentSpace = createSpace('forest', 'p2')
     const state = createState([player], [justPlaced, opponentSpace])
 
-    const result = executeCardListener(listener, {
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener, {
       state,
       player,
       space: justPlaced,
       actionId: 'place-farmer',
       phase: 'after',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeUndefined()
   })
 
   it('excludes Meeting Place from candidate list', () => {
-    const listener = findListener()!
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry)!
     const player = createPlayer('p1')
     player.occupationPlayed.push(CARD_ID)
 
@@ -148,20 +154,21 @@ describe('D093_SheepInspector listener', () => {
     const justPlaced = createSpace('clay-pit', player.id)
     const state = createState([player], [meetingPlace, justPlaced])
 
-    const result = executeCardListener(listener, {
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener, {
       state,
       player,
       space: justPlaced,
       actionId: 'place-farmer',
       phase: 'after',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     // Only Meeting Place is a candidate — which is excluded — so no flow.
     expect(result).toBeUndefined()
   })
 
   it('returns optional seq with flag + pay + recall when candidates exist', () => {
-    const listener = findListener()!
+    const ruleRegistry = createOfficialCardRegistry()
+    const listener = findListener(ruleRegistry)!
     const player = createPlayer('p1')
     player.occupationPlayed.push(CARD_ID)
 
@@ -170,13 +177,13 @@ describe('D093_SheepInspector listener', () => {
     const justPlaced = createSpace('farmland', player.id)
     const state = createState([player], [forest, clayPit, justPlaced])
 
-    const result = executeCardListener(listener, {
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener, {
       state,
       player,
       space: justPlaced,
       actionId: 'place-farmer',
       phase: 'after',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeDefined()
     const flow = result!.flow as Extract<ActionFlow, { type: 'seq' }>

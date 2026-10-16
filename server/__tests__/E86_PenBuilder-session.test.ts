@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 
@@ -120,7 +116,7 @@ describe('E086_PenBuilder session', () => {
     session.loadState(state)
 
     // Before any discards - no card zone
-    let zones = computeAnimalZones(player)
+    let zones = session.withCtx(() => computeAnimalZones(player))
     const cardZoneBefore = zones.find((z: InteractionAnimalReorgZone) => z.id === 'card:E086_PenBuilder')
     expect(cardZoneBefore).toBeUndefined()
 
@@ -132,7 +128,7 @@ describe('E086_PenBuilder session', () => {
     expect(resp2.ok).toBe(true)
 
     const updatedPlayer = resp2.state.players[0]!
-    zones = computeAnimalZones(updatedPlayer)
+    zones = session.withCtx(() => computeAnimalZones(updatedPlayer))
     const cardZone = zones.find((z: AnimalZone) => z.id === 'card:E086_PenBuilder')
     expect(cardZone).toBeDefined()
     expect(cardZone!.zoneType).toBe('card')

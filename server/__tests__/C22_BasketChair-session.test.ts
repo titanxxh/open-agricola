@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -202,10 +198,10 @@ describe('C022_BasketChair session', () => {
     const player = state.players[0]!
     expect(getRoundPlacementDetails(player)).toHaveLength(0)
 
-    const effect = getCardEffect(CARD_ID)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
     expect(effect).toBeDefined()
     expect(effect!.onBuy).toBeDefined()
-    const flow = effect!.onBuy!(state, player)
+    const flow = session.withCtx(() => effect!.onBuy!(state, player))
     expect(flow).toBeUndefined()
   })
 
@@ -215,8 +211,8 @@ describe('C022_BasketChair session', () => {
 
     const state = session.getState().state
     const player = state.players[0]!
-    const effect = getCardEffect(CARD_ID)
-    const flow = effect!.onBuy!(state, player)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
+    const flow = session.withCtx(() => effect!.onBuy!(state, player))
     expect(flow).toBeUndefined()
   })
 

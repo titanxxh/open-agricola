@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { createWorkSession } from './_helpers/session-fixtures'
 import { type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
@@ -53,7 +49,7 @@ describe('D122_ClayCarrier session', () => {
     const session = setup()
     const state = session.getState().state
     const player = state.players[0]!
-    const flow = runCardEffectHook(state, player, 'D122_ClayCarrier', 'onBuy')
+    const flow = session.withCtx(() => runCardEffectHook(state, player, 'D122_ClayCarrier', 'onBuy'))
     expect(flow).not.toBeNull()
     expect(flow!.type).toBe('leaf')
     expect((flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('gain')

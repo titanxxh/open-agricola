@@ -1,7 +1,4 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
+import type { GameSession as SessionRuleOwner } from '../game/authoritative-session'
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { executeCardListener } from '../../shared/cards/card-listeners'
@@ -80,11 +77,11 @@ const terrain = (row: number, col: number, kind: 'forest' | 'moor'): FarmTerrain
   kind,
 })
 
-const bonusVp = (state: GameState, playerIndex = 0) =>
-  Scoring.breakdown(state, playerIndex).categories.find((category) => category.key === 'cardBonusVp')?.total ?? 0
+const bonusVp = (ruleOwner: SessionRuleOwner, state: GameState, playerIndex = 0) =>
+  ruleOwner.withCtx(() => Scoring.breakdown(state, playerIndex)).categories.find((category) => category.key === 'cardBonusVp')?.total ?? 0
 
-const bonusVpEntries = (state: GameState, playerIndex = 0) =>
-  Scoring.breakdown(state, playerIndex).categories.find((category) => category.key === 'cardBonusVp')?.entries ?? []
+const bonusVpEntries = (session: GameSession, state: GameState, playerIndex = 0) =>
+  session.withCtx(() => Scoring.breakdown(state, playerIndex)).categories.find((category) => category.key === 'cardBonusVp')?.entries ?? []
 
 const effect = (cardId: string) => {
   const found = getCardEffect(cardId)
@@ -92,8 +89,8 @@ const effect = (cardId: string) => {
   return found!
 }
 
-const listener = (id: string) => {
-  const found = getActiveCardRegistry()?.getAllListeners().find((entry) => entry.id === id)
+const listener = (session: GameSession, id: string) => {
+  const found = session.withCtx(() => getActiveCardRegistry()?.getAllListeners().find((entry) => entry.id === id))
   expect(found).toBeDefined()
   return found!
 }
@@ -134,17 +131,23 @@ const directContext = (
   player.id = 'p1'
   player.minorPlayed = [cardId]
   Object.assign(player, playerOverrides)
-  return {
+  return { session, context: {
+    actionHooks: session.actionHooks,
     state,
     player,
     space: state.actionSpaces.find((space) => space.id === 'forest')!,
     actionId,
-    phase: 'after',
+    phase: 'after' as const,
     transactionEvents: events,
     actionEvents: events,
-    result: { type: 'ok' },
+    result: { type: 'ok' as const },
     ...contextOverrides,
-  } as never
+  } }
+}
+
+const invokeDirectListener = (id: string, { session, context }: ReturnType<typeof directContext>) => {
+  const registration = listener(session, id)
+  return session.withCtx(() => executeCardListener(registration, context))
 }
 
 const actionIds = (flow: ActionFlow | null | undefined): string[] => {
@@ -197,16 +200,15 @@ describe('Moor Batch 1 scoring, cookery, and exchange minors', () => {
     const resp = playMinor(session, 'M067_ChamberOfCommerce')
 
     expect(resp.state.players[0]!.resources).toMatchObject({ wood: 1, reed: 1 })
-    expect(bonusVp(resp.state)).toBe(2)
+    expect(bonusVp(session, resp.state)).toBe(2)
 
     const noCraft = setup()
     noCraft.state.players[0]!.minorPlayed = ['M067_ChamberOfCommerce']
-    expect(bonusVp(noCraft.state)).toBe(0)
+    expect(bonusVp(noCraft, noCraft.state)).toBe(0)
   })
 
   it('M069 awards bonus VP for cattle converted while the owner has at least 3 horses', () => {
-    setup()
-    const reg = listener('M069-leather-saddle-trade-applied')
+    const listenerId = 'M069-leather-saddle-trade-applied'
     const ctx = directContext('M069_LeatherSaddle', 'trade-applied', [exchangeEvent({ cattle: 2 })], {
       resources: fullResources({ horse: 2 }),
     }, {
@@ -214,7 +216,7 @@ describe('Moor Batch 1 scoring, cookery, and exchange minors', () => {
       extraData: { sourceId: 'Major_Fireplace1', times: 2, preResources: fullResources({ horse: 3 }) },
     })
 
-    const result = executeCardListener(reg, ctx)
+    const result = invokeDirectListener(listenerId, ctx)
 
     expect(result?.flow).toMatchObject({
       type: 'leaf',
@@ -222,7 +224,7 @@ describe('Moor Batch 1 scoring, cookery, and exchange minors', () => {
       params: { kind: 'increment-counter', key: 'bonusVp', amount: 2 },
     })
 
-    const noHorses = executeCardListener(reg, directContext('M069_LeatherSaddle', 'trade-applied', [exchangeEvent({ cattle: 1 })], {
+    const noHorses = invokeDirectListener(listenerId, directContext('M069_LeatherSaddle', 'trade-applied', [exchangeEvent({ cattle: 1 })], {
       resources: fullResources({ horse: 3 }),
     }, {
       phase: 'immediatelyAfter',
@@ -230,7 +232,7 @@ describe('Moor Batch 1 scoring, cookery, and exchange minors', () => {
     }))
     expect(noHorses).toBeUndefined()
 
-    const nonCattle = executeCardListener(reg, directContext('M069_LeatherSaddle', 'trade-applied', [exchangeEvent({ sheep: 1 })], {
+    const nonCattle = invokeDirectListener(listenerId, directContext('M069_LeatherSaddle', 'trade-applied', [exchangeEvent({ sheep: 1 })], {
       resources: fullResources({ horse: 3 }),
     }, {
       phase: 'immediatelyAfter',
@@ -245,7 +247,7 @@ describe('Moor Batch 1 scoring, cookery, and exchange minors', () => {
     player.minorPlayed = ['M069_LeatherSaddle']
     player.improvements = ['Major_Fireplace1']
     player.resources = fullResources({ cattle: 2, horse: 3 })
-    const cattleTradeIndex = getExchangesInWindow(player, 'anytime', session.state)
+    const cattleTradeIndex = session.withCtx(() => getExchangesInWindow(player, 'anytime', session.state))
       .findIndex((trade) =>
         trade.sourceId === 'Major_Fireplace1' &&
         (trade.from.cattle ?? 0) === 1 &&
@@ -264,7 +266,7 @@ describe('Moor Batch 1 scoring, cookery, and exchange minors', () => {
     ))
 
     expect(result.type).toBe('ok')
-    expect(bonusVp(session.state)).toBe(2)
+    expect(bonusVp(session, session.state)).toBe(2)
   })
 
   it('M071 gives Museum of the Moors and Living History Museum owners one shared post-score point each', () => {
@@ -273,12 +275,12 @@ describe('Moor Batch 1 scoring, cookery, and exchange minors', () => {
     session.state.players[1]!.improvements = ['Major_Moor_MuseumOfTheMoors']
     session.state.players[2]!.minorPlayed = ['M113_LivingHistoryMuseum']
 
-    expect(bonusVp(session.state, 0)).toBe(0)
-    expect(bonusVp(session.state, 1)).toBe(1)
-    expect(bonusVp(session.state, 2)).toBe(1)
+    expect(bonusVp(session, session.state, 0)).toBe(0)
+    expect(bonusVp(session, session.state, 1)).toBe(1)
+    expect(bonusVp(session, session.state, 2)).toBe(1)
 
     session.state.players[1]!.minorPlayed = ['M113_LivingHistoryMuseum']
-    expect(bonusVp(session.state, 1)).toBe(2)
+    expect(bonusVp(session, session.state, 1)).toBe(2)
   })
 
   it('M072 gives 3 fuel and scores the four target ovens plus Oven Installation', () => {
@@ -292,11 +294,11 @@ describe('Moor Batch 1 scoring, cookery, and exchange minors', () => {
     const resp = playMinor(session, 'M072_OvenDamper')
 
     expect(resp.state.players[0]!.resources.fuel).toBe(3)
-    expect(bonusVp(resp.state)).toBe(5)
+    expect(bonusVp(session, resp.state)).toBe(5)
 
     const noOvens = setup()
     noOvens.state.players[0]!.minorPlayed = ['M072_OvenDamper']
-    expect(bonusVp(noOvens.state)).toBe(0)
+    expect(bonusVp(noOvens, noOvens.state)).toBe(0)
 
     const identityOvens = setup()
     identityOvens.state.players[0]!.minorPlayed = [
@@ -305,7 +307,7 @@ describe('Moor Batch 1 scoring, cookery, and exchange minors', () => {
       'E063_IronOven',
       'E064_SimpleOven',
     ]
-    expect(bonusVp(identityOvens.state)).toBe(3)
+    expect(bonusVp(identityOvens, identityOvens.state)).toBe(3)
   })
 
   it('M073 scores the minimum complete animal set times other players', () => {
@@ -313,10 +315,10 @@ describe('Moor Batch 1 scoring, cookery, and exchange minors', () => {
     const player = session.state.players[0]!
     player.minorPlayed = ['M073_StockBreedingPrize']
     player.resources = fullResources({ sheep: 2, boar: 3, cattle: 2, horse: 4 })
-    expect(bonusVp(session.state)).toBe(4)
+    expect(bonusVp(session, session.state)).toBe(4)
 
     player.resources.cattle = 0
-    expect(bonusVp(session.state)).toBe(0)
+    expect(bonusVp(session, session.state)).toBe(0)
   })
 
   it('M074 requires at most 4 minor improvements in hand, gives food, and offers round-14 major-count VP exchange', () => {
@@ -324,9 +326,9 @@ describe('Moor Batch 1 scoring, cookery, and exchange minors', () => {
     const player = session.state.players[0]!
     player.minorHand = ['M074_Administration']
     player.resources = fullResources({ wood: 1, clay: 2 })
-    expect(meetsCardPrerequisites(player, M074_Administration, session.state.round, session.state)).toBe(true)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, M074_Administration, session.state.round, session.state))).toBe(true)
     player.minorHand = ['M074_Administration', 'M030_FarmAnimalMarket', 'M067_ChamberOfCommerce', 'M069_LeatherSaddle', 'M071_BogBody']
-    expect(meetsCardPrerequisites(player, M074_Administration, session.state.round, session.state)).toBe(false)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, M074_Administration, session.state.round, session.state))).toBe(false)
 
     player.minorHand = ['M074_Administration']
     const resp = playMinor(session, 'M074_Administration')
@@ -341,7 +343,7 @@ describe('Moor Batch 1 scoring, cookery, and exchange minors', () => {
     player.minorPlayed = ['M081_PeatBoat']
     player.resources = fullResources({ fuel: 20 })
 
-    const trades = getExchangesInWindow(player, 'anytime', session.state)
+    const trades = session.withCtx(() => getExchangesInWindow(player, 'anytime', session.state))
       .filter((trade) => trade.sourceId === 'M081_PeatBoat')
 
     expect(trades.map((trade) => ({ from: trade.from, to: trade.to }))).toEqual([
@@ -352,7 +354,7 @@ describe('Moor Batch 1 scoring, cookery, and exchange minors', () => {
       { from: { fuel: 2 }, to: { sheep: 1 } },
       { from: { fuel: 3 }, to: { food: 1 } },
     ])
-    expect(getExchangesInWindow(player, 'harvest', session.state).some((trade) => trade.sourceId === 'M081_PeatBoat')).toBe(false)
+    expect(session.withCtx(() => getExchangesInWindow(player, 'harvest', session.state)).some((trade) => trade.sourceId === 'M081_PeatBoat')).toBe(false)
   })
 
   it('M104 gives food on play and at harvest start when the drawn start card number is within forest count', () => {
@@ -366,11 +368,11 @@ describe('Moor Batch 1 scoring, cookery, and exchange minors', () => {
     const harvest = setup()
     harvest.state.players[0]!.minorPlayed = ['M104_WildHarvest']
     harvest.state.players[0]!.farmTerrain = Array.from({ length: 9 }, (_, index) => terrain(0, index, 'forest'))
-    const flow = effect('M104_WildHarvest').onStartHarvest!(harvest.state, harvest.state.players[0]!)
+    const flow = harvest.withCtx(() => effect('M104_WildHarvest').onStartHarvest!(harvest.state, harvest.state.players[0]!))
     expect(actionIds(flow)).toEqual(['gain'])
 
     harvest.state.players[0]!.farmTerrain = []
-    expect(effect('M104_WildHarvest').onStartHarvest!(harvest.state, harvest.state.players[0]!)).toBeUndefined()
+    expect(harvest.withCtx(() => effect('M104_WildHarvest').onStartHarvest!(harvest.state, harvest.state.players[0]!))).toBeUndefined()
   })
 
   it('M105 is a cookery with vegetable and animal anytime exchanges plus grain bake exchange', () => {
@@ -379,7 +381,7 @@ describe('Moor Batch 1 scoring, cookery, and exchange minors', () => {
     player.minorPlayed = ['M105_OpenGrill']
     player.resources = fullResources({ vegetable: 1, sheep: 1, boar: 1, cattle: 1, horse: 1, grain: 1 })
 
-    const anytime = getExchangesInWindow(player, 'anytime', session.state).filter((trade) => trade.sourceId === 'M105_OpenGrill')
+    const anytime = session.withCtx(() => getExchangesInWindow(player, 'anytime', session.state)).filter((trade) => trade.sourceId === 'M105_OpenGrill')
     expect(anytime.map((trade) => ({ from: trade.from, to: trade.to }))).toEqual([
       { from: { vegetable: 1 }, to: { food: 2 } },
       { from: { sheep: 1 }, to: { food: 2 } },
@@ -388,7 +390,7 @@ describe('Moor Batch 1 scoring, cookery, and exchange minors', () => {
       { from: { horse: 1 }, to: { food: 2 } },
     ])
 
-    const bake = getExchangesInWindow(player, 'bake-bread', session.state).find((trade) => trade.sourceId === 'M105_OpenGrill')
+    const bake = session.withCtx(() => getExchangesInWindow(player, 'bake-bread', session.state)).find((trade) => trade.sourceId === 'M105_OpenGrill')
     expect(bake).toMatchObject({ from: { grain: 1 }, to: { food: 2 } })
   })
 
@@ -397,15 +399,15 @@ describe('Moor Batch 1 scoring, cookery, and exchange minors', () => {
     const player = session.state.players[0]!
     player.minorHand = ['M107_PotRoastRecipe']
     player.resources = fullResources({ horse: 2 })
-    expect(meetsCardPrerequisites(player, M107_PotRoastRecipe, session.state.round, session.state)).toBe(true)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, M107_PotRoastRecipe, session.state.round, session.state))).toBe(true)
     player.resources.horse = 1
-    expect(meetsCardPrerequisites(player, M107_PotRoastRecipe, session.state.round, session.state)).toBe(false)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, M107_PotRoastRecipe, session.state.round, session.state))).toBe(false)
 
     player.resources.horse = 2
     player.minorPlayed = ['M107_PotRoastRecipe']
-    expect(getExchangesInWindow(player, 'anytime', session.state).some((trade) => trade.sourceId === 'M107_PotRoastRecipe')).toBe(false)
+    expect(session.withCtx(() => getExchangesInWindow(player, 'anytime', session.state)).some((trade) => trade.sourceId === 'M107_PotRoastRecipe')).toBe(false)
     player.improvements = ['Major_Fireplace1']
-    const trade = getExchangesInWindow(player, 'anytime', session.state).find((entry) => entry.sourceId === 'M107_PotRoastRecipe')
+    const trade = session.withCtx(() => getExchangesInWindow(player, 'anytime', session.state)).find((entry) => entry.sourceId === 'M107_PotRoastRecipe')
     expect(trade).toMatchObject({ from: { horse: 1 }, to: { food: 2 } })
   })
 
@@ -415,11 +417,11 @@ describe('Moor Batch 1 scoring, cookery, and exchange minors', () => {
     player.minorPlayed = ['M108_GrainDistillery']
     player.resources = fullResources({ fuel: 3, grain: 2 })
 
-    const harvestTrades = getExchangesInWindow(player, 'harvest', session.state).filter((trade) => trade.sourceId === 'M108_GrainDistillery')
+    const harvestTrades = session.withCtx(() => getExchangesInWindow(player, 'harvest', session.state)).filter((trade) => trade.sourceId === 'M108_GrainDistillery')
     expect(harvestTrades).toHaveLength(1)
     expect(harvestTrades[0]).toMatchObject({ from: { fuel: 1, grain: 1 }, to: { food: 5 }, max: 1 })
-    expect(bonusVp(session.state)).toBe(2)
-    expect(bonusVpEntries(session.state)).toEqual([
+    expect(bonusVp(session, session.state)).toBe(2)
+    expect(bonusVpEntries(session, session.state)).toEqual([
       expect.objectContaining({
         cardId: 'M108_GrainDistillery',
         score: 2,
@@ -427,18 +429,18 @@ describe('Moor Batch 1 scoring, cookery, and exchange minors', () => {
     ])
 
     player.resources.grain = 0
-    expect(bonusVp(session.state)).toBe(0)
+    expect(bonusVp(session, session.state)).toBe(0)
 
     player.resources = fullResources({ fuel: 3, grain: 2 })
     player.improvements = ['Major_Moor_PeatCharcoalKiln']
-    expect(bonusVp(session.state)).toBe(2)
-    expect(bonusVpEntries(session.state)).toEqual([
+    expect(bonusVp(session, session.state)).toBe(2)
+    expect(bonusVpEntries(session, session.state)).toEqual([
       expect.objectContaining({
         cardId: 'M108_GrainDistillery',
         score: 2,
       }),
     ])
-    expect(bonusVpEntries(session.state).some((entry) => entry.cardId === 'Major_Moor_PeatCharcoalKiln')).toBe(false)
+    expect(bonusVpEntries(session, session.state).some((entry) => entry.cardId === 'Major_Moor_PeatCharcoalKiln')).toBe(false)
   })
 
   it('M115 gives 2 wood on play and extra wood for converted boar, cattle, and horses only', () => {
@@ -448,36 +450,36 @@ describe('Moor Batch 1 scoring, cookery, and exchange minors', () => {
     player.resources = fullResources({ vegetable: 1 })
     player.improvements = ['Major_Well']
     player.minorPlayed = ['D060_LargePottery']
-    expect(meetsCardPrerequisites(player, { id: 'M115_OakBark', prerequisite: '2 Major Improvements' }, session.state.round, session.state)).toBe(true)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, { id: 'M115_OakBark', prerequisite: '2 Major Improvements' }, session.state.round, session.state))).toBe(true)
 
     const resp = playMinor(session, 'M115_OakBark')
     expect(resp.state.players[0]!.resources.wood).toBe(2)
 
     setup()
-    const reg = listener('M115-oak-bark-after-exchange')
-    const result = executeCardListener(reg, directContext('M115_OakBark', 'exchange', [exchangeEvent({ boar: 1, cattle: 1, horse: 1 })]))
+    const listenerId = 'M115-oak-bark-after-exchange'
+    const result = invokeDirectListener(listenerId, directContext('M115_OakBark', 'exchange', [exchangeEvent({ boar: 1, cattle: 1, horse: 1 })]))
     expect(result?.flow).toMatchObject({ type: 'leaf', actionId: 'gain', params: { wood: 3 } })
 
-    const ignored = executeCardListener(reg, directContext('M115_OakBark', 'exchange', [exchangeEvent({ sheep: 2 })]))
+    const ignored = invokeDirectListener(listenerId, directContext('M115_OakBark', 'exchange', [exchangeEvent({ sheep: 2 })]))
     expect(ignored).toBeUndefined()
   })
 
   it('M117 offers food-for-wood when collecting exactly 3 or at least 4 wood with a horse', () => {
     setup()
-    const reg = listener('M117-draught-horses-after-wood-collect')
+    const listenerId = 'M117-draught-horses-after-wood-collect'
 
-    const three = executeCardListener(reg, directContext('M117_DraughtHorses', 'collect', [movedEvent({ wood: 3 })], {
+    const three = invokeDirectListener(listenerId, directContext('M117_DraughtHorses', 'collect', [movedEvent({ wood: 3 })], {
       resources: fullResources({ horse: 1, food: 1, wood: 3 }),
     }))
     expect(actionIds(three?.flow)).toEqual(['pay', 'gain'])
     expect(three?.flow).toMatchObject({ type: 'seq', optional: true })
 
-    const four = executeCardListener(reg, directContext('M117_DraughtHorses', 'collect', [movedEvent({ wood: 4 })], {
+    const four = invokeDirectListener(listenerId, directContext('M117_DraughtHorses', 'collect', [movedEvent({ wood: 4 })], {
       resources: fullResources({ horse: 1, food: 1, wood: 4 }),
     }))
     expect(four?.flow).toMatchObject({ children: [{ params: { food: 1 } }, { params: { wood: 2 } }] })
 
-    const noHorse = executeCardListener(reg, directContext('M117_DraughtHorses', 'collect', [movedEvent({ wood: 4 })], {
+    const noHorse = invokeDirectListener(listenerId, directContext('M117_DraughtHorses', 'collect', [movedEvent({ wood: 4 })], {
       resources: fullResources({ horse: 0, food: 1, wood: 4 }),
     }))
     expect(noHorse).toBeUndefined()

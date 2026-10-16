@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getExtraRoomCapacity } from '../../shared/cards/card-effects'
@@ -24,7 +20,7 @@ describe('C010_BunkBeds session', () => {
     const state = session.getState().state
     const player = state.players[0]!
     player.rooms = 5
-    expect(getExtraRoomCapacity(player)).toBe(0)
+    expect(session.withCtx(() => getExtraRoomCapacity(player))).toBe(0)
   })
 
   it('grants no extra room below 4 rooms', () => {
@@ -33,7 +29,7 @@ describe('C010_BunkBeds session', () => {
     const player = state.players[0]!
     player.minorPlayed.push(CARD_ID)
     player.rooms = 3
-    expect(getExtraRoomCapacity(player)).toBe(0)
+    expect(session.withCtx(() => getExtraRoomCapacity(player))).toBe(0)
   })
 
   it('grants +1 extra room at exactly 4 rooms', () => {
@@ -42,7 +38,7 @@ describe('C010_BunkBeds session', () => {
     const player = state.players[0]!
     player.minorPlayed.push(CARD_ID)
     player.rooms = 4
-    expect(getExtraRoomCapacity(player)).toBe(1)
+    expect(session.withCtx(() => getExtraRoomCapacity(player))).toBe(1)
   })
 
   it('grants +1 extra room at 5 rooms too', () => {
@@ -51,6 +47,6 @@ describe('C010_BunkBeds session', () => {
     const player = state.players[0]!
     player.minorPlayed.push(CARD_ID)
     player.rooms = 5
-    expect(getExtraRoomCapacity(player)).toBe(1)
+    expect(session.withCtx(() => getExtraRoomCapacity(player))).toBe(1)
   })
 })

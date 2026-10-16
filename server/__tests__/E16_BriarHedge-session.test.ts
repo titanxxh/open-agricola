@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -27,7 +23,7 @@ describe('E016_BriarHedge session', () => {
     const session = setup()
     const state = session.getState().state
     const player = state.players[0]!
-    expect(meetsCardPrerequisites(player, E016_BriarHedge, state.round, state)).toBe(false)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, E016_BriarHedge, state.round, state))).toBe(false)
   })
 
   it('blocked with only sheep + pig (missing cattle)', () => {
@@ -38,7 +34,7 @@ describe('E016_BriarHedge session', () => {
       { id: 'p1', size: 1, stables: 0, tiles: [{ row: 0, col: 0 }], animalType: 'sheep', animalCount: 1 },
       { id: 'p2', size: 1, stables: 0, tiles: [{ row: 0, col: 1 }], animalType: 'boar', animalCount: 1 },
     ]
-    expect(meetsCardPrerequisites(player, E016_BriarHedge, state.round, state)).toBe(false)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, E016_BriarHedge, state.round, state))).toBe(false)
   })
 
   it('playable with 1 of each animal type on the board', () => {
@@ -50,7 +46,7 @@ describe('E016_BriarHedge session', () => {
       { id: 'p2', size: 1, stables: 0, tiles: [{ row: 0, col: 1 }], animalType: 'boar', animalCount: 1 },
       { id: 'p3', size: 1, stables: 0, tiles: [{ row: 0, col: 2 }], animalType: 'cattle', animalCount: 1 },
     ]
-    expect(meetsCardPrerequisites(player, E016_BriarHedge, state.round, state)).toBe(true)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, E016_BriarHedge, state.round, state))).toBe(true)
   })
 
   it('animals in house and stables count', () => {
@@ -62,7 +58,7 @@ describe('E016_BriarHedge session', () => {
     player.pastures = [
       { id: 'p3', size: 1, stables: 0, tiles: [{ row: 1, col: 0 }], animalType: 'cattle', animalCount: 1 },
     ]
-    expect(meetsCardPrerequisites(player, E016_BriarHedge, state.round, state)).toBe(true)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, E016_BriarHedge, state.round, state))).toBe(true)
   })
 
   it('animals held on animal-holder cards count', () => {
@@ -76,7 +72,7 @@ describe('E016_BriarHedge session', () => {
         extraData: { held: 1, animalType: 'cattle' },
       },
     }
-    expect(meetsCardPrerequisites(player, E016_BriarHedge, state.round, state)).toBe(true)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, E016_BriarHedge, state.round, state))).toBe(true)
   })
 })
 

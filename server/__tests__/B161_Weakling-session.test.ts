@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -116,16 +112,16 @@ describe('B161_Weakling session', () => {
     const state = session.getState().state
     const player = state.players[0]!
     state.roundPhase = 'returning-home'
-    const listener = getRegisteredCardListeners().find((entry) => entry.id === LISTENER_ID)!
+    const listener = session.withCtx(() => getRegisteredCardListeners()).find((entry) => entry.id === LISTENER_ID)!
 
-    const result = executeCardListener(listener, {
+    const result = session.withCtx(() => executeCardListener(listener, {
       state,
       player,
       space: state.actionSpaces.find((entry) => entry.id === 'day-laborer')!,
       actionId: 'place-farmer',
       phase: 'after',
       actionContext: { workerId: player.workers[0]!.id },
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeUndefined()
   })
@@ -134,16 +130,16 @@ describe('B161_Weakling session', () => {
     const session = setup()
     const state = session.getState().state
     const player = state.players[0]!
-    const listener = getRegisteredCardListeners().find((entry) => entry.id === LISTENER_ID)!
+    const listener = session.withCtx(() => getRegisteredCardListeners()).find((entry) => entry.id === LISTENER_ID)!
 
-    const result = executeCardListener(listener, {
+    const result = session.withCtx(() => executeCardListener(listener, {
       state,
       player,
       space: state.actionSpaces.find((entry) => entry.id === 'day-laborer')!,
       actionId: 'place-farmer',
       phase: 'after',
       actionContext: { viaCardJump: true, targetSpaceId: 'day-laborer' },
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext))
 
     expect(result).toBeUndefined()
   })

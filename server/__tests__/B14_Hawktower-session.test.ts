@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
@@ -34,9 +30,9 @@ describe('B14 Hawktower — session', () => {
     const state = session.getState().state
     const player = state.players[0]!
 
-    const effect = getCardEffect(CARD_ID)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
     expect(effect?.onBuy).toBeDefined()
-    effect!.onBuy!(state, player)
+    session.withCtx(() => effect!.onBuy!(state, player))
 
     resolveFutureMeepleRequests(state)
     const beforeRooms = player.rooms
@@ -59,8 +55,8 @@ describe('B14 Hawktower — session', () => {
     const state = session.getState().state
     const player = state.players[0]!
 
-    const effect = getCardEffect(CARD_ID)
-    effect!.onBuy!(state, player)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
+    session.withCtx(() => effect!.onBuy!(state, player))
     resolveFutureMeepleRequests(state)
 
     const beforeRooms = player.rooms
@@ -78,8 +74,8 @@ describe('B14 Hawktower — session', () => {
     const state = session.getState().state
     const player = state.players[0]!
 
-    const effect = getCardEffect(CARD_ID)
-    effect!.onBuy!(state, player)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
+    session.withCtx(() => effect!.onBuy!(state, player))
     resolveFutureMeepleRequests(state)
 
     const beforeRooms = player.rooms
@@ -101,8 +97,8 @@ describe('B14 Hawktower — session', () => {
     const state = session.getState().state
     const player = state.players[0]!
 
-    const effect = getCardEffect(CARD_ID)
-    effect!.onBuy!(state, player)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
+    session.withCtx(() => effect!.onBuy!(state, player))
     resolveFutureMeepleRequests(state)
 
     // Pre-12 rounds: applyFutureMeeples must NOT consume the entry.
@@ -136,7 +132,7 @@ describe('B14 Hawktower — session', () => {
       const state = session.getState().state
       state.round = 8
       const player = state.players[0]!
-      expect(meetsCardPrerequisites(player, B014_Hawktower, state.round, state)).toBe(false)
+      expect(session.withCtx(() => meetsCardPrerequisites(player, B014_Hawktower, state.round, state))).toBe(false)
     })
 
     it('allows when round <= 7', () => {
@@ -144,7 +140,7 @@ describe('B14 Hawktower — session', () => {
       const state = session.getState().state
       state.round = 7
       const player = state.players[0]!
-      expect(meetsCardPrerequisites(player, B014_Hawktower, state.round, state)).toBe(true)
+      expect(session.withCtx(() => meetsCardPrerequisites(player, B014_Hawktower, state.round, state))).toBe(true)
     })
   })
 })

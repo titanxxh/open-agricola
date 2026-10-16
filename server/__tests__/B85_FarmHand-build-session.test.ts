@@ -1,7 +1,4 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
+import type { GameSession as SessionRuleOwner } from '../game/authoritative-session'
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import type { FarmTilePosition, PlayerState } from '../../shared/contract/types'
@@ -94,7 +91,7 @@ describe('B85 FarmHand — build through Build Stables farm-select', () => {
     enterStableSelect(session)
     let response = session.commitSelectionChoice(0, { farmHand: FARM_HAND_TILE })
     expect(response.ok).toBe(true)
-    expect(getExtraRoomCapacity(response.state.players[0]!)).toBe(1)
+    expect(session.withCtx(() => getExtraRoomCapacity(response.state.players[0]!))).toBe(1)
     expect(response.state.players[0]!.stableTiles).toEqual([])
     response = session.resolveChoice(0, '__done__')
     expect(response.interaction.stateId === 'wait' && response.interaction.request.kind).toBe('confirm-next-player')
@@ -111,8 +108,8 @@ describe('B85 FarmHand — build through Build Stables farm-select', () => {
     expect(after.resources).toMatchObject({ wood: 9, grain: 1, food: 21 })
     expect(readFarmHandPosition(after)).toBeUndefined()
     expect(after.cardStates[CARD_ID]?.flagged).toBe(true)
-    expect(getExtraRoomCapacity(after)).toBe(0)
-    expect(getAvailableStableSupplyCount(response.state, after)).toBe(4)
+    expect(session.withCtx(() => getExtraRoomCapacity(after))).toBe(0)
+    expect(session.withCtx(() => getAvailableStableSupplyCount(response.state, after))).toBe(4)
     expect(response.interaction.stateId).toBe('idle')
   })
   it('B085 S1: playing Farm Hand through Lessons keeps the occupation in play', () => {
@@ -139,7 +136,7 @@ describe('B85 FarmHand — build through Build Stables farm-select', () => {
     const candidates = farm.farmHandPositions
     expect(candidates).toEqual([FARM_HAND_TILE])
 
-    const before = getAvailableStableSupplyCount(resp.state, resp.state.players[0]!)
+    const before = session.withCtx(() => getAvailableStableSupplyCount(resp.state, resp.state.players[0]!))
     const woodBefore = resp.state.players[0]!.resources.wood
 
     const commit = session.commitSelectionChoice(0, { farmHand: FARM_HAND_TILE })
@@ -150,7 +147,7 @@ describe('B85 FarmHand — build through Build Stables farm-select', () => {
     expect(after.cardStates?.[CARD_ID]?.extraData?.position).toEqual(FARM_HAND_TILE)
     expect(after.cardStates?.[CARD_ID]?.flagged).toBe(true)
     expect(after.stableTiles.length).toBe(0)
-    expect(getAvailableStableSupplyCount(commit.state, after)).toBe(before - 1)
+    expect(session.withCtx(() => getAvailableStableSupplyCount(commit.state, after))).toBe(before - 1)
   })
 
   it('emits a special farm.stableBuilt item tagged with the source card', () => {
@@ -210,10 +207,10 @@ describe('B85 FarmHand — build through Build Stables farm-select', () => {
     const farmHandKey = positionKey(FARM_HAND_TILE)
     expect(after.stableTiles.length).toBe(0)
     expect(getLooseStableKeys(after)).not.toContain(farmHandKey)
-    const zones = computeAnimalZones(after, commit.state)
+    const zones = session.withCtx(() => computeAnimalZones(after, commit.state))
     expect(zones.map((zone) => zone.id)).not.toContain(`stable:${farmHandKey}`)
-    expect(getTotalAnimalCapacity(after, commit.state)).toBe(1)
-    expect(getExtraRoomCapacity(after)).toBe(1)
+    expect(session.withCtx(() => getTotalAnimalCapacity(after, commit.state))).toBe(1)
+    expect(session.withCtx(() => getExtraRoomCapacity(after))).toBe(1)
   })
 
   it('rejects a submission that reuses the FarmHand tile as an ordinary stable', () => {
@@ -293,15 +290,15 @@ describe('B85 FarmHand — return-stable lifecycle (#187)', () => {
     expect(commit.ok).toBe(true)
     const player = commit.state.players[0]!
     expect(readFarmHandPosition(player)).toEqual(FARM_HAND_TILE)
-    expect(getExtraRoomCapacity(player)).toBe(1)
+    expect(session.withCtx(() => getExtraRoomCapacity(player))).toBe(1)
     return { session, state: commit.state, player }
   }
 
   const positionStr = positionKey(FARM_HAND_TILE)
 
   it('E76 return clears the FarmHand stable and reverses its lifecycle', () => {
-    const { state, player } = buildFarmHand()
-    const supplyBefore = getAvailableStableSupplyCount(state, player)
+    const { session: ruleSession, state, player } = buildFarmHand()
+    const supplyBefore = ruleSession.withCtx(() => getAvailableStableSupplyCount(state, player))
 
     const flow = runSelectionEffect('lumber-pile-return-stables', {
       player,
@@ -314,14 +311,14 @@ describe('B85 FarmHand — return-stable lifecycle (#187)', () => {
     expect(flow).toBeUndefined()
     expect(readFarmHandPosition(player)).toBeUndefined()
     expect(player.cardStates?.[CARD_ID]?.flagged).toBe(true)
-    expect(getExtraRoomCapacity(player)).toBe(0)
-    expect(getAvailableStableSupplyCount(state, player)).toBe(supplyBefore + 1)
+    expect(ruleSession.withCtx(() => getExtraRoomCapacity(player))).toBe(0)
+    expect(ruleSession.withCtx(() => getAvailableStableSupplyCount(state, player))).toBe(supplyBefore + 1)
     expect(player.stableTiles).toEqual([])
   })
 
   it('D102 return clears the FarmHand stable and reverses its lifecycle', () => {
-    const { state, player } = buildFarmHand()
-    const supplyBefore = getAvailableStableSupplyCount(state, player)
+    const { session: ruleSession, state, player } = buildFarmHand()
+    const supplyBefore = ruleSession.withCtx(() => getAvailableStableSupplyCount(state, player))
 
     const flow = runSelectionEffect('sample-stable-maker-return', {
       player,
@@ -334,13 +331,13 @@ describe('B85 FarmHand — return-stable lifecycle (#187)', () => {
     expect(flow).toBeUndefined()
     expect(readFarmHandPosition(player)).toBeUndefined()
     expect(player.cardStates?.[CARD_ID]?.flagged).toBe(true)
-    expect(getExtraRoomCapacity(player)).toBe(0)
-    expect(getAvailableStableSupplyCount(state, player)).toBe(supplyBefore + 1)
+    expect(ruleSession.withCtx(() => getExtraRoomCapacity(player))).toBe(0)
+    expect(ruleSession.withCtx(() => getAvailableStableSupplyCount(state, player))).toBe(supplyBefore + 1)
   })
 
   it('does not create an animal-reorganization flow when returning the FarmHand stable', () => {
-    const { state, player } = buildFarmHand()
-    const capacityBefore = getTotalAnimalCapacity(player, state)
+    const { session: ruleSession, state, player } = buildFarmHand()
+    const capacityBefore = ruleSession.withCtx(() => getTotalAnimalCapacity(player, state))
 
     const flow = runSelectionEffect('lumber-pile-return-stables', {
       player,
@@ -351,9 +348,9 @@ describe('B85 FarmHand — return-stable lifecycle (#187)', () => {
     })
 
     expect(flow).toBeUndefined()
-    const zones = computeAnimalZones(player, state)
+    const zones = ruleSession.withCtx(() => computeAnimalZones(player, state))
     expect(zones.map((zone) => zone.id)).not.toContain(`stable:${positionStr}`)
-    expect(getTotalAnimalCapacity(player, state)).toBe(capacityBefore)
+    expect(ruleSession.withCtx(() => getTotalAnimalCapacity(player, state))).toBe(capacityBefore)
   })
 
   it('offers no FarmHand position on a later Build Stables once it has been returned', () => {
@@ -377,13 +374,13 @@ describe('B85 FarmHand — return-stable lifecycle (#187)', () => {
 })
 
 describe('B85 FarmHand — snapshot specialStables display field', () => {
-  const serializeFor = (state: ReturnType<GameSession['getState']>['state'], viewerId: string) =>
-    serializeStateForPlayer(state, viewerId, { engineStack: new EngineStack() })
+  const serializeFor = (ruleOwner: SessionRuleOwner, state: ReturnType<GameSession['getState']>['state'], viewerId: string) =>
+    ruleOwner.withCtx(() => serializeStateForPlayer(state, viewerId, { engineStack: new EngineStack() }))
 
   it('omits specialStables before the FarmHand stable is built', () => {
     const session = setupBuildStables()
     const state = session.getState().state
-    const view = serializeFor(state, state.players[0]!.id)
+    const view = serializeFor(session, state, state.players[0]!.id)
     expect(view.players[0]!.specialStables).toEqual([])
   })
 
@@ -394,7 +391,7 @@ describe('B85 FarmHand — snapshot specialStables display field', () => {
     expect(commit.ok).toBe(true)
 
     const ownerId = commit.state.players[0]!.id
-    const ownerView = serializeFor(commit.state, ownerId)
+    const ownerView = serializeFor(session, commit.state, ownerId)
     expect(ownerView.players[0]!.specialStables).toEqual([
       { position: FARM_HAND_TILE, sourceCardId: CARD_ID },
     ])
@@ -406,7 +403,7 @@ describe('B85 FarmHand — snapshot specialStables display field', () => {
     const commit = session.commitSelectionChoice(0, { farmHand: FARM_HAND_TILE })
     expect(commit.ok).toBe(true)
 
-    const opponentView = serializeFor(commit.state, commit.state.players[1]!.id)
+    const opponentView = serializeFor(session, commit.state, commit.state.players[1]!.id)
     expect(opponentView.players[0]!.specialStables).toEqual([
       { position: FARM_HAND_TILE, sourceCardId: CARD_ID },
     ])
@@ -427,7 +424,7 @@ describe('B85 FarmHand — snapshot specialStables display field', () => {
       state: commit.state,
     })
 
-    const view = serializeFor(commit.state, player.id)
+    const view = serializeFor(session, commit.state, player.id)
     expect(view.players[0]!.specialStables).toEqual([])
   })
 })

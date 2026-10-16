@@ -1,7 +1,4 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
+import type { GameSession as SessionRuleOwner } from '../game/authoritative-session'
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
@@ -57,20 +54,21 @@ const resourcesByRound = (cardId: string, round: number) =>
 
 const space = (id: string): ActionSpace => ({ id } as ActionSpace)
 
-const executeGainLeaf = (flow: ActionFlow | null, state: GameState, player: PlayerState) => {
+const executeGainLeaf = (ruleOwner: SessionRuleOwner, flow: ActionFlow | null, state: GameState, player: PlayerState) => {
   expect(flow).toMatchObject({ type: 'leaf', actionId: 'gain' })
   if (!flow || flow.type !== 'leaf') return
-  gainAction.execute({
+  const lookupRule1 = () => gainAction.execute({
     state,
     player,
     space: space('test'),
     params: flow.params,
     sourceCard: flow.sourceCard,
   })
+  ruleOwner.withCtx(lookupRule1)
 }
 
-const findListener = (id: string) => {
-  const listener = getRegisteredCardListeners().find((entry) => entry.id === id)
+const findListener = (session: GameSession, id: string) => {
+  const listener = session.withCtx(() => getRegisteredCardListeners()).find((entry) => entry.id === id)
   expect(listener).toBeDefined()
   return listener!
 }
@@ -174,8 +172,8 @@ describe('Moor future resource minors', () => {
   })
 
   it('M079 Peat Sled hides expired choices and the selected future fuel resolves', () => {
-    const { state, player } = setup(5)
-    const flow = M079_PeatSled_impl.effect.onBuy?.(state, player)
+    const { session: ruleSession, state, player } = setup(5)
+    const flow = ruleSession.withCtx(() => M079_PeatSled_impl.effect.onBuy?.(state, player))
     expect(flow?.type).toBe('xor')
     if (flow?.type !== 'xor') throw new Error('expected xor')
     const choices = flow.children.map((child) => {
@@ -191,13 +189,13 @@ describe('Moor future resource minors', () => {
 
     const selected = flow.children[1]!
     if (selected.type !== 'leaf') throw new Error('expected leaf')
-    futureMeeplesAction.execute({
+    ruleSession.withCtx(() => futureMeeplesAction.execute({
       state,
       player,
       space: space('future'),
       params: selected.params,
       sourceCard: selected.sourceCard,
-    })
+    }))
     expect(state.futureMeeples).toEqual([
       expect.objectContaining({ cardId: 'M079_PeatSled', round: 9, resources: { fuel: 4 } }),
     ])
@@ -329,19 +327,21 @@ describe('Moor action listener minors', () => {
   })
 
   it('M110 Farm Cart gives grain for wood/clay/reed/stone accumulation thresholds only', () => {
-    const listener = findListener('M110-farm-cart-after-collect')
+    const listenerId = 'M110-farm-cart-after-collect'
 
     for (const [resource, amount] of [['wood', 5], ['clay', 4], ['reed', 3], ['stone', 2]] as const) {
-      const { state, player } = setup()
+      const { session: ruleSession, state, player } = setup()
+      const listener = findListener(ruleSession, listenerId)
       player.minorPlayed.push('M110_FarmCart')
-      const result = executeCardListener(listener, collectContext(state, player, resource, amount))
-      executeGainLeaf(result?.flow ?? null, state, player)
+      const result = ruleSession.withCtx(() => executeCardListener(listener, collectContext(state, player, resource, amount)))
+      executeGainLeaf(ruleSession, result?.flow ?? null, state, player)
       expect(player.resources.grain).toBe(1)
     }
 
-    const { state, player } = setup()
+    const { session: ruleSession2, state, player } = setup()
+    const listener = findListener(ruleSession2, listenerId)
     player.minorPlayed.push('M110_FarmCart')
-    const low = executeCardListener(listener, collectContext(state, player, 'wood', 4))
+    const low = ruleSession2.withCtx(() => executeCardListener(listener, collectContext(state, player, 'wood', 4)))
     expect(low).toBeUndefined()
   })
 
@@ -378,45 +378,46 @@ describe('Moor action listener minors', () => {
   })
 
   it('M129 Plowhorse Market offers food for horse on Farmland and Cultivation only when affordable', () => {
-    const listener = findListener('M129-plowhorse-market-after-place-farmer')
-    const { state, player } = setup()
+
+    const { session: ruleSession, state, player } = setup()
+    const listener = findListener(ruleSession, 'M129-plowhorse-market-after-place-farmer')
     player.minorPlayed.push('M129_PlowhorseMarket')
     player.resources.food = 1
-    const farmland = executeCardListener(listener, {
+    const farmland = ruleSession.withCtx(() => executeCardListener(listener, {
       state,
       player,
       space: space('farmland'),
       actionId: 'place-farmer',
       phase: 'after',
-    } as CardListenerContext)
+    } as CardListenerContext))
     expect(farmland?.flow).toMatchObject({ type: 'seq', optional: true })
 
-    const cultivation = executeCardListener(listener, {
+    const cultivation = ruleSession.withCtx(() => executeCardListener(listener, {
       state,
       player,
       space: space('cultivation'),
       actionId: 'place-farmer',
       phase: 'after',
-    } as CardListenerContext)
+    } as CardListenerContext))
     expect(cultivation?.flow).toMatchObject({ type: 'seq', optional: true })
 
-    const nonTrigger = executeCardListener(listener, {
+    const nonTrigger = ruleSession.withCtx(() => executeCardListener(listener, {
       state,
       player,
       space: space('grain-seeds'),
       actionId: 'place-farmer',
       phase: 'after',
-    } as CardListenerContext)
+    } as CardListenerContext))
     expect(nonTrigger).toBeUndefined()
 
     player.resources.food = 0
-    const noFood = executeCardListener(listener, {
+    const noFood = ruleSession.withCtx(() => executeCardListener(listener, {
       state,
       player,
       space: space('farmland'),
       actionId: 'place-farmer',
       phase: 'after',
-    } as CardListenerContext)
+    } as CardListenerContext))
     expect(noFood).toBeUndefined()
   })
 

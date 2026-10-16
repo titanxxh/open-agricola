@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -137,7 +133,7 @@ describe('C054_MarketBooth session', () => {
     player.stableTiles = [
       { row: 0, col: 0 }, { row: 0, col: 1 }, { row: 0, col: 2 }, { row: 1, col: 0 },
     ]
-    expect(meetsCardPrerequisites(player, card as never, 1, state)).toBe(true)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, card as never, 1, state))).toBe(true)
   })
 
   it('pays one stable supply token through the minor-improvement purchase path', () => {

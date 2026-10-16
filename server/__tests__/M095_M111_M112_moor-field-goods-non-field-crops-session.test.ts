@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 
 import { GameSession } from '../game/authoritative-session'
@@ -260,7 +256,7 @@ describe('Moor field goods and non-field crop spaces', () => {
     }]
     session.loadState(session.state)
 
-    reap(session.state, session.state.players[0]!)
+    session.withCtx(() => reap(session.state, session.state.players[0]!))
     expect(session.state.players[0]!.resources.food).toBe(0)
     expect(statesOf(session.state.players[0]!, 'M095_FallowFields', 'field-goods-token')).toHaveLength(1)
 
@@ -352,7 +348,7 @@ describe('Moor field goods and non-field crop spaces', () => {
     ]
     session.loadState(session.state)
 
-    runCardEffectHook(session.state, player, 'M111_NoTillFarming', 'onHarvestFieldPhase')
+    session.withCtx(() => runCardEffectHook(session.state, player, 'M111_NoTillFarming', 'onHarvestFieldPhase'))
 
     expect(player.resources.grain).toBe(1)
     expect(player.resources.vegetable).toBe(1)

@@ -1,7 +1,4 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
+import type { GameSession as SessionRuleOwner } from '../game/authoritative-session'
 import { type SessionResponse } from '../game/authoritative-session'
 import type { AnimalType } from '../../shared/contract/types'
 import { setWorkersAtHome } from '../../shared/domain/player'
@@ -18,34 +15,35 @@ import { mkActionSpace } from '../../shared/cards/__tests__/fixtures'
 
 const CARD_ID = 'B168_PastureMaster'
 
-const findListener = (id: string) =>
-  getRegisteredCardListeners().find((l) => l.id === id)
+const findListener = (ruleOwner: SessionRuleOwner, id: string) =>
+  ruleOwner.withCtx(() => getRegisteredCardListeners()).find((l) => l.id === id)
 
 describe('B168_PastureMaster session', () => {
   const createBaseState = () => {
     const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
-    return state
+    return { session, state }
   }
 
   it('gains 2 food on renovate when no pastures with stables', () => {
-    const listener = findListener('B168-pasture-master-after-renovate')
-    expect(listener).toBeDefined()
 
-    const state = createBaseState()
+
+    const { session, state } = createBaseState()
+    const listener = findListener(session, 'B168-pasture-master-after-renovate')
+    expect(listener).toBeDefined()
     const player = state.players[0]!
     player.occupationPlayed = [CARD_ID]
     player.pastures = []
 
-    const result = executeCardListener(listener!, {
+    const result = session.withCtx(() => executeCardListener(listener!, {
       state,
       player,
       space: mkActionSpace({ id: 'renovate-house' }),
       actionId: 'renovate-house',
       phase: 'after',
       result: { type: 'ok' },
-    } as CardListenerContext)
+    } as CardListenerContext))
 
     expect(result).toBeDefined()
     expect(result!.flow?.type).toBe('leaf')
@@ -55,10 +53,11 @@ describe('B168_PastureMaster session', () => {
   })
 
   it('gains 2 food + 1 sheep when pasture with stable has sheep', () => {
-    const listener = findListener('B168-pasture-master-after-renovate')
-    expect(listener).toBeDefined()
 
-    const state = createBaseState()
+
+    const { session, state } = createBaseState()
+    const listener = findListener(session, 'B168-pasture-master-after-renovate')
+    expect(listener).toBeDefined()
     const player = state.players[0]!
     player.occupationPlayed = [CARD_ID]
     player.pastures = [
@@ -71,14 +70,14 @@ describe('B168_PastureMaster session', () => {
     ]
     player.stableTiles = [{ row: 0, col: 2 }]
 
-    const result = executeCardListener(listener!, {
+    const result = session.withCtx(() => executeCardListener(listener!, {
       state,
       player,
       space: mkActionSpace({ id: 'renovate-house' }),
       actionId: 'renovate-house',
       phase: 'after',
       result: { type: 'ok' },
-    } as CardListenerContext)
+    } as CardListenerContext))
 
     expect(result).toBeDefined()
     expect(result!.flow?.type).toBe('leaf')
@@ -88,10 +87,11 @@ describe('B168_PastureMaster session', () => {
   })
 
   it('gains animals from multiple pastures with stables', () => {
-    const listener = findListener('B168-pasture-master-after-renovate')
-    expect(listener).toBeDefined()
 
-    const state = createBaseState()
+
+    const { session, state } = createBaseState()
+    const listener = findListener(session, 'B168-pasture-master-after-renovate')
+    expect(listener).toBeDefined()
     const player = state.players[0]!
     player.occupationPlayed = [CARD_ID]
     player.pastures = [
@@ -116,14 +116,14 @@ describe('B168_PastureMaster session', () => {
     ]
     player.stableTiles = [{ row: 0, col: 2 }, { row: 1, col: 2 }]
 
-    const result = executeCardListener(listener!, {
+    const result = session.withCtx(() => executeCardListener(listener!, {
       state,
       player,
       space: mkActionSpace({ id: 'renovate-house' }),
       actionId: 'renovate-house',
       phase: 'after',
       result: { type: 'ok' },
-    } as CardListenerContext)
+    } as CardListenerContext))
 
     expect(result).toBeDefined()
     expect(result!.flow?.type).toBe('leaf')
@@ -136,10 +136,11 @@ describe('B168_PastureMaster session', () => {
 
 
   it('skips pastures with stables but no animals', () => {
-    const listener = findListener('B168-pasture-master-after-renovate')
-    expect(listener).toBeDefined()
 
-    const state = createBaseState()
+
+    const { session, state } = createBaseState()
+    const listener = findListener(session, 'B168-pasture-master-after-renovate')
+    expect(listener).toBeDefined()
     const player = state.players[0]!
     player.occupationPlayed = [CARD_ID]
     player.pastures = [
@@ -152,14 +153,14 @@ describe('B168_PastureMaster session', () => {
     ]
     player.stableTiles = [{ row: 0, col: 2 }]
 
-    const result = executeCardListener(listener!, {
+    const result = session.withCtx(() => executeCardListener(listener!, {
       state,
       player,
       space: mkActionSpace({ id: 'renovate-house' }),
       actionId: 'renovate-house',
       phase: 'after',
       result: { type: 'ok' },
-    } as CardListenerContext)
+    } as CardListenerContext))
 
     expect(result).toBeDefined()
     expect(result!.flow?.type).toBe('leaf')

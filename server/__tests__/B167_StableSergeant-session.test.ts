@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -21,8 +17,8 @@ describe('B167_StableSergeant session', () => {
     const player = state.players[0]!
     player.resources.food = 2
 
-    const effect = getCardEffect(CARD_ID)
-    const flow = effect!.onBuy!(state, player)
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
+    const flow = session.withCtx(() => effect!.onBuy!(state, player))
     expect(flow).toBeUndefined()
   })
 
@@ -44,8 +40,8 @@ describe('B167_StableSergeant session', () => {
     player.stableTiles = [{ row: 2, col: 2 }]
     player.stableAnimals = {}
 
-    const effect = getCardEffect(CARD_ID)
-    const flow = effect!.onBuy!(state, player) as ActionFlow
+    const effect = session.withCtx(() => getCardEffect(CARD_ID))
+    const flow = session.withCtx(() => effect!.onBuy!(state, player)) as ActionFlow
     expect(flow).toBeDefined()
     expect(flow.type).toBe('seq')
     const seq = flow as Extract<ActionFlow, { type: 'seq' }>

@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { createWorkSession } from './_helpers/session-fixtures'
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
@@ -156,11 +152,11 @@ describe('E149 Midnight Fencer', () => {
     expect(owner.pastures).toHaveLength(1)
     expect(owner.cardStates?.[CARD_ID]?.extraData?.timedRuleReceipts).toContain('borrowed-final-fences:14')
     expect(owner.cardStates?.[CARD_ID]?.extraData?.owedFences).toBeUndefined()
-    expect(getCardEffect(CARD_ID)?.computeBonusScore).toBeUndefined()
+    expect(session.withCtx(() => getCardEffect(CARD_ID))?.computeBonusScore).toBeUndefined()
     expect(resp.state.players[1]!.supplyTokensConsumed?.fence).toBe(2)
     expect(resp.state.players[2]!.supplyTokensConsumed?.fence).toBe(15)
-    expect(getOwnOrdinaryFenceReserveCount(resp.state.players[1]!)).toBe(13)
-    expect(getOwnOrdinaryFenceBuildLimit(resp.state.players[1]!)).toBe(13)
+    expect(session.withCtx(() => getOwnOrdinaryFenceReserveCount(resp.state.players[1]!))).toBe(13)
+    expect(session.withCtx(() => getOwnOrdinaryFenceBuildLimit(resp.state.players[1]!))).toBe(13)
   })
 
   it('does not let undoStep cross the round-end boundary from the borrowed fence prompt', () => {

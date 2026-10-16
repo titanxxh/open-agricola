@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
@@ -27,7 +23,7 @@ const moved = (
 
 const directContext = (
   transactionEvents: CardListenerContext['transactionEvents'],
-): CardListenerContext => {
+): { session: GameSession; context: CardListenerContext } => {
   const session = new GameSession(42)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
@@ -35,7 +31,8 @@ const directContext = (
   player.id = 'p1'
   player.occupationPlayed.push(CARD_ID)
   setStoredResource(player, CARD_ID, 'clay', 8)
-  return {
+  return { session, context: {
+    actionHooks: session.actionHooks,
     state,
     player,
     space: state.actionSpaces.find((space) => space.id === 'day-laborer')!,
@@ -44,15 +41,15 @@ const directContext = (
     transactionEvents,
     actionEvents: transactionEvents,
     result: { type: 'ok', resourcesGained: { grain: 2 } },
-  } as unknown as CardListenerContext
+  } as unknown as CardListenerContext }
 }
 
 describe('C120_AgriculturalLabourer session', () => {
   it('takes clay from the card for grain moved to the player even without result gains', () => {
-    const ctx = directContext([moved()])
+    const { session, context: ctx } = directContext([moved()])
     ctx.result = { type: 'ok' }
 
-    const result = executeCardListener(GAIN_LISTENER, ctx)
+    const result = session.withCtx(() => executeCardListener(GAIN_LISTENER, ctx))
 
     expect(result?.flow).toMatchObject({
       type: 'leaf',
@@ -63,23 +60,23 @@ describe('C120_AgriculturalLabourer session', () => {
   })
 
   it('does not trigger for non-grain events even when result reports grain', () => {
-    const ctx = directContext([moved({ resources: { wood: 2 } })])
+    const { session, context: ctx } = directContext([moved({ resources: { wood: 2 } })])
 
-    const result = executeCardListener(GAIN_LISTENER, ctx)
+    const result = session.withCtx(() => executeCardListener(GAIN_LISTENER, ctx))
 
     expect(result).toBeUndefined()
   })
 
   it('does not trigger without a current grain event', () => {
-    const ctx = directContext([])
+    const { session, context: ctx } = directContext([])
 
-    const result = executeCardListener(GAIN_LISTENER, ctx)
+    const result = session.withCtx(() => executeCardListener(GAIN_LISTENER, ctx))
 
     expect(result).toBeUndefined()
   })
 
   it('takes clay from the card for grain gained through exchange events', () => {
-    const ctx = directContext([])
+    const { context: ctx } = directContext([])
     const player = ctx.player
     const event = {
       type: 'resource.exchanged',
@@ -93,7 +90,8 @@ describe('C120_AgriculturalLabourer session', () => {
       times: 1,
     } as any
 
-    const result = GAIN_LISTENER.handler(directContext([event]))
+    const { session: exchangeSession, context: exchangeContext } = directContext([event])
+    const result = exchangeSession.withCtx(() => GAIN_LISTENER.handler(exchangeContext))
 
     expect(result?.flow).toMatchObject({
       type: 'leaf',

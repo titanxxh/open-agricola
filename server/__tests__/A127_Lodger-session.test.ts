@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import assert from 'node:assert/strict'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { GameState } from '../../shared/contract/types'
@@ -98,11 +94,11 @@ describe('A127 Lodger', () => {
       setActiveWorkerCount(state.players[0]!, family)
       state.players[0]!.houseType = 'clay'
     })
-    expect(getExtraRoomCapacity(session.state.players[0]!)).toBe(2)
+    expect(session.withCtx(() => getExtraRoomCapacity(session.state.players[0]!))).toBe(2)
     const response = finishRound(session)
     expect(response.state.round).toBe(10)
     expect(response.state.players[0]!.rooms).toBe(2)
-    expect(getExtraRoomCapacity(response.state.players[0]!)).toBe(1)
+    expect(session.withCtx(() => getExtraRoomCapacity(response.state.players[0]!))).toBe(1)
     expect(familySize(response.state.players[0]!)).toBe(3)
     expect(response.state.players[0]!.cardStates[LODGER]?.extraData?.hasRoom).toBe(false)
     expect(removals(response)).toHaveLength(family === 3 ? 0 : 1)
@@ -171,7 +167,7 @@ describe('A127 Lodger', () => {
     })
     const entering = finishRound(session, true)
     expect(entering.interaction).toMatchObject({ stateId: 'wait', sourceCard: 'D018_SteamPlow' })
-    expect(getExtraRoomCapacity(entering.state.players[0]!)).toBe(1)
+    expect(session.withCtx(() => getExtraRoomCapacity(entering.state.players[0]!))).toBe(1)
     const returning = ok(session.resolveChoice(0, '__skip__'))
     expect(returning.state.roundPhase).toBe('returning-home')
     expect(returning.interaction).toMatchObject({ stateId: 'wait', sourceCard: 'A029_AleBenches' })
@@ -189,7 +185,7 @@ describe('A127 Lodger', () => {
     const undone = ok(session.undoStep())
     expect(undone.state.roundPhase).toBe('returning-home')
     expect(undone.interaction).toMatchObject({ stateId: 'wait', sourceCard: 'D018_SteamPlow' })
-    expect(getExtraRoomCapacity(undone.state.players[0]!)).toBe(1)
+    expect(session.withCtx(() => getExtraRoomCapacity(undone.state.players[0]!))).toBe(1)
     expect(getFamilyTokenLimit(undone.state.players[0]!)).toBe(5)
     expect(getWorkerHeldOnCard(undone.state.players[0]!, 'C022_BasketChair')).toBe('1')
     expect(undone.state.actionSpaces.find(space => space.id === 'lessons')!.blockedBy).toEqual([
@@ -234,12 +230,12 @@ describe('A127 Lodger', () => {
     const session = setup(state => { state.round = 8 })
     const nine = finishRound(session)
     expect(nine.state.round).toBe(9)
-    expect(getExtraRoomCapacity(nine.state.players[0]!)).toBe(1)
+    expect(session.withCtx(() => getExtraRoomCapacity(nine.state.players[0]!))).toBe(1)
     expect(familySize(nine.state.players[0]!)).toBe(3)
     expect(removals(nine)).toHaveLength(0)
     const ten = finishRound(session)
     expect(ten.state.round).toBe(10)
-    expect(getExtraRoomCapacity(ten.state.players[0]!)).toBe(0)
+    expect(session.withCtx(() => getExtraRoomCapacity(ten.state.players[0]!))).toBe(0)
     expect(familySize(ten.state.players[0]!)).toBe(2)
     expect(removals(ten)).toHaveLength(1)
     const restored = new GameSession(rehydrateState(
@@ -259,7 +255,7 @@ describe('A127 Lodger', () => {
     })
     const response = finishRound(session)
     expect(familySize(response.state.players[0]!)).toBe(3)
-    expect(getExtraRoomCapacity(response.state.players[0]!)).toBe(0)
+    expect(session.withCtx(() => getExtraRoomCapacity(response.state.players[0]!))).toBe(0)
     expect(response.scores?.[0]?.categories.find(category => category.key === 'clayRooms')).toMatchObject({ quantity: 3, total: 3 })
     expect(removals(response)).toEqual([])
   })
@@ -276,7 +272,7 @@ describe('A127 Lodger', () => {
     let response = ok(session.takeAction(0, 'lessons'))
     if (response.state.players[0]!.occupationHand.includes(LODGER)) response = ok(session.resolveChoice(0, LODGER))
     expect(response.state.players[0]!.occupationPlayed).toEqual([LODGER])
-    expect(getExtraRoomCapacity(response.state.players[0]!)).toBe(0)
+    expect(session.withCtx(() => getExtraRoomCapacity(response.state.players[0]!))).toBe(0)
     expect(familySize(response.state.players[0]!)).toBe(2)
     expect(removals(response)).toEqual([])
   })

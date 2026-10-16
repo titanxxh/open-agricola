@@ -1,7 +1,6 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
+import { CardRegistry as TestCardRegistry } from '../../shared/cards/registry'
+import { withActiveRegistry } from '../../shared/cards/active-registry'
+import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -80,10 +79,13 @@ const mkState = (player: PlayerState): GameState => ({
   gameOver: false, workPhaseObtainedResources: {},
 } as GameState)
 
-const findListener = (id: string) =>
-  getRegisteredCardListeners().find((l) => l.id === id)!
+const findListener = (ruleOwner: TestCardRegistry, id: string) =>
+  {
+  const lookupRule1 = () => getRegisteredCardListeners().find((l) => l.id === id)!
+  return withActiveRegistry(ruleOwner, lookupRule1)
+}
 
-const payWithEngine = (
+const payWithEngine = (ruleOwner: TestCardRegistry,
   state: GameState,
   player: PlayerState,
   cost: ComplexCost,
@@ -104,16 +106,17 @@ const payWithEngine = (
     log: new LogStore(),
   })
   const space = createSpace('pay')
-  const first = engine.proceed({ state, player, space })
+  const first = withActiveRegistry(ruleOwner, () => engine.proceed({ actionHooks, state, player, space }))
   let result
   if (first.type === 'choice') {
-    result = engine.resolveChoice(pick(first.choice.options), { state, player, space })
+    const lookupRule2 = () => result = engine.resolveChoice(pick(first.choice.options), { actionHooks, state, player, space })
+    withActiveRegistry(ruleOwner, lookupRule2)
   } else {
     result = first.result ?? { type: 'ok' }
   }
   let done = false
   for (let safety = 0; safety < 10; safety += 1) {
-    if (engine.proceed({ state, player, space }).type === 'done') { done = true; break }
+    if (withActiveRegistry(ruleOwner, () => engine.proceed({ actionHooks, state, player, space })).type === 'done') { done = true; break }
   }
   expect(done).toBe(true)
   engine.flushEventTransaction({ state, player, space })
@@ -122,18 +125,19 @@ const payWithEngine = (
 
 describe('E123_ResourceHoarder use-top-k (reference full)', () => {
   it('N=2 stack [stone, clay]: emits 3 BonusChoice (k=0/1/2)', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     const player = createPlayer({
       occupationPlayed: [CARD_ID],
       cardStates: { [CARD_ID]: { stack: ['stone', 'clay'] } },
     })
     const state = mkState(player)
-    const listener = findListener('E123-resource-hoarder-compute-costs')
+    const listener = findListener(ruleRegistry, 'E123-resource-hoarder-compute-costs')
     const context: CardListenerContext = {
       state, player, space: createSpace('improvement'),
       actionId: 'improvement', phase: 'computeCosts',
     } as CardListenerContext
 
-    const result = executeCardListener(listener, context)
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener, context))
     expect(result?.bonuses).toBeDefined()
     expect(result!.bonuses!).toHaveLength(1)
     const bonus = result!.bonuses![0]!
@@ -150,18 +154,19 @@ describe('E123_ResourceHoarder use-top-k (reference full)', () => {
   })
 
   it('N=3 stack [stone, clay, wood]: emits 4 BonusChoice (k=0..3)', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     const player = createPlayer({
       occupationPlayed: [CARD_ID],
       cardStates: { [CARD_ID]: { stack: ['stone', 'clay', 'wood'] } },
     })
     const state = mkState(player)
-    const listener = findListener('E123-resource-hoarder-compute-costs')
+    const listener = findListener(ruleRegistry, 'E123-resource-hoarder-compute-costs')
     const context: CardListenerContext = {
       state, player, space: createSpace('construct'),
       actionId: 'construct', phase: 'computeCosts',
     } as CardListenerContext
 
-    const result = executeCardListener(listener, context)
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener, context))
     const bonus = result!.bonuses![0]!
     expect(bonus.choices!).toHaveLength(4)
     expect(bonus.choices![0]!.discount).toEqual({})
@@ -171,18 +176,19 @@ describe('E123_ResourceHoarder use-top-k (reference full)', () => {
   })
 
   it('N=2 stack [reed, reed]: top 2 same kind doubles up (reed: 2)', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     const player = createPlayer({
       occupationPlayed: [CARD_ID],
       cardStates: { [CARD_ID]: { stack: ['reed', 'reed'] } },
     })
     const state = mkState(player)
-    const listener = findListener('E123-resource-hoarder-compute-costs')
+    const listener = findListener(ruleRegistry, 'E123-resource-hoarder-compute-costs')
     const context: CardListenerContext = {
       state, player, space: createSpace('improvement'),
       actionId: 'improvement', phase: 'computeCosts',
     } as CardListenerContext
 
-    const result = executeCardListener(listener, context)
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener, context))
     const bonus = result!.bonuses![0]!
     expect(bonus.choices!).toHaveLength(3)
     expect(bonus.choices![0]!.discount).toEqual({})
@@ -191,12 +197,13 @@ describe('E123_ResourceHoarder use-top-k (reference full)', () => {
   })
 
   it('after-pay with bonusChoiceIndex k=0: no pop', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     const player = createPlayer({
       occupationPlayed: [CARD_ID],
       cardStates: { [CARD_ID]: { stack: ['stone', 'clay'] } },
     })
     const state = mkState(player)
-    const listener = findListener('E123-resource-hoarder-after-pay')
+    const listener = findListener(ruleRegistry, 'E123-resource-hoarder-after-pay')
     const context: CardListenerContext = {
       state, player, space: createSpace('improvement'),
       actionId: 'pay', phase: 'after',
@@ -209,7 +216,7 @@ describe('E123_ResourceHoarder use-top-k (reference full)', () => {
       }],
     } as CardListenerContext
 
-    executeCardListener(listener, context)
+    withActiveRegistry(ruleRegistry, () => executeCardListener(listener, context))
     expect(player.cardStates[CARD_ID]!.stack).toEqual(['stone', 'clay'])
     expect(state.events).not.toEqual(expect.arrayContaining([
       expect.objectContaining({ type: 'card.stackChanged', sourceCardId: CARD_ID }),
@@ -217,12 +224,13 @@ describe('E123_ResourceHoarder use-top-k (reference full)', () => {
   })
 
   it('after-pay with bonusChoiceIndex k=2: pops top 2', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     const player = createPlayer({
       occupationPlayed: [CARD_ID],
       cardStates: { [CARD_ID]: { stack: ['stone', 'clay'] } },
     })
     const state = mkState(player)
-    const listener = findListener('E123-resource-hoarder-after-pay')
+    const listener = findListener(ruleRegistry, 'E123-resource-hoarder-after-pay')
     const context: CardListenerContext = {
       state, player, space: createSpace('improvement'),
       actionId: 'pay', phase: 'after',
@@ -235,7 +243,7 @@ describe('E123_ResourceHoarder use-top-k (reference full)', () => {
       }],
     } as CardListenerContext
 
-    const result = executeCardListener(listener, context)
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener, context))
     expect(result?.flow?.type).toBe('seq')
     const children = result?.flow?.type === 'seq' ? result.flow.children : []
     expect(children.filter((child) =>
@@ -247,6 +255,7 @@ describe('E123_ResourceHoarder use-top-k (reference full)', () => {
   })
 
   it('pay event records k=2 bonusChoiceIndex and payment source details', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     const player = createPlayer({
       resources: { ...emptyResources(), wood: 2, clay: 2 },
       occupationPlayed: [CARD_ID],
@@ -266,7 +275,7 @@ describe('E123_ResourceHoarder use-top-k (reference full)', () => {
       }],
     }
 
-    const result = payWithEngine(state, player, cost, (options) => {
+    const result = payWithEngine(ruleRegistry, state, player, cost, (options) => {
       const option = options.find((entry) => {
         const paid = (entry.labelParams as { resourcesPaid?: Partial<Resource> } | undefined)?.resourcesPaid
         return paid?.wood === 1 && paid?.clay === 1
@@ -296,6 +305,7 @@ describe('E123_ResourceHoarder use-top-k (reference full)', () => {
   })
 
   it('renovation pay event keeps bonusChoiceIndex and bonus sources', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     const player = createPlayer({
       resources: { ...emptyResources(), clay: 2, reed: 1 },
       occupationPlayed: [CARD_ID],
@@ -314,7 +324,7 @@ describe('E123_ResourceHoarder use-top-k (reference full)', () => {
       }],
     }
 
-    const result = payWithEngine(state, player, cost, (options) => {
+    const result = payWithEngine(ruleRegistry, state, player, cost, (options) => {
       const option = options.find((entry) => {
         const paid = (entry.labelParams as { resourcesPaid?: Partial<Resource> } | undefined)?.resourcesPaid
         return paid?.clay === 1 && paid?.reed === 1
@@ -337,6 +347,7 @@ describe('E123_ResourceHoarder use-top-k (reference full)', () => {
   })
 
   it('C14 removes reed before E123 can offer its top reed', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     const player = createPlayer({
       resources: { ...emptyResources(), clay: 2 },
       occupationPlayed: [CARD_ID],
@@ -345,14 +356,14 @@ describe('E123_ResourceHoarder use-top-k (reference full)', () => {
       activeModifiers: [...(C014_StrawThatchedRoof.impl.modifiers ?? [])],
     })
     const state = mkState(player)
-    const listener = findListener('E123-resource-hoarder-compute-costs')
-    const result = executeCardListener(listener, {
+    const listener = findListener(ruleRegistry, 'E123-resource-hoarder-compute-costs')
+    const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener, {
       state,
       player,
       space: createSpace('renovate-house'),
       actionId: 'renovate-house',
       phase: 'computeCosts',
-    } as CardListenerContext)
+    } as CardListenerContext))
     const cost: ComplexCost = {
       fees: [{ reed: 1 }],
       unitFee: { clay: 1 },
@@ -361,7 +372,7 @@ describe('E123_ResourceHoarder use-top-k (reference full)', () => {
     }
 
     let requestedPaymentChoice = false
-    const paymentResult = payWithEngine(state, player, cost, () => {
+    const paymentResult = payWithEngine(ruleRegistry, state, player, cost, () => {
       requestedPaymentChoice = true
       return ''
     }, 'renovation')

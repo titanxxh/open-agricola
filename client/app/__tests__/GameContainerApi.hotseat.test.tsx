@@ -1,8 +1,6 @@
 // @vitest-environment jsdom
-import { installOfficialCardRegistry } from '../../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
+import { withActiveRegistry } from '../../../shared/cards/active-registry'
+import { createOfficialCardRegistry } from '../../../shared/cards/__tests__/card-environment'
 import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import '@testing-library/jest-dom/vitest'
@@ -17,6 +15,7 @@ import { LocaleProvider } from '../../contexts/LocaleContext'
 import { GameContainerApi } from '../GameContainerApi'
 
 const workPayload = (): GameSyncPayload => {
+  const registry = createOfficialCardRegistry()
   const state = createInitialState(1098, { playerCount: 2 })
   state.players.forEach((player, index) => {
     player.name = index === 0 ? 'Alice' : 'Bob'
@@ -28,7 +27,7 @@ const workPayload = (): GameSyncPayload => {
   state.players[1]!.occupationPlayed = ['D099_EarthenwarePotter']
   state.players[1]!.cardStates.D099_EarthenwarePotter = { extraData: { secret: '__private_card_state__' } }
   return {
-    state: serializeState(state, { engineStack: new EngineStack() }),
+    state: withActiveRegistry(registry, () => serializeState(state, { actionHooks: undefined, engineStack: new EngineStack() })),
     interaction: { stateId: 'idle', allowedCommands: ['takeAction'], anytimeActions: [] },
     actionAvailability: { forest: true },
     scores: null,
@@ -177,7 +176,7 @@ describe('hotseat public farm browsing', () => {
     if (waiting) state.currentPlayerIndex = 1
     GameSocket.payload = {
       ...workPayload(),
-      state: serializeState(state, { engineStack: new EngineStack() }),
+      state: withActiveRegistry(createOfficialCardRegistry(), () => serializeState(state, { actionHooks: undefined, engineStack: new EngineStack() })),
       ...(waiting ? {
         interaction: {
           stateId: 'wait', playerIndex: 0, allowedCommands: ['resolveChoice'], anytimeActions: [],
@@ -368,7 +367,7 @@ describe('hotseat public farm browsing', () => {
       player.name = index === 0 ? 'Alice' : 'Bob'
       player.nameIsDefault = false
     })
-    GameSocket.payload.state = serializeState(state, { engineStack: new EngineStack() })
+    GameSocket.payload.state = withActiveRegistry(createOfficialCardRegistry(), () => serializeState(state, { actionHooks: undefined, engineStack: new EngineStack() }))
     const { container } = renderGame()
     await user.click(await screen.findByRole('button', { name: "I'm Alice — continue" }))
     expect(screen.queryByRole('dialog', { name: 'Hotseat handoff' })).not.toBeInTheDocument()

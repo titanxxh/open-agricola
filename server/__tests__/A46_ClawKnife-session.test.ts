@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { A046_ClawKnife } from '../../shared/cards/A/A046_ClawKnife'
@@ -92,7 +88,7 @@ describe('A046_ClawKnife prerequisite', () => {
     const state = session.getState().state
     const player = state.players[0]!
     player.pastures = []
-    expect(meetsCardPrerequisites(player, A046_ClawKnife, state.round, state)).toBe(false)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, A046_ClawKnife, state.round, state))).toBe(false)
   })
 
   it('allows when player has exactly 1 pasture', () => {
@@ -107,7 +103,7 @@ describe('A046_ClawKnife prerequisite', () => {
       size: 1,
       stables: 0,
     }]
-    expect(meetsCardPrerequisites(player, A046_ClawKnife, state.round, state)).toBe(true)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, A046_ClawKnife, state.round, state))).toBe(true)
   })
 
   it('blocks when player has 2 pastures', () => {
@@ -118,7 +114,7 @@ describe('A046_ClawKnife prerequisite', () => {
       { id: 'p1', tiles: [{ row: 0, col: 0 }], animalType: null, animalCount: 0, size: 1, stables: 0 },
       { id: 'p2', tiles: [{ row: 1, col: 0 }], animalType: null, animalCount: 0, size: 1, stables: 0 },
     ]
-    expect(meetsCardPrerequisites(player, A046_ClawKnife, state.round, state)).toBe(false)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, A046_ClawKnife, state.round, state))).toBe(false)
   })
 })
 

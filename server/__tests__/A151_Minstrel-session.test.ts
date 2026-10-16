@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
@@ -44,7 +40,7 @@ describe('A151_Minstrel session — viaCardJump worker-less', () => {
     state.roundActionOrder[3] = 'major-improvement'
     state.round = 4
 
-    const flow = runCardEffectHook(state, owner, CARD_ID, 'onStartReturnHome', undefined, { actionHooks: session.actionHooks })
+    const flow = session.withCtx(() => runCardEffectHook(state, owner, CARD_ID, 'onStartReturnHome', undefined, { actionHooks: session.actionHooks }))
     expect(flow).not.toBeNull()
     const seq = flow as Extract<ActionFlow, { type: 'seq' }>
     expect(seq.type).toBe('seq')
@@ -74,7 +70,7 @@ describe('A151_Minstrel session — viaCardJump worker-less', () => {
     state.roundActionOrder[3] = 'major-improvement'
     state.round = 4
 
-    const flow = runCardEffectHook(state, owner, CARD_ID, 'onStartReturnHome', undefined, { actionHooks: session.actionHooks })
+    const flow = session.withCtx(() => runCardEffectHook(state, owner, CARD_ID, 'onStartReturnHome', undefined, { actionHooks: session.actionHooks }))
     expect(flow).toBeNull()
   })
 
@@ -92,7 +88,7 @@ describe('A151_Minstrel session — viaCardJump worker-less', () => {
     state.roundActionOrder[3] = 'major-improvement'
     state.round = 4
 
-    const flow = runCardEffectHook(state, owner, CARD_ID, 'onStartReturnHome', undefined, { actionHooks: session.actionHooks })
+    const flow = session.withCtx(() => runCardEffectHook(state, owner, CARD_ID, 'onStartReturnHome', undefined, { actionHooks: session.actionHooks }))
     expect(flow).toBeNull()
   })
 
@@ -106,7 +102,7 @@ describe('A151_Minstrel session — viaCardJump worker-less', () => {
     state.roundActionOrder[4] = 'sheep-market'
     state.round = 4
 
-    const flow = runCardEffectHook(state, owner, CARD_ID, 'onStartReturnHome', undefined, { actionHooks: session.actionHooks })
+    const flow = session.withCtx(() => runCardEffectHook(state, owner, CARD_ID, 'onStartReturnHome', undefined, { actionHooks: session.actionHooks }))
     expect(flow).toBeNull()
   })
 
@@ -126,7 +122,7 @@ describe('A151_Minstrel session — viaCardJump worker-less', () => {
     state.roundActionOrder[3] = 'major-improvement'
     state.round = 4
 
-    const flow = runCardEffectHook(state, owner, CARD_ID, 'onStartReturnHome', undefined, { actionHooks: session.actionHooks })
+    const flow = session.withCtx(() => runCardEffectHook(state, owner, CARD_ID, 'onStartReturnHome', undefined, { actionHooks: session.actionHooks }))
     expect(flow).toBeNull()
   })
 })
@@ -170,7 +166,7 @@ describe('A151 Minstrel authoritative return-home flow', () => {
     const session = setupReturnHome()
     const workersBefore = structuredClone(session.state.players[0]!.workers)
     expect(
-      runCardEffectHook(session.state, session.state.players[0]!, CARD_ID, 'onStartReturnHome', undefined, { actionHooks: session.actionHooks }),
+      session.withCtx(() => runCardEffectHook(session.state, session.state.players[0]!, CARD_ID, 'onStartReturnHome', undefined, { actionHooks: session.actionHooks })),
     ).not.toBeNull()
     let response = session.performRoundEnd()
 

@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -32,58 +28,58 @@ const setup = () => {
   const player = state.players[0]!
   player.occupationPlayed.push(CARD_ID)
 
-  return { state, player }
+  return { session: session, state, player }
 }
 
 describe('A106_SlurrySpreader session', () => {
   it('grain field depleted after reap gives 2 food', () => {
-    const { state, player } = setup()
+    const { session: ruleSession, state, player } = setup()
 
     player.fields = [{ row: 0, col: 0, stacks: [] }]
     state.harvestReapSummary = {
       [player.id]: { resources: { grain: 1 }, grainFields: 1, vegetableFields: 0 },
     }
 
-    const flow = runCardEffectHook(state, player, CARD_ID, 'onAfterReap')
+    const flow = ruleSession.withCtx(() => runCardEffectHook(state, player, CARD_ID, 'onAfterReap'))
 
     expectGainFoodLeaf(flow, 2)
   })
 
   it('vegetable field depleted after reap gives 1 food', () => {
-    const { state, player } = setup()
+    const { session: ruleSession, state, player } = setup()
 
     player.fields = [{ row: 0, col: 0, stacks: [] }]
     state.harvestReapSummary = {
       [player.id]: { resources: { vegetable: 1 }, grainFields: 0, vegetableFields: 1 },
     }
 
-    const flow = runCardEffectHook(state, player, CARD_ID, 'onAfterReap')
+    const flow = ruleSession.withCtx(() => runCardEffectHook(state, player, CARD_ID, 'onAfterReap'))
 
     expectGainFoodLeaf(flow, 1)
   })
 
   it('grain field with remaining crop after reap does not trigger', () => {
-    const { state, player } = setup()
+    const { session: ruleSession, state, player } = setup()
 
     player.fields = [{ row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 2 }] }]
     state.harvestReapSummary = {
       [player.id]: { resources: { grain: 1 }, grainFields: 1, vegetableFields: 0 },
     }
 
-    const flow = runCardEffectHook(state, player, CARD_ID, 'onAfterReap')
+    const flow = ruleSession.withCtx(() => runCardEffectHook(state, player, CARD_ID, 'onAfterReap'))
 
     expect(flow).toBeNull()
   })
 
   it('vegetable field with remaining crop after reap does not trigger', () => {
-    const { state, player } = setup()
+    const { session: ruleSession, state, player } = setup()
 
     player.fields = [{ row: 0, col: 0, stacks: [{ kind: 'vegetable', remaining: 1 }] }]
     state.harvestReapSummary = {
       [player.id]: { resources: { vegetable: 1 }, grainFields: 0, vegetableFields: 1 },
     }
 
-    const flow = runCardEffectHook(state, player, CARD_ID, 'onAfterReap')
+    const flow = ruleSession.withCtx(() => runCardEffectHook(state, player, CARD_ID, 'onAfterReap'))
 
     expect(flow).toBeNull()
   })

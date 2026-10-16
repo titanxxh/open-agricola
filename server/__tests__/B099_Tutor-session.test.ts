@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { computeScores } from '../../shared/domain/scoring'
@@ -69,8 +65,8 @@ const returnTurnToOwner = (session: GameSession) => {
   return response
 }
 
-const tutorBonus = (response: SessionResponse) =>
-  computeScores(response.state)[0]!.categories
+const tutorBonus = (session: GameSession, response: SessionResponse) =>
+  session.withCtx(() => computeScores(response.state))[0]!.categories
     .find((category) => category.key === 'cardBonusVp')?.entries
     .find((entry) => 'cardId' in entry && entry.cardId === CARD_ID)?.score ?? 0
 
@@ -90,12 +86,13 @@ describe('B099 Tutor parity', () => {
     const response = playOccupation(session, 0, 'lessons-4', AFTER)
 
     expect(response.state.players[0]!.occupationPlayed).toEqual([BEFORE, CARD_ID, AFTER])
-    expect(tutorBonus(response)).toBe(1)
+    expect(tutorBonus(session, response)).toBe(1)
   })
 
   it('B099 S3: Tutor scores zero when no occupation is played after it', () => {
-    const response = playOccupation(setup({ previousOccupation: true }), 0, 'lessons', CARD_ID)
+    const session = setup({ previousOccupation: true })
+    const response = playOccupation(session, 0, 'lessons', CARD_ID)
 
-    expect(tutorBonus(response)).toBe(0)
+    expect(tutorBonus(session, response)).toBe(0)
   })
 })

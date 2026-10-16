@@ -1,7 +1,5 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
+import { withActiveRegistry } from '../../shared/cards/active-registry'
+import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
 import { describe, expect, it } from 'vitest'
 import { getCardEffect, getExtraRoomCapacity } from '../../shared/cards/card-effects'
 import { runSelectionEffect } from '../../shared/actions/helpers/selection-effect-registry'
@@ -57,24 +55,26 @@ describe('D102_SampleStableMaker card effect', () => {
   }
 
   it('onStartReturnHome returns undefined when the player has no stables', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     const player = createOwner()
     player.stableTiles = []
     const state = createState([player])
-    const effect = getCardEffect(CARD_ID)
+    const effect = withActiveRegistry(ruleRegistry, () => getCardEffect(CARD_ID))
     expect(effect).toBeDefined()
-    const flow = effect!.onStartReturnHome!(state, player)
+    const flow = withActiveRegistry(ruleRegistry, () => effect!.onStartReturnHome!(state, player))
     expect(flow).toBeUndefined()
   })
 
 
   it('onStartReturnHome offers optional selection + minor improvement', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     const player = createOwner()
     player.stableTiles = [
       { row: 0, col: 0 }, { row: 1, col: 0 },
     ]
     const state = createState([player])
-    const effect = getCardEffect(CARD_ID)
-    const flow = effect!.onStartReturnHome!(state, player) as Extract<ActionFlow, { type: 'seq' }>
+    const effect = withActiveRegistry(ruleRegistry, () => getCardEffect(CARD_ID))
+    const flow = withActiveRegistry(ruleRegistry, () => effect!.onStartReturnHome!(state, player)) as Extract<ActionFlow, { type: 'seq' }>
     expect(flow).toBeDefined()
     expect(flow.type).toBe('seq')
     expect(flow.optional).toBe(true)
@@ -130,6 +130,7 @@ describe('D102_SampleStableMaker card effect', () => {
   })
 
   it('offers the B85 FarmHand tile as a selection candidate', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     const player = createOwner()
     player.stableTiles = []
     if (!player.occupationPlayed.includes('B085_FarmHand')) player.occupationPlayed.push('B085_FarmHand')
@@ -137,13 +138,14 @@ describe('D102_SampleStableMaker card effect', () => {
       B085_FarmHand: { extraData: { position: { row: 2, col: 1 } } },
     }
     const state = createState([player])
-    const flow = getCardEffect(CARD_ID)!.onStartReturnHome!(state, player) as Extract<ActionFlow, { type: 'seq' }>
+    const flow = withActiveRegistry(ruleRegistry, () => getCardEffect(CARD_ID)!.onStartReturnHome!(state, player)) as Extract<ActionFlow, { type: 'seq' }>
     expect(flow).toBeDefined()
     const selection = flow.children[0]
     expect(selection.actionContext.selectableTiles).toEqual([{ row: 2, col: 1 }])
   })
 
   it('returns the B85 FarmHand tile and pays the normal resource reward', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     const player = createOwner()
     player.occupationPlayed.push('B085_FarmHand')
     player.stableTiles = []
@@ -159,7 +161,7 @@ describe('D102_SampleStableMaker card effect', () => {
       grain: player.resources.grain,
       food: player.resources.food,
     }
-    expect(getExtraRoomCapacity(player)).toBe(1)
+    expect(withActiveRegistry(ruleRegistry, () => getExtraRoomCapacity(player))).toBe(1)
     runSelectionEffect(FIELD_EFFECT, {
       player,
       positions: ['2-1'],
@@ -170,13 +172,14 @@ describe('D102_SampleStableMaker card effect', () => {
     expect(player.cardStates!.B085_FarmHand!.extraData?.position).toBeUndefined()
     expect(player.cardStates!.B085_FarmHand!.flagged).toBe(true)
     expect(player.stableTiles).toEqual([])
-    expect(getExtraRoomCapacity(player)).toBe(0)
+    expect(withActiveRegistry(ruleRegistry, () => getExtraRoomCapacity(player))).toBe(0)
     expect(player.resources.wood).toBe(initial.wood + 1)
     expect(player.resources.grain).toBe(initial.grain + 1)
     expect(player.resources.food).toBe(initial.food + 1)
   })
 
   it('returning the B85 FarmHand tile releases stable reserve', () => {
+    const ruleRegistry = createOfficialCardRegistry()
     const player = createOwner()
     player.stableTiles = [
       { row: 0, col: 0 },
@@ -191,7 +194,7 @@ describe('D102_SampleStableMaker card effect', () => {
       },
     }
     const state = createState([player])
-    expect(getAvailableStableSupplyCount(state, player)).toBe(0)
+    expect(withActiveRegistry(ruleRegistry, () => getAvailableStableSupplyCount(state, player))).toBe(0)
 
     runSelectionEffect(FIELD_EFFECT, {
       player,
@@ -201,6 +204,6 @@ describe('D102_SampleStableMaker card effect', () => {
       cards: [],
     })
 
-    expect(getAvailableStableSupplyCount(state, player)).toBe(1)
+    expect(withActiveRegistry(ruleRegistry, () => getAvailableStableSupplyCount(state, player))).toBe(1)
   })
 })

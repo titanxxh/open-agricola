@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from './card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../../../server/game/authoritative-session'
 import { getAdHocAction } from '../../actions/helpers/ad-hoc-action-registry'
@@ -47,7 +43,7 @@ const setup = () => {
     player.fields = []
     player.cardStates = {}
   })
-  return { state, player: state.players[0]! }
+  return { session: session, state, player: state.players[0]! }
 }
 
 const setCardField = (
@@ -62,43 +58,43 @@ const setCardField = (
 
 describe('A/B Logical Field consumers', () => {
   it('counts Card Fields once for A007, A030, A068, and B045 predicates', () => {
-    const { state, player } = setup()
+    const { session: ruleSession, state, player } = setup()
     setCardField(player, 'B113_PatchCaregiver', [{ crop: 'grain', remaining: 2 }], 'occupation')
     setCardField(player, 'B068_Beanfield', [{ crop: 'vegetable', remaining: 2 }])
     setCardField(player, 'C070_LettucePatch', [{ crop: 'vegetable', remaining: 1 }])
 
-    expect(A007_GardenersKnife_impl.effect.onBuy!(state, player)).toMatchObject({
+    expect(ruleSession.withCtx(() => A007_GardenersKnife_impl.effect.onBuy!(state, player))).toMatchObject({
       actionId: 'gain',
       params: { food: 1, grain: 2 },
     })
-    expect(A030_BakingSheet_impl.prerequisiteCheck!(player)).toBe(false)
-    expect(A068_AsparagusGift_impl.prerequisiteCheck!(player)).toBe(false)
-    expect(B045_StrawberryPatch_impl.prerequisiteCheck!(player)).toBe(true)
+    expect(ruleSession.withCtx(() => A030_BakingSheet_impl.prerequisiteCheck!(player))).toBe(false)
+    expect(ruleSession.withCtx(() => A068_AsparagusGift_impl.prerequisiteCheck!(player))).toBe(false)
+    expect(ruleSession.withCtx(() => B045_StrawberryPatch_impl.prerequisiteCheck!(player))).toBe(true)
   })
 
   it('recognizes an empty Card Field for A065 and B061', () => {
-    const { state, player } = setup()
+    const { session: ruleSession, state, player } = setup()
     setCardField(player, 'B113_PatchCaregiver', [{ crop: 'grain', remaining: 2 }], 'occupation')
     setCardField(player, 'B068_Beanfield', [{ crop: 'vegetable', remaining: 2 }])
     setCardField(player, 'C070_LettucePatch', [null])
     const seedPellets = A065_SeedPellets_impl.listeners!.find((listener) => listener.id === 'A65-seed-pellets-isdoable-sow')!
 
-    expect(seedPellets.handler!({
+    expect(ruleSession.withCtx(() => seedPellets.handler!({
       state,
       player,
       actionId: 'sow',
       phase: 'isDoable',
       doable: false,
-    } as never)).toEqual({ doable: true })
-    expect(B061_ThreeFieldRotation_impl.effect.onStartHarvestFieldPhase!(state, player)).toMatchObject({
+    } as never))).toEqual({ doable: true })
+    expect(ruleSession.withCtx(() => B061_ThreeFieldRotation_impl.effect.onStartHarvestFieldPhase!(state, player))).toMatchObject({
       actionId: 'gain',
       params: { food: 3 },
     })
-    expect(A068_AsparagusGift_impl.prerequisiteCheck!(player)).toBe(true)
+    expect(ruleSession.withCtx(() => A068_AsparagusGift_impl.prerequisiteCheck!(player))).toBe(true)
   })
 
   it('uses shared Reap evidence for A064, A106, and B021', () => {
-    const { state, player } = setup()
+    const { session: ruleSession, state, player } = setup()
     setCardField(player, 'B113_PatchCaregiver', [null], 'occupation')
     state.harvestReapSummary = {
       [player.id]: {
@@ -112,20 +108,20 @@ describe('A/B Logical Field consumers', () => {
     }
     player.cardStates.B021_HayloftBarn = { extraData: { foodCount: 4 } }
 
-    expect(A064_BarleyMill_impl.effect.onAfterReap!(state, player)).toMatchObject({
+    expect(ruleSession.withCtx(() => A064_BarleyMill_impl.effect.onAfterReap!(state, player))).toMatchObject({
       children: [expect.objectContaining({ params: { food: 1 } })],
     })
-    expect(A106_SlurrySpreader_impl.effect.onAfterReap!(state, player)).toMatchObject({ params: { food: 2 } })
-    expect(B021_HayloftBarn_impl.effect.onAfterReap!(state, player)).toMatchObject({ params: { food: 1 } })
+    expect(ruleSession.withCtx(() => A106_SlurrySpreader_impl.effect.onAfterReap!(state, player))).toMatchObject({ params: { food: 2 } })
+    expect(ruleSession.withCtx(() => B021_HayloftBarn_impl.effect.onAfterReap!(state, player))).toMatchObject({ params: { food: 1 } })
     expect(readCardExtraData<number>(player, 'B021_HayloftBarn', 'foodCount')).toBe(3)
   })
 
   it('lets A070 remove a vegetable from a Card Field outside harvest', () => {
-    const { state, player } = setup()
+    const { session: ruleSession, state, player } = setup()
     state.round = 5
     setCardField(player, 'B068_Beanfield', [{ crop: 'vegetable', remaining: 2 }])
 
-    expect(A070_LiftingMachine_impl.effect.onReturnHome!(state, player)).toMatchObject({
+    expect(ruleSession.withCtx(() => A070_LiftingMachine_impl.effect.onReturnHome!(state, player))).toMatchObject({
       actionContext: {
         selectableTiles: [expect.objectContaining({ row: -1, col: 2068, sourceCard: 'B068_Beanfield' })],
       },
@@ -145,15 +141,15 @@ describe('A/B Logical Field consumers', () => {
   })
 
   it('lets A084 count Logical Fields and pay grain from a Card Field', () => {
-    const { state, player } = setup()
+    const { session: ruleSession, state, player } = setup()
     state.round = 5
     player.minorPlayed.push('A084_Silage')
     player.resources.cattle = 2
     setCardField(player, 'B113_PatchCaregiver', [{ crop: 'grain', remaining: 2 }], 'occupation')
     setCardField(player, 'B068_Beanfield', [null])
 
-    expect(A084_Silage_impl.effect.onReturnHome!(state, player)).toMatchObject({ type: 'xor' })
-    expect(getAdHocAction('card_A084_Silage_pay-grain-any')!.resolveChoice!({ state, player } as never, 'card:B113_PatchCaregiver')).toEqual({ type: 'ok' })
+    expect(ruleSession.withCtx(() => A084_Silage_impl.effect.onReturnHome!(state, player))).toMatchObject({ type: 'xor' })
+    expect(ruleSession.withCtx(() => getAdHocAction('card_A084_Silage_pay-grain-any')!.resolveChoice!({ state, player } as never, 'card:B113_PatchCaregiver'))).toEqual({ type: 'ok' })
     expect(player.cardStates.B113_PatchCaregiver?.extraData?.cardFieldStacks).toEqual([
       { crop: 'grain', remaining: 1 },
     ])
@@ -162,42 +158,42 @@ describe('A/B Logical Field consumers', () => {
 
 describe('A/B Farmyard Field consumers', () => {
   it('does not treat a Card Field as Farmyard geometry', () => {
-    const { state, player } = setup()
+    const { session: ruleSession, state, player } = setup()
     setCardField(player, 'B113_PatchCaregiver', [null], 'occupation')
     player.occupationPlayed.push('A144_Sequestrator')
-    A144_Sequestrator_impl.effect.onBuy!(state, player)
+    ruleSession.withCtx(() => A144_Sequestrator_impl.effect.onBuy!(state, player))
 
     const zones: never[] = []
-    A011_MudPatch_impl.effect.onComputeAnimalZones!(player, zones, state)
+    ruleSession.withCtx(() => A011_MudPatch_impl.effect.onComputeAnimalZones!(player, zones, state))
     const plowListener = A144_Sequestrator_impl.listeners!.find((listener) => listener.id.includes('after-plow'))!
     const lieutenant = B159_LieutenantGeneral_impl.listeners![0]!
 
     expect(zones).toEqual([])
-    expect(A072_CalciumFertilizers_impl.prerequisiteCheck!(player)).toBe(true)
-    expect(A085_Homekeeper_impl.effect.computeExtraRoomCapacity!(player)).toBe(0)
+    expect(ruleSession.withCtx(() => A072_CalciumFertilizers_impl.prerequisiteCheck!(player))).toBe(true)
+    expect(ruleSession.withCtx(() => A085_Homekeeper_impl.effect.computeExtraRoomCapacity!(player))).toBe(0)
     expect(getFarmHandCandidates(player)).toEqual([])
-    expect(plowListener.handler!({ state, player, actionId: 'plow', phase: 'after' } as never)).toBeUndefined()
-    expect(lieutenant.handler!({ state, player, triggerPlayer: player, actionId: 'plow', phase: 'after' } as never)).toBeUndefined()
-    expect(A031_DebtSecurity_impl.effect.computeBonusScore!(state, player)).toBe(0)
-    expect(B031_PotteryYard_impl.effect.computeBonusScore!(state, player)).toBe(2)
+    expect(ruleSession.withCtx(() => plowListener.handler!({ state, player, actionId: 'plow', phase: 'after' } as never))).toBeUndefined()
+    expect(ruleSession.withCtx(() => lieutenant.handler!({ state, player, triggerPlayer: player, actionId: 'plow', phase: 'after' } as never))).toBeUndefined()
+    expect(ruleSession.withCtx(() => A031_DebtSecurity_impl.effect.computeBonusScore!(state, player))).toBe(0)
+    expect(ruleSession.withCtx(() => B031_PotteryYard_impl.effect.computeBonusScore!(state, player))).toBe(2)
   })
 
   it('places A040 clay on seven unused Farmyard spaces without counting a Card Field as geometry', () => {
-    const { state, player } = setup()
+    const { session: ruleSession, state, player } = setup()
     setCardField(player, 'B113_PatchCaregiver', [null], 'occupation')
     player.fields = [0, 1, 2].flatMap(row => [3, 4].map(col => ({ row, col, stacks: [] })))
     player.minorPlayed.push('A040_PottersYard')
-    expect(A040_PottersYard_impl.prerequisiteCheck!(player)).toBe(true)
-    const flow = getCardEffect('A040_PottersYard')!.onBuy!(state, player)
+    expect(ruleSession.withCtx(() => A040_PottersYard_impl.prerequisiteCheck!(player))).toBe(true)
+    const flow = ruleSession.withCtx(() => ruleSession.withCtx(() => getCardEffect('A040_PottersYard'))!.onBuy!(state, player))
     if (!flow || flow.type !== 'leaf') throw new Error('Expected A040 placement action')
     const action = getAdHocAction(flow.actionId)
     if (!action) throw new Error(`Missing placement action ${flow.actionId}`)
     const events: DraftGameEvent[] = []
 
-    expect(action.execute({
+    expect(ruleSession.withCtx(() => action.execute({
       state, player, space: state.actionSpaces[0]!, params: flow.params, sourceCard: flow.sourceCard,
       eventSink: { emit: event => events.push(event), emitMany: emitted => events.push(...emitted) },
-    }).type).toBe('ok')
+    })).type).toBe('ok')
 
     expect(player.farmyardSpaceStates).toEqual(['0-0', '0-1', '0-2', '1-1', '1-2', '2-1', '2-2'].map(spaceKey => ({
       spaceKey, sourceCardId: 'A040_PottersYard', kind: 'farmyard-goods-token',

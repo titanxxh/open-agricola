@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getOwnOrdinaryFenceReserveCount } from '../../shared/domain/supply-tokens'
@@ -79,7 +75,7 @@ describe('A088 Hedge Keeper session', () => {
     expect(response.state.players[0]!.resources.wood).toBe(0)
     expect(response.state.players[0]!.fenceSegments).toHaveLength(4)
     expect(response.state.players[0]!.pastures).toHaveLength(1)
-    expect(getOwnOrdinaryFenceReserveCount(response.state.players[0]!)).toBe(11)
+    expect(session.withCtx(() => getOwnOrdinaryFenceReserveCount(response.state.players[0]!))).toBe(11)
   })
 
   it('A088 S3: building four fences with Hedge Keeper costs one wood', () => {

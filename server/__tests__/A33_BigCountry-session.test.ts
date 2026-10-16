@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { type SessionResponse } from '../game/authoritative-session'
 import { positionKey } from '../../shared/domain/farm'
 import { setWorkersAtHome } from '../../shared/domain/player'
@@ -18,7 +14,7 @@ describe('A033_BigCountry prerequisite', () => {
     const session = new GameSession(42)
     const state = session.getState().state
     const player = state.players[0]!
-    expect(meetsCardPrerequisites(player, A033_BigCountry, state.round, state)).toBe(false)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, A033_BigCountry, state.round, state))).toBe(false)
   })
 
   it('allows when all 15 farmyard spaces are used', () => {
@@ -30,7 +26,7 @@ describe('A033_BigCountry prerequisite', () => {
     player.fields = []
     player.stableTiles = []
     player.pastures = []
-    expect(meetsCardPrerequisites(player, A033_BigCountry, state.round, state)).toBe(true)
+    expect(session.withCtx(() => meetsCardPrerequisites(player, A033_BigCountry, state.round, state))).toBe(true)
   })
 })
 

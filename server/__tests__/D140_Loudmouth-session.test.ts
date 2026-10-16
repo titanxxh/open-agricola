@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import type { AnimalType } from '../../shared/contract/types'
@@ -31,14 +27,15 @@ const moved = (
 
 const directContext = (
   transactionEvents: DraftGameEvent<'resource.moved'>[],
-): CardListenerContext => {
+): { session: GameSession; context: CardListenerContext } => {
   const session = new GameSession(42)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   const player = state.players[0]!
   player.id = 'p1'
   player.occupationPlayed.push(CARD_ID)
-  return {
+  return { session, context: {
+    actionHooks: session.actionHooks,
     state,
     player,
     space: state.actionSpaces.find((space) => space.id === 'forest')!,
@@ -47,15 +44,15 @@ const directContext = (
     transactionEvents,
     actionEvents: transactionEvents,
     result: { type: 'ok', resourcesGained: { wood: 4 } },
-  } as unknown as CardListenerContext
+  } as unknown as CardListenerContext }
 }
 
 describe('D140_Loudmouth session', () => {
   it('grants food for 4+ building resources from an action space without result gains', () => {
-    const ctx = directContext([moved({ wood: 4 })])
+    const { session: ruleSession1, context: ctx } = directContext([moved({ wood: 4 })])
     ctx.result = { type: 'ok' }
 
-    const result = executeCardListener(LISTENER, ctx)
+    const result = ruleSession1.withCtx(() => executeCardListener(LISTENER, ctx))
 
     expect(result?.flow).toMatchObject({
       type: 'leaf',
@@ -66,10 +63,10 @@ describe('D140_Loudmouth session', () => {
   })
 
   it('grants food for 4+ animals from an action space without result gains', () => {
-    const ctx = directContext([moved({ sheep: 4 }, { kind: 'actionSpace', spaceId: 'sheep-market' })])
+    const { session: ruleSession2, context: ctx } = directContext([moved({ sheep: 4 }, { kind: 'actionSpace', spaceId: 'sheep-market' })])
     ctx.result = { type: 'ok' }
 
-    const result = executeCardListener(LISTENER, ctx)
+    const result = ruleSession2.withCtx(() => executeCardListener(LISTENER, ctx))
 
     expect(result?.flow).toMatchObject({
       type: 'leaf',
@@ -80,17 +77,17 @@ describe('D140_Loudmouth session', () => {
   })
 
   it('does not trigger below threshold', () => {
-    const ctx = directContext([moved({ wood: 3 })])
+    const { session: ruleSession3, context: ctx } = directContext([moved({ wood: 3 })])
 
-    const result = executeCardListener(LISTENER, ctx)
+    const result = ruleSession3.withCtx(() => executeCardListener(LISTENER, ctx))
 
     expect(result).toBeUndefined()
   })
 
   it('does not trigger for supply/cardEffect resources even when result reports threshold', () => {
-    const ctx = directContext([moved({ wood: 4 }, { kind: 'supply' })])
+    const { session: ruleSession4, context: ctx } = directContext([moved({ wood: 4 }, { kind: 'supply' })])
 
-    const result = executeCardListener(LISTENER, ctx)
+    const result = ruleSession4.withCtx(() => executeCardListener(LISTENER, ctx))
 
     expect(result).toBeUndefined()
   })

@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -37,7 +33,7 @@ describe('E111_Recluse session', () => {
 
     expect(player.minorPlayed.length).toBe(0)
 
-    const flow = runCardEffectHook(state, player, 'E111_Recluse', 'onRoundStart')
+    const flow = session.withCtx(() => runCardEffectHook(state, player, 'E111_Recluse', 'onRoundStart'))
     expect(flow).not.toBeNull()
     expect(flow).toMatchObject({
       type: 'leaf',
@@ -54,7 +50,7 @@ describe('E111_Recluse session', () => {
 
     expect(player.minorPlayed.length).toBe(1)
 
-    const flow = runCardEffectHook(state, player, 'E111_Recluse', 'onRoundStart')
+    const flow = session.withCtx(() => runCardEffectHook(state, player, 'E111_Recluse', 'onRoundStart'))
     expect(flow).toBeNull()
   })
 
@@ -65,7 +61,7 @@ describe('E111_Recluse session', () => {
 
     expect(player.minorPlayed.length).toBe(0)
 
-    const flow = runCardEffectHook(state, player, 'E111_Recluse', 'onStartHarvest')
+    const flow = session.withCtx(() => runCardEffectHook(state, player, 'E111_Recluse', 'onStartHarvest'))
     expect(flow).not.toBeNull()
     expect(flow).toMatchObject({
       type: 'leaf',
@@ -80,7 +76,7 @@ describe('E111_Recluse session', () => {
     const state = session.getState().state
     const player = state.players[0]!
 
-    const flow = runCardEffectHook(state, player, 'E111_Recluse', 'onStartHarvest')
+    const flow = session.withCtx(() => runCardEffectHook(state, player, 'E111_Recluse', 'onStartHarvest'))
     expect(flow).toBeNull()
   })
 
@@ -90,18 +86,18 @@ describe('E111_Recluse session', () => {
     const player = state.players[0]!
 
     // Initially no minors → should grant food
-    let flow = runCardEffectHook(state, player, 'E111_Recluse', 'onRoundStart')
+    let flow = session.withCtx(() => runCardEffectHook(state, player, 'E111_Recluse', 'onRoundStart'))
     expect(flow).not.toBeNull()
 
     // Play a minor improvement
     player.minorPlayed.push('STUB_MINOR')
 
     // Should no longer grant food
-    flow = runCardEffectHook(state, player, 'E111_Recluse', 'onRoundStart')
+    flow = session.withCtx(() => runCardEffectHook(state, player, 'E111_Recluse', 'onRoundStart'))
     expect(flow).toBeNull()
 
     // Should no longer grant wood at harvest
-    flow = runCardEffectHook(state, player, 'E111_Recluse', 'onStartHarvest')
+    flow = session.withCtx(() => runCardEffectHook(state, player, 'E111_Recluse', 'onStartHarvest'))
     expect(flow).toBeNull()
   })
 })

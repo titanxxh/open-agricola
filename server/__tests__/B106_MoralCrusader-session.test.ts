@@ -1,7 +1,3 @@
-import { installOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-
-installOfficialCardRegistry()
-
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
@@ -51,7 +47,7 @@ describe('B106_MoralCrusader session (verify-only)', () => {
       resources: { food: 4 },
     })
 
-    const flow = runCardEffectHook(state, player, 'B106_MoralCrusader', 'onBeforeStartOfTurn')
+    const flow = session.withCtx(() => runCardEffectHook(state, player, 'B106_MoralCrusader', 'onBeforeStartOfTurn'))
     expect(flow).not.toBeNull()
     const leaf = flow as Extract<ActionFlow, { type: 'leaf' }>
     expect(leaf.type).toBe('leaf')
@@ -73,7 +69,7 @@ describe('B106_MoralCrusader session (verify-only)', () => {
       actionId: null,
       resources: { food: 4 },
     })
-    const flow = runCardEffectHook(state, player, 'B106_MoralCrusader', 'onBeforeStartOfTurn')
+    const flow = session.withCtx(() => runCardEffectHook(state, player, 'B106_MoralCrusader', 'onBeforeStartOfTurn'))
     expect(flow).toBeNull()
   })
 
@@ -90,7 +86,7 @@ describe('B106_MoralCrusader session (verify-only)', () => {
       actionId: null,
       resources: { food: 4 },
     })
-    const flow = runCardEffectHook(state, player, 'B106_MoralCrusader', 'onBeforeStartOfTurn')
+    const flow = session.withCtx(() => runCardEffectHook(state, player, 'B106_MoralCrusader', 'onBeforeStartOfTurn'))
     expect(flow).toBeNull()
   })
 
@@ -98,7 +94,7 @@ describe('B106_MoralCrusader session (verify-only)', () => {
     const session = setup()
     const state = session.getState().state
     const player = state.players[0]!
-    const flow = runCardEffectHook(state, player, 'B106_MoralCrusader', 'onBeforeStartOfTurn')
+    const flow = session.withCtx(() => runCardEffectHook(state, player, 'B106_MoralCrusader', 'onBeforeStartOfTurn'))
     expect(flow).toBeNull()
   })
 
@@ -114,7 +110,7 @@ describe('B106_MoralCrusader session (verify-only)', () => {
       actionId: null,
       resources: {},
     })
-    const flow = runCardEffectHook(state, player, 'B106_MoralCrusader', 'onBeforeStartOfTurn')
+    const flow = session.withCtx(() => runCardEffectHook(state, player, 'B106_MoralCrusader', 'onBeforeStartOfTurn'))
     expect(flow).toBeNull()
   })
 })
