@@ -5,7 +5,6 @@ import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/A/A008_FoodBasket'
 import assert from 'node:assert/strict'
-import { type PlayerState } from '../../shared/contract/types'
 import { createWorkSession } from './_helpers/session-fixtures'
 import { assertRejectedUnchanged, assertUndoRestored, undoRuleSnapshot, getChoiceOptions } from './_helpers/session-assertions'
 import { createScenarioEvidence } from './_helpers/scenario-evidence'
@@ -104,15 +103,12 @@ describe('A008 Food Basket parity', () => {
 })
 describe("A008 command boundaries", () => {
   const BASKET = 'A008_FoodBasket'
-  const MARKET = 'A009_YoungAnimalMarket'
-  function setup(card: string, { ownMajors = [], opponentMajors = [], occupations = 0, improvements = 0, resources = {}, opponentPrerequisites = false, inHand = true }: {
+  function setup({ ownMajors = [], occupations = 0, improvements = 0, reed = 0, opponentPrerequisites = false }: {
     ownMajors?: string[]
-    opponentMajors?: string[]
     occupations?: number
     improvements?: number
-    resources?: Partial<PlayerState['resources']>
+    reed?: number
     opponentPrerequisites?: boolean
-    inHand?: boolean
   } = {}) {
     const s = sessionEvidence.track(createWorkSession({ seed: 4242, configure(state) {
         state.round = 14
@@ -122,21 +118,12 @@ describe("A008 command boundaries", () => {
           Object.assign(p.resources, { wood: 0, clay: 0, reed: 0, stone: 0, grain: 0, vegetable: 0, food: 0, sheep: 0, cattle: 0 })
         })
         const p = state.players[0]!
-        if (inHand)
-          p.minorHand.push(card)
-        else
-          state.players[1]!.minorHand.push(card)
+        p.minorHand.push(BASKET)
         p.improvements = ownMajors
-        if (card === MARKET && resources.sheep === 1)
-          p.minorPlayed = ['A017_ReclamationPlow']
-        state.players[1]!.improvements = opponentMajors
         const target = state.players[opponentPrerequisites ? 1 : 0]!
         target.occupationPlayed = ['A116_WoodCutter', 'B121_Geologist'].slice(0, occupations)
         target.minorPlayed = ['A041_VegetableSlicer', 'B010_Caravan'].slice(0, improvements)
-        Object.assign(p.resources, resources)
-        if (resources.cattle === 1) {
-          p.houseAnimals = { '2-0': 'cattle' }
-        }
+        p.resources.reed = reed
       } }))
     return s
   }
@@ -157,7 +144,7 @@ describe("A008 command boundaries", () => {
     assert.ok(options(r).some(o => o.value === card))
     return ok(s.resolveChoice(0, card))
   }
-  function passed(r: SessionResponse, card: string) {
+  function passed(r: SessionResponse, card: typeof BASKET) {
     const p = r.state.players[0]!
     assert.equal(p.minorHand.includes(card), false)
     assert.equal(p.minorPlayed.includes(card), false)
@@ -172,27 +159,16 @@ describe("A008 command boundaries", () => {
     assert.equal(play.fromPlayerId, p.id)
     assert.equal(play.toPlayerId, r.state.players[1]!.id)
     const payments = r.state.events.filter(event => event.type === 'resource.paid' && event.sourceCardId === card)
-    const expectedCost = card === BASKET ? { reed: 1 } : card === MARKET ? { sheep: 1 } : {}
-    assert.equal(payments.length, Object.keys(expectedCost).length ? 1 : 0)
-    if (payments.length) {
-      const payment = payments[0]!
-      assert.ok(payment.type === 'resource.paid')
-      assert.deepEqual(payment.resources, expectedCost)
-    }
+    assert.equal(payments.length, 1)
+    const payment = payments[0]!
+    assert.ok(payment.type === 'resource.paid')
+    assert.deepEqual(payment.resources, { reed: 1 })
     const rewards = r.state.events.filter(event => event.type === 'resource.moved' && event.sourceCardId === card && event.reason === 'cardEffect')
-    const expectedGain = card === BASKET ? { grain: 1, vegetable: 1 } : card === MARKET ? { cattle: 1 } : {
-      ...(p.improvements.includes('Major_Well') ? { stone: 1 } : {}),
-      ...(p.improvements.includes('Major_Joinery') ? { wood: 1 } : {}),
-      ...(p.improvements.includes('Major_Pottery') ? { clay: 1 } : {}),
-      ...(p.improvements.includes('Major_Basket') ? { reed: 1 } : {}),
-    }
-    assert.equal(rewards.length, Object.keys(expectedGain).length ? 1 : 0)
-    if (rewards.length) {
-      const reward = rewards[0]!
-      assert.ok(reward.type === 'resource.moved')
-      assert.deepEqual(reward.resources, expectedGain)
-      assert.deepEqual(reward.to, { kind: 'player', playerId: p.id })
-    }
+    assert.equal(rewards.length, 1)
+    const reward = rewards[0]!
+    assert.ok(reward.type === 'resource.moved')
+    assert.deepEqual(reward.resources, { grain: 1, vegetable: 1 })
+    assert.deepEqual(reward.to, { kind: 'player', playerId: p.id })
   }
   function resources(r: SessionResponse) {
     const p = r.state.players[0]!.resources
@@ -201,7 +177,7 @@ describe("A008 command boundaries", () => {
   const ZERO = { stone: 0, wood: 0, clay: 0, reed: 0, grain: 0, vegetable: 0, sheep: 0, cattle: 0 }
   function noRepeat(s: GameSession, card: string) { assertRejectedUnchanged(s, () => s.resolveChoice(0, card)); }
   it("two occupations and mixed major minor prerequisites pay reed for exactly one of each crop", () => {
-    const s = setup(BASKET, { occupations: 2, improvements: 1, ownMajors: ['Major_Fireplace1'], resources: { reed: 2 } })
+    const s = setup({ occupations: 2, improvements: 1, ownMajors: ['Major_Fireplace1'], reed: 2 })
     const offer = enter(s)
     assert.deepEqual(resources(offer), { ...ZERO, reed: 2 })
     assertRejectedUnchanged(s, () => s.resolveChoice(1, BASKET))
@@ -216,7 +192,7 @@ describe("A008 command boundaries", () => {
     { name: "zero reed rejects forged purchase before legal retry", occupations: 2, improvements: 2, reed: 0 },
   ]) {
     it(scenario.name, () => {
-      const s = setup(BASKET, { ...scenario, resources: { reed: scenario.reed } })
+      const s = setup({ ...scenario, reed: scenario.reed })
       const r = enter(s)
       assert.equal(options(r).some(o => o.value === BASKET), false)
       assertRejectedUnchanged(s, () => s.resolveChoice(0, BASKET))
@@ -227,14 +203,14 @@ describe("A008 command boundaries", () => {
     })
   }
   it("opponents occupations and improvements cannot satisfy own prerequisites", () => {
-    const s = setup(BASKET, { occupations: 2, improvements: 2, opponentPrerequisites: true, resources: { reed: 1 } })
+    const s = setup({ occupations: 2, improvements: 2, opponentPrerequisites: true, reed: 1 })
     const r = enter(s)
     assert.equal(options(r).some(o => o.value === BASKET), false)
     assertRejectedUnchanged(s, () => s.resolveChoice(0, BASKET))
     assert.deepEqual(resources(buy(s, r, 'A054_Credit')), { ...ZERO, reed: 1 })
   })
   it("undo restores paid reed crops hand and worker before a single legal retry", () => {
-    const s = setup(BASKET, { occupations: 2, improvements: 2, resources: { reed: 1 } })
+    const s = setup({ occupations: 2, improvements: 2, reed: 1 })
     const before = undoRuleSnapshot(s.getState())
     passed(buy(s, enter(s), BASKET), BASKET)
     assertUndoRestored(before, s.undoAction())

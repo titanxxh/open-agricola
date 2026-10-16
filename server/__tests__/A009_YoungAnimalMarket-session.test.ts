@@ -6,7 +6,6 @@ import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import '../../shared/cards/A/A009_YoungAnimalMarket'
 import { countRoomAnimals } from '../../shared/domain/animals'
 import assert from 'node:assert/strict'
-import { type PlayerState } from '../../shared/contract/types'
 import { createWorkSession } from './_helpers/session-fixtures'
 import { assertRejectedUnchanged, assertUndoRestored, undoRuleSnapshot, getChoiceOptions } from './_helpers/session-assertions'
 import { createScenarioEvidence } from './_helpers/scenario-evidence'
@@ -83,17 +82,8 @@ describe('A009 Young Animal Market parity', () => {
   })
 })
 describe("A009 command boundaries", () => {
-  const BASKET = 'A008_FoodBasket'
   const MARKET = 'A009_YoungAnimalMarket'
-  function setup(card: string, { ownMajors = [], opponentMajors = [], occupations = 0, improvements = 0, resources = {}, opponentPrerequisites = false, inHand = true }: {
-    ownMajors?: string[]
-    opponentMajors?: string[]
-    occupations?: number
-    improvements?: number
-    resources?: Partial<PlayerState['resources']>
-    opponentPrerequisites?: boolean
-    inHand?: boolean
-  } = {}) {
+  function setup({ sheep = 0, cattle = 0 } = {}) {
     const s = sessionEvidence.track(createWorkSession({ seed: 4242, configure(state) {
         state.round = 14
         state.players.forEach(p => {
@@ -102,21 +92,9 @@ describe("A009 command boundaries", () => {
           Object.assign(p.resources, { wood: 0, clay: 0, reed: 0, stone: 0, grain: 0, vegetable: 0, food: 0, sheep: 0, cattle: 0 })
         })
         const p = state.players[0]!
-        if (inHand)
-          p.minorHand.push(card)
-        else
-          state.players[1]!.minorHand.push(card)
-        p.improvements = ownMajors
-        if (card === MARKET && resources.sheep === 1)
-          p.minorPlayed = ['A017_ReclamationPlow']
-        state.players[1]!.improvements = opponentMajors
-        const target = state.players[opponentPrerequisites ? 1 : 0]!
-        target.occupationPlayed = ['A116_WoodCutter', 'B121_Geologist'].slice(0, occupations)
-        target.minorPlayed = ['A041_VegetableSlicer', 'B010_Caravan'].slice(0, improvements)
-        Object.assign(p.resources, resources)
-        if (resources.cattle === 1) {
-          p.houseAnimals = { '2-0': 'cattle' }
-        }
+        p.minorHand.push(MARKET)
+        Object.assign(p.resources, { sheep, cattle })
+        if (cattle === 1) p.houseAnimals = { '2-0': 'cattle' }
       } }))
     return s
   }
@@ -137,7 +115,7 @@ describe("A009 command boundaries", () => {
     assert.ok(options(r).some(o => o.value === card))
     return ok(s.resolveChoice(0, card))
   }
-  function passed(r: SessionResponse, card: string) {
+  function passed(r: SessionResponse, card: typeof MARKET) {
     const p = r.state.players[0]!
     assert.equal(p.minorHand.includes(card), false)
     assert.equal(p.minorPlayed.includes(card), false)
@@ -152,27 +130,16 @@ describe("A009 command boundaries", () => {
     assert.equal(play.fromPlayerId, p.id)
     assert.equal(play.toPlayerId, r.state.players[1]!.id)
     const payments = r.state.events.filter(event => event.type === 'resource.paid' && event.sourceCardId === card)
-    const expectedCost = card === BASKET ? { reed: 1 } : card === MARKET ? { sheep: 1 } : {}
-    assert.equal(payments.length, Object.keys(expectedCost).length ? 1 : 0)
-    if (payments.length) {
-      const payment = payments[0]!
-      assert.ok(payment.type === 'resource.paid')
-      assert.deepEqual(payment.resources, expectedCost)
-    }
+    assert.equal(payments.length, 1)
+    const payment = payments[0]!
+    assert.ok(payment.type === 'resource.paid')
+    assert.deepEqual(payment.resources, { sheep: 1 })
     const rewards = r.state.events.filter(event => event.type === 'resource.moved' && event.sourceCardId === card && event.reason === 'cardEffect')
-    const expectedGain = card === BASKET ? { grain: 1, vegetable: 1 } : card === MARKET ? { cattle: 1 } : {
-      ...(p.improvements.includes('Major_Well') ? { stone: 1 } : {}),
-      ...(p.improvements.includes('Major_Joinery') ? { wood: 1 } : {}),
-      ...(p.improvements.includes('Major_Pottery') ? { clay: 1 } : {}),
-      ...(p.improvements.includes('Major_Basket') ? { reed: 1 } : {}),
-    }
-    assert.equal(rewards.length, Object.keys(expectedGain).length ? 1 : 0)
-    if (rewards.length) {
-      const reward = rewards[0]!
-      assert.ok(reward.type === 'resource.moved')
-      assert.deepEqual(reward.resources, expectedGain)
-      assert.deepEqual(reward.to, { kind: 'player', playerId: p.id })
-    }
+    assert.equal(rewards.length, 1)
+    const reward = rewards[0]!
+    assert.ok(reward.type === 'resource.moved')
+    assert.deepEqual(reward.resources, { cattle: 1 })
+    assert.deepEqual(reward.to, { kind: 'player', playerId: p.id })
   }
   function resources(r: SessionResponse) {
     const p = r.state.players[0]!.resources
@@ -188,7 +155,7 @@ describe("A009 command boundaries", () => {
     return placed
   }
   it("one sheep pays for one housed cattle and stale purchase cannot repeat", () => {
-    const s = setup(MARKET, { resources: { sheep: 1 } })
+    const s = setup({ sheep: 1 })
     const offer = enter(s)
     assert.deepEqual(resources(offer), { ...ZERO, sheep: 1 })
     const r = buy(s, offer, MARKET)
@@ -200,7 +167,7 @@ describe("A009 command boundaries", () => {
     noRepeat(s, MARKET)
   })
   it("no sheep rejects forged purchase before legal retry without free cattle", () => {
-    const s = setup(MARKET)
+    const s = setup()
     const r = enter(s)
     assert.equal(options(r).some(o => o.value === MARKET), false)
     assertRejectedUnchanged(s, () => s.resolveChoice(0, MARKET))
@@ -209,7 +176,7 @@ describe("A009 command boundaries", () => {
     assert.equal(retry.state.players[0]!.minorHand.includes(MARKET), true)
   })
   it("invalid target invented cattle overcapacity and cancel reject before valid house retry", () => {
-    const s = setup(MARKET, { resources: { sheep: 1 } })
+    const s = setup({ sheep: 1 })
     buy(s, enter(s), MARKET)
     for (const zone of [
       { id: 'missing-pasture', zoneType: 'pasture', animalType: 'cattle', animalCount: 1 },
@@ -223,7 +190,7 @@ describe("A009 command boundaries", () => {
     passed(r, MARKET)
   })
   it("undo during animal placement restores sheep cattle hand and worker before retry", () => {
-    const s = setup(MARKET, { resources: { sheep: 1 } })
+    const s = setup({ sheep: 1 })
     const before = undoRuleSnapshot(s.getState())
     buy(s, enter(s), MARKET)
     assertUndoRestored(before, s.undoAction())
@@ -232,7 +199,7 @@ describe("A009 command boundaries", () => {
     passed(r, MARKET)
   })
   it("two available cattle cannot exceed the single house slot and surplus can be discarded", () => {
-    const s = setup(MARKET, { resources: { sheep: 1, cattle: 1 } })
+    const s = setup({ sheep: 1, cattle: 1 })
     const r = buy(s, enter(s), MARKET)
     assert.deepEqual(resources(r), { ...ZERO, cattle: 2 })
     assertRejectedUnchanged(s, () => s.resolveChoice(0, 'confirm', { zones: [{ id: 'house:2-0', zoneType: 'house', animalType: 'cattle', animalCount: 2 }] }))
