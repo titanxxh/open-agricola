@@ -280,6 +280,8 @@ describe('A062 command boundaries', () => {
       })
       const offer = endWork(s)
       save(`A062-N${n}-offer`, offer)
+      const issued = opts(beerOffer(offer)).find(option => !option.disabled && amountPaid(offer, option.value, 'grain') === amount)
+      assert.ok(issued)
       const paid = beer(s, offer, amount)
       save(`A062-N${n}-post-exchange`, paid)
       resource(paid, 'food', 0)
@@ -292,6 +294,7 @@ describe('A062 command boundaries', () => {
       assert.equal(done.state.round, 5)
       assert.equal(gainCount(done, CARD_ID), 1)
       assertRejectedUnchanged(s, () => s.resolveChoice(0, '0'))
+      assertRejectedUnchanged(s, () => s.resolveChoice(0, issued.value))
     })
   it('unaffordable and invalid exchange reject before one grain retry', () => {
     const s = setup({ resources: { grain: 1, food: 1 } })
@@ -345,7 +348,7 @@ describe('A062 command boundaries', () => {
       opponent: { grain: 3, food: 4 },
     })
     const offer = endWork(s)
-    const first = opts(offer).find((o) => o.value !== '__skip__')
+    const first = opts(beerOffer(offer)).find(o => !o.disabled && amountPaid(offer, o.value, 'grain') === 2)
     assert.ok(first)
     assertRejectedUnchanged(s, () => s.resolveChoice(1, first.value))
     const done = roundStarted(beer(s, offer, 2), 5)
