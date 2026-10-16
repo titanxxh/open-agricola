@@ -130,14 +130,48 @@ describe("A131 command boundaries", () => {
   it("declining all or after one free occupation preserves unused hand and food", () => {
     for (const cards of [[], ['A110_Roughcaster']]) {
       const s = setup(state => state.players[0]!.resources.food = 0)
-      const r = teach(s, buyMajor(s, 'Major_Joinery'), cards)
+      let r = buyMajor(s, 'Major_Joinery')
+      assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice')
+      assert.equal(r.interaction.sourceCard, CRAFT)
+      assert.equal(r.interaction.promptKey, 'ui.interactionFlowSelect')
+      assert.equal(r.interaction.playerIndex, 0)
+      assert.equal(r.state.currentPlayerIndex, 0)
+      const workshopResources = structuredClone(r.state.players[0]!.resources)
+      assert.deepEqual({ food: workshopResources.food, wood: workshopResources.wood, stone: workshopResources.stone }, { food: 0, wood: 8, stone: 8 })
+      if (cards.length === 1) {
+        const twoOccupations = getChoiceOptions(r).find(option => !option.disabled && option.descriptionPreview?.kind === 'group' && option.descriptionPreview.operator === 'sequence')
+        assert.ok(twoOccupations)
+        r = choice(s, r, twoOccupations.value)
+        assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice')
+        assert.equal(r.interaction.sourceCard, CRAFT)
+        assert.equal(r.interaction.promptKey, 'ui.interactionChooseOccupation')
+        assert.equal(r.interaction.playerIndex, 0)
+        r = choice(s, r, 'A110_Roughcaster')
+        sessionEvidence.record('A131-N2-second-optional', r)
+        assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice')
+        assert.equal(r.interaction.sourceCard, CRAFT)
+        assert.equal(r.interaction.promptKey, 'ui.interactionOptionalAction')
+        assert.equal(r.interaction.playerIndex, 0)
+        assert.equal(r.state.currentPlayerIndex, 0)
+      }
+      const skip = getChoiceOptions(r).find(option => option.value === '__skip__' && !option.disabled)
+      assert.ok(skip)
+      r = choice(s, r, skip.value)
       assert.ok(r.interaction.stateId === 'wait')
       assert.deepEqual(r.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
       assert.equal(r.interaction.playerIndex, 0)
       assert.equal(r.state.currentPlayerIndex, 0)
-      assert.equal(r.state.players[0]!.occupationPlayed.length, 1 + cards.length)
-      assert.equal(r.state.players[0]!.resources.food, 0)
-
+      assert.deepEqual(r.state.players[0]!.occupationPlayed, [CRAFT, ...cards])
+      assert.deepEqual(r.state.players[0]!.occupationHand, cards.length === 0
+        ? ['A110_Roughcaster', 'A114_SeasonalWorker', 'A119_FirewoodCollector']
+        : ['A114_SeasonalWorker', 'A119_FirewoodCollector'])
+      assert.deepEqual(r.state.players[0]!.resources, workshopResources)
+      const played = r.state.events.filter(event => event.type === 'card.played')
+      assert.deepEqual(played.map(event => ({ cardId: event.cardId, resourcesPaid: event.payment?.resources })), [
+        { cardId: 'Major_Joinery', resourcesPaid: { wood: 2, stone: 2 } },
+        ...(cards.length === 0 ? [] : [{ cardId: 'A110_Roughcaster', resourcesPaid: {} }]),
+      ])
+      assertRejectedUnchanged(s, () => s.resolveChoice(0, skip.value))
       sessionEvidence.record(`A131-N2-${cards.length}`, r)
     }
   })

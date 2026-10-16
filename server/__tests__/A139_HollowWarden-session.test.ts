@@ -269,13 +269,35 @@ describe("A139 command boundaries", () => {
       r = choice(s, r, WARDEN)
     return r
   }
-  function fireplace(s: GameSession, r: SessionResponse, card: string | null) {
-    for (let n = 0; n < 10 && r.interaction.stateId === 'wait' && r.interaction.request.kind !== 'confirm-next-player'; n++) {
-      assert.ok(r.interaction.request.kind === 'choice', JSON.stringify(r.interaction))
-      const o = getChoiceOptions(r).find(o => card ? (o.value === card || o.value === `major:${card}`) : (o.value === '__skip__' || o.value === '__done__')) ?? (card ? getChoiceOptions(r).find(o => o.value !== '__skip__' && !('disabled' in o && o.disabled)) : undefined)
-      assert.ok(o)
-      r = choice(s, r, o.value)
+  function fireplace(s: GameSession, r: SessionResponse, card: 'Major_Fireplace1' | 'Major_Fireplace2' | null) {
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice')
+    assert.equal(r.interaction.sourceCard, WARDEN)
+    assert.equal(r.interaction.promptKey, 'ui.interactionOptionalAction')
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
+    const entries = getChoiceOptions(r).filter(option => option.value !== '__skip__' && !option.disabled)
+    assert.equal(entries.length, 1)
+    const entry = entries[0]!
+    assert.equal(entry.labelKey, 'actions.improvement.name')
+    assert.equal(entry.sourceCard, WARDEN)
+    assert.ok(getChoiceOptions(r).some(option => option.value === '__skip__' && !option.disabled))
+    if (card === null) {
+      r = choice(s, r, '__skip__')
+    } else {
+      r = choice(s, r, entry.value)
+      if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice') {
+        assert.equal(r.interaction.sourceCard, WARDEN)
+        assert.equal(r.interaction.promptKey, 'ui.interactionChooseImprovement')
+        assert.equal(r.interaction.playerIndex, 0)
+        assert.equal(r.state.currentPlayerIndex, 0)
+        assert.deepEqual(getChoiceOptions(r).filter(option => !option.disabled).map(option => option.value).sort(), ['Major_Fireplace1', 'Major_Fireplace2'])
+        r = choice(s, r, card)
+      }
     }
+    assert.ok(r.interaction.stateId === 'wait')
+    assert.deepEqual(r.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
     return r
   }
   it("real Lessons grants only one Fireplace purchase at its ordinary clay cost", () => {
