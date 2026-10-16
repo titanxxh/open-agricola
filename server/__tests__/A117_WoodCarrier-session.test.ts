@@ -1,3 +1,4 @@
+import { assertUndoRestored, undoRuleSnapshot } from './_helpers/session-assertions'
 import { describe, expect, it } from 'vitest'
 import { type GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
@@ -103,8 +104,10 @@ describe("A117 command boundaries", () => {
   function play(s: GameSession, card: string) {
     let r = ok(s.takeAction(0, 'lessons'))
     assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice')
-    assertRejectedUnchanged(s, () => s.resolveChoice(1, card))
-    r = ok(s.resolveChoice(0, card))
+    const option = getChoiceOptions(r).find(option => option.value === card && !option.disabled)
+    assert.ok(option)
+    assertRejectedUnchanged(s, () => s.resolveChoice(1, option.value))
+    r = ok(s.resolveChoice(0, option.value))
     assert(r.state.players[0]!.occupationPlayed.includes(card))
     assert(r.state.log.length > 0)
     return r
@@ -116,8 +119,13 @@ describe("A117 command boundaries", () => {
         state.players[0]!.improvements = [...majors]
       })
       const r = play(s, CARRIER)
+      assert.ok(r.interaction.stateId === 'wait')
+      assert.deepEqual(r.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+      assert.equal(r.interaction.playerIndex, 0)
+      assert.equal(r.state.currentPlayerIndex, 0)
       assert.equal(r.state.players[0]!.resources.wood, expected)
       assert.equal(r.state.players[0]!.resources.food, 40)
+
       sessionEvidence.record(`A117-N1-${expected}`, r)
     }
   })
@@ -129,9 +137,14 @@ describe("A117 command boundaries", () => {
       state.players[1]!.improvements = ['Major_Fireplace1']
     })
     const r = play(s, CARRIER)
+    assert.ok(r.interaction.stateId === 'wait')
+    assert.deepEqual(r.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
     assert.equal(r.state.players[0]!.resources.wood, 0)
     assert.equal(r.state.players[0]!.resources.food, 39)
     assert.equal(r.state.players[1]!.resources.wood, 0)
+
     sessionEvidence.record('A117-N2', r)
   })
   it("later improvement and stale occupation choice cannot repeat onBuy reward", () => {
@@ -141,6 +154,10 @@ describe("A117 command boundaries", () => {
       state.players[0]!.houseAnimals = { '2-0': 'sheep' }
     })
     const first = play(s, CARRIER)
+    assert.ok(first.interaction.stateId === 'wait')
+    assert.deepEqual(first.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(first.interaction.playerIndex, 0)
+    assert.equal(first.state.currentPlayerIndex, 0)
     assert.equal(first.state.players[0]!.resources.wood, 1)
     assertRejectedUnchanged(s, () => s.resolveChoice(0, CARRIER))
     confirmNext(s, first)
@@ -152,7 +169,12 @@ describe("A117 command boundaries", () => {
     r = ok(s.resolveChoice(0, action.value))
     if (!r.state.players[0]!.minorPlayed.includes('A030_BakingSheet'))
       r = ok(s.resolveChoice(0, 'A030_BakingSheet'))
+    assert.ok(r.interaction.stateId === 'wait')
+    assert.deepEqual(r.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
     assert.equal(r.state.players[0]!.resources.wood, 1)
+
     sessionEvidence.record('A117-N3', { first, r })
   })
   it("zero food cannot pay later Lessons and undo restores reward before one retry", () => {
@@ -163,12 +185,27 @@ describe("A117 command boundaries", () => {
     })
     assertRejectedUnchanged(poor, () => poor.takeAction(0, 'lessons'))
     const s = setup(state => state.players[0]!.minorPlayed = ['A016_RammedClay'])
+    const beforeUndo = s.getState()
+    const beforeRules = undoRuleSnapshot(beforeUndo)
     const first = play(s, CARRIER)
+    assert.ok(first.interaction.stateId === 'wait')
+    assert.deepEqual(first.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(first.interaction.playerIndex, 0)
+    assert.equal(first.state.currentPlayerIndex, 0)
     const undone = ok(s.undoAction())
+    assertUndoRestored(beforeRules, undone)
+    assert.deepEqual(undone.interaction, beforeUndo.interaction)
+    assert.equal(undone.interaction.stateId, 'idle')
+    assert.equal(undone.state.currentPlayerIndex, 0)
     assert.equal(undone.state.players[0]!.resources.wood, 0)
     assert(undone.state.players[0]!.occupationHand.includes(CARRIER))
     const retry = play(s, CARRIER)
+    assert.ok(retry.interaction.stateId === 'wait')
+    assert.deepEqual(retry.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(retry.interaction.playerIndex, 0)
+    assert.equal(retry.state.currentPlayerIndex, 0)
     assert.equal(retry.state.players[0]!.resources.wood, 1)
+
     sessionEvidence.record('A117-N4', { first, undone, retry })
   })
 })

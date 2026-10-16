@@ -1,3 +1,4 @@
+import { assertUndoRestored, undoRuleSnapshot } from './_helpers/session-assertions'
 import { describe, expect, it } from 'vitest'
 import { type GameSession, type SessionResponse } from '../game/authoritative-session'
 import { isCardFlagged } from '../../shared/cards/helpers/card-state'
@@ -178,10 +179,9 @@ describe("A120 command boundaries", () => {
     return ok(s.takeAction(actor, space))
   }
   function optional(s: GameSession, r: SessionResponse, actor = 0) {
-    for (let n = 0; n < 5 && r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice' && getChoiceOptions(r).some(o => o.value === '__skip__' || o.value === '__done__'); n++) {
-      const o = getChoiceOptions(r).find(o => o.value === '__skip__' || o.value === '__done__')
-      assert.ok(o)
-      r = ok(s.resolveChoice(actor, o.value))
+    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice') {
+      assert.deepEqual(getChoiceOptions(r).map(option => option.labelKey), ['actions.improvement.name', 'ui.interactionOptionalSkip'])
+      r = ok(s.resolveChoice(actor, '__skip__'))
     }
     return r
   }
@@ -222,20 +222,30 @@ describe("A120 command boundaries", () => {
         assert.fail(JSON.stringify(i))
     }
     assert.equal(r.interaction.stateId, 'idle')
+    assert.equal(r.state.currentPlayerIndex, 0)
     return r
   }
   it("actual play in wood waits while clay and stone schedule next five rounds once", () => {
     for (const material of ['wood', 'clay', 'stone'] as const) {
       const s = setup(state => state.players[0]!.houseType = material, false)
       const r = play(s, CLAY)
+      assert.ok(r.interaction.stateId === 'wait')
+      assert.deepEqual(r.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+      assert.equal(r.interaction.playerIndex, 0)
+      assert.equal(r.state.currentPlayerIndex, 0)
       assert.equal(r.state.players[0]!.resources.clay, 10)
       assert.deepEqual(schedule(r).map(e => e.slice(0, 2)), material === 'wood' ? [] : [[6, 2], [7, 2], [8, 2], [9, 2], [10, 2]])
+
       sessionEvidence.record(`A120-N1-${material}`, r)
     }
   })
   it("actual first renovation schedules once and natural second renovation cannot reschedule", () => {
     const s = setup(undefined, true, 10)
     const first = renovation(s)
+    assert.ok(first.interaction.stateId === 'wait')
+    assert.deepEqual(first.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(first.interaction.playerIndex, 0)
+    assert.equal(first.state.currentPlayerIndex, 0)
     assert.deepEqual(schedule(first).map(e => e.slice(0, 2)), [[11, 2], [12, 2], [13, 2], [14, 2]])
     assert.equal(first.state.players[0]!.resources.clay, 8)
     turn(s, 1, 'reed-bank')
@@ -244,13 +254,24 @@ describe("A120 command boundaries", () => {
     assert.equal(next.state.round, 11)
     assert.equal(next.state.players[0]!.resources.clay, 10)
     const second = renovation(s)
+    assert.ok(second.interaction.stateId === 'wait')
+    assert.deepEqual(second.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(second.interaction.playerIndex, 0)
+    assert.equal(second.state.currentPlayerIndex, 0)
     assert.equal(second.state.players[0]!.houseType, 'stone')
     assert.deepEqual(schedule(second).map(e => e.slice(0, 2)), [[12, 2], [13, 2], [14, 2]])
+
+    assert.equal(next.interaction.stateId, 'idle')
+    assert.equal(next.state.currentPlayerIndex, 0)
     sessionEvidence.record('A120-N2', { first, next, second })
   })
   it("natural next five starts deliver exactly two clay owner only then stop", () => {
     const s = setup(state => state.players[0]!.houseType = 'clay', false)
     const bought = play(s, CLAY)
+    assert.ok(bought.interaction.stateId === 'wait')
+    assert.deepEqual(bought.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(bought.interaction.playerIndex, 0)
+    assert.equal(bought.state.currentPlayerIndex, 0)
     turn(s, 1, 'reed-bank')
     turn(s, 0, 'day-laborer')
     let r = cleanup(s, confirmNext(s, turn(s, 1, 'clay-pit')))
@@ -267,33 +288,64 @@ describe("A120 command boundaries", () => {
     assert.equal(r.state.round, 11)
     assert.equal(r.state.players[0]!.resources.clay, 20)
     assert.deepEqual(schedule(r), [])
+
+    assert.equal(r.interaction.stateId, 'idle')
+    assert.equal(r.state.currentPlayerIndex, 0)
     sessionEvidence.record('A120-N3', { bought, r })
   })
   it("late activation clips rounds and round fourteen cannot award immediate clay", () => {
     for (const round of [12, 14]) {
       const r = play(setup(state => state.players[0]!.houseType = 'stone', false, round), CLAY)
+      assert.ok(r.interaction.stateId === 'wait')
+      assert.deepEqual(r.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+      assert.equal(r.interaction.playerIndex, 0)
+      assert.equal(r.state.currentPlayerIndex, 0)
       assert.deepEqual(schedule(r).map(e => e.slice(0, 2)), round === 12 ? [[13, 2], [14, 2]] : [])
       assert.equal(r.state.players[0]!.resources.clay, 10)
+
       sessionEvidence.record(`A120-N4-${round}`, r)
     }
   })
   it("hand opponent and rejected renovation cannot leave owner schedule and undo resets flag", () => {
     const hand = renovation(setup(undefined, false, 14))
+    assert.ok(hand.interaction.stateId === 'wait')
+    assert.deepEqual(hand.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(hand.interaction.playerIndex, 0)
+    assert.equal(hand.state.currentPlayerIndex, 0)
     assert.deepEqual(schedule(hand), [])
     const otherS = setup(undefined, true, 14)
     turn(otherS, 0, 'grain-seeds')
     const other = renovation(otherS, 1)
+    assert.ok(other.interaction.stateId === 'wait')
+    assert.deepEqual(other.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 0 })
+    assert.equal(other.interaction.playerIndex, 1)
+    assert.equal(other.state.currentPlayerIndex, 1)
     assert.deepEqual(schedule(other), [])
     const poor = setup(state => state.players[0]!.resources.reed = 0)
     assertRejectedUnchanged(poor, () => poor.takeAction(0, 'house-redevelopment'))
     assert.deepEqual(schedule(poor.getState()), [])
     const s = setup()
+    const beforeUndo = s.getState()
+    const beforeRules = undoRuleSnapshot(beforeUndo)
     const first = renovation(s)
+    assert.ok(first.interaction.stateId === 'wait')
+    assert.deepEqual(first.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(first.interaction.playerIndex, 0)
+    assert.equal(first.state.currentPlayerIndex, 0)
     const undone = ok(s.undoAction())
+    assertUndoRestored(beforeRules, undone)
+    assert.deepEqual(undone.interaction, beforeUndo.interaction)
+    assert.equal(undone.interaction.stateId, 'idle')
+    assert.equal(undone.state.currentPlayerIndex, 0)
     assert.deepEqual(schedule(undone), [])
     assert.equal(undone.state.players[0]!.houseType, 'wood')
     const retry = renovation(s)
+    assert.ok(retry.interaction.stateId === 'wait')
+    assert.deepEqual(retry.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(retry.interaction.playerIndex, 0)
+    assert.equal(retry.state.currentPlayerIndex, 0)
     assert.equal(schedule(retry).length, 5)
+
     sessionEvidence.record('A120-N5', { hand, other, first, undone, retry })
   })
 })

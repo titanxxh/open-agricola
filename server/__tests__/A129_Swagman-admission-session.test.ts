@@ -1,7 +1,8 @@
+import { assertUndoRestored, undoRuleSnapshot } from './_helpers/session-assertions'
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { createWorkSession } from './_helpers/session-fixtures'
-import { setActiveWorkerCount } from '../../shared/domain/player'
+import { setActiveWorkerCount, workersAvailable } from '../../shared/domain/player'
 import { recordRoundPlacement, getRoundPersonPlacementDetails } from '../../shared/cards/helpers/round-placement'
 import '../../shared/cards/A/A129_Swagman'
 import '../../shared/cards/A/A130_MummysBoy'
@@ -223,11 +224,18 @@ describe("A129 command boundaries", () => {
   function driveSwag(s: GameSession, r: SessionResponse, accept = true) {
     for (let n = 0; n < 15 && r.interaction.stateId === 'wait' && r.interaction.request.kind !== 'confirm-next-player'; n++) {
       const i = r.interaction
+      sessionEvidence.record('A129-driver-stage', r)
+      assert.equal(i.playerIndex, 0)
+      assert.equal(r.state.currentPlayerIndex, 0)
       if (i.request.kind === 'farm-select' && i.request.farm.farmType === 'stable')
         r = ok(s.commitSelectionChoice(i.playerIndex, { stables: [{ row: 0, col: 1 }] }))
       else if (i.request.kind === 'choice') {
-        const jump = getChoiceOptions({ interaction: i }).find(o => o.sourceCard === SWAG && o.value !== '__skip__')
-        const choice = jump ? (accept ? jump : getChoiceOptions({ interaction: i }).find(o => o.value === '__skip__')) : getChoiceOptions({ interaction: i }).find(o => o.labelKey === 'actions.stables.name') ?? getChoiceOptions({ interaction: i }).find(o => o.value === '__skip__' || o.value === '__done__')
+        const jump = getChoiceOptions({ interaction: i }).find(o => o.sourceCard === SWAG && o.value !== '__skip__' && !o.disabled)
+        if (!jump) {
+          assert.equal(i.promptKey, 'ui.interactionFarmExpansionSelect')
+          assert.ok(getChoiceOptions({ interaction: i }).every(option => option.labelKey === 'actions.construct.name' || option.labelKey === 'actions.stables.name' || option.labelKey === 'ui.interactionFlowDone'))
+        }
+        const choice = jump ? (accept ? jump : getChoiceOptions({ interaction: i }).find(o => o.value === '__skip__')) : getChoiceOptions({ interaction: i }).find(o => o.labelKey === 'actions.stables.name' && !o.disabled) ?? getChoiceOptions({ interaction: i }).find(o => o.value === '__done__')
         assert.ok(choice, JSON.stringify(i))
         r = ok(s.resolveChoice(i.playerIndex, choice.value))
       }
@@ -243,12 +251,23 @@ describe("A129 command boundaries", () => {
     const s = setup(state => Object.assign(state.players[0]!.resources, { wood: 2, reed: 0 }))
     const first = turn(s, 0, 'grain-seeds')
     const worker = placements(first, 'grain-seeds')[0]
+    assert.equal(worker, '1')
     const r = driveSwag(s, first)
+    assert.deepEqual(r.state.events.filter(event => event.type === 'worker.placed').map(event => ({ actor: event.actorPlayerId, worker: event.workerId, space: event.spaceId, viaCard: event.viaCardId })), [
+      { actor: 'p1', worker: '1', space: 'grain-seeds', viaCard: undefined },
+      { actor: 'p1', worker: '1', space: 'farm-expansion', viaCard: SWAG },
+    ])
+    assert.ok(r.interaction.stateId === 'wait')
+    assert.deepEqual(r.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
     assert.equal(r.state.players[0]!.resources.grain, 1)
     assert.equal(r.state.players[0]!.stableTiles.length, 1)
     assert.deepEqual(placements(r, 'grain-seeds'), [])
     assert.deepEqual(placements(r, 'farm-expansion'), [worker])
+    assert.equal(workersAvailable(r.state, r.state.players[0]!), 1)
     assert.equal(r.state.players[0]!.resources.wood, 0)
+
     sessionEvidence.record('A129-N1', { first, r })
   })
   it("Farm Expansion can move to occupied Grain Seeds without consuming another person", () => {
@@ -256,60 +275,131 @@ describe("A129 command boundaries", () => {
     turn(s, 0, 'day-laborer')
     turn(s, 1, 'grain-seeds')
     turn(s, 2, 'reed-bank')
+    confirmNext(s, s.getState())
+    const beforeUndo = s.getState()
+    const beforeRules = undoRuleSnapshot(beforeUndo)
     const first = turn(s, 0, 'farm-expansion')
     const worker = placements(first, 'farm-expansion')[0]
+    assert.equal(worker, '2')
     const r = driveSwag(s, first)
+    assert.deepEqual(r.state.events.filter(event => event.type === 'worker.placed').map(event => ({ actor: event.actorPlayerId, worker: event.workerId, space: event.spaceId, viaCard: event.viaCardId })), [
+      { actor: 'p1', worker: '1', space: 'day-laborer', viaCard: undefined },
+      { actor: 'p2', worker: '1', space: 'grain-seeds', viaCard: undefined },
+      { actor: 'p3', worker: '1', space: 'reed-bank', viaCard: undefined },
+      { actor: 'p1', worker: '2', space: 'farm-expansion', viaCard: undefined },
+      { actor: 'p1', worker: '2', space: 'grain-seeds', viaCard: SWAG },
+    ])
+    assert.ok(r.interaction.stateId === 'wait')
+    assert.deepEqual(r.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
     sessionEvidence.record('A129-N2-before-rule-assert', { first, r, worker })
     assert.equal(r.state.players[0]!.stableTiles.length, 1)
+    assert.equal(workersAvailable(r.state, r.state.players[0]!), 0)
     assert.equal(placements(r, 'grain-seeds', 1).length, 1)
     assert.equal(r.state.players[0]!.resources.wood, 0)
     assert.equal(r.interaction.stateId, 'wait')
     assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
     const actual = { grain: r.state.players[0]!.resources.grain, grainWorkers: placements(r, 'grain-seeds'), buildWorkers: placements(r, 'farm-expansion') }
     const undone = ok(s.undoAction())
+    assertUndoRestored(beforeRules, undone)
+    assert.deepEqual(undone.interaction, beforeUndo.interaction)
+    assert.equal(undone.interaction.stateId, 'idle')
+    assert.equal(undone.state.currentPlayerIndex, 0)
     assert.equal(undone.state.players[0]!.stableTiles.length, 0)
     assert.equal(undone.state.players[0]!.resources.wood, 2)
     assert.deepEqual(placements(undone, 'farm-expansion'), [])
     assert.equal(placements(undone, 'grain-seeds', 1).length, 1)
     const retry = driveSwag(s, turn(s, 0, 'farm-expansion'))
+    assert.ok(retry.interaction.stateId === 'wait')
+    assert.deepEqual(retry.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(retry.interaction.playerIndex, 0)
+    assert.equal(retry.state.currentPlayerIndex, 0)
     assert.equal(retry.state.players[0]!.stableTiles.length, 1)
     assert.deepEqual({ grain: retry.state.players[0]!.resources.grain, grainWorkers: placements(retry, 'grain-seeds'), buildWorkers: placements(retry, 'farm-expansion') }, actual)
+
     sessionEvidence.record('A129-N2', { first, r, actual, undone, retry })
     assert.deepEqual(actual, { grain: 1, grainWorkers: [worker], buildWorkers: [] })
   })
   it("decline hand and unrelated spaces cannot move farmer or grant a second action", () => {
     for (const played of [true, false]) {
       const s = setup(undefined, played)
-      const r = driveSwag(s, turn(s, 0, 'grain-seeds'), false)
+      const pending = turn(s, 0, 'grain-seeds')
+      const r = played ? driveSwag(s, pending, false) : pending
+      assert.ok(r.interaction.stateId === 'wait')
+      assert.deepEqual(r.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+      assert.equal(r.interaction.playerIndex, 0)
+      assert.equal(r.state.currentPlayerIndex, 0)
       assert.equal(r.state.players[0]!.resources.grain, 1)
       assert.equal(placements(r, 'grain-seeds').length, 1)
       assert.deepEqual(placements(r, 'farm-expansion'), [])
+
       sessionEvidence.record(`A129-N3-${played}`, r)
     }
     const other = turn(setup(), 0, 'day-laborer')
+    assert.ok(other.interaction.stateId === 'wait')
+    assert.deepEqual(other.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(other.interaction.playerIndex, 0)
+    assert.equal(other.state.currentPlayerIndex, 0)
     assert.equal(other.state.players[0]!.resources.grain, 0)
+
     sessionEvidence.record('A129-N3-unrelated', other)
   })
   it("unaffordable target and stale choice cannot grant an unpaid room or replay jump", () => {
     const poor = setup(state => Object.assign(state.players[0]!.resources, { wood: 0, reed: 0 }))
     const r = turn(poor, 0, 'grain-seeds')
+    assert.ok(r.interaction.stateId === 'wait')
+    assert.deepEqual(r.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
     assert.equal(placements(r, 'grain-seeds').length, 1)
     assert.equal(r.state.players[0]!.rooms, 2)
     assertRejectedUnchanged(poor, () => poor.resolveChoice(0, 'jump:farm-expansion'))
+
     sessionEvidence.record('A129-N4', r)
+    const paid = setup(state => Object.assign(state.players[0]!.resources, { wood: 2, reed: 0 }))
+    const offered = turn(paid, 0, 'grain-seeds')
+    assert.ok(offered.interaction.stateId === 'wait' && offered.interaction.request.kind === 'choice')
+    const jump = getChoiceOptions(offered).find(option => option.sourceCard === SWAG && !option.disabled)
+    assert.ok(jump)
+    const completed = driveSwag(paid, offered)
+    assert.ok(completed.interaction.stateId === 'wait')
+    assert.deepEqual(completed.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(completed.interaction.playerIndex, 0)
+    assert.equal(completed.state.currentPlayerIndex, 0)
+    assert.equal(completed.state.players[0]!.stableTiles.length, 1)
+    assert.equal(completed.state.players[0]!.resources.wood, 0)
+    assertRejectedUnchanged(paid, () => paid.resolveChoice(0, jump.value))
+    sessionEvidence.record('A129-N4-actual-stale', { offered, completed })
+
   })
   it("whole action undo restores both locations and yields exactly one stable on retry", () => {
     const s = setup(state => Object.assign(state.players[0]!.resources, { wood: 2, reed: 0 }))
+    const beforeUndo = s.getState()
+    const beforeRules = undoRuleSnapshot(beforeUndo)
     const first = driveSwag(s, turn(s, 0, 'grain-seeds'))
+    assert.ok(first.interaction.stateId === 'wait')
+    assert.deepEqual(first.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(first.interaction.playerIndex, 0)
+    assert.equal(first.state.currentPlayerIndex, 0)
     const undone = ok(s.undoAction())
+    assertUndoRestored(beforeRules, undone)
+    assert.deepEqual(undone.interaction, beforeUndo.interaction)
+    assert.equal(undone.interaction.stateId, 'idle')
+    assert.equal(undone.state.currentPlayerIndex, 0)
     assert.equal(undone.state.players[0]!.resources.grain, 0)
     assert.equal(undone.state.players[0]!.stableTiles.length, 0)
     assert.equal(undone.state.players[0]!.resources.wood, 2)
     assert.deepEqual(placements(undone, 'grain-seeds'), [])
     assert.deepEqual(placements(undone, 'farm-expansion'), [])
     const retry = driveSwag(s, turn(s, 0, 'grain-seeds'))
+    assert.ok(retry.interaction.stateId === 'wait')
+    assert.deepEqual(retry.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(retry.interaction.playerIndex, 0)
+    assert.equal(retry.state.currentPlayerIndex, 0)
     assert.equal(retry.state.players[0]!.resources.grain, 1)
     assert.equal(retry.state.players[0]!.stableTiles.length, 1)
+
     sessionEvidence.record('A129-N5', { first, undone, retry })
   })
 })

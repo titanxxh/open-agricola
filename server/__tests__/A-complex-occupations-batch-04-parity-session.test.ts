@@ -1109,40 +1109,37 @@ describe("A112 command boundaries", () => {
     turn(s, 0, 'forest')
     return confirmNext(s, turn(s, 1, 'clay-pit'))
   }
-  function harvest(s: GameSession, r: SessionResponse, card: string, positions: {
-    row: number
-    col: number
-  }[] | null = null, purchase = 0) {
+  function harvest(s: GameSession, r: SessionResponse, positions: { row: number; col: number }[] | null = null, expectOffer = true) {
+    let offered = false
     for (let n = 0; n < 30 && r.interaction.stateId === 'wait'; n++) {
       const i = r.interaction
-      sessionEvidence.record(`pending-${card}-${n}`, r)
-      if (i.request.kind === 'confirm-next-player')
-        r = confirmNext(s, r)
-      else if (i.request.kind === 'confirm-player-switch')
-        r = ok(s.resolveChoice(i.request.toPlayerIndex, 'confirm'))
-      else if (i.request.kind === 'feed')
-        r = ok(s.resolveChoice(i.playerIndex, 'confirm', { selections: [] }))
+      sessionEvidence.record(`pending-${SCYTHE}-${n}`, r)
+      if (i.request.kind === 'confirm-player-switch') r = ok(s.resolveChoice(i.request.toPlayerIndex, 'confirm'))
+      else if (i.request.kind === 'feed') r = ok(s.resolveChoice(i.playerIndex, 'confirm', { selections: [] }))
       else if (i.request.kind === 'select-trigger') {
-        const o = getChoiceOptions({ interaction: i }).find(o => JSON.stringify(o).includes(card)) ?? getChoiceOptions({ interaction: i })[0]
-        assert.ok(o)
-        r = ok(s.resolveChoice(i.playerIndex, o.value))
-      }
-      else if (i.request.kind === 'choice') {
-        const skip = getChoiceOptions({ interaction: i }).find(o => o.value === '__skip__' || o.value === '__done__')
-        const wants = card === SCYTHE ? positions !== null : purchase > 0
-        const o = wants ? getChoiceOptions({ interaction: i }).find(o => o.value !== '__skip__' && o.value !== '__done__' && (card === SCYTHE || (o.effectPreview && 'resourcesPaid' in o.effectPreview && o.effectPreview.resourcesPaid?.food === purchase))) : skip
-        assert.ok(o, JSON.stringify(i))
-        r = ok(s.resolveChoice(i.playerIndex, o.value))
-      }
-      else if (i.request.kind === 'selection') {
+        const option = getChoiceOptions({ interaction: i }).find(option => option.sourceCard === SCYTHE && !option.disabled)
+        assert.ok(option, JSON.stringify(i))
+        r = ok(s.resolveChoice(i.playerIndex, option.value))
+      } else if (i.request.kind === 'choice') {
+        assert.equal(expectOffer, true)
+        assert.equal(i.sourceCard, SCYTHE)
+        assert.equal(i.playerIndex, 0)
+        offered = true
+        const option = getChoiceOptions({ interaction: i }).find(option => positions ? option.sourceCard === SCYTHE && !option.disabled : option.value === '__skip__')
+        assert.ok(option, JSON.stringify(i))
+        r = ok(s.resolveChoice(0, option.value))
+      } else if (i.request.kind === 'selection') {
+        assert.equal(expectOffer, true)
+        assert.equal(i.sourceCard, SCYTHE)
+        assert.equal(i.playerIndex, 0)
         assert.ok(positions)
-        r = ok(s.commitSelectionChoice(i.playerIndex, { positions }))
+        r = ok(s.commitSelectionChoice(0, { positions }))
         positions = null
-      }
-      else
-        assert.fail(JSON.stringify(i))
+      } else assert.fail(JSON.stringify(i))
     }
+    assert.equal(offered, expectOffer)
     assert.equal(r.interaction.stateId, 'idle')
+    assert.equal(r.state.currentPlayerIndex, 0)
     return r
   }
   it("real first Lessons play gains one grain once and later unrelated placement does not", () => {
@@ -1150,46 +1147,65 @@ describe("A112 command boundaries", () => {
     let r = turn(s, 0, 'lessons')
     assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice')
     r = ok(s.resolveChoice(0, SCYTHE))
+    assert.ok(r.interaction.stateId === 'wait')
+    assert.deepEqual(r.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
     assert.equal(r.state.players[0]!.resources.grain, 1)
     assertRejectedUnchanged(s, () => s.resolveChoice(0, SCYTHE))
     turn(s, 1, 'reed-bank')
     const later = turn(s, 0, 'day-laborer')
+    assert.ok(later.interaction.stateId === 'wait')
+    assert.deepEqual(later.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(later.interaction.playerIndex, 0)
+    assert.equal(later.state.currentPlayerIndex, 0)
     assert.equal(later.state.players[0]!.resources.grain, 1)
+
     sessionEvidence.record('A112-N1', { r, later })
   })
   it("one additional grain per selected grain field and no extra vegetable", () => {
     const s = setup([{ kind: 'grain', remaining: 3 }, { kind: 'grain', remaining: 2 }, { kind: 'vegetable', remaining: 2 }])
-    const r = harvest(s, end(s), SCYTHE, [{ row: 0, col: 1 }, { row: 0, col: 2 }])
+    const r = harvest(s, end(s), [{ row: 0, col: 1 }, { row: 0, col: 2 }])
     assert.equal(r.state.players[0]!.resources.grain, 5)
     assert.equal(r.state.players[0]!.resources.vegetable, 1)
     assert.deepEqual(r.state.players[0]!.fields.map(f => f.stacks), [[{ kind: 'grain', remaining: 1 }], [], [{ kind: 'vegetable', remaining: 1 }]])
     assert.equal(r.state.players[0]!.resources.food, 36)
+    assert.equal(r.interaction.stateId, 'idle')
+    assert.equal(r.state.currentPlayerIndex, 0)
     sessionEvidence.record('A112-N2', r)
   })
   it("select one eligible field decline all and one crop threshold cannot overharvest", () => {
     for (const positions of [[{ row: 0, col: 1 }], null]) {
       const s = setup([{ kind: 'grain', remaining: 3 }, { kind: 'grain', remaining: 3 }, { kind: 'grain', remaining: 1 }])
-      const r = harvest(s, end(s), SCYTHE, positions)
+      const r = harvest(s, end(s), positions)
       assert.equal(r.state.players[0]!.resources.grain, positions ? 5 : 4)
       assert.deepEqual(r.state.players[0]!.fields.map(f => f.stacks[0]?.remaining ?? 0), positions ? [1, 2, 0] : [2, 2, 0])
+      assert.equal(r.interaction.stateId, 'idle')
+      assert.equal(r.state.currentPlayerIndex, 0)
       sessionEvidence.record(`A112-N3-${positions ? 'one' : 'decline'}`, r)
     }
   })
   it("hand opponent crops vegetables empty fields and nonharvest cannot give extra grain", () => {
     const handS = setup([{ kind: 'grain', remaining: 3 }], undefined, false)
-    const hand = harvest(handS, end(handS), SCYTHE)
+    const hand = harvest(handS, end(handS), null, false)
     assert.equal(hand.state.players[0]!.resources.grain, 2)
     const otherS = setup([], state => {
       state.players[0]!.fields = [{ row: 0, col: 1, stacks: [] }]
       state.players[1]!.fields = [{ row: 0, col: 1, stacks: [{ kind: 'grain', remaining: 3 }] }]
     })
-    const other = harvest(otherS, end(otherS), SCYTHE)
+    const other = harvest(otherS, end(otherS), null, false)
     assert.equal(other.state.players[0]!.resources.grain, 1)
     assert.equal(other.state.players[1]!.resources.grain, 1)
     const nonS = setup([{ kind: 'grain', remaining: 3 }], undefined, true, 5)
-    const non = harvest(nonS, end(nonS), SCYTHE)
+    const non = harvest(nonS, end(nonS), null, false)
     assert.equal(non.state.players[0]!.resources.grain, 1)
     assert.equal(non.state.players[0]!.fields[0]!.stacks[0]!.remaining, 3)
+    assert.equal(hand.interaction.stateId, 'idle')
+    assert.equal(hand.state.currentPlayerIndex, 0)
+    assert.equal(other.interaction.stateId, 'idle')
+    assert.equal(other.state.currentPlayerIndex, 0)
+    assert.equal(non.interaction.stateId, 'idle')
+    assert.equal(non.state.currentPlayerIndex, 0)
     sessionEvidence.record('A112-N4', { hand, other, non })
   })
   it("wrong actor invalid ineligible and duplicate targets reject before valid selection", () => {
@@ -1207,26 +1223,32 @@ describe("A112 command boundaries", () => {
       assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { positions }))
     assertRejectedUnchanged(s, () => s.commitSelectionChoice(1, { positions: [{ row: 0, col: 1 }] }))
     r = ok(s.commitSelectionChoice(0, { positions: [{ row: 0, col: 1 }] }))
-    r = harvest(s, r, SCYTHE)
+    r = harvest(s, r, null, false)
     assert.equal(r.state.players[0]!.resources.grain, 4)
+    assert.equal(r.interaction.stateId, 'idle')
+    assert.equal(r.state.currentPlayerIndex, 0)
     sessionEvidence.record('A112-N5', r)
   })
   it("natural cleanup prevents previous selection leaking into next harvest", () => {
     const s = setup([{ kind: 'grain', remaining: 4 }])
-    const first = harvest(s, end(s), SCYTHE, [{ row: 0, col: 1 }])
+    const first = harvest(s, end(s), [{ row: 0, col: 1 }])
     assert.equal(first.state.players[0]!.fields[0]!.stacks[0]!.remaining, 2)
-    harvest(s, end(s), SCYTHE)
-    harvest(s, end(s), SCYTHE)
-    const next = harvest(s, end(s), SCYTHE)
+    harvest(s, end(s), null, false)
+    harvest(s, end(s), null, false)
+    const next = harvest(s, end(s))
     assert.equal(next.state.round, 8)
     assert.equal(next.state.players[0]!.fields[0]!.stacks[0]!.remaining, 1)
     assert.equal(next.state.players[0]!.resources.grain, 7)
+    assert.equal(first.interaction.stateId, 'idle')
+    assert.equal(first.state.currentPlayerIndex, 0)
+    assert.equal(next.interaction.stateId, 'idle')
+    assert.equal(next.state.currentPlayerIndex, 0)
     sessionEvidence.record('A112-N6', { first, next })
   })
 })
 
 describe("A118 command boundaries", () => {
-  const SCYTHE = 'A112_ScytheWorker', TREE = 'A118_Treegardener'
+  const TREE = 'A118_Treegardener'
   function ok(r: SessionResponse) {
     assert.equal(r.ok, true, r.error)
     return r
@@ -1259,67 +1281,65 @@ describe("A118 command boundaries", () => {
     turn(s, 0, 'forest')
     return confirmNext(s, turn(s, 1, 'clay-pit'))
   }
-  function harvest(s: GameSession, r: SessionResponse, card: string, positions: {
-    row: number
-    col: number
-  }[] | null = null, purchase = 0) {
+  function harvest(s: GameSession, r: SessionResponse, purchase = 0, expectOffer = true) {
+    let offered = false
     for (let n = 0; n < 30 && r.interaction.stateId === 'wait'; n++) {
       const i = r.interaction
-      sessionEvidence.record(`pending-${card}-${n}`, r)
-      if (i.request.kind === 'confirm-next-player')
-        r = confirmNext(s, r)
-      else if (i.request.kind === 'confirm-player-switch')
-        r = ok(s.resolveChoice(i.request.toPlayerIndex, 'confirm'))
-      else if (i.request.kind === 'feed')
-        r = ok(s.resolveChoice(i.playerIndex, 'confirm', { selections: [] }))
+      sessionEvidence.record(`pending-${TREE}-${n}`, r)
+      if (i.request.kind === 'confirm-player-switch') r = ok(s.resolveChoice(i.request.toPlayerIndex, 'confirm'))
+      else if (i.request.kind === 'feed') r = ok(s.resolveChoice(i.playerIndex, 'confirm', { selections: [] }))
       else if (i.request.kind === 'select-trigger') {
-        const o = getChoiceOptions({ interaction: i }).find(o => JSON.stringify(o).includes(card)) ?? getChoiceOptions({ interaction: i })[0]
-        assert.ok(o)
-        r = ok(s.resolveChoice(i.playerIndex, o.value))
-      }
-      else if (i.request.kind === 'choice') {
-        const skip = getChoiceOptions({ interaction: i }).find(o => o.value === '__skip__' || o.value === '__done__')
-        const wants = card === SCYTHE ? positions !== null : purchase > 0
-        const o = wants ? getChoiceOptions({ interaction: i }).find(o => o.value !== '__skip__' && o.value !== '__done__' && (card === SCYTHE || (o.effectPreview && 'resourcesPaid' in o.effectPreview && o.effectPreview.resourcesPaid?.food === purchase))) : skip
-        assert.ok(o, JSON.stringify(i))
-        r = ok(s.resolveChoice(i.playerIndex, o.value))
-      }
-      else if (i.request.kind === 'selection') {
-        assert.ok(positions)
-        r = ok(s.commitSelectionChoice(i.playerIndex, { positions }))
-        positions = null
-      }
-      else
-        assert.fail(JSON.stringify(i))
+        const option = getChoiceOptions({ interaction: i }).find(option => option.sourceCard === TREE && !option.disabled)
+        assert.ok(option, JSON.stringify(i))
+        r = ok(s.resolveChoice(i.playerIndex, option.value))
+      } else if (i.request.kind === 'choice') {
+        assert.equal(expectOffer, true)
+        assert.equal(i.sourceCard, TREE)
+        assert.equal(i.playerIndex, 0)
+        offered = true
+        const option = getChoiceOptions({ interaction: i }).find(option => purchase === 0 ? option.value === '__skip__' : !option.disabled && option.effectPreview?.kind === 'resourceExchange' && option.effectPreview.resourcesPaid?.food === purchase)
+        assert.ok(option, JSON.stringify(i))
+        r = ok(s.resolveChoice(0, option.value))
+      } else assert.fail(JSON.stringify(i))
     }
+    assert.equal(offered, expectOffer)
     assert.equal(r.interaction.stateId, 'idle')
+    assert.equal(r.state.currentPlayerIndex, 0)
     return r
   }
   it("harvest free wood and zero one or two purchased wood have exact food costs", () => {
     for (const purchase of [0, 1, 2]) {
       const s = setup()
-      const r = harvest(s, end(s), TREE, null, purchase)
+      const r = harvest(s, end(s), purchase)
       assert.equal(r.state.players[0]!.resources.wood, 4 + purchase)
       assert.equal(r.state.players[0]!.resources.food, 36 - purchase)
+      assert.equal(r.interaction.stateId, 'idle')
+      assert.equal(r.state.currentPlayerIndex, 0)
       sessionEvidence.record(`A118-N1-${purchase}`, r)
     }
   })
   it("zero food allows only free wood and one food cannot buy two", () => {
     for (const available of [0, 1]) {
       const s = setup([], state => state.players[0]!.resources.food = available)
-      const r = harvest(s, end(s), TREE, null, available)
+      const r = harvest(s, end(s), available, available > 0)
       assert.equal(r.state.players[0]!.resources.wood, 4 + available)
       assert.equal(r.state.players[0]!.resources.food, 0)
       assert.equal(r.state.players[0]!.resources.begging, 4)
+      assert.equal(r.interaction.stateId, 'idle')
+      assert.equal(r.state.currentPlayerIndex, 0)
       sessionEvidence.record(`A118-N2-${available}`, r)
     }
   })
   it("nonharvest unplayed and opponent field phase cannot give owner wood", () => {
-    const nonS = setup([], undefined, true, 5), non = harvest(nonS, end(nonS), TREE)
+    const nonS = setup([], undefined, true, 5), non = harvest(nonS, end(nonS), 0, false)
     assert.equal(non.state.players[0]!.resources.wood, 3)
-    const handS = setup([], undefined, false), hand = harvest(handS, end(handS), TREE)
+    const handS = setup([], undefined, false), hand = harvest(handS, end(handS), 0, false)
     assert.equal(hand.state.players[0]!.resources.wood, 3)
     assert.equal(hand.state.players[1]!.resources.wood, 0)
+    assert.equal(non.interaction.stateId, 'idle')
+    assert.equal(non.state.currentPlayerIndex, 0)
+    assert.equal(hand.interaction.stateId, 'idle')
+    assert.equal(hand.state.currentPlayerIndex, 0)
     sessionEvidence.record('A118-N3', { non, hand })
   })
   it("invalid wrong actor and stale purchase cannot exceed two extra wood", () => {
@@ -1327,22 +1347,30 @@ describe("A118 command boundaries", () => {
     const pending = end(s)
     assert.ok(pending.interaction.stateId === 'wait' && pending.interaction.request.kind === 'choice')
     assertRejectedUnchanged(s, () => s.resolveChoice(0, 'buy-three'))
-    const firstValue = getChoiceOptions(pending)[0]!.value
+    const firstOption = getChoiceOptions(pending).find(option => option.sourceCard === TREE && !option.disabled)
+    assert.ok(firstOption)
+    const firstValue = firstOption.value
     assertRejectedUnchanged(s, () => s.resolveChoice(1, firstValue))
-    const r = harvest(s, pending, TREE, null, 2)
-    assertRejectedUnchanged(s, () => s.resolveChoice(0, 'buy-three'))
+    const r = harvest(s, pending, 2)
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, firstValue))
     assert.equal(r.state.players[0]!.resources.wood, 6)
+    assert.equal(r.interaction.stateId, 'idle')
+    assert.equal(r.state.currentPlayerIndex, 0)
     sessionEvidence.record('A118-N4', { pending, r })
   })
   it("later natural harvest awards only one fresh free wood without prior purchase", () => {
     const s = setup()
-    const first = harvest(s, end(s), TREE, null, 2)
-    harvest(s, end(s), TREE)
-    harvest(s, end(s), TREE)
-    const next = harvest(s, end(s), TREE)
+    const first = harvest(s, end(s), 2)
+    harvest(s, end(s), 0, false)
+    harvest(s, end(s), 0, false)
+    const next = harvest(s, end(s))
     assert.equal(next.state.round, 8)
     assert.equal(next.state.players[0]!.resources.wood, 16)
     assert.equal(next.state.players[0]!.resources.food, 30)
+    assert.equal(first.interaction.stateId, 'idle')
+    assert.equal(first.state.currentPlayerIndex, 0)
+    assert.equal(next.interaction.stateId, 'idle')
+    assert.equal(next.state.currentPlayerIndex, 0)
     sessionEvidence.record('A118-N5', { first, next })
   })
 })
@@ -1379,8 +1407,13 @@ describe("A119 command boundaries", () => {
     assert.equal(pending.state.players[0]!.resources.wood, 0)
     assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { tile: { row: 99, col: 99 } }))
     const r = ok(s.commitSelectionChoice(0, { tile: { row: 0, col: 1 } }))
+    assert.ok(r.interaction.stateId === 'wait')
+    assert.deepEqual(r.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
     assert.equal(r.state.players[0]!.resources.wood, 1)
     assert.equal(r.state.players[0]!.fields.length, 1)
+
     sessionEvidence.record('A119-N1', { pending, r })
   })
   it("Grain Seeds Grain Utilization and Cultivation grant one wood once", () => {
@@ -1405,32 +1438,65 @@ describe("A119 command boundaries", () => {
             assert.fail(JSON.stringify(r.interaction))
         }
       }
+      assert.ok(r.interaction.stateId === 'wait')
+      assert.deepEqual(r.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+      assert.equal(r.interaction.playerIndex, 0)
+      assert.equal(r.state.currentPlayerIndex, 0)
       assert.equal(r.state.players[0]!.resources.wood, 1)
+
       sessionEvidence.record(`A119-N2-${space}`, r)
     }
   })
   it("unrelated action unplayed and opponent cannot reward owner wood", () => {
     const basic = turn(setup(), 0, 'day-laborer')
+    assert.ok(basic.interaction.stateId === 'wait')
+    assert.deepEqual(basic.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(basic.interaction.playerIndex, 0)
+    assert.equal(basic.state.currentPlayerIndex, 0)
     assert.equal(basic.state.players[0]!.resources.wood, 0)
     const hand = turn(setup(undefined, false), 0, 'grain-seeds')
+    assert.ok(hand.interaction.stateId === 'wait')
+    assert.deepEqual(hand.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(hand.interaction.playerIndex, 0)
+    assert.equal(hand.state.currentPlayerIndex, 0)
     assert.equal(hand.state.players[0]!.resources.wood, 0)
     const s = setup()
     turn(s, 0, 'day-laborer')
     const r = turn(s, 1, 'grain-seeds')
+    assert.ok(r.interaction.stateId === 'wait')
+    assert.deepEqual(r.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 0 })
+    assert.equal(r.interaction.playerIndex, 1)
+    assert.equal(r.state.currentPlayerIndex, 1)
     assert.equal(r.state.players[0]!.resources.wood, 0)
     assert.equal(r.state.players[1]!.resources.wood, 0)
+
     sessionEvidence.record('A119-N3', { basic, hand, r })
   })
   it("whole Farmland undo removes field and wood then one retry", () => {
     const s = setup()
+    const beforeUndo = s.getState()
+    const beforeRules = undoRuleSnapshot(beforeUndo)
     turn(s, 0, 'farmland')
     const first = ok(s.commitSelectionChoice(0, { tile: { row: 0, col: 1 } }))
+    assert.ok(first.interaction.stateId === 'wait')
+    assert.deepEqual(first.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(first.interaction.playerIndex, 0)
+    assert.equal(first.state.currentPlayerIndex, 0)
     const undone = ok(s.undoAction())
+    assertUndoRestored(beforeRules, undone)
+    assert.deepEqual(undone.interaction, beforeUndo.interaction)
+    assert.equal(undone.interaction.stateId, 'idle')
+    assert.equal(undone.state.currentPlayerIndex, 0)
     assert.equal(undone.state.players[0]!.resources.wood, 0)
     assert.equal(undone.state.players[0]!.fields.length, 0)
     turn(s, 0, 'farmland')
     const retry = ok(s.commitSelectionChoice(0, { tile: { row: 0, col: 1 } }))
+    assert.ok(retry.interaction.stateId === 'wait')
+    assert.deepEqual(retry.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(retry.interaction.playerIndex, 0)
+    assert.equal(retry.state.currentPlayerIndex, 0)
     assert.equal(retry.state.players[0]!.resources.wood, 1)
+
     sessionEvidence.record('A119-N4', { first, undone, retry })
   })
 })

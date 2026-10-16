@@ -1,3 +1,4 @@
+import { assertUndoRestored, undoRuleSnapshot } from './_helpers/session-assertions'
 import { type SessionResponse, type GameSession } from '../game/authoritative-session'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 import { describe, expect, it } from 'vitest'
@@ -283,40 +284,74 @@ describe("A139 command boundaries", () => {
       const pending = playWarden(s)
       assertRejectedUnchanged(s, () => s.resolveChoice(0, 'Major_Joinery'))
       const r = fireplace(s, pending, card)
+      assert.ok(r.interaction.stateId === 'wait')
+      assert.deepEqual(r.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+      assert.equal(r.interaction.playerIndex, 0)
+      assert.equal(r.state.currentPlayerIndex, 0)
       assert.ok(r.state.players[0]!.improvements.includes(card))
       assert.equal(r.state.players[0]!.resources.clay, 0)
       assert.ok(!r.state.players[0]!.improvements.includes('Major_Joinery'))
+
       sessionEvidence.record(`A139-N1-${card}`, { pending, r })
     }
   })
   it("declining or lacking payment cannot grant a free Fireplace", () => {
     const s = setup(undefined, false)
     const declined = fireplace(s, playWarden(s), null)
+    assert.ok(declined.interaction.stateId === 'wait')
+    assert.deepEqual(declined.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(declined.interaction.playerIndex, 0)
+    assert.equal(declined.state.currentPlayerIndex, 0)
     assert.deepEqual(declined.state.players[0]!.improvements, [])
     assert.equal(declined.state.players[0]!.resources.clay, 10)
     const poor = setup(state => state.players[0]!.resources.clay = 0, false)
     const denied = playWarden(poor)
+    assert.ok(denied.interaction.stateId === 'wait')
+    assert.deepEqual(denied.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(denied.interaction.playerIndex, 0)
+    assert.equal(denied.state.currentPlayerIndex, 0)
     assert.deepEqual(denied.state.players[0]!.improvements, [])
     assertRejectedUnchanged(poor, () => poor.resolveChoice(0, 'Major_Fireplace1'))
+
     sessionEvidence.record('A139-N2', { declined, denied })
   })
   it("own Hollow grants one food while Clay Pit and hand do not", () => {
     for (const [space, played, food] of [['hollow', true, 41], ['clay-pit', true, 40], ['hollow', false, 40]] as const) {
       const s = setup(undefined, played)
       const r = ok(s.takeAction(0, space))
+      assert.ok(r.interaction.stateId === 'wait')
+      assert.deepEqual(r.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+      assert.equal(r.interaction.playerIndex, 0)
+      assert.equal(r.state.currentPlayerIndex, 0)
       assert.equal(r.state.players[0]!.resources.food, food)
+
       sessionEvidence.record(`A139-N3-${space}-${played}`, r)
     }
   })
   it("whole purchase undo restores occupation and clay before one fireplace retry", () => {
     const s = setup(state => state.players[0]!.resources.clay = 2, false)
+    const beforeUndo = s.getState()
+    const beforeRules = undoRuleSnapshot(beforeUndo)
     const first = fireplace(s, playWarden(s), 'Major_Fireplace1')
+    assert.ok(first.interaction.stateId === 'wait')
+    assert.deepEqual(first.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(first.interaction.playerIndex, 0)
+    assert.equal(first.state.currentPlayerIndex, 0)
     const undone = ok(s.undoAction())
+    assertUndoRestored(beforeRules, undone)
+    assert.deepEqual(undone.interaction, beforeUndo.interaction)
+    assert.equal(undone.interaction.stateId, 'idle')
+    assert.equal(undone.state.currentPlayerIndex, 0)
     assert.deepEqual(undone.state.players[0]!.improvements, [])
     assert.ok(undone.state.players[0]!.occupationHand.includes(WARDEN))
     assert.equal(undone.state.players[0]!.resources.clay, 2)
     const retry = fireplace(s, playWarden(s), 'Major_Fireplace1')
+    assert.ok(retry.interaction.stateId === 'wait')
+    assert.deepEqual(retry.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(retry.interaction.playerIndex, 0)
+    assert.equal(retry.state.currentPlayerIndex, 0)
     assert.equal(retry.state.players[0]!.resources.clay, 0)
+
     sessionEvidence.record('A139-N4', { first, undone, retry })
   })
 })

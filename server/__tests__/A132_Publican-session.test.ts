@@ -753,7 +753,7 @@ describe("A132 command boundaries", () => {
   }
   function accept(session: GameSession, response: SessionResponse, actor: number) {
     assert.ok(response.interaction.stateId === 'wait' && response.interaction.request.kind === 'choice')
-    const option = getChoiceOptions(response).find(o => o.value !== '__skip__')
+    const option = getChoiceOptions(response).find(o => o.value !== '__skip__' && !o.disabled)
     assert.ok(option)
     const accepted = session.resolveChoice(actor, option.value)
     assert.equal(accepted.ok, true, accepted.error)
@@ -776,7 +776,7 @@ describe("A132 command boundaries", () => {
     const pending = start(session)
     assert.ok(pending.interaction.stateId === 'wait' && pending.interaction.request.kind === 'choice')
     assert.equal(pending.interaction.playerIndex, 0)
-    const option = getChoiceOptions(pending)?.find(o => o.value !== '__skip__')
+    const option = getChoiceOptions(pending).find(o => o.value !== '__skip__' && !o.disabled)
     assert.ok(option)
     assertRejectedUnchanged(session, () => session.resolveChoice(1, option.value))
     const { response } = accept(session, session.getState(), 0)
@@ -784,24 +784,36 @@ describe("A132 command boundaries", () => {
     assert.equal(response.state.players[0]!.resources.grain, 0)
     assert.equal(response.state.players[1]!.resources.grain, 2)
     const completed = session.commitSelectionChoice(1, { crops: [{ row: 0, col: 2, crop: 'grain' }] })
+    assert.ok(completed.interaction.stateId === 'wait')
+    assert.deepEqual(completed.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 2 })
+    assert.equal(completed.interaction.playerIndex, 1)
+    assert.equal(completed.state.currentPlayerIndex, 1)
     assert.equal(completed.ok, true, completed.error)
     assert.equal(completed.state.players[1]!.resources.grain, 1)
     assert.deepEqual(completed.state.players[1]!.fields[0]!.stacks, [{ kind: 'grain', remaining: 3 }])
     assert.equal(score(completed), 1)
+
   })
   it("Chief Forester single-field sow cannot earn Publican grain or points", () => {
     const session = setup({ restricted: true })
     let r = accept(session, start(session, true), 1).response
     const illegalOffer = r.interaction.stateId === 'wait' && r.interaction.sourceCard === CARD
-    if (illegalOffer)
-      accept(session, r, 0)
+    assert.equal(illegalOffer, false)
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'farm-select' && r.interaction.request.farm.farmType === 'sow')
+    assert.equal(r.interaction.playerIndex, 1)
+    assert.equal(r.state.currentPlayerIndex, 1)
     r = session.commitSelectionChoice(1, { crops: [{ row: 0, col: 2, crop: 'grain' }] })
+    assert.ok(r.interaction.stateId === 'wait')
+    assert.deepEqual(r.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 2 })
+    assert.equal(r.interaction.playerIndex, 1)
+    assert.equal(r.state.currentPlayerIndex, 1)
     assert.equal(r.ok, true, r.error)
     assert.equal(r.state.players[1]!.resources.wood, 3)
     assert.deepEqual(r.state.players[1]!.fields[0]!.stacks, [{ kind: 'grain', remaining: 3 }])
     assert.deepEqual(r.state.players[1]!.fields[1]!.stacks, [])
     assert.deepEqual({ illegalOffer, ownerGrain: r.state.players[0]!.resources.grain,
       opponentGrain: r.state.players[1]!.resources.grain, bonus: score(r) }, { illegalOffer: false, ownerGrain: 1, opponentGrain: 0, bonus: 0 })
+
   })
   it("non-triggering sow still completes (0 grain, self=false)", () => {
     const config = { grain: 0, self: false }
@@ -810,10 +822,15 @@ describe("A132 command boundaries", () => {
     const r = start(session, false, actor)
     assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'farm-select')
     const done = session.commitSelectionChoice(actor, { crops: [{ row: 0, col: 2, crop: 'grain' }] })
+    assert.ok(done.interaction.stateId === 'wait')
+    assert.deepEqual(done.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 2 })
+    assert.equal(done.interaction.playerIndex, 1)
+    assert.equal(done.state.currentPlayerIndex, 1)
     assert.equal(done.ok, true, done.error)
     assert.equal(score(done), 0)
     assert.equal(done.state.players[0]!.resources.grain, 0)
     assert.deepEqual(done.state.players[actor]!.fields[0]!.stacks, [{ kind: 'grain', remaining: 3 }])
+
   })
   it("non-triggering sow still completes (1 grain, self=true)", () => {
     const config = { grain: 1, self: true }
@@ -822,9 +839,14 @@ describe("A132 command boundaries", () => {
     const r = start(session, false, actor)
     assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'farm-select')
     const done = session.commitSelectionChoice(actor, { crops: [{ row: 0, col: 2, crop: 'grain' }] })
+    assert.ok(done.interaction.stateId === 'wait')
+    assert.deepEqual(done.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(done.interaction.playerIndex, 0)
+    assert.equal(done.state.currentPlayerIndex, 0)
     assert.equal(done.ok, true, done.error)
     assert.equal(score(done), 0)
     assert.equal(done.state.players[0]!.resources.grain, 0)
     assert.deepEqual(done.state.players[actor]!.fields[0]!.stacks, [{ kind: 'grain', remaining: 3 }])
+
   })
 })

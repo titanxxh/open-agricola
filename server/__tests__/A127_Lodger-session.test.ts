@@ -1,3 +1,4 @@
+import { assertUndoRestored, undoRuleSnapshot } from './_helpers/session-assertions'
 import assert from 'node:assert/strict'
 import { describe, expect, it } from 'vitest'
 import { type GameState } from '../../shared/contract/types'
@@ -8,7 +9,7 @@ import { addSyntheticLinkedOccupancyRef } from '../../shared/domain/space'
 import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/serialization'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { createWorkSession } from './_helpers/session-fixtures'
-import { assertRejectedUnchanged, confirmNext, getChoiceOptions } from './_helpers/session-assertions'
+import { assertRejectedUnchanged, confirmNext } from './_helpers/session-assertions'
 import { createScenarioEvidence } from './_helpers/scenario-evidence'
 
 const sessionEvidence = createScenarioEvidence(import.meta.url)
@@ -312,7 +313,7 @@ describe("A127 command boundaries", () => {
       r = ok(s.resolveChoice(0, CARD))
     return r
   }
-  function finishChoice(s: GameSession, r: SessionResponse) {
+  function finishSystemInteractions(s: GameSession, r: SessionResponse) {
     for (let n = 0; n < 12 && r.interaction.stateId === 'wait' && r.interaction.request.kind !== 'confirm-next-player'; n++) {
       const i = r.interaction
       if (i.request.kind === 'confirm-player-switch')
@@ -321,11 +322,6 @@ describe("A127 command boundaries", () => {
         r = ok(s.resolveChoice(i.playerIndex, 'confirm', { zones: i.request.zones }))
       else if (i.request.kind === 'feed')
         r = ok(s.resolveChoice(i.playerIndex, 'confirm', { selections: [] }))
-      else if (i.request.kind === 'choice') {
-        const skip = getChoiceOptions({ interaction: i }).find(o => o.value === '__skip__' || o.value === '__done__')
-        assert.ok(skip)
-        r = ok(s.resolveChoice(i.playerIndex, skip.value))
-      }
       else
         assert.fail(JSON.stringify(i))
     }
@@ -337,10 +333,10 @@ describe("A127 command boundaries", () => {
     const originalRound = r.state.round
     for (let n = 0; n < 24 && r.state.round === originalRound; n++) {
       const beforeRound = r.state.round
-      r = finishChoice(s, r)
+      r = finishSystemInteractions(s, r)
       if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
         r = confirmNext(s, r)
-      r = finishChoice(s, r)
+      r = finishSystemInteractions(s, r)
       if (r.state.round !== beforeRound || r.interaction.stateId === 'gameover')
         return r
       assert.equal(r.interaction.stateId, 'idle')
@@ -361,14 +357,23 @@ describe("A127 command boundaries", () => {
   it("real round eight Lessons creates one capacity and actual growth uses one finite third person", () => {
     const s = setup()
     const bought = play(s)
+    assert.ok(bought.interaction.stateId === 'wait')
+    assert.deepEqual(bought.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(bought.interaction.playerIndex, 0)
+    assert.equal(bought.state.currentPlayerIndex, 0)
     assert.equal(s.withCtx(() => getExtraRoomCapacity(bought.state.players[0]!)), 1)
     turn(s, 1, 'grain-seeds')
     turn(s, 2, 'reed-bank')
-    const grown = finishChoice(s, turn(s, 0, 'wish-children'))
+    const grown = finishSystemInteractions(s, turn(s, 0, 'wish-children'))
+    assert.ok(grown.interaction.stateId === 'wait')
+    assert.deepEqual(grown.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(grown.interaction.playerIndex, 0)
+    assert.equal(grown.state.currentPlayerIndex, 0)
     assert.equal(grown.state.players[0]!.rooms, 2)
     assert.equal(familySize(grown.state.players[0]!), 3)
     assert.equal(grown.state.players[0]!.workers.length, 5)
     assertRejectedUnchanged(s, () => s.resolveChoice(0, CARD))
+
     sessionEvidence.record('A127-N1', { bought, grown })
   })
   it("natural round eight retains capacity and round nine returning home removes only unhoused person", () => {
@@ -382,6 +387,10 @@ describe("A127 command boundaries", () => {
     assert.equal(familySize(ten.state.players[0]!), 2)
     assert.equal(s.withCtx(() => getExtraRoomCapacity(ten.state.players[0]!)), 0)
     assert.equal(ten.state.players[0]!.cardStates[CARD]?.extraData?.hasRoom, false)
+    assert.equal(nine.interaction.stateId, 'idle')
+    assert.equal(nine.state.currentPlayerIndex, 0)
+    assert.equal(ten.interaction.stateId, 'idle')
+    assert.equal(ten.state.currentPlayerIndex, 0)
     sessionEvidence.record('A127-N2', { nine, ten })
   })
   it("physical third room retains the person when temporary capacity expires", () => {
@@ -393,10 +402,16 @@ describe("A127 command boundaries", () => {
     assert.equal(r.state.round, 10)
     assert.equal(familySize(r.state.players[0]!), 3)
     assert.equal(s.withCtx(() => getExtraRoomCapacity(r.state.players[0]!)), 0)
+    assert.equal(r.interaction.stateId, 'idle')
+    assert.equal(r.state.currentPlayerIndex, 0)
     sessionEvidence.record('A127-N3', r)
   })
   it("round ten play cannot create capacity while hand and opponent never change owner capacity", () => {
     const lateSession = setup(10), late = play(lateSession)
+    assert.ok(late.interaction.stateId === 'wait')
+    assert.deepEqual(late.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(late.interaction.playerIndex, 0)
+    assert.equal(late.state.currentPlayerIndex, 0)
     assert.equal(lateSession.withCtx(() => getExtraRoomCapacity(late.state.players[0]!)), 0)
     const handSession = setup(8), hand = handSession.getState()
     assert.equal(handSession.withCtx(() => getExtraRoomCapacity(hand.state.players[0]!)), 0)
@@ -408,6 +423,7 @@ describe("A127 command boundaries", () => {
     }), other = otherSession.getState()
     assert.equal(otherSession.withCtx(() => getExtraRoomCapacity(other.state.players[0]!)), 0)
     assert.equal(otherSession.withCtx(() => getExtraRoomCapacity(other.state.players[1]!)), 1)
+
     sessionEvidence.record('A127-N4', { late, hand, other })
   })
   it("other persistent card room protects the third person at expiration", () => {
@@ -421,18 +437,35 @@ describe("A127 command boundaries", () => {
     assert.equal(s.withCtx(() => getExtraRoomCapacity(before.state.players[0]!)), 2)
     const r = endRound(s)
     const actual = { family: familySize(r.state.players[0]!), rooms: r.state.players[0]!.rooms, extra: s.withCtx(() => getExtraRoomCapacity(r.state.players[0]!)), lodger: r.state.players[0]!.cardStates[CARD]?.extraData?.hasRoom }
+    assert.equal(r.interaction.stateId, 'idle')
+    assert.equal(r.state.currentPlayerIndex, 0)
     sessionEvidence.record('A127-N5', { before, r, actual })
     assert.deepEqual(actual, { family: 3, rooms: 2, extra: 1, lodger: false })
   })
   it("whole Lessons undo removes capacity and a new legal retry restores exactly one", () => {
     const s = setup()
+    const beforeUndo = s.getState()
+    const beforeRules = undoRuleSnapshot(beforeUndo)
     const first = play(s)
+    assert.ok(first.interaction.stateId === 'wait')
+    assert.deepEqual(first.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(first.interaction.playerIndex, 0)
+    assert.equal(first.state.currentPlayerIndex, 0)
     const undone = ok(s.undoAction())
+    assertUndoRestored(beforeRules, undone)
+    assert.deepEqual(undone.interaction, beforeUndo.interaction)
+    assert.equal(undone.interaction.stateId, 'idle')
+    assert.equal(undone.state.currentPlayerIndex, 0)
     assert.equal(s.withCtx(() => getExtraRoomCapacity(undone.state.players[0]!)), 0)
     assert.ok(undone.state.players[0]!.occupationHand.includes(CARD))
     const retry = play(s)
+    assert.ok(retry.interaction.stateId === 'wait')
+    assert.deepEqual(retry.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(retry.interaction.playerIndex, 0)
+    assert.equal(retry.state.currentPlayerIndex, 0)
     assert.equal(s.withCtx(() => getExtraRoomCapacity(retry.state.players[0]!)), 1)
     assert.equal(familySize(retry.state.players[0]!), 2)
+
     sessionEvidence.record('A127-N6', { first, undone, retry })
   })
 })
