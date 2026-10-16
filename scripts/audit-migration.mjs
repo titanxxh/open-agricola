@@ -107,11 +107,16 @@ function checkNative(manifest) {
       && /(?:^|\/)(?:__tests__|__fixtures__|tests|fixtures)\//.test(relative)
       && /\.[cm]?[jt]sx?$/.test(file) && !/\.d\.[cm]?ts$/.test(file)
   })
+  const loadedConfig = ts.readConfigFile(config, ts.sys.readFile)
+  if (loadedConfig.error) fail('Cannot read native snapshot-policy compiler configuration')
+  const parsedConfig = ts.parseJsonConfigFileContent(loadedConfig.config, ts.sys, path.dirname(config))
+  if (parsedConfig.errors.length) fail('Cannot parse native snapshot-policy compiler configuration')
+  const program = ts.createProgram(parsedConfig.fileNames, parsedConfig.options)
   for (const file of observationSources) {
-    const violations = normalizingSnapshotViolations(fs.readFileSync(file, 'utf8'), path.relative(root, file))
+    const violations = normalizingSnapshotViolations(fs.readFileSync(file, 'utf8'), file, program)
     if (violations.length) {
       const issue = violations[0]
-      fail(`Normalizing test snapshot: ${issue.file}:${issue.line}:${issue.column}: ${issue.message}`)
+      fail(`Normalizing test snapshot: ${path.relative(root, issue.file)}:${issue.line}:${issue.column}: ${issue.message}`)
     }
   }
   return { nativeFiles, typesExit, fileInventoryExit, missingTypeRoots, includedFiles: included.size, reportDirectory: output }

@@ -1,3 +1,4 @@
+import { normalizationSubject } from './_helpers/normalization-subject'
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { createInitialState, normalizeState } from '../../shared/session/state-bootstrap'
@@ -177,6 +178,8 @@ describe('3P resource-market XOR choice', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId === 'wait') {
+      expect(resp.interaction.request.kind).toBe('choice')
+      if (resp.interaction.request.kind !== 'choice') throw new Error('Expected the resource-market choice')
       expect(resp.interaction.request.options).toHaveLength(2)
     }
   })
@@ -194,6 +197,8 @@ describe('3P resource-market XOR choice', () => {
     const resp = session.takeAction(0, 'resource-market')
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.request.kind).toBe('choice')
+    if (resp.interaction.request.kind !== 'choice') throw new Error('Expected the resource-market choice')
     // First option is reed+food (action-gain-0)
     const resp2 = session.resolveChoice(0, resp.interaction.request.options[0]!.value)
     expect(resp2.ok).toBe(true)
@@ -214,6 +219,8 @@ describe('3P resource-market XOR choice', () => {
     const resp = session.takeAction(0, 'resource-market')
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.request.kind).toBe('choice')
+    if (resp.interaction.request.kind !== 'choice') throw new Error('Expected the resource-market choice')
     // Second option is stone+food (action-gain-1)
     const resp2 = session.resolveChoice(0, resp.interaction.request.options[1]!.value)
     expect(resp2.ok).toBe(true)
@@ -234,7 +241,10 @@ describe('3P lessons-3 cost', () => {
 
     const resp = session.takeAction(0, 'lessons-3')
     expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId === 'wait') {
+      expect(resp.interaction.request.kind).toBe('choice')
+      if (resp.interaction.request.kind !== 'choice') throw new Error('Expected the occupation choice')
       const occId = resp.interaction.request.options[0]!.value
       const resp2 = session.resolveChoice(0, occId)
       expect(resp2.ok).toBe(true)
@@ -250,7 +260,7 @@ describe('normalizeState preserves player-count filtering', () => {
   it('3P state round-trips correctly', () => {
     const original = createInitialState(42, { playerCount: 3 })
     const serialized = JSON.parse(JSON.stringify(original))
-    const restored = normalizeState(serialized)
+    const restored = normalizationSubject(normalizeState, serialized)
     const originalIds = original.actionSpaces.map((s) => s.id).sort()
     const restoredIds = restored.actionSpaces.map((s) => s.id).sort()
     expect(restoredIds).toEqual(originalIds)
@@ -270,7 +280,7 @@ describe('normalizeState preserves player-count filtering', () => {
       takenBy: [],
     })
 
-    const restored = normalizeState(serialized)
+    const restored = normalizationSubject(normalizeState, serialized)
     expect(restored.actionSpaces.some((space) => space.id === 'copse')).toBe(false)
   })
 
@@ -285,7 +295,7 @@ describe('normalizeState preserves player-count filtering', () => {
       takenBy: [],
     })
 
-    const restored = normalizeState(serialized, id => id === '__test-worker-sink__'
+    const restored = normalizationSubject(normalizeState, serialized, id => id === '__test-worker-sink__'
       ? { ...original.actionSpaces[0]!, id: '__test-worker-sink__' } : undefined)
     expect(restored.actionSpaces.some((space) => space.id === '__test-worker-sink__')).toBe(true)
   })
