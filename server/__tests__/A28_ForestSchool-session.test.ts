@@ -236,6 +236,9 @@ describe("A028 command boundaries", () => {
     assert.ok(event.type === 'card.played')
     assert.equal(event.actorPlayerId, result.state.players[0]!.id)
     assert.deepEqual(event.payment?.resources ?? {}, card === SCHOOL ? { wood: 1, clay: 1 } : {})
+    assert.ok(result.interaction.stateId === 'wait' && result.interaction.request.kind === 'confirm-next-player', JSON.stringify(result.interaction))
+    assert.equal(result.interaction.playerIndex, 0)
+    assert.equal(result.state.currentPlayerIndex, 0)
     return result
   }
   function ready(s: GameSession, actor: number) {
@@ -273,6 +276,9 @@ describe("A028 command boundaries", () => {
     const event = events[0]!
     assert.ok(event.type === 'card.played')
     assert.deepEqual(event.payment?.resources ?? {}, Object.fromEntries(Object.entries(paid).filter(([, n]) => n > 0)))
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, actor)
+    assert.equal(r.state.currentPlayerIndex, actor)
     return r
   }
   function occupiedSchool({ played = true, other = false, players = 2, resources = { wood: 1, food: 0 }, occupations = 1, space = 'lessons' }: {
@@ -326,6 +332,9 @@ describe("A028 command boundaries", () => {
       const s = occupiedSchool({ played: false, other })
       assertRejectedUnchanged(s, () => s.takeAction(0, 'lessons'))
       const r = turn(s, 0, 'forest')
+      assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+      assert.equal(r.interaction.playerIndex, 0)
+      assert.equal(r.state.currentPlayerIndex, 0)
       assert.equal(r.state.players[0]!.occupationPlayed.includes('A123_FrameBuilder'), false)
     }
   })
@@ -348,6 +357,9 @@ describe("A028 command boundaries", () => {
     const s = occupiedSchool({ players: 3, resources: { food: 0, wood: 1 }, space: 'lessons-3' })
     assertRejectedUnchanged(s, () => s.takeAction(0, 'lessons-3'))
     const r = turn(s, 0, 'clay-pit')
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
     assert.equal(r.state.players[0]!.occupationPlayed.includes('A123_FrameBuilder'), false)
     assert.equal(r.state.players[0]!.resources.wood, 1)
   })

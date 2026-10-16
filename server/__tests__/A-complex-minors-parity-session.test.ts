@@ -825,6 +825,9 @@ describe("A029 command boundaries", () => {
     assert.ok(event.type === 'card.played')
     assert.equal(event.actorPlayerId, result.state.players[0]!.id)
     assert.deepEqual(event.payment?.resources ?? {}, card === ALE ? { wood: 1 } : {})
+    assert.ok(result.interaction.stateId === 'wait' && result.interaction.request.kind === 'confirm-next-player', JSON.stringify(result.interaction))
+    assert.equal(result.interaction.playerIndex, 0)
+    assert.equal(result.state.currentPlayerIndex, 0)
     return result
   }
 
@@ -882,6 +885,8 @@ describe("A029 command boundaries", () => {
         assert.deepEqual(gift.to, { kind: 'player', playerId: r.state.players[i]!.id })
       }
     }
+    assert.equal(r.interaction.stateId, 'idle')
+    assert.equal(r.state.currentPlayerIndex, 0)
   }
   it("actual purchase requires two occupations and pays one wood", () => {
     const s = setup({ occupations: 2, resources: { wood: 1 } })

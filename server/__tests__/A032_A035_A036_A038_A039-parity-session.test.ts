@@ -325,9 +325,18 @@ describe("A035 command boundaries", () => {
   function buy(s: GameSession, card: string) {
     const r = buyMenu(s)
     if (r.state.players[0]!.minorPlayed.includes(card))
-      return r
+      {
+        assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+        assert.equal(r.interaction.playerIndex, 0)
+        assert.equal(r.state.currentPlayerIndex, 0)
+        return r
+      }
     assert.ok(options(r).some(o => o.value === card && !('disabled' in o && o.disabled)))
-    return ok(s.resolveChoice(0, card))
+    const completedResponse = ok(s.resolveChoice(0, card))
+    assert.ok(completedResponse.interaction.stateId === 'wait' && completedResponse.interaction.request.kind === 'confirm-next-player', JSON.stringify(completedResponse.interaction))
+    assert.equal(completedResponse.interaction.playerIndex, 0)
+    assert.equal(completedResponse.state.currentPlayerIndex, 0)
+    return completedResponse
   }
   function deny(s: GameSession, card: string) {
     const r = buyMenu(s)
@@ -374,7 +383,10 @@ describe("A035 command boundaries", () => {
     assert.equal(vp(grown, SWIM), 0)
     const last = turn(s, 1, 'clay-pit')
     assert.equal(vp(last, SWIM), 0)
-    return confirmNext(s, last)
+    const completedResponse = confirmNext(s, last)
+    assert.equal(completedResponse.interaction.stateId, 'idle')
+    assert.equal(completedResponse.state.currentPlayerIndex, 0)
+    return completedResponse
   }
   it("actual purchase requires two occupations and pays one food", () => {
     deny(setup({ occupations: 1, resources: { food: 1 } }), SWIM)
@@ -406,6 +418,8 @@ describe("A035 command boundaries", () => {
     turn(s, 1, 'forest')
     turn(s, 0, 'grain-seeds')
     const first = confirmNext(s, turn(s, 1, 'clay-pit'))
+    assert.equal(first.interaction.stateId, 'idle')
+    assert.equal(first.state.currentPlayerIndex, 0)
     assert.equal(first.state.round, 6)
     assert.equal(vp(first, SWIM), 0)
     assert.equal(familySize(first.state.players[0]!), 2)
@@ -461,6 +475,9 @@ describe("A032 command boundaries", () => {
       r = ok(s.resolveChoice(0, candidate.value))
     }
     assert(r.state.players[0]!.minorPlayed.includes(card) || r.state.players[0]!.improvements.includes(card))
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
     return r
   }
   function denied(s: GameSession, card: string) {
@@ -547,13 +564,19 @@ describe("A032 command boundaries", () => {
   it("actual three fence enclosure crosses six spaces and full undo restores five spaces", () => {
     const s = manger(5, { wood: 3 })
     const before = undoRuleSnapshot(s.getState())
+    const beforeInteraction = JSON.stringify(s.getState().interaction)
     assert.equal(bonus(s.getState(), MANGER), 0)
     const menu = ok(s.takeAction(0, 'fencing'))
     assert(menu.interaction.stateId === 'wait' && menu.interaction.request.kind === 'farm-select', JSON.stringify(menu.interaction))
     const r = ok(s.commitSelectionChoice(0, { edges: ['H-2-0', 'V-1-0', 'V-1-1'] }))
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
     assert.equal(r.state.players[0]!.resources.wood, 0)
     assert.equal(r.state.players[0]!.fenceSegments.length, 15)
     assert.equal(bonus(r, MANGER), 1)
-    assertUndoRestored(before, s.undoAction())
+    const undone = s.undoAction()
+    assertUndoRestored(before, undone)
+    assert.equal(JSON.stringify(undone.interaction), beforeInteraction)
   })
 })

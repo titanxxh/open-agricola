@@ -159,9 +159,18 @@ describe("A033 command boundaries", () => {
   function buy(s: GameSession, card: string) {
     const r = buyMenu(s)
     if (r.state.players[0]!.minorPlayed.includes(card))
-      return r
+      {
+        assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+        assert.equal(r.interaction.playerIndex, 0)
+        assert.equal(r.state.currentPlayerIndex, 0)
+        return r
+      }
     assert.ok(options(r).some(o => o.value === card && !('disabled' in o && o.disabled)))
-    return ok(s.resolveChoice(0, card))
+    const completedResponse = ok(s.resolveChoice(0, card))
+    assert.ok(completedResponse.interaction.stateId === 'wait' && completedResponse.interaction.request.kind === 'confirm-next-player', JSON.stringify(completedResponse.interaction))
+    assert.equal(completedResponse.interaction.playerIndex, 0)
+    assert.equal(completedResponse.state.currentPlayerIndex, 0)
+    return completedResponse
   }
   function deny(s: GameSession, card: string) {
     const r = buyMenu(s)
@@ -194,12 +203,15 @@ describe("A033 command boundaries", () => {
   it("immediate points and food survive stale rejection and whole purchase undo retry", () => {
     const s = setup({ round: 10 }, state => fullFarm(state))
     const before = undoRuleSnapshot(s.getState())
+    const beforeInteraction = JSON.stringify(s.getState().interaction)
     let r = buy(s, BIG)
     assert.equal(r.state.players[0]!.resources.food, 48)
     assert.equal(vp(r, BIG), 4)
     assert.equal(score(r, BIG), 4)
     assertRejectedUnchanged(s, () => s.resolveChoice(0, BIG))
-    assertUndoRestored(before, s.undoAction())
+    const undone = s.undoAction()
+    assertUndoRestored(before, undone)
+    assert.equal(JSON.stringify(undone.interaction), beforeInteraction)
     r = buy(s, BIG)
     assert.equal(vp(r, BIG), 4)
     assert.equal(score(r, BIG), 4)

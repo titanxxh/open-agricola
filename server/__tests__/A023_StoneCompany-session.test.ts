@@ -290,7 +290,11 @@ describe("A023 command boundaries", () => {
   }
   function buy(s: GameSession, card: string) {
     const r = minor(s, card)
-    return r.state.players[0]!.minorPlayed.includes(card) ? r : choose(s, r, o => o.value === card)
+    const completedResponse = r.state.players[0]!.minorPlayed.includes(card) ? r : choose(s, r, o => o.value === card)
+    assert.ok(completedResponse.interaction.stateId === 'wait' && completedResponse.interaction.request.kind === 'confirm-next-player', JSON.stringify(completedResponse.interaction))
+    assert.equal(completedResponse.interaction.playerIndex, 0)
+    assert.equal(completedResponse.state.currentPlayerIndex, 0)
+    return completedResponse
   }
   function denied(s: GameSession, card: string) {
     const r = minor(s, card)
@@ -312,6 +316,9 @@ describe("A023 command boundaries", () => {
     let current = acceptCompany(s, response)
     if (!current.state.players[0]!.minorPlayed.includes(card))
       current = choose(s, current, option => option.value === card)
+    assert.ok(current.interaction.stateId === 'wait' && current.interaction.request.kind === 'confirm-next-player', JSON.stringify(current.interaction))
+    assert.equal(current.interaction.playerIndex, 0)
+    assert.equal(current.state.currentPlayerIndex, 0)
     return current
   }
   it("clay or reed fee shortage rejects forged purchase before exact-cost control", () => {
@@ -352,11 +359,17 @@ describe("A023 command boundaries", () => {
   it("decline undo and stale purchase cannot duplicate Quarry improvement", () => {
     const s = setup({ hand: [TAP], resources: { wood: 2 } })
     const before = undoRuleSnapshot(s.getState())
+    const beforeInteraction = JSON.stringify(s.getState().interaction)
     quarry(s)
-    ok(s.resolveChoice(0, '__skip__'))
+    const declined = ok(s.resolveChoice(0, '__skip__'))
+    assert.ok(declined.interaction.stateId === 'wait' && declined.interaction.request.kind === 'confirm-next-player', JSON.stringify(declined.interaction))
+    assert.equal(declined.interaction.playerIndex, 0)
+    assert.equal(declined.state.currentPlayerIndex, 0)
     assert.equal(s.getState().state.players[0]!.resources.stone, 1)
     assert.ok(s.getState().state.players[0]!.minorHand.includes(TAP))
-    assertUndoRestored(before, s.undoAction())
+    const undone = s.undoAction()
+    assertUndoRestored(before, undone)
+    assert.equal(JSON.stringify(undone.interaction), beforeInteraction)
     const r = improvement(s, quarry(s))
     assert.equal(r.state.players[0]!.resources.stone, 0)
     assert.equal(r.state.players[0]!.resources.wood, 1)
@@ -367,12 +380,18 @@ describe("A023 command boundaries", () => {
     // The non-Quarry Resource Market exists only in the four-player action pool.
     const market = setup({ players: 4, hand: [TAP], resources: { wood: 2 } })
     const non = turn(market, 0, 'resource-market-4')
+    assert.ok(non.interaction.stateId === 'wait' && non.interaction.request.kind === 'confirm-next-player', JSON.stringify(non.interaction))
+    assert.equal(non.interaction.playerIndex, 0)
+    assert.equal(non.state.currentPlayerIndex, 0)
     assert.equal(non.state.players[0]!.resources.stone, 1)
     assert.ok(non.state.players[0]!.minorHand.includes(TAP))
     assert.equal(non.state.players[0]!.minorPlayed.includes(TAP), false)
     const s = setup({ hand: [TAP], opponentHand: [PARLOR], resources: { wood: 2 }, opponent: { wood: 2 } })
     turn(s, 0, 'forest')
     const r = turn(s, 1, 'western-quarry')
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, 1)
+    assert.equal(r.state.currentPlayerIndex, 1)
     assert.ok(r.state.players[0]!.minorHand.includes(TAP))
     assert.ok(r.state.players[1]!.minorHand.includes(PARLOR))
     assert.equal(r.state.players[1]!.resources.stone, 1)

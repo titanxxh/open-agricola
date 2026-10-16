@@ -190,6 +190,9 @@ describe("A030 command boundaries", () => {
       r = ok(s.resolveChoice(0, candidate.value))
     }
     assert(r.state.players[0]!.minorPlayed.includes(card) || r.state.players[0]!.improvements.includes(card))
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
     return r
   }
   function denied(s: GameSession, card: string) {
@@ -244,7 +247,11 @@ describe("A030 command boundaries", () => {
     const current = sheetMenu(s, r)
     const takes = options(current).filter(option => option.value !== '__skip__' && !option.disabled)
     assert.equal(takes.length, 1, JSON.stringify(current.interaction))
-    return ok(s.resolveChoice(0, takes[0]!.value))
+    const completedResponse = ok(s.resolveChoice(0, takes[0]!.value))
+    assert.ok(completedResponse.interaction.stateId === 'wait' && completedResponse.interaction.request.kind === 'confirm-next-player', JSON.stringify(completedResponse.interaction))
+    assert.equal(completedResponse.interaction.playerIndex, 0)
+    assert.equal(completedResponse.state.currentPlayerIndex, 0)
+    return completedResponse
   }
   it("planted grain forbids purchase while empty and vegetable fields allow a neutral free purchase", () => {
     denied(sheet({ played: false }, state => {
@@ -262,14 +269,10 @@ describe("A030 command boundaries", () => {
   })
   it("no facility and forged zero normal bake cannot grant the exchange before a real bake control", () => {
     const none = sheet({ facility: false })
-    const before = undoRuleSnapshot(none.getState())
-    const r = none.takeAction(0, 'grain-utilization')
-    if (!r.ok)
-      assert.equal(undoRuleSnapshot(r), before)
-    else {
-      if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice')
-        assert(!getChoiceOptions(r).some(o => o.sourceCard === SHEET && !o.disabled))
-    }
+    const unavailable = assertRejectedUnchanged(none, () => none.takeAction(0, 'grain-utilization'))
+    assert.equal(unavailable.error, 'space unavailable')
+    assert.equal(unavailable.interaction.stateId, 'idle')
+    assert.equal(unavailable.state.currentPlayerIndex, 0)
     assertRejectedUnchanged(none, () => none.resolveChoice(0, SHEET))
     assert.equal(none.state.players[0]!.resources.grain, 2)
     assert.equal(bonus(none.getState(), SHEET), 0)
@@ -287,6 +290,9 @@ describe("A030 command boundaries", () => {
   it("spending the last grain on normal baking gives no extra exchange or point", () => {
     const s = sheet({ grain: 1 })
     const r = bake(s)
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
     assert.equal(r.state.players[0]!.resources.grain, 0)
     assert.equal(r.state.players[0]!.resources.food, 22)
     assert.equal(bonus(r, SHEET), 0)
@@ -295,17 +301,23 @@ describe("A030 command boundaries", () => {
   it("one exact grain exchange rejects wrong actor and stale requests then whole action undo retries once", () => {
     const s = sheet({ grain: 3 })
     const before = undoRuleSnapshot(s.getState())
+    const beforeInteraction = JSON.stringify(s.getState().interaction)
     const r = sheetMenu(s, bake(s))
     const take = options(r).find(o => o.value !== '__skip__')
     assert(take)
     assertRejectedUnchanged(s, () => s.resolveChoice(1, take.value))
     assertRejectedUnchanged(s, () => s.resolveChoice(0, 'exchange-two-grain'))
     const after = ok(s.resolveChoice(0, take.value))
+    assert.ok(after.interaction.stateId === 'wait' && after.interaction.request.kind === 'confirm-next-player', JSON.stringify(after.interaction))
+    assert.equal(after.interaction.playerIndex, 0)
+    assert.equal(after.state.currentPlayerIndex, 0)
     assert.equal(after.state.players[0]!.resources.grain, 1)
     assert.equal(after.state.players[0]!.resources.food, 24)
     assert.equal(bonus(after, SHEET), 1)
     assertRejectedUnchanged(s, () => s.resolveChoice(0, take.value))
-    assertUndoRestored(before, s.undoAction())
+    const undone = s.undoAction()
+    assertUndoRestored(before, undone)
+    assert.equal(JSON.stringify(undone.interaction), beforeInteraction)
     assert.equal(bonus(acceptSheet(s, bake(s)), SHEET), 1)
   })
   it("declining its exchange preserves remaining grain and grants no bonus", () => {
@@ -314,6 +326,9 @@ describe("A030 command boundaries", () => {
     const decline = options(r).find(o => o.value === '__skip__')
     assert(decline)
     const after = ok(s.resolveChoice(0, decline.value))
+    assert.ok(after.interaction.stateId === 'wait' && after.interaction.request.kind === 'confirm-next-player', JSON.stringify(after.interaction))
+    assert.equal(after.interaction.playerIndex, 0)
+    assert.equal(after.state.currentPlayerIndex, 0)
     assert.equal(after.state.players[0]!.resources.grain, 1)
     assert.equal(after.state.players[0]!.resources.food, 22)
     assert.equal(bonus(after, SHEET), 0)
@@ -325,6 +340,9 @@ describe("A030 command boundaries", () => {
     })
     confirmNext(s, ok(s.takeAction(0, 'day-laborer')))
     const r = bake(s, 1, 'Major_Fireplace2')
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, 1)
+    assert.equal(r.state.currentPlayerIndex, 1)
     assert.equal(r.state.players[1]!.resources.grain, 1)
     assert.equal(r.state.players[1]!.resources.food, 22)
     assert.equal(r.state.players[0]!.resources.grain, 2)
@@ -340,6 +358,8 @@ describe("A030 command boundaries", () => {
     assert(cook)
     assert(cook.value.startsWith('trade:'))
     const after = ok(s.resolveChoice(0, `bulk:${cook.value.split(':')[1]}=1`))
+    assert.equal(after.interaction.stateId, 'idle')
+    assert.equal(after.state.currentPlayerIndex, 0)
     assert.equal(after.state.players[0]!.resources.vegetable, 0)
     assert.equal(after.state.players[0]!.resources.food, 22)
     assert.equal(after.state.players[0]!.resources.grain, 2)
