@@ -115,6 +115,28 @@ describe('A076 Cob parity', () => {
 
 describe("A076 command boundaries", () => {
   const COB = 'A076_Cob'
+  function confirmed(r: SessionResponse, actor = 0) {
+    assert.equal(r.ok, true, r.error)
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, actor)
+    assert.equal(r.state.currentPlayerIndex, actor)
+    assert.equal(r.interaction.request.nextPlayerIndex, 1 - actor)
+    return r
+  }
+  function roundStarted(r: SessionResponse, round: number) {
+    assert.equal(r.ok, true, r.error)
+    assert.equal(r.interaction.stateId, 'idle', JSON.stringify(r.interaction))
+    assert.equal(r.state.currentPlayerIndex, 0)
+    assert.equal(r.state.roundPhase, 'work')
+    assert.equal(r.state.round, round)
+    return r
+  }
+  function restoredInteraction(s: GameSession, r: SessionResponse, expected: string) {
+    assert.equal(JSON.stringify(r.interaction), expected)
+    assert.equal(JSON.stringify(s.getState().interaction), expected)
+    assert.equal(r.state.currentPlayerIndex, 0)
+    assert.equal(s.getState().state.currentPlayerIndex, 0)
+  }
   function ok(r: SessionResponse) {
     assert.equal(r.ok, true, r.error)
     return r
@@ -170,49 +192,57 @@ describe("A076 command boundaries", () => {
   function buy(s: GameSession, card: string) {
     const r = buyMenu(s)
     if (r.state.players[0]!.minorPlayed.includes(card))
-      return r
+      return confirmed(r)
     assert.ok(options(r).some(o => o.value === card && !('disabled' in o && o.disabled)))
-    return record(`buy:${card}`, ok(s.resolveChoice(0, card)))
+    return confirmed(record(`buy:${card}`, ok(s.resolveChoice(0, card))))
   }
   function deny(s: GameSession, card: string) {
     let r = buyMenu(s)
     assert.ok(!r.state.players[0]!.minorPlayed.includes(card))
     record(`denied:${card}`, assertRejectedUnchanged(s, () => s.resolveChoice(0, card)))
     const food = r.state.players[0]!.resources.food
-    r = ok(s.resolveChoice(0, 'B007_Wage'))
+    r = confirmed(ok(s.resolveChoice(0, 'B007_Wage')))
     assert.equal(r.state.players[0]!.resources.food - food, 2)
     return r
   }
   function ready(s: GameSession, actor: number) {
     let r = s.getState()
     if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
-      r = record('confirm', confirmNext(s, r))
+      r = record('confirm', confirmNext(s, confirmed(r, 1 - actor)))
     assert.equal(r.interaction.stateId, 'idle', JSON.stringify(r.interaction))
     assert.equal(r.state.currentPlayerIndex, actor)
     return r
   }
   function turn(s: GameSession, actor: number, space: string) {
     ready(s, actor)
-    return record(`takeAction:${actor}:${space}`, ok(s.takeAction(actor, space)))
+    return confirmed(record(`takeAction:${actor}:${space}`, ok(s.takeAction(actor, space))), actor)
   }
-  function complete(s: GameSession, partial = false) {
-    if (!partial)
-      turn(s, 0, 'reed-bank')
+  function complete(s: GameSession, expected: 'offer' | 'idle', round = 6) {
+    turn(s, 0, 'reed-bank')
     turn(s, 1, 'forest')
     turn(s, 0, 'day-laborer')
-    return record('round-confirm', confirmNext(s, turn(s, 1, 'clay-pit')))
+    const r = record('round-confirm', confirmNext(s, turn(s, 1, 'clay-pit')))
+    assert.equal(r.state.round, round)
+    return expected === 'offer' ? cobOffer(r) : roundStarted(r, round)
   }
   function resources(r: SessionResponse) {
     const p = r.state.players[0]!.resources
     return { clay: p.clay, grain: p.grain, food: p.food }
   }
-  function exchange(s: GameSession, r: SessionResponse, accept = true) {
-    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'select-trigger')
-      r = choose(s, r, o => o.sourceCard === COB)
+  function cobOffer(r: SessionResponse) {
     assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice', JSON.stringify(r.interaction))
     assert.equal(r.interaction.sourceCard, COB)
     assert.equal(r.interaction.promptKey, 'ui.interactionCob')
-    return choose(s, r, o => accept ? o.value !== '__skip__' && !('disabled' in o && o.disabled) : o.value === '__skip__')
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
+    assert.equal(r.state.roundPhase, 'preparation')
+    assert.equal(options(r).filter(option => option.value !== '__skip__' && !option.disabled).length, 1)
+    assert.ok(options(r).some(option => option.value === '__skip__' && !option.disabled))
+    return r
+  }
+  function exchange(s: GameSession, r: SessionResponse, accept = true) {
+    cobOffer(r)
+    return roundStarted(choose(s, r, option => accept ? option.value !== '__skip__' : option.value === '__skip__'), r.state.round)
   }
   it("one food purchase has no immediate exchange and zero food rejects", () => {
     deny(setup({ resources: { food: 0, clay: 1, grain: 2 } }), COB)
@@ -221,7 +251,7 @@ describe("A076 command boundaries", () => {
   })
   it("natural work phase accepts exactly one grain and cannot repeat in same phase", () => {
     const s = setup({ played: true, resources: { clay: 1, grain: 2 } })
-    const offer = complete(s)
+    const offer = complete(s, 'offer')
     const acceptedValue = options(offer).find(o => o.value !== '__skip__' && !('disabled' in o && o.disabled))?.value
     assert.ok(acceptedValue)
     let r = exchange(s, offer)
@@ -233,9 +263,9 @@ describe("A076 command boundaries", () => {
   })
   it("decline preserves crops and clay and next phase offers once again", () => {
     const s = setup({ played: true, resources: { clay: 1, grain: 2 } })
-    let r = exchange(s, complete(s), false)
+    let r = exchange(s, complete(s, 'offer'), false)
     assert.deepEqual(resources(r), { clay: 1, grain: 2, food: 42 })
-    r = exchange(s, complete(s))
+    r = exchange(s, complete(s, 'offer', 7))
     assert.equal(r.state.round, 7)
     assert.deepEqual(resources(r), { clay: 3, grain: 1, food: 45 })
   })
@@ -243,7 +273,7 @@ describe("A076 command boundaries", () => {
     const s = setup({ played: true, resources: { clay: 0, grain: 1 } }, state => {
       state.players[1]!.resources.clay = 3
     })
-    const r = complete(s)
+    const r = complete(s, 'idle')
     assert.equal(r.interaction.stateId, 'idle')
     assert.deepEqual(resources(r), { clay: 0, grain: 1, food: 42 })
     record('no-clay', assertRejectedUnchanged(s, () => s.resolveChoice(0, 'pay-gain')))
@@ -252,19 +282,19 @@ describe("A076 command boundaries", () => {
     const s = setup({ played: true, resources: { clay: 1, grain: 0 } }, state => {
       state.players[1]!.resources.grain = 3
     })
-    const r = complete(s)
+    const r = complete(s, 'idle')
     assert.equal(r.interaction.stateId, 'idle')
     assert.deepEqual(resources(r), { clay: 1, grain: 0, food: 42 })
     record('no-grain', assertRejectedUnchanged(s, () => s.resolveChoice(0, 'pay-gain')))
   })
   it("exact last grain exchange leaves no grain and never spends prerequisite clay", () => {
     const s = setup({ played: true, resources: { clay: 1, grain: 1 } })
-    const r = exchange(s, complete(s))
+    const r = exchange(s, complete(s, 'offer'))
     assert.deepEqual(resources(r), { clay: 3, grain: 0, food: 43 })
   })
   it("unplayed card never exchanges during a natural work phase", () => {
     const s = setup({ resources: { clay: 1, grain: 1 } })
-    const r = complete(s)
+    const r = complete(s, 'idle')
     assert.equal(r.interaction.stateId, 'idle')
     assert.deepEqual(resources(r), { clay: 1, grain: 1, food: 42 })
   })
@@ -276,20 +306,25 @@ describe("A076 command boundaries", () => {
     turn(s, 1, 'forest')
     turn(s, 0, 'day-laborer')
     r = record('midwork-clay-confirm', confirmNext(s, turn(s, 1, 'reed-bank')))
+    assert.equal(r.state.round, 6)
     r = exchange(s, r)
     assert.deepEqual(resources(r), { clay: 3, grain: 0, food: 43 })
   })
   it("whole purchase undo restores food hand and exchange resources before retry", () => {
     const s = setup({ resources: { clay: 1, grain: 1 } })
-    const before = undoRuleSnapshot(s.getState())
+    const initial = roundStarted(s.getState(), 5)
+    const beforeInteraction = JSON.stringify(initial.interaction)
+    const before = undoRuleSnapshot(initial)
     buy(s, COB)
-    assertUndoRestored(before, record('undo-cob-buy', s.undoAction()))
+    const restored = record('undo-cob-buy', s.undoAction())
+    assertUndoRestored(before, restored)
+    restoredInteraction(s, restored, beforeInteraction)
     const r = buy(s, COB)
     assert.deepEqual(resources(r), { clay: 1, grain: 1, food: 39 })
   })
   it("actual work phase exchange undo records exposed eligibility before any retry", () => {
     const s = setup({ played: true, resources: { clay: 1, grain: 1 } })
-    const offer = complete(s)
+    const offer = complete(s, 'offer')
     const r = exchange(s, offer)
     assert.deepEqual(resources(r), { clay: 3, grain: 0, food: 43 })
     const undone = record('undo-cob-phase', assertRejectedUnchanged(s, () => s.undoStep()))
