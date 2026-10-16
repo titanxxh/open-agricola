@@ -60,6 +60,15 @@ function replaceOnce(source, before, after, file) {
 }
 
 function adaptSource(file, source) {
+  const evidenceDirectory = "(process.env.AGRICOLA_NEGATIVE_ARTIFACT_DIR ?? 'output/ae-negative')"
+  if (file === 'ae-negative-05-building-session.test.ts') {
+    source = replaceOnce(source, "mkdirSync('output/ae-negative/building-oa-artifacts',", `mkdirSync(${evidenceDirectory},`, file)
+    source = replaceOnce(source, "writeFileSync('output/ae-negative/building-oa-artifacts/A014-N5-duplicate.json',", `writeFileSync(${evidenceDirectory} + '/A014-N5-duplicate.json',`, file)
+  }
+  if (file === 'ae-negative-08-triggers-session.test.ts') {
+    source = replaceOnce(source, "mkdirSync('output/ae-negative',", `mkdirSync(${evidenceDirectory},`, file)
+    source = replaceOnce(source, '`output/ae-negative/08-oa-facts-', '`' + '${' + evidenceDirectory + '}/08-oa-facts-', file)
+  }
   if (file === 'ae-negative-25-occupations-session.test.ts') {
     source = replaceOnce(source, 'sourceCard:flow.sourceCard,eventSink}', 'sourceCard:flow.sourceCard,eventSink,actionHooks:session.actionHooks}', file)
   }
