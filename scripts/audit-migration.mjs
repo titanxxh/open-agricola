@@ -91,7 +91,8 @@ function prepare(manifest, output) {
   const commonGit = path.resolve(root, git('rev-parse', '--git-common-dir').toString().trim())
   for (const checkout of [root, path.dirname(commonGit)]) {
     const relative = path.relative(checkout, output)
-    if (!relative.startsWith('..') && !path.isAbsolute(relative)) fail('overlay and evidence must be outside Git')
+    const outside = relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)
+    if (!outside) fail('overlay and evidence must be outside Git')
   }
   if (fs.existsSync(output)) fail('output already exists; select a fresh run directory')
   const candidate = path.join(output, 'candidate')
@@ -134,7 +135,7 @@ function prepare(manifest, output) {
   const covered = [...new Set([...tracked, ...remainingFiles, helper, 'vitest.migration.config.ts', 'tsconfig.migration.json'])].filter(file => fs.existsSync(path.join(candidate, file)) && fs.statSync(path.join(candidate, file)).isFile()).sort()
   const candidateFingerprints = covered.map(file => [file, digest(fs.readFileSync(path.join(candidate, file)))])
   json(path.join(output, 'cases.json'), manifest)
-  json(path.join(output, 'assembly.json'), { candidateCommit: git('rev-parse', 'HEAD').toString().trim(), candidateFingerprint: digest(JSON.stringify(fingerprints)), candidateFiles: fingerprints, assembledFiles: candidateFingerprints, assembledFingerprint: digest(JSON.stringify(candidateFingerprints)), sourceInventory: sourceInventory(candidate), source: manifest.source, sourceFiles: sourceDigests, remainingFiles, nativeFiles, remainingCases: titles.length, createdAt: new Date().toISOString() })
+  json(path.join(output, 'assembly.json'), { candidateCommit: git('rev-parse', 'HEAD').toString().trim(), candidateFingerprint: digest(JSON.stringify(fingerprints)), candidateFiles: fingerprints, assembledFiles: candidateFingerprints, assembledFingerprint: digest(JSON.stringify(candidateFingerprints)), sourceInventory: sourceInventory(candidate), runManifestSha256: digest(fs.readFileSync(path.join(output, 'cases.json'))), source: manifest.source, sourceFiles: sourceDigests, remainingFiles, nativeFiles, remainingCases: titles.length, createdAt: new Date().toISOString() })
   return { candidate, remainingFiles: remainingFiles.length, nativeFiles: nativeFiles.length, remainingCases: titles.length }
 }
 
@@ -149,6 +150,8 @@ function verify(output) {
   if (!fs.existsSync(path.join(output, 'assembly.json'))) fail('run prepare before verify')
   const assembly = JSON.parse(fs.readFileSync(path.join(output, 'assembly.json'), 'utf8'))
   const assertCandidate = () => {
+    const runManifest = path.join(output, 'cases.json')
+    if (!fs.existsSync(runManifest) || digest(fs.readFileSync(runManifest)) !== assembly.runManifestSha256) fail('run manifest changed since assembly')
     if (JSON.stringify(sourceInventory(candidate)) !== JSON.stringify(assembly.sourceInventory)) fail('candidate source inventory changed since assembly')
     for (const [file, expected] of assembly.assembledFiles) if (!fs.existsSync(path.join(candidate, file)) || digest(fs.readFileSync(path.join(candidate, file))) !== expected) fail(`candidate changed since assembly: ${file}`)
   }
