@@ -344,6 +344,55 @@ it('checks the actual loadState receiver in the native compiler Program', () => 
   expect(restored.status, restored.stderr).toBe(0)
 }, 30000)
 
+it.each(['server/test-support/snapshots.ts', 'arbitrary/snapshots.ts'])(
+  'checks the actual transitive helper %s despite a type-only production edge', helper => {
+    const { write, cli } = createSnapshotFixture()
+    const importFrom = (file: string, target: string) => {
+      const relative = path.relative(path.dirname(file), target).split(path.sep).join('/').replace(/\.ts$/, '')
+      return relative.startsWith('.') ? relative : `./${relative}`
+    }
+    write('shared/session/session-core.ts', `import type { Tag } from '${importFrom('shared/session/session-core.ts', helper)}'; export class GameCore { loadState(state: unknown) { return state } }`)
+    write('server/test-support/barrel.ts', `export { observe } from '${importFrom('server/test-support/barrel.ts', helper)}'`)
+    write(helper, `import { cloneState } from '${importFrom(helper, 'shared/session/state-bootstrap')}'; export type Tag = {}; export const observe = (state: object) => cloneState(state)`)
+    write('server/__tests__/native-snapshot.test.ts', "import { it } from 'vitest'; import { GameSession } from '../game/authoritative-session'; import { observe } from '../test-support/barrel'; it('preserves the snapshot rule', () => observe(new GameSession()))")
+    const rejected = cli('check-native')
+    expect(rejected.status).toBe(1)
+    expect(rejected.stderr).toContain(`Normalizing test snapshot: ${helper}`)
+    write('shared/session/history-streams.ts', 'export const captureStateWithHistory = <T>(state: T): T => state')
+    write(helper, `import { captureStateWithHistory } from '${importFrom(helper, 'shared/session/history-streams')}'; export type Tag = {}; export const observe = (state: object) => captureStateWithHistory(state)`)
+    const pure = cli('check-native')
+    expect(pure.status, pure.stderr).toBe(0)
+    const summary = JSON.parse(pure.stdout)
+    const partition = JSON.parse(fs.readFileSync(path.join(summary.reportDirectory, 'policy-partition.json'), 'utf8'))
+    expect(partition.observationFiles).toContainEqual(expect.objectContaining({ file: helper }))
+    expect(partition.runtimeFiles).toContainEqual(expect.objectContaining({ file: 'shared/session/session-core.ts' }))
+    const { partitionSha256, runtimeSources, observationSources, ...membership } = partition
+    expect(summary.snapshotPolicy).toEqual({ partitionSha256, runtimeSources, observationSources })
+    expect(partitionSha256).toBe(createHash('sha256').update(JSON.stringify(membership)).digest('hex'))
+  }, 30000,
+)
+
+it('rejects an observation in a genuine Session restore receiver and permits its data argument', () => {
+  const { write, cli } = createSnapshotFixture()
+  const imports = "import { it } from 'vitest'; import { cloneState } from '../../shared/session/state-bootstrap'; import { GameSession } from '../game/authoritative-session'; const session = new GameSession(); function getSession(_value: unknown) { return session }; "
+  write('server/__tests__/native-snapshot.test.ts', imports + "it('preserves the snapshot rule', () => getSession(cloneState({ value: 1 })).loadState({ value: 2 }))")
+  const rejected = cli('check-native')
+  expect(rejected.status).toBe(1)
+  expect(rejected.stderr).toContain('Normalizing test snapshot: server/__tests__/native-snapshot.test.ts')
+  write('server/__tests__/native-snapshot.test.ts', imports + "it('preserves the snapshot rule', () => getSession({ value: 1 }).loadState(cloneState({ value: 2 })))")
+  const restored = cli('check-native')
+  expect(restored.status, restored.stderr).toBe(0)
+}, 30000)
+
+it('rejects a native root imported by production instead of silently exempting it', () => {
+  const { write, cli } = createSnapshotFixture()
+  write('shared/session/session-core.ts', "import '../../server/__tests__/native-snapshot.test'; export class GameCore {}")
+  write('server/__tests__/native-snapshot.test.ts', "import { it } from 'vitest'; import { GameSession } from '../game/authoritative-session'; it('preserves the snapshot rule', () => new GameSession())")
+  const rejected = cli('check-native')
+  expect(rejected.status).toBe(1)
+  expect(rejected.stderr).toContain('Native test root is part of the production runtime import closure')
+}, 30000)
+
 it('rejects observations imported through actual transitive normalizer re-exports', () => {
   const { write, cli } = createSnapshotFixture()
   write('server/__tests__/_helpers/barrel.ts', "export { copied as copy } from './normalizer'")

@@ -8,6 +8,11 @@ export interface NormalizingSnapshotViolation {
   message: string
 }
 
+export function snapshotSourcePartition(
+  program: ts.Program,
+  includedFiles: ReadonlySet<string>,
+): { runtimeFiles: string[]; observationFiles: string[] }
+
 export function normalizingSnapshotViolations(
   source: string,
   file: string,

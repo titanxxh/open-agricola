@@ -5,7 +5,7 @@ import crypto from 'node:crypto'
 import ts from 'typescript'
 import { execFileSync, spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
-import { normalizingSnapshotViolations } from './test-snapshot-policy.mjs'
+import { normalizingSnapshotViolations, snapshotSourcePartition } from './test-snapshot-policy.mjs'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const defaultManifest = path.join(root, 'scripts/audit-migration/cases.json')
@@ -101,12 +101,6 @@ function checkNative(manifest) {
   for (const file of ownedSources) {
     if (fs.statSync(file).size > 1024 * 1024) fail(`Native test source exceeds 1 MiB; keep full scenario evidence outside Git: ${path.relative(root, file)}`)
   }
-  const observationSources = [...included].filter(file => {
-    const relative = path.relative(root, file)
-    return !relative.startsWith(`..${path.sep}`) && !relative.startsWith(`node_modules${path.sep}`)
-      && /(?:^|\/)(?:__tests__|__fixtures__|tests|fixtures)\//.test(relative)
-      && /\.[cm]?[jt]sx?$/.test(file) && !/\.d\.[cm]?ts$/.test(file)
-  })
   const loadedConfig = ts.readConfigFile(config, ts.sys.readFile)
   if (loadedConfig.error) fail('Cannot read native snapshot-policy compiler configuration')
   const parsedConfig = ts.parseJsonConfigFileContent(loadedConfig.config, ts.sys, path.dirname(config))
@@ -114,14 +108,21 @@ function checkNative(manifest) {
   const compilerHost = ts.createCompilerHost(parsedConfig.options)
   compilerHost.getCurrentDirectory = () => root
   const program = ts.createProgram(parsedConfig.fileNames, parsedConfig.options, compilerHost)
-  for (const file of observationSources) {
+  const partition = snapshotSourcePartition(program, included)
+  if (nativeFiles.some(file => partition.runtimeFiles.includes(path.join(root, file)))) fail('Native test root is part of the production runtime import closure')
+  const policyPartition = Object.fromEntries(Object.entries(partition).map(([kind, files]) => [kind,
+    files.map(file => ({ file: path.relative(root, file), sha256: digest(program.getSourceFile(file).text) })),
+  ]))
+  const snapshotPolicy = { runtimeSources: partition.runtimeFiles.length, observationSources: partition.observationFiles.length, partitionSha256: digest(JSON.stringify(policyPartition)) }
+  json(path.join(output, 'policy-partition.json'), { ...snapshotPolicy, ...policyPartition })
+  for (const file of partition.observationFiles) {
     const violations = normalizingSnapshotViolations(fs.readFileSync(file, 'utf8'), file, program)
     if (violations.length) {
       const issue = violations[0]
       fail(`Normalizing test snapshot: ${path.relative(root, issue.file)}:${issue.line}:${issue.column}: ${issue.message}`)
     }
   }
-  return { nativeFiles, typesExit, fileInventoryExit, missingTypeRoots, includedFiles: included.size, reportDirectory: output }
+  return { nativeFiles, typesExit, fileInventoryExit, missingTypeRoots, includedFiles: included.size, snapshotPolicy, reportDirectory: output }
 }
 
 function replaceOnce(source, before, after, file) {
