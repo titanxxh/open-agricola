@@ -1,15 +1,19 @@
 import { describe, expect, it } from 'vitest'
-import { GameSession, type SessionResponse } from '../game/authoritative-session'
+import { type GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
+import { createWorkSession } from './_helpers/session-fixtures'
+import { createScenarioEvidence } from './_helpers/scenario-evidence'
+import { assertRejectedUnchanged, getChoiceOptions } from './_helpers/session-assertions'
 
 import '../../shared/cards/A/A050_MilkJug'
 
 const CARD_ID = 'A050_MilkJug'
+const evidence = createScenarioEvidence(import.meta.url)
 
 const purchaseSession = (clay: number) => {
-  const session = new GameSession(50, undefined, { playerCount: 4 })
+  const session = evidence.track(createWorkSession({ seed: 50, options: { playerCount: 4 } }))
   const state = session.getState().state
   stabilizeRandomHands(state.players)
   state.currentPlayerIndex = 0
@@ -26,8 +30,8 @@ const openMinorPrompt = (session: GameSession) => {
   let response = session.takeAction(0, 'meeting-place')
   expect(response.ok, response.error).toBe(true)
   if (response.interaction.stateId !== 'wait') return response
-  if (response.interaction.request.options?.some((option) => option.value === CARD_ID)) return response
-  const improvement = response.interaction.request.options?.find((option) =>
+  if (getChoiceOptions(response).some((option) => option.value === CARD_ID)) return response
+  const improvement = getChoiceOptions(response).find((option) =>
     option.value.startsWith('action-improvement-'),
   )
   if (improvement) response = session.resolveChoice(0, improvement.value)
@@ -35,7 +39,7 @@ const openMinorPrompt = (session: GameSession) => {
 }
 
 const cardOption = (response: SessionResponse) => response.interaction.stateId === 'wait'
-  ? response.interaction.request.options?.find((option) => option.value === CARD_ID)
+  ? getChoiceOptions(response).find((option) => option.value === CARD_ID)
   : undefined
 
 const playMinor = (session: GameSession) => {
@@ -47,7 +51,7 @@ const playMinor = (session: GameSession) => {
 }
 
 const actionSession = (actor: number) => {
-  const session = new GameSession(50, undefined, { playerCount: 4 })
+  const session = evidence.track(createWorkSession({ seed: 50, options: { playerCount: 4 } }))
   const state = session.getState().state
   stabilizeRandomHands(state.players)
   state.currentPlayerIndex = actor
@@ -59,9 +63,7 @@ const actionSession = (actor: number) => {
     player.resources.food = 0
     player.pastures = [{
       id: `pasture-${index}`,
-      size: 1,
       tiles: [{ row: 0, col: index }],
-      stables: 0,
       animalType: null,
       animalCount: 0,
     }]
@@ -78,12 +80,12 @@ const useCattleMarket = (session: GameSession, actor: number) => {
     response.interaction.stateId === 'wait'
     && response.interaction.request.kind === 'animal-reorg'
   ) {
-    response = session.resolveChoice(actor, 'confirm', [{
+    response = session.resolveChoice(actor, 'confirm', { zones: [{
       id: `pasture-${actor}`,
       zoneType: 'pasture',
       animalType: 'cattle',
       animalCount: 1,
-    }])
+    }] })
   }
   while (
     response.interaction.stateId === 'wait'
@@ -130,5 +132,29 @@ describe('A050 Milk Jug parity', () => {
 
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players.map((player) => player.resources.food)).toEqual([0, 2, 0, 0])
+  })
+})
+
+describe('A050 command boundaries', () => {
+  it('actual Milk Jug purchase pays one clay without immediate food', () => {
+    for (const clay of [0, 1]) {
+      const session = evidence.track(createWorkSession({ seed: 4242, configure(state) {
+        state.availableMajorImprovements = []
+        for (const player of state.players) player.resources.food = 40
+        state.players[0]!.minorHand = [CARD_ID]
+        state.players[0]!.resources.clay = clay
+      } }))
+      if (clay === 0) {
+        const offered = openMinorPrompt(session)
+        expect(cardOption(offered)).toBeUndefined()
+        assertRejectedUnchanged(session, () => session.resolveChoice(0, CARD_ID))
+      } else {
+        const response = playMinor(session)
+        expect(response.ok, response.error).toBe(true)
+        expect(response.state.players[0]!.resources.clay).toBe(0)
+        expect(response.state.players[0]!.minorPlayed).toContain(CARD_ID)
+        expect(response.state.players.map(player => player.resources.food)).toEqual([40, 40])
+      }
+    }
   })
 })
