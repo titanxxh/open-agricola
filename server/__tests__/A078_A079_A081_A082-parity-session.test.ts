@@ -1,22 +1,33 @@
 import { createWorkSession } from './_helpers/session-fixtures'
 import { describe, expect, it } from 'vitest'
-import type { GameSession, SessionResponse } from '../game/authoritative-session'
-import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
+import { type GameSession, type SessionResponse } from '../game/authoritative-session'
+import { markAllWorkersUsed, setWorkersAtHome, workersAtHome } from '../../shared/domain/player'
 import { setStoredResource, getStoredResource } from '../../shared/cards/helpers/card-storage'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
-
 import '../../shared/cards/A/A078_Canoe'
 import '../../shared/cards/A/A079_GardenHoe'
 import '../../shared/cards/A/A081_InterimStorage'
 import '../../shared/cards/A/A082_WorkCertificate'
+import assert from 'node:assert/strict'
+import { type PlayerState, type GameState, type FarmTilePosition } from '../../shared/contract/types'
+import { assertRejectedUnchanged, assertUndoRestored, confirmNext, undoRuleSnapshot, getChoiceOptions } from './_helpers/session-assertions'
+import { getAvailableStableSupplyCount, getOwnOrdinaryFenceReserveCount } from '../../shared/domain/supply-tokens'
+import { createScenarioEvidence } from './_helpers/scenario-evidence'
+
+import { readCardResourceStats } from '../../shared/cards/helpers/card-state'
+import '../../shared/cards/A/A073_AgriculturalFertilizers'
+import '../../shared/cards/A/A115_ChiefForester'
+import '../../shared/cards/A/A071_ClearingSpade'
+
+const sessionEvidence = createScenarioEvidence(import.meta.url)
 
 const FILLER = '__test_placeholder__'
 const OCCUPATIONS = ['A116_WoodCutter', 'B121_Geologist', 'C123_Freemason']
 
 const options = (response: SessionResponse) => response.interaction.stateId === 'wait'
-  ? response.interaction.request.options ?? []
+  ? getChoiceOptions(response) ?? []
   : []
 
 const setup = ({
@@ -29,7 +40,7 @@ const setup = ({
   occupations?: number
   resources?: Record<string, number>
 }) => {
-  const session = createWorkSession({ seed: 7080 + round, options: { playerCount } })
+  const session = sessionEvidence.track(createWorkSession({ seed: 7080 + round, options: { playerCount } }))
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.currentPlayerIndex = 0
@@ -238,8 +249,8 @@ describe('A082 Work Certificate parity', () => {
     expect(response.interaction.stateId).toBe('wait')
     if (response.interaction.stateId !== 'wait') return
     const wood = options(response).find((option) =>
-      option.value !== '__skip__' && option.effectPreview?.resourcesGained?.wood === 1)
-      ?? options(response).find((option) => option.value !== '__skip__')
+      option.value !== '__skip__' && !option.disabled && option.effectPreview
+        && 'resourcesGained' in option.effectPreview && option.effectPreview.resourcesGained?.wood === 1)
     expect(wood).toBeDefined()
     response = session.resolveChoice(response.interaction.playerIndex, wood!.value)
     expect(response.state.players[0]!.resources.wood).toBe(1)
@@ -249,6 +260,8 @@ describe('A082 Work Certificate parity', () => {
   it('A082 S4: the Work Certificate take may be declined', () => {
     const session = certificateSession(4)
     let response = enterCertificate(session)
+    assert.ok(response.interaction.stateId === 'wait')
+    assert.ok(options(response).some(option => option.value === '__skip__' && !option.disabled))
     response = session.resolveChoice(response.interaction.playerIndex, '__skip__')
     expect(response.state.players[0]!.resources.wood).toBe(0)
     expect(response.state.actionSpaces.find((space) => space.id === 'forest')!.resources.wood).toBe(4)
@@ -258,5 +271,468 @@ describe('A082 Work Certificate parity', () => {
     const response = certificateSession(3).takeAction(0, 'day-laborer')
     expect(JSON.stringify(response.interaction)).not.toContain(CARD_ID)
     expect(response.state.actionSpaces.find((space) => space.id === 'forest')!.resources.wood).toBe(3)
+  })
+})
+
+describe("A078 command boundaries", () => {
+  const CANOE = 'A078_Canoe', WAGE = 'B007_Wage'
+  function setup({ played = true, resources = {}, occupations = [], fishing = 2 }: {
+    played?: boolean
+    resources?: Partial<PlayerState['resources']>
+    occupations?: string[]
+    fishing?: number
+  } = {}) {
+    const s = sessionEvidence.track(createWorkSession({ seed: 1077, configure: state => {
+        state.round = 14
+        state.availableMajorImprovements = []
+        for (const p of state.players) {
+          p.minorHand = ['__test_placeholder__']
+          p.occupationHand = ['__test_placeholder__']
+          p.minorPlayed = []
+          p.occupationPlayed = []
+          p.improvements = []
+          p.cardStates = {}
+          Object.assign(p.resources, { wood: 0, clay: 0, reed: 0, stone: 0, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, food: 40, begging: 0 })
+        }
+        const owner = state.players[0]!
+        owner.minorHand = [...(!played ? [CANOE, WAGE, 'A016_RammedClay'] : []), '__test_placeholder__']
+        owner.minorPlayed = played ? [CANOE] : []
+        owner.occupationPlayed = occupations
+        Object.assign(owner.resources, resources)
+        state.actionSpaces.find(a => a.id === 'fishing')!.resources.food = fishing
+        state.actionSpaces.find(a => a.id === 'forest')!.resources.wood = 3
+      } }))
+    for (const p of s.state.players) {
+      assert.equal(p.workers.length, 5)
+      assert.equal(workersAtHome(s.state, p).length, 2)
+      assert.equal(s.withCtx(() => getOwnOrdinaryFenceReserveCount(p)), 15)
+      assert.equal(s.withCtx(() => getAvailableStableSupplyCount(s.state, p)), 4)
+    }
+    return s
+  }
+  function ok(r: SessionResponse) {
+    assert.equal(r.ok, true, r.error)
+    return r
+  }
+  function opts(r: SessionResponse) {
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice', JSON.stringify(r.interaction))
+    return getChoiceOptions(r)
+  }
+  function ready(s: GameSession, actor: number) {
+    let r = s.getState()
+    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
+      r = confirmNext(s, r)
+    assert.equal(r.interaction.stateId, 'idle', JSON.stringify(r.interaction))
+    assert.equal(r.state.currentPlayerIndex, actor)
+    return r
+  }
+  function turn(s: GameSession, actor: number, space: string) {
+    const before = ready(s, actor), r = ok(s.takeAction(actor, space))
+    sessionEvidence.record('take-action', { command: 'takeAction', actor, space, before, response: r })
+    return r
+  }
+  function choose(s: GameSession, r: SessionResponse, value: string) {
+    assert.ok(r.interaction.stateId === 'wait')
+    assert.ok(opts(r).some(o => o.value === value && !o.disabled))
+    return ok(s.resolveChoice(r.interaction.playerIndex, value))
+  }
+  function menu(s: GameSession) {
+    let r = turn(s, 0, 'meeting-place')
+    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice') {
+      const o = getChoiceOptions(r).find(o => o.value.startsWith('action-improvement-'))
+      if (o)
+        r = choose(s, r, o.value)
+    }
+    sessionEvidence.record('minor-menu', r)
+    return r
+  }
+  function buy(s: GameSession, card: string) {
+    const r = menu(s)
+    assert.ok(opts(r).some(o => o.value === card && !o.disabled))
+    const bought = choose(s, r, card)
+    sessionEvidence.record('actual-purchase', { before: r, card, response: bought })
+    return bought
+  }
+  function deny(s: GameSession, card: string) {
+    const r = menu(s)
+    assert.equal(opts(r).some(o => o.value === card && !o.disabled), false)
+    const denied = assertRejectedUnchanged(s, () => s.resolveChoice(0, card))
+    sessionEvidence.record('rejected-native-card', { before: r, card, response: denied })
+    const food = r.state.players[0]!.resources.food
+    const retry = choose(s, r, WAGE)
+    assert.equal(retry.state.players[0]!.resources.food - food, 2)
+    assert.equal(retry.state.players[0]!.minorPlayed.includes(card), false)
+    sessionEvidence.record('legal-original-pending-retry', retry)
+  }
+  function gainCount(r: SessionResponse, card: string) {
+    return r.state.log.filter(e => e.key === 'log.cardEffectGain' && e.params?.cardId === card).length
+  }
+  function purchaseUndo(s: GameSession, before: string) {
+    const r = ok(s.undoAction())
+    const normalize = (v: string) => JSON.parse(v, (key, value: unknown) => key === 'playedCards' ? undefined : value)
+    assert.deepEqual(normalize(undoRuleSnapshot(r)), normalize(before))
+    const packet = r.state.publicEventArchive.at(-1)
+    assert.ok(packet?.type === 'publicEvents.canceled' && packet.reason === 'undoAction')
+    sessionEvidence.record('purchase-undo', r)
+  }
+  function printedVp(r: SessionResponse, card: string) {
+    assert.ok(r.scores)
+    return r.scores[0]!.categories.find(c => c.key === 'cards')?.entries.filter(e => e.type === 'card' && e.cardId === card).reduce((sum, e) => sum + e.score, 0) ?? 0
+  }
+  function canoe(config: Parameters<typeof setup>[0] = {}) {
+    return setup({ occupations: ['A124_Knapper'], ...config })
+  }
+  it("wood and occupation shortage reject before exact purchase and point", () => {
+    deny(canoe({ played: false, resources: { wood: 1 } }), CANOE)
+    deny(canoe({ played: false, resources: { wood: 2 }, occupations: [] }), CANOE)
+    const r = buy(canoe({ played: false, resources: { wood: 2 } }), CANOE)
+    assert.equal(r.state.players[0]!.resources.wood, 0)
+    assert.equal(r.state.players[0]!.resources.food, 40)
+    assert.equal(r.state.players[0]!.resources.reed, 0)
+    assert.equal(printedVp(r, CANOE), 1)
+  })
+  it("actual Fishing after purchase adds exactly one food and reed", () => {
+    const s = canoe({ played: false, resources: { wood: 2 } })
+    buy(s, CANOE)
+    turn(s, 1, 'forest')
+    const r = turn(s, 0, 'fishing')
+    assert.equal(r.state.players[0]!.resources.food, 43)
+    assert.equal(r.state.players[0]!.resources.reed, 1)
+    assert.equal(r.state.actionSpaces.find(a => a.id === 'fishing')!.resources.food, 0)
+    assert.equal(gainCount(r, CANOE), 1)
+    assert.equal(printedVp(r, CANOE), 1)
+  })
+  it("actual opponent nonfishing and in hand exclude holder bonus", () => {
+    const s = canoe()
+    turn(s, 0, 'forest')
+    const other = turn(s, 1, 'fishing')
+    assert.equal(other.state.players[0]!.resources.food, 40)
+    assert.equal(other.state.players[0]!.resources.reed, 0)
+    assert.equal(other.state.players[1]!.resources.food, 42)
+    assert.equal(other.state.players[1]!.resources.reed, 0)
+    const non = turn(canoe(), 0, 'day-laborer')
+    assert.equal(non.state.players[0]!.resources.food, 42)
+    assert.equal(non.state.players[0]!.resources.reed, 0)
+    const hand = turn(canoe({ played: false }), 0, 'fishing')
+    assert.equal(hand.state.players[0]!.resources.food, 42)
+    assert.equal(hand.state.players[0]!.resources.reed, 0)
+    assert.equal(gainCount(hand, CANOE), 0)
+  })
+  it("occupied Fishing rejects before legal remaining worker control", () => {
+    const s = canoe()
+    turn(s, 0, 'fishing')
+    turn(s, 1, 'forest')
+    ready(s, 0)
+    assertRejectedUnchanged(s, () => s.takeAction(0, 'fishing'))
+    const r = turn(s, 0, 'day-laborer')
+    assert.equal(r.state.players[0]!.resources.food, 45)
+    assert.equal(r.state.players[0]!.resources.reed, 1)
+    assert.equal(gainCount(r, CANOE), 1)
+  })
+  it("actual purchase and Fishing undo restore piles goods workers and point", () => {
+    const purchase = canoe({ played: false, resources: { wood: 2 } })
+    const beforePurchase = undoRuleSnapshot(purchase.getState())
+    const bought = buy(purchase, CANOE)
+    assert.equal(printedVp(bought, CANOE), 1)
+    purchaseUndo(purchase, beforePurchase)
+    assert.equal(printedVp(purchase.getState(), CANOE), 0)
+    assert.equal(printedVp(buy(purchase, CANOE), CANOE), 1)
+    const s = canoe()
+    const before = undoRuleSnapshot(s.getState())
+    turn(s, 0, 'fishing')
+    assertUndoRestored(before, s.undoAction())
+    const r = turn(s, 0, 'fishing')
+    assert.equal(r.state.players[0]!.resources.food, 43)
+    assert.equal(r.state.players[0]!.resources.reed, 1)
+    assert.equal(gainCount(r, CANOE), 1)
+    assert.equal(printedVp(r, CANOE), 1)
+    sessionEvidence.record('Canoe-whole-use-undo-replay', r)
+  })
+})
+
+describe("A079 command boundaries", () => {
+  const FERT = 'A073_AgriculturalFertilizers', HOE = 'A079_GardenHoe'
+  function pasture(state: GameState, cols = [4]) {
+    const p = state.players[0]!
+    p.pastures = [{ id: 'actual-pasture', tiles: cols.map(col => ({ row: 2, col })), animalType: null, animalCount: 0 }]
+    const edges = cols.flatMap(col => [`H-2-${col}`, `H-3-${col}`]).concat([`V-2-${Math.min(...cols)}`, `V-2-${Math.max(...cols) + 1}`])
+    p.fenceSegments = edges.map(edge => ({ edge, type: 'fence', source: { kind: 'own', ownerPlayerId: p.id } }))
+  }
+  function setup({ played = true, resources = {}, pastureCols = [], minor = [], configure = () => {
+  } }: {
+    played?: boolean
+    resources?: Partial<PlayerState['resources']>
+    pastureCols?: number[]
+    minor?: string[]
+    configure?: (state: GameState) => void
+  } = {}) {
+    const s = sessionEvidence.track(createWorkSession({ seed: 4242, configure(state) {
+        state.round = 5
+        state.players.forEach(p => {
+          p.minorHand = ['B007_Wage', 'A016_RammedClay', 'A054_Credit']
+          p.occupationHand = ['__test_placeholder__']
+          p.minorPlayed = []
+          p.occupationPlayed = []
+          p.improvements = []
+          Object.assign(p.resources, { wood: 0, clay: 0, reed: 0, stone: 0, grain: 0, vegetable: 0, food: 20, sheep: 0, boar: 0, cattle: 0 })
+        })
+        const p = state.players[0]!
+        p.minorPlayed = played ? [HOE, ...minor] : minor
+        if (!played)
+          p.minorHand.push(HOE)
+        p.fields = [{ row: 0, col: 1, stacks: [] }, { row: 0, col: 2, stacks: [] }]
+        Object.assign(p.resources, resources)
+        if (pastureCols.length)
+          pasture(state, pastureCols)
+        configure(state)
+      } }))
+    assert.equal(s.getState().interaction.stateId, 'idle')
+    if (pastureCols.length)
+      s.withCtx(() => assert.equal(getOwnOrdinaryFenceReserveCount(s.state.players[0]!), 15 - (2 * pastureCols.length + 2)))
+    return s
+  }
+  function ok(r: SessionResponse) {
+    assert.equal(r.ok, true, r.error)
+    return r
+  }
+  function res(r: SessionResponse, actor = 0) {
+    return r.state.players[actor]!.resources
+  }
+  function opts(r: SessionResponse) {
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice', JSON.stringify(r.interaction))
+    return getChoiceOptions(r)
+  }
+  function ready(s: GameSession, actor: number) {
+    let r = s.getState()
+    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
+      r = confirmNext(s, r)
+    assert.equal(r.interaction.stateId, 'idle', JSON.stringify(r.interaction))
+    assert.equal(r.state.currentPlayerIndex, actor)
+    return r
+  }
+  function turn(s: GameSession, actor: number, space: string) {
+    ready(s, actor)
+    const r = ok(s.takeAction(actor, space))
+    assert.ok(r.state.actionSpaces.find(a => a.id === space)!.takenBy.some(w => w.playerId === r.state.players[actor]!.id))
+    return r
+  }
+  function close(s: GameSession, r: SessionResponse) {
+    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice' && r.interaction.promptKey === 'ui.interactionFarmExpansionSelect' && opts(r).some(o => o.value === '__done__'))
+      return ok(s.resolveChoice(r.interaction.playerIndex, '__done__'))
+    return r
+  }
+  function complete(r: SessionResponse) {
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    return r
+  }
+  function enter(s: GameSession, actor = 0, space = 'meeting-place') {
+    let r = turn(s, actor, space)
+    const branch = opts(r).find(o => o.value.startsWith('action-improvement-'))
+    if (branch)
+      r = ok(s.resolveChoice(actor, branch.value))
+    return r
+  }
+  function purchase(s: GameSession, r: SessionResponse, card: string, actor = 0) {
+    assert.ok(opts(r).some(o => o.value === card && !o.disabled))
+    r = ok(s.resolveChoice(actor, card))
+    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice' && r.interaction.promptKey === 'prompt.selectPayment') {
+      const choices = opts(r).filter(o => o.value !== 'cancel' && !o.disabled)
+      assert.equal(choices.length, 1, JSON.stringify(r.interaction))
+      const choice = choices[0]!
+      r = ok(s.resolveChoice(actor, choice.value))
+    }
+    assert.ok(r.state.players[actor]!.minorPlayed.includes(card) || r.state.players[actor]!.improvements.includes(card))
+    const events = r.state.events.filter(e => 'cardId' in e && e.cardId === card && 'payment' in e)
+    assert.equal(events.length, 1)
+    return r
+  }
+  function buy(s: GameSession, card: string) {
+    return complete(purchase(s, enter(s), card))
+  }
+  function deny(s: GameSession, card: string, space = 'meeting-place') {
+    const r = enter(s, 0, space)
+    assert.equal(opts(r).some(o => o.value === card && !o.disabled), false)
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, card))
+    const retry = complete(purchase(s, r, 'A016_RammedClay'))
+    assert.ok(retry.state.players[0]!.minorHand.includes(card) || card.startsWith('Major_'))
+    return retry
+  }
+  function farm(s: GameSession, kind: 'stable' | 'room', actor = 0) {
+    let r = turn(s, actor, 'farm-expansion')
+    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice') {
+      const choice = opts(r).find(o => o.value.includes(kind === 'stable' ? 'stables' : 'construct'))
+      assert.ok(choice, JSON.stringify(r.interaction))
+      r = ok(s.resolveChoice(actor, choice.value))
+    }
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'farm-select' && r.interaction.request.farm.farmType === kind, JSON.stringify(r.interaction))
+    return r
+  }
+  function stable(s: GameSession, tiles: FarmTilePosition[] = [{ row: 1, col: 1 }, { row: 1, col: 2 }], actor = 0) {
+    farm(s, 'stable', actor)
+    const r = ok(s.commitSelectionChoice(actor, { stables: tiles }))
+    assert.equal(r.state.players[actor]!.stableTiles.length, tiles.length)
+    assert.equal(s.withCtx(() => getAvailableStableSupplyCount(r.state, r.state.players[actor]!)), 4 - tiles.length)
+    return close(s, r)
+  }
+  function sowSelect(s: GameSession, r: SessionResponse, actor = 0) {
+    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice') {
+      const choices = opts(r).filter(o => o.labelKey === 'actions.sow.name' && !o.disabled)
+      assert.equal(choices.length, 1, JSON.stringify(r.interaction))
+      const choice = choices[0]!
+      r = ok(s.resolveChoice(actor, choice.value))
+    }
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'farm-select' && r.interaction.request.farm.farmType === 'sow', JSON.stringify(r.interaction))
+    return r
+  }
+  function sow(s: GameSession, r: SessionResponse, crops: {
+    row: number
+    col: number
+    crop: 'grain' | 'vegetable'
+  }[], actor = 0) {
+    sowSelect(s, r, actor)
+    return complete(close(s, ok(s.commitSelectionChoice(actor, { crops }))))
+  }
+  function normalSow(s: GameSession, crops: {
+    row: number
+    col: number
+    crop: 'grain' | 'vegetable'
+  }[], actor = 0) {
+    return sow(s, turn(s, actor, 'grain-utilization'), crops, actor)
+  }
+  function stack(r: SessionResponse, col: number, actor = 0) {
+    return r.state.players[actor]!.fields.find(f => f.row === 0 && f.col === col)?.stacks?.[0]?.remaining ?? 0
+  }
+  function gain(r: SessionResponse, card: string, kind: 'clay' | 'stone') {
+    return readCardResourceStats(r.state.players[0]!, card)?.gained[kind] ?? 0
+  }
+  function reward(r: SessionResponse, clay: number, stone: number) {
+    assert.equal(res(r).clay, clay)
+    assert.equal(res(r).stone, stone)
+    assert.equal(gain(r, HOE, 'clay'), clay)
+    assert.equal(gain(r, HOE, 'stone'), stone)
+  }
+  function undo(s: GameSession, before: string, retry: () => SessionResponse) {
+    assertUndoRestored(before, s.undoAction())
+    return retry()
+  }
+  it("actual Garden Hoe purchase pays one wood without an immediate reward", () => {
+    const r = buy(setup({ played: false, resources: { wood: 1 } }), HOE)
+    assert.equal(res(r).wood, 0)
+    reward(r, 0, 0)
+  })
+  it("missing wood rejects the forged purchase before a legal retry", () => {
+    deny(setup({ played: false }), HOE)
+  })
+  it("unrestricted Sow into two vegetable fields pays two seeds and rewards once", () => {
+    const r = normalSow(setup({ resources: { vegetable: 2 } }), [{ row: 0, col: 1, crop: 'vegetable' }, { row: 0, col: 2, crop: 'vegetable' }])
+    assert.equal(res(r).vegetable, 0)
+    assert.equal(stack(r, 1), 2)
+    assert.equal(stack(r, 2), 2)
+    reward(r, 1, 1)
+  })
+  it("one vegetable and one grain in a real Sow reward once", () => {
+    const r = normalSow(setup({ resources: { vegetable: 1, grain: 1 } }), [{ row: 0, col: 1, crop: 'vegetable' }, { row: 0, col: 2, crop: 'grain' }])
+    assert.equal(res(r).vegetable, 0)
+    assert.equal(res(r).grain, 0)
+    assert.equal(stack(r, 1), 2)
+    assert.equal(stack(r, 2), 3)
+    reward(r, 1, 1)
+  })
+  it("grain only Sow beside an existing vegetable field gives no reward", () => {
+    const s = setup({ resources: { grain: 1 }, configure(state) {
+        state.players[0]!.fields[0]!.stacks = [{ kind: 'vegetable', remaining: 2 }]
+      } })
+    const r = normalSow(s, [{ row: 0, col: 2, crop: 'grain' }])
+    assert.equal(stack(r, 1), 2)
+    assert.equal(stack(r, 2), 3)
+    reward(r, 0, 0)
+  })
+  it("zero planting after real Sow entry gives no reward", () => {
+    const s = setup({ resources: { vegetable: 1 } })
+    const pending = sowSelect(s, turn(s, 0, 'grain-utilization'))
+    assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { crops: [] }))
+    reward(pending, 0, 0)
+    const r = complete(ok(s.commitSelectionChoice(0, { crops: [{ row: 0, col: 1, crop: 'vegetable' }] })))
+    reward(r, 1, 1)
+  })
+  it("opponent actual vegetable Sow cannot reward the owner", () => {
+    const s = setup({ configure(state) {
+        state.players[1]!.resources.vegetable = 1
+        state.players[1]!.fields = [{ row: 0, col: 1, stacks: [] }]
+      } })
+    turn(s, 0, 'grain-seeds')
+    const r = normalSow(s, [{ row: 0, col: 1, crop: 'vegetable' }], 1)
+    assert.equal(stack(r, 1, 1), 2)
+    assert.equal(res(r, 1).vegetable, 0)
+    reward(r, 0, 0)
+  })
+  it("Garden Hoe in hand cannot reward actual vegetable Sow", () => {
+    const r = normalSow(setup({ played: false, resources: { vegetable: 1 } }), [{ row: 0, col: 1, crop: 'vegetable' }])
+    assert.equal(stack(r, 1), 2)
+    reward(r, 0, 0)
+  })
+  it("Chief Forester restricted one-field vegetable Sow gives no reward", () => {
+    const s = setup({ resources: { vegetable: 1 }, configure(state) {
+        state.players[0]!.occupationPlayed = ['A115_ChiefForester']
+      } })
+    const entered = turn(s, 0, 'forest')
+    assert.ok(entered.interaction.stateId === 'wait')
+    assert.equal(entered.interaction.sourceCard, 'A115_ChiefForester')
+    const selected = sowSelect(s, entered)
+    assert.ok(selected.interaction.stateId === 'wait')
+    assert.equal(selected.interaction.sourceCard, 'A115_ChiefForester')
+    const cursor = s.createSessionPrivateCursor()
+    assert.ok(selected.interaction.request.kind === 'farm-select' && selected.interaction.request.farm.farmType === 'sow')
+    assert.equal(selected.interaction.request.farm.maxSelections, 1)
+    sessionEvidence.record('ChiefForester-source', { interaction: selected.interaction, sessionCursor: cursor, beforeResources: res(selected), beforeFields: selected.state.players[0]!.fields })
+    const r = complete(ok(s.commitSelectionChoice(0, { crops: [{ row: 0, col: 1, crop: 'vegetable' }] })))
+    sessionEvidence.record('ChiefForester-completed', { state: r.state, interaction: r.interaction })
+    assert.equal(stack(r, 1), 2)
+    assert.equal(res(r).vegetable, 0)
+    const actual = { restrictedOneField: true, vegetableStack: 2, clay: res(r).clay, stone: res(r).stone }
+    assert.equal(gain(r, HOE, 'clay'), actual.clay)
+    assert.equal(gain(r, HOE, 'stone'), actual.stone)
+    assert.deepEqual(actual, { restrictedOneField: true, vegetableStack: 2, clay: 0, stone: 0 })
+  })
+  it("Fertilizers additional unrestricted vegetable Sow gives the printed reward", () => {
+    const s = setup({ minor: [FERT], pastureCols: [4], resources: { wood: 4, vegetable: 1 } })
+    const r = sow(s, stable(s), [{ row: 0, col: 1, crop: 'vegetable' }])
+    assert.equal(res(r).wood, 0)
+    assert.equal(stack(r, 1), 2)
+    reward(r, 1, 1)
+  })
+  it("Clearing Spade actual vegetable transfer is not Sow", () => {
+    const s = setup({ minor: ['A071_ClearingSpade'], configure(state) {
+        state.players[0]!.fields[0]!.stacks = [{ kind: 'vegetable', remaining: 2 }]
+      } })
+    let r = ok(s.takeAnytimeAction(0, 'A71-clearing-spade-anytime'))
+    assert.ok(r.interaction.stateId === 'wait')
+    r = ok(s.commitSelectionChoice(0, { positions: [{ row: 0, col: 1 }] }))
+    assert.ok(r.interaction.stateId === 'wait')
+    r = ok(s.commitSelectionChoice(0, { positions: [{ row: 0, col: 2 }] }))
+    assert.equal(stack(r, 1), 1)
+    assert.equal(stack(r, 2), 1)
+    reward(r, 0, 0)
+  })
+  it("illegal occupied or outside farm Sow targets reject before a valid vegetable planting", () => {
+    const s = setup({ resources: { vegetable: 1 }, configure(state) {
+        state.players[0]!.fields[0]!.stacks = [{ kind: 'vegetable', remaining: 2 }]
+      } })
+    sowSelect(s, turn(s, 0, 'grain-utilization'))
+    assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { crops: [{ row: 0, col: 1, crop: 'vegetable' }] }))
+    assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { crops: [{ row: 3, col: 0, crop: 'vegetable' }] }))
+    const r = complete(ok(s.commitSelectionChoice(0, { crops: [{ row: 0, col: 2, crop: 'vegetable' }] })))
+    reward(r, 1, 1)
+    assert.equal(stack(r, 1), 2)
+    assert.equal(stack(r, 2), 2)
+  })
+  it("undo actual vegetable Sow restores seed stacks and reward before one retry", () => {
+    const s = setup({ resources: { vegetable: 1 } })
+    const before = undoRuleSnapshot(s.getState())
+    normalSow(s, [{ row: 0, col: 1, crop: 'vegetable' }])
+    const r = undo(s, before, () => normalSow(s, [{ row: 0, col: 1, crop: 'vegetable' }]))
+    reward(r, 1, 1)
+    assert.equal(res(r).vegetable, 0)
+    assert.equal(stack(r, 1), 2)
   })
 })

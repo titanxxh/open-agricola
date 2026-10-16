@@ -1,21 +1,19 @@
+import { createScenarioEvidence } from './_helpers/scenario-evidence'
+import { getChoiceOptions } from './_helpers/session-assertions'
 import assert from 'node:assert/strict'
-import { afterEach, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { createWorkSession } from './_helpers/session-fixtures'
 import { confirmNextPlayer } from './_helpers/pending-confirms'
 import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/serialization'
 import '../../shared/cards/register-all'
+const sessionEvidence = createScenarioEvidence(import.meta.url)
 
 const CARD = 'A073_AgriculturalFertilizers'
 const STOCK = 'B094_StockProtector'
 const EXISTING = ['H-1-3', 'H-2-3', 'V-1-3', 'V-1-4']
 const OUTER = ['H-1-1', 'H-1-2', 'H-2-1', 'H-2-2', 'V-1-1']
 const ONE = ['H-1-2', 'H-2-2', 'V-1-2']
-const sessions = new Set<GameSession>()
-afterEach(() => {
-  sessions.forEach(session => session.dispose())
-  sessions.clear()
-})
 const ok = (response: SessionResponse) => {
   expect(response.ok, response.error).toBe(true)
   return response
@@ -28,19 +26,19 @@ const wait = (response: SessionResponse) => {
 }
 const choose = (session: GameSession, response: SessionResponse, value: string) => {
   const interaction = wait(response)
-  const option = interaction.request.options?.find(option => option.value === value && !option.disabled)
+  const option = getChoiceOptions({ interaction })?.find(option => option.value === value && !option.disabled)
   assert.ok(option, `Missing ${value}: ${JSON.stringify(interaction)}`)
   return ok(session.resolveChoice(0, option.value))
 }
 const accept = (session: GameSession, response: SessionResponse) => {
-  const option = wait(response).request.options?.find(option => !option.value.startsWith('__') && !option.disabled)
+  const option = getChoiceOptions({ interaction: wait(response) })?.find(option => !option.value.startsWith('__') && !option.disabled)
   assert.ok(option, JSON.stringify(response.interaction))
   return choose(session, response, option.value)
 }
 const setup = ({ stock = true, grain = 2, emptyField = true, widePasture = false }: {
   stock?: boolean; grain?: number; emptyField?: boolean; widePasture?: boolean
 } = {}) => {
-  const session = createWorkSession({ seed: 1196, configure(state) {
+  const session = sessionEvidence.track(createWorkSession({ seed: 1196, configure(state) {
     state.round = 10
     const player = state.players[0]!
     player.minorPlayed = [CARD]
@@ -50,14 +48,13 @@ const setup = ({ stock = true, grain = 2, emptyField = true, widePasture = false
     player.pastures = [{ id: 'existing', tiles: widePasture ? [{ row: 1, col: 3 }, { row: 1, col: 4 }] : [{ row: 1, col: 3 }], animalType: null, animalCount: 0 }]
     const edges = widePasture ? ['H-1-3', 'H-1-4', 'H-2-3', 'H-2-4', 'V-1-3', 'V-1-5'] : EXISTING
     player.fenceSegments = edges.map(edge => ({ edge, type: 'fence', source: { kind: 'own', ownerPlayerId: player.id } }))
-  } })
-  sessions.add(session)
+  } }))
   return session
 }
 const beforeFence = (session: GameSession) => {
   let response = ok(session.takeAction(0, 'fencing'))
   for (let step = 0; step < 4 && wait(response).request.kind === 'select-trigger'; step++) {
-    const options = wait(response).request.options ?? []
+    const options = getChoiceOptions({ interaction: wait(response) }) ?? []
     const source = options.find(option => option.value === STOCK && !option.disabled)
       ?? options.find(option => option.value === CARD && !option.disabled)
     assert.ok(source, JSON.stringify(response.interaction))
@@ -70,7 +67,7 @@ const beginOuter = (session: GameSession) => {
   beforeFence(session)
   const response = ok(session.commitSelectionChoice(0, { edges: OUTER }))
   expect(wait(response).request.kind).toBe('select-trigger')
-  expect(wait(response).request.options?.filter(option => !option.disabled).map(option => option.value))
+  expect(getChoiceOptions({ interaction: wait(response) })?.filter(option => !option.disabled).map(option => option.value))
     .toEqual(expect.arrayContaining([CARD, STOCK]))
   return response
 }
@@ -82,7 +79,7 @@ const beginStable = (session: GameSession, response: SessionResponse) => {
   current = choose(session, current, 'farm-expansion')
   if (wait(current).request.kind === 'choice') {
     expect(wait(current).promptKey).toBe('ui.interactionFarmExpansionSelect')
-    const stable = wait(current).request.options?.find(option => option.labelKey === 'actions.stables.name')
+    const stable = getChoiceOptions({ interaction: wait(current) })?.find(option => option.labelKey === 'actions.stables.name')
     assert.ok(stable, JSON.stringify(current.interaction))
     current = choose(session, current, stable.value)
   }
@@ -99,7 +96,7 @@ const beginSow = (session: GameSession, response: SessionResponse) => {
   if (wait(current).request.kind === 'select-trigger') current = choose(session, current, CARD)
   expect(wait(current).promptKey).toBe('ui.interactionOptionalAction')
   expect(wait(current).sourceCard).toBe(CARD)
-  expect(wait(current).request.options?.some(option => option.labelKey === 'actions.sow.name')).toBe(true)
+  expect(getChoiceOptions({ interaction: wait(current) })?.some(option => option.labelKey === 'actions.sow.name')).toBe(true)
   current = accept(session, current)
   const interaction = wait(current)
   assert.equal(interaction.request.kind, 'farm-select')
@@ -126,8 +123,7 @@ const assertSown = (response: SessionResponse, wood = 15) => {
   ])
 }
 const restore = (session: GameSession) => {
-  const restored = new GameSession(rehydrateState(JSON.parse(JSON.stringify(serializeSessionSnapshot(session.state, session)))))
-  sessions.add(restored)
+  const restored = sessionEvidence.track(new GameSession(rehydrateState(JSON.parse(JSON.stringify(serializeSessionSnapshot(session.state, session))))))
   return restored
 }
 
@@ -196,7 +192,7 @@ describe('A073 committed host usage events', () => {
     const session = setup({ stock: false })
     let response = ok(session.takeAction(0, 'farm-expansion'))
     if (wait(response).request.kind === 'choice') {
-      const stable = wait(response).request.options?.find(option => option.labelKey === 'actions.stables.name')
+      const stable = getChoiceOptions({ interaction: wait(response) })?.find(option => option.labelKey === 'actions.stables.name')
       assert.ok(stable)
       response = choose(session, response, stable.value)
     }
@@ -253,7 +249,7 @@ describe('A073 committed host usage events', () => {
     const session = setup()
     beginStable(session, beginOuter(session))
     let response = ok(session.commitSelectionChoice(0, { stables: [{ row: 2, col: 3 }] }))
-    if (point === 'sow') response = sow(session, finishExpansion(session, response))
+    if (point === 'sow') sow(session, finishExpansion(session, response))
     const undone = ok(session.undoStep())
     const pending = wait(undone)
     assert.equal(pending.request.kind, 'farm-select')
