@@ -297,7 +297,7 @@ export const reapAction: ActionDefinition = {
     getLogicalFields(player).some((field) => field.stacks.length > 0),
   execute: ({ state, player, sourceCard, actionContext, eventSink, actionHooks }) => {
     const trigger = readActionTrigger(actionContext, sourceCard)
-    if (!reapAction.canBeExecutedByPlayer(state, player, { sourceCard, actionContext })) {
+    if (!reapAction.canBeExecutedByPlayer(state, player, { actionHooks, sourceCard, actionContext })) {
       return { type: 'fail', errorKey: 'log.action' }
     }
 

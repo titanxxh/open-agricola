@@ -287,7 +287,7 @@ export class StageDispatch {
           .some(occurrence => occurrence.round === this.state.round && occurrence.rule.at.phase === hook)) continue
       const preparationHook = roundPreparationHooks.find(candidate => candidate === hook)
       if (preparationHook && effect.stageEligibility?.[preparationHook]?.(
-        this.state, player, { roundPreparation: options.roundPreparation },
+        this.state, player, { actionHooks: this.host.actionHooks, roundPreparation: options.roundPreparation },
       ) === false) continue
       const preview = options.inferMandatoryFromPreview
         ? this.previewStageEffectFlow(hook, player, cardId, options.roundPreparation)

@@ -10,12 +10,14 @@ import { isPlacementActionDoableInFlowContext } from '../../flow'
 import { getActionDefinition } from '../../action-definition-lookup'
 
 const collectAfterPlacementFlows = (
+  actionHooks: ActionHookRegistry | undefined,
   state: GameState,
   player: PlayerState,
   targetSpace: ActionSpace,
   actionContext: Record<string, unknown> | undefined,
 ): ActionFlow[] => {
   const context = {
+    actionHooks,
     state,
     player,
     space: targetSpace,
@@ -124,7 +126,7 @@ export const placeFarmerOnSpaceAction: ActionDefinition = {
       actionContext: targetActionContext,
     }
     const beforeFlows = collectBeforePlacementFlows(actionHooks, state, player, targetSpace, targetActionContext)
-    const afterFlows = collectAfterPlacementFlows(state, player, targetSpace, targetActionContext)
+    const afterFlows = collectAfterPlacementFlows(actionHooks, state, player, targetSpace, targetActionContext)
     if (beforeFlows.length === 0 && afterFlows.length === 0) {
       return { type: 'flow', flow: targetLeaf, extraData: { actionContextWrite } }
     }

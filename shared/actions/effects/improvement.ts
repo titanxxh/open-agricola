@@ -358,7 +358,7 @@ const meetsMinimumPayment = (
   state: GameState,
   player: PlayerState,
   choice: string,
-  context?: { actionHooks?: ActionHookRegistry; sourceCard?: string; space?: Pick<ActionSpace, 'id'>; params?: Record<string, unknown>; actionContext?: Record<string, unknown> },
+  context?: Pick<ActionExecutionContext, 'actionHooks' | 'sourceCard' | 'params' | 'actionContext'> & { space?: Pick<ActionSpace, 'id'> },
 ) => {
   const minimum = context?.actionContext?.minimumResourcesPaid as PaymentResourceMap | undefined
   if (!minimum) return true

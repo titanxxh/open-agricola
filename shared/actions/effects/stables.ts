@@ -427,7 +427,7 @@ export const stablesAction: ActionDefinition = {
   ),
   costPreview: stablesCostPreview,
   previewEffect: ({ state, player, actionContext, costs, previewMode, actionHooks }) => {
-    if (previewMode === 'base') return { kind: 'unitCost', unit: 'stable' as const, actionNameKey: 'actions.stables.name', resourcesPaid: stablesCostPreview.getBaseCost({ state, player, params: { actionContext } }) }
+    if (previewMode === 'base') return { kind: 'unitCost', unit: 'stable' as const, actionNameKey: 'actions.stables.name', resourcesPaid: stablesCostPreview.getBaseCost({ actionHooks, state, player, params: { actionContext } }) }
 
     const selection = buildStableFarmSelection(requireActionHookRegistry(actionHooks), state, player, actionContext, costs)
     if (selection.farmType !== 'stable') return undefined

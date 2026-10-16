@@ -14,7 +14,7 @@ export const createBaseActionDescriber = (state: GameState): ((space: ActionSpac
   for (const action of [...state.actionSpaces, ...createInternalActionDefinitions(actionId => registry.get(actionId)), ...getAllAdHocActions()]) registry.register(action)
   return space => {
     const description = Engine.describeFlow({ type: 'leaf', actionId: space.id, expandFlow: true }, registry,
-      { state: baseState, player, space, previewMode: 'base' })
+      { actionHooks: undefined, state: baseState, player, space, previewMode: 'base' })
     return description && state.enableFarmersOfTheMoor && getMoorWorkerPlacementPolicy(space.id) === 'sick-preferred'
       ? { ...description, workerPlacement: 'sick-preferred' } : description
   }

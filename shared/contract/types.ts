@@ -688,7 +688,7 @@ export type GameState = {
 
 export type CanBeExecutedByPlayerContext = {
   /** Session-owned runtime dependency; never part of action metadata or snapshots. */
-  actionHooks?: ActionHookRegistry
+  actionHooks: ActionHookRegistry | undefined
   params?: Record<string, unknown>
   space?: ActionSpace
   /**
@@ -720,7 +720,7 @@ export type ActionContext = Record<string, unknown> & {
 
 export type ActionAvailabilityContext = {
   /** Session-owned runtime dependency; never part of action metadata or snapshots. */
-  actionHooks?: ActionHookRegistry
+  actionHooks: ActionHookRegistry | undefined
   state: GameState
   player: PlayerState
   space?: ActionSpace
@@ -737,7 +737,7 @@ export type ProtectedObservation = {
 
 export type ActionExecutionContext = {
   /** Session-owned runtime dependency; never part of action metadata or snapshots. */
-  actionHooks?: ActionHookRegistry
+  actionHooks: ActionHookRegistry | undefined
   completedTransactionEvents?: readonly GameEvent[]
   previewMode?: 'base'
   state: GameState

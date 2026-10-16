@@ -151,7 +151,7 @@ type FlowEffectHandler = (
   ctx?: FlowEffectContext,
 ) => ActionFlow | void
 export type FlowEffectContext = {
-  actionHooks?: ActionHookRegistry
+  actionHooks: ActionHookRegistry | undefined
   transactionEvents?: readonly import('../contract/events').GameEvent[]
   /** The action space or card that supplied this particular purchase. */
   purchaseActionCardId?: string

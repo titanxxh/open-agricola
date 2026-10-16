@@ -1139,16 +1139,11 @@ export function maybeBuildChoiceCandidates(
 }
 
 export function buildChoiceExecutionContext(
-  context: {
-    state: ActionExecutionContext['state']
-    player: ActionExecutionContext['player']
-    space: ActionExecutionContext['space']
-    emitPrivateEvent?: ActionExecutionContext['emitPrivateEvent']
-    reportProtectedObservation?: ActionExecutionContext['reportProtectedObservation']
-  },
+  context: Pick<ActionExecutionContext, 'actionHooks' | 'state' | 'player' | 'space' | 'emitPrivateEvent' | 'reportProtectedObservation'>,
   base?: Pick<ActionExecutionContext, 'params' | 'costs' | 'costTrades' | 'costBonuses' | 'paymentResourceProviders' | 'costAttribution' | 'sourceCard' | 'actionContext'> | null,
 ): ActionExecutionContext {
   return {
+    actionHooks: context.actionHooks,
     state: context.state,
     player: context.player,
     space: context.space,

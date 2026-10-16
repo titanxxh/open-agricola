@@ -15,7 +15,7 @@ export type AllowedPlacement = {
   option?: ActionChoiceOption
 }
 
-type PlacementContextOverrides = Partial<CardListenerDispatchInput> & {
+type PlacementContextOverrides = Partial<Omit<CardListenerDispatchInput, 'actionHooks'>> & Pick<CardListenerDispatchInput, 'actionHooks'> & {
   ignoreWorkerAvailability?: boolean
   isActionDoable?: (space: ActionSpace, baseDoable: () => boolean) => boolean
 }
@@ -90,7 +90,7 @@ const canExecutePlacementSpace = (
 export function computeAllowedPlacementSpaces(
   state: GameState,
   player: PlayerState,
-  contextOverrides: PlacementContextOverrides = {},
+  contextOverrides: PlacementContextOverrides,
 ): AllowedPlacement[] {
   const base: AllowedPlacement[] = state.actionSpaces
     .filter((s) => {
@@ -111,6 +111,7 @@ export function computeAllowedPlacementSpaces(
     request: { kind: 'choice' as const, options: baseOptions },
   }
   const actionResults = requireActionHookRegistry(contextOverrides.actionHooks).run({
+    actionHooks: contextOverrides.actionHooks,
     state,
     player,
     space: createPlaceFarmerVirtualSpace(),

@@ -21,7 +21,7 @@ describe('per-session action rules', () => {
   it('requires the query dependency while allowing an explicitly empty registry', () => {
     const session = game()
     const player = session.state.players[0]!
-    expect(() => session.withCtx(() => computeAllowedPlacementSpaces(session.state, player)))
+    expect(() => session.withCtx(() => computeAllowedPlacementSpaces(session.state, player, { actionHooks: undefined })))
       .toThrow('ActionHookRegistry is required')
     const placements = session.withCtx(() => computeAllowedPlacementSpaces(session.state, player, { actionHooks: new ActionHookRegistry() }))
     expect(placements.map(entry => entry.spaceId)).toContain('fishing')

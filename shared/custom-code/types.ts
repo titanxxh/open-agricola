@@ -41,7 +41,7 @@ export type CustomCodeListenerInvocation = {
   compiledCode: string
   cardId: string
   registrationId: string
-  context: CardListenerContext
+  context: Omit<CardListenerContext, 'actionHooks'>
 }
 
 export type CustomCodeValidateResult =

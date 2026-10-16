@@ -55,7 +55,7 @@ export const collectAccumulatedResources = (
   })
 }
 
-const collectionTarget = ({ state, space, actionContext }: ActionExecutionContext): ActionSpace | undefined => {
+const collectionTarget = ({ state, space, actionContext }: Pick<ActionExecutionContext, 'state' | 'space' | 'actionContext'>): ActionSpace | undefined => {
   const hint = actionContext?.spaceId
   return typeof hint === 'string' ? hint === space.id ? space : findActionSpaceById(state, hint) : space
 }
@@ -100,7 +100,7 @@ export const collectAction: ActionDefinition = {
   },
   execute: ({ state, player, space, actionContext, eventSink }) => {
     const spaceIdHint = actionContext?.spaceId as string | undefined
-    const targetSpace = collectionTarget({ state, player, space, actionContext })
+    const targetSpace = collectionTarget({ state, space, actionContext })
     if (!targetSpace) return { type: 'fail', errorKey: 'log.collectNoSpace' }
     const resource = actionContext?.resource
     const amount = actionContext?.amount

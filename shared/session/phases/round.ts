@@ -214,7 +214,7 @@ export const takeAction = (
 
   const beforeFlows = collectBeforePlacementFlows(core.actionHooks, state, player, space)
   if (beforeFlows.length > 0) {
-    core.peekEngineFrame()?.engine.injectBeforeFlows(beforeFlows, { state, player, space })
+    core.peekEngineFrame()?.engine.injectBeforeFlows(beforeFlows, { actionHooks: core.actionHooks, state, player, space })
     core.flushEngineLogPublic()
     player._activeActionBonusSources = []
     core.setActionStartPlayerSnapshot(core.cloneSessionPlayer(player))

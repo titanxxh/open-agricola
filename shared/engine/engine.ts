@@ -58,7 +58,7 @@ type EngineDeps = {
 }
 
 type EngineContext = {
-  actionHooks?: ActionExecutionContext['actionHooks']
+  actionHooks: ActionExecutionContext['actionHooks']
   state: GameState
   player: PlayerState
   space: ActionSpace
