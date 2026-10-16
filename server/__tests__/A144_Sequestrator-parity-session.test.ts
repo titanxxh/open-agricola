@@ -3,20 +3,29 @@ import { GameSession, type SessionResponse } from '../game/authoritative-session
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { getStoredResource, setStoredResource } from '../../shared/cards/helpers/card-storage'
-
 import '../../shared/cards/A/A144_Sequestrator'
+import assert from 'node:assert/strict'
+import { type GameState } from '../../shared/contract/types'
+import { createWorkSession } from './_helpers/session-fixtures'
+import { assertRejectedUnchanged, confirmNext , getChoiceOptions , expectTileFarmSelection , undoRuleSnapshot , assertUndoRestored } from './_helpers/session-assertions'
+import { createScenarioEvidence } from './_helpers/scenario-evidence'
+
+const sessionEvidence = createScenarioEvidence(import.meta.url)
 
 const CARD_ID = 'A144_Sequestrator'
+
 const FILLER = '__test_placeholder__'
+
 const THREE_PASTURES = [
   'H-0-2', 'H-1-2', 'V-0-2', 'V-0-3',
   'H-2-2', 'V-1-2', 'V-1-3',
   'H-3-2', 'V-2-2', 'V-2-3',
 ]
+
 const TWO_PASTURES = THREE_PASTURES.slice(0, 7)
 
 const setup = ({ played = true, actor = 0 } = {}) => {
-  const session = new GameSession(7144, undefined, { playerCount: 3 })
+  const session = sessionEvidence.track(createWorkSession({ seed: 7144, options: { playerCount: 3 } }))
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.currentPlayerIndex = actor
@@ -53,7 +62,7 @@ const setup = ({ played = true, actor = 0 } = {}) => {
 const chooseCard = (session: GameSession, response: SessionResponse, cardId: string) => {
   if (!response.state.players[0]!.occupationHand.includes(cardId)) return response
   if (response.interaction.stateId !== 'wait') return response
-  const option = response.interaction.request.options?.find((candidate) => candidate.value === cardId)
+  const option = getChoiceOptions(response)?.find((candidate) => candidate.value === cardId)
   expect(option, JSON.stringify(response.interaction)).toBeDefined()
   return session.resolveChoice(response.interaction.playerIndex, option!.value)
 }
@@ -72,14 +81,14 @@ describe('A144 Sequestrator parity', () => {
     const session = setup({ actor: 1 })
     const state = session.getState().state
     const actor = state.players[1]!
-    actor.fields = Array.from({ length: 4 }, (_, col) => ({ row: 0, col, crop: null, remaining: 0 }))
+    actor.fields = Array.from({ length: 4 }, (_, col) => ({ row: 0, col, stacks: [] }))
     session.loadState(state)
     let response = session.takeAction(1, 'farmland')
     expect(response.interaction).toMatchObject({
       stateId: 'wait', request: { kind: 'farm-select', farm: { farmType: 'plow' } },
     })
-    if (response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'farm-select') return
-    response = session.commitSelectionChoice(1, { tile: response.interaction.request.farm.selectableTiles[0]! })
+    assert.ok(!(response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'farm-select'), JSON.stringify(response.interaction))
+    response = session.commitSelectionChoice(1, { tile: expectTileFarmSelection(response, 'plow').selectableTiles[0]! })
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[1]!.fields).toHaveLength(5)
     expect(response.state.players[1]!.resources.clay).toBe(4)
@@ -112,7 +121,7 @@ describe('A144 Sequestrator parity', () => {
   it('A144 S4: existing five fields do not receive stored clay retroactively', () => {
     const session = setup({ played: false })
     const state = session.getState().state
-    state.players[0]!.fields = Array.from({ length: 5 }, (_, col) => ({ row: 0, col, crop: null, remaining: 0 }))
+    state.players[0]!.fields = Array.from({ length: 5 }, (_, col) => ({ row: 0, col, stacks: [] }))
     session.loadState(state)
     const response = chooseCard(session, session.takeAction(0, 'lessons'), CARD_ID)
     expect(response.state.players[0]!.resources.clay).toBe(0)
@@ -123,13 +132,173 @@ describe('A144 Sequestrator parity', () => {
     const session = setup()
     const state = session.getState().state
     const owner = state.players[0]!
-    owner.fields = Array.from({ length: 5 }, (_, col) => ({ row: 0, col, crop: null, remaining: 0 }))
+    owner.fields = Array.from({ length: 5 }, (_, col) => ({ row: 0, col, stacks: [] }))
     setStoredResource(owner, CARD_ID, 'clay', 0)
     session.loadState(state)
     let response = session.takeAction(0, 'farmland')
-    if (response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'farm-select') return
-    response = session.commitSelectionChoice(0, { tile: response.interaction.request.farm.selectableTiles[0]! })
+    assert.ok(!(response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'farm-select'), JSON.stringify(response.interaction))
+    response = session.commitSelectionChoice(0, { tile: expectTileFarmSelection(response, 'plow').selectableTiles[0]! })
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources.clay).toBe(0)
+  })
+})
+
+describe("A144 command boundaries", () => {
+  const CARD = 'A144_Sequestrator'
+  const TWO = ['H-0-2', 'H-1-2', 'V-0-2', 'V-0-3', 'H-2-2', 'V-1-2', 'V-1-3']
+  const THREE = [...TWO, 'H-3-2', 'V-2-2', 'V-2-3']
+  function save(id: string, value: unknown) {
+    sessionEvidence.record(id, value)
+  }
+  function ok(r: SessionResponse) {
+    assert.equal(r.ok, true, r.error)
+    return r
+  }
+  function fields(state: GameState, actor: number, count: number) {
+    state.players[actor]!.fields = Array.from({ length: count }, (_, n) => ({ row: n < 5 ? 0 : 1, col: n % 5, stacks: [] }))
+  }
+  function fences(state: GameState, actor: number, edges: string[]) {
+    const p = state.players[actor]!
+    p.fenceSegments = edges.map(edge => ({ edge, type: 'fence' as const, source: { kind: 'own' as const, ownerPlayerId: p.id } }))
+  }
+  function setup(configure: (state: GameState) => void = () => {
+  }, played = true) {
+    const s = sessionEvidence.track(createWorkSession({ seed: 4242, options: { playerCount: 3 }, configure(state) {
+        state.round = 14
+        for (const p of state.players)
+          Object.assign(p.resources, { food: 40, wood: 15, clay: 0, reed: 0, stone: 0, grain: 0, vegetable: 0 })
+        const p = state.players[0]!
+        p.occupationPlayed = played ? [CARD] : []
+        p.occupationHand = played ? ['__test_placeholder__'] : [CARD, 'A110_Roughcaster']
+        if (played) {
+          setStoredResource(p, CARD, 'reed', 3)
+          setStoredResource(p, CARD, 'clay', 4)
+        }
+        configure(state)
+      } }))
+    return s
+  }
+  const beforeAction = new WeakMap<GameSession, string>()
+  function turn(s: GameSession, actor: number, space: string) {
+    let r = s.getState()
+    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
+      r = confirmNext(s, r)
+    assert.equal(r.interaction.stateId, 'idle')
+    assert.equal(r.state.currentPlayerIndex, actor)
+    beforeAction.set(s, undoRuleSnapshot(s.getState()))
+    return ok(s.takeAction(actor, space))
+  }
+  function undo(s: GameSession) {
+    const before = beforeAction.get(s)
+    assert.ok(before)
+    const undone = s.undoAction()
+    assertUndoRestored(before, undone)
+    assertUndoRestored(before, s.getState())
+    return undone
+  }
+  function close(s: GameSession, r: SessionResponse) {
+    for (let n = 0; n < 10 && r.interaction.stateId === 'wait' && r.interaction.request.kind !== 'confirm-next-player'; n++) {
+      const i = r.interaction
+      if (i.request.kind === 'confirm-player-switch')
+        r = ok(s.resolveChoice(i.request.fromPlayerIndex, 'confirm'))
+      else
+        assert.fail(JSON.stringify(i))
+    }
+    assert.ok(r.interaction.stateId === 'idle' || (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player'), JSON.stringify(r.interaction))
+    return r
+  }
+  function plow(s: GameSession, actor: number, space = 'farmland') {
+    let r = turn(s, actor, space)
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'farm-select' && r.interaction.request.farm.farmType === 'plow')
+    const tile = r.interaction.request.farm.selectableTiles[0]
+    assert.ok(tile)
+    r = ok(s.commitSelectionChoice(actor, { tile }))
+    return close(s, r)
+  }
+  function fence(s: GameSession, actor: number, edges = THREE) {
+    const r = turn(s, actor, 'fencing')
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'farm-select')
+    return close(s, ok(s.commitSelectionChoice(actor, { edges, palisadeEdges: [], extraWood: 0 })))
+  }
+  function store(r: SessionResponse) {
+    return (['reed', 'clay'] as const).map(t => getStoredResource(r.state.players[0]!, CARD, t))
+  }
+  it("actual Lessons stores three reed and four clay without retroactive fields or pastures", () => {
+    for (const farm of ['fields', 'pastures']) {
+      const s = setup(state => farm === 'fields' ? fields(state, 0, 5) : fences(state, 0, THREE), false)
+      let r = turn(s, 0, 'lessons')
+      if (!r.state.players[0]!.occupationPlayed.includes(CARD))
+        r = ok(s.resolveChoice(0, CARD))
+      assert.ok(r.state.players[0]!.occupationPlayed.includes(CARD))
+      assert.deepEqual(store(r), [3, 4])
+      assert.equal(r.state.players[0]!.resources.reed, 0)
+      assert.equal(r.state.players[0]!.resources.clay, 0)
+      save(`A144-N1-${farm}`, r)
+    }
+  })
+  it("real owner and opponent fifth plow award recipient four clay and empty owner storage", () => {
+    for (const actor of [0, 1]) {
+      const s = setup(state => fields(state, actor, 4))
+      if (actor === 1)
+        turn(s, 0, 'day-laborer')
+      const r = plow(s, actor)
+      assert.equal(r.state.players[actor]!.fields.length, 5)
+      assert.equal(r.state.players[actor]!.resources.clay, 4)
+      if (actor === 1)
+        assert.equal(r.state.players[0]!.resources.clay, 0)
+      assert.deepEqual(store(r), [3, 0])
+      save(`A144-N2-${actor}`, r)
+    }
+  })
+  it("real owner and opponent third pasture award three reed and empty only reed storage", () => {
+    for (const actor of [0, 1]) {
+      const s = setup(state => fences(state, actor, TWO))
+      if (actor === 1)
+        turn(s, 0, 'day-laborer')
+      const r = fence(s, actor)
+      assert.equal(r.state.players[actor]!.pastures.length, 3)
+      assert.equal(r.state.players[actor]!.resources.reed, 3)
+      assert.equal(r.state.players[actor]!.resources.wood, 12)
+      assert.deepEqual(store(r), [0, 4])
+      save(`A144-N3-${actor}`, r)
+    }
+  })
+  it("below threshold empty stock and hand cannot award resources on real plow", () => {
+    for (const [count, played, empty] of [[3, true, false], [4, false, false], [4, true, true]] as const) {
+      const s = setup(state => {
+        fields(state, 0, count)
+        if (empty)
+          setStoredResource(state.players[0]!, CARD, 'clay', 0)
+      }, played)
+      const r = plow(s, 0)
+      assert.equal(r.state.players[0]!.resources.clay, 0)
+      save(`A144-N4-${count}-${played}-${empty}`, r)
+    }
+  })
+  it("invalid plow rejects and own undo restores full stock before a single legal retry", () => {
+    const s = setup(state => fields(state, 0, 4))
+    let r = turn(s, 0, 'farmland')
+    assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { tile: { row: 99, col: 99 } }))
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'farm-select' && r.interaction.request.farm.farmType === 'plow')
+    r = close(s, ok(s.commitSelectionChoice(0, { tile: r.interaction.request.farm.selectableTiles[0]! })))
+    const undone = undo(s)
+    assert.equal(undone.state.players[0]!.fields.length, 4)
+    assert.equal(undone.state.players[0]!.resources.clay, 0)
+    assert.deepEqual(store(undone), [3, 4])
+    const retry = plow(s, 0)
+    assert.equal(retry.state.players[0]!.resources.clay, 4)
+    assert.deepEqual(store(retry), [3, 0])
+    save('A144-N5', { r, undone, retry })
+  })
+  it("next real sixth field cannot award emptied clay a second time", () => {
+    const s = setup(state => fields(state, 0, 4))
+    const first = plow(s, 0)
+    turn(s, 1, 'day-laborer')
+    turn(s, 2, 'grain-seeds')
+    const second = plow(s, 0, 'cultivation')
+    assert.equal(second.state.players[0]!.fields.length, 6)
+    assert.equal(second.state.players[0]!.resources.clay, 4)
+    assert.deepEqual(store(second), [3, 0])
+    save('A144-N6', { first, second })
   })
 })

@@ -1,14 +1,15 @@
-import { afterEach, expect, it } from 'vitest'
+import { expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { createWorkSession } from './_helpers/session-fixtures'
-import type { ActionFlow, ChoiceDescriptionPreview } from '../../shared/contract/types'
+import { type ActionFlow, type ChoiceDescriptionPreview } from '../../shared/contract/types'
 import { cloneState } from '../../shared/session/state-bootstrap'
 import { requireActiveCardRegistry } from '../../shared/cards/active-registry'
 
-// Approved Session seam: real card purchase followed by action use, cursor
-// restore and undo. A162's printed 4+ requirement uses a four-player game.
-const sessions: GameSession[] = []
-afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+import { assertRejectedUnchanged, undoRuleSnapshot, assertUndoRestored } from './_helpers/session-assertions'
+import { setWorkersAtHome, setActiveWorkerCount, availableWorkers } from '../../shared/domain/player'
+import { createScenarioEvidence } from './_helpers/scenario-evidence'
+
+const sessionEvidence = createScenarioEvidence(import.meta.url)
 
 function ready(session: GameSession): SessionResponse {
   let response = session.getState()
@@ -41,17 +42,24 @@ function choose(session: GameSession, response: SessionResponse, value: string):
 }
 
 const FOREST_TALLYMAN = 'A162_ForestTallyman'
-function forestTallymanSession(): GameSession {
-  const session = createWorkSession({
+
+function forestTallymanSession(ownerWorkers = 2): GameSession {
+  const session = sessionEvidence.track(createWorkSession({
     seed: 4242,
     options: { playerCount: 4 },
     configure(state) {
       state.round = 14
       for (const player of state.players) Object.assign(player.resources, { food: 40, wood: 0, clay: 0 })
       state.players[0]!.occupationHand = [FOREST_TALLYMAN, 'A110_Roughcaster']
+      if (ownerWorkers === 3) {
+        state.players[0]!.roomTiles.push({ row: 0, col: 0 })
+        state.players[0]!.rooms = 3
+        setActiveWorkerCount(state.players[0]!, 3)
+        setWorkersAtHome(state, state.players[0]!, 3)
+      }
     },
-  })
-  sessions.push(session)
+  }))
+
   return session
 }
 
@@ -67,12 +75,33 @@ it('a real Forest Tallyman purchase makes its private space executable without l
   take(session, 2, 'clay-pit')
   take(session, 3, 'fishing')
 
+  ready(session)
+  const beforeResponse = session.getState()
+  sessionEvidence.record('before private action', beforeResponse)
+  // #1258: undo materializes these two known defaults after a public card purchase.
+  expect(beforeResponse.state.players[0]!.playedCards).toEqual([])
+  expect(beforeResponse.state.actionSpaces.find(space => space.id === cardId)?.blockedBy).toBeUndefined()
+  const expectedBefore = {
+    ...beforeResponse,
+    state: {
+      ...beforeResponse.state,
+      players: beforeResponse.state.players.map((player, index) => index === 0
+        ? { ...player, playedCards: ['occupation:A162_ForestTallyman'] } : player),
+      actionSpaces: beforeResponse.state.actionSpaces.map(space => space.id === cardId
+        ? { ...space, blockedBy: [] } : space),
+    },
+  }
+  const before = undoRuleSnapshot(expectedBefore)
   const used = take(session, 0, cardId)
   expect(used.state.players[0]!.resources).toMatchObject({ wood: 3, clay: 2 })
   expect(used.state.actionSpaces.find(space => space.id === cardId)?.takenBy).toHaveLength(1)
   expect(used.state.events.some(event => event.type === 'resource.moved' && event.sourceCardId === cardId)).toBe(true)
   const undone = session.undoAction()
-  expect(undone.ok, undone.error).toBe(true)
+  sessionEvidence.record('after private action undo', undone)
+  expect(undone.state.players[0]!.playedCards).toEqual(['occupation:A162_ForestTallyman'])
+  expect(undone.state.actionSpaces.find(space => space.id === cardId)?.blockedBy).toEqual([])
+  assertUndoRestored(before, undone)
+  assertUndoRestored(before, session.getState())
   expect(undone.state.players[0]!.resources).toMatchObject({ wood: 0, clay: 0 })
   expect(undone.state.actionSpaces.find(space => space.id === cardId)?.takenBy).toEqual([])
   expect(take(session, 0, cardId).state.players[0]!.resources).toMatchObject({ wood: 3, clay: 2 })
@@ -91,7 +120,7 @@ it.each(['none', 'forest', 'clay'] as const)('a purchased Forest Tallyman remain
 })
 
 function flowHostSession(flow: ActionFlow): GameSession {
-  const session = createWorkSession({
+  const session = sessionEvidence.track(createWorkSession({
     configure(state) {
       const template = state.actionSpaces.find(space => space.id === 'day-laborer')
       if (!template) throw new Error('Missing day-laborer fixture template')
@@ -108,8 +137,8 @@ function flowHostSession(flow: ActionFlow): GameSession {
         takenBy: [],
       })
     },
-  })
-  sessions.push(session)
+  }))
+
   return session
 }
 
@@ -153,16 +182,17 @@ it.each(['optional', 'xor'] as const)('a missing %s branch definition cannot sil
 })
 
 const FOREST_INN = 'B042_ForestInn'
+
 function forestInnSession(ownerWood: number, guestWood = 0, guestFood = 1): GameSession {
-  const session = createWorkSession({ seed: 4242, configure(state) {
+  const session = sessionEvidence.track(createWorkSession({ seed: 4242, configure(state) {
     state.round = 6
     const [owner, guest] = state.players
     if (!owner || !guest) throw new Error('Forest Inn requires two players')
     owner.minorHand = [FOREST_INN, 'B004_WoodPile']
     Object.assign(owner.resources, { food: 100, wood: ownerWood, clay: 1, reed: 1 })
     Object.assign(guest.resources, { wood: guestWood, food: guestFood })
-  } })
-  sessions.push(session)
+  } }))
+
   return session
 }
 
@@ -233,8 +263,8 @@ it.each([[5, 2], [7, 4], [9, 7]])('a purchased Forest Inn charges its guest once
   if (wood > 5) {
     expectRejectedUnchanged(session, () => session.resolveChoice(0, 'invalid'))
     expectRejectedUnchanged(session, () => session.resolveChoice(1, 'invalid'))
-    const restored = new GameSession({ state: cloneState(session.state), sessionCursor: session.createSessionPrivateCursor() })
-    sessions.push(restored)
+    const restored = sessionEvidence.track(new GameSession({ state: cloneState(session.state), sessionCursor: session.createSessionPrivateCursor() }))
+
     const restoredResponse = restored.getState()
     expect(restoredResponse.interaction).toEqual(entered.interaction)
     const restoredDone = exchange(restored, restoredResponse, wood)
@@ -292,11 +322,11 @@ it.each(['optional', 'xor'] as const)('a registered but unaffordable %s branch r
 
 function preparationSourceSession(flow: ActionFlow): GameSession {
   const cardId = 'CARD_TEST_PreparationDefinition'
-  const session = createWorkSession({ seed: 4242, configure(state) {
+  const session = sessionEvidence.track(createWorkSession({ seed: 4242, configure(state) {
     for (const player of state.players) player.resources.food = 40
     state.players[0]!.minorPlayed = [cardId]
-  } })
-  sessions.push(session)
+  } }))
+
   session.withCtx(() => requireActiveCardRegistry('preparation definition regression').loadImpl(cardId, {
     effect: { id: cardId, onRoundStart: () => flow },
   }))
@@ -331,7 +361,7 @@ it('a registered but unpaid preparation activation retains the normal skip seman
 it('a flow can create a new composite space and immediately offer and execute it', () => {
   const dynamicId = 'card_test_created_composite'
   const hostId = 'card_test_create_composite'
-  const session = createWorkSession({ configure(state) {
+  const session = sessionEvidence.track(createWorkSession({ configure(state) {
     const template = state.actionSpaces.find(space => space.id === 'day-laborer')
     if (!template) throw new Error('Missing day-laborer fixture template')
     state.actionSpaces.push({
@@ -354,8 +384,8 @@ it('a flow can create a new composite space and immediately offer and execute it
       },
       resources: { ...template.resources }, takenBy: [],
     })
-  } })
-  sessions.push(session)
+  } }))
+
   const offered = take(session, 0, hostId)
   const selected = chooseWoodGain(session, offered, 3)
   const completed = chooseWoodGain(session, selected, 3)
@@ -365,8 +395,8 @@ it('a flow can create a new composite space and immediately offer and execute it
 })
 
 it('a new composite space exposes its action choice on first use', () => {
-  const session = createWorkSession()
-  sessions.push(session)
+  const session = sessionEvidence.track(createWorkSession())
+
   const template = session.state.actionSpaces.find(space => space.id === 'day-laborer')
   if (!template) throw new Error('Missing day-laborer fixture template')
   const dynamicId = 'card_test_new_composite_entry'
@@ -384,4 +414,37 @@ it('a new composite space exposes its action choice on first use', () => {
   const completed = chooseWoodGain(session, offered, 3)
   expect(completed.state.players[0]!.resources).toMatchObject({ wood: 3, clay: 0 })
   expect(completed.state.actionSpaces.find(space => space.id === dynamicId)?.takenBy).toHaveLength(1)
+})
+
+
+it('Forest Tallyman hand, another player, and an occupied private space reject without using a person', () => {
+  const hand = forestTallymanSession()
+  take(hand, 0, 'grain-seeds')
+  take(hand, 1, 'forest')
+  take(hand, 2, 'clay-pit')
+  take(hand, 3, 'fishing')
+  ready(hand)
+  expect(hand.getActionAvailability(0)).not.toHaveProperty(FOREST_TALLYMAN)
+  assertRejectedUnchanged(hand, () => hand.takeAction(0, FOREST_TALLYMAN))
+  expect(hand.getState().state.players[0]!.resources).toMatchObject({ wood: 0, clay: 0 })
+
+  const session = forestTallymanSession(3)
+  choose(session, take(session, 0, 'lessons'), FOREST_TALLYMAN)
+  take(session, 1, 'forest')
+  take(session, 2, 'clay-pit')
+  take(session, 3, 'fishing')
+  ready(session)
+  expect(session.getActionAvailability(1)[FOREST_TALLYMAN]).toBe(false)
+  assertRejectedUnchanged(session, () => session.takeAction(1, FOREST_TALLYMAN))
+  const used = take(session, 0, FOREST_TALLYMAN)
+  expect(used.state.players[0]!.resources).toMatchObject({ wood: 3, clay: 2 })
+  take(session, 1, 'reed-bank')
+  take(session, 2, 'grove')
+  take(session, 3, 'day-laborer')
+  const ownerTurn = ready(session)
+  expect(ownerTurn.state.currentPlayerIndex).toBe(0)
+  expect(availableWorkers(ownerTurn.state, ownerTurn.state.players[0]!)).toHaveLength(1)
+  expect(session.getActionAvailability(0)[FOREST_TALLYMAN]).toBe(false)
+  assertRejectedUnchanged(session, () => session.takeAction(0, FOREST_TALLYMAN))
+  expect(session.getState().state.players[0]!.resources).toMatchObject({ wood: 3, clay: 2 })
 })

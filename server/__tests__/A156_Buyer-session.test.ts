@@ -1,17 +1,26 @@
-import { type SessionResponse } from '../game/authoritative-session'
+import { type SessionResponse, GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
-
 import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
-
 import '../../shared/cards/A/A156_Buyer'
-import type { ActionChoiceOption } from '../../shared/contract/types'
+import { type ActionChoiceOption, type GameState } from '../../shared/contract/types'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
+import assert from 'node:assert/strict'
+import { createWorkSession } from './_helpers/session-fixtures'
+
+import { assertEmptyAccumulationRejected, assertRejectedUnchanged, confirmNext , getChoiceOptions } from './_helpers/session-assertions'
+import { createScenarioEvidence } from './_helpers/scenario-evidence'
+
+const sessionEvidence = createScenarioEvidence(import.meta.url)
+
+function assertTurnFinished(response: SessionResponse) {
+  assert.equal(response.ok, true, response.error)
+  assert.ok(response.interaction.stateId === 'wait' && response.interaction.request.kind === 'confirm-next-player', JSON.stringify(response.interaction))
+}
 
 describe('A156_Buyer session', () => {
   const setup = (currentPlayerIndex: number) => {
-    const session = new GameSession(42)
+    const session = sessionEvidence.track(createWorkSession({ seed: 42 }))
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -60,7 +69,7 @@ describe('A156_Buyer session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId === 'wait') {
       // Find the non-skip option (accept)
-      const acceptOption = resp.interaction.request.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
+      const acceptOption = getChoiceOptions(resp)?.find((o: ActionChoiceOption) => o.value !== '__skip__')
       expect(acceptOption).toBeDefined()
       resp = session.resolveChoice(0, acceptOption!.value)
     }
@@ -122,8 +131,8 @@ describe('A156_Buyer session', () => {
     expect(resp.ok).toBe(true)
 
     // Sheep collection triggers animalReorg for opponent first
-    if (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
-      resp = session.resolveChoice(1, 'confirm', [])
+    if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'animal-reorg') {
+      resp = session.resolveChoice(1, 'confirm', { zones: [] })
     }
 
     // After opponent's action, after-hooks fire with PlayerSwitch
@@ -134,17 +143,17 @@ describe('A156_Buyer session', () => {
     // Accept the optional exchange
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId === 'wait') {
-      const acceptOption = resp.interaction.request.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
+      const acceptOption = getChoiceOptions(resp)?.find((o: ActionChoiceOption) => o.value !== '__skip__')
       expect(acceptOption).toBeDefined()
       resp = session.resolveChoice(0, acceptOption!.value)
     }
 
     // Handle animalReorg for buyer if needed (gaining sheep requires placement)
-    if (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
+    if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'animal-reorg') {
       expect(resp.interaction.playerIndex).toBe(0)
-      resp = session.resolveChoice(0, 'confirm', [
+      resp = session.resolveChoice(0, 'confirm', { zones: [
         { id: 'house:1-0', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
-      ])
+      ] })
     }
 
     // Walk through any remaining player switches
@@ -204,7 +213,7 @@ describe('A156 Buyer parity', () => {
   const FILLER = '__test_placeholder__'
 
   const setup = ({ actor = 1, food = 1, played = true } = {}) => {
-    const session = new GameSession(6156, undefined, { playerCount: 4 })
+    const session = sessionEvidence.track(createWorkSession({ seed: 6156, options: { playerCount: 4 } }))
     const state = session.getState().state
     stabilizeRandomHands(state.players)
     state.currentPlayerIndex = actor
@@ -254,9 +263,9 @@ describe('A156 Buyer parity', () => {
     response = enterBuyerChoice(session, response)
     expect(response.interaction.stateId).toBe('wait')
     if (response.interaction.stateId !== 'wait') return response
-    const purchase = response.interaction.request.options?.find((option) =>
+    const purchase = getChoiceOptions(response)?.find((option) =>
       option.sourceCard === CARD_ID && option.value !== '__skip__')
-      ?? response.interaction.request.options?.find((option) => option.value !== '__skip__')
+      ?? getChoiceOptions(response)?.find((option) => option.value !== '__skip__')
     expect(purchase, JSON.stringify(response.interaction)).toBeDefined()
     return session.resolveChoice(response.interaction.playerIndex, purchase!.value)
   }
@@ -267,7 +276,7 @@ describe('A156 Buyer parity', () => {
 
     expect(response.state.players[0]!.resources).toMatchObject({ food: 0, reed: 0 })
     expect(response.interaction.stateId === 'wait'
-      ? response.interaction.request.options?.some((option) =>
+      ? getChoiceOptions(response)?.some((option) =>
         option.sourceCard === CARD_ID && option.value !== '__skip__') ?? false
       : false).toBe(false)
   })
@@ -278,5 +287,145 @@ describe('A156 Buyer parity', () => {
 
     expect(response.state.players[0]!.resources).toMatchObject({ food: 0, stone: 1 })
     expect(response.state.players[1]!.resources).toMatchObject({ food: 1, stone: 2 })
+  })
+})
+
+describe("A156 command boundaries", () => {
+  const BUYER = 'A156_Buyer'
+  function save(id: string, value: unknown) {
+    sessionEvidence.record(id, value)
+  }
+  function ok(r: SessionResponse) {
+    assert.equal(r.ok, true, r.error)
+    return r
+  }
+  function setup(resources: Partial<GameState['players'][number]['resources']> = {}, played = true, configure: (state: GameState) => void = () => {
+  }) {
+    const s = sessionEvidence.track(createWorkSession({ seed: 4242, options: { playerCount: 4 }, configure(state) {
+        state.round = 14
+        for (const p of state.players)
+          Object.assign(p.resources, { food: 20, wood: 0, clay: 0, reed: 0, stone: 0, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0 })
+        const p = state.players[0]!
+        Object.assign(p.resources, resources)
+        p.occupationPlayed = played ? [BUYER] : []
+        p.occupationHand = played ? ['__test_placeholder__'] : [BUYER, 'A110_Roughcaster']
+        configure(state)
+      } }))
+    return s
+  }
+  function turn(s: GameSession, actor: number, space: string) {
+    let r = s.getState()
+    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
+      r = confirmNext(s, r)
+    assert.equal(r.interaction.stateId, 'idle')
+    assert.equal(r.state.currentPlayerIndex, actor)
+    return ok(s.takeAction(actor, space))
+  }
+  function finish(s: GameSession, r: SessionResponse, accept = true) {
+    for (let n = 0; n < 24 && r.interaction.stateId === 'wait' && r.interaction.request.kind !== 'confirm-next-player'; n++) {
+      const i = r.interaction
+      if (i.request.kind === 'confirm-player-switch')
+        r = ok(s.resolveChoice(i.request.fromPlayerIndex, 'confirm'))
+      else if (i.request.kind === 'animal-reorg')
+        r = ok(s.resolveChoice(i.playerIndex, 'confirm', { zones: i.request.zones }))
+      else {
+        if (i.request.kind === 'select-trigger') {
+          const trigger = i.request.options[0]
+          assert.ok(trigger)
+          r = ok(s.resolveChoice(i.playerIndex, trigger.value))
+          continue
+        }
+        assert.ok(i.request.kind === 'choice', JSON.stringify(i))
+        const o = i.request.options.find(o => accept ? !o.disabled && o.value !== '__skip__' && o.value !== '__done__' : o.value === '__skip__' || o.value === '__done__')
+        assert.ok(o, JSON.stringify(i))
+        r = ok(s.resolveChoice(i.playerIndex, o.value))
+      }
+    }
+    assert.ok(r.interaction.stateId === 'idle' || (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player'), JSON.stringify(r.interaction))
+    return r
+  }
+  function offer(s: GameSession, space: string) {
+    finish(s, turn(s, 0, 'day-laborer'))
+    return turn(s, 1, space)
+  }
+  function material(r: SessionResponse, actor = 0) {
+    return r.state.players[actor]!.resources
+  }
+  function prepareHousing(state: GameState) {
+    const p = state.players[0]!
+    p.fenceSegments = ['H-0-2', 'H-1-2', 'V-0-2', 'V-0-3'].map(edge => ({ edge, type: 'fence' as const, source: { kind: 'own' as const, ownerPlayerId: p.id } }))
+    p.pastures = [{ id: 'housing', tiles: [{ row: 0, col: 2 }], animalType: null, animalCount: 0 }]
+    p.stableTiles = [{ row: 0, col: 2 }]
+  }
+  function pile(state: GameState, space: string, type: 'reed' | 'stone' | 'sheep' | 'boar' | 'food', count: number) {
+    state.actionSpaces.find(a => a.id === space)!.resources[type] = count
+  }
+  it("actual opponent reed stone sheep and pig accumulation transfers one food for one matching good", () => {
+    for (const [space, type] of [['reed-bank', 'reed'], ['western-quarry', 'stone'], ['eastern-quarry', 'stone'], ['sheep-market', 'sheep'], ['pig-market', 'boar']] as const) {
+      const s = setup({ food: 1 }, true, state => {
+        prepareHousing(state)
+        pile(state, space, type, 1)
+      })
+      const pending = offer(s, space), r = finish(s, pending)
+      assert.equal(material(r).food, 2)
+      assert.equal(material(r, 1).food, 21)
+      assert.equal(material(r)[type], 1)
+      assert.equal(material(r, 2)[type], 0)
+      save(`A156-N1-${space}`, { pending, r })
+    }
+  })
+  it("decline zero food hand own and unrelated spaces cannot pay or gain", () => {
+    const ds = setup({ food: 1 })
+    const declined = finish(ds, offer(ds, 'reed-bank'), false)
+    assert.equal(material(declined).reed, 0)
+    assert.equal(material(declined).food, 3)
+    const poor = setup({ food: 0 })
+    turn(poor, 0, 'grain-seeds')
+    const denied = turn(poor, 1, 'reed-bank')
+    assertTurnFinished(denied)
+    assert.equal(material(denied).food, 0)
+    assert.equal(material(denied).reed, 0)
+    for (const played of [false, true]) {
+      const s = setup({ food: 1 }, played)
+      const r = played ? turn(s, 0, 'reed-bank') : finish(s, offer(s, 'reed-bank'))
+      assert.equal(material(r).food, played ? 1 : 3)
+      assert.equal(material(r, 1).food, 20)
+      assertTurnFinished(r)
+      save(`A156-N2-${played}`, r)
+    }
+    const unrelatedSession = setup({ food: 1 }, true, state => state.actionSpaces.find(space => space.id === 'forest')!.resources.wood = 3)
+    const unrelated = offer(unrelatedSession, 'forest')
+    assertTurnFinished(unrelated)
+    assert.equal(material(unrelated).food, 3)
+    assert.equal(material(unrelated).wood, 0)
+    assert.equal(material(unrelated, 1).food, 20)
+    assert.equal(material(unrelated, 1).wood, 3)
+    save('A156-N2', { declined, denied, unrelated })
+  })
+  it("empty opponent pile rejects without a food transfer or general supply good", () => {
+    const s = setup({ food: 1 }, true, state => pile(state, 'reed-bank', 'reed', 0))
+    finish(s, turn(s, 0, 'day-laborer'))
+    const r = assertEmptyAccumulationRejected(s, 1, 'reed-bank')
+    assert.equal(material(r).reed, 0)
+    assert.equal(material(r).food, 3)
+    assert.equal(material(r, 1).reed, 0)
+    assert.equal(material(r, 1).food, 20)
+    save('A156-N3', r)
+  })
+  it("invalid wrong actor and stale commands cannot transfer food twice", () => {
+    const s = setup({ food: 1 })
+    let pending = offer(s, 'reed-bank')
+    while (pending.interaction.stateId === 'wait' && pending.interaction.request.kind === 'confirm-player-switch')
+      pending = ok(s.resolveChoice(pending.interaction.request.fromPlayerIndex, 'confirm'))
+    assert.ok(pending.interaction.stateId === 'wait' && pending.interaction.request.kind === 'choice')
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, 'buy-five'))
+    const c = getChoiceOptions(pending).find(o => o.value !== '__skip__')
+    assert.ok(c)
+    assertRejectedUnchanged(s, () => s.resolveChoice(1, c.value))
+    const r = finish(s, pending)
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, c.value))
+    assert.equal(material(r).reed, 1)
+    assert.equal(material(r, 1).food, 21)
+    save('A156-N4', r)
   })
 })

@@ -2,10 +2,23 @@ import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
-
 import '../../shared/cards/A/A164_WoodWorker'
+import assert from 'node:assert/strict'
+import { type GameState } from '../../shared/contract/types'
+import { createWorkSession } from './_helpers/session-fixtures'
+
+import { assertEmptyAccumulationRejected, assertRejectedUnchanged, confirmNext , getChoiceOptions , undoRuleSnapshot , assertUndoRestored } from './_helpers/session-assertions'
+import { createScenarioEvidence } from './_helpers/scenario-evidence'
+
+const sessionEvidence = createScenarioEvidence(import.meta.url)
+
+function assertTurnFinished(response: SessionResponse) {
+  assert.equal(response.ok, true, response.error)
+  assert.ok(response.interaction.stateId === 'wait' && response.interaction.request.kind === 'confirm-next-player', JSON.stringify(response.interaction))
+}
 
 const CARD_ID = 'A164_WoodWorker'
+
 const FILLER = '__test_placeholder__'
 
 const setup = ({
@@ -14,7 +27,7 @@ const setup = ({
   actor = 0,
   played = true,
 } = {}) => {
-  const session = new GameSession(5164, undefined, { playerCount: 4 })
+  const session = sessionEvidence.track(createWorkSession({ seed: 5164, options: { playerCount: 4 } }))
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.currentPlayerIndex = actor
@@ -46,14 +59,14 @@ const playOccupation = (session: GameSession) => {
   const response = session.takeAction(0, 'lessons')
   if (!response.state.players[0]!.occupationHand.includes(CARD_ID)) return response
   if (response.interaction.stateId !== 'wait') return response
-  const option = response.interaction.request.options?.find((candidate) => candidate.value === CARD_ID)
+  const option = getChoiceOptions(response)?.find((candidate) => candidate.value === CARD_ID)
   expect(option).toBeDefined()
   return session.resolveChoice(response.interaction.playerIndex, option!.value)
 }
 
 const cardOption = (response: SessionResponse) => {
   if (response.interaction.stateId !== 'wait') return undefined
-  return response.interaction.request.options?.find((option) =>
+  return getChoiceOptions(response)?.find((option) =>
     option.sourceCard === CARD_ID && option.value !== '__skip__')
 }
 
@@ -75,9 +88,9 @@ const keepSheepInHouse = (session: GameSession, response: SessionResponse) => {
   }
   const house = response.interaction.request.zones.find((zone) => zone.zoneType === 'house')
   expect(house?.capacity).toBeGreaterThanOrEqual(1)
-  return session.resolveChoice(0, 'confirm', [{
+  return session.resolveChoice(0, 'confirm', { zones: [{
     id: 'house:1-0', zoneType: 'house', animalType: 'sheep', animalCount: 1,
-  }] as unknown as Record<string, unknown>)
+  }] })
 }
 
 describe('A164 Wood Worker parity', () => {
@@ -148,5 +161,145 @@ describe('A164 Wood Worker parity', () => {
     expect(response.state.players[1]!.resources.wood).toBe(3)
     expect(response.state.players[0]!.resources.sheep).toBe(0)
     expect(cardOption(response)).toBeUndefined()
+  })
+})
+
+describe("A164 command boundaries", () => {
+  const CARD = 'A164_WoodWorker'
+  function save(id: string, value: unknown) {
+    sessionEvidence.record(id, value)
+  }
+  function ok(r: SessionResponse) {
+    assert.equal(r.ok, true, r.error)
+    return r
+  }
+  function setup(resources: Partial<GameState['players'][number]['resources']> = {}, played = true, configure: (state: GameState) => void = () => {
+  }) {
+    const s = sessionEvidence.track(createWorkSession({ seed: 4242, options: { playerCount: 4 }, configure(state) {
+        state.round = 14
+        for (const p of state.players)
+          Object.assign(p.resources, { food: 20, wood: 0, clay: 0, reed: 0, stone: 0, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0 })
+        const p = state.players[0]!
+        Object.assign(p.resources, resources)
+        p.occupationPlayed = played ? [CARD] : []
+        p.occupationHand = played ? ['__test_placeholder__'] : [CARD, 'A110_Roughcaster']
+        configure(state)
+      } }))
+    return s
+  }
+  const beforeAction = new WeakMap<GameSession, string>()
+  function turn(s: GameSession, actor: number, space: string) {
+    let r = s.getState()
+    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
+      r = confirmNext(s, r)
+    assert.equal(r.interaction.stateId, 'idle')
+    assert.equal(r.state.currentPlayerIndex, actor)
+    beforeAction.set(s, undoRuleSnapshot(s.getState()))
+    return ok(s.takeAction(actor, space))
+  }
+  function undo(s: GameSession) {
+    const before = beforeAction.get(s)
+    assert.ok(before)
+    const undone = s.undoAction()
+    assertUndoRestored(before, undone)
+    assertUndoRestored(before, s.getState())
+    return undone
+  }
+  function finish(s: GameSession, r: SessionResponse, accept = true) {
+    for (let n = 0; n < 24 && r.interaction.stateId === 'wait' && r.interaction.request.kind !== 'confirm-next-player'; n++) {
+      const i = r.interaction
+      if (i.request.kind === 'confirm-player-switch')
+        r = ok(s.resolveChoice(i.request.fromPlayerIndex, 'confirm'))
+      else if (i.request.kind === 'animal-reorg')
+        r = ok(s.resolveChoice(i.playerIndex, 'confirm', { zones: i.request.zones }))
+      else {
+        if (i.request.kind === 'select-trigger') {
+          const trigger = i.request.options[0]
+          assert.ok(trigger)
+          r = ok(s.resolveChoice(i.playerIndex, trigger.value))
+          continue
+        }
+        assert.ok(i.request.kind === 'choice', JSON.stringify(i))
+        const o = i.request.options.find(o => accept ? !o.disabled && o.value !== '__skip__' && o.value !== '__done__' : o.value === '__skip__' || o.value === '__done__') ?? (accept ? i.request.options.find(o => !o.disabled && o.value !== '__skip__' && o.value !== '__done__') : undefined)
+        assert.ok(o, JSON.stringify(i))
+        r = ok(s.resolveChoice(i.playerIndex, o.value))
+      }
+    }
+    assert.ok(r.interaction.stateId === 'idle' || (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player'), JSON.stringify(r.interaction))
+    return r
+  }
+  function offer(s: GameSession, space: string) {
+    turn(s, 0, 'day-laborer')
+    return turn(s, 1, space)
+  }
+  function material(r: SessionResponse, actor = 0) {
+    return r.state.players[actor]!.resources
+  }
+  function prepareHousing(state: GameState) {
+    const p = state.players[0]!
+    p.fenceSegments = ['H-0-2', 'H-1-2', 'V-0-2', 'V-0-3'].map(edge => ({ edge, type: 'fence' as const, source: { kind: 'own' as const, ownerPlayerId: p.id } }))
+    p.pastures = [{ id: 'housing', tiles: [{ row: 0, col: 2 }], animalType: null, animalCount: 0 }]
+    p.stableTiles = [{ row: 0, col: 2 }]
+  }
+  it("actual wood accumulations return one wood to original pile for exactly one sheep", () => {
+    for (const space of ['forest', 'grove', 'copse'])
+      for (const count of [1, 3]) {
+        const s = setup({ wood: 0 }, true, state => {
+          prepareHousing(state)
+          state.actionSpaces.find(a => a.id === space)!.resources.wood = count
+        })
+        const pending = turn(s, 0, space), r = finish(s, pending)
+        assert.equal(material(r).wood, count - 1)
+        assert.equal(material(r).sheep, 1)
+        assert.equal(r.state.actionSpaces.find(a => a.id === space)!.resources.wood, 1)
+        assert.equal(material(r, 1).sheep, 0)
+        save(`A164-N1-${space}-${count}`, { pending, r })
+      }
+  })
+  it("empty wood pile rejects with or without existing exchange supply", () => {
+    for (const wood of [0, 1]) {
+      const s = setup({ wood }, true, state => state.actionSpaces.find(a => a.id === 'forest')!.resources.wood = 0)
+      const r = assertEmptyAccumulationRejected(s, 0, 'forest')
+      assert.equal(material(r).wood, wood)
+      assert.equal(material(r).sheep, 0)
+      assert.equal(r.state.actionSpaces.find(a => a.id === 'forest')!.resources.wood, 0)
+      save(`A164-N2-${wood}`, r)
+    }
+  })
+  it("decline hand opponent and non wood action cannot exchange supply wood", () => {
+    const ds = setup({ wood: 1 }, true, state => state.actionSpaces.find(a => a.id === 'forest')!.resources.wood = 2)
+    const decline = finish(ds, turn(ds, 0, 'forest'), false)
+    assert.equal(material(decline).wood, 3)
+    assert.equal(material(decline).sheep, 0)
+    for (const [played, own, space] of [[false, true, 'forest'], [true, false, 'forest'], [true, true, 'clay-pit']] as const) {
+      const s = setup({ wood: 1 }, played)
+      const r = own ? finish(s, turn(s, 0, space)) : finish(s, offer(s, space))
+      assert.equal(material(r).sheep, 0)
+      assert.equal(r.state.actionSpaces.find(a => a.id === space)!.resources.wood ?? 0, 0)
+      assertTurnFinished(r)
+      save(`A164-N3-${played}-${own}-${space}`, r)
+    }
+    save('A164-N3', decline)
+  })
+  it("illegal wrong actor stale and whole undo cannot duplicate exchange", () => {
+    const s = setup({ wood: 0 }, true, state => state.actionSpaces.find(a => a.id === 'forest')!.resources.wood = 3)
+    const pending = turn(s, 0, 'forest')
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, 'return-zero'))
+    assert.ok(pending.interaction.stateId === 'wait' && pending.interaction.request.kind === 'choice')
+    assert.equal(pending.interaction.playerIndex, 0)
+    assert.equal(pending.interaction.sourceCard, CARD)
+    const exchange = getChoiceOptions(pending).find(option => !option.disabled && option.value !== '__skip__' && option.value !== '__done__')
+    assert.ok(exchange)
+    assertRejectedUnchanged(s, () => s.resolveChoice(1, exchange.value))
+    const r = finish(s, pending)
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, 'exchange-again'))
+    const undone = undo(s)
+    assert.equal(material(undone).wood, 0)
+    assert.equal(material(undone).sheep, 0)
+    assert.equal(undone.state.actionSpaces.find(a => a.id === 'forest')!.resources.wood, 3)
+    const retry = finish(s, turn(s, 0, 'forest'))
+    assert.equal(material(retry).wood, 2)
+    assert.equal(material(retry).sheep, 1)
+    save('A164-N4', { pending, r, undone, retry })
   })
 })
