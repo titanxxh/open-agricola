@@ -5,6 +5,7 @@ import crypto from 'node:crypto'
 import ts from 'typescript'
 import { execFileSync, spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
+import { normalizingSnapshotViolations } from './test-snapshot-policy.mjs'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const defaultManifest = path.join(root, 'scripts/audit-migration/cases.json')
@@ -99,6 +100,19 @@ function checkNative(manifest) {
   const ownedSources = [...included].filter(file => nativeFiles.includes(path.relative(root, file)) || file.startsWith(path.join(root, 'server/__tests__/_helpers/')))
   for (const file of ownedSources) {
     if (fs.statSync(file).size > 1024 * 1024) fail(`Native test source exceeds 1 MiB; keep full scenario evidence outside Git: ${path.relative(root, file)}`)
+  }
+  const observationSources = [...included].filter(file => {
+    const relative = path.relative(root, file)
+    return !relative.startsWith(`..${path.sep}`) && !relative.startsWith(`node_modules${path.sep}`)
+      && /(?:^|\/)(?:__tests__|__fixtures__|tests|fixtures)\//.test(relative)
+      && /\.[cm]?[jt]sx?$/.test(file) && !/\.d\.[cm]?ts$/.test(file)
+  })
+  for (const file of observationSources) {
+    const violations = normalizingSnapshotViolations(fs.readFileSync(file, 'utf8'), path.relative(root, file))
+    if (violations.length) {
+      const issue = violations[0]
+      fail(`Normalizing test snapshot: ${issue.file}:${issue.line}:${issue.column}: ${issue.message}`)
+    }
   }
   return { nativeFiles, typesExit, fileInventoryExit, missingTypeRoots, includedFiles: included.size, reportDirectory: output }
 }
