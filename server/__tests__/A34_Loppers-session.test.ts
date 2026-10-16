@@ -521,9 +521,18 @@ describe("A034 command boundaries", () => {
   function buy(s: GameSession, card: string) {
     const r = buyMenu(s)
     if (r.state.players[0]!.minorPlayed.includes(card))
-      return r
+      {
+        assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+        assert.equal(r.interaction.playerIndex, 0)
+        assert.equal(r.state.currentPlayerIndex, 0)
+        return r
+      }
     assert.ok(options(r).some(o => o.value === card && !('disabled' in o && o.disabled)))
-    return ok(s.resolveChoice(0, card))
+    const completedResponse = ok(s.resolveChoice(0, card))
+    assert.ok(completedResponse.interaction.stateId === 'wait' && completedResponse.interaction.request.kind === 'confirm-next-player', JSON.stringify(completedResponse.interaction))
+    assert.equal(completedResponse.interaction.playerIndex, 0)
+    assert.equal(completedResponse.state.currentPlayerIndex, 0)
+    return completedResponse
   }
   function deny(s: GameSession, card: string) {
     const r = buyMenu(s)
@@ -588,7 +597,9 @@ describe("A034 command boundaries", () => {
       values.push(enabled[0]!.value)
       response = ok(s.resolveChoice(interaction.playerIndex, enabled[0]!.value))
     }
-    if (response.interaction.stateId === 'wait') assert.equal(response.interaction.request.kind, 'confirm-next-player')
+    assert.ok(response.interaction.stateId === 'wait' && response.interaction.request.kind === 'confirm-next-player', JSON.stringify(response.interaction))
+    assert.equal(response.interaction.playerIndex, 0)
+    assert.equal(response.state.currentPlayerIndex, 0)
     return { r: response, values }
   }
   it("actual purchase enforces two occupations and one wood", () => {
@@ -612,6 +623,7 @@ describe("A034 command boundaries", () => {
   it("four fences give one exchange and whole action undo permits one reward retry", () => {
     const s = setup({ played: true, resources: { wood: 5 } })
     const before = undoRuleSnapshot(s.getState())
+    const beforeInteraction = JSON.stringify(s.getState().interaction)
     const result = exchange(s, fence(s), true)
     const p = result.r.state.players[0]!
     assert.equal(p.fenceSegments.length, 4)
@@ -620,7 +632,9 @@ describe("A034 command boundaries", () => {
     const stale = result.values.at(-1)
     assert.ok(stale)
     assertRejectedUnchanged(s, () => s.resolveChoice(0, stale))
-    assertUndoRestored(before, s.undoAction())
+    const undone = s.undoAction()
+    assertUndoRestored(before, undone)
+    assert.equal(JSON.stringify(undone.interaction), beforeInteraction)
     const retry = exchange(s, fence(s), true).r
     assert.equal(vp(retry, LOPPERS), 1)
     assert.equal(retry.state.players[0]!.resources.food, 42)
@@ -652,8 +666,14 @@ describe("A034 command boundaries", () => {
       state.players[1]!.resources.wood = 4
     })
     const own = turn(s, 0, 'forest')
+    assert.ok(own.interaction.stateId === 'wait' && own.interaction.request.kind === 'confirm-next-player', JSON.stringify(own.interaction))
+    assert.equal(own.interaction.playerIndex, 0)
+    assert.equal(own.state.currentPlayerIndex, 0)
     assert.equal(vp(own, LOPPERS), 0)
     const r = fence(s, oneCell, 1)
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, 1)
+    assert.equal(r.state.currentPlayerIndex, 1)
     assert.equal(r.state.players[1]!.fenceSegments.length, 4)
     assert.equal(vp(r, LOPPERS), 0)
     assert.equal(r.state.players[0]!.resources.food, 40)

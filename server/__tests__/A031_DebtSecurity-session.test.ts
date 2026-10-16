@@ -222,6 +222,9 @@ describe("A031 command boundaries", () => {
       r = ok(s.resolveChoice(0, candidate.value))
     }
     assert(r.state.players[0]!.minorPlayed.includes(card) || r.state.players[0]!.improvements.includes(card))
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
     return r
   }
   function denied(s: GameSession, card: string) {
@@ -324,12 +327,15 @@ describe("A031 command boundaries", () => {
       state.availableMajorImprovements = ['Major_Fireplace1']
     })
     const before = undoRuleSnapshot(s.getState())
+    const beforeInteraction = JSON.stringify(s.getState().interaction)
     assert.equal(bonus(s.getState(), DEBT), 1)
     const r = buy(s, 'Major_Fireplace1', 'major-improvement')
     assert.equal(r.state.players[0]!.resources.clay, 0)
     assert.equal(bonus(r, DEBT), 2)
     assertRejectedUnchanged(s, () => s.resolveChoice(0, 'Major_Fireplace1'))
-    assertUndoRestored(before, s.undoAction())
+    const undone = s.undoAction()
+    assertUndoRestored(before, undone)
+    assert.equal(JSON.stringify(undone.interaction), beforeInteraction)
     assert.equal(bonus(buy(s, 'Major_Fireplace1', 'major-improvement'), DEBT), 2)
   })
   it("actual loose stable consumes one previously unused tile and full undo restores cap", () => {
@@ -337,6 +343,7 @@ describe("A031 command boundaries", () => {
       state.players[0]!.resources.wood = 2
     })
     const before = undoRuleSnapshot(s.getState())
+    const beforeInteraction = JSON.stringify(s.getState().interaction)
     assert.equal(bonus(s.getState(), DEBT), 2)
     let r = ok(s.takeAction(0, 'farm-expansion'))
     if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice') {
@@ -348,6 +355,11 @@ describe("A031 command boundaries", () => {
     r = ok(s.commitSelectionChoice(0, { rooms: [], stables: [{ row: 2, col: 4 }] }))
     assert.equal(r.state.players[0]!.resources.wood, 0)
     assert.equal(bonus(r, DEBT), 1)
-    assertUndoRestored(before, s.undoAction())
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
+    const undone = s.undoAction()
+    assertUndoRestored(before, undone)
+    assert.equal(JSON.stringify(undone.interaction), beforeInteraction)
   })
 })

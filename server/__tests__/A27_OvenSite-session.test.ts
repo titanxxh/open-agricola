@@ -352,6 +352,9 @@ describe("A027 command boundaries", () => {
     const events = result.state.events.filter(e => e.type === 'card.played' && e.cardId === card)
     if (card === OVEN && result.interaction.stateId === 'wait' && result.interaction.request.kind === 'choice') {
       assert.equal(events.length, 0)
+      assert.equal(result.interaction.sourceCard, OVEN)
+      assert.equal(result.interaction.playerIndex, 0)
+      assert.equal(result.state.currentPlayerIndex, 0)
       return result
     }
     assert.equal(events.length, 1)
@@ -359,6 +362,9 @@ describe("A027 command boundaries", () => {
     assert.ok(event.type === 'card.played')
     assert.equal(event.actorPlayerId, result.state.players[0]!.id)
     assert.deepEqual(event.payment?.resources ?? {}, {})
+    assert.ok(result.interaction.stateId === 'wait' && result.interaction.request.kind === 'confirm-next-player', JSON.stringify(result.interaction))
+    assert.equal(result.interaction.playerIndex, 0)
+    assert.equal(result.state.currentPlayerIndex, 0)
     return result
   }
   function ovenCompleted(r: SessionResponse) {
@@ -372,6 +378,9 @@ describe("A027 command boundaries", () => {
     const gain = gains[0]!
     assert.ok(gain.type === 'resource.moved')
     assert.deepEqual(gain.resources, { wood: 2 })
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
   }
   function skip(s: GameSession, r: SessionResponse) {
     assert.ok(choices(r).some(o => o.value === '__skip__'))
@@ -496,6 +505,9 @@ describe("A027 command boundaries", () => {
     assertRejectedUnchanged(s, () => s.resolveChoice(0, 'Major_Fireplace2'))
     r = ok(s.resolveChoice(0, 'Major_ClayOven'))
     assert.deepEqual([r.state.players[0]!.resources.clay, r.state.players[0]!.resources.stone], [1, 0])
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
   })
   it("after declining the immediate opportunity a later oven retains its printed price", () => {
     const s = oven({ resources: { clay: 3, stone: 1 } })
@@ -506,14 +518,20 @@ describe("A027 command boundaries", () => {
     assert.ok(offered(r, 'Major_ClayOven'))
     r = ok(s.resolveChoice(0, 'Major_ClayOven'))
     assert.deepEqual([r.state.players[0]!.resources.clay, r.state.players[0]!.resources.stone, r.state.players[0]!.resources.wood], [0, 0, 2])
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
   })
   it("undo at the immediate optional opportunity uses only exposed public history", () => {
     const s = oven({ resources: { clay: 1, stone: 1 } })
     const before = undoRuleSnapshot(s.getState())
+    const beforeInteraction = JSON.stringify(s.getState().interaction)
     const r = buy(s, enter(s), OVEN)
     assert.equal(r.state.players[0]!.resources.wood, 2)
     assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice')
-    assertUndoRestored(before, s.undoAction())
+    const undone = s.undoAction()
+    assertUndoRestored(before, undone)
+    assert.equal(JSON.stringify(undone.interaction), beforeInteraction)
   })
   it("when both ovens are already owned the free card still gains two wood without another purchase", () => {
     const s = oven({ resources: { clay: 1, stone: 1 }, configure(state) {
