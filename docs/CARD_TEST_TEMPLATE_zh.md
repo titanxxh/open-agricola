@@ -509,6 +509,8 @@ const resp = session.takeAction(X, 'ACTION_ID')
 
 批次修改的额外原生回归文件，在迁移清单的 `nativeScope` 中用 `{ file, reason }` 显式登记。它们与已映射目标共同进入严格类型门禁和候选行为验收。路径必须是工作区内已存在的测试文件，不得重复，且理由不能为空。此检查范围不新增或替代任何源场景映射。
 
+观测 `GameState` 原值的副本使用 `shared/session/history-streams` 的 `captureStateWithHistory`。`cloneState`、`cloneStateWithHistory` 和 `normalizeState` 会归一化数据，可能掩盖返回值中的差异；只在显式 `GameSession` 构造器或 `loadState` 操作内部使用。native 门禁检查目标文件及其实际测试 helper 的这类误用。撤销预期必须在命令前从 live Session 或纯观测副本捕获，并在重试前比较完整规则、分数、返回和 live 交互以及实际玩家。已确认的恢复差异用该场景的明确预期值表达，不能通过归一化抹掉字段。
+
 C131 N3 以当前 OA 的蔬菜 `0` 作为回归预期。此前蔬菜 `1` 的对照保留在暂缓的规则讨论中（[#1175](https://github.com/titanxxh/open-agricola/issues/1175)、[#1181](https://github.com/titanxxh/open-agricola/issues/1181)）。该对照不构成官方裁定，也不要求在这次测试迁移中修改生产行为。
 
 成功用例只保留简短结果。断言失败或显式诊断运行请求时，才保存场景证据。按运行批次、测试文件和场景隔离证据，完整快照保存在 Git 外。用一个临时测试的主动失败验证留证，再通过并行运行检查产物是否覆盖。

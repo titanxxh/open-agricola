@@ -64,6 +64,7 @@ const createFixture = () => {
     fs.writeFileSync(target, text)
   }
   write('scripts/audit-migration.mjs', fs.readFileSync('scripts/audit-migration.mjs', 'utf8'))
+  write('scripts/test-snapshot-policy.mjs', fs.readFileSync('scripts/test-snapshot-policy.mjs', 'utf8'))
   write('package.json', '{"type":"module"}')
   write('vitest.config.ts', "import { defineConfig } from 'vitest/config'\nexport default defineConfig({ test: { projects: [{ extends: true, test: { name: 'fast-server', include: ['server/__tests__/*.test.ts'] } }] } })\n")
   write('.gitignore', 'node_modules/\n')
@@ -248,6 +249,7 @@ it('checks native targets and their helpers without reading the original audit c
     fs.writeFileSync(target, contents)
   }
   write('scripts/audit-migration.mjs', fs.readFileSync('scripts/audit-migration.mjs', 'utf8'))
+  write('scripts/test-snapshot-policy.mjs', fs.readFileSync('scripts/test-snapshot-policy.mjs', 'utf8'))
   write('.gitignore', 'node_modules/\n')
   write('package.json', '{"type":"module"}')
   write('tsconfig.server.json', JSON.stringify({ compilerOptions: { target: 'ES2023', module: 'ESNext', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true, types: ['node'] } }))
@@ -270,6 +272,31 @@ it('checks native targets and their helpers without reading the original audit c
   const artifact = gate()
   expect(artifact.status).toBe(1)
   expect(artifact.stderr).toContain('Keep scenario evidence outside Git')
+}, 30000)
+
+it('rejects normalizing observation copies in actual transitive helpers', () => {
+  const { checkout, write, cli, fixtureManifest } = createFixture()
+  fs.rmSync(path.join(checkout, 'server/__tests__/ae-negative-example.test.ts'))
+  fs.rmSync(path.join(checkout, 'server/__tests__/_helpers/negative-rule-audit.ts'))
+  write('server/__tests__/native-observation.test.ts', "import { it, expect } from 'vitest'\nimport { observe } from './_helpers/observation'\nit('keeps the returned value', () => expect(observe({ state: 1 }).state).toBe(1))\n")
+  write('shared/session/state-bootstrap.ts', 'export const cloneState = <T>(state: T): T => state\n')
+  write('server/__tests__/_helpers/observation.ts', "import { cloneState as copy } from '../../../shared/session/state-bootstrap'\nexport function observe(r: { state: number }) { return { ...r, state: copy(r.state) } }\n")
+  const nativeManifest = manifest([{ title: 'source observation', batch: 'M01', status: 'migrated', targetFile: 'server/__tests__/native-observation.test.ts', targetTitle: 'keeps the returned value' }])
+  nativeManifest.source.commit = fixtureManifest.source.commit
+  write('cases.json', JSON.stringify(nativeManifest))
+  const rejected = cli('check-native')
+  expect(rejected.status).toBe(1)
+  expect(rejected.stderr).toContain('Normalizing test snapshot: server/__tests__/_helpers/observation.ts')
+  expect(rejected.stderr).toContain('use captureStateWithHistory')
+  write('server/__tests__/_helpers/observation.ts', "export { observe } from '../../../shared/cards/__tests__/observation'\n")
+  write('shared/cards/__tests__/observation.ts', "import { cloneState as copy } from '../../session/state-bootstrap'\nexport function observe(r: { state: number }) { return { ...r, state: copy(r.state) } }\n")
+  const sharedHelper = cli('check-native')
+  expect(sharedHelper.status).toBe(1)
+  expect(sharedHelper.stderr).toContain('Normalizing test snapshot: shared/cards/__tests__/observation.ts')
+  write('shared/session/history-streams.ts', 'export const captureStateWithHistory = <T>(state: T): T => state\n')
+  write('shared/cards/__tests__/observation.ts', "import { captureStateWithHistory } from '../../session/history-streams'\nexport function observe(r: { state: number }) { return { ...r, state: captureStateWithHistory(r.state) } }\n")
+  const accepted = cli('check-native')
+  expect(accepted.status, accepted.stderr).toBe(0)
 }, 30000)
 
 it('physically removes migrated registrations from a partial source group', () => {
