@@ -172,6 +172,14 @@ describe('A068 command boundaries', () => {
   function save(name: string, value: unknown) {
     sessionEvidence.record(name, value)
   }
+  function confirmed(r: SessionResponse, actor = 0) {
+    assert.equal(r.ok, true, r.error)
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, actor)
+    assert.equal(r.state.currentPlayerIndex, actor)
+    assert.equal(r.interaction.request.nextPlayerIndex, 1 - actor)
+    return r
+  }
   function ok(r: SessionResponse) {
     assert.equal(r.ok, true, r.error)
     return r
@@ -245,15 +253,17 @@ describe('A068 command boundaries', () => {
     return r
   }
   function buy(s: GameSession, card: string) {
+    // These fixtures have one playable minor, selected automatically after the improvement entry.
     const r = buyMenu(s)
-    if (!r.state.players[0]!.minorHand.includes(card)) return r
-    assert.ok(options(r).some((o) => o.value === card && !o.disabled))
-    return ok(s.resolveChoice(0, card))
+    assert.ok(r.state.players[0]!.minorPlayed.includes(card))
+    assert.equal(r.state.players[0]!.minorHand.includes(card), false)
+    return confirmed(r)
   }
   function deny(s: GameSession, card: string) {
     const r = buyMenu(s)
     assert.ok(!r.state.players[0]!.minorPlayed.includes(card))
     assertRejectedUnchanged(s, () => s.resolveChoice(0, card))
+    confirmed(s.getState())
   }
   function ready(s: GameSession, actor: number) {
     let r = s.getState()
@@ -261,7 +271,7 @@ describe('A068 command boundaries', () => {
       r.interaction.stateId === 'wait' &&
       r.interaction.request.kind === 'confirm-next-player'
     )
-      r = confirmNext(s, r)
+      r = confirmNext(s, confirmed(r, 1 - actor))
     assert.equal(r.interaction.stateId, 'idle', JSON.stringify(r.interaction))
     assert.equal(r.state.currentPlayerIndex, actor)
     return r
@@ -278,6 +288,7 @@ describe('A068 command boundaries', () => {
       before,
       response: r,
     })
+    if (['forest', 'grain-seeds', 'clay-pit'].includes(space)) confirmed(r, actor)
     return r
   }
   const one = ['H-0-1', 'H-1-1', 'V-0-1', 'V-0-2']
@@ -307,13 +318,13 @@ describe('A068 command boundaries', () => {
     })
   }
   function commit(s: GameSession, edges = one, actor = 0) {
-    return ok(
+    return confirmed(ok(
       s.commitSelectionChoice(actor, {
         edges,
         palisadeEdges: [],
         extraWood: 0,
       }),
-    )
+    ), actor)
   }
   function fence(s: GameSession, edges = one, actor = 0) {
     const r = turn(s, actor, 'fencing')
@@ -521,9 +532,18 @@ describe('A068 command boundaries', () => {
   })
   it('actual fence undo restores payment reserve and vegetable before legal retry', () => {
     const s = gift(),
-      before = undoRuleSnapshot(s.getState())
+      initial = s.getState()
+    assert.equal(initial.interaction.stateId, 'idle')
+    assert.equal(initial.state.currentPlayerIndex, 0)
+    const beforeInteraction = JSON.stringify(initial.interaction)
+    const before = undoRuleSnapshot(initial)
     fence(s)
-    assertUndoRestored(before, s.undoAction())
+    const restored = s.undoAction()
+    assertUndoRestored(before, restored)
+    assert.equal(JSON.stringify(restored.interaction), beforeInteraction)
+    assert.equal(JSON.stringify(s.getState().interaction), beforeInteraction)
+    assert.equal(restored.state.currentPlayerIndex, 0)
+    assert.equal(s.getState().state.currentPlayerIndex, 0)
     assert.deepEqual(outcome(s, fence(s)), {
       wood: 6,
       fences: 4,
