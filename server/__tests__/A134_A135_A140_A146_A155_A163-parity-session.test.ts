@@ -353,6 +353,7 @@ describe("A155 command boundaries", () => {
   it("hand and actual opponent Traveling Players do not grant owner rewards", () => {
     const hand = turn(setup(undefined, false), 0, 'traveling-players')
     assert.equal(hand.state.players[0]!.resources.wood, 0)
+    assert.equal(hand.state.players[0]!.resources.grain, 0)
     const s = setup()
     turn(s, 0, 'day-laborer')
     const other = turn(s, 1, 'traveling-players')

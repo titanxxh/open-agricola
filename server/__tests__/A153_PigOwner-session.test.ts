@@ -240,6 +240,8 @@ describe("A153 command boundaries", () => {
   it("hand and actual wrong actor cannot claim five pig owner reward", () => {
     const hs = pig(5, false), hand = finish(hs, turn(hs, 0, 'day-laborer'))
     assert.ok(!hand.interaction.anytimeActions.some(a => a.id === ANY))
+    assert.equal(points(hand), 0)
+    assert.equal(isCardFlagged(hand.state.players[0]!, PIG), false)
     const s = pig(5)
     finish(s, turn(s, 0, 'day-laborer'))
     assertRejectedUnchanged(s, () => s.takeAnytimeAction(1, ANY))

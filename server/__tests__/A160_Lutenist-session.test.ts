@@ -238,7 +238,13 @@ describe("A160 command boundaries", () => {
   it("hand own and unrelated opponent cannot grant mandatory owner goods", () => {
     for (const [played, own, space] of [[false, false, 'traveling-players'], [true, true, 'traveling-players'], [true, false, 'fishing']] as const) {
       const s = setup({}, played)
+      const expected = { ...material(s.getState()) }
+      const collectedFood = s.getState().state.actionSpaces.find(candidate => candidate.id === space)!.resources.food ?? 0
+      expected.food += own ? collectedFood : 2
       const r = own ? turn(s, 0, space) : offer(s, space)
+      assert.deepEqual(material(r), expected)
+      assert.deepEqual(material(s.getState()), expected)
+      assert.equal(material(r).food, own ? 21 : 22)
       assert.equal(material(r).wood, 0)
       assert.equal(material(r).vegetable, 0)
       assertTurnFinished(r, own ? 0 : 1)
