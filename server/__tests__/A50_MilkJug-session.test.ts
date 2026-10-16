@@ -5,6 +5,8 @@ import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 import '../../shared/cards/A/A050_MilkJug'
+import { isWithinFarmyard, positionKey } from '../../shared/domain/farm'
+import { getPastureCapacity } from '../../shared/domain/pasture'
 const sessionEvidence = createScenarioEvidence(import.meta.url)
 describe('A050_MilkJug session', () => {
   /**
@@ -23,10 +25,10 @@ describe('A050_MilkJug session', () => {
     owner.minorPlayed.push('A050_MilkJug')
     setWorkersAtHome(state, owner, 2)
     owner.resources.food = 0
-    // Give pasture so cattle placement works
+    const pastureTiles = [{ row: 0, col: 2 }, { row: 0, col: 3 }, { row: 1, col: 2 }, { row: 1, col: 3 }]
     owner.pastures = [{
         id: 'p1',
-        tiles: [{ row: 0, col: 0 }, { row: 0, col: 1 }, { row: 1, col: 0 }, { row: 1, col: 1 }],
+        tiles: pastureTiles.map(tile => ({ ...tile })),
         animalType: null, animalCount: 0
       }]
     const opponent = state.players[1]!
@@ -34,9 +36,20 @@ describe('A050_MilkJug session', () => {
     opponent.resources.food = 0
     opponent.pastures = [{
         id: 'p2',
-        tiles: [{ row: 2, col: 0 }, { row: 2, col: 1 }, { row: 3, col: 0 }, { row: 3, col: 1 }],
+        tiles: pastureTiles.map(tile => ({ ...tile })),
         animalType: null, animalCount: 0
       }]
+    for (const player of state.players) {
+      player.fenceSegments = ['H-0-2', 'H-0-3', 'H-2-2', 'H-2-3', 'V-0-2', 'V-1-2', 'V-0-4', 'V-1-4']
+        .map(edge => ({ edge, type: 'fence', source: { kind: 'own', ownerPlayerId: player.id } }))
+      const occupied = new Set([...player.roomTiles, ...player.fields, ...(player.farmTerrain ?? [])].map(positionKey))
+      for (const pasture of player.pastures) {
+        expect(pasture.tiles).toHaveLength(4)
+        expect(pasture.tiles.every(tile => isWithinFarmyard(player, tile))).toBe(true)
+        expect(pasture.tiles.filter(tile => occupied.has(positionKey(tile)))).toEqual([])
+        expect(getPastureCapacity(player, pasture)).toBe(8)
+      }
+    }
     // Ensure cattle-market has accumulated resources
     const cattleMarket = state.actionSpaces.find((s) => s.id === 'cattle-market')
     if (cattleMarket) cattleMarket.resources.cattle = 1

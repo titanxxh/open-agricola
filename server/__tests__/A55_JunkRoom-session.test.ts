@@ -101,7 +101,7 @@ describe('A055 Junk Room after-reaction ordering', () => {
     expect(response.state.players[0]!.resources.food).toBe(1)
     expect(response.interaction).toMatchObject({ stateId: 'wait', sourceCard: UPHOLSTERY, request: { kind: 'choice' } })
     expect(getChoiceOptions(response)?.some((option) => option.value === CARD_ID)).toBe(false)
-    const restored = restoreSession(session)
+    const restored = sessionEvidence.track(restoreSession(session))
     response = restored.getState()
     if (response.interaction.stateId !== 'wait') throw new Error('Expected Upholstery choice')
     const accept = getChoiceOptions(response)!.find((option) => option.value !== '__skip__')!
