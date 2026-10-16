@@ -701,8 +701,17 @@ describe("A038 command boundaries", () => {
       const s = wool({ played: true }, state => {
         state.players[0]!.houseType = house
       })
-      assert.equal(bonus(s.getState()), expected)
-      assert.equal(bonus(s.getState()), expected)
+      const first = s.getState()
+      assert.equal(bonus(first), expected)
+      const scores = structuredClone(first.scores)
+      assert.ok(scores)
+      const second = s.getState()
+      assert.equal(bonus(second), expected)
+      assert.deepEqual(second.scores, scores)
+      const categories = scores[0]!.categories.filter(category => category.key === 'cardBonusVp')
+      assert.deepEqual(categories.map(category => category.total), expected === 0 ? [] : [expected])
+      const entries = categories.flatMap(category => category.entries.filter(entry => entry.type === 'bonus' && entry.cardId === WOOL))
+      assert.deepEqual(entries.map(entry => entry.score), expected === 0 ? [] : [expected])
     }
   })
   it("card in hand and only opponent played card grant no owner bonus", () => {
@@ -716,29 +725,40 @@ describe("A038 command boundaries", () => {
     assert.equal(bonus(s.getState(), 1), 3)
   })
   it("actual cooking removes sheep without revoking card then actual renovation reduces bonus", () => {
-    const s = wool({ played: true }, state => {
-      state.players[0]!.improvements = ['Major_Fireplace1']
-      Object.assign(state.players[0]!.resources, { clay: 2, reed: 1 })
-    })
-    const menu = ok(s.takeAnytimeAction(0, 'exchange'))
-    const c = options(menu).find(o => o.effectPreview?.kind === 'resourceExchange' && o.effectPreview.resourcesPaid?.sheep === 5)
-    assert(c, JSON.stringify(menu.interaction))
-    assert(c.value.startsWith('trade:'))
-    const cooked = ok(s.resolveChoice(0, `bulk:${c.value.split(':')[1]}=5`))
-    assert.equal(cooked.state.players[0]!.resources.sheep, 0)
-    assert.equal(cooked.state.players[0]!.resources.food, 30)
-    assert.equal(bonus(cooked), 3)
-    assert.equal(cooked.interaction.stateId, 'idle')
-    assert.equal(cooked.state.currentPlayerIndex, 0)
-    const r = renovate(s)
-    assert.equal(r.state.players[0]!.houseType, 'clay')
-    assert.equal(bonus(r), 2)
-    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice')
-    assert.equal(r.interaction.playerIndex, 0)
-    assert.equal(r.state.currentPlayerIndex, 0)
-    assert.equal(r.interaction.sourceCard, undefined)
-    assert.equal(r.interaction.promptKey, 'ui.interactionOptionalAction')
-    assert.equal(options(r).filter(option => option.labelKey === 'actions.improvement.name' && !option.disabled).length, 1)
+    for (const mixed of [false, true]) {
+      const s = wool({ played: true, mixed }, state => {
+        state.players[0]!.improvements = ['Major_Fireplace1']
+        Object.assign(state.players[0]!.resources, { clay: 2, reed: 1 })
+      })
+      const housed = s.getState().state.players[0]!
+      assert.deepEqual(housed.pastures.map(pasture => ({ animalType: pasture.animalType, animalCount: pasture.animalCount })), [{ animalType: 'sheep', animalCount: mixed ? 3 : 5 }])
+      assert.deepEqual(housed.houseAnimals, mixed ? { '2-0': 'sheep' } : {})
+      assert.deepEqual(housed.stableAnimals, mixed ? { '0-3': 'sheep' } : {})
+      const menu = ok(s.takeAnytimeAction(0, 'exchange'))
+      const c = options(menu).find(o => o.effectPreview?.kind === 'resourceExchange' && o.effectPreview.resourcesPaid?.sheep === 5)
+      assert(c, JSON.stringify(menu.interaction))
+      assert(c.value.startsWith('trade:'))
+      const cooked = ok(s.resolveChoice(0, `bulk:${c.value.split(':')[1]}=5`))
+      const owner = cooked.state.players[0]!
+      assert.equal(owner.resources.sheep, 0)
+      assert.equal(owner.resources.food, 30)
+      assert.deepEqual(owner.pastures.map(pasture => ({ animalType: pasture.animalType, animalCount: pasture.animalCount })), [{ animalType: null, animalCount: 0 }])
+      assert.deepEqual(owner.houseAnimals, {})
+      assert.deepEqual(owner.stableAnimals, mixed ? { '0-3': null } : {})
+      assert.equal(countRoomAnimals(owner), 0)
+      assert.equal(bonus(cooked), 3)
+      assert.equal(cooked.interaction.stateId, 'idle')
+      assert.equal(cooked.state.currentPlayerIndex, 0)
+      const r = renovate(s)
+      assert.equal(r.state.players[0]!.houseType, 'clay')
+      assert.equal(bonus(r), 2)
+      assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice')
+      assert.equal(r.interaction.playerIndex, 0)
+      assert.equal(r.state.currentPlayerIndex, 0)
+      assert.equal(r.interaction.sourceCard, undefined)
+      assert.equal(r.interaction.promptKey, 'ui.interactionOptionalAction')
+      assert.equal(options(r).filter(option => option.labelKey === 'actions.improvement.name' && !option.disabled).length, 1)
+    }
   })
   it("actual free purchase and renovation each support whole action undo and retry", () => {
     const s = wool()
