@@ -1,11 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { type GameSession, type SessionResponse } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
-import { familySize, markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
+import { familySize, markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome, workersAtHome } from '../../shared/domain/player'
 import { getAllTilePositions } from '../../shared/domain/farm'
 import { type FarmyardSpaceState, type GameState, type PlayerState, type Resource } from '../../shared/contract/types'
 import { resolveTriggerIfPresent, expectWait } from './_helpers/trigger-select'
-
 import '../../shared/cards/A/A010_WoodenShed'
 import '../../shared/cards/A/A021_FamilyFriendHome'
 import '../../shared/cards/A/A029_AleBenches'
@@ -19,7 +18,9 @@ import assert from 'node:assert/strict'
 import { createWorkSession } from './_helpers/session-fixtures'
 import { assertRejectedUnchanged, assertUndoRestored, confirmNext, undoRuleSnapshot, getChoiceOptions, expectFarmSelection, expectTileFarmSelection } from './_helpers/session-assertions'
 import { createScenarioEvidence } from './_helpers/scenario-evidence'
+
 const sessionEvidence = createScenarioEvidence(import.meta.url)
+
 type CardId = 'A010_WoodenShed'
   | 'A021_FamilyFriendHome'
   | 'A029_AleBenches'
@@ -31,6 +32,7 @@ type CardId = 'A010_WoodenShed'
   | 'D003_Furrows'
 
 const FILLER = '__test_placeholder__'
+
 const OCCUPATIONS = ['A116_WoodCutter', 'B121_Geologist', 'C123_Freemason']
 
 const setupMinor = ({
@@ -341,14 +343,19 @@ const setupPottersYard = (usedSpaces: number, played = false) => {
   session.loadState(session.state)
   return session
 }
+
 const pottersYardClay = (keys: string[]): FarmyardSpaceState[] => keys.map(spaceKey => ({
   spaceKey, sourceCardId: 'A040_PottersYard', kind: 'farmyard-goods-token',
   resources: { clay: 1 }, claimPolicy: 'when-no-longer-unused',
 }))
+
 const pottersYardTokens = (player: PlayerState) => player.farmyardSpaceStates
   ?.filter(token => token.sourceCardId === 'A040_PottersYard') ?? []
+
 const sevenClayKeys = ['1-2', '1-3', '1-4', '2-1', '2-2', '2-3', '2-4']
+
 const sixClayKeys = ['1-3', '1-4', '2-1', '2-2', '2-3', '2-4']
+
 const pottersYardPlow = () => {
   const session = setupPottersYard(8, true)
   session.state.players[0]!.farmyardSpaceStates = pottersYardClay(sevenClayKeys)
@@ -363,6 +370,7 @@ const pottersYardPlow = () => {
   response = resolveTriggerIfPresent(session, response, 'A040_PottersYard')
   return { session, response }
 }
+
 describe('A040 Potters Yard parity', () => {
   it('A040 S1: at most seven unused spaces allow Potters Yard and place one clay on each unused space', () => {
     const response = playMinor(setupPottersYard(8), 'A040_PottersYard')
@@ -387,6 +395,7 @@ describe('A040 Potters Yard parity', () => {
     expect(pottersYardTokens(response.state.players[0]!)).toEqual(pottersYardClay(sixClayKeys))
   })
 })
+
 describe('A043 Farmyard Manure parity', () => {
   it('A043 S1: one animal allows Farmyard Manure to be played', () => {
     const session = setupMinor({ cardId: 'A043_FarmyardManure' })
@@ -450,12 +459,14 @@ describe('A043 Farmyard Manure parity', () => {
     expect(futureRounds(response.state, 'A043_FarmyardManure', 'food')).toEqual([])
   })
 })
+
 const setupSeedPellets = (fieldCount: number, played = true) => {
   const session = setupMinor({ cardId: 'A065_SeedPellets', played, round: 14 })
   session.state.players[0]!.fields = getAllTilePositions().slice(0, fieldCount).map((tile) => ({ ...tile, stacks: [] }))
   session.loadState(session.state)
   return session
 }
+
 describe('A065 Seed Pellets parity', () => {
   it('A065 S1: three fields allow Seed Pellets to be played', () => {
     const response = playMinor(setupSeedPellets(3, false), 'A065_SeedPellets')
@@ -499,6 +510,7 @@ describe('A065 Seed Pellets parity', () => {
     expect(response.state.players[0]!.resources.grain).toBe(0)
   })
 })
+
 describe('A074 Stable Tree parity', () => {
   it('A074 S1: Stable Tree costs one wood and remains in play', () => {
     const response = playMinor(setupMinor({
@@ -551,17 +563,21 @@ describe('A074 Stable Tree parity', () => {
     expect(futureRounds(response.state, 'A074_StableTree', 'wood')).toEqual([])
   })
 })
+
 const EDGES_FOR_TWO_BY_TWO = [
   'H-0-1', 'H-0-2', 'H-2-1', 'H-2-2',
   'V-0-1', 'V-1-1', 'V-0-3', 'V-1-3',
 ]
+
 const EDGES_FOR_ONE = ['H-0-1', 'H-1-1', 'V-0-1', 'V-0-2']
+
 const playerAnimalCount = (player: PlayerState, type: 'sheep' | 'boar' | 'cattle') => {
   const pasture = player.pastures.reduce((sum, current) => sum + (current.animalType === type ? current.animalCount : 0), 0)
   const house = (Object.values(player.houseAnimals)[0] ?? null) === type ? Object.values(player.houseAnimals).length : 0
   const stables = Object.values(player.stableAnimals).filter((animal) => animal === type).length
   return pasture + house + stables
 }
+
 describe('A083 Shepherds Crook parity', () => {
   it('A083 S1: Shepherds Crook costs one wood and remains in play', () => {
     const response = playMinor(setupMinor({
@@ -601,9 +617,13 @@ describe('A083 Shepherds Crook parity', () => {
     expect(playerAnimalCount(response.state.players[0]!, 'sheep')).toBe(0)
   })
 })
+
 describe("A021 command boundaries", () => {
   const HOME = 'A021_FamilyFriendHome', CORNER = 'A026_SleepingCorner'
-  function ok(r: SessionResponse) { assert.equal(r.ok, true, r.error); return r; }
+  function ok(r: SessionResponse) {
+    assert.equal(r.ok, true, r.error)
+    return r
+  }
   const roomTiles = [{ row: 0, col: 0 }, { row: 1, col: 0 }, { row: 2, col: 0 }, { row: 1, col: 1 }, { row: 2, col: 1 }, { row: 0, col: 1 }]
   function setRooms(state: GameState, count: number, owner = 0) {
     state.players[owner]!.rooms = count
@@ -616,7 +636,8 @@ describe("A021 command boundaries", () => {
     grainFields?: number
     occupations?: number
     resources?: Partial<Resource>
-  } = {}, configure: (state: GameState) => void = () => { }) {
+  } = {}, configure: (state: GameState) => void = () => {
+  }) {
     const s = sessionEvidence.track(createWorkSession({ seed: 4242, configure(state) {
         state.round = 14
         for (const p of state.players)
@@ -711,7 +732,10 @@ describe("A021 command boundaries", () => {
     assert.equal(stable.state.players[0]!.stableTiles.length, 1)
     assert.equal(familySize(stable.state.players[0]!), 2)
     assert.equal(stable.state.players[0]!.resources.food, 20)
-    const other = setup(HOME, {}, state => { setRooms(state, 3, 1); Object.assign(state.players[1]!.resources, { wood: 5, reed: 2 }); })
+    const other = setup(HOME, {}, state => {
+      setRooms(state, 3, 1)
+      Object.assign(state.players[1]!.resources, { wood: 5, reed: 2 })
+    })
     confirmNext(other, ok(other.takeAction(0, 'grain-seeds')))
     construct(other, 1)
     const r = ok(other.commitSelectionChoice(1, { rooms: [{ row: 1, col: 1 }], stables: [] }))
@@ -730,7 +754,9 @@ describe("A021 command boundaries", () => {
     assert.equal(r.state.players[0]!.resources.food, 20)
   })
   it("granted family growth does not inherit optional minor improvement", () => {
-    const s = setup(HOME, { resources: { wood: 5, reed: 2 } }, state => { state.players[0]!.minorHand = ['B007_Wage']; })
+    const s = setup(HOME, { resources: { wood: 5, reed: 2 } }, state => {
+      state.players[0]!.minorHand = ['B007_Wage']
+    })
     construct(s)
     const r = ok(s.commitSelectionChoice(0, { rooms: [{ row: 1, col: 1 }], stables: [] }))
     assert.equal(familySize(r.state.players[0]!), 3)
@@ -738,5 +764,175 @@ describe("A021 command boundaries", () => {
     assert.equal(r.interaction.stateId, 'wait')
     assert(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
     assertRejectedUnchanged(s, () => s.resolveChoice(0, 'B007_Wage'))
+  })
+})
+
+describe("A029 command boundaries", () => {
+  const ALE = 'A029_AleBenches'
+  function setup({ played = false, players = 2, round = 14, occupations = 0, resources = {}, configure = () => {
+  } }: {
+    played?: boolean
+    players?: number
+    round?: number
+    occupations?: number
+    resources?: Partial<PlayerState['resources']>
+    configure?: (state: GameState) => void
+  } = {}) {
+    const s = sessionEvidence.track(createWorkSession({ seed: 4242, options: { playerCount: players }, configure(state) {
+        state.round = round
+        state.players.forEach(p => {
+          p.minorHand = ['B007_Wage', 'A054_Credit']
+          p.occupationHand = [p === state.players[0] ? 'A123_FrameBuilder' : 'A116_WoodCutter']
+          p.minorPlayed = []
+          p.occupationPlayed = []
+          Object.assign(p.resources, { wood: 0, clay: 0, reed: 0, stone: 0, food: 20, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0 })
+        })
+        const p = state.players[0]!
+        if (played)
+          p.minorPlayed = [ALE]
+        else
+          p.minorHand.push(ALE)
+        p.occupationPlayed = ['B121_Geologist', 'C123_Freemason'].slice(0, occupations)
+        Object.assign(p.resources, resources)
+        configure(state)
+      } }))
+    return s
+  }
+  function ok(r: SessionResponse) {
+    assert.equal(r.ok, true, r.error)
+    return r
+  }
+  function choices(r: SessionResponse) {
+    ok(r)
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice', JSON.stringify(r.interaction))
+    return getChoiceOptions(r)
+  }
+  function enter(s: GameSession, space = 'meeting-place') {
+    let r = ok(s.takeAction(0, space))
+    const branch = choices(r).find(o => o.value.startsWith('action-improvement-'))
+    if (branch)
+      r = ok(s.resolveChoice(0, branch.value))
+    return r
+  }
+  function buy(s: GameSession, r: SessionResponse, card: string) {
+    assert.ok(choices(r).some(o => o.value === card && !o.disabled))
+    const result = ok(s.resolveChoice(0, card))
+    assert.equal(result.state.players[0]!.minorPlayed.includes(card), true)
+    assert.equal(result.state.players[0]!.minorHand.includes(card), false)
+    const events = result.state.events.filter(e => e.type === 'card.played' && e.cardId === card)
+    assert.equal(events.length, 1)
+    const event = events[0]!
+    assert.ok(event.type === 'card.played')
+    assert.equal(event.actorPlayerId, result.state.players[0]!.id)
+    assert.deepEqual(event.payment?.resources ?? {}, card === ALE ? { wood: 1 } : {})
+    return result
+  }
+
+  function skip(s: GameSession, r: SessionResponse) {
+    assert.ok(choices(r).some(o => o.value === '__skip__'))
+    const result = ok(s.resolveChoice(0, '__skip__'))
+    return result
+  }
+  function accept(s: GameSession, response: SessionResponse, actor = 0) {
+    assert.ok(response.interaction.stateId === 'wait')
+    assert.equal(response.interaction.sourceCard, ALE)
+    const enabled = choices(response).filter(option => option.value !== '__skip__' && !option.disabled)
+    assert.equal(enabled.length, 1, JSON.stringify(response.interaction))
+    return ok(s.resolveChoice(actor, enabled[0]!.value))
+  }
+  function offered(r: SessionResponse, card: string) {
+    return choices(r).some(o => o.value === card && !o.disabled)
+  }
+  function returnHome({ grain = 2, players = 2, field = false, otherGrain = 0 } = {}) {
+    const s = setup({ played: true, players, round: 3, occupations: 2, resources: { grain, food: 0 }, configure(state) {
+        state.players.forEach(p => {
+          p.resources.food = 0
+          markAllWorkersUsed(state, p)
+        })
+        state.players[1]!.resources.grain = otherGrain
+        if (field)
+          state.players[0]!.fields = [{ row: 0, col: 2, stacks: [{ kind: 'grain', remaining: 3 }] }]
+      } })
+    const r = ok(s.performRoundEnd())
+    return { s, r }
+  }
+  function reward(r: SessionResponse, grain: number, bonus: number, players = 2) {
+    assert.equal(r.state.players[0]!.resources.grain, grain)
+    assert.equal(r.state.players[0]!.resources.food, 0)
+    for (let n = 1; n < players; n++)
+      assert.equal(r.state.players[n]!.resources.food, bonus)
+    assert.equal(r.state.players[0]!.cardStates[ALE]?.counters?.bonusVp ?? 0, bonus)
+    assert.ok(r.scores)
+    const category = r.scores[0]!.categories.find(c => c.key === 'cardBonusVp')
+    assert.equal(category?.entries?.find(e => e.type === 'bonus' && e.cardId === ALE)?.score ?? 0, bonus)
+    for (const player of r.state.players)
+      assert.equal(workersAtHome(r.state, player).length, 2)
+    const payments = r.state.events.filter(e => e.type === 'resource.paid' && e.sourceCardId === ALE)
+    assert.equal(payments.length, bonus)
+    if (bonus) {
+      const payment = payments[0]!
+      assert.ok(payment.type === 'resource.paid')
+      assert.deepEqual(payment.resources, { grain: 1 })
+      const gifts = r.state.events.filter(e => e.type === 'resource.moved' && e.sourceCardId === ALE && e.resources.food === 1)
+      assert.equal(gifts.length, players - 1)
+      for (let i = 1; i < players; i++) {
+        const gift = gifts[i - 1]!
+        assert.ok(gift.type === 'resource.moved')
+        assert.deepEqual(gift.resources, { food: 1 })
+        assert.deepEqual(gift.to, { kind: 'player', playerId: r.state.players[i]!.id })
+      }
+    }
+  }
+  it("actual purchase requires two occupations and pays one wood", () => {
+    const s = setup({ occupations: 2, resources: { wood: 1 } })
+    const r = buy(s, enter(s), ALE)
+    assert.equal(r.state.players[0]!.resources.wood, 0)
+    assert.equal(r.state.players[0]!.cardStates[ALE]?.counters?.bonusVp ?? 0, 0)
+  })
+  it("insufficient wood or only one occupation rejects before legal retry", () => {
+    for (const config of [{ occupations: 2, wood: 0 }, { occupations: 1, wood: 1 }]) {
+      const s = setup({ occupations: config.occupations, resources: { wood: config.wood } })
+      const r = enter(s)
+      assert.equal(offered(r, ALE), false)
+      assertRejectedUnchanged(s, () => s.resolveChoice(0, ALE))
+      const done = buy(s, r, 'A054_Credit')
+      assert.equal(done.state.players[0]!.resources.wood, config.wood)
+    }
+  })
+  it("returning home pays exactly one supply grain once and rewards only the opponent", () => {
+    const { s, r } = returnHome()
+    assert.equal(r.state.players[0]!.resources.grain, 2)
+    const payment = choices(r).find(o => o.value !== '__skip__' && !o.disabled)
+    assert.ok(payment)
+    assertRejectedUnchanged(s, () => s.resolveChoice(1, payment.value))
+    const result = accept(s, r)
+    reward(result, 1, 1)
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, '__skip__'))
+    assert.equal(result.state.round, 4)
+  })
+  it("declining returning home preserves grain and gives no point or food", () => {
+    const { s, r } = returnHome()
+    reward(skip(s, r), 2, 0)
+  })
+  it("zero supply grain cannot earn a reward despite the accepted Pass prompt difference", () => {
+    const { r } = returnHome({ grain: 0 })
+    assert.equal(r.interaction.stateId, 'idle')
+    reward(r, 0, 0)
+  })
+  it("grain growing in a field is not supply grain and cannot pay", () => {
+    const { r } = returnHome({ grain: 0, field: true })
+    assert.equal(r.interaction.stateId, 'idle')
+    reward(r, 0, 0)
+    assert.equal(r.state.players[0]!.fields[0]!.stacks[0]!.remaining, 3)
+  })
+  it("with three players only the owner pays while every other player gains one food", () => {
+    const { s, r } = returnHome({ players: 3, otherGrain: 4 })
+    assert.equal(r.interaction.stateId, 'wait')
+    if (r.interaction.stateId === 'wait')
+      assert.equal(r.interaction.playerIndex, 0)
+    const result = accept(s, r)
+    reward(result, 1, 1, 3)
+    assert.equal(result.state.players[1]!.resources.grain, 4)
+    assert.equal(result.state.players[1]!.cardStates[ALE]?.counters?.bonusVp ?? 0, 0)
   })
 })

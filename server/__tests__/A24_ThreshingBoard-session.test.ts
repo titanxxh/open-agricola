@@ -1,16 +1,21 @@
-import { type SessionResponse } from '../game/authoritative-session'
+import { expectWait } from './_helpers/trigger-select'
+import { type SessionResponse, GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
-
 import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
-import type { ActionChoiceOption } from '../../shared/contract/types'
+import { type ActionChoiceOption, type PlayerState } from '../../shared/contract/types'
 import '../../shared/cards/A/A024_ThreshingBoard'
+import assert from 'node:assert/strict'
+import { createWorkSession } from './_helpers/session-fixtures'
+import { assertRejectedUnchanged, assertUndoRestored, confirmNext, undoRuleSnapshot , getChoiceOptions } from './_helpers/session-assertions'
+import { createScenarioEvidence } from './_helpers/scenario-evidence'
+
+const sessionEvidence = createScenarioEvidence(import.meta.url)
 
 const CARD_ID = 'A024_ThreshingBoard'
 
 const setup = () => {
-  const session = new GameSession(6024, undefined, { playerCount: 2 })
+  const session = sessionEvidence.track(createWorkSession({ seed: 6024, options: { playerCount: 2 } }))
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   state.currentPlayerIndex = 0
@@ -34,7 +39,7 @@ const setup = () => {
 const finishPlow = (session: GameSession) => {
   const response = session.getState()
   expect(response.interaction.stateId).toBe('wait')
-  if (response.interaction.stateId !== 'wait') throw new Error('expected plow selection')
+  if (response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'farm-select' || response.interaction.request.farm.farmType !== 'plow') throw new Error('expected plow selection')
   expect(response.interaction.request.kind).toBe('farm-select')
   const tile = response.interaction.request.farm.selectableTiles[0]
   expect(tile).toBeDefined()
@@ -65,7 +70,7 @@ describe('A024_ThreshingBoard session', () => {
 
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    expect(resp.interaction.request.options?.map((option: ActionChoiceOption) => option.value)).toContain('__skip__')
+    expect(getChoiceOptions(resp)?.map((option: ActionChoiceOption) => option.value)).toContain('__skip__')
     resp = session.resolveChoice(0, '__skip__')
 
     expect(resp.ok).toBe(true)
@@ -82,13 +87,13 @@ describe('A024_ThreshingBoard session', () => {
 
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    const accept = resp.interaction.request.options?.find((option: ActionChoiceOption) => option.value !== '__skip__')
+    const accept = getChoiceOptions(resp)?.find((option: ActionChoiceOption) => option.value !== '__skip__')
     expect(accept).toBeDefined()
     resp = session.resolveChoice(0, accept!.value)
 
     expect(resp.ok).toBe(true)
     if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'ui.interactionBakeBreadChoice') {
-      expect(resp.interaction.request.options?.map((option) => option.value)).not.toContain('cancel')
+      expect(getChoiceOptions(resp)?.map((option) => option.value)).not.toContain('cancel')
       resp = session.resolveChoice(0, 'Major_Fireplace1')
     }
 
@@ -108,7 +113,7 @@ describe('A024 Threshing Board parity', () => {
   const FILLER = '__test_placeholder__'
 
   const setup = ({ played = true, occupations = 2 } = {}) => {
-    const session = new GameSession(6024, undefined, { playerCount: 2 })
+    const session = sessionEvidence.track(createWorkSession({ seed: 6024, options: { playerCount: 2 } }))
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.currentPlayerIndex = 0
@@ -135,7 +140,7 @@ describe('A024 Threshing Board parity', () => {
   }
 
   const options = (response: SessionResponse) => response.interaction.stateId === 'wait'
-    ? response.interaction.request.options ?? []
+    ? getChoiceOptions(response) ?? []
     : []
 
   const enterMinor = (session: GameSession) => {
@@ -143,7 +148,7 @@ describe('A024 Threshing Board parity', () => {
     if (response.interaction.stateId !== 'wait') return response
     if (options(response).some((option) => option.value === CARD_ID)) return response
     const improvement = options(response).find((option) => option.value.startsWith('action-improvement-'))
-    if (improvement) response = session.resolveChoice(response.interaction.playerIndex, improvement.value)
+    if (improvement) response = session.resolveChoice(expectWait(response).interaction.playerIndex, improvement.value)
     return response
   }
 
@@ -151,7 +156,7 @@ describe('A024 Threshing Board parity', () => {
     let response = enterMinor(session)
     if (!response.state.players[0]!.minorHand.includes(CARD_ID)) return response
     const card = options(response).find((option) => option.value === CARD_ID)
-    if (card) response = session.resolveChoice(response.interaction.playerIndex, card.value)
+    if (card) response = session.resolveChoice(expectWait(response).interaction.playerIndex, card.value)
     return response
   }
 
@@ -169,5 +174,174 @@ describe('A024 Threshing Board parity', () => {
     expect(options(response).some((option) => option.value === CARD_ID)).toBe(false)
     expect(response.state.players[0]!.minorHand).toContain(CARD_ID)
     expect(response.state.players[0]!.resources.wood).toBe(1)
+  })
+})
+
+describe("A024 command boundaries", () => {
+  const A024 = 'A024_ThreshingBoard'
+  function setup({ played = true, occupations = [], cookery = false, opponentCookery = false, resources = {}, opponent = {} }: {
+    played?: boolean
+    occupations?: string[]
+    cookery?: boolean
+    opponentCookery?: boolean
+    resources?: Partial<PlayerState['resources']>
+    opponent?: Partial<PlayerState['resources']>
+  } = {}) {
+    return sessionEvidence.track(createWorkSession({ seed: 624, configure: state => {
+        state.round = 14
+        state.availableMajorImprovements = []
+        for (const player of state.players)
+          Object.assign(player.resources, { wood: 0, clay: 0, reed: 0, stone: 0, food: 40, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0 })
+        const player = state.players[0]!
+        player.minorPlayed = played ? [A024] : []
+        player.minorHand = played ? ['__test_placeholder__'] : [A024]
+        player.occupationPlayed = occupations
+        player.improvements = cookery ? ['Major_Fireplace1'] : []
+        Object.assign(player.resources, resources)
+        Object.assign(state.players[1]!.resources, opponent)
+        if (opponentCookery)
+          state.players[1]!.improvements = ['Major_Fireplace2']
+        state.actionSpaces.find(space => space.id === 'forest')!.resources.wood = 3
+      } }))
+  }
+  function ok(r: SessionResponse) {
+    assert.equal(r.ok, true, r.error)
+    return r
+  }
+  function opts(r: SessionResponse) {
+    return r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice' ? getChoiceOptions(r) : []
+  }
+  function choose(s: GameSession, r: SessionResponse, predicate: (o: {
+    value: string
+    labelKey?: string
+    sourceCard?: string
+  }) => boolean) {
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice', JSON.stringify(r.interaction))
+    const o = opts(r).find(predicate)
+    assert.ok(o, JSON.stringify(r.interaction))
+    return ok(s.resolveChoice(r.interaction.playerIndex, o.value))
+  }
+  function ready(s: GameSession, actor: number) {
+    let r = s.getState()
+    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
+      r = confirmNext(s, r)
+    assert.equal(r.interaction.stateId, 'idle', JSON.stringify(r.interaction))
+    assert.equal(r.state.currentPlayerIndex, actor)
+    return r
+  }
+  function turn(s: GameSession, actor: number, space: string) {
+    ready(s, actor)
+    return ok(s.takeAction(actor, space))
+  }
+  function minor(s: GameSession, card: string) {
+    let r = turn(s, 0, 'meeting-place')
+    if (!opts(r).some(o => o.value === card) && opts(r).some(o => o.value.startsWith('action-improvement-')))
+      r = choose(s, r, o => o.value.startsWith('action-improvement-'))
+    return r
+  }
+  function buy(s: GameSession, card: string) {
+    const r = minor(s, card)
+    return r.state.players[0]!.minorPlayed.includes(card) ? r : choose(s, r, o => o.value === card)
+  }
+  function denied(s: GameSession, card: string) {
+    const r = minor(s, card)
+    assert.equal(opts(r).some(o => o.value === card && !o.disabled), false)
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, card))
+    assert.ok(r.state.players[0]!.minorHand.includes(card))
+  }
+  function plow(s: GameSession, actor = 0) {
+    const r = s.getState()
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'farm-select' && r.interaction.request.farm.farmType === 'plow', JSON.stringify(r.interaction))
+    const tile = r.interaction.request.farm.selectableTiles[0]
+    assert.ok(tile)
+    return ok(s.commitSelectionChoice(actor, { tile }))
+  }
+  function skipRemaining(s: GameSession, r: SessionResponse) {
+    if (opts(r).some(o => o.value === '__skip__'))
+      return ok(s.resolveChoice(r.interaction.stateId === 'wait' ? r.interaction.playerIndex : 0, '__skip__'))
+    return r
+  }
+  function bake(s: GameSession, r: SessionResponse) {
+    assert.ok(r.interaction.stateId === 'wait')
+    assert.equal(r.interaction.sourceCard, A024)
+    const accepts = opts(r).filter(option => option.value !== '__skip__' && !option.disabled)
+    assert.equal(accepts.length, 1)
+    r = choose(s, r, option => option.value === accepts[0]!.value)
+    if (r.interaction.stateId === 'wait' && r.interaction.promptKey === 'ui.interactionBakeBreadChoice')
+      r = ok(s.resolveChoice(0, 'Major_Fireplace1'))
+    assert.equal(r.state.players[0]!.resources.grain, 0)
+    assert.equal(r.state.players[0]!.resources.food, 42)
+    return r
+  }
+  function bakeSetup(config: Parameters<typeof setup>[0] = {}) {
+    return setup({ cookery: true, resources: { grain: 1 }, ...config })
+  }
+  it("occupation or wood shortage rejects forged card before legal purchase", () => {
+    const occ = ['A125_Priest', 'A124_Knapper']
+    denied(setup({ played: false, occupations: occ.slice(0, 1), resources: { wood: 1 } }), A024)
+    denied(setup({ played: false, occupations: occ }), A024)
+    const r = buy(setup({ played: false, occupations: occ, resources: { wood: 1 } }), A024)
+    assert.equal(r.state.players[0]!.resources.wood, 0)
+    assert.ok(r.state.players[0]!.minorPlayed.includes(A024))
+  })
+  it("Farmland bakes once and rejects wrong actor or room plow target before retry", () => {
+    const s = bakeSetup()
+    const offer = turn(s, 0, 'farmland')
+    assertRejectedUnchanged(s, () => s.resolveChoice(1, opts(offer).find(o => o.value !== '__skip__')!.value))
+    bake(s, offer)
+    assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { tile: { row: 1, col: 0 } }))
+    const r = plow(s)
+    assert.equal(r.state.players[0]!.resources.food, 42)
+    assert.equal(r.state.players[0]!.fields.length, 1)
+  })
+  it("Cultivation grants one reachable bake and cannot replay it after plowing", () => {
+    const s = bakeSetup()
+    bake(s, turn(s, 0, 'cultivation'))
+    const r = skipRemaining(s, plow(s))
+    assert.equal(r.state.players[0]!.fields.length, 1)
+    assert.equal(r.state.players[0]!.resources.food, 42)
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, 'Major_Fireplace1'))
+  })
+  it("missing grain or cookery skips bake while core plow remains legal", () => {
+    for (const config of [{ resources: { grain: 0 }, cookery: true }, { resources: { grain: 1 }, cookery: false }]) {
+      const s = bakeSetup(config)
+      const r = turn(s, 0, 'farmland')
+      assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'farm-select')
+      const done = plow(s)
+      assert.equal(done.state.players[0]!.resources.grain, config.resources.grain)
+      assert.equal(done.state.players[0]!.resources.food, 40)
+      assert.equal(done.state.players[0]!.fields.length, 1)
+    }
+  })
+  it("decline other space and opponent Farmland do not consume owner grain", () => {
+    const decline = bakeSetup()
+    turn(decline, 0, 'farmland')
+    ok(decline.resolveChoice(0, '__skip__'))
+    const d = plow(decline)
+    assert.equal(d.state.players[0]!.resources.grain, 1)
+    assert.equal(d.state.players[0]!.resources.food, 40)
+    const s = bakeSetup({ opponent: { grain: 1 }, opponentCookery: true })
+    turn(s, 0, 'forest')
+    turn(s, 1, 'farmland')
+    const r = plow(s, 1)
+    assert.equal(r.state.players[0]!.resources.grain, 1)
+    assert.equal(r.state.players[0]!.resources.food, 40)
+    assert.equal(r.state.players[0]!.fields.length, 0)
+    assert.equal(r.state.players[1]!.fields.length, 1)
+    assert.equal(r.state.players[1]!.resources.grain, 1)
+    assert.equal(r.state.players[1]!.resources.food, 40)
+  })
+  it("action undo restores baked grain food field and placement before replay", () => {
+    const s = bakeSetup()
+    const before = undoRuleSnapshot(s.getState())
+    bake(s, turn(s, 0, 'farmland'))
+    plow(s)
+    assertUndoRestored(before, s.undoAction())
+    turn(s, 0, 'farmland')
+    ok(s.resolveChoice(0, '__skip__'))
+    const r = plow(s)
+    assert.equal(r.state.players[0]!.resources.grain, 1)
+    assert.equal(r.state.players[0]!.resources.food, 40)
+    assert.equal(r.state.players[0]!.fields.length, 1)
   })
 })

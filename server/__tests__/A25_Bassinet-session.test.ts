@@ -1,37 +1,29 @@
 import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game/authoritative-session'
+import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { recordRoundPlacement } from '../../shared/cards/helpers/round-placement'
-import {
-  markAllWorkersUsed,
-  setActiveWorkerCount,
-  setWorkersAtHome,
-  newbornCount,
-} from '../../shared/domain/player'
+import { markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome, newbornCount, familySize } from '../../shared/domain/player'
 import { addWorkerRef } from '../../shared/domain/space'
-import type { GameState, PlayerState } from '../../shared/contract/types'
+import { type GameState, type PlayerState } from '../../shared/contract/types'
 import { appendImmediateEvents } from '../../shared/events/append'
 import { computeAllowedPlacementSpaces } from '../../shared/actions/helpers/placement-availability'
 import { confirmNextPlayer } from './_helpers/pending-confirms'
-
 import '../../shared/cards/A/A025_Bassinet'
 import '../../shared/cards/A/A092_AdoptiveParents'
+import assert from 'node:assert/strict'
+import { createWorkSession } from './_helpers/session-fixtures'
+import { assertRejectedUnchanged, assertUndoRestored, confirmNext, undoRuleSnapshot , getChoiceOptions } from './_helpers/session-assertions'
+import { createScenarioEvidence } from './_helpers/scenario-evidence'
+
+const sessionEvidence = createScenarioEvidence(import.meta.url)
 
 const CARD_ID = 'A025_Bassinet'
 
-/**
- * Give P2 (index 1) the Bassinet minor improvement.
- */
 const giveP2Bassinet = (state: GameState) => {
   const p2 = state.players[1]!
   if (!p2.minorPlayed.includes(CARD_ID)) p2.minorPlayed.push(CARD_ID)
 }
 
-/**
- * Simulate player `p` placing worker `workerId` on space `spaceId` by directly
- * mutating state: add WorkerRef, emit the placement event, and record the round placement.
- * Does NOT execute the action flow — only the bookkeeping that A25's logic reads.
- */
 const simulatePlacement = (
   state: GameState,
   p: PlayerState,
@@ -48,12 +40,8 @@ const simulatePlacement = (
   recordRoundPlacement(p, spaceId, workerId)
 }
 
-/**
- * Base 2P setup: round 2, P1 is start player, P2 has A25.
- * Each player has 2 active workers all at home.
- */
 const baseSetup = () => {
-  const session = new GameSession(42, undefined, { playerCount: 2 })
+  const session = sessionEvidence.track(createWorkSession({ seed: 42, options: { playerCount: 2 } }))
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
@@ -77,7 +65,8 @@ const baseSetup = () => {
 
 const completeFarmland = (session: GameSession, playerIndex: number) => {
   let resp = session.takeAction(playerIndex, 'farmland')
-  if (resp.ok && resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'farm-select') {
+  if (resp.ok) {
+    assert.ok(resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'farm-select' && resp.interaction.request.farm.farmType === 'plow', JSON.stringify(resp.interaction))
     const tile = resp.interaction.request.farm.selectableTiles[0]
     expect(tile).toBeDefined()
     resp = session.commitSelectionChoice(playerIndex, { tile: tile! })
@@ -158,7 +147,7 @@ describe('A025_Bassinet session', () => {
 
     let resp = session.takeAction(0, 'meeting-place')
     expect(resp.ok).toBe(true)
-    if (resp.interaction.stateId === 'wait' && resp.interaction.request.options?.some((option) => option.value === '__skip__')) {
+    if (resp.interaction.stateId === 'wait' && getChoiceOptions(resp)?.some((option) => option.value === '__skip__')) {
       expect(session.resolveChoice(0, '__skip__').ok).toBe(true)
     }
     advanceTurn(session)
@@ -378,7 +367,7 @@ describe('A025_Bassinet session', () => {
     expect(resp.ok).toBe(true)
     resp = session.takeAnytimeAction(0, 'A92-adoptive-parents-anytime-grow')
     expect(resp.ok).toBe(true)
-    if (resp.interaction.stateId === 'wait' && resp.interaction.request.options?.some((option) => option.value === '__skip__')) {
+    if (resp.interaction.stateId === 'wait' && getChoiceOptions(resp)?.some((option) => option.value === '__skip__')) {
       resp = session.resolveChoice(0, '__skip__')
     }
     if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-next-player') {
@@ -409,14 +398,14 @@ describe('A025_Bassinet session', () => {
     let resp = session.takeAction(1, 'major-improvement')
     expect(resp.ok).toBe(true)
     if (resp.interaction.stateId === 'wait') {
-      const improvement = resp.interaction.request.options?.find((option) =>
+      const improvement = getChoiceOptions(resp)?.find((option) =>
         option.value.startsWith('action-improvement-'))
-      const card = resp.interaction.request.options?.find((option) => option.value === CARD_ID)
+      const card = getChoiceOptions(resp)?.find((option) => option.value === CARD_ID)
       expect(improvement ?? card).toBeDefined()
       resp = session.resolveChoice(1, (improvement ?? card)!.value)
     }
     if (resp.interaction.stateId === 'wait') {
-      const card = resp.interaction.request.options?.find((option) => option.value === CARD_ID)
+      const card = getChoiceOptions(resp)?.find((option) => option.value === CARD_ID)
       if (card) resp = session.resolveChoice(1, card.value)
     }
     expect(resp.state.players[1]!.minorPlayed).toContain(CARD_ID)
@@ -436,7 +425,7 @@ describe('A025_Bassinet session', () => {
     advanceTurn(session)
     let resp = session.takeAction(1, 'meeting-place')
     expect(resp.ok).toBe(true)
-    if (resp.interaction.stateId === 'wait' && resp.interaction.request.options?.some((option) => option.value === '__skip__')) {
+    if (resp.interaction.stateId === 'wait' && getChoiceOptions(resp)?.some((option) => option.value === '__skip__')) {
       resp = session.resolveChoice(1, '__skip__')
     }
     expect(resp.state.players[1]!.startPlayer).toBe(true)
@@ -492,7 +481,7 @@ describe('A025_Bassinet session', () => {
   })
 
   it('uses actual chronology when one player acts twice before another', () => {
-    const session = new GameSession(25, undefined, { playerCount: 4 })
+    const session = sessionEvidence.track(createWorkSession({ seed: 25, options: { playerCount: 4 } }))
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.currentPlayerIndex = 0
@@ -535,5 +524,180 @@ describe('A025_Bassinet session', () => {
       params: expect.objectContaining({ action: 'actions.day-laborer.name' }),
     }))
     expect(followed.scores).toHaveLength(4)
+  })
+})
+
+describe("A025 command boundaries", () => {
+  const A025 = 'A025_Bassinet'
+  function setup({ played = true, owner = 0, round = 14, rooms = 2, resources = {} }: {
+    played?: boolean
+    owner?: number
+    round?: number
+    rooms?: number
+    resources?: Partial<PlayerState['resources']>
+  } = {}) {
+    return sessionEvidence.track(createWorkSession({ seed: 624, configure: state => {
+        state.round = round
+        state.availableMajorImprovements = []
+        for (const player of state.players) {
+          player.rooms = rooms
+          player.roomTiles = [{ row: 1, col: 0 }, { row: 2, col: 0 }, ...[{ row: 1, col: 1 }].slice(0, rooms - 2)]
+          Object.assign(player.resources, { wood: 0, clay: 0, reed: 0, stone: 0, food: 40, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0 })
+        }
+        const player = state.players[owner]!
+        player.minorPlayed = played ? [A025] : []
+        player.minorHand = played ? ['__test_placeholder__'] : [A025]
+        Object.assign(player.resources, resources)
+        state.actionSpaces.find(space => space.id === 'forest')!.resources.wood = 3
+      } }))
+  }
+  function ok(r: SessionResponse) {
+    assert.equal(r.ok, true, r.error)
+    return r
+  }
+  function opts(r: SessionResponse) {
+    return r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice' ? getChoiceOptions(r) : []
+  }
+  function choose(s: GameSession, r: SessionResponse, predicate: (o: {
+    value: string
+    labelKey?: string
+    sourceCard?: string
+  }) => boolean) {
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice', JSON.stringify(r.interaction))
+    const o = opts(r).find(predicate)
+    assert.ok(o, JSON.stringify(r.interaction))
+    return ok(s.resolveChoice(r.interaction.playerIndex, o.value))
+  }
+  function ready(s: GameSession, actor: number) {
+    let r = s.getState()
+    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
+      r = confirmNext(s, r)
+    assert.equal(r.interaction.stateId, 'idle', JSON.stringify(r.interaction))
+    assert.equal(r.state.currentPlayerIndex, actor)
+    return r
+  }
+  function turn(s: GameSession, actor: number, space: string) {
+    ready(s, actor)
+    return ok(s.takeAction(actor, space))
+  }
+  function minor(s: GameSession, card: string) {
+    let r = turn(s, 0, 'meeting-place')
+    if (!opts(r).some(o => o.value === card) && opts(r).some(o => o.value.startsWith('action-improvement-')))
+      r = choose(s, r, o => o.value.startsWith('action-improvement-'))
+    return r
+  }
+  function buy(s: GameSession, card: string) {
+    const r = minor(s, card)
+    return r.state.players[0]!.minorPlayed.includes(card) ? r : choose(s, r, o => o.value === card)
+  }
+  function denied(s: GameSession, card: string) {
+    const r = minor(s, card)
+    assert.equal(opts(r).some(o => o.value === card && !o.disabled), false)
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, card))
+    assert.ok(r.state.players[0]!.minorHand.includes(card))
+  }
+  function skipRemaining(s: GameSession, r: SessionResponse) {
+    if (opts(r).some(o => o.value === '__skip__'))
+      return ok(s.resolveChoice(r.interaction.stateId === 'wait' ? r.interaction.playerIndex : 0, '__skip__'))
+    return r
+  }
+  function bassinet(config: Parameters<typeof setup>[0] = {}) {
+    return setup({ owner: 1, round: 1, ...config })
+  }
+  function people(r: SessionResponse, id: string) {
+    return r.state.actionSpaces.find(a => a.id === id)!.takenBy.length
+  }
+  it("wood or reed shortage rejects forged purchase before exact fee control", () => {
+    for (const resources of [{ wood: 0, reed: 1 }, { wood: 1, reed: 0 }])
+      denied(setup({ played: false, resources }), A025)
+    const r = buy(setup({ played: false, resources: { wood: 1, reed: 1 } }), A025)
+    assert.equal(r.state.players[0]!.resources.wood, 0)
+    assert.equal(r.state.players[0]!.resources.reed, 0)
+    assert.ok(r.state.players[0]!.minorPlayed.includes(A025))
+  })
+  it("only global first nonaccumulating space survives earlier accumulation and later spaces", () => {
+    const s = bassinet()
+    turn(s, 0, 'forest')
+    turn(s, 1, 'day-laborer')
+    turn(s, 0, 'grain-seeds')
+    ready(s, 1)
+    assertRejectedUnchanged(s, () => s.takeAction(1, 'grain-seeds'))
+    const r = turn(s, 1, 'day-laborer')
+    assert.equal(people(r, 'day-laborer'), 2)
+    assert.equal(r.state.players[1]!.resources.food, 44)
+  })
+  it("nonowner cannot reuse first space while owner may join exactly once", () => {
+    const s = bassinet()
+    turn(s, 0, 'day-laborer')
+    turn(s, 1, 'grain-seeds')
+    ready(s, 0)
+    assertRejectedUnchanged(s, () => s.takeAction(0, 'day-laborer'))
+    turn(s, 0, 'clay-pit')
+    const r = turn(s, 1, 'day-laborer')
+    assert.equal(people(r, 'day-laborer'), 2)
+    assert.equal(r.state.players[1]!.resources.food, 42)
+  })
+  it("first Meeting Place excludes itself and all later nonaccumulating spaces", () => {
+    const s = bassinet()
+    skipRemaining(s, turn(s, 0, 'meeting-place'))
+    turn(s, 1, 'grain-seeds')
+    turn(s, 0, 'forest')
+    ready(s, 1)
+    assertRejectedUnchanged(s, () => s.takeAction(1, 'meeting-place'))
+    assertRejectedUnchanged(s, () => s.takeAction(1, 'grain-seeds'))
+    const r = turn(s, 1, 'clay-pit')
+    assert.equal(people(r, 'meeting-place'), 1)
+  })
+  it("real Family Growth parent plus newborn prevents occupied reentry", () => {
+    const control = bassinet({ round: 14, rooms: 3 })
+    turn(control, 0, 'forest')
+    const grew = skipRemaining(control, turn(control, 1, 'wish-children'))
+    assert.equal(newbornCount(grew.state.players[1]!), 1)
+    assert.equal(people(grew, 'wish-children'), 2)
+    const s = bassinet({ round: 14, rooms: 3 })
+    const born = skipRemaining(s, turn(s, 0, 'wish-children'))
+    assert.equal(people(born, 'wish-children'), 2)
+    assert.equal(newbornCount(born.state.players[0]!), 1)
+    ready(s, 1)
+    assert.equal(s.getState().state.players[1]!.rooms, 3)
+    assert.equal(familySize(s.getState().state.players[1]!), 2)
+    assertRejectedUnchanged(s, () => s.takeAction(1, 'wish-children'))
+    turn(s, 1, 'grain-seeds')
+  })
+  it("two actual occupants forbid a third person and undo restores single-target eligibility", () => {
+    const s = bassinet()
+    turn(s, 0, 'day-laborer')
+    turn(s, 1, 'day-laborer')
+    turn(s, 0, 'grain-seeds')
+    ready(s, 1)
+    assertRejectedUnchanged(s, () => s.takeAction(1, 'day-laborer'))
+    turn(s, 1, 'clay-pit')
+    const undo = bassinet()
+    turn(undo, 0, 'day-laborer')
+    ready(undo, 1)
+    const before = undoRuleSnapshot(undo.getState())
+    const first = turn(undo, 1, 'day-laborer')
+    assert.equal(people(first, 'day-laborer'), 2)
+    assertUndoRestored(before, undo.undoAction())
+    const replay = turn(undo, 1, 'day-laborer')
+    assert.equal(people(replay, 'day-laborer'), 2)
+  })
+  it("natural next work phase resets first-space target without synthetic placement history", () => {
+    const s = bassinet()
+    turn(s, 0, 'day-laborer')
+    turn(s, 1, 'forest')
+    turn(s, 0, 'clay-pit')
+    const last = turn(s, 1, 'grain-seeds')
+    const next = confirmNext(s, last)
+    assert.equal(next.state.round, 2)
+    assert.equal(next.state.roundPhase, 'work')
+    turn(s, 0, 'grain-seeds')
+    turn(s, 1, 'day-laborer')
+    turn(s, 0, 'forest')
+    ready(s, 1)
+    assertRejectedUnchanged(s, () => s.takeAction(1, 'day-laborer'))
+    const r = turn(s, 1, 'grain-seeds')
+    assert.equal(people(r, 'grain-seeds'), 2)
+    assert.equal(r.scores?.length, 2)
   })
 })
