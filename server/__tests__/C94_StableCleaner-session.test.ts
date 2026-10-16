@@ -1,3 +1,4 @@
+import { getAvailableStableSupplyCount } from '../../shared/domain/supply-tokens'
 import { type GameSession as SessionRuleOwner, GameSession, type SessionResponse } from '../game/authoritative-session'
 import { describe, expect, it } from 'vitest'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -304,8 +305,16 @@ describe('C094 rule boundaries', () => {
   it("duplicate stable positions must reject without paying or consuming supply", () => {
     const s = cleaner()
     enterCleaner(s)
-    const r = s.commitSelectionChoice(0, { stables: [{ row: 0, col: 2 }, { row: 0, col: 2 }] })
+    const supply = () => s.withCtx(() => getAvailableStableSupplyCount(s.state, s.state.players[0]!))
+    assert.equal(supply(), 4)
+    const r = assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { stables: [{ row: 0, col: 2 }, { row: 0, col: 2 }] }))
     const actual = { ok: r.ok, ...cleanerObserved(r), uniquePositions: new Set(r.state.players[0]!.stableTiles.map(t => `${t.row},${t.col}`)).size }
     assert.deepEqual(actual, { ok: false, wood: 2, food: 2, stables: 0, workers: 0, uniquePositions: 0 })
+    assert.equal(supply(), 4)
+    const retry = s.commitSelectionChoice(0, { stables: [{ row: 0, col: 2 }] })
+    assert.equal(retry.ok, true, retry.error)
+    assert.deepEqual(cleanerObserved(retry), { wood: 1, food: 1, stables: 1, workers: 0 })
+    assert.deepEqual(retry.state.players[0]!.stableTiles, [{ row: 0, col: 2 }])
+    assert.equal(supply(), 3)
   })
 })
