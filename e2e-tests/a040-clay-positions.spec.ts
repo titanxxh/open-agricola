@@ -1,9 +1,11 @@
-import { expect, test, type APIResponse, type Page } from '@playwright/test'
+import { expect, test, type APIRequestContext, type APIResponse, type Page } from '@playwright/test'
 import type { GameSyncPayload } from '../shared/contract/protocol/game'
 import type { ServerEvent } from '../shared/contract/protocol/ws'
 import { createWorkSession } from '../server/__tests__/_helpers/session-fixtures'
 import { serializeState } from '../shared/session/serialization'
 import { BACKEND_URL, FRONTEND_URL } from './fixtures'
+
+test.use({ actionTimeout: 10000 })
 
 const CARD = 'A040_PottersYard'
 const startingPositions = ['0-3', '0-4', '1-4', '2-3', '2-4']
@@ -110,8 +112,65 @@ async function expectRemaining(page: Page, observer: Page, amount: number, posit
   }
 }
 
-async function confirmSwitch(page: Page) {
-  await page.locator('.interaction-bar').getByRole('button', { name: 'Confirm switch', exact: true }).click()
+async function confirmSwitch(page: Page, observer: Page) {
+  const clients = [page, observer]
+  const handoffOwner = async () => {
+    for (const client of clients) {
+      const current = await snapshot(client)
+      if (current.interaction.stateId === 'wait' && current.interaction.request.kind === 'confirm-next-player') return client
+    }
+    return undefined
+  }
+  await expect.poll(async () => Boolean(await handoffOwner())).toBe(true)
+  const controller = await handoffOwner()
+  if (!controller) throw new Error('Expected next-player handoff')
+  const button = controller.locator('.interaction-bar').getByRole('button', { name: 'Confirm switch', exact: true })
+  await expect(button).toBeEnabled()
+  await button.click()
+  await expect.poll(async () => (await snapshot(page)).interaction.stateId).toBe('idle')
+}
+
+async function plow(page: Page, spaceKey: string) {
+  await page.locator('[data-action-id="farmland"] button').first().click()
+  await expect.poll(async () => {
+    const current = await snapshot(page)
+    return current.interaction.stateId === 'wait' ? current.interaction.request.kind : null
+  }).toBe('farm-select')
+  const tile = page.locator(`[data-farm-tile-player="p1"][data-farm-tile-key="${spaceKey}"]`)
+  await expect(tile).toHaveClass(/selectable/)
+  await tile.click()
+  const confirm = page.getByRole('button', { name: 'Confirm plow', exact: true })
+  await expect(confirm).toBeEnabled()
+  await confirm.click()
+}
+
+async function openRoom(page: Page, observer: Page, request: APIRequestContext) {
+  for (const [index, client] of [page, observer].entries()) {
+    const username = `a040_${Date.now().toString(36)}_${index}`
+    const oauth = await request.post(`${BACKEND_URL}/api/test/oauth/github/callback`, { data: {
+      providerUserId: username, providerLogin: username, email: `${username}@example.com`, displayName: username,
+    } })
+    expect(oauth.ok()).toBe(true)
+    const complete = await request.post(`${BACKEND_URL}/api/auth/onboarding/complete`, {
+      headers: { Cookie: `oa_onboarding=${cookie(oauth, 'oa_onboarding')}` },
+      data: { username, displayName: username, password: 'a040-browser-pass', confirmPassword: 'a040-browser-pass' },
+    })
+    expect(complete.ok()).toBe(true)
+    await client.context().addCookies([{ name: 'oa_session', value: cookie(complete, 'oa_session'), url: FRONTEND_URL }])
+    await observe(client)
+    await client.goto(`${FRONTEND_URL}/?player=p${index + 1}&transport=ws&room=dev2&devMode=1`)
+    await expect(client.locator('.game-layout')).toBeVisible({ timeout: 30000 })
+  }
+  await loadFixture(page)
+}
+
+async function buyA040(page: Page) {
+  const improvement = page.locator('[data-action-id="major-improvement"] button').first()
+  await expect(improvement).toBeEnabled()
+  await improvement.click()
+  await page.locator(`.interaction-bar [data-choice-value="${CARD}"]`).click()
+  await expect.poll(async () => (await snapshot(page)).state.players[0]!.minorPlayed).toContain(CARD)
+  expect((await snapshot(page)).state.players[0]!.resources).toMatchObject({ wood: 19, reed: 9, clay: 0, food: 20 })
 }
 
 // A040 is bought through the UI, not injected as a played card. The browser
@@ -120,29 +179,8 @@ async function confirmSwitch(page: Page) {
 test('A040 pays for its clay positions, exchanges one claim and synchronizes the remaining supply', async ({ page, browser, request }) => {
   const observer = await browser.newPage()
   try {
-    for (const [index, client] of [page, observer].entries()) {
-      const username = `a040_${Date.now().toString(36)}_${index}`
-      const oauth = await request.post(`${BACKEND_URL}/api/test/oauth/github/callback`, { data: {
-        providerUserId: username, providerLogin: username, email: `${username}@example.com`, displayName: username,
-      } })
-      expect(oauth.ok()).toBe(true)
-      const complete = await request.post(`${BACKEND_URL}/api/auth/onboarding/complete`, {
-        headers: { Cookie: `oa_onboarding=${cookie(oauth, 'oa_onboarding')}` },
-        data: { username, displayName: username, password: 'a040-browser-pass', confirmPassword: 'a040-browser-pass' },
-      })
-      expect(complete.ok()).toBe(true)
-      await client.context().addCookies([{ name: 'oa_session', value: cookie(complete, 'oa_session'), url: FRONTEND_URL }])
-      await observe(client)
-      await client.goto(`${FRONTEND_URL}/?player=p${index + 1}&transport=ws&room=dev2&devMode=1`)
-      await expect(client.locator('.game-layout')).toBeVisible({ timeout: 30000 })
-    }
-    await loadFixture(page)
-    const improvement = page.locator('[data-action-id="major-improvement"] button').first()
-    await expect(improvement).toBeEnabled()
-    await improvement.click()
-    await page.locator(`.interaction-bar [data-choice-value="${CARD}"]`).click()
-    await expect.poll(async () => (await snapshot(page)).state.players[0]!.minorPlayed).toContain(CARD)
-    expect((await snapshot(page)).state.players[0]!.resources).toMatchObject({ wood: 19, reed: 9, clay: 0, food: 20 })
+    await openRoom(page, observer, request)
+    await buyA040(page)
     await expectRemaining(page, observer, 5, startingPositions)
     expect(tokens(await snapshot(page))).toEqual(expect.arrayContaining(startingPositions.map(spaceKey =>
       expect.objectContaining({ spaceKey, kind: 'farmyard-goods-token', sourceCardId: CARD,
@@ -150,16 +188,16 @@ test('A040 pays for its clay positions, exchanges one claim and synchronizes the
     await page.reload()
     await expectRemaining(page, observer, 5, startingPositions)
 
-    await confirmSwitch(observer)
+    await confirmSwitch(page, observer)
     await observer.locator('[data-action-id="day-laborer"] button').first().click()
-    await confirmSwitch(page)
-    await page.locator('[data-action-id="farmland"] button').first().click()
-    await page.locator('[data-farm-tile-player="p1"][data-farm-tile-key="0-3"]').click()
-    await page.getByRole('button', { name: 'Confirm plow', exact: true }).click()
+    await confirmSwitch(page, observer)
+    await plow(page, '0-3')
     await expect.poll(async () => (await snapshot(page)).state.players[0]!.resources.clay).toBe(1)
     await expectRemaining(page, observer, 4, ['0-4', '1-4', '2-3', '2-4'])
     const current = await snapshot(page)
-    if (current.interaction.stateId !== 'wait') throw new Error('Missing optional clay exchange')
+    if (current.interaction.stateId !== 'wait' || current.interaction.request.kind !== 'choice') {
+      throw new Error('Missing optional clay exchange')
+    }
     const exchange = current.interaction.request.options.find(option => !option.disabled && !option.value.startsWith('__'))
     expect(exchange).toBeDefined()
     if (!exchange) throw new Error('Missing clay-to-food exchange option')
@@ -180,6 +218,47 @@ test('A040 pays for its clay positions, exchanges one claim and synchronizes the
     expect(completed.state.events.filter(event => event.type === 'resource.paid' && event.returnedCardId === undefined
       && event.resources.wood === 1 && event.resources.reed === 1)).toHaveLength(1)
     await expect(page.locator('.interaction-bar')).toContainText('Confirm switch')
-    await confirmSwitch(observer)
+    await confirmSwitch(page, observer)
+  } finally { await observer.close() }
+})
+
+
+test('clearing an original moor and plowing it never borrows another A040 clay token', async ({ page, browser, request }) => {
+  const observer = await browser.newPage()
+  try {
+    await openRoom(page, observer, request)
+    await buyA040(page)
+    await expectRemaining(page, observer, 5, startingPositions)
+    await confirmSwitch(page, observer)
+    await observer.locator('[data-action-id="day-laborer"] button').first().click()
+    await confirmSwitch(page, observer)
+
+    const cutPeat = page.locator('[aria-label="Special Actions"]').getByRole('button', { name: 'Cut Peat', exact: true })
+    await expect(cutPeat).toBeEnabled()
+    await cutPeat.click()
+    const formerMoor = page.locator('[data-farm-tile-player="p1"][data-farm-tile-key="0-2"]')
+    await expect(formerMoor).toHaveClass(/selectable/)
+    await formerMoor.click()
+    await expect.poll(async () => (await snapshot(page)).state.players[0]!.farmTerrain
+      ?.some(tile => tile.row === 0 && tile.col === 2)).toBe(false)
+    await expectRemaining(page, observer, 5, startingPositions)
+    expect((await snapshot(page)).state.players[0]!.resources.clay).toBe(0)
+
+    await confirmSwitch(page, observer)
+    await observer.locator('[data-action-id="forest"] button').first().click()
+    await confirmSwitch(page, observer)
+    await plow(page, '0-2')
+    await expect.poll(async () => (await snapshot(page)).state.players[0]!.fields)
+      .toContainEqual(expect.objectContaining({ row: 0, col: 2 }))
+    await expectRemaining(page, observer, 5, startingPositions)
+    const completed = await snapshot(page)
+    expect(completed.state.players[0]!.resources.clay).toBe(0)
+    expect(completed.state.events.filter(event => event.type === 'resource.moved'
+      && event.sourceCardId === CARD && event.resources.clay && event.to.kind === 'player'
+      && event.to.playerId === completed.state.players[0]!.id)).toEqual([])
+    await expect(page.locator('.interaction-bar')).toContainText('Confirm switch')
+    await page.reload()
+    await observer.reload()
+    await expectRemaining(page, observer, 5, startingPositions)
   } finally { await observer.close() }
 })
