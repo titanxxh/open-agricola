@@ -8,7 +8,6 @@ import '../../shared/cards/E/E142_Smuggler'
 import assert from 'node:assert/strict'
 import { createWorkSession } from './_helpers/session-fixtures'
 import { assertRejectedUnchanged, getChoiceOptions } from './_helpers/session-assertions'
-import { createPlayerActionSpaces } from '../../shared/cards/player-action-space'
 import { createScenarioEvidence } from './_helpers/scenario-evidence'
 
 const evidence = createScenarioEvidence(import.meta.url)
@@ -184,25 +183,17 @@ describe('E142 Smuggler parity', () => {
 
 describe('E142 rule boundaries', () => {
 
-  const SMUGGLER = 'E142_Smuggler', OVERHAUL = 'C001_Overhaul', HARDWORKER = 'D127_HardworkingMan'
+  const SMUGGLER = 'E142_Smuggler'
 
-  function setup(card: string, configure: (state: GameState) => void = () => { }) {
+  function setup(configure: (state: GameState) => void = () => { }) {
     const session = evidence.track(createWorkSession({
-      seed: 4242, options: { playerCount: card === OVERHAUL ? 2 : 3 }, configure(state) {
+      seed: 4242, options: { playerCount: 3 }, configure(state) {
         state.round = 4
         for (const p of state.players)
           Object.assign(p.resources, { wood: 0, clay: 0, reed: 0, stone: 0, grain: 0, vegetable: 0, food: 20 })
         const owner = state.players[0]!
-        if (card === OVERHAUL) {
-          owner.minorHand = [card]
-          owner.occupationPlayed = ['A116_WoodCutter', 'A103_Portmonger']
-          owner.resources.wood = 1
-        }
-        else
-          owner.occupationPlayed = [card]
+        owner.occupationPlayed = [SMUGGLER]
         configure(state)
-        if (card === HARDWORKER)
-          state.actionSpaces.push(...createPlayerActionSpaces(state))
       }
     }))
     return session
@@ -215,7 +206,7 @@ describe('E142 rule boundaries', () => {
   function options(r: SessionResponse) { const request = wait(r).request; assert(request.kind === 'choice'); return request.options }
 
   function harvest(wood: number, grain: number) {
-    const s = setup(SMUGGLER, state => {
+    const s = setup(state => {
       state.players[0]!.resources.wood = wood
       state.players[0]!.resources.grain = grain
       for (const p of state.players)
@@ -266,17 +257,20 @@ describe('E142 rule boundaries', () => {
   })
 
   it("declining one or both stages never invents a good or expands the remaining quota", () => {
-    for (const exchangeSecond of [false, true]) {
+    for (const { exchangeSecond, expected } of [
+      { exchangeSecond: false, expected: { wood: 1, grain: 0, stone: 0, exchanges: 0 } },
+      { exchangeSecond: true, expected: { wood: 0, grain: 1, stone: 0, exchanges: 1 } },
+    ]) {
       const { s, r } = harvest(1, 0)
       assert.equal(wait(r).sourceCard, SMUGGLER)
       const second = ok(s.resolveChoice(0, '__skip__'))
       const final = ok(s.resolveChoice(0, exchangeSecond ? trade(second, { wood: 1 }, { grain: 1 }) : '__skip__'))
-      assert.deepEqual(stocks(final), { wood: exchangeSecond ? 0 : 1, grain: exchangeSecond ? 1 : 0, stone: 0, exchanges: exchangeSecond ? 1 : 0 })
+      assert.deepEqual(stocks(final), expected)
     }
   })
 
   it("exchanges cannot be requested from the ordinary work phase", () => {
-    const s = setup(SMUGGLER, state => { state.players[0]!.resources.wood = 1 })
+    const s = setup(state => { state.players[0]!.resources.wood = 1 })
     const control = harvest(1, 0)
     assertRejectedUnchanged(s, () => s.resolveChoice(0, trade(control.r, { wood: 1 }, { grain: 1 })))
     assert.deepEqual(stocks(s.getState()), { wood: 1, grain: 0, stone: 0, exchanges: 0 })
