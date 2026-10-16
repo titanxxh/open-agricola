@@ -1,3 +1,4 @@
+import { assertUndoRestored, undoRuleSnapshot } from './_helpers/session-assertions'
 import type { ActionChoiceOption } from '../../shared/contract/types'
 import { describe, expect, it } from 'vitest'
 import { type GameSession, type SessionResponse } from '../game/authoritative-session'
@@ -171,11 +172,12 @@ describe("A123 command boundaries", () => {
     assert.equal(r.state.currentPlayerIndex, actor)
     return ok(s.takeAction(actor, space))
   }
-  function optional(s: GameSession, r: SessionResponse, actor = 0) {
-    for (let n = 0; n < 5 && r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice' && getChoiceOptions(r).some(o => o.value === '__skip__' || o.value === '__done__'); n++) {
-      const o = getChoiceOptions(r).find(o => o.value === '__skip__' || o.value === '__done__')
-      assert.ok(o)
-      r = ok(s.resolveChoice(actor, o.value))
+  function optional(s: GameSession, r: SessionResponse, actor = 0, continuation: 'stables' | 'improvement' = 'stables') {
+    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice') {
+      assert.deepEqual(getChoiceOptions(r).map(option => option.labelKey), continuation === 'stables'
+        ? ['actions.stables.name', 'ui.interactionFlowDone']
+        : ['actions.improvement.name', 'ui.interactionOptionalSkip'])
+      r = ok(s.resolveChoice(actor, continuation === 'stables' ? '__done__' : '__skip__'))
     }
     return r
   }
@@ -188,7 +190,7 @@ describe("A123 command boundaries", () => {
       assert.ok(o)
       r = ok(s.resolveChoice(actor, o.value))
     }
-    return optional(s, r, actor)
+    return optional(s, r, actor, 'improvement')
   }
   function startBuild(s: GameSession) {
     let r = turn(s, 0, 'farm-expansion')
@@ -220,10 +222,15 @@ describe("A123 command boundaries", () => {
           p.resources[material] = 3 * count
         })
         const r = build(s, count)
+        assert.ok(r.interaction.stateId === 'wait')
+        assert.deepEqual(r.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+        assert.equal(r.interaction.playerIndex, 0)
+        assert.equal(r.state.currentPlayerIndex, 0)
         assert.equal(r.state.players[0]!.rooms, 2 + count)
         assert.equal(r.state.players[0]!.resources[material], 0)
         assert.equal(r.state.players[0]!.resources.wood, 0)
         assert.equal(r.state.players[0]!.resources.reed, 0)
+
         sessionEvidence.record(`A123-N1-${material}-${count}`, r)
       }
   })
@@ -236,20 +243,34 @@ describe("A123 command boundaries", () => {
     startBuild(s)
     assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { rooms: [{ row: 1, col: 1 }, { row: 2, col: 1 }] }))
     const r = optional(s, ok(s.commitSelectionChoice(0, { rooms: [{ row: 1, col: 1 }] })))
+    assert.ok(r.interaction.stateId === 'wait')
+    assert.deepEqual(r.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
     assert.equal(r.state.players[0]!.rooms, 3)
     assert.equal(r.state.players[0]!.resources.clay, 1)
     assert.equal(r.state.players[0]!.resources.wood, 1)
+
     sessionEvidence.record('A123-N2', r)
   })
   it("wood room and unplayed card use ordinary room costs without substitution", () => {
     const wood = build(setup(state => Object.assign(state.players[0]!.resources, { wood: 5, reed: 2 })), 1)
+    assert.ok(wood.interaction.stateId === 'wait')
+    assert.deepEqual(wood.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(wood.interaction.playerIndex, 0)
+    assert.equal(wood.state.currentPlayerIndex, 0)
     assert.equal(wood.state.players[0]!.resources.wood, 0)
     const hand = build(setup(state => {
       state.players[0]!.houseType = 'clay'
       Object.assign(state.players[0]!.resources, { clay: 5, wood: 1, reed: 2 })
     }, false), 1)
+    assert.ok(hand.interaction.stateId === 'wait')
+    assert.deepEqual(hand.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(hand.interaction.playerIndex, 0)
+    assert.equal(hand.state.currentPlayerIndex, 0)
     assert.equal(hand.state.players[0]!.resources.clay, 0)
     assert.equal(hand.state.players[0]!.resources.wood, 1)
+
     sessionEvidence.record('A123-N3', { wood, hand })
   })
   it("actual two room renovation trades exactly two material for one wood once", () => {
@@ -260,9 +281,14 @@ describe("A123 command boundaries", () => {
         Object.assign(p.resources, { wood: 1, clay: 0, stone: 0, reed: 1 })
       }, true, 14)
       const r = renovation(s)
+      assert.ok(r.interaction.stateId === 'wait')
+      assert.deepEqual(r.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+      assert.equal(r.interaction.playerIndex, 0)
+      assert.equal(r.state.currentPlayerIndex, 0)
       assert.equal(r.state.players[0]!.houseType, material === 'wood' ? 'clay' : 'stone')
       assert.equal(r.state.players[0]!.resources.wood, 0)
       assert.equal(r.state.players[0]!.resources.reed, 0)
+
       sessionEvidence.record(`A123-N4-${material}`, r)
     }
   })
@@ -271,16 +297,31 @@ describe("A123 command boundaries", () => {
       state.players[0]!.houseType = 'clay'
       Object.assign(state.players[0]!.resources, { wood: 1, clay: 3, reed: 2 })
     })
+    const beforeUndo = s.getState()
+    const beforeRules = undoRuleSnapshot(beforeUndo)
     startBuild(s)
     assertRejectedUnchanged(s, () => s.commitSelectionChoice(1, { rooms: [{ row: 1, col: 1 }] }))
     assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { rooms: [{ row: 99, col: 99 }] }))
     const first = optional(s, ok(s.commitSelectionChoice(0, { rooms: [{ row: 1, col: 1 }] })))
+    assert.ok(first.interaction.stateId === 'wait')
+    assert.deepEqual(first.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(first.interaction.playerIndex, 0)
+    assert.equal(first.state.currentPlayerIndex, 0)
     const undone = ok(s.undoAction())
+    assertUndoRestored(beforeRules, undone)
+    assert.deepEqual(undone.interaction, beforeUndo.interaction)
+    assert.equal(undone.interaction.stateId, 'idle')
+    assert.equal(undone.state.currentPlayerIndex, 0)
     assert.equal(undone.state.players[0]!.rooms, 2)
     assert.equal(undone.state.players[0]!.resources.clay, 3)
     assert.equal(undone.state.players[0]!.resources.wood, 1)
     const retry = build(s, 1)
+    assert.ok(retry.interaction.stateId === 'wait')
+    assert.deepEqual(retry.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(retry.interaction.playerIndex, 0)
+    assert.equal(retry.state.currentPlayerIndex, 0)
     assert.equal(retry.state.players[0]!.resources.wood, 0)
+
     sessionEvidence.record('A123-N5', { first, undone, retry })
   })
 })

@@ -1,3 +1,4 @@
+import { assertUndoRestored, undoRuleSnapshot } from './_helpers/session-assertions'
 import { describe, expect, it } from 'vitest'
 import { type GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
@@ -156,18 +157,12 @@ describe("A138 command boundaries", () => {
     return ok(s.takeAction(actor, space))
   }
   function finishOptional(s: GameSession, r: SessionResponse, accept: boolean) {
-    for (let n = 0; n < 8 && r.interaction.stateId === 'wait' && r.interaction.request.kind !== 'confirm-next-player'; n++) {
-      const i = r.interaction
-      if (i.request.kind === 'animal-reorg') {
-        r = ok(s.resolveChoice(i.playerIndex, 'confirm', { zones: i.request.zones }))
-        continue
-      }
-      assert.ok(i.request.kind === 'choice' || i.request.kind === 'select-trigger', JSON.stringify(i))
-      const o = getChoiceOptions({ interaction: i }).find(o => accept ? o.value !== '__skip__' && o.value !== '__done__' : o.value === '__skip__' || o.value === '__done__')
-      assert.ok(o)
-      r = ok(s.resolveChoice(i.playerIndex, o.value))
-    }
-    return r
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.sourceCard, HARPOON)
+    assert.equal(r.interaction.playerIndex, 0)
+    const option = getChoiceOptions(r).find(option => accept ? option.sourceCard === HARPOON && !option.disabled : option.value === '__skip__')
+    assert.ok(option)
+    return ok(s.resolveChoice(0, option.value))
   }
   function piles(state: GameState, space: string, resource: 'wood' | 'clay' | 'reed' | 'stone' | 'sheep' | 'food', amount: number) {
     const a = state.actionSpaces.find(a => a.id === space)
@@ -181,10 +176,15 @@ describe("A138 command boundaries", () => {
     })
     const pending = turn(s, 0, 'fishing')
     const r = finishOptional(s, pending, true)
+    assert.ok(r.interaction.stateId === 'wait')
+    assert.deepEqual(r.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
     assert.equal(r.state.players[0]!.resources.wood, 0)
     assert.equal(r.state.players[0]!.resources.food, 45)
     assert.equal(r.state.players[0]!.resources.reed, 1)
     assert.equal(r.state.actionSpaces.find(a => a.id === 'fishing')!.resources.food, 0)
+
     sessionEvidence.record('A138-N1', { pending, r })
   })
   it("decline keeps wood and zero wood cannot award free harpoon bonus", () => {
@@ -193,32 +193,59 @@ describe("A138 command boundaries", () => {
         state.players[0]!.resources.wood = wood
         piles(state, 'fishing', 'food', 3)
       })
-      const r = finishOptional(s, turn(s, 0, 'fishing'), false)
+      const pending = turn(s, 0, 'fishing')
+      const r = wood === 0 ? pending : finishOptional(s, pending, false)
+      assert.ok(r.interaction.stateId === 'wait')
+      assert.deepEqual(r.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+      assert.equal(r.interaction.playerIndex, 0)
+      assert.equal(r.state.currentPlayerIndex, 0)
       assert.equal(r.state.players[0]!.resources.wood, wood)
       assert.equal(r.state.players[0]!.resources.food, 43)
       assert.equal(r.state.players[0]!.resources.reed, 0)
+
       sessionEvidence.record(`A138-N2-${wood}`, r)
     }
   })
   it("hand unrelated and opponent Fishing cannot reward owner", () => {
     const hs = setup(state => state.players[0]!.resources.wood = 1, false)
-    const hand = finishOptional(hs, turn(hs, 0, 'fishing'), false)
+    const hand = turn(hs, 0, 'fishing')
+    assert.ok(hand.interaction.stateId === 'wait')
+    assert.deepEqual(hand.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(hand.interaction.playerIndex, 0)
+    assert.equal(hand.state.currentPlayerIndex, 0)
     assert.equal(hand.state.players[0]!.resources.reed, 0)
     const s = setup(state => state.players[0]!.resources.wood = 1)
     const unrelated = turn(s, 0, 'day-laborer')
+    assert.ok(unrelated.interaction.stateId === 'wait')
+    assert.deepEqual(unrelated.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(unrelated.interaction.playerIndex, 0)
+    assert.equal(unrelated.state.currentPlayerIndex, 0)
     const other = turn(s, 1, 'fishing')
+    assert.ok(other.interaction.stateId === 'wait')
+    assert.deepEqual(other.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 2 })
+    assert.equal(other.interaction.playerIndex, 1)
+    assert.equal(other.state.currentPlayerIndex, 1)
     assert.equal(other.state.players[0]!.resources.wood, 1)
     assert.equal(other.state.players[0]!.resources.reed, 0)
+
     sessionEvidence.record('A138-N3', { hand, unrelated, other })
   })
   it("wrong actor invalid and stale choice cannot pay or gain twice", () => {
     const s = setup(state => state.players[0]!.resources.wood = 1)
     const pending = turn(s, 0, 'fishing')
-    assertRejectedUnchanged(s, () => s.resolveChoice(1, 'accept'))
+    assert.ok(pending.interaction.stateId === 'wait' && pending.interaction.request.kind === 'choice')
+    const option = getChoiceOptions(pending).find(option => option.sourceCard === HARPOON && !option.disabled)
+    assert.ok(option)
+    assertRejectedUnchanged(s, () => s.resolveChoice(1, option.value))
     assertRejectedUnchanged(s, () => s.resolveChoice(0, 'free'))
     const r = finishOptional(s, pending, true)
-    assertRejectedUnchanged(s, () => s.resolveChoice(0, 'accept'))
+    assert.ok(r.interaction.stateId === 'wait')
+    assert.deepEqual(r.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, option.value))
     assert.equal(r.state.players[0]!.resources.reed, 1)
+
     sessionEvidence.record('A138-N4', r)
   })
   it("whole action undo restores cost reward and pile before one retry", () => {
@@ -226,14 +253,29 @@ describe("A138 command boundaries", () => {
       state.players[0]!.resources.wood = 1
       piles(state, 'fishing', 'food', 3)
     })
+    const beforeUndo = s.getState()
+    const beforeRules = undoRuleSnapshot(beforeUndo)
     const first = finishOptional(s, turn(s, 0, 'fishing'), true)
+    assert.ok(first.interaction.stateId === 'wait')
+    assert.deepEqual(first.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(first.interaction.playerIndex, 0)
+    assert.equal(first.state.currentPlayerIndex, 0)
     const undone = ok(s.undoAction())
+    assertUndoRestored(beforeRules, undone)
+    assert.deepEqual(undone.interaction, beforeUndo.interaction)
+    assert.equal(undone.interaction.stateId, 'idle')
+    assert.equal(undone.state.currentPlayerIndex, 0)
     assert.equal(undone.state.players[0]!.resources.wood, 1)
     assert.equal(undone.state.players[0]!.resources.food, 40)
     assert.equal(undone.state.players[0]!.resources.reed, 0)
     assert.equal(undone.state.actionSpaces.find(a => a.id === 'fishing')!.resources.food, 3)
     const retry = finishOptional(s, turn(s, 0, 'fishing'), true)
+    assert.ok(retry.interaction.stateId === 'wait')
+    assert.deepEqual(retry.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(retry.interaction.playerIndex, 0)
+    assert.equal(retry.state.currentPlayerIndex, 0)
     assert.equal(retry.state.players[0]!.resources.food, 45)
+
     sessionEvidence.record('A138-N5', { first, undone, retry })
   })
 })

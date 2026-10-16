@@ -1,3 +1,4 @@
+import { assertUndoRestored, undoRuleSnapshot } from './_helpers/session-assertions'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { describe, expect, it } from 'vitest'
 import { type GameSession, type SessionResponse } from '../game/authoritative-session'
@@ -237,21 +238,39 @@ describe("A124 command boundaries", () => {
       const r = assertEmptyAccumulationRejected(s, 0, space)
       assert.equal(r.state.players[0]!.resources.stone, 0)
       assert.equal(r.state.players[0]!.resources.boar, 0)
+      assert.equal(r.interaction.stateId, 'idle')
+      assert.equal(r.state.currentPlayerIndex, 0)
       sessionEvidence.record(`A124-N1-${space}`, r)
     }
   })
   it("round six vegetable gives stone once and later current round remains eligible", () => {
     const s = knapper()
     const r = turn(s, 0, 'vegetable-seeds')
+    assert.ok(r.interaction.stateId === 'wait')
+    assert.deepEqual(r.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
     assert.equal(r.state.round, 14)
     assert.equal(r.state.players[0]!.resources.stone, 1)
     assert.equal(r.state.players[0]!.resources.vegetable, 1)
+
     sessionEvidence.record('A124-N2', r)
   })
   it("basic and round eight assigned action cannot grant stone", () => {
     for (const space of ['day-laborer', 'cattle-market']) {
       const r = turn(knapper(), 0, space)
+      assert.ok(r.interaction.stateId === 'wait')
+      if (space === 'cattle-market') {
+        assert.equal(r.interaction.promptKey, 'ui.interactionAnimalReorg')
+        assert.ok(r.interaction.request.kind === 'animal-reorg')
+        assert.equal(r.interaction.request.zones.find(zone => zone.animalType === 'cattle')?.animalCount, 1)
+      } else {
+        assert.deepEqual(r.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+      }
+      assert.equal(r.interaction.playerIndex, 0)
+      assert.equal(r.state.currentPlayerIndex, 0)
       assert.equal(r.state.players[0]!.resources.stone, 0)
+
       sessionEvidence.record(`A124-N3-${space}`, r)
     }
   })
@@ -259,24 +278,57 @@ describe("A124 command boundaries", () => {
     const hand = knapper(false)
     const handUse = assertEmptyAccumulationRejected(hand, 0, 'western-quarry')
     assert.equal(handUse.state.players[0]!.resources.stone, 0)
+    assert.equal(handUse.interaction.stateId, 'idle')
+    assert.equal(handUse.state.currentPlayerIndex, 0)
     sessionEvidence.record('A124-N4-empty-use', { handUse, emptyEntryRejected: true })
     const s = knapper()
     turn(s, 0, 'grain-seeds')
     const r = turn(s, 1, 'vegetable-seeds')
+    assert.ok(r.interaction.stateId === 'wait')
+    assert.deepEqual(r.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 0 })
+    assert.equal(r.interaction.playerIndex, 1)
+    assert.equal(r.state.currentPlayerIndex, 1)
     assert.equal(r.state.players[0]!.resources.stone, 0)
     assert.equal(r.state.players[1]!.resources.stone, 0)
     assert.equal(r.state.players[1]!.resources.vegetable, 1)
+
     sessionEvidence.record('A124-N4', r)
   })
   it("whole action undo and stale occupied source cannot duplicate stone", () => {
+    const occupied = knapper(true, 1)
+    const occupiedTurn = confirmNext(occupied, turn(occupied, 0, 'western-quarry'))
+    assert.equal(occupiedTurn.interaction.stateId, 'idle')
+    assert.equal(occupiedTurn.state.currentPlayerIndex, 1)
+    assertRejectedUnchanged(occupied, () => occupied.takeAction(1, 'western-quarry'))
+    const legalOtherSpace = turn(occupied, 1, 'grain-seeds')
+    assert.ok(legalOtherSpace.interaction.stateId === 'wait')
+    assert.deepEqual(legalOtherSpace.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 0 })
+    assert.equal(legalOtherSpace.interaction.playerIndex, 1)
+    assert.equal(legalOtherSpace.state.currentPlayerIndex, 1)
+    assert.equal(legalOtherSpace.state.players[1]!.resources.grain, 1)
     const s = knapper(true, 1)
+    const beforeUndo = s.getState()
+    const beforeRules = undoRuleSnapshot(beforeUndo)
     const first = turn(s, 0, 'western-quarry')
+    assert.ok(first.interaction.stateId === 'wait')
+    assert.deepEqual(first.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(first.interaction.playerIndex, 0)
+    assert.equal(first.state.currentPlayerIndex, 0)
     assertRejectedUnchanged(s, () => s.takeAction(0, 'western-quarry'))
     const undone = ok(s.undoAction())
+    assertUndoRestored(beforeRules, undone)
+    assert.deepEqual(undone.interaction, beforeUndo.interaction)
+    assert.equal(undone.interaction.stateId, 'idle')
+    assert.equal(undone.state.currentPlayerIndex, 0)
     assert.equal(undone.state.players[0]!.resources.stone, 0)
     assert.equal(undone.state.actionSpaces.find(a => a.id === 'western-quarry')!.resources.stone, 1)
     const retry = turn(s, 0, 'western-quarry')
+    assert.ok(retry.interaction.stateId === 'wait')
+    assert.deepEqual(retry.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(retry.interaction.playerIndex, 0)
+    assert.equal(retry.state.currentPlayerIndex, 0)
     assert.equal(retry.state.players[0]!.resources.stone, 2)
+
     sessionEvidence.record('A124-N5', { first, undone, retry })
   })
 })

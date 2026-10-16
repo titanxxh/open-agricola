@@ -804,12 +804,27 @@ describe("A133 command boundaries", () => {
       }
       return r
     }
+    const beforeUndo = s.getState()
+    const beforeRules = undoRuleSnapshot(beforeUndo)
     const first = buy()
+    assert.ok(first.interaction.stateId === 'wait')
+    assert.deepEqual(first.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(first.interaction.playerIndex, 0)
+    assert.equal(first.state.currentPlayerIndex, 0)
     assert.equal(bonus(first, BRAG), 2)
     const undone = ok(s.undoAction())
+    assertUndoRestored(beforeRules, undone)
+    assert.deepEqual(undone.interaction, beforeUndo.interaction)
+    assert.equal(undone.interaction.stateId, 'idle')
+    assert.equal(undone.state.currentPlayerIndex, 0)
     assert.equal(bonus(undone, BRAG), 0)
     const retry = buy()
+    assert.ok(retry.interaction.stateId === 'wait')
+    assert.deepEqual(retry.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(retry.interaction.playerIndex, 0)
+    assert.equal(retry.state.currentPlayerIndex, 0)
     assert.equal(bonus(retry, BRAG), 2)
+
     sessionEvidence.record('A133-N4', { before, first, undone, retry })
   })
 })

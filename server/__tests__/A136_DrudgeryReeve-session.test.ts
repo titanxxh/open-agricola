@@ -1,3 +1,4 @@
+import { assertUndoRestored, undoRuleSnapshot } from './_helpers/session-assertions'
 import { setWorkersAtHome, markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import '../../shared/cards/A/A136_DrudgeryReeve'
@@ -341,11 +342,6 @@ describe("A136 command boundaries", () => {
         assert.ok(o)
         r = ok(s.resolveChoice(i.playerIndex, o.value))
       }
-      else if (i.request.kind === 'choice' && i.promptKey !== 'ui.cards.A136_DrudgeryReeve.prompt') {
-        const o = getChoiceOptions({ interaction: i }).find(o => o.value === '__skip__' || o.value === '__done__')
-        assert.ok(o, JSON.stringify(i))
-        r = ok(s.resolveChoice(i.playerIndex, o.value))
-      }
       else
         break
     }
@@ -385,10 +381,10 @@ describe("A136 command boundaries", () => {
   it("missing any one building resource suppresses sets and zero choice gives no bonus", () => {
     for (const missing of ['wood', 'clay', 'reed', 'stone'] as const) {
       const s = setup([2, 0, 0], state => state.players[0]!.resources[missing] = 0)
-      let r = start(s)
-      if (r.interaction.stateId === 'wait' && r.interaction.promptKey === 'ui.cards.A136_DrudgeryReeve.prompt')
-        r = choose(s, r, 0)
+      const r = start(s)
+      assert.equal(r.interaction.stateId, 'gameover')
       assert.equal(bonus(r, 0), 0)
+      assert.equal(r.interaction.stateId, 'gameover')
       sessionEvidence.record(`A136-N2-${missing}`, r)
     }
     const s = setup([2, 0, 0])
@@ -397,6 +393,7 @@ describe("A136 command boundaries", () => {
     r = choose(s, r, 0)
     assert.equal(bonus(r, 0), 0)
     assert.equal(r.state.players[0]!.cardStates[CARD]?.extraData?.scoringReserveBonus, undefined)
+    assert.equal(r.interaction.stateId, 'gameover')
     sessionEvidence.record('A136-N2-zero', r)
   })
   it("negative excessive unknown and wrong actor choices reject before a legal selection", () => {
@@ -409,6 +406,7 @@ describe("A136 command boundaries", () => {
     r = choose(s, r, 1)
     assert.equal(bonus(r, 0), 1)
     assertRejectedUnchanged(s, () => s.resolveChoice(0, `${CARD}:sets:1`))
+    assert.equal(r.interaction.stateId, 'gameover')
     sessionEvidence.record('A136-N3', r)
   })
   it("another scoring reservation reduces max and cannot double count resource sets", () => {
@@ -421,6 +419,7 @@ describe("A136 command boundaries", () => {
     assertRejectedUnchanged(s, () => s.resolveChoice(0, `${CARD}:sets:2`))
     r = choose(s, r, 1)
     assert.equal(bonus(r, 0), 1)
+    assert.equal(r.interaction.stateId, 'gameover')
     sessionEvidence.record('A136-N4', r)
   })
   it("unplayed card never offers shared scoring even with reserve sets", () => {
@@ -440,12 +439,27 @@ describe("A136 command boundaries", () => {
           r = ok(s.resolveChoice(0, CARD))
         return r
       }
+      const beforeUndo = s.getState()
+      const beforeRules = undoRuleSnapshot(beforeUndo)
       const first = play()
+      assert.ok(first.interaction.stateId === 'wait')
+      assert.deepEqual(first.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+      assert.equal(first.interaction.playerIndex, 0)
+      assert.equal(first.state.currentPlayerIndex, 0)
       assert.equal(first.state.players[0]!.resources.wood, wood)
       const undone = ok(s.undoAction())
+      assertUndoRestored(beforeRules, undone)
+      assert.deepEqual(undone.interaction, beforeUndo.interaction)
+      assert.equal(undone.interaction.stateId, 'idle')
+      assert.equal(undone.state.currentPlayerIndex, 0)
       assert.equal(undone.state.players[0]!.resources.wood, 0)
       const retry = play()
+      assert.ok(retry.interaction.stateId === 'wait')
+      assert.deepEqual(retry.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+      assert.equal(retry.interaction.playerIndex, 0)
+      assert.equal(retry.state.currentPlayerIndex, 0)
       assert.equal(retry.state.players[0]!.resources.wood, wood)
+
       sessionEvidence.record(`A136-N6-${left}`, { first, undone, retry })
     }
   })

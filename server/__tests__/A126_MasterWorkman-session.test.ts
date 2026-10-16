@@ -1,3 +1,4 @@
+import { assertUndoRestored, undoRuleSnapshot } from './_helpers/session-assertions'
 import { describe, expect, it } from 'vitest'
 import { type GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
@@ -182,18 +183,15 @@ describe("A126 command boundaries", () => {
     assert.equal(r.state.currentPlayerIndex, actor)
     return ok(s.takeAction(actor, space))
   }
-  function finishOptional(s: GameSession, r: SessionResponse, accept: boolean) {
-    for (let n = 0; n < 8 && r.interaction.stateId === 'wait' && r.interaction.request.kind !== 'confirm-next-player'; n++) {
-      const i = r.interaction
-      if (i.request.kind === 'animal-reorg') {
-        r = ok(s.resolveChoice(i.playerIndex, 'confirm', { zones: i.request.zones }))
-        continue
-      }
-      assert.ok(i.request.kind === 'choice' || i.request.kind === 'select-trigger', JSON.stringify(i))
-      const o = getChoiceOptions({ interaction: i }).find(o => accept ? o.value !== '__skip__' && o.value !== '__done__' : o.value === '__skip__' || o.value === '__done__')
-      assert.ok(o)
-      r = ok(s.resolveChoice(i.playerIndex, o.value))
+  function finishAnimals(s: GameSession, r: SessionResponse) {
+    for (let n = 0; n < 4 && r.interaction.stateId === 'wait' && r.interaction.request.kind === 'animal-reorg'; n++) {
+      assert.equal(r.interaction.playerIndex, 0)
+      r = ok(s.resolveChoice(0, 'confirm', { zones: r.interaction.request.zones }))
     }
+    assert.ok(r.interaction.stateId === 'wait')
+    assert.deepEqual(r.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
     return r
   }
   function piles(state: GameState, space: string, resource: 'wood' | 'clay' | 'reed' | 'stone' | 'sheep' | 'food', amount: number) {
@@ -217,7 +215,11 @@ describe("A126 command boundaries", () => {
         piles(state, 'sheep-market', 'sheep', 1)
         piles(state, 'western-quarry', 'stone', 1)
       })
-      const r = finishOptional(s, turn(s, 0, space), false)
+      const r = finishAnimals(s, turn(s, 0, space))
+      assert.ok(r.interaction.stateId === 'wait')
+      assert.deepEqual(r.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+      assert.equal(r.interaction.playerIndex, 0)
+      assert.equal(r.state.currentPlayerIndex, 0)
       const res = r.state.players[0]!.resources
       assert.equal(res.wood, index === 0 ? 1 : 0)
       assert.equal(res.clay, index === 1 ? 1 : 0)
@@ -225,6 +227,7 @@ describe("A126 command boundaries", () => {
       assert.equal(res.stone, (index === 3 ? 1 : 0) + (space === 'western-quarry' ? 1 : 0))
       assert.equal(res.grain, space === 'grain-seeds' ? 1 : 0)
       assert.equal(res.vegetable, space === 'vegetable-seeds' ? 1 : 0)
+
       sessionEvidence.record(`A126-N1-${index}`, r)
     }
   })
@@ -236,37 +239,82 @@ describe("A126 command boundaries", () => {
         state.roundActionOrder[4] = 'vegetable-seeds'
       })
       const r = turn(s, 0, space)
+      assert.ok(r.interaction.stateId === 'wait')
+      assert.deepEqual(r.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+      assert.equal(r.interaction.playerIndex, 0)
+      assert.equal(r.state.currentPlayerIndex, 0)
       assert.deepEqual((['wood', 'clay', 'reed', 'stone'] as const).map(k => r.state.players[0]!.resources[k]), [0, 0, 0, 0])
+
       sessionEvidence.record(`A126-N2-${space}`, r)
     }
   })
   it("hand and actual opponent mapped use cannot reward owner", () => {
     const hand = turn(setup(mapped, false), 0, 'grain-seeds')
+    assert.ok(hand.interaction.stateId === 'wait')
+    assert.deepEqual(hand.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(hand.interaction.playerIndex, 0)
+    assert.equal(hand.state.currentPlayerIndex, 0)
     assert.equal(hand.state.players[0]!.resources.clay, 0)
     const s = setup(mapped)
     turn(s, 0, 'day-laborer')
     const other = turn(s, 1, 'grain-seeds')
+    assert.ok(other.interaction.stateId === 'wait')
+    assert.deepEqual(other.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 0 })
+    assert.equal(other.interaction.playerIndex, 1)
+    assert.equal(other.state.currentPlayerIndex, 1)
     assert.equal(other.state.players[0]!.resources.clay, 0)
     assert.equal(other.state.players[1]!.resources.clay, 0)
+
     sessionEvidence.record('A126-N3', { hand, other })
   })
   it("invalid actor and occupied action cannot duplicate before reward", () => {
     const s = setup(mapped)
     assertRejectedUnchanged(s, () => s.takeAction(1, 'grain-seeds'))
     const first = turn(s, 0, 'grain-seeds')
+    assert.ok(first.interaction.stateId === 'wait')
+    assert.deepEqual(first.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(first.interaction.playerIndex, 0)
+    assert.equal(first.state.currentPlayerIndex, 0)
     assertRejectedUnchanged(s, () => s.takeAction(0, 'grain-seeds'))
     assert.equal(first.state.players[0]!.resources.clay, 1)
+
     sessionEvidence.record('A126-N4', first)
   })
   it("whole action undo restores mapped resource and source before exactly one retry", () => {
+    const occupied = setup(mapped)
+    const occupiedTurn = confirmNext(occupied, turn(occupied, 0, 'grain-seeds'))
+    assert.equal(occupiedTurn.interaction.stateId, 'idle')
+    assert.equal(occupiedTurn.state.currentPlayerIndex, 1)
+    assertRejectedUnchanged(occupied, () => occupied.takeAction(1, 'grain-seeds'))
+    const legalOtherSpace = turn(occupied, 1, 'reed-bank')
+    assert.ok(legalOtherSpace.interaction.stateId === 'wait')
+    assert.deepEqual(legalOtherSpace.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 0 })
+    assert.equal(legalOtherSpace.interaction.playerIndex, 1)
+    assert.equal(legalOtherSpace.state.currentPlayerIndex, 1)
+    assert.equal(legalOtherSpace.state.players[1]!.resources.reed, 1)
     const s = setup(mapped)
+    const beforeUndo = s.getState()
+    const beforeRules = undoRuleSnapshot(beforeUndo)
     const first = turn(s, 0, 'grain-seeds')
+    assert.ok(first.interaction.stateId === 'wait')
+    assert.deepEqual(first.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(first.interaction.playerIndex, 0)
+    assert.equal(first.state.currentPlayerIndex, 0)
     const undone = ok(s.undoAction())
+    assertUndoRestored(beforeRules, undone)
+    assert.deepEqual(undone.interaction, beforeUndo.interaction)
+    assert.equal(undone.interaction.stateId, 'idle')
+    assert.equal(undone.state.currentPlayerIndex, 0)
     assert.equal(undone.state.players[0]!.resources.clay, 0)
     assert.equal(undone.state.players[0]!.resources.grain, 0)
     const retry = turn(s, 0, 'grain-seeds')
+    assert.ok(retry.interaction.stateId === 'wait')
+    assert.deepEqual(retry.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(retry.interaction.playerIndex, 0)
+    assert.equal(retry.state.currentPlayerIndex, 0)
     assert.equal(retry.state.players[0]!.resources.clay, 1)
     assert.equal(retry.state.players[0]!.resources.grain, 1)
+
     sessionEvidence.record('A126-N5', { first, undone, retry })
   })
 })

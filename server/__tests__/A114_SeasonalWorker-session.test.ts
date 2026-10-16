@@ -1,3 +1,4 @@
+import { assertUndoRestored, undoRuleSnapshot } from './_helpers/session-assertions'
 import { describe, expect, it } from 'vitest'
 import { type GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
@@ -123,16 +124,26 @@ describe("A114 command boundaries", () => {
   }
   it("round five adds grain only and round six chooses exactly one crop", () => {
     const early = turn(setup(undefined, true, 5), 0, 'day-laborer')
+    assert.ok(early.interaction.stateId === 'wait')
+    assert.deepEqual(early.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(early.interaction.playerIndex, 0)
+    assert.equal(early.state.currentPlayerIndex, 0)
     assert.equal(early.state.players[0]!.resources.food, 42)
     assert.equal(early.state.players[0]!.resources.grain, 1)
     assert.equal(early.state.players[0]!.resources.vegetable, 0)
+
     sessionEvidence.record('A114-N1-early', early)
     for (const crop of ['grain', 'vegetable'] as const) {
       const s = setup(undefined, true, 6)
       const r = selectCrop(s, turn(s, 0, 'day-laborer'), crop)
+      assert.ok(r.interaction.stateId === 'wait')
+      assert.deepEqual(r.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+      assert.equal(r.interaction.playerIndex, 0)
+      assert.equal(r.state.currentPlayerIndex, 0)
       assert.equal(r.state.players[0]!.resources.food, 42)
       assert.equal(r.state.players[0]!.resources[crop], 1)
       assert.equal(r.state.players[0]!.resources[crop === 'grain' ? 'vegetable' : 'grain'], 0)
+
       sessionEvidence.record(`A114-N1-${crop}`, r)
     }
   })
@@ -140,39 +151,70 @@ describe("A114 command boundaries", () => {
     for (const played of [true, false]) {
       const s = setup(undefined, played)
       const r = turn(s, 0, played ? 'forest' : 'day-laborer')
+      assert.ok(r.interaction.stateId === 'wait')
+      assert.deepEqual(r.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+      assert.equal(r.interaction.playerIndex, 0)
+      assert.equal(r.state.currentPlayerIndex, 0)
       assert.equal(r.state.players[0]!.resources.grain, 0)
       assert.equal(r.state.players[0]!.resources.vegetable, 0)
+
       sessionEvidence.record(`A114-N2-${played}`, r)
     }
     const s = setup()
     turn(s, 0, 'grain-seeds')
     const r = turn(s, 1, 'day-laborer')
+    assert.ok(r.interaction.stateId === 'wait')
+    assert.deepEqual(r.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 0 })
+    assert.equal(r.interaction.playerIndex, 1)
+    assert.equal(r.state.currentPlayerIndex, 1)
     assert.equal(r.state.players[0]!.resources.grain, 1)
     assert.equal(r.state.players[0]!.resources.vegetable, 0)
     assert.equal(r.state.players[1]!.resources.grain, 0)
+
     sessionEvidence.record('A114-N2-opponent', r)
   })
   it("wrong actor invalid crop and stale choice cannot duplicate reward", () => {
     const s = setup()
     const pending = turn(s, 0, 'day-laborer')
     assert.ok(pending.interaction.stateId === 'wait' && pending.interaction.request.kind === 'choice')
-    const o = getChoiceOptions(pending)[0]!
+    const o = getChoiceOptions(pending).find(option => !option.disabled && option.effectPreview?.kind === 'resourceExchange' && option.effectPreview.resourcesGained?.vegetable === 1)
+    assert.ok(o)
     assertRejectedUnchanged(s, () => s.resolveChoice(1, o.value))
     assertRejectedUnchanged(s, () => s.resolveChoice(0, 'both-crops'))
-    const r = selectCrop(s, pending, 'vegetable')
+    const r = ok(s.resolveChoice(0, o.value))
+    assert.ok(r.interaction.stateId === 'wait')
+    assert.deepEqual(r.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
     assertRejectedUnchanged(s, () => s.resolveChoice(0, o.value))
     assert.equal(r.state.players[0]!.resources.vegetable, 1)
+
     sessionEvidence.record('A114-N3', r)
   })
   it("whole action undo restores crop and base food before one retry", () => {
     const s = setup()
+    const beforeUndo = s.getState()
+    const beforeRules = undoRuleSnapshot(beforeUndo)
     const first = selectCrop(s, turn(s, 0, 'day-laborer'), 'vegetable')
+    assert.ok(first.interaction.stateId === 'wait')
+    assert.deepEqual(first.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(first.interaction.playerIndex, 0)
+    assert.equal(first.state.currentPlayerIndex, 0)
     const undone = ok(s.undoAction())
+    assertUndoRestored(beforeRules, undone)
+    assert.deepEqual(undone.interaction, beforeUndo.interaction)
+    assert.equal(undone.interaction.stateId, 'idle')
+    assert.equal(undone.state.currentPlayerIndex, 0)
     assert.equal(undone.state.players[0]!.resources.food, 40)
     assert.equal(undone.state.players[0]!.resources.vegetable, 0)
     const retry = selectCrop(s, turn(s, 0, 'day-laborer'), 'grain')
+    assert.ok(retry.interaction.stateId === 'wait')
+    assert.deepEqual(retry.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(retry.interaction.playerIndex, 0)
+    assert.equal(retry.state.currentPlayerIndex, 0)
     assert.equal(retry.state.players[0]!.resources.food, 42)
     assert.equal(retry.state.players[0]!.resources.grain, 1)
+
     sessionEvidence.record('A114-N4', { first, undone, retry })
   })
 })

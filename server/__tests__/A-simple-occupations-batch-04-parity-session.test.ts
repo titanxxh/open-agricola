@@ -1,3 +1,4 @@
+import { assertUndoRestored, undoRuleSnapshot } from './_helpers/session-assertions'
 import { describe, expect, it } from 'vitest'
 import { type GameSession, type SessionResponse } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -322,17 +323,27 @@ describe("A125 command boundaries", () => {
   it("exactly two clay rooms at actual purchase give three clay two reed two stone", () => {
     const s = setup(state => material(state, 'clay'))
     const r = play(s, PRIEST)
+    assert.ok(r.interaction.stateId === 'wait')
+    assert.deepEqual(r.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
     assert.equal(r.state.players[0]!.resources.clay, 3)
     assert.equal(r.state.players[0]!.resources.reed, 2)
     assert.equal(r.state.players[0]!.resources.stone, 2)
     assert.equal(r.state.players[0]!.resources.food, 40)
+
     sessionEvidence.record('A125-N1', r)
   })
   it("wood stone and three clay rooms fail the exact house predicate", () => {
     for (const [type, rooms] of [['wood', 2], ['stone', 2], ['clay', 3]] as const) {
       const s = setup(state => material(state, type, rooms))
       const r = play(s, PRIEST)
+      assert.ok(r.interaction.stateId === 'wait')
+      assert.deepEqual(r.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+      assert.equal(r.interaction.playerIndex, 0)
+      assert.equal(r.state.currentPlayerIndex, 0)
       assert.deepEqual((['clay', 'reed', 'stone'] satisfies Array<'clay' | 'reed' | 'stone'>).map(k => r.state.players[0]!.resources[k]), [0, 0, 0])
+
       sessionEvidence.record(`A125-N2-${type}-${rooms}`, r)
     }
   })
@@ -343,6 +354,10 @@ describe("A125 command boundaries", () => {
       state.players[0]!.resources.reed = 1
     })
     const first = play(s, PRIEST)
+    assert.ok(first.interaction.stateId === 'wait')
+    assert.deepEqual(first.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(first.interaction.playerIndex, 0)
+    assert.equal(first.state.currentPlayerIndex, 0)
     assert.equal(first.state.players[0]!.resources.clay, 2)
     assert.equal(first.state.players[1]!.resources.clay, 0)
     confirmNext(s, first)
@@ -354,17 +369,37 @@ describe("A125 command boundaries", () => {
     assert.equal(r.state.players[0]!.resources.clay, 0)
     assert.equal(r.state.players[0]!.resources.reed, 0)
     assert.equal(r.state.players[0]!.resources.stone, 0)
+
+    assert.ok(r.interaction.stateId === 'wait')
+    assert.deepEqual(r.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
     sessionEvidence.record('A125-N3', { first, r })
   })
   it("invalid choice and undo cannot retain a duplicate purchase reward", () => {
     const s = setup(state => material(state, 'clay'))
+    const beforeUndo = s.getState()
+    const beforeRules = undoRuleSnapshot(beforeUndo)
     const first = play(s, PRIEST)
+    assert.ok(first.interaction.stateId === 'wait')
+    assert.deepEqual(first.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(first.interaction.playerIndex, 0)
+    assert.equal(first.state.currentPlayerIndex, 0)
     assertRejectedUnchanged(s, () => s.resolveChoice(0, PRIEST))
     const undone = ok(s.undoAction())
+    assertUndoRestored(beforeRules, undone)
+    assert.deepEqual(undone.interaction, beforeUndo.interaction)
+    assert.equal(undone.interaction.stateId, 'idle')
+    assert.equal(undone.state.currentPlayerIndex, 0)
     assert.deepEqual((['clay', 'reed', 'stone'] satisfies Array<'clay' | 'reed' | 'stone'>).map(k => undone.state.players[0]!.resources[k]), [0, 0, 0])
     assert(undone.state.players[0]!.occupationHand.includes(PRIEST))
     const retry = play(s, PRIEST)
+    assert.ok(retry.interaction.stateId === 'wait')
+    assert.deepEqual(retry.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(retry.interaction.playerIndex, 0)
+    assert.equal(retry.state.currentPlayerIndex, 0)
     assert.equal(retry.state.players[0]!.resources.clay, 3)
+
     sessionEvidence.record('A125-N4', { first, undone, retry })
   })
 })
