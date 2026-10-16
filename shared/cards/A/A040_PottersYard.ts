@@ -42,6 +42,7 @@ const after: CardListenerRegistration = {
   cardIds: [CARD_ID],
   phases: ['after'],
   handler: context => {
+    if (!context.triggerSnapshot?.players[context.player.id]?.played.includes(CARD_ID)) return
     if (context.sourceCard === CARD_ID && context.params?.kind === 'claim-farmyard-goods-tokens') {
       const clay = sumResourceMovedToPlayer(context.actionEvents?.filter(event => 'schemaVersion' in event), 'clay', context.player.id,
         event => event.sourceCardId === CARD_ID && event.from.kind === 'card' && event.from.cardId === CARD_ID)
@@ -55,7 +56,6 @@ const after: CardListenerRegistration = {
       }
       return { sourceCard: CARD_ID, flow: { type: 'xor', optional: true, children } }
     }
-    if (!context.triggerSnapshot?.players[context.player.id]?.played.includes(CARD_ID)) return
     const positions = getActionNewlyUsedTiles(context)
     if (!hasClaimableFarmyardGoodsTokens(context.player, CARD_ID, positions)) return
     return {

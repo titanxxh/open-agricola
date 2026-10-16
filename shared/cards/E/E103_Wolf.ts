@@ -56,7 +56,7 @@ const buildClaimFlow = (
 const afterGainCollectListener: CardListenerRegistration = {
   id: 'E103-wolf-after-gain-collect',
   cardIds: [CARD_ID],
-  actions: ['gain', 'collect', 'exchange', 'receive', 'reap', 'take-from-card', 'pop-card-stack'],
+  actions: ['gain', 'collect', 'exchange', 'receive', 'reap', 'take-from-card', 'pop-card-stack', 'special-effect'],
   phases: ['after' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.sourceCard === CARD_ID) return
