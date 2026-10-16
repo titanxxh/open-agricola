@@ -1,11 +1,11 @@
 import { expect } from 'vitest'
-import { GameSession, type SessionResponse } from '../../game/authoritative-session'
+import { type GameSession, type SessionResponse } from '../../game/authoritative-session'
 import { setWorkersAtHome } from '../../../shared/domain/player'
 import { stabilizeRandomHands } from './stabilize-random-hands'
+import { createWorkSession } from './session-fixtures'
+import { getChoiceOptions } from './session-assertions'
 
-export const sowOptions = (response: SessionResponse) => response.interaction.stateId === 'wait'
-  ? response.interaction.request.options ?? []
-  : []
+export const sowOptions = getChoiceOptions
 
 export const setupSowingSession = ({ cardId, grain = 0, vegetable = 0, wood = 0, stone = 0 }: {
   cardId: string
@@ -14,7 +14,7 @@ export const setupSowingSession = ({ cardId, grain = 0, vegetable = 0, wood = 0,
   wood?: number
   stone?: number
 }) => {
-  const session = new GameSession(9811, undefined, { playerCount: 2 })
+  const session = createWorkSession({ seed: 9811 })
   stabilizeRandomHands(session.state.players)
   const state = session.state
   state.currentPlayerIndex = 0
@@ -52,7 +52,8 @@ export const commitFirstPlow = (session: GameSession, response: SessionResponse)
   expect(response.interaction).toMatchObject({
     stateId: 'wait', request: { kind: 'farm-select', farm: { farmType: 'plow' } },
   })
-  if (response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'farm-select') {
+  if (response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'farm-select'
+    || response.interaction.request.farm.farmType !== 'plow') {
     return response
   }
   return session.commitSelectionChoice(response.interaction.playerIndex, {

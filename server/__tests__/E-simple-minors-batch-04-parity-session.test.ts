@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { GameSession, type SessionResponse } from '../game/authoritative-session'
+import { type GameSession, type SessionResponse } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { createPlayerActionSpaces } from '../../shared/cards/player-action-space'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
-import type { GameState, Resource } from '../../shared/contract/types'
+import { type GameState, type Resource } from '../../shared/contract/types'
 
 import '../../shared/cards/E/E006_Recount'
 import '../../shared/cards/E/E010_StrawHat'
@@ -13,9 +13,12 @@ import '../../shared/cards/E/E044_FodderBeets'
 import '../../shared/cards/E/E045_FruitLadder'
 import '../../shared/cards/E/E065_Almsbag'
 import '../../shared/cards/E/E081_AlchemistsLab'
-
-type CardId =
-  | 'E006_Recount' | 'E010_StrawHat' | 'E041_MuddyWaters' | 'E043_BarnCats'
+import assert from 'node:assert/strict'
+import { createWorkSession } from './_helpers/session-fixtures'
+import { assertRejectedUnchanged, assertUndoRestored, confirmNext, undoRuleSnapshot, getChoiceOptions } from './_helpers/session-assertions'
+import { createScenarioEvidence } from './_helpers/scenario-evidence'
+const sessionEvidence = createScenarioEvidence(import.meta.url)
+type CardId = 'E006_Recount' | 'E010_StrawHat' | 'E041_MuddyWaters' | 'E043_BarnCats'
   | 'E044_FodderBeets' | 'E045_FruitLadder' | 'E065_Almsbag' | 'E081_AlchemistsLab'
 
 const FILLER = '__test_placeholder__'
@@ -32,7 +35,7 @@ const setupMinor = ({
   occupations?: number
   played?: boolean
 }) => {
-  const session = new GameSession(4056, undefined, { playerCount: 2 })
+  const session = sessionEvidence.track(createWorkSession({ seed: 4056, options: { playerCount: 2 } }))
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.currentPlayerIndex = 0
@@ -55,8 +58,7 @@ const setupMinor = ({
   state.availableMajorImprovements = []
   if (played && cardId === 'E081_AlchemistsLab') {
     state.actionSpaces.push(...createPlayerActionSpaces(state).filter((space) =>
-      !state.actionSpaces.some((existing) => existing.id === space.id),
-    ))
+      !state.actionSpaces.some((existing) => existing.id === space.id)))
   }
   session.loadState(state)
   return session
@@ -65,7 +67,7 @@ const setupMinor = ({
 const enterImprovement = (session: GameSession) => {
   let response = session.takeAction(0, 'major-improvement')
   if (response.interaction.stateId !== 'wait') return response
-  const option = response.interaction.request.options?.find((candidate) => candidate.value.startsWith('action-improvement-'))
+  const option = getChoiceOptions(response)?.find((candidate) => candidate.value.startsWith('action-improvement-'))
   if (option) response = session.resolveChoice(0, option.value)
   return response
 }
@@ -74,7 +76,7 @@ const playMinor = (session: GameSession, cardId: CardId): SessionResponse => {
   let response = enterImprovement(session)
   if (!response.state.players[0]!.minorHand.includes(cardId)) return response
   if (response.interaction.stateId !== 'wait') return response
-  const option = response.interaction.request.options?.find((candidate) => candidate.value === cardId)
+  const option = getChoiceOptions(response)?.find((candidate) => candidate.value === cardId)
   if (option) response = session.resolveChoice(0, option.value)
   return response
 }
@@ -83,7 +85,7 @@ const cardIsOffered = (session: GameSession, cardId: CardId) => {
   const response = enterImprovement(session)
   if (!response.state.players[0]!.minorHand.includes(cardId)) return true
   if (response.interaction.stateId !== 'wait') return false
-  return response.interaction.request.options?.some((candidate) => candidate.value === cardId) ?? false
+  return getChoiceOptions(response)?.some((candidate) => candidate.value === cardId) ?? false
 }
 
 const futureRounds = (state: GameState, cardId: CardId, resource: keyof Resource) =>
@@ -123,7 +125,7 @@ describe('E010 Straw Hat parity', () => {
     const { session, response: initial } = roundEnd(3)
     expect(initial.interaction.stateId).toBe('wait')
     if (initial.interaction.stateId !== 'wait') return
-    const food = initial.interaction.request.options?.find((option) => option.effectPreview?.resourcesGained?.food === 1)
+    const food = getChoiceOptions(initial)?.find((option) => option.effectPreview && 'resourcesGained' in option.effectPreview && option.effectPreview.resourcesGained?.food === 1)
     expect(food).toBeDefined()
     const response = session.resolveChoice(0, food!.value)
     expect(response.state.players[0]!.resources.food).toBe(21)
@@ -133,7 +135,7 @@ describe('E010 Straw Hat parity', () => {
     const { session, response: initial } = roundEnd(3)
     expect(initial.interaction.stateId).toBe('wait')
     if (initial.interaction.stateId !== 'wait') return
-    const move = initial.interaction.request.options?.find((option) => option.labelKey === 'actions.move-farmer-to-space.name')
+    const move = getChoiceOptions(initial)?.find((option) => option.labelKey === 'actions.move-farmer-to-space.name')
     expect(move).toBeDefined()
     let response = session.resolveChoice(0, move!.value)
     expect(response.interaction.stateId).toBe('wait')
@@ -320,5 +322,106 @@ describe('E044 Fodder Beets parity', () => {
   it('E044 S3: round twelve keeps only the round-thirteen food', () => {
     const response = playMinor(withFields(3, 12), 'E044_FodderBeets')
     expect(futureRounds(response.state, 'E044_FodderBeets', 'food')).toEqual([13])
+  })
+})
+describe("E044 command boundaries", () => {
+  const PLANTER = 'D115_FodderPlanter', BEETS = 'E044_FodderBeets'
+  function ok(r: SessionResponse) { assert.equal(r.ok, true, r.error); return r; }
+  function setup(card: string, configure: (state: GameState) => void = () => { }, players = 2) {
+    const s = sessionEvidence.track(createWorkSession({ seed: 4242, options: { playerCount: players }, configure(state) {
+        state.round = 4
+        for (const p of state.players)
+          Object.assign(p.resources, { wood: 0, clay: 0, reed: 0, stone: 0, grain: 0, vegetable: 0, food: 20 })
+        const p = state.players[0]!
+        if (card === PLANTER)
+          p.occupationPlayed = [card]
+        else
+          p.minorHand = [card]
+        configure(state)
+      } }))
+    return s
+  }
+  function options(r: SessionResponse) {
+    ok(r)
+    assert(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice', JSON.stringify(r.interaction))
+    return getChoiceOptions(r)
+  }
+  function minorMenu(s: GameSession) {
+    let r = ok(s.takeAction(0, 'meeting-place'))
+    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice') {
+      const branch = getChoiceOptions(r).find(o => o.value.startsWith('action-improvement-'))
+      if (branch)
+        r = ok(s.resolveChoice(0, branch.value))
+    }
+    return r
+  }
+  function buy(s: GameSession, card: string) {
+    const menu = minorMenu(s)
+    if (menu.state.players[0]!.minorPlayed.includes(card))
+      return menu
+    assert(options(menu).some(o => o.value === card && !o.disabled))
+    return ok(s.resolveChoice(0, card))
+  }
+  function deniedBuy(s: GameSession, card: string) {
+    const menu = minorMenu(s)
+    assert(!JSON.stringify(menu.interaction).includes(`"value":"${card}"`))
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, card))
+    assert(s.state.players[0]!.minorHand.includes(card))
+  }
+  function fields(state: GameState, count: number) { state.players[0]!.fields = Array.from({ length: count }, (_, i) => ({ row: 0, col: i + 1, stacks: [] })); }
+  function future(r: SessionResponse) { return r.state.futureMeeples.filter(m => m.cardId === BEETS).map(m => ({ round: m.round, resources: m.resources })); }
+  function naturalTurn(s: GameSession, index: number, space: string) { return confirmNext(s, ok(s.takeAction(index, space))); }
+  it("two field tiles including an extra card field cannot satisfy three field tiles", () => {
+    for (const extra of [false, true])
+      deniedBuy(setup(BEETS, state => {
+        fields(state, 2)
+        if (extra)
+          state.players[0]!.minorPlayed = ['E070_CropRotationField']
+      }), BEETS)
+    const s = setup(BEETS, state => fields(state, 3))
+    const r = buy(s, BEETS)
+    assert(r.state.players[0]!.minorPlayed.includes(BEETS))
+    assert.deepEqual(future(r).map(m => m.round), [5, 7, 9, 11, 13])
+  })
+  it("current and past odd rounds never receive food and last rounds invent no future", () => {
+    for (const [round, targets] of [[3, [5, 7, 9, 11, 13]], [12, [13]], [13, []], [14, []]] as const) {
+      const s = setup(BEETS, state => { state.round = round; fields(state, 3); })
+      const r = buy(s, BEETS)
+      assert.deepEqual(future(r), targets.map(target => ({ round: target, resources: { food: 1 } })))
+      assert.equal(r.state.players[0]!.resources.food, 20)
+    }
+  })
+  it("whole-action undo removes all future food and retry schedules once", () => {
+    const s = setup(BEETS, state => fields(state, 3))
+    const before = undoRuleSnapshot(s.getState())
+    const r = buy(s, BEETS)
+    assert.equal(future(r).length, 5)
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, BEETS))
+    assertUndoRestored(before, s.undoAction())
+    assert.deepEqual(future(s.getState()), [])
+    assert.deepEqual(future(buy(s, BEETS)).map(m => m.round), [5, 7, 9, 11, 13])
+  })
+  it("natural next odd round delivers one food exactly once", () => {
+    const s = setup(BEETS, state => { state.round = 2; fields(state, 3); })
+    let r = confirmNext(s, buy(s, BEETS))
+    assert.equal(r.state.round, 2)
+    naturalTurn(s, 1, 'grain-seeds')
+    naturalTurn(s, 0, 'day-laborer')
+    r = naturalTurn(s, 1, 'clay-pit')
+    assert.equal(r.state.round, 3)
+    assert.equal(r.state.players[0]!.resources.food, 23)
+    assert.deepEqual(future(r).map(m => m.round), [5, 7, 9, 11, 13])
+    const work = ok(s.takeAction(0, 'grain-seeds'))
+    assert.equal(work.state.players[0]!.resources.food, 23)
+  })
+  it("natural even round pays no scheduled food", () => {
+    const s = setup(BEETS, state => { state.round = 1; fields(state, 3); })
+    confirmNext(s, buy(s, BEETS))
+    naturalTurn(s, 1, 'grain-seeds')
+    naturalTurn(s, 0, 'day-laborer')
+    const r = naturalTurn(s, 1, 'clay-pit')
+    assert.equal(r.state.round, 2)
+    assert.equal(r.state.players[0]!.resources.food, 22)
+    assert.deepEqual(future(r).map(m => m.round), [3, 5, 7, 9, 11, 13])
   })
 })
