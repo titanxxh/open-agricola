@@ -1,21 +1,26 @@
+import { emptyResources } from '../../shared/contract/state-constants'
 import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game/authoritative-session'
+import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
-
 import '../../shared/cards/A/A132_Publican'
 import '../../shared/cards/A/A065_SeedPellets'
 import '../../shared/cards/A/A094_LazySowman'
 import '../../shared/cards/D/D114_SeedTrader'
 import '../../shared/cards/D/D025_WitchesDanceFloor'
-import type { ActionChoiceOption, ActionDefinition } from '../../shared/contract/types'
+import { type ActionChoiceOption, type ActionDefinition } from '../../shared/contract/types'
 import { rollAndCacheCardPick } from '../../shared/cards/helpers/card-random'
-import type { SessionResponse } from '../../shared/session/session-core'
 import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/serialization'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
+import assert from 'node:assert/strict'
+import { createWorkSession } from './_helpers/session-fixtures'
+import { assertRejectedUnchanged, getChoiceOptions } from './_helpers/session-assertions'
+import { createScenarioEvidence } from './_helpers/scenario-evidence'
+
+const sessionEvidence = createScenarioEvidence(import.meta.url)
 
 describe('A132_Publican session', () => {
   const setup = (currentPlayerIndex: number) => {
-    const session = new GameSession(42)
+    const session = sessionEvidence.track(createWorkSession({ seed: 42 }))
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -42,7 +47,7 @@ describe('A132_Publican session', () => {
   }
 
   const setupMultipleHelpers = () => {
-    const session = new GameSession(undefined, undefined, { playerCount: 3 })
+    const session = sessionEvidence.track(createWorkSession({ options: { playerCount: 3 } }))
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.currentPlayerIndex = 2
@@ -92,8 +97,7 @@ describe('A132_Publican session', () => {
         return { type: 'ok' }
       },
     }
-    ;(session as unknown as { registry: { register: (definition: ActionDefinition) => void } })
-      .registry.register(action)
+    session.state.actionSpaces.push({ ...action, resources: { ...emptyResources }, takenBy: [] })
   }
 
   const registerNoopAnytime = (session: GameSession, id: string) => {
@@ -117,8 +121,7 @@ describe('A132_Publican session', () => {
       }),
       resolveChoice: () => ({ type: 'ok' }),
     }
-    ;(session as unknown as { registry: { register: (definition: ActionDefinition) => void } })
-      .registry.register(action)
+    session.state.actionSpaces.push({ ...action, resources: { ...emptyResources }, takenBy: [] })
   }
 
   it('publican can pay 1 grain for 1 VP when opponent sows', () => {
@@ -135,7 +138,7 @@ describe('A132_Publican session', () => {
 
     // If it's a choice (sow/bake-bread), pick sow
     if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'ui.interactionGrainUtilizationChoice') {
-      const sowOption = resp.interaction.request.options?.find(
+      const sowOption = getChoiceOptions(resp)?.find(
         (o: ActionChoiceOption) => o.labelKey === 'actions.sow.name' || o.value === 'sow',
       )
       if (sowOption) {
@@ -150,7 +153,7 @@ describe('A132_Publican session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
 
-    const acceptOption = resp.interaction.request.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
+    const acceptOption = getChoiceOptions(resp)?.find((o: ActionChoiceOption) => o.value !== '__skip__')
     expect(acceptOption).toBeDefined()
     resp = session.resolveChoice(0, acceptOption!.value)
 
@@ -167,7 +170,7 @@ describe('A132_Publican session', () => {
     })
     expect(resp.ok).toBe(true)
 
-    resp = advancePastPlayerSwitches(session, resp)
+    expect(advancePastPlayerSwitches(session, resp).ok).toBe(true)
 
     const after = session.getState().state
     // Owner lost 1 grain
@@ -190,6 +193,8 @@ describe('A132_Publican session', () => {
     if (resp.interaction.stateId !== 'wait') throw new Error('expected player switch confirmation')
     expect(resp.interaction.request.kind).toBe('confirm-player-switch')
     expect(resp.interaction.playerIndex).toBe(1)
+    assert.ok(resp.interaction.stateId === 'wait')
+    assert.ok(resp.interaction.request.kind === 'confirm-player-switch')
     expect(resp.interaction.request.kind === 'confirm-player-switch'
       ? resp.interaction.request.fromPlayerIndex
       : undefined).toBe(1)
@@ -208,7 +213,7 @@ describe('A132_Publican session', () => {
     expect(resp.interaction.playerIndex).toBe(0)
     expect(resp.interaction.sourceCard).toBe('A132_Publican')
 
-    const acceptOption = resp.interaction.request.options.find((option) => option.value !== '__skip__')
+    const acceptOption = getChoiceOptions(resp).find((option) => option.value !== '__skip__')
     expect(acceptOption).toBeDefined()
     resp = session.resolveChoice(0, acceptOption!.value)
     resp = advancePastPlayerSwitches(session, resp)
@@ -245,7 +250,7 @@ describe('A132_Publican session', () => {
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.sourceCard : undefined)
       .toBe('A132_Publican')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected Publican choice')
-    const accept = resp.interaction.request.options.find((option) => option.value !== '__skip__')
+    const accept = getChoiceOptions(resp).find((option) => option.value !== '__skip__')
 
     resp = advancePastPlayerSwitches(session, session.resolveChoice(0, accept!.value))
 
@@ -325,8 +330,8 @@ describe('A132_Publican session', () => {
     session.loadState(state)
     registerRandomAnytime(session, 'card___TEST_random_success', true)
 
-    let resp = advancePastPlayerSwitches(session, session.takeAction(1, 'grain-utilization'))
-    resp = session.takeAnytimeAction(1, 'card___TEST_random_success')
+    expect(advancePastPlayerSwitches(session, session.takeAction(1, 'grain-utilization')).ok).toBe(true)
+    let resp = session.takeAnytimeAction(1, 'card___TEST_random_success')
 
     expect([resp.ok, resp.error]).toEqual([true, undefined])
     expect(resp.state.players[1]!.resources.grain).toBe(1)
@@ -377,7 +382,7 @@ describe('A132_Publican session', () => {
     expect(session.createSessionPrivateCursor().provisionalContinuationScopes).toHaveLength(1)
 
     if (resp.interaction.stateId !== 'wait') throw new Error('expected second Publican choice')
-    const accept = resp.interaction.request.options.find((option) => option.value !== '__skip__')
+    const accept = getChoiceOptions(resp).find((option) => option.value !== '__skip__')
     resp = session.resolveChoice(1, accept!.value)
     resp = advancePastPlayerSwitches(session, resp)
 
@@ -395,9 +400,9 @@ describe('A132_Publican session', () => {
 
   it('aborts a shared Publican scope once after every helper declines', () => {
     const session = setupMultipleHelpers()
-    let resp = advancePastPlayerSwitches(session, session.takeAction(2, 'grain-utilization'))
-    resp = advancePastPlayerSwitches(session, session.resolveChoice(0, '__skip__'))
-    resp = advancePastPlayerSwitches(session, session.resolveChoice(1, '__skip__'))
+    expect(advancePastPlayerSwitches(session, session.takeAction(2, 'grain-utilization')).ok).toBe(true)
+    expect(advancePastPlayerSwitches(session, session.resolveChoice(0, '__skip__')).ok).toBe(true)
+    const resp = advancePastPlayerSwitches(session, session.resolveChoice(1, '__skip__'))
 
     expect(resp.interaction.stateId).toBe('idle')
     expect(resp.state.players.map((player) => player.resources.grain)).toEqual([1, 1, 0])
@@ -559,7 +564,7 @@ describe('A132_Publican session', () => {
     expect(JSON.stringify(snapshot.frame)).not.toContain('provisionalContinuationScopes')
     expect(snapshot.sessionCursor.provisionalContinuationScopes).toHaveLength(1)
 
-    const restored = new GameSession(rehydrateState(JSON.parse(JSON.stringify(snapshot))))
+    const restored = sessionEvidence.track(new GameSession(rehydrateState(JSON.parse(JSON.stringify(snapshot)))))
     resp = restored.getState()
     expect(resp.interaction.stateId).toBe('wait')
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.sourceCard : undefined).toBe('A132_Publican')
@@ -573,7 +578,7 @@ describe('A132_Publican session', () => {
     expect(resp.scores).toHaveLength(2)
 
     const failedSnapshot = serializeSessionSnapshot(restored.state, restored)
-    const failedRestored = new GameSession(rehydrateState(JSON.parse(JSON.stringify(failedSnapshot))))
+    const failedRestored = sessionEvidence.track(new GameSession(rehydrateState(JSON.parse(JSON.stringify(failedSnapshot)))))
     expect(failedRestored.takeAction(1, 'grain-utilization').ok).toBe(false)
   })
 
@@ -588,7 +593,7 @@ describe('A132_Publican session', () => {
 
     // If it's a choice, pick sow
     if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'ui.interactionGrainUtilizationChoice') {
-      const sowOption = resp.interaction.request.options?.find(
+      const sowOption = getChoiceOptions(resp)?.find(
         (o: ActionChoiceOption) => o.labelKey === 'actions.sow.name' || o.value === 'sow',
       )
       if (sowOption) {
@@ -617,7 +622,7 @@ describe('A132_Publican session', () => {
     })
     expect(resp.ok).toBe(true)
 
-    resp = advancePastPlayerSwitches(session, resp)
+    expect(advancePastPlayerSwitches(session, resp).ok).toBe(true)
 
     const after = session.getState().state
     // Owner resources unchanged
@@ -636,7 +641,7 @@ describe('A132_Publican session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    const sowOption = resp.interaction.request.options.find(
+    const sowOption = getChoiceOptions(resp).find(
       (option) => option.labelKey === 'ui.interactionDoNotReplace',
     )
     expect(sowOption).toBeDefined()
@@ -648,7 +653,7 @@ describe('A132_Publican session', () => {
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.playerIndex).toBe(0)
     expect(resp.interaction.sourceCard).toBe('A132_Publican')
-    expect(resp.interaction.request.options.map((option) => option.value)).toContain('__skip__')
+    expect(getChoiceOptions(resp).map((option) => option.value)).toContain('__skip__')
   })
 
   it('rechecks sow after Seed Pellets gives the opponent grain', () => {
@@ -687,7 +692,7 @@ describe('A132_Publican session', () => {
 
     // If it's a choice, pick sow
     if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'ui.interactionGrainUtilizationChoice') {
-      const sowOption = resp.interaction.request.options?.find(
+      const sowOption = getChoiceOptions(resp)?.find(
         (o: ActionChoiceOption) => o.labelKey === 'actions.sow.name' || o.value === 'sow',
       )
       if (sowOption) {
@@ -707,12 +712,119 @@ describe('A132_Publican session', () => {
     })
     expect(resp.ok).toBe(true)
 
-    resp = advancePastPlayerSwitches(session, resp)
+    expect(advancePastPlayerSwitches(session, resp).ok).toBe(true)
 
     const after = session.getState().state
     // No bonus VP should be gained (owner sowed, not opponent)
     expect(after.players[0]!.cardStates?.A132_Publican?.counters?.bonusVp).toBeUndefined()
     // Owner should only have lost grain from sowing
     expect(after.players[0]!.resources.grain).toBe(grainBefore - 1)
+  })
+})
+
+describe("A132 command boundaries", () => {
+  const CARD = 'A132_Publican'
+  function setup({ restricted = false, grain = 1, self = false } = {}) {
+    const session = sessionEvidence.track(createWorkSession({ seed: 132, options: { playerCount: 4 }, configure: state => {
+        state.round = 14
+        state.currentPlayerIndex = self ? 0 : 1
+        state.players[0]!.occupationPlayed = [CARD]
+        state.players[0]!.resources.grain = grain
+        state.players[0]!.fields = [{ row: 0, col: 2, stacks: [] }]
+        state.players[1]!.resources.grain = 1
+        state.players[1]!.resources.wood = 0
+        state.players[1]!.fields = [{ row: 0, col: 2, stacks: [] }, { row: 0, col: 3, stacks: [] }]
+        if (restricted) {
+          state.players[1]!.occupationPlayed = ['A115_ChiefForester']
+          state.actionSpaces.find(space => space.id === 'forest')!.resources.wood = 3
+        }
+      } }))
+    return session
+  }
+  function switches(session: GameSession, response: SessionResponse) {
+    for (let i = 0; i < 4 && response.interaction.stateId === 'wait'
+      && response.interaction.request.kind === 'confirm-player-switch'; i++) {
+      assert.ok(response.interaction.stateId === 'wait')
+      assert.ok(response.interaction.request.kind === 'confirm-player-switch')
+      response = session.resolveChoice(response.interaction.request.fromPlayerIndex, 'confirm')
+      assert.equal(response.ok, true, response.error)
+    }
+    return response
+  }
+  function accept(session: GameSession, response: SessionResponse, actor: number) {
+    assert.ok(response.interaction.stateId === 'wait' && response.interaction.request.kind === 'choice')
+    const option = getChoiceOptions(response).find(o => o.value !== '__skip__')
+    assert.ok(option)
+    const accepted = session.resolveChoice(actor, option.value)
+    assert.equal(accepted.ok, true, accepted.error)
+    return { response: switches(session, accepted), value: option.value }
+  }
+  function start(session: GameSession, restricted = false, actor = 1) {
+    let r = session.takeAction(actor, restricted ? 'forest' : 'grain-utilization')
+    assert.equal(r.ok, true, r.error)
+    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice' && getChoiceOptions(r).some(o => o.value === 'sow')) {
+      r = session.resolveChoice(actor, 'sow')
+      assert.equal(r.ok, true, r.error)
+    }
+    return switches(session, r)
+  }
+  function score(r: SessionResponse) {
+    return r.scores?.[0]?.categories.find(c => c.key === 'cardBonusVp')?.total ?? 0
+  }
+  it("rejects the wrong responder and a duplicate offer, then completes a legal transfer once", () => {
+    const session = setup()
+    const pending = start(session)
+    assert.ok(pending.interaction.stateId === 'wait' && pending.interaction.request.kind === 'choice')
+    assert.equal(pending.interaction.playerIndex, 0)
+    const option = getChoiceOptions(pending)?.find(o => o.value !== '__skip__')
+    assert.ok(option)
+    assertRejectedUnchanged(session, () => session.resolveChoice(1, option.value))
+    const { response } = accept(session, session.getState(), 0)
+    assertRejectedUnchanged(session, () => session.resolveChoice(0, option.value))
+    assert.equal(response.state.players[0]!.resources.grain, 0)
+    assert.equal(response.state.players[1]!.resources.grain, 2)
+    const completed = session.commitSelectionChoice(1, { crops: [{ row: 0, col: 2, crop: 'grain' }] })
+    assert.equal(completed.ok, true, completed.error)
+    assert.equal(completed.state.players[1]!.resources.grain, 1)
+    assert.deepEqual(completed.state.players[1]!.fields[0]!.stacks, [{ kind: 'grain', remaining: 3 }])
+    assert.equal(score(completed), 1)
+  })
+  it("Chief Forester single-field sow cannot earn Publican grain or points", () => {
+    const session = setup({ restricted: true })
+    let r = accept(session, start(session, true), 1).response
+    const illegalOffer = r.interaction.stateId === 'wait' && r.interaction.sourceCard === CARD
+    if (illegalOffer)
+      accept(session, r, 0)
+    r = session.commitSelectionChoice(1, { crops: [{ row: 0, col: 2, crop: 'grain' }] })
+    assert.equal(r.ok, true, r.error)
+    assert.equal(r.state.players[1]!.resources.wood, 3)
+    assert.deepEqual(r.state.players[1]!.fields[0]!.stacks, [{ kind: 'grain', remaining: 3 }])
+    assert.deepEqual(r.state.players[1]!.fields[1]!.stacks, [])
+    assert.deepEqual({ illegalOffer, ownerGrain: r.state.players[0]!.resources.grain,
+      opponentGrain: r.state.players[1]!.resources.grain, bonus: score(r) }, { illegalOffer: false, ownerGrain: 1, opponentGrain: 0, bonus: 0 })
+  })
+  it("non-triggering sow still completes (0 grain, self=false)", () => {
+    const config = { grain: 0, self: false }
+    const session = setup(config)
+    const actor = config.self ? 0 : 1
+    const r = start(session, false, actor)
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'farm-select')
+    const done = session.commitSelectionChoice(actor, { crops: [{ row: 0, col: 2, crop: 'grain' }] })
+    assert.equal(done.ok, true, done.error)
+    assert.equal(score(done), 0)
+    assert.equal(done.state.players[0]!.resources.grain, 0)
+    assert.deepEqual(done.state.players[actor]!.fields[0]!.stacks, [{ kind: 'grain', remaining: 3 }])
+  })
+  it("non-triggering sow still completes (1 grain, self=true)", () => {
+    const config = { grain: 1, self: true }
+    const session = setup(config)
+    const actor = config.self ? 0 : 1
+    const r = start(session, false, actor)
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'farm-select')
+    const done = session.commitSelectionChoice(actor, { crops: [{ row: 0, col: 2, crop: 'grain' }] })
+    assert.equal(done.ok, true, done.error)
+    assert.equal(score(done), 0)
+    assert.equal(done.state.players[0]!.resources.grain, 0)
+    assert.deepEqual(done.state.players[actor]!.fields[0]!.stacks, [{ kind: 'grain', remaining: 3 }])
   })
 })

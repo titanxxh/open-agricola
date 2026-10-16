@@ -1,9 +1,14 @@
+import { createWorkSession } from './_helpers/session-fixtures'
+import { createScenarioEvidence } from './_helpers/scenario-evidence'
 import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game/authoritative-session'
+
 import { A123_FrameBuilder } from '../../shared/cards/A/A123_FrameBuilder'
 import { PaymentSolver } from '../../shared/actions/payment'
 import { computePaymentOptionsForTest } from '../../shared/actions/payment/__tests__/test-helpers'
-import type { PlayerState } from '../../shared/contract/types'
+
+
+const sessionEvidence = createScenarioEvidence(import.meta.url)
+
 
 // Keep side-effect import referenced so registration runs.
 void A123_FrameBuilder
@@ -22,12 +27,12 @@ const CARD_ID = 'A123_FrameBuilder'
  */
 
 const setup3RoomsClayHouse = (resources: Record<string, number>) => {
-  const session = new GameSession(42)
+  const session = sessionEvidence.track(createWorkSession({ seed: 42 }))
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   state.players.forEach((p) => {
-    ;(p as any).minorHand = ['__test_placeholder__']
-    ;(p as any).occupationHand = ['__test_placeholder__']
+    p.minorHand = ['__test_placeholder__']
+    p.occupationHand = ['__test_placeholder__']
   })
   const player = state.players[0]!
   player.occupationPlayed = [CARD_ID]
@@ -131,7 +136,7 @@ describe('A123_FrameBuilder construct — per-room wood-for-clay swap (spec §7.
 
   it('wood house: A123 modifier filtered out — pure {wood:5, reed:2} per room', () => {
     const { player } = setup3RoomsClayHouse({ wood: 15, reed: 6 })
-    ;(player as PlayerState).houseType = 'wood'
+    player.houseType = 'wood'
     const sols = computePaymentOptionsForTest(
       player,
       { unitFee: { wood: 5, reed: 2 }, nb: 3 },

@@ -1,15 +1,21 @@
+import { createWorkSession } from './_helpers/session-fixtures'
+import { createScenarioEvidence } from './_helpers/scenario-evidence'
+import { getChoiceOptions } from './_helpers/session-assertions'
 import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game/authoritative-session'
+
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { setWorkersAtHome } from '../../shared/domain/player'
 
 import '../../shared/cards/A/A123_FrameBuilder'
 
+const sessionEvidence = createScenarioEvidence(import.meta.url)
+
+
 const CARD_ID = 'A123_FrameBuilder'
 
 describe('A123_FrameBuilder renovation action log attribution', () => {
   const setup = () => {
-    const session = new GameSession(42)
+    const session = sessionEvidence.track(createWorkSession({ seed: 42 }))
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -53,7 +59,7 @@ describe('A123_FrameBuilder renovation action log attribution', () => {
         continue
       }
       // Skip the optional improvement-any leaf if we're prompted for it.
-      const skip = resp.interaction.request.options?.find(
+      const skip = getChoiceOptions(resp)?.find(
         (opt) => opt.value === '__skip__' || opt.value === 'skip',
       )
       if (skip) {
@@ -71,12 +77,9 @@ describe('A123_FrameBuilder renovation action log attribution', () => {
       return typeof action === 'string' && action.includes('renovate-house')
     })
     expect(renovateLog).toBeDefined()
-    const detailParts = renovateLog!.params?.detailParts as
-      | { bonusSources?: string[]; effects?: { renovate?: { from: string; to: string } } }
-      | undefined
-    expect(detailParts).toBeDefined()
-    expect(detailParts!.effects?.renovate).toEqual({ from: 'wood', to: 'clay' })
-    expect(detailParts!.bonusSources).toEqual([CARD_ID])
+    expect(renovateLog!.params?.detailParts).toMatchObject({
+      effects: { renovate: { from: 'wood', to: 'clay' } }, bonusSources: [CARD_ID],
+    })
 
     // After the action finalizes, the scratchpad must be cleared so it
     // doesn't leak into subsequent actions.
@@ -84,7 +87,7 @@ describe('A123_FrameBuilder renovation action log attribution', () => {
   })
 
   it('does NOT attribute renovate-house log when paying directly (no bonus used)', () => {
-    const session = new GameSession(42)
+    const session = sessionEvidence.track(createWorkSession({ seed: 42 }))
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -115,7 +118,7 @@ describe('A123_FrameBuilder renovation action log attribution', () => {
         resp = session.resolveChoice(0, 'clay')
         continue
       }
-      const skip = resp.interaction.request.options?.find(
+      const skip = getChoiceOptions(resp)?.find(
         (opt) => opt.value === '__skip__' || opt.value === 'skip',
       )
       if (skip) {
@@ -131,9 +134,9 @@ describe('A123_FrameBuilder renovation action log attribution', () => {
       return typeof action === 'string' && action.includes('renovate-house')
     })
     expect(renovateLog).toBeDefined()
-    const detailParts = renovateLog!.params?.detailParts as
-      | { bonusSources?: string[] }
-      | undefined
-    expect(detailParts?.bonusSources).toBeUndefined()
+    const detailParts = renovateLog!.params?.detailParts
+    if (typeof detailParts === 'object' && detailParts !== null && 'bonusSources' in detailParts) {
+      expect(detailParts.bonusSources).toBeUndefined()
+    }
   })
 })

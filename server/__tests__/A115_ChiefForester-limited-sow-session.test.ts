@@ -1,8 +1,13 @@
-import { afterEach, describe, expect, it } from 'vitest'
-import type { GameSession, SessionResponse } from '../game/authoritative-session'
-import type { GameState } from '../../shared/contract/types'
+import { describe, expect, it } from 'vitest'
+import { type GameSession, type SessionResponse } from '../game/authoritative-session'
+import { type GameState } from '../../shared/contract/types'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 import { createWorkSession } from './_helpers/session-fixtures'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged, confirmNext, getChoiceOptions } from './_helpers/session-assertions'
+import { createScenarioEvidence } from './_helpers/scenario-evidence'
+
+const sessionEvidence = createScenarioEvidence(import.meta.url)
 
 const FORESTER = 'A115_ChiefForester'
 const HOE = 'A079_GardenHoe'
@@ -11,13 +16,11 @@ const PUBLICAN = 'A132_Publican'
 const WOOD_FIELD = 'D075_WoodField'
 type RewardCard = typeof HOE | typeof PELLETS | typeof PUBLICAN
 const REWARDS: RewardCard[] = [PELLETS, HOE, PUBLICAN]
-const sessions: GameSession[] = []
-afterEach(() => sessions.splice(0).forEach((session) => session.dispose()))
 
 // Confirmed Session seam (#1134): a new work game uses Forest's before Sow,
 // rejects two Logical Fields atomically, then completes one field and collects.
 const setup = (reward: RewardCard = HOE, configure?: (state: GameState) => void) => {
-  const session = createWorkSession({ options: { playerCount: reward === PUBLICAN ? 4 : 2 }, configure: (state) => {
+  const session = sessionEvidence.track(createWorkSession({ options: { playerCount: reward === PUBLICAN ? 4 : 2 }, configure: (state) => {
     state.round = 5
     const player = state.players[0]!
     player.occupationPlayed = [FORESTER]
@@ -31,8 +34,7 @@ const setup = (reward: RewardCard = HOE, configure?: (state: GameState) => void)
     state.actionSpaces.find((space) => space.id === 'forest')!.resources.wood = 3
     state.roundActionOrder[0] = 'grain-utilization'
     configure?.(state)
-  } })
-  sessions.push(session)
+  } }))
   return session
 }
 
@@ -285,4 +287,112 @@ describe('A115 Chief Forester limited Sow', () => {
     expect(response.state.actionSpaces.find((space) => space.id === 'forest')!.takenBy).toHaveLength(0)
   })
 
+})
+
+describe("A115 command boundaries", () => {
+  const FORESTER = 'A115_ChiefForester'
+  function ok(r: SessionResponse) {
+    assert.equal(r.ok, true, r.error)
+    return r
+  }
+  function setup(configure: (state: GameState) => void = () => {
+  }, played = true) {
+    const s = sessionEvidence.track(createWorkSession({ seed: 4242, configure(state) {
+        state.round = 14
+        for (const p of state.players)
+          Object.assign(p.resources, { food: 40, wood: 0, clay: 0, reed: 0, stone: 0, grain: 0, vegetable: 0 })
+        state.players[0]!.occupationPlayed = played ? [FORESTER] : []
+        state.players[0]!.occupationHand = played ? ['__test_placeholder__'] : [FORESTER]
+        state.players[0]!.fields = [{ row: 0, col: 1, stacks: [] }, { row: 0, col: 2, stacks: [] }]
+        state.players[0]!.resources.grain = 2
+        configure(state)
+      } }))
+    return s
+  }
+  function turn(s: GameSession, actor: number, space: string) {
+    let r = s.getState()
+    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
+      r = confirmNext(s, r)
+    assert.equal(r.interaction.stateId, 'idle')
+    assert.equal(r.state.currentPlayerIndex, actor)
+    return ok(s.takeAction(actor, space))
+  }
+  function sow(s: GameSession, r: SessionResponse) {
+    for (let n = 0; n < 5 && r.interaction.stateId === 'wait' && r.interaction.request.kind !== 'farm-select'; n++) {
+      const i = r.interaction
+      assert.ok(i.request.kind === 'choice' || i.request.kind === 'select-trigger')
+      const o = getChoiceOptions({ interaction: i }).find(o => o.value !== '__skip__' && o.value !== '__done__')
+      assert.ok(o)
+      r = ok(s.resolveChoice(0, o.value))
+    }
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'farm-select' && r.interaction.request.farm.farmType === 'sow')
+    return r
+  }
+  it("wood accumulation permits exactly one chosen ordinary grain field before collection", () => {
+    const s = setup()
+    const pending = sow(s, turn(s, 0, 'forest'))
+    assert.equal(pending.state.players[0]!.resources.wood, 0)
+    const submitted = s.commitSelectionChoice(0, { crops: [{ row: 0, col: 1, crop: 'grain' }, { row: 0, col: 2, crop: 'grain' }] })
+    const actual = { ok: submitted.ok, grain: submitted.state.players[0]!.resources.grain, wood: submitted.state.players[0]!.resources.wood, stacks: submitted.state.players[0]!.fields.map(f => f.stacks) }
+    sessionEvidence.record('A115-N1-two-fields', { pending, submitted, actual })
+    assert.deepEqual(actual, { ok: false, grain: 2, wood: 0, stacks: [[], []] })
+    ok(s.undoAction())
+    sow(s, turn(s, 0, 'forest'))
+    const r = ok(s.commitSelectionChoice(0, { crops: [{ row: 0, col: 2, crop: 'grain' }] }))
+    assert.equal(r.state.players[0]!.resources.grain, 1)
+    assert.equal(r.state.players[0]!.resources.wood, 3)
+    assert.deepEqual(r.state.players[0]!.fields.map(f => f.stacks), [[], [{ kind: 'grain', remaining: 3 }]])
+    sessionEvidence.record('A115-N1', { pending, r })
+  })
+  it("decline keeps seeds and no seed cannot sow a field", () => {
+    const s = setup()
+    let r = turn(s, 0, 'forest')
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice')
+    const o = getChoiceOptions(r).find(o => o.value === '__skip__')
+    assert.ok(o)
+    r = ok(s.resolveChoice(0, o.value))
+    assert.equal(r.state.players[0]!.resources.grain, 2)
+    assert.equal(r.state.players[0]!.resources.wood, 3)
+    const zero = turn(setup(state => state.players[0]!.resources.grain = 0), 0, 'forest')
+    assert.equal(zero.state.players[0]!.resources.wood, 3)
+    assert.deepEqual(zero.state.players[0]!.fields.map(f => f.stacks), [[], []])
+    sessionEvidence.record('A115-N2', { r, zero })
+  })
+  it("nonwood hand and actual opponent collection cannot offer owner restricted sow", () => {
+    const clay = turn(setup(), 0, 'clay-pit')
+    assert.equal(clay.state.players[0]!.resources.grain, 2)
+    const hand = turn(setup(undefined, false), 0, 'forest')
+    assert.equal(hand.state.players[0]!.resources.grain, 2)
+    const s = setup()
+    turn(s, 0, 'day-laborer')
+    const other = turn(s, 1, 'forest')
+    assert.equal(other.state.players[0]!.resources.grain, 2)
+    assert.deepEqual(other.state.players[0]!.fields.map(f => f.stacks), [[], []])
+    sessionEvidence.record('A115-N3', { clay, hand, other })
+  })
+  it("occupied farm tile invalid target and wrong actor reject then one valid sow", () => {
+    const s = setup(state => state.players[0]!.fields[0]!.stacks = [{ kind: 'grain', remaining: 2 }])
+    sow(s, turn(s, 0, 'forest'))
+    for (const crop of [{ row: 99, col: 99, crop: 'grain' }, { row: 0, col: 1, crop: 'grain' }, { row: 0, col: 2, crop: 'vegetable' }] as const)
+      assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { crops: [crop] }))
+    assertRejectedUnchanged(s, () => s.commitSelectionChoice(1, { crops: [{ row: 0, col: 2, crop: 'grain' }] }))
+    const r = ok(s.commitSelectionChoice(0, { crops: [{ row: 0, col: 2, crop: 'grain' }] }))
+    assert.equal(r.state.players[0]!.resources.grain, 1)
+    assert.deepEqual(r.state.players[0]!.fields[0]!.stacks, [{ kind: 'grain', remaining: 2 }])
+    sessionEvidence.record('A115-N4', r)
+  })
+  it("whole sow action undo restores seeds fields and source before one retry", () => {
+    const s = setup()
+    sow(s, turn(s, 0, 'forest'))
+    const first = ok(s.commitSelectionChoice(0, { crops: [{ row: 0, col: 1, crop: 'grain' }] }))
+    const undone = ok(s.undoAction())
+    assert.equal(undone.state.players[0]!.resources.grain, 2)
+    assert.equal(undone.state.players[0]!.resources.wood, 0)
+    assert.deepEqual(undone.state.players[0]!.fields.map(f => f.stacks), [[], []])
+    sow(s, turn(s, 0, 'forest'))
+    const retry = ok(s.commitSelectionChoice(0, { crops: [{ row: 0, col: 2, crop: 'grain' }] }))
+    assert.equal(retry.state.players[0]!.resources.grain, 1)
+    assert.equal(retry.state.players[0]!.resources.wood, 3)
+    sessionEvidence.record('A115-N5', { first, undone, retry })
+  })
 })

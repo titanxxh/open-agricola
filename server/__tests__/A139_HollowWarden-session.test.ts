@@ -1,18 +1,22 @@
-import { type SessionResponse } from '../game/authoritative-session'
+import { type SessionResponse, type GameSession } from '../game/authoritative-session'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
-
 import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
-
 import { setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/A/A139_HollowWarden'
+import assert from 'node:assert/strict'
+import { type GameState } from '../../shared/contract/types'
+import { createWorkSession } from './_helpers/session-fixtures'
+import { assertRejectedUnchanged, getChoiceOptions } from './_helpers/session-assertions'
+import { createScenarioEvidence } from './_helpers/scenario-evidence'
+
+const sessionEvidence = createScenarioEvidence(import.meta.url)
 
 const CARD_ID = 'A139_HollowWarden'
 
 describe('A139_HollowWarden session', () => {
   const setup = () => {
-    const session = new GameSession(undefined, undefined, { playerCount: 4 })
+    const session = sessionEvidence.track(createWorkSession({ options: { playerCount: 4 } }))
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 4) // 4 players for hollow-4 space
@@ -47,7 +51,6 @@ describe('A139_HollowWarden session', () => {
 
   it('does not trigger on non-hollow spaces', () => {
     const session = setup()
-    const woodBefore = session.getState().state.players[0]!.resources.wood
     const foodBefore = session.getState().state.players[0]!.resources.food
 
     // Use farmland (gives no food, no wood) to verify no HollowWarden trigger
@@ -62,7 +65,7 @@ describe('A139_HollowWarden session', () => {
   it('gains 1 food when using 3p hollow space', () => {
     // 3p game uses 'hollow' space (non-4p variant). The reference listens via
     // isActionCardEvent($event, 'Hollow') which matches both spaces.
-    const session = new GameSession(undefined, undefined, { playerCount: 3 })
+    const session = sessionEvidence.track(createWorkSession({ options: { playerCount: 3 } }))
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 3)
@@ -93,7 +96,7 @@ describe('A139_HollowWarden session', () => {
   })
 
   it('gains 1 food when using 5/6 hollow space', () => {
-    const session = new GameSession(undefined, undefined, { playerCount: 5 })
+    const session = sessionEvidence.track(createWorkSession({ options: { playerCount: 5 } }))
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.currentPlayerIndex = 0
@@ -122,7 +125,7 @@ describe('A139_HollowWarden session', () => {
     const session = setup()
     const state = session.getState().state
     state.currentPlayerIndex = 1
-    state.players[1]!.workersAvailable = 2
+    setWorkersAtHome(state, state.players[1]!, 2)
     session.loadState(state)
 
     const resp = session.takeAction(1, 'hollow-4')
@@ -142,7 +145,7 @@ describe('A139 Hollow Warden parity', () => {
   const FILLER = '__test_placeholder__'
 
   const setup = ({ actor = 0, played = true, clay = 0 } = {}) => {
-    const session = new GameSession(6139, undefined, { playerCount: 4 })
+    const session = sessionEvidence.track(createWorkSession({ seed: 6139, options: { playerCount: 4 } }))
     const state = session.getState().state
     stabilizeRandomHands(state.players)
     state.currentPlayerIndex = actor
@@ -180,7 +183,7 @@ describe('A139 Hollow Warden parity', () => {
     if (response.state.players[0]!.occupationHand.includes(CARD_ID)) {
       expect(response.interaction.stateId).toBe('wait')
       if (response.interaction.stateId !== 'wait') return response
-      const card = response.interaction.request.options?.find((option) => option.value === CARD_ID)
+      const card = getChoiceOptions(response)?.find((option) => option.value === CARD_ID)
       expect(card, JSON.stringify(response.interaction)).toBeDefined()
       response = session.resolveChoice(response.interaction.playerIndex, card!.value)
     }
@@ -192,10 +195,10 @@ describe('A139 Hollow Warden parity', () => {
     for (let step = 0; step < 5; step += 1) {
       if (response.state.players[0]!.improvements.includes(FIREPLACE)) return response
       if (response.interaction.stateId !== 'wait') return response
-      if (response.interaction.request.options?.some((option) => option.value === FIREPLACE)) {
+      if (getChoiceOptions(response)?.some((option) => option.value === FIREPLACE)) {
         return response
       }
-      const enter = response.interaction.request.options?.find((option) =>
+      const enter = getChoiceOptions(response)?.find((option) =>
         option.value !== '__skip__' && option.value !== 'cancel')
       expect(enter, JSON.stringify(response.interaction)).toBeDefined()
       response = session.resolveChoice(response.interaction.playerIndex, enter!.value)
@@ -223,7 +226,7 @@ describe('A139 Hollow Warden parity', () => {
     if (!response.state.players[0]!.improvements.includes(FIREPLACE)) {
       expect(response.interaction.stateId).toBe('wait')
       if (response.interaction.stateId !== 'wait') return
-      const majorIds = response.interaction.request.options
+      const majorIds = getChoiceOptions(response)
         ?.map((option) => option.value).filter((value) => value.startsWith('Major_')) ?? []
       expect(majorIds).toEqual([FIREPLACE])
       response = session.resolveChoice(response.interaction.playerIndex, FIREPLACE)
@@ -233,5 +236,87 @@ describe('A139 Hollow Warden parity', () => {
     expect(response.state.players[0]!.improvements).toContain(FIREPLACE)
     expect(response.state.players[0]!.improvements).not.toContain('Major_Well')
     expect(response.state.players[0]!.resources.clay).toBe(0)
+  })
+})
+
+describe("A139 command boundaries", () => {
+  const WARDEN = 'A139_HollowWarden'
+  function ok(r: SessionResponse) {
+    assert.equal(r.ok, true, r.error)
+    return r
+  }
+  function setup(configure: (state: GameState) => void = () => {
+  }, played = true) {
+    const s = sessionEvidence.track(createWorkSession({ seed: 4242, options: { playerCount: 3 }, configure(state) {
+        state.round = 14
+        for (const p of state.players)
+          Object.assign(p.resources, { food: 40, wood: 10, clay: 10, reed: 10, stone: 10, grain: 0, vegetable: 0 })
+        state.players[0]!.occupationPlayed = played ? [WARDEN] : []
+        state.players[0]!.occupationHand = played ? ['A110_Roughcaster', 'A114_SeasonalWorker', 'A119_FirewoodCollector'] : [WARDEN, 'A110_Roughcaster']
+        configure(state)
+      } }))
+    return s
+  }
+  function choice(s: GameSession, r: SessionResponse, value: string) {
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice')
+    assert.ok(getChoiceOptions(r).some(o => o.value === value && !('disabled' in o && o.disabled)))
+    return ok(s.resolveChoice(r.interaction.playerIndex, value))
+  }
+  function playWarden(s: GameSession) {
+    let r = ok(s.takeAction(0, 'lessons'))
+    if (!r.state.players[0]!.occupationPlayed.includes(WARDEN))
+      r = choice(s, r, WARDEN)
+    return r
+  }
+  function fireplace(s: GameSession, r: SessionResponse, card: string | null) {
+    for (let n = 0; n < 10 && r.interaction.stateId === 'wait' && r.interaction.request.kind !== 'confirm-next-player'; n++) {
+      assert.ok(r.interaction.request.kind === 'choice', JSON.stringify(r.interaction))
+      const o = getChoiceOptions(r).find(o => card ? (o.value === card || o.value === `major:${card}`) : (o.value === '__skip__' || o.value === '__done__')) ?? (card ? getChoiceOptions(r).find(o => o.value !== '__skip__' && !('disabled' in o && o.disabled)) : undefined)
+      assert.ok(o)
+      r = choice(s, r, o.value)
+    }
+    return r
+  }
+  it("real Lessons grants only one Fireplace purchase at its ordinary clay cost", () => {
+    for (const [card, cost] of [['Major_Fireplace1', 2], ['Major_Fireplace2', 3]] as const) {
+      const s = setup(state => state.players[0]!.resources.clay = cost, false)
+      const pending = playWarden(s)
+      assertRejectedUnchanged(s, () => s.resolveChoice(0, 'Major_Joinery'))
+      const r = fireplace(s, pending, card)
+      assert.ok(r.state.players[0]!.improvements.includes(card))
+      assert.equal(r.state.players[0]!.resources.clay, 0)
+      assert.ok(!r.state.players[0]!.improvements.includes('Major_Joinery'))
+      sessionEvidence.record(`A139-N1-${card}`, { pending, r })
+    }
+  })
+  it("declining or lacking payment cannot grant a free Fireplace", () => {
+    const s = setup(undefined, false)
+    const declined = fireplace(s, playWarden(s), null)
+    assert.deepEqual(declined.state.players[0]!.improvements, [])
+    assert.equal(declined.state.players[0]!.resources.clay, 10)
+    const poor = setup(state => state.players[0]!.resources.clay = 0, false)
+    const denied = playWarden(poor)
+    assert.deepEqual(denied.state.players[0]!.improvements, [])
+    assertRejectedUnchanged(poor, () => poor.resolveChoice(0, 'Major_Fireplace1'))
+    sessionEvidence.record('A139-N2', { declined, denied })
+  })
+  it("own Hollow grants one food while Clay Pit and hand do not", () => {
+    for (const [space, played, food] of [['hollow', true, 41], ['clay-pit', true, 40], ['hollow', false, 40]] as const) {
+      const s = setup(undefined, played)
+      const r = ok(s.takeAction(0, space))
+      assert.equal(r.state.players[0]!.resources.food, food)
+      sessionEvidence.record(`A139-N3-${space}-${played}`, r)
+    }
+  })
+  it("whole purchase undo restores occupation and clay before one fireplace retry", () => {
+    const s = setup(state => state.players[0]!.resources.clay = 2, false)
+    const first = fireplace(s, playWarden(s), 'Major_Fireplace1')
+    const undone = ok(s.undoAction())
+    assert.deepEqual(undone.state.players[0]!.improvements, [])
+    assert.ok(undone.state.players[0]!.occupationHand.includes(WARDEN))
+    assert.equal(undone.state.players[0]!.resources.clay, 2)
+    const retry = fireplace(s, playWarden(s), 'Major_Fireplace1')
+    assert.equal(retry.state.players[0]!.resources.clay, 0)
+    sessionEvidence.record('A139-N4', { first, undone, retry })
   })
 })

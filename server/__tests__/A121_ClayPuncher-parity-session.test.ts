@@ -1,3 +1,6 @@
+import { createWorkSession } from './_helpers/session-fixtures'
+import { createScenarioEvidence } from './_helpers/scenario-evidence'
+import { getChoiceOptions } from './_helpers/session-assertions'
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
@@ -5,6 +8,9 @@ import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/A/A121_ClayPuncher'
 import '../../shared/cards/A/A099_FellowGrazer'
+
+const sessionEvidence = createScenarioEvidence(import.meta.url)
+
 
 const CARD_ID = 'A121_ClayPuncher'
 const OTHER_OCCUPATION = 'A099_FellowGrazer'
@@ -16,7 +22,7 @@ const setup = ({
   played = true,
   food = 1,
 } = {}) => {
-  const session = new GameSession(5121, undefined, { playerCount })
+  const session = sessionEvidence.track(createWorkSession({ seed: 5121, options: { playerCount } }))
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.currentPlayerIndex = actor
@@ -42,7 +48,7 @@ const playOccupation = (session: GameSession, spaceId: string, cardId: string) =
   expect(response.ok, response.error).toBe(true)
   if (!response.state.players[0]!.occupationHand.includes(cardId)) return response
   if (response.interaction.stateId !== 'wait') return response
-  const option = response.interaction.request.options?.find((candidate) => candidate.value === cardId)
+  const option = getChoiceOptions(response)?.find((candidate) => candidate.value === cardId)
   expect(option).toBeDefined()
   return session.resolveChoice(response.interaction.playerIndex, option!.value)
 }

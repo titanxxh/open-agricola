@@ -1,3 +1,4 @@
+import { takeMajorImprovementFromSupply } from '../../shared/cards/major/supply'
 import { expectWait } from './_helpers/trigger-select'
 import { expectTileFarmSelection } from './_helpers/session-assertions'
 import { describe, expect, it } from 'vitest'
@@ -722,5 +723,93 @@ describe("A091 command boundaries", () => {
     assert.equal(r.state.players[0]!.resources.wood, 3)
     assert.equal(r.state.players[0]!.fields.length, 1)
     sessionEvidence.record('A091-N7-retry', r)
+  })
+})
+
+describe("A133 command boundaries", () => {
+  const BRAG = 'A133_Braggart'
+  const MINORS = ['A014_CarpentersHammer', 'A031_DebtSecurity', 'A037_Bucksaw', 'A040_PottersYard', 'A045_FireProtectionPond', 'A047_Trellises', 'A051_DriftNetBoat', 'A056_Basket', 'A063_DutchWindmill', 'A068_AsparagusGift', 'A069_LargeGreenhouse']
+  const MAJORS = ['Major_Fireplace1', 'Major_Fireplace2', 'Major_Joinery', 'Major_Pottery', 'Major_Basket']
+  function ok(r: SessionResponse) {
+    assert.equal(r.ok, true, r.error)
+    return r
+  }
+  function setup(configure: (state: GameState) => void = () => {
+  }, played = true, owner = 0, round = 14) {
+    const s = sessionEvidence.track(createWorkSession({ seed: 4242, options: { playerCount: 3 }, configure(state) {
+        state.round = round
+        for (const p of state.players)
+          Object.assign(p.resources, { food: 40, wood: 0, clay: 0, reed: 0, stone: 0, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0 })
+        state.players[owner]!.occupationPlayed = played ? [BRAG] : []
+        state.players[owner]!.occupationHand = played ? ['__test_placeholder__'] : [BRAG, 'A110_Roughcaster']
+        configure(state)
+        for (const p of state.players)
+          for (const id of p.improvements)
+            takeMajorImprovementFromSupply(state, id)
+      } }))
+    assert.equal(s.getState().state.players.length, 3)
+    return s
+  }
+  function bonus(r: SessionResponse, card: string, owner = 0) {
+    assert.ok(r.scores)
+    return r.scores[owner]!.categories.find(c => c.key === 'cardBonusVp')?.entries.filter(e => e.type === 'bonus' && e.cardId === card).reduce((v, e) => v + e.score, 0) ?? 0
+  }
+  function read(s: GameSession, card: string, expected: number, owner = 0) {
+    const r = s.getState()
+    assert.equal(bonus(r, card, owner), expected)
+    assert.equal(bonus(s.getState(), card, owner), expected)
+    return r
+  }
+  it("four through eleven own minors use every printed threshold and cap nine points", () => {
+    for (const [count, expected] of [[4, 0], [5, 2], [6, 3], [7, 4], [8, 5], [9, 7], [10, 9], [11, 9]]) {
+      const s = setup(state => state.players[0]!.minorPlayed = MINORS.slice(0, count))
+      sessionEvidence.record(`A133-N1-${count}`, read(s, BRAG, expected!))
+    }
+  })
+  it("mixed major minor in front counts five while occupations and hand cannot count", () => {
+    const s = setup(state => {
+      const p = state.players[0]!
+      p.minorPlayed = MINORS.slice(0, 3)
+      p.improvements = MAJORS.slice(0, 2)
+      p.occupationPlayed.push('A110_Roughcaster')
+      p.minorHand = MINORS.slice(3, 8)
+    })
+    sessionEvidence.record('A133-N2', read(s, BRAG, 2))
+  })
+  it("hand and opponent improvements cannot reward nonowner score", () => {
+    const c = (state: GameState) => {
+      state.players[0]!.minorPlayed = MINORS.slice(0, 5)
+      state.players[1]!.minorPlayed = MINORS.slice(5, 11)
+    }
+    const hand = read(setup(c, false), BRAG, 0)
+    const s = setup(c, true, 1)
+    const other = read(s, BRAG, 0)
+    assert.equal(bonus(other, BRAG, 1), 3)
+    sessionEvidence.record('A133-N3', { hand, other })
+  })
+  it("actual fifth improvement purchase raises threshold and undo removes it before retry", () => {
+    const s = setup(state => {
+      state.players[0]!.minorPlayed = MINORS.slice(0, 4)
+      state.players[0]!.minorHand = ['A030_BakingSheet', 'A056_Basket']
+      state.players[0]!.resources.wood = 1
+    })
+    const before = read(s, BRAG, 0)
+    function buy() {
+      let r = ok(s.takeAction(0, 'major-improvement'))
+      for (let n = 0; n < 8 && !r.state.players[0]!.minorPlayed.includes('A030_BakingSheet'); n++) {
+        assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice')
+        const o = getChoiceOptions(r).find(o => o.value === 'A030_BakingSheet' || o.value === 'minor:A030_BakingSheet') ?? getChoiceOptions(r).find(o => o.value.startsWith('action-improvement-'))
+        assert.ok(o)
+        r = ok(s.resolveChoice(0, o.value))
+      }
+      return r
+    }
+    const first = buy()
+    assert.equal(bonus(first, BRAG), 2)
+    const undone = ok(s.undoAction())
+    assert.equal(bonus(undone, BRAG), 0)
+    const retry = buy()
+    assert.equal(bonus(retry, BRAG), 2)
+    sessionEvidence.record('A133-N4', { before, first, undone, retry })
   })
 })

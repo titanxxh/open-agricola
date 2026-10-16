@@ -1,3 +1,6 @@
+import { createWorkSession } from './_helpers/session-fixtures'
+import { createScenarioEvidence } from './_helpers/scenario-evidence'
+import { getChoiceOptions } from './_helpers/session-assertions'
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
@@ -6,12 +9,15 @@ import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 
 import '../../shared/cards/A/A131_CraftTeacher'
 
+const sessionEvidence = createScenarioEvidence(import.meta.url)
+
+
 const CARD_ID = 'A131_CraftTeacher'
 const OCCUPATIONS = ['A116_WoodCutter', 'B121_Geologist']
 const FILLER = '__test_placeholder__'
 
 const setup = (played = true) => {
-  const session = new GameSession(7131, undefined, { playerCount: 3 })
+  const session = sessionEvidence.track(createWorkSession({ seed: 7131, options: { playerCount: 3 } }))
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.currentPlayerIndex = 0
@@ -46,9 +52,9 @@ const chooseCard = (session: GameSession, response: SessionResponse, cardId: str
     && !response.state.players[response.interaction.stateId === 'wait' ? response.interaction.playerIndex : 0]!
       .occupationHand.includes(cardId)) return response
   for (let guard = 0; guard < 4 && response.interaction.stateId === 'wait'; guard += 1) {
-    const option = response.interaction.request.options?.find((candidate) => candidate.value === cardId)
+    const option = getChoiceOptions(response)?.find((candidate) => candidate.value === cardId)
     if (option) return session.resolveChoice(response.interaction.playerIndex, option.value)
-    const enter = response.interaction.request.options?.find((candidate) => candidate.value !== '__skip__')
+    const enter = getChoiceOptions(response)?.find((candidate) => candidate.value !== '__skip__')
     expect(enter, JSON.stringify(response.interaction)).toBeDefined()
     response = session.resolveChoice(response.interaction.playerIndex, enter!.value)
   }
@@ -61,7 +67,7 @@ const buildMajor = (session: GameSession, cardId: string) =>
 const enterCraftTeacher = (session: GameSession, response: SessionResponse, takeTwo: boolean) => {
   response = resolveTriggerIfPresent(session, response, CARD_ID)
   if (response.interaction.stateId !== 'wait') return response
-  const choices = response.interaction.request.options?.filter((option) => option.value !== '__skip__') ?? []
+  const choices = getChoiceOptions(response)?.filter((option) => option.value !== '__skip__') ?? []
   const choice = takeTwo ? choices.at(-1) : choices[0]
   expect(choice, JSON.stringify(response.interaction)).toBeDefined()
   return session.resolveChoice(response.interaction.playerIndex, choice!.value)
@@ -92,7 +98,7 @@ describe('A131 Craft Teacher parity', () => {
     response = chooseCard(session, response, OCCUPATIONS[0]!)
     expect(response.interaction.stateId).toBe('wait')
     expect(response.interaction.stateId === 'wait'
-      ? response.interaction.request.options?.some((option) => option.value === '__skip__')
+      ? getChoiceOptions(response)?.some((option) => option.value === '__skip__')
       : false).toBe(true)
     response = session.resolveChoice(0, '__skip__')
 
@@ -106,7 +112,7 @@ describe('A131 Craft Teacher parity', () => {
     let response = resolveTriggerIfPresent(session, buildMajor(session, 'Major_Basket'), CARD_ID)
     expect(response.interaction.stateId).toBe('wait')
     expect(response.interaction.stateId === 'wait'
-      ? response.interaction.request.options?.some((option) => option.value === '__skip__')
+      ? getChoiceOptions(response)?.some((option) => option.value === '__skip__')
       : false).toBe(true)
     response = session.resolveChoice(0, '__skip__')
 

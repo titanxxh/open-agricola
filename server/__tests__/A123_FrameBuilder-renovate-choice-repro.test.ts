@@ -1,15 +1,21 @@
+import { createWorkSession } from './_helpers/session-fixtures'
+import { createScenarioEvidence } from './_helpers/scenario-evidence'
+import { getChoiceOptions } from './_helpers/session-assertions'
 import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game/authoritative-session'
+
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { setWorkersAtHome } from '../../shared/domain/player'
 
 import '../../shared/cards/A/A123_FrameBuilder'
 
+const sessionEvidence = createScenarioEvidence(import.meta.url)
+
+
 const CARD_ID = 'A123_FrameBuilder'
 
 describe('A123_FrameBuilder renovation choice repro', () => {
   it('should prompt payment choice when BOTH direct (2 clay + 1 reed) AND bonus (1 wood + 1 reed) are affordable', () => {
-    const session = new GameSession(42)
+    const session = sessionEvidence.track(createWorkSession({ seed: 42 }))
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -50,22 +56,13 @@ describe('A123_FrameBuilder renovation choice repro', () => {
     expect(resp.state.players[0]!.houseType).toBe('wood')
     expect(resp.state.players[0]!.resources.clay).toBe(2)
     expect(resp.state.players[0]!.resources.reed).toBe(1)
-    expect(resp.interaction.request.options?.length).toBeGreaterThanOrEqual(2)
+    expect(getChoiceOptions(resp)?.length).toBeGreaterThanOrEqual(2)
 
     // Confirm both options are present.
-    type PaymentLabel = {
-      resourcesPaid?: Record<string, number>
-      sourceCards?: string[]
-    }
-    const labels = resp.interaction.request.options?.map(
-      (opt) => opt.labelParams as PaymentLabel | undefined,
-    )
-    const direct = labels.find(
-      (l) => (l?.resourcesPaid?.clay ?? 0) === 2 && (l?.resourcesPaid?.wood ?? 0) === 0,
-    )
-    const bonus = labels.find(
-      (l) => (l?.resourcesPaid?.clay ?? 0) === 0 && (l?.resourcesPaid?.wood ?? 0) === 1,
-    )
+    const payments = getChoiceOptions(resp).map(option => option.effectPreview)
+      .filter(preview => preview?.kind === 'payment')
+    const direct = payments.find(preview => preview.resourcesPaid?.clay === 2 && (preview.resourcesPaid.wood ?? 0) === 0)
+    const bonus = payments.find(preview => (preview.resourcesPaid?.clay ?? 0) === 0 && preview.resourcesPaid?.wood === 1)
     expect(direct).toBeDefined()
     expect(bonus).toBeDefined()
     // Direct payment didn't use FrameBuilder; bonus payment did.
@@ -74,7 +71,7 @@ describe('A123_FrameBuilder renovation choice repro', () => {
   })
 
   it('keeps the house wooden when payment choice resolution fails', () => {
-    const session = new GameSession(42)
+    const session = sessionEvidence.track(createWorkSession({ seed: 42 }))
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

@@ -1,3 +1,7 @@
+import assert from 'node:assert/strict'
+import { createWorkSession } from './_helpers/session-fixtures'
+import { createScenarioEvidence } from './_helpers/scenario-evidence'
+import { getChoiceOptions } from './_helpers/session-assertions'
 import { describe, expect, it } from 'vitest'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import type { SessionResponse } from '../../shared/session/session-core'
@@ -7,11 +11,14 @@ import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/A/A132_Publican'
 
+const sessionEvidence = createScenarioEvidence(import.meta.url)
+
+
 const CARD_ID = 'A132_Publican'
 
 describe('A132_Publican four-player parity prototype', () => {
   const setup = (currentPlayerIndex: number, opponentGrain = 2) => {
-    const session = new GameSession(undefined, undefined, { playerCount: 4 })
+    const session = sessionEvidence.track(createWorkSession({ options: { playerCount: 4 } }))
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.currentPlayerIndex = currentPlayerIndex
@@ -53,7 +60,7 @@ describe('A132_Publican four-player parity prototype', () => {
       response.interaction.stateId === 'wait'
       && response.interaction.promptKey === 'ui.interactionGrainUtilizationChoice'
     ) {
-      const sow = response.interaction.request.options.find((option) => option.value === 'sow')
+      const sow = getChoiceOptions(response).find((option) => option.value === 'sow')
       expect(sow).toBeDefined()
       response = session.resolveChoice(playerIndex, sow!.value)
     }
@@ -76,7 +83,7 @@ describe('A132_Publican four-player parity prototype', () => {
       request: { kind: 'choice' },
     })
     if (response.interaction.stateId !== 'wait') throw new Error('expected Publican choice')
-    const accept = response.interaction.request.options.find((option) => option.value !== '__skip__')
+    const accept = getChoiceOptions(response).find((option) => option.value !== '__skip__')
     expect(accept).toBeDefined()
     return advancePastPlayerSwitches(session, session.resolveChoice(0, accept!.value))
   }
@@ -97,7 +104,7 @@ describe('A132_Publican four-player parity prototype', () => {
     expect(response.state.players[0]!.cardStates[CARD_ID]?.counters?.bonusVp).toBe(1)
     expect(response.state.log.filter((entry) => entry.key === 'log.provisionalContinuationRollback')).toHaveLength(0)
     expect(response.scores).toHaveLength(4)
-    expect(response.scores[0]!.categories.find((category) => category.key === 'cardBonusVp')?.total).toBe(1)
+    expect(requiredScores(response)[0]!.categories.find((category) => category.key === 'cardBonusVp')?.total).toBe(1)
   })
 
   it('declines the offer and still completes the opponent sow', () => {
@@ -122,7 +129,7 @@ describe('A132_Publican four-player parity prototype', () => {
     expect(response.state.players[1]!.fields[0]!.stacks[0]?.kind).toBe('grain')
     expect(response.state.players[0]!.cardStates[CARD_ID]?.counters?.bonusVp).toBeUndefined()
     expect(response.scores).toHaveLength(4)
-    expect(response.scores[0]!.categories.find((category) => category.key === 'cardBonusVp')?.total ?? 0).toBe(0)
+    expect(requiredScores(response)[0]!.categories.find((category) => category.key === 'cardBonusVp')?.total ?? 0).toBe(0)
   })
 
   it('does not trigger for the owner sowing', () => {
@@ -141,7 +148,7 @@ describe('A132_Publican four-player parity prototype', () => {
     expect(response.state.players[0]!.fields[0]!.stacks[0]?.kind).toBe('grain')
     expect(response.state.players[0]!.cardStates[CARD_ID]?.counters?.bonusVp).toBeUndefined()
     expect(response.scores).toHaveLength(4)
-    expect(response.scores[0]!.categories.find((category) => category.key === 'cardBonusVp')?.total ?? 0).toBe(0)
+    expect(requiredScores(response)[0]!.categories.find((category) => category.key === 'cardBonusVp')?.total ?? 0).toBe(0)
   })
 
   it('offers grain and completes the opponent sow from zero grain', () => {
@@ -160,6 +167,11 @@ describe('A132_Publican four-player parity prototype', () => {
     expect(response.state.players[0]!.cardStates[CARD_ID]?.counters?.bonusVp).toBe(1)
     expect(response.state.log.filter((entry) => entry.key === 'log.provisionalContinuationRollback')).toHaveLength(0)
     expect(response.scores).toHaveLength(4)
-    expect(response.scores[0]!.categories.find((category) => category.key === 'cardBonusVp')?.total).toBe(1)
+    expect(requiredScores(response)[0]!.categories.find((category) => category.key === 'cardBonusVp')?.total).toBe(1)
   })
 })
+
+function requiredScores(response: SessionResponse) {
+  assert.ok(response.scores)
+  return response.scores
+}

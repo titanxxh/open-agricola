@@ -1,16 +1,22 @@
 import { describe, expect, it } from 'vitest'
-import { GameSession, type SessionResponse } from '../game/authoritative-session'
+import { type GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
-
 import '../../shared/cards/A/A137_RiverineShepherd'
+import assert from 'node:assert/strict'
+import { type GameState } from '../../shared/contract/types'
+import { createWorkSession } from './_helpers/session-fixtures'
+import { assertRejectedUnchanged, confirmNext, getChoiceOptions } from './_helpers/session-assertions'
+import { createScenarioEvidence } from './_helpers/scenario-evidence'
+
+const sessionEvidence = createScenarioEvidence(import.meta.url)
 
 const CARD_ID = 'A137_RiverineShepherd'
 const FILLER = '__test_placeholder__'
 
 const setup = ({ played = true, reed = 3, sheep = 2 } = {}) => {
-    const session = new GameSession(5137, undefined, { playerCount: 3 })
+    const session = sessionEvidence.track(createWorkSession({ seed: 5137, options: { playerCount: 3 } }))
     const state = session.getState().state
     stabilizeRandomHands(state.players)
     state.currentPlayerIndex = 0
@@ -34,13 +40,11 @@ const setup = ({ played = true, reed = 3, sheep = 2 } = {}) => {
     player.stableAnimals = {}
     player.pastures = [
       {
-        id: 'riverine-pasture',
-        size: 1,
-        tiles: [{ row: 0, col: 1 }],
-        stables: 0,
-        animalType: null,
-        animalCount: 0,
-      },
+    id: 'riverine-pasture',
+    tiles: [{ row: 0, col: 1 }],
+    animalType: null,
+    animalCount: 0
+},
     ]
 
     state.actionSpaces.find((space) => space.id === 'sheep-market')!.resources.sheep = sheep
@@ -55,7 +59,7 @@ const playOccupation = (session: GameSession) => {
   expect(response.ok, response.error).toBe(true)
   if (!response.state.players[0]!.occupationHand.includes(CARD_ID)) return response
   if (response.interaction.stateId !== 'wait') return response
-  const option = response.interaction.request.options?.find((candidate) => candidate.value === CARD_ID)
+  const option = getChoiceOptions(response)?.find((candidate) => candidate.value === CARD_ID)
   expect(option, JSON.stringify(response.interaction)).toBeDefined()
   return session.resolveChoice(response.interaction.playerIndex, option!.value)
 }
@@ -91,7 +95,7 @@ const resolveRiverine = (session: GameSession, initial: SessionResponse, accept:
       continue
     }
     if (response.interaction.stateId !== 'wait') break
-    const cardOption = response.interaction.request.options?.find((option) =>
+    const cardOption = getChoiceOptions(response)?.find((option) =>
       option.sourceCard === CARD_ID && option.value !== '__skip__')
     if (!cardOption) break
     response = session.resolveChoice(
@@ -166,5 +170,115 @@ describe('A137 Riverine Shepherd parity', () => {
     expect(response.state.players[0]!.resources).toMatchObject({ food: 2, reed: 0, sheep: 0 })
     expect(response.state.actionSpaces.find((space) => space.id === 'reed-bank')!.resources.reed).toBe(3)
     expect(response.state.actionSpaces.find((space) => space.id === 'sheep-market')!.resources.sheep).toBe(2)
+  })
+})
+
+describe("A137 command boundaries", () => {
+  const SHEPHERD = 'A137_RiverineShepherd'
+  function ok(r: SessionResponse) {
+    assert.equal(r.ok, true, r.error)
+    return r
+  }
+  function setup(configure: (state: GameState) => void = () => {
+  }, played = true) {
+    const players = 3
+    const s = sessionEvidence.track(createWorkSession({ seed: 4242, options: { playerCount: players }, configure(state) {
+        state.round = 14
+        for (const p of state.players)
+          Object.assign(p.resources, { food: 40, wood: 0, clay: 0, reed: 0, stone: 0, grain: 0, vegetable: 0 })
+        state.players[0]!.occupationPlayed = played ? [SHEPHERD] : []
+        state.players[0]!.occupationHand = played ? ['__test_placeholder__'] : [SHEPHERD, 'A110_Roughcaster']
+        configure(state)
+      } }))
+    assert.equal(s.getState().state.players.length, players)
+    return s
+  }
+  function turn(s: GameSession, actor: number, space: string) {
+    let r = s.getState()
+    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
+      r = confirmNext(s, r)
+    assert.equal(r.interaction.stateId, 'idle')
+    assert.equal(r.state.currentPlayerIndex, actor)
+    return ok(s.takeAction(actor, space))
+  }
+  function finishOptional(s: GameSession, r: SessionResponse, accept: boolean) {
+    for (let n = 0; n < 8 && r.interaction.stateId === 'wait' && r.interaction.request.kind !== 'confirm-next-player'; n++) {
+      const i = r.interaction
+      if (i.request.kind === 'animal-reorg') {
+        r = ok(s.resolveChoice(i.playerIndex, 'confirm', { zones: i.request.zones }))
+        continue
+      }
+      assert.ok(i.request.kind === 'choice' || i.request.kind === 'select-trigger', JSON.stringify(i))
+      const o = getChoiceOptions({ interaction: i }).find(o => accept ? o.value !== '__skip__' && o.value !== '__done__' : o.value === '__skip__' || o.value === '__done__')
+      assert.ok(o)
+      r = ok(s.resolveChoice(i.playerIndex, o.value))
+    }
+    return r
+  }
+  function piles(state: GameState, space: string, resource: 'wood' | 'clay' | 'reed' | 'stone' | 'sheep' | 'food', amount: number) {
+    const a = state.actionSpaces.find(a => a.id === space)
+    assert.ok(a)
+    a.resources[resource] = amount
+  }
+  function shepherd(other: number, played = true) {
+    return setup(state => {
+      piles(state, 'sheep-market', 'sheep', 1)
+      piles(state, 'reed-bank', 'reed', other)
+    }, played)
+  }
+  it("Sheep Market takes exactly one reed from nonempty other pile", () => {
+    for (const amount of [1, 4]) {
+      const s = shepherd(amount)
+      const pending = turn(s, 0, 'sheep-market')
+      const r = finishOptional(s, pending, true)
+      assert.equal(r.state.players[0]!.resources.sheep, 1)
+      assert.equal(r.state.players[0]!.resources.reed, 1)
+      assert.equal(r.state.actionSpaces.find(a => a.id === 'reed-bank')!.resources.reed, amount - 1)
+      assert.equal(r.state.actionSpaces.find(a => a.id === 'reed-bank')!.takenBy.length, 0)
+      sessionEvidence.record(`A137-N1-${amount}`, { pending, r })
+    }
+  })
+  it("Reed Bank can take one sheep without collecting or occupying other space", () => {
+    const s = shepherd(2)
+    const r = finishOptional(s, turn(s, 0, 'reed-bank'), true)
+    assert.equal(r.state.players[0]!.resources.reed, 2)
+    assert.equal(r.state.players[0]!.resources.sheep, 1)
+    assert.equal(r.state.actionSpaces.find(a => a.id === 'sheep-market')!.resources.sheep, 0)
+    assert.equal(r.state.actionSpaces.find(a => a.id === 'sheep-market')!.takenBy.length, 0)
+    sessionEvidence.record('A137-N2', r)
+  })
+  it("empty other pile and decline cannot create reserve reed", () => {
+    const zeroS = shepherd(0)
+    const zero = finishOptional(zeroS, turn(zeroS, 0, 'sheep-market'), false)
+    assert.equal(zero.state.players[0]!.resources.reed, 0)
+    const s = shepherd(4)
+    const declined = finishOptional(s, turn(s, 0, 'sheep-market'), false)
+    assert.equal(declined.state.players[0]!.resources.reed, 0)
+    assert.equal(declined.state.actionSpaces.find(a => a.id === 'reed-bank')!.resources.reed, 4)
+    sessionEvidence.record('A137-N3', { zero, declined })
+  })
+  it("hand unrelated and actual opponent cannot collect owner other pile", () => {
+    const hs = shepherd(4, false)
+    const hand = finishOptional(hs, turn(hs, 0, 'sheep-market'), false)
+    assert.equal(hand.state.players[0]!.resources.reed, 0)
+    const s = shepherd(4)
+    const unrelated = turn(s, 0, 'day-laborer')
+    const other = turn(s, 1, 'sheep-market')
+    assert.equal(other.state.players[0]!.resources.reed, 0)
+    assert.equal(other.state.players[1]!.resources.reed, 0)
+    sessionEvidence.record('A137-N4', { hand, unrelated, other })
+  })
+  it("invalid choice rejects and whole undo returns source and animals before retry", () => {
+    const s = shepherd(4)
+    const pending = turn(s, 0, 'sheep-market')
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, 'take-five'))
+    const first = finishOptional(s, pending, true)
+    const undone = ok(s.undoAction())
+    assert.equal(undone.state.players[0]!.resources.sheep, 0)
+    assert.equal(undone.state.players[0]!.resources.reed, 0)
+    assert.equal(undone.state.actionSpaces.find(a => a.id === 'reed-bank')!.resources.reed, 4)
+    const retry = finishOptional(s, turn(s, 0, 'sheep-market'), true)
+    assert.equal(retry.state.players[0]!.resources.reed, 1)
+    sessionEvidence.record('A137-N5', { first, undone, retry })
   })
 })

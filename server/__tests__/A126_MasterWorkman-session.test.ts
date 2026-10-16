@@ -1,22 +1,28 @@
 import { describe, expect, it } from 'vitest'
-import { GameSession, type SessionResponse } from '../game/authoritative-session'
+import { type GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
-
 import '../../shared/cards/A/A126_MasterWorkman'
+import assert from 'node:assert/strict'
+import { type GameState } from '../../shared/contract/types'
+import { createWorkSession } from './_helpers/session-fixtures'
+import { assertRejectedUnchanged, confirmNext, getChoiceOptions } from './_helpers/session-assertions'
+import { createScenarioEvidence } from './_helpers/scenario-evidence'
+
+const sessionEvidence = createScenarioEvidence(import.meta.url)
 
 const CARD_ID = 'A126_MasterWorkman'
 const OTHER_OCCUPATION = 'A093_BedMaker'
 const FILLER = '__test_placeholder__'
 
 const setup = ({
-  played = true, resources = {}, houseType = 'wood' as 'wood' | 'clay',
+  played = true, resources = {}, houseType = 'wood',
 }: {
   played?: boolean
   resources?: Partial<Record<'wood' | 'clay' | 'reed' | 'stone' | 'food', number>>
   houseType?: 'wood' | 'clay'
 } = {}) => {
-  const session = new GameSession(6126, undefined, { playerCount: 2 })
+  const session = sessionEvidence.track(createWorkSession({ seed: 6126, options: { playerCount: 2 } }))
   const state = session.getState().state
   stabilizeRandomHands(state.players)
   state.currentPlayerIndex = 0
@@ -62,7 +68,7 @@ const playOccupation = (session: GameSession, cardId = CARD_ID) => {
   const response = session.takeAction(0, 'lessons')
   if (!response.state.players[0]!.occupationHand.includes(cardId)) return response
   if (response.interaction.stateId !== 'wait') return response
-  const option = response.interaction.request.options?.find((candidate) => candidate.value === cardId)
+  const option = getChoiceOptions(response)?.find((candidate) => candidate.value === cardId)
   expect(option).toBeDefined()
   return session.resolveChoice(response.interaction.playerIndex, option!.value)
 }
@@ -145,5 +151,122 @@ describe('A126 Master Workman parity', () => {
     expect(basic.state.players[0]!.resources).toMatchObject({
       wood: 0, clay: 0, reed: 0, stone: 0,
     })
+  })
+})
+
+describe("A126 command boundaries", () => {
+  const MASTER = 'A126_MasterWorkman'
+  function ok(r: SessionResponse) {
+    assert.equal(r.ok, true, r.error)
+    return r
+  }
+  function setup(configure: (state: GameState) => void = () => {
+  }, played = true) {
+    const players = 2
+    const s = sessionEvidence.track(createWorkSession({ seed: 4242, options: { playerCount: players }, configure(state) {
+        state.round = 14
+        for (const p of state.players)
+          Object.assign(p.resources, { food: 40, wood: 0, clay: 0, reed: 0, stone: 0, grain: 0, vegetable: 0 })
+        state.players[0]!.occupationPlayed = played ? [MASTER] : []
+        state.players[0]!.occupationHand = played ? ['__test_placeholder__'] : [MASTER, 'A110_Roughcaster']
+        configure(state)
+      } }))
+    assert.equal(s.getState().state.players.length, players)
+    return s
+  }
+  function turn(s: GameSession, actor: number, space: string) {
+    let r = s.getState()
+    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
+      r = confirmNext(s, r)
+    assert.equal(r.interaction.stateId, 'idle')
+    assert.equal(r.state.currentPlayerIndex, actor)
+    return ok(s.takeAction(actor, space))
+  }
+  function finishOptional(s: GameSession, r: SessionResponse, accept: boolean) {
+    for (let n = 0; n < 8 && r.interaction.stateId === 'wait' && r.interaction.request.kind !== 'confirm-next-player'; n++) {
+      const i = r.interaction
+      if (i.request.kind === 'animal-reorg') {
+        r = ok(s.resolveChoice(i.playerIndex, 'confirm', { zones: i.request.zones }))
+        continue
+      }
+      assert.ok(i.request.kind === 'choice' || i.request.kind === 'select-trigger', JSON.stringify(i))
+      const o = getChoiceOptions({ interaction: i }).find(o => accept ? o.value !== '__skip__' && o.value !== '__done__' : o.value === '__skip__' || o.value === '__done__')
+      assert.ok(o)
+      r = ok(s.resolveChoice(i.playerIndex, o.value))
+    }
+    return r
+  }
+  function piles(state: GameState, space: string, resource: 'wood' | 'clay' | 'reed' | 'stone' | 'sheep' | 'food', amount: number) {
+    const a = state.actionSpaces.find(a => a.id === space)
+    assert.ok(a)
+    a.resources[resource] = amount
+  }
+  function mapped(state: GameState) {
+    state.roundActionOrder = state.roundActionOrder.map(() => null)
+    for (const [index, id] of ['sheep-market', 'grain-seeds', 'western-quarry', 'vegetable-seeds'].entries()) {
+      state.roundActionOrder[index] = id
+      state.actionSpaces.find(a => a.id === id)!.roundAvailable = 1
+    }
+    piles(state, 'sheep-market', 'sheep', 0)
+    piles(state, 'western-quarry', 'stone', 0)
+  }
+  it("round assignment one through four gives wood clay reed stone before ordinary body", () => {
+    for (const [index, space] of ['sheep-market', 'grain-seeds', 'western-quarry', 'vegetable-seeds'].entries()) {
+      const s = setup(state => {
+        mapped(state)
+        piles(state, 'sheep-market', 'sheep', 1)
+        piles(state, 'western-quarry', 'stone', 1)
+      })
+      const r = finishOptional(s, turn(s, 0, space), false)
+      const res = r.state.players[0]!.resources
+      assert.equal(res.wood, index === 0 ? 1 : 0)
+      assert.equal(res.clay, index === 1 ? 1 : 0)
+      assert.equal(res.reed, index === 2 ? 1 : 0)
+      assert.equal(res.stone, (index === 3 ? 1 : 0) + (space === 'western-quarry' ? 1 : 0))
+      assert.equal(res.grain, space === 'grain-seeds' ? 1 : 0)
+      assert.equal(res.vegetable, space === 'vegetable-seeds' ? 1 : 0)
+      sessionEvidence.record(`A126-N1-${index}`, r)
+    }
+  })
+  it("basic and fifth round assignments cannot award mapped resources", () => {
+    for (const space of ['day-laborer', 'vegetable-seeds']) {
+      const s = setup(state => {
+        mapped(state)
+        state.roundActionOrder[3] = null
+        state.roundActionOrder[4] = 'vegetable-seeds'
+      })
+      const r = turn(s, 0, space)
+      assert.deepEqual((['wood', 'clay', 'reed', 'stone'] as const).map(k => r.state.players[0]!.resources[k]), [0, 0, 0, 0])
+      sessionEvidence.record(`A126-N2-${space}`, r)
+    }
+  })
+  it("hand and actual opponent mapped use cannot reward owner", () => {
+    const hand = turn(setup(mapped, false), 0, 'grain-seeds')
+    assert.equal(hand.state.players[0]!.resources.clay, 0)
+    const s = setup(mapped)
+    turn(s, 0, 'day-laborer')
+    const other = turn(s, 1, 'grain-seeds')
+    assert.equal(other.state.players[0]!.resources.clay, 0)
+    assert.equal(other.state.players[1]!.resources.clay, 0)
+    sessionEvidence.record('A126-N3', { hand, other })
+  })
+  it("invalid actor and occupied action cannot duplicate before reward", () => {
+    const s = setup(mapped)
+    assertRejectedUnchanged(s, () => s.takeAction(1, 'grain-seeds'))
+    const first = turn(s, 0, 'grain-seeds')
+    assertRejectedUnchanged(s, () => s.takeAction(0, 'grain-seeds'))
+    assert.equal(first.state.players[0]!.resources.clay, 1)
+    sessionEvidence.record('A126-N4', first)
+  })
+  it("whole action undo restores mapped resource and source before exactly one retry", () => {
+    const s = setup(mapped)
+    const first = turn(s, 0, 'grain-seeds')
+    const undone = ok(s.undoAction())
+    assert.equal(undone.state.players[0]!.resources.clay, 0)
+    assert.equal(undone.state.players[0]!.resources.grain, 0)
+    const retry = turn(s, 0, 'grain-seeds')
+    assert.equal(retry.state.players[0]!.resources.clay, 1)
+    assert.equal(retry.state.players[0]!.resources.grain, 1)
+    sessionEvidence.record('A126-N5', { first, undone, retry })
   })
 })
