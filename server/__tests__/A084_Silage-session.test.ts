@@ -266,7 +266,7 @@ describe("A084 command boundaries", () => {
           assert.equal(p.workers.filter(w => w.isActive).length, 2)
         }
         const p = state.players[0]!
-        p.minorHand = [...(played ? [] : [SILAGE]), 'B007_Wage']
+        p.minorHand = [...(played ? [] : [SILAGE]), 'B007_Wage', 'A016_RammedClay']
         p.occupationHand = ['__test_placeholder__']
         if (played)
           (p.minorPlayed).push("A084_Silage")

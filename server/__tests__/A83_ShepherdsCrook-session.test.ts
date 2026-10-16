@@ -55,11 +55,15 @@ describe('A083_ShepherdsCrook session flow', () => {
     resp = resolveTriggerIfPresent(session, resp, 'A083_ShepherdsCrook')
     expect(resp.interaction.stateId).toBe('wait')
     expect(resp.state.players[0]!.resources.sheep).toBe(2)
+    const expectedNewTiles = [
+      { playerId: player.id, row: 0, col: 1 }, { playerId: player.id, row: 0, col: 2 },
+      { playerId: player.id, row: 1, col: 1 }, { playerId: player.id, row: 1, col: 2 },
+    ]
     expect(resp.state.events).toEqual(expect.arrayContaining([
       expect.objectContaining({
         type: 'farm.fenceBuilt',
-        newlyUsedTiles: [],
-        newlyEnclosedPastureTiles: [],
+        newlyUsedTiles: expectedNewTiles,
+        newlyEnclosedPastureTiles: expectedNewTiles,
         newPastures: expect.arrayContaining([
           expect.objectContaining({
             tiles: expect.arrayContaining([
@@ -126,7 +130,7 @@ describe("A083 command boundaries", () => {
           assert.equal(p.workers.filter(w => w.isActive).length, 2)
         }
         const p = state.players[0]!
-        p.minorHand = [...(played ? [] : [CROOK]), 'B007_Wage']
+        p.minorHand = [...(played ? [] : [CROOK]), 'B007_Wage', 'A016_RammedClay']
         p.minorPlayed = played ? [CROOK] : []
         Object.assign(p.resources, resources)
         configure(state)
