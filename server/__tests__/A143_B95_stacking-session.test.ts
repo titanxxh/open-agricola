@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game/authoritative-session'
+import { createWorkSession } from './_helpers/session-fixtures'
+import { createScenarioEvidence } from './_helpers/scenario-evidence'
+
+const sessionEvidence = createScenarioEvidence(import.meta.url)
 import { A143_Stonecutter } from '../../shared/cards/A/A143_Stonecutter'
 import { B095_MasterBricklayer } from '../../shared/cards/B/B095_MasterBricklayer'
 import { setWorkersAtHome } from '../../shared/domain/player'
@@ -10,9 +13,8 @@ void B095_MasterBricklayer
 
 describe('A143 + B95 stacking', () => {
   const setup = (rooms: number) => {
-    const session = new GameSession(42)
+    const session = sessionEvidence.track(createWorkSession({ seed: 42, options: { playerCount: 3 } }))
     const state = session.getState().state
-    state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
     state.round = 1
 
@@ -20,6 +22,7 @@ describe('A143 + B95 stacking', () => {
     setWorkersAtHome(state, player, 2)
     player.occupationPlayed = ['A143_Stonecutter', 'B095_MasterBricklayer']
     player.rooms = rooms
+    player.roomTiles = [{ row: 1, col: 0 }, { row: 2, col: 0 }, { row: 1, col: 1 }, { row: 2, col: 1 }].slice(0, rooms)
     player.resources = {
       ...player.resources,
       wood: 0,

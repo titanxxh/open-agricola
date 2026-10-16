@@ -1,19 +1,22 @@
-import { type SessionResponse } from '../game/authoritative-session'
+import { type SessionResponse, GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
-
 import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { isCardFlagged } from '../../shared/cards/helpers/card-state'
-
 import '../../shared/cards/A/A153_PigOwner'
-import type { AnytimeAction } from '../../shared/contract/types';
+import { type AnytimeAction, type GameState } from '../../shared/contract/types'
+import assert from 'node:assert/strict'
+import { createWorkSession } from './_helpers/session-fixtures'
+import { assertRejectedUnchanged, confirmNext } from './_helpers/session-assertions'
+import { createScenarioEvidence } from './_helpers/scenario-evidence'
+
+const sessionEvidence = createScenarioEvidence(import.meta.url)
 
 const CARD_ID = 'A153_PigOwner'
 
 describe('A153_PigOwner session', () => {
   const setup = (boar = 0) => {
-    const session = new GameSession(42)
+    const session = sessionEvidence.track(createWorkSession({ seed: 42 }))
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -23,19 +26,13 @@ describe('A153_PigOwner session', () => {
     const player = state.players[0]!
     player.occupationHand.push(CARD_ID)
     player.resources.boar = boar
-    // Place the pigs in a pasture so they count as "on the farm" (A153 counts
-    // on-farm pigs, not supply). Pasture covers 2 spaces in row 2 to avoid
-    // colliding with default rooms at row 0.
     if (boar > 0) {
-      player.pastures = [
-        {
-          id: 'p1',
-          tiles: [{ row: 2, col: 0 }, { row: 2, col: 1 }],
-          animalType: 'boar',
-          animalCount: boar,
-          stables: 0,
-        } as any,
-      ]
+      player.fenceSegments = ['H-0-2', 'H-1-2', 'V-0-2', 'V-0-3'].map(edge => ({
+        edge, type: 'fence', source: { kind: 'own', ownerPlayerId: player.id },
+      }))
+      player.pastures = [{ id: 'p1', tiles: [{ row: 0, col: 2 }], animalType: 'boar', animalCount: Math.min(boar, 4) }]
+      player.stableTiles = [{ row: 0, col: 2 }]
+      player.houseAnimals = boar > 4 ? { '1-0': 'boar' } : {}
     }
     session.loadState(state)
     session.devPlayCard(0, CARD_ID)
@@ -88,7 +85,7 @@ describe('A153 Pig Owner parity', () => {
   const FILLER = '__test_placeholder__'
 
   const setup = ({ played = true, pigs = 0 } = {}) => {
-    const session = new GameSession(6153, undefined, { playerCount: 4 })
+    const session = sessionEvidence.track(createWorkSession({ seed: 6153, options: { playerCount: 4 } }))
     const state = session.getState().state
     stabilizeRandomHands(state.players)
     state.currentPlayerIndex = 0
@@ -108,16 +105,11 @@ describe('A153 Pig Owner parity', () => {
     const player = state.players[0]!
     player.occupationHand = played ? [FILLER] : [CARD_ID]
     player.occupationPlayed = played ? [CARD_ID] : []
-    player.pastures = pigs > 0 ? [{
-      id: 'pig-owner-pasture',
-      size: 1,
-      tiles: [{ row: 1, col: 0 }],
-      stables: pigs >= 4 ? 1 : 0,
-      animalType: 'boar',
-      animalCount: Math.min(pigs, 4),
-    }] : []
-    player.houseAnimals = Object.fromEntries(player.roomTiles.slice(0, pigs >= 5 ? 1 : 0).map(tile => [`${tile.row}-${tile.col}`, pigs >= 5 ? 'boar' : null]));
+    player.pastures = pigs > 0 ? [{ id: 'pig-owner-pasture', tiles: [{ row: 0, col: 2 }], animalType: 'boar', animalCount: Math.min(pigs, 4) }] : []
+    player.houseAnimals = pigs >= 5 ? { '1-0': 'boar' } : {}
     player.stableAnimals = {}
+    player.stableTiles = pigs > 0 ? [{ row: 0, col: 2 }] : []
+    player.fenceSegments = pigs > 0 ? ['H-0-2', 'H-1-2', 'V-0-2', 'V-0-3'].map(edge => ({ edge, type: 'fence', source: { kind: 'own', ownerPlayerId: player.id } })) : []
     player.resources.boar = pigs
     session.loadState(state)
     return session
@@ -159,5 +151,101 @@ describe('A153 Pig Owner parity', () => {
 
     expect(anytimeIds(response)).not.toContain(ANYTIME_ID)
     expect(response.state.players[0]!.cardStates[CARD_ID]?.counters?.bonusVp).toBe(3)
+  })
+})
+
+describe("A153 command boundaries", () => {
+  const PIG = 'A153_PigOwner', ANY = 'A153-pig-owner-anytime'
+  function save(id: string, value: unknown) {
+    sessionEvidence.record(id, value)
+  }
+  function ok(r: SessionResponse) {
+    assert.equal(r.ok, true, r.error)
+    return r
+  }
+  function setup(configure: (state: GameState) => void = () => {
+  }, played = true) {
+    const s = sessionEvidence.track(createWorkSession({ seed: 4242, options: { playerCount: 4 }, configure(state) {
+        state.round = 14
+        for (const p of state.players)
+          Object.assign(p.resources, { food: 40, wood: 0, clay: 0, reed: 0, stone: 0, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0 })
+        const p = state.players[0]!
+        p.occupationPlayed = played ? [PIG] : []
+        p.occupationHand = played ? ['__test_placeholder__'] : [PIG, 'A110_Roughcaster']
+        configure(state)
+      } }))
+    return s
+  }
+  function pasture(state: GameState) {
+    const p = state.players[0]!
+    p.fenceSegments = ['H-0-2', 'H-1-2', 'V-0-2', 'V-0-3'].map(edge => ({ edge, type: 'fence' as const, source: { kind: 'own' as const, ownerPlayerId: p.id } }))
+    p.pastures = [{ id: 'housing', tiles: [{ row: 0, col: 2 }], animalType: null, animalCount: 0 }]
+    p.stableTiles = [{ row: 0, col: 2 }]
+  }
+  function turn(s: GameSession, actor: number, space: string) {
+    let r = s.getState()
+    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
+      r = confirmNext(s, r)
+    assert.equal(r.interaction.stateId, 'idle')
+    assert.equal(r.state.currentPlayerIndex, actor)
+    return ok(s.takeAction(actor, space))
+  }
+  function finish(s: GameSession, r: SessionResponse, accept = true) {
+    for (let n = 0; n < 18 && r.interaction.stateId === 'wait' && r.interaction.request.kind !== 'confirm-next-player'; n++) {
+      const i = r.interaction
+      if (i.request.kind === 'animal-reorg')
+        r = ok(s.resolveChoice(i.playerIndex, 'confirm', { zones: i.request.zones }))
+      else if (i.request.kind === 'choice' || i.request.kind === 'select-trigger') {
+        const o = i.request.options.find(o => accept ? o.value !== '__skip__' && o.value !== '__done__' : o.value === '__skip__' || o.value === '__done__')
+        assert.ok(o, JSON.stringify(i))
+        r = ok(s.resolveChoice(i.playerIndex, o.value))
+      }
+      else
+        assert.fail(JSON.stringify(i))
+    }
+    assert.ok(r.interaction.stateId === 'idle' || (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player'), JSON.stringify(r.interaction))
+    return r
+  }
+  function pig(count: number, played = true) {
+    return setup(state => {
+      pasture(state)
+      const p = state.players[0]!
+      p.resources.boar = count
+      p.pastures[0]!.animalType = 'boar'
+      p.pastures[0]!.animalCount = Math.min(count, 4)
+      p.houseAnimals = count >= 5 ? { '2-0': 'boar' } : {}
+    }, played)
+  }
+  function points(r: SessionResponse) {
+    return r.state.players[0]!.cardStates[PIG]?.counters?.bonusVp ?? 0
+  }
+  it("four farm pigs never unlock the three point reward", () => {
+    const s = pig(4), r = finish(s, turn(s, 0, 'day-laborer'))
+    assert.ok(!r.interaction.anytimeActions.some(a => a.id === ANY))
+    assertRejectedUnchanged(s, () => s.takeAnytimeAction(0, ANY))
+    assert.equal(points(r), 0)
+    save('A153-N1', r)
+  })
+  it("five pigs across finite stable pasture and house award owner three points once", () => {
+    const s = pig(5)
+    const entered = finish(s, turn(s, 0, 'day-laborer'))
+    assert.ok(entered.interaction.anytimeActions.some(a => a.id === ANY))
+    const r = ok(s.takeAnytimeAction(0, ANY))
+    assert.equal(points(r), 3)
+    assert.equal(isCardFlagged(r.state.players[0]!, PIG), true)
+    assert.equal(r.state.players[0]!.resources.boar, 5)
+    assertRejectedUnchanged(s, () => s.takeAnytimeAction(0, ANY))
+    assert.equal(points(s.getState()), 3)
+    save('A153-N2', { entered, r })
+  })
+  it("hand and actual wrong actor cannot claim five pig owner reward", () => {
+    const hs = pig(5, false), hand = finish(hs, turn(hs, 0, 'day-laborer'))
+    assert.ok(!hand.interaction.anytimeActions.some(a => a.id === ANY))
+    const s = pig(5)
+    finish(s, turn(s, 0, 'day-laborer'))
+    assertRejectedUnchanged(s, () => s.takeAnytimeAction(1, ANY))
+    const r = ok(s.takeAnytimeAction(0, ANY))
+    assert.equal(points(r), 3)
+    save('A153-N3', { hand, r })
   })
 })

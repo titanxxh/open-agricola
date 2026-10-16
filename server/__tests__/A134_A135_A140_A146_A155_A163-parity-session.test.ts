@@ -1,9 +1,9 @@
 import { captureStateWithHistory } from '../../shared/session/history-streams'
-import { assertUndoRestored, undoRuleSnapshot } from './_helpers/session-assertions'
+import { assertUndoRestored, undoRuleSnapshot, assertEmptyAccumulationRejected } from './_helpers/session-assertions'
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
-import { recordRoundPlacement } from '../../shared/cards/helpers/round-placement'
+import { recordRoundPlacement, getRoundPersonPlacementOrder } from '../../shared/cards/helpers/round-placement'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import '../../shared/cards/A/A134_FullFarmer'
 import '../../shared/cards/A/A135_AnimalReeve'
@@ -20,7 +20,13 @@ import { assertRejectedUnchanged, confirmNext, getChoiceOptions } from './_helpe
 
 const sessionEvidence = createScenarioEvidence(import.meta.url)
 
+function assertTurnFinished(response: SessionResponse) {
+  assert.equal(response.ok, true, response.error)
+  assert.ok(response.interaction.stateId === 'wait' && response.interaction.request.kind === 'confirm-next-player', JSON.stringify(response.interaction))
+}
+
 const FILLER = '__test_placeholder__'
+
 const options = (response: SessionResponse) => response.interaction.stateId === 'wait'
   ? getChoiceOptions(response) ?? []
   : []
@@ -34,7 +40,7 @@ const setup = ({
   round?: number
   resources?: Record<string, number>
 }) => {
-  const session = sessionEvidence.track(new GameSession(7134 + round, undefined, { playerCount }))
+  const session = sessionEvidence.track(createWorkSession({ seed: 7134 + round, options: { playerCount } }))
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.currentPlayerIndex = 0
@@ -89,11 +95,9 @@ describe('A134 Full Farmer parity', () => {
   const scorePasture = (animalCount: number) => {
     const session = setup({ cardId: CARD_ID, round: 14, resources: { sheep: animalCount } })
     const state = session.getState().state
-    state.players[0]!.pastures = [{
-    id: 'full', tiles: [{ row: 0, col: 2 }],
-    animalType: 'sheep', animalCount
-}]
+    state.players[0]!.pastures = [{ id: 'full', tiles: [{ row: 0, col: 2 }], animalType: 'sheep', animalCount }]
     state.players[0]!.stableTiles = [{ row: 0, col: 2 }]
+    state.players[0]!.fenceSegments = ['H-0-2', 'H-1-2', 'V-0-2', 'V-0-3'].map(edge => ({ edge, type: 'fence', source: { kind: 'own', ownerPlayerId: state.players[0]!.id } }))
     session.loadState(state)
     return bonusScore(session.getState(), CARD_ID)
   }
@@ -264,6 +268,205 @@ describe('A163 Building Expert parity', () => {
       expect(response.state.players[0]!.resources[resource]).toBe(before + 1 + (resource === 'reed' || resource === 'stone' ? 1 : 0))
     })
   }
+})
+
+describe("A155 command boundaries", () => {
+  const CONJURER = 'A155_Conjurer'
+  function save(id: string, value: unknown) {
+    sessionEvidence.record(id, value)
+  }
+  function ok(r: SessionResponse) {
+    assert.equal(r.ok, true, r.error)
+    return r
+  }
+  function setup(configure: (state: GameState) => void = () => {
+  }, played = true) {
+    const players = 4
+    const s = sessionEvidence.track(createWorkSession({ seed: 4242, options: { playerCount: players }, configure(state) {
+        state.round = 14
+        for (const p of state.players)
+          Object.assign(p.resources, { food: 40, wood: 0, clay: 0, reed: 0, stone: 0, grain: 0, vegetable: 0 })
+        state.players[0]!.occupationPlayed = played ? [CONJURER] : []
+        state.players[0]!.occupationHand = played ? ['__test_placeholder__'] : [CONJURER, 'A110_Roughcaster']
+        configure(state)
+      } }))
+    assert.equal(s.getState().state.players.length, players)
+    return s
+  }
+  function pile(state: GameState, space: string, resource: 'food' | 'reed', count: number) {
+    const a = state.actionSpaces.find(a => a.id === space)
+    assert.ok(a, space)
+    a.resources[resource] = count
+  }
+  const beforeAction = new WeakMap<GameSession, string>()
+  function turn(s: GameSession, actor: number, space: string) {
+    let r = s.getState()
+    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
+      r = confirmNext(s, r)
+    assert.equal(r.interaction.stateId, 'idle')
+    assert.equal(r.state.currentPlayerIndex, actor)
+    beforeAction.set(s, undoRuleSnapshot(s.getState()))
+    return ok(s.takeAction(actor, space))
+  }
+  function undo(s: GameSession) {
+    const before = beforeAction.get(s)
+    assert.ok(before)
+    const undone = s.undoAction()
+    assertUndoRestored(before, undone)
+    assertUndoRestored(before, s.getState())
+    return undone
+  }
+  it("empty Traveling Players rejects while nonempty piles add one wood and grain", () => {
+    for (const count of [0, 2, 5]) {
+      const s = setup(state => pile(state, 'traveling-players', 'food', count))
+      const r = count === 0 ? assertEmptyAccumulationRejected(s, 0, 'traveling-players') : turn(s, 0, 'traveling-players')
+      assert.equal(r.state.players[0]!.resources.food, 40 + count)
+      assert.equal(r.state.players[0]!.resources.wood, count === 0 ? 0 : 1)
+      assert.equal(r.state.players[0]!.resources.grain, count === 0 ? 0 : 1)
+      save(`A155-N1-${count}`, r)
+    }
+  })
+  it("unrelated Fishing and Day Laborer cannot grant wood or grain", () => {
+    for (const space of ['fishing', 'day-laborer']) {
+      const r = turn(setup(), 0, space)
+      assert.equal(r.state.players[0]!.resources.wood, 0)
+      assert.equal(r.state.players[0]!.resources.grain, 0)
+      assertTurnFinished(r)
+      save(`A155-N2-${space}`, r)
+    }
+  })
+  it("hand and actual opponent Traveling Players do not grant owner rewards", () => {
+    const hand = turn(setup(undefined, false), 0, 'traveling-players')
+    assert.equal(hand.state.players[0]!.resources.wood, 0)
+    const s = setup()
+    turn(s, 0, 'day-laborer')
+    const other = turn(s, 1, 'traveling-players')
+    assert.equal(other.state.players[0]!.resources.wood, 0)
+    assert.equal(other.state.players[0]!.resources.grain, 0)
+    assert.equal(other.state.players[1]!.resources.wood, 0)
+    assertTurnFinished(hand)
+    assertTurnFinished(other)
+    save('A155-N3', { hand, other })
+  })
+  it("invalid repeated input and whole undo preserve exactly one retry reward", () => {
+    const s = setup(state => pile(state, 'traveling-players', 'food', 2))
+    const first = turn(s, 0, 'traveling-players')
+    assertRejectedUnchanged(s, () => s.takeAction(0, 'traveling-players'))
+    const undone = undo(s)
+    assert.equal(undone.state.players[0]!.resources.wood, 0)
+    assert.equal(undone.state.players[0]!.resources.grain, 0)
+    assert.equal(undone.state.players[0]!.resources.food, 40)
+    const retry = turn(s, 0, 'traveling-players')
+    assert.equal(retry.state.players[0]!.resources.wood, 1)
+    assert.equal(retry.state.players[0]!.resources.grain, 1)
+    save('A155-N4', { first, undone, retry })
+  })
+})
+
+describe("A163 command boundaries", () => {
+  const EXPERT = 'A163_BuildingExpert'
+  function save(id: string, value: unknown) {
+    sessionEvidence.record(id, value)
+  }
+  function ok(r: SessionResponse) {
+    assert.equal(r.ok, true, r.error)
+    return r
+  }
+  function setup(configure: (state: GameState) => void = () => {
+  }, played = true) {
+    const players = 4
+    const s = sessionEvidence.track(createWorkSession({ seed: 4242, options: { playerCount: players }, configure(state) {
+        state.round = 14
+        for (const p of state.players)
+          Object.assign(p.resources, { food: 40, wood: 0, clay: 0, reed: 0, stone: 0, grain: 0, vegetable: 0 })
+        state.players[0]!.occupationPlayed = played ? [EXPERT] : []
+        state.players[0]!.occupationHand = played ? ['__test_placeholder__'] : [EXPERT, 'A110_Roughcaster']
+        configure(state)
+      } }))
+    assert.equal(s.getState().state.players.length, players)
+    return s
+  }
+  const beforeAction = new WeakMap<GameSession, string>()
+  function turn(s: GameSession, actor: number, space: string) {
+    let r = s.getState()
+    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
+      r = confirmNext(s, r)
+    assert.equal(r.interaction.stateId, 'idle')
+    assert.equal(r.state.currentPlayerIndex, actor)
+    beforeAction.set(s, undoRuleSnapshot(s.getState()))
+    return ok(s.takeAction(actor, space))
+  }
+  function undo(s: GameSession) {
+    const before = beforeAction.get(s)
+    assert.ok(before)
+    const undone = s.undoAction()
+    assertUndoRestored(before, undone)
+    assertUndoRestored(before, s.getState())
+    return undone
+  }
+  const FILLER = ['grain-seeds', 'day-laborer', 'forest', 'clay-pit', 'reed-bank', 'fishing', 'grove', 'hollow-4', 'copse', 'traveling-players', 'western-quarry', 'eastern-quarry', 'vegetable-seeds', 'sheep-market', 'pig-market', 'cattle-market']
+  function beforeExpert(ordinal: number, played = true) {
+    const s = setup(state => {
+      for (const p of state.players) {
+        p.workers.forEach(w => {
+          w.isActive = true
+          w.isNewborn = false
+        })
+        p.rooms = 5
+        p.roomTiles = [{ row: 0, col: 0 }, { row: 1, col: 0 }, { row: 1, col: 1 }, { row: 2, col: 0 }, { row: 2, col: 1 }]
+      }
+      for (const [id, key] of [['western-quarry', 'stone'], ['eastern-quarry', 'stone'], ['sheep-market', 'sheep'], ['pig-market', 'boar'], ['cattle-market', 'cattle']] as const)
+        state.actionSpaces.find(a => a.id === id)!.resources[key] = 1
+    }, played)
+    let used = 0
+    const target = (ordinal - 1) * 4
+    for (let n = 0; n < target; n++) {
+      const actor = n % 4
+      const space = FILLER[used++]
+      assert.ok(space)
+      let r = turn(s, actor, space)
+      if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'animal-reorg')
+        r = ok(s.resolveChoice(actor, 'confirm', { zones: r.interaction.request.zones }))
+      assertTurnFinished(r)
+    }
+    return s
+  }
+  it("first through fifth real placed person gains mapped material from Resource Market", () => {
+    for (const ordinal of [1, 2, 3, 4, 5]) {
+      const on = beforeExpert(ordinal), off = beforeExpert(ordinal, false)
+      const a = turn(on, 0, 'resource-market-4'), b = turn(off, 0, 'resource-market-4')
+      const target = ['wood', 'clay', 'reed', 'stone', 'stone'][ordinal - 1]!
+      for (const type of ['wood', 'clay', 'reed', 'stone'] as const)
+        assert.equal(a.state.players[0]!.resources[type] - b.state.players[0]!.resources[type], type === target ? 1 : 0)
+      assert.equal(getRoundPersonPlacementOrder(a.state.players[0]!).length, ordinal)
+      save(`A163-N1-${ordinal}`, { a, b })
+    }
+  })
+  it("ordinary accumulation opponent market and hand cannot grant owner mapped resource", () => {
+    const on = setup(), off = setup(undefined, false)
+    const a = turn(on, 0, 'forest'), b = turn(off, 0, 'forest')
+    assert.equal(a.state.players[0]!.resources.wood, b.state.players[0]!.resources.wood)
+    const s = setup()
+    turn(s, 0, 'grain-seeds')
+    const r = turn(s, 1, 'resource-market-4')
+    assert.equal(r.state.players[0]!.resources.wood, 0)
+    assert.equal(r.state.players[0]!.resources.clay, 0)
+    assertTurnFinished(a)
+    assertTurnFinished(b)
+    assertTurnFinished(r)
+    save('A163-N2', { a, b, r })
+  })
+  it("occupied market rejects and whole undo restores material before one retry", () => {
+    const s = beforeExpert(1)
+    const r = turn(s, 0, 'resource-market-4')
+    assertRejectedUnchanged(s, () => s.takeAction(0, 'resource-market-4'))
+    const undone = undo(s)
+    for (const type of ['wood', 'clay', 'reed', 'stone'] as const)
+      assert.equal(undone.state.players[0]!.resources[type], 0)
+    const retry = turn(s, 0, 'resource-market-4')
+    assert.deepEqual(retry.state.players[0]!.resources, r.state.players[0]!.resources)
+    save('A163-N3', { r, undone, retry })
+  })
 })
 
 describe("A134 command boundaries", () => {

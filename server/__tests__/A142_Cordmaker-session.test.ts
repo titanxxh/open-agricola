@@ -161,14 +161,14 @@ describe('A142 command boundaries', () => {
   const turn = (session: GameSession, actor: number, space: string) => {
     let response = session.getState()
     if (response.interaction.stateId === 'wait'
-      && response.interaction.request.kind === 'confirm-next-player') response = confirmNext(session, response)
+      && response.interaction.request.kind === 'confirm-next-player')
+      response = confirmNext(session, response)
     assert.equal(response.interaction.stateId, 'idle')
     assert.equal(response.state.currentPlayerIndex, actor)
     const result = session.takeAction(actor, space)
     assert.equal(result.ok, true, result.error)
     return result
   }
-
   it('own Reed Bank two or three gives one grain or paid vegetable exactly once', () => {
     for (const [reed, crop, grain, vegetable, food] of [
       [2, 'grain', 1, 0, 2], [3, 'grain', 1, 0, 2],
@@ -181,7 +181,6 @@ describe('A142 command boundaries', () => {
         && response.interaction.request.kind === 'confirm-next-player')
     }
   })
-
   it('Reed Bank zero or one and hand cannot trigger crop reward', () => {
     const empty = setup({ reed: 0, food: 40 })
     assertEmptyAccumulationRejected(empty, 0, 'reed-bank')
@@ -193,7 +192,6 @@ describe('A142 command boundaries', () => {
         && response.interaction.request.kind === 'confirm-next-player')
     }
   })
-
   it('actual opponent Reed Bank rewards only owner and decline keeps crops', () => {
     for (const [crop, grain, vegetable, food] of [
       ['grain', 1, 0, 4], ['vegetable', 0, 1, 2], [null, 0, 0, 4],
@@ -204,9 +202,10 @@ describe('A142 command boundaries', () => {
       assert.ok(response.interaction.stateId === 'wait' && response.interaction.request.kind === 'choice')
       assert.equal(response.interaction.playerIndex, 0)
       assert.equal(response.interaction.sourceCard, CARD_ID)
-      if (crop) response = chooseReward(session, response, crop)
+      if (crop)
+        response = chooseReward(session, response, crop)
       else {
-        const decline = response.interaction.request.options.find(option => option.value === '__skip__')
+        const decline = getChoiceOptions(response).find(option => option.value === '__skip__')
         assert.ok(decline && !decline.disabled)
         response = session.resolveChoice(0, decline.value)
         assert.equal(response.ok, true, response.error)
@@ -215,7 +214,6 @@ describe('A142 command boundaries', () => {
       expect(response.state.players[0]!.resources).toMatchObject({ grain, vegetable, food })
     }
   })
-
   it('one food cannot buy vegetable and invalid actor or crop cannot produce free reward', () => {
     const session = setup({ food: 1 })
     const response = turn(session, 0, 'reed-bank')
@@ -225,7 +223,6 @@ describe('A142 command boundaries', () => {
     assertRejectedUnchanged(session, () => session.resolveChoice(1, 'vegetable'))
     assertRejectedUnchanged(session, () => session.resolveChoice(0, 'unpaid-vegetable'))
   })
-
   it('whole own action undo restores payment crop and Reed Bank before retry', () => {
     const session = setup({ food: 2 })
     const before = undoRuleSnapshot(session.getState())

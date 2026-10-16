@@ -1,15 +1,29 @@
+import { createInitialState } from '../../shared/session/state-bootstrap'
+import { ActionHookRegistry } from '../../shared/actions/hooks'
+import { createEventQuery } from '../../shared/events/query'
+import { invokeListenerHandlerUnderGuard } from '../../shared/cards/__tests__/listener-purity-guard'
 import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game/authoritative-session'
-import type { CardListenerContext } from '../../shared/cards/card-listeners'
-import type { DraftGameEvent } from '../../shared/contract/events'
+import { GameSession, type SessionResponse } from '../game/authoritative-session'
+import { type CardListenerContext } from '../../shared/cards/card-listeners'
+import { type DraftGameEvent } from '../../shared/contract/events'
 import { A146_StorehouseSteward_impl } from '../../shared/cards/A/A146_StorehouseSteward'
+import assert from 'node:assert/strict'
+import { type GameState } from '../../shared/contract/types'
+import { createWorkSession } from './_helpers/session-fixtures'
+import { assertEmptyAccumulationRejected, assertRejectedUnchanged, confirmNext , undoRuleSnapshot , assertUndoRestored } from './_helpers/session-assertions'
+import { createScenarioEvidence } from './_helpers/scenario-evidence'
 
-import '../../shared/cards/A/A146_StorehouseSteward'
+const sessionEvidence = createScenarioEvidence(import.meta.url)
+
+function assertTurnFinished(response: SessionResponse) {
+  assert.equal(response.ok, true, response.error)
+  assert.ok(response.interaction.stateId === 'wait' && response.interaction.request.kind === 'confirm-next-player', JSON.stringify(response.interaction))
+}
 
 const CARD_ID = 'A146_StorehouseSteward'
 
 const setup = (fishingFood: number) => {
-  const session = new GameSession(42)
+  const session = sessionEvidence.track(createWorkSession({ seed: 42 }))
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   state.currentPlayerIndex = 0
@@ -49,16 +63,21 @@ const runListener = (
   transactionEvents: DraftGameEvent[],
   resourcesGained: { food?: number },
   actionEvents?: DraftGameEvent[],
-) => A146_StorehouseSteward_impl.listeners![0]!.handler({
-  state: { players: [{ id: 'p1', occupationPlayed: [CARD_ID] }] },
-  player: { id: 'p1' },
-  space: { id: 'fishing', gainPerRound: { food: 1 } },
-  actionId: 'collect',
-  phase: 'after',
-  transactionEvents,
-  actionEvents,
-  result: { type: 'ok', resourcesGained },
-} as unknown as CardListenerContext)
+) => {
+  const state = createInitialState(42, { playerCount: 3 })
+  const player = state.players[0]!
+  player.id = 'p1'
+  player.occupationPlayed = [CARD_ID]
+  const space = state.actionSpaces.find(candidate => candidate.id === 'fishing')
+  const registration = A146_StorehouseSteward_impl.listeners?.[0]
+  assert.ok(space && registration)
+  return invokeListenerHandlerUnderGuard(registration, {
+    state, player, space, actionHooks: new ActionHookRegistry(),
+    actionId: 'collect', phase: 'after', transactionEvents, actionEvents,
+    eventQuery: createEventQuery(actionEvents ?? transactionEvents),
+    result: { type: 'ok', resourcesGained },
+  } satisfies CardListenerContext)
+}
 
 describe('A146_StorehouseSteward session', () => {
   it.each([
@@ -105,5 +124,108 @@ describe('A146_StorehouseSteward listener provenance guard', () => {
     const result = runListener([fishingFood(3)], { food: 3 }, [])
 
     expect(result).toBeUndefined()
+  })
+})
+
+describe("A146 command boundaries", () => {
+  const STEWARD = 'A146_StorehouseSteward'
+  function save(id: string, value: unknown) {
+    sessionEvidence.record(id, value)
+  }
+  function ok(r: SessionResponse) {
+    assert.equal(r.ok, true, r.error)
+    return r
+  }
+  function setup(configure: (state: GameState) => void = () => {
+  }, played = true) {
+    // Traveling Players is a four-player accumulation space in this matrix.
+    const players = 4
+    const s = sessionEvidence.track(createWorkSession({ seed: 4242, options: { playerCount: players }, configure(state) {
+        state.round = 14
+        for (const p of state.players)
+          Object.assign(p.resources, { food: 40, wood: 0, clay: 0, reed: 0, stone: 0, grain: 0, vegetable: 0 })
+        state.players[0]!.occupationPlayed = played ? [STEWARD] : []
+        state.players[0]!.occupationHand = played ? ['__test_placeholder__'] : [STEWARD, 'A110_Roughcaster']
+        configure(state)
+      } }))
+    assert.equal(s.getState().state.players.length, players)
+    return s
+  }
+  function pile(state: GameState, space: string, resource: 'food' | 'reed', count: number) {
+    const a = state.actionSpaces.find(a => a.id === space)
+    assert.ok(a, space)
+    a.resources[resource] = count
+  }
+  const beforeAction = new WeakMap<GameSession, string>()
+  function turn(s: GameSession, actor: number, space: string) {
+    let r = s.getState()
+    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
+      r = confirmNext(s, r)
+    assert.equal(r.interaction.stateId, 'idle')
+    assert.equal(r.state.currentPlayerIndex, actor)
+    beforeAction.set(s, undoRuleSnapshot(s.getState()))
+    const result = ok(s.takeAction(actor, space))
+    assertTurnFinished(result)
+    return result
+  }
+  function undo(s: GameSession) {
+    const before = beforeAction.get(s)
+    assert.ok(before)
+    const undone = s.undoAction()
+    assertUndoRestored(before, undone)
+    assertUndoRestored(before, s.getState())
+    return undone
+  }
+  function res(r: SessionResponse) {
+    return (['stone', 'reed', 'clay', 'wood'] as const).map(k => r.state.players[0]!.resources[k])
+  }
+  it("exact food piles two through five give only the mapped material", () => {
+    for (const space of ['fishing', 'traveling-players'])
+      for (const count of [2, 3, 4, 5]) {
+        const s = setup(state => pile(state, space, 'food', count))
+        const r = turn(s, 0, space)
+        assert.deepEqual(res(r), [2, 3, 4, 5].map(n => n === count ? 1 : 0))
+        assert.equal(r.state.players[0]!.resources.food, 40 + count)
+        assert.equal(r.state.actionSpaces.find(a => a.id === space)!.resources.food, 0)
+        save(`A146-N1-${space}-${count}`, r)
+      }
+  })
+  it("zero one six and seven food piles cannot yield any material", () => {
+    for (const count of [0, 1, 6, 7]) {
+      const s = setup(state => pile(state, 'fishing', 'food', count))
+      const r = count === 0 ? assertEmptyAccumulationRejected(s, 0, 'fishing') : turn(s, 0, 'fishing')
+      assert.deepEqual(res(r), [0, 0, 0, 0])
+      assert.equal(r.state.players[0]!.resources.food, 40 + count)
+      save(`A146-N2-${count}`, r)
+    }
+  })
+  it("ordinary Day Laborer food and reserve food cannot count as accumulation", () => {
+    const r = turn(setup(state => state.players[0]!.resources.food = 3), 0, 'day-laborer')
+    assert.equal(r.state.players[0]!.resources.food, 5)
+    assert.deepEqual(res(r), [0, 0, 0, 0])
+    save('A146-N3', r)
+  })
+  it("hand and actual opponent accumulation do not reward wrong owner", () => {
+    const hs = setup(state => pile(state, 'fishing', 'food', 2), false)
+    const hand = turn(hs, 0, 'fishing')
+    assert.deepEqual(res(hand), [0, 0, 0, 0])
+    const s = setup(state => pile(state, 'fishing', 'food', 2))
+    turn(s, 0, 'grain-seeds')
+    const other = turn(s, 1, 'fishing')
+    assert.deepEqual(res(other), [0, 0, 0, 0])
+    assert.equal(other.state.players[1]!.resources.stone, 0)
+    save('A146-N4', { hand, other })
+  })
+  it("occupied input and whole undo cannot duplicate mapped reward", () => {
+    const s = setup(state => pile(state, 'fishing', 'food', 2))
+    const first = turn(s, 0, 'fishing')
+    assertRejectedUnchanged(s, () => s.takeAction(0, 'fishing'))
+    const undone = undo(s)
+    assert.deepEqual(res(undone), [0, 0, 0, 0])
+    assert.equal(undone.state.players[0]!.resources.food, 40)
+    assert.equal(undone.state.actionSpaces.find(a => a.id === 'fishing')!.resources.food, 2)
+    const retry = turn(s, 0, 'fishing')
+    assert.deepEqual(res(retry), [1, 0, 0, 0])
+    save('A146-N5', { first, undone, retry })
   })
 })

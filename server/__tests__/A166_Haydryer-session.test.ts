@@ -2,14 +2,22 @@ import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
-
 import '../../shared/cards/A/A166_Haydryer'
+import assert from 'node:assert/strict'
+import { type GameState } from '../../shared/contract/types'
+import { createWorkSession } from './_helpers/session-fixtures'
+
+import { confirmNext , getChoiceOptions } from './_helpers/session-assertions'
+import { createScenarioEvidence } from './_helpers/scenario-evidence'
+
+const sessionEvidence = createScenarioEvidence(import.meta.url)
 
 const CARD_ID = 'A166_Haydryer'
+
 const FILLER = '__test_placeholder__'
 
 const setup = ({ played = true, pastures = 1, food = 10, round = 4 } = {}) => {
-  const session = new GameSession(5166, undefined, { playerCount: 4 })
+  const session = sessionEvidence.track(createWorkSession({ seed: 5166, options: { playerCount: 4 } }))
   const state = session.getState().state
   stabilizeRandomHands(state.players)
   state.currentPlayerIndex = 0
@@ -28,14 +36,13 @@ const setup = ({ played = true, pastures = 1, food = 10, round = 4 } = {}) => {
   player.resources.cattle = 0
   player.houseAnimals = {};
   player.stableAnimals = {}
-  player.pastures = Array.from({ length: pastures }, (_, index) => ({
-    id: `haydryer-pasture-${index}`,
-    size: 1,
-    tiles: [{ row: index, col: 1 }],
-    stables: 0,
-    animalType: null,
-    animalCount: 0,
-  }))
+  player.pastures = Array.from({ length: pastures }, (_, index) => ({ id: `haydryer-pasture-${index}`, tiles: [{ row: 0, col: index + 1 }], animalType: null, animalCount: 0 }))
+  const edges = new Set<string>()
+  for (let col = 1; col <= pastures; col++) {
+    for (const edge of [`H-0-${col}`, `H-1-${col}`, `V-0-${col}`, `V-0-${col + 1}`]) edges.add(edge)
+  }
+  expect(edges.size).toBeLessThanOrEqual(15)
+  player.fenceSegments = [...edges].map(edge => ({ edge, type: 'fence', source: { kind: 'own', ownerPlayerId: player.id } }))
   if (!played) setWorkersAtHome(state, player, 2)
   session.loadState(state)
   return session
@@ -45,7 +52,7 @@ const playOccupation = (session: GameSession) => {
   const response = session.takeAction(0, 'lessons')
   if (!response.state.players[0]!.occupationHand.includes(CARD_ID)) return response
   if (response.interaction.stateId !== 'wait') return response
-  const option = response.interaction.request.options?.find((candidate) => candidate.value === CARD_ID)
+  const option = getChoiceOptions(response)?.find((candidate) => candidate.value === CARD_ID)
   expect(option).toBeDefined()
   return session.resolveChoice(response.interaction.playerIndex, option!.value)
 }
@@ -53,9 +60,9 @@ const playOccupation = (session: GameSession) => {
 const acceptHaydryer = (session: GameSession, response: SessionResponse) => {
   expect(response.interaction.stateId).toBe('wait')
   if (response.interaction.stateId !== 'wait') return response
-  const option = response.interaction.request.options?.find((candidate) =>
+  const option = getChoiceOptions(response)?.find((candidate) =>
     candidate.sourceCard === CARD_ID && candidate.value !== '__skip__')
-    ?? response.interaction.request.options?.find((candidate) => candidate.value !== '__skip__')
+    ?? getChoiceOptions(response)?.find((candidate) => candidate.value !== '__skip__')
   expect(option, JSON.stringify(response.interaction)).toBeDefined()
   return session.resolveChoice(response.interaction.playerIndex, option!.value)
 }
@@ -141,5 +148,134 @@ describe('A166 Haydryer parity', () => {
 
     expect(response.state.players[0]!.resources.cattle).toBe(0)
     expect(response.state.round).toBe(4)
+  })
+})
+
+describe("A166 command boundaries", () => {
+  const HAY = 'A166_Haydryer'
+  function save(id: string, value: unknown) {
+    sessionEvidence.record(id, value)
+  }
+  function ok(r: SessionResponse) {
+    assert.equal(r.ok, true, r.error)
+    return r
+  }
+  function setup(resources: Partial<GameState['players'][number]['resources']> = {}, played = true, configure: (state: GameState) => void = () => {
+  }) {
+    const s = sessionEvidence.track(createWorkSession({ seed: 4242, options: { playerCount: 4 }, configure(state) {
+        state.round = 14
+        for (const p of state.players)
+          Object.assign(p.resources, { food: 20, wood: 0, clay: 0, reed: 0, stone: 0, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0 })
+        const p = state.players[0]!
+        Object.assign(p.resources, resources)
+        p.occupationPlayed = played ? [HAY] : []
+        p.occupationHand = played ? ['__test_placeholder__'] : [HAY, 'A110_Roughcaster']
+        configure(state)
+      } }))
+    return s
+  }
+  function turn(s: GameSession, actor: number, space: string) {
+    let r = s.getState()
+    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
+      r = confirmNext(s, r)
+    assert.equal(r.interaction.stateId, 'idle')
+    assert.equal(r.state.currentPlayerIndex, actor)
+    return ok(s.takeAction(actor, space))
+  }
+  function finish(s: GameSession, r: SessionResponse, accept = true, noHaydryerOffer = false) {
+    for (let n = 0; n < 24 && r.interaction.stateId === 'wait' && r.interaction.request.kind !== 'confirm-next-player'; n++) {
+      const i = r.interaction
+      if (noHaydryerOffer) {
+        assert.notEqual(i.sourceCard, HAY, JSON.stringify(i))
+        if (i.request.kind === 'choice' || i.request.kind === 'select-trigger') assert.ok(i.request.options.every(option => option.sourceCard !== HAY || option.disabled))
+      }
+      if (i.request.kind === 'confirm-player-switch')
+        r = ok(s.resolveChoice(i.request.fromPlayerIndex, 'confirm'))
+      else if (i.request.kind === 'feed')
+        r = ok(s.resolveChoice(i.playerIndex, 'confirm', { selections: [] }))
+      else if (i.request.kind === 'animal-reorg')
+        r = ok(s.resolveChoice(i.playerIndex, 'confirm', { zones: i.request.zones }))
+      else {
+        if (i.request.kind === 'select-trigger') {
+          const trigger = i.request.options[0]
+          assert.ok(trigger)
+          r = ok(s.resolveChoice(i.playerIndex, trigger.value))
+          continue
+        }
+        assert.ok(i.request.kind === 'choice', JSON.stringify(i))
+        const o = i.request.options.find(o => accept ? !o.disabled && o.value !== '__skip__' && o.value !== '__done__' : o.value === '__skip__' || o.value === '__done__') ?? (accept ? i.request.options.find(o => !o.disabled && o.value !== '__skip__' && o.value !== '__done__') : undefined)
+        assert.ok(o, JSON.stringify(i))
+        r = ok(s.resolveChoice(i.playerIndex, o.value))
+      }
+    }
+    assert.ok(r.interaction.stateId === 'idle' || (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player'), JSON.stringify(r.interaction))
+    return r
+  }
+  function material(r: SessionResponse, actor = 0) {
+    return r.state.players[actor]!.resources
+  }
+  const EIGHT = ['grain-seeds', 'day-laborer', 'forest', 'reed-bank', 'clay-pit', 'fishing', 'hollow-4', 'traveling-players']
+  function pastures(state: GameState, count: number, animals = 0, stable = false) {
+    const p = state.players[0]!
+    const edges = new Set<string>()
+    for (let col = 1; col <= count; col++) {
+      for (const edge of [`H-0-${col}`, `H-1-${col}`, `V-0-${col}`, `V-0-${col + 1}`])
+        edges.add(edge)
+    }
+    assert.ok(edges.size <= 15)
+    p.fenceSegments = [...edges].map(edge => ({ edge, type: 'fence' as const, source: { kind: 'own' as const, ownerPlayerId: p.id } }))
+    p.pastures = Array.from({ length: count }, (_, n) => ({ id: 'p' + n, tiles: [{ row: 0, col: n + 1 }], animalType: n === 0 && animals ? 'boar' as const : null, animalCount: n === 0 ? animals : 0 }))
+    p.stableTiles = stable ? [{ row: 0, col: 1 }] : []
+    p.resources.boar = animals
+  }
+  function phaseSetup(round: number, pastureCount: number, pigs = 0, played = true, food = 60, stable = false) {
+    return setup({ food }, played, state => {
+      state.round = round
+      pastures(state, pastureCount, pigs, stable)
+    })
+  }
+  function end(s: GameSession, accept = true, noHaydryerOffer = false) {
+    let r = s.getState()
+    for (const [n, space] of EIGHT.entries()) {
+      r = turn(s, n % 4, space)
+      if (n < EIGHT.length - 1)
+        r = finish(s, r, accept, noHaydryerOffer)
+    }
+    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
+      r = confirmNext(s, r)
+    const pending = r
+    return { pending, r: finish(s, r, accept, noHaydryerOffer) }
+  }
+  it("natural harvest charges four minus pasture count food for one cattle", () => {
+    for (const count of [0, 1, 3]) {
+      const s = phaseSetup(4, count)
+      const { pending, r } = end(s)
+      assert.equal(r.state.round, 5)
+      assert.equal(material(r).cattle, 1)
+      const control = end(phaseSetup(4, count, 0, false)).r
+      assert.equal(material(r).food - material(control).food, -(4 - count))
+      save(`A166-N1-${count}`, { pending, r, control })
+    }
+  })
+  it("decline unaffordable hand and nonharvest cannot grant cattle", () => {
+    const declined = end(phaseSetup(4, 1), false).r
+    assert.equal(material(declined).cattle, 0)
+    const poor = end(phaseSetup(4, 1, 0, true, 0), false, true).r
+    assert.equal(poor.state.round, 5)
+    assert.equal(poor.state.roundPhase, 'work')
+    assert.equal(poor.interaction.stateId, 'idle')
+    assert.equal(material(poor).food, 0)
+    assert.equal(material(poor).cattle, 0)
+    const hand = end(phaseSetup(4, 1, 0, false)).r
+    assert.equal(material(hand).cattle, 0)
+    const ordinary = end(phaseSetup(3, 1)).r
+    assert.equal(material(ordinary).cattle, 0)
+    save('A166-N2', { declined, poor, hand, ordinary })
+  })
+  it("four pastures clamp free cattle cost without creating food", () => {
+    const on = end(phaseSetup(4, 4)).r, off = end(phaseSetup(4, 4, 0, false)).r
+    assert.equal(material(on).cattle, 1)
+    assert.equal(material(on).food, material(off).food)
+    save('A166-N3', { on, off, limitation: 'Runtime free grant is automatic; printed optionality remains unadjudicated here' })
   })
 })

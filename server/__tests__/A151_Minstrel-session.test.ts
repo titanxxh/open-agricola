@@ -1,17 +1,22 @@
 import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game/authoritative-session'
+import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
-import type { ActionFlow } from '../../shared/contract/types'
+import { type GameState } from '../../shared/contract/types'
 import { markAllWorkersUsed } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
-
 import '../../shared/cards/A/A151_Minstrel'
+import assert from 'node:assert/strict'
+import { createWorkSession } from './_helpers/session-fixtures'
+import { confirmNext, assertRejectedUnchanged , getChoiceOptions } from './_helpers/session-assertions'
+import { createScenarioEvidence } from './_helpers/scenario-evidence'
+
+const sessionEvidence = createScenarioEvidence(import.meta.url)
 
 const CARD_ID = 'A151_Minstrel'
 
 describe('A151_Minstrel session — viaCardJump worker-less', () => {
   const setup4P = () => {
-    const session = new GameSession(undefined, undefined, { playerCount: 4 })
+    const session = sessionEvidence.track(createWorkSession({ options: { playerCount: 4 } }))
     const state = session.getState().state
     expect(state.players.length).toBe(4)
     const owner = state.players[0]!
@@ -42,12 +47,12 @@ describe('A151_Minstrel session — viaCardJump worker-less', () => {
 
     const flow = session.withCtx(() => runCardEffectHook(state, owner, CARD_ID, 'onStartReturnHome', undefined, { actionHooks: session.actionHooks }))
     expect(flow).not.toBeNull()
-    const seq = flow as Extract<ActionFlow, { type: 'seq' }>
-    expect(seq.type).toBe('seq')
+    assert.ok(flow?.type === 'seq')
+    const seq = flow
     expect(seq.optional).toBe(true)
 
-    const leaf = seq.children[0] as Extract<ActionFlow, { type: 'leaf' }>
-    expect(leaf.type).toBe('leaf')
+    const leaf = seq.children[0]
+    assert.ok(leaf?.type === 'leaf')
     expect(leaf.actionId).toBe('place-farmer')
     expect(leaf.expandFlow).toBe(true)
     expect(leaf.actionContext?.viaCardJump).toBe(true)
@@ -128,7 +133,7 @@ describe('A151_Minstrel session — viaCardJump worker-less', () => {
 })
 
 const setupReturnHome = ({ doable = true } = {}) => {
-  const session = new GameSession(9951, undefined, { playerCount: 4 })
+  const session = sessionEvidence.track(createWorkSession({ seed: 9951, options: { playerCount: 4 } }))
   stabilizeRandomHands(session.state.players)
   const state = session.state
   state.currentPlayerIndex = 0
@@ -151,7 +156,7 @@ const setupReturnHome = ({ doable = true } = {}) => {
   const owner = state.players[0]!
   owner.occupationPlayed = [CARD_ID]
   owner.resources.grain = doable ? 1 : 0
-  owner.fields = doable ? [{ row: 0, col: 0, crop: null, remaining: 0 }] : []
+  owner.fields = doable ? [{ row: 0, col: 0, stacks: [] }] : []
 
   const sink = state.actionSpaces.find((space) => space.id === '__test-worker-sink__')!
   for (const spaceId of ['sheep-market', 'fencing', 'major-improvement']) {
@@ -171,6 +176,7 @@ describe('A151 Minstrel authoritative return-home flow', () => {
     let response = session.performRoundEnd()
 
     expect(response.ok, response.error).toBe(true)
+    assert.ok(response.interaction.stateId === 'wait')
     expect(response.interaction.sourceCard, JSON.stringify({
       interaction: response.interaction,
       round: response.state.round,
@@ -188,15 +194,16 @@ describe('A151 Minstrel authoritative return-home flow', () => {
     expect(rejected.interaction).toEqual(interactionBefore)
     expect(rejected.state.players[0]).toEqual(playerBefore)
 
-    if (response.interaction.stateId !== 'wait') return
-    const accept = response.interaction.request.options?.find((option) => option.value !== '__skip__')
+    assert.ok(!(response.interaction.stateId !== 'wait'), JSON.stringify(response.interaction))
+    const accept = getChoiceOptions(response)?.find((option) => option.value !== '__skip__')
     expect(accept, JSON.stringify(response.interaction)).toBeDefined()
     response = session.resolveChoice(0, accept!.value)
     if (response.interaction.stateId === 'wait' && response.interaction.request.kind === 'choice') {
-      const sow = response.interaction.request.options?.find((option) => option.labelKey === 'actions.sow.name')
+      const sow = getChoiceOptions(response)?.find((option) => option.labelKey === 'actions.sow.name')
       expect(sow, JSON.stringify(response.interaction)).toBeDefined()
       response = session.resolveChoice(0, sow!.value)
     }
+    expect(response.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'farm-select', farm: { farmType: 'sow' } } })
     response = session.commitSelectionChoice(0, { crops: [{ row: 0, col: 0, crop: 'grain' }] })
 
     expect(response.ok, response.error).toBe(true)
@@ -212,8 +219,123 @@ describe('A151 Minstrel authoritative return-home flow', () => {
     const response = session.performRoundEnd()
 
     expect(response.ok, response.error).toBe(true)
-    expect(response.interaction.sourceCard).not.toBe(CARD_ID)
+    expect(response.interaction.stateId).toBe('idle')
+    expect(response.state.roundPhase).toBe('work')
     expect(response.state.round).toBe(6)
     expect(response.state.players[0]!.resources.grain).toBe(0)
+  })
+})
+
+describe("A151 command boundaries", () => {
+  const CARD = 'A151_Minstrel'
+  function save(id: string, value: unknown) {
+    sessionEvidence.record(id, value)
+  }
+  function ok(r: SessionResponse) {
+    assert.equal(r.ok, true, r.error)
+    return r
+  }
+  function setup(played = true, configure: (state: GameState) => void = () => {
+  }) {
+    const s = sessionEvidence.track(createWorkSession({ seed: 4242, options: { playerCount: 4 }, configure(state) {
+        state.round = 5
+        state.roundActionOrder.splice(0, 4, 'sheep-market', 'grain-utilization', 'fencing', 'major-improvement')
+        state.availableMajorImprovements = ['Major_Fireplace1']
+        for (const p of state.players) {
+          Object.assign(p.resources, { food: 60, wood: 4, clay: 2, reed: 0, stone: 0, grain: 1, vegetable: 0, sheep: 0, boar: 0, cattle: 0 })
+          p.fields = [{ row: 0, col: 4, stacks: [] }]
+        }
+        const p = state.players[0]!
+        p.occupationPlayed = played ? [CARD] : []
+        p.occupationHand = played ? ['__test_placeholder__'] : [CARD, 'A110_Roughcaster']
+        p.stableTiles = [{ row: 0, col: 1 }]
+        state.actionSpaces.find(a => a.id === 'sheep-market')!.resources.sheep = 1
+        configure(state)
+      } }))
+    return s
+  }
+  function turn(s: GameSession, actor: number, space: string) {
+    let r = s.getState()
+    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
+      r = confirmNext(s, r)
+    assert.equal(r.interaction.stateId, 'idle')
+    assert.equal(r.state.currentPlayerIndex, actor)
+    return ok(s.takeAction(actor, space))
+  }
+  function drive(s: GameSession, r: SessionResponse, acceptCard = false) {
+    for (let n = 0; n < 24 && r.interaction.stateId === 'wait' && r.interaction.request.kind !== 'confirm-next-player'; n++) {
+      const i = r.interaction
+      if (i.request.kind === 'animal-reorg')
+        r = ok(s.resolveChoice(i.playerIndex, 'confirm', { zones: i.request.zones }))
+      else if (i.request.kind === 'confirm-player-switch')
+        r = ok(s.resolveChoice(i.request.fromPlayerIndex, 'confirm'))
+      else if (i.request.kind === 'farm-select') {
+        if (i.request.farm.farmType === 'fence')
+          r = ok(s.commitSelectionChoice(i.playerIndex, { edges: ['H-0-2', 'H-1-2', 'V-0-2', 'V-0-3'], extraWood: 0 }))
+        else if (i.request.farm.farmType === 'sow')
+          r = ok(s.commitSelectionChoice(i.playerIndex, { crops: [{ row: 0, col: 4, crop: 'grain' }] }))
+        else
+          assert.fail(JSON.stringify(i))
+      }
+      else if (i.request.kind === 'choice' || i.request.kind === 'select-trigger') {
+        const o = i.request.options.find(o => o.value === 'Major_Fireplace1' || o.value === 'major:Major_Fireplace1' || ('labelKey' in o && o.labelKey === 'actions.sow.name')) ?? i.request.options.find(o => i.sourceCard === CARD && !acceptCard ? o.value === '__skip__' || o.value === '__done__' : o.value !== '__skip__' && o.value !== '__done__')
+        assert.ok(o, JSON.stringify(i))
+        r = ok(s.resolveChoice(i.playerIndex, o.value))
+      }
+      else
+        assert.fail(JSON.stringify(i))
+    }
+    assert.ok(r.interaction.stateId === 'idle' || (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player'), JSON.stringify(r.interaction))
+    return r
+  }
+  function end(s: GameSession, spaces: string[], acceptCard = false) {
+    let r = s.getState()
+    for (const [n, space] of spaces.entries())
+      r = drive(s, turn(s, n % 4, space))
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
+    const pending = confirmNext(s, r)
+    const done = drive(s, pending, acceptCard)
+    return { pending, r: done }
+  }
+  const EIGHT = ['day-laborer', 'fencing', 'major-improvement', 'grain-utilization', 'forest', 'reed-bank', 'clay-pit', 'fishing']
+  it("real eight placements leave one vacant stage one space for workerless return home use", () => {
+    const s = setup()
+    const workers = structuredClone(s.getState().state.players.map(player => player.workers))
+    const { pending, r } = end(s, EIGHT, true)
+    assert.deepEqual(r.state.players.map(player => player.workers), workers)
+    assert.ok(!r.state.events.some(event => event.type === 'worker.placed' && event.viaCardId === CARD))
+    assert.equal(r.state.round, 6)
+    assert.equal(r.state.players[0]!.resources.sheep, 1)
+    assert.equal(r.state.players[0]!.workers.filter(w => w.isActive).length, 2)
+    assert.equal(r.state.actionSpaces.find(a => a.id === 'sheep-market')!.resources.sheep, 1)
+    assert.equal(r.state.actionSpaces.find(a => a.id === 'sheep-market')!.takenBy.length, 0)
+    save('A151-N1', { pending, r })
+  })
+  it("decline and hand leave vacant sheep accumulation untouched until next refill", () => {
+    for (const played of [true, false]) {
+      const s = setup(played)
+      const { pending, r } = end(s, EIGHT, false)
+      assert.equal(r.state.players[0]!.resources.sheep, 0)
+      assert.equal(r.state.actionSpaces.find(a => a.id === 'sheep-market')!.resources.sheep, 2)
+      save(`A151-N2-${played}`, { pending, r })
+    }
+  })
+  it("zero and two vacant stage one spaces cannot offer extra action", () => {
+    for (const spaces of [['sheep-market', 'fencing', 'major-improvement', 'grain-utilization', 'forest', 'reed-bank', 'clay-pit', 'fishing'], ['day-laborer', 'fencing', 'major-improvement', 'traveling-players', 'forest', 'reed-bank', 'clay-pit', 'fishing']]) {
+      const s = setup()
+      const { pending, r } = end(s, spaces, true)
+      assert.equal(r.state.players[0]!.resources.sheep, spaces[0] === 'sheep-market' ? 1 : 0)
+      assert.ok(pending.interaction.stateId !== 'wait' || pending.interaction.sourceCard !== CARD)
+      save(`A151-N3-${spaces[0]}`, { pending, r })
+    }
+  })
+  it("sole unaffordable major target cannot offer unpaid action or stale return use", () => {
+    const s = setup(true, state => state.players[0]!.resources.clay = 0)
+    const spaces = ['day-laborer', 'fencing', 'sheep-market', 'grain-utilization', 'forest', 'reed-bank', 'grove', 'fishing']
+    const { pending, r } = end(s, spaces, true)
+    assert.ok(pending.interaction.stateId !== 'wait' || pending.interaction.sourceCard !== CARD)
+    assert.equal(r.state.players[0]!.improvements.length, 0)
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, 'reuse-return-home'))
+    save('A151-N4', { pending, r })
   })
 })
