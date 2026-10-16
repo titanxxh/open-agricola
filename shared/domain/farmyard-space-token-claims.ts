@@ -1,4 +1,4 @@
-import type { PlayerState, Resource } from '../contract/types'
+import type { FarmTilePosition, PlayerState, Resource } from '../contract/types'
 import { positionKey } from './farm'
 import { getUsedFarmyardTileKeys } from './farmyard-usage'
 import { getFarmyardSpaceStates } from './farmyard-space-states'
@@ -17,14 +17,15 @@ const addResources = (
 
 export const claimFarmyardGoodsTokens = (
   player: PlayerState,
-  sourceCardId?: string,
+  sourceCardId: string,
+  positions?: readonly FarmTilePosition[],
 ): Partial<Resource> => {
-  const used = getUsedFarmyardTileKeys(player)
+  const used = positions === undefined ? getUsedFarmyardTileKeys(player) : new Set(positions.map(positionKey))
   const gained: Partial<Resource> = {}
   const remaining = getFarmyardSpaceStates(player).filter((state) => {
     if (state.kind !== 'farmyard-goods-token') return true
     if (state.claimPolicy !== 'when-no-longer-unused') return true
-    if (sourceCardId && state.sourceCardId !== sourceCardId) return true
+    if (state.sourceCardId !== sourceCardId) return true
     if (!used.has(state.spaceKey)) return true
     addResources(gained, state.resources)
     return false
@@ -36,13 +37,14 @@ export const claimFarmyardGoodsTokens = (
 
 export const hasClaimableFarmyardGoodsTokens = (
   player: PlayerState,
-  sourceCardId?: string,
+  sourceCardId: string,
+  positions?: readonly FarmTilePosition[],
 ): boolean => {
-  const used = getUsedFarmyardTileKeys(player)
+  const used = positions === undefined ? getUsedFarmyardTileKeys(player) : new Set(positions.map(positionKey))
   return getFarmyardSpaceStates(player).some((state) =>
     state.kind === 'farmyard-goods-token' &&
     state.claimPolicy === 'when-no-longer-unused' &&
-    (!sourceCardId || state.sourceCardId === sourceCardId) &&
+    state.sourceCardId === sourceCardId &&
     used.has(state.spaceKey),
   )
 }
