@@ -8,8 +8,9 @@ import '../../shared/cards/A/A102_Grocer'
 import { type AnytimeAction, type GameState } from '../../shared/contract/types'
 import assert from 'node:assert/strict'
 import { createWorkSession } from './_helpers/session-fixtures'
-import { assertRejectedUnchanged, confirmNext } from './_helpers/session-assertions'
+import { assertRejectedUnchanged, assertUndoRestored, undoRuleSnapshot, confirmNext } from './_helpers/session-assertions'
 import { createScenarioEvidence } from './_helpers/scenario-evidence'
+import { captureStateWithHistory } from '../../shared/session/history-streams'
 
 const sessionEvidence = createScenarioEvidence(import.meta.url)
 
@@ -216,11 +217,22 @@ describe("A102 command boundaries", () => {
     it("eight actual top purchases each pay one food and drain in the printed order", () => {
         const session = grocer();
         enterGrocer(session);
+        const expectedResources = [
+            { wood: 1, clay: 0, reed: 0, stone: 0, food: 7, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 },
+            { wood: 1, clay: 0, reed: 0, stone: 0, food: 6, grain: 1, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 },
+            { wood: 1, clay: 0, reed: 1, stone: 0, food: 5, grain: 1, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 },
+            { wood: 1, clay: 0, reed: 1, stone: 1, food: 4, grain: 1, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 },
+            { wood: 1, clay: 0, reed: 1, stone: 1, food: 3, grain: 1, vegetable: 1, sheep: 0, boar: 0, cattle: 0, begging: 0 },
+            { wood: 1, clay: 1, reed: 1, stone: 1, food: 2, grain: 1, vegetable: 1, sheep: 0, boar: 0, cattle: 0, begging: 0 },
+            { wood: 1, clay: 1, reed: 2, stone: 1, food: 1, grain: 1, vegetable: 1, sheep: 0, boar: 0, cattle: 0, begging: 0 },
+            { wood: 1, clay: 1, reed: 2, stone: 1, food: 0, grain: 1, vegetable: 2, sheep: 0, boar: 0, cattle: 0, begging: 0 },
+        ];
         const order = ['wood', 'grain', 'reed', 'stone', 'vegetable', 'clay', 'reed', 'vegetable'] as const;
         for (const [i, resource] of order.entries()) {
             const before = session.getState().state.players[0]!.resources[resource];
             const response = take(session);
             assert.equal(response.state.players[0]!.resources[resource], before + 1);
+            assert.deepEqual(response.state.players[0]!.resources, expectedResources[i]);
             assert.equal(response.state.players[0]!.resources.food, 7 - i);
             assert.equal(getCardStack(response.state.players[0]!, GROCER).length, 7 - i);
             assert.ok(response.interaction.stateId === 'wait' && response.interaction.request.kind === 'farm-select');
@@ -263,15 +275,38 @@ describe("A102 command boundaries", () => {
         save('A102-N4', response);
     });
     it("whole action undo restores purchased stack top and food before one retry", () => {
-        const session = grocer();
+        // Keep the unrelated hand nonempty; the real exhausted-hand undo defect is reproduced separately.
+        const session = setup(state => { state.players[0]!.resources.food = 8; state.players[0]!.occupationHand = [GROCER, '__test_placeholder__']; }, false);
         buyGrocer(session);
         turn(session, 1, 'grain-seeds');
         ready(session, 0);
-        const undoInteraction = JSON.stringify(session.getState().interaction);
+        const before = { ...session.getState(), state: captureStateWithHistory(session.getState().state), interaction: structuredClone(session.getState().interaction), scores: structuredClone(session.getState().scores) };
+        const undoInteraction = JSON.stringify(before.interaction);
+        assert.deepEqual(getCardStack(before.state.players[0]!, GROCER), ['vegetable', 'reed', 'clay', 'vegetable', 'stone', 'reed', 'grain', 'wood']);
         const pending = turn(session, 0, 'farmland');
         take(session);
         take(session);
+        assert.deepEqual(before.state.players[0]!.occupationHand, ['__test_placeholder__']);
+        assert.equal(session.getState().state.players[0]!.resources.food, 6);
+        assert.equal(session.getState().state.players[0]!.resources.wood, 1);
+        assert.equal(session.getState().state.players[0]!.resources.grain, 1);
+        assert.deepEqual(getCardStack(session.getState().state.players[0]!, GROCER), ['vegetable', 'reed', 'clay', 'vegetable', 'stone', 'reed']);
         const undone = ok(session.undoAction());
+        save('A102-N5-raw-undo', { before, undone });
+        assert.deepEqual(before.state.players[0]!.playedCards, []);
+        // #1258: restore materializes this derived card-identity representation.
+        const expectedRestored = { ...before, state: captureStateWithHistory(before.state) };
+        expectedRestored.state.players[0]!.playedCards = ['occupation:A102_Grocer'];
+        assertUndoRestored(undoRuleSnapshot(expectedRestored), undone);
+        const live = session.getState();
+        assertUndoRestored(undoRuleSnapshot(expectedRestored), live);
+        assert.deepEqual(undone.state.players[0]!.occupationHand, ['__test_placeholder__']);
+        assert.deepEqual(live.state.players[0]!.occupationHand, ['__test_placeholder__']);
+        assert.deepEqual(live.interaction, before.interaction);
+        assert.equal(live.interaction.stateId, 'idle');
+        assert.equal(live.state.currentPlayerIndex, 0);
+        assert.deepEqual(getCardStack(undone.state.players[0]!, GROCER), ['vegetable', 'reed', 'clay', 'vegetable', 'stone', 'reed', 'grain', 'wood']);
+        assert.deepEqual(getCardStack(live.state.players[0]!, GROCER), ['vegetable', 'reed', 'clay', 'vegetable', 'stone', 'reed', 'grain', 'wood']);
         assert.equal(JSON.stringify(undone.interaction), undoInteraction);
         assert.equal(undone.interaction.stateId, 'idle');
         assert.equal(undone.state.currentPlayerIndex, 0);

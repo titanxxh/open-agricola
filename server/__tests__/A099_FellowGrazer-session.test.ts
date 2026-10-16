@@ -1,4 +1,5 @@
-import { getChoiceOptions } from './_helpers/session-assertions'
+import { captureStateWithHistory } from '../../shared/session/history-streams'
+import { getChoiceOptions, assertUndoRestored, undoRuleSnapshot } from './_helpers/session-assertions'
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
@@ -170,13 +171,23 @@ describe("A099 command boundaries", () => {
     });
     it("real three tile pasture scores two and whole action undo removes the bonus", () => {
         const session = setup();
-        const undoInteraction = JSON.stringify(session.getState().interaction);
+        const rawBefore = { ...session.getState(), state: captureStateWithHistory(session.getState().state), interaction: structuredClone(session.getState().interaction), scores: structuredClone(session.getState().scores) };
+        assert.equal(rawBefore.interaction.stateId, 'idle');
+        assert.equal(rawBefore.state.currentPlayerIndex, 0);
+        const undoInteraction = JSON.stringify(rawBefore.interaction);
         ok(session.takeAction(0, 'fencing'));
         const edges = ['H-0-1', 'H-0-2', 'H-0-3', 'H-1-1', 'H-1-2', 'H-1-3', 'V-0-1', 'V-0-4'];
         const response = ok(session.commitSelectionChoice(0, { edges, extraWood: 0 }));
         assert.equal(bonus(response, GRAZER), 2);
         assert.equal(response.state.players[0]!.resources.wood, 7);
         const undone = ok(session.undoAction());
+        save('A099-raw-undo', { before: rawBefore, undone });
+        assertUndoRestored(undoRuleSnapshot(rawBefore), undone);
+        const live = session.getState();
+        assertUndoRestored(undoRuleSnapshot(rawBefore), live);
+        assert.deepEqual(live.interaction, rawBefore.interaction);
+        assert.equal(live.interaction.stateId, 'idle');
+        assert.equal(live.state.currentPlayerIndex, 0);
         assert.equal(JSON.stringify(undone.interaction), undoInteraction);
         assert.equal(undone.interaction.stateId, 'idle');
         assert.equal(undone.state.currentPlayerIndex, 0);

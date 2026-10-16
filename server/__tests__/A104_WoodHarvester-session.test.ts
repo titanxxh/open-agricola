@@ -163,6 +163,14 @@ describe("A104 command boundaries", () => {
         assert.ok(collected.interaction.stateId === 'wait');
         assert.deepEqual(collected.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 });
         assert.equal(collected.state.currentPlayerIndex, 0);
+        for (const amount of [3, 5]) {
+            const foodSession = setup(state => state.actionSpaces.find(s => s.id === 'forest')!.resources.wood = amount, true, 4);
+            const foodReward = harvest(foodSession);
+            assert.deepEqual(foodReward.state.players.map(player => ({ wood: player.resources.wood, food: player.resources.food })), [{ wood: 0, food: 39 }, { wood: 0, food: 36 }]);
+            assert.equal(foodReward.interaction.stateId, 'idle');
+            assert.equal(foodReward.state.roundPhase, 'work');
+            save(`A104-N3-food-${amount}`, foodReward);
+        }
         save('A104-N3', { response, collected });
     });
 });

@@ -1,3 +1,4 @@
+import { captureStateWithHistory } from '../../shared/session/history-streams'
 import { expectWait } from './_helpers/trigger-select'
 import assert from 'node:assert/strict'
 import { describe, expect, it } from 'vitest'
@@ -5,7 +6,7 @@ import { type GameState, type FarmTilePosition } from '../../shared/contract/typ
 import { takeMajorImprovementFromSupply } from '../../shared/cards/major/supply'
 import { type GameSession, type SessionResponse } from '../game/authoritative-session'
 import { createWorkSession } from './_helpers/session-fixtures'
-import { assertRejectedUnchanged , getChoiceOptions } from './_helpers/session-assertions'
+import { assertRejectedUnchanged, getChoiceOptions, assertUndoRestored, undoRuleSnapshot } from './_helpers/session-assertions'
 import { createScenarioEvidence } from './_helpers/scenario-evidence'
 
 const sessionEvidence = createScenarioEvidence(import.meta.url)
@@ -216,7 +217,10 @@ describe("A101 command boundaries", () => {
     });
     it("real major purchase pays printed cost and undo removes only its cooking bonus", () => {
         const session = setup();
-        const undoInteraction = JSON.stringify(session.getState().interaction);
+        const rawBefore = { ...session.getState(), state: captureStateWithHistory(session.getState().state), interaction: structuredClone(session.getState().interaction), scores: structuredClone(session.getState().scores) };
+        assert.equal(rawBefore.interaction.stateId, 'idle');
+        assert.equal(rawBefore.state.currentPlayerIndex, 0);
+        const undoInteraction = JSON.stringify(rawBefore.interaction);
         let response = ok(session.takeAction(0, 'major-improvement'));
         if (response.interaction.stateId === 'wait' && expectWait(response).interaction.request.kind === 'choice') {
             const option = choices(response).find(option => option.value.startsWith('action-improvement-'));
@@ -229,6 +233,13 @@ describe("A101 command boundaries", () => {
         assert.equal(response.state.players[0]!.resources.clay, 3);
         assert.equal(bonus(response, COOK), 1);
         const undone = ok(session.undoAction());
+        save('A101-raw-undo', { before: rawBefore, undone });
+        assertUndoRestored(undoRuleSnapshot(rawBefore), undone);
+        const live = session.getState();
+        assertUndoRestored(undoRuleSnapshot(rawBefore), live);
+        assert.deepEqual(live.interaction, rawBefore.interaction);
+        assert.equal(live.interaction.stateId, 'idle');
+        assert.equal(live.state.currentPlayerIndex, 0);
         assert.equal(JSON.stringify(undone.interaction), undoInteraction);
         assert.equal(undone.interaction.stateId, 'idle');
         assert.equal(undone.state.currentPlayerIndex, 0);

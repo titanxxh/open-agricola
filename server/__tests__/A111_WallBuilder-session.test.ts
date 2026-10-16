@@ -1,3 +1,4 @@
+import { captureStateWithHistory } from '../../shared/session/history-streams'
 import { expectWait } from './_helpers/trigger-select'
 import { type SessionResponse, GameSession } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
@@ -7,7 +8,7 @@ import '../../shared/cards/A/A111_WallBuilder'
 import assert from 'node:assert/strict'
 import { type GameState } from '../../shared/contract/types'
 import { createWorkSession } from './_helpers/session-fixtures'
-import { assertRejectedUnchanged, confirmNext, getChoiceOptions, expectTileFarmSelection } from './_helpers/session-assertions'
+import { assertRejectedUnchanged, confirmNext, getChoiceOptions, expectTileFarmSelection, assertUndoRestored, undoRuleSnapshot } from './_helpers/session-assertions'
 import { createScenarioEvidence } from './_helpers/scenario-evidence'
 
 const sessionEvidence = createScenarioEvidence(import.meta.url)
@@ -334,7 +335,10 @@ describe("A111 command boundaries", () => {
         assert.equal(other.state.currentPlayerIndex, 1);
         save('A111-N4-opponent', other);
         const session = setup();
-        const undoInteraction = JSON.stringify(session.getState().interaction);
+        const rawBefore = { ...session.getState(), state: captureStateWithHistory(session.getState().state), interaction: structuredClone(session.getState().interaction), scores: structuredClone(session.getState().scores) };
+        assert.equal(rawBefore.interaction.stateId, 'idle');
+        assert.equal(rawBefore.state.currentPlayerIndex, 0);
+        const undoInteraction = JSON.stringify(rawBefore.interaction);
         turn(session, 0, 'farm-expansion');
         let r = session.getState();
         if (r.interaction.stateId === 'wait' && expectWait(r).interaction.request.kind === 'choice') {
@@ -345,7 +349,17 @@ describe("A111 command boundaries", () => {
         assertRejectedUnchanged(session, () => session.commitSelectionChoice(0, { rooms: [{ row: 99, col: 99 }] }));
         assert.deepEqual(schedule(session.getState()), []);
         r = ok(session.commitSelectionChoice(0, { rooms: [{ row: 1, col: 1 }] }));
+        assert.deepEqual(schedule(r), [{ round: 6, food: 1, owner: 'p1' }, { round: 7, food: 1, owner: 'p1' }, { round: 8, food: 1, owner: 'p1' }, { round: 9, food: 1, owner: 'p1' }]);
+        assert.equal(r.state.players[0]!.rooms, 3);
         const undone = ok(session.undoAction());
+        save('A111-raw-undo', { before: rawBefore, undone });
+        assertUndoRestored(undoRuleSnapshot(rawBefore), undone);
+        const undoLive = session.getState();
+        assertUndoRestored(undoRuleSnapshot(rawBefore), undoLive);
+        assert.deepEqual(undone.interaction, rawBefore.interaction);
+        assert.deepEqual(undoLive.interaction, rawBefore.interaction);
+        assert.equal(undoLive.interaction.stateId, 'idle');
+        assert.equal(undoLive.state.currentPlayerIndex, 0);
         assert.equal(JSON.stringify(undone.interaction), undoInteraction);
         assert.equal(undone.interaction.stateId, 'idle');
         assert.equal(undone.state.currentPlayerIndex, 0);

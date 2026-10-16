@@ -1,3 +1,4 @@
+import { captureStateWithHistory } from '../../shared/session/history-streams'
 import { expectWait } from './_helpers/trigger-select'
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
@@ -8,7 +9,7 @@ import '../../shared/cards/A/A109_SmallTrader'
 import assert from 'node:assert/strict'
 import { type GameState } from '../../shared/contract/types'
 import { createWorkSession } from './_helpers/session-fixtures'
-import { assertRejectedUnchanged, confirmNext , getChoiceOptions } from './_helpers/session-assertions'
+import { assertRejectedUnchanged, confirmNext, getChoiceOptions, assertUndoRestored, undoRuleSnapshot } from './_helpers/session-assertions'
 import { createScenarioEvidence } from './_helpers/scenario-evidence'
 
 const sessionEvidence = createScenarioEvidence(import.meta.url)
@@ -231,9 +232,23 @@ describe("A109 command boundaries", () => {
         save('A109-N5', { r, unplayed }); });
     it("whole action undo restores cost card and reward before exactly one retry", () => {
         const s = setup();
-        const undoInteraction = JSON.stringify(s.getState().interaction);
+        const rawBefore = { ...s.getState(), state: captureStateWithHistory(s.getState().state), interaction: structuredClone(s.getState().interaction), scores: structuredClone(s.getState().scores) };
+        assert.equal(rawBefore.interaction.stateId, 'idle');
+        assert.equal(rawBefore.state.currentPlayerIndex, 0);
+        const undoInteraction = JSON.stringify(rawBefore.interaction);
         const bought = select(s, enter(s, 'major-improvement'), PAID);
+        assert.equal(bought.state.players[0]!.resources.food, 43);
+        assert.equal(bought.state.players[0]!.resources.wood, 0);
+        assert.ok(bought.state.players[0]!.minorPlayed.includes(PAID));
         const undone = ok(s.undoAction());
+        save('A109-raw-undo', { before: rawBefore, undone });
+        assertUndoRestored(undoRuleSnapshot(rawBefore), undone);
+        const undoLive = s.getState();
+        assertUndoRestored(undoRuleSnapshot(rawBefore), undoLive);
+        assert.deepEqual(undone.interaction, rawBefore.interaction);
+        assert.deepEqual(undoLive.interaction, rawBefore.interaction);
+        assert.equal(undoLive.interaction.stateId, 'idle');
+        assert.equal(undoLive.state.currentPlayerIndex, 0);
         assert.equal(JSON.stringify(undone.interaction), undoInteraction);
         assert.equal(undone.interaction.stateId, 'idle');
         assert.equal(undone.state.currentPlayerIndex, 0);
