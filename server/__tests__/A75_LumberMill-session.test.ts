@@ -233,7 +233,7 @@ describe("A075 command boundaries", () => {
   function ready(s: GameSession, actor: number) {
     let r = s.getState()
     if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
-      r = confirmNext(s, r)
+      r = confirmNext(s, complete(r, 1 - actor))
     assert.equal(r.interaction.stateId, 'idle', JSON.stringify(r.interaction))
     assert.equal(r.state.currentPlayerIndex, actor)
     return r
@@ -242,15 +242,15 @@ describe("A075 command boundaries", () => {
     ready(s, actor)
     const r = ok(s.takeAction(actor, space))
     assert.ok(r.state.actionSpaces.find(a => a.id === space)!.takenBy.some(w => w.playerId === r.state.players[actor]!.id))
+    if (['grain-seeds', 'reed-bank', 'clay-pit'].includes(space)) complete(r, actor)
     return r
   }
-  function close(s: GameSession, r: SessionResponse) {
-    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice' && r.interaction.promptKey === 'ui.interactionFarmExpansionSelect' && opts(r).some(o => o.value === '__done__'))
-      return ok(s.resolveChoice(r.interaction.playerIndex, '__done__'))
-    return r
-  }
-  function complete(r: SessionResponse) {
+  function complete(r: SessionResponse, actor = 0) {
+    assert.equal(r.ok, true, r.error)
     assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, actor)
+    assert.equal(r.state.currentPlayerIndex, actor)
+    assert.equal(r.interaction.request.nextPlayerIndex, 1 - actor)
     return r
   }
   function enter(s: GameSession, actor = 0, space = 'meeting-place') {
@@ -285,14 +285,12 @@ describe("A075 command boundaries", () => {
     assert.ok(retry.state.players[0]!.minorHand.includes(card) || card.startsWith('Major_'))
     return retry
   }
-  function farm(s: GameSession, kind: 'stable' | 'room', actor = 0) {
-    let r = turn(s, actor, 'farm-expansion')
-    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice') {
-      const choice = opts(r).find(o => o.value.includes(kind === 'stable' ? 'stables' : 'construct'))
-      assert.ok(choice, JSON.stringify(r.interaction))
-      r = ok(s.resolveChoice(actor, choice.value))
-    }
+  function farm(s: GameSession, kind: 'stable', actor = 0) {
+    const r = turn(s, actor, 'farm-expansion')
+
     assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'farm-select' && r.interaction.request.farm.farmType === kind, JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, actor)
+    assert.equal(r.state.currentPlayerIndex, actor)
     return r
   }
   function stable(s: GameSession, tiles: FarmTilePosition[] = [{ row: 1, col: 1 }, { row: 1, col: 2 }], actor = 0) {
@@ -300,10 +298,15 @@ describe("A075 command boundaries", () => {
     const r = ok(s.commitSelectionChoice(actor, { stables: tiles }))
     assert.equal(r.state.players[actor]!.stableTiles.length, tiles.length)
     assert.equal(s.withCtx(() => getAvailableStableSupplyCount(r.state, r.state.players[actor]!)), 4 - tiles.length)
-    return close(s, r)
+    return r
   }
-  function undo(s: GameSession, before: string, retry: () => SessionResponse) {
-    assertUndoRestored(before, s.undoAction())
+  function undo(s: GameSession, before: string, beforeInteraction: string, retry: () => SessionResponse) {
+    const restored = s.undoAction()
+    assertUndoRestored(before, restored)
+    assert.equal(JSON.stringify(restored.interaction), beforeInteraction)
+    assert.equal(JSON.stringify(s.getState().interaction), beforeInteraction)
+    assert.equal(restored.state.currentPlayerIndex, 0)
+    assert.equal(s.getState().state.currentPlayerIndex, 0)
     return retry()
   }
   it("zero occupations permit paying two stone for Lumber Mill", () => {
@@ -358,19 +361,7 @@ describe("A075 command boundaries", () => {
         state.players[0]!.occupationHand = ['D116_TreeInspector']
         state.players[0]!.minorHand.push('A066_FeedingDish')
       } })
-    let r = turn(s, 0, 'lessons')
-    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice') {
-      const card = opts(r).find(o => o.value === 'D116_TreeInspector')
-      if (card)
-        r = ok(s.resolveChoice(0, card.value))
-    }
-    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice') {
-      const payments = opts(r).filter(o => o.value !== 'cancel' && !o.disabled)
-      assert.equal(payments.length, 1, JSON.stringify(r.interaction))
-      const payment = payments[0]!
-      r = ok(s.resolveChoice(0, payment.value))
-    }
-    complete(r)
+    let r = complete(turn(s, 0, 'lessons'))
     assert.equal(r.state.players[0]!.occupationPlayed.length, 4)
     turn(s, 1, 'grain-seeds')
     r = buy(s, 'A066_FeedingDish')
@@ -381,7 +372,7 @@ describe("A075 command boundaries", () => {
         Object.assign(state.players[1]!.resources, { wood: 2, stone: 2 })
       } })
     turn(s, 0, 'grain-seeds')
-    const r = complete(purchase(s, enter(s, 1, 'major-improvement'), 'Major_Joinery', 1))
+    const r = complete(purchase(s, enter(s, 1, 'major-improvement'), 'Major_Joinery', 1), 1)
     assert.equal(res(r, 1).wood, 0)
     assert.equal(res(r, 1).stone, 0)
   })
@@ -391,9 +382,13 @@ describe("A075 command boundaries", () => {
   })
   it("undo discounted Joinery purchase restores resources and supply before one retry", () => {
     const s = setup({ resources: { wood: 1, stone: 2 } })
-    const before = undoRuleSnapshot(s.getState())
+    const initial = s.getState()
+    assert.equal(initial.interaction.stateId, 'idle')
+    assert.equal(initial.state.currentPlayerIndex, 0)
+    const beforeInteraction = JSON.stringify(initial.interaction)
+    const before = undoRuleSnapshot(initial)
     complete(purchase(s, enter(s, 0, 'major-improvement'), 'Major_Joinery'))
-    const r = undo(s, before, () => complete(purchase(s, enter(s, 0, 'major-improvement'), 'Major_Joinery')))
+    const r = undo(s, before, beforeInteraction, () => complete(purchase(s, enter(s, 0, 'major-improvement'), 'Major_Joinery')))
     assert.equal(res(r).wood, 0)
     assert.equal(res(r).stone, 0)
   })
