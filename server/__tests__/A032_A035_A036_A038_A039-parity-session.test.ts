@@ -355,11 +355,15 @@ describe("A035 command boundaries", () => {
     return ok(s.takeAction(actor, space))
   }
   function swimSetup() {
-    return setup({ round: 5, played: true }, state => {
+    const s = setup({ round: 5, played: true }, state => {
       const p = state.players[0]!
       p.rooms = 3
-      p.roomTiles.push({ row: 2, col: 0 })
+      p.roomTiles.push({ row: 0, col: 0 })
     })
+    const p = s.getState().state.players[0]!
+    assert.equal(p.rooms, 3)
+    assert.deepEqual(p.roomTiles, [{ row: 2, col: 0 }, { row: 1, col: 0 }, { row: 0, col: 0 }])
+    return s
   }
   function roundWithGrowth(s: GameSession, ownFirst = 'fishing', otherFirst = 'forest') {
     turn(s, 0, ownFirst)
