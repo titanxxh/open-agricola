@@ -299,10 +299,10 @@ describe('A003_PaperKnife session-tier: flow', () => {
   })
 
   it.each([
-    { cardIds: [OCC_A, OCC_A, OCC_A] },
-    { cardIds: [OCC_A, OCC_B] },
-    { cardIds: [OCC_A, OCC_B, '__not_in_hand__'] },
-  ])('rejects an invalid occupation subset $cardIds atomically before randomness, then accepts a legal subset', ({ cardIds }) => {
+    { scenario: 'duplicate cards', cardIds: [OCC_A, OCC_A, OCC_A] },
+    { scenario: 'too few cards', cardIds: [OCC_A, OCC_B] },
+    { scenario: 'a card outside the hand', cardIds: [OCC_A, OCC_B, '__not_in_hand__'] },
+  ])('rejects $scenario atomically before randomness, then accepts a legal subset', ({ cardIds }) => {
     const session = makeSession({ wood: 1, gameSeed: 42 })
     const initial = playA3(session)
     const before = JSON.stringify(session.state)
@@ -458,10 +458,7 @@ describe('A003_PaperKnife session-tier: flow', () => {
   // Case 6: Picked occupation's onBuy fires (A117_WoodCarrier grants wood)
   // ---------------------------------------------------------------------------
   it('case 6: the randomly picked occupation onBuy fires — A117 grants wood per improvement', () => {
-    // A117_WoodCarrier onBuy: grants 1 wood per improvement (major + minor) already in play.
-    // We pre-load a minor improvement so A117 grants >= 1 wood when played.
-    // This asserts that the full occupation path runs (fixing the pre-rewrite bypass).
-    const session = makeSession({ wood: 1, gameSeed: 42 })
+    const session = makeSession({ wood: 1, gameSeed: 7 })
     const state = session.getState().state
 
     const p0 = state.players[0]!
@@ -478,33 +475,23 @@ describe('A003_PaperKnife session-tier: flow', () => {
     expect(a3Resp.interaction.stateId).toBe('wait')
     if (a3Resp.interaction.stateId !== 'wait') return
 
-    // Record wood after A3's wood cost was paid
-    const woodAfterA3Pay = a3Resp.state.players[0]!.resources.wood
+    expect(a3Resp.state.players[0]!.resources.wood).toBe(0)
 
-    // Commit OCC_A, OCC_B, OCC_C — may include OCC_B (A117) as one of the 3
     const commitResp = session.commitSelectionChoice(0, { cardIds: [OCC_A, OCC_B, OCC_C] })
     expect(commitResp.ok).toBe(true)
 
     expect(commitResp.interaction.stateId).toBe('wait')
     if (commitResp.interaction.stateId !== 'wait') return
     const pick = commitResp.state.players[0]!.cardStates?.[SESSION_CARD_ID]?.privateData?.pick
-    expect(pick).toBeDefined()
+    expect(pick).toBe(OCC_B)
     const acceptOption = getChoiceOptions(commitResp)?.find((option) => option.value !== '__skip__')
     expect(acceptOption).toBeDefined()
     const acceptResp = session.resolveChoice(0, acceptOption!.value)
     expect(acceptResp.ok).toBe(true)
     const p0After = acceptResp.state.players[0]!
-    // The pick must be in occupationPlayed
-    expect(p0After.occupationPlayed).toContain(pick)
-
-    if (pick === OCC_B) {
-      // A117 onBuy fired → grants wood per improvement.
-      // p0 has A010_WoodenShed in minorPlayed (pre-loaded) + A3 was just added to minorPlayed
-      // = at least 2 minor improvements, so wood should increase by >= 2.
-      // Use >= woodAfterA3Pay + 1 as a conservative lower bound to accommodate timing variance.
-      // This assertion would FAIL on the pre-rewrite impl (which bypasses onBuy entirely).
-      expect(p0After.resources.wood).toBeGreaterThanOrEqual(woodAfterA3Pay + 1)
-    }
+    expect(p0After.occupationPlayed).toContain(OCC_B)
+    expect(p0After.minorPlayed).toEqual(['A010_WoodenShed'])
+    expect(p0After.resources.wood).toBe(1)
   })
 
 
