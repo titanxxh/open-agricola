@@ -509,7 +509,7 @@ const resp = session.takeAction(X, 'ACTION_ID')
 
 批次修改的额外原生回归文件，在迁移清单的 `nativeScope` 中用 `{ file, reason }` 显式登记。它们与已映射目标共同进入严格类型门禁和候选行为验收。路径必须是工作区内已存在的测试文件，不得重复，且理由不能为空。此检查范围不新增或替代任何源场景映射。
 
-观测 `GameState` 原值的副本使用 `shared/session/history-streams` 的 `captureStateWithHistory`。`cloneState`、`cloneStateWithHistory` 和 `normalizeState` 会归一化数据，可能掩盖返回值中的差异；只在真实 `GameSession` / `GameCore` 构造器或其 `loadState` 操作内部使用。以归一化为被测对象的测试必须调用 `server/__tests__/_helpers/normalization-subject` 的 `normalizationSubject(normalizeState, ...args)`；仅归一化函数字面参数获得豁免，其余参数及回调仍被检查。native 门禁通过真实编译器符号追踪目标文件及其实际测试 helper 中的别名和重导出。撤销预期必须在命令前从 live Session 或纯观测副本捕获，并在重试前比较完整规则、分数、返回和 live 交互以及实际玩家。已确认的恢复差异用该场景的明确预期值表达，不能通过归一化抹掉字段。
+观测 `GameState` 原值的副本使用 `shared/session/history-streams` 的 `captureStateWithHistory`。`cloneState`、`cloneStateWithHistory` 和 `normalizeState` 会归一化数据，可能掩盖返回值中的差异；只用于直接传入真实 `GameSession` / `GameCore` 构造器或其 `loadState` 操作的待加载状态。构造器的 `state` 包装字段或 `stateOrSeed` 选项承载待加载状态；receiver、其他参数、元数据和回调不属于待加载状态。以归一化为被测对象的测试必须调用 `server/__tests__/_helpers/normalization-subject` 的 `normalizationSubject(normalizeState, ...args)`；仅归一化函数字面参数获得豁免，其余参数及回调仍被检查。native 门禁通过真实编译器符号追踪所有实际纳入的本地源码，仅排除 canonical Session 与归一化实现的运行时导入闭包。helper 目录名不提供豁免，纯类型导入也不授予生产代码归属。撤销预期必须在命令前从 live Session 或纯观测副本捕获，并在重试前比较完整规则、分数、返回和 live 交互以及实际玩家。已确认的恢复差异用该场景的明确预期值表达，不能通过归一化抹掉字段。
 
 C131 N3 以当前 OA 的蔬菜 `0` 作为回归预期。此前蔬菜 `1` 的对照保留在暂缓的规则讨论中（[#1175](https://github.com/titanxxh/open-agricola/issues/1175)、[#1181](https://github.com/titanxxh/open-agricola/issues/1181)）。该对照不构成官方裁定，也不要求在这次测试迁移中修改生产行为。
 

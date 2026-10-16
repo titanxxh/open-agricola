@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest'
 import path from 'node:path'
 import ts from 'typescript'
-import { normalizingSnapshotViolations } from '../test-snapshot-policy.mjs'
+import { normalizingSnapshotViolations, snapshotSourcePartition } from '../test-snapshot-policy.mjs'
 
 const inspect = (source: string) => inspectProgram(source)
 
@@ -75,13 +75,13 @@ new Unrelated({ state: cloneState(response.state) })
   expect(inspect(source).map(issue => issue.helper)).toEqual(['cloneState'])
 })
 
-const inspectProgram = (source: string, helpers: Record<string, string> = {}) => {
+const fixtureProgram = (source: string, helpers: Record<string, string> = {}) => {
   const root = path.resolve('/snapshot-policy-fixture')
   const filename = path.join(root, 'server/__tests__/observation.test.ts')
   const files = new Map(Object.entries({
     'shared/session/state-bootstrap.ts': ['cloneState', 'cloneStateWithHistory', 'normalizeState', 'createInitialState'].map(name => `export const ${name} = <T>(state: T): T => state`).join(';'),
-    'shared/session/session-core.ts': 'export class GameCore { constructor(..._args: unknown[]) {} loadState(state: unknown) { return state } }',
-    'server/game/authoritative-session.ts': "import { GameCore } from '../../shared/session/session-core'; export class GameSession extends GameCore {}",
+    'shared/session/session-core.ts': 'export class GameCore { constructor(_options: { stateOrSeed?: unknown; initialStateOptions?: unknown } = {}) {} loadState(state: unknown) { return state } }',
+    'server/game/authoritative-session.ts': "import { GameCore } from '../../shared/session/session-core'; export class GameSession extends GameCore { constructor(stateOrSeed?: unknown, _cards?: unknown, _options?: unknown) { super({ stateOrSeed }) } }",
     'server/__tests__/_helpers/normalization-subject.ts': 'export function normalizationSubject<A extends unknown[], R>(subject: (...args: A) => R, ...args: A): R { return subject(...args) }',
     ...helpers,
     'server/__tests__/observation.test.ts': source,
@@ -102,7 +102,12 @@ const inspectProgram = (source: string, helpers: Record<string, string> = {}) =>
     return text === undefined ? originalGet(file, language, ...rest) : ts.createSourceFile(file, text, language, true)
   }
   const program = ts.createProgram([...files.keys()], options, host)
-  return normalizingSnapshotViolations(source, filename, program)
+  return { source, filename, program }
+}
+
+const inspectProgram = (source: string, helpers: Record<string, string> = {}) => {
+  const fixture = fixtureProgram(source, helpers)
+  return normalizingSnapshotViolations(source, fixture.filename, fixture.program)
 }
 
 it('rejects an unrelated loadState while allowing an actual Session instance restore', () => {
@@ -156,4 +161,87 @@ it('rejects a normalizing namespace obtained through a dynamic import', () => {
 }`
   expect(inspectProgram(source).map(issue => issue.helper)).toEqual(['state-bootstrap namespace'])
   expect(inspectProgram("async function fixture() { return (await import('../../shared/session/state-bootstrap')).createInitialState({ value: 1 }) }")).toEqual([])
+})
+
+it('rejects normalization in restore receivers, other arguments, metadata, and callbacks', () => {
+  const source = `import { cloneState } from '../../shared/session/state-bootstrap'
+import { GameSession } from '../game/authoritative-session'
+import { GameCore } from '../../shared/session/session-core'
+const session = new GameSession()
+const saved = { value: 1 }
+function getSession(_state: unknown) { return session }
+getSession(cloneState(saved)).loadState(saved)
+session.loadState(saved, cloneState(saved))
+new GameSession(saved, undefined, { playerCount: cloneState(saved) })
+new GameSession({ state: saved, sessionCursor: cloneState(saved) })
+new GameCore({ stateOrSeed: saved, initialStateOptions: cloneState(saved) })
+session.loadState({ callback: () => cloneState(saved) })
+session.loadState(getSession(cloneState(saved)))
+`
+  expect(inspectProgram(source).map(issue => issue.helper)).toEqual(Array(7).fill('cloneState'))
+})
+
+it('allows only direct restored state values and the actual state wrapper fields', () => {
+  const source = `import { cloneState } from '../../shared/session/state-bootstrap'
+import { GameSession } from '../game/authoritative-session'
+import { GameCore } from '../../shared/session/session-core'
+const session = new GameSession()
+const saved = { value: 1 }
+session.loadState((cloneState(saved)))
+session.loadState({ state: cloneState(saved), sessionCursor: {} })
+new GameSession(cloneState(saved))
+new GameSession({ state: cloneState(saved), sessionCursor: {} })
+new GameCore({ stateOrSeed: cloneState(saved) })
+new GameCore({ stateOrSeed: { state: cloneState(saved), sessionCursor: {} } })
+class Inherited extends GameSession {}
+new Inherited(cloneState(saved))
+class Changed extends GameSession { constructor(option: unknown) { super(); void option } }
+new Changed(cloneState(saved))
+`
+  expect(inspectProgram(source).map(issue => issue.helper)).toEqual(['cloneState'])
+})
+
+it('checks arbitrary helper paths and re-exports despite type-only production edges', () => {
+  const fixture = fixtureProgram(`import { observe } from '../test-support/snapshots'
+import { copied } from '../../arbitrary/barrel'
+observe({ value: 1 }); copied({ value: 1 })`, {
+    'shared/session/session-core.ts': "import type { Tag } from '../../server/test-support/snapshots'; import { type Other } from '../../arbitrary/types'; export class GameCore {}",
+    'server/test-support/snapshots.ts': "import { cloneState } from '../../shared/session/state-bootstrap'; export type Tag = {}; export const observe = (state: object) => cloneState(state)",
+    'arbitrary/types.ts': 'export type Other = {}',
+    'arbitrary/barrel.ts': "export { cloneState as copied } from '../shared/session/state-bootstrap'",
+  })
+  const partition = snapshotSourcePartition(fixture.program, new Set(fixture.program.getSourceFiles().map(file => path.resolve(file.fileName))))
+  const issues = partition.observationFiles.flatMap(file => normalizingSnapshotViolations(fixture.program.getSourceFile(file)!.text, file, fixture.program))
+  expect(issues.map(issue => path.relative(fixture.program.getCurrentDirectory(), issue.file)).sort()).toEqual([
+    'server/__tests__/observation.test.ts', 'server/test-support/snapshots.ts',
+  ])
+  expect(partition.observationFiles).toContain(path.join(fixture.program.getCurrentDirectory(), 'arbitrary/barrel.ts'))
+  expect(partition.observationFiles).toContain(path.join(fixture.program.getCurrentDirectory(), 'arbitrary/types.ts'))
+})
+
+it('keeps value re-exports and literal dynamic imports inside production ownership', () => {
+  const fixture = fixtureProgram('export {}', {
+    'shared/session/session-core.ts': "export class GameCore {}; export { preview } from '../production/barrel'; export async function dynamic() { return import('../production/dynamic') }",
+    'shared/production/barrel.ts': "export { preview } from './preview'",
+    'shared/production/preview.ts': "import { cloneState } from '../session/state-bootstrap'; export const preview = (state: object) => cloneState(state)",
+    'shared/production/dynamic.ts': "import { normalizeState } from '../session/state-bootstrap'; export const load = (state: object) => normalizeState(state)",
+  })
+  const partition = snapshotSourcePartition(fixture.program, new Set(fixture.program.getSourceFiles().map(file => path.resolve(file.fileName))))
+  expect(partition.runtimeFiles).toEqual(expect.arrayContaining(['shared/production/barrel.ts', 'shared/production/preview.ts', 'shared/production/dynamic.ts'].map(file => path.join(fixture.program.getCurrentDirectory(), file))))
+  expect(partition.observationFiles.flatMap(file => normalizingSnapshotViolations(fixture.program.getSourceFile(file)!.text, file, fixture.program))).toEqual([])
+})
+
+it('does not require Sessions for pure domain tests or explicit normalization subjects', () => {
+  const fixture = fixtureProgram(`import { normalizeState } from '../../shared/session/state-bootstrap'
+import { normalizationSubject } from './_helpers/normalization-subject'
+normalizationSubject(normalizeState, { value: 1 })`, {
+    'server/game/authoritative-session.ts': 'export {}',
+    'shared/session/session-core.ts': 'export {}',
+  })
+  const partition = snapshotSourcePartition(fixture.program, new Set(fixture.program.getSourceFiles().map(file => path.resolve(file.fileName))))
+  expect(partition.runtimeFiles).toContain(path.join(fixture.program.getCurrentDirectory(), 'shared/session/state-bootstrap.ts'))
+  expect(partition.observationFiles.flatMap(file => normalizingSnapshotViolations(fixture.program.getSourceFile(file)!.text, file, fixture.program))).toEqual([])
+  expect(inspectProgram("import { cloneState } from '../../shared/session/state-bootstrap'; new Map([[1, cloneState({ value: 1 })]])", {
+    'server/game/authoritative-session.ts': 'export {}', 'shared/session/session-core.ts': 'export {}',
+  }).map(issue => issue.helper)).toEqual(['cloneState'])
 })
