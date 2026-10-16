@@ -122,13 +122,18 @@ describe("A105 command boundaries", () => {
         for (let n = 0; n < 8 && response.interaction.stateId === 'wait'; n++) {
             const request = expectWait(response).interaction.request;
             if (request.kind === 'select-trigger') {
-                const option = request.options.find(o => o.value === first) ?? request.options[0];
-                assert.ok(option);
+                const other = first === BARROW ? 'A018_WheelPlow' : BARROW;
+                const option = request.options.find(option => option.value === first)
+                    ?? request.options.find(option => option.value === other);
+                assert.ok(option, JSON.stringify(response.interaction));
+                assert.equal(option.disabled ?? false, false);
                 response = ok(session.resolveChoice(0, option.value));
             }
             else if (request.kind === 'choice') {
-                const option = request.options.find(o => o.value !== '__skip__');
-                assert.ok(option);
+                assert.equal(response.interaction.sourceCard, 'A018_WheelPlow');
+                const matching = request.options.filter(option => option.sourceCard === 'A018_WheelPlow' && !option.disabled);
+                assert.equal(matching.length, 1, JSON.stringify(response.interaction));
+                const option = matching[0]!;
                 response = ok(session.resolveChoice(0, option.value));
             }
             else

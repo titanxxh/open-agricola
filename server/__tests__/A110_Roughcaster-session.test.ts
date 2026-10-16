@@ -184,11 +184,17 @@ describe("A110 command boundaries", () => {
         }
         assert.ok(r.interaction.stateId === 'wait' && expectWait(r).interaction.request.kind === 'farm-select');
         let completed = ok(session.commitSelectionChoice(actor, stable ? { stables: [{ row: 0, col: 1 }] } : { rooms: Array.from({ length: count }, (_, i) => ({ row: i + 1, col: 1 })) }));
-        if (completed.interaction.stateId === 'wait' && expectWait(completed).interaction.request.kind === 'choice') {
-            const skip = getChoiceOptions(completed).find(o => o.value === '__skip__' || o.value === '__done__');
-            if (skip)
-                completed = ok(session.resolveChoice(actor, skip.value));
-        }
+        sessionEvidence.record('A110-build-sequence-stage', { stable, count, actor, response: completed });
+        assert.ok(completed.interaction.stateId === 'wait');
+        assert.equal(completed.interaction.promptKey, 'ui.interactionFarmExpansionSelect');
+        assert.equal(completed.interaction.request.kind, 'choice');
+        const remaining = getChoiceOptions(completed).filter(option => option.labelKey === (stable ? 'actions.construct.name' : 'actions.stables.name'));
+        assert.equal(remaining.length, 1, JSON.stringify(completed.interaction));
+        const done = getChoiceOptions(completed).find(option => option.value === '__done__');
+        assert.ok(done);
+        completed = ok(session.resolveChoice(actor, done.value));
+        assert.ok(completed.interaction.stateId === 'wait');
+        assert.deepEqual(completed.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 - actor });
         return completed;
     }
     it("one and two clay rooms reward three food once but wood stone and stable do not", () => {
