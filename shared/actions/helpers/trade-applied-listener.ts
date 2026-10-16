@@ -1,4 +1,4 @@
-import type { ActionHookRegistry } from '../hooks'
+import { requireActionHookRegistry, type ActionHookRegistry } from '../hooks'
 import type { ActionSpace, GameState, PlayerState, Resource } from '../../contract/types'
 import type { DraftGameEvent, EventSink } from '../../contract/events'
 import type { Trade } from '../../contract/types'
@@ -29,5 +29,6 @@ export const dispatchTradeAppliedListener = (
     extraData: { sourceId, times, ...(preResources ? { preResources } : {}) },
     transactionEvents,
   })
-  executeImmediateSpecialEffectFlows({ state, player, space, eventSink, results })
+  if (results.length === 0) return
+  executeImmediateSpecialEffectFlows({ actionHooks: requireActionHookRegistry(actionHooks), state, player, space, eventSink, results })
 }

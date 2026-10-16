@@ -129,12 +129,16 @@ describe('E091_PlowBuilder session', () => {
     const session = setup(4, { joineryUsed: false })
     const state = session.getState().state
     const player = state.players[0]!
-    dispatchTradeAppliedListener(
+    session.withCtx(() => dispatchTradeAppliedListener(
       state,
       player,
       { from: { wood: 1 }, to: { food: 2 }, sourceId: 'Major_Joinery' },
       1,
-    )
+      undefined,
+      [],
+      undefined,
+      session.actionHooks,
+    ))
     expect(readCardExtraData<boolean>(player, CARD_ID, 'usedJoinery')).toBeFalsy()
     session.loadState(state)
 
@@ -256,12 +260,16 @@ describe('E091_PlowBuilder session', () => {
     session.loadState(state)
 
     expect(readCardExtraData<boolean>(player, CARD_ID, 'usedJoinery')).toBeUndefined()
-    dispatchTradeAppliedListener(
+    session.withCtx(() => dispatchTradeAppliedListener(
       state,
       player,
       { from: { wood: 1 }, to: { food: 2 }, sourceId: 'Major_Joinery' },
       1,
-    )
+      undefined,
+      [],
+      undefined,
+      session.actionHooks,
+    ))
     expect(readCardExtraData<boolean>(player, CARD_ID, 'usedJoinery')).toBe(true)
   })
 
@@ -279,12 +287,16 @@ describe('E091_PlowBuilder session', () => {
     player.occupationPlayed.push(CARD_ID)
     session.loadState(state)
 
-    dispatchTradeAppliedListener(
+    session.withCtx(() => dispatchTradeAppliedListener(
       state,
       player,
       { from: { wood: 1 }, to: { food: 2 }, sourceId },
       1,
-    )
+      undefined,
+      [],
+      undefined,
+      session.actionHooks,
+    ))
     expect(readCardExtraData<boolean>(player, CARD_ID, 'usedJoinery')).toBeFalsy()
   })
 
@@ -298,12 +310,16 @@ describe('E091_PlowBuilder session', () => {
     player.occupationPlayed.push(CARD_ID)
     session.loadState(state)
 
-    dispatchTradeAppliedListener(
+    session.withCtx(() => dispatchTradeAppliedListener(
       state,
       player,
       { from: { wood: 1 }, to: { food: 2 }, sourceId: 'Major_Joinery2' },
       1,
-    )
+      undefined,
+      [],
+      undefined,
+      session.actionHooks,
+    ))
     expect(readCardExtraData<boolean>(player, CARD_ID, 'usedJoinery')).toBe(true)
   })
 
