@@ -1,45 +1,68 @@
-import { describe, expect, it } from 'vitest'
-import { GameSession } from '../../../../server/game/authoritative-session'
-import type { ActionExecutionContext, ActionSpace } from '../../../contract/types'
+import { afterEach, describe, expect, it } from 'vitest'
+import type { GameSession } from '../../../../server/game/authoritative-session'
+import { createWorkSession } from '../../../../server/__tests__/_helpers/session-fixtures'
+import type { ActionExecutionContext } from '../../../contract/types'
 import { setWorkersAtHome } from '../../../domain/player'
 import { createInitialPlayerStats } from '../../../session/stats'
 import { placeFarmerAction } from '../place-farmer'
 
-const makeCtx = (actionContext: Record<string, unknown> = {}): ActionExecutionContext => {
-  const session = new GameSession(undefined, undefined, { playerCount: 2 })
+const sessions: GameSession[] = []
+afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+
+const makeCtx = (
+  actionContext: Record<string, unknown> = {},
+  seed = 42,
+  sheep = 1,
+): ActionExecutionContext => {
+  const session = createWorkSession({ seed, configure(state) {
+    state.currentPlayerIndex = 0
+    state.round = 14
+    for (const space of state.actionSpaces) space.takenBy = []
+    state.actionSpaces.find(space => space.id === 'forest')!.resources.wood = 3
+    state.actionSpaces.find(space => space.id === 'sheep-market')!.resources.sheep = sheep
+    const player = state.players[0]!
+    setWorkersAtHome(state, player, 2)
+    player.stats = createInitialPlayerStats({ isFirstPlayer: true })
+  } })
+  sessions.push(session)
   const state = session.getState().state
-  state.currentPlayerIndex = 0
-  state.round = 14
-  state.actionSpaces = state.actionSpaces.filter((space) =>
-    ['forest', 'sheep-market', 'farmland'].includes(space.id),
-  )
-  for (const space of state.actionSpaces) {
-    space.takenBy = []
-  }
-  const farmland = state.actionSpaces.find((space) => space.id === 'farmland')!
-  farmland.execute = () => ({
-    type: 'flow' as const,
-    flow: { type: 'leaf' as const, actionId: 'plow' },
-  })
-
+  state.actionSpaces = state.actionSpaces.filter(space =>
+    ['forest', 'sheep-market', 'farmland'].includes(space.id))
   const player = state.players[0]!
-  setWorkersAtHome(state, player, 2)
-  player.stats = createInitialPlayerStats({ isFirstPlayer: true })
-
   return {
     state,
     player,
-    space: state.actionSpaces[0] as ActionSpace,
+    space: state.actionSpaces.find(space => space.id === 'forest')!,
     actionContext,
-  } as ActionExecutionContext
+  }
 }
 
 describe('place-farmer extra placement', () => {
-  it('filters extra placement choices by actionContext.constraints', () => {
-    const result = placeFarmerAction.execute(makeCtx({ constraints: ['sheep-market'] }))
+  it.each([1, 42, 9707])('filters extra placement choices by constraints with seed %s', seed => {
+    const ctx = makeCtx({}, seed)
+    const unconstrained = placeFarmerAction.execute(ctx)
+    expect(unconstrained.type).toBe('request')
+    if (unconstrained.type !== 'request' || unconstrained.request.kind !== 'choice') throw new Error('Expected placement options')
+    expect(unconstrained.request.options.map(option => option.value).sort()).toEqual(['farmland', 'forest', 'sheep-market'])
+
+    ctx.actionContext = { constraints: ['sheep-market'] }
+    const result = placeFarmerAction.execute(ctx)
     expect(result.type).toBe('request')
-    if (result.type !== 'request' || result.request.kind !== 'choice') return
+    if (result.type !== 'request' || result.request.kind !== 'choice') throw new Error('Expected constrained placement options')
     expect(result.request.options.map((option) => option.value)).toEqual(['sheep-market'])
+  })
+
+  it.each([1, 42, 9707])('rejects an empty constrained target despite other legal spaces with seed %s', seed => {
+    const ctx = makeCtx({}, seed, 0)
+    const unconstrained = placeFarmerAction.execute(ctx)
+    expect(unconstrained.type).toBe('request')
+    if (unconstrained.type !== 'request' || unconstrained.request.kind !== 'choice') throw new Error('Expected placement options')
+    expect(unconstrained.request.options.map(option => option.value).sort()).toEqual(['farmland', 'forest'])
+
+    ctx.actionContext = { constraints: ['sheep-market'] }
+    const result = placeFarmerAction.execute(ctx)
+    expect(result).toMatchObject({ type: 'fail', errorKey: 'log.placeFarmerFail' })
+    expect(ctx.state.actionSpaces.every(space => space.takenBy.length === 0)).toBe(true)
   })
 
   it('rejects resolving a target outside actionContext.constraints', () => {
