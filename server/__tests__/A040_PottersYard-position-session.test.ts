@@ -744,26 +744,26 @@ describe("A040 command boundaries", () => {
     assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'farm-select', JSON.stringify(r.interaction))
     return r
   }
-  function finish(s: GameSession, r: SessionResponse) {
-    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice') {
-      assert.equal(r.interaction.sourceCard, A040)
-      assert.equal(r.interaction.playerIndex, 0)
-      assert.equal(r.state.currentPlayerIndex, 0)
-      assert.ok(opts(r).some(option => option.value === '__skip__' && !option.disabled))
-      r = ok(s.resolveChoice(0, '__skip__'))
-    }
-    return confirmed(r)
-  }
-  function exchange(s: GameSession, r: SessionResponse, partial = false) {
+  function exchangeOffer(r: SessionResponse) {
     assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice', JSON.stringify(r.interaction))
     assert.equal(r.interaction.sourceCard, A040)
+    assert.equal(r.interaction.promptKey, 'ui.interactionFlowSelect')
     assert.equal(r.interaction.playerIndex, 0)
     assert.equal(r.state.currentPlayerIndex, 0)
-    if (partial)
-      assert.equal(r.state.players[0]!.resources.clay, 2)
     const choices = opts(r).filter(option => !option.disabled && option.effectPreview?.kind === 'resourceExchange' && option.effectPreview.resourcesPaid?.clay === 1 && option.effectPreview.resourcesGained?.food === 2)
     assert.equal(choices.length, 1, JSON.stringify(r.interaction))
-    return finish(s, ok(s.resolveChoice(0, choices[0]!.value)))
+    assert.ok(opts(r).some(option => option.value === '__skip__' && !option.disabled))
+    return choices[0]!
+  }
+  function declineExchange(s: GameSession, r: SessionResponse) {
+    exchangeOffer(r)
+    return confirmed(ok(s.resolveChoice(0, '__skip__')))
+  }
+  function exchange(s: GameSession, r: SessionResponse, partial = false) {
+    const choice = exchangeOffer(r)
+    if (partial)
+      assert.equal(r.state.players[0]!.resources.clay, 2)
+    return confirmed(ok(s.resolveChoice(0, choice.value)))
   }
   function plow(s: GameSession) {
     return ok(s.commitSelectionChoice(0, { tile }))
@@ -782,7 +782,7 @@ describe("A040 command boundaries", () => {
     const s = boughtPotter(potter())
     turn(s, 0, 'farmland')
     assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { tile: { row: 1, col: 0 } }))
-    const r = finish(s, plow(s))
+    const r = declineExchange(s, plow(s))
     assert.equal(r.state.players[0]!.fields.length, 7)
     assert.equal(r.state.players[0]!.resources.clay, 1)
     assert.equal(r.state.players[0]!.resources.food, 40)
@@ -819,7 +819,7 @@ describe("A040 command boundaries", () => {
     assert.equal(remaining(s.getState()), 7)
     assert.equal(s.getState().state.players[1]!.resources.clay, 0)
     turn(s, 0, 'fencing')
-    const r = finish(s, ok(s.commitSelectionChoice(0, { edges, extraWood: 0 })))
+    const r = declineExchange(s, ok(s.commitSelectionChoice(0, { edges, extraWood: 0 })))
     assert.equal(r.state.players[0]!.pastures.flatMap(p => p.tiles).length, 1)
     assert.equal(r.state.players[0]!.resources.wood, 0)
     assert.equal(r.state.players[0]!.resources.clay, 1)
@@ -832,11 +832,11 @@ describe("A040 command boundaries", () => {
       let r: SessionResponse
       if (used === 'pasture') {
         farm(s, 'stables')
-        r = finish(s, ok(s.commitSelectionChoice(0, { stables: [tile] })))
+        r = confirmed(ok(s.commitSelectionChoice(0, { stables: [tile] })))
       }
       else {
         turn(s, 0, 'fencing')
-        r = finish(s, ok(s.commitSelectionChoice(0, { edges, extraWood: 0 })))
+        r = confirmed(ok(s.commitSelectionChoice(0, { edges, extraWood: 0 })))
       }
       assert.equal(r.state.players[0]!.resources.clay, 0)
       assert.equal(r.state.players[0]!.resources.food, 40)
@@ -867,7 +867,7 @@ describe("A040 command boundaries", () => {
     assert.equal(JSON.stringify(beforeRestored.interaction), beforeInteraction)
     assert.equal(beforeRestored.state.currentPlayerIndex, 0)
     turn(s, 0, 'farmland')
-    const r = finish(s, plow(s))
+    const r = declineExchange(s, plow(s))
     assert.equal(r.state.players[0]!.fields.length, 7)
     assert.equal(r.state.players[0]!.resources.clay, 1)
     assert.equal(r.state.players[0]!.resources.food, 40)
