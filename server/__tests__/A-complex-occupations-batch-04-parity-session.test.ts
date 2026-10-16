@@ -1,5 +1,6 @@
+import { captureStateWithHistory } from '../../shared/session/history-streams'
 import { takeMajorImprovementFromSupply } from '../../shared/cards/major/supply'
-import { expectFarmSelection, expectTileFarmSelection , assertEmptyAccumulationRejected } from './_helpers/session-assertions'
+import { expectFarmSelection, expectTileFarmSelection, assertEmptyAccumulationRejected } from './_helpers/session-assertions'
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -855,8 +856,11 @@ describe("A098 command boundaries", () => {
     });
     it("real fencing stops stable bonus and public undo restores it before retry", () => {
         const session = setup(state => state.players[0]!.stableTiles = [{ row: 0, col: 1 }]);
-        const undoInteraction = JSON.stringify(session.getState().interaction);
-        const before = session.getState();
+        const rawBefore = { ...session.getState(), state: captureStateWithHistory(session.getState().state), interaction: structuredClone(session.getState().interaction), scores: structuredClone(session.getState().scores) };
+        assert.equal(rawBefore.interaction.stateId, 'idle');
+        assert.equal(rawBefore.state.currentPlayerIndex, 0);
+        const undoInteraction = JSON.stringify(rawBefore.interaction);
+        const before = rawBefore;
         assert.equal(bonus(before, ARCH), 1);
         const edges = ['H-0-1', 'H-1-1', 'V-0-1', 'V-0-2'];
         function fence() { ok(session.takeAction(0, 'fencing')); return ok(session.commitSelectionChoice(0, { edges, extraWood: 0 })); }
@@ -864,6 +868,13 @@ describe("A098 command boundaries", () => {
         assert.equal(bonus(response, ARCH), 0);
         assert.equal(response.state.players[0]!.resources.wood, 11);
         const undone = ok(session.undoAction());
+        save('A098-raw-undo', { before: rawBefore, undone });
+        assertUndoRestored(undoRuleSnapshot(rawBefore), undone);
+        const live = session.getState();
+        assertUndoRestored(undoRuleSnapshot(rawBefore), live);
+        assert.deepEqual(live.interaction, rawBefore.interaction);
+        assert.equal(live.interaction.stateId, 'idle');
+        assert.equal(live.state.currentPlayerIndex, 0);
         assert.equal(JSON.stringify(undone.interaction), undoInteraction);
         assert.equal(undone.interaction.stateId, 'idle');
         assert.equal(undone.state.currentPlayerIndex, 0);
@@ -966,10 +977,20 @@ describe("A107 command boundaries", () => {
     });
     it("whole action undo restores pile order and food before exactly one retry", () => {
         const session = setup(state => state.actionSpaces.find(s => s.id === 'forest')!.resources.wood = 5);
-        const undoInteraction = JSON.stringify(session.getState().interaction);
+        const rawBefore = { ...session.getState(), state: captureStateWithHistory(session.getState().state), interaction: structuredClone(session.getState().interaction), scores: structuredClone(session.getState().scores) };
+        assert.equal(rawBefore.interaction.stateId, 'idle');
+        assert.equal(rawBefore.state.currentPlayerIndex, 0);
+        const undoInteraction = JSON.stringify(rawBefore.interaction);
         const response = turn(session, 0, 'forest');
         assert.equal(response.state.players[0]!.resources.food, 41);
         const undone = ok(session.undoAction());
+        save('A107-raw-undo', { before: rawBefore, undone });
+        assertUndoRestored(undoRuleSnapshot(rawBefore), undone);
+        const live = session.getState();
+        assertUndoRestored(undoRuleSnapshot(rawBefore), live);
+        assert.deepEqual(live.interaction, rawBefore.interaction);
+        assert.equal(live.interaction.stateId, 'idle');
+        assert.equal(live.state.currentPlayerIndex, 0);
         assert.equal(JSON.stringify(undone.interaction), undoInteraction);
         assert.equal(undone.interaction.stateId, 'idle');
         assert.equal(undone.state.currentPlayerIndex, 0);

@@ -8,8 +8,9 @@ import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites
 import { type FenceSegment, type GameState } from '../../shared/contract/types'
 import assert from 'node:assert/strict'
 import { createWorkSession } from './_helpers/session-fixtures'
-import { assertRejectedUnchanged, getChoiceOptions, expectTileFarmSelection } from './_helpers/session-assertions'
+import { assertRejectedUnchanged, assertUndoRestored, undoRuleSnapshot, getChoiceOptions, expectTileFarmSelection } from './_helpers/session-assertions'
 import { createScenarioEvidence } from './_helpers/scenario-evidence'
+import { captureStateWithHistory } from '../../shared/session/history-streams'
 
 const sessionEvidence = createScenarioEvidence(import.meta.url)
 
@@ -287,16 +288,52 @@ describe("E001 command boundaries", () => {
         assert.deepEqual(r.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 });
         assert.equal(r.interaction.playerIndex, 0);
         assert.equal(r.state.currentPlayerIndex, 0);
-        save('E001-N3', r);
+        const fresh = setup(2, state => pole(state));
+        assert.equal(fresh.getState().state.players[0]!.stableTiles.length, 0);
+        let freshPending = buy(fresh, POLE);
+        freshPending = optional(fresh, freshPending, true);
+        const farm = expectTileFarmSelection(freshPending, 'stable');
+        assert.equal(farm.farmType, 'stable');
+        assert.ok(farm.farmType === 'stable');
+        const four = [{ row: 0, col: 1 }, { row: 0, col: 2 }, { row: 0, col: 3 }, { row: 1, col: 1 }];
+        for (const tile of four)
+            assert.ok(farm.selectableTiles.some(candidate => candidate.row === tile.row && candidate.col === tile.col));
+        assert.ok(freshPending.interaction.stateId === 'wait');
+        assert.equal(freshPending.interaction.playerIndex, 0);
+        assert.equal(freshPending.state.currentPlayerIndex, 0);
+        const rejected = assertRejectedUnchanged(fresh, () => fresh.commitSelectionChoice(0, { stables: four }));
+        const live = fresh.getState();
+        assert.deepEqual({ state: live.state, interaction: live.interaction, scores: live.scores }, { state: rejected.state, interaction: rejected.interaction, scores: rejected.scores });
+        assert.equal(farm.maxSelections, 3);
+        const built = ok(fresh.commitSelectionChoice(0, { stables: [{ row: 0, col: 1 }, { row: 0, col: 2 }, { row: 0, col: 3 }] }));
+        assert.deepEqual(built.state.players[0]!.stableTiles, [{ row: 0, col: 1 }, { row: 0, col: 2 }, { row: 0, col: 3 }]);
+        assert.equal(built.state.players[0]!.resources.wood, 0);
+        assert.ok(built.state.players[1]!.minorHand.includes(POLE));
+        assert.ok(built.interaction.stateId === 'wait');
+        assert.deepEqual(built.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 });
+        assert.equal(built.interaction.playerIndex, 0);
+        assert.equal(built.state.currentPlayerIndex, 0);
+        save('E001-N3', { r, freshPending, rejected, built });
     });
     it("decline and whole undo preserve fences and restore stable cost and passing", () => {
         const session = setup(2, state => pole(state));
-        const undoInteraction = JSON.stringify(session.getState().interaction);
+        const rawBefore = { ...session.getState(), state: captureStateWithHistory(session.getState().state), interaction: structuredClone(session.getState().interaction), scores: structuredClone(session.getState().scores) };
+        assert.equal(rawBefore.interaction.stateId, 'idle');
+        assert.equal(rawBefore.state.currentPlayerIndex, 0);
+        const undoInteraction = JSON.stringify(rawBefore.interaction);
         const pending = buy(session, POLE);
         const r = optional(session, pending, false);
         assert.equal(r.state.players[0]!.stableTiles.length, 0);
         assert.equal(r.state.players[0]!.resources.wood, 0);
         const undone = ok(session.undoAction());
+        save('E001-raw-undo', { before: rawBefore, undone });
+        assertUndoRestored(undoRuleSnapshot(rawBefore), undone);
+        const undoLive = session.getState();
+        assertUndoRestored(undoRuleSnapshot(rawBefore), undoLive);
+        assert.deepEqual(undone.interaction, rawBefore.interaction);
+        assert.deepEqual(undoLive.interaction, rawBefore.interaction);
+        assert.equal(undoLive.interaction.stateId, 'idle');
+        assert.equal(undoLive.state.currentPlayerIndex, 0);
         assert.equal(JSON.stringify(undone.interaction), undoInteraction);
         assert.equal(undone.interaction.stateId, 'idle');
         assert.equal(undone.state.currentPlayerIndex, 0);
@@ -307,6 +344,39 @@ describe("E001 command boundaries", () => {
         assert.ok(r.interaction.stateId === 'wait');
         assert.deepEqual(r.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 });
         assert.equal(r.state.currentPlayerIndex, 0);
-        save('E001-N4', { r, undone });
+        const accepted = setup(2, state => pole(state));
+        const before = { ...accepted.getState(), state: captureStateWithHistory(accepted.getState().state), interaction: structuredClone(accepted.getState().interaction), scores: structuredClone(accepted.getState().scores) };
+        assert.equal(before.interaction.stateId, 'idle');
+        assert.equal(before.state.currentPlayerIndex, 0);
+        assert.equal(before.state.players[0]!.stableTiles.length, 0);
+        let buildPending = buy(accepted, POLE);
+        buildPending = optional(accepted, buildPending, true);
+        assert.equal(expectTileFarmSelection(buildPending, 'stable').farmType, 'stable');
+        const built = ok(accepted.commitSelectionChoice(0, { stables: [{ row: 0, col: 1 }, { row: 0, col: 2 }, { row: 0, col: 3 }] }));
+        assert.deepEqual(built.state.players[0]!.stableTiles, [{ row: 0, col: 1 }, { row: 0, col: 2 }, { row: 0, col: 3 }]);
+        assert.equal(built.state.players[0]!.resources.wood, 0);
+        assert.ok(built.state.players[1]!.minorHand.includes(POLE));
+        assert.ok(!built.state.players[0]!.minorHand.includes(POLE));
+        assert.ok(built.interaction.stateId === 'wait');
+        assert.deepEqual(built.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 });
+        assert.equal(built.interaction.playerIndex, 0);
+        assert.equal(built.state.currentPlayerIndex, 0);
+        const buildUndone = ok(accepted.undoAction());
+        save('E001-N4-raw-undo', { before, buildUndone });
+        assertUndoRestored(undoRuleSnapshot(before), buildUndone);
+        const live = accepted.getState();
+        assertUndoRestored(undoRuleSnapshot(before), live);
+        assert.deepEqual(buildUndone.interaction, before.interaction);
+        assert.deepEqual(live.interaction, before.interaction);
+        for (const restored of [buildUndone, live]) {
+            assert.equal(restored.interaction.stateId, 'idle');
+            assert.equal(restored.state.currentPlayerIndex, 0);
+            assert.deepEqual(restored.state.players[0]!.stableTiles, []);
+            assert.equal(restored.state.players[0]!.fenceSegments.length, 15);
+            assert.equal(restored.state.players[0]!.resources.wood, 2);
+            assert.ok(restored.state.players[0]!.minorHand.includes(POLE));
+            assert.ok(!restored.state.players[1]!.minorHand.includes(POLE));
+        }
+        save('E001-N4', { r, undone, before, built, buildUndone });
     });
 });

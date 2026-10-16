@@ -1,3 +1,4 @@
+import { captureStateWithHistory } from '../../shared/session/history-streams'
 import { expectWait } from './_helpers/trigger-select'
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
@@ -7,7 +8,7 @@ import '../../shared/cards/A/A105_BarrowPusher'
 import assert from 'node:assert/strict'
 import { type GameState } from '../../shared/contract/types'
 import { createWorkSession } from './_helpers/session-fixtures'
-import { assertRejectedUnchanged, confirmNext, getChoiceOptions, expectTileFarmSelection } from './_helpers/session-assertions'
+import { assertRejectedUnchanged, confirmNext, getChoiceOptions, expectTileFarmSelection, assertUndoRestored, undoRuleSnapshot } from './_helpers/session-assertions'
 import { createScenarioEvidence } from './_helpers/scenario-evidence'
 
 const sessionEvidence = createScenarioEvidence(import.meta.url)
@@ -168,7 +169,33 @@ describe("A105 command boundaries", () => {
         assert.deepEqual(response.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 });
         assert.equal(response.interaction.playerIndex, 0);
         assert.equal(response.state.currentPlayerIndex, 0);
-        save('A105-N2', response);
+        const wheel = setup(state => state.players[0]!.minorPlayed = ['A018_WheelPlow']);
+        turn(wheel, 0, 'farmland');
+        let second = ok(wheel.commitSelectionChoice(0, { tile: { row: 0, col: 1 } }));
+        second = plowTriggers(wheel, second);
+        assert.equal(expectTileFarmSelection(second, 'plow').farmType, 'plow');
+        assert.ok(second.interaction.stateId === 'wait');
+        assert.equal(second.interaction.playerIndex, 0);
+        assert.equal(second.state.currentPlayerIndex, 0);
+        assert.deepEqual(second.state.players[0]!.fields.map(({ row, col }) => ({ row, col })), [{ row: 0, col: 1 }]);
+        assert.equal(second.state.players[0]!.resources.clay, 1);
+        assert.equal(second.state.players[0]!.resources.food, 41);
+        const rejected = assertRejectedUnchanged(wheel, () => wheel.commitSelectionChoice(0, { tile: { row: 0, col: 1 } }));
+        const live = wheel.getState();
+        assert.deepEqual({ state: live.state, interaction: live.interaction, scores: live.scores }, { state: rejected.state, interaction: rejected.interaction, scores: rejected.scores });
+        let completed = ok(wheel.commitSelectionChoice(0, { tile: { row: 0, col: 2 } }));
+        completed = plowTriggers(wheel, completed);
+        assert.equal(expectTileFarmSelection(completed, 'plow').farmType, 'plow');
+        completed = ok(wheel.commitSelectionChoice(0, { tile: { row: 0, col: 3 } }));
+        completed = plowTriggers(wheel, completed);
+        assert.deepEqual(completed.state.players[0]!.fields.map(({ row, col }) => ({ row, col })), [{ row: 0, col: 1 }, { row: 0, col: 2 }, { row: 0, col: 3 }]);
+        assert.equal(completed.state.players[0]!.resources.clay, 3);
+        assert.equal(completed.state.players[0]!.resources.food, 43);
+        assert.ok(completed.interaction.stateId === 'wait');
+        assert.deepEqual(completed.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 });
+        assert.equal(completed.interaction.playerIndex, 0);
+        assert.equal(completed.state.currentPlayerIndex, 0);
+        save('A105-N2', { response, second, rejected, completed });
     });
     it("nonplow opponent and unplayed plow do not grant owner reward", () => {
         const ordinary = turn(setup(), 0, 'day-laborer');
@@ -198,7 +225,10 @@ describe("A105 command boundaries", () => {
     it("three real Wheel Plow fields each award clay and food and undo restores all", () => {
         for (const first of [BARROW, 'A018_WheelPlow']) {
             const session = setup(state => state.players[0]!.minorPlayed = ['A018_WheelPlow']);
-            const undoInteraction = JSON.stringify(session.getState().interaction);
+            const rawBefore = { ...session.getState(), state: captureStateWithHistory(session.getState().state), interaction: structuredClone(session.getState().interaction), scores: structuredClone(session.getState().scores) };
+        assert.equal(rawBefore.interaction.stateId, 'idle');
+        assert.equal(rawBefore.state.currentPlayerIndex, 0);
+        const undoInteraction = JSON.stringify(rawBefore.interaction);
             let response = turn(session, 0, 'farmland');
             for (let n = 0; n < 3; n++) {
                 response = plowTriggers(session, response, first);
@@ -210,6 +240,13 @@ describe("A105 command boundaries", () => {
             assert.equal(response.state.players[0]!.resources.clay, 3);
             assert.equal(response.state.players[0]!.resources.food, 43);
             const undone = ok(session.undoAction());
+        save('A105-raw-undo', { before: rawBefore, undone });
+        assertUndoRestored(undoRuleSnapshot(rawBefore), undone);
+        const live = session.getState();
+        assertUndoRestored(undoRuleSnapshot(rawBefore), live);
+        assert.deepEqual(live.interaction, rawBefore.interaction);
+        assert.equal(live.interaction.stateId, 'idle');
+        assert.equal(live.state.currentPlayerIndex, 0);
             assert.equal(JSON.stringify(undone.interaction), undoInteraction);
             assert.equal(undone.interaction.stateId, 'idle');
             assert.equal(undone.state.currentPlayerIndex, 0);

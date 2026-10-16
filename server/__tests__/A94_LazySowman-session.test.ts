@@ -1,3 +1,4 @@
+import { captureStateWithHistory } from '../../shared/session/history-streams'
 import { expectWait } from './_helpers/trigger-select'
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
@@ -9,7 +10,7 @@ import '../../shared/cards/C/C151_SowingDirector'
 import assert from 'node:assert/strict'
 import { type ActionChoiceOption, type GameState } from '../../shared/contract/types'
 import { createWorkSession } from './_helpers/session-fixtures'
-import { assertRejectedUnchanged, confirmNext, passPreparationExchanges , getChoiceOptions } from './_helpers/session-assertions'
+import { assertRejectedUnchanged, confirmNext, passPreparationExchanges, getChoiceOptions, assertUndoRestored, undoRuleSnapshot } from './_helpers/session-assertions'
 import { createScenarioEvidence } from './_helpers/scenario-evidence'
 
 const sessionEvidence = createScenarioEvidence(import.meta.url)
@@ -276,6 +277,10 @@ describe("A094 command boundaries", () => {
         turn(session, 0, 'grain-seeds');
         turn(session, 1, 'day-laborer');
         ready(session, 0);
+        const rawBefore = { ...session.getState(), state: captureStateWithHistory(session.getState().state), interaction: structuredClone(session.getState().interaction), scores: structuredClone(session.getState().scores) };
+        assert.equal(rawBefore.interaction.stateId, 'idle');
+        assert.equal(rawBefore.state.currentPlayerIndex, 0);
+        const undoInteraction = JSON.stringify(rawBefore.interaction);
         const response = ok(session.takeAction(0, 'grain-utilization'));
         assert.equal(response.interaction.stateId === 'wait' ? expectWait(response).interaction.request.kind : '', 'engine-blocked');
         assert.equal(workersAvailable(response.state, response.state.players[0]!), 0);
@@ -283,6 +288,14 @@ describe("A094 command boundaries", () => {
         assert.deepEqual(response.state.actionSpaces.find(space => space.id === 'grain-seeds')!.takenBy, [{ playerId: 'p1', workerId: '1' }]);
         assert.equal(response.state.currentPlayerIndex, 0);
         const undone = ok(session.undoAction());
+        save('A094-raw-undo', { before: rawBefore, undone });
+        assertUndoRestored(undoRuleSnapshot(rawBefore), undone);
+        const undoLive = session.getState();
+        assertUndoRestored(undoRuleSnapshot(rawBefore), undoLive);
+        assert.deepEqual(undone.interaction, rawBefore.interaction);
+        assert.deepEqual(undoLive.interaction, rawBefore.interaction);
+        assert.equal(undoLive.interaction.stateId, 'idle');
+        assert.equal(undoLive.state.currentPlayerIndex, 0);
         assert.equal(workersAvailable(undone.state, undone.state.players[0]!), 1);
         assert.deepEqual(undone.state.actionSpaces.find(space => space.id === 'grain-utilization')!.takenBy, []);
         assert.deepEqual(undone.state.actionSpaces.find(space => space.id === 'grain-seeds')!.takenBy, [{ playerId: 'p1', workerId: '1' }]);

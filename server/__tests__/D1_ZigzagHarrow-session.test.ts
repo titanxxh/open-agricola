@@ -1,3 +1,4 @@
+import { captureStateWithHistory } from '../../shared/session/history-streams'
 import { expectWait } from './_helpers/trigger-select'
 import { type GameSession as SessionRuleOwner, GameSession, type SessionResponse } from '../game/authoritative-session'
 import { describe, expect, it } from 'vitest'
@@ -9,7 +10,7 @@ import { D001_ZigzagHarrow } from '../../shared/cards/D/D001_ZigzagHarrow'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 import assert from 'node:assert/strict'
 import { createWorkSession } from './_helpers/session-fixtures'
-import { assertRejectedUnchanged, getChoiceOptions, expectTileFarmSelection } from './_helpers/session-assertions'
+import { assertRejectedUnchanged, getChoiceOptions, expectTileFarmSelection, assertUndoRestored, undoRuleSnapshot } from './_helpers/session-assertions'
 import { createScenarioEvidence } from './_helpers/scenario-evidence'
 
 const sessionEvidence = createScenarioEvidence(import.meta.url)
@@ -234,11 +235,24 @@ describe("D001 command boundaries", () => {
         assert.equal(declined.state.players[0]!.fields.length, 3);
         assert.equal(declined.state.players[0]!.resources.wood, 0);
         const session = setup(1, zigzag);
-        const undoInteraction = JSON.stringify(session.getState().interaction);
+        const rawBefore = { ...session.getState(), state: captureStateWithHistory(session.getState().state), interaction: structuredClone(session.getState().interaction), scores: structuredClone(session.getState().scores) };
+        assert.equal(rawBefore.interaction.stateId, 'idle');
+        assert.equal(rawBefore.state.currentPlayerIndex, 0);
+        const undoInteraction = JSON.stringify(rawBefore.interaction);
         const pending = optional(session, buy(session, ZIG), true);
         assert.equal(expectTileFarmSelection(pending, 'plow').farmType, 'plow');
         const r = ok(session.commitSelectionChoice(0, { tile: expectTileFarmSelection(pending, 'plow').selectableTiles[0] }));
+        assert.equal(r.state.players[0]!.fields.length, 4);
+        assert.equal(r.state.players[0]!.resources.wood, 0);
         const undone = ok(session.undoAction());
+        save('D001-raw-undo', { before: rawBefore, undone });
+        assertUndoRestored(undoRuleSnapshot(rawBefore), undone);
+        const undoLive = session.getState();
+        assertUndoRestored(undoRuleSnapshot(rawBefore), undoLive);
+        assert.deepEqual(undone.interaction, rawBefore.interaction);
+        assert.deepEqual(undoLive.interaction, rawBefore.interaction);
+        assert.equal(undoLive.interaction.stateId, 'idle');
+        assert.equal(undoLive.state.currentPlayerIndex, 0);
         assert.equal(JSON.stringify(undone.interaction), undoInteraction);
         assert.equal(undone.interaction.stateId, 'idle');
         assert.equal(undone.state.currentPlayerIndex, 0);

@@ -1,3 +1,4 @@
+import { captureStateWithHistory } from '../../shared/session/history-streams'
 import { expectWait } from './_helpers/trigger-select'
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
@@ -7,7 +8,7 @@ import { A103_Portmonger_impl } from '../../shared/cards/A/A103_Portmonger'
 import assert from 'node:assert/strict'
 import { type GameState } from '../../shared/contract/types'
 import { createWorkSession } from './_helpers/session-fixtures'
-import { assertRejectedUnchanged, confirmNext } from './_helpers/session-assertions'
+import { assertRejectedUnchanged, confirmNext, assertUndoRestored, undoRuleSnapshot } from './_helpers/session-assertions'
 import { createScenarioEvidence } from './_helpers/scenario-evidence'
 
 const sessionEvidence = createScenarioEvidence(import.meta.url)
@@ -128,10 +129,17 @@ describe("A103 command boundaries", () => {
     function turn(session: GameSession, actor: number, space: string) { ready(session, actor); return ok(session.takeAction(actor, space)); }
     function goods(response: SessionResponse, actor = 0) { const r = response.state.players[actor]!.resources; return { food: r.food, wood: r.wood, clay: r.clay, reed: r.reed, grain: r.grain, vegetable: r.vegetable }; }
     it("original one two three and five food piles give vegetable grain and reed respectively", () => {
-        for (const [amount, resource] of [[1, 'vegetable'], [2, 'grain'], [3, 'reed'], [5, 'reed']] as const) {
+        const cases = [
+            { amount: 1, resource: 'vegetable', expected: { wood: 0, clay: 0, reed: 0, stone: 0, food: 41, grain: 0, vegetable: 1, sheep: 0, boar: 0, cattle: 0, begging: 0 } },
+            { amount: 2, resource: 'grain', expected: { wood: 0, clay: 0, reed: 0, stone: 0, food: 42, grain: 1, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 } },
+            { amount: 3, resource: 'reed', expected: { wood: 0, clay: 0, reed: 1, stone: 0, food: 43, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 } },
+            { amount: 5, resource: 'reed', expected: { wood: 0, clay: 0, reed: 1, stone: 0, food: 45, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 } },
+        ] as const;
+        for (const { amount, resource, expected } of cases) {
             const session = setup(state => state.actionSpaces.find(s => s.id === 'fishing')!.resources.food = amount);
             const response = turn(session, 0, 'fishing');
             assert.equal(response.state.players[0]!.resources[resource], 1);
+            assert.deepEqual(response.state.players[0]!.resources, expected);
             assert.equal(response.state.players[0]!.resources.food, 40 + amount);
             assert.equal(response.state.actionSpaces.find(s => s.id === 'fishing')!.resources.food, 0);
             assert.ok(response.interaction.stateId === 'wait');
@@ -144,10 +152,12 @@ describe("A103 command boundaries", () => {
     it("Day Laborer food and nonfood collection cannot grant accumulation bonuses", () => {
         const response = turn(setup(), 0, 'day-laborer');
         assert.deepEqual(goods(response), { food: 42, wood: 0, clay: 0, reed: 0, grain: 0, vegetable: 0 });
+        assert.deepEqual(response.state.players[0]!.resources, { wood: 0, clay: 0, reed: 0, stone: 0, food: 42, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 });
         const forest = turn(setup(), 0, 'forest');
         assert.equal(forest.state.players[0]!.resources.wood, 3);
         assert.equal(forest.state.players[0]!.resources.reed, 0);
         assert.equal(forest.state.players[0]!.resources.grain, 0);
+        assert.deepEqual(forest.state.players[0]!.resources, { wood: 3, clay: 0, reed: 0, stone: 0, food: 40, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 });
         assert.ok(response.interaction.stateId === 'wait');
         assert.deepEqual(response.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 });
         assert.equal(response.state.currentPlayerIndex, 0);
@@ -175,10 +185,20 @@ describe("A103 command boundaries", () => {
     });
     it("occupied source rejects and whole undo restores pile and exactly one bonus", () => {
         const session = setup(state => state.actionSpaces.find(s => s.id === 'fishing')!.resources.food = 2);
-        const undoInteraction = JSON.stringify(session.getState().interaction);
+        const rawBefore = { ...session.getState(), state: captureStateWithHistory(session.getState().state), interaction: structuredClone(session.getState().interaction), scores: structuredClone(session.getState().scores) };
+        assert.equal(rawBefore.interaction.stateId, 'idle');
+        assert.equal(rawBefore.state.currentPlayerIndex, 0);
+        const undoInteraction = JSON.stringify(rawBefore.interaction);
         let response = turn(session, 0, 'fishing');
         assert.equal(response.state.players[0]!.resources.grain, 1);
         const undone = ok(session.undoAction());
+        save('A103-raw-undo', { before: rawBefore, undone });
+        assertUndoRestored(undoRuleSnapshot(rawBefore), undone);
+        const live = session.getState();
+        assertUndoRestored(undoRuleSnapshot(rawBefore), live);
+        assert.deepEqual(live.interaction, rawBefore.interaction);
+        assert.equal(live.interaction.stateId, 'idle');
+        assert.equal(live.state.currentPlayerIndex, 0);
         assert.equal(JSON.stringify(undone.interaction), undoInteraction);
         assert.equal(undone.interaction.stateId, 'idle');
         assert.equal(undone.state.currentPlayerIndex, 0);
