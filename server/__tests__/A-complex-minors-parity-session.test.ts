@@ -1016,6 +1016,20 @@ describe('A065 command boundaries', () => {
     )
     return s
   }
+  function confirmed(r: SessionResponse, actor = 0) {
+    assert.equal(r.ok, true, r.error)
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, actor)
+    assert.equal(r.state.currentPlayerIndex, actor)
+    assert.equal(r.interaction.request.nextPlayerIndex, 1 - actor)
+    return r
+  }
+  function restoredInteraction(s: GameSession, restored: SessionResponse, beforeInteraction: string) {
+    assert.equal(JSON.stringify(restored.interaction), beforeInteraction)
+    assert.equal(JSON.stringify(s.getState().interaction), beforeInteraction)
+    assert.equal(restored.state.currentPlayerIndex, 0)
+    assert.equal(s.getState().state.currentPlayerIndex, 0)
+  }
   function ok(r: SessionResponse) {
     assert.equal(r.ok, true, r.error)
     return r
@@ -1047,7 +1061,7 @@ describe('A065 command boundaries', () => {
       r.interaction.stateId === 'wait' &&
       r.interaction.request.kind === 'confirm-next-player'
     )
-      r = confirmNext(s, r)
+      r = confirmNext(s, confirmed(r, 1 - actor))
     assert.equal(r.interaction.stateId, 'idle', JSON.stringify(r.interaction))
     assert.equal(r.state.currentPlayerIndex, actor)
     return r
@@ -1075,7 +1089,7 @@ describe('A065 command boundaries', () => {
       r.interaction.promptKey === 'prompt.selectPayment'
     )
       r = choose(s, r, (o) => o.value !== 'cancel')
-    return r
+    return confirmed(r)
   }
   function deny(s: GameSession, card: string) {
     const r = minorMenu(s, card)
@@ -1093,7 +1107,7 @@ describe('A065 command boundaries', () => {
       false,
     )
     const food = r.state.players[0]!.resources.food
-    const retry = ok(s.resolveChoice(0, WAGE))
+    const retry = confirmed(ok(s.resolveChoice(0, WAGE)))
     resource(retry, 'food', food + 2)
     assert.equal(retry.state.players[0]!.minorPlayed.includes(card), false)
   }
@@ -1110,27 +1124,6 @@ describe('A065 command boundaries', () => {
   ) {
     assert.equal(r.state.players[actor]!.resources[key], value)
   }
-  function finishHarvest(s: GameSession, r: SessionResponse) {
-    for (let n = 0; n < 8 && r.interaction.stateId === 'wait'; n++) {
-      const request = r.interaction.request
-      if (request.kind === 'feed')
-        r = ok(
-          s.resolveChoice(r.interaction.playerIndex, 'confirm', {
-            selections: [],
-          }),
-        )
-      else if (request.kind === 'confirm-player-switch')
-        r = ok(s.resolveChoice(r.interaction.playerIndex, 'confirm'))
-      else if (request.kind === 'confirm-next-player') r = confirmNext(s, r)
-      else if (
-        request.kind === 'choice' &&
-        opts(r).some((o) => o.value === '__skip__')
-      )
-        r = ok(s.resolveChoice(r.interaction.playerIndex, '__skip__'))
-      else assert.fail(JSON.stringify(r.interaction))
-    }
-    return r
-  }
   function save(name: string, r: SessionResponse) {
     sessionEvidence.record(name, r)
   }
@@ -1143,16 +1136,24 @@ describe('A065 command boundaries', () => {
   }
   function sowStart(s: GameSession, actor = 0, space = 'grain-utilization') {
     let r = turn(s, actor, space)
-    if (
-      r.interaction.stateId === 'wait' &&
-      r.interaction.request.kind === 'choice'
-    )
-      r = choose(s, r, (o) => o.value === 'sow' || o.value !== '__skip__')
+    if (space === 'forest') {
+      assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice', JSON.stringify(r.interaction))
+      assert.equal(r.interaction.sourceCard, 'A115_ChiefForester')
+      assert.equal(r.interaction.promptKey, 'ui.interactionOptionalAction')
+      assert.equal(r.interaction.playerIndex, actor)
+      assert.equal(r.state.currentPlayerIndex, actor)
+      assert.equal(opts(r).filter(o => o.value !== '__skip__' && !o.disabled).length, 1)
+      r = choose(s, r, o => o.labelKey === 'actions.sow.name' && !('disabled' in o && o.disabled))
+    }
     assert.ok(
       r.interaction.stateId === 'wait' &&
         r.interaction.request.kind === 'farm-select',
       JSON.stringify(r.interaction),
     )
+    assert.equal(r.interaction.playerIndex, actor)
+    assert.equal(r.state.currentPlayerIndex, actor)
+    assert.ok(r.interaction.request.farm.farmType === 'sow')
+    if (space === 'forest') assert.equal(r.interaction.request.farm.maxSelections, 1)
     save('sow-pending', r)
     return r
   }
@@ -1165,12 +1166,17 @@ describe('A065 command boundaries', () => {
     }>,
   ) {
     sowStart(s)
-    return ok(s.commitSelectionChoice(0, { crops }))
+    return confirmed(ok(s.commitSelectionChoice(0, { crops })), 0)
   }
   function afterSowHarvest(s: GameSession) {
-    turn(s, 1, 'clay-pit')
-    turn(s, 0, 'forest')
-    return finishHarvest(s, confirmNext(s, turn(s, 1, 'reed-bank')))
+    confirmed(turn(s, 1, 'clay-pit'), 1)
+    confirmed(turn(s, 0, 'forest'))
+    const r = confirmNext(s, confirmed(turn(s, 1, 'reed-bank'), 1))
+    assert.equal(r.interaction.stateId, 'idle', JSON.stringify(r.interaction))
+    assert.equal(r.state.currentPlayerIndex, 0)
+    assert.equal(r.state.roundPhase, 'work')
+    assert.equal(r.state.round, 11)
+    return r
   }
   function printedVp(r: SessionResponse, card: string) {
     assert.ok(r.scores)
@@ -1208,11 +1214,11 @@ describe('A065 command boundaries', () => {
     const pending = sowStart(s)
     assert.equal(pending.state.players[0]!.resources.grain, 1)
     assert.equal(gainCount(pending, CARD_ID), 1)
-    const r = ok(
+    const r = confirmed(ok(
       s.commitSelectionChoice(0, {
         crops: [{ row: 0, col: 2, crop: 'grain' }],
       }),
-    )
+    ), 0)
     save('A065-N2-sown', r)
     assert.equal(r.state.players[0]!.resources.grain, 0)
     assert.deepEqual(r.state.players[0]!.fields[0]!.stacks, [
@@ -1245,11 +1251,11 @@ describe('A065 command boundaries', () => {
         crops: [{ row: 0, col: 2, crop: 'grain' }],
       }),
     )
-    const r = ok(
+    const r = confirmed(ok(
       s.commitSelectionChoice(0, {
         crops: [{ row: 0, col: 2, crop: 'grain' }],
       }),
-    )
+    ), 0)
     assert.equal(r.state.players[0]!.resources.grain, 0)
     assert.equal(gainCount(r, CARD_ID), 1)
     assert.equal(
@@ -1284,11 +1290,11 @@ describe('A065 command boundaries', () => {
     })
     const pending = sowStart(s, 0, 'forest')
     save('A065-N5-limited-pending', pending)
-    const r = ok(
+    const r = confirmed(ok(
       s.commitSelectionChoice(0, {
         crops: [{ row: 0, col: 2, crop: 'grain' }],
       }),
-    )
+    ), 0)
     save('A065-N5-limited', r)
     assert.deepEqual(
       {
@@ -1314,11 +1320,11 @@ describe('A065 command boundaries', () => {
     })
     turn(s, 0, 'forest')
     sowStart(s, 1)
-    const r = ok(
+    const r = confirmed(ok(
       s.commitSelectionChoice(1, {
         crops: [{ row: 0, col: 2, crop: 'grain' }],
       }),
-    )
+    ), 1)
     assert.equal(r.state.players[0]!.resources.grain, 0)
     assert.equal(r.state.players[1]!.resources.grain, 0)
     assert.equal(gainCount(r, CARD_ID), 0)
@@ -1349,9 +1355,15 @@ describe('A065 command boundaries', () => {
   })
   it('actual Sow undo restores before grant and one replay grain event', () => {
     const s = pellets()
-    const before = undoRuleSnapshot(s.getState())
+    const initial = s.getState()
+    assert.equal(initial.interaction.stateId, 'idle')
+    assert.equal(initial.state.currentPlayerIndex, 0)
+    const beforeInteraction = JSON.stringify(initial.interaction)
+    const before = undoRuleSnapshot(initial)
     sow(s, [{ row: 0, col: 2, crop: 'grain' }])
-    assertUndoRestored(before, s.undoAction())
+    const restored = s.undoAction()
+    assertUndoRestored(before, restored)
+    restoredInteraction(s, restored, beforeInteraction)
     const r = sow(s, [{ row: 0, col: 2, crop: 'grain' }])
     save('A065-N8-replayed', r)
     assert.equal(r.state.players[0]!.resources.grain, 0)
@@ -1372,17 +1384,17 @@ describe('A065 command boundaries', () => {
     assert.deepEqual(initial.state.players[0]!.occupationPlayed, [])
     assert.deepEqual(initial.state.players[0]!.improvements, [])
     assert.equal(initial.state.players[0]!.resources.grain, 0)
+    assert.equal(initial.interaction.stateId, 'idle')
+    assert.equal(initial.state.currentPlayerIndex, 0)
+    const beforeInteraction = JSON.stringify(initial.interaction)
     const before = undoRuleSnapshot(initial)
-    const r = s.takeAction(0, 'grain-utilization')
+    const r = ok(s.takeAction(0, 'grain-utilization'))
     save('A065-N6b-no-target', r)
-    if (
-      r.interaction.stateId === 'wait' &&
-      r.interaction.request.kind === 'engine-blocked'
-    )
-      assert.deepEqual(r.interaction.allowedCommands, [
-        'undoStep',
-        'undoAction',
-      ])
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'engine-blocked', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.request.actionId, 'sow')
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
+    assert.deepEqual(r.interaction.allowedCommands, ['undoStep', 'undoAction'])
     const actual = {
       accepted: r.ok,
       grain: r.state.players[0]!.resources.grain,
@@ -1392,8 +1404,10 @@ describe('A065 command boundaries', () => {
         r.interaction.request.kind === 'engine-blocked' &&
         r.interaction.request.actionId === 'sow',
     }
-    if (r.ok) assertUndoRestored(before, s.undoAction())
-    const retry = turn(s, 0, 'day-laborer')
+    const restored = s.undoAction()
+    assertUndoRestored(before, restored)
+    restoredInteraction(s, restored, beforeInteraction)
+    const retry = confirmed(turn(s, 0, 'day-laborer'))
     resource(retry, 'food', 6)
     assert.equal(gainCount(retry, CARD_ID), 0)
     assert.deepEqual(actual, {
