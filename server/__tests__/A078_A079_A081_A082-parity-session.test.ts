@@ -4,7 +4,7 @@ import { type GameSession, type SessionResponse } from '../game/authoritative-se
 import { markAllWorkersUsed, setWorkersAtHome, workersAtHome } from '../../shared/domain/player'
 import { setStoredResource, getStoredResource } from '../../shared/cards/helpers/card-storage'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
-import { resolveTriggerIfPresent } from './_helpers/trigger-select'
+import { resolveTriggerIfPresent , expectWait } from './_helpers/trigger-select'
 import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
 import '../../shared/cards/A/A078_Canoe'
 import '../../shared/cards/A/A079_GardenHoe'
@@ -161,11 +161,26 @@ describe('A081 Interim Storage parity', () => {
   const CARD_ID = 'A081_InterimStorage'
 
   it('A081 S1: paying two food plays Interim Storage', () => {
+    const poor = setup({ cardId: CARD_ID, played: false, resources: { food: 1 } })
+    const state = poor.getState().state
+    state.players[0]!.minorHand = [CARD_ID, 'B007_Wage']
+    poor.loadState(state)
+    const pending = expectWait(poor.takeAction(0, 'meeting-place'))
+    expect(pending.interaction.request.kind).toBe('choice')
+    expect(getChoiceOptions(pending).filter(option => option.value === CARD_ID && !option.disabled)).toHaveLength(0)
+    assertRejectedUnchanged(poor, () => poor.resolveChoice(0, CARD_ID))
+
     const response = playMinor(setup({
       cardId: CARD_ID, played: false, resources: { food: 2 },
     }), CARD_ID)
+    expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.minorPlayed).toContain(CARD_ID)
     expect(response.state.players[0]!.resources.food).toBe(0)
+    expect({
+      wood: getStoredResource(response.state.players[0]!, CARD_ID, 'wood'),
+      clay: getStoredResource(response.state.players[0]!, CARD_ID, 'clay'),
+      reed: getStoredResource(response.state.players[0]!, CARD_ID, 'reed'),
+    }).toEqual({ wood: 0, clay: 0, reed: 0 })
   })
 
   for (const { scenario, action, collected, stored } of [
