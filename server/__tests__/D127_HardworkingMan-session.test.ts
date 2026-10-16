@@ -1,8 +1,17 @@
+import { noopEventSink } from '../../shared/events/noop'
+import { setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
 import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game/authoritative-session'
+import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
-
 import '../../shared/cards/D/D127_HardworkingMan'
+import assert from 'node:assert/strict'
+import { type GameState } from '../../shared/contract/types'
+import { createWorkSession } from './_helpers/session-fixtures'
+import { assertRejectedUnchanged, assertUndoRestored, confirmNext, undoRuleSnapshot, getChoiceOptions } from './_helpers/session-assertions'
+import { createPlayerActionSpaces } from '../../shared/cards/player-action-space'
+import { createScenarioEvidence } from './_helpers/scenario-evidence'
+
+const evidence = createScenarioEvidence(import.meta.url)
 
 const CARD_ID = 'D127_HardworkingMan'
 
@@ -13,7 +22,7 @@ describe('D127_HardworkingMan session', () => {
    * other player so canBeExecutedByPlayer returns true.
    */
   const setup = () => {
-    const session = new GameSession(42)
+    const session = evidence.track(createWorkSession({ seed: 42 }))
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -25,10 +34,10 @@ describe('D127_HardworkingMan session', () => {
     const opp = state.players[1]!
     owner.rooms = 2
     opp.rooms = 3 // strictly greater so D127 condition satisfied
-    owner.workersAvailable = 1
-    opp.workersAvailable = 0
-    owner.familySize = 1
-    opp.familySize = 1
+    setActiveWorkerCount(owner, 1)
+    setActiveWorkerCount(opp, 1)
+    setWorkersAtHome(state, owner, 1)
+    setWorkersAtHome(state, opp, 0)
     // Plenty of food to "buy" things later if needed; D127 itself has no cost.
     owner.resources = {
       ...owner.resources,
@@ -45,7 +54,7 @@ describe('D127_HardworkingMan session', () => {
 
     const updated = session.getState().state
     updated.currentPlayerIndex = 0
-    updated.players[0]!.workersAvailable = 1
+    setWorkersAtHome(updated, updated.players[0]!, 1)
     session.loadState(updated)
     return session
   }
@@ -62,8 +71,8 @@ describe('D127_HardworkingMan session', () => {
     const space = state.actionSpaces.find((s) => s.id === CARD_ID)!
     const owner = state.players[0]!
     const opp = state.players[1]!
-    expect(space.canBeExecutedByPlayer!(state, owner)).toBe(true)
-    expect(space.canBeExecutedByPlayer!(state, opp)).toBe(false)
+    expect(session.withCtx(() => space.canBeExecutedByPlayer!(state, owner))).toBe(true)
+    expect(session.withCtx(() => space.canBeExecutedByPlayer!(state, opp))).toBe(false)
   })
 
   it('canBeExecutedByPlayer: false if any other player has equal or fewer rooms', () => {
@@ -75,7 +84,7 @@ describe('D127_HardworkingMan session', () => {
     session.loadState(state)
     const refreshed = session.getState().state
     const space = refreshed.actionSpaces.find((s) => s.id === CARD_ID)!
-    expect(space.canBeExecutedByPlayer!(refreshed, refreshed.players[0]!)).toBe(false)
+    expect(session.withCtx(() => space.canBeExecutedByPlayer!(refreshed, refreshed.players[0]!))).toBe(false)
     expect(owner.rooms).toBe(2)
   })
 
@@ -84,12 +93,15 @@ describe('D127_HardworkingMan session', () => {
     const state = session.getState().state
     const space = state.actionSpaces.find((s) => s.id === CARD_ID)!
     const owner = state.players[0]!
-    const result = space.execute({ state, player: owner, space })
+    const result = session.withCtx(() => space.execute({ state, player: owner, space, actionHooks: session.actionHooks, eventSink: noopEventSink }))
     expect(result.type).toBe('flow')
     if (result.type !== 'flow') return
     expect(result.flow.type).toBe('or')
     if (result.flow.type !== 'or') return
-    const ids = result.flow.children.map((c) => (c as { actionId: string }).actionId)
+    const ids = result.flow.children.map(child => {
+      assert.ok(child.type === 'leaf')
+      return child.actionId
+    })
     expect(ids).toEqual(['day-laborer', 'construct', 'improvement'])
   })
 
@@ -105,16 +117,16 @@ describe('D127_HardworkingMan session', () => {
     expect(resp.interaction.stateId).toBe('wait')
 
     if (resp.interaction.stateId !== 'wait') throw new Error('expected OR choice')
-    const dayLaborerOption = resp.interaction.request.options?.find((o) =>
+    const dayLaborerOption = getChoiceOptions(resp)?.find((o) =>
       typeof o.labelKey === 'string' && o.labelKey.includes('day-laborer'),
-    ) ?? resp.interaction.request.options[0]
+    ) ?? getChoiceOptions(resp)[0]
     resp = session.resolveChoice(0, dayLaborerOption!.value)
     expect(resp.ok).toBe(true)
 
     // After day-laborer leaf executed, OR re-prompts (still has choice for next branch / __done__)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    expect(resp.interaction.request.options?.some((o) => o.value === '__done__')).toBe(true)
+    expect(getChoiceOptions(resp)?.some((o) => o.value === '__done__')).toBe(true)
 
     resp = session.resolveChoice(0, '__done__')
     expect(resp.ok).toBe(true)
@@ -122,5 +134,125 @@ describe('D127_HardworkingMan session', () => {
     state = resp.state
     const finalOwner = state.players[0]!
     expect(finalOwner.resources.food).toBe(beforeFood + 2)
+  })
+})
+
+describe('D127 rule boundaries', () => {
+
+  const OVERHAUL = 'C001_Overhaul', HARDWORKER = 'D127_HardworkingMan'
+
+  function setup(card: string, configure: (state: GameState) => void = () => { }) {
+    const session = evidence.track(createWorkSession({
+      seed: 4242, options: { playerCount: card === OVERHAUL ? 2 : 3 }, configure(state) {
+        state.round = 4
+        for (const p of state.players)
+          Object.assign(p.resources, { wood: 0, clay: 0, reed: 0, stone: 0, grain: 0, vegetable: 0, food: 20 })
+        const owner = state.players[0]!
+        if (card === OVERHAUL) {
+          owner.minorHand = [card]
+          owner.occupationPlayed = ['A116_WoodCutter', 'A103_Portmonger']
+          owner.resources.wood = 1
+        }
+        else
+          owner.occupationPlayed = [card]
+        configure(state)
+        if (card === HARDWORKER)
+          state.actionSpaces.push(...createPlayerActionSpaces(state))
+      }
+    }))
+    return session
+  }
+
+  function ok(r: SessionResponse) { assert.equal(r.ok, true, r.error); return r }
+
+  function wait(r: SessionResponse) { ok(r); assert(r.interaction.stateId === 'wait'); return r.interaction }
+
+  function options(r: SessionResponse) { const request = wait(r).request; assert(request.kind === 'choice'); return request.options }
+
+  function branch(s: GameSession, r: SessionResponse, action: string) {
+    const choice = options(r).find(o => o.labelKey === `actions.${action}.name`)
+    assert(choice, JSON.stringify(r.interaction))
+    return ok(s.resolveChoice(0, choice.value))
+  }
+
+  function hardworking(configure: (state: GameState) => void = () => { }) {
+    return setup(HARDWORKER, state => {
+      for (const p of state.players.slice(1)) {
+        p.rooms = 3
+        p.roomTiles.push({ row: 1, col: 1 })
+      }
+      Object.assign(state.players[0]!.resources, { wood: 5, reed: 2, clay: 2, food: 2 })
+      state.players[0]!.minorHand = ['A002_ShiftingCultivation']
+      configure(state)
+    })
+  }
+
+  it("Major Improvement must not offer or allow a minor improvement", () => {
+    const s = hardworking()
+    const r = branch(s, ok(s.takeAction(0, HARDWORKER)), 'improvement')
+    const minorOffered = options(r).some(o => o.value === 'A002_ShiftingCultivation')
+    assert.deepEqual({ minorOffered }, { minorOffered: false })
+    const major = options(s.getState()).find(o => o.value === 'Major_Fireplace1')
+    assert(major)
+    const final = ok(s.resolveChoice(0, major.value))
+    assert(final.state.players[0]!.improvements.includes('Major_Fireplace1'))
+    assert.equal(final.state.players[0]!.resources.clay, 0)
+  })
+
+  it("Major Improvement must reject an actual minor purchase", () => {
+    const s = hardworking()
+    branch(s, ok(s.takeAction(0, HARDWORKER)), 'improvement')
+    const r = s.resolveChoice(0, 'A002_ShiftingCultivation')
+    assert.deepEqual({ accepted: r.ok, passedMinor: r.state.players[1]!.minorHand.includes('A002_ShiftingCultivation'), food: r.state.players[0]!.resources.food }, { accepted: false, passedMinor: false, food: 2 })
+  })
+
+  it("ties and a nonowner with fewer rooms cannot use the private space", () => {
+    const tied = hardworking(state => { state.players[2]!.rooms = 2; state.players[2]!.roomTiles.pop() })
+    assertRejectedUnchanged(tied, () => tied.takeAction(0, HARDWORKER))
+    const other = hardworking(state => {
+      state.players[0]!.rooms = 3
+      state.players[0]!.roomTiles.push({ row: 1, col: 1 })
+      state.players[1]!.rooms = 2
+      state.players[1]!.roomTiles.pop()
+    })
+    confirmNext(other, ok(other.takeAction(0, 'grain-seeds')))
+    assert.equal(other.state.currentPlayerIndex, 1)
+    assertRejectedUnchanged(other, () => other.takeAction(1, HARDWORKER))
+    ok(other.takeAction(1, 'forest'))
+  })
+
+  it("Day Laborer cannot be repeated and undo restores the placement and food", () => {
+    const s = hardworking()
+    const before = undoRuleSnapshot(s.getState())
+    const entered = ok(s.takeAction(0, HARDWORKER))
+    const day = options(entered).find(o => o.labelKey === 'actions.day-laborer.name')
+    assert(day)
+    const r = ok(s.resolveChoice(0, day.value))
+    assert.equal(r.state.players[0]!.resources.food, 4)
+    assert(!options(r).some(o => o.value === day.value))
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, day.value))
+    ok(s.resolveChoice(0, '__done__'))
+    assertUndoRestored(before, s.undoAction())
+    const retry = branch(s, ok(s.takeAction(0, HARDWORKER)), 'day-laborer')
+    assert.equal(retry.state.players[0]!.resources.food, 4)
+  })
+
+  it("building to a room tie still completes all three accepted subactions exactly once", () => {
+    const s = hardworking()
+    let r = branch(s, ok(s.takeAction(0, HARDWORKER)), 'construct')
+    assert.equal(wait(r).request.kind, 'farm-select')
+    r = ok(s.commitSelectionChoice(0, { rooms: [{ row: 0, col: 0 }], stables: [] }))
+    assert.equal(r.state.players[0]!.rooms, 3)
+    assert.equal(r.state.players[0]!.resources.wood, 0)
+    assert.equal(r.state.players[0]!.resources.reed, 0)
+    r = branch(s, r, 'improvement')
+    const major = options(r).find(o => o.value === 'Major_Fireplace1')
+    assert(major)
+    r = ok(s.resolveChoice(0, major.value))
+    r = branch(s, r, 'day-laborer')
+    assert.equal(r.state.players[0]!.resources.food, 4)
+    assert.equal(r.state.players[0]!.resources.clay, 0)
+    assert(r.state.players[0]!.improvements.includes('Major_Fireplace1'))
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, major.value))
   })
 })

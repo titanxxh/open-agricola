@@ -1,17 +1,20 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
-import {
-  getFenceCount,
-  getPalisadeCount,
-} from '../../shared/actions/effects/fencing'
+import { getFenceCount, getPalisadeCount } from '../../shared/actions/effects/fencing'
 import { getOwnOrdinaryFenceCount } from '../../shared/domain/fence-segments'
-import type { FenceSegment, GameState, PlayerState } from '../../shared/contract/types'
-
+import { type FenceSegment, type GameState, type PlayerState } from '../../shared/contract/types'
 import '../../shared/cards/B/B030_WoodPalisades'
 import '../../shared/cards/B/B094_StockProtector'
 import '../../shared/cards/C/C001_Overhaul'
 import '../../shared/cards/E/E108_BlackberryFarmer'
+import assert from 'node:assert/strict'
+import { createWorkSession } from './_helpers/session-fixtures'
+import { assertRejectedUnchanged, assertUndoRestored, undoRuleSnapshot, getChoiceOptions, expectFarmSelection } from './_helpers/session-assertions'
+import { createPlayerActionSpaces } from '../../shared/cards/player-action-space'
+import { createScenarioEvidence } from './_helpers/scenario-evidence'
+
+const evidence = createScenarioEvidence(import.meta.url)
 
 const CARD_ID = 'C001_Overhaul'
 const B030_ID = 'B030_WoodPalisades'
@@ -71,7 +74,7 @@ const borrowedFence = (owner: PlayerState, edge: string): FenceSegment => ({
 })
 
 const setup = (opts: SetupOptions = {}) => {
-  const session = new GameSession(42)
+  const session = evidence.track(createWorkSession({ seed: 42 }))
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   state.currentPlayerIndex = 0
@@ -126,15 +129,15 @@ const buyC1 = (session: GameSession) => {
   expect(resp.ok).toBe(true)
   expect(resp.interaction.stateId).toBe('wait')
   if (resp.interaction.stateId !== 'wait') return resp
-  const improvementOption = resp.interaction.request.options?.find((option) => option.value.startsWith('action-improvement-'))
+  const improvementOption = getChoiceOptions(resp)?.find((option) => option.value.startsWith('action-improvement-'))
   if (improvementOption) {
     resp = session.resolveChoice(0, improvementOption.value)
     expect(resp.ok).toBe(true)
   }
-  if (resp.interaction.sourceCard === CARD_ID) return resp
+  if (resp.interaction.stateId === 'wait' && resp.interaction.sourceCard === CARD_ID) return resp
   expect(resp.interaction.stateId).toBe('wait')
   if (resp.interaction.stateId !== 'wait') return resp
-  const cardOption = resp.interaction.request.options?.find((option) => option.value === CARD_ID)
+  const cardOption = getChoiceOptions(resp)?.find((option) => option.value === CARD_ID)
   if (!cardOption) return resp
   resp = session.resolveChoice(0, cardOption!.value)
   expect(resp.ok).toBe(true)
@@ -153,10 +156,10 @@ const expectFarmSelect = (
   expect(resp.interaction.sourceCard).toBe(CARD_ID)
   expect(resp.interaction.promptKey).toBe('ui.interactionFenceSelect')
   expect(resp.interaction.request.kind).toBe('farm-select')
-  expect(resp.interaction.request.options).toEqual([
+  expect(getChoiceOptions(resp)).toEqual([
     { value: 'confirm', labelKey: 'ui.interactionFenceConfirm' },
   ])
-  expect(resp.interaction.request.farm?.farmType).toBe('fence')
+  expect(expectFarmSelection(resp)?.farmType).toBe('fence')
   if (expected) {
     expect(resp.interaction).toEqual(expected)
   }
@@ -374,11 +377,11 @@ describe('C1 Overhaul session', () => {
     const beforeInteraction = cloneInteraction(pending)
     const before = snapshotAfterRaze(session.getState().state)
 
-    const tooMany = session.commitSelectionChoice(0, {
+    const tooMany = assertRejectedUnchanged(session, () => session.commitSelectionChoice(0, {
       edges: TOP_ROW_16,
       palisadeEdges: [],
       extraWood: 0,
-    })
+    }))
     expect(tooMany.ok).toBe(false)
     expect(tooMany.error).toBe('TOO_MANY_FENCES')
     expectFarmSelect(tooMany, beforeInteraction)
@@ -470,5 +473,95 @@ describe('C1 Overhaul session', () => {
         animalCount: 2,
       },
     ])
+  })
+})
+
+describe('C001 rule boundaries', () => {
+
+  const OVERHAUL = 'C001_Overhaul', HARDWORKER = 'D127_HardworkingMan'
+
+  const one = ['H-0-1', 'H-1-1', 'V-0-1', 'V-0-2']
+
+  const two = [...one, 'H-0-2', 'H-1-2', 'V-0-3']
+
+  function setup(card: string, configure: (state: GameState) => void = () => { }) {
+    const session = evidence.track(createWorkSession({
+      seed: 4242, options: { playerCount: card === OVERHAUL ? 2 : 3 }, configure(state) {
+        state.round = 4
+        for (const p of state.players)
+          Object.assign(p.resources, { wood: 0, clay: 0, reed: 0, stone: 0, grain: 0, vegetable: 0, food: 20 })
+        const owner = state.players[0]!
+        if (card === OVERHAUL) {
+          owner.minorHand = [card]
+          owner.occupationPlayed = ['A116_WoodCutter', 'A103_Portmonger']
+          owner.resources.wood = 1
+        }
+        else
+          owner.occupationPlayed = [card]
+        configure(state)
+        if (card === HARDWORKER)
+          state.actionSpaces.push(...createPlayerActionSpaces(state))
+      }
+    }))
+    return session
+  }
+
+  function ok(r: SessionResponse) { assert.equal(r.ok, true, r.error); return r }
+
+  function wait(r: SessionResponse) { ok(r); assert(r.interaction.stateId === 'wait'); return r.interaction }
+
+  function options(r: SessionResponse) { const request = wait(r).request; assert(request.kind === 'choice'); return request.options }
+
+  function play(s: GameSession, card: string) {
+    let r = ok(s.takeAction(0, 'meeting-place'))
+    if (!r.state.players[0]!.minorHand.includes(card))
+      return r
+    const improvement = options(r).find(o => o.value.startsWith('action-improvement-'))
+    if (improvement)
+      r = ok(s.resolveChoice(0, improvement.value))
+    if (r.state.players[0]!.minorHand.includes(card))
+      r = ok(s.resolveChoice(0, card))
+    return r
+  }
+
+  function fenceSetup(edges = one, animals = false) {
+    return setup(OVERHAUL, state => {
+      const p = state.players[0]!
+      p.fenceSegments = edges.map(edge => ({ edge, type: 'fence', source: { kind: 'own', ownerPlayerId: p.id } }))
+      p.pastures = [{ id: 'one', tiles: [{ row: 0, col: 1 }], animalType: animals ? 'sheep' : null, animalCount: animals ? 2 : 0 }]
+      if (edges.length === 7)
+        p.pastures.push({ id: 'two', tiles: [{ row: 0, col: 2 }], animalType: null, animalCount: 0 })
+      if (edges.length === 13)
+        for (const col of [2, 3, 4])
+          p.pastures.push({ id: `pasture-${col}`, tiles: [{ row: 0, col }], animalType: null, animalCount: 0 })
+      p.resources.sheep = animals ? 2 : 0
+    })
+  }
+
+  it("raze cannot be canceled or add four fences and legal reconstruction keeps animals", () => {
+    const s = fenceSetup(one, true)
+    const before = undoRuleSnapshot(s.getState())
+    let r = play(s, OVERHAUL)
+    assert.equal(wait(r).request.kind, 'farm-select')
+    assert.equal(r.state.players[0]!.fenceSegments.length, 0)
+    assert.equal(r.state.players[0]!.resources.sheep, 2)
+    assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { cancel: true }))
+    const eight = ['H-0-1', 'H-0-2', 'H-0-3', 'H-1-1', 'H-1-2', 'H-1-3', 'V-0-1', 'V-0-4']
+    assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { edges: eight, palisadeEdges: [], extraWood: 0 }))
+    r = ok(s.commitSelectionChoice(0, { edges: one, palisadeEdges: [], extraWood: 0 }))
+    assert.equal(r.state.players[0]!.fenceSegments.length, 4)
+    assert.equal(r.state.players[0]!.resources.wood, 0)
+    assert.equal(r.state.players[0]!.resources.sheep, 2)
+    assert(r.state.players[1]!.minorHand.includes(OVERHAUL))
+    assertUndoRestored(before, s.undoAction())
+  })
+
+  it("valid four-edge enclosure cannot replace seven returned fences", () => {
+    const s = fenceSetup(two)
+    play(s, OVERHAUL)
+    assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { edges: one, palisadeEdges: [], extraWood: 0 }))
+    const r = ok(s.commitSelectionChoice(0, { edges: two, palisadeEdges: [], extraWood: 0 }))
+    assert.equal(r.state.players[0]!.fenceSegments.length, 7)
+    assert.equal(r.state.players[0]!.resources.wood, 0)
   })
 })

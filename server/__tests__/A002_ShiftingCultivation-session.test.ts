@@ -7,10 +7,12 @@ import { assertRejectedUnchanged, assertUndoRestored, getChoiceOptions, undoRule
 const CARD_ID = 'A002_ShiftingCultivation'
 const evidence = createScenarioEvidence(import.meta.url)
 
-const setup = (food: number) => evidence.track(createWorkSession({ configure(state) {
-  state.players[0]!.minorHand = [CARD_ID]
-  state.players[0]!.resources.food = food
-} }))
+const setup = (food: number) => evidence.track(createWorkSession({
+  configure(state) {
+    state.players[0]!.minorHand = [CARD_ID]
+    state.players[0]!.resources.food = food
+  }
+}))
 
 const openMinorPrompt = (session: GameSession) => {
   let response = session.takeAction(0, 'meeting-place')

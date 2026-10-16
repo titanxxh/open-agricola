@@ -2,20 +2,23 @@ import { collectScheduledEffectPreviews } from '../../shared/actions/scheduled-e
 import { createWorkSession } from './_helpers/session-fixtures'
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
-import {
-  familySize, markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome,
-} from '../../shared/domain/player'
+import { familySize, markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
-import { recordRoundPlacement } from '../../shared/cards/helpers/round-placement'
-
+import { getRoundPersonPlacementDetails } from '../../shared/cards/helpers/round-placement'
 import '../../shared/cards/A/A127_Lodger'
 import '../../shared/cards/A/A129_Swagman'
 import '../../shared/cards/A/A130_MummysBoy'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged, assertUndoRestored, confirmNext, undoRuleSnapshot, getChoiceOptions, expectFarmSelection, expectTileFarmSelection } from './_helpers/session-assertions'
+import { findActionSpaceById } from '../../shared/domain/space'
+import { createScenarioEvidence } from './_helpers/scenario-evidence'
+
+const evidence = createScenarioEvidence(import.meta.url)
 
 const FILLER = '__test_placeholder__'
 
 const setup = (cardId: string, playerCount: number, round = 5, played = true) => {
-  const session = createWorkSession({ seed: 7127 + round, options: { playerCount } })
+  const session = evidence.track(createWorkSession({ seed: 7127 + round, options: { playerCount } }))
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.currentPlayerIndex = 0
@@ -45,7 +48,7 @@ const playOccupation = (session: GameSession, cardId: string) => {
   const response = session.takeAction(0, 'lessons')
   if (!response.state.players[0]!.occupationHand.includes(cardId)) return response
   if (response.interaction.stateId !== 'wait') return response
-  const option = response.interaction.request.options?.find((candidate) => candidate.value === cardId)
+  const option = getChoiceOptions(response)?.find((candidate) => candidate.value === cardId)
   expect(option).toBeDefined()
   return session.resolveChoice(0, option!.value)
 }
@@ -122,7 +125,7 @@ const driveSwagman = (session: GameSession, response: SessionResponse, accept: b
   for (let guard = 0; guard < 24 && response.interaction.stateId === 'wait'; guard += 1) {
     if (response.interaction.request.kind === 'confirm-next-player') break
     if (response.interaction.request.kind === 'farm-select') {
-      const farm = response.interaction.request.farm
+      const farm = expectFarmSelection(response)
       if (farm.farmType === 'sow') {
         const field = farm.selectableFields[0]!
         response = session.commitSelectionChoice(0, { crops: [{ ...field.tile, crop: 'grain' }] })
@@ -131,7 +134,7 @@ const driveSwagman = (session: GameSession, response: SessionResponse, accept: b
       } else break
       continue
     }
-    const options = response.interaction.request.options ?? []
+    const options = getChoiceOptions(response) ?? []
     const card = options.find((option) => option.sourceCard === 'A129_Swagman' && option.value !== '__skip__')
     const skip = options.find((option) => option.value === '__skip__')
     const ordinary = options.find((option) => option.value !== '__skip__' && option.value !== '__pass__')
@@ -153,7 +156,7 @@ describe('A129 Swagman parity', () => {
     const session = setup('A129_Swagman', 3)
     const state = session.getState().state
     state.players[0]!.resources = { ...state.players[0]!.resources, grain: 1, wood: 2 }
-    state.players[0]!.fields = [{ row: 0, col: 0, crop: null, remaining: 0 }]
+    state.players[0]!.fields = [{ row: 0, col: 0, stacks: [] }]
     session.loadState(state)
     const response = driveSwagman(session, session.takeAction(0, 'grain-seeds'), true)
     expect(response.state.actionSpaces.find((space) => space.id === 'grain-seeds')!.takenBy).toEqual([])
@@ -165,7 +168,7 @@ describe('A129 Swagman parity', () => {
     const session = setup('A129_Swagman', 3)
     const state = session.getState().state
     state.players[0]!.resources.grain = 1
-    state.players[0]!.fields = [{ row: 0, col: 0, crop: null, remaining: 0 }]
+    state.players[0]!.fields = [{ row: 0, col: 0, stacks: [] }]
     session.loadState(state)
     const response = driveSwagman(session, session.takeAction(0, 'grain-seeds'), false)
     expect(response.state.actionSpaces.find((space) => space.id === 'grain-seeds')!.takenBy).toHaveLength(1)
@@ -176,7 +179,7 @@ describe('A129 Swagman parity', () => {
     const session = setup('A129_Swagman', 3)
     const state = session.getState().state
     state.players[0]!.resources.wood = 2
-    state.players[0]!.fields = [{ row: 0, col: 0, crop: null, remaining: 0 }]
+    state.players[0]!.fields = [{ row: 0, col: 0, stacks: [] }]
     session.loadState(state)
     const response = driveSwagman(session, session.takeAction(0, 'farm-expansion'), true)
     expect(response.state.actionSpaces.find((space) => space.id === 'farm-expansion')!.takenBy).toEqual([])
@@ -186,47 +189,116 @@ describe('A129 Swagman parity', () => {
   })
 })
 
-const setupMummysBoy = (secondSpaceId: string, family = 3) => {
-  const session = setup('A130_MummysBoy', 3)
-  const state = session.getState().state
-  const owner = state.players[0]!
-  setActiveWorkerCount(owner, family)
-  setWorkersAtHome(state, owner, family)
-  const first = state.actionSpaces.find((space) => space.id === 'forest')!
-  const second = state.actionSpaces.find((space) => space.id === secondSpaceId)!
-  first.takenBy = [{ playerId: owner.id, workerId: '1' }]
-  second.takenBy = [{ playerId: owner.id, workerId: '2' }]
-  recordRoundPlacement(owner, 'forest', '1')
-  recordRoundPlacement(owner, secondSpaceId, '2')
-  state.currentPlayerIndex = 0
-  session.loadState(state)
-  return session
-}
+describe('A130 rule boundaries', () => {
 
-describe("A130 Mummy's Boy parity", () => {
-  it('A130 S1: the third person may reuse the action occupied by the second person', () => {
-    const session = setupMummysBoy('day-laborer')
-    const before = session.state.players[0]!.resources.food
-    const response = session.takeAction(0, 'day-laborer')
-    expect(response.ok, response.error).toBe(true)
-    expect(response.state.players[0]!.resources.food).toBe(before + 2)
-    expect(response.state.actionSpaces.find((space) => space.id === 'day-laborer')!.takenBy).toHaveLength(2)
+  const A130 = 'A130_MummysBoy'
+
+  function setup(card: string, { family = 2, players = 3, round = 5 } = {}) {
+    const session = evidence.track(createWorkSession({
+      seed: 42, options: { playerCount: players }, configure: state => {
+        state.round = round
+        state.players.forEach(p => { p.resources.food = 20 })
+        const p = state.players[0]!
+        p.occupationPlayed = [card]
+        p.resources.food = 0
+        setActiveWorkerCount(p, family)
+        setWorkersAtHome(state, p, family)
+        if (family > 2 && card === A130) {
+          p.rooms = family
+          p.roomTiles = [{ row: 1, col: 0 }, { row: 2, col: 0 }, { row: 1, col: 1 }, { row: 2, col: 1 }].slice(0, family)
+        }
+      }
+    }))
+    return session
+  }
+
+  function ok(r: SessionResponse) { assert.equal(r.ok, true, r.error); return r }
+
+  function ready(session: GameSession, actor: number) {
+    let r = session.getState()
+    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
+      r = confirmNext(session, r)
+    assert.equal(r.interaction.stateId, 'idle')
+    assert.equal(r.state.currentPlayerIndex, actor)
+    return r
+  }
+
+  function turn(session: GameSession, actor: number, space: string) {
+    ready(session, actor)
+    let r = ok(session.takeAction(actor, space))
+    if (space === 'meeting-place' && r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice') {
+      const skip = getChoiceOptions(r).find(o => o.value === '__skip__' || o.value === '__done__')
+      assert.ok(skip)
+      r = ok(session.resolveChoice(actor, skip.value))
+    }
+    return r
+  }
+
+  function secondPerson(session: GameSession, target = 'day-laborer') {
+    turn(session, 0, 'forest')
+    turn(session, 1, 'clay-pit')
+    turn(session, 2, 'reed-bank')
+    ready(session, 0)
+    assertRejectedUnchanged(session, () => session.takeAction(0, 'forest'))
+    turn(session, 0, target)
+    turn(session, 1, 'grain-seeds')
+    turn(session, 2, 'fishing')
+    ready(session, 0)
+    assert.equal(getRoundPersonPlacementDetails(session.state.players[0]!).length, 2)
+  }
+
+  function occupants(r: SessionResponse, space: string) {
+    return findActionSpaceById(r.state, space)!.takenBy.filter(w => w.playerId === r.state.players[0]!.id)
+  }
+
+  it("third reuse rejects first and opponent targets and undo restores quota", () => {
+    const s = setup(A130, { family: 4 })
+    secondPerson(s)
+    assertRejectedUnchanged(s, () => s.takeAction(0, 'forest'))
+    assertRejectedUnchanged(s, () => s.takeAction(0, 'clay-pit'))
+    const before = undoRuleSnapshot(s.getState())
+    const r = ok(s.takeAction(0, 'day-laborer'))
+    assert.equal(r.state.players[0]!.resources.food, 4)
+    assert.equal(occupants(r, 'day-laborer').length, 2)
+    assert.equal(r.state.players[0]!.cardStates[A130]?.flagged, true)
+    assert.equal(getRoundPersonPlacementDetails(r.state.players[0]!).length, 3)
+    assert.ok(r.scores)
+    assert.equal(r.scores.length, 3)
+    assert.ok(r.state.log.some(l => l.key === 'log.placeFarmer'))
+    assertUndoRestored(before, s.undoAction())
+    const retried = ok(s.takeAction(0, 'day-laborer'))
+    assert.equal(retried.state.players[0]!.resources.food, 4)
+    assert.equal(occupants(retried, 'day-laborer').length, 2)
   })
 
-  it('A130 S2: Meeting Place occupied by the second person cannot be reused', () => {
-    const session = setupMummysBoy('meeting-place')
-    const response = session.takeAction(0, 'allow-occupied:meeting-place')
-    expect(response.ok).toBe(false)
+  it("Meeting Place second person cannot be reused and legal placement remains", () => {
+    const s = setup(A130, { family: 3 })
+    secondPerson(s, 'meeting-place')
+    assertRejectedUnchanged(s, () => s.takeAction(0, 'meeting-place'))
+    let r = ok(s.takeAction(0, 'farmland'))
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'farm-select' && expectFarmSelection(r).farmType === 'plow')
+    r = ok(s.commitSelectionChoice(0, { tile: expectTileFarmSelection(r, 'plow').selectableTiles[0]! }))
+    assert.equal(occupants(r, 'meeting-place').length, 1)
+    assert.equal(r.state.players[0]!.cardStates[A130]?.flagged, undefined)
+    assert.equal(occupants(r, 'farmland').length, 1)
   })
 
-  it("A130 S3: Mummy's Boy can reuse the second person's space only once per round", () => {
-    const session = setupMummysBoy('day-laborer', 4)
-    const first = session.takeAction(0, 'day-laborer')
-    expect(first.ok, first.error).toBe(true)
-    const state = session.getState().state
-    state.currentPlayerIndex = 0
-    session.loadState(state)
-    const second = session.takeAction(0, 'day-laborer')
-    expect(second.ok).toBe(false)
+  it("fourth reuse is rejected and a new round renews the allowance", () => {
+    const s = setup(A130, { family: 4 })
+    secondPerson(s)
+    ok(s.takeAction(0, 'day-laborer'))
+    ready(s, 0)
+    assertRejectedUnchanged(s, () => s.takeAction(0, 'day-laborer'))
+    let r = ok(s.takeAction(0, 'farmland'))
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'farm-select' && expectFarmSelection(r).farmType === 'plow')
+    r = ok(s.commitSelectionChoice(0, { tile: expectTileFarmSelection(r, 'plow').selectableTiles[0]! }))
+    assert.equal(r.state.players[0]!.resources.food, 4)
+    ready(s, 0)
+    assert.equal(s.state.round, 6)
+    assert.equal(s.state.players[0]!.cardStates[A130]?.flagged, false)
+    secondPerson(s)
+    const next = ok(s.takeAction(0, 'day-laborer'))
+    assert.equal(next.state.players[0]!.resources.food, 8)
+    assert.equal(occupants(next, 'day-laborer').length, 2)
   })
 })

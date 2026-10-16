@@ -1,19 +1,12 @@
 import { createWorkSession } from './_helpers/session-fixtures'
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
-import { hasPendingExtraTurn } from '../../shared/cards/card-effects'
-import { getCardEffect } from '../../shared/cards/card-effects'
+import { hasPendingExtraTurn, getCardEffect } from '../../shared/cards/card-effects'
 import { readActionSnapshotToken } from '../../shared/cards/helpers/action-snapshot'
 import { writeCardExtraData } from '../../shared/cards/helpers/card-state'
 import { moveMajorImprovementToSupplyTop } from '../../shared/cards/major/supply'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
-import {
-  markAllWorkersUsed,
-  newbornCount,
-  setActiveWorkerCount,
-  setWorkersAtHome,
-} from '../../shared/domain/player'
-
+import { markAllWorkersUsed, newbornCount, setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/E/E010_StrawHat'
 import '../../shared/cards/E/E024_Ambition'
 import '../../shared/cards/A/A074_StableTree'
@@ -24,6 +17,13 @@ import '../../shared/cards/D/D050_ForeignAid'
 import '../../shared/cards/D/D051_Archway'
 import '../../shared/cards/D/D074_RoyalWood'
 import '../../shared/cards/M/M062_HearthBrush'
+import assert from 'node:assert/strict'
+import { type GameState } from '../../shared/contract/types'
+import { assertRejectedUnchanged, confirmNext, getChoiceOptions, expectFarmSelection, expectTileFarmSelection } from './_helpers/session-assertions'
+import { createPlayerActionSpaces } from '../../shared/cards/player-action-space'
+import { createScenarioEvidence } from './_helpers/scenario-evidence'
+
+const evidence = createScenarioEvidence(import.meta.url)
 
 const CARD_ID = 'E010_StrawHat'
 const A092_ID = 'A092_AdoptiveParents'
@@ -52,7 +52,7 @@ const setupRoundEnd = (options?: {
   farmlandWorkerIds?: string[]
   occupationHand?: string[]
 }) => {
-  const session = createWorkSession({ seed: 2010 })
+  const session = evidence.track(createWorkSession({ seed: 2010 }))
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   state.currentPlayerIndex = 0
@@ -106,9 +106,9 @@ describe('E010_StrawHat session', () => {
     let resp = session.performRoundEnd()
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected StrawHat choice')
-    expect(resp.interaction.request.options?.some(option => option.value === '__skip__')).toBe(false)
+    expect(getChoiceOptions(resp)?.some(option => option.value === '__skip__')).toBe(false)
 
-    resp = session.resolveChoice(0, resp.interaction.request.options![0]!.value)
+    resp = session.resolveChoice(0, getChoiceOptions(resp)![0]!.value)
 
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.resources.food).toBe(beforeFood + 1)
@@ -125,11 +125,11 @@ describe('E010_StrawHat session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected StrawHat choice')
 
-    resp = session.resolveChoice(0, resp.interaction.request.options![1]!.value)
+    resp = session.resolveChoice(0, getChoiceOptions(resp)![1]!.value)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected move target choice')
 
-    const lessonsOption = resp.interaction.request.options?.find(option => option.value === 'lessons')
+    const lessonsOption = getChoiceOptions(resp)?.find(option => option.value === 'lessons')
     expect(lessonsOption).toBeDefined()
     resp = session.resolveChoice(0, lessonsOption!.value)
 
@@ -149,7 +149,7 @@ describe('E010_StrawHat session', () => {
 
     let resp = session.performRoundEnd()
     if (resp.interaction.stateId !== 'wait') throw new Error('expected Straw Hat choice')
-    const move = resp.interaction.request.options?.find(
+    const move = getChoiceOptions(resp)?.find(
       (option) => option.labelKey === 'actions.move-farmer-to-space.name',
     )
     resp = session.resolveChoice(0, move!.value)
@@ -157,14 +157,14 @@ describe('E010_StrawHat session', () => {
     resp = session.resolveChoice(0, 'meeting-place')
 
     if (resp.interaction.stateId !== 'wait') throw new Error('expected Minor Improvement action')
-    const takeImprovement = resp.interaction.request.options?.find(
+    const takeImprovement = getChoiceOptions(resp)?.find(
       (option) => option.value !== '__skip__',
     )
     resp = session.resolveChoice(0, takeImprovement!.value)
 
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected improvement choice')
-    expect(resp.interaction.request.options?.map((option) => option.value))
+    expect(getChoiceOptions(resp)?.map((option) => option.value))
       .toContain('Major_Pottery')
   })
 
@@ -177,18 +177,18 @@ describe('E010_StrawHat session', () => {
 
     let resp = session.performRoundEnd()
     if (resp.interaction.stateId !== 'wait') throw new Error('expected first worker choice')
-    expect(resp.interaction.request.options?.some((option) => option.value === '__skip__')).toBe(false)
-    resp = session.resolveChoice(0, resp.interaction.request.options![1]!.value)
+    expect(getChoiceOptions(resp)?.some((option) => option.value === '__skip__')).toBe(false)
+    resp = session.resolveChoice(0, getChoiceOptions(resp)![1]!.value)
     if (resp.interaction.stateId !== 'wait') throw new Error('expected first move target')
     resp = session.resolveChoice(0, 'forest')
 
     if (resp.interaction.stateId !== 'wait') throw new Error('expected second worker choice')
-    expect(resp.interaction.request.options?.some((option) => option.value === '__skip__')).toBe(false)
+    expect(getChoiceOptions(resp)?.some((option) => option.value === '__skip__')).toBe(false)
     expect(resp.state.actionSpaces.find((space) => space.id === 'farmland')?.takenBy)
       .toEqual([{ playerId: resp.state.players[0]!.id, workerId: '2' }])
     expect(resp.state.actionSpaces.find((space) => space.id === 'forest')?.takenBy)
       .toContainEqual({ playerId: resp.state.players[0]!.id, workerId: '1' })
-    resp = session.resolveChoice(0, resp.interaction.request.options![0]!.value)
+    resp = session.resolveChoice(0, getChoiceOptions(resp)![0]!.value)
 
     expect(resp.state.players[0]!.resources.food).toBe(beforeFood + 1)
     expect(resp.state.round).toBe(4)
@@ -202,7 +202,7 @@ describe('E010_StrawHat session', () => {
 
     let resp = session.performRoundEnd()
     if (resp.interaction.stateId !== 'wait') throw new Error('expected first worker choice')
-    const firstMove = resp.interaction.request.options?.find((option) =>
+    const firstMove = getChoiceOptions(resp)?.find((option) =>
       option.labelKey === 'actions.move-farmer-to-space.name'
     )
     resp = session.resolveChoice(0, firstMove!.value)
@@ -210,7 +210,7 @@ describe('E010_StrawHat session', () => {
     resp = session.resolveChoice(0, 'forest')
 
     if (resp.interaction.stateId !== 'wait') throw new Error('expected second worker choice')
-    const secondMove = resp.interaction.request.options?.find((option) =>
+    const secondMove = getChoiceOptions(resp)?.find((option) =>
       option.labelKey === 'actions.move-farmer-to-space.name'
     )
     resp = session.resolveChoice(0, secondMove!.value)
@@ -229,47 +229,49 @@ describe('E010_StrawHat session', () => {
     const session = setupStrawHatStableTurns()
     let resp = session.performRoundEnd()
     if (resp.interaction.stateId !== 'wait') throw new Error('expected first worker choice')
-    const firstMove = resp.interaction.request.options?.find(
+    const firstMove = getChoiceOptions(resp)?.find(
       (option) => option.labelKey === 'actions.move-farmer-to-space.name',
     )
     resp = session.resolveChoice(0, firstMove!.value)
     if (resp.interaction.stateId !== 'wait') throw new Error('expected first move target')
     resp = session.resolveChoice(0, 'farm-expansion')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected first stable selection')
-    if (resp.interaction.request.farm.farmType !== 'stable') throw new Error('expected stable selection')
-    const firstStable = resp.interaction.request.farm.selectableTiles[0]!
+    if (expectFarmSelection(resp).farmType !== 'stable') throw new Error('expected stable selection')
+    const firstStable = expectTileFarmSelection(resp, 'stable').selectableTiles[0]!
     resp = session.commitSelectionChoice(0, { stables: [firstStable] })
 
     expect(resp.interaction.stateId).toBe('wait')
     expect(readActionSnapshotToken(resp.state.players[0]!)).toBeUndefined()
     expect(resp.state.events.filter(
-      (event) => event.type === 'futureMeeple.queued' && event.sourceCardId === A074_ID,
+      (event) => event.type === 'futureMeeple.queued',
+    ).filter(event => event.sourceCardId === A074_ID
     )).toHaveLength(1)
     if (resp.interaction.stateId !== 'wait') throw new Error('expected second worker choice')
-    const secondMove = resp.interaction.request.options?.find(
+    const secondMove = getChoiceOptions(resp)?.find(
       (option) => option.labelKey === 'actions.move-farmer-to-space.name',
     )
     resp = session.resolveChoice(0, secondMove!.value)
     if (resp.interaction.stateId !== 'wait') throw new Error('expected second move target')
-    expect(resp.interaction.request.options?.some((option) => option.value === 'meeting-place'))
+    expect(getChoiceOptions(resp)?.some((option) => option.value === 'meeting-place'))
       .toBe(true)
     resp = session.resolveChoice(0, 'meeting-place')
 
     if (resp.interaction.stateId !== 'wait') throw new Error('expected minor improvement offer')
-    const acceptMinor = resp.interaction.request.options?.find((option) => option.value !== '__skip__')
+    const acceptMinor = getChoiceOptions(resp)?.find((option) => option.value !== '__skip__')
     resp = session.resolveChoice(0, acceptMinor!.value)
     if (resp.interaction.stateId !== 'wait') throw new Error('expected minor improvement selection')
-    const stableCard = resp.interaction.request.options?.find((option) => option.value === 'C002_Stable')
+    const stableCard = getChoiceOptions(resp)?.find((option) => option.value === 'C002_Stable')
     if (stableCard) resp = session.resolveChoice(0, stableCard.value)
     if (resp.interaction.stateId !== 'wait') throw new Error('expected second stable selection')
-    if (resp.interaction.request.farm.farmType !== 'stable') throw new Error('expected stable selection')
-    const secondStable = resp.interaction.request.farm.selectableTiles[0]!
+    if (expectFarmSelection(resp).farmType !== 'stable') throw new Error('expected stable selection')
+    const secondStable = expectTileFarmSelection(resp, 'stable').selectableTiles[0]!
     resp = session.commitSelectionChoice(0, { stables: [secondStable] })
 
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.stableTiles).toHaveLength(2)
     const queued = resp.state.events.filter(
-      (event) => event.type === 'futureMeeple.queued' && event.sourceCardId === A074_ID,
+      (event) => event.type === 'futureMeeple.queued',
+    ).filter(event => event.sourceCardId === A074_ID
     )
     expect(queued).toHaveLength(2)
     expect(queued.every((event) => event.entries.length === 3)).toBe(true)
@@ -277,7 +279,7 @@ describe('E010_StrawHat session', () => {
   })
 
   it('moving an A92 extra-turn worker does not lose or duplicate the A92 opportunity', () => {
-    const session = createWorkSession({ seed: 2010 })
+    const session = evidence.track(createWorkSession({ seed: 2010 }))
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 1
@@ -320,7 +322,7 @@ describe('E010_StrawHat session', () => {
     if (resp.interaction.stateId !== 'wait') throw new Error('expected A92 choice')
     expect(session.withCtx(() => hasPendingExtraTurn(resp.state, resp.state.players[0]!))).toBe(true)
 
-    resp = session.resolveChoice(0, resp.interaction.request.options![0]!.value)
+    resp = session.resolveChoice(0, getChoiceOptions(resp)![0]!.value)
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
       .toBe('ui.interactionPlaceFarmerExtra')
     expect(newbornCount(resp.state.players[0]!)).toBe(0)
@@ -330,7 +332,7 @@ describe('E010_StrawHat session', () => {
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
       .toBe('ui.interactionPlowSelect')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected plow selection')
-    const tile = resp.interaction.request.farm.selectableTiles[0]
+    const tile = expectTileFarmSelection(resp, 'plow').selectableTiles[0]
     expect(tile).toBeDefined()
 
     resp = session.commitSelectionChoice(0, { tile })
@@ -341,11 +343,11 @@ describe('E010_StrawHat session', () => {
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
       .toBe('ui.interactionFlowSelect')
     expect(resp.interaction.stateId === 'wait'
-      ? resp.interaction.request.options?.map((option) => option.sourceCard)
+      ? getChoiceOptions(resp)?.map((option) => option.sourceCard)
       : []).toEqual([CARD_ID, CARD_ID])
 
     if (resp.interaction.stateId !== 'wait') throw new Error('expected E10 choice')
-    const move = resp.interaction.request.options!.find((option) => option.labelKey === 'actions.move-farmer-to-space.name')!
+    const move = getChoiceOptions(resp)!.find((option) => option.labelKey === 'actions.move-farmer-to-space.name')!
     resp = session.resolveChoice(0, move.value)
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
       .toBe('ui.interactionMoveFarmerToSpace')
@@ -361,7 +363,7 @@ describe('E010_StrawHat session', () => {
 })
 
 const setupArchwayRoundEnd = (withAllowedTarget: boolean) => {
-  const session = createWorkSession({ seed: 2010 })
+  const session = evidence.track(createWorkSession({ seed: 2010 }))
   const state = session.getState().state
   state.currentPlayerIndex = 0
   state.round = 14
@@ -397,7 +399,7 @@ const setupArchwayRoundEnd = (withAllowedTarget: boolean) => {
 const acceptArchwayMove = (session: GameSession, resp: SessionResponse) => {
   expect(resp.interaction.stateId).toBe('wait')
   if (resp.interaction.stateId !== 'wait') throw new Error('expected Archway optional move')
-  const move = resp.interaction.request.options?.find((option) => option.value !== '__skip__')
+  const move = getChoiceOptions(resp)?.find((option) => option.value !== '__skip__')
   expect(move?.sourceCard).toBe(D051_ID)
   return session.resolveChoice(0, move!.value)
 }
@@ -407,12 +409,14 @@ const setupArchwayStableTurn = (options?: {
   royalWood?: boolean
   stableTree?: boolean
 }) => {
-  const session = createWorkSession({ seed: 42, options: {
-    playerCount: 2,
-    ...(options?.hearthBrush
-      ? { enableFarmersOfTheMoor: true, allowIncompleteFarmersOfTheMoorMinorDeal: true }
-      : {}),
-  } })
+  const session = evidence.track(createWorkSession({
+    seed: 42, options: {
+      playerCount: 2,
+      ...(options?.hearthBrush
+        ? { enableFarmersOfTheMoor: true, allowIncompleteFarmersOfTheMoorMinorDeal: true }
+        : {}),
+    }
+  }))
   const state = session.getState().state
   state.currentPlayerIndex = 0
   state.round = 3
@@ -451,29 +455,31 @@ describe('D051_Archway session', () => {
 
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected Archway move target')
-    expect(resp.interaction.request.options?.some((option) => option.value === 'farm-expansion'))
+    expect(getChoiceOptions(resp)?.some((option) => option.value === 'farm-expansion'))
       .toBe(true)
 
     resp = session.resolveChoice(0, 'farm-expansion')
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected stable selection')
-    expect(resp.interaction.request.farm.farmType).toBe('stable')
-    if (resp.interaction.request.farm.farmType !== 'stable') throw new Error('expected stable selection')
+    expect(expectFarmSelection(resp).farmType).toBe('stable')
+    if (expectFarmSelection(resp).farmType !== 'stable') throw new Error('expected stable selection')
 
-    const stable = resp.interaction.request.farm.selectableTiles[0]!
+    const stable = expectTileFarmSelection(resp, 'stable').selectableTiles[0]!
     resp = session.commitSelectionChoice(0, { stables: [stable] })
 
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.stableTiles).toContainEqual(stable)
     const queued = resp.state.events.filter(
-      (event) => event.type === 'futureMeeple.queued' && event.sourceCardId === A074_ID,
+      (event) => event.type === 'futureMeeple.queued',
+    ).filter(event => event.sourceCardId === A074_ID
     )
     expect(queued).toHaveLength(1)
     expect(queued[0]?.entries).toHaveLength(3)
-    expect(resp.state.log.some((entry) => {
-      const detailParts = entry.params?.detailParts as { effects?: { buildStables?: number } } | undefined
-      return detailParts?.effects?.buildStables === 1
-    })).toBe(true)
+    expect(resp.state.log).toContainEqual(expect.objectContaining({
+      params: expect.objectContaining({
+        detailParts: expect.objectContaining({ effects: expect.objectContaining({ buildStables: 1 }) }),
+      }),
+    }))
     expect(readActionSnapshotToken(resp.state.players[0]!)).toBeUndefined()
   })
 
@@ -483,9 +489,9 @@ describe('D051_Archway session', () => {
     if (resp.interaction.stateId !== 'wait') throw new Error('expected Archway move target')
     resp = session.resolveChoice(0, 'farm-expansion')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected stable selection')
-    if (resp.interaction.request.farm.farmType !== 'stable') throw new Error('expected stable selection')
+    if (expectFarmSelection(resp).farmType !== 'stable') throw new Error('expected stable selection')
 
-    const stable = resp.interaction.request.farm.selectableTiles[0]!
+    const stable = expectTileFarmSelection(resp, 'stable').selectableTiles[0]!
     resp = session.commitSelectionChoice(0, { stables: [stable] })
     resp = resolveTriggerIfPresent(session, resp, D074_ID)
 
@@ -505,7 +511,7 @@ describe('D051_Archway session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected Hearth Brush purchase')
     expect(resp.interaction.sourceCard).toBe(M062_ID)
-    const skip = resp.interaction.request.options?.find((option) => option.value === '__skip__')
+    const skip = getChoiceOptions(resp)?.find((option) => option.value === '__skip__')
     expect(skip).toBeDefined()
     resp = session.resolveChoice(0, skip!.value)
     expect(readActionSnapshotToken(resp.state.players[0]!)).toBeUndefined()
@@ -523,12 +529,149 @@ describe('D051_Archway session', () => {
 
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected Archway move target')
-    expect(resp.interaction.request.options?.some((option) => option.value === 'forest')).toBe(false)
-    expect(resp.interaction.request.options?.some((option) => option.value === 'fishing')).toBe(true)
+    expect(getChoiceOptions(resp)?.some((option) => option.value === 'forest')).toBe(false)
+    expect(getChoiceOptions(resp)?.some((option) => option.value === 'fishing')).toBe(true)
 
     resp = session.resolveChoice(0, 'forest')
     expect(resp.ok).toBe(false)
     expect(resp.state.actionSpaces.find((space) => space.id === D051_ID)?.takenBy)
       .toEqual([{ playerId: resp.state.players[0]!.id, workerId: '1' }])
+  })
+})
+
+describe('E010 rule boundaries', () => {
+
+  const D = 'D051_Archway', E = 'E010_StrawHat', L = 'E148_Lazybones'
+
+  function setup(card: string, round = 3, configure: (state: GameState) => void = () => { }, played = true) {
+    return evidence.track(createWorkSession({
+      seed: 8251, options: { playerCount: card === L ? 4 : 2 }, configure: state => {
+        state.round = round
+        state.availableMajorImprovements = []
+        for (const p of state.players) {
+          p.minorHand = ['__test_placeholder__']
+          p.occupationHand = ['__test_placeholder__']
+          p.resources = { ...p.resources, wood: 0, clay: 0, reed: 0, stone: 0, grain: 0, vegetable: 0, food: 20 }
+        }
+        const owner = state.players[0]!
+        if (played)
+          (card === L ? owner.occupationPlayed : owner.minorPlayed).push(card)
+        else
+          (card === L ? owner.occupationHand : owner.minorHand).splice(0, 1, card)
+        configure(state)
+        if (card === D && played)
+          state.actionSpaces.push(...createPlayerActionSpaces(state))
+      }
+    }))
+  }
+
+  function wait(r: SessionResponse) { assert.equal(r.ok, true, r.error); assert.ok(r.interaction.stateId === 'wait'); return r.interaction }
+
+  function option(r: SessionResponse, predicate: (value: {
+    value: string
+    labelKey?: string
+  }) => boolean) {
+    const i = wait(r)
+    assert.ok(i.request.kind === 'choice')
+    const o = getChoiceOptions({ interaction: i })?.find(predicate)
+    assert.ok(o, JSON.stringify(i))
+    return o.value
+  }
+
+  function finish(s: GameSession, initial: SessionResponse) {
+    let r = initial
+    for (let n = 0; n < 10 && r.interaction.stateId === 'wait'; n++) {
+      const kind = r.interaction.request.kind
+      if (kind === 'confirm-next-player')
+        r = confirmNext(s, r)
+      else if (kind === 'choice' && getChoiceOptions(r)?.some(o => o.value === '__skip__'))
+        r = s.resolveChoice(r.interaction.playerIndex, '__skip__')
+      else
+        break
+      assert.equal(r.ok, true, r.error)
+    }
+    return r
+  }
+
+  function place(s: GameSession, actor: number, id: string) {
+    let r = s.takeAction(actor, id)
+    assert.equal(r.ok, true, r.error)
+    if (id === 'farmland') {
+      wait(r)
+      r = s.commitSelectionChoice(actor, { tile: { row: 0, col: 2 } })
+      assert.equal(r.ok, true, r.error)
+    }
+    return r
+  }
+
+  function endWork(s: GameSession, first = 'grain-seeds', second = 'reed-bank') {
+    finish(s, place(s, 0, first))
+    finish(s, place(s, 1, second))
+    finish(s, place(s, 0, 'clay-pit'))
+    const r = place(s, 1, 'forest')
+    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
+      return confirmNext(s, r)
+    if (r.interaction.stateId === 'idle' && r.state.roundPhase === 'work')
+      return s.performRoundEnd()
+    return r
+  }
+
+  it("actual Farmland food choice rewards once in round three and stale acceptance is rejected", () => {
+    const s = setup(E)
+    let r = endWork(s, 'farmland')
+    const food = option(r, o => o.labelKey === 'actions.gain.name')
+    r = s.resolveChoice(0, food)
+    assert.equal(r.ok, true, r.error)
+    assert.equal(r.state.players[0]!.resources.food, 21)
+    assert.equal(r.state.round, 4)
+    assert.equal(r.state.players[0]!.workers.filter(w => w.isActive).length, 2)
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, food))
+  })
+
+  it("no Farmland person gives no food and no response", () => {
+    const s = setup(E)
+    const r = endWork(s)
+    assert.equal(r.state.players[0]!.resources.food, 20)
+    assert.equal(r.state.round, 4)
+    assert.equal(r.interaction.stateId, 'idle')
+  })
+
+  it("actual Farmland move gives two food without another worker or rotation", () => {
+    const s = setup(E)
+    let r = endWork(s, 'farmland')
+    r = s.resolveChoice(0, option(r, o => o.labelKey === 'actions.move-farmer-to-space.name'))
+    wait(r)
+    assertRejectedUnchanged(s, () => s.resolveChoice(1, 'day-laborer'))
+    r = s.resolveChoice(0, 'day-laborer')
+    assert.equal(r.ok, true, r.error)
+    assert.equal(r.state.players[0]!.resources.food, 22)
+    assert.equal(r.state.round, 4)
+    assert.equal(r.state.players[0]!.workers.filter(w => w.isActive).length, 2)
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, 'day-laborer'))
+  })
+
+  it("real Farmland placement outside its two rounds has no bonus", () => {
+    const s = setup(E, 2)
+    const r = endWork(s, 'farmland')
+    assert.equal(r.state.players[0]!.resources.food, 20)
+    assert.equal(r.state.round, 3)
+    assert.equal(r.interaction.stateId, 'idle')
+  })
+
+  it("real round six Farmland food choice rewards exactly one food", () => {
+    const s = setup(E, 6)
+    let r = endWork(s, 'farmland')
+    r = s.resolveChoice(0, option(r, o => o.labelKey === 'actions.gain.name'))
+    assert.equal(r.ok, true, r.error)
+    assert.equal(r.state.players[0]!.resources.food, 21)
+    assert.equal(r.state.round, 7)
+  })
+
+  it("opponents Farmland person cannot grant the owner a food choice", () => {
+    const s = setup(E)
+    const r = endWork(s, 'grain-seeds', 'farmland')
+    assert.equal(r.state.players[0]!.resources.food, 20)
+    assert.equal(r.state.round, 4)
+    assert.equal(r.interaction.stateId, 'idle')
   })
 })

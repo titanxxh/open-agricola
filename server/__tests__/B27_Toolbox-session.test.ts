@@ -1,18 +1,21 @@
 import { createWorkSession } from './_helpers/session-fixtures'
-import { type SessionResponse } from '../game/authoritative-session'
-
+import { type SessionResponse, type GameSession } from '../game/authoritative-session'
 import { describe, expect, it } from 'vitest'
-import type { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { isCardFlagged, setCardFlag, writeCardExtraData } from '../../shared/cards/helpers/card-state'
 import { endTurnScope, recordActionSnapshot } from '../../shared/cards/helpers/action-snapshot'
 import '../../shared/cards/A/A040_PottersYard'
-import '../../shared/cards/B/B027_Toolbox'
+import { B027_Toolbox_impl } from '../../shared/cards/B/B027_Toolbox'
 import '../../shared/cards/B/B150_LargeScaleFarmer'
 import '../../shared/cards/C/C094_StableCleaner'
 import '../../shared/cards/E/E052_Cubbyhole'
-import { B027_Toolbox_impl } from '../../shared/cards/B/B027_Toolbox'
+import assert from 'node:assert/strict'
+import { type PlayerState } from '../../shared/contract/types'
+import { assertRejectedUnchanged, assertUndoRestored, confirmNext, passPreparationExchanges, undoRuleSnapshot, getChoiceOptions, expectFarmSelection, expectTileFarmSelection } from './_helpers/session-assertions'
+import { createScenarioEvidence } from './_helpers/scenario-evidence'
+
+const evidence = createScenarioEvidence(import.meta.url)
 
 const CARD_ID = 'B027_Toolbox'
 const POTTERS_YARD_ID = 'A040_PottersYard'
@@ -20,7 +23,7 @@ const CUBBYHOLE_ID = 'E052_Cubbyhole'
 const STABLE_CLEANER_ID = 'C94-stable-cleaner-anytime'
 
 const setupPlayed = (food = 5) => {
-  const session = createWorkSession({ seed: 42 })
+  const session = evidence.track(createWorkSession({ seed: 42 }))
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
@@ -60,7 +63,7 @@ describe('B27 Toolbox session', () => {
     let safety = 30
     let reachedBuyMajor = false
     while (resp.interaction.stateId === 'wait' && safety-- > 0) {
-      const opts = resp.interaction.request.options ?? []
+      const opts = getChoiceOptions(resp) ?? []
       const promptKey = (resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
       if (promptKey === 'ui.interactionToolboxImprovement') {
         reachedBuyMajor = true
@@ -76,8 +79,8 @@ describe('B27 Toolbox session', () => {
       }
       // Engine farm prompt: confirm with the first selectable room tile so we
       // actually build (B27 needs a real construct to trigger onEndTurn).
-      if (promptKey === 'ui.interactionRoomSelect' && resp.interaction.stateId === 'wait' && resp.interaction.request.farm.farmType === 'room') {
-        const tile = resp.interaction.request.farm.selectableTiles[0]!
+      if (promptKey === 'ui.interactionRoomSelect' && resp.interaction.stateId === 'wait' && expectFarmSelection(resp).farmType === 'room') {
+        const tile = expectTileFarmSelection(resp, 'room').selectableTiles[0]!
         resp = session.commitSelectionChoice(0, { rooms: [tile] })
         continue
       }
@@ -94,7 +97,7 @@ describe('B27 Toolbox session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    const stable = resp.interaction.request.farm.selectableTiles[0]!
+    const stable = expectTileFarmSelection(resp, 'stable').selectableTiles[0]!
     resp = session.commitSelectionChoice(0, { stables: [stable] })
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId)
@@ -133,7 +136,7 @@ describe('B27 Toolbox session', () => {
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.request.kind).toBe('farm-select')
 
-    const firstStable = resp.interaction.request.farm.selectableTiles[0]!
+    const firstStable = expectTileFarmSelection(resp, 'stable').selectableTiles[0]!
     expect(firstStable).toEqual({ row: 0, col: 0 })
     resp = session.commitSelectionChoice(0, { stables: [firstStable] })
     expect(resp.ok).toBe(true)
@@ -143,14 +146,14 @@ describe('B27 Toolbox session', () => {
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.request.kind).toBe('select-trigger')
 
-    const toolboxFlag = resp.interaction.request.options?.find((option) => option.sourceCard === CARD_ID)
+    const toolboxFlag = getChoiceOptions(resp)?.find((option) => option.sourceCard === CARD_ID)
     expect(toolboxFlag).toBeDefined()
     resp = session.resolveChoice(0, toolboxFlag!.value)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.promptKey).not.toBe('ui.interactionToolboxImprovement')
 
-    const pottersYard = resp.interaction.request.options?.find((option) => option.sourceCard === POTTERS_YARD_ID)
+    const pottersYard = getChoiceOptions(resp)?.find((option) => option.sourceCard === POTTERS_YARD_ID)
     expect(pottersYard).toBeDefined()
     resp = session.resolveChoice(0, pottersYard!.value)
     expect(resp.state.players[0]!.resources.clay).toBe(21)
@@ -160,9 +163,9 @@ describe('B27 Toolbox session', () => {
     expect(resp.interaction.promptKey).not.toBe('ui.interactionToolboxImprovement')
 
     expect(resp.interaction.request.kind).toBe('select-trigger')
-    expect(resp.interaction.request.options?.filter(option => !option.value.startsWith('__'))
+    expect(getChoiceOptions(resp)?.filter(option => !option.value.startsWith('__'))
       .map(option => option.sourceCard)).toEqual([POTTERS_YARD_ID])
-    const exchange = resp.interaction.request.options?.find((option) => option.sourceCard === POTTERS_YARD_ID)
+    const exchange = getChoiceOptions(resp)?.find((option) => option.sourceCard === POTTERS_YARD_ID)
     expect(exchange).toBeDefined()
     resp = session.resolveChoice(0, exchange!.value)
     expect(resp.ok).toBe(true)
@@ -170,15 +173,15 @@ describe('B27 Toolbox session', () => {
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.promptKey).not.toBe('ui.interactionToolboxImprovement')
 
-    const skipPottersYard = resp.interaction.request.options?.find((option) => option.value === '__skip__')
+    const skipPottersYard = getChoiceOptions(resp)?.find((option) => option.value === '__skip__')
     expect(skipPottersYard, JSON.stringify(resp.interaction)).toBeDefined()
     resp = session.resolveChoice(0, skipPottersYard!.value)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.request.kind).toBe('select-trigger')
-    expect(resp.interaction.request.options?.filter(option => !option.value.startsWith('__'))
+    expect(getChoiceOptions(resp)?.filter(option => !option.value.startsWith('__'))
       .map(option => option.sourceCard)).toEqual([CARD_ID])
-    const toolboxWindow = resp.interaction.request.options?.find(option => option.sourceCard === CARD_ID)
+    const toolboxWindow = getChoiceOptions(resp)?.find(option => option.sourceCard === CARD_ID)
     expect(toolboxWindow).toBeDefined()
     resp = session.resolveChoice(0, toolboxWindow!.value)
     expect(resp.ok).toBe(true)
@@ -186,7 +189,7 @@ describe('B27 Toolbox session', () => {
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.promptKey, JSON.stringify(resp.interaction)).toBe('ui.interactionToolboxImprovement')
 
-    const skip = resp.interaction.request.options?.find((option) => option.value === '__skip__')
+    const skip = getChoiceOptions(resp)?.find((option) => option.value === '__skip__')
     expect(skip).toBeDefined()
     resp = session.resolveChoice(0, skip!.value)
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId)
@@ -196,7 +199,7 @@ describe('B27 Toolbox session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    const secondStable = resp.interaction.request.farm.selectableTiles[0]!
+    const secondStable = expectTileFarmSelection(resp, 'stable').selectableTiles[0]!
     resp = session.commitSelectionChoice(0, { stables: [secondStable] })
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.stableTiles).toHaveLength(2)
@@ -228,7 +231,7 @@ describe('B27 Toolbox session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    const stable = resp.interaction.request.farm.selectableTiles[0]!
+    const stable = expectTileFarmSelection(resp, 'stable').selectableTiles[0]!
     resp = session.commitSelectionChoice(1, { stables: [stable] })
     expect(resp.ok).toBe(true)
     expect(isCardFlagged(resp.state.players[1]!, CARD_ID)).toBe(true)
@@ -256,7 +259,7 @@ describe('B27 Toolbox session', () => {
     while (resp.interaction.stateId === 'wait' && safety-- > 0) {
       const promptKey = resp.interaction.promptKey
       if (resp.interaction.request.kind === 'select-trigger') {
-        const opts = resp.interaction.request.options ?? []
+        const opts = getChoiceOptions(resp) ?? []
         expect(opts.find(o => o.sourceCard === CARD_ID)).toBeDefined()
         expect(opts.find(o => o.sourceCard === CUBBYHOLE_ID)).toBeDefined()
         const toolbox = opts.find(o => o.sourceCard === CARD_ID)!
@@ -266,12 +269,12 @@ describe('B27 Toolbox session', () => {
         sawGroupedTrigger = true
         break
       }
-      if (promptKey === 'ui.interactionRoomSelect' && resp.interaction.request.farm.farmType === 'room') {
-        const tile = resp.interaction.request.farm.selectableTiles[0]!
+      if (promptKey === 'ui.interactionRoomSelect' && expectFarmSelection(resp).farmType === 'room') {
+        const tile = expectTileFarmSelection(resp, 'room').selectableTiles[0]!
         resp = session.commitSelectionChoice(0, { rooms: [tile] })
         continue
       }
-      const opts = resp.interaction.request.options ?? []
+      const opts = getChoiceOptions(resp) ?? []
       const constructOption = opts.find(o => o.value === 'construct' || /construct/i.test(o.value))
       const doneOpt = opts.find(o => o.value === '__done__')
       const choice = constructOption ?? doneOpt ?? opts.find(o => o.value !== '__skip__') ?? opts[0]!
@@ -289,7 +292,7 @@ describe('B27 Toolbox session', () => {
     player.minorHand.push(CARD_ID)
     // 模拟"本 turn 已造过 1 个房间"：先快照后增加 roomTiles
     session.withCtx(() => recordActionSnapshot(player, 1))
-    player.roomTiles = [...(player.roomTiles ?? []), { row: 0, col: 0 }] as typeof player.roomTiles
+    player.roomTiles = [...(player.roomTiles ?? []), { row: 0, col: 0 }]
     session.loadState(state)
 
     // 直接调用 effect.onBuy
@@ -344,13 +347,13 @@ describe('B27 Toolbox session', () => {
       const promptKey = (resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
       // Engine farm prompt: confirm with the first selectable room tile so we
       // actually build (test asserts construct → setFlag flow).
-      if (promptKey === 'ui.interactionRoomSelect' && resp.interaction.stateId === 'wait' && resp.interaction.request.farm.farmType === 'room') {
-        const tile = resp.interaction.request.farm.selectableTiles[0]!
+      if (promptKey === 'ui.interactionRoomSelect' && resp.interaction.stateId === 'wait' && expectFarmSelection(resp).farmType === 'room') {
+        const tile = expectTileFarmSelection(resp, 'room').selectableTiles[0]!
         resp = session.commitSelectionChoice(0, { rooms: [tile] })
         continue
       }
       if (resp.interaction.request.kind !== 'choice') break
-      const opts = resp.interaction.request.options ?? []
+      const opts = getChoiceOptions(resp) ?? []
       // 优先选 construct（如果有）以确保修房触发 setFlag；
       // 修房完成后 OR 会有 __done__，优先选它结束 OR 进入 B150/B27 prompt。
       const constructOption = opts.find(o => o.value === 'construct' || /construct/i.test(o.value))
@@ -380,7 +383,7 @@ describe('B027 Toolbox parity', () => {
     played?: boolean
     resources?: Partial<{ wood: number; clay: number; reed: number; stone: number; food: number }>
   } = {}) => {
-    const session = createWorkSession({ seed: 6027, options: { playerCount: 2 } })
+    const session = evidence.track(createWorkSession({ seed: 6027, options: { playerCount: 2 } }))
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.currentPlayerIndex = 0
@@ -413,7 +416,7 @@ describe('B027 Toolbox parity', () => {
   }
 
   const options = (response: SessionResponse) => response.interaction.stateId === 'wait'
-    ? response.interaction.request.options ?? []
+    ? getChoiceOptions(response) ?? []
     : []
 
   const resolveToolboxTrigger = (session: GameSession, response: SessionResponse) => {
@@ -444,7 +447,8 @@ describe('B027 Toolbox parity', () => {
         continue
       }
       if (response.interaction.request.kind === 'farm-select') {
-        const farm = response.interaction.request.farm
+        const farm = expectFarmSelection(response)
+        assert.ok(farm.farmType === 'room' || farm.farmType === 'stable')
         const tile = farm.selectableTiles[0]
         expect(tile).toBeDefined()
         if (farm.farmType === 'room') {
@@ -454,7 +458,7 @@ describe('B027 Toolbox parity', () => {
           response = session.commitSelectionChoice(response.interaction.playerIndex, { stables: [tile!] })
           builtStable = true
         } else {
-          throw new Error(`unexpected farm type ${farm.farmType}`)
+          throw new Error('Unexpected farm selection')
         }
         continue
       }
@@ -508,7 +512,8 @@ describe('B027 Toolbox parity', () => {
     response = enterToolboxMajors(session, response)
     if (response.state.players[0]!.improvements.includes(cardId)) return response
     expect(options(response).map((option) => option.value)).toContain(cardId)
-    return session.resolveChoice(response.interaction.playerIndex ?? 0, cardId)
+    assert.ok(response.interaction.stateId === 'wait')
+    return session.resolveChoice(response.interaction.playerIndex, cardId)
   }
 
   it('B027 S2: after building a room Toolbox can buy Joinery at normal cost', () => {
@@ -578,5 +583,209 @@ describe('B027 Toolbox parity', () => {
     expect(new Set(options(response).map((option) => option.value)))
       .toEqual(new Set(TOOLBOX_MAJORS))
     expect(options(response).map((option) => option.value)).not.toContain('Major_Well')
+  })
+})
+
+describe('B027 rule boundaries', () => {
+
+  const A089 = 'A089_StablePlanner'
+
+  const D102 = 'D102_SampleStableMaker'
+
+  const B027 = 'B027_Toolbox'
+
+  function ok(r: SessionResponse) { assert.equal(r.ok, true, r.error); return r }
+
+  function setup({ card = A089, round = 1, stableCount = 0, toolbox = false, resources = {} }: {
+    card?: string
+    round?: number
+    stableCount?: number
+    toolbox?: boolean
+    resources?: Partial<PlayerState['resources']>
+  } = {}) {
+    const s = evidence.track(createWorkSession({
+      seed: 42, configure: state => {
+        state.round = round
+        state.players.forEach(p => { p.resources.food = 40 })
+        const p = state.players[0]!
+        p.occupationHand = card === A089 ? [A089] : ['__test_placeholder__']
+        p.occupationPlayed = card === D102 ? [D102] : []
+        p.minorPlayed = toolbox || card === B027 ? [B027] : []
+        if (card === D102) {
+          p.minorHand = ['D076_SocialBenefits']
+          p.resources.reed = 1
+        }
+        Object.assign(p.resources, resources)
+        p.stableTiles = Array.from({ length: stableCount }, (_, col) => ({ row: 0, col: col + 1 }))
+      }
+    }))
+    return s
+  }
+
+  function choose(s: GameSession, r: SessionResponse, predicate: (o: {
+    value: string
+    labelKey?: string
+    sourceCard?: string
+  }) => boolean) {
+    assert.ok(r.interaction.stateId === 'wait' && (r.interaction.request.kind === 'choice' || r.interaction.request.kind === 'select-trigger'), JSON.stringify(r.interaction))
+    const option = getChoiceOptions(r).find(predicate)
+    assert.ok(option, JSON.stringify(r.interaction))
+    return ok(s.resolveChoice(r.interaction.playerIndex, option.value))
+  }
+
+  function ready(s: GameSession, actor: number) {
+    let r = s.getState()
+    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
+      r = confirmNext(s, r)
+    assert.equal(r.interaction.stateId, 'idle', JSON.stringify(r.interaction))
+    assert.equal(r.state.currentPlayerIndex, actor)
+    return r
+  }
+
+  function turn(s: GameSession, actor: number, space: string) { ready(s, actor); return ok(s.takeAction(actor, space)) }
+
+  function playPlanner(s: GameSession) {
+    const r = ok(s.takeAction(0, 'lessons'))
+    assert.ok(r.state.players[0]!.occupationPlayed.includes(A089))
+    return r
+  }
+
+  function schedule(session: GameSession, response: SessionResponse, count: number) {
+    const interaction = response.interaction
+    assert.ok(interaction.stateId === 'wait' && interaction.request.kind === 'choice')
+    const options = getChoiceOptions(response).filter(option => option.sourceCard === A089
+      && option.effectPreview?.kind === 'futureSchedule' && option.effectPreview.entries.length === count)
+    assert.equal(options.length, 1, JSON.stringify(interaction))
+    return ok(session.resolveChoice(0, options[0]!.value))
+  }
+
+  function futureRounds(r: SessionResponse) {
+    return r.state.futureMeeples.filter(m => m.cardId === A089 && m.resources.stable === 1).map(m => m.round).sort((a, b) => a - b)
+  }
+
+  function reachDue(s: GameSession) {
+    schedule(s, playPlanner(s), 1)
+    turn(s, 1, 'forest')
+    turn(s, 0, 'reed-bank')
+    const first = turn(s, 1, 'clay-pit')
+    let r = confirmNext(s, first)
+    assert.equal(r.state.round, 2)
+    for (const round of [2, 3]) {
+      assert.equal(r.state.players[0]!.stableTiles.length, 0)
+      assert.deepEqual(futureRounds(r), [4])
+      turn(s, 0, 'grain-seeds')
+      turn(s, 1, 'forest')
+      turn(s, 0, 'day-laborer')
+      r = confirmNext(s, turn(s, 1, 'clay-pit'))
+      assert.equal(r.state.round, round + 1)
+    }
+    assert.equal(r.state.players[0]!.resources.wood, 0)
+    r = choose(s, r, o => o.sourceCard === A089 || o.value === A089)
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'farm-select' && expectFarmSelection(r).farmType === 'stable')
+    return r
+  }
+
+  function buildFarm(s: GameSession, mode: 'room' | 'stable', r = ok(s.takeAction(0, 'farm-expansion'))) {
+    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice')
+      r = choose(s, r, o => o.labelKey === (mode === 'room' ? 'actions.construct.name' : 'actions.stables.name'))
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'farm-select')
+    const farm = expectFarmSelection(r)
+    assert.ok(farm.farmType === 'room' || farm.farmType === 'stable')
+    assert.equal(farm.farmType, mode)
+    const tile = farm.selectableTiles[0]!
+    return ok(s.commitSelectionChoice(0, mode === 'room' ? { rooms: [tile] } : { stables: [tile] }))
+  }
+
+  function finishExpansion(s: GameSession, r: SessionResponse) {
+    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice' && r.interaction.promptKey !== 'ui.interactionToolboxImprovement') {
+      r = choose(s, r, o => o.value === '__done__' || o.value === '__skip__')
+    }
+    return r
+  }
+
+  function toolboxMajors(s: GameSession, r: SessionResponse) {
+    r = finishExpansion(s, r)
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.sourceCard === B027)
+    assert.equal(r.interaction.promptKey, 'ui.interactionToolboxImprovement')
+    r = choose(s, r, o => o.value !== '__skip__')
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice')
+    assert.deepEqual(getChoiceOptions(r).map(o => o.value).sort(), ['Major_Basket', 'Major_Joinery', 'Major_Pottery'])
+    return r
+  }
+
+  it("stable turn restricts majors and pays normally with undo and retry", () => {
+    const s = setup({ card: B027, round: 5, resources: { wood: 4, reed: 2, clay: 2, stone: 3 } })
+    const before = undoRuleSnapshot(s.getState())
+    toolboxMajors(s, buildFarm(s, 'stable'))
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, 'Major_Well'))
+    const r = ok(s.resolveChoice(0, 'Major_Basket'))
+    assert.ok(r.state.players[0]!.improvements.includes('Major_Basket'))
+    assert.deepEqual({ wood: r.state.players[0]!.resources.wood, reed: r.state.players[0]!.resources.reed, stone: r.state.players[0]!.resources.stone }, { wood: 2, reed: 0, stone: 1 })
+    assert.equal(r.state.players[0]!.stableTiles.length, 1)
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, 'Major_Pottery'))
+    assertUndoRestored(before, s.undoAction())
+    toolboxMajors(s, buildFarm(s, 'stable'))
+    const retry = ok(s.resolveChoice(0, 'Major_Basket'))
+    assert.equal(retry.state.players[0]!.stableTiles.length, 1)
+    assert.deepEqual(retry.state.players[0]!.improvements, ['Major_Basket'])
+  })
+
+  it("room and stable in one real turn offer only one major purchase", () => {
+    const s = setup({ card: B027, round: 5, resources: { wood: 9, reed: 4, clay: 2, stone: 4 } })
+    let r = buildFarm(s, 'room')
+    r = buildFarm(s, 'stable', r)
+    toolboxMajors(s, r)
+    r = ok(s.resolveChoice(0, 'Major_Joinery'))
+    assert.equal(r.state.players[0]!.rooms, 3)
+    assert.equal(r.state.players[0]!.stableTiles.length, 1)
+    assert.deepEqual(r.state.players[0]!.improvements, ['Major_Joinery'])
+    assert.equal(r.state.players[0]!.resources.stone, 2)
+    assert.equal(r.state.players[0]!.resources.clay, 2)
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, 'Major_Pottery'))
+    turn(s, 1, 'forest')
+    const normal = turn(s, 0, 'grain-seeds')
+    assert.ok(normal.interaction.stateId === 'wait' && normal.interaction.request.kind === 'confirm-next-player')
+    assert.deepEqual(normal.state.players[0]!.improvements, ['Major_Joinery'])
+  })
+
+  it("insufficient resources never grants a free major or stale window", () => {
+    const s = setup({ card: B027, round: 5, resources: { wood: 2 } })
+    const r = finishExpansion(s, buildFarm(s, 'stable'))
+    assert.equal(r.state.players[0]!.resources.wood, 0)
+    assert.equal(r.state.players[0]!.stableTiles.length, 1)
+    assert.deepEqual(r.state.players[0]!.improvements, [])
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
+    turn(s, 1, 'forest')
+    const normal = turn(s, 0, 'grain-seeds')
+    assert.deepEqual(normal.state.players[0]!.improvements, [])
+    assert.ok(normal.interaction.stateId === 'wait' && normal.interaction.request.kind === 'confirm-next-player')
+  })
+
+  it("Stable Planner offturn stable never creates a Toolbox purchase", () => {
+    const s = setup({ toolbox: true, resources: { reed: 2, stone: 2 } })
+    const r = reachDue(s)
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'farm-select' && expectFarmSelection(r).farmType === 'stable')
+    const built = ok(s.commitSelectionChoice(0, { stables: [expectTileFarmSelection(r, 'stable').selectableTiles[0]!] }))
+    assert.equal(built.state.round, 4)
+    assert.equal(built.state.players[0]!.stableTiles.length, 1)
+    assert.deepEqual(built.state.players[0]!.improvements, [])
+    assert.ok(passPreparationExchanges(s, built).interaction.stateId === 'idle', JSON.stringify(s.getState().interaction))
+  })
+
+  it("own nonbuilding turn and opponents stable never grants owner a purchase", () => {
+    const s = setup({ card: B027, round: 5, resources: { reed: 2, stone: 2 } })
+    s.state.players[1]!.resources.wood = 2
+    const own = turn(s, 0, 'grain-seeds')
+    assert.ok(own.interaction.stateId === 'wait' && own.interaction.request.kind === 'confirm-next-player')
+    let r = turn(s, 1, 'farm-expansion')
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'farm-select' && expectFarmSelection(r).farmType === 'stable')
+    r = ok(s.commitSelectionChoice(1, { stables: [expectTileFarmSelection(r, 'stable').selectableTiles[0]!] }))
+    assert.equal(r.state.players[1]!.stableTiles.length, 1)
+    assert.deepEqual(r.state.players[0]!.improvements, [])
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
+    const next = turn(s, 0, 'day-laborer')
+    assert.deepEqual(next.state.players[0]!.improvements, [])
   })
 })

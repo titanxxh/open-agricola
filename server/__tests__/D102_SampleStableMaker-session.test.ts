@@ -1,51 +1,37 @@
+import { createInitialState } from '../../shared/session/state-bootstrap'
 import { withActiveRegistry } from '../../shared/cards/active-registry'
 import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
 import { describe, expect, it } from 'vitest'
 import { getCardEffect, getExtraRoomCapacity } from '../../shared/cards/card-effects'
 import { runSelectionEffect } from '../../shared/actions/helpers/selection-effect-registry'
 import { getAvailableStableSupplyCount } from '../../shared/domain/supply-tokens'
-import type { GameState, PlayerState , ActionFlow } from '../../shared/contract/types'
-
+import { type GameState, type PlayerState } from '../../shared/contract/types'
 import '../../shared/cards/D/D102_SampleStableMaker'
 import '../../shared/cards/B/B085_FarmHand'
+import assert from 'node:assert/strict'
+import { type GameSession, type SessionResponse } from '../game/authoritative-session'
+import { createWorkSession } from './_helpers/session-fixtures'
+import { assertRejectedUnchanged, confirmNext, getChoiceOptions } from './_helpers/session-assertions'
+import { createScenarioEvidence } from './_helpers/scenario-evidence'
+
+const evidence = createScenarioEvidence(import.meta.url)
 
 const CARD_ID = 'D102_SampleStableMaker'
 const FIELD_EFFECT = 'sample-stable-maker-return'
 
-const createPlayer = (id = 'p1'): PlayerState =>
-  ({
-    id, name: id, color: 'red',
-    resources: {
-      wood: 0, clay: 0, reed: 0, stone: 0, food: 0,
-      grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
-    },
-    workers: [
-      { id: '1', isActive: true, isNewborn: false },
-      { id: '2', isActive: true, isNewborn: false },
-      { id: '3', isActive: false, isNewborn: false },
-      { id: '4', isActive: false, isNewborn: false },
-      { id: '5', isActive: false, isNewborn: false },
-    ],
-    rooms: 2, houseType: 'wood' as const,
-    fields: [], fences: 0, roomTiles: [{ row: 0, col: 0 }, { row: 1, col: 0 }],
-    stableTiles: [],
-    improvements: [], minorHand: [], minorPlayed: [],
-    occupationHand: [], occupationPlayed: [],houseAnimals: {}, stableAnimals: {},
-    pastures: [], fenceSegments: [],
-    majorEffects: { wellRounds: 0 }, startPlayer: false,
-    activeModifiers: [],
-    cardStates: {},
-  }) as unknown as PlayerState
+const createPlayer = (id = 'p1'): PlayerState => {
+  const player = createInitialState(1, { playerCount: 2 }).players[0]!
+  player.id = id
+  player.name = id
+  player.minorHand = []
+  player.occupationHand = []
+  Object.assign(player.resources, { wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 })
+  return player
+}
 
-const createState = (players: PlayerState[]): GameState =>
-  ({
-    round: 5, currentPlayerIndex: 0, players,
-    actionSpaces: [], log: [],
-    roundActionOrder: Array.from({ length: 14 }).map(() => null),
-    gameSeed: 1, availableMajorImprovements: [],
-    futureMeeples: [], pendingFutureMeeples: [],
-    gameOver: false, workPhaseObtainedResources: {},
-  }) as unknown as GameState
+const createState = (players: PlayerState[]): GameState => ({
+  ...createInitialState(1, { playerCount: 2 }), players,
+})
 
 describe('D102_SampleStableMaker card effect', () => {
   const createOwner = () => {
@@ -74,18 +60,21 @@ describe('D102_SampleStableMaker card effect', () => {
     ]
     const state = createState([player])
     const effect = withActiveRegistry(ruleRegistry, () => getCardEffect(CARD_ID))
-    const flow = withActiveRegistry(ruleRegistry, () => effect!.onStartReturnHome!(state, player)) as Extract<ActionFlow, { type: 'seq' }>
-    expect(flow).toBeDefined()
-    expect(flow.type).toBe('seq')
+    const flow = withActiveRegistry(ruleRegistry, () => effect!.onStartReturnHome!(state, player))
+    assert.ok(flow?.type === 'seq')
     expect(flow.optional).toBe(true)
     expect(flow.children).toHaveLength(2)
-    expect(flow.children[0].actionId).toBe('selection')
-    expect(flow.children[0].actionContext.selectionEffect).toBe(FIELD_EFFECT)
-    expect(flow.children[0].actionContext.selectionKind).toBe('farm-position')
-    expect(flow.children[0].actionContext.maxSelections).toBe(1)
-    expect(flow.children[1].actionId).toBe('improvement')
-    expect(flow.children[1].optional).toBe(true)
-    expect(flow.children[1].sourceCard).toBe(CARD_ID)
+    const selection = flow.children[0]
+    assert.ok(selection?.type === 'leaf')
+    expect(selection.actionId).toBe('selection')
+    expect(selection.actionContext?.selectionEffect).toBe(FIELD_EFFECT)
+    expect(selection.actionContext?.selectionKind).toBe('farm-position')
+    expect(selection.actionContext?.maxSelections).toBe(1)
+    const improvement = flow.children[1]
+    assert.ok(improvement?.type === 'leaf')
+    expect(improvement.actionId).toBe('improvement')
+    expect(improvement.optional).toBe(true)
+    expect(improvement.sourceCard).toBe(CARD_ID)
   })
 
   it('selection-effect removes exactly 1 stable and grants 1 wood, 1 grain, 1 food', () => {
@@ -100,7 +89,7 @@ describe('D102_SampleStableMaker card effect', () => {
       food: player.resources.food,
     }
     withActiveRegistry(ruleRegistry, () => runSelectionEffect(FIELD_EFFECT, {
-      player,
+      state: createState([player]), cards: [], player,
       positions: ['0-0'],
       sourceCard: CARD_ID,
     }))
@@ -121,7 +110,7 @@ describe('D102_SampleStableMaker card effect', () => {
       food: player.resources.food,
     }
     withActiveRegistry(ruleRegistry, () => runSelectionEffect(FIELD_EFFECT, {
-      player,
+      state: createState([player]), cards: [], player,
       positions: [],
       sourceCard: CARD_ID,
     }))
@@ -140,10 +129,11 @@ describe('D102_SampleStableMaker card effect', () => {
       B085_FarmHand: { extraData: { position: { row: 2, col: 1 } } },
     }
     const state = createState([player])
-    const flow = withActiveRegistry(ruleRegistry, () => getCardEffect(CARD_ID)!.onStartReturnHome!(state, player)) as Extract<ActionFlow, { type: 'seq' }>
-    expect(flow).toBeDefined()
+    const flow = withActiveRegistry(ruleRegistry, () => getCardEffect(CARD_ID)!.onStartReturnHome!(state, player))
+    assert.ok(flow?.type === 'seq')
     const selection = flow.children[0]
-    expect(selection.actionContext.selectableTiles).toEqual([{ row: 2, col: 1 }])
+    assert.ok(selection?.type === 'leaf')
+    expect(selection.actionContext?.selectableTiles).toEqual([{ row: 2, col: 1 }])
   })
 
   it('returns the B85 FarmHand tile and pays the normal resource reward', () => {
@@ -165,7 +155,7 @@ describe('D102_SampleStableMaker card effect', () => {
     }
     expect(withActiveRegistry(ruleRegistry, () => getExtraRoomCapacity(player))).toBe(1)
     withActiveRegistry(ruleRegistry, () => runSelectionEffect(FIELD_EFFECT, {
-      player,
+      state: createState([player]), cards: [], player,
       positions: ['2-1'],
       sourceCard: CARD_ID,
     }))
@@ -199,13 +189,151 @@ describe('D102_SampleStableMaker card effect', () => {
     expect(withActiveRegistry(ruleRegistry, () => getAvailableStableSupplyCount(state, player))).toBe(0)
 
     withActiveRegistry(ruleRegistry, () => runSelectionEffect(FIELD_EFFECT, {
-      player,
-      positions: ['2-1'],
-      sourceCard: CARD_ID,
-      state,
-      cards: [],
+      player, positions: ['2-1'], sourceCard: CARD_ID, state, cards: [],
     }))
 
     expect(withActiveRegistry(ruleRegistry, () => getAvailableStableSupplyCount(state, player))).toBe(1)
+  })
+})
+
+describe('D102 rule boundaries', () => {
+
+  const A089 = 'A089_StablePlanner'
+
+  const D102 = 'D102_SampleStableMaker'
+
+  const B027 = 'B027_Toolbox'
+
+  function ok(r: SessionResponse) { assert.equal(r.ok, true, r.error); return r }
+
+  function setup({ card = A089, round = 1, stableCount = 0, toolbox = false, resources = {} }: {
+    card?: string
+    round?: number
+    stableCount?: number
+    toolbox?: boolean
+    resources?: Partial<PlayerState['resources']>
+  } = {}) {
+    const s = evidence.track(createWorkSession({
+      seed: 42, configure: state => {
+        state.round = round
+        state.players.forEach(p => { p.resources.food = 40 })
+        const p = state.players[0]!
+        p.occupationHand = card === A089 ? [A089] : ['__test_placeholder__']
+        p.occupationPlayed = card === D102 ? [D102] : []
+        p.minorPlayed = toolbox || card === B027 ? [B027] : []
+        if (card === D102) {
+          p.minorHand = ['D076_SocialBenefits']
+          p.resources.reed = 1
+        }
+        Object.assign(p.resources, resources)
+        p.stableTiles = Array.from({ length: stableCount }, (_, col) => ({ row: 0, col: col + 1 }))
+      }
+    }))
+    return s
+  }
+
+  function choose(s: GameSession, r: SessionResponse, predicate: (o: {
+    value: string
+    labelKey?: string
+    sourceCard?: string
+  }) => boolean) {
+    assert.ok(r.interaction.stateId === 'wait' && (r.interaction.request.kind === 'choice' || r.interaction.request.kind === 'select-trigger'), JSON.stringify(r.interaction))
+    const option = getChoiceOptions(r).find(predicate)
+    assert.ok(option, JSON.stringify(r.interaction))
+    return ok(s.resolveChoice(r.interaction.playerIndex, option.value))
+  }
+
+  function ready(s: GameSession, actor: number) {
+    let r = s.getState()
+    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
+      r = confirmNext(s, r)
+    assert.equal(r.interaction.stateId, 'idle', JSON.stringify(r.interaction))
+    assert.equal(r.state.currentPlayerIndex, actor)
+    return r
+  }
+
+  function turn(s: GameSession, actor: number, space: string) { ready(s, actor); return ok(s.takeAction(actor, space)) }
+
+  function returnWindow(s: GameSession) {
+    turn(s, 0, 'reed-bank')
+    turn(s, 1, 'forest')
+    turn(s, 0, 'grain-seeds')
+    const r = confirmNext(s, turn(s, 1, 'clay-pit'))
+    assert.equal(r.state.round, 5)
+    assert.equal(r.state.players[0]!.resources.wood, 0)
+    assert.equal(r.state.players[0]!.resources.grain, 1)
+    assert.equal(r.state.players[0]!.resources.food, 40)
+    return r
+  }
+
+  function returnSelection(s: GameSession) {
+    let r = returnWindow(s)
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.sourceCard === D102)
+    r = choose(s, r, o => o.value !== '__skip__')
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'selection', JSON.stringify(r.interaction))
+    return r
+  }
+
+  function makerGoods(r: SessionResponse) { const p = r.state.players[0]!; return { stables: p.stableTiles.length, wood: p.resources.wood, grain: p.resources.grain, food: p.resources.food } }
+
+  it("real return gains once and offers only a minor improvement", () => {
+    const s = setup({ card: D102, round: 5, stableCount: 2, resources: { clay: 2, stone: 2 } })
+    const before = returnSelection(s)
+    const baseline = makerGoods(before)
+    let r = ok(s.commitSelectionChoice(0, { positions: [{ row: 0, col: 1 }] }))
+    assert.deepEqual(makerGoods(r), { stables: 1, wood: 1, grain: 2, food: 41 })
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.sourceCard === D102)
+    assert.ok(r.interaction.allowedCommands.includes('undoStep'))
+    const undone = ok(s.undoStep())
+    assert.deepEqual(makerGoods(undone), baseline)
+    assert.ok(undone.interaction.stateId === 'wait' && undone.interaction.request.kind === 'selection')
+    r = ok(s.commitSelectionChoice(0, { positions: [{ row: 0, col: 1 }] }))
+    assert.deepEqual(makerGoods(r), { stables: 1, wood: 1, grain: 2, food: 41 })
+    r = choose(s, r, o => o.value !== '__skip__')
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, 'Major_Pottery'))
+    if (!r.state.players[0]!.minorPlayed.includes('D076_SocialBenefits'))
+      r = ok(s.resolveChoice(0, 'D076_SocialBenefits'))
+    assert.ok(r.state.players[0]!.minorPlayed.includes('D076_SocialBenefits'))
+    assert.equal(r.state.players[0]!.resources.reed, 1)
+  })
+
+  it("nonexistent stable cannot grant exchange goods", () => {
+    const s = setup({ card: D102, round: 5, stableCount: 2 })
+    const r = returnSelection(s)
+    const baseline = makerGoods(r)
+    const bad = s.commitSelectionChoice(0, { positions: [{ row: 0, col: 4 }] })
+    const outcome = { accepted: bad.ok, ...makerGoods(bad) }
+    assert.equal(bad.ok, false)
+    assert.deepEqual(makerGoods(bad), baseline)
+    const good = ok(s.commitSelectionChoice(0, { positions: [{ row: 0, col: 1 }] }))
+    assert.deepEqual(makerGoods(good), { stables: 1, wood: 1, grain: 2, food: 41 })
+    assert.deepEqual(outcome, { accepted: false, stables: 2, wood: 0, grain: 1, food: 40 })
+  })
+
+  it("duplicate or two stable selection is rejected before one legal return", () => {
+    const s = setup({ card: D102, round: 5, stableCount: 2 })
+    returnSelection(s)
+    assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { positions: [{ row: 0, col: 1 }, { row: 0, col: 1 }] }))
+    assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { positions: [{ row: 0, col: 1 }, { row: 0, col: 2 }] }))
+    const r = ok(s.commitSelectionChoice(0, { positions: [{ row: 0, col: 1 }] }))
+    assert.deepEqual(makerGoods(r), { stables: 1, wood: 1, grain: 2, food: 41 })
+  })
+
+  it("declining a real return-home opportunity keeps both stables and all goods", () => {
+    const s = setup({ card: D102, round: 5, stableCount: 2 })
+    const r = choose(s, returnWindow(s), o => o.value === '__skip__')
+    assert.deepEqual(makerGoods(r), { stables: 2, wood: 0, grain: 1, food: 40 })
+    assert.equal(r.state.round, 6)
+  })
+
+  it("no built stable offers no return-home exchange", () => {
+    const s = setup({ card: D102, round: 5 })
+    turn(s, 0, 'reed-bank')
+    turn(s, 1, 'forest')
+    turn(s, 0, 'grain-seeds')
+    const r = confirmNext(s, turn(s, 1, 'clay-pit'))
+    assert.equal(r.state.round, 6)
+    assert.deepEqual(makerGoods(r), { stables: 0, wood: 0, grain: 1, food: 40 })
+    assert.ok(r.interaction.stateId === 'idle')
   })
 })
