@@ -211,31 +211,39 @@ describe("A085 command boundaries", () => {
     assert(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice', JSON.stringify(r.interaction))
     return getChoiceOptions(r)
   }
-  function finish(s: GameSession, r: SessionResponse, actor = 0) {
-    for (let n = 0; n < 5 && r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice'; n++) {
-      const skips = getChoiceOptions(r).filter(o => o.value === '__skip__' || o.value === '__done__')
-      assert.equal(skips.length, 1, JSON.stringify(r.interaction))
-      const skip = skips[0]
-      assert(skip, JSON.stringify(r.interaction))
-      r = record('finish-optional', ok(s.resolveChoice(actor, skip.value)))
-    }
+    function finish(r: SessionResponse, actor = 0) {
+    ok(r)
     assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
     assert.equal(r.interaction.playerIndex, actor)
+    assert.equal(r.interaction.request.nextPlayerIndex, 1 - actor)
+    assert.equal(r.state.currentPlayerIndex, actor)
     return r
   }
   function ready(s: GameSession, actor: number) {
     let r = s.getState()
     if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
       r = record('confirm', confirmNext(s, r))
+    assert.equal(r.interaction.stateId, 'idle', JSON.stringify(r.interaction))
     assert.equal(r.state.currentPlayerIndex, actor)
     return r
   }
   function turn(s: GameSession, actor: number, space: string) {
     ready(s, actor)
-    return record(`take:${space}`, ok(s.takeAction(actor, space)))
+    const response = record(`take:${space}`, ok(s.takeAction(actor, space)))
+    return space === 'wish-children' || space === 'lessons' ? response : finish(response, actor)
   }
-  function growth(s: GameSession) {
-    return finish(s, turn(s, 0, 'wish-children'))
+    function growth(s: GameSession) {
+    const pending = turn(s, 0, 'wish-children')
+    assert.ok(pending.interaction.stateId === 'wait' && pending.interaction.request.kind === 'choice', JSON.stringify(pending.interaction))
+    assert.equal(pending.interaction.sourceCard, undefined)
+    assert.equal(pending.interaction.promptKey, 'ui.interactionOptionalAction')
+    assert.equal(pending.interaction.playerIndex, 0)
+    assert.equal(pending.state.currentPlayerIndex, 0)
+    const improvement = options(pending).filter(option => option.value !== '__skip__' && !option.disabled)
+    assert.equal(improvement.length, 1)
+    assert.equal(improvement[0]!.labelKey, 'actions.improvement.name')
+    assert.ok(options(pending).some(option => option.value === '__skip__' && !option.disabled))
+    return finish(record('decline-minor', ok(s.resolveChoice(0, '__skip__'))))
   }
   function values(r: SessionResponse) {
     const p = r.state.players[0]!
@@ -261,7 +269,7 @@ describe("A085 command boundaries", () => {
     assert.equal(newbornCount(s.state.players[0]!), 0)
     const retry = turn(s, 0, 'day-laborer')
     assert.equal(values(retry).food, 32)
-    assert.ok(retry.interaction.stateId === 'wait' && retry.interaction.request.kind === 'confirm-next-player', JSON.stringify(retry.interaction))
+    finish(retry)
   }
   it("clay room with orthogonal field and pasture permits a real third newborn", () => {
     const s = setup({ house: 'clay' }, geometry)
@@ -298,15 +306,27 @@ describe("A085 command boundaries", () => {
   it("actual whole growth undo restores all farmers and permits one retry", () => {
     const s = setup({ house: 'clay' }, geometry)
     const before = undoRuleSnapshot(s.getState())
+    const interactionBefore = structuredClone(s.getState().interaction)
     growth(s)
-    assertUndoRestored(before, record('undo-homekeeper', s.undoAction()))
+    const undone = record('undo-homekeeper', s.undoAction())
+    assertUndoRestored(before, undone)
+    assertUndoRestored(before, s.getState())
+    assert.deepEqual(undone.interaction, interactionBefore)
+    assert.deepEqual(s.getState().interaction, interactionBefore)
+    assert.equal(undone.interaction.stateId, 'idle')
+    assert.equal(undone.state.currentPlayerIndex, 0)
+    assert.equal(s.getState().state.currentPlayerIndex, 0)
     assert.equal(values(growth(s)).family, 3)
   })
   function lesson(s: GameSession, card: string) {
     const r = turn(s, 0, 'lessons')
-    const found = options(r).find(o => o.value === card)
+    assert.ok(r.interaction.stateId === 'wait')
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
+    assert.equal(r.interaction.promptKey, 'ui.interactionChooseOccupation')
+    const found = options(r).find(o => o.value === card && !o.disabled)
     assert(found, JSON.stringify(r.interaction))
-    return record('play-occupation', ok(s.resolveChoice(0, found.value)))
+    return finish(record('play-occupation', ok(s.resolveChoice(0, found.value))))
   }
   it("actual first Lesson is free and only later room growth uses Homekeeper", () => {
     const s = setup({ played: false, house: 'clay', resources: { food: 1 } }, geometry)
