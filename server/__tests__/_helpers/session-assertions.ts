@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import type { GameSession, SessionResponse } from '../../game/authoritative-session'
 import type { ActionChoiceOption } from '../../../shared/contract/types'
 
-export function getChoiceOptions(response: SessionResponse): ActionChoiceOption[] {
+export function getChoiceOptions(response: Pick<SessionResponse, 'interaction'>): ActionChoiceOption[] {
   const interaction = response.interaction
   if (interaction.stateId !== 'wait') return []
   const request = interaction.request
@@ -61,4 +61,35 @@ export function assertUndoRestored(before: string, after: SessionResponse): void
   const packet = after.state.publicEventArchive.at(-1)
   assert.ok(packet?.type === 'publicEvents.canceled')
   assert.equal(packet.reason, 'undoAction')
+}
+
+export function getFarmSelection(response: SessionResponse) {
+  const interaction = response.interaction
+  return interaction.stateId === 'wait' && interaction.request.kind === 'farm-select'
+    ? interaction.request.farm : undefined
+}
+
+export function expectFarmSelection(response: SessionResponse) {
+  assert.ok(response.interaction.stateId === 'wait', JSON.stringify(response.interaction))
+  assert.ok(response.interaction.request.kind === 'farm-select', JSON.stringify(response.interaction))
+  return response.interaction.request.farm
+}
+
+export function assertEmptyAccumulationRejected(session: GameSession, actor: number, spaceId: string): SessionResponse {
+  let current = session.getState()
+  if (current.interaction.stateId === 'wait' && current.interaction.request.kind === 'confirm-next-player') current = confirmNext(session, current)
+  assert.equal(current.interaction.stateId, 'idle', JSON.stringify(current.interaction))
+  assert.equal(current.state.currentPlayerIndex, actor)
+  const space = current.state.actionSpaces.find(candidate => candidate.id === spaceId)
+  assert.ok(space)
+  assert.ok(Object.values(space.resources).every(amount => amount === 0), JSON.stringify(space.resources))
+  assert.equal(session.getActionAvailability(actor)[spaceId], false)
+  return assertRejectedUnchanged(session, () => session.takeAction(actor, spaceId))
+}
+
+export function expectTileFarmSelection(response: SessionResponse, kind: 'plow' | 'room' | 'stable') {
+  const farm = expectFarmSelection(response)
+  assert.ok(farm.farmType === 'plow' || farm.farmType === 'room' || farm.farmType === 'stable')
+  assert.equal(farm.farmType, kind)
+  return farm
 }

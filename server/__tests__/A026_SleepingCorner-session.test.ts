@@ -1,15 +1,23 @@
+import { expectWait } from './_helpers/trigger-select'
 import { describe, expect, it } from 'vitest'
-import { GameSession, type SessionResponse } from '../game/authoritative-session'
+import { type GameSession, type SessionResponse } from '../game/authoritative-session'
 import { familySize, setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/A/A026_SleepingCorner'
-
+import assert from 'node:assert/strict'
+import { type GameState, type Resource } from '../../shared/contract/types'
+import { createWorkSession } from './_helpers/session-fixtures'
+import { assertRejectedUnchanged, assertUndoRestored, confirmNext, undoRuleSnapshot, getChoiceOptions } from './_helpers/session-assertions'
+import { createScenarioEvidence } from './_helpers/scenario-evidence'
+const sessionEvidence = createScenarioEvidence(import.meta.url)
 const CARD_ID = 'A026_SleepingCorner'
 const FILLER = '__test_placeholder__'
 
-const setup = (occupants: Array<{ player: number; worker: number; newborn?: boolean }>) => {
-  const session = new GameSession(9826, undefined, { playerCount: 3 })
+const setup = (occupants: Array<{ player: number
+  worker: number
+  newborn?: boolean }>) => {
+  const session = sessionEvidence.track(createWorkSession({ seed: 9826, options: { playerCount: 3 } }))
   stabilizeRandomHands(session.state.players)
   const state = session.state
   state.currentPlayerIndex = 0
@@ -19,7 +27,7 @@ const setup = (occupants: Array<{ player: number; worker: number; newborn?: bool
     'wish-children',
     ...state.roundActionOrder.filter((spaceId) => spaceId !== 'wish-children'),
   ]
-  state.actionSpaces.forEach((space) => { space.takenBy = [] })
+  state.actionSpaces.forEach((space) => { space.takenBy = []; })
   state.players.forEach((player, index) => {
     setActiveWorkerCount(player, 2)
     setWorkersAtHome(state, player, index === 0 ? 2 : 0)
@@ -46,13 +54,13 @@ const setup = (occupants: Array<{ player: number; worker: number; newborn?: bool
 }
 
 const setupForPlay = (grainFields: number) => {
-  const session = new GameSession(7026, undefined, { playerCount: 2 })
+  const session = sessionEvidence.track(createWorkSession({ seed: 7026, options: { playerCount: 2 } }))
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.currentPlayerIndex = 0
   state.round = 5
   state.roundPhase = 'work'
-  state.actionSpaces.forEach((space) => { space.takenBy = [] })
+  state.actionSpaces.forEach((space) => { space.takenBy = []; })
   state.players.forEach((player) => {
     setActiveWorkerCount(player, 2)
     setWorkersAtHome(state, player, 2)
@@ -73,7 +81,7 @@ const setupForPlay = (grainFields: number) => {
 }
 
 const options = (response: SessionResponse) => response.interaction.stateId === 'wait'
-  ? response.interaction.request.options ?? []
+  ? getChoiceOptions(response) ?? []
   : []
 
 const enterMinor = (session: GameSession) => {
@@ -81,7 +89,7 @@ const enterMinor = (session: GameSession) => {
   if (response.interaction.stateId === 'wait'
     && !options(response).some((option) => option.value === CARD_ID)) {
     const branch = options(response).find((option) => option.value.startsWith('action-improvement-'))
-    if (branch) response = session.resolveChoice(response.interaction.playerIndex, branch.value)
+    if (branch) response = session.resolveChoice(expectWait(response).interaction.playerIndex, branch.value)
   }
   return response
 }
@@ -90,7 +98,7 @@ const playMinor = (session: GameSession) => {
   let response = enterMinor(session)
   if (response.interaction.stateId === 'wait') {
     const card = options(response).find((option) => option.value === CARD_ID)
-    if (card) response = session.resolveChoice(response.interaction.playerIndex, card.value)
+    if (card) response = session.resolveChoice(expectWait(response).interaction.playerIndex, card.value)
   }
   return response
 }
@@ -142,8 +150,7 @@ describe('A026 Sleeping Corner through Session', () => {
       const before = session.getState()
       const playerBefore = structuredClone(before.state.players[0])
       const occupantsBefore = structuredClone(
-        before.state.actionSpaces.find((space) => space.id === 'wish-children')!.takenBy,
-      )
+        before.state.actionSpaces.find((space) => space.id === 'wish-children')!.takenBy)
 
       expect(before.actionAvailability?.['wish-children']).toBe(false)
       const response = session.takeAction(0, 'wish-children')
@@ -154,5 +161,112 @@ describe('A026 Sleeping Corner through Session', () => {
       expect(response.state.actionSpaces.find((space) => space.id === 'wish-children')!.takenBy)
         .toEqual(occupantsBefore)
     }
+  })
+})
+describe("A026 command boundaries", () => {
+  const CORNER = 'A026_SleepingCorner'
+  function ok(r: SessionResponse) { assert.equal(r.ok, true, r.error); return r; }
+  const roomTiles = [{ row: 0, col: 0 }, { row: 1, col: 0 }, { row: 2, col: 0 }, { row: 1, col: 1 }, { row: 2, col: 1 }, { row: 0, col: 1 }]
+  function setRooms(state: GameState, count: number, owner = 0) {
+    state.players[owner]!.rooms = count
+    state.players[owner]!.roomTiles = roomTiles.slice(0, count).map(t => ({ ...t }))
+  }
+  function setup(card: string, { played = true, rooms = 3, people = 2, grainFields = 2, occupations = 1, resources = {} }: {
+    played?: boolean
+    rooms?: number
+    people?: number
+    grainFields?: number
+    occupations?: number
+    resources?: Partial<Resource>
+  } = {}, configure: (state: GameState) => void = () => { }) {
+    const s = sessionEvidence.track(createWorkSession({ seed: 4242, configure(state) {
+        state.round = 14
+        for (const p of state.players)
+          Object.assign(p.resources, { food: 20, wood: 0, clay: 0, reed: 0, stone: 0, grain: 0, vegetable: 0 })
+        const p = state.players[0]!
+        setRooms(state, rooms)
+        setActiveWorkerCount(p, people)
+        p.minorHand = played ? ['__test_placeholder__'] : [card, '__test_placeholder__']
+        p.minorPlayed = played ? [card] : []
+        p.occupationPlayed = occupations ? ['D115_FodderPlanter'] : []
+        Object.assign(p.resources, resources)
+        if (card === CORNER)
+          p.fields = Array.from({ length: grainFields }, (_, i) => ({ row: 0, col: i + 2, stacks: [{ kind: 'grain', remaining: 1 }] }))
+        configure(state)
+      } }))
+    return s
+  }
+  function options(r: SessionResponse) {
+    ok(r)
+    assert(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice', JSON.stringify(r.interaction))
+    return getChoiceOptions(r)
+  }
+  function minorMenu(s: GameSession, card: string) {
+    let r = ok(s.takeAction(0, 'meeting-place'))
+    if (r.state.players[0]!.minorPlayed.includes(card))
+      return r
+    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice') {
+      const branch = getChoiceOptions(r).find(o => o.value.startsWith('action-improvement-'))
+      if (branch)
+        r = ok(s.resolveChoice(0, branch.value))
+    }
+    return r
+  }
+  function denied(s: GameSession, card: string) {
+    const r = minorMenu(s, card)
+    assert(!r.state.players[0]!.minorPlayed.includes(card))
+    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice')
+      assert(!getChoiceOptions(r).some(o => o.value === card && !o.disabled))
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, card))
+  }
+  function buy(s: GameSession, card: string) {
+    const r = minorMenu(s, card)
+    if (r.state.players[0]!.minorPlayed.includes(card))
+      return r
+    assert(options(r).some(o => o.value === card && !o.disabled))
+    return ok(s.resolveChoice(0, card))
+  }
+  it("missing cost or second grain field rejects forged purchase before legal retry", () => {
+    denied(setup(CORNER, { played: false, resources: { wood: 0 } }), CORNER)
+    denied(setup(CORNER, { played: false, grainFields: 1, resources: { wood: 1 } }), CORNER)
+    denied(setup(CORNER, { played: false, resources: { wood: 1 } }, state => { state.players[0]!.fields.forEach(f => { f.stacks = [{ kind: 'vegetable', remaining: 2 }]; }); }), CORNER)
+    const s = setup(CORNER, { played: false, resources: { wood: 1 } })
+    const r = buy(s, CORNER)
+    assert(r.state.players[0]!.minorPlayed.includes(CORNER))
+    assert.equal(r.state.players[0]!.resources.wood, 0)
+  })
+  it("own prior adult occupancy cannot be reused after real opponent turn", () => {
+    const s = setup(CORNER, { rooms: 4 })
+    let r = confirmNext(s, ok(s.takeAction(0, 'wish-children')))
+    assert.equal(familySize(r.state.players[0]!), 3)
+    r = confirmNext(s, ok(s.takeAction(1, 'grain-seeds')))
+    assert.equal(r.state.currentPlayerIndex, 0)
+    assert.equal(s.getActionAvailability(0)['wish-children'], false)
+    assertRejectedUnchanged(s, () => s.takeAction(0, 'wish-children'))
+    const legal = ok(s.takeAction(0, 'day-laborer'))
+    assert.equal(legal.state.players[0]!.resources.food, 22)
+  })
+  it("real opponent adult beside newborn allows one owner growth and full undo", () => {
+    const s = setup(CORNER, {}, state => { setRooms(state, 3, 1); })
+    confirmNext(s, ok(s.takeAction(0, 'grain-seeds')))
+    confirmNext(s, ok(s.takeAction(1, 'wish-children')))
+    const before = undoRuleSnapshot(s.getState())
+    assert.equal(s.getActionAvailability(0)['wish-children'], true)
+    const r = ok(s.takeAction(0, 'wish-children'))
+    assert.equal(familySize(r.state.players[0]!), 3)
+    assert.equal(familySize(r.state.players[1]!), 3)
+    const occupied = r.state.actionSpaces.find(space => space.id === 'wish-children')
+    assert(occupied)
+    assert.equal(occupied.takenBy.filter(ref => ref.playerId === r.state.players[1]!.id).length, 2)
+    assertUndoRestored(before, s.undoAction())
+    assert.equal(familySize(ok(s.takeAction(0, 'wish-children')).state.players[0]!), 3)
+  })
+  it("permission does not bypass free-room requirement or unrelated occupied spaces", () => {
+    const s = setup(CORNER, { rooms: 2 }, state => { setRooms(state, 3, 1); })
+    confirmNext(s, ok(s.takeAction(0, 'grain-seeds')))
+    confirmNext(s, ok(s.takeAction(1, 'wish-children')))
+    assertRejectedUnchanged(s, () => s.takeAction(0, 'wish-children'))
+    assertRejectedUnchanged(s, () => s.takeAction(0, 'grain-seeds'))
+    assert.equal(familySize(s.state.players[0]!), 2)
   })
 })
