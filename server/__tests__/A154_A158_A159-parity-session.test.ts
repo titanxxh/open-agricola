@@ -280,7 +280,14 @@ describe("A154 command boundaries", () => {
   it("real opponent food accumulation transfers exactly one owner grain for one owner bonus", () => {
     for (const space of ['fishing', 'traveling-players']) {
       const s = setup(2, true, state => state.actionSpaces.find(a => a.id === space)!.resources.food = 2)
+      const expected = s.getState().state.players.map(player => ({ ...player.resources }))
+      expected[0]!.food += 2
+      expected[0]!.grain -= 1
+      expected[1]!.food += 2
+      expected[1]!.grain += 1
       const pending = offer(s, space), r = finish(s, pending)
+      assert.deepEqual(r.state.players.map(player => player.resources), expected)
+      assert.deepEqual(s.getState().state.players.map(player => player.resources), expected)
       assert.equal(r.state.players[0]!.resources.grain, 1)
       assert.equal(r.state.players[1]!.resources.grain, 1)
       assert.equal(r.state.players[2]!.resources.grain, 0)
@@ -322,6 +329,12 @@ describe("A154 command boundaries", () => {
   })
   it("invalid wrong actor and stale choices cannot transfer twice", () => {
     const s = setup(2)
+    const expected = s.getState().state.players.map(player => ({ ...player.resources }))
+    const pileFood = s.getState().state.actionSpaces.find(space => space.id === 'fishing')!.resources.food ?? 0
+    expected[0]!.food += 2
+    expected[0]!.grain -= 1
+    expected[1]!.food += pileFood
+    expected[1]!.grain += 1
     let r = offer(s)
     for (let n = 0; n < 4 && r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-player-switch'; n++)
       r = ok(s.resolveChoice(r.interaction.request.fromPlayerIndex, 'confirm'))
@@ -332,6 +345,8 @@ describe("A154 command boundaries", () => {
     assert.ok(o)
     assertRejectedUnchanged(s, () => s.resolveChoice(1, o.value))
     const done = finish(s, r)
+    assert.deepEqual(done.state.players.map(player => player.resources), expected)
+    assert.deepEqual(s.getState().state.players.map(player => player.resources), expected)
     assert.equal(vp(done), 1)
     assert.equal(done.state.players[0]!.resources.grain, 1)
     assert.equal(done.state.players[1]!.resources.grain, 1)
@@ -341,11 +356,26 @@ describe("A154 command boundaries", () => {
   it("next distinct opponent accumulation awards once more and stops when supply empty", () => {
     for (const [grain, finalPoints, secondGrain] of [[1, 1, 0], [2, 2, 1]] as const) {
       const s = setup(grain)
+      const expectedFirst = s.getState().state.players.map(player => ({ ...player.resources }))
+      const firstPileFood = s.getState().state.actionSpaces.find(space => space.id === 'fishing')!.resources.food ?? 0
+      expectedFirst[0]!.food += 2
+      expectedFirst[0]!.grain -= 1
+      expectedFirst[1]!.food += firstPileFood
+      expectedFirst[1]!.grain += 1
       const first = finish(s, offer(s, 'fishing'))
+      assert.deepEqual(first.state.players.map(player => player.resources), expectedFirst)
+      assert.deepEqual(s.getState().state.players.map(player => player.resources), expectedFirst)
       assert.equal(vp(first), 1)
+      const expectedSecond = s.getState().state.players.map(player => ({ ...player.resources }))
+      const secondPileFood = s.getState().state.actionSpaces.find(space => space.id === 'traveling-players')!.resources.food ?? 0
+      expectedSecond[0]!.grain -= secondGrain
+      expectedSecond[2]!.grain += secondGrain
+      expectedSecond[2]!.food += secondPileFood
       const pending = turn(s, 2, 'traveling-players')
       if (grain === 1) assertTurnFinished(pending, 2)
       const second = finish(s, pending, grain === 2, 2)
+      assert.deepEqual(second.state.players.map(player => player.resources), expectedSecond)
+      assert.deepEqual(s.getState().state.players.map(player => player.resources), expectedSecond)
       assert.equal(vp(second), finalPoints)
       assert.equal(second.state.players[0]!.resources.grain, 0)
       assert.equal(second.state.players[1]!.resources.grain, 1)
@@ -429,7 +459,14 @@ describe("A158 command boundaries", () => {
   it("actual opponent Traveling Players exchanges exactly one selected supply good for four five or seven food", () => {
     for (const [type, food] of [['grain', 4], ['sheep', 5], ['vegetable', 7]] as const) {
       const s = setup({ [type]: 1 }, true, prepareHousing)
+      const expected = s.getState().state.players.map(player => ({ ...player.resources }))
+      const pileFood = s.getState().state.actionSpaces.find(space => space.id === 'traveling-players')!.resources.food ?? 0
+      expected[0]!.food += 2 + food
+      expected[0]![type] -= 1
+      expected[1]!.food += pileFood
       const pending = offer(s, 'traveling-players'), r = finish(s, pending, true, type)
+      assert.deepEqual(r.state.players.map(player => player.resources), expected)
+      assert.deepEqual(s.getState().state.players.map(player => player.resources), expected)
       assert.equal(material(r)[type], 0)
       assert.equal(material(r).food, 22 + food)
       assert.equal(material(r, 1)[type], 0)
@@ -458,9 +495,16 @@ describe("A158 command boundaries", () => {
   })
   it("single choice cannot exchange all goods or repeat after completion", () => {
     const s = setup({ grain: 1, sheep: 1, vegetable: 1 }, true, prepareHousing)
+    const expected = s.getState().state.players.map(player => ({ ...player.resources }))
+    const pileFood = s.getState().state.actionSpaces.find(space => space.id === 'traveling-players')!.resources.food ?? 0
+    expected[0]!.food += 9
+    expected[0]!.vegetable -= 1
+    expected[1]!.food += pileFood
     const pending = offer(s, 'traveling-players')
     assertRejectedUnchanged(s, () => s.resolveChoice(0, 'trade-all-goods'))
     const r = finish(s, pending, true, 'vegetable')
+    assert.deepEqual(r.state.players.map(player => player.resources), expected)
+    assert.deepEqual(s.getState().state.players.map(player => player.resources), expected)
     assert.equal(material(r).grain, 1)
     assert.equal(material(r).sheep, 1)
     assert.equal(material(r).vegetable, 0)
@@ -537,7 +581,16 @@ describe("A159 command boundaries", () => {
   it("actual opponent Fishing and Reed Bank receive one wood while owner gains two or three food", () => {
     for (const [space, food] of [['fishing', 2], ['reed-bank', 3]] as const) {
       const s = setup({ wood: 1 })
+      const expected = s.getState().state.players.map(player => ({ ...player.resources }))
+      const collectedType = space === 'fishing' ? 'food' : 'reed'
+      const pileCount = s.getState().state.actionSpaces.find(candidate => candidate.id === space)!.resources[collectedType] ?? 0
+      expected[0]!.wood -= 1
+      expected[0]!.food += 2 + food
+      expected[1]!.wood += 1
+      expected[1]![collectedType] += pileCount
       const pending = offer(s, space), r = finish(s, pending)
+      assert.deepEqual(r.state.players.map(player => player.resources), expected)
+      assert.deepEqual(s.getState().state.players.map(player => player.resources), expected)
       assert.equal(material(r).wood, 0)
       assert.equal(material(r, 1).wood, 1)
       assert.equal(material(r, 2).wood, 0)
@@ -571,6 +624,12 @@ describe("A159 command boundaries", () => {
   })
   it("invalid actor and stale exchange cannot duplicate wood or food", () => {
     const s = setup({ wood: 2 })
+    const expected = s.getState().state.players.map(player => ({ ...player.resources }))
+    const pileFood = s.getState().state.actionSpaces.find(space => space.id === 'fishing')!.resources.food ?? 0
+    expected[0]!.wood -= 1
+    expected[0]!.food += 4
+    expected[1]!.wood += 1
+    expected[1]!.food += pileFood
     let pending = offer(s, 'fishing')
     assert.ok(pending.interaction.stateId === 'wait' && pending.interaction.request.kind === 'confirm-player-switch')
     assert.equal(pending.interaction.request.fromPlayerIndex, 1)
@@ -584,6 +643,8 @@ describe("A159 command boundaries", () => {
     assertRejectedUnchanged(s, () => s.resolveChoice(0, 'give-zero-wood'))
     assertRejectedUnchanged(s, () => s.resolveChoice(1, exchange.value))
     const r = finish(s, pending)
+    assert.deepEqual(r.state.players.map(player => player.resources), expected)
+    assert.deepEqual(s.getState().state.players.map(player => player.resources), expected)
     assert.equal(material(r).wood, 1)
     assert.equal(material(r, 1).wood, 1)
     assert.equal(material(r).food, 24)

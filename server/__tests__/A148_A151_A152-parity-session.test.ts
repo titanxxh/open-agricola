@@ -259,6 +259,26 @@ describe("A148 command boundaries", () => {
     assertRejectedUnchanged(s, () => s.resolveChoice(0, 'confirm', { zones: [{ ...z, animalType: 'sheep', animalCount: 3 }] }))
     assertRejectedUnchanged(s, () => s.resolveChoice(0, 'confirm', { zones: [{ ...z, animalType: 'boar', animalCount: 1 }] }))
     assertRejectedUnchanged(s, () => s.resolveChoice(0, 'confirm', { zones: [{ ...z, id: 'card:unknown', animalCount: 1 }] }))
+    const stocked = wool(2, 'boar')
+    const stockedPending = turn(stocked, 0, 'day-laborer')
+    const stockedCard = menu(stockedPending).zones.find(zone => zone.id === `card:${WOOL}`)
+    const house = menu(stockedPending).zones.find(zone => zone.zoneType === 'house')
+    assert.ok(stockedCard && house)
+    assert.equal(stockedPending.state.players[0]!.resources.boar, 3)
+    assert.equal(stockedCard.capacity, 2)
+    assert.deepEqual(stockedCard.allowedAnimalTypes, ['sheep'])
+    assert.equal(house.capacity, 1)
+    assertRejectedUnchanged(stocked, () => stocked.resolveChoice(0, 'confirm', {
+      zones: [{ ...stockedCard, animalType: 'boar', animalCount: 1, animalCounts: { boar: 1 } }],
+    }))
+    const housed = ok(stocked.resolveChoice(0, 'confirm', {
+      zones: [{ ...house, animalType: 'boar', animalCount: 1, animalCounts: { boar: 1 } }],
+    }))
+    assert.equal(housed.state.players[0]!.resources.boar, 1)
+    assert.ok(housed.interaction.stateId === 'wait')
+    assert.deepEqual(housed.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(housed.interaction.playerIndex, 0)
+    assert.equal(housed.state.currentPlayerIndex, 0)
     const done = ok(s.resolveChoice(0, 'confirm', { zones: [{ ...z, animalCount: 2 }] }))
     assert.equal(done.state.players[0]!.resources.sheep, 2)
     assert.ok(done.interaction.stateId === 'wait', JSON.stringify(done.interaction))

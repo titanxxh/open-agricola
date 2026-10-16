@@ -232,6 +232,9 @@ describe("A146 command boundaries", () => {
   it("occupied input and whole undo cannot duplicate mapped reward", () => {
     const s = setup(state => pile(state, 'fishing', 'food', 2))
     const first = turn(s, 0, 'fishing')
+    assert.deepEqual(res(first), [1, 0, 0, 0])
+    assert.equal(first.state.players[0]!.resources.food, 42)
+    assert.equal(first.state.actionSpaces.find(a => a.id === 'fishing')!.resources.food, 0)
     assertRejectedUnchanged(s, () => s.takeAction(0, 'fishing'))
     const undone = undo(s)
     assert.deepEqual(res(undone), [0, 0, 0, 0])

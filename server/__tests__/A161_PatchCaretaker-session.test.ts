@@ -245,6 +245,8 @@ describe("A161 command boundaries", () => {
   })
   it("whole second action undo restores vegetable and one retry grants only once", () => {
     const { s, r } = patch('forest', 'grove')
+    assert.equal(r.state.players[0]!.resources.vegetable, 1)
+    assert.equal(r.state.players[0]!.resources.wood, 2)
     assertRejectedUnchanged(s, () => s.takeAction(0, 'grove'))
     const undone = undo(s)
     assert.equal(undone.state.players[0]!.resources.vegetable, 0)
