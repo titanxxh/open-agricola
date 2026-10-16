@@ -111,7 +111,9 @@ function checkNative(manifest) {
   if (loadedConfig.error) fail('Cannot read native snapshot-policy compiler configuration')
   const parsedConfig = ts.parseJsonConfigFileContent(loadedConfig.config, ts.sys, path.dirname(config))
   if (parsedConfig.errors.length) fail('Cannot parse native snapshot-policy compiler configuration')
-  const program = ts.createProgram(parsedConfig.fileNames, parsedConfig.options)
+  const compilerHost = ts.createCompilerHost(parsedConfig.options)
+  compilerHost.getCurrentDirectory = () => root
+  const program = ts.createProgram(parsedConfig.fileNames, parsedConfig.options, compilerHost)
   for (const file of observationSources) {
     const violations = normalizingSnapshotViolations(fs.readFileSync(file, 'utf8'), file, program)
     if (violations.length) {
