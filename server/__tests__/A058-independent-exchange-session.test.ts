@@ -1,31 +1,26 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { createWorkSession } from './_helpers/session-fixtures'
-import type { SessionResponse } from '../game/authoritative-session'
-import type { GameState } from '../../shared/contract/types'
-
+import { type SessionResponse, type GameSession } from '../game/authoritative-session'
+import { type GameState, type Resource } from '../../shared/contract/types'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged, confirmNext, getChoiceOptions } from './_helpers/session-assertions'
+import { createScenarioEvidence } from './_helpers/scenario-evidence'
+const sessionEvidence = createScenarioEvidence(import.meta.url)
 const CARD_ID = 'A058_AsparagusKnife'
-const sessions: ReturnType<typeof createWorkSession>[] = []
-afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
-
-// Local rule fix, no infrastructure gap. The agreed seam is a fresh two-player
-// Session: actual placements reach return-home, then field selection and an
-// independent payment choice. Check resources, field, interaction and events.
 const setup = (round = 8, configure?: (state: GameState) => void) => {
-  const session = createWorkSession({ seed: 42, configure: state => {
-    state.round = round
-    for (const player of state.players) {
+  const session = sessionEvidence.track(createWorkSession({ seed: 42, configure: state => {
+      state.round = round
+      for (const player of state.players) {
       player.minorHand = ['__test_placeholder__']
       player.occupationHand = ['__test_placeholder__']
       player.resources.food = 40
     }
-    state.players[0]!.minorPlayed = [CARD_ID]
-    state.players[0]!.fields = [{ row: 0, col: 2, stacks: [{ kind: 'vegetable', remaining: 2 }] }]
-    configure?.(state)
-  } })
-  sessions.push(session)
+      state.players[0]!.minorPlayed = [CARD_ID]
+      state.players[0]!.fields = [{ row: 0, col: 2, stacks: [{ kind: 'vegetable', remaining: 2 }] }]
+      configure?.(state)
+    } }))
   return session
 }
-
 const reachReturnHome = (session: ReturnType<typeof setup>) => {
   let response = session.getState()
   for (const [player, space] of [[0, 'forest'], [1, 'clay-pit'], [0, 'reed-bank'], [1, 'grain-seeds']] as const) {
@@ -38,18 +33,15 @@ const reachReturnHome = (session: ReturnType<typeof setup>) => {
   }
   return response
 }
-
 const snapshot = ({ state, interaction, scores }: SessionResponse) => JSON.stringify({ state, interaction, scores })
-
 const accept = (session: ReturnType<typeof setup>, response: SessionResponse) => {
   expect(response.interaction.stateId).toBe('wait')
   if (response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'choice') throw new Error('Expected choice')
   expect(response.interaction.playerIndex).toBe(0)
-  const option = response.interaction.request.options?.find(candidate => candidate.value !== '__skip__')
+  const option = getChoiceOptions(response)?.find(candidate => candidate.value !== '__skip__')
   if (!option) throw new Error('Expected acceptance option')
   return session.resolveChoice(0, option.value)
 }
-
 describe('Asparagus Knife takes a vegetable before an independent exchange', () => {
   it('can keep the selected vegetable without earning food or a bonus point', () => {
     const session = setup()
@@ -211,5 +203,144 @@ describe('Asparagus Knife takes a vegetable before an independent exchange', () 
     expect(response.state.players[0]!.fields[0]!.stacks[0]!.remaining).toBe(1)
     expect(response.state.players[0]!.resources).toMatchObject({ vegetable: 1, food: 40 })
     expect(response.state.players[0]!.cardStates[CARD_ID]?.counters?.bonusVp ?? 0).toBe(0)
+  })
+})
+describe("A058 command boundaries", () => {
+  const KNIFE = 'A058_AsparagusKnife'
+  function ok(r: SessionResponse) { assert.equal(r.ok, true, r.error); return r; }
+  function setup({ round = 5, played = false, occupations = 0, resources = {} }: {
+    round?: number
+    played?: boolean
+    occupations?: number
+    resources?: Partial<Resource>
+  } = {}, configure: (state: GameState) => void = () => { }) {
+    const s = sessionEvidence.track(createWorkSession({ seed: 4242, options: { playerCount: 2 }, configure(state) {
+        state.round = round
+        state.availableMajorImprovements = []
+        for (const p of state.players)
+          Object.assign(p.resources, { food: 40, wood: 0, clay: 0, reed: 0, stone: 0, grain: 0, vegetable: 0 })
+        const p = state.players[0]!
+        p.minorHand = played ? ['__test_placeholder__'] : ["A058_AsparagusKnife", '__test_placeholder__']
+        p.minorPlayed = played ? ["A058_AsparagusKnife"] : []
+        p.occupationPlayed = ['D115_FodderPlanter', 'A111_WallBuilder', 'A125_Priest'].slice(0, occupations)
+        Object.assign(p.resources, resources)
+        configure(state)
+      } }))
+    return s
+  }
+
+
+
+
+
+  function ready(s: GameSession, actor: number) {
+    let r = s.getState()
+    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
+      r = confirmNext(s, r)
+    assert.equal(r.interaction.stateId, 'idle', JSON.stringify(r.interaction))
+    assert.equal(r.state.currentPlayerIndex, actor)
+    return r
+  }
+  function turn(s: GameSession, actor: number, space: string) { ready(s, actor); return ok(s.takeAction(actor, space)); }
+  function cardFlow(s: GameSession, r: SessionResponse, card: string, accept = true) {
+    for (let n = 0; n < 8 && r.interaction.stateId === 'wait'; n++) {
+      if (r.interaction.request.kind === 'select-trigger') {
+        const o = getChoiceOptions(r).find(o => o.value === card)
+        assert.ok(o, JSON.stringify(r.interaction))
+        r = ok(s.resolveChoice(r.interaction.playerIndex, o.value))
+        continue
+      }
+      if (r.interaction.request.kind !== 'choice')
+        break
+      const opts = getChoiceOptions(r)
+      const selected = opts.filter(o => accept ? o.value !== '__skip__' && !o.disabled : o.value === '__skip__' && !o.disabled)
+      assert.equal(selected.length, 1, JSON.stringify(r.interaction))
+      const o = selected[0]
+      assert.ok(o, JSON.stringify(r.interaction))
+      r = ok(s.resolveChoice(r.interaction.playerIndex, o.value))
+    }
+    return r
+  }
+  function fields(state: GameState, crop: 'vegetable' | 'grain', amounts: number[], owner = 0) { state.players[owner]!.fields = amounts.map((remaining, i) => ({ row: 0, col: 1 + i, stacks: remaining > 0 ? [{ kind: crop, remaining }] : [] })); }
+  function phase(round = 8, amounts = [2], vegetable = 0, played = true, configure: (state: GameState) => void = () => { }) { return setup({ round, played, resources: { vegetable } }, state => { fields(state, 'vegetable', amounts); configure(state); }); }
+  function end(s: GameSession) { turn(s, 0, 'grain-seeds'); turn(s, 1, 'forest'); turn(s, 0, 'reed-bank'); return confirmNext(s, turn(s, 1, 'clay-pit')); }
+  function remaining(r: SessionResponse, owner = 0) { return r.state.players[owner]!.fields.map(f => f.stacks.reduce((n, stack) => n + stack.remaining, 0)); }
+  function bonus(r: SessionResponse) { const value = r.state.players[0]!.cardStates[KNIFE]?.counters?.bonusVp ?? 0; assert.ok(r.scores); assert.ok(r.scores[0]); assert.equal(r.scores[0].categories.find(c => c.key === 'cardBonusVp')?.entries.find(e => e.type === 'bonus' && e.cardId === KNIFE)?.score ?? 0, value); return value; }
+  function knifeResult(r: SessionResponse) { return { remaining: remaining(r), vegetable: r.state.players[0]!.resources.vegetable, food: r.state.players[0]!.resources.food, bonus: bonus(r) }; }
+  function takeField(s: GameSession, r: SessionResponse, target = { row: 0, col: 1 }, exchange = true) {
+    r = cardFlow(s, r, KNIFE)
+    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'selection')
+      r = ok(s.commitSelectionChoice(r.interaction.playerIndex, { positions: [target] }))
+    return exchange ? cardFlow(s, r, KNIFE) : r
+  }
+  it("real return home of eight ten twelve triggers while seven nine and empty fields do not", () => {
+    for (const round of [8, 10, 12]) {
+      const s = phase(round)
+      const r = takeField(s, end(s))
+      assert.deepEqual(knifeResult(r), { remaining: [1], vegetable: 0, food: 43, bonus: 1 })
+      assert.equal(r.state.round, round + 1)
+    }
+    for (const round of [7, 9]) {
+      const s = phase(round)
+      const r = end(s)
+      assert.equal(bonus(r), 0)
+      assert.equal(r.state.players[0]!.resources.food, 36)
+      assert.deepEqual(remaining(r), [1])
+    }
+    const empty = phase(8, [])
+    const r = end(empty)
+    assert.equal(bonus(r), 0)
+    assert.equal(r.state.players[0]!.resources.food, 40)
+  })
+  it("only one selected vegetable field changes after invalid target and multi target rejection", () => {
+    const s = phase(8, [2, 1], 0, true, state => { state.players[0]!.fields.push({ row: 0, col: 3, stacks: [{ kind: 'grain', remaining: 2 }] }, { row: 0, col: 4, stacks: [] }); fields(state, 'vegetable', [2], 1); })
+    let r = cardFlow(s, end(s), KNIFE)
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'selection')
+    assertRejectedUnchanged(s, () => s.commitSelectionChoice(1, { positions: [{ row: 0, col: 1 }] }))
+    for (const positions of [[{ row: 0, col: 3 }], [{ row: 0, col: 4 }], [{ row: 2, col: 4 }], [{ row: 0, col: 1 }, { row: 0, col: 2 }]])
+      assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { positions }))
+    r = cardFlow(s, ok(s.commitSelectionChoice(0, { positions: [{ row: 0, col: 2 }] })), KNIFE)
+    assert.deepEqual(knifeResult(r), { remaining: [2, 0, 2, 0], vegetable: 0, food: 43, bonus: 1 })
+    assert.deepEqual(remaining(r, 1), [2])
+  })
+  it("unplayed card and only opponent vegetable field give no owner reward", () => {
+    const unplayed = phase(8, [2], 0, false)
+    let r = end(unplayed)
+    assert.deepEqual(knifeResult(r), { remaining: [2], vegetable: 0, food: 40, bonus: 0 })
+    const s = phase(8, [], 0, true, state => fields(state, 'vegetable', [2], 1))
+    r = end(s)
+    assert.equal(bonus(r), 0)
+    assert.equal(r.state.players[0]!.resources.food, 40)
+    assert.deepEqual(remaining(r, 1), [2])
+  })
+  it("completed scheduled exchange rejects step undo and stale field selection without replaying rewards", () => {
+    const s = phase(8, [2, 2])
+    const selection = cardFlow(s, end(s), KNIFE)
+    assert.ok(selection.interaction.stateId === 'wait' && selection.interaction.request.kind === 'selection')
+    const taken = cardFlow(s, ok(s.commitSelectionChoice(0, { positions: [{ row: 0, col: 1 }] })), KNIFE)
+    assert.deepEqual(knifeResult(taken), { remaining: [1, 2], vegetable: 0, food: 43, bonus: 1 })
+    assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { positions: [{ row: 0, col: 1 }] }))
+    const undone = assertRejectedUnchanged(s, () => s.undoStep())
+    sessionEvidence.record('A058-N8-undo', { selection, taken, undone })
+    assert.equal(undone.error, 'no history to undo')
+    assert.deepEqual(knifeResult(s.getState()), { remaining: [1, 2], vegetable: 0, food: 43, bonus: 1 })
+  })
+  it("forged own grain field is rejected at the actual multi field selection", () => {
+    const s = phase(8, [2, 1], 0, true, state => { state.players[0]!.fields.push({ row: 0, col: 3, stacks: [{ kind: 'grain', remaining: 2 }] }); })
+    const r = cardFlow(s, end(s), KNIFE)
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'selection')
+    assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { positions: [{ row: 0, col: 3 }] }))
+    const legal = cardFlow(s, ok(s.commitSelectionChoice(0, { positions: [{ row: 0, col: 2 }] })), KNIFE)
+    assert.deepEqual(remaining(legal), [2, 0, 2])
+    assert.equal(bonus(legal), 1)
+  })
+  it("forged opponent vegetable field is rejected at the actual multi field selection", () => {
+    const s = phase(8, [2, 1], 0, true, state => { state.players[1]!.fields = [{ row: 0, col: 4, stacks: [{ kind: 'vegetable', remaining: 2 }] }]; })
+    const r = cardFlow(s, end(s), KNIFE)
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'selection')
+    assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { positions: [{ row: 0, col: 4 }] }))
+    const legal = cardFlow(s, ok(s.commitSelectionChoice(0, { positions: [{ row: 0, col: 2 }] })), KNIFE)
+    assert.deepEqual(remaining(legal, 1), [2])
+    assert.equal(bonus(legal), 1)
   })
 })
