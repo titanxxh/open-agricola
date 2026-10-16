@@ -100,6 +100,59 @@ function threeWorkers(state: GameState) {
 // Approved seams: actual paid card play, authoritative farm mutations, committed
 // events, source-owned goods, persisted pending, undo, and public presentation.
 describe('A040 original clay positions', () => {
+  it('does not replenish clay when Lumber Pile returns a stable and fencing reuses the same space', () => {
+    const session = setup(state => {
+      state.round = 4
+      const player = state.players[0]!
+      player.rooms = 4
+      player.roomTiles.push({ row: 0, col: 0 }, { row: 0, col: 1 })
+      setActiveWorkerCount(player, 4)
+      setWorkersAtHome(state, player, 4)
+      player.minorHand.push('E076_LumberPile')
+    }, false)
+    const originalPositions = ['0-2', '1-1', '1-2', '2-1', '2-2']
+    const remainingPositions = ['1-1', '1-2', '2-1', '2-2']
+    let response = play(session)
+    expect(keys(response.state)).toEqual(originalPositions)
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 19, reed: 9, clay: 0 })
+    nextTurn(session, response)
+    response = session.takeAction(0, 'farm-expansion')
+    expect(response.ok, response.error).toBe(true)
+    const buildStable = options(response).find(option => option.labelKey === 'actions.stables.name')
+    expect(buildStable).toBeDefined()
+    response = choose(session, response, buildStable!.value)
+    expect(response.interaction.request.kind).toBe('farm-select')
+    response = session.commitSelectionChoice(0, { stables: [{ row: 0, col: 2 }] })
+    expect(response.ok, response.error).toBe(true)
+    response = skipExchange(session, exchangeWindow(session, response))
+    response = choose(session, response, '__done__')
+    expect(response.state.players[0]!.stableTiles).toEqual([{ row: 0, col: 2 }])
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 17, clay: 1, food: 20 })
+    expect(keys(response.state)).toEqual(remainingPositions)
+    nextTurn(session, response, 'forest')
+    response = play(session, 'E076_LumberPile', 'meeting-place')
+    expect(response.state.players[0]!.resources.wood).toBe(17)
+    response = accept(session, response)
+    expect(response.interaction.request.selection?.kind).toBe('farm-position')
+    response = session.commitSelectionChoice(0, { positions: [{ row: 0, col: 2 }] })
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.stableTiles).toEqual([])
+    expect(getUsedFarmyardTileKeys(response.state.players[0]!).has('0-2')).toBe(false)
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 20, clay: 1, food: 20 })
+    expect(keys(response.state)).toEqual(remainingPositions)
+    nextTurn(session, response)
+    response = session.takeAction(0, 'fencing')
+    expect(response.ok, response.error).toBe(true)
+    response = session.commitSelectionChoice(0, { edges: ['H-0-2', 'H-1-2', 'V-0-2', 'V-0-3'] })
+    expect(response.ok, response.error).toBe(true)
+    expect(response.interaction.request.kind).toBe('confirm-next-player')
+    expect(response.state.players[0]!.pastures.map(pasture => pasture.tiles)).toEqual([[{ row: 0, col: 2 }]])
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 16, clay: 1, food: 20 })
+    expect(keys(response.state)).toEqual(remainingPositions)
+    expect(response.state.events.filter(event => event.type === 'resource.moved' && event.sourceCardId === CARD && event.to.kind === 'player' && event.resources.clay === 1)).toHaveLength(1)
+    expect(response.state.log.filter(entry => entry.key === 'log.cardEffectGain' && entry.params?.cardId === CARD)).toHaveLength(1)
+  })
+
   it.each([CARD, 'M096_FallowLand'])('keeps co-located sources and the other owner separate with %s first', first => {
     const session = setup(state => {
       const player = state.players[0]!
