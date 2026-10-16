@@ -12,9 +12,9 @@ const sessionEvidence = createScenarioEvidence(import.meta.url)
 
 describe('A064 Barley Mill through Session', () => {
   it.each([
-    { resources: { wood: 1, clay: 4 }, remaining: { wood: 0, clay: 0 } },
-    { resources: { wood: 1, stone: 2 }, remaining: { wood: 0, stone: 0 } },
-  ])('charges the shared wood in every cost', ({ resources, remaining }) => {
+    { material: 'clay', resources: { wood: 1, clay: 4 }, remaining: { wood: 0, clay: 0 } },
+    { material: 'stone', resources: { wood: 1, stone: 2 }, remaining: { wood: 0, stone: 0 } },
+  ])('charges the shared wood in the $material cost', ({ resources, remaining }) => {
     const response = playMinor(sessionEvidence.track(setupMinorSession({ cardId: 'A064_BarleyMill', resources })), 'A064_BarleyMill')
     expect(response.state.players[0]!.minorPlayed).toContain('A064_BarleyMill')
     expect(response.state.players[0]!.resources).toMatchObject(remaining)
