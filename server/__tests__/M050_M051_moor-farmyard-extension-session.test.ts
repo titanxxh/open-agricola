@@ -137,10 +137,10 @@ describe('M050/M051 farmyard extension', () => {
     expect(isFarmyardBorderEdge(player, 'H--1-0')).toBe(true)
     expect(isFarmyardBorderEdge(player, 'H-0-0')).toBe(false)
 
-    const fenceResult = playerBoard(committed.state, 0).farmyard.canBuildFence({
+    const fenceResult = session.withCtx(() => playerBoard(committed.state, 0).farmyard.canBuildFence({
       edges: ['H--1-0', 'H--1-1', 'V--1-0', 'V--1-2', 'H-0-0', 'H-0-1'],
       options: { skipPayment: true },
-    })
+    }))
     expect(fenceResult.ok).toBe(true)
   })
 

@@ -204,7 +204,7 @@ describe('A041_VegetableSlicer improvement listener', () => {
     player.improvements = [FIREPLACE_ID]
 
     const state = createState(player)
-    const result = playImprovement(state, player, `major:${COOKING_HEARTH_ID}`, 'any')
+    const result = withActiveRegistry(ruleRegistry, () => playImprovement(state, player, `major:${COOKING_HEARTH_ID}`, 'any'))
 
     expect(result.type).toBe('ok')
     const actionEvents = [paidForImprovement(FIREPLACE_ID), playedMajor()]
@@ -271,7 +271,7 @@ describe('A041_VegetableSlicer improvement listener', () => {
     player.resources.clay = 4
 
     const state = createState(player)
-    const result = playImprovement(state, player, `major:${COOKING_HEARTH_ID}`, 'any')
+    const result = withActiveRegistry(ruleRegistry, () => playImprovement(state, player, `major:${COOKING_HEARTH_ID}`, 'any'))
 
     expect(result.type).toBe('ok')
     const actionEvents = [paidForImprovement(), playedMajor()]

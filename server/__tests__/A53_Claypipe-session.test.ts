@@ -27,7 +27,7 @@ describe('A053_Claypipe session flow', () => {
     player.resources.clay = 1
     state.workPhaseObtainedResources[player.id] = { clay: 8 }
 
-    const playResult = playImprovement(state, player, 'minor:A053_Claypipe', 'any')
+    const playResult = session.withCtx(() => playImprovement(state, player, 'minor:A053_Claypipe', 'any', undefined, undefined, session.actionHooks))
     expect(playResult.type).toBe('ok')
     expect(player.cardStates?.A053_Claypipe?.infobox).toBe('8 / 7')
 

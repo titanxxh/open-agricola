@@ -184,10 +184,10 @@ describe('M038/M039/M043 one-shot adjacency overrides', () => {
     expect(committed.state.players[0]!.pastures.some((pasture) =>
       pasture.tiles.some((tile) => tile.row === 2 && tile.col === 4),
     )).toBe(true)
-    expect(playerBoard(committed.state, 0).farmyard.canBuildFence({
+    expect(session.withCtx(() => playerBoard(committed.state, 0).farmyard.canBuildFence({
       edges: edgesForTile(0, 4),
       options: { skipPayment: true },
-    }).ok).toBe(false)
+    })).ok).toBe(false)
   })
 
   it('M039 rejects extra free fence segments outside the one-space special pasture', () => {

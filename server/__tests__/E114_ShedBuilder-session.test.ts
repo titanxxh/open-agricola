@@ -127,32 +127,36 @@ describe('E114 Shed Builder parity', () => {
     { scenario: 'S5', priorStables: 3, expected: { grain: 0, vegetable: 1 } },
   ]) {
     it(`E114 ${scenario}: building stable ${priorStables + 1} grants its ordinal crop`, () => {
-      const response = buildStables(setup({ priorStables }), 0, 1)
+      const session = setup({ priorStables })
+      const response = buildStables(session, 0, 1)
 
       expect(response.ok, response.error).toBe(true)
       expect(response.state.players[0]!.resources).toMatchObject(expected)
-      expect(getStableCountForCards(response.state.players[0]!)).toBe(priorStables + 1)
+      expect(session.withCtx(() => getStableCountForCards(response.state.players[0]!))).toBe(priorStables + 1)
     })
   }
 
   it('E114 S6: building the second and third stables together gains one grain and one vegetable', () => {
-    const response = buildStables(setup({ priorStables: 1 }), 0, 2)
+    const session = setup({ priorStables: 1 })
+    const response = buildStables(session, 0, 2)
 
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources).toMatchObject({ grain: 1, vegetable: 1 })
-    expect(getStableCountForCards(response.state.players[0]!)).toBe(3)
+    expect(session.withCtx(() => getStableCountForCards(response.state.players[0]!))).toBe(3)
   })
 
   it('E114 S7: a built Farm Hand stable counts when locating the next stable ordinal', () => {
-    const response = buildStables(setup({ priorStables: 1, farmHand: true }), 0, 1)
+    const session = setup({ priorStables: 1, farmHand: true })
+    const response = buildStables(session, 0, 1)
 
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources).toMatchObject({ grain: 0, vegetable: 1 })
-    expect(getStableCountForCards(response.state.players[0]!)).toBe(3)
+    expect(session.withCtx(() => getStableCountForCards(response.state.players[0]!))).toBe(3)
   })
 
   it('E114 S8: an opponent building a stable grants the Shed Builder owner no crops', () => {
-    const response = buildStables(setup({ actor: 1 }), 1, 1)
+    const session = setup({ actor: 1 })
+    const response = buildStables(session, 1, 1)
 
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources).toMatchObject({ grain: 0, vegetable: 0 })

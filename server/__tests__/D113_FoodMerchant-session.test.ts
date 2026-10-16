@@ -96,7 +96,7 @@ const finishHarvest = (
     onChoice: (interaction, currentSession) => {
       if (interaction.sourceCard !== CARD_ID) return undefined
       sawMerchant = true
-      const current = currentSession.emitResponse()
+      const current = currentSession.withCtx(() => currentSession.emitResponse())
       if (!purchase) return currentSession.resolveChoice(interaction.playerIndex, '__skip__')
       const option = purchaseOption(current, purchase.food, purchase.vegetable)
       expect(option, JSON.stringify(interaction)).toBeDefined()

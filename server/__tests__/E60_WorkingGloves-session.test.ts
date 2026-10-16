@@ -27,14 +27,14 @@ describe('E060 Working Gloves cost candidates', () => {
       Object.assign(owner.resources, { wood: 1, clay: 1, reed: 1, stone: 1, food })
     } })
     sessions.push(session)
-    return session.getState().state
+    return { session, state: session.getState().state }
   }
 
   const options = (foodFee: number, availableFood = 4) => {
-    const state = setup(availableFood)
-    const resolved = PaymentSolver.resolveCardPreviewCostDetailedByProvider(
-      state, state.players[0]!, 'occupation', 'A116_WoodCutter', () => ({ food: foodFee }), 'lessons',
-    )
+    const { session, state } = setup(availableFood)
+    const resolved = session.withCtx(() => PaymentSolver.resolveCardPreviewCostDetailedByProvider(
+      state, state.players[0]!, 'occupation', 'A116_WoodCutter', () => ({ food: foodFee }), 'lessons', session.actionHooks,
+    ))
     if (!resolved) throw new Error('Expected an occupation cost')
     const cost = PaymentSolver.isComplexCost(resolved.cost) ? resolved.cost : { fee: resolved.cost }
     const context = { actionId: 'occupation', costType: 'occupation' as const,
@@ -63,15 +63,14 @@ describe('E060 Working Gloves cost candidates', () => {
   })
 
   it('combines a single substitution with Forest School for the remaining food', () => {
-    const state = setup(0)
+    const { session, state } = setup(0)
     const owner = state.players[0]!
     owner.minorPlayed.push('A028_ForestSchool')
     Object.assign(owner.resources, { wood: 2, clay: 1 })
     // Reload derives the other card's ordinary occupation payment modifier.
-    const session = sessions.at(-1)!
     session.loadState(state)
     const live = session.getState().state
-    const resolved = PaymentSolver.resolveCardPreviewCostDetailedByProvider(live, live.players[0]!, 'occupation', 'A116_WoodCutter', () => ({ food: 4 }))
+    const resolved = session.withCtx(() => PaymentSolver.resolveCardPreviewCostDetailedByProvider(live, live.players[0]!, 'occupation', 'A116_WoodCutter', () => ({ food: 4 }), undefined, session.actionHooks))
     if (!resolved) throw new Error('Expected cost candidates')
     const previews = PaymentSolver.describeOptions(live, 0, resolved.cost, {
       actionId: 'occupation', costType: 'occupation', candidateMetadataByFeeIndex: resolved.candidateMetadataByFeeIndex,

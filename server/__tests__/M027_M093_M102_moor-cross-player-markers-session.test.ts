@@ -181,14 +181,14 @@ describe('FoM M027/M093/M102 cross-player markers and transfers', () => {
     const player = state.players[0]!
     player.minorPlayed = [M093]
 
-    const result = resolveCardCostDetailedForTest(
+    const result = session.withCtx(() => resolveCardCostDetailedForTest(
       state,
       player,
       'improvement',
       'Major_Fireplace1',
       { clay: 2 },
-      'improvement',
-    )
+      'improvement', session.actionHooks,
+    ))
     const fees = 'fees' in result.cost ? result.cost.fees ?? [] : [result.cost]
 
     expect(fees.map(nonZeroResources)).toEqual([

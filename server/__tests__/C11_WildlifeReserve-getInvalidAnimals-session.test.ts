@@ -38,7 +38,7 @@ describe('C011_WildlifeReserve getInvalidAnimals', () => {
     // synthesize 1 sheep
     zone.animalType = 'sheep'
     zone.animalCount = 1
-    const invalid = computeInvalidAnimalsForZone(state, player, zone)
+    const invalid = session.withCtx(() => computeInvalidAnimalsForZone(state, player, zone))
     expect(invalid).toEqual([])
   })
 
@@ -50,7 +50,7 @@ describe('C011_WildlifeReserve getInvalidAnimals', () => {
     // synthesize 3 sheep — over per-type cap
     zone.animalType = 'sheep'
     zone.animalCount = 3
-    const invalid = computeInvalidAnimalsForZone(state, player, zone)
+    const invalid = session.withCtx(() => computeInvalidAnimalsForZone(state, player, zone))
     // 2 are invalid (kept 1, rejected 2)
     expect(invalid.length).toBe(2)
     expect(invalid.every(m => m.type === 'sheep')).toBe(true)
@@ -64,7 +64,7 @@ describe('C011_WildlifeReserve getInvalidAnimals', () => {
     const zone = session.withCtx(() => computeAnimalZones(player)).find(z => z.id === `card:C011_WildlifeReserve`)!
     zone.animalCounts = { sheep: 1, horse: 1 }
 
-    const invalid = computeInvalidAnimalsForZone(state, player, zone)
+    const invalid = session.withCtx(() => computeInvalidAnimalsForZone(state, player, zone))
 
     expect(invalid).toEqual([{ type: 'horse' }])
   })

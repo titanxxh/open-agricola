@@ -85,7 +85,7 @@ describe('A010_WoodenShed session', () => {
       const player = state.players[0]!
       player.minorHand.push(CARD_ID)
       givePayResources(player)
-      const result = playMinorImprovement(state, player, CARD_ID, 'minor-improvement')
+      const result = session.withCtx(() => playMinorImprovement(state, player, CARD_ID, 'minor-improvement', undefined, undefined, undefined, session.actionHooks))
       expect(result.type).toBe('fail')
       expect(player.minorPlayed).not.toContain(CARD_ID)
     })
@@ -96,7 +96,7 @@ describe('A010_WoodenShed session', () => {
       const player = state.players[0]!
       player.minorHand.push(CARD_ID)
       givePayResources(player)
-      const result = playMinorImprovement(state, player, CARD_ID, 'improvement-any')
+      const result = session.withCtx(() => playMinorImprovement(state, player, CARD_ID, 'improvement-any', undefined, undefined, undefined, session.actionHooks))
       expect(result.type === 'ok' || result.type === 'flow').toBe(true)
       expect(player.minorPlayed).toContain(CARD_ID)
     })

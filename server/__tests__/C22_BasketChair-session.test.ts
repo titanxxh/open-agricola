@@ -342,7 +342,7 @@ describe('C022_BasketChair session', () => {
 
     // Drive the central return-home path directly (same pattern as
     // card-held-return-home.test.ts). This clears every held worker.
-    ;(session as unknown as { continueReturnHomeHooks: () => void }).continueReturnHomeHooks()
+    session.withCtx(() => (session as unknown as { continueReturnHomeHooks: () => void }).continueReturnHomeHooks())
 
     const afterState = session.getState().state
     expect(getWorkerHeldOnCard(afterState.players[0]!, CARD_ID)).toBeUndefined()

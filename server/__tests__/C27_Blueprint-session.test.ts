@@ -45,15 +45,15 @@ describe('C027_Blueprint session — verify chooseOne aligned to the reference m
   const ALLOWED_MAJORS = ['Major_Joinery', 'Major_Pottery', 'Major_Basket'] as const
 
   it.each(ALLOWED_MAJORS)('adds sourced stone discount candidate for %s', (majorId) => {
-    const { state, player } = setup()
+    const { session: ruleSession, state, player } = setup()
     const baseCost = { wood: 2, stone: 2 }
-    const resolved = resolveCardCostDetailedForTest(
+    const resolved = ruleSession.withCtx(() => resolveCardCostDetailedForTest(
       state,
       player,
       'improvement',
       majorId,
-      baseCost,
-    )
+      baseCost, undefined, ruleSession.actionHooks,
+    ))
     expect(PaymentSolver.isComplexCost(resolved.cost)).toBe(true)
     if (!PaymentSolver.isComplexCost(resolved.cost)) return
     expect(resolved.cost.fees).toEqual([
@@ -65,19 +65,19 @@ describe('C027_Blueprint session — verify chooseOne aligned to the reference m
   })
 
   it('surfaces only the discounted payment path for allowed majors', () => {
-    const { state, player } = setup()
+    const { session: ruleSession, state, player } = setup()
     player.resources = {
       ...player.resources,
       wood: 5,
       stone: 5,
     }
-    const resolved = resolveCardCostDetailedForTest(
+    const resolved = ruleSession.withCtx(() => resolveCardCostDetailedForTest(
       state,
       player,
       'improvement',
       'Major_Joinery',
-      { wood: 2, stone: 2 },
-    )
+      { wood: 2, stone: 2 }, undefined, ruleSession.actionHooks,
+    ))
     expect(PaymentSolver.isComplexCost(resolved.cost)).toBe(true)
     if (!PaymentSolver.isComplexCost(resolved.cost)) return
 
@@ -97,31 +97,31 @@ describe('C027_Blueprint session — verify chooseOne aligned to the reference m
   })
 
   it('does NOT reduce cost for non-listed majors (e.g. Major_Fireplace)', () => {
-    const { state, player } = setup()
+    const { session: ruleSession, state, player } = setup()
     const baseCost = { clay: 2 }
-    const resolved = resolveCardCostForTest(
+    const resolved = ruleSession.withCtx(() => resolveCardCostForTest(
       state,
       player,
       'improvement',
       'Major_Fireplace',
-      baseCost,
-    )
+      baseCost, undefined, ruleSession.actionHooks,
+    ))
     expect(PaymentSolver.isComplexCost(resolved)).toBe(false)
     if (PaymentSolver.isComplexCost(resolved)) return
     expect(resolved.clay).toBe(2)
   })
 
   it('does NOT reduce cost when player does not own C27', () => {
-    const { state } = setup()
+    const { session: ruleSession, state } = setup()
     const other = state.players[1]!
     const baseCost = { wood: 2, stone: 2 }
-    const resolved = resolveCardCostForTest(
+    const resolved = ruleSession.withCtx(() => resolveCardCostForTest(
       state,
       other,
       'improvement',
       'Major_Joinery',
-      baseCost,
-    )
+      baseCost, undefined, ruleSession.actionHooks,
+    ))
     expect(PaymentSolver.isComplexCost(resolved)).toBe(false)
     if (PaymentSolver.isComplexCost(resolved)) return
     expect(resolved.stone).toBe(2)
@@ -163,7 +163,7 @@ describe('C027_Blueprint session — minor-improvement routing for 3 majors', ()
   }
 
   it('listener injects 3 allowed majors when player owns C27', () => {
-    const { state, player } = setupWithResources()
+    const { session: ruleSession, state, player } = setupWithResources()
     const listener = findListener(ruleSession, ROUTING_LISTENER_ID)
     expect(listener).toBeDefined()
 
@@ -217,15 +217,15 @@ describe('C027_Blueprint session — minor-improvement routing for 3 majors', ()
   })
 
   it('does not inject majors into B131 card-derived minor improvement choices', () => {
-    const { state, player } = setupWithResources()
+    const { session: ruleSession, state, player } = setupWithResources()
 
-    const extras = collectComputeChoiceCandidates(
+    const extras = ruleSession.withCtx(() => collectComputeChoiceCandidates(
       state,
       player,
       'improvement',
       { types: ['minor'], trueAction: false },
-      'B131_Equipper',
-    )
+      'B131_Equipper', ruleSession.actionHooks,
+    ))
 
     expect(extras.some((option) => option.value === 'Major_Joinery')).toBe(false)
   })
