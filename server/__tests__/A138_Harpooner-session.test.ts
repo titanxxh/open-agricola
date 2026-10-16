@@ -37,7 +37,7 @@ const setup = ({ played = true, family = 2, wood = 1 } = {}) => {
   setWorkersAtHome(state, owner, 2)
   const fishing = state.actionSpaces.find((space) => space.id === 'fishing')
   if (!fishing) throw new Error('fishing space missing')
-  fishing.resources.food = 0
+  fishing.resources.food = 1
   session.loadState(state)
   return session
 }
@@ -77,20 +77,20 @@ describe('A138 Harpooner parity', () => {
     expect(response.state.players[0]!.occupationPlayed).toContain(CARD_ID)
   })
 
-  it('A138 S2: a two-person family may pay one wood after Fishing for two food and one reed', () => {
+  it('A138 S2: a two-person family may pay one wood after Fishing for two extra food and one reed', () => {
     const session = setup()
     const response = acceptHarpooner(session, session.takeAction(0, 'fishing'))
 
     expect(response.ok, response.error).toBe(true)
-    expect(response.state.players[0]!.resources).toMatchObject({ wood: 0, food: 2, reed: 1 })
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 0, food: 3, reed: 1 })
   })
 
-  it('A138 S3: a three-person family receives three food and one reed', () => {
+  it('A138 S3: a three-person family receives three extra food and one reed', () => {
     const session = setup({ family: 3 })
     const response = acceptHarpooner(session, session.takeAction(0, 'fishing'))
 
     expect(response.ok, response.error).toBe(true)
-    expect(response.state.players[0]!.resources).toMatchObject({ wood: 0, food: 3, reed: 1 })
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 0, food: 4, reed: 1 })
   })
 
   it('A138 S4: the Harpooner exchange may be declined', () => {
@@ -101,12 +101,13 @@ describe('A138 Harpooner parity', () => {
     }
 
     expect(response.ok, response.error).toBe(true)
-    expect(response.state.players[0]!.resources).toMatchObject({ wood: 1, food: 0, reed: 0 })
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 1, food: 1, reed: 0 })
   })
 
   it('A138 S5: no wood or a non-Fishing action offers no usable Harpooner exchange', () => {
     const noWood = setup({ wood: 0 }).takeAction(0, 'fishing')
-    expect(noWood.state.players[0]!.resources).toMatchObject({ wood: 0, food: 0, reed: 0 })
+    expect(noWood.ok, noWood.error).toBe(true)
+    expect(noWood.state.players[0]!.resources).toMatchObject({ wood: 0, food: 1, reed: 0 })
     expect(noWood.interaction.stateId === 'wait'
       ? noWood.interaction.request.options?.some((option) =>
         option.sourceCard === CARD_ID && option.value !== '__skip__' && !option.disabled) ?? false

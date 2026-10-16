@@ -600,6 +600,7 @@ type ActionDefinition = {
   roundAvailable?: number
   gainPerRound?: Partial<Resource>
   canBeExecutedByPlayer?(state, player): boolean
+  originalActionCondition?(context): boolean
   costPreview?(...): CostPreview
   isDoable?(...): boolean
   isAutomatic?(...): boolean
@@ -634,6 +635,8 @@ Hook 不进 `ActionDefinition`，由 `hooks.ts` 显式注册（卡牌文件内�
 `gain` 先解析所有接收者。由付款方出资时，必须足额支付单人数量乘以接收人数；失败不改变任一方资源，事件来源保留付款方。其余来源先取显式 `actionContext.sourceLocation`，卡牌发放保留卡牌来源，普通行动格发放标记行动格。`return-to-space` 可通过 `actionContext.targetSpaceId` 指定其他实时行动格；付款及移动事件使用同一目标。
 
 职业可用性、选择提交及直接／免费打出统一调用卡牌前置检查。改善费用预览和付款一致地使用授予者 `sourceCard` 或实体行动格 ID 作为 `actionCardId`；私有手牌展示仅使用真实 source card。卡内折扣由此可辨别行动来源，同时不会把行动格 ID 当作私有卡牌。
+
+`individual-food-cost` 结算职业牌自身的强制食物费用，独立于普通职业打出费用及 PaymentSolver。它按实时库存支付食物，差额获得乞讨标记；付款事件与来源卡统计只记录实际支出的食物，乞讨单独记录为资源获得。缺粮时返回必须显式确认的单选请求，不提供跳过；既有合法 anytime 可先换粮，恢复后的预览和最终确认均读取实时库存。足额及零费用自动结算。C127 将此效果和无房生育组成必选序列，保留人物上限与显式 Undo。
 
 ### 7.4 payment/
 
@@ -778,6 +781,9 @@ Card listener 区域默认只匹配已打出卡：`zones` 省略等价于 `['pla
 ### 7.5.2 当前步骤准入、before 与 blocked 恢复
 
 行动格可用性与权威入口共用 `GameCore.applyIsDoableCheck()` 和 flow 准入 helper。原子判断携带 params、sourceCard、actionContext、owner、目标行动格、实际费用修正与替代行动信息。当前步骤可执行，或适用的 before 可以开始，就允许尝试；不保证整条流程能够完成。SEQ 检查下一步，OR/XOR 检查是否有分支可以开始。显式 veto 和放人限制仍然有效。入口 helper 延迟求值基础判定，只对带自定义判定的 strict 复合行动执行这次前置检查。flow 查询中，叶子的基础回退只在没有 `costPreview` 时执行；复合流程遍历和 strict gate 保持原有顺序。每次查询仍基于完整的当前状态执行适用的 hook 与费用预览，不缓存可用性结果。查询不消费资源、触发、事件或私有 cursor。 普通放人和卡牌授予的额外放人共享 `isPlacementActionDoableInFlowContext()`，包含 `place-farmer.before` 的准入回退、显式 veto、strict 前置条件和 before 抑制语义。额外放人的可达性 resolver 通过无环的 `action-definition-lookup.ts` 同时查询行动格及内部行动，能够预览包含 `gain` / `pay` 的 before flow。
+
+`originalActionCondition` 表达原动作分支的结构条件。原分支不满足此条件时，普通 `isDoable: true` 结果或附加收益 before 不能重新打开入口。累积格及 `collect` 以实际可领取的商品为准；定向或部分收取按真实目标、商品子集和数量判断，不能只检查 `gainPerRound`。空格的固定收益、owner 奖励及卡牌附加收益不授予准入。明确授权的 `computeReplace` 仍独立检查；复合动作沿实际 `flow` 或纯 `flowFactory` 检查当前步骤，使合法子替代保持可执行。Strict Action Entry 的归属等硬限制仍先行。普通、额外放人和移动目标共用这一查询，权威执行再次校验。
+
 
 准入递归键由行动 ID、参数和排序后的已消费 replacement producer ID 组成。同名行动的替代若消耗了一个新来源，可以继续检查其实际可执行性；重复相同键则终止探测。这样 E151 的 `skipRoomCheck` 替代可以通过真实 family-growth 判定，无需卡牌 `isDoable` 绕过，也不会无限递归。
 

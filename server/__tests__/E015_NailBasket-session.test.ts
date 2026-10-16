@@ -186,15 +186,14 @@ describe('E015 Nail Basket parity', () => {
     expect(response.state.actionSpaces.find((space) => space.id === 'forest')!.resources.stone).toBe(0)
   })
 
-  it('E015 S8: an empty Forest still triggers Nail Basket and can receive the returned stone', () => {
+  it('E015 S8: Nail Basket cannot authorize an empty Forest', () => {
     const session = setup({ played: true, reed: 0, stone: 1, wood: 4, forestWood: 0 })
-
-    const response = buildFourFences(session, acceptNailBasket(session, session.takeAction(0, 'forest')))
-
-    expect(response.ok, response.error).toBe(true)
-    expect(response.state.actionSpaces.find((space) => space.id === 'forest')!.resources.stone).toBe(1)
-    expect(response.state.players[0]!.resources.wood).toBe(0)
-    expect(response.state.players[0]!.fenceSegments).toHaveLength(4)
+    const response = session.takeAction(0, 'forest')
+    expect(response.ok).toBe(false)
+    expect(response.interaction.stateId).toBe('idle')
+    expect(response.state.actionSpaces.find(space => space.id === 'forest')!.resources.stone).toBe(0)
+    expect(response.state.players[0]!.resources).toMatchObject({ stone: 1, wood: 4 })
+    expect(response.state.players[0]!.fenceSegments).toHaveLength(0)
   })
 
   it('E015 S9: a four-player Copse also triggers Nail Basket', () => {

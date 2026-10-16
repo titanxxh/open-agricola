@@ -53,7 +53,22 @@ describe('E054-E059 parity', () => {
   it('E054 S2: after a clay-cost improvement one extra clay may buy three food', () => expect(contraband(true).state.players[0]!.resources).toMatchObject({ clay: 0, food: 3 }))
   it('E054 S3: the Contraband exchange may be declined', () => expect(contraband(false).state.players[0]!.resources).toMatchObject({ clay: 1, food: 0 }))
   it('E055 S1: two occupations and one stone play Stone Weir', () => expect(playMinor(setup({ cardId: 'E055_StoneWeir', played: false, occupations: 2, resources: { stone: 1 } }), 'E055_StoneWeir').state.players[0]!.minorPlayed).toContain('E055_StoneWeir'))
-  it.each([0, 1, 3, 4])('E055 Fishing with %i food leaves four food total', (food) => { const s = setup({ cardId: 'E055_StoneWeir', occupations: 2 }); s.state.actionSpaces.find((x) => x.id === 'fishing')!.resources.food = food; s.loadState(s.state); expect(s.takeAction(0, 'fishing').state.players[0]!.resources.food).toBe(4) })
+  it.each([1, 3, 4])('E055 Fishing with %i food leaves four food total', (food) => { const s = setup({ cardId: 'E055_StoneWeir', occupations: 2 }); s.state.actionSpaces.find((x) => x.id === 'fishing')!.resources.food = food; s.loadState(s.state); const r = s.takeAction(0, 'fishing'); expect(r.ok, r.error).toBe(true); expect(r.state.players[0]!.resources.food).toBe(4) })
+  it('E055 cannot enter empty Fishing to receive its extra food', () => {
+    const session = setup({ cardId: 'E055_StoneWeir', occupations: 2 })
+    session.state.actionSpaces.find(space => space.id === 'fishing')!.resources.food = 0
+    session.loadState(session.state)
+    const before = session.getState()
+    expect(session.getActionAvailability(0).fishing).toBe(false)
+
+    const response = session.takeAction(0, 'fishing')
+
+    expect(response.ok).toBe(false)
+    expect(response.state).toEqual(before.state)
+    expect(response.interaction).toEqual(before.interaction)
+    expect(response.state.players[0]!.resources.food).toBe(0)
+    session.dispose()
+  })
   it('E057 S1: paying one clay plays Cheese Fondue', () => expect(playMinor(setup({ cardId: 'E057_CheeseFondue', played: false, resources: { clay: 1 } }), 'E057_CheeseFondue').state.players[0]!.minorPlayed).toContain('E057_CheeseFondue'))
   const bake = (animals: boolean) => { const s = setup({ cardId: 'E057_CheeseFondue', resources: { grain: 1, sheep: animals ? 1 : 0, cattle: animals ? 1 : 0 } }); s.state.players[0]!.improvements = ['Major_Fireplace1']; if (animals) { s.state.players[0]!.houseAnimals = Object.fromEntries(s.state.players[0]!.roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, 'sheep'])); s.state.players[0]!.pastures = [{ id: 'cattle-pasture', size: 1, tiles: [{ row: 2, col: 2 }], stables: 0, animalType: 'cattle', animalCount: 1 }] } s.state.roundActionOrder[0] = 'grain-utilization'; s.state.actionSpaces.find((x) => x.id === 'grain-utilization')!.roundAvailable = 1; s.loadState(s.state); let r = s.takeAction(0, 'grain-utilization'); if (r.interaction.stateId === 'wait' && options(r).some((o) => o.value === 'bake-bread' || o.labelKey === 'actions.bakeBread.name')) r = choose(s, r, (o) => o.value === 'bake-bread' || o.labelKey === 'actions.bakeBread.name'); if (r.interaction.stateId === 'wait' && r.interaction.promptKey === 'ui.interactionBakeBreadChoice') r = choose(s, r, (o) => o.value === 'Major_Fireplace1'); return r }
   it('E057 S2: baking with sheep and cattle gains two additional food', () => expect(bake(true).state.players[0]!.resources.food).toBe(4))

@@ -1,5 +1,5 @@
 import { defineOccupationCard } from '../card-source'
-import { payLeaf } from '../helpers/pay-gain-node'
+import { individualFoodCostRequest } from '../../actions/helpers/individual-food-cost'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C127_Lover'
@@ -12,9 +12,8 @@ const cardImpl = {
     if (roundsLeft < 0) return
     return {
       type: 'seq' as const,
-      optional: true,
       children: [
-        payLeaf({ cardId: CARD_ID, cost: { food: roundsLeft } }),
+        { type: 'leaf' as const, actionId: 'individual-food-cost', sourceCard: CARD_ID, params: { food: roundsLeft } },
         {
           type: 'leaf' as const,
           actionId: 'family-growth',
@@ -24,6 +23,10 @@ const cardImpl = {
       ],
     }
   },
+  projectInteractionRequest: (state, player, request, actionId) =>
+    actionId === 'individual-food-cost' && request.kind === 'choice'
+      ? individualFoodCostRequest(player, 14 - state.round)
+      : request,
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl

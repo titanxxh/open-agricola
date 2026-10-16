@@ -189,14 +189,18 @@ describe('E075 Stone Axe parity', () => {
     expect(stoneAxeOption(response)).toBeUndefined()
   })
 
-  it('E075 S10: an empty wood accumulation space can trigger Stone Axe using a supplied stone', () => {
+  it('E075 S10: an empty wood accumulation space is rejected despite a supplied stone', () => {
     const session = setup({ played: true, wood: 0, clay: 0, stone: 1 })
     setSpaceResource(session, 'forest', 'wood', 0)
+    const before = session.getState()
 
-    const response = acceptStoneAxe(session, session.takeAction(0, 'forest'))
+    const response = session.takeAction(0, 'forest')
 
-    expect(response.ok, response.error).toBe(true)
-    expect(response.state.players[0]!.resources).toMatchObject({ stone: 0, wood: 3 })
+    expect(response.ok).toBe(false)
+    expect(response.state).toEqual(before.state)
+    expect(response.interaction).toEqual(before.interaction)
+    expect(response.state.players[0]!.resources).toMatchObject({ stone: 1, wood: 0 })
+    session.dispose()
   })
 
   it('E075 S11: Stone Axe contributes its printed one point at scoring', () => {

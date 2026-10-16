@@ -142,14 +142,18 @@ describe('A124 Knapper parity', () => {
     return session
   }
 
-  it('A124 S2: its stone arrives before and unlocks the empty round-five Pig Market', () => {
+  it('A124 S2: its before stone cannot authorize an empty round-five Pig Market', () => {
     const session = setup()
-    expect(session.getActionAvailability(0)['pig-market']).toBe(true)
+    const before = session.getState()
+    expect(session.getActionAvailability(0)['pig-market']).toBe(false)
 
     const response = session.takeAction(0, 'pig-market')
 
-    expect(response.ok, response.error).toBe(true)
-    expect(response.state.players[0]!.resources).toMatchObject({ stone: 1, boar: 0 })
+    expect(response.ok).toBe(false)
+    expect(response.state).toEqual(before.state)
+    expect(response.interaction).toEqual(before.interaction)
+    expect(response.state.players[0]!.resources).toMatchObject({ stone: 0, boar: 0 })
+    session.dispose()
   })
 
   it('A124 S3: using the round-six Vegetable Seeds gains exactly one stone', () => {
@@ -159,14 +163,18 @@ describe('A124 Knapper parity', () => {
     expect(response.state.players[0]!.resources).toMatchObject({ stone: 1, vegetable: 1 })
   })
 
-  it('A124 S4: its stone arrives before and unlocks the empty round-seven Western Quarry', () => {
+  it('A124 S4: its before stone cannot authorize an empty round-seven Western Quarry', () => {
     const session = setup()
-    expect(session.getActionAvailability(0)['western-quarry']).toBe(true)
+    const before = session.getState()
+    expect(session.getActionAvailability(0)['western-quarry']).toBe(false)
 
     const response = session.takeAction(0, 'western-quarry')
 
-    expect(response.ok, response.error).toBe(true)
-    expect(response.state.players[0]!.resources.stone).toBe(1)
+    expect(response.ok).toBe(false)
+    expect(response.state).toEqual(before.state)
+    expect(response.interaction).toEqual(before.interaction)
+    expect(response.state.players[0]!.resources.stone).toBe(0)
+    session.dispose()
   })
 
   it('A124 S5: round-eight and basic action spaces grant no Knapper stone', () => {

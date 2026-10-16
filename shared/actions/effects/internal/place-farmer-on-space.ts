@@ -5,6 +5,8 @@ import { addLinkedSpaceBlocks, addWorkerRef, findActionSpaceById, isSpaceBlocked
 import { smallestAvailableWorker, workersAvailable } from '../../../domain/player'
 import { incPlacedFarmers } from '../../../session/stats'
 import { canEnterSpace } from '../../helpers/placement-availability'
+import { isPlacementActionDoableInFlowContext } from '../../flow'
+import { getActionDefinition } from '../../action-definition-lookup'
 
 const collectAfterPlacementFlows = (
   state: GameState,
@@ -58,7 +60,11 @@ const canTargetSpace = (
   if (!canEnterSpace(space, player, state)) return false
   if (isSpaceBlocked(space)) return false
   if (!allowOccupied && isSpaceOccupied(space)) return false
-  return space.canBeExecutedByPlayer(state, player)
+  if (!space.canBeExecutedByPlayer(state, player)) return false
+  return isPlacementActionDoableInFlowContext({
+    state, player, space, action: space, actionId: space.id,
+    resolveAction: actionId => findActionSpaceById(state, actionId) ?? getActionDefinition(actionId),
+  })
 }
 
 export const placeFarmerOnSpaceAction: ActionDefinition = {

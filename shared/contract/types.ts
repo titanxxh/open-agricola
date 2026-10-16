@@ -1031,6 +1031,8 @@ export type ActionDefinition = {
   allowAnytimeReentry?: boolean
   idleOnly?: boolean
   canBeExecutedByPlayer: CanBeExecutedByPlayer
+  /** Structural eligibility of the original body; independent replacement flows remain available. */
+  originalActionCondition?: (context: ActionExecutionContext) => boolean
   /** Non-payment eligibility for an explicit optional decision; never authorizes execution. */
   canBeOfferedByPlayer?: CanBeExecutedByPlayer
   isAlreadySatisfied?: (

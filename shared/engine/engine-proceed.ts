@@ -1,4 +1,4 @@
-import { evaluateFlowDoable, isActionVetoedInFlowContext } from '../actions/flow'
+import { evaluateFlowDoable, isActionDoableInFlowContext, isActionVetoedInFlowContext } from '../actions/flow'
 import type {
   ActionExecutionContext,
   ActionExecutionResult,
@@ -271,21 +271,11 @@ const triggerSelectEvaluationOptions = (
     const action = int.registry.get(hostContext.actionId)
     if (!action) return false
     const scopedContext = withResourcePreview(hostContext, resources)
-    const directDoable = action.canBeExecutedByPlayer(
-      scopedContext.state,
-      scopedContext.player,
-      {
-        params: scopedContext.params,
-        space: scopedContext.space,
-        sourceCard: scopedContext.sourceCard,
-        actionContext: scopedContext.actionContext,
-      },
-    )
-    return int.hooks.applyIsDoable(
-      { ...scopedContext, ...currentEventReadContext(int), actionId: hostContext.actionId },
-      action,
-      directDoable,
-    )
+    return isActionDoableInFlowContext({
+      ...scopedContext, ...currentEventReadContext(int), actionId: hostContext.actionId, action,
+      actionContext: { ...scopedContext.actionContext, skipBeforeTriggers: true },
+      resolveAction: actionId => int.registry.get(actionId),
+    })
   },
 })
 
@@ -1189,20 +1179,11 @@ export function engineProceed(
     }
     const doabilityEventReadContext = currentEventReadContext(int)
     const doabilityActionContext = { ...executionContext.actionContext, checkedReplaceAction: true }
-    const doable = int.hooks.applyIsDoable(
-      { ...executionContext, actionContext: doabilityActionContext, ...doabilityEventReadContext, actionId: replacedActionId },
-      action,
-      action.canBeExecutedByPlayer(
-        executionContext.state,
-        executionContext.player,
-        {
-          params: executionContext.params,
-          space: executionContext.space,
-          sourceCard: executionContext.sourceCard,
-          actionContext: doabilityActionContext,
-        },
-      ),
-    )
+    const doable = isActionDoableInFlowContext({
+      ...executionContext, ...doabilityEventReadContext, actionId: replacedActionId, action,
+      actionContext: { ...doabilityActionContext, skipBeforeTriggers: true },
+      resolveAction: actionId => int.registry.get(actionId),
+    })
     if (!doable) {
       if (node.mandatory === true && action.isAlreadySatisfied?.({
         ...executionContext,

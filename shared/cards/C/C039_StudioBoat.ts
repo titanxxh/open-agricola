@@ -4,6 +4,7 @@ import type { CardImpl } from '../registry'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isTravelingPlayersSpaceId } from '../helpers/action-space-categories'
+import { hasCollectableResources } from '../../actions/effects/collect'
 
 const CARD_ID = 'C039_StudioBoat'
 registerPlayerActionSpace({
@@ -16,6 +17,7 @@ registerPlayerActionSpace({
     nameKey: 'cards.C039_StudioBoat.name',
     descriptionKey: 'cards.C039_StudioBoat.desc',
     canBeExecutedByPlayer: () => true,
+    originalActionCondition: context => hasCollectableResources({ ...context, actionContext: undefined }),
     flowFactory: ({ player }) => ({ type: 'seq', children: [
       { type: 'leaf', actionId: 'collect', sourceCard: CARD_ID },
       ...(player.id === ownerId ? [{ type: 'leaf' as const, actionId: 'bonus-vp', sourceCard: CARD_ID }] : []),

@@ -4,6 +4,7 @@ import { findActionSpaceById } from '../../domain/space'
 import { registerAdHocAction } from '../../actions/helpers/ad-hoc-action-registry'
 import type { ActionDefinition } from '../../contract/types'
 import type { CardImpl } from '../registry'
+import { hasCollectableResources } from '../../actions/effects/collect'
 
 const CARD_ID = 'D116_TreeInspector'
 const DISCARD_WOOD = `card_${CARD_ID}_discardWood`
@@ -36,6 +37,7 @@ registerPlayerActionSpace({
     nameKey: 'cards.D116_TreeInspector.name',
     descriptionKey: 'cards.D116_TreeInspector.desc',
     canBeExecutedByPlayer: (_state, player) => player.id === ownerId,
+    originalActionCondition: context => hasCollectableResources({ ...context, actionContext: undefined }),
     flowFactory: () => ({ type: 'leaf', actionId: 'collect', sourceCard: CARD_ID }),
   }),
 })

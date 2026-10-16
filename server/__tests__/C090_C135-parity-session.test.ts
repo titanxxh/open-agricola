@@ -162,8 +162,8 @@ describe('C126 Excavator parity', () => {
 })
 
 describe('C127 Lover parity', () => {
-  it('C127 S1: round-ten Lover may pay four food for family growth without room', () => { const s = setup({ cardId: 'C127_Lover', played: false, playerCount: 3, round: 10, resources: { food: 4 } }); let r = playOccupation(s, 'C127_Lover'); r = accept(s, r, 'C127_Lover'); expect(familySize(r.state.players[0]!)).toBe(3); expect(r.state.players[0]!.resources.food).toBe(0) })
-  it('C127 S2: the Lover growth may be declined', () => { const s = setup({ cardId: 'C127_Lover', played: false, playerCount: 3, round: 10, resources: { food: 4 } }); const r = decline(s, playOccupation(s, 'C127_Lover'), 'C127_Lover'); expect(familySize(r.state.players[0]!)).toBe(2); expect(r.state.players[0]!.resources.food).toBe(4) })
+  it('C127 S1: round-ten Lover pays four food for family growth without room', () => { const s = setup({ cardId: 'C127_Lover', played: false, playerCount: 3, round: 10, resources: { food: 4 } }); const r = playOccupation(s, 'C127_Lover'); expect(familySize(r.state.players[0]!)).toBe(3); expect(r.state.players[0]!.resources.food).toBe(0) })
+  it('C127 S2: the individual cost and growth do not offer a decline', () => { const s = setup({ cardId: 'C127_Lover', played: false, playerCount: 3, round: 10, resources: { food: 4 } }); const r = playOccupation(s, 'C127_Lover'); expect(options(r).some(option => option.value === '__skip__')).toBe(false); expect(familySize(r.state.players[0]!)).toBe(3); expect(r.state.players[0]!.resources.food).toBe(0) })
 })
 
 describe('C131 Private Teacher parity', () => {

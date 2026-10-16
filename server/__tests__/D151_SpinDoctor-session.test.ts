@@ -255,7 +255,7 @@ describe('D151 Spin Doctor native session', () => {
     finishTurn(session, response)
   })
 
-  it('selects Brotherly Love alongside Spin Doctor and limits its occupied choice to the third space', () => {
+  it('selects Brotherly Love alongside Spin Doctor without reopening the exhausted third space', () => {
     const { session, meetingWorkerId, forestWorkerId } = setupWithBrotherlyLove()
     const before = snapshot(session.getState())
     let response = session.takeAction(0, 'traveling-players')
@@ -270,21 +270,27 @@ describe('D151 Spin Doctor native session', () => {
       : undefined
     expect(accept).toBeDefined()
     response = session.resolveChoice(0, accept!.value)
-    expect(choicesOf(response)).toContain('allow-occupied:traveling-players')
+    expect(choicesOf(response)).not.toContain('allow-occupied:traveling-players')
     expect(choicesOf(response)).not.toContain('allow-occupied:meeting-place')
     expect(choicesOf(response)).not.toContain('allow-occupied:forest')
 
-    response = session.resolveChoice(0, 'allow-occupied:traveling-players')
+    const pending = structuredClone(response.interaction)
+    const beforeRejected = JSON.stringify(response.state)
+    const rejected = session.resolveChoice(0, 'allow-occupied:traveling-players')
+    expect(rejected.ok).toBe(false)
+    expect(rejected.interaction).toEqual(pending)
+    expect(JSON.stringify(rejected.state)).toBe(beforeRejected)
+    response = session.resolveChoice(0, 'grain-seeds')
     expect(response.ok, response.error).toBe(true)
     expect(response.state.actionSpaces.find((space) => space.id === 'meeting-place')?.takenBy)
       .toEqual([{ playerId: response.state.players[0]!.id, workerId: meetingWorkerId }])
     expect(response.state.actionSpaces.find((space) => space.id === 'forest')?.takenBy)
       .toEqual([{ playerId: response.state.players[0]!.id, workerId: forestWorkerId }])
     expect(response.state.actionSpaces.find((space) => space.id === 'traveling-players')?.takenBy)
-      .toHaveLength(2)
+      .toHaveLength(1)
     expect(newEvents(before, response)).toContainEqual(expect.objectContaining({
       type: 'worker.placed',
-      spaceId: 'traveling-players',
+      spaceId: 'grain-seeds',
       viaCardId: BROTHERLY_LOVE_ID,
     }))
     expect(newLogs(before, response).filter((entry) => entry.key === 'log.placeFarmer'))

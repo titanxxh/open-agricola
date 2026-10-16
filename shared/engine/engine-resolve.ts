@@ -1,4 +1,4 @@
-import { evaluateFlowDoable } from '../actions/flow'
+import { evaluateFlowDoable, isActionDoableInFlowContext } from '../actions/flow'
 import type {
   ActionExecutionContext,
   ActionExecutionResult,
@@ -207,21 +207,11 @@ const triggerSelectEvaluationOptions = (
     const action = int.registry.get(hostContext.actionId)
     if (!action) return false
     const scopedContext = withResourcePreview(hostContext, resources)
-    const directDoable = action.canBeExecutedByPlayer(
-      scopedContext.state,
-      scopedContext.player,
-      {
-        params: scopedContext.params,
-        space: scopedContext.space,
-        sourceCard: scopedContext.sourceCard,
-        actionContext: scopedContext.actionContext,
-      },
-    )
-    return int.hooks.applyIsDoable(
-      { ...scopedContext, ...currentEventReadContext(int), actionId: hostContext.actionId },
-      action,
-      directDoable,
-    )
+    return isActionDoableInFlowContext({
+      ...scopedContext, ...currentEventReadContext(int), actionId: hostContext.actionId, action,
+      actionContext: { ...scopedContext.actionContext, skipBeforeTriggers: true },
+      resolveAction: actionId => int.registry.get(actionId),
+    })
   },
 })
 
@@ -609,20 +599,11 @@ export function engineResolveChoice(
         return { type: 'ok' }
       }
       const doabilityActionContext = { ...executionContext.actionContext, checkedReplaceAction: true }
-      const doable = int.hooks.applyIsDoable(
-        { ...executionContext, actionContext: doabilityActionContext, ...currentEventReadContext(int), actionId },
-        action,
-        action.canBeExecutedByPlayer(
-          executionContext.state,
-          executionContext.player,
-          {
-            params: executionContext.params,
-            space: executionContext.space,
-            sourceCard: executionContext.sourceCard,
-            actionContext: doabilityActionContext,
-          },
-        ),
-      )
+      const doable = isActionDoableInFlowContext({
+        ...executionContext, ...currentEventReadContext(int), actionId, action,
+        actionContext: { ...doabilityActionContext, skipBeforeTriggers: true },
+        resolveAction: actionId => int.registry.get(actionId),
+      })
       if (!doable) {
         int.pendingNodeIdRef.value = null
         return { type: 'ok' }
@@ -962,20 +943,11 @@ export function engineResolveChoice(
       return { type: 'ok' }
     }
     const doabilityActionContext = { ...executionContext.actionContext, checkedReplaceAction: true }
-    const doable = int.hooks.applyIsDoable(
-      { ...executionContext, actionContext: doabilityActionContext, ...pendingEventReadContext(), actionId: committedActionId },
-      committedAction,
-      committedAction.canBeExecutedByPlayer(
-        executionContext.state,
-        executionContext.player,
-        {
-          params: executionContext.params,
-          space: executionContext.space,
-          sourceCard: executionContext.sourceCard,
-          actionContext: doabilityActionContext,
-        },
-      ),
-    )
+    const doable = isActionDoableInFlowContext({
+      ...executionContext, ...pendingEventReadContext(), actionId: committedActionId, action: committedAction,
+      actionContext: { ...doabilityActionContext, skipBeforeTriggers: true },
+      resolveAction: actionId => int.registry.get(actionId),
+    })
     if (!doable) {
       // An issued choice menu stays open: an anytime action may make one of
       // its options payable again, or the player may undo. Other request

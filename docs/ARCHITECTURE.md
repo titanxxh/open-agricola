@@ -605,6 +605,7 @@ type ActionDefinition = {
   roundAvailable?: number
   gainPerRound?: Partial<Resource>
   canBeExecutedByPlayer?(state, player): boolean
+  originalActionCondition?(context): boolean
   costPreview?(...): CostPreview
   isDoable?(...): boolean
   isAutomatic?(...): boolean
@@ -639,6 +640,8 @@ Follow-up selection for an extra crop placement carries provenance in `actionCon
 `gain` resolves recipients before settlement. A payer-backed gain requires the full per-recipient amount multiplied by the recipient count, and failure changes neither side. Events retain the payer as their source. Otherwise explicit `actionContext.sourceLocation` takes precedence; card gains retain card provenance, and ordinary action-space gains name the action space. `return-to-space` can name a different live action space through `actionContext.targetSpaceId`; payment and the emitted movement use that same target.
 
 Occupation availability, choice submission, and direct/free play all call the shared card prerequisite gate. Improvement cost preview and payment use the granting `sourceCard` or physical action-space ID consistently as `actionCardId`; private-hand presentation continues to use only the actual source card. This lets card-local discounts recognize their action without exposing action-space IDs as private cards.
+
+`individual-food-cost` settles an occupation card's mandatory individual food cost separately from the ordinary Occupation Cost and PaymentSolver. It pays the available food and gains begging markers for the shortfall. Payment events and source-card statistics record only the food actually spent; begging is recorded separately as a resource gain. A shortage creates a single mandatory choice requiring explicit confirmation, with no skip. Existing legal anytime conversions remain available, and both the resumed preview and final settlement read live inventory. Sufficient-food and zero-cost cases settle automatically. C127 sequences this effect with family growth without room as mandatory steps, preserving the worker limit and explicit undo.
 
 ### 7.4 `payment/`
 
@@ -786,6 +789,9 @@ A hand listener is only for a card-local rule that must observe history while th
 #### 7.5.2 Current-step admission, before, and blocked recovery
 
 Action-space availability and authoritative entry share `GameCore.applyIsDoableCheck()` and the flow admission helpers. Normal and card-granted placements share `isPlacementActionDoableInFlowContext()`, including the `place-farmer.before` admission fallback, explicit vetoes, strict predicates, and suppressed before listeners. The placement resolver reads both board spaces and internal actions through the acyclic `action-definition-lookup.ts`; listing an extra placement must be able to preview a before flow containing `gain` or `pay`. Atomic checks carry params, sourceCard, actionContext, owner, target space, actual cost modifiers and replacement alternatives. An action can start when its current step is executable or an applicable before can start; this does not promise completion. SEQ checks its next step and OR/XOR checks whether any branch can start. Explicit vetoes and placement restrictions still apply. Entry helpers pass the base predicate lazily, evaluating the preliminary gate only for a strict composite with a custom predicate. Within flow queries, a leaf's base fallback runs only when it has no `costPreview`; composite traversal and strict gates retain their existing order. Every query still evaluates applicable hooks and cost previews against the full current state, with no availability-result cache. Queries do not consume resources, activations, events or the private cursor.
+
+`originalActionCondition` expresses a structural condition of the original action branch. Ordinary `isDoable: true` results and bonus-only before flows cannot reopen that branch. Accumulation spaces and `collect` check the goods actually available; targeted or partial collection uses the real target, resource subset and amount rather than only `gainPerRound`. Fixed gains, owner bonuses and card bonuses do not authorize an empty space. Explicit `computeReplace` alternatives remain independently eligible. Composite actions inspect the current step of their actual `flow` or pure `flowFactory`, preserving legal child replacements. Strict Action Entry still enforces ownership and other hard restrictions first. Normal placement, extra placement and movement targets share this query and authoritative execution rechecks it.
+
 
 Admission recursion keys contain the action ID, parameters and sorted consumed replacement producer IDs. A same-action alternative can progress after consuming a new producer and is checked against its actual execution predicate. Repeating the same key terminates the probe. This admits E151's `skipRoomCheck` family-growth alternative without a card-specific `isDoable` bypass or unbounded recursion.
 

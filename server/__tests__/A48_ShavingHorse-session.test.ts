@@ -121,13 +121,14 @@ describe('A048_ShavingHorse session', () => {
     expect(resp.state.players[0]!.resources.food).toBe(0)
   })
 
-  it('does not trigger when collect returns 0 wood (empty space)', () => {
+  it('rejects an empty wood space without triggering an exchange', () => {
     const session = setup({ forestWood: 0, playerWood: 6 })
     const resp = session.takeAction(0, 'forest')
-    expect(resp.ok).toBe(true)
-    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
+    expect(resp.ok).toBe(false)
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('idle')
     expect(resp.state.players[0]!.resources.wood).toBe(6)
     expect(resp.state.players[0]!.resources.food).toBe(0)
+    expect(resp.state.actionSpaces.find(space => space.id === 'forest')!.takenBy).toEqual([])
   })
 
   it('offers optional exchange when wood reaches 5', () => {
@@ -354,13 +355,14 @@ describe('A048_ShavingHorse session', () => {
     expect(resp.state.players[0]!.resources.food).toBe(0)
   })
 
-  it('A048 S5c: taking an empty wood space while already above five wood triggers no exchange', () => {
+  it('A048 S5c: having six wood does not authorize an empty Forest', () => {
     const session = setup({ forestWood: 0, playerWood: 6 })
     const resp = session.takeAction(0, 'forest')
-    expect(resp.ok).toBe(true)
-    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
+    expect(resp.ok).toBe(false)
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('idle')
     expect(resp.state.players[0]!.resources.wood).toBe(6)
     expect(resp.state.players[0]!.resources.food).toBe(0)
+    expect(resp.state.actionSpaces.find(space => space.id === 'forest')!.takenBy).toEqual([])
   })
 
   it('A048 S2: obtaining wood and reaching five wood may exchange one wood for three food', () => {

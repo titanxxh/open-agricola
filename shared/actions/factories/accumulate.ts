@@ -1,4 +1,4 @@
-import { collectAccumulatedResources } from '../effects/collect'
+import { collectAccumulatedResources, hasCollectableResources } from '../effects/collect'
 import type { ActionDefinition, Resource } from '../../contract/types'
 import { deriveCanBeExecutedByFlow } from '../flow'
 
@@ -16,6 +16,7 @@ export const createAccumulatingAction = (
 ): ActionDefinition => ({
   ...config,
   canBeExecutedByPlayer: deriveCanBeExecutedByFlow(),
+  originalActionCondition: context => hasCollectableResources({ ...context, actionContext: undefined }),
   execute: ({ player, space }) => {
     collectAccumulatedResources(player, space)
     return { type: 'ok' }

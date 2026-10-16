@@ -171,11 +171,15 @@ describe('E131 Market Master parity', () => {
     expect(response.state.players[0]!.occupationHand).toContain(TARGET_ID)
   })
 
-  it('E131 S6: without one food after collecting Traveling Players the trigger cannot play an occupation', () => {
+  it('E131 S6: empty Traveling Players rejects entry without offering an occupation', () => {
     const session = setup({ food: 0, travelingFood: 0 })
+    const before = session.getState()
+    expect(session.getActionAvailability(0)['traveling-players']).toBe(false)
     const offered = session.takeAction(0, 'traveling-players')
 
-    expect(offered.ok, offered.error).toBe(true)
+    expect(offered.ok).toBe(false)
+    expect(offered.state).toEqual(before.state)
+    expect(offered.interaction).toEqual(before.interaction)
     expect(offersMarketMaster(offered)).toBe(false)
     expect(offered.state.players[0]!.occupationHand).toContain(TARGET_ID)
     expect(offered.state.players[0]!.resources.food).toBe(0)

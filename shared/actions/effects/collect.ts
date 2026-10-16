@@ -60,13 +60,32 @@ const collectionTarget = ({ state, space, actionContext }: ActionExecutionContex
   return typeof hint === 'string' ? hint === space.id ? space : findActionSpaceById(state, hint) : space
 }
 
+export const hasCollectableResources = (context: ActionExecutionContext): boolean => {
+  const target = collectionTarget(context)
+  if (!target) return false
+  const { actionContext } = context
+  if (actionContext?.resourceTypes !== undefined) {
+    const types = readResourceTypes(actionContext.resourceTypes)
+    return types !== null && types.some(resource => (target.resources[resource] ?? 0) > 0)
+  }
+  if (actionContext?.spaceId) {
+    const { resource, amount } = actionContext
+    return isCollectableResource(resource) && typeof amount === 'number' && Number.isFinite(amount)
+      && amount > 0 && (target.resources[resource] ?? 0) >= amount
+  }
+  return COLLECTABLE_RESOURCES.some(resource => (target.resources[resource] ?? 0) > 0)
+}
+
 export const collectAction: ActionDefinition = {
   id: 'collect',
   nameKey: 'actions.collect.name',
   descriptionKey: 'actions.collect.description',
   roundAvailable: 1,
   gainPerRound: {},
-  canBeExecutedByPlayer: () => true,
+  canBeExecutedByPlayer: (state, player, context) => !!context?.space && hasCollectableResources({
+    state, player, space: context.space, actionContext: context.actionContext,
+  }),
+  originalActionCondition: hasCollectableResources,
   previewEffect: context => {
     const target = collectionTarget(context)
     if (!target) return undefined

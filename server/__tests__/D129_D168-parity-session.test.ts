@@ -456,6 +456,7 @@ describe('D158 Bean Counter parity', () => {
     expect(actionSlot).toBeGreaterThanOrEqual(0)
     session.state.roundActionOrder[actionSlot] = previousSlot
     session.state.roundActionOrder[7] = actionId
+    session.state.actionSpaces.find(space => space.id === actionId)!.resources.stone = 1
     session.loadState(session.state)
     const response = session.takeAction(0, actionId)
     expect(response.state.players[0]!.resources.food).toBe(3)
@@ -685,6 +686,7 @@ describe('D150 Godly Spouse parity', () => {
     state.roundActionOrder = state.roundActionOrder.map(() => null)
     state.roundActionOrder[0] = 'wish-children'
     state.roundActionOrder[1] = 'western-quarry'
+    state.actionSpaces.find(space => space.id === 'western-quarry')!.resources.stone = 1
     session.loadState(state)
 
     let response = session.takeAction(0, 'western-quarry')

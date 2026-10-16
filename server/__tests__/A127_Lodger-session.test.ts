@@ -141,7 +141,10 @@ describe('A127 Lodger', () => {
   })
 
   it('removes at most one person even when remaining housing is still insufficient', () => {
-    const session = setup(state => setActiveWorkerCount(state.players[0]!, 5))
+    const session = setup(state => {
+      setActiveWorkerCount(state.players[0]!, 5)
+      state.actionSpaces.find(space => space.id === 'western-quarry')!.resources.stone = 1
+    })
     const response = finishRound(session)
     expect(familySize(response.state.players[0]!)).toBe(4)
     expect(getFamilyTokenLimit(response.state.players[0]!)).toBe(4)

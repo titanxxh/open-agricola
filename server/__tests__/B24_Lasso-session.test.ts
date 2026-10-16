@@ -45,9 +45,9 @@ const setup = ({ played = true, reed = 1 } = {}) => {
     space.roundAvailable = Math.min(space.roundAvailable, 14)
   }
   state.actionSpaces.find((space) => space.id === 'forest')!.resources.wood = 3
-  state.actionSpaces.find((space) => space.id === 'sheep-market')!.resources.sheep = 0
-  state.actionSpaces.find((space) => space.id === 'pig-market')!.resources.boar = 0
-  state.actionSpaces.find((space) => space.id === 'cattle-market')!.resources.cattle = 0
+  state.actionSpaces.find((space) => space.id === 'sheep-market')!.resources.sheep = 1
+  state.actionSpaces.find((space) => space.id === 'pig-market')!.resources.boar = 1
+  state.actionSpaces.find((space) => space.id === 'cattle-market')!.resources.cattle = 1
   session.loadState(state)
   return session
 }
@@ -89,6 +89,19 @@ const placedSpaces = (response: SessionResponse) => response.state.actionSpaces
   .map((space) => space.id)
   .sort()
 
+const accommodateSheep = (session: GameSession, response: SessionResponse) => {
+  if (response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'animal-reorg') return response
+  expect(response.state.players[0]!.resources.sheep).toBe(1)
+  const pasture = response.interaction.request.zones.find(zone => zone.id === 'p1')
+  expect(pasture?.capacity).toBeGreaterThanOrEqual(1)
+  const settled = session.resolveChoice(0, 'confirm', {
+    zones: [{ id: 'p1', zoneType: 'pasture', animalType: 'sheep', animalCount: 1 }],
+  })
+  expect(settled.ok, settled.error).toBe(true)
+  expect(settled.state.players[0]!.pastures[0]).toMatchObject({ animalType: 'sheep', animalCount: 1 })
+  return settled
+}
+
 describe('B024 Lasso parity', () => {
   it('B024 S1: paying one reed plays Lasso', () => {
     const response = playLasso(setup({ played: false }))
@@ -114,6 +127,7 @@ describe('B024 Lasso parity', () => {
     response = acceptLasso(session, response)
     expect(waitOptions(response).map((option) => option.value)).toEqual(MARKET_SPACES)
     response = session.resolveChoice(0, 'sheep-market')
+    response = accommodateSheep(session, response)
 
     expect(response.ok, response.error).toBe(true)
     expect(placedSpaces(response)).toEqual(['forest', 'sheep-market'])
@@ -125,6 +139,7 @@ describe('B024 Lasso parity', () => {
   it('B024 S4: after an animal-market placement Lasso allows any legal second space', () => {
     const session = setup()
     let response = session.takeAction(0, 'sheep-market')
+    response = accommodateSheep(session, response)
 
     response = acceptLasso(session, response)
     const options = waitOptions(response).map((option) => option.value)

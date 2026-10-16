@@ -28,6 +28,7 @@ describe('D158 Bean Counter session', () => {
     expect(quarrySlot).toBeGreaterThanOrEqual(0)
     state.roundActionOrder[quarrySlot] = previousSlot8
     state.roundActionOrder[7] = actionId
+    state.actionSpaces.find(space => space.id === actionId)!.resources.stone = 1
     session.loadState(state)
 
     const beforeLogLength = session.state.log.length

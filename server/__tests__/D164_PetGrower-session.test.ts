@@ -229,14 +229,12 @@ describe('D164 Pet Grower parity', () => {
     expect(response.state.players[0]!.resources).toMatchObject({ sheep: 0, wood: 3 })
   })
 
-  it('D164 S9: an empty animal accumulation space still grants one sheep', () => {
+  it('D164 S9: an empty animal accumulation space is unavailable and grants no sheep', () => {
     const session = setup({ marketCount: 0 })
-    let response = session.takeAction(0, 'sheep-market')
-    expect(response.ok, response.error).toBe(true)
-    response = resolveAnimalReorg(session, response, [
-      { id: 'pasture-0-a', zoneType: 'pasture', animalType: 'sheep', animalCount: 1 },
-    ])
-
-    expect(response.state.players[0]!.resources.sheep).toBe(1)
+    const response = session.takeAction(0, 'sheep-market')
+    expect(response.ok).toBe(false)
+    expect(response.interaction.stateId).toBe('idle')
+    expect(response.state.players[0]!.resources.sheep).toBe(0)
+    expect(response.state.actionSpaces.find(space => space.id === 'sheep-market')!.takenBy).toEqual([])
   })
 })

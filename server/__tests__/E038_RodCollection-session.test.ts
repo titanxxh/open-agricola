@@ -74,6 +74,7 @@ describe('E038 Rod Collection through Session', () => {
   it('hides unaffordable choices and atomically rejects a forged choice before a legal retry', () => {
     const session = setupResourceAction('E038_RodCollection', 'fishing')
     session.state.players[0]!.resources.wood = 1
+    session.state.actionSpaces.find(space => space.id === 'fishing')!.resources.food = 1
     session.loadState(session.state)
     const offered = resolveTriggerIfPresent(session, session.takeAction(0, 'fishing'), 'E038_RodCollection')
     expect(resourceOptions(offered).some((option) => option.effectPreview?.resourcesPaid?.wood === 2)).toBe(false)

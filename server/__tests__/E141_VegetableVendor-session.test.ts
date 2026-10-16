@@ -150,12 +150,13 @@ describe('E141 Vegetable Vendor parity', () => {
   it('E141 S6: another action space grants neither a vegetable nor an improvement action', () => {
     const session = setup()
     const state = session.getState().state
-    state.actionSpaces.find((space) => space.id === 'forest')!.resources.wood = 0
+    state.actionSpaces.find((space) => space.id === 'forest')!.resources.wood = 1
     session.loadState(state)
 
     const response = session.takeAction(0, 'forest')
 
     expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources.wood).toBe(1)
     expect(response.state.players[0]!.resources.vegetable).toBe(0)
     expect(response.state.players[0]!.minorHand).toContain(MINOR_ID)
     expect(response.state.events).not.toEqual(expect.arrayContaining([

@@ -68,6 +68,10 @@ const acceptSourceCardFlow = (
   let resp = initialResp
   let safety = 30
   while (resp.interaction.stateId === 'wait' && safety-- > 0) {
+    if (resp.interaction.request.kind === 'animal-reorg') {
+      resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', { zones: resp.interaction.request.zones })
+      continue
+    }
     const farmResp = commitFirstFarmSelect(session, resp)
     if (farmResp) {
       resp = farmResp
@@ -213,7 +217,7 @@ describe('distinct workers in round placement history', () => {
     setActiveWorkerCount(player, 3)
     setWorkersAtHome(state, player, 3)
     player.occupationPlayed.push('E116_FirCutter')
-    state.actionSpaces.find((space) => space.id === 'sheep-market')!.resources.sheep = 0
+    state.actionSpaces.find((space) => space.id === 'sheep-market')!.resources.sheep = 1
     session.loadState(state)
 
     let resp = session.takeAction(0, 'farm-expansion')
@@ -241,7 +245,7 @@ describe('distinct workers in round placement history', () => {
     setWorkersAtHome(state, player, 3)
     player.minorPlayed.push('D075_WoodField')
     player.minorHand = ['E003_TeaTime']
-    state.actionSpaces.find((space) => space.id === 'sheep-market')!.resources.sheep = 0
+    state.actionSpaces.find((space) => space.id === 'sheep-market')!.resources.sheep = 1
     session.loadState(state)
 
     let resp = session.takeAction(0, 'grain-utilization')

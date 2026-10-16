@@ -24,7 +24,7 @@ const setup = (lasso = false, played = true) => {
     player.minorPlayed = lasso ? ['B024_Lasso'] : []
     Object.assign(player.resources, { food: 2, clay: 1, wood: 0, reed: 0, stone: 0 })
     const sheep = state.actionSpaces.find((space) => space.id === 'sheep-market')!
-    sheep.resources.sheep = 0
+    sheep.resources.sheep = 1
   } })
   sessions.push(session)
   return session
@@ -45,6 +45,12 @@ describe('E105 Pioneer before placement action', () => {
     let response = session.takeAction(0, lasso ? 'sheep-market' : 'major-improvement')
     expect(response.ok).toBe(true)
     if (lasso) {
+      expect(response.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'animal-reorg' } })
+      if (response.interaction.request.kind !== 'animal-reorg') throw new Error('Expected sheep accommodation')
+      const house = response.interaction.request.zones.find(zone => zone.zoneType === 'house')!
+      response = session.resolveChoice(0, 'confirm', {
+        zones: [{ id: house.id, zoneType: 'house', animalType: 'sheep', animalCount: 1 }],
+      })
       expect(response.interaction).toMatchObject({ stateId: 'wait', sourceCard: 'B024_Lasso', request: { kind: 'choice' } })
       if (response.interaction.stateId !== 'wait') throw new Error('Expected Lasso extra placement')
       const accept = response.interaction.request.options!.find((option) => option.value !== '__skip__')!

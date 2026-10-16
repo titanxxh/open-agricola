@@ -36,7 +36,7 @@ export { filterSerializedStateForPlayer } from '../projections/serialized-state'
 
 export type SerializedActionSpace = Omit<
   ActionSpace,
-  'canBeExecutedByPlayer' | 'execute' | 'resolveChoice' | 'flow' | 'previewEffect' | 'flowFactory'
+  'canBeExecutedByPlayer' | 'originalActionCondition' | 'execute' | 'resolveChoice' | 'flow' | 'previewEffect' | 'flowFactory'
 >
 
 /**
@@ -224,7 +224,7 @@ export const serializeState = (
     })),
     actionSpaces: actionSpaces.map(
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      ({ canBeExecutedByPlayer, execute, resolveChoice, flow, previewEffect, flowFactory, ...s }, index) => ({ ...s, baseDescriptionPreview: describeBaseAction(actionSpaces[index]!) }),
+      ({ canBeExecutedByPlayer, originalActionCondition, execute, resolveChoice, flow, previewEffect, flowFactory, ...s }, index) => ({ ...s, baseDescriptionPreview: describeBaseAction(actionSpaces[index]!) }),
     ),
     engineStack: { frames: [] },
   }
@@ -257,7 +257,7 @@ export const serializeSessionSnapshot = (
       players: players.map((player, index) => ({ ...player, ...displays[index]! })),
       actionSpaces: actionSpaces.map(
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        ({ canBeExecutedByPlayer, execute, resolveChoice, flow, previewEffect, flowFactory, ...space }, index) => ({ ...space, ...(baseDescriptions[index] ? { baseDescriptionPreview: baseDescriptions[index]! } : {}) }),
+        ({ canBeExecutedByPlayer, originalActionCondition, execute, resolveChoice, flow, previewEffect, flowFactory, ...space }, index) => ({ ...space, ...(baseDescriptions[index] ? { baseDescriptionPreview: baseDescriptions[index]! } : {}) }),
       ),
       engineStack: { frames: [] },
     }

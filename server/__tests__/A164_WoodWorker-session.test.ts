@@ -114,15 +114,17 @@ describe('A164 Wood Worker parity', () => {
     expect(response.state.actionSpaces.find((space) => space.id === 'forest')!.resources.wood).toBe(0)
   })
 
-  it('A164 S4: an empty wood accumulation space can still trigger using wood already in supply', () => {
+  it('A164 S4: an empty wood accumulation space is rejected despite wood already in supply', () => {
     const session = setup({ woodOnSpace: 0, woodInSupply: 1 })
+    const before = session.getState()
 
-    const response = keepSheepInHouse(session, accept(session, session.takeAction(0, 'forest')))
+    const response = session.takeAction(0, 'forest')
 
-    expect(response.ok, response.error).toBe(true)
-    expect(response.state.players[0]!.resources).toMatchObject({ wood: 0, sheep: 1 })
-    expect(Object.values(response.state.players[0]!.houseAnimals).length).toBe(1)
-    expect(response.state.actionSpaces.find((space) => space.id === 'forest')!.resources.wood).toBe(1)
+    expect(response.ok).toBe(false)
+    expect(response.state).toEqual(before.state)
+    expect(response.interaction).toEqual(before.interaction)
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 1, sheep: 0 })
+    session.dispose()
   })
 
   it('A164 S5: a non-wood accumulation space does not trigger Wood Worker', () => {

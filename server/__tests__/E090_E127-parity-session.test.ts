@@ -44,7 +44,31 @@ describe('E090-E107 parity', () => {
   it('E102 S1: Acquirer can be played as the first occupation', () => expect(playOccupation(setup({ cardId: 'E102_Acquirer', played: false }), 'E102_Acquirer').state.players[0]!.occupationPlayed).toContain('E102_Acquirer'))
   it.each([true, false])('E102 round start purchase take=%s', (take) => { const s = setup({ cardId: 'E102_Acquirer', round: 4, resources: { food: 22 } }); prepareRoundEnd(s); let r = s.performRoundEnd(); r = resolveTriggerIfPresent(s, r, 'E102_Acquirer'); if (r.interaction.stateId === 'wait') r = s.resolveChoice(r.interaction.playerIndex, take ? options(r).find((o) => o.value !== '__skip__')!.value : '__skip__'); if (take && r.interaction.stateId === 'wait') r = choose(s, r, (o) => o.effectPreview?.resourcesGained?.stone === 1); expect(r.state.players[0]!.resources).toMatchObject({ food: take ? 16 : 18, stone: take ? 1 : 0 }) })
   it('E105 S1: playing Pioneer gains one chosen resource and one food', () => { const s = setup({ cardId: 'E105_Pioneer', played: false }); let r = playOccupation(s, 'E105_Pioneer'); if (r.interaction.stateId === 'wait') r = choose(s, r, (o) => o.effectPreview?.resourcesGained?.stone === 1); expect(r.state.players[0]!.resources).toMatchObject({ stone: 1, food: 1 }) })
-  it('E105 S2: using the most recent action gains one resource and food', () => { const s = setup({ cardId: 'E105_Pioneer', round: 8 }); s.state.roundActionOrder[7] = 'cattle-market'; s.state.actionSpaces.find((x) => x.id === 'cattle-market')!.resources.cattle = 0; s.loadState(s.state); let r = s.takeAction(0, 'cattle-market'); if (r.interaction.stateId === 'wait') r = choose(s, r, (o) => o.effectPreview?.resourcesGained?.wood === 1); expect(r.state.players[0]!.resources).toMatchObject({ wood: 1, food: 1 }) })
+  it('E105 S2: using the most recent action gains one resource and food', () => {
+    const session = setup({ cardId: 'E105_Pioneer', round: 8 })
+    session.state.roundActionOrder[7] = 'cattle-market'
+    session.state.actionSpaces.find(space => space.id === 'cattle-market')!.resources.cattle = 1
+    session.loadState(session.state)
+    let response = session.takeAction(0, 'cattle-market')
+    expect(response.ok, response.error).toBe(true)
+    response = choose(session, response, option => option.effectPreview?.resourcesGained?.wood === 1)
+    expect(response.interaction.stateId).toBe('wait')
+    if (response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'animal-reorg') {
+      throw new Error('Expected collected cattle placement')
+    }
+    const zones = response.interaction.request.zones
+    const house = zones.find(zone => zone.zoneType === 'house')
+    expect(house).toBeDefined()
+    response = session.resolveChoice(0, 'confirm', { zones: zones.map(zone => ({
+      ...zone,
+      animalType: zone.id === house!.id ? 'cattle' : null,
+      animalCount: zone.id === house!.id ? 1 : 0,
+    })) })
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 1, food: 1, cattle: 1 })
+    expect(Object.values(response.state.players[0]!.houseAnimals)).toEqual(['cattle'])
+    session.dispose()
+  })
   it('E105 S3: another action gives no Pioneer reward', () => expect(setup({ cardId: 'E105_Pioneer', round: 8 }).takeAction(0, 'day-laborer').state.players[0]!.resources).toMatchObject({ wood: 0, food: 2 }))
   it.each([true, false])('E106 Emergency Seller take=%s', (take) => { const s = setup({ cardId: 'E106_EmergencySeller', played: false, resources: { wood: 1, stone: 1 } }); let r = playOccupation(s, 'E106_EmergencySeller'); for (let guard = 0; take && guard < 6 && r.interaction.stateId === 'wait'; guard += 1) { const resource = r.state.players[0]!.resources.wood > 0 ? 'wood' : 'stone'; const o = options(r).find((x) => x.effectPreview?.resourcesPaid?.[resource] === 1) ?? options(r).find((x) => x.value !== '__skip__'); if (!o) break; r = s.resolveChoice(r.interaction.playerIndex, o.value) } if (!take && r.interaction.stateId === 'wait') r = s.resolveChoice(r.interaction.playerIndex, '__skip__'); expect(r.state.players[0]!.resources, JSON.stringify(r.interaction)).toMatchObject(take ? { wood: 0, stone: 0, food: 5 } : { wood: 1, stone: 1, food: 0 }) })
   it.each([{ resource: 'wood', food: 2 }, { resource: 'clay', food: 2 }, { resource: 'reed', food: 3 }, { resource: 'stone', food: 3 }] as const)('E106 S3: one $resource sells for $food food', ({ resource, food }) => { const s = setup({ cardId: 'E106_EmergencySeller', played: false, resources: { [resource]: 1 } }); let r = playOccupation(s, 'E106_EmergencySeller'); for (let guard = 0; guard < 3 && r.interaction.stateId === 'wait' && r.state.players[0]!.resources[resource] > 0; guard += 1) { const sale = options(r).find((o) => o.effectPreview?.resourcesPaid?.[resource] === 1) ?? options(r).find((o) => o.value !== '__skip__'); expect(sale, JSON.stringify(r.interaction)).toBeDefined(); r = s.resolveChoice(r.interaction.playerIndex, sale!.value) } expect(r.state.players[0]!.resources[resource]).toBe(0); expect(r.state.players[0]!.resources.food).toBe(food) })

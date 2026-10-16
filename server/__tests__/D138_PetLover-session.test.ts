@@ -203,7 +203,7 @@ describe('D138 Pet Lover parity', () => {
 
     const response = session.takeAction(0, 'sheep-market')
 
-    expect(response.ok, response.error).toBe(true)
+    expect(response.ok).toBe(false)
     expect(options(response).some((option) => option.sourceCard === CARD_ID)).toBe(false)
     expect(response.state.players[0]!.resources).toMatchObject({ sheep: 0, food: 0, grain: 0 })
     expect(response.state.actionSpaces.find((space) => space.id === 'sheep-market')!.resources.sheep)
