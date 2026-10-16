@@ -22,7 +22,7 @@ export const ruleOperationAction: ActionDefinition = {
       case 'card-fact-refund': case 'take-stored-resources': case 'harvest-selected-supply-reward':
       case 'supply-worker-turn': case 'release-reserved-worker': case 'gain-per-building-resource-collected': case 'skip-next-turns':
         return true
-      default: return canExecuteFixedRuleOperation(match.body.operation, { state, player, sourceCard: options?.sourceCard, space: options?.space })
+      default: return canExecuteFixedRuleOperation(match.body.operation, { actionHooks: options?.actionHooks, state, player, sourceCard: options?.sourceCard, space: options?.space })
     }
   },
   previewEffect: context => {

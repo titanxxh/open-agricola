@@ -1,6 +1,6 @@
 import type { ActionExecutionResult, GameState, PlayerState, ProtectedObservation } from '../../contract/types'
 import type { EventSink } from '../../contract/events'
-import type { PaymentInfo } from '../../cards/card-effects'
+import type { FlowEffectContext, PaymentInfo } from '../../cards/card-effects'
 import { getMinorImprovement } from '../../cards/registry-display'
 import { returnCardToBoard } from '../../cards/helpers/return-card'
 import { takeMajorImprovementFromSupply } from '../../cards/major/supply'
@@ -37,7 +37,7 @@ type CommitImprovementPurchaseLifecycleArgs = {
 type FinalizeDirectImprovementPurchaseLifecycleArgs = Omit<
   CommitImprovementPurchaseLifecycleArgs,
   'emitPrivateEvent' | 'eventSink' | 'actionContext'
->
+> & Pick<FlowEffectContext, 'actionHooks'>
 
 const attachImprovementPayment = (
   result: SuccessfulImprovementResult,
@@ -172,6 +172,7 @@ export const commitImprovementPurchaseLifecycle = ({
 }
 
 export const finalizeDirectImprovementPurchaseLifecycle = ({
+  actionHooks,
   state,
   player,
   kind,
@@ -185,7 +186,7 @@ export const finalizeDirectImprovementPurchaseLifecycle = ({
     improvementId,
     paymentInfo,
   })
-  const activation = activateCardEffect(state, player, improvementId, 'onBuy', paymentInfo)
+  const activation = activateCardEffect(state, player, improvementId, 'onBuy', paymentInfo, { actionHooks })
   if (activation.type === 'flow') {
     return attachImprovementPayment(
       { ...activation, extraData: { ...activation.extraData, ...committed.extraData } },

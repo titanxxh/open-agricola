@@ -42,7 +42,7 @@ const discountedActionLeaf = (sourceCard: string, operation: Extract<RuleFixedOp
   actionContext: { costBonuses: [sourcedMandatoryBonusChoices(sourceCard, operation.discounts.map(discount => ({ ...discount })))] },
 })
 
-export const canExecuteFixedRuleOperation = (operation: RuleFixedOperation, context: Pick<ActionExecutionContext, 'state' | 'player' | 'sourceCard'> & Partial<Pick<ActionExecutionContext, 'space'>>): boolean => {
+export const canExecuteFixedRuleOperation = (operation: RuleFixedOperation, context: Pick<ActionExecutionContext, 'actionHooks' | 'state' | 'player' | 'sourceCard'> & Partial<Pick<ActionExecutionContext, 'space'>>): boolean => {
   const { state, player, sourceCard } = context
   switch (operation.kind) {
     case 'collect-board-resources': return state.actionSpaces.some(space => operation.resources.some(resource => (space.resources[resource] ?? 0) > 0))

@@ -1,8 +1,11 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { createWorkSession } from './_helpers/session-fixtures'
 import { playOccupation } from '../../shared/actions/effects/occupation'
+import { playImprovement, playMinorImprovement } from '../../shared/actions/effects/improvement'
 import { isActionVetoedInFlowContext } from '../../shared/actions/flow'
 import { getActiveCardRegistry, requireActiveCardRegistry } from '../../shared/cards/active-registry'
+import { markAllWorkersUsed } from '../../shared/domain/player'
+import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
 
 const sessions: ReturnType<typeof createWorkSession>[] = []
 const game = (options: Parameters<typeof createWorkSession>[0] = {}) => {
@@ -49,6 +52,119 @@ describe('rule entry points retain their owning session', () => {
         },
       },
     } : { type: 'ok' })
+    expect(getActiveCardRegistry()).toBeNull()
+  })
+
+  it.each([false, true])('keeps owner renovation vetoes in fixed-rule admission, veto=%s', vetoed => {
+    const session = game({ configure(state) {
+      state.round = 7
+      state.players.forEach(player => {
+        player.resources.food = 20
+        markAllWorkersUsed(state, player)
+      })
+      const player = state.players[0]!
+      player.occupationPlayed = ['E087_MasterRenovator']
+      Object.assign(player.resources, { clay: 1, reed: 1 })
+    } })
+    session.actionHooks.register({
+      id: 'test:renovation-veto', actions: ['renovate-house'], phases: ['isDoable'],
+      handler: () => vetoed ? { doable: false } : undefined,
+    })
+
+    const response = autoAdvanceRoundEnd(session, { onChoice(interaction, current) {
+      const accept = interaction.request.options?.find(option => !option.disabled
+        && !['__skip__', '__pass__'].includes(option.value))
+      if (!accept) throw new Error('Expected discounted renovation option')
+      return current.resolveChoice(interaction.playerIndex, accept.value)
+    } })
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.round).toBe(8)
+    expect(response.interaction.stateId).toBe('idle')
+    expect(response.state.players[0]!.houseType).toBe(vetoed ? 'wood' : 'clay')
+    expect(response.state.players[0]!.resources).toMatchObject({ clay: vetoed ? 1 : 0, reed: vetoed ? 1 : 0 })
+    expect(response.state.events.filter(event => event.type === 'farm.renovated'))
+      .toHaveLength(vetoed ? 0 : 1)
+    expect(response.state.events.filter(event => event.type === 'worker.placed')).toEqual([])
+    expect(response.state.players[0]!.stats?.placedFarmers).toBe(0)
+  })
+
+  describe.each(['minor', 'combined'])('direct %s improvement helper', helper => {
+    it.each([false, true])('keeps the owner while M018 passes and checks its followup, veto=%s', vetoed => {
+      const card = 'M018_RegisterOfCraftsmen'
+      const listenerCard = '__direct_improvement_owner__'
+      const targets = ['Major_Joinery', 'Major_Pottery', 'Major_Basket']
+      const session = game({
+        options: { enableFarmersOfTheMoor: true, allowIncompleteFarmersOfTheMoorMinorDeal: true },
+        configure(state) {
+          const player = state.players[0]!
+          player.minorHand = [card]
+          player.minorPlayed = [listenerCard]
+          player.improvements = ['Major_Fireplace1', 'Major_Fireplace2']
+          Object.assign(player.resources, { wood: 1, stone: 1, clay: 0, reed: 0 })
+          state.availableMajorImprovements = [...targets]
+        },
+      })
+      session.actionHooks.register({
+        id: 'test:direct-improvement-veto', actions: ['plow'], phases: ['isDoable'],
+        handler: () => vetoed ? { doable: false } : undefined,
+      })
+      session.withCtx(() => requireActiveCardRegistry('direct improvement regression').registerListener({
+        id: listenerCard, cardIds: [listenerCard], actions: ['improvement'], phases: ['computeCosts'],
+        handler: context => context.cardId && targets.includes(context.cardId) ? {
+          costs: { wood: isActionVetoedInFlowContext({ ...context, actionId: 'plow' }) ? -1 : 0 },
+        } : undefined,
+      }))
+      const player = session.state.players[0]!
+
+      const result = session.withCtx(() => helper === 'minor'
+        ? playMinorImprovement(session.state, player, card, 'minor-improvement', undefined, 'minorAction', undefined, session.actionHooks)
+        : playImprovement(session.state, player, card, 'minor', undefined, undefined, session.actionHooks))
+
+      expect(result.type).toBe(vetoed ? 'flow' : 'ok')
+      if (result.type !== 'flow' && result.type !== 'ok') throw new Error('Expected completed direct minor purchase')
+      if (vetoed) expect(result).toMatchObject({
+        type: 'flow', flow: {
+          type: 'leaf', actionId: 'improvement', sourceCard: card,
+          params: { types: ['major'], allowedPurchases: ['Major_Joinery'], trueAction: false },
+        },
+      })
+      expect(player.resources).toMatchObject({ wood: 1, stone: 1, clay: 0, reed: 0 })
+      expect(player.minorHand).toEqual([])
+      expect(player.minorPlayed).toEqual([listenerCard])
+      expect(session.state.players[1]!.minorHand).toEqual(['__test_placeholder__', card])
+      expect(result.extraData).toMatchObject({ improvementPayment: { improvementId: card, resourcesPaid: {} } })
+      expect(getActiveCardRegistry()).toBeNull()
+    })
+  })
+
+  it('keeps the owner in the shared direct major-purchase activation', () => {
+    const session = game({ configure(state) {
+      state.availableMajorImprovements = ['Major_Joinery']
+      Object.assign(state.players[0]!.resources, { wood: 2, stone: 2, food: 0 })
+    } })
+    session.actionHooks.register({
+      id: 'test:major-on-buy-veto', actions: ['plow'], phases: ['isDoable'], handler: () => ({ doable: false }),
+    })
+    session.withCtx(() => requireActiveCardRegistry('major onBuy regression').setEffect({
+      id: 'Major_Joinery',
+      onBuy: (state, player, _payment, context) => ({
+        type: 'leaf', actionId: 'gain', params: { food: isActionVetoedInFlowContext({
+          actionHooks: context?.actionHooks, state, player,
+          space: state.actionSpaces.find(space => space.id === 'major-improvement')!, actionId: 'plow',
+        }) ? 2 : 0 },
+      }),
+    }))
+    const player = session.state.players[0]!
+
+    const result = session.withCtx(() => playImprovement(session.state, player, 'Major_Joinery', 'major', undefined, undefined, session.actionHooks))
+
+    expect(result).toMatchObject({ type: 'flow', flow: { type: 'leaf', actionId: 'gain', params: { food: 2 } } })
+    if (result.type !== 'flow') throw new Error('Expected direct major onBuy flow')
+    expect(player.resources).toMatchObject({ wood: 0, stone: 0, food: 0 })
+    expect(player.improvements).toEqual(['Major_Joinery'])
+    expect(session.state.availableMajorImprovements).toEqual([])
+    expect(result.extraData).toMatchObject({ improvementPayment: { improvementId: 'Major_Joinery', resourcesPaid: { wood: 2, stone: 2 } } })
     expect(getActiveCardRegistry()).toBeNull()
   })
 
