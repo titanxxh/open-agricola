@@ -27,6 +27,7 @@ export const resolveTriggerIfPresent = (
     candidate.value === sourceCard || candidate.sourceCard === sourceCard,
   )
   expect(option).toBeDefined()
+  expect(option?.disabled, 'trigger option must be enabled').not.toBe(true)
   return session.resolveChoice(resp.interaction.playerIndex, option!.value)
 }
 
