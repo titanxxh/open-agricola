@@ -153,6 +153,8 @@ Selected fields:
 
 `actionSpaces[*].takenBy` is a `WorkerRef[]`. An ordinary reference contains only `playerId` and `workerId`. Linked occupancy created by a card may additionally contain `synthetic: { kind: 'linked-occupancy', sourceCard, linkedWorkerId }`. Cleanup can then use semantic metadata stored on the action-space state instead of reading another card's ID.
 
+`spend-worker` records a Card-held Person on a noninteractive `card-worker:<sourceCard>` holder. Its WorkerRefs are authoritative placement facts: worker availability, undo and recovery retain them until normal return-home cleanup. The producer, direct state normalization and JSON snapshot recovery share the pure factory in `shared/domain/card-worker-space.ts`. Recovery recognizes the reserved prefix with a nonempty complete source ID, recreates the nonexecutable definition from code, and restores occupancy without accepting stored callbacks or arbitrary unknown executable spaces. The source card need not remain in the played zone for an already placed person to stay unavailable.
+
 `workPhaseObtainedResources` supports cards such as A53 that inspect resources gained during the previous work phase. It is cleared after the returning-home phase resolves.
 
 `completedFeedingPhases` increments in the feeding phase of `shared/session/phases/harvest.ts`. It matches the reference's global count. Cards such as A148 and B86 read it for completed-harvest-plus-one capacity instead of maintaining a per-card post-play counter.

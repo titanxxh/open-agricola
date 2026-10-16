@@ -33,6 +33,7 @@ import type { ActionDefinition, ActionSpace, Field, GameState, OrdinaryCardDecks
 import { createPlayerActionSpaces } from '../cards/player-action-space'
 import { normalizeFarmyardSpaceStates } from '../domain/farmyard-space-states'
 import { normalizeBlockedBy, normalizeTakenBy } from '../domain/space'
+import { restoreCardWorkerSpaces } from '../domain/card-worker-space'
 import { createInitialPlayerStats } from './stats'
 import { dealParentCardsIfNeeded, ensureParentMotherScheduleLogs, startParentSelectionIfNeeded } from '../parents/selection'
 import { cardAllowedForPlayerCount } from '../cards/player-count-filter'
@@ -341,8 +342,8 @@ export const normalizeState = (raw: GameState, getActionDefinition?: ActionDefin
     }
     actionSpaces.push(pas)
   }
-  // Preserve caller-added spaces not produced by createActionSpaces / PlayerActionCard.
-  // (e.g. `__test-worker-sink__` and `card-worker:...` pseudo-spaces.)
+  actionSpaces.push(...restoreCardWorkerSpaces(raw.actionSpaces ?? []))
+  // Preserve other caller-added runtime spaces, including the test worker sink.
   const allBaseActionIds = new Set(createActionSpaces().map((space) => space.id))
   const knownIds = new Set(actionSpaces.map((s) => s.id))
   for (const stored of raw.actionSpaces ?? []) {
