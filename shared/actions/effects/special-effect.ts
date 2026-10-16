@@ -22,6 +22,7 @@ import {
   addCardResourceGained,
 } from '../../cards/helpers/card-state'
 import { addResourcesFromCards } from '../../session/stats'
+import { trackWorkPhaseBuildingResources } from '../../session/work-phase-resources'
 import { initCardState } from '../../cards/__stubs__/helpers'
 import {
   fieldFindStackOfKind,
@@ -329,6 +330,7 @@ export const specialEffectAction: ActionDefinition = {
         if (Object.keys(gained).length > 0) {
           addResourcesFromCards(target, gained)
           addCardResourceGained(target, sourceCard, gained)
+          trackWorkPhaseBuildingResources(state, target.id, gained)
           eventSink?.emit<'resource.moved'>({
             type: 'resource.moved',
             resources: gained,
