@@ -1227,12 +1227,7 @@ export type InteractionRequest = (
   | {
       kind: 'select-trigger'
       ownerPlayerId: string
-      options: Array<{
-        value: string
-        labelKey: string
-        labelParams?: Record<string, unknown>
-        sourceCard?: string
-      }>
+      options: ActionChoiceOption[]
     }
   | {
       kind: 'engine-blocked'
