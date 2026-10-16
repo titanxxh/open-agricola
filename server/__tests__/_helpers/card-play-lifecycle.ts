@@ -1,11 +1,12 @@
 import { expect } from 'vitest'
 import { GameSession, type SessionResponse } from '../../game/authoritative-session'
 import { rehydrateState, serializeSessionSnapshot } from '../../../shared/session/serialization'
+import { getChoiceOptions } from './session-assertions'
 
 export const choose = (session: GameSession, response: SessionResponse, value: string): SessionResponse => {
   expect(response.ok, response.error).toBe(true)
   if (response.interaction.stateId !== 'wait') throw new Error(`Expected a choice for ${value}`)
-  expect(response.interaction.request.options?.some((option) => option.value === value && !option.disabled),
+  expect(getChoiceOptions(response).some((option) => option.value === value && !option.disabled),
     JSON.stringify(response.interaction)).toBe(true)
   const next = session.resolveChoice(response.interaction.playerIndex, value)
   expect(next.ok, next.error).toBe(true)
@@ -29,7 +30,7 @@ export const playImprovement = (
     return player.minorPlayed.includes(cardId) || player.improvements.includes(cardId)
   }
   if (!played() && response.interaction.stateId === 'wait') {
-    const branch = response.interaction.request.options?.find((option) => option.value.startsWith('action-improvement-'))
+    const branch = getChoiceOptions(response).find((option) => option.value.startsWith('action-improvement-'))
     if (branch) response = choose(session, response, branch.value)
   }
   return played() ? response : choose(session, response, cardId)
