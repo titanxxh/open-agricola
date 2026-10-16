@@ -5,7 +5,7 @@ import { createWorkSession } from './_helpers/session-fixtures'
 import { choose, playImprovement, restoreSession, snapshotResponse } from './_helpers/card-play-lifecycle'
 import assert from 'node:assert/strict'
 import { type GameState } from '../../shared/contract/types'
-import { assertRejectedUnchanged, confirmNext, getChoiceOptions, expectTileFarmSelection } from './_helpers/session-assertions'
+import { assertRejectedUnchanged, confirmNext, getChoiceOptions, expectTileFarmSelection, passPreparationExchanges } from './_helpers/session-assertions'
 import { createPlayerActionSpaces } from '../../shared/cards/player-action-space'
 import { createScenarioEvidence } from './_helpers/scenario-evidence'
 
@@ -167,6 +167,9 @@ describe('B018 rule boundaries', () => {
       assert.equal(r.ok, true, r.error)
     }
     assert.equal(played(), true)
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
     return r
   }
 
@@ -259,6 +262,7 @@ describe('B018 rule boundaries', () => {
     assert.equal(r.state.players[0]!.fields.length, 1)
     assert.deepEqual(r.state.futureMeeples, [])
     assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { tile: { row: 0, col: 2 } }))
+    assert.equal(passPreparationExchanges(s, s.getState()).interaction.stateId, 'idle')
   })
 
   it("actual card undo restores both wood cost and the single future field", () => {
@@ -268,10 +272,16 @@ describe('B018 rule boundaries', () => {
     playImprovement(s, B, 'meeting-place')
     const r = s.undoAction()
     assert.equal(r.ok, true, r.error)
+    assert.equal(r.interaction.stateId, 'idle')
+    assert.equal(r.state.currentPlayerIndex, 0)
     assert.equal(JSON.stringify(r.state.players[0]!.resources), before)
     assert.equal(JSON.stringify(r.scores), score)
     assert.deepEqual(r.state.futureMeeples, [])
     assert.equal(r.state.players[0]!.minorHand.includes(B), true)
+
+    const retry = playImprovement(s, B, 'meeting-place')
+    assert.equal(retry.state.players[0]!.resources.wood, 0)
+    assert.deepEqual(retry.state.futureMeeples.map(token => ({ round: token.round, resources: token.resources })), [{ round: 4, resources: { field: 1 } }])
   })
 
   it("natural due optional field can be declined without plowing or delaying a token", () => {

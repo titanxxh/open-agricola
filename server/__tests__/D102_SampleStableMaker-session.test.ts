@@ -295,6 +295,12 @@ describe('D102 rule boundaries', () => {
       r = ok(s.resolveChoice(0, 'D076_SocialBenefits'))
     assert.ok(r.state.players[0]!.minorPlayed.includes('D076_SocialBenefits'))
     assert.equal(r.state.players[0]!.resources.reed, 1)
+
+    const continuation = r.interaction
+    assert.ok(continuation.stateId === 'wait' && continuation.request.kind === 'choice')
+    assert.equal(continuation.promptKey, 'ui.interactionOptionalAction')
+    assert.equal(continuation.sourceCard, D102)
+    assert.equal(continuation.playerIndex, 0)
   })
 
   it("nonexistent stable cannot grant exchange goods", () => {
@@ -312,6 +318,12 @@ describe('D102 rule boundaries', () => {
     assert.deepEqual(makerGoods(good), { stables: 1, wood: 1, grain: 2, food: 41 })
     assert.equal(supply(), 3)
     assert.deepEqual(outcome, { accepted: false, stables: 2, wood: 0, grain: 1, food: 40 })
+
+    const continuation = good.interaction
+    assert.ok(continuation.stateId === 'wait' && continuation.request.kind === 'choice')
+    assert.equal(continuation.promptKey, 'ui.interactionOptionalAction')
+    assert.equal(continuation.sourceCard, D102)
+    assert.equal(continuation.playerIndex, 0)
   })
 
   it("duplicate or two stable selection is rejected before one legal return", () => {
@@ -321,6 +333,12 @@ describe('D102 rule boundaries', () => {
     assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { positions: [{ row: 0, col: 1 }, { row: 0, col: 2 }] }))
     const r = ok(s.commitSelectionChoice(0, { positions: [{ row: 0, col: 1 }] }))
     assert.deepEqual(makerGoods(r), { stables: 1, wood: 1, grain: 2, food: 41 })
+
+    const continuation = r.interaction
+    assert.ok(continuation.stateId === 'wait' && continuation.request.kind === 'choice')
+    assert.equal(continuation.promptKey, 'ui.interactionOptionalAction')
+    assert.equal(continuation.sourceCard, D102)
+    assert.equal(continuation.playerIndex, 0)
   })
 
   it("declining a real return-home opportunity keeps both stables and all goods", () => {

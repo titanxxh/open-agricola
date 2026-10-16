@@ -301,6 +301,8 @@ describe('C094 rule boundaries', () => {
     const undone = s.undoStep()
     assert.equal(undone.ok, true, undone.error)
     assert.deepEqual(cleanerObserved(undone), { wood: 2, food: 2, stables: 0, workers: 0 })
+    assert.ok(undone.interaction.stateId === 'wait' && undone.interaction.request.kind === 'farm-select' && undone.interaction.request.farm.farmType === 'stable')
+    assert.equal(undone.interaction.playerIndex, 0)
     const r = s.commitSelectionChoice(0, { stables: [{ row: 0, col: 3 }] })
     assert.equal(r.ok, true, r.error)
     assert.deepEqual(cleanerObserved(r), { wood: 1, food: 1, stables: 1, workers: 0 })

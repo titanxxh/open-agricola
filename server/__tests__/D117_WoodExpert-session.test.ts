@@ -183,7 +183,12 @@ describe('D117 rule boundaries', () => {
 
   function chooseCard(s: GameSession, r: SessionResponse, card: string, actor = 0) {
     assert.ok(options(r).some(o => o.value === card), JSON.stringify(r.interaction))
-    return s.resolveChoice(actor, card)
+    const selected = s.resolveChoice(actor, card)
+    assert.equal(selected.ok, true, selected.error)
+    assert.ok(selected.interaction.stateId === 'wait' && selected.interaction.request.kind === 'confirm-next-player', JSON.stringify(selected.interaction))
+    assert.equal(selected.interaction.playerIndex, actor)
+    assert.equal(selected.state.currentPlayerIndex, actor)
+    return selected
   }
 
   function woodExpert(resources: Partial<Resource> = {}, played = true) {
@@ -261,6 +266,8 @@ describe('D117 rule boundaries', () => {
     chooseCard(s, enterImprovement(s), 'D033_SummerHouse')
     const undone = s.undoAction()
     assert.equal(undone.ok, true, undone.error)
+    assert.equal(undone.interaction.stateId, 'idle')
+    assert.equal(undone.state.currentPlayerIndex, 0)
     assert.deepEqual(costObserved(undone), { wood: 1, stone: 1, food: 1, built: false })
     assert.equal(undone.state.actionSpaces.flatMap(space => space.takenBy).filter(worker => worker.playerId === undone.state.players[0]!.id).length, 0)
     const retry = chooseCard(s, enterImprovement(s), 'D033_SummerHouse')
@@ -280,6 +287,9 @@ describe('D117 rule boundaries', () => {
         const r = s.commitSelectionChoice(0, { stables: [{ row: 0, col: 2 }] })
         assert.equal(r.ok, true, r.error)
         assert.deepEqual([r.state.players[0]!.resources.wood, r.state.players[0]!.resources.food, r.state.players[0]!.stableTiles.length], [0, 1, 1])
+        assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+        assert.equal(r.interaction.playerIndex, 0)
+        assert.equal(r.state.currentPlayerIndex, 0)
       }
     }
   })

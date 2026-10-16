@@ -265,10 +265,19 @@ describe('A130 rule boundaries', () => {
     assert.ok(r.scores)
     assert.equal(r.scores.length, 3)
     assert.ok(r.state.log.some(l => l.key === 'log.placeFarmer'))
-    assertUndoRestored(before, s.undoAction())
+    const undone = s.undoAction()
+    assertUndoRestored(before, undone)
+    assert.equal(undone.interaction.stateId, 'idle')
+    assert.equal(undone.state.currentPlayerIndex, 0)
     const retried = ok(s.takeAction(0, 'day-laborer'))
     assert.equal(retried.state.players[0]!.resources.food, 4)
     assert.equal(occupants(retried, 'day-laborer').length, 2)
+    assert.ok(retried.interaction.stateId === 'wait' && retried.interaction.request.kind === 'confirm-next-player')
+    assert.equal(retried.interaction.playerIndex, 0)
+
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
   })
 
   it("Meeting Place second person cannot be reused and legal placement remains", () => {
@@ -281,6 +290,10 @@ describe('A130 rule boundaries', () => {
     assert.equal(occupants(r, 'meeting-place').length, 1)
     assert.equal(r.state.players[0]!.cardStates[A130]?.flagged, undefined)
     assert.equal(occupants(r, 'farmland').length, 1)
+
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.interaction.playerIndex, 0)
+    assert.equal(r.state.currentPlayerIndex, 0)
   })
 
   it("fourth reuse is rejected and a new round renews the allowance", () => {
@@ -300,5 +313,9 @@ describe('A130 rule boundaries', () => {
     const next = ok(s.takeAction(0, 'day-laborer'))
     assert.equal(next.state.players[0]!.resources.food, 8)
     assert.equal(occupants(next, 'day-laborer').length, 2)
+
+    assert.ok(next.interaction.stateId === 'wait' && next.interaction.request.kind === 'confirm-next-player', JSON.stringify(next.interaction))
+    assert.equal(next.interaction.playerIndex, 0)
+    assert.equal(next.state.currentPlayerIndex, 0)
   })
 })

@@ -489,6 +489,12 @@ describe('E148 rule boundaries', () => {
     assert.equal(r.ok, true, r.error)
     assert.deepEqual(r.state.players[0]!.cardStates[L]?.extraData?.reservedActionSpaces, ['grain-seeds'])
     assert.equal(s.withCtx(() => getAvailableStableSupplyCount(r.state, r.state.players[0]!)), 0)
+
+    const completed = wait(r)
+    assert.equal(completed.playerIndex, 0)
+    assert.deepEqual(completed.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+    assert.equal(r.state.currentPlayerIndex, 0)
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, 'lazybones:grain-seeds'))
   })
 
   it("owner use leaves its reservation intact and grants no stable", () => {

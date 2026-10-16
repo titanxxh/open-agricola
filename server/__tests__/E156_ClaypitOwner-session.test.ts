@@ -131,6 +131,8 @@ describe('E156 rule boundaries', () => {
     assert.deepEqual(clayObserved(purchase), { ownerFood: 1, ownerClay: 1, actorWood: 0, built: true })
     const undone = s.undoAction()
     assert.equal(undone.ok, true, undone.error)
+    assert.equal(undone.interaction.stateId, 'idle')
+    assert.equal(undone.state.currentPlayerIndex, 1)
     assert.deepEqual(clayObserved(undone), { ownerFood: 0, ownerClay: 0, actorWood: 1, built: false })
     assert.equal(undone.state.players[0]!.resources.grain, 1)
     assert.equal(undone.state.actionSpaces.flatMap(space => space.takenBy).filter(worker => worker.playerId === undone.state.players[1]!.id).length, 0)

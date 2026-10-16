@@ -216,7 +216,11 @@ describe('A089 rule boundaries', () => {
     const options = getChoiceOptions(response).filter(option => option.sourceCard === A089
       && option.effectPreview?.kind === 'futureSchedule' && option.effectPreview.entries.length === count)
     assert.equal(options.length, 1, JSON.stringify(interaction))
-    return ok(session.resolveChoice(0, options[0]!.value))
+    const scheduled = ok(session.resolveChoice(0, options[0]!.value))
+    assert.ok(scheduled.interaction.stateId === 'wait' && scheduled.interaction.request.kind === 'confirm-next-player', JSON.stringify(scheduled.interaction))
+    assert.equal(scheduled.interaction.playerIndex, 0)
+    assert.equal(scheduled.state.currentPlayerIndex, 0)
+    return scheduled
   }
 
   function futureRounds(r: SessionResponse) {
@@ -256,7 +260,10 @@ describe('A089 rule boundaries', () => {
     assert.deepEqual(futureRounds(r), [4, 7])
     assert.equal(s.withCtx(() => getAvailableStableSupplyCount(r.state, r.state.players[0]!)), 0)
     assert.equal(r.state.players[0]!.stableTiles.length, 2)
-    assertUndoRestored(before, s.undoAction())
+    const undone = s.undoAction()
+    assertUndoRestored(before, undone)
+    assert.equal(undone.interaction.stateId, 'idle')
+    assert.equal(undone.state.currentPlayerIndex, 0)
     const retry = schedule(s, playPlanner(s), 2)
     assert.deepEqual(futureRounds(retry), [4, 7])
     assert.ok(retry.scores && retry.scores.length === 2)
