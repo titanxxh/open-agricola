@@ -1,9 +1,8 @@
 import { defineOccupationCard } from '../card-source'
-import { runCardListeners, type CardListenerRegistration, type CardListenerContext } from '../card-listeners'
+import { type CardListenerRegistration, type CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged } from '../helpers/card-state'
 import { stablesAction } from '../../actions/effects/stables'
-import type { ActionAvailabilityContext, Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { getAvailableStableSupplyCount } from '../../domain/supply-tokens'
 import { INJECTED_ANYTIME_COMPLETION_CONTEXT_KEY } from '../../engine/action-context-flags'
@@ -12,41 +11,16 @@ const CARD_ID = 'C094_StableCleaner'
 
 const STABLES_CONTEXT = { exactCost: { wood: 1, food: 1 }, trueAction: false }
 
-const collectStablesCostDelta = (context: CardListenerContext): Partial<Resource> => {
-  const results = runCardListeners({
-    ...context,
-    actionHooks: context.actionHooks,
-    actionId: 'stables',
-    phase: 'computeCosts',
-    actionContext: STABLES_CONTEXT,
-    // Probe affordability of building one more stable (e.g. C88's 3rd/4th
-    // discount), which is what this anytime action can build.
-    params: { stableCount: 1 },
-    sourceCard: CARD_ID,
-  })
-  const delta: Partial<Resource> = {}
-  for (const result of results) {
-    if (!result.costs) continue
-    for (const [key, value] of Object.entries(result.costs)) {
-      if (typeof value !== 'number') continue
-      const resource = key as keyof Resource
-      delta[resource] = (delta[resource] ?? 0) + value
-    }
-  }
-  return delta
-}
-
 const canBuildCleanerStable = (context: CardListenerContext) => {
-  const costDelta = collectStablesCostDelta(context)
   return stablesAction.costPreview?.canExecute?.(
     {
       actionHooks: context.actionHooks,
       state: context.state,
       player: context.player,
       space: context.space,
+      sourceCard: CARD_ID,
       actionContext: STABLES_CONTEXT,
-    } as ActionAvailabilityContext & { actionContext?: Record<string, unknown> },
-    Object.keys(costDelta).length > 0 ? costDelta : undefined,
+    },
   ) ?? false
 }
 

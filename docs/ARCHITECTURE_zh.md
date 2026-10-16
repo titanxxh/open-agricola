@@ -153,7 +153,7 @@ ESLint 三层强制（`eslint.config.js`）：
 
 `actionSpaces[*].takenBy` 是 `WorkerRef[]`。普通 ref 只包含 `playerId` / `workerId`；卡牌创建的联动占格可额外写 `synthetic: { kind: 'linked-occupancy', sourceCard, linkedWorkerId }`，让后续清理按行动格 state 上的语义 metadata 判断，而不是跨读外卡 id。
 
-`spend-worker` 将 Card-held Person 记录在非交互的 `card-worker:<sourceCard>` 占位格中。其 WorkerRef 是权威放置事实，可用工人查询、undo 和恢复必须保留它，直到正常归家清理。创建、直接状态规范化和 JSON 快照恢复共用 `shared/domain/card-worker-space.ts` 的纯工厂。恢复仅识别保留前缀及非空完整来源 ID，从代码重建不可执行定义并恢复占位，不接受快照回调或任意未知可执行格。来源卡不再位于已打出区，也不会使已放置的人员重新可用。
+`spend-worker` 将 Card-held Person 记录在非交互的 `card-worker:<sourceCard>` 占位格中。其 WorkerRef 是权威放置事实，可用工人查询、undo 和恢复必须保留它，直到正常归家清理。创建和 Core 负责的状态规范化共用 `shared/domain/card-worker-space.ts` 的纯工厂。JSON rehydration 只解码数据，Core 初始化本局规则环境后再恢复占位格。恢复仅识别保留前缀及非空完整来源 ID，从代码重建不可执行定义并恢复占位，不接受快照回调或任意未知可执行格。来源卡不再位于已打出区，也不会使已放置的人员重新可用。
 
 `workPhaseObtainedResources` 服务于"前一工作阶段获得资源"类卡（A53 等），回家阶段结算后清空。
 
@@ -654,6 +654,8 @@ Hook 不进 `ActionDefinition`。通用变体规则显式注册到当前 Core �
 生产 effect / helper / card runtime 默认通过 `PaymentSolver` 进入支付生命周期或支付相关 facade；外部测试使用 `PaymentSolver` 或 `shared/actions/payment/__tests__/test-helpers.ts`，只有 `shared/actions/payment/internal/__tests__` 保留算法白盒测试；`payment/internal/*` 只供 payment package 内部和算法聚焦测试使用，边界测试禁止生产代码和非 payment 内部测试直接 import。卡牌购买费用走 `computeCosts` phase + `actions: ['improvement']` 区分行动空间费用 vs 卡牌购买费用。
 
 **统一 cost 模型（`ComplexCost`）**：construct / renovation / fencing / plow / occupation / minor / major / pay leaf 全部走同一条 `computeAllBuyableCombinations` 管线。`ComplexCost` 字段语义：
+
+厩舍单价来自默认费用或该次行动的 `exactCost` / `costOverride`。拿到实际 `stableCount` 和 `stableUnitCost` 后，一次完整的 farm-choice 查询提供整次 `computeCosts.costs`、trades、bonuses、providers 和费用归因，并保留行动来源与上下文。引擎预先收集的 `context.costs` 不再重复修改单价。因此整次加价 1 木时，一座普通厩舍支付 3 木，两座支付 5 木。准入、描述、农场选择和支付共用该 resolver；C094 直接调用其可用性检查，不再预先聚合另一份费用 delta。
 
 - `fees: Partial<Resource>[]` —— per-action 总固定费用。`computeCosts` 返回的 raw `costs` 总成本 delta 写入 `fees[0]`；有来源的 参考实现 `addBonus` / `addBonusChoices` 优先表达为 `bonuses`，有来源且保留原始候选的 参考实现 `addCost` 优先表达为 `trades`。负值在 `enumerate` 内部 `mergeResources(fees[0], unitFee*nb)` 后 clamp 到 0，避免对 unrelated resource 退款。
 - `unitFee: Partial<Resource>` + `nb: number` —— per-unit × 数量。Construct 的每间房 `{wood: rooms_cost, reed: 1_per_pile_or_room}`、renovation 的 `{[material]: 1}`、fencing 的 `{wood: 1}` 都落在 `unitFee`，`nb` 是行动同时处理的单位数（建房间数 / fence 段数）。enumerate 先对每个 unit cost row 生成有序替换后的可选行，再组合成总成本。
