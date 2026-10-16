@@ -414,7 +414,7 @@ describe("A070 command boundaries", () => {
     const s = lift({ multi: true })
     const r = flow(s, end(s), LIFT)
     assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'selection')
-    for (const positions of [[{ row: 0, col: 4 }], [{ row: 0, col: 1 }, { row: 0, col: 2 }]])
+    for (const positions of [[], [{ row: 0, col: 4 }], [{ row: 0, col: 1 }, { row: 0, col: 2 }]])
       assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { positions }))
     assertRejectedUnchanged(s, () => s.commitSelectionChoice(1, { positions: [{ row: 0, col: 2 }] }))
     const legal = selection(s, r, { row: 0, col: 2 })
