@@ -381,7 +381,7 @@ describe('B054 Tumbrel parity', () => {
   it('B054 S2: an unconditional Sow gains one food per stable', () => {
     const session = setup({ cardId: 'B054_Tumbrel', round: 10, resources: { grain: 1 } })
     const state = session.getState().state
-    state.players[0]!.fields = [{ row: 0, col: 0, crop: null, remaining: 0 }]
+    state.players[0]!.fields = [{ row: 0, col: 0, stacks: [] }]
     state.players[0]!.stableTiles = [{ row: 0, col: 3 }, { row: 0, col: 4 }]
     session.loadState(state)
     const response = sow(session)
@@ -392,7 +392,7 @@ describe('B054 Tumbrel parity', () => {
   it('B054 S3: an unconditional Sow with no stable grants no Tumbrel food', () => {
     const session = setup({ cardId: 'B054_Tumbrel', round: 10, resources: { grain: 1 } })
     const state = session.getState().state
-    state.players[0]!.fields = [{ row: 0, col: 0, crop: null, remaining: 0 }]
+    state.players[0]!.fields = [{ row: 0, col: 0, stacks: [] }]
     session.loadState(state)
     expect(sow(session).state.players[0]!.resources.food).toBe(0)
   })

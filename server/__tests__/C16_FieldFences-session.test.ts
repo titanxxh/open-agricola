@@ -28,7 +28,7 @@ const setup = (opts: { wood: number; withField?: boolean; food?: number }) => {
   player.minorHand = [CARD_ID]
 
   if (opts.withField) {
-    player.fields = [{ row: 0, col: 1, crop: null, remaining: 0 } as never]
+    player.fields = [{ row: 0, col: 1, stacks: [] }]
   }
 
   session.loadState(state)
@@ -135,9 +135,9 @@ describe('C16 FieldFences session', () => {
     const state = session.getState().state
     const player = state.players[0]!
     player.fields = [
-      { row: 0, col: 0, crop: null, remaining: 0 } as never,
-      { row: 0, col: 2, crop: null, remaining: 0 } as never,
-      { row: 1, col: 1, crop: null, remaining: 0 } as never,
+      { row: 0, col: 0, stacks: [] },
+      { row: 0, col: 2, stacks: [] },
+      { row: 1, col: 1, stacks: [] },
     ]
     session.loadState(state)
 

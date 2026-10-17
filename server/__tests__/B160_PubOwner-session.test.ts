@@ -120,9 +120,9 @@ describe('B160_PubOwner session', () => {
     const forest = state.actionSpaces.find((s) => s.id === 'forest')
     const clayPit = state.actionSpaces.find((s) => s.id === 'clay-pit')
     const reedBank = state.actionSpaces.find((s) => s.id === 'reed-bank')
-    if (forest) forest.takenBy = state.players[0]!.id
-    if (clayPit) clayPit.takenBy = state.players[1]!.id
-    if (reedBank) reedBank.takenBy = state.players[0]!.id
+    if (forest) forest.takenBy = [{ playerId: state.players[0]!.id, workerId: '1' }]
+    if (clayPit) clayPit.takenBy = [{ playerId: state.players[1]!.id, workerId: '1' }]
+    if (reedBank) reedBank.takenBy = [{ playerId: state.players[0]!.id, workerId: '2' }]
 
     session.loadState(state)
 

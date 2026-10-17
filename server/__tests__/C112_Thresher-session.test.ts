@@ -29,7 +29,7 @@ const setup = (options?: {
   }
   // Give fields so actions are doable
   player.fields = [
-    { row: 0, col: 2, crop: null, remaining: 0 },
+    { row: 0, col: 2, stacks: [] },
   ]
 
   if (options?.withCard ?? true) {

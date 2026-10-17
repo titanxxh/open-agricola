@@ -67,7 +67,7 @@ describe('A042_ForestLakeHut session', () => {
         option.value.startsWith('action-improvement-'))
       if (enter) response = session.resolveChoice(0, enter.value)
     }
-    if (response.interaction.stateId === 'wait') {
+    if (!response.state.players[0]!.minorPlayed.includes(CARD_ID) && response.interaction.stateId === 'wait') {
       const card = getChoiceOptions(response)?.find((option) => option.value === CARD_ID)
       expect(card).toBeDefined()
       response = session.resolveChoice(0, card!.value)

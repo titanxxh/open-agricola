@@ -81,6 +81,7 @@ const openMinorPrompt = (session: GameSession) => {
 
 const playStoneCompany = (session: GameSession) => {
   const response = openMinorPrompt(session)
+  if (response.state.players[0]!.minorPlayed.includes(CARD_ID)) return response
   if (response.interaction.stateId !== 'wait') return response
   const card = getChoiceOptions(response)?.find((option) => option.value === CARD_ID)
   expect(card).toBeDefined()
