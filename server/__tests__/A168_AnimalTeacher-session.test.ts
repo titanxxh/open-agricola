@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { computeAnimalZones, type AnimalZone } from '../../shared/domain/animal-zones'
+import { captureStateWithHistory } from '../../shared/session/history-streams'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { type GameState } from '../../shared/contract/types'
 import { setWorkersAtHome } from '../../shared/domain/player'
@@ -13,6 +15,24 @@ import { assertRejectedUnchanged, confirmNext , getChoiceOptions } from './_help
 import { createScenarioEvidence } from './_helpers/scenario-evidence'
 
 const sessionEvidence = createScenarioEvidence(import.meta.url)
+
+function assertAnimalPlacement(session: GameSession, initial: SessionResponse, totals: [number, number, number], expected: Pick<AnimalZone, 'id' | 'animalType' | 'animalCount' | 'capacity'>[], actor = 0) {
+  for (const response of [initial, session.getState()]) {
+    const player = response.state.players[actor]!
+    assert.deepEqual([player.resources.sheep, player.resources.boar, player.resources.cattle], totals)
+    const zones = session.withCtx(() => computeAnimalZones(player, response.state))
+    assert.deepEqual(zones.filter(zone => zone.animalCount !== undefined && zone.animalCount > 0).map(zone => ({ id: zone.id, animalType: zone.animalType, animalCount: zone.animalCount, capacity: zone.capacity })), expected)
+  }
+}
+
+function assertStaleRejected(session: GameSession, command: () => SessionResponse) {
+  const before = session.getState()
+  const expected = { state: captureStateWithHistory(before.state), interaction: structuredClone(before.interaction), scores: structuredClone(before.scores) }
+  const rejected = assertRejectedUnchanged(session, command)
+  for (const response of [rejected, session.getState()]) {
+    assert.deepEqual({ state: captureStateWithHistory(response.state), interaction: response.interaction, scores: response.scores }, expected)
+  }
+}
 
 function assertTurnFinished(response: SessionResponse, actor: number) {
   assert.equal(response.ok, true, response.error)
@@ -282,6 +302,7 @@ describe("A168 command boundaries", () => {
         const r = finish(s, pending, true, type)
         assert.equal(material(r)[type], 1)
         assert.equal(material(r).food, finalFood)
+        assertAnimalPlacement(s, r, [type === 'sheep' ? 1 : 0, type === 'boar' ? 1 : 0, type === 'cattle' ? 1 : 0], [{ id: 'housing', animalType: type, animalCount: 1, capacity: 4 }])
         for (const other of ['sheep', 'boar', 'cattle'] as const)
           if (other !== type)
             assert.equal(material(r)[other], 0)
@@ -293,6 +314,7 @@ describe("A168 command boundaries", () => {
     const pending = enter(s), decline = finish(s, pending, false)
     assert.equal(material(decline).food, 3)
     assert.equal(material(decline).sheep, 0)
+    assert.deepEqual([material(decline).sheep, material(decline).boar, material(decline).cattle], [0, 0, 0])
     const poor = setup({ food: 1 })
     const pp = enterAnimalChoices(poor, enter(poor))
     assert.equal(material(pp).food, 0)
@@ -311,6 +333,7 @@ describe("A168 command boundaries", () => {
     assert.equal(material(r).boar, 0)
     assert.equal(material(r).cattle, 0)
     assert.equal(material(r).food, 0)
+    assertAnimalPlacement(poor, r, [1, 0, 0], [{ id: 'house:2-0', animalType: 'sheep', animalCount: 1, capacity: 1 }])
     save('A168-N2', { pending, decline, pp, r })
   })
   it("unrelated action opponent Lessons and still in hand cannot grant animal", () => {
@@ -320,16 +343,21 @@ describe("A168 command boundaries", () => {
     const hs = setup({}, false)
     const hand = turn(hs, 0, 'grain-seeds')
     assert.equal(material(hand).sheep, 0)
-    const os = setup({}, true, state => state.players[1]!.occupationHand = ['A114_SeasonalWorker'])
-    turn(os, 0, 'grain-seeds')
-    let other = turn(os, 1, 'lessons')
-    if (other.interaction.stateId === 'wait' && other.interaction.request.kind === 'choice')
-      other = ok(os.resolveChoice(1, 'A114_SeasonalWorker'))
-    assert.ok(other.state.players[1]!.occupationPlayed.includes('A114_SeasonalWorker'))
-    for (const [response, actor] of [[unrelated, 0], [hand, 0], [other, 1]] as const)
-      assertTurnFinished(response, actor)
-    assert.equal(material(other).sheep, 0)
-    save('A168-N3', { unrelated, hand, other })
+    for (const lesson of ['lessons', 'lessons-4']) {
+      const os = setup({}, true, state => state.players[1]!.occupationHand = ['A114_SeasonalWorker'])
+      turn(os, 0, 'grain-seeds')
+      let other = turn(os, 1, lesson)
+      if (other.interaction.stateId === 'wait' && other.interaction.request.kind === 'choice')
+        other = ok(os.resolveChoice(1, 'A114_SeasonalWorker'))
+      assert.ok(other.state.players[1]!.occupationPlayed.includes('A114_SeasonalWorker'))
+      for (const [response, actor] of [[unrelated, 0], [hand, 0], [other, 1]] as const)
+        assertTurnFinished(response, actor)
+      assert.equal(material(other).sheep, 0)
+      for (const response of [unrelated, hand, other]) {
+        assert.deepEqual(response.state.players.map(player => [player.resources.sheep, player.resources.boar, player.resources.cattle]), [[0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0]])
+      }
+      save(`A168-N3-${lesson}`, { unrelated, hand, other })
+    }
   })
   it("invalid wrong actor and stale animal choice cannot purchase twice", () => {
     const s = setup({ food: 4 })
@@ -340,10 +368,24 @@ describe("A168 command boundaries", () => {
     assert.ok(animal)
     assertRejectedUnchanged(s, () => s.resolveChoice(1, animal.value))
     assertRejectedUnchanged(s, () => s.resolveChoice(0, 'buy-all'))
+    const cattle = getChoiceOptions(pending).find(option => !option.disabled && option.effectPreview?.kind === 'resourceExchange' && option.effectPreview.resourcesGained?.cattle === 1)
+    assert.ok(cattle)
     const r = finish(s, pending, true, 'cattle')
     assert.equal(material(r).cattle, 1)
+    assertAnimalPlacement(s, r, [0, 0, 1], [{ id: 'house:2-0', animalType: 'cattle', animalCount: 1, capacity: 1 }])
+    assertStaleRejected(s, () => s.resolveChoice(0, cattle.value))
     assertRejectedUnchanged(s, () => s.resolveChoice(0, 'buy-again'))
-    save('A168-N4', { pending, r })
+    const rich = setup({ food: 6 }, true, prepareHousing)
+    const richPending = enterAnimalChoices(rich, enter(rich))
+    const richCattle = getChoiceOptions(richPending).find(option => !option.disabled && option.effectPreview?.kind === 'resourceExchange' && option.effectPreview.resourcesGained?.cattle === 1)
+    assert.ok(richCattle)
+    const richDone = finish(rich, richPending, true, 'cattle')
+    assert.equal(material(richDone).food, 3)
+    assert.equal(material(richDone).cattle, 1)
+    assert.equal(richDone.state.players[0]!.pastures[0]!.animalCount, 1)
+    assertAnimalPlacement(rich, richDone, [0, 0, 1], [{ id: 'housing', animalType: 'cattle', animalCount: 1, capacity: 4 }])
+    assertStaleRejected(rich, () => rich.resolveChoice(0, richCattle.value))
+    save('A168-N4', { pending, r, richPending, richDone })
   })
   it("playing Animal Teacher through real Lessons can offer the printed immediate after action purchase", () => {
     const s = setup({ food: 2 }, false)
@@ -354,6 +396,7 @@ describe("A168 command boundaries", () => {
     const r = finish(s, pending, true, 'sheep')
     assert.equal(material(r).sheep, 1)
     assert.equal(material(r).food, 2)
+    assertAnimalPlacement(s, r, [1, 0, 0], [{ id: 'house:2-0', animalType: 'sheep', animalCount: 1, capacity: 1 }])
     save('A168-N5', { pending, r })
   })
 })

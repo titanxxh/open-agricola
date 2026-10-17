@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { computeAnimalZones, type AnimalZone } from '../../shared/domain/animal-zones'
+import { captureStateWithHistory } from '../../shared/session/history-streams'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -11,6 +13,24 @@ import { assertEmptyAccumulationRejected, assertRejectedUnchanged, confirmNext ,
 import { createScenarioEvidence } from './_helpers/scenario-evidence'
 
 const sessionEvidence = createScenarioEvidence(import.meta.url)
+
+function assertAnimalPlacement(session: GameSession, initial: SessionResponse, totals: [number, number, number], expected: Pick<AnimalZone, 'id' | 'animalType' | 'animalCount' | 'capacity'>[], actor = 0) {
+  for (const response of [initial, session.getState()]) {
+    const player = response.state.players[actor]!
+    assert.deepEqual([player.resources.sheep, player.resources.boar, player.resources.cattle], totals)
+    const zones = session.withCtx(() => computeAnimalZones(player, response.state))
+    assert.deepEqual(zones.filter(zone => zone.animalCount !== undefined && zone.animalCount > 0).map(zone => ({ id: zone.id, animalType: zone.animalType, animalCount: zone.animalCount, capacity: zone.capacity })), expected)
+  }
+}
+
+function assertStaleRejected(session: GameSession, command: () => SessionResponse) {
+  const before = session.getState()
+  const expected = { state: captureStateWithHistory(before.state), interaction: structuredClone(before.interaction), scores: structuredClone(before.scores) }
+  const rejected = assertRejectedUnchanged(session, command)
+  for (const response of [rejected, session.getState()]) {
+    assert.deepEqual({ state: captureStateWithHistory(response.state), interaction: response.interaction, scores: response.scores }, expected)
+  }
+}
 
 function assertTurnFinished(response: SessionResponse, actor: number) {
   assert.equal(response.ok, true, response.error)
@@ -265,6 +285,7 @@ describe("A164 command boundaries", () => {
         assert.equal(material(r).sheep, 1)
         assert.equal(r.state.actionSpaces.find(a => a.id === space)!.resources.wood, 1)
         assert.equal(material(r, 1).sheep, 0)
+        assertAnimalPlacement(s, r, [1, 0, 0], [{ id: 'housing', animalType: 'sheep', animalCount: 1, capacity: 4 }])
         save(`A164-N1-${space}-${count}`, { pending, r })
       }
   })
@@ -285,10 +306,12 @@ describe("A164 command boundaries", () => {
     const decline = finish(ds, turn(ds, 0, 'forest'), false)
     assert.equal(material(decline).wood, 3)
     assert.equal(material(decline).sheep, 0)
+    assertAnimalPlacement(ds, decline, [0, 0, 0], [])
     for (const [played, own, space] of [[false, true, 'forest'], [true, false, 'forest'], [true, true, 'clay-pit']] as const) {
       const s = setup({ wood: 1 }, played)
       const r = own ? turn(s, 0, space) : offer(s, space)
       assert.equal(material(r).sheep, 0)
+      assertAnimalPlacement(s, r, [0, 0, 0], [])
       assert.equal(r.state.actionSpaces.find(a => a.id === space)!.resources.wood ?? 0, 0)
       assertTurnFinished(r, own ? 0 : 1)
       save(`A164-N3-${played}-${own}-${space}`, r)
@@ -307,8 +330,10 @@ describe("A164 command boundaries", () => {
     assertRejectedUnchanged(s, () => s.resolveChoice(1, exchange.value))
     const r = finish(s, pending)
     assertRejectedUnchanged(s, () => s.resolveChoice(0, 'exchange-again'))
+    assertStaleRejected(s, () => s.resolveChoice(0, exchange.value))
     assert.equal(material(r).wood, 2)
     assert.equal(material(r).sheep, 1)
+    assertAnimalPlacement(s, r, [1, 0, 0], [{ id: 'house:2-0', animalType: 'sheep', animalCount: 1, capacity: 1 }])
     assert.equal(r.state.actionSpaces.find(a => a.id === 'forest')!.resources.wood, 1)
     const undone = undo(s)
     assert.equal(material(undone).wood, 0)
@@ -317,6 +342,7 @@ describe("A164 command boundaries", () => {
     const retry = finish(s, turn(s, 0, 'forest'))
     assert.equal(material(retry).wood, 2)
     assert.equal(material(retry).sheep, 1)
+    assertAnimalPlacement(s, retry, [1, 0, 0], [{ id: 'house:2-0', animalType: 'sheep', animalCount: 1, capacity: 1 }])
     save('A164-N4', { pending, r, undone, retry })
   })
 })

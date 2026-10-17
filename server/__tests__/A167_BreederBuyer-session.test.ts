@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { computeAnimalZones, type AnimalZone } from '../../shared/domain/animal-zones'
+import { captureStateWithHistory } from '../../shared/session/history-streams'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -10,6 +12,24 @@ import { assertRejectedUnchanged, confirmNext , getChoiceOptions , expectTileFar
 import { createScenarioEvidence } from './_helpers/scenario-evidence'
 
 const sessionEvidence = createScenarioEvidence(import.meta.url)
+
+function assertAnimalPlacement(session: GameSession, initial: SessionResponse, totals: [number, number, number], expected: Pick<AnimalZone, 'id' | 'animalType' | 'animalCount' | 'capacity'>[], actor = 0) {
+  for (const response of [initial, session.getState()]) {
+    const player = response.state.players[actor]!
+    assert.deepEqual([player.resources.sheep, player.resources.boar, player.resources.cattle], totals)
+    const zones = session.withCtx(() => computeAnimalZones(player, response.state))
+    assert.deepEqual(zones.filter(zone => zone.animalCount !== undefined && zone.animalCount > 0).map(zone => ({ id: zone.id, animalType: zone.animalType, animalCount: zone.animalCount, capacity: zone.capacity })), expected)
+  }
+}
+
+function assertStaleRejected(session: GameSession, command: () => SessionResponse) {
+  const before = session.getState()
+  const expected = { state: captureStateWithHistory(before.state), interaction: structuredClone(before.interaction), scores: structuredClone(before.scores) }
+  const rejected = assertRejectedUnchanged(session, command)
+  for (const response of [rejected, session.getState()]) {
+    assert.deepEqual({ state: captureStateWithHistory(response.state), interaction: response.interaction, scores: response.scores }, expected)
+  }
+}
 
 const CARD_ID = 'A167_BreederBuyer'
 
@@ -232,6 +252,7 @@ describe("A167 command boundaries", () => {
         assert.equal(r.state.players[0]!.rooms, 3)
         assert.equal(r.state.players[0]!.stableTiles.length, 1)
         assert.equal(r.state.players[0]!.resources[animal], 1)
+        assertAnimalPlacement(s, r, [animal === 'sheep' ? 1 : 0, animal === 'boar' ? 1 : 0, animal === 'cattle' ? 1 : 0], [{ id: 'house:2-0', animalType: animal, animalCount: 1, capacity: 1 }])
         for (const other of ['sheep', 'boar', 'cattle'] as const)
           if (other !== animal)
             assert.equal(r.state.players[0]!.resources[other], 0)
@@ -257,6 +278,7 @@ describe("A167 command boundaries", () => {
     const s = farm('wood', true, counts)
     const r = build(s, turn(s, 0, 'farm-expansion'), 'room', counts)
     assert.equal(r.state.players[0]!.rooms, 4)
+    assertAnimalPlacement(s, r, [1, 0, 0], [{ id: 'house:2-0', animalType: 'sheep', animalCount: 1, capacity: 1 }])
     assert.equal(r.state.players[0]!.stableTiles.length, 2)
     assert.equal(r.state.players[0]!.resources.sheep, 1)
     save('A167-N3', r)
@@ -273,8 +295,21 @@ describe("A167 command boundaries", () => {
     assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { rooms: [{ row: 99, col: 99 }] }))
     const done = build(s, r, 'room')
     assert.equal(done.state.players[0]!.resources.sheep, 1)
+    assertAnimalPlacement(s, done, [1, 0, 0], [{ id: 'house:2-0', animalType: 'sheep', animalCount: 1, capacity: 1 }])
     assertRejectedUnchanged(s, () => s.resolveChoice(0, 'build-again'))
-    save('A167-N4', { r, done })
+    assertStaleRejected(s, () => s.commitSelectionChoice(0, { rooms: [{ row: 1, col: 1 }] }))
+    const rich = farm('wood', true, { room: 2, stable: 2 })
+    const richPending = turn(rich, 0, 'farm-expansion')
+    assert.ok(richPending.interaction.stateId === 'wait' && richPending.interaction.request.kind === 'choice')
+    const room = getChoiceOptions(richPending).find(option => !option.disabled && option.labelKey === 'actions.construct.name')
+    assert.ok(room)
+    const richDone = build(rich, richPending, 'room')
+    assert.deepEqual([richDone.state.players[0]!.resources.wood, richDone.state.players[0]!.resources.reed, richDone.state.players[0]!.rooms, richDone.state.players[0]!.stableTiles.length], [7, 2, 3, 1])
+    assert.ok(!richDone.state.players[0]!.roomTiles.some(tile => tile.row === 2 && tile.col === 1))
+    assert.ok(!richDone.state.players[0]!.stableTiles.some(tile => tile.row === 0 && tile.col === 2))
+    assertAnimalPlacement(rich, richDone, [1, 0, 0], [{ id: 'house:2-0', animalType: 'sheep', animalCount: 1, capacity: 1 }])
+    assertStaleRejected(rich, () => rich.resolveChoice(0, room.value))
+    save('A167-N4', { r, done, richPending, richDone })
   })
   it("whole construction undo restores animal payment and finite structures before retry", () => {
     const s = farm('wood')
@@ -285,6 +320,7 @@ describe("A167 command boundaries", () => {
     assert.equal(r.state.players[0]!.resources.sheep, 1)
     assert.equal(r.state.players[0]!.resources.wood, 0)
     assert.equal(r.state.players[0]!.resources.reed, 0)
+    assertAnimalPlacement(s, r, [1, 0, 0], [{ id: 'house:2-0', animalType: 'sheep', animalCount: 1, capacity: 1 }])
     const undone = undo(s)
     assert.equal(undone.state.players[0]!.rooms, 2)
     assert.equal(undone.state.players[0]!.stableTiles.length, 0)
@@ -293,6 +329,7 @@ describe("A167 command boundaries", () => {
     assert.equal(undone.state.players[0]!.resources.reed, 2)
     const retry = build(s, turn(s, 0, 'farm-expansion'), 'stable')
     assert.equal(retry.state.players[0]!.resources.sheep, 1)
+    assertAnimalPlacement(s, retry, [1, 0, 0], [{ id: 'house:2-0', animalType: 'sheep', animalCount: 1, capacity: 1 }])
     save('A167-N5', { r, undone, retry })
   })
 })

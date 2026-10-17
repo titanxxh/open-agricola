@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { captureStateWithHistory } from '../../shared/session/history-streams'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -12,6 +13,15 @@ import { assertRejectedUnchanged, confirmNext , getChoiceOptions } from './_help
 import { createScenarioEvidence } from './_helpers/scenario-evidence'
 
 const sessionEvidence = createScenarioEvidence(import.meta.url)
+
+function assertStaleRejected(session: GameSession, command: () => SessionResponse) {
+  const before = session.getState()
+  const expected = { state: captureStateWithHistory(before.state), interaction: structuredClone(before.interaction), scores: structuredClone(before.scores) }
+  const rejected = assertRejectedUnchanged(session, command)
+  for (const response of [rejected, session.getState()]) {
+    assert.deepEqual({ state: captureStateWithHistory(response.state), interaction: response.interaction, scores: response.scores }, expected)
+  }
+}
 
 function assertTurnFinished(response: SessionResponse, actor: number) {
   assert.equal(response.ok, true, response.error)
@@ -270,6 +280,7 @@ describe("A160 command boundaries", () => {
     assert.equal(material(r).food, 2)
     assert.equal(material(r).vegetable, 1)
     assertRejectedUnchanged(s, () => s.resolveChoice(0, 'buy'))
+    assertStaleRejected(s, () => s.resolveChoice(0, vegetable.value))
     save('A160-N4', r)
   })
 })

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { captureStateWithHistory } from '../../shared/session/history-streams'
 import { type GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { createWorkSession } from './_helpers/session-fixtures'
@@ -12,6 +13,15 @@ import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 import '../../shared/cards/A/A142_Cordmaker'
 
 const sessionEvidence = createScenarioEvidence(import.meta.url)
+
+function assertStaleRejected(session: GameSession, command: () => SessionResponse) {
+  const before = session.getState()
+  const expected = { state: captureStateWithHistory(before.state), interaction: structuredClone(before.interaction), scores: structuredClone(before.scores) }
+  const rejected = assertRejectedUnchanged(session, command)
+  for (const response of [rejected, session.getState()]) {
+    assert.deepEqual({ state: captureStateWithHistory(response.state), interaction: response.interaction, scores: response.scores }, expected)
+  }
+}
 
 const CARD_ID = 'A142_Cordmaker'
 const FILLER = '__test_placeholder__'
@@ -245,10 +255,17 @@ describe('A142 command boundaries', () => {
     const session = setup({ food: 2 })
     const beforeInteraction = JSON.stringify(session.getState().interaction)
     const before = undoRuleSnapshot(session.getState())
-    const first = chooseReward(session, turn(session, 0, 'reed-bank'), 'vegetable')
+    const pending = enterCordmakerChoice(session, turn(session, 0, 'reed-bank'))
+    assert.ok(pending.interaction.stateId === 'wait' && pending.interaction.request.kind === 'choice')
+    assert.equal(pending.interaction.playerIndex, 0)
+    assert.equal(pending.interaction.sourceCard, CARD_ID)
+    const vegetable = getChoiceOptions(pending).find(option => !option.disabled && [option.effectPreview, ...descriptionEffects(option.descriptionPreview)].some(effect => effect?.kind === 'resourceExchange' && effect.resourcesGained?.vegetable === 1))
+    assert.ok(vegetable)
+    const first = chooseReward(session, pending, 'vegetable')
     complete(first, 0)
     expect(first.state.players[0]!.resources).toMatchObject({ food: 0, reed: 2, vegetable: 1 })
     assertRejectedUnchanged(session, () => session.resolveChoice(0, 'vegetable'))
+    assertStaleRejected(session, () => session.resolveChoice(0, vegetable.value))
     const undone = session.undoAction()
     assertUndoRestored(before, undone)
     assertUndoRestored(before, session.getState())
@@ -259,5 +276,13 @@ describe('A142 command boundaries', () => {
     const retry = chooseReward(session, turn(session, 0, 'reed-bank'), 'grain')
     complete(retry, 0)
     expect(retry.state.players[0]!.resources).toMatchObject({ food: 2, reed: 2, grain: 1, vegetable: 0 })
+    const rich = setup({ food: 4 })
+    const richPending = enterCordmakerChoice(rich, turn(rich, 0, 'reed-bank'))
+    const richVegetable = getChoiceOptions(richPending).find(option => !option.disabled && [option.effectPreview, ...descriptionEffects(option.descriptionPreview)].some(effect => effect?.kind === 'resourceExchange' && effect.resourcesGained?.vegetable === 1))
+    assert.ok(richVegetable)
+    const richDone = chooseReward(rich, richPending, 'vegetable')
+    complete(richDone, 0)
+    expect(richDone.state.players[0]!.resources).toMatchObject({ food: 2, reed: 2, grain: 0, vegetable: 1 })
+    assertStaleRejected(rich, () => rich.resolveChoice(0, richVegetable.value))
   })
 })

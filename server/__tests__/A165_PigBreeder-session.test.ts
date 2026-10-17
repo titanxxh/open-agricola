@@ -5,10 +5,20 @@ import assert from 'node:assert/strict'
 import { type GameSession, type SessionResponse } from '../game/authoritative-session'
 import { type GameState } from '../../shared/contract/types'
 
+import { computeAnimalZones, type AnimalZone } from '../../shared/domain/animal-zones'
 import { confirmNext } from './_helpers/session-assertions'
 import { createScenarioEvidence } from './_helpers/scenario-evidence'
 
 const sessionEvidence = createScenarioEvidence(import.meta.url)
+
+function assertAnimalPlacement(session: GameSession, initial: SessionResponse, totals: [number, number, number], expected: Pick<AnimalZone, 'id' | 'animalType' | 'animalCount' | 'capacity'>[], actor = 0) {
+  for (const response of [initial, session.getState()]) {
+    const player = response.state.players[actor]!
+    assert.deepEqual([player.resources.sheep, player.resources.boar, player.resources.cattle], totals)
+    const zones = session.withCtx(() => computeAnimalZones(player, response.state))
+    assert.deepEqual(zones.filter(zone => zone.animalCount !== undefined && zone.animalCount > 0).map(zone => ({ id: zone.id, animalType: zone.animalType, animalCount: zone.animalCount, capacity: zone.capacity })), expected)
+  }
+}
 
 const CARD_ID = 'A165_PigBreeder'
 
@@ -165,7 +175,21 @@ describe("A165 command boundaries", () => {
     let pending = turn(s, 0, 'lessons')
     if (!pending.state.players[0]!.occupationPlayed.includes(PIG))
       pending = ok(s.resolveChoice(0, PIG))
+    assert.ok(pending.interaction.stateId === 'wait' && pending.interaction.request.kind === 'animal-reorg', JSON.stringify(pending.interaction))
+    assert.equal(pending.interaction.playerIndex, 0)
+    assert.equal(pending.state.currentPlayerIndex, 0)
+    assert.equal(pending.interaction.promptKey, 'ui.interactionAnimalReorg')
+    assert.deepEqual(pending.interaction.request.zones.map(zone => ({ id: zone.id, type: zone.animalType, count: zone.animalCount, capacity: zone.capacity })), [
+      { id: 'house:2-0', type: 'boar', count: 1, capacity: 1 }, { id: 'house:1-0', type: null, count: 0, capacity: 1 },
+    ])
+    assert.deepEqual(pending.state.players.map(player => [player.resources.sheep, player.resources.boar, player.resources.cattle]), [[0, 1, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0]])
     const r = finish(s, pending)
+    for (const response of [r, s.getState()]) {
+      assert.deepEqual(response.state.players[0]!.houseAnimals, { '2-0': 'boar' })
+      const zones = s.withCtx(() => computeAnimalZones(response.state.players[0]!, response.state))
+      assert.deepEqual(zones.filter(zone => zone.animalCount !== undefined && zone.animalCount > 0).map(zone => ({ id: zone.id, type: zone.animalType, count: zone.animalCount, capacity: zone.capacity })), [{ id: 'house:2-0', type: 'boar', count: 1, capacity: 1 }])
+      assert.deepEqual(response.state.players.map(player => [player.resources.sheep, player.resources.boar, player.resources.cattle]), [[0, 1, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0]])
+    }
     assert.ok(r.interaction.stateId === 'wait', JSON.stringify(r.interaction))
     assert.deepEqual(r.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
     assert.equal(r.interaction.playerIndex, 0)
@@ -181,6 +205,7 @@ describe("A165 command boundaries", () => {
     const { pending, r } = end(s)
     assert.equal(r.state.round, 13)
     assert.equal(material(r).boar, 3)
+    assertAnimalPlacement(s, r, [0, 3, 0], [{ id: 'p0', animalType: 'boar', animalCount: 3, capacity: 4 }])
     assert.ok(r.state.events.some(e => e.type === 'farm.animalBred' && e.sourceCardId === PIG))
     save('A165-N2', { pending, r })
   })
@@ -189,6 +214,7 @@ describe("A165 command boundaries", () => {
       const s = phaseSetup(round, 1, pigs, played, 60, true)
       const { r } = end(s)
       assert.equal(material(r).boar, pigs)
+      assertAnimalPlacement(s, r, [0, pigs, 0], [{ id: 'p0', animalType: 'boar', animalCount: pigs, capacity: 4 }])
       save(`A165-N3-${round}-${pigs}-${played}`, r)
     }
   })
@@ -203,6 +229,7 @@ describe("A165 command boundaries", () => {
     const { r } = end(s)
     assert.equal(material(r).boar, 2)
     assert.equal(material(r).sheep, 1)
+    assertAnimalPlacement(s, r, [1, 2, 0], [{ id: 'p0', animalType: 'boar', animalCount: 2, capacity: 2 }, { id: 'house:2-0', animalType: 'sheep', animalCount: 1, capacity: 1 }])
     save('A165-N4', r)
   })
 })
