@@ -186,11 +186,14 @@ const applyReorganizeMutate = (
     .filter(zone => zone.zoneType === 'house' && zone.animalType && zone.animalCount > 0)
     .map(zone => [zone.id.slice('house:'.length), zone.animalType!]))
 
-  const stable: Record<string, AnimalKey | null> = {}
+  const stable: PlayerState['stableAnimals'] = {}
   zones
     .filter((z) => z.zoneType === 'stable')
     .forEach((z) => {
-      stable[z.id.replace('stable:', '')] = normalizeAnimalType(z.animalType)
+      const animalType = normalizeAnimalType(z.animalType)
+      if (animalType && z.animalCount > 0) {
+        stable[z.id.slice('stable:'.length)] = { animalType, animalCount: z.animalCount }
+      }
     })
   player.stableAnimals = stable
 

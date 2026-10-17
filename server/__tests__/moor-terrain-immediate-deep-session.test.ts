@@ -141,7 +141,7 @@ describe('Moor immediate and terrain clause audit', () => {
     player.resources.vegetable = 4
     player.houseAnimals = Object.fromEntries(player.roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, 'sheep']));
     player.stableTiles = [{ row: 1, col: 2 }]
-    player.stableAnimals = { '1-2': 'horse' }
+    player.stableAnimals = { '1-2': { animalType: 'horse', animalCount: 1 } }
     session.loadState(session.state)
     const response = playMoorAuditMinor(session, 'M022_EcologicalNiche')
     expect(response.state.players[0]!.resources).toMatchObject({ food: 22, fuel: 20 })

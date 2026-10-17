@@ -350,6 +350,12 @@ export type FarmyardExtension = {
   tiles: FarmTilePosition[]
 }
 
+/** An occupied loose stable; empty stables have no assignment entry. */
+export type StableAnimalAssignment = {
+  animalType: AnimalKey
+  animalCount: number
+}
+
 export type PlayerState = {
   id: string
   name: string
@@ -375,7 +381,7 @@ export type PlayerState = {
   extraOccupationsFromCards: string[]
   playedCards: string[]
   houseAnimals: Record<string, AnimalKey>
-  stableAnimals: Record<string, AnimalKey | null>
+  stableAnimals: Record<string, StableAnimalAssignment>
   pastures: Pasture[]
   fenceSegments: FenceSegment[]
   majorEffects: MajorEffectState

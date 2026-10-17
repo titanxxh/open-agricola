@@ -37,7 +37,7 @@ const setup = (shed = true) => {
     Object.assign(player.resources, { sheep: 1, boar: 1, cattle: 1 })
     player.houseAnimals = { [positionKey(player.roomTiles[0]!)]: 'sheep' }
     player.stableTiles = [{ row: 0, col: 2 }, { row: 1, col: 2 }]
-    player.stableAnimals = { '0-2': 'boar', '1-2': 'cattle' }
+    player.stableAnimals = { '0-2': { animalType: 'boar', animalCount: 1 }, '1-2': { animalType: 'cattle', animalCount: 1 } }
   } })
   sessions.push(session)
   return session

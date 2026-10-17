@@ -14,7 +14,7 @@ const placeholder = ['__test_placeholder__']
 const setup = (options?: {
   resources?: Partial<{ sheep: number; boar: number; cattle: number; food: number }>
   pastures?: Array<{ id:string; size:number; tiles:{row:number;col:number}[]; stables:number; animalType:'sheep'|'boar'|'cattle'|null; animalCount:number }>
-  stableAnimals?: Record<string, 'sheep'|'boar'|'cattle'|null>
+  stableAnimals?: Record<string, { animalType: 'sheep'|'boar'|'cattle'; animalCount: number }>
   round?: number
 }) => {
   const session = new GameSession(8157, undefined, { playerCount: 2 })
@@ -112,7 +112,7 @@ describe('B157_Salter session', () => {
     const session = setup({
       resources: { sheep: 2, cattle: 1 },
       pastures: [{ id:'p1',size:2,tiles:[{row:2,col:0}],stables:0,animalType:'sheep',animalCount:2 }],
-      stableAnimals: { '2-1': 'cattle' },
+      stableAnimals: { '2-1': { animalType: 'cattle', animalCount: 1 } },
       round: 3,
     })
     const resp = session.takeAnytimeAction(0, 'B157-salter-anytime')
@@ -147,7 +147,7 @@ describe('B157_Salter session', () => {
     const session = setup({
       resources: { sheep: 2, cattle: 1 },
       pastures: [{ id:'p1',size:2,tiles:[{row:2,col:0}],stables:0,animalType:'sheep',animalCount:2 }],
-      stableAnimals: { '2-1': 'cattle' },
+      stableAnimals: { '2-1': { animalType: 'cattle', animalCount: 1 } },
       round: 3,
     })
     session.takeAnytimeAction(0, 'B157-salter-anytime')
@@ -158,7 +158,7 @@ describe('B157_Salter session', () => {
     expect(p.resources.cattle).toBe(0)
     expect(p.pastures[0].animalCount).toBe(0)
     expect(p.pastures[0].animalType).toBeNull()
-    expect(p.stableAnimals['2-1']).toBeNull()
+    expect(p.stableAnimals['2-1']).toBeUndefined()
     // futureMeeples: sheep×2 in rounds 4/5/6, cattle×1 in rounds 4..10
     const fms = resp.state.futureMeeples
     const sheepRounds = fms.filter((e) => e.resources.food === 2).map((e) => e.round).sort((a, b) => a - b)
@@ -349,7 +349,7 @@ describe('B157 Salter parity', () => {
     }
     if ((farm.boar ?? 0) > 0) {
       owner.stableTiles = [{ row: 1, col: 1 }]
-      owner.stableAnimals['1-1'] = 'boar'
+      owner.stableAnimals['1-1'] = { animalType: 'boar', animalCount: 1 }
     }
     if ((farm.cattle ?? 0) > 0) {
       owner.houseAnimals = Object.fromEntries(owner.roomTiles.slice(0, farm.cattle!).map(tile => [`${tile.row}-${tile.col}`, 'cattle']));
@@ -378,7 +378,7 @@ describe('B157 Salter parity', () => {
       .filter((pasture) => pasture.animalType === 'sheep')
       .reduce((sum, pasture) => sum + pasture.animalCount, 0)
     if (type === 'boar') return Object.values(player.stableAnimals)
-      .filter((animal) => animal === 'boar').length
+      .reduce((sum, assignment) => sum + (assignment.animalType === 'boar' ? assignment.animalCount : 0), 0)
     return (Object.values(player.houseAnimals)[0] ?? null) === 'cattle' ? Object.values(player.houseAnimals).length : 0
   }
 

@@ -1,6 +1,6 @@
 import { buildAnimalReorgRequest } from '../domain/animal-reorg'
 import { beginHistoryOperation, captureStateWithHistory, historyBranch, materializeHistoryBranch, recoveryRecordId, registerRecoveryRecordId } from './history-streams'
-import { cloneStateWithHistory } from './state-bootstrap'
+import { restoreSessionState } from './state-recovery'
 import { evaluateFlowDoable, isActionVetoedInFlowContext, isPlacementActionDoableInFlowContext } from '../actions/flow'
 import type {
   DraftGameEvent,
@@ -69,7 +69,6 @@ import {
   emptyResources,
   harvestRounds,
   type InitialStateOptions,
-  normalizeState,
   resourceKeyList,
   applyRoundGrowth,
 } from './state-bootstrap.ts'
@@ -370,6 +369,7 @@ type ActiveCommandSettlement = {
   protectedObservations: ProtectedObservation[]
   provisional: boolean
   abortScopeId?: string
+  rejectedInput?: string
 }
 
 export type SessionPrivateCursor = Omit<SessionCommandCheckpoint, 'state'> & {
@@ -945,13 +945,13 @@ export class GameCore {
 
     if (stateOrSeed && typeof stateOrSeed === 'object') {
       if (isStateWithCursor(stateOrSeed)) {
-        this.state = this.withCtx(() => rebuildActiveModifiers(normalizeState(stateOrSeed.state, id => this.registry.get(id))))
+        this.state = this.withCtx(() => rebuildActiveModifiers(restoreSessionState(stateOrSeed.state, id => this.registry.get(id))))
         this.syncDynamicActionSpaces()
         const cursor = stateOrSeed.sessionCursor
         if (cursor) this.withCtx(() => this.restoreSessionPrivateCursor(cursor))
         return
       }
-      this.state = this.withCtx(() => rebuildActiveModifiers(normalizeState(stateOrSeed, id => this.registry.get(id))))
+      this.state = this.withCtx(() => rebuildActiveModifiers(restoreSessionState(stateOrSeed, id => this.registry.get(id))))
     } else {
       const seed = typeof stateOrSeed === 'number' ? stateOrSeed : undefined
       const extraMinorIds = this.withCtx(() => getCustomMinorImprovementIds())
@@ -1064,43 +1064,8 @@ export class GameCore {
       engine.restore(snapshot)
       return engine
     })
-    // Capture the pre-`runEngineSteps` pending host id so the dev-only
-    // assert below can detect a non-idempotent `proceed()` (Task 8 reviewer
-    // Important): if `runEngineSteps` advances the pending host out from
-    // under the freshly-restored cursor we silently lose the client's
-    // already-shown prompt and the next ServerEvent surfaces a different
-    // request. The assert is a cheap canary — it has no production cost
-    // because the comparison is a string equality.
-    const preRestoreNodeId = this.engineStack.peekPendingHost()?.id ?? null
-    // Task 10: the previous GameCore pending field is gone — every consumer
-    // derives the PendingAction response shape from the current pending
-    // envelope. No dual-write rebuild is needed; the envelope survived the cursor round-trip with its
-    // `request` and `choices` intact, which is the single source of truth.
-    //
-    // Re-run engine steps so the freshly-restored frame proceeds through any
-    // already-emitted choice node. `proceed()` is idempotent on a still-
-    // pending host (it re-emits `step.type === 'choice'`), so the
-    // canonical pre/post pending-host-id assert below catches drift.
-    this.runEngineSteps()
-    // Cross-platform NODE_ENV check that works in both Node (server) and
-    // browser (esbuild-style `process.env.NODE_ENV` replacement). Vite/Rollup
-    // shim `process.env.NODE_ENV` for browser bundles, while Node has the
-    // real `process`; both expose the value via this guarded access.
-    const env =
-      (globalThis as { process?: { env?: { NODE_ENV?: string } } }).process?.env?.NODE_ENV
-    if (env !== 'production') {
-      const postRestoreNodeId = this.engineStack.peekPendingHost()?.id ?? null
-      if (
-        preRestoreNodeId !== null &&
-        postRestoreNodeId !== null &&
-        preRestoreNodeId !== postRestoreNodeId
-      ) {
-        throw new Error(
-          `non-idempotent proceed detected during restoreEngineStackFromCursor: ` +
-            `pre=${preRestoreNodeId} post=${postRestoreNodeId}`,
-        )
-      }
-    }
+    // Restore the captured cursor and buffers without advancing pending nodes
+    // or flushing deferred facts. The next command owns further progression.
   }
 
   private syncDynamicActionSpaces() {
@@ -1535,6 +1500,12 @@ export class GameCore {
     response: SessionResponse,
     settlement: ActiveCommandSettlement,
   ): SessionResponse {
+    if (settlement.rejectedInput !== undefined) {
+      this.restoreCommandCheckpoint(settlement.checkpoint)
+      this.provisionalContinuationScopes = settlement.scopeSnapshot
+      this.failedAuthoritativeCommands = settlement.failedCommandSnapshot
+      return this.respond(false, settlement.rejectedInput)
+    }
     if (!resourceCommitmentsSatisfied(this.state)) {
       this.restoreCommandCheckpoint(settlement.checkpoint)
       this.provisionalContinuationScopes = settlement.scopeSnapshot
@@ -1847,9 +1818,13 @@ export class GameCore {
     let assigned = 0
     for (const zone of playerBoard(this.state, idx).animals.zones()) {
       const zoneCounts = readAnimalCountsForZoneAssignment(zone)
+      let zoneTotal = 0
       for (const key of animalKeys) {
-        assigned += zoneCounts[key] ?? 0
+        zoneTotal += zoneCounts[key] ?? 0
       }
+      // Capacity may shrink while stored assignment data still holds the
+      // displaced animals. Keep inventory intact and request reorganization.
+      assigned += Math.min(zoneTotal, zone.capacity)
     }
     return assigned
   }
@@ -2650,7 +2625,7 @@ export class GameCore {
   }
 
   private restoreHistory(entry: HistoryEntry) {
-    this.state = preservePlayerDisplayNames(this.state, cloneStateWithHistory(entry.state, id => this.registry.get(id)))
+    this.state = preservePlayerDisplayNames(this.state, restoreSessionState(entry.state, id => this.registry.get(id)))
     // Task 10/11: the previous GameCore pending field was deleted from
     // `GameState`. S2 Task 13.6 collapsed the HistoryEntry pending snapshot to a single boolean
     // (`hadChoicePending`) consumed by `undoStep()`'s `canRestorePriorChoice`
@@ -4127,6 +4102,11 @@ export class GameCore {
     )
   }
 
+  private rejectInput(error: string): SessionResponse {
+    if (this.activeCommandSettlement) this.activeCommandSettlement.rejectedInput = error
+    return this.respond(false, error)
+  }
+
   private resolveEngineChoice(
     playerIndex: number,
     value: string,
@@ -4155,13 +4135,13 @@ export class GameCore {
       requestKind === 'animal-reorg' ||
       requestKind === 'select-trigger'
     if (!isResolveChoiceTarget || pendingPlayerIndex !== playerIndex) {
-      return this.respond(false, 'no pending choice for this player')
+      return this.rejectInput('no pending choice for this player')
     }
     // Reject attempts to resolve a choice with an option that's been marked disabled
     // (e.g. B3 Moonshine's "play" option when the player can't afford 2 food).
     const chosenOption = pendingOptions.find((o) => o.value === value)
     if (chosenOption?.disabled) {
-      return this.respond(false, 'option disabled')
+      return this.rejectInput('option disabled')
     }
     if (!this.engine) return this.respond(false, 'no active engine')
     const player = this.state.players[pendingPlayerIndex]
@@ -4170,7 +4150,6 @@ export class GameCore {
 
     const resolvedActionId = this.peekHostPendingActionId()
     const protectedDirectCancel = isProtectedActionCancel(resolvedActionId, value)
-    const reorgCheckpoint = requestKind === 'animal-reorg' ? this.createCommandCheckpoint() : undefined
 
     if (pushHistoryEntry && !protectedDirectCancel) {
       this.pushHistory(false, frame?.undoBoundaryOnResolve === true)
@@ -4200,11 +4179,8 @@ export class GameCore {
       return this.respond()
     }
     if (result.type === 'fail') {
-      if (result.recoverable === true) {
-        const guarded = this.provisionalContinuationScopes.find((scope) => scope.guarded)
-        if (guarded && this.activeCommandSettlement) return this.rejectCurrentCommand(this.activeCommandSettlement, guarded)
-        if (reorgCheckpoint) this.restoreCommandCheckpoint(reorgCheckpoint)
-        return this.respond(false, result.errorKey ?? 'action failed')
+      if (result.disposition === 'rejected-input') {
+        return this.rejectInput(result.errorKey ?? 'action failed')
       }
       if (this.blockFailedMandatoryAction()) return this.respond(false, result.errorKey ?? 'action failed')
       endTurnScope(this.state.players[frame?.ownerPlayerIndex ?? playerIndex] ?? player)
@@ -4264,13 +4240,13 @@ export class GameCore {
         isFarmPrompt: !!this.isFarmPromptKey(view.promptKey),
         isSelectionPrompt: !!this.isSelectionPromptKey(view.promptKey),
       })
-      if (!plan.ok) return this.respond(false, plan.error)
+      if (!plan.ok) return this.rejectInput(plan.error)
       switch (plan.kind) {
         case 'confirm-next-player':
           return this.handleConfirmNextPlayerResolved(plan.nextPlayerIndex)
         case 'confirm-player-switch':
           if (playerIndex !== plan.fromPlayerIndex) {
-            return this.respond(false, 'no pending choice for this player')
+            return this.rejectInput('no pending choice for this player')
           }
           return this.handleConfirmPlayerSwitchResolved(plan.fromPlayerIndex, plan.toPlayerIndex)
         case 'feed':
@@ -4866,7 +4842,7 @@ export class GameCore {
     } else {
       nextState = raw as GameState
     }
-    this.state = rebuildActiveModifiers(normalizeState(nextState, id => this.registry.get(id)))
+    this.state = rebuildActiveModifiers(restoreSessionState(nextState, id => this.registry.get(id)))
     this.syncDynamicActionSpaces()
     this.engineStack.clear()
     this.history = []
@@ -4945,7 +4921,7 @@ export class GameCore {
       ? this.effectiveOwnerIndexForFrame(frame, cursor.hostNodeId, view)
       : -1
     if (!farmType || pendingPlayerIndex !== playerIndex) {
-      return this.respond(false, 'no pending selection/resource choice for this player')
+      return this.rejectInput('no pending selection/resource choice for this player')
     }
     if (!this.engine) return this.respond(false, 'no active engine')
     const player = this.state.players[playerIndex]
@@ -4953,7 +4929,7 @@ export class GameCore {
     if (!player || !space) return this.respond(false, 'invalid state')
     const pendingSourceCard = this.peekPendingSourceCard()
     if (payload.cancel === true) {
-      return this.respond(false, 'action cancel is not allowed')
+      return this.rejectInput('action cancel is not allowed')
     }
 
     let farmPayload: Record<string, unknown> | undefined
@@ -4994,10 +4970,8 @@ export class GameCore {
       return this.respond()
     }
     if (result.type === 'fail') {
-      if (result.recoverable === true) {
-        const guarded = this.provisionalContinuationScopes.find((scope) => scope.guarded)
-        if (guarded && this.activeCommandSettlement) return this.rejectCurrentCommand(this.activeCommandSettlement, guarded)
-        return this.respond(false, result.errorKey ?? 'action failed')
+      if (result.disposition === 'rejected-input') {
+        return this.rejectInput(result.errorKey ?? 'action failed')
       }
       if (this.blockFailedMandatoryAction()) return this.respond(false, result.errorKey ?? 'action failed')
       endTurnScope(this.state.players[frame?.ownerPlayerIndex ?? playerIndex] ?? player)
@@ -5058,7 +5032,7 @@ export class GameCore {
       playerIndex,
       payload,
     })
-    if (!plan.ok) return this.respond(false, plan.error)
+    if (!plan.ok) return this.rejectInput(plan.error)
     const player = this.state.players[playerIndex]
     if (!player) return this.respond(false, 'invalid player')
     const pendingSourceCard = this.peekPendingSourceCard()
@@ -5076,15 +5050,16 @@ export class GameCore {
         request: envelope.request,
         resourceCounts: payload.resourceCounts,
       })
-      if (!validation.ok) return this.respond(false, validation.error)
+      if (!validation.ok) return this.rejectInput(validation.error)
       const counts = validation.counts
       this.pushHistory()
       const space = this.getSpaceById(this.activeSpaceId!) ?? this.createSyntheticSpace('resource-quantity')
       const result = this.engine?.resolveChoice('confirm', {
         ...this.buildEngineExecutionContext(player, space),
       }, { resourceCounts: counts })
-      // Effect 校验失败应直接 respond(false)，pending envelope 保留，让前端再次提交合法选择。
+      // Explicit input rejection restores this command; accepted failure keeps its blocking contract.
       if (result?.type === 'fail') {
+        if (result.disposition === 'rejected-input') return this.rejectInput(result.errorKey)
         if (!result.recoverable) this.blockFailedMandatoryAction()
         this.flushEngineLog()
         return this.respond(false, result.errorKey ?? 'invalid resource-quantity selection')
@@ -5109,7 +5084,7 @@ export class GameCore {
         request: envelope.request,
         resourceBatchExchange: payload.resourceBatchExchange,
       })
-      if (!validation.ok) return this.respond(false, validation.error)
+      if (!validation.ok) return this.rejectInput(validation.error)
       const batch = validation.batch
       this.pushHistory()
       const space = this.getSpaceById(this.activeSpaceId!) ?? this.createSyntheticSpace('resource-batch-exchange')
@@ -5117,6 +5092,7 @@ export class GameCore {
         ...this.buildEngineExecutionContext(player, space),
       }, { resourceBatchExchange: batch })
       if (result?.type === 'fail') {
+        if (result.disposition === 'rejected-input') return this.rejectInput(result.errorKey)
         if (!result.recoverable) this.blockFailedMandatoryAction()
         this.flushEngineLog()
         return this.respond(false, result.errorKey ?? 'invalid resource batch exchange')
@@ -5149,7 +5125,7 @@ export class GameCore {
         minSelections,
         maxSelections,
       })
-      if (!validation.ok) return this.respond(false, validation.error)
+      if (!validation.ok) return this.rejectInput(validation.error)
       this.pushHistory()
       // S2 Task 7: forward structured payload via engine.resolveChoice's
       // `payload` arg; selection.resolveChoice now reads `payload.cards` first
@@ -5160,6 +5136,7 @@ export class GameCore {
         ...this.buildEngineExecutionContext(this.state.players[playerIndex]!, space),
       }, { cards: cardIds })
       if (result?.type === 'fail') {
+        if (result.disposition === 'rejected-input') return this.rejectInput(result.errorKey)
         if (!result.recoverable) this.blockFailedMandatoryAction()
         return this.respond(false, result.errorKey ?? 'invalid selection')
       }
@@ -5187,7 +5164,7 @@ export class GameCore {
       minSelections,
       maxSelections,
     })
-    if (!validation.ok) return this.respond(false, validation.error)
+    if (!validation.ok) return this.rejectInput(validation.error)
 
     this.pushHistory()
     const space = this.getSpaceById(this.activeSpaceId!) ?? this.createSyntheticSpace('selection')
@@ -5195,7 +5172,8 @@ export class GameCore {
       ...this.buildEngineExecutionContext(this.state.players[playerIndex]!, space),
     }, { positions: validation.positionStrings })
     if (result?.type === 'fail') {
-        if (!result.recoverable) this.blockFailedMandatoryAction()
+      if (result.disposition === 'rejected-input') return this.rejectInput(result.errorKey)
+      if (!result.recoverable) this.blockFailedMandatoryAction()
       return this.respond(false, result.errorKey ?? 'invalid selection')
     }
     if (result?.type === 'ok') {

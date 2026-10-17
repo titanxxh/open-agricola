@@ -726,7 +726,7 @@ describe('Engine pipeline phase order', () => {
 
     const cancelResult = engine.resolveChoice('cancel', { state, player, space })
 
-    expect(cancelResult).toEqual({ type: 'fail', errorKey: 'log.action', recoverable: true })
+    expect(cancelResult).toEqual({ type: 'fail', errorKey: 'log.action', recoverable: true, disposition: 'rejected-input' })
     expect(phases).toEqual([])
 
     const confirmResult = engine.resolveChoice('confirm', { state, player, space })
@@ -824,7 +824,7 @@ describe('Engine pipeline phase order', () => {
 
     const cancelResult = engine.resolveChoice('cancel', { state, player, space })
 
-    expect(cancelResult).toEqual({ type: 'fail', errorKey: 'log.action', recoverable: true })
+    expect(cancelResult).toEqual({ type: 'fail', errorKey: 'log.action', recoverable: true, disposition: 'rejected-input' })
     expect(state.events).toEqual([])
 
     const confirmResult = engine.resolveChoice('confirm', { state, player, space })

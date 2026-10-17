@@ -533,7 +533,7 @@ describe('Parent Card selection setup', () => {
     ]))
   })
 
-  it('backfills missing mother schedule logs when a selected parent-card game is loaded', () => {
+  it('preserves missing mother schedule logs when a selected parent-card snapshot is loaded', () => {
     const session = new GameSession(308, undefined, {
       playerCount: 2,
       enableParentCards: true,
@@ -563,8 +563,8 @@ describe('Parent Card selection setup', () => {
     const logs = restored.log.filter((entry) => entry.key === 'log.parentMotherScheduled')
     session.loadState(restored)
 
-    expect(logs).toHaveLength(2)
-    expect(session.state.log.filter((entry) => entry.key === 'log.parentMotherScheduled')).toHaveLength(2)
+    expect(logs).toHaveLength(0)
+    expect(session.state.log.filter((entry) => entry.key === 'log.parentMotherScheduled')).toHaveLength(0)
   })
 
   it('auto-submits a player with only one mother and one father candidate left', () => {

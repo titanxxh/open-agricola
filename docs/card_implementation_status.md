@@ -4,7 +4,7 @@
 
 > [`card_implementation_status.md`](card_implementation_status.md) is canonical. This file has a maintained Chinese mirror at [`card_implementation_status_zh.md`](card_implementation_status_zh.md).
 
-> Generated and last updated on 2026-10-16. This file replaces `docs/card_desc_audit.md`, `docs/card_progress.md`, `docs/master-plan.md`, and `docs/bad-smell.md`. Rule authority comes from publisher card text and printed icons, official rulings, and recorded maintainer decisions. Reference code is implementation evidence.
+> Generated and last updated on 2026-10-17. This file replaces `docs/card_desc_audit.md`, `docs/card_progress.md`, `docs/master-plan.md`, and `docs/bad-smell.md`. Rule authority comes from publisher card text and printed icons, official rulings, and recorded maintainer decisions. Reference code is implementation evidence.
 
 ## 2. Open issues by priority
 
@@ -202,6 +202,8 @@ Shared action replacement uses one explicit source menu before the original opti
 Gain provenance distinguishes explicit resource parameters from the action space's configured base gain. C168 uses this existing distinction locally (#1125), preserving additional rewards and genuine Day Laborer actions granted by another card. Four-player Session regressions cover acceptance, refusal, payment, animal housing, Farmers of the Moor combinations, and undo/retry without a new trigger marker.
 
 ## 6. Infrastructure backlog
+
+Session recovery preserves captured hands, card identities, optional rule data and history under ADR 0028 (#1258/#1270). Input rejection restores the full command checkpoint under ADR 0015 (#1257), while accepted mandatory blocking and guard violations retain their own contracts. Loose stables store species and count under ADR 0029 (#1267); E012 and C089 retain two/three animals through confirmation, payment, undo and recovery. Stable display zones project backend capacity to both clients. Public-history validation and Frame-only pasture projections remain separate decoding boundaries.
 
 Issue #1204 makes stable pricing consume the complete payload-aware `computeCosts` contribution once per payment plan. Fixed action fees remain separate from declared per-stable prices; admission, current previews and actual payment agree for one or multiple stables. C088's quantity-aware discounts and unit payment alternatives remain supported, while C094 reuses shared affordability without its own preliminary aggregation. Session regressions cover budget boundaries, discounts, exact/overridden unit prices, source-scoped fees, attribution, read purity, recovery and undo.
 

@@ -246,7 +246,7 @@ describe('Farmers of the Moor remaining major improvements', () => {
     paidPlayer.resources.horse = 2
     paidPlayer.houseAnimals = Object.fromEntries(paidPlayer.roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, 'horse']));
     paidPlayer.stableTiles = [{ row: 0, col: 0 }]
-    paidPlayer.stableAnimals = { '0-0': 'horse' }
+    paidPlayer.stableAnimals = { '0-0': { animalType: 'horse', animalCount: 1 } }
     const paidFoodBefore = paidPlayer.resources.food
     for (const player of paidSession.state.players) markAllWorkersUsed(paidSession.state, player)
 

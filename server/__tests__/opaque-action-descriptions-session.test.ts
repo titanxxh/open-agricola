@@ -263,7 +263,7 @@ describe('opaque actions use executable operation data', () => {
     state.round = 13
     const player = state.players[0]!
     player.resources.sheep = 2; player.houseAnimals = Object.fromEntries(player.roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, 'sheep']));
-    player.stableTiles = [{ row: 0, col: 2 }]; player.stableAnimals = { '0-2': 'sheep' }
+    player.stableTiles = [{ row: 0, col: 2 }]; player.stableAnimals = { '0-2': { animalType: 'sheep', animalCount: 1 } }
     session.loadState(state)
     const action = preview(session, card)
     expect(action.effects).toContainEqual(expect.objectContaining({ kind: 'resourceQuantitySchedule', choices: expect.arrayContaining([{ resource: 'sheep', available: 2, rounds: [14], resourcesPerUnit: { food: 1 } }]) }))

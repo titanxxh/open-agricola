@@ -47,7 +47,7 @@ type FarmAnimalType = NonNullable<Pasture['animalType']>
 
 type PlayerFarmAnimalState = PlayerFarmState & {
   houseAnimals?: Record<string, FarmAnimalType>
-  stableAnimals?: Record<string, FarmAnimalType | null>
+  stableAnimals?: PlayerState['stableAnimals']
 }
 
 export type PlayerFarmState = {
@@ -354,7 +354,7 @@ export function normalizePlayerFarm<T extends PlayerFarmState>(player: T): T {
 const animalTypesForPlayer = (player: PlayerFarmAnimalState): readonly AnimalKey[] =>
   (player.resources?.horse ?? 0) > 0 ||
   Object.values(player.houseAnimals ?? {}).includes('horse') ||
-  Object.values(player.stableAnimals ?? {}).includes('horse') ||
+  Object.values(player.stableAnimals ?? {}).some(assignment => assignment.animalType === 'horse' && assignment.animalCount > 0) ||
   (player.pastures ?? []).some((pasture) => pasture.animalType === 'horse')
     ? ALL_ANIMAL_KEYS
     : ANIMAL_KEYS
@@ -365,8 +365,8 @@ const countNonPastureAnimals = (player: PlayerFarmAnimalState) => {
   Object.entries(player.houseAnimals ?? {}).filter(([key]) => roomKeys.has(key)).forEach(([, animal]) => {
     totals[animal] = (totals[animal] ?? 0) + 1
   })
-  Object.values(player.stableAnimals ?? {}).forEach((animal) => {
-    if (animal) totals[animal] = (totals[animal] ?? 0) + 1
+  Object.values(player.stableAnimals ?? {}).forEach(({ animalType, animalCount }) => {
+    totals[animalType] = (totals[animalType] ?? 0) + animalCount
   })
   return totals
 }

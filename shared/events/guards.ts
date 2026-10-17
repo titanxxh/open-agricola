@@ -1,4 +1,5 @@
 import { PAYMENT_RESOURCE_KEYS, REAL_RESOURCE_KEYS, isPaymentResourceKey } from '../contract/resource-keys'
+import type { GameEvent } from '../contract/events'
 
 export const assertPublicGameEvent = (event: unknown): void => {
   const visibility = (event as { visibility?: unknown } | null)?.visibility
@@ -769,4 +770,19 @@ export const assertEventSizeUnderLimit = (event: unknown, limit: number): void =
   if (size > limit) {
     throw new Error(`GameEvent exceeds ${limit} bytes`)
   }
+}
+
+/** Public persisted history accepts only bounded, known JSON event records. */
+export const isPersistedGameEvent = (event: unknown): event is GameEvent => {
+  if (typeof event !== 'object' || event === null) return false
+  try {
+    assertGameEventEnvelope(event)
+    assertKnownGameEventShape(event)
+    assertPublicGameEvent(event)
+    assertJsonSafeEvent(event)
+    assertEventSizeUnderLimit(event, 4096)
+  } catch {
+    return false
+  }
+  return true
 }

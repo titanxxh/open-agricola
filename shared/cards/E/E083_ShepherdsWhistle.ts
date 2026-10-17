@@ -21,7 +21,7 @@ const POST_REORG_CHECK_ACTION_ID = 'card_E083_ShepherdsWhistle_post-reorg-check'
 const hasEmptyUnfencedStable = (state: GameState, player: PlayerState): boolean => {
   const idx = state.players.indexOf(player)
   const looseStableKeys = playerBoard(state, idx).animals.looseStableKeys()
-  return looseStableKeys.some((key) => !player.stableAnimals?.[key])
+  return looseStableKeys.some((key) => (player.stableAnimals?.[key]?.animalCount ?? 0) === 0)
 }
 
 const hasAnyUnfencedStable = (state: GameState, player: PlayerState): boolean => {

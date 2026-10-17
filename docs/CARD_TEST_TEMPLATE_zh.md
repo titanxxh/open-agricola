@@ -194,6 +194,10 @@ const opening = createOpeningSession({
 
 `server/__tests__/_helpers/session-assertions.ts` 提供共享的 Session 检查：`assertRejectedUnchanged` 要求被拒绝的命令在返回值和 live 会话中都不改变 `state`、`interaction` 与 `scores`；`confirmNext`、`getChoiceOptions` 用于推进等待；`undoRuleSnapshot` 和 `assertUndoRestored` 用于比较撤销结果。需要保留失败现场时，在 suite 中调用 `server/__tests__/_helpers/scenario-evidence.ts` 的 `createScenarioEvidence(import.meta.url)`，用 `track(session)` 登记每个会话，用 `record(label, value)` 冻结中间数据。helper 负责释放已登记的会话，仅在测试失败时写出有界现场。`AGRICOLA_TEST_DIAGNOSTIC=1` 会同时写出成功诊断，`AGRICOLA_TEST_EVIDENCE_DIR` 指定 Git 外目录（默认系统临时目录）。同一 suite 内的 concurrent 测试会被拒绝。
 
+观测 `GameState` 原值的副本使用 `shared/session/history-streams` 的 `captureStateWithHistory`。`normalizeState` 是显式开局归一化器，可能掩盖返回值差异；`cloneState` 和 `cloneStateWithHistory` 保留已有对局数据，但会挂接可执行定义。观测预期使用纯捕获，这三个 helper 只用于构造交给真实 `GameSession` / `GameCore` 加载的状态。撤销预期必须在命令前从 live Session 或纯观测副本捕获。
+
+恢复、容纳区及输入拒绝回归（ADR 0028/0029、#1257）选择 Session 测试：先通过真实购卡把职业或小改手牌打空，再撤销后续行动；returned/live 快照必须保留空手牌及原始可选字段表示，普通新局发牌和非空手牌对照单独验证。输入拒绝在每步前后比较完整 state、interaction、scores 和可执行 undo 元数据，并连续拒绝后再合法重试，检查历史或效果是否累积。已接受强制续行的阻塞、需要持久化记忆的 guard violation 分别作对照，失败响应本身不证明输入拒绝。扩容动物区必须确认真实布局，通过公开分区查询回读持久数量，并完成正常交接；只检查 capacity 或资源总数不足以证明安置正确。支付、容量变化及快照恢复继续保留逐容纳区数量。
+
 不要假设存在 `POST /api/game/dev/*`。当前可用的状态预设方式有：
 
 - **`GameSession.loadState(state)`** —— 加载一份 `SerializedGameState`（`shared/session/serialization.ts`）

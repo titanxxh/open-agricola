@@ -121,8 +121,10 @@ export const getAssignedAnimalsByType = (player: PlayerState, state?: GameState)
     }
   }
   for (const animal of Object.values(getRoomAnimals(player))) result[animal] = (result[animal] ?? 0) + 1
-  for (const animal of Object.values(player.stableAnimals ?? {})) {
-    if (animal && isAnimalKey(animal)) result[animal] = (result[animal] ?? 0) + 1
+  for (const assignment of Object.values(player.stableAnimals ?? {})) {
+    if (isAnimalKey(assignment.animalType)) {
+      result[assignment.animalType] = (result[assignment.animalType] ?? 0) + assignment.animalCount
+    }
   }
   for (const cardState of Object.values(player.cardStates ?? {})) {
     addCounts(result, readAnimalHolderCountsWithZones(cardState?.extraData, player.id))
@@ -179,13 +181,15 @@ export const subtractAnimalsFromBoard = (
       delete player.houseAnimals[room]
       remaining -= 1
     }
-    // 3. stable animals (each key = 1 animal)
+    // 3. stable animals
     if (remaining > 0 && player.stableAnimals) {
-      for (const [key, animal] of Object.entries(player.stableAnimals)) {
+      for (const [key, assignment] of Object.entries(player.stableAnimals)) {
         if (remaining <= 0) break
-        if (animal !== type) continue
-        player.stableAnimals[key] = null
-        remaining -= 1
+        if (assignment.animalType !== type) continue
+        const take = Math.min(assignment.animalCount, remaining)
+        assignment.animalCount -= take
+        remaining -= take
+        if (assignment.animalCount === 0) delete player.stableAnimals[key]
       }
     }
     // 4. animal-holder cards

@@ -78,22 +78,7 @@ function roomFixture(tamer: boolean) {
 test('room assignments can be edited separately, remain after reload, and synchronize to another client', async ({ page, browser, request }) => {
   const observer = await browser.newPage()
   try {
-    for (const [index, client] of [page, observer].entries()) {
-      const username = `room_holders_${Date.now().toString(36)}_${index}`
-      const oauth = await request.post(`${BACKEND_URL}/api/test/oauth/github/callback`, { data: {
-        providerUserId: username, providerLogin: username, email: `${username}@example.com`, displayName: username,
-      } })
-      expect(oauth.ok()).toBe(true)
-      const complete = await request.post(`${BACKEND_URL}/api/auth/onboarding/complete`, {
-        headers: { Cookie: `oa_onboarding=${cookie(oauth, 'oa_onboarding')}` },
-        data: { username, displayName: username, password: 'room-holder-pass', confirmPassword: 'room-holder-pass' },
-      })
-      expect(complete.ok()).toBe(true)
-      await client.context().addCookies([{ name: 'oa_session', value: cookie(complete, 'oa_session'), url: FRONTEND_URL }])
-      await observe(client)
-      await client.goto(`${FRONTEND_URL}/?player=p${index + 1}&transport=ws&room=dev2&devMode=1`)
-      await expect(client.locator('.game-layout')).toBeVisible({ timeout: 30000 })
-    }
+    await joinClients([page, observer], request)
     const fixture = roomFixture(true)
     try {
       const loaded = await command(page, { type: 'loadGame', state: fixture.withCtx(() => serializeState(fixture.state, {})) })
@@ -141,3 +126,80 @@ test('room assignments can be edited separately, remain after reload, and synchr
     await observer.close()
   }
 })
+
+async function joinClients(clients: Page[], request: import('@playwright/test').APIRequestContext) {
+  for (const [index, client] of clients.entries()) {
+    const username = `room_holders_${Date.now().toString(36)}_${index}`
+    const oauth = await request.post(`${BACKEND_URL}/api/test/oauth/github/callback`, { data: {
+      providerUserId: username, providerLogin: username, email: `${username}@example.com`, displayName: username,
+    } })
+    expect(oauth.ok()).toBe(true)
+    const complete = await request.post(`${BACKEND_URL}/api/auth/onboarding/complete`, {
+      headers: { Cookie: `oa_onboarding=${cookie(oauth, 'oa_onboarding')}` },
+      data: { username, displayName: username, password: 'room-holder-pass', confirmPassword: 'room-holder-pass' },
+    })
+    expect(complete.ok()).toBe(true)
+    await client.context().addCookies([{ name: 'oa_session', value: cookie(complete, 'oa_session'), url: FRONTEND_URL }])
+    await observe(client)
+    await client.goto(`${FRONTEND_URL}/?player=p${index + 1}&transport=ws&room=dev2&devMode=1`)
+    await expect(client.locator('.game-layout')).toBeVisible({ timeout: 30000 })
+  }
+}
+
+for (const [card, capacity] of [['E012_AnimalBedding', 2], ['C089_StableMaster', 3], ['', 1]] as const) {
+  test(`loose stable ${card || 'ordinary'} count and capacity synchronize after confirmation and reload`, async ({ page, browser, request }, testInfo) => {
+    const observer = await browser.newPage()
+    try {
+      await joinClients([page, observer], request)
+      const fixture = createWorkSession({ seed: 4242, configure(state) {
+        state.round = 14
+        for (const player of state.players) player.resources.food = 40
+        const owner = state.players[0]!
+        owner.minorPlayed = card === 'E012_AnimalBedding' ? [card] : []
+        owner.occupationPlayed = card === 'C089_StableMaster' ? [card] : []
+        owner.roomTiles = [{ row: 2, col: 0 }, { row: 1, col: 0 }]
+        owner.fields = [{ row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 1 }] }]
+        owner.stableTiles = [{ row: 0, col: 1 }]
+        owner.stableAnimals = {}
+        owner.houseAnimals = {}
+        owner.pastures = []
+        owner.resources.sheep = 0
+        state.actionSpaces.find(space => space.id === 'sheep-market')!.resources.sheep = capacity + 1
+      } })
+      try {
+        expect((await command(page, { type: 'loadGame', state: fixture.withCtx(() => serializeState(fixture.state, {})) })).receipt.outcome.ok).toBe(true)
+      } finally { fixture.dispose() }
+      await page.locator('[data-action-id="sheep-market"] button').first().click()
+      await expect(page.locator('.interaction-reorg-panel')).toBeVisible()
+      const stable = page.locator('[data-farm-tile-key="0-1"][data-farm-tile-player="p1"]')
+      const label = stable.locator('div.pasture-count')
+      await expect(label).toHaveText(new RegExp(`${capacity}[ ]*/${capacity}`))
+      const control = stable.locator('.pasture-control-row').filter({ hasText: 'Sheep' })
+      await expect(control.getByRole('button', { name: '+', exact: true })).toBeDisabled()
+      await control.getByRole('button', { name: '-', exact: true }).click()
+      await expect(label).toHaveText(new RegExp(`${capacity - 1}[ ]*/${capacity}`))
+      await control.getByRole('button', { name: '+', exact: true }).click()
+      await expect(label).toHaveText(new RegExp(`${capacity}[ ]*/${capacity}`))
+      const before = await page.evaluate(() => window.roomHolderPayload!.state.players[0]!.stableAnimals)
+      const rejected = await command(page, { type: 'choice', value: 'confirm', payload: { zones: [{ id: 'stable:0-1', zoneType: 'stable', animalType: 'sheep', animalCount: capacity + 1 }] } })
+      expect(rejected.receipt.outcome.ok).toBe(false)
+      expect(await page.evaluate(() => window.roomHolderPayload!.state.players[0]!.stableAnimals)).toEqual(before)
+      await expect(label).toHaveText(new RegExp(`${capacity}[ ]*/${capacity}`))
+      await page.locator('.interaction-reorg-panel').getByRole('button', { name: 'Confirm', exact: true }).click()
+      await expect(page.locator('.interaction-reorg-panel')).toHaveCount(0)
+      const expected = { '0-1': { animalType: 'sheep', animalCount: capacity } }
+      for (const client of [page, observer]) {
+        await expect.poll(() => client.evaluate(() => window.roomHolderPayload?.state.players[0]!.stableAnimals)).toEqual(expected)
+        await expect.poll(() => client.evaluate(() => window.roomHolderPayload?.state.players[0]!.resources.sheep)).toBe(capacity + 1)
+      }
+      await observer.locator('.player-tab').first().click()
+      const observed = observer.locator('[data-farm-tile-key="0-1"][data-farm-tile-player="p1"] div.pasture-count')
+      await expect(observed).toHaveText(new RegExp(`${capacity}[ ]*/${capacity}`))
+      const handoff = await command(observer, { type: 'choice', value: 'confirm' })
+      expect(handoff.receipt.outcome.ok).toBe(true)
+      await page.reload()
+      await expect(page.locator('[data-farm-tile-key="0-1"][data-farm-tile-player="p1"] div.pasture-count')).toHaveText(new RegExp(`${capacity}[ ]*/${capacity}`))
+      await page.screenshot({ path: testInfo.outputPath(`loose-stable-${capacity}.png`), fullPage: true })
+    } finally { await observer.close() }
+  })
+}

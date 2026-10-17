@@ -12,7 +12,7 @@ const setup = (mode: 'occupied' | 'empty' | 'none' | 'fenced' | 'hand') => creat
     p.minorPlayed = mode === 'hand' ? [] : [CARD]
     if (mode === 'hand') p.minorHand = [CARD]
     if (mode !== 'none') p.stableTiles = [{ row: 0, col: 1 }]
-    if (mode === 'occupied') { p.stableAnimals = { '0-1': 'sheep' }; p.resources.sheep = 1 }
+    if (mode === 'occupied') { p.stableAnimals = { '0-1': { animalType: 'sheep', animalCount: 1 } }; p.resources.sheep = 1 }
     p.pastures = [{ id: 'whistle-target', tiles: [{ row: 0, col: 2 }], animalType: null, animalCount: 0 }]
     p.fenceSegments = ['H-0-2','H-1-2','V-0-2','V-0-3'].map(edge => ({edge,type:'fence',source:{kind:'own',ownerPlayerId:p.id}}))
     if (mode === 'fenced') {
@@ -79,7 +79,7 @@ describe('Shepherds Whistle occupied-stable harvest continuation', () => {
     if (mode === 'accept') {
       expect(cardReorgs).toBeGreaterThan(0)
       expect(r.state.players[0]!.pastures[0]!.animalCount).toBe(2)
-      expect(Object.values(r.state.players[0]!.stableAnimals).filter(a => a === 'sheep')).toHaveLength(1)
+      expect(Object.values(r.state.players[0]!.stableAnimals).filter(a => a.animalType === 'sheep')).toHaveLength(1)
     }
     session.dispose()
   })

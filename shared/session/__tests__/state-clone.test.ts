@@ -36,6 +36,17 @@ describe('cloneState', () => {
     expect(state.players[0].resources.wood).not.toBe(99)
     expect(state.players[0].roomTiles).not.toHaveLength(cloned.players[0].roomTiles.length)
   })
+
+  it('preserves exhausted hands and optional data while previewing existing state', () => {
+    const state = createInitialState(42)
+    state.players[0]!.minorHand = []
+    state.players[0]!.occupationHand = []
+    state.players[0]!.minorPlayed = ['A003_PaperKnife']
+    state.players[0]!.farmTerrain = []
+    const copied = cloneState(state)
+    expect(JSON.stringify(copied)).toBe(JSON.stringify(state))
+    expect(copied.players[0]!.playedCards).toEqual([])
+  })
 })
 
 

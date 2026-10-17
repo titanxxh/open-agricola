@@ -1,3 +1,4 @@
+import { assertRejectedUnchanged } from './_helpers/session-assertions'
 import { afterEach, describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { createWorkSession } from './_helpers/session-fixtures'
@@ -146,7 +147,8 @@ describe('E128 Saddler session', () => {
     expect(food[0]!.seq).toBeGreaterThan(major.seq)
     const restored = restoreSession(session)
     sessions.push(restored)
-    const invalid = restored.commitSelectionChoice(0, { tile: restored.state.players[0]!.roomTiles[0]! })
+    const invalid = assertRejectedUnchanged(restored, () => restored.commitSelectionChoice(0, { tile: restored.state.players[0]!.roomTiles[0]! }))
+    assertRejectedUnchanged(restored, () => restored.commitSelectionChoice(0, { tile: restored.state.players[0]!.roomTiles[0]! }))
     expect(invalid.ok).toBe(false)
     expect(invalid.state.players[0]!.resources.food).toBe(0)
     expect(invalid.state.players[0]!.improvements).toContain(MAJOR_ID)

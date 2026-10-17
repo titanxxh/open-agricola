@@ -55,7 +55,7 @@ describe('shared/session/serialization', () => {
         const {
           lockedFarmTileKeys, playerPanelSummary, moorSpecialActionAvailability,
           specialStables,
-          roomAnimalZones,
+          roomAnimalZones, stableAnimalZones,
           playedCardAnimalZones,
           farmCardAnimalZones,
           borrowedPlayedCardAnimalZones,
@@ -65,6 +65,7 @@ describe('shared/session/serialization', () => {
           ...domainPlayer
         } = serializedPlayer
         expect(domainPlayer).toEqual(state.players[index])
+        expect(stableAnimalZones).toEqual([])
         expect(scheduledEffects).toEqual([])
         expect(cardStatePresentation).toEqual({})
         expect(lockedFarmTileKeys).toEqual([])

@@ -1256,7 +1256,7 @@ describe('FarmBoard', () => {
       <FarmBoard
         {...createFarmBoardProps(player, {
           farmCells: [{ key: 'tile-0-0', type: 'tile', tileRow: 0, tileCol: 0, tileKey: '0-0', isStable: true }],
-          stableDisplayMap: new Map([['0-0', { animalType: 'sheep', animalCount: 1 }]]),
+          stableDisplayMap: new Map([['0-0', { animalType: 'sheep', animalCount: 1, capacity: 1 }]]),
         })}
       />,
     )
@@ -1272,7 +1272,7 @@ describe('FarmBoard', () => {
       <FarmBoard
         {...createFarmBoardProps(player, {
           farmCells: [{ key: 'tile-0-0', type: 'tile', tileRow: 0, tileCol: 0, tileKey: '0-0', isStable: true }],
-          stableDisplayMap: new Map([['0-0', { animalType: null, animalCount: 0 }]]),
+          stableDisplayMap: new Map([['0-0', { animalType: null, animalCount: 0, capacity: 1 }]]),
         })}
       />,
     )

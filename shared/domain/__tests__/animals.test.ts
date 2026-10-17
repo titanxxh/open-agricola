@@ -60,7 +60,7 @@ describe('getAssignedAnimalsByType', () => {
 
   it('counts stable animals (1 per stable slot)', () => {
     const p = mkPlayer({
-      stableAnimals: { 's-1': 'sheep', 's-2': 'sheep', 's-3': 'cattle', 's-4': null },
+      stableAnimals: { 's-1': { animalType: 'sheep', animalCount: 1 }, 's-2': { animalType: 'sheep', animalCount: 1 }, 's-3': { animalType: 'cattle', animalCount: 1 } },
     })
     expect(getAssignedAnimalsByType(p)).toEqual({ sheep: 2, boar: 0, cattle: 1 })
   })
@@ -68,7 +68,7 @@ describe('getAssignedAnimalsByType', () => {
   it('counts assigned horses without producing NaN', () => {
     const p = mkPlayer({
       houseAnimals: { '1-0': 'horse' },
-      stableAnimals: { 's-1': 'horse' },
+      stableAnimals: { 's-1': { animalType: 'horse', animalCount: 1 } },
     })
     expect(getAssignedAnimalsByType(p)).toEqual({ sheep: 0, boar: 0, cattle: 0, horse: 2 })
     expect(getAssignedAnimalCount(p)).toBe(2)
@@ -191,7 +191,7 @@ describe('getAssignedAnimalsByType', () => {
         { id: 'pa-1', size: 1, tiles: [], stables: 0, animalType: 'sheep', animalCount: 2 },
       ] as PlayerState['pastures'],
       houseAnimals: { '1-0': 'sheep' },
-      stableAnimals: { 's-1': 'sheep' },
+      stableAnimals: { 's-1': { animalType: 'sheep', animalCount: 1 } },
       cardStates: {
         C148_MudWallower: { extraData: { held: 1, animalType: 'boar' } },
       } as PlayerState['cardStates'],

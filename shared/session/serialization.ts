@@ -6,6 +6,7 @@ import { collectCardStatePresentation } from '../cards/card-state-presentation'
 import { projectParentCardState } from '../parents/father-completion'
 import type { RecoveryHistoryCatalog } from './recovery-catalog'
 import { captureStateWithHistory } from './history-streams'
+import { isPersistedGameEvent } from '../events/guards'
 import type {
   ActionSpace,
   GameSeed,
@@ -48,6 +49,7 @@ export type SerializedPlayerState = Omit<PlayerState, 'pastures'> & {
   playerPanelSummary: PlayerPanelSupplySummary
   specialStables: BuiltSpecialStable[]
   roomAnimalZones: InteractionAnimalReorgZone[]
+  stableAnimalZones: InteractionAnimalReorgZone[]
   playedCardAnimalZones: InteractionAnimalReorgZone[]
   farmCardAnimalZones: InteractionAnimalReorgZone[]
   borrowedPlayedCardAnimalZones: InteractionAnimalReorgZone[]
@@ -200,6 +202,7 @@ const serializePlayerDisplayFields = (
     playerPanelSummary,
     specialStables,
     roomAnimalZones: zones.filter(zone => zone.zoneType === 'house').map(serializeAnimalZone),
+    stableAnimalZones: zones.filter(zone => zone.zoneType === 'stable').map(serializeAnimalZone),
     playedCardAnimalZones: collectPlayedCardAnimalZones(zones),
     farmCardAnimalZones: collectFarmCardAnimalZones(zones),
     borrowedPlayedCardAnimalZones: collectBorrowedPlayedCardAnimalZones(zones),
@@ -310,12 +313,16 @@ export const rehydrateState = (
   // leaks into the authoritative `PlayerState` domain shape.
   const rawWithoutCursor = {
     ...rest,
+    // Persisted public history still enforces its JSON/privacy boundary.
+    // Valid captured events retain their values, order and sequence cursor.
+    events: rest.events.filter(isPersistedGameEvent),
     players: players.map(({
       moorSpecialActionAvailability: _moorSpecialActionAvailability,
       lockedFarmTileKeys: _lockedFarmTileKeys,
       playerPanelSummary: _playerPanelSummary,
       specialStables: _specialStables,
       roomAnimalZones: _roomAnimalZones,
+      stableAnimalZones: _stableAnimalZones,
       playedCardAnimalZones: _playedCardAnimalZones,
       farmCardAnimalZones: _farmCardAnimalZones,
       cardStatePresentation: _cardStatePresentation,
@@ -323,10 +330,18 @@ export const rehydrateState = (
       pastureCapacities: _pastureCapacities,
       scheduledEffects: _scheduledEffects,
       ...player
-    }) => player),
+    }) => {
+      if (persisted) return player
+      // Frame pasture facts are presentation projections of tiles/stables.
+      // They are absent from the authoritative pasture assignment shape.
+      return { ...player, pastures: player.pastures.map(({
+        size: _size, stables: _stables,
+        ...pasture
+      }) => pasture) }
+    }),
   }
-  // Decode data before a Core exists. Rule-dependent normalization and
-  // modifier reconstruction run only after that Core registers its cards.
+  // Decode data before a Core exists. Definition reattachment and modifier
+  // reconstruction run only after that Core registers its cards.
   return {
     state: rawWithoutCursor as unknown as GameState,
     ...(persisted ? { sessionCursor: persisted.sessionCursor } : {}),

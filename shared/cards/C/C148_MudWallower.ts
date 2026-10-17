@@ -96,7 +96,7 @@ const computePigsInC148 = (player: PlayerState): number => {
     .reduce((sum, p) => sum + p.animalCount, 0)
   const houseBoars = countRoomAnimals(player, 'boar')
   const stableBoars = Object.values(player.stableAnimals ?? {})
-    .filter((t) => t === 'boar').length
+    .reduce((sum, assignment) => sum + (assignment.animalType === 'boar' ? assignment.animalCount : 0), 0)
   return Math.max(
     0,
     (player.resources.boar ?? 0) - pastureBoars - houseBoars - stableBoars,

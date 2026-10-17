@@ -53,24 +53,24 @@ describe('subtractAnimalsFromBoard', () => {
       resources: { ...emptyResources(), sheep: 3 },
       pastures: [{ id: 'p1', size: 1, tiles: [{ row: 2, col: 0 }], stables: 0, animalType: 'sheep', animalCount: 1 }],
       houseAnimals: { '1-0': 'sheep' },
-      stableAnimals: { '2-2': 'sheep' },
+      stableAnimals: { '2-2': { animalType: 'sheep', animalCount: 1 } },
     })
     subtractAnimalsFromBoard(p, { sheep: 3 })
     expect(p.resources.sheep).toBe(0)
     expect(p.pastures[0].animalCount).toBe(0)
     expect(Object.values(p.houseAnimals).length).toBe(0)
     expect((Object.values(p.houseAnimals)[0] ?? null)).toBeNull()
-    expect(p.stableAnimals['2-2']).toBeNull()
+    expect(p.stableAnimals['2-2']).toBeUndefined()
   })
 
   it('stable 多 entry 扣 1', () => {
     const p = createPlayer({
       resources: { ...emptyResources(), cattle: 2 },
-      stableAnimals: { '2-2': 'cattle', '2-3': 'cattle' },
+      stableAnimals: { '2-2': { animalType: 'cattle', animalCount: 1 }, '2-3': { animalType: 'cattle', animalCount: 1 } },
     })
     subtractAnimalsFromBoard(p, { cattle: 1 })
     expect(p.resources.cattle).toBe(1)
-    const remaining = Object.values(p.stableAnimals).filter((a) => a === 'cattle').length
+    const remaining = Object.values(p.stableAnimals).filter((a) => a.animalType === 'cattle').length
     expect(remaining).toBe(1)
   })
 
