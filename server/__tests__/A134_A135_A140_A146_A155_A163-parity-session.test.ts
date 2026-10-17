@@ -360,6 +360,8 @@ describe("A155 command boundaries", () => {
     assert.equal(other.state.players[0]!.resources.wood, 0)
     assert.equal(other.state.players[0]!.resources.grain, 0)
     assert.equal(other.state.players[1]!.resources.wood, 0)
+    for (const actual of [other, s.getState()])
+      assert.deepEqual(actual.state.players.map(player => [player.resources.wood, player.resources.grain]), [[0, 0], [0, 0], [0, 0], [0, 0]])
     assertTurnFinished(hand, 0)
     assertTurnFinished(other, 1)
     save('A155-N3', { hand, other })
@@ -500,6 +502,11 @@ describe("A163 command boundaries", () => {
     assert.equal(r.state.players[0]!.resources.wood, 0)
     assert.equal(r.state.players[0]!.resources.clay, 0)
     assert.deepEqual(r.state.players[0]!.resources, { wood: 0, clay: 0, reed: 0, stone: 0, food: 40, grain: 1, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 })
+    const baseline = { wood: 0, clay: 0, reed: 0, stone: 0, food: 40, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 }
+    for (const actual of [r, s.getState()])
+      assert.deepEqual(actual.state.players.map(player => player.resources), [
+        { ...baseline, grain: 1 }, { ...baseline, reed: 1, stone: 1, food: 41 }, baseline, baseline,
+      ])
     assertTurnFinished(a, 0)
     assertTurnFinished(b, 0)
     assertTurnFinished(r, 1)

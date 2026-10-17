@@ -409,6 +409,9 @@ describe("A156 command boundaries", () => {
     assert.equal(material(declined).reed, 0)
     assert.equal(material(declined).food, 3)
     assert.deepEqual(material(declined), { wood: 0, clay: 0, reed: 0, stone: 0, food: 3, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 })
+    const baseline = { wood: 0, clay: 0, reed: 0, stone: 0, food: 20, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 }
+    for (const actual of [declined, ds.getState()])
+      assert.deepEqual(actual.state.players.map(player => player.resources), [{ ...baseline, food: 3 }, { ...baseline, reed: 1 }, baseline, baseline])
     const poor = setup({ food: 0 })
     turn(poor, 0, 'grain-seeds')
     const denied = turn(poor, 1, 'reed-bank')
@@ -416,6 +419,8 @@ describe("A156 command boundaries", () => {
     assert.equal(material(denied).food, 0)
     assert.equal(material(denied).reed, 0)
     assert.deepEqual(material(denied), { wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 1, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 })
+    for (const actual of [denied, poor.getState()])
+      assert.deepEqual(actual.state.players.map(player => player.resources), [{ ...baseline, food: 0, grain: 1 }, { ...baseline, reed: 1 }, baseline, baseline])
     for (const played of [false, true]) {
       const s = setup({ food: 1 }, played)
       const r = played ? turn(s, 0, 'reed-bank') : offer(s, 'reed-bank')
