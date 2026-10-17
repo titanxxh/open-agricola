@@ -290,6 +290,11 @@ describe("A143 command boundaries", () => {
     assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { rooms: [{ row: 99, col: 99 }] }))
     const built = drive(s, r)
     assert.equal(built.state.players[0]!.rooms, 3)
+    for (const response of [built, s.getState()]) {
+      assert.equal(response.state.players[0]!.resources.stone, 0)
+      assert.equal(response.state.players[0]!.resources.reed, 0)
+      assert.deepEqual(response.state.players[0]!.resources, { wood: 0, clay: 0, reed: 0, stone: 0, food: 40, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 })
+    }
     save('A143-N4', { r, built })
   })
   it("whole actual purchase undo restores discounted stone before one retry", () => {

@@ -231,8 +231,9 @@ describe("A148 command boundaries", () => {
     assert.equal(r.state.currentPlayerIndex, actor)
     return ok(s.takeAction(actor, space))
   }
-  function wool(cap: number, type: 'sheep' | 'boar' | 'cattle' = 'sheep', played = true) {
+  function wool(cap: number, type: 'sheep' | 'boar' | 'cattle' = 'sheep', played = true, round = 14) {
     return setup(state => {
+      state.round = round
       state.completedFeedingPhases = cap
       state.players[0]!.resources[type] = cap + 1
     }, played)
@@ -242,26 +243,30 @@ describe("A148 command boundaries", () => {
     return r.interaction.request
   }
   it("completed feeding phases one two and six bound legal sheep housing on the card", () => {
-    for (const cap of [1, 2, 6]) {
-      const s = wool(cap), r = turn(s, 0, 'day-laborer'), q = menu(r)
-      const z = q.zones.find(z => z.id === `card:${WOOL}`)
-      assert.ok(z)
-      assert.equal(z.capacity, cap)
-      const done = ok(s.resolveChoice(0, 'confirm', { zones: [{ ...z, animalType: 'sheep', animalCount: cap }] }))
-      assert.equal(done.state.players[0]!.resources.sheep, cap)
-      assertAnimalPlacement(s, done, [cap, 0, 0], [{ id: `card:${WOOL}`, animalType: 'sheep', animalCount: cap, capacity: cap }])
-      assert.ok(done.interaction.stateId === 'wait', JSON.stringify(done.interaction))
-      assert.deepEqual(done.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
-      assert.equal(done.interaction.playerIndex, 0)
-      assert.equal(done.state.currentPlayerIndex, 0)
-      save(`A148-N1-${cap}`, { r, done })
+    for (const round of [14, 8]) {
+      for (const cap of round === 14 ? [1, 2, 6] : [1, 2]) {
+        const s = wool(cap, 'sheep', true, round), r = turn(s, 0, 'day-laborer'), q = menu(r)
+        const z = q.zones.find(z => z.id === `card:${WOOL}`)
+        assert.ok(z)
+        assert.equal(z.capacity, cap)
+        const done = ok(s.resolveChoice(0, 'confirm', { zones: [{ ...z, animalType: 'sheep', animalCount: cap }] }))
+        assert.equal(done.state.players[0]!.resources.sheep, cap)
+        assertAnimalPlacement(s, done, [cap, 0, 0], [{ id: `card:${WOOL}`, animalType: 'sheep', animalCount: cap, capacity: cap }])
+        assert.ok(done.interaction.stateId === 'wait', JSON.stringify(done.interaction))
+        assert.deepEqual(done.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
+        assert.equal(done.interaction.playerIndex, 0)
+        assert.equal(done.state.currentPlayerIndex, 0)
+        save(`A148-N1-${round}-${cap}`, { r, done })
+      }
     }
   })
   it("zero phases and hand exclude the holder independently of round number", () => {
-    for (const [cap, played] of [[0, true], [2, false]] as const) {
-      const s = wool(cap, 'sheep', played), r = turn(s, 0, 'day-laborer')
-      assert.ok(!menu(r).zones.some(z => z.id === `card:${WOOL}`))
-      save(`A148-N2-${cap}-${played}`, r)
+    for (const round of [14, 8]) {
+      for (const [cap, played] of [[0, true], [2, false]] as const) {
+        const s = wool(cap, 'sheep', played, round), r = turn(s, 0, 'day-laborer')
+        assert.ok(!menu(r).zones.some(z => z.id === `card:${WOOL}`))
+        save(`A148-N2-${round}-${cap}-${played}`, r)
+      }
     }
   })
   it("overcapacity wrong species and fabricated card reject before legal sheep placement", () => {
@@ -404,6 +409,11 @@ describe("A152 command boundaries", () => {
     assert.equal(declined.state.players[0]!.resources.food, 60)
     const poor = end(setup(5, state => state.players[0]!.resources.food = 0), EIGHT, null, false).r
     assert.equal(poor.state.players[0]!.occupationPlayed.length, 1)
+    for (const response of [declined, poor]) {
+      assert.deepEqual(response.state.players[0]!.occupationPlayed, [STUDENT])
+      assert.deepEqual(response.state.players[0]!.occupationHand, ['A110_Roughcaster', 'A114_SeasonalWorker'])
+    }
+    assert.equal(poor.state.players[0]!.resources.food, 0)
     save('A152-N2', { declined, poor })
   })
   it("any opponent Lessons placement suppresses night school", () => {

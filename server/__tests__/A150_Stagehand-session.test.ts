@@ -253,7 +253,8 @@ describe("A150 command boundaries", () => {
     const decline = drive(s, offer(s), null)
     assert.equal(decline.state.players[0]!.rooms, 2)
     assert.equal(decline.state.players[0]!.resources.wood, 10)
-    const own = turn(stage(), 0, 'traveling-players')
+    const ownSession = stage()
+    const own = turn(ownSession, 0, 'traveling-players')
     assertTurnFinished(own, 0)
     assert.equal(own.state.players[0]!.rooms, 2)
     const hs = stage(10, false)
@@ -265,6 +266,15 @@ describe("A150 command boundaries", () => {
     const unrelated = turn(us, 1, 'fishing')
     assertTurnFinished(unrelated, 1)
     assert.equal(unrelated.state.players[0]!.rooms, 2)
+    for (const response of [decline, s.getState(), own, ownSession.getState(), hand, hs.getState(), unrelated, us.getState()]) {
+      for (const player of response.state.players) {
+        assert.equal(player.rooms, 2)
+        assert.deepEqual(player.roomTiles.map(tile => [tile.row, tile.col]).sort(), [[1, 0], [2, 0]])
+        assert.deepEqual(player.stableTiles, [])
+        assert.deepEqual(player.pastures, [])
+        assert.deepEqual(player.fenceSegments, [])
+      }
+    }
     save('A150-N2', { decline, own, hand, unrelated })
   })
   it("poor owner cannot select unpaid construction and stale choice cannot repeat", () => {
