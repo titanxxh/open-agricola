@@ -100,7 +100,7 @@ describe('reorganizeAction engine sub-flow integration', () => {
     ])
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources).toMatchObject({ sheep: 0, boar: 1 })
-    expect(response.state.players[0]!.stableAnimals['2-4']).toBeNull()
+    expect(response.state.players[0]!.stableAnimals['2-4']).toBeUndefined()
     expect(Object.values(response.state.players[0]!.houseAnimals).length).toBe(0)
     expect(response.state.players[0]!.pastures[0]).toMatchObject({ animalType: 'boar', animalCount: 1 })
     expect(response.state.log.find((entry) => entry.key === 'log.reorganizeDiscard')?.params?.resources)

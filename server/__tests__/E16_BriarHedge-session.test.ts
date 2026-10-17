@@ -54,7 +54,7 @@ describe('E016_BriarHedge session', () => {
     const state = session.getState().state
     const player = state.players[0]!
     player.houseAnimals = Object.fromEntries(player.roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, 'sheep']));
-    player.stableAnimals = { '0-0': 'boar' }
+    player.stableAnimals = { '0-0': { animalType: 'boar', animalCount: 1 } }
     player.pastures = [
       { id: 'p3', size: 1, stables: 0, tiles: [{ row: 1, col: 0 }], animalType: 'cattle', animalCount: 1 },
     ]
@@ -66,7 +66,7 @@ describe('E016_BriarHedge session', () => {
     const state = session.getState().state
     const player = state.players[0]!
     player.houseAnimals = Object.fromEntries(player.roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, 'sheep']));
-    player.stableAnimals = { '0-0': 'boar' }
+    player.stableAnimals = { '0-0': { animalType: 'boar', animalCount: 1 } }
     player.cardStates = {
       Test_AnimalHolder: {
         extraData: { held: 1, animalType: 'cattle' },

@@ -1,3 +1,4 @@
+import { assertRejectedUnchanged } from './_helpers/session-assertions'
 import { createTestDatabase } from './_helpers/postgres'
 import { PostgresRoomPersistence } from '../game/persistence/postgres-adapter'
 import { describe, expect, it } from 'vitest'
@@ -402,6 +403,9 @@ describe('D014 Hammer Crusher provisional continuation', () => {
     if (response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'farm-select') {
       throw new Error('expected room selection')
     }
+    assertRejectedUnchanged(session, () => session.commitSelectionChoice(0, { rooms: [{ row: -1, col: -1 }] }))
+    assertRejectedUnchanged(session, () => session.commitSelectionChoice(0, { rooms: [{ row: -1, col: -1 }] }))
+    expect(session.createSessionPrivateCursor().failedAuthoritativeCommands).toEqual([])
     const room = response.interaction.request.farm.selectableTiles[0]!
 
     response = session.commitSelectionChoice(0, { rooms: [room] })

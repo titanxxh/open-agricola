@@ -19,7 +19,7 @@ const countCattleOnBoard = (player: PlayerState): number => {
   }
   total += countRoomAnimals(player, 'cattle')
   for (const animal of Object.values(player.stableAnimals ?? {})) {
-    if (animal === 'cattle') total += 1
+    if (animal.animalType === 'cattle') total += animal.animalCount
   }
   return total
 }

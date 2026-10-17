@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { setupMoorAudit, playMoorAuditMinor, startMoorAuditFeeding, advanceMoorAuditToRound, acceptMoorAuditChoice } from './_helpers/moor-rules-audit'
-import { moveMajorImprovementToSupplyTop } from '../../shared/cards/major/supply'
+import { takeMajorImprovementFromSupply, moveMajorImprovementToSupplyTop } from '../../shared/cards/major/supply'
 import { setWorkersAtHome, workersAvailable } from '../../shared/domain/player'
 
 describe('Moor exchange printed-rule native audit', () => {
@@ -125,6 +125,8 @@ describe('Moor exchange printed-rule native audit', () => {
     const session = setupMoorAudit()
     session.state.players[0]!.improvements = ['Major_Moor_MuseumOfTheMoors']
     session.state.players[1]!.improvements = ['Major_Moor_PeatCharcoalKiln']
+    takeMajorImprovementFromSupply(session.state, 'Major_Moor_MuseumOfTheMoors')
+    takeMajorImprovementFromSupply(session.state, 'Major_Moor_PeatCharcoalKiln')
     session.loadState(session.state)
     if (museum === 'M113_LivingHistoryMuseum') {
       session.state.players[0]!.houseType = 'clay'

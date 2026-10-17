@@ -18,7 +18,7 @@ import {
   SequenceNode,
   XorNode,
 } from './nodes'
-import type { EngineNode, EngineStepResult, NodeCursor } from './types'
+import type { EngineNode, EngineStepResult, NodeCursor, EngineChoiceResult } from './types'
 import type { PendingEnvelope } from './types'
 import { ActionRegistry } from './registry'
 import { HookDispatcher } from './dispatcher'
@@ -903,11 +903,11 @@ export class Engine {
     choice: string,
     context: EngineContext,
     payload?: Record<string, unknown>,
-  ): ActionExecutionResult {
+  ): EngineChoiceResult {
     context = { ...context, actionHooks: this.hooks.actionHooks }
     const pending = this.peekPendingEnvelope()
     if (pending?.syntheticKind === 'before-action-anytime') {
-      if (choice !== 'continue') return { type: 'fail', errorKey: 'log.action', recoverable: true }
+      if (choice !== 'continue') return { type: 'fail', errorKey: 'log.action', recoverable: true, disposition: 'rejected-input' }
       this.peekPendingHost()?.clearPending()
       this._pendingNodeIdRef.value = null
       return { type: 'ok' }

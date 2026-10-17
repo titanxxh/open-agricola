@@ -1177,16 +1177,7 @@ describe("A047 command boundaries", () => {
     assert.equal(s.getState().interaction.stateId, 'idle')
     const initial = s.getState()
     assert.deepEqual(initial.state.players[0]!.farmTerrain, [])
-    // #1258: restore currently removes this player's empty terrain array.
-    const before = undoRuleSnapshot({
-      ...initial,
-      state: {
-        ...initial.state,
-        players: initial.state.players.map((player, index) => index === 0
-          ? { ...player, farmTerrain: undefined }
-          : player),
-      },
-    })
+    const before = undoRuleSnapshot(initial)
     let r = buy(s)
     assert.deepEqual(rounds(r), [6, 7, 8, 9])
     assert.equal(r.state.players[0]!.resources.wood, 0)

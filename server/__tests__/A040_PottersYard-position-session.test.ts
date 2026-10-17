@@ -850,16 +850,7 @@ describe("A040 command boundaries", () => {
     assert.equal(s.getState().interaction.stateId, 'idle')
     const initial = s.getState()
     assert.deepEqual(initial.state.players[0]!.playedCards, [])
-    // #1258: restore currently rebuilds this purchase's canonical card alias.
-    const before = undoRuleSnapshot({
-      ...initial,
-      state: {
-        ...initial.state,
-        players: initial.state.players.map((player, index) => index === 0
-          ? { ...player, playedCards: ['minor:A040_PottersYard'] }
-          : player),
-      },
-    })
+    const before = undoRuleSnapshot(initial)
     turn(s, 0, 'farmland')
     exchange(s, plow(s))
     const beforeRestored = s.undoAction()

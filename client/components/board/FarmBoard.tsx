@@ -462,7 +462,7 @@ export type FarmBoardView = {
   houseDisplayMap: Map<string, { animalType: AnimalType | null; animalCount: number }>
   stableDisplayMap: Map<
     string,
-    { animalType: AnimalType | null; animalCount: number }
+    { animalType: AnimalType | null; animalCount: number; capacity: number }
   >
   cardDisplayMap?: Map<string, CardAnimalDisplay>
   farmCardDisplayMap?: Map<string, CardAnimalDisplay>
@@ -1362,14 +1362,15 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
                 : '0/1'
               : null
           const stableDisplay = stableDisplayMap.get(tileKey)
+          const stableCapacity = stableDisplay?.capacity ?? 0
           const farmCardDisplay = farmCardDisplayMap.get(tileKey)
           const stableLabel = stableDisplay
             ? stableDisplay.animalType
               ? `${stableDisplay.animalCount}${t(
                   locale,
                   `resources.${stableDisplay.animalType}`,
-                )}/1`
-              : '0/1'
+                )}/${stableCapacity}`
+              : `0/${stableCapacity}`
             : null
           const tileLabel = isRoom
             ? displayPlayer.houseType === 'clay'
@@ -1544,7 +1545,7 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
               ) : null}
               {stableLabel ? (
                 <div className="pasture-info">
-                  <div className="pasture-count"><AnimalCount count={stableDisplay?.animalCount ?? 0} animalType={stableDisplay?.animalType ?? null} capacity={1} /></div>
+                  <div className="pasture-count"><AnimalCount count={stableDisplay?.animalCount ?? 0} animalType={stableDisplay?.animalType ?? null} capacity={stableCapacity} /></div>
                   {isReorgActive ? (
                     <div className="pasture-controls">
                       {ANIMAL_CONTROL_TYPES.map((animalType) => {
@@ -1556,7 +1557,9 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
                           stableDisplay?.animalType === animalType && count > 0
                         const canIncrease =
                           (reorgRemaining?.[animalType] ?? 0) > 0 &&
-                          (stableDisplay?.animalType !== animalType || count < 1)
+                          stableCapacity > 0 &&
+                          (stableDisplay?.animalCount ?? 0) < stableCapacity &&
+                          (!stableDisplay?.animalType || stableDisplay.animalType === animalType)
                         return (
                           <div key={animalType} className="pasture-control-row">
                             <span className="pasture-control-label">

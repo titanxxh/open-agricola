@@ -714,7 +714,7 @@ describe('validateFenceSelection — generic fence policy', () => {
     player.resources.sheep = 1
     player.houseAnimals = {};
     player.stableTiles = [{ row: 2, col: 4 }]
-    player.stableAnimals = { '2-4': 'sheep' }
+    player.stableAnimals = { '2-4': { animalType: 'sheep', animalCount: 1 } }
 
     const result = validateFenceSelection(player, edgesForTile(0, 1))
 
@@ -722,7 +722,7 @@ describe('validateFenceSelection — generic fence policy', () => {
     if (result.ok) {
       expect(result.player.pastures[0]?.animalType).toBeNull()
       expect(result.player.pastures[0]?.animalCount).toBe(0)
-      expect(result.player.stableAnimals['2-4']).toBe('sheep')
+      expect(result.player.stableAnimals['2-4']).toEqual({ animalType: 'sheep', animalCount: 1 })
       expect(result.player.resources.sheep).toBe(1)
     }
   })

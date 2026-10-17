@@ -8,7 +8,7 @@ import type {
   Resource,
   ActionSpace,
 } from '../contract/types'
-import type { EngineNode, InteractionContextSnapshot } from './types'
+import type { EngineNode, InteractionContextSnapshot, EngineChoiceResult } from './types'
 import {
   ActionNode,
   OrNode,
@@ -168,10 +168,11 @@ const commitIfEngineComplete = (
 const rollbackAndReturn = (
   int: EngineInternals,
   result: ActionExecutionResult & { type: 'fail' },
-): ActionExecutionResult => {
+  disposition: 'rejected-input' | 'accepted-blocked' | 'execution-failed' = 'rejected-input',
+): EngineChoiceResult => {
   int.events.rollbackTransaction()
   clearEventLogDerivations(int)
-  return result
+  return { ...result, disposition }
 }
 
 const rememberBranchSelection = (node: OrNode | XorNode, targetNode: EngineNode | undefined): void => {
@@ -379,7 +380,7 @@ export function engineResolveChoice(
   choice: string,
   context: EngineContext,
   payload?: Record<string, unknown>,
-): ActionExecutionResult {
+): EngineChoiceResult {
   ensureEventState(context.state)
   int.events.ensureTransaction()
   if (int.pendingNodeIdRef.value) {
@@ -391,7 +392,7 @@ export function engineResolveChoice(
         ?? (node instanceof ActionNode ? node.actionId : null)
       const protectedCancelFailure = rejectProtectedActionCancel(pendingActionId, choice)
       if (protectedCancelFailure) {
-        return protectedCancelFailure
+        return { ...protectedCancelFailure, disposition: 'rejected-input' }
       }
       if (envelope && !isPendingChoiceValueAllowed(envelope, choice)) {
         return rollbackAndReturn(int, { type: 'fail', errorKey: 'log.buildRoomFail' })
@@ -639,7 +640,7 @@ export function engineResolveChoice(
       if (result.type === 'fail') {
         eventFrame.rollback()
         setEngineBlockedPending(int, child.id, actionId)
-        return result
+        return { ...result, disposition: 'accepted-blocked' }
       }
       if (result.type !== 'request') {
         emitCardTriggered(int, eventFrame.sink, executionContext, actionId, {
@@ -956,7 +957,7 @@ export function engineResolveChoice(
       // its options payable again, or the player may undo. Other request
       // kinds keep blocking a mandatory host.
       const keepIssuedMenu = pendingEnvelope?.request.kind === 'choice'
-      return rollbackAndReturn(int, { type: 'fail', errorKey: 'log.buildRoomFail', ...(keepIssuedMenu ? { recoverable: true } : {}) })
+      return rollbackAndReturn(int, { type: 'fail', errorKey: 'log.buildRoomFail', ...(keepIssuedMenu ? { recoverable: true } : {}) }, keepIssuedMenu ? 'rejected-input' : 'accepted-blocked')
     }
     const costResults = int.hooks.computeCosts({
       ...executionContext,
@@ -1079,10 +1080,10 @@ export function engineResolveChoice(
       actionContext: contextSnapshot?.actionContext,
     })
     if (pendingHost instanceof ActionNode) copyInternalMetadataToPending(pendingHost, pendingEnvelope)
-    return result.recoverable === true ? result : { type: 'fail', errorKey: result.errorKey, recoverable: true }
+    return { ...result, disposition: 'rejected-input' }
   }
   if (result.type === 'fail') {
-    return pendingHost?.mandatory ? result : rollbackAndReturn(int, result)
+    return pendingHost?.mandatory ? { ...result, disposition: 'accepted-blocked' } : rollbackAndReturn(int, result, 'execution-failed')
   }
   if (result.type === 'request') {
     if (pendingActionNode) {

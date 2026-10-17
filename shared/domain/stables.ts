@@ -16,7 +16,7 @@ export const getUnfencedStableCountForCards = (player: PlayerState): number =>
 
 export const getEmptyUnfencedStableCountForCards = (player: PlayerState): number => {
   const emptyOrdinary = getLooseStableKeys(player).filter(
-    (key) => !player.stableAnimals?.[key],
+    (key) => (player.stableAnimals?.[key]?.animalCount ?? 0) === 0,
   ).length
   return emptyOrdinary + getStandingSpecialStableCount(player)
 }

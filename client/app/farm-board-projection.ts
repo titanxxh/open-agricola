@@ -136,7 +136,7 @@ export type FarmBoardProjection = {
   pastureDisplayMap: Map<string, FarmBoardProjectionAnimalDisplay>
   pastureCapacityMap: Map<string, number>
   houseDisplayMap: Map<string, FarmBoardProjectionAnimalDisplay>
-  stableDisplayMap: Map<string, FarmBoardProjectionAnimalDisplay>
+  stableDisplayMap: Map<string, FarmBoardProjectionAnimalDisplay & { capacity: number }>
   cardDisplayMap: Map<string, CardAnimalDisplay>
   farmCardDisplayMap: Map<string, CardAnimalDisplay>
   borrowedPlayedCardDisplays: BorrowedPlayedCardDisplay[]

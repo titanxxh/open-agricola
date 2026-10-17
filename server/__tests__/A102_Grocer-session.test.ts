@@ -294,12 +294,9 @@ describe("A102 command boundaries", () => {
         const undone = ok(session.undoAction());
         save('A102-N5-raw-undo', { before, undone });
         assert.deepEqual(before.state.players[0]!.playedCards, []);
-        // #1258: restore materializes this derived card-identity representation.
-        const expectedRestored = { ...before, state: captureStateWithHistory(before.state) };
-        expectedRestored.state.players[0]!.playedCards = ['occupation:A102_Grocer'];
-        assertUndoRestored(undoRuleSnapshot(expectedRestored), undone);
+        assertUndoRestored(undoRuleSnapshot(before), undone);
         const live = session.getState();
-        assertUndoRestored(undoRuleSnapshot(expectedRestored), live);
+        assertUndoRestored(undoRuleSnapshot(before), live);
         assert.deepEqual(undone.state.players[0]!.occupationHand, ['__test_placeholder__']);
         assert.deepEqual(live.state.players[0]!.occupationHand, ['__test_placeholder__']);
         assert.deepEqual(live.interaction, before.interaction);

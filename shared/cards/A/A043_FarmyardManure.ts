@@ -76,7 +76,7 @@ const cardImpl = {
 },
   prerequisiteCheck: (player) => {
     const inStables = Object.values(player.stableAnimals ?? {}).filter(
-      (animal) => animal !== null,
+      (animal) => animal.animalCount > 0,
     ).length
     const inHouse = countRoomAnimals(player)
     const inPastures = (player.pastures ?? []).reduce(

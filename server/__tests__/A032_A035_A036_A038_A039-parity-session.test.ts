@@ -664,7 +664,7 @@ describe("A038 command boundaries", () => {
     p.fenceSegments = ['H-0-1', 'H-0-2', 'H-1-1', 'H-1-2', 'V-0-1', 'V-0-3'].map(edge => ({ edge, type: 'fence', source: { kind: 'own', ownerPlayerId: p.id } }))
     p.stableTiles = mixed ? [{ row: 0, col: 3 }] : [{ row: 0, col: 1 }]
     p.houseAnimals = mixed && sheep > 3 ? { '2-0': 'sheep' } : {}
-    p.stableAnimals = mixed && sheep > 4 ? { '0-3': 'sheep' } : {}
+    p.stableAnimals = mixed && sheep > 4 ? { '0-3': { animalType: 'sheep', animalCount: 1 } } : {}
   }
   function wool({ sheep = 5, played = false, mixed = false } = {}, configure: (state: GameState) => void = () => {
   }) {
@@ -687,7 +687,7 @@ describe("A038 command boundaries", () => {
     const r = buy(s)
     assert.equal(r.state.players[0]!.pastures[0]!.animalCount, 3)
     assert.equal(countRoomAnimals(r.state.players[0]!), 1)
-    assert.equal(Object.values(r.state.players[0]!.stableAnimals ?? {}).filter(x => x === 'sheep').length, 1)
+    assert.equal(Object.values(r.state.players[0]!.stableAnimals ?? {}).filter(x => x.animalType === 'sheep').length, 1)
     assert.equal(bonus(r), 3)
   })
   it("opponent sheep and controlled unallocated supply cannot satisfy owner board prerequisite", () => {
@@ -733,7 +733,7 @@ describe("A038 command boundaries", () => {
       const housed = s.getState().state.players[0]!
       assert.deepEqual(housed.pastures.map(pasture => ({ animalType: pasture.animalType, animalCount: pasture.animalCount })), [{ animalType: 'sheep', animalCount: mixed ? 3 : 5 }])
       assert.deepEqual(housed.houseAnimals, mixed ? { '2-0': 'sheep' } : {})
-      assert.deepEqual(housed.stableAnimals, mixed ? { '0-3': 'sheep' } : {})
+      assert.deepEqual(housed.stableAnimals, mixed ? { '0-3': { animalType: 'sheep', animalCount: 1 } } : {})
       const menu = ok(s.takeAnytimeAction(0, 'exchange'))
       const c = options(menu).find(o => o.effectPreview?.kind === 'resourceExchange' && o.effectPreview.resourcesPaid?.sheep === 5)
       assert(c, JSON.stringify(menu.interaction))
@@ -744,7 +744,7 @@ describe("A038 command boundaries", () => {
       assert.equal(owner.resources.food, 30)
       assert.deepEqual(owner.pastures.map(pasture => ({ animalType: pasture.animalType, animalCount: pasture.animalCount })), [{ animalType: null, animalCount: 0 }])
       assert.deepEqual(owner.houseAnimals, {})
-      assert.deepEqual(owner.stableAnimals, mixed ? { '0-3': null } : {})
+      assert.deepEqual(owner.stableAnimals, {})
       assert.equal(countRoomAnimals(owner), 0)
       assert.equal(bonus(cooked), 3)
       assert.equal(cooked.interaction.stateId, 'idle')
@@ -881,16 +881,7 @@ describe("A039 command boundaries", () => {
     const chapel = r.state.actionSpaces.find(space => space.id === A039)
     assert.ok(chapel)
     assert.equal(chapel.blockedBy, undefined)
-    // #1258: restore currently adds only this public space's empty blocker list.
-    return undoRuleSnapshot({
-      ...r,
-      state: {
-        ...r.state,
-        actionSpaces: r.state.actionSpaces.map(space => space.id === A039
-          ? { ...space, blockedBy: [] }
-          : space),
-      },
-    })
+    return undoRuleSnapshot(r)
   }
   function occupants(r: SessionResponse) {
     return r.state.actionSpaces.find(a => a.id === A039)!.takenBy.length

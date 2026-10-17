@@ -141,7 +141,7 @@ describe('getEmptyUnfencedStableCountForCards', () => {
         { row: 0, col: 0 },
         { row: 0, col: 1 },
       ],
-      stableAnimals: { '0-0': 'sheep', '0-1': null },
+      stableAnimals: { '0-0': { animalType: 'sheep', animalCount: 1 } },
     })
     expect(getEmptyUnfencedStableCountForCards(p)).toBe(1)
   })
@@ -170,7 +170,7 @@ describe('getEmptyUnfencedStableCountForCards', () => {
   it('always counts the B85 FarmHand position as one empty unfenced stable', () => {
     const p = player({
       stableTiles: [{ row: 0, col: 0 }],
-      stableAnimals: { '0-0': 'cattle' },
+      stableAnimals: { '0-0': { animalType: 'cattle', animalCount: 1 } },
       farmHandPosition: { row: 2, col: 2 },
     })
     expect(getEmptyUnfencedStableCountForCards(p)).toBe(1)

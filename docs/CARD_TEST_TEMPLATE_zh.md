@@ -509,7 +509,9 @@ const resp = session.takeAction(X, 'ACTION_ID')
 
 批次修改的额外原生回归文件，在迁移清单的 `nativeScope` 中用 `{ file, reason }` 显式登记。它们与已映射目标共同进入严格类型门禁和候选行为验收。路径必须是工作区内已存在的测试文件，不得重复，且理由不能为空。此检查范围不新增或替代任何源场景映射。
 
-观测 `GameState` 原值的副本使用 `shared/session/history-streams` 的 `captureStateWithHistory`。`cloneState`、`cloneStateWithHistory` 和 `normalizeState` 会归一化数据，可能掩盖返回值中的差异；只用于直接传入真实 `GameSession` / `GameCore` 构造器或其 `loadState` 操作的待加载状态。构造器的 `state` 包装字段或 `stateOrSeed` 选项承载待加载状态；receiver、其他参数、元数据和回调不属于待加载状态。以归一化为被测对象的测试必须调用 `server/__tests__/_helpers/normalization-subject` 的 `normalizationSubject(normalizeState, ...args)`；仅归一化函数字面参数获得豁免，其余参数及回调仍被检查。native 门禁通过真实编译器符号追踪所有实际纳入的本地源码，仅排除 canonical Session 与归一化实现的运行时导入闭包。helper 目录名不提供豁免，纯类型导入也不授予生产代码归属。撤销预期必须在命令前从 live Session 或纯观测副本捕获，并在重试前比较完整规则、分数、返回和 live 交互以及实际玩家。已确认的恢复差异用该场景的明确预期值表达，不能通过归一化抹掉字段。
+观测 `GameState` 原值的副本使用 `shared/session/history-streams` 的 `captureStateWithHistory`。`normalizeState` 是显式开局归一化器，可能掩盖返回值差异；`cloneState` 和 `cloneStateWithHistory` 现在保留已有对局数据，但仍会挂接可执行定义，观测预期继续使用纯捕获。原生门禁对这三个 helper 保留保守限制，只允许直接作为真实 `GameSession` / `GameCore` 构造或 `loadState` 的加载输入。构造器的 `state` 包装字段或 `stateOrSeed` 选项承载待加载状态；receiver、其他参数、元数据和回调不属于待加载状态。以归一化为被测对象的测试必须调用 `server/__tests__/_helpers/normalization-subject` 的 `normalizationSubject(normalizeState, ...args)`；仅归一化函数字面参数获得豁免，其余参数及回调仍被检查。native 门禁通过真实编译器符号追踪所有实际纳入的本地源码，仅排除 canonical Session 与归一化实现的运行时导入闭包。helper 目录名不提供豁免，纯类型导入也不授予生产代码归属。撤销预期必须在命令前从 live Session 或纯观测副本捕获，并在重试前比较完整规则、分数、返回和 live 交互以及实际玩家。已确认的恢复差异用该场景的明确预期值表达，不能通过归一化抹掉字段。
+
+恢复、容纳区及输入拒绝回归（ADR 0028/0029、#1257）选择 Session 测试：先通过真实购卡把职业或小改手牌打空，再撤销后续行动；returned/live 快照必须保留空手牌及原始可选字段表示，普通新局发牌和非空手牌对照单独验证。输入拒绝在每步前后比较完整 state、interaction、scores 和可执行 undo 元数据，并连续拒绝后再合法重试，检查历史或效果是否累积。已接受强制续行的阻塞、需要持久化记忆的 guard violation 分别作对照，失败响应本身不证明输入拒绝。扩容动物区必须确认真实布局，通过公开分区查询回读持久数量，并完成正常交接；只检查 capacity 或资源总数不足以证明安置正确。支付、容量变化及快照恢复继续保留逐容纳区数量。只有对应修复通过这些严格断言后，才删除已知恢复差异的单场景例外。
 
 C131 N3 以当前 OA 的蔬菜 `0` 作为回归预期。此前蔬菜 `1` 的对照保留在暂缓的规则讨论中（[#1175](https://github.com/titanxxh/open-agricola/issues/1175)、[#1181](https://github.com/titanxxh/open-agricola/issues/1181)）。该对照不构成官方裁定，也不要求在这次测试迁移中修改生产行为。
 

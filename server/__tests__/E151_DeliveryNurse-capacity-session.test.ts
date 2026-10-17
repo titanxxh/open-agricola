@@ -43,7 +43,7 @@ const setup = (shed = true) => {
       Object.assign(player.resources, { sheep: 1, boar: 1, cattle: 1 })
       player.houseAnimals = { [positionKey(player.roomTiles[0]!)]: 'sheep' }
       player.stableTiles = [{ row: 0, col: 2 }, { row: 1, col: 2 }]
-      player.stableAnimals = { '0-2': 'boar', '1-2': 'cattle' }
+      player.stableAnimals = { '0-2': { animalType: 'boar', animalCount: 1 }, '1-2': { animalType: 'cattle', animalCount: 1 } }
     }
   }))
   return session
@@ -189,7 +189,7 @@ describe('E151 rule boundaries', () => {
         p.resources.boar = 1
         p.resources.cattle = missing ? 0 : 1
         p.stableTiles = [{ row: 0, col: 1 }, { row: 0, col: 2 }, { row: 0, col: 3 }]
-        p.stableAnimals = { '0-1': 'sheep', '0-2': 'boar', '0-3': missing ? null : 'cattle' }
+        p.stableAnimals = { '0-1': { animalType: 'sheep', animalCount: 1 }, '0-2': { animalType: 'boar', animalCount: 1 }, ...(missing ? {} : { '0-3': { animalType: 'cattle' as const, animalCount: 1 } }) }
         setActiveWorkerCount(p, family)
         setWorkersAtHome(state, p, family)
       }

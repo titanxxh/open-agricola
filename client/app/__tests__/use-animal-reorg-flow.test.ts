@@ -133,7 +133,7 @@ describe('use-animal-reorg-flow helpers', () => {
     })
     expect((Object.values(target.houseAnimals)[0] ?? null)).toBe('sheep')
     expect(Object.values(target.houseAnimals).length).toBe(1)
-    expect(target.stableAnimals['1-1']).toBe('cattle')
+    expect(target.stableAnimals['1-1']).toEqual({ animalType: 'cattle', animalCount: 1 })
     expect(target.resources.sheep).toBe(5)
     expect(target.resources.boar).toBe(2)
     expect(target.resources.cattle).toBe(4)
@@ -157,15 +157,15 @@ describe('use-animal-reorg-flow helpers', () => {
 
   it('builds stable display from reorg draft zones while reorganizing', () => {
     const display = buildStableDisplayMap(player(), animalReorgState())
-    expect(display.get('1-1')).toEqual({ animalType: 'cattle', animalCount: 1 })
+    expect(display.get('1-1')).toEqual({ animalType: 'cattle', animalCount: 1, capacity: 1 })
   })
 
   it('builds empty stable display from stable tiles', () => {
     const target = player()
     target.stableTiles = [{ row: 0, col: 0 }]
     target.stableAnimals = {}
-    const display = buildStableDisplayMap(target, null)
-    expect(display.get('0-0')).toEqual({ animalType: null, animalCount: 0 })
+    const display = buildStableDisplayMap({ ...target, stableAnimalZones: [{ id: 'stable:0-0', zoneType: 'stable', animalType: null, animalCount: 0, capacity: 1 }] }, null)
+    expect(display.get('0-0')).toEqual({ animalType: null, animalCount: 0, capacity: 1 })
   })
 
   it('builds card display from reorg draft zones while reorganizing', () => {

@@ -21,7 +21,7 @@ import {
   clearCustomCards,
   type CustomCardData,
 } from '../../shared/cards/custom-registry'
-import type { GameState, InteractionState, PlayerState, Resource } from '../../shared/contract/types'
+import type { GameState, InteractionAnimalReorgZone, InteractionState, PlayerState, Resource } from '../../shared/contract/types'
 import { rewriteCardId } from './extract'
 import { workshopCardJsonFromDefinition } from '../../server/workshop-draft-validation'
 import { getCardEffect } from '../../shared/cards/card-effects'
@@ -296,6 +296,7 @@ export interface AutoAdvanceOptions {
  */
 function buildPreservingZones(
   player: PlayerState,
+  availableZones: readonly InteractionAnimalReorgZone[],
 ): { id: string; zoneType: 'pasture' | 'house' | 'stable'; animalType: 'sheep' | 'boar' | 'cattle' | null; animalCount: number }[] {
   const remaining: Record<'sheep' | 'boar' | 'cattle', number> = {
     sheep: player.resources?.sheep ?? 0,
@@ -332,15 +333,17 @@ function buildPreservingZones(
       zones.push({ id: `house:${key}`, zoneType: 'house', animalType: null, animalCount: 0 })
     }
   }
-  // Loose stables: each holds 1.
-  for (const key of Object.keys(player.stableAnimals ?? {})) {
+  // Use backend holder entities and capacities, including empty stables.
+  for (const stable of availableZones.filter(zone => zone.zoneType === 'stable')) {
+    const key = stable.id.slice('stable:'.length)
     let chosen: 'sheep' | 'boar' | 'cattle' | null = null
     for (const k of ['cattle', 'boar', 'sheep'] as const) {
       if (remaining[k] > 0) { chosen = k; break }
     }
     if (chosen) {
-      zones.push({ id: `stable:${key}`, zoneType: 'stable', animalType: chosen, animalCount: 1 })
-      remaining[chosen] -= 1
+      const count = Math.min(stable.capacity, remaining[chosen])
+      zones.push({ id: `stable:${key}`, zoneType: 'stable', animalType: chosen, animalCount: count })
+      remaining[chosen] -= count
     } else {
       zones.push({ id: `stable:${key}`, zoneType: 'stable', animalType: null, animalCount: 0 })
     }
@@ -382,7 +385,7 @@ export function autoAdvanceRoundEnd(
       // build a zone list that preserves all current animals.
       const pi = resp.interaction.playerIndex
       const player = session.getState().state.players[pi]
-      const zones = player ? buildPreservingZones(player) : []
+      const zones = player ? buildPreservingZones(player, resp.interaction.request.zones) : []
       resp = session.resolveChoice(pi, 'confirm', { zones })
       continue
     }
