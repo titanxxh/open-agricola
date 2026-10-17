@@ -1230,6 +1230,7 @@ describe('A147 command boundaries', () => {
     const other = collectionComplete(collect(otherSession, 1, 'sheep-market', 'sheep'), 1)
     assert.equal(other.state.players[0]!.resources.sheep, 0)
     assert.equal(other.state.players[0]!.resources.food, 1)
+    assert.deepEqual(other.state.players.map(player => [player.resources.sheep, player.resources.boar, player.resources.cattle]), [[0, 0, 0], [1, 0, 0], [0, 0, 0]])
     assert.equal(other.state.players[1]!.resources.sheep, 1)
     assert.equal(other.state.players[1]!.resources.food, 40)
     const session = setup('sheep', 1)
