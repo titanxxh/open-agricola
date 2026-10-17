@@ -274,4 +274,49 @@ describe("A161 command boundaries", () => {
     assert.equal(legal.state.players[0]!.resources.vegetable, 0)
     save('A161-N4', { r, undone, retry, legal })
   })
+  it("a previous work phase wood accumulation cannot reward the next work phase's first wood", () => {
+    const s = setup(state => { state.round = 5 })
+    const baseline = { wood: 0, clay: 0, reed: 0, stone: 0, food: 40, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 }
+    const firstPhase = ['forest', 'clay-pit', 'day-laborer', 'fishing', 'grain-seeds', 'reed-bank', 'hollow-4', 'traveling-players']
+    let last = s.getState()
+    for (const [n, space] of firstPhase.entries()) {
+      last = turn(s, n % 4, space)
+      for (const actual of [last, s.getState()]) {
+        assert.equal(actual.state.round, 5)
+        assert.equal(actual.state.players[0]!.resources.vegetable, 0)
+      }
+    }
+    const next = confirmNext(s, last)
+    for (const actual of [next, s.getState()]) {
+      assert.equal(actual.interaction.stateId, 'idle', JSON.stringify(actual.interaction))
+      assert.equal(actual.state.round, 6)
+      assert.equal(actual.state.roundPhase, 'work')
+      assert.equal(actual.state.currentPlayerIndex, 0)
+      assert.deepEqual(actual.state.players.map(player => player.resources), [
+        { ...baseline, wood: 3, grain: 1 }, { ...baseline, clay: 1, reed: 1 },
+        { ...baseline, clay: 2, food: 42 }, { ...baseline, food: 42 },
+      ])
+    }
+    const firstWood = turn(s, 0, 'forest')
+    for (const actual of [firstWood, s.getState()]) {
+      assertTurnFinished(actual, 0)
+      assert.equal(actual.state.round, 6)
+      assert.deepEqual(actual.state.players.map(player => player.resources), [
+        { ...baseline, wood: 6, grain: 1 }, { ...baseline, clay: 1, reed: 1 },
+        { ...baseline, clay: 2, food: 42 }, { ...baseline, food: 42 },
+      ])
+    }
+    for (const [actor, space] of [[1, 'clay-pit'], [2, 'day-laborer'], [3, 'fishing']] as const)
+      turn(s, actor, space)
+    const secondWood = turn(s, 0, 'grove')
+    for (const actual of [secondWood, s.getState()]) {
+      assertTurnFinished(actual, 0)
+      assert.equal(actual.state.round, 6)
+      assert.deepEqual(actual.state.players.map(player => player.resources), [
+        { ...baseline, wood: 10, grain: 1, vegetable: 1 }, { ...baseline, clay: 2, reed: 1 },
+        { ...baseline, clay: 2, food: 44 }, { ...baseline, food: 43 },
+      ])
+    }
+    save('A161-work-phase-reset', { next, firstWood, secondWood })
+  })
 })

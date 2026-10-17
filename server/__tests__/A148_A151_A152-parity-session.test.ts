@@ -427,4 +427,77 @@ describe("A152 command boundaries", () => {
       save(`A152-N3-${lesson}`, r)
     }
   })
+  it("each natural returning home phase can play one retained occupation for one food", () => {
+    const s = setup()
+    const baseline = { wood: 0, clay: 0, reed: 0, stone: 0, food: 60, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 }
+    const phases = [
+      {
+        round: 5, occupation: 'A110_Roughcaster', foodBefore: 60,
+        handBefore: ['A110_Roughcaster', 'A114_SeasonalWorker'], handAfter: ['A114_SeasonalWorker'],
+        playedBefore: [STUDENT], playedAfter: [STUDENT, 'A110_Roughcaster'],
+        resources: [{ ...baseline, clay: 1, food: 59, grain: 1 }, { ...baseline, food: 63 }, { ...baseline, wood: 3, clay: 2 }, { ...baseline, reed: 1, food: 61 }],
+      },
+      {
+        round: 6, occupation: 'A114_SeasonalWorker', foodBefore: 59,
+        handBefore: ['A114_SeasonalWorker'], handAfter: [],
+        playedBefore: [STUDENT, 'A110_Roughcaster'], playedAfter: [STUDENT, 'A110_Roughcaster', 'A114_SeasonalWorker'],
+        resources: [{ ...baseline, clay: 2, food: 58, grain: 2 }, { ...baseline, food: 66 }, { ...baseline, wood: 6, clay: 4 }, { ...baseline, reed: 2, food: 62 }],
+      },
+    ]
+    for (const phase of phases) {
+      let last = s.getState()
+      assert.equal(last.state.round, phase.round)
+      for (const [n, space] of EIGHT.entries()) {
+        const actor = n % 4
+        last = turn(s, actor, space)
+        assert.ok(last.interaction.stateId === 'wait', JSON.stringify(last.interaction))
+        assert.deepEqual(last.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: (actor + 1) % 4 })
+        assert.equal(last.interaction.playerIndex, actor)
+        assert.equal(last.state.currentPlayerIndex, actor)
+        assert.equal(last.state.round, phase.round)
+        assert.equal(last.state.roundPhase, 'work')
+      }
+      const pending = confirmNext(s, last)
+      for (const actual of [pending, s.getState()]) {
+        assert.ok(actual.interaction.stateId === 'wait' && actual.interaction.request.kind === 'choice', JSON.stringify(actual.interaction))
+        assert.equal(actual.interaction.sourceCard, STUDENT)
+        assert.equal(actual.interaction.playerIndex, 0)
+        assert.equal(actual.state.currentPlayerIndex, 0)
+        assert.equal(actual.state.round, phase.round)
+        assert.equal(actual.state.roundPhase, 'returning-home')
+        assert.deepEqual(actual.state.players[0]!.occupationHand, phase.handBefore)
+        assert.deepEqual(actual.state.players[0]!.occupationPlayed, phase.playedBefore)
+        assert.equal(actual.state.players[0]!.resources.food, phase.foodBefore)
+      }
+      const offers = getChoiceOptions(pending).filter(option => !option.disabled && option.sourceCard === STUDENT && option.value !== '__skip__' && option.value !== '__done__')
+      assert.equal(offers.length, 1)
+      const offer = offers[0]
+      assert.ok(offer)
+      const choosing = ok(s.resolveChoice(0, offer.value))
+      let done = choosing
+      if (phase.round === 5) {
+        assert.ok(choosing.interaction.stateId === 'wait' && choosing.interaction.request.kind === 'choice', JSON.stringify(choosing.interaction))
+        assert.equal(choosing.interaction.sourceCard, STUDENT)
+        assert.equal(choosing.interaction.playerIndex, 0)
+        assert.equal(choosing.interaction.promptKey, 'ui.interactionChooseOccupation')
+        const occupation = choosing.interaction.request.options.find(option => option.value === phase.occupation && !option.disabled)
+        assert.ok(occupation)
+        done = ok(s.resolveChoice(0, occupation.value))
+      }
+      else {
+        assert.equal(phase.round, 6)
+        assert.deepEqual(choosing.interaction, { stateId: 'idle', allowedCommands: ['takeAction'], anytimeActions: [] })
+      }
+      for (const actual of [done, s.getState()]) {
+        assert.equal(actual.interaction.stateId, 'idle', JSON.stringify(actual.interaction))
+        assert.equal(actual.state.round, phase.round + 1)
+        assert.equal(actual.state.roundPhase, 'work')
+        assert.equal(actual.state.currentPlayerIndex, 0)
+        assert.deepEqual(actual.state.players.map(player => player.resources), phase.resources)
+        assert.deepEqual(actual.state.players.map(player => player.occupationHand), [phase.handAfter, ['__test_placeholder__'], ['__test_placeholder__'], ['__test_placeholder__']])
+        assert.deepEqual(actual.state.players.map(player => player.occupationPlayed), [phase.playedAfter, [], [], []])
+      }
+      save(`A152-each-returning-home-${phase.round}`, { pending, choosing, done })
+    }
+  })
 })

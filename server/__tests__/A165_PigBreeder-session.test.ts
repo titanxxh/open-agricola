@@ -217,6 +217,43 @@ describe("A165 command boundaries", () => {
       assertAnimalPlacement(s, r, [0, pigs, 0], [{ id: 'p0', animalType: 'boar', animalCount: pigs, capacity: 4 }])
       save(`A165-N3-${round}-${pigs}-${played}`, r)
     }
+    for (const played of [true, false]) {
+      const s = phaseSetup(13, 1, 2, played, 60, true)
+      let pending = s.getState()
+      for (const [n, space] of EIGHT.entries()) {
+        pending = turn(s, n % 4, space)
+        assert.ok(pending.interaction.stateId === 'wait', JSON.stringify(pending.interaction))
+        assert.deepEqual(pending.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: (n + 1) % 4 })
+        assert.equal(pending.interaction.playerIndex, n % 4)
+        assert.equal(pending.state.currentPlayerIndex, n % 4)
+        assert.equal(pending.state.roundPhase, 'work')
+        assert.equal(pending.state.round, 13)
+      }
+      pending = confirmNext(s, pending)
+      assert.ok(pending.interaction.stateId === 'wait' && pending.interaction.request.kind === 'animal-reorg', JSON.stringify(pending.interaction))
+      assert.equal(pending.interaction.playerIndex, 0)
+      assert.equal(pending.state.round, 13)
+      assert.equal(pending.state.roundPhase, 'breeding')
+      assert.deepEqual(pending.state.players.map(player => [player.resources.sheep, player.resources.boar, player.resources.cattle]), [[0, 3, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0]])
+      const pasture = pending.interaction.request.zones.find(zone => zone.id === 'p0')
+      assert.ok(pasture)
+      assert.deepEqual([pasture.animalType, pasture.animalCount, pasture.capacity], ['boar', 3, 4])
+      const r = ok(s.resolveChoice(0, 'confirm', { zones: pending.interaction.request.zones }))
+      for (const actual of [r, s.getState()]) {
+        assert.equal(actual.interaction.stateId, 'idle')
+        assert.equal(actual.state.currentPlayerIndex, 0)
+        assert.equal(actual.state.roundPhase, 'work')
+        assert.equal(actual.state.round, 14)
+        assert.deepEqual(actual.state.players.map(player => [player.resources.sheep, player.resources.boar, player.resources.cattle]), [[0, 3, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0]])
+        assert.deepEqual(actual.state.players[0]!.pastures, [{ id: 'p0', tiles: [{ row: 0, col: 1 }], animalType: 'boar', animalCount: 3 }])
+        assert.deepEqual(actual.state.players[0]!.houseAnimals, {})
+        assert.deepEqual(actual.state.players[0]!.stableAnimals, {})
+        assert.ok(actual.state.events.some(event => event.type === 'farm.animalBred' && event.source === 'harvest' && event.animals.boar === 1))
+        assert.equal(actual.state.events.some(event => event.type === 'farm.animalBred' && event.sourceCardId === PIG), false)
+      }
+      assertAnimalPlacement(s, r, [0, 3, 0], [{ id: 'p0', animalType: 'boar', animalCount: 3, capacity: 4 }])
+      save(`A165-N3-13-2-${played}`, { pending, r })
+    }
   })
   it("full two pig pasture and other species house leave no extra pig capacity", () => {
     const s = setup({ food: 60 }, true, state => {

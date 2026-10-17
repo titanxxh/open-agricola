@@ -241,6 +241,8 @@ describe('A142 command boundaries', () => {
       }
       expect(response.state.players[1]!.resources).toMatchObject({ reed: 2, grain: 0, vegetable: 0, food: 0 })
       expect(response.state.players[0]!.resources).toMatchObject({ grain, vegetable, food })
+      for (const actual of [response, session.getState()])
+        assert.deepEqual(actual.state.players.map(player => [player.resources.food, player.resources.grain, player.resources.vegetable, player.resources.reed]), [[food, grain, vegetable, 0], [0, 0, 0, 2], [0, 0, 0, 0]])
     }
   })
   it('one food cannot buy vegetable and invalid actor or crop cannot produce free reward', () => {

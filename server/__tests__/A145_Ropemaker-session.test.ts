@@ -165,12 +165,18 @@ describe("A145 command boundaries", () => {
   }
   const ROPE_SIX = ['grain-seeds', 'day-laborer', 'forest', 'grove', 'clay-pit', 'fishing']
   it("first natural harvest adds one reed only after feeding while ordinary return home adds none", () => {
-    const harvest = end(setup(4), ROPE_SIX).r
+    const harvestSession = setup(4)
+    const harvest = end(harvestSession, ROPE_SIX).r
     assert.equal(harvest.state.round, 5)
     assert.equal(harvest.state.players[0]!.resources.reed, 1)
-    const ordinary = end(setup(3), ROPE_SIX).r
+    for (const actual of [harvest, harvestSession.getState()])
+      assert.deepEqual(actual.state.players.map(player => player.resources.reed), [1, 0, 0])
+    const ordinarySession = setup(3)
+    const ordinary = end(ordinarySession, ROPE_SIX).r
     assert.equal(ordinary.state.round, 4)
     assert.equal(ordinary.state.players[0]!.resources.reed, 0)
+    for (const actual of [ordinary, ordinarySession.getState()])
+      assert.deepEqual(actual.state.players.map(player => player.resources.reed), [0, 0, 0])
     const feedingSession = setup(4, state => { state.players[0]!.resources.food = 3 })
     const pending = endWork(feedingSession, ROPE_SIX)
     assert.ok(pending.interaction.stateId === 'wait' && pending.interaction.request.kind === 'feed', JSON.stringify(pending.interaction))
@@ -198,6 +204,8 @@ describe("A145 command boundaries", () => {
     assert.equal(pending.state.completedFeedingPhases, 0)
     assert.deepEqual(feedingSession.getState().interaction, pending.interaction)
     assert.equal(feedingSession.getState().state.players[0]!.resources.reed, 0)
+    for (const actual of [pending, feedingSession.getState()])
+      assert.deepEqual(actual.state.players.map(player => player.resources.reed), [0, 0, 0])
     const fed = ok(feedingSession.resolveChoice(0, 'confirm', { selections: [{ sourceId: '__basic__', exchangeIndex: 0, count: 1 }] }))
     assert.equal(fed.interaction.stateId, 'idle')
     assert.equal(fed.state.currentPlayerIndex, 0)
@@ -208,6 +216,8 @@ describe("A145 command boundaries", () => {
     assert.equal(fed.state.round, 5)
     assert.equal(fed.state.players[0]!.resources.reed, 1)
     assert.equal(feedingSession.getState().state.players[0]!.resources.reed, 1)
+    for (const actual of [fed, feedingSession.getState()])
+      assert.deepEqual(actual.state.players.map(player => player.resources.reed), [1, 0, 0])
     save('A145-N1', { harvest, ordinary })
     save('A145-N1-feeding', { pending, fed })
   })
@@ -216,18 +226,27 @@ describe("A145 command boundaries", () => {
     const first = end(s, ROPE_SIX).r
     assert.equal(first.state.players[0]!.resources.reed, 1)
     assert.equal(s.getState().state.players[0]!.resources.reed, 1)
+    for (const actual of [first, s.getState()])
+      assert.deepEqual(actual.state.players.map(player => player.resources.reed), [1, 0, 0])
     const ordinary = end(s, ROPE_SIX).r
     assert.equal(ordinary.state.round, 9)
     assert.equal(ordinary.state.players[0]!.resources.reed, 1)
     assert.equal(ordinary.interaction.stateId, 'idle')
+    for (const actual of [ordinary, s.getState()])
+      assert.deepEqual(actual.state.players.map(player => player.resources.reed), [1, 0, 0])
     const repeated = end(s, ROPE_SIX).r
     assert.equal(repeated.state.round, 10)
     assert.equal(repeated.state.roundPhase, 'work')
     assert.equal(repeated.interaction.stateId, 'idle')
     assert.equal(repeated.state.players[0]!.resources.reed, 2)
     assert.equal(s.getState().state.players[0]!.resources.reed, 2)
-    const hand = end(setup(4, undefined, false), ROPE_SIX).r
+    for (const actual of [repeated, s.getState()])
+      assert.deepEqual(actual.state.players.map(player => player.resources.reed), [2, 0, 0])
+    const handSession = setup(4, undefined, false)
+    const hand = end(handSession, ROPE_SIX).r
     assert.equal(hand.state.players[0]!.resources.reed, 0)
+    for (const actual of [hand, handSession.getState()])
+      assert.deepEqual(actual.state.players.map(player => player.resources.reed), [0, 0, 0])
     save('A145-N2', { first, ordinary, repeated, hand })
   })
 })

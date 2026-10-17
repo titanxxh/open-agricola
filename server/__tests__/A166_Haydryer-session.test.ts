@@ -276,6 +276,60 @@ describe("A166 command boundaries", () => {
       assert.equal(material(r).food - material(control).food, -(4 - count))
       save(`A166-N1-${count}`, { pending, r, control })
     }
+    for (const played of [true, false]) {
+      const s = phaseSetup(7, 1, 0, played)
+      let r = s.getState()
+      for (const [n, space] of EIGHT.entries()) {
+        r = turn(s, n % 4, space)
+        assert.ok(r.interaction.stateId === 'wait', JSON.stringify(r.interaction))
+        assert.deepEqual(r.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: (n + 1) % 4 })
+        assert.equal(r.interaction.playerIndex, n % 4)
+        assert.equal(r.state.currentPlayerIndex, n % 4)
+        assert.equal(r.state.roundPhase, 'work')
+        assert.equal(r.state.round, 7)
+      }
+      r = confirmNext(s, r)
+      if (played) {
+        assert.equal(r.state.round, 7)
+        assert.equal(r.state.roundPhase, 'harvest')
+        assert.equal(material(r).food, 60)
+        assert.equal(material(r).cattle, 0)
+        assert.ok(r.interaction.stateId === 'wait', JSON.stringify(r.interaction))
+        if (r.interaction.request.kind === 'select-trigger') {
+          const triggers = r.interaction.request.options.filter(option => option.sourceCard === HAY && !option.disabled)
+          assert.equal(triggers.length, 1)
+          assert.equal(r.interaction.playerIndex, 0)
+          r = ok(s.resolveChoice(0, triggers[0]!.value))
+        }
+        assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice', JSON.stringify(r.interaction))
+        assert.equal(r.interaction.sourceCard, HAY)
+        assert.equal(r.interaction.playerIndex, 0)
+        assert.equal(r.interaction.promptKey, 'ui.interactionHaydryer')
+        const purchases = r.interaction.request.options.filter(option => !option.disabled && option.value !== '__skip__' && option.value !== '__done__')
+        assert.equal(purchases.length, 1)
+        r = ok(s.resolveChoice(0, purchases[0]!.value))
+        assert.equal(material(r).food, 57)
+        assert.equal(material(r).cattle, 1)
+        assert.equal(r.state.round, 7)
+        assert.equal(r.state.roundPhase, 'harvest')
+        assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'animal-reorg', JSON.stringify(r.interaction))
+        assert.equal(r.interaction.playerIndex, 0)
+        const pasture = r.interaction.request.zones.find(zone => zone.id === 'p0')
+        assert.ok(pasture)
+        assert.deepEqual([pasture.animalType, pasture.animalCount, pasture.capacity], ['cattle', 1, 2])
+        r = ok(s.resolveChoice(0, 'confirm', { zones: r.interaction.request.zones }))
+      }
+      for (const actual of [r, s.getState()]) {
+        assert.equal(actual.interaction.stateId, 'idle')
+        assert.equal(actual.state.currentPlayerIndex, 0)
+        assert.equal(actual.state.roundPhase, 'work')
+        assert.equal(actual.state.round, 8)
+        assert.deepEqual(actual.state.players[0]!.resources, { wood: 0, clay: 1, reed: 0, stone: 0, food: played ? 53 : 56, grain: 1, vegetable: 0, sheep: 0, boar: 0, cattle: played ? 1 : 0, begging: 0 })
+        assert.deepEqual(actual.state.players.map(player => player.resources.cattle), played ? [1, 0, 0, 0] : [0, 0, 0, 0])
+      }
+      assertAnimalPlacement(s, r, [0, 0, played ? 1 : 0], played ? [{ id: 'p0', animalType: 'cattle', animalCount: 1, capacity: 2 }] : [])
+      save(`A166-N1-7-${played}`, r)
+    }
   })
   it("decline unaffordable hand and nonharvest cannot grant cattle", () => {
     const { pending: declineOffer, r: declined } = end(phaseSetup(4, 1), false)
