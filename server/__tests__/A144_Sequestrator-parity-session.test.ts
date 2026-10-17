@@ -256,6 +256,8 @@ describe("A144 command boundaries", () => {
       if (actor === 1)
         assert.equal(r.state.players[0]!.resources.clay, 0)
       assert.deepEqual(store(r), [3, 0])
+      for (const actual of [r, s.getState()])
+        assert.deepEqual(actual.state.players.map(player => player.resources.clay), actor === 0 ? [4, 0, 0] : [0, 4, 0])
       save(`A144-N2-${actor}`, r)
     }
   })
